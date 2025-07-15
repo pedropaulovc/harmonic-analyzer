@@ -1,0 +1,3 @@
+[submodule "refs"]
+	path = refs
+	url = https://github.com/pedropaulovc/harmonic-analyzer-references.git
