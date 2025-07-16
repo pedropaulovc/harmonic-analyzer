@@ -1,0 +1,102 @@
+{
+  "model": "PM-728VT",
+  "type": "Bench Type Mill",
+  "country_of_origin": "Taiwan",
+  "spindle": {
+    "taper": "R8",
+    "to_table_max": "16.25 in",
+    "to_column_distance": "8.5 in",
+    "quill_travel": "3 in",
+    "quill_diameter": "2.362 in"
+  },
+  "travels": {
+    "x": "19 in",
+    "y": "10 in",
+    "z": "16 in"
+  },
+  "table": {
+    "length": "28 in",
+    "width": "7 in",
+    "t_slot_size": "1/2 in",
+    "dial_graduations": "0.001 in",
+    "leadscrew_pitch": "10 TPI (0.100 in per turn)",
+    "min_height": "8.5 in"
+  },
+  "motor": {
+    "type": "DC Brushless",
+    "horsepower": "1 HP",
+    "voltage": "110V",
+    "amperage": "20A",
+    "phase": "1PH",
+    "frequency": "60Hz",
+    "plug": "NEMA 5-15P",
+    "drive_type": "Belt",
+    "speed_range": {
+      "min": "75 RPM",
+      "max": "4000 RPM"
+    }
+  },
+  "features": {
+    "head_tilt": "±90° with worm gear tramming",
+    "drawbar_thread": "7/16-20",
+    "column_attachment": "4-bolt with rigid mounting",
+    "thrust_bearings": true,
+    "split_nuts": true,
+    "quill_dro": true,
+    "spindle_lock": true
+  },
+  "cutting_capacity": {
+    "max_drilling": "0.75 in",
+    "max_end_milling": "1 in",
+    "max_face_milling": "3 in"
+  },
+  "dimensions": {
+    "unit_length": "30 in",
+    "unit_width": "29 in",
+    "unit_height": "39 in",
+    "weight": "410 lb",
+    "shipping": {
+      "length": "34 in",
+      "width": "34 in",
+      "height": "42 in",
+      "weight": "440 lb",
+      "class": "SC-F20LE",
+      "liftgate_eligible": true
+    },
+    "footprint": {
+      "depth": "30 in",
+      "width": "41 in",
+      "height": "44.5 in",
+      "height_on_stand": "76.5 in",
+      "working_height_no_stand": "36 in"
+    },
+    "chip_tray": {
+      "width": "21.5 in",
+      "depth": "24.75 in"
+    },
+    "mounting_pattern": {
+      "width": "10.125 in",
+      "depth": "17.5 in",
+      "hole_diameter": "0.5 in"
+    },
+    "base_casting": {
+      "depth": "20.75 in",
+      "width": "12.5 in",
+      "height_at_mounting": "3.25 in"
+    }
+  },
+  "standard_accessories": [
+    "Chip tray",
+    "Brushless motor with belt drive",
+    "Way cover set",
+    "Drawbar",
+    "R8 spindle taper",
+    "Quill/spindle depth DRO",
+    "Spindle locking wrench"
+  ],
+  "optional_accessories": [
+    "Stand with leveling feet",
+    "3-axis DRO (MX-100M or MX-200M)"
+  ],
+  "hs_code": "8459.69"
+}
