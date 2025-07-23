@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
+    <StartProgram>"C:\Program Files\Dassault Systemes\SOLIDWORKS 3DEXPERIENCE\win_b64\code\bin\CATSTART.exe" -run "SWXDesktopLauncher.exe" -object "--AppName=\"SWXCSWK_AP\" -tenant=OI000387486  -monoapp -3DRegistryURL=https://eu1-makers-registry.3dexperience.3ds.com" -nowindow</StartProgram>
+    <StartAction>Project</StartAction>
+  </PropertyGroup>
+</Project>
