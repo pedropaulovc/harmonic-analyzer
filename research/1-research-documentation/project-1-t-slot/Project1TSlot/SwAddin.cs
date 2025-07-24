@@ -709,10 +709,11 @@ namespace Project1TSlot
                 iSwApp.SendMsgToUser("  Inserting sketch for hole...");
                 swSketchMgr.InsertSketch(true);
 
-                // Create circle for bolt hole - M12 clearance hole (13mm diameter)
-                // Position at center of the slot body: X=0 (centered), Z=0.0115 (11.5mm up from T-nut head center)
-                iSwApp.SendMsgToUser("  Creating circle 13mm diameter at Z=11.5mm...");
-                swSketchMgr.CreateCircleByRadius(0, 0.0115, 0, 0.0065);  // 13mm diameter hole, centered at Z=11.5mm
+                // Create circle for bolt hole - M6 clearance hole (7mm diameter fits in 7mm slot)
+                // Position at center of the slot body on Top Plane: X=0 (centered), Y=0.0115 (11.5mm from origin)
+                // The slot body goes from Y=4mm to Y=19mm, so center is at Y=11.5mm
+                iSwApp.SendMsgToUser("  Creating circle 6mm diameter at Y=11.5mm...");
+                swSketchMgr.CreateCircleByRadius(0, 0.0115, 0, 0.003);  // 6mm diameter hole for M6 bolt
 
                 // Exit sketch
                 iSwApp.SendMsgToUser("  Exiting hole sketch...");
