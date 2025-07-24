@@ -1,77 +1,124 @@
-﻿using System;
-using SolidWorks.Interop.sldworks;
+﻿using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
+using SolidWorks.Interop.swpublished;
+using SolidWorksTools;
+using SolidWorksTools.File;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Reflection;
+using System.Runtime.InteropServices;
 
-/// <summary>
-/// Creates a T-nut that fits PM-30MV milling machine with 14mm T-slots
-/// Based on forum information: T-slots are 14mm wide, 9/16" bolts work in center slots
-/// </summary>
-public class CreateTNut_PM30MV
+namespace Project1TSlot
 {
-    private ISldWorks swApp;
-    private IModelDoc2 swModel;
-    private IPartDoc swPart;
-    private ISketchManager swSketchMgr;
-    private IFeatureManager swFeatMgr;
-
-    public CreateTNut_PM30MV(ISldWorks solidWorksApp)
-    {
-        swApp = solidWorksApp;
-    }
-
     /// <summary>
-    /// Creates a T-nut part for PM-30MV milling machine
-    /// Dimensions based on 14mm T-slot width and standard T-nut proportions
+    /// SolidWorks Add-in for creating T-nuts that fit PM-30MV milling machine with 14mm T-slots
+    /// Based on forum information: T-slots are 14mm wide, 9/16" bolts work in center slots
     /// </summary>
-    public bool CreateTNutPart()
-    {
-        try
-        {
-            // Create new part document
-            swModel = swApp.NewDocument(@"C:\ProgramData\SOLIDWORKS\SOLIDWORKS 2024\templates\prt.prtdot",
-                                      (int)swDwgPaperSizes_e.swDwgPaperA0size, 0.0, 0.0);
+    [Guid("a4e2f3b8-6c7d-4a5e-9f8b-2c1d3e4f5a6b"), ComVisible(true)]
+    [SwAddin(
+        Description = "T-Nut Creator for PM-30MV - Creates custom T-nuts for 14mm T-slots",
+        Title = "PM-30MV T-Nut Creator",
+        LoadAtStartup = true
+        )]
+    public class CreateTNut_PM30MV : ISwAddin
+{
+        #region Local Variables
+        ISldWorks iSwApp = null;
+        ICommandManager iCmdMgr = null;
+        int addinID = 0;
+        BitmapHandler iBmp;
+        int registerID;
 
-            if (swModel == null)
+        public const int mainCmdGroupID = 5;
+        public const int tnutItemID = 0;
+        public const int flyoutGroupID = 91;
+
+        string[] mainIcons = new string[6];
+        string[] icons = new string[6];
+
+        #region Event Handler Variables
+        Hashtable openDocs = new Hashtable();
+        SolidWorks.Interop.sldworks.SldWorks SwEventPtr = null;
+        #endregion
+
+        // Public Properties
+        public ISldWorks SwApp
+        {
+            get { return iSwApp; }
+        }
+        public ICommandManager CmdMgr
+        {
+            get { return iCmdMgr; }
+        }
+
+        public Hashtable OpenDocs
+        {
+            get { return openDocs; }
+        }
+        #endregion
+
+        /// <summary>
+        /// Creates a T-nut part for PM-30MV milling machine
+        /// Dimensions based on 14mm T-slot width and standard T-nut proportions
+        /// </summary>
+        public bool CreateTNutPart()
+        {
+            try
             {
-                Console.WriteLine("Failed to create new part document");
+                // Get part template from user preferences
+                string partTemplate = iSwApp.GetUserPreferenceStringValue((int)swUserPreferenceStringValue_e.swDefaultTemplatePart);
+                if (string.IsNullOrEmpty(partTemplate))
+                {
+                    System.Windows.Forms.MessageBox.Show("No part template found. Please set a default part template in SolidWorks options.");
+                    return false;
+                }
+
+                // Create new part document
+                IModelDoc2 swModel = iSwApp.NewDocument(partTemplate, (int)swDwgPaperSizes_e.swDwgPaperA0size, 0.0, 0.0);
+
+                if (swModel == null)
+                {
+                    System.Windows.Forms.MessageBox.Show("Failed to create new part document");
+                    return false;
+                }
+
+                IPartDoc swPart = (IPartDoc)swModel;
+                ISketchManager swSketchMgr = swModel.SketchManager;
+                IFeatureManager swFeatMgr = swModel.FeatureManager;
+
+                // Set units to millimeters
+                swModel.Extension.SetUserPreferenceInteger((int)swUserPreferenceIntegerValue_e.swUnitSystem,
+                                                         (int)swUserPreferenceOption_e.swDetailingNoOptionSpecified,
+                                                         (int)swUnitSystem_e.swUnitSystem_MMGS);
+
+                // Create T-nut geometry
+                if (!CreateTNutHead(swModel, swSketchMgr, swFeatMgr)) return false;
+                if (!CreateTNutSlot(swModel, swSketchMgr, swFeatMgr)) return false;
+                if (!CreateThreadHole(swModel, swSketchMgr, swFeatMgr)) return false;
+
+                // Rebuild the model
+                swModel.EditRebuild3();
+
+                System.Windows.Forms.MessageBox.Show("T-nut for PM-30MV created successfully!\n\nSpecifications:\n- Head: 13.5mm x 8mm x 6mm (fits 14mm T-slot)\n- Body: 7mm x 15mm x 6mm\n- Bolt hole: 13mm diameter (M12 clearance)\n- Compatible with PM-30MV milling machine T-slots", "T-Nut Creator");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Windows.Forms.MessageBox.Show($"Error creating T-nut: {ex.Message}", "T-Nut Creator Error");
                 return false;
             }
-
-            swPart = (IPartDoc)swModel;
-            swSketchMgr = swModel.SketchManager;
-            swFeatMgr = swModel.FeatureManager;
-
-            // Set units to millimeters
-            swModel.Extension.SetUserPreferenceInteger((int)swUserPreferenceIntegerValue_e.swUnitSystem,
-                                                     (int)swUserPreferenceOption_e.swDetailingNoOptionSpecified,
-                                                     (int)swUnitSystem_e.swUnitSystem_MMGS);
-
-            // Create T-nut geometry
-            if (!CreateTNutHead()) return false;
-            if (!CreateTNutSlot()) return false;
-            if (!CreateThreadHole()) return false;
-
-            // Rebuild the model
-            swModel.EditRebuild3();
-
-            Console.WriteLine("T-nut for PM-30MV created successfully");
-            return true;
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error creating T-nut: {ex.Message}");
-            return false;
-        }
-    }
 
-    /// <summary>
-    /// Creates the main head of the T-nut (the wide part that sits in the T-slot)
-    /// Dimensions: 14mm slot width, allowing for clearance
-    /// </summary>
-    private bool CreateTNutHead()
-    {
-        try
+        /// <summary>
+        /// Creates the main head of the T-nut (the wide part that sits in the T-slot)
+        /// Dimensions: 14mm slot width, allowing for clearance
+        /// </summary>
+        private bool CreateTNutHead(IModelDoc2 swModel, ISketchManager swSketchMgr, IFeatureManager swFeatMgr)
         {
+            try
+            {
             // Select the front plane for sketching
             bool boolstatus = swModel.Extension.SelectByID2("Front Plane", "PLANE", 0, 0, 0,
                                                           false, 0, null, 0);
@@ -101,21 +148,21 @@ public class CreateTNut_PM30MV
             }
 
             return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating T-nut head: {ex.Message}");
+                return false;
+            }
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error creating T-nut head: {ex.Message}");
-            return false;
-        }
-    }
 
-    /// <summary>
-    /// Creates the slot/body portion of the T-nut (the narrow part that extends upward)
-    /// </summary>
-    private bool CreateTNutSlot()
-    {
-        try
+        /// <summary>
+        /// Creates the slot/body portion of the T-nut (the narrow part that extends upward)
+        /// </summary>
+        private bool CreateTNutSlot(IModelDoc2 swModel, ISketchManager swSketchMgr, IFeatureManager swFeatMgr)
         {
+            try
+            {
             // Select the front face of the head for sketching
             bool boolstatus = swModel.Extension.SelectByID2("", "FACE", 0.00675, 0, 0.003,
                                                           false, 0, null, 0);
@@ -146,22 +193,22 @@ public class CreateTNut_PM30MV
             }
 
             return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating T-nut slot: {ex.Message}");
+                return false;
+            }
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error creating T-nut slot: {ex.Message}");
-            return false;
-        }
-    }
 
-    /// <summary>
-    /// Creates the threaded hole for the bolt (9/16" = 14.29mm diameter hole for tap)
-    /// Creates clearance hole for M14 or 9/16" bolt
-    /// </summary>
-    private bool CreateThreadHole()
-    {
-        try
+        /// <summary>
+        /// Creates the threaded hole for the bolt (9/16" = 14.29mm diameter hole for tap)
+        /// Creates clearance hole for M14 or 9/16" bolt
+        /// </summary>
+        private bool CreateThreadHole(IModelDoc2 swModel, ISketchManager swSketchMgr, IFeatureManager swFeatMgr)
         {
+            try
+            {
             // Select the top face of the slot for sketching
             bool boolstatus = swModel.Extension.SelectByID2("", "FACE", 0, 0.019, 0.003,
                                                           false, 0, null, 0);
@@ -202,56 +249,438 @@ public class CreateTNut_PM30MV
             }
 
             return true;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error creating thread hole: {ex.Message}");
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Main entry point for creating the T-nut
-    /// </summary>
-    public static void Main(string[] args)
-    {
-        try
-        {
-            // Connect to SolidWorks
-            ISldWorks swApp = (ISldWorks)System.Activator.CreateInstance(System.Type.GetTypeFromProgID("SldWorks.Application"));
-
-            if (swApp == null)
+            }
+            catch (Exception ex)
             {
-                Console.WriteLine("Failed to connect to SolidWorks");
-                return;
+                Console.WriteLine($"Error creating thread hole: {ex.Message}");
+                return false;
+            }
+        }
+
+        #region SolidWorks Registration
+        [ComRegisterFunctionAttribute]
+        public static void RegisterFunction(Type t)
+        {
+            #region Get Custom Attribute: SwAddinAttribute
+            SwAddinAttribute SWattr = null;
+            Type type = typeof(CreateTNut_PM30MV);
+
+            foreach (System.Attribute attr in type.GetCustomAttributes(false))
+            {
+                if (attr is SwAddinAttribute)
+                {
+                    SWattr = attr as SwAddinAttribute;
+                    break;
+                }
+            }
+            #endregion
+
+            try
+            {
+                Microsoft.Win32.RegistryKey hklm = Microsoft.Win32.Registry.LocalMachine;
+                Microsoft.Win32.RegistryKey hkcu = Microsoft.Win32.Registry.CurrentUser;
+
+                string keyname = "SOFTWARE\\SolidWorks\\Addins\\{" + t.GUID.ToString() + "}";
+                Microsoft.Win32.RegistryKey addinkey = hklm.CreateSubKey(keyname);
+                addinkey.SetValue(null, 0);
+
+                addinkey.SetValue("Description", SWattr.Description);
+                addinkey.SetValue("Title", SWattr.Title);
+
+                keyname = "Software\\SolidWorks\\AddInsStartup\\{" + t.GUID.ToString() + "}";
+                addinkey = hkcu.CreateSubKey(keyname);
+                addinkey.SetValue(null, Convert.ToInt32(SWattr.LoadAtStartup), Microsoft.Win32.RegistryValueKind.DWord);
+            }
+            catch (System.NullReferenceException nl)
+            {
+                Console.WriteLine("There was a problem registering this dll: SWattr is null. \n\"" + nl.Message + "\"");
+                System.Windows.Forms.MessageBox.Show("There was a problem registering this dll: SWattr is null.\n\"" + nl.Message + "\"");
+            }
+            catch (System.Exception e)
+            {
+                Console.WriteLine(e.Message);
+                System.Windows.Forms.MessageBox.Show("There was a problem registering the function: \n\"" + e.Message + "\"");
+            }
+        }
+
+        [ComUnregisterFunctionAttribute]
+        public static void UnregisterFunction(Type t)
+        {
+            try
+            {
+                Microsoft.Win32.RegistryKey hklm = Microsoft.Win32.Registry.LocalMachine;
+                Microsoft.Win32.RegistryKey hkcu = Microsoft.Win32.Registry.CurrentUser;
+
+                string keyname = "SOFTWARE\\SolidWorks\\Addins\\{" + t.GUID.ToString() + "}";
+                hklm.DeleteSubKey(keyname);
+
+                keyname = "Software\\SolidWorks\\AddInsStartup\\{" + t.GUID.ToString() + "}";
+                hkcu.DeleteSubKey(keyname);
+            }
+            catch (System.NullReferenceException nl)
+            {
+                Console.WriteLine("There was a problem unregistering this dll: " + nl.Message);
+                System.Windows.Forms.MessageBox.Show("There was a problem unregistering this dll: \n\"" + nl.Message + "\"");
+            }
+            catch (System.Exception e)
+            {
+                Console.WriteLine("There was a problem unregistering this dll: " + e.Message);
+                System.Windows.Forms.MessageBox.Show("There was a problem unregistering this dll: \n\"" + e.Message + "\"");
+            }
+        }
+        #endregion
+
+        #region UI Methods
+        public void AddCommandMgr()
+        {
+            ICommandGroup cmdGroup;
+            if (iBmp == null)
+                iBmp = new BitmapHandler();
+            Assembly thisAssembly;
+            int cmdIndex0;
+            string Title = "T-Nut Creator", ToolTip = "Create T-nuts for PM-30MV";
+
+            int[] docTypes = new int[]{(int)swDocumentTypes_e.swDocASSEMBLY,
+                                       (int)swDocumentTypes_e.swDocDRAWING,
+                                       (int)swDocumentTypes_e.swDocPART};
+
+            thisAssembly = System.Reflection.Assembly.GetAssembly(this.GetType());
+
+            int cmdGroupErr = 0;
+            bool ignorePrevious = false;
+
+            object registryIDs;
+            //get the ID information stored in the registry
+            bool getDataResult = iCmdMgr.GetGroupDataFromRegistry(mainCmdGroupID, out registryIDs);
+
+            int[] knownIDs = new int[1] { tnutItemID };
+
+            if (getDataResult)
+            {
+                if (!CompareIDs((int[])registryIDs, knownIDs)) //if the IDs don't match, reset the commandGroup
+                {
+                    ignorePrevious = true;
+                }
             }
 
-            swApp.Visible = true;
+            cmdGroup = iCmdMgr.CreateCommandGroup2(mainCmdGroupID, Title, ToolTip, "", -1, ignorePrevious, ref cmdGroupErr);
 
-            // Create T-nut
-            CreateTNut_PM30MV tnutCreator = new CreateTNut_PM30MV(swApp);
-            bool success = tnutCreator.CreateTNutPart();
+            // Add default icons (you can customize these later)
+            icons[0] = iBmp.CreateFileFromResourceBitmap("Project1TSlot.toolbar20x.png", thisAssembly);
+            icons[1] = iBmp.CreateFileFromResourceBitmap("Project1TSlot.toolbar32x.png", thisAssembly);
+            icons[2] = iBmp.CreateFileFromResourceBitmap("Project1TSlot.toolbar40x.png", thisAssembly);
+            icons[3] = iBmp.CreateFileFromResourceBitmap("Project1TSlot.toolbar64x.png", thisAssembly);
+            icons[4] = iBmp.CreateFileFromResourceBitmap("Project1TSlot.toolbar96x.png", thisAssembly);
+            icons[5] = iBmp.CreateFileFromResourceBitmap("Project1TSlot.toolbar128x.png", thisAssembly);
 
-            if (success)
+            mainIcons[0] = iBmp.CreateFileFromResourceBitmap("Project1TSlot.mainicon_20.png", thisAssembly);
+            mainIcons[1] = iBmp.CreateFileFromResourceBitmap("Project1TSlot.mainicon_32.png", thisAssembly);
+            mainIcons[2] = iBmp.CreateFileFromResourceBitmap("Project1TSlot.mainicon_40.png", thisAssembly);
+            mainIcons[3] = iBmp.CreateFileFromResourceBitmap("Project1TSlot.mainicon_64.png", thisAssembly);
+            mainIcons[4] = iBmp.CreateFileFromResourceBitmap("Project1TSlot.mainicon_96.png", thisAssembly);
+            mainIcons[5] = iBmp.CreateFileFromResourceBitmap("Project1TSlot.mainicon_128.png", thisAssembly);
+
+            cmdGroup.MainIconList = mainIcons;
+            cmdGroup.IconList = icons;
+
+            int menuToolbarOption = (int)(swCommandItemType_e.swMenuItem | swCommandItemType_e.swToolbarItem);
+            cmdIndex0 = cmdGroup.AddCommandItem2("Create PM-30MV T-Nut", -1, "Create a T-nut for PM-30MV milling machine", "Create T-Nut", 0, "CreateTNut", "", tnutItemID, menuToolbarOption);
+
+            cmdGroup.HasToolbar = true;
+            cmdGroup.HasMenu = true;
+            cmdGroup.Activate();
+
+            bool bResult;
+
+            foreach (int type in docTypes)
             {
-                Console.WriteLine("T-nut creation completed successfully!");
-                Console.WriteLine("T-nut specifications:");
-                Console.WriteLine("- Head: 13.5mm x 8mm x 6mm (fits 14mm T-slot)");
-                Console.WriteLine("- Body: 7mm x 15mm x 6mm");
-                Console.WriteLine("- Bolt hole: 13mm diameter (M12 clearance)");
-                Console.WriteLine("- Compatible with PM-30MV milling machine T-slots");
+                CommandTab cmdTab;
+
+                cmdTab = iCmdMgr.GetCommandTab(type, Title);
+
+                if (cmdTab != null & !getDataResult | ignorePrevious)//if tab exists, but we have ignored the registry info (or changed command group ID), re-create the tab.  Otherwise the ids won't matchup and the tab will be blank
+                {
+                    bool res = iCmdMgr.RemoveCommandTab(cmdTab);
+                    cmdTab = null;
+                }
+
+                //if cmdTab is null, must be first load (possibly after reset), add the commands to the tabs
+                if (cmdTab == null)
+                {
+                    cmdTab = iCmdMgr.AddCommandTab(type, Title);
+
+                    CommandTabBox cmdBox = cmdTab.AddCommandTabBox();
+
+                    int[] cmdIDs = new int[1];
+                    int[] TextType = new int[1];
+
+                    cmdIDs[0] = cmdGroup.get_CommandID(cmdIndex0);
+                    TextType[0] = (int)swCommandTabButtonTextDisplay_e.swCommandTabButton_TextHorizontal;
+
+                    bResult = cmdBox.AddCommands(cmdIDs, TextType);
+                }
+            }
+
+            thisAssembly = null;
+        }
+
+        public void RemoveCommandMgr()
+        {
+            iBmp.Dispose();
+            iCmdMgr.RemoveCommandGroup(mainCmdGroupID);
+        }
+
+        public bool CompareIDs(int[] storedIDs, int[] addinIDs)
+        {
+            List<int> storedList = new List<int>(storedIDs);
+            List<int> addinList = new List<int>(addinIDs);
+
+            addinList.Sort();
+            storedList.Sort();
+
+            if (addinList.Count != storedList.Count)
+            {
+                return false;
             }
             else
             {
-                Console.WriteLine("T-nut creation failed. Check error messages above.");
+                for (int i = 0; i < addinList.Count; i++)
+                {
+                    if (addinList[i] != storedList[i])
+                    {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+        #endregion
+
+        #region UI Callbacks
+        public void CreateTNut()
+        {
+            try
+            {
+                CreateTNutPart();
+            }
+            catch (Exception ex)
+            {
+                System.Windows.Forms.MessageBox.Show($"Error creating T-nut: {ex.Message}", "T-Nut Creator Error");
             }
         }
-        catch (Exception ex)
+        #endregion
+
+        #region Event Methods
+        public bool AttachEventHandlers()
         {
-            Console.WriteLine($"Application error: {ex.Message}");
+            AttachSwEvents();
+            //Listen for events on all currently open docs
+            AttachEventsToAllDocuments();
+            return true;
         }
 
-        Console.WriteLine("Press any key to exit...");
-        Console.ReadKey();
+        private bool AttachSwEvents()
+        {
+            try
+            {
+                SwEventPtr.ActiveDocChangeNotify += new DSldWorksEvents_ActiveDocChangeNotifyEventHandler(OnDocChange);
+                SwEventPtr.DocumentLoadNotify2 += new DSldWorksEvents_DocumentLoadNotify2EventHandler(OnDocLoad);
+                SwEventPtr.FileNewNotify2 += new DSldWorksEvents_FileNewNotify2EventHandler(OnFileNew);
+                SwEventPtr.ActiveModelDocChangeNotify += new DSldWorksEvents_ActiveModelDocChangeNotifyEventHandler(OnModelChange);
+                SwEventPtr.FileOpenPostNotify += new DSldWorksEvents_FileOpenPostNotifyEventHandler(FileOpenPostNotify);
+                return true;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return false;
+            }
+        }
+
+        private bool DetachSwEvents()
+        {
+            try
+            {
+                SwEventPtr.ActiveDocChangeNotify -= new DSldWorksEvents_ActiveDocChangeNotifyEventHandler(OnDocChange);
+                SwEventPtr.DocumentLoadNotify2 -= new DSldWorksEvents_DocumentLoadNotify2EventHandler(OnDocLoad);
+                SwEventPtr.FileNewNotify2 -= new DSldWorksEvents_FileNewNotify2EventHandler(OnFileNew);
+                SwEventPtr.ActiveModelDocChangeNotify -= new DSldWorksEvents_ActiveModelDocChangeNotifyEventHandler(OnModelChange);
+                SwEventPtr.FileOpenPostNotify -= new DSldWorksEvents_FileOpenPostNotifyEventHandler(FileOpenPostNotify);
+                return true;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return false;
+            }
+        }
+
+        public void AttachEventsToAllDocuments()
+        {
+            ModelDoc2 modDoc = (ModelDoc2)iSwApp.GetFirstDocument();
+            while (modDoc != null)
+            {
+                if (!openDocs.Contains(modDoc))
+                {
+                    AttachModelDocEventHandler(modDoc);
+                }
+                else if (openDocs.Contains(modDoc))
+                {
+                    bool connected = false;
+                    DocumentEventHandler docHandler = (DocumentEventHandler)openDocs[modDoc];
+                    if (docHandler != null)
+                    {
+                        connected = docHandler.ConnectModelViews();
+                    }
+                }
+
+                modDoc = (ModelDoc2)modDoc.GetNext();
+            }
+        }
+
+        public bool AttachModelDocEventHandler(ModelDoc2 modDoc)
+        {
+            if (modDoc == null)
+                return false;
+
+            DocumentEventHandler docHandler = null;
+
+            if (!openDocs.Contains(modDoc))
+            {
+                switch (modDoc.GetType())
+                {
+                    case (int)swDocumentTypes_e.swDocPART:
+                        {
+                            docHandler = new PartEventHandler(modDoc, this);
+                            break;
+                        }
+                    case (int)swDocumentTypes_e.swDocASSEMBLY:
+                        {
+                            docHandler = new AssemblyEventHandler(modDoc, this);
+                            break;
+                        }
+                    case (int)swDocumentTypes_e.swDocDRAWING:
+                        {
+                            docHandler = new DrawingEventHandler(modDoc, this);
+                            break;
+                        }
+                    default:
+                        {
+                            return false; //Unsupported document type
+                        }
+                }
+                docHandler.AttachEventHandlers();
+                openDocs.Add(modDoc, docHandler);
+            }
+            return true;
+        }
+
+        public bool DetachModelEventHandler(ModelDoc2 modDoc)
+        {
+            DocumentEventHandler docHandler;
+            docHandler = (DocumentEventHandler)openDocs[modDoc];
+            openDocs.Remove(modDoc);
+            modDoc = null;
+            docHandler = null;
+            return true;
+        }
+
+        public bool DetachEventHandlers()
+        {
+            DetachSwEvents();
+
+            //Close events on all currently open docs
+            DocumentEventHandler docHandler;
+            int numKeys = openDocs.Count;
+            object[] keys = new Object[numKeys];
+
+            //Remove all document event handlers
+            openDocs.Keys.CopyTo(keys, 0);
+            foreach (ModelDoc2 key in keys)
+            {
+                docHandler = (DocumentEventHandler)openDocs[key];
+                docHandler.DetachEventHandlers(); //This also removes the pair from the hash
+                docHandler = null;
+            }
+            return true;
+        }
+        #endregion
+
+        #region Event Handlers
+        //Events
+        public int OnDocChange()
+        {
+            return 0;
+        }
+
+        public int OnDocLoad(string docTitle, string docPath)
+        {
+            return 0;
+        }
+
+        int FileOpenPostNotify(string FileName)
+        {
+            AttachEventsToAllDocuments();
+            return 0;
+        }
+
+        public int OnFileNew(object newDoc, int docType, string templateName)
+        {
+            AttachEventsToAllDocuments();
+            return 0;
+        }
+
+        public int OnModelChange()
+        {
+            return 0;
+        }
+        #endregion
+
+        #region ISwAddin Implementation
+        public CreateTNut_PM30MV()
+        {
+        }
+
+        public bool ConnectToSW(object ThisSW, int cookie)
+        {
+            iSwApp = (ISldWorks)ThisSW;
+            addinID = cookie;
+
+            //Setup callbacks
+            iSwApp.SetAddinCallbackInfo(0, this, addinID);
+
+            #region Setup the Command Manager
+            iCmdMgr = iSwApp.GetCommandManager(cookie);
+            AddCommandMgr();
+            #endregion
+
+            #region Setup the Event Handlers
+            SwEventPtr = (SolidWorks.Interop.sldworks.SldWorks)iSwApp;
+            openDocs = new Hashtable();
+            AttachEventHandlers();
+            #endregion
+
+            return true;
+        }
+
+        public bool DisconnectFromSW()
+        {
+            RemoveCommandMgr();
+            DetachEventHandlers();
+
+            System.Runtime.InteropServices.Marshal.ReleaseComObject(iCmdMgr);
+            iCmdMgr = null;
+            System.Runtime.InteropServices.Marshal.ReleaseComObject(iSwApp);
+            iSwApp = null;
+            //The addin _must_ call GC.Collect() here in order to retrieve all managed code pointers 
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+
+            return true;
+        }
+        #endregion
     }
 }
