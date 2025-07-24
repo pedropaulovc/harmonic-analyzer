@@ -695,13 +695,13 @@ namespace Project1TSlot
         {
             try
             {
-                // Select the Front Plane for sketching the hole (same as the other sketches)
-                iSwApp.SendMsgToUser("  Selecting Front Plane for hole...");
-                bool boolstatus = swModel.Extension.SelectByID2("Front Plane", "PLANE", 0, 0, 0,
+                // Select the Top Plane for sketching the hole (to drill down through the T-nut)
+                iSwApp.SendMsgToUser("  Selecting Top Plane for hole...");
+                bool boolstatus = swModel.Extension.SelectByID2("Top Plane", "PLANE", 0, 0, 0,
                                                               false, 0, null, 0);
                 if (!boolstatus)
                 {
-                    iSwApp.SendMsgToUser("  FAILED: Could not select Front Plane for hole");
+                    iSwApp.SendMsgToUser("  FAILED: Could not select Top Plane for hole");
                     return false;
                 }
 
@@ -710,18 +710,18 @@ namespace Project1TSlot
                 swSketchMgr.InsertSketch(true);
 
                 // Create circle for bolt hole - M12 clearance hole (13mm diameter)
-                // Position at center of the slot body, centered horizontally and vertically in the slot
-                iSwApp.SendMsgToUser("  Creating circle 13mm diameter at Y=11.5mm...");
-                swSketchMgr.CreateCircleByRadius(0, 0.0115, 0, 0.0065);  // 13mm diameter hole, centered at Y=11.5mm
+                // Position at center of the slot body: X=0 (centered), Z=0.0115 (11.5mm up from T-nut head center)
+                iSwApp.SendMsgToUser("  Creating circle 13mm diameter at Z=11.5mm...");
+                swSketchMgr.CreateCircleByRadius(0, 0.0115, 0, 0.0065);  // 13mm diameter hole, centered at Z=11.5mm
 
                 // Exit sketch
                 iSwApp.SendMsgToUser("  Exiting hole sketch...");
                 swSketchMgr.InsertSketch(true);
 
-                // Create cut extrude to create the hole (through all in both directions)
+                // Create cut extrude to create the hole (through all downward)
                 iSwApp.SendMsgToUser("  Creating cut feature (through all)...");
                 IFeature holeFeature = swFeatMgr.FeatureCut4(true, false, false, 
-                    (int)swEndConditions_e.swEndCondThroughAll, (int)swEndConditions_e.swEndCondThroughAll,
+                    (int)swEndConditions_e.swEndCondThroughAll, (int)swEndConditions_e.swEndCondBlind,
                     0.0, 0.0, false, false, false, false, 0.0, 0.0, false, false, false, false, false, true, true, true, false, false, 
                     (int)swStartConditions_e.swStartSketchPlane, 0.0, false, false);
 
