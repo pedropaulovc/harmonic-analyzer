@@ -522,6 +522,7 @@ namespace Project1TSlot
         {
             try
             {
+                iSwApp.SendMsgToUser("Creating T-nut for PM-30MV...");
                 // Get part template from user preferences
                 string partTemplate = iSwApp.GetUserPreferenceStringValue((int)swUserPreferenceStringValue_e.swDefaultTemplatePart);
                 if (string.IsNullOrEmpty(partTemplate))
@@ -579,7 +580,7 @@ namespace Project1TSlot
                                                               false, 0, null, 0);
                 if (!boolstatus)
                 {
-                    Console.WriteLine("Failed to select Front Plane");
+                    iSwApp.SendMsgToUser("Failed to select Front Plane for T-nut head");
                     return false;
                 }
 
@@ -601,7 +602,7 @@ namespace Project1TSlot
 
                 if (headFeature == null)
                 {
-                    Console.WriteLine("Failed to create T-nut head extrude");
+                    iSwApp.SendMsgToUser("Failed to create T-nut head extrude");
                     return false;
                 }
 
@@ -609,7 +610,7 @@ namespace Project1TSlot
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error creating T-nut head: {ex.Message}");
+                iSwApp.SendMsgToUser($"Error creating T-nut head: {ex.Message}");
                 return false;
             }
         }
@@ -626,7 +627,7 @@ namespace Project1TSlot
                                                               false, 0, null, 0);
                 if (!boolstatus)
                 {
-                    Console.WriteLine("Failed to select Front Plane for slot");
+                    iSwApp.SendMsgToUser("Failed to select Front Plane for slot");
                     return false;
                 }
 
@@ -648,7 +649,7 @@ namespace Project1TSlot
 
                 if (slotFeature == null)
                 {
-                    Console.WriteLine("Failed to create T-nut slot extrude");
+                    iSwApp.SendMsgToUser("Failed to create T-nut slot extrude");
                     return false;
                 }
 
@@ -656,7 +657,7 @@ namespace Project1TSlot
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error creating T-nut slot: {ex.Message}");
+                iSwApp.SendMsgToUser($"Error creating T-nut slot: {ex.Message}");
                 return false;
             }
         }
@@ -674,7 +675,7 @@ namespace Project1TSlot
                                                               false, 0, null, 0);
                 if (!boolstatus)
                 {
-                    Console.WriteLine("Failed to select Top Plane for hole");
+                    iSwApp.SendMsgToUser("Failed to select Top Plane for hole");
                     return false;
                 }
 
@@ -696,7 +697,7 @@ namespace Project1TSlot
 
                 if (holeFeature == null)
                 {
-                    Console.WriteLine("Failed to create bolt hole");
+                    iSwApp.SendMsgToUser("Failed to create bolt hole");
                     return false;
                 }
 
@@ -704,7 +705,7 @@ namespace Project1TSlot
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error creating thread hole: {ex.Message}");
+                iSwApp.SendMsgToUser($"Error creating thread hole: {ex.Message}");
                 return false;
             }
         }
