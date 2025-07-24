@@ -523,8 +523,11 @@ namespace Project1TSlot
             try
             {
                 iSwApp.SendMsgToUser("Creating T-nut for PM-30MV...");
+                
                 // Get part template from user preferences
                 string partTemplate = iSwApp.GetUserPreferenceStringValue((int)swUserPreferenceStringValue_e.swDefaultTemplatePart);
+                iSwApp.SendMsgToUser($"Using part template: {partTemplate}");
+                
                 if (string.IsNullOrEmpty(partTemplate))
                 {
                     System.Windows.Forms.MessageBox.Show("No part template found. Please set a default part template in SolidWorks options.");
@@ -532,6 +535,7 @@ namespace Project1TSlot
                 }
 
                 // Create new part document
+                iSwApp.SendMsgToUser("Creating new part document...");
                 IModelDoc2 swModel = iSwApp.NewDocument(partTemplate, (int)swDwgPaperSizes_e.swDwgPaperA0size, 0.0, 0.0);
 
                 if (swModel == null)
@@ -545,24 +549,33 @@ namespace Project1TSlot
                 IFeatureManager swFeatMgr = swModel.FeatureManager;
 
                 // Set units to millimeters
+                iSwApp.SendMsgToUser("Setting units to millimeters...");
                 swModel.Extension.SetUserPreferenceInteger((int)swUserPreferenceIntegerValue_e.swUnitSystem,
                                                          (int)swUserPreferenceOption_e.swDetailingNoOptionSpecified,
                                                          (int)swUnitSystem_e.swUnitSystem_MMGS);
 
                 // Create T-nut geometry
+                iSwApp.SendMsgToUser("Step 1: Creating T-nut head...");
                 if (!CreateTNutHead(swModel, swSketchMgr, swFeatMgr)) return false;
+                
+                iSwApp.SendMsgToUser("Step 2: Creating T-nut slot...");
                 if (!CreateTNutSlot(swModel, swSketchMgr, swFeatMgr)) return false;
+                
+                iSwApp.SendMsgToUser("Step 3: Creating thread hole...");
                 if (!CreateThreadHole(swModel, swSketchMgr, swFeatMgr)) return false;
 
                 // Rebuild the model
+                iSwApp.SendMsgToUser("Rebuilding model...");
                 swModel.EditRebuild3();
 
+                iSwApp.SendMsgToUser("T-nut creation completed successfully!");
                 System.Windows.Forms.MessageBox.Show("T-nut for PM-30MV created successfully!\n\nSpecifications:\n- Head: 13.5mm x 8mm x 6mm (fits 14mm T-slot)\n- Body: 7mm x 15mm x 6mm\n- Bolt hole: 13mm diameter (M12 clearance)\n- Compatible with PM-30MV milling machine T-slots", "T-Nut Creator");
                 return true;
             }
             catch (Exception ex)
             {
-                System.Windows.Forms.MessageBox.Show($"Error creating T-nut: {ex.Message}", "T-Nut Creator Error");
+                iSwApp.SendMsgToUser($"EXCEPTION in CreateTNutPart: {ex.Message}");
+                System.Windows.Forms.MessageBox.Show($"Error creating T-nut: {ex.Message}\n\nStack trace: {ex.StackTrace}", "T-Nut Creator Error");
                 return false;
             }
         }
@@ -576,25 +589,30 @@ namespace Project1TSlot
             try
             {
                 // Select the front plane for sketching
+                iSwApp.SendMsgToUser("  Selecting Front Plane for head...");
                 bool boolstatus = swModel.Extension.SelectByID2("Front Plane", "PLANE", 0, 0, 0,
                                                               false, 0, null, 0);
                 if (!boolstatus)
                 {
-                    iSwApp.SendMsgToUser("Failed to select Front Plane for T-nut head");
+                    iSwApp.SendMsgToUser("  FAILED: Could not select Front Plane for T-nut head");
                     return false;
                 }
 
                 // Insert sketch
+                iSwApp.SendMsgToUser("  Inserting sketch for head...");
                 swSketchMgr.InsertSketch(true);
 
                 // Create rectangle for T-nut head (13.5mm wide to fit in 14mm slot with clearance)
                 // Height: 8mm (standard T-nut proportion)
+                iSwApp.SendMsgToUser("  Creating rectangle 13.5mm x 8mm...");
                 swSketchMgr.CreateCornerRectangle(-0.00675, -0.004, 0, 0.00675, 0.004, 0);  // 13.5mm x 8mm
 
                 // Exit sketch
+                iSwApp.SendMsgToUser("  Exiting sketch...");
                 swSketchMgr.InsertSketch(true);
 
                 // Create extrude feature for head (6mm thick)
+                iSwApp.SendMsgToUser("  Creating extrude feature 6mm thick...");
                 IFeature headFeature = swFeatMgr.FeatureExtrusion2(true, false, false, 
                     (int)swEndConditions_e.swEndCondBlind, (int)swEndConditions_e.swEndCondBlind, 
                     0.006, 0.0, false, false, false, false, 0.0, 0.0, false, false, false, false, true, true, true, 
@@ -602,15 +620,16 @@ namespace Project1TSlot
 
                 if (headFeature == null)
                 {
-                    iSwApp.SendMsgToUser("Failed to create T-nut head extrude");
+                    iSwApp.SendMsgToUser("  FAILED: FeatureExtrusion2 returned null for head");
                     return false;
                 }
 
+                iSwApp.SendMsgToUser("  Head created successfully!");
                 return true;
             }
             catch (Exception ex)
             {
-                iSwApp.SendMsgToUser($"Error creating T-nut head: {ex.Message}");
+                iSwApp.SendMsgToUser($"  EXCEPTION in CreateTNutHead: {ex.Message}");
                 return false;
             }
         }
@@ -623,25 +642,30 @@ namespace Project1TSlot
             try
             {
                 // Select the Front Plane for sketching the slot body
+                iSwApp.SendMsgToUser("  Selecting Front Plane for slot...");
                 bool boolstatus = swModel.Extension.SelectByID2("Front Plane", "PLANE", 0, 0, 0,
                                                               false, 0, null, 0);
                 if (!boolstatus)
                 {
-                    iSwApp.SendMsgToUser("Failed to select Front Plane for slot");
+                    iSwApp.SendMsgToUser("  FAILED: Could not select Front Plane for slot");
                     return false;
                 }
 
                 // Insert sketch
+                iSwApp.SendMsgToUser("  Inserting sketch for slot...");
                 swSketchMgr.InsertSketch(true);
 
                 // Create rectangle for T-nut slot body (7mm wide x 15mm tall)
                 // This extends above the head to provide gripping surface
+                iSwApp.SendMsgToUser("  Creating rectangle 7mm x 15mm...");
                 swSketchMgr.CreateCornerRectangle(-0.0035, 0.004, 0, 0.0035, 0.019, 0);  // 7mm x 15mm
 
                 // Exit sketch
+                iSwApp.SendMsgToUser("  Exiting slot sketch...");
                 swSketchMgr.InsertSketch(true);
 
                 // Create extrude feature for slot body (6mm thick, same as head)
+                iSwApp.SendMsgToUser("  Creating slot extrude feature 6mm thick...");
                 IFeature slotFeature = swFeatMgr.FeatureExtrusion2(true, false, false, 
                     (int)swEndConditions_e.swEndCondBlind, (int)swEndConditions_e.swEndCondBlind, 
                     0.006, 0.0, false, false, false, false, 0.0, 0.0, false, false, false, false, true, true, true, 
@@ -649,15 +673,16 @@ namespace Project1TSlot
 
                 if (slotFeature == null)
                 {
-                    iSwApp.SendMsgToUser("Failed to create T-nut slot extrude");
+                    iSwApp.SendMsgToUser("  FAILED: FeatureExtrusion2 returned null for slot");
                     return false;
                 }
 
+                iSwApp.SendMsgToUser("  Slot created successfully!");
                 return true;
             }
             catch (Exception ex)
             {
-                iSwApp.SendMsgToUser($"Error creating T-nut slot: {ex.Message}");
+                iSwApp.SendMsgToUser($"  EXCEPTION in CreateTNutSlot: {ex.Message}");
                 return false;
             }
         }
@@ -671,25 +696,30 @@ namespace Project1TSlot
             try
             {
                 // Select the Front Plane for sketching the hole (same as the other sketches)
+                iSwApp.SendMsgToUser("  Selecting Front Plane for hole...");
                 bool boolstatus = swModel.Extension.SelectByID2("Front Plane", "PLANE", 0, 0, 0,
                                                               false, 0, null, 0);
                 if (!boolstatus)
                 {
-                    iSwApp.SendMsgToUser("Failed to select Front Plane for hole");
+                    iSwApp.SendMsgToUser("  FAILED: Could not select Front Plane for hole");
                     return false;
                 }
 
                 // Insert sketch
+                iSwApp.SendMsgToUser("  Inserting sketch for hole...");
                 swSketchMgr.InsertSketch(true);
 
                 // Create circle for bolt hole - M12 clearance hole (13mm diameter)
                 // Position at center of the slot body, centered horizontally and vertically in the slot
+                iSwApp.SendMsgToUser("  Creating circle 13mm diameter at Y=11.5mm...");
                 swSketchMgr.CreateCircleByRadius(0, 0.0115, 0, 0.0065);  // 13mm diameter hole, centered at Y=11.5mm
 
                 // Exit sketch
+                iSwApp.SendMsgToUser("  Exiting hole sketch...");
                 swSketchMgr.InsertSketch(true);
 
                 // Create cut extrude to create the hole (through all in both directions)
+                iSwApp.SendMsgToUser("  Creating cut feature (through all)...");
                 IFeature holeFeature = swFeatMgr.FeatureCut4(true, false, false, 
                     (int)swEndConditions_e.swEndCondThroughAll, (int)swEndConditions_e.swEndCondThroughAll,
                     0.0, 0.0, false, false, false, false, 0.0, 0.0, false, false, false, false, false, true, true, true, false, false, 
@@ -697,15 +727,21 @@ namespace Project1TSlot
 
                 if (holeFeature == null)
                 {
-                    iSwApp.SendMsgToUser("Failed to create bolt hole");
+                    iSwApp.SendMsgToUser("  FAILED: FeatureCut4 returned null for hole");
+                    
+                    // Try alternative approach - get last error
+                    int lastError = swModel.GetLastError();
+                    iSwApp.SendMsgToUser($"  SolidWorks last error code: {lastError}");
+                    
                     return false;
                 }
 
+                iSwApp.SendMsgToUser("  Hole created successfully!");
                 return true;
             }
             catch (Exception ex)
             {
-                iSwApp.SendMsgToUser($"Error creating thread hole: {ex.Message}");
+                iSwApp.SendMsgToUser($"  EXCEPTION in CreateThreadHole: {ex.Message}");
                 return false;
             }
         }
