@@ -728,11 +728,7 @@ namespace Project1TSlot
                 if (holeFeature == null)
                 {
                     iSwApp.SendMsgToUser("  FAILED: FeatureCut4 returned null for hole");
-                    
-                    // Try alternative approach - get last error
-                    int lastError = iSwApp.GetLastError();
-                    iSwApp.SendMsgToUser($"  SolidWorks last error code: {lastError}");
-                    
+                    iSwApp.SendMsgToUser("  Check: sketch valid, geometry exists, cut parameters correct");
                     return false;
                 }
 
