@@ -594,7 +594,10 @@ namespace Project1TSlot
                 swSketchMgr.InsertSketch(true);
 
                 // Create extrude feature for head (6mm thick)
-                IFeature headFeature = swFeatMgr.SimpleFeatureBossExtrude("Sketch1", 0.006, true);
+                IFeature headFeature = swFeatMgr.FeatureExtrusion2(true, false, false, 
+                    (int)swEndConditions_e.swEndCondBlind, (int)swEndConditions_e.swEndCondBlind, 
+                    0.006, 0.0, false, false, false, false, 0.0, 0.0, false, false, false, false, true, true, true, 
+                    (int)swStartConditions_e.swStartSketchPlane, 0.0, false);
 
                 if (headFeature == null)
                 {
@@ -618,14 +621,13 @@ namespace Project1TSlot
         {
             try
             {
-                // Select the front face of the head for sketching
-                bool boolstatus = swModel.Extension.SelectByID2("", "FACE", 0.00675, 0, 0.003,
+                // Select the Front Plane for sketching the slot body
+                bool boolstatus = swModel.Extension.SelectByID2("Front Plane", "PLANE", 0, 0, 0,
                                                               false, 0, null, 0);
                 if (!boolstatus)
                 {
-                    // Try alternative selection method - select Front Plane again
-                    boolstatus = swModel.Extension.SelectByID2("Front Plane", "PLANE", 0, 0, 0,
-                                                             false, 0, null, 0);
+                    Console.WriteLine("Failed to select Front Plane for slot");
+                    return false;
                 }
 
                 // Insert sketch
@@ -639,7 +641,10 @@ namespace Project1TSlot
                 swSketchMgr.InsertSketch(true);
 
                 // Create extrude feature for slot body (6mm thick, same as head)
-                IFeature slotFeature = swFeatMgr.SimpleFeatureBossExtrude("Sketch2", 0.006, true);
+                IFeature slotFeature = swFeatMgr.FeatureExtrusion2(true, false, false, 
+                    (int)swEndConditions_e.swEndCondBlind, (int)swEndConditions_e.swEndCondBlind, 
+                    0.006, 0.0, false, false, false, false, 0.0, 0.0, false, false, false, false, true, true, true, 
+                    (int)swStartConditions_e.swStartSketchPlane, 0.0, false);
 
                 if (slotFeature == null)
                 {
@@ -664,14 +669,13 @@ namespace Project1TSlot
         {
             try
             {
-                // Select the top face of the slot for sketching
-                bool boolstatus = swModel.Extension.SelectByID2("", "FACE", 0, 0.019, 0.003,
+                // Select the Top Plane for sketching the hole
+                bool boolstatus = swModel.Extension.SelectByID2("Top Plane", "PLANE", 0, 0, 0,
                                                               false, 0, null, 0);
                 if (!boolstatus)
                 {
-                    // Try alternative - select a plane parallel to the top
-                    boolstatus = swModel.Extension.SelectByID2("Top Plane", "PLANE", 0, 0, 0,
-                                                             false, 0, null, 0);
+                    Console.WriteLine("Failed to select Top Plane for hole");
+                    return false;
                 }
 
                 // Insert sketch
@@ -685,22 +689,15 @@ namespace Project1TSlot
                 swSketchMgr.InsertSketch(true);
 
                 // Create cut extrude to create the hole (through all)
-                // Note: Using FeatureCut with through-all option
-                bool cutResult = swModel.Extension.SelectByID2("Sketch3", "SKETCH", 0, 0, 0,
-                                                             false, 0, null, 0);
+                IFeature holeFeature = swFeatMgr.FeatureCut4(true, false, false, 
+                    (int)swEndConditions_e.swEndCondThroughAll, (int)swEndConditions_e.swEndCondBlind,
+                    0.0, 0.0, false, false, false, false, 0.0, 0.0, false, false, false, false, false, true, true, true, false, false, 
+                    (int)swStartConditions_e.swStartSketchPlane, 0.0, false, false);
 
-                if (cutResult)
+                if (holeFeature == null)
                 {
-                    IFeature holeFeature = swFeatMgr.FeatureCut(true, false, true,
-                        (int)swEndConditions_e.swEndCondBlind, (int)swEndConditions_e.swEndCondBlind,
-                        0.025, 0.0, false, false, false, false, 0.0, 0.0,
-                        false, false, false, false, true, true, true);
-
-                    if (holeFeature == null)
-                    {
-                        Console.WriteLine("Failed to create bolt hole");
-                        return false;
-                    }
+                    Console.WriteLine("Failed to create bolt hole");
+                    return false;
                 }
 
                 return true;
