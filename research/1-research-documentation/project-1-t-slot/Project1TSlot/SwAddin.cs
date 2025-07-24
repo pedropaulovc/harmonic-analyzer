@@ -730,7 +730,7 @@ namespace Project1TSlot
                     iSwApp.SendMsgToUser("  FAILED: FeatureCut4 returned null for hole");
                     
                     // Try alternative approach - get last error
-                    int lastError = swModel.GetLastError();
+                    int lastError = iSwApp.GetLastError();
                     iSwApp.SendMsgToUser($"  SolidWorks last error code: {lastError}");
                     
                     return false;
