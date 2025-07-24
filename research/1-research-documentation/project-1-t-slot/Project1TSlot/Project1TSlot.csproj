@@ -130,7 +130,6 @@
     <Compile Include="AssemblyInfo.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="CreateTNut_PM30MV.cs" />
     <Compile Include="EventHandling.cs" />
     <Compile Include="PMPHandler.cs" />
     <Compile Include="SwAddin.cs">

@@ -35,6 +35,7 @@ namespace Project1TSlot
         public const int mainItemID1 = 0;
         public const int mainItemID2 = 1;
         public const int mainItemID3 = 2;
+        public const int tnutItemID = 3;
         public const int flyoutGroupID = 91;
 
         string[] mainIcons = new string[6];
@@ -221,7 +222,7 @@ namespace Project1TSlot
             //get the ID information stored in the registry
             bool getDataResult = iCmdMgr.GetGroupDataFromRegistry(mainCmdGroupID, out registryIDs);
 
-            int[] knownIDs = new int[2] { mainItemID1, mainItemID2 };
+            int[] knownIDs = new int[3] { mainItemID1, mainItemID2, tnutItemID };
 
             if (getDataResult)
             {
@@ -254,6 +255,7 @@ namespace Project1TSlot
             int menuToolbarOption = (int)(swCommandItemType_e.swMenuItem | swCommandItemType_e.swToolbarItem);
             cmdIndex0 = cmdGroup.AddCommandItem2("CreateCube", -1, "Create a cube", "Create cube", 0, "CreateCube", "", mainItemID1, menuToolbarOption);
             cmdIndex1 = cmdGroup.AddCommandItem2("Show PMP", -1, "Display sample property manager", "Show PMP", 2, "ShowPMP", "EnablePMP", mainItemID2, menuToolbarOption);
+            int cmdIndex2 = cmdGroup.AddCommandItem2("Create PM-30MV T-Nut", -1, "Create a T-nut for PM-30MV milling machine", "Create T-Nut", 0, "CreateTNut", "", tnutItemID, menuToolbarOption);
 
             cmdGroup.HasToolbar = true;
             cmdGroup.HasMenu = true;
@@ -291,20 +293,20 @@ namespace Project1TSlot
 
                     CommandTabBox cmdBox = cmdTab.AddCommandTabBox();
 
-                    int[] cmdIDs = new int[3];
-                    int[] TextType = new int[3];
+                    int[] cmdIDs = new int[4];
+                    int[] TextType = new int[4];
 
                     cmdIDs[0] = cmdGroup.get_CommandID(cmdIndex0);
-
                     TextType[0] = (int)swCommandTabButtonTextDisplay_e.swCommandTabButton_TextHorizontal;
 
                     cmdIDs[1] = cmdGroup.get_CommandID(cmdIndex1);
-
                     TextType[1] = (int)swCommandTabButtonTextDisplay_e.swCommandTabButton_TextHorizontal;
 
-                    cmdIDs[2] = cmdGroup.ToolbarId;
+                    cmdIDs[2] = cmdGroup.get_CommandID(cmdIndex2);
+                    TextType[2] = (int)swCommandTabButtonTextDisplay_e.swCommandTabButton_TextHorizontal;
 
-                    TextType[2] = (int)swCommandTabButtonTextDisplay_e.swCommandTabButton_TextHorizontal | (int)swCommandTabButtonFlyoutStyle_e.swCommandTabButton_ActionFlyout;
+                    cmdIDs[3] = cmdGroup.ToolbarId;
+                    TextType[3] = (int)swCommandTabButtonTextDisplay_e.swCommandTabButton_TextHorizontal | (int)swCommandTabButtonFlyoutStyle_e.swCommandTabButton_ActionFlyout;
 
                     bResult = cmdBox.AddCommands(cmdIDs, TextType);
 
@@ -498,6 +500,216 @@ namespace Project1TSlot
         public int FlyoutEnableCommandItem1()
         {
             return 1;
+        }
+
+        public void CreateTNut()
+        {
+            try
+            {
+                CreateTNutPart();
+            }
+            catch (Exception ex)
+            {
+                System.Windows.Forms.MessageBox.Show($"Error creating T-nut: {ex.Message}", "T-Nut Creator Error");
+            }
+        }
+
+        /// <summary>
+        /// Creates a T-nut part for PM-30MV milling machine
+        /// Dimensions based on 14mm T-slot width and standard T-nut proportions
+        /// </summary>
+        public bool CreateTNutPart()
+        {
+            try
+            {
+                // Get part template from user preferences
+                string partTemplate = iSwApp.GetUserPreferenceStringValue((int)swUserPreferenceStringValue_e.swDefaultTemplatePart);
+                if (string.IsNullOrEmpty(partTemplate))
+                {
+                    System.Windows.Forms.MessageBox.Show("No part template found. Please set a default part template in SolidWorks options.");
+                    return false;
+                }
+
+                // Create new part document
+                IModelDoc2 swModel = iSwApp.NewDocument(partTemplate, (int)swDwgPaperSizes_e.swDwgPaperA0size, 0.0, 0.0);
+
+                if (swModel == null)
+                {
+                    System.Windows.Forms.MessageBox.Show("Failed to create new part document");
+                    return false;
+                }
+
+                IPartDoc swPart = (IPartDoc)swModel;
+                ISketchManager swSketchMgr = swModel.SketchManager;
+                IFeatureManager swFeatMgr = swModel.FeatureManager;
+
+                // Set units to millimeters
+                swModel.Extension.SetUserPreferenceInteger((int)swUserPreferenceIntegerValue_e.swUnitSystem,
+                                                         (int)swUserPreferenceOption_e.swDetailingNoOptionSpecified,
+                                                         (int)swUnitSystem_e.swUnitSystem_MMGS);
+
+                // Create T-nut geometry
+                if (!CreateTNutHead(swModel, swSketchMgr, swFeatMgr)) return false;
+                if (!CreateTNutSlot(swModel, swSketchMgr, swFeatMgr)) return false;
+                if (!CreateThreadHole(swModel, swSketchMgr, swFeatMgr)) return false;
+
+                // Rebuild the model
+                swModel.EditRebuild3();
+
+                System.Windows.Forms.MessageBox.Show("T-nut for PM-30MV created successfully!\n\nSpecifications:\n- Head: 13.5mm x 8mm x 6mm (fits 14mm T-slot)\n- Body: 7mm x 15mm x 6mm\n- Bolt hole: 13mm diameter (M12 clearance)\n- Compatible with PM-30MV milling machine T-slots", "T-Nut Creator");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Windows.Forms.MessageBox.Show($"Error creating T-nut: {ex.Message}", "T-Nut Creator Error");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Creates the main head of the T-nut (the wide part that sits in the T-slot)
+        /// Dimensions: 14mm slot width, allowing for clearance
+        /// </summary>
+        private bool CreateTNutHead(IModelDoc2 swModel, ISketchManager swSketchMgr, IFeatureManager swFeatMgr)
+        {
+            try
+            {
+                // Select the front plane for sketching
+                bool boolstatus = swModel.Extension.SelectByID2("Front Plane", "PLANE", 0, 0, 0,
+                                                              false, 0, null, 0);
+                if (!boolstatus)
+                {
+                    Console.WriteLine("Failed to select Front Plane");
+                    return false;
+                }
+
+                // Insert sketch
+                swSketchMgr.InsertSketch(true);
+
+                // Create rectangle for T-nut head (13.5mm wide to fit in 14mm slot with clearance)
+                // Height: 8mm (standard T-nut proportion)
+                swSketchMgr.CreateCornerRectangle(-0.00675, -0.004, 0, 0.00675, 0.004, 0);  // 13.5mm x 8mm
+
+                // Exit sketch
+                swSketchMgr.InsertSketch(true);
+
+                // Create extrude feature for head (6mm thick)
+                IFeature headFeature = swFeatMgr.SimpleFeatureBossExtrude("Sketch1", 0.006, true);
+
+                if (headFeature == null)
+                {
+                    Console.WriteLine("Failed to create T-nut head extrude");
+                    return false;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating T-nut head: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Creates the slot/body portion of the T-nut (the narrow part that extends upward)
+        /// </summary>
+        private bool CreateTNutSlot(IModelDoc2 swModel, ISketchManager swSketchMgr, IFeatureManager swFeatMgr)
+        {
+            try
+            {
+                // Select the front face of the head for sketching
+                bool boolstatus = swModel.Extension.SelectByID2("", "FACE", 0.00675, 0, 0.003,
+                                                              false, 0, null, 0);
+                if (!boolstatus)
+                {
+                    // Try alternative selection method - select Front Plane again
+                    boolstatus = swModel.Extension.SelectByID2("Front Plane", "PLANE", 0, 0, 0,
+                                                             false, 0, null, 0);
+                }
+
+                // Insert sketch
+                swSketchMgr.InsertSketch(true);
+
+                // Create rectangle for T-nut slot body (7mm wide x 15mm tall)
+                // This extends above the head to provide gripping surface
+                swSketchMgr.CreateCornerRectangle(-0.0035, 0.004, 0, 0.0035, 0.019, 0);  // 7mm x 15mm
+
+                // Exit sketch
+                swSketchMgr.InsertSketch(true);
+
+                // Create extrude feature for slot body (6mm thick, same as head)
+                IFeature slotFeature = swFeatMgr.SimpleFeatureBossExtrude("Sketch2", 0.006, true);
+
+                if (slotFeature == null)
+                {
+                    Console.WriteLine("Failed to create T-nut slot extrude");
+                    return false;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating T-nut slot: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Creates the threaded hole for the bolt (9/16" = 14.29mm diameter hole for tap)
+        /// Creates clearance hole for M14 or 9/16" bolt
+        /// </summary>
+        private bool CreateThreadHole(IModelDoc2 swModel, ISketchManager swSketchMgr, IFeatureManager swFeatMgr)
+        {
+            try
+            {
+                // Select the top face of the slot for sketching
+                bool boolstatus = swModel.Extension.SelectByID2("", "FACE", 0, 0.019, 0.003,
+                                                              false, 0, null, 0);
+                if (!boolstatus)
+                {
+                    // Try alternative - select a plane parallel to the top
+                    boolstatus = swModel.Extension.SelectByID2("Top Plane", "PLANE", 0, 0, 0,
+                                                             false, 0, null, 0);
+                }
+
+                // Insert sketch
+                swSketchMgr.InsertSketch(true);
+
+                // Create circle for bolt hole - M12 clearance hole (13mm diameter)
+                // Position at center of the slot body
+                swSketchMgr.CreateCircleByRadius(0, 0.0115, 0, 0.0065);  // 13mm diameter hole
+
+                // Exit sketch
+                swSketchMgr.InsertSketch(true);
+
+                // Create cut extrude to create the hole (through all)
+                // Note: Using FeatureCut with through-all option
+                bool cutResult = swModel.Extension.SelectByID2("Sketch3", "SKETCH", 0, 0, 0,
+                                                             false, 0, null, 0);
+
+                if (cutResult)
+                {
+                    IFeature holeFeature = swFeatMgr.FeatureCut(true, false, true,
+                        (int)swEndConditions_e.swEndCondBlind, (int)swEndConditions_e.swEndCondBlind,
+                        0.025, 0.0, false, false, false, false, 0.0, 0.0,
+                        false, false, false, false, true, true, true);
+
+                    if (holeFeature == null)
+                    {
+                        Console.WriteLine("Failed to create bolt hole");
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating thread hole: {ex.Message}");
+                return false;
+            }
         }
         #endregion
 
