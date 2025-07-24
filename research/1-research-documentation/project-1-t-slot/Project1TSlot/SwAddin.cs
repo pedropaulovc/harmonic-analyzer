@@ -670,12 +670,12 @@ namespace Project1TSlot
         {
             try
             {
-                // Select the Top Plane for sketching the hole
-                bool boolstatus = swModel.Extension.SelectByID2("Top Plane", "PLANE", 0, 0, 0,
+                // Select the Front Plane for sketching the hole (same as the other sketches)
+                bool boolstatus = swModel.Extension.SelectByID2("Front Plane", "PLANE", 0, 0, 0,
                                                               false, 0, null, 0);
                 if (!boolstatus)
                 {
-                    iSwApp.SendMsgToUser("Failed to select Top Plane for hole");
+                    iSwApp.SendMsgToUser("Failed to select Front Plane for hole");
                     return false;
                 }
 
@@ -683,15 +683,15 @@ namespace Project1TSlot
                 swSketchMgr.InsertSketch(true);
 
                 // Create circle for bolt hole - M12 clearance hole (13mm diameter)
-                // Position at center of the slot body
-                swSketchMgr.CreateCircleByRadius(0, 0.0115, 0, 0.0065);  // 13mm diameter hole
+                // Position at center of the slot body, centered horizontally and vertically in the slot
+                swSketchMgr.CreateCircleByRadius(0, 0.0115, 0, 0.0065);  // 13mm diameter hole, centered at Y=11.5mm
 
                 // Exit sketch
                 swSketchMgr.InsertSketch(true);
 
-                // Create cut extrude to create the hole (through all)
+                // Create cut extrude to create the hole (through all in both directions)
                 IFeature holeFeature = swFeatMgr.FeatureCut4(true, false, false, 
-                    (int)swEndConditions_e.swEndCondThroughAll, (int)swEndConditions_e.swEndCondBlind,
+                    (int)swEndConditions_e.swEndCondThroughAll, (int)swEndConditions_e.swEndCondThroughAll,
                     0.0, 0.0, false, false, false, false, 0.0, 0.0, false, false, false, false, false, true, true, true, false, false, 
                     (int)swStartConditions_e.swStartSketchPlane, 0.0, false, false);
 
