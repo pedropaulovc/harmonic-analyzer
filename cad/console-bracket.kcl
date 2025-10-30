@@ -70,23 +70,28 @@ bracketWithBends = fillet(bracketBody, radius = bendRadius, tags = [
   topBendLine
 ])
 
-// Add screw holes to top shelf
+// Add screw holes to top shelf - create each hole separately
 topShelfZ = verticalLength + sheetThickness
-hole1Pos = [screwHoleInset, screwHoleInset, topShelfZ]
-hole2Pos = [bracketWidth - screwHoleInset, screwHoleInset, topShelfZ]
-hole3Pos = [screwHoleInset, topShelfLength - screwHoleInset, topShelfZ]
-hole4Pos = [bracketWidth - screwHoleInset, topShelfLength - screwHoleInset, topShelfZ]
-
 topShelfHolePlane = offsetPlane(XY, offset = topShelfZ)
-screwHoles = startSketchOn(topShelfHolePlane)
-  |> circle(center = [hole1Pos[0], hole1Pos[1]], diameter = screwHoleDiameter)
-  |> circle(center = [hole2Pos[0], hole2Pos[1]], diameter = screwHoleDiameter)
-  |> circle(center = [hole3Pos[0], hole3Pos[1]], diameter = screwHoleDiameter)
-  |> circle(center = [hole4Pos[0], hole4Pos[1]], diameter = screwHoleDiameter)
+
+screwHole1 = startSketchOn(topShelfHolePlane)
+  |> circle(center = [screwHoleInset, screwHoleInset], diameter = screwHoleDiameter)
   |> extrude(length = sheetThickness)
 
-// Subtract screw holes
-bracketWithHoles = subtract([bracketWithBends], tools = [screwHoles])
+screwHole2 = startSketchOn(topShelfHolePlane)
+  |> circle(center = [bracketWidth - screwHoleInset, screwHoleInset], diameter = screwHoleDiameter)
+  |> extrude(length = sheetThickness)
+
+screwHole3 = startSketchOn(topShelfHolePlane)
+  |> circle(center = [screwHoleInset, topShelfLength - screwHoleInset], diameter = screwHoleDiameter)
+  |> extrude(length = sheetThickness)
+
+screwHole4 = startSketchOn(topShelfHolePlane)
+  |> circle(center = [bracketWidth - screwHoleInset, topShelfLength - screwHoleInset], diameter = screwHoleDiameter)
+  |> extrude(length = sheetThickness)
+
+// Subtract all screw holes
+bracketWithHoles = subtract([bracketWithBends], tools = [screwHole1, screwHole2, screwHole3, screwHole4])
 
 // Add larger ventilation holes to vertical section
 // Positioned centrally with better spacing
