@@ -328,3 +328,4 @@ cad/*.png
 cad/*.jpg
 cad/*.txt
 cad/output.*
+cad/project.toml
