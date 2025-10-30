@@ -24,13 +24,13 @@ bpy.context.view_layer.objects.active = obj
 bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
 obj.location = (0, 0, 0)
 
-# Add material with metallic appearance
+# Add material with metallic appearance - dark charcoal for contrast
 mat = bpy.data.materials.new(name="BracketMaterial")
 mat.use_nodes = True
 bsdf = mat.node_tree.nodes["Principled BSDF"]
-bsdf.inputs['Base Color'].default_value = (0.6, 0.6, 0.6, 1.0)
-bsdf.inputs['Metallic'].default_value = 0.8
-bsdf.inputs['Roughness'].default_value = 0.3
+bsdf.inputs['Base Color'].default_value = (0.15, 0.15, 0.18, 1.0)  # Dark charcoal with slight blue tint
+bsdf.inputs['Metallic'].default_value = 0.9
+bsdf.inputs['Roughness'].default_value = 0.2
 obj.data.materials.append(mat)
 
 # Set up render settings - use EEVEE for fast rendering
