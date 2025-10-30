@@ -321,3 +321,10 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# CAD/KCL generated files
+cad/*.stl
+cad/*.png
+cad/*.jpg
+cad/*.txt
+cad/output.*
