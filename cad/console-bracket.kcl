@@ -1,6 +1,15 @@
 // Game Console Under-Desk Mounting Bracket
 // C-shaped bracket made from 20 gauge sheet metal
 // Final bent form with manufacturable bend radii
+//
+// PROMPT:
+// Create a bracket made from rectangular 10 inches x 18 inches 20 gauge sheet metal
+// bent twice to form a C shape. It is to support a game console under a desk.
+// - Top part: 5 inches of length with 4 holes for #8 screws
+// - Side part: 10 inches of length with large ventilation holes
+// - Bottom part: 3 inches of length
+// - Ventilation holes: Large rectangular slots (2.5" x 1.0") for airflow
+// - Bend radius: 1/8" (0.125") for manufacturability
 
 @settings(defaultLengthUnit = in)
 
