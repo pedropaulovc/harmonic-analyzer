@@ -1,0 +1,121 @@
+// Game Console Under-Desk Mounting Bracket
+// C-shaped bracket made from 20 gauge sheet metal
+// Final bent form with manufacturable bend radii
+
+@settings(defaultLengthUnit = in)
+
+// Material specifications
+sheetThickness = 0.0359 // 20 gauge steel thickness in inches
+bendRadius = 0.125 // 1/8" bend radius for manufacturability
+
+// Bracket dimensions
+bracketWidth = 10 // Width of the bracket
+topShelfLength = 5 // Top horizontal section
+verticalLength = 10 // Vertical side section
+bottomShelfLength = 3 // Bottom horizontal section
+
+// Screw hole specifications for #8 screws
+screwHoleDiameter = 0.177 // #8 screw clearance hole (11/64")
+screwHoleInset = 0.5 // Distance from edges
+
+// Ventilation hole specifications - made larger for better airflow
+ventHoleWidth = 2.5 // Increased from 1.5"
+ventHoleHeight = 1.0 // Increased from 0.75"
+ventHoleSpacing = 0.75 // Increased spacing
+
+// Create bottom shelf (horizontal, facing down)
+bottomShelf = startSketchOn(XY)
+  |> startProfile(at = [0, 0])
+  |> line(end = [bracketWidth, 0])
+  |> line(end = [0, bottomShelfLength])
+  |> line(end = [-bracketWidth, 0])
+  |> close()
+  |> extrude(length = sheetThickness, tagStart = $bottomStart, tagEnd = $bottomEnd)
+
+// Create vertical side section with tagged edges
+verticalSide = startSketchOn(XZ)
+  |> startProfile(at = [0, sheetThickness])
+  |> line(end = [bracketWidth, 0], tag = $bottomBendLine)
+  |> line(end = [0, verticalLength])
+  |> line(end = [-bracketWidth, 0], tag = $topBendLine)
+  |> close()
+  |> extrude(length = sheetThickness)
+
+// Create top shelf (horizontal, facing up)
+topShelfPlane = offsetPlane(XY, offset = verticalLength + sheetThickness)
+topShelf = startSketchOn(topShelfPlane)
+  |> startProfile(at = [0, 0])
+  |> line(end = [bracketWidth, 0])
+  |> line(end = [0, topShelfLength])
+  |> line(end = [-bracketWidth, 0])
+  |> close()
+  |> extrude(length = sheetThickness)
+
+// Union all three sections together
+bracketBody = union([bottomShelf, verticalSide, topShelf])
+
+// Add fillets at the bend locations for manufacturable radii
+// Apply fillets to the inside edges where bends occur
+bracketWithBends = fillet(bracketBody, radius = bendRadius, tags = [
+  bottomBendLine,
+  topBendLine
+])
+
+// Add screw holes to top shelf
+topShelfZ = verticalLength + sheetThickness
+hole1Pos = [screwHoleInset, screwHoleInset, topShelfZ]
+hole2Pos = [bracketWidth - screwHoleInset, screwHoleInset, topShelfZ]
+hole3Pos = [screwHoleInset, topShelfLength - screwHoleInset, topShelfZ]
+hole4Pos = [bracketWidth - screwHoleInset, topShelfLength - screwHoleInset, topShelfZ]
+
+topShelfHolePlane = offsetPlane(XY, offset = topShelfZ)
+screwHoles = startSketchOn(topShelfHolePlane)
+  |> circle(center = [hole1Pos[0], hole1Pos[1]], diameter = screwHoleDiameter)
+  |> circle(center = [hole2Pos[0], hole2Pos[1]], diameter = screwHoleDiameter)
+  |> circle(center = [hole3Pos[0], hole3Pos[1]], diameter = screwHoleDiameter)
+  |> circle(center = [hole4Pos[0], hole4Pos[1]], diameter = screwHoleDiameter)
+  |> extrude(length = sheetThickness)
+
+// Subtract screw holes
+bracketWithHoles = subtract([bracketWithBends], tools = [screwHoles])
+
+// Add larger ventilation holes to vertical section
+// Positioned centrally with better spacing
+ventStartZ = 2.0 // Start higher up for better positioning
+
+ventHole1 = startSketchOn(XZ)
+  |> startProfile(at = [(bracketWidth - ventHoleWidth) / 2, sheetThickness + ventStartZ])
+  |> line(end = [ventHoleWidth, 0])
+  |> line(end = [0, ventHoleHeight])
+  |> line(end = [-ventHoleWidth, 0])
+  |> close()
+
+ventHole2 = startSketchOn(XZ)
+  |> startProfile(at = [(bracketWidth - ventHoleWidth) / 2, sheetThickness + ventStartZ + (ventHoleHeight + ventHoleSpacing)])
+  |> line(end = [ventHoleWidth, 0])
+  |> line(end = [0, ventHoleHeight])
+  |> line(end = [-ventHoleWidth, 0])
+  |> close()
+
+ventHole3 = startSketchOn(XZ)
+  |> startProfile(at = [(bracketWidth - ventHoleWidth) / 2, sheetThickness + ventStartZ + 2 * (ventHoleHeight + ventHoleSpacing)])
+  |> line(end = [ventHoleWidth, 0])
+  |> line(end = [0, ventHoleHeight])
+  |> line(end = [-ventHoleWidth, 0])
+  |> close()
+
+ventHole4 = startSketchOn(XZ)
+  |> startProfile(at = [(bracketWidth - ventHoleWidth) / 2, sheetThickness + ventStartZ + 3 * (ventHoleHeight + ventHoleSpacing)])
+  |> line(end = [ventHoleWidth, 0])
+  |> line(end = [0, ventHoleHeight])
+  |> line(end = [-ventHoleWidth, 0])
+  |> close()
+
+// Extrude ventilation holes through the thickness
+ventHoles = extrude([ventHole1, ventHole2, ventHole3, ventHole4], length = sheetThickness)
+
+// Create final bracket with all features
+bracket = subtract([bracketWithHoles], tools = ventHoles)
+
+// Final C-shaped bracket with manufacturable bend radii
+bracket
