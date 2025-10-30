@@ -42,7 +42,9 @@ bottomShelf = startSketchOn(XY)
   |> extrude(length = sheetThickness, tagStart = $bottomStart, tagEnd = $bottomEnd)
 
 // Create vertical side section with tagged edges
-verticalSide = startSketchOn(XZ)
+// Position at the back edge of bottom shelf (y = bottomShelfLength)
+verticalSidePlane = offsetPlane(XZ, offset = bottomShelfLength)
+verticalSide = startSketchOn(verticalSidePlane)
   |> startProfile(at = [0, sheetThickness])
   |> line(end = [bracketWidth, 0], tag = $bottomBendLine)
   |> line(end = [0, verticalLength])
@@ -51,9 +53,10 @@ verticalSide = startSketchOn(XZ)
   |> extrude(length = sheetThickness)
 
 // Create top shelf (horizontal, facing up)
+// Position at back edge aligned with vertical side
 topShelfPlane = offsetPlane(XY, offset = verticalLength + sheetThickness)
 topShelf = startSketchOn(topShelfPlane)
-  |> startProfile(at = [0, 0])
+  |> startProfile(at = [0, bottomShelfLength])
   |> line(end = [bracketWidth, 0])
   |> line(end = [0, topShelfLength])
   |> line(end = [-bracketWidth, 0])
@@ -97,28 +100,28 @@ bracketWithHoles = subtract([bracketWithBends], tools = [screwHole1, screwHole2,
 // Positioned centrally with better spacing
 ventStartZ = 2.0 // Start higher up for better positioning
 
-ventHole1 = startSketchOn(XZ)
+ventHole1 = startSketchOn(verticalSidePlane)
   |> startProfile(at = [(bracketWidth - ventHoleWidth) / 2, sheetThickness + ventStartZ])
   |> line(end = [ventHoleWidth, 0])
   |> line(end = [0, ventHoleHeight])
   |> line(end = [-ventHoleWidth, 0])
   |> close()
 
-ventHole2 = startSketchOn(XZ)
+ventHole2 = startSketchOn(verticalSidePlane)
   |> startProfile(at = [(bracketWidth - ventHoleWidth) / 2, sheetThickness + ventStartZ + (ventHoleHeight + ventHoleSpacing)])
   |> line(end = [ventHoleWidth, 0])
   |> line(end = [0, ventHoleHeight])
   |> line(end = [-ventHoleWidth, 0])
   |> close()
 
-ventHole3 = startSketchOn(XZ)
+ventHole3 = startSketchOn(verticalSidePlane)
   |> startProfile(at = [(bracketWidth - ventHoleWidth) / 2, sheetThickness + ventStartZ + 2 * (ventHoleHeight + ventHoleSpacing)])
   |> line(end = [ventHoleWidth, 0])
   |> line(end = [0, ventHoleHeight])
   |> line(end = [-ventHoleWidth, 0])
   |> close()
 
-ventHole4 = startSketchOn(XZ)
+ventHole4 = startSketchOn(verticalSidePlane)
   |> startProfile(at = [(bracketWidth - ventHoleWidth) / 2, sheetThickness + ventStartZ + 3 * (ventHoleHeight + ventHoleSpacing)])
   |> line(end = [ventHoleWidth, 0])
   |> line(end = [0, ventHoleHeight])
