@@ -42,7 +42,7 @@ scene.render.resolution_y = 720
 scene.render.image_settings.file_format = 'PNG'
 scene.view_settings.view_transform = 'Standard'
 
-# Set white background
+# Set neon pink background
 scene.render.film_transparent = False
 if scene.world is None:
     scene.world = bpy.data.worlds.new("World")
@@ -50,7 +50,7 @@ scene.world.use_nodes = True
 world_nodes = scene.world.node_tree.nodes
 world_nodes.clear()
 bg_node = world_nodes.new('ShaderNodeBackground')
-bg_node.inputs['Color'].default_value = (1.0, 1.0, 1.0, 1.0)  # White
+bg_node.inputs['Color'].default_value = (1.0, 0.078, 0.576, 1.0)  # Neon pink
 bg_node.inputs['Strength'].default_value = 1.0
 output_node = world_nodes.new('ShaderNodeOutputWorld')
 scene.world.node_tree.links.new(bg_node.outputs['Background'], output_node.inputs['Surface'])
