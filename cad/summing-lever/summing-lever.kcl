@@ -28,6 +28,11 @@ notchDepth = 0.125 // Depth of notches marking paddle end
 notchWidth = 0.25 // Width of notches
 
 
+// Taper specifications
+taperRadius = 11.0 // Radius for tangential arcs thinning middle section
+middleWidth = 2.0 // Width of thinned middle section
+
+
 // Hole specifications
 paddleHoleCount = 20 // Number of mounting holes in line
 paddleHoleDiam = 0.0403 // Spring mounting hole diameter (18 AWG wire gauge)
@@ -77,22 +82,26 @@ assert(paddleHoleSpacingY, isGreaterThan = paddleHoleDiam, error = "Paddle holes
 // LEVER PROFILE WITH NOTCHES
 // ============================================================================
 
-// Create base lever profile with notches marking paddle end
+// Create base lever profile with notches and tapered middle section
 leverProfile = startSketchOn(XY)
   |> startProfile(at = [0, -paddleWidth / 2])
   |> line(end = [paddleLength, 0]) // Bottom edge to paddle end
   |> line(end = [0, -notchDepth]) // Notch down on bottom
   |> line(end = [notchWidth, 0]) // Notch width
   |> line(end = [0, notchDepth]) // Notch back up
+  |> tangentialArc(angle = -5, radius = taperRadius) // Taper inward (bottom)
   |> line(end = [
-       leverLength - paddleLength - notchWidth,
+       leverLength - paddleLength - notchWidth - 1.0,
        0
-     ]) // Rest of bottom
-  |> line(end = [0, paddleWidth]) // Right edge
+     ]) // Middle section
+  |> tangentialArc(angle = 5, radius = taperRadius) // Taper back out (bottom)
+  |> line(end = [0, middleWidth]) // Right edge (narrower)
+  |> tangentialArc(angle = -5, radius = taperRadius) // Taper back out (top)
   |> line(end = [
-       -(leverLength - paddleLength - notchWidth),
+       -(leverLength - paddleLength - notchWidth - 1.0),
        0
-     ]) // Top edge start
+     ]) // Middle section
+  |> tangentialArc(angle = 5, radius = taperRadius) // Taper inward (top)
   |> line(end = [0, notchDepth]) // Notch up on top
   |> line(end = [-notchWidth, 0]) // Notch width
   |> line(end = [0, -notchDepth]) // Notch back down
