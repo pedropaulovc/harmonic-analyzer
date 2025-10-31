@@ -1,23 +1,47 @@
 // Sheet Metal Console Bracket - C-Shaped Design
-// Material: 20 gauge sheet metal (0.0359" thick)
-// Dimensions: 10" width × 18" total flat length (before bending)
+// Material: 20 gauge 304 stainless steel (0.0359" thick)
+// Yield strength: ~40,000 psi typical for 304 SS
+// Application: Wall-mounted equipment console support
+// Design: C-shaped bent sheet metal profile for wall mounting
 
-// Parameters
-sheetThickness = 0.0359
+// Set units
+@settings(defaultLengthUnit = in, kclVersion = 1.0)
+
+// Material and Design Parameters
+sheetThickness = 0.0359 // 20 gauge
 width = 10.0
-topLength = 5.0
-verticalLength = 10.0
-bottomLength = 3.0
-bendRadius = 0.125
+topLength = 5.0 // Horizontal mounting surface
+verticalLength = 10.0 // Vertical drop
+bottomLength = 3.0 // Bottom support ledge
+bendRadius = 0.125 // Inner bend radius
 
-// Mounting holes (for #8 screws)
-mountHoleDia = 0.177
-mountHoleOffset = 1.0 // offset from edges
+
+// Mounting holes (for #8 screws, 0.164" nominal diameter)
+mountHoleDia = 0.177 // Clearance hole for #8 screw
+mountHoleOffset = 1.0 // Offset from edges
 
 
 // Ventilation slots
 ventSlotWidth = 1.0
 ventSlotHeight = 2.5
+numVentSlots = 4
+
+// Edge finishing
+cornerFilletRadius = 0.03125 // 1/32" radius for safe handling
+
+
+// Calculated parameters
+extBendRadius = bendRadius + sheetThickness // Outer bend radius
+totalFlatLength = topLength + verticalLength + bottomLength + PI * bendRadius // Approximate developed length
+slotSpacing = (width - (numVentSlots * ventSlotWidth)) / (numVentSlots + 1)
+slotCenterZ = -verticalLength / 2 // Center slots vertically on face
+
+
+// Design validation - ensure holes fit within geometry
+assert(topLength, isGreaterThanOrEqual = mountHoleDia * 4, error = "topLength too short for mounting hole pattern. Increase topLength or decrease mountHoleDia")
+assert(width, isGreaterThanOrEqual = mountHoleDia * 3, error = "width too narrow for mounting hole pattern. Increase width or decrease mountHoleDia")
+assert(width, isGreaterThanOrEqual = numVentSlots * ventSlotWidth + (numVentSlots + 1) * 0.5, error = "width too narrow for ventilation slots. Increase width, decrease ventSlotWidth, or reduce numVentSlots")
+assert(verticalLength, isGreaterThanOrEqual = ventSlotHeight + 1.0, error = "verticalLength too short for ventilation slots. Increase verticalLength or decrease ventSlotHeight")
 
 // Create C-shaped profile (side view in XZ plane)
 // Starting from top-left corner, creating the outer path
@@ -37,83 +61,34 @@ cProfile = startSketchOn(XZ)
   |> close()
   |> extrude(length = width)
 
-  // Add mounting holes on the top face
-// Create 4 holes in a rectangular pattern
-mountHole1 = startSketchOn(cProfile, face = topOuter)
-  |> circle(
-       center = [
-         mountHoleOffset,
-         width - mountHoleOffset
-       ],
-       radius = mountHoleDia / 2,
-     )
-
-mountHole2 = startSketchOn(cProfile, face = topOuter)
-  |> circle(
-       center = [
-         topLength - mountHoleOffset,
-         width - mountHoleOffset
-       ],
-       radius = mountHoleDia / 2,
-     )
-
-mountHole3 = startSketchOn(cProfile, face = topOuter)
+// Add mounting holes on the top face using pattern operations
+mountingHoles = startSketchOn(cProfile, face = topOuter)
   |> circle(center = [mountHoleOffset, mountHoleOffset], radius = mountHoleDia / 2)
+  |> patternLinear2d(instances = 2, distance = topLength - (2 * mountHoleOffset), axis = [1, 0])
+  |> patternLinear2d(instances = 2, distance = width - (2 * mountHoleOffset), axis = [0, 1])
+  |> extrude(length = -sheetThickness - 0.01)
 
-mountHole4 = startSketchOn(cProfile, face = topOuter)
-  |> circle(
-       center = [
-         topLength - mountHoleOffset,
-         mountHoleOffset
-       ],
-       radius = mountHoleDia / 2,
-     )
-
-// Create mounting holes
-hole1 = extrude(mountHole1, length = -sheetThickness)
-hole2 = extrude(mountHole2, length = -sheetThickness)
-hole3 = extrude(mountHole3, length = -sheetThickness)
-hole4 = extrude(mountHole4, length = -sheetThickness)
-
-// Add ventilation slots on the vertical face
-// 4 slots evenly spaced
-slotSpacing = (width - (4 * ventSlotWidth)) / 5
-slot1Y = slotSpacing
-slot2Y = slotSpacing * 2 + ventSlotWidth
-slot3Y = slotSpacing * 3 + ventSlotWidth * 2
-slot4Y = slotSpacing * 4 + ventSlotWidth * 3
-
-slotZ = -verticalLength / 2 // Center vertically
-
-
-ventSlot1 = startSketchOn(cProfile, face = verticalOuter)
-  |> startProfile(at = [slotZ - (ventSlotHeight / 2), slot1Y])
+// Add ventilation slots on the vertical face using pattern operations
+ventSlots = startSketchOn(cProfile, face = verticalOuter)
+  |> startProfile(at = [
+       slotCenterZ - (ventSlotHeight / 2),
+       slotSpacing
+     ])
   |> line(end = [ventSlotHeight, 0])
   |> line(end = [0, ventSlotWidth])
   |> line(end = [-ventSlotHeight, 0])
   |> close()
-  |> extrude(length = -sheetThickness)
+  |> patternLinear2d(instances = numVentSlots, distance = slotSpacing + ventSlotWidth, axis = [0, 1])
+  |> extrude(length = -sheetThickness - 0.01)
 
-ventSlot2 = startSketchOn(cProfile, face = verticalOuter)
-  |> startProfile(at = [slotZ - (ventSlotHeight / 2), slot2Y])
-  |> line(end = [ventSlotHeight, 0])
-  |> line(end = [0, ventSlotWidth])
-  |> line(end = [-ventSlotHeight, 0])
-  |> close()
-  |> extrude(length = -sheetThickness)
-
-ventSlot3 = startSketchOn(cProfile, face = verticalOuter)
-  |> startProfile(at = [slotZ - (ventSlotHeight / 2), slot3Y])
-  |> line(end = [ventSlotHeight, 0])
-  |> line(end = [0, ventSlotWidth])
-  |> line(end = [-ventSlotHeight, 0])
-  |> close()
-  |> extrude(length = -sheetThickness)
-
-ventSlot4 = startSketchOn(cProfile, face = verticalOuter)
-  |> startProfile(at = [slotZ - (ventSlotHeight / 2), slot4Y])
-  |> line(end = [ventSlotHeight, 0])
-  |> line(end = [0, ventSlotWidth])
-  |> line(end = [-ventSlotHeight, 0])
-  |> close()
-  |> extrude(length = -sheetThickness)
+// Apply corner fillets for safe handling and professional appearance
+fillet(
+  cProfile,
+  radius = cornerFilletRadius,
+  tags = [
+    getNextAdjacentEdge(topOuter),
+    getOppositeEdge(getNextAdjacentEdge(topOuter)),
+    getNextAdjacentEdge(bottomOuter),
+    getOppositeEdge(getNextAdjacentEdge(bottomOuter))
+  ],
+)
