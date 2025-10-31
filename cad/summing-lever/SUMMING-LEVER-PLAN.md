@@ -47,41 +47,15 @@ Creating a parametric KCL model of the summing lever component for the harmonic 
 
 ### 🔲 REMAINING PHASES
 
-#### Phase 3: Add Center Fulcrum Section
-**Goal:** Extend lever geometry from paddle to center section with fulcrum mounting
-
-**Steps:**
-1. Read current `summing-lever.kcl` to see the paddle profile
-2. Extend the lever profile to include:
-   - Continue from paddle edge to fulcrum position (10" from origin)
-   - Add width transition (paddle is 3" wide, may need to taper/expand)
-   - Add fulcrum slot/hole at center position
-3. Create fulcrum geometry:
-   - Simple rectangular slot (`fulcrumSlotWidth = 0.5"`, `fulcrumSlotLength = 1.0"`)
-   - Position at `fulcrumPosition = 10.0"` along length
-   - Use `subtract2d` for slot before final extrusion
-4. Keep geometry simplified (rectangular sections, no curves yet)
-5. Export and review:
-   ```bash
-   zoo kcl snapshot summing-lever.kcl summing-lever-phase3.png
-   zoo kcl export --output-format=stl summing-lever.kcl .
-   ```
-6. Commit using Task tool with message about adding fulcrum section
-
-**What to check:** Fulcrum position looks correct, slot is visible, overall proportions make sense
-
----
-
-#### Phase 4: Add Organic Curves & Transitions
+#### Phase 3: Add Organic Curves & Transitions
 **Goal:** Replace straight edges with curves to match the flowing design in the reference photo
 
 **Steps:**
 1. Replace straight line segments with `tangentialArc` or `arc` calls
 2. Key areas to add curves:
-   - Paddle outer edges (use `largeRadius = 2.0"` for gentle curves)
-   - Transition from paddle to center section
-   - Transition from center to counter arm
-   - Any internal corners (use `smallRadius = 0.333"` for tight curves)
+   - Paddle outer edges (use gentle curves for flowing design)
+   - Round corners for smoother transitions
+   - Any internal corners (use smaller radii for tight curves)
 3. Important KCL constraint: Use EITHER:
    - `tangentialArc(angle = ..., radius = ...)` OR
    - `tangentialArc(end = [x, y])` alone
@@ -89,12 +63,37 @@ Creating a parametric KCL model of the summing lever component for the harmonic 
 4. Build incrementally - add one curve, test, then continue
 5. Export and review:
    ```bash
-   zoo kcl snapshot summing-lever.kcl summing-lever-phase4.png
+   zoo kcl snapshot summing-lever.kcl summing-lever-phase3.png
    zoo kcl export --output-format=stl summing-lever.kcl .
    ```
 6. Commit using Task tool
 
-**What to check:** Curves flow smoothly, profile is closed properly, proportions match reference photo
+**What to check:** Curves flow smoothly, profile is closed properly, proportions look good
+
+---
+
+#### Phase 4: Add Center Fulcrum Section
+**Goal:** Extend lever geometry from paddle to center section with fulcrum mounting
+
+**Steps:**
+1. Read current `summing-lever.kcl` to see the paddle profile
+2. Extend the lever profile to include:
+   - Continue from paddle edge to fulcrum position
+   - Add width transition (paddle is 3" wide, may need to taper/expand)
+   - Add fulcrum slot/hole at center position
+3. Create fulcrum geometry:
+   - Simple rectangular slot (`fulcrumSlotWidth = 0.5"`, `fulcrumSlotLength = 1.0"`)
+   - Position at `fulcrumPosition` along length
+   - Use `subtract2d` for slot before final extrusion
+4. Keep geometry simplified (rectangular sections, apply curves consistent with Phase 3)
+5. Export and review:
+   ```bash
+   zoo kcl snapshot summing-lever.kcl summing-lever-phase4.png
+   zoo kcl export --output-format=stl summing-lever.kcl .
+   ```
+6. Commit using Task tool with message about adding fulcrum section
+
+**What to check:** Fulcrum position looks correct, slot is visible, overall proportions make sense
 
 ---
 
@@ -279,5 +278,5 @@ When resuming this work:
 ---
 
 **Created:** 2025-10-31
-**Last Updated:** 2025-10-31 (Phase 2 complete)
-**Next Phase:** Phase 3 - Add center fulcrum section
+**Last Updated:** 2025-10-31 (Phase 2 complete, phases 3-4 swapped)
+**Next Phase:** Phase 3 - Add organic curves & transitions
