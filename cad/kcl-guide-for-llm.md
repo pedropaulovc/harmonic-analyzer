@@ -12,6 +12,13 @@
 
 When creating KCL parts, follow this workflow for best results:
 
+### File Structure (Do this FIRST)
+1. **Start with @settings**: Always begin with `@settings(defaultLengthUnit = [unit], kclVersion = 1.0)`
+2. **Organize parameters**: Separate input parameters from calculated parameters with clear comment headers
+3. **Add assertions early**: Validate parameter relationships before creating geometry
+4. **Use patterns, not loops**: Create repeating features with `patternLinear2d`, `patternCircular2d`, not individual sketches
+
+### Geometry Creation Workflow
 1. **Plan 2D first**: Design your 2D profile completely including all holes/cutouts
 2. **Use subtract2d**: Add holes using `subtract2d` on the 2D profile
 3. **Then extrude**: Only extrude to 3D after the 2D profile is complete
@@ -21,12 +28,13 @@ When creating KCL parts, follow this workflow for best results:
 
 **Good workflow:**
 ```
-2D profile → add 2D holes → extrude → add features on faces → done
+@settings → input params → calculated params → assertions → 2D profile → add 2D holes → extrude → done
 ```
 
 **Problematic workflow (avoid):**
 ```
 extrude → create separate 3D holes → subtract (may fail!)
+No @settings, mixed parameters, no assertions, repetitive code
 ```
 
 ## Known Engine Limitations and Workarounds
@@ -548,20 +556,24 @@ assertIs(booleanValue)  // Assert true
 
 ## Common Gotchas
 
-1. **Variables are immutable** - Cannot reassign
-2. **All function parameters must be labeled** (except first if marked with `@`)
-3. **Tags declared with `$`, used without** - `tag = $myTag` vs `tags = [myTag]`
-4. **Units in arithmetic** - `10in * 2` gives 20in, not 20cm
-5. **Close your sketches** - Profiles must be closed before extrusion
-6. **Pipeline first param** - If function's first param is marked `@`, it's automatically filled from pipeline
-7. **Arrays are 0-indexed** - First element is `arr[0]`, not `arr[1]`
-8. **Imports must be at top** - Import statements cannot be inside functions or conditionals
-9. **Sketch on face coordinates** - When sketching on a face, coordinates use the global coordinate system, not the face's local system
-10. **Method parameter** - `extrude(method = NEW)` creates a separate solid; `method = MERGE` (default) extends/modifies existing solid
-11. **3D Boolean limitations** - `union` and `subtract` operations may fail; prefer 2D operations before extruding
-12. **Arc parameter combinations** - `tangentialArc` needs EITHER `angle + radius` OR just `end` point, not both
-13. **Snapshot views** - `zoo kcl snapshot` only produces default isometric view; rotate model in code for other views
-14. **2D before 3D** - Always add holes/cutouts using `subtract2d` on 2D profiles before extruding to 3D
+1. **Missing @settings** - Always start files with `@settings(defaultLengthUnit = [unit], kclVersion = 1.0)`
+2. **Unorganized parameters** - Separate input parameters from calculated parameters with comment headers
+3. **Repetitive code instead of patterns** - Use `patternLinear2d` / `patternCircular2d` instead of creating individual features
+4. **No assertions** - Validate parameter relationships early to catch errors before geometry creation
+5. **Variables are immutable** - Cannot reassign once declared
+6. **All function parameters must be labeled** (except first if marked with `@`)
+7. **Tags declared with `$`, used without** - `tag = $myTag` vs `tags = [myTag]`
+8. **Units in arithmetic** - `10in * 2` gives 20in, not 20cm
+9. **Close your sketches** - Profiles must be closed before extrusion
+10. **Pipeline first param** - If function's first param is marked `@`, it's automatically filled from pipeline
+11. **Arrays are 0-indexed** - First element is `arr[0]`, not `arr[1]`
+12. **Imports must be at top** - Import statements cannot be inside functions or conditionals
+13. **Sketch on face coordinates** - When sketching on a face, coordinates use the global coordinate system, not the face's local system
+14. **Method parameter** - `extrude(method = NEW)` creates a separate solid; `method = MERGE` (default) extends/modifies existing solid
+15. **3D Boolean limitations** - `union` and `subtract` operations may fail; prefer 2D operations before extruding
+16. **Arc parameter combinations** - `tangentialArc` needs EITHER `angle + radius` OR just `end` point, not both
+17. **Snapshot views** - `zoo kcl snapshot` only produces default isometric view; rotate model in code for other views
+18. **2D before 3D** - Always add holes/cutouts using `subtract2d` on 2D profiles before extruding to 3D
 
 ## Module System
 
@@ -592,18 +604,64 @@ Some features require enabling experimental features:
 
 ## Best Practices
 
-1. **Use descriptive variable names** - `flangeRadius` not `r`
-2. **Define parameters at top** - Makes modification easier
-3. **Tag geometry you'll reference** - Edges for fillets, faces for sketching
-4. **Break complex models into functions** - Reusability and clarity
-5. **Use units explicitly** - Especially when mixing systems
-6. **Comment non-obvious calculations** - Help future readers
-7. **Validate with assertions** - Catch errors early
+### Code Organization (CRITICAL for new projects)
+
+**Every KCL file should follow this structure:**
+
+```kcl
+// 1. File header comment describing the part
+// [Part Name] - [Brief Description]
+// Material: [material specs]
+// Purpose: [what this part does]
+
+// 2. Settings declaration (MANDATORY)
+@settings(defaultLengthUnit = in, kclVersion = 1.0)
+
+// 3. Input parameters (user-modifiable values)
+width = 10.0
+height = 5.0
+thickness = 0.125
+holeCount = 4
+
+// 4. Calculated parameters (derived from inputs)
+totalLength = width + height
+holeSpacing = width / (holeCount + 1)
+
+// 5. Assertions (validate parameters early)
+assert(width, isGreaterThan = thickness * 2, error = "Width too small")
+assert(holeSpacing, isGreaterThan = holeDiameter, error = "Holes too close")
+
+// 6. Geometry creation
+// ... your 3D modeling code here
+```
+
+### General Best Practices
+
+1. **Always start with @settings** - Specify `defaultLengthUnit` and `kclVersion = 1.0`
+2. **Organize parameters clearly** - Separate input parameters from calculated parameters with comments
+3. **Use pattern functions, not repetition** - Use `patternLinear2d`, `patternCircular2d` instead of creating individual features
+4. **Add assertions early** - Validate dimensions before creating geometry
+5. **Use descriptive variable names** - `flangeRadius` not `r`, `mountingHoles` not `h1`
+6. **Define parameters at top** - Makes modification easier and clearer
+7. **Tag geometry you'll reference** - Edges for fillets, faces for sketching
+8. **Break complex models into functions** - Reusability and clarity
+9. **Use units explicitly** - Especially when mixing systems
+10. **Comment non-obvious calculations** - Help future readers understand intent
+11. **Prefer 2D operations** - Use `subtract2d` for holes before extruding, not 3D subtract
 
 ## Example: Complete Part
 
+This example demonstrates all best practices in a single part:
+
 ```kcl
-// Parameters
+// Mounting Plate with Central Boss
+// Material: Aluminum 6061-T6
+// Purpose: Base plate with mounting holes and central boss for shaft mounting
+
+// Settings (ALWAYS include this)
+@settings(defaultLengthUnit = mm, kclVersion = 1.0)
+
+// Input parameters
 baseWidth = 50
 baseHeight = 30
 baseThickness = 5
@@ -611,6 +669,17 @@ bossDiameter = 20
 bossHeight = 15
 mountHoleDia = 6
 mountHoleOffset = 35
+filletRadius = 2
+
+// Calculated parameters
+minBossClearance = mountHoleOffset - bossDiameter / 2
+edgeMargin = (baseWidth - 2 * mountHoleOffset) / 2
+
+// Assertions - validate before building geometry
+assert(baseWidth, isGreaterThan = mountHoleOffset * 2, error = "Plate too narrow for hole pattern")
+assert(baseHeight, isGreaterThan = mountHoleOffset * 2, error = "Plate too short for hole pattern")
+assert(minBossClearance, isGreaterThan = mountHoleDia, error = "Boss interferes with mounting holes")
+assert(bossDiameter, isLessThan = baseWidth * 0.8, error = "Boss too large for plate")
 
 // Create base plate profile
 basePlateProfile = startSketchOn(XY)
@@ -620,7 +689,7 @@ basePlateProfile = startSketchOn(XY)
   |> line(end = [-baseWidth, 0], tag = $backEdge)
   |> close(tag = $leftEdge)
 
-// Create mounting holes pattern IN 2D
+// Create mounting holes pattern IN 2D (pattern-based approach)
 mountingHoles = startSketchOn(XY)
   |> circle(center = [mountHoleOffset/2, 0], radius = mountHoleDia/2)
   |> patternCircular2d(
@@ -630,24 +699,33 @@ mountingHoles = startSketchOn(XY)
        rotateDuplicates = true
      )
 
-// Subtract holes in 2D BEFORE extruding
+// Subtract holes in 2D BEFORE extruding (best practice)
 basePlate = basePlateProfile
   |> subtract2d(tool = mountingHoles)
   |> extrude(length = baseThickness)
-  |> fillet(radius = 2, tags = [
+  |> fillet(radius = filletRadius, tags = [
        getNextAdjacentEdge(frontEdge),
        getNextAdjacentEdge(rightEdge),
        getNextAdjacentEdge(backEdge),
        getNextAdjacentEdge(leftEdge)
      ])
 
-// Boss on top (extrude from face of base)
+// Boss on top (extrude from face of base - uses method=MERGE by default)
 boss = startSketchOn(basePlate, face = END)
   |> circle(center = [0, 0], radius = bossDiameter/2)
   |> extrude(length = bossHeight)
-
-// Note: boss uses method=MERGE by default, so it joins with basePlate automatically
 ```
+
+**Key practices demonstrated:**
+1. ✅ Header comment explaining purpose and material
+2. ✅ `@settings` declaration at the top
+3. ✅ Input parameters clearly separated
+4. ✅ Calculated parameters in their own section
+5. ✅ Assertions validate geometry before creation
+6. ✅ Pattern-based approach for mounting holes (not 4 individual circles)
+7. ✅ 2D subtract before extrude (not 3D boolean operations)
+8. ✅ Descriptive variable names throughout
+9. ✅ Tagged edges for later reference
 
 ## CLI Usage
 
