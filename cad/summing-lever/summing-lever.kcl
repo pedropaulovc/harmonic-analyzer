@@ -54,8 +54,9 @@ edgeFillet = 0.0625 // 1/16" fillet on main edges (to be added in Phase 6)
 
 // Paddle hole spacing - single line along the short edge (20 holes across width)
 paddleHoleSpacingY = paddleWidth * 0.9 / (paddleHoleCols - 1) // 20 holes across the 3" width
-paddleHoleStartX = 0.25  // Position 0.25" from the left edge
-paddleHoleStartY = -paddleWidth * 0.45  // Start position across width
+paddleHoleStartX = 0.25 // Position 0.25" from the left edge
+paddleHoleStartY = -paddleWidth * 0.45 // Start position across width
+
 
 // Right arm dimensions
 counterArmLength = leverLength - fulcrumPosition - 2.0
@@ -88,18 +89,12 @@ leverProfile = startSketchOn(XY)
 
 // Create mounting hole pattern (single line of 20 holes across width on left end)
 mountingHoles = startSketchOn(XY)
-  |> circle(
-       center = [paddleHoleStartX, paddleHoleStartY],
-       radius = paddleHoleDiam / 2,
-     )
+  |> circle(center = [paddleHoleStartX, paddleHoleStartY], radius = paddleHoleDiam / 2)
   |> patternLinear2d(axis = Y, instances = paddleHoleCols, distance = paddleHoleSpacingY)
 
 // Create output hole on opposite end (centered)
 outputHole = startSketchOn(XY)
-  |> circle(
-       center = [outputHolePosition, 0],
-       radius = outputHoleDiam / 2
-     )
+  |> circle(center = [outputHolePosition, 0], radius = outputHoleDiam / 2)
 
 // Subtract all holes in 2D before extruding (best practice - more reliable than 3D subtract)
 leverOutline = leverProfile
