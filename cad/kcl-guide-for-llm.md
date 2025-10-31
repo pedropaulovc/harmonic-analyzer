@@ -396,25 +396,28 @@ concatArr = concat(arr, items = [7, 8, 9])  // Combine arrays
 ## Important Constants
 
 ```kcl
-// Planes
-XY, XZ, YZ          // Standard planes
--XY, -XZ, -YZ       // Negative planes (flipped normal)
+// Standard planes: XY, XZ, YZ
+sketch1 = startSketchOn(XY) |> circle(center = [0, 0], radius = 5)
 
-// Axes
-X, Y, Z             // 3D axes
+// Negative planes (flipped normal): -XY, -XZ, -YZ
+sketch2 = startSketchOn(-XY) |> circle(center = [0, 0], radius = 5)
 
-// Special tags
-START               // Starting face of extrusion
-END                 // Ending face of extrusion
+// 3D axes: X, Y, Z
+solid1 = extrude(sketch1, length = 10)
+  |> patternLinear3d(instances = 3, distance = 15, axis = X)
 
-// Math constants
-PI                  // 3.14159...
-E                   // 2.71828...
-TAU                 // 6.28318... (2π)
+// Math constants: PI, E, TAU
+circumference = 20
+radius = (circumference / (2 * PI)): mm
+area = E * TAU
 
-// Extrusion methods
-NEW                 // Create separate solid
-MERGE               // Merge with existing (default)
+// Special face tags: START, END
+solid2 = extrude(sketch2, length = 10)
+sketch3 = startSketchOn(solid2, face = END)
+  |> circle(center = [0, 0], radius = 2)
+
+// Extrusion methods: NEW (separate solid), MERGE (default, extends existing)
+cylinder1 = extrude(sketch3, length = 5, method = NEW)
 ```
 
 ## Assertions and Validation
