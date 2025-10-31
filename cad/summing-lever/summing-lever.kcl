@@ -9,169 +9,96 @@
 @settings(defaultLengthUnit = in, kclVersion = 1.0)
 
 // ============================================================================
-// INPUT PARAMETERS (from sketch)
+// INPUT PARAMETERS
 // ============================================================================
 
-// Overall dimensions from sketch
-leverLength = 10.0 // Total horizontal length
+// Overall dimensions
+leverLength = 5.0 // Total horizontal length
 baseThickness = 0.125 // 1/8" extrusion thickness
+paddleWidth = 3.0 // Width of paddle section
 
 
-// Left paddle section (wide end with mounting holes)
-paddleWidth = 4.5 // Width at widest point (left end)
-paddleLength = 3.0 // Length of paddle section
-
-
-// Center section (narrow waist)
-waistWidth = 2.0 // Narrowest width at center
-waistPosition = 5.0 // Distance from left to center of waist
-centerHoleDiam = 1.0 // Center fulcrum hole diameter
-
-
-// Right section (counter-weight with rounded end)
-counterWidth = 2.0 // Width of counter arm
-counterEndRadius = 1.0 // Radius of rounded right end
-counterLength = 3.0 // Length of counter section
-
-
-// Transition radii
-smallRadius = 0.333 // Small transition curves (1/3")
+// Margins and spacing
+edgeMargin = 0.25 // Distance from edges for hole placement
+outputHoleMargin = 0.25 // Distance from right end for output hole
+cornerRadius = 0.5 // Radius for rounded corners
 
 
 // Hole specifications
 paddleHoleCount = 20 // Number of mounting holes in line
 paddleHoleDiam = 0.0403 // Spring mounting hole diameter (18 AWG wire gauge)
-paddleHoleMargin = 0.25 // Distance from edge for holes
 outputHoleDiam = 0.0508 // Output hole diameter (16 AWG wire gauge)
 
+
+// Fulcrum slot (for future use)
+fulcrumSlotWidth = 0.5 // Width of mounting slot
+fulcrumSlotLength = 1.0 // Length of mounting slot
+
+
+// Future features (not yet implemented)
+// edgeFillet = 0.0625 // 1/16" fillet on main edges
+// smallRadius = 0.333 // 1/3" radius for tight curves
+// largeRadius = 2.0 // 2" radius for gradual transitions
 
 // ============================================================================
 // CALCULATED PARAMETERS
 // ============================================================================
 
-// Paddle hole pattern (vertical line along left edge)
-paddleHoleSpacingY = (paddleWidth - (2 * paddleHoleMargin)) / (paddleHoleCount - 1)
-paddleHoleStartX = paddleHoleMargin
-paddleHoleStartY = -paddleWidth / 2 + paddleHoleMargin
+// Geometric relationships
+paddleLength = leverLength * 0.25 // Paddle takes 25% of lever length
+fulcrumPosition = leverLength / 2 // Fulcrum at center
+outputHolePosition = leverLength - outputHoleMargin // Output hole near right end
 
-// Position calculations
-outputHolePosition = leverLength - counterEndRadius - 0.5 // Near right end
-transitionLength = (waistPosition - paddleLength - counterLength) / 2 // Length of each transition
 
+// Paddle hole pattern
+paddleHoleSpacingY = (paddleWidth - (2 * edgeMargin)) / (paddleHoleCount - 1)
+paddleHoleStartX = edgeMargin // Start holes one margin from left edge
+paddleHoleStartY = -paddleWidth / 2 + edgeMargin // Start position across width
+
+
+// Right arm dimensions (for future use)
+counterArmLength = leverLength - fulcrumPosition
 
 // ============================================================================
 // ASSERTIONS - Validate design constraints
 // ============================================================================
 
 
-assert(leverLength, isGreaterThan = paddleLength + counterLength, error = "Lever too short")
-assert(paddleWidth, isGreaterThan = waistWidth, error = "Paddle must be wider than waist")
-assert(paddleHoleSpacingY, isGreaterThan = paddleHoleDiam, error = "Paddle holes too close")
+assert(leverLength, isGreaterThan = 2.0, error = "Lever length too short")
+assert(paddleWidth, isGreaterThan = 2 * edgeMargin, error = "Paddle width too narrow for margins")
+assert(outputHoleMargin, isLessThan = leverLength * 0.4, error = "Output hole margin too large")
+assert(paddleHoleSpacingY, isGreaterThan = paddleHoleDiam, error = "Paddle holes too close - will overlap")
+assert(cornerRadius, isLessThan = paddleWidth / 2, error = "Corner radius too large for paddle width")
+assert(cornerRadius, isLessThan = leverLength / 2, error = "Corner radius too large for lever length")
 
 // ============================================================================
-// GEOMETRY - Top view profile matching sketch
+// PHASE 3: LEVER PROFILE WITH ORGANIC CURVES
 // ============================================================================
 
-
-// Build the profile in a simple, controlled way:
-// 1. Left paddle (wide section with rounded end)
-// 2. Taper to narrow waist
-// 3. Widen back out to counter section
-// 4. Rounded counter end
-
-
+// Create base lever profile with rounded corners for organic look
 leverProfile = startSketchOn(XY)
-  // Start at bottom-left corner of paddle
-  |> startProfile(at = [smallRadius, -paddleWidth / 2])
-
-  // Left rounded end (bottom half)
-  |> tangentialArc(angle = -90, radius = smallRadius)
-  |> line(end = [0, paddleWidth - (2 * smallRadius)])
-  |> tangentialArc(angle = -90, radius = smallRadius)
-
-  // Top edge of paddle
-  |> line(end = [paddleLength - (2 * smallRadius), 0])
-
-  // Taper from paddle to waist (top side)
-  |> tangentialArc(angle = -45, radius = smallRadius)
-  |> line(end = [
-       transitionLength,
-       -(paddleWidth - waistWidth) / 2
-     ])
-  |> tangentialArc(angle = -45, radius = smallRadius)
-
-  // Top of waist section
-  |> line(end = [
-       waistPosition - paddleLength - transitionLength,
-       0
-     ])
-
-  // Widen from waist to counter (top side)
-  |> tangentialArc(angle = 45, radius = smallRadius)
-  |> line(end = [
-       transitionLength,
-       (counterWidth - waistWidth) / 2
-     ])
-  |> tangentialArc(angle = 45, radius = smallRadius)
-
-  // Top of counter section
-  |> line(end = [
-       counterLength - counterEndRadius - 0.5,
-       0
-     ])
-
-  // Rounded right end (semicircle)
-  |> tangentialArc(angle = 90, radius = counterEndRadius)
-  |> tangentialArc(angle = 90, radius = counterEndRadius)
-
-  // Bottom of counter section
-  |> line(end = [
-       -(counterLength - counterEndRadius - 0.5),
-       0
-     ])
-
-  // Narrow from counter to waist (bottom side)
-  |> tangentialArc(angle = 45, radius = smallRadius)
-  |> line(end = [
-       -transitionLength,
-       -(counterWidth - waistWidth) / 2
-     ])
-  |> tangentialArc(angle = 45, radius = smallRadius)
-
-  // Bottom of waist section
-  |> line(end = [
-       -(waistPosition - paddleLength - transitionLength),
-       0
-     ])
-
-  // Widen from waist to paddle (bottom side)
-  |> tangentialArc(angle = -45, radius = smallRadius)
-  |> line(end = [
-       -transitionLength,
-       (paddleWidth - waistWidth) / 2
-     ])
-  |> tangentialArc(angle = -45, radius = smallRadius)
-
-  // Bottom edge of paddle
-  |> line(end = [-(paddleLength - (2 * smallRadius)), 0])
+  |> startProfile(at = [0, -paddleWidth / 2 + cornerRadius])
+  |> line(end = [0, paddleWidth - (2 * cornerRadius)])
+  |> tangentialArc(angle = 90, radius = cornerRadius)
+  |> line(end = [leverLength - (2 * cornerRadius), 0])
+  |> tangentialArc(angle = 90, radius = cornerRadius)
+  |> line(end = [0, -(paddleWidth - (2 * cornerRadius))])
+  |> tangentialArc(angle = 90, radius = cornerRadius)
+  |> line(end = [-(leverLength - (2 * cornerRadius)), 0])
+  |> tangentialArc(angle = 90, radius = cornerRadius)
   |> close()
 
-// Create mounting hole pattern (vertical line on left paddle)
+// Create mounting hole pattern (single line of holes across width on left end)
 mountingHoles = startSketchOn(XY)
   |> circle(center = [paddleHoleStartX, paddleHoleStartY], radius = paddleHoleDiam / 2)
   |> patternLinear2d(axis = Y, instances = paddleHoleCount, distance = paddleHoleSpacingY)
 
-// Create center fulcrum hole
-centerHole = startSketchOn(XY)
-  |> circle(center = [waistPosition, 0], radius = centerHoleDiam / 2)
-
-// Create output hole on right end
+// Create output hole on opposite end (centered)
 outputHole = startSketchOn(XY)
   |> circle(center = [outputHolePosition, 0], radius = outputHoleDiam / 2)
 
-// Subtract all holes in 2D before extruding
+// Subtract all holes in 2D before extruding (best practice - more reliable than 3D subtract)
 leverOutline = leverProfile
   |> subtract2d(tool = mountingHoles)
-  |> subtract2d(tool = centerHole)
   |> subtract2d(tool = outputHole)
   |> extrude(length = baseThickness)
