@@ -9,69 +9,64 @@
 @settings(defaultLengthUnit = in, kclVersion = 1.0)
 
 // ============================================================================
-// INPUT PARAMETERS (from user sketches)
+// INPUT PARAMETERS
 // ============================================================================
 
 // Overall dimensions
 leverLength = 5.0 // Total horizontal length
 baseThickness = 0.125 // 1/8" extrusion thickness
-
-
-// Left paddle section (input side with multiple spring holes)
 paddleWidth = 3.0 // Width of paddle section
-paddleLength = 1.25 // Length along lever arm (scaled to fit 5" total)
-paddleHoleCount = 20 // Total mounting holes (single line pattern)
-paddleHoleRows = 1 // Single row of holes
-paddleHoleCols = 20 // 20 columns across the width
+
+
+// Margins and spacing
+edgeMargin = 0.25 // Distance from edges for hole placement
+outputHoleMargin = 0.25 // Distance from right end for output hole
+
+
+// Hole specifications
+paddleHoleCount = 20 // Number of mounting holes in line
 paddleHoleDiam = 0.0403 // Spring mounting hole diameter (18 AWG wire gauge)
+outputHoleDiam = 0.0508 // Output hole diameter (16 AWG wire gauge)
 
 
-// Center fulcrum section
-fulcrumPosition = 2.5 // Distance from left end to fulcrum center (scaled to fit 5" total)
+// Fulcrum slot (for future use)
 fulcrumSlotWidth = 0.5 // Width of mounting slot
 fulcrumSlotLength = 1.0 // Length of mounting slot
 
 
-// Right counter-weight section
-counterWidth = 2.0 // Width of counter-weight arm
-counterHoleDiam = 1.0 // Diameter of spring hole (from sketch)
-outputHoleDiam = 0.0508 // Output hole diameter (16 AWG wire gauge)
-outputHolePosition = 4.75 // Distance from left end to output hole
-
-
-// Transition curves (from sketch)
-smallRadius = 0.333 // 1/3" radius for tight curves
-largeRadius = 2.0 // 2" radius for gradual transitions
-
-
-// Edge fillets
-edgeFillet = 0.0625 // 1/16" fillet on main edges (to be added in Phase 6)
-
+// Future features (not yet implemented)
+// edgeFillet = 0.0625 // 1/16" fillet on main edges
+// smallRadius = 0.333 // 1/3" radius for tight curves
+// largeRadius = 2.0 // 2" radius for gradual transitions
 
 // ============================================================================
 // CALCULATED PARAMETERS
 // ============================================================================
 
-// Paddle hole spacing - single line along the short edge (20 holes across width)
-paddleHoleSpacingY = paddleWidth * 0.9 / (paddleHoleCols - 1) // 20 holes across the 3" width
-paddleHoleStartX = 0.25 // Position 0.25" from the left edge
-paddleHoleStartY = -paddleWidth * 0.45 // Start position across width
+// Geometric relationships
+paddleLength = leverLength * 0.25 // Paddle takes 25% of lever length
+fulcrumPosition = leverLength / 2 // Fulcrum at center
+outputHolePosition = leverLength - outputHoleMargin // Output hole near right end
 
 
-// Right arm dimensions
-counterArmLength = leverLength - fulcrumPosition - 2.0
-counterHolePosition = fulcrumPosition + counterArmLength - 1.0
+// Paddle hole pattern
+paddleHoleSpacingY = (paddleWidth - (2 * edgeMargin)) / (paddleHoleCount - 1)
+paddleHoleStartX = edgeMargin // Start holes one margin from left edge
+paddleHoleStartY = -paddleWidth / 2 + edgeMargin // Start position across width
+
+
+// Right arm dimensions (for future use)
+counterArmLength = leverLength - fulcrumPosition
 
 // ============================================================================
 // ASSERTIONS - Validate design constraints
 // ============================================================================
 
 
-assert(leverLength, isGreaterThan = paddleLength + 1.25, error = "Lever too short for paddle and counter sections")
-assert(fulcrumPosition, isGreaterThan = paddleLength * 0.5, error = "Fulcrum too close to paddle end")
-assert(fulcrumPosition, isLessThan = leverLength - counterArmLength, error = "Fulcrum position leaves insufficient counter-arm length")
-assert(paddleWidth, isGreaterThan = paddleHoleDiam * paddleHoleCols, error = "Paddle too narrow for hole pattern - holes would overlap")
-assert(counterHoleDiam, isLessThan = counterWidth * 0.8, error = "Counter hole too large for arm width")
+assert(leverLength, isGreaterThan = 2.0, error = "Lever length too short")
+assert(paddleWidth, isGreaterThan = 2 * edgeMargin, error = "Paddle width too narrow for margins")
+assert(outputHoleMargin, isLessThan = leverLength * 0.4, error = "Output hole margin too large")
+assert(paddleHoleSpacingY, isGreaterThan = paddleHoleDiam, error = "Paddle holes too close - will overlap")
 
 // ============================================================================
 // PHASE 1-2: BASIC OUTLINE WITH MOUNTING HOLES
@@ -87,10 +82,10 @@ leverProfile = startSketchOn(XY)
   |> line(end = [-leverLength, 0])
   |> close()
 
-// Create mounting hole pattern (single line of 20 holes across width on left end)
+// Create mounting hole pattern (single line of holes across width on left end)
 mountingHoles = startSketchOn(XY)
   |> circle(center = [paddleHoleStartX, paddleHoleStartY], radius = paddleHoleDiam / 2)
-  |> patternLinear2d(axis = Y, instances = paddleHoleCols, distance = paddleHoleSpacingY)
+  |> patternLinear2d(axis = Y, instances = paddleHoleCount, distance = paddleHoleSpacingY)
 
 // Create output hole on opposite end (centered)
 outputHole = startSketchOn(XY)
