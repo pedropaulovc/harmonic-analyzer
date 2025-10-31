@@ -23,7 +23,7 @@ paddleLength = 5.0 // Length along lever arm
 paddleHoleCount = 20 // Total mounting holes (single line pattern)
 paddleHoleRows = 1 // Single row of holes
 paddleHoleCols = 20 // 20 columns across the width
-paddleHoleDiam = 0.125 // Spring mounting hole diameter
+paddleHoleDiam = 0.0403 // Spring mounting hole diameter (18 AWG wire gauge)
 
 
 // Center fulcrum section
