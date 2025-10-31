@@ -20,6 +20,7 @@ area = width * height
 ### Functions
 ```kcl
 // All parameters must be labeled when calling (except first if marked with @)
+// @ prefix makes the first parameter positional/unlabeled
 fn makeCube(@size, color) {
   return startSketchOn(XY)
     |> startProfile(at = [0, 0])
@@ -33,6 +34,13 @@ fn makeCube(@size, color) {
 
 // Call with labeled args (first unlabeled due to @)
 cube = makeCube(10, color = "#ff0000")
+
+// Functions can have type annotations
+fn makeBox(@width: number(mm), height: number(mm), depth: number(mm)) {
+  return startSketchOn(XY)
+    |> rectangle(width = width, height = height, center = [0, 0])
+    |> extrude(length = depth)
+}
 ```
 
 ### Pipeline Operator
@@ -47,6 +55,25 @@ sketch = startSketchOn(XY)
 
 // The % symbol represents the left side value (often implicit for first unlabeled param)
 x = 10 |> sqrt(%) |> pow(%, exp = 2)
+```
+
+### Conditionals
+```kcl
+// if/else expressions (must have else branch)
+thickness = if partSize > 100 {
+  5
+} else if partSize > 50 {
+  3
+} else {
+  2
+}
+
+// Conditional geometry
+profile = if needHoles {
+  baseProfile |> subtract2d(tool = holes)
+} else {
+  baseProfile
+}
 ```
 
 ## Units of Measurement
@@ -69,16 +96,28 @@ line(end = [10mm, 5in])  // Mixed units auto-convert
 extrude(length = 2.5cm)
 revolve(angle = 180deg)
 
-// Type ascription for complex expressions
-area = (width * height): mm  // Assert result is in mm
+// Type ascription for unit assertions
+// Use `: type` syntax when KCL cannot infer units (e.g., with PI calculations)
+radius = (circumference / (2 * PI)): mm  // Asserts result should be mm
+angle = (degrees * PI / 180): rad        // Asserts result should be radians
+
+// For area/volume calculations - convert to same unit first
+area = units::toMillimeters(width) * units::toMillimeters(height)  // Result in mm²
 ```
+
+**Important**: Type ascription (`: type`) only asserts/validates units, it doesn't convert them. For actual unit conversion, use `units::` functions like `units::toMillimeters()`. KCL doesn't have built-in area or volume units.
 
 ## 2D Sketching Workflow
 
 ### 1. Choose a plane
 ```kcl
-startSketchOn(XY)   // Or XZ, YZ, -XY, -XZ, -YZ
-startSketchOn(offsetPlane(XY, offset = 10))  // Offset plane
+startSketchOn(XY)   // Z points up (default for horizontal surfaces)
+startSketchOn(XZ)   // Y points down (good for side views)
+startSketchOn(YZ)   // X points out (good for front/back views)
+startSketchOn(-XY)  // Z points down (flipped normal)
+startSketchOn(-XZ)  // Y points up (flipped normal)
+startSketchOn(-YZ)  // X points in (flipped normal)
+startSketchOn(offsetPlane(XY, offset = 10))  // Parallel plane, offset along normal
 ```
 
 ### 2. Start a profile
@@ -89,11 +128,11 @@ startProfile(at = [0, 0])  // Starting point
 ### 3. Draw paths
 ```kcl
 // Basic lines
-line(end = [10, 5])           // Relative distance
-line(endAbsolute = [20, 30])  // Absolute position
-xLine(length = 10)            // Horizontal line
-yLine(length = 5)             // Vertical line
-angledLine(angle = 45deg, length = 10)
+line(end = [10, 5])           // Relative: move 10 right, 5 up from current point
+line(endAbsolute = [20, 30])  // Absolute: go to exact position [20, 30]
+xLine(length = 10)            // Horizontal line (relative)
+yLine(length = 5)             // Vertical line (relative)
+angledLine(angle = 45deg, length = 10)  // Line at angle (relative)
 
 // Arcs and curves
 arc(angleStart = 0, angleEnd = 90deg, radius = 5)
@@ -128,17 +167,19 @@ revolve(axis = Y, angle = 180deg)  // Partial revolve
 
 ### Sweep
 ```kcl
-// Define a path
+// Define a path for the sweep
 sweepPath = startSketchOn(XZ)
   |> startProfile(at = [0, 0])
   |> line(end = [0, 10])
   |> tangentialArc(angle = 90deg, radius = 5)
   |> line(end = [10, 0])
 
-// Sweep a profile along path
+// Create a profile to sweep
 profile = startSketchOn(XY)
   |> circle(center = [0, 0], radius = 2)
-  |> sweep(path = sweepPath)
+
+// Sweep the profile along the path
+sweptSolid = sweep(profile, path = sweepPath)
 ```
 
 ### Loft
@@ -247,6 +288,22 @@ scale(x = 2, y = 1.5, z = 1)
 mirror2d(axis = X)  // For sketches only
 ```
 
+## Cloning Geometry
+
+```kcl
+// Clone creates an independent copy that can be transformed separately
+originalSketch = startSketchOn(XY)
+  |> circle(center = [0, 0], radius = 5)
+  |> extrude(length = 10)
+
+// Create a clone and transform it
+clonedPart = clone(originalSketch)
+  |> translate(x = 20, y = 0, z = 0)
+  |> scale(z = 2)
+
+// Both original and clone exist independently
+```
+
 ## Sketch on Face
 
 ```kcl
@@ -277,9 +334,18 @@ filletRadius = 1
 
 // Use throughout design
 sketch = startSketchOn(XY)
-  |> rectangle(width = width, height = height, center = [0, 0])
+  |> startProfile(at = [-width/2, -height/2])
+  |> line(end = [width, 0], tag = $edge1)
+  |> line(end = [0, height], tag = $edge2)
+  |> line(end = [-width, 0], tag = $edge3)
+  |> close(tag = $edge4)
   |> extrude(length = thickness)
-  |> fillet(radius = filletRadius, tags = getAllEdges())
+  |> fillet(radius = filletRadius, tags = [
+       getNextAdjacentEdge(edge1),
+       getNextAdjacentEdge(edge2),
+       getNextAdjacentEdge(edge3),
+       getNextAdjacentEdge(edge4)
+     ])
 ```
 
 ### Reusable Functions
@@ -318,6 +384,13 @@ numbers = [1, 2, 3, 4, 5]
 sum = reduce(numbers, initial = 0, f = fn(@item, accum) {
   return accum + item
 })
+
+// Array operations
+arr = [1, 2, 3, 4, 5]
+first = arr[0]           // Access by index (0-based)
+last = arr[count(arr)-1] // Get last element
+newArr = push(arr, item = 6)  // Add element
+concatArr = concat(arr, items = [7, 8, 9])  // Combine arrays
 ```
 
 ## Important Constants
@@ -362,6 +435,9 @@ assertIs(booleanValue)  // Assert true
 5. **Close your sketches** - Profiles must be closed before extrusion
 6. **Pipeline first param** - If function's first param is marked `@`, it's automatically filled from pipeline
 7. **Arrays are 0-indexed** - First element is `arr[0]`, not `arr[1]`
+8. **Imports must be at top** - Import statements cannot be inside functions or conditionals
+9. **Sketch on face coordinates** - When sketching on a face, coordinates use the global coordinate system, not the face's local system
+10. **Method parameter** - `extrude(method = NEW)` creates a separate solid; `method = MERGE` (default) extends/modifies existing solid
 
 ## Module System
 
@@ -374,6 +450,20 @@ export myConstant = 42
 // Import in another file
 import myFunction, myConstant from "utils.kcl"
 import "utils.kcl" as utils  // Import entire module
+```
+
+**Important**: Import statements must be at the top level of a file, before any other code (comments are allowed).
+
+## Experimental Features
+
+Some features require enabling experimental features:
+
+```kcl
+@settings(experimentalFeatures = allow)
+
+// Now you can use experimental features like:
+// - hole::hole() and related hole functions
+// - gdt::datum() and gdt::flatness()
 ```
 
 ## Best Practices
@@ -443,6 +533,7 @@ zoo kcl format main.kcl -w
 # Export to different formats
 zoo kcl export --output-format=step main.kcl ./output
 zoo kcl export --output-format=stl main.kcl ./output
+zoo kcl export --output-format=obj main.kcl ./output
 
 # Create snapshot
 zoo kcl snapshot main.kcl output.png
@@ -456,4 +547,23 @@ zoo kcl surface-area main.kcl
 zoo kcl lint main.kcl
 ```
 
-This guide covers the essential KCL concepts and patterns needed for effective CAD modeling.
+## Debugging Tips
+
+1. **Use assertions liberally** - Validate dimensions and relationships
+2. **Break complex operations** - Split into smaller, testable functions
+3. **Check units** - Ensure consistent units throughout calculations
+4. **Validate tags** - Ensure tags are declared before use
+5. **Use comments** - Document design intent and constraints
+
+## Common Functions Reference
+
+- **Sketch**: `startSketchOn`, `startProfile`, `line`, `arc`, `circle`, `close`
+- **3D**: `extrude`, `revolve`, `sweep`, `loft`
+- **Boolean**: `union`, `subtract`, `intersect`
+- **Modify**: `fillet`, `chamfer`, `shell`, `hollow`
+- **Pattern**: `patternLinear3d`, `patternCircular3d`, `patternTransform`
+- **Transform**: `translate`, `rotate`, `scale`, `mirror2d`
+- **Query**: `segLen`, `segAng`, `profileStart`, `getOppositeEdge`
+- **Utility**: `clone`, `assert`, `assertIs`
+
+This guide covers the essential KCL concepts and patterns needed for effective CAD modeling in KittyCAD's KCL language.
