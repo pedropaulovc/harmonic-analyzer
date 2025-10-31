@@ -1,39 +1,119 @@
-// Console Bracket - C-shaped sheet metal bracket
+// Sheet Metal Console Bracket - C-Shaped Design
 // Material: 20 gauge sheet metal (0.0359" thick)
-// Dimensions: 10" width, 18" total length (before bending)
-// Continuous bent sheet metal design
+// Dimensions: 10" width × 18" total flat length (before bending)
 
 // Parameters
 sheetThickness = 0.0359
-bracketWidth = 10
-topSectionLength = 5
-verticalSectionLength = 10
-bottomSectionLength = 3
+width = 10.0
+topLength = 5.0
+verticalLength = 10.0
+bottomLength = 3.0
 bendRadius = 0.125
 
-// Create the C-shaped bracket as a continuous profile
-// Draw the cross-section in the XZ plane (side view), then extrude for width
-bracket = startSketchOn(XZ)
+// Mounting holes (for #8 screws)
+mountHoleDia = 0.177
+mountHoleOffset = 1.0 // offset from edges
+
+
+// Ventilation slots
+ventSlotWidth = 1.0
+ventSlotHeight = 2.5
+
+// Create C-shaped profile (side view in XZ plane)
+// Starting from top-left corner, creating the outer path
+cProfile = startSketchOn(XZ)
   |> startProfile(at = [0, 0])
-  // Top section outer edge (horizontal)
-  |> line(end = [topSectionLength, 0])
-  // First bend - outer arc (90 degrees, going from horizontal to vertical)
-  |> arc(angleStart = 0, angleEnd = 90deg, radius = bendRadius)
-  // Vertical section outer edge (going down)
-  |> line(end = [0, -verticalSectionLength])
-  // Second bend - outer arc (90 degrees, going from vertical to horizontal)
-  |> arc(angleStart = 270deg, angleEnd = 0deg, radius = bendRadius)
-  // Bottom section outer edge (horizontal)
-  |> line(end = [bottomSectionLength, 0])
-  // Return path - bottom edge with thickness
-  |> line(end = [0, -sheetThickness])
-  // Second bend - inner arc (return path)
-  |> arc(angleStart = 0, angleEnd = -90deg, radius = bendRadius)
-  // Vertical section inner edge (going up)
-  |> line(end = [0, verticalSectionLength])
-  // First bend - inner arc (return path)
-  |> arc(angleStart = 90deg, angleEnd = 180deg, radius = bendRadius)
-  // Top section inner edge (returning to start)
-  |> line(end = [-topSectionLength, 0])
+  |> line(end = [topLength, 0], tag = $topOuter) // Top section
+  |> tangentialArc(angle = -90deg, radius = bendRadius) // First bend
+  |> line(end = [0, -verticalLength], tag = $verticalOuter) // Vertical section
+  |> tangentialArc(angle = -90deg, radius = bendRadius) // Second bend
+  |> line(end = [bottomLength, 0], tag = $bottomOuter) // Bottom section
+  |> line(end = [0, -sheetThickness]) // Thickness at edge
+  |> line(end = [-bottomLength, 0]) // Bottom inner
+  |> tangentialArc(angle = 90deg, radius = bendRadius - sheetThickness) // Inner bend
+  |> line(end = [0, verticalLength], tag = $verticalInner) // Vertical inner
+  |> tangentialArc(angle = 90deg, radius = bendRadius - sheetThickness) // Inner bend
+  |> line(end = [-topLength, 0]) // Top inner
   |> close()
-  |> extrude(length = bracketWidth)
+  |> extrude(length = width)
+
+  // Add mounting holes on the top face
+// Create 4 holes in a rectangular pattern
+mountHole1 = startSketchOn(cProfile, face = topOuter)
+  |> circle(
+       center = [
+         mountHoleOffset,
+         width - mountHoleOffset
+       ],
+       radius = mountHoleDia / 2,
+     )
+
+mountHole2 = startSketchOn(cProfile, face = topOuter)
+  |> circle(
+       center = [
+         topLength - mountHoleOffset,
+         width - mountHoleOffset
+       ],
+       radius = mountHoleDia / 2,
+     )
+
+mountHole3 = startSketchOn(cProfile, face = topOuter)
+  |> circle(center = [mountHoleOffset, mountHoleOffset], radius = mountHoleDia / 2)
+
+mountHole4 = startSketchOn(cProfile, face = topOuter)
+  |> circle(
+       center = [
+         topLength - mountHoleOffset,
+         mountHoleOffset
+       ],
+       radius = mountHoleDia / 2,
+     )
+
+// Create mounting holes
+hole1 = extrude(mountHole1, length = -sheetThickness)
+hole2 = extrude(mountHole2, length = -sheetThickness)
+hole3 = extrude(mountHole3, length = -sheetThickness)
+hole4 = extrude(mountHole4, length = -sheetThickness)
+
+// Add ventilation slots on the vertical face
+// 4 slots evenly spaced
+slotSpacing = (width - (4 * ventSlotWidth)) / 5
+slot1Y = slotSpacing
+slot2Y = slotSpacing * 2 + ventSlotWidth
+slot3Y = slotSpacing * 3 + ventSlotWidth * 2
+slot4Y = slotSpacing * 4 + ventSlotWidth * 3
+
+slotZ = -verticalLength / 2 // Center vertically
+
+
+ventSlot1 = startSketchOn(cProfile, face = verticalOuter)
+  |> startProfile(at = [slotZ - (ventSlotHeight / 2), slot1Y])
+  |> line(end = [ventSlotHeight, 0])
+  |> line(end = [0, ventSlotWidth])
+  |> line(end = [-ventSlotHeight, 0])
+  |> close()
+  |> extrude(length = -sheetThickness)
+
+ventSlot2 = startSketchOn(cProfile, face = verticalOuter)
+  |> startProfile(at = [slotZ - (ventSlotHeight / 2), slot2Y])
+  |> line(end = [ventSlotHeight, 0])
+  |> line(end = [0, ventSlotWidth])
+  |> line(end = [-ventSlotHeight, 0])
+  |> close()
+  |> extrude(length = -sheetThickness)
+
+ventSlot3 = startSketchOn(cProfile, face = verticalOuter)
+  |> startProfile(at = [slotZ - (ventSlotHeight / 2), slot3Y])
+  |> line(end = [ventSlotHeight, 0])
+  |> line(end = [0, ventSlotWidth])
+  |> line(end = [-ventSlotHeight, 0])
+  |> close()
+  |> extrude(length = -sheetThickness)
+
+ventSlot4 = startSketchOn(cProfile, face = verticalOuter)
+  |> startProfile(at = [slotZ - (ventSlotHeight / 2), slot4Y])
+  |> line(end = [ventSlotHeight, 0])
+  |> line(end = [0, ventSlotWidth])
+  |> line(end = [-ventSlotHeight, 0])
+  |> close()
+  |> extrude(length = -sheetThickness)
