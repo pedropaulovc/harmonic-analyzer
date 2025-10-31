@@ -5,7 +5,7 @@
 @settings(defaultLengthUnit = in)
 
 // Define a function to create a spur gear using imperial diametral pitch system
-fn spurGear(nTeeth, diametralPitch, pressureAngle, gearHeight) {
+fn spurGear(nTeeth, diametralPitch, pressureAngle, gearHeight, holeDiam, keywayWidth) {
   // Define gear parameters using diametral pitch formulas
   // Note: In imperial, pitchDiameter = nTeeth / diametralPitch
   pitchDiameter = nTeeth / diametralPitch
@@ -14,10 +14,8 @@ fn spurGear(nTeeth, diametralPitch, pressureAngle, gearHeight) {
   baseDiameter = pitchDiameter * cos(pressureAngle)
   tipDiameter = pitchDiameter + 2 * addendum
 
-  // Define the constants of the keyway and the bore hole (converted to inches)
-  keywayWidth = 0.0787  // ~2mm converted to inches
+  // Calculate derived dimensions from keyway and bore hole parameters
   keywayDepth = keywayWidth / 2
-  holeDiam = 0.1969  // ~5mm converted to inches
   holeRadius = holeDiam / 2
   startAngle = asin(keywayWidth / 2 / holeRadius)
 
@@ -68,11 +66,12 @@ fn spurGear(nTeeth, diametralPitch, pressureAngle, gearHeight) {
   return gearSketch
 }
 
-// Example: Create a 21-tooth gear with 16 diametral pitch
-// Note: module 1.5mm ≈ DP 16.9, rounded to standard DP 16
+// Example: Create a 6-tooth gear with 16 diametral pitch
 spurGear(
-  nTeeth = 21,
+  nTeeth = 6,
   diametralPitch = 16,  // Standard imperial diametral pitch
   pressureAngle = 14deg,
-  gearHeight = 0.236,  // ~6mm converted to inches
+  gearHeight = 0.100,
+  holeDiam = 0.1969,  // ~5mm converted to inches
+  keywayWidth = 0.0787,  // ~2mm converted to inches
 )
