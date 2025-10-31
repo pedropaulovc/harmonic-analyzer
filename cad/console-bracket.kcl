@@ -1,7 +1,7 @@
 // Console Bracket - C-shaped sheet metal bracket
 // Material: 20 gauge sheet metal (0.0359" thick)
 // Dimensions: 10" width, 18" total length (before bending)
-// Simplified version for rendering (holes and slots not included due to engine limitations)
+// Continuous bent sheet metal design
 
 // Parameters
 sheetThickness = 0.0359
@@ -11,36 +11,29 @@ verticalSectionLength = 10
 bottomSectionLength = 3
 bendRadius = 0.125
 
-// Create the C-shaped bracket in three separate sections
-// Top section (horizontal, for desk mounting)
-topSection = startSketchOn(XY)
-  |> rectangle(width = bracketWidth, height = topSectionLength, center = [bracketWidth / 2, topSectionLength / 2])
-  |> extrude(length = sheetThickness)
-
-// Vertical section (goes down from wall)
-verticalOffsetZ = -(topSectionLength + bendRadius)
-verticalSection = startSketchOn(XZ)
-  |> rectangle(
-       width = bracketWidth,
-       height = verticalSectionLength,
-       center = [
-         bracketWidth / 2,
-         verticalOffsetZ - (verticalSectionLength / 2)
-       ],
-     )
-  |> extrude(length = sheetThickness)
-  |> translate(x = bendRadius + sheetThickness, y = 0, z = 0)
-
-// Bottom section (horizontal shelf)
-bottomOffsetZ = verticalOffsetZ - verticalSectionLength - bendRadius
-bottomSection = startSketchOn(XY)
-  |> rectangle(
-       width = bracketWidth,
-       height = bottomSectionLength,
-       center = [
-         bracketWidth / 2,
-         bottomSectionLength / 2
-       ],
-     )
-  |> extrude(length = sheetThickness)
-  |> translate(x = bendRadius + sheetThickness, y = 0, z = bottomOffsetZ)
+// Create the C-shaped bracket as a continuous profile
+// Draw the cross-section in the XZ plane (side view), then extrude for width
+bracket = startSketchOn(XZ)
+  |> startProfile(at = [0, 0])
+  // Top section outer edge (horizontal)
+  |> line(end = [topSectionLength, 0])
+  // First bend - outer arc (90 degrees, going from horizontal to vertical)
+  |> arc(angleStart = 0, angleEnd = 90deg, radius = bendRadius)
+  // Vertical section outer edge (going down)
+  |> line(end = [0, -verticalSectionLength])
+  // Second bend - outer arc (90 degrees, going from vertical to horizontal)
+  |> arc(angleStart = 270deg, angleEnd = 0deg, radius = bendRadius)
+  // Bottom section outer edge (horizontal)
+  |> line(end = [bottomSectionLength, 0])
+  // Return path - bottom edge with thickness
+  |> line(end = [0, -sheetThickness])
+  // Second bend - inner arc (return path)
+  |> arc(angleStart = 0, angleEnd = -90deg, radius = bendRadius)
+  // Vertical section inner edge (going up)
+  |> line(end = [0, verticalSectionLength])
+  // First bend - inner arc (return path)
+  |> arc(angleStart = 90deg, angleEnd = 180deg, radius = bendRadius)
+  // Top section inner edge (returning to start)
+  |> line(end = [-topSectionLength, 0])
+  |> close()
+  |> extrude(length = bracketWidth)
