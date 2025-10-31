@@ -23,6 +23,11 @@ edgeMargin = 0.25 // Distance from edges for hole placement
 outputHoleMargin = 0.25 // Distance from right end for output hole
 
 
+// Notch specifications
+notchDepth = 0.125 // Depth of notches marking paddle end
+notchWidth = 0.25 // Width of notches
+
+
 // Hole specifications
 paddleHoleCount = 20 // Number of mounting holes in line
 paddleHoleDiam = 0.0403 // Spring mounting hole diameter (18 AWG wire gauge)
@@ -69,15 +74,29 @@ assert(outputHoleMargin, isLessThan = leverLength * 0.4, error = "Output hole ma
 assert(paddleHoleSpacingY, isGreaterThan = paddleHoleDiam, error = "Paddle holes too close - will overlap")
 
 // ============================================================================
-// LEVER PROFILE - SIMPLE RECTANGLE
+// LEVER PROFILE WITH NOTCHES
 // ============================================================================
 
-// Create base lever profile (simple rectangular shape)
+// Create base lever profile with notches marking paddle end
 leverProfile = startSketchOn(XY)
   |> startProfile(at = [0, -paddleWidth / 2])
-  |> line(end = [leverLength, 0])
-  |> line(end = [0, paddleWidth])
-  |> line(end = [-leverLength, 0])
+  |> line(end = [paddleLength, 0]) // Bottom edge to paddle end
+  |> line(end = [0, -notchDepth]) // Notch down on bottom
+  |> line(end = [notchWidth, 0]) // Notch width
+  |> line(end = [0, notchDepth]) // Notch back up
+  |> line(end = [
+       leverLength - paddleLength - notchWidth,
+       0
+     ]) // Rest of bottom
+  |> line(end = [0, paddleWidth]) // Right edge
+  |> line(end = [
+       -(leverLength - paddleLength - notchWidth),
+       0
+     ]) // Top edge start
+  |> line(end = [0, notchDepth]) // Notch up on top
+  |> line(end = [-notchWidth, 0]) // Notch width
+  |> line(end = [0, -notchDepth]) // Notch back down
+  |> line(end = [-paddleLength, 0]) // Rest of top edge
   |> close()
 
 // Create mounting hole pattern (single line of holes across width on left end)
