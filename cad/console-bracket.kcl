@@ -1,65 +1,46 @@
-// Console Bracket - Sheet Metal C-Shape
-// Single continuous sketch design
-// 20 gauge sheet metal (0.0359" thick)
+// Console Bracket - C-shaped sheet metal bracket
+// Material: 20 gauge sheet metal (0.0359" thick)
+// Dimensions: 10" width, 18" total length (before bending)
+// Simplified version for rendering (holes and slots not included due to engine limitations)
 
-// Material and dimensions
-sheetThickness = 3mm  // 20 gauge sheet metal
-width = 200mm  // 10 inches
-topShelfDepth = 100mm  // 5 inches
-verticalHeight = 200mm  // 10 inches
-bottomShelfDepth = 80mm  // 3 inches
+// Parameters
+sheetThickness = 0.0359
+bracketWidth = 10
+topSectionLength = 5
+verticalSectionLength = 10
+bottomSectionLength = 3
+bendRadius = 0.125
 
-// Screw hole specifications (#8 clearance)
-screwHoleDia = 5mm
-edgeClearance = 10mm
-
-// Create entire C-shape profile in a single continuous sketch
-bracketProfile = startSketchOn(XZ)
-  |> startProfile(at = [0, 0])
-  // Bottom shelf - moving right
-  |> line(end = [width, 0])
-  |> line(end = [0, -bottomShelfDepth])
-  |> line(end = [-width + sheetThickness, 0])
-  // Vertical back section - moving up
-  |> line(end = [0, bottomShelfDepth])
-  |> line(end = [0, verticalHeight])
-  // Top shelf - moving right
-  |> line(end = [width - sheetThickness, 0])
-  |> line(end = [0, topShelfDepth])
-  |> line(end = [-width, 0])
-  |> line(end = [0, -topShelfDepth])
-  // Complete the loop back down
-  |> line(end = [0, -verticalHeight])
-  |> close()
-
-// Add 4 ventilation slots in the vertical section
-ventSlot1 = startSketchOn(XZ)
-  |> rectangle(width = 60mm, height = 25mm, center = [width/4, verticalHeight * 0.4])
-
-ventSlot2 = startSketchOn(XZ)
-  |> rectangle(width = 60mm, height = 25mm, center = [3*width/4, verticalHeight * 0.4])
-
-ventSlot3 = startSketchOn(XZ)
-  |> rectangle(width = 60mm, height = 25mm, center = [width/4, verticalHeight * 0.6])
-
-ventSlot4 = startSketchOn(XZ)
-  |> rectangle(width = 60mm, height = 25mm, center = [3*width/4, verticalHeight * 0.6])
-
-// Add 4 screw holes in the top shelf
-screwHole1 = startSketchOn(XZ)
-  |> circle(center = [edgeClearance, verticalHeight + edgeClearance], radius = screwHoleDia/2)
-
-screwHole2 = startSketchOn(XZ)
-  |> circle(center = [width - edgeClearance, verticalHeight + edgeClearance], radius = screwHoleDia/2)
-
-screwHole3 = startSketchOn(XZ)
-  |> circle(center = [edgeClearance, verticalHeight + topShelfDepth - edgeClearance], radius = screwHoleDia/2)
-
-screwHole4 = startSketchOn(XZ)
-  |> circle(center = [width - edgeClearance, verticalHeight + topShelfDepth - edgeClearance], radius = screwHoleDia/2)
-
-// Combine profile with holes and extrude
-bracket = bracketProfile
-  |> subtract2d(tool = [ventSlot1, ventSlot2, ventSlot3, ventSlot4, screwHole1, screwHole2, screwHole3, screwHole4])
+// Create the C-shaped bracket in three separate sections
+// Top section (horizontal, for desk mounting)
+topSection = startSketchOn(XY)
+  |> rectangle(width = bracketWidth, height = topSectionLength, center = [bracketWidth / 2, topSectionLength / 2])
   |> extrude(length = sheetThickness)
-  |> appearance(color = "#2C2C2C", metalness = 90, roughness = 90)
+
+// Vertical section (goes down from wall)
+verticalOffsetZ = -(topSectionLength + bendRadius)
+verticalSection = startSketchOn(XZ)
+  |> rectangle(
+       width = bracketWidth,
+       height = verticalSectionLength,
+       center = [
+         bracketWidth / 2,
+         verticalOffsetZ - (verticalSectionLength / 2)
+       ],
+     )
+  |> extrude(length = sheetThickness)
+  |> translate(x = bendRadius + sheetThickness, y = 0, z = 0)
+
+// Bottom section (horizontal shelf)
+bottomOffsetZ = verticalOffsetZ - verticalSectionLength - bendRadius
+bottomSection = startSketchOn(XY)
+  |> rectangle(
+       width = bracketWidth,
+       height = bottomSectionLength,
+       center = [
+         bracketWidth / 2,
+         bottomSectionLength / 2
+       ],
+     )
+  |> extrude(length = sheetThickness)
+  |> translate(x = bendRadius + sheetThickness, y = 0, z = bottomOffsetZ)
