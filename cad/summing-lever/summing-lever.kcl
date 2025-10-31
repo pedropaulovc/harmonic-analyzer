@@ -22,6 +22,7 @@ paddleWidth = 3.0 // Width of paddle section
 edgeMargin = 0.25 // Distance from edges for hole placement
 outputHoleMargin = 0.25 // Distance from right end for output hole
 cornerRadius = 0.5 // Radius for rounded corners
+leftSetback = 3.0 // Setback on left edge before radius (side with holes)
 
 
 // Hole specifications
@@ -75,17 +76,25 @@ assert(cornerRadius, isLessThan = leverLength / 2, error = "Corner radius too la
 // PHASE 3: LEVER PROFILE WITH ORGANIC CURVES
 // ============================================================================
 
-// Create base lever profile with rounded corners for organic look
+// Create base lever profile with rounded corners and left setback
 leverProfile = startSketchOn(XY)
-  |> startProfile(at = [0, -paddleWidth / 2 + cornerRadius])
+  |> startProfile(at = [0, -paddleWidth / 2])
+  |> line(end = [leftSetback, 0]) // Setback on side with holes
+  |> line(end = [0, cornerRadius])
+  |> tangentialArc(angle = 90, radius = cornerRadius)
   |> line(end = [0, paddleWidth - (2 * cornerRadius)])
   |> tangentialArc(angle = 90, radius = cornerRadius)
-  |> line(end = [leverLength - (2 * cornerRadius), 0])
+  |> line(end = [
+       leverLength - leftSetback - (2 * cornerRadius),
+       0
+     ])
   |> tangentialArc(angle = 90, radius = cornerRadius)
   |> line(end = [0, -(paddleWidth - (2 * cornerRadius))])
   |> tangentialArc(angle = 90, radius = cornerRadius)
-  |> line(end = [-(leverLength - (2 * cornerRadius)), 0])
-  |> tangentialArc(angle = 90, radius = cornerRadius)
+  |> line(end = [
+       -(leverLength - leftSetback - cornerRadius),
+       0
+     ])
   |> close()
 
 // Create mounting hole pattern (single line of holes across width on left end)
