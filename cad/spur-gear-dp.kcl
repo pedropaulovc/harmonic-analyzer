@@ -72,6 +72,6 @@ spurGear(
   diametralPitch = 16,  // Standard imperial diametral pitch
   pressureAngle = 14deg,
   gearHeight = 0.100,
-  holeDiam = 0.1969,  // ~5mm converted to inches
-  keywayWidth = 0.0787,  // ~2mm converted to inches
+  holeDiam = 0.1,  // ~5mm converted to inches
+  keywayWidth = 0.05,  // ~2mm converted to inches
 )
