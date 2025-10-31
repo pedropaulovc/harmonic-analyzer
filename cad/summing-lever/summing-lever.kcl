@@ -13,13 +13,13 @@
 // ============================================================================
 
 // Overall dimensions
-leverLength = 20.0 // Total horizontal length (estimated from proportions)
+leverLength = 5.0 // Total horizontal length
 baseThickness = 0.125 // 1/8" extrusion thickness
 
 
 // Left paddle section (input side with multiple spring holes)
 paddleWidth = 3.0 // Width of paddle section
-paddleLength = 5.0 // Length along lever arm
+paddleLength = 1.25 // Length along lever arm (scaled to fit 5" total)
 paddleHoleCount = 20 // Total mounting holes (single line pattern)
 paddleHoleRows = 1 // Single row of holes
 paddleHoleCols = 20 // 20 columns across the width
@@ -27,7 +27,7 @@ paddleHoleDiam = 0.0403 // Spring mounting hole diameter (18 AWG wire gauge)
 
 
 // Center fulcrum section
-fulcrumPosition = 10.0 // Distance from left end to fulcrum center
+fulcrumPosition = 2.5 // Distance from left end to fulcrum center (scaled to fit 5" total)
 fulcrumSlotWidth = 0.5 // Width of mounting slot
 fulcrumSlotLength = 1.0 // Length of mounting slot
 
@@ -36,7 +36,7 @@ fulcrumSlotLength = 1.0 // Length of mounting slot
 counterWidth = 2.0 // Width of counter-weight arm
 counterHoleDiam = 1.0 // Diameter of spring hole (from sketch)
 outputHoleDiam = 0.0508 // Output hole diameter (16 AWG wire gauge)
-outputHolePosition = 19.0 // Distance from left end to output hole
+outputHolePosition = 4.75 // Distance from left end to output hole
 
 
 // Transition curves (from sketch)
@@ -67,7 +67,7 @@ counterHolePosition = fulcrumPosition + counterArmLength - 1.0
 // ============================================================================
 
 
-assert(leverLength, isGreaterThan = paddleLength + 5.0, error = "Lever too short for paddle and counter sections")
+assert(leverLength, isGreaterThan = paddleLength + 1.25, error = "Lever too short for paddle and counter sections")
 assert(fulcrumPosition, isGreaterThan = paddleLength * 0.5, error = "Fulcrum too close to paddle end")
 assert(fulcrumPosition, isLessThan = leverLength - counterArmLength, error = "Fulcrum position leaves insufficient counter-arm length")
 assert(paddleWidth, isGreaterThan = paddleHoleDiam * paddleHoleCols, error = "Paddle too narrow for hole pattern - holes would overlap")
