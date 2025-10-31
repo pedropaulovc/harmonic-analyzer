@@ -89,7 +89,7 @@ leverProfile = startSketchOn(XY)
   |> line(end = [0, -notchDepth]) // Notch down on bottom
   |> line(end = [notchWidth, 0]) // Notch width
   |> line(end = [0, notchDepth]) // Notch back up
-  |> tangentialArc(angle = -5, radius = taperRadius) // Taper inward (bottom)
+  |> tangentialArc(angle = -10, radius = taperRadius) // Taper inward (bottom)
   |> line(end = [
        leverLength - paddleLength - notchWidth - 1.0,
        0
