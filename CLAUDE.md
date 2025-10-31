@@ -11,3 +11,4 @@
 - **Commit first, ask questions later**: Do NOT wait for user confirmation before committing. Commit immediately after making changes
 - **Push frequently**: Push after every few commits or when completing a logical unit of work
 - **Include lint/test status in commits**: Run lint before committing. If there are failures, fix them if possible or note in commit message and proceed
+- You must use uv if using python tools
