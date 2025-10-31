@@ -21,8 +21,6 @@ paddleWidth = 3.0 // Width of paddle section
 // Margins and spacing
 edgeMargin = 0.25 // Distance from edges for hole placement
 outputHoleMargin = 0.25 // Distance from right end for output hole
-cornerRadius = 0.5 // Radius for rounded corners
-leftSetback = 3.0 // Setback on left edge before radius (side with holes)
 
 
 // Hole specifications
@@ -69,32 +67,17 @@ assert(leverLength, isGreaterThan = 2.0, error = "Lever length too short")
 assert(paddleWidth, isGreaterThan = 2 * edgeMargin, error = "Paddle width too narrow for margins")
 assert(outputHoleMargin, isLessThan = leverLength * 0.4, error = "Output hole margin too large")
 assert(paddleHoleSpacingY, isGreaterThan = paddleHoleDiam, error = "Paddle holes too close - will overlap")
-assert(cornerRadius, isLessThan = paddleWidth / 2, error = "Corner radius too large for paddle width")
-assert(cornerRadius, isLessThan = leverLength / 2, error = "Corner radius too large for lever length")
 
 // ============================================================================
-// PHASE 3: LEVER PROFILE WITH ORGANIC CURVES
+// LEVER PROFILE - SIMPLE RECTANGLE
 // ============================================================================
 
-// Create base lever profile with rounded corners and left setback
+// Create base lever profile (simple rectangular shape)
 leverProfile = startSketchOn(XY)
   |> startProfile(at = [0, -paddleWidth / 2])
-  |> line(end = [leftSetback, 0]) // Setback on side with holes
-  |> line(end = [0, cornerRadius])
-  |> tangentialArc(angle = 90, radius = cornerRadius)
-  |> line(end = [0, paddleWidth - (2 * cornerRadius)])
-  |> tangentialArc(angle = 90, radius = cornerRadius)
-  |> line(end = [
-       leverLength - leftSetback - (2 * cornerRadius),
-       0
-     ])
-  |> tangentialArc(angle = 90, radius = cornerRadius)
-  |> line(end = [0, -(paddleWidth - (2 * cornerRadius))])
-  |> tangentialArc(angle = 90, radius = cornerRadius)
-  |> line(end = [
-       -(leverLength - leftSetback - cornerRadius),
-       0
-     ])
+  |> line(end = [leverLength, 0])
+  |> line(end = [0, paddleWidth])
+  |> line(end = [-leverLength, 0])
   |> close()
 
 // Create mounting hole pattern (single line of holes across width on left end)
