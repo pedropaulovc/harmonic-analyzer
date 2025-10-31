@@ -8,6 +8,90 @@
 4. **Unit-aware**: Numbers carry unit information (mm, in, deg, rad, etc.)
 5. **Tagged geometry**: Use tags (`$tagName`) to reference geometry for later operations
 
+## Design Strategy for LLMs
+
+When creating KCL parts, follow this workflow for best results:
+
+1. **Plan 2D first**: Design your 2D profile completely including all holes/cutouts
+2. **Use subtract2d**: Add holes using `subtract2d` on the 2D profile
+3. **Then extrude**: Only extrude to 3D after the 2D profile is complete
+4. **Avoid 3D boolean ops**: Minimize use of `union` and 3D `subtract` due to engine limitations
+5. **Keep it simple**: For complex assemblies, keep parts as separate variables instead of unioning
+6. **Test incrementally**: Build complex parts by adding features one at a time
+
+**Good workflow:**
+```
+2D profile → add 2D holes → extrude → add features on faces → done
+```
+
+**Problematic workflow (avoid):**
+```
+extrude → create separate 3D holes → subtract (may fail!)
+```
+
+## Known Engine Limitations and Workarounds
+
+**IMPORTANT**: The KCL engine has some limitations as of 2025. Understanding these will save significant time:
+
+### 3D Boolean Operation Limitations
+
+1. **Union of non-touching solids**: `union([solid1, solid2, solid3])` may fail if the solids don't share edges/faces
+   - **Workaround**: Keep parts separate, or use `method = MERGE` when extruding from existing geometry
+
+2. **Multiple subtract operations**: Complex `subtract(tools = [many_holes])` operations may fail
+   - **Workaround**: Use 2D operations (`subtract2d`) on profiles BEFORE extruding to 3D
+
+3. **Subtract with transformed geometry**: Subtracting geometry that has been translated/rotated may fail
+   - **Workaround**: Create subtract tools in their final position, not transformed after creation
+
+### Preferred Workflow for Parts with Holes
+
+**ALWAYS prefer this approach:**
+
+```kcl
+// 1. Create 2D profile
+basePlate = startSketchOn(XY)
+  |> rectangle(width = 100, height = 50, center = [0, 0])
+
+// 2. Create holes as 2D profile
+holes = startSketchOn(XY)
+  |> circle(center = [20, 0], radius = 5)
+  |> patternLinear2d(axis = X, instances = 3, distance = 30)
+
+// 3. Subtract in 2D (more reliable than 3D subtract)
+plateWithHoles = basePlate
+  |> subtract2d(tool = holes)
+  |> extrude(length = 10)
+```
+
+**Avoid this approach when possible:**
+```kcl
+// This may fail due to engine limitations
+plate = startSketchOn(XY)
+  |> rectangle(width = 100, height = 50, center = [0, 0])
+  |> extrude(length = 10)
+
+holes = startSketchOn(XY)
+  |> circle(center = [20, 0], radius = 5)
+  |> extrude(length = 10)
+
+plateWithHoles = subtract([plate], tools = [holes])  // May fail!
+```
+
+### Arc and Curve Limitations
+
+1. **tangentialArc parameter combinations**: Must use EITHER:
+   - `tangentialArc(angle = ..., radius = ...)` OR
+   - `tangentialArc(end = [x, y])` (without radius)
+   - NOT `tangentialArc(end = [...], radius = ...)` together
+
+### Rendering Limitations
+
+1. **zoo kcl snapshot**: Does not support view parameters
+   - No `--view=front`, `--view=side`, etc.
+   - Always produces isometric/default view
+   - To get different views, rotate your model in the code
+
 ## Basic Syntax
 
 ### Variables
@@ -150,6 +234,28 @@ polygon(numSides = 6, radius = 10, center = [0, 0])
 close()  // Completes the profile loop
 ```
 
+### 5. Add holes and cutouts (BEFORE extruding to 3D)
+
+**CRITICAL**: Always add holes using 2D operations before extruding to 3D:
+
+```kcl
+// Create base profile
+base = startSketchOn(XY)
+  |> rectangle(width = 50, height = 30, center = [0, 0])
+
+// Create hole pattern
+mountingHoles = startSketchOn(XY)
+  |> circle(center = [15, 10], radius = 2)
+  |> patternLinear2d(axis = X, instances = 2, distance = 20)
+
+// Subtract in 2D, then extrude
+plate = base
+  |> subtract2d(tool = mountingHoles)
+  |> extrude(length = 5)
+```
+
+This approach is much more reliable than creating 3D holes after extrusion.
+
 ## 3D Operations
 
 ### Extrude
@@ -237,11 +343,22 @@ profileStartX()         // Get profile start X coordinate
 
 ## Solid Operations
 
+**⚠️ WARNING**: 3D boolean operations have engine limitations. Prefer 2D operations (`subtract2d`) on profiles before extruding when possible. See "Known Engine Limitations" section.
+
 ### Boolean Operations
 ```kcl
-union([solid1, solid2, solid3])              // Combine solids
-subtract([baseSolid], tools = [toolSolid])   // Cut away
+union([solid1, solid2, solid3])              // Combine solids (may fail if non-touching)
+subtract([baseSolid], tools = [toolSolid])   // Cut away (may fail with multiple tools)
 intersect([solid1, solid2])                  // Keep only overlap
+```
+
+**Recommended alternative for holes:**
+```kcl
+// Instead of 3D subtract, use 2D subtract before extrude:
+plate = startSketchOn(XY)
+  |> rectangle(width = 100, height = 50, center = [0, 0])
+  |> subtract2d(tool = holeProfile)  // 2D operation
+  |> extrude(length = 10)
 ```
 
 ### Edge Operations
@@ -441,6 +558,10 @@ assertIs(booleanValue)  // Assert true
 8. **Imports must be at top** - Import statements cannot be inside functions or conditionals
 9. **Sketch on face coordinates** - When sketching on a face, coordinates use the global coordinate system, not the face's local system
 10. **Method parameter** - `extrude(method = NEW)` creates a separate solid; `method = MERGE` (default) extends/modifies existing solid
+11. **3D Boolean limitations** - `union` and `subtract` operations may fail; prefer 2D operations before extruding
+12. **Arc parameter combinations** - `tangentialArc` needs EITHER `angle + radius` OR just `end` point, not both
+13. **Snapshot views** - `zoo kcl snapshot` only produces default isometric view; rotate model in code for other views
+14. **2D before 3D** - Always add holes/cutouts using `subtract2d` on 2D profiles before extruding to 3D
 
 ## Module System
 
@@ -491,14 +612,27 @@ bossHeight = 15
 mountHoleDia = 6
 mountHoleOffset = 35
 
-// Base plate
-basePlate = startSketchOn(XY)
+// Create base plate profile
+basePlateProfile = startSketchOn(XY)
   |> startProfile(at = [-baseWidth/2, -baseHeight/2])
   |> line(end = [baseWidth, 0], tag = $frontEdge)
   |> line(end = [0, baseHeight], tag = $rightEdge)
   |> line(end = [-baseWidth, 0], tag = $backEdge)
-  |> line(end = [0, -baseHeight], tag = $leftEdge)
-  |> close()
+  |> close(tag = $leftEdge)
+
+// Create mounting holes pattern IN 2D
+mountingHoles = startSketchOn(XY)
+  |> circle(center = [mountHoleOffset/2, 0], radius = mountHoleDia/2)
+  |> patternCircular2d(
+       center = [0, 0],
+       instances = 4,
+       arcDegrees = 360,
+       rotateDuplicates = true
+     )
+
+// Subtract holes in 2D BEFORE extruding
+basePlate = basePlateProfile
+  |> subtract2d(tool = mountingHoles)
   |> extrude(length = baseThickness)
   |> fillet(radius = 2, tags = [
        getNextAdjacentEdge(frontEdge),
@@ -507,24 +641,12 @@ basePlate = startSketchOn(XY)
        getNextAdjacentEdge(leftEdge)
      ])
 
-// Boss on top
+// Boss on top (extrude from face of base)
 boss = startSketchOn(basePlate, face = END)
   |> circle(center = [0, 0], radius = bossDiameter/2)
   |> extrude(length = bossHeight)
 
-// Mounting holes
-holes = startSketchOn(basePlate, face = START)
-  |> circle(center = [mountHoleOffset/2, 0], radius = mountHoleDia/2)
-  |> patternCircular2d(
-       center = [0, 0],
-       instances = 4,
-       arcDegrees = 360,
-       rotateDuplicates = true
-     )
-  |> extrude(length = -baseThickness)
-
-// Combine
-finalPart = subtract([union([basePlate, boss])], tools = [holes])
+// Note: boss uses method=MERGE by default, so it joins with basePlate automatically
 ```
 
 ## CLI Usage
