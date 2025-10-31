@@ -196,19 +196,25 @@ zoo kcl mass summing-lever.kcl --material-density=7200 --material-density-unit=k
 
 ## File Organization
 
-### Source Files:
+**Note:** All summing-lever files are now organized in the `cad/summing-lever/` directory.
+
+### Source Files (in summing-lever/):
 - `summing-lever.kcl` - Main source file (work in progress)
 - `summing-lever.jpg` - Reference photo
+- `summing-lever-sketch.png` - Hand-drawn dimension sketches
 - `SUMMING-LEVER-PLAN.md` - This planning document
 
-### Generated Files (per phase):
+### Generated Files (per phase, in summing-lever/):
 - `summing-lever-phase1.png` - Phase 1 snapshot
-- `summing-lever-phase2-aligned.png` - Phase 2 snapshot
+- `summing-lever-phase2-18ga.png` - Phase 2 final snapshot (18ga holes, single line)
+- `summing-lever-phase2.stl` - Phase 2 STL export
 - `summing-lever-phase3.png` - Phase 3 snapshot (to be created)
 - `summing-lever-phase4.png` - Phase 4 snapshot (to be created)
 - `summing-lever-phase5.png` - Phase 5 snapshot (to be created)
 - `summing-lever-final.png` - Phase 6 final snapshot (to be created)
-- `output.stl` - Latest STL export (gets overwritten)
+
+### Working Directory:
+When working on the summing lever, ensure you're in the `cad/summing-lever/` directory, or use full paths.
 
 ## Important KCL Constraints & Best Practices
 
