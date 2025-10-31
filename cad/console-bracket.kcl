@@ -26,11 +26,11 @@ cProfile = startSketchOn(XZ)
   |> line(end = [topLength, 0], tag = $topOuter) // Top section - extends right
   |> tangentialArc(angle = -90deg, radius = bendRadius) // First bend - curves down
   |> line(end = [0, -verticalLength], tag = $verticalOuter) // Vertical section - goes down
-  |> tangentialArc(angle = 90deg, radius = bendRadius) // Second bend - curves LEFT for C-shape
+  |> tangentialArc(angle = -90deg, radius = bendRadius) // Second bend - curves LEFT for C-shape
   |> line(end = [-bottomLength, 0], tag = $bottomOuter) // Bottom section - extends LEFT
-  |> line(end = [0, -sheetThickness]) // Thickness at edge
+  |> line(end = [0, sheetThickness]) // Thickness at edge
   |> line(end = [bottomLength, 0]) // Bottom inner - back right
-  |> tangentialArc(angle = -90deg, radius = bendRadius - sheetThickness) // Inner bend
+  |> tangentialArc(angle = 90deg, radius = bendRadius - sheetThickness) // Inner bend
   |> line(end = [0, verticalLength], tag = $verticalInner) // Vertical inner - up
   |> tangentialArc(angle = 90deg, radius = bendRadius - sheetThickness) // Inner bend
   |> line(end = [-topLength, 0]) // Top inner - back left
