@@ -50,11 +50,11 @@ edgeFillet = 0.0625 // 1/16" fillet on main edges (to be added in Phase 6)
 // CALCULATED PARAMETERS
 // ============================================================================
 
-// Paddle hole spacing (columns along X/length, rows along Y/width)
-paddleHoleSpacingX = paddleLength * 0.8 / (paddleHoleCols - 1) // Spacing between columns
-paddleHoleSpacingY = paddleWidth * 0.8 / (paddleHoleRows - 1)  // Spacing between rows
-paddleHoleStartX = paddleLength * 0.1  // First column position along length
-paddleHoleStartY = -paddleWidth * 0.4  // First row position along width
+// Paddle hole spacing - aligned on short edge (5 holes across width, 4 rows deep)
+paddleHoleSpacingY = paddleWidth * 0.8 / (paddleHoleCols - 1) // 5 holes across the 3" width
+paddleHoleSpacingX = 0.5  // 4 rows spaced 0.5" apart going into the length
+paddleHoleStartX = 0.25  // Start 0.25" from the left edge
+paddleHoleStartY = -paddleWidth * 0.4  // Center pattern across width
 
 // Right arm dimensions
 counterArmLength = leverLength - fulcrumPosition - 2.0
