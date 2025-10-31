@@ -1,0 +1,130 @@
+// Summing Lever for Harmonic Analyzer
+// Material: Steel or Cast Iron (painted green)
+// Purpose: First-class lever that sums the motions from 20 top levers via springs
+//          and balances against a single counterbalance spring. Uses knife-edge
+//          fulcrum for minimal friction. Small range of motion (~few mm).
+
+@settings(defaultLengthUnit = mm, kclVersion = 1.0)
+
+// Input parameters - Wide paddle end (spring array side)
+paddleWidth = 60
+paddleLength = 80
+paddleThickness = 6
+
+// Fulcrum section (knife edge mounting)
+fulcrumWidth = 20
+fulcrumLength = 30
+fulcrumSlotWidth = 8
+fulcrumSlotDepth = 3
+
+// Narrow arm sections
+armWidth = 12
+armToFulcrumLength = 40  // From paddle to fulcrum
+fulcrumToCounterLength = 100  // From fulcrum to counter-balance end
+
+// Counter-balance end
+counterEndWidth = 15
+counterEndLength = 25
+counterEndThickness = 8
+
+// Spring connection holes
+springHoleArrayCols = 5
+springHoleArrayRows = 4
+springHoleDiameter = 3
+springHoleSpacing = 12
+
+counterSpringHoleDiameter = 6
+counterSpringHoleOffset = 10  // From end
+
+// General
+basePlateThickness = 6
+filletRadius = 2
+
+// Calculated parameters
+totalLength = armToFulcrumLength + fulcrumLength + fulcrumToCounterLength
+springArrayWidth = (springHoleArrayCols - 1) * springHoleSpacing
+springArrayHeight = (springHoleArrayRows - 1) * springHoleSpacing
+paddleCenter = -armToFulcrumLength - paddleLength / 2
+fulcrumCenter = 0
+counterCenter = fulcrumLength + fulcrumToCounterLength + counterEndLength / 2
+
+// Assertions - validate design parameters
+assert(paddleWidth, isGreaterThan = springArrayWidth, error = "Paddle too narrow for spring hole array")
+assert(paddleLength, isGreaterThan = springArrayHeight, error = "Paddle too short for spring hole array")
+assert(armWidth, isLessThan = paddleWidth, error = "Arm wider than paddle")
+assert(fulcrumSlotWidth, isLessThan = fulcrumWidth, error = "Fulcrum slot too wide")
+assert(springHoleDiameter, isLessThan = springHoleSpacing, error = "Spring holes too close")
+assert(counterSpringHoleOffset, isLessThan = counterEndLength, error = "Counter spring hole too far from end")
+
+// Create the main lever profile as a continuous 2D shape
+leverProfile = startSketchOn(XY)
+  |> startProfile(at = [-armToFulcrumLength - paddleLength, -paddleWidth/2])
+  // Paddle section (wide end for 20 springs)
+  |> line(end = [paddleLength, 0], tag = $paddleFront)
+  |> line(end = [0, (paddleWidth - armWidth)/2])
+  // Transition from paddle to arm
+  |> line(end = [armToFulcrumLength, 0])
+  // Transition to fulcrum
+  |> line(end = [0, (fulcrumWidth - armWidth)/2])
+  // Fulcrum section
+  |> line(end = [fulcrumLength, 0])
+  // Transition from fulcrum to arm
+  |> line(end = [0, -(fulcrumWidth - armWidth)/2])
+  // Arm to counter-balance
+  |> line(end = [fulcrumToCounterLength, 0])
+  // Transition to counter-balance end
+  |> line(end = [0, (counterEndWidth - armWidth)/2])
+  // Counter-balance end
+  |> line(end = [counterEndLength, 0], tag = $counterFront)
+  |> line(end = [0, counterEndWidth])
+  |> line(end = [-counterEndLength, 0])
+  // Return path
+  |> line(end = [0, -(counterEndWidth - armWidth)/2])
+  |> line(end = [-fulcrumToCounterLength, 0])
+  |> line(end = [0, -(fulcrumWidth - armWidth)/2])
+  |> line(end = [-fulcrumLength, 0])
+  |> line(end = [0, -(fulcrumWidth - armWidth)/2])
+  |> line(end = [-armToFulcrumLength, 0])
+  |> line(end = [0, -(paddleWidth - armWidth)/2])
+  |> close(tag = $paddleBack)
+
+// Create spring hole array on paddle end (20 holes = 5x4 pattern)
+springHoleArray = startSketchOn(XY)
+  |> circle(center = [paddleCenter - springArrayWidth/2, -springArrayHeight/2], radius = springHoleDiameter/2)
+  |> patternLinear2d(axis = X, instances = springHoleArrayCols, distance = springHoleSpacing)
+  |> patternLinear2d(axis = Y, instances = springHoleArrayRows, distance = springHoleSpacing)
+
+// Create counter-balance spring hole
+counterSpringHole = startSketchOn(XY)
+  |> circle(
+       center = [fulcrumLength + fulcrumToCounterLength + counterEndLength - counterSpringHoleOffset, 0],
+       radius = counterSpringHoleDiameter/2
+     )
+
+// Create fulcrum knife-edge slot
+fulcrumSlot = startSketchOn(XY)
+  |> rectangle(
+       width = fulcrumSlotWidth,
+       height = fulcrumWidth * 0.8,
+       center = [fulcrumLength/2, 0]
+     )
+
+// Combine profile with all holes in 2D, then extrude
+sumningLever = leverProfile
+  |> subtract2d(tool = springHoleArray)
+  |> subtract2d(tool = counterSpringHole)
+  |> subtract2d(tool = fulcrumSlot)
+  |> extrude(length = basePlateThickness)
+  |> fillet(radius = filletRadius, tags = [
+       getNextAdjacentEdge(paddleFront),
+       getNextAdjacentEdge(counterFront)
+     ])
+
+// Add thickness to counter-balance end for stronger spring connection
+counterBoss = startSketchOn(sumningLever, face = END)
+  |> rectangle(
+       width = counterEndLength * 0.8,
+       height = counterEndWidth * 0.8,
+       center = [fulcrumLength + fulcrumToCounterLength + counterEndLength/2, 0]
+     )
+  |> extrude(length = counterEndThickness - basePlateThickness)
