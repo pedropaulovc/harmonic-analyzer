@@ -662,13 +662,13 @@ This example demonstrates all best practices in a single part:
 @settings(defaultLengthUnit = mm, kclVersion = 1.0)
 
 // Input parameters
-baseWidth = 50
-baseHeight = 30
+baseWidth = 80
+baseHeight = 80
 baseThickness = 5
 bossDiameter = 20
 bossHeight = 15
 mountHoleDia = 6
-mountHoleOffset = 35
+mountHoleOffset = 30
 filletRadius = 2
 
 // Calculated parameters
