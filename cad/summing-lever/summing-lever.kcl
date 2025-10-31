@@ -35,6 +35,8 @@ fulcrumSlotLength = 1.0 // Length of mounting slot
 // Right counter-weight section
 counterWidth = 2.0 // Width of counter-weight arm
 counterHoleDiam = 1.0 // Diameter of spring hole (from sketch)
+outputHoleDiam = 0.0508 // Output hole diameter (16 AWG wire gauge)
+outputHolePosition = 19.0 // Distance from left end to output hole
 
 
 // Transition curves (from sketch)
@@ -76,15 +78,15 @@ assert(counterHoleDiam, isLessThan = counterWidth * 0.8, error = "Counter hole t
 // Creating simplified geometry for initial review
 // Will add organic curves in Phase 4
 
-// Create base paddle profile (centered at origin)
-paddleProfile = startSketchOn(XY)
+// Create base lever profile (simplified rectangular shape for now)
+leverProfile = startSketchOn(XY)
   |> startProfile(at = [0, -paddleWidth / 2])
-  |> line(end = [paddleLength, 0], tag = $paddleBottom)
+  |> line(end = [leverLength, 0], tag = $leverBottom)
   |> line(end = [0, paddleWidth])
-  |> line(end = [-paddleLength, 0])
+  |> line(end = [-leverLength, 0])
   |> close()
 
-  // Create mounting hole pattern (single line of 20 holes across width)
+// Create mounting hole pattern (single line of 20 holes across width on left end)
 mountingHoles = startSketchOn(XY)
   |> circle(
        center = [paddleHoleStartX, paddleHoleStartY],
@@ -92,7 +94,15 @@ mountingHoles = startSketchOn(XY)
      )
   |> patternLinear2d(axis = Y, instances = paddleHoleCols, distance = paddleHoleSpacingY)
 
-// Subtract holes in 2D before extruding (best practice - more reliable than 3D subtract)
-leverOutline = paddleProfile
+// Create output hole on opposite end (centered)
+outputHole = startSketchOn(XY)
+  |> circle(
+       center = [outputHolePosition, 0],
+       radius = outputHoleDiam / 2
+     )
+
+// Subtract all holes in 2D before extruding (best practice - more reliable than 3D subtract)
+leverOutline = leverProfile
   |> subtract2d(tool = mountingHoles)
+  |> subtract2d(tool = outputHole)
   |> extrude(length = baseThickness)
