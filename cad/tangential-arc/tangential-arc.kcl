@@ -29,8 +29,8 @@ solid = startSketchOn(XY)
   |> startProfile(at = [leftMargin, bottomMargin])
   |> line(end = [0, totalHeight])  // Left edge going up
   |> line(end = [cornerStartX, 0])  // Top edge to corner start
-  |> tangentialArc(end = [cornerEndX - cornerStartX, -cornerDepth])  // Concave arc
+  |> tangentialArc(end = [cornerEndX - cornerStartX, cornerDepth])  // Concave arc (curves inward/upward)
   |> line(end = [totalWidth - cornerEndX, 0])  // Top right edge
-  |> line(end = [0, -(totalHeight - cornerDepth)])  // Right edge going down
+  |> line(end = [0, -totalHeight])  // Right edge going down
   |> close()  // Bottom edge back to start
   |> extrude(length = extrudeHeight)
