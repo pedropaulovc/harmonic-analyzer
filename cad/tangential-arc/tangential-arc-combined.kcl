@@ -6,29 +6,24 @@
 // Input parameters
 totalWidth = 360
 totalHeight = 400
-arcStartX = 95
-arcEndX = 145
-upperArcY = 50
-lowerArcStartY = 350
-lowerArcEndY = 400
 extrusionDepth = 10
 
 // Create the combined 2D profile
 profile = startSketchOn(XY)
   |> startProfile(at = [0, 0])
-  // Top edge with arc
-  |> line(end = [arcStartX, 0])
-  |> tangentialArc(end = [arcEndX, upperArcY])
-  |> line(end = [totalWidth - arcEndX, 0])
+  // Top edge with upper arc
+  |> line(end = [95, 0])
+  |> tangentialArc(end = [50, 50])
+  |> line(end = [215, 0])
   // Right edge
-  |> line(end = [0, totalHeight - upperArcY])
-  // Right side down to lower arc start
-  |> line(end = [0, lowerArcStartY - (totalHeight - upperArcY)])
-  // Lower arc segment
-  |> line(end = [arcStartX - totalWidth, 0])
-  |> tangentialArc(end = [-arcEndX + arcStartX, lowerArcEndY - lowerArcStartY])
+  |> line(end = [0, 150])
+  |> line(end = [0, 150])
+  // Back along top of lower section
+  |> line(end = [-215, 0])
+  // Lower arc
+  |> tangentialArc(end = [-50, 50])
   // Bottom edge
-  |> line(end = [-arcStartX, 0])
+  |> line(end = [-95, 0])
   // Left edge back to start
   |> close()
   |> extrude(length = extrusionDepth)
