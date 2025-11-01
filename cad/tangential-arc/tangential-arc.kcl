@@ -1,36 +1,30 @@
-// Tangential Arc Profile
-// Purpose: 2D profile demonstrating tangentialArc with a concave rounded corner
+// Tangential Arc Profile - Symmetric
+// Purpose: 2D symmetric profile demonstrating tangentialArc with concave rounded corners
 
 @settings(defaultLengthUnit = mm, kclVersion = 1.0)
 
 // Input parameters
-totalWidth = 350
-totalHeight = 150
-leftMargin = 25
-bottomMargin = 25
-
-// Concave corner parameters
-cornerStartX = 95  // Distance from left edge where corner starts
-cornerEndX = 145   // Distance from left edge where corner ends
-cornerDepth = 50   // How deep the concave curve goes
+baseWidth = 300      // Width of the base
+baseHeight = 100     // Height of the base
+cornerWidth = 50     // Width of each concave corner section
+cornerDepth = 50     // How deep the concave curve goes
 
 // 3D parameters
-extrudeHeight = 10  // Thickness of the extruded solid
+extrudeHeight = 10   // Thickness of the extruded solid
 
-// Calculated parameters
-rightEdgeX = leftMargin + totalWidth
-topEdgeY = bottomMargin + totalHeight
-cornerAbsStartX = leftMargin + cornerStartX
-cornerAbsEndX = leftMargin + cornerEndX
-cornerBottomY = bottomMargin + totalHeight - cornerDepth
+// Calculated parameters (centered at origin)
+halfWidth = baseWidth / 2
+halfHeight = baseHeight / 2
 
-// Create the profile with tangential arc and extrude to 3D
+// Create the symmetric profile with tangential arcs and extrude to 3D
 solid = startSketchOn(XY)
-  |> startProfile(at = [leftMargin, bottomMargin])
-  |> line(end = [0, totalHeight])  // Left edge going up
-  |> line(end = [cornerStartX, 0])  // Top edge to corner start
-  |> tangentialArc(end = [cornerEndX - cornerStartX, cornerDepth])  // Concave arc (curves inward/upward)
-  |> line(end = [totalWidth - cornerEndX, 0])  // Top right edge
-  |> line(end = [0, -totalHeight])  // Right edge going down
-  |> close()  // Bottom edge back to start
+  |> startProfile(at = [-halfWidth, -halfHeight])
+  |> line(end = [0, baseHeight])                           // Left edge going up
+  |> line(end = [halfWidth - cornerWidth / 2, 0])          // Top left edge to left corner start
+  |> tangentialArc(end = [cornerWidth, cornerDepth])       // Left concave arc
+  |> line(end = [cornerWidth, 0])                          // Center top section
+  |> tangentialArc(end = [cornerWidth, -cornerDepth])      // Right concave arc (mirror of left)
+  |> line(end = [halfWidth - cornerWidth / 2, 0])          // Top right edge to right corner end
+  |> line(end = [0, -baseHeight])                          // Right edge going down
+  |> close()                                                // Bottom edge back to start
   |> extrude(length = extrudeHeight)
