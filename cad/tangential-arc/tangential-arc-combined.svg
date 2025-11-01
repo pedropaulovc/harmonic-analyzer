@@ -1,19 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" width="400" height="500">
-  <rect width="400" height="500" fill="white"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 400" width="360" height="400">
+  <rect width="360" height="400" fill="white"/>
 
-  <!-- Single continuous path combining both profiles -->
-  <path d="M 25 25
-           L 120 25
-           Q 120 75 170 75
-           L 385 75
-           L 385 225
-           L 25 225
-           L 25 275
-           L 120 275
-           Q 120 325 170 325
-           L 385 325
-           L 385 475
-           L 25 475
+  <!-- Combined profile: original on top, flipped on bottom, joined along long edge -->
+  <path d="M 0 0
+           L 95 0
+           Q 95 50 145 50
+           L 360 50
+           L 360 200
+           L 360 350
+           L 145 350
+           Q 95 350 95 400
+           L 0 400
+           L 0 0
            Z"
         fill="black"
         stroke="none"/>
