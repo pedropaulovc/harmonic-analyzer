@@ -3,15 +3,14 @@
   <title>Tangential Arc Profile</title>
   <desc>2D profile with concave rounded corner demonstrating tangential arc</desc>
 
-  <!-- Main profile shape with mirrored arcs -->
-  <path d="M 25 125
+  <!-- Main profile shape with diagonal arcs -->
+  <path d="M 25 175
            L 25 25
            L 120 25
            Q 120 75, 170 75
            L 375 75
-           L 375 175
-           L 170 175
-           Q 120 175, 120 125
+           L 375 125
+           Q 375 175, 325 175
            Z"
         fill="#000000"
         stroke="none"/>
