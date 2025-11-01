@@ -1,22 +1,29 @@
 // Tangential Arc Profile
-// Purpose: Demonstrate tangentialArc feature with concave rounded corner
+// Purpose: Demonstrate tangentialArc feature with symmetric concave rounded corners
 
 // Settings
 @settings(defaultLengthUnit = mm, kclVersion = 1.0)
 
 // Input parameters
-baseWidth = 360
-baseHeight = 200
-arcStartX = 95
+totalWidth = 360
+totalHeight = 200
 arcWidth = 50
 arcDepth = 50
 
-// Create base profile with tangential arc in upper-left corner
+// Calculated parameters
+halfWidth = totalWidth / 2
+halfHeight = totalHeight / 2
+
+// Create symmetric profile with tangential arcs on both sides
 profile = startSketchOn(XY)
-  |> startProfile(at = [0, 0])
-  |> line(end = [arcStartX, 0])
+  |> startProfile(at = [-halfWidth, -halfHeight])
+  |> line(end = [0, totalHeight])
+  |> line(end = [halfWidth - arcWidth, 0])
+  |> tangentialArc(end = [arcWidth, -arcDepth])
   |> tangentialArc(end = [arcWidth, arcDepth])
-  |> line(end = [baseWidth - arcStartX - arcWidth, 0])
-  |> line(end = [0, baseHeight])
-  |> line(end = [-baseWidth, 0])
+  |> line(end = [halfWidth - arcWidth, 0])
+  |> line(end = [0, -totalHeight])
+  |> line(end = [-halfWidth + arcWidth, 0])
+  |> tangentialArc(end = [-arcWidth, arcDepth])
+  |> tangentialArc(end = [-arcWidth, -arcDepth])
   |> close()
