@@ -1,30 +1,21 @@
-// Tangential Arc Profile - Symmetric
-// Purpose: 2D symmetric profile demonstrating tangentialArc with concave rounded corners
+// Tangential Arc Profile
+// Purpose: Demonstrates tangentialArc feature with concave rounded corner
 
 @settings(defaultLengthUnit = mm, kclVersion = 1.0)
 
 // Input parameters
-baseWidth = 300      // Width of the base
-baseHeight = 100     // Height of the base
-cornerWidth = 50     // Width of each concave corner section
-cornerDepth = 50     // How deep the concave curve goes
+baseWidth = 360
+baseHeight = 150
+arcRadius = 50
+thickness = 10
 
-// 3D parameters
-extrudeHeight = 10   // Thickness of the extruded solid
-
-// Calculated parameters (centered at origin)
-halfWidth = baseWidth / 2
-halfHeight = baseHeight / 2
-
-// Create the symmetric profile with tangential arcs and extrude to 3D
-solid = startSketchOn(XY)
-  |> startProfile(at = [-halfWidth, -halfHeight])
-  |> line(end = [0, baseHeight])                           // Left edge going up
-  |> line(end = [halfWidth - cornerWidth / 2, 0])          // Top left edge to left corner start
-  |> tangentialArc(end = [cornerWidth, cornerDepth])       // Left concave arc
-  |> line(end = [cornerWidth, 0])                          // Center top section
-  |> tangentialArc(end = [cornerWidth, -cornerDepth])      // Right concave arc (mirror of left)
-  |> line(end = [halfWidth - cornerWidth / 2, 0])          // Top right edge to right corner end
-  |> line(end = [0, -baseHeight])                          // Right edge going down
-  |> close()                                                // Bottom edge back to start
-  |> extrude(length = extrudeHeight)
+// Create the base profile with tangential arc
+profile = startSketchOn(XY)
+  |> startProfile(at = [25, 25])
+  |> line(end = [95, 0])
+  |> tangentialArc(end = [50, 50], radius = arcRadius)
+  |> line(end = [265, 0])
+  |> line(end = [0, 150])
+  |> line(end = [-360, 0])
+  |> close()
+  |> extrude(length = thickness)
