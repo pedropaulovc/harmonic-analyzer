@@ -1,0 +1,23 @@
+// Tangential Arc Profile
+// A rectangular profile with a concave rounded corner
+// Purpose: Demonstrating tangentialArc usage
+
+@settings(defaultLengthUnit = mm, kclVersion = 1.0)
+
+// Input parameters
+width = 100
+height = 40
+arcRadius = 20
+
+// Calculated parameters
+arcStartX = width - arcRadius
+arcStartY = height
+
+// Create the 2D profile
+profile = startSketchOn(XY)
+  |> startProfile(at = [0, 0])
+  |> line(end = [width, 0], tag = $bottomEdge)
+  |> line(end = [0, height], tag = $rightEdge)
+  |> line(end = [-arcRadius, 0], tag = $topEdge)
+  |> tangentialArc(angle = 90deg, radius = arcRadius, tag = $arc)
+  |> close(tag = $leftEdge)
