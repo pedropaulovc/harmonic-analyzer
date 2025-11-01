@@ -14,6 +14,9 @@ cornerStartX = 95  // Distance from left edge where corner starts
 cornerEndX = 145   // Distance from left edge where corner ends
 cornerDepth = 50   // How deep the concave curve goes
 
+// 3D parameters
+extrudeHeight = 10  // Thickness of the extruded solid
+
 // Calculated parameters
 rightEdgeX = leftMargin + totalWidth
 topEdgeY = bottomMargin + totalHeight
@@ -21,8 +24,8 @@ cornerAbsStartX = leftMargin + cornerStartX
 cornerAbsEndX = leftMargin + cornerEndX
 cornerBottomY = bottomMargin + totalHeight - cornerDepth
 
-// Create the profile with tangential arc
-profile = startSketchOn(XY)
+// Create the profile with tangential arc and extrude to 3D
+solid = startSketchOn(XY)
   |> startProfile(at = [leftMargin, bottomMargin])
   |> line(end = [0, totalHeight])  // Left edge going up
   |> line(end = [cornerStartX, 0])  // Top edge to corner start
@@ -30,3 +33,4 @@ profile = startSketchOn(XY)
   |> line(end = [totalWidth - cornerEndX, 0])  // Top right edge
   |> line(end = [0, -(totalHeight - cornerDepth)])  // Right edge going down
   |> close()  // Bottom edge back to start
+  |> extrude(length = extrudeHeight)
