@@ -20,8 +20,8 @@ profile = startSketchOn(XY)
   |> line(end = [0, 150])
   // Back along top of lower section
   |> line(end = [-215, 0])
-  // Lower arc
-  |> tangentialArc(end = [-50, 50])
+  // Lower arc (concave)
+  |> tangentialArc(end = [-50, -50])
   // Bottom edge
   |> line(end = [-95, 0])
   // Left edge back to start
