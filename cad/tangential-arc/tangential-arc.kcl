@@ -1,21 +1,22 @@
 // Tangential Arc Profile
-// Purpose: Demonstrates tangentialArc feature with concave rounded corner
+// Purpose: Demonstrate tangentialArc feature with concave rounded corner
 
+// Settings
 @settings(defaultLengthUnit = mm, kclVersion = 1.0)
 
 // Input parameters
 baseWidth = 360
-baseHeight = 150
-arcRadius = 50
-thickness = 10
+baseHeight = 200
+arcStartX = 95
+arcEndX = 145
+arcY = 50
 
-// Create the base profile with tangential arc
+// Create base profile with tangential arc
 profile = startSketchOn(XY)
   |> startProfile(at = [25, 25])
-  |> line(end = [95, 0])
-  |> tangentialArc(end = [50, 50])
-  |> line(end = [265, 0])
-  |> line(end = [0, 150])
-  |> line(end = [-360, 0])
+  |> line(end = [arcStartX, 0])
+  |> tangentialArc(end = [arcEndX - arcStartX, arcY])
+  |> line(end = [baseWidth - arcEndX, 0])
+  |> line(end = [0, baseHeight])
+  |> line(end = [-baseWidth, 0])
   |> close()
-  |> extrude(length = thickness)
