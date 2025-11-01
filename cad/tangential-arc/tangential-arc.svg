@@ -1,17 +1,12 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <svg width="400" height="200" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
-  <title>Tangential Arc Profile</title>
-  <desc>2D profile with concave rounded corner demonstrating tangential arc</desc>
-
-  <!-- Main profile shape with diagonal arcs -->
-  <path d="M 25 175
-           L 25 25
-           L 120 25
-           Q 120 75, 170 75
-           L 375 75
-           L 375 125
-           Q 375 175, 325 175
-           Z"
-        fill="#000000"
-        stroke="none"/>
+  <path d="
+    M 25,25
+    L 100,25
+    A 30,30 0 0,1 100,85
+    L 100,175
+    L 375,175
+    L 375,25
+    Z
+  " fill="black"/>
 </svg>
