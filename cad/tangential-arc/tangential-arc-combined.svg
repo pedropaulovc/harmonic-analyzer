@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" width="400" height="500">
+  <rect width="400" height="500" fill="white"/>
+
+  <!-- Original profile with arc in upper-left corner -->
+  <path d="M 25 25
+           L 120 25
+           Q 120 75 170 75
+           L 385 75
+           L 385 225
+           L 25 225
+           Z"
+        fill="black"
+        stroke="none"/>
+
+  <!-- Flipped profile with arc in lower-left corner, positioned below the first -->
+  <path d="M 25 275
+           L 120 275
+           Q 120 325 170 325
+           L 385 325
+           L 385 475
+           L 25 475
+           Z"
+        fill="black"
+        stroke="none"/>
+</svg>
