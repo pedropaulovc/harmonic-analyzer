@@ -13,7 +13,7 @@ thickness = 10
 profile = startSketchOn(XY)
   |> startProfile(at = [25, 25])
   |> line(end = [95, 0])
-  |> tangentialArc(end = [50, 50], radius = arcRadius)
+  |> tangentialArc(end = [50, 50])
   |> line(end = [265, 0])
   |> line(end = [0, 150])
   |> line(end = [-360, 0])
