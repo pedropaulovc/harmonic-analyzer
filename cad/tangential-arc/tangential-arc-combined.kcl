@@ -1,0 +1,34 @@
+// Combined Tangential Arc Profile
+// Two-piece profile with concave arcs at upper-left and lower-left corners
+
+@settings(defaultLengthUnit = mm, kclVersion = 1.0)
+
+// Input parameters
+totalWidth = 360
+totalHeight = 400
+arcStartX = 95
+arcEndX = 145
+upperArcY = 50
+lowerArcStartY = 350
+lowerArcEndY = 400
+extrusionDepth = 10
+
+// Create the combined 2D profile
+profile = startSketchOn(XY)
+  |> startProfile(at = [0, 0])
+  // Top edge with arc
+  |> line(end = [arcStartX, 0])
+  |> tangentialArc(end = [arcEndX, upperArcY])
+  |> line(end = [totalWidth - arcEndX, 0])
+  // Right edge
+  |> line(end = [0, totalHeight - upperArcY])
+  // Right side down to lower arc start
+  |> line(end = [0, lowerArcStartY - (totalHeight - upperArcY)])
+  // Lower arc segment
+  |> line(end = [arcStartX - totalWidth, 0])
+  |> tangentialArc(end = [-arcEndX + arcStartX, lowerArcEndY - lowerArcStartY])
+  // Bottom edge
+  |> line(end = [-arcStartX, 0])
+  // Left edge back to start
+  |> close()
+  |> extrude(length = extrusionDepth)
