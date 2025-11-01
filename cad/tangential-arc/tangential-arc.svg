@@ -1,14 +1,14 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg width="400" height="200" xmlns="http://www.w3.org/2000/svg">
-  <path d="
-    M 25 25
-    L 120 25
-    Q 120 75 170 75
-    L 385 75
-    L 385 175
-    L 25 175
-    Z
-  "
-  fill="black"
-  stroke="none"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250" width="400" height="250">
+  <rect width="400" height="250" fill="white"/>
+
+  <!-- Main profile shape with concave arc in upper-left corner -->
+  <path d="M 25 25
+           L 120 25
+           Q 120 75 170 75
+           L 385 75
+           L 385 225
+           L 25 225
+           Z"
+        fill="black"
+        stroke="none"/>
 </svg>
