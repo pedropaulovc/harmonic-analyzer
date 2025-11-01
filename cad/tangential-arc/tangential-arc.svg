@@ -1,13 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250" width="400" height="250">
-  <rect width="400" height="250" fill="white"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 200" width="360" height="200">
+  <rect width="360" height="200" fill="white"/>
 
   <!-- Main profile shape with concave arc in upper-left corner -->
-  <path d="M 25 25
-           L 120 25
-           Q 120 75 170 75
-           L 385 75
-           L 385 225
-           L 25 225
+  <path d="M 0 0
+           L 95 0
+           Q 95 50 145 50
+           L 360 50
+           L 360 200
+           L 0 200
            Z"
         fill="black"
         stroke="none"/>
