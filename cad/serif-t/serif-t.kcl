@@ -10,6 +10,7 @@ crossbarWidth = 7
 serifLength = 0.6
 serifThickness = 0.4
 extrudeDepth = 0.5
+filletRadius = 0.15
 
 // Calculated parameters
 stemHeight = letterHeight - crossbarThickness
@@ -21,28 +22,39 @@ assert(letterHeight, isGreaterThan = 0, error = "Height must be positive")
 assert(crossbarWidth, isGreaterThan = stemWidth, error = "Crossbar must be wider than stem")
 assert(serifLength, isGreaterThan = 0, error = "Serif length must be positive")
 
-// Create the T profile - starting from bottom left
+// Create the T profile with rounded corners - starting from bottom left
 tProfile = startSketchOn(XY)
   // Bottom left serif
   |> startProfile(at = [-serifOverhang, 0])
-  |> line(end = [serifLength + stemWidth + serifLength, 0], tag = $bottomSerifBottom)
-  |> line(end = [0, serifThickness])
-  |> line(end = [-serifLength, 0])
+  |> line(end = [serifLength + stemWidth + serifLength, 0])
+  |> line(end = [0, serifThickness - filletRadius])
+  |> tangentialArc(angle = 90deg, radius = filletRadius)
+  |> line(end = [-serifLength + filletRadius * 2, 0])
+  |> tangentialArc(angle = -90deg, radius = filletRadius)
   // Right side of stem
-  |> line(end = [0, stemHeight - serifThickness])
-  // Bottom of crossbar
-  |> line(end = [crossbarOverhang, 0])
-  |> line(end = [0, crossbarThickness])
+  |> line(end = [0, stemHeight - serifThickness - filletRadius * 2])
+  // Bottom right of crossbar (inner corner)
+  |> tangentialArc(angle = -90deg, radius = filletRadius)
+  |> line(end = [crossbarOverhang - filletRadius * 2, 0])
+  |> tangentialArc(angle = 90deg, radius = filletRadius)
+  |> line(end = [0, crossbarThickness - filletRadius])
+  |> tangentialArc(angle = 90deg, radius = filletRadius)
   // Top of crossbar
-  |> line(end = [-crossbarWidth, 0], tag = $topEdge)
+  |> line(end = [-crossbarWidth + filletRadius * 2, 0])
   // Left side going down
-  |> line(end = [0, -crossbarThickness])
-  |> line(end = [crossbarOverhang, 0])
+  |> tangentialArc(angle = 90deg, radius = filletRadius)
+  |> line(end = [0, -crossbarThickness + filletRadius])
+  |> tangentialArc(angle = 90deg, radius = filletRadius)
+  |> line(end = [crossbarOverhang - filletRadius * 2, 0])
+  // Bottom left of crossbar (inner corner)
+  |> tangentialArc(angle = -90deg, radius = filletRadius)
   // Left side of stem
-  |> line(end = [0, -(stemHeight - serifThickness)])
+  |> line(end = [0, -(stemHeight - serifThickness - filletRadius * 2)])
+  |> tangentialArc(angle = -90deg, radius = filletRadius)
   // Top left serif
-  |> line(end = [-serifLength, 0])
-  |> line(end = [0, -serifThickness])
+  |> line(end = [-serifLength + filletRadius * 2, 0])
+  |> tangentialArc(angle = 90deg, radius = filletRadius)
+  |> line(end = [0, -serifThickness + filletRadius])
   |> close()
 
 // Extrude to create 3D letter
