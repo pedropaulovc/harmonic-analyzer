@@ -1,5 +1,8 @@
 // Serif Capital T Letter - Classic serif typography
 
+
+
+
 @settings(defaultLengthUnit = in, kclVersion = 1.0)
 
 // Input parameters
@@ -26,37 +29,36 @@ assert(serifLength, isGreaterThan = 0, error = "Serif length must be positive")
 tProfile = startSketchOn(XY)
   // Bottom left serif
   |> startProfile(at = [-serifOverhang, 0])
-  |> line(end = [serifLength + stemWidth + serifLength, 0])
+  |> line(end = [
+       serifLength + stemWidth + serifLength,
+       0
+     ])
   |> line(end = [0, serifThickness - filletRadius])
   |> tangentialArc(angle = 90deg, radius = filletRadius)
-  |> line(end = [-serifLength + filletRadius * 2, 0])
+  |> line(end = [-serifLength + 0, 0])
   |> tangentialArc(angle = -90deg, radius = filletRadius)
   // Right side of stem
-  |> line(end = [0, stemHeight - serifThickness - filletRadius * 2])
+  |> line(end = [0, stemHeight - serifThickness - 0])
   // Bottom right of crossbar (inner corner)
   |> tangentialArc(angle = -90deg, radius = filletRadius)
-  |> line(end = [crossbarOverhang - filletRadius * 2, 0])
+  |> line(end = [crossbarOverhang - 0, 0])
   |> tangentialArc(angle = 90deg, radius = filletRadius)
   |> line(end = [0, crossbarThickness - filletRadius])
   |> tangentialArc(angle = 90deg, radius = filletRadius)
   // Top of crossbar
-  |> line(end = [-crossbarWidth + filletRadius * 2, 0])
+  |> line(end = [-crossbarWidth + 0, 0])
   // Left side going down
   |> tangentialArc(angle = 90deg, radius = filletRadius)
   |> line(end = [0, -crossbarThickness + filletRadius])
   |> tangentialArc(angle = 90deg, radius = filletRadius)
-  |> line(end = [crossbarOverhang - filletRadius * 2, 0])
+  |> line(end = [crossbarOverhang - 0, 0])
   // Bottom left of crossbar (inner corner)
   |> tangentialArc(angle = -90deg, radius = filletRadius)
   // Left side of stem
-  |> line(end = [0, -(stemHeight - serifThickness - filletRadius * 2)])
-  |> tangentialArc(angle = -90deg, radius = filletRadius)
+  |> line(end = [0, -(stemHeight - serifThickness - 0)])
+  |> arc(angleStart = 90, angleEnd = 180, radius = filletRadius)
   // Top left serif
-  |> line(end = [-serifLength + filletRadius * 2, 0])
-  |> tangentialArc(angle = 90deg, radius = filletRadius)
+  |> line(end = [-serifLength + 0, 0])
+  // |> tangentialArc(angle = 90deg, radius = filletRadius)
   |> line(end = [0, -serifThickness + filletRadius])
-  |> close()
-
-// Extrude to create 3D letter
-letter = tProfile
-  |> extrude(length = extrudeDepth)
+  // |> close()
