@@ -1,0 +1,50 @@
+// Serif Capital T Letter - Classic serif typography
+
+@settings(defaultLengthUnit = in, kclVersion = 1.0)
+
+// Input parameters
+letterHeight = 10
+stemWidth = 1.5
+crossbarThickness = 1.5
+crossbarWidth = 7
+serifLength = 0.6
+serifThickness = 0.4
+extrudeDepth = 0.5
+
+// Calculated parameters
+stemHeight = letterHeight - crossbarThickness
+crossbarOverhang = (crossbarWidth - stemWidth) / 2
+serifOverhang = (stemWidth + serifLength * 2 - stemWidth) / 2
+
+// Assertions
+assert(letterHeight, isGreaterThan = 0, error = "Height must be positive")
+assert(crossbarWidth, isGreaterThan = stemWidth, error = "Crossbar must be wider than stem")
+assert(serifLength, isGreaterThan = 0, error = "Serif length must be positive")
+
+// Create the T profile - starting from bottom left
+tProfile = startSketchOn(XY)
+  // Bottom left serif
+  |> startProfile(at = [-serifOverhang, 0])
+  |> line(end = [serifLength + stemWidth + serifLength, 0], tag = $bottomSerifBottom)
+  |> line(end = [0, serifThickness])
+  |> line(end = [-serifLength, 0])
+  // Right side of stem
+  |> line(end = [0, stemHeight - serifThickness])
+  // Bottom of crossbar
+  |> line(end = [crossbarOverhang, 0])
+  |> line(end = [0, crossbarThickness])
+  // Top of crossbar
+  |> line(end = [-crossbarWidth, 0], tag = $topEdge)
+  // Left side going down
+  |> line(end = [0, -crossbarThickness])
+  |> line(end = [crossbarOverhang, 0])
+  // Left side of stem
+  |> line(end = [0, -(stemHeight - serifThickness)])
+  // Top left serif
+  |> line(end = [-serifLength, 0])
+  |> line(end = [0, -serifThickness])
+  |> close()
+
+// Extrude to create 3D letter
+letter = tProfile
+  |> extrude(length = extrudeDepth)
