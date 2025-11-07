@@ -56,17 +56,25 @@ cylinder = startSketchOn(XZ)
 
 // Middle rib at center
 middleRib = startSketchOn(XZ)
-  |> startProfile(at = [cylinderCenterX, cylinderCenterZ - cylinderRadius])
+  |> startProfile(at = [
+       cylinderCenterX,
+       cylinderCenterZ - cylinderRadius
+     ])
   |> line(end = [0, cylinderDiameter])
-  |> line(end = [-coefficientsPlateWidth, -cylinderRadius])
+  |> line(end = [
+       -coefficientsPlateWidth,
+       -cylinderRadius
+     ])
   |> close()
   |> extrude(length = ribThickness, symmetric = true)
 
 // Edge ribs at short edges of coefficients plate
 edgeRibs = startSketchOn(XZ)
-  |> startProfile(at = [cylinderCenterX, cylinderCenterZ - cylinderRadius])
-  |> line(end = [0, cylinderRadius])
-  |> line(end = [-coefficientsPlateWidth, -cylinderRadius])
+  |> startProfile(at = [cylinderCenterX, cylinderCenterZ])
+  |> yLine(length = cylinderRadius, tag = $midTriangleBaseToRadius)
+  |> line(endAbsolute = [cylinderCenterX - coefficientsPlateWidth, cylinderCenterZ])
+  |> line(endAbsolute = [cylinderCenterX, cylinderCenterZ - cylinderRadius])
+  |> tangentialArc(endAbsolute = segEnd(midTriangleBaseToRadius))
   |> close()
   |> extrude(length = ribThickness, symmetric = true)
   |> patternLinear3d(axis = [0, 1, 0], instances = 2, distance = coefficientsPlateLength)
@@ -87,7 +95,7 @@ summationPlate = startSketchOn(XY)
        endAbsolute = [
          cylinderCenterX + summationPlateHeight,
          0
-       ]
+       ],
      )
   |> arc(
        interiorAbsolute = [
@@ -97,7 +105,7 @@ summationPlate = startSketchOn(XY)
        endAbsolute = [
          cylinderCenterX,
          -summationPlateBaseLength / 2
-       ]
+       ],
      )
   |> close()
   |> extrude(length = plateThickness)
