@@ -10,6 +10,8 @@ width = 3
 height = 9
 depth = 0.1
 cylinderRadius = 0.5
+ribThickness = 0.2
+ribHeight = 0.5
 
 // Create rectangle sketch and extrude to 3D solid
 solid = startSketchOn(XY)
@@ -20,3 +22,28 @@ solid = startSketchOn(XY)
 cylinder = startSketchOn(XZ)
   |> circle(center = [width / 2, depth / 2], radius = cylinderRadius)
   |> extrude(length = height, symmetric = true)
+
+// Add 3 ribs parallel to short edges
+rib1 = startSketchOn(XY)
+  |> startProfile(at = [-width / 2, -3 - (ribThickness / 2)])
+  |> line(end = [width, 0])
+  |> line(end = [0, ribThickness])
+  |> line(end = [-width, 0])
+  |> close()
+  |> extrude(length = depth + ribHeight)
+
+rib2 = startSketchOn(XY)
+  |> startProfile(at = [-width / 2, -ribThickness / 2])
+  |> line(end = [width, 0])
+  |> line(end = [0, ribThickness])
+  |> line(end = [-width, 0])
+  |> close()
+  |> extrude(length = depth + ribHeight)
+
+rib3 = startSketchOn(XY)
+  |> startProfile(at = [-width / 2, 3 - (ribThickness / 2)])
+  |> line(end = [width, 0])
+  |> line(end = [0, ribThickness])
+  |> line(end = [-width, 0])
+  |> close()
+  |> extrude(length = depth + ribHeight)
