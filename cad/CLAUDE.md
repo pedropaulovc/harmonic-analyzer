@@ -1,1 +1,1 @@
-Read the contents of @kcl-guide-for-llm.md in its entirety before processing any kcl requests. Ensure to format, lint and export to stl. No need to take a snapshot.
+Read the contents of @kcl-guide-for-llm.md in its entirety before processing any kcl requests. Ensure export to stl. No need to format, lint or take a snapshot.
