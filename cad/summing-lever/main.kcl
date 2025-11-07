@@ -78,7 +78,7 @@ summationPlate = startSketchOn(XY)
 
 // Summation anchor: cylinder at summation plate tip with center hole
 summationAnchorRadius = 0.5
-summationAnchorHeight = 2
+summationAnchorHeight = cylinderDiameter
 summationAnchorHoleRadius = 2 * holeRadius
 summationPlateTipX = coefficientsPlateWidth / 2 + summationPlateHeight
 
