@@ -32,8 +32,6 @@ transitionRadius = 20
 // Rib parameters
 ribThickness = 2
 ribHeight = 6
-wideEndRibCount = 3
-narrowEndRibCount = 2
 
 // Calculated parameters
 totalLength = wideEndLength + fulcrumLength + narrowEndLength
@@ -120,29 +118,39 @@ knifeEdge = startSketchOn(lever, face = END)
   |> close()
   |> extrude(length = knifeEdgeHeight, tagEnd = $knifeTop)
 
-// Add transverse ribs on wide end (perpendicular to length)
-wideEndRibSpacing = wideEndLength / (wideEndRibCount + 1)
-wideEndRib = startSketchOn(lever, face = END)
+  // Add 3 perpendicular ribs at left, middle, and right positions
+// Left rib - in wide end area
+leftRib = startSketchOn(lever, face = END)
   |> startProfile(at = [
        -wideEndWidth / 2 + 2,
-       wideEndRibSpacing - (ribThickness / 2)
+       wideEndLength / 2 - (ribThickness / 2)
      ])
   |> line(end = [wideEndWidth - 4, 0])
   |> line(end = [0, ribThickness])
   |> line(end = [-(wideEndWidth - 4), 0])
   |> close()
   |> extrude(length = ribHeight)
-  |> patternLinear3d(axis = [0, 1, 0], instances = wideEndRibCount, distance = wideEndRibSpacing)
 
-// Add longitudinal rib on narrow end (along the length)
-narrowEndRibSpacing = (narrowEndLength - 20) / (narrowEndRibCount + 1)
-narrowEndRib = startSketchOn(lever, face = END)
+// Middle rib - at fulcrum area
+middleRib = startSketchOn(lever, face = END)
   |> startProfile(at = [
-       -ribThickness / 2,
-       wideEndLength + fulcrumLength + 10 + narrowEndRibSpacing - (ribThickness / 2)
+       -fulcrumWidth / 2,
+       wideEndLength + fulcrumLength / 2 - (ribThickness / 2)
      ])
-  |> line(end = [ribThickness, 0])
-  |> line(end = [0, narrowEndLength - 30])
-  |> line(end = [-ribThickness, 0])
+  |> line(end = [fulcrumWidth, 0])
+  |> line(end = [0, ribThickness])
+  |> line(end = [-fulcrumWidth, 0])
+  |> close()
+  |> extrude(length = ribHeight)
+
+// Right rib - in narrow end area
+rightRib = startSketchOn(lever, face = END)
+  |> startProfile(at = [
+       -narrowEndWidth / 2,
+       wideEndLength + fulcrumLength + narrowEndLength / 2 - (ribThickness / 2)
+     ])
+  |> line(end = [narrowEndWidth, 0])
+  |> line(end = [0, ribThickness])
+  |> line(end = [-narrowEndWidth, 0])
   |> close()
   |> extrude(length = ribHeight)
