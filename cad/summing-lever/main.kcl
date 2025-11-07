@@ -34,6 +34,7 @@ solid = startSketchOn(XY)
 cylinder = startSketchOn(XZ)
   |> circle(center = [width / 2, depth / 2], radius = cylinderRadius)
   |> extrude(length = height, symmetric = true)
+  |> appearance(color = "#FF0000", metalness = 60, roughness = 20)
 
 ribs = startSketchOn(XZ)
   |> startProfile(at = [width / 2, depth / 2 - cylinderRadius])
