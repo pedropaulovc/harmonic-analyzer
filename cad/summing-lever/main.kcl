@@ -8,7 +8,9 @@
 // Dimensions
 width = 3
 height = 9
+depth = 1
 
-// Create rectangle sketch
-sketch = startSketchOn(XY)
+// Create rectangle sketch and extrude to 3D solid
+solid = startSketchOn(XY)
   |> rectangle(width = width, height = height, center = [0, 0])
+  |> extrude(length = depth)
