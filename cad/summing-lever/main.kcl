@@ -76,4 +76,4 @@ tipCylinderHeight = 2
 triangleTipX = width / 2 + triangleHeight
 tipCylinder = startSketchOn(XY)
   |> circle(center = [triangleTipX, 0], radius = tipCylinderRadius)
-  |> extrude(length = tipCylinderHeight)
+  |> extrude(length = tipCylinderHeight, symmetric = true)
