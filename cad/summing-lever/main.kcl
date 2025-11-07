@@ -23,12 +23,13 @@ cylinder = startSketchOn(XZ)
   |> circle(center = [width / 2, depth / 2], radius = cylinderRadius)
   |> extrude(length = height, symmetric = true)
 
-// Add 3 ribs parallel to short edges using linear pattern
+  // Add 3 ribs parallel to short edges using linear pattern
+// Ribs extend symmetrically to both sides of XY plane
 ribs = startSketchOn(XY)
   |> startProfile(at = [-width / 2, -3 - (ribThickness / 2)])
   |> line(end = [width, 0])
   |> line(end = [0, ribThickness])
   |> line(end = [-width, 0])
   |> close()
-  |> extrude(length = depth + ribHeight)
+  |> extrude(length = depth + ribHeight, symmetric = true)
   |> patternLinear3d(axis = [0, 1, 0], instances = 3, distance = 3)
