@@ -329,3 +329,5 @@ cad/*.jpg
 cad/*.txt
 cad/output.*
 cad/project.toml
+cad/**/project.toml
+cad/**/thumbnail.png
