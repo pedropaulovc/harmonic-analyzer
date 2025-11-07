@@ -9,9 +9,9 @@
 @settings(defaultLengthUnit = mm, kclVersion = 1.0)
 
 // Dimensions
-width = 3
-height = 9
-depth = 0.1
+coefficientsPlateWidth = 3
+coefficientsPlateLength = 9
+coefficientsPlateThickness = 0.1
 cylinderRadius = 0.5
 ribThickness = 0.2
 ribHeight = 0.5
@@ -21,42 +21,42 @@ ribCount = 3
 ribSpacing = 3
 
 // Summation plate parameters
-summationPlateBaseLength = height / 2
+summationPlateBaseLength = coefficientsPlateLength / 2
 summationPlateHeight = 4
 
 // Hole pattern parameters
 holeCount = 20
 holeRadius = 0.01
-holeSpacing = height / (holeCount - 1)
+holeSpacing = coefficientsPlateLength / (holeCount - 1)
 
 // Calculated parameters
 cylinderDiameter = 2 * cylinderRadius
 ribOffset = (ribCount - 1) * ribSpacing / 2
-holeOffset = height / 2
+holeOffset = coefficientsPlateLength / 2
 
 // Create hole pattern for 2D subtraction
-// Position holes at left edge with margin = depth from edge
-holeXPosition = -width / 2 + holeRadius + depth
+// Position holes at left edge with margin = coefficientsPlateThickness from edge
+holeXPosition = -coefficientsPlateWidth / 2 + holeRadius + coefficientsPlateThickness
 holes = startSketchOn(XY)
   |> circle(center = [holeXPosition, -holeOffset], radius = holeRadius)
   |> patternLinear2d(axis = [0, 1], instances = holeCount, distance = holeSpacing)
 
 // Coefficients plate: rectangular plate with holes for spring connections
 coefficientsPlate = startSketchOn(XY)
-  |> rectangle(width = width, height = height, center = [0, 0])
+  |> rectangle(width = coefficientsPlateWidth, height = coefficientsPlateLength, center = [0, 0])
   |> subtract2d(tool = holes)
-  |> extrude(length = depth)
+  |> extrude(length = coefficientsPlateThickness)
 
 // Add cylinder along the long edge (perpendicular to rectangle)
 cylinder = startSketchOn(XZ)
-  |> circle(center = [width / 2, depth / 2], radius = cylinderRadius)
-  |> extrude(length = height, symmetric = true)
+  |> circle(center = [coefficientsPlateWidth / 2, coefficientsPlateThickness / 2], radius = cylinderRadius)
+  |> extrude(length = coefficientsPlateLength, symmetric = true)
   |> appearance(color = "#FF0000", metalness = 60, roughness = 20)
 
 ribs = startSketchOn(XZ)
-  |> startProfile(at = [width / 2, depth / 2 - cylinderRadius])
+  |> startProfile(at = [coefficientsPlateWidth / 2, coefficientsPlateThickness / 2 - cylinderRadius])
   |> line(end = [0, cylinderDiameter])
-  |> line(end = [-width, -cylinderRadius])
+  |> line(end = [-coefficientsPlateWidth, -cylinderRadius])
   |> close()
   |> extrude(length = ribThickness, symmetric = true)
   |> patternLinear3d(axis = [0, 1, 0], instances = ribCount, distance = ribSpacing)
@@ -65,7 +65,7 @@ ribs = startSketchOn(XZ)
 // Summation plate: triangular extension in XY plane with base at cylinder edge
 summationPlate = startSketchOn(XY)
   |> startProfile(at = [
-       width / 2,
+       coefficientsPlateWidth / 2,
        -summationPlateBaseLength / 2
      ])
   |> line(end = [0, summationPlateBaseLength])
@@ -74,13 +74,13 @@ summationPlate = startSketchOn(XY)
        -summationPlateBaseLength / 2
      ])
   |> close()
-  |> extrude(length = depth)
+  |> extrude(length = coefficientsPlateThickness)
 
 // Summation anchor: cylinder at summation plate tip with center hole
 summationAnchorRadius = 0.5
 summationAnchorHeight = 2
 summationAnchorHoleRadius = 2 * holeRadius
-summationPlateTipX = width / 2 + summationPlateHeight
+summationPlateTipX = coefficientsPlateWidth / 2 + summationPlateHeight
 
 summationAnchorHole = startSketchOn(XY)
   |> circle(center = [summationPlateTipX, 0], radius = summationAnchorHoleRadius)
