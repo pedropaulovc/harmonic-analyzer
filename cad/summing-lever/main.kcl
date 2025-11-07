@@ -32,8 +32,10 @@ ribOffset = (ribCount - 1) * ribSpacing / 2
 holeOffset = height / 2
 
 // Create hole pattern for 2D subtraction
+// Position holes at left edge with margin = depth from edge
+holeXPosition = -width / 2 + holeRadius + depth
 holes = startSketchOn(XY)
-  |> circle(center = [width / 2, -holeOffset], radius = holeRadius)
+  |> circle(center = [holeXPosition, -holeOffset], radius = holeRadius)
   |> patternLinear2d(axis = [0, 1], instances = holeCount, distance = holeSpacing)
 
 // Create rectangle sketch with holes and extrude to 3D solid
