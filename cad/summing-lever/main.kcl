@@ -23,7 +23,7 @@ triangleHeight = 4
 
 // Hole pattern parameters
 holeCount = 20
-holeRadius = 0.15
+holeRadius = 0.005 // diameter = 0.01mm
 holeSpacing = height / (holeCount - 1)
 
 // Calculated parameters
