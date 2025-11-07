@@ -13,6 +13,14 @@ cylinderRadius = 0.5
 ribThickness = 0.2
 ribHeight = 0.5
 
+// Rib pattern parameters
+ribCount = 3
+ribSpacing = 3
+
+// Calculated parameters
+cylinderDiameter = 2 * cylinderRadius
+ribOffset = (ribCount - 1) * ribSpacing / 2
+
 // Create rectangle sketch and extrude to 3D solid
 solid = startSketchOn(XY)
   |> rectangle(width = width, height = height, center = [0, 0])
@@ -25,9 +33,9 @@ cylinder = startSketchOn(XZ)
 
 ribs = startSketchOn(XZ)
   |> startProfile(at = [width / 2, depth / 2 - cylinderRadius])
-  |> line(end = [0, 2 * cylinderRadius])
+  |> line(end = [0, cylinderDiameter])
   |> line(end = [-width, -cylinderRadius])
   |> close()
   |> extrude(length = ribThickness, symmetric = true)
-  |> patternLinear3d(axis = [0, 1, 0], instances = 3, distance = 3)
-  |> translate(x = 0, y = -3, z = 0)
+  |> patternLinear3d(axis = [0, 1, 0], instances = ribCount, distance = ribSpacing)
+  |> translate(x = 0, y = -ribOffset, z = 0)
