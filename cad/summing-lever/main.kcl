@@ -29,6 +29,12 @@ knifeEdgeAngle = 60deg
 // Transition parameters
 transitionRadius = 20
 
+// Rib parameters
+ribThickness = 2
+ribHeight = 6
+wideEndRibCount = 3
+narrowEndRibCount = 2
+
 // Calculated parameters
 totalLength = wideEndLength + fulcrumLength + narrowEndLength
 wideEndHoleSpacing = (wideEndWidth - 10) / (wideEndHoleCount - 1)
@@ -113,3 +119,30 @@ knifeEdge = startSketchOn(lever, face = END)
   |> line(end = [-fulcrumWidth, 0])
   |> close()
   |> extrude(length = knifeEdgeHeight, tagEnd = $knifeTop)
+
+// Add transverse ribs on wide end (perpendicular to length)
+wideEndRibSpacing = wideEndLength / (wideEndRibCount + 1)
+wideEndRib = startSketchOn(lever, face = END)
+  |> startProfile(at = [
+       -wideEndWidth / 2 + 2,
+       wideEndRibSpacing - (ribThickness / 2)
+     ])
+  |> line(end = [wideEndWidth - 4, 0])
+  |> line(end = [0, ribThickness])
+  |> line(end = [-(wideEndWidth - 4), 0])
+  |> close()
+  |> extrude(length = ribHeight)
+  |> patternLinear3d(axis = [0, 1, 0], instances = wideEndRibCount, distance = wideEndRibSpacing)
+
+// Add longitudinal rib on narrow end (along the length)
+narrowEndRibSpacing = (narrowEndLength - 20) / (narrowEndRibCount + 1)
+narrowEndRib = startSketchOn(lever, face = END)
+  |> startProfile(at = [
+       -ribThickness / 2,
+       wideEndLength + fulcrumLength + 10 + narrowEndRibSpacing - (ribThickness / 2)
+     ])
+  |> line(end = [ribThickness, 0])
+  |> line(end = [0, narrowEndLength - 30])
+  |> line(end = [-ribThickness, 0])
+  |> close()
+  |> extrude(length = ribHeight)
