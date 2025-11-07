@@ -71,7 +71,7 @@ triangle = startSketchOn(XY)
   |> extrude(length = depth)
 
 // Cylinder at triangle tip
-tipCylinderRadius = 1
+tipCylinderRadius = 0.5
 tipCylinderHeight = 2
 triangleTipX = width / 2 + triangleHeight
 tipCylinder = startSketchOn(XY)
