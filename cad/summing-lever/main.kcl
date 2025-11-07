@@ -11,7 +11,7 @@
 // Dimensions
 coefficientsPlateWidth = 3
 coefficientsPlateLength = 9
-coefficientsPlateThickness = 0.1
+plateThickness = 0.2
 cylinderRadius = 0.5
 ribThickness = 0.2
 ribHeight = 0.5
@@ -36,8 +36,8 @@ ribOffset = (ribCount - 1) * ribSpacing / 2
 holeOffset = coefficientsPlateLength / 2
 
 // Create hole pattern for 2D subtraction
-// Position holes at left edge with margin = coefficientsPlateThickness from edge
-holeXPosition = -coefficientsPlateWidth / 2 + holeRadius + coefficientsPlateThickness
+// Position holes at left edge with margin = plateThickness from edge
+holeXPosition = -coefficientsPlateWidth / 2 + holeRadius + plateThickness
 holes = startSketchOn(XY)
   |> circle(center = [holeXPosition, -holeOffset], radius = holeRadius)
   |> patternLinear2d(axis = [0, 1], instances = holeCount, distance = holeSpacing)
@@ -46,16 +46,16 @@ holes = startSketchOn(XY)
 coefficientsPlate = startSketchOn(XY)
   |> rectangle(width = coefficientsPlateWidth, height = coefficientsPlateLength, center = [0, 0])
   |> subtract2d(tool = holes)
-  |> extrude(length = coefficientsPlateThickness)
+  |> extrude(length = plateThickness)
 
 // Add cylinder along the long edge (perpendicular to rectangle)
 cylinder = startSketchOn(XZ)
-  |> circle(center = [coefficientsPlateWidth / 2, coefficientsPlateThickness / 2], radius = cylinderRadius)
+  |> circle(center = [coefficientsPlateWidth / 2, plateThickness / 2], radius = cylinderRadius)
   |> extrude(length = coefficientsPlateLength, symmetric = true)
   |> appearance(color = "#FF0000", metalness = 60, roughness = 20)
 
 ribs = startSketchOn(XZ)
-  |> startProfile(at = [coefficientsPlateWidth / 2, coefficientsPlateThickness / 2 - cylinderRadius])
+  |> startProfile(at = [coefficientsPlateWidth / 2, plateThickness / 2 - cylinderRadius])
   |> line(end = [0, cylinderDiameter])
   |> line(end = [-coefficientsPlateWidth, -cylinderRadius])
   |> close()
@@ -91,7 +91,7 @@ summationPlate = startSketchOn(XY)
        ]
      )
   |> close()
-  |> extrude(length = coefficientsPlateThickness)
+  |> extrude(length = plateThickness)
 
 // Summation anchor: cylinder at summation plate tip with center hole
 summationAnchorRadius = 0.5
