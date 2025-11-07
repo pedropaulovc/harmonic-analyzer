@@ -65,7 +65,7 @@ middleRib = startSketchOn(XZ)
 // Edge ribs at short edges of coefficients plate
 edgeRibs = startSketchOn(XZ)
   |> startProfile(at = [cylinderCenterX, cylinderCenterZ - cylinderRadius])
-  |> line(end = [0, cylinderDiameter])
+  |> line(end = [0, cylinderRadius])
   |> line(end = [-coefficientsPlateWidth, -cylinderRadius])
   |> close()
   |> extrude(length = ribThickness, symmetric = true)
