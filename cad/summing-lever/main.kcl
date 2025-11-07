@@ -70,10 +70,16 @@ triangle = startSketchOn(XY)
   |> close()
   |> extrude(length = depth)
 
-// Cylinder at triangle tip
+// Cylinder at triangle tip with center hole
 tipCylinderRadius = 0.5
 tipCylinderHeight = 2
+tipCylinderHoleRadius = 2 * holeRadius
 triangleTipX = width / 2 + triangleHeight
+
+tipCylinderHole = startSketchOn(XY)
+  |> circle(center = [triangleTipX, 0], radius = tipCylinderHoleRadius)
+
 tipCylinder = startSketchOn(XY)
   |> circle(center = [triangleTipX, 0], radius = tipCylinderRadius)
+  |> subtract2d(tool = tipCylinderHole)
   |> extrude(length = tipCylinderHeight, symmetric = true)
