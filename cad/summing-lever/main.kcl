@@ -21,13 +21,25 @@ ribSpacing = 3
 triangleBaseLength = width / 3
 triangleHeight = 4
 
+// Hole pattern parameters
+holeCount = 20
+holeRadius = 0.15
+holeSpacing = height / (holeCount - 1)
+
 // Calculated parameters
 cylinderDiameter = 2 * cylinderRadius
 ribOffset = (ribCount - 1) * ribSpacing / 2
+holeOffset = height / 2
 
-// Create rectangle sketch and extrude to 3D solid
+// Create hole pattern for 2D subtraction
+holes = startSketchOn(XY)
+  |> circle(center = [width / 2, -holeOffset], radius = holeRadius)
+  |> patternLinear2d(axis = [0, 1], instances = holeCount, distance = holeSpacing)
+
+// Create rectangle sketch with holes and extrude to 3D solid
 solid = startSketchOn(XY)
   |> rectangle(width = width, height = height, center = [0, 0])
+  |> subtract2d(tool = holes)
   |> extrude(length = depth)
 
 // Add cylinder along the long edge (perpendicular to rectangle)
