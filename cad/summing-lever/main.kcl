@@ -12,11 +12,10 @@ fulcrumWidth = 8
 fulcrumLength = 20
 
 // Wide end (connects to 20 small springs)
-wideEndWidth = 60
-wideEndLength = 40
+wideEndWidth = 120
+wideEndLength = 20
 wideEndHoleDia = 4
-wideEndHoleRows = 4
-wideEndHoleCols = 5
+wideEndHoleCount = 20
 
 // Narrow end (connects to single large spring)
 narrowEndWidth = 15
@@ -32,8 +31,7 @@ transitionRadius = 20
 
 // Calculated parameters
 totalLength = wideEndLength + fulcrumLength + narrowEndLength
-wideEndHoleSpacingX = (wideEndWidth - 10) / (wideEndHoleCols - 1)
-wideEndHoleSpacingY = (wideEndLength - 10) / (wideEndHoleRows - 1)
+wideEndHoleSpacing = (wideEndWidth - 10) / (wideEndHoleCount - 1)
 
 // Assertions
 assert(wideEndWidth, isGreaterThan = narrowEndWidth, error = "Wide end must be wider than narrow end")
@@ -81,11 +79,16 @@ leverProfile = startSketchOn(XY)
 lever = leverProfile
   |> extrude(length = leverThickness, tagEnd = $leverTop)
 
-// Add holes in wide end for 20 springs
+// Add holes in wide end for 20 springs (single line)
 wideEndHoles = startSketchOn(XY)
-  |> circle(center = [-wideEndWidth / 2 + 5, 5], radius = wideEndHoleDia / 2)
-  |> patternLinear2d(axis = [1, 0], instances = wideEndHoleCols, distance = wideEndHoleSpacingX)
-  |> patternLinear2d(axis = [0, 1], instances = wideEndHoleRows, distance = wideEndHoleSpacingY)
+  |> circle(
+       center = [
+         -wideEndWidth / 2 + 5,
+         wideEndLength / 2
+       ],
+       radius = wideEndHoleDia / 2,
+     )
+  |> patternLinear2d(axis = [1, 0], instances = wideEndHoleCount, distance = wideEndHoleSpacing)
   |> extrude(length = -leverThickness - 0.1)
 
 // Add hole in narrow end for counterbalance spring
