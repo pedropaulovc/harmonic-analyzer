@@ -17,6 +17,10 @@ ribHeight = 0.5
 ribCount = 3
 ribSpacing = 3
 
+// Triangle parameters
+triangleBaseLength = width / 3
+triangleHeight = 4
+
 // Calculated parameters
 cylinderDiameter = 2 * cylinderRadius
 ribOffset = (ribCount - 1) * ribSpacing / 2
@@ -39,3 +43,14 @@ ribs = startSketchOn(XZ)
   |> extrude(length = ribThickness, symmetric = true)
   |> patternLinear3d(axis = [0, 1, 0], instances = ribCount, distance = ribSpacing)
   |> translate(x = 0, y = -ribOffset, z = 0)
+
+// Triangle in XY plane with base at cylinder edge
+triangle = startSketchOn(XY)
+  |> startProfile(at = [width / 2, -triangleBaseLength / 2])
+  |> line(end = [0, triangleBaseLength])
+  |> line(end = [
+       -triangleHeight,
+       -triangleBaseLength / 2
+     ])
+  |> close()
+  |> extrude(length = depth)
