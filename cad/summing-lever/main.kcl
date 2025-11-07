@@ -16,7 +16,7 @@ solid = startSketchOn(XY)
   |> rectangle(width = width, height = height, center = [0, 0])
   |> extrude(length = depth)
 
-// Add cylinder at the long edge
-cylinder = startSketchOn(XY)
-  |> circle(center = [width / 2, 0], radius = cylinderRadius)
-  |> extrude(length = depth)
+// Add cylinder along the long edge (perpendicular to rectangle)
+cylinder = startSketchOn(XZ)
+  |> circle(center = [width / 2, depth / 2], radius = cylinderRadius)
+  |> extrude(length = height, symmetric = true)
