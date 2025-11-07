@@ -8,9 +8,15 @@
 // Dimensions
 width = 3
 height = 9
-depth = 1
+depth = 0.1
+cylinderRadius = 0.5
 
 // Create rectangle sketch and extrude to 3D solid
 solid = startSketchOn(XY)
   |> rectangle(width = width, height = height, center = [0, 0])
+  |> extrude(length = depth)
+
+// Add cylinder at the long edge
+cylinder = startSketchOn(XY)
+  |> circle(center = [width / 2, 0], radius = cylinderRadius)
   |> extrude(length = depth)
