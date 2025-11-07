@@ -21,7 +21,7 @@ ribCount = 3
 ribSpacing = 3
 
 // Summation plate parameters
-summationPlateBaseLength = width / 3
+summationPlateBaseLength = height / 2
 summationPlateHeight = 4
 
 // Hole pattern parameters
