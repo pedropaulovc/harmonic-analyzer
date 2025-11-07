@@ -16,9 +16,8 @@ cylinderRadius = 0.5
 ribThickness = 0.2
 ribHeight = 0.5
 
-// Rib pattern parameters
-ribCount = 3
-ribSpacing = 3
+// Rib parameters
+// Middle rib is at center, edge ribs at plate ends
 
 // Summation plate parameters
 summationPlateBaseLength = coefficientsPlateLength / 2
@@ -32,7 +31,6 @@ holeSpacing = coefficientsPlateLength / (holeCount - 1)
 
 // Calculated parameters
 cylinderDiameter = 2 * cylinderRadius
-ribOffset = (ribCount - 1) * ribSpacing / 2
 holeOffset = coefficientsPlateLength / 2
 
 // Create hole pattern for 2D subtraction
@@ -54,14 +52,23 @@ cylinder = startSketchOn(XZ)
   |> extrude(length = coefficientsPlateLength, symmetric = true)
   |> appearance(color = "#FF0000", metalness = 60, roughness = 20)
 
-ribs = startSketchOn(XZ)
+// Middle rib at center
+middleRib = startSketchOn(XZ)
   |> startProfile(at = [coefficientsPlateWidth / 2, plateThickness / 2 - cylinderRadius])
   |> line(end = [0, cylinderDiameter])
   |> line(end = [-coefficientsPlateWidth, -cylinderRadius])
   |> close()
   |> extrude(length = ribThickness, symmetric = true)
-  |> patternLinear3d(axis = [0, 1, 0], instances = ribCount, distance = ribSpacing)
-  |> translate(x = 0, y = -ribOffset, z = 0)
+
+// Edge ribs at short edges of coefficients plate
+edgeRibs = startSketchOn(XZ)
+  |> startProfile(at = [coefficientsPlateWidth / 2, plateThickness / 2 - cylinderRadius])
+  |> line(end = [0, cylinderDiameter])
+  |> line(end = [-coefficientsPlateWidth, -cylinderRadius])
+  |> close()
+  |> extrude(length = ribThickness, symmetric = true)
+  |> patternLinear3d(axis = [0, 1, 0], instances = 2, distance = coefficientsPlateLength)
+  |> translate(x = 0, y = -coefficientsPlateLength / 2, z = 0)
 
 // Summation plate: triangular extension with curved sides using 3-point arcs
 summationPlate = startSketchOn(XY)
