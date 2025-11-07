@@ -1,0 +1,112 @@
+// Summing Lever - First-class lever for harmonic analyzer
+// Asymmetric lever with wide flat end for 20 springs and narrow end for counterbalance
+
+
+
+
+@settings(defaultLengthUnit = mm, kclVersion = 1.0)
+
+// Input parameters
+leverThickness = 6
+fulcrumWidth = 8
+fulcrumLength = 20
+
+// Wide end (connects to 20 small springs)
+wideEndWidth = 60
+wideEndLength = 40
+wideEndHoleDia = 4
+wideEndHoleRows = 4
+wideEndHoleCols = 5
+
+// Narrow end (connects to single large spring)
+narrowEndWidth = 15
+narrowEndLength = 80
+narrowEndHoleDia = 6
+
+// Fulcrum knife edge
+knifeEdgeHeight = 10
+knifeEdgeAngle = 60deg
+
+// Transition parameters
+transitionRadius = 20
+
+// Calculated parameters
+totalLength = wideEndLength + fulcrumLength + narrowEndLength
+wideEndHoleSpacingX = (wideEndWidth - 10) / (wideEndHoleCols - 1)
+wideEndHoleSpacingY = (wideEndLength - 10) / (wideEndHoleRows - 1)
+
+// Assertions
+assert(wideEndWidth, isGreaterThan = narrowEndWidth, error = "Wide end must be wider than narrow end")
+assert(fulcrumWidth, isGreaterThan = leverThickness, error = "Fulcrum must be wider than lever thickness")
+
+// Main lever profile
+leverProfile = startSketchOn(XY)
+  |> startProfile(at = [-wideEndWidth / 2, 0])
+
+  // Wide end rectangle
+  |> line(end = [wideEndWidth, 0], tag = $wideBottom)
+  |> line(end = [0, wideEndLength], tag = $wideRight)
+  |> line(end = [-wideEndWidth, 0], tag = $wideTop)
+  |> line(end = [0, -wideEndLength], tag = $wideLeft)
+
+  // Transition to fulcrum (right side)
+  |> line(endAbsolute = [fulcrumWidth / 2, wideEndLength])
+  |> line(end = [0, fulcrumLength], tag = $fulcrumRight)
+
+  // Transition to narrow end (right side)
+  |> line(endAbsolute = [
+       narrowEndWidth / 2,
+       wideEndLength + fulcrumLength
+     ])
+  |> line(end = [0, narrowEndLength], tag = $narrowRight)
+
+  // Narrow end cap
+  |> line(end = [-narrowEndWidth, 0], tag = $narrowTop)
+
+  // Transition back (left side)
+  |> line(end = [0, -narrowEndLength], tag = $narrowLeft)
+  |> line(endAbsolute = [
+       -fulcrumWidth / 2,
+       wideEndLength + fulcrumLength
+     ])
+
+  // Fulcrum section (left side)
+  |> line(end = [0, -fulcrumLength], tag = $fulcrumLeft)
+
+  // Close back to start
+  |> line(endAbsolute = [-wideEndWidth / 2, wideEndLength])
+  |> close()
+
+// Create base lever body
+lever = leverProfile
+  |> extrude(length = leverThickness, tagEnd = $leverTop)
+
+// Add holes in wide end for 20 springs
+wideEndHoles = startSketchOn(XY)
+  |> circle(center = [-wideEndWidth / 2 + 5, 5], radius = wideEndHoleDia / 2)
+  |> patternLinear2d(axis = [1, 0], instances = wideEndHoleCols, distance = wideEndHoleSpacingX)
+  |> patternLinear2d(axis = [0, 1], instances = wideEndHoleRows, distance = wideEndHoleSpacingY)
+  |> extrude(length = -leverThickness - 0.1)
+
+// Add hole in narrow end for counterbalance spring
+narrowEndHole = startSketchOn(XY)
+  |> circle(
+       center = [
+         0,
+         wideEndLength + fulcrumLength + narrowEndLength - 10
+       ],
+       radius = narrowEndHoleDia / 2,
+     )
+  |> extrude(length = -leverThickness - 0.1)
+
+// Add knife edge fulcrum feature on top
+knifeEdge = startSketchOn(lever, face = END)
+  |> startProfile(at = [
+       -fulcrumWidth / 2,
+       wideEndLength + fulcrumLength / 2 - (knifeEdgeHeight / 2)
+     ])
+  |> line(end = [fulcrumWidth, 0])
+  |> line(end = [0, knifeEdgeHeight])
+  |> line(end = [-fulcrumWidth, 0])
+  |> close()
+  |> extrude(length = knifeEdgeHeight, tagEnd = $knifeTop)
