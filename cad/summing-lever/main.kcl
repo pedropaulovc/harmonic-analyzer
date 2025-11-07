@@ -23,7 +23,7 @@ triangleHeight = 4
 
 // Hole pattern parameters
 holeCount = 20
-holeRadius = 0.005 // diameter = 0.01mm
+holeRadius = 0.01
 holeSpacing = height / (holeCount - 1)
 
 // Calculated parameters
@@ -69,3 +69,11 @@ triangle = startSketchOn(XY)
      ])
   |> close()
   |> extrude(length = depth)
+
+// Cylinder at triangle tip
+tipCylinderRadius = 1
+tipCylinderHeight = 2
+triangleTipX = width / 2 + triangleHeight
+tipCylinder = startSketchOn(XY)
+  |> circle(center = [triangleTipX, 0], radius = tipCylinderRadius)
+  |> extrude(length = tipCylinderHeight)
