@@ -46,14 +46,11 @@ ribs = startSketchOn(XZ)
 
 // Triangle in XY plane with base at cylinder edge
 triangle = startSketchOn(XY)
-  |> startProfile(at = [
-       width / 2 - (triangleBaseLength / 2),
-       0
-     ])
-  |> line(end = [triangleBaseLength, 0])
+  |> startProfile(at = [width / 2, -triangleBaseLength / 2])
+  |> line(end = [0, triangleBaseLength])
   |> line(end = [
-       -triangleBaseLength / 2,
-       -triangleHeight
+       triangleHeight,
+       -triangleBaseLength / 2
      ])
   |> close()
   |> extrude(length = depth)
