@@ -1,4 +1,7 @@
-// Simple Rectangle Sketch
+// Harmonic Analyzer Summing Lever Components
+// - Coefficients Plate (rectangular plate with holes)
+// - Summation Plate (triangular extension)
+// - Summation Anchor (cylinder at triangle tip)
 
 
 
@@ -17,9 +20,9 @@ ribHeight = 0.5
 ribCount = 3
 ribSpacing = 3
 
-// Triangle parameters
-triangleBaseLength = width / 3
-triangleHeight = 4
+// Summation plate parameters
+summationPlateBaseLength = width / 3
+summationPlateHeight = 4
 
 // Hole pattern parameters
 holeCount = 20
@@ -38,8 +41,8 @@ holes = startSketchOn(XY)
   |> circle(center = [holeXPosition, -holeOffset], radius = holeRadius)
   |> patternLinear2d(axis = [0, 1], instances = holeCount, distance = holeSpacing)
 
-// Create rectangle sketch with holes and extrude to 3D solid
-solid = startSketchOn(XY)
+// Coefficients plate: rectangular plate with holes for spring connections
+coefficientsPlate = startSketchOn(XY)
   |> rectangle(width = width, height = height, center = [0, 0])
   |> subtract2d(tool = holes)
   |> extrude(length = depth)
@@ -59,27 +62,30 @@ ribs = startSketchOn(XZ)
   |> patternLinear3d(axis = [0, 1, 0], instances = ribCount, distance = ribSpacing)
   |> translate(x = 0, y = -ribOffset, z = 0)
 
-// Triangle in XY plane with base at cylinder edge
-triangle = startSketchOn(XY)
-  |> startProfile(at = [width / 2, -triangleBaseLength / 2])
-  |> line(end = [0, triangleBaseLength])
+// Summation plate: triangular extension in XY plane with base at cylinder edge
+summationPlate = startSketchOn(XY)
+  |> startProfile(at = [
+       width / 2,
+       -summationPlateBaseLength / 2
+     ])
+  |> line(end = [0, summationPlateBaseLength])
   |> line(end = [
-       triangleHeight,
-       -triangleBaseLength / 2
+       summationPlateHeight,
+       -summationPlateBaseLength / 2
      ])
   |> close()
   |> extrude(length = depth)
 
-// Cylinder at triangle tip with center hole
-tipCylinderRadius = 0.5
-tipCylinderHeight = 2
-tipCylinderHoleRadius = 2 * holeRadius
-triangleTipX = width / 2 + triangleHeight
+// Summation anchor: cylinder at summation plate tip with center hole
+summationAnchorRadius = 0.5
+summationAnchorHeight = 2
+summationAnchorHoleRadius = 2 * holeRadius
+summationPlateTipX = width / 2 + summationPlateHeight
 
-tipCylinderHole = startSketchOn(XY)
-  |> circle(center = [triangleTipX, 0], radius = tipCylinderHoleRadius)
+summationAnchorHole = startSketchOn(XY)
+  |> circle(center = [summationPlateTipX, 0], radius = summationAnchorHoleRadius)
 
-tipCylinder = startSketchOn(XY)
-  |> circle(center = [triangleTipX, 0], radius = tipCylinderRadius)
-  |> subtract2d(tool = tipCylinderHole)
-  |> extrude(length = tipCylinderHeight, symmetric = true)
+summationAnchor = startSketchOn(XY)
+  |> circle(center = [summationPlateTipX, 0], radius = summationAnchorRadius)
+  |> subtract2d(tool = summationAnchorHole)
+  |> extrude(length = summationAnchorHeight, symmetric = true)
