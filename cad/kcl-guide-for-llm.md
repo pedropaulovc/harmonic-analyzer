@@ -1,4 +1,4 @@
-# KCL (KittyCAD Language) Reference Guide for LLMs - Version 3
+# KCL (KittyCAD Language) Reference Guide for LLMs - Version 4
 
 ## Core Principles
 
@@ -41,6 +41,342 @@ assert(width, isGreaterThan = height, error = "Width must exceed height")
 - Use query functions (`profileStartX()`, `segEndY()`) for dynamic geometry
 - Tag extrude faces: `extrude(length = 10, tagStart = $bottom, tagEnd = $top)`
 - Axis can be vectors: `axis = [1, 1]` for diagonal, not just X/Y/Z constants
+
+## Zoo CLI Tools
+
+The `zoo` CLI provides essential tools for working with KCL files. All commands support stdin input using `-` as the file path.
+
+### Format - Code Formatting
+
+Format KCL files according to standard style guidelines:
+
+```bash
+# Output formatted code to stdout
+zoo kcl format my-file.kcl
+
+# Overwrite file in-place
+zoo kcl format -w my-file.kcl
+
+# From stdin
+cat my-file.kcl | zoo kcl format -
+
+# Custom tab size
+zoo kcl format --tab-size 4 my-file.kcl
+
+# Use tabs instead of spaces
+zoo kcl format --use-tabs -w my-file.kcl
+```
+
+**Options:**
+- `-w, --write`: Write output back to original file
+- `--tab-size <N>`: Set tab size in spaces (default: 2)
+- `--use-tabs`: Use tabs instead of spaces
+- `--insert-final-newline`: Ensure/remove final newline
+
+### Lint - Style & Quality Checks
+
+Check KCL files for style issues and code quality problems:
+
+```bash
+# Basic lint check
+zoo kcl lint my-file.kcl
+
+# Show offending source code
+zoo kcl lint -s my-file.kcl
+
+# Show detailed descriptions and rationale
+zoo kcl lint --descriptions my-file.kcl
+
+# From stdin
+cat my-file.kcl | zoo kcl lint -
+```
+
+**Options:**
+- `-s, --show-code`: Display the problematic source code
+- `--descriptions`: Show detailed explanations and rationale
+
+**Best practice:** Always run `zoo kcl lint` before committing KCL files.
+
+### Export - Convert to CAD Formats
+
+Export KCL files to standard CAD and 3D model formats:
+
+```bash
+# Export to STL
+zoo kcl export --output-format=stl my-file.kcl output_dir
+
+# Export to STEP
+zoo kcl export --output-format=step my-file.kcl .
+
+# Export to OBJ
+zoo kcl export --output-format=obj my-file.kcl output_dir
+
+# From stdin
+cat my-file.kcl | zoo kcl export --output-format=step - output_dir
+
+# Deterministic output (no timestamps, useful for version control)
+zoo kcl export --output-format=stl --deterministic my-file.kcl .
+```
+
+**Supported formats:**
+- `stl`: STL (stereolithography) - widely supported for 3D printing
+- `step`: STEP (ISO 10303-21) - industry standard for CAD interchange
+- `obj`: Wavefront OBJ - common 3D model format
+- `gltf`: glTF 2.0 (embedded, pretty printed) - modern 3D format
+- `glb`: Binary glTF 2.0 - compact 3D format
+- `fbx`: Autodesk Filmbox - animation and modeling format
+- `ply`: PLY (Polygon File Format) - 3D scanning format
+
+**Options:**
+- `-t, --output-format`: Required - specify output format
+- `--deterministic`: Remove timestamps for version control
+- `--show-trace`: Print tracing data link for debugging
+
+### Snapshot - Render Images
+
+Generate rendered images of KCL models:
+
+```bash
+# Snapshot to PNG
+zoo kcl snapshot my-file.kcl my-file.png
+
+# Snapshot to JPEG
+zoo kcl snapshot --output-format=jpeg my-file.kcl output.jpg
+
+# From stdin
+cat my-file.kcl | zoo kcl snapshot - output.png
+```
+
+**Supported formats:**
+- `png`: PNG image (default, lossless)
+- `jpeg`: JPEG image (lossy compression)
+
+**Options:**
+- `-t, --output-format`: Specify image format (png or jpeg)
+- `--session <ID>`: Reuse existing modeling session
+- `--replay`: Tell engine to store a replay
+- `--show-trace`: Print tracing data link
+
+**Use case:** Generate preview images for documentation, version control, or visual comparison.
+
+### View - Terminal Preview
+
+View a rendered preview of a KCL file directly in your terminal:
+
+```bash
+# View in terminal
+zoo kcl view my-file.kcl
+
+# From stdin
+cat my-file.kcl | zoo kcl view -
+```
+
+**Use case:** Quick visual verification without opening external tools.
+
+### Volume - Calculate Volume
+
+Calculate the volume of objects in a KCL file:
+
+```bash
+# Volume in cubic millimeters
+zoo kcl volume --output-unit=mm3 my-file.kcl
+
+# Volume in cubic inches
+zoo kcl volume --output-unit=in3 my-file.kcl
+
+# Volume in liters
+zoo kcl volume --output-unit=l my-file.kcl
+```
+
+**Supported units:**
+- `mm3`: Cubic millimeters
+- `cm3`: Cubic centimeters
+- `m3`: Cubic meters
+- `in3`: Cubic inches
+- `ft3`: Cubic feet
+- `yd3`: Cubic yards
+- `l`: Liters
+- `ml`: Milliliters
+- `usfloz`: US Fluid Ounces
+- `usgal`: US Gallons
+
+**Options:**
+- `-u, --output-unit`: Required - specify volume unit
+- `-f, --format`: Output format (json, yaml, table)
+
+### Mass - Calculate Mass
+
+Calculate the mass of objects given material density:
+
+```bash
+# Mass of steel part (7850 kg/m³)
+zoo kcl mass \
+  --material-density=7850 \
+  --material-density-unit=kg-m3 \
+  --output-unit=kg \
+  my-file.kcl
+
+# Mass of aluminum part (2700 kg/m³) in grams
+zoo kcl mass \
+  --material-density=2700 \
+  --material-density-unit=kg-m3 \
+  --output-unit=g \
+  my-file.kcl
+
+# Mass in pounds with imperial density
+zoo kcl mass \
+  --material-density=490 \
+  --material-density-unit=lb-ft3 \
+  --output-unit=lb \
+  my-file.kcl
+```
+
+**Density units:**
+- `kg-m3`: Kilograms per cubic meter
+- `lb-ft3`: Pounds per cubic foot
+
+**Mass units:**
+- `g`: Grams
+- `kg`: Kilograms
+- `lb`: Pounds
+
+**Options:**
+- `-m, --material-density`: Required - material density value
+- `--material-density-unit`: Required - density unit
+- `-u, --output-unit`: Required - output mass unit
+- `-f, --format`: Output format (json, yaml, table)
+
+**Common material densities (kg/m³):**
+- Steel: 7850
+- Aluminum: 2700
+- Titanium: 4500
+- Brass: 8400-8700
+- Copper: 8960
+- ABS plastic: 1040
+- PLA plastic: 1250
+
+### Surface Area - Calculate Surface Area
+
+Calculate the surface area of objects:
+
+```bash
+# Surface area in square millimeters
+zoo kcl surface-area --output-unit=mm2 my-file.kcl
+
+# Surface area in square inches
+zoo kcl surface-area --output-unit=in2 my-file.kcl
+```
+
+**Supported units:**
+- `mm2`: Square millimeters
+- `cm2`: Square centimeters
+- `dm2`: Square decimeters
+- `m2`: Square meters
+- `km2`: Square kilometers
+- `in2`: Square inches
+- `ft2`: Square feet
+- `yd2`: Square yards
+
+**Options:**
+- `-u, --output-unit`: Required - specify area unit
+- `-f, --format`: Output format (json, yaml, table)
+
+### Center of Mass - Calculate Center of Mass
+
+Get the center of mass coordinates:
+
+```bash
+# Center of mass in millimeters
+zoo kcl center-of-mass --output-unit=mm my-file.kcl
+
+# Center of mass in inches
+zoo kcl center-of-mass --output-unit=in my-file.kcl
+```
+
+**Supported units:**
+- `mm`: Millimeters
+- `cm`: Centimeters
+- `m`: Meters
+- `in`: Inches
+- `ft`: Feet
+- `yd`: Yards
+
+**Options:**
+- `-u, --output-unit`: Required - specify length unit
+- `-f, --format`: Output format (json, yaml, table)
+
+### Common Workflows
+
+```bash
+# Development workflow: format, lint, and view
+zoo kcl format -w my-file.kcl
+zoo kcl lint my-file.kcl
+zoo kcl view my-file.kcl
+
+# Export workflow: generate renders and CAD files
+zoo kcl snapshot my-file.kcl preview.png
+zoo kcl export --output-format=stl my-file.kcl .
+zoo kcl export --output-format=step my-file.kcl .
+
+# Analysis workflow: get physical properties
+zoo kcl volume --output-unit=cm3 my-file.kcl
+zoo kcl surface-area --output-unit=cm2 my-file.kcl
+zoo kcl mass --material-density=7850 --material-density-unit=kg-m3 --output-unit=kg my-file.kcl
+zoo kcl center-of-mass --output-unit=mm my-file.kcl
+
+# Version control workflow: deterministic exports
+zoo kcl format -w my-file.kcl
+zoo kcl lint my-file.kcl
+zoo kcl export --output-format=stl --deterministic my-file.kcl .
+zoo kcl snapshot my-file.kcl preview.png
+git add my-file.kcl my-file.stl preview.png
+git commit -m "Update part design"
+```
+
+### Global Options
+
+All `zoo kcl` commands support these global options:
+
+- `-d, --debug`: Enable debug output
+- `--host <HOST>`: Specify Zoo API host (default: api.zoo.dev)
+- `-f, --format`: Output format for data (json, yaml, table)
+- `--show-trace`: Print tracing link for API requests
+
+### Working with Directories
+
+Most commands accept either a file path or a directory containing `main.kcl`:
+
+```bash
+# These are equivalent if my-project/ contains main.kcl
+zoo kcl format my-project/main.kcl
+zoo kcl format my-project
+
+# Same for export
+zoo kcl export --output-format=stl my-project .
+```
+
+### Using with CI/CD
+
+```bash
+# Pre-commit hook example
+#!/bin/bash
+zoo kcl format -w "$1"
+zoo kcl lint "$1" || exit 1
+
+# GitHub Actions example
+- name: Lint KCL files
+  run: |
+    for file in $(find . -name "*.kcl"); do
+      zoo kcl lint "$file"
+    done
+
+- name: Export STL files
+  run: |
+    for file in $(find . -name "*.kcl"); do
+      dir=$(dirname "$file")
+      zoo kcl export --output-format=stl --deterministic "$file" "$dir"
+    done
+```
 
 ## Known Engine Limitations
 
