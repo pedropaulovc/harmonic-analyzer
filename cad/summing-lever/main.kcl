@@ -23,6 +23,7 @@ ribSpacing = 3
 // Summation plate parameters
 summationPlateBaseLength = coefficientsPlateLength / 2
 summationPlateHeight = 4
+summationPlateCurvature = 0.5
 
 // Hole pattern parameters
 holeCount = 20
@@ -62,17 +63,35 @@ ribs = startSketchOn(XZ)
   |> patternLinear3d(axis = [0, 1, 0], instances = ribCount, distance = ribSpacing)
   |> translate(x = 0, y = -ribOffset, z = 0)
 
-// Summation plate: triangular extension in XY plane with base at cylinder edge
+// Summation plate: triangular extension with parabolic sides
 summationPlate = startSketchOn(XY)
   |> startProfile(at = [
        coefficientsPlateWidth / 2,
        -summationPlateBaseLength / 2
      ])
   |> line(end = [0, summationPlateBaseLength])
-  |> line(end = [
-       summationPlateHeight,
-       -summationPlateBaseLength / 2
-     ])
+  |> bezierCurve(
+       control1 = [
+         summationPlateHeight / 3,
+         -summationPlateBaseLength / 6 - summationPlateCurvature
+       ],
+       control2 = [
+         2 * summationPlateHeight / 3,
+         -summationPlateBaseLength / 3 - summationPlateCurvature
+       ],
+       end = [summationPlateHeight, -summationPlateBaseLength / 2]
+     )
+  |> bezierCurve(
+       control1 = [
+         -summationPlateHeight / 3,
+         -summationPlateBaseLength / 6 + summationPlateCurvature
+       ],
+       control2 = [
+         -2 * summationPlateHeight / 3,
+         -summationPlateBaseLength / 3 + summationPlateCurvature
+       ],
+       end = [-summationPlateHeight, summationPlateBaseLength / 2]
+     )
   |> close()
   |> extrude(length = coefficientsPlateThickness)
 
