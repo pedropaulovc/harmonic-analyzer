@@ -130,24 +130,24 @@ summationAnchor = startSketchOn(XY)
   |> subtract2d(tool = summationAnchorHole)
   |> extrude(length = summationAnchorHeight, symmetric = true)
 
-// Middle rib: diamond-shaped rib extending to both sides with rounded corners
+// Middle rib: linear-round-linear profile with rounded corners around cylinder
 middleRib = startSketchOn(XZ)
-  |> startProfile(at = [cylinderCenterX, cylinderCenterZ + cylinderRadius + ribPadding], tag = $topVertex)
-  |> line(endAbsolute = [summationPlateTipX, cylinderCenterZ])
-  |> line(endAbsolute = [cylinderCenterX, cylinderCenterZ - cylinderRadius - ribPadding], tag = $bottomVertex)
+  |> startProfile(at = [-coefficientsPlateWidth, cylinderCenterZ + cylinderRadius + ribPadding])
+  |> line(endAbsolute = [cylinderCenterX, cylinderCenterZ + cylinderRadius + ribPadding], tag = $topLeftCorner)
   |> arc(
        interiorAbsolute = [
-         cylinderCenterX - (cylinderRadius + ribPadding) * 1.5,
-         cylinderCenterZ - (cylinderRadius + ribPadding) * 0.7
-       ],
-       endAbsolute = [-coefficientsPlateWidth, cylinderCenterZ],
-     )
-  |> arc(
-       interiorAbsolute = [
-         cylinderCenterX - (cylinderRadius + ribPadding) * 1.5,
+         cylinderCenterX + (cylinderRadius + ribPadding) * 0.7,
          cylinderCenterZ + (cylinderRadius + ribPadding) * 0.7
        ],
-       endAbsolute = segEnd(topVertex),
+       endAbsolute = [summationPlateTipX, cylinderCenterZ],
+     )
+  |> line(endAbsolute = [cylinderCenterX, cylinderCenterZ - cylinderRadius - ribPadding], tag = $bottomRightCorner)
+  |> arc(
+       interiorAbsolute = [
+         cylinderCenterX + (cylinderRadius + ribPadding) * 0.7,
+         cylinderCenterZ - (cylinderRadius + ribPadding) * 0.7
+       ],
+       endAbsolute = [-coefficientsPlateWidth, cylinderCenterZ - cylinderRadius - ribPadding],
      )
   |> close()
   |> extrude(length = ribThickness, symmetric = true)
