@@ -113,7 +113,7 @@ summationPlate = startSketchOn(XY)
   |> extrude(length = plateThickness)
 
 // Summation anchor: cylinder at summation plate tip with center hole
-summationAnchorRadius = 0.5
+summationAnchorRadius = 0.375
 summationAnchorHeight = cylinderDiameter
 summationAnchorHoleRadius = 2 * holeRadius
 summationPlateTipX = cylinderCenterX + summationPlateHeight
