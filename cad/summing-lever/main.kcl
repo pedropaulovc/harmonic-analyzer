@@ -76,7 +76,7 @@ edgeRibs = startSketchOn(XZ)
   |> line(endAbsolute = [cylinderCenterX, cylinderCenterZ - cylinderRadius])
   |> tangentialArc(endAbsolute = segEnd(midTriangleBaseToRadius))
   |> close()
-  |> extrude(length = ribThickness, symmetric = true)
+  |> extrude(length = ribThickness)
   |> patternLinear3d(axis = [0, 1, 0], instances = 2, distance = coefficientsPlateLength)
   |> translate(x = 0, y = -coefficientsPlateLength / 2, z = 0)
 
