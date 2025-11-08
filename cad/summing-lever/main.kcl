@@ -130,19 +130,13 @@ summationAnchor = startSketchOn(XY)
   |> subtract2d(tool = summationAnchorHole)
   |> extrude(length = summationAnchorHeight, symmetric = true)
 
-// Middle rib: triangular rib extending from cylinder to summation anchor
+// Middle rib: diamond-shaped rib extending to both sides
 middleRib = startSketchOn(XZ)
   |> startProfile(at = [cylinderCenterX, cylinderCenterZ])
-  |> yLine(length = cylinderRadius + ribPadding, tag = $middleRibBaseToRadius)
+  |> line(endAbsolute = [cylinderCenterX, cylinderCenterZ + cylinderRadius + ribPadding], tag = $top)
   |> line(endAbsolute = [summationPlateTipX, cylinderCenterZ])
   |> line(endAbsolute = [cylinderCenterX, cylinderCenterZ - cylinderRadius - ribPadding])
-  |> arc(
-       interiorAbsolute = [
-         cylinderCenterX + cylinderRadius + ribPadding,
-         cylinderCenterZ
-       ],
-       endAbsolute = segEnd(middleRibBaseToRadius),
-     )
+  |> line(endAbsolute = [-coefficientsPlateWidth, cylinderCenterZ])
   |> close()
   |> extrude(length = ribThickness, symmetric = true)
   |> appearance(color = "#FFFF00", metalness = 60, roughness = 20)
