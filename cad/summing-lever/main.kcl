@@ -28,27 +28,27 @@ summationPlateCurvature = 0.5
 holeCount = 20
 holeRadius = 0.01
 holeMargin = 0.2 // 1/5" margin from plate edges
-holeSpanLength = coefficientsPlateLength - 2 * holeMargin
+holeSpanLength = coefficientsPlateLength - (2 * holeMargin) - 2 * ribThickness
 holeSpacing = holeSpanLength / (holeCount - 1)
 
 // Calculated parameters
 cylinderDiameter = 2 * cylinderRadius
-cylinderCenterX = coefficientsPlateWidth / 2
-cylinderCenterZ = plateThickness / 2
-holeOffset = coefficientsPlateLength / 2 - holeMargin
+cylinderCenterX = 0
+cylinderCenterZ = 0
+holeOffsetX = -coefficientsPlateWidth + holeMargin
+holeOffsetY = coefficientsPlateLength / 2 - holeMargin - ribThickness
 
 // Create hole pattern for 2D subtraction
 // Position holes at left edge with margin = plateThickness from edge
-holeXPosition = -coefficientsPlateWidth / 2 + holeRadius + plateThickness
 holes = startSketchOn(XY)
-  |> circle(center = [holeXPosition, -holeOffset], radius = holeRadius)
-  |> patternLinear2d(axis = [0, 1], instances = holeCount, distance = holeSpacing)
+  |> circle(center = [holeOffsetX, -holeOffsetY], radius = holeRadius)
+  |> patternLinear2d(axis = Y, instances = holeCount, distance = holeSpacing)
 
 // Coefficients plate: rectangular plate with holes for spring connections
 coefficientsPlate = startSketchOn(XY)
-  |> rectangle(width = coefficientsPlateWidth, height = coefficientsPlateLength, center = [0, 0])
+  |> rectangle(width = coefficientsPlateWidth, height = coefficientsPlateLength, center = [-coefficientsPlateWidth / 2, 0])
   |> subtract2d(tool = holes)
-  |> extrude(length = plateThickness)
+  |> extrude(length = plateThickness, symmetric = true)
 
 // Add cylinder along the long edge (perpendicular to rectangle)
 cylinder = startSketchOn(XZ)
@@ -65,7 +65,7 @@ middleRib = startSketchOn(XZ)
   |> line(end = [0, cylinderDiameter])
   |> line(end = [
        -coefficientsPlateWidth,
-       -cylinderRadius
+       -cylinderRadius - (plateThickness / 2)
      ])
   |> close()
   |> extrude(length = ribThickness, symmetric = true)
@@ -75,16 +75,25 @@ edgeRibPadding = 0.1
 edgeRibs = startSketchOn(XZ)
   |> startProfile(at = [cylinderCenterX, cylinderCenterZ])
   |> yLine(length = cylinderRadius + edgeRibPadding, tag = $midTriangleBaseToRadius)
-  |> line(endAbsolute = [cylinderCenterX - coefficientsPlateWidth, cylinderCenterZ])
-  |> line(endAbsolute = [cylinderCenterX + edgeRibPadding, cylinderCenterZ - cylinderRadius - edgeRibPadding])
+  |> line(endAbsolute = [
+       cylinderCenterX - coefficientsPlateWidth,
+       cylinderCenterZ
+     ])
+  |> line(endAbsolute = [
+       cylinderCenterX,
+       cylinderCenterZ - cylinderRadius - edgeRibPadding
+     ])
   |> arc(
-       interiorAbsolute = [cylinderCenterX + cylinderRadius + edgeRibPadding, cylinderCenterZ],
-       endAbsolute = segEnd(midTriangleBaseToRadius)
+       interiorAbsolute = [
+         cylinderCenterX + cylinderRadius + edgeRibPadding,
+         cylinderCenterZ
+       ],
+       endAbsolute = segEnd(midTriangleBaseToRadius),
      )
   |> close()
   |> extrude(length = ribThickness)
-  |> patternLinear3d(axis = [0, 1, 0], instances = 2, distance = coefficientsPlateLength-ribThickness)
-  |> translate(x = 0, y = -coefficientsPlateLength/2 + ribThickness, z = 0)
+  |> patternLinear3d(axis = [0, 1, 0], instances = 2, distance = coefficientsPlateLength - ribThickness)
+  |> translate(x = 0, y = -coefficientsPlateLength / 2 + ribThickness, z = 0)
 
 // Summation plate: triangular extension with curved sides using 3-point arcs
 summationPlate = startSketchOn(XY)
@@ -114,7 +123,7 @@ summationPlate = startSketchOn(XY)
        ],
      )
   |> close()
-  |> extrude(length = plateThickness)
+  |> extrude(length = plateThickness, symmetric = true)
 
 // Summation anchor: cylinder at summation plate tip with center hole
 summationAnchorRadius = 0.375
@@ -129,3 +138,4 @@ summationAnchor = startSketchOn(XY)
   |> circle(center = [summationPlateTipX, 0], radius = summationAnchorRadius)
   |> subtract2d(tool = summationAnchorHole)
   |> extrude(length = summationAnchorHeight, symmetric = true)
+sketch001 = startSketchOn(XZ)
