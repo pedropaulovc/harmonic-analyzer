@@ -77,7 +77,10 @@ edgeRibs = startSketchOn(XZ)
   |> yLine(length = cylinderRadius + edgeRibPadding, tag = $midTriangleBaseToRadius)
   |> line(endAbsolute = [cylinderCenterX - coefficientsPlateWidth, cylinderCenterZ])
   |> line(endAbsolute = [cylinderCenterX + edgeRibPadding, cylinderCenterZ - cylinderRadius - edgeRibPadding])
-  |> tangentialArc(endAbsolute = segEnd(midTriangleBaseToRadius))
+  |> arc(
+       interiorAbsolute = [cylinderCenterX + cylinderRadius + edgeRibPadding, cylinderCenterZ],
+       endAbsolute = segEnd(midTriangleBaseToRadius)
+     )
   |> close()
   |> extrude(length = ribThickness)
   |> patternLinear3d(axis = [0, 1, 0], instances = 2, distance = coefficientsPlateLength-ribThickness)
