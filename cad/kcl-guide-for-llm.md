@@ -893,7 +893,7 @@ import "utils.kcl" as utils
 4. Close sketches before extrusion
 5. Arrays are 0-indexed
 6. Imports must be at file top
-7. **Sketch on FACE merges (MERGE), sketch on PLANE creates new solid** - use `planeOf()` or `method = NEW` for separate solids
+7. Sketch on FACE merges (MERGE), sketch on PLANE creates new solid - use `planeOf()` or `method = NEW` for separate solids
 8. Sketch on face uses global coordinates, not face-local
 9. 3D booleans may fail - use 2D ops or negative extrude
 10. Arc needs EITHER `(angle, radius)` OR `(end)` - not both
