@@ -73,7 +73,7 @@ middleRib = startSketchOn(XZ)
 // Edge ribs at short edges of coefficients plate
 edgeRibPadding = 0.1
 edgeRibs = startSketchOn(XZ)
-  |> startProfile(at = [cylinderCenterX + edgeRibPadding, cylinderCenterZ])
+  |> startProfile(at = [cylinderCenterX, cylinderCenterZ])
   |> yLine(length = cylinderRadius + edgeRibPadding, tag = $midTriangleBaseToRadius)
   |> line(endAbsolute = [cylinderCenterX - coefficientsPlateWidth, cylinderCenterZ])
   |> line(endAbsolute = [cylinderCenterX + edgeRibPadding, cylinderCenterZ - cylinderRadius - edgeRibPadding])
