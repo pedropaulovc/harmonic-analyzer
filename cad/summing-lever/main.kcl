@@ -9,7 +9,7 @@
 @settings(defaultLengthUnit = in, kclVersion = 1.0)
 
 // Dimensions
-coefficientsPlateWidth = 3
+coefficientsPlateWidth = 1.75
 coefficientsPlateLength = 9
 plateThickness = 0.2
 cylinderRadius = 0.5
@@ -21,7 +21,7 @@ ribHeight = 0.5
 
 // Summation plate parameters
 summationPlateBaseLength = coefficientsPlateLength / 2
-summationPlateHeight = 4
+summationPlateHeight = 3
 summationPlateCurvature = 0.5
 
 // Hole pattern parameters
