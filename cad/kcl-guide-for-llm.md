@@ -495,6 +495,14 @@ startSketchOn(YZ)   // X out
 startSketchOn(-XY)  // Flipped normal
 startSketchOn(offsetPlane(XY, offset = 10))
 
+// Get plane from face without sketching on it
+planeOf(solid, face = END)  // Returns plane, doesn't modify solid
+
+// Use planeOf to create separate solid (not merged)
+tower = startSketchOn(planeOf(cube, face = END))
+  |> circle(radius = 2)
+  |> extrude(length = 5)  // Creates NEW solid, not merged with cube
+
 // Custom plane
 customPlane = {
   origin = [x, y, z],
@@ -775,11 +783,20 @@ rotate(roll = 0, pitch = 45deg, yaw = 90deg, global = true)
 clonedPart = clone(originalPart)
   |> translate(x = 20, y = 0, z = 0)
 
-// Sketch on faces
-solid = extrude(profile, length = 10, tagEnd = $topFace)
-feature = startSketchOn(solid, face = topFace)
-  |> circle(radius = 3)
-  |> extrude(length = -5)  // Negative cuts down
+// Sketch on face → extrude MERGES with solid (default)
+startSketchOn(cube, face = END)
+  |> circle(radius = 2)
+  |> extrude(length = 5)  // Merged into cube
+
+// Use planeOf() to create separate solid
+startSketchOn(planeOf(cube, face = END))
+  |> circle(radius = 2)
+  |> extrude(length = 5)  // NEW solid, not merged
+
+// Or use method = NEW for separate solid
+startSketchOn(cube, face = END)
+  |> circle(radius = 2)
+  |> extrude(method = NEW, length = 5)  // NEW solid
 ```
 
 ## Mathematical Functions
@@ -876,12 +893,13 @@ import "utils.kcl" as utils
 4. Close sketches before extrusion
 5. Arrays are 0-indexed
 6. Imports must be at file top
-7. Sketch on face uses global coordinates, not face-local
-8. 3D booleans may fail - use 2D ops or negative extrude
-9. Arc needs EITHER `(angle, radius)` OR `(end)` - not both
-10. Type ascription (`: mm`) validates, doesn't convert - use `units::` for conversion
-11. Axis can be vectors like `[1, 1]` not just X/Y/Z
-12. Use `getCommonEdge` for precise fillet targeting
+7. **Sketch on FACE merges (MERGE), sketch on PLANE creates new solid** - use `planeOf()` or `method = NEW` for separate solids
+8. Sketch on face uses global coordinates, not face-local
+9. 3D booleans may fail - use 2D ops or negative extrude
+10. Arc needs EITHER `(angle, radius)` OR `(end)` - not both
+11. Type ascription (`: mm`) validates, doesn't convert - use `units::` for conversion
+12. Axis can be vectors like `[1, 1]` not just X/Y/Z
+13. Use `getCommonEdge` for precise fillet targeting
 
 ## Complete Example
 
