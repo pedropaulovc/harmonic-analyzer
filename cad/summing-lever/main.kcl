@@ -27,13 +27,15 @@ summationPlateCurvature = 0.5
 // Hole pattern parameters
 holeCount = 20
 holeRadius = 0.01
-holeSpacing = coefficientsPlateLength / (holeCount - 1)
+holeMargin = 0.2 // 1/5" margin from plate edges
+holeSpanLength = coefficientsPlateLength - 2 * holeMargin
+holeSpacing = holeSpanLength / (holeCount - 1)
 
 // Calculated parameters
 cylinderDiameter = 2 * cylinderRadius
 cylinderCenterX = coefficientsPlateWidth / 2
 cylinderCenterZ = plateThickness / 2
-holeOffset = coefficientsPlateLength / 2
+holeOffset = coefficientsPlateLength / 2 - holeMargin
 
 // Create hole pattern for 2D subtraction
 // Position holes at left edge with margin = plateThickness from edge
