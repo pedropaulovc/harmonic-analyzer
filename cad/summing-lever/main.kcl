@@ -77,8 +77,8 @@ edgeRibs = startSketchOn(XZ)
   |> tangentialArc(endAbsolute = segEnd(midTriangleBaseToRadius))
   |> close()
   |> extrude(length = ribThickness)
-  |> patternLinear3d(axis = [0, 1, 0], instances = 2, distance = coefficientsPlateLength)
-  |> translate(x = 0, y = -coefficientsPlateLength / 2, z = 0)
+  |> patternLinear3d(axis = [0, 1, 0], instances = 2, distance = coefficientsPlateLength-ribThickness)
+  |> translate(x = 0, y = -coefficientsPlateLength/2 + ribThickness, z = 0)
 
 // Summation plate: triangular extension with curved sides using 3-point arcs
 summationPlate = startSketchOn(XY)
