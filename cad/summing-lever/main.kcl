@@ -130,28 +130,19 @@ summationAnchor = startSketchOn(XY)
   |> subtract2d(tool = summationAnchorHole)
   |> extrude(length = summationAnchorHeight, symmetric = true)
 
-// Middle rib: connects coefficients plate edge through cylinder to summation anchor
+// Middle rib: triangular rib extending from cylinder to summation anchor
 middleRib = startSketchOn(XZ)
-  |> startProfile(at = [-coefficientsPlateWidth, cylinderCenterZ - ribThickness / 2])
-  |> line(endAbsolute = [cylinderCenterX - cylinderRadius - ribPadding, cylinderCenterZ - ribThickness / 2])
+  |> startProfile(at = [cylinderCenterX, cylinderCenterZ])
+  |> yLine(length = cylinderRadius + ribPadding, tag = $middleRibBaseToRadius)
+  |> line(endAbsolute = [summationPlateTipX, cylinderCenterZ])
+  |> line(endAbsolute = [cylinderCenterX, cylinderCenterZ - cylinderRadius - ribPadding])
   |> arc(
        interiorAbsolute = [
-         cylinderCenterX,
-         cylinderCenterZ - cylinderRadius - ribPadding - ribThickness / 2
+         cylinderCenterX + cylinderRadius + ribPadding,
+         cylinderCenterZ
        ],
-       endAbsolute = [cylinderCenterX + cylinderRadius + ribPadding, cylinderCenterZ - ribThickness / 2],
+       endAbsolute = segEnd(middleRibBaseToRadius),
      )
-  |> line(endAbsolute = [summationPlateTipX, cylinderCenterZ - ribThickness / 2])
-  |> line(endAbsolute = [summationPlateTipX, cylinderCenterZ + ribThickness / 2])
-  |> line(endAbsolute = [cylinderCenterX + cylinderRadius + ribPadding, cylinderCenterZ + ribThickness / 2])
-  |> arc(
-       interiorAbsolute = [
-         cylinderCenterX,
-         cylinderCenterZ + cylinderRadius + ribPadding + ribThickness / 2
-       ],
-       endAbsolute = [cylinderCenterX - cylinderRadius - ribPadding, cylinderCenterZ + ribThickness / 2],
-     )
-  |> line(endAbsolute = [-coefficientsPlateWidth, cylinderCenterZ + ribThickness / 2])
   |> close()
   |> extrude(length = ribThickness, symmetric = true)
   |> appearance(color = "#FFFF00", metalness = 60, roughness = 20)
