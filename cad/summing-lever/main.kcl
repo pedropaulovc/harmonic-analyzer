@@ -10,7 +10,7 @@
 
 // Dimensions
 coefficientsPlateWidth = 1.75
-coefficientsPlateLength = 9
+coefficientsPlateLength = 6
 plateThickness = 0.2
 cylinderRadius = 0.5
 ribThickness = 0.2
