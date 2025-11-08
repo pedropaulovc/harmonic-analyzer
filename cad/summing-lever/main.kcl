@@ -140,15 +140,13 @@ middleRib = startSketchOn(XZ)
   |> line(endAbsolute = [cylinderCenterX - roundingRadius, topVertexZ - roundingRadius * 0.5])
   |> arc(
        interiorAbsolute = [cylinderCenterX, topVertexZ],
-       endAbsolute = [cylinderCenterX + roundingRadius, topVertexZ - roundingRadius * 0.5],
-       tag = $topRound
+       endAbsolute = [cylinderCenterX + roundingRadius, topVertexZ - roundingRadius * 0.5]
      )
-  |> line(endAbsolute = [summationPlateTipX, cylinderCenterZ], tag = $rightVertex)
+  |> line(endAbsolute = [summationPlateTipX, cylinderCenterZ])
   |> line(endAbsolute = [cylinderCenterX + roundingRadius, bottomVertexZ + roundingRadius * 0.5])
   |> arc(
        interiorAbsolute = [cylinderCenterX, bottomVertexZ],
-       endAbsolute = [cylinderCenterX - roundingRadius, bottomVertexZ + roundingRadius * 0.5],
-       tag = $bottomRound
+       endAbsolute = [cylinderCenterX - roundingRadius, bottomVertexZ + roundingRadius * 0.5]
      )
   |> line(endAbsolute = segEnd(leftVertex))
   |> close()
