@@ -131,22 +131,24 @@ summationAnchor = startSketchOn(XY)
   |> extrude(length = summationAnchorHeight, symmetric = true)
 
 // Middle rib: elongated diamond with rounded corners near cylinder
-roundingRadius = 0.15 // Radius for rounded corners near cylinder
-topVertexZ = cylinderCenterZ + cylinderRadius + ribPadding
-bottomVertexZ = cylinderCenterZ - cylinderRadius - ribPadding
+// Arcs are centered at cylinder center with same radius as cylinder + padding
+arcRadius = cylinderRadius + ribPadding
+arcAngleOffset = 45deg // Angle span from vertical for rounded corners
+arcOffsetX = arcRadius * sin(arcAngleOffset)
+arcOffsetZ = arcRadius * cos(arcAngleOffset)
 
 middleRib = startSketchOn(XZ)
   |> startProfile(at = [-coefficientsPlateWidth, cylinderCenterZ], tag = $leftVertex)
-  |> line(endAbsolute = [cylinderCenterX - roundingRadius, topVertexZ - roundingRadius * 0.5])
+  |> line(endAbsolute = [cylinderCenterX - arcOffsetX, cylinderCenterZ + arcOffsetZ])
   |> arc(
-       interiorAbsolute = [cylinderCenterX, topVertexZ],
-       endAbsolute = [cylinderCenterX + roundingRadius, topVertexZ - roundingRadius * 0.5]
+       interiorAbsolute = [cylinderCenterX, cylinderCenterZ + arcRadius],
+       endAbsolute = [cylinderCenterX + arcOffsetX, cylinderCenterZ + arcOffsetZ]
      )
   |> line(endAbsolute = [summationPlateTipX, cylinderCenterZ])
-  |> line(endAbsolute = [cylinderCenterX + roundingRadius, bottomVertexZ + roundingRadius * 0.5])
+  |> line(endAbsolute = [cylinderCenterX + arcOffsetX, cylinderCenterZ - arcOffsetZ])
   |> arc(
-       interiorAbsolute = [cylinderCenterX, bottomVertexZ],
-       endAbsolute = [cylinderCenterX - roundingRadius, bottomVertexZ + roundingRadius * 0.5]
+       interiorAbsolute = [cylinderCenterX, cylinderCenterZ - arcRadius],
+       endAbsolute = [cylinderCenterX - arcOffsetX, cylinderCenterZ - arcOffsetZ]
      )
   |> line(endAbsolute = segEnd(leftVertex))
   |> close()
