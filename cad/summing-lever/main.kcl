@@ -22,13 +22,16 @@ ribHeight = 0.5
 // Summation plate parameters
 summationPlateBaseLength = coefficientsPlateLength / 2
 summationPlateHeight = 3
-summationPlateCurvature = 0.5
+summationPlateCurvature = 0.3
+
+summationAnchorRadius = 0.375
+summationAnchorHeight = 0.75
 
 // Hole pattern parameters
 holeCount = 20
-holeRadius = 0.01
+holeRadius = 0.02
 holeMargin = 0.2 // 1/5" margin from plate edges
-holeSpanLength = coefficientsPlateLength - (2 * holeMargin) - 2 * ribThickness
+holeSpanLength = coefficientsPlateLength - (2 * holeMargin) - (2 * ribThickness)
 holeSpacing = holeSpanLength / (holeCount - 1)
 
 // Calculated parameters
@@ -37,6 +40,9 @@ cylinderCenterX = 0
 cylinderCenterZ = 0
 holeOffsetX = -coefficientsPlateWidth + holeMargin
 holeOffsetY = coefficientsPlateLength / 2 - holeMargin - ribThickness
+
+// Edge ribs at short edges of coefficients plate
+ribPadding = 0.1
 
 // Create hole pattern for 2D subtraction
 // Position holes at left edge with margin = plateThickness from edge
@@ -49,6 +55,7 @@ coefficientsPlate = startSketchOn(XY)
   |> rectangle(width = coefficientsPlateWidth, height = coefficientsPlateLength, center = [-coefficientsPlateWidth / 2, 0])
   |> subtract2d(tool = holes)
   |> extrude(length = plateThickness, symmetric = true)
+  |> appearance(color = "#00FF00", metalness = 60, roughness = 20)
 
 // Add cylinder along the long edge (perpendicular to rectangle)
 cylinder = startSketchOn(XZ)
@@ -58,34 +65,46 @@ cylinder = startSketchOn(XZ)
 
 // Middle rib at center
 middleRib = startSketchOn(XZ)
-  |> startProfile(at = [
-       cylinderCenterX,
-       cylinderCenterZ - cylinderRadius
-     ])
-  |> line(end = [0, cylinderDiameter])
+  |> startProfile(at = [cylinderCenterX, cylinderCenterZ])
+  |> line(
+       end = [
+         -ribPadding,
+         cylinderRadius + ribPadding
+       ],
+       tag = $middleRibTop,
+     )
   |> line(end = [
-       -coefficientsPlateWidth,
-       -cylinderRadius - (plateThickness / 2)
+       -coefficientsPlateWidth + holeMargin,
+       -cylinderRadius - ribPadding
      ])
+  |> line(endAbsolute = [
+       cylinderCenterX - ribPadding,
+       cylinderCenterZ - cylinderRadius - ribPadding
+     ])
+  |> arc(
+       interiorAbsolute = [
+         cylinderCenterX + cylinderRadius,
+         cylinderCenterZ
+       ],
+       endAbsolute = segEnd(middleRibTop),
+     )
   |> close()
   |> extrude(length = ribThickness, symmetric = true)
 
-// Edge ribs at short edges of coefficients plate
-edgeRibPadding = 0.1
 edgeRibs = startSketchOn(XZ)
   |> startProfile(at = [cylinderCenterX, cylinderCenterZ])
-  |> yLine(length = cylinderRadius + edgeRibPadding, tag = $midTriangleBaseToRadius)
+  |> yLine(length = cylinderRadius + ribPadding, tag = $midTriangleBaseToRadius)
   |> line(endAbsolute = [
        cylinderCenterX - coefficientsPlateWidth,
        cylinderCenterZ
      ])
   |> line(endAbsolute = [
        cylinderCenterX,
-       cylinderCenterZ - cylinderRadius - edgeRibPadding
+       cylinderCenterZ - cylinderRadius - ribPadding
      ])
   |> arc(
        interiorAbsolute = [
-         cylinderCenterX + cylinderRadius + edgeRibPadding,
+         cylinderCenterX + cylinderRadius + ribPadding,
          cylinderCenterZ
        ],
        endAbsolute = segEnd(midTriangleBaseToRadius),
@@ -109,9 +128,10 @@ summationPlate = startSketchOn(XY)
        ],
        endAbsolute = [
          cylinderCenterX + summationPlateHeight,
-         0
+         cylinderCenterZ + summationAnchorRadius
        ],
      )
+  |> line(end = [0, -summationAnchorRadius * 2])
   |> arc(
        interiorAbsolute = [
          cylinderCenterX + summationPlateHeight / 2,
@@ -124,10 +144,9 @@ summationPlate = startSketchOn(XY)
      )
   |> close()
   |> extrude(length = plateThickness, symmetric = true)
+  |> appearance(color = "#0000FF", metalness = 60, roughness = 20)
 
 // Summation anchor: cylinder at summation plate tip with center hole
-summationAnchorRadius = 0.375
-summationAnchorHeight = 0.75
 summationAnchorHoleRadius = 2 * holeRadius
 summationPlateTipX = cylinderCenterX + summationPlateHeight
 
@@ -138,4 +157,3 @@ summationAnchor = startSketchOn(XY)
   |> circle(center = [summationPlateTipX, 0], radius = summationAnchorRadius)
   |> subtract2d(tool = summationAnchorHole)
   |> extrude(length = summationAnchorHeight, symmetric = true)
-sketch001 = startSketchOn(XZ)
