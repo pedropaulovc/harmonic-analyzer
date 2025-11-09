@@ -15,6 +15,9 @@ topHeight = 1.5
 // Fillet radius where plates meet
 filletRadius = 0.125
 
+// Edge fillet radius (smooths outer edges)
+edgeFilletRadius = 0.0625
+
 // Calculated parameters
 totalHeight = bottomHeight + topHeight
 
@@ -22,29 +25,30 @@ totalHeight = bottomHeight + topHeight
 assert(topWidth, isLessThan = bottomWidth, error = "Top plate must be narrower than bottom")
 assert(topLength, isLessThan = bottomLength, error = "Top plate must be shorter than bottom")
 
-// Bottom plate profile (centered at origin)
+// Bottom plate profile (centered at origin) with rounded corners
 bottomPlate = startSketchOn(XY)
-  |> startProfile(at = [-bottomLength/2, -bottomWidth/2])
-  |> line(end = [bottomLength, 0], tag = $bottomFront)
-  |> line(end = [0, bottomWidth], tag = $bottomRight)
-  |> line(end = [-bottomLength, 0], tag = $bottomBack)
-  |> close(tag = $bottomLeft)
+  |> startProfile(at = [-bottomLength/2 + edgeFilletRadius, -bottomWidth/2])
+  |> line(end = [bottomLength - 2 * edgeFilletRadius, 0], tag = $bottomFront)
+  |> tangentialArc(angle = 90deg, radius = edgeFilletRadius)
+  |> line(end = [0, bottomWidth - 2 * edgeFilletRadius], tag = $bottomRight)
+  |> tangentialArc(angle = 90deg, radius = edgeFilletRadius)
+  |> line(end = [-(bottomLength - 2 * edgeFilletRadius), 0], tag = $bottomBack)
+  |> tangentialArc(angle = 90deg, radius = edgeFilletRadius)
+  |> line(end = [0, -(bottomWidth - 2 * edgeFilletRadius)], tag = $bottomLeft)
+  |> tangentialArc(angle = 90deg, radius = edgeFilletRadius)
+  |> close()
   |> extrude(length = bottomHeight, tagEnd = $bottomTop)
 
-// Top plate profile (sketch on top of bottom plate)
+// Top plate profile (sketch on top of bottom plate) with rounded corners
 topPlate = startSketchOn(bottomPlate, face = END)
-  |> startProfile(at = [-topLength/2, -topWidth/2])
-  |> line(end = [topLength, 0], tag = $topFront)
-  |> line(end = [0, topWidth], tag = $topRight)
-  |> line(end = [-topLength, 0], tag = $topBack)
-  |> close(tag = $topLeft)
+  |> startProfile(at = [-topLength/2 + edgeFilletRadius, -topWidth/2])
+  |> line(end = [topLength - 2 * edgeFilletRadius, 0], tag = $topFront)
+  |> tangentialArc(angle = 90deg, radius = edgeFilletRadius)
+  |> line(end = [0, topWidth - 2 * edgeFilletRadius], tag = $topRight)
+  |> tangentialArc(angle = 90deg, radius = edgeFilletRadius)
+  |> line(end = [-(topLength - 2 * edgeFilletRadius), 0], tag = $topBack)
+  |> tangentialArc(angle = 90deg, radius = edgeFilletRadius)
+  |> line(end = [0, -(topWidth - 2 * edgeFilletRadius)], tag = $topLeft)
+  |> tangentialArc(angle = 90deg, radius = edgeFilletRadius)
+  |> close()
   |> extrude(length = topHeight, tagEnd = $topTop)
-  |> fillet(
-       radius = filletRadius,
-       tags = [
-         getCommonEdge(faces = [topFront, bottomTop]),
-         getCommonEdge(faces = [topRight, bottomTop]),
-         getCommonEdge(faces = [topBack, bottomTop]),
-         getCommonEdge(faces = [topLeft, bottomTop])
-       ]
-     )
