@@ -37,10 +37,23 @@ bottomPlate = startSketchOn(XY)
   |> line(end = [0, -(bottomWidth - 2 * edgeFilletRadius)], tag = $bottomLeft)
   |> tangentialArc(angle = 90deg, radius = edgeFilletRadius)
   |> close()
-  |> extrude(length = bottomHeight, tagEnd = $bottomTop)
+  |> extrude(length = bottomHeight, tagStart = $bottomBottom, tagEnd = $bottomTop)
+  |> fillet(
+       radius = edgeFilletRadius,
+       tags = [
+         getCommonEdge(faces = [bottomFront, bottomBottom]),
+         getCommonEdge(faces = [bottomRight, bottomBottom]),
+         getCommonEdge(faces = [bottomBack, bottomBottom]),
+         getCommonEdge(faces = [bottomLeft, bottomBottom]),
+         getCommonEdge(faces = [bottomFront, bottomTop]),
+         getCommonEdge(faces = [bottomRight, bottomTop]),
+         getCommonEdge(faces = [bottomBack, bottomTop]),
+         getCommonEdge(faces = [bottomLeft, bottomTop])
+       ]
+     )
 
-// Top plate profile (sketch on top of bottom plate) with rounded corners
-topPlate = startSketchOn(bottomPlate, face = END)
+// Top plate profile (created separately on offset plane) with rounded corners
+topPlate = startSketchOn(offsetPlane(XY, offset = bottomHeight))
   |> startProfile(at = [-topLength/2 + edgeFilletRadius, -topWidth/2])
   |> line(end = [topLength - 2 * edgeFilletRadius, 0], tag = $topFront)
   |> tangentialArc(angle = 90deg, radius = edgeFilletRadius)
