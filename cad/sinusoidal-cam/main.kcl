@@ -1,0 +1,195 @@
+// Sinusoidal Cam - produces harmonic motion for follower
+// Creates a cam with radius varying as: r(θ) = baseRadius + amplitude * sin(frequency * θ)
+
+@settings(defaultLengthUnit = mm, kclVersion = 1.0)
+
+// Input parameters - cam profile
+baseRadius = 25        // Minimum radius of cam (mm)
+amplitude = 5          // Rise amount (peak-to-peak = 2 * amplitude)
+cycles = 1             // Number of complete sine waves per revolution
+segments = 120         // Number of segments to approximate curve (higher = smoother)
+
+// Input parameters - cam body
+camThickness = 10      // Thickness of cam disk
+shaftDiameter = 10     // Center mounting hole diameter
+includeKeyway = true   // Add keyway for shaft mounting
+keywayWidth = 3        // Keyway width
+keywayDepth = 1.5      // Keyway depth from shaft surface
+
+// Calculated parameters
+maxRadius = baseRadius + amplitude
+minRadius = baseRadius - amplitude
+degreesPerSegment = 360 / segments
+radiansPerSegment = degreesPerSegment * PI / 180
+
+// Assertions
+assert(baseRadius, isGreaterThan = amplitude, error = "Base radius must be larger than amplitude")
+assert(shaftDiameter, isGreaterThan = 0, isLessThan = minRadius * 2, error = "Shaft diameter invalid")
+assert(segments, isGreaterThan = 36, error = "Need at least 36 segments for smooth curve")
+assert(camThickness, isGreaterThan = 0, error = "Cam thickness must be positive")
+assert(keywayWidth, isLessThan = shaftDiameter, error = "Keyway too wide for shaft")
+
+// Function to calculate cam radius at given angle
+fn camRadius(@angleDeg) {
+  angleRad = (angleDeg * PI / 180): rad
+  return baseRadius + amplitude * sin(cycles * angleRad)
+}
+
+// Function to get cam point coordinates at given angle index
+fn camPoint(@angleDeg) {
+  angleRad = (angleDeg * PI / 180): rad
+  r = baseRadius + amplitude * sin(cycles * angleRad)
+  return [r * cos(angleRad), r * sin(angleRad)]
+}
+
+// Generate array of angles for each segment
+angles = map(
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119],
+  f = fn(@i) { return i * degreesPerSegment }
+)
+
+// Create cam profile by drawing many small line segments
+camProfile = startSketchOn(XY)
+  |> startProfile(at = camPoint(0))
+  |> line(endAbsolute = camPoint(angles[1]))
+  |> line(endAbsolute = camPoint(angles[2]))
+  |> line(endAbsolute = camPoint(angles[3]))
+  |> line(endAbsolute = camPoint(angles[4]))
+  |> line(endAbsolute = camPoint(angles[5]))
+  |> line(endAbsolute = camPoint(angles[6]))
+  |> line(endAbsolute = camPoint(angles[7]))
+  |> line(endAbsolute = camPoint(angles[8]))
+  |> line(endAbsolute = camPoint(angles[9]))
+  |> line(endAbsolute = camPoint(angles[10]))
+  |> line(endAbsolute = camPoint(angles[11]))
+  |> line(endAbsolute = camPoint(angles[12]))
+  |> line(endAbsolute = camPoint(angles[13]))
+  |> line(endAbsolute = camPoint(angles[14]))
+  |> line(endAbsolute = camPoint(angles[15]))
+  |> line(endAbsolute = camPoint(angles[16]))
+  |> line(endAbsolute = camPoint(angles[17]))
+  |> line(endAbsolute = camPoint(angles[18]))
+  |> line(endAbsolute = camPoint(angles[19]))
+  |> line(endAbsolute = camPoint(angles[20]))
+  |> line(endAbsolute = camPoint(angles[21]))
+  |> line(endAbsolute = camPoint(angles[22]))
+  |> line(endAbsolute = camPoint(angles[23]))
+  |> line(endAbsolute = camPoint(angles[24]))
+  |> line(endAbsolute = camPoint(angles[25]))
+  |> line(endAbsolute = camPoint(angles[26]))
+  |> line(endAbsolute = camPoint(angles[27]))
+  |> line(endAbsolute = camPoint(angles[28]))
+  |> line(endAbsolute = camPoint(angles[29]))
+  |> line(endAbsolute = camPoint(angles[30]))
+  |> line(endAbsolute = camPoint(angles[31]))
+  |> line(endAbsolute = camPoint(angles[32]))
+  |> line(endAbsolute = camPoint(angles[33]))
+  |> line(endAbsolute = camPoint(angles[34]))
+  |> line(endAbsolute = camPoint(angles[35]))
+  |> line(endAbsolute = camPoint(angles[36]))
+  |> line(endAbsolute = camPoint(angles[37]))
+  |> line(endAbsolute = camPoint(angles[38]))
+  |> line(endAbsolute = camPoint(angles[39]))
+  |> line(endAbsolute = camPoint(angles[40]))
+  |> line(endAbsolute = camPoint(angles[41]))
+  |> line(endAbsolute = camPoint(angles[42]))
+  |> line(endAbsolute = camPoint(angles[43]))
+  |> line(endAbsolute = camPoint(angles[44]))
+  |> line(endAbsolute = camPoint(angles[45]))
+  |> line(endAbsolute = camPoint(angles[46]))
+  |> line(endAbsolute = camPoint(angles[47]))
+  |> line(endAbsolute = camPoint(angles[48]))
+  |> line(endAbsolute = camPoint(angles[49]))
+  |> line(endAbsolute = camPoint(angles[50]))
+  |> line(endAbsolute = camPoint(angles[51]))
+  |> line(endAbsolute = camPoint(angles[52]))
+  |> line(endAbsolute = camPoint(angles[53]))
+  |> line(endAbsolute = camPoint(angles[54]))
+  |> line(endAbsolute = camPoint(angles[55]))
+  |> line(endAbsolute = camPoint(angles[56]))
+  |> line(endAbsolute = camPoint(angles[57]))
+  |> line(endAbsolute = camPoint(angles[58]))
+  |> line(endAbsolute = camPoint(angles[59]))
+  |> line(endAbsolute = camPoint(angles[60]))
+  |> line(endAbsolute = camPoint(angles[61]))
+  |> line(endAbsolute = camPoint(angles[62]))
+  |> line(endAbsolute = camPoint(angles[63]))
+  |> line(endAbsolute = camPoint(angles[64]))
+  |> line(endAbsolute = camPoint(angles[65]))
+  |> line(endAbsolute = camPoint(angles[66]))
+  |> line(endAbsolute = camPoint(angles[67]))
+  |> line(endAbsolute = camPoint(angles[68]))
+  |> line(endAbsolute = camPoint(angles[69]))
+  |> line(endAbsolute = camPoint(angles[70]))
+  |> line(endAbsolute = camPoint(angles[71]))
+  |> line(endAbsolute = camPoint(angles[72]))
+  |> line(endAbsolute = camPoint(angles[73]))
+  |> line(endAbsolute = camPoint(angles[74]))
+  |> line(endAbsolute = camPoint(angles[75]))
+  |> line(endAbsolute = camPoint(angles[76]))
+  |> line(endAbsolute = camPoint(angles[77]))
+  |> line(endAbsolute = camPoint(angles[78]))
+  |> line(endAbsolute = camPoint(angles[79]))
+  |> line(endAbsolute = camPoint(angles[80]))
+  |> line(endAbsolute = camPoint(angles[81]))
+  |> line(endAbsolute = camPoint(angles[82]))
+  |> line(endAbsolute = camPoint(angles[83]))
+  |> line(endAbsolute = camPoint(angles[84]))
+  |> line(endAbsolute = camPoint(angles[85]))
+  |> line(endAbsolute = camPoint(angles[86]))
+  |> line(endAbsolute = camPoint(angles[87]))
+  |> line(endAbsolute = camPoint(angles[88]))
+  |> line(endAbsolute = camPoint(angles[89]))
+  |> line(endAbsolute = camPoint(angles[90]))
+  |> line(endAbsolute = camPoint(angles[91]))
+  |> line(endAbsolute = camPoint(angles[92]))
+  |> line(endAbsolute = camPoint(angles[93]))
+  |> line(endAbsolute = camPoint(angles[94]))
+  |> line(endAbsolute = camPoint(angles[95]))
+  |> line(endAbsolute = camPoint(angles[96]))
+  |> line(endAbsolute = camPoint(angles[97]))
+  |> line(endAbsolute = camPoint(angles[98]))
+  |> line(endAbsolute = camPoint(angles[99]))
+  |> line(endAbsolute = camPoint(angles[100]))
+  |> line(endAbsolute = camPoint(angles[101]))
+  |> line(endAbsolute = camPoint(angles[102]))
+  |> line(endAbsolute = camPoint(angles[103]))
+  |> line(endAbsolute = camPoint(angles[104]))
+  |> line(endAbsolute = camPoint(angles[105]))
+  |> line(endAbsolute = camPoint(angles[106]))
+  |> line(endAbsolute = camPoint(angles[107]))
+  |> line(endAbsolute = camPoint(angles[108]))
+  |> line(endAbsolute = camPoint(angles[109]))
+  |> line(endAbsolute = camPoint(angles[110]))
+  |> line(endAbsolute = camPoint(angles[111]))
+  |> line(endAbsolute = camPoint(angles[112]))
+  |> line(endAbsolute = camPoint(angles[113]))
+  |> line(endAbsolute = camPoint(angles[114]))
+  |> line(endAbsolute = camPoint(angles[115]))
+  |> line(endAbsolute = camPoint(angles[116]))
+  |> line(endAbsolute = camPoint(angles[117]))
+  |> line(endAbsolute = camPoint(angles[118]))
+  |> line(endAbsolute = camPoint(angles[119]))
+  |> close()
+
+// Subtract shaft hole
+shaftHole = startSketchOn(XY)
+  |> circle(center = [0, 0], radius = shaftDiameter / 2)
+
+// Combine profile and hole, then extrude
+cam = camProfile
+  |> subtract2d(tool = shaftHole)
+  |> extrude(length = camThickness, tagEnd = $topFace)
+
+// Add keyway if requested
+keywaySlot = if includeKeyway {
+  startSketchOn(planeOf(cam, face = END))
+    |> startProfile(at = [-keywayWidth / 2, shaftDiameter / 2 - keywayDepth])
+    |> line(end = [keywayWidth, 0])
+    |> line(end = [0, keywayDepth + 1])
+    |> line(end = [-keywayWidth, 0])
+    |> close()
+    |> extrude(length = -camThickness - 0.1)
+} else {
+  0
+}
