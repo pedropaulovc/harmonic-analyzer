@@ -1,0 +1,50 @@
+// Harmonic Analyzer Base - Two-plate welded construction
+
+@settings(defaultLengthUnit = in, kclVersion = 1.0)
+
+// Bottom plate parameters
+bottomWidth = 11
+bottomLength = 18
+bottomHeight = 0.5
+
+// Top plate parameters
+topWidth = 10.5
+topLength = 17.5
+topHeight = 1.5
+
+// Fillet radius where plates meet
+filletRadius = 0.125
+
+// Calculated parameters
+totalHeight = bottomHeight + topHeight
+
+// Assertions
+assert(topWidth, isLessThan = bottomWidth, error = "Top plate must be narrower than bottom")
+assert(topLength, isLessThan = bottomLength, error = "Top plate must be shorter than bottom")
+
+// Bottom plate profile (centered at origin)
+bottomPlate = startSketchOn(XY)
+  |> startProfile(at = [-bottomLength/2, -bottomWidth/2])
+  |> line(end = [bottomLength, 0], tag = $bottomFront)
+  |> line(end = [0, bottomWidth], tag = $bottomRight)
+  |> line(end = [-bottomLength, 0], tag = $bottomBack)
+  |> close(tag = $bottomLeft)
+  |> extrude(length = bottomHeight, tagEnd = $bottomTop)
+
+// Top plate profile (sketch on top of bottom plate)
+topPlate = startSketchOn(bottomPlate, face = END)
+  |> startProfile(at = [-topLength/2, -topWidth/2])
+  |> line(end = [topLength, 0], tag = $topFront)
+  |> line(end = [0, topWidth], tag = $topRight)
+  |> line(end = [-topLength, 0], tag = $topBack)
+  |> close(tag = $topLeft)
+  |> extrude(length = topHeight, tagEnd = $topTop)
+  |> fillet(
+       radius = filletRadius,
+       tags = [
+         getCommonEdge(faces = [topFront, bottomTop]),
+         getCommonEdge(faces = [topRight, bottomTop]),
+         getCommonEdge(faces = [topBack, bottomTop]),
+         getCommonEdge(faces = [topLeft, bottomTop])
+       ]
+     )
