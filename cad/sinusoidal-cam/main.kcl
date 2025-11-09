@@ -1,20 +1,20 @@
 // Sinusoidal Cam - produces harmonic motion for follower
 // Creates a cam with radius varying as: r(θ) = baseRadius + amplitude * sin(frequency * θ)
 
-@settings(defaultLengthUnit = mm, kclVersion = 1.0)
+@settings(defaultLengthUnit = in, kclVersion = 1.0)
 
 // Input parameters - cam profile
-baseRadius = 25        // Minimum radius of cam (mm)
-amplitude = 5          // Rise amount (peak-to-peak = 2 * amplitude)
+baseRadius = 1.0       // Minimum radius of cam (inches)
+amplitude = 0.2        // Rise amount (peak-to-peak = 2 * amplitude)
 cycles = 1             // Number of complete sine waves per revolution
 segments = 120         // Number of segments to approximate curve (higher = smoother)
 
 // Input parameters - cam body
-camThickness = 10      // Thickness of cam disk
-shaftDiameter = 10     // Center mounting hole diameter
+camThickness = 0.4     // Thickness of cam disk (inches)
+shaftDiameter = 0.375  // Center mounting hole diameter (3/8")
 includeKeyway = true   // Add keyway for shaft mounting
-keywayWidth = 3        // Keyway width
-keywayDepth = 1.5      // Keyway depth from shaft surface
+keywayWidth = 0.125    // Keyway width (1/8")
+keywayDepth = 0.06     // Keyway depth from shaft surface (inches)
 
 // Calculated parameters
 maxRadius = baseRadius + amplitude
