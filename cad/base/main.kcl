@@ -3,13 +3,8 @@
 @settings(defaultLengthUnit = in, kclVersion = 1.0)
 
 // Bottom plate parameters
-// bottomWidth = 11
-// bottomLength = 18
-// bottomHeight = 0.5
-
-// Debug only
-bottomWidth = 15
-bottomLength = 25
+bottomWidth = 11
+bottomLength = 18
 bottomHeight = 0.5
 
 // Top plate parameters
