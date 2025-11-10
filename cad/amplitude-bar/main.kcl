@@ -1,40 +1,45 @@
 // Amplitude Bar - Vertical rod with notches at top and bottom
 
+
+
+
 @settings(defaultLengthUnit = in, kclVersion = 1.0)
 
 // Input parameters
-barLength = 32
+barLength = 8
 barWidth = 0.25
 barDepth = 0.25
 
 // Bottom notch
 bottomNotchWidth = 0.125
-bottomNotchHeight = 0.09375  // 3/32"
+bottomNotchHeight = 0.09375 // 3/32"
+
 
 // Top notch
 topNotchWidth = 0.125
 topNotchHeight = 0.5
 
 // Calculated parameters
-notchDepth = barWidth / 2  // Notch cuts halfway into the bar
+notchDepth = barWidth / 2 // Notch cuts halfway into the bar
+
 
 // Single sketch profile with notches included
 barProfile = startSketchOn(XZ)
-  |> startProfile(at = [0, 0])
-  // Left edge going up with bottom notch
-  |> line(end = [0, bottomNotchHeight])
-  |> line(end = [-bottomNotchWidth, 0])
-  |> line(end = [0, barLength - bottomNotchHeight - topNotchHeight])
-  |> line(end = [-topNotchWidth, 0])
-  |> line(end = [0, topNotchHeight])
-  // Top edge going right
-  |> line(end = [barWidth + bottomNotchWidth + topNotchWidth, 0])
-  // Right edge going down with top notch
+  |> startProfile(at = [bottomNotchWidth, 0])
+  // Bottom edge to right
+  |> line(end = [barWidth - bottomNotchWidth, 0])
+  // Right edge going up
+  |> line(end = [0, barLength])
+  // Top edge going left
+  |> line(end = [-(barWidth - bottomNotchWidth), 0])
+  // Down to bottom of top notch
   |> line(end = [0, -topNotchHeight])
-  |> line(end = [-topNotchWidth, 0])
-  |> line(end = [0, -(barLength - bottomNotchHeight - topNotchHeight)])
+  // Left out of top notch
   |> line(end = [-bottomNotchWidth, 0])
-  |> line(end = [0, -bottomNotchHeight])
-  // Bottom edge closing
+  // Down outside left edge
+  |> line(end = [0, -(barLength - topNotchHeight - bottomNotchHeight)])
+  // Right into bottom notch
+  |> line(end = [bottomNotchWidth, 0])
+  // Down to close
   |> close()
   |> extrude(length = barDepth)
