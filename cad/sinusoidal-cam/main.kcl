@@ -11,7 +11,6 @@ camThickness = 0.4     // Thickness of cam disk (inches)
 
 // Input parameters - shaft mounting
 shaftDiameter = 0.375  // Mounting hole diameter (3/8")
-includeKeyway = true   // Add keyway for shaft mounting
 keywayWidth = 0.125    // Keyway width (1/8")
 keywayDepth = 0.06     // Keyway depth from shaft surface (inches)
 
@@ -30,24 +29,32 @@ assert(keywayWidth, isLessThan = shaftDiameter, error = "Keyway too wide for sha
 camBody = startSketchOn(XY)
   |> circle(center = [0, 0], radius = camRadius)
 
-// Create off-center shaft hole (offset by eccentricity)
-shaftHole = startSketchOn(XY)
-  |> circle(center = [eccentricity, 0], radius = shaftDiameter / 2)
+// Create shaft hole with keyway
+// The hole is positioned at [eccentricity, 0] to create eccentric motion
+shaftRadius = shaftDiameter / 2
+startAngle = asin(keywayWidth / 2 / shaftRadius)
 
-// Combine: subtract hole from cam body, then extrude
+holeWithKeyway = startSketchOn(XY)
+  |> startProfile(at = [
+       eccentricity + shaftRadius * cos(startAngle),
+       shaftRadius * sin(startAngle)
+     ])
+  |> xLine(length = keywayDepth)
+  |> yLine(length = -keywayWidth)
+  |> xLine(length = -keywayDepth)
+  |> arc(
+       angleStart = -1 * startAngle + 360deg,
+       angleEnd = 180deg,
+       radius = shaftRadius
+     )
+  |> arc(
+       angleStart = 180deg,
+       angleEnd = startAngle,
+       radius = shaftRadius
+     )
+  |> close()
+
+// Combine: subtract hole (with keyway) from cam body, then extrude
 cam = camBody
-  |> subtract2d(tool = shaftHole)
+  |> subtract2d(tool = holeWithKeyway)
   |> extrude(length = camThickness, tagEnd = $topFace)
-
-// Add keyway if requested (positioned at eccentric shaft hole)
-keywaySlot = if includeKeyway {
-  startSketchOn(planeOf(cam, face = END))
-    |> startProfile(at = [eccentricity - keywayWidth / 2, shaftDiameter / 2 - keywayDepth])
-    |> line(end = [keywayWidth, 0])
-    |> line(end = [0, keywayDepth])
-    |> line(end = [-keywayWidth, 0])
-    |> close()
-    |> extrude(length = -camThickness)
-} else {
-  0
-}
