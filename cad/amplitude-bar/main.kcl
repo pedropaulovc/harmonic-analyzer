@@ -19,7 +19,7 @@ topNotchHeight = 0.5
 notchDepth = barWidth / 2  // Notch cuts halfway into the bar
 
 // Single sketch profile with notches included
-barProfile = startSketchOn(XY)
+barProfile = startSketchOn(XZ)
   |> startProfile(at = [0, 0])
   // Left edge going up with bottom notch
   |> line(end = [0, bottomNotchHeight])
