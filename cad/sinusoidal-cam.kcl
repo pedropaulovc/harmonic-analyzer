@@ -4,15 +4,10 @@
 
 @settings(defaultLengthUnit = in, kclVersion = 1.0)
 
-// Input parameters - cam geometry
-camDiameter = 2.0      // Outer diameter of cam disk (inches)
-eccentricity = 0.2     // Offset distance from center (amplitude of motion)
-camThickness = 0.4     // Thickness of cam disk (inches)
+import camDiameter, camThickness, shaftDiameter, keywayWidth, keywayDepth from "parameters.kcl"
 
-// Input parameters - shaft mounting
-shaftDiameter = 0.375  // Mounting hole diameter (3/8")
-keywayWidth = 0.125    // Keyway width (1/8")
-keywayDepth = 0.06     // Keyway depth from shaft surface (inches)
+// Input parameters - cam geometry
+eccentricity = 0.2     // Offset distance from center (amplitude of motion)
 
 // Calculated parameters
 camRadius = camDiameter / 2

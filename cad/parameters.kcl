@@ -1,0 +1,12 @@
+// Shared parameters for harmonic analyzer CAD components
+
+@settings(defaultLengthUnit = in, kclVersion = 1.0)
+
+// Cam parameters
+export camDiameter = 2.0      // Outer diameter of cam disk (inches)
+export camThickness = 0.4     // Thickness of cam disk (inches)
+
+// Shaft mounting parameters
+export shaftDiameter = 0.375  // Mounting hole diameter (3/8")
+export keywayWidth = 0.125    // Keyway width (1/8")
+export keywayDepth = 0.06     // Keyway depth from shaft surface (inches)
