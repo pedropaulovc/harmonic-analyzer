@@ -39,7 +39,7 @@ rightNotchOffset = (barWidth - topNotchWidth) / 2
 //   ##  ##
 //   ##  ##
 barProfile = startSketchOn(XZ)
-  |> startProfile(at = [1, 1])
+  |> startProfile(at = [0, 0])
   |> line(end = [leftNotchOffset, 0])
   |> line(end = [0, bottomNotchHeight])
   |> line(end = [bottomNotchWidth, 0])
