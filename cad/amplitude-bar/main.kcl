@@ -24,30 +24,32 @@ leftNotchOffset = (barWidth - bottomNotchWidth) / 2
 rightNotchOffset = (barWidth - topNotchWidth) / 2
 
 // Single sketch profile tracing around both centered notches
+//   ##  ##
+//   ##  ##
+//   ##  ##
+//   ######
+//   ######
+//   ######
+//   ######
+//   ######
+//   ######
+//   ######
+//   ######
+//   ######
+//   ##  ##
+//   ##  ##
 barProfile = startSketchOn(XZ)
-  |> startProfile(at = [0, 0])
-  // Bottom edge to left side of bottom notch
+  |> startProfile(at = [1, 1])
   |> line(end = [leftNotchOffset, 0])
-  // Up into bottom notch
   |> line(end = [0, bottomNotchHeight])
-  // Right across bottom notch
   |> line(end = [bottomNotchWidth, 0])
-  // Down out of bottom notch
   |> line(end = [0, -bottomNotchHeight])
-  // Right to right edge
   |> line(end = [leftNotchOffset, 0])
-  // Up right edge to top
   |> line(end = [0, barLength])
-  // Left to right side of top notch
   |> line(end = [-rightNotchOffset, 0])
-  // Down into top notch
   |> line(end = [0, -topNotchHeight])
-  // Left across top notch
   |> line(end = [-topNotchWidth, 0])
-  // Up out of top notch
   |> line(end = [0, topNotchHeight])
-  // Left to left edge
   |> line(end = [-rightNotchOffset, 0])
-  // Down left edge to close
   |> close()
   |> extrude(length = barDepth)
