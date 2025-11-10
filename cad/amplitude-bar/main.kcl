@@ -1,0 +1,46 @@
+// Amplitude Bar - Vertical rod with notches at top and bottom
+
+@settings(defaultLengthUnit = in, kclVersion = 1.0)
+
+// Input parameters
+barLength = 32
+barWidth = 0.25
+barDepth = 0.25
+
+// Bottom notch
+bottomNotchWidth = 0.125
+bottomNotchHeight = 0.09375  // 3/32"
+
+// Top notch
+topNotchWidth = 0.125
+topNotchHeight = 0.5
+
+// Calculated parameters
+notchDepth = barDepth  // Notch goes through full depth
+
+// Main bar profile (square cross-section)
+barProfile = startSketchOn(XY)
+  |> startProfile(at = [-barWidth/2, -barDepth/2])
+  |> line(end = [barWidth, 0], tag = $front)
+  |> line(end = [0, barDepth], tag = $right)
+  |> line(end = [-barWidth, 0], tag = $back)
+  |> close(tag = $left)
+  |> extrude(length = barLength, tagStart = $bottom, tagEnd = $top)
+
+// Bottom notch - centered on the bar
+bottomNotch = startSketchOn(barProfile, face = START)
+  |> startProfile(at = [-bottomNotchWidth/2, -notchDepth/2])
+  |> line(end = [bottomNotchWidth, 0])
+  |> line(end = [0, notchDepth])
+  |> line(end = [-bottomNotchWidth, 0])
+  |> close()
+  |> extrude(length = bottomNotchHeight)
+
+// Top notch - centered on the bar
+topNotch = startSketchOn(barProfile, face = END)
+  |> startProfile(at = [-topNotchWidth/2, -notchDepth/2])
+  |> line(end = [topNotchWidth, 0])
+  |> line(end = [0, notchDepth])
+  |> line(end = [-topNotchWidth, 0])
+  |> close()
+  |> extrude(length = -topNotchHeight)
