@@ -18,29 +18,23 @@ topNotchHeight = 0.5
 // Calculated parameters
 notchDepth = barWidth / 2  // Notch cuts halfway into the bar
 
-// Main bar profile (square cross-section)
+// Single sketch profile with notches included
 barProfile = startSketchOn(XY)
-  |> startProfile(at = [-barWidth/2, -barDepth/2])
-  |> line(end = [barWidth, 0], tag = $front)
-  |> line(end = [0, barDepth], tag = $right)
-  |> line(end = [-barWidth, 0], tag = $back)
-  |> close(tag = $left)
-  |> extrude(length = barLength, tagStart = $bottom, tagEnd = $top)
-
-// Bottom notch - cut into the side of the bar near the bottom
-bottomNotch = startSketchOn(barProfile, face = front)
-  |> startProfile(at = [-barDepth/2, 0])
-  |> line(end = [barDepth, 0])
+  |> startProfile(at = [0, 0])
+  // Left edge going up with bottom notch
   |> line(end = [0, bottomNotchHeight])
-  |> line(end = [-barDepth, 0])
-  |> close()
-  |> extrude(length = -notchDepth)
-
-// Top notch - cut into the side of the bar near the top
-topNotch = startSketchOn(barProfile, face = front)
-  |> startProfile(at = [-barDepth/2, barLength - topNotchHeight])
-  |> line(end = [barDepth, 0])
+  |> line(end = [-bottomNotchWidth, 0])
+  |> line(end = [0, barLength - bottomNotchHeight - topNotchHeight])
+  |> line(end = [-topNotchWidth, 0])
   |> line(end = [0, topNotchHeight])
-  |> line(end = [-barDepth, 0])
+  // Top edge going right
+  |> line(end = [barWidth + bottomNotchWidth + topNotchWidth, 0])
+  // Right edge going down with top notch
+  |> line(end = [0, -topNotchHeight])
+  |> line(end = [-topNotchWidth, 0])
+  |> line(end = [0, -(barLength - bottomNotchHeight - topNotchHeight)])
+  |> line(end = [-bottomNotchWidth, 0])
+  |> line(end = [0, -bottomNotchHeight])
+  // Bottom edge closing
   |> close()
-  |> extrude(length = -notchDepth)
+  |> extrude(length = barDepth)
