@@ -23,23 +23,32 @@ topNotchHeight = 0.5
 notchDepth = barWidth / 2 // Notch cuts halfway into the bar
 
 
-// Single sketch profile with notches included
-barProfile = startSketchOn(XZ)
-  |> startProfile(at = [bottomNotchWidth, 0])
-  // Bottom edge to right
-  |> line(end = [barWidth - bottomNotchWidth, 0])
-  // Right edge going up
+// Main bar profile
+mainProfile = startSketchOn(XZ)
+  |> startProfile(at = [0, 0])
+  |> line(end = [barWidth, 0])
   |> line(end = [0, barLength])
-  // Top edge going left
-  |> line(end = [-(barWidth - bottomNotchWidth), 0])
-  // Down to bottom of top notch
-  |> line(end = [0, -topNotchHeight])
-  // Left out of top notch
-  |> line(end = [-bottomNotchWidth, 0])
-  // Down outside left edge
-  |> line(end = [0, -(barLength - topNotchHeight - bottomNotchHeight)])
-  // Right into bottom notch
-  |> line(end = [bottomNotchWidth, 0])
-  // Down to close
+  |> line(end = [-barWidth, 0])
   |> close()
+
+// Bottom notch profile (centered)
+bottomNotchProfile = startSketchOn(XZ)
+  |> startProfile(at = [(barWidth - bottomNotchWidth) / 2, 0])
+  |> line(end = [bottomNotchWidth, 0])
+  |> line(end = [0, bottomNotchHeight])
+  |> line(end = [-bottomNotchWidth, 0])
+  |> close()
+
+// Top notch profile (centered)
+topNotchProfile = startSketchOn(XZ)
+  |> startProfile(at = [(barWidth - topNotchWidth) / 2, barLength - topNotchHeight])
+  |> line(end = [topNotchWidth, 0])
+  |> line(end = [0, topNotchHeight])
+  |> line(end = [-topNotchWidth, 0])
+  |> close()
+
+// Combine: subtract notches from main bar, then extrude
+barProfile = mainProfile
+  |> subtract2d(tool = bottomNotchProfile)
+  |> subtract2d(tool = topNotchProfile)
   |> extrude(length = barDepth)
