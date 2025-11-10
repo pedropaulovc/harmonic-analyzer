@@ -14,6 +14,8 @@
 // Set units to inches (diametral pitch is imperial)
 @settings(defaultLengthUnit = in)
 
+import shaftDiameter, keywayWidth, keywayDepth from "parameters.kcl"
+
 // Define a function to create a spur gear using diametral pitch
 fn spurGear(nTeeth, diametralPitch, pressureAngle, gearHeight) {
   // Define gear parameters using diametral pitch
@@ -24,11 +26,8 @@ fn spurGear(nTeeth, diametralPitch, pressureAngle, gearHeight) {
   baseDiameter = pitchDiameter * cos(pressureAngle)
   tipDiameter = pitchDiameter + 2 * addendum
 
-  // Define the constants of the keyway and the bore hole
-  keywayWidth = 0.0787  // ~2mm in inches
-  keywayDepth = keywayWidth / 2
-  holeDiam = 0.197  // ~5mm in inches
-  holeRadius = holeDiam / 2
+  // Define the constants of the keyway and the bore hole (using imported parameters)
+  holeRadius = shaftDiameter / 2
   startAngle = asin(keywayWidth / 2 / holeRadius)
 
   // Sketch the keyway and center hole
