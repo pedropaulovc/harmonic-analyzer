@@ -13,6 +13,11 @@ Creates a vertical rod with notches at top and bottom
 
 import win32com.client
 import pythoncom
+from win32com.client import VARIANT
+from pythoncom import VT_DISPATCH
+
+# SolidWorks Constants
+swSelectOptionDefault = 0
 
 # Input parameters (converted from inches to meters for SolidWorks API)
 BAR_LENGTH = 32.0 * 0.0254          # 32" = 0.8128 m
@@ -66,17 +71,12 @@ def create_amplitude_bar():
     sw_sketch_mgr = sw_model.SketchManager
     sw_feat_mgr = sw_model.FeatureManager
 
+    # Create NULL variant for Callout parameter (required for SelectByID2)
+    null_variant = VARIANT(VT_DISPATCH, None)
+
     # 2. Select the XZ plane (Front plane in SolidWorks)
     print("Selecting Front Plane...")
-    select_result = sw_model_ext.SelectByID2(
-        "Front Plane",     # Plane name
-        "PLANE",           # Selection type
-        0.0, 0.0, 0.0,     # X, Y, Z coordinates (not used for named selection)
-        False,             # Append = False (clear previous selection)
-        0,                 # Mark
-        None,              # Callout
-        1                  # swSelectOption_e.swSelectOptionDefault = 1
-    )
+    select_result = sw_model_ext.SelectByID2("Front Plane", "PLANE", 0, 0, 0, False, 0, null_variant, 0)
 
     if not select_result:
         print("Error: Failed to select Front Plane")
@@ -165,15 +165,7 @@ def create_amplitude_bar():
 
     # 6. Select the sketch for extrusion
     print("Selecting sketch for extrusion...")
-    select_result = sw_model_ext.SelectByID2(
-        "Sketch1",         # Sketch name
-        "SKETCH",          # Selection type
-        0.0, 0.0, 0.0,     # X, Y, Z coordinates
-        False,             # Append = False
-        0,                 # Mark
-        None,              # Callout
-        1                  # swSelectOption_e.swSelectOptionDefault = 1
-    )
+    select_result = sw_model_ext.SelectByID2("Sketch1", "SKETCH", 0, 0, 0, False, 0, null_variant, 0)
 
     if not select_result:
         print("Error: Failed to select sketch for extrusion")
