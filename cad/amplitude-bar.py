@@ -84,120 +84,51 @@ def create_amplitude_bar():
 
     # 3. Insert sketch on selected plane
     print("Inserting sketch...")
-    sw_sketch_mgr.InsertSketch(True)
+    sw_model.InsertSketch2(True)
 
-    # 4. Draw the profile with notches
-    # The profile traces around both centered notches
-    #   ##  ##
-    #   ##  ##
-    #   ##  ##
-    #   ######
-    #   ######
-    #   ######
-    #   ######
-    #   ######
-    #   ######
-    #   ######
-    #   ######
-    #   ######
-    #   ##  ##
-    #   ##  ##
+    # 4. Draw a simple rectangle profile for testing
+    print("Drawing simple rectangle profile...")
 
-    print("Drawing sketch profile...")
+    # Draw a simple rectangle: BAR_WIDTH x BAR_LENGTH
+    seg1 = sw_sketch_mgr.CreateLine(0, 0, 0, BAR_WIDTH, 0, 0)  # Bottom
+    seg2 = sw_sketch_mgr.CreateLine(BAR_WIDTH, 0, 0, BAR_WIDTH, 0, BAR_LENGTH)  # Right
+    seg3 = sw_sketch_mgr.CreateLine(BAR_WIDTH, 0, BAR_LENGTH, 0, 0, BAR_LENGTH)  # Top
+    seg4 = sw_sketch_mgr.CreateLine(0, 0, BAR_LENGTH, 0, 0, 0)  # Left (close)
 
-    # Track current position
-    x = 0.0
-    z = 0.0
-
-    # Start at origin [0, 0] and draw lines in sequence
-    # Note: In XZ plane, Y is always 0
-
-    # Line 1: Right to leftNotchOffset
-    seg1 = sw_sketch_mgr.CreateLine(x, 0, z, x + LEFT_NOTCH_OFFSET, 0, z)
-    x += LEFT_NOTCH_OFFSET
-
-    # Line 2: Up by bottomNotchHeight
-    seg2 = sw_sketch_mgr.CreateLine(x, 0, z, x, 0, z + BOTTOM_NOTCH_HEIGHT)
-    z += BOTTOM_NOTCH_HEIGHT
-
-    # Line 3: Right by bottomNotchWidth
-    seg3 = sw_sketch_mgr.CreateLine(x, 0, z, x + BOTTOM_NOTCH_WIDTH, 0, z)
-    x += BOTTOM_NOTCH_WIDTH
-
-    # Line 4: Down by bottomNotchHeight
-    seg4 = sw_sketch_mgr.CreateLine(x, 0, z, x, 0, z - BOTTOM_NOTCH_HEIGHT)
-    z -= BOTTOM_NOTCH_HEIGHT
-
-    # Line 5: Right to leftNotchOffset
-    seg5 = sw_sketch_mgr.CreateLine(x, 0, z, x + LEFT_NOTCH_OFFSET, 0, z)
-    x += LEFT_NOTCH_OFFSET
-
-    # Line 6: Up by barLength
-    seg6 = sw_sketch_mgr.CreateLine(x, 0, z, x, 0, z + BAR_LENGTH)
-    z += BAR_LENGTH
-
-    # Line 7: Left by rightNotchOffset
-    seg7 = sw_sketch_mgr.CreateLine(x, 0, z, x - RIGHT_NOTCH_OFFSET, 0, z)
-    x -= RIGHT_NOTCH_OFFSET
-
-    # Line 8: Down by topNotchHeight
-    seg8 = sw_sketch_mgr.CreateLine(x, 0, z, x, 0, z - TOP_NOTCH_HEIGHT)
-    z -= TOP_NOTCH_HEIGHT
-
-    # Line 9: Left by topNotchWidth
-    seg9 = sw_sketch_mgr.CreateLine(x, 0, z, x - TOP_NOTCH_WIDTH, 0, z)
-    x -= TOP_NOTCH_WIDTH
-
-    # Line 10: Up by topNotchHeight
-    seg10 = sw_sketch_mgr.CreateLine(x, 0, z, x, 0, z + TOP_NOTCH_HEIGHT)
-    z += TOP_NOTCH_HEIGHT
-
-    # Line 11: Left by rightNotchOffset
-    seg11 = sw_sketch_mgr.CreateLine(x, 0, z, x - RIGHT_NOTCH_OFFSET, 0, z)
-    x -= RIGHT_NOTCH_OFFSET
-
-    # Line 12: Close back to origin (down to z=0)
-    seg12 = sw_sketch_mgr.CreateLine(x, 0, z, 0, 0, 0)
-
-    # 5. Exit sketch
-    print("Exiting sketch...")
-    sw_sketch_mgr.InsertSketch(True)
-
-    # 6. Select the sketch for extrusion
-    print("Selecting sketch for extrusion...")
-    select_result = sw_model_ext.SelectByID2("Sketch1", "SKETCH", 0, 0, 0, False, 0, null_variant, 0)
-
-    if not select_result:
-        print("Error: Failed to select sketch for extrusion")
-        return None
-
-    # 7. Extrude the profile by barDepth
+    # 5. Extrude the profile by barDepth directly (without exiting sketch)
     print("Extruding profile...")
-    extrude_feature = sw_feat_mgr.FeatureExtrusion3(
-        True,              # Sd: Single direction
-        False,             # Flip: Don't flip cut side
-        False,             # Dir: Don't flip direction
-        0,                 # T1: swEndCondBlind (blind end condition)
-        0,                 # T2: Not used for single direction
-        BAR_DEPTH,         # D1: Extrusion depth in meters
-        0.0,               # D2: Not used
-        False,             # Dchk1: No draft
-        False,             # Dchk2: No draft
-        False,             # Ddir1: Not used
-        False,             # Ddir2: Not used
-        0.0,               # Dang1: Draft angle
-        0.0,               # Dang2: Draft angle
-        False,             # OffsetReverse1
-        False,             # OffsetReverse2
-        False,             # TranslateSurface1
-        False,             # TranslateSurface2
-        True,              # Merge: Merge results
-        False,             # UseFeatScope: Don't use feature scope
-        False,             # UseAutoSelect: Don't auto-select bodies
-        0,                 # T0: swStartSketchPlane (start from sketch plane)
-        0.0,               # StartOffset: No offset
-        False              # FlipStartOffset: Don't flip
-    )
+    print(f"Extrusion depth: {BAR_DEPTH} meters = {BAR_DEPTH * 39.3701:.3f} inches")
+
+    try:
+        extrude_feature = sw_feat_mgr.FeatureExtrusion2(
+            True,              # Sd: Single direction
+            False,             # Flip: Don't flip cut side
+            False,             # Dir: Don't flip direction
+            0,                 # T1: swEndCondBlind (blind end condition)
+            0,                 # T2: Not used for single direction
+            BAR_DEPTH,         # D1: Extrusion depth in meters
+            0.0,               # D2: Not used
+            False,             # Dchk1: No draft
+            False,             # Dchk2: No draft
+            False,             # Ddir1: Not used
+            False,             # Ddir2: Not used
+            0.0,               # Dang1: Draft angle
+            0.0,               # Dang2: Draft angle
+            False,             # OffsetReverse1
+            False,             # OffsetReverse2
+            False,             # TranslateSurface1
+            False,             # TranslateSurface2
+            True,              # Merge: Merge results
+            False,             # UseFeatScope: Don't use feature scope
+            True,              # UseAutoSelect: Auto-select bodies
+            0,                 # T0: swStartSketchPlane (start from sketch plane)
+            0.0,               # StartOffset: No offset
+            False              # FlipStartOffset: Don't flip
+        )
+        print(f"Extrusion result: {extrude_feature}")
+    except Exception as e:
+        print(f"Error during extrusion: {e}")
+        extrude_feature = None
 
     if extrude_feature is None:
         print("Error: Failed to create extrusion feature")
