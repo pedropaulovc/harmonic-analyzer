@@ -71,11 +71,11 @@ def create_amplitude_bar():
     select_result = sw_model_ext.SelectByID2(
         "Front Plane",     # Plane name
         "PLANE",           # Selection type
-        0, 0, 0,           # X, Y, Z coordinates (not used for named selection)
+        0.0, 0.0, 0.0,     # X, Y, Z coordinates (not used for named selection)
         False,             # Append = False (clear previous selection)
         0,                 # Mark
         None,              # Callout
-        0                  # swSelectOptionDefault
+        1                  # swSelectOption_e.swSelectOptionDefault = 1
     )
 
     if not select_result:
@@ -168,11 +168,11 @@ def create_amplitude_bar():
     select_result = sw_model_ext.SelectByID2(
         "Sketch1",         # Sketch name
         "SKETCH",          # Selection type
-        0, 0, 0,           # X, Y, Z coordinates
+        0.0, 0.0, 0.0,     # X, Y, Z coordinates
         False,             # Append = False
         0,                 # Mark
         None,              # Callout
-        0                  # swSelectOptionDefault
+        1                  # swSelectOption_e.swSelectOptionDefault = 1
     )
 
     if not select_result:
