@@ -86,28 +86,33 @@ def create_amplitude_bar():
     print("Inserting sketch...")
     sw_model.InsertSketch2(True)
 
-    # 4. Draw a simple rectangle profile for testing
-    print("Drawing simple rectangle profile...")
+    # 4. Draw a simple circle profile (matching C++ example)
+    print("Drawing simple circle profile...")
 
-    # Draw a simple rectangle: BAR_WIDTH x BAR_LENGTH
-    seg1 = sw_sketch_mgr.CreateLine(0, 0, 0, BAR_WIDTH, 0, 0)  # Bottom
-    seg2 = sw_sketch_mgr.CreateLine(BAR_WIDTH, 0, 0, BAR_WIDTH, 0, BAR_LENGTH)  # Right
-    seg3 = sw_sketch_mgr.CreateLine(BAR_WIDTH, 0, BAR_LENGTH, 0, 0, BAR_LENGTH)  # Top
-    seg4 = sw_sketch_mgr.CreateLine(0, 0, BAR_LENGTH, 0, 0, 0)  # Left (close)
+    # Create circle: ICreateCircle2(x, y, z, radius, x_vec, y_vec)
+    # Matching C++ example: swDoc->ICreateCircle2(0.0, 0.0, 0.0, 0.025, 0.0, 0.0, &swSkSeg);
+    circle = sw_model.CreateCircle2(0.0, 0.0, 0.0, 0.025, 0.0, 0.0)
+    print(f"Circle created: {circle}")
 
-    # 5. Extrude the profile by barDepth directly (without exiting sketch)
+    # 5. Extrude the profile (matching C++ example parameters exactly)
     print("Extruding profile...")
-    print(f"Extrusion depth: {BAR_DEPTH} meters = {BAR_DEPTH * 39.3701:.3f} inches")
+    print(f"Using extrusion depth: 0.100 meters")
 
     try:
+        # Matching C++ example exactly:
+        # swFeatMgr->FeatureExtrusion2(VARIANT_FALSE, VARIANT_FALSE, VARIANT_FALSE,
+        #     0, 0, 0.100, 0.100,
+        #     VARIANT_FALSE, VARIANT_FALSE, VARIANT_FALSE, VARIANT_FALSE, 0.0, 0.0,
+        #     VARIANT_FALSE, VARIANT_FALSE, VARIANT_FALSE, VARIANT_FALSE,
+        #     VARIANT_TRUE, VARIANT_FALSE, VARIANT_TRUE, 0, 0.0, VARIANT_FALSE, &swFeat);
         extrude_feature = sw_feat_mgr.FeatureExtrusion2(
-            True,              # Sd: Single direction
+            False,             # Sd: False = double-ended (matching C++)
             False,             # Flip: Don't flip cut side
             False,             # Dir: Don't flip direction
             0,                 # T1: swEndCondBlind (blind end condition)
-            0,                 # T2: Not used for single direction
-            BAR_DEPTH,         # D1: Extrusion depth in meters
-            0.0,               # D2: Not used
+            0,                 # T2: swEndCondBlind for second end
+            0.100,             # D1: Extrusion depth in meters (matching C++)
+            0.100,             # D2: Second end depth (matching C++)
             False,             # Dchk1: No draft
             False,             # Dchk2: No draft
             False,             # Ddir1: Not used
@@ -118,9 +123,9 @@ def create_amplitude_bar():
             False,             # OffsetReverse2
             False,             # TranslateSurface1
             False,             # TranslateSurface2
-            True,              # Merge: Merge results
+            True,              # Merge: Merge results (matching C++)
             False,             # UseFeatScope: Don't use feature scope
-            True,              # UseAutoSelect: Auto-select bodies
+            True,              # UseAutoSelect: Auto-select bodies (matching C++)
             0,                 # T0: swStartSketchPlane (start from sketch plane)
             0.0,               # StartOffset: No offset
             False              # FlipStartOffset: Don't flip
