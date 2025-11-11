@@ -54,7 +54,8 @@ def create_amplitude_bar():
 
     # 1. Create new part document
     print("Creating new part document...")
-    sw_model = sw_app.NewDocument("", 0, 0.0, 0.0)
+    template_path = r"C:\ProgramData\SolidWorks\SOLIDWORKS 2025\templates\Part.prtdot"
+    sw_model = sw_app.NewDocument(template_path, 0, 0.0, 0.0)
 
     if sw_model is None:
         print("Error: Failed to create new part document")
