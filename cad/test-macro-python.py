@@ -72,7 +72,38 @@ def test_macro():
     print("Exiting sketch...")
     part.SketchManager.InsertSketch(True)
 
-    print("\n=== Rectangle created successfully! ===")
+    # Try to extrude
+    print("Attempting extrusion...")
+    extrude_depth = 0.01  # 10mm
+    try:
+        feat_mgr = part.FeatureManager
+        extrude_feature = feat_mgr.FeatureExtrusion2(
+            True,   # Single direction
+            False,  # Don't flip
+            False,  # Don't flip direction
+            0,      # Blind end condition
+            0,      # Not used
+            extrude_depth,  # Depth
+            0.0,    # Not used
+            False, False, False, False,  # No draft
+            0.0, 0.0,  # Draft angles
+            False, False, False, False,  # No offset/translate
+            True,   # Merge
+            False,  # No feature scope
+            True,   # Auto select
+            0,      # Start from sketch plane
+            0.0,    # No start offset
+            False   # Don't flip start
+        )
+        print(f"Extrusion result: {extrude_feature}")
+    except Exception as e:
+        print(f"Extrusion error: {e}")
+
+    # Rebuild
+    part.ForceRebuild3(False)
+    part.ViewZoomtofit2()
+
+    print("\n=== Test completed! ===")
     return part
 
 

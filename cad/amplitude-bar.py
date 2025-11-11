@@ -74,7 +74,11 @@ def create_amplitude_bar():
     # Create NULL variant for Callout parameter (required for SelectByID2)
     null_variant = VARIANT(VT_DISPATCH, None)
 
-    # 2. Select the XZ plane (Front plane in SolidWorks)
+    # 2. Insert sketch (matching macro recorder - InsertSketch FIRST)
+    print("Inserting sketch...")
+    sw_sketch_mgr.InsertSketch(True)
+
+    # 3. Select the XZ plane (Front plane in SolidWorks)
     print("Selecting Front Plane...")
     select_result = sw_model_ext.SelectByID2("Front Plane", "PLANE", 0, 0, 0, False, 0, null_variant, 0)
 
@@ -82,24 +86,26 @@ def create_amplitude_bar():
         print("Error: Failed to select Front Plane")
         return None
 
-    # 3. Insert sketch on selected plane
-    print("Inserting sketch...")
-    sw_model.InsertSketch2(True)
+    # Clear selection (matching macro recorder)
+    sw_model.ClearSelection2(True)
 
-    # 4. Draw circular profile for now (rectangle extrusion needs more investigation)
-    print("Drawing circular profile...")
+    # 4. Draw rectangle profile using SketchManager (matching macro recorder)
+    print("Drawing rectangle profile...")
 
-    # Calculate radius to approximate bar cross-section
-    # Using bar width as diameter
-    radius = BAR_WIDTH / 2
+    # Front Plane is XZ (X horizontal, Z vertical), so use Z for height
+    # CreateLine(x1, y1, z1, x2, y2, z2)
+    seg1 = sw_sketch_mgr.CreateLine(0, 0, 0, BAR_WIDTH, 0, 0)  # Bottom - X direction
+    seg2 = sw_sketch_mgr.CreateLine(BAR_WIDTH, 0, 0, BAR_WIDTH, 0, BAR_LENGTH)  # Right - Z direction
+    seg3 = sw_sketch_mgr.CreateLine(BAR_WIDTH, 0, BAR_LENGTH, 0, 0, BAR_LENGTH)  # Top - -X direction
+    seg4 = sw_sketch_mgr.CreateLine(0, 0, BAR_LENGTH, 0, 0, 0)  # Left - -Z direction (close)
+    print(f"Rectangle lines created: {seg1}, {seg2}, {seg3}, {seg4}")
 
-    # Create circle at center: ICreateCircle2(x, y, z, radius, x_vec, y_vec)
-    circle = sw_model.CreateCircle2(0.0, 0.0, 0.0, radius, 0.0, 0.0)
-    print(f"Circle created: {circle}")
+    # Exit sketch (matching macro recorder pattern)
+    sw_sketch_mgr.InsertSketch(True)
 
-    # 5. Extrude the profile by BAR_LENGTH (the bar is vertical)
+    # 5. Extrude the profile by BAR_DEPTH
     print("Extruding profile...")
-    print(f"Extrusion length: {BAR_LENGTH} meters = {BAR_LENGTH * 39.3701:.3f} inches")
+    print(f"Extrusion depth: {BAR_DEPTH} meters = {BAR_DEPTH * 39.3701:.3f} inches")
 
     try:
         extrude_feature = sw_feat_mgr.FeatureExtrusion2(
@@ -108,7 +114,7 @@ def create_amplitude_bar():
             False,             # Dir: Don't flip direction
             0,                 # T1: swEndCondBlind (blind end condition)
             0,                 # T2: Not used for single direction
-            BAR_LENGTH,        # D1: Extrusion length in meters (bar length)
+            BAR_DEPTH,         # D1: Extrusion depth in meters
             0.0,               # D2: Not used for single direction
             False,             # Dchk1: No draft
             False,             # Dchk2: No draft
