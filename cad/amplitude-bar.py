@@ -4,6 +4,13 @@ Translated from amplitude-bar.kcl
 Creates a vertical rod with notches at top and bottom
 """
 
+# /// script
+# requires-python = ">=3.8"
+# dependencies = [
+#   "pywin32",
+# ]
+# ///
+
 import win32com.client
 import pythoncom
 
