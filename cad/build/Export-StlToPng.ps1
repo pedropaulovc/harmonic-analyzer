@@ -43,7 +43,7 @@ param(
     [string]$StlFile = '',
     
     [Parameter(Mandatory = $false)]
-    [string]$OutputDir = 'renders',
+    [string]$OutputDir = 'png-renders',
     
     [Parameter(Mandatory = $false)]
     [ValidateRange(256, 8192)]
@@ -59,6 +59,10 @@ param(
 )
 
 Set-StrictMode -Version Latest
+
+# Resolve output directory relative to script location
+$scriptDir = $PSScriptRoot
+$OutputDir = Join-Path -Path $scriptDir -ChildPath $OutputDir
 
 # Check if OpenSCAD is installed
 $openscad = Get-Command -Name openscad -ErrorAction SilentlyContinue
@@ -103,13 +107,19 @@ function Invoke-StlRender {
     $baseName = [System.IO.Path]::GetFileNameWithoutExtension($FilePath)
     Write-Information "Rendering: $baseName"
     
+    # Create output subfolder for this file
+    $fileOutputDir = Join-Path -Path $OutputDir -ChildPath $baseName
+    if (-not (Test-Path -Path $fileOutputDir)) {
+        $null = New-Item -ItemType Directory -Path $fileOutputDir
+    }
+    
     # Create temporary SCAD file to import the STL
     $tempScad = Join-Path -Path $env:TEMP -ChildPath "$baseName-temp.scad"
     $absoluteStlPath = (Resolve-Path -Path $FilePath).Path -replace '\\', '/'
     "import(`"$absoluteStlPath`");" | Set-Content -Path $tempScad
     
     foreach ($angle in $script:Angles.GetEnumerator()) {
-        $outputFile = Join-Path -Path $OutputDir -ChildPath "$baseName-$($angle.Key).png"
+        $outputFile = Join-Path -Path $fileOutputDir -ChildPath "$($angle.Key).png"
         Write-Information "Rendering $($angle.Key) view..."
         
         $openScadArgs = @(
