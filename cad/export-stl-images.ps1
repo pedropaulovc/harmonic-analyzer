@@ -9,7 +9,7 @@ param(
     [string]$OutputDir = "renders",
     
     [Parameter(Mandatory=$false)]
-    [int]$ImageSize = 1024,
+    [int]$ImageSize = 4096,
     
     [Parameter(Mandatory=$false)]
     [int]$Distance = 150
@@ -58,7 +58,7 @@ function Render-STL {
             "-o", $outputFile,
             "--imgsize=$ImageSize,$ImageSize",
             "--camera=$($angle.Value)",
-            "--colorscheme=BeforeDawn",
+            "--colorscheme=Starnight",
             "--render",
             $tempScad
         )
