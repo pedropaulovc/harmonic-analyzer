@@ -104,7 +104,7 @@ function Invoke-StlRender {
     
     foreach ($angle in $script:Angles.GetEnumerator()) {
         $outputFile = Join-Path -Path $OutputDir -ChildPath "$baseName-$($angle.Key).png"
-        Write-Verbose "Rendering $($angle.Key) view..."
+        Write-Information "Rendering $($angle.Key) view..."
         
         $openScadArgs = @(
             '-o', $outputFile
@@ -118,9 +118,20 @@ function Invoke-StlRender {
             $tempScad
         )
         
-        $process = Start-Process -FilePath 'openscad' -ArgumentList $openScadArgs -NoNewWindow -Wait -PassThru
+        # Capture output directly
+        $output = & openscad $openScadArgs 2>&1
+        $exitCode = $LASTEXITCODE
         
-        if ($process.ExitCode -eq 0 -and (Test-Path -Path $outputFile)) {
+        # Write output to verbose stream
+        $output | ForEach-Object { Write-Verbose $_ }
+        
+        # Check for errors in output
+        $errorMessages = $output | Where-Object { $_ -match 'ERROR:' }
+        if ($errorMessages) {
+            throw "OpenSCAD error while rendering $($angle.Key) view for $baseName`: $($errorMessages -join '; ')"
+        }
+        
+        if ($exitCode -eq 0 -and (Test-Path -Path $outputFile)) {
             Write-Verbose "Successfully rendered $($angle.Key) view"
         }
         else {
@@ -138,6 +149,11 @@ if ($StlFile) {
     if (-not (Test-Path -Path $StlFile)) {
         throw "File not found: $StlFile"
     }
+    
+    if ([System.IO.Path]::GetExtension($StlFile) -ne '.stl') {
+        throw "Invalid file type. Only .stl files are supported."
+    }
+    
     Invoke-StlRender -FilePath $StlFile
 }
 else {
