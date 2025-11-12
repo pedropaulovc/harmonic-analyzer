@@ -59,7 +59,6 @@ param(
 )
 
 Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
 
 # Check if OpenSCAD is installed
 $openscad = Get-Command -Name openscad -ErrorAction SilentlyContinue
