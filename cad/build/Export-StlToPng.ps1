@@ -127,7 +127,7 @@ function Invoke-StlRender {
             "--imgsize=$ImageSize,$ImageSize"
             "--camera=$($angle.Value)"
             "--colorscheme=$ColorScheme"
-            '--view=axes,scales,edges,crosshairs'
+            '--view=axes,scales,edges'
             '--viewall'
             '--projection=o'
             '--render'
