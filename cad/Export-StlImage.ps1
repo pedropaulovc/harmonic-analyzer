@@ -81,12 +81,12 @@ $script:Angles = @{
     'bottom' = "0,0,0,180,0,0,$Distance"    # Looking along +Z axis
     'iso-front-left'  = "0,0,0,60,0,315,$Distance"   # Isometric front-left
     'iso-front-right' = "0,0,0,60,0,45,$Distance"    # Isometric front-right
-    'iso-left'     = "0,0,0,60,0,135,$Distance"   # Isometric left
-    'iso-right'    = "0,0,0,60,0,315,$Distance"   # Isometric right
-    'cabinet'      = "0,0,0,63.43,0,45,$Distance" # Cabinet projection
-    'military-left'  = "0,0,0,45,0,45,$Distance"  # Military left
-    'military-right' = "0,0,0,45,0,315,$Distance" # Military right
-    'cavalier'     = "0,0,0,45,0,45,$Distance"    # Cavalier projection
+    'iso-back-left'   = "0,0,0,60,0,135,$Distance"   # Isometric back-left
+    'iso-back-right'  = "0,0,0,60,0,225,$Distance"   # Isometric back-right
+    'cabinet'         = "0,0,0,63.43,0,45,$Distance" # Cabinet projection
+    'military-left'   = "0,0,0,45,0,45,$Distance"    # Military left
+    'military-right'  = "0,0,0,45,0,315,$Distance"   # Military right
+    'cavalier'        = "0,0,0,45,0,45,$Distance"    # Cavalier projection
 }
 
 function Invoke-StlRender {
