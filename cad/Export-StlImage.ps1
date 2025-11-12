@@ -73,13 +73,19 @@ if (-not (Test-Path -Path $OutputDir)) {
 
 # Define camera angles: x,y,z,rot_x,rot_y,rot_z,distance
 $script:Angles = @{
-    'front'  = "0,0,0,55,0,25,$Distance"
-    'back'   = "0,0,0,55,0,205,$Distance"
-    'left'   = "0,0,0,55,0,115,$Distance"
-    'right'  = "0,0,0,55,0,295,$Distance"
-    'top'    = "0,0,0,0,0,0,$Distance"
-    'bottom' = "0,0,0,180,0,0,$Distance"
-    'iso'    = "0,0,0,60,0,45,$Distance"
+    'front'  = "0,0,0,90,0,0,$Distance"     # Looking along -Y axis
+    'back'   = "0,0,0,90,0,180,$Distance"   # Looking along +Y axis
+    'left'   = "0,0,0,90,0,90,$Distance"    # Looking along +X axis
+    'right'  = "0,0,0,90,0,270,$Distance"   # Looking along -X axis
+    'top'    = "0,0,0,0,0,0,$Distance"      # Looking along -Z axis
+    'bottom' = "0,0,0,180,0,0,$Distance"    # Looking along +Z axis
+    'iso'    = "0,0,0,60,0,45,$Distance"    # Isometric view
+    'iso-left'     = "0,0,0,60,0,135,$Distance"   # Isometric left
+    'iso-right'    = "0,0,0,60,0,315,$Distance"   # Isometric right
+    'cabinet'      = "0,0,0,63.43,0,45,$Distance" # Cabinet projection
+    'military-left'  = "0,0,0,45,0,45,$Distance"  # Military left
+    'military-right' = "0,0,0,45,0,315,$Distance" # Military right
+    'cavalier'     = "0,0,0,45,0,45,$Distance"    # Cavalier projection
 }
 
 function Invoke-StlRender {
