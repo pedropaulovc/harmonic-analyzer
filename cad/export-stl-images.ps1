@@ -59,6 +59,7 @@ function Render-STL {
             "--imgsize=$ImageSize,$ImageSize",
             "--camera=$($angle.Value)",
             "--colorscheme=Starnight",
+            "--view=axes",
             "--render",
             $tempScad
         )
