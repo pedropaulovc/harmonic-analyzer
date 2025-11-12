@@ -1,104 +1,165 @@
 #!/usr/bin/env pwsh
-# Export STL files to PNG images from multiple angles using OpenSCAD
+#Requires -Version 7.0
 
+<#
+.SYNOPSIS
+    Export STL files to PNG images from multiple angles using OpenSCAD.
+
+.DESCRIPTION
+    Renders STL files to PNG images from predefined camera angles using OpenSCAD.
+    Can process a single file or batch process all STL files in the current directory.
+
+.PARAMETER StlFile
+    Path to a specific STL file to render. If not provided, processes all .stl files in the current directory.
+
+.PARAMETER OutputDir
+    Output directory for rendered images. Default is "renders".
+
+.PARAMETER ImageSize
+    Image resolution in pixels (width and height). Default is 4096.
+
+.PARAMETER Distance
+    Camera distance from the object. Default is 150. Note: Less relevant when using viewall.
+
+.PARAMETER ColorScheme
+    OpenSCAD color scheme to use for rendering. Default is "Solarized".
+
+.EXAMPLE
+    .\export-stl-images.ps1
+    Processes all STL files in the current directory.
+
+.EXAMPLE
+    .\export-stl-images.ps1 -StlFile "model.stl" -Distance 50
+    Renders a specific file with custom camera distance.
+
+.EXAMPLE
+    .\export-stl-images.ps1 -ColorScheme "DeepOcean" -ImageSize 2048
+    Processes all STL files with custom color scheme and image size.
+#>
+
+[CmdletBinding()]
 param(
-    [Parameter(Mandatory=$false)]
-    [string]$StlFile = "",
+    [Parameter(Mandatory = $false)]
+    [string]$StlFile = '',
     
-    [Parameter(Mandatory=$false)]
-    [string]$OutputDir = "renders",
+    [Parameter(Mandatory = $false)]
+    [string]$OutputDir = 'renders',
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
+    [ValidateRange(256, 8192)]
     [int]$ImageSize = 4096,
     
-    [Parameter(Mandatory=$false)]
-    [int]$Distance = 150
+    [Parameter(Mandatory = $false)]
+    [ValidateRange(1, 1000)]
+    [int]$Distance = 150,
+    
+    [Parameter(Mandatory = $false)]
+    [ValidateSet('BeforeDawn', 'Cornfield', 'DeepOcean', 'Metallic', 'Sunset', 'Tomorrow', 'Starnight', 'Solarized')]
+    [string]$ColorScheme = 'Solarized'
 )
 
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
 # Check if OpenSCAD is installed
-$openscad = Get-Command openscad -ErrorAction SilentlyContinue
+$openscad = Get-Command -Name openscad -ErrorAction SilentlyContinue
 if (-not $openscad) {
-    Write-Error "OpenSCAD not found. Please install OpenSCAD and add it to PATH."
-    exit 1
+    throw 'OpenSCAD not found. Please install OpenSCAD and add it to PATH.'
 }
 
 # Create output directory
-if (-not (Test-Path $OutputDir)) {
-    New-Item -ItemType Directory -Path $OutputDir | Out-Null
+if (-not (Test-Path -Path $OutputDir)) {
+    $null = New-Item -ItemType Directory -Path $OutputDir
 }
 
 # Define camera angles: x,y,z,rot_x,rot_y,rot_z,distance
-$angles = @{
-    "front" = "0,0,0,55,0,25,$Distance"
-    "back" = "0,0,0,55,0,205,$Distance"
-    "left" = "0,0,0,55,0,115,$Distance"
-    "right" = "0,0,0,55,0,295,$Distance"
-    "top" = "0,0,0,0,0,0,$Distance"
-    "bottom" = "0,0,0,180,0,0,$Distance"
-    "iso" = "0,0,0,60,0,45,$Distance"
+$script:Angles = @{
+    'front'  = "0,0,0,55,0,25,$Distance"
+    'back'   = "0,0,0,55,0,205,$Distance"
+    'left'   = "0,0,0,55,0,115,$Distance"
+    'right'  = "0,0,0,55,0,295,$Distance"
+    'top'    = "0,0,0,0,0,0,$Distance"
+    'bottom' = "0,0,0,180,0,0,$Distance"
+    'iso'    = "0,0,0,60,0,45,$Distance"
 }
 
-# Function to render a single STL file
 function Render-STL {
-    param([string]$FilePath)
+    <#
+    .SYNOPSIS
+        Renders a single STL file to PNG images from multiple angles.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath
+    )
     
     $baseName = [System.IO.Path]::GetFileNameWithoutExtension($FilePath)
     Write-Host "`nRendering: $baseName" -ForegroundColor Cyan
     
     # Create temporary SCAD file to import the STL
-    $tempScad = Join-Path $env:TEMP "$baseName-temp.scad"
-    $absoluteStlPath = (Resolve-Path $FilePath).Path -replace '\\', '/'
-    "import(`"$absoluteStlPath`");" | Set-Content $tempScad
+    $tempScad = Join-Path -Path $env:TEMP -ChildPath "$baseName-temp.scad"
+    $absoluteStlPath = (Resolve-Path -Path $FilePath).Path -replace '\\', '/'
+    "import(`"$absoluteStlPath`");" | Set-Content -Path $tempScad
     
-    foreach ($angle in $angles.GetEnumerator()) {
-        $outputFile = Join-Path $OutputDir "$baseName-$($angle.Key).png"
+    foreach ($angle in $script:Angles.GetEnumerator()) {
+        $outputFile = Join-Path -Path $OutputDir -ChildPath "$baseName-$($angle.Key).png"
         Write-Host "  $($angle.Key)... " -NoNewline
         
-        $args = @(
-            "-o", $outputFile,
-            "--imgsize=$ImageSize,$ImageSize",
-            "--camera=$($angle.Value)",
-            "--colorscheme=Starnight",
-            "--view=axes",
-            "--render",
+        $openScadArgs = @(
+            '-o', $outputFile
+            "--imgsize=$ImageSize,$ImageSize"
+            "--camera=$($angle.Value)"
+            "--colorscheme=$ColorScheme"
+            '--view=axes,scales,edges,crosshairs'
+            '--viewall'
+            '--projection=o'
+            '--render'
             $tempScad
         )
         
-        $process = Start-Process -FilePath "openscad" -ArgumentList $args -NoNewWindow -Wait -PassThru
+        $process = Start-Process -FilePath 'openscad' -ArgumentList $openScadArgs -NoNewWindow -Wait -PassThru
         
-        if ($process.ExitCode -eq 0 -and (Test-Path $outputFile)) {
-            Write-Host "✓" -ForegroundColor Green
-        } else {
-            Write-Host "✗" -ForegroundColor Red
+        if ($process.ExitCode -eq 0 -and (Test-Path -Path $outputFile)) {
+            Write-Host '✓' -ForegroundColor Green
+        }
+        else {
+            Write-Host '✗' -ForegroundColor Red
         }
     }
     
     # Clean up temp file
-    Remove-Item $tempScad -ErrorAction SilentlyContinue
+    Remove-Item -Path $tempScad -ErrorAction SilentlyContinue
 }
 
 # Main logic
-if ($StlFile) {
-    # Single file mode
-    if (-not (Test-Path $StlFile)) {
-        Write-Error "File not found: $StlFile"
-        exit 1
+try {
+    if ($StlFile) {
+        # Single file mode
+        if (-not (Test-Path -Path $StlFile)) {
+            throw "File not found: $StlFile"
+        }
+        Render-STL -FilePath $StlFile
     }
-    Render-STL -FilePath $StlFile
-} else {
-    # Batch mode - process all STL files in current directory
-    $stlFiles = Get-ChildItem -Filter "*.stl" -File
-    
-    if ($stlFiles.Count -eq 0) {
-        Write-Warning "No STL files found in current directory."
-        exit 0
+    else {
+        # Batch mode - process all STL files in current directory
+        $stlFiles = Get-ChildItem -Filter '*.stl' -File
+        
+        if ($stlFiles.Count -eq 0) {
+            Write-Warning 'No STL files found in current directory.'
+            return
+        }
+        
+        Write-Host "Found $($stlFiles.Count) STL file(s)" -ForegroundColor Cyan
+        
+        foreach ($file in $stlFiles) {
+            Render-STL -FilePath $file.FullName
+        }
     }
     
-    Write-Host "Found $($stlFiles.Count) STL file(s)" -ForegroundColor Cyan
-    
-    foreach ($file in $stlFiles) {
-        Render-STL -FilePath $file.FullName
-    }
+    Write-Host "`nDone! Images saved to: $OutputDir" -ForegroundColor Green
 }
-
-Write-Host "`nDone! Images saved to: $OutputDir" -ForegroundColor Green
+catch {
+    Write-Error -Message $_.Exception.Message
+    exit 1
+}
