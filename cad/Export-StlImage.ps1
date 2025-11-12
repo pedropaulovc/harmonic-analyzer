@@ -95,7 +95,7 @@ function Invoke-StlRender {
     )
     
     $baseName = [System.IO.Path]::GetFileNameWithoutExtension($FilePath)
-    Write-Information "`nRendering: $baseName" -InformationAction Continue
+    Write-Information "Rendering: $baseName"
     
     # Create temporary SCAD file to import the STL
     $tempScad = Join-Path -Path $env:TEMP -ChildPath "$baseName-temp.scad"
@@ -149,11 +149,11 @@ else {
         return
     }
     
-    Write-Information "Found $($stlFiles.Count) STL file(s)" -InformationAction Continue
+    Write-Information "Found $($stlFiles.Count) STL file(s)"
     
     foreach ($file in $stlFiles) {
         Invoke-StlRender -FilePath $file.FullName
     }
 }
 
-Write-Information "`nDone! Images saved to: $OutputDir" -InformationAction Continue
+Write-Information "Done! Images saved to: $OutputDir"
