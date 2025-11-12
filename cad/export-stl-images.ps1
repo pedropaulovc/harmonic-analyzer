@@ -12,7 +12,7 @@ param(
     [int]$ImageSize = 1024,
     
     [Parameter(Mandatory=$false)]
-    [int]$Distance = 500
+    [int]$Distance = 150
 )
 
 # Check if OpenSCAD is installed
