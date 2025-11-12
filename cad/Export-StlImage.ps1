@@ -83,7 +83,7 @@ $script:Angles = @{
     'iso'    = "0,0,0,60,0,45,$Distance"
 }
 
-function Render-STL {
+function Invoke-StlRender {
     <#
     .SYNOPSIS
         Renders a single STL file to PNG images from multiple angles.
@@ -95,7 +95,7 @@ function Render-STL {
     )
     
     $baseName = [System.IO.Path]::GetFileNameWithoutExtension($FilePath)
-    Write-Host "`nRendering: $baseName" -ForegroundColor Cyan
+    Write-Information "`nRendering: $baseName" -InformationAction Continue
     
     # Create temporary SCAD file to import the STL
     $tempScad = Join-Path -Path $env:TEMP -ChildPath "$baseName-temp.scad"
@@ -104,7 +104,7 @@ function Render-STL {
     
     foreach ($angle in $script:Angles.GetEnumerator()) {
         $outputFile = Join-Path -Path $OutputDir -ChildPath "$baseName-$($angle.Key).png"
-        Write-Host "  $($angle.Key)... " -NoNewline
+        Write-Verbose "Rendering $($angle.Key) view..."
         
         $openScadArgs = @(
             '-o', $outputFile
@@ -121,10 +121,10 @@ function Render-STL {
         $process = Start-Process -FilePath 'openscad' -ArgumentList $openScadArgs -NoNewWindow -Wait -PassThru
         
         if ($process.ExitCode -eq 0 -and (Test-Path -Path $outputFile)) {
-            Write-Host '✓' -ForegroundColor Green
+            Write-Verbose "Successfully rendered $($angle.Key) view"
         }
         else {
-            Write-Host '✗' -ForegroundColor Red
+            Write-Warning "Failed to render $($angle.Key) view"
         }
     }
     
@@ -133,33 +133,27 @@ function Render-STL {
 }
 
 # Main logic
-try {
-    if ($StlFile) {
-        # Single file mode
-        if (-not (Test-Path -Path $StlFile)) {
-            throw "File not found: $StlFile"
-        }
-        Render-STL -FilePath $StlFile
+if ($StlFile) {
+    # Single file mode
+    if (-not (Test-Path -Path $StlFile)) {
+        throw "File not found: $StlFile"
     }
-    else {
-        # Batch mode - process all STL files in current directory
-        $stlFiles = Get-ChildItem -Filter '*.stl' -File
-        
-        if ($stlFiles.Count -eq 0) {
-            Write-Warning 'No STL files found in current directory.'
-            return
-        }
-        
-        Write-Host "Found $($stlFiles.Count) STL file(s)" -ForegroundColor Cyan
-        
-        foreach ($file in $stlFiles) {
-            Render-STL -FilePath $file.FullName
-        }
+    Invoke-StlRender -FilePath $StlFile
+}
+else {
+    # Batch mode - process all STL files in current directory
+    $stlFiles = Get-ChildItem -Filter '*.stl' -File
+    
+    if ($stlFiles.Count -eq 0) {
+        Write-Warning 'No STL files found in current directory.'
+        return
     }
     
-    Write-Host "`nDone! Images saved to: $OutputDir" -ForegroundColor Green
+    Write-Information "Found $($stlFiles.Count) STL file(s)" -InformationAction Continue
+    
+    foreach ($file in $stlFiles) {
+        Invoke-StlRender -FilePath $file.FullName
+    }
 }
-catch {
-    Write-Error -Message $_.Exception.Message
-    exit 1
-}
+
+Write-Information "`nDone! Images saved to: $OutputDir" -InformationAction Continue
