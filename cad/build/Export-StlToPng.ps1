@@ -61,7 +61,7 @@ param(
 Set-StrictMode -Version Latest
 
 # Resolve output directory relative to script location
-$scriptDir = $PSScriptRoot
+$scriptDir = Split-Path -Parent $PSScriptRoot
 $OutputDir = Join-Path -Path $scriptDir -ChildPath $OutputDir
 
 # Check if OpenSCAD is installed
