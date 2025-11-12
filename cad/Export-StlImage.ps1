@@ -124,7 +124,7 @@ function Invoke-StlRender {
             Write-Verbose "Successfully rendered $($angle.Key) view"
         }
         else {
-            Write-Error "Failed to render $($angle.Key) view"
+            throw "Failed to render $($angle.Key) view for $baseName"
         }
     }
     
