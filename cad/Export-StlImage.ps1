@@ -108,29 +108,9 @@ function Invoke-StlRender {
     $absoluteStlPath = (Resolve-Path -Path $FilePath).Path -replace '\\', '/'
     "import(`"$absoluteStlPath`");" | Set-Content -Path $tempScad
     
-    # Start all rendering jobs in parallel
-    $jobs = @()
     foreach ($angle in $script:Angles.GetEnumerator()) {
         $outputFile = Join-Path -Path $OutputDir -ChildPath "$baseName-$($angle.Key).png"
-        Write-Information "Starting $($angle.Key) view..."
-        
-        $scriptBlock = {
-            param($OpenScadArgs, $OutputFile, $AngleName)
-            
-            $output = & openscad $OpenScadArgs 2>&1
-            $exitCode = $LASTEXITCODE
-            
-            # Check for errors in output
-            $errorMessages = $output | Where-Object { $_ -match 'ERROR:' }
-            
-            return @{
-                AngleName = $AngleName
-                ExitCode = $exitCode
-                Output = $output
-                ErrorMessages = $errorMessages
-                OutputFile = $OutputFile
-            }
-        }
+        Write-Information "Rendering $($angle.Key) view..."
         
         $openScadArgs = @(
             '-o', $outputFile
@@ -144,29 +124,24 @@ function Invoke-StlRender {
             $tempScad
         )
         
-        $job = Start-Job -ScriptBlock $scriptBlock -ArgumentList $openScadArgs, $outputFile, $angle.Key
-        $jobs += $job
-    }
-    
-    # Wait for all jobs to complete and process results
-    Write-Information "Waiting for all rendering jobs to complete..."
-    $results = $jobs | Wait-Job | Receive-Job
-    $jobs | Remove-Job
-    
-    # Process results
-    foreach ($result in $results) {
-        # Write output to verbose stream
-        $result.Output | ForEach-Object { Write-Verbose $_ }
+        # Capture output directly
+        $output = & openscad $openScadArgs 2>&1
+        $exitCode = $LASTEXITCODE
         
-        if ($result.ErrorMessages) {
-            throw "OpenSCAD error while rendering $($result.AngleName) view for $baseName`: $($result.ErrorMessages -join '; ')"
+        # Write output to verbose stream
+        $output | ForEach-Object { Write-Verbose $_ }
+        
+        # Check for errors in output
+        $errorMessages = $output | Where-Object { $_ -match 'ERROR:' }
+        if ($errorMessages) {
+            throw "OpenSCAD error while rendering $($angle.Key) view for $baseName`: $($errorMessages -join '; ')"
         }
         
-        if ($result.ExitCode -eq 0 -and (Test-Path -Path $result.OutputFile)) {
-            Write-Verbose "Successfully rendered $($result.AngleName) view"
+        if ($exitCode -eq 0 -and (Test-Path -Path $outputFile)) {
+            Write-Verbose "Successfully rendered $($angle.Key) view"
         }
         else {
-            throw "Failed to render $($result.AngleName) view for $baseName"
+            throw "Failed to render $($angle.Key) view for $baseName"
         }
     }
     
