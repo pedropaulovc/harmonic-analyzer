@@ -3,14 +3,13 @@
 
 <#
 .SYNOPSIS
-    Export STL files to PNG images from multiple angles using OpenSCAD.
+    Export a single STL file to PNG images from multiple angles using OpenSCAD.
 
 .DESCRIPTION
-    Renders STL files to PNG images from predefined camera angles using OpenSCAD.
-    Can process a single file or batch process all STL files in the current directory.
+    Renders a single STL file to PNG images from predefined camera angles using OpenSCAD.
 
 .PARAMETER StlFile
-    Path to a specific STL file to render. If not provided, processes all .stl files in the current directory.
+    Path to the STL file to render. This parameter is required.
 
 .PARAMETER OutputDir
     Output directory for rendered images. Default is "renders".
@@ -25,22 +24,22 @@
     OpenSCAD color scheme to use for rendering. Default is "Solarized".
 
 .EXAMPLE
-    .\export-stl-images.ps1
-    Processes all STL files in the current directory.
+    .\export-stl-images.ps1 -StlFile "model.stl"
+    Renders the specified STL file with default settings.
 
 .EXAMPLE
     .\export-stl-images.ps1 -StlFile "model.stl" -Distance 50
-    Renders a specific file with custom camera distance.
+    Renders a file with custom camera distance.
 
 .EXAMPLE
-    .\export-stl-images.ps1 -ColorScheme "DeepOcean" -ImageSize 2048
-    Processes all STL files with custom color scheme and image size.
+    .\export-stl-images.ps1 -StlFile "model.stl" -ColorScheme "DeepOcean" -ImageSize 2048
+    Renders a file with custom color scheme and image size.
 #>
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $false)]
-    [string]$StlFile = '',
+    [Parameter(Mandatory = $true, Position = 0)]
+    [string]$StlFile,
     
     [Parameter(Mandatory = $false)]
     [string]$OutputDir = 'png-renders',
@@ -114,7 +113,7 @@ function Invoke-StlRender {
     }
     
     # Create temporary SCAD file to import the STL
-    $tempScad = Join-Path -Path $env:TEMP -ChildPath "$baseName-temp.scad"
+    $tempScad = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "$baseName-temp.scad"
     $absoluteStlPath = (Resolve-Path -Path $FilePath).Path -replace '\\', '/'
     "import(`"$absoluteStlPath`");" | Set-Content -Path $tempScad
     
@@ -127,10 +126,9 @@ function Invoke-StlRender {
             "--imgsize=$ImageSize,$ImageSize"
             "--camera=$($angle.Value)"
             "--colorscheme=$ColorScheme"
-            '--view=axes,scales,edges'
+            '--view=axes,scales'
             '--viewall'
             '--projection=o'
-            '--render'
             $tempScad
         )
         
@@ -160,32 +158,14 @@ function Invoke-StlRender {
 }
 
 # Main logic
-if ($StlFile) {
-    # Single file mode
-    if (-not (Test-Path -Path $StlFile)) {
-        throw "File not found: $StlFile"
-    }
-    
-    if ([System.IO.Path]::GetExtension($StlFile) -ne '.stl') {
-        throw "Invalid file type. Only .stl files are supported."
-    }
-    
-    Invoke-StlRender -FilePath $StlFile
+if (-not (Test-Path -Path $StlFile)) {
+    throw "File not found: $StlFile"
 }
-else {
-    # Batch mode - process all STL files in current directory
-    $stlFiles = Get-ChildItem -Filter '*.stl' -File
-    
-    if ($stlFiles.Count -eq 0) {
-        Write-Warning 'No STL files found in current directory.'
-        return
-    }
-    
-    Write-Information "Found $($stlFiles.Count) STL file(s)"
-    
-    foreach ($file in $stlFiles) {
-        Invoke-StlRender -FilePath $file.FullName
-    }
+
+if ([System.IO.Path]::GetExtension($StlFile) -ne '.stl') {
+    throw "Invalid file type. Only .stl files are supported."
 }
+
+Invoke-StlRender -FilePath $StlFile
 
 Write-Information "Done! Images saved to: $OutputDir"
