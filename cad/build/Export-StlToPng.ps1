@@ -130,7 +130,6 @@ function Invoke-StlRender {
             '--view=axes,scales,edges'
             '--viewall'
             '--projection=o'
-            '--render'
             $tempScad
         )
         
