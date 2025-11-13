@@ -135,7 +135,8 @@ function Invoke-StlRender {
         )
         
         # Capture output directly (use xvfb-run for headless rendering)
-        $output = & xvfb-run openscad $openScadArgs 2>&1
+        $allArgs = @('openscad') + $openScadArgs
+        $output = & xvfb-run -a @allArgs 2>&1
         $exitCode = $LASTEXITCODE
         
         # Write output to verbose stream
