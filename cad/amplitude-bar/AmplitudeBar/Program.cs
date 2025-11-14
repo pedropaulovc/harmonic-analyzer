@@ -30,7 +30,7 @@ namespace AmplitudeBar
                 // Attach to SolidWorks (or start one)
                 try
                 {
-                    swApp = (SldWorks)Marshal.GetActiveObject("SldWorks.Application");
+                    swApp = (SldWorks)Marshal.GetActiveObject(progID: "SldWorks.Application");
                 }
                 catch (COMException)
                 {
@@ -48,8 +48,11 @@ namespace AmplitudeBar
                 string templatePath = @"C:\ProgramData\SolidWorks\SOLIDWORKS 2025\templates\Part.prtdot";
                 try
                 {
-                    swModel = swApp.NewDocument(templatePath,
-                                                (int)swDwgPaperSizes_e.swDwgPaperA0size, 0, 0) as ModelDoc2;
+                    swModel = swApp.NewDocument(
+                        TemplateName: templatePath,
+                        PaperSize: (int)swDwgPaperSizes_e.swDwgPaperA0size,
+                        Width: 0,
+                        Height: 0) as ModelDoc2;
                 }
                 catch
                 {
@@ -67,32 +70,63 @@ namespace AmplitudeBar
 
                 // 1) Create base rectangular profile (centered on X, bottom at Y=0 -> top at Y=barLength)
                 double halfWidth = barWidth / 2.0;
-                swModel.Extension.SelectByID2("Right Plane", "PLANE", 0, 0, 0, false, 0, null, 0); // ensure a plane exists
-                skMgr.InsertSketch(true); // start sketch on default plane (Front/Right selection may vary)
+                swModel.Extension.SelectByID2(
+                    Name: "Right Plane",
+                    Type: "PLANE",
+                    X: 0,
+                    Y: 0,
+                    Z: 0,
+                    Append: false,
+                    Mark: 0,
+                    Callout: null,
+                    SelectOption: 0); // ensure a plane exists
+                skMgr.InsertSketch(UpdateEditRebuild: true); // start sketch on default plane (Front/Right selection may vary)
 
                 // Draw rectangle (lines) as a closed profile
                 // Coordinates: X across width, Y along length (0..barLength)
-                skMgr.CreateLine(-halfWidth, 0.0, 0.0, halfWidth, 0.0, 0.0);
-                skMgr.CreateLine(halfWidth, 0.0, 0.0, halfWidth, barLength, 0.0);
-                skMgr.CreateLine(halfWidth, barLength, 0.0, -halfWidth, barLength, 0.0);
-                skMgr.CreateLine(-halfWidth, barLength, 0.0, -halfWidth, 0.0, 0.0);
+                skMgr.CreateLine(
+                    X1: -halfWidth, Y1: 0.0, Z1: 0.0,
+                    X2: halfWidth, Y2: 0.0, Z2: 0.0);
+                skMgr.CreateLine(
+                    X1: halfWidth, Y1: 0.0, Z1: 0.0,
+                    X2: halfWidth, Y2: barLength, Z2: 0.0);
+                skMgr.CreateLine(
+                    X1: halfWidth, Y1: barLength, Z1: 0.0,
+                    X2: -halfWidth, Y2: barLength, Z2: 0.0);
+                skMgr.CreateLine(
+                    X1: -halfWidth, Y1: barLength, Z1: 0.0,
+                    X2: -halfWidth, Y2: 0.0, Z2: 0.0);
 
                 skMgr.InsertSketch(true); // exit sketch
                 // DON'T clear selection here — call extrusion while sketch/profile is selected
                 Feature baseFeat = swFeatMgr.FeatureExtrusion2(
-                    true, false, false,
-                    (int)swEndConditions_e.swEndCondBlind, 0,
-                    barDepth, 0.0,
-                    false, false, false, false,
-                    0.0, 0.0,
-                    false, false, false, false,
-                    true, false, false,
-                    (int)swStartConditions_e.swStartSketchPlane,
-                    0.0, false);
+                    Sd: true,
+                    Flip: false,
+                    Dir: false,
+                    T1: (int)swEndConditions_e.swEndCondBlind,
+                    T2: 0,
+                    D1: barDepth,
+                    D2: 0.0,
+                    Dchk1: false,
+                    Dchk2: false,
+                    Ddir1: false,
+                    Ddir2: false,
+                    Dang1: 0.0,
+                    Dang2: 0.0,
+                    OffsetReverse1: false,
+                    OffsetReverse2: false,
+                    TranslateSurface1: false,
+                    TranslateSurface2: false,
+                    Merge: true,
+                    UseFeatScope: false,
+                    UseAutoSelect: false,
+                    T0: (int)swStartConditions_e.swStartSketchPlane,
+                    StartOffset: 0.0,
+                    false);
 
                 if (baseFeat == null) throw new InvalidOperationException("Base extrusion failed.");
 
-                swModel.ClearSelection2(true); // clear only after extrusion completes
+                swModel.ClearSelection2(All: true); // clear only after extrusion completes
 
                 // 3) Create bottom notch sketch and cut-extrude
                 // Start a new sketch on the same plane as the original sketch
@@ -100,29 +134,47 @@ namespace AmplitudeBar
 
                 double bnHalfW = bottomNotchWidth / 2.0;
                 // rectangle from Y=0 up to bottomNotchHeight
-                skMgr.CreateLine(-bnHalfW, 0.0, 0.0, bnHalfW, 0.0, 0.0);
-                skMgr.CreateLine(bnHalfW, 0.0, 0.0, bnHalfW, bottomNotchHeight, 0.0);
-                skMgr.CreateLine(bnHalfW, bottomNotchHeight, 0.0, -bnHalfW, bottomNotchHeight, 0.0);
-                skMgr.CreateLine(-bnHalfW, bottomNotchHeight, 0.0, -bnHalfW, 0.0, 0.0);
+                skMgr.CreateLine(
+                    X1: -bnHalfW, Y1: 0.0, Z1: 0.0,
+                    X2: bnHalfW, Y2: 0.0, Z2: 0.0);
+                skMgr.CreateLine(
+                    X1: bnHalfW, Y1: 0.0, Z1: 0.0,
+                    X2: bnHalfW, Y2: bottomNotchHeight, Z2: 0.0);
+                skMgr.CreateLine(
+                    X1: bnHalfW, Y1: bottomNotchHeight, Z1: 0.0,
+                    X2: -bnHalfW, Y2: bottomNotchHeight, Z2: 0.0);
+                skMgr.CreateLine(
+                    X1: -bnHalfW, Y1: bottomNotchHeight, Z1: 0.0,
+                    X2: -bnHalfW, Y2: 0.0, Z2: 0.0);
 
                 skMgr.InsertSketch(true);
                 swModel.ClearSelection2(true);
 
                 // Cut-extrude the bottom notch using FeatureExtrusion2 as a cut
                 Feature bottomCut = swFeatMgr.FeatureExtrusion2(
-                    false,              // cut (false = create cut)
-                    false,             // thin feature
-                    false,             // draft outward
-                    (int)swEndConditions_e.swEndCondBlind,
-                    0,
-                    bottomNotchHeight + 0.0001, // depth
-                    0.0,
-                    false, false, false, false,
-                    0.0, 0.0,
-                    false, false, false, false,
-                    true, false, false,
-                    (int)swStartConditions_e.swStartSketchPlane,
-                    0.0, false);
+                    Sd: false,              // cut (false = create cut)
+                    Flip: false,             // thin feature
+                    Dir: false,             // draft outward
+                    T1: (int)swEndConditions_e.swEndCondBlind,
+                    T2: 0,
+                    D1: bottomNotchHeight + 0.0001, // depth
+                    D2: 0.0,
+                    Dchk1: false,
+                    Dchk2: false,
+                    Ddir1: false,
+                    Ddir2: false,
+                    Dang1: 0.0,
+                    Dang2: 0.0,
+                    OffsetReverse1: false,
+                    OffsetReverse2: false,
+                    TranslateSurface1: false,
+                    TranslateSurface2: false,
+                    Merge: true,
+                    UseFeatScope: false,
+                    UseAutoSelect: false,
+                    T0: (int)swStartConditions_e.swStartSketchPlane,
+                    StartOffset: 0.0,
+                    false);
 
                 if (bottomCut == null)
                 {
@@ -137,29 +189,47 @@ namespace AmplitudeBar
                 double tnHalfW = topNotchWidth / 2.0;
                 // top notch rectangle positioned at top: from Y=barLength-topNotchHeight to Y=barLength
                 double y0 = barLength - topNotchHeight;
-                skMgr.CreateLine(-tnHalfW, y0, 0.0, tnHalfW, y0, 0.0);
-                skMgr.CreateLine(tnHalfW, y0, 0.0, tnHalfW, barLength, 0.0);
-                skMgr.CreateLine(tnHalfW, barLength, 0.0, -tnHalfW, barLength, 0.0);
-                skMgr.CreateLine(-tnHalfW, barLength, 0.0, -tnHalfW, y0, 0.0);
+                skMgr.CreateLine(
+                    X1: -tnHalfW, Y1: y0, Z1: 0.0,
+                    X2: tnHalfW, Y2: y0, Z2: 0.0);
+                skMgr.CreateLine(
+                    X1: tnHalfW, Y1: y0, Z1: 0.0,
+                    X2: tnHalfW, Y2: barLength, Z2: 0.0);
+                skMgr.CreateLine(
+                    X1: tnHalfW, Y1: barLength, Z1: 0.0,
+                    X2: -tnHalfW, Y2: barLength, Z2: 0.0);
+                skMgr.CreateLine(
+                    X1: -tnHalfW, Y1: barLength, Z1: 0.0,
+                    X2: -tnHalfW, Y2: y0, Z2: 0.0);
 
                 skMgr.InsertSketch(true);
                 swModel.ClearSelection2(true);
 
                 // Cut-extrude the top notch (cut)
                 Feature topCut = swFeatMgr.FeatureExtrusion2(
-                    false,
-                    false,
-                    false,
-                    (int)swEndConditions_e.swEndCondBlind,
-                    0,
-                    topNotchHeight + 0.0001,
-                    0.0,
-                    false, false, false, false,
-                    0.0, 0.0,
-                    false, false, false, false,
-                    true, false, false,
-                    (int)swStartConditions_e.swStartSketchPlane,
-                    0.0, false);
+                    Sd: false,
+                    Flip: false,
+                    Dir: false,
+                    T1: (int)swEndConditions_e.swEndCondBlind,
+                    T2: 0,
+                    D1: topNotchHeight + 0.0001,
+                    D2: 0.0,
+                    Dchk1: false,
+                    Dchk2: false,
+                    Ddir1: false,
+                    Ddir2: false,
+                    Dang1: 0.0,
+                    Dang2: 0.0,
+                    OffsetReverse1: false,
+                    OffsetReverse2: false,
+                    TranslateSurface1: false,
+                    TranslateSurface2: false,
+                    Merge: true,
+                    UseFeatScope: false,
+                    UseAutoSelect: false,
+                    T0: (int)swStartConditions_e.swStartSketchPlane,
+                    StartOffset: 0.0,
+                    false);
 
                 if (topCut == null)
                 {
