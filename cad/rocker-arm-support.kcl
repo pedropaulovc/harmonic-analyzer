@@ -1,0 +1,79 @@
+// Rocker Arm Support - Trapezoidal bracket with center cutout and pivot pin
+
+@settings(defaultLengthUnit = mm, kclVersion = 1.0)
+
+// Base dimensions
+baseLength = 120
+baseWidth = 40
+baseThickness = 8
+
+// Support dimensions
+supportHeight = 100
+supportBottomWidth = 40
+supportTopWidth = 20
+supportThickness = 8
+
+// Cutout dimensions
+cutoutWidth = 80
+cutoutHeight = 60
+cutoutBottomOffset = 20
+
+// Top pivot pin
+pinDiameter = 12
+pinHeight = 15
+
+// Mounting holes
+mountHoleDia = 6
+mountHoleSpacing = 80
+
+// Fillet radius
+filletRadius = 2
+
+// Base plate
+basePlate = startSketchOn(XY)
+  |> startProfile(at = [-baseLength/2, -baseWidth/2])
+  |> line(end = [baseLength, 0], tag = $baseFront)
+  |> line(end = [0, baseWidth], tag = $baseRight)
+  |> line(end = [-baseLength, 0], tag = $baseBack)
+  |> close(tag = $baseLeft)
+
+// Mounting holes in base
+mountingHoles = startSketchOn(XY)
+  |> circle(center = [-mountHoleSpacing/2, 0], radius = mountHoleDia/2)
+  |> circle(center = [mountHoleSpacing/2, 0], radius = mountHoleDia/2)
+
+// Create base with holes
+base = basePlate
+  |> subtract2d(tool = mountingHoles)
+  |> extrude(length = baseThickness, tagEnd = $baseTop)
+
+// Calculated angle for trapezoid
+sideOffset = (supportBottomWidth - supportTopWidth) / 2
+trapAngle = atan2(y = supportHeight, x = sideOffset)
+sideLength = sqrt(supportHeight^2 + sideOffset^2)
+
+// Trapezoidal support profile on YZ plane
+supportProfile = startSketchOn(planeOf(base, face = END))
+  |> startProfile(at = [-supportBottomWidth/2, baseThickness])
+  |> line(end = [supportBottomWidth, 0], tag = $suppBottom)
+  |> angledLine(angle = trapAngle, length = sideLength, tag = $suppRight)
+  |> line(end = [-supportTopWidth, 0], tag = $suppTop)
+  |> close(tag = $suppLeft)
+
+// Create cutout window profile (on same plane)
+cutoutProfile = startSketchOn(planeOf(base, face = END))
+  |> startProfile(at = [-cutoutWidth/2, baseThickness + cutoutBottomOffset])
+  |> line(end = [cutoutWidth, 0])
+  |> line(end = [0, cutoutHeight])
+  |> line(end = [-cutoutWidth, 0])
+  |> close()
+
+// Subtract cutout from support profile, then extrude
+support = supportProfile
+  |> subtract2d(tool = cutoutProfile)
+  |> extrude(length = supportThickness)
+
+// Add top pivot pin
+pivotPin = startSketchOn(offsetPlane(XY, offset = baseThickness + supportHeight))
+  |> circle(center = [0, supportThickness/2], radius = pinDiameter/2)
+  |> extrude(length = pinHeight)
