@@ -202,7 +202,12 @@ namespace SinusoidalCamStandalone
                     defaultTemplate = "C:\\ProgramData\\SolidWorks\\SOLIDWORKS 2016\\templates\\Part.prtdot";
                 }
 
-                swModel = (ModelDoc2)swApp.NewDocument(defaultTemplate, 0, 0, 0);
+                // Note: NewDocument doesn't support named parameters in COM interop
+                swModel = (ModelDoc2)swApp.NewDocument(
+                    defaultTemplate,  // Template file path
+                    0,                // Paper size (0 = use template default)
+                    0,                // Width (0 = use template default)
+                    0);               // Height (0 = use template default)
 
                 if (swModel == null)
                     throw new InvalidOperationException("Failed to create new part document");
@@ -296,7 +301,7 @@ namespace SinusoidalCamStandalone
                 if (camBodyFeature == null)
                     throw new InvalidOperationException("Failed to create cam body extrusion");
 
-                swModel.ClearSelection2(true);
+                swModel.ClearSelection2(true);  // true = clear all selections
 
                 // Step 4: Create eccentric shaft hole with keyway
                 Console.WriteLine("Step 4: Creating eccentric shaft hole with keyway...");
@@ -454,7 +459,7 @@ namespace SinusoidalCamStandalone
                 if (cutFeature == null)
                     throw new InvalidOperationException("Failed to create cut feature for shaft hole");
 
-                swModel.ClearSelection2(true);
+                swModel.ClearSelection2(true);  // true = clear all selections
 
                 // Zoom to fit
                 swModel.ViewZoomtofit2();
