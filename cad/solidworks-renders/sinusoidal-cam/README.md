@@ -46,6 +46,8 @@ This is the **easiest method** - just build and run!
 - SolidWorks installed (will connect to running instance or start new one)
 
 **Build Steps:**
+
+*Option A - Using batch scripts (easiest):*
 ```batch
 # Navigate to this directory
 cd cad\solidworks-renders\sinusoidal-cam
@@ -54,15 +56,24 @@ cd cad\solidworks-renders\sinusoidal-cam
 build.bat
 ```
 
+*Option B - Using Visual Studio:*
+1. Navigate to `cad\solidworks-renders\`
+2. Double-click `solidworks-renders.sln` to open in Visual Studio
+3. Press **F6** or **Build > Build Solution**
+
+*Option C - Using dotnet CLI:*
+```batch
+dotnet build -c Release
+```
+
 **Run Steps:**
 ```batch
 # Run the executable
 run.bat
 ```
 
-**Manual Build (if you prefer):**
+Or run directly:
 ```batch
-dotnet build -c Release
 bin\Release\net48\SinusoidalCam.exe
 ```
 
