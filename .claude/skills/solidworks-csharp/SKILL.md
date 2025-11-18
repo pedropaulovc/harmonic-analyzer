@@ -1,6 +1,6 @@
 ---
 name: solidworks-csharp
-description: Use this skill when writing, modifying, or debugging C# code that interacts with the SolidWorks API. Includes automation scripts, macros, add-ins, and integration code. Provides expert guidance on SolidWorks SDK best practices, COM interop, and proper API usage patterns.
+description: Use this skill when writing, modifying, or debugging C# code that interacts with the SolidWorks API. Provides expert guidance on SolidWorks SDK best practices, COM interop, and proper API usage patterns.
 ---
 
 # SolidWorks C# Development Skill
