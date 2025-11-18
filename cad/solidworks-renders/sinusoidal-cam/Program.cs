@@ -64,7 +64,7 @@ namespace SinusoidalCamStandalone
                 {
                     Console.WriteLine("ERROR: Could not connect to SolidWorks.");
                     Console.WriteLine("Please ensure SolidWorks is installed and try again.");
-                    Environment.Exit(1);
+                    System.Environment.Exit(1);
                 }
 
                 Console.WriteLine($"Connected to SolidWorks {swApp.RevisionNumber()}");
@@ -94,7 +94,7 @@ namespace SinusoidalCamStandalone
                 Console.WriteLine();
                 Console.WriteLine("Press any key to exit...");
                 Console.ReadKey();
-                Environment.Exit(1);
+                System.Environment.Exit(1);
             }
             finally
             {
@@ -193,7 +193,6 @@ namespace SinusoidalCamStandalone
                 Console.WriteLine("Step 1: Creating new part document...");
 
                 // Use default template (pass empty string to use default)
-                int templateType = (int)swDocumentTypes_e.swDocPART;
                 string defaultTemplate = swApp.GetUserPreferenceStringValue(
                     (int)swUserPreferenceStringValue_e.swDefaultTemplatePart);
 
@@ -203,11 +202,7 @@ namespace SinusoidalCamStandalone
                     defaultTemplate = "C:\\ProgramData\\SolidWorks\\SOLIDWORKS 2016\\templates\\Part.prtdot";
                 }
 
-                swModel = (ModelDoc2)swApp.NewDocument(
-                    TemplatePath: defaultTemplate,
-                    PaperSize: 0,
-                    Width: 0,
-                    Height: 0);
+                swModel = (ModelDoc2)swApp.NewDocument(defaultTemplate, 0, 0, 0);
 
                 if (swModel == null)
                     throw new InvalidOperationException("Failed to create new part document");
@@ -301,7 +296,7 @@ namespace SinusoidalCamStandalone
                 if (camBodyFeature == null)
                     throw new InvalidOperationException("Failed to create cam body extrusion");
 
-                swModel.ClearSelection2(clearAll: true);
+                swModel.ClearSelection2(true);
 
                 // Step 4: Create eccentric shaft hole with keyway
                 Console.WriteLine("Step 4: Creating eccentric shaft hole with keyway...");
@@ -379,7 +374,7 @@ namespace SinusoidalCamStandalone
                 double arc1EndX = ECCENTRICITY - SHAFT_RADIUS;
                 double arc1EndY = 0.0;
 
-                SketchArc arc1 = swSketchMgr.CreateArc(
+                SketchArc arc1 = (SketchArc)swSketchMgr.CreateArc(
                     XC: ECCENTRICITY,
                     YC: 0.0,
                     Zc: 0.0,
@@ -392,7 +387,7 @@ namespace SinusoidalCamStandalone
                     Direction: 1);  // Counter-clockwise
 
                 // Arc 2: from left side of shaft to top of keyway
-                SketchArc arc2 = swSketchMgr.CreateArc(
+                SketchArc arc2 = (SketchArc)swSketchMgr.CreateArc(
                     XC: ECCENTRICITY,
                     YC: 0.0,
                     Zc: 0.0,
@@ -459,7 +454,7 @@ namespace SinusoidalCamStandalone
                 if (cutFeature == null)
                     throw new InvalidOperationException("Failed to create cut feature for shaft hole");
 
-                swModel.ClearSelection2(clearAll: true);
+                swModel.ClearSelection2(true);
 
                 // Zoom to fit
                 swModel.ViewZoomtofit2();
