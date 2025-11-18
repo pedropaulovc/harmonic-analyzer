@@ -1,9 +1,0 @@
-<Solution>
-  <Configurations>
-    <Platform Name="Any CPU" />
-    <Platform Name="x64" />
-  </Configurations>
-  <Project Path="AmplitudeBar.csproj" Id="2285cf9d-a960-4ce8-a76e-ddb66f6c4ae1">
-    <Platform Solution="*|x64" Project="x64" />
-  </Project>
-</Solution>
