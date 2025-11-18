@@ -84,11 +84,7 @@ namespace SinusoidalCamMacro
             {
                 // Step 1: Create new part document
                 Debug.Print("Creating new part document...");
-                swModel = (ModelDoc2)swApp.NewDocument(
-                    TemplatePath: "C:\\ProgramData\\SolidWorks\\SOLIDWORKS 2016\\templates\\Part.prtdot",
-                    PaperSize: 0,
-                    Width: 0,
-                    Height: 0);
+                swModel = (ModelDoc2)swApp.NewDocument("C:\\ProgramData\\SolidWorks\\SOLIDWORKS 2016\\templates\\Part.prtdot", 0, 0, 0);
 
                 if (swModel == null)
                     throw new InvalidOperationException("Failed to create new part document");
@@ -182,7 +178,7 @@ namespace SinusoidalCamMacro
                 if (camBodyFeature == null)
                     throw new InvalidOperationException("Failed to create cam body extrusion");
 
-                swModel.ClearSelection2(clearAll: true);
+                swModel.ClearSelection2(true);
 
                 // Step 4: Create eccentric shaft hole with keyway
                 Debug.Print("Creating shaft hole with keyway...");
@@ -260,7 +256,7 @@ namespace SinusoidalCamMacro
                 double arc1EndX = ECCENTRICITY - SHAFT_RADIUS;
                 double arc1EndY = 0.0;
 
-                SketchArc arc1 = swSketchMgr.CreateArc(
+                SketchArc arc1 = (SketchArc)swSketchMgr.CreateArc(
                     XC: ECCENTRICITY,
                     YC: 0.0,
                     Zc: 0.0,
@@ -273,7 +269,7 @@ namespace SinusoidalCamMacro
                     Direction: 1);  // Counter-clockwise
 
                 // Arc 2: from left side of shaft to top of keyway
-                SketchArc arc2 = swSketchMgr.CreateArc(
+                SketchArc arc2 = (SketchArc)swSketchMgr.CreateArc(
                     XC: ECCENTRICITY,
                     YC: 0.0,
                     Zc: 0.0,
@@ -340,7 +336,7 @@ namespace SinusoidalCamMacro
                 if (cutFeature == null)
                     throw new InvalidOperationException("Failed to create cut feature for shaft hole");
 
-                swModel.ClearSelection2(clearAll: true);
+                swModel.ClearSelection2(true);
 
                 // Zoom to fit
                 swModel.ViewZoomtofit2();
