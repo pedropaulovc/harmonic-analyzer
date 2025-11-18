@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(zoo kcl export:*)"
-    ],
-    "deny": [],
-    "ask": []
-  }
-}
