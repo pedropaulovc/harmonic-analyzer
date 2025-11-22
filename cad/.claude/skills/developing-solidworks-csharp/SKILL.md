@@ -175,7 +175,7 @@ Code Quality:
 - [ ] Used named parameters
 - [ ] Added null checks and error handling
 - [ ] Included SolidWorks-specific comments
-- [ ] Handled units correctly (meters internally)
+- [ ] Handled units correctly
 - [ ] Code is complete and runnable
 ```
 
