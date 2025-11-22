@@ -1,1 +1,1 @@
-For KCL development tasks, use the developing-kcl skill. Ensure export to stl. No need to format, lint or take a snapshot.
+For KCL, always export to stl. No need to format, lint or take a snapshot.
