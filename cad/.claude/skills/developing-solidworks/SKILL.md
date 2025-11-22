@@ -1,5 +1,5 @@
 ---
-name: developing-solidworks-csharp
+name: developing-solidworks
 description: Writes, modifies, and debugs C# code that interacts with the SolidWorks API. Use when working with .cs or .csproj files that reference SolidWorks SDK, SolidWorks.Interop assemblies, COM interop with SolidWorks, or when the user mentions SolidWorks development, macros, or add-ins.
 ---
 
