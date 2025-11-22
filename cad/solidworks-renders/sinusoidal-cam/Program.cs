@@ -199,15 +199,14 @@ namespace SinusoidalCamStandalone
                 if (string.IsNullOrEmpty(defaultTemplate))
                 {
                     // Fallback to typical location
-                    defaultTemplate = "C:\\ProgramData\\SolidWorks\\SOLIDWORKS 2016\\templates\\Part.prtdot";
+                    defaultTemplate = "C:\\ProgramData\\SolidWorks\\SOLIDWORKS 2025\\templates\\Part.prtdot";
                 }
 
-                // Note: NewDocument doesn't support named parameters in COM interop
                 swModel = (ModelDoc2)swApp.NewDocument(
-                    defaultTemplate,  // Template file path
-                    0,                // Paper size (0 = use template default)
-                    0,                // Width (0 = use template default)
-                    0);               // Height (0 = use template default)
+                    TemplateName: defaultTemplate,
+                    PaperSize: 0,
+                    Width: 0.0,
+                    Height: 0.0);
 
                 if (swModel == null)
                     throw new InvalidOperationException("Failed to create new part document");
@@ -301,7 +300,7 @@ namespace SinusoidalCamStandalone
                 if (camBodyFeature == null)
                     throw new InvalidOperationException("Failed to create cam body extrusion");
 
-                swModel.ClearSelection2(true);  // true = clear all selections
+                swModel.ClearSelection2(All: true);
 
                 // Step 4: Create eccentric shaft hole with keyway
                 Console.WriteLine("Step 4: Creating eccentric shaft hole with keyway...");
@@ -323,7 +322,7 @@ namespace SinusoidalCamStandalone
 
                 // Enable AddToDB for better performance
                 swSketchMgr.AddToDB = true;
-                swSketchMgr.DisplayWhenAdded = false;
+                swSketchMgr.DisplayWhenAdded = true;
 
                 // Create shaft hole circle, offset by ECCENTRICITY
                 // The hole is positioned at [eccentricity, 0] to create eccentric motion
@@ -459,7 +458,7 @@ namespace SinusoidalCamStandalone
                 if (cutFeature == null)
                     throw new InvalidOperationException("Failed to create cut feature for shaft hole");
 
-                swModel.ClearSelection2(true);  // true = clear all selections
+                swModel.ClearSelection2(All: true);
 
                 // Zoom to fit
                 swModel.ViewZoomtofit2();
