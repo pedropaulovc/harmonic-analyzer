@@ -1,1 +1,1 @@
-Read the contents of @kcl-guide-for-llm.md in its entirety before processing any kcl requests. Ensure export to stl. No need to format, lint or take a snapshot.
+For KCL development tasks, use the kcl-developer skill. Ensure export to stl. No need to format, lint or take a snapshot.
