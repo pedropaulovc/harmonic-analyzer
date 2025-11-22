@@ -93,15 +93,13 @@ if (!success)
 
 ### Common patterns
 
-**Units**: SolidWorks uses meters internally
+**Part creation**: Use `GetUserPreferenceStringValue` to avoid hardcoding template paths.
 ```csharp
-// Convert inches to meters
-double lengthMeters = lengthInches * 0.0254;
-```
-
-**Object cleanup**: Release COM objects when done
-```csharp
-Marshal.ReleaseComObject(feature);
+    swModel = (ModelDoc2)swApp.NewDocument(
+        defaultTemplate: swApp.GetUserPreferenceStringValue((int)swUserPreferenceStringValue_e.swDefaultTemplatePart),
+        paperSize: 0,
+        width: 0,
+        height: 0);
 ```
 
 **Selection management**: Use selection marks for multi-step operations
