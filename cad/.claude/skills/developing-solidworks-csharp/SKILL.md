@@ -33,11 +33,11 @@ SolidWorks Development Progress:
 
 3. **Verify approach**: Confirm alignment with current SDK conventions
 
-## Grep Use Cases
+### Grep Use Cases
 
 The grep-optimized structure makes it easy to:
 
-### Find specific methods quickly
+**Find specific methods quickly**
 ```bash
 # Find CreateArc method documentation
 grep -r "CreateArc" .claude/skills/developing-solidworks-csharp/solidworks-api/api/types/IModelDoc2/
@@ -46,7 +46,7 @@ grep -r "CreateArc" .claude/skills/developing-solidworks-csharp/solidworks-api/a
 cat .claude/skills/developing-solidworks-csharp/solidworks-api/api/types/IModelDoc2/CreateArc2.md
 ```
 
-### Extract member documentation programmatically
+**Extract member documentation programmatically**
 ```bash
 # Get all methods in IModelDoc2
 ls .claude/skills/developing-solidworks-csharp/solidworks-api/api/types/IModelDoc2/*.md | grep -v "_overview"
@@ -55,7 +55,7 @@ ls .claude/skills/developing-solidworks-csharp/solidworks-api/api/types/IModelDo
 grep "^**Signature**:" .claude/skills/developing-solidworks-csharp/solidworks-api/api/types/IModelDoc2/*.md
 ```
 
-### Search by metadata
+**Search by metadata**
 ```bash
 # Find all members in "Application Interfaces" category
 grep -r "category: Application Interfaces" .claude/skills/developing-solidworks-csharp/solidworks-api/api/types/
@@ -67,7 +67,7 @@ grep -r "kind: method" .claude/skills/developing-solidworks-csharp/solidworks-ap
 grep -r "kind: enum_member" .claude/skills/developing-solidworks-csharp/solidworks-api/api/enums/
 ```
 
-### Navigate by category
+**Navigate by category**
 ```bash
 # View all types in a category
 cat .claude/skills/developing-solidworks-csharp/solidworks-api/api/index/by_category.md | grep -A 20 "Application Interfaces"
