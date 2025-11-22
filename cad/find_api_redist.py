@@ -16,15 +16,12 @@ def find_api_redist(root_path="C:\\Program Files"):
     """
     matches = []
 
-    print(f"Searching in {root_path}...")
-
     for dirpath, dirnames, _ in os.walk(root_path):
         try:
             # Check if current path ends with api\redist
             if dirpath.lower().endswith(os.path.join("api", "redist")):
                 if dirpath not in matches:
                     matches.append(dirpath)
-                    print(f"Found: {dirpath}")
 
             # Also check subdirectories
             if "redist" in dirnames:
@@ -33,7 +30,6 @@ def find_api_redist(root_path="C:\\Program Files"):
                     full_path = os.path.join(dirpath, "redist")
                     if full_path not in matches:
                         matches.append(full_path)
-                        print(f"Found: {full_path}")
 
         except PermissionError:
             # Skip directories we don't have permission to access
@@ -47,20 +43,13 @@ def find_api_redist(root_path="C:\\Program Files"):
 if __name__ == "__main__":
     results = find_api_redist()
 
-    print("\n" + "="*60)
     if results:
-        print(f"Found {len(results)} match(es):")
         for path in results:
-            print(f"  {path}")
+            print(path)
     else:
-        print("No api\\redist folders found in C:\\Program Files")
-
         # Also search Program Files (x86) if available
         alt_path = "C:\\Program Files (x86)"
         if os.path.exists(alt_path):
-            print(f"\nSearching in {alt_path}...")
             results_x86 = find_api_redist(alt_path)
-            if results_x86:
-                print(f"Found {len(results_x86)} match(es):")
-                for path in results_x86:
-                    print(f"  {path}")
+            for path in results_x86:
+                print(path)
