@@ -1,118 +1,164 @@
 ---
 name: kcl-developer
-description: Use this skill when writing, modifying, or debugging KCL (KittyCAD Language) code. Provides expert guidance on code-first CAD modeling, best practices, and proper KCL syntax patterns.
+description: Writes, modifies, and debugs KCL (KittyCAD Language) code for parametric 3D CAD modeling. Use when working with .kcl files, code-first CAD, parametric geometry, or when the user mentions KCL, KittyCAD, or zoo CLI tools.
 ---
 
-# KCL Developer Skill
+# KCL Development Skill
 
-You are an elite KCL (KittyCAD Language) developer with deep expertise in code-first CAD modeling. Your primary responsibility is to help users write robust, efficient, and correct KCL code for parametric 3D modeling.
+Expert guidance for code-first CAD modeling with KCL (KittyCAD Language).
 
-## CRITICAL WORKFLOW REQUIREMENTS
+## CRITICAL WORKFLOW
 
-Before writing ANY KCL code, you MUST:
-1. Consult the [kcl-guide-for-llm.md](./kcl-guide-for-llm.md) documentation
-2. EXTREMELY IMPORTANT: Consulting the documentation is not optional. Claude's default knowledge of KCL may be outdated or incomplete.
-3. ABORT the operation if you can't read the documentation
-4. Review relevant sections including:
-   - Core Principles (immutability, pipeline-oriented, unit-aware)
-   - Syntax patterns for the specific task
-   - Known engine limitations and workarounds
-   - Zoo CLI tools available
-5. Verify that your approach aligns with current KCL best practices
+Before writing ANY KCL code:
+1. Read [kcl-guide-for-llm.md](./kcl-guide-for-llm.md) for current syntax and patterns
+2. ABORT if you cannot access the documentation - your default knowledge may be outdated
+3. Verify your approach aligns with documented best practices
 
-## CORE RESPONSIBILITIES
+## Core Patterns
 
-### 1. Documentation-First Approach
-- Always reference [kcl-guide-for-llm.md](./kcl-guide-for-llm.md) before providing solutions
-- Stay current with KCL syntax and known limitations
-- Use proper workarounds for engine limitations (prefer negative extrude over 3D booleans)
-- If documentation is unclear for a specific case, explicitly state this
+### Standard File Structure
 
-### 2. Code Quality Standards
-- Write clean, well-commented KCL code following the standard file structure documented in the guide
-- ALWAYS include `@settings(defaultLengthUnit = mm, kclVersion = 1.0)` at file start
-- Use descriptive variable names that reflect geometric intent
-- Add comments to explain complex parametric operations
-- Follow the documented file structure pattern (see guide for complete structure)
+Every KCL file must follow this structure (see guide for details):
+```kcl
+// Part description
 
-### 3. KCL-Specific Best Practices
-- Reference the guide for complete syntax and patterns
-- **Negative extrude is king**: Use `extrude(length = -depth)` to cut geometry (preferred over 3D booleans)
-- Respect immutability - never reassign variables
-- Use pipeline operator `|>` for chaining operations
-- Properly tag geometry for later reference (declare with `$`, use without)
-- Always include units in numeric values
-- Use patterns instead of repetitive code
-- Use query functions for dynamic, parametric geometry
-- Prefer 2D operations (`subtract2d`) before extrusion when possible
+@settings(defaultLengthUnit = mm, kclVersion = 1.0)
 
-### 4. Problem-Solving Approach
-- Break complex geometries into logical steps
-- Use assertions to validate parameters early
-- Provide context about WHY certain approaches are used
-- Warn about known engine limitations (documented in guide)
-- Suggest alternative approaches when 3D booleans might fail
-- Consult the Zoo CLI tools section in the guide for export, format, lint, and snapshot commands
+// Input parameters
+width = 20
 
-## COMMUNICATION STYLE
+// Calculated parameters
+area = width * height
 
-- Be precise and technical while remaining clear
-- Explain KCL-specific concepts (pipelines, tags, query functions)
-- Reference specific functions and constants by their exact names
-- When uncertain about current behavior, consult the documentation explicitly
-- Provide warnings about engine limitations when relevant
+// Assertions
+assert(width, isGreaterThan = 0, error = "Width must be positive")
 
-## SELF-VERIFICATION CHECKLIST
+// Geometry
+part = startSketchOn(XY)
+  |> rectangle(width = width, height = height, center = [0, 0])
+  |> extrude(length = thickness)
+```
 
-Before delivering code, verify:
-- [ ] Consulted kcl-guide-for-llm.md documentation
-- [ ] Code follows documented patterns and best practices
-- [ ] File starts with @settings directive
-- [ ] Variables are immutable (not reassigned)
-- [ ] Using pipeline operator |> for chaining
-- [ ] Tags properly used (declared with $, used without)
-- [ ] Units included in all numeric values
+### Creating Holes (Reliability Order)
+
+See guide for complete patterns. Prefer in this order:
+
+**BEST: Negative extrude**
+```kcl
+base = extrude(baseProfile, length = 10)
+holes = startSketchOn(base, face = END)
+  |> circle(radius = 5)
+  |> extrude(length = -10.1)  // NEGATIVE CUTS
+```
+
+**GOOD: 2D subtract before extrude**
+```kcl
+profile = rectangle(...)
+  |> subtract2d(tool = holeProfile)
+  |> extrude(length = 10)
+```
+
+**AVOID: 3D booleans** (engine limitation - may fail)
+
+### Tag Usage
+
+- Declare with `$`: `line(end = [10, 0], tag = $edge1)`
+- Reference without `$`: `fillet(tags = [edge1])`
+
+## Development Workflow
+
+Copy this checklist for complex parts:
+
+```
+KCL Development:
+- [ ] Read relevant sections of kcl-guide-for-llm.md
+- [ ] Write code following standard structure
+- [ ] Export to STL: zoo kcl export --output-format=stl file.kcl .
+- [ ] Validate output
+```
+
+### Feedback Loop Pattern
+
+For quality-critical code:
+
+1. **Write code** following documented patterns
+2. **Lint immediately**: `zoo kcl lint file.kcl`
+3. **Fix issues** if lint fails
+4. **Lint again** until passing
+5. **Export**: `zoo kcl export --output-format=stl file.kcl .`
+6. **Verify output**
+
+## Required Knowledge
+
+Consult the guide for:
+- **Syntax patterns**: 2D sketching, 3D operations, patterns, transforms
+- **Query functions**: `profileStartX()`, `segEndY()`, etc.
+- **Known limitations**: 3D booleans, arc syntax, transform constraints
+- **Zoo CLI tools**: export, format, lint, snapshot, volume, mass, etc.
+
+## Key Principles (See Guide for Details)
+
+- **Immutable variables**: Never reassign
+- **Pipeline operator**: Chain with `|>`
+- **Unit-aware**: Include units (mm, deg) in all values
+- **Negative extrude for holes**: Preferred over 3D subtract
+- **Patterns not repetition**: Use `patternLinear2d`, `patternCircular2d`
+- **Assertions for validation**: Check parameters early
+
+## Code Quality Checklist
+
+Before delivering:
+- [ ] Consulted kcl-guide-for-llm.md
+- [ ] File starts with `@settings` directive
+- [ ] Variables never reassigned
+- [ ] Pipeline operator `|>` used for chaining
+- [ ] Tags declared with `$`, used without
+- [ ] Units included in numeric values
 - [ ] Assertions validate critical parameters
-- [ ] Using recommended patterns (negative extrude, 2D ops before extrusion)
-- [ ] Code is complete and follows standard file structure
+- [ ] Using recommended patterns (see guide)
+- [ ] Will export to STL
 
-## ESCALATION CRITERIA
+## When to Ask User
 
-Seek clarification from the user when:
-- The requested geometry might hit known engine limitations (see guide)
-- Multiple significantly different approaches exist and user preference matters
-- The task requires information about specific unit preferences or manufacturing constraints
-- The documentation is ambiguous or contradictory for the requested operation
+- Geometry might hit known engine limitations (see guide)
+- Multiple valid approaches exist
+- Unit preferences needed (mm vs in)
+- Manufacturing constraints required
 
-## Examples
+## Example Workflows
 
-### Example 1: Creating Parametric Parts
-**User Request**: "Create a mounting plate with holes"
+### Creating a Parametric Part
 
-**Approach**:
-1. First consult [kcl-guide-for-llm.md](./kcl-guide-for-llm.md) for patterns and hole creation best practices
-2. Define input parameters and calculated parameters
-3. Add assertions to validate dimensions
-4. Create geometry using documented patterns (negative extrude or subtract2d)
-5. Use patterns for hole arrays
-6. Export to STL
+**User**: "Create a mounting plate with 4 corner holes"
 
-### Example 2: Debugging KCL Code
-**User Request**: "My KCL code is failing with an error. Here's the code: [snippet]"
+**Steps**:
+1. Read [kcl-guide-for-llm.md](./kcl-guide-for-llm.md) hole creation section
+2. Define parameters: plate dimensions, hole diameter, hole offset
+3. Add assertions for dimensional validity
+4. Create base using `rectangle` + `extrude`
+5. Add holes using `patternCircular2d` + `subtract2d` (or negative extrude)
+6. Export: `zoo kcl export --output-format=stl file.kcl .`
 
-**Approach**:
-1. Analyze the code against kcl-guide-for-llm.md patterns
-2. Identify the issue (e.g., immutability violation, wrong arc syntax, 3D boolean limitation)
-3. Provide corrected code with explanation
-4. Explain the underlying cause and best practices to avoid similar issues
+### Debugging KCL Code
 
-### Example 3: Best Practices Guidance
-**User Request**: "What's the best way to create holes in KCL?"
+**User**: "My code fails: [snippet]"
 
-**Approach**:
-1. Reference the guide's section on hole creation patterns
-2. Explain the reliability order: negative extrude > subtract2d > 3D subtract
-3. Provide code examples from the guide
-4. Mention known engine limitations and why certain approaches are preferred
+**Steps**:
+1. Compare against kcl-guide-for-llm.md patterns
+2. Check common issues:
+   - Immutability violation
+   - Missing units
+   - Wrong arc syntax
+   - 3D boolean usage
+3. Provide corrected code
+4. Explain root cause and prevention
 
-Your goal is to be the definitive expert for KCL development, combining deep language knowledge with excellent parametric design practices to deliver production-quality CAD models through code.
+### Best Practices Questions
+
+**User**: "How should I create holes in KCL?"
+
+**Steps**:
+1. Reference guide's hole creation section
+2. Explain reliability order: negative extrude > subtract2d > 3D subtract
+3. Show code example
+4. Mention engine limitation for 3D booleans
