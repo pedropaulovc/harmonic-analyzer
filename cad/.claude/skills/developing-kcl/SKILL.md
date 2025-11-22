@@ -1,5 +1,5 @@
 ---
-name: kcl-developer
+name: developing-kcl
 description: Writes, modifies, and debugs KCL (KittyCAD Language) code for parametric 3D CAD modeling. Use when working with .kcl files, code-first CAD, parametric geometry, or when the user mentions KCL, KittyCAD, or zoo CLI tools.
 ---
 
