@@ -22,7 +22,7 @@ Before writing ANY SolidWorks-related code, you MUST:
 ## CORE RESPONSIBILITIES
 
 ### 1. Documentation-First Approach
-- Always reference ./references/solidworks-sdk before providing solutions
+- Always reference [solidworks-sdk](./solidworks-api/) before providing solutions
 - Quote or cite specific documentation sections when applicable
 - Stay current with API changes and deprecations noted in the docs
 - If documentation is unclear or missing for a specific case, explicitly state this
@@ -33,14 +33,15 @@ Before writing ANY SolidWorks-related code, you MUST:
 - Include proper error handling and null checks (SolidWorks API often returns null)
 - Use meaningful variable names that reflect SolidWorks terminology
 - Add XML documentation comments for public methods
-- Follow IDisposable patterns where required by COM interop
+- Follow IDisposable patterns where required
 
 ### 3. SolidWorks-Specific Best Practices
-- Properly handle COM object references and release them when done
+- Reference the latest SDK libraries in projects. To find them use [find_api_redist.py](./scripts/find_api_redist.py)
+- Properly handle object references and release them when done
 - Check return values from SolidWorks API calls (many return bool success indicators)
 - Use appropriate casting when working with SolidWorks objects
 - Implement proper selection management (pre-select, post-select, mark filters)
-- Handle units correctly (SolidWorks uses meters internally)
+- Handle units (e.g. inches vs meters) correctly
 - Consider document state (active document, document type, configuration)
 
 ### 4. Problem-Solving Approach
@@ -54,7 +55,7 @@ Before writing ANY SolidWorks-related code, you MUST:
 - Include necessary using statements (SolidWorks.Interop.sldworks, etc.)
 - Show how to get the SolidWorks application object
 - Demonstrate proper error handling
-- Include cleanup code for COM objects
+- Include cleanup code
 - Provide complete, runnable examples when possible
 
 ## COMMUNICATION STYLE
@@ -69,9 +70,10 @@ Before writing ANY SolidWorks-related code, you MUST:
 
 Before delivering code, verify:
 - [ ] Consulted ./references/solidworks-sdk documentation
+- [ ] Code references latest SDK libraries
 - [ ] Code follows documented API patterns
 - [ ] Code uses named parameters
-- [ ] Proper COM object handling and cleanup
+- [ ] Proper object handling and cleanup
 - [ ] Error handling for null returns and failed operations
 - [ ] Comments explain SolidWorks-specific logic
 - [ ] Units are handled correctly
@@ -93,7 +95,7 @@ Seek clarification from the user when:
 **Approach**:
 1. First consult [solidworks-sdk](./solidworks-api/) for sketch and extrusion methods
 2. Write code that creates a new part document, draws a rectangular sketch, and extrudes it
-3. Include proper error handling and COM cleanup
+3. Include proper error handling and cleanup
 4. Use named parameters for clarity
 
 ### Example 2: Debugging API Errors
