@@ -35,7 +35,7 @@ SolidWorks Development Progress:
 
 ### Grep Use Cases
 
-The grep-optimized structure makes it easy to:
+The grep-optimized documentation structure makes it easy to:
 
 **Find specific methods quickly**
 ```bash
