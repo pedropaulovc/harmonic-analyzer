@@ -18,24 +18,24 @@ SolidWorks Development Progress:
 - [ ] Step 1: Review API documentation for required methods
 - [ ] Step 2: Write code with named parameters
 - [ ] Step 3: Add error handling and null checks
-- [ ] Step 4: Test and verify functionality
+- [ ] Step 4: Test and verify functionality via `dotnet run` or `dotnet test`
 - [ ] Step 5: Add cleanup and resource disposal
 ```
 
 ### Required steps before writing code
 
-1. **Read documentation**: See [solidworks-api](./solidworks-api/) for:
+1. **Use grep to explore the docs**: The grep-optimized documentation structure makes it easy to find specific methods quickly or extract member documentation programmatically
+
+2. **Read documentation**: See [solidworks-api](./solidworks-api/) for:
    - API Reference (method signatures, parameters)
    - Programming Guide (best practices, patterns)
    - Code Examples (proven implementations)
 
-2. **If documentation is unavailable**: ABORT and notify user
+3. **If documentation is unavailable**: ABORT and notify user
 
-3. **Verify approach**: Confirm alignment with current SDK conventions
+4. **Verify approach**: Confirm alignment with current SDK conventions
 
 ### Grep Use Cases
-
-The grep-optimized documentation structure makes it easy to:
 
 **Find specific methods quickly**
 ```bash
@@ -91,31 +91,21 @@ Find latest SDK libraries via `scripts/find_api_redist.py`. It will return the m
       Sd: true,                                          // Single direction
       Flip: false,                                       // Don't flip side to cut
       Dir: false,                                        // Don't flip extrusion direction
-      T1: (int)swEndConditions_e.swEndCondBlind,         // End condition: Blind
-      T2: (int)swEndConditions_e.swEndCondBlind,         // End condition 2 (unused for single)
-      D1: 0.1,                                           // Depth in meters
-      D2: 0,                                             // Depth 2 (unused for single)
-      Dchk1: false,                                      // No draft angle
-      Dchk2: false,                                      // No draft angle 2
-      Ddir1: false,                                      // Draft direction (unused)
-      Ddir2: false,                                      // Draft direction 2 (unused)
-      Dang1: 0,                                          // Draft angle (unused)
-      Dang2: 0,                                          // Draft angle 2 (unused)
-      OffsetReverse1: false,                             // Offset direction (unused)
-      OffsetReverse2: false,                             // Offset direction 2 (unused)
-      TranslateSurface1: false,                          // Surface translation (unused)
-      TranslateSurface2: false,                          // Surface translation 2 (unused)
-      Merge: false,                                      // Don't merge bodies
-      UseFeatScope: false,                               // Affect all bodies
-      UseAutoSelect: true,                               // Auto-select bodies
-      T0: (int)swStartConditions_e.swStartSketchPlane,   // Start from sketch plane
-      StartOffset: 0,                                    // No start offset
-      FlipStartOffset: false                             // Don't flip start offset
+      //...
   );
 
 // Avoid - Unclear what values mean
 IFeature extrudeFeature = swFeatureMgr.FeatureExtrusion3(true, false, false, (int)swEndConditions_e.swEndCondBlind, (int)swEndConditions_e.swEndCondBlind, 0.1, 0, false, false, false, false, 0, 0, false,
    false, false, false, false, false, true, (int)swStartConditions_e.swStartSketchPlane, 0, false);
+```
+
+**Object initialization** (use SDK and not COM interop)
+```csharp
+// Good - uses SDK
+ISldWorks swApp = new SldWorks.SldWorks();
+
+// Avoid - Uses COM interop
+ISldWorks swApp = (ISldWorks)Marshal.GetActiveObject("SldWorks.Application");
 ```
 
 **Error handling** (SolidWorks API frequently returns null):
@@ -177,6 +167,7 @@ Code Quality:
 - [ ] Included SolidWorks-specific comments
 - [ ] Handled units correctly
 - [ ] Code is complete and runnable
+- [ ] Code was validated at least once via `dotnet run` or `dotnet test`
 ```
 
 ## When to Ask for Clarification
@@ -198,7 +189,7 @@ using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 
 // Get application and create new part
-ISldWorks swApp = (ISldWorks)Marshal.GetActiveObject("SldWorks.Application");
+ISldWorks swApp = new SldWorks.SldWorks();
 IModelDoc2 doc = swApp.NewDocument("part template", 0, 0, 0);
 
 if (doc == null) throw new Exception("Failed to create document");

@@ -52,7 +52,7 @@ namespace HarmonicAnalyzer.CAD
             {
                 Console.WriteLine($"Error creating eccentric cam: {ex.Message}");
                 Console.WriteLine($"Stack trace: {ex.StackTrace}");
-                Environment.Exit(1);
+                System.Environment.Exit(1);
             }
         }
 
@@ -166,7 +166,7 @@ namespace HarmonicAnalyzer.CAD
             CutHoleWithKeyway(swFeatureMgr);
 
             // Rebuild the model to ensure all features are updated
-            swModel.ForceRebuild3(TopDown: false);
+            swModel.ForceRebuild3(TopOnly: false);
 
             // Zoom to fit
             swModel.ViewZoomtofit2();
@@ -195,7 +195,7 @@ namespace HarmonicAnalyzer.CAD
             }
 
             // Insert sketch on Front Plane
-            swSketchMgr.InsertSketch(Attached: true);
+            swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
             // Create circular cam body centered at origin
             // Circle is defined by center point (0, 0, 0) and a point on the circumference
@@ -208,7 +208,7 @@ namespace HarmonicAnalyzer.CAD
                 Zp: 0);
 
             // Exit sketch
-            swSketchMgr.InsertSketch(Attached: true);
+            swSketchMgr.InsertSketch(UpdateEditRebuild: true);
         }
 
         /// <summary>
@@ -288,7 +288,7 @@ namespace HarmonicAnalyzer.CAD
                 Callout: null,
                 SelectOption: 0);
 
-            swSketchMgr.InsertSketch(Attached: true);
+            swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
             // Calculate keyway profile points
             // The shaft hole center is offset by eccentricity
@@ -366,7 +366,7 @@ namespace HarmonicAnalyzer.CAD
                 Direction: 1);  // Counter-clockwise
 
             // Exit sketch
-            swSketchMgr.InsertSketch(Attached: true);
+            swSketchMgr.InsertSketch(UpdateEditRebuild: true);
         }
 
         /// <summary>
