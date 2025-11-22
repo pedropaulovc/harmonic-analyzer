@@ -84,12 +84,11 @@ namespace SinusoidalCamMacro
             {
                 // Step 1: Create new part document
                 Debug.Print("Creating new part document...");
-                // Note: NewDocument doesn't support named parameters in COM interop
                 swModel = (ModelDoc2)swApp.NewDocument(
-                    "C:\\ProgramData\\SolidWorks\\SOLIDWORKS 2016\\templates\\Part.prtdot",  // Template file path
-                    0,  // Paper size (0 = use template default)
-                    0,  // Width (0 = use template default)
-                    0); // Height (0 = use template default)
+                    TemplateName: "C:\\ProgramData\\SolidWorks\\SOLIDWORKS 2016\\templates\\Part.prtdot",
+                    PaperSize: 0,
+                    Width: 0.0,
+                    Height: 0.0);
 
                 if (swModel == null)
                     throw new InvalidOperationException("Failed to create new part document");
@@ -183,7 +182,7 @@ namespace SinusoidalCamMacro
                 if (camBodyFeature == null)
                     throw new InvalidOperationException("Failed to create cam body extrusion");
 
-                swModel.ClearSelection2(true);  // true = clear all selections
+                swModel.ClearSelection2(All: true);
 
                 // Step 4: Create eccentric shaft hole with keyway
                 Debug.Print("Creating shaft hole with keyway...");
@@ -341,7 +340,7 @@ namespace SinusoidalCamMacro
                 if (cutFeature == null)
                     throw new InvalidOperationException("Failed to create cut feature for shaft hole");
 
-                swModel.ClearSelection2(true);  // true = clear all selections
+                swModel.ClearSelection2(All: true);
 
                 // Zoom to fit
                 swModel.ViewZoomtofit2();
@@ -363,6 +362,8 @@ namespace SinusoidalCamMacro
         /// <summary>
         /// The SldWorks swApp variable is pre-assigned for you.
         /// </summary>
+#pragma warning disable CS0649 // Field is assigned by SolidWorks macro framework
         public SldWorks swApp;
+#pragma warning restore CS0649
     }
 }
