@@ -188,34 +188,19 @@ namespace SolidWorksRenders
             IFeatureManager swFeatMgr = swModel.FeatureManager;
             IModelDocExtension swModelExt = swModel.Extension;
 
-            // Select the top face of the bottom plate to sketch on
-            // The face is at Z = BottomHeight from the Top Plane
+            // Select Top Plane for sketching the top plate
+            // The extrusion will start at BottomHeight using StartOffset
             bool selected = swModelExt.SelectByID2(
-                Name: "Boss-Extrude1",
-                Type: "BODYFEATURE",
-                X: 0, Y: 0, Z: BottomHeight,
+                Name: "Top Plane",
+                Type: "PLANE",
+                X: 0, Y: 0, Z: 0,
                 Append: false,
                 Mark: 0,
                 Callout: null,
                 SelectOption: 0);
 
             if (!selected)
-            {
-                // Alternative: Try selecting the face directly
-                // SelectByID2 can be tricky with face selection, so let's select a plane offset
-                // Instead, we'll sketch on a plane offset from Top Plane
-                selected = swModelExt.SelectByID2(
-                    Name: "Top Plane",
-                    Type: "PLANE",
-                    X: 0, Y: 0, Z: 0,
-                    Append: false,
-                    Mark: 0,
-                    Callout: null,
-                    SelectOption: 0);
-
-                if (!selected)
-                    throw new InvalidOperationException("Failed to select plane for top plate");
-            }
+                throw new InvalidOperationException("Failed to select Top Plane for top plate");
 
             // Insert sketch
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
