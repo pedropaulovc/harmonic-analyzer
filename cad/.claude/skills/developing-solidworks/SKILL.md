@@ -7,7 +7,11 @@ description: Writes, modifies, and debugs C# code that interacts with SolidWorks
 
 ## Documentation-First Workflow
 
-**CRITICAL**: Base knowledge of SolidWorks API is inconsistent. Always consult [solidworks-api](./solidworks-api/) before writing code.
+**CRITICAL**: Base knowledge of SolidWorks API is inconsistent. Always consult documentation before writing code:
+- [Types](./types/) - Interface and class documentation with method signatures
+- [Enums](./enums/) - Enumeration values and constants
+- [Docs](./docs/) - Programming guides and best practices
+- [Examples](./examples/) - Code samples and proven implementations
 
 ### Workflow checklist
 
@@ -26,10 +30,10 @@ SolidWorks Development Progress:
 
 1. **Use grep to explore the docs**: The grep-optimized documentation structure makes it easy to find specific methods quickly or extract member documentation programmatically
 
-2. **Read documentation**: See [solidworks-api](./solidworks-api/) for:
-   - API Reference (method signatures, parameters)
-   - Programming Guide (best practices, patterns)
-   - Code Examples (proven implementations)
+2. **Read documentation**: Available in the skill folder:
+   - API Reference in `./types/` and `./enums/` (method signatures, parameters, enum values)
+   - Programming Guide in `./docs/` (best practices, patterns)
+   - Code Examples in `./examples/` (proven implementations)
 
 3. **If documentation is unavailable**: ABORT and notify user
 
@@ -40,40 +44,40 @@ SolidWorks Development Progress:
 **Find specific methods quickly**
 ```bash
 # Find CreateArc method documentation
-grep -r "CreateArc" .claude/skills/developing-solidworks-csharp/solidworks-api/api/types/IModelDoc2/
+grep -r "CreateArc" .claude/skills/developing-solidworks/types/IModelDoc2/
 
 # Get just that method's file
-cat .claude/skills/developing-solidworks-csharp/solidworks-api/api/types/IModelDoc2/CreateArc2.md
+cat .claude/skills/developing-solidworks/types/IModelDoc2/CreateArc2.md
 ```
 
 **Extract member documentation programmatically**
 ```bash
 # Get all methods in IModelDoc2
-ls .claude/skills/developing-solidworks-csharp/solidworks-api/api/types/IModelDoc2/*.md | grep -v "_overview"
+ls .claude/skills/developing-solidworks/types/IModelDoc2/*.md | grep -v "_overview"
 
 # Extract all method signatures
-grep "^**Signature**:" .claude/skills/developing-solidworks-csharp/solidworks-api/api/types/IModelDoc2/*.md
+grep "^**Signature**:" .claude/skills/developing-solidworks/types/IModelDoc2/*.md
 ```
 
 **Search by metadata**
 ```bash
 # Find all members in "Application Interfaces" category
-grep -r "category: Application Interfaces" .claude/skills/developing-solidworks-csharp/solidworks-api/api/types/
+grep -r "category: Application Interfaces" .claude/skills/developing-solidworks/types/
 
 # Find all methods (not properties)
-grep -r "kind: method" .claude/skills/developing-solidworks-csharp/solidworks-api/api/types/
+grep -r "kind: method" .claude/skills/developing-solidworks/types/
 
 # Find all enum members
-grep -r "kind: enum_member" .claude/skills/developing-solidworks-csharp/solidworks-api/api/enums/
+grep -r "kind: enum_member" .claude/skills/developing-solidworks/enums/
 ```
 
 **Navigate by category**
 ```bash
 # View all types in a category
-cat .claude/skills/developing-solidworks-csharp/solidworks-api/api/index/by_category.md | grep -A 20 "Application Interfaces"
+cat .claude/skills/developing-solidworks/index/by_category.md | grep -A 20 "Application Interfaces"
 
 # View statistics
-cat .claude/skills/developing-solidworks-csharp/solidworks-api/api/index/statistics.md
+cat .claude/skills/developing-solidworks/index/statistics.md
 ```
 
 ## SolidWorks-Specific Patterns
@@ -109,7 +113,7 @@ if (doc == null)
 ```
 
 **Error troubleshooting** (Leverage `IFaultEntity` to get more details on failed operations):
-See [Check Edges for Faults (C#)](./solidworks-api/docs/examples/Utility Interfaces/Check_Edges_for_Faults_Example_CSharp.md) for an example of how to use it.
+See [Check Edges for Faults (C#)](./examples/Check_Edges_for_Faults_Example_CSharp.md) for an example of how to use it.
 
 **Return value checks** (many methods return bool for success):
 ```csharp
@@ -155,7 +159,7 @@ if (doc.GetType() != (int)swDocumentTypes_e.swDocPART)
 Before delivering code:
 ```
 Code Quality:
-- [ ] Consulted solidworks-api documentation
+- [ ] Consulted API documentation (types/, enums/, docs/, examples/)
 - [ ] Used latest SDK library references
 - [ ] Applied documented API patterns
 - [ ] Used named parameters
@@ -177,7 +181,7 @@ Code Quality:
 
 ### Creating a part with extrusion
 
-1. Consult [solidworks-api](./solidworks-api/) for `CreateExtrudeFeatureSolid2`
+1. Consult API documentation for `CreateExtrudeFeatureSolid2` (search in `./types/`)
 2. Write code:
 
 ```csharp
@@ -248,10 +252,10 @@ Common issues:
 - **Don't guess - verify**: Double check docs when in doubt
    ```bash
    # Check enum values, e.g.
-   grep -r "swEndConditions_e" .claude/skills/developing-solidworks/solidworks-api/api/enums/
+   grep -r "swEndConditions_e" .claude/skills/developing-solidworks/enums/
 
    # Read specific docs e.g.
-   cat .claude/skills/developing-solidworks/solidworks-api/api/types/IFeatureManager/FeatureCut4.md
+   cat .claude/skills/developing-solidworks/types/IFeatureManager/FeatureCut4.md
    ```
 
-For detailed troubleshooting, see [solidworks-api](./solidworks-api/) error handling guides.
+For detailed troubleshooting, consult the programming guides in `./docs/` or search for relevant examples in `./examples/`.
