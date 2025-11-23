@@ -147,13 +147,15 @@ namespace SolidWorksRenders
 
                 Console.WriteLine($"Saving part to: {fullPath}");
 
-                // Save the document
+                // Save the document using IModelDocExtension.SaveAs3
                 int errors = 0;
                 int warnings = 0;
-                bool saveResult = model.SaveAs3(
-                    FileName: fullPath,
-                    SaveVersion: (int)swSaveAsVersion_e.swSaveAsCurrentVersion,
+                bool saveResult = model.Extension.SaveAs3(
+                    Name: fullPath,
+                    Version: (int)swSaveAsVersion_e.swSaveAsCurrentVersion,
                     Options: (int)swSaveAsOptions_e.swSaveAsOptions_Silent,
+                    ExportData: null,
+                    AdvancedSaveAsOptions: null,
                     Errors: ref errors,
                     Warnings: ref warnings);
 
