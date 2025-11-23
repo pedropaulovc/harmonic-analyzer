@@ -14,6 +14,8 @@ namespace SolidWorksRenders
     public class EccentricCam : IPartCreator
     {
         public string PartName => "Eccentric Cam";
+        public string FileName => "eccentric-cam.sldprt";
+
         // Parameters from parameters.kcl (in inches, converted to meters for SolidWorks API)
         private const double CamDiameter = 2.0 * 0.0254;        // 2.0 inches
         private const double CamThickness = 0.4 * 0.0254;       // 0.4 inches
