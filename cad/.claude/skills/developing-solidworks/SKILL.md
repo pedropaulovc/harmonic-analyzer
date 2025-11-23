@@ -1,6 +1,6 @@
 ---
 name: developing-solidworks
-description: Writes, modifies, and debugs C# code that interacts with the SolidWorks API. Use when working with .cs or .csproj files that reference SolidWorks SDK, SolidWorks.Interop assemblies, COM interop with SolidWorks, or when the user mentions SolidWorks development, macros, or add-ins.
+description: Writes, modifies, and debugs C# code that interacts with SolidWorks. Use when working with .cs or .csproj files that (will) reference SolidWorks SDK, SolidWorks.Interop assemblies, COM interop with SolidWorks, or when the user mentions ANYTHING related to SolidWorks.
 ---
 
 # Developing SolidWorks C# Code
@@ -97,15 +97,6 @@ Find latest SDK libraries via `scripts/find_api_redist.py`. It will return the m
 // Avoid - Unclear what values mean
 IFeature extrudeFeature = swFeatureMgr.FeatureExtrusion3(true, false, false, (int)swEndConditions_e.swEndCondBlind, (int)swEndConditions_e.swEndCondBlind, 0.1, 0, false, false, false, false, 0, 0, false,
    false, false, false, false, false, true, (int)swStartConditions_e.swStartSketchPlane, 0, false);
-```
-
-**Object initialization** (use SDK and not COM interop)
-```csharp
-// Good - uses SDK
-ISldWorks swApp = new SldWorks.SldWorks();
-
-// Avoid - Uses COM interop
-ISldWorks swApp = (ISldWorks)Marshal.GetActiveObject("SldWorks.Application");
 ```
 
 **Error handling** (SolidWorks API frequently returns null):
