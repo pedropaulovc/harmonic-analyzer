@@ -3,74 +3,46 @@ using System.Runtime.InteropServices;
 using SolidWorks.Interop.sldworks;
 using SolidWorksRenders;
 
-namespace EccentricCamApp
+namespace SolidWorksRenders
 {
     class Program
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Eccentric Cam Creator for SolidWorks");
-            Console.WriteLine("====================================\n");
+            // TODO: In the future, this could be selected via command line args or config
+            IPartCreator partCreator = CreatePartCreator(args);
+
+            Console.WriteLine($"{partCreator.PartName} Creator for SolidWorks");
+            Console.WriteLine(new string('=', partCreator.PartName.Length + 24) + "\n");
 
             ISldWorks? swApp = null;
 
             try
             {
-                // Try to get a running instance of SolidWorks
-                Console.WriteLine("Connecting to SolidWorks...");
-                swApp = (ISldWorks?)Marshal.GetActiveObject("SldWorks.Application");
-
-                if (swApp == null)
-                {
-                    Console.WriteLine("No running SolidWorks instance found. Starting SolidWorks...");
-
-                    // Create a new instance of SolidWorks
-                    Type? swType = Type.GetTypeFromProgID("SldWorks.Application");
-                    if (swType == null)
-                    {
-                        Console.Error.WriteLine("ERROR: SolidWorks is not installed or not properly registered.");
-                        return;
-                    }
-
-                    swApp = (ISldWorks?)Activator.CreateInstance(swType);
-                    if (swApp == null)
-                    {
-                        Console.Error.WriteLine("ERROR: Failed to create SolidWorks instance.");
-                        return;
-                    }
-
-                    // Make SolidWorks visible
-                    swApp.Visible = true;
-                }
-
+                swApp = ConnectToSolidWorks();
                 Console.WriteLine($"Connected to SolidWorks {swApp.RevisionNumber()}\n");
 
-                // Create the eccentric cam
-                Console.WriteLine("Creating eccentric cam part...");
-                EccentricCam camCreator = new EccentricCam(swApp);
-                IModelDoc2 camModel = camCreator.CreatePart();
+                // Create the part
+                Console.WriteLine($"Creating {partCreator.PartName.ToLower()} part...");
+                IModelDoc2 model = partCreator.CreatePart();
 
-                if (camModel != null)
+                if (model != null)
                 {
-                    Console.WriteLine("SUCCESS: Eccentric cam created successfully!");
-                    Console.WriteLine($"Model name: {camModel.GetTitle()}");
+                    Console.WriteLine($"SUCCESS: {partCreator.PartName} created successfully!");
+                    Console.WriteLine($"Model name: {model.GetTitle()}");
 
                     // Zoom to fit
-                    camModel.ViewZoomtofit2();
+                    model.ViewZoomtofit2();
 
-                    Console.WriteLine("\nPart Details:");
-                    Console.WriteLine("- Cam diameter: 2.0 inches");
-                    Console.WriteLine("- Cam thickness: 0.4 inches");
-                    Console.WriteLine("- Shaft diameter: 0.375 inches (3/8\")");
-                    Console.WriteLine("- Eccentricity: 0.2 inches");
-                    Console.WriteLine("- Keyway width: 0.125 inches (1/8\")");
-                    Console.WriteLine("- Keyway depth: 0.06 inches");
+                    // Print part-specific details
+                    partCreator.PrintPartDetails();
+
                     Console.WriteLine("\nThe part is now open in SolidWorks.");
                     Console.WriteLine("Save the part using File > Save in SolidWorks.");
                 }
                 else
                 {
-                    Console.Error.WriteLine("ERROR: Failed to create eccentric cam.");
+                    Console.Error.WriteLine($"ERROR: Failed to create {partCreator.PartName.ToLower()}.");
                 }
             }
             catch (COMException comEx)
@@ -86,6 +58,59 @@ namespace EccentricCamApp
 
             Console.WriteLine("\nPress any key to exit...");
             Console.ReadKey();
+        }
+
+        /// <summary>
+        /// Creates the appropriate part creator based on configuration
+        /// In the future, this could read from args or a config file
+        /// </summary>
+        private static IPartCreator CreatePartCreator(string[] args)
+        {
+            // For now, we only have eccentric cam, but this is where you would
+            // add logic to select different part types in the future
+            ISldWorks swApp = ConnectToSolidWorks();
+            return new EccentricCam(swApp);
+        }
+
+        /// <summary>
+        /// Connects to a running SolidWorks instance or creates a new one
+        /// </summary>
+        private static ISldWorks ConnectToSolidWorks()
+        {
+            Console.WriteLine("Connecting to SolidWorks...");
+
+            try
+            {
+                ISldWorks? swApp = (ISldWorks?)Marshal.GetActiveObject("SldWorks.Application");
+                if (swApp != null)
+                {
+                    return swApp;
+                }
+            }
+            catch (COMException)
+            {
+                // No running instance found, will create new one below
+            }
+
+            Console.WriteLine("No running SolidWorks instance found. Starting SolidWorks...");
+
+            // Create a new instance of SolidWorks
+            Type? swType = Type.GetTypeFromProgID("SldWorks.Application");
+            if (swType == null)
+            {
+                throw new InvalidOperationException("SolidWorks is not installed or not properly registered.");
+            }
+
+            ISldWorks? newSwApp = (ISldWorks?)Activator.CreateInstance(swType);
+            if (newSwApp == null)
+            {
+                throw new InvalidOperationException("Failed to create SolidWorks instance.");
+            }
+
+            // Make SolidWorks visible
+            newSwApp.Visible = true;
+
+            return newSwApp;
         }
     }
 }
