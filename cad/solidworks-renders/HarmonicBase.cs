@@ -105,9 +105,9 @@ namespace SolidWorksRenders
             IFeatureManager swFeatMgr = swModel.FeatureManager;
             IModelDocExtension swModelExt = swModel.Extension;
 
-            // Select XY Plane (Front Plane)
+            // Select XY Plane (Top Plane)
             bool selected = swModelExt.SelectByID2(
-                Name: "Front Plane",
+                Name: "Top Plane",
                 Type: "PLANE",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -116,9 +116,9 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select Front Plane");
+                throw new InvalidOperationException("Failed to select Top Plane");
 
-            // Insert sketch on Front Plane
+            // Insert sketch on Top Plane
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
             // Create bottom plate rectangle centered at origin
@@ -189,7 +189,7 @@ namespace SolidWorksRenders
             IModelDocExtension swModelExt = swModel.Extension;
 
             // Select the top face of the bottom plate to sketch on
-            // The face is at Z = BottomHeight from the Front Plane
+            // The face is at Z = BottomHeight from the Top Plane
             bool selected = swModelExt.SelectByID2(
                 Name: "Boss-Extrude1",
                 Type: "BODYFEATURE",
@@ -203,9 +203,9 @@ namespace SolidWorksRenders
             {
                 // Alternative: Try selecting the face directly
                 // SelectByID2 can be tricky with face selection, so let's select a plane offset
-                // Instead, we'll sketch on a plane offset from Front Plane
+                // Instead, we'll sketch on a plane offset from Top Plane
                 selected = swModelExt.SelectByID2(
-                    Name: "Front Plane",
+                    Name: "Top Plane",
                     Type: "PLANE",
                     X: 0, Y: 0, Z: 0,
                     Append: false,
