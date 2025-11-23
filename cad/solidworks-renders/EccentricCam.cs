@@ -367,7 +367,22 @@ namespace SolidWorksRenders
                 OptimizeGeometry: false);
 
             if (keywayFeature == null)
-                throw new InvalidOperationException("Failed to create keyway cut");
+            {
+                // Get the last feature added (even if it failed) to check error code
+                IFeature lastFeature = swModelExt.GetLastFeatureAdded();
+                if (lastFeature != null)
+                {
+                    bool isWarning;
+                    int errorCode = lastFeature.GetErrorCode2(out isWarning);
+                    string errorMsg = $"Failed to create keyway cut. Error code: {errorCode} ({(swFeatureError_e)errorCode})";
+                    if (errorCode != 0)
+                    {
+                        errorMsg += isWarning ? " (Warning)" : " (Error)";
+                    }
+                    throw new InvalidOperationException(errorMsg);
+                }
+                throw new InvalidOperationException("Failed to create keyway cut - no feature created");
+            }
         }
     }
 }
