@@ -108,6 +108,9 @@ if (doc == null)
 }
 ```
 
+**Error troubleshooting** (Leverage `IFaultEntity` to get more details on failed operations):
+See [Check Edges for Faults (C#)](./solidworks-api/docs/examples/Utility Interfaces/Check_Edges_for_Faults_Example_CSharp.md) for an example of how to use it.
+
 **Return value checks** (many methods return bool for success):
 ```csharp
 bool success = doc.Extension.SelectByID2(
@@ -242,5 +245,13 @@ Common issues:
 - **Missing type cast**: Cast returned objects to correct interface
 - **Null returns**: Always check for null after selection operations
 - **Selection marks**: Ensure unique marks when selecting multiple entities
+- **Don't guess - verify**: Double check docs when in doubt
+   ```bash
+   # Check enum values, e.g.
+   grep -r "swEndConditions_e" .claude/skills/developing-solidworks/solidworks-api/api/enums/
+
+   # Read specific docs e.g.
+   cat .claude/skills/developing-solidworks/solidworks-api/api/types/IFeatureManager/FeatureCut4.md
+   ```
 
 For detailed troubleshooting, see [solidworks-api](./solidworks-api/) error handling guides.
