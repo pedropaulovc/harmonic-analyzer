@@ -1,13 +1,13 @@
 ---
 name: developing-solidworks
-description: Writes, modifies, and debugs C# code that interacts with SolidWorks. Use when working with .cs or .csproj files that (will) reference SolidWorks SDK, SolidWorks.Interop assemblies, COM interop with SolidWorks, or when the user mentions ANYTHING related to SolidWorks.
+description: ANYTHING related to SolidWorks. Writes, modifies, and debugs C# code that interacts with SolidWorks. Use when working with .cs or .csproj files that (will) reference SolidWorks SDK, SolidWorks.Interop assemblies, COM interop with SolidWorks.
 ---
 
 # Developing SolidWorks C# Code
 
 ## Documentation-First Workflow
 
-**CRITICAL**: Base knowledge of SolidWorks API is inconsistent. Always consult documentation [Types](./types/), [Enums](./enums/), [Docs](./docs/), [Examples](./examples/).
+**CRITICAL**: Base knowledge of SolidWorks API is inconsistent. Always consult documentation [Types](./types/), [Enums](./enums/), [Docs](./docs/), [Examples](./examples/). You ABSOLUTELY MUST run your code before claiming success. Don't bother with `dotnet build`, use `dotnet run` immediately after code changes. JUST COMPILING IS NOT ENOUGH.
 
 ### Workflow checklist
 
@@ -18,7 +18,7 @@ SolidWorks Development Progress:
 - [ ] Step 1: Review API documentation for required methods
 - [ ] Step 2: Write code with named parameters
 - [ ] Step 3: Add error handling and null checks
-- [ ] Step 4: Test and verify functionality via `dotnet run` or `dotnet test`
+- [ ] Step 4: Verify functionality via `dotnet run`
 - [ ] Step 5: Add cleanup and resource disposal
 ```
 
