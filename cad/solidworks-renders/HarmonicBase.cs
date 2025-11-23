@@ -27,9 +27,9 @@ namespace SolidWorksRenders
         private const double TopLength = 17.5 * 0.0254;        // 17.5 inches
         private const double TopHeight = 1.5 * 0.0254;         // 1.5 inches
 
-        // Fillet radii (not yet implemented - would require edge selection)
-        // private const double FilletRadius = 0.125 * 0.0254;     // 0.125 inches - where plates meet
-        // private const double EdgeFilletRadius = 0.0625 * 0.0254; // 0.0625 inches - smooths outer edges
+        // Fillet radii
+        private const double FilletRadius = 0.125 * 0.0254;        // 0.125 inches - bottom plate edges
+        private const double EdgeFilletRadius = 0.0625 * 0.0254;  // 0.0625 inches - top plate intersection
 
         // Calculated parameters
         private const double TotalHeight = (0.5 + 1.5) * 0.0254; // bottomHeight + topHeight
@@ -71,8 +71,12 @@ namespace SolidWorksRenders
             ValidateParameters();
 
             // Create the base geometry
-            CreateBottomPlate(swModel);
-            CreateTopPlate(swModel);
+            IFeature bottomFeature = CreateBottomPlate(swModel);
+            IFeature topFeature = CreateTopPlate(swModel);
+
+            // Add fillets
+            ApplyBottomPlateFillets(swModel, bottomFeature);
+            ApplyTopPlateFillets(swModel, topFeature);
 
             // Rebuild the model
             swModel.ForceRebuild3(true);
@@ -95,7 +99,7 @@ namespace SolidWorksRenders
         /// <summary>
         /// Creates the bottom plate (centered at origin)
         /// </summary>
-        private void CreateBottomPlate(IModelDoc2 swModel)
+        private IFeature CreateBottomPlate(IModelDoc2 swModel)
         {
             ISketchManager swSketchMgr = swModel.SketchManager;
             IFeatureManager swFeatMgr = swModel.FeatureManager;
@@ -171,12 +175,14 @@ namespace SolidWorksRenders
 
             if (extrudeFeature == null)
                 throw new InvalidOperationException("Failed to extrude bottom plate");
+
+            return extrudeFeature;
         }
 
         /// <summary>
         /// Creates the top plate (centered on top of bottom plate)
         /// </summary>
-        private void CreateTopPlate(IModelDoc2 swModel)
+        private IFeature CreateTopPlate(IModelDoc2 swModel)
         {
             ISketchManager swSketchMgr = swModel.SketchManager;
             IFeatureManager swFeatMgr = swModel.FeatureManager;
@@ -275,6 +281,122 @@ namespace SolidWorksRenders
 
             if (extrudeFeature == null)
                 throw new InvalidOperationException("Failed to extrude top plate");
+
+            return extrudeFeature;
+        }
+
+        /// <summary>
+        /// Applies fillets to the bottom plate edges
+        /// </summary>
+        private void ApplyBottomPlateFillets(IModelDoc2 swModel, IFeature bottomFeature)
+        {
+            IFeatureManager swFeatMgr = swModel.FeatureManager;
+            IModelDocExtension swModelExt = swModel.Extension;
+
+            // Select the feature to fillet its edges
+            bool selected = swModelExt.SelectByID2(
+                Name: bottomFeature.Name,
+                Type: "BODYFEATURE",
+                X: 0, Y: 0, Z: 0,
+                Append: false,
+                Mark: 1,  // Mark = 1 for edges to fillet
+                Callout: null,
+                SelectOption: 0);
+
+            if (!selected)
+            {
+                Console.WriteLine($"WARNING: Could not select bottom plate feature '{bottomFeature.Name}' for filleting");
+                return;
+            }
+
+            // Create fillet definition
+            object filletData = swFeatMgr.CreateDefinition((int)swFeatureNameID_e.swFmFillet);
+            if (filletData == null)
+            {
+                Console.WriteLine("WARNING: Failed to create fillet definition");
+                swModel.ClearSelection2(true);
+                return;
+            }
+
+            ISimpleFilletFeatureData2 filletFeatureData = (ISimpleFilletFeatureData2)filletData;
+
+            // Initialize as constant radius fillet
+            filletFeatureData.Initialize((int)swSimpleFilletType_e.swConstRadiusFillet);
+
+            // Set fillet properties
+            filletFeatureData.DefaultRadius = FilletRadius;  // 0.125 inches
+            filletFeatureData.OverflowType = (int)swFilletOverFlowType_e.swFilletOverFlowType_Default;
+            filletFeatureData.ConicTypeForCrossSectionProfile = (int)swFeatureFilletProfileType_e.swFeatureFilletCircular;
+
+            // Create the fillet feature
+            swModel.ClearSelection2(true);
+            IFeature filletFeature = swFeatMgr.CreateFeature(filletFeatureData);
+
+            if (filletFeature == null)
+            {
+                Console.WriteLine("WARNING: Failed to create bottom plate fillet feature");
+            }
+            else
+            {
+                Console.WriteLine($"SUCCESS: Created fillet on bottom plate with radius {FilletRadius * 1000 / 0.0254:F3} inches");
+            }
+        }
+
+        /// <summary>
+        /// Applies fillets to the top plate intersection edges
+        /// </summary>
+        private void ApplyTopPlateFillets(IModelDoc2 swModel, IFeature topFeature)
+        {
+            IFeatureManager swFeatMgr = swModel.FeatureManager;
+            IModelDocExtension swModelExt = swModel.Extension;
+
+            // Select the feature to fillet its edges
+            bool selected = swModelExt.SelectByID2(
+                Name: topFeature.Name,
+                Type: "BODYFEATURE",
+                X: 0, Y: 0, Z: 0,
+                Append: false,
+                Mark: 1,  // Mark = 1 for edges to fillet
+                Callout: null,
+                SelectOption: 0);
+
+            if (!selected)
+            {
+                Console.WriteLine($"WARNING: Could not select top plate feature '{topFeature.Name}' for filleting");
+                return;
+            }
+
+            // Create fillet definition
+            object filletData = swFeatMgr.CreateDefinition((int)swFeatureNameID_e.swFmFillet);
+            if (filletData == null)
+            {
+                Console.WriteLine("WARNING: Failed to create fillet definition");
+                swModel.ClearSelection2(true);
+                return;
+            }
+
+            ISimpleFilletFeatureData2 filletFeatureData = (ISimpleFilletFeatureData2)filletData;
+
+            // Initialize as constant radius fillet
+            filletFeatureData.Initialize((int)swSimpleFilletType_e.swConstRadiusFillet);
+
+            // Set fillet properties
+            filletFeatureData.DefaultRadius = EdgeFilletRadius;  // 0.0625 inches
+            filletFeatureData.OverflowType = (int)swFilletOverFlowType_e.swFilletOverFlowType_Default;
+            filletFeatureData.ConicTypeForCrossSectionProfile = (int)swFeatureFilletProfileType_e.swFeatureFilletCircular;
+
+            // Create the fillet feature
+            swModel.ClearSelection2(true);
+            IFeature filletFeature = swFeatMgr.CreateFeature(filletFeatureData);
+
+            if (filletFeature == null)
+            {
+                Console.WriteLine("WARNING: Failed to create top plate fillet feature");
+            }
+            else
+            {
+                Console.WriteLine($"SUCCESS: Created fillet on top plate with radius {EdgeFilletRadius * 1000 / 0.0254:F3} inches");
+            }
         }
 
         /// <summary>
@@ -286,7 +408,8 @@ namespace SolidWorksRenders
             Console.WriteLine("- Bottom plate: 18\" x 11\" x 0.5\"");
             Console.WriteLine("- Top plate: 17.5\" x 10.5\" x 1.5\"");
             Console.WriteLine("- Total height: 2.0\"");
-            Console.WriteLine("- NOTE: Fillets from KCL not yet implemented");
+            Console.WriteLine("- Bottom plate fillet radius: 0.125\"");
+            Console.WriteLine("- Top plate intersection fillet radius: 0.0625\"");
         }
     }
 }
