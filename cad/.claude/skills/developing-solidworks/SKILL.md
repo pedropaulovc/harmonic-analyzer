@@ -126,6 +126,8 @@ if (!success)
 }
 ```
 
+**Run code before claiming success** (you MUST run your new code using `dotnet run` or similar. Just building it is NOT enough)
+
 ### Common patterns
 
 **Part creation**: Use `GetUserPreferenceStringValue` to avoid hardcoding template paths.
@@ -181,33 +183,53 @@ using SolidWorks.Interop.swconst;
 
 // Get application and create new part
 ISldWorks swApp = new SldWorks.SldWorks();
-IModelDoc2 doc = swApp.NewDocument("part template", 0, 0, 0);
+IModelDoc2 doc = swApp.NewDocument(
+      TemplateName: swApp.GetUserPreferenceStringValue((int)swUserPreferenceStringValue_e.swDefaultTemplatePart),
+      PaperSize: 0,
+      Width: 0,
+      Height: 0);
 
 if (doc == null) throw new Exception("Failed to create document");
 
 // Create sketch on front plane
-doc.Extension.SelectByID2("Front Plane", "PLANE", 0, 0, 0, false, 0, null, 0);
+doc.Extension.SelectByID2(
+    Name: "Front Plane",
+    Type: "PLANE",
+    X: 0, Y: 0, Z: 0,
+    Append: false,
+    Mark: 0,
+    Callout: null,
+    SelectOption: 0
+);
 doc.SketchManager.InsertSketch(true);
 doc.SketchManager.CreateCenterRectangle(0, 0, 0, 0.05, 0.05, 0);
 doc.SketchManager.InsertSketch(true);
 
 // Create extrude
-doc.Extension.SelectByID2("Sketch1", "SKETCH", 0, 0, 0, false, 0, null, 0);
+doc.Extension.SelectByID2(
+    Name: "Sketch1",
+    Type: "SKETCH",
+    X: 0, Y: 0, Z: 0,
+    Append: false,
+    Mark: 0,
+    Callout: null,
+    SelectOption: 0
+);
 IFeature feature = doc.FeatureManager.FeatureExtrusion2(
-    sd: true,
-    flip: false,
-    dir: false,
-    dir2: (int)swEndConditions_e.swEndCondBlind,
-    dir1: (int)swEndConditions_e.swEndCondBlind,
-    d1: 0.1,
-    d2: 0,
-    dchk1: false,
-    dchk2: false,
-    ddir1: false,
-    ddir2: false,
-    dang1: 0,
-    dang2: 0,
-    offstatus: false
+    Sd: true,                                          // Single direction
+    Flip: false,                                       // Don't flip side to cut
+    Dir: false,                                        // Don't flip extrusion direction
+    Dir2: (int)swEndConditions_e.swEndCondBlind,      // End condition for direction 2
+    Dir1: (int)swEndConditions_e.swEndCondBlind,      // End condition for direction 1
+    D1: 0.1,                                           // Depth in meters
+    D2: 0,                                             // Depth for direction 2
+    Dchk1: false,                                      // Draft outward direction 1
+    Dchk2: false,                                      // Draft outward direction 2
+    Ddir1: false,                                      // Draft direction 1
+    Ddir2: false,                                      // Draft direction 2
+    Dang1: 0,                                          // Draft angle direction 1
+    Dang2: 0,                                          // Draft angle direction 2
+    Offstatus: false                                   // Offset from surface
 );
 
 if (feature == null) throw new Exception("Extrusion failed");
