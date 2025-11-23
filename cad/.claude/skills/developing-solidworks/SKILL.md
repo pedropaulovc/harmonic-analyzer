@@ -7,11 +7,7 @@ description: Writes, modifies, and debugs C# code that interacts with SolidWorks
 
 ## Documentation-First Workflow
 
-**CRITICAL**: Base knowledge of SolidWorks API is inconsistent. Always consult documentation before writing code:
-- [Types](./types/) - Interface and class documentation with method signatures
-- [Enums](./enums/) - Enumeration values and constants
-- [Docs](./docs/) - Programming guides and best practices
-- [Examples](./examples/) - Code samples and proven implementations
+**CRITICAL**: Base knowledge of SolidWorks API is inconsistent. Always consult documentation [Types](./types/), [Enums](./enums/), [Docs](./docs/), [Examples](./examples/).
 
 ### Workflow checklist
 
