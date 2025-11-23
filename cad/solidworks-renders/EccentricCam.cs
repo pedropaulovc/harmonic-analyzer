@@ -179,11 +179,23 @@ namespace SolidWorksRenders
         /// </summary>
         private void CreateShaftHoleWithKeyway(IModelDoc2 swModel)
         {
+            // Create shaft hole as a simple circle
+            CreateShaftHole(swModel);
+
+            // Create keyway as a rectangular cut
+            CreateKeyway(swModel);
+        }
+
+        /// <summary>
+        /// Creates the circular shaft hole at eccentric position
+        /// </summary>
+        private void CreateShaftHole(IModelDoc2 swModel)
+        {
             ISketchManager swSketchMgr = swModel.SketchManager;
             IFeatureManager swFeatMgr = swModel.FeatureManager;
             IModelDocExtension swModelExt = swModel.Extension;
 
-            // Select the top face of the extruded cam for the cut sketch
+            // Select Front Plane for shaft hole sketch
             bool selected = swModelExt.SelectByID2(
                 Name: "Front Plane",
                 Type: "PLANE",
@@ -194,76 +206,24 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select plane for hole sketch");
+                throw new InvalidOperationException("Failed to select Front Plane for shaft hole");
 
             // Insert sketch
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
-            // Calculate shaft hole with keyway profile parameters
+            // Create circular shaft hole offset by eccentricity
             double shaftRadius = ShaftDiameter / 2;
-            double startAngle = Math.Asin(KeywayWidth / 2 / shaftRadius);
-
-            // Calculate profile start point (on the shaft circle, offset by eccentricity)
-            double startX = Eccentricity + shaftRadius * Math.Cos(startAngle);
-            double startY = shaftRadius * Math.Sin(startAngle);
-
-            // Enable AddToDB for performance
-            swSketchMgr.AddToDB = true;
-            swSketchMgr.DisplayWhenAdded = false;
-
-            // Create keyway rectangle portion (extending outward from circle)
-            // Line 1: Horizontal line going outward (keyway depth)
-            ISketchSegment line1 = swSketchMgr.CreateLine(
-                X1: startX, Y1: startY, Z1: 0,
-                X2: startX + KeywayDepth, Y2: startY, Z2: 0);
-
-            // Line 2: Vertical line going down (keyway width)
-            ISketchSegment line2 = swSketchMgr.CreateLine(
-                X1: startX + KeywayDepth, Y1: startY, Z1: 0,
-                X2: startX + KeywayDepth, Y2: startY - KeywayWidth, Z2: 0);
-
-            // Line 3: Horizontal line going back (closing keyway)
-            ISketchSegment line3 = swSketchMgr.CreateLine(
-                X1: startX + KeywayDepth, Y1: startY - KeywayWidth, Z1: 0,
-                X2: startX, Y2: startY - KeywayWidth, Z2: 0);
-
-            // Arc 1: From bottom of keyway to opposite side (clockwise, covering ~180°)
-            // Start angle: -startAngle + 360° (bottom of keyway)
-            // End angle: 180° (opposite side of circle)
-            double arc1StartX = startX;
-            double arc1StartY = startY - KeywayWidth;
-            double arc1EndX = Eccentricity - shaftRadius;
-            double arc1EndY = 0;
-
-            ISketchSegment arc1 = swSketchMgr.CreateArc(
+            ISketchSegment shaftCircle = swSketchMgr.CreateCircle(
                 XC: Eccentricity, YC: 0, Zc: 0,
-                X1: arc1StartX, Y1: arc1StartY, Z1: 0,
-                X2: arc1EndX, Y2: arc1EndY, Z2: 0,
-                Direction: -1);  // Clockwise
+                Xp: Eccentricity + shaftRadius, Yp: 0, Zp: 0);
 
-            // Arc 2: From opposite side back to start of keyway (clockwise, covering remaining angle)
-            // Start angle: 180°
-            // End angle: startAngle
-            double arc2StartX = arc1EndX;
-            double arc2StartY = arc1EndY;
-            double arc2EndX = startX;
-            double arc2EndY = startY;
-
-            ISketchSegment arc2 = swSketchMgr.CreateArc(
-                XC: Eccentricity, YC: 0, Zc: 0,
-                X1: arc2StartX, Y1: arc2StartY, Z1: 0,
-                X2: arc2EndX, Y2: arc2EndY, Z2: 0,
-                Direction: -1);  // Clockwise
-
-            // Disable AddToDB and refresh display
-            swSketchMgr.AddToDB = false;
-            swSketchMgr.DisplayWhenAdded = true;
-            swModel.GraphicsRedraw2();
+            if (shaftCircle == null)
+                throw new InvalidOperationException("Failed to create shaft hole circle");
 
             // Exit sketch
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
-            // Select the sketch for cut extrusion
+            // Select the sketch for cutting
             selected = swModelExt.SelectByID2(
                 Name: "Sketch2",
                 Type: "SKETCH",
@@ -274,14 +234,14 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select hole sketch for cut");
+                throw new InvalidOperationException("Failed to select shaft hole sketch");
 
-            // Cut through the entire cam thickness
-            IFeature cutFeature = swFeatMgr.FeatureCut4(
-                Sd: true,                                          // Single direction
+            // Cut through all - using parameters from working VBA example
+            IFeature holeFeature = swFeatMgr.FeatureCut4(
+                Sd: true,                                          // Single-ended cut
                 Flip: false,                                       // Don't flip side to cut
-                Dir: false,                                        // Don't flip direction
-                T1: (int)swEndConditions_e.swEndCondThroughAll,   // Cut through all
+                Dir: true,                                         // Flip direction (VBA uses True)
+                T1: (int)swEndConditions_e.swEndCondThroughAll,   // Through all
                 T2: 0,                                             // Not used
                 D1: 0,                                             // Not needed for through all
                 D2: 0,                                             // Not used
@@ -296,18 +256,118 @@ namespace SolidWorksRenders
                 TranslateSurface1: false,                          // Translation (not used)
                 TranslateSurface2: false,                          // Translation (not used)
                 NormalCut: false,                                  // Not a sheet metal part
-                UseFeatScope: false,                               // Affect all bodies
+                UseFeatScope: true,                                // Feature affects selected bodies (VBA uses True)
                 UseAutoSelect: true,                               // Auto-select bodies
-                AssemblyFeatureScope: false,                       // Not an assembly feature
-                AutoSelectComponents: false,                       // Not an assembly feature
-                PropagateFeatureToParts: false,                    // Not an assembly feature
+                AssemblyFeatureScope: true,                        // Assembly feature scope (VBA uses True)
+                AutoSelectComponents: true,                        // Auto-select components (VBA uses True)
+                PropagateFeatureToParts: false,                    // Don't propagate to parts
                 T0: (int)swStartConditions_e.swStartSketchPlane,  // Start from sketch plane
                 StartOffset: 0,                                    // No start offset
                 FlipStartOffset: false,                            // Don't flip start offset
                 OptimizeGeometry: false);                          // Not a sheet metal part
 
-            if (cutFeature == null)
+            if (holeFeature == null)
                 throw new InvalidOperationException("Failed to create shaft hole cut");
+        }
+
+        /// <summary>
+        /// Creates the keyway as a rectangular cut
+        /// </summary>
+        private void CreateKeyway(IModelDoc2 swModel)
+        {
+            ISketchManager swSketchMgr = swModel.SketchManager;
+            IFeatureManager swFeatMgr = swModel.FeatureManager;
+            IModelDocExtension swModelExt = swModel.Extension;
+
+            // Select Front Plane for keyway sketch
+            bool selected = swModelExt.SelectByID2(
+                Name: "Front Plane",
+                Type: "PLANE",
+                X: 0, Y: 0, Z: 0,
+                Append: false,
+                Mark: 0,
+                Callout: null,
+                SelectOption: 0);
+
+            if (!selected)
+                throw new InvalidOperationException("Failed to select Front Plane for keyway");
+
+            // Insert sketch
+            swSketchMgr.InsertSketch(UpdateEditRebuild: true);
+
+            // Create keyway rectangle
+            // Position: starts from the edge of the shaft hole and extends outward
+            double shaftRadius = ShaftDiameter / 2;
+            double keywayLeft = Eccentricity + shaftRadius;
+            double keywayRight = keywayLeft + KeywayDepth;
+            double keywayTop = KeywayWidth / 2;
+            double keywayBottom = -KeywayWidth / 2;
+
+            // Create rectangle for keyway
+            ISketchSegment line1 = swSketchMgr.CreateLine(
+                X1: keywayLeft, Y1: keywayTop, Z1: 0,
+                X2: keywayRight, Y2: keywayTop, Z2: 0);
+
+            ISketchSegment line2 = swSketchMgr.CreateLine(
+                X1: keywayRight, Y1: keywayTop, Z1: 0,
+                X2: keywayRight, Y2: keywayBottom, Z2: 0);
+
+            ISketchSegment line3 = swSketchMgr.CreateLine(
+                X1: keywayRight, Y1: keywayBottom, Z1: 0,
+                X2: keywayLeft, Y2: keywayBottom, Z2: 0);
+
+            ISketchSegment line4 = swSketchMgr.CreateLine(
+                X1: keywayLeft, Y1: keywayBottom, Z1: 0,
+                X2: keywayLeft, Y2: keywayTop, Z2: 0);
+
+            // Exit sketch
+            swSketchMgr.InsertSketch(UpdateEditRebuild: true);
+
+            // Select the sketch for cutting
+            selected = swModelExt.SelectByID2(
+                Name: "Sketch3",
+                Type: "SKETCH",
+                X: 0, Y: 0, Z: 0,
+                Append: false,
+                Mark: 0,
+                Callout: null,
+                SelectOption: 0);
+
+            if (!selected)
+                throw new InvalidOperationException("Failed to select keyway sketch");
+
+            // Cut through all - using parameters from working VBA example
+            IFeature keywayFeature = swFeatMgr.FeatureCut4(
+                Sd: true,
+                Flip: false,
+                Dir: true,                                         // Flip direction (VBA uses True)
+                T1: (int)swEndConditions_e.swEndCondThroughAll,
+                T2: 0,
+                D1: 0,
+                D2: 0,
+                Dchk1: false,
+                Dchk2: false,
+                Ddir1: false,
+                Ddir2: false,
+                Dang1: 0,
+                Dang2: 0,
+                OffsetReverse1: false,
+                OffsetReverse2: false,
+                TranslateSurface1: false,
+                TranslateSurface2: false,
+                NormalCut: false,
+                UseFeatScope: true,                                // Feature affects selected bodies (VBA uses True)
+                UseAutoSelect: true,
+                AssemblyFeatureScope: true,                        // Assembly feature scope (VBA uses True)
+                AutoSelectComponents: true,                        // Auto-select components (VBA uses True)
+                PropagateFeatureToParts: false,
+                T0: (int)swStartConditions_e.swStartSketchPlane,
+                StartOffset: 0,
+                FlipStartOffset: false,
+                OptimizeGeometry: false);
+
+            if (keywayFeature == null)
+                throw new InvalidOperationException("Failed to create keyway cut");
         }
     }
 }
