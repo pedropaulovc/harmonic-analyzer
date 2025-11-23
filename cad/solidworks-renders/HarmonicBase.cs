@@ -293,44 +293,63 @@ namespace SolidWorksRenders
             IFeatureManager swFeatMgr = swModel.FeatureManager;
             IModelDocExtension swModelExt = swModel.Extension;
 
-            // Select the feature to fillet its edges
-            bool selected = swModelExt.SelectByID2(
-                Name: bottomFeature.Name,
-                Type: "BODYFEATURE",
-                X: 0, Y: 0, Z: 0,
-                Append: false,
-                Mark: 1,  // Mark = 1 for edges to fillet
-                Callout: null,
-                SelectOption: 0);
-
-            if (!selected)
+            // Get all edges from the bottom plate feature
+            object[] faces = (object[])bottomFeature.GetFaces();
+            if (faces == null || faces.Length == 0)
             {
-                Console.WriteLine($"WARNING: Could not select bottom plate feature '{bottomFeature.Name}' for filleting");
+                Console.WriteLine("WARNING: No faces found on bottom plate feature");
                 return;
             }
 
-            // Create fillet definition
-            object filletData = swFeatMgr.CreateDefinition((int)swFeatureNameID_e.swFmFillet);
-            if (filletData == null)
-            {
-                Console.WriteLine("WARNING: Failed to create fillet definition");
-                swModel.ClearSelection2(true);
-                return;
-            }
-
-            ISimpleFilletFeatureData2 filletFeatureData = (ISimpleFilletFeatureData2)filletData;
-
-            // Initialize as constant radius fillet
-            filletFeatureData.Initialize((int)swSimpleFilletType_e.swConstRadiusFillet);
-
-            // Set fillet properties
-            filletFeatureData.DefaultRadius = FilletRadius;  // 0.125 inches
-            filletFeatureData.OverflowType = (int)swFilletOverFlowType_e.swFilletOverFlowType_Default;
-            filletFeatureData.ConicTypeForCrossSectionProfile = (int)swFeatureFilletProfileType_e.swFeatureFilletCircular;
-
-            // Create the fillet feature
+            // Clear any existing selections
             swModel.ClearSelection2(true);
-            IFeature filletFeature = swFeatMgr.CreateFeature(filletFeatureData);
+
+            // Select all edges from all faces
+            int edgeCount = 0;
+            foreach (object faceObj in faces)
+            {
+                IFace2 face = (IFace2)faceObj;
+                object[] edges = (object[])face.GetEdges();
+
+                if (edges != null)
+                {
+                    foreach (object edgeObj in edges)
+                    {
+                        IEdge edge = (IEdge)edgeObj;
+                        IEntity edgeEntity = (IEntity)edge;
+
+                        // Select each edge with Mark = 1 for filleting
+                        bool selected = edgeEntity.Select4(
+                            Append: edgeCount > 0,  // Append to selection after first edge
+                            Data: null);
+
+                        if (selected)
+                        {
+                            edgeCount++;
+                        }
+                    }
+                }
+            }
+
+            if (edgeCount == 0)
+            {
+                Console.WriteLine("WARNING: No edges selected for bottom plate filleting");
+                return;
+            }
+
+            Console.WriteLine($"DEBUG: Selected {edgeCount} edges for bottom plate filleting");
+
+            // Create fillet using FeatureFillet with selected edges
+            IFeature filletFeature = (IFeature)swFeatMgr.FeatureFillet(
+                Options: (int)swFeatureFilletOptions_e.swFeatureFilletUniformRadius,
+                R1: FilletRadius,  // 0.125 inches
+                Ftyp: (int)swFeatureFilletType_e.swFeatureFilletType_Simple,
+                OverflowType: (int)swFilletOverFlowType_e.swFilletOverFlowType_Default,
+                Radii: null,
+                SetBackDistances: null,
+                PointRadiusArray: null);
+
+            swModel.ClearSelection2(true);
 
             if (filletFeature == null)
             {
@@ -350,44 +369,63 @@ namespace SolidWorksRenders
             IFeatureManager swFeatMgr = swModel.FeatureManager;
             IModelDocExtension swModelExt = swModel.Extension;
 
-            // Select the feature to fillet its edges
-            bool selected = swModelExt.SelectByID2(
-                Name: topFeature.Name,
-                Type: "BODYFEATURE",
-                X: 0, Y: 0, Z: 0,
-                Append: false,
-                Mark: 1,  // Mark = 1 for edges to fillet
-                Callout: null,
-                SelectOption: 0);
-
-            if (!selected)
+            // Get all edges from the top plate feature
+            object[] faces = (object[])topFeature.GetFaces();
+            if (faces == null || faces.Length == 0)
             {
-                Console.WriteLine($"WARNING: Could not select top plate feature '{topFeature.Name}' for filleting");
+                Console.WriteLine("WARNING: No faces found on top plate feature");
                 return;
             }
 
-            // Create fillet definition
-            object filletData = swFeatMgr.CreateDefinition((int)swFeatureNameID_e.swFmFillet);
-            if (filletData == null)
-            {
-                Console.WriteLine("WARNING: Failed to create fillet definition");
-                swModel.ClearSelection2(true);
-                return;
-            }
-
-            ISimpleFilletFeatureData2 filletFeatureData = (ISimpleFilletFeatureData2)filletData;
-
-            // Initialize as constant radius fillet
-            filletFeatureData.Initialize((int)swSimpleFilletType_e.swConstRadiusFillet);
-
-            // Set fillet properties
-            filletFeatureData.DefaultRadius = EdgeFilletRadius;  // 0.0625 inches
-            filletFeatureData.OverflowType = (int)swFilletOverFlowType_e.swFilletOverFlowType_Default;
-            filletFeatureData.ConicTypeForCrossSectionProfile = (int)swFeatureFilletProfileType_e.swFeatureFilletCircular;
-
-            // Create the fillet feature
+            // Clear any existing selections
             swModel.ClearSelection2(true);
-            IFeature filletFeature = swFeatMgr.CreateFeature(filletFeatureData);
+
+            // Select all edges from all faces
+            int edgeCount = 0;
+            foreach (object faceObj in faces)
+            {
+                IFace2 face = (IFace2)faceObj;
+                object[] edges = (object[])face.GetEdges();
+
+                if (edges != null)
+                {
+                    foreach (object edgeObj in edges)
+                    {
+                        IEdge edge = (IEdge)edgeObj;
+                        IEntity edgeEntity = (IEntity)edge;
+
+                        // Select each edge with Mark = 1 for filleting
+                        bool selected = edgeEntity.Select4(
+                            Append: edgeCount > 0,  // Append to selection after first edge
+                            Data: null);
+
+                        if (selected)
+                        {
+                            edgeCount++;
+                        }
+                    }
+                }
+            }
+
+            if (edgeCount == 0)
+            {
+                Console.WriteLine("WARNING: No edges selected for top plate filleting");
+                return;
+            }
+
+            Console.WriteLine($"DEBUG: Selected {edgeCount} edges for top plate filleting");
+
+            // Create fillet using FeatureFillet with selected edges
+            IFeature filletFeature = (IFeature)swFeatMgr.FeatureFillet(
+                Options: (int)swFeatureFilletOptions_e.swFeatureFilletUniformRadius,
+                R1: EdgeFilletRadius,  // 0.0625 inches
+                Ftyp: (int)swFeatureFilletType_e.swFeatureFilletType_Simple,
+                OverflowType: (int)swFilletOverFlowType_e.swFilletOverFlowType_Default,
+                Radii: null,
+                SetBackDistances: null,
+                PointRadiusArray: null);
+
+            swModel.ClearSelection2(true);
 
             if (filletFeature == null)
             {
