@@ -13,6 +13,11 @@ namespace SolidWorksRenders
         string PartName { get; }
 
         /// <summary>
+        /// Gets the filename to save the part as (e.g., "eccentric-cam.sldprt")
+        /// </summary>
+        string FileName { get; }
+
+        /// <summary>
         /// Creates the part and returns the model document
         /// </summary>
         IModelDoc2 CreatePart();
