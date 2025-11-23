@@ -364,9 +364,10 @@ namespace SolidWorksRenders
             IFeatureManager swFeatMgr = swModel.FeatureManager;
             IModelDocExtension swModelExt = swModel.Extension;
 
-            // Select XZ Plane (Right Plane in SolidWorks)
+            // Select XZ Plane (Top Plane in SolidWorks) to sketch the cylinder profile
+            // The cylinder will be extruded along Y (parallel to the plate's long edge)
             bool selected = swModelExt.SelectByID2(
-                Name: "Right Plane",
+                Name: "Top Plane",
                 Type: "PLANE",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -375,7 +376,7 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select Right Plane");
+                throw new InvalidOperationException("Failed to select Top Plane");
 
             // Insert sketch
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
@@ -452,9 +453,9 @@ namespace SolidWorksRenders
             IFeatureManager swFeatMgr = swModel.FeatureManager;
             IModelDocExtension swModelExt = swModel.Extension;
 
-            // Select XZ Plane (Right Plane)
+            // Select XZ Plane (Top Plane)
             bool selected = swModelExt.SelectByID2(
-                Name: "Right Plane",
+                Name: "Top Plane",
                 Type: "PLANE",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -463,13 +464,13 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select Right Plane for edge ribs");
+                throw new InvalidOperationException("Failed to select Top Plane for edge ribs");
 
             // Insert sketch
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
             // Create the profile matching KCL edge rib
-            // On XZ plane (Right Plane), X maps to sketch X, Z maps to sketch Y
+            // On XZ plane (Top Plane), X maps to sketch X, Z maps to sketch Y
             double xCenter = CylinderCenterX * IN_TO_M;
             double zCenter = CylinderCenterZ * IN_TO_M;
             double arcRadius = (CylinderRadius + RibPadding) * IN_TO_M;
@@ -786,9 +787,9 @@ namespace SolidWorksRenders
             IFeatureManager swFeatMgr = swModel.FeatureManager;
             IModelDocExtension swModelExt = swModel.Extension;
 
-            // Select XZ Plane (Right Plane)
+            // Select XZ Plane (Top Plane)
             bool selected = swModelExt.SelectByID2(
-                Name: "Right Plane",
+                Name: "Top Plane",
                 Type: "PLANE",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -797,7 +798,7 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select Right Plane for middle rib");
+                throw new InvalidOperationException("Failed to select Top Plane for middle rib");
 
             // Insert sketch
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
