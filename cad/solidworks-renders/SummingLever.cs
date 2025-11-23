@@ -108,10 +108,12 @@ namespace SolidWorksRenders
             // Create all components
             CreateCoefficientsPlate(swModel);
             CreateCylinder(swModel);
-            CreateEdgeRibs(swModel);
+            // TODO: Edge ribs failing - needs debugging (sketch not closing properly)
+            // CreateEdgeRibs(swModel);
             CreateSummationPlate(swModel);
             CreateSummationAnchor(swModel);
-            CreateMiddleRib(swModel);
+            // TODO: Middle rib failing - needs debugging (sketch not closing properly)
+            // CreateMiddleRib(swModel);
 
             // Rebuild the model
             swModel.ForceRebuild3(true);
@@ -466,34 +468,45 @@ namespace SolidWorksRenders
             // Insert sketch
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
-            // Create the profile with lines and arc
-            // Starting point at [cylinderCenterX, cylinderCenterZ]
-            double x = CylinderCenterX * IN_TO_M;
-            double z = CylinderCenterZ * IN_TO_M;
+            // Create the profile matching KCL edge rib
+            // On XZ plane (Right Plane), X maps to sketch X, Z maps to sketch Y
+            double xCenter = CylinderCenterX * IN_TO_M;
+            double zCenter = CylinderCenterZ * IN_TO_M;
+            double arcRadius = (CylinderRadius + RibPadding) * IN_TO_M;
+            double xLeft = (CylinderCenterX - CoefficientsPlateWidth) * IN_TO_M;
 
-            // Line 1: vertical line up to radius + padding
-            double y1 = z + (CylinderRadius + RibPadding) * IN_TO_M;
-            swSketchMgr.CreateLine(x, z, 0, x, y1, 0);
+            // Start at center [0, 0]
+            double x1 = xCenter;
+            double z1 = zCenter;
 
-            // Line 2: to left edge
-            double x2 = (CylinderCenterX - CoefficientsPlateWidth) * IN_TO_M;
-            swSketchMgr.CreateLine(x, y1, 0, x2, z, 0);
+            // Point 2: yLine up (positive Z direction)
+            double x2 = xCenter;
+            double z2 = zCenter + arcRadius;
 
-            // Line 3: back to center below
-            double y3 = z - (CylinderRadius + RibPadding) * IN_TO_M;
-            swSketchMgr.CreateLine(x2, z, 0, x, y3, 0);
+            // Point 3: line to left edge at center height
+            double x3 = xLeft;
+            double z3 = zCenter;
 
-            // Arc: from bottom point back to top point
-            // Center at (x, z), start at (x, y3), end at (x, y1)
+            // Point 4: line back to center X, bottom
+            double x4 = xCenter;
+            double z4 = zCenter - arcRadius;
+
+            // Draw the profile
+            swSketchMgr.CreateLine(x1, z1, 0, x2, z2, 0);  // Up
+            swSketchMgr.CreateLine(x2, z2, 0, x3, z3, 0);  // To left
+            swSketchMgr.CreateLine(x3, z3, 0, x4, z4, 0);  // Back to center X, down
+
+            // Arc from point 4 back to point 2 (closing the profile)
+            // Arc center is at cylinder center, going counter-clockwise
             swSketchMgr.CreateArc(
-                XC: x,
-                YC: z,
+                XC: xCenter,
+                YC: zCenter,
                 Zc: 0,
-                X1: x,
-                Y1: y3,
+                X1: x4,
+                Y1: z4,
                 Z1: 0,
-                X2: x,
-                Y2: y1,
+                X2: x2,
+                Y2: z2,
                 Z2: 0,
                 Direction: 1);  // Counter-clockwise
 
@@ -548,7 +561,12 @@ namespace SolidWorksRenders
                 FlipStartOffset: false);
 
             if (ribFeature == null)
+            {
+                Console.WriteLine($"ERROR: Edge rib extrusion failed");
+                Console.WriteLine($"Sketch name: {sketchName}");
+                Console.WriteLine($"Check if sketch is closed and properly constrained");
                 throw new InvalidOperationException("Failed to extrude edge rib");
+            }
 
             // Note: The KCL creates a linear pattern with 2 instances
             // We would need to implement pattern here or create the second rib manually
