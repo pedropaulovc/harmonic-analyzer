@@ -74,10 +74,9 @@ namespace SolidWorksRenders
         /// </summary>
         private static IPartCreator CreatePartCreator(string[] args)
         {
-            // For now, we only have eccentric cam, but this is where you would
-            // add logic to select different part types in the future
+            // For now, using harmonic base (can switch to EccentricCam or add selection logic)
             ISldWorks swApp = ConnectToSolidWorks();
-            return new EccentricCam(swApp);
+            return new HarmonicBase(swApp);
         }
 
         /// <summary>
