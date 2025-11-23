@@ -11,8 +11,9 @@ namespace SolidWorksRenders
     /// The cam produces harmonic motion with displacement = eccentricity × sin(θ)
     /// Features a simple cylinder with off-center mounting hole and keyway.
     /// </summary>
-    public class EccentricCam
+    public class EccentricCam : IPartCreator
     {
+        public string PartName => "Eccentric Cam";
         // Parameters from parameters.kcl (in inches, converted to meters for SolidWorks API)
         private const double CamDiameter = 2.0 * 0.0254;        // 2.0 inches
         private const double CamThickness = 0.4 * 0.0254;       // 0.4 inches
@@ -385,6 +386,20 @@ namespace SolidWorksRenders
                 }
                 throw new InvalidOperationException("Failed to create keyway cut - no feature created");
             }
+        }
+
+        /// <summary>
+        /// Prints eccentric cam-specific part details
+        /// </summary>
+        public void PrintPartDetails()
+        {
+            Console.WriteLine("\nPart Details:");
+            Console.WriteLine("- Cam diameter: 2.0 inches");
+            Console.WriteLine("- Cam thickness: 0.4 inches");
+            Console.WriteLine("- Shaft diameter: 0.375 inches (3/8\")");
+            Console.WriteLine("- Eccentricity: 0.2 inches");
+            Console.WriteLine("- Keyway width: 0.125 inches (1/8\")");
+            Console.WriteLine("- Keyway depth: 0.06 inches");
         }
     }
 }
