@@ -303,29 +303,31 @@ namespace SolidWorksRenders
             double keywayTop = KeywayWidth / 2;
             double keywayBottom = -KeywayWidth / 2;
 
-            // Create rectangle for keyway
-            ISketchSegment line1 = swSketchMgr.CreateLine(
+            // Create corner rectangle - this creates a proper closed contour
+            object rect = swSketchMgr.CreateCornerRectangle(
                 X1: keywayLeft, Y1: keywayTop, Z1: 0,
-                X2: keywayRight, Y2: keywayTop, Z2: 0);
-
-            ISketchSegment line2 = swSketchMgr.CreateLine(
-                X1: keywayRight, Y1: keywayTop, Z1: 0,
                 X2: keywayRight, Y2: keywayBottom, Z2: 0);
 
-            ISketchSegment line3 = swSketchMgr.CreateLine(
-                X1: keywayRight, Y1: keywayBottom, Z1: 0,
-                X2: keywayLeft, Y2: keywayBottom, Z2: 0);
-
-            ISketchSegment line4 = swSketchMgr.CreateLine(
-                X1: keywayLeft, Y1: keywayBottom, Z1: 0,
-                X2: keywayLeft, Y2: keywayTop, Z2: 0);
+            if (rect == null)
+                throw new InvalidOperationException("Failed to create keyway rectangle");
 
             // Exit sketch
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
+            // Rebuild to ensure sketch is recognized
+            swModel.ForceRebuild3(false);
+
+            // Get the last feature added (should be the keyway sketch)
+            IFeature keywaySketch = swModelExt.GetLastFeatureAdded();
+            if (keywaySketch == null)
+                throw new InvalidOperationException("Failed to get keyway sketch - no feature was added");
+
+            string sketchName = keywaySketch.Name;
+            Console.WriteLine($"DEBUG: Keyway sketch name: {sketchName}");
+
             // Select the sketch for cutting
             selected = swModelExt.SelectByID2(
-                Name: "Sketch3",
+                Name: sketchName,
                 Type: "SKETCH",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -334,7 +336,7 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select keyway sketch");
+                throw new InvalidOperationException($"Failed to select keyway sketch '{sketchName}'");
 
             // Cut through all - using parameters from working VBA example
             IFeature keywayFeature = swFeatMgr.FeatureCut4(
