@@ -71,7 +71,7 @@ namespace SolidWorksRenders
         /// <summary>
         /// Creates the appropriate part creator based on configuration
         /// Usage: SolidWorksRenders.exe [part-name]
-        /// Available parts: harmonic-base, eccentric-cam, amplitude-bar
+        /// Available parts: harmonic-base, eccentric-cam, amplitude-bar, summing-lever
         /// </summary>
         private static IPartCreator CreatePartCreator(string[] args)
         {
@@ -91,9 +91,12 @@ namespace SolidWorksRenders
                 case "amplitude-bar":
                     return new AmplitudeBar(swApp);
 
+                case "summing-lever":
+                    return new SummingLever(swApp);
+
                 default:
                     Console.WriteLine($"Unknown part name: {args[0]}");
-                    Console.WriteLine("Available parts: harmonic-base, eccentric-cam, amplitude-bar");
+                    Console.WriteLine("Available parts: harmonic-base, eccentric-cam, amplitude-bar, summing-lever");
                     Console.WriteLine("Defaulting to harmonic-base\n");
                     return new HarmonicBase(swApp);
             }
