@@ -104,16 +104,6 @@ cat .claude/skills/developing-solidworks/index/statistics.md
 - Working solutions with code examples
 - Best practices to avoid the issue
 
-Use grep to search by category or tags:
-```bash
-# Find all learnings in a category
-grep -r "category: Feature Operations" .claude/skills/developing-solidworks/learnings/
-
-# Search by tag or keyword
-grep -r "tags:.*FeatureCut4" .claude/skills/developing-solidworks/learnings/
-grep -r "extrusion" .claude/skills/developing-solidworks/learnings/
-```
-
 When encountering new issues not covered in learnings, document the problem, investigation, and solution in a new file with appropriate frontmatter.
 
 ## SolidWorks-Specific Patterns
