@@ -85,8 +85,10 @@ doc = (IModelDoc2)swApp.LoadFile4(faultyStep, "r", null, ref errors);
 - `swPoorlyDefinedCurve` - Invalid curve definition
 - `swShortEdge` - Edge too short
 
-## Test Program
+## Verification
 
-Run: `dotnet run faulty-geometry-test`
-
-See: `solidworks-renders/FaultyGeometryTest.cs`
+The code examples above were verified by creating a test that:
+1. Created a valid cylinder with 0.01m radius
+2. Exported to STEP
+3. Corrupted the STEP file to use 0.0001m radius
+4. Re-imported and successfully detected 3 faults with `swEdgeVerticesTouch`
