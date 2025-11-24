@@ -660,8 +660,11 @@ namespace SolidWorksRenders
         }
 
         /// <summary>
-        /// Creates the middle rib: elongated diamond with rounded corners near cylinder
+        /// Creates the middle rib: elongated diamond with tangent arcs near cylinder
         /// Sketch on XZ plane (Front Plane)
+        ///
+        /// Uses SolidWorks sketch constraints to make the arcs tangent to the lines.
+        /// This lets SolidWorks compute the exact tangent geometry.
         /// </summary>
         private void CreateMiddleRib(IModelDoc2 swModel)
         {
@@ -682,62 +685,87 @@ namespace SolidWorksRenders
                 throw new InvalidOperationException("Failed to select Front Plane for middle rib");
 
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
-            swSketchMgr.AddToDB = true;
-
-            // KCL middle rib profile (elongated diamond with rounded corners):
-            // arcAngleOffset = 45deg
-            // arcOffsetX = arcRadius * sin(45) = arcRadius * 0.7071
-            // arcOffsetZ = arcRadius * cos(45) = arcRadius * 0.7071
-
-            double arcAngle = Math.PI / 4;  // 45 degrees
-            double arcOffsetX = arcRadius * Math.Sin(arcAngle);
-            double arcOffsetZ = arcRadius * Math.Cos(arcAngle);
 
             double cx = 0;  // cylinderCenterX
             double cz = 0;  // cylinderCenterZ
+            double r = arcRadius;
 
-            // Points in the KCL profile:
-            // leftVertex: [-coefficientsPlateWidth, 0]
-            // upper-left arc start: [-arcOffsetX, arcOffsetZ]
-            // top of arc: [0, arcRadius]
-            // upper-right arc end: [arcOffsetX, arcOffsetZ]
-            // right vertex: [summationPlateTipX, 0]
-            // lower-right arc start: [arcOffsetX, -arcOffsetZ]
-            // bottom of arc: [0, -arcRadius]
-            // lower-left arc end: [-arcOffsetX, -arcOffsetZ]
-            // back to leftVertex
+            double leftX = -CoefficientsPlateWidth;
+            double rightX = summationPlateTipX;
 
-            // Line from left vertex to upper-left arc start
-            swSketchMgr.CreateLine(
-                -CoefficientsPlateWidth, cz, 0,
-                cx - arcOffsetX, cz + arcOffsetZ, 0);
+            // Calculate initial tangent points (approximate) for drawing
+            double txLeft = (r * r) / leftX;
+            double tyLeft = r * Math.Sqrt(1 - (r * r) / (leftX * leftX));
+            double txRight = (r * r) / rightX;
+            double tyRight = r * Math.Sqrt(1 - (r * r) / (rightX * rightX));
 
-            // Arc from upper-left to upper-right through top
-            swSketchMgr.Create3PointArc(
-                X1: cx - arcOffsetX, Y1: cz + arcOffsetZ, Z1: 0,   // Start
-                X2: cx + arcOffsetX, Y2: cz + arcOffsetZ, Z2: 0,   // End
-                X3: cx, Y3: cz + arcRadius, Z3: 0);                // Interior (top)
+            // Create geometry and capture segment references for constraints
+            // Line 1: Left vertex to upper arc region
+            ISketchSegment line1 = (ISketchSegment)swSketchMgr.CreateLine(
+                leftX, cz, 0,
+                cx + txLeft, cz + tyLeft, 0);
 
-            // Line from upper-right to right vertex
-            swSketchMgr.CreateLine(
-                cx + arcOffsetX, cz + arcOffsetZ, 0,
-                summationPlateTipX, cz, 0);
+            // Arc 1: Upper arc (will be constrained tangent to line1 and line2)
+            ISketchSegment arc1 = (ISketchSegment)swSketchMgr.Create3PointArc(
+                X1: cx + txLeft, Y1: cz + tyLeft, Z1: 0,
+                X2: cx + txRight, Y2: cz + tyRight, Z2: 0,
+                X3: cx, Y3: cz + r, Z3: 0);
 
-            // Line from right vertex to lower-right arc start
-            swSketchMgr.CreateLine(
-                summationPlateTipX, cz, 0,
-                cx + arcOffsetX, cz - arcOffsetZ, 0);
+            // Line 2: Upper arc to right vertex
+            ISketchSegment line2 = (ISketchSegment)swSketchMgr.CreateLine(
+                cx + txRight, cz + tyRight, 0,
+                rightX, cz, 0);
 
-            // Arc from lower-right to lower-left through bottom
-            swSketchMgr.Create3PointArc(
-                X1: cx + arcOffsetX, Y1: cz - arcOffsetZ, Z1: 0,   // Start
-                X2: cx - arcOffsetX, Y2: cz - arcOffsetZ, Z2: 0,   // End
-                X3: cx, Y3: cz - arcRadius, Z3: 0);                // Interior (bottom)
+            // Line 3: Right vertex to lower arc region
+            ISketchSegment line3 = (ISketchSegment)swSketchMgr.CreateLine(
+                rightX, cz, 0,
+                cx + txRight, cz - tyRight, 0);
 
-            // Line from lower-left back to left vertex
-            swSketchMgr.CreateLine(
-                cx - arcOffsetX, cz - arcOffsetZ, 0,
-                -CoefficientsPlateWidth, cz, 0);
+            // Arc 2: Lower arc (will be constrained tangent to line3 and line4)
+            ISketchSegment arc2 = (ISketchSegment)swSketchMgr.Create3PointArc(
+                X1: cx + txRight, Y1: cz - tyRight, Z1: 0,
+                X2: cx + txLeft, Y2: cz - tyLeft, Z2: 0,
+                X3: cx, Y3: cz - r, Z3: 0);
+
+            // Line 4: Lower arc back to left vertex
+            ISketchSegment line4 = (ISketchSegment)swSketchMgr.CreateLine(
+                cx + txLeft, cz - tyLeft, 0,
+                leftX, cz, 0);
+
+            // Apply tangent constraints between lines and arcs
+            // The geometry is already close to tangent, so constraints should solve easily
+
+            // Clear selection and apply tangent between line1 and arc1
+            swModel.ClearSelection2(true);
+            line1.Select4(false, null);
+            arc1.Select4(true, null);  // Append to selection
+            swModel.SketchAddConstraints("sgTANGENT");
+
+            // Tangent between arc1 and line2
+            swModel.ClearSelection2(true);
+            arc1.Select4(false, null);
+            line2.Select4(true, null);
+            swModel.SketchAddConstraints("sgTANGENT");
+
+            // Tangent between line3 and arc2
+            swModel.ClearSelection2(true);
+            line3.Select4(false, null);
+            arc2.Select4(true, null);
+            swModel.SketchAddConstraints("sgTANGENT");
+
+            // Tangent between arc2 and line4
+            swModel.ClearSelection2(true);
+            arc2.Select4(false, null);
+            line4.Select4(true, null);
+            swModel.SketchAddConstraints("sgTANGENT");
+
+            // Make the two arcs concentric (share center at origin)
+            swModel.ClearSelection2(true);
+            arc1.Select4(false, null);
+            arc2.Select4(true, null);
+            swModel.SketchAddConstraints("sgCONCENTRIC");
+
+            swModel.ClearSelection2(true);
 
             swSketchMgr.AddToDB = false;
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
