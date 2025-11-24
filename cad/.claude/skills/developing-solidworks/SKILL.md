@@ -78,10 +78,25 @@ cat .claude/skills/developing-solidworks/index/statistics.md
 
 ## Learnings from Past Issues
 
-Consult the `./learnings/` directory for documented solutions to common problems and pitfalls:
-- [FeatureCut4 Returning Null](./learnings/featurecut4-returning-null.md) - Critical parameters for cut operations
+Consult the `./learnings/` directory for documented solutions to common problems and pitfalls. Each learning includes:
+- Problem description and symptoms
+- Investigation process and root cause analysis
+- Working solutions with code examples
+- Key takeaways and best practices
 
-When encountering new issues, document the problem, investigation, and solution in a new file in this directory.
+Use grep to search by category, tags, or severity:
+```bash
+# Find all learnings in a category
+grep -r "category: Feature Operations" .claude/skills/developing-solidworks/learnings/
+
+# Find critical issues
+grep -r "severity: critical" .claude/skills/developing-solidworks/learnings/
+
+# Search by tag
+grep -r "tags:.*FeatureCut4" .claude/skills/developing-solidworks/learnings/
+```
+
+When encountering new issues, document the problem, investigation, and solution in a new file in this directory with appropriate frontmatter.
 
 ## SolidWorks-Specific Patterns
 
