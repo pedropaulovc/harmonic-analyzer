@@ -732,9 +732,12 @@ namespace SolidWorksRenders
                 cx + txLeft, cz - tyLeft, 0,
                 leftX, cz, 0);
 
-            // Apply tangent constraints between lines and arcs
-            // The geometry is already close to tangent, so constraints should solve easily
+            // Create a horizontal centerline for symmetry constraint
+            ISketchSegment centerLine = (ISketchSegment)swSketchMgr.CreateCenterLine(
+                leftX, cz, 0,
+                rightX, cz, 0);
 
+            // Apply tangent constraints between lines and arcs
             // Clear selection and apply tangent between line1 and arc1
             swModel.ClearSelection2(true);
             line1.Select4(false, null);
@@ -764,6 +767,21 @@ namespace SolidWorksRenders
             arc1.Select4(false, null);
             arc2.Select4(true, null);
             swModel.SketchAddConstraints("sgCORADIAL");
+
+            // Add symmetry constraints about the horizontal centerline
+            // line1 symmetric to line4 about centerline
+            swModel.ClearSelection2(true);
+            line1.Select4(false, null);
+            line4.Select4(true, null);
+            centerLine.Select4(true, null);
+            swModel.SketchAddConstraints("sgSYMMETRIC");
+
+            // line2 symmetric to line3 about centerline
+            swModel.ClearSelection2(true);
+            line2.Select4(false, null);
+            line3.Select4(true, null);
+            centerLine.Select4(true, null);
+            swModel.SketchAddConstraints("sgSYMMETRIC");
 
             swModel.ClearSelection2(true);
 
