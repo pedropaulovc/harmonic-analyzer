@@ -759,11 +759,11 @@ namespace SolidWorksRenders
             line4.Select4(true, null);
             swModel.SketchAddConstraints("sgTANGENT");
 
-            // Make the two arcs concentric (share center at origin)
+            // Make the two arcs coradial (same center AND same radius)
             swModel.ClearSelection2(true);
             arc1.Select4(false, null);
             arc2.Select4(true, null);
-            swModel.SketchAddConstraints("sgCONCENTRIC");
+            swModel.SketchAddConstraints("sgCORADIAL");
 
             swModel.ClearSelection2(true);
 
