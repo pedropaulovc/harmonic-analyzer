@@ -1,14 +1,18 @@
 ---
-title: Detecting Self-Intersecting Sketches
+title: Troubleshooting Why Sketches Can't Be Extruded
 category: Sketch Validation
-tags: [sketch, validation, error-handling, CheckFeatureUse, GetErrorCode2]
+tags: [sketch, validation, error-handling, CheckFeatureUse, GetErrorCode2, troubleshooting, extrusion-failures]
 date: 2025-11-23
 ---
 
-# Detecting Self-Intersecting Sketches
+# Troubleshooting Why Sketches Can't Be Extruded
 
 ## Problem
-When sketches contain self-intersecting contours (like a bowtie shape), extrusion fails. The UI shows: "The sketch contains a self-intersecting contour". Need programmatic detection via SDK.
+**When extrusion fails and you don't know why**, the sketch may have validation issues that aren't immediately obvious. The UI shows warnings like "The sketch contains a self-intersecting contour", but programmatically we need to diagnose *why* a sketch can't be extruded.
+
+## Core Insight: Troubleshooting Extrusion Failures
+
+**This is the key technique for diagnosing why sketches fail to extrude.** When `FeatureExtrusion3` returns null or fails, use `ISketch.CheckFeatureUse()` to get the exact reason.
 
 ## Solution: Two Detection Methods
 
@@ -80,17 +84,42 @@ doc.SketchManager.InsertSketch(true); // Exit sketch
 
 ## Key Takeaways
 
-1. **Prefer Method 2 (CheckFeatureUse)**: Validates *before* operation, more reliable
-2. **Use Method 1 as fallback**: When feature object exists, provides specific error code
-3. **CheckFeatureUse is versatile**: Can validate for different feature types (BASEEXTRUDE, CUT, etc.)
-4. **Multiple intersection types**: Different status codes indicate specific geometry problems
+1. **PRIMARY USE CASE: Troubleshooting extrusion failures** - When `FeatureExtrusion3` returns null, immediately use `CheckFeatureUse()` to diagnose the problem
+2. **Prefer Method 2 (CheckFeatureUse)**: Validates *before* operation, more reliable, gives specific diagnosis
+3. **Use Method 1 as fallback**: When feature object exists, provides specific error code
+4. **CheckFeatureUse is versatile**: Can validate for different feature types (BASEEXTRUDE, CUT, REVOLVE, etc.)
+5. **Multiple intersection types**: Different status codes indicate specific geometry problems (self-intersection, open contours, etc.)
 
 ## Best Practices
 
-1. **Validate before creating features** - Prevents failed operations and wasted computation
-2. **Check both methods** - For robust error detection, use CheckFeatureUse first, then verify with GetErrorCode2
-3. **Report specific issues** - Use status codes to provide detailed feedback to users
-4. **Test with simple geometry** - Bowtie/X shape is minimal reproducible case
+1. **Always diagnose failed extrusions** - Don't just return "extrusion failed", use CheckFeatureUse to get the actual reason
+2. **Validate before creating features** - Prevents failed operations and wasted computation
+3. **Report specific issues** - Use status codes to provide detailed feedback (e.g., "Sketch has 2 open contours" vs "Extrusion failed")
+4. **Test with simple geometry** - Bowtie/X shape is minimal reproducible case for self-intersection
+
+## Troubleshooting Pattern
+
+```csharp
+IFeature feature = doc.FeatureManager.FeatureExtrusion3(/* params */);
+
+if (feature == null) {
+    Console.WriteLine("Extrusion failed. Diagnosing sketch...");
+
+    // Get the sketch and diagnose
+    doc.Extension.SelectByID2("Sketch1", "SKETCH", 0, 0, 0, false, 0, null, 0);
+    IFeature sketchFeat = (IFeature)doc.SelectionManager.GetSelectedObject6(1, -1);
+    ISketch sketch = (ISketch)sketchFeat.GetSpecificFeature2();
+
+    int openCount = 0, closedCount = 0;
+    int status = sketch.CheckFeatureUse(
+        (int)swSketchCheckFeatureProfileUsage_e.swSketchCheckFeature_BASEEXTRUDE,
+        ref openCount, ref closedCount
+    );
+
+    Console.WriteLine($"Diagnosis: {(swSketchCheckFeatureStatus_e)status}");
+    Console.WriteLine($"Open contours: {openCount}, Closed contours: {closedCount}");
+}
+```
 
 ## References
 - `IFeature.GetErrorCode2()` documentation
