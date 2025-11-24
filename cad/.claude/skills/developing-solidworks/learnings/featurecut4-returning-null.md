@@ -2,7 +2,6 @@
 title: FeatureCut4 Returning Null
 category: Feature Operations
 tags: [FeatureCut4, IFeatureManager, cuts, direction, debugging]
-severity: critical
 date: 2025-11-23
 ---
 
