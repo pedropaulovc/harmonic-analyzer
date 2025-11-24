@@ -76,6 +76,13 @@ cat .claude/skills/developing-solidworks/index/by_category.md | grep -A 20 "Appl
 cat .claude/skills/developing-solidworks/index/statistics.md
 ```
 
+## Learnings from Past Issues
+
+Consult the `./learnings/` directory for documented solutions to common problems and pitfalls:
+- [FeatureCut4 Returning Null](./learnings/featurecut4-returning-null.md) - Critical parameters for cut operations
+
+When encountering new issues, document the problem, investigation, and solution in a new file in this directory.
+
 ## SolidWorks-Specific Patterns
 
 ### SDK library references

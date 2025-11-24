@@ -1,21 +1,27 @@
-# SolidWorks API Development Learnings
+---
+title: FeatureCut4 Returning Null
+category: Feature Operations
+tags: [FeatureCut4, IFeatureManager, cuts, direction, debugging]
+severity: critical
+date: 2025-11-23
+---
 
-## Issue: FeatureCut4 Returning Null
+# FeatureCut4 Returning Null
 
-### Problem
+## Problem
 When translating eccentric cam KCL code to SolidWorks C#, the `FeatureCut4` method consistently returned null, causing the cut operation to fail with the error:
 ```
 ERROR: Failed to create shaft hole cut
 ```
 
-### What We Tried (That Didn't Work)
+## What We Tried (That Didn't Work)
 1. **Using complex sketch profiles** - Initially tried to create the shaft hole with keyway as a single complex profile using arcs and lines. This failed.
 2. **Different sketch selection methods** - Tried selecting sketches by name ("Sketch2"), by feature reference, and using Linq queries. None worked.
 3. **Simplified to separate cuts** - Split into two operations: circular shaft hole + rectangular keyway. Shaft hole still failed.
 
-### Root Cause Analysis
+## Root Cause Analysis
 
-#### Investigation Process
+### Investigation Process
 1. **Compared with working VBA code** - Found a working VBA example:
    ```vb
    Set myFeature = Part.FeatureManager.FeatureCut4(True, False, True, 1, 0, 0.00254, 0.00254, False, False, False, False, 1.74532925199433E-02, 1.74532925199433E-02, False, False, False, False, False, True, True, True, True, False, 0, 0, False, False)
@@ -29,7 +35,7 @@ ERROR: Failed to create shaft hole cut
    - **AssemblyFeatureScope**: VBA used `True`, we used `False`
    - **AutoSelectComponents**: VBA used `True`, we used `False`
 
-#### The Critical Parameter: Dir
+### The Critical Parameter: Dir
 
 From the documentation:
 > **Dir**: True for Direction 1 to be opposite of the default direction
@@ -38,7 +44,7 @@ From the documentation:
 
 **This was the primary issue** - we were cutting in the wrong direction!
 
-### The Solution
+## The Solution
 
 Changed FeatureCut4 parameters to match working VBA example:
 
@@ -73,7 +79,7 @@ IFeature holeFeature = swFeatMgr.FeatureCut4(
     OptimizeGeometry: false);
 ```
 
-### Key Takeaways
+## Key Takeaways
 
 1. **Always check working examples first** - Don't assume parameter values. Look for VBA/C# examples that work.
 
@@ -98,7 +104,7 @@ IFeature holeFeature = swFeatMgr.FeatureCut4(
    cat .claude/skills/developing-solidworks/solidworks-api/api/types/IFeatureManager/FeatureCut4.md
    ```
 
-### Best Practices Going Forward
+## Best Practices Going Forward
 
 1. **Start with working examples** - Find VBA or C# code that does something similar
 2. **Match parameters exactly** - Use the same parameter values as working code
@@ -106,7 +112,7 @@ IFeature holeFeature = swFeatMgr.FeatureCut4(
 4. **Use named parameters** - Makes code readable and prevents parameter order mistakes
 5. **Check documentation** - Don't assume, verify enum values and parameter meanings
 
-### References
+## References
 - `solidworks-api/api/types/IFeatureManager/FeatureCut4.md`
 - `solidworks-api/api/enums/swEndConditions_e/`
 - Working VBA example (see above)
