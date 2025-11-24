@@ -272,21 +272,3 @@ IFeature feature = doc.FeatureManager.FeatureExtrusion2(
 
 if (feature == null) throw new Exception("Extrusion failed");
 ```
-
-### Debugging selection errors
-
-Common issues:
-- **Wrong selection type**: Use exact type string ("FACE", not "Face" or "face")
-- **Missing type cast**: Cast returned objects to correct interface
-- **Null returns**: Always check for null after selection operations
-- **Selection marks**: Ensure unique marks when selecting multiple entities
-- **Don't guess - verify**: Double check docs when in doubt
-   ```bash
-   # Check enum values, e.g.
-   grep -r "swEndConditions_e" .claude/skills/developing-solidworks/enums/
-
-   # Read specific docs e.g.
-   cat .claude/skills/developing-solidworks/types/IFeatureManager/FeatureCut4.md
-   ```
-
-For detailed troubleshooting, consult `./learnings/` for documented solutions, the programming guides in `./docs/`, or search for relevant examples in `./examples/`.
