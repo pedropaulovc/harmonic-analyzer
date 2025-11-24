@@ -98,8 +98,7 @@ When encountering new issues, document the problem, investigation, and solution 
 ## SolidWorks-Specific Patterns
 
 ### SDK library references
-
-Find latest SDK libraries via `scripts/find_api_redist.py`. It will return the main folder with all SolidWorks.Interop.* assemblies.
+The SolidWorks SDK works with .NET Framework only. Find latest SDK libraries via [find_api_redist.py](./scripts/find_api_redist.py). It will return the main folder with all SolidWorks.Interop.* assemblies.
 
 ### Code quality requirements
 
