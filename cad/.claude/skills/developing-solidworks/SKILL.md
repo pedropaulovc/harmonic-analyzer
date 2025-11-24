@@ -131,9 +131,6 @@ if (doc == null)
 }
 ```
 
-**Error troubleshooting** (Leverage `IFaultEntity` to get more details on failed operations):
-See [Check Edges for Faults (C#)](./examples/Check_Edges_for_Faults_Example_CSharp.md) for an example of how to use it.
-
 **Return value checks** (many methods return bool for success):
 ```csharp
 bool success = doc.Extension.SelectByID2(
