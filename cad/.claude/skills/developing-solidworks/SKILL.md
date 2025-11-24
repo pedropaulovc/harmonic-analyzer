@@ -76,6 +76,82 @@ cat .claude/skills/developing-solidworks/index/by_category.md | grep -A 20 "Appl
 cat .claude/skills/developing-solidworks/index/statistics.md
 ```
 
+### Finding Enums and Their Values
+
+SolidWorks API relies heavily on enums. Finding the correct enum and its values is critical for writing working code.
+
+**Step 1: Find the enum file**
+```bash
+# Find enum by name (e.g., swEndConditions_e)
+ls .claude/skills/developing-solidworks/enums/ | grep -i "endconditions"
+
+# Search across all enums
+grep -r "swEndCondBlind" .claude/skills/developing-solidworks/enums/
+```
+
+**Step 2: Read the enum definition**
+```bash
+# Read the full enum file
+cat .claude/skills/developing-solidworks/enums/swEndConditions_e.md
+```
+
+**Step 3: Extract specific enum values**
+
+Each enum file contains:
+- Enum name and description
+- All possible values with their integer equivalents
+- Usage context
+
+Example enum file structure:
+```markdown
+# swEndConditions_e
+
+**Description**: End conditions for extrude and revolve features
+
+**Values**:
+- `swEndCondBlind = 0` - Blind end condition
+- `swEndCondThroughAll = 1` - Through all end condition
+- `swEndCondUpToNext = 2` - Up to next end condition
+...
+```
+
+**Common enum patterns**:
+```bash
+# Find all sketch-related enums
+ls .claude/skills/developing-solidworks/enums/ | grep -i "sketch"
+
+# Find all feature error enums
+ls .claude/skills/developing-solidworks/enums/ | grep -i "error"
+
+# Find enums for specific operation type
+grep -r "category:" .claude/skills/developing-solidworks/enums/ | grep "Feature"
+```
+
+**Verify enum usage in code examples**:
+```bash
+# Find examples using specific enum
+grep -r "swEndConditions_e" .claude/skills/developing-solidworks/examples/
+
+# See how enum is cast in practice
+grep -r "int.*swEndConditions_e" .claude/skills/developing-solidworks/examples/
+```
+
+**CRITICAL**: Always cast enums to `int` when passing to API methods:
+```csharp
+// Correct - explicit cast
+Dir1: (int)swEndConditions_e.swEndCondBlind
+
+// Wrong - will cause compilation error
+Dir1: swEndConditions_e.swEndCondBlind
+```
+
+**Return value enums**: When methods return enum values as integers, cast back to enum for readability:
+```csharp
+// Cast return value to enum for readable output
+var status = (swSketchCheckFeatureStatus_e)sketch.CheckFeatureUse();
+Console.WriteLine($"Sketch status: {status}");  // Prints "swSketchCheckFeatureStatus_OK" not "0"
+```
+
 ## Learnings from Past Issues
 
 Consult the `./learnings/` directory for documented solutions to common problems and pitfalls. Each learning includes:
