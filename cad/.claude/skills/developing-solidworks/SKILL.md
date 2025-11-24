@@ -77,7 +77,7 @@ cat .claude/skills/developing-solidworks/enums/swEndConditions_e.md
 grep -r "swEndConditions_e" .claude/skills/developing-solidworks/examples/
 ```
 
-**CRITICAL enum casting**: Always cast to `int` for API parameters, cast back for readable output:
+**Enum casting**: Always cast to `int` for API parameters, cast back for readable output:
 ```csharp
 Dir1: (int)swEndConditions_e.swEndCondBlind                           // API input
 var status = (swSketchCheckFeatureStatus_e)sketch.CheckFeatureUse();  // readable output
