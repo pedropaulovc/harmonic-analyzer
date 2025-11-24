@@ -84,13 +84,10 @@ Consult the `./learnings/` directory for documented solutions to common problems
 - Working solutions with code examples
 - Key takeaways and best practices
 
-Use grep to search by category, tags, or severity:
+Use grep to search by category or tags:
 ```bash
 # Find all learnings in a category
 grep -r "category: Feature Operations" .claude/skills/developing-solidworks/learnings/
-
-# Find critical issues
-grep -r "severity: critical" .claude/skills/developing-solidworks/learnings/
 
 # Search by tag
 grep -r "tags:.*FeatureCut4" .claude/skills/developing-solidworks/learnings/
