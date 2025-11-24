@@ -283,4 +283,4 @@ Common issues:
    cat .claude/skills/developing-solidworks/types/IFeatureManager/FeatureCut4.md
    ```
 
-For detailed troubleshooting, consult the programming guides in `./docs/` or search for relevant examples in `./examples/`.
+For detailed troubleshooting, consult `./learnings/` for documented solutions, the programming guides in `./docs/`, or search for relevant examples in `./examples/`.
