@@ -7,7 +7,7 @@ description: ANYTHING related to SolidWorks. Writes, modifies, and debugs C# cod
 
 ## Documentation-First Workflow
 
-**CRITICAL**: Base knowledge of SolidWorks API is inconsistent. Always consult documentation [Types](./types/), [Enums](./enums/), [Docs](./docs/), [Examples](./examples/). You ABSOLUTELY MUST run your code before claiming success. Don't bother with `dotnet build`, use `dotnet run` immediately after code changes. JUST COMPILING IS NOT ENOUGH.
+**CRITICAL**: Base knowledge of SolidWorks API is inconsistent. Always consult documentation [Types](./types/), [Enums](./enums/), [Docs](./docs/), [Examples](./examples/), [Learnings](./learnings/). You ABSOLUTELY MUST run your code before claiming success. Don't bother with `dotnet build`, use `dotnet run` immediately after code changes. JUST COMPILING IS NOT ENOUGH.
 
 ### Workflow checklist
 
@@ -30,6 +30,7 @@ SolidWorks Development Progress:
    - API Reference in `./types/` and `./enums/` (method signatures, parameters, enum values)
    - Programming Guide in `./docs/` (best practices, patterns)
    - Code Examples in `./examples/` (proven implementations)
+   - Troubleshooting Guide in `./learnings/` (documented solutions to common problems)
 
 3. **If documentation is unavailable**: ABORT and notify user
 
@@ -95,24 +96,25 @@ cat .claude/skills/developing-solidworks/index/by_category.md | grep -A 20 "Appl
 cat .claude/skills/developing-solidworks/index/statistics.md
 ```
 
-## Learnings from Past Issues
+## Troubleshooting Guide
 
-Consult the `./learnings/` directory for documented solutions to common problems and pitfalls. Each learning includes:
-- Problem description and symptoms
-- Investigation process and root cause analysis
+**IMPORTANT**: When encountering errors or unexpected behavior, consult `./learnings/` first. This directory contains documented solutions to real issues encountered during development, including:
+- Problem symptoms and error messages
+- Root cause analysis
 - Working solutions with code examples
-- Key takeaways and best practices
+- Best practices to avoid the issue
 
 Use grep to search by category or tags:
 ```bash
 # Find all learnings in a category
 grep -r "category: Feature Operations" .claude/skills/developing-solidworks/learnings/
 
-# Search by tag
+# Search by tag or keyword
 grep -r "tags:.*FeatureCut4" .claude/skills/developing-solidworks/learnings/
+grep -r "extrusion" .claude/skills/developing-solidworks/learnings/
 ```
 
-When encountering new issues, document the problem, investigation, and solution in a new file in this directory with appropriate frontmatter.
+When encountering new issues not covered in learnings, document the problem, investigation, and solution in a new file with appropriate frontmatter.
 
 ## SolidWorks-Specific Patterns
 
