@@ -188,15 +188,15 @@ namespace SolidWorksRenders
             // Exit sketch
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
-            // Get the sketch
+            // Get the sketch and rename it
             swModel.ForceRebuild3(false);
             IFeature plateSketch = swModelExt.GetLastFeatureAdded();
-            string sketchName = plateSketch.Name;
-            Console.WriteLine($"DEBUG: Coefficients plate sketch name: {sketchName}");
+            plateSketch.Name = "Coefficients Plate Sketch";
+            Console.WriteLine($"DEBUG: Renamed sketch to: {plateSketch.Name}");
 
             // Select sketch for extrusion
             selected = swModelExt.SelectByID2(
-                Name: sketchName,
+                Name: plateSketch.Name,
                 Type: "SKETCH",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -205,7 +205,7 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException($"Failed to select coefficients plate sketch '{sketchName}' for extrusion");
+                throw new InvalidOperationException($"Failed to select coefficients plate sketch for extrusion");
 
             // Extrude symmetric (both directions)
             IFeature extrudeFeature = swFeatMgr.FeatureExtrusion3(
@@ -236,8 +236,7 @@ namespace SolidWorksRenders
             if (extrudeFeature == null)
                 throw new InvalidOperationException("Failed to extrude coefficients plate");
 
-            // Add appearance (green color)
-            // Note: SolidWorks API appearance is complex; skipping for now
+            extrudeFeature.Name = "Coefficients Plate";
         }
 
         /// <summary>
@@ -276,11 +275,11 @@ namespace SolidWorksRenders
 
             swModel.ForceRebuild3(false);
             IFeature cylinderSketch = swModelExt.GetLastFeatureAdded();
-            string sketchName = cylinderSketch.Name;
-            Console.WriteLine($"DEBUG: Cylinder sketch name: {sketchName}");
+            cylinderSketch.Name = "Pivot Cylinder Sketch";
+            Console.WriteLine($"DEBUG: Renamed sketch to: {cylinderSketch.Name}");
 
             selected = swModelExt.SelectByID2(
-                Name: sketchName,
+                Name: cylinderSketch.Name,
                 Type: "SKETCH",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -289,7 +288,7 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException($"Failed to select cylinder sketch '{sketchName}' for extrusion");
+                throw new InvalidOperationException("Failed to select cylinder sketch for extrusion");
 
             // Extrude symmetric along Y axis
             IFeature extrudeFeature = swFeatMgr.FeatureExtrusion3(
@@ -319,6 +318,8 @@ namespace SolidWorksRenders
 
             if (extrudeFeature == null)
                 throw new InvalidOperationException("Failed to extrude cylinder");
+
+            extrudeFeature.Name = "Pivot Cylinder";
         }
 
         /// <summary>
@@ -336,13 +337,13 @@ namespace SolidWorksRenders
             double cz = 0;  // cylinderCenterZ
             double arcTop = CylinderRadius + RibPadding;
 
-            // Create first edge rib
+            // Create first edge rib (front)
             CreateSingleEdgeRib(swModel, swSketchMgr, swFeatMgr, swModelExt,
-                cx, cz, arcTop, CoefficientsPlateLength / 2 - RibThickness, false);
+                cx, cz, arcTop, CoefficientsPlateLength / 2 - RibThickness, false, "Front");
 
-            // Create second edge rib at opposite end
+            // Create second edge rib at opposite end (back)
             CreateSingleEdgeRib(swModel, swSketchMgr, swFeatMgr, swModelExt,
-                cx, cz, arcTop, -(CoefficientsPlateLength / 2 - RibThickness), true);
+                cx, cz, arcTop, -(CoefficientsPlateLength / 2 - RibThickness), true, "Back");
         }
 
         /// <summary>
@@ -350,7 +351,7 @@ namespace SolidWorksRenders
         /// </summary>
         private void CreateSingleEdgeRib(IModelDoc2 swModel, ISketchManager swSketchMgr,
             IFeatureManager swFeatMgr, IModelDocExtension swModelExt,
-            double cx, double cz, double arcTop, double yOffset, bool flipDir)
+            double cx, double cz, double arcTop, double yOffset, bool flipDir, string position)
         {
             // Select Front Plane (XZ in KCL)
             bool selected = swModelExt.SelectByID2(
@@ -393,11 +394,11 @@ namespace SolidWorksRenders
 
             swModel.ForceRebuild3(false);
             IFeature ribSketch = swModelExt.GetLastFeatureAdded();
-            string sketchName = ribSketch.Name;
-            Console.WriteLine($"DEBUG: Edge rib sketch name: {sketchName}");
+            ribSketch.Name = $"Edge Rib {position} Sketch";
+            Console.WriteLine($"DEBUG: Renamed sketch to: {ribSketch.Name}");
 
             selected = swModelExt.SelectByID2(
-                Name: sketchName,
+                Name: ribSketch.Name,
                 Type: "SKETCH",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -406,7 +407,7 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException($"Failed to select edge rib sketch '{sketchName}' for extrusion");
+                throw new InvalidOperationException($"Failed to select edge rib sketch for extrusion");
 
             // Extrude the rib with offset from sketch plane
             IFeature ribFeature = swFeatMgr.FeatureExtrusion3(
@@ -437,7 +438,7 @@ namespace SolidWorksRenders
             if (ribFeature == null)
             {
                 // Diagnose the failure
-                selected = swModelExt.SelectByID2(sketchName, "SKETCH", 0, 0, 0, false, 0, null, 0);
+                selected = swModelExt.SelectByID2(ribSketch.Name, "SKETCH", 0, 0, 0, false, 0, null, 0);
                 if (selected)
                 {
                     ISelectionMgr selMgr = (ISelectionMgr)swModel.SelectionManager;
@@ -453,7 +454,8 @@ namespace SolidWorksRenders
                 throw new InvalidOperationException($"Failed to extrude edge rib (yOffset={yOffset})");
             }
 
-            Console.WriteLine($"DEBUG: Edge rib feature name: {ribFeature.Name}");
+            ribFeature.Name = $"Edge Rib {position}";
+            Console.WriteLine($"DEBUG: Renamed feature to: {ribFeature.Name}");
         }
 
         /// <summary>
@@ -525,11 +527,11 @@ namespace SolidWorksRenders
 
             swModel.ForceRebuild3(false);
             IFeature summationSketch = swModelExt.GetLastFeatureAdded();
-            string sketchName = summationSketch.Name;
-            Console.WriteLine($"DEBUG: Summation plate sketch name: {sketchName}");
+            summationSketch.Name = "Summation Plate Sketch";
+            Console.WriteLine($"DEBUG: Renamed sketch to: {summationSketch.Name}");
 
             selected = swModelExt.SelectByID2(
-                Name: sketchName,
+                Name: summationSketch.Name,
                 Type: "SKETCH",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -538,7 +540,7 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException($"Failed to select summation plate sketch '{sketchName}' for extrusion");
+                throw new InvalidOperationException($"Failed to select summation plate sketch for extrusion");
 
             // Extrude symmetric
             IFeature extrudeFeature = swFeatMgr.FeatureExtrusion3(
@@ -568,6 +570,8 @@ namespace SolidWorksRenders
 
             if (extrudeFeature == null)
                 throw new InvalidOperationException("Failed to extrude summation plate");
+
+            extrudeFeature.Name = "Summation Plate";
         }
 
         /// <summary>
@@ -614,11 +618,11 @@ namespace SolidWorksRenders
 
             swModel.ForceRebuild3(false);
             IFeature anchorSketch = swModelExt.GetLastFeatureAdded();
-            string sketchName = anchorSketch.Name;
-            Console.WriteLine($"DEBUG: Summation anchor sketch name: {sketchName}");
+            anchorSketch.Name = "Summation Anchor Sketch";
+            Console.WriteLine($"DEBUG: Renamed sketch to: {anchorSketch.Name}");
 
             selected = swModelExt.SelectByID2(
-                Name: sketchName,
+                Name: anchorSketch.Name,
                 Type: "SKETCH",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -627,7 +631,7 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException($"Failed to select summation anchor sketch '{sketchName}' for extrusion");
+                throw new InvalidOperationException($"Failed to select summation anchor sketch for extrusion");
 
             // Extrude symmetric
             IFeature extrudeFeature = swFeatMgr.FeatureExtrusion3(
@@ -657,6 +661,8 @@ namespace SolidWorksRenders
 
             if (extrudeFeature == null)
                 throw new InvalidOperationException("Failed to extrude summation anchor");
+
+            extrudeFeature.Name = "Summation Anchor";
         }
 
         /// <summary>
@@ -790,11 +796,11 @@ namespace SolidWorksRenders
 
             swModel.ForceRebuild3(false);
             IFeature ribSketch = swModelExt.GetLastFeatureAdded();
-            string sketchName = ribSketch.Name;
-            Console.WriteLine($"DEBUG: Middle rib sketch name: {sketchName}");
+            ribSketch.Name = "Middle Rib Sketch";
+            Console.WriteLine($"DEBUG: Renamed sketch to: {ribSketch.Name}");
 
             selected = swModelExt.SelectByID2(
-                Name: sketchName,
+                Name: ribSketch.Name,
                 Type: "SKETCH",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -803,7 +809,7 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException($"Failed to select middle rib sketch '{sketchName}' for extrusion");
+                throw new InvalidOperationException($"Failed to select middle rib sketch for extrusion");
 
             // Extrude symmetric
             IFeature extrudeFeature = swFeatMgr.FeatureExtrusion3(
@@ -833,6 +839,8 @@ namespace SolidWorksRenders
 
             if (extrudeFeature == null)
                 throw new InvalidOperationException("Failed to extrude middle rib");
+
+            extrudeFeature.Name = "Middle Rib";
         }
 
         public void PrintPartDetails()
