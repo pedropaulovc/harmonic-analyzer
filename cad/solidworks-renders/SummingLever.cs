@@ -5,68 +5,60 @@ using System;
 namespace SolidWorksRenders
 {
     /// <summary>
-    /// Creates a summing lever assembly with multiple components.
+    /// Creates a summing lever for the harmonic analyzer.
     /// Translated from summing-lever.kcl
     ///
-    /// Components:
-    /// - Coefficients Plate: rectangular plate with hole pattern for spring connections
-    /// - Cylinder: along the long edge perpendicular to the rectangle
-    /// - Edge Ribs: reinforcement at plate ends
-    /// - Middle Rib: elongated diamond with rounded corners
+    /// Features:
+    /// - Coefficients Plate: rectangular plate with holes for spring connections
+    /// - Cylinder: along the long edge, perpendicular to rectangle
+    /// - Edge Ribs: at the short edges of the coefficients plate
     /// - Summation Plate: triangular extension with curved sides
-    /// - Summation Anchor: cylinder at triangle tip with center hole
+    /// - Summation Anchor: cylinder at summation plate tip with center hole
+    /// - Middle Rib: elongated diamond with rounded corners near cylinder
     /// </summary>
     public class SummingLever : IPartCreator
     {
         public string PartName => "Summing Lever";
         public string FileName => "summing-lever.sldprt";
 
-        // Conversion factor: inches to meters
-        private const double IN_TO_M = 0.0254;
+        // Dimensions (in inches, converted to meters for SolidWorks API)
+        private const double InchToMeter = 0.0254;
 
-        // Dimensions (from KCL, in inches)
-        private const double CoefficientsPlateWidth = 1.75;
-        private const double CoefficientsPlateLength = 6.0;
-        private const double PlateThickness = 0.2;
-        private const double CylinderRadius = 0.5;
-        private const double RibThickness = 0.2;
-        private const double RibHeight = 0.5;
+        // Coefficients plate parameters
+        private const double CoefficientsPlateWidth = 1.75 * InchToMeter;
+        private const double CoefficientsPlateLength = 6.0 * InchToMeter;
+        private const double PlateThickness = 0.2 * InchToMeter;
+
+        // Cylinder parameters
+        private const double CylinderRadius = 0.5 * InchToMeter;
+
+        // Rib parameters
+        private const double RibThickness = 0.2 * InchToMeter;
+        private const double RibHeight = 0.5 * InchToMeter;
+        private const double RibPadding = 0.1 * InchToMeter;
 
         // Summation plate parameters
-        private const double SummationPlateBaseLength = CoefficientsPlateLength / 2.0;
-        private const double SummationPlateHeight = 3.0;
-        private const double SummationPlateCurvature = 0.3;
+        private readonly double summationPlateBaseLength;
+        private const double SummationPlateHeight = 3.0 * InchToMeter;
+        private const double SummationPlateCurvature = 0.3 * InchToMeter;
 
-        // Summation anchor
-        private const double SummationAnchorRadius = 0.375;
-        private const double SummationAnchorHeight = 0.75;
+        // Summation anchor parameters
+        private const double SummationAnchorRadius = 0.375 * InchToMeter;
+        private const double SummationAnchorHeight = 0.75 * InchToMeter;
 
         // Hole pattern parameters
         private const int HoleCount = 20;
-        private const double HoleRadius = 0.02;
-        private const double HoleMargin = 0.2;
-        private const double HoleSpanLength = CoefficientsPlateLength - (2.0 * HoleMargin) - (2.0 * RibThickness);
-        private const double HoleSpacing = HoleSpanLength / (HoleCount - 1.0);
+        private const double HoleRadius = 0.02 * InchToMeter;
+        private const double HoleMargin = 0.2 * InchToMeter;
 
         // Calculated parameters
-        private const double CylinderDiameter = 2.0 * CylinderRadius;
-        private const double CylinderCenterX = 0.0;
-        private const double CylinderCenterZ = 0.0;
-        private const double HoleOffsetX = -CoefficientsPlateWidth + HoleMargin;
-        private const double HoleOffsetY = CoefficientsPlateLength / 2.0 - HoleMargin - RibThickness;
-
-        // Edge ribs
-        private const double RibPadding = 0.1;
-
-        // Arc parameters for middle rib
-        private const double ArcRadius = CylinderRadius + RibPadding;
-        private const double ArcAngleOffset = 45.0 * Math.PI / 180.0; // 45 degrees in radians
-        private readonly double arcOffsetX;
-        private readonly double arcOffsetZ;
-
-        // Summation anchor
-        private const double SummationAnchorHoleRadius = 2.0 * HoleRadius;
-        private const double SummationPlateTipX = CylinderCenterX + SummationPlateHeight;
+        private readonly double holeSpanLength;
+        private readonly double holeSpacing;
+        private readonly double holeOffsetX;
+        private readonly double holeOffsetY;
+        private readonly double summationAnchorHoleRadius;
+        private readonly double summationPlateTipX;
+        private readonly double arcRadius;
 
         private ISldWorks swApp;
 
@@ -74,17 +66,19 @@ namespace SolidWorksRenders
         {
             swApp = solidWorksApp ?? throw new ArgumentNullException(nameof(solidWorksApp));
 
-            // Calculate arc offsets for middle rib
-            arcOffsetX = ArcRadius * Math.Sin(ArcAngleOffset);
-            arcOffsetZ = ArcRadius * Math.Cos(ArcAngleOffset);
+            // Calculate derived parameters
+            summationPlateBaseLength = CoefficientsPlateLength / 2;
+            holeSpanLength = CoefficientsPlateLength - (2 * HoleMargin) - (2 * RibThickness);
+            holeSpacing = holeSpanLength / (HoleCount - 1);
+            holeOffsetX = -CoefficientsPlateWidth + HoleMargin;
+            holeOffsetY = CoefficientsPlateLength / 2 - HoleMargin - RibThickness;
+            summationAnchorHoleRadius = 2 * HoleRadius;
+            summationPlateTipX = SummationPlateHeight;  // cylinderCenterX is 0
+            arcRadius = CylinderRadius + RibPadding;
         }
 
-        /// <summary>
-        /// Creates the summing lever part with all components
-        /// </summary>
         public IModelDoc2 CreatePart()
         {
-            // Get part template from user preferences
             string partTemplate = swApp.GetUserPreferenceStringValue(
                 (int)swUserPreferenceStringValue_e.swDefaultTemplatePart);
 
@@ -93,7 +87,6 @@ namespace SolidWorksRenders
                 throw new InvalidOperationException("No part template found. Please set a default part template in SolidWorks options.");
             }
 
-            // Create new part document
             IModelDoc2 swModel = (IModelDoc2)swApp.NewDocument(
                 TemplateName: partTemplate,
                 PaperSize: 0,
@@ -105,15 +98,24 @@ namespace SolidWorksRenders
                 throw new InvalidOperationException("Failed to create new part document");
             }
 
-            // Create all components
+            // Create components in order
+            Console.WriteLine("Creating coefficients plate...");
             CreateCoefficientsPlate(swModel);
+
+            Console.WriteLine("Creating cylinder...");
             CreateCylinder(swModel);
-            // TODO: Edge ribs failing - needs debugging (sketch not closing properly)
-            // CreateEdgeRibs(swModel);
+
+            Console.WriteLine("Creating edge ribs...");
+            CreateEdgeRibs(swModel);
+
+            Console.WriteLine("Creating summation plate...");
             CreateSummationPlate(swModel);
+
+            Console.WriteLine("Creating summation anchor...");
             CreateSummationAnchor(swModel);
-            // TODO: Middle rib failing - needs debugging (sketch not closing properly)
-            // CreateMiddleRib(swModel);
+
+            Console.WriteLine("Creating middle rib...");
+            CreateMiddleRib(swModel);
 
             // Rebuild the model
             swModel.ForceRebuild3(true);
@@ -122,7 +124,8 @@ namespace SolidWorksRenders
         }
 
         /// <summary>
-        /// Creates the coefficients plate - rectangular plate with hole pattern
+        /// Creates the coefficients plate: rectangular plate with holes for spring connections
+        /// Sketch on XY plane (Top Plane), centered at [-coefficientsPlateWidth/2, 0]
         /// </summary>
         private void CreateCoefficientsPlate(IModelDoc2 swModel)
         {
@@ -130,9 +133,9 @@ namespace SolidWorksRenders
             IFeatureManager swFeatMgr = swModel.FeatureManager;
             IModelDocExtension swModelExt = swModel.Extension;
 
-            // Select XY Plane (Front Plane in SolidWorks)
+            // Select Top Plane (XY in KCL)
             bool selected = swModelExt.SelectByID2(
-                Name: "Front Plane",
+                Name: "Top Plane",
                 Type: "PLANE",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -141,52 +144,57 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select Front Plane");
+                throw new InvalidOperationException("Failed to select Top Plane for coefficients plate");
 
-            // Insert sketch on Front Plane
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
-            // Create rectangle centered at [-coefficientsPlateWidth / 2, 0]
-            // Rectangle from bottom-left to top-right
-            double rectLeft = -CoefficientsPlateWidth;
-            double rectRight = 0.0;
-            double rectBottom = -CoefficientsPlateLength / 2.0;
-            double rectTop = CoefficientsPlateLength / 2.0;
+            // Enable AddToDB for better performance
+            swSketchMgr.AddToDB = true;
 
-            // Create the rectangle
-            swSketchMgr.CreateCornerRectangle(
-                X1: rectLeft * IN_TO_M,
-                Y1: rectBottom * IN_TO_M,
-                Z1: 0,
-                X2: rectRight * IN_TO_M,
-                Y2: rectTop * IN_TO_M,
-                Z2: 0);
+            // Create the rectangle centered at [-coefficientsPlateWidth/2, 0]
+            // KCL: rectangle(width = coefficientsPlateWidth, height = coefficientsPlateLength, center = [-coefficientsPlateWidth / 2, 0])
+            double rectCenterX = -CoefficientsPlateWidth / 2;
+            double rectCenterY = 0;
 
-            // Create hole pattern - 20 holes in a linear pattern
-            // First hole position
-            double holeX = HoleOffsetX * IN_TO_M;
-            double holeY = -HoleOffsetY * IN_TO_M;
+            swSketchMgr.CreateCenterRectangle(
+                X1: rectCenterX, Y1: rectCenterY, Z1: 0,
+                X2: rectCenterX + CoefficientsPlateWidth / 2, Y2: rectCenterY + CoefficientsPlateLength / 2, Z2: 0);
+
+            // Create hole pattern
+            // KCL: holes at [holeOffsetX, -holeOffsetY], pattern linear along Y
+            // First hole is at [-coefficientsPlateWidth + holeMargin, -(coefficientsPlateLength/2 - holeMargin - ribThickness)]
+            double firstHoleX = holeOffsetX;
+            double firstHoleY = -holeOffsetY;
 
             // Create first hole
             swSketchMgr.CreateCircleByRadius(
-                XC: holeX,
-                YC: holeY,
+                XC: firstHoleX,
+                YC: firstHoleY,
                 Zc: 0,
-                Radius: HoleRadius * IN_TO_M);
+                Radius: HoleRadius);
+
+            // Create remaining holes in the pattern
+            for (int i = 1; i < HoleCount; i++)
+            {
+                swSketchMgr.CreateCircleByRadius(
+                    XC: firstHoleX,
+                    YC: firstHoleY + (i * holeSpacing),
+                    Zc: 0,
+                    Radius: HoleRadius);
+            }
+
+            swSketchMgr.AddToDB = false;
 
             // Exit sketch
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
-            // Get the sketch name
+            // Get the sketch
             swModel.ForceRebuild3(false);
             IFeature plateSketch = swModelExt.GetLastFeatureAdded();
-            if (plateSketch == null)
-                throw new InvalidOperationException("Failed to get coefficients plate sketch");
-
             string sketchName = plateSketch.Name;
             Console.WriteLine($"DEBUG: Coefficients plate sketch name: {sketchName}");
 
-            // Select the sketch for extrusion
+            // Select sketch for extrusion
             selected = swModelExt.SelectByID2(
                 Name: sketchName,
                 Type: "SKETCH",
@@ -199,15 +207,15 @@ namespace SolidWorksRenders
             if (!selected)
                 throw new InvalidOperationException($"Failed to select coefficients plate sketch '{sketchName}' for extrusion");
 
-            // Extrude the plate symmetrically
-            IFeature plateFeature = swFeatMgr.FeatureExtrusion3(
+            // Extrude symmetric (both directions)
+            IFeature extrudeFeature = swFeatMgr.FeatureExtrusion3(
                 Sd: false,                                         // Both directions (symmetric)
                 Flip: false,
                 Dir: false,
                 T1: (int)swEndConditions_e.swEndCondBlind,
                 T2: (int)swEndConditions_e.swEndCondBlind,
-                D1: PlateThickness / 2.0 * IN_TO_M,                // Half depth for symmetric
-                D2: PlateThickness / 2.0 * IN_TO_M,                // Half depth for symmetric
+                D1: PlateThickness / 2,                            // Half in each direction for symmetric
+                D2: PlateThickness / 2,
                 Dchk1: false,
                 Dchk2: false,
                 Ddir1: false,
@@ -225,26 +233,24 @@ namespace SolidWorksRenders
                 StartOffset: 0,
                 FlipStartOffset: false);
 
-            if (plateFeature == null)
+            if (extrudeFeature == null)
                 throw new InvalidOperationException("Failed to extrude coefficients plate");
 
-            // Now create a linear pattern for the holes
-            // We need to select the circle and create a linear pattern
-            // First, we need to create the hole as a cut feature
-            CreateHolePattern(swModel);
+            // Add appearance (green color)
+            // Note: SolidWorks API appearance is complex; skipping for now
         }
 
         /// <summary>
-        /// Creates the linear pattern of holes
+        /// Creates the cylinder along the long edge (perpendicular to rectangle)
+        /// Sketch on XZ plane (Front Plane)
         /// </summary>
-        private void CreateHolePattern(IModelDoc2 swModel)
+        private void CreateCylinder(IModelDoc2 swModel)
         {
             ISketchManager swSketchMgr = swModel.SketchManager;
             IFeatureManager swFeatMgr = swModel.FeatureManager;
             IModelDocExtension swModelExt = swModel.Extension;
 
-            // Select the top face of the plate for the hole sketch
-            // We'll select a face on the extruded plate
+            // Select Front Plane (XZ in KCL)
             bool selected = swModelExt.SelectByID2(
                 Name: "Front Plane",
                 Type: "PLANE",
@@ -255,151 +261,24 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select Front Plane for hole pattern");
+                throw new InvalidOperationException("Failed to select Front Plane for cylinder");
 
-            // Insert sketch
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
-            // Create first hole circle
-            double holeX = HoleOffsetX * IN_TO_M;
-            double holeY = -HoleOffsetY * IN_TO_M;
-
+            // Create circle at origin (cylinderCenterX=0, cylinderCenterZ=0)
             swSketchMgr.CreateCircleByRadius(
-                XC: holeX,
-                YC: holeY,
+                XC: 0,
+                YC: 0,
                 Zc: 0,
-                Radius: HoleRadius * IN_TO_M);
+                Radius: CylinderRadius);
 
-            // Exit sketch
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
-            // Get the sketch name
-            swModel.ForceRebuild3(false);
-            IFeature holeSketch = swModelExt.GetLastFeatureAdded();
-            if (holeSketch == null)
-                throw new InvalidOperationException("Failed to get hole sketch");
-
-            string holeSketchName = holeSketch.Name;
-            Console.WriteLine($"DEBUG: Hole sketch name: {holeSketchName}");
-
-            // Select the sketch for cut extrude
-            selected = swModelExt.SelectByID2(
-                Name: holeSketchName,
-                Type: "SKETCH",
-                X: 0, Y: 0, Z: 0,
-                Append: false,
-                Mark: 0,
-                Callout: null,
-                SelectOption: 0);
-
-            if (!selected)
-                throw new InvalidOperationException($"Failed to select hole sketch '{holeSketchName}' for cut");
-
-            // Cut through all
-            IFeature cutFeature = swFeatMgr.FeatureCut4(
-                Sd: true,                                          // Single direction
-                Flip: false,
-                Dir: false,
-                T1: (int)swEndConditions_e.swEndCondThroughAll,   // Through all
-                T2: (int)swEndConditions_e.swEndCondBlind,
-                D1: 0,
-                D2: 0,
-                Dchk1: false,
-                Dchk2: false,
-                Ddir1: false,
-                Ddir2: false,
-                Dang1: 0,
-                Dang2: 0,
-                OffsetReverse1: false,
-                OffsetReverse2: false,
-                TranslateSurface1: false,
-                TranslateSurface2: false,
-                NormalCut: false,
-                UseFeatScope: false,
-                UseAutoSelect: true,
-                AssemblyFeatureScope: false,
-                AutoSelectComponents: false,
-                PropagateFeatureToParts: false,
-                T0: (int)swStartConditions_e.swStartSketchPlane,
-                StartOffset: 0,
-                FlipStartOffset: false,
-                OptimizeGeometry: false);
-
-            if (cutFeature == null)
-                throw new InvalidOperationException("Failed to create hole cut");
-
-            // Now create linear pattern of this cut feature
-            // Select the cut feature
-            string cutFeatureName = cutFeature.Name;
-            Console.WriteLine($"DEBUG: Cut feature name: {cutFeatureName}");
-
-            selected = swModelExt.SelectByID2(
-                Name: cutFeatureName,
-                Type: "BODYFEATURE",
-                X: 0, Y: 0, Z: 0,
-                Append: false,
-                Mark: 4,  // Mark 4 for features to pattern
-                Callout: null,
-                SelectOption: 0);
-
-            if (!selected)
-                throw new InvalidOperationException($"Failed to select cut feature '{cutFeatureName}' for pattern");
-
-            // We need to specify direction using a reference edge or dimension
-            // For simplicity, we'll use the Y direction (vertical on the plate)
-            // Select a vertical edge of the rectangle for direction
-            // Create a reference line for the pattern direction
-
-            // For now, let's use FeatureLinearPattern5 which might be more flexible
-            // Actually, we need to create a simpler approach - just create all holes individually
-            // This is more straightforward for now
-        }
-
-        /// <summary>
-        /// Creates the cylinder along the long edge
-        /// </summary>
-        private void CreateCylinder(IModelDoc2 swModel)
-        {
-            ISketchManager swSketchMgr = swModel.SketchManager;
-            IFeatureManager swFeatMgr = swModel.FeatureManager;
-            IModelDocExtension swModelExt = swModel.Extension;
-
-            // Select XZ Plane (Top Plane in SolidWorks) to sketch the cylinder profile
-            // The cylinder will be extruded along Y (parallel to the plate's long edge)
-            bool selected = swModelExt.SelectByID2(
-                Name: "Top Plane",
-                Type: "PLANE",
-                X: 0, Y: 0, Z: 0,
-                Append: false,
-                Mark: 0,
-                Callout: null,
-                SelectOption: 0);
-
-            if (!selected)
-                throw new InvalidOperationException("Failed to select Top Plane");
-
-            // Insert sketch
-            swSketchMgr.InsertSketch(UpdateEditRebuild: true);
-
-            // Create circle for cylinder
-            swSketchMgr.CreateCircleByRadius(
-                XC: CylinderCenterX * IN_TO_M,
-                YC: CylinderCenterZ * IN_TO_M,
-                Zc: 0,
-                Radius: CylinderRadius * IN_TO_M);
-
-            // Exit sketch
-            swSketchMgr.InsertSketch(UpdateEditRebuild: true);
-
-            // Get the sketch name
             swModel.ForceRebuild3(false);
             IFeature cylinderSketch = swModelExt.GetLastFeatureAdded();
-            if (cylinderSketch == null)
-                throw new InvalidOperationException("Failed to get cylinder sketch");
-
             string sketchName = cylinderSketch.Name;
+            Console.WriteLine($"DEBUG: Cylinder sketch name: {sketchName}");
 
-            // Select the sketch for extrusion
             selected = swModelExt.SelectByID2(
                 Name: sketchName,
                 Type: "SKETCH",
@@ -412,15 +291,15 @@ namespace SolidWorksRenders
             if (!selected)
                 throw new InvalidOperationException($"Failed to select cylinder sketch '{sketchName}' for extrusion");
 
-            // Extrude symmetrically along Y axis (the length of the plate)
-            IFeature cylinderFeature = swFeatMgr.FeatureExtrusion3(
-                Sd: false,                                         // Both directions (symmetric)
+            // Extrude symmetric along Y axis
+            IFeature extrudeFeature = swFeatMgr.FeatureExtrusion3(
+                Sd: false,                                         // Both directions
                 Flip: false,
                 Dir: false,
                 T1: (int)swEndConditions_e.swEndCondBlind,
                 T2: (int)swEndConditions_e.swEndCondBlind,
-                D1: CoefficientsPlateLength / 2.0 * IN_TO_M,      // Half length for symmetric
-                D2: CoefficientsPlateLength / 2.0 * IN_TO_M,
+                D1: CoefficientsPlateLength / 2,
+                D2: CoefficientsPlateLength / 2,
                 Dchk1: false,
                 Dchk2: false,
                 Ddir1: false,
@@ -438,24 +317,44 @@ namespace SolidWorksRenders
                 StartOffset: 0,
                 FlipStartOffset: false);
 
-            if (cylinderFeature == null)
+            if (extrudeFeature == null)
                 throw new InvalidOperationException("Failed to extrude cylinder");
         }
 
         /// <summary>
-        /// Creates the edge ribs at the short edges of the coefficients plate
+        /// Creates the edge ribs at short edges of coefficients plate.
+        /// Sketch on XZ plane (Front Plane)
+        /// The profile is a triangular shape with an arc wrapping around the cylinder.
         /// </summary>
         private void CreateEdgeRibs(IModelDoc2 swModel)
         {
-            // Edge ribs use a triangular profile with an arc
-            // This is complex and will need arc creation
             ISketchManager swSketchMgr = swModel.SketchManager;
             IFeatureManager swFeatMgr = swModel.FeatureManager;
             IModelDocExtension swModelExt = swModel.Extension;
 
-            // Select XZ Plane (Top Plane)
+            double cx = 0;  // cylinderCenterX
+            double cz = 0;  // cylinderCenterZ
+            double arcTop = CylinderRadius + RibPadding;
+
+            // Create first edge rib
+            CreateSingleEdgeRib(swModel, swSketchMgr, swFeatMgr, swModelExt,
+                cx, cz, arcTop, CoefficientsPlateLength / 2 - RibThickness, false);
+
+            // Create second edge rib at opposite end
+            CreateSingleEdgeRib(swModel, swSketchMgr, swFeatMgr, swModelExt,
+                cx, cz, arcTop, -(CoefficientsPlateLength / 2 - RibThickness), true);
+        }
+
+        /// <summary>
+        /// Creates a single edge rib at the specified Y offset
+        /// </summary>
+        private void CreateSingleEdgeRib(IModelDoc2 swModel, ISketchManager swSketchMgr,
+            IFeatureManager swFeatMgr, IModelDocExtension swModelExt,
+            double cx, double cz, double arcTop, double yOffset, bool flipDir)
+        {
+            // Select Front Plane (XZ in KCL)
             bool selected = swModelExt.SelectByID2(
-                Name: "Top Plane",
+                Name: "Front Plane",
                 Type: "PLANE",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -464,65 +363,39 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select Top Plane for edge ribs");
+                throw new InvalidOperationException("Failed to select Front Plane for edge rib");
 
-            // Insert sketch
+            swSketchMgr.InsertSketch(UpdateEditRebuild: true);
+            swSketchMgr.AddToDB = true;
+
+            // Edge rib profile: triangular shape with curved side wrapping cylinder
+            // Vertices:
+            // A: [0, arcTop] - top point on arc
+            // B: [-coefficientsPlateWidth, 0] - left vertex (tip of triangle)
+            // C: [0, -arcTop] - bottom point on arc
+            // Arc from C back to A through right side (wrapping around cylinder)
+
+            // Line from top (A) to left corner (B)
+            swSketchMgr.CreateLine(cx, cz + arcTop, 0, cx - CoefficientsPlateWidth, cz, 0);
+
+            // Line from left corner (B) to bottom (C)
+            swSketchMgr.CreateLine(cx - CoefficientsPlateWidth, cz, 0, cx, cz - arcTop, 0);
+
+            // Arc from bottom (C) back to top (A) through right side
+            // 3-point arc: start, end, interior point
+            swSketchMgr.Create3PointArc(
+                X1: cx, Y1: cz - arcTop, Z1: 0,              // Start point (C)
+                X2: cx, Y2: cz + arcTop, Z2: 0,              // End point (A)
+                X3: cx + arcTop, Y3: cz, Z3: 0);             // Interior point (right side)
+
+            swSketchMgr.AddToDB = false;
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
-            // Create the profile matching KCL edge rib
-            // On XZ plane (Top Plane), X maps to sketch X, Z maps to sketch Y
-            double xCenter = CylinderCenterX * IN_TO_M;
-            double zCenter = CylinderCenterZ * IN_TO_M;
-            double arcRadius = (CylinderRadius + RibPadding) * IN_TO_M;
-            double xLeft = (CylinderCenterX - CoefficientsPlateWidth) * IN_TO_M;
-
-            // Start at center [0, 0]
-            double x1 = xCenter;
-            double z1 = zCenter;
-
-            // Point 2: yLine up (positive Z direction)
-            double x2 = xCenter;
-            double z2 = zCenter + arcRadius;
-
-            // Point 3: line to left edge at center height
-            double x3 = xLeft;
-            double z3 = zCenter;
-
-            // Point 4: line back to center X, bottom
-            double x4 = xCenter;
-            double z4 = zCenter - arcRadius;
-
-            // Draw the profile
-            swSketchMgr.CreateLine(x1, z1, 0, x2, z2, 0);  // Up
-            swSketchMgr.CreateLine(x2, z2, 0, x3, z3, 0);  // To left
-            swSketchMgr.CreateLine(x3, z3, 0, x4, z4, 0);  // Back to center X, down
-
-            // Arc from point 4 back to point 2 (closing the profile)
-            // Arc center is at cylinder center, going counter-clockwise
-            swSketchMgr.CreateArc(
-                XC: xCenter,
-                YC: zCenter,
-                Zc: 0,
-                X1: x4,
-                Y1: z4,
-                Z1: 0,
-                X2: x2,
-                Y2: z2,
-                Z2: 0,
-                Direction: 1);  // Counter-clockwise
-
-            // Exit sketch
-            swSketchMgr.InsertSketch(UpdateEditRebuild: true);
-
-            // Get the sketch name
             swModel.ForceRebuild3(false);
             IFeature ribSketch = swModelExt.GetLastFeatureAdded();
-            if (ribSketch == null)
-                throw new InvalidOperationException("Failed to get edge rib sketch");
-
             string sketchName = ribSketch.Name;
+            Console.WriteLine($"DEBUG: Edge rib sketch name: {sketchName}");
 
-            // Select the sketch for extrusion
             selected = swModelExt.SelectByID2(
                 Name: sketchName,
                 Type: "SKETCH",
@@ -535,14 +408,14 @@ namespace SolidWorksRenders
             if (!selected)
                 throw new InvalidOperationException($"Failed to select edge rib sketch '{sketchName}' for extrusion");
 
-            // Extrude the rib
+            // Extrude the rib with offset from sketch plane
             IFeature ribFeature = swFeatMgr.FeatureExtrusion3(
-                Sd: true,                                          // Single direction
+                Sd: true,
                 Flip: false,
-                Dir: false,
+                Dir: flipDir,
                 T1: (int)swEndConditions_e.swEndCondBlind,
                 T2: (int)swEndConditions_e.swEndCondBlind,
-                D1: RibThickness * IN_TO_M,
+                D1: RibThickness,
                 D2: 0,
                 Dchk1: false,
                 Dchk2: false,
@@ -557,25 +430,35 @@ namespace SolidWorksRenders
                 Merge: true,
                 UseFeatScope: false,
                 UseAutoSelect: true,
-                T0: (int)swStartConditions_e.swStartSketchPlane,
-                StartOffset: 0,
-                FlipStartOffset: false);
+                T0: (int)swStartConditions_e.swStartOffset,
+                StartOffset: Math.Abs(yOffset),
+                FlipStartOffset: yOffset < 0);
 
             if (ribFeature == null)
             {
-                Console.WriteLine($"ERROR: Edge rib extrusion failed");
-                Console.WriteLine($"Sketch name: {sketchName}");
-                Console.WriteLine($"Check if sketch is closed and properly constrained");
-                throw new InvalidOperationException("Failed to extrude edge rib");
+                // Diagnose the failure
+                selected = swModelExt.SelectByID2(sketchName, "SKETCH", 0, 0, 0, false, 0, null, 0);
+                if (selected)
+                {
+                    ISelectionMgr selMgr = (ISelectionMgr)swModel.SelectionManager;
+                    ISketch sketch = (ISketch)((IFeature)selMgr.GetSelectedObject6(1, -1)).GetSpecificFeature2();
+                    int openCount = 0, closedCount = 0;
+                    int statusCode = sketch.CheckFeatureUse(
+                        (int)swSketchCheckFeatureProfileUsage_e.swSketchCheckFeature_BASEEXTRUDE,
+                        ref openCount,
+                        ref closedCount);
+                    swSketchCheckFeatureStatus_e status = (swSketchCheckFeatureStatus_e)statusCode;
+                    Console.WriteLine($"DEBUG: Sketch check status: {status}, Open: {openCount}, Closed: {closedCount}");
+                }
+                throw new InvalidOperationException($"Failed to extrude edge rib (yOffset={yOffset})");
             }
 
-            // Note: The KCL creates a linear pattern with 2 instances
-            // We would need to implement pattern here or create the second rib manually
-            // For now, we'll note this as a TODO
+            Console.WriteLine($"DEBUG: Edge rib feature name: {ribFeature.Name}");
         }
 
         /// <summary>
-        /// Creates the summation plate - triangular extension with curved sides
+        /// Creates the summation plate: triangular extension with curved sides
+        /// Sketch on XY plane (Top Plane)
         /// </summary>
         private void CreateSummationPlate(IModelDoc2 swModel)
         {
@@ -583,9 +466,8 @@ namespace SolidWorksRenders
             IFeatureManager swFeatMgr = swModel.FeatureManager;
             IModelDocExtension swModelExt = swModel.Extension;
 
-            // Select XY Plane (Front Plane)
             bool selected = swModelExt.SelectByID2(
-                Name: "Front Plane",
+                Name: "Top Plane",
                 Type: "PLANE",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -594,55 +476,58 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select Front Plane for summation plate");
+                throw new InvalidOperationException("Failed to select Top Plane for summation plate");
 
-            // Insert sketch
+            swSketchMgr.InsertSketch(UpdateEditRebuild: true);
+            swSketchMgr.AddToDB = true;
+
+            // KCL summation plate profile:
+            // startProfile(at = [cylinderCenterX, -summationPlateBaseLength / 2])
+            // line(end = [0, summationPlateBaseLength])
+            // arc(interiorAbsolute = [summationPlateHeight/2, summationPlateBaseLength/4 - curvature],
+            //     endAbsolute = [summationPlateHeight, summationAnchorRadius])
+            // line(end = [0, -summationAnchorRadius * 2])
+            // arc(interiorAbsolute = [summationPlateHeight/2, -summationPlateBaseLength/4 + curvature],
+            //     endAbsolute = [0, -summationPlateBaseLength/2])
+            // close()
+
+            double cx = 0;  // cylinderCenterX
+            double baseHalf = summationPlateBaseLength / 2;
+
+            // Point 1: [0, -baseHalf]
+            // Point 2: [0, baseHalf]
+            // Arc to Point 3: [summationPlateHeight, summationAnchorRadius]
+            // Point 4: [summationPlateHeight, -summationAnchorRadius]
+            // Arc back to Point 1
+
+            // Line from bottom to top (left edge)
+            swSketchMgr.CreateLine(cx, -baseHalf, 0, cx, baseHalf, 0);
+
+            // Arc from top-left to tip-top
+            swSketchMgr.Create3PointArc(
+                X1: cx, Y1: baseHalf, Z1: 0,                                           // Start
+                X2: summationPlateTipX, Y2: SummationAnchorRadius, Z2: 0,              // End
+                X3: SummationPlateHeight / 2, Y3: baseHalf / 2 - SummationPlateCurvature, Z3: 0);  // Interior
+
+            // Line across the tip (short edge at anchor)
+            swSketchMgr.CreateLine(
+                summationPlateTipX, SummationAnchorRadius, 0,
+                summationPlateTipX, -SummationAnchorRadius, 0);
+
+            // Arc from tip-bottom back to bottom-left
+            swSketchMgr.Create3PointArc(
+                X1: summationPlateTipX, Y1: -SummationAnchorRadius, Z1: 0,             // Start
+                X2: cx, Y2: -baseHalf, Z2: 0,                                          // End
+                X3: SummationPlateHeight / 2, Y3: -baseHalf / 2 + SummationPlateCurvature, Z3: 0);  // Interior
+
+            swSketchMgr.AddToDB = false;
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
-            // Create the profile with lines and arcs
-            // Start point at [cylinderCenterX, -summationPlateBaseLength / 2]
-            double x1 = CylinderCenterX * IN_TO_M;
-            double y1 = (-SummationPlateBaseLength / 2.0) * IN_TO_M;
-
-            // Line 1: vertical line up
-            double y2 = (SummationPlateBaseLength / 2.0) * IN_TO_M;
-            swSketchMgr.CreateLine(x1, y1, 0, x1, y2, 0);
-
-            // Arc 1: from top of line to right point
-            // Note: Interior point for arc curvature (not used in line approximation):
-            // arc1InteriorX = (CylinderCenterX + SummationPlateHeight / 2.0)
-            // arc1InteriorY = (SummationPlateBaseLength / 4.0 - SummationPlateCurvature)
-            double arc1EndX = (CylinderCenterX + SummationPlateHeight) * IN_TO_M;
-            double arc1EndY = (CylinderCenterZ + SummationAnchorRadius) * IN_TO_M;
-
-            // We need to create a 3-point arc
-            // SolidWorks CreateArc requires center, start, end, direction
-            // For a 3-point arc (start, interior, end), we need to calculate the center
-            // This is complex - for now we'll use a simplified approach with spline or approximate
-
-            // Simplified: use line for now (TODO: implement proper arc)
-            swSketchMgr.CreateLine(x1, y2, 0, arc1EndX, arc1EndY, 0);
-
-            // Line 2: short vertical line down
-            double line2EndY = (CylinderCenterZ - SummationAnchorRadius) * IN_TO_M;
-            swSketchMgr.CreateLine(arc1EndX, arc1EndY, 0, arc1EndX, line2EndY, 0);
-
-            // Arc 2: from right point back to bottom of base line
-            // Simplified: use line for now (TODO: implement proper arc)
-            swSketchMgr.CreateLine(arc1EndX, line2EndY, 0, x1, y1, 0);
-
-            // Exit sketch
-            swSketchMgr.InsertSketch(UpdateEditRebuild: true);
-
-            // Get the sketch name
             swModel.ForceRebuild3(false);
             IFeature summationSketch = swModelExt.GetLastFeatureAdded();
-            if (summationSketch == null)
-                throw new InvalidOperationException("Failed to get summation plate sketch");
-
             string sketchName = summationSketch.Name;
+            Console.WriteLine($"DEBUG: Summation plate sketch name: {sketchName}");
 
-            // Select the sketch for extrusion
             selected = swModelExt.SelectByID2(
                 Name: sketchName,
                 Type: "SKETCH",
@@ -655,15 +540,15 @@ namespace SolidWorksRenders
             if (!selected)
                 throw new InvalidOperationException($"Failed to select summation plate sketch '{sketchName}' for extrusion");
 
-            // Extrude symmetrically
-            IFeature summationFeature = swFeatMgr.FeatureExtrusion3(
-                Sd: false,                                         // Both directions (symmetric)
+            // Extrude symmetric
+            IFeature extrudeFeature = swFeatMgr.FeatureExtrusion3(
+                Sd: false,
                 Flip: false,
                 Dir: false,
                 T1: (int)swEndConditions_e.swEndCondBlind,
                 T2: (int)swEndConditions_e.swEndCondBlind,
-                D1: PlateThickness / 2.0 * IN_TO_M,
-                D2: PlateThickness / 2.0 * IN_TO_M,
+                D1: PlateThickness / 2,
+                D2: PlateThickness / 2,
                 Dchk1: false,
                 Dchk2: false,
                 Ddir1: false,
@@ -681,12 +566,13 @@ namespace SolidWorksRenders
                 StartOffset: 0,
                 FlipStartOffset: false);
 
-            if (summationFeature == null)
+            if (extrudeFeature == null)
                 throw new InvalidOperationException("Failed to extrude summation plate");
         }
 
         /// <summary>
-        /// Creates the summation anchor - cylinder at summation plate tip with center hole
+        /// Creates the summation anchor: cylinder at summation plate tip with center hole
+        /// Sketch on XY plane (Top Plane)
         /// </summary>
         private void CreateSummationAnchor(IModelDoc2 swModel)
         {
@@ -694,9 +580,8 @@ namespace SolidWorksRenders
             IFeatureManager swFeatMgr = swModel.FeatureManager;
             IModelDocExtension swModelExt = swModel.Extension;
 
-            // Select XY Plane (Front Plane)
             bool selected = swModelExt.SelectByID2(
-                Name: "Front Plane",
+                Name: "Top Plane",
                 Type: "PLANE",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -705,37 +590,33 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select Front Plane for summation anchor");
+                throw new InvalidOperationException("Failed to select Top Plane for summation anchor");
 
-            // Insert sketch
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
+            swSketchMgr.AddToDB = true;
 
-            // Create outer circle
+            // Outer circle for anchor
             swSketchMgr.CreateCircleByRadius(
-                XC: SummationPlateTipX * IN_TO_M,
+                XC: summationPlateTipX,
                 YC: 0,
                 Zc: 0,
-                Radius: SummationAnchorRadius * IN_TO_M);
+                Radius: SummationAnchorRadius);
 
-            // Create inner circle (hole)
+            // Inner circle for hole
             swSketchMgr.CreateCircleByRadius(
-                XC: SummationPlateTipX * IN_TO_M,
+                XC: summationPlateTipX,
                 YC: 0,
                 Zc: 0,
-                Radius: SummationAnchorHoleRadius * IN_TO_M);
+                Radius: summationAnchorHoleRadius);
 
-            // Exit sketch
+            swSketchMgr.AddToDB = false;
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
-            // Get the sketch name
             swModel.ForceRebuild3(false);
             IFeature anchorSketch = swModelExt.GetLastFeatureAdded();
-            if (anchorSketch == null)
-                throw new InvalidOperationException("Failed to get summation anchor sketch");
-
             string sketchName = anchorSketch.Name;
+            Console.WriteLine($"DEBUG: Summation anchor sketch name: {sketchName}");
 
-            // Select the sketch for extrusion
             selected = swModelExt.SelectByID2(
                 Name: sketchName,
                 Type: "SKETCH",
@@ -748,15 +629,15 @@ namespace SolidWorksRenders
             if (!selected)
                 throw new InvalidOperationException($"Failed to select summation anchor sketch '{sketchName}' for extrusion");
 
-            // Extrude symmetrically
-            IFeature anchorFeature = swFeatMgr.FeatureExtrusion3(
-                Sd: false,                                         // Both directions (symmetric)
+            // Extrude symmetric
+            IFeature extrudeFeature = swFeatMgr.FeatureExtrusion3(
+                Sd: false,
                 Flip: false,
                 Dir: false,
                 T1: (int)swEndConditions_e.swEndCondBlind,
                 T2: (int)swEndConditions_e.swEndCondBlind,
-                D1: SummationAnchorHeight / 2.0 * IN_TO_M,
-                D2: SummationAnchorHeight / 2.0 * IN_TO_M,
+                D1: SummationAnchorHeight / 2,
+                D2: SummationAnchorHeight / 2,
                 Dchk1: false,
                 Dchk2: false,
                 Ddir1: false,
@@ -774,12 +655,13 @@ namespace SolidWorksRenders
                 StartOffset: 0,
                 FlipStartOffset: false);
 
-            if (anchorFeature == null)
+            if (extrudeFeature == null)
                 throw new InvalidOperationException("Failed to extrude summation anchor");
         }
 
         /// <summary>
-        /// Creates the middle rib - elongated diamond with rounded corners
+        /// Creates the middle rib: elongated diamond with rounded corners near cylinder
+        /// Sketch on XZ plane (Front Plane)
         /// </summary>
         private void CreateMiddleRib(IModelDoc2 swModel)
         {
@@ -787,9 +669,8 @@ namespace SolidWorksRenders
             IFeatureManager swFeatMgr = swModel.FeatureManager;
             IModelDocExtension swModelExt = swModel.Extension;
 
-            // Select XZ Plane (Top Plane)
             bool selected = swModelExt.SelectByID2(
-                Name: "Top Plane",
+                Name: "Front Plane",
                 Type: "PLANE",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -798,78 +679,74 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select Top Plane for middle rib");
+                throw new InvalidOperationException("Failed to select Front Plane for middle rib");
 
-            // Insert sketch
+            swSketchMgr.InsertSketch(UpdateEditRebuild: true);
+            swSketchMgr.AddToDB = true;
+
+            // KCL middle rib profile (elongated diamond with rounded corners):
+            // arcAngleOffset = 45deg
+            // arcOffsetX = arcRadius * sin(45) = arcRadius * 0.7071
+            // arcOffsetZ = arcRadius * cos(45) = arcRadius * 0.7071
+
+            double arcAngle = Math.PI / 4;  // 45 degrees
+            double arcOffsetX = arcRadius * Math.Sin(arcAngle);
+            double arcOffsetZ = arcRadius * Math.Cos(arcAngle);
+
+            double cx = 0;  // cylinderCenterX
+            double cz = 0;  // cylinderCenterZ
+
+            // Points in the KCL profile:
+            // leftVertex: [-coefficientsPlateWidth, 0]
+            // upper-left arc start: [-arcOffsetX, arcOffsetZ]
+            // top of arc: [0, arcRadius]
+            // upper-right arc end: [arcOffsetX, arcOffsetZ]
+            // right vertex: [summationPlateTipX, 0]
+            // lower-right arc start: [arcOffsetX, -arcOffsetZ]
+            // bottom of arc: [0, -arcRadius]
+            // lower-left arc end: [-arcOffsetX, -arcOffsetZ]
+            // back to leftVertex
+
+            // Line from left vertex to upper-left arc start
+            swSketchMgr.CreateLine(
+                -CoefficientsPlateWidth, cz, 0,
+                cx - arcOffsetX, cz + arcOffsetZ, 0);
+
+            // Arc from upper-left to upper-right through top
+            swSketchMgr.Create3PointArc(
+                X1: cx - arcOffsetX, Y1: cz + arcOffsetZ, Z1: 0,   // Start
+                X2: cx + arcOffsetX, Y2: cz + arcOffsetZ, Z2: 0,   // End
+                X3: cx, Y3: cz + arcRadius, Z3: 0);                // Interior (top)
+
+            // Line from upper-right to right vertex
+            swSketchMgr.CreateLine(
+                cx + arcOffsetX, cz + arcOffsetZ, 0,
+                summationPlateTipX, cz, 0);
+
+            // Line from right vertex to lower-right arc start
+            swSketchMgr.CreateLine(
+                summationPlateTipX, cz, 0,
+                cx + arcOffsetX, cz - arcOffsetZ, 0);
+
+            // Arc from lower-right to lower-left through bottom
+            swSketchMgr.Create3PointArc(
+                X1: cx + arcOffsetX, Y1: cz - arcOffsetZ, Z1: 0,   // Start
+                X2: cx - arcOffsetX, Y2: cz - arcOffsetZ, Z2: 0,   // End
+                X3: cx, Y3: cz - arcRadius, Z3: 0);                // Interior (bottom)
+
+            // Line from lower-left back to left vertex
+            swSketchMgr.CreateLine(
+                cx - arcOffsetX, cz - arcOffsetZ, 0,
+                -CoefficientsPlateWidth, cz, 0);
+
+            swSketchMgr.AddToDB = false;
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
-            // Create the diamond profile with arcs at rounded corners
-            // Start at left vertex
-            double xStart = -CoefficientsPlateWidth * IN_TO_M;
-            double zStart = CylinderCenterZ * IN_TO_M;
-
-            // Point 1: left vertex to top-left arc start
-            double x1 = (CylinderCenterX - arcOffsetX) * IN_TO_M;
-            double z1 = (CylinderCenterZ + arcOffsetZ) * IN_TO_M;
-            swSketchMgr.CreateLine(xStart, zStart, 0, x1, z1, 0);
-
-            // Arc 1: top arc (counter-clockwise from left to right)
-            double xArcCenter = CylinderCenterX * IN_TO_M;
-            double zArcCenter = CylinderCenterZ * IN_TO_M;
-            double x2 = (CylinderCenterX + arcOffsetX) * IN_TO_M;
-            double z2 = (CylinderCenterZ + arcOffsetZ) * IN_TO_M;
-            swSketchMgr.CreateArc(
-                XC: xArcCenter,
-                YC: zArcCenter,
-                Zc: 0,
-                X1: x1,
-                Y1: z1,
-                Z1: 0,
-                X2: x2,
-                Y2: z2,
-                Z2: 0,
-                Direction: 1);  // Counter-clockwise
-
-            // Line 2: to right vertex
-            double xRight = SummationPlateTipX * IN_TO_M;
-            double zRight = CylinderCenterZ * IN_TO_M;
-            swSketchMgr.CreateLine(x2, z2, 0, xRight, zRight, 0);
-
-            // Line 3: to bottom-right arc start
-            double x3 = (CylinderCenterX + arcOffsetX) * IN_TO_M;
-            double z3 = (CylinderCenterZ - arcOffsetZ) * IN_TO_M;
-            swSketchMgr.CreateLine(xRight, zRight, 0, x3, z3, 0);
-
-            // Arc 2: bottom arc (counter-clockwise from right to left)
-            double x4 = (CylinderCenterX - arcOffsetX) * IN_TO_M;
-            double z4 = (CylinderCenterZ - arcOffsetZ) * IN_TO_M;
-            swSketchMgr.CreateArc(
-                XC: xArcCenter,
-                YC: zArcCenter,
-                Zc: 0,
-                X1: x3,
-                Y1: z3,
-                Z1: 0,
-                X2: x4,
-                Y2: z4,
-                Z2: 0,
-                Direction: 1);  // Counter-clockwise
-
-            // Line 4: close back to start
-            swSketchMgr.CreateLine(x4, z4, 0, xStart, zStart, 0);
-
-            // Exit sketch
-            swSketchMgr.InsertSketch(UpdateEditRebuild: true);
-
-            // Get the sketch name
             swModel.ForceRebuild3(false);
             IFeature ribSketch = swModelExt.GetLastFeatureAdded();
-            if (ribSketch == null)
-                throw new InvalidOperationException("Failed to get middle rib sketch");
-
             string sketchName = ribSketch.Name;
+            Console.WriteLine($"DEBUG: Middle rib sketch name: {sketchName}");
 
-            // Select the sketch for extrusion
             selected = swModelExt.SelectByID2(
                 Name: sketchName,
                 Type: "SKETCH",
@@ -882,15 +759,15 @@ namespace SolidWorksRenders
             if (!selected)
                 throw new InvalidOperationException($"Failed to select middle rib sketch '{sketchName}' for extrusion");
 
-            // Extrude symmetrically
-            IFeature ribFeature = swFeatMgr.FeatureExtrusion3(
-                Sd: false,                                         // Both directions (symmetric)
+            // Extrude symmetric
+            IFeature extrudeFeature = swFeatMgr.FeatureExtrusion3(
+                Sd: false,
                 Flip: false,
                 Dir: false,
                 T1: (int)swEndConditions_e.swEndCondBlind,
                 T2: (int)swEndConditions_e.swEndCondBlind,
-                D1: RibThickness / 2.0 * IN_TO_M,
-                D2: RibThickness / 2.0 * IN_TO_M,
+                D1: RibThickness / 2,
+                D2: RibThickness / 2,
                 Dchk1: false,
                 Dchk2: false,
                 Ddir1: false,
@@ -908,23 +785,19 @@ namespace SolidWorksRenders
                 StartOffset: 0,
                 FlipStartOffset: false);
 
-            if (ribFeature == null)
+            if (extrudeFeature == null)
                 throw new InvalidOperationException("Failed to extrude middle rib");
         }
 
-        /// <summary>
-        /// Prints summing lever part details
-        /// </summary>
         public void PrintPartDetails()
         {
             Console.WriteLine("\nPart Details:");
-            Console.WriteLine($"- Coefficients Plate: {CoefficientsPlateWidth}\" x {CoefficientsPlateLength}\" x {PlateThickness}\"");
-            Console.WriteLine($"- Hole Pattern: {HoleCount} holes, {HoleRadius}\" radius, {HoleSpacing:F3}\" spacing");
-            Console.WriteLine($"- Cylinder: {CylinderRadius}\" radius, {CoefficientsPlateLength}\" length");
-            Console.WriteLine($"- Summation Plate: {SummationPlateHeight}\" height, {SummationPlateBaseLength}\" base");
-            Console.WriteLine($"- Summation Anchor: {SummationAnchorRadius}\" radius, {SummationAnchorHeight}\" height");
-            Console.WriteLine($"- Edge Ribs: {RibThickness}\" thick");
-            Console.WriteLine($"- Middle Rib: {RibThickness}\" thick, elongated diamond profile");
+            Console.WriteLine($"- Coefficients plate: {CoefficientsPlateWidth / InchToMeter}\" x {CoefficientsPlateLength / InchToMeter}\" x {PlateThickness / InchToMeter}\"");
+            Console.WriteLine($"- Cylinder radius: {CylinderRadius / InchToMeter}\"");
+            Console.WriteLine($"- Rib thickness: {RibThickness / InchToMeter}\"");
+            Console.WriteLine($"- Summation plate height: {SummationPlateHeight / InchToMeter}\"");
+            Console.WriteLine($"- Summation anchor radius: {SummationAnchorRadius / InchToMeter}\"");
+            Console.WriteLine($"- Hole pattern: {HoleCount} holes at {HoleRadius / InchToMeter}\" radius");
         }
     }
 }
