@@ -81,12 +81,6 @@ cat .claude/skills/developing-solidworks/enums/swEndConditions_e/swEndCondBlind.
 grep -r "swEndConditions_e" .claude/skills/developing-solidworks/examples/
 ```
 
-**Enum casting**: Always cast to `int` for API parameters, cast back for readable output:
-```csharp
-Dir1: (int)swEndConditions_e.swEndCondBlind                           // API input
-var status = (swSketchCheckFeatureStatus_e)sketch.CheckFeatureUse();  // readable output
-```
-
 **Navigate by category**
 ```bash
 # View all types in a category
@@ -156,6 +150,18 @@ if (!success)
 {
     throw new Exception("Selection failed");
 }
+```
+
+**Type casting** (consult documentation for exact return types, cast appropriately):
+```csharp
+// Enum casting - cast to int for API input, cast from int for readable output
+Dir1: (int)swEndConditions_e.swEndCondBlind                          // API parameter
+var status = (swSketchCheckFeatureStatus_e)sketch.CheckFeatureUse(); // Return value
+
+// Interface casting - check docs for return type, chain casts as needed
+ISketch sketch = (ISketch)((IFeature)doc.SelectionManager.GetSelectedObject6(1, -1)).GetSpecificFeature2();
+
+// Always verify return types in documentation before casting
 ```
 
 **Run code before claiming success** (you MUST run your new code using `dotnet run` or similar. Just building it is NOT enough)
