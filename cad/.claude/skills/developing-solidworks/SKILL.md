@@ -184,7 +184,7 @@ if (doc.GetType() != (int)swDocumentTypes_e.swDocPART)
 Before delivering code:
 ```
 Code Quality:
-- [ ] Consulted API documentation (types/, enums/, docs/, examples/)
+- [ ] Consulted API documentation (types/, enums/, docs/, examples/, learnings/)
 - [ ] Used latest SDK library references
 - [ ] Applied documented API patterns
 - [ ] Used named parameters
