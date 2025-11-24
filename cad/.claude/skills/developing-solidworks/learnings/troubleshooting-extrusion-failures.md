@@ -27,16 +27,20 @@ if (feature == null) {
 
     // Diagnose the problem
     int openCount = 0, closedCount = 0;
-    int status = sketch.CheckFeatureUse(
+    int statusCode = sketch.CheckFeatureUse(
         (int)swSketchCheckFeatureProfileUsage_e.swSketchCheckFeature_BASEEXTRUDE,
         ref openCount,
         ref closedCount
     );
 
+    // Cast to enum for readability
+    swSketchCheckFeatureStatus_e status = (swSketchCheckFeatureStatus_e)statusCode;
+    Console.WriteLine($"Status: {status}");
+
     // Interpret results
-    if (status == (int)swSketchCheckFeatureStatus_e.swSketchCheckFeatureStatus_CturXCtur ||
-        status == (int)swSketchCheckFeatureStatus_e.swSketchCheckFeatureStatus_EntXSelf ||
-        status == (int)swSketchCheckFeatureStatus_e.swSketchCheckFeatureStatus_EntXEnt) {
+    if (status == swSketchCheckFeatureStatus_e.swSketchCheckFeatureStatus_CturXCtur ||
+        status == swSketchCheckFeatureStatus_e.swSketchCheckFeatureStatus_EntXSelf ||
+        status == swSketchCheckFeatureStatus_e.swSketchCheckFeatureStatus_EntXEnt) {
         Console.WriteLine("Self-intersecting geometry detected");
     }
 }
@@ -58,11 +62,11 @@ If the feature object exists but has errors:
 
 ```csharp
 if (feature != null) {
-    bool isWarning = false;
-    int errorCode = feature.GetErrorCode2(out isWarning);
+    int errorCode = feature.GetErrorCode2(out bool isWarning);
+    swFeatureError_e error = (swFeatureError_e)errorCode;
 
-    if (errorCode == (int)swFeatureError_e.swFeatureErrorSketchContainsSelfIntersectingContour) {
-        Console.WriteLine("Sketch contains self-intersecting contour");
+    if (error == swFeatureError_e.swFeatureErrorSketchContainsSelfIntersectingContour) {
+        Console.WriteLine($"Error: {error}");
     }
 }
 ```
@@ -93,18 +97,20 @@ if (feature == null) {
     ISketch sketch = (ISketch)((IFeature)doc.SelectionManager.GetSelectedObject6(1, -1)).GetSpecificFeature2();
 
     int openCount = 0, closedCount = 0;
-    int status = sketch.CheckFeatureUse(
+    int statusCode = sketch.CheckFeatureUse(
         (int)swSketchCheckFeatureProfileUsage_e.swSketchCheckFeature_BASEEXTRUDE,
         ref openCount, ref closedCount
     );
 
-    throw new Exception($"Extrusion failed: {(swSketchCheckFeatureStatus_e)status}");
+    swSketchCheckFeatureStatus_e status = (swSketchCheckFeatureStatus_e)statusCode;
+    throw new Exception($"Extrusion failed: {status}");
 }
 else {
     // Optional: Check for errors even when feature exists
     int errorCode = feature.GetErrorCode2(out bool isWarning);
     if (errorCode != 0) {
-        Console.WriteLine($"Feature created with error: {errorCode}");
+        swFeatureError_e error = (swFeatureError_e)errorCode;
+        Console.WriteLine($"Feature created with error: {error}");
     }
 }
 ```
