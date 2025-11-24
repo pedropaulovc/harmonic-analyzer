@@ -64,14 +64,17 @@ grep -r "category: Application Interfaces" .claude/skills/developing-solidworks/
 grep -r "kind: method" .claude/skills/developing-solidworks/types/
 ```
 
-**Find and use enums**
+**Find and use enums** (each enum is a directory with _overview.md and individual value files):
 ```bash
-# Find enum by name or value
+# Find enum directory
 ls .claude/skills/developing-solidworks/enums/ | grep -i "endconditions"
-grep -r "swEndCondBlind" .claude/skills/developing-solidworks/enums/
 
-# Read enum definition
-cat .claude/skills/developing-solidworks/enums/swEndConditions_e.md
+# Read enum overview
+cat .claude/skills/developing-solidworks/enums/swEndConditions_e/_overview.md
+
+# Find specific enum value
+grep -r "swEndCondBlind" .claude/skills/developing-solidworks/enums/
+cat .claude/skills/developing-solidworks/enums/swEndConditions_e/swEndCondBlind.md
 
 # Find enum usage in examples
 grep -r "swEndConditions_e" .claude/skills/developing-solidworks/examples/
