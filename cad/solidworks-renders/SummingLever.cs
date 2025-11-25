@@ -160,28 +160,34 @@ namespace SolidWorksRenders
                 X1: rectCenterX, Y1: rectCenterY, Z1: 0,
                 X2: rectCenterX + CoefficientsPlateWidth / 2, Y2: rectCenterY + CoefficientsPlateLength / 2, Z2: 0);
 
-            // Create hole pattern
+            // Create hole pattern using linear sketch pattern
             // KCL: holes at [holeOffsetX, -holeOffsetY], pattern linear along Y
             // First hole is at [-coefficientsPlateWidth + holeMargin, -(coefficientsPlateLength/2 - holeMargin - ribThickness)]
             double firstHoleX = holeOffsetX;
             double firstHoleY = -holeOffsetY;
 
-            // Create first hole
-            swSketchMgr.CreateCircleByRadius(
+            // Create the seed hole (first hole in the pattern)
+            ISketchSegment seedHole = (ISketchSegment)swSketchMgr.CreateCircleByRadius(
                 XC: firstHoleX,
                 YC: firstHoleY,
                 Zc: 0,
                 Radius: HoleRadius);
 
-            // Create remaining holes in the pattern
-            for (int i = 1; i < HoleCount; i++)
-            {
-                swSketchMgr.CreateCircleByRadius(
-                    XC: firstHoleX,
-                    YC: firstHoleY + (i * holeSpacing),
-                    Zc: 0,
-                    Radius: HoleRadius);
-            }
+            // Select the seed hole for linear pattern
+            swModel.ClearSelection2(true);
+            seedHole.Select4(false, null);
+
+            // Create linear sketch pattern along Y axis
+            // Parameters: NumX, SpacingX, NumY, SpacingY, PatternRotate, DeleteInstances, CreateNumOfInstances, Seed
+            object patternFeature = swSketchMgr.CreateLinearSketchStepAndRepeat(
+                NumX: 1,                    // 1 instance in X direction (no repeat)
+                NumY: HoleCount,            // 20 instances in Y direction
+                SpacingX: 0,                // No X spacing
+                SpacingY: holeSpacing,      // Spacing between holes in Y
+                PatternRotate: 0,           // No rotation
+                DeleteInstances: "",        // No instances to delete
+                CreateNumOfInstances: true, // Create specified number of instances
+                Seed: "");
 
             swSketchMgr.AddToDB = false;
 
