@@ -178,16 +178,23 @@ namespace SolidWorksRenders
             seedHole.Select4(false, null);
 
             // Create linear sketch pattern along Y axis
-            // Parameters: NumX, SpacingX, NumY, SpacingY, PatternRotate, DeleteInstances, CreateNumOfInstances, Seed
-            object patternFeature = swSketchMgr.CreateLinearSketchStepAndRepeat(
-                NumX: 1,                    // 1 instance in X direction (no repeat)
-                NumY: HoleCount,            // 20 instances in Y direction
-                SpacingX: 0,                // No X spacing
-                SpacingY: holeSpacing,      // Spacing between holes in Y
-                PatternRotate: 0,           // No rotation
-                DeleteInstances: "",        // No instances to delete
-                CreateNumOfInstances: true, // Create specified number of instances
-                Seed: "");
+            // AngleY = Math.PI/2 (90 degrees) means pattern along Y axis
+            bool patternSuccess = swSketchMgr.CreateLinearSketchStepAndRepeat(
+                NumX: 1,                       // 1 instance in X direction (seed only)
+                NumY: HoleCount,               // 20 instances in Y direction
+                SpacingX: 0,                   // No X spacing (only 1 instance in X)
+                SpacingY: holeSpacing,         // Spacing between holes in Y
+                AngleX: 0,                     // Direction 1 angle (0 = along X axis)
+                AngleY: Math.PI / 2,           // Direction 2 angle (90° = along Y axis)
+                DeleteInstances: "",           // No instances to delete
+                XSpacingDim: false,            // Don't show X spacing dimension
+                YSpacingDim: false,            // Don't show Y spacing dimension
+                AngleDim: false,               // Don't show angle dimension
+                CreateNumOfInstancesDimInXDir: false,  // Don't show X instance count
+                CreateNumOfInstancesDimInYDir: false); // Don't show Y instance count
+
+            if (!patternSuccess)
+                Console.WriteLine("WARNING: Linear sketch pattern creation returned false");
 
             swSketchMgr.AddToDB = false;
 
