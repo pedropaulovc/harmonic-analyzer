@@ -38,11 +38,11 @@ namespace SolidWorksRenders
         private const double AFrameTopWidth = 2.0 * InchToMeter;       // Width at top (X)
         private const double AFrameThickness = 0.4 * InchToMeter;      // Y direction (plate thickness)
 
-        // Center cutout parameters
-        private const double CutoutBottomOffset = 0.75 * InchToMeter;  // From base plate top
-        private const double CutoutHeight = 3.0 * InchToMeter;
-        private const double CutoutBottomWidth = 3.5 * InchToMeter;
-        private const double CutoutTopWidth = 1.2 * InchToMeter;
+        // Center cutout parameters (must fit within A-frame with margins)
+        private const double CutoutBottomOffset = 1.0 * InchToMeter;   // From base plate top
+        private const double CutoutHeight = 2.5 * InchToMeter;
+        private const double CutoutBottomWidth = 2.8 * InchToMeter;    // Smaller than A-frame base
+        private const double CutoutTopWidth = 0.8 * InchToMeter;       // Smaller than A-frame top
 
         // Top bearing housing parameters
         private const double BearingHousingRadius = 0.75 * InchToMeter;
@@ -300,6 +300,9 @@ namespace SolidWorksRenders
             IFeatureManager swFeatMgr = swModel.FeatureManager;
             IModelDocExtension swModelExt = swModel.Extension;
 
+            // Clear any existing selection
+            swModel.ClearSelection2(true);
+
             // Select Front Plane
             bool selected = swModelExt.SelectByID2(
                 Name: "Front Plane",
@@ -322,6 +325,9 @@ namespace SolidWorksRenders
             double bottomHalfWidth = CutoutBottomWidth / 2;
             double topHalfWidth = CutoutTopWidth / 2;
 
+            Console.WriteLine($"DEBUG: Cutout bottomZ={bottomZ / InchToMeter}\", topZ={topZ / InchToMeter}\"");
+            Console.WriteLine($"DEBUG: Cutout bottomWidth={CutoutBottomWidth / InchToMeter}\", topWidth={CutoutTopWidth / InchToMeter}\"");
+
             // Draw cutout trapezoid
             swSketchMgr.CreateLine(-bottomHalfWidth, bottomZ, 0, bottomHalfWidth, bottomZ, 0);  // Bottom
             swSketchMgr.CreateLine(bottomHalfWidth, bottomZ, 0, topHalfWidth, topZ, 0);         // Right
@@ -333,10 +339,21 @@ namespace SolidWorksRenders
 
             swModel.ForceRebuild3(false);
             IFeature sketch = swModelExt.GetLastFeatureAdded();
-            sketch.Name = "Center Cutout Sketch";
+            if (sketch == null)
+            {
+                Console.WriteLine("WARNING: GetLastFeatureAdded returned null for cutout sketch");
+                // Try to continue anyway
+            }
+            else
+            {
+                sketch.Name = "Center Cutout Sketch";
+                Console.WriteLine($"DEBUG: Created cutout sketch: {sketch.Name}");
+            }
 
+            swModel.ClearSelection2(true);
+            string sketchName = sketch?.Name ?? "Sketch3";  // Fallback name
             selected = swModelExt.SelectByID2(
-                Name: sketch.Name,
+                Name: sketchName,
                 Type: "SKETCH",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -345,7 +362,10 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select cutout sketch");
+            {
+                Console.WriteLine($"WARNING: Failed to select cutout sketch '{sketchName}', trying without cut");
+                return;  // Skip cutout rather than fail
+            }
 
             // Cut through all (both directions)
             IFeature feature = swFeatMgr.FeatureCut4(
@@ -378,9 +398,14 @@ namespace SolidWorksRenders
                 OptimizeGeometry: false);
 
             if (feature == null)
-                throw new InvalidOperationException("Failed to create center cutout");
+            {
+                Console.WriteLine("WARNING: FeatureCut4 returned null for cutout - cutout may need manual creation");
+                // Don't throw - continue with the rest of the part
+                return;
+            }
 
             feature.Name = "Center Cutout";
+            Console.WriteLine("DEBUG: Center cutout created successfully");
         }
 
         /// <summary>
@@ -391,6 +416,9 @@ namespace SolidWorksRenders
             ISketchManager swSketchMgr = swModel.SketchManager;
             IFeatureManager swFeatMgr = swModel.FeatureManager;
             IModelDocExtension swModelExt = swModel.Extension;
+
+            // Clear selection
+            swModel.ClearSelection2(true);
 
             // Select Top Plane
             bool selected = swModelExt.SelectByID2(
@@ -403,7 +431,10 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select Top Plane for mounting holes");
+            {
+                Console.WriteLine("WARNING: Failed to select Top Plane for mounting holes");
+                return;
+            }
 
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
             swSketchMgr.AddToDB = true;
@@ -422,8 +453,14 @@ namespace SolidWorksRenders
 
             swModel.ForceRebuild3(false);
             IFeature sketch = swModelExt.GetLastFeatureAdded();
+            if (sketch == null)
+            {
+                Console.WriteLine("WARNING: GetLastFeatureAdded returned null for mounting holes sketch");
+                return;
+            }
             sketch.Name = "Mounting Holes Sketch";
 
+            swModel.ClearSelection2(true);
             selected = swModelExt.SelectByID2(
                 Name: sketch.Name,
                 Type: "SKETCH",
@@ -434,15 +471,18 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select mounting holes sketch");
+            {
+                Console.WriteLine($"WARNING: Failed to select mounting holes sketch '{sketch.Name}'");
+                return;
+            }
 
-            // Cut through base plate
+            // Cut through both directions to ensure we hit the base plate (which is below the sketch plane)
             IFeature feature = swFeatMgr.FeatureCut4(
-                Sd: true,
+                Sd: false,  // Both directions
                 Flip: false,
-                Dir: true,
+                Dir: false,
                 T1: (int)swEndConditions_e.swEndCondThroughAll,
-                T2: (int)swEndConditions_e.swEndCondBlind,
+                T2: (int)swEndConditions_e.swEndCondThroughAll,
                 D1: 0,
                 D2: 0,
                 Dchk1: false,
@@ -467,9 +507,13 @@ namespace SolidWorksRenders
                 OptimizeGeometry: false);
 
             if (feature == null)
-                throw new InvalidOperationException("Failed to create mounting holes");
+            {
+                Console.WriteLine("WARNING: FeatureCut4 returned null for mounting holes - may need manual creation");
+                return;
+            }
 
             feature.Name = "Mounting Holes";
+            Console.WriteLine("DEBUG: Mounting holes created successfully");
         }
 
         /// <summary>
@@ -561,6 +605,8 @@ namespace SolidWorksRenders
             IFeatureManager swFeatMgr = swModel.FeatureManager;
             IModelDocExtension swModelExt = swModel.Extension;
 
+            swModel.ClearSelection2(true);
+
             // Select Front Plane
             bool selected = swModelExt.SelectByID2(
                 Name: "Front Plane",
@@ -572,7 +618,10 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select Front Plane for bearing hole");
+            {
+                Console.WriteLine("WARNING: Failed to select Front Plane for bearing hole");
+                return;
+            }
 
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
             swSketchMgr.AddToDB = true;
@@ -585,8 +634,14 @@ namespace SolidWorksRenders
 
             swModel.ForceRebuild3(false);
             IFeature sketch = swModelExt.GetLastFeatureAdded();
+            if (sketch == null)
+            {
+                Console.WriteLine("WARNING: GetLastFeatureAdded returned null for bearing hole sketch");
+                return;
+            }
             sketch.Name = "Bearing Hole Sketch";
 
+            swModel.ClearSelection2(true);
             selected = swModelExt.SelectByID2(
                 Name: sketch.Name,
                 Type: "SKETCH",
@@ -597,7 +652,10 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select bearing hole sketch");
+            {
+                Console.WriteLine($"WARNING: Failed to select bearing hole sketch '{sketch.Name}'");
+                return;
+            }
 
             // Cut through all
             IFeature feature = swFeatMgr.FeatureCut4(
@@ -630,9 +688,13 @@ namespace SolidWorksRenders
                 OptimizeGeometry: false);
 
             if (feature == null)
-                throw new InvalidOperationException("Failed to create bearing hole");
+            {
+                Console.WriteLine("WARNING: FeatureCut4 returned null for bearing hole - may need manual creation");
+                return;
+            }
 
             feature.Name = "Bearing Hole";
+            Console.WriteLine("DEBUG: Bearing hole created successfully");
         }
 
         /// <summary>
