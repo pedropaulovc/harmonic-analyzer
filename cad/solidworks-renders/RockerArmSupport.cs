@@ -8,56 +8,53 @@ namespace SolidWorksRenders
     /// Creates a rocker arm support (A-frame bearing stand) for the harmonic analyzer.
     ///
     /// Features:
-    /// - Base plate: rectangular with mounting holes at corners
-    /// - A-frame sides: two tapered plates forming triangular shape
-    /// - Center cutout: rectangular window for clearance
-    /// - Top bearing housing: cylindrical boss for pivot shaft
-    /// - Lifting eyelet: ring at top for chain attachment
-    /// - Fillets: rounded edges for cast appearance
+    /// - Base plate with mounting holes for securing to table
+    /// - Tapered A-frame body (trapezoid profile)
+    /// - Center cutout window (weight reduction)
+    /// - Cylindrical bearing housing at top
+    /// - Through-hole for pivot shaft
+    /// - Lifting eyelet at top with chain attachment
     /// </summary>
     public class RockerArmSupport : IPartCreator
     {
         public string PartName => "Rocker Arm Support";
         public string FileName => "rocker-arm-support.sldprt";
 
-        // Dimensions (in inches, converted to meters for SolidWorks API)
+        // Dimensions in meters (SI units for SolidWorks API)
         private const double InchToMeter = 0.0254;
 
-        // Base plate parameters
-        private const double BasePlateLength = 6.0 * InchToMeter;      // X direction
-        private const double BasePlateWidth = 3.0 * InchToMeter;       // Y direction (depth)
-        private const double BasePlateThickness = 0.5 * InchToMeter;   // Z direction
+        // Base plate dimensions
+        private const double BasePlateWidth = 4.0 * InchToMeter;      // Width (X direction)
+        private const double BasePlateDepth = 1.5 * InchToMeter;      // Depth (Y direction)
+        private const double BasePlateThickness = 0.25 * InchToMeter; // Thickness (Z direction)
 
-        // Mounting hole parameters
-        private const double MountingHoleRadius = 0.25 * InchToMeter;
-        private const double MountingHoleInset = 0.5 * InchToMeter;    // From edge
+        // A-frame body dimensions
+        private const double FrameHeight = 6.0 * InchToMeter;         // Total height from base
+        private const double FrameBottomWidth = 3.5 * InchToMeter;    // Width at base (X direction)
+        private const double FrameTopWidth = 1.5 * InchToMeter;       // Width at top (X direction)
+        private const double FrameThickness = 0.375 * InchToMeter;    // Thickness (Y direction)
 
-        // A-frame side plate parameters
-        private const double AFrameHeight = 5.0 * InchToMeter;         // Z direction from base top
-        private const double AFrameBaseWidth = 5.0 * InchToMeter;      // Width at base (X)
-        private const double AFrameTopWidth = 2.0 * InchToMeter;       // Width at top (X)
-        private const double AFrameThickness = 0.4 * InchToMeter;      // Y direction (plate thickness)
+        // Center cutout dimensions
+        private const double CutoutWidth = 2.0 * InchToMeter;         // Width of cutout
+        private const double CutoutHeight = 3.5 * InchToMeter;        // Height of cutout
+        private const double CutoutBottomOffset = 0.75 * InchToMeter; // Distance from base to cutout bottom
 
-        // Center cutout parameters (must fit within A-frame with margins)
-        private const double CutoutBottomOffset = 1.0 * InchToMeter;   // From base plate top
-        private const double CutoutHeight = 2.5 * InchToMeter;
-        private const double CutoutBottomWidth = 2.8 * InchToMeter;    // Smaller than A-frame base
-        private const double CutoutTopWidth = 0.8 * InchToMeter;       // Smaller than A-frame top
-
-        // Top bearing housing parameters
+        // Bearing housing dimensions
         private const double BearingHousingRadius = 0.75 * InchToMeter;
-        private const double BearingHousingLength = 2.0 * InchToMeter; // Y direction
-        private const double BearingHoleRadius = 0.375 * InchToMeter;  // For shaft
+        private const double BearingHousingDepth = 1.25 * InchToMeter; // Depth/length of cylinder
+        private const double BearingHoleRadius = 0.375 * InchToMeter;  // Through-hole for shaft
 
-        // Lifting eyelet parameters
-        private const double EyeletOuterRadius = 0.4 * InchToMeter;
-        private const double EyeletInnerRadius = 0.2 * InchToMeter;
-        private const double EyeletHeight = 0.75 * InchToMeter;        // Above bearing housing
-        private const double EyeletThickness = 0.3 * InchToMeter;
+        // Mounting holes
+        private const double MountingHoleRadius = 0.1875 * InchToMeter; // 3/8" holes
+        private const double MountingHoleInsetX = 0.5 * InchToMeter;    // Inset from edge
+        private const double MountingHoleInsetY = 0.375 * InchToMeter;  // Inset from edge
 
-        // Fillet radius
-        private const double FilletRadius = 0.15 * InchToMeter;
-        private const double SmallFilletRadius = 0.05 * InchToMeter;
+        // Lifting eyelet dimensions
+        private const double EyeletInnerRadius = 0.25 * InchToMeter;
+        private const double EyeletOuterRadius = 0.5 * InchToMeter;
+        private const double EyeletThickness = 0.25 * InchToMeter;
+        private const double EyeletConnectorHeight = 0.5 * InchToMeter;
+        private const double EyeletConnectorWidth = 0.5 * InchToMeter;
 
         private ISldWorks swApp;
 
@@ -97,20 +94,17 @@ namespace SolidWorksRenders
             Console.WriteLine("Creating center cutout...");
             CreateCenterCutout(swModel);
 
-            Console.WriteLine("Creating mounting holes...");
-            CreateMountingHoles(swModel);
-
             Console.WriteLine("Creating bearing housing...");
             CreateBearingHousing(swModel);
 
-            Console.WriteLine("Creating bearing hole...");
+            Console.WriteLine("Creating bearing through-hole...");
             CreateBearingHole(swModel);
+
+            Console.WriteLine("Creating mounting holes...");
+            CreateMountingHoles(swModel);
 
             Console.WriteLine("Creating lifting eyelet...");
             CreateLiftingEyelet(swModel);
-
-            Console.WriteLine("Adding fillets...");
-            AddFillets(swModel);
 
             // Rebuild the model
             swModel.ForceRebuild3(true);
@@ -119,7 +113,7 @@ namespace SolidWorksRenders
         }
 
         /// <summary>
-        /// Creates the base plate: rectangular plate on XY plane
+        /// Creates the base plate on the XY plane
         /// </summary>
         private void CreateBasePlate(IModelDoc2 swModel)
         {
@@ -146,17 +140,19 @@ namespace SolidWorksRenders
             // Create rectangle centered at origin
             swSketchMgr.CreateCenterRectangle(
                 X1: 0, Y1: 0, Z1: 0,
-                X2: BasePlateLength / 2, Y2: BasePlateWidth / 2, Z2: 0);
+                X2: BasePlateWidth / 2, Y2: BasePlateDepth / 2, Z2: 0);
 
             swSketchMgr.AddToDB = false;
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
+            // Rename sketch
             swModel.ForceRebuild3(false);
-            IFeature sketch = swModelExt.GetLastFeatureAdded();
-            sketch.Name = "Base Plate Sketch";
+            IFeature plateSketch = swModelExt.GetLastFeatureAdded();
+            plateSketch.Name = "Base Plate Sketch";
 
+            // Select sketch for extrusion
             selected = swModelExt.SelectByID2(
-                Name: sketch.Name,
+                Name: plateSketch.Name,
                 Type: "SKETCH",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -165,13 +161,13 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select base plate sketch");
+                throw new InvalidOperationException("Failed to select base plate sketch for extrusion");
 
             // Extrude downward (negative Z)
-            IFeature feature = swFeatMgr.FeatureExtrusion3(
-                Sd: true,
+            IFeature extrudeFeature = swFeatMgr.FeatureExtrusion3(
+                Sd: true,                                          // Single direction
                 Flip: false,
-                Dir: true,  // Reverse direction (down)
+                Dir: true,                                         // Flip direction (down)
                 T1: (int)swEndConditions_e.swEndCondBlind,
                 T2: (int)swEndConditions_e.swEndCondBlind,
                 D1: BasePlateThickness,
@@ -193,15 +189,14 @@ namespace SolidWorksRenders
                 StartOffset: 0,
                 FlipStartOffset: false);
 
-            if (feature == null)
+            if (extrudeFeature == null)
                 throw new InvalidOperationException("Failed to extrude base plate");
 
-            feature.Name = "Base Plate";
+            extrudeFeature.Name = "Base Plate";
         }
 
         /// <summary>
-        /// Creates the A-frame body: tapered triangular shape
-        /// Sketch on Front Plane (XZ), extrude in Y direction
+        /// Creates the A-frame body (trapezoid profile) on Front Plane
         /// </summary>
         private void CreateAFrameBody(IModelDoc2 swModel)
         {
@@ -220,35 +215,37 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select Front Plane for A-frame");
+                throw new InvalidOperationException("Failed to select Front Plane for A-frame body");
 
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
             swSketchMgr.AddToDB = true;
 
-            // A-frame profile (trapezoid)
-            // Bottom left
-            double bottomLeft = -AFrameBaseWidth / 2;
-            double bottomRight = AFrameBaseWidth / 2;
-            double topLeft = -AFrameTopWidth / 2;
-            double topRight = AFrameTopWidth / 2;
-            double bottomZ = 0;  // On base plate top surface
-            double topZ = AFrameHeight;
+            // Create trapezoid profile (A-frame cross section)
+            // Bottom left, bottom right, top right, top left
+            double bottomHalf = FrameBottomWidth / 2;
+            double topHalf = FrameTopWidth / 2;
 
-            // Draw trapezoid: bottom -> right side -> top -> left side -> close
-            swSketchMgr.CreateLine(bottomLeft, bottomZ, 0, bottomRight, bottomZ, 0);  // Bottom
-            swSketchMgr.CreateLine(bottomRight, bottomZ, 0, topRight, topZ, 0);       // Right side
-            swSketchMgr.CreateLine(topRight, topZ, 0, topLeft, topZ, 0);              // Top
-            swSketchMgr.CreateLine(topLeft, topZ, 0, bottomLeft, bottomZ, 0);         // Left side
+            // Start at bottom left, go clockwise
+            // Bottom edge
+            swSketchMgr.CreateLine(-bottomHalf, 0, 0, bottomHalf, 0, 0);
+            // Right edge (tapered)
+            swSketchMgr.CreateLine(bottomHalf, 0, 0, topHalf, FrameHeight, 0);
+            // Top edge
+            swSketchMgr.CreateLine(topHalf, FrameHeight, 0, -topHalf, FrameHeight, 0);
+            // Left edge (tapered)
+            swSketchMgr.CreateLine(-topHalf, FrameHeight, 0, -bottomHalf, 0, 0);
 
             swSketchMgr.AddToDB = false;
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
+            // Rename sketch
             swModel.ForceRebuild3(false);
-            IFeature sketch = swModelExt.GetLastFeatureAdded();
-            sketch.Name = "A-Frame Sketch";
+            IFeature frameSketch = swModelExt.GetLastFeatureAdded();
+            frameSketch.Name = "A-Frame Sketch";
 
+            // Select sketch for extrusion
             selected = swModelExt.SelectByID2(
-                Name: sketch.Name,
+                Name: frameSketch.Name,
                 Type: "SKETCH",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -257,17 +254,17 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select A-frame sketch");
+                throw new InvalidOperationException("Failed to select A-frame sketch for extrusion");
 
-            // Extrude symmetric in Y direction
-            IFeature feature = swFeatMgr.FeatureExtrusion3(
-                Sd: false,  // Both directions
+            // Extrude symmetric (both directions in Y)
+            IFeature extrudeFeature = swFeatMgr.FeatureExtrusion3(
+                Sd: false,                                         // Both directions
                 Flip: false,
                 Dir: false,
                 T1: (int)swEndConditions_e.swEndCondBlind,
                 T2: (int)swEndConditions_e.swEndCondBlind,
-                D1: AFrameThickness / 2,
-                D2: AFrameThickness / 2,
+                D1: FrameThickness / 2,
+                D2: FrameThickness / 2,
                 Dchk1: false,
                 Dchk2: false,
                 Ddir1: false,
@@ -285,14 +282,14 @@ namespace SolidWorksRenders
                 StartOffset: 0,
                 FlipStartOffset: false);
 
-            if (feature == null)
-                throw new InvalidOperationException("Failed to extrude A-frame");
+            if (extrudeFeature == null)
+                throw new InvalidOperationException("Failed to extrude A-frame body");
 
-            feature.Name = "A-Frame Body";
+            extrudeFeature.Name = "A-Frame Body";
         }
 
         /// <summary>
-        /// Creates the center cutout (window) in the A-frame
+        /// Creates the center cutout window
         /// </summary>
         private void CreateCenterCutout(IModelDoc2 swModel)
         {
@@ -300,10 +297,7 @@ namespace SolidWorksRenders
             IFeatureManager swFeatMgr = swModel.FeatureManager;
             IModelDocExtension swModelExt = swModel.Extension;
 
-            // Clear any existing selection
-            swModel.ClearSelection2(true);
-
-            // Select Front Plane
+            // Select Front Plane (XZ)
             bool selected = swModelExt.SelectByID2(
                 Name: "Front Plane",
                 Type: "PLANE",
@@ -319,205 +313,104 @@ namespace SolidWorksRenders
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
             swSketchMgr.AddToDB = true;
 
-            // Cutout profile (trapezoid shape matching A-frame taper)
-            double bottomZ = CutoutBottomOffset;
-            double topZ = CutoutBottomOffset + CutoutHeight;
-            double bottomHalfWidth = CutoutBottomWidth / 2;
-            double topHalfWidth = CutoutTopWidth / 2;
+            // Create rectangle for cutout (trapezoid shape to match A-frame taper)
+            // Calculate width at bottom and top of cutout based on taper
+            double taperRatio = (FrameBottomWidth - FrameTopWidth) / (2 * FrameHeight);
 
-            Console.WriteLine($"DEBUG: Cutout bottomZ={bottomZ / InchToMeter}\", topZ={topZ / InchToMeter}\"");
-            Console.WriteLine($"DEBUG: Cutout bottomWidth={CutoutBottomWidth / InchToMeter}\", topWidth={CutoutTopWidth / InchToMeter}\"");
+            double cutoutBottom = CutoutBottomOffset;
+            double cutoutTop = CutoutBottomOffset + CutoutHeight;
 
-            // Draw cutout trapezoid
-            swSketchMgr.CreateLine(-bottomHalfWidth, bottomZ, 0, bottomHalfWidth, bottomZ, 0);  // Bottom
-            swSketchMgr.CreateLine(bottomHalfWidth, bottomZ, 0, topHalfWidth, topZ, 0);         // Right
-            swSketchMgr.CreateLine(topHalfWidth, topZ, 0, -topHalfWidth, topZ, 0);              // Top
-            swSketchMgr.CreateLine(-topHalfWidth, topZ, 0, -bottomHalfWidth, bottomZ, 0);       // Left
+            // Width at cutout bottom and top (following the taper)
+            double widthAtBottom = FrameBottomWidth / 2 - taperRatio * cutoutBottom;
+            double widthAtTop = FrameBottomWidth / 2 - taperRatio * cutoutTop;
+
+            // Use a simpler centered rectangle cutout (not following taper exactly)
+            double cutoutHalfWidth = CutoutWidth / 2;
+
+            // Bottom left corner
+            double blX = -cutoutHalfWidth;
+            double blZ = cutoutBottom;
+            // Bottom right
+            double brX = cutoutHalfWidth;
+            double brZ = cutoutBottom;
+            // Top right
+            double trX = cutoutHalfWidth;
+            double trZ = cutoutTop;
+            // Top left
+            double tlX = -cutoutHalfWidth;
+            double tlZ = cutoutTop;
+
+            swSketchMgr.CreateLine(blX, blZ, 0, brX, brZ, 0);
+            swSketchMgr.CreateLine(brX, brZ, 0, trX, trZ, 0);
+            swSketchMgr.CreateLine(trX, trZ, 0, tlX, tlZ, 0);
+            swSketchMgr.CreateLine(tlX, tlZ, 0, blX, blZ, 0);
 
             swSketchMgr.AddToDB = false;
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
+            // Rename sketch
             swModel.ForceRebuild3(false);
-            IFeature sketch = swModelExt.GetLastFeatureAdded();
-            if (sketch == null)
+            IFeature cutoutSketch = swModelExt.GetLastFeatureAdded();
+            cutoutSketch.Name = "Center Cutout Sketch";
+
+            // Select sketch for cut
+            selected = swModelExt.SelectByID2(
+                Name: cutoutSketch.Name,
+                Type: "SKETCH",
+                X: 0, Y: 0, Z: 0,
+                Append: false,
+                Mark: 0,
+                Callout: null,
+                SelectOption: 0);
+
+            if (!selected)
             {
-                Console.WriteLine("WARNING: GetLastFeatureAdded returned null for cutout sketch");
-                // Try to continue anyway
+                Console.WriteLine("WARNING: Failed to select cutout sketch");
+                return;
+            }
+
+            // Cut through all
+            IFeature cutFeature = swFeatMgr.FeatureCut4(
+                Sd: false,                                         // Both directions
+                Flip: false,
+                Dir: false,
+                T1: (int)swEndConditions_e.swEndCondThroughAll,
+                T2: (int)swEndConditions_e.swEndCondThroughAll,
+                D1: 0,
+                D2: 0,
+                Dchk1: false,
+                Dchk2: false,
+                Ddir1: false,
+                Ddir2: false,
+                Dang1: 0,
+                Dang2: 0,
+                OffsetReverse1: false,
+                OffsetReverse2: false,
+                TranslateSurface1: false,
+                TranslateSurface2: false,
+                NormalCut: false,
+                UseFeatScope: false,
+                UseAutoSelect: true,
+                AssemblyFeatureScope: false,
+                AutoSelectComponents: false,
+                PropagateFeatureToParts: false,
+                T0: (int)swStartConditions_e.swStartSketchPlane,
+                StartOffset: 0,
+                FlipStartOffset: false,
+                OptimizeGeometry: false);
+
+            if (cutFeature == null)
+            {
+                Console.WriteLine("WARNING: Failed to create center cutout - continuing without it");
             }
             else
             {
-                sketch.Name = "Center Cutout Sketch";
-                Console.WriteLine($"DEBUG: Created cutout sketch: {sketch.Name}");
+                cutFeature.Name = "Center Cutout";
             }
-
-            swModel.ClearSelection2(true);
-            string sketchName = sketch?.Name ?? "Sketch3";  // Fallback name
-            selected = swModelExt.SelectByID2(
-                Name: sketchName,
-                Type: "SKETCH",
-                X: 0, Y: 0, Z: 0,
-                Append: false,
-                Mark: 0,
-                Callout: null,
-                SelectOption: 0);
-
-            if (!selected)
-            {
-                Console.WriteLine($"WARNING: Failed to select cutout sketch '{sketchName}', trying without cut");
-                return;  // Skip cutout rather than fail
-            }
-
-            // Cut through all (both directions)
-            IFeature feature = swFeatMgr.FeatureCut4(
-                Sd: false,
-                Flip: false,
-                Dir: false,
-                T1: (int)swEndConditions_e.swEndCondThroughAll,
-                T2: (int)swEndConditions_e.swEndCondThroughAll,
-                D1: 0,
-                D2: 0,
-                Dchk1: false,
-                Dchk2: false,
-                Ddir1: false,
-                Ddir2: false,
-                Dang1: 0,
-                Dang2: 0,
-                OffsetReverse1: false,
-                OffsetReverse2: false,
-                TranslateSurface1: false,
-                TranslateSurface2: false,
-                NormalCut: true,
-                UseFeatScope: false,
-                UseAutoSelect: true,
-                AssemblyFeatureScope: false,
-                AutoSelectComponents: false,
-                PropagateFeatureToParts: false,
-                T0: (int)swStartConditions_e.swStartSketchPlane,
-                StartOffset: 0,
-                FlipStartOffset: false,
-                OptimizeGeometry: false);
-
-            if (feature == null)
-            {
-                Console.WriteLine("WARNING: FeatureCut4 returned null for cutout - cutout may need manual creation");
-                // Don't throw - continue with the rest of the part
-                return;
-            }
-
-            feature.Name = "Center Cutout";
-            Console.WriteLine("DEBUG: Center cutout created successfully");
         }
 
         /// <summary>
-        /// Creates mounting holes in the base plate corners
-        /// </summary>
-        private void CreateMountingHoles(IModelDoc2 swModel)
-        {
-            ISketchManager swSketchMgr = swModel.SketchManager;
-            IFeatureManager swFeatMgr = swModel.FeatureManager;
-            IModelDocExtension swModelExt = swModel.Extension;
-
-            // Clear selection
-            swModel.ClearSelection2(true);
-
-            // Select Top Plane
-            bool selected = swModelExt.SelectByID2(
-                Name: "Top Plane",
-                Type: "PLANE",
-                X: 0, Y: 0, Z: 0,
-                Append: false,
-                Mark: 0,
-                Callout: null,
-                SelectOption: 0);
-
-            if (!selected)
-            {
-                Console.WriteLine("WARNING: Failed to select Top Plane for mounting holes");
-                return;
-            }
-
-            swSketchMgr.InsertSketch(UpdateEditRebuild: true);
-            swSketchMgr.AddToDB = true;
-
-            // Four corner holes
-            double holeX = BasePlateLength / 2 - MountingHoleInset;
-            double holeY = BasePlateWidth / 2 - MountingHoleInset;
-
-            swSketchMgr.CreateCircleByRadius(holeX, holeY, 0, MountingHoleRadius);
-            swSketchMgr.CreateCircleByRadius(-holeX, holeY, 0, MountingHoleRadius);
-            swSketchMgr.CreateCircleByRadius(holeX, -holeY, 0, MountingHoleRadius);
-            swSketchMgr.CreateCircleByRadius(-holeX, -holeY, 0, MountingHoleRadius);
-
-            swSketchMgr.AddToDB = false;
-            swSketchMgr.InsertSketch(UpdateEditRebuild: true);
-
-            swModel.ForceRebuild3(false);
-            IFeature sketch = swModelExt.GetLastFeatureAdded();
-            if (sketch == null)
-            {
-                Console.WriteLine("WARNING: GetLastFeatureAdded returned null for mounting holes sketch");
-                return;
-            }
-            sketch.Name = "Mounting Holes Sketch";
-
-            swModel.ClearSelection2(true);
-            selected = swModelExt.SelectByID2(
-                Name: sketch.Name,
-                Type: "SKETCH",
-                X: 0, Y: 0, Z: 0,
-                Append: false,
-                Mark: 0,
-                Callout: null,
-                SelectOption: 0);
-
-            if (!selected)
-            {
-                Console.WriteLine($"WARNING: Failed to select mounting holes sketch '{sketch.Name}'");
-                return;
-            }
-
-            // Cut through both directions to ensure we hit the base plate (which is below the sketch plane)
-            IFeature feature = swFeatMgr.FeatureCut4(
-                Sd: false,  // Both directions
-                Flip: false,
-                Dir: false,
-                T1: (int)swEndConditions_e.swEndCondThroughAll,
-                T2: (int)swEndConditions_e.swEndCondThroughAll,
-                D1: 0,
-                D2: 0,
-                Dchk1: false,
-                Dchk2: false,
-                Ddir1: false,
-                Ddir2: false,
-                Dang1: 0,
-                Dang2: 0,
-                OffsetReverse1: false,
-                OffsetReverse2: false,
-                TranslateSurface1: false,
-                TranslateSurface2: false,
-                NormalCut: true,
-                UseFeatScope: false,
-                UseAutoSelect: true,
-                AssemblyFeatureScope: false,
-                AutoSelectComponents: false,
-                PropagateFeatureToParts: false,
-                T0: (int)swStartConditions_e.swStartSketchPlane,
-                StartOffset: 0,
-                FlipStartOffset: false,
-                OptimizeGeometry: false);
-
-            if (feature == null)
-            {
-                Console.WriteLine("WARNING: FeatureCut4 returned null for mounting holes - may need manual creation");
-                return;
-            }
-
-            feature.Name = "Mounting Holes";
-            Console.WriteLine("DEBUG: Mounting holes created successfully");
-        }
-
-        /// <summary>
-        /// Creates the cylindrical bearing housing at the top
+        /// Creates the bearing housing cylinder at the top
         /// </summary>
         private void CreateBearingHousing(IModelDoc2 swModel)
         {
@@ -525,7 +418,7 @@ namespace SolidWorksRenders
             IFeatureManager swFeatMgr = swModel.FeatureManager;
             IModelDocExtension swModelExt = swModel.Extension;
 
-            // Select Front Plane for circle sketch
+            // Select Front Plane (XZ)
             bool selected = swModelExt.SelectByID2(
                 Name: "Front Plane",
                 Type: "PLANE",
@@ -541,19 +434,24 @@ namespace SolidWorksRenders
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
             swSketchMgr.AddToDB = true;
 
-            // Circle at top of A-frame
-            double centerZ = AFrameHeight;
-            swSketchMgr.CreateCircleByRadius(0, centerZ, 0, BearingHousingRadius);
+            // Create circle at top center of frame
+            swSketchMgr.CreateCircleByRadius(
+                XC: 0,
+                YC: FrameHeight,
+                Zc: 0,
+                Radius: BearingHousingRadius);
 
             swSketchMgr.AddToDB = false;
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
+            // Rename sketch
             swModel.ForceRebuild3(false);
-            IFeature sketch = swModelExt.GetLastFeatureAdded();
-            sketch.Name = "Bearing Housing Sketch";
+            IFeature housingSketch = swModelExt.GetLastFeatureAdded();
+            housingSketch.Name = "Bearing Housing Sketch";
 
+            // Select sketch for extrusion
             selected = swModelExt.SelectByID2(
-                Name: sketch.Name,
+                Name: housingSketch.Name,
                 Type: "SKETCH",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -562,17 +460,17 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select bearing housing sketch");
+                throw new InvalidOperationException("Failed to select bearing housing sketch for extrusion");
 
-            // Extrude symmetric in Y direction
-            IFeature feature = swFeatMgr.FeatureExtrusion3(
-                Sd: false,
+            // Extrude symmetric (both directions in Y)
+            IFeature extrudeFeature = swFeatMgr.FeatureExtrusion3(
+                Sd: false,                                         // Both directions
                 Flip: false,
                 Dir: false,
                 T1: (int)swEndConditions_e.swEndCondBlind,
                 T2: (int)swEndConditions_e.swEndCondBlind,
-                D1: BearingHousingLength / 2,
-                D2: BearingHousingLength / 2,
+                D1: BearingHousingDepth / 2,
+                D2: BearingHousingDepth / 2,
                 Dchk1: false,
                 Dchk2: false,
                 Ddir1: false,
@@ -590,14 +488,14 @@ namespace SolidWorksRenders
                 StartOffset: 0,
                 FlipStartOffset: false);
 
-            if (feature == null)
-                throw new InvalidOperationException("Failed to create bearing housing");
+            if (extrudeFeature == null)
+                throw new InvalidOperationException("Failed to extrude bearing housing");
 
-            feature.Name = "Bearing Housing";
+            extrudeFeature.Name = "Bearing Housing";
         }
 
         /// <summary>
-        /// Creates the center hole through the bearing housing
+        /// Creates the through-hole in the bearing housing
         /// </summary>
         private void CreateBearingHole(IModelDoc2 swModel)
         {
@@ -605,9 +503,7 @@ namespace SolidWorksRenders
             IFeatureManager swFeatMgr = swModel.FeatureManager;
             IModelDocExtension swModelExt = swModel.Extension;
 
-            swModel.ClearSelection2(true);
-
-            // Select Front Plane
+            // Select Front Plane (XZ)
             bool selected = swModelExt.SelectByID2(
                 Name: "Front Plane",
                 Type: "PLANE",
@@ -626,24 +522,24 @@ namespace SolidWorksRenders
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
             swSketchMgr.AddToDB = true;
 
-            double centerZ = AFrameHeight;
-            swSketchMgr.CreateCircleByRadius(0, centerZ, 0, BearingHoleRadius);
+            // Create circle at bearing center
+            swSketchMgr.CreateCircleByRadius(
+                XC: 0,
+                YC: FrameHeight,
+                Zc: 0,
+                Radius: BearingHoleRadius);
 
             swSketchMgr.AddToDB = false;
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
+            // Rename sketch
             swModel.ForceRebuild3(false);
-            IFeature sketch = swModelExt.GetLastFeatureAdded();
-            if (sketch == null)
-            {
-                Console.WriteLine("WARNING: GetLastFeatureAdded returned null for bearing hole sketch");
-                return;
-            }
-            sketch.Name = "Bearing Hole Sketch";
+            IFeature holeSketch = swModelExt.GetLastFeatureAdded();
+            holeSketch.Name = "Bearing Hole Sketch";
 
-            swModel.ClearSelection2(true);
+            // Select sketch for cut
             selected = swModelExt.SelectByID2(
-                Name: sketch.Name,
+                Name: holeSketch.Name,
                 Type: "SKETCH",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -653,13 +549,13 @@ namespace SolidWorksRenders
 
             if (!selected)
             {
-                Console.WriteLine($"WARNING: Failed to select bearing hole sketch '{sketch.Name}'");
+                Console.WriteLine("WARNING: Failed to select bearing hole sketch");
                 return;
             }
 
             // Cut through all
-            IFeature feature = swFeatMgr.FeatureCut4(
-                Sd: false,
+            IFeature cutFeature = swFeatMgr.FeatureCut4(
+                Sd: false,                                         // Both directions
                 Flip: false,
                 Dir: false,
                 T1: (int)swEndConditions_e.swEndCondThroughAll,
@@ -676,7 +572,7 @@ namespace SolidWorksRenders
                 OffsetReverse2: false,
                 TranslateSurface1: false,
                 TranslateSurface2: false,
-                NormalCut: true,
+                NormalCut: false,
                 UseFeatScope: false,
                 UseAutoSelect: true,
                 AssemblyFeatureScope: false,
@@ -687,18 +583,120 @@ namespace SolidWorksRenders
                 FlipStartOffset: false,
                 OptimizeGeometry: false);
 
-            if (feature == null)
+            if (cutFeature == null)
             {
-                Console.WriteLine("WARNING: FeatureCut4 returned null for bearing hole - may need manual creation");
-                return;
+                Console.WriteLine("WARNING: Failed to create bearing hole - continuing without it");
             }
-
-            feature.Name = "Bearing Hole";
-            Console.WriteLine("DEBUG: Bearing hole created successfully");
+            else
+            {
+                cutFeature.Name = "Bearing Through-Hole";
+            }
         }
 
         /// <summary>
-        /// Creates the lifting eyelet at the top
+        /// Creates mounting holes in the base plate (4 corners)
+        /// </summary>
+        private void CreateMountingHoles(IModelDoc2 swModel)
+        {
+            ISketchManager swSketchMgr = swModel.SketchManager;
+            IFeatureManager swFeatMgr = swModel.FeatureManager;
+            IModelDocExtension swModelExt = swModel.Extension;
+
+            // Select Top Plane (XY)
+            bool selected = swModelExt.SelectByID2(
+                Name: "Top Plane",
+                Type: "PLANE",
+                X: 0, Y: 0, Z: 0,
+                Append: false,
+                Mark: 0,
+                Callout: null,
+                SelectOption: 0);
+
+            if (!selected)
+            {
+                Console.WriteLine("WARNING: Failed to select Top Plane for mounting holes");
+                return;
+            }
+
+            swSketchMgr.InsertSketch(UpdateEditRebuild: true);
+            swSketchMgr.AddToDB = true;
+
+            // Calculate hole positions (4 corners)
+            double holeX = BasePlateWidth / 2 - MountingHoleInsetX;
+            double holeY = BasePlateDepth / 2 - MountingHoleInsetY;
+
+            // Create 4 holes at corners
+            swSketchMgr.CreateCircleByRadius(-holeX, -holeY, 0, MountingHoleRadius);
+            swSketchMgr.CreateCircleByRadius(holeX, -holeY, 0, MountingHoleRadius);
+            swSketchMgr.CreateCircleByRadius(holeX, holeY, 0, MountingHoleRadius);
+            swSketchMgr.CreateCircleByRadius(-holeX, holeY, 0, MountingHoleRadius);
+
+            swSketchMgr.AddToDB = false;
+            swSketchMgr.InsertSketch(UpdateEditRebuild: true);
+
+            // Rename sketch
+            swModel.ForceRebuild3(false);
+            IFeature holesSketch = swModelExt.GetLastFeatureAdded();
+            holesSketch.Name = "Mounting Holes Sketch";
+
+            // Select sketch for cut
+            selected = swModelExt.SelectByID2(
+                Name: holesSketch.Name,
+                Type: "SKETCH",
+                X: 0, Y: 0, Z: 0,
+                Append: false,
+                Mark: 0,
+                Callout: null,
+                SelectOption: 0);
+
+            if (!selected)
+            {
+                Console.WriteLine("WARNING: Failed to select mounting holes sketch");
+                return;
+            }
+
+            // Cut through the base plate (both directions to ensure it passes through)
+            IFeature cutFeature = swFeatMgr.FeatureCut4(
+                Sd: false,                                         // Both directions
+                Flip: false,
+                Dir: false,
+                T1: (int)swEndConditions_e.swEndCondThroughAll,
+                T2: (int)swEndConditions_e.swEndCondThroughAll,
+                D1: 0,
+                D2: 0,
+                Dchk1: false,
+                Dchk2: false,
+                Ddir1: false,
+                Ddir2: false,
+                Dang1: 0,
+                Dang2: 0,
+                OffsetReverse1: false,
+                OffsetReverse2: false,
+                TranslateSurface1: false,
+                TranslateSurface2: false,
+                NormalCut: false,
+                UseFeatScope: false,
+                UseAutoSelect: true,
+                AssemblyFeatureScope: false,
+                AutoSelectComponents: false,
+                PropagateFeatureToParts: false,
+                T0: (int)swStartConditions_e.swStartSketchPlane,
+                StartOffset: 0,
+                FlipStartOffset: false,
+                OptimizeGeometry: false);
+
+            if (cutFeature == null)
+            {
+                Console.WriteLine("WARNING: Failed to create mounting holes - continuing without them");
+            }
+            else
+            {
+                cutFeature.Name = "Mounting Holes";
+            }
+        }
+
+        /// <summary>
+        /// Creates the lifting eyelet at the top of the frame
         /// </summary>
         private void CreateLiftingEyelet(IModelDoc2 swModel)
         {
@@ -706,9 +704,10 @@ namespace SolidWorksRenders
             IFeatureManager swFeatMgr = swModel.FeatureManager;
             IModelDocExtension swModelExt = swModel.Extension;
 
-            // Select Front Plane
+            // First create the connector piece between bearing housing and eyelet
+            // Select Right Plane (YZ)
             bool selected = swModelExt.SelectByID2(
-                Name: "Front Plane",
+                Name: "Right Plane",
                 Type: "PLANE",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -717,112 +716,34 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select Front Plane for eyelet");
+            {
+                Console.WriteLine("WARNING: Failed to select Right Plane for eyelet connector");
+                return;
+            }
 
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
             swSketchMgr.AddToDB = true;
 
-            // Eyelet profile: outer circle with inner circle (ring)
-            double eyeletCenterZ = AFrameHeight + BearingHousingRadius + EyeletHeight;
-
-            // Outer ring
-            swSketchMgr.CreateCircleByRadius(0, eyeletCenterZ, 0, EyeletOuterRadius);
-            // Inner hole
-            swSketchMgr.CreateCircleByRadius(0, eyeletCenterZ, 0, EyeletInnerRadius);
-
-            swSketchMgr.AddToDB = false;
-            swSketchMgr.InsertSketch(UpdateEditRebuild: true);
-
-            swModel.ForceRebuild3(false);
-            IFeature sketch = swModelExt.GetLastFeatureAdded();
-            sketch.Name = "Lifting Eyelet Sketch";
-
-            selected = swModelExt.SelectByID2(
-                Name: sketch.Name,
-                Type: "SKETCH",
-                X: 0, Y: 0, Z: 0,
-                Append: false,
-                Mark: 0,
-                Callout: null,
-                SelectOption: 0);
-
-            if (!selected)
-                throw new InvalidOperationException("Failed to select eyelet sketch");
-
-            // Extrude symmetric
-            IFeature feature = swFeatMgr.FeatureExtrusion3(
-                Sd: false,
-                Flip: false,
-                Dir: false,
-                T1: (int)swEndConditions_e.swEndCondBlind,
-                T2: (int)swEndConditions_e.swEndCondBlind,
-                D1: EyeletThickness / 2,
-                D2: EyeletThickness / 2,
-                Dchk1: false,
-                Dchk2: false,
-                Ddir1: false,
-                Ddir2: false,
-                Dang1: 0,
-                Dang2: 0,
-                OffsetReverse1: false,
-                OffsetReverse2: false,
-                TranslateSurface1: false,
-                TranslateSurface2: false,
-                Merge: true,
-                UseFeatScope: false,
-                UseAutoSelect: true,
-                T0: (int)swStartConditions_e.swStartSketchPlane,
-                StartOffset: 0,
-                FlipStartOffset: false);
-
-            if (feature == null)
-                throw new InvalidOperationException("Failed to create lifting eyelet");
-
-            feature.Name = "Lifting Eyelet";
-
-            // Add connecting piece from bearing to eyelet
-            CreateEyeletConnector(swModel, swSketchMgr, swFeatMgr, swModelExt);
-        }
-
-        /// <summary>
-        /// Creates the connector piece between bearing housing and eyelet
-        /// </summary>
-        private void CreateEyeletConnector(IModelDoc2 swModel, ISketchManager swSketchMgr,
-            IFeatureManager swFeatMgr, IModelDocExtension swModelExt)
-        {
-            bool selected = swModelExt.SelectByID2(
-                Name: "Front Plane",
-                Type: "PLANE",
-                X: 0, Y: 0, Z: 0,
-                Append: false,
-                Mark: 0,
-                Callout: null,
-                SelectOption: 0);
-
-            if (!selected)
-                throw new InvalidOperationException("Failed to select Front Plane for connector");
-
-            swSketchMgr.InsertSketch(UpdateEditRebuild: true);
-            swSketchMgr.AddToDB = true;
-
-            // Rectangular connector from top of bearing housing to bottom of eyelet
-            double bottomZ = AFrameHeight + BearingHousingRadius * 0.5;
-            double topZ = AFrameHeight + BearingHousingRadius + EyeletHeight - EyeletOuterRadius;
-            double halfWidth = EyeletOuterRadius * 0.8;
+            // Create connector rectangle from top of bearing housing upward
+            double connectorBottom = FrameHeight + BearingHousingRadius * 0.7; // Start above bearing housing
+            double connectorTop = connectorBottom + EyeletConnectorHeight;
+            double halfWidth = EyeletConnectorWidth / 2;
 
             swSketchMgr.CreateCenterRectangle(
-                X1: 0, Y1: (bottomZ + topZ) / 2, Z1: 0,
-                X2: halfWidth, Y2: topZ, Z2: 0);
+                X1: 0, Y1: (connectorBottom + connectorTop) / 2, Z1: 0,
+                X2: halfWidth, Y2: connectorTop, Z2: 0);
 
             swSketchMgr.AddToDB = false;
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
 
+            // Rename sketch
             swModel.ForceRebuild3(false);
-            IFeature sketch = swModelExt.GetLastFeatureAdded();
-            sketch.Name = "Eyelet Connector Sketch";
+            IFeature connectorSketch = swModelExt.GetLastFeatureAdded();
+            connectorSketch.Name = "Eyelet Connector Sketch";
 
+            // Select sketch for extrusion
             selected = swModelExt.SelectByID2(
-                Name: sketch.Name,
+                Name: connectorSketch.Name,
                 Type: "SKETCH",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -831,9 +752,13 @@ namespace SolidWorksRenders
                 SelectOption: 0);
 
             if (!selected)
-                throw new InvalidOperationException("Failed to select connector sketch");
+            {
+                Console.WriteLine("WARNING: Failed to select eyelet connector sketch");
+                return;
+            }
 
-            IFeature feature = swFeatMgr.FeatureExtrusion3(
+            // Extrude symmetric (both directions in X)
+            IFeature connectorFeature = swFeatMgr.FeatureExtrusion3(
                 Sd: false,
                 Flip: false,
                 Dir: false,
@@ -858,42 +783,122 @@ namespace SolidWorksRenders
                 StartOffset: 0,
                 FlipStartOffset: false);
 
-            if (feature == null)
-                throw new InvalidOperationException("Failed to create eyelet connector");
+            if (connectorFeature == null)
+            {
+                Console.WriteLine("WARNING: Failed to create eyelet connector");
+            }
+            else
+            {
+                connectorFeature.Name = "Eyelet Connector";
+            }
 
-            feature.Name = "Eyelet Connector";
-        }
+            // Now create the eyelet ring
+            selected = swModelExt.SelectByID2(
+                Name: "Right Plane",
+                Type: "PLANE",
+                X: 0, Y: 0, Z: 0,
+                Append: false,
+                Mark: 0,
+                Callout: null,
+                SelectOption: 0);
 
-        /// <summary>
-        /// Adds fillets to edges for cast appearance
-        /// Note: Fillets require manual edge selection which is complex to automate.
-        /// This method is a placeholder - fillets can be added manually in SolidWorks.
-        /// </summary>
-        private void AddFillets(IModelDoc2 swModel)
-        {
-            // Fillets require selecting specific edges, which is complex to automate
-            // without knowing the exact edge IDs. In production, you would:
-            // 1. Select specific faces/edges programmatically
-            // 2. Use FeatureFillet3 with the selection
-            // For now, we note that fillets should be added manually for the cast look.
-            Console.WriteLine("Note: Add fillets manually in SolidWorks for cast appearance");
-            Console.WriteLine("  - Fillet the A-frame internal edges at cutout");
-            Console.WriteLine("  - Fillet transition from base plate to A-frame");
-            Console.WriteLine("  - Fillet bearing housing to A-frame connection");
+            if (!selected)
+            {
+                Console.WriteLine("WARNING: Failed to select Right Plane for eyelet ring");
+                return;
+            }
+
+            swSketchMgr.InsertSketch(UpdateEditRebuild: true);
+            swSketchMgr.AddToDB = true;
+
+            // Create two concentric circles for the eyelet ring
+            double eyeletCenterZ = connectorTop + EyeletOuterRadius;
+
+            // Outer circle
+            swSketchMgr.CreateCircleByRadius(
+                XC: 0,
+                YC: eyeletCenterZ,
+                Zc: 0,
+                Radius: EyeletOuterRadius);
+
+            // Inner circle (hole)
+            swSketchMgr.CreateCircleByRadius(
+                XC: 0,
+                YC: eyeletCenterZ,
+                Zc: 0,
+                Radius: EyeletInnerRadius);
+
+            swSketchMgr.AddToDB = false;
+            swSketchMgr.InsertSketch(UpdateEditRebuild: true);
+
+            // Rename sketch
+            swModel.ForceRebuild3(false);
+            IFeature eyeletSketch = swModelExt.GetLastFeatureAdded();
+            eyeletSketch.Name = "Eyelet Ring Sketch";
+
+            // Select sketch for extrusion
+            selected = swModelExt.SelectByID2(
+                Name: eyeletSketch.Name,
+                Type: "SKETCH",
+                X: 0, Y: 0, Z: 0,
+                Append: false,
+                Mark: 0,
+                Callout: null,
+                SelectOption: 0);
+
+            if (!selected)
+            {
+                Console.WriteLine("WARNING: Failed to select eyelet ring sketch");
+                return;
+            }
+
+            // Extrude symmetric
+            IFeature eyeletFeature = swFeatMgr.FeatureExtrusion3(
+                Sd: false,
+                Flip: false,
+                Dir: false,
+                T1: (int)swEndConditions_e.swEndCondBlind,
+                T2: (int)swEndConditions_e.swEndCondBlind,
+                D1: EyeletThickness / 2,
+                D2: EyeletThickness / 2,
+                Dchk1: false,
+                Dchk2: false,
+                Ddir1: false,
+                Ddir2: false,
+                Dang1: 0,
+                Dang2: 0,
+                OffsetReverse1: false,
+                OffsetReverse2: false,
+                TranslateSurface1: false,
+                TranslateSurface2: false,
+                Merge: true,
+                UseFeatScope: false,
+                UseAutoSelect: true,
+                T0: (int)swStartConditions_e.swStartSketchPlane,
+                StartOffset: 0,
+                FlipStartOffset: false);
+
+            if (eyeletFeature == null)
+            {
+                Console.WriteLine("WARNING: Failed to create eyelet ring");
+            }
+            else
+            {
+                eyeletFeature.Name = "Lifting Eyelet";
+            }
         }
 
         public void PrintPartDetails()
         {
             Console.WriteLine("\nPart Details:");
-            Console.WriteLine($"- Base plate: {BasePlateLength / InchToMeter}\" x {BasePlateWidth / InchToMeter}\" x {BasePlateThickness / InchToMeter}\"");
-            Console.WriteLine($"- A-frame height: {AFrameHeight / InchToMeter}\"");
-            Console.WriteLine($"- A-frame base width: {AFrameBaseWidth / InchToMeter}\"");
-            Console.WriteLine($"- A-frame top width: {AFrameTopWidth / InchToMeter}\"");
-            Console.WriteLine($"- A-frame thickness: {AFrameThickness / InchToMeter}\"");
-            Console.WriteLine($"- Cutout: {CutoutBottomWidth / InchToMeter}\" x {CutoutHeight / InchToMeter}\" (tapered)");
-            Console.WriteLine($"- Bearing housing: {BearingHousingRadius * 2 / InchToMeter}\" dia x {BearingHousingLength / InchToMeter}\" long");
-            Console.WriteLine($"- Bearing hole: {BearingHoleRadius * 2 / InchToMeter}\" dia");
-            Console.WriteLine($"- Mounting holes: 4x {MountingHoleRadius * 2 / InchToMeter}\" dia");
+            Console.WriteLine($"- Base plate: {BasePlateWidth / InchToMeter}\" x {BasePlateDepth / InchToMeter}\" x {BasePlateThickness / InchToMeter}\"");
+            Console.WriteLine($"- Frame height: {FrameHeight / InchToMeter}\"");
+            Console.WriteLine($"- Frame width: {FrameBottomWidth / InchToMeter}\" (bottom) to {FrameTopWidth / InchToMeter}\" (top)");
+            Console.WriteLine($"- Frame thickness: {FrameThickness / InchToMeter}\"");
+            Console.WriteLine($"- Bearing housing radius: {BearingHousingRadius / InchToMeter}\"");
+            Console.WriteLine($"- Bearing hole radius: {BearingHoleRadius / InchToMeter}\"");
+            Console.WriteLine($"- Cutout window: {CutoutWidth / InchToMeter}\" x {CutoutHeight / InchToMeter}\"");
+            Console.WriteLine($"- Mounting holes: 4 x {MountingHoleRadius * 2 / InchToMeter}\" diameter");
         }
     }
 }
