@@ -24,12 +24,12 @@ namespace SolidWorksRenders
             var registry = new Dictionary<string, (string, Type)>();
             var partTypes = Assembly.GetExecutingAssembly()
                 .GetTypes()
-                .Where(t => typeof(IPartCreator).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
+                .Where(t => typeof(IPart).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
 
             foreach (var type in partTypes)
             {
                 // Create uninitialized instance to read metadata properties
-                var instance = (IPartCreator)FormatterServices.GetUninitializedObject(type);
+                var instance = (IPart)FormatterServices.GetUninitializedObject(type);
                 var cliName = Path.GetFileNameWithoutExtension(instance.FileName);
                 registry[cliName] = (instance.Description, type);
             }
@@ -135,7 +135,7 @@ namespace SolidWorksRenders
         /// </summary>
         private static bool BuildComponent(ISldWorks swApp, string componentName)
         {
-            IPartCreator? partCreator = CreatePartCreator(swApp, componentName);
+            IPart? partCreator = CreatePartCreator(swApp, componentName);
             if (partCreator == null)
             {
                 Console.Error.WriteLine($"ERROR: Unknown component '{componentName}'");
@@ -211,11 +211,11 @@ namespace SolidWorksRenders
         /// <summary>
         /// Creates the appropriate part creator based on component name
         /// </summary>
-        private static IPartCreator? CreatePartCreator(ISldWorks swApp, string componentName)
+        private static IPart? CreatePartCreator(ISldWorks swApp, string componentName)
         {
             if (PartRegistry.TryGetValue(componentName.ToLower(), out var entry))
             {
-                return (IPartCreator)Activator.CreateInstance(entry.PartType, swApp);
+                return (IPart)Activator.CreateInstance(entry.PartType, swApp);
             }
             return null;
         }

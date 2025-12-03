@@ -16,7 +16,7 @@ namespace SolidWorksRenders
     /// - Summation Anchor: cylinder at summation plate tip with center hole
     /// - Middle Rib: elongated diamond with rounded corners near cylinder
     /// </summary>
-    public class SummingLever : IPartCreator
+    public class SummingLever : IPart
     {
         public string PartName => "Summing Lever";
         public string FileName => "summing-lever.sldprt";

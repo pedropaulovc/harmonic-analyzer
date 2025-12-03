@@ -15,7 +15,7 @@ namespace SolidWorksRenders
     /// - Through-hole for pivot shaft
     /// - Lifting eyelet at top with chain attachment
     /// </summary>
-    public class RockerArmSupport : IPartCreator
+    public class RockerArmSupport : IPart
     {
         public string PartName => "Rocker Arm Support";
         public string FileName => "rocker-arm-support.sldprt";
