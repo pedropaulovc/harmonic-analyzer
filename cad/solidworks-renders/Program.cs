@@ -143,10 +143,8 @@ namespace SolidWorksRenders
                         Console.WriteLine($"Part saved to: {savePath}");
                     }
 
-                    // Close the document to release file lock
-                    string modelTitle = model.GetTitle();
-                    swApp.CloseDoc(modelTitle);
-                    Console.WriteLine($"Closed: {modelTitle}");
+                    // Keep document open for inspection
+                    Console.WriteLine("Part remains open in SolidWorks for inspection.");
 
                     return true;
                 }
