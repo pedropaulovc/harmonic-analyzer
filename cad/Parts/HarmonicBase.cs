@@ -16,6 +16,7 @@ namespace SolidWorksRenders
     {
         public string PartName => "Harmonic Analyzer Base";
         public string FileName => "harmonic-base.sldprt";
+        public string Description => "Two-plate welded base for harmonic analyzer";
 
         // Bottom plate parameters (in inches, converted to meters for SolidWorks API)
         private const double BottomWidth = 11.0 * 0.0254;      // 11 inches

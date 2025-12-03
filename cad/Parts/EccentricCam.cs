@@ -15,6 +15,7 @@ namespace SolidWorksRenders
     {
         public string PartName => "Eccentric Cam";
         public string FileName => "eccentric-cam.sldprt";
+        public string Description => "2\" diameter cam with off-center mounting hole and keyway";
 
         // Parameters from parameters.kcl (in inches, converted to meters for SolidWorks API)
         private const double CamDiameter = 2.0 * 0.0254;        // 2.0 inches

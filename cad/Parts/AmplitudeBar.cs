@@ -17,6 +17,7 @@ namespace SolidWorksRenders
     {
         public string PartName => "Amplitude Bar";
         public string FileName => "amplitude-bar.sldprt";
+        public string Description => "Vertical 32\" rod with top and bottom notches";
 
         // Bar dimensions (in inches, converted to meters for SolidWorks API)
         private const double BarLength = 32.0 * 0.0254;        // 32 inches

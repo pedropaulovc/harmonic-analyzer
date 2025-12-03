@@ -11,6 +11,19 @@ namespace SolidWorksRenders
 {
     class Program
     {
+        /// <summary>
+        /// Registry of part creators: CLI name -> (description, factory)
+        /// </summary>
+        public static readonly Dictionary<string, (string Description, Func<ISldWorks, IPartCreator> Factory)> PartRegistry =
+            new Dictionary<string, (string, Func<ISldWorks, IPartCreator>)>
+            {
+                { "harmonic-base", ("Two-plate welded base for harmonic analyzer", sw => new HarmonicBase(sw)) },
+                { "eccentric-cam", ("2\" diameter cam with off-center mounting hole and keyway", sw => new EccentricCam(sw)) },
+                { "amplitude-bar", ("Vertical 32\" rod with top and bottom notches", sw => new AmplitudeBar(sw)) },
+                { "summing-lever", ("Complex assembly with coefficients plate and pivot", sw => new SummingLever(sw)) },
+                { "rocker-arm-support", ("A-frame bearing stand with mounting holes", sw => new RockerArmSupport(sw)) },
+            };
+
         static int Main(string[] args)
         {
             // Parse command-line arguments
@@ -188,26 +201,11 @@ namespace SolidWorksRenders
         /// </summary>
         private static IPartCreator? CreatePartCreator(ISldWorks swApp, string componentName)
         {
-            switch (componentName.ToLower())
+            if (PartRegistry.TryGetValue(componentName.ToLower(), out var entry))
             {
-                case "harmonic-base":
-                    return new HarmonicBase(swApp);
-
-                case "eccentric-cam":
-                    return new EccentricCam(swApp);
-
-                case "amplitude-bar":
-                    return new AmplitudeBar(swApp);
-
-                case "summing-lever":
-                    return new SummingLever(swApp);
-
-                case "rocker-arm-support":
-                    return new RockerArmSupport(swApp);
-
-                default:
-                    return null;
+                return entry.Factory(swApp);
             }
+            return null;
         }
 
         /// <summary>
