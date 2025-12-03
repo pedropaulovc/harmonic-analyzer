@@ -19,6 +19,7 @@ namespace SolidWorksRenders
     {
         public string PartName => "Rocker Arm Support";
         public string FileName => "rocker-arm-support.sldprt";
+        public string Description => "A-frame bearing stand with mounting holes";
 
         // Dimensions in meters (SI units for SolidWorks API)
         private const double InchToMeter = 0.0254;

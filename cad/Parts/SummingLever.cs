@@ -20,6 +20,7 @@ namespace SolidWorksRenders
     {
         public string PartName => "Summing Lever";
         public string FileName => "summing-lever.sldprt";
+        public string Description => "Complex assembly with coefficients plate and pivot";
 
         // Dimensions (in inches, converted to meters for SolidWorks API)
         private const double InchToMeter = 0.0254;
