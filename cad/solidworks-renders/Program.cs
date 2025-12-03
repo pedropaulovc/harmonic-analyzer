@@ -55,6 +55,9 @@ namespace SolidWorksRenders
                 swApp = ConnectToSolidWorks();
                 Console.WriteLine($"Connected to SolidWorks {swApp.RevisionNumber()}\n");
 
+                // Close all open documents first to avoid file lock issues
+                CloseAllDocuments(swApp);
+
                 // Build each component
                 foreach (string componentName in componentsToBuild)
                 {
@@ -140,6 +143,11 @@ namespace SolidWorksRenders
                         Console.WriteLine($"Part saved to: {savePath}");
                     }
 
+                    // Close the document to release file lock
+                    string modelTitle = model.GetTitle();
+                    swApp.CloseDoc(modelTitle);
+                    Console.WriteLine($"Closed: {modelTitle}");
+
                     return true;
                 }
                 else
@@ -182,6 +190,40 @@ namespace SolidWorksRenders
 
                 default:
                     return null;
+            }
+        }
+
+        /// <summary>
+        /// Close all open documents in SolidWorks to release file locks
+        /// </summary>
+        private static void CloseAllDocuments(ISldWorks swApp)
+        {
+            try
+            {
+                // Get the first document
+                IModelDoc2 doc = (IModelDoc2)swApp.GetFirstDocument();
+                int closedCount = 0;
+
+                while (doc != null)
+                {
+                    string docTitle = doc.GetTitle();
+                    IModelDoc2 nextDoc = (IModelDoc2)doc.GetNext();
+
+                    // Close without saving (we'll rebuild fresh)
+                    swApp.CloseDoc(docTitle);
+                    closedCount++;
+
+                    doc = nextDoc;
+                }
+
+                if (closedCount > 0)
+                {
+                    Console.WriteLine($"Closed {closedCount} existing document(s) to avoid file locks.\n");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning: Could not close all documents: {ex.Message}");
             }
         }
 
