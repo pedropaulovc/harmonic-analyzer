@@ -136,11 +136,25 @@ namespace SolidWorksRenders
                     // Print part-specific details
                     partCreator.PrintPartDetails();
 
-                    // Save the part
+                    // Save the part as SLDPRT
                     string? savePath = SavePart(model, partCreator.FileName);
                     if (savePath != null)
                     {
                         Console.WriteLine($"Part saved to: {savePath}");
+                    }
+
+                    // Export to STL
+                    string? stlPath = ExportToSTL(model, partCreator.FileName);
+                    if (stlPath != null)
+                    {
+                        Console.WriteLine($"STL exported to: {stlPath}");
+                    }
+
+                    // Export to STEP
+                    string? stepPath = ExportToSTEP(model, partCreator.FileName);
+                    if (stepPath != null)
+                    {
+                        Console.WriteLine($"STEP exported to: {stepPath}");
                     }
 
                     // Keep document open for inspection
@@ -315,6 +329,120 @@ namespace SolidWorksRenders
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"ERROR saving part: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Exports the part to STL format in the out/stl directory
+        /// </summary>
+        /// <param name="model">The model to export</param>
+        /// <param name="fileName">The filename (without extension) to export as</param>
+        /// <returns>The full path where the file was exported, or null if export failed</returns>
+        private static string? ExportToSTL(IModelDoc2 model, string fileName)
+        {
+            try
+            {
+                // Get the directory relative to the current executable
+                string exeDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+                string saveDir = Path.GetFullPath(Path.Combine(exeDir, "..", "..", "..", "..", "out", "stl"));
+
+                // Create directory if it doesn't exist
+                if (!Directory.Exists(saveDir))
+                {
+                    Directory.CreateDirectory(saveDir);
+                    Console.WriteLine($"Created directory: {saveDir}");
+                }
+
+                // Replace .sldprt extension with .stl
+                string stlFileName = Path.GetFileNameWithoutExtension(fileName) + ".stl";
+                string fullPath = Path.Combine(saveDir, stlFileName);
+
+                Console.WriteLine($"Exporting to STL: {fullPath}");
+
+                // Clear selection to export entire model
+                model.ClearSelection2(true);
+
+                // Export using SaveAs3 - the .stl extension triggers STL format
+                int errors = 0;
+                int warnings = 0;
+                bool saveResult = model.Extension.SaveAs3(
+                    Name: fullPath,
+                    Version: (int)swSaveAsVersion_e.swSaveAsCurrentVersion,
+                    Options: (int)swSaveAsOptions_e.swSaveAsOptions_Silent,
+                    ExportData: null,
+                    AdvancedSaveAsOptions: null,
+                    Errors: ref errors,
+                    Warnings: ref warnings);
+
+                if (!saveResult || errors != 0)
+                {
+                    Console.Error.WriteLine($"ERROR: Failed to export STL. Errors: {errors}, Warnings: {warnings}");
+                    return null;
+                }
+
+                return fullPath;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"ERROR exporting to STL: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Exports the part to STEP format in the out/step directory
+        /// </summary>
+        /// <param name="model">The model to export</param>
+        /// <param name="fileName">The filename (without extension) to export as</param>
+        /// <returns>The full path where the file was exported, or null if export failed</returns>
+        private static string? ExportToSTEP(IModelDoc2 model, string fileName)
+        {
+            try
+            {
+                // Get the directory relative to the current executable
+                string exeDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+                string saveDir = Path.GetFullPath(Path.Combine(exeDir, "..", "..", "..", "..", "out", "step"));
+
+                // Create directory if it doesn't exist
+                if (!Directory.Exists(saveDir))
+                {
+                    Directory.CreateDirectory(saveDir);
+                    Console.WriteLine($"Created directory: {saveDir}");
+                }
+
+                // Replace .sldprt extension with .step
+                string stepFileName = Path.GetFileNameWithoutExtension(fileName) + ".step";
+                string fullPath = Path.Combine(saveDir, stepFileName);
+
+                Console.WriteLine($"Exporting to STEP: {fullPath}");
+
+                // Clear selection to export entire model
+                model.ClearSelection2(true);
+
+                // Export using SaveAs3 - the .step extension triggers STEP format
+                int errors = 0;
+                int warnings = 0;
+                bool saveResult = model.Extension.SaveAs3(
+                    Name: fullPath,
+                    Version: (int)swSaveAsVersion_e.swSaveAsCurrentVersion,
+                    Options: (int)swSaveAsOptions_e.swSaveAsOptions_Silent,
+                    ExportData: null,
+                    AdvancedSaveAsOptions: null,
+                    Errors: ref errors,
+                    Warnings: ref warnings);
+
+                if (!saveResult || errors != 0)
+                {
+                    Console.Error.WriteLine($"ERROR: Failed to export STEP. Errors: {errors}, Warnings: {warnings}");
+                    return null;
+                }
+
+                return fullPath;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"ERROR exporting to STEP: {ex.Message}");
                 return null;
             }
         }
