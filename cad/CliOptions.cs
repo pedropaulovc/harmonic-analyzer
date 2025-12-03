@@ -18,8 +18,7 @@ namespace SolidWorksRenders
             { "eccentric-cam", "2\" diameter cam with off-center mounting hole and keyway" },
             { "amplitude-bar", "Vertical 32\" rod with top and bottom notches" },
             { "summing-lever", "Complex assembly with coefficients plate and pivot" },
-            { "rocker-arm-support", "A-frame bearing stand with mounting holes" },
-            { "extrusion-test", "Diagnostic tool for sketch validation testing" }
+            { "rocker-arm-support", "A-frame bearing stand with mounting holes" }
         };
 
         /// <summary>
