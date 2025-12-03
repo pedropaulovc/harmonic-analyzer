@@ -109,7 +109,7 @@ namespace SolidWorksRenders
         /// </summary>
         private static bool BuildComponent(ISldWorks swApp, string componentName)
         {
-            IPartCreator partCreator = CreatePartCreator(swApp, componentName);
+            IPartCreator? partCreator = CreatePartCreator(swApp, componentName);
             if (partCreator == null)
             {
                 Console.Error.WriteLine($"ERROR: Unknown component '{componentName}'");
@@ -137,7 +137,7 @@ namespace SolidWorksRenders
                     partCreator.PrintPartDetails();
 
                     // Save the part
-                    string savePath = SavePart(model, partCreator.FileName);
+                    string? savePath = SavePart(model, partCreator.FileName);
                     if (savePath != null)
                     {
                         Console.WriteLine($"Part saved to: {savePath}");
@@ -272,7 +272,7 @@ namespace SolidWorksRenders
         /// <param name="model">The model to save</param>
         /// <param name="fileName">The filename to save as</param>
         /// <returns>The full path where the file was saved, or null if save failed</returns>
-        private static string SavePart(IModelDoc2 model, string fileName)
+        private static string? SavePart(IModelDoc2 model, string fileName)
         {
             try
             {
