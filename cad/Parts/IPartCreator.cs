@@ -18,6 +18,11 @@ namespace SolidWorksRenders
         string FileName { get; }
 
         /// <summary>
+        /// Gets a short description of the part for CLI help
+        /// </summary>
+        string Description { get; }
+
+        /// <summary>
         /// Creates the part and returns the model document
         /// </summary>
         IModelDoc2 CreatePart();

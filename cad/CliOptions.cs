@@ -10,16 +10,10 @@ namespace SolidWorksRenders
     public class CliOptions
     {
         /// <summary>
-        /// Available components that can be built
+        /// Available components that can be built (derived from Program.PartRegistry)
         /// </summary>
-        public static readonly Dictionary<string, string> AvailableComponents = new Dictionary<string, string>
-        {
-            { "harmonic-base", "Two-plate welded base for harmonic analyzer" },
-            { "eccentric-cam", "2\" diameter cam with off-center mounting hole and keyway" },
-            { "amplitude-bar", "Vertical 32\" rod with top and bottom notches" },
-            { "summing-lever", "Complex assembly with coefficients plate and pivot" },
-            { "rocker-arm-support", "A-frame bearing stand with mounting holes" }
-        };
+        public static IReadOnlyDictionary<string, string> AvailableComponents =>
+            Program.PartRegistry.ToDictionary(p => p.Key, p => p.Value.Description);
 
         /// <summary>
         /// The component to build (null if listing or showing help)
