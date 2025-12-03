@@ -28,41 +28,11 @@ if (-not (Test-Path $targetDir)) {
     New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
 }
 
-# Unpack with progress
+# Unpack using 7-Zip
 Write-Output "Unpacking to: $targetDir"
-
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-$zip = [System.IO.Compression.ZipFile]::OpenRead($tempPath)
-$totalEntries = $zip.Entries.Count
-$currentEntry = 0
-
-foreach ($entry in $zip.Entries) {
-    $currentEntry++
-    $percent = [math]::Round(($currentEntry / $totalEntries) * 100)
-
-    Write-Progress -Activity "Unpacking SolidWorks API docs" `
-        -Status "$currentEntry / $totalEntries files ($percent%)" `
-        -PercentComplete $percent
-
-    $destPath = Join-Path $targetDir $entry.FullName
-    $destDir = Split-Path $destPath -Parent
-
-    if (-not (Test-Path $destDir)) {
-        New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-    }
-
-    if (-not $entry.FullName.EndsWith('/')) {
-        [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $destPath, $true)
-    }
-}
-
-$zip.Dispose()
-Write-Progress -Activity "Unpacking SolidWorks API docs" -Completed
+& "C:\Program Files\7-Zip\7z.exe" x $tempPath -o"$targetDir" -y
 
 # Clean up
 Remove-Item $tempPath
-Write-Output "Done! Cleaned up temporary file."
-
-# Show what was unpacked
-Write-Output "Unpacked $totalEntries files to $targetDir"
+Write-Output "Done! Unpacked to $targetDir"
 ```
