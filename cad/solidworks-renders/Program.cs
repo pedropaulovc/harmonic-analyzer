@@ -91,8 +91,12 @@ namespace SolidWorksRenders
                 return 1;
             }
 
-            Console.WriteLine("\nPress any key to exit...");
-            Console.ReadKey();
+            // Only prompt for key if running interactively
+            if (!Console.IsInputRedirected)
+            {
+                Console.WriteLine("\nPress any key to exit...");
+                Console.ReadKey();
+            }
 
             return failCount > 0 ? 1 : 0;
         }
