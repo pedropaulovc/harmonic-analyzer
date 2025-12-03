@@ -12,7 +12,7 @@ namespace SolidWorksRenders
     /// (10.5" x 17.5" x 1.5") centered on top.
     /// NOTE: KCL version includes fillets; this version creates basic geometry without fillets.
     /// </summary>
-    public class HarmonicBase : IPartCreator
+    public class HarmonicBase : IPart
     {
         public string PartName => "Harmonic Analyzer Base";
         public string FileName => "harmonic-base.sldprt";

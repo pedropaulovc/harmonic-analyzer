@@ -5,7 +5,7 @@ namespace SolidWorksRenders
     /// <summary>
     /// Interface for creating SolidWorks parts
     /// </summary>
-    public interface IPartCreator
+    public interface IPart
     {
         /// <summary>
         /// Gets the name of the part being created

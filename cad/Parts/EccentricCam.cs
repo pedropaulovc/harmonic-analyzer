@@ -11,7 +11,7 @@ namespace SolidWorksRenders
     /// The cam produces harmonic motion with displacement = eccentricity × sin(θ)
     /// Features a simple cylinder with off-center mounting hole and keyway.
     /// </summary>
-    public class EccentricCam : IPartCreator
+    public class EccentricCam : IPart
     {
         public string PartName => "Eccentric Cam";
         public string FileName => "eccentric-cam.sldprt";

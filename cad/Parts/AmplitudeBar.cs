@@ -13,7 +13,7 @@ namespace SolidWorksRenders
     /// - Top notch: 0.125" wide x 0.5" tall
     /// Both notches are centered on the bar width.
     /// </summary>
-    public class AmplitudeBar : IPartCreator
+    public class AmplitudeBar : IPart
     {
         public string PartName => "Amplitude Bar";
         public string FileName => "amplitude-bar.sldprt";
