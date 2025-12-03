@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using SolidWorks.Interop.sldworks;
@@ -148,6 +149,13 @@ namespace SolidWorksRenders
                     if (stlPath != null)
                     {
                         Console.WriteLine($"STL exported to: {stlPath}");
+
+                        // Export to PNG renders from the STL
+                        string? pngDir = ExportToPNG(stlPath, partCreator.FileName);
+                        if (pngDir != null)
+                        {
+                            Console.WriteLine($"PNG renders exported to: {pngDir}");
+                        }
                     }
 
                     // Export to STEP
@@ -445,6 +453,148 @@ namespace SolidWorksRenders
                 Console.Error.WriteLine($"ERROR exporting to STEP: {ex.Message}");
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Camera angles for PNG rendering: x,y,z,rot_x,rot_y,rot_z,distance
+        /// </summary>
+        private static readonly Dictionary<string, string> CameraAngles = new Dictionary<string, string>
+        {
+            { "front", "0,0,0,90,0,0,150" },
+            { "back", "0,0,0,90,0,180,150" },
+            { "left", "0,0,0,90,0,90,150" },
+            { "right", "0,0,0,90,0,270,150" },
+            { "top", "0,0,0,0,0,0,150" },
+            { "bottom", "0,0,0,180,0,0,150" },
+            { "iso-front-left", "0,0,0,60,0,315,150" },
+            { "iso-front-right", "0,0,0,60,0,45,150" },
+            { "iso-back-left", "0,0,0,60,0,135,150" },
+            { "iso-back-right", "0,0,0,60,0,225,150" }
+        };
+
+        /// <summary>
+        /// Exports the STL to PNG images from multiple camera angles using OpenSCAD
+        /// </summary>
+        /// <param name="stlPath">Path to the STL file to render</param>
+        /// <param name="fileName">The filename (without extension) for output directory naming</param>
+        /// <returns>The output directory path, or null if export failed</returns>
+        private static string? ExportToPNG(string stlPath, string fileName)
+        {
+            try
+            {
+                // Check if OpenSCAD is available
+                string? openscadPath = FindOpenSCAD();
+                if (openscadPath == null)
+                {
+                    Console.WriteLine("OpenSCAD not found. Skipping PNG export.");
+                    return null;
+                }
+
+                // Get the directory relative to the current executable
+                string exeDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+                string baseName = Path.GetFileNameWithoutExtension(fileName);
+                string saveDir = Path.GetFullPath(Path.Combine(exeDir, "..", "..", "..", "out", "png", baseName));
+
+                // Create directory if it doesn't exist
+                if (!Directory.Exists(saveDir))
+                {
+                    Directory.CreateDirectory(saveDir);
+                }
+
+                Console.WriteLine($"Exporting PNG renders to: {saveDir}");
+
+                // Create temporary SCAD file to import the STL
+                string tempScad = Path.Combine(Path.GetTempPath(), $"{baseName}-temp.scad");
+                string absoluteStlPath = Path.GetFullPath(stlPath).Replace("\\", "/");
+                File.WriteAllText(tempScad, $"import(\"{absoluteStlPath}\");");
+
+                int successCount = 0;
+                int failCount = 0;
+
+                foreach (var angle in CameraAngles)
+                {
+                    string outputFile = Path.Combine(saveDir, $"{angle.Key}.png");
+
+                    var startInfo = new ProcessStartInfo
+                    {
+                        FileName = openscadPath,
+                        Arguments = $"-o \"{outputFile}\" --imgsize=4096,4096 --camera={angle.Value} --colorscheme=Solarized --view=axes,scales --viewall --projection=o \"{tempScad}\"",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true
+                    };
+
+                    using (var process = Process.Start(startInfo))
+                    {
+                        if (process == null)
+                        {
+                            Console.Error.WriteLine($"  Failed to start OpenSCAD for {angle.Key} view");
+                            failCount++;
+                            continue;
+                        }
+
+                        string stderr = process.StandardError.ReadToEnd();
+                        process.WaitForExit();
+
+                        if (process.ExitCode == 0 && File.Exists(outputFile))
+                        {
+                            Console.WriteLine($"  Rendered {angle.Key} view");
+                            successCount++;
+                        }
+                        else
+                        {
+                            Console.Error.WriteLine($"  Failed to render {angle.Key} view: {stderr}");
+                            failCount++;
+                        }
+                    }
+                }
+
+                // Clean up temp file
+                try { File.Delete(tempScad); } catch { }
+
+                Console.WriteLine($"PNG export complete: {successCount} succeeded, {failCount} failed");
+                return successCount > 0 ? saveDir : null;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"ERROR exporting to PNG: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Finds OpenSCAD executable in PATH or common installation locations
+        /// </summary>
+        private static string? FindOpenSCAD()
+        {
+            // Check PATH first
+            string[] pathDirs = System.Environment.GetEnvironmentVariable("PATH")?.Split(Path.PathSeparator) ?? Array.Empty<string>();
+            foreach (string dir in pathDirs)
+            {
+                string candidate = Path.Combine(dir, "openscad.exe");
+                if (File.Exists(candidate))
+                    return candidate;
+                candidate = Path.Combine(dir, "openscad");
+                if (File.Exists(candidate))
+                    return candidate;
+            }
+
+            // Check common Windows installation locations
+            string[] commonPaths = new[]
+            {
+                @"C:\Program Files\OpenSCAD\openscad.exe",
+                @"C:\Program Files (x86)\OpenSCAD\openscad.exe",
+                Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "Programs", "OpenSCAD", "openscad.exe")
+            };
+
+            foreach (string path in commonPaths)
+            {
+                if (File.Exists(path))
+                    return path;
+            }
+
+            return null;
         }
     }
 }
