@@ -32,7 +32,7 @@ SolidWorks Development Progress:
    - Code Examples in `./examples/` (proven implementations)
    - Troubleshooting Guide in `./learnings/` (documented solutions to common problems)
 
-3. **If documentation is unavailable**: ABORT and notify user
+3. **If documentation is unavailable**: Run `/download-solidworks-docs` command to download the API documentation, then continue. If the command fails, ABORT and notify user
 
 4. **Verify approach**: Confirm alignment with current SDK conventions
 
