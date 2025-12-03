@@ -10,60 +10,9 @@ if (-not $asset) {
 $downloadUrl = $asset.browser_download_url
 Write-Output "Downloading from: $downloadUrl"
 
-# Download with progress
+# Download
 $tempPath = Join-Path $env:TEMP 'solidworks-docs.zip'
-$totalSize = $asset.size
-$totalSizeMB = [math]::Round($totalSize / 1MB, 2)
-
-Write-Output "File size: $totalSizeMB MB"
-
-# Use WebClient for progress tracking
-$webClient = New-Object System.Net.WebClient
-$stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-$lastBytes = 0
-$lastTime = 0
-
-$progressHandler = {
-    param($sender, $e)
-    $percent = $e.ProgressPercentage
-    $receivedMB = [math]::Round($e.BytesReceived / 1MB, 2)
-
-    # Calculate speed
-    $elapsed = $stopwatch.ElapsedMilliseconds
-    if ($elapsed -gt $script:lastTime + 500) {
-        $bytesThisPeriod = $e.BytesReceived - $script:lastBytes
-        $timePeriod = ($elapsed - $script:lastTime) / 1000
-        $speedMBps = [math]::Round(($bytesThisPeriod / 1MB) / $timePeriod, 2)
-        $script:lastBytes = $e.BytesReceived
-        $script:lastTime = $elapsed
-        $script:currentSpeed = $speedMBps
-    }
-
-    $speedDisplay = if ($script:currentSpeed) { "$($script:currentSpeed) MB/s" } else { "calculating..." }
-
-    Write-Progress -Activity "Downloading SolidWorks API docs" `
-        -Status "$receivedMB / $totalSizeMB MB ($speedDisplay)" `
-        -PercentComplete $percent
-}
-
-$completedHandler = {
-    Write-Progress -Activity "Downloading SolidWorks API docs" -Completed
-}
-
-Register-ObjectEvent -InputObject $webClient -EventName DownloadProgressChanged -Action $progressHandler | Out-Null
-Register-ObjectEvent -InputObject $webClient -EventName DownloadFileCompleted -Action $completedHandler | Out-Null
-
-$webClient.DownloadFileAsync([Uri]$downloadUrl, $tempPath)
-
-# Wait for download to complete
-while ($webClient.IsBusy) {
-    Start-Sleep -Milliseconds 100
-}
-
-$stopwatch.Stop()
-$webClient.Dispose()
-Get-EventSubscriber | Unregister-Event
-
+Invoke-WebRequest -Uri $downloadUrl -OutFile $tempPath
 Write-Output "Downloaded to: $tempPath"
 
 # Create target directory if it doesn't exist
@@ -72,14 +21,40 @@ if (-not (Test-Path $targetDir)) {
     New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
 }
 
-# Unpack
+# Unpack with progress
 Write-Output "Unpacking to: $targetDir"
-Expand-Archive -Path $tempPath -DestinationPath $targetDir -Force
+
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$zip = [System.IO.Compression.ZipFile]::OpenRead($tempPath)
+$totalEntries = $zip.Entries.Count
+$currentEntry = 0
+
+foreach ($entry in $zip.Entries) {
+    $currentEntry++
+    $percent = [math]::Round(($currentEntry / $totalEntries) * 100)
+
+    Write-Progress -Activity "Unpacking SolidWorks API docs" `
+        -Status "$currentEntry / $totalEntries files ($percent%)" `
+        -PercentComplete $percent
+
+    $destPath = Join-Path $targetDir $entry.FullName
+    $destDir = Split-Path $destPath -Parent
+
+    if (-not (Test-Path $destDir)) {
+        New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+    }
+
+    if (-not $entry.FullName.EndsWith('/')) {
+        [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $destPath, $true)
+    }
+}
+
+$zip.Dispose()
+Write-Progress -Activity "Unpacking SolidWorks API docs" -Completed
 
 # Clean up
 Remove-Item $tempPath
 Write-Output "Done! Cleaned up temporary file."
 
 # Show what was unpacked
-$fileCount = (Get-ChildItem -Path $targetDir -Recurse -File).Count
-Write-Output "Unpacked $fileCount files to $targetDir"
+Write-Output "Unpacked $totalEntries files to $targetDir"
