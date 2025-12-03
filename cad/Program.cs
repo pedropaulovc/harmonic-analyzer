@@ -2,7 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Runtime.Serialization;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 using SolidWorksRenders;
@@ -12,17 +15,26 @@ namespace SolidWorksRenders
     class Program
     {
         /// <summary>
-        /// Registry of part creators: CLI name -> (description, factory)
+        /// Registry of part creators, auto-discovered via reflection
         /// </summary>
-        public static readonly Dictionary<string, (string Description, Func<ISldWorks, IPartCreator> Factory)> PartRegistry =
-            new Dictionary<string, (string, Func<ISldWorks, IPartCreator>)>
+        public static readonly Dictionary<string, (string Description, Type PartType)> PartRegistry = DiscoverParts();
+
+        private static Dictionary<string, (string Description, Type PartType)> DiscoverParts()
+        {
+            var registry = new Dictionary<string, (string, Type)>();
+            var partTypes = Assembly.GetExecutingAssembly()
+                .GetTypes()
+                .Where(t => typeof(IPartCreator).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
+
+            foreach (var type in partTypes)
             {
-                { "harmonic-base", ("Two-plate welded base for harmonic analyzer", sw => new HarmonicBase(sw)) },
-                { "eccentric-cam", ("2\" diameter cam with off-center mounting hole and keyway", sw => new EccentricCam(sw)) },
-                { "amplitude-bar", ("Vertical 32\" rod with top and bottom notches", sw => new AmplitudeBar(sw)) },
-                { "summing-lever", ("Complex assembly with coefficients plate and pivot", sw => new SummingLever(sw)) },
-                { "rocker-arm-support", ("A-frame bearing stand with mounting holes", sw => new RockerArmSupport(sw)) },
-            };
+                // Create uninitialized instance to read metadata properties
+                var instance = (IPartCreator)FormatterServices.GetUninitializedObject(type);
+                var cliName = Path.GetFileNameWithoutExtension(instance.FileName);
+                registry[cliName] = (instance.Description, type);
+            }
+            return registry;
+        }
 
         static int Main(string[] args)
         {
@@ -203,7 +215,7 @@ namespace SolidWorksRenders
         {
             if (PartRegistry.TryGetValue(componentName.ToLower(), out var entry))
             {
-                return entry.Factory(swApp);
+                return (IPartCreator)Activator.CreateInstance(entry.PartType, swApp);
             }
             return null;
         }
