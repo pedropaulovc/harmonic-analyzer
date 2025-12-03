@@ -267,7 +267,7 @@ namespace SolidWorksRenders
         }
 
         /// <summary>
-        /// Saves the part to the sldprt-renders directory
+        /// Saves the part to the out/sldprt directory
         /// </summary>
         /// <param name="model">The model to save</param>
         /// <param name="fileName">The filename to save as</param>
@@ -278,7 +278,7 @@ namespace SolidWorksRenders
             {
                 // Get the directory relative to the current executable
                 string exeDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
-                string saveDir = Path.GetFullPath(Path.Combine(exeDir, "..", "..", "..", "..", "sldprt-renders"));
+                string saveDir = Path.GetFullPath(Path.Combine(exeDir, "..", "..", "..", "..", "out", "sldprt"));
 
                 // Create directory if it doesn't exist
                 if (!Directory.Exists(saveDir))
