@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using SolidWorks.Interop.sldworks;
@@ -9,21 +10,110 @@ namespace SolidWorksRenders
 {
     class Program
     {
-        static void Main(string[] args)
+        static int Main(string[] args)
         {
-            // TODO: In the future, this could be selected via command line args or config
-            IPartCreator partCreator = CreatePartCreator(args);
+            // Parse command-line arguments
+            var options = CliOptions.Parse(args);
 
-            Console.WriteLine($"{partCreator.PartName} Creator for SolidWorks");
-            Console.WriteLine(new string('=', partCreator.PartName.Length + 24) + "\n");
+            // Handle parse errors
+            if (!string.IsNullOrEmpty(options.Error))
+            {
+                Console.Error.WriteLine($"Error: {options.Error}");
+                Console.WriteLine();
+                CliOptions.PrintHelp();
+                return 1;
+            }
+
+            // Handle help request
+            if (options.ShowHelp)
+            {
+                CliOptions.PrintHelp();
+                return 0;
+            }
+
+            // Handle list request
+            if (options.ListComponents)
+            {
+                CliOptions.PrintComponentList();
+                return 0;
+            }
+
+            // Get components to build
+            var componentsToBuild = new List<string>(options.GetComponentsToBuild());
+            if (componentsToBuild.Count == 0)
+            {
+                CliOptions.PrintHelp();
+                return 1;
+            }
 
             ISldWorks? swApp = null;
+            int successCount = 0;
+            int failCount = 0;
 
             try
             {
                 swApp = ConnectToSolidWorks();
                 Console.WriteLine($"Connected to SolidWorks {swApp.RevisionNumber()}\n");
 
+                // Build each component
+                foreach (string componentName in componentsToBuild)
+                {
+                    Console.WriteLine(new string('=', 60));
+                    bool success = BuildComponent(swApp, componentName);
+                    if (success)
+                        successCount++;
+                    else
+                        failCount++;
+                    Console.WriteLine();
+                }
+
+                // Print summary if building multiple
+                if (componentsToBuild.Count > 1)
+                {
+                    Console.WriteLine(new string('=', 60));
+                    Console.WriteLine("BUILD SUMMARY");
+                    Console.WriteLine(new string('=', 60));
+                    Console.WriteLine($"  Successful: {successCount}");
+                    Console.WriteLine($"  Failed:     {failCount}");
+                    Console.WriteLine($"  Total:      {componentsToBuild.Count}");
+                }
+            }
+            catch (COMException comEx)
+            {
+                Console.Error.WriteLine($"COM ERROR: {comEx.Message}");
+                Console.Error.WriteLine($"HRESULT: 0x{comEx.ErrorCode:X}");
+                return 1;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"ERROR: {ex.Message}");
+                Console.Error.WriteLine($"Stack trace: {ex.StackTrace}");
+                return 1;
+            }
+
+            Console.WriteLine("\nPress any key to exit...");
+            Console.ReadKey();
+
+            return failCount > 0 ? 1 : 0;
+        }
+
+        /// <summary>
+        /// Build a single component by name
+        /// </summary>
+        private static bool BuildComponent(ISldWorks swApp, string componentName)
+        {
+            IPartCreator partCreator = CreatePartCreator(swApp, componentName);
+            if (partCreator == null)
+            {
+                Console.Error.WriteLine($"ERROR: Unknown component '{componentName}'");
+                return false;
+            }
+
+            Console.WriteLine($"Building: {partCreator.PartName}");
+            Console.WriteLine(new string('-', 60));
+
+            try
+            {
                 // Create the part
                 Console.WriteLine($"Creating {partCreator.PartName.ToLower()} part...");
                 IModelDoc2 model = partCreator.CreatePart();
@@ -43,44 +133,30 @@ namespace SolidWorksRenders
                     string savePath = SavePart(model, partCreator.FileName);
                     if (savePath != null)
                     {
-                        Console.WriteLine($"\nPart saved to: {savePath}");
+                        Console.WriteLine($"Part saved to: {savePath}");
                     }
 
-                    Console.WriteLine("\nThe part is now open in SolidWorks.");
+                    return true;
                 }
                 else
                 {
                     Console.Error.WriteLine($"ERROR: Failed to create {partCreator.PartName.ToLower()}.");
+                    return false;
                 }
-            }
-            catch (COMException comEx)
-            {
-                Console.Error.WriteLine($"COM ERROR: {comEx.Message}");
-                Console.Error.WriteLine($"HRESULT: 0x{comEx.ErrorCode:X}");
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"ERROR: {ex.Message}");
-                Console.Error.WriteLine($"Stack trace: {ex.StackTrace}");
+                Console.Error.WriteLine($"ERROR building {componentName}: {ex.Message}");
+                return false;
             }
-
-            Console.WriteLine("\nPress any key to exit...");
-            Console.ReadKey();
         }
 
         /// <summary>
-        /// Creates the appropriate part creator based on configuration
-        /// Usage: SolidWorksRenders.exe [part-name]
-        /// Available parts: harmonic-base, eccentric-cam, amplitude-bar, summing-lever, extrusion-test, rocker-arm-support
+        /// Creates the appropriate part creator based on component name
         /// </summary>
-        private static IPartCreator CreatePartCreator(string[] args)
+        private static IPartCreator? CreatePartCreator(ISldWorks swApp, string componentName)
         {
-            ISldWorks swApp = ConnectToSolidWorks();
-
-            // Check if a part name was provided as an argument
-            string partName = args.Length > 0 ? args[0].ToLower() : "harmonic-base";
-
-            switch (partName)
+            switch (componentName.ToLower())
             {
                 case "harmonic-base":
                     return new HarmonicBase(swApp);
@@ -101,10 +177,7 @@ namespace SolidWorksRenders
                     return new RockerArmSupport(swApp);
 
                 default:
-                    Console.WriteLine($"Unknown part name: {args[0]}");
-                    Console.WriteLine("Available parts: harmonic-base, eccentric-cam, amplitude-bar, summing-lever, extrusion-test, rocker-arm-support");
-                    Console.WriteLine("Defaulting to harmonic-base\n");
-                    return new HarmonicBase(swApp);
+                    return null;
             }
         }
 
