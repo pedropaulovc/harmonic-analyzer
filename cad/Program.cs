@@ -292,7 +292,7 @@ namespace SolidWorksRenders
             {
                 // Get the directory relative to the current executable
                 string exeDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
-                string saveDir = Path.GetFullPath(Path.Combine(exeDir, "..", "..", "..", "..", "out", "sldprt"));
+                string saveDir = Path.GetFullPath(Path.Combine(exeDir, "..", "..", "..", "out", "sldprt"));
 
                 // Create directory if it doesn't exist
                 if (!Directory.Exists(saveDir))
@@ -345,7 +345,7 @@ namespace SolidWorksRenders
             {
                 // Get the directory relative to the current executable
                 string exeDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
-                string saveDir = Path.GetFullPath(Path.Combine(exeDir, "..", "..", "..", "..", "out", "stl"));
+                string saveDir = Path.GetFullPath(Path.Combine(exeDir, "..", "..", "..", "out", "stl"));
 
                 // Create directory if it doesn't exist
                 if (!Directory.Exists(saveDir))
@@ -402,7 +402,7 @@ namespace SolidWorksRenders
             {
                 // Get the directory relative to the current executable
                 string exeDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
-                string saveDir = Path.GetFullPath(Path.Combine(exeDir, "..", "..", "..", "..", "out", "step"));
+                string saveDir = Path.GetFullPath(Path.Combine(exeDir, "..", "..", "..", "out", "step"));
 
                 // Create directory if it doesn't exist
                 if (!Directory.Exists(saveDir))
