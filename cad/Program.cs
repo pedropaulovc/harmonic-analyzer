@@ -202,9 +202,6 @@ namespace SolidWorksRenders
                 case "summing-lever":
                     return new SummingLever(swApp);
 
-                case "extrusion-test":
-                    return new ExtrusionTroubleshootingTest(swApp);
-
                 case "rocker-arm-support":
                     return new RockerArmSupport(swApp);
 
