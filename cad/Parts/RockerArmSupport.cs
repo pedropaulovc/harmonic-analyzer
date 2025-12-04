@@ -10,19 +10,21 @@ namespace SolidWorksRenders
     /// Design follows standard CAD workflow:
     /// 1. Sketch isosceles trapezoid on Right Plane (side profile)
     /// 2. Extrude Mid-Plane to 7.25" total width (solid)
-    /// 3. Cut window pocket from front (blind, leaves central web)
-    /// 4. Cut window pocket from back (blind, creates I-beam cross section)
-    /// 5. Add mounting holes on bottom
-    /// 6. Add external fillets
+    /// 3. Cut window through-all (front to back)
+    /// 4. Add mounting holes on bottom
+    /// 5. Add external fillets
     ///
-    /// Cross section when cut in half resembles an "I" - single window in middle,
-    /// with solid material on left and right sides connected by central web.
+    /// When cut vertically (plane parallel to Right Plane through center),
+    /// cross section resembles an "I" shape:
+    /// - Top flange = material above the window
+    /// - Web area = window opening (empty)
+    /// - Bottom flange = material below the window
     /// </summary>
     public class RockerArmSupport : IPart
     {
         public string PartName => "Rocker Arm Support";
         public string FileName => "rocker-arm-support.sldprt";
-        public string Description => "A-frame support with I-beam cross section";
+        public string Description => "A-frame support with through-all window";
 
         // Unit conversion
         private const double InchToMeter = 0.0254;
@@ -34,14 +36,10 @@ namespace SolidWorksRenders
         private const double TopDepth = (2.0 / 3.0) * InchToMeter;    // 0.67" (~2/3") (side top depth)
         private const double WallThickness = 0.25 * InchToMeter;      // 0.25" uniform
 
-        // Window (internal cutout) dimensions - creates I-beam cross section
+        // Window (internal cutout) dimensions - creates I-beam cross section when cut vertically
         private const double WindowSize = 5.00 * InchToMeter;         // 5.00" x 5.00" square
         private const double WindowCornerRadius = 0.50 * InchToMeter; // 0.50" fillet on corners
-        // Window is centered: 1.125" from side edge, 1.00" from top and bottom
-        // Central web thickness (I-beam style cross section)
-        private const double CentralWebThickness = 0.25 * InchToMeter;
-        // Window pocket depth = (MaxWidth - CentralWebThickness) / 2 = (7.25 - 0.25) / 2 = 3.50"
-        private const double WindowPocketDepth = (MaxWidth - CentralWebThickness) / 2;
+        // Window is centered: 1.00" from top and bottom when height is 7.00"
 
         // Mounting holes
         private const double MountingHoleDiameter = 0.3125 * InchToMeter; // 5/16" clearance holes
@@ -82,12 +80,13 @@ namespace SolidWorksRenders
             Console.WriteLine("Creating A-frame profile (isosceles trapezoid)...");
             CreateAFrameBody(swModel);
 
-            // Step 2: Create window pockets from front and back (I-beam cross section)
-            // No shell - instead cut blind pockets leaving a central web
-            Console.WriteLine("Creating front window pocket...");
-            CreateWindowPocket(swModel, isFront: true);
-            Console.WriteLine("Creating back window pocket...");
-            CreateWindowPocket(swModel, isFront: false);
+            // Step 2: Create window cutout through the entire part
+            // When cut vertically (through center), shows I-beam cross section:
+            // - Top material (above window) = top flange
+            // - Window opening = web removed
+            // - Bottom material (below window) = bottom flange
+            Console.WriteLine("Creating center window cutout...");
+            CreateWindowCutout(swModel);
 
             // Step 3: Add mounting holes on bottom
             Console.WriteLine("Creating mounting holes...");
@@ -201,10 +200,10 @@ namespace SolidWorksRenders
         }
 
         /// <summary>
-        /// Creates a window pocket from either the front or back face.
-        /// This creates an I-beam cross section by leaving a central web.
+        /// Creates a through-all window cutout in the center of the A-frame.
+        /// When cut vertically, shows I-beam cross section.
         /// </summary>
-        private void CreateWindowPocket(IModelDoc2 swModel, bool isFront)
+        private void CreateWindowCutout(IModelDoc2 swModel)
         {
             ISketchManager swSketchMgr = swModel.SketchManager;
             IFeatureManager swFeatMgr = swModel.FeatureManager;
@@ -222,14 +221,14 @@ namespace SolidWorksRenders
 
             if (!selected)
             {
-                Console.WriteLine($"WARNING: Failed to select Front Plane for {(isFront ? "front" : "back")} window pocket");
+                Console.WriteLine("WARNING: Failed to select Front Plane for window cutout");
                 return;
             }
 
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
             swSketchMgr.AddToDB = true;
 
-            // Window is centered in the 7.25" width and 7.00" height
+            // Window is centered in the 7.00" height
             // Window size: 5.00" x 5.00"
             // Vertical centering: (7.00 - 5.00) / 2 = 1.00" from top and bottom
             double halfWindow = WindowSize / 2;
@@ -278,7 +277,7 @@ namespace SolidWorksRenders
             // Get and rename the sketch
             swModel.ForceRebuild3(false);
             IFeature windowSketch = swModelExt.GetLastFeatureAdded();
-            windowSketch.Name = isFront ? "Front Window Sketch" : "Back Window Sketch";
+            windowSketch.Name = "Window Sketch";
 
             // Select sketch for cut
             selected = swModelExt.SelectByID2(
@@ -292,20 +291,18 @@ namespace SolidWorksRenders
 
             if (!selected)
             {
-                Console.WriteLine($"WARNING: Failed to select {(isFront ? "front" : "back")} window sketch for cut");
+                Console.WriteLine("WARNING: Failed to select window sketch for cut");
                 return;
             }
 
-            // Blind cut - pocket depth stops before reaching the central web
-            // For front: cut in positive X direction (into the part)
-            // For back: cut in negative X direction (into the part from back)
+            // Through-all cut in both directions (front to back)
             IFeature cutFeature = swFeatMgr.FeatureCut4(
-                Sd: true,                                          // Single direction
+                Sd: false,                                         // Both directions (through-all)
                 Flip: false,
-                Dir: !isFront,                                     // Flip direction for back cut
-                T1: (int)swEndConditions_e.swEndCondBlind,
-                T2: (int)swEndConditions_e.swEndCondBlind,
-                D1: WindowPocketDepth,                             // Blind depth to leave central web
+                Dir: false,
+                T1: (int)swEndConditions_e.swEndCondThroughAll,   // Through-all direction 1
+                T2: (int)swEndConditions_e.swEndCondThroughAll,   // Through-all direction 2
+                D1: 0,
                 D2: 0,
                 Dchk1: false,
                 Dchk2: false,
@@ -323,19 +320,19 @@ namespace SolidWorksRenders
                 AssemblyFeatureScope: false,
                 AutoSelectComponents: false,
                 PropagateFeatureToParts: false,
-                T0: (int)swStartConditions_e.swStartOffset,        // Start from offset
-                StartOffset: isFront ? MaxWidth / 2 : MaxWidth / 2,  // Start from face
-                FlipStartOffset: !isFront,                         // Flip for back
+                T0: (int)swStartConditions_e.swStartSketchPlane,
+                StartOffset: 0,
+                FlipStartOffset: false,
                 OptimizeGeometry: false);
 
             if (cutFeature == null)
             {
-                Console.WriteLine($"WARNING: Failed to create {(isFront ? "front" : "back")} window pocket - continuing");
+                Console.WriteLine("WARNING: Failed to create window cutout - continuing");
             }
             else
             {
-                cutFeature.Name = isFront ? "Front Window Pocket" : "Back Window Pocket";
-                Console.WriteLine($"Created {(isFront ? "front" : "back")} window pocket ({WindowPocketDepth / InchToMeter:F2}\" deep)");
+                cutFeature.Name = "Window Cutout";
+                Console.WriteLine($"Created through-all window cutout ({WindowSize / InchToMeter:F2}\" x {WindowSize / InchToMeter:F2}\")");
             }
         }
 
@@ -527,12 +524,11 @@ namespace SolidWorksRenders
             Console.WriteLine($"- Max Width (Front): {MaxWidth / InchToMeter:F2}\"");
             Console.WriteLine($"- Base Depth (Side): {BaseDepth / InchToMeter:F2}\"");
             Console.WriteLine($"- Top Depth (Side): {TopDepth / InchToMeter:F2}\" (~2/3\")");
-            Console.WriteLine($"- Window Size: {WindowSize / InchToMeter:F2}\" x {WindowSize / InchToMeter:F2}\"");
-            Console.WriteLine($"- Window Pocket Depth: {WindowPocketDepth / InchToMeter:F2}\" (each side)");
-            Console.WriteLine($"- Central Web Thickness: {CentralWebThickness / InchToMeter:F2}\" (I-beam cross section)");
+            Console.WriteLine($"- Window Size: {WindowSize / InchToMeter:F2}\" x {WindowSize / InchToMeter:F2}\" (through-all)");
             Console.WriteLine($"- Window Corner Radius: {WindowCornerRadius / InchToMeter:F2}\"");
             Console.WriteLine($"- Mounting Hole Diameter: {MountingHoleDiameter / InchToMeter:F4}\"");
             Console.WriteLine($"- External Fillet Radius: {ExternalFilletRadius / InchToMeter:F3}\"");
+            Console.WriteLine("- Vertical cross section shows I-beam shape");
         }
     }
 }
