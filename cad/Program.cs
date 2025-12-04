@@ -656,8 +656,8 @@ namespace SolidWorksRenders
                 int sketchCount = partData.Features.Count(f => f is SketchFeatureData);
                 int extrusionCount = partData.Features.Count(f => f is ExtrusionFeatureData);
                 int filletCount = partData.Features.Count(f => f is FilletFeatureData);
-                int chamferCount = partData.Features.Count(f => f is ChamferFeatureData);
-                int shellCount = partData.Features.Count(f => f is ShellFeatureData);
+                int chamferCount = partData.Features.Count(f => f is SketchExtraction.ChamferFeatureData);
+                int shellCount = partData.Features.Count(f => f is SketchExtraction.ShellFeatureData);
                 int otherCount = partData.Features.Count(f => f is GenericFeatureData);
 
                 Console.WriteLine($"\nExtracted Features:");
