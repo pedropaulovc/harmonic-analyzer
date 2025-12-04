@@ -9,6 +9,7 @@ using System.Runtime.Serialization;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 using SolidWorksRenders;
+using SolidWorksRenders.SketchExtraction;
 
 namespace SolidWorksRenders
 {
@@ -62,6 +63,12 @@ namespace SolidWorksRenders
             {
                 CliOptions.PrintComponentList();
                 return 0;
+            }
+
+            // Handle extraction mode
+            if (options.IsExtractMode)
+            {
+                return ExtractPart(options.ExtractFile!);
             }
 
             // Get components to build
@@ -602,6 +609,105 @@ namespace SolidWorksRenders
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Extract sketches and features from an SLDPRT file to XML
+        /// </summary>
+        /// <param name="sldprtPath">Path to the SLDPRT file</param>
+        /// <returns>0 on success, 1 on failure</returns>
+        private static int ExtractPart(string sldprtPath)
+        {
+            ISldWorks? swApp = null;
+            IModelDoc2? model = null;
+
+            try
+            {
+                Console.WriteLine($"Extracting from: {sldprtPath}");
+                Console.WriteLine(new string('=', 60));
+
+                swApp = ConnectToSolidWorks();
+                Console.WriteLine($"Connected to SolidWorks {swApp.RevisionNumber()}\n");
+
+                // Open the document
+                int errors = 0;
+                int warnings = 0;
+                model = (IModelDoc2)swApp.OpenDoc6(
+                    sldprtPath,
+                    (int)swDocumentTypes_e.swDocPART,
+                    (int)swOpenDocOptions_e.swOpenDocOptions_Silent,
+                    "",
+                    ref errors,
+                    ref warnings);
+
+                if (model == null || errors != 0)
+                {
+                    Console.Error.WriteLine($"ERROR: Failed to open file. Errors: {errors}, Warnings: {warnings}");
+                    return 1;
+                }
+
+                Console.WriteLine($"Opened: {model.GetTitle()}");
+
+                // Extract the part data
+                var extractor = new PartExtractor(swApp, model);
+                PartData partData = extractor.Extract();
+
+                // Print extraction summary
+                int sketchCount = partData.Features.Count(f => f is SketchFeatureData);
+                int extrusionCount = partData.Features.Count(f => f is ExtrusionFeatureData);
+                int filletCount = partData.Features.Count(f => f is FilletFeatureData);
+                int chamferCount = partData.Features.Count(f => f is ChamferFeatureData);
+                int shellCount = partData.Features.Count(f => f is ShellFeatureData);
+                int otherCount = partData.Features.Count(f => f is GenericFeatureData);
+
+                Console.WriteLine($"\nExtracted Features:");
+                Console.WriteLine($"  Sketches:   {sketchCount}");
+                Console.WriteLine($"  Extrusions: {extrusionCount}");
+                Console.WriteLine($"  Fillets:    {filletCount}");
+                Console.WriteLine($"  Chamfers:   {chamferCount}");
+                Console.WriteLine($"  Shells:     {shellCount}");
+                Console.WriteLine($"  Other:      {otherCount}");
+                Console.WriteLine($"  Total:      {partData.Features.Count}");
+
+                // Save to XML
+                string exeDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+                string saveDir = Path.GetFullPath(Path.Combine(exeDir, "..", "..", "..", "out", "xml"));
+
+                if (!Directory.Exists(saveDir))
+                {
+                    Directory.CreateDirectory(saveDir);
+                    Console.WriteLine($"Created directory: {saveDir}");
+                }
+
+                string xmlFileName = partData.Name + ".xml";
+                string xmlPath = Path.Combine(saveDir, xmlFileName);
+
+                Console.WriteLine($"\nSaving to: {xmlPath}");
+                XmlExporter.Export(partData, xmlPath);
+
+                Console.WriteLine("\nExtraction complete!");
+                return 0;
+            }
+            catch (COMException comEx)
+            {
+                Console.Error.WriteLine($"COM ERROR: {comEx.Message}");
+                Console.Error.WriteLine($"HRESULT: 0x{comEx.ErrorCode:X}");
+                return 1;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"ERROR: {ex.Message}");
+                Console.Error.WriteLine($"Stack trace: {ex.StackTrace}");
+                return 1;
+            }
+            finally
+            {
+                // Close the document if it was opened
+                if (model != null && swApp != null)
+                {
+                    swApp.CloseDoc(model.GetTitle());
+                }
+            }
         }
     }
 }
