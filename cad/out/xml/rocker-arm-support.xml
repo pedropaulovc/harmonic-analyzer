@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Part name="rocker-arm-support" unit="inches">
   <SourceFile>C:\src\harmonic-analyzer\cad\out\sldprt\rocker-arm-support.SLDPRT</SourceFile>
-  <ExtractionDate>2025-12-04T12:49:58.1231734-08:00</ExtractionDate>
+  <ExtractionDate>2025-12-04T12:53:18.5138247-08:00</ExtractionDate>
   <Features>
     <Feature name="Annotations" type="DetailCabinet">
       <Description>Feature type 'DetailCabinet' not fully supported</Description>
