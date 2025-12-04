@@ -9,17 +9,20 @@ namespace SolidWorksRenders
     ///
     /// Design follows standard CAD workflow:
     /// 1. Sketch isosceles trapezoid on Right Plane (side profile)
-    /// 2. Extrude Mid-Plane to 7.25" total width
-    /// 3. Shell to 0.25" thickness (remove bottom face)
-    /// 4. Cut 5"x5" window with rounded corners through both directions
-    /// 5. Add mounting holes on bottom flange
+    /// 2. Extrude Mid-Plane to 7.25" total width (solid)
+    /// 3. Cut window pocket from front (blind, leaves central web)
+    /// 4. Cut window pocket from back (blind, creates I-beam cross section)
+    /// 5. Add mounting holes on bottom
     /// 6. Add external fillets
+    ///
+    /// Cross section when cut in half resembles an "I" - single window in middle,
+    /// with solid material on left and right sides connected by central web.
     /// </summary>
     public class RockerArmSupport : IPart
     {
         public string PartName => "Rocker Arm Support";
         public string FileName => "rocker-arm-support.sldprt";
-        public string Description => "Symmetrical cast iron A-frame support";
+        public string Description => "A-frame support with I-beam cross section";
 
         // Unit conversion
         private const double InchToMeter = 0.0254;
@@ -31,10 +34,14 @@ namespace SolidWorksRenders
         private const double TopDepth = (2.0 / 3.0) * InchToMeter;    // 0.67" (~2/3") (side top depth)
         private const double WallThickness = 0.25 * InchToMeter;      // 0.25" uniform
 
-        // Window (internal cutout) dimensions
+        // Window (internal cutout) dimensions - creates I-beam cross section
         private const double WindowSize = 5.00 * InchToMeter;         // 5.00" x 5.00" square
         private const double WindowCornerRadius = 0.50 * InchToMeter; // 0.50" fillet on corners
         // Window is centered: 1.125" from side edge, 1.00" from top and bottom
+        // Central web thickness (I-beam style cross section)
+        private const double CentralWebThickness = 0.25 * InchToMeter;
+        // Window pocket depth = (MaxWidth - CentralWebThickness) / 2 = (7.25 - 0.25) / 2 = 3.50"
+        private const double WindowPocketDepth = (MaxWidth - CentralWebThickness) / 2;
 
         // Mounting holes
         private const double MountingHoleDiameter = 0.3125 * InchToMeter; // 5/16" clearance holes
@@ -73,21 +80,20 @@ namespace SolidWorksRenders
 
             // Step 1: Create isosceles trapezoid on Right Plane and extrude
             Console.WriteLine("Creating A-frame profile (isosceles trapezoid)...");
-            IFeature aframeFeature = CreateAFrameBody(swModel);
+            CreateAFrameBody(swModel);
 
-            // Step 2: Shell to create hollow casting (remove bottom face)
-            Console.WriteLine("Shelling to create hollow casting...");
-            CreateShell(swModel, aframeFeature);
+            // Step 2: Create window pockets from front and back (I-beam cross section)
+            // No shell - instead cut blind pockets leaving a central web
+            Console.WriteLine("Creating front window pocket...");
+            CreateWindowPocket(swModel, isFront: true);
+            Console.WriteLine("Creating back window pocket...");
+            CreateWindowPocket(swModel, isFront: false);
 
-            // Step 3: Create center window cutout with rounded corners
-            Console.WriteLine("Creating center window cutout...");
-            CreateWindowCutout(swModel);
-
-            // Step 4: Add mounting holes on bottom flange
+            // Step 3: Add mounting holes on bottom
             Console.WriteLine("Creating mounting holes...");
             CreateMountingHoles(swModel);
 
-            // Step 5: Add external fillets
+            // Step 4: Add external fillets
             Console.WriteLine("Adding external fillets...");
             ApplyExternalFillets(swModel);
 
@@ -101,7 +107,7 @@ namespace SolidWorksRenders
         /// Creates the A-frame body by sketching an isosceles trapezoid on Right Plane
         /// and extruding Mid-Plane to 7.25" total width.
         /// </summary>
-        private IFeature CreateAFrameBody(IModelDoc2 swModel)
+        private void CreateAFrameBody(IModelDoc2 swModel)
         {
             ISketchManager swSketchMgr = swModel.SketchManager;
             IFeatureManager swFeatMgr = swModel.FeatureManager;
@@ -192,118 +198,13 @@ namespace SolidWorksRenders
                 throw new InvalidOperationException("Failed to extrude A-frame body");
 
             extrudeFeature.Name = "A-Frame Body";
-            return extrudeFeature;
         }
 
         /// <summary>
-        /// Creates a shell feature to hollow out the part with 0.25" wall thickness.
-        /// Removes the bottom face to create the open casting.
+        /// Creates a window pocket from either the front or back face.
+        /// This creates an I-beam cross section by leaving a central web.
         /// </summary>
-        private void CreateShell(IModelDoc2 swModel, IFeature bodyFeature)
-        {
-            IModelDocExtension swModelExt = swModel.Extension;
-
-            // Find and select the bottom face to remove
-            // The bottom face is at Y=0 (the base of the trapezoid)
-            // We need to select it with Mark = 1 for the shell feature
-            object[] faces = (object[])bodyFeature.GetFaces();
-            if (faces == null || faces.Length == 0)
-            {
-                Console.WriteLine("WARNING: No faces found on body feature for shelling");
-                return;
-            }
-
-            swModel.ClearSelection2(true);
-
-            // Find the bottom face by checking which face has its centroid at Y ~ 0
-            bool bottomFaceSelected = false;
-            foreach (object faceObj in faces)
-            {
-                IFace2 face = (IFace2)faceObj;
-                double[] uvBounds = (double[])face.GetUVBounds();
-                double[] normal = (double[])face.Normal;
-
-                // Bottom face has normal pointing downward (negative Y direction)
-                // and is positioned at Y = 0
-                if (normal != null && normal.Length >= 3)
-                {
-                    // Check if normal is pointing down (Y component is negative)
-                    if (normal[1] < -0.9) // Nearly -1 in Y direction
-                    {
-                        IEntity faceEntity = (IEntity)face;
-                        bool selected = faceEntity.Select4(
-                            Append: false,
-                            Data: null);
-
-                        if (selected)
-                        {
-                            // Re-select with Mark = 1 for shell feature
-                            // Use SelectByID2 with coordinates from face center
-                            double[] faceParams = (double[])face.GetClosestPointOn(0, 0, 0);
-                            if (faceParams != null && faceParams.Length >= 3)
-                            {
-                                swModel.ClearSelection2(true);
-                                selected = swModelExt.SelectByID2(
-                                    Name: "",
-                                    Type: "FACE",
-                                    X: faceParams[0],
-                                    Y: faceParams[1],
-                                    Z: faceParams[2],
-                                    Append: false,
-                                    Mark: 1,  // Mark = 1 for faces to remove
-                                    Callout: null,
-                                    SelectOption: 0);
-                            }
-
-                            if (selected)
-                            {
-                                bottomFaceSelected = true;
-                                Console.WriteLine("Found and selected bottom face for shell removal");
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (!bottomFaceSelected)
-            {
-                Console.WriteLine("WARNING: Could not find bottom face - trying coordinate-based selection");
-                // Try selecting by coordinate at the bottom center
-                bool selected = swModelExt.SelectByID2(
-                    Name: "",
-                    Type: "FACE",
-                    X: 0,
-                    Y: 0,
-                    Z: 0,
-                    Append: false,
-                    Mark: 1,
-                    Callout: null,
-                    SelectOption: 0);
-
-                if (!selected)
-                {
-                    Console.WriteLine("WARNING: Failed to select bottom face for shelling - skipping shell");
-                    return;
-                }
-            }
-
-            // Create shell feature
-            // InsertFeatureShell(Thickness, Outward)
-            // Thickness = 0.25" in meters
-            // Outward = false (shell inward)
-            swModel.InsertFeatureShell(
-                Thickness: WallThickness,
-                Outward: false);
-
-            Console.WriteLine($"Created shell with {WallThickness / InchToMeter:F3}\" wall thickness");
-        }
-
-        /// <summary>
-        /// Creates the center window cutout - a 5"x5" square with 0.50" radius filleted corners.
-        /// Cut goes through both directions (through all).
-        /// </summary>
-        private void CreateWindowCutout(IModelDoc2 swModel)
+        private void CreateWindowPocket(IModelDoc2 swModel, bool isFront)
         {
             ISketchManager swSketchMgr = swModel.SketchManager;
             IFeatureManager swFeatMgr = swModel.FeatureManager;
@@ -321,7 +222,7 @@ namespace SolidWorksRenders
 
             if (!selected)
             {
-                Console.WriteLine("WARNING: Failed to select Front Plane for window cutout");
+                Console.WriteLine($"WARNING: Failed to select Front Plane for {(isFront ? "front" : "back")} window pocket");
                 return;
             }
 
@@ -330,15 +231,12 @@ namespace SolidWorksRenders
 
             // Window is centered in the 7.25" width and 7.00" height
             // Window size: 5.00" x 5.00"
-            // Horizontal centering: (7.25 - 5.00) / 2 = 1.125" from each side
             // Vertical centering: (7.00 - 5.00) / 2 = 1.00" from top and bottom
             double halfWindow = WindowSize / 2;
             double windowBottom = (TotalHeight - WindowSize) / 2;  // 1.00"
             double windowTop = windowBottom + WindowSize;
 
             // Create rectangle for window (centered horizontally at X=0)
-            // On Front Plane: X is horizontal, Y is vertical
-            // We'll create a rectangle and then fillet the corners
             double left = -halfWindow;
             double right = halfWindow;
             double bottom = windowBottom;
@@ -353,9 +251,7 @@ namespace SolidWorksRenders
             swSketchMgr.AddToDB = false;
 
             // Apply fillets to corners
-            // Need to select two adjacent lines at each corner and create fillet
-            // For simplicity, we'll select by coordinates near each corner
-            double offset = 0.01 * InchToMeter; // Small offset for selection
+            double offset = 0.01 * InchToMeter;
 
             // Bottom-left corner
             swModelExt.SelectByID2("", "SKETCHSEGMENT", left + offset, bottom, 0, false, 0, null, 0);
@@ -382,7 +278,7 @@ namespace SolidWorksRenders
             // Get and rename the sketch
             swModel.ForceRebuild3(false);
             IFeature windowSketch = swModelExt.GetLastFeatureAdded();
-            windowSketch.Name = "Window Cutout Sketch";
+            windowSketch.Name = isFront ? "Front Window Sketch" : "Back Window Sketch";
 
             // Select sketch for cut
             selected = swModelExt.SelectByID2(
@@ -396,18 +292,20 @@ namespace SolidWorksRenders
 
             if (!selected)
             {
-                Console.WriteLine("WARNING: Failed to select window sketch for cut");
+                Console.WriteLine($"WARNING: Failed to select {(isFront ? "front" : "back")} window sketch for cut");
                 return;
             }
 
-            // Cut through all both directions
+            // Blind cut - pocket depth stops before reaching the central web
+            // For front: cut in positive X direction (into the part)
+            // For back: cut in negative X direction (into the part from back)
             IFeature cutFeature = swFeatMgr.FeatureCut4(
-                Sd: false,                                         // Both directions
+                Sd: true,                                          // Single direction
                 Flip: false,
-                Dir: false,
-                T1: (int)swEndConditions_e.swEndCondThroughAll,
-                T2: (int)swEndConditions_e.swEndCondThroughAll,
-                D1: 0,
+                Dir: !isFront,                                     // Flip direction for back cut
+                T1: (int)swEndConditions_e.swEndCondBlind,
+                T2: (int)swEndConditions_e.swEndCondBlind,
+                D1: WindowPocketDepth,                             // Blind depth to leave central web
                 D2: 0,
                 Dchk1: false,
                 Dchk2: false,
@@ -425,19 +323,19 @@ namespace SolidWorksRenders
                 AssemblyFeatureScope: false,
                 AutoSelectComponents: false,
                 PropagateFeatureToParts: false,
-                T0: (int)swStartConditions_e.swStartSketchPlane,
-                StartOffset: 0,
-                FlipStartOffset: false,
+                T0: (int)swStartConditions_e.swStartOffset,        // Start from offset
+                StartOffset: isFront ? MaxWidth / 2 : MaxWidth / 2,  // Start from face
+                FlipStartOffset: !isFront,                         // Flip for back
                 OptimizeGeometry: false);
 
             if (cutFeature == null)
             {
-                Console.WriteLine("WARNING: Failed to create window cutout - continuing");
+                Console.WriteLine($"WARNING: Failed to create {(isFront ? "front" : "back")} window pocket - continuing");
             }
             else
             {
-                cutFeature.Name = "Center Window";
-                Console.WriteLine("Created 5\" x 5\" window with rounded corners");
+                cutFeature.Name = isFront ? "Front Window Pocket" : "Back Window Pocket";
+                Console.WriteLine($"Created {(isFront ? "front" : "back")} window pocket ({WindowPocketDepth / InchToMeter:F2}\" deep)");
             }
         }
 
@@ -629,8 +527,9 @@ namespace SolidWorksRenders
             Console.WriteLine($"- Max Width (Front): {MaxWidth / InchToMeter:F2}\"");
             Console.WriteLine($"- Base Depth (Side): {BaseDepth / InchToMeter:F2}\"");
             Console.WriteLine($"- Top Depth (Side): {TopDepth / InchToMeter:F2}\" (~2/3\")");
-            Console.WriteLine($"- Wall Thickness: {WallThickness / InchToMeter:F2}\"");
             Console.WriteLine($"- Window Size: {WindowSize / InchToMeter:F2}\" x {WindowSize / InchToMeter:F2}\"");
+            Console.WriteLine($"- Window Pocket Depth: {WindowPocketDepth / InchToMeter:F2}\" (each side)");
+            Console.WriteLine($"- Central Web Thickness: {CentralWebThickness / InchToMeter:F2}\" (I-beam cross section)");
             Console.WriteLine($"- Window Corner Radius: {WindowCornerRadius / InchToMeter:F2}\"");
             Console.WriteLine($"- Mounting Hole Diameter: {MountingHoleDiameter / InchToMeter:F4}\"");
             Console.WriteLine($"- External Fillet Radius: {ExternalFilletRadius / InchToMeter:F3}\"");
