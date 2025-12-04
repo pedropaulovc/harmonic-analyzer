@@ -1,0 +1,91 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Part name="rocker-arm-support" unit="inches">
+  <SourceFile>C:\src\harmonic-analyzer\cad\out\sldprt\rocker-arm-support.SLDPRT</SourceFile>
+  <ExtractionDate>2025-12-04T12:41:24.4767261-08:00</ExtractionDate>
+  <Features>
+    <Feature name="Annotations" type="DetailCabinet">
+      <Description>Feature type 'DetailCabinet' not fully supported</Description>
+    </Feature>
+    <Sketch name="A-Frame Profile" plane="Right Plane">
+      <Lines>
+        <Line id="0">
+          <Start x="-1.25" y="0" z="0" />
+          <End x="1.25" y="0" z="0" />
+        </Line>
+        <Line id="1">
+          <Start x="1.25" y="0" z="0" />
+          <End x="0.333333" y="7" z="0" />
+        </Line>
+        <Line id="2">
+          <Start x="0.333333" y="7" z="0" />
+          <End x="-0.333333" y="7" z="0" />
+        </Line>
+        <Line id="3">
+          <Start x="-0.333333" y="7" z="0" />
+          <End x="-1.25" y="0" z="0" />
+        </Line>
+      </Lines>
+      <Points>
+        <Point x="-1.25" y="0" z="0" />
+        <Point id="1" x="1.25" y="0" z="0" />
+        <Point id="2" x="0.333333" y="7" z="0" />
+        <Point id="3" x="-0.333333" y="7" z="0" />
+      </Points>
+    </Sketch>
+    <Extrusion name="A-Frame Body">
+      <EndCondition>Blind</EndCondition>
+      <Depth>3.625</Depth>
+      <Direction>Both</Direction>
+    </Extrusion>
+    <Sketch name="Window Sketch" plane="Front Plane">
+      <Lines>
+        <Line id="0">
+          <Start x="-2.5" y="1.25" z="0" />
+          <End x="2.5" y="1.25" z="0" />
+        </Line>
+        <Line id="1">
+          <Start x="2.5" y="1.25" z="0" />
+          <End x="2.5" y="6.25" z="0" />
+        </Line>
+        <Line id="2">
+          <Start x="2.5" y="6.25" z="0" />
+          <End x="-2.5" y="6.25" z="0" />
+        </Line>
+        <Line id="3">
+          <Start x="-2.5" y="6.25" z="0" />
+          <End x="-2.5" y="1.25" z="0" />
+        </Line>
+      </Lines>
+      <Points>
+        <Point x="-2.5" y="1.25" z="0" />
+        <Point id="1" x="2.5" y="1.25" z="0" />
+        <Point id="2" x="2.5" y="6.25" z="0" />
+        <Point id="3" x="-2.5" y="6.25" z="0" />
+      </Points>
+    </Sketch>
+    <Feature name="Window Cutout" type="ICE">
+      <Description>Feature type 'ICE' not fully supported</Description>
+    </Feature>
+    <Sketch name="Mounting Holes Sketch" plane="Top Plane">
+      <Circles>
+        <Circle id="0" radius="0.1562499998">
+          <Center x="-1.25" y="0" z="0" />
+        </Circle>
+        <Circle id="1" radius="0.1562499998">
+          <Center x="1.25" y="0" z="0" />
+        </Circle>
+      </Circles>
+      <Points>
+        <Point x="-1.25" y="0" z="0" />
+        <Point id="2" x="1.25" y="0" z="0" />
+      </Points>
+    </Sketch>
+    <Feature name="Mounting Holes" type="ICE">
+      <Description>Feature type 'ICE' not fully supported</Description>
+    </Feature>
+    <Fillet name="External Fillets">
+      <Radius>0.125</Radius>
+      <EdgeCount>0</EdgeCount>
+    </Fillet>
+  </Features>
+</Part>
