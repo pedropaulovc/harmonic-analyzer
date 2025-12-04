@@ -38,8 +38,9 @@ namespace SolidWorksRenders
 
         // Window (internal cutout) dimensions - creates I-beam cross section when cut vertically
         private const double WindowSize = 5.00 * InchToMeter;         // 5.00" x 5.00" square
-        private const double WindowCornerRadius = 0.50 * InchToMeter; // 0.50" fillet on corners
-        // Window is centered: 1.00" from top and bottom when height is 7.00"
+        private const double WindowCornerRadius = 0.625 * InchToMeter; // 0.625" fillet on corners (range: 0.50"-0.75")
+        // Window vertical position: 0.75" top rail, 1.25" bottom rail (asymmetric for structural stability)
+        private const double WindowBottomRail = 1.25 * InchToMeter;   // 1.25" material below window
 
         // Mounting holes
         private const double MountingHoleDiameter = 0.3125 * InchToMeter; // 5/16" clearance holes
@@ -228,12 +229,12 @@ namespace SolidWorksRenders
             swSketchMgr.InsertSketch(UpdateEditRebuild: true);
             swSketchMgr.AddToDB = true;
 
-            // Window is centered in the 7.00" height
+            // Window is positioned asymmetrically for structural stability
             // Window size: 5.00" x 5.00"
-            // Vertical centering: (7.00 - 5.00) / 2 = 1.00" from top and bottom
+            // Top rail: 0.75", Bottom rail: 1.25"
             double halfWindow = WindowSize / 2;
-            double windowBottom = (TotalHeight - WindowSize) / 2;  // 1.00"
-            double windowTop = windowBottom + WindowSize;
+            double windowBottom = WindowBottomRail;  // 1.25" from bottom
+            double windowTop = windowBottom + WindowSize;  // 6.25" from bottom (leaves 0.75" top rail)
 
             // Create rectangle for window (centered horizontally at X=0)
             double left = -halfWindow;
@@ -519,13 +520,15 @@ namespace SolidWorksRenders
 
         public void PrintPartDetails()
         {
+            double topRail = TotalHeight - WindowBottomRail - WindowSize;
             Console.WriteLine("\nPart Details (Symmetrical Cast Iron A-Frame Support):");
             Console.WriteLine($"- Total Height: {TotalHeight / InchToMeter:F2}\"");
             Console.WriteLine($"- Max Width (Front): {MaxWidth / InchToMeter:F2}\"");
             Console.WriteLine($"- Base Depth (Side): {BaseDepth / InchToMeter:F2}\"");
             Console.WriteLine($"- Top Depth (Side): {TopDepth / InchToMeter:F2}\" (~2/3\")");
             Console.WriteLine($"- Window Size: {WindowSize / InchToMeter:F2}\" x {WindowSize / InchToMeter:F2}\" (through-all)");
-            Console.WriteLine($"- Window Corner Radius: {WindowCornerRadius / InchToMeter:F2}\"");
+            Console.WriteLine($"- Window Position: {topRail / InchToMeter:F2}\" top rail, {WindowBottomRail / InchToMeter:F2}\" bottom rail");
+            Console.WriteLine($"- Window Corner Radius: {WindowCornerRadius / InchToMeter:F3}\"");
             Console.WriteLine($"- Mounting Hole Diameter: {MountingHoleDiameter / InchToMeter:F4}\"");
             Console.WriteLine($"- External Fillet Radius: {ExternalFilletRadius / InchToMeter:F3}\"");
             Console.WriteLine("- Vertical cross section shows I-beam shape");
