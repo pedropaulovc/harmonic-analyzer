@@ -37,16 +37,6 @@ namespace SolidWorksRenders
         public bool BuildAll { get; private set; }
 
         /// <summary>
-        /// SLDPRT file path to extract (null if not in extract mode)
-        /// </summary>
-        public string? ExtractFile { get; private set; }
-
-        /// <summary>
-        /// Whether we're in extract mode
-        /// </summary>
-        public bool IsExtractMode => !string.IsNullOrEmpty(ExtractFile);
-
-        /// <summary>
         /// Parse error message, if any
         /// </summary>
         public string? Error { get; private set; }
@@ -54,7 +44,7 @@ namespace SolidWorksRenders
         /// <summary>
         /// Whether parsing was successful (for building components)
         /// </summary>
-        public bool IsValid => string.IsNullOrEmpty(Error) && !ShowHelp && !ListComponents && !IsExtractMode;
+        public bool IsValid => string.IsNullOrEmpty(Error) && !ShowHelp && !ListComponents;
 
         private CliOptions() { }
 
@@ -92,28 +82,6 @@ namespace SolidWorksRenders
                     case "--all":
                         options.BuildAll = true;
                         break;
-
-                    case "-e":
-                    case "--extract":
-                        if (i + 1 >= args.Length)
-                        {
-                            options.Error = "Missing file path after --extract";
-                            return options;
-                        }
-                        i++;
-                        string extractPath = args[i];
-                        if (!File.Exists(extractPath))
-                        {
-                            options.Error = $"File not found: '{extractPath}'";
-                            return options;
-                        }
-                        if (!extractPath.EndsWith(".SLDPRT", StringComparison.OrdinalIgnoreCase))
-                        {
-                            options.Error = $"Only .SLDPRT files are supported for extraction.\nGot: '{extractPath}'";
-                            return options;
-                        }
-                        options.ExtractFile = Path.GetFullPath(extractPath);
-                        return options;
 
                     case "-c":
                     case "--component":
@@ -174,7 +142,6 @@ namespace SolidWorksRenders
             Console.WriteLine("OPTIONS:");
             Console.WriteLine("  -c, --component <name>   Build a specific component");
             Console.WriteLine("  -a, --all                Build all components");
-            Console.WriteLine("  -e, --extract <file>     Extract sketches/features from .SLDPRT to XML");
             Console.WriteLine("  -l, --list               List all available components");
             Console.WriteLine("  -h, --help               Show this help message");
             Console.WriteLine();
@@ -183,7 +150,6 @@ namespace SolidWorksRenders
             Console.WriteLine("  SolidWorksRenders.exe -c eccentric-cam");
             Console.WriteLine("  SolidWorksRenders.exe harmonic-base");
             Console.WriteLine("  SolidWorksRenders.exe --all");
-            Console.WriteLine("  SolidWorksRenders.exe -e mypart.SLDPRT");
             Console.WriteLine();
             Console.WriteLine("Use --list to see all available components.");
         }
