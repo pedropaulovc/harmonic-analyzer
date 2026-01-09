@@ -183,7 +183,7 @@ namespace SolidWorksRenders
                 BMergeSmoothFaces: true,
                 CircularProfile: true,                                   // Use circular profile
                 CircularProfileDiameter: TubeDiameter,                   // 50mm tube
-                Direction: (int)swSweepDirection_e.swSweepDirection_Bidirectional);
+                Direction: (int)swSweepDirection_e.swSweepBidirectional);
 
             if (sweepFeature == null)
                 throw new InvalidOperationException("Failed to create U-rack sweep feature");
@@ -378,7 +378,7 @@ namespace SolidWorksRenders
                 BMergeSmoothFaces: true,
                 CircularProfile: true,
                 CircularProfileDiameter: TubeDiameter,
-                Direction: (int)swSweepDirection_e.swSweepDirection_Bidirectional);
+                Direction: (int)swSweepDirection_e.swSweepBidirectional);
 
             if (sweepFeature == null)
             {
