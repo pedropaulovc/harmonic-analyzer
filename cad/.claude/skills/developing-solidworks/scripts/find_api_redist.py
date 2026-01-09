@@ -1,55 +1,43 @@
 r"""
-Search for api\redist folder in C:\Program Files
+Find the most recent SolidWorks api\redist folder under C:\Program Files\Dassault Systemes
 """
 import os
-from pathlib import Path
 
-def find_api_redist(root_path="C:\\Program Files"):
+
+def find_api_redist(root_path=r"C:\Program Files\Dassault Systemes"):
     """
-    Traverse directory tree and find folders matching api\redist pattern.
+    Find the most recent api/redist folder under Dassault Systemes installation.
 
     Args:
-        root_path: Root directory to start search from
+        root_path: Root directory to search (default: C:\Program Files\Dassault Systemes)
 
     Returns:
-        List of full paths to matching folders
+        Path to the most recent api/redist folder, or None if not found
     """
+    if not os.path.exists(root_path):
+        return None
+
     matches = []
 
-    for dirpath, dirnames, _ in os.walk(root_path):
-        try:
-            # Check if current path ends with api\redist
-            if dirpath.lower().endswith(os.path.join("api", "redist")):
-                if dirpath not in matches:
-                    matches.append(dirpath)
+    # Search each subdirectory for api/redist
+    for entry in os.scandir(root_path):
+        if entry.is_dir():
+            redist_path = os.path.join(entry.path, "SOLIDWORKS", "api", "redist")
+            if os.path.isdir(redist_path):
+                matches.append((redist_path, entry.stat().st_mtime))
 
-            # Also check subdirectories
-            if "redist" in dirnames:
-                parent_name = os.path.basename(dirpath)
-                if parent_name.lower() == "api":
-                    full_path = os.path.join(dirpath, "redist")
-                    if full_path not in matches:
-                        matches.append(full_path)
+    if not matches:
+        return None
 
-        except PermissionError:
-            # Skip directories we don't have permission to access
-            pass
-        except Exception as e:
-            # Skip other errors but continue searching
-            pass
+    # Return the most recently modified
+    matches.sort(key=lambda x: x[1], reverse=True)
+    return matches[0][0]
 
-    return matches
 
 if __name__ == "__main__":
-    results = find_api_redist()
+    result = find_api_redist()
 
-    if results:
-        for path in results:
-            print(path)
+    if result:
+        print(result)
     else:
-        # Also search Program Files (x86) if available
-        alt_path = "C:\\Program Files (x86)"
-        if os.path.exists(alt_path):
-            results_x86 = find_api_redist(alt_path)
-            for path in results_x86:
-                print(path)
+        print("No SolidWorks api/redist found under C:\\Program Files\\Dassault Systemes")
