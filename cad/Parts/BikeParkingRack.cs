@@ -88,9 +88,9 @@ namespace SolidWorksRenders
         /// Creates a single U-shaped rack at the specified position
         /// </summary>
         /// <param name="swModel">The model document</param>
-        /// <param name="xOffset">X offset from origin for this rack</param>
+        /// <param name="yOffset">Y offset from origin for this rack</param>
         /// <returns>The sweep feature for the U-rack</returns>
-        private IFeature CreateURack(IModelDoc2 swModel, double xOffset)
+        private IFeature CreateURack(IModelDoc2 swModel, double yOffset)
         {
             ISketchManager swSketchMgr = swModel.SketchManager;
             IFeatureManager swFeatMgr = swModel.FeatureManager;
@@ -103,36 +103,35 @@ namespace SolidWorksRenders
             // 1. Left vertical leg (from base to top-arc start)
             // 2. Top arc (semicircle)
             // 3. Right vertical leg (from top-arc end to base)
+            // Orientation: U-rack in XZ plane, perpendicular to Top Plane (XY)
 
-            double leftX = xOffset;
-            double rightX = xOffset;
-            double leftY = -RackWidth / 2;   // Left side of U
-            double rightY = RackWidth / 2;   // Right side of U
+            double leftX = -RackWidth / 2;   // Left side of U
+            double rightX = RackWidth / 2;   // Right side of U
+            double rackY = yOffset;          // Y position of this rack
             double baseZ = BaseRailHeight;   // Start above ground
             double topZ = RackHeight;        // Top of U-rack
 
             // Create left vertical line
             ISketchSegment leftLeg = swSketchMgr.CreateLine(
-                X1: leftX, Y1: leftY, Z1: baseZ,
-                X2: leftX, Y2: leftY, Z2: topZ);
+                X1: leftX, Y1: rackY, Z1: baseZ,
+                X2: leftX, Y2: rackY, Z2: topZ);
             if (leftLeg == null)
                 throw new InvalidOperationException("Failed to create left leg of U-rack");
 
             // Create top arc (semicircle connecting the two legs)
             // For a 3-point arc: start point, end point, and point on arc
-            double arcCenterY = 0;
-            double arcCenterZ = topZ;
+            double arcCenterX = 0;
             ISketchSegment topArc = swSketchMgr.Create3PointArc(
-                X1: leftX, Y1: leftY, Z1: topZ,       // Start at left leg top
-                X2: rightX, Y2: rightY, Z2: topZ,     // End at right leg top
-                X3: leftX, Y3: arcCenterY, Z3: topZ + ArcRadius);  // Point on arc (top of semicircle)
+                X1: leftX, Y1: rackY, Z1: topZ,       // Start at left leg top
+                X2: rightX, Y2: rackY, Z2: topZ,     // End at right leg top
+                X3: arcCenterX, Y3: rackY, Z3: topZ + ArcRadius);  // Point on arc (top of semicircle)
             if (topArc == null)
                 throw new InvalidOperationException("Failed to create top arc of U-rack");
 
             // Create right vertical line
             ISketchSegment rightLeg = swSketchMgr.CreateLine(
-                X1: rightX, Y1: rightY, Z1: topZ,
-                X2: rightX, Y2: rightY, Z2: baseZ);
+                X1: rightX, Y1: rackY, Z1: topZ,
+                X2: rightX, Y2: rackY, Z2: baseZ);
             if (rightLeg == null)
                 throw new InvalidOperationException("Failed to create right leg of U-rack");
 
@@ -202,20 +201,10 @@ namespace SolidWorksRenders
             // Clear selection
             swModel.ClearSelection2(true);
 
-            // Select the X-axis for Direction 1 (mark = 1)
+            // Select the Y-axis for Direction 1 (mark = 1)
+            // Use Right Plane normal as direction reference (Y-axis direction)
             bool selected = swModelExt.SelectByID2(
-                Name: "Point1@Origin",
-                Type: "EXTSKETCHPOINT",
-                X: 0, Y: 0, Z: 0,
-                Append: false,
-                Mark: 0,
-                Callout: null,
-                SelectOption: 0);
-
-            // Select an edge along the X-axis direction for pattern direction
-            // We'll use the Front Plane normal as direction reference
-            selected = swModelExt.SelectByID2(
-                Name: "Front Plane",
+                Name: "Right Plane",
                 Type: "PLANE",
                 X: 0, Y: 0, Z: 0,
                 Append: false,
@@ -271,9 +260,9 @@ namespace SolidWorksRenders
         {
             for (int i = 1; i < NumRacks; i++)
             {
-                double xOffset = i * RackSpacing;
-                CreateURack(swModel, xOffset);
-                Console.WriteLine($"Created rack {i + 1} at offset {xOffset * 1000}mm");
+                double yOffset = i * RackSpacing;
+                CreateURack(swModel, yOffset);
+                Console.WriteLine($"Created rack {i + 1} at offset {yOffset * 1000}mm");
             }
         }
 
@@ -286,49 +275,49 @@ namespace SolidWorksRenders
             IFeatureManager swFeatMgr = swModel.FeatureManager;
             IModelDocExtension swModelExt = swModel.Extension;
 
-            // Create front base rail (3D sketch)
-            swSketchMgr.Insert3DSketch(UpdateEditRebuild: true);
-
-            // Front rail: from first rack to last rack
-            double startX = -RackSpacing / 2;  // Extend beyond first rack
-            double endX = TotalLength + RackSpacing / 2;  // Extend beyond last rack
-            double frontY = -RackWidth / 2;
+            // Rails run along Y axis (perpendicular orientation)
+            double startY = -RackSpacing / 2;  // Extend beyond first rack
+            double endY = TotalLength + RackSpacing / 2;  // Extend beyond last rack
+            double leftX = -RackWidth / 2;
+            double rightX = RackWidth / 2;
             double railZ = BaseRailHeight;
 
-            ISketchSegment frontRail = swSketchMgr.CreateLine(
-                X1: startX, Y1: frontY, Z1: railZ,
-                X2: endX, Y2: frontY, Z2: railZ);
-            if (frontRail == null)
-                Console.WriteLine("WARNING: Failed to create front rail line");
+            // Create left base rail (3D sketch)
+            swSketchMgr.Insert3DSketch(UpdateEditRebuild: true);
+
+            ISketchSegment leftRail = swSketchMgr.CreateLine(
+                X1: leftX, Y1: startY, Z1: railZ,
+                X2: leftX, Y2: endY, Z2: railZ);
+            if (leftRail == null)
+                Console.WriteLine("WARNING: Failed to create left rail line");
 
             // Exit 3D sketch
             swSketchMgr.Insert3DSketch(UpdateEditRebuild: true);
 
             // Get the sketch and create sweep
-            IFeature frontRailSketch = (IFeature)swModelExt.GetLastFeatureAdded();
-            if (frontRailSketch != null)
+            IFeature leftRailSketch = (IFeature)swModelExt.GetLastFeatureAdded();
+            if (leftRailSketch != null)
             {
-                CreateRailSweep(swModel, frontRailSketch.Name, "front rail");
+                CreateRailSweep(swModel, leftRailSketch.Name, "left rail");
             }
 
-            // Create back base rail (3D sketch)
+            // Create right base rail (3D sketch)
             swSketchMgr.Insert3DSketch(UpdateEditRebuild: true);
 
-            double backY = RackWidth / 2;
-            ISketchSegment backRail = swSketchMgr.CreateLine(
-                X1: startX, Y1: backY, Z1: railZ,
-                X2: endX, Y2: backY, Z2: railZ);
-            if (backRail == null)
-                Console.WriteLine("WARNING: Failed to create back rail line");
+            ISketchSegment rightRail = swSketchMgr.CreateLine(
+                X1: rightX, Y1: startY, Z1: railZ,
+                X2: rightX, Y2: endY, Z2: railZ);
+            if (rightRail == null)
+                Console.WriteLine("WARNING: Failed to create right rail line");
 
             // Exit 3D sketch
             swSketchMgr.Insert3DSketch(UpdateEditRebuild: true);
 
             // Get the sketch and create sweep
-            IFeature backRailSketch = (IFeature)swModelExt.GetLastFeatureAdded();
-            if (backRailSketch != null)
+            IFeature rightRailSketch = (IFeature)swModelExt.GetLastFeatureAdded();
+            if (rightRailSketch != null)
             {
-                CreateRailSweep(swModel, backRailSketch.Name, "back rail");
+                CreateRailSweep(swModel, rightRailSketch.Name, "right rail");
             }
         }
 
