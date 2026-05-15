@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "solidworks": {
+      "type": "stdio",
+      "command": "C:\\src\\SolidworksMCP-python\\.venv\\Scripts\\solidworks-mcp.exe",
+      "args": [],
+      "env": {}
+    }
+  }
+}
