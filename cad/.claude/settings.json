@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "personal-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "pedropaulovc/personal-marketplace"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "developing-solidworks@personal-marketplace": true
+  }
+}
