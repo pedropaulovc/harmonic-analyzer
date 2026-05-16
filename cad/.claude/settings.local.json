@@ -3,12 +3,7 @@
     "allow": [
       "Bash(git commit:*)",
       "Bash(dotnet build:*)",
-      "Bash(findstr:*)",
-      "Bash(dir \"C:\\src\\harmonic-analyzer\\cad\\.claude\\skills\\developing-solidworks\\types\")",
-      "Bash(dir /b \"C:\\src\\harmonic-analyzer\\cad\\.claude\\skills\\developing-solidworks\\types\\ISketch\")",
-      "Bash(dir /b \"C:\\src\\harmonic-analyzer\\cad\\.claude\\skills\\developing-solidworks\\types\\ISketchSegment\")",
-      "Bash(dir /b \"C:\\src\\harmonic-analyzer\\cad\\.claude\\skills\\developing-solidworks\\types\\ISketchRelation\")",
-      "Bash(dir /b \"C:\\src\\harmonic-analyzer\\cad\\.claude\\skills\\developing-solidworks\\types\\IFeature\")"
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []
