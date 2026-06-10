@@ -444,30 +444,31 @@ async def add_reeded_head_and_thread(
         )
     print(f"  OK  reeding seed: removed {before - after_seed:.2f} mm^3 (analytic {v_groove:.2f})")
 
-    check(
+    # The screw's axis is buried inside solid material, so point-projected
+    # axis selection picks the body face in front of it (live failure) --
+    # select the reference axis by NAME instead (MCP PR #47).
+    axis = check(
         "create_axis X (Front x Top)",
         await adapter.create_axis(
             CreateAxisParameters(mode="two_planes", planes=["Front Plane", "Top Plane"])
         ),
     )
-    adapter._zoom_to_fit(adapter.currentModel)
-    pattern = None
-    for axis_point in ([head_length / 2.0, 0.0, 0.0], [0.0, 0.0, 0.0]):
-        res = await adapter.circular_pattern_feature(
+    # The blank must be EXTRUDED, not revolved: circular patterns of cuts
+    # on stepped revolved bodies fail to create (probe_reed1-3 live: plain
+    # revolved cylinder OK, stepped revolve fails at any depth with either
+    # geometry_pattern value; identical stepped geometry from coaxial
+    # extrusions patterns fine).
+    check(
+        f"reeding pattern about {axis.name}",
+        await adapter.circular_pattern_feature(
             CircularPatternParameters(
-                axis_point=axis_point,
+                axis_name=axis.name,
                 features=[groove_cut.data.name],
                 count=groove_count,
                 geometry_pattern=True,
             )
-        )
-        if res.is_success:
-            print(f"  OK  reeding pattern axis via point {axis_point}")
-            pattern = res
-            break
-        print(f"  ..  axis candidate {axis_point} failed: {res.error}")
-    if pattern is None:
-        raise RuntimeError("reeding pattern: no axis candidate selectable")
+        ),
+    )
     after_pattern = await _volume()
     expected = before - groove_count * v_groove
     if abs(after_pattern - expected) > 0.02 * groove_count * v_groove:
