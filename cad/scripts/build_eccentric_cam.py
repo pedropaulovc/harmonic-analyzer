@@ -23,6 +23,7 @@ import sys
 from _common import (
     IN,
     add_line_chain,
+    apply_material,
     check,
     define_circle,
     ensure_fully_defined,
@@ -32,6 +33,7 @@ from _common import (
 )
 
 PART_NAME = "eccentric-cam"
+MATERIAL = "Brass"  # see _common.apply_material docstring
 
 CAM_DIAMETER = 2.0 * IN  # 50.8  DIMENSIONS.md ch13: cam diameter (legacy, med)
 CAM_THICKNESS = 0.4 * IN  # 10.16 DIMENSIONS.md ch13: cam thickness (legacy, med)
@@ -109,6 +111,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
 
+    await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

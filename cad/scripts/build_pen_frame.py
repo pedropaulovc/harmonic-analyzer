@@ -22,6 +22,7 @@ import sys
 
 from _common import (
     add_line_chain,
+    apply_material,
     check,
     define_circle,
     ensure_fully_defined,
@@ -31,6 +32,7 @@ from _common import (
 )
 
 PART_NAME = "pen-frame"
+MATERIAL = "Brass"  # see _common.apply_material docstring
 
 OUTER_WIDTH = 22.0  # X  DIMENSIONS.md ch24: p.64/65 vs 5 mm rod (low)
 OUTER_HEIGHT = 40.0  # Y
@@ -98,6 +100,7 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     print(f"  volume after screw hole: {vol:.1f} mm^3")
 
+    await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

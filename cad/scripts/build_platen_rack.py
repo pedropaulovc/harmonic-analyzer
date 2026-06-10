@@ -23,6 +23,7 @@ import sys
 
 from _common import (
     add_line_chain,
+    apply_material,
     check,
     ensure_fully_defined,
     report_mass_properties,
@@ -31,6 +32,7 @@ from _common import (
 )
 
 PART_NAME = "platen-rack"
+MATERIAL = "Brass"  # see _common.apply_material docstring
 
 RACK_LENGTH = 300.0  # DIMENSIONS.md ch22: = platen width (low)
 RACK_HEIGHT = 30.0  # DIMENSIONS.md ch22: back-side brass strip (low)
@@ -59,6 +61,7 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=RACK_THICKNESS)),
     )
 
+    await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

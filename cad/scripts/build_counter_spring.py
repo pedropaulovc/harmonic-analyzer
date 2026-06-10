@@ -24,6 +24,7 @@ from __future__ import annotations
 import sys
 
 from _common import (
+    apply_material,
     check,
     define_circle,
     ensure_fully_defined,
@@ -34,6 +35,7 @@ from _common import (
 )
 
 PART_NAME = "counter-spring"
+MATERIAL = "Alloy Steel"  # see _common.apply_material docstring
 
 COIL_BODY_LENGTH = 300.0  # DIMENSIONS.md ch19: scaled, gooseneck rise (low)
 COIL_OD = 22.0  # DIMENSIONS.md ch19: scaled vs gooseneck tube (low)
@@ -64,6 +66,7 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_sweep(SweepParameters(path=helix_name)),
     )
 
+    await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

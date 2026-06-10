@@ -25,15 +25,18 @@ import sys
 
 from _common import (
     add_line_chain,
+    apply_material,
     check,
     define_circle,
     ensure_fully_defined,
+    measure_check,
     report_mass_properties,
     run_build,
     save_part_and_images,
 )
 
 PART_NAME = "magnifying-wheel"
+MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
 RIM_OUTER_DIA = 100.0  # DIMENSIONS.md ch21: annotated (high)
 HUB_DIA = 20.0  # DIMENSIONS.md ch21: annotated (high)
@@ -130,6 +133,25 @@ async def build(adapter) -> dict[str, str]:
                 count=SPOKE_COUNT,
             )
         ),
+    )
+
+    await apply_material(adapter, MATERIAL)
+
+    # Verify the two annotated diameters (ch. 21: 100 mm rim, 20 mm hub
+    # — they self-validate against the stated 5x magnification).
+    await measure_check(
+        adapter,
+        "rim OD (annotated 100)",
+        [{"entity_type": "EDGE", "point": [RIM_OUTER_DIA / 2.0, 0.0, RIM_AXIAL / 2.0]}],
+        "diameter",
+        RIM_OUTER_DIA,
+    )
+    await measure_check(
+        adapter,
+        "hub dia (annotated 20)",
+        [{"entity_type": "EDGE", "point": [HUB_DIA / 2.0, 0.0, HUB_AXIAL / 2.0]}],
+        "diameter",
+        HUB_DIA,
     )
 
     await report_mass_properties(adapter)

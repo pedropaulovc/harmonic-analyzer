@@ -22,6 +22,7 @@ from __future__ import annotations
 import sys
 
 from _common import (
+    apply_material,
     check,
     define_circle,
     ensure_fully_defined,
@@ -31,6 +32,7 @@ from _common import (
 )
 
 PART_NAME = "output-fixture"
+MATERIAL = "Brass"  # see _common.apply_material docstring
 
 COLLAR_DIA = 10.0  # DIMENSIONS.md ch20: p.48 bottom close-up (low)
 COLLAR_HEIGHT = 8.0  # DIMENSIONS.md ch20 (low)
@@ -87,6 +89,7 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     print(f"  volume after cross hole: {vol:.1f} mm^3")
 
+    await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

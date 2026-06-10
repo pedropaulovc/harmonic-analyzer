@@ -24,6 +24,7 @@ import sys
 
 from _common import (
     IN,
+    apply_material,
     check,
     define_circle,
     ensure_fully_defined,
@@ -33,6 +34,7 @@ from _common import (
 )
 
 PART_NAME = "crankshaft"
+MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 SHAFT_DIA = 0.375 * IN  # ch11: legacy ShaftDiameter, uncontradicted
 SHAFT_LENGTH = 120.0  # ch11: derived (crank seat + pedestal bearing + seats)
@@ -73,6 +75,7 @@ async def build(adapter) -> dict[str, str]:
     print(f"  volume after pin hole: {res.data.volume:.1f} mm^3")
     # expected: -178 (O5 cross-drill) -> ~8,373 mm^3
 
+    await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

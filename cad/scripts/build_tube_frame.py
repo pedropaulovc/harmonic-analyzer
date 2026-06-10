@@ -26,9 +26,11 @@ import sys
 
 from _common import (
     IN,
+    apply_material,
     check,
     define_circle,
     ensure_fully_defined,
+    measure_check,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -36,6 +38,7 @@ from _common import (
 )
 
 PART_NAME = "tube-frame"
+MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 OUTER_DIA = 1.375 * IN  # legacy: Ø34.925 (no book numerics)
 WALL_THICKNESS = 0.12 * IN  # legacy: 3.048 wall -> Ø28.829 bore
@@ -63,6 +66,22 @@ async def build(adapter) -> dict[str, str]:
     res = await adapter.get_mass_properties()
     print(f"  volume after extrude: {res.data.volume:.1f} mm^3")
     # expected: pi * (17.4625^2 - 14.4145^2) * 1070 = ~326,620 mm^3
+
+    await apply_material(adapter, MATERIAL)
+
+    # Verify the book-stated 107 cm column height (the dim that
+    # contradicted the legacy part) via the end annulus faces.
+    mid_r = (OUTER_DIA + INNER_DIA) / 4.0
+    await measure_check(
+        adapter,
+        "column length (stated 107 cm)",
+        [
+            {"entity_type": "FACE", "point": [mid_r, 0.0, 0.0]},
+            {"entity_type": "FACE", "point": [mid_r, COLUMN_LENGTH, 0.0]},
+        ],
+        "normal_distance",
+        COLUMN_LENGTH,
+    )
 
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
