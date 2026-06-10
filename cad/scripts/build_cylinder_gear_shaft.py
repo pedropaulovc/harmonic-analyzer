@@ -27,6 +27,7 @@ import sys
 from _common import (
     IN,
     add_line_chain,
+    apply_material,
     check,
     define_circle,
     ensure_fully_defined,
@@ -37,6 +38,7 @@ from _common import (
 )
 
 PART_NAME = "cylinder-gear-shaft"
+MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 SHAFT_DIA = 0.375 * IN  # ch13: = cam bore (legacy parameters.kcl)
 SHAFT_LENGTH = 200.0  # ch13: 150 stack + ~25 journal each end (derived)
@@ -93,6 +95,7 @@ async def build(adapter) -> dict[str, str]:
     print(f"  volume after keyseat: {res.data.volume:.1f} mm^3")
     # expected: -4.51 mm^2 segment x 175 = -789 -> ~13,462 mm^3
 
+    await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

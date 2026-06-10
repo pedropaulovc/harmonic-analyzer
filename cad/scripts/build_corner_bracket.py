@@ -31,6 +31,7 @@ import sys
 from _common import (
     IN,
     add_line_chain,
+    apply_material,
     check,
     define_circle,
     ensure_fully_defined,
@@ -42,6 +43,7 @@ from _common import (
 )
 
 PART_NAME = "corner-bracket"
+MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
 BASE_WIDTH = 1.125 * IN  # legacy: 28.575 across the base
 TOTAL_HEIGHT = 2.3 * IN  # legacy: 58.42 to the lug crown
@@ -160,6 +162,7 @@ async def build(adapter) -> dict[str, str]:
     print(f"  volume after holes: {await _volume(adapter):.1f} mm^3")
     # expected: -617.9 (lug) -148.3 (foot) -> ~13,038 mm^3 (legacy: 13,035.0)
 
+    await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

@@ -27,6 +27,7 @@ import sys
 
 from _common import (
     add_line_chain,
+    apply_material,
     check,
     define_circle,
     ensure_fully_defined,
@@ -37,6 +38,7 @@ from _common import (
 )
 
 PART_NAME = "connecting-rod"
+MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
 CENTER_DISTANCE = 105.0  # ch13 rods: cam ring centre -> rocker pin (scaled)
 RING_BORE_DIA = 51.0  # ch13 rods: cam OD 50.8 + 0.1 clearance per side
@@ -148,6 +150,7 @@ async def build(adapter) -> dict[str, str]:
     print(f"  volume after cuts: {res.data.volume:.1f} mm^3")
     # expected: -6128 bore -8 sliver -19 pin -> ~5,003 mm^3
 
+    await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

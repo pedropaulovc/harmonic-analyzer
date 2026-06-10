@@ -24,14 +24,17 @@ import sys
 from _common import (
     IN,
     add_line_chain,
+    apply_material,
     check,
     ensure_fully_defined,
+    measure_check,
     report_mass_properties,
     run_build,
     save_part_and_images,
 )
 
 PART_NAME = "amplitude-bar"
+MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 BAR_LENGTH = 32.0 * IN  # 812.8  DIMENSIONS.md ch15: ~80 cm stated; legacy 32" (high)
 BAR_WIDTH = 0.25 * IN  # 6.35   DIMENSIONS.md ch15: annotated (high)
@@ -99,6 +102,32 @@ async def build(adapter) -> dict[str, str]:
     check(
         "extrude bar",
         await adapter.create_extrusion(ExtrusionParameters(depth=BAR_DEPTH)),
+    )
+
+    await apply_material(adapter, MATERIAL)
+
+    # Verify the two book-sourced dims on the built solid (ch. 15).
+    mid_y, mid_z = BAR_LENGTH / 2.0, BAR_DEPTH / 2.0
+    await measure_check(
+        adapter,
+        "bar width (annotated 6.35)",
+        [
+            {"entity_type": "FACE", "point": [0.0, mid_y, mid_z]},
+            {"entity_type": "FACE", "point": [BAR_WIDTH, mid_y, mid_z]},
+        ],
+        "normal_distance",
+        BAR_WIDTH,
+    )
+    # End-face pair selection fails (the far face is hidden in the active
+    # view and point picking is screen-projected) — use a long silhouette
+    # edge instead; the notches only cut the end faces, so it runs full
+    # length.
+    await measure_check(
+        adapter,
+        "bar length (stated ~80 cm / legacy 32 in)",
+        [{"entity_type": "EDGE", "point": [0.0, mid_y, BAR_DEPTH]}],
+        "length",
+        BAR_LENGTH,
     )
 
     await report_mass_properties(adapter)

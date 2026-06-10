@@ -30,6 +30,7 @@ import sys
 
 from _common import (
     add_line_chain,
+    apply_material,
     check,
     define_circle,
     ensure_fully_defined,
@@ -39,6 +40,7 @@ from _common import (
 )
 
 PART_NAME = "crank-arm"
+MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 ARM_C2C = 150.0  # DIMENSIONS.md ch11: shaft-to-handle-pivot centres (low)
 ARM_WIDTH = 16.0  # DIMENSIONS.md ch11: arm width (low)
@@ -148,6 +150,7 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     print(f"  volume after pin hole: {vol:.1f} mm^3")
 
+    await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

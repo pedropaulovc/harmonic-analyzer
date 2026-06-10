@@ -25,6 +25,7 @@ import sys
 
 from _common import (
     add_line_chain,
+    apply_material,
     check,
     ensure_fully_defined,
     report_mass_properties,
@@ -34,6 +35,7 @@ from _common import (
 )
 
 PART_NAME = "crank-handle"
+MATERIAL = "Oak"  # see _common.apply_material docstring
 
 HANDLE_LENGTH = 90.0  # DIMENSIONS.md ch11: handle length (low)
 HANDLE_MAX_DIA = 22.0  # DIMENSIONS.md ch11: handle diameter (low)
@@ -81,6 +83,7 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_revolve(RevolveParameters(angle=360.0)),
     )
 
+    await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

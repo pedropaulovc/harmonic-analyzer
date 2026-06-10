@@ -25,6 +25,7 @@ import sys
 
 from _common import (
     add_line_chain,
+    apply_material,
     check,
     define_circle,
     ensure_fully_defined,
@@ -34,6 +35,7 @@ from _common import (
 )
 
 PART_NAME = "magnifying-clamp"
+MATERIAL = "Brass"  # see _common.apply_material docstring
 
 BLOCK_WIDTH = 20.0  # X  DIMENSIONS.md ch20: clamp block, p.48 (low)
 BLOCK_HEIGHT = 26.0  # Y
@@ -111,6 +113,7 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     print(f"  volume after y-bores: {vol:.1f} mm^3")
 
+    await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

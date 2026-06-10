@@ -20,6 +20,7 @@ from __future__ import annotations
 import sys
 
 from _common import (
+    apply_material,
     check,
     ensure_fully_defined,
     report_mass_properties,
@@ -29,6 +30,7 @@ from _common import (
 )
 
 PART_NAME = "magnifying-vertical-rod"
+MATERIAL = "Brass"  # see _common.apply_material docstring
 
 ROD_LENGTH = 150.0  # DIMENSIONS.md ch20: ~half the lever rod, p.46/48 (low)
 ROD_DIA = 5.0  # DIMENSIONS.md ch20: thinner than the Ø6 lever (low)
@@ -76,6 +78,7 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_revolve(RevolveParameters(angle=360.0)),
     )
 
+    await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

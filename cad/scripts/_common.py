@@ -300,6 +300,58 @@ async def save_part_and_images(
     return artefacts
 
 
+async def apply_material(adapter: Any, material: str) -> None:
+    """Assign a SolidWorks-database material (saved with the part).
+
+    Materials follow the book: brass for the polished gauge/lever/pen
+    hardware, gray cast iron for the castings (base, levers, supports),
+    plain carbon steel for shafts/pins/bars, alloy steel for spring wire,
+    oak for the stained-wood crank handle (see DIMENSIONS.md per chapter).
+    """
+    from solidworks_mcp.adapters.base import ApplyMaterialParameters
+
+    check(
+        f"apply_material {material}",
+        await adapter.apply_material(ApplyMaterialParameters(material=material)),
+    )
+
+
+async def measure_check(
+    adapter: Any,
+    label: str,
+    entities: list[dict[str, Any]],
+    key: str,
+    expected: float,
+    tol: float = 0.01,
+) -> None:
+    """Measure entities and assert ``key`` equals ``expected`` (mm/mm²/deg).
+
+    ``entities`` are ``MeasureEntityRef`` kwargs, e.g.
+    ``{"entity_type": "EDGE", "point": [x, y, z]}`` or
+    ``{"entity_type": "PLANE", "name": "Front Plane"}``. Point-based
+    selection is view-dependent (screen projection) — use points visible
+    in the default view, same caveat as the live regression suite.
+    """
+    from solidworks_mcp.adapters.base import MeasureEntityRef, MeasureParameters
+
+    # Point selection projects through the screen, so the whole part must be
+    # in the viewport — long parts otherwise miss their far faces.
+    adapter._zoom_to_fit(adapter.currentModel)
+
+    refs = [MeasureEntityRef(**entity) for entity in entities]
+    res = await adapter.measure(MeasureParameters(entities=refs))
+    if not res.is_success:
+        raise RuntimeError(f"measure {label} failed: {res.error}")
+    value = res.data.get(key)
+    if value is None:
+        raise RuntimeError(f"measure {label}: no {key!r} in {res.data!r}")
+    if abs(value - expected) > tol:
+        raise RuntimeError(
+            f"measure {label}: {key}={value} outside {expected} +/- {tol}"
+        )
+    print(f"  OK  measure {label}: {key}={value:.4f} (expected {expected:g})")
+
+
 async def report_mass_properties(adapter: Any) -> None:
     """Print volume/bounding data for the eyeball-vs-DIMENSIONS.md check."""
     res = await adapter.get_mass_properties()

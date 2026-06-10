@@ -26,15 +26,18 @@ import sys
 
 from _common import (
     add_line_chain,
+    apply_material,
     check,
     ensure_fully_defined,
     extrude_at_offset,
+    measure_check,
     report_mass_properties,
     run_build,
     save_part_and_images,
 )
 
 PART_NAME = "harmonic-base"
+MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
 IN = 25.4
 BOTTOM_LENGTH = 18.0 * IN  # DIMENSIONS.md ch6: 46 cm callout = 18.1" (annotated)
@@ -93,6 +96,27 @@ async def build(adapter) -> dict[str, str]:
     extrude_at_offset(adapter, TOP_THICKNESS, BOTTOM_THICKNESS)
     print(f"  volume after top plate: {await _volume(adapter):.1f} mm^3")
     # expected: 99 + 17.5 * 10.5 * 1.5 = 374.625 in^3 = 6,139,003 mm^3
+
+    await apply_material(adapter, MATERIAL)
+
+    # Verify the annotated footprint (ch. 6: 46 x 28 cm callouts = 18.1 x
+    # 11.0 in; legacy 18.0 x 11.0 kept). Side-face pairs fail to pick (the
+    # far faces are hidden in the active view and point picking is
+    # screen-projected) — measure the bottom plate's perimeter edges.
+    await measure_check(
+        adapter,
+        "base length (annotated 46 cm / 18 in)",
+        [{"entity_type": "EDGE", "point": [0.0, 0.0, BOTTOM_WIDTH / 2.0]}],
+        "length",
+        BOTTOM_LENGTH,
+    )
+    await measure_check(
+        adapter,
+        "base depth (annotated 28 cm / 11 in)",
+        [{"entity_type": "EDGE", "point": [BOTTOM_LENGTH / 2.0, 0.0, 0.0]}],
+        "length",
+        BOTTOM_WIDTH,
+    )
 
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)

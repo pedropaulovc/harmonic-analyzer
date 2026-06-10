@@ -21,6 +21,7 @@ import sys
 
 from _common import (
     add_line_chain,
+    apply_material,
     check,
     ensure_fully_defined,
     report_mass_properties,
@@ -30,6 +31,7 @@ from _common import (
 )
 
 PART_NAME = "thumb-screw"
+MATERIAL = "Brass"  # see _common.apply_material docstring
 
 HEAD_DIA = 10.0  # DIMENSIONS.md ch20: knurled head, p.48 (low)
 HEAD_LENGTH = 5.0  # DIMENSIONS.md ch20 (low)
@@ -70,6 +72,7 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_revolve(RevolveParameters(angle=360.0)),
     )
 
+    await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

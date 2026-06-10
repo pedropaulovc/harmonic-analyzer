@@ -26,6 +26,7 @@ import sys
 
 from _common import (
     add_line_chain,
+    apply_material,
     check,
     define_circle,
     ensure_fully_defined,
@@ -36,6 +37,7 @@ from _common import (
 )
 
 PART_NAME = "channel-lever"
+MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
 LEVER_LENGTH = 240.0  # DIMENSIONS.md ch17: pivot-to-spring-hole c2c (low)
 TIP_OVERHANG = 8.0  # DIMENSIONS.md ch17: bar past the spring hole (low)
@@ -112,6 +114,7 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     print(f"  volume after holes: {vol:.1f} mm^3")
 
+    await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

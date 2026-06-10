@@ -25,14 +25,17 @@ import sys
 
 from _common import (
     add_line_chain,
+    apply_material,
     check,
     ensure_fully_defined,
+    measure_check,
     report_mass_properties,
     run_build,
     save_part_and_images,
 )
 
 PART_NAME = "measuring-stick"
+MATERIAL = "Brass"  # see _common.apply_material docstring
 
 BODY_LENGTH = 200.0  # DIMENSIONS.md ch16: annotated (high)
 BODY_WIDTH = 15.0  # DIMENSIONS.md ch16: scaled (low)
@@ -139,6 +142,35 @@ async def build(adapter) -> dict[str, str]:
     # The hand-stamped artefact the book calls out: a longer 0.5 tick.
     await _cut_tick(
         adapter, "tick 0.5", SCALE_START_X + DIVISION_SPACING / 2.0, HALF_TICK_LENGTH
+    )
+
+    await apply_material(adapter, MATERIAL)
+
+    # Verify the annotated 200 mm length and the untouched front face
+    # (the 8 mm tick spacing is driven by the linear pattern's spacing).
+    # End faces are edge-on in the active view (point picking is
+    # screen-projected) — measure the uncut front-bottom edge instead;
+    # the ticks only engrave the back face from the top edge down.
+    mid_y = BODY_WIDTH / 2.0
+    await measure_check(
+        adapter,
+        "body length (annotated 200)",
+        [{"entity_type": "EDGE", "point": [BODY_LENGTH / 2.0, 0.0, BODY_THICKNESS]}],
+        "length",
+        BODY_LENGTH,
+    )
+    await measure_check(
+        adapter,
+        "front face area (ticks cut the back face only)",
+        [
+            {
+                "entity_type": "FACE",
+                "point": [BODY_LENGTH / 2.0, mid_y, BODY_THICKNESS],
+            }
+        ],
+        "area",
+        BODY_LENGTH * BODY_WIDTH,
+        tol=1.0,
     )
 
     await report_mass_properties(adapter)
