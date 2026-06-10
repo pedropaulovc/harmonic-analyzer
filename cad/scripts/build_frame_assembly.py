@@ -16,12 +16,17 @@ depth):
 * corner-bracket x4 beside each column on its inboard-X side, upright
   plate tangent to the column, foot toward the machine centre (ch. 30
   views 1/8 show the green tabs against the column bases).
-* rocker-arm-support x3 on the machine centreline (Z = 0) at
-  X = -160/0/+160: the rocker shaft runs along X (ch. 14: the 20 rocker
-  arms stack along the shaft; the p.28 end-view shows their ends spread
-  across the machine width), so the A-frame taper faces +/-X and the
-  windowed faces look along X. The 63.5 mm taper read in the ch. 30 rear
-  view (view 5/8) confirms this orientation.
+* rocker-arm-support x2 at X = +/-87, centred Z = +45 (aft of centre):
+  the rocker shaft runs along X (ch. 14: the 20 rocker arms stack along
+  the shaft at the 7.5 mm channel pitch, Appendix C #3 resolved -> stack
+  spans 150 mm, gates hug it at +/-87), the A-frame taper faces +/-X and
+  the windowed faces look along X (the 63.5 mm taper triangle in the
+  ch. 30 front/rear views confirms). The gates sit aft so the gear drums
+  (ch. 13, Ø103) clear their front faces (Z = -47) — the drums occupy
+  the front ~100 mm of base depth (eight views 1/8, 3/8). Only two gates
+  carry the rocker shaft: a middle gate would displace ~3 of the 7.5 mm
+  channels; the third A-frame casting supports the magnifying-lever
+  pivot and belongs to output.SLDASM.
 
 Every component is fixed (base) or fully defined by three orthogonal
 plane-plane mates against the base part's principal planes; distance-mate
@@ -66,7 +71,8 @@ COLUMN_Z = 112.0
 COLUMN_RADIUS = 1.375 * IN / 2.0  # tube-frame OD/2
 BRACKET_PLATE_T = 0.3 * IN  # corner-bracket upright plate
 BRACKET_X = COLUMN_X - COLUMN_RADIUS - BRACKET_PLATE_T / 2.0  # plate tangent
-SUPPORT_X = 160.0  # A-frame stations along the rocker shaft
+SUPPORT_X = 87.0  # gate stations: 150 mm arm stack / 2 + top-rail half + air
+SUPPORT_Z = 45.0  # aft offset: front face at Z -47 clears the gear drums
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 ROT_Y_POS90 = [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]
@@ -206,10 +212,10 @@ async def build(adapter) -> dict[str, str]:
         )
         assert_component_placed(adapter, name, target, rows)
 
-    # Rocker-arm A-frames on the centreline; taper faces +/-X so the rocker
-    # shaft (along X) crosses their windowed faces.
-    for station in (-SUPPORT_X, 0.0, SUPPORT_X):
-        target = [station, BASE_TOP_Y, 0.0]
+    # Rocker-arm gates aft of centre; taper faces +/-X so the rocker shaft
+    # (along X) rests across their top rails.
+    for station in (-SUPPORT_X, SUPPORT_X):
+        target = [station, BASE_TOP_Y, SUPPORT_Z]
         res = await adapter.insert_component(
             InsertComponentParameters(
                 file_path=support_path, position=target, rotation=[0.0, 90.0, 0.0]
@@ -221,7 +227,7 @@ async def build(adapter) -> dict[str, str]:
             adapter, name, "Front Plane", "Right Plane", base_name, station, target
         )
         await _plane_mate(
-            adapter, name, "Right Plane", "Front Plane", base_name, 0.0, target
+            adapter, name, "Right Plane", "Front Plane", base_name, SUPPORT_Z, target
         )
         await _plane_mate(
             adapter, name, "Top Plane", "Top Plane", base_name, BASE_TOP_Y, target

@@ -139,10 +139,11 @@ drive component — Appendix C #9.
 | Tooth count | 120 (each gear) | — | derived from gear law k/80 (ch.29) + 4:1 + cone teeth 6k — see ch.6/26/29 section | derived | high |
 | Alignment notch depth | 3 mm | 0.118 | text p.22 (also pp. 66–67) | stated | high |
 | Gear material | brass (polished) | — | text p.22 | stated | high |
-| Axial pitch | 7.5 mm | 0.295 | must match cone-set axial pitch (ch. 12) | derived | med |
+| Axial pitch | 7.5 mm | 0.295 | must match cone-set axial pitch (ch. 12); M6 cross-check: rocker-arm end-view pitch measures the same 7.5 (ch. 14 note) | derived | high |
+| Gear face width | 3.0 mm | 0.118 | M6 (Appendix C #6): p.22 stack macro face/pitch = 190/497 px ≈ 0.38 × 7.5 axial pitch ≈ 2.9, rounded 3.0 (the ch. 12 "7 mm" callout is the CONE gear face; the cylinder sandwich must also fit cam + rod ring) | scaled | med |
 | Gear outer diameter | 103.3 mm (4.067") | 4.067 | (120+2)/DP30; PD = 4.000" exactly (module closed — ch. 12 row) | derived | high |
 | Cam diameter (integral cam per gear) | 50.8 mm (2.0") | 2.0 | legacy `parameters.kcl`; M2 check: p.25 printed outline measures cam OD ≈ 0.52 × cylinder-gear OD → 0.52 × 103.3 = 53.7 vs legacy 50.8 (5% — within the outline-measurement error); keep the legacy round 2.0" | legacy + scaled ratio | med |
-| Cam thickness | 10.2 mm (0.4") | 0.4 | legacy `parameters.kcl` | legacy | med |
+| Cam thickness | 3.5 mm | 0.138 | M6 (Appendix C #6): inter-face gap 7.5 − 3.0 = 4.5 minus 0.5 air per side; REFUTES legacy 10.2 (0.4"), which alone exceeds the axial pitch | derived | med |
 | Cam eccentricity | 5.1 mm (0.2") | 0.2 | legacy `parameters.kcl`; sets rocker-arm stroke; p.25 photo shows ≈ 4 mm center offset (within photo error) | legacy | med |
 | Cam bore | 9.5 mm (3/8") | 0.375 | legacy `parameters.kcl` | legacy | med |
 | Cam keyway | 3.2 × 1.5 mm (1/8" × 0.06") | 0.125 × 0.06 | legacy `parameters.kcl` | legacy | med |
@@ -476,24 +477,26 @@ re-measure during their M2 script build.
    (counted on engineerguy video 4/4 frame `v4_pinion_018`; see ch. 25
    section). Video stills live in `references/engineerguy-youtube/`
    (see its README to re-fetch the videos; mp4/stills not committed).
-3. **Channel pitch** — M2 re-read: the ch. 14 "16 mm" callout measures the
-   rocker arm's end-face depth, NOT pitch, so the 16 mm pitch candidate now
-   rests only on the top-down fit (base 46 cm → 20 × 16 mm = 320 mm with
-   ~70 mm margin per side, plausible vs the lever bank). 7.5 mm axial gear
-   pitch (ch. 12 derived) still holds for the gear stack. Confirm 16 mm
-   against the end-view photo (p. 28) before the M6 channel array.
+3. **Channel pitch** — **RESOLVED in M6: 7.5 mm**, uniform with the gear
+   stack (vertical connecting rods, no splay). Measured on all four p.28
+   end-view strips (400 dpi extraction): arm-end tip pitch ≈ 60 px vs tip
+   width ≈ 20 px = the 2.5 mm arm plate (annotated p.27) → pitch ≈ 3.0 ×
+   2.5 = 7.5 mm. Self-consistent: 20 ends × 60 px ≈ 1140 px of the 1512 px
+   strip. The 16 mm candidate is refuted; channel stack spans 150 mm.
 4. **Rocker arm working length** — RESOLVED in M2: eight-views view 5/8
    side photo agrees with the ch. 16 derivation (~80 mm working half);
    modeled 100 mm rod side / 70 mm tail (`build_rocker_arm.py`).
 5. **Feature mapping of the 16 mm (ch. 14) and 32 mm (ch. 17) callouts** —
    ch. 14 16 mm RESOLVED in M2 = rocker arm end-face depth (see ch. 14
    table). ch. 17 32 mm still to identify when finishing that chapter.
-6. **Cylinder-set axial budget** (ch. 13) — needed by M6 channel array.
-   The 7.5 mm axial pitch must fit gear face + integral cam + rod ring,
-   but the legacy cam thickness (10.2 mm) alone exceeds it. M2 modeled
-   the rod ring at 3 mm; re-measure gear face / cam / ring thicknesses
-   from ch. 13 macro photos (or photogrammetry `195445871`) and reconcile
-   the eccentric-cam part before assembling a channel.
+6. **Cylinder-set axial budget** (ch. 13) — **RESOLVED in M6**: p.22
+   stack macro (400 dpi) measures gear face / axial pitch = 190/497 px
+   ≈ 0.38 → face 3.0 mm; budget per 7.5 mm channel = face 3.0 + cam 3.5
+   (0.5 air per side in the 4.5 gap) with the 3.0 rod ring riding the cam
+   (0.25 axial clearance per side). Legacy 10.2 cam thickness refuted;
+   `build_cylinder_gear.py` updated (face 7 → 3, cam 10.16 → 3.5). The
+   ch. 12 "7 mm" face callout stays valid for the CONE gears (pure gear
+   stack, 0.5 mm inter-face air at the same 7.5 pitch).
 7. **Small cone gears cannot carry the 9.5 mm shaft bore** (ch. 12) —
    **RESOLVED in M4c: configured bore + stepped shaft, no keyway.** At
    DP 30 the 6T gear's OD is 6.77 mm and the 12T root circle is 8.0 mm,

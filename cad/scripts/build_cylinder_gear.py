@@ -9,13 +9,17 @@ units = inches, trig in radians inside curve expressions).
 
 Features, in order:
 
-1. Gear blank: disc at tip radius ``Ra`` (OD 4.067"), face width 7 mm,
-   extruded z = 0..7 from the Front plane.
+1. Gear blank: disc at tip radius ``Ra`` (OD 4.067"), face width 3 mm,
+   extruded z = 0..3 from the Front plane. The face width comes from the
+   M6 axial-budget resolution (Appendix C #6): face/pitch = 0.38 measured
+   on the p.22 stack macro x the 7.5 mm axial pitch.
 2. One tooth gap (six equation curves: two involute flanks, base chord, two
    radial extensions, outer clearance arc) cut through, then circular-
    patterned 120x about the gear axis (reference axis Top x Right = Z).
-3. Integral eccentric cam: disc OD 2.0", thickness 0.4", centre offset -Y by
-   the 0.2" eccentricity, boss-extruded z = 7..17.16 from an offset reference
+3. Integral eccentric cam: disc OD 2.0", thickness 3.5 mm (the 4.5 mm
+   inter-face gap minus 0.5 mm air per side; supersedes the legacy 0.4"
+   which alone exceeded the 7.5 mm pitch), centre offset -Y by the 0.2"
+   eccentricity, boss-extruded z = 3..6.5 from an offset reference
    plane (the cam shares the layout of the superseded standalone
    ``build_eccentric_cam.py``: lobe -Y, keyway +Y).
 4. Alignment notch: 3 mm deep square notch (width estimated = depth) cut
@@ -24,16 +28,16 @@ Features, in order:
 5. Shaft bore 3/8" through gear + cam, on the gear axis.
 6. Keyway 1/8" x 0.06" past the bore, pointing +Y (away from the cam lobe).
 
-Every feature's volume delta is asserted against an analytic expectation;
-the toothed-disc volume must reproduce the cone gear's T120 configuration
-(same DP 30 / PA 14.5 deg / face width). The notch delta integrates the
+Every feature's volume delta is asserted against an analytic expectation
+(same DP 30 / PA 14.5 deg tooth profile as the cone set, narrower face).
+The notch delta integrates the
 exact involute solid-fraction over the notch window (the notch floor sits
 below the base circle, so part of the window is full annulus and part is
 tooth-fraction fill).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 13".
 
-Layout: gear axis = Z through the origin, gear z = 0..7 mm, cam z = 7..17.16,
+Layout: gear axis = Z through the origin, gear z = 0..3 mm, cam z = 3..6.5,
 cam lobe -Y, notch and keyway +Y.
 
 Run (SolidWorks already open)::
@@ -59,14 +63,15 @@ from _common import (
     set_sketch_direct_db,
 )
 from _gear import build_fixed_gear, volume_check
-from build_cone_gear import FACE_WIDTH, gear_facts
+from build_cone_gear import gear_facts
 
 PART_NAME = "cylinder-gear"
 MATERIAL = "Brass"  # ch. 13 text p.22: polished brass
 
 TEETH = 120  # DIMENSIONS.md ch13: derived from gear law k/80 (high)
+FACE_WIDTH = 3.0  # DIMENSIONS.md ch13: 0.38 face/pitch x 7.5 axial pitch (scaled, med)
 CAM_DIAMETER = 2.0 * IN  # 50.8  DIMENSIONS.md ch13: integral cam diameter (legacy, med)
-CAM_THICKNESS = 0.4 * IN  # 10.16 DIMENSIONS.md ch13: cam thickness (legacy, med)
+CAM_THICKNESS = 3.5  # DIMENSIONS.md ch13: axial-budget resolution, Appendix C #6 (derived, med)
 ECCENTRICITY = 0.2 * IN  # 5.08  DIMENSIONS.md ch13: cam eccentricity (legacy, med)
 BORE_DIAMETER = 0.375 * IN  # 9.525 DIMENSIONS.md ch13: cam bore (legacy, med)
 KEYWAY_WIDTH = 0.125 * IN  # 3.175 DIMENSIONS.md ch13: keyway width (legacy, med)
