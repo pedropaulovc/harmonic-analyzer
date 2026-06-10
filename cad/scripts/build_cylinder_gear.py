@@ -56,6 +56,7 @@ from _common import (
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_sketch_direct_db,
 )
 from build_cone_gear import FACE_WIDTH, R_CLEAR_IN, gap_area_in_disc, gear_facts
 
@@ -337,6 +338,11 @@ async def build(adapter) -> dict[str, str]:
     # Alignment notch at +Y (top = cosine mode), gear face only.
     # ------------------------------------------------------------------
     check("create_sketch notch", await adapter.create_sketch("Front"))
+    # Inference OFF: with it on, the bottom corners snap coincident onto the
+    # flank-start vertices at the base circle ~0.5 mm away (live-caught: the
+    # rectangle came back 3.32 mm wide with its floor at r = Rb and the width
+    # dimension silently driven).
+    set_sketch_direct_db(adapter, True)
     notch = await add_line_chain(
         adapter,
         [
@@ -346,6 +352,7 @@ async def build(adapter) -> dict[str, str]:
             (-NOTCH_WIDTH / 2.0, NOTCH_OUTER),
         ],
     )
+    set_sketch_direct_db(adapter, False)
     bottom, right, top, left = notch
     for ent, relation in (
         (bottom, "horizontal"),
@@ -394,6 +401,7 @@ async def build(adapter) -> dict[str, str]:
     # Keyway pointing +Y, through gear + cam (eccentric-cam recipe).
     # ------------------------------------------------------------------
     check("create_sketch keyway", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)  # same snap risk against the bore edge
     keyway = await add_line_chain(
         adapter,
         [
@@ -403,6 +411,7 @@ async def build(adapter) -> dict[str, str]:
             (-KEYWAY_HALF_WIDTH, KEYWAY_TOP_Y),
         ],
     )
+    set_sketch_direct_db(adapter, False)
     bottom, right, top, left = keyway
     for ent, relation in (
         (bottom, "horizontal"),

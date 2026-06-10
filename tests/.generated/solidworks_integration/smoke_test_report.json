@@ -1,0 +1,961 @@
+[
+  {
+    "tool": "open_model",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "file_path"
+    ]
+  },
+  {
+    "tool": "create_part",
+    "status": "error",
+    "elapsed_s": 0.0002,
+    "payload_keys": [
+      "name"
+    ]
+  },
+  {
+    "tool": "create_assembly",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "name"
+    ]
+  },
+  {
+    "tool": "create_drawing",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "name"
+    ]
+  },
+  {
+    "tool": "close_model",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "save"
+    ]
+  },
+  {
+    "tool": "create_extrusion",
+    "status": "error",
+    "elapsed_s": 0.003,
+    "payload_keys": [
+      "sketch_name",
+      "depth"
+    ]
+  },
+  {
+    "tool": "create_revolve",
+    "status": "error",
+    "elapsed_s": 0.0018,
+    "payload_keys": [
+      "sketch_name",
+      "axis_entity",
+      "angle"
+    ]
+  },
+  {
+    "tool": "get_dimension",
+    "status": "error",
+    "elapsed_s": 0.1292,
+    "payload_keys": [
+      "name"
+    ]
+  },
+  {
+    "tool": "set_dimension",
+    "status": "success",
+    "elapsed_s": 0.1156,
+    "payload_keys": [
+      "name",
+      "value"
+    ]
+  },
+  {
+    "tool": "create_cut_extrude",
+    "status": "error",
+    "elapsed_s": 0.0007,
+    "payload_keys": []
+  },
+  {
+    "tool": "add_fillet",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "add_chamfer",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "mirror_feature",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "circular_pattern_feature",
+    "status": "error",
+    "elapsed_s": 0.0001,
+    "payload_keys": []
+  },
+  {
+    "tool": "linear_pattern_feature",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "shell",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "draft",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "create_sweep",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "create_loft",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "create_plane",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "create_axis",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "create_reference_point",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "create_coordinate_system",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "create_sketch",
+    "status": "success",
+    "elapsed_s": 0.1009,
+    "payload_keys": [
+      "plane"
+    ]
+  },
+  {
+    "tool": "add_line",
+    "status": "success",
+    "elapsed_s": 0.0653,
+    "payload_keys": [
+      "x1",
+      "y1",
+      "x2",
+      "y2"
+    ]
+  },
+  {
+    "tool": "add_circle",
+    "status": "success",
+    "elapsed_s": 0.0511,
+    "payload_keys": [
+      "center_x",
+      "center_y",
+      "radius"
+    ]
+  },
+  {
+    "tool": "add_rectangle",
+    "status": "success",
+    "elapsed_s": 0.1139,
+    "payload_keys": [
+      "x1",
+      "y1",
+      "x2",
+      "y2"
+    ]
+  },
+  {
+    "tool": "exit_sketch",
+    "status": "success",
+    "elapsed_s": 0.0515,
+    "payload_keys": []
+  },
+  {
+    "tool": "check_sketch_fully_defined",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "add_arc",
+    "status": "error",
+    "elapsed_s": 0.0001,
+    "payload_keys": [
+      "center_x",
+      "center_y",
+      "start_x",
+      "start_y",
+      "end_x",
+      "end_y"
+    ]
+  },
+  {
+    "tool": "add_spline",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "points"
+    ]
+  },
+  {
+    "tool": "add_centerline",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "x1",
+      "y1",
+      "x2",
+      "y2"
+    ]
+  },
+  {
+    "tool": "add_polygon",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "center_x",
+      "center_y",
+      "sides",
+      "circumradius"
+    ]
+  },
+  {
+    "tool": "add_ellipse",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "center_x",
+      "center_y",
+      "major_radius",
+      "minor_radius"
+    ]
+  },
+  {
+    "tool": "add_sketch_constraint",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "entity1",
+      "relation_type"
+    ]
+  },
+  {
+    "tool": "add_sketch_dimension",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "entity1",
+      "value",
+      "dimension_type"
+    ]
+  },
+  {
+    "tool": "sketch_linear_pattern",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "entity",
+      "x_count",
+      "y_count",
+      "x_spacing",
+      "y_spacing"
+    ]
+  },
+  {
+    "tool": "sketch_circular_pattern",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "entity",
+      "count",
+      "angle"
+    ]
+  },
+  {
+    "tool": "sketch_mirror",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "entity",
+      "mirror_line"
+    ]
+  },
+  {
+    "tool": "sketch_offset",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "entity",
+      "distance"
+    ]
+  },
+  {
+    "tool": "sketch_tutorial_simple_hole",
+    "status": "success",
+    "elapsed_s": 0.2176,
+    "payload_keys": [
+      "plane",
+      "center_x",
+      "center_y",
+      "diameter"
+    ]
+  },
+  {
+    "tool": "tutorial_simple_hole",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "plane",
+      "center_x",
+      "center_y",
+      "diameter"
+    ]
+  },
+  {
+    "tool": "create_drawing_view",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "model_path",
+      "view_type"
+    ]
+  },
+  {
+    "tool": "add_dimension",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "entity1",
+      "value",
+      "dimension_type"
+    ]
+  },
+  {
+    "tool": "add_note",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "text",
+      "x",
+      "y"
+    ]
+  },
+  {
+    "tool": "create_section_view",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "cutting_line"
+    ]
+  },
+  {
+    "tool": "create_detail_view",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "center_x",
+      "center_y",
+      "radius",
+      "scale"
+    ]
+  },
+  {
+    "tool": "update_sheet_format",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "sheet_format_path"
+    ]
+  },
+  {
+    "tool": "auto_dimension_view",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "view_name"
+    ]
+  },
+  {
+    "tool": "check_drawing_standards",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "create_technical_drawing",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "model_path"
+    ]
+  },
+  {
+    "tool": "add_drawing_view",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "model_path",
+      "view_type"
+    ]
+  },
+  {
+    "tool": "add_annotation",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "annotation_type",
+      "text",
+      "x",
+      "y"
+    ]
+  },
+  {
+    "tool": "update_title_block",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "title"
+    ]
+  },
+  {
+    "tool": "analyze_drawing_comprehensive",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "analyze_drawing_dimensions",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "analyze_drawing_annotations",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "check_drawing_compliance",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "analyze_drawing_views",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "generate_drawing_report",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "compare_drawing_versions",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "drawing1_path",
+      "drawing2_path"
+    ]
+  },
+  {
+    "tool": "validate_drawing_completeness",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "calculate_mass_properties",
+    "status": "error",
+    "elapsed_s": 0.0001,
+    "payload_keys": []
+  },
+  {
+    "tool": "get_mass_properties",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "check_interference",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "analyze_geometry",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "analysis_type"
+    ]
+  },
+  {
+    "tool": "get_material_properties",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "export_step",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "file_path",
+      "format_type"
+    ]
+  },
+  {
+    "tool": "export_iges",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "file_path",
+      "format_type"
+    ]
+  },
+  {
+    "tool": "export_stl",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "file_path",
+      "format_type"
+    ]
+  },
+  {
+    "tool": "export_pdf",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "file_path",
+      "format_type"
+    ]
+  },
+  {
+    "tool": "export_dwg",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "file_path",
+      "format_type"
+    ]
+  },
+  {
+    "tool": "export_image",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "file_path",
+      "format_type"
+    ]
+  },
+  {
+    "tool": "batch_export",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "source_directory",
+      "output_directory",
+      "format_type"
+    ]
+  },
+  {
+    "tool": "generate_vba_code",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "code_type"
+    ]
+  },
+  {
+    "tool": "automation_start_macro_recording",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "automation_stop_macro_recording",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "batch_process_files",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "source_directory",
+      "operation",
+      "output_directory"
+    ]
+  },
+  {
+    "tool": "manage_design_table",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "action"
+    ]
+  },
+  {
+    "tool": "execute_workflow",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "steps"
+    ]
+  },
+  {
+    "tool": "create_template",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "template_name",
+      "template_type"
+    ]
+  },
+  {
+    "tool": "optimize_performance",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "save_file",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "save_as",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "file_path"
+    ]
+  },
+  {
+    "tool": "get_file_properties",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "get_model_info",
+    "status": "error",
+    "elapsed_s": 0.0001,
+    "payload_keys": []
+  },
+  {
+    "tool": "list_features",
+    "status": "error",
+    "elapsed_s": 0.0001,
+    "payload_keys": []
+  },
+  {
+    "tool": "classify_feature_tree",
+    "status": "error",
+    "elapsed_s": 0.0001,
+    "payload_keys": []
+  },
+  {
+    "tool": "list_configurations",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "manage_file_properties",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "convert_file_format",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "source_path",
+      "target_format"
+    ]
+  },
+  {
+    "tool": "batch_file_operations",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "source_directory",
+      "operation"
+    ]
+  },
+  {
+    "tool": "load_part",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "file_path"
+    ]
+  },
+  {
+    "tool": "load_assembly",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "file_path"
+    ]
+  },
+  {
+    "tool": "save_part",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "save_assembly",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "generate_vba_extrusion",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "sketch_name",
+      "depth"
+    ]
+  },
+  {
+    "tool": "generate_vba_revolve",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "sketch_name",
+      "axis_entity",
+      "angle"
+    ]
+  },
+  {
+    "tool": "generate_vba_assembly_insert",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "component_path"
+    ]
+  },
+  {
+    "tool": "generate_vba_drawing_views",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "model_path"
+    ]
+  },
+  {
+    "tool": "generate_vba_batch_export",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "source_directory",
+      "output_directory",
+      "format_type"
+    ]
+  },
+  {
+    "tool": "generate_vba_part_modeling",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "operations"
+    ]
+  },
+  {
+    "tool": "generate_vba_assembly_mates",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "mate_type"
+    ]
+  },
+  {
+    "tool": "generate_vba_drawing_dimensions",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "generate_vba_file_operations",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "operation"
+    ]
+  },
+  {
+    "tool": "generate_vba_macro_recorder",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "macro_name"
+    ]
+  },
+  {
+    "tool": "extract_template",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "model_path"
+    ]
+  },
+  {
+    "tool": "apply_template",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "template_path",
+      "target_path"
+    ]
+  },
+  {
+    "tool": "batch_apply_template",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "template_path",
+      "source_directory"
+    ]
+  },
+  {
+    "tool": "compare_templates",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "template1_path",
+      "template2_path"
+    ]
+  },
+  {
+    "tool": "save_to_template_library",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "template_path",
+      "library_name"
+    ]
+  },
+  {
+    "tool": "list_template_library",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "start_macro_recording",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "macro_name"
+    ]
+  },
+  {
+    "tool": "stop_macro_recording",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "execute_macro",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "macro_path"
+    ]
+  },
+  {
+    "tool": "analyze_macro",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "macro_path"
+    ]
+  },
+  {
+    "tool": "batch_execute_macros",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "macro_paths"
+    ]
+  },
+  {
+    "tool": "optimize_macro",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "macro_path"
+    ]
+  },
+  {
+    "tool": "create_macro_library",
+    "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": [
+      "library_name",
+      "macro_paths"
+    ]
+  },
+  {
+    "tool": "discover_solidworks_docs",
+    "status": "success",
+    "elapsed_s": 0.404,
+    "payload_keys": []
+  },
+  {
+    "tool": "search_solidworks_api_help",
+    "status": "success",
+    "elapsed_s": 0.0006,
+    "payload_keys": [
+      "query"
+    ]
+  }
+]
