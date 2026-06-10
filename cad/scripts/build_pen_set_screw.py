@@ -1,12 +1,19 @@
 r"""Reproduction script: pen set screw (book ch. 24, pp. 64-65).
 
 The small screw with the black knurled knob that threads up through the
-pen frame's bottom rail to set the pen-to-paper angle. Modelled smooth;
-knurling and threads wait for the Phase 5 manufacturing tools.
+pen frame's bottom rail to set the pen-to-paper angle. M4 finishing pass:
+knob reeded with 22 axial Ø1 mm grooves (tube-frame fluting recipe,
+``_common.add_reeded_head_and_thread``) and a cosmetic M3 thread on the
+shank (annotation only -- keeps M6 interference checks clean).
 
-Dimensions: cad/DIMENSIONS.md "Chapter 24" — photo-scaled (low).
+The stepped body is two coaxial merged extrusions, NOT a profile revolve:
+circular patterns of cuts on stepped REVOLVED bodies fail to create (see
+``build_thumb_screw.py``).
 
-Layout: axis along +X from the knob face, revolved about a centerline.
+Dimensions: cad/DIMENSIONS.md "Chapter 24" — photo-scaled (low); groove
+count/size photo-estimated (low).
+
+Layout: axis along +X from the knob face at x=0.
 
 Run (SolidWorks already open)::
 
@@ -15,17 +22,19 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
 
 from _common import (
-    add_line_chain,
+    add_reeded_head_and_thread,
     apply_material,
     check,
+    define_circle,
     ensure_fully_defined,
     report_mass_properties,
     run_build,
     save_part_and_images,
-    set_sketch_direct_db,
+    volume_check,
 )
 
 PART_NAME = "pen-set-screw"
@@ -38,36 +47,29 @@ SHANK_LENGTH = 15.0
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import RevolveParameters
+    from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
-    check("create_sketch profile", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    centerline = check(
-        "add_centerline axis",
-        await adapter.add_centerline(0.0, 0.0, KNOB_LENGTH + SHANK_LENGTH, 0.0),
+    for label, dia, length in (
+        ("knob", KNOB_DIA, KNOB_LENGTH),
+        ("shank", SHANK_DIA, KNOB_LENGTH + SHANK_LENGTH),
+    ):
+        check(f"create_sketch {label}", await adapter.create_sketch("Right"))
+        await define_circle(adapter, 0.0, 0.0, dia / 2.0, label)
+        await ensure_fully_defined(adapter, f"{label} sketch")
+        check(f"exit_sketch {label}", await adapter.exit_sketch())
+        check(
+            f"extrude {label}",
+            await adapter.create_extrusion(ExtrusionParameters(depth=length)),
+        )
+    v_blank = math.pi * (
+        (KNOB_DIA / 2.0) ** 2 * KNOB_LENGTH + (SHANK_DIA / 2.0) ** 2 * SHANK_LENGTH
     )
-    lines = await add_line_chain(
-        adapter,
-        [
-            (0.0, 0.0),
-            (0.0, KNOB_DIA / 2.0),
-            (KNOB_LENGTH, KNOB_DIA / 2.0),
-            (KNOB_LENGTH, SHANK_DIA / 2.0),
-            (KNOB_LENGTH + SHANK_LENGTH, SHANK_DIA / 2.0),
-            (KNOB_LENGTH + SHANK_LENGTH, 0.0),
-        ],
-    )
-    set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(
-        adapter, "screw profile", fix_entities=[centerline, *lines]
-    )
-    check("exit_sketch profile", await adapter.exit_sketch())
+    await volume_check(adapter, "stepped blank", v_blank, 0.005 * v_blank)
 
-    check(
-        "revolve screw",
-        await adapter.create_revolve(RevolveParameters(angle=360.0)),
+    await add_reeded_head_and_thread(
+        adapter, KNOB_DIA, KNOB_LENGTH, SHANK_DIA, SHANK_LENGTH, groove_count=22
     )
 
     await apply_material(adapter, MATERIAL)

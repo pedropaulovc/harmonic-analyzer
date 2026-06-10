@@ -1,14 +1,21 @@
 r"""Reproduction script: reeded thumb screw (book ch. 20, p. 48).
 
 The knurled ("reeded") thumb screw that locks the magnifying-lever clamp
-block (a second identical one locks the output fixture). Modelled smooth:
-knurling and threads wait for the Phase 5 manufacturing tools.
+block (a second identical one locks the output fixture). M4 finishing
+pass: head reeded with 24 axial Ø1 mm grooves (tube-frame fluting recipe,
+``_common.add_reeded_head_and_thread``) and a cosmetic M3 thread on the
+shank (annotation only -- keeps M6 interference checks clean).
+
+The stepped body is two coaxial merged extrusions (cone-gear-shaft
+recipe), NOT a profile revolve: circular patterns of cuts on stepped
+REVOLVED bodies fail to create (probe-verified on SW 2026 -- plain
+revolved cylinders pattern fine, stepped ones never do; identical
+geometry from stacked extrusions patterns fine).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 20" — photo-scaled vs the Ø6
-lever rod (low).
+lever rod (low); groove count/size photo-estimated (low).
 
-Layout: screw axis along +X from the origin (head face at x=0), profile
-revolved 360 deg about a centerline.
+Layout: screw axis along +X from the origin (head face at x=0).
 
 Run (SolidWorks already open)::
 
@@ -17,17 +24,19 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
 
 from _common import (
-    add_line_chain,
+    add_reeded_head_and_thread,
     apply_material,
     check,
+    define_circle,
     ensure_fully_defined,
     report_mass_properties,
     run_build,
     save_part_and_images,
-    set_sketch_direct_db,
+    volume_check,
 )
 
 PART_NAME = "thumb-screw"
@@ -40,36 +49,29 @@ SHANK_LENGTH = 12.0  # DIMENSIONS.md ch20 (low)
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import RevolveParameters
+    from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
-    check("create_sketch profile", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    centerline = check(
-        "add_centerline axis",
-        await adapter.add_centerline(0.0, 0.0, HEAD_LENGTH + SHANK_LENGTH, 0.0),
+    for label, dia, length in (
+        ("head", HEAD_DIA, HEAD_LENGTH),
+        ("shank", SHANK_DIA, HEAD_LENGTH + SHANK_LENGTH),
+    ):
+        check(f"create_sketch {label}", await adapter.create_sketch("Right"))
+        await define_circle(adapter, 0.0, 0.0, dia / 2.0, label)
+        await ensure_fully_defined(adapter, f"{label} sketch")
+        check(f"exit_sketch {label}", await adapter.exit_sketch())
+        check(
+            f"extrude {label}",
+            await adapter.create_extrusion(ExtrusionParameters(depth=length)),
+        )
+    v_blank = math.pi * (
+        (HEAD_DIA / 2.0) ** 2 * HEAD_LENGTH + (SHANK_DIA / 2.0) ** 2 * SHANK_LENGTH
     )
-    lines = await add_line_chain(
-        adapter,
-        [
-            (0.0, 0.0),
-            (0.0, HEAD_DIA / 2.0),
-            (HEAD_LENGTH, HEAD_DIA / 2.0),
-            (HEAD_LENGTH, SHANK_DIA / 2.0),
-            (HEAD_LENGTH + SHANK_LENGTH, SHANK_DIA / 2.0),
-            (HEAD_LENGTH + SHANK_LENGTH, 0.0),
-        ],
-    )
-    set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(
-        adapter, "screw profile", fix_entities=[centerline, *lines]
-    )
-    check("exit_sketch profile", await adapter.exit_sketch())
+    await volume_check(adapter, "stepped blank", v_blank, 0.005 * v_blank)
 
-    check(
-        "revolve screw",
-        await adapter.create_revolve(RevolveParameters(angle=360.0)),
+    await add_reeded_head_and_thread(
+        adapter, HEAD_DIA, HEAD_LENGTH, SHANK_DIA, SHANK_LENGTH, groove_count=24
     )
 
     await apply_material(adapter, MATERIAL)
