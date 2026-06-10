@@ -229,12 +229,18 @@ photos during M2 rebuild.
 
 ## Chapter 19 — Counter Spring (pp. 44–45)
 
-No annotated or stated numeric dimensions. No legacy part.
+No annotated or stated numeric dimensions. No legacy part. M2 revision: the
+first-pass ~45 × ~80 mm estimate was wrong — the book calls it "a long spring
+[that] towers above the machine" and photogrammetry `195253322` shows the coil
+spanning most of the gooseneck's run above the top casting (≈ 40 cm per ch. 6:
+147 cm total − 107 cm column).
 
 | dim | value | (in) | source | method | confidence |
 |---|---|---|---|---|---|
-| Coil OD | ~45 mm | ~1.77 | "large-diameter" vs channel springs (32 mm callout, ch. 17); photo proportion | scaled | low |
-| Free length | ~80 mm | ~3.1 | p.44–45 photo proportion | scaled | low |
+| Coil body length | ~300 mm | ~11.8 | gooseneck rise (147−107 cm, ch. 6) minus curve; photogrammetry 195253322 + p.45 centre photo | scaled | low |
+| Coil OD | ~22 mm | ~0.87 | p.45 top-right close-up: coil slightly narrower than the gooseneck tube (~25 mm) | scaled | low |
+| Wire dia | ~2.5 mm | ~0.098 | p.45 close-up: heavy close-wound wire | scaled | low |
+| Coil count | ~110 | — | body length / ~2.73 mm pitch (close-wound) | derived | low |
 | Adjustment post | square-head screw on adjustable post | — | text pp. 44–45 | stated | high (feature) |
 
 Notes: single large spring balancing the combined pull of the 20 channel springs
