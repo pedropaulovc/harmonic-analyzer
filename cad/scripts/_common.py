@@ -25,6 +25,13 @@ Fully-defined recipes (probed live on SW 2026):
   :func:`define_circle`.
 * **Off-origin line profiles**: pass the line IDs as ``fix_entities`` —
   perpendicular fixed lines with merged vertices pin each other's endpoints.
+* **Never mix driving dimensions with fix escalation across a chain**: a
+  driving dim determines geometry downstream through merged vertices;
+  fixing any of that downstream geometry re-pins what the dim already
+  determined and the sketch goes over-defined (consistent-but-redundant
+  counts — caught live on the channel-lever outline). A profile is either
+  constraints+dims with no fixes (amplitude-bar style, needs an origin
+  vertex) or fix-only (crank-pin style).
 """
 
 from __future__ import annotations
@@ -87,6 +94,7 @@ async def ensure_fully_defined(
         if not fixed.is_success:
             raise RuntimeError(f"{label}: fix {entity_id} failed: {fixed.error}")
         state = await _state()
+        print(f"  ..  fixed {entity_id} -> {state}")
         if state == "fully_defined":
             print(f"  OK  fully defined after fixing {entity_id}: {label}")
             return
@@ -175,10 +183,11 @@ def set_sketch_direct_db(adapter: Any, enabled: bool) -> None:
     With inferencing on (the default), a nearly-horizontal sloped line gets
     snapped to an automatic ``horizontal`` relation — a tapered revolve
     profile silently flattens into a rectangle (caught live on the crank
-    pin: the frustum came back as a perfect cylinder). ``AddToDB=True``
-    bypasses inference snapping; it also disables endpoint auto-merge, so
-    expect ``ensure_fully_defined`` to need every entity in
-    ``fix_entities``.
+    pin: the frustum came back as a perfect cylinder; on the channel lever
+    a step profile picked up redundant auto-relations and went straight to
+    over-defined). ``AddToDB=True`` bypasses inference relations; exactly
+    coincident endpoints still merge in the sketch DB (proven live: the
+    pin chain closed and defined through fixed neighbours).
     """
     adapter.currentSketchManager.AddToDB = enabled
     print(f"  OK  sketch AddToDB = {enabled}")
