@@ -477,12 +477,20 @@ re-measure during their M2 script build.
    (counted on engineerguy video 4/4 frame `v4_pinion_018`; see ch. 25
    section). Video stills live in `references/engineerguy-youtube/`
    (see its README to re-fetch the videos; mp4/stills not committed).
-3. **Channel pitch** — **RESOLVED in M6: 7.5 mm**, uniform with the gear
+3. **Channel pitch** — **RESOLVED in M6: 7.5 mm along the cone axis,
+   7.10 mm projected on the machine depth (Z)**, uniform with the gear
    stack (vertical connecting rods, no splay). Measured on all four p.28
    end-view strips (400 dpi extraction): arm-end tip pitch ≈ 60 px vs tip
    width ≈ 20 px = the 2.5 mm arm plate (annotated p.27) → pitch ≈ 3.0 ×
    2.5 = 7.5 mm. Self-consistent: 20 ends × 60 px ≈ 1140 px of the 1512 px
-   strip. The 16 mm candidate is refuted; channel stack spans 150 mm.
+   strip. The 16 mm candidate is refuted.
+   Z-projection refinement: the cone shaft is inclined ≈ 18.7° in the
+   vertical plane (atan(2.54 mm pitch-radius growth per gear / 7.5 mm
+   axial pitch)), so the channel grid spacing along the machine depth is
+   7.5 × cos 18.7° = 7.10 mm. Independent route agrees: gates flush with
+   the top-plate edges at Z = ±101.6 leave 139.7 mm between their inner
+   faces; (139.7 − 2.5 arm plate − air) / 19 intervals ≈ 7.10 mm. Channel
+   stack spans 19 × 7.10 ≈ 134.9 mm along Z.
 4. **Rocker arm working length** — RESOLVED in M2: eight-views view 5/8
    side photo agrees with the ch. 16 derivation (~80 mm working half);
    modeled 100 mm rod side / 70 mm tail (`build_rocker_arm.py`).
