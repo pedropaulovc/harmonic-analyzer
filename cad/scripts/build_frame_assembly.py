@@ -63,6 +63,7 @@ from _common import (
     check,
     check_no_interference,
     component_transform,
+    log,
     run_build,
     save_assembly_and_images,
 )
@@ -135,7 +136,7 @@ async def _plane_mate(
     if moved <= 0.5:
         return
     mate_name = res.get("name", "")
-    print(f"  ..  {label}: moved {moved:.2f} mm -> re-adding flipped")
+    log(f"{label}: moved {moved:.2f} mm -> re-adding flipped")
     check(
         f"{label} (delete wrong side)",
         await adapter.delete_mate(MateRefParameters(name=mate_name)),
@@ -158,7 +159,7 @@ async def build(adapter) -> dict[str, str]:
     # Re-runnable: a previous run leaves documents open and saving over an
     # open path fails.
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    print("  OK  CloseAllDocuments (clean session)")
+    log("CloseAllDocuments (clean session)")
 
     check("create_assembly", await adapter.create_assembly())
 
