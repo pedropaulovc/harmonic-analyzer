@@ -310,7 +310,7 @@ No annotated or stated numeric dimensions. No legacy part.
 | Lever rod length | ~310 mm (300 usable) | ~12.2 | 4× constraint vs summing-lever ~76 mm effective arm (300/76 ≈ 3.9); p.46 inset consistent; resolved in M2 | derived | low |
 | Vertical rod | ~Ø5 × 150, domed ends | — | p.46/48 vs lever rod | scaled | low |
 | Clamp block | ~20 × 26 × 12; Ø6.2 lever bore, Ø5.2 rod bore (skew, 6.5 off-axis), Ø3 screw hole | — | p.48 close-up | scaled | low |
-| Thumb screw | ~Ø10 × 5 reeded head, Ø3 × 12 shank (×2: clamp + output fixture) | — | p.48; knurl/thread deferred to Phase 5 | scaled | low |
+| Thumb screw | ~Ø10 × 5 reeded head, Ø3 × 12 shank (×2: clamp + output fixture) | — | p.48; M4: head reeded (24 × Ø1 grooves), cosmetic M3 thread on shank | scaled | low |
 | Output fixture | collar ~Ø10 × 8, Ø5.2 bore, Ø3 cross hole | — | p.48 bottom close-up | scaled | low |
 
 Notes: round brass rod lever; magnification set by a reeded (knurled) screw
@@ -390,7 +390,7 @@ other part").
 | Square rod length | ~120 mm, Ø2 wire hole near top | ~4.7 | p.64 inset; resolved in M2 | scaled | low |
 | Frame (stirrup) | ~22 × 40 × 10, 5 mm rails, Ø3 set-screw hole in bottom rail | — | p.64–65 vs 5 mm rod; resolved in M2 | scaled | low |
 | V-block | ~32 × 18 × 16; 6 mm 45° top chamfers; 2 × Ø8 vertical bores at x = 11/21; stopped clamp slit 26 long × 4 (y 4–8); Ø2.5 screw hole | — | p.65 close-up | scaled | low |
-| Set screw | Ø9 × 5 knurled knob + Ø3 × 15 shank | — | p.64–65; knurl/thread deferred to Phase 5 | scaled | low |
+| Set screw | Ø9 × 5 knurled knob + Ø3 × 15 shank | — | p.64–65; M4: knob reeded (22 × Ø1 grooves), cosmetic M3 thread on shank | scaled | low |
 
 Notes: brass frame holds the marker in a v-block; v-block on a square brass rod
 attached to the wire from the magnifying wheel (vertical motion); platen provides
