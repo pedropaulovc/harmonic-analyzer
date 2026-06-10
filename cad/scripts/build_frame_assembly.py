@@ -16,17 +16,21 @@ depth):
 * corner-bracket x4 beside each column on its inboard-X side, upright
   plate tangent to the column, foot toward the machine centre (ch. 30
   views 1/8 show the green tabs against the column bases).
-* rocker-arm-support x2 at X = +/-87, centred Z = +45 (aft of centre):
-  the rocker shaft runs along X (ch. 14: the 20 rocker arms stack along
-  the shaft at the 7.5 mm channel pitch, Appendix C #3 resolved -> stack
-  spans 150 mm, gates hug it at +/-87), the A-frame taper faces +/-X and
-  the windowed faces look along X (the 63.5 mm taper triangle in the
-  ch. 30 front/rear views confirms). The gates sit aft so the gear drums
-  (ch. 13, Ø103) clear their front faces (Z = -47) — the drums occupy
-  the front ~100 mm of base depth (eight views 1/8, 3/8). Only two gates
-  carry the rocker shaft: a middle gate would displace ~3 of the 7.5 mm
-  channels; the third A-frame casting supports the magnifying-lever
-  pivot and belongs to output.SLDASM.
+* rocker-arm-support x2 at Z = +/-101.6, X centred: the CHANNEL AXIS
+  runs along Z (ch. 30 view 3/8 shows the cone gear set lying along the
+  machine depth and the channel curtain spread across the side views;
+  ch. 14 p.26 shows the pivot bosses at the gate apex with the windowed
+  face looking along the pivot). The gates stand as built (no rotation:
+  184 mm width across X, 63.5 mm taper along Z, window facing +/-Z) at
+  the channel-stack ends, outer edges flush with the top-plate edge
+  (133.35 - 63.5/2 = 101.6 — the eight views show the castings
+  edge-to-edge in depth). The usable span between the gates' inner
+  faces (139.7 mm) fixes the channel Z-pitch at 7.10 mm, which equals
+  the 7.5 mm cone-axis pitch x cos(18.7 deg cone-shaft incline) — two
+  independent routes agree (DIMENSIONS.md appendix C #3). Only two
+  gates carry the rocker pivot; the third A-frame casting is the
+  translational-gearing/output support (the taper-on triangle visible
+  front-centre in views 1/8 and 5/8) and belongs to output.SLDASM.
 
 Every component is fixed (base) or fully defined by three orthogonal
 plane-plane mates against the base part's principal planes; distance-mate
@@ -71,8 +75,7 @@ COLUMN_Z = 112.0
 COLUMN_RADIUS = 1.375 * IN / 2.0  # tube-frame OD/2
 BRACKET_PLATE_T = 0.3 * IN  # corner-bracket upright plate
 BRACKET_X = COLUMN_X - COLUMN_RADIUS - BRACKET_PLATE_T / 2.0  # plate tangent
-SUPPORT_X = 87.0  # gate stations: 150 mm arm stack / 2 + top-rail half + air
-SUPPORT_Z = 45.0  # aft offset: front face at Z -47 clears the gear drums
+SUPPORT_Z = 133.35 - 63.5 / 2.0  # 101.6: gate outer edge flush w/ top plate
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 ROT_Y_POS90 = [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]
@@ -212,27 +215,25 @@ async def build(adapter) -> dict[str, str]:
         )
         assert_component_placed(adapter, name, target, rows)
 
-    # Rocker-arm gates aft of centre; taper faces +/-X so the rocker shaft
-    # (along X) rests across their top rails.
-    for station in (-SUPPORT_X, SUPPORT_X):
-        target = [station, BASE_TOP_Y, SUPPORT_Z]
+    # Rocker-arm gates at the channel-stack ends along Z, as built (window
+    # facing +/-Z); the rocker pivot (along Z) crosses their top rails.
+    for station in (-SUPPORT_Z, SUPPORT_Z):
+        target = [0.0, BASE_TOP_Y, station]
         res = await adapter.insert_component(
-            InsertComponentParameters(
-                file_path=support_path, position=target, rotation=[0.0, 90.0, 0.0]
-            )
+            InsertComponentParameters(file_path=support_path, position=target)
         )
         check(f"insert_component rocker-arm-support @ {target}", res)
         name = res.data["name"]
         await _plane_mate(
-            adapter, name, "Front Plane", "Right Plane", base_name, station, target
+            adapter, name, "Right Plane", "Right Plane", base_name, 0.0, target
         )
         await _plane_mate(
-            adapter, name, "Right Plane", "Front Plane", base_name, SUPPORT_Z, target
+            adapter, name, "Front Plane", "Front Plane", base_name, station, target
         )
         await _plane_mate(
             adapter, name, "Top Plane", "Top Plane", base_name, BASE_TOP_Y, target
         )
-        assert_component_placed(adapter, name, target, ROT_Y_POS90)
+        assert_component_placed(adapter, name, target, IDENTITY)
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)
