@@ -331,7 +331,10 @@ other part").
 | dim | value | (in) | source | method | confidence |
 |---|---|---|---|---|---|
 | Square brass rod cross-section | ~5 mm | ~0.2 | photo proportion | scaled | low |
-| Frame envelope | OPEN | — | scale from p.60–61 photos in M2 | — | — |
+| Square rod length | ~120 mm, Ø2 wire hole near top | ~4.7 | p.64 inset; resolved in M2 | scaled | low |
+| Frame (stirrup) | ~22 × 40 × 10, 5 mm rails, Ø3 set-screw hole in bottom rail | — | p.64–65 vs 5 mm rod; resolved in M2 | scaled | low |
+| V-block | ~32 × 18 × 16; 6 mm 45° top chamfers; 2 × Ø8 vertical bores at x = 11/21; stopped clamp slit 26 long × 4 (y 4–8); Ø2.5 screw hole | — | p.65 close-up | scaled | low |
+| Set screw | Ø9 × 5 knurled knob + Ø3 × 15 shank | — | p.64–65; knurl/thread deferred to Phase 5 | scaled | low |
 
 Notes: brass frame holds the marker in a v-block; v-block on a square brass rod
 attached to the wire from the magnifying wheel (vertical motion); platen provides
