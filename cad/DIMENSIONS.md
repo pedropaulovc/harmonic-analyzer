@@ -110,7 +110,7 @@ arm with fiducial indentations for alignment; tapered pin affixes crank to shaft
 | Tooth counts | 6, 12, 18 … 120 (step 6) | — | text p.16 | stated | high |
 | Crank→cone reduction | 4:1 (1 crank turn = 1/4 cone turn) | — | text p.16 | stated | high |
 | Axial gear pitch | 7.5 mm | 0.295 | 150 mm / 20 gears (leaves 0.5 mm gap at 7 mm face) | derived | med |
-| Diametral pitch / module | OPEN | — | count teeth + scale a pitch dia from photo in M4 prep | — | — |
+| Diametral pitch / module | DP 30 (m = 0.8467 mm) | — | M4 prep, two independent measurements converge (see Appendix C #1 — resolved): p.18 photo tooth pitch 2.69 mm via 7 mm-callout scale; largest-gear OD ≈ 105 ± 5 mm via 150 mm-arrow scale (DP 30 → 103.3). Gives round-inch PDs: largest cone / cylinder gear PD = 120/30 = 4.000", pinion PD = 1.400" | scaled ×2 + period argument | high |
 | Pressure angle | 14.5° assumed | — | period-typical; not stated anywhere | derived | low |
 | Cone shaft length | ~225 mm | ~8.9 | derived: 150 stack + small-end pinion seat ~15 + bearing post ~35 (p.18 top-down) + large-end pivot journal ~25 | derived | low |
 | Cone shaft diameter | 9.5 mm (3/8") | 0.375 | = crankshaft/cam-bore dia, legacy `parameters.kcl` ShaftDiameter | legacy | med |
@@ -131,8 +131,8 @@ during M4 gear pipeline prototyping.
 | Alignment notch depth | 3 mm | 0.118 | text p.22 (also pp. 66–67) | stated | high |
 | Gear material | brass (polished) | — | text p.22 | stated | high |
 | Axial pitch | 7.5 mm | 0.295 | must match cone-set axial pitch (ch. 12) | derived | med |
-| Gear outer diameter | 120 × module; module still OPEN | — | scale OD from ch.13 photos (= largest cone gear dia) | — | — |
-| Cam diameter (integral cam per gear) | 50.8 mm (2.0") | 2.0 | legacy `parameters.kcl`; M2 check: p.25 printed outline measures cam OD ≈ 0.52 × cylinder-gear OD — at module 0.8 (gear OD 97.6) that gives exactly 50.8, consistent; re-verify once module closes (Appendix C #1) | legacy + scaled ratio | med |
+| Gear outer diameter | 103.3 mm (4.067") | 4.067 | (120+2)/DP30; PD = 4.000" exactly (module closed — ch. 12 row) | derived | high |
+| Cam diameter (integral cam per gear) | 50.8 mm (2.0") | 2.0 | legacy `parameters.kcl`; M2 check: p.25 printed outline measures cam OD ≈ 0.52 × cylinder-gear OD → 0.52 × 103.3 = 53.7 vs legacy 50.8 (5% — within the outline-measurement error); keep the legacy round 2.0" | legacy + scaled ratio | med |
 | Cam thickness | 10.2 mm (0.4") | 0.4 | legacy `parameters.kcl` | legacy | med |
 | Cam eccentricity | 5.1 mm (0.2") | 0.2 | legacy `parameters.kcl`; sets rocker-arm stroke; p.25 photo shows ≈ 4 mm center offset (within photo error) | legacy | med |
 | Cam bore | 9.5 mm (3/8") | 0.375 | legacy `parameters.kcl` | legacy | med |
@@ -374,14 +374,18 @@ Wilson. Model the replacement (it is what the photos document).
 
 | dim | value | (in) | source | method | confidence |
 |---|---|---|---|---|---|
-| Tooth count | OPEN — visible in photos, never stated; count from p.67–69 photos in M4 prep | — | — | — | — |
+| Tooth count | 42 | — | counted on the drum end view (engineerguy video 4/4 @ 8:00, frame `v4_pinion_018`): 7 tips per 60° sector × 6; tip-radius ratio to the meshing 120T cylinder gear = 0.36 = 44/122 confirms same DP | counted | high |
+| Pitch diameter | 35.56 mm (1.400") | 1.400 | 42 / DP 30 — round-inch PD corroborates both the count and DP 30 | derived | high |
+| Outer diameter | 37.25 mm (1.467") | 1.467 | (42+2)/30 | derived | high |
+| Drum length | ~150 mm | ~5.9 | spans/engages all 20 cylinder gears at once (p.67 photo: drum ≈ cylinder stack length = 20 × 7.5 axial pitch) | derived | med |
 | Material | brass | — | photos | stated | high |
 
-Notes: single pinion, engaged via a small lever, meshes the cylinder gear set and
-turns all 20 cylinder gears as one — used only during setup to align the 3 mm
-notches (top = cosine, 90° = sine) after pivoting the cone set out of engagement.
-Must span/engage the cylinder set; geometry resolved with the ch. 12/13 module
-question.
+Notes: single pinion — a long toothed drum, engaged via a small ball-handle
+lever, meshes the cylinder gear set and turns all 20 cylinder gears as one —
+used only during setup to align the 3 mm notches (top = cosine, 90° = sine)
+after pivoting the cone set out of engagement. The "small gear" visible on the
+lever arm in the p.68–69 photos is the drum's front end face, not a separate
+idler (video frame `v4_pinion_018` shows the drum receding behind it).
 
 ---
 
@@ -424,14 +428,25 @@ re-measure during their M2 script build.
 
 ## Appendix C — Open items (must close before the milestone that needs them)
 
-1. **Gear module + pressure angle** (ch. 12/13/23/25) — needed by M4. Tooth
-   counts now fully known (cone 6k, cylinder 120 derived); remaining unknown is
-   module only. Plan: scale a cylinder-gear OD from ch.13 photos against the
-   7 mm face / 150 mm cone references (cylinder gear PD = largest cone gear PD
-   = 120 × module); cross-check via photogrammetry photo `195445871` (nameplate
-   100 mm legible in-frame with the gear stack — see PHOTOS.md); assume PA 14.5°
-   unless tooth profile photos contradict.
-2. **Pinion tooth count** (ch. 25) — count from p.67–69 photos in M4 prep.
+1. **Gear module + pressure angle** (ch. 12/13/25) — **RESOLVED in M4 prep:
+   DP 30 (m = 0.8467 mm), PA 14.5° (assumed, unchanged).** Two independent
+   measurements converge: (a) p.18 macro (`12_…/page002_img07`, 7 mm-callout
+   scale 16.57 px/mm): rim silhouette striations at 22.3 px are the interleaved
+   near/far tooth serrations (half-pitch — the steel drive gear's visibly
+   coarser teeth in `page002_img02` corroborate), so p = 44.6 px = 2.69 mm vs
+   DP 30's 2.66 mm; (b) p.18 cone view (`page002_img04`, 150 mm-arrow scale
+   ≈ 4.83 px/mm): largest cone gear OD ≈ 105 ± 5 mm vs DP 30's 103.3 mm
+   (m = 0.8 → 97.6 marginal, m = 1.0 → 122 excluded). Clincher: DP 30 makes
+   every key PD a round inch value — largest cone / cylinder gear 4.000",
+   pinion 1.400". The photogrammetry cross-check (`195445871`) was abandoned:
+   through-glass color cast + parallax made the nameplate unusable.
+   NOTE: ch. 23 translational gearing looks coarser than DP 30 in the video
+   frames (`v4_transgear_*`) — its module is a separate question, measure when
+   authoring those parts.
+2. **Pinion tooth count** (ch. 25) — **RESOLVED in M4 prep: 42 teeth**
+   (counted on engineerguy video 4/4 frame `v4_pinion_018`; see ch. 25
+   section). Video stills live in `references/engineerguy-youtube/`
+   (see its README to re-fetch the videos; mp4/stills not committed).
 3. **Channel pitch** — M2 re-read: the ch. 14 "16 mm" callout measures the
    rocker arm's end-face depth, NOT pitch, so the 16 mm pitch candidate now
    rests only on the top-down fit (base 46 cm → 20 × 16 mm = 320 mm with
