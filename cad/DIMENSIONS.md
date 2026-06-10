@@ -26,6 +26,53 @@ legacy code is inches).
 
 ---
 
+## Chapter 6 — Introduction: overall machine dimensions (p. 3)
+
+The last page of the Introduction is a dedicated "Dimensions" photo with callouts
+— the authoritative envelope for the whole assembly.
+
+| dim | value | (in) | source | method | confidence |
+|---|---|---|---|---|---|
+| Total height (incl. curved counter-spring rod arching over top) | 147 cm | 57.9 | photo callout p.3 | annotated | high |
+| Frame column height | 107 cm | 42.1 | photo callout p.3 | annotated | high |
+| Base length | 46 cm | 18.1 | photo callout p.3 | annotated | high |
+| Base depth | 28 cm | 11.0 | photo callout p.3 | annotated | high |
+| Weight | 69 kg | 152 lb | photo callout p.3 | annotated | high |
+
+Cross-validation: base 46 × 28 cm = 18.1" × 11.0" **confirms** legacy
+HarmonicBase.cs bottom plate 18.0" × 11.0" (within rounding of the cm callouts).
+Frame column 107 cm is the top-down anchor for tube-frame length; 147 − 107 =
+40 cm of counter-spring rod arc above the frame.
+
+## Chapter 26/29/8/9 — System-level facts (gear law, scale references)
+
+| fact | value | source | method | confidence |
+|---|---|---|---|---|
+| Gear law | cylinder gear k turns k/80 rev per crank turn (k = 1…20) | ch.29 photo caption p.99 | annotated | high |
+| Sample spacing | Δ = π/20 per 2 crank turns; 20 arms uniformly subdivide [0, π] | ch.29 p.99 | annotated | high |
+| Cylinder gear speed ratio | gear n spins n× gear 1 | ch.8 p.7 | stated | high |
+| Nameplate | 100 × 55 mm, brass, 4 corner screws, on base near platen | ch.26 text p.70 | stated | high |
+| Maker / date | Wm. Gaertner & Co., Chicago; built 1896–1923 (likely 1901–09) | ch.26 | stated | high |
+
+The nameplate's 100 mm width nearly fills the p.71 photo and appears in situ on
+the base in the p.70 photo — best photogrammetric ruler for the base/platen region.
+
+**Derived: cylinder gear tooth count = 120.** Cone does 1/4 rev per crank turn
+(ch.12); cone gear k has 6k teeth (ch.12); cylinder gear k rate = (1/4)·(6k/T) rev
+per crank = k/80 (ch.29) ⟹ T = 120 for all cylinder gears. Consequence: each
+cylinder gear has the same tooth count (and pitch diameter) as the largest cone
+gear — visually checkable against ch.13 photos. Confidence: high (pure arithmetic
+from three high-confidence facts).
+
+Chapters scanned with no dimensional content: 01–05, 07, 10, 27, 31. Ch.28
+(Michelson & Stratton 1898 paper, 80-element machine) gives no absolute
+dimensions; transferable facts: cone tooth counts proportional 1:2:…:n; sine⇄cosine
+shift = 90° quarter-turn of all eccentrics via one long pinion engaging all at once
+(matches ch.25); spring-summation balance y = Σx / [n(l/L + a/b)] with design rule
+"l/L and a/b as small as possible"; accuracy benchmark 0.65–0.7% of largest term.
+
+---
+
 ## Chapter 11 — Crank (pp. 12–15)
 
 No annotated or stated numeric dimensions in this chapter.
@@ -67,10 +114,11 @@ during M4 gear pipeline prototyping.
 | dim | value | (in) | source | method | confidence |
 |---|---|---|---|---|---|
 | Gear count | 20, all identical size | — | text p.22 | stated | high |
+| Tooth count | 120 (each gear) | — | derived from gear law k/80 (ch.29) + 4:1 + cone teeth 6k — see ch.6/26/29 section | derived | high |
 | Alignment notch depth | 3 mm | 0.118 | text p.22 (also pp. 66–67) | stated | high |
 | Gear material | brass (polished) | — | text p.22 | stated | high |
 | Axial pitch | 7.5 mm | 0.295 | must match cone-set axial pitch (ch. 12) | derived | med |
-| Gear outer diameter | OPEN | — | count teeth + module from ch.12 resolution | — | — |
+| Gear outer diameter | 120 × module; module still OPEN | — | scale OD from ch.13 photos (= largest cone gear dia) | — | — |
 | Cam diameter (integral cam per gear) | 50.8 mm (2.0") | 2.0 | legacy `parameters.kcl`; cam outline printed p.25 — verify by scaling p.25 outline in M2 | legacy | med |
 | Cam thickness | 10.2 mm (0.4") | 0.4 | legacy `parameters.kcl` | legacy | med |
 | Cam eccentricity | 5.1 mm (0.2") | 0.2 | legacy `parameters.kcl`; sets rocker-arm stroke | legacy | med |
@@ -254,6 +302,9 @@ other part").
 Notes: brass frame holds the marker in a v-block; v-block on a square brass rod
 attached to the wire from the magnifying wheel (vertical motion); platen provides
 horizontal motion. Small set screw adjusts pen angle to paper to cut friction.
+Provenance (ch. 5 Preface): the original pen holder was missing — the one in all
+book photos is a modern replacement designed/built by Mike Harland and Tom
+Wilson. Model the replacement (it is what the photos document).
 
 ## Chapter 25 — Pinion Gear (pp. 66–69)
 
@@ -282,8 +333,9 @@ audit detail in the M1 extraction; key values referenced by the chapter tables:
   eccentricity 0.2" — uncontradicted; verify against the cam outline printed on
   book p. 25 during M2.
 - **HarmonicBase.cs**: bottom plate 18.0 × 11.0 × 0.5", top plate
-  17.5 × 10.5 × 1.5", fillets 0.125"/0.0625" — no book numerics; verify against
-  ch. 30 eight-view proportions in M2.
+  17.5 × 10.5 × 1.5", fillets 0.125"/0.0625" — footprint **CONFIRMED** by the
+  ch. 6 base callouts (46 × 28 cm = 18.1" × 11.0"); plate thicknesses still
+  photo-verify in M2.
 - **RockerArmSupport.cs**: 7.00" tall × 7.25" wide A-frame, trapezoid depth
   2.50"→0.667", wall 0.25", 5.00" sq window (r 0.625" corners), mounting holes
   Ø5/16" — no book numerics; verify by photo scaling in M2.
@@ -295,12 +347,12 @@ audit detail in the M1 extraction; key values referenced by the chapter tables:
 |---|---|---|
 | amplitude-bar | width 6.35 mm ✓, length ~80 cm ✓ | PASS — re-author script with same dims |
 | eccentric-cam | none annotated; cam outline p.25 available | UNVERIFIED — scale p.25 outline in M2 |
-| harmonic-base | none | UNVERIFIED — eight-view proportion check in M2 |
+| harmonic-base | ch.6: base 46 × 28 cm ✓ (= 18.1" × 11.0") | PASS (footprint) — thicknesses photo-verify in M2 |
 | summing-lever | none | UNVERIFIED — p.42–43 proportion check in M2 |
 | rocker-arm-support ×3 | none | UNVERIFIED — photo scaling in M2 |
 | oscilating-arms | ch.14: width 12.5 mm, curvature R ≈ 800 mm | AUDIT in M2 — check both against part |
 | corner-bracket | none | UNVERIFIED |
-| tube-frame | none | UNVERIFIED — eight-view proportion check in M2 |
+| tube-frame | ch.6: frame column height 107 cm | AUDIT in M2 — check tube length against 107 cm |
 
 No legacy part contradicts a book annotation. Every part still gets re-authored
 as a reproduction script (project requirement); UNVERIFIED parts get their photo
@@ -308,15 +360,17 @@ re-measure during their M2 script build.
 
 ## Appendix C — Open items (must close before the milestone that needs them)
 
-1. **Gear module/DP + pressure angle** (ch. 12/13/23/25) — needed by M4. Plan:
-   count teeth on a photographed gear with a known-scale reference (7 mm face
-   width, 150 mm cone length), scale its pitch diameter, derive module; assume
-   PA 14.5° unless tooth profile photos contradict.
+1. **Gear module + pressure angle** (ch. 12/13/23/25) — needed by M4. Tooth
+   counts now fully known (cone 6k, cylinder 120 derived); remaining unknown is
+   module only. Plan: scale a cylinder-gear OD from ch.13 photos against the
+   7 mm face / 150 mm cone references (cylinder gear PD = largest cone gear PD
+   = 120 × module); assume PA 14.5° unless tooth profile photos contradict.
 2. **Pinion tooth count** (ch. 25) — count from p.67–69 photos in M4 prep.
 3. **Channel pitch** — candidates: 7.5 mm axial gear pitch (ch. 12 derived) vs
    16 mm callout (ch. 14). These may both be real (gears packed tighter than
-   rocker arms, connecting rods fan out). Resolve top-down from frame width +
-   end-view photo (p. 28) before M6 channel array.
+   rocker arms, connecting rods fan out). Resolve top-down: base is 46 cm wide
+   (ch. 6) → 20 channels at 16 mm = 320 mm fits with ~70 mm margin per side;
+   confirm against end-view photo (p. 28) before M6 channel array.
 4. **Rocker arm working length** — measuring stick implies half-arm ≈ 80 mm
    (ch. 16); reconcile with arm photos in M2.
 5. **Feature mapping of the 16 mm (ch. 14) and 32 mm (ch. 17) callouts** —
