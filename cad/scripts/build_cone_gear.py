@@ -93,11 +93,11 @@ CONFIGS = [(f"T{n:03d}", n) for n in range(6, 121, 6)]
 DEFAULT_TEETH = 120  # globals' all-configuration value at authoring time
 
 
-def gear_facts(teeth: int) -> dict[str, float]:
+def gear_facts(teeth: int, dp: float = DP, pa_deg: float = PA_DEG) -> dict[str, float]:
     """Python mirror of the equation-manager globals (lengths in inches)."""
-    pa = math.radians(PA_DEG)
-    rb = teeth / DP * math.cos(pa) / 2.0
-    ra = (teeth + 2.0) / DP / 2.0
+    pa = math.radians(pa_deg)
+    rb = teeth / dp * math.cos(pa) / 2.0
+    ra = (teeth + 2.0) / dp / 2.0
     tmax = math.sqrt((ra / rb) ** 2 - 1.0)
     delta = math.pi / (2.0 * teeth) + math.tan(pa) - pa
     gamma = 2.0 * math.pi / teeth
@@ -113,7 +113,9 @@ def gear_facts(teeth: int) -> dict[str, float]:
     }
 
 
-def gap_area_in_disc(teeth: int, samples: int = 2000) -> float:
+def gap_area_in_disc(
+    teeth: int, samples: int = 2000, dp: float = DP, pa_deg: float = PA_DEG
+) -> float:
     """Exact in-blank area of one tooth gap (in^2), by Green's theorem.
 
     Boundary: lower flank A1->B1, blank-rim arc B1->B2 at ``Ra`` (the
@@ -122,7 +124,7 @@ def gap_area_in_disc(teeth: int, samples: int = 2000) -> float:
     equation curves, so the expected volume validates the involute shape,
     not just that "some" cut happened.
     """
-    f = gear_facts(teeth)
+    f = gear_facts(teeth, dp, pa_deg)
     rb, ra = f["Rb"], f["Ra"]
     tmax, delta, gamma = f["Tmax"], f["Delta"], f["Gamma"]
     pts: list[tuple[float, float]] = []
