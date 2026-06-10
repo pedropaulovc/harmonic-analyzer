@@ -169,6 +169,21 @@ def feature_name_by_type(adapter: Any, type_name: str) -> str:
     return found
 
 
+def set_sketch_direct_db(adapter: Any, enabled: bool) -> None:
+    """Toggle ``SketchManager.AddToDB`` around non-axis-parallel geometry.
+
+    With inferencing on (the default), a nearly-horizontal sloped line gets
+    snapped to an automatic ``horizontal`` relation — a tapered revolve
+    profile silently flattens into a rectangle (caught live on the crank
+    pin: the frustum came back as a perfect cylinder). ``AddToDB=True``
+    bypasses inference snapping; it also disables endpoint auto-merge, so
+    expect ``ensure_fully_defined`` to need every entity in
+    ``fix_entities``.
+    """
+    adapter.currentSketchManager.AddToDB = enabled
+    print(f"  OK  sketch AddToDB = {enabled}")
+
+
 def insert_helix(
     adapter: Any, height: float, pitch: float, clockwise: bool = True
 ) -> str:
