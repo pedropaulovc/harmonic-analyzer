@@ -83,3 +83,70 @@ rotation to near-sinusoidal reciprocation of the rod → rocker arm. Notches ali
 to top = cosine mode; rotated 90° = sine mode (pp. 66–67).
 
 ---
+
+## Chapter 14 — Rocker Arms (pp. 26–29)
+
+| dim | value | (in) | source | method | confidence |
+|---|---|---|---|---|---|
+| Arm width | 12.5 mm | 0.492 | photo callout p.27 | annotated | high |
+| Secondary dim (p.29) | 16 mm | 0.630 | photo callout p.29 — likely channel pitch or arm height; identify exact feature in M2 | annotated | high (value), low (feature mapping) |
+| Top-surface curvature radius | = amplitude bar length ≈ 800 mm | ≈ 31.5 | text pp. 26–27 ("equal to the length of amplitude bars" — minimizes nonlinearity) | stated | high |
+| Arm count | 20 | — | photos/text | stated | high |
+| Arm length | OPEN — see ch. 16 note: half-arm = 10 measuring-stick divisions | — | derive from measuring stick + photo scaling in M2 | — | — |
+
+Notes: concave-upward curved top supports the amplitude bar; knife-edge/pivot
+see-saw motion driven by vertical connecting rods from the cams. Labeled "pivot"
+point = zero-coefficient position for the amplitude bar. Matte-black finish
+(blackened cast/steel). End view p.28 shows the 20-arm array at uniform pitch.
+
+## Chapter 15 — Amplitude Bars (pp. 30–33)
+
+| dim | value | (in) | source | method | confidence |
+|---|---|---|---|---|---|
+| Bar width | 6.35 mm | 0.250 | photo callout pp. 32–33 — exactly matches legacy BarWidth 0.25" | annotated | high |
+| Bar length | ~800 mm ("about 80 cm") | ~31.5 | text pp. 30–31 — legacy BarLength 32.0" (813 mm) consistent | stated | high |
+| Bar depth (cross-section) | 6.35 mm | 0.250 | legacy BarDepth, square section consistent with photos | legacy | med |
+| Bottom notch width | 3.2 mm | 0.125 | legacy BottomNotchWidth (notch existence stated pp. 30–31) | legacy | med |
+| Bottom notch height | 2.4 mm | 0.094 | legacy BottomNotchHeight (3/32") | legacy | med |
+| Top notch width | 3.2 mm | 0.125 | legacy TopNotchWidth | legacy | med |
+| Top notch height | 12.7 mm | 0.5 | legacy TopNotchHeight | legacy | med |
+| Bar count | 20 | — | text | stated | high |
+
+Notes: bottom notch rides/slides along the rocker arm for positioning (bar at
+pivot = zero coefficient; opposite ends = 180° phase reversal). Chrome-like
+finish. Legacy AmplitudeBar.cs survives the audit: both book-verifiable dims
+(width, length) confirm it.
+
+## Chapter 16 — Measuring Stick (pp. 34–37)
+
+| dim | value | (in) | source | method | confidence |
+|---|---|---|---|---|---|
+| Overall length | 200 mm | 7.87 | photo callout pp. 34–35 | annotated | high |
+| Division spacing | 8 mm | 0.315 | photo callout pp. 34–35 | annotated | high |
+| Scale | 0–10, hand-stamped, uneven | — | text pp. 34–35 (0.5 tick longest; 0.4–0.5 gap < 0.5–0.6 gap) | stated | high |
+| Scale span (10 divisions) | 80 mm | 3.15 | 10 × 8 mm | derived | med |
+
+Notes: ruled brass gauge (Wm. Gaertner & Co.) with a sliding/locking stop. The
+0–10 scale spans "the 10 equal divisions of one half of the rocker arm" → half
+rocker-arm working length ≈ 80 mm → rocker-arm working length ≈ 160 mm. This is
+the top-down channel-geometry anchor; cross-check against the 16 mm callout in
+ch. 14 and photo scaling during M2. Model the nominal 8 mm spacing (not the
+hand-stamping error).
+
+## Chapter 17 — Springs and Levers (pp. 38–41)
+
+| dim | value | (in) | source | method | confidence |
+|---|---|---|---|---|---|
+| Spring dimension (p.40–41 callout) | 32 mm | 1.260 | photo callout — free length or coil OD; identify exact feature in M2 | annotated | high (value), low (feature mapping) |
+| Lever count | 20, cast metal, third-class | — | text pp. 38–39 | stated | high |
+| Spring count | 20 | — | text pp. 38–39 | stated | high |
+| Lever length | OPEN | — | scale from p.40–41 photos vs 32 mm spring callout in M2 | — | — |
+| Spring wire dia / coil count | OPEN | — | scale from p.40–41 close-up in M2 | — | — |
+
+Notes: each third-class lever pivots at its end (fulcrum), is driven by its
+rocker arm/amplitude bar, and pulls one of 20 helical springs attached to the
+pivoted summing lever below. Amplitude bar at rocker pivot → lever motionless;
+at rocker edge → full amplitude; opposite end → 180° phase flip.
+
+---
+
