@@ -94,6 +94,7 @@ No annotated or stated numeric dimensions in this chapter.
 | Handle pivot bore | ~6 mm | ~0.24 | p.12 photo, proportion of handle dia | scaled | low |
 | Fiducial dimple | ~Ø8 × 0.5 deep | — | p.15 photo | scaled | low |
 | Tapered-pin cross-hole | ~Ø5 mm | ~0.20 | p.14 photo, pin small end | scaled | low |
+| Crankshaft length | ~120 mm | ~4.7 | derived: crank seat (~30, incl. 10 overhang) + green pedestal bearing (~60, eight-views 8/8) + sprocket/drive-pinion seats (~30) | derived | low |
 
 Construction (stated): wooden handle stained black, rotates on a pivot; metal crank
 arm with fiducial indentations for alignment; tapered pin affixes crank to shaft
@@ -111,6 +112,8 @@ arm with fiducial indentations for alignment; tapered pin affixes crank to shaft
 | Axial gear pitch | 7.5 mm | 0.295 | 150 mm / 20 gears (leaves 0.5 mm gap at 7 mm face) | derived | med |
 | Diametral pitch / module | OPEN | — | count teeth + scale a pitch dia from photo in M4 prep | — | — |
 | Pressure angle | 14.5° assumed | — | period-typical; not stated anywhere | derived | low |
+| Cone shaft length | ~225 mm | ~8.9 | derived: 150 stack + small-end pinion seat ~15 + bearing post ~35 (p.18 top-down) + large-end pivot journal ~25 | derived | low |
+| Cone shaft diameter | 9.5 mm (3/8") | 0.375 | = crankshaft/cam-bore dia, legacy `parameters.kcl` ShaftDiameter | legacy | med |
 
 Notes: all 20 gears fixed to one shaft, rotate together. Engagement with cylinder
 gears is at an oblique angle (partial engagement → distinct wear). The four smallest
@@ -134,6 +137,8 @@ during M4 gear pipeline prototyping.
 | Cam eccentricity | 5.1 mm (0.2") | 0.2 | legacy `parameters.kcl`; sets rocker-arm stroke; p.25 photo shows ≈ 4 mm center offset (within photo error) | legacy | med |
 | Cam bore | 9.5 mm (3/8") | 0.375 | legacy `parameters.kcl` | legacy | med |
 | Cam keyway | 3.2 × 1.5 mm (1/8" × 0.06") | 0.125 × 0.06 | legacy `parameters.kcl` | legacy | med |
+| Cylinder shaft length | ~200 mm | ~7.9 | derived: 150 stack (20 × 7.5 axial pitch) + ~25 bearing journal each end (eight-views 8/8 pedestals) | derived | low |
+| Cylinder shaft keyseat | 3.2 wide × 1.5 deep, lower end through stack span | — | mates the cam keyway (row above) | derived | low |
 
 Notes: set is a sandwich — shiny brass gears alternating with black rough-finished
 connecting rods. Each rod rides the cam on the gear to its right; cam converts
