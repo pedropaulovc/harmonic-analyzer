@@ -40,6 +40,7 @@ import asyncio
 import math
 import os
 import sys
+import time
 import traceback
 from collections.abc import Awaitable, Callable, Iterable
 from pathlib import Path
@@ -58,11 +59,31 @@ IN = 25.4  # inch -> mm
 DEFAULT_VIEWS = ("front", "top", "isometric")
 
 
+_T0 = time.perf_counter()
+_LAST_TICK = _T0
+
+
+def _stamp() -> str:
+    """``[total +step]`` wall-clock prefix; step = time since the last log."""
+    global _LAST_TICK
+    now = time.perf_counter()
+    prefix = f"[{now - _T0:7.1f}s +{now - _LAST_TICK:5.1f}s]"
+    _LAST_TICK = now
+    return prefix
+
+
+def log(message: str) -> None:
+    """Timestamped, unbuffered progress line (stdout is redirected when the
+    build runs in the background, so unflushed prints sit in the pipe and the
+    build looks hung)."""
+    print(f"  ..  {_stamp()} {message}", flush=True)
+
+
 def check(label: str, result: Any) -> Any:
     """Raise when an adapter result is not success; return ``result.data``."""
     if not result.is_success:
         raise RuntimeError(f"{label} failed: {result.error}")
-    print(f"  OK  {label}")
+    print(f"  OK  {_stamp()} {label}", flush=True)
     return result.data
 
 
@@ -693,7 +714,7 @@ def assert_component_placed(
             raise RuntimeError(
                 f"{name}: rotation {array[0:9]} != expected {flat} (drift {drift:.4f})"
             )
-    print(f"  OK  {name} placed at {[round(v, 3) for v in actual]}")
+    print(f"  OK  {_stamp()} {name} placed at {[round(v, 3) for v in actual]}", flush=True)
 
 
 def assert_components_fully_defined(adapter: Any) -> None:
@@ -706,19 +727,22 @@ def assert_components_fully_defined(adapter: Any) -> None:
     """
     asm = adapter.currentModel
     components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
+    log(f"checking {len(components)} components for free DOF ...")
     problems = []
     for component in components:
         _flag(component, "IComponent2")
         comp_name = str(_read_member(component, "Name2"))
         if bool(_read_member(component, "IsFixed")):
+            log(f"{comp_name}: fixed")
             continue
         status = int(
             adapter._attempt(lambda c=component: c.GetConstrainedStatus(), default=-1)
         )
+        log(f"{comp_name}: constrained status {status}")
         if status != FULLY_CONSTRAINED:
             kind = "under" if status == UNDER_CONSTRAINED else f"status={status}"
             problems.append(f"{comp_name} ({kind})")
-    print(f"  checked {len(components)} components for free DOF")
+    print(f"  OK  {_stamp()} checked {len(components)} components for free DOF", flush=True)
     if problems:
         raise RuntimeError("components not fully defined: " + ", ".join(problems))
 
@@ -732,6 +756,7 @@ def check_no_interference(adapter: Any) -> None:
     Coincident/tangent contact is not treated as interference.
     """
     asm = adapter.currentModel
+    log("interference detection: starting ...")
     _flag(asm, "IAssemblyDoc")
     adapter._attempt(lambda: asm.ToolsCheckInterference(), default=None)
     mgr = _read_member(asm, "InterferenceDetectionManager")
@@ -744,6 +769,7 @@ def check_no_interference(adapter: Any) -> None:
     mgr.MakeInterferingPartsTransparent = False
     mgr.CreateFastenersFolder = False
     mgr.UseTransform = False
+    log("interference detection: computing interferences ...")
     interferences = adapter._attempt(lambda: mgr.GetInterferences(), default=None)
     details = []
     for interference in list(interferences or []):
@@ -759,7 +785,7 @@ def check_no_interference(adapter: Any) -> None:
         raise RuntimeError(
             f"{len(details)} interference(s): " + "; ".join(details)
         )
-    print("  OK  interference check: none found")
+    print(f"  OK  {_stamp()} interference check: none found", flush=True)
 
 
 async def save_assembly_and_images(
@@ -797,23 +823,24 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
 
     async def _run() -> dict[str, str]:
         adapter = PyWin32Adapter({})
-        print("Connecting to SolidWorks ...")
+        print("Connecting to SolidWorks ...", flush=True)
         await adapter.connect()
+        log("connected")
         try:
             return await build(adapter)
         finally:
             try:
                 await adapter.disconnect()
-                print("Disconnected.")
+                print("Disconnected.", flush=True)
             except Exception as exc:  # noqa: BLE001
-                print(f"  WARN disconnect failed: {exc}")
+                print(f"  WARN disconnect failed: {exc}", flush=True)
 
     try:
         artefacts = asyncio.run(_run())
     except Exception:
         traceback.print_exc()
         return 1
-    print("\nArtefacts:")
+    print(f"\nDone in {time.perf_counter() - _T0:.1f}s. Artefacts:", flush=True)
     for key, value in artefacts.items():
         print(f"  {key}: {value}")
     return 0
