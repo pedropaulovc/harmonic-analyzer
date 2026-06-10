@@ -149,6 +149,14 @@ connecting rods. Each rod rides the cam on the gear to its right; cam converts
 rotation to near-sinusoidal reciprocation of the rod → rocker arm. Notches aligned
 to top = cosine mode; rotated 90° = sine mode (pp. 66–67).
 
+M4 build (`build_cylinder_gear.py`): single non-configured part — 120T involute
+ring (cone-gear equation-curve technique, toothed-disc volume reproduces the
+cone gear's T120 configuration), integral cam boss (lobe −Y), bore + keyway
+(+Y) through gear and cam, alignment notch at +Y. Notch width is unstated in
+the book — modeled square (3 mm wide × 3 mm deep, low confidence). The
+standalone `eccentric-cam` part (M2 legacy re-author) is superseded by the
+integral cam for assembly purposes.
+
 ### Connecting rods (ch. 13 pp. 22–25 + ch. 14 p. 29; 20 used)
 
 | dim | value | (in) | source | method | confidence |
