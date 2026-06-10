@@ -127,6 +127,68 @@ async def add_line_chain(
     return ids
 
 
+def _read_member(obj: Any, name: str) -> Any:
+    """Read a COM accessor that pywin32 may expose as a method or property."""
+    member = getattr(obj, name, None)
+    if not callable(member):
+        return member
+    try:
+        return member()
+    except Exception:
+        return member
+
+
+def feature_name_by_type(adapter: Any, type_name: str) -> str:
+    """Return the name of the last feature whose GetTypeName2 matches.
+
+    Recovers features whose creator call returns None on success (e.g. the
+    raw-COM ``InsertHelix`` stopgap used until Phase 3 lands), by walking the
+    feature tree with method flagging.
+    """
+    from solidworks_mcp.adapters import sw_type_info
+
+    def _flag(obj: Any, iface: str) -> None:
+        try:
+            sw_type_info.flag_methods(obj, iface)
+        except Exception:
+            pass
+
+    _flag(adapter.currentModel, "IModelDoc2")
+    found = ""
+    feat = _read_member(adapter.currentModel, "FirstFeature")
+    for _ in range(5000):
+        if not feat:
+            break
+        _flag(feat, "IFeature")
+        try:
+            if _read_member(feat, "GetTypeName2") == type_name:
+                found = str(_read_member(feat, "Name"))
+        except Exception:
+            pass
+        feat = _read_member(feat, "GetNextFeature")
+    return found
+
+
+def insert_helix(
+    adapter: Any, height: float, pitch: float, clockwise: bool = True
+) -> str:
+    """Create a helix from the OPEN base-circle sketch; return the feature name.
+
+    Raw-COM stopgap (``IModelDoc2::InsertHelix``, height & pitch mode) until
+    Phase 3 reference geometry lands. ``height``/``pitch`` are millimetres.
+    The helix starts on the +X side of the base circle.
+    """
+    adapter.currentModel.InsertHelix(
+        False, clockwise, False, False, 2, height / 1000.0, pitch / 1000.0, 0.0, 0.0, 0.0
+    )
+    adapter.currentModel.ClearSelection2(True)
+    name = feature_name_by_type(adapter, "Helix")
+    if not name:
+        raise RuntimeError("InsertHelix did not create a helix feature")
+    print(f"  OK  insert_helix -> {name}")
+    return name
+
+
 async def save_part_and_images(
     adapter: Any, part_name: str, views: Iterable[str] = DEFAULT_VIEWS
 ) -> dict[str, str]:
