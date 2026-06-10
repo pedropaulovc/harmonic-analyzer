@@ -338,7 +338,7 @@ the stated magnification — strongest-sourced part in chapters 18–21.
 | Front face height | 140 mm | 5.51 | photo callout p.55 | annotated | high |
 | Width (travel direction) | ~300 mm | ~11.8 | p.55 front photo aspect ≈ 2.15:1 vs 140 mm; p.54 inset vs 460 mm frame agrees. M2 revision: supersedes earlier ~200 estimate | scaled | low |
 | Plate thickness | ~4 mm | ~0.16 | p.55 top edge-on photo | scaled | low |
-| Rack bar | ~300 × 30 × 6, brass | — | p.55 back-side photo; teeth + mounting deferred to M4 (module OPEN) | scaled | low |
+| Rack bar | ~300 × 30 × 6, brass | — | p.55 back-side photo; M4c: teeth cut at DP 30 / PA 14.5° (ch. 23 measurement), 112 gaps at p = 2.660 mm, crest at bar top, pitch line addendum (0.847) below it — `build_platen_rack.py`; mounting holes deferred to M6 (Appendix C #8) | scaled | low |
 | Paper clip strips (×2) | ~125 × 10 × 1.2, Ø3 end-screw holes | — | p.55 front photo vs 140 mm | scaled | low |
 | Material | heavy brass (darkened) | — | text | stated | high |
 
