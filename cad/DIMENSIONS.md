@@ -263,11 +263,16 @@ No annotated or stated numeric dimensions. No legacy part.
 |---|---|---|---|---|---|
 | Magnification | up to 4× (adjustable) | — | text pp. 46–49 | stated | high |
 | Rod diameter | ~6 mm | ~0.24 | round brass rod, photo proportion | scaled | low |
-| Lever length | OPEN | — | scale from p.46–49 photos in M2; arm ratio must give 4× at max setting | — | — |
+| Lever rod length | ~310 mm (300 usable) | ~12.2 | 4× constraint vs summing-lever ~76 mm effective arm (300/76 ≈ 3.9); p.46 inset consistent; resolved in M2 | derived | low |
+| Vertical rod | ~Ø5 × 150, domed ends | — | p.46/48 vs lever rod | scaled | low |
+| Clamp block | ~20 × 26 × 12; Ø6.2 lever bore, Ø5.2 rod bore (skew, 6.5 off-axis), Ø3 screw hole | — | p.48 close-up | scaled | low |
+| Thumb screw | ~Ø10 × 5 reeded head, Ø3 × 12 shank (×2: clamp + output fixture) | — | p.48; knurl/thread deferred to Phase 5 | scaled | low |
+| Output fixture | collar ~Ø10 × 8, Ø5.2 bore, Ø3 cross hole | — | p.48 bottom close-up | scaled | low |
 
 Notes: round brass rod lever; magnification set by a reeded (knurled) screw
 adjustment that moves the effective fulcrum/attachment point. Geometry
-constraint for M2: output/input arm ratio = 4 at maximum setting.
+constraint used in M2: output/input arm ratio = 4 at maximum setting (rod
+ends domed; both rods revolves with hemispherical caps).
 
 ## Chapter 21 — Magnifying Wheel (pp. 50–53)
 
