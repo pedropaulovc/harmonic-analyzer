@@ -8,8 +8,8 @@ springs; tension is set by sliding the post (square-head screw).
 No numeric dimensions are stated; everything here is photo-scaled (book
 p. 45 + photogrammetry 195253322) against the ch. 6 frame anchors -- see the
 M2 revision note in DIMENSIONS.md ch. 19 (the first-pass 45 x 80 mm estimate
-was wrong by ~4x). End hooks deferred to the Phase 3 rebuild, as with the
-channel spring.
+was wrong by ~4x). M4: bent-wire end hooks added as with the channel spring
+(``_common.add_spring_end_hooks`` -- axial lead + 270-degree loop each end).
 
 Layout: coil axis along +Y from the origin (helix base circle on the Top
 plane); the helix starts and ends on the +X side (whole number of coils).
@@ -24,6 +24,7 @@ from __future__ import annotations
 import sys
 
 from _common import (
+    add_spring_end_hooks,
     apply_material,
     check,
     define_circle,
@@ -65,6 +66,8 @@ async def build(adapter) -> dict[str, str]:
         "sweep wire along helix",
         await adapter.create_sweep(SweepParameters(path=helix_name)),
     )
+
+    await add_spring_end_hooks(adapter, MEAN_RADIUS, WIRE_DIA, COIL_BODY_LENGTH)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

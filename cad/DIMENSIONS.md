@@ -245,7 +245,7 @@ hand-stamping error).
 | Spring coil OD | ~6.5 mm | ~0.256 | p.41 inset proportion vs 32 mm body (body/OD ≈ 4.9) | scaled | low |
 | Spring wire dia | ~1.0 mm | ~0.039 | p.41 inset: close-wound, coils just distinguishable | scaled | low |
 | Spring coil count | ~28 | — | body length / ~1.14 mm pitch (close-wound) | derived | low |
-| Spring end hooks | bent-wire loops, both ends, extend axially | — | p.41 inset (feature only; modelling deferred to Phase 3 rebuild) | stated | high (feature) |
+| Spring end hooks | bent-wire loops, both ends, extend axially | — | p.41 inset; M4: modelled as axial lead (2× wire dia) + 270° loop at coil mean radius, both springs (`_common.add_spring_end_hooks`) | stated | high (feature), loop geometry estimated (low) |
 | Lever count | 20, cast metal, third-class | — | text pp. 38–39 | stated | high |
 | Spring count | 20 | — | text pp. 38–39 | stated | high |
 | Lever length (pivot→spring hole c2c) | ~240 mm | ~9.4 | p.38 inset vs 320 mm lever-bank width (20 × 16 mm ch.14 pitch); resolved in M2 | scaled | low |
