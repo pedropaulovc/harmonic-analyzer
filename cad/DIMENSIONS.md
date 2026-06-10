@@ -129,9 +129,9 @@ during M4 gear pipeline prototyping.
 | Gear material | brass (polished) | — | text p.22 | stated | high |
 | Axial pitch | 7.5 mm | 0.295 | must match cone-set axial pitch (ch. 12) | derived | med |
 | Gear outer diameter | 120 × module; module still OPEN | — | scale OD from ch.13 photos (= largest cone gear dia) | — | — |
-| Cam diameter (integral cam per gear) | 50.8 mm (2.0") | 2.0 | legacy `parameters.kcl`; cam outline printed p.25 — verify by scaling p.25 outline in M2 | legacy | med |
+| Cam diameter (integral cam per gear) | 50.8 mm (2.0") | 2.0 | legacy `parameters.kcl`; M2 check: p.25 printed outline measures cam OD ≈ 0.52 × cylinder-gear OD — at module 0.8 (gear OD 97.6) that gives exactly 50.8, consistent; re-verify once module closes (Appendix C #1) | legacy + scaled ratio | med |
 | Cam thickness | 10.2 mm (0.4") | 0.4 | legacy `parameters.kcl` | legacy | med |
-| Cam eccentricity | 5.1 mm (0.2") | 0.2 | legacy `parameters.kcl`; sets rocker-arm stroke | legacy | med |
+| Cam eccentricity | 5.1 mm (0.2") | 0.2 | legacy `parameters.kcl`; sets rocker-arm stroke; p.25 photo shows ≈ 4 mm center offset (within photo error) | legacy | med |
 | Cam bore | 9.5 mm (3/8") | 0.375 | legacy `parameters.kcl` | legacy | med |
 | Cam keyway | 3.2 × 1.5 mm (1/8" × 0.06") | 0.125 × 0.06 | legacy `parameters.kcl` | legacy | med |
 
@@ -395,7 +395,7 @@ audit detail in the M1 extraction; key values referenced by the chapter tables:
 | summing-lever | none | UNVERIFIED — p.42–43 proportion check in M2 |
 | rocker-arm-support ×3 | none | UNVERIFIED — photo scaling in M2 |
 | oscilating-arms | ch.14 re-read: the "12.5 mm width" was a misread (callout is 2.5 mm plate thickness) | SUPERSEDED — re-authored as rocker-arm with corrected dims (`build_rocker_arm.py`) |
-| corner-bracket | none | UNVERIFIED |
+| corner-bracket | none — no source either; geometry interrogated live from the SLDPRT (face inventory): base 1.125" × 0.75", height 2.3", plate 0.3" thick, sides tangent-tapered to R0.5" crown (centre 1.8" up), Ø0.4" lug hole, #9 (Ø0.196") foot hole | RE-AUTHORED — `build_corner_bracket.py` reproduces it to 13,035 mm³ (exact volume match) |
 | tube-frame | ch.6: frame column height 107 cm | AUDIT in M2 — check tube length against 107 cm. NOTE: photogrammetry shows columns are fluted/reeded, not plain round (PHOTOS.md `195108425`, `195123524`) |
 
 No legacy part contradicts a book annotation. Every part still gets re-authored
