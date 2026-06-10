@@ -355,12 +355,24 @@ gearing can be unlatched from the rack for free repositioning/reset.
 | Rack & pinion | 2 of the 6 gears | — | text | stated | high |
 | Chain drive | 2 gears (one at platen front, one on crankshaft) | — | text | stated | high |
 | Fixed crank-speed reduction | 2 gears | — | text | stated | high |
-| Module / diameters | OPEN | — | resolve with ch. 12/13 gear-pitch question in M4 prep | — | — |
+| Rack & rack pinion pitch | DP 30 (machine system) | — | M4c keyframe measurement: with the rack pitch taken as DP 30 (2.66 mm), the rack pinion's vertical OD in `v4_transgear_030` measures ≈ 105 mm — matching a 120T DP 30 gear (103.3 mm) to 1.8%; quadrant tooth counts on `v4_transgear_028` give ~30–32/quadrant ≈ 120T | scaled + counted | med |
+| Rack pinion | 120T, OD 103.3 mm (4.067"), thin disc ≈ 3 mm face, brass | 4.067 | rows above; thickness from edge-on view `v4_transgear_002` | scaled | med (face: low) |
+| Removable gear module | 2.0 mm (≈ DP 12.7) | — | 24T gear OD ≈ 51 mm in `v4_transgear_030` (scale via DP 30 rack pitch) ⟹ m = OD/(N+2) ≈ 1.96; m = 2.0 makes every swap combo's centre distance m(12+24)/2 = 36 mm exactly | scaled | med |
+| Removable gear face / bore / pins | ≈ 5 thick; common bore Ø12; 2 × Ø3.5 pin holes on Ø19 BC | — | `v4_transgear_015` (catalog shot) + `v4_transgear_020/025/030` (mounted on the oval-pin stub shaft) | scaled | low |
+| Chain sprockets | 17T (both), roller chain ≈ 3/8" pitch, ≈ 4.5 thick, Ø9.525 bore | — | tooth counts from `v4_transgear_012` crops (16–17 counted; modeled equal ⟹ 1:1 chain); pitch from sprocket OD ≈ 56–60 px-scaled mm (17T @ 3/8": PD 51.8) | counted + scaled | low |
+| Reduction pinion (coaxial with rack pinion) | est. 24T DP 30, OD ≈ 21 mm measured, face ≈ 6 | — | edge-on views `v4_transgear_002/003/008`: small fine-tooth steel pinion on the rack-pinion shaft | scaled | low |
 
 Notes: speed combos — small driving + large driven = slowest platen (smallest
 horizontal scale), large+small = fastest, medium+medium = 1:1. Latch disengages
 gearing from the platen rack (quick reset; also slackens chain for swapping the
 removable gears). Brass gears, central bores.
+
+M4c note: the fixed-reduction pair's exact topology (what the coaxial DP 30
+pinion meshes, and which shafts carry the two sprockets vs the removable pair)
+is not fully resolvable from the available frames — logged as Appendix C #8,
+to be settled when mating the drive train in M6. Parts authored now:
+`transgear-removable` (one part, T12/T18/T24 configurations), `rack-pinion`,
+`platen-rack`, `chain-sprocket`, `transgear-pinion`.
 
 ## Chapter 24 — Pen Mechanism (pp. 60–61)
 
@@ -487,6 +499,14 @@ re-measure during their M2 script build.
    bore/keyway yet; add bore/keyway only for configurations that clear it
    (or model the small end integral) when authoring the cone-gear stepped
    shaft in M4c.
+8. **Translational gearing fixed-reduction topology** (ch. 23) — found in
+   M4c keyframe measurement: a small fine-tooth steel pinion (≈ Ø21 mm,
+   est. 24T DP 30) rides coaxially with the 120T rack pinion
+   (`v4_transgear_002/003/008`), but the frames do not show what it meshes,
+   nor which shafts carry the two 17T sprockets vs the removable 12/18/24
+   pair. All six gear parts are authored individually; resolve the shaft
+   layout (and re-check the reduction pinion's tooth count against the
+   required k/80→platen-speed law) when mating the drive train in M6.
 
 
 
