@@ -37,6 +37,7 @@ Fully-defined recipes (probed live on SW 2026):
 from __future__ import annotations
 
 import asyncio
+import math
 import os
 import sys
 import traceback
@@ -217,6 +218,279 @@ def insert_helix(
         raise RuntimeError("InsertHelix did not create a helix feature")
     print(f"  OK  insert_helix -> {name}")
     return name
+
+
+async def add_spring_end_hooks(
+    adapter: Any, mean_radius: float, wire_dia: float, body_length: float
+) -> None:
+    """Sweep a bent-wire end hook onto each end of a +Y helical coil body.
+
+    Extension-spring hooks (book pp. 41, 45): each is a straight axial lead
+    (2 x wire dia) continuing the coil end, then a tangent 270-degree loop
+    arc at the coil's mean radius, drawn in the Front plane -- a whole-coil
+    helix starts AND ends at +X, z=0, so both end points already lie there.
+    The loop's open end tucks back through the coil bore (no wire clash:
+    it passes near the axis).
+
+    The bottom hook's wire profile sits on the Top plane; the top hook's
+    needs an offset reference plane at the coil's far end (the Phase 3
+    capability the hooks were deferred for). Offset direction is attempted
+    +normal first; if the sweep can't pierce that profile, the plane is
+    rebuilt flipped and the sweep retried (the dead sketch/plane stay in
+    the tree -- harmless, never consumed).
+
+    The path is drawn as two equation-driven curves, not add_line/add_arc:
+    a ``fix`` on a line or arc pins the curve but its endpoints still slide
+    along the fixed locus, so the sketch stays under-defined (caught live
+    on this path -- the loop's open end has a genuine DOF). Fixed equation
+    curves have no free endpoints (the gear-gap recipe). Expressions are in
+    document units (inches), trig in radians.
+
+    Each sweep is volume-asserted: Pappus gives the exact added volume for
+    a planar path; the junction where the hook tube merges into the coil
+    end may absorb up to a full Steinmetz lens (16 r^3 / 3).
+    """
+    from solidworks_mcp.adapters.base import (
+        CreateEquationCurveParameters,
+        CreatePlaneParameters,
+        SweepParameters,
+    )
+
+    loop_r = mean_radius
+    lead = 2.0 * wire_dia
+    wire_area = math.pi * (wire_dia / 2.0) ** 2
+    v_hook = (lead + 1.5 * math.pi * loop_r) * wire_area
+    max_overlap = 16.0 * (wire_dia / 2.0) ** 3 / 3.0
+
+    async def _volume() -> float:
+        res = await adapter.get_mass_properties()
+        if not res.is_success:
+            raise RuntimeError(f"get_mass_properties failed: {res.error}")
+        return float(res.data.volume)
+
+    async def _profile(plane: str, label: str) -> None:
+        check(f"create_sketch {label} hook profile", await adapter.create_sketch(plane))
+        await define_circle(adapter, mean_radius, 0.0, wire_dia / 2.0, f"{label} hook wire")
+        await ensure_fully_defined(adapter, f"{label} hook profile")
+        check(f"exit_sketch {label} hook profile", await adapter.exit_sketch())
+
+    def fmt(value_mm: float) -> str:
+        return f"{value_mm / IN:.12g}"  # document units are inches
+
+    async def _curve(label: str, x_expr: str, y_expr: str) -> str:
+        res = await adapter.create_equation_driven_curve(
+            CreateEquationCurveParameters(
+                x_expression=x_expr,
+                y_expression=y_expr,
+                range_start="0",
+                range_end="1",
+            )
+        )
+        return check(f"curve {label}", res)
+
+    for label, y_end, d in (("bottom", 0.0, -1.0), ("top", body_length, 1.0)):
+        # Path: axial lead line from the helix end, tangent 270-degree loop
+        # (clockwise for the bottom hook, counter-clockwise for the top, so
+        # the loop extends axially outward).
+        p1 = (mean_radius, y_end + d * lead)
+        c = (mean_radius - loop_r, p1[1])
+        path_name = check(
+            f"create_sketch {label} hook path", await adapter.create_sketch("Front")
+        )
+        lead_line = await _curve(
+            f"{label} hook lead",
+            f"{fmt(mean_radius)} + 0 * t",
+            f"{fmt(y_end)} + {fmt(d * lead)} * t",
+        )
+        sweep_rad = d * 1.5 * math.pi  # 270 deg from angle 0 at the junction
+        loop_arc = await _curve(
+            f"{label} hook loop",
+            f"{fmt(c[0])} + {fmt(loop_r)} * cos({sweep_rad:.12g} * t)",
+            f"{fmt(c[1])} + {fmt(loop_r)} * sin({sweep_rad:.12g} * t)",
+        )
+        await ensure_fully_defined(
+            adapter, f"{label} hook path", fix_entities=[lead_line, loop_arc]
+        )
+        check(f"exit_sketch {label} hook path", await adapter.exit_sketch())
+
+        if d > 0:
+            plane = check(
+                "create_plane top hook profile",
+                await adapter.create_plane(
+                    CreatePlaneParameters(
+                        mode="offset", base_plane="Top Plane", offset=body_length
+                    )
+                ),
+            )
+            profile_plane = getattr(plane, "name", plane)
+        else:
+            profile_plane = "Top Plane"
+        await _profile(profile_plane, label)
+
+        before = await _volume()
+        res = await adapter.create_sweep(SweepParameters(path=path_name))
+        if not res.is_success and d > 0:
+            print(f"  ..  top hook sweep failed ({res.error}); flipping profile plane")
+            plane = check(
+                "create_plane top hook profile (flipped)",
+                await adapter.create_plane(
+                    CreatePlaneParameters(
+                        mode="offset",
+                        base_plane="Top Plane",
+                        offset=body_length,
+                        flip=True,
+                    )
+                ),
+            )
+            await _profile(getattr(plane, "name", plane), f"{label} (flipped)")
+            res = await adapter.create_sweep(SweepParameters(path=path_name))
+        check(f"sweep {label} hook", res)
+
+        added = await _volume() - before
+        # Upper bound 1%: planar-path Pappus is exact analytically, but the
+        # mass-properties integrator came back +0.34% on the top hook live.
+        if not (v_hook - max_overlap <= added <= 1.01 * v_hook):
+            raise RuntimeError(
+                f"{label} hook: added {added:.2f} mm^3, expected "
+                f"{v_hook:.2f} (junction overlap allowance {max_overlap:.2f})"
+            )
+        print(
+            f"  OK  {label} hook: added {added:.2f} mm^3 "
+            f"(Pappus {v_hook:.2f}, overlap allowance {max_overlap:.2f})"
+        )
+
+
+async def volume_check(adapter: Any, label: str, expected: float, tol: float) -> float:
+    """Assert the part volume (mm^3) and return it."""
+    mass = await adapter.get_mass_properties()
+    if not mass.is_success:
+        raise RuntimeError(f"{label}: get_mass_properties failed: {mass.error}")
+    volume = float(mass.data.volume)
+    if abs(volume - expected) > tol:
+        raise RuntimeError(
+            f"{label}: volume {volume:.1f} mm^3, expected {expected:.1f} "
+            f"(+/- {tol:.1f})"
+        )
+    print(f"  OK  {label}: volume {volume:.1f} mm^3 (analytic {expected:.1f})")
+    return volume
+
+
+def lens_area(groove_r: float, body_r: float) -> float:
+    """Two-circle lens area: groove circle centred ON a body of radius R.
+
+    Cross-section a groove cutter of radius ``groove_r`` removes when its
+    centre rides the body surface (centre distance d = R) -- the reeding /
+    fluting recipe (tube-frame columns, screw heads).
+    """
+    r, big, d = groove_r, body_r, body_r
+    a_small = r * r * math.acos((d * d + r * r - big * big) / (2.0 * d * r))
+    a_big = big * big * math.acos((d * d + big * big - r * r) / (2.0 * d * big))
+    a_tri = 0.5 * math.sqrt(
+        (-d + r + big) * (d + r - big) * (d - r + big) * (d + r + big)
+    )
+    return a_small + a_big - a_tri
+
+
+async def add_reeded_head_and_thread(
+    adapter: Any,
+    head_dia: float,
+    head_length: float,
+    shank_dia: float,
+    shank_length: float,
+    groove_count: int,
+    groove_dia: float = 1.0,
+    thread_size: str = "M3x0.5",
+) -> None:
+    """Reed a screw head and add a cosmetic thread to its shank.
+
+    For the thumb/set screws (axis +X, head face at x=0, shank ending at
+    x = head_length + shank_length): one axial groove cut at the head OD
+    (Right-plane seed sketch), circular-patterned about the X axis --
+    the proven tube-frame fluting recipe -- then a cosmetic (annotation)
+    thread on the shank's end edge. Volume asserted analytically per step;
+    the cosmetic thread adds no geometry.
+    """
+    from solidworks_mcp.adapters.base import (
+        AddThreadParameters,
+        CircularPatternParameters,
+        CreateAxisParameters,
+        ExtrusionParameters,
+    )
+
+    async def _volume() -> float:
+        res = await adapter.get_mass_properties()
+        if not res.is_success:
+            raise RuntimeError(f"get_mass_properties failed: {res.error}")
+        return float(res.data.volume)
+
+    before = await _volume()
+    v_groove = lens_area(groove_dia / 2.0, head_dia / 2.0) * head_length
+
+    check("create_sketch reeding seed", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    await define_circle(adapter, head_dia / 2.0, 0.0, groove_dia / 2.0, "reeding seed")
+    set_sketch_direct_db(adapter, False)
+    await ensure_fully_defined(adapter, "reeding seed sketch")
+    check("exit_sketch reeding seed", await adapter.exit_sketch())
+    groove_cut = await adapter.create_cut_extrude(
+        ExtrusionParameters(depth=head_length)
+    )
+    check("cut reeding seed", groove_cut)
+    after_seed = await _volume()
+    if abs(after_seed - (before - v_groove)) > 0.02 * v_groove:
+        raise RuntimeError(
+            f"reeding seed: volume {after_seed:.2f}, expected "
+            f"{before - v_groove:.2f} -- cut direction or lens math wrong"
+        )
+    print(f"  OK  reeding seed: removed {before - after_seed:.2f} mm^3 (analytic {v_groove:.2f})")
+
+    check(
+        "create_axis X (Front x Top)",
+        await adapter.create_axis(
+            CreateAxisParameters(mode="two_planes", planes=["Front Plane", "Top Plane"])
+        ),
+    )
+    adapter._zoom_to_fit(adapter.currentModel)
+    pattern = None
+    for axis_point in ([head_length / 2.0, 0.0, 0.0], [0.0, 0.0, 0.0]):
+        res = await adapter.circular_pattern_feature(
+            CircularPatternParameters(
+                axis_point=axis_point,
+                features=[groove_cut.data.name],
+                count=groove_count,
+                geometry_pattern=True,
+            )
+        )
+        if res.is_success:
+            print(f"  OK  reeding pattern axis via point {axis_point}")
+            pattern = res
+            break
+        print(f"  ..  axis candidate {axis_point} failed: {res.error}")
+    if pattern is None:
+        raise RuntimeError("reeding pattern: no axis candidate selectable")
+    after_pattern = await _volume()
+    expected = before - groove_count * v_groove
+    if abs(after_pattern - expected) > 0.02 * groove_count * v_groove:
+        raise RuntimeError(
+            f"reeded head: volume {after_pattern:.2f}, expected {expected:.2f}"
+        )
+    print(f"  OK  reeded head: volume {after_pattern:.2f} mm^3 (analytic {expected:.2f})")
+
+    adapter._zoom_to_fit(adapter.currentModel)
+    check(
+        f"cosmetic thread {thread_size}",
+        await adapter.add_thread(
+            AddThreadParameters(
+                edge_point=[head_length + shank_length, shank_dia / 2.0, 0.0],
+                standard="ansi_metric",
+                size=thread_size,
+                end_type="blind",
+                depth=shank_length,
+            )
+        ),
+    )
+    if abs(await _volume() - after_pattern) > 1e-6:
+        raise RuntimeError("cosmetic thread changed the volume -- it cut geometry")
 
 
 def extrude_at_offset(

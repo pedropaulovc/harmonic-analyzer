@@ -35,11 +35,13 @@ from _common import (
     check,
     define_circle,
     ensure_fully_defined,
+    lens_area,
     measure_check,
     report_mass_properties,
     run_build,
     save_part_and_images,
     set_sketch_direct_db,
+    volume_check,
 )
 
 PART_NAME = "tube-frame"
@@ -53,36 +55,8 @@ INNER_DIA = OUTER_DIA - 2.0 * WALL_THICKNESS
 
 FLUTE_COUNT = 16  # photo estimate: ~5-6 ridges per visible face (low)
 FLUTE_DIA = 3.0  # groove cutter dia; depth ~1.5 < 3.05 wall (low)
-
-
-def flute_lens_area() -> float:
-    """Cross-section area one groove removes (two-circle lens, mm^2).
-
-    Intersection of the Ø3 cutter circle (centred ON the OD, so d = R)
-    with the outer circle. At the OD the 16 grooves sit pi*34.925/16 =
-    6.86 mm apart, ~3 mm wide each -> no overlap, areas simply add.
-    """
-    r = FLUTE_DIA / 2.0
-    big = OUTER_DIA / 2.0
-    d = big
-    a_small = r * r * math.acos((d * d + r * r - big * big) / (2.0 * d * r))
-    a_big = big * big * math.acos((d * d + big * big - r * r) / (2.0 * d * big))
-    a_tri = 0.5 * math.sqrt(
-        (-d + r + big) * (d + r - big) * (d - r + big) * (d + r + big)
-    )
-    return a_small + a_big - a_tri
-
-
-async def volume_check(adapter, label: str, expected: float, tol: float) -> None:
-    res = await adapter.get_mass_properties()
-    if not res.is_success:
-        raise RuntimeError(f"{label}: get_mass_properties failed: {res.error}")
-    volume = float(res.data.volume)
-    if abs(volume - expected) > tol:
-        raise RuntimeError(
-            f"{label}: volume {volume:.1f} mm^3, expected {expected:.1f} (+/- {tol:.1f})"
-        )
-    print(f"  OK  {label}: volume {volume:.1f} mm^3 (analytic {expected:.1f})")
+# At the OD the 16 grooves sit pi*34.925/16 = 6.86 mm apart, ~3 mm wide
+# each -> no overlap, lens areas simply add.
 
 
 async def build(adapter) -> dict[str, str]:
@@ -122,7 +96,7 @@ async def build(adapter) -> dict[str, str]:
         ExtrusionParameters(depth=COLUMN_LENGTH)
     )
     check("cut flute seed", flute_cut)
-    v_flute = flute_lens_area() * COLUMN_LENGTH
+    v_flute = lens_area(FLUTE_DIA / 2.0, OUTER_DIA / 2.0) * COLUMN_LENGTH
     await volume_check(adapter, "seed flute", v_annulus - v_flute, 0.01 * v_flute)
 
     check(

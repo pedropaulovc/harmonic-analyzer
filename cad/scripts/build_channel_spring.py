@@ -7,9 +7,10 @@ coil OD" ambiguity logged in DIMENSIONS.md). Wire diameter, coil OD and
 coil count are scaled from the same inset (close-wound, coils just
 distinguishable).
 
-The bent-wire end hooks need a 3D sweep path / angled reference planes, so
-they are deferred to the Phase 3 rebuild (M4); this part is the coil body
-only. Assembly mates can reference the coil end faces until then.
+M4 (Phase 3 landed): bent-wire end hooks per the p. 41 inset -- each is an
+axial lead + 270-degree loop at the coil mean radius, swept in the Front
+plane (see ``_common.add_spring_end_hooks``). The top hook's wire profile
+sits on an offset reference plane at the coil's far end.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 17".
 
@@ -26,6 +27,7 @@ from __future__ import annotations
 import sys
 
 from _common import (
+    add_spring_end_hooks,
     apply_material,
     check,
     define_circle,
@@ -69,6 +71,8 @@ async def build(adapter) -> dict[str, str]:
         "sweep wire along helix",
         await adapter.create_sweep(SweepParameters(path=helix_name)),
     )
+
+    await add_spring_end_hooks(adapter, MEAN_RADIUS, WIRE_DIA, COIL_BODY_LENGTH)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
