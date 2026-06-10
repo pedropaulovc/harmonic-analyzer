@@ -58,7 +58,8 @@ from _common import (
     save_part_and_images,
     set_sketch_direct_db,
 )
-from build_cone_gear import FACE_WIDTH, R_CLEAR_IN, gap_area_in_disc, gear_facts
+from _gear import build_fixed_gear, volume_check
+from build_cone_gear import FACE_WIDTH, gear_facts
 
 PART_NAME = "cylinder-gear"
 MATERIAL = "Brass"  # ch. 13 text p.22: polished brass
@@ -85,11 +86,6 @@ NOTCH_FLOOR = RA_MM - NOTCH_DEPTH
 NOTCH_OUTER = RA_MM + 1.5  # clearance past the OD so the cut always opens
 
 THROUGH_ALL = FACE_WIDTH + CAM_THICKNESS + 2.0  # bore/keyway cut depth
-
-
-def fmt(value: float) -> str:
-    """Literal for a curve expression (document units = inches, radians)."""
-    return f"{value:.12g}"
 
 
 def is_solid(x: float, y: float) -> bool:
@@ -145,157 +141,18 @@ def keyway_area_outside_bore() -> float:
     return area
 
 
-async def volume_check(adapter, label: str, expected: float, tol: float) -> float:
-    """Assert the part volume (mm^3) and return it."""
-    mass = await adapter.get_mass_properties()
-    if not mass.is_success:
-        raise RuntimeError(f"{label}: get_mass_properties failed: {mass.error}")
-    volume = float(mass.data.volume)
-    if abs(volume - expected) > tol:
-        raise RuntimeError(
-            f"{label}: volume {volume:.1f} mm^3, expected {expected:.1f} "
-            f"(+/- {tol:.1f})"
-        )
-    print(f"  OK  {label}: volume {volume:.1f} mm^3 (analytic {expected:.1f})")
-    return volume
-
-
-async def equation_curve(adapter, label: str, x_expr: str, y_expr: str) -> str:
-    """Add a parametric equation curve over t in [0, 1]; return its entity ID."""
-    from solidworks_mcp.adapters.base import CreateEquationCurveParameters
-
-    res = await adapter.create_equation_driven_curve(
-        CreateEquationCurveParameters(
-            x_expression=x_expr,
-            y_expression=y_expr,
-            range_start="0",
-            range_end="1",
-        )
-    )
-    return check(f"curve {label}", res)
-
-
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
-        CircularPatternParameters,
-        CreateAxisParameters,
         CreatePlaneParameters,
         ExtrusionParameters,
     )
 
     check("create_part", await adapter.create_part())
 
-    # ------------------------------------------------------------------
-    # Gear blank: disc at tip radius, z = 0..FACE_WIDTH.
-    # ------------------------------------------------------------------
-    check("create_sketch blank", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, 0.0, RA_MM, "gear blank")
-    await ensure_fully_defined(adapter, "blank sketch")
-    check("exit_sketch blank", await adapter.exit_sketch())
-    check(
-        "extrude blank",
-        await adapter.create_extrusion(ExtrusionParameters(depth=FACE_WIDTH)),
-    )
-    v_blank = math.pi * RA_MM**2 * FACE_WIDTH
-    volume = await volume_check(adapter, "blank", v_blank, 0.005 * v_blank)
-
-    # ------------------------------------------------------------------
-    # One tooth gap, six equation curves with literal coefficients (inches,
-    # radians -- the curve parser's dialect; see build_cone_gear docstring).
-    # Loop: A1 ->(lower flank)-> B1 ->(radial)-> arc ->(radial)-> B2
-    # ->(upper flank, reversed)-> A2 ->(base chord)-> A1.
-    # ------------------------------------------------------------------
-    rb, ra = fmt(FACTS["Rb"]), fmt(FACTS["Ra"])
-    th_l, th_u = fmt(FACTS["ThetaL"]), fmt(FACTS["ThetaU"])
-    rc = fmt(R_CLEAR_IN)
-    u = f"({fmt(FACTS['Tmax'])} * t)"
-    ph_low = f"({u} - {fmt(FACTS['Delta'])})"
-    ph_up = f"({u} + {fmt(FACTS['Gamma'] - FACTS['Delta'])})"
-    a1, a2 = FACTS["Delta"], FACTS["Gamma"] - FACTS["Delta"]
-    check("create_sketch gap", await adapter.create_sketch("Front"))
-    gap_curves = [
-        await equation_curve(
-            adapter,
-            "lower flank (tooth 0 upper, mirrored involute)",
-            f"{rb} * (cos{ph_low} + {u} * sin{ph_low})",
-            f"{rb} * ({u} * cos{ph_low} - sin{ph_low})",
-        ),
-        await equation_curve(
-            adapter,
-            "upper flank (tooth 1 lower involute)",
-            f"{rb} * (cos{ph_up} + {u} * sin{ph_up})",
-            f"{rb} * (sin{ph_up} - {u} * cos{ph_up})",
-        ),
-        await equation_curve(
-            adapter,
-            "base chord A2->A1",
-            f"{rb} * ((1 - t) * {fmt(math.cos(a2))} + t * {fmt(math.cos(a1))})",
-            f"{rb} * ((1 - t) * {fmt(math.sin(a2))} + t * {fmt(math.sin(a1))})",
-        ),
-        await equation_curve(
-            adapter,
-            "lower radial extension B1->clearance",
-            f"({ra} + t * ({rc} - {ra})) * {fmt(math.cos(FACTS['ThetaL']))}",
-            f"({ra} + t * ({rc} - {ra})) * {fmt(math.sin(FACTS['ThetaL']))}",
-        ),
-        await equation_curve(
-            adapter,
-            "outer clearance arc",
-            f"{rc} * cos({th_l} + t * ({th_u} - {th_l}))",
-            f"{rc} * sin({th_l} + t * ({th_u} - {th_l}))",
-        ),
-        await equation_curve(
-            adapter,
-            "upper radial extension clearance->B2",
-            f"({rc} + t * ({ra} - {rc})) * {fmt(math.cos(FACTS['ThetaU']))}",
-            f"({rc} + t * ({ra} - {rc})) * {fmt(math.sin(FACTS['ThetaU']))}",
-        ),
-    ]
-    await ensure_fully_defined(adapter, "gap sketch", fix_entities=gap_curves)
-    check("exit_sketch gap", await adapter.exit_sketch())
-    gap_cut = await adapter.create_cut_extrude(
-        ExtrusionParameters(depth=FACE_WIDTH + 1.0)
-    )
-    check("cut tooth gap", gap_cut)
-
-    # ------------------------------------------------------------------
-    # Pattern the gap 120x about Z. Axis selection by point is flaky
-    # (live-caught on the cone gear), so walk candidates: the reference
-    # axis first, then OD-face points away from the seed gap.
-    # ------------------------------------------------------------------
-    check(
-        "create_axis Z (Top x Right)",
-        await adapter.create_axis(
-            CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
-        ),
-    )
-    adapter._zoom_to_fit(adapter.currentModel)
-    candidates = [[0.0, 0.0, FACE_WIDTH / 2.0]]
-    for angle_deg in (-45.0, -90.0, -135.0, 135.0, 45.0):
-        a = math.radians(angle_deg)
-        candidates.append(
-            [RA_MM * math.cos(a), RA_MM * math.sin(a), FACE_WIDTH / 2.0]
-        )
-    pattern = None
-    for point in candidates:
-        res = await adapter.circular_pattern_feature(
-            CircularPatternParameters(
-                axis_point=point,
-                features=[gap_cut.data.name],
-                count=TEETH,
-            )
-        )
-        if res.is_success:
-            pattern = res
-            print(f"  OK  circular pattern axis via point {point}")
-            break
-        print(f"  ..  axis candidate {point} failed: {res.error}")
-    if pattern is None:
-        raise RuntimeError("circular pattern: no axis candidate selectable")
-
-    # Toothed disc must reproduce the cone gear's T120 configuration.
-    v_teeth = v_blank - TEETH * gap_area_in_disc(TEETH) * IN**2 * FACE_WIDTH
-    volume = await volume_check(adapter, "toothed disc", v_teeth, 0.01 * v_teeth)
+    # Toothed disc (blank + gap + 120x pattern, z = 0..FACE_WIDTH); the
+    # volume must reproduce the cone gear's T120 configuration.
+    v_teeth = await build_fixed_gear(adapter, TEETH, FACE_WIDTH)
+    volume = v_teeth
 
     # ------------------------------------------------------------------
     # Integral cam on the far gear face (z = 7..17.16), lobe -Y.
