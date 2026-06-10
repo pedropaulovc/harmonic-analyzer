@@ -178,6 +178,8 @@ finish. Legacy AmplitudeBar.cs survives the audit: both book-verifiable dims
 | Division spacing | 8 mm | 0.315 | photo callout pp. 34–35 | annotated | high |
 | Scale | 0–10, hand-stamped, uneven | — | text pp. 34–35 (0.5 tick longest; 0.4–0.5 gap < 0.5–0.6 gap) | stated | high |
 | Scale span (10 divisions) | 80 mm | 3.15 | 10 × 8 mm | derived | med |
+| Body width | ~15 mm | ~0.59 | pp. 34–35 photo proportion vs 200 mm length | scaled | low |
+| Body thickness | ~3 mm | ~0.12 | pp. 34–35 photo proportion | scaled | low |
 
 Notes: ruled brass gauge (Wm. Gaertner & Co.) with a sliding/locking stop. The
 0–10 scale spans "the 10 equal divisions of one half of the rocker arm" → half
