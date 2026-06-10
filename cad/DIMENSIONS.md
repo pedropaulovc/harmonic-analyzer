@@ -145,6 +145,21 @@ connecting rods. Each rod rides the cam on the gear to its right; cam converts
 rotation to near-sinusoidal reciprocation of the rod → rocker arm. Notches aligned
 to top = cosine mode; rotated 90° = sine mode (pp. 66–67).
 
+### Connecting rods (ch. 13 pp. 22–25 + ch. 14 p. 29; 20 used)
+
+| dim | value | (in) | source | method | confidence |
+|---|---|---|---|---|---|
+| Centre distance (cam ring → rocker pin) | ~105 mm | ~4.1 | eight-views 8/8: cylinder shaft axis ~74 mm above base (A-frame 177.8 mm scale), rocker tip just above the A-frame top; visible black rod band ~104 mm agrees | scaled | low |
+| Cam ring bore | 51.0 mm | 2.008 | cam OD 50.8 + 0.1 running clearance per side | derived | med |
+| Cam ring radial wall | 5 mm (OD 61) | 0.20 | ch.13 photos, strap proportion vs cam | scaled | low |
+| Ring / shank / tip-block thickness | 3 / 2.5 / 6 mm | — | sandwich budget (7.5 axial pitch) + p.29 tip blocks ~2.4× the strap | scaled | low |
+| Shank width | 8 mm | 0.31 | ch.13 p.23 rod silhouettes vs 7 mm gear face | scaled | low |
+| Tip block (flattened upper end) | 10 × 18, Ø2 pin hole centred | — | p.29 stepped blocks at the rocker tips; pin matches the rocker's Ø2 rod hole (ch. 14) | scaled | low |
+
+The p.29 "stepped" tip profile (alternate rods offset to clear adjacent
+rockers) is deferred — modeled as a plain block until the channel array
+is laid out in M6 (Appendix C #6).
+
 ---
 
 ## Chapter 14 — Rocker Arms (pp. 26–29)
@@ -429,6 +444,12 @@ re-measure during their M2 script build.
 5. **Feature mapping of the 16 mm (ch. 14) and 32 mm (ch. 17) callouts** —
    ch. 14 16 mm RESOLVED in M2 = rocker arm end-face depth (see ch. 14
    table). ch. 17 32 mm still to identify when finishing that chapter.
+6. **Cylinder-set axial budget** (ch. 13) — needed by M6 channel array.
+   The 7.5 mm axial pitch must fit gear face + integral cam + rod ring,
+   but the legacy cam thickness (10.2 mm) alone exceeds it. M2 modeled
+   the rod ring at 3 mm; re-measure gear face / cam / ring thicknesses
+   from ch. 13 macro photos (or photogrammetry `195445871`) and reconcile
+   the eccentric-cam part before assembling a channel.
 
 
 
