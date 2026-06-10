@@ -146,16 +146,23 @@ to top = cosine mode; rotated 90° = sine mode (pp. 66–67).
 
 | dim | value | (in) | source | method | confidence |
 |---|---|---|---|---|---|
-| Arm width | 12.5 mm | 0.492 | photo callout p.27 | annotated | high |
-| Secondary dim (p.29) | 16 mm | 0.630 | photo callout p.29 — likely channel pitch or arm height; identify exact feature in M2 | annotated | high (value), low (feature mapping) |
+| Arm plate thickness | 2.5 mm | 0.098 | photo callout p.27 (M2 re-read at 400 dpi; the M1 row misread this as a 12.5 mm "arm width") | annotated | high |
+| Arm depth (end-face height) | 16 mm | 0.630 | photo callout p.29 — M2 zoom shows the arrows span the arm's end face vertically (NOT channel pitch) | annotated | high |
 | Top-surface curvature radius | = amplitude bar length ≈ 800 mm | ≈ 31.5 | text pp. 26–27 ("equal to the length of amplitude bars" — minimizes nonlinearity) | stated | high |
 | Arm count | 20 | — | photos/text | stated | high |
-| Arm length | OPEN — see ch. 16 note: half-arm = 10 measuring-stick divisions | — | derive from measuring stick + photo scaling in M2 | — | — |
+| Arm length | RESOLVED ~170 mm: ~100 mm pivot→rod end + ~70 mm tail | — | eight-views view 5/8 side photo (perspective-corrected; p.29 macro inflates the near end ~4×) + ch.16 half-arm ≈ 80 mm | scaled/derived | low-med |
+| Pivot pin hole | Ø3 at the pivot, mid-depth | — | p.27/p.28 dark dots on the strap at the pivot | scaled | low |
+| Connecting-rod pin hole | Ø2, 6 mm from the rod end, mid-depth | — | p.29 tip pins | scaled | low |
 
 Notes: concave-upward curved top supports the amplitude bar; knife-edge/pivot
 see-saw motion driven by vertical connecting rods from the cams. Labeled "pivot"
 point = zero-coefficient position for the amplitude bar. Matte-black finish
 (blackened cast/steel). End view p.28 shows the 20-arm array at uniform pitch.
+Bottom edge concentric with the top (uniform 16 mm depth, R 816/800 arcs).
+The stepped sawtooth blocks at the arm tips (p.29 top) are the connecting
+rods' flattened upper ends — they belong to the connecting-rod part.
+Re-authored as `cad/scripts/build_rocker_arm.py` (supersedes the legacy
+`oscilating-arms` part, which had no surviving source).
 
 ## Chapter 15 — Amplitude Bars (pp. 30–33)
 
@@ -387,7 +394,7 @@ audit detail in the M1 extraction; key values referenced by the chapter tables:
 | harmonic-base | ch.6: base 46 × 28 cm ✓ (= 18.1" × 11.0") | PASS (footprint) — thicknesses photo-verify in M2 |
 | summing-lever | none | UNVERIFIED — p.42–43 proportion check in M2 |
 | rocker-arm-support ×3 | none | UNVERIFIED — photo scaling in M2 |
-| oscilating-arms | ch.14: width 12.5 mm, curvature R ≈ 800 mm | AUDIT in M2 — check both against part |
+| oscilating-arms | ch.14 re-read: the "12.5 mm width" was a misread (callout is 2.5 mm plate thickness) | SUPERSEDED — re-authored as rocker-arm with corrected dims (`build_rocker_arm.py`) |
 | corner-bracket | none | UNVERIFIED |
 | tube-frame | ch.6: frame column height 107 cm | AUDIT in M2 — check tube length against 107 cm. NOTE: photogrammetry shows columns are fluted/reeded, not plain round (PHOTOS.md `195108425`, `195123524`) |
 
@@ -405,15 +412,18 @@ re-measure during their M2 script build.
    100 mm legible in-frame with the gear stack — see PHOTOS.md); assume PA 14.5°
    unless tooth profile photos contradict.
 2. **Pinion tooth count** (ch. 25) — count from p.67–69 photos in M4 prep.
-3. **Channel pitch** — candidates: 7.5 mm axial gear pitch (ch. 12 derived) vs
-   16 mm callout (ch. 14). These may both be real (gears packed tighter than
-   rocker arms, connecting rods fan out). Resolve top-down: base is 46 cm wide
-   (ch. 6) → 20 channels at 16 mm = 320 mm fits with ~70 mm margin per side;
-   confirm against end-view photo (p. 28) before M6 channel array.
-4. **Rocker arm working length** — measuring stick implies half-arm ≈ 80 mm
-   (ch. 16); reconcile with arm photos in M2.
+3. **Channel pitch** — M2 re-read: the ch. 14 "16 mm" callout measures the
+   rocker arm's end-face depth, NOT pitch, so the 16 mm pitch candidate now
+   rests only on the top-down fit (base 46 cm → 20 × 16 mm = 320 mm with
+   ~70 mm margin per side, plausible vs the lever bank). 7.5 mm axial gear
+   pitch (ch. 12 derived) still holds for the gear stack. Confirm 16 mm
+   against the end-view photo (p. 28) before the M6 channel array.
+4. **Rocker arm working length** — RESOLVED in M2: eight-views view 5/8
+   side photo agrees with the ch. 16 derivation (~80 mm working half);
+   modeled 100 mm rod side / 70 mm tail (`build_rocker_arm.py`).
 5. **Feature mapping of the 16 mm (ch. 14) and 32 mm (ch. 17) callouts** —
-   identify which feature each annotates when building those parts in M2.
+   ch. 14 16 mm RESOLVED in M2 = rocker arm end-face depth (see ch. 14
+   table). ch. 17 32 mm still to identify when finishing that chapter.
 
 
 
