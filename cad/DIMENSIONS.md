@@ -192,11 +192,14 @@ hand-stamping error).
 
 | dim | value | (in) | source | method | confidence |
 |---|---|---|---|---|---|
-| Spring dimension (p.40–41 callout) | 32 mm | 1.260 | photo callout — free length or coil OD; identify exact feature in M2 | annotated | high (value), low (feature mapping) |
+| Spring coil body length | 32 mm | 1.260 | p.41 inset callout — dimension line spans the coiled body (excludes end hooks); resolved during M2 build | annotated | high |
+| Spring coil OD | ~6.5 mm | ~0.256 | p.41 inset proportion vs 32 mm body (body/OD ≈ 4.9) | scaled | low |
+| Spring wire dia | ~1.0 mm | ~0.039 | p.41 inset: close-wound, coils just distinguishable | scaled | low |
+| Spring coil count | ~28 | — | body length / ~1.14 mm pitch (close-wound) | derived | low |
+| Spring end hooks | bent-wire loops, both ends, extend axially | — | p.41 inset (feature only; modelling deferred to Phase 3 rebuild) | stated | high (feature) |
 | Lever count | 20, cast metal, third-class | — | text pp. 38–39 | stated | high |
 | Spring count | 20 | — | text pp. 38–39 | stated | high |
 | Lever length | OPEN | — | scale from p.40–41 photos vs 32 mm spring callout in M2 | — | — |
-| Spring wire dia / coil count | OPEN | — | scale from p.40–41 close-up in M2 | — | — |
 
 Notes: each third-class lever pivots at its end (fulcrum), is driven by its
 rocker arm/amplitude bar, and pulls one of 20 helical springs attached to the
@@ -256,15 +259,17 @@ constraint for M2: output/input arm ratio = 4 at maximum setting.
 
 | dim | value | (in) | source | method | confidence |
 |---|---|---|---|---|---|
-| Inner hub diameter | 20 mm | 0.787 | photo callout pp. 50–53 | annotated | high |
+| Inner hub diameter | 20 mm | 0.787 | photo callout pp. 50–53 (stated in text: "100 mm versus 20 mm") | annotated | high |
 | Outer wheel diameter | 100 mm | 3.937 | photo callout pp. 50–53 | annotated | high |
 | Magnification | 5× | — | text; consistent: 100/20 = 5 ✓ | stated | high |
-| Spoke count | 5 | — | photos | stated | high |
+| Spoke count | 6 | — | counted on the full-page photo p.51 (and photogrammetry `195607299`); an earlier extraction said 5 — wrong | stated | high |
 
-Notes: brass; inner hub is grooved (wire from magnifying lever wraps the hub,
-wire to pen mechanism leaves the outer rim → 5× motion magnification).
-Five-spoke wheel. The two annotated diameters self-validate against the stated
-magnification — strongest-sourced part in chapters 18–21.
+Notes: wheel body is black-painted cast metal with a bright machined rim
+(wire groove on the outer circumference); the inner hub is a grooved brass
+drum (wire from magnifying lever wraps the hub, wire to pen mechanism leaves
+the outer rim → 5× motion magnification). Six straight spokes. Hex-nut axle on
+a horizontal support bar. The two annotated diameters self-validate against
+the stated magnification — strongest-sourced part in chapters 18–21.
 
 ---
 
