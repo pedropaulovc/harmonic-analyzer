@@ -636,6 +636,161 @@ async def report_mass_properties(adapter: Any) -> None:
     print(f"  WARN get_mass_properties failed: {res.error}")
 
 
+# ---------------------------------------------------------------------------
+# Assembly helpers (M6)
+# ---------------------------------------------------------------------------
+
+# swConstrainedStatus_e
+UNDER_CONSTRAINED = 2
+FULLY_CONSTRAINED = 3
+
+
+def _flag(obj: Any, interface: str) -> None:
+    from solidworks_mcp.adapters import sw_type_info
+
+    try:
+        sw_type_info.flag_methods(obj, interface)
+    except Exception:
+        pass
+
+
+def component_transform(adapter: Any, name: str) -> list[float]:
+    """Return a component's ``Transform2`` ArrayData (rotation rows in
+    [0:9], translation in metres in [9:12])."""
+    component = adapter.currentModel.GetComponentByName(name)
+    if component is None:
+        raise RuntimeError(f"component not found for transform readback: {name!r}")
+    return [
+        float(v)
+        for v in _read_member(_read_member(component, "Transform2"), "ArrayData")
+    ]
+
+
+def assert_component_placed(
+    adapter: Any,
+    name: str,
+    origin_mm: list[float],
+    rotation_rows: list[list[float]] | None = None,
+    tol_mm: float = 0.5,
+) -> None:
+    """Assert a component sits at ``origin_mm`` with the given rotation.
+
+    ``rotation_rows`` are the images of the component X/Y/Z axes in assembly
+    space (``Transform2`` rows). Catches both wrong-side distance-mate flips
+    (translation) and silent 180-degree plane-mate flips (rotation).
+    """
+    array = component_transform(adapter, name)
+    actual = [array[9] * 1000.0, array[10] * 1000.0, array[11] * 1000.0]
+    deltas = [abs(a - e) for a, e in zip(actual, origin_mm, strict=True)]
+    if max(deltas) > tol_mm:
+        raise RuntimeError(
+            f"{name}: origin {actual} != expected {origin_mm} (tol {tol_mm} mm)"
+        )
+    if rotation_rows is not None:
+        flat = [c for row in rotation_rows for c in row]
+        drift = max(abs(a - e) for a, e in zip(array[0:9], flat, strict=True))
+        if drift > 1e-3:
+            raise RuntimeError(
+                f"{name}: rotation {array[0:9]} != expected {flat} (drift {drift:.4f})"
+            )
+    print(f"  OK  {name} placed at {[round(v, 3) for v in actual]}")
+
+
+def assert_components_fully_defined(adapter: Any) -> None:
+    """Raise when any top-level component is neither fixed nor fully defined.
+
+    ``IComponent2::GetConstrainedStatus`` returns swConstrainedStatus_e
+    (2 = under, 3 = fully, 4 = over constrained). ``GetComponents`` hands
+    back unflagged dispatches, so the IComponent2 methods must be flagged
+    first or the call resolves as a property and raises.
+    """
+    asm = adapter.currentModel
+    components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
+    problems = []
+    for component in components:
+        _flag(component, "IComponent2")
+        comp_name = str(_read_member(component, "Name2"))
+        if bool(_read_member(component, "IsFixed")):
+            continue
+        status = int(
+            adapter._attempt(lambda c=component: c.GetConstrainedStatus(), default=-1)
+        )
+        if status != FULLY_CONSTRAINED:
+            kind = "under" if status == UNDER_CONSTRAINED else f"status={status}"
+            problems.append(f"{comp_name} ({kind})")
+    print(f"  checked {len(components)} components for free DOF")
+    if problems:
+        raise RuntimeError("components not fully defined: " + ", ".join(problems))
+
+
+def check_no_interference(adapter: Any) -> None:
+    """Run interference detection on the active assembly; raise on any hit.
+
+    Raw-COM stopgap until the MCP adapter implements ``check_interference``
+    (``IAssemblyDoc::InterferenceDetectionManager``; the tool-layer call
+    currently returns a simulated result without adapter support).
+    Coincident/tangent contact is not treated as interference.
+    """
+    asm = adapter.currentModel
+    _flag(asm, "IAssemblyDoc")
+    adapter._attempt(lambda: asm.ToolsCheckInterference(), default=None)
+    mgr = _read_member(asm, "InterferenceDetectionManager")
+    if mgr is None:
+        raise RuntimeError("InterferenceDetectionManager unavailable")
+    _flag(mgr, "IInterferenceDetectionMgr")
+    mgr.TreatCoincidenceAsInterference = False
+    mgr.TreatSubAssembliesAsComponents = True
+    mgr.IncludeMultibodyPartInterferences = True
+    mgr.MakeInterferingPartsTransparent = False
+    mgr.CreateFastenersFolder = False
+    mgr.UseTransform = False
+    interferences = adapter._attempt(lambda: mgr.GetInterferences(), default=None)
+    details = []
+    for interference in list(interferences or []):
+        _flag(interference, "IInterference")
+        names = []
+        for comp in list(_read_member(interference, "Components") or []):
+            _flag(comp, "IComponent2")
+            names.append(str(_read_member(comp, "Name2")))
+        volume_mm3 = float(_read_member(interference, "Volume") or 0.0) * 1e9
+        details.append(f"{' & '.join(names)}: {volume_mm3:.2f} mm^3")
+    adapter._attempt(lambda: mgr.Done(), default=None)
+    if details:
+        raise RuntimeError(
+            f"{len(details)} interference(s): " + "; ".join(details)
+        )
+    print("  OK  interference check: none found")
+
+
+async def save_assembly_and_images(
+    adapter: Any, asm_name: str, views: Iterable[str] = DEFAULT_VIEWS
+) -> dict[str, str]:
+    """Save the assembly to ``cad/out/sldasm`` and PNG views to ``cad/out/png``."""
+    OUT_SLDASM.mkdir(parents=True, exist_ok=True)
+    asm_path = (OUT_SLDASM / f"{asm_name}.SLDASM").resolve()
+    check(f"save_file -> {asm_path}", await adapter.save_file(str(asm_path)))
+
+    png_dir = OUT_PNG / asm_name
+    png_dir.mkdir(parents=True, exist_ok=True)
+    artefacts = {"assembly": str(asm_path)}
+    for view in views:
+        img_path = (png_dir / f"{asm_name}_{view}.png").resolve()
+        check(
+            f"export_image {view}",
+            await adapter.export_image(
+                {
+                    "file_path": str(img_path),
+                    "format_type": "png",
+                    "width": 1600,
+                    "height": 1000,
+                    "view_orientation": view,
+                }
+            ),
+        )
+        artefacts[view] = str(img_path)
+    return artefacts
+
+
 def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
     """Connect, run ``build(adapter)``, disconnect; return a process exit code."""
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
