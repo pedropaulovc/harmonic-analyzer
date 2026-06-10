@@ -24,10 +24,10 @@ depth):
   184 mm width across X, 63.5 mm taper along Z, window facing +/-Z) at
   the channel-stack ends, outer edges flush with the top-plate edge
   (133.35 - 63.5/2 = 101.6 — the eight views show the castings
-  edge-to-edge in depth). The usable span between the gates' inner
-  faces (139.7 mm) fixes the channel Z-pitch at 7.10 mm, which equals
-  the 7.5 mm cone-axis pitch x cos(18.7 deg cone-shaft incline) — two
-  independent routes agree (DIMENSIONS.md appendix C #3). Only two
+  edge-to-edge in depth). The gates' 139.7 mm clear span comfortably
+  holds the channel stack: Z-pitch 7.06 mm = 7.5 mm cone-axis pitch x
+  cos(19.8 deg cone-shaft incline, arcsin(2.54/7.5) from the mesh
+  condition — DIMENSIONS.md appendix C #3). Only two
   gates carry the rocker pivot; the third A-frame casting is the
   translational-gearing/output support (the taper-on triangle visible
   front-centre in views 1/8 and 5/8) and belongs to output.SLDASM.
