@@ -1,0 +1,412 @@
+{
+  "version": "1.0",
+  "solidworks_version": "34.2.0",
+  "com_objects": {
+    "ISldWorks": {
+      "methods": [
+        "OpenDoc6",
+        "CloseDoc",
+        "ActivateDoc3",
+        "GetActiveObject",
+        "GetFirstDocument",
+        "GetDocumentCount",
+        "NewDocument",
+        "SendMsgToUser2",
+        "GetProcessID",
+        "ExitApp",
+        "RevisionNumber",
+        "GetUserTypeLibraryFile",
+        "CreateNewDocument"
+      ],
+      "properties": [
+        "Visible",
+        "ActiveDoc",
+        "FrameState"
+      ],
+      "method_count": 13,
+      "property_count": 3
+    },
+    "IModelDoc2": {
+      "methods": [
+        "ShowNamedView2",
+        "ViewZoomToFit2",
+        "SaveBitmapWithVariableSize",
+        "SaveAs3",
+        "GetTitle",
+        "GetPathName",
+        "GetType",
+        "GetFeatureCount",
+        "GetActiveConfiguration",
+        "Extension",
+        "SketchManager",
+        "FeatureManager",
+        "SelectionManager",
+        "GetMassProperties",
+        "Close",
+        "SetSaveAsFileName",
+        "ResolveAllLightweightComponents",
+        "InsertSketch2",
+        "SketchAddConstraints",
+        "ClearSelection2"
+      ],
+      "properties": [
+        "ActiveView",
+        "ActiveLayer"
+      ],
+      "method_count": 20,
+      "property_count": 2
+    },
+    "IPartDoc": {
+      "methods": [
+        "CreateFeatureFromSketch2",
+        "AddMateReference",
+        "GetBodies2",
+        "GetEntityByName",
+        "InsertSmartComponents",
+        "Material"
+      ],
+      "properties": [],
+      "method_count": 6,
+      "property_count": 0
+    },
+    "IAssemblyDoc": {
+      "methods": [
+        "AddComponent4",
+        "AddComponent5",
+        "InsertNewPart3",
+        "LayoutToAssembly",
+        "ResolveAllLightweightComponents",
+        "AddMate5",
+        "GetComponents",
+        "GetComponentCount"
+      ],
+      "properties": [],
+      "method_count": 8,
+      "property_count": 0
+    },
+    "IDrawingDoc": {
+      "methods": [
+        "CreateDrawViewFromModelView3",
+        "InsertModelAnnotations3",
+        "GenerateViewPalette",
+        "Get3DDrawingView"
+      ],
+      "properties": [],
+      "method_count": 4,
+      "property_count": 0
+    },
+    "IFeatureManager": {
+      "methods": [
+        "FeatureExtrusion3",
+        "FeatureCut3",
+        "FeatureRevolve2",
+        "InsertProtrusionBlend4",
+        "InsertShell",
+        "InsertFillet3",
+        "InsertChamfer",
+        "InsertDraftXpert3",
+        "FeatureMirror3",
+        "FeatureCircularPattern2",
+        "FeatureLinearPattern3",
+        "InsertBoss",
+        "FeatureSweep5",
+        "FeatureLoft3"
+      ],
+      "properties": [],
+      "method_count": 14,
+      "property_count": 0
+    },
+    "ISketchManager": {
+      "methods": [
+        "InsertSketch",
+        "CreateLine",
+        "CreateArc",
+        "CreateCircle",
+        "CreateRectangle",
+        "CreateEllipse",
+        "CreateSpline",
+        "CreateCenterLine",
+        "SketchMirror",
+        "SketchOffset",
+        "AddToDB",
+        "InsertSketch2"
+      ],
+      "properties": [
+        "ActiveSketch"
+      ],
+      "method_count": 12,
+      "property_count": 1
+    },
+    "IModelView": {
+      "methods": [
+        "SaveBitmapWithVariableSize",
+        "ZoomToFit",
+        "ZoomToSheet",
+        "OrientView",
+        "SetCameraParameters"
+      ],
+      "properties": [
+        "Orientation3",
+        "Translation3"
+      ],
+      "method_count": 5,
+      "property_count": 2
+    },
+    "IExtensionManager": {
+      "methods": [
+        "SaveAs2",
+        "SelectByID2",
+        "MultiSelect2"
+      ],
+      "properties": [],
+      "method_count": 3,
+      "property_count": 0
+    },
+    "IFeature": {
+      "methods": [
+        "GetNextFeature",
+        "GetName",
+        "GetTypeName2",
+        "SetSuppression2",
+        "IsSuppressed2",
+        "GetDefinition"
+      ],
+      "properties": [
+        "Name"
+      ],
+      "method_count": 6,
+      "property_count": 1
+    },
+    "IBody2": {
+      "methods": [
+        "GetFaceCount",
+        "GetEdgeCount",
+        "GetVertexCount",
+        "GetMassProperties",
+        "GetType"
+      ],
+      "properties": [],
+      "method_count": 5,
+      "property_count": 0
+    },
+    "ISketchSegment": {
+      "methods": [
+        "GetStartPoint2",
+        "GetEndPoint2",
+        "GetType",
+        "SetEndPoint"
+      ],
+      "properties": [],
+      "method_count": 4,
+      "property_count": 0
+    }
+  },
+  "vba_references": {
+    "Visual Basic For Applications ({000204EF-0000-0000-C000-000000000046} v4.2)": {
+      "description": "Visual Basic For Applications",
+      "guid": "{000204EF-0000-0000-C000-000000000046}",
+      "version": "4.2",
+      "status": "available"
+    },
+    "Visual Basic For Applications ({000204EF-0000-0000-C000-000000000046} v6.0)": {
+      "description": "Visual Basic For Applications",
+      "guid": "{000204EF-0000-0000-C000-000000000046}",
+      "version": "6.0",
+      "status": "available"
+    },
+    "Microsoft Visual Basic for Applications Extensibility 5.3 ({0002E157-0000-0000-C000-000000000046} v5.3)": {
+      "description": "Microsoft Visual Basic for Applications Extensibility 5.3",
+      "guid": "{0002E157-0000-0000-C000-000000000046}",
+      "version": "5.3",
+      "status": "available"
+    },
+    "Microsoft Office Template and Media Control 1.0 Type Library ({012F24C1-35B0-11D0-BF2D-0000E8D0D146} v1.0)": {
+      "description": "Microsoft Office Template and Media Control 1.0 Type Library",
+      "guid": "{012F24C1-35B0-11D0-BF2D-0000E8D0D146}",
+      "version": "1.0",
+      "status": "available"
+    },
+    "SOLIDWORKS Inspection 2026 AddIn Type Library ({04BDB9F2-60FB-4B7C-AF6E-0B36094D10B2} v22.0)": {
+      "description": "SOLIDWORKS Inspection 2026 AddIn Type Library",
+      "guid": "{04BDB9F2-60FB-4B7C-AF6E-0B36094D10B2}",
+      "version": "22.0",
+      "status": "available"
+    },
+    "SOLIDWORKS 2026 Commands type library ({0AC1DE9F-3FBC-4C25-868D-7D4E9139CCE0} v22.0)": {
+      "description": "SOLIDWORKS 2026 Commands type library",
+      "guid": "{0AC1DE9F-3FBC-4C25-868D-7D4E9139CCE0}",
+      "version": "22.0",
+      "status": "available"
+    },
+    "SolidWorks_Visualize_Interfaces ({2615126C-0ACD-4C09-A4ED-A31DC6A93B14} v1.0)": {
+      "description": "SolidWorks_Visualize_Interfaces",
+      "guid": "{2615126C-0ACD-4C09-A4ED-A31DC6A93B14}",
+      "version": "1.0",
+      "status": "available"
+    },
+    "Microsoft Office 16.0 Object Library ({2DF8D04C-5BFA-101B-BDE5-00AA0044DE52} v2.8)": {
+      "description": "Microsoft Office 16.0 Object Library",
+      "guid": "{2DF8D04C-5BFA-101B-BDE5-00AA0044DE52}",
+      "version": "2.8",
+      "status": "available"
+    },
+    "SolidWorks 2026 MotionStudy Type library ({45DB5211-F358-4B5E-A235-E792EB818BAA} v22.0)": {
+      "description": "SolidWorks 2026 MotionStudy Type library",
+      "guid": "{45DB5211-F358-4B5E-A235-E792EB818BAA}",
+      "version": "22.0",
+      "status": "available"
+    },
+    "SOLIDWORKS 2026 Constant type library ({4687F359-55D0-4CD3-B6CF-2EB42C11F989} v22.0)": {
+      "description": "SOLIDWORKS 2026 Constant type library",
+      "guid": "{4687F359-55D0-4CD3-B6CF-2EB42C11F989}",
+      "version": "22.0",
+      "status": "available"
+    },
+    "Microsoft Office 16.0 Access Database Engine Object Library ({4AC9E1DA-5BAD-4AC7-86E3-24F4CDCECA28} vc.0)": {
+      "description": "Microsoft Office 16.0 Access Database Engine Object Library",
+      "guid": "{4AC9E1DA-5BAD-4AC7-86E3-24F4CDCECA28}",
+      "version": "c.0",
+      "status": "available"
+    },
+    "SwFeedback - Package, encrypt, and upload performance and post-mortem logs to SolidWorks web service ({4B31B22B-BE2B-3D2F-9E4F-1C146B36EC68} v22.0)": {
+      "description": "SwFeedback - Package, encrypt, and upload performance and post-mortem logs to SolidWorks web service",
+      "guid": "{4B31B22B-BE2B-3D2F-9E4F-1C146B36EC68}",
+      "version": "22.0",
+      "status": "available"
+    },
+    "SolidWorks 2026 DimXpert type library ({582D0D5B-FF58-42CD-8968-A8A001A52454} v22.0)": {
+      "description": "SolidWorks 2026 DimXpert type library",
+      "guid": "{582D0D5B-FF58-42CD-8968-A8A001A52454}",
+      "version": "22.0",
+      "status": "available"
+    },
+    "SOLIDWORKS Utilities 2015 Type Library ({62E9747A-1836-436E-827F-0AE2E0081353} v7d7.5)": {
+      "description": "SOLIDWORKS Utilities 2015 Type Library",
+      "guid": "{62E9747A-1836-436E-827F-0AE2E0081353}",
+      "version": "7d7.5",
+      "status": "available"
+    },
+    "SolidWorks 2026 Routing Type Library ({6DD4B124-4733-4DFF-97A8-52F70924D514} v22.0)": {
+      "description": "SolidWorks 2026 Routing Type Library",
+      "guid": "{6DD4B124-4733-4DFF-97A8-52F70924D514}",
+      "version": "22.0",
+      "status": "available"
+    },
+    "SolidWorks 2026 Extensibility Type Library ({801A0000-A66C-11D3-A8BD-0000861EBBD6} v22.0)": {
+      "description": "SolidWorks 2026 Extensibility Type Library",
+      "guid": "{801A0000-A66C-11D3-A8BD-0000861EBBD6}",
+      "version": "22.0",
+      "status": "available"
+    },
+    "Office CSP Type Library ({82038836-85BB-49D5-BAE6-F406733DCF40} v1.0)": {
+      "description": "Office CSP Type Library",
+      "guid": "{82038836-85BB-49D5-BAE6-F406733DCF40}",
+      "version": "1.0",
+      "status": "available"
+    },
+    "SOLIDWORKS OLE Automation 1.0 Type Library ({83A33D31-27C5-11CE-BFD4-00400513BB57} v1.0)": {
+      "description": "SOLIDWORKS OLE Automation 1.0 Type Library",
+      "guid": "{83A33D31-27C5-11CE-BFD4-00400513BB57}",
+      "version": "1.0",
+      "status": "available"
+    },
+    "SldWorks 2026 Type Library ({83A33D31-27C5-11CE-BFD4-00400513BB57} v22.0)": {
+      "description": "SldWorks 2026 Type Library",
+      "guid": "{83A33D31-27C5-11CE-BFD4-00400513BB57}",
+      "version": "22.0",
+      "status": "available"
+    },
+    "Microsoft Visual Studio 2010 Tools for Office Runtime Execution Engine 10.0 Type Library ({AAB9C2AA-6036-4AE1-A41C-A40AB7F39520} va.0)": {
+      "description": "Microsoft Visual Studio 2010 Tools for Office Runtime Execution Engine 10.0 Type Library",
+      "guid": "{AAB9C2AA-6036-4AE1-A41C-A40AB7F39520}",
+      "version": "a.0",
+      "status": "available"
+    },
+    "Office2013CustomActionsLib ({AB4D3FA3-21B9-443C-886E-FC4A417D3E4D} v1.0)": {
+      "description": "Office2013CustomActionsLib",
+      "guid": "{AB4D3FA3-21B9-443C-886E-FC4A417D3E4D}",
+      "version": "1.0",
+      "status": "available"
+    },
+    "SolidWorks Simulation 2026 type library ({B5697F4F-C68A-4685-A7B8-478AF05EF605} v13.0)": {
+      "description": "SolidWorks Simulation 2026 type library",
+      "guid": "{B5697F4F-C68A-4685-A7B8-478AF05EF605}",
+      "version": "13.0",
+      "status": "available"
+    },
+    "SolidWorksPluginV6 1.0 Type Library ({C20FFD7F-00C3-45C7-A67C-94E2CEEA18FA} v1.0)": {
+      "description": "SolidWorksPluginV6 1.0 Type Library",
+      "guid": "{C20FFD7F-00C3-45C7-A67C-94E2CEEA18FA}",
+      "version": "1.0",
+      "status": "available"
+    },
+    "SOLIDWORKS PDM RefDlg 5.2 Type Library ({C24771C5-2560-4E1F-9A9E-54A5F7B80923} v5.2)": {
+      "description": "SOLIDWORKS PDM RefDlg 5.2 Type Library",
+      "guid": "{C24771C5-2560-4E1F-9A9E-54A5F7B80923}",
+      "version": "5.2",
+      "status": "available"
+    },
+    "SolidWorks 2026 exposed type libraries for add-in use ({C71C31CD-898C-11D4-AEF6-00C04F603FAF} v22.0)": {
+      "description": "SolidWorks 2026 exposed type libraries for add-in use",
+      "guid": "{C71C31CD-898C-11D4-AEF6-00C04F603FAF}",
+      "version": "22.0",
+      "status": "available"
+    },
+    "OfficeFileLinkHandlingComponent Type Library ({C7D63755-ED33-4737-AADA-259D19C6F064} v1.0)": {
+      "description": "OfficeFileLinkHandlingComponent Type Library",
+      "guid": "{C7D63755-ED33-4737-AADA-259D19C6F064}",
+      "version": "1.0",
+      "status": "available"
+    },
+    "SolidWorks Design Checker 2026 Type Library ({D0A9841D-752D-4C47-ADD9-6254DEE0F559} v1.0)": {
+      "description": "SolidWorks Design Checker 2026 Type Library",
+      "guid": "{D0A9841D-752D-4C47-ADD9-6254DEE0F559}",
+      "version": "1.0",
+      "status": "available"
+    },
+    "SwFeedback - Package, encrypt, and upload performance and post-mortem logs to SolidWorks web service ({D4F37A96-66A9-37EE-B533-1CFDF0B05140} v22.2)": {
+      "description": "SwFeedback - Package, encrypt, and upload performance and post-mortem logs to SolidWorks web service",
+      "guid": "{D4F37A96-66A9-37EE-B533-1CFDF0B05140}",
+      "version": "22.2",
+      "status": "available"
+    },
+    "COSMOS Motion SolidWorks Type Library ({DF368539-FDA7-4FA3-BA4C-E5E1CE6A5AF7} v3.0)": {
+      "description": "COSMOS Motion SolidWorks Type Library",
+      "guid": "{DF368539-FDA7-4FA3-BA4C-E5E1CE6A5AF7}",
+      "version": "3.0",
+      "status": "available"
+    },
+    "SwFeedback - Package, encrypt, and upload performance and post-mortem logs to SolidWorks web service ({EA08F7FC-3CCA-3947-9AFC-E579965ED2DC} v22.1)": {
+      "description": "SwFeedback - Package, encrypt, and upload performance and post-mortem logs to SolidWorks web service",
+      "guid": "{EA08F7FC-3CCA-3947-9AFC-E579965ED2DC}",
+      "version": "22.1",
+      "status": "available"
+    },
+    "Visual Basic runtime objects and procedures ({EA544A21-C82D-11D1-A3E4-00A0C90AEA82} v6.0)": {
+      "description": "Visual Basic runtime objects and procedures",
+      "guid": "{EA544A21-C82D-11D1-A3E4-00A0C90AEA82}",
+      "version": "6.0",
+      "status": "available"
+    },
+    "SolidWorks_MacroBuilder ({F82BB37A-0DB8-45DC-B110-AEFC4663671B} v22.0)": {
+      "description": "SolidWorks_MacroBuilder",
+      "guid": "{F82BB37A-0DB8-45DC-B110-AEFC4663671B}",
+      "version": "22.0",
+      "status": "available"
+    },
+    "SolidWorks_MacroBuilder ({F82BB37A-0DB8-45DC-B110-AEFC4663671B} v22.1)": {
+      "description": "SolidWorks_MacroBuilder",
+      "guid": "{F82BB37A-0DB8-45DC-B110-AEFC4663671B}",
+      "version": "22.1",
+      "status": "available"
+    },
+    "SolidWorks_MacroBuilder ({F82BB37A-0DB8-45DC-B110-AEFC4663671B} v22.2)": {
+      "description": "SolidWorks_MacroBuilder",
+      "guid": "{F82BB37A-0DB8-45DC-B110-AEFC4663671B}",
+      "version": "22.2",
+      "status": "available"
+    }
+  },
+  "total_methods": 100,
+  "total_properties": 9
+}

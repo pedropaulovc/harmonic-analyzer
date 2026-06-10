@@ -1,0 +1,612 @@
+{
+  "max_tool_response_bytes": 250000,
+  "max_total_response_bytes": 3000000,
+  "total_response_bytes": 0,
+  "tools": [
+    {
+      "tool": "open_model",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "create_part",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "create_assembly",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "create_drawing",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "close_model",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "create_extrusion",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "create_revolve",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "get_dimension",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "set_dimension",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "create_cut_extrude",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "add_fillet",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "add_chamfer",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "mirror_feature",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "circular_pattern_feature",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "linear_pattern_feature",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "shell",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "draft",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "create_sweep",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "create_loft",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "create_plane",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "create_axis",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "create_reference_point",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "create_coordinate_system",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "create_sketch",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "add_line",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "add_circle",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "add_rectangle",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "exit_sketch",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "check_sketch_fully_defined",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "add_arc",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "add_spline",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "add_centerline",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "add_polygon",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "add_ellipse",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "add_sketch_constraint",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "add_sketch_dimension",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "sketch_linear_pattern",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "sketch_circular_pattern",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "sketch_mirror",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "sketch_offset",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "sketch_tutorial_simple_hole",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "tutorial_simple_hole",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "create_drawing_view",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "add_dimension",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "add_note",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "create_section_view",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "create_detail_view",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "update_sheet_format",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "auto_dimension_view",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "check_drawing_standards",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "create_technical_drawing",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "add_drawing_view",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "add_annotation",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "update_title_block",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "analyze_drawing_comprehensive",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "analyze_drawing_dimensions",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "analyze_drawing_annotations",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "check_drawing_compliance",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "analyze_drawing_views",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "generate_drawing_report",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "compare_drawing_versions",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "validate_drawing_completeness",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "calculate_mass_properties",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "get_mass_properties",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "check_interference",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "analyze_geometry",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "get_material_properties",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "export_step",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "export_iges",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "export_stl",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "export_pdf",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "export_dwg",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "export_image",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "batch_export",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "generate_vba_code",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "automation_start_macro_recording",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "automation_stop_macro_recording",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "batch_process_files",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "manage_design_table",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "execute_workflow",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "create_template",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "optimize_performance",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "save_file",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "save_as",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "get_file_properties",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "get_model_info",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "list_features",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "classify_feature_tree",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "list_configurations",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "manage_file_properties",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "convert_file_format",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "batch_file_operations",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "load_part",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "load_assembly",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "save_part",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "save_assembly",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "generate_vba_extrusion",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "generate_vba_revolve",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "generate_vba_assembly_insert",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "generate_vba_drawing_views",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "generate_vba_batch_export",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "generate_vba_part_modeling",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "generate_vba_assembly_mates",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "generate_vba_drawing_dimensions",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "generate_vba_file_operations",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "generate_vba_macro_recorder",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "extract_template",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "apply_template",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "batch_apply_template",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "compare_templates",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "save_to_template_library",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "list_template_library",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "start_macro_recording",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "stop_macro_recording",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "execute_macro",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "analyze_macro",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "batch_execute_macros",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "optimize_macro",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "create_macro_library",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "discover_solidworks_docs",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "search_solidworks_api_help",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    }
+  ]
+}
