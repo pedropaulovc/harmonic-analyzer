@@ -21,6 +21,11 @@ Confidence: **high** (annotated/stated, or legacy confirmed by book), **med**
 (scaled with a good reference, or uncontradicted legacy), **low** (rough estimate,
 must be re-measured against photos during the M2 build of that part).
 
+Photo evidence: besides the book, 89 first-party photos of the machine exist in
+`photogrammetry/raw/` — indexed per component in `cad/PHOTOS.md`. Use them for
+detail inspection (fasteners, cross-sections, routing) and secondary scaling
+(the 100 × 55 mm nameplate appears in-frame with the gear stack).
+
 Units: original units as found; inches in parentheses (book annotations are metric;
 legacy code is inches).
 
@@ -352,7 +357,7 @@ audit detail in the M1 extraction; key values referenced by the chapter tables:
 | rocker-arm-support ×3 | none | UNVERIFIED — photo scaling in M2 |
 | oscilating-arms | ch.14: width 12.5 mm, curvature R ≈ 800 mm | AUDIT in M2 — check both against part |
 | corner-bracket | none | UNVERIFIED |
-| tube-frame | ch.6: frame column height 107 cm | AUDIT in M2 — check tube length against 107 cm |
+| tube-frame | ch.6: frame column height 107 cm | AUDIT in M2 — check tube length against 107 cm. NOTE: photogrammetry shows columns are fluted/reeded, not plain round (PHOTOS.md `195108425`, `195123524`) |
 
 No legacy part contradicts a book annotation. Every part still gets re-authored
 as a reproduction script (project requirement); UNVERIFIED parts get their photo
@@ -364,7 +369,9 @@ re-measure during their M2 script build.
    counts now fully known (cone 6k, cylinder 120 derived); remaining unknown is
    module only. Plan: scale a cylinder-gear OD from ch.13 photos against the
    7 mm face / 150 mm cone references (cylinder gear PD = largest cone gear PD
-   = 120 × module); assume PA 14.5° unless tooth profile photos contradict.
+   = 120 × module); cross-check via photogrammetry photo `195445871` (nameplate
+   100 mm legible in-frame with the gear stack — see PHOTOS.md); assume PA 14.5°
+   unless tooth profile photos contradict.
 2. **Pinion tooth count** (ch. 25) — count from p.67–69 photos in M4 prep.
 3. **Channel pitch** — candidates: 7.5 mm axial gear pitch (ch. 12 derived) vs
    16 mm callout (ch. 14). These may both be real (gears packed tighter than
