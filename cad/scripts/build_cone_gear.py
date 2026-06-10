@@ -32,10 +32,17 @@ involute starting at angle ``+Delta``) and above by tooth 1's lower flank
 
 Prototype scope notes:
 
-* **No bore/keyway yet**: at DP 30 the 6-tooth gear's OD is 6.77 mm --
-  *smaller than the 9.5 mm cone shaft* (DIMENSIONS.md ch. 12). The small
-  cone gears must be integral with a reduced shaft section; bore/keyway
-  join in the full pass once the mounting is resolved (Appendix C).
+* **Configured bore, no keyway** (Appendix C #7 resolution): at DP 30 the
+  small gears cannot clear the 9.5 mm shaft (6T OD is 6.77 mm), so the
+  shaft steps down at the tip (`build_cone_gear_shaft.py`) and the bore
+  diameter is a configured global ``BoreDia``: 3/8" for T024..T120, then
+  1/4" (T018), 3/16" (T012), 1/8" (T006) -- the 6T wall comes out 0.8 mm,
+  matching the visibly thin tip rod in the p.18 photos. The bore circle is
+  origin-centred with a DRIVING diameter dimension equation-linked to
+  ``BoreDia`` (an origin-snapped circle + driving dim is fully defined and
+  config-drivable -- probed live; the fix+driven-dim recipe is not). No
+  keyway: the book never shows the attachment, and the p.21 macro shows
+  solder at the small gears -- key hardware stays out of scope.
 * Root geometry is simplified: the gap floor is the chord at the base
   circle, not the true root circle + trochoid fillet (for N >= 96 the base
   circle is slightly inside root, for small N teeth come out stub-form --
@@ -91,6 +98,18 @@ PI_LIT = "3.14159265358979"  # literal pi for equation-manager expressions
 # plan risk #2; the same script now carries all 20 configurations.
 CONFIGS = [(f"T{n:03d}", n) for n in range(6, 121, 6)]
 DEFAULT_TEETH = 120  # globals' all-configuration value at authoring time
+
+
+def bore_dia_in(teeth: int) -> float:
+    """Configured bore diameter (inches) -- steps down where the gear is
+    too small for the 9.5 mm shaft (DIMENSIONS.md Appendix C #7)."""
+    if teeth <= 6:
+        return 0.125
+    if teeth <= 12:
+        return 0.1875
+    if teeth <= 18:
+        return 0.25
+    return 0.375
 
 
 def gear_facts(teeth: int, dp: float = DP, pa_deg: float = PA_DEG) -> dict[str, float]:
@@ -407,6 +426,65 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # ------------------------------------------------------------------
+    # Configured bore (Appendix C #7): origin-snapped circle + DRIVING
+    # diameter dimension -- no fix, or the dimension goes driven and the
+    # configuration link dies. Diameter equation-linked to "BoreDia".
+    # The bore MUST precede the circular pattern: cut AFTER the pattern,
+    # the same recipe solves to nothing in every configuration whose
+    # BoreDia differs from the creation-time value (live SW 2026 finding,
+    # probe_bore5/6; the minimal disc+pattern+bore+configs model does NOT
+    # reproduce it, so it is specific to this part's downstream-of-pattern
+    # chain -- pre-pattern placement regenerates correctly).
+    # ------------------------------------------------------------------
+    bore_default_in = bore_dia_in(DEFAULT_TEETH)
+    await set_global(adapter, "BoreDia", f"{bore_default_in:g}", bore_default_in)
+    check("create_sketch bore", await adapter.create_sketch("Front"))
+    bore_circle = check(
+        "add_circle bore", await adapter.add_circle(0.0, 0.0, bore_default_in * 12.7)
+    )
+    check(
+        "bore diameter dim (driving)",
+        await adapter.add_sketch_dimension(
+            bore_circle, None, "diameter", bore_default_in * 25.4
+        ),
+    )
+    status = await adapter.check_sketch_fully_defined()
+    state = status.data.get("definition_state") if status.is_success else None
+    if state != "fully_defined":
+        raise RuntimeError(
+            f"bore sketch is {state!r} -- origin snap missing; a fix would "
+            "break the BoreDia configuration link, aborting"
+        )
+    print("  OK  bore sketch fully defined (driving dim, no fix)")
+    check("exit_sketch bore", await adapter.exit_sketch())
+    bore_sketch = feature_name_by_type(adapter, "ProfileFeature")
+    check(
+        "cut bore",
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH + 2.0)),
+    )
+    bore_dim = f"D1@{bore_sketch}"
+    bore_before = read_dimension(adapter, bore_dim)
+    if not (
+        abs(bore_before - bore_default_in) < 1e-6
+        or abs(bore_before - bore_default_in * 25.4) < 1e-4
+    ):
+        raise RuntimeError(f"{bore_dim} reads {bore_before!r}, not the bore diameter")
+    check(
+        f"link {bore_dim} to BoreDia",
+        await adapter.create_equation(
+            CreateEquationParameters(equation=f'"{bore_dim}" = "BoreDia"')
+        ),
+    )
+    mass = await adapter.get_mass_properties()
+    bored_volume = float(mass.data.volume)
+    expected_bored = expected_blank - math.pi * (bore_default_in * 12.7) ** 2 * FACE_WIDTH
+    if abs(bored_volume - expected_bored) > 0.02 * expected_bored:
+        raise RuntimeError(
+            f"bored blank volume {bored_volume:.1f} mm^3, expected {expected_bored:.1f}"
+        )
+    print(f"  OK  bored blank volume {bored_volume:.1f} mm^3")
+
+    # ------------------------------------------------------------------
     # One tooth gap, all six profile entities equation-driven (t in [0,1]).
     # Loop: A1 ->(lower flank)-> B1 ->(radial)-> arc -> (radial)-> B2
     # ->(upper flank, reversed)-> A2 ->(base chord)-> A1.
@@ -546,6 +624,16 @@ async def build(adapter) -> dict[str, str]:
                 )
             ),
         )
+        check(
+            f"BoreDia = {bore_dia_in(teeth):g} in {name}",
+            await adapter.set_global_variable(
+                SetGlobalVariableParameters(
+                    name="BoreDia",
+                    expression=f"{bore_dia_in(teeth):g}",
+                    configuration=name,
+                )
+            ),
+        )
 
     png_dir = OUT_PNG / PART_NAME
     png_dir.mkdir(parents=True, exist_ok=True)
@@ -568,7 +656,12 @@ async def build(adapter) -> dict[str, str]:
             raise RuntimeError(f"{name}: get_mass_properties failed: {mass.error}")
         volume = float(mass.data.volume)
         blank_mm3 = math.pi * ra_mm**2 * FACE_WIDTH
-        expected = blank_mm3 - teeth * gap_area_in_disc(teeth) * 25.4**2 * FACE_WIDTH
+        bore_mm3 = math.pi * (bore_dia_in(teeth) * 12.7) ** 2 * FACE_WIDTH
+        expected = (
+            blank_mm3
+            - teeth * gap_area_in_disc(teeth) * 25.4**2 * FACE_WIDTH
+            - bore_mm3
+        )
         if abs(volume - expected) > 0.01 * expected:
             raise RuntimeError(
                 f"{name}: volume {volume:.1f} mm^3, analytic expectation "
