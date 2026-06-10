@@ -23,7 +23,7 @@ from __future__ import annotations
 import sys
 
 from _common import (
-    add_line_chain,
+    apply_material,
     check,
     ensure_fully_defined,
     report_mass_properties,
@@ -33,6 +33,7 @@ from _common import (
 )
 
 PART_NAME = "magnifying-lever"
+MATERIAL = "Brass"  # see _common.apply_material docstring
 
 ROD_LENGTH = 310.0  # DIMENSIONS.md ch20: 4x-ratio constraint + p.46 inset (low)
 ROD_DIA = 6.0  # DIMENSIONS.md ch20: round brass rod (low)
@@ -81,6 +82,7 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_revolve(RevolveParameters(angle=360.0)),
     )
 
+    await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

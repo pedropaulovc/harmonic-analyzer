@@ -24,6 +24,7 @@ import sys
 
 from _common import (
     IN,
+    apply_material,
     check,
     define_circle,
     ensure_fully_defined,
@@ -33,6 +34,7 @@ from _common import (
 )
 
 PART_NAME = "cone-gear-shaft"
+MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 SHAFT_DIA = 0.375 * IN  # ch12: = ShaftDiameter (legacy), matches cam bore
 SHAFT_LENGTH = 225.0  # ch12: 150 stack + pinion seat ~15 + journals ~35/~25
@@ -55,6 +57,7 @@ async def build(adapter) -> dict[str, str]:
     print(f"  volume after shaft: {res.data.volume:.1f} mm^3")
     # expected: pi * 4.7625^2 * 225 = ~16,033 mm^3
 
+    await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

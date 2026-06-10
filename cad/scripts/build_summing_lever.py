@@ -27,6 +27,7 @@ import sys
 from _common import (
     IN,
     add_line_chain,
+    apply_material,
     check,
     define_circle,
     ensure_fully_defined,
@@ -38,6 +39,7 @@ from _common import (
 )
 
 PART_NAME = "summing-lever"
+MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
 # DIMENSIONS.md ch18 (legacy SummingLever.cs values, uncontradicted; med)
 PLATE_WIDTH = 1.75 * IN  # 44.45  coefficients plate width (X)
@@ -273,6 +275,7 @@ async def build(adapter) -> dict[str, str]:
     )
     print(f"  volume after middle rib: {await _volume(adapter):.1f} mm^3")
 
+    await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

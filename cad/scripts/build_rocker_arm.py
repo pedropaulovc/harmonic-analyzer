@@ -32,6 +32,7 @@ import math
 import sys
 
 from _common import (
+    apply_material,
     check,
     define_circle,
     ensure_fully_defined,
@@ -42,6 +43,7 @@ from _common import (
 )
 
 PART_NAME = "rocker-arm"
+MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 CURVE_RADIUS = 800.0  # DIMENSIONS.md ch14: = amplitude bar length (stated)
 ARM_DEPTH = 16.0  # ch14: p.29 photo callout, end-face height (annotated)
@@ -139,6 +141,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
 
+    await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

@@ -25,14 +25,17 @@ import sys
 
 from _common import (
     add_line_chain,
+    apply_material,
     check,
     ensure_fully_defined,
+    measure_check,
     report_mass_properties,
     run_build,
     save_part_and_images,
 )
 
 PART_NAME = "platen"
+MATERIAL = "Brass"  # see _common.apply_material docstring
 
 PLATE_WIDTH = 300.0  # DIMENSIONS.md ch22: photo aspect vs 140 mm (low)
 PLATE_HEIGHT = 140.0  # DIMENSIONS.md ch22: p.55 callout (high)
@@ -59,6 +62,21 @@ async def build(adapter) -> dict[str, str]:
     check(
         "extrude plate",
         await adapter.create_extrusion(ExtrusionParameters(depth=PLATE_THICKNESS)),
+    )
+
+    await apply_material(adapter, MATERIAL)
+
+    # Verify the annotated 140 mm front-face height (p.55 callout).
+    mid_x, mid_z = PLATE_WIDTH / 2.0, PLATE_THICKNESS / 2.0
+    await measure_check(
+        adapter,
+        "plate height (annotated 140)",
+        [
+            {"entity_type": "FACE", "point": [mid_x, 0.0, mid_z]},
+            {"entity_type": "FACE", "point": [mid_x, PLATE_HEIGHT, mid_z]},
+        ],
+        "normal_distance",
+        PLATE_HEIGHT,
     )
 
     await report_mass_properties(adapter)

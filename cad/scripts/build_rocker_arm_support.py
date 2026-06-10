@@ -29,6 +29,7 @@ import sys
 
 from _common import (
     add_line_chain,
+    apply_material,
     check,
     define_circle,
     ensure_fully_defined,
@@ -39,6 +40,7 @@ from _common import (
 )
 
 PART_NAME = "rocker-arm-support"
+MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
 IN = 25.4
 TOTAL_HEIGHT = 7.00 * IN  # legacy RockerArmSupport.cs (no book numerics)
@@ -173,6 +175,7 @@ async def build(adapter) -> dict[str, str]:
     print(f"  volume after holes: {await _volume(adapter):.1f} mm^3")
     # expected: -2 * pi * (5/32)^2 * 1.25 in^3 = -3,142 mm^3 -> ~700,110 mm^3
 
+    await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 
