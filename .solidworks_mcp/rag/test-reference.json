@@ -1,0 +1,13 @@
+{
+  "version": "1.0",
+  "namespace": "test-reference",
+  "source_location": "C:\\Users\\pedro\\AppData\\Local\\Temp\\pytest-of-pedro\\pytest-54\\test_ingest_reference_source_t0\\reference.txt",
+  "chunk_count": 1,
+  "chunks": [
+    {
+      "id": "test-reference-1",
+      "source": "C:\\Users\\pedro\\AppData\\Local\\Temp\\pytest-of-pedro\\pytest-54\\test_ingest_reference_source_t0\\reference.txt",
+      "text": "Design guidelines: use 3mm walls for 3D printing"
+    }
+  ]
+}

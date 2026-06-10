@@ -119,6 +119,31 @@
       "error": "name 'inspect' is not defined"
     },
     {
+      "tool": "create_equation_driven_curve",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "set_global_variable",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "create_equation",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "create_configuration",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "set_active_configuration",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
       "tool": "create_sketch",
       "bytes": 0,
       "error": "name 'inspect' is not defined"
@@ -329,12 +354,37 @@
       "error": "name 'inspect' is not defined"
     },
     {
+      "tool": "measure",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
       "tool": "analyze_geometry",
       "bytes": 0,
       "error": "name 'inspect' is not defined"
     },
     {
       "tool": "get_material_properties",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "apply_material",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "add_thread",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "create_bom",
+      "bytes": 0,
+      "error": "name 'inspect' is not defined"
+    },
+    {
+      "tool": "export_bom_csv",
       "bytes": 0,
       "error": "name 'inspect' is not defined"
     },
