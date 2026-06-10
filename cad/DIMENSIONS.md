@@ -113,7 +113,9 @@ arm with fiducial indentations for alignment; tapered pin affixes crank to shaft
 | Diametral pitch / module | DP 30 (m = 0.8467 mm) | — | M4 prep, two independent measurements converge (see Appendix C #1 — resolved): p.18 photo tooth pitch 2.69 mm via 7 mm-callout scale; largest-gear OD ≈ 105 ± 5 mm via 150 mm-arrow scale (DP 30 → 103.3). Gives round-inch PDs: largest cone / cylinder gear PD = 120/30 = 4.000", pinion PD = 1.400" | scaled ×2 + period argument | high |
 | Pressure angle | 14.5° assumed | — | period-typical; not stated anywhere | derived | low |
 | Cone shaft length | ~225 mm | ~8.9 | derived: 150 stack + small-end pinion seat ~15 + bearing post ~35 (p.18 top-down) + large-end pivot journal ~25 | derived | low |
-| Cone shaft diameter | 9.5 mm (3/8") | 0.375 | = crankshaft/cam-bore dia, legacy `parameters.kcl` ShaftDiameter | legacy | med |
+| Cone shaft diameter | stepped: 9.5 (3/8") y 0–152.5, 6.35 (1/4") to 160, 4.76 (3/16") to 167.5, 3.175 (1/8") to 225 (large/pivot end at y 0) | 0.375/0.25/0.1875/0.125 | base dia legacy `parameters.kcl` ShaftDiameter; steps = gear bores (Appendix C #7 resolution): small gears can't clear 3/8", and p.18 shows a visibly thin rod past the smallest gears — `build_cone_gear_shaft.py` | legacy + derived | med |
+| Gear bores (configured `BoreDia`) | 9.5 (3/8") T024–T120; 6.35 (1/4") T018; 4.76 (3/16") T012; 3.175 (1/8") T006; no keyway | 0.375/0.25/0.1875/0.125 | Appendix C #7 resolution; 6T wall 0.8 mm matches the thin tip rod (p.18); p.21 macro shows solder blobs fixing the small gears — no keyway evidence anywhere | derived | med |
+| Crank-drive gear (dark steel gear at the large end, "This gear engages the crank" p.20) | coarser pitch than DP 30, est. DP 16: ~64T, PD 4" (OD ≈ cone 120T's); mates a ~16T crank pinion (4:1) | — | p.20 annotation + visibly ~1.5–2× coarser teeth than the 120T beside it; tooth counts NOT countable in available photos — est. from the stated 4:1 + round-PD argument (see Appendix C #9) | scaled | low |
 
 Notes: all 20 gears fixed to one shaft, rotate together. Engagement with cylinder
 gears is at an oblique angle (partial engagement → distinct wear). The four smallest
@@ -123,8 +125,11 @@ is severely undercut at standard proportions — `build_cone_gear.py` (M4) model
 stub-form (gap floor at the base-circle chord, no trochoid root), validated against
 an analytic profile integral to ≤ 0.015% per configuration. All 20 tooth counts are
 configurations T006..T120 of the single parametric part `cone-gear.SLDPRT`
-(equation-driven involutes from ToothCount/DP/PA globals). Bore/keyway deferred —
-see Appendix C #7 (small gears can't clear the 9.5 mm shaft).
+(equation-driven involutes from ToothCount/DP/PA globals) with a configured bore
+(`BoreDia` global per configuration, no keyway — Appendix C #7 resolved; the
+mating shaft steps down accordingly, see the shaft rows). The dark coarse-tooth
+steel gear beside the 120T ("This gear engages the crank", p.20) is a separate
+drive component — Appendix C #9.
 
 ## Chapter 13 — Cylinder Gear Set (pp. 22–25)
 
@@ -490,15 +495,20 @@ re-measure during their M2 script build.
    from ch. 13 macro photos (or photogrammetry `195445871`) and reconcile
    the eccentric-cam part before assembling a channel.
 7. **Small cone gears cannot carry the 9.5 mm shaft bore** (ch. 12) —
-   found in M4 while authoring `build_cone_gear.py`: at DP 30 the 6T gear's
-   OD is 6.77 mm and the 12T root circle is 8.0 mm, both smaller than the
-   9.5 mm cone shaft (18T root 13.1 mm leaves only a 1.8 mm wall). On the
-   real machine the smallest gears must be cut integral with a reduced
-   shaft section (the p.18 photo's yellower small gears are consistent
-   with separate construction). The cone-gear part therefore has NO
-   bore/keyway yet; add bore/keyway only for configurations that clear it
-   (or model the small end integral) when authoring the cone-gear stepped
-   shaft in M4c.
+   **RESOLVED in M4c: configured bore + stepped shaft, no keyway.** At
+   DP 30 the 6T gear's OD is 6.77 mm and the 12T root circle is 8.0 mm,
+   both smaller than the 9.5 mm cone shaft. Resolution: the cone-gear
+   part carries a configured `BoreDia` global — 3/8" (T024–T120), 1/4"
+   (T018), 3/16" (T012), 1/8" (T006; 0.8 mm wall matches the visibly
+   thin tip rod in p.18) — and the shaft (`build_cone_gear_shaft.py`)
+   steps 3/8 → 1/4 → 3/16 → 1/8" at the same stations (ch. 12 rows). No
+   keyway anywhere: the book never shows the attachment and the p.21
+   macro shows solder blobs at the small gears, so gears are modeled
+   plain-bored (key/solder hardware out of scope). Implementation note:
+   the configured bore forced the gear blank from a revolve to an
+   extruded disc — on SW 2026 a dimension-driven cut through a revolved
+   body freezes at its creation-time size (skill learning
+   `cut-on-revolved-body-freezes-at-creation-size.md`).
 8. **Translational gearing fixed-reduction topology** (ch. 23) — found in
    M4c keyframe measurement: a small fine-tooth steel pinion (≈ Ø21 mm,
    est. 24T DP 30) rides coaxially with the 120T rack pinion
@@ -507,6 +517,17 @@ re-measure during their M2 script build.
    pair. All six gear parts are authored individually; resolve the shaft
    layout (and re-check the reduction pinion's tooth count against the
    required k/80→platen-speed law) when mating the drive train in M6.
+9. **Crank-drive gear pair** (ch. 11/12) — found in M4c: the dark steel
+   gear at the cone set's large end ("This gear engages the crank",
+   p.20) implements the stated 4:1 crank→cone reduction together with a
+   pinion on the crankshaft; neither part is in any legacy source. Teeth
+   are visibly ~1.5–2× coarser than the DP 30 train and not countable in
+   the available photos. Working estimate (round-PD argument, mirrors
+   the DP 30 resolution): DP 16, drive gear 64T (PD 4.000", OD ≈ the
+   120T cone gear's, matching p.20), crank pinion 16T (PD 1.000").
+   Author both as M4 parts at the estimate; re-measure/ratify when the
+   drive train is mated in M6 (the 4:1 ratio itself is book-stated and
+   fixed — only DP/tooth-count split is estimated).
 
 
 
