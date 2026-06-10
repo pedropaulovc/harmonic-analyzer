@@ -89,6 +89,11 @@ No annotated or stated numeric dimensions in this chapter.
 | Handle diameter | ~22 mm | ~0.87 | p.12 photo, proportion of arm length | scaled | low |
 | Crank arm width | ~16 mm | ~0.63 | p.12 photo | scaled | low |
 | Crankshaft diameter | 9.5 mm (3/8") | 0.375 | legacy `parameters.kcl` ShaftDiameter; uncontradicted | legacy | med |
+| Arm thickness | ~8 mm | ~0.31 | p.12 photo, ~half the arm width | scaled | low |
+| Square-end overhang past pivot | ~10 mm | ~0.39 | p.12 photo | scaled | low |
+| Handle pivot bore | ~6 mm | ~0.24 | p.12 photo, proportion of handle dia | scaled | low |
+| Fiducial dimple | ~Ø8 × 0.5 deep | — | p.15 photo | scaled | low |
+| Tapered-pin cross-hole | ~Ø5 mm | ~0.20 | p.14 photo, pin small end | scaled | low |
 
 Construction (stated): wooden handle stained black, rotates on a pivot; metal crank
 arm with fiducial indentations for alignment; tapered pin affixes crank to shaft
