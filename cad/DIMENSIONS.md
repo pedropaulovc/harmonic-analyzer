@@ -150,3 +150,67 @@ at rocker edge → full amplitude; opposite end → 180° phase flip.
 
 ---
 
+## Chapter 18 — Summing Lever (pp. 42–43)
+
+No annotated or stated numeric dimensions in this chapter. Legacy SummingLever.cs
+(from summing-lever.kcl) is the numeric source; nothing in the book contradicts it.
+
+| dim | value | (in) | source | method | confidence |
+|---|---|---|---|---|---|
+| Coefficients plate | 44.5 × 152.4 × 5.1 mm | 1.75 × 6.0 × 0.2 | legacy | legacy | med |
+| Pivot cylinder radius | 12.7 mm | 0.5 | legacy | legacy | med |
+| Spring attachment holes | 20 × r 0.5 mm, spacing ≈ 6.95 mm | 20 × r 0.02, ≈ 0.274 pitch | legacy (5.2" span / 19) | legacy | med |
+| Summation plate height | 76.2 mm | 3.0 | legacy | legacy | med |
+| Summation anchor | r 9.5 × h 19.1 mm | r 0.375 × h 0.75 | legacy | legacy | med |
+| Rib thickness / height | 5.1 / 12.7 mm | 0.2 / 0.5 | legacy | legacy | med |
+
+Notes (stated, qualitative): cast iron; pivots on a knife-edge fulcrum; the 20
+channel springs attach along the wide end; total motion is only a few mm
+(magnified downstream by ch. 20–21). Re-scale plate proportions against p.42–43
+photos during M2 rebuild.
+
+## Chapter 19 — Counter Spring (pp. 44–45)
+
+No annotated or stated numeric dimensions. No legacy part.
+
+| dim | value | (in) | source | method | confidence |
+|---|---|---|---|---|---|
+| Coil OD | ~45 mm | ~1.77 | "large-diameter" vs channel springs (32 mm callout, ch. 17); photo proportion | scaled | low |
+| Free length | ~80 mm | ~3.1 | p.44–45 photo proportion | scaled | low |
+| Adjustment post | square-head screw on adjustable post | — | text pp. 44–45 | stated | high (feature) |
+
+Notes: single large spring balancing the combined pull of the 20 channel springs
+on the summing lever; tension adjustable via the square-head screw post.
+Re-measure both dims from photos during the M2 build.
+
+## Chapter 20 — Magnifying Lever (pp. 46–49)
+
+No annotated or stated numeric dimensions. No legacy part.
+
+| dim | value | (in) | source | method | confidence |
+|---|---|---|---|---|---|
+| Magnification | up to 4× (adjustable) | — | text pp. 46–49 | stated | high |
+| Rod diameter | ~6 mm | ~0.24 | round brass rod, photo proportion | scaled | low |
+| Lever length | OPEN | — | scale from p.46–49 photos in M2; arm ratio must give 4× at max setting | — | — |
+
+Notes: round brass rod lever; magnification set by a reeded (knurled) screw
+adjustment that moves the effective fulcrum/attachment point. Geometry
+constraint for M2: output/input arm ratio = 4 at maximum setting.
+
+## Chapter 21 — Magnifying Wheel (pp. 50–53)
+
+| dim | value | (in) | source | method | confidence |
+|---|---|---|---|---|---|
+| Inner hub diameter | 20 mm | 0.787 | photo callout pp. 50–53 | annotated | high |
+| Outer wheel diameter | 100 mm | 3.937 | photo callout pp. 50–53 | annotated | high |
+| Magnification | 5× | — | text; consistent: 100/20 = 5 ✓ | stated | high |
+| Spoke count | 5 | — | photos | stated | high |
+
+Notes: brass; inner hub is grooved (wire from magnifying lever wraps the hub,
+wire to pen mechanism leaves the outer rim → 5× motion magnification).
+Five-spoke wheel. The two annotated diameters self-validate against the stated
+magnification — strongest-sourced part in chapters 18–21.
+
+---
+
+
