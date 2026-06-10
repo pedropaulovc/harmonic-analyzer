@@ -492,11 +492,15 @@ async def build(adapter) -> dict[str, str]:
         )
     pattern = None
     for point in candidates:
+        # geometry_pattern: per-instance re-solve of the global-driven
+        # equation-curve profile produces corrupt sliver cuts (live SW 2026
+        # finding on the removable transgear); verbatim copies are exact.
         res = await adapter.circular_pattern_feature(
             CircularPatternParameters(
                 axis_point=point,
                 features=[gap_cut.data.name],
                 count=DEFAULT_TEETH,
+                geometry_pattern=True,
             )
         )
         if res.is_success:
