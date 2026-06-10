@@ -13,11 +13,16 @@ from ``ToothCount``/``DP``/``PA`` alone:
   NOT metres -- inch-valued globals keep the two parsers consistent, and a
   blank-volume self-check right after the first extrude fails fast if the
   template's units ever change.
-* The blank (two half circles at tip radius ``Ra``) and the six-entity
-  tooth-gap profile (two involute flanks, base chord, two radial extensions,
-  outer clearance arc) are all ``CreateEquationSpline2`` curves referencing
-  the globals; parameter ranges are kept numeric (t in [0,1]) so only the
-  expression parser needs global support.
+* The blank is an EXTRUDED disc at tip radius ``Ra`` (origin-snapped
+  circle, driving diameter dim equation-linked to ``2*Ra``) -- NOT a
+  revolve: on SW 2026 a dimension-driven cut through a revolved body
+  freezes at its creation-time profile size (any later change of the
+  cut's dimension makes the cut solve to nothing; probed live, see the
+  blank section comment). The six-entity tooth-gap profile (two involute
+  flanks, base chord, two radial extensions, outer clearance arc) is all
+  ``CreateEquationSpline2`` curves referencing the globals; parameter
+  ranges are kept numeric (t in [0,1]) so only the expression parser
+  needs global support.
 * One gap is cut through the blank, then circular-patterned about the gear
   axis; the pattern instance count is equation-linked to ``ToothCount``.
 
@@ -68,7 +73,6 @@ from typing import Any
 from _common import (
     OUT_PNG,
     _read_member,
-    add_line_chain,
     apply_material,
     check,
     ensure_fully_defined,
@@ -76,7 +80,6 @@ from _common import (
     report_mass_properties,
     run_build,
     save_part_and_images,
-    set_sketch_direct_db,
 )
 
 PART_NAME = "cone-gear"
@@ -273,7 +276,6 @@ async def build(adapter) -> dict[str, str]:
         CreateConfigurationParameters,
         CreateEquationParameters,
         ExtrusionParameters,
-        RevolveParameters,
     )
 
     findings: list[str] = []
@@ -330,62 +332,40 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # ------------------------------------------------------------------
-    # Blank: disc at tip radius Ra, revolved from a fully-dimensioned
-    # rectangle whose radial dimension is then equation-linked to "Ra" --
-    # the canonical configuration pattern. (A circle cannot be config-driven
-    # through the fix+driven-dim recipe, and a disc from two half-circle
-    # equation curves goes OVER-defined as soon as one curve is fixed --
-    # both dead ends probed live.)
+    # Blank: disc at tip radius Ra -- an origin-snapped circle with a
+    # DRIVING diameter dimension, extruded. NOT a revolve: a dimension-
+    # driven cut through a revolved body freezes at its creation-time
+    # profile size on SW 2026 (any later change of the cut's dimension --
+    # equation, configured value or plain SystemValue -- makes the cut
+    # solve to NOTHING; minimal repro probe_bore11, extrude counterpart
+    # passes in probe_bore12). The bore cut below needs an extruded blank.
     # ------------------------------------------------------------------
     ra_default_mm = facts["Ra"] * 25.4
-    check("create_sketch blank", await adapter.create_sketch("Top"))
-    blank_lines = await add_line_chain(
-        adapter,
-        [
-            (0.0, 0.0),
-            (ra_default_mm, 0.0),
-            (ra_default_mm, -FACE_WIDTH),
-            (0.0, -FACE_WIDTH),
-        ],
-    )
-    radial_line, side_line, _inner_line, axis_edge = blank_lines
-    for ent, relation in (
-        (radial_line, "horizontal"),
-        (side_line, "vertical"),
-        (_inner_line, "horizontal"),
-        (axis_edge, "vertical"),
-    ):
-        check(f"blank {relation}", await adapter.add_sketch_constraint(ent, None, relation))
-    # Radial dimension FIRST so it is D1@<sketch> (deterministic naming for
-    # the equation link; verified by read-back below).
-    check(
-        "blank radial dim (D1)",
-        await adapter.add_sketch_dimension(radial_line, None, "linear", ra_default_mm),
+    check("create_sketch blank", await adapter.create_sketch("Front"))
+    blank_circle = check(
+        "add_circle blank", await adapter.add_circle(0.0, 0.0, ra_default_mm)
     )
     check(
-        "blank width dim (D2)",
-        await adapter.add_sketch_dimension(side_line, None, "linear", FACE_WIDTH),
+        "blank diameter dim (driving, D1)",
+        await adapter.add_sketch_dimension(
+            blank_circle, None, "diameter", 2.0 * ra_default_mm
+        ),
     )
-    # Revolve axis: a centerline strictly inside the axis edge's span (no
-    # shared endpoints -> no merged vertices) drawn with inference off (no
-    # collinear auto-relation) -- fixing it then cannot over-define the
-    # dimensioned rectangle.
-    set_sketch_direct_db(adapter, True)
-    centerline = check(
-        "add_centerline axis",
-        await adapter.add_centerline(0.0, -1.0, 0.0, -(FACE_WIDTH - 1.0)),
-    )
-    set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "blank sketch", fix_entities=[centerline])
+    status = await adapter.check_sketch_fully_defined()
+    state = status.data.get("definition_state") if status.is_success else None
+    if state != "fully_defined":
+        raise RuntimeError(
+            f"blank sketch is {state!r} -- origin snap missing; a fix would "
+            "break the Ra configuration link, aborting"
+        )
+    print("  OK  blank sketch fully defined (driving dim, no fix)")
     check("exit_sketch blank", await adapter.exit_sketch())
     blank_sketch = feature_name_by_type(adapter, "ProfileFeature")
     check(
-        "revolve blank",
-        await adapter.create_revolve(RevolveParameters(angle=360.0)),
+        "extrude blank",
+        await adapter.create_extrusion(ExtrusionParameters(depth=FACE_WIDTH)),
     )
 
-    # The Top-plane sketch maps sketch -y onto global +Z: the blank must sit
-    # at z = 0..FACE_WIDTH where the Front-plane gap cut (+Z, below) lands.
     mass = await adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"blank mass properties failed: {mass.error}")
@@ -393,7 +373,7 @@ async def build(adapter) -> dict[str, str]:
     if abs(com_z - FACE_WIDTH / 2.0) > 0.1:
         raise RuntimeError(
             f"blank centre of mass z = {com_z:.2f}, expected {FACE_WIDTH / 2.0:.2f}"
-            " -- Top-plane sketch axis mapping flipped; mirror the rectangle"
+            " -- Front-plane extrusion direction flipped"
         )
     blank_volume = float(mass.data.volume)
     expected_blank = math.pi * ra_default_mm**2 * FACE_WIDTH
@@ -403,25 +383,25 @@ async def build(adapter) -> dict[str, str]:
         )
     print(f"  OK  blank volume {blank_volume:.1f} mm^3 (com z {com_z:.2f})")
 
-    # Equation-link the radial dimension to "Ra". Dimension equations
+    # Equation-link the blank diameter to 2*Ra. Dimension equations
     # evaluate in DOCUMENT units; probe which unit Parameter().Value reports
     # so the per-config read-back asserts compare in the right unit.
-    radial_dim = f"D1@{blank_sketch}"
-    before = read_dimension(adapter, radial_dim)
-    if abs(before - facts["Ra"]) < 1e-6 * facts["Ra"]:
+    od_dim = f"D1@{blank_sketch}"
+    before = read_dimension(adapter, od_dim)
+    if abs(before - 2.0 * facts["Ra"]) < 1e-6 * facts["Ra"]:
         dim_unit = 1.0  # Value reads in inches
-    elif abs(before - ra_default_mm) < 1e-6 * ra_default_mm:
+    elif abs(before - 2.0 * ra_default_mm) < 1e-6 * ra_default_mm:
         dim_unit = 25.4  # Value reads in millimetres
     else:
         raise RuntimeError(
-            f"{radial_dim} reads {before!r}, matches neither {facts['Ra']:.6g} in "
-            f"nor {ra_default_mm:.6g} mm"
+            f"{od_dim} reads {before!r}, matches neither {2 * facts['Ra']:.6g} in "
+            f"nor {2 * ra_default_mm:.6g} mm"
         )
-    print(f"  ..  {radial_dim} reads {before:g} (unit factor {dim_unit:g})")
+    print(f"  ..  {od_dim} reads {before:g} (unit factor {dim_unit:g})")
     check(
-        f"link {radial_dim} to Ra",
+        f"link {od_dim} to 2*Ra",
         await adapter.create_equation(
-            CreateEquationParameters(equation=f'"{radial_dim}" = "Ra"')
+            CreateEquationParameters(equation=f'"{od_dim}" = 2 * "Ra"')
         ),
     )
 
@@ -674,17 +654,17 @@ async def build(adapter) -> dict[str, str]:
             f"(analytic {expected:.1f}, blank {blank_mm3:.1f})"
         )
 
-        # OD check via the equation-driven radial dimension (selection-free;
+        # OD check via the equation-driven diameter dimension (selection-free;
         # the measure tool's point selection proved unreliable on the
         # patterned gear -- it kept grabbing gap-wall faces).
-        radial = read_dimension(adapter, radial_dim)
-        if abs(radial - cfg["Ra"] * dim_unit) > 1e-4 * cfg["Ra"] * dim_unit:
+        od = read_dimension(adapter, od_dim)
+        if abs(od - 2.0 * cfg["Ra"] * dim_unit) > 2e-4 * cfg["Ra"] * dim_unit:
             raise RuntimeError(
-                f"{name}: {radial_dim} reads {radial:g}, expected "
-                f"{cfg['Ra'] * dim_unit:g} -- dimension equation did not "
+                f"{name}: {od_dim} reads {od:g}, expected "
+                f"{2.0 * cfg['Ra'] * dim_unit:g} -- dimension equation did not "
                 "regenerate"
             )
-        print(f"  OK  {name}: blank radius dim = {radial:g}")
+        print(f"  OK  {name}: blank diameter dim = {od:g}")
 
         img = (png_dir / f"{PART_NAME}_{name}_isometric.png").resolve()
         check(
