@@ -204,7 +204,10 @@ hand-stamping error).
 | Spring end hooks | bent-wire loops, both ends, extend axially | — | p.41 inset (feature only; modelling deferred to Phase 3 rebuild) | stated | high (feature) |
 | Lever count | 20, cast metal, third-class | — | text pp. 38–39 | stated | high |
 | Spring count | 20 | — | text pp. 38–39 | stated | high |
-| Lever length | OPEN | — | scale from p.40–41 photos vs 32 mm spring callout in M2 | — | — |
+| Lever length (pivot→spring hole c2c) | ~240 mm | ~9.4 | p.38 inset vs 320 mm lever-bank width (20 × 16 mm ch.14 pitch); resolved in M2 | scaled | low |
+| Lever bar section | ~12.5 wide × 9.5 thick | ~0.49 × 0.37 | width matches ch.14 arm callout; thickness vs spring OD p.39 | scaled | low |
+| Lever fulcrum boss | ~Ø19 × 14 long, Ø6 pivot hole | — | p.40 bottom-left close-up | scaled | low |
+| Lever tip | Ø3 spring-hook hole, ~8 mm overhang; fork/clip fittings deferred (photogrammetry 195527397) | — | p.39, p.40 | scaled | low |
 
 Notes: each third-class lever pivots at its end (fulcrum), is driven by its
 rocker arm/amplitude bar, and pulls one of 20 helical springs attached to the
