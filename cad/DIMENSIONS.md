@@ -119,8 +119,12 @@ Notes: all 20 gears fixed to one shaft, rotate together. Engagement with cylinde
 gears is at an oblique angle (partial engagement → distinct wear). The four smallest
 gears (6–24T) look yellower — possibly a harder metal. Cone set pivots out of
 engagement via a knob (for sine/cosine alignment, ch. 25). A 6-tooth involute gear
-is severely undercut at standard proportions — expect a stub/pin-tooth form; resolve
-during M4 gear pipeline prototyping.
+is severely undercut at standard proportions — `build_cone_gear.py` (M4) models it
+stub-form (gap floor at the base-circle chord, no trochoid root), validated against
+an analytic profile integral to ≤ 0.015% per configuration. All 20 tooth counts are
+configurations T006..T120 of the single parametric part `cone-gear.SLDPRT`
+(equation-driven involutes from ToothCount/DP/PA globals). Bore/keyway deferred —
+see Appendix C #7 (small gears can't clear the 9.5 mm shaft).
 
 ## Chapter 13 — Cylinder Gear Set (pp. 22–25)
 
@@ -465,6 +469,16 @@ re-measure during their M2 script build.
    the rod ring at 3 mm; re-measure gear face / cam / ring thicknesses
    from ch. 13 macro photos (or photogrammetry `195445871`) and reconcile
    the eccentric-cam part before assembling a channel.
+7. **Small cone gears cannot carry the 9.5 mm shaft bore** (ch. 12) —
+   found in M4 while authoring `build_cone_gear.py`: at DP 30 the 6T gear's
+   OD is 6.77 mm and the 12T root circle is 8.0 mm, both smaller than the
+   9.5 mm cone shaft (18T root 13.1 mm leaves only a 1.8 mm wall). On the
+   real machine the smallest gears must be cut integral with a reduced
+   shaft section (the p.18 photo's yellower small gears are consistent
+   with separate construction). The cone-gear part therefore has NO
+   bore/keyway yet; add bore/keyway only for configurations that clear it
+   (or model the small end integral) when authoring the cone-gear stepped
+   shaft in M4c.
 
 
 
