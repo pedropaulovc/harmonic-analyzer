@@ -21,8 +21,10 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from _common import IN, check, define_circle, ensure_fully_defined
+from _common import IN, check, define_circle, ensure_fully_defined, volume_check
 from build_cone_gear import gap_area_in_disc, gear_facts
+
+__all__ = ["build_fixed_gear", "cut_tooth_gap", "pattern_about_z", "volume_check"]
 
 # Cut clearance radius (inches -- document units): beyond the largest tip
 # radius in the machine (120T OD/2 = 2.033") so gap profiles always close
@@ -48,21 +50,6 @@ async def equation_curve(adapter: Any, label: str, x_expr: str, y_expr: str) -> 
         )
     )
     return check(f"curve {label}", res)
-
-
-async def volume_check(adapter: Any, label: str, expected: float, tol: float) -> float:
-    """Assert the part volume (mm^3) and return it."""
-    mass = await adapter.get_mass_properties()
-    if not mass.is_success:
-        raise RuntimeError(f"{label}: get_mass_properties failed: {mass.error}")
-    volume = float(mass.data.volume)
-    if abs(volume - expected) > tol:
-        raise RuntimeError(
-            f"{label}: volume {volume:.1f} mm^3, expected {expected:.1f} "
-            f"(+/- {tol:.1f})"
-        )
-    print(f"  OK  {label}: volume {volume:.1f} mm^3 (analytic {expected:.1f})")
-    return volume
 
 
 async def cut_tooth_gap(
