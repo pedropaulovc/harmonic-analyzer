@@ -42,7 +42,7 @@
   {
     "tool": "create_extrusion",
     "status": "error",
-    "elapsed_s": 0.003,
+    "elapsed_s": 0.0026,
     "payload_keys": [
       "sketch_name",
       "depth"
@@ -51,7 +51,7 @@
   {
     "tool": "create_revolve",
     "status": "error",
-    "elapsed_s": 0.0018,
+    "elapsed_s": 0.0024,
     "payload_keys": [
       "sketch_name",
       "axis_entity",
@@ -61,7 +61,7 @@
   {
     "tool": "get_dimension",
     "status": "error",
-    "elapsed_s": 0.1292,
+    "elapsed_s": 0.1262,
     "payload_keys": [
       "name"
     ]
@@ -69,7 +69,7 @@
   {
     "tool": "set_dimension",
     "status": "success",
-    "elapsed_s": 0.1156,
+    "elapsed_s": 0.1107,
     "payload_keys": [
       "name",
       "value"
@@ -78,7 +78,7 @@
   {
     "tool": "create_cut_extrude",
     "status": "error",
-    "elapsed_s": 0.0007,
+    "elapsed_s": 0.0001,
     "payload_keys": []
   },
   {
@@ -102,7 +102,7 @@
   {
     "tool": "circular_pattern_feature",
     "status": "error",
-    "elapsed_s": 0.0001,
+    "elapsed_s": 0.0,
     "payload_keys": []
   },
   {
@@ -160,9 +160,39 @@
     "payload_keys": []
   },
   {
+    "tool": "create_equation_driven_curve",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "set_global_variable",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "create_equation",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "create_configuration",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "set_active_configuration",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
     "tool": "create_sketch",
     "status": "success",
-    "elapsed_s": 0.1009,
+    "elapsed_s": 0.1107,
     "payload_keys": [
       "plane"
     ]
@@ -170,7 +200,7 @@
   {
     "tool": "add_line",
     "status": "success",
-    "elapsed_s": 0.0653,
+    "elapsed_s": 0.063,
     "payload_keys": [
       "x1",
       "y1",
@@ -181,7 +211,7 @@
   {
     "tool": "add_circle",
     "status": "success",
-    "elapsed_s": 0.0511,
+    "elapsed_s": 0.0629,
     "payload_keys": [
       "center_x",
       "center_y",
@@ -191,7 +221,7 @@
   {
     "tool": "add_rectangle",
     "status": "success",
-    "elapsed_s": 0.1139,
+    "elapsed_s": 0.1112,
     "payload_keys": [
       "x1",
       "y1",
@@ -202,13 +232,13 @@
   {
     "tool": "exit_sketch",
     "status": "success",
-    "elapsed_s": 0.0515,
+    "elapsed_s": 0.064,
     "payload_keys": []
   },
   {
     "tool": "check_sketch_fully_defined",
     "status": "error",
-    "elapsed_s": 0.0,
+    "elapsed_s": 0.0001,
     "payload_keys": []
   },
   {
@@ -327,7 +357,7 @@
   {
     "tool": "sketch_tutorial_simple_hole",
     "status": "success",
-    "elapsed_s": 0.2176,
+    "elapsed_s": 0.238,
     "payload_keys": [
       "plane",
       "center_x",
@@ -522,6 +552,12 @@
     "payload_keys": []
   },
   {
+    "tool": "measure",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
     "tool": "analyze_geometry",
     "status": "error",
     "elapsed_s": 0.0,
@@ -532,6 +568,30 @@
   {
     "tool": "get_material_properties",
     "status": "success",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "apply_material",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "add_thread",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "create_bom",
+    "status": "error",
+    "elapsed_s": 0.0,
+    "payload_keys": []
+  },
+  {
+    "tool": "export_bom_csv",
+    "status": "error",
     "elapsed_s": 0.0,
     "payload_keys": []
   },
@@ -689,13 +749,13 @@
   {
     "tool": "list_features",
     "status": "error",
-    "elapsed_s": 0.0001,
+    "elapsed_s": 0.0,
     "payload_keys": []
   },
   {
     "tool": "classify_feature_tree",
     "status": "error",
-    "elapsed_s": 0.0001,
+    "elapsed_s": 0.0,
     "payload_keys": []
   },
   {
@@ -947,7 +1007,7 @@
   {
     "tool": "discover_solidworks_docs",
     "status": "success",
-    "elapsed_s": 0.404,
+    "elapsed_s": 0.1166,
     "payload_keys": []
   },
   {
