@@ -1,18 +1,25 @@
-r"""Reproduction script: rocker arm support (book ch. 14 / ch. 30 views; 2 used).
+r"""Reproduction script: rocker arm support (book ch. 14 / ch. 30 views; 1 used).
 
-Solid green-painted cast-iron tapered frustum carrying the rocker-pivot
-shaft: base 88.9 x 63.5 tapering to 20 x 16.9 at the apex over 177.8 (7")
-tall. A ball mount (separate part) seats on the apex and holds the
-Ø6.35 pivot shaft at 25.2 above it, putting the pivot axis at machine
-y = 228.6 + 25.2 = 253.8. Two stand at (x, z) = (-72.9, +/-101.6).
+Solid green-painted cast-iron tapered frustum carrying the BACK (north,
+z +101.6) end of the rocker-pivot shaft: base 88.9 x 63.5 tapering to
+20 x 16.9 at the apex over 177.8 (7") tall. A ball mount (separate part)
+seats on the apex and holds the Ø6.35 pivot shaft at 25.2 above it,
+putting the pivot axis at machine y = 228.6 + 25.2 = 253.8. An integral
+boss on the east flank (Ø20 about local (+25.4, 76), axis Z) carries a
+Ø9.7 through-bore that clamps the north end of the stationary cylinder
+arbor (machine (x, y) = (-47.5, 126.8)) - the back view (p5) shows the
+drum running straight into this casting with no separate pedestal, and
+the v3 side view shows the arbor end buried in the green flank.
 
 M6.3 REFUTES the legacy windowed-square-frame `rocker-arm-support`
 (184 wide with a 127 square window): no such face appears in any ch. 30
-view - the front view shows a plain solid triangle (base spans x
--130..-44, apex at -81 +/- 6) and the side views the old trapezoid
-silhouette. Only the legacy side taper (2.5" -> 2/3") and 7" height
-survive into this re-authoring. The third leg of the legacy "3 used"
-count was the output-end support - a different casting, deferred to M6.4.
+view. M6.5 photo audit REFUTES the second (south) instance entirely: the
+calibrated v3 side view shows NO green frustum anywhere in z -133..-60
+(the "solid triangle" the front view shows at x -130..-44 is the
+transgear A-FRAME at z -111, whose clevis grips the south pivot ball
+directly - see build_a_frame.py). Only the back (p5) view's frustum is
+real. Only the legacy side taper (2.5" -> 2/3") and 7" height survive
+into this re-authoring.
 
 Dimensions: cad/DIMENSIONS.md ch. 14 "Rocker pivot & supports layout"
 (photo + legacy height, med); mounting holes legacy 5/16" (low).
@@ -26,7 +33,11 @@ symmetric in sketch x, so that plane's handedness does not matter.
 Layout: origin at the base centre, height +Y, base 88.9 along X / 63.5
 along Z. Mounting holes are Ø7.9 x 25 sockets up from the base underside
 (hold-down screws come up through the wooden base; fasteners not
-modeled), cut mid-plane so the cut direction never matters.
+modeled), cut mid-plane so the cut direction never matters. The arbor
+boss extrudes from z -27.5 (machine z +74.1: 0.6 clear of the j=19
+connecting-rod ring at z <= +73.5) back to the sketch plane z 0, merging
+into the tapered flank; its added volume and the bore's removal are gated
+by grid integration over the taper (no tidy closed form).
 
 Run (SolidWorks already open)::
 
@@ -45,6 +56,7 @@ from _common import (
     check,
     define_circle,
     ensure_fully_defined,
+    extrude_at_offset,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -66,6 +78,52 @@ MOUNTING_HOLE_DEPTH = 25.0  # socket depth up from the base underside (low)
 
 WEDGE_CUT_DEPTH = BASE_Z * 2.5  # mid-plane total; > base depth
 HOLE_CUT_DEPTH = 2.0 * MOUNTING_HOLE_DEPTH  # mid-plane total about y = 0
+
+# Arbor clamp boss on the east flank (M6.5): the cylinder arbor at machine
+# (x, y) = (-47.5, 126.8) = local (+25.4, 76.0) clamps into this casting
+# (back view p5: the drum runs into the green flank; no north pedestal).
+BOSS_X = 25.4  # local x of the arbor axis (= -47.5 - (-72.9))
+BOSS_Y = 76.0  # drive height above the base top
+BOSS_DIA = 20.0  # boss OD around the bore (function-driven, low)
+BOSS_Z_FRONT = -27.5  # boss face: machine z 74.1, 0.6 clear of the j=19 rod ring
+BORE_DIA = 9.7  # arbor Ø9.525 + slip clearance
+BORE_CUT_DEPTH = 70.0  # mid-plane total; > boss + body depth
+
+
+def _taper_half_widths(y: float) -> tuple[float, float]:
+    """Body half-width (X) and half-depth (Z) at height y (linear taper)."""
+    s = y / TOTAL_HEIGHT
+    half_w = BASE_X / 2.0 + (TOP_X / 2.0 - BASE_X / 2.0) * s
+    half_d = BASE_Z / 2.0 + (TOP_Z / 2.0 - BASE_Z / 2.0) * s
+    return half_w, half_d
+
+
+def _grid_circle_volume(radius: float, boss_only: bool, step: float = 0.02) -> float:
+    """Grid-integrate material length along Z over a circle at (BOSS_X, BOSS_Y).
+
+    boss_only=True: volume the boss ADDS (z BOSS_Z_FRONT..0 outside the body).
+    boss_only=False: material the bore REMOVES (boss span + body span).
+    """
+    n = int(2.0 * radius / step)
+    total = 0.0
+    for i in range(n):
+        x = BOSS_X - radius + (i + 0.5) * step
+        half_chord_sq = radius * radius - (x - BOSS_X) ** 2
+        if half_chord_sq <= 0.0:
+            continue
+        dy = math.sqrt(half_chord_sq)
+        m = int(2.0 * dy / step)
+        for j in range(m):
+            y = BOSS_Y - dy + (j + 0.5) * step
+            half_w, half_d = _taper_half_widths(y)
+            inside = abs(x) <= half_w
+            if boss_only:
+                length = -BOSS_Z_FRONT - half_d if inside else -BOSS_Z_FRONT
+                total += max(0.0, length) * step * step
+                continue
+            length = (-BOSS_Z_FRONT + half_d) if inside else -BOSS_Z_FRONT
+            total += length * step * step
+    return total
 
 
 async def build(adapter) -> dict[str, str]:
@@ -163,7 +221,33 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     v_holes = 2.0 * math.pi * (MOUNTING_HOLE_DIA / 2.0) ** 2 * MOUNTING_HOLE_DEPTH
-    await volume_check(adapter, "mounting holes", volume - v_holes, 0.01 * v_holes + 5.0)
+    volume = await volume_check(
+        adapter, "mounting holes", volume - v_holes, 0.01 * v_holes + 5.0
+    )
+
+    # Arbor clamp boss on the east flank (Front sketch (x, y) -> (X, Y),
+    # extruded from z = BOSS_Z_FRONT back to the sketch plane).
+    check("create_sketch boss", await adapter.create_sketch("Front"))
+    await define_circle(adapter, BOSS_X, BOSS_Y, BOSS_DIA / 2.0, "arbor boss")
+    await ensure_fully_defined(adapter, "boss sketch")
+    check("exit_sketch boss", await adapter.exit_sketch())
+    extrude_at_offset(adapter, -BOSS_Z_FRONT, BOSS_Z_FRONT)
+    v_boss = _grid_circle_volume(BOSS_DIA / 2.0, boss_only=True)
+    volume = await volume_check(adapter, "arbor boss", volume + v_boss, 0.02 * v_boss)
+
+    # Arbor through-bore along Z (mid-plane cut: direction never matters).
+    check("create_sketch arbor bore", await adapter.create_sketch("Front"))
+    await define_circle(adapter, BOSS_X, BOSS_Y, BORE_DIA / 2.0, "arbor bore")
+    await ensure_fully_defined(adapter, "arbor bore sketch")
+    check("exit_sketch arbor bore", await adapter.exit_sketch())
+    check(
+        "cut arbor bore",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=BORE_CUT_DEPTH, both_directions=True)
+        ),
+    )
+    v_bore = _grid_circle_volume(BORE_DIA / 2.0, boss_only=False)
+    await volume_check(adapter, "arbor bore", volume - v_bore, 0.02 * v_bore)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
