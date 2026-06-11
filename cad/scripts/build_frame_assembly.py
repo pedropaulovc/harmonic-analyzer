@@ -156,11 +156,6 @@ async def build(adapter) -> dict[str, str]:
     bracket_path = _part("corner-bracket")
     support_path = _part("rocker-arm-support")
 
-    # Re-runnable: a previous run leaves documents open and saving over an
-    # open path fails.
-    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    log("CloseAllDocuments (clean session)")
-
     check("create_assembly", await adapter.create_assembly())
 
     # Base: first insert is auto-fixed by SolidWorks.

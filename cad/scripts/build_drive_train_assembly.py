@@ -53,7 +53,6 @@ from _common import (
     assert_components_fully_defined,
     check,
     check_no_interference,
-    log,
     run_build,
     save_assembly_and_images,
 )
@@ -180,8 +179,6 @@ async def _place(
 
 
 async def build(adapter) -> dict[str, str]:
-    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    log("CloseAllDocuments (clean session)")
     check("create_assembly", await adapter.create_assembly())
 
     # --- cone set (all inclined 19.8 deg in plan) ---
