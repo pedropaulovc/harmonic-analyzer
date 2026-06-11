@@ -11,7 +11,7 @@ p.18 photos visibly show a thin rod past the smallest gears. Gears
 attach by means the book never shows (p.21 macro shows solder blobs at
 the small gears) -- no keyseat, the shaft steps are plain.
 
-Sections, large (pivot) end at y = 0, gear seats at the 7.5 mm stack
+Sections, large (pivot) end at z = 0, gear seats at the 7.5 mm stack
 pitch (150 mm / 20 gears, annotated p.18):
 
 * 3/8 in x 152.5 -- pivot journal 25 + 17 seats (T120..T024)
@@ -23,13 +23,16 @@ Dimensions: cad/DIMENSIONS.md "Chapter 12" -- base dia legacy (med),
 length derived from the annotated 150 mm stack + p.18 top-down end
 allowances (low), step diameters = gear bores (Appendix C #7).
 
-Build: four coaxial Top-plane circles extruded +Y to each section's end
+Build: four coaxial Front-plane circles extruded +Z to each section's end
 station with ``merge_result`` -- each smaller cylinder is contained in
 its larger neighbour over the shared length, so the union is exactly the
 stepped shaft (volume check is exact per section, no offset planes
 needed).
 
-Layout: shaft axis along +Y, large (pivot) end at the origin.
+Layout: shaft axis along +Z, large (pivot) end at the origin -- along
+the assembly depth like the gears (`build_cone_gear.py` axis = Z), so
+the drive-train assembly inclines the whole cone set with one Ry(-19.8)
+rotation (DIMENSIONS.md ch. 13 drive-train layout).
 
 Run (SolidWorks already open)::
 
@@ -77,19 +80,19 @@ async def build(adapter) -> dict[str, str]:
 
     volume = 0.0
     prev_end = 0.0
-    for dia_in, end_y in SECTIONS:
-        label = f"section d{dia_in:g}in to y={end_y:g}"
-        check(f"create_sketch {label}", await adapter.create_sketch("Top"))
+    for dia_in, end_z in SECTIONS:
+        label = f"section d{dia_in:g}in to z={end_z:g}"
+        check(f"create_sketch {label}", await adapter.create_sketch("Front"))
         await define_circle(adapter, 0.0, 0.0, dia_in * IN / 2.0, label)
         await ensure_fully_defined(adapter, f"{label} sketch")
         check(f"exit_sketch {label}", await adapter.exit_sketch())
         check(
             f"extrude {label}",
-            await adapter.create_extrusion(ExtrusionParameters(depth=end_y)),
+            await adapter.create_extrusion(ExtrusionParameters(depth=end_z)),
         )
-        volume += math.pi * (dia_in * IN / 2.0) ** 2 * (end_y - prev_end)
+        volume += math.pi * (dia_in * IN / 2.0) ** 2 * (end_z - prev_end)
         await volume_check(adapter, label, volume, 0.005 * volume)
-        prev_end = end_y
+        prev_end = end_z
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
