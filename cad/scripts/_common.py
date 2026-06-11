@@ -831,6 +831,13 @@ async def save_assembly_and_images(
             ),
         )
         artefacts[view] = str(img_path)
+
+    from trim_renders import trim_readme_render
+
+    trimmed = trim_readme_render(asm_name)
+    if trimmed:
+        print(f"  OK  trim README render {trimmed}")
+        artefacts["readme"] = trimmed.split(":")[0]
     return artefacts
 
 

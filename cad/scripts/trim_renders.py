@@ -1,25 +1,33 @@
-"""Trim background margins from build renders into README-friendly copies."""
+"""Trim background margins from assembly renders into README copies.
+
+``save_assembly_and_images`` calls :func:`trim_readme_render` after each
+export, so ``docs/images`` stays in sync with the build. Runnable
+standalone to refresh all five README images from existing renders.
+"""
+
+from __future__ import annotations
 
 from pathlib import Path
 
 from PIL import Image, ImageChops
 
 ROOT = Path(__file__).resolve().parents[2]
-PNG = ROOT / "cad" / "out" / "png"
-OUT = ROOT / "docs" / "images"
+OUT_PNG = ROOT / "cad" / "out" / "png"
+DOCS_IMAGES = ROOT / "docs" / "images"
 PAD = 24
 THRESHOLD = 30
 
-RENDERS = {
-    "hero.png": PNG / "harmonic-analyzer" / "harmonic-analyzer_isometric.png",
-    "frame.png": PNG / "frame" / "frame_isometric.png",
-    "drive-train.png": PNG / "drive-train" / "drive-train_isometric.png",
-    "channel.png": PNG / "channel" / "channel_isometric.png",
-    "output.png": PNG / "output" / "output_isometric.png",
+README_RENDERS = {
+    "harmonic-analyzer": "hero.png",
+    "frame": "frame.png",
+    "drive-train": "drive-train.png",
+    "channel": "channel.png",
+    "output": "output.png",
 }
 
 
 def trim(src: Path, dst: Path) -> str:
+    """Crop ``src`` to its content (vs the corner background colour) + PAD."""
     img = Image.open(src).convert("RGB")
     background = Image.new("RGB", img.size, img.getpixel((0, 0)))
     diff = ImageChops.difference(img, background).convert("L")
@@ -34,10 +42,22 @@ def trim(src: Path, dst: Path) -> str:
         min(img.height, bottom + PAD),
     )
     cropped = img.crop(bbox)
+    dst.parent.mkdir(parents=True, exist_ok=True)
     cropped.save(dst)
-    return f"{dst.name}: {img.size} -> {cropped.size}"
+    return f"{dst.relative_to(ROOT)}: {img.size} -> {cropped.size}"
 
 
-OUT.mkdir(parents=True, exist_ok=True)
-for name, src in RENDERS.items():
-    print(trim(src, OUT / name))
+def trim_readme_render(asm_name: str) -> str | None:
+    """Trim ``<asm>_isometric.png`` into docs/images if the README uses it."""
+    docs_name = README_RENDERS.get(asm_name)
+    if docs_name is None:
+        return None
+    src = OUT_PNG / asm_name / f"{asm_name}_isometric.png"
+    if not src.exists():
+        return None
+    return trim(src, DOCS_IMAGES / docs_name)
+
+
+if __name__ == "__main__":
+    for asm in README_RENDERS:
+        print(trim_readme_render(asm) or f"--  skip {asm} (no isometric render)")
