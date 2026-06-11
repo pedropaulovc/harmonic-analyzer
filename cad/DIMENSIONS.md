@@ -368,7 +368,7 @@ boss, Z along the knife edge.
 | Hook hole | Ø3 vertical in the boss top at x 75.5 (machine 90.5) | — | derived: boss-hook shank seat (real joint ≈ 2.6 tap drill + M3 — modeled at shank size for a zero-volume fit) | derived | low |
 | Knife mount | 8-square hardened bar set diamond-wise (edge up), 31.8 long — rides inside the lever tube's slot tunnel (z ±15.9 vs slot ±16; contact bands outside the slot are geometrically impossible — the diamond flanks clash with the tube lower wall); brass block 24 × 28 × 24 below; Ø8 stud through the tube slot rising to machine y 1065 | — | p.42/43 (square-head bolt + stirrup strap collapsed to block + stud — simplification) | scaled | low |
 | Top crossbar | 22 × 41 rail section (ch. 6), 372 long along Z, Ø8.2 stud hole at centre; bottom face machine y 1010 (0.5 above the summing-lever tube top 1009.5) — the bar floats 10.3 proud of the top-frame ring band (999.7..1040.7), ends face-flush against the rail inner faces over y 1010..1040.7 | — | ch. 30 views + top-frame ring inner span | scaled + derived | med |
-| Knife stay | Ø3 rod along X at machine (0, 1086), x −197..+20; 8 × 2 strap from the rod at x −40 down to the knife-mount stud west flank at (10.6, 1053), 2 above the raised crossbar top 1051 | — | p.42–43; M6.4 reroute: a drop to the knife block crosses the summing-plate band, a hook west of x −40 crosses the channel-lever bank | scaled + derived | low |
+| Knife stay | Ø3 rod along X at machine (0, 1086), x −197..+20; 8 × 2 strap from the rod at x −40 down to the knife-mount stud west flank at (10, 1053) (end corner 0.45 clear of the stud face), 2 above the raised crossbar top 1051 | — | p.42–43; M6.4 reroute: a drop to the knife block crosses the summing-plate band, a hook west of x −40 crosses the channel-lever bank | scaled + derived | low |
 | Boss hook | Ø3 J-hook: shank +Y in the boss hole, rise 12, elbow R 3, arm +X 3.5 — rod top machine y 1015, tip x 97 | — | p.43/45 (hook + chrome link ring collapsed to one hook; the spring's own loop is the ring) | derived | low |
 
 Notes (stated, qualitative): cast iron; pivots on a knife-edge fulcrum; the 20
@@ -463,10 +463,12 @@ z −146.9 (axle flange on the bar front −138.9).
 Notes: toothed brass rack along the bottom edge (driven by ch. 23 gearing for
 horizontal travel); two brass clips (left/right) retain the recording paper;
 gearing can be unlatched from the rack for free repositioning/reset.
-M6.4 rack mesh: rack mounted teeth-down (Rz 180) at y 324.09 = pinion axis
-253.5 + PD r 40.64 + 0.8 backlash + pitch-line offset (0.3 left eight small
-involute-vs-straight flank overlaps off the pitch point); rack x0 = 15 × pitch
-(2.660) ≈ 39.90 phases a tooth space onto the 96T pinion's bottom gap.
+M6.4 rack mesh: rack mounted teeth-down (Rz 180) at y 323.59 = pinion axis
+253.5 + PD r 40.64 + 0.3 backlash + pitch-line offset; rack x0 = 15.5 × pitch
+(2.660) ≈ 41.23 — the gear's seed gap is centred at +γ/2 (flanks cross the
+pitch circle at ±π/(2N) of the gap centreline), so a TOOTH sits at bottom
+dead centre and the gaps flank it at ±p/2: rack teeth land on those gaps
+(15 × pitch was tip-to-tip — 7 decaying overlaps, NOT a backlash problem).
 
 ## Chapter 23 — Translational Gearing (pp. 56–59)
 

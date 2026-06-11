@@ -144,13 +144,15 @@ PLATE_Y0 = 305.0
 PLATE_FRONT_Z = BAR_FRONT_Z - PLATE_THICKNESS  # -142.9
 PINION_AXIS = (0.0, 253.5)  # transgear stud on the pinion bar
 PINION_PD_R = RACK_PINION_TEETH / 30.0 * IN / 2.0  # 40.64 (DP 30)
-RACK_BACKLASH = 0.8  # 0.3 left eight small flank overlaps off the pitch point
-# (involute vs straight rack flanks); 0.8 separates every tooth pair
+RACK_BACKLASH = 0.3
 # Rz(180) placement: machine x = RACK_X0 - x_local, y = RACK_Y0 - y_local.
-# Tooth centres sit at x_local = k * PITCH, so RACK_X0 = 15 * PITCH puts a
-# rack tooth dead on x = 0 -- straight into the 96T gear's bottom gap (the
-# seed gap is at +X and 96/4 puts gap #24 at the bottom).
-RACK_X0 = 15.0 * RACK_PITCH  # 39.90 (right edge 2.1 west of the plate's)
+# Tooth centres sit at x_local = k * PITCH. The gear's seed gap is centred
+# at +gamma/2 (the _gear.py flanks cross the pitch circle at +pi/(2N) and
+# gamma - pi/(2N)), so a TOOTH -- not a gap -- sits at bottom dead centre
+# and the gaps flank it at x = +-PITCH/2. RACK_X0 = 15.5 * PITCH puts rack
+# teeth onto those gaps (the original 15 * PITCH was tip-to-tip: one max
+# overlap dead centre decaying by the tip-circle sagitta at +-1..3 teeth).
+RACK_X0 = 15.5 * RACK_PITCH  # 41.23 (right edge 0.77 west of the plate's)
 RACK_Y0 = PINION_AXIS[1] + PINION_PD_R + RACK_BACKLASH + RACK_PITCH_LINE_Y
 
 CLIP_Y0 = 312.0
@@ -269,13 +271,16 @@ def _assert_rack_mesh() -> None:
     backlash = rack_pitch_y - (PINION_AXIS[1] + PINION_PD_R)
     if abs(backlash - RACK_BACKLASH) > 1e-9:
         raise RuntimeError(f"rack backlash {backlash:.3f} != {RACK_BACKLASH}")
-    phase = math.remainder(RACK_X0, RACK_PITCH)  # tooth centre at x = 0
-    if abs(phase) > 1e-9:
-        raise RuntimeError(f"rack tooth phase {phase:.4f} != 0 at the pinion")
+    phase = math.remainder(RACK_X0, RACK_PITCH)  # tooth centres at +-p/2
+    if abs(abs(phase) - RACK_PITCH / 2.0) > 1e-9:
+        raise RuntimeError(
+            f"rack tooth phase {phase:.4f} != +-p/2: the gear gaps sit at"
+            f" +-PITCH/2 about bottom dead centre (tooth at the bottom)"
+        )
     if RACK_PINION_TEETH % 4:
-        raise RuntimeError("96T bottom-gap alignment needs a multiple of 4")
+        raise RuntimeError("96T bottom-tooth alignment needs a multiple of 4")
     log(f"rack mesh: pitch line y {rack_pitch_y:.2f}, backlash {backlash:.2f},"
-        f" tooth centred on the bottom gap")
+        f" rack teeth on the gaps flanking the gear's bottom tooth")
 
 
 def _assert_knob_shaft_clearance() -> None:
