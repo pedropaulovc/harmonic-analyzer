@@ -26,6 +26,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
 
 from _common import (
@@ -39,6 +40,7 @@ from _common import (
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_sketch_direct_db,
 )
 
 PART_NAME = "amplitude-bar"
@@ -120,16 +122,26 @@ async def build(adapter) -> dict[str, str]:
     # ambiguous: the wrong sketch-x sign puts the circle at Z = -3.175,
     # outside the 0..6.35 body, and the cut removes nothing — probe by
     # volume read-back and flip (a dead miss feature may stay in the tree,
-    # same precedent as the _common spring-hook flip retry).
+    # same precedent as the _common spring-hook flip retry). Inference OFF:
+    # with it on, the circle snapped onto the bar's top corner and resized
+    # to r 6.35 (live-caught via STL: cut surface fit centre (812.8, 0),
+    # r 6.353 — a 100.5 mm^3 corner round-off instead of the 10 mm^3 pin
+    # hole), so the removed volume is asserted within ±2 of analytic.
     res = await adapter.get_mass_properties()
     vol_before = res.data.volume
     print(f"  volume before top pin hole: {vol_before:.1f} mm^3")
     pin_y = BAR_LENGTH - TOP_PIN_DROP
+    # cheeks total = bar width - slot width
+    expected_removed = (
+        math.pi * (TOP_PIN_HOLE_DIA / 2.0) ** 2 * (BAR_WIDTH - TOP_NOTCH_WIDTH)
+    )
     for sketch_x in (BAR_DEPTH / 2.0, -BAR_DEPTH / 2.0):
         check("create_sketch top pin hole", await adapter.create_sketch("Right"))
+        set_sketch_direct_db(adapter, True)  # inference snaps to the top corner
         await define_circle(
             adapter, sketch_x, pin_y, TOP_PIN_HOLE_DIA / 2.0, "top pin hole"
         )
+        set_sketch_direct_db(adapter, False)
         await ensure_fully_defined(adapter, "top pin hole sketch")
         check("exit_sketch top pin hole", await adapter.exit_sketch())
         cut = await adapter.create_cut_extrude(
@@ -143,14 +155,22 @@ async def build(adapter) -> dict[str, str]:
             continue
         res = await adapter.get_mass_properties()
         removed = vol_before - res.data.volume
-        if removed > 1.0:
+        if abs(removed - expected_removed) < 2.0:
             print(
                 f"  OK  top pin hole at sketch x={sketch_x:+g}"
-                f" removed {removed:.1f} mm^3"
+                f" removed {removed:.1f} mm^3 (analytic {expected_removed:.1f})"
             )
-            # expected: pi * 1^2 * (2 cheeks * 1.5875) = ~10 mm^3
             break
-        print(f"  ..  top pin cut at sketch x={sketch_x:+g} removed nothing; flipping")
+        if removed < 1.0:
+            print(
+                f"  ..  top pin cut at sketch x={sketch_x:+g} removed nothing;"
+                " flipping"
+            )
+            continue
+        raise RuntimeError(
+            f"top pin cut removed {removed:.1f} mm^3, expected"
+            f" {expected_removed:.1f} — circle misplaced/resized"
+        )
     else:
         raise RuntimeError("top pin hole cut removed no material on either side")
 
