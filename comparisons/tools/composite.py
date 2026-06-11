@@ -103,6 +103,23 @@ def _trim_uniform_border(img: Image.Image) -> Image.Image:
     return img.crop(bbox) if bbox else img
 
 
+def trim_render_file(path: Path, margin_frac: float = 0.01) -> None:
+    """Crop a captured render to its content + a small margin, in place.
+
+    ViewZoomToFit2 fits the SolidWorks window aspect, not the capture canvas,
+    so raw captures carry large background margins. render_compare captures
+    on an oversized canvas and calls this to store a content-tight image.
+    """
+    img = Image.open(path)
+    bbox = _content_mask(img).getbbox()
+    if not bbox:
+        return
+    m = round(max(img.size) * margin_frac)
+    img.crop((max(0, bbox[0] - m), max(0, bbox[1] - m),
+              min(img.width, bbox[2] + m), min(img.height, bbox[3] + m))).save(
+        path, **JPEG_OPTS)
+
+
 def _fitted_render(pair_id: str, ref_size: tuple[int, int], align: dict | None):
     """Content-trimmed render scaled to fit the ref frame.
 

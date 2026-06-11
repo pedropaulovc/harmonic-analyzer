@@ -307,11 +307,13 @@ def _sidecar(pair_id: str) -> Path:
 
 
 def pair_size(ref_png: Path, max_side: int) -> tuple[int, int]:
+    """Capture canvas: ref aspect, oversized 1.4x (capped) — the capture is
+    trimmed to content afterwards, so the slack buys content resolution."""
     from PIL import Image
 
     with Image.open(ref_png) as img:
         rw, rh = img.size
-    scale = max_side / max(rw, rh)
+    scale = min(max_side * 1.4, 2400) / max(rw, rh)
     return max(1, round(rw * scale)), max(1, round(rh * scale))
 
 
@@ -467,6 +469,7 @@ def main() -> int:
                     + f" {w}x{h}")
                 set_camera(adapter, cam)
                 await capture(adapter, composite.pair_paths(pid)["render"], w, h)
+                composite.trim_render_file(composite.pair_paths(pid)["render"])
                 write_sidecar(pair, mpath, (w, h))
                 done[pid] = "rendered"
             adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
