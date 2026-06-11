@@ -176,6 +176,13 @@ Assembly frame: X = machine length (+ right when viewed from the front),
 Y up from base top face (absolute Y = value + 50.8), Z = depth (− front).
 Scales: front view bottom plate 2750 px / 457 mm = 6.02 px/mm; landmarks
 converted from 400 dpi eight-views extractions (`ch30_images/`).
+Eight-views calibrations (make_machine_grid.py): front p1 6.02 px/mm,
+x0_img 1634, base-top y_img 6580; back p5 6.143 px/mm, x0 1647, ybase
+6551, x mirrored (--xflip); side v3 (90°, camera WEST, −z left, M6.5)
+6.124 px/mm, z0 at x_img 1744.5, ybase 6569. Perspective: scale ratio ≈
+D/(D + depth), D ≈ 977 from the near base edge — far objects compress
+toward the horizon (e.g. the crank pedestal at x +122.3 reads at ratio
+0.736 in v3).
 
 | item | value | source | confidence |
 |---|---|---|---|
@@ -196,7 +203,7 @@ converted from 400 dpi eight-views extractions (`ch30_images/`).
 | part | dims | position (x, z), bore y = 76 | source | confidence |
 |---|---|---|---|---|
 | `crank-pedestal` | green cylinder Ø46 × 110 tall, Ø9.5 bore along Z | (+122.3, −108) | front view: centre +123 ± 3, Ø 278 px / 6.02 px/mm, top ~110 above base top; z: standing inside the base front edge (−133.35), shaft stations in front | low/med |
-| `arbor-pedestal` ×2 | green block 24 × 16 × 85, Ø9.5 clamp bore along Z | (−47.5, ±92) — arbor 200 long spans z ±100, stack ends ±70.6 | function-driven; posts hidden behind the gate legs in the eight views | low |
+| `arbor-pedestal` ×1 (M6.5) | green block 24 × 16 × 85, Ø9.5 clamp bore along Z | (−47.5, −92) south only — arbor 200 long spans z ±100, stack ends ±70.6; the NORTH end clamps into the rocker-support frustum's east-flank boss bore (Ø9.7 at local (+25.4, 76) = machine (−47.5, 126.8), boss Ø20 face at z 74.1) — calibrated v3 side view shows no north pedestal, the arbor disappears into the frustum flank | function-driven; v3 side view (6.124 px/mm) | low/med |
 | `cone-pivot-post` | black steel block 25 × 20 × 85, Ø9.5 journal bore (rotated 19.8° in plan with the cone axis) | (+64.0, −90.4) = shaft station 4 mm from the pivot end (post straddles the journal, bore part-empty toward the front) | p.18 "pivot" bracket; journal length from the cone-shaft row (~25) | low |
 | `cone-knob-post` | green round post Ø32 × 80, upward-open U-slot 3.5 wide, floor at 74.4 (tip centre 76) | (−2.4, +94.0) = shaft station 200 from the pivot end (thin-tip journal) | p.18 top-down: green post Ø ~72 px / 2.23 px/mm (largest-cone-gear-OD scale); view 5/8 ball-knob at x ≈ −20 ± 15 agrees within error | low |
 
@@ -236,9 +243,9 @@ ch. 14 layout) and are plain thin straps at the top.
 | item | value | source | confidence |
 |---|---|---|---|
 | Pivot shaft | Ø6.35 × 228.6 (9") along Z at (x, y) = (−72.9, 253.8) | x = arbor −47.5 − 25.4 rod-lever; y = drive 126.8 + 127 rod (arm level at cam mid-stroke); ball x photo-measured −66…−81, ball y 252–255 in both 0°/180° views ✓ | med (x, y derived; dia low) |
-| Support castings ×2 | solid tapered frustum, base 88.9 × 63.5 → top 20 × 16.9, 177.8 tall (7"), green | front view: triangle base spans x −130…−44 (≈86), apex at −81 ± 6; side taper = the old trapezoid silhouette (ch. 14 p.29 photos); REFUTES the legacy windowed-square-frame `rocker-arm-support` (184 wide, window) — no such face appears in any view | photo + legacy height | med |
-| Support positions | apex centred (x, z) = (−72.9, ±101.6), feet on the base top | same stations as the M6.1 gates (outer faces flush with the top plate edge); apex top at y = 228.6 | med |
-| Ball mounts ×2 | clevis + Ø19 ball, ball centre 25.2 above its seat; Ø6.5 shaft cross-bore | apex top 228.6 + 25.2 = 253.8 = pivot axis ✓; same style at the lever rail (ch. 17) | scaled | low |
+| Support casting ×1 (M6.5) | solid tapered frustum, base 88.9 × 63.5 → top 20 × 16.9, 177.8 tall (7"), green; east-flank boss Ø20 at local (+25.4, 76) protruding to local z −27.5 (machine z 74.1), Ø9.7 through-bore along Z clamping the cylinder-arbor north end | front view: triangle base spans x −130…−44 (≈86), apex at −81 ± 6; side taper = the old trapezoid silhouette (ch. 14 p.29 photos); REFUTES the legacy windowed-square-frame `rocker-arm-support` (184 wide, window). M6.5 REFUTES the former SOUTH instance: the calibrated v3 side view (6.124 px/mm, z0 x_img 1744.5, ybase 6569) shows exactly ONE frustum at the back (z +69..+134 footprint, perspective-corrected) — the front-view "triangle base x −130..−44" silhouette is the BACK frustum; the south pivot ball is gripped by the transgear A-frame's clevis (ch. 23) | photo + legacy height | med |
+| Support position | apex centred (x, z) = (−72.9, +101.6), feet on the base top | north (back) only; outer face flush with the top plate edge; apex top at y = 228.6 | med |
+| Ball mounts ×2 | clevis + Ø19 ball, ball centre 25.2 above its seat; Ø6.5 shaft cross-bore | apex/saddle top 228.6 + 25.2 = 253.8 = pivot axis ✓; north mount on the frustum apex (z +101.6), south mount on the A-frame saddle between its clevis ears (z −111, M6.5); same style at the lever rail (ch. 17) | scaled | low |
 | Pivot spacer bushings ×19 | Ø10 OD × 4.5565 long × Ø6.5 bore (pitch 7.0565 − arm 2.5) | M6.3 geometric ceiling: at d = 0 the bar-foot cheeks pass 6.45 above the shaft axis (contact 262.63 − notch 2.381 − axis 253.8), so OD < ~12.9 — REFUTES the p.27 "Ø~25 barrel" read (those barrels are something else); Ø10 keeps 1.45 clearance | derived | med (OD low) |
 | Arm stations | arm mid-plane z = z_j + 0.8 (rod strap at z_j + 3.3 sits beside the arm) | cam/ring z budget, ch. 13 sandwich | derived | med |
 
@@ -310,7 +317,7 @@ hand-stamping error).
 | Lever length (fulcrum→spring hole c2c) | 177.8 mm (7") | 7.0 | M6.4: the 254 "clean 2:1" guess (and the M2 ~240 scaling) is photo-REFUTED — calibrated ch. 30 front view: the lever bank ends at x ≈ −30, the summing-lever plate (pivot bolt read x ≈ +13..17, plate 44.45 wide) sits directly under the tab line, and the 32 mm springs can only bridge tab → plate at x ≈ −22; p.39 shows the bar pin ~5 bar-heights from the tip (50.8/9.5 ✓, 127/9.5 ✗). Bar pin stays at 127 (bar line −72.9, high) → motion ratio 1.4 | derived | med |
 | Bar-pin hole | Ø2 at 127 (5") from the fulcrum, mid-height | 5.0 | amplitude-bar top pin (ch. 15); bar line x = −72.9 | derived | med |
 | Lever bar section | 9.5 tall × 3.0 thick | 0.37 × 0.118 | M6.3: 20 levers at the 7.06 channel pitch on a common shaft cap the thickness (the M2 12.5 "width" violated the pitch); 3.0 lets the bar's 3.2 top slot straddle the lever | derived | med |
-| Lever fulcrum | Ø6.5 pivot hole at 0; common Ø6.35 × 228.6 shaft along Z at (x, y) = (−199.9, 1065.9), 2 ball mounts (same part as the rocker pivot's) on the top-frame west rail; Ø12 × 4.0565 spacer bushings ×19 | — | p.40 bottom-left clevis+ball = the shaft END mount (mirror of the rocker pivot design); rail top = 1065.9 − 25.2 = 1040.7 | derived | low-med |
+| Lever fulcrum | Ø6.5 pivot hole at 0; common Ø6.35 × 182 shaft (`fulcrum-shaft`, M6.5 — shortened from 228.6: tips ±91 clear the west columns' Ø34.925 surfaces at (−197, ±112), where 228.6 tips overlapped them by 0.09 mm) along Z at (x, y) = (−199.9, 1065.9), 2 ball mounts (same part as the rocker pivot's) on the top-frame west rail at z ±85; Ø12 × 4.0565 spacer bushings ×19 | — | p.40 bottom-left clevis+ball = the shaft END mount (mirror of the rocker pivot design); rail top = 1065.9 − 25.2 = 1040.7 | derived | low-med |
 | Lever tip | bar steps to a 6.0-tall centred tab at x 169 (p.39/p.41), rounded r3 tip, Ø4 spring-hook hole at 177.8, 8 mm overhang; fork/clip fittings deferred (photogrammetry 195527397) | — | p.39, p.40; the Ø3 photo read is infeasible — the spring's r 2.75 Ø1-wire eye threading the 3.0 plate needs eye-drop margins |√(ρ²−1.5²)−D| ≤ hole_r − 0.1 at ρ = 2.25/3.25, best ~0.05 through Ø3, ~0.3 through Ø4 (M6.3 toroid solve) | scaled→derived | med |
 
 Notes: each third-class lever pivots at its end (fulcrum), is driven by its
@@ -334,9 +341,9 @@ z_j + 0.8.
 | item | position / value | source | confidence |
 |---|---|---|---|
 | Rocker pivot shaft | Ø6.35 × 228.6 along Z at (−72.9, 253.8) | ch. 14 layout table | med |
-| Top-lever fulcrum shaft | Ø6.35 × 228.6 along Z at (−199.9, 1065.9) | ch. 17 rows | med |
+| Top-lever fulcrum shaft | Ø6.35 × 182 (`fulcrum-shaft`) along Z at (−199.9, 1065.9) — M6.5: 228.6 tips fell inside the west columns | ch. 17 rows | med |
 | Top frame (NEW part) | green cast rectangular ring around the 4 columns: rails 22 wide × 41 tall (y 999.7…1040.7, top = lever ball-mount seat 1065.9 − 25.2), corner bosses Ø48 bored Ø35 (column Ø34.925) at (±197, ±112); clamps the columns 80 below their tops (1120.8 − 1040.7) | eight-views: green ring at y ≈ 1010–1055 in all views, columns continue above it to caps ≈ 1090–1120 | med |
-| Ball mounts ×4 | rocker pair on the support apexes (seats y 228.6, z ±101.6); lever pair on the top-frame west rail (seat y 1040.7) at z ±85 — any further out the Ø16 base overhangs the Ø35 boss bores (need √(2.9² + dz²) ≥ 17.5 + 8 → dz ≥ 25.3 from the boss at z 112) | ch. 14 / ch. 17; lever z from boss-bore clearance | med |
+| Ball mounts ×4 | rocker pair at seats y 228.6: north on the support apex (z +101.6), south on the A-frame saddle (z −111, M6.5); lever pair on the top-frame west rail (seat y 1040.7) at z ±85 — any further out the Ø16 base overhangs the Ø35 boss bores (need √(2.9² + dz²) ≥ 17.5 + 8 → dz ≥ 25.3 from the boss at z 112) | ch. 14 / ch. 17; lever z from boss-bore clearance | med |
 | Amplitude bars (default) | vertical, slot centred on the pivot x = −72.9 (d = 0, bar rotated 90° about its long axis: slot/pin across Z); foot roof on the tilted arm's top edge at 262.63 (contact at the bar −X edge, arc max), bar bottom 260.25, top 1073.05, top pin 1066.70 | ch. 15 notes + M6.3 assembly solve | med |
 | Springs (default) | hanging free from lever tab holes (−22.10, 1067.02), rotated 90° about Y so the eye ring (r 2.75, plane ⊥ lever face) threads the Ø4 hole; eye centre 3.37 below the hole (torus-swept worst cases at the slab faces: upper branch inside the hole void with 0.31 margin, lower branch clears the tab underside by 2.05); body 32 + hooks (eye centre at spring local y 34 = body 32 + lead 2.0); lower hook centre lands at y 1027.6 = summing-plate level — the 32 mm spring length closes the lever→plate chain only with the 177.8 lever (M6.4) | ch. 17/18 + M6.4 threading solve | med |
 | Default mechanism state | gear notches +Y (cosine alignment) → cam lobes −Y → rod rings concentric on the cams at (−47.5, 121.72) → arms tilted −11.54° (pin solve: circle r 25.4 about (−72.9, 253.8) ∩ r 127 about ring centre → pin (−48.01, 248.72)), rods leaning 0.23° (Rz +0.23°), levers +0.36° (bar-pin chain 1066.70 vs fulcrum 1065.9) | ch. 13 notes + ch. 25 + M6.3 solve | derived |
@@ -367,7 +374,7 @@ boss, Z along the knife edge.
 | Web + boss | twin ribs 3 wide, y 2..12, x 9..80, z taper ±17.18 → ±4.27; boss Ø14 × 12 at x 80 (machine 95) | — | p.43 plan | scaled | low |
 | Hook hole | Ø3 vertical in the boss top at x 75.5 (machine 90.5) | — | derived: boss-hook shank seat (real joint ≈ 2.6 tap drill + M3 — modeled at shank size for a zero-volume fit) | derived | low |
 | Knife mount | 8-square hardened bar set diamond-wise (edge up), 31.8 long — rides inside the lever tube's slot tunnel (z ±15.9 vs slot ±16; contact bands outside the slot are geometrically impossible — the diamond flanks clash with the tube lower wall); brass block 24 × 28 × 24 below; Ø8 stud through the tube slot rising to machine y 1065 | — | p.42/43 (square-head bolt + stirrup strap collapsed to block + stud — simplification) | scaled | low |
-| Top crossbar | 22 × 41 rail section (ch. 6), 372 long along Z, Ø8.2 stud hole at centre; bottom face machine y 1010 (0.5 above the summing-lever tube top 1009.5) — the bar floats 10.3 proud of the top-frame ring band (999.7..1040.7), ends face-flush against the rail inner faces over y 1010..1040.7 | — | ch. 30 views + top-frame ring inner span | scaled + derived | med |
+| Top crossbar | 22 × 41 rail section (ch. 6), 202 long along Z (M6.5 — the M6.4 372 mistakenly used the ring's inner X half-span 186; the bar spans the ring WINDOW along Z, inner faces at z ±101), Ø8.2 stud hole at centre; bottom face machine y 1010 (0.5 above the summing-lever tube top 1009.5) — the bar floats 10.3 proud of the top-frame ring band (999.7..1040.7), ends face-flush against the north/south rail inner faces over y 1010..1040.7 | — | ch. 30 views + top-frame ring inner span | scaled + derived | med |
 | Knife stay | Ø3 rod along X at machine (0, 1086), x −197..+20; 8 × 2 strap from the rod at x −40 down to the knife-mount stud west flank at (10, 1053) (end corner 0.45 clear of the stud face), 2 above the raised crossbar top 1051 | — | p.42–43; M6.4 reroute: a drop to the knife block crosses the summing-plate band, a hook west of x −40 crosses the channel-lever bank | scaled + derived | low |
 | Boss hook | Ø3 J-hook: shank +Y in the boss hole, rise 12, elbow R 3, arm +X 3.5 — rod top machine y 1015, tip x 97 | — | p.43/45 (hook + chrome link ring collapsed to one hook; the spring's own loop is the ring) | derived | low |
 
@@ -412,7 +419,7 @@ No annotated or stated numeric dimensions. No legacy part.
 | Clamp block | ~20 × 26 × 12; Ø6.2 lever bore, Ø5.2 rod bore (skew, 6.5 off-axis), Ø3 screw hole | — | p.48 close-up | scaled | low |
 | Thumb screw | ~Ø10 × 5 reeded head, Ø3 × 12 shank (×2: clamp + output fixture) | — | p.48; M4: head reeded (24 × Ø1 grooves), cosmetic M3 thread on shank | scaled | low |
 | Output fixture | collar ~Ø10 × 8, Ø5.2 bore, Ø3 cross hole | — | p.48 bottom close-up | scaled | low |
-| Mounting bracket | collar Ø12 × 10 (bore Ø6.2) at machine (−40, 985, −85), axis along X; arm 10 wide reaching +Z to −70; 40 × 4 flange under the plate's front edge (top touches the plate bottom 992.9) | — | p.47 close-up (mounting screws omitted — simplification) | scaled | low |
+| Mounting bracket | collar Ø12 × 10 (bore Ø6.2) at machine (−40, 985, −85), axis along X; arm 10 wide reaching +Z to −70; 16 × 4 flange (machine x −45..−29, M6.5 — trimmed from 40 long: the east end stops 0.65 west of the j = 0 channel-spring helix at x −28.35) under the plate's front edge (top touches the plate bottom 992.9) | — | p.47 close-up (mounting screws omitted — simplification) | scaled | low |
 
 Notes: round brass rod lever; magnification set by a reeded (knurled) screw
 adjustment that moves the effective fulcrum/attachment point. Geometry
@@ -433,7 +440,7 @@ omitted at assembly level.
 | Magnification | 5× | — | text; consistent: 100/20 = 5 ✓ | stated | high |
 | Spoke count | 6 | — | counted on the full-page photo p.51 (and photogrammetry `195607299`); an earlier extraction said 5 — wrong | stated | high |
 | Wheel axle (M6.4) | flange Ø35 × 3 seated on the bar front face; Ø5 stud × 14 the wheel bore rides; Ø9 × 4 retaining collar (photo's washer + hex nut collapsed to a collar — simplification) | — | p.50–51 | scaled | low |
-| Support bar (×3, M6.4) | 10-square steel, 400 long (spans the column lines x ±197); wheel bar y 565, platen top rail y 440, bottom rail y 334 — all on the column-clamp axis z −133.9 (front face −138.9) | — | M6.4 layout; p3 90° view: bars run tangent IN FRONT of the columns (z −112) | derived | low |
+| Support bar (×3, M6.4) | 10-square steel, 384 long (M6.5 — trimmed from 400: at the bar's z band −138.9..−128.9 the Ø34.925 column surfaces reach x ±192.6, so ends at ±192 stay just inside); wheel bar y 565, platen top rail y 440, bottom rail y 334 — all on the column-clamp axis z −133.9 (front face −138.9) | — | M6.4 layout; p3 90° view: bars run tangent IN FRONT of the columns (z −112) | derived | low |
 | Column clamp (×6, M6.4) | green cast collar Ø48 × 16, bore Ø35.2 sliding on the Ø35 column; open channel across the front face (10.2 wide, floor 5.1 below bar centre) at column-to-bar offset 21.9; pinch screws omitted | — | p.50–55 | scaled + derived | low |
 
 Notes: wheel body is black-painted cast metal with a bright machined rim
@@ -485,8 +492,8 @@ dead centre and the gaps flank it at ±p/2: rack teeth land on those gaps
 | Removable gear face / bore / pins | ≈ 5 thick; common bore Ø12; 2 × Ø3.5 pin holes on Ø19 BC | — | `v4_transgear_015` (catalog shot) + `v4_transgear_020/025/030` (mounted on the oval-pin stub shaft) | scaled | low |
 | Chain sprockets | 17T (both), roller chain ≈ 3/8" pitch, ≈ 4.5 thick, Ø9.525 bore | — | tooth counts from `v4_transgear_012` crops (16–17 counted; modeled equal ⟹ 1:1 chain); pitch from sprocket OD ≈ 56–60 px-scaled mm (17T @ 3/8": PD 51.8) | counted + scaled | low |
 | Reduction pinion (coaxial with rack pinion) | est. 24T DP 30, OD ≈ 21 mm measured, face ≈ 6 | — | edge-on views `v4_transgear_002/003/008`: small fine-tooth steel pinion on the rack-pinion shaft | scaled | low |
-| Pinion bar (M6.4) | 12-square steel, x −95 (A-frame apex) → +197 (east column line) at machine y 253.5; Ø9.6 stud bore along Z at x 0 (9.525 stud + slip clearance) | — | ch. 30 views + M6.4 layout | scaled + derived | low/med |
-| A-frame (M6.4) | green cast stand on the base front-west: tapered plate (8 thick), foot x −115..−45 on the base top (y 50.8), clevis ears gripping the 12-square bar at y 253.5; lightening cutouts omitted | — | p.56–59 + ch. 30 views | scaled | low/med |
+| Pinion bar (M6.5) | 12-square steel, x −58 → +178 at machine y 253.5 (M6.5 trim from −95..+197: west end clears the A-frame clevis ears/ball at x −59, east end clears the SE column tangent 179.54); Ø9.6 stud bore along Z at x 0 (9.525 stud + slip clearance); both ends FLOAT (documented simplification — the real machine likely straps the bar to the a-frame and column) | — | ch. 30 views + M6.5 layout | scaled + derived | low/med |
+| A-frame (M6.5) | green cast stand on the base front-west, doubles as the FRONT rocker support: tapered plate 8 thick, foot x −115..−45 on the base top (y 50.8), apex x −87..−59 at the ball-seat saddle y 228.6 (machine); full-width saddle z ±11.1 over the last 19.8 of rise; clevis ears (z ±(8.1..11.1), 20 tall, tops machine 248.6) flank the south pivot-ball mount's Ø16 base (gap 16.2; ball r 9.5 centre 253.8 clears the ear inner faces; pivot shaft bottom 250.65 clears ear tops by 2.05); lightening cutouts omitted | — | p.56–59 + ch. 30 front view: clevis grips the pivot ball at (−72, 252) — M6.5 apex crop; the M6.4 "ears grip the pinion bar" read is REFUTED (bar now floats) | scaled | med |
 | Transgear stud (M6.4) | Ø9.525 (3/8") × 36 plug in the pinion-bar bore, axis −Z from z −101.5; Ø14 × 4 retaining collar at the front end (z −141.5) | — | derived: carries rack pinion (z −137.5), fixed pinion (z −134) and latch big hub (z −122.5); end hardware collapsed to a collar | derived | low |
 | Latch arm (M6.4) | tapered link, 4.5 thick: big hub Ø22 / small hub Ø16, both bores Ø9.6; centre distance 34.26 = (removable 24T m2 PD 48 + fixed 24T DP 30 PD 20.32 + 0.4 backlash) / 2; assembled at −20° below +X (knob shaft clears the pinion-bar underside) | — | `v4_transgear_008` + mesh math | derived | low |
 | Knob shaft (M6.4) | Ø9.525 × 51.4 through the latch small hub at (32.19, 241.78), spanning machine z −76.5 (sprocket end, chain plane) → −127.9; Ø20 × 6.5 brass thumb knob ending at −134.4, 0.1 shy of the rack-pinion disc back face −134.5 (latch C2C 34.26 < disc r 41.49, so the shaft must stop behind the disc) | — | `v4_transgear_008/020` + M6.4 layout | scaled + derived | low |
@@ -506,7 +513,10 @@ to be settled when mating the drive train in M6. Parts authored now:
 M6.4 notes (Appendix C #8 partial resolution): the removable gear CANNOT be
 mounted meshed — module 2 teeth against the DP 30 fixed pinion leave ~4.6
 teeth jammed in the overlap zone; the T24 removable gear is placed loose on
-the base (machine (−150, 55.8, −93)) as the photo's spare-gear catalog state,
+the base (machine (−137, 55.8, −93), M6.5 — moved east from −150 so the
+Ø41.4-radius disc at x −157.7..−116.3 clears the SW corner-bracket foot tip
+x −160.5 and the a-frame plate west edge −115) as the photo's spare-gear
+catalog state,
 and the latch small hub carries only the knob shaft. The knob shaft's
 sprocket plane (machine z −76.5..) does not reach the drive-train chain plane
 mid −78.75 / SPROCKET_Z0 −81 exactly — flagged for M6.5 chain routing. The
