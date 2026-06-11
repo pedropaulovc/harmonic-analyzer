@@ -70,10 +70,40 @@ def _fit_height(img: Image.Image, h: int) -> Image.Image:
     return img.resize((w, h), Image.LANCZOS)
 
 
+def _trim_uniform_border(img: Image.Image, tol: int = 12) -> Image.Image:
+    """Crop the render's uniform background margin (zoom-to-fit underfills)."""
+    from PIL import ImageChops
+
+    rgb = img.convert("RGB")
+    bg = Image.new("RGB", rgb.size, rgb.getpixel((0, 0)))
+    bbox = ImageChops.difference(rgb, bg).convert("L").point(
+        lambda v: 255 if v > tol else 0
+    ).getbbox()
+    return img.crop(bbox) if bbox else img
+
+
+def _fitted_render(pair_id: str, ref_size: tuple[int, int], align: dict | None):
+    """Trimmed render scaled to fit the ref frame + its paste offset.
+
+    The capture fills only part of the viewport (zoom-to-fit margins), while
+    references mostly fill their frame — so content-fit first, then apply the
+    manifest's 2D fine-alignment (scale about centre + pixel offset).
+    """
+    align = align or {}
+    ren = _trim_uniform_border(Image.open(pair_paths(pair_id)["render"]))
+    rw, rh = ref_size
+    s = min(rw / ren.width, rh / ren.height) * align.get("scale", 1.0)
+    w, h = max(1, round(ren.width * s)), max(1, round(ren.height * s))
+    ren = ren.resize((w, h), Image.LANCZOS)
+    dx = align.get("dx_px", 0) + (rw - w) // 2
+    dy = align.get("dy_px", 0) + (rh - h) // 2
+    return ren, (dx, dy)
+
+
 def side_by_side(pair_id: str) -> Path:
     p = pair_paths(pair_id)
     ref = _fit_height(Image.open(p["ref"]).convert("RGB"), PANEL_H)
-    ren = _fit_height(Image.open(p["render"]).convert("RGB"), PANEL_H)
+    ren = _fit_height(_trim_uniform_border(Image.open(p["render"])).convert("RGB"), PANEL_H)
     gap, bar = 8, 28
     canvas = Image.new("RGB", (ref.width + gap + ren.width, PANEL_H + bar), "white")
     canvas.paste(ref, (0, bar))
@@ -104,18 +134,9 @@ def _render_rgba(render: Image.Image) -> Image.Image:
 def blend_overlay(pair_id: str, align: dict | None) -> Path:
     p = pair_paths(pair_id)
     ref = Image.open(p["ref"]).convert("L").convert("RGB")
-    ren = Image.open(p["render"])
-    align = align or {}
-    scale = align.get("scale", 1.0)
-    # Render is captured at the ref's aspect; bring it to ref size, then apply
-    # the 2D fine-alignment similarity transform (scale about centre + offset).
-    base_w, base_h = ref.size
-    w, h = round(base_w * scale), round(base_h * scale)
-    ren = ren.resize((w, h), Image.LANCZOS)
-    dx = align.get("dx_px", 0) + (base_w - w) // 2
-    dy = align.get("dy_px", 0) + (base_h - h) // 2
+    ren, offset = _fitted_render(pair_id, ref.size, align)
     layer = Image.new("RGBA", ref.size, (0, 0, 0, 0))
-    layer.paste(_render_rgba(ren), (dx, dy))
+    layer.paste(_render_rgba(ren), offset)
     out = Image.alpha_composite(ref.convert("RGBA"), layer).convert("RGB")
     p["blend"].parent.mkdir(parents=True, exist_ok=True)
     out.save(p["blend"])
@@ -127,14 +148,10 @@ def score_pair(pair_id: str, align: dict | None) -> float:
     only meaningful as a trend per pair across iterations."""
     p = pair_paths(pair_id)
     ref = Image.open(p["ref"]).convert("L")
-    ren = Image.open(p["render"]).convert("L")
-    align = align or {}
-    scale = align.get("scale", 1.0)
-    w, h = round(ref.width * scale), round(ref.height * scale)
-    ren = ren.resize((w, h), Image.LANCZOS)
+    ren, offset = _fitted_render(pair_id, ref.size, align)
+    ren = ren.convert("L")
     canvas = Image.new("L", ref.size, 255)
-    canvas.paste(ren, (align.get("dx_px", 0) + (ref.width - w) // 2,
-                       align.get("dy_px", 0) + (ref.height - h) // 2))
+    canvas.paste(ren, offset)
     total = n = 0
     for rv, cv in zip(ref.getdata(), canvas.getdata(), strict=True):
         if cv < WHITE_THRESH:  # render content only

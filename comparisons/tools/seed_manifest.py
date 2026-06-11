@@ -171,9 +171,12 @@ def seed_from_catalog(by_asm: dict[str, set[str]], parts: set[str]) -> list[dict
             asm0 = next((c for c in comps if c in ASSEMBLIES), None)
             if c0 is None and asm0 is None:
                 continue
-            if e["source"].startswith("ch"):
-                model = c0 or asm0
+            if e["source"].startswith("ch") and c0 and len(comps) <= 2:
+                # Isolated studio shot of one part -> compare the part itself.
+                model = c0
             else:
+                # In-context shot (video frames, busy book photos with >=3
+                # tagged components) -> compare the enclosing assembly.
                 model = asm0 or enclosing_assembly(c0, by_asm)
         vg = e.get("view_guess") or {}
         camera = {"az_deg": vg.get("az_deg", 15), "el_deg": vg.get("el_deg", 8)}
