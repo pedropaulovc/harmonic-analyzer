@@ -1,20 +1,20 @@
-r"""Reproduction script: pivot shaft (book ch. 14 / ch. 17; 1 used).
+r"""Reproduction script: lever fulcrum shaft (book ch. 17; 1 used).
 
-Plain Ø6.35 (1/4") x 228.6 (9") steel shaft carrying the 20 rocker arms
-at machine (x, y) = (-72.9, 253.8). Each end seats in a pivot-ball-mount's
-Ø6.5 cross-bore (north mount on the rocker-support apex at z +101.6,
-south mount on the A-frame clevis at z -111, M6.5); pivot-bushing spacers
-set the 7.0565 channel pitch along it. The top levers' fulcrum is the
-shorter build_fulcrum_shaft.py (182), which clears the west columns.
+Plain Ø6.35 (1/4") x 182 steel shaft: the top levers' common fulcrum at
+machine (x, y) = (-199.9, 1065.9). M6.5 split this off the 228.6
+pivot-shaft: the fulcrum line sits on the west column line, and a 228.6
+shaft's tips (z +-114.3) clipped the west columns (within 20.6 of the
+column axes for |z| 91.6..132.4, ~87 mm^3 each at top level). 182 ends
+the shaft at z +-91, 0.6 clear, still 6 past each lever ball-mount's
+cross-bore centre at z +-85.
 
 Dimensions: cad/DIMENSIONS.md "Channel & top-frame layout" (med; dia low).
 
-Layout: shaft axis along Z, centred (z -114.3..+114.3) - the channel bank
-is symmetric about the part origin.
+Layout: shaft axis along Z, centred (z -91..+91).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_pivot_shaft.py
+    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_fulcrum_shaft.py
 """
 
 from __future__ import annotations
@@ -34,11 +34,11 @@ from _common import (
     volume_check,
 )
 
-PART_NAME = "pivot-shaft"
+PART_NAME = "fulcrum-shaft"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 SHAFT_DIA = 0.25 * IN  # 6.35  DIMENSIONS.md channel layout (low)
-SHAFT_LENGTH = 9.0 * IN  # 228.6  spans the 20-channel bank + ball mounts (med)
+SHAFT_LENGTH = 182.0  # ends z +-91: clear of the west columns (derived, M6.5)
 
 
 async def build(adapter) -> dict[str, str]:

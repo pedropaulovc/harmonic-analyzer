@@ -3,8 +3,10 @@ r"""Reproduction script: top crossbar (book ch. 18, pp. 42-43).
 The green cast bar spanning the top-frame ring front-to-back (along Z)
 at the machine's x mid-line: it carries the knife-mount stud that hangs
 the summing-lever knife bar. Same 22 x 41 section as the ring rails
-(build_top_frame.py), 372 long to bridge the ring's inner span, with a
-O8.2 vertical hole at its centre for the O8 stud.
+(build_top_frame.py), 202 long: its ends sit face-flush on the ring
+window's north/south faces at z +/-101 (INNER_Z; the M6.4 372 span used
+the ring's inner X span by mistake and buried both ends in the rails).
+A O8.2 vertical hole at its centre passes the O8 stud.
 
 Layout: origin on the stud-hole axis at the bar's bottom face (machine
 (15, 999.7, 0)); bar +Y 41, +-Z 186. Dimensions: cad/DIMENSIONS.md
@@ -36,7 +38,7 @@ MATERIAL = "Gray Cast Iron"  # green casting
 
 BAR_HALF_X = 11.0  # rail section 22 wide (DIMENSIONS.md ch6, med)
 BAR_HEIGHT = 41.0  # rail section 41 tall (med)
-BAR_HALF_Z = 186.0  # bridges the ring inner span (derived)
+BAR_HALF_Z = 101.0  # ends flush on the ring window faces at z +/-101 (derived)
 HOLE_DIA = 8.2  # knife-mount O8 stud passes through (low)
 
 
