@@ -31,14 +31,17 @@ uv run comparisons/tools/seed_manifest.py
 C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\render_compare.py --stale-only
 #    --selftest validates the euler camera against named views pixel-wise
 
-# 2b. or render offline (no SolidWorks): refresh the STL/boxes cache once
-#     after any rebuild, then Blender replays the same manifest cameras
+# 2b. or render offline (no SolidWorks): refresh the STL cache once after
+#     any rebuild, then Blender replays the same manifest cameras
 C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\export_models.py
 uv run comparisons/tools/render_offline.py [--only id,..] [--stale-only]
-#    ortho only; sidecars carry "engine" — score trends are only comparable
-#    within one engine. parity_check.py measures SW-vs-Blender silhouette
-#    IoU (P0 baseline: 0.95-0.98; side views lower only because SW captures
-#    include sketch-point markers).
+#    parts render from their own STL; assemblies instance per-part STLs
+#    (metres, untranslated) through the scene graph in cad/out/boxes/*.json,
+#    with each component's SolidWorks appearance RGB as Workbench object
+#    colour. Ortho only; sidecars carry "engine" — score trends are only
+#    comparable within one engine. parity_check.py measures silhouette IoU
+#    between the backed-up and current renders (instanced-vs-monolith
+#    baseline: 0.99+).
 
 # 3. recompute composites/scores without rendering (e.g. after align edits)
 uv run comparisons/tools/composite.py [--only id1,id2]
