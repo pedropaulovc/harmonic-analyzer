@@ -3,7 +3,7 @@ r"""Reproduction script: channel (top) lever (book ch. 17, pp. 38-41).
 One of the 20 cast third-class levers at the top of the machine: fulcrum
 pivot at one end (Ø6.5 hole riding the common Ø6.35 fulcrum shaft - the
 p.40 ball clevis is the shaft's END mount, mirroring the rocker-pivot
-design), channel-spring pull at the free end (Ø3 hook hole at 254 = 10"),
+design), channel-spring pull at the free end (Ø4 hook hole at 254 = 10"),
 driven in between by its amplitude bar pinned Ø2 at 127 (5") - an exact
 2:1 motion ratio. Section 9.5 tall x 3.0 thick: 20 levers at the 7.0565
 channel pitch cap the thickness (the M2 12.5 "width" violated the pitch),
@@ -49,7 +49,10 @@ LEVER_THICKNESS = 3.0  # DIMENSIONS.md ch17: fits 7.06 pitch + 3.2 bar slot (der
 PIVOT_HOLE_DIA = 6.5  # DIMENSIONS.md ch17: rides the 6.35 fulcrum shaft (derived)
 BAR_PIN_HOLE_DIA = 2.0  # DIMENSIONS.md ch17: amplitude-bar top pin (derived)
 BAR_PIN_X = 127.0  # 5" from the fulcrum = half the spring c2c (derived)
-SPRING_HOLE_DIA = 3.0  # DIMENSIONS.md ch17: spring hook passes through (low)
+SPRING_HOLE_DIA = 4.0  # DIMENSIONS.md ch17: sized so the spring's O5.5-mean
+# O1-wire eye threads the 3.0 plate with ~0.3 margins; the O3 photo read
+# (low) is infeasible (best margins ~0.05) — see build_channel_assembly.py
+# _assert_spring_threading
 
 BAR_END_X = LEVER_LENGTH + TIP_OVERHANG
 HALF_BAR = BAR_TALL / 2.0
@@ -111,7 +114,7 @@ async def build(adapter) -> dict[str, str]:
     )
     vol = await _volume(adapter)
     print(f"  volume after holes: {vol:.1f} mm^3")
-    # expected: -3.0 * pi * (3.25^2 + 1^2 + 1.5^2) = ~7,442 mm^3
+    # expected: -3.0 * pi * (3.25^2 + 1^2 + 2^2) = ~7,427 mm^3
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
