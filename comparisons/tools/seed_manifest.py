@@ -33,31 +33,12 @@ CATALOG = REPO / "references" / "curation" / "stills_catalog.json"
 PHOTOS_MD = REPO / "cad" / "PHOTOS.md"
 MANIFEST = REPO / "comparisons" / "manifest.json"
 
-ASSEMBLIES = ("drive_train", "channel", "output", "frame")
-
-
 def part_stems() -> set[str]:
     return {
         f.stem.removeprefix("build_")
         for f in SCRIPTS.glob("build_*.py")
         if not f.stem.endswith("_assembly") and f.stem != "build_all"
     }
-
-
-def parts_by_assembly() -> dict[str, set[str]]:
-    parts = part_stems()
-    out: dict[str, set[str]] = {}
-    for asm in ASSEMBLIES:
-        src = (SCRIPTS / f"build_{asm}_assembly.py").read_text(encoding="utf-8")
-        out[asm] = {p for p in parts if f'"{p.replace("_", "-")}"' in src}
-    return out
-
-
-def enclosing_assembly(part: str, by_asm: dict[str, set[str]]) -> str:
-    for asm in ASSEMBLIES:
-        if part in by_asm[asm]:
-            return asm
-    return "harmonic_analyzer"
 
 
 # --- photogrammetry ----------------------------------------------------------
@@ -140,13 +121,18 @@ def photo_path(suffix: str) -> str:
 # --- pair construction -------------------------------------------------------
 
 def make_pair(pid: str, model: str, ref_path: str, source: str, camera: dict,
-              focus: list[str], notes: str) -> dict:
+              focus: list[str], notes: str, frame: list[str] | None = None) -> dict:
+    cam = {"mode": "euler", "roll_deg": 0.0, "zoom": 1.0,
+           "target_mm": None, "perspective": None, **camera}
+    if frame:
+        # In-context reference: render the whole assembly with the camera
+        # framed on these components (render_compare.resolve_framing).
+        cam["frame_components"] = frame
     return {
         "id": pid,
         "model": model,
         "reference": {"path": ref_path, "source": source},
-        "camera": {"mode": "euler", "roll_deg": 0.0, "zoom": 1.0,
-                   "target_mm": None, "perspective": None, **camera},
+        "camera": cam,
         "align": {"scale": 1.0, "dx_px": 0, "dy_px": 0},
         "component_focus": focus,
         "status": "rough",
@@ -154,7 +140,7 @@ def make_pair(pid: str, model: str, ref_path: str, source: str, camera: dict,
     }
 
 
-def seed_from_catalog(by_asm: dict[str, set[str]], parts: set[str]) -> list[dict]:
+def seed_from_catalog(parts: set[str]) -> list[dict]:
     entries = json.loads(CATALOG.read_text(encoding="utf-8"))["entries"]
     pairs = []
     for e in entries:
@@ -164,20 +150,22 @@ def seed_from_catalog(by_asm: dict[str, set[str]], parts: set[str]) -> list[dict
         cls = e.get("class")
         if cls not in ("machine", "machine-detail", "mixed", "drawing"):
             continue
+        frame: list[str] = []
         if cls == "machine" or "harmonic_analyzer" in comps:
             model = "harmonic_analyzer"
         else:
-            c0 = next((c for c in comps if c in parts), None)
-            asm0 = next((c for c in comps if c in ASSEMBLIES), None)
-            if c0 is None and asm0 is None:
+            if not comps:
                 continue
+            c0 = next((c for c in comps if c in parts), None)
             if e["source"].startswith("ch") and c0 and len(comps) <= 2:
                 # Isolated studio shot of one part -> compare the part itself.
                 model = c0
             else:
-                # In-context shot (video frames, busy book photos with >=3
-                # tagged components) -> compare the enclosing assembly.
-                model = asm0 or enclosing_assembly(c0, by_asm)
+                # In-context shot: the photo shows the component mounted in
+                # the complete machine -> render the full assembly with the
+                # camera framed on the tagged components.
+                model = "harmonic_analyzer"
+                frame = comps
         vg = e.get("view_guess") or {}
         camera = {"az_deg": vg.get("az_deg", 15), "el_deg": vg.get("el_deg", 8)}
         if e["source"].startswith("video"):
@@ -188,11 +176,11 @@ def seed_from_catalog(by_asm: dict[str, set[str]], parts: set[str]) -> list[dict
             ref = e["path"]
             src = f"book {e['source']}"
         pairs.append(make_pair(f"{model}--{e['id']}", model, ref, src, camera,
-                               comps, e.get("notes", "")))
+                               comps, e.get("notes", ""), frame=frame))
     return pairs
 
 
-def seed_from_photos(by_asm: dict[str, set[str]]) -> list[dict]:
+def seed_from_photos() -> list[dict]:
     best, views = parse_photos_md()
     claimed: set[str] = set()
     pairs = []
@@ -201,12 +189,13 @@ def seed_from_photos(by_asm: dict[str, set[str]]) -> list[dict]:
             if suffix in claimed:
                 continue
             claimed.add(suffix)
-            model = enclosing_assembly(focus[0], by_asm)
+            # The machine is photographed fully assembled in its case.
+            model = "harmonic_analyzer"
             camera = view_to_euler(views.get(suffix, ""))
             pairs.append(make_pair(
                 f"{model}--photo-{suffix}", model, photo_path(suffix),
                 f"photogrammetry {suffix} ({views.get(suffix, '?')})",
-                camera, focus, label,
+                camera, focus, label, frame=focus,
             ))
     return pairs
 
@@ -216,9 +205,7 @@ def main() -> int:
     ap.add_argument("--reset", action="store_true", help="discard existing pairs")
     args = ap.parse_args()
 
-    parts = part_stems()
-    by_asm = parts_by_assembly()
-    fresh = seed_from_catalog(by_asm, parts) + seed_from_photos(by_asm)
+    fresh = seed_from_catalog(part_stems()) + seed_from_photos()
 
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     existing = {} if args.reset else {p["id"]: p for p in manifest.get("pairs", [])}
