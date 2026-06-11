@@ -29,6 +29,7 @@ from __future__ import annotations
 import sys
 
 from _common import (
+    IN,
     add_line_chain,
     apply_material,
     check,
@@ -46,7 +47,8 @@ ARM_C2C = 150.0  # DIMENSIONS.md ch11: shaft-to-handle-pivot centres (low)
 ARM_WIDTH = 16.0  # DIMENSIONS.md ch11: arm width (low)
 ARM_THICKNESS = 8.0  # DIMENSIONS.md ch11: ~half the arm width, p.12 photo (low)
 SQUARE_END_OVERHANG = 10.0  # DIMENSIONS.md ch11: square end past the pivot (low)
-SHAFT_BORE_DIA = 9.5  # DIMENSIONS.md ch11: legacy 3/8" crankshaft (med)
+SHAFT_BORE_DIA = 0.375 * IN  # 9.525: 3/8" crankshaft (med); the legacy 9.5
+# rounding left the bore 0.025 smaller than the shaft (caught in M6.2)
 PIVOT_BORE_DIA = 6.0  # DIMENSIONS.md ch11: handle pivot screw (low)
 DIMPLE_DIA = 8.0  # DIMENSIONS.md ch11: fiducial indentation (low)
 DIMPLE_DEPTH = 0.5  # DIMENSIONS.md ch11: fiducial indentation (low)
