@@ -182,11 +182,12 @@ converted from 400 dpi eight-views extractions (`ch30_images/`).
 | Drive height (cylinder arbor AND cone big-end axis) | y = 76 above base top | crank-arm pivot + cone big-end brass blob, front view; side-view cone midline near-level confirms equal heights | med |
 | Mesh offset direction | horizontal (plan), cone beside drum | ch. 12 p.18 top-down: cone converges on the drum toward the small end; side view cone midline ≈ level | high |
 | Cone plan incline | 19.8° = arcsin(2.54/7.5), converging +X→−X toward the drum | mesh condition (appendix C #3) | high |
-| Cone big-end axis | (x, z) = (+58.5, −67.1) | x = crank 122 − 63.5 mesh distance (DP16 64T+16T); photo blob at +55 ± 5 agrees; z = −19/2 × 7.06 (stack centered between gates) | med |
-| Cone gear j (j = 0 big … 19 small) | x_j = 58.5 − 2.54j, z_j = −67.1 + 7.06j, y = 76 | mesh + stack grid | med |
-| Cylinder arbor (stationary) | x = −43.1 (= 58.5 − 101.6), y = 76, along Z | mesh distance at T120; vertical connecting rods reach rocker tips (pivot x = 0, rod side ~100) only for x_cyl ≥ −100 ✓ | med |
+| Cone big-end axis (T120 station) | (x, z) = (+55.6, −67.1) | the 64T drive gear sits ~8.5 mm outboard of T120 along the cone axis (p.20: back-to-back), so the crank mesh is at the 64T station: x_T120 = crank 122 − 63.5 − 8.5·sin19.8° = 55.6; photo blob at +55 ± 5 agrees; z = −19/2 × 7.06 (stack centered between gates) | med |
+| 64T drive gear | centre (x, z) = (+58.5, −75.1) = T120 station − 8.5 mm along the cone axis (toward the pivot) | p.20 (directly beside the 120T); face 10 → centres 8.5 = (7 + 10)/2 apart | med |
+| Cone gear j (j = 0 big … 19 small) | x_j = 55.6 − 2.54j, z_j = −67.1 + 7.06j, y = 76 | mesh + stack grid | med |
+| Cylinder arbor (stationary) | x = −46.0 (= 55.6 − 101.6), y = 76, along Z | mesh distance at T120; vertical connecting rods reach rocker tips (pivot x = 0, rod side ~100) only for x_cyl ≥ −100 ✓ | med |
 | Cylinder gear j | z_j = −67.1 + 7.06j (same stations as cone gear j) | mesh plane alignment | high |
-| Crankshaft | along Z at (x, y) = (+122, 76); green cylindrical pedestal at front-right; arm + chain sprocket at front end, 16T pinion at back end beside the 64T | front view pedestal at +122 ± 3; crank-to-cone distance 67 ± 5 measured ≈ 63.5 required ✓ ratifies appendix C #9 pair | med |
+| Crankshaft | along Z at (x, y) = (+122.3, 76) = 64T x + 63.5 + 0.3 backlash; green cylindrical pedestal at front-right; arm + chain sprocket at front end, 16T pinion at back end overlapping the 64T's back half (skewed-mesh clearance) | front view pedestal at +122 ± 3; crank-to-cone distance 67 ± 5 measured ≈ 63.5 required ✓ ratifies appendix C #9 pair | med |
 | Chain run | crank sprocket (+122, 76) up to the translational-gearing sprocket at the third A-frame apex (x ≈ −7 ≈ 0, centered) | front view; transgear disc center measured x = −7 | med |
 | Cone pivot | at the big end, front (black bracket, p.18 "pivot" label); small end carried by the green knob post — swing is horizontal (out of mesh) | p.18 + ch. 12 notes | high |
 
@@ -194,10 +195,10 @@ converted from 400 dpi eight-views extractions (`ch30_images/`).
 
 | part | dims | position (x, z), bore y = 76 | source | confidence |
 |---|---|---|---|---|
-| `crank-pedestal` | green cylinder Ø46 × 110 tall, Ø9.5 bore along Z | (+122, 0) | front view: centre +123 ± 3, Ø 278 px / 6.02 px/mm, top ~110 above base top | low/med |
-| `arbor-pedestal` ×2 | green block 24 × 16 × 85, Ø9.5 clamp bore along Z | (−43.1, ±92) — arbor 200 long spans z ±100, stack ends ±70.6 | function-driven; posts hidden behind the gate legs in the eight views | low |
-| `cone-pivot-post` | black steel block 25 × 20 × 85, Ø9.5 journal bore (rotated 19.8° in plan with the cone axis) | (+67.0, −90.6) = 25 mm past the big end along the cone axis | p.18 "pivot" bracket; journal length from the cone-shaft row (~25) | low |
-| `cone-knob-post` | green round post Ø32 × 80, upward-open U-slot 3.5 wide, floor at 74.4 (tip centre 76) | (+0.04 ≈ 0, +95.3) = 30 mm past the small-end gear along the cone axis | p.18 top-down: green post Ø ~72 px / 2.23 px/mm (largest-cone-gear-OD scale); view 5/8 ball-knob at x ≈ −20 ± 15 agrees within error | low |
+| `crank-pedestal` | green cylinder Ø46 × 110 tall, Ø9.5 bore along Z | (+122.3, −108) | front view: centre +123 ± 3, Ø 278 px / 6.02 px/mm, top ~110 above base top; z: standing inside the base front edge (−133.35), shaft stations in front | low/med |
+| `arbor-pedestal` ×2 | green block 24 × 16 × 85, Ø9.5 clamp bore along Z | (−46.0, ±92) — arbor 200 long spans z ±100, stack ends ±70.6 | function-driven; posts hidden behind the gate legs in the eight views | low |
+| `cone-pivot-post` | black steel block 25 × 20 × 85, Ø9.5 journal bore (rotated 19.8° in plan with the cone axis) | (+64.0, −90.4) = shaft station 4 mm from the pivot end (post straddles the journal, bore part-empty toward the front) | p.18 "pivot" bracket; journal length from the cone-shaft row (~25) | low |
+| `cone-knob-post` | green round post Ø32 × 80, upward-open U-slot 3.5 wide, floor at 74.4 (tip centre 76) | (−2.4, +94.0) = shaft station 200 from the pivot end (thin-tip journal) | p.18 top-down: green post Ø ~72 px / 2.23 px/mm (largest-cone-gear-OD scale); view 5/8 ball-knob at x ≈ −20 ± 15 agrees within error | low |
 
 ### Connecting rods (ch. 13 pp. 22–25 + ch. 14 p. 29; 20 used)
 
