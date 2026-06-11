@@ -366,9 +366,9 @@ boss, Z along the knife edge.
 | Spring holes | 20 × Ø4.5 at x −37.10 (machine x −22.10 = channel-lever tab line), z = z_j − 1.95 | — | derived: installed-spring eye reach √(3.25²−2.55²) = 2.0 through the 5.1 plate; z offset puts the hole under the helix lead | derived | med |
 | Web + boss | twin ribs 3 wide, y 2..12, x 9..80, z taper ±17.18 → ±4.27; boss Ø14 × 12 at x 80 (machine 95) | — | p.43 plan | scaled | low |
 | Hook hole | Ø3 vertical in the boss top at x 75.5 (machine 90.5) | — | derived: boss-hook shank seat (real joint ≈ 2.6 tap drill + M3 — modeled at shank size for a zero-volume fit) | derived | low |
-| Knife mount | 8-square hardened bar set diamond-wise (edge up), 35 long; brass block 24 × 28 × 24 below; Ø8 stud through the tube slot rising to machine y 1065 | — | p.42/43 (square-head bolt + stirrup strap collapsed to block + stud — simplification) | scaled | low |
-| Top crossbar | 22 × 41 rail section (ch. 6), 372 long along Z, Ø8.2 stud hole at centre; bottom face machine y 999.7 | — | ch. 30 views + top-frame ring inner span | scaled + derived | med |
-| Knife stay | Ø3 rod along X at machine (0, 1086), x −197..+20; 8 × 2 strap from the rod at x −40 down to the knife-mount stud west flank at (10, 1050) | — | p.42–43; M6.4 reroute: a drop to the knife block crosses the summing-plate band, a hook west of x −40 crosses the channel-lever bank | scaled + derived | low |
+| Knife mount | 8-square hardened bar set diamond-wise (edge up), 31.8 long — rides inside the lever tube's slot tunnel (z ±15.9 vs slot ±16; contact bands outside the slot are geometrically impossible — the diamond flanks clash with the tube lower wall); brass block 24 × 28 × 24 below; Ø8 stud through the tube slot rising to machine y 1065 | — | p.42/43 (square-head bolt + stirrup strap collapsed to block + stud — simplification) | scaled | low |
+| Top crossbar | 22 × 41 rail section (ch. 6), 372 long along Z, Ø8.2 stud hole at centre; bottom face machine y 1010 (0.5 above the summing-lever tube top 1009.5) — the bar floats 10.3 proud of the top-frame ring band (999.7..1040.7), ends face-flush against the rail inner faces over y 1010..1040.7 | — | ch. 30 views + top-frame ring inner span | scaled + derived | med |
+| Knife stay | Ø3 rod along X at machine (0, 1086), x −197..+20; 8 × 2 strap from the rod at x −40 down to the knife-mount stud west flank at (10.6, 1053), 2 above the raised crossbar top 1051 | — | p.42–43; M6.4 reroute: a drop to the knife block crosses the summing-plate band, a hook west of x −40 crosses the channel-lever bank | scaled + derived | low |
 | Boss hook | Ø3 J-hook: shank +Y in the boss hole, rise 12, elbow R 3, arm +X 3.5 — rod top machine y 1015, tip x 97 | — | p.43/45 (hook + chrome link ring collapsed to one hook; the spring's own loop is the ring) | derived | low |
 
 Notes (stated, qualitative): cast iron; pivots on a knife-edge fulcrum; the 20
@@ -463,8 +463,9 @@ z −146.9 (axle flange on the bar front −138.9).
 Notes: toothed brass rack along the bottom edge (driven by ch. 23 gearing for
 horizontal travel); two brass clips (left/right) retain the recording paper;
 gearing can be unlatched from the rack for free repositioning/reset.
-M6.4 rack mesh: rack mounted teeth-down (Rz 180) at y 323.59 = pinion axis
-253.5 + PD r 40.64 + 0.3 backlash + pitch-line offset; rack x0 = 15 × pitch
+M6.4 rack mesh: rack mounted teeth-down (Rz 180) at y 324.09 = pinion axis
+253.5 + PD r 40.64 + 0.8 backlash + pitch-line offset (0.3 left eight small
+involute-vs-straight flank overlaps off the pitch point); rack x0 = 15 × pitch
 (2.660) ≈ 39.90 phases a tooth space onto the 96T pinion's bottom gap.
 
 ## Chapter 23 — Translational Gearing (pp. 56–59)
@@ -486,7 +487,7 @@ M6.4 rack mesh: rack mounted teeth-down (Rz 180) at y 323.59 = pinion axis
 | A-frame (M6.4) | green cast stand on the base front-west: tapered plate (8 thick), foot x −115..−45 on the base top (y 50.8), clevis ears gripping the 12-square bar at y 253.5; lightening cutouts omitted | — | p.56–59 + ch. 30 views | scaled | low/med |
 | Transgear stud (M6.4) | Ø9.525 (3/8") × 36 plug in the pinion-bar bore, axis −Z from z −101.5; Ø14 × 4 retaining collar at the front end (z −141.5) | — | derived: carries rack pinion (z −137.5), fixed pinion (z −134) and latch big hub (z −122.5); end hardware collapsed to a collar | derived | low |
 | Latch arm (M6.4) | tapered link, 4.5 thick: big hub Ø22 / small hub Ø16, both bores Ø9.6; centre distance 34.26 = (removable 24T m2 PD 48 + fixed 24T DP 30 PD 20.32 + 0.4 backlash) / 2; assembled at −20° below +X (knob shaft clears the pinion-bar underside) | — | `v4_transgear_008` + mesh math | derived | low |
-| Knob shaft (M6.4) | Ø9.525 × 62.5 through the latch small hub at (32.19, 241.78), spanning machine z −76.5 (sprocket end, chain plane) → −139; Ø20 × 6.5 brass thumb knob at the front (reeding omitted) | — | `v4_transgear_008/020` + M6.4 layout | scaled + derived | low |
+| Knob shaft (M6.4) | Ø9.525 × 51.4 through the latch small hub at (32.19, 241.78), spanning machine z −76.5 (sprocket end, chain plane) → −127.9; Ø20 × 6.5 brass thumb knob ending at −134.4, 0.1 shy of the rack-pinion disc back face −134.5 (latch C2C 34.26 < disc r 41.49, so the shaft must stop behind the disc) | — | `v4_transgear_008/020` + M6.4 layout | scaled + derived | low |
 
 Notes: speed combos — small driving + large driven = slowest platen (smallest
 horizontal scale), large+small = fastest, medium+medium = 1:1. Latch disengages
@@ -519,10 +520,10 @@ other part").
 |---|---|---|---|---|---|
 | Square brass rod cross-section | ~5 mm | ~0.2 | photo proportion | scaled | low |
 | Square rod length | ~120 mm, Ø2 wire hole near top | ~4.7 | p.64 inset; resolved in M2 | scaled | low |
-| Frame (stirrup) | ~22 × 40 × 10, 5 mm rails, Ø3 set-screw hole in bottom rail | — | p.64–65 vs 5 mm rod; resolved in M2 | scaled | low |
+| Frame (stirrup) | ~22 × 40 × 10; side rails 4 (long sides), end rails 5; Ø3 set-screw hole in one end rail | — | p.64–65 vs 5 mm rod; resolved in M2; M6.4: side rails thinned 5 → 4 (read thinner in the photo; the 14-wide window must clear the marker barrel at the platen side) | scaled | low |
 | V-block | ~32 × 18 × 16; 6 mm 45° top chamfers; 2 × Ø8 vertical bores at x = 11/21; stopped clamp slit 26 long × 4 (y 4–8); Ø2.5 screw hole | — | p.65 close-up | scaled | low |
 | Set screw | Ø9 × 5 knurled knob + Ø3 × 15 shank | — | p.64–65; M4: knob reeded (22 × Ø1 grooves), cosmetic M3 thread on shank | scaled | low |
-| Pen hanger (M6.4) | black strap (3 thick, tapering 16 → 10 wide) flat on the wheel-bar front face (z −138.9), descending from the bar band (y 560..570) to a 12 × 12 guide block (z −155.5..−138.9) with a 5.4-square hole the pen rod slides in; mounting bolt omitted | — | p.60–63 | scaled + derived | low |
+| Pen hanger (M6.4) | black strap (3 thick, tapering 16 → 10 wide) flat on the wheel-bar front face (z −138.9), descending from the bar band (y 560..570) to a 12 × 12 guide block (z −155.5..−138.9) with a 5.4-square VERTICAL channel (cut along Y) the pen rod slides in; mounting bolt omitted | — | p.60–63 | scaled + derived | low |
 | Pen marker (M6.4) | Ø8 brass barrel, 12-tall conical tip, 60 overall; collar/ferrule detail omitted | — | p.60–63 | scaled | low |
 
 Notes: brass frame holds the marker in a v-block; v-block on a square brass rod
@@ -538,8 +539,11 @@ block top (511); v-block at (−24, 390, −159.5) — rod bore (local x 21) on
 the rod axis; marker VERTICAL in the x −13 bore, tip at y 368, i.e. 8.6 off
 the paper plane — the book's ~12° tilt would cut the v-block's vertical
 bores, so the marker stands plumb (documented deviation, settle in M6.5);
-pen frame flat (Rx +90) around the rod on the v-block top at (−14, 418, −183);
-set screw along −Z at (−3, 413, −188).
+pen frame flat on the v-block top (y 408), long axis along X (Ry+90·Rx+90 at
+(−29, 418, −143)): window machine x −25..+7, z −161..−147 spans marker +
+rod, the plate's near edge stops 0.1 short of the platen front face −142.9;
+set screw along +X at (−38, 413, −154) — knob x −38..−33, shank threading
+the west end rail (x −29..−24), tip at −18, 1 shy of the marker barrel.
 
 ## Chapter 25 — Pinion Gear (pp. 66–69)
 
