@@ -21,12 +21,15 @@ Features, in order:
    which alone exceeded the 7.5 mm pitch), centre offset -Y by the 0.2"
    eccentricity, boss-extruded z = 3..6.5 from an offset reference
    plane (the cam shares the layout of the superseded standalone
-   ``build_eccentric_cam.py``: lobe -Y, keyway +Y).
+   ``build_eccentric_cam.py``: lobe -Y).
 4. Alignment notch: 3 mm deep square notch (width estimated = depth) cut
    into the gear rim at +Y ("notches aligned to top = cosine mode",
    pp. 66-67) -- gear face only, after the pattern so it is not replicated.
-5. Shaft bore 3/8" through gear + cam, on the gear axis.
-6. Keyway 1/8" x 0.06" past the bore, pointing +Y (away from the cam lobe).
+5. Plain shaft bore 3/8" through gear + cam, on the gear axis. No keyway:
+   gear k turns k/80 rev per crank turn (ch. 29 gear law), so the 20 gears
+   all spin at DIFFERENT speeds and cannot be keyed to a common shaft --
+   they run free on a stationary arbor (DIMENSIONS.md ch. 13, "M6.2 keyway
+   refutation"). The legacy keyway was fiction and was removed in M6.2.
 
 Every feature's volume delta is asserted against an analytic expectation
 (same DP 30 / PA 14.5 deg tooth profile as the cone set, narrower face).
@@ -38,7 +41,7 @@ tooth-fraction fill).
 Dimensions: cad/DIMENSIONS.md "Chapter 13".
 
 Layout: gear axis = Z through the origin, gear z = 0..3 mm, cam z = 3..6.5,
-cam lobe -Y, notch and keyway +Y.
+cam lobe -Y, notch +Y.
 
 Run (SolidWorks already open)::
 
@@ -74,15 +77,10 @@ CAM_DIAMETER = 2.0 * IN  # 50.8  DIMENSIONS.md ch13: integral cam diameter (lega
 CAM_THICKNESS = 3.5  # DIMENSIONS.md ch13: axial-budget resolution, Appendix C #6 (derived, med)
 ECCENTRICITY = 0.2 * IN  # 5.08  DIMENSIONS.md ch13: cam eccentricity (legacy, med)
 BORE_DIAMETER = 0.375 * IN  # 9.525 DIMENSIONS.md ch13: cam bore (legacy, med)
-KEYWAY_WIDTH = 0.125 * IN  # 3.175 DIMENSIONS.md ch13: keyway width (legacy, med)
-KEYWAY_DEPTH = 0.06 * IN  # 1.524 DIMENSIONS.md ch13: keyway depth past bore (legacy, med)
 NOTCH_DEPTH = 3.0  # DIMENSIONS.md ch13: alignment notch depth, text p.22 (high)
 NOTCH_WIDTH = 3.0  # DIMENSIONS.md ch13: square notch, width estimated = depth (low)
 
 BORE_RADIUS = BORE_DIAMETER / 2.0
-KEYWAY_TOP_Y = BORE_RADIUS + KEYWAY_DEPTH
-KEYWAY_BOTTOM_Y = BORE_RADIUS / 2.0  # inside the bore; exact value immaterial
-KEYWAY_HALF_WIDTH = KEYWAY_WIDTH / 2.0
 
 FACTS = gear_facts(TEETH)  # inches; same DP/PA as the cone set by construction
 RA_MM = FACTS["Ra"] * IN  # 51.6467 -- gear OD/2 = 4.067"/2 (high)
@@ -90,7 +88,7 @@ RB_MM = FACTS["Rb"] * IN
 NOTCH_FLOOR = RA_MM - NOTCH_DEPTH
 NOTCH_OUTER = RA_MM + 1.5  # clearance past the OD so the cut always opens
 
-THROUGH_ALL = FACE_WIDTH + CAM_THICKNESS + 2.0  # bore/keyway cut depth
+THROUGH_ALL = FACE_WIDTH + CAM_THICKNESS + 2.0  # bore cut depth
 
 
 def is_solid(x: float, y: float) -> bool:
@@ -129,21 +127,6 @@ def notch_solid_area(step: float = 0.004) -> float:
             if is_solid(x, y):  # notch at +Y: window coords are (x, y) global
                 hits += 1
     return hits * dx * dy
-
-
-def keyway_area_outside_bore() -> float:
-    """Keyway rectangle area (mm^2) outside the bore circle (midpoint rule).
-
-    The rectangle bottom (``BORE_RADIUS/2``) is fully inside the bore for
-    ``|x| <= KEYWAY_HALF_WIDTH``, so the boundary is the circle itself.
-    """
-    n = 4000
-    dx = KEYWAY_WIDTH / n
-    area = 0.0
-    for i in range(n):
-        x = -KEYWAY_HALF_WIDTH + (i + 0.5) * dx
-        area += (KEYWAY_TOP_Y - math.sqrt(BORE_RADIUS**2 - x * x)) * dx
-    return area
 
 
 async def build(adapter) -> dict[str, str]:
@@ -258,48 +241,6 @@ async def build(adapter) -> dict[str, str]:
     )
     v_bore = math.pi * BORE_RADIUS**2 * (FACE_WIDTH + CAM_THICKNESS)
     volume = await volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
-
-    # ------------------------------------------------------------------
-    # Keyway pointing +Y, through gear + cam (eccentric-cam recipe).
-    # ------------------------------------------------------------------
-    check("create_sketch keyway", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)  # same snap risk against the bore edge
-    keyway = await add_line_chain(
-        adapter,
-        [
-            (-KEYWAY_HALF_WIDTH, KEYWAY_BOTTOM_Y),
-            (KEYWAY_HALF_WIDTH, KEYWAY_BOTTOM_Y),
-            (KEYWAY_HALF_WIDTH, KEYWAY_TOP_Y),
-            (-KEYWAY_HALF_WIDTH, KEYWAY_TOP_Y),
-        ],
-    )
-    set_sketch_direct_db(adapter, False)
-    bottom, right, top, left = keyway
-    for ent, relation in (
-        (bottom, "horizontal"),
-        (top, "horizontal"),
-        (right, "vertical"),
-        (left, "vertical"),
-    ):
-        check(f"keyway {relation}", await adapter.add_sketch_constraint(ent, None, relation))
-    check(
-        "dimension keyway width",
-        await adapter.add_sketch_dimension(bottom, None, "linear", KEYWAY_WIDTH),
-    )
-    check(
-        "dimension keyway height",
-        await adapter.add_sketch_dimension(
-            right, None, "linear", KEYWAY_TOP_Y - KEYWAY_BOTTOM_Y
-        ),
-    )
-    await ensure_fully_defined(adapter, "keyway sketch", fix_entities=keyway)
-    check("exit_sketch keyway", await adapter.exit_sketch())
-    check(
-        "cut keyway",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=THROUGH_ALL)),
-    )
-    v_key = keyway_area_outside_bore() * (FACE_WIDTH + CAM_THICKNESS)
-    await volume_check(adapter, "keyway", volume - v_key, 0.02 * v_key)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
