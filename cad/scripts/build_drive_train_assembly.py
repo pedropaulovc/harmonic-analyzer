@@ -105,7 +105,13 @@ ARBOR_LENGTH = 200.0  # spans z -100..+100
 CRANKSHAFT_Z0 = -150.0  # front end; crank-arm hub at +12 (PIN_HOLE_HEIGHT)
 CRANK_ARM_Z0 = CRANKSHAFT_Z0 + 8.0  # hub centre 12 - half thickness 4
 ARM_C2C = 150.0  # handle pivot from the shaft axis
-SPROCKET_Z0 = -81.0  # face 4.5: between pedestal (-85) and pinion (-75.1)
+SPROCKET_Z0 = -81.0  # face 4.5: between pedestal (-85) and pinion (-75.1).
+# M6.4 note: engineerguy v4_transgear_020 shows the real sprocket OUTBOARD
+# at a pedestal front boss, but with our plain O46 pedestal column
+# (z -131..-85) and the crank-arm hub (-134..-142) no outboard slot
+# exists, and on the transgear side the rack pinion occupies
+# -134.5..-137.5 -- so the chain plane stays inboard at -81 and the
+# transgear sprocket matches it (documented discrepancy, Appendix C).
 PEDESTAL_Z = -108.0  # crank pedestal centre (front face inside base edge)
 ARBOR_PEDESTAL_Z = 92.0  # +/-: clamps at the arbor ends
 PIVOT_POST_STATION = 4.0  # shaft station under the pivot post centre
