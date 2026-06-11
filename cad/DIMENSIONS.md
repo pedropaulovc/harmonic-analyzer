@@ -190,6 +190,15 @@ converted from 400 dpi eight-views extractions (`ch30_images/`).
 | Chain run | crank sprocket (+122, 76) up to the translational-gearing sprocket at the third A-frame apex (x ≈ −7 ≈ 0, centered) | front view; transgear disc center measured x = −7 | med |
 | Cone pivot | at the big end, front (black bracket, p.18 "pivot" label); small end carried by the green knob post — swing is horizontal (out of mesh) | p.18 + ch. 12 notes | high |
 
+### Drive supports (M6.2, photo-estimated)
+
+| part | dims | position (x, z), bore y = 76 | source | confidence |
+|---|---|---|---|---|
+| `crank-pedestal` | green cylinder Ø46 × 110 tall, Ø9.5 bore along Z | (+122, 0) | front view: centre +123 ± 3, Ø 278 px / 6.02 px/mm, top ~110 above base top | low/med |
+| `arbor-pedestal` ×2 | green block 24 × 16 × 85, Ø9.5 clamp bore along Z | (−43.1, ±92) — arbor 200 long spans z ±100, stack ends ±70.6 | function-driven; posts hidden behind the gate legs in the eight views | low |
+| `cone-pivot-post` | black steel block 25 × 20 × 85, Ø9.5 journal bore (rotated 19.8° in plan with the cone axis) | (+67.0, −90.6) = 25 mm past the big end along the cone axis | p.18 "pivot" bracket; journal length from the cone-shaft row (~25) | low |
+| `cone-knob-post` | green round post Ø32 × 80, upward-open U-slot 3.5 wide, floor at 74.4 (tip centre 76) | (+0.04 ≈ 0, +95.3) = 30 mm past the small-end gear along the cone axis | p.18 top-down: green post Ø ~72 px / 2.23 px/mm (largest-cone-gear-OD scale); view 5/8 ball-knob at x ≈ −20 ± 15 agrees within error | low |
+
 ### Connecting rods (ch. 13 pp. 22–25 + ch. 14 p. 29; 20 used)
 
 | dim | value | (in) | source | method | confidence |
