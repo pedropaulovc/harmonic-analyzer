@@ -1,15 +1,18 @@
 r"""Reproduction script: connecting rod (book ch. 13 pp. 22-25 / ch. 14 p. 29; 20 used).
 
 Black rough-finished rod converting each cam's rotation into the rocker
-arm's see-saw: a full ring (strap) riding the Ø50.8 eccentric cam, a thin
-flat shank, and a flattened tip block pinned (Ø2) to the rocker arm's rod
-end. The p.29 "stepped" tip variant (alternate rods offset to clear
-adjacent rockers) is deferred to the M6 channel layout - modeled as a
-plain block (DIMENSIONS.md Appendix C #6 also tracks the cylinder-set
-axial budget this part lives in).
+arm's see-saw: a full ring (strap) riding the Ø50.8 eccentric cam (cast
+integral with each cylinder gear), a thin flat shank, and a flattened tip
+strap pinned (Ø2) to the rocker arm's rod-pin hole 1" from the arm pivot.
+Centre distance is exactly 5" (127): rocker pivot height 253.8 minus
+drive height 126.8 (M6.3 closure). The tip strap matches the arm's
+2.5 thickness so the pin joint stacks strap-beside-arm inside the 7.06
+channel pitch; the M2 "thick stepped tip blocks" read of p.29 was
+amplitude-bar feet, not these rods.
 
-Dimensions: cad/DIMENSIONS.md "Chapter 13 - Connecting rods" - ring bore
-derived from the cam OD (med), everything else photo-scaled (low).
+Dimensions: cad/DIMENSIONS.md "Chapter 13 - Connecting rods" - centre
+distance derived (high), ring bore derived from the cam OD (med),
+everything else photo-scaled (low).
 
 Layout: ring centre at the origin, shank rising +Y to the tip block;
 thicknesses extruded mid-plane in Z. Build order matters: ring disc,
@@ -40,15 +43,15 @@ from _common import (
 PART_NAME = "connecting-rod"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
-CENTER_DISTANCE = 105.0  # ch13 rods: cam ring centre -> rocker pin (scaled)
+CENTER_DISTANCE = 127.0  # ch13 rods: 5" cam ring centre -> rocker pin (derived)
 RING_BORE_DIA = 51.0  # ch13 rods: cam OD 50.8 + 0.1 clearance per side
 RING_WALL = 5.0  # ch13 rods: radial strap wall (scaled)
 RING_THICKNESS = 3.0  # ch13 rods: sandwich budget (scaled)
 SHANK_WIDTH = 8.0  # ch13 rods: silhouette vs 7 mm gear face (scaled)
 SHANK_THICKNESS = 2.5  # ch13 rods: thinner than the ring (scaled)
-BLOCK_WIDTH = 10.0  # ch14 p.29 tip blocks (scaled)
+BLOCK_WIDTH = 10.0  # flattened tip strap (scaled)
 BLOCK_LENGTH = 18.0
-BLOCK_THICKNESS = 6.0
+BLOCK_THICKNESS = 2.5  # = arm thickness: pin joint stacks beside the arm (M6.3)
 PIN_HOLE_DIA = 2.0  # ch14: rocker arm rod-end pin
 THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > any local thickness
 
@@ -96,7 +99,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
 
-    # Flattened tip block (plain; stepped variant deferred, see docstring).
+    # Flattened tip strap, pinned beside the rocker arm at assembly.
     check("create_sketch tip block", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     block = await add_line_chain(
@@ -119,7 +122,7 @@ async def build(adapter) -> dict[str, str]:
     )
     res = await adapter.get_mass_properties()
     print(f"  volume after bosses: {res.data.volume:.1f} mm^3")
-    # expected: 8767 disc + 1420 shank - 109 overlap + 1080 block = ~11,158
+    # expected: 8767 disc + 1860 shank - 109 overlap + 450 block = ~10,968
 
     # Strap bore - rides the eccentric cam.
     check("create_sketch bore", await adapter.create_sketch("Front"))
@@ -148,7 +151,7 @@ async def build(adapter) -> dict[str, str]:
     )
     res = await adapter.get_mass_properties()
     print(f"  volume after cuts: {res.data.volume:.1f} mm^3")
-    # expected: -6128 bore -8 sliver -19 pin -> ~5,003 mm^3
+    # expected: -6128 bore -8 sliver -8 pin -> ~4,824 mm^3
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
