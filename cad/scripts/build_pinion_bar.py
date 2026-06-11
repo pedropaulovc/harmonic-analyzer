@@ -2,7 +2,7 @@ r"""Reproduction script: transgear pinion bar (book ch. 23, pp. 56-59).
 
 The square steel bar that carries the translational-gearing stud: it
 runs from the A-frame apex (machine x -95) to the east column line
-(x +197) at y 253.5 on the output side, with a O9.5 hole along Z at the
+(x +197) at y 253.5 on the output side, with a O9.6 hole along Z at the
 rack-pinion stud position (machine x 0). The stud (build_transgear_stub.py)
 plugs into this hole; the rack pinion, fixed pinion and latch ride it.
 
@@ -35,7 +35,7 @@ MATERIAL = "Plain Carbon Steel"
 
 BAR_SIDE = 12.0  # square section (low)
 BAR_X = (-95.0, 197.0)  # A-frame apex -> east column line (med)
-HOLE_DIA = 9.5  # 3/8" stud bore (low)
+HOLE_DIA = 9.6  # 3/8" stud bore: 9.525 stud + slip clearance (low)
 
 
 async def build(adapter) -> dict[str, str]:

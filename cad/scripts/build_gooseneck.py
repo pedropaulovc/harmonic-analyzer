@@ -8,13 +8,14 @@ carrying the spring pin. Tension is set by sliding the tube in its clamp
 
 M6.4 geometry (ch. 19 full-machine photo at gooseneck scale 0.515 px/mm,
 p3 90-degree page): vertical leg at machine x 197 (east column line),
-y 1030..1390; bend top ~y 1441; tip leg at machine x 95 -- directly above
+y 1041..1390 (bottom seats in the clamp bore just above the east rail
+top at 1040.7); bend top ~y 1441; tip leg at machine x 95 -- directly above
 the summing-lever boss hook so the counter spring hangs plumb -- ending
 at y 1378. The book's tip "slotted screw" is modeled as a lug + O4 X-pin
 under the tip for the spring's top loop to encircle (simplification).
 
 Layout: part origin at the vertical leg's MID-height (machine
-(197, 1210, 0)): leg y +-180, bend arc centre (-51, +180), tip leg at
+(197, 1210, 0)): leg y -169..+180, bend arc centre (-51, +180), tip leg at
 x -102 (y 168..180), lug x -109..-103.5 (y 159..168), pin along X at
 (y 163, z 0). Dimensions: cad/DIMENSIONS.md ch. 19 (low/med).
 
@@ -46,7 +47,9 @@ PART_NAME = "gooseneck"
 MATERIAL = "Chrome Stainless Steel"  # polished chrome tube
 
 TUBE_DIA = 16.0  # DIMENSIONS.md ch19: scaled vs frame anchors (med)
-LEG_HALF = 180.0  # vertical leg y +-180 = machine 1030..1390 (med)
+LEG_HALF = 180.0  # vertical leg top y +180 = machine 1390 (med)
+LEG_BOTTOM = -169.0  # leg bottom = machine 1041: stops 0.3 above the east
+# rail top (1040.7) -- the tube seats in the clamp bore, not in the rail
 BEND_R = 51.0  # 180-degree bend; tip lands at x -102 = machine 95 (derived:
 # the tip must sit plumb above the boss hook at machine x 95)
 TIP_TOP = 180.0  # tip leg top (bend exit)
@@ -73,7 +76,6 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreateEquationCurveParameters,
         CreatePlaneParameters,
-        ExtrusionParameters,
         RevolveParameters,
         SweepParameters,
     )
@@ -83,18 +85,14 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # 1. Vertical leg (mid-plane extrude from the Top plane).
+    # 1. Vertical leg (start-offset extrude from the Top plane: the leg is
+    # asymmetric -- bottom at LEG_BOTTOM, top at +LEG_HALF into the bend).
     check("create_sketch leg", await adapter.create_sketch("Top"))
     await define_circle(adapter, 0.0, 0.0, TUBE_R, "leg")
     await ensure_fully_defined(adapter, "leg sketch")
     check("exit_sketch leg", await adapter.exit_sketch())
-    check(
-        "extrude leg",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=2.0 * LEG_HALF, both_directions=True)
-        ),
-    )
-    expected = math.pi * TUBE_R**2 * 2.0 * LEG_HALF
+    extrude_at_offset(adapter, LEG_HALF - LEG_BOTTOM, LEG_BOTTOM)
+    expected = math.pi * TUBE_R**2 * (LEG_HALF - LEG_BOTTOM)
     vol = await _volume(adapter)
     print(f"  volume after leg: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.005 * expected:
