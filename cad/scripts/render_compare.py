@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -115,6 +116,82 @@ def camera_axes(az_deg: float, el_deg: float, roll_deg: float = 0.0):
     r = tuple(cr * a + sr * b for a, b in zip(r0, u0, strict=True))
     u = tuple(-sr * a + cr * b for a, b in zip(r0, u0, strict=True))
     return r, u, o
+
+
+# --- component framing -------------------------------------------------------
+
+def component_boxes(adapter: Any) -> list[tuple[str, tuple[float, ...]]]:
+    """(instance name's last path segment lowercased, assembly-space box in
+    metres) for every component at every level. Suppressed/graphics-less
+    instances return no box and are skipped."""
+    model = adapter.currentModel
+    _flag(model, "IModelDoc2")
+    _flag(model, "IAssemblyDoc")
+    try:
+        comps = model.GetComponents(False)
+    except Exception as exc:
+        log(f"GetComponents failed ({exc}); framing disabled")
+        return []
+    out = []
+    total = len(comps or [])
+    for i, comp in enumerate(comps or [], 1):
+        if i % 50 == 0:
+            log(f"component boxes {i}/{total} ...")
+        _flag(comp, "IComponent2")
+        try:
+            name = str(_read_member(comp, "Name2") or "")
+            box = comp.GetBox(False, False)
+        except Exception:
+            continue
+        if not box:
+            continue
+        out.append((name.split("/")[-1].lower(), tuple(float(v) for v in box)))
+    return out
+
+
+def _union_box(boxes: list[tuple[float, ...]]) -> tuple[float, ...]:
+    return tuple(min(b[i] for b in boxes) for i in range(3)) + tuple(
+        max(b[i + 3] for b in boxes) for i in range(3)
+    )
+
+
+def _proj_extent(box: tuple[float, ...], axis: tuple[float, ...]) -> float:
+    vals = [
+        axis[0] * x + axis[1] * y + axis[2] * z
+        for x in (box[0], box[3])
+        for y in (box[1], box[4])
+        for z in (box[2], box[5])
+    ]
+    return max(vals) - min(vals)
+
+
+def resolve_framing(cam: dict, boxes: list[tuple[str, tuple[float, ...]]]) -> dict:
+    """Turn camera.frame_components into a concrete target_mm + zoom.
+
+    References shot in-context show a component mounted in the complete
+    machine, so the pair renders the full assembly with the camera centred on
+    the focus components' union box, zoomed so it fills ~75% of the frame.
+    Instance names match `<dashed>(-N)?` so cone_gear matches cone-gear-12 but
+    not cone-gear-shaft-1.
+    """
+    focus = cam.get("frame_components") or []
+    if not focus or not boxes:
+        return cam
+    pats = [re.compile(re.escape(f.replace("_", "-")) + r"(-\d+)?$") for f in focus]
+    hits = [b for seg, b in boxes if any(p.fullmatch(seg) for p in pats)]
+    if not hits:
+        log(f"frame_components {focus}: no instances matched; zoom-to-fit fallback")
+        return {**cam, "target_mm": None, "zoom": 1.0}
+    u = _union_box(hits)
+    whole = _union_box([b for _, b in boxes])
+    r, up, _o = camera_axes(cam.get("az_deg", 0.0), cam.get("el_deg", 0.0), cam.get("roll_deg", 0.0))
+    zoom = min(
+        _proj_extent(whole, r) / max(_proj_extent(u, r), 1e-6),
+        _proj_extent(whole, up) / max(_proj_extent(u, up), 1e-6),
+    )
+    zoom = max(1.0, min(0.75 * zoom, 15.0))
+    target = [(u[i] + u[i + 3]) / 2 * 1000.0 for i in range(3)]
+    return {**cam, "target_mm": target, "zoom": round(zoom, 2)}
 
 
 # --- SolidWorks view staging -----------------------------------------------
@@ -309,24 +386,41 @@ def main() -> int:
 
     async def build(adapter: Any) -> dict[str, str]:
         done: dict[str, str] = {}
-        for model in order:
+        n = 0
+        for mi, model in enumerate(order, 1):
             mpath = model_path(model)
+            log(f"model {mi}/{len(order)}: {model} ({len(by_model[model])} pairs)")
             check(f"open {mpath.name}", await adapter.open_model(str(mpath)))
+            boxes = []
+            if mpath.suffix.lower() == ".sldasm" and any(
+                p["camera"].get("frame_components") for p in by_model[model]
+            ):
+                log(f"{model}: scanning component boxes for framing "
+                    "(slow COM pass, ~0.4s/component, viewport idle)")
+                boxes = component_boxes(adapter)
+                log(f"{model}: {len(boxes)} component boxes")
             for pair in by_model[model]:
                 pid = pair["id"]
+                n += 1
                 # Capture at the reference's aspect so side-by-side panels and
                 # the blend overlay compare 1:1 (portrait refs would otherwise
                 # letterbox inside a landscape viewport).
                 ref_png = composite.prepare_reference(pair)
                 w, h = pair_size(ref_png, max(width, height))
-                set_camera(adapter, pair["camera"])
+                cam = resolve_framing(pair["camera"], boxes)
+                tgt = cam.get("target_mm")
+                log(f"[{n}/{n_pairs}] {pid}: az {cam.get('az_deg', 0):g} "
+                    f"el {cam.get('el_deg', 0):g} zoom {cam.get('zoom', 1):g}"
+                    + (f" target ({tgt[0]:.0f},{tgt[1]:.0f},{tgt[2]:.0f})mm" if tgt else "")
+                    + f" {w}x{h}")
+                set_camera(adapter, cam)
                 await capture(adapter, COMP / "render" / f"{pid}.png", w, h)
                 write_sidecar(pair, mpath, (w, h))
                 composite.side_by_side(pid)
                 composite.blend_overlay(pid, pair.get("align"))
                 done[pid] = "rendered"
             adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-            log(f"closed {model}")
+            log(f"closed {model} ({n}/{n_pairs} pairs done)")
         composite.regenerate(set(done))  # refresh scores.json for what changed
         return done
 
