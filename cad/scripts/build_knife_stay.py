@@ -8,9 +8,12 @@ descending diagonally to the knife block's face. Modeled as ONE part
 the p.43 hooked end collapsed; documented simplification).
 
 Layout: origin on the rod axis at machine x 0 (machine (0, 1086, 0)),
-rod along X (local -197..+20), strap from (x -95, rod) down to the block
-face at local (5, -96) = machine (5, 990). Dimensions: cad/DIMENSIONS.md
-ch. 18 (M6.4, low).
+rod along X (local -197..+20), strap from (x -40, rod) down to the
+knife-mount stud's west flank at local (10, -36) = machine (10, 1050),
+stopping 0.4 short of the stud face (M6.4 reroute: the original drop to
+the knife block at (5, 990) crossed the summing-lever plate band, and any
+rod hook west of x -40 sends the strap through the channel-lever bank).
+Dimensions: cad/DIMENSIONS.md ch. 18 (M6.4, low).
 
 Run (SolidWorks already open)::
 
@@ -38,8 +41,11 @@ MATERIAL = "Plain Carbon Steel"
 
 ROD_DIA = 3.0  # DIMENSIONS.md ch18: thin anchor rod (low)
 ROD_X = (-197.0, 20.0)  # west column line -> past centre (low)
-STRAP_TOP = (-95.0, 0.0)  # strap hooks the rod here (low)
-STRAP_BOT = (5.0, -96.0)  # knife block face at the knife line (derived)
+STRAP_TOP = (-40.0, 0.0)  # strap hooks the rod here (derived: any hook west
+# of -40 sends the strap through the channel-lever bank at y 1063..1069)
+STRAP_BOT = (10.0, -36.0)  # knife-mount stud west flank at machine y 1050,
+# 0.4 shy of the stud face (derived: a drop to the knife block itself would
+# cross the summing-lever plate band x -45..+5 at y 992.9..998)
 STRAP_HALF_W = 4.0  # strap 8 wide (z), 2 thick (low)
 STRAP_HALF_T = 1.0
 
