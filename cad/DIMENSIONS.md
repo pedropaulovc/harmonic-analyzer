@@ -145,10 +145,8 @@ drive component — Appendix C #9.
 | Cam diameter (integral cam per gear) | 50.8 mm (2.0") | 2.0 | legacy `parameters.kcl`; M2 check: p.25 printed outline measures cam OD ≈ 0.52 × cylinder-gear OD → 0.52 × 103.3 = 53.7 vs legacy 50.8 (5% — within the outline-measurement error); keep the legacy round 2.0" | legacy + scaled ratio | med |
 | Cam thickness | 3.5 mm | 0.138 | M6 (Appendix C #6): inter-face gap 7.5 − 3.0 = 4.5 minus 0.5 air per side; REFUTES legacy 10.2 (0.4"), which alone exceeds the axial pitch | derived | med |
 | Cam eccentricity | 5.1 mm (0.2") | 0.2 | legacy `parameters.kcl`; sets rocker-arm stroke; p.25 photo shows ≈ 4 mm center offset (within photo error) | legacy | med |
-| Cam bore | 9.5 mm (3/8") | 0.375 | legacy `parameters.kcl` | legacy | med |
-| Cam keyway | 3.2 × 1.5 mm (1/8" × 0.06") | 0.125 × 0.06 | legacy `parameters.kcl` | legacy | med |
-| Cylinder shaft length | ~200 mm | ~7.9 | derived: 150 stack (20 × 7.5 axial pitch) + ~25 bearing journal each end (eight-views 8/8 pedestals) | derived | low |
-| Cylinder shaft keyseat | 3.2 wide × 1.5 deep, lower end through stack span | — | mates the cam keyway (row above) | derived | low |
+| Cam bore | 9.5 mm (3/8") | 0.375 | legacy `parameters.kcl`; plain bore, NO keyway (M6.2 refutation below) | legacy | med |
+| Cylinder arbor length | ~200 mm | ~7.9 | derived: 134 stack (20 × 7.06 Z-pitch) + journal/clamp each end (eight-views 8/8 pedestals) | derived | low |
 
 Notes: set is a sandwich — shiny brass gears alternating with black rough-finished
 connecting rods. Each rod rides the cam on the gear to its right; cam converts
@@ -157,8 +155,8 @@ to top = cosine mode; rotated 90° = sine mode (pp. 66–67).
 
 M4 build (`build_cylinder_gear.py`): single non-configured part — 120T involute
 ring (cone-gear equation-curve technique, toothed-disc volume reproduces the
-cone gear's T120 configuration), integral cam boss (lobe −Y), bore + keyway
-(+Y) through gear and cam, alignment notch at +Y. Notch width is unstated in
+cone gear's T120 configuration), integral cam boss (lobe −Y), plain bore
+through gear and cam, alignment notch at +Y. Notch width is unstated in
 the book — modeled square (3 mm wide × 3 mm deep, low confidence). The
 standalone `eccentric-cam` part (M2 legacy re-author) is superseded by the
 integral cam for assembly purposes.
@@ -168,9 +166,9 @@ rev per crank (ch. 29 gear law) — every gear at a DIFFERENT speed — so the
 gears cannot be keyed to a common rotating shaft. The cylinder shaft is a
 stationary arbor; gears spin freely on plain bores. This also explains the
 ch. 25 setup pinion (turns all 20 gears as one only after the cone pivots
-out of engagement). The legacy cam keyway + shaft keyseat rows above are
-legacy fiction — both removed in M6.2 (`build_cylinder_gear.py`,
-`build_cylinder_gear_shaft.py`).
+out of engagement). The legacy `parameters.kcl` cam keyway (3.2 × 1.5) and
+matching shaft keyseat were legacy fiction — both removed in M6.2
+(`build_cylinder_gear.py`, `build_cylinder_gear_shaft.py`).
 
 ### Drive-train layout (M6.2, eight-views 0°/90° + ch. 12 p.18 top-down)
 
