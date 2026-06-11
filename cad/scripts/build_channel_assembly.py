@@ -96,8 +96,10 @@ BAR_TOP_PIN_DROP = 6.35
 # --- lever bank -------------------------------------------------------------
 FULCRUM = (-199.9, 1065.9)  # lever fulcrum shaft axis (x, y)
 LEVER_BAR_PIN_X = 127.0
-LEVER_SPRING_X = 254.0
-LEVER_HALF_TALL = 9.5 / 2.0
+LEVER_SPRING_X = 177.8  # 7" c2c; the 254 "2:1" guess is photo-refuted (M6.4 -
+# the lever bank ends at x ~ -30 in the ch. 30 front view and the 32 mm
+# springs must reach the summing plate at x ~ -22..-27)
+LEVER_TAB_HALF = 3.0  # spring hole sits in the lever's 6.0-tall end tab
 LEVER_THICKNESS = 3.0
 
 # --- supports / mounts ------------------------------------------------------
@@ -228,14 +230,14 @@ def _assert_spring_threading(hole_y: float, eye_y: float) -> None:
     lever, X) offset r*sin(phi), reaches slab depth z (|z| <= 1.5) on the
     upper branch at dy = +sqrt(rho^2 - z^2) above the eye centre and must
     stay inside the hole bore there; the lower branch at -sqrt(rho^2 - z^2)
-    must pass under the lever's bottom edge. Binding extremes (rho 2.25,
-    z +/-1.5): sqrt(2.25^2 - 1.5^2) = 1.677 -> top |1.677 - D|, bottom
-    D + 1.677 - 4.75; with D = 3.37 margins ~0.21 / ~0.30.
+    must pass under the lever tab's bottom edge. Binding extremes (rho
+    2.25, z +/-1.5): sqrt(2.25^2 - 1.5^2) = 1.677 -> top |1.677 - D|,
+    bottom D + 1.677 - 3.0; with D = 3.37 margins ~0.31 / ~2.0.
     """
     half_t = LEVER_THICKNESS / 2.0
     wire_r = SPRING_WIRE_DIA / 2.0
     hole_r = SPRING_HOLE_DIA / 2.0
-    plate_bottom = hole_y - LEVER_HALF_TALL
+    plate_bottom = hole_y - LEVER_TAB_HALF
     worst_bore = 0.0  # max distance of the upper branch from the hole axis
     worst_under = -math.inf  # max y of the lower branch inside the slab
     steps = 360

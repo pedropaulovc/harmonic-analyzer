@@ -3,16 +3,25 @@ r"""Reproduction script: channel (top) lever (book ch. 17, pp. 38-41).
 One of the 20 cast third-class levers at the top of the machine: fulcrum
 pivot at one end (Ø6.5 hole riding the common Ø6.35 fulcrum shaft - the
 p.40 ball clevis is the shaft's END mount, mirroring the rocker-pivot
-design), channel-spring pull at the free end (Ø4 hook hole at 254 = 10"),
-driven in between by its amplitude bar pinned Ø2 at 127 (5") - an exact
-2:1 motion ratio. Section 9.5 tall x 3.0 thick: 20 levers at the 7.0565
-channel pitch cap the thickness (the M2 12.5 "width" violated the pitch),
-and 3.0 lets the bar's 3.2 top slot straddle the lever at the pin. The
-small fork/clip fittings some tips carry (photogrammetry 195527397)
-remain deferred.
+design), channel-spring pull from a narrow end tab (Ø4 hook hole at
+177.8 = 7"), driven in between by its amplitude bar pinned Ø2 at 127
+(5"). Section 9.5 tall x 3.0 thick: 20 levers at the 7.0565 channel
+pitch cap the thickness (the M2 12.5 "width" violated the pitch), and
+3.0 lets the bar's 3.2 top slot straddle the lever at the pin.
+
+The earlier 254 (10", "clean 2:1") length is REFUTED by the calibrated
+ch. 30 front view: the lever bank ends at x ~ -30 (not +54), the
+summing-lever plate (44.45 wide, pivot bolt read at x ~ +13..17) sits
+directly under the tab line, and the 32 mm channel springs can only
+bridge lever tab -> plate if the tab holes are at x ~ -22 - i.e.
+c2c = 177.8 from the -199.9 fulcrum (motion ratio 177.8/127 = 1.4).
+The p.39 close-up also shows the bar pin only ~4-5 bar-heights from the
+tip (50.8/9.5 = 5.3 fits; 127/9.5 = 13 does not). The tab itself is the
+narrow stepped end visible on p.39/p.41: bar height 9.5 steps to a 6.0
+centred tab carrying the spring hole, rounded tip.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 17" - lengths/section derived in
-M6.3 (med), hole diameters low.
+M6.3/M6.4 (med), hole diameters low.
 
 Layout: lever length along +X from the pivot axis at the origin, bar
 height in Y, thickness extruded mid-plane in Z. Through-holes use
@@ -25,6 +34,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
 
 from _common import (
@@ -42,19 +52,22 @@ from _common import (
 PART_NAME = "channel-lever"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
-LEVER_LENGTH = 254.0  # DIMENSIONS.md ch17: fulcrum-to-spring-hole c2c, 10" (derived)
-TIP_OVERHANG = 8.0  # DIMENSIONS.md ch17: bar past the spring hole (low)
+LEVER_SPRING_X = 177.8  # DIMENSIONS.md ch17: fulcrum->spring-hole c2c, 7" (derived,
+# M6.4: supersedes the 254 "2:1" guess - see docstring)
 BAR_TALL = 9.5  # DIMENSIONS.md ch17: bar height, p.39 vs spring OD (low)
 LEVER_THICKNESS = 3.0  # DIMENSIONS.md ch17: fits 7.06 pitch + 3.2 bar slot (derived)
 PIVOT_HOLE_DIA = 6.5  # DIMENSIONS.md ch17: rides the 6.35 fulcrum shaft (derived)
 BAR_PIN_HOLE_DIA = 2.0  # DIMENSIONS.md ch17: amplitude-bar top pin (derived)
-BAR_PIN_X = 127.0  # 5" from the fulcrum = half the spring c2c (derived)
+BAR_PIN_X = 127.0  # 5" from the fulcrum (bar line -72.9, fulcrum -199.9)
 SPRING_HOLE_DIA = 4.0  # DIMENSIONS.md ch17: sized so the spring's O5.5-mean
-# O1-wire eye threads the 3.0 plate with ~0.3 margins; the O3 photo read
-# (low) is infeasible (best margins ~0.05) — see build_channel_assembly.py
+# O1-wire eye threads the tab with ~0.3 margins; the O3 photo read (low)
+# is infeasible (best margins ~0.05) - see build_channel_assembly.py
 # _assert_spring_threading
+TAB_START_X = 169.0  # bar steps down to the end tab (p.39/p.41, low)
+TAB_HALF = 3.0  # tab 6.0 tall, centred on the bar axis
+TIP_RADIUS = 3.0  # rounded tab tip; tip overhang = 182.8 + 3 - 177.8 = 8
+TIP_ARC_CX = LEVER_SPRING_X + 5.0  # 182.8
 
-BAR_END_X = LEVER_LENGTH + TIP_OVERHANG
 HALF_BAR = BAR_TALL / 2.0
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > extrude width
 
@@ -69,25 +82,44 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Side profile: round-nosed flat bar (arc about the fulcrum + 3 lines).
+    # Side profile: round fulcrum nose, flat bar, stepped end tab with a
+    # rounded tip (two arcs + 6-line chain).
     check("create_sketch outline", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    arc = check(
+    nose = check(
         "add_arc fulcrum nose",
         await adapter.add_arc(0.0, 0.0, 0.0, HALF_BAR, 0.0, -HALF_BAR),
     )
-    lines = await add_line_chain(
+    lower = await add_line_chain(
         adapter,
         [
             (0.0, -HALF_BAR),
-            (BAR_END_X, -HALF_BAR),
-            (BAR_END_X, HALF_BAR),
+            (TAB_START_X, -HALF_BAR),
+            (TAB_START_X, -TAB_HALF),
+            (TIP_ARC_CX, -TAB_HALF),
+        ],
+        close=False,
+    )
+    tip = check(
+        "add_arc tab tip",
+        await adapter.add_arc(
+            TIP_ARC_CX, 0.0, TIP_ARC_CX, -TAB_HALF, TIP_ARC_CX, TAB_HALF
+        ),
+    )
+    upper = await add_line_chain(
+        adapter,
+        [
+            (TIP_ARC_CX, TAB_HALF),
+            (TAB_START_X, TAB_HALF),
+            (TAB_START_X, HALF_BAR),
             (0.0, HALF_BAR),
         ],
         close=False,
     )
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "lever outline", fix_entities=[arc, *lines])
+    await ensure_fully_defined(
+        adapter, "lever outline", fix_entities=[nose, *lower, tip, *upper]
+    )
     check("exit_sketch outline", await adapter.exit_sketch())
     check(
         "extrude lever",
@@ -96,14 +128,27 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     vol = await _volume(adapter)
-    print(f"  volume after extrude: {vol:.1f} mm^3")
-    # expected: (262 * 9.5 + pi/2 * 4.75^2) * 3.0 = ~7,573 mm^3
+    area = (
+        TAB_START_X * BAR_TALL
+        + math.pi * HALF_BAR**2 / 2.0
+        + (TIP_ARC_CX - TAB_START_X) * 2.0 * TAB_HALF
+        + math.pi * TIP_RADIUS**2 / 2.0
+    )
+    expected = area * LEVER_THICKNESS
+    print(f"  volume after extrude: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    if abs(vol - expected) > 0.005 * expected:
+        raise RuntimeError(
+            f"outline volume {vol:.1f} != analytic {expected:.1f} - an arc"
+            " bulged the wrong way or the chain snapped"
+        )
 
     # Fulcrum hole + bar-pin hole + spring-hook hole, one mid-plane cut.
     check("create_sketch holes", await adapter.create_sketch("Front"))
     await define_circle(adapter, 0.0, 0.0, PIVOT_HOLE_DIA / 2.0, "fulcrum hole")
     await define_circle(adapter, BAR_PIN_X, 0.0, BAR_PIN_HOLE_DIA / 2.0, "bar pin hole")
-    await define_circle(adapter, LEVER_LENGTH, 0.0, SPRING_HOLE_DIA / 2.0, "spring hole")
+    await define_circle(
+        adapter, LEVER_SPRING_X, 0.0, SPRING_HOLE_DIA / 2.0, "spring hole"
+    )
     await ensure_fully_defined(adapter, "holes sketch")
     check("exit_sketch holes", await adapter.exit_sketch())
     check(
@@ -113,8 +158,21 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     vol = await _volume(adapter)
-    print(f"  volume after holes: {vol:.1f} mm^3")
-    # expected: -3.0 * pi * (3.25^2 + 1^2 + 2^2) = ~7,427 mm^3
+    v_holes = (
+        math.pi
+        * (
+            (PIVOT_HOLE_DIA / 2.0) ** 2
+            + (BAR_PIN_HOLE_DIA / 2.0) ** 2
+            + (SPRING_HOLE_DIA / 2.0) ** 2
+        )
+        * LEVER_THICKNESS
+    )
+    expected -= v_holes
+    print(f"  volume after holes: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    if abs(vol - expected) > 0.005 * expected:
+        raise RuntimeError(
+            f"hole-cut volume {vol:.1f} != analytic {expected:.1f}"
+        )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
