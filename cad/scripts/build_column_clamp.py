@@ -131,7 +131,9 @@ async def build(adapter) -> dict[str, str]:
     feature = model.FeatureManager.FeatureCut4(
         True,  # Sd: single direction
         False,  # Flip side to cut
-        False,  # Dir
+        True,  # Dir: flip -- the default cut direction from a Top sketch
+        # points -Y (verified live: the un-flipped cut removed only the
+        # floor..collar-bottom band)
         0, 0,  # T1, T2: blind
         (COLLAR_HALF_H + 2.0 - CHANNEL_FLOOR_Y) / 1000.0,  # D1
         0.0,  # D2
@@ -145,6 +147,7 @@ async def build(adapter) -> dict[str, str]:
         3,  # T0: swStartOffset
         CHANNEL_FLOOR_Y / 1000.0,  # StartOffset
         False,  # FlipStartOffset
+        True,  # OptimizeGeometry
     )
     model.ClearSelection2(True)
     if feature is None:
