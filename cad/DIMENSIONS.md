@@ -346,7 +346,7 @@ z_j + 0.8.
 | Ball mounts ×4 | rocker pair at seats y 228.6: north on the support apex (z +101.6), south on the A-frame saddle (z −111, M6.5); lever pair on the top-frame west rail (seat y 1040.7) at z ±85 — any further out the Ø16 base overhangs the Ø35 boss bores (need √(2.9² + dz²) ≥ 17.5 + 8 → dz ≥ 25.3 from the boss at z 112) | ch. 14 / ch. 17; lever z from boss-bore clearance | med |
 | Amplitude bars (default) | vertical, slot centred on the pivot x = −72.9 (d = 0, bar rotated 90° about its long axis: slot/pin across Z); foot roof on the tilted arm's top edge at 262.63 (contact at the bar −X edge, arc max), bar bottom 260.25, top 1073.05, top pin 1066.70 | ch. 15 notes + M6.3 assembly solve | med |
 | Springs (default) | hanging free from lever tab holes (−22.10, 1067.02), rotated 90° about Y so the eye ring (r 2.75, plane ⊥ lever face) threads the Ø4 hole; eye centre 3.37 below the hole (torus-swept worst cases at the slab faces: upper branch inside the hole void with 0.31 margin, lower branch clears the tab underside by 2.05); body 32 + hooks (eye centre at spring local y 34 = body 32 + lead 2.0); lower hook centre lands at y 1027.6 = summing-plate level — the 32 mm spring length closes the lever→plate chain only with the 177.8 lever (M6.4) | ch. 17/18 + M6.4 threading solve | med |
-| Default mechanism state | gear notches +Y (cosine alignment) → cam lobes −Y → rod rings concentric on the cams at (−47.5, 121.72) → arms tilted −11.54° (pin solve: circle r 25.4 about (−72.9, 253.8) ∩ r 127 about ring centre → pin (−48.01, 248.72)), rods leaning 0.23° (Rz +0.23°), levers +0.36° (bar-pin chain 1066.70 vs fulcrum 1065.9) | ch. 13 notes + ch. 25 + M6.3 solve | derived |
+| Default mechanism state | gear notches near +Y with the drive-train's +1.5° tooth-phase rotation (a T120 tooth faces the cone mesh) → cam centres at (−47.367, 121.721) = arbor + 5.08·(sin 1.5°, −cos 1.5°) → rod rings concentric on the cams there (M6.5 — assuming the unrotated centre (−47.5, 121.72) dug every ring 0.033 into its cam: 20 × 2.40 mm³) → arms tilted −11.54° (pin solve → pin (−48.01, 248.72)), rods leaning Rz +0.29°, levers +0.36° (bar-pin chain vs fulcrum 1065.9) | ch. 13 notes + ch. 25 + M6.3 solve, M6.5 phase fix | derived |
 
 The measuring stick (ch. 16) is a loose hand tool — excluded from the
 assemblies.
@@ -375,7 +375,7 @@ boss, Z along the knife edge.
 | Hook hole | Ø3 vertical in the boss top at x 75.5 (machine 90.5) | — | derived: boss-hook shank seat (real joint ≈ 2.6 tap drill + M3 — modeled at shank size for a zero-volume fit) | derived | low |
 | Knife mount | 8-square hardened bar set diamond-wise (edge up), 31.8 long — rides inside the lever tube's slot tunnel (z ±15.9 vs slot ±16; contact bands outside the slot are geometrically impossible — the diamond flanks clash with the tube lower wall); brass block 24 × 28 × 24 below; Ø8 stud through the tube slot rising to machine y 1065 | — | p.42/43 (square-head bolt + stirrup strap collapsed to block + stud — simplification) | scaled | low |
 | Top crossbar | 22 × 41 rail section (ch. 6), 202 long along Z (M6.5 — the M6.4 372 mistakenly used the ring's inner X half-span 186; the bar spans the ring WINDOW along Z, inner faces at z ±101), Ø8.2 stud hole at centre; bottom face machine y 1010 (0.5 above the summing-lever tube top 1009.5) — the bar floats 10.3 proud of the top-frame ring band (999.7..1040.7), ends face-flush against the north/south rail inner faces over y 1010..1040.7 | — | ch. 30 views + top-frame ring inner span | scaled + derived | med |
-| Knife stay | Ø3 rod along X at machine (0, 1086), x −197..+20; 8 × 2 strap from the rod at x −40 down to the knife-mount stud west flank at (10, 1053) (end corner 0.45 clear of the stud face), 2 above the raised crossbar top 1051 | — | p.42–43; M6.4 reroute: a drop to the knife block crosses the summing-plate band, a hook west of x −40 crosses the channel-lever bank | scaled + derived | low |
+| Knife stay | Ø3 rod along X at machine (0, 1086), x −197..+20; 8 × 2 strap from the rod at x −10 down to the knife-mount stud west flank at (9.7, 1053) (end corner 0.44 clear of the stud face, low corner 1.5 above the raised crossbar top 1051) | — | p.42–43; M6.4 reroute: a drop to the knife block crosses the summing-plate band; M6.5 reroute: the lever spring tabs overhang to x −14.1 (tab tops ~1070.1), so the hook moved −40 → −10 to keep the whole strap east of the tab tips | scaled + derived | low |
 | Boss hook | Ø3 J-hook: shank +Y in the boss hole, rise 12, elbow R 3, arm +X 3.5 — rod top machine y 1015, tip x 97 | — | p.43/45 (hook + chrome link ring collapsed to one hook; the spring's own loop is the ring) | derived | low |
 
 Notes (stated, qualitative): cast iron; pivots on a knife-edge fulcrum; the 20
@@ -513,15 +513,16 @@ to be settled when mating the drive train in M6. Parts authored now:
 M6.4 notes (Appendix C #8 partial resolution): the removable gear CANNOT be
 mounted meshed — module 2 teeth against the DP 30 fixed pinion leave ~4.6
 teeth jammed in the overlap zone; the T24 removable gear is placed loose on
-the base (machine (−137, 55.8, −93), M6.5 — moved east from −150 so the
-Ø41.4-radius disc at x −157.7..−116.3 clears the SW corner-bracket foot tip
-x −160.5 and the a-frame plate west edge −115) as the photo's spare-gear
-catalog state,
+the base (machine (−133, 55.8, −80), M6.5 — plan circle r 26 (OD 52) clears
+the SW corner-bracket region (nearest corner (−160.5, −97.7), 6.7 margin)
+and the a-frame foot (nearest (−115, −107), 6.4 margin)) as the photo's
+spare-gear catalog state,
 and the latch small hub carries only the knob shaft. The knob shaft's
 sprocket plane (machine z −76.5..) does not reach the drive-train chain plane
 mid −78.75 / SPROCKET_Z0 −81 exactly — flagged for M6.5 chain routing. The
 measuring stick (ch. 16, hand tool) lies flat on the base at
-(−175, 53.8, −135), graduations up.
+(−158, 53.8, −133), graduations up (M6.5 — the M6.4 spot (−175, .., −135)
+ran it through the SW corner bracket's plate + foot).
 
 ## Chapter 24 — Pen Mechanism (pp. 60–61)
 
