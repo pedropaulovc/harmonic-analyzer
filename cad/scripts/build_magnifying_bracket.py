@@ -53,7 +53,7 @@ async def _volume(adapter) -> float:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
+    from solidworks_mcp.adapters.base import RevolveParameters
 
     check("create_part", await adapter.create_part())
 

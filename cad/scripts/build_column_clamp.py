@@ -24,12 +24,13 @@ import math
 import sys
 
 from _common import (
+    CASTING_GREEN,
     add_line_chain,
+    apply_color,
     apply_material,
     check,
     define_circle,
     ensure_fully_defined,
-    extrude_at_offset,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -160,6 +161,7 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"channel volume {vol:.1f} != {expected:.1f}")
 
     await apply_material(adapter, MATERIAL)
+    await apply_color(adapter, CASTING_GREEN)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 
