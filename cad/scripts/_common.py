@@ -242,12 +242,18 @@ def insert_helix(
 
 
 async def add_spring_end_hooks(
-    adapter: Any, mean_radius: float, wire_dia: float, body_length: float
+    adapter: Any,
+    mean_radius: float,
+    wire_dia: float,
+    body_length: float,
+    leads: tuple[float, float] | None = None,
 ) -> None:
     """Sweep a bent-wire end hook onto each end of a +Y helical coil body.
 
     Extension-spring hooks (book pp. 41, 45): each is a straight axial lead
-    (2 x wire dia) continuing the coil end, then a tangent 270-degree loop
+    (default 2 x wire dia; override per end via ``leads`` = (bottom, top) --
+    the counter spring's bottom wire drops ~47 mm to the summing-lever boss
+    ring) continuing the coil end, then a tangent 270-degree loop
     arc at the coil's mean radius, drawn in the Front plane -- a whole-coil
     helix starts AND ends at +X, z=0, so both end points already lie there.
     The loop's open end tucks back through the coil bore (no wire clash:
@@ -278,9 +284,9 @@ async def add_spring_end_hooks(
     )
 
     loop_r = mean_radius
-    lead = 2.0 * wire_dia
+    default_lead = 2.0 * wire_dia
+    lead_by_end = leads if leads is not None else (default_lead, default_lead)
     wire_area = math.pi * (wire_dia / 2.0) ** 2
-    v_hook = (lead + 1.5 * math.pi * loop_r) * wire_area
     max_overlap = 16.0 * (wire_dia / 2.0) ** 3 / 3.0
 
     async def _volume() -> float:
@@ -309,10 +315,13 @@ async def add_spring_end_hooks(
         )
         return check(f"curve {label}", res)
 
-    for label, y_end, d in (("bottom", 0.0, -1.0), ("top", body_length, 1.0)):
+    for (label, y_end, d), lead in zip(
+        (("bottom", 0.0, -1.0), ("top", body_length, 1.0)), lead_by_end, strict=True
+    ):
         # Path: axial lead line from the helix end, tangent 270-degree loop
         # (clockwise for the bottom hook, counter-clockwise for the top, so
         # the loop extends axially outward).
+        v_hook = (lead + 1.5 * math.pi * loop_r) * wire_area
         p1 = (mean_radius, y_end + d * lead)
         c = (mean_radius - loop_r, p1[1])
         path_name = check(
