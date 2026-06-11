@@ -826,6 +826,10 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
         print("Connecting to SolidWorks ...", flush=True)
         await adapter.connect()
         log("connected")
+        # Re-runnable: a previous (possibly failed) build leaves documents
+        # open, and saving over an open path fails.
+        adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+        log("CloseAllDocuments (clean session)")
         try:
             return await build(adapter)
         finally:
