@@ -100,7 +100,8 @@ from build_counter_spring import (  # noqa: E402
 )
 
 BOSS_HOOK_POS = (90.5, 1000.0, 0.0)
-SPRING_POS = (95.0, 1052.0, 0.0)  # coil-bottom origin; ring at y 1012
+SPRING_POS = (95.0, 1052.1, 0.0)  # coil-bottom origin; ring at y 1012.1
+# (1052.0 left the hook rod poking 0.05 past the ring inner top)
 
 # --- magnifying group --------------------------------------------------------
 LEVER_ROD_Y = 985.0
@@ -143,7 +144,8 @@ PLATE_Y0 = 305.0
 PLATE_FRONT_Z = BAR_FRONT_Z - PLATE_THICKNESS  # -142.9
 PINION_AXIS = (0.0, 253.5)  # transgear stud on the pinion bar
 PINION_PD_R = RACK_PINION_TEETH / 30.0 * IN / 2.0  # 40.64 (DP 30)
-RACK_BACKLASH = 0.3
+RACK_BACKLASH = 0.8  # 0.3 left eight small flank overlaps off the pitch point
+# (involute vs straight rack flanks); 0.8 separates every tooth pair
 # Rz(180) placement: machine x = RACK_X0 - x_local, y = RACK_Y0 - y_local.
 # Tooth centres sit at x_local = k * PITCH, so RACK_X0 = 15 * PITCH puts a
 # rack tooth dead on x = 0 -- straight into the 96T gear's bottom gap (the
@@ -175,8 +177,18 @@ PEN_ROD_POS = (PEN_ROD_X, 398.0, PEN_Z_MID - 2.5)  # rod z -154..-149
 VBLOCK_POS = (-24.0, 390.0, -159.5)  # rod bore (local x 21) at (-3, -151.5)
 MARKER_X = -13.0  # marker bore (local x 11)
 MARKER_TIP_Y = 368.0
-FRAME_POS = (-14.0, 418.0, -183.0)  # Rx(+90): ring flat-ish... see _place call
-SET_SCREW_POS = (PEN_ROD_X, 413.0, -188.0)
+# Frame flat on the v-block top (y 408), long axis along X so its window
+# (machine x -25..+7, z -161..-147) spans the marker barrel (-17..-9,
+# z -155.5..-147.5) and the pen rod (-5.5..-0.5, z -154..-149). Mapping:
+# machine x = -29 + local y, machine y = 418 - local z, machine z =
+# -143 - local x; the plate's near edge (z -143) stops 0.1 short of the
+# platen front face (-142.9). The screw hole (local x 11, z 5) lands at
+# machine (y 413, z -154), axis along X through the west end rail.
+FRAME_POS = (-29.0, 418.0, -143.0)
+FRAME_ROWS = [[0.0, 0.0, -1.0], [1.0, 0.0, 0.0], [0.0, -1.0, 0.0]]
+# Set screw along +X (the part's own axis): knob x -38..-33, shank tip at
+# x -18, 1 short of the marker barrel's west face (-17).
+SET_SCREW_POS = (-38.0, 413.0, -154.0)
 
 # --- loose hardware ----------------------------------------------------------
 STICK_POS = (-175.0, 53.8, -135.0)  # flat on the base, graduations up
@@ -286,7 +298,10 @@ async def build(adapter) -> dict[str, str]:
                  [0.0, 0.0, 0.0], IDENTITY)
     await _place(adapter, "knife-mount", [KNIFE[0], KNIFE[1], 0.0],
                  [0.0, 0.0, 0.0], IDENTITY)
-    await _place(adapter, "top-crossbar", [KNIFE[0], 999.7, 0.0],
+    # Crossbar band y 1010..1051: 0.5 above the summing-lever tube top
+    # (1009.5), ends face-flush on the ring rail inner faces (y to 1040.7),
+    # stud pokes 14 above for the nut seat.
+    await _place(adapter, "top-crossbar", [KNIFE[0], 1010.0, 0.0],
                  [0.0, 0.0, 0.0], IDENTITY)
     await _place(adapter, "knife-stay", [0.0, 1086.0, 0.0],
                  [0.0, 0.0, 0.0], IDENTITY)
@@ -380,13 +395,14 @@ async def build(adapter) -> dict[str, str]:
                  [0.0, 0.0, 0.0], IDENTITY)
     await _place(adapter, "pen-marker", [MARKER_X, MARKER_TIP_Y, PEN_Z_MID],
                  [0.0, 0.0, 0.0], IDENTITY)
-    # Rx(+90): the ring lies flat on the v-block top, encircling the pen
-    # rod through its window; the bottom rail lands at the far (-Z) side.
+    # Ry(+90)*Rx(+90): the ring lies flat on the v-block top, long axis
+    # along X, window over the marker + pen rod (see FRAME_POS comment).
     await _place(adapter, "pen-frame", list(FRAME_POS),
-                 [90.0, 0.0, 0.0], ROT_X_POS90)
-    # Ry(-90): screw +X -> +Z, threading the frame's (rotated) bottom rail.
+                 [90.0, 90.0, 0.0], FRAME_ROWS)
+    # No rotation: the screw's own +X axis presses east through the frame's
+    # west end-rail hole toward the marker barrel.
     await _place(adapter, "pen-set-screw", list(SET_SCREW_POS),
-                 [0.0, -90.0, 0.0], ROT_Y_NEG90)
+                 [0.0, 0.0, 0.0], IDENTITY)
 
     # --- loose hardware -------------------------------------------------------
     # Rx(+90): the stick lies flat, graduated face up.
