@@ -239,7 +239,7 @@ ch. 14 layout) and are plain thin straps at the top.
 | Support castings ×2 | solid tapered frustum, base 88.9 × 63.5 → top 20 × 16.9, 177.8 tall (7"), green | front view: triangle base spans x −130…−44 (≈86), apex at −81 ± 6; side taper = the old trapezoid silhouette (ch. 14 p.29 photos); REFUTES the legacy windowed-square-frame `rocker-arm-support` (184 wide, window) — no such face appears in any view | photo + legacy height | med |
 | Support positions | apex centred (x, z) = (−72.9, ±101.6), feet on the base top | same stations as the M6.1 gates (outer faces flush with the top plate edge); apex top at y = 228.6 | med |
 | Ball mounts ×2 | clevis + Ø19 ball, ball centre 25.2 above its seat; Ø6.5 shaft cross-bore | apex top 228.6 + 25.2 = 253.8 = pivot axis ✓; same style at the lever rail (ch. 17) | scaled | low |
-| Pivot spacer bushings ×19 | Ø25.4 OD × 4.5565 long × Ø6.5 bore (pitch 7.0565 − arm 2.5) | p.27 macro: large barrel spacers between the 2.5 arms | derived/scaled | med |
+| Pivot spacer bushings ×19 | Ø10 OD × 4.5565 long × Ø6.5 bore (pitch 7.0565 − arm 2.5) | M6.3 geometric ceiling: at d = 0 the bar-foot cheeks pass 6.45 above the shaft axis (contact 262.63 − notch 2.381 − axis 253.8), so OD < ~12.9 — REFUTES the p.27 "Ø~25 barrel" read (those barrels are something else); Ø10 keeps 1.45 clearance | derived | med (OD low) |
 | Arm stations | arm mid-plane z = z_j + 0.8 (rod strap at z_j + 3.3 sits beside the arm) | cam/ring z budget, ch. 13 sandwich | derived | med |
 
 Notes: concave-upward curved top supports the amplitude bar (R = bar
@@ -311,7 +311,7 @@ hand-stamping error).
 | Bar-pin hole | Ø2 at 127 (5") from the fulcrum, mid-height | 5.0 | amplitude-bar top pin (ch. 15); bar line x = −72.9 | derived | med |
 | Lever bar section | 9.5 tall × 3.0 thick | 0.37 × 0.118 | M6.3: 20 levers at the 7.06 channel pitch on a common shaft cap the thickness (the M2 12.5 "width" violated the pitch); 3.0 lets the bar's 3.2 top slot straddle the lever | derived | med |
 | Lever fulcrum | Ø6.5 pivot hole at 0; common Ø6.35 × 228.6 shaft along Z at (x, y) = (−199.9, 1065.9), 2 ball mounts (same part as the rocker pivot's) on the top-frame west rail; Ø12 × 4.0565 spacer bushings ×19 | — | p.40 bottom-left clevis+ball = the shaft END mount (mirror of the rocker pivot design); rail top = 1065.9 − 25.2 = 1040.7 | derived | low-med |
-| Lever tip | Ø3 spring-hook hole at 254, ~8 mm overhang; fork/clip fittings deferred (photogrammetry 195527397) | — | p.39, p.40 | scaled | low |
+| Lever tip | Ø4 spring-hook hole at 254, ~8 mm overhang; fork/clip fittings deferred (photogrammetry 195527397) | — | p.39, p.40; the Ø3 photo read is infeasible — the spring's r 2.75 Ø1-wire eye threading the 3.0 plate needs eye-drop margins |√(ρ²−1.5²)−D| ≤ hole_r − 0.1 at ρ = 2.25/3.25, best ~0.05 through Ø3, ~0.3 through Ø4 (M6.3 toroid solve) | scaled→derived | med |
 
 Notes: each third-class lever pivots at its end (fulcrum), is driven by its
 rocker arm/amplitude bar pinned at mid-length, and pulls one of 20 helical
@@ -336,10 +336,10 @@ z_j + 0.8.
 | Rocker pivot shaft | Ø6.35 × 228.6 along Z at (−72.9, 253.8) | ch. 14 layout table | med |
 | Top-lever fulcrum shaft | Ø6.35 × 228.6 along Z at (−199.9, 1065.9) | ch. 17 rows | med |
 | Top frame (NEW part) | green cast rectangular ring around the 4 columns: rails 22 wide × 41 tall (y 999.7…1040.7, top = lever ball-mount seat 1065.9 − 25.2), corner bosses Ø48 bored Ø35 (column Ø34.925) at (±197, ±112); clamps the columns 80 below their tops (1120.8 − 1040.7) | eight-views: green ring at y ≈ 1010–1055 in all views, columns continue above it to caps ≈ 1090–1120 | med |
-| Ball mounts ×4 | rocker pair on the support apexes (seats y 228.6); lever pair on the top-frame west rail (seat y 1040.7) | ch. 14 / ch. 17 | med |
-| Amplitude bars (default) | vertical at x = −72.9 (d = 0), foot notch on the arm at y 261.8, top 1072.3 | ch. 15 notes | med |
-| Springs (default) | hanging free from lever tips (+54.1, 1063.4), body 32 + hooks; lower hook joins the summing lever in M6.4 | ch. 17/18 | med |
-| Default mechanism state | gear notches +Y (cosine alignment) → cam lobes −Y → ring centres (−47.37, 121.70) → arms tilted −11.6°, rods 0.18°, bars/levers unaffected (d = 0) | ch. 13 notes + ch. 25 | derived |
+| Ball mounts ×4 | rocker pair on the support apexes (seats y 228.6, z ±101.6); lever pair on the top-frame west rail (seat y 1040.7) at z ±85 — any further out the Ø16 base overhangs the Ø35 boss bores (need √(2.9² + dz²) ≥ 17.5 + 8 → dz ≥ 25.3 from the boss at z 112) | ch. 14 / ch. 17; lever z from boss-bore clearance | med |
+| Amplitude bars (default) | vertical, slot centred on the pivot x = −72.9 (d = 0, bar rotated 90° about its long axis: slot/pin across Z); foot roof on the tilted arm's top edge at 262.63 (contact at the bar −X edge, arc max), bar bottom 260.25, top 1073.05, top pin 1066.70 | ch. 15 notes + M6.3 assembly solve | med |
+| Springs (default) | hanging free from lever spring holes (54.10, 1067.50), rotated 90° about Y so the eye ring (r 2.75, plane ⊥ lever face) threads the Ø4 hole; eye centre 3.37 below the hole (torus-swept worst cases at the slab faces: upper branch inside the hole void with 0.31 margin, lower branch clears the lever underside by 0.30); body 32 + hooks (eye centre at spring local y 34 = body 32 + lead 2.0); lower hook joins the summing lever in M6.4 | ch. 17/18 + M6.3 threading solve | med |
+| Default mechanism state | gear notches +Y (cosine alignment) → cam lobes −Y → rod rings concentric on the cams at (−47.5, 121.72) → arms tilted −11.54° (pin solve: circle r 25.4 about (−72.9, 253.8) ∩ r 127 about ring centre → pin (−48.01, 248.72)), rods leaning 0.23° (Rz +0.23°), levers +0.36° (bar-pin chain 1066.70 vs fulcrum 1065.9) | ch. 13 notes + ch. 25 + M6.3 solve | derived |
 
 The measuring stick (ch. 16) is a loose hand tool — excluded from the
 assemblies.

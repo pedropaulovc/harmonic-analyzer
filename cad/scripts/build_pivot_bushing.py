@@ -1,12 +1,20 @@
 r"""Reproduction script: rocker pivot spacer bushing (book ch. 14 p. 27; 19 used).
 
-The large barrel spacers visible between the rocker arms in the p. 27
-macro: Ø25.4 OD x 4.5565 long x Ø6.5 bore, sliding on the Ø6.35 pivot
-shaft. Their length sets the 7.0565 channel pitch against the 2.5 arm
-thickness (7.0565 - 2.5 = 4.5565); 19 fill the gaps between 20 arms.
+Spacer between adjacent rocker arms on the Ø6.35 pivot shaft: Ø10 OD x
+4.5565 long x Ø6.5 bore. Length sets the 7.0565 channel pitch against
+the 2.5 arm thickness (7.0565 - 2.5 = 4.5565); 19 fill the gaps between
+20 arms.
+
+The OD has a hard geometric ceiling the M2 photo read (Ø25.4) violates:
+at d = 0 the amplitude-bar foot passes directly over the shaft, its
+cheek bottoms 6.45 above the axis (contact 262.63 - notch 2.381 - axis
+253.8), so the spacer radius must stay under ~6.4 or the bar can never
+reach zero coefficient (ch. 15 says it slides through the pivot to the
+opposite side). The p. 27 "large barrels" are therefore not these
+spacers; Ø10 keeps 1.45 clearance under the bar.
 
 Dimensions: cad/DIMENSIONS.md ch. 14 layout "Pivot spacer bushings" row
-(derived/scaled, med).
+(derived, med; OD bounded by bar clearance, low).
 
 Layout: bushing axis along Z, centred (annulus on the Front plane,
 mid-plane extrude).
@@ -33,9 +41,9 @@ from _common import (
 )
 
 PART_NAME = "pivot-bushing"
-MATERIAL = "Brass"  # p.27 macro: polished barrel spacers
+MATERIAL = "Brass"
 
-OUTER_DIA = 25.4  # DIMENSIONS.md ch14 layout (scaled, med)
+OUTER_DIA = 10.0  # DIMENSIONS.md ch14 layout: bar-clearance ceiling ~12.9 (low)
 BORE_DIA = 6.5  # rides the 6.35 pivot shaft (derived)
 LENGTH = 4.5565  # channel pitch 7.0565 - arm 2.5 (derived)
 
