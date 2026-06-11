@@ -58,8 +58,8 @@ def prepare_reference(pair: dict, max_px: int = 1600) -> Path:
     img = Image.open(src)
     img = ImageOps.exif_transpose(img)
     if pair["reference"].get("mirror"):
-        # e.g. the book's ch30 eight-views pages are printed mirrored
-        # (verified against first-party photogrammetry: crank front-right).
+        # only for individually-verified flipped reproductions: confirm with a
+        # chiral cue (text direction, crank-vs-platen side) before setting.
         img = img.transpose(Image.FLIP_LEFT_RIGHT)
     rot = pair["reference"].get("rotate_deg", 0)
     if rot:
