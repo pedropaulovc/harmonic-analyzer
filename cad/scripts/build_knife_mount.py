@@ -6,12 +6,14 @@ lever's tube bore rides this top edge -- seated in a brass block, with a
 O8 stud rising through the lever tube's central slot and the crossbar's
 hole to a nut above. The p.42/43 square-head bolt + stirrup strap detail
 is collapsed into block + stud merged with the bar (the stud visually
-passes over the bar's mid-section -- documented simplification; the
-lever's bore contacts the knife edge at |z| 16..17.5, outside the slot,
-so the working edge is unaffected).
+passes over the bar's mid-section -- documented simplification). The bar
+rides entirely inside the lever tube's slot tunnel (z +-15.9 vs slot
++-16): contact bands outside the slot are geometrically impossible --
+the diamond's lower flanks would clash with the tube's lower wall -- so
+the knife-edge contact is conceptual (M6.4).
 
 Layout: origin ON the knife edge line (machine (15, 990, 0)), edge along
-Z. Diamond bar z +-17.5, block below, stud +Y to y +75 (machine 1065).
+Z. Diamond bar z +-15.9, block below, stud +Y to y +75 (machine 1065).
 Dimensions: cad/DIMENSIONS.md ch. 18 (M6.4, low).
 
 Run (SolidWorks already open)::
@@ -41,7 +43,7 @@ PART_NAME = "knife-mount"
 MATERIAL = "Brass"
 
 BAR_SIDE = 8.0  # hardened knife bar, square section set diamond-wise (low)
-BAR_LENGTH = 35.0  # spans the lever tube slot + contact bands (derived)
+BAR_LENGTH = 31.8  # inside the lever tube slot (+-16) with 0.1 ends (derived)
 BLOCK_HALF_X = 12.0  # brass block 24 x 28 x 24 (low)
 BLOCK_TOP_Y = -8.0  # bar's lower half seats 3.3 into the block
 BLOCK_HEIGHT = 28.0

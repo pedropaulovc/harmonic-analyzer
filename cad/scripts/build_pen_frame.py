@@ -5,7 +5,9 @@ screw threads up through its bottom rail to set the pen angle. Nested
 sketch contours (outer + inner rectangle) extrude directly into the ring.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 24" — scaled from the p.64-65
-photos vs the ~5 mm square rod (low).
+photos vs the ~5 mm square rod (low). Side rails 4, end rails 5 (the
+window must span the marker + pen rod when the frame lies flat on the
+v-block, long axis along machine X -- see build_output_assembly.py).
 
 Layout: width along +X, height along +Y from the origin corner, depth
 extruded +Z; set-screw hole cut along Y from a Top-plane sketch with a
@@ -36,7 +38,10 @@ MATERIAL = "Brass"  # see _common.apply_material docstring
 
 OUTER_WIDTH = 22.0  # X  DIMENSIONS.md ch24: p.64/65 vs 5 mm rod (low)
 OUTER_HEIGHT = 40.0  # Y
-RAIL = 5.0  # ring wall thickness
+RAIL_SIDE = 4.0  # long-side rails (local X): read thinner in the photo; the
+# extra 1 mm of window also clears the marker barrel at the platen side in
+# the M6.4 flat-on-the-v-block layout
+RAIL_END = 5.0  # end rails (local Y); the screw rail keeps thread depth
 FRAME_DEPTH = 10.0  # Z
 SCREW_HOLE_DIA = 3.0  # set screw, bottom rail only
 
@@ -69,10 +74,10 @@ async def build(adapter) -> dict[str, str]:
     inner = await add_line_chain(
         adapter,
         [
-            (RAIL, RAIL),
-            (OUTER_WIDTH - RAIL, RAIL),
-            (OUTER_WIDTH - RAIL, OUTER_HEIGHT - RAIL),
-            (RAIL, OUTER_HEIGHT - RAIL),
+            (RAIL_SIDE, RAIL_END),
+            (OUTER_WIDTH - RAIL_SIDE, RAIL_END),
+            (OUTER_WIDTH - RAIL_SIDE, OUTER_HEIGHT - RAIL_END),
+            (RAIL_SIDE, OUTER_HEIGHT - RAIL_END),
         ],
     )
     await ensure_fully_defined(adapter, "ring sketch", fix_entities=[*outer, *inner])

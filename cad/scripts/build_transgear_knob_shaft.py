@@ -39,7 +39,9 @@ PART_NAME = "transgear-knob-shaft"
 MATERIAL = "Brass"
 
 SHAFT_DIA = 0.375 * IN  # 9.525 (low)
-SHAFT_LEN = 62.5  # machine z -76.5 (sprocket end) .. -139 (knob face) (derived)
+SHAFT_LEN = 51.4  # machine z -76.5 (sprocket end) .. -127.9 (knob face); the
+# knob then ends at -134.4, 0.1 shy of the rack-pinion disc back face -134.5
+# (the latch C2C 34.26 < disc r 41.49, so a longer shaft crosses the disc band)
 KNOB_DIA = 20.0  # large brass thumb knob (low)
 KNOB_LEN = 6.5
 
