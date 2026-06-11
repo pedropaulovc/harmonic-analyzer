@@ -3,7 +3,9 @@ r"""Reproduction script: pen hanger (book ch. 24, pp. 60-63).
 The black tapered strap bolted to the wheel support bar that hangs the
 pen rod's upper guide: a flat strap (3 thick) tapering 16 -> 10 wide,
 lying on the bar's front face and descending to a deep guide block with
-a 5.4 square hole the 5-square pen rod slides in. The block reaches
+a 5.4 square channel the 5-square pen rod slides in -- the rod is
+VERTICAL, so the channel is cut along Y through the block (an M6.4 fix:
+the first build wrongly tunnelled it along Z). The block reaches
 forward (-Z in the machine) so the pen rod hangs clear of the platen
 paper plane while the strap stays flush on the bar. The mounting bolt is
 omitted (simplification).
@@ -52,9 +54,11 @@ async def _volume(adapter) -> float:
 
 
 async def build(adapter) -> dict[str, str]:
+    from solidworks_mcp.adapters.base import ExtrusionParameters
+
     check("create_part", await adapter.create_part())
 
-    # 1. Guide block with the square rod hole (nested contours).
+    # 1. Solid guide block.
     check("create_sketch block", await adapter.create_sketch("Front"))
     outline = await add_line_chain(
         adapter,
@@ -65,7 +69,20 @@ async def build(adapter) -> dict[str, str]:
             (-BLOCK_HALF, BLOCK_HALF),
         ],
     )
-    hole = await add_line_chain(
+    await ensure_fully_defined(adapter, "block sketch", fix_entities=outline)
+    check("exit_sketch block", await adapter.exit_sketch())
+    extrude_at_offset(adapter, BLOCK_Z[1] - BLOCK_Z[0], BLOCK_Z[0])
+    expected = (2.0 * BLOCK_HALF) ** 2 * (BLOCK_Z[1] - BLOCK_Z[0])
+    vol = await _volume(adapter)
+    print(f"  volume after block: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    if abs(vol - expected) > 0.005 * expected:
+        raise RuntimeError(f"block volume {vol:.1f} != {expected:.1f}")
+
+    # 1b. Square rod channel cut along Y (the pen rod hangs vertically).
+    # The +-2.7 footprint stays inside the block's z -4..12.6 band and well
+    # clear of the strap's z 9.6..12.6 band, so a through cut is safe.
+    check("create_sketch channel", await adapter.create_sketch("Top"))
+    channel = await add_line_chain(
         adapter,
         [
             (-GUIDE_HOLE_HALF, -GUIDE_HOLE_HALF),
@@ -74,16 +91,19 @@ async def build(adapter) -> dict[str, str]:
             (-GUIDE_HOLE_HALF, GUIDE_HOLE_HALF),
         ],
     )
-    await ensure_fully_defined(adapter, "block sketch", fix_entities=[*outline, *hole])
-    check("exit_sketch block", await adapter.exit_sketch())
-    extrude_at_offset(adapter, BLOCK_Z[1] - BLOCK_Z[0], BLOCK_Z[0])
-    expected = (
-        (2.0 * BLOCK_HALF) ** 2 - (2.0 * GUIDE_HOLE_HALF) ** 2
-    ) * (BLOCK_Z[1] - BLOCK_Z[0])
+    await ensure_fully_defined(adapter, "channel sketch", fix_entities=channel)
+    check("exit_sketch channel", await adapter.exit_sketch())
+    check(
+        "cut channel",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=4.0 * BLOCK_HALF, both_directions=True)
+        ),
+    )
+    expected -= (2.0 * GUIDE_HOLE_HALF) ** 2 * 2.0 * BLOCK_HALF
     vol = await _volume(adapter)
-    print(f"  volume after block: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    print(f"  volume after channel: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.005 * expected:
-        raise RuntimeError(f"block volume {vol:.1f} != {expected:.1f}")
+        raise RuntimeError(f"channel volume {vol:.1f} != {expected:.1f}")
 
     # 2. Tapered strap rising to the support bar.
     check("create_sketch strap", await adapter.create_sketch("Front"))
