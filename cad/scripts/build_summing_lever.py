@@ -13,8 +13,9 @@ views:
 * The coefficients plate (20 spring holes at the channel-lever tab line)
   hangs off the tube on the -X side, top face 8 above the knife line.
 * A twin-rib web arm runs +X from the tube to a round boss; the counter
-  spring's bottom ring threads a O5 z-hole in the boss (the p.43 black
-  hook + chrome ring reduced to ring-through-hole -- simplification).
+  spring hangs from a J-hook (build_boss_hook.py) whose shank plants in
+  a vertical O2.6 hole in the boss top (the p.43 black hook + chrome
+  ring chain collapsed to one hook part -- simplification).
 
 Part-local origin = the knife-edge line (machine (+15, 990, 0)); X +ve
 toward the boss/counter spring, Y up, Z along the knife edge (channel
@@ -82,8 +83,10 @@ RIB_Z1 = 4.27  # |z| at the boss (low)
 BOSS_X = 80.0  # machine x 95: counter-spring anchor (med)
 BOSS_DIA = 14.0
 BOSS_LENGTH = 12.0  # z +-6 (low)
-BOSS_HOLE_DIA = 5.0  # counter-spring ring threads this z-hole (low)
-BOSS_HOLE_Y = 9.0  # 2 above the boss centre (derived: ring reach)
+HOOK_HOLE_DIA = 2.6  # boss-hook O3 shank taps in here (low)
+HOOK_HOLE_X = 75.5  # machine x 90.5: hook rod tip reaches x 97 (derived)
+HOOK_HOLE_DEPTH = 14.0  # half-depth of the mid-plane cut; clears the boss
+# top at this x (y 12.36) and bottom (y 1.64)
 
 TUBE_R = TUBE_OD / 2.0
 BORE_R = BORE_DIA / 2.0
@@ -277,21 +280,30 @@ async def build(adapter) -> dict[str, str]:
         )
     expected = vol
 
-    # 7. O5 ring hole through the boss along Z.
-    check("create_sketch boss hole", await adapter.create_sketch("Front"))
+    # 7. Vertical O2.6 hook-shank hole in the boss top (Top sketch).
+    check("create_sketch hook hole", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
-    await define_circle(adapter, BOSS_X, BOSS_HOLE_Y, BOSS_HOLE_DIA / 2.0, "boss hole")
+    await define_circle(adapter, HOOK_HOLE_X, 0.0, HOOK_HOLE_DIA / 2.0, "hook hole")
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "boss hole sketch")
-    check("exit_sketch boss hole", await adapter.exit_sketch())
+    await ensure_fully_defined(adapter, "hook hole sketch")
+    check("exit_sketch hook hole", await adapter.exit_sketch())
     check(
-        "cut boss hole",
+        "cut hook hole",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=BOSS_LENGTH + 4.0, both_directions=True)
+            ExtrusionParameters(depth=2.0 * HOOK_HOLE_DEPTH, both_directions=True)
         ),
     )
-    expected -= math.pi * (BOSS_HOLE_DIA / 2.0) ** 2 * BOSS_LENGTH
-    await _assert_volume(adapter, "boss hole", expected, 0.01)
+    # Boss chord height at the hole x (the hole passes top-to-bottom).
+    chord = 2.0 * math.sqrt((BOSS_DIA / 2.0) ** 2 - (HOOK_HOLE_X - BOSS_X) ** 2)
+    v_hole = math.pi * (HOOK_HOLE_DIA / 2.0) ** 2 * chord
+    before = expected
+    vol = await _volume(adapter)
+    removed = before - vol
+    print(f"  volume after hook hole: {vol:.1f} mm^3 (-{removed:.1f}, chord {v_hole:.1f})")
+    if not (0.8 * v_hole <= removed <= 1.15 * v_hole):
+        raise RuntimeError(
+            f"hook hole: removed {removed:.1f}, expected ~{v_hole:.1f}"
+        )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
