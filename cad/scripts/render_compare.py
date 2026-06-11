@@ -247,14 +247,14 @@ def set_camera(adapter: Any, cam: dict) -> None:
     model.GraphicsRedraw2()
 
 
-async def capture(adapter: Any, out_png: Path, width: int, height: int) -> None:
-    out_png.parent.mkdir(parents=True, exist_ok=True)
+async def capture(adapter: Any, out_img: Path, width: int, height: int) -> None:
+    out_img.parent.mkdir(parents=True, exist_ok=True)
     check(
-        f"export {out_png.name}",
+        f"export {out_img.name}",
         await adapter.export_image(
             {
-                "file_path": str(out_png),
-                "format_type": "png",
+                "file_path": str(out_img),
+                "format_type": out_img.suffix.lstrip(".").lower(),
                 "width": width,
                 "height": height,
                 "view_orientation": "current",
@@ -279,9 +279,9 @@ def pair_size(ref_png: Path, max_side: int) -> tuple[int, int]:
 
 
 def is_stale(pair: dict, mpath: Path) -> bool:
-    png = COMP / "render" / f"{pair['id']}.png"
+    img = composite.pair_paths(pair["id"])["render"]
     sc = _sidecar(pair["id"])
-    if not png.exists() or not sc.exists():
+    if not img.exists() or not sc.exists():
         return True
     meta = json.loads(sc.read_text(encoding="utf-8"))
     return (
@@ -414,7 +414,7 @@ def main() -> int:
                     + (f" target ({tgt[0]:.0f},{tgt[1]:.0f},{tgt[2]:.0f})mm" if tgt else "")
                     + f" {w}x{h}")
                 set_camera(adapter, cam)
-                await capture(adapter, COMP / "render" / f"{pid}.png", w, h)
+                await capture(adapter, composite.pair_paths(pid)["render"], w, h)
                 write_sidecar(pair, mpath, (w, h))
                 composite.side_by_side(pid)
                 composite.blend_overlay(pid, pair.get("align"))

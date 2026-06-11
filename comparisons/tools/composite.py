@@ -37,12 +37,17 @@ def load_manifest(path: Path = MANIFEST) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+JPEG_OPTS = {"quality": 90, "optimize": True}
+
+
 def pair_paths(pair_id: str) -> dict[str, Path]:
+    # JPEG throughout: the full pair set is ~1.4 GB as PNG and is rewritten
+    # every loop iteration; q90 JPEG is ~10x smaller with no inspection loss.
     return {
-        "ref": COMP / "ref" / f"{pair_id}.png",
-        "render": COMP / "render" / f"{pair_id}.png",
-        "sbs": COMP / "composite" / f"{pair_id}_sbs.png",
-        "blend": COMP / "composite" / f"{pair_id}_blend.png",
+        "ref": COMP / "ref" / f"{pair_id}.jpg",
+        "render": COMP / "render" / f"{pair_id}.jpg",
+        "sbs": COMP / "composite" / f"{pair_id}_sbs.jpg",
+        "blend": COMP / "composite" / f"{pair_id}_blend.jpg",
     }
 
 
@@ -61,7 +66,7 @@ def prepare_reference(pair: dict, max_px: int = 1600) -> Path:
         img = img.crop(tuple(crop))
     if max(img.size) > max_px:
         img.thumbnail((max_px, max_px), Image.LANCZOS)
-    img.convert("RGB").save(out)
+    img.convert("RGB").save(out, **JPEG_OPTS)
     return out
 
 
@@ -112,7 +117,7 @@ def side_by_side(pair_id: str) -> Path:
     draw.text((4, 6), f"REF  {pair_id}", fill="black")
     draw.text((ref.width + gap + 4, 6), "CAD", fill="black")
     p["sbs"].parent.mkdir(parents=True, exist_ok=True)
-    canvas.save(p["sbs"])
+    canvas.save(p["sbs"], **JPEG_OPTS)
     return p["sbs"]
 
 
@@ -139,7 +144,7 @@ def blend_overlay(pair_id: str, align: dict | None) -> Path:
     layer.paste(_render_rgba(ren), offset)
     out = Image.alpha_composite(ref.convert("RGBA"), layer).convert("RGB")
     p["blend"].parent.mkdir(parents=True, exist_ok=True)
-    out.save(p["blend"])
+    out.save(p["blend"], **JPEG_OPTS)
     return p["blend"]
 
 
