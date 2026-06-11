@@ -1,0 +1,156 @@
+r"""Reproduction script: magnifying-lever bracket (book ch. 20, pp. 46-49).
+
+The black fitting that affixes the magnifying lever rod to the summing
+lever: a flange screwed under the coefficients plate's front edge and a
+forward arm ending in a collar (O12, bore 6.2) the O6 rod clamps into.
+The p.47 mounting screws are omitted (simplification).
+
+Layout: origin at the collar centre (machine (-40, 985, -85)); collar
+axis along X (the rod direction), arm runs +Z (toward the plate, machine
+-85 -> -70), flange under the plate at local z 9..20. Dimensions:
+cad/DIMENSIONS.md ch. 20 (M6.4, low).
+
+Run (SolidWorks already open)::
+
+    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_magnifying_bracket.py
+"""
+
+from __future__ import annotations
+
+import math
+import sys
+
+from _common import (
+    add_line_chain,
+    apply_material,
+    check,
+    ensure_fully_defined,
+    extrude_at_offset,
+    report_mass_properties,
+    run_build,
+    save_part_and_images,
+    set_sketch_direct_db,
+)
+
+PART_NAME = "magnifying-bracket"
+MATERIAL = "Plain Carbon Steel"  # black hardware
+
+COLLAR_OD = 12.0  # rod collar (low)
+COLLAR_BORE = 6.2  # the O6 magnifying rod clamps in (derived)
+COLLAR_HALF_LEN = 5.0  # along X
+ARM_HALF_X = 5.0  # arm 10 wide (x), y -3..+4.5, z 4..15 (low)
+ARM_Y = (-3.0, 4.5)
+ARM_Z = (4.0, 15.0)
+FLANGE_X = (-5.0, 35.0)  # under-plate flange, machine x -45..-5 (low)
+FLANGE_Y = (3.9, 7.9)  # flange top touches the plate bottom (992.9)
+FLANGE_Z = (9.0, 20.0)  # under the plate's front edge band (derived)
+
+
+async def _volume(adapter) -> float:
+    res = await adapter.get_mass_properties()
+    return res.data.volume if res.is_success else float("nan")
+
+
+async def build(adapter) -> dict[str, str]:
+    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
+
+    check("create_part", await adapter.create_part())
+
+    # 1. Collar tube about the X axis (revolved rectangle).
+    check("create_sketch collar", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    centerline = check(
+        "collar centerline",
+        await adapter.add_centerline(-COLLAR_HALF_LEN, 0.0, COLLAR_HALF_LEN, 0.0),
+    )
+    profile = await add_line_chain(
+        adapter,
+        [
+            (-COLLAR_HALF_LEN, COLLAR_BORE / 2.0),
+            (COLLAR_HALF_LEN, COLLAR_BORE / 2.0),
+            (COLLAR_HALF_LEN, COLLAR_OD / 2.0),
+            (-COLLAR_HALF_LEN, COLLAR_OD / 2.0),
+        ],
+    )
+    set_sketch_direct_db(adapter, False)
+    await ensure_fully_defined(
+        adapter, "collar sketch", fix_entities=[centerline, *profile]
+    )
+    check("exit_sketch collar", await adapter.exit_sketch())
+    check(
+        "revolve collar", await adapter.create_revolve(RevolveParameters(angle=360.0))
+    )
+    expected = (
+        math.pi
+        * ((COLLAR_OD / 2.0) ** 2 - (COLLAR_BORE / 2.0) ** 2)
+        * 2.0
+        * COLLAR_HALF_LEN
+    )
+    vol = await _volume(adapter)
+    print(f"  volume after collar: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    if abs(vol - expected) > 0.005 * expected:
+        raise RuntimeError(f"collar volume {vol:.1f} != {expected:.1f}")
+
+    # 2. Arm from the collar shell toward the plate (+Z), Top sketch.
+    check("create_sketch arm", await adapter.create_sketch("Top"))
+    arm = await add_line_chain(
+        adapter,
+        [
+            (-ARM_HALF_X, -ARM_Z[1]),
+            (ARM_HALF_X, -ARM_Z[1]),
+            (ARM_HALF_X, -ARM_Z[0]),
+            (-ARM_HALF_X, -ARM_Z[0]),
+        ],
+    )
+    await ensure_fully_defined(adapter, "arm sketch", fix_entities=arm)
+    check("exit_sketch arm", await adapter.exit_sketch())
+    extrude_at_offset(adapter, ARM_Y[1] - ARM_Y[0], ARM_Y[0])
+    v_arm = 2.0 * ARM_HALF_X * (ARM_Z[1] - ARM_Z[0]) * (ARM_Y[1] - ARM_Y[0])
+    before = expected
+    vol = await _volume(adapter)
+    added = vol - before
+    print(f"  volume after arm: {vol:.1f} mm^3 (+{added:.1f}, solid {v_arm:.1f})")
+    if not (0.85 * v_arm <= added <= 1.01 * v_arm):
+        raise RuntimeError(f"arm: added {added:.1f}, expected ~{v_arm:.1f}")
+    expected = vol
+
+    # 3. Flange under the plate's front edge.
+    check("create_sketch flange", await adapter.create_sketch("Top"))
+    flange = await add_line_chain(
+        adapter,
+        [
+            (FLANGE_X[0], -FLANGE_Z[1]),
+            (FLANGE_X[1], -FLANGE_Z[1]),
+            (FLANGE_X[1], -FLANGE_Z[0]),
+            (FLANGE_X[0], -FLANGE_Z[0]),
+        ],
+    )
+    await ensure_fully_defined(adapter, "flange sketch", fix_entities=flange)
+    check("exit_sketch flange", await adapter.exit_sketch())
+    extrude_at_offset(adapter, FLANGE_Y[1] - FLANGE_Y[0], FLANGE_Y[0])
+    v_flange = (
+        (FLANGE_X[1] - FLANGE_X[0])
+        * (FLANGE_Z[1] - FLANGE_Z[0])
+        * (FLANGE_Y[1] - FLANGE_Y[0])
+    )
+    # Overlap with the arm: x +-5 cap, z 9..15, y 3.9..4.5.
+    v_overlap = (
+        (min(ARM_HALF_X, FLANGE_X[1]) - max(-ARM_HALF_X, FLANGE_X[0]))
+        * (min(ARM_Z[1], FLANGE_Z[1]) - max(ARM_Z[0], FLANGE_Z[0]))
+        * (min(ARM_Y[1], FLANGE_Y[1]) - max(ARM_Y[0], FLANGE_Y[0]))
+    )
+    v_net = v_flange - v_overlap
+    before = expected
+    vol = await _volume(adapter)
+    added = vol - before
+    print(f"  volume after flange: {vol:.1f} mm^3 (+{added:.1f}, net {v_net:.1f})")
+    if abs(added - v_net) > 0.02 * v_net:
+        raise RuntimeError(f"flange: added {added:.1f}, expected {v_net:.1f}")
+
+    await apply_material(adapter, MATERIAL)
+    await report_mass_properties(adapter)
+    return await save_part_and_images(adapter, PART_NAME)
+
+
+if __name__ == "__main__":
+    sys.exit(run_build(build))
