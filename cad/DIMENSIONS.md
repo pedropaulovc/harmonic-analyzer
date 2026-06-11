@@ -204,16 +204,18 @@ converted from 400 dpi eight-views extractions (`ch30_images/`).
 
 | dim | value | (in) | source | method | confidence |
 |---|---|---|---|---|---|
-| Centre distance (cam ring → rocker pin) | ~105 mm | ~4.1 | eight-views 8/8: cylinder shaft axis ~74 mm above base (A-frame 177.8 mm scale), rocker tip just above the A-frame top; visible black rod band ~104 mm agrees | scaled | low |
+| Centre distance (cam ring → rocker pin) | 127.0 mm (5") | 5.0 | M6.3: rocker pivot axis y = 253.8 (apex ball mounts, front + back eight-views) minus drive height y = 126.8 = exactly 5" with the arm level; supersedes the earlier ~105 scaling (which used the wrong "rocker tip" attachment reading) | derived | high |
 | Cam ring bore | 51.0 mm | 2.008 | cam OD 50.8 + 0.1 running clearance per side | derived | med |
 | Cam ring radial wall | 5 mm (OD 61) | 0.20 | ch.13 photos, strap proportion vs cam | scaled | low |
-| Ring / shank / tip-block thickness | 3 / 2.5 / 6 mm | — | sandwich budget (7.5 axial pitch) + p.29 tip blocks ~2.4× the strap | scaled | low |
+| Ring / shank / tip-strap thickness | 3 / 2.5 / 2.5 mm | — | sandwich budget (7.5 axial pitch); tip strap = arm thickness so the pin joint is strap-beside-arm inside the 7.06 channel pitch (M6.3 — the "thick tip blocks" read of p.29 was wrong, see ch. 14 note) | scaled/derived | med |
 | Shank width | 8 mm | 0.31 | ch.13 p.23 rod silhouettes vs 7 mm gear face | scaled | low |
-| Tip block (flattened upper end) | 10 × 18, Ø2 pin hole centred | — | p.29 stepped blocks at the rocker tips; pin matches the rocker's Ø2 rod hole (ch. 14) | scaled | low |
+| Tip strap (flattened upper end) | 10 × 18, Ø2 pin hole centred | — | pin matches the rocker's Ø2 rod-pin hole at +25.4 from the pivot (ch. 14) | scaled | low |
 
-The p.29 "stepped" tip profile (alternate rods offset to clear adjacent
-rockers) is deferred — modeled as a plain block until the channel array
-is laid out in M6 (Appendix C #6).
+M6.3 re-read of p.29: the stepped sawtooth blocks at the rocker-arm tips
+are the AMPLITUDE BARS' notched feet parked near the arm ends (ch. 15
+"slide along its rocker arm … can slide completely off"), NOT the rod
+tops. The rods attach near the pivot (rod pin +25.4 from the pivot, see
+ch. 14 layout) and are plain thin straps at the top.
 
 ---
 
@@ -225,17 +227,29 @@ is laid out in M6 (Appendix C #6).
 | Arm depth (end-face height) | 16 mm | 0.630 | photo callout p.29 — M2 zoom shows the arrows span the arm's end face vertically (NOT channel pitch) | annotated | high |
 | Top-surface curvature radius | = amplitude bar length ≈ 800 mm | ≈ 31.5 | text pp. 26–27 ("equal to the length of amplitude bars" — minimizes nonlinearity) | stated | high |
 | Arm count | 20 | — | photos/text | stated | high |
-| Arm length | RESOLVED ~170 mm: ~100 mm pivot→rod end + ~70 mm tail | — | eight-views view 5/8 side photo (perspective-corrected; p.29 macro inflates the near end ~4×) + ch.16 half-arm ≈ 80 mm | scaled/derived | low-med |
-| Pivot pin hole | Ø3 at the pivot, mid-depth | — | p.27/p.28 dark dots on the strap at the pivot | scaled | low |
-| Connecting-rod pin hole | Ø2, 6 mm from the rod end, mid-depth | — | p.29 tip pins | scaled | low |
+| Arm length | symmetric ±88 mm about the pivot (176 total) | ~6.9 | M6.3: ch. 15 text — positive amplitudes one side of the pivot, negative the OPPOSITE side, both up to the 80 mm measuring-stick span (+8 mm notch margin); supersedes the M2 100/70 asymmetric read | derived | med |
+| Rod-pin hole | Ø2 at +25.4 (1") from the pivot, rod side, mid-depth | 1.0 | M6.3 closure: vertical connecting rods hang at the cylinder-arbor x = −47.5; pivot ball measured x ≈ −66 (back view, base-edge calibration) … −81 (front view) → designer value 1" lever arm, pivot at −72.9 | derived | med |
+| Pivot pin hole | Ø6.5 (rides the Ø6.35 pivot shaft), mid-depth | 0.256 | function-driven (common pivot shaft, see layout below); the M2 "Ø3 dark dots" read was the rod-pin holes | derived | low |
 
-Notes: concave-upward curved top supports the amplitude bar; knife-edge/pivot
-see-saw motion driven by vertical connecting rods from the cams. Labeled "pivot"
-point = zero-coefficient position for the amplitude bar. Matte-black finish
-(blackened cast/steel). End view p.28 shows the 20-arm array at uniform pitch.
-Bottom edge concentric with the top (uniform 16 mm depth, R 816/800 arcs).
-The stepped sawtooth blocks at the arm tips (p.29 top) are the connecting
-rods' flattened upper ends — they belong to the connecting-rod part.
+### Rocker pivot & supports layout (M6.3, ch. 14 + ch. 30 front/back views)
+
+| item | value | source | confidence |
+|---|---|---|---|
+| Pivot shaft | Ø6.35 × 228.6 (9") along Z at (x, y) = (−72.9, 253.8) | x = arbor −47.5 − 25.4 rod-lever; y = drive 126.8 + 127 rod (arm level at cam mid-stroke); ball x photo-measured −66…−81, ball y 252–255 in both 0°/180° views ✓ | med (x, y derived; dia low) |
+| Support castings ×2 | solid tapered frustum, base 88.9 × 63.5 → top 20 × 16.9, 177.8 tall (7"), green | front view: triangle base spans x −130…−44 (≈86), apex at −81 ± 6; side taper = the old trapezoid silhouette (ch. 14 p.29 photos); REFUTES the legacy windowed-square-frame `rocker-arm-support` (184 wide, window) — no such face appears in any view | photo + legacy height | med |
+| Support positions | apex centred (x, z) = (−72.9, ±101.6), feet on the base top | same stations as the M6.1 gates (outer faces flush with the top plate edge); apex top at y = 228.6 | med |
+| Ball mounts ×2 | clevis + Ø19 ball, ball centre 25.2 above its seat; Ø6.5 shaft cross-bore | apex top 228.6 + 25.2 = 253.8 = pivot axis ✓; same style at the lever rail (ch. 17) | scaled | low |
+| Pivot spacer bushings ×19 | Ø25.4 OD × 4.5565 long × Ø6.5 bore (pitch 7.0565 − arm 2.5) | p.27 macro: large barrel spacers between the 2.5 arms | derived/scaled | med |
+| Arm stations | arm mid-plane z = z_j + 0.8 (rod strap at z_j + 3.3 sits beside the arm) | cam/ring z budget, ch. 13 sandwich | derived | med |
+
+Notes: concave-upward curved top supports the amplitude bar (R = bar
+length, minimizing the bar-tilt cosine error — the bar-top pin height is
+invariant within 0.1 mm across the ±11.6° arm swing). Pivot = zero-
+coefficient position for the amplitude bar. Matte-black finish. End view
+p.28 shows the 20-arm array at uniform pitch. Bottom edge concentric with
+the top (uniform 16 mm depth, R 816/800 arcs). Canonical rest state
+(cylinder-gear notches at +Y = cosine alignment, integral cam lobes −Y):
+arms tilt −11.6° (rod side down), rods tilt 0.18°.
 Re-authored as `cad/scripts/build_rocker_arm.py` (supersedes the legacy
 `oscilating-arms` part, which had no surviving source).
 
@@ -250,12 +264,19 @@ Re-authored as `cad/scripts/build_rocker_arm.py` (supersedes the legacy
 | Bottom notch height | 2.4 mm | 0.094 | legacy BottomNotchHeight (3/32") | legacy | med |
 | Top notch width | 3.2 mm | 0.125 | legacy TopNotchWidth | legacy | med |
 | Top notch height | 12.7 mm | 0.5 | legacy TopNotchHeight | legacy | med |
+| Top pin hole | Ø2 through the top-notch cheeks, 6.35 below the top end | — | M6.3: p.39 shows the bar pinned to its top lever; the 3.2 top slot straddles the 3.0-thick lever with a Ø2 cross pin (matches the lever's bar-pin hole at 127 from its fulcrum, ch. 17) | derived | low |
 | Bar count | 20 | — | text | stated | high |
 
 Notes: bottom notch rides/slides along the rocker arm for positioning (bar at
 pivot = zero coefficient; opposite ends = 180° phase reversal). Chrome-like
 finish. Legacy AmplitudeBar.cs survives the audit: both book-verifiable dims
-(width, length) confirm it.
+(width, length) confirm it. M6.3: the bars run UP the spine from the rocker
+arms to the top levers (text pp. 30–31) — top pin FIXED on the lever at
+x = −72.9 (above the rocker pivot), foot slides ±80 along the arm, the bar
+tilting up to ±5.6° (the "nonlinearity ameliorated" by the 813 length).
+Default assembly state: all bars at the pivot (d = 0, all coefficients
+zero), exactly vertical, foot notch on the arm top edge at y ≈ 261.8,
+top at ≈ 1072.3, pin at ≈ 1065.9.
 
 ## Chapter 16 — Measuring Stick (pp. 34–37)
 
@@ -286,15 +307,42 @@ hand-stamping error).
 | Spring end hooks | bent-wire loops, both ends, extend axially | — | p.41 inset; M4: modelled as axial lead (2× wire dia) + 270° loop at coil mean radius, both springs (`_common.add_spring_end_hooks`) | stated | high (feature), loop geometry estimated (low) |
 | Lever count | 20, cast metal, third-class | — | text pp. 38–39 | stated | high |
 | Spring count | 20 | — | text pp. 38–39 | stated | high |
-| Lever length (pivot→spring hole c2c) | ~240 mm | ~9.4 | p.38 inset vs 320 mm lever-bank width (20 × 16 mm ch.14 pitch); resolved in M2 | scaled | low |
-| Lever bar section | ~12.5 wide × 9.5 thick | ~0.49 × 0.37 | width matches ch.14 arm callout; thickness vs spring OD p.39 | scaled | low |
-| Lever fulcrum boss | ~Ø19 × 14 long, Ø6 pivot hole | — | p.40 bottom-left close-up | scaled | low |
-| Lever tip | Ø3 spring-hook hole, ~8 mm overhang; fork/clip fittings deferred (photogrammetry 195527397) | — | p.39, p.40 | scaled | low |
+| Lever length (fulcrum→spring hole c2c) | 254 mm (10") | 10.0 | M6.3: amplitude-bar pin at 127 from the fulcrum (fulcrum x = −199.9 = bar line −72.9 − 5"; clevis ball measured at x ≈ −205 in the front view) and spring end at exactly 2× = clean 2:1 motion ratio; supersedes the M2 ~240 scaling | derived | med |
+| Bar-pin hole | Ø2 at 127 (5") from the fulcrum, mid-height | 5.0 | amplitude-bar top pin (ch. 15); bar line x = −72.9 | derived | med |
+| Lever bar section | 9.5 tall × 3.0 thick | 0.37 × 0.118 | M6.3: 20 levers at the 7.06 channel pitch on a common shaft cap the thickness (the M2 12.5 "width" violated the pitch); 3.0 lets the bar's 3.2 top slot straddle the lever | derived | med |
+| Lever fulcrum | Ø6.5 pivot hole at 0; common Ø6.35 × 228.6 shaft along Z at (x, y) = (−199.9, 1065.9), 2 ball mounts (same part as the rocker pivot's) on the top-frame west rail; Ø12 × 4.0565 spacer bushings ×19 | — | p.40 bottom-left clevis+ball = the shaft END mount (mirror of the rocker pivot design); rail top = 1065.9 − 25.2 = 1040.7 | derived | low-med |
+| Lever tip | Ø3 spring-hook hole at 254, ~8 mm overhang; fork/clip fittings deferred (photogrammetry 195527397) | — | p.39, p.40 | scaled | low |
 
 Notes: each third-class lever pivots at its end (fulcrum), is driven by its
-rocker arm/amplitude bar, and pulls one of 20 helical springs attached to the
-pivoted summing lever below. Amplitude bar at rocker pivot → lever motionless;
-at rocker edge → full amplitude; opposite end → 180° phase flip.
+rocker arm/amplitude bar pinned at mid-length, and pulls one of 20 helical
+springs attached to the pivoted summing lever below. Amplitude bar at rocker
+pivot → lever motionless; at rocker edge → full amplitude; opposite end →
+180° phase flip. M6.3 closure: fulcrum height 1065.9 = bar-top pin height
+(levers level in the d = 0 default state) — consistent with the 1070
+columns + top frame + 25.2 ball mounts within photo error (ball measured
+(−205, 1078) on the tilted museum machine). Spring row hangs at
+x = +54.1 (lever tips), z = lever stations; lower ends reach the summing
+lever (ch. 18, M6.4).
+
+### Channel & top-frame layout (M6.3, eight-views 0°/180° + ch. 14–18)
+
+Machine coords as in "Drive-train layout". Channel j (j = 0 back … 19
+front): cylinder gear at z_j = −67.1 + 7.0565 j; integral cam + rod ring
+plane at z_j + 3.3; rocker arm / amplitude bar / top lever mid-planes at
+z_j + 0.8.
+
+| item | position / value | source | confidence |
+|---|---|---|---|
+| Rocker pivot shaft | Ø6.35 × 228.6 along Z at (−72.9, 253.8) | ch. 14 layout table | med |
+| Top-lever fulcrum shaft | Ø6.35 × 228.6 along Z at (−199.9, 1065.9) | ch. 17 rows | med |
+| Top frame (NEW part) | green cast rectangular ring around the 4 columns: rails 22 wide × 41 tall, corner bosses bored Ø35 at (±197, ±112), y 1024.7…1040.7 top… see build script for the exact profile; clamps the columns 80 below their tops | eight-views: green ring at y ≈ 1010–1055 in all views, columns continue above it to caps ≈ 1090–1120 | med |
+| Ball mounts ×4 | rocker pair on the support apexes (seats y 228.6); lever pair on the top-frame west rail (seat y 1040.7) | ch. 14 / ch. 17 | med |
+| Amplitude bars (default) | vertical at x = −72.9 (d = 0), foot notch on the arm at y 261.8, top 1072.3 | ch. 15 notes | med |
+| Springs (default) | hanging free from lever tips (+54.1, 1063.4), body 32 + hooks; lower hook joins the summing lever in M6.4 | ch. 17/18 | med |
+| Default mechanism state | gear notches +Y (cosine alignment) → cam lobes −Y → ring centres (−47.37, 121.70) → arms tilted −11.6°, rods 0.18°, bars/levers unaffected (d = 0) | ch. 13 notes + ch. 25 | derived |
+
+The measuring stick (ch. 16) is a loose hand tool — excluded from the
+assemblies.
 
 ---
 
@@ -484,7 +532,7 @@ audit detail in the M1 extraction; key values referenced by the chapter tables:
 | eccentric-cam | none annotated; cam outline p.25 available | UNVERIFIED — scale p.25 outline in M2 |
 | harmonic-base | ch.6: base 46 × 28 cm ✓ (= 18.1" × 11.0") | PASS (footprint) — thicknesses photo-verify in M2 |
 | summing-lever | none | UNVERIFIED — p.42–43 proportion check in M2 |
-| rocker-arm-support ×3 | none | UNVERIFIED — photo scaling in M2 |
+| rocker-arm-support ×3 | none | REFUTED in M6.3 — the legacy windowed square frame (184 wide) appears in no photo; the real castings are solid tapered frustums (ch. 14 layout table); re-authored |
 | oscilating-arms | ch.14 re-read: the "12.5 mm width" was a misread (callout is 2.5 mm plate thickness) | SUPERSEDED — re-authored as rocker-arm with corrected dims (`build_rocker_arm.py`) |
 | corner-bracket | none — no source either; geometry interrogated live from the SLDPRT (face inventory): base 1.125" × 0.75", height 2.3", plate 0.3" thick, sides tangent-tapered to R0.5" crown (centre 1.8" up), Ø0.4" lug hole, #9 (Ø0.196") foot hole | RE-AUTHORED — `build_corner_bracket.py` reproduces it to 13,035 mm³ (exact volume match) |
 | tube-frame | ch.6: frame column height 107 cm — legacy file measured 1016 mm (40"), CONTRADICTS the book | RE-AUTHORED — `build_tube_frame.py` at 1070 mm (book wins), Ø1.375" × 0.12" wall from legacy. M4: fluted/reeded per PHOTOS.md `195108425`/`195123524` — 16 × Ø3 mm full-length grooves, 1.5 mm deep (count/size photo-estimated, low) |
@@ -536,12 +584,16 @@ re-measure during their M2 script build.
    leaving ~2.8 mm air per side inside the gates' 139.7 mm clear span
    (inner faces at Z = ±69.85). The big-end (T120) cone axis sits
    exactly 101.6 mm beside the cylinder axis (50.8 + 50.8 mesh).
-4. **Rocker arm working length** — RESOLVED in M2: eight-views view 5/8
-   side photo agrees with the ch. 16 derivation (~80 mm working half);
-   modeled 100 mm rod side / 70 mm tail (`build_rocker_arm.py`).
+4. **Rocker arm working length** — RE-RESOLVED in M6.3 (supersedes the
+   M2 100/70 model): symmetric ±88 about the pivot, rod pin at +25.4 —
+   see the ch. 14 "Rocker pivot & supports layout" table. The M2 read
+   put the connecting rods at the arm tips; ch. 15's "positive one side,
+   negative the opposite side" plus the vertical-rod/arbor-x closure
+   refutes that.
 5. **Feature mapping of the 16 mm (ch. 14) and 32 mm (ch. 17) callouts** —
    ch. 14 16 mm RESOLVED in M2 = rocker arm end-face depth (see ch. 14
-   table). ch. 17 32 mm still to identify when finishing that chapter.
+   table). ch. 17 32 mm RESOLVED in M2 = spring coil body length (ch. 17
+   table, annotated high).
 6. **Cylinder-set axial budget** (ch. 13) — **RESOLVED in M6**: p.22
    stack macro (400 dpi) measures gear face / axial pitch = 190/497 px
    ≈ 0.38 → face 3.0 mm; budget per 7.5 mm channel = face 3.0 + cam 3.5
