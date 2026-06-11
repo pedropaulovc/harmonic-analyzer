@@ -4642,8 +4642,7 @@
    "model": "harmonic_analyzer",
    "reference": {
     "path": "references/albert-michelsons-harmonic-analyzer/ch30_images/page002_img01.png",
-    "source": "book ch30",
-    "mirror": true
+    "source": "book ch30"
    },
    "camera": {
     "mode": "euler",
@@ -4651,19 +4650,19 @@
     "zoom": 1.0,
     "target_mm": null,
     "perspective": null,
-    "az_deg": 0.0,
+    "az_deg": 0,
     "el_deg": 0
    },
    "align": {
-    "scale": 1.18,
-    "dx_px": 7,
-    "dy_px": -273
+    "scale": 1.21,
+    "dx_px": 20,
+    "dy_px": -300
    },
    "component_focus": [
     "harmonic_analyzer"
    ],
    "status": "aligned",
-   "notes": "MIRRORED PRINT (verified vs photogrammetry); 8-views station 1: front - magnifying wheel face-on, platen with waveform, crank/sprocket bottom-right; matches CAD front render",
+   "notes": "8-views station 1: front - magnifying wheel face-on, platen with waveform, crank/sprocket bottom-right; matches CAD front render",
    "tier": 0
   },
   {
@@ -4671,182 +4670,7 @@
    "model": "harmonic_analyzer",
    "reference": {
     "path": "references/albert-michelsons-harmonic-analyzer/ch30_images/page003_img01.png",
-    "source": "book ch30",
-    "mirror": true
-   },
-   "camera": {
-    "mode": "euler",
-    "roll_deg": 0.0,
-    "zoom": 1.0,
-    "target_mm": null,
-    "perspective": null,
-    "az_deg": -45.0,
-    "el_deg": 0
-   },
-   "align": {
-    "scale": 1.13,
-    "dx_px": -20,
-    "dy_px": -233
-   },
-   "component_focus": [
-    "harmonic_analyzer"
-   ],
-   "status": "aligned",
-   "notes": "MIRRORED PRINT (verified vs photogrammetry); 8-views station 2: front-right quarter - platen face image-left, crank/chain bottom-center near, body receding right-back",
-   "tier": 0
-  },
-  {
-   "id": "harmonic_analyzer--ch30-p004-img01",
-   "model": "harmonic_analyzer",
-   "reference": {
-    "path": "references/albert-michelsons-harmonic-analyzer/ch30_images/page004_img01.png",
-    "source": "book ch30",
-    "mirror": true
-   },
-   "camera": {
-    "mode": "euler",
-    "roll_deg": 0.0,
-    "zoom": 1.0,
-    "target_mm": null,
-    "perspective": null,
-    "az_deg": -90.0,
-    "el_deg": 0
-   },
-   "align": {
-    "scale": 1.13,
-    "dx_px": -73,
-    "dy_px": -233
-   },
-   "component_focus": [
-    "harmonic_analyzer"
-   ],
-   "status": "aligned",
-   "notes": "MIRRORED PRINT (verified vs photogrammetry); 8-views station 3: right side - amplitude-bar bank edge-on, crank handle near at bottom-left, front hardware image-left",
-   "tier": 0
-  },
-  {
-   "id": "harmonic_analyzer--ch30-p005-img01",
-   "model": "harmonic_analyzer",
-   "reference": {
-    "path": "references/albert-michelsons-harmonic-analyzer/ch30_images/page005_img01.jpeg",
-    "source": "book ch30",
-    "mirror": true
-   },
-   "camera": {
-    "mode": "euler",
-    "roll_deg": 0.0,
-    "zoom": 1.0,
-    "target_mm": null,
-    "perspective": null,
-    "az_deg": -135.0,
-    "el_deg": 0
-   },
-   "align": {
-    "scale": 1.17,
-    "dx_px": -60,
-    "dy_px": -233
-   },
-   "component_focus": [
-    "harmonic_analyzer"
-   ],
-   "status": "aligned",
-   "notes": "MIRRORED PRINT (verified vs photogrammetry); 8-views station 4: back-right quarter - platen back panel dark, wheel face-on image-left, lever fan sweeping right, chain bottom-left",
-   "tier": 0
-  },
-  {
-   "id": "harmonic_analyzer--ch30-p006-img01",
-   "model": "harmonic_analyzer",
-   "reference": {
-    "path": "references/albert-michelsons-harmonic-analyzer/ch30_images/page006_img01.png",
-    "source": "book ch30",
-    "mirror": true
-   },
-   "camera": {
-    "mode": "euler",
-    "roll_deg": 0.0,
-    "zoom": 1.0,
-    "target_mm": null,
-    "perspective": null,
-    "az_deg": 180.0,
-    "el_deg": 0
-   },
-   "align": {
-    "scale": 1.18,
-    "dx_px": -20,
-    "dy_px": -273
-   },
-   "component_focus": [
-    "harmonic_analyzer"
-   ],
-   "status": "aligned",
-   "notes": "MIRRORED PRINT (verified vs photogrammetry); 8-views station 5: back - platen back panel, wheel seen through frame, cones/chain bottom-left (mirror of front)",
-   "tier": 0
-  },
-  {
-   "id": "harmonic_analyzer--ch30-p007-img01",
-   "model": "harmonic_analyzer",
-   "reference": {
-    "path": "references/albert-michelsons-harmonic-analyzer/ch30_images/page007_img01.jpeg",
-    "source": "book ch30",
-    "mirror": true
-   },
-   "camera": {
-    "mode": "euler",
-    "roll_deg": 0.0,
-    "zoom": 1.0,
-    "target_mm": null,
-    "perspective": null,
-    "az_deg": 135.0,
-    "el_deg": 0
-   },
-   "align": {
-    "scale": 1.14,
-    "dx_px": 20,
-    "dy_px": -233
-   },
-   "component_focus": [
-    "harmonic_analyzer"
-   ],
-   "status": "aligned",
-   "notes": "MIRRORED PRINT (verified vs photogrammetry); 8-views station 6: back-left quarter - platen back panel at image-right, rod bank receding, cones bottom-left",
-   "tier": 0
-  },
-  {
-   "id": "harmonic_analyzer--ch30-p008-img01",
-   "model": "harmonic_analyzer",
-   "reference": {
-    "path": "references/albert-michelsons-harmonic-analyzer/ch30_images/page008_img01.png",
-    "source": "book ch30",
-    "mirror": true
-   },
-   "camera": {
-    "mode": "euler",
-    "roll_deg": 0.0,
-    "zoom": 1.0,
-    "target_mm": null,
-    "perspective": null,
-    "az_deg": 90.0,
-    "el_deg": 0
-   },
-   "align": {
-    "scale": 1.13,
-    "dx_px": 60,
-    "dy_px": -247
-   },
-   "component_focus": [
-    "harmonic_analyzer"
-   ],
-   "status": "aligned",
-   "notes": "MIRRORED PRINT (verified vs photogrammetry); 8-views station 7: left side - rod bank edge-on, crank handle far side at bottom-right, front hardware image-right",
-   "tier": 0
-  },
-  {
-   "id": "harmonic_analyzer--ch30-p009-img01",
-   "model": "harmonic_analyzer",
-   "reference": {
-    "path": "references/albert-michelsons-harmonic-analyzer/ch30_images/page009_img01.png",
-    "source": "book ch30",
-    "mirror": true
+    "source": "book ch30"
    },
    "camera": {
     "mode": "euler",
@@ -4859,14 +4683,182 @@
    },
    "align": {
     "scale": 1.12,
-    "dx_px": 73,
+    "dx_px": 60,
+    "dy_px": -220
+   },
+   "component_focus": [
+    "harmonic_analyzer"
+   ],
+   "status": "aligned",
+   "notes": "8-views station 2: front-right quarter - platen face image-left, crank/chain bottom-center near, body receding right-back",
+   "tier": 0
+  },
+  {
+   "id": "harmonic_analyzer--ch30-p004-img01",
+   "model": "harmonic_analyzer",
+   "reference": {
+    "path": "references/albert-michelsons-harmonic-analyzer/ch30_images/page004_img01.png",
+    "source": "book ch30"
+   },
+   "camera": {
+    "mode": "euler",
+    "roll_deg": 0.0,
+    "zoom": 1.0,
+    "target_mm": null,
+    "perspective": null,
+    "az_deg": 90.0,
+    "el_deg": 0
+   },
+   "align": {
+    "scale": 1.15,
+    "dx_px": 87,
+    "dy_px": -260
+   },
+   "component_focus": [
+    "harmonic_analyzer"
+   ],
+   "status": "aligned",
+   "notes": "8-views station 3: right side - amplitude-bar bank edge-on, crank handle near at bottom-left, front hardware image-left",
+   "tier": 0
+  },
+  {
+   "id": "harmonic_analyzer--ch30-p005-img01",
+   "model": "harmonic_analyzer",
+   "reference": {
+    "path": "references/albert-michelsons-harmonic-analyzer/ch30_images/page005_img01.jpeg",
+    "source": "book ch30"
+   },
+   "camera": {
+    "mode": "euler",
+    "roll_deg": 0.0,
+    "zoom": 1.0,
+    "target_mm": null,
+    "perspective": null,
+    "az_deg": 135.0,
+    "el_deg": 0
+   },
+   "align": {
+    "scale": 1.1,
+    "dx_px": -100,
+    "dy_px": -220
+   },
+   "component_focus": [
+    "harmonic_analyzer"
+   ],
+   "status": "aligned",
+   "notes": "8-views station 4: back-right quarter - platen back panel dark, wheel face-on image-left, lever fan sweeping right, chain bottom-left",
+   "tier": 0
+  },
+  {
+   "id": "harmonic_analyzer--ch30-p006-img01",
+   "model": "harmonic_analyzer",
+   "reference": {
+    "path": "references/albert-michelsons-harmonic-analyzer/ch30_images/page006_img01.png",
+    "source": "book ch30"
+   },
+   "camera": {
+    "mode": "euler",
+    "roll_deg": 0.0,
+    "zoom": 1.0,
+    "target_mm": null,
+    "perspective": null,
+    "az_deg": 180,
+    "el_deg": 0
+   },
+   "align": {
+    "scale": 1.18,
+    "dx_px": -20,
+    "dy_px": -287
+   },
+   "component_focus": [
+    "harmonic_analyzer"
+   ],
+   "status": "aligned",
+   "notes": "8-views station 5: back - platen back panel, wheel seen through frame, cones/chain bottom-left (mirror of front)",
+   "tier": 0
+  },
+  {
+   "id": "harmonic_analyzer--ch30-p007-img01",
+   "model": "harmonic_analyzer",
+   "reference": {
+    "path": "references/albert-michelsons-harmonic-analyzer/ch30_images/page007_img01.jpeg",
+    "source": "book ch30"
+   },
+   "camera": {
+    "mode": "euler",
+    "roll_deg": 0.0,
+    "zoom": 1.0,
+    "target_mm": null,
+    "perspective": null,
+    "az_deg": -135.0,
+    "el_deg": 0
+   },
+   "align": {
+    "scale": 1.11,
+    "dx_px": -73,
+    "dy_px": -233
+   },
+   "component_focus": [
+    "harmonic_analyzer"
+   ],
+   "status": "aligned",
+   "notes": "8-views station 6: back-left quarter - platen back panel at image-right, rod bank receding, cones bottom-left",
+   "tier": 0
+  },
+  {
+   "id": "harmonic_analyzer--ch30-p008-img01",
+   "model": "harmonic_analyzer",
+   "reference": {
+    "path": "references/albert-michelsons-harmonic-analyzer/ch30_images/page008_img01.png",
+    "source": "book ch30"
+   },
+   "camera": {
+    "mode": "euler",
+    "roll_deg": 0.0,
+    "zoom": 1.0,
+    "target_mm": null,
+    "perspective": null,
+    "az_deg": -90.0,
+    "el_deg": 0
+   },
+   "align": {
+    "scale": 1.13,
+    "dx_px": -60,
+    "dy_px": -247
+   },
+   "component_focus": [
+    "harmonic_analyzer"
+   ],
+   "status": "aligned",
+   "notes": "8-views station 7: left side - rod bank edge-on, crank handle far side at bottom-right, front hardware image-right",
+   "tier": 0
+  },
+  {
+   "id": "harmonic_analyzer--ch30-p009-img01",
+   "model": "harmonic_analyzer",
+   "reference": {
+    "path": "references/albert-michelsons-harmonic-analyzer/ch30_images/page009_img01.png",
+    "source": "book ch30"
+   },
+   "camera": {
+    "mode": "euler",
+    "roll_deg": 0.0,
+    "zoom": 1.0,
+    "target_mm": null,
+    "perspective": null,
+    "az_deg": -45.0,
+    "el_deg": 0
+   },
+   "align": {
+    "scale": 1.1,
+    "dx_px": -20,
     "dy_px": -207
    },
    "component_focus": [
     "harmonic_analyzer"
    ],
    "status": "aligned",
-   "notes": "MIRRORED PRINT (verified vs photogrammetry); 8-views station 8: front-left quarter - platen face large at center, crank handle small at right edge, body receding left-back",
+   "notes": "8-views station 8: front-left quarter - platen face large at center, crank handle small at right edge, body receding left-back",
    "tier": 0
   },
   {
