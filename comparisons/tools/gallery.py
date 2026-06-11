@@ -27,6 +27,9 @@ header h1 { font-size: 1.05em; margin: 0; }
 header input { background: #1b1b1f; color: #ddd; border: 1px solid #555;
                border-radius: 4px; padding: .3em .6em; width: 22em; }
 header .count { color: #9a9; }
+header .tiers button { background: #1b1b1f; color: #bbb; border: 1px solid #555;
+                       border-radius: 4px; padding: .25em .7em; cursor: pointer; }
+header .tiers button.active { background: #354; color: #cfc; border-color: #7a7; }
 h2 { padding: .4em 1em 0; margin: .6em 0 0; color: #cdc; font-size: 1em; }
 .pair { display: flex; gap: 6px; align-items: flex-start; padding: .5em 1em;
         border-bottom: 1px solid #2e2e35; }
@@ -50,15 +53,28 @@ JS = """
 const q = document.getElementById('q');
 const rows = [...document.querySelectorAll('.pair')];
 const count = document.getElementById('count');
+const tierBtns = [...document.querySelectorAll('.tiers button')];
+let tier = 'all';
 function apply() {
   const t = q.value.toLowerCase();
   let n = 0;
   for (const r of rows) {
-    const hit = !t || r.dataset.text.includes(t);
+    const hit = (tier === 'all' || r.dataset.tier === tier)
+      && (!t || r.dataset.text.includes(t));
     r.classList.toggle('hide', !hit);
     if (hit) n++;
   }
+  for (const s of document.querySelectorAll('section')) {
+    s.style.display = s.querySelector('.pair:not(.hide)') ? '' : 'none';
+  }
   count.textContent = n + ' / ' + rows.length + ' pairs';
+}
+for (const b of tierBtns) {
+  b.addEventListener('click', () => {
+    tier = b.dataset.tier;
+    tierBtns.forEach(x => x.classList.toggle('active', x === b));
+    apply();
+  });
 }
 q.addEventListener('input', apply);
 apply();
@@ -97,7 +113,7 @@ def pair_row(pair: dict, score) -> str:
     if pair.get("notes"):
         meta.append(f'<div class="notes">{html.escape(pair["notes"])}</div>')
     return (
-        f'<div class="pair" data-text="{html.escape(text)}">'
+        f'<div class="pair" data-text="{html.escape(text)}" data-tier="{tier}">'
         f'<div class="meta">{"".join(meta)}</div>'
         f'<div class="imgs">'
         + img_cell(f"ref/{pid}.jpg", "reference")
@@ -120,13 +136,20 @@ def main() -> int:
     for model in sorted(by_model):
         pairs = sorted(by_model[model], key=lambda p: (p.get("tier", 9), p["id"]))
         rows = "".join(pair_row(p, scores.get(p["id"])) for p in pairs)
-        sections.append(f'<h2 id="{model}">{model} ({len(pairs)})</h2>{rows}')
+        sections.append(f'<section><h2 id="{model}">{model} ({len(pairs)})</h2>{rows}</section>')
 
+    from collections import Counter
+
+    tiers = Counter(f"p{p.get('tier', 9)}" for p in manifest["pairs"])
+    tier_btns = "<button class='active' data-tier='all'>all</button>" + "".join(
+        f"<button data-tier='{t}'>{t} ({tiers[t]})</button>" for t in sorted(tiers)
+    )
     nav = " · ".join(f'<a href="#{m}" style="color:#8ab">{m}</a>' for m in sorted(by_model))
     OUT.write_text(
         "<!doctype html><meta charset='utf-8'><title>harmonic-analyzer comparisons</title>"
         f"<style>{CSS}</style>"
         "<header><h1>photo vs CAD</h1>"
+        f"<span class='tiers'>{tier_btns}</span>"
         "<input id='q' placeholder='filter: id, model, source, notes…'>"
         "<span class='count' id='count'></span></header>"
         f"<div style='padding:.5em 1em;font-size:.85em'>{nav}</div>"
