@@ -1,0 +1,1 @@
+{"camera": {"mode": "euler", "roll_deg": 0.0, "zoom": 1.0, "target_mm": null, "perspective": null, "az_deg": 10, "el_deg": 0, "frame_components": ["chain_sprocket", "crank_pedestal", "transgear_stub"]}, "reference": {"path": "references/engineerguy-youtube/stills/full/v4_t00207.png", "source": "engineerguy video 4 @ 207s"}, "size": [1600, 900], "model_mtime": 1781202733.717478}

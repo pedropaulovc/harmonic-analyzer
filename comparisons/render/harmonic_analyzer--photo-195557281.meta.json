@@ -1,0 +1,1 @@
+{"camera": {"mode": "euler", "roll_deg": 0.0, "zoom": 1.0, "target_mm": null, "perspective": null, "az_deg": -35, "el_deg": 30, "frame_components": ["rocker_arm"]}, "reference": {"path": "photogrammetry/raw/20250828_195557281_iOS.jpg", "source": "photogrammetry 195557281 (oblique left high)"}, "size": [1600, 1200], "model_mtime": 1781202733.717478}

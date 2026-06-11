@@ -1,0 +1,1 @@
+{"camera": {"mode": "euler", "roll_deg": 0.0, "zoom": 1.0, "target_mm": null, "perspective": null, "az_deg": -50, "el_deg": 10, "frame_components": ["rocker_arm", "amplitude_bar"]}, "reference": {"path": "references/engineerguy-youtube/stills/full/v2_t00114.png", "source": "engineerguy video 2 @ 114s"}, "size": [1600, 900], "model_mtime": 1781202733.717478}

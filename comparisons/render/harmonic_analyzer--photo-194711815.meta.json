@@ -1,0 +1,1 @@
+{"camera": {"mode": "euler", "roll_deg": 0.0, "zoom": 1.0, "target_mm": null, "perspective": null, "az_deg": 0, "el_deg": 8, "frame_components": ["platen", "platen_rack"]}, "reference": {"path": "photogrammetry/raw/20250828_194711815_iOS.jpg", "source": "photogrammetry 194711815 (front close-up)"}, "size": [1600, 1200], "model_mtime": 1781202733.717478}

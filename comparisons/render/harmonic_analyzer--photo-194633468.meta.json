@@ -1,0 +1,1 @@
+{"camera": {"mode": "euler", "roll_deg": 0.0, "zoom": 1.0, "target_mm": null, "perspective": null, "az_deg": 35, "el_deg": 8, "frame_components": ["summing_lever"]}, "reference": {"path": "photogrammetry/raw/20250828_194633468_iOS.jpg", "source": "photogrammetry 194633468 (front-right oblique)"}, "size": [1600, 1200], "model_mtime": 1781202733.717478}
