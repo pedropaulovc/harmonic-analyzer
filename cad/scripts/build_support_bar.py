@@ -4,7 +4,10 @@ The square steel bar used three times on the output (front, -Z) side of
 the machine, clamped between the front columns by column clamps
 (build_column_clamp.py): the magnifying-wheel axle bar (y 565), the
 platen top rail (y 460) and the platen bottom rail (y ~318). Square 10
-section, 400 long (column lines at x +-197 plus the clamp lugs).
+section, 384 long: the ends stop at x +-192, still seated in the clamps'
+front channels but clear of the column cylinders - at the bar's z band
+(-138.9..-128.9) the column surface reaches x 192.6 (a 400 bar clipped
+the column corners by ~8 mm^3 at top level, M6.5).
 
 Layout: bar axis along X, origin at the bar centre. Dimensions:
 cad/DIMENSIONS.md ch. 21/22 (M6.4, low).
@@ -32,7 +35,7 @@ PART_NAME = "support-bar"
 MATERIAL = "Plain Carbon Steel"
 
 BAR_SIDE = 10.0  # square section (low)
-BAR_LENGTH = 400.0  # spans the column lines at x +-197 (derived)
+BAR_LENGTH = 384.0  # ends at x +-192: in the clamp channels, off the columns
 
 
 async def build(adapter) -> dict[str, str]:
