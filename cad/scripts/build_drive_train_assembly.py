@@ -3,64 +3,71 @@ r"""Reproduction script: drive-train subassembly (book ch. 11-13, 30).
 The complete drive train in machine coordinates (assembly origin = base
 origin; base top face at y = 50.8, drive height 76 above it):
 
-* crankshaft along Z at (+122.25, 126.8) in the green crank pedestal:
-  crank arm + handle at the front, chain sprocket and the 16T DP 16
-  pinion inboard (the removable tapered pin is OMITTED: a tapered pin
-  cannot sit in the straight 5 mm cross-holes without solid
-  interference -- reaming the holes conical is deferred).
-* cone set on its stepped shaft, SHAFT axis inclined 19.8 deg in PLAN
-  (arcsin(2.54/7.5), appendix C #3): 20 cone-gear configurations
-  T120..T006 at the stack stations, the 64T crank-drive gear outboard
-  of T120, big-end journal in the black pivot post, thin tip resting
-  in the green knob post's U-slot.
+* cone set: a TRUE CONE -- all 20 gears AND the 64T crank-drive gear
+  seated perpendicular to the stepped shaft (p.18/p.20 photos), the
+  shaft inclined 21.1 deg in PLAN, big-end journal in the black pivot
+  post, thin 1/8" tip resting in the green knob post's U-slot.
 * cylinder drum: 20 identical 120T gears spinning freely on the
   stationary arbor along Z at (-47.5, 126.8) (M6.2 keyway refutation),
   clamped by the south arbor pedestal and (at the north end) the
-  rocker-arm-support's boss bore in frame.SLDASM; notches up = cosine setup
-  (pp. 66-67).
+  rocker-arm-support's boss bore in frame.SLDASM; notches up = cosine
+  setup (pp. 66-67).
+* crankshaft along Z in the green crank pedestal: crank arm + handle at
+  the front, chain sprocket and the 16T DP 16 pinion inboard (the
+  removable tapered pin is OMITTED: a tapered pin cannot sit in the
+  straight 5 mm cross-holes without solid interference).
 
-CANTED GEAR SEATS (M6.6 -- "most gears not meshing" fix). A spur gear
-seated perpendicular to the 19.8 deg shaft CANNOT mesh the drum: its
-projected radius toward the drum shrinks by cos(19.8) (3.0 mm at T120 --
-nearly 2x the whole DP 30 working depth of 1.69 mm) and its closest
-point sits r*sin(19.8) south in z (17 mm = 2.4 channels at T120), so no
-centre-distance choice engages more than a few stations (the retired
-DRUM_BACKLASH=1.5 split that error and left air gaps at 17+ of 21
-meshes). The book's own mesh condition -- centre distance shrinking
-2.54/station to match the 6-teeth radius step -- closes EXACTLY when the
-gear DISC stays square to the drum (vertical) and only the shaft
-inclines. So gears T120..T012 and the 64T are seated canted-vertical
-(bores sized by build_cone_gear.bore_dia_in to clear the inclined
-shaft's ELLIPTICAL constant-z cross-section -- semi-axis r/cos(19.8),
-not r -- everywhere in each slab; the real machine's small-gear seats
-were solder-filled, p.21), every station meshing at
-101.6 - 2.54j + MESH_BACKLASH. Physically a rigid canted gear would
-wobble when the shaft turns -- this is a display-state model (the saved
-gear phases ARE the cosine setup); the book's "oblique ... partial
-engagement, distinct wear" (ch. 12) records how the real, perpendicular-
-seated train coped, which rigid CAD cannot (the dims are mutually
-inconsistent at the few-mm level; see DIMENSIONS.md ch. 13 notes).
-Two tooth-form caps, from the part's stub simplification (gap floor at
-the BASE circle, build_cone_gear.py): gears T054 and smaller get an
-eastward `mesh_relief` so the drum tips never bottom in their shallow
-gaps, and T006 (6T -- below minimum tooth count, cannot mesh a 120T with
-any seating) stays perpendicular, parked NORTH past its drum gear on the
-0.08" tip (T006_STATION). The 16T crank pinion mesh gets the same
-treatment via CRANK_BACKOFF (16T stub gaps are 1.99 mm deep vs the
-3.18 mm DP 16 working depth).
+TRUE-CONE MESH GEOMETRY (M6.7; supersedes the M6.6 canted-vertical
+seats, which satisfied the interference checker but visibly deformed
+the cone -- user-flagged against the p.18 photo). A gear seated
+perpendicular to a shaft inclined i in plan reaches a parallel-axis
+drum only with the tooth at the azimuth facing the drum; that contact
+tooth sits r*sin(i) SOUTH (along the shaft) of the gear centre and
+reaches x = x_centre - r*cos(i). Meshing every station therefore
+needs:
 
-Positions per cad/DIMENSIONS.md ch. 13 "Drive-train layout" +
-"Drive supports". Tooth phasing: every gear script seeds a TOOTH centred
-on local +X (`build_cone_gear.py` profile derivation), so at each mesh
-the driven side presents a tooth to the driver's tooth; the drum gears
-are pre-rotated +1.5 deg (half a 3 deg pitch) and the crank pinion
-+11.25 deg (half of 22.5) to land tooth-in-gap. The cone gears keep
-phase 0: their even tooth counts put a tooth at azimuth 180 (toward the
-drum), and the canted-vertical seats keep the line of centres in the
-gear plane, so the rotated drum gap receives it.
+* a centre-x grid stepping by the PROJECTED radius step 2.54*cos(i),
+* each centre z at z_drum_j + r_j*sin(i) -- NORTH of its drum plane,
+  so the contact tooth lands exactly in that plane.
+
+Those centres lie on ONE straight shaft iff sin(i) = 2.54/Z_PITCH ->
+i = 21.0976 deg (the retired arcsin(2.54/7.5) = 19.8 put the tracking
+on the wrong leg of the triangle: it produced a 0.44/station z-drift
+and 0.15/station radial error -- "most gears not meshing"), with seat
+pitch Z_PITCH*cos(i) = 6.5839 along the shaft. The 6.5839 pitch forces
+CONE_FACE down to 6.5 (annotated 7 mm faces would overlap 0.42): the
+book's annotated cone figures (face 7, pitch 7.5, stack 150) are
+mutually inconsistent with the photo-measured drum grid -- the drum
+grid wins (it anchors the gates and all channel machinery), and the
+150 mm annotation reconciles as gear stack 131.6 + 64T face 10 + air.
+Self-consistency: tan(cone half-angle) = 2.54/6.5839 = tan(i), so the
+cone's drum-side generator runs PARALLEL to the drum axis -- the p.18
+seam.
+
+The engagement is intentionally PARTIAL ("oblique angle ... partial
+engagement, distinct wear", ch. 12): the contact tooth crosses the
+3 mm drum face obliquely, penetration varying +-1.5*tan(i) = 0.58
+about its centre value; X_PITCH backs the cone off so the DEEPEST
+crossing point stays 0.15 short of the DP 30 working depth -> tip
+interleave 0.39..1.54 across each drum face, identical at ALL 20
+stations (zero drift, T006 included). Stub-gap caps hold without any
+per-gear relief: the drum tips dive at most 0.64 into a cone gap vs
+the shallowest (T006) stub cap 0.88. The 16T crank pinion mesh gets
+the same treatment: the perpendicular 64T presents its contact tooth
+50.8*sin(i) = 18.3 north of its centre, the pinion is centred on that
+plane, and X_CRANK backs off so the +-5 mm oblique dive across the 64T
+face caps 0.15 short of the DP 16 working depth (the 16T/64T stub gaps
+clear by 0.5+ at that depth).
+
+Positions per cad/DIMENSIONS.md ch. 13 "Drive-train layout" + "Drive
+supports". Tooth phasing: every gear script seeds a TOOTH centred on
+local +X; the cone gears keep phase 0 (even tooth counts put a tooth
+at azimuth 180, the contact azimuth) and the drum gears are
+pre-rotated +1.5 deg (half a 3 deg pitch) to receive it tooth-in-gap;
+the crank pinion +11.25 deg (half of 22.5) likewise.
 
 Every component is inserted at its exact final transform and FIXED
-(saved state fully defined; the 19.8 deg components cannot be fully
+(saved state fully defined; the inclined components cannot be fully
 constrained by axis-aligned plane mates, and the meshed/locked gear
 phases ARE the book's cosine setup state). Kinematic gear-ratio
 verification is deferred to a dedicated motion script that floats the
@@ -93,102 +100,54 @@ ASM_NAME = "drive-train"
 Y_BASE_TOP = 50.8  # harmonic-base top face
 Y_DRIVE = Y_BASE_TOP + 76.0  # 126.8: crank, cone big end and arbor axes
 
-INCLINE_DEG = math.degrees(math.asin(2.54 / 7.5))  # 19.8: SHAFT plan incline
-SIN_I = 2.54 / 7.5
-COS_I = math.cos(math.radians(INCLINE_DEG))
-TAN_I = SIN_I / COS_I
-
-SEAT_PITCH = 7.5  # cone stack pitch along the shaft (annotated p.18)
 DP_TRAIN = 30.0  # cone/cylinder train diametral pitch (DIMENSIONS.md ch12)
-PA_DEG = 14.5  # pressure angle (build_cone_gear.py)
 ADDENDUM = 25.4 / DP_TRAIN  # 0.847
 WORKING_DEPTH = 2.0 * ADDENDUM  # 1.693: full tooth interleave depth
 RADIUS_STEP = 3.0 * 25.4 / DP_TRAIN  # 2.54: pitch-radius step per 6 teeth
-MESH_BACKLASH = 0.15  # radial slack so tessellated involute flanks clear
 
-X_DRUM = -47.5  # frame-locked: rocker-support boss bore + arbor pedestal
-X_T120 = X_DRUM + 4.0 * 25.4 + MESH_BACKLASH  # 54.25: 50.8 + 50.8 mesh
-Z_T120 = -67.1  # = -19/2 x 7.06: stack centred between the gates
+# Frame-locked machine grid (M6.3 lineage -- the drum planes anchor the
+# gates, cams, rockers and bars; nothing here may move them).
+Z_PITCH = 7.5 * math.cos(math.asin(2.54 / 7.5))  # 7.0568: drum z-pitch
+X_DRUM = -47.5  # rocker-support boss bore + arbor pedestal
+Z_DRUM0 = -67.1  # drum gear 0 plane: stack centred between the gates
 
-# 64T crank-drive gear (canted vertical like the rest): z packing between
-# the T120 south face (-70.6), the sprocket and the pedestal north face
-# fixes its offset -- 0.25 air to T120, 0.25 to the sprocket.
-GEAR64_ZOFF = 8.75  # 64T centre south of T120 (book p.20: directly beside)
-X_64 = X_T120 + GEAR64_ZOFF * TAN_I  # 57.40: 64T seat on the shaft line
-Z_64 = Z_T120 - GEAR64_ZOFF  # -75.85
-CRANK_BACKOFF = 1.35  # DP16 relief: 16T stub gaps 1.99 deep vs 3.18 working
-X_CRANK = X_64 + 63.5 + CRANK_BACKOFF  # 122.25 -- photo: 122 +- 3
+# True-cone incline (M6.7, exact tracking -- see module docstring).
+SIN_I = RADIUS_STEP / Z_PITCH  # 0.35993
+COS_I = math.sqrt(1.0 - SIN_I * SIN_I)  # 0.93299
+TAN_I = SIN_I / COS_I
+SEC_I = 1.0 / COS_I
+INCLINE_DEG = math.degrees(math.asin(SIN_I))  # 21.0976
+SEAT_PITCH = Z_PITCH * COS_I  # 6.5839: seat pitch along the shaft
 
-# Cone shaft: pivot end at seat station -28.75 from the T120 centre
-# (25 journal + half of the first 7.5 seat -- build_cone_gear_shaft.py).
-SHAFT_T120_STATION = 28.75
-CONE_ORIGIN = [
-    X_T120 + SHAFT_T120_STATION * SIN_I,
-    Y_DRIVE,
-    Z_T120 - SHAFT_T120_STATION * COS_I,
-]
-
-# T006 cannot mesh (6T stub involute, below minimum tooth count): it stays
-# perpendicular on the 0.08" tip, parked 6.75 mm NORTH of its nominal seat
-# -- retracting south instead would thread its tilted rim through T012's
-# slab. At 178 its rim band sits 0.41 clear of its drum gear's north face
-# and 0.26 clear of the knob post's plan circle.
-T006_STATION = 178.0
-
-CONE_FACE = 7.0  # cone gear face width (annotated p.18)
+CONE_FACE = 6.5  # M6.7 mesh packing (annotated 7 -- build_cone_gear.py)
 GEAR64_FACE = 10.0
 DRUM_FACE = 3.0  # cylinder gear face (gear z = 0..3, cam 3..6.5)
 PINION_FACE = 12.0
 
-ARBOR_LENGTH = 200.0  # spans z -100..+100
-CRANKSHAFT_Z0 = -150.0  # front end; crank-arm hub at +12 (PIN_HOLE_HEIGHT)
-CRANK_ARM_Z0 = CRANKSHAFT_Z0 + 8.0  # hub centre 12 - half thickness 4
-ARM_C2C = 150.0  # handle pivot from the shaft axis
-SPROCKET_Z0 = -85.6  # face 4.5 against the pedestal; 0.25 air to the 64T.
-# M6.4/M6.6 note: engineerguy v4_transgear_020 shows the real sprocket
-# OUTBOARD at a pedestal front boss, but with our plain O46 pedestal
-# column and the crank-arm hub (-134..-142) no outboard slot exists; the
-# canted 64T (M6.6) pushes the chain plane further south to -83.35 vs the
-# transgear sprocket at -81 (documented discrepancy, Appendix C).
-PEDESTAL_Z = -108.6  # crank pedestal centre (front face inside base edge)
-ARBOR_PEDESTAL_Z = 92.0  # south (-z) end only; north end clamps into the
-# rocker-arm-support boss bore at z 74.1..133 (frame.SLDASM, M6.5)
-# Post centre station: the rotated 25x20 block reaches 13.64 in machine z
-# from its centre (10*cos + 12.5*sin); at -1.0 its north corner stops 0.60
-# short of the canted 64T's south face, with the shaft engaging the first
-# 9 mm of the journal bore (blind-bearing look, p.18: the shaft end
-# disappears into the black bracket).
-PIVOT_POST_STATION = -1.0  # shaft station under the pivot post centre
-KNOB_POST_STATION = 200.0  # shaft station over the knob post centre
-
-IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
-ROT_X_POS90 = [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0]]
-ROT_Y_POS90 = [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]
-ROT_Y_INCLINE = [
-    [COS_I, 0.0, SIN_I],
-    [0.0, 1.0, 0.0],
-    [-SIN_I, 0.0, COS_I],
-]  # Ry(-19.8), row-vector convention (matches the frame script's Ry rows)
+# Mesh anchor: X_PITCH is every cone gear's pitch-section x at the
+# contact azimuth. The oblique crossing dives (DRUM_FACE/2)*tan(i) past
+# the mid-face penetration, so the mid value is capped at working depth
+# minus the dive minus 0.15 slack -> tip interleave 0.39..1.54.
+DRUM_TIP_X = X_DRUM + (122.0 / DP_TRAIN) * 25.4 / 2.0  # 4.147
+PEN_EDGE_SLACK = 0.15
+PEN_MID = WORKING_DEPTH - PEN_EDGE_SLACK - (DRUM_FACE / 2.0) * TAN_I  # 0.965
+X_PITCH = DRUM_TIP_X + ADDENDUM * SEC_I - PEN_MID  # 4.090
 
 
-def rot_z_rows(deg: float) -> list[list[float]]:
-    c, s = math.cos(math.radians(deg)), math.sin(math.radians(deg))
-    return [[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]]
+def cone_seat(j: int) -> tuple[float, float]:
+    """(x, z) centre of cone gear j: pitch-projected x, r*sin(i) north."""
+    r = 2.0 * 25.4 - RADIUS_STEP * j
+    return X_PITCH + r * COS_I, Z_DRUM0 + Z_PITCH * j + r * SIN_I
 
 
-def stub_gap_depth(r_pitch: float) -> float:
-    """Radial depth of a tooth gap whose floor sits at the BASE circle
-    (build_cone_gear.py stub simplification): tip radius - base radius."""
-    return ADDENDUM + r_pitch * (1.0 - math.cos(math.radians(PA_DEG)))
-
-
-def mesh_relief(j: int) -> float:
-    """Extra eastward centre-distance relief for canted cone gear j so the
-    120T drum tips never bottom in its stub gap (0.05 floor margin) --
-    nonzero from T054 (j=11, 0.02) growing to T012 (j=18, 0.58)."""
-    penetration = WORKING_DEPTH - MESH_BACKLASH
-    cap = stub_gap_depth(2.0 * 25.4 - RADIUS_STEP * j) - 0.05
-    return max(0.0, penetration - cap)
+# Cone shaft: pivot end at seat station -28.25 from the T120 centre
+# (25 journal + half of the first 6.5 face -- build_cone_gear_shaft.py).
+SHAFT_T120_STATION = 25.0 + CONE_FACE / 2.0  # 28.25
+CONE_ORIGIN = [
+    cone_seat(0)[0] + SHAFT_T120_STATION * SIN_I,
+    Y_DRIVE,
+    cone_seat(0)[1] - SHAFT_T120_STATION * COS_I,
+]
 
 
 def cone_station(s: float) -> list[float]:
@@ -198,6 +157,67 @@ def cone_station(s: float) -> list[float]:
         Y_DRIVE,
         CONE_ORIGIN[2] + s * COS_I,
     ]
+
+
+# Exact-tracking self-check: the 20 mesh-derived seats lie on the shaft.
+for _j in range(20):
+    _x, _z = cone_seat(_j)
+    _p = cone_station(SHAFT_T120_STATION + _j * SEAT_PITCH)
+    if abs(_p[0] - _x) > 1e-9 or abs(_p[2] - _z) > 1e-9:
+        raise AssertionError(f"cone seat {_j} off the shaft line: {(_x, _z)} vs {_p}")
+
+# 64T crank-drive gear: perpendicular on the pivot journal, 0.1 air to
+# the T120 south face (p.20: directly beside).
+GEAR64_STATION = SHAFT_T120_STATION - (CONE_FACE + GEAR64_FACE) / 2.0 - 0.1  # 19.9
+GEAR64_SEAT = cone_station(GEAR64_STATION)  # (54.49, , -56.61)
+R64 = 2.0 * 25.4  # DP 16, 64T pitch radius
+
+# Crank: the 64T's contact tooth (azimuth 0, toward +x) sits R64*sin(i)
+# north of its centre; the pinion is centred on that plane and the mesh
+# backs off so the +-5 oblique dive caps 0.15 short of working depth.
+ADD16 = 25.4 / 16.0
+WORK16 = 2.0 * ADD16  # 3.175
+PEN16_MID = WORK16 - PEN_EDGE_SLACK - (GEAR64_FACE / 2.0) * SIN_I  # 1.225
+PINION_TOOTH_Z = GEAR64_SEAT[2] + R64 * SIN_I  # -38.32
+X_CRANK = (
+    GEAR64_SEAT[0] + R64 * COS_I + 12.7 + (ADD16 * (1.0 + SEC_I) - PEN16_MID)
+)  # 116.65 -- photo: pedestal 122 +- 3 (1.8 sigma, see DIMENSIONS.md)
+
+ARBOR_LENGTH = 200.0  # spans z -100..+100
+CRANKSHAFT_Z0 = -150.0  # front end; crank-arm hub at +12 (PIN_HOLE_HEIGHT)
+CRANKSHAFT_LENGTH = 120.0  # build_crankshaft.py SHAFT_LENGTH
+CRANK_ARM_Z0 = CRANKSHAFT_Z0 + 8.0  # hub centre 12 - half thickness 4
+ARM_C2C = 150.0  # handle pivot from the shaft axis
+SPROCKET_Z0 = -85.6  # face 4.5 against the pedestal north face
+PEDESTAL_Z = -108.6  # crank pedestal centre (front face inside base edge)
+ARBOR_PEDESTAL_Z = 92.0  # south (-z) end only; north end clamps into the
+# rocker-arm-support boss bore at z 74.1..133 (frame.SLDASM, M6.5)
+
+# The pinion must sit fully on the crankshaft.
+if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
+    raise AssertionError("crankshaft too short for the M6.7 pinion station")
+
+# Posts: the rotated 25x20 pivot block reaches 10*cos+12.5*sin = 13.83
+# in machine z from its centre; at station -1.0 its north corner stops
+# 1.0 short of the perpendicular 64T's south face, with the shaft
+# engaging the first 9 mm of the journal bore (blind-bearing look,
+# p.18: the shaft end disappears into the black bracket).
+PIVOT_POST_STATION = -1.0
+KNOB_POST_STATION = 177.0  # thin-tip journal; z 90.0, x -2.1 (p.18)
+
+IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+ROT_X_POS90 = [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0]]
+ROT_Y_POS90 = [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]
+ROT_Y_INCLINE = [
+    [COS_I, 0.0, SIN_I],
+    [0.0, 1.0, 0.0],
+    [-SIN_I, 0.0, COS_I],
+]  # Ry(-21.1), row-vector convention (matches the frame script's Ry rows)
+
+
+def rot_z_rows(deg: float) -> list[list[float]]:
+    c, s = math.cos(math.radians(deg)), math.sin(math.radians(deg))
+    return [[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]]
 
 
 def _part(name: str) -> str:
@@ -244,11 +264,30 @@ async def _place(
     return name
 
 
+async def _place_on_shaft(
+    adapter, part: str, station: float, face: float, configuration: str = "", label: str = ""
+) -> str:
+    """Insert a gear perpendicular on the cone shaft, centred at station."""
+    centre = cone_station(station)
+    return await _place(
+        adapter,
+        part,
+        [
+            centre[0] + (face / 2.0) * SIN_I,
+            Y_DRIVE,
+            centre[2] - (face / 2.0) * COS_I,
+        ],
+        [0.0, -INCLINE_DEG, 0.0],
+        ROT_Y_INCLINE,
+        configuration=configuration,
+        label=label,
+    )
+
+
 async def build(adapter) -> dict[str, str]:
     check("create_assembly", await adapter.create_assembly())
 
-    # --- cone set (shaft inclined 19.8 deg in plan; gears canted vertical
-    # at the exact DP30 mesh grid, except the parked perpendicular T006) ---
+    # --- cone set: true cone, every gear perpendicular on the shaft ---
     await _place(
         adapter,
         "cone-gear-shaft",
@@ -256,45 +295,23 @@ async def build(adapter) -> dict[str, str]:
         [0.0, -INCLINE_DEG, 0.0],
         ROT_Y_INCLINE,
     )
-    await _place(
+    await _place_on_shaft(
         adapter,
         "crank-drive-gear",
-        [X_64, Y_DRIVE, Z_64 - GEAR64_FACE / 2.0],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
-        label="crank-drive-gear (canted vertical)",
+        GEAR64_STATION,
+        GEAR64_FACE,
+        label="crank-drive-gear (perpendicular, journal seat)",
     )
     for j in range(20):
         teeth = 120 - 6 * j
         cfg = f"T{teeth:03d}"
-        if teeth == 6:
-            centre = cone_station(T006_STATION)
-            await _place(
-                adapter,
-                "cone-gear",
-                [
-                    centre[0] + (CONE_FACE / 2.0) * SIN_I,
-                    Y_DRIVE,
-                    centre[2] - (CONE_FACE / 2.0) * COS_I,
-                ],
-                [0.0, -INCLINE_DEG, 0.0],
-                ROT_Y_INCLINE,
-                configuration=cfg,
-                label=f"cone-gear {cfg} (perpendicular, parked clear)",
-            )
-            continue
-        await _place(
+        await _place_on_shaft(
             adapter,
             "cone-gear",
-            [
-                X_T120 - RADIUS_STEP * j + mesh_relief(j),
-                Y_DRIVE,
-                Z_T120 + SEAT_PITCH * COS_I * j - CONE_FACE / 2.0,
-            ],
-            [0.0, 0.0, 0.0],
-            IDENTITY,
+            SHAFT_T120_STATION + j * SEAT_PITCH,
+            CONE_FACE,
             configuration=cfg,
-            label=f"cone-gear {cfg} (canted vertical)",
+            label=f"cone-gear {cfg}",
         )
 
     # --- cylinder drum (stationary arbor, free gears locked notch-up) ---
@@ -307,7 +324,7 @@ async def build(adapter) -> dict[str, str]:
         label="cylinder arbor",
     )
     for j in range(20):
-        z_j = Z_T120 + SEAT_PITCH * COS_I * j
+        z_j = Z_DRUM0 + Z_PITCH * j
         await _place(
             adapter,
             "cylinder-gear",
@@ -328,9 +345,10 @@ async def build(adapter) -> dict[str, str]:
     await _place(
         adapter,
         "crank-pinion",
-        [X_CRANK, Y_DRIVE, Z_64],  # south face at the 64T centre: the 12
-        [0.0, 0.0, 11.25],  # face overlaps the vertical 64T's north half
-        rot_z_rows(11.25),  # (5 mm engaged band); +11.25 = half pitch
+        [X_CRANK, Y_DRIVE, PINION_TOOTH_Z - PINION_FACE / 2.0],
+        [0.0, 0.0, 11.25],  # +11.25 = half pitch, tooth-in-gap
+        rot_z_rows(11.25),
+        label="crank-pinion (centred on the 64T contact tooth)",
     )
     await _place(
         adapter,
