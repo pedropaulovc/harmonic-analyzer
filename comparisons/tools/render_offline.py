@@ -33,21 +33,43 @@ BLENDER = Path(r"C:\Program Files\Blender Foundation\Blender 5.1\blender.exe")
 WORKER = TOOLS / "blender_worker.py"
 
 
-def model_paths(model: str) -> tuple[Path, Path, Path | None]:
-    """(solidworks artefact, stl, boxes-json-or-None)."""
+STL_DIR = CAD_OUT / "stl"
+
+
+def _stale(path: Path, src: Path, what: str) -> None:
+    if not path.exists():
+        raise FileNotFoundError(f"{path} missing — run cad/scripts/export_models.py")
+    if path.stat().st_mtime < src.stat().st_mtime:
+        raise RuntimeError(f"{what} older than {src.name} — re-run export_models.py")
+
+
+def model_paths(model: str) -> tuple[Path, dict]:
+    """(solidworks artefact, worker-job geometry fields).
+
+    Parts: single STL + appearance RGB from colors.json. Assemblies: the
+    boxes/scene JSON + the per-part STL dir (each referenced part checked
+    against its own SLDPRT).
+    """
     dashed = model.replace("_", "-")
-    for src in (CAD_OUT / "sldasm" / f"{dashed}.SLDASM", CAD_OUT / "sldprt" / f"{dashed}.SLDPRT"):
-        if src.exists():
-            break
-    else:
+    asm = CAD_OUT / "sldasm" / f"{dashed}.SLDASM"
+    prt = CAD_OUT / "sldprt" / f"{dashed}.SLDPRT"
+    if asm.exists():
+        scene = CAD_OUT / "boxes" / f"{dashed}.json"
+        _stale(scene, asm, scene.name)
+        data = json.loads(scene.read_text(encoding="utf-8"))
+        if not data.get("components"):
+            raise RuntimeError(f"{scene.name} has no scene graph — re-run export_models.py")
+        for stem in {c["part"] for c in data["components"]}:
+            part_src = CAD_OUT / "sldprt" / f"{stem}.SLDPRT"
+            _stale(STL_DIR / f"{stem}.STL", part_src, f"{stem}.STL")
+        return asm, {"scene": str(scene), "parts_dir": str(STL_DIR)}
+    if not prt.exists():
         raise FileNotFoundError(f"no artefact for {model}")
-    stl = CAD_OUT / "stl" / f"{dashed}.STL"
-    if not stl.exists():
-        raise FileNotFoundError(f"{stl} missing — run cad/scripts/export_models.py")
-    if stl.stat().st_mtime < src.stat().st_mtime:
-        raise RuntimeError(f"{stl.name} older than {src.name} — re-run export_models.py")
-    boxes = CAD_OUT / "boxes" / f"{dashed}.json"
-    return src, stl, boxes if boxes.exists() else None
+    stl = STL_DIR / f"{dashed}.STL"
+    _stale(stl, prt, stl.name)
+    colors_file = STL_DIR / "colors.json"
+    colors = json.loads(colors_file.read_text(encoding="utf-8")) if colors_file.exists() else {}
+    return prt, {"stl": str(stl), "rgb": colors.get(dashed)}
 
 
 def _sidecar(pair_id: str) -> Path:
@@ -90,7 +112,7 @@ def main() -> int:
             continue
         if args.model and pair["model"] != args.model:
             continue
-        src, _stl, _boxes = model_paths(pair["model"])
+        src, _geom = model_paths(pair["model"])
         if args.stale_only and not is_stale(pair, src):
             continue
         by_model.setdefault(pair["model"], []).append(pair)
@@ -104,7 +126,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="harm_render_") as tmp:
         tmpdir = Path(tmp)
         for model, pairs in sorted(by_model.items()):
-            src, stl, boxes = model_paths(model)
+            src, geom = model_paths(model)
             jobs = []
             for pair in pairs:
                 ref = composite.prepare_reference(pair)
@@ -115,8 +137,8 @@ def main() -> int:
                              "_size": (w, h)})
             job_file = tmpdir / f"{model}.json"
             job_file.write_text(json.dumps(
-                {"stl": str(stl), "boxes": str(boxes) if boxes else None,
-                 "pairs": [{k: v for k, v in j.items() if k != "_size"} for j in jobs]}),
+                geom | {"pairs": [{k: v for k, v in j.items() if k != "_size"}
+                                  for j in jobs]}),
                 encoding="utf-8")
             print(f"  {model}: {len(pairs)} pairs ...")
             proc = subprocess.run(
