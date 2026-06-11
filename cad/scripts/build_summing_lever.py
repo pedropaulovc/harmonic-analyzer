@@ -70,7 +70,10 @@ HOLE_X = -37.10  # machine x -22.10 = channel-lever tab line (derived)
 HOLE_COUNT = 20
 CHANNEL_Z0 = -67.1  # frame channel j=0 (DIMENSIONS.md ch6)
 CHANNEL_PITCH = 7.0565
-HOLE_Z_OFFSET = 0.8  # holes on the lever mid-planes z_j + 0.8
+HOLE_Z_OFFSET = 0.8 - 2.75  # the spring's bottom lead hangs one coil mean
+# radius (2.75) off the spring axis (z_j + 0.8) on the helix-start side,
+# which the assembly's Ry(+90) maps to -Z -- the hole sits under the LEAD
+# (see build_channel_spring_installed.py)
 
 WEB_Y_BOT = 2.0  # twin-rib web band above the knife line (low)
 WEB_Y_TOP = 12.0
