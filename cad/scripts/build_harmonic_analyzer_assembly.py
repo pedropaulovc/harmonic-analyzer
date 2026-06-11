@@ -32,6 +32,7 @@ from __future__ import annotations
 import sys
 
 from _common import (
+    OUT_PNG,
     OUT_SLDASM,
     assert_component_placed,
     assert_components_fully_defined,
@@ -44,6 +45,20 @@ from _common import (
 ASM_NAME = "harmonic-analyzer"
 
 SUBASSEMBLIES = ("frame", "drive-train", "channel", "output")
+
+# Render gallery mirroring the book's ch. 30 "Eight Views" chapter: the six
+# orthographic faces plus two 3/4 views (the photos walk 45-degree steps
+# around the machine; axonometric views are the CAD equivalent).
+EIGHT_VIEWS = (
+    "front",
+    "back",
+    "left",
+    "right",
+    "top",
+    "bottom",
+    "isometric",
+    "trimetric",
+)
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 
@@ -86,7 +101,39 @@ async def build(adapter) -> dict[str, str]:
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)
-    return await save_assembly_and_images(adapter, ASM_NAME)
+    artefacts = await save_assembly_and_images(adapter, ASM_NAME)
+
+    # Ch. 30 eight-views gallery (after the save: gallery + BOM leave the
+    # doc dirty, the SLDASM on disk stays table-free).
+    for view in EIGHT_VIEWS:
+        img_path = (OUT_PNG / f"eight-views-{view}.png").resolve()
+        check(
+            f"export_image eight-views {view}",
+            await adapter.export_image(
+                {
+                    "file_path": str(img_path),
+                    "format_type": "png",
+                    "width": 1920,
+                    "height": 1200,
+                    "view_orientation": view,
+                }
+            ),
+        )
+        artefacts[f"eight-views-{view}"] = str(img_path)
+
+    # Parts-only BOM (flattened through the subassemblies) -> CSV.
+    from solidworks_mcp.adapters.base import CreateBomParameters
+
+    bom_path = (OUT_PNG.parent / "harmonic-analyzer-bom.csv").resolve()
+    data = check(
+        "export_bom_csv",
+        await adapter.export_bom_csv(
+            CreateBomParameters(bom_type="parts_only", file_path=str(bom_path))
+        ),
+    )
+    print(f"  BOM: {data['rows']} rows -> {data['file_path']}", flush=True)
+    artefacts["bom"] = str(bom_path)
+    return artefacts
 
 
 if __name__ == "__main__":
