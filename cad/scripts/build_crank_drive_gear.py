@@ -43,13 +43,11 @@ MATERIAL = "Plain Carbon Steel"  # p.20: dark gear, distinct from the brass trai
 TEETH = 64  # DIMENSIONS.md ch12 / Appendix C #9 estimate (low)
 DP = 16.0  # coarser than the DP 30 train; round-PD estimate (low)
 FACE_WIDTH = 10.0  # mm, p.20 -- wider than the 7 mm cone faces (low)
-# M6.6 mesh fix: the 64T is seated CANTED on the 19.8 deg cone shaft
-# (gear plane square to the crank pinion) so the 4:1 mesh closes at the
-# exact DP 16 centre distance; the bore swallows the 3/8" shaft within
-# the 10 mm slab: radius = (10/2)*tan(19.8) + (9.525/2)/cos(19.8) + 0.25
-# margin = 7.11 (the sec factor because an inclined cylinder's constant-z
-# section is an ellipse). See build_cone_gear.bore_dia_in.
-BORE_DIAMETER = 0.56 * IN  # 14.22 -- canted seat over the 3/8" journal
+# M6.7: seated perpendicular on the cone shaft's 3/8" pivot journal
+# like the cone gears (true cone, p.20); the oblique crank-pinion mesh
+# is handled in the assembly (contact tooth 50.8*sin(21.1) north of the
+# gear centre, crank backed off for the oblique dive).
+BORE_DIAMETER = 0.375 * IN  # snug on the 3/8" journal
 
 
 async def build(adapter) -> dict[str, str]:

@@ -1,7 +1,7 @@
 r"""Reproduction script: cone knob post (book ch. 12, p. 18).
 
 Green round post that carries the cone shaft's thin small-end tip (the
-0.08" rod past the smallest gears): the tip rests in an open U-slot so
+1/8" rod past the smallest gears): the tip rests in an open U-slot so
 the cone set can be lifted/swung out of mesh by the knurled knob on the
 shaft (ch. 12 notes; p. 18 top-down shows the green round post under
 the small end, ~Ø32 at 2.23 px/mm from the largest-cone-gear-OD scale).
@@ -41,15 +41,13 @@ PART_NAME = "cone-knob-post"
 MATERIAL = "Gray Cast Iron"  # green-painted like the base castings
 
 POST_DIA = 32.0  # p.18 top-down green post (scaled, low)
-POST_HEIGHT = 80.0  # slot floor ~75 + walls past the tip (low)
-TIP_DIA = 0.08 * IN  # 2.032: cone shaft small-end tip (M6.6 -- turned
-# down from 1/8" so it clears the last drum gear's tooth tips, see
-# build_cone_gear_shaft.py)
-SLOT_WIDTH = 2.4  # tip dia + 0.18 clearance per side (derived)
+POST_HEIGHT = 80.0  # slot floor 74.4 + walls past the tip (low)
+TIP_DIA = 0.125 * IN  # 3.175: cone shaft small-end tip (ch. 12 shaft steps)
+SLOT_WIDTH = 3.5  # tip dia + 0.16 clearance per side (derived)
 BORE_HEIGHT = 76.0  # resting tip centre = drive height (med)
 
 POST_RADIUS = POST_DIA / 2.0
-SLOT_FLOOR = BORE_HEIGHT - TIP_DIA / 2.0  # 74.98: tip rests at drive height
+SLOT_FLOOR = BORE_HEIGHT - TIP_DIA / 2.0  # 74.4: tip rests at the drive height
 SLOT_TOP = POST_HEIGHT + 2.0  # open upward
 
 
