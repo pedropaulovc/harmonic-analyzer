@@ -68,8 +68,26 @@ def run_script(script: Path) -> None:
     print(f"OK  {script.name} in {elapsed:.0f}s")
 
 
+def close_solidworks_documents() -> None:
+    """Release file locks before the wipe.
+
+    A running SolidWorks session keeps the previous run's parts open
+    (CloseAllDocuments only happens when the NEXT script connects), so
+    ``rmtree`` hits WinError 32 without this.
+    """
+    try:
+        import win32com.client
+
+        app = win32com.client.GetActiveObject("SldWorks.Application")
+        app.CloseAllDocuments(True)
+        print("--  closed all SolidWorks documents")
+    except Exception as exc:
+        print(f"--  CloseAllDocuments skipped ({exc})")
+
+
 def main() -> int:
     if "--clean" in sys.argv[1:]:
+        close_solidworks_documents()
         for sub in ("sldprt", "sldasm", "png"):
             target = CAD_OUT / sub
             if target.exists():
