@@ -379,14 +379,22 @@ async def add_spring_end_hooks(
         added = await _volume() - before
         # Upper bound 1%: planar-path Pappus is exact analytically, but the
         # mass-properties integrator came back +0.34% on the top hook live.
-        if not (v_hook - max_overlap <= added <= 1.01 * v_hook):
+        # `added` is a difference of two whole-part reads, so the helix
+        # body's re-tessellation wobble leaks in -- +0.017% of a 14k mm^3
+        # coil (counter spring) is +2.4 mm^3 on a 166 mm^3 hook. Slack at
+        # 0.03% of the pre-hook volume covers it with 2x margin while
+        # staying far below a real shape error (~10% of the hook).
+        slack = 0.0003 * before
+        if not (v_hook - max_overlap - slack <= added <= 1.01 * v_hook + slack):
             raise RuntimeError(
                 f"{label} hook: added {added:.2f} mm^3, expected "
-                f"{v_hook:.2f} (junction overlap allowance {max_overlap:.2f})"
+                f"{v_hook:.2f} (overlap allowance {max_overlap:.2f}, "
+                f"tessellation slack {slack:.2f})"
             )
         print(
             f"  OK  {label} hook: added {added:.2f} mm^3 "
-            f"(Pappus {v_hook:.2f}, overlap allowance {max_overlap:.2f})"
+            f"(Pappus {v_hook:.2f}, overlap allowance {max_overlap:.2f}, "
+            f"slack {slack:.2f})"
         )
 
 
