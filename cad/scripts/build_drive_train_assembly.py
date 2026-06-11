@@ -74,7 +74,18 @@ GEAR64_OFFSET = 8.5  # 64T centre toward the pivot from T120: (7 + 10)/2
 X_64 = X_T120 + GEAR64_OFFSET * SIN_I  # 58.48
 Z_64 = Z_T120 - GEAR64_OFFSET * COS_I  # -75.10
 X_CRANK = X_64 + 63.5 + 0.3  # DP16 64T+16T centres + skew-mesh backlash
-X_DRUM = X_T120 - 101.6  # -46.0: DP30 120T+120T centres at the big end
+
+# Drum backlash: a STRAIGHT cone meshing a straight drum cannot hit ideal
+# centre distance at every station -- the tilted small gears engage
+# 0.15 mm/station deeper than the big end (their plan-projected radius
+# shrinks by cos19.8 while the x-step stays 2.54), so ideal distance at
+# the big end leaves the last six stations interfering by up to ~0.5 mm
+# (measured live: 2.7 mm^3 tooth overlap at T012). Backing the drum off
+# 1.0 mm clears the small end and widens the big-end gap to ~2.4 mm --
+# the book notes exactly this: "engagement ... at an oblique angle
+# (partial engagement, distinct wear)" (ch. 12).
+DRUM_BACKLASH = 1.0
+X_DRUM = X_T120 - 101.6 - DRUM_BACKLASH  # -47.0
 
 # Cone shaft: pivot end at seat station -28.75 from the T120 centre
 # (25 journal + half of the first 7.5 seat -- build_cone_gear_shaft.py).
