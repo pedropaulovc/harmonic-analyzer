@@ -29,7 +29,6 @@ REPO = COMP.parent
 MANIFEST = COMP / "manifest.json"
 SCORES = COMP / "scores.json"
 
-WHITE_THRESH = 235  # render background knock-out
 PANEL_H = 1000
 
 
@@ -58,6 +57,10 @@ def prepare_reference(pair: dict, max_px: int = 1600) -> Path:
     out.parent.mkdir(parents=True, exist_ok=True)
     img = Image.open(src)
     img = ImageOps.exif_transpose(img)
+    if pair["reference"].get("mirror"):
+        # e.g. the book's ch30 eight-views pages are printed mirrored
+        # (verified against first-party photogrammetry: crank front-right).
+        img = img.transpose(Image.FLIP_LEFT_RIGHT)
     rot = pair["reference"].get("rotate_deg", 0)
     if rot:
         img = img.rotate(-rot, expand=True, fillcolor="white")
@@ -75,34 +78,52 @@ def _fit_height(img: Image.Image, h: int) -> Image.Image:
     return img.resize((w, h), Image.LANCZOS)
 
 
-def _trim_uniform_border(img: Image.Image, tol: int = 12) -> Image.Image:
-    """Crop the render's uniform background margin (zoom-to-fit underfills)."""
-    from PIL import ImageChops
+def _content_mask(img: Image.Image, thresh: int = 30) -> Image.Image:
+    """255 where render content, 0 where viewport background.
+
+    SolidWorks captures sit on a vertical-gradient background, so a plain
+    corner-colour test fails; flood-filling from the corners follows the
+    gradient and stops at content edges.
+    """
+    from PIL import ImageChops, ImageDraw
 
     rgb = img.convert("RGB")
-    bg = Image.new("RGB", rgb.size, rgb.getpixel((0, 0)))
-    bbox = ImageChops.difference(rgb, bg).convert("L").point(
-        lambda v: 255 if v > tol else 0
-    ).getbbox()
+    sentinel = (255, 0, 255)
+    w, h = rgb.size
+    for xy in ((0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)):
+        if rgb.getpixel(xy) != sentinel:
+            ImageDraw.floodfill(rgb, xy, sentinel, thresh=thresh)
+    bg = Image.new("RGB", rgb.size, sentinel)
+    return ImageChops.difference(rgb, bg).convert("L").point(lambda v: 255 if v else 0)
+
+
+def _trim_uniform_border(img: Image.Image) -> Image.Image:
+    """Crop the render's background margin (zoom-to-fit underfills)."""
+    bbox = _content_mask(img).getbbox()
     return img.crop(bbox) if bbox else img
 
 
 def _fitted_render(pair_id: str, ref_size: tuple[int, int], align: dict | None):
-    """Trimmed render scaled to fit the ref frame + its paste offset.
+    """Content-trimmed render scaled to fit the ref frame.
 
-    The capture fills only part of the viewport (zoom-to-fit margins), while
-    references mostly fill their frame — so content-fit first, then apply the
-    manifest's 2D fine-alignment (scale about centre + pixel offset).
+    Returns (render RGB, content mask, paste offset). The capture fills only
+    part of the viewport (zoom-to-fit margins), while references mostly fill
+    their frame — so content-fit first, then apply the manifest's 2D
+    fine-alignment (scale about centre + pixel offset).
     """
     align = align or {}
-    ren = _trim_uniform_border(Image.open(pair_paths(pair_id)["render"]))
+    ren = Image.open(pair_paths(pair_id)["render"])
+    mask = _content_mask(ren)
+    bbox = mask.getbbox() or (0, 0, ren.width, ren.height)
+    ren, mask = ren.crop(bbox), mask.crop(bbox)
     rw, rh = ref_size
     s = min(rw / ren.width, rh / ren.height) * align.get("scale", 1.0)
     w, h = max(1, round(ren.width * s)), max(1, round(ren.height * s))
     ren = ren.resize((w, h), Image.LANCZOS)
+    mask = mask.resize((w, h), Image.NEAREST)
     dx = align.get("dx_px", 0) + (rw - w) // 2
     dy = align.get("dy_px", 0) + (rh - h) // 2
-    return ren, (dx, dy)
+    return ren, mask, (dx, dy)
 
 
 def side_by_side(pair_id: str) -> Path:
@@ -121,27 +142,21 @@ def side_by_side(pair_id: str) -> Path:
     return p["sbs"]
 
 
-def _render_rgba(render: Image.Image) -> Image.Image:
-    """Red-tint the render and knock out its near-white background."""
+def _render_rgba(render: Image.Image, mask: Image.Image) -> Image.Image:
+    """Red-tint the render; alpha comes from the content mask."""
     g = render.convert("L")
-    rgba = Image.merge(
+    return Image.merge(
         "RGBA",
-        (
-            g.point(lambda v: 255),                       # R
-            g,                                            # G
-            g,                                            # B
-            g.point(lambda v: 0 if v >= WHITE_THRESH else 230),  # A
-        ),
+        (g.point(lambda v: 255), g, g, mask.point(lambda v: 230 if v else 0)),
     )
-    return rgba
 
 
 def blend_overlay(pair_id: str, align: dict | None) -> Path:
     p = pair_paths(pair_id)
     ref = Image.open(p["ref"]).convert("L").convert("RGB")
-    ren, offset = _fitted_render(pair_id, ref.size, align)
+    ren, mask, offset = _fitted_render(pair_id, ref.size, align)
     layer = Image.new("RGBA", ref.size, (0, 0, 0, 0))
-    layer.paste(_render_rgba(ren), offset)
+    layer.paste(_render_rgba(ren, mask), offset)
     out = Image.alpha_composite(ref.convert("RGBA"), layer).convert("RGB")
     p["blend"].parent.mkdir(parents=True, exist_ok=True)
     out.save(p["blend"], **JPEG_OPTS)
@@ -153,13 +168,14 @@ def score_pair(pair_id: str, align: dict | None) -> float:
     only meaningful as a trend per pair across iterations."""
     p = pair_paths(pair_id)
     ref = Image.open(p["ref"]).convert("L")
-    ren, offset = _fitted_render(pair_id, ref.size, align)
-    ren = ren.convert("L")
-    canvas = Image.new("L", ref.size, 255)
-    canvas.paste(ren, offset)
+    ren, mask, offset = _fitted_render(pair_id, ref.size, align)
+    canvas = Image.new("L", ref.size, 0)
+    canvas.paste(ren.convert("L"), offset)
+    mcanvas = Image.new("L", ref.size, 0)
+    mcanvas.paste(mask, offset)
     total = n = 0
-    for rv, cv in zip(ref.getdata(), canvas.getdata(), strict=True):
-        if cv < WHITE_THRESH:  # render content only
+    for rv, cv, mv in zip(ref.getdata(), canvas.getdata(), mcanvas.getdata(), strict=True):
+        if mv:  # render content only
             d = rv - cv
             total += d * d
             n += 1

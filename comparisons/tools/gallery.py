@@ -38,6 +38,7 @@ h2 { padding: .4em 1em 0; margin: .6em 0 0; color: #cdc; font-size: 1em; }
 .imgs .lbl { font-size: .7em; color: #888; }
 .meta { width: 21em; flex: none; font-size: .8em; line-height: 1.5; }
 .meta .id { font-weight: 600; color: #fff; word-break: break-all; }
+.meta .tier { background: #354; color: #cfc; border-radius: 3px; padding: 0 .4em; font-weight: 600; }
 .meta .cam { color: #8ab; }
 .meta .score { color: #c96; }
 .meta .status-rough { color: #b85; } .meta .status-aligned { color: #8b5; }
@@ -82,11 +83,13 @@ def pair_row(pair: dict, score) -> str:
         campart.append(f"zoom {cam['zoom']:g}")
     if cam.get("frame_components"):
         campart.append("framed: " + ", ".join(cam["frame_components"][:4]))
-    text = " ".join([pid, pair["model"], pair["reference"].get("source", ""),
+    tier = f"p{pair.get('tier', 9)}"
+    text = " ".join([pid, tier, pair["model"], pair["reference"].get("source", ""),
                      pair.get("notes", ""), pair.get("status", "")]).lower()
     meta = [
         f'<div class="id">{html.escape(pid)}</div>',
-        f'<div>{html.escape(pair["reference"].get("source", ""))}</div>',
+        f'<div><span class="tier">{tier}</span> · '
+        f'{html.escape(pair["reference"].get("source", ""))}</div>',
         f'<div class="cam">{html.escape(" | ".join(campart))}</div>',
         f'<div><span class="score">score {score if score is not None else "—"}</span>'
         f' · <span class="status-{pair.get("status", "rough")}">{pair.get("status", "rough")}</span></div>',
@@ -115,8 +118,9 @@ def main() -> int:
 
     sections = []
     for model in sorted(by_model):
-        rows = "".join(pair_row(p, scores.get(p["id"])) for p in by_model[model])
-        sections.append(f'<h2 id="{model}">{model} ({len(by_model[model])})</h2>{rows}')
+        pairs = sorted(by_model[model], key=lambda p: (p.get("tier", 9), p["id"]))
+        rows = "".join(pair_row(p, scores.get(p["id"])) for p in pairs)
+        sections.append(f'<h2 id="{model}">{model} ({len(pairs)})</h2>{rows}')
 
     nav = " · ".join(f'<a href="#{m}" style="color:#8ab">{m}</a>' for m in sorted(by_model))
     OUT.write_text(
