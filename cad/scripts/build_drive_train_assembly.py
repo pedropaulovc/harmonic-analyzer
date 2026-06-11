@@ -48,16 +48,17 @@ The engagement is intentionally PARTIAL ("oblique angle ... partial
 engagement, distinct wear", ch. 12): the contact tooth crosses the
 3 mm drum face obliquely, penetration varying +-1.5*tan(i) = 0.58
 about its centre value; X_PITCH backs the cone off so the DEEPEST
-crossing point stays 0.15 short of the DP 30 working depth -> tip
-interleave 0.39..1.54 across each drum face, identical at ALL 20
-stations (zero drift, T006 included). Stub-gap caps hold without any
-per-gear relief: the drum tips dive at most 0.64 into a cone gap vs
-the shallowest (T006) stub cap 0.88. The 16T crank pinion mesh gets
-the same treatment: the perpendicular 64T presents its contact tooth
-50.8*sin(i) = 18.3 north of its centre, the pinion is centred on that
-plane, and X_CRANK backs off so the +-5 mm oblique dive across the 64T
-face caps 0.15 short of the DP 16 working depth (the 16T/64T stub gaps
-clear by 0.5+ at that depth).
+crossing point stays clear of the DP 30 working depth (edge slack
+checker-arbitrated, see PEN_EDGE_SLACK) -> tip interleave 0.19..1.34
+across each drum face, identical at ALL 20 stations (zero drift, T006
+included). Stub-gap caps hold without any per-gear relief: the drum
+tips dive at most 0.44 into a cone gap vs the shallowest (T006) stub
+cap 0.88. The 16T crank pinion mesh gets the same treatment: the
+perpendicular 64T presents its contact tooth 50.8*sin(i) = 18.3 north
+of its centre, the pinion is centred on that plane, and X_CRANK backs
+off so the +-1.8 oblique dive across the 64T face caps clear of the
+DP 16 working depth (PEN16_EDGE_SLACK; the deep south side stays
+visibly interleaved at 2.6 of 3.2).
 
 Positions per cad/DIMENSIONS.md ch. 13 "Drive-train layout" + "Drive
 supports". Tooth phasing: every gear script seeds a TOOTH centred on
@@ -127,11 +128,14 @@ PINION_FACE = 12.0
 # Mesh anchor: X_PITCH is every cone gear's pitch-section x at the
 # contact azimuth. The oblique crossing dives (DRUM_FACE/2)*tan(i) past
 # the mid-face penetration, so the mid value is capped at working depth
-# minus the dive minus 0.15 slack -> tip interleave 0.39..1.54.
+# minus the dive minus the edge slack -> tip interleave 0.19..1.34.
+# Slack 0.35 is checker-arbitrated: the oblique crossing distorts the
+# flank match beyond plain backlash math -- 0.15 left <=0.06 mm^3 flank
+# slivers at the five smallest stations (T036..T006).
 DRUM_TIP_X = X_DRUM + (122.0 / DP_TRAIN) * 25.4 / 2.0  # 4.147
-PEN_EDGE_SLACK = 0.15
-PEN_MID = WORKING_DEPTH - PEN_EDGE_SLACK - (DRUM_FACE / 2.0) * TAN_I  # 0.965
-X_PITCH = DRUM_TIP_X + ADDENDUM * SEC_I - PEN_MID  # 4.090
+PEN_EDGE_SLACK = 0.35
+PEN_MID = WORKING_DEPTH - PEN_EDGE_SLACK - (DRUM_FACE / 2.0) * TAN_I  # 0.765
+X_PITCH = DRUM_TIP_X + ADDENDUM * SEC_I - PEN_MID  # 4.290
 
 
 def cone_seat(j: int) -> tuple[float, float]:
@@ -174,14 +178,17 @@ R64 = 2.0 * 25.4  # DP 16, 64T pitch radius
 
 # Crank: the 64T's contact tooth (azimuth 0, toward +x) sits R64*sin(i)
 # north of its centre; the pinion is centred on that plane and the mesh
-# backs off so the +-5 oblique dive caps 0.15 short of working depth.
+# backs off so the +-5 oblique dive caps short of working depth. Slack
+# 0.60 is checker-arbitrated like the drum mesh's (the long +-1.8 dive
+# across the 64T face squeezes flanks: 0.15 left 1.48 mm^3).
 ADD16 = 25.4 / 16.0
 WORK16 = 2.0 * ADD16  # 3.175
-PEN16_MID = WORK16 - PEN_EDGE_SLACK - (GEAR64_FACE / 2.0) * SIN_I  # 1.225
+PEN16_EDGE_SLACK = 0.60
+PEN16_MID = WORK16 - PEN16_EDGE_SLACK - (GEAR64_FACE / 2.0) * SIN_I  # 0.775
 PINION_TOOTH_Z = GEAR64_SEAT[2] + R64 * SIN_I  # -38.32
 X_CRANK = (
     GEAR64_SEAT[0] + R64 * COS_I + 12.7 + (ADD16 * (1.0 + SEC_I) - PEN16_MID)
-)  # 116.65 -- photo: pedestal 122 +- 3 (1.8 sigma, see DIMENSIONS.md)
+)  # 117.30 -- photo: pedestal 122 +- 3 (1.6 sigma, see DIMENSIONS.md)
 
 ARBOR_LENGTH = 200.0  # spans z -100..+100
 CRANKSHAFT_Z0 = -150.0  # front end; crank-arm hub at +12 (PIN_HOLE_HEIGHT)
