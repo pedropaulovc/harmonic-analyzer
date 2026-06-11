@@ -104,17 +104,17 @@ arm with fiducial indentations for alignment; tapered pin affixes crank to shaft
 
 | dim | value | (in) | source | method | confidence |
 |---|---|---|---|---|---|
-| Gear face width | 7 mm | 0.276 | photo callout p.18 | annotated | high |
-| Cone set axial length | 150 mm | 5.91 | photo callout p.18 | annotated | high |
+| Gear face width | 7 mm annotated; modeled 6.5 | 0.276 | photo callout p.18; M6.7: the exact-tracking seat pitch 6.584 (see Axial gear pitch row) cannot carry 7 mm faces (0.42 overlap) — the annotated 7/7.5/150 trio is mutually inconsistent with the frame-locked drum grid, which wins | annotated (callout), derived (modeled) | high/med |
+| Cone set axial length | 150 mm | 5.91 | photo callout p.18; M6.7 reconciliation: gear stack 19 × 6.584 + 6.5 ≈ 131.6 + 64T face 10 + air ≈ 145 — the arrow plausibly spans gears + 64T | annotated | high |
 | Gear count | 20 | — | text p.16 | stated | high |
 | Tooth counts | 6, 12, 18 … 120 (step 6) | — | text p.16 | stated | high |
 | Crank→cone reduction | 4:1 (1 crank turn = 1/4 cone turn) | — | text p.16 | stated | high |
-| Axial gear pitch | 7.5 mm | 0.295 | 150 mm / 20 gears (leaves 0.5 mm gap at 7 mm face) | derived | med |
+| Axial gear pitch | 7.5 mm annotated lineage; modeled 6.584 along the shaft | 0.295 | 150 mm / 20 gears gave 7.5, whose Z-projection 7.0568 became the frame-locked drum grid (gates, channels — Appendix C #3); M6.7 exact tracking then fixes the along-shaft seat pitch at 7.0568 × cos 21.1° = 6.5839 (the drum grid is the survivor, the 7.5 annotation only its lineage) | derived | med |
 | Diametral pitch / module | DP 30 (m = 0.8467 mm) | — | M4 prep, two independent measurements converge (see Appendix C #1 — resolved): p.18 photo tooth pitch 2.69 mm via 7 mm-callout scale; largest-gear OD ≈ 105 ± 5 mm via 150 mm-arrow scale (DP 30 → 103.3). Gives round-inch PDs: largest cone / cylinder gear PD = 120/30 = 4.000", pinion PD = 1.400" | scaled ×2 + period argument | high |
 | Pressure angle | 14.5° assumed | — | period-typical; not stated anywhere | derived | low |
-| Cone shaft length | ~225 mm | ~8.9 | derived: 150 stack + small-end pinion seat ~15 + bearing post ~35 (p.18 top-down) + large-end pivot journal ~25 | derived | low |
-| Cone shaft diameter | stepped: 9.5 (3/8") y 0–150.5, 6.35 (1/4") to 158.6, 2.03 (0.08") to 225 (large/pivot end at y 0) | 0.375/0.25/0.08 | base dia legacy `parameters.kcl` ShaftDiameter; p.18 shows a visibly thin rod past the smallest gears. M6.6: steps end shy of the nominal 25 + k·7.5 seat boundaries so each section's surface stays out of the next CANTED gear's vertical slab, and the tip is turned below the photo-suggested 1/8" — the inclined shaft line passes only 1.30 mm outside the 120T tip circle at the last drum gear's face, so a 1/8" rod would rub those tooth tips (0.08" clears by 0.22) — `build_cone_gear_shaft.py` | legacy + derived | med |
-| Gear bores (configured `BoreDia`) | computed per config by `bore_dia_in` (M6.6 canted seats): 13.1–14.0 (0.517–0.551") T024–T120; 10.8 (0.424") T018; 6.35 (0.25") T012; 2.03 (0.08", snug) T006; no keyway | — | Appendix C #7 + M6.6: a canted gear's bore must clear the inclined shaft's ELLIPTICAL constant-z cross-section (semi-axis r/cos 19.8°, not r) across the 7 mm slab, plus the shaft-axis walk (face/2 · tan 19.8°), plus the assembly's stub-gap mesh relief (≤ 0.58 at T012), plus 0.25 margin; p.21 macro shows solder blobs fixing the small gears — sloppy fits are period-authentic, no keyway evidence anywhere | derived | med |
+| Cone shaft length | 190 mm | 7.5 | M6.7: pivot journal 25 + stack 19 × 6.584 + 6.5 ≈ 131.6 + thin-tip journal through the knob post at station 177 | derived | low |
+| Cone shaft diameter | stepped: 9.5 (3/8") z 0–136.88, 6.35 (1/4") to 143.47, 4.76 (3/16") to 150.05, 3.18 (1/8") to 190 (large/pivot end at z 0) | 0.375/0.25/0.1875/0.125 | base dia legacy `parameters.kcl` ShaftDiameter; p.18 shows a visibly thin rod past the smallest gears. M6.7: each step station lands in the 0.08 mm air gap between adjacent gear faces (seats at 28.25 + 6.584j ± 3.25); the M6.7 shaft line passes 0.39 clear of the last drum gear's tooth tips, so the photo-true 1/8" tip needs no narrowing — `build_cone_gear_shaft.py` | legacy + derived | med |
+| Gear bores (configured `BoreDia`) | snug on the stepped shaft (M6.7 perpendicular seats): 9.5 (3/8") T024–T120; 6.35 (1/4") T018; 4.76 (3/16") T012; 3.18 (1/8") T006; no keyway | — | Appendix C #7: bore = shaft section at the seat (perpendicular gears need no ellipse margin — the M6.6 canted clearance terms are retired with the canted seats); p.21 macro shows solder blobs fixing the small gears — no keyway evidence anywhere | derived | med |
 | Crank-drive gear (dark steel gear at the large end, "This gear engages the crank" p.20) | coarser pitch than DP 30, est. DP 16: ~64T, PD 4" (OD ≈ cone 120T's); mates a ~16T crank pinion (4:1) | — | p.20 annotation + visibly ~1.5–2× coarser teeth than the 120T beside it; tooth counts NOT countable in available photos — est. from the stated 4:1 + round-PD argument (see Appendix C #9) | scaled | low |
 
 Notes: all 20 gears fixed to one shaft, rotate together. Engagement with cylinder
@@ -139,7 +139,7 @@ drive component — Appendix C #9.
 | Tooth count | 120 (each gear) | — | derived from gear law k/80 (ch.29) + 4:1 + cone teeth 6k — see ch.6/26/29 section | derived | high |
 | Alignment notch depth | 3 mm | 0.118 | text p.22 (also pp. 66–67) | stated | high |
 | Gear material | brass (polished) | — | text p.22 | stated | high |
-| Axial pitch | 7.5 mm | 0.295 | must match cone-set axial pitch (ch. 12); M6 cross-check: rocker-arm end-view pitch measures the same 7.5 (ch. 14 note) | derived | high |
+| Axial pitch (z) | 7.0568 mm | 0.278 | frame-locked drum grid = the cone-set 7.5 annotation's Z-projection (Appendix C #3); M6 cross-check: rocker-arm end-view pitch measures ≈ 7.5 within photo error (ch. 14 note) | derived | high |
 | Gear face width | 3.0 mm | 0.118 | M6 (Appendix C #6): p.22 stack macro face/pitch = 190/497 px ≈ 0.38 × 7.5 axial pitch ≈ 2.9, rounded 3.0 (the ch. 12 "7 mm" callout is the CONE gear face; the cylinder sandwich must also fit cam + rod ring) | scaled | med |
 | Gear outer diameter | 103.3 mm (4.067") | 4.067 | (120+2)/DP30; PD = 4.000" exactly (module closed — ch. 12 row) | derived | high |
 | Cam diameter (integral cam per gear) | 50.8 mm (2.0") | 2.0 | legacy `parameters.kcl`; M2 check: p.25 printed outline measures cam OD ≈ 0.52 × cylinder-gear OD → 0.52 × 103.3 = 53.7 vs legacy 50.8 (5% — within the outline-measurement error); keep the legacy round 2.0" | legacy + scaled ratio | med |
@@ -188,13 +188,14 @@ toward the horizon (e.g. the crank pedestal at x +122.3 reads at ratio
 |---|---|---|---|
 | Drive height (cylinder arbor AND cone big-end axis) | y = 76 above base top | crank-arm pivot + cone big-end brass blob, front view; side-view cone midline near-level confirms equal heights | med |
 | Mesh offset direction | horizontal (plan), cone beside drum | ch. 12 p.18 top-down: cone converges on the drum toward the small end; side view cone midline ≈ level | high |
-| Cone plan incline | 19.8° = arcsin(2.54/7.5), converging +X→−X toward the drum | mesh condition (appendix C #3) | high |
-| Cone big-end axis (T120 station) | (x, z) = (+54.25, −67.1) | M6.6: x_T120 = drum x −47.5 + 101.6 (exact DP 30 centre distance, 4.000" + 4.000" PDs halved) + 0.15 mesh backlash — the canted-vertical seats (below) mesh EVERY station exactly, retiring the 1.5 mm drum-backlash compromise that put T120 at 55.6; photo blob at +55 ± 5 still agrees; z = −19/2 × 7.06 (stack centered between gates) | med |
-| 64T drive gear | centre (x, z) = (+57.4, −75.85): seat 8.75 mm south of T120 along the shaft, gear CANTED VERTICAL (disc square to the crank pinion) | p.20 (directly beside the 120T); z packing: 0.25 air to the T120 south face and 0.25 to the sprocket | med |
-| Cone gear j (j = 0 big … 19 small) | x_j = 54.25 − 2.54j (+ stub-gap mesh relief ≤ 0.58 from T054 down), z_j = −67.1 + 7.06j, y = 76; gears seated CANTED VERTICAL (disc square to the drum — only the shaft inclines 19.8°); T006 (below minimum tooth count, cannot mesh) parked perpendicular at shaft station 178, north of its drum gear | mesh + stack grid; M6.6: a perpendicular seat loses cos 19.8° of projected radius (3 mm at T120 vs the 1.69 mm working depth) and offsets contact by r·sin 19.8° in z — geometrically unable to mesh, hence the canted display-state seats (`build_drive_train_assembly.py` docstring) | med |
-| Cylinder arbor (stationary) | x = −47.5 (frame-locked: rocker-support boss bore + arbor pedestal), y = 76, along Z | the cone grid is derived FROM the drum at the exact DP 30 centre distance (M6.6); the book's "oblique partial engagement, distinct wear" (ch. 12) records how the real perpendicular-seated train coped, which rigid CAD cannot. Vertical connecting rods reach rocker tips only for x_cyl ≥ −100 ✓ | med |
-| Cylinder gear j | z_j = −67.1 + 7.06j (same stations as cone gear j) | mesh plane alignment | high |
-| Crankshaft | along Z at (x, y) = (+122.25, 76) = 64T x 57.4 + 63.5 + 1.35 stub-gap backoff (16T DP 16 gaps are 1.99 mm deep vs the 3.18 mm working depth); green cylindrical pedestal at front-right; arm + chain sprocket at front end, 16T pinion at back end overlapping the vertical 64T's back half (5 mm engaged band) | front view pedestal at +122 ± 3; crank-to-cone distance 67 ± 5 measured ≈ 63.5 required ✓ ratifies appendix C #9 pair | med |
+| Cone plan incline | 21.0976° = arcsin(2.54/7.0568), converging +X→−X toward the drum | M6.7 exact-tracking mesh condition (appendix C #3): the radius step tracks per DRUM z-pitch, not per along-shaft station — arcsin(2.54/7.5) = 19.8° was the wrong leg of the triangle (0.44/station z-drift, 0.15/station radial error: "most gears not meshing") | high |
+| Cone mesh grid (X_PITCH) | every cone gear's pitch section crosses x = 4.090 at the contact azimuth: X_PITCH = drum tip x 4.147 + addendum·sec 21.1° − mid-face penetration 0.965 | M6.7 oblique partial engagement (book ch. 12 "partial engagement, distinct wear"): the contact tooth crosses the 3 mm drum face obliquely, penetration varying ±1.5·tan 21.1° = ±0.58 about mid; deepest point capped 0.15 short of the DP 30 working depth 1.693 → tip interleave 0.39..1.54, identical at all 20 stations, T006 included | med |
+| Cone big-end (T120) gear centre | (x, z) = (+51.49, −48.82) = (X_PITCH + 50.8 cos i, drum plane −67.1 + 50.8 sin i) | M6.7: a perpendicular gear's contact tooth sits r·sin i along-shaft south of its centre, so each centre rides r_j·sin i NORTH of its drum plane; photo blob at +55 ± 5 still agrees in x | med |
+| 64T drive gear | perpendicular on the 3/8" pivot journal at shaft station 19.9, centre (x, z) = (+54.49, −56.61), 0.1 air to the T120 south face | p.20 (directly beside the 120T); its contact tooth (toward the crank) sits 50.8·sin i = 18.3 north of centre at z = −38.32 | med |
+| Cone gear j (j = 0 big … 19 small) | shaft seat station 28.25 + 6.584j; centre x_j = 4.090 + (50.8 − 2.54j)·cos i, z_j = −67.1 + 7.0568j + (50.8 − 2.54j)·sin i, y = 76; ALL 20 perpendicular to the shaft (true cone, p.18) | M6.7 exact tracking: the 20 mesh-derived centres are collinear iff sin i = 2.54/7.0568 (asserted in `build_drive_train_assembly.py`); elegance check: tan(cone half-angle) = 2.54/6.584 = tan i, so the drum-side generator runs parallel to the drum axis — the p.18 seam | med |
+| Cylinder arbor (stationary) | x = −47.5 (frame-locked: rocker-support boss bore + arbor pedestal), y = 76, along Z | the cone grid is derived FROM the drum (X_PITCH + exact tracking); the book's "oblique partial engagement, distinct wear" (ch. 12) is now modeled literally (M6.7). Vertical connecting rods reach rocker tips only for x_cyl ≥ −100 ✓ | med |
+| Cylinder gear j | z_j = −67.1 + 7.0568j (cone gear j's contact tooth lands in this plane; the cone CENTRES sit r_j·sin i north of it) | mesh plane alignment | high |
+| Crankshaft | along Z at (x, y) = (+116.65, 76) = 64T contact x (54.49 + 50.8 cos i) + 63.5 DP 16 centre distance + 2.06 oblique backoff (pinion centred on the 64T contact-tooth plane z −38.32; ±5 mm dive across the 64T face capped 0.15 short of the 3.18 working depth); green cylindrical pedestal at front-right; arm + chain sprocket at front end, 16T pinion inboard | front view pedestal at +122 ± 3 (M6.7 x within 1.8σ); crank-to-cone distance 67 ± 5 measured ≈ 63.5 required ✓ ratifies appendix C #9 pair | med |
 | Chain run | crank sprocket (+122, 76) up to the translational-gearing sprocket at the third A-frame apex (x ≈ −7 ≈ 0, centered) | front view; transgear disc center measured x = −7 | med |
 | Cone pivot | at the big end, front (black bracket, p.18 "pivot" label); small end carried by the green knob post — swing is horizontal (out of mesh) | p.18 + ch. 12 notes | high |
 
@@ -202,10 +203,10 @@ toward the horizon (e.g. the crank pedestal at x +122.3 reads at ratio
 
 | part | dims | position (x, z), bore y = 76 | source | confidence |
 |---|---|---|---|---|
-| `crank-pedestal` | green cylinder Ø46 × 110 tall, Ø9.5 bore along Z | (+122.3, −108) | front view: centre +123 ± 3, Ø 278 px / 6.02 px/mm, top ~110 above base top; z: standing inside the base front edge (−133.35), shaft stations in front | low/med |
+| `crank-pedestal` | green cylinder Ø46 × 110 tall, Ø9.5 bore along Z | (+116.65, −108.6) | front view: centre +123 ± 3 (M6.7 mesh-derived x within 1.8σ — crankshaft row), Ø 278 px / 6.02 px/mm, top ~110 above base top; z: standing inside the base front edge (−133.35), shaft stations in front | low/med |
 | `arbor-pedestal` ×1 (M6.5) | green block 24 × 16 × 85, Ø9.5 clamp bore along Z | (−47.5, −92) south only — arbor 200 long spans z ±100, stack ends ±70.6; the NORTH end clamps into the rocker-support frustum's east-flank boss bore (Ø9.7 at local (+25.4, 76) = machine (−47.5, 126.8), boss Ø20 face at z 74.1) — calibrated v3 side view shows no north pedestal, the arbor disappears into the frustum flank | function-driven; v3 side view (6.124 px/mm) | low/med |
-| `cone-pivot-post` | black steel block 25 × 20 × 85, Ø9.5 journal bore (rotated 19.8° in plan with the cone axis) | (+64.3, −95.1) = shaft station −1 from the pivot end: the shaft engages the first 9 mm of the bore and ends inside (blind-bearing look — p.18 shows the shaft end disappearing into the bracket); M6.6: at station 4 the rotated block's corner (reach ±13.64 in z) cut 4 mm into the canted 64T, at −1 it stops 0.60 clear | p.18 "pivot" bracket; journal length from the cone-shaft row (~25) | low |
-| `cone-knob-post` | green round post Ø32 × 80, upward-open U-slot 2.4 wide, floor at 74.98 (resting 0.08" tip centre 76) | (−3.7, +94.0) = shaft station 200 from the pivot end (thin-tip journal) | p.18 top-down: green post Ø ~72 px / 2.23 px/mm (largest-cone-gear-OD scale); view 5/8 ball-knob at x ≈ −20 ± 15 agrees within error; slot resized for the M6.6 0.08" tip | low |
+| `cone-pivot-post` | black steel block 25 × 20 × 85, Ø9.5 journal bore (rotated 21.1° in plan with the cone axis) | (+62.0, −76.1) = shaft station −1 from the pivot end: the shaft engages the first 9 mm of the bore and ends inside (blind-bearing look — p.18 shows the shaft end disappearing into the bracket); the rotated block's z-reach 13.83 stops 1.0 clear of the perpendicular 64T's south face | p.18 "pivot" bracket; journal length from the cone-shaft row (~25) | low |
+| `cone-knob-post` | green round post Ø32 × 80, upward-open U-slot 3.5 wide, floor at 74.4 (resting 1/8" tip centre 76) | (−2.1, +90.0) = shaft station 177 from the pivot end (thin-tip journal) | p.18 top-down: green post Ø ~72 px / 2.23 px/mm (largest-cone-gear-OD scale); view 5/8 ball-knob at x ≈ −20 ± 15 agrees within error | low |
 
 ### Connecting rods (ch. 13 pp. 22–25 + ch. 14 p. 29; 20 used)
 
@@ -642,21 +643,28 @@ re-measure during their M2 script build.
    width ≈ 20 px = the 2.5 mm arm plate (annotated p.27) → pitch ≈ 3.0 ×
    2.5 = 7.5 mm. Self-consistent: 20 ends × 60 px ≈ 1140 px of the 1512 px
    strip. The 16 mm candidate is refuted.
-   Z-projection refinement: every cone gear must mesh its cylinder gear
-   at center distance r_cone + 50.8 with the cylinder gears on one
-   common axis, so the axis-to-axis offset shrinks by the 2.54 mm
-   pitch-radius step per 7.5 mm shaft station: 7.5 sin θ = 2.54 → cone
-   shaft inclined θ = arcsin(2.54/7.5) = 19.8° (NOT atan = 18.7° — the
-   radius step is per station along the shaft, not per unit Z). The
+   Z-projection refinement (M6.7 supersedes the M6.2/M6.6 readings):
+   the 7.5 annotation's Z-projection 7.5 × cos(arcsin(2.54/7.5)) =
+   7.0568 mm is the FRAME-LOCKED drum/channel grid — stack spans
+   19 × 7.0568 ≈ 134.1 mm, ~2.8 mm air per side inside the gates'
+   139.7 mm clear span (inner faces at Z = ±69.85). The cone-shaft
+   incline then follows from exact tracking of perpendicular-seated
+   gears (true cone, p.18): a gear square to the shaft contacts the
+   parallel-axis drum via the tooth at the drum-facing azimuth, which
+   sits r·sin θ along-shaft south of the gear centre, so the 20 mesh
+   centres are collinear iff the radius step tracks per DRUM pitch:
+   7.0568 sin θ = 2.54 → θ = arcsin(2.54/7.0568) = 21.0976° (the
+   earlier arcsin(2.54/7.5) = 19.8° put the tracking on the wrong leg
+   of the triangle — 0.44 mm/station z-drift, "most gears not
+   meshing"; atan = 18.7° was doubly wrong). Along-shaft seat pitch
+   7.0568 × cos θ = 6.5839 (forces the 6.5 face, ch. 12 rows). The
    incline lies in the HORIZONTAL plane: the cone sits beside the drum
    at the same height and converges on it toward the small end (ch. 12
    p.18 top-down photo; the eight-views side view shows the cone
-   midline near-level) — see "Drive-train layout (M6.2)" in the ch. 13
-   section. Channel grid spacing along the machine depth is
-   7.5 × cos 19.8° = 7.06 mm; channel stack spans 19 × 7.06 ≈ 134.1 mm,
-   leaving ~2.8 mm air per side inside the gates' 139.7 mm clear span
-   (inner faces at Z = ±69.85). The big-end (T120) cone axis sits
-   exactly 101.6 mm beside the cylinder axis (50.8 + 50.8 mesh).
+   midline near-level) — see "Drive-train layout" in the ch. 13
+   section. Cross-check: tan(cone half-angle) = 2.54/6.5839 = tan θ,
+   so the cone's drum-side generator runs parallel to the drum axis —
+   exactly the p.18 seam.
 4. **Rocker arm working length** — RE-RESOLVED in M6.3 (supersedes the
    M2 100/70 model): symmetric ±88 about the pivot, rod pin at +25.4 —
    see the ch. 14 "Rocker pivot & supports layout" table. The M2 read
@@ -673,17 +681,18 @@ re-measure during their M2 script build.
    (0.5 air per side in the 4.5 gap) with the 3.0 rod ring riding the cam
    (0.25 axial clearance per side). Legacy 10.2 cam thickness refuted;
    `build_cylinder_gear.py` updated (face 7 → 3, cam 10.16 → 3.5). The
-   ch. 12 "7 mm" face callout stays valid for the CONE gears (pure gear
-   stack, 0.5 mm inter-face air at the same 7.5 pitch).
+   ch. 12 "7 mm" face callout applies to the CONE gears, trimmed to 6.5
+   in M6.7 by the 6.584 exact-tracking seat pitch (ch. 12 face row).
 7. **Small cone gears cannot carry the 9.5 mm shaft bore** (ch. 12) —
    **RESOLVED in M4c: configured bore + stepped shaft, no keyway.** At
    DP 30 the 6T gear's OD is 6.77 mm and the 12T root circle is 8.0 mm,
    both smaller than the 9.5 mm cone shaft. Resolution: the cone-gear
    part carries a configured `BoreDia` global computed by `bore_dia_in`
-   (M6.6 canted seats: ~0.52–0.55" T024–T120, 0.424" T018, 0.25" T012,
-   0.08" snug T006 — see the ch. 12 bore row for the clearance terms)
-   and the shaft (`build_cone_gear_shaft.py`)
-   steps 3/8 → 1/4 → 0.08" at stations 150.5/158.6 (ch. 12 rows). No
+   (snug on the shaft section at the seat: 3/8" T024–T120, 1/4" T018,
+   3/16" T012, 1/8" T006 — M6.7 perpendicular seats need no ellipse
+   margin) and the shaft (`build_cone_gear_shaft.py`)
+   steps 3/8 → 1/4 → 3/16 → 1/8" at stations 136.88/143.47/150.05
+   (each in the 0.08 air gap between gear faces, ch. 12 rows). No
    keyway anywhere: the book never shows the attachment and the p.21
    macro shows solder blobs at the small gears, so gears are modeled
    plain-bored (key/solder hardware out of scope). Implementation note:
