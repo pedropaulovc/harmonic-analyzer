@@ -5,10 +5,13 @@ up to 4x. Plain rod with domed (hemispherical) ends, clearly visible in
 the p.47 close-up. The sliding clamp block, vertical rod, thumb screw and
 output fixture are separate parts (build_magnifying_*.py).
 
-Dimensions: cad/DIMENSIONS.md "Chapter 20" — Ø6 photo-scaled (low);
-length from the 4x constraint: max magnification puts the vertical rod
-~300 mm from the summing-lever pivot against its ~76 mm effective spring
-arm (300/76 = 3.9), consistent with the p.46 inset proportions (low).
+Dimensions: cad/DIMENSIONS.md "Chapter 20" — Ø6 photo-scaled (low).
+M6.4 revision: the M2 "310 from the 4x constraint" length is REFUTED by
+the calibrated ch. 30 front view (p1): the rod spans x ~ -200..-35 at
+y ~982, i.e. ~165 long. Magnification comes from the ratio of the clamp
+radius (vertical-rod position along this rod, measured from the bracket
+collar near the summing-lever plate) to the summing lever's own ratio --
+the p.46/p.48 insets show the CLAMP sliding, not a 310 rod.
 
 Layout: rod axis along +X from the origin (tip of the pivot-end dome at
 x=0), profile revolved 360 deg about a centerline on the axis.
@@ -35,7 +38,8 @@ from _common import (
 PART_NAME = "magnifying-lever"
 MATERIAL = "Brass"  # see _common.apply_material docstring
 
-ROD_LENGTH = 310.0  # DIMENSIONS.md ch20: 4x-ratio constraint + p.46 inset (low)
+ROD_LENGTH = 165.0  # DIMENSIONS.md ch20: calibrated p1, x -200..-35 (med,
+# supersedes the 310 "4x" guess -- see docstring)
 ROD_DIA = 6.0  # DIMENSIONS.md ch20: round brass rod (low)
 
 R = ROD_DIA / 2.0
