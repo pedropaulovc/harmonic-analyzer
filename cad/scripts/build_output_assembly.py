@@ -19,7 +19,10 @@ z_j = -67.1 + 7.0565 j; the output side is -Z). 46 components:
   face-flush on the rails, platen-rack on its back (teeth down, meshing
   the rack pinion with 0.3 backlash and tooth-on-gap phasing), two
   platen-clips on the paper face.
-* Transgear group: a-frame + pinion-bar (y 253.5, z -105..-117),
+* Transgear group: a-frame (M6.5: its clevis grips the SOUTH PIVOT BALL
+  MOUNT from channel.SLDASM - the front stand doubles as the rocker-shaft
+  support; ball-mount seat at machine 228.6) + pinion-bar (y 253.5,
+  z -105..-117, x -58..+178: west end floats just east of the clevis),
   transgear-stub carrying rack-pinion (96T) + fixed transgear-pinion +
   latch big hub; the latch (at -20 deg, so the knob shaft clears the
   pinion bar) carries the knob shaft with the chain sprocket at the
@@ -48,8 +51,9 @@ Default-state notes / documented simplifications (Appendix C):
 * The knife-stay strap crosses the channel-lever plane east of the lever
   bank (x > -22); verified against channel.SLDASM geometry here, but the
   cross-assembly fit is re-checked at the top level (M6.5).
-* The pinion bar's east end is unsupported (the book's east column
-  bracket is not modeled; the A-frame holds the west end).
+* Both pinion-bar ends float: in the real machine the west end is
+  carried by the ball-mount housing at the A-frame clevis (ch. 30 front
+  view) and the east end by a column bracket; neither fitting is modeled.
 
 Fix-all strategy (M6.2): every component inserted at its exact final
 transform and fixed; transforms asserted by read-back; zero interference
@@ -194,7 +198,8 @@ SET_SCREW_POS = (-38.0, 413.0, -154.0)
 
 # --- loose hardware ----------------------------------------------------------
 STICK_POS = (-175.0, 53.8, -135.0)  # flat on the base, graduations up
-SPARE_GEAR_POS = (-150.0, 55.8, -93.0)  # T24 lying flat west of the A-frame
+SPARE_GEAR_POS = (-137.0, 55.8, -93.0)  # T24 lying flat: disc x -157.7..-116.3
+# clears the corner-bracket foot (to -160.5) and the a-frame plate (from -115)
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 ROT_Y_POS90 = [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]

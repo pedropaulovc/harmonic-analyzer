@@ -15,7 +15,8 @@ origin; base top face at y = 50.8, drive height 76 above it):
   resting in the green knob post's U-slot.
 * cylinder drum: 20 identical 120T gears spinning freely on the
   stationary arbor along Z at (-46.0, 126.8) (M6.2 keyway refutation),
-  clamped by the two arbor pedestals; notches up = cosine setup
+  clamped by the south arbor pedestal and (at the north end) the
+  rocker-arm-support's boss bore in frame.SLDASM; notches up = cosine setup
   (pp. 66-67).
 
 Positions per cad/DIMENSIONS.md ch. 13 "Drive-train layout" +
@@ -113,7 +114,8 @@ SPROCKET_Z0 = -81.0  # face 4.5: between pedestal (-85) and pinion (-75.1).
 # -134.5..-137.5 -- so the chain plane stays inboard at -81 and the
 # transgear sprocket matches it (documented discrepancy, Appendix C).
 PEDESTAL_Z = -108.0  # crank pedestal centre (front face inside base edge)
-ARBOR_PEDESTAL_Z = 92.0  # +/-: clamps at the arbor ends
+ARBOR_PEDESTAL_Z = 92.0  # south (-z) end only; north end clamps into the
+# rocker-arm-support boss bore at z 74.1..133 (frame.SLDASM, M6.5)
 PIVOT_POST_STATION = 4.0  # shaft station under the pivot post centre
 KNOB_POST_STATION = 200.0  # shaft station over the knob post centre
 
@@ -290,15 +292,18 @@ async def build(adapter) -> dict[str, str]:
         [0.0, 0.0, 0.0],
         IDENTITY,
     )
-    for sz in (-1.0, 1.0):
-        await _place(
-            adapter,
-            "arbor-pedestal",
-            [X_DRUM, Y_BASE_TOP, sz * ARBOR_PEDESTAL_Z],
-            [0.0, 0.0, 0.0],
-            IDENTITY,
-            label=f"arbor-pedestal z={sz * ARBOR_PEDESTAL_Z:g}",
-        )
+    # South pedestal only (M6.5): the arbor's north end clamps into the
+    # rocker-arm-support's east-flank boss bore (frame.SLDASM) - the back
+    # view (p5) shows the drum running straight into that casting, and a
+    # pedestal at z +92 cannot coexist with the frustum footprint.
+    await _place(
+        adapter,
+        "arbor-pedestal",
+        [X_DRUM, Y_BASE_TOP, -ARBOR_PEDESTAL_Z],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        label=f"arbor-pedestal z={-ARBOR_PEDESTAL_Z:g}",
+    )
     post = cone_station(PIVOT_POST_STATION)
     await _place(
         adapter,
