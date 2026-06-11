@@ -2,14 +2,16 @@ r"""Reproduction script: pen hanger (book ch. 24, pp. 60-63).
 
 The black tapered strap bolted to the wheel support bar that hangs the
 pen rod's upper guide: a flat strap (3 thick) tapering 16 -> 10 wide,
-descending from the bar's front face to a small guide block with a 5.4
-square hole the 5-square pen rod slides in. The mounting bolt is omitted
-(simplification).
+lying on the bar's front face and descending to a deep guide block with
+a 5.4 square hole the 5-square pen rod slides in. The block reaches
+forward (-Z in the machine) so the pen rod hangs clear of the platen
+paper plane while the strap stays flush on the bar. The mounting bolt is
+omitted (simplification).
 
-Layout: origin at the guide block centre (machine (-3, 505, -150));
-strap in the z = +-1.5 plane rising +Y to the bar band (machine
-y 560..570), block 12 x 12 x 8. Dimensions: cad/DIMENSIONS.md ch. 24
-(M6.4, low).
+Layout: origin at the guide block centre (machine (-3, 505, -151.5));
+block z -4..+12.6 (back face flush with the bar front at machine
+z -138.9), strap in the z = 9.6..12.6 band rising +Y to the bar band
+(machine y 560..570). Dimensions: cad/DIMENSIONS.md ch. 24 (M6.4, low).
 
 Run (SolidWorks already open)::
 
@@ -25,6 +27,7 @@ from _common import (
     apply_material,
     check,
     ensure_fully_defined,
+    extrude_at_offset,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -35,9 +38,9 @@ PART_NAME = "pen-hanger"
 MATERIAL = "Plain Carbon Steel"  # black hardware
 
 BLOCK_HALF = 6.0  # guide block 12 x 12 (low)
-BLOCK_HALF_Z = 4.0  # 8 deep
+BLOCK_Z = (-4.0, 12.6)  # deep block: back face on the bar front (derived)
 GUIDE_HOLE_HALF = 2.7  # 5.4 square: the 5-square pen rod slides (derived)
-STRAP_HALF_T = 1.5  # strap 3 thick along Z (low)
+STRAP_Z = (9.6, 12.6)  # strap 3 thick, flush with the block back (derived)
 STRAP_TOP_Y = 65.0  # machine 570: support bar top (derived)
 STRAP_TOP_X = (0.0, 16.0)  # 16 wide at the bar (low)
 STRAP_BOT_X = (-5.0, 5.0)  # 10 wide at the block (low)
@@ -49,8 +52,6 @@ async def _volume(adapter) -> float:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
-
     check("create_part", await adapter.create_part())
 
     # 1. Guide block with the square rod hole (nested contours).
@@ -75,15 +76,10 @@ async def build(adapter) -> dict[str, str]:
     )
     await ensure_fully_defined(adapter, "block sketch", fix_entities=[*outline, *hole])
     check("exit_sketch block", await adapter.exit_sketch())
-    check(
-        "extrude block",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=2.0 * BLOCK_HALF_Z, both_directions=True)
-        ),
-    )
+    extrude_at_offset(adapter, BLOCK_Z[1] - BLOCK_Z[0], BLOCK_Z[0])
     expected = (
         (2.0 * BLOCK_HALF) ** 2 - (2.0 * GUIDE_HOLE_HALF) ** 2
-    ) * 2.0 * BLOCK_HALF_Z
+    ) * (BLOCK_Z[1] - BLOCK_Z[0])
     vol = await _volume(adapter)
     print(f"  volume after block: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.005 * expected:
@@ -104,16 +100,11 @@ async def build(adapter) -> dict[str, str]:
     set_sketch_direct_db(adapter, False)
     await ensure_fully_defined(adapter, "strap sketch", fix_entities=strap)
     check("exit_sketch strap", await adapter.exit_sketch())
-    check(
-        "extrude strap",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=2.0 * STRAP_HALF_T, both_directions=True)
-        ),
-    )
+    extrude_at_offset(adapter, STRAP_Z[1] - STRAP_Z[0], STRAP_Z[0])
     bot_w = STRAP_BOT_X[1] - STRAP_BOT_X[0]
     top_w = STRAP_TOP_X[1] - STRAP_TOP_X[0]
     v_strap = (
-        (bot_w + top_w) / 2.0 * (STRAP_TOP_Y - BLOCK_HALF) * 2.0 * STRAP_HALF_T
+        (bot_w + top_w) / 2.0 * (STRAP_TOP_Y - BLOCK_HALF) * (STRAP_Z[1] - STRAP_Z[0])
     )
     before = expected
     vol = await _volume(adapter)

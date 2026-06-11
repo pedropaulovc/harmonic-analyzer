@@ -86,7 +86,8 @@ RIB_Z1 = 4.27  # |z| at the boss (low)
 BOSS_X = 80.0  # machine x 95: counter-spring anchor (med)
 BOSS_DIA = 14.0
 BOSS_LENGTH = 12.0  # z +-6 (low)
-HOOK_HOLE_DIA = 2.6  # boss-hook O3 shank taps in here (low)
+HOOK_HOLE_DIA = 3.0  # boss-hook O3 shank seats here (low; the real joint is
+# a 2.6 tap drill + M3 thread -- modeled at shank size for a zero-volume fit)
 HOOK_HOLE_X = 75.5  # machine x 90.5: hook rod tip reaches x 97 (derived)
 HOOK_HOLE_DEPTH = 14.0  # half-depth of the mid-plane cut; clears the boss
 # top at this x (y 12.36) and bottom (y 1.64)
