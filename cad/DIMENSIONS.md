@@ -348,42 +348,56 @@ assemblies.
 
 ## Chapter 18 — Summing Lever (pp. 42–43)
 
-No annotated or stated numeric dimensions in this chapter. Legacy SummingLever.cs
-(from summing-lever.kcl) is the numeric source; nothing in the book contradicts it.
+No annotated or stated numeric dimensions in this chapter. M6.4 REVISION: the
+legacy SummingLever.cs shape (solid pivot cylinder + edge ribs + tapering
+summation tongue + anchor boss) is REFUTED by the p.42/43 close-ups and the
+calibrated ch. 30 views — the pivot is a TUBE riding a knife-edge bar hung
+from a top crossbar, the plate hangs off the tube's −X side, and a twin-rib
+web arm runs +X to a round boss carrying the counter-spring hook. Plate
+thickness and length keep the uncontradicted legacy values. Lever-local
+coords below: origin on the knife line (machine (15, 990, 0)), X toward the
+boss, Z along the knife edge.
 
 | dim | value | (in) | source | method | confidence |
 |---|---|---|---|---|---|
-| Coefficients plate | 44.5 × 152.4 × 5.1 mm | 1.75 × 6.0 × 0.2 | legacy | legacy | med |
-| Pivot cylinder radius | 12.7 mm | 0.5 | legacy | legacy | med |
-| Spring attachment holes | 20 × r 0.5 mm, spacing ≈ 6.95 mm | 20 × r 0.02, ≈ 0.274 pitch | legacy (5.2" span / 19) | legacy | med |
-| Summation plate height | 76.2 mm | 3.0 | legacy | legacy | med |
-| Summation anchor | r 9.5 × h 19.1 mm | r 0.375 × h 0.75 | legacy | legacy | med |
-| Rib thickness / height | 5.1 / 12.7 mm | 0.2 / 0.5 | legacy | legacy | med |
+| Pivot tube | Ø25 OD × 114 long (z ±57), Ø14 bore; bore bottom = knife line | — | calibrated p1/p3 + p.42–43 close-ups | scaled | med |
+| Tube slot | central slot \|z\| ≤ 16, \|x\| ≤ 9 — clears the knife-mount stud | — | p.42 close-up | scaled | low |
+| Coefficients plate | x −60..−10 (machine −45..+5), top y 8, 5.1 thick, z ±76.2 | — | calibrated p1; thickness/length legacy (uncontradicted) | scaled + legacy | med |
+| Spring holes | 20 × Ø4.5 at x −37.10 (machine x −22.10 = channel-lever tab line), z = z_j − 1.95 | — | derived: installed-spring eye reach √(3.25²−2.55²) = 2.0 through the 5.1 plate; z offset puts the hole under the helix lead | derived | med |
+| Web + boss | twin ribs 3 wide, y 2..12, x 9..80, z taper ±17.18 → ±4.27; boss Ø14 × 12 at x 80 (machine 95) | — | p.43 plan | scaled | low |
+| Hook hole | Ø3 vertical in the boss top at x 75.5 (machine 90.5) | — | derived: boss-hook shank seat (real joint ≈ 2.6 tap drill + M3 — modeled at shank size for a zero-volume fit) | derived | low |
+| Knife mount | 8-square hardened bar set diamond-wise (edge up), 35 long; brass block 24 × 28 × 24 below; Ø8 stud through the tube slot rising to machine y 1065 | — | p.42/43 (square-head bolt + stirrup strap collapsed to block + stud — simplification) | scaled | low |
+| Top crossbar | 22 × 41 rail section (ch. 6), 372 long along Z, Ø8.2 stud hole at centre; bottom face machine y 999.7 | — | ch. 30 views + top-frame ring inner span | scaled + derived | med |
+| Knife stay | Ø3 rod along X at machine (0, 1086), x −197..+20; 8 × 2 strap from the rod at x −40 down to the knife-mount stud west flank at (10, 1050) | — | p.42–43; M6.4 reroute: a drop to the knife block crosses the summing-plate band, a hook west of x −40 crosses the channel-lever bank | scaled + derived | low |
+| Boss hook | Ø3 J-hook: shank +Y in the boss hole, rise 12, elbow R 3, arm +X 3.5 — rod top machine y 1015, tip x 97 | — | p.43/45 (hook + chrome link ring collapsed to one hook; the spring's own loop is the ring) | derived | low |
 
 Notes (stated, qualitative): cast iron; pivots on a knife-edge fulcrum; the 20
 channel springs attach along the wide end; total motion is only a few mm
-(magnified downstream by ch. 20–21). Re-scale plate proportions against p.42–43
-photos during M2 rebuild.
+(magnified downstream by ch. 20–21).
 
 ## Chapter 19 — Counter Spring (pp. 44–45)
 
-No annotated or stated numeric dimensions. No legacy part. M2 revision: the
-first-pass ~45 × ~80 mm estimate was wrong — the book calls it "a long spring
-[that] towers above the machine" and photogrammetry `195253322` shows the coil
-spanning most of the gooseneck's run above the top casting (≈ 40 cm per ch. 6:
-147 cm total − 107 cm column).
+No annotated or stated numeric dimensions. No legacy part. M6.4 REVISION: the
+M2 "~300 × Ø22, wire ~2.5" read came from the cut-off p1 front page (the
+spring exits the page top). Recalibrated against the ch. 19 full-machine photo
+(gooseneck scale 0.515 px/mm) and the p3 90° page.
 
 | dim | value | (in) | source | method | confidence |
 |---|---|---|---|---|---|
-| Coil body length | ~300 mm | ~11.8 | gooseneck rise (147−107 cm, ch. 6) minus curve; photogrammetry 195253322 + p.45 centre photo | scaled | low |
-| Coil OD | ~22 mm | ~0.87 | p.45 top-right close-up: coil slightly narrower than the gooseneck tube (~25 mm) | scaled | low |
-| Wire dia | ~2.5 mm | ~0.098 | p.45 close-up: heavy close-wound wire | scaled | low |
-| Coil count | ~110 | — | body length / ~2.73 mm pitch (close-wound) | derived | low |
+| Coil body length | 315 mm | 12.4 | ch. 19 full-machine photo, gooseneck-scaled (supersedes the ~300 M2 read) | scaled | low |
+| Coil OD | 12.5 mm | 0.49 | vs the Ø16 gooseneck tube in the same frame (supersedes ~22) | scaled | low |
+| Wire dia | 1.8 mm | 0.071 | close-wound dark coil, no light through (supersedes ~2.5) | scaled | low |
+| Coil count | 165 | — | close-wound: pitch 1.91 leaves a 0.11 sweep-merge gap | derived | low |
+| Bottom lead | straight 40 mm drop, coil bottom → ring that hangs on the boss hook (ring centre machine y 1012, rod top 1015) | — | M6.4 hang solve (`build_output_assembly.py`: ring inner top 1016.45 vs rod top 1016.5) | derived | low |
 | Adjustment post | square-head screw on adjustable post | — | text pp. 44–45 | stated | high (feature) |
+| Gooseneck | Ø16 chrome tube: vertical leg machine x 197 (east column line), y 1041..1390; 180° bend R 51; tip leg x 95 — plumb above the boss hook — ending y 1378; lug + Ø4 X-pin at y 1373 carries the spring's top loop | — | ch. 19 photo 0.515 px/mm + p3 90° page; the tip "slotted screw" modeled as lug + pin (simplification) | scaled + derived | med |
+| Gooseneck clamp | green cast block 30 × 29 × 24 at machine (197, 1040.7, 0) on the east rail end; Ø16.5 vertical bore; square-head pinch screw (10 × 10 × 6 head, Ø5 shank stopped at the bore wall) | — | p.45: "a square-head screw pinches the post in its socket" | scaled | low |
 
-Notes: single large spring balancing the combined pull of the 20 channel springs
-on the summing lever; tension adjustable via the square-head screw post.
-Re-measure both dims from photos during the M2 build.
+Notes: single large spring balancing the combined pull of the 20 channel
+springs. Hang chain (machine y): boss hook rod 1015 → bottom ring 1012 →
+coil 1052..1367 → top loop 1370.6 → gooseneck pin 1373. Tension is set by
+sliding the tube in the clamp bore (tube bottom stops 0.3 above the rail
+top at 1040.7).
 
 ## Chapter 20 — Magnifying Lever (pp. 46–49)
 
@@ -393,16 +407,22 @@ No annotated or stated numeric dimensions. No legacy part.
 |---|---|---|---|---|---|
 | Magnification | up to 4× (adjustable) | — | text pp. 46–49 | stated | high |
 | Rod diameter | ~6 mm | ~0.24 | round brass rod, photo proportion | scaled | low |
-| Lever rod length | ~310 mm (300 usable) | ~12.2 | 4× constraint vs summing-lever ~76 mm effective arm (300/76 ≈ 3.9); p.46 inset consistent; resolved in M2 | derived | low |
+| Lever rod length | 165 mm | 6.5 | calibrated ch. 30 front view (p1): rod spans x ≈ −200..−35 at y ≈ 982. M6.4: REFUTES the M2 "~310 from the 4× constraint" — the p.46/48 insets show the CLAMP sliding along the rod (magnification = clamp-radius ratio), not a 310 rod | scaled | med |
 | Vertical rod | ~Ø5 × 150, domed ends | — | p.46/48 vs lever rod | scaled | low |
 | Clamp block | ~20 × 26 × 12; Ø6.2 lever bore, Ø5.2 rod bore (skew, 6.5 off-axis), Ø3 screw hole | — | p.48 close-up | scaled | low |
 | Thumb screw | ~Ø10 × 5 reeded head, Ø3 × 12 shank (×2: clamp + output fixture) | — | p.48; M4: head reeded (24 × Ø1 grooves), cosmetic M3 thread on shank | scaled | low |
 | Output fixture | collar ~Ø10 × 8, Ø5.2 bore, Ø3 cross hole | — | p.48 bottom close-up | scaled | low |
+| Mounting bracket | collar Ø12 × 10 (bore Ø6.2) at machine (−40, 985, −85), axis along X; arm 10 wide reaching +Z to −70; 40 × 4 flange under the plate's front edge (top touches the plate bottom 992.9) | — | p.47 close-up (mounting screws omitted — simplification) | scaled | low |
 
 Notes: round brass rod lever; magnification set by a reeded (knurled) screw
 adjustment that moves the effective fulcrum/attachment point. Geometry
 constraint used in M2: output/input arm ratio = 4 at maximum setting (rod
-ends domed; both rods revolves with hemispherical caps).
+ends domed; both rods revolves with hemispherical caps). M6.4 placement:
+lever rod axis machine y 985 / z −85; clamp block at x −150; vertical rod
+at z −91.5 (the clamp's skew bore, 6.5 off the lever axis), top y 990,
+fixture at y 926; clamp thumb screw modeled BACKED OUT (head tangent above
+the rod it pinches — seated it would overlap); the fixture's screw is
+omitted at assembly level.
 
 ## Chapter 21 — Magnifying Wheel (pp. 50–53)
 
@@ -412,6 +432,9 @@ ends domed; both rods revolves with hemispherical caps).
 | Outer wheel diameter | 100 mm | 3.937 | photo callout pp. 50–53 | annotated | high |
 | Magnification | 5× | — | text; consistent: 100/20 = 5 ✓ | stated | high |
 | Spoke count | 6 | — | counted on the full-page photo p.51 (and photogrammetry `195607299`); an earlier extraction said 5 — wrong | stated | high |
+| Wheel axle (M6.4) | flange Ø35 × 3 seated on the bar front face; Ø5 stud × 14 the wheel bore rides; Ø9 × 4 retaining collar (photo's washer + hex nut collapsed to a collar — simplification) | — | p.50–51 | scaled | low |
+| Support bar (×3, M6.4) | 10-square steel, 400 long (spans the column lines x ±197); wheel bar y 565, platen top rail y 440, bottom rail y 334 — all on the column-clamp axis z −133.9 (front face −138.9) | — | M6.4 layout; p3 90° view: bars run tangent IN FRONT of the columns (z −112) | derived | low |
+| Column clamp (×6, M6.4) | green cast collar Ø48 × 16, bore Ø35.2 sliding on the Ø35 column; open channel across the front face (10.2 wide, floor 5.1 below bar centre) at column-to-bar offset 21.9; pinch screws omitted | — | p.50–55 | scaled + derived | low |
 
 Notes: wheel body is black-painted cast metal with a bright machined rim
 (wire groove on the outer circumference); the inner hub is a grooved brass
@@ -419,6 +442,8 @@ drum (wire from magnifying lever wraps the hub, wire to pen mechanism leaves
 the outer rim → 5× motion magnification). Six straight spokes. Hex-nut axle on
 a horizontal support bar. The two annotated diameters self-validate against
 the stated magnification — strongest-sourced part in chapters 18–21.
+M6.4 placement: wheel at machine x −53 on the y-565 bar, wheel mid-plane
+z −146.9 (axle flange on the bar front −138.9).
 
 ---
 
@@ -432,10 +457,15 @@ the stated magnification — strongest-sourced part in chapters 18–21.
 | Rack bar | ~300 × 30 × 6, brass | — | p.55 back-side photo; M4c: teeth cut at DP 30 / PA 14.5° (ch. 23 measurement), 112 gaps at p = 2.660 mm, crest at bar top, pitch line addendum (0.847) below it — `build_platen_rack.py`; mounting holes deferred to M6 (Appendix C #8) | scaled | low |
 | Paper clip strips (×2) | ~125 × 10 × 1.2, Ø3 end-screw holes | — | p.55 front photo vs 140 mm | scaled | low |
 | Material | heavy brass (darkened) | — | text | stated | high |
+| Platen position (M6.4) | plate x −258..+42, y 305..445, front face z −142.9 (back face on the rail fronts at −138.9); carried by the y-440 / y-334 support bars | — | M6.4 layout: bottom rail raised 318 → 334 so the rack clears the column-clamp collars; top rail 460 → 440 to sit under the plate top 445 | derived | low |
+| Paper clips position (M6.4) | two vertical strips on the paper face (z −144.1), rising from y 312: left at x −250..−240, right at x +22..+32 — shifted east of the pen v-block's x band (−24..8) | — | M6.4 layout | derived | low |
 
 Notes: toothed brass rack along the bottom edge (driven by ch. 23 gearing for
 horizontal travel); two brass clips (left/right) retain the recording paper;
 gearing can be unlatched from the rack for free repositioning/reset.
+M6.4 rack mesh: rack mounted teeth-down (Rz 180) at y 323.59 = pinion axis
+253.5 + PD r 40.64 + 0.3 backlash + pitch-line offset; rack x0 = 15 × pitch
+(2.660) ≈ 39.90 phases a tooth space onto the 96T pinion's bottom gap.
 
 ## Chapter 23 — Translational Gearing (pp. 56–59)
 
@@ -446,12 +476,17 @@ gearing can be unlatched from the rack for free repositioning/reset.
 | Rack & pinion | 2 of the 6 gears | — | text | stated | high |
 | Chain drive | 2 gears (one at platen front, one on crankshaft) | — | text | stated | high |
 | Fixed crank-speed reduction | 2 gears | — | text | stated | high |
-| Rack & rack pinion pitch | DP 30 (machine system) | — | M4c keyframe measurement: with the rack pitch taken as DP 30 (2.66 mm), the rack pinion's vertical OD in `v4_transgear_030` measures ≈ 105 mm — matching a 120T DP 30 gear (103.3 mm) to 1.8%; quadrant tooth counts on `v4_transgear_028` give ~30–32/quadrant ≈ 120T | scaled + counted | med |
-| Rack pinion | 120T, OD 103.3 mm (4.067"), thin disc ≈ 3 mm face, brass | 4.067 | rows above; thickness from edge-on view `v4_transgear_002` | scaled | med (face: low) |
+| Rack & rack pinion pitch | DP 30 (machine system) | — | M4c keyframe measurement: rack pitch 2.66 mm; the DP 30 conclusion stands, but the M4c 120T/OD-105 read of the keyframes is superseded — see the rack-pinion row | scaled + counted | med |
+| Rack pinion | 96T DP 30: PD 81.28, OD 82.97, ~3 mm face, Ø9.525 (3/8") bore, brass | 3.266 OD | M6.4: REFUTES the M4c "120T, OD 103.3" keyframe read — the calibrated ch. 30 front view (p1, 6.02 px/mm) shows OD ≈ 83 centred on the pinion-bar stud at (0, 253.5) | scaled | med (face: low) |
 | Removable gear module | 2.0 mm (≈ DP 12.7) | — | 24T gear OD ≈ 51 mm in `v4_transgear_030` (scale via DP 30 rack pitch) ⟹ m = OD/(N+2) ≈ 1.96; m = 2.0 makes every swap combo's centre distance m(12+24)/2 = 36 mm exactly | scaled | med |
 | Removable gear face / bore / pins | ≈ 5 thick; common bore Ø12; 2 × Ø3.5 pin holes on Ø19 BC | — | `v4_transgear_015` (catalog shot) + `v4_transgear_020/025/030` (mounted on the oval-pin stub shaft) | scaled | low |
 | Chain sprockets | 17T (both), roller chain ≈ 3/8" pitch, ≈ 4.5 thick, Ø9.525 bore | — | tooth counts from `v4_transgear_012` crops (16–17 counted; modeled equal ⟹ 1:1 chain); pitch from sprocket OD ≈ 56–60 px-scaled mm (17T @ 3/8": PD 51.8) | counted + scaled | low |
 | Reduction pinion (coaxial with rack pinion) | est. 24T DP 30, OD ≈ 21 mm measured, face ≈ 6 | — | edge-on views `v4_transgear_002/003/008`: small fine-tooth steel pinion on the rack-pinion shaft | scaled | low |
+| Pinion bar (M6.4) | 12-square steel, x −95 (A-frame apex) → +197 (east column line) at machine y 253.5; Ø9.6 stud bore along Z at x 0 (9.525 stud + slip clearance) | — | ch. 30 views + M6.4 layout | scaled + derived | low/med |
+| A-frame (M6.4) | green cast stand on the base front-west: tapered plate (8 thick), foot x −115..−45 on the base top (y 50.8), clevis ears gripping the 12-square bar at y 253.5; lightening cutouts omitted | — | p.56–59 + ch. 30 views | scaled | low/med |
+| Transgear stud (M6.4) | Ø9.525 (3/8") × 36 plug in the pinion-bar bore, axis −Z from z −101.5; Ø14 × 4 retaining collar at the front end (z −141.5) | — | derived: carries rack pinion (z −137.5), fixed pinion (z −134) and latch big hub (z −122.5); end hardware collapsed to a collar | derived | low |
+| Latch arm (M6.4) | tapered link, 4.5 thick: big hub Ø22 / small hub Ø16, both bores Ø9.6; centre distance 34.26 = (removable 24T m2 PD 48 + fixed 24T DP 30 PD 20.32 + 0.4 backlash) / 2; assembled at −20° below +X (knob shaft clears the pinion-bar underside) | — | `v4_transgear_008` + mesh math | derived | low |
+| Knob shaft (M6.4) | Ø9.525 × 62.5 through the latch small hub at (32.19, 241.78), spanning machine z −76.5 (sprocket end, chain plane) → −139; Ø20 × 6.5 brass thumb knob at the front (reeding omitted) | — | `v4_transgear_008/020` + M6.4 layout | scaled + derived | low |
 
 Notes: speed combos — small driving + large driven = slowest platen (smallest
 horizontal scale), large+small = fastest, medium+medium = 1:1. Latch disengages
@@ -465,6 +500,16 @@ to be settled when mating the drive train in M6. Parts authored now:
 `transgear-removable` (one part, T12/T18/T24 configurations), `rack-pinion`,
 `platen-rack`, `chain-sprocket`, `transgear-pinion`.
 
+M6.4 notes (Appendix C #8 partial resolution): the removable gear CANNOT be
+mounted meshed — module 2 teeth against the DP 30 fixed pinion leave ~4.6
+teeth jammed in the overlap zone; the T24 removable gear is placed loose on
+the base (machine (−150, 55.8, −93)) as the photo's spare-gear catalog state,
+and the latch small hub carries only the knob shaft. The knob shaft's
+sprocket plane (machine z −76.5..) does not reach the drive-train chain plane
+mid −78.75 / SPROCKET_Z0 −81 exactly — flagged for M6.5 chain routing. The
+measuring stick (ch. 16, hand tool) lies flat on the base at
+(−175, 53.8, −135), graduations up.
+
 ## Chapter 24 — Pen Mechanism (pp. 60–61)
 
 No numeric dimensions; modern reconstruction ("about 100 years younger than any
@@ -477,6 +522,8 @@ other part").
 | Frame (stirrup) | ~22 × 40 × 10, 5 mm rails, Ø3 set-screw hole in bottom rail | — | p.64–65 vs 5 mm rod; resolved in M2 | scaled | low |
 | V-block | ~32 × 18 × 16; 6 mm 45° top chamfers; 2 × Ø8 vertical bores at x = 11/21; stopped clamp slit 26 long × 4 (y 4–8); Ø2.5 screw hole | — | p.65 close-up | scaled | low |
 | Set screw | Ø9 × 5 knurled knob + Ø3 × 15 shank | — | p.64–65; M4: knob reeded (22 × Ø1 grooves), cosmetic M3 thread on shank | scaled | low |
+| Pen hanger (M6.4) | black strap (3 thick, tapering 16 → 10 wide) flat on the wheel-bar front face (z −138.9), descending from the bar band (y 560..570) to a 12 × 12 guide block (z −155.5..−138.9) with a 5.4-square hole the pen rod slides in; mounting bolt omitted | — | p.60–63 | scaled + derived | low |
+| Pen marker (M6.4) | Ø8 brass barrel, 12-tall conical tip, 60 overall; collar/ferrule detail omitted | — | p.60–63 | scaled | low |
 
 Notes: brass frame holds the marker in a v-block; v-block on a square brass rod
 attached to the wire from the magnifying wheel (vertical motion); platen provides
@@ -484,6 +531,15 @@ horizontal motion. Small set screw adjusts pen angle to paper to cut friction.
 Provenance (ch. 5 Preface): the original pen holder was missing — the one in all
 book photos is a modern replacement designed/built by Mike Harland and Tom
 Wilson. Model the replacement (it is what the photos document).
+
+M6.4 pen layout (machine coords): pen rod vertical at x −3, z −151.5 band
+(rod z −154..−149), y 398..518, Ø2 wire hole at y 513 just above the hanger
+block top (511); v-block at (−24, 390, −159.5) — rod bore (local x 21) on
+the rod axis; marker VERTICAL in the x −13 bore, tip at y 368, i.e. 8.6 off
+the paper plane — the book's ~12° tilt would cut the v-block's vertical
+bores, so the marker stands plumb (documented deviation, settle in M6.5);
+pen frame flat (Rx +90) around the rod on the v-block top at (−14, 418, −183);
+set screw along −Z at (−3, 413, −188).
 
 ## Chapter 25 — Pinion Gear (pp. 66–69)
 

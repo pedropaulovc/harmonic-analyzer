@@ -39,7 +39,7 @@ PART_NAME = "transgear-knob-shaft"
 MATERIAL = "Brass"
 
 SHAFT_DIA = 0.375 * IN  # 9.525 (low)
-SHAFT_LEN = 62.5  # machine z -77 (sprocket end) .. -139.5 (knob) (derived)
+SHAFT_LEN = 62.5  # machine z -76.5 (sprocket end) .. -139 (knob face) (derived)
 KNOB_DIA = 20.0  # large brass thumb knob (low)
 KNOB_LEN = 6.5
 
