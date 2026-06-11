@@ -2,15 +2,22 @@ r"""Reproduction script: amplitude bar (book ch. 15, pp. 30-33).
 
 One of the 20 chrome-finished bars (~80 cm long, 1/4" square) that set each
 channel's Fourier coefficient. The bottom-end notch rides the rocker arm;
-the deeper top-end notch hangs from the channel lever.
+the deeper top-end notch straddles the channel lever and hangs from its Ø2
+bar pin through the top pin hole (M6.3 layout: bars run UP the spine from
+the rocker bank to the top-lever bank).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 15" — width 6.35 mm is book-annotated,
 length ~80 cm book-stated (legacy 32" = 812.8 mm consistent, used exactly);
-notch sizes are uncontradicted legacy values. Audit verdict: PASS.
+notch sizes are uncontradicted legacy values; top pin hole derived (M6.3).
+Audit verdict: PASS.
 
 Profile (on the Front plane, bar length along +Y, origin at bottom-left
 corner) is a single 12-segment chain; both notches are centred slots in the
-end faces. Extruded by the bar depth.
+end faces. Extruded by the bar depth (+Z, 0..6.35). The top pin hole runs
+along global X through the top-slot cheeks at 6.35 below the bar top,
+mid-depth (Z = 3.175): a Right-plane sketch maps (x, y) -> global (±Z, Y)
+with ambiguous handedness, so the cut is probed by volume read-back and the
+sketch-x sign flipped on a miss (crank-arm cross-hole pattern).
 
 Run (SolidWorks already open)::
 
@@ -26,6 +33,7 @@ from _common import (
     add_line_chain,
     apply_material,
     check,
+    define_circle,
     ensure_fully_defined,
     measure_check,
     report_mass_properties,
@@ -43,8 +51,11 @@ BOTTOM_NOTCH_WIDTH = 0.125 * IN  # 3.175  DIMENSIONS.md ch15: legacy (med)
 BOTTOM_NOTCH_HEIGHT = 0.09375 * IN  # 2.381  DIMENSIONS.md ch15: legacy 3/32" (med)
 TOP_NOTCH_WIDTH = 0.125 * IN  # 3.175  DIMENSIONS.md ch15: legacy (med)
 TOP_NOTCH_HEIGHT = 0.5 * IN  # 12.7   DIMENSIONS.md ch15: legacy (med)
+TOP_PIN_HOLE_DIA = 2.0  # DIMENSIONS.md ch15: channel-lever bar pin (derived, M6.3)
+TOP_PIN_DROP = 0.25 * IN  # 6.35  DIMENSIONS.md ch15: hole centre below bar top (derived)
 
 NOTCH_OFFSET = (BAR_WIDTH - BOTTOM_NOTCH_WIDTH) / 2.0  # notches centred on width
+THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > bar width
 
 
 async def build(adapter) -> dict[str, str]:
@@ -103,6 +114,45 @@ async def build(adapter) -> dict[str, str]:
         "extrude bar",
         await adapter.create_extrusion(ExtrusionParameters(depth=BAR_DEPTH)),
     )
+
+    # Top pin hole: Ø2 along global X through the top-slot cheeks, hanging
+    # the bar from the channel lever's bar pin. Right-plane handedness is
+    # ambiguous: the wrong sketch-x sign puts the circle at Z = -3.175,
+    # outside the 0..6.35 body, and the cut removes nothing — probe by
+    # volume read-back and flip (a dead miss feature may stay in the tree,
+    # same precedent as the _common spring-hook flip retry).
+    res = await adapter.get_mass_properties()
+    vol_before = res.data.volume
+    print(f"  volume before top pin hole: {vol_before:.1f} mm^3")
+    pin_y = BAR_LENGTH - TOP_PIN_DROP
+    for sketch_x in (BAR_DEPTH / 2.0, -BAR_DEPTH / 2.0):
+        check("create_sketch top pin hole", await adapter.create_sketch("Right"))
+        await define_circle(
+            adapter, sketch_x, pin_y, TOP_PIN_HOLE_DIA / 2.0, "top pin hole"
+        )
+        await ensure_fully_defined(adapter, "top pin hole sketch")
+        check("exit_sketch top pin hole", await adapter.exit_sketch())
+        cut = await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+        )
+        if not cut.is_success:
+            print(
+                f"  ..  top pin cut at sketch x={sketch_x:+g} failed"
+                f" ({cut.error}); flipping sign"
+            )
+            continue
+        res = await adapter.get_mass_properties()
+        removed = vol_before - res.data.volume
+        if removed > 1.0:
+            print(
+                f"  OK  top pin hole at sketch x={sketch_x:+g}"
+                f" removed {removed:.1f} mm^3"
+            )
+            # expected: pi * 1^2 * (2 cheeks * 1.5875) = ~10 mm^3
+            break
+        print(f"  ..  top pin cut at sketch x={sketch_x:+g} removed nothing; flipping")
+    else:
+        raise RuntimeError("top pin hole cut removed no material on either side")
 
     await apply_material(adapter, MATERIAL)
 

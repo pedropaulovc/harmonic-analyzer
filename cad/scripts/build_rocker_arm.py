@@ -1,25 +1,29 @@
 r"""Reproduction script: rocker arm (book ch. 14, pp. 26-29; 20 used).
 
-Thin matte-black steel strap that see-saws on a knife-edge pivot atop the
-A-frame supports. Top edge concave upward with R = 800 mm (the book states
-the radius equals the amplitude-bar length, minimizing nonlinearity as the
-bar slides); bottom edge concentric, giving a uniform 16 mm depth (p.29
-photo callout spans the end face). Plate thickness 2.5 mm (p.27 callout -
-the M1 table misread this as a 12.5 mm "arm width"; corrected with this
-script). Pivot-asymmetric: ~100 mm to the connecting-rod end, ~70 mm tail
-for the amplitude bar's 180-degree phase-reversal side (p.29 bottom photo;
-the working half matches the measuring stick's 10 x 8 mm divisions,
-ch. 16). The stepped blocks visible at the arm tips on p.29 are the
-connecting rods' flattened upper ends - separate part, not this strap.
+Thin matte-black steel strap that see-saws on its pivot shaft atop the
+tapered support castings. Top edge concave upward with R = 800 mm (the
+book states the radius equals the amplitude-bar length, minimizing
+nonlinearity as the bar slides); bottom edge concentric, giving a uniform
+16 mm depth (p.29 photo callout spans the end face). Plate thickness
+2.5 mm (p.27 callout - the M1 table misread this as a 12.5 mm "arm
+width"). Mid-pivot SEESAW, symmetric +/-88 mm: the amplitude bar rides
+either side of the pivot up to the measuring stick's 80 mm span (positive
+one side, negative the other - ch. 15 text); the connecting rod pins at
++25.4 (1") on the +X side, closing the vertical-rod geometry against the
+cylinder arbor (M6.3, DIMENSIONS.md ch. 14 layout table). The "stepped
+blocks" at the arm tips on p.29 are amplitude-bar feet parked near max
+amplitude, not part of this strap.
 
-This supersedes the legacy `oscilating-arms` part (no surviving source;
-its audit row carried the misread 12.5 mm width).
+This supersedes the legacy `oscilating-arms` part (no surviving source)
+and the M2 asymmetric 100/70 rod-at-tip geometry (refuted in M6.3).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 14" - annotated thickness/depth,
-stated curvature, photo-scaled lengths (low-med).
+stated curvature, derived spans/pin positions (med).
 
-Layout: pivot at the origin, arm along X (+X = connecting-rod end), arc
-center 816 mm above, extruded mid-plane in Z; holes cut through Z.
+Layout: pivot at the origin, arm along X (+X = connecting-rod side), arc
+center 816 mm above, extruded mid-plane in Z; holes cut through Z. The
+pivot hole centre sits at local (0, 8) - assembly scripts must offset
+placements accordingly.
 
 Run (SolidWorks already open)::
 
@@ -48,11 +52,11 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 CURVE_RADIUS = 800.0  # DIMENSIONS.md ch14: = amplitude bar length (stated)
 ARM_DEPTH = 16.0  # ch14: p.29 photo callout, end-face height (annotated)
 ARM_THICKNESS = 2.5  # ch14: p.27 photo callout (annotated)
-ROD_SPAN = 100.0  # pivot -> connecting-rod end (photo-scaled, low)
-TAIL_SPAN = 70.0  # pivot -> phase-reversal tail end (photo-scaled, low)
-PIVOT_HOLE_DIA = 3.0  # pivot pin (photo-scaled, low)
+ROD_SPAN = 88.0  # pivot -> rod-side end: 80 amplitude travel + 8 margin (derived)
+TAIL_SPAN = 88.0  # pivot -> opposite end, symmetric seesaw (derived)
+PIVOT_HOLE_DIA = 6.5  # rides the 6.35 pivot shaft (DIMENSIONS.md ch14, derived)
 ROD_HOLE_DIA = 2.0  # connecting-rod pin (photo-scaled, low)
-ROD_HOLE_INSET = 6.0  # hole centre from the rod end
+ROD_HOLE_X = 25.4  # rod pin 1" from the pivot, +X side (derived, M6.3)
 THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > thickness
 
 # Arc centre sits ARM_DEPTH above the pivot's bottom edge: bottom edge is
@@ -114,7 +118,7 @@ async def build(adapter) -> dict[str, str]:
     )
     res = await adapter.get_mass_properties()
     print(f"  volume after strap: {res.data.volume:.1f} mm^3")
-    # expected: ~0.2086/2 * (816^2 - 800^2) * 2.5 = ~6,742 mm^3
+    # expected: asin(88/816) * (816^2 - 800^2) * 2.5 = ~6,985 mm^3
 
     # Pivot pin hole at the origin, mid-depth.
     check("create_sketch pivot hole", await adapter.create_sketch("Front"))
@@ -128,8 +132,8 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
 
-    # Connecting-rod pin hole near the rod end, mid-depth.
-    rod_x = ROD_SPAN - ROD_HOLE_INSET
+    # Connecting-rod pin hole 1 inch from the pivot, mid-depth.
+    rod_x = ROD_HOLE_X
     check("create_sketch rod hole", await adapter.create_sketch("Front"))
     await define_circle(adapter, rod_x, _mid_y(rod_x), ROD_HOLE_DIA / 2.0, "rod hole")
     await ensure_fully_defined(adapter, "rod hole sketch")
