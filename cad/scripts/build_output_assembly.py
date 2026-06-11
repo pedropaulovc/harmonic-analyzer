@@ -49,8 +49,10 @@ Default-state notes / documented simplifications (Appendix C):
 * Wires (lever rod -> wheel hub, wheel rim -> pen rod), the drive chain
   and the recording paper are flexible elements, not modeled.
 * The knife-stay strap crosses the channel-lever plane east of the lever
-  bank (x > -22); verified against channel.SLDASM geometry here, but the
-  cross-assembly fit is re-checked at the top level (M6.5).
+  tab TIPS (x > -14.1 including the 8 mm overhang past the spring-hole
+  line; M6.5 moved the rod hook -40 -> -10 after the strap clipped the
+  two tab overhangs nearest z 0); the cross-assembly fit is re-checked
+  at the top level.
 * Both pinion-bar ends float: in the real machine the west end is
   carried by the ball-mount housing at the A-frame clevis (ch. 30 front
   view) and the east end by a column bracket; neither fitting is modeled.
@@ -113,7 +115,6 @@ LEVER_ROD_Z = -85.0
 CLAMP_X = -150.0  # sliding clamp default position (p.46/48 insets)
 from build_magnifying_clamp import (  # noqa: E402
     BLOCK_DEPTH as CLAMP_DEPTH,
-    BLOCK_HEIGHT as CLAMP_HEIGHT,
     LEVER_BORE_Y as CLAMP_BORE_Y,
     ROD_BORE_X as CLAMP_ROD_DX,
 )
@@ -135,9 +136,8 @@ WHEEL_MID_Z = BAR_FRONT_Z - FLANGE_LEN - (STUD_LEN - 4.0) / 2.0  # -146.9:
 # the 10-wide hub sits flush between the flange face and the tip collar
 
 # --- platen ------------------------------------------------------------------
-from build_platen import PLATE_HEIGHT, PLATE_THICKNESS, PLATE_WIDTH  # noqa: E402
+from build_platen import PLATE_THICKNESS  # noqa: E402
 from build_platen_rack import (  # noqa: E402
-    BAR_THICKNESS as RACK_T,
     PITCH as RACK_PITCH,
     PITCH_LINE_Y as RACK_PITCH_LINE_Y,
 )
@@ -197,8 +197,17 @@ FRAME_ROWS = [[0.0, 0.0, -1.0], [1.0, 0.0, 0.0], [0.0, -1.0, 0.0]]
 SET_SCREW_POS = (-38.0, 413.0, -154.0)
 
 # --- loose hardware ----------------------------------------------------------
-STICK_POS = (-175.0, 53.8, -135.0)  # flat on the base, graduations up
-SPARE_GEAR_POS = (-137.0, 55.8, -93.0)  # T24 lying flat: disc x -157.7..-116.3
+STICK_POS = (-158.0, 53.8, -133.0)  # flat on the base, graduations up;
+# Rx+90 footprint x -158..+42, z -133..-118: west end 2.5 east of the SW
+# corner-bracket foot tip (x -160.5, M6.5 - the old -175 ran the stick
+# through the bracket's plate + foot, 271 mm^3), z band fully on the top
+# plate (edge -133.35) and 3 clear of the a-frame foot (z -115..-107)
+SPARE_GEAR_POS = (-133.0, 55.8, -80.0)  # T24 lying flat: plan circle
+# r 26 (OD 52) about (-133, -80) - 6.7 clear of the SW corner-bracket
+# region (nearest corner (-160.5, -97.7)), 6.4 clear of the a-frame foot
+# (nearest (-115, -107)), 12 clear of the measuring stick band z <= -118
+# (M6.5: the M6.4 spot (-137, -93) was computed with the T24 HUB radius
+# 20.7 instead of the OD radius 26 and clipped the bracket foot 10.6 mm^3)
 # clears the corner-bracket foot (to -160.5) and the a-frame plate (from -115)
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
