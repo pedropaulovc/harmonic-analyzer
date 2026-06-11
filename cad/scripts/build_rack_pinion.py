@@ -1,9 +1,11 @@
 r"""Reproduction script: translational-gearing rack pinion (book ch. 23).
 
-The large thin brass gear that drives the platen rack: 120 teeth DP 30
-(keyframe measurement, DIMENSIONS.md ch. 23 -- OD matches the cylinder
-gears' 103.3 mm), ~3 mm disc, plain 3/8" shaft bore (hub hardware deferred
-to the M6 drive-train work, Appendix C #8).
+The large thin brass gear that drives the platen rack: 96 teeth DP 30.
+The M4c "120 teeth / OD 103.3" keyframe read is REFUTED by the calibrated
+ch. 30 front view (p1, 6.02 px/mm): the gear OD spans ~83 mm centred on
+the pinion-bar stud at (0, 253.5) -- 96T DP 30 gives PD 81.28 / OD 82.97.
+~3 mm disc, plain 3/8" shaft bore (the latch/stud hardware is modeled in
+build_output_assembly.py; Appendix C #8).
 
 Layout: gear axis = Z through the origin, disc z = 0..3 mm.
 
@@ -32,7 +34,8 @@ from _gear import build_fixed_gear, volume_check
 PART_NAME = "rack-pinion"
 MATERIAL = "Brass"  # ch. 23 photos: brass
 
-TEETH = 120  # DIMENSIONS.md ch23: OD + quadrant counts, v4_transgear_028/030 (med)
+TEETH = 96  # DIMENSIONS.md ch23: calibrated p1 OD ~83 -> 96T DP30 (med,
+# supersedes the 120T keyframe count -- see docstring)
 FACE_WIDTH = 3.0  # mm, edge-on view v4_transgear_002 (low)
 BORE_DIAMETER = 0.375 * IN  # 9.525 -- machine-standard shaft stock (low)
 
