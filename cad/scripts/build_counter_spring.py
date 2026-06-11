@@ -1,18 +1,23 @@
 r"""Reproduction script: counter spring (book ch. 19, pp. 44-45).
 
-The "long spring [that] towers above the machine": a heavy close-wound
-extension spring from the summing-lever hook up to the curved, tapered
+The "long spring [that] towers above the machine": a slender close-wound
+extension spring from the summing-lever boss hook up to the curved, tapered
 gooseneck post. It counterbalances the accumulated pull of the 20 channel
 springs; tension is set by sliding the post (square-head screw).
 
-No numeric dimensions are stated; everything here is photo-scaled (book
-p. 45 + photogrammetry 195253322) against the ch. 6 frame anchors -- see the
-M2 revision note in DIMENSIONS.md ch. 19 (the first-pass 45 x 80 mm estimate
-was wrong by ~4x). M4: bent-wire end hooks added as with the channel spring
-(``_common.add_spring_end_hooks`` -- axial lead + 270-degree loop each end).
+M6.4 revision: the M2 "300 x O22, wire 2.5" read came from the cut-off p1
+front page (the spring exits the page top). Recalibrated against the ch. 19
+full-machine photo (gooseneck scale 0.515 px/mm, top ~ y 1438) and the p3
+90-degree page: body ~315 long, OD ~12.5, wire ~1.8, visibly close-wound
+(dark, no light through the coils). The bottom wire is a LONG straight drop
+(~49 mm) from the coil to the ring that hooks the summing-lever boss at
+(95, ~1003); the top hook is the usual short lead + loop onto the gooseneck
+tip screw. See DIMENSIONS.md ch. 19.
 
 Layout: coil axis along +Y from the origin (helix base circle on the Top
 plane); the helix starts and ends on the +X side (whole number of coils).
+In the machine the origin lands at (x ~93, y 1052, z 0): bottom ring centre
+at y ~1003, top hook tip at y ~1376.
 
 Run (SolidWorks already open)::
 
@@ -38,10 +43,13 @@ from _common import (
 PART_NAME = "counter-spring"
 MATERIAL = "Alloy Steel"  # see _common.apply_material docstring
 
-COIL_BODY_LENGTH = 300.0  # DIMENSIONS.md ch19: scaled, gooseneck rise (low)
-COIL_OD = 22.0  # DIMENSIONS.md ch19: scaled vs gooseneck tube (low)
-WIRE_DIA = 2.5  # DIMENSIONS.md ch19: scaled, heavy wire (low)
-COIL_COUNT = 110  # close-wound: body length / ~2.73 mm pitch (derived, low)
+COIL_BODY_LENGTH = 315.0  # DIMENSIONS.md ch19: ch.19 photo, gooseneck-scaled (low)
+COIL_OD = 12.5  # DIMENSIONS.md ch19: scaled vs gooseneck tube O16 (low)
+WIRE_DIA = 1.8  # DIMENSIONS.md ch19: close-wound dark coil (low)
+COIL_COUNT = 165  # close-wound: pitch 1.91 leaves a 0.11 sweep-merge gap (derived)
+BOTTOM_LEAD = 49.0  # straight drop, coil bottom -> boss ring centre (derived:
+# body bottom y 1052 - ring centre y ~1003; see build_output_assembly.py)
+TOP_LEAD = 2.0 * WIRE_DIA  # standard short hook onto the gooseneck tip screw
 
 MEAN_RADIUS = (COIL_OD - WIRE_DIA) / 2.0
 PITCH = COIL_BODY_LENGTH / COIL_COUNT  # whole coils: both ends land at +X
@@ -67,7 +75,13 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_sweep(SweepParameters(path=helix_name)),
     )
 
-    await add_spring_end_hooks(adapter, MEAN_RADIUS, WIRE_DIA, COIL_BODY_LENGTH)
+    await add_spring_end_hooks(
+        adapter,
+        MEAN_RADIUS,
+        WIRE_DIA,
+        COIL_BODY_LENGTH,
+        leads=(BOTTOM_LEAD, TOP_LEAD),
+    )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
