@@ -192,18 +192,32 @@ def _sidecar(pair_id: str) -> Path:
     return COMP / "render" / f"{pair_id}.meta.json"
 
 
+def pair_size(ref_png: Path, max_side: int) -> tuple[int, int]:
+    from PIL import Image
+
+    with Image.open(ref_png) as img:
+        rw, rh = img.size
+    scale = max_side / max(rw, rh)
+    return max(1, round(rw * scale)), max(1, round(rh * scale))
+
+
 def is_stale(pair: dict, mpath: Path) -> bool:
     png = COMP / "render" / f"{pair['id']}.png"
     sc = _sidecar(pair["id"])
     if not png.exists() or not sc.exists():
         return True
     meta = json.loads(sc.read_text(encoding="utf-8"))
-    return meta.get("camera") != pair["camera"] or meta.get("model_mtime") != mpath.stat().st_mtime
+    return (
+        meta.get("camera") != pair["camera"]
+        or meta.get("reference") != pair["reference"]
+        or meta.get("model_mtime") != mpath.stat().st_mtime
+    )
 
 
-def write_sidecar(pair: dict, mpath: Path) -> None:
+def write_sidecar(pair: dict, mpath: Path, size: tuple[int, int]) -> None:
     _sidecar(pair["id"]).write_text(
-        json.dumps({"camera": pair["camera"], "model_mtime": mpath.stat().st_mtime}),
+        json.dumps({"camera": pair["camera"], "reference": pair["reference"],
+                    "size": list(size), "model_mtime": mpath.stat().st_mtime}),
         encoding="utf-8",
     )
 
@@ -300,10 +314,14 @@ def main() -> int:
             check(f"open {mpath.name}", await adapter.open_model(str(mpath)))
             for pair in by_model[model]:
                 pid = pair["id"]
+                # Capture at the reference's aspect so side-by-side panels and
+                # the blend overlay compare 1:1 (portrait refs would otherwise
+                # letterbox inside a landscape viewport).
+                ref_png = composite.prepare_reference(pair)
+                w, h = pair_size(ref_png, max(width, height))
                 set_camera(adapter, pair["camera"])
-                await capture(adapter, COMP / "render" / f"{pid}.png", width, height)
-                write_sidecar(pair, mpath)
-                composite.prepare_reference(pair)
+                await capture(adapter, COMP / "render" / f"{pid}.png", w, h)
+                write_sidecar(pair, mpath, (w, h))
                 composite.side_by_side(pid)
                 composite.blend_overlay(pid, pair.get("align"))
                 done[pid] = "rendered"
