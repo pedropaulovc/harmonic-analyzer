@@ -29,7 +29,9 @@ from _common import (
     add_line_chain,
     apply_material,
     check,
+    define_circle,
     ensure_fully_defined,
+    extrude_at_offset,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -56,36 +58,34 @@ async def _volume(adapter) -> float:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
-
     check("create_part", await adapter.create_part())
 
-    # 1. Rod along X (revolved rectangle -- no Right-plane mapping risk).
-    check("create_sketch rod", await adapter.create_sketch("Front"))
+    # 1. Rod along X: an extruded circle, NOT a revolved rectangle -- a
+    # 360-degree revolve of an on-axis profile leaves a degenerate axis
+    # edge in the b-rep, and every boolean that crosses that axis (the
+    # strap below) fails (probed live: extrude+merge and revolve-second
+    # both refuse; the extruded rod merges fine). The circle sits on the
+    # part origin, so the Right-plane axis-mapping ambiguity is moot.
+    check("create_sketch rod", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
-    centerline = check(
-        "rod centerline",
-        await adapter.add_centerline(ROD_X[0], 0.0, ROD_X[1], 0.0),
-    )
-    profile = await add_line_chain(
-        adapter,
-        [
-            (ROD_X[0], 0.0),
-            (ROD_X[1], 0.0),
-            (ROD_X[1], ROD_DIA / 2.0),
-            (ROD_X[0], ROD_DIA / 2.0),
-        ],
-    )
+    await define_circle(adapter, 0.0, 0.0, ROD_DIA / 2.0, "rod circle")
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "rod sketch", fix_entities=[centerline, *profile])
+    await ensure_fully_defined(adapter, "rod sketch")
     check("exit_sketch rod", await adapter.exit_sketch())
-    check("revolve rod", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     rod_len = ROD_X[1] - ROD_X[0]
+    extrude_at_offset(adapter, rod_len, ROD_X[0])
     expected = math.pi * (ROD_DIA / 2.0) ** 2 * rod_len
     vol = await _volume(adapter)
     print(f"  volume after rod: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.005 * expected:
         raise RuntimeError(f"rod volume {vol:.1f} != {expected:.1f}")
+    res = await adapter.get_mass_properties()
+    com_x = float(res.data.center_of_mass[0])
+    rod_mid = (ROD_X[0] + ROD_X[1]) / 2.0
+    if abs(com_x - rod_mid) > 0.5:
+        raise RuntimeError(
+            f"rod extruded the wrong way: COM x {com_x:.1f}, expected {rod_mid:.1f}"
+        )
 
     # 2. Diagonal strap (Front sketch quad, mid-plane along Z).
     dx = STRAP_BOT[0] - STRAP_TOP[0]
@@ -106,12 +106,10 @@ async def build(adapter) -> dict[str, str]:
     set_sketch_direct_db(adapter, False)
     await ensure_fully_defined(adapter, "strap sketch", fix_entities=strap)
     check("exit_sketch strap", await adapter.exit_sketch())
-    check(
-        "extrude strap",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=2.0 * STRAP_HALF_W, both_directions=True)
-        ),
-    )
+    # Raw-COM start-offset extrude: the adapter's mid-plane extrusion fails
+    # on this direct-db quad ("Failed to create extrusion feature"), while
+    # the offset path is the proven recipe for direct-db sketches.
+    extrude_at_offset(adapter, 2.0 * STRAP_HALF_W, -STRAP_HALF_W)
     v_strap = length * 2.0 * STRAP_HALF_T * 2.0 * STRAP_HALF_W
     before = expected
     vol = await _volume(adapter)
