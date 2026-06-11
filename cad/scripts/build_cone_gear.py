@@ -40,8 +40,8 @@ Prototype scope notes:
 * **Configured bore, no keyway** (Appendix C #7 resolution): at DP 30 the
   small gears cannot clear the 9.5 mm shaft (6T OD is 6.77 mm), so the
   shaft steps down at the tip (`build_cone_gear_shaft.py`) and the bore
-  diameter is a configured global ``BoreDia`` computed per tooth count by
-  ``bore_dia_in`` (canted-seat clearance, M6.6 -- see its docstring),
+  diameter is a configured global ``BoreDia``: 3/8" for T024..T120, then
+  1/4" (T018), 3/16" (T012), 1/8" (T006) -- the 6T wall comes out 0.8 mm,
   matching the visibly thin tip rod in the p.18 photos. The bore circle is
   origin-centred with a DRIVING diameter dimension equation-linked to
   ``BoreDia`` (an origin-snapped circle + driving dim is fully defined and
@@ -54,7 +54,8 @@ Prototype scope notes:
   the 6T gear is severely undercut at standard proportions anyway).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 12" -- DP 30 / PA 14.5 deg (module
-resolved M4 prep), face width 7 mm (annotated p.18), tooth counts 6k.
+resolved M4 prep), face width 6.5 mm (M6.7 mesh packing; annotated 7 is
+inconsistent with the drum grid, see FACE_WIDTH comment), tooth counts 6k.
 
 Layout: gear axis = Z through the origin, blank extruded +Z from the Front
 plane (z = 0..7 mm).
@@ -87,7 +88,12 @@ MATERIAL = "Brass"  # ch. 13 text: polished brass gear stock; cone set matches
 
 DP = 30.0  # teeth per inch of pitch diameter, DIMENSIONS.md ch12 (high)
 PA_DEG = 14.5  # pressure angle, period-typical assumption (low)
-FACE_WIDTH = 7.0  # mm, photo callout p.18 (high)
+# M6.7: the exact-tracking mesh (assembly docstring) fixes the seat
+# pitch along the shaft at Z_PITCH*cos(21.1 deg) = 6.584 mm, so the
+# photo's 7 mm face callout cannot hold (faces would overlap 0.42);
+# 6.5 leaves 0.08 air -- the annotated cone figures are mutually
+# inconsistent with the drum grid, see DIMENSIONS.md ch. 12 notes.
+FACE_WIDTH = 6.5  # mm, derived (photo callout 7, see above)
 
 # Cut clearance radius (inches -- document units, see module docstring)
 # beyond the largest tip radius (120T OD/2 = 2.033") so the gap profile
@@ -103,58 +109,26 @@ CONFIGS = [(f"T{n:03d}", n) for n in range(6, 121, 6)]
 DEFAULT_TEETH = 120  # globals' all-configuration value at authoring time
 
 
-INCLINE_SIN = 2.54 / 7.5  # cone-shaft plan incline (assembly ch. 13 layout)
-INCLINE_COS = math.sqrt(1.0 - INCLINE_SIN**2)
-INCLINE_TAN = INCLINE_SIN / INCLINE_COS
-
-
 def bore_dia_in(teeth: int) -> float:
-    """Configured bore diameter (inches), computed from the canted seat.
+    """Configured bore diameter (inches) -- snug on the stepped shaft.
 
-    M6.6 mesh fix: gears T012..T120 are seated CANTED on the 19.8 deg
-    shaft (gear plane vertical, square to the cylinder set) so every
-    station meshes at the exact DP 30 centre distance -- a perpendicular
-    seat loses cos(19.8) of the projected radius (3 mm at T120, more than
-    the whole 1.69 mm working depth) and offsets the contact r*sin(19.8)
-    along Z (2.4 channels at T120), which is why the drive train never
-    meshed. A canted gear's bore must clear the inclined shaft everywhere
-    inside the gear's vertical 7 mm slab. Worst case (slab face, west
-    side), the required bore RADIUS is the sum of
-
-    * ``(face/2) * tan(19.8)`` -- the shaft axis walk across the slab,
-    * the assembly's eastward stub-gap ``mesh_relief`` (nonzero from T054,
-      up to 0.58 mm at T012 -- mirror of
-      build_drive_train_assembly.mesh_relief),
-    * ``r_shaft / cos(19.8)`` -- an inclined cylinder's constant-z cross
-      section is an ELLIPSE with in-plane semi-axis r*sec(i), NOT r (the
-      0.3 mm difference on the 3/8" shaft was a real interference), and
-    * 0.25 mm clearance margin.
-
-    The shaft section under each slab follows build_cone_gear_shaft.py
-    (3/8" to station 150.5, 1/4" to 158.6, then the 0.08" tip); T024's
-    slab straddles the first step and is sized for the larger 3/8". The
-    real machine ran sloppy bores too: the p.21 macro shows solder blobs
-    filling the small-gear seats. T006 keeps a snug tip bore: it stays
-    perpendicular (its 6T stub profile cannot mesh a 120T regardless --
-    below minimum tooth count -- so it is parked north of its drum gear,
-    see the assembly script).
+    All 20 gears seat PERPENDICULAR to the shaft (true cone, p.18 --
+    M6.7; the M6.6 canted-vertical experiment is retired: it met the
+    interference checker but visibly deformed the cone). At DP 30 the
+    small gears cannot clear the 9.5 mm shaft (6T OD is 6.77 mm), so the
+    shaft steps down at the tip (`build_cone_gear_shaft.py`) and each
+    bore matches its section: 3/8" T024..T120, 1/4" T018, 3/16" T012,
+    1/8" T006 (0.8 mm wall, matching the visibly thin tip rod in the
+    p.18 photos). No keyway: the book never shows the attachment and the
+    p.21 macro shows solder at the small gears.
     """
     if teeth <= 6:
-        return 0.08  # perpendicular seat, snug on the 0.08" tip section
-    j = (120 - teeth) // 6
-    addendum = 25.4 / DP
-    penetration = 2.0 * addendum - 0.15  # working depth - mesh backlash
-    r_pitch = 2.0 * 25.4 - 3.0 * 25.4 / DP * j
-    cap = addendum + r_pitch * (1.0 - math.cos(math.radians(PA_DEG))) - 0.05
-    relief = max(0.0, penetration - cap)
-    shaft_dia = {18: 0.25, 12: 0.08}.get(teeth, 0.375) * 25.4
-    r_bore = (
-        (FACE_WIDTH / 2.0) * INCLINE_TAN
-        + relief
-        + (shaft_dia / 2.0) / INCLINE_COS
-        + 0.25
-    )
-    return 2.0 * r_bore / 25.4
+        return 0.125
+    if teeth <= 12:
+        return 0.1875
+    if teeth <= 18:
+        return 0.25
+    return 0.375
 
 
 def gear_facts(teeth: int, dp: float = DP, pa_deg: float = PA_DEG) -> dict[str, float]:

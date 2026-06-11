@@ -1,38 +1,36 @@
 r"""Reproduction script: cone gear shaft (book ch. 12, pp. 16-21) -- stepped.
 
-Steel shaft carrying the 20-gear cone set (150 mm annotated stack, all
-gears fixed to and rotating with the shaft), with bearing journals into
-the pivot block (large end -- the cone set pivots out of engagement,
-ch. 25) and the green post (thin end). At DP 30 the small gears cannot
-clear a 3/8 in shaft (the 6T gear's OD is 6.77 mm), so the shaft steps
-down at the thin end to match the configured gear bores
-(`build_cone_gear.py` ``BoreDia``, DIMENSIONS.md Appendix C #7): the
-p.18 photos visibly show a thin rod past the smallest gears. Gears
-attach by means the book never shows (p.21 macro shows solder blobs at
-the small gears) -- no keyseat, the shaft steps are plain.
+Steel shaft carrying the 20-gear cone set (all gears fixed to and
+rotating with the shaft), with bearing journals into the pivot block
+(large end -- the cone set pivots out of engagement, ch. 25) and the
+green post (thin end). At DP 30 the small gears cannot clear a 3/8 in
+shaft (the 6T gear's OD is 6.77 mm), so the shaft steps down at the
+thin end to match the configured gear bores (`build_cone_gear.py`
+``BoreDia``, DIMENSIONS.md Appendix C #7): the p.18 photos visibly
+show a thin rod past the smallest gears. Gears attach by means the
+book never shows (p.21 macro shows solder blobs at the small gears) --
+no keyseat, the shaft steps are plain. The "150 mm" stack annotation
+reconciles as gear stack 131.6 + 64T face + air (M6.7 exact-tracking
+pitch, see DIMENSIONS.md ch. 12 notes).
 
-Sections, large (pivot) end at z = 0, gear seats at the 7.5 mm stack
-pitch (150 mm / 20 gears, annotated p.18). M6.6 (canted gear seats):
-each step ends shy of its nominal seat boundary so the larger section's
-east surface line stays out of the next CANTED gear's vertical slab
-(the inclined cylinder's surface reaches r*sin(19.8) past its end
-station in z, and r/cos(19.8) in plan -- both bit as real
-interferences), and the tip is turned down from the photo-suggested
-1/8 in: the inclined shaft line converges toward the drum as z grows,
-passing only 1.30 mm outside the 120T tip circle at the last drum
-gear's face -- a 1/8 in rod (r 1.59) would rub those tooth tips, the
-0.08 in tip clears them by 0.22:
+Sections, large (pivot) end at z = 0. M6.7 (true-cone mesh, see the
+assembly docstring): gear seats at the exact-tracking stack pitch
+6.584 mm (= drum z-pitch x cos 21.1 deg), seat centres at
+28.25 + 6.584 j, gear faces 6.5 -- each step lands in the 0.08 mm air
+gap between adjacent gear faces:
 
-* 3/8 in x 150.5 -- pivot journal 25 + seats T120..T024 (shy of 152.5:
-  east line out of T018's slab)
-* 1/4 in x 8.1 -- T018 seat (shy of 160: east line out of T012's slab)
-* 0.08 in x 66.4 -- T012/T006 region + thin-tip journal into the green
-  post (T012 rides it canted with a loose 1/4 in bore; the parked
-  perpendicular T006 is snug at station 178)
+* 3/8 in x 136.88 -- pivot journal 25 (64T at stations 14.9..24.9) +
+  seats T120..T024
+* 1/4 in x 6.59 -- T018 seat
+* 3/16 in x 6.58 -- T012 seat
+* 1/8 in x 39.95 -- T006 seat + thin-tip journal into the green post
+  (the M6.7 shaft line passes 0.39 clear of the last drum gear's tooth
+  tips, so the photo-true 1/8 in tip needs no narrowing)
 
 Dimensions: cad/DIMENSIONS.md "Chapter 12" -- base dia legacy (med),
-length derived from the annotated 150 mm stack + p.18 top-down end
-allowances (low), step diameters = gear bores (Appendix C #7).
+length 190 = pivot journal + stack + thin-tip journal through the knob
+post at station 177 (derived, low), step diameters = gear bores
+(Appendix C #7).
 
 Build: four coaxial Front-plane circles extruded +Z to each section's end
 station with ``merge_result`` -- each smaller cylinder is contained in
@@ -70,17 +68,19 @@ from _gear import volume_check
 PART_NAME = "cone-gear-shaft"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
-SEAT_PITCH = 7.5  # mm, 150 stack / 20 gears (annotated p.18)
 PIVOT_JOURNAL = 25.0  # mm, large-end journal into the pivot block (low)
 
 # (diameter in inches, section end station in mm from the pivot end).
-# Sections feed build_cone_gear.bore_dia_in; end stations sit shy of the
-# nominal 25 + k * 7.5 seat boundaries and the tip is 0.08 in -- M6.6
-# canted-slab / drum-tip clearances, see docstring. Total 225.
+# M6.7 exact-tracking seat pitch 6.58390 (= 7.0568 drum z-pitch x
+# cos 21.0976 deg): seat j spans 28.25 + 6.5839 j +- 3.25; each step
+# station sits in the 0.08 air gap between faces (T024 north face
+# 136.84 | 136.88 | T018 south face 136.93, and so on). Diameters
+# mirror build_cone_gear.bore_dia_in (snug perpendicular seats).
 SECTIONS = [
-    (0.375, 150.5),  # pivot journal + seats T120..T024
-    (0.25, 158.6),  # T018 seat
-    (0.08, 225.0),  # T012/T006 region + thin-tip journal
+    (0.375, 136.88),  # pivot journal + 64T seat + T120..T024
+    (0.25, 143.47),  # T018 seat
+    (0.1875, 150.05),  # T012 seat
+    (0.125, 190.0),  # T006 seat + thin-tip journal (knob post at 177)
 ]
 
 
