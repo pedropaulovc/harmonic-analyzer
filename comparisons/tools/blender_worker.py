@@ -1,21 +1,31 @@
-"""Blender headless worker — renders comparison pairs from an STL.
+"""Blender headless worker — renders comparison pairs from the STL cache.
 
 Runs INSIDE Blender's bundled Python (no repo imports; stdlib + bpy only):
 
     blender -b --factory-startup -P blender_worker.py -- job.json
 
-job.json = {
-  "stl": "<abs path>",
-  "boxes": "<abs path or null>",          # component boxes JSON (assemblies)
-  "pairs": [{"id", "camera", "width", "height", "out"}]
-}
+job.json (part model):
+  {"stl": "<abs path>", "rgb": [r,g,b] | null,
+   "pairs": [{"id", "camera", "width", "height", "out"}]}
+
+job.json (assembly model):
+  {"parts_dir": "<abs dir of per-part STLs>",
+   "scene": "<abs path of boxes/scene JSON>",      # boxes + components
+   "pairs": [...]}
+
+Geometry is exported in metres, untranslated (export_models.py sets
+swExportStlUnits/swSTLDontTranslateToPositive), so component transforms
+(IMathTransform.ArrayData: row-vector convention, 9 rotation + 3
+translation + scale) place instanced part meshes exactly in assembly
+space, and component boxes need no normalisation.
 
 Camera convention matches cad/scripts/render_compare.py: model space has +Y
 up, az 0 / el 0 looks from +Z (SolidWorks Front), +az moves the camera
 toward +X. Orthographic only (the SolidWorks pipeline is ortho too). Pairs
 with camera.frame_components replicate resolve_framing(): centre on the
 matched components' union box, zoom = clamp(0.75 * whole/box, 1, 15).
-Background is rendered transparent; the CLI composites it onto white.
+Workbench renders with per-object colours (the components' appearance RGB);
+background is transparent and the CLI composites it onto white.
 """
 
 import json
@@ -26,6 +36,8 @@ from pathlib import Path
 
 import bpy
 from mathutils import Matrix, Vector
+
+DEFAULT_RGB = (0.55, 0.55, 0.55)
 
 
 def camera_axes(az_deg, el_deg, roll_deg=0.0):
@@ -65,16 +77,54 @@ def scene_bounds(objs):
     return lo, hi
 
 
-def load_boxes(path, mesh_lo, mesh_hi):
-    """Component boxes scaled from metres into mesh units via bbox ratio
-    (robust to whatever unit the STL was exported in)."""
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
-    boxes = [(e["name"], e["box"]) for e in data["boxes"]]
-    blo = tuple(min(b[i] for _, b in boxes) for i in range(3))
-    bhi = tuple(max(b[i + 3] for _, b in boxes) for i in range(3))
-    s = max(hi - lo for hi, lo in zip(mesh_hi, mesh_lo)) / max(
-        hi - lo for hi, lo in zip(bhi, blo))
-    return [(n, [v * s for v in b]) for n, b in boxes]
+def sw_matrix(xform):
+    """SolidWorks ArrayData (row-vector convention) -> Blender 4x4."""
+    a, b, c, d, e, f, g, h, i, tx, ty, tz, s = xform[:13]
+    m = Matrix((
+        (a * s, d * s, g * s, tx),
+        (b * s, e * s, h * s, ty),
+        (c * s, f * s, i * s, tz),
+        (0.0, 0.0, 0.0, 1.0),
+    ))
+    return m
+
+
+def import_stl(path):
+    before = set(bpy.data.objects)
+    bpy.ops.wm.stl_import(filepath=str(path))
+    new = [o for o in set(bpy.data.objects) - before if o.type == "MESH"]
+    if not new:
+        raise RuntimeError(f"no mesh imported from {path}")
+    return new[0]
+
+
+def build_part(job):
+    obj = import_stl(job["stl"])
+    obj.color = (*(job.get("rgb") or DEFAULT_RGB), 1.0)
+    return [obj], []
+
+
+def build_assembly(job):
+    scene_data = json.loads(Path(job["scene"]).read_text(encoding="utf-8"))
+    components = scene_data.get("components") or []
+    if not components:
+        raise RuntimeError(f"no components in {job['scene']} — re-run export_models.py")
+    parts_dir = Path(job["parts_dir"])
+    meshes = {}
+    objs = []
+    for comp in components:
+        stem = comp["part"]
+        if stem not in meshes:
+            seed = import_stl(parts_dir / f"{stem}.STL")
+            meshes[stem] = seed.data
+            bpy.data.objects.remove(seed)
+        obj = bpy.data.objects.new(comp["name"], meshes[stem])
+        bpy.context.scene.collection.objects.link(obj)
+        obj.matrix_world = sw_matrix(comp["xform"])
+        obj.color = (*(comp.get("rgb") or DEFAULT_RGB), 1.0)
+        objs.append(obj)
+    boxes = [(e["name"], e["box"]) for e in scene_data.get("boxes", [])]
+    return objs, boxes
 
 
 def resolve_framing(cam, boxes, mesh_lo, mesh_hi):
@@ -102,14 +152,10 @@ def main():
     job = json.loads(Path(sys.argv[sys.argv.index("--") + 1]).read_text(encoding="utf-8"))
 
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    bpy.ops.wm.stl_import(filepath=job["stl"])
+    objs, boxes = build_assembly(job) if job.get("scene") else build_part(job)
     scene = bpy.context.scene
-    objs = [o for o in scene.objects if o.type == "MESH"]
-    if not objs:
-        raise RuntimeError(f"no meshes imported from {job['stl']}")
     mesh_lo, mesh_hi = scene_bounds(objs)
     ext = max(hi - lo for hi, lo in zip(mesh_hi, mesh_lo))
-    boxes = load_boxes(job["boxes"], mesh_lo, mesh_hi) if job.get("boxes") else []
 
     cam_data = bpy.data.cameras.new("cam")
     cam_data.type = "ORTHO"
@@ -122,6 +168,7 @@ def main():
 
     scene.render.engine = "BLENDER_WORKBENCH"
     scene.display.shading.light = "STUDIO"
+    scene.display.shading.color_type = "OBJECT"
     scene.display.render_aa = "11"
     scene.render.film_transparent = True
     scene.render.image_settings.file_format = "PNG"
@@ -130,8 +177,6 @@ def main():
         c = pair["camera"]
         r, u, o = camera_axes(c.get("az_deg", 0.0), c.get("el_deg", 0.0), c.get("roll_deg", 0.0))
         target, zoom = resolve_framing(c, boxes, mesh_lo, mesh_hi)
-        # explicit manifest target overrides (mm -> mesh units not resolvable
-        # without boxes; framed/centred cases cover the manifest as seeded)
         rot = Matrix(((r[0], u[0], o[0]), (r[1], u[1], o[1]), (r[2], u[2], o[2])))
         m = rot.to_4x4()
         m.translation = Vector(target) + Vector(o) * ext * 3
