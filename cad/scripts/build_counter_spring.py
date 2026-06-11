@@ -10,14 +10,17 @@ front page (the spring exits the page top). Recalibrated against the ch. 19
 full-machine photo (gooseneck scale 0.515 px/mm, top ~ y 1438) and the p3
 90-degree page: body ~315 long, OD ~12.5, wire ~1.8, visibly close-wound
 (dark, no light through the coils). The bottom wire is a LONG straight drop
-(~49 mm) from the coil to the ring that hooks the summing-lever boss at
-(95, ~1003); the top hook is the usual short lead + loop onto the gooseneck
-tip screw. See DIMENSIONS.md ch. 19.
+(40 mm) from the coil to the ring that hangs on the summing-lever boss
+J-hook (build_boss_hook.py, rod along X at (95, 1015)); the top hook hangs
+on the X-pin under the gooseneck tip lug at (95, 1373). Both loops lie in
+the YZ plane after the assembly's 90-degree Y-rotation, so each encircles
+its X-rod nail-through-ring style (the p.43 black hook + chrome ring chain
+collapsed to loop-on-hook -- simplification). See DIMENSIONS.md ch. 19.
 
 Layout: coil axis along +Y from the origin (helix base circle on the Top
 plane); the helix starts and ends on the +X side (whole number of coils).
-In the machine the origin lands at (x ~93, y 1052, z 0): bottom ring centre
-at y ~1003, top hook tip at y ~1376.
+In the machine the origin lands at (95, 1052, 0): bottom ring centre at
+y 1012, top loop centre at y 1370.6.
 
 Run (SolidWorks already open)::
 
@@ -47,9 +50,9 @@ COIL_BODY_LENGTH = 315.0  # DIMENSIONS.md ch19: ch.19 photo, gooseneck-scaled (l
 COIL_OD = 12.5  # DIMENSIONS.md ch19: scaled vs gooseneck tube O16 (low)
 WIRE_DIA = 1.8  # DIMENSIONS.md ch19: close-wound dark coil (low)
 COIL_COUNT = 165  # close-wound: pitch 1.91 leaves a 0.11 sweep-merge gap (derived)
-BOTTOM_LEAD = 49.0  # straight drop, coil bottom -> boss ring centre (derived:
-# body bottom y 1052 - ring centre y ~1003; see build_output_assembly.py)
-TOP_LEAD = 2.0 * WIRE_DIA  # standard short hook onto the gooseneck tip screw
+BOTTOM_LEAD = 40.0  # straight drop, coil bottom -> boss-hook ring centre
+# (body bottom y 1052 - ring centre y 1012; see build_output_assembly.py)
+TOP_LEAD = 2.0 * WIRE_DIA  # standard short hook onto the gooseneck tip pin
 
 MEAN_RADIUS = (COIL_OD - WIRE_DIA) / 2.0
 PITCH = COIL_BODY_LENGTH / COIL_COUNT  # whole coils: both ends land at +X
