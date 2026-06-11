@@ -258,7 +258,7 @@ def main() -> int:
             ok = doc.SaveAs3(str(out), 0, 0)
             if not out.exists():
                 raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={ok})")
-            colors.setdefault(stem, doc_rgb(doc))
+            colors[stem] = doc_rgb(doc)
             log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB) rgb={colors[stem]}")
             adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
@@ -288,7 +288,11 @@ def main() -> int:
                 if not out.exists():
                     raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={ok})")
                 log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB)")
-                boxes, scene, stems = scan_assembly(adapter, colors)
+                # fresh cache: preloaded colors.json entries would mask
+                # colour changes made to part docs since the last export
+                scan_colors: dict = {}
+                boxes, scene, stems = scan_assembly(adapter, scan_colors)
+                colors.update(scan_colors)
                 (OUT_BOXES / f"{dashed}.json").write_text(json.dumps({
                     "unit": "m",
                     "boxes": [{"name": n, "box": list(b)} for n, b in boxes],
