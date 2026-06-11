@@ -16,6 +16,10 @@ build_<name>_assembly.py -> cad/out/sldasm/<name>.SLDASM.
 Run (SolidWorks already open)::
 
     C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_all.py [--clean]
+
+``--rebuild stem1,stem2`` deletes just those artefacts plus every assembly
+whose build script references them (dashed-name literal scan), then runs the
+normal queue -- the skip logic rebuilds exactly what was deleted.
 """
 
 from __future__ import annotations
@@ -85,7 +89,59 @@ def close_solidworks_documents() -> None:
         print(f"--  CloseAllDocuments skipped ({exc})")
 
 
+def script_for(stem: str) -> Path:
+    if stem in ASSEMBLY_ORDER:
+        return SCRIPTS_DIR / f"build_{stem}_assembly.py"
+    return SCRIPTS_DIR / f"build_{stem}.py"
+
+
+def dependents_of(stem: str) -> list[str]:
+    """Assembly stems whose build script references this part/assembly.
+
+    Prefix string scan for the dashed name literal (e.g. "cone-gear" or
+    "drive-train.SLDASM"); over-matching on shared prefixes only costs an
+    extra rebuild, never a stale artefact.
+    """
+    dashed = stem.replace("_", "-")
+    deps = []
+    for asm in ASSEMBLY_ORDER:
+        if asm == stem:
+            continue
+        src = script_for(asm).read_text(encoding="utf-8")
+        if f'"{dashed}' in src:
+            deps.append(asm)
+    if deps and "harmonic_analyzer" not in deps:
+        deps.append("harmonic_analyzer")
+    return deps
+
+
+def delete_artefacts(stem: str) -> None:
+    artefact = artefact_for(script_for(stem))
+    png_dir = CAD_OUT / "png" / stem.replace("_", "-")
+    for target in (artefact, png_dir):
+        if not target.exists():
+            continue
+        if target.is_dir():
+            shutil.rmtree(target)
+        else:
+            target.unlink()
+        print(f"--  deleted {target.relative_to(CAD_OUT)}")
+
+
 def main() -> int:
+    if "--rebuild" in sys.argv[1:]:
+        stems = sys.argv[sys.argv.index("--rebuild") + 1].split(",")
+        unknown = [s for s in stems if not script_for(s).exists()]
+        if unknown:
+            print(f"!!  unknown stems: {unknown}")
+            return 1
+        close_solidworks_documents()
+        targets = []
+        for s in stems:
+            targets += [s] + dependents_of(s)
+        for s in dict.fromkeys(targets):
+            delete_artefacts(s)
+
     if "--clean" in sys.argv[1:]:
         close_solidworks_documents()
         for sub in ("sldprt", "sldasm", "png"):
