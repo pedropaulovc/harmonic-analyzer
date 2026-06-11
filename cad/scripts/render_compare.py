@@ -63,6 +63,21 @@ def _flag(obj: Any, iface: str) -> None:
         pass
 
 
+def _put_object(obj: Any, prop: str, value: Any) -> None:
+    """Assign an object-valued COM property, escalating to PROPERTYPUTREF."""
+    try:
+        setattr(obj, prop, value)
+    except Exception:
+        import pythoncom
+
+        dispid = obj._oleobj_.GetIDsOfNames(0, prop)
+        obj._oleobj_.Invoke(
+            dispid, 0,
+            pythoncom.DISPATCH_PROPERTYPUT | pythoncom.DISPATCH_PROPERTYPUTREF,
+            0, value,
+        )
+
+
 def model_path(model: str) -> Path:
     dashed = model.replace("_", "-")
     for p in (OUT_SLDASM / f"{dashed}.SLDASM", OUT_SLDPRT / f"{dashed}.SLDPRT"):
@@ -123,22 +138,11 @@ def set_camera(adapter: Any, cam: dict) -> None:
 
     r, u, o = camera_axes(cam.get("az_deg", 0.0), cam.get("el_deg", 0.0), cam.get("roll_deg", 0.0))
     vecs = [mu.CreateVector(double_array(list(v))) for v in (r, u, o)]
-    origin = mu.CreatePoint(double_array([0.0, 0.0, 0.0]))
-    xform = mu.ComposeTransform(*vecs, origin.ConvertToVector(), 1.0)
+    origin_vec = mu.CreateVector(double_array([0.0, 0.0, 0.0]))
+    xform = mu.ComposeTransform(*vecs, origin_vec, 1.0)
+    _flag(xform, "IMathTransform")
     orient = _read_member(xform, "Inverse")
-    _flag(orient, "IMathTransform")
-    try:
-        view.Orientation3 = orient
-    except Exception:
-        # Object-valued propput can need PROPERTYPUTREF under late binding.
-        import pythoncom
-
-        dispid = view._oleobj_.GetIDsOfNames(0, "Orientation3")
-        view._oleobj_.Invoke(
-            dispid, 0,
-            pythoncom.DISPATCH_PROPERTYPUT | pythoncom.DISPATCH_PROPERTYPUTREF,
-            0, orient._oleobj_,
-        )
+    _put_object(view, "Orientation3", orient)
     model.ViewZoomToFit2()  # normalise Scale2/Translation3 for the new rotation
 
     scale = float(_read_member(view, "Scale2"))
@@ -149,11 +153,11 @@ def set_camera(adapter: Any, cam: dict) -> None:
     target = cam.get("target_mm")
     if target:
         # Doc recipe: Translation3 = (target * -Scale2) through the orientation.
-        pt = mu.CreatePoint(double_array([c / 1000.0 for c in target]))
-        _flag(pt, "IMathPoint")
-        pt = pt.Scale(-scale)
-        pt = pt.MultiplyTransform(orient)
-        view.Translation3 = pt.ConvertToVector()
+        # View-space coords of the target are plain dot products with the
+        # camera axes, so no COM math-object chaining is needed.
+        t = [c / 1000.0 for c in target]
+        tv = [-scale * sum(a * b for a, b in zip(axis, t, strict=True)) for axis in (r, u, o)]
+        _put_object(view, "Translation3", mu.CreateVector(double_array(tv)))
 
     persp = cam.get("perspective")
     has = bool(_read_member(view, "HasPerspective"))
