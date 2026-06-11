@@ -4,8 +4,10 @@ The green cast block on the east end of the top frame that grips the
 gooseneck post: a vertical O16.5 bore the O16 tube slides in (spring
 tension adjustment), pinched by a square-head screw from the side --
 "a square-head screw [that] pinches the post in its socket" (p. 45).
-The screw is merged into this part with its shank stopped at the bore
-wall so the assembled tube does not interfere (simplification).
+The screw is merged into this part as just the square head on the block
+face -- the shank band between head and bore wall is solid block
+material, so a shank feature would be a zero-volume no-op
+(simplification; the assembled tube does not interfere).
 
 Layout: origin at the block's base centre on the bore axis (machine
 (197, 1040.7, 0) -- on the east rail/crossbar end). Block +Y, bore
@@ -41,9 +43,8 @@ BLOCK_HEIGHT = 29.0
 BLOCK_HALF_Z = 12.0
 BORE_DIA = 16.5  # slides on the O16 gooseneck (derived)
 HEAD_HALF = 5.0  # square screw head 10 x 10 x 6 (low)
-HEAD_Z = (12.0, 18.0)
-SHANK_DIA = 5.0
-SHANK_Z = (8.4, 12.0)  # stops 0.15 shy of the bore wall (8.25)
+HEAD_Z = (12.0, 18.0)  # on the block face; the shank is implicit -- the
+# band between the head and the bore wall (8.25) is solid block material
 SCREW_Y = 15.0
 
 
@@ -117,14 +118,10 @@ async def build(adapter) -> dict[str, str]:
     expected += (2.0 * HEAD_HALF) ** 2 * (HEAD_Z[1] - HEAD_Z[0])
     await _assert_volume(adapter, "head", expected, 0.005)
 
-    # Screw shank, stopping at the bore wall.
-    check("create_sketch shank", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, SCREW_Y, SHANK_DIA / 2.0, "shank")
-    await ensure_fully_defined(adapter, "shank sketch")
-    check("exit_sketch shank", await adapter.exit_sketch())
-    extrude_at_offset(adapter, SHANK_Z[1] - SHANK_Z[0], SHANK_Z[0])
-    expected += math.pi * (SHANK_DIA / 2.0) ** 2 * (SHANK_Z[1] - SHANK_Z[0])
-    await _assert_volume(adapter, "shank", expected, 0.005)
+    # No shank feature: the head sits on the block face (z 12) and the bore
+    # wall is at z 8.25, so the whole shank band lies inside solid block
+    # material -- a shank extrude is a zero-volume no-op (caught live: the
+    # +70.7 mm^3 expectation passed only via the 0.5% tolerance).
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
