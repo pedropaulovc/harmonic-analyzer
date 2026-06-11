@@ -58,7 +58,7 @@ perpendicular 64T presents its contact tooth 50.8*sin(i) = 18.3 north
 of its centre, the pinion is centred on that plane, and X_CRANK backs
 off so the +-1.8 oblique dive across the 64T face caps clear of the
 DP 16 working depth (PEN16_EDGE_SLACK; the deep south side stays
-visibly interleaved at 2.6 of 3.2).
+visibly interleaved at 2.1 of 3.2).
 
 Positions per cad/DIMENSIONS.md ch. 13 "Drive-train layout" + "Drive
 supports". Tooth phasing: every gear script seeds a TOOTH centred on
@@ -182,17 +182,17 @@ R64 = 2.0 * 25.4  # DP 16, 64T pitch radius
 # Crank: the 64T's contact tooth (azimuth 0, toward +x) sits R64*sin(i)
 # north of its centre; the pinion is centred on that plane and the mesh
 # backs off so the +-5 oblique dive caps short of working depth. Slack
-# 0.90 is checker-arbitrated like the drum mesh's (the long +-1.8 dive
+# 1.10 is checker-arbitrated like the drum mesh's (the long +-1.8 dive
 # across the 64T face squeezes flanks: 0.15 left 1.48 mm^3, 0.60 left
-# 0.23).
+# 0.23, 0.90 a 0.00 skin).
 ADD16 = 25.4 / 16.0
 WORK16 = 2.0 * ADD16  # 3.175
-PEN16_EDGE_SLACK = 0.90
-PEN16_MID = WORK16 - PEN16_EDGE_SLACK - (GEAR64_FACE / 2.0) * SIN_I  # 0.475
+PEN16_EDGE_SLACK = 1.10
+PEN16_MID = WORK16 - PEN16_EDGE_SLACK - (GEAR64_FACE / 2.0) * SIN_I  # 0.275
 PINION_TOOTH_Z = GEAR64_SEAT[2] + R64 * SIN_I  # -38.32
 X_CRANK = (
     GEAR64_SEAT[0] + R64 * COS_I + 12.7 + (ADD16 * (1.0 + SEC_I) - PEN16_MID)
-)  # 117.80 -- photo: pedestal 122 +- 3 (1.4 sigma, see DIMENSIONS.md)
+)  # 118.00 -- photo: pedestal 122 +- 3 (1.3 sigma, see DIMENSIONS.md)
 
 ARBOR_LENGTH = 200.0  # spans z -100..+100
 CRANKSHAFT_Z0 = -150.0  # front end; crank-arm hub at +12 (PIN_HOLE_HEIGHT)
