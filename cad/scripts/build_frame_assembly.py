@@ -1,8 +1,9 @@
 r"""Reproduction script: frame subassembly (book ch. 6 / eight-views).
 
 Static structure of the machine: the two-plate cast base, four fluted
-columns at the corners, four corner brackets hugging the columns, and the
-three cast A-frames that will carry the rocker-arm shaft.
+columns at the corners, four corner brackets hugging the columns, the two
+tapered support frustums that carry the rocker-pivot shaft, and the
+top-frame ring clamping the columns just below their tops.
 
 Layout (from the ch. 6 dimension photo and the ch. 30 eight views; assembly
 axes follow the harmonic-base part: X = 46 cm length, Y = up, Z = 28 cm
@@ -10,27 +11,23 @@ depth):
 
 * harmonic-base fixed at the origin, top face at Y = 50.8.
 * tube-frame x4 standing on the base top face near the top-plate corners,
-  centres at (+/-197, , +/-112) — 25.25/21.35 mm inset from the top-plate
-  edges, clear of the A-frames (eight views: columns sit at the extreme
-  corners).
+  centres at (+/-197, +/-112) — 25.25/21.35 mm inset from the top-plate
+  edges (eight views: columns sit at the extreme corners).
 * corner-bracket x4 beside each column on its inboard-X side, upright
   plate tangent to the column, foot toward the machine centre (ch. 30
   views 1/8 show the green tabs against the column bases).
-* rocker-arm-support x2 at Z = +/-101.6, X centred: the CHANNEL AXIS
-  runs along Z (ch. 30 view 3/8 shows the cone gear set lying along the
-  machine depth and the channel curtain spread across the side views;
-  ch. 14 p.26 shows the pivot bosses at the gate apex with the windowed
-  face looking along the pivot). The gates stand as built (no rotation:
-  184 mm width across X, 63.5 mm taper along Z, window facing +/-Z) at
-  the channel-stack ends, outer edges flush with the top-plate edge
-  (133.35 - 63.5/2 = 101.6 — the eight views show the castings
-  edge-to-edge in depth). The gates' 139.7 mm clear span comfortably
-  holds the channel stack: Z-pitch 7.06 mm = 7.5 mm cone-axis pitch x
-  cos(19.8 deg cone-shaft incline, arcsin(2.54/7.5) from the mesh
-  condition — DIMENSIONS.md appendix C #3). Only two
-  gates carry the rocker pivot; the third A-frame casting is the
-  translational-gearing/output support (the taper-on triangle visible
-  front-centre in views 1/8 and 5/8) and belongs to output.SLDASM.
+* rocker-arm-support x2 (solid tapered frustums, M6.3 re-authoring) at
+  (X, Z) = (-72.9, +/-101.6): apexes under the rocker-pivot shaft (its
+  ball mounts and the shaft itself live in channel.SLDASM), outer faces
+  flush with the top-plate edge (133.35 - 63.5/2 = 101.6). The CHANNEL
+  AXIS runs along Z. The M6.1 windowed-gate placement at X = 0 is
+  superseded: the pivot x = arbor -47.5 minus the 25.4 rod lever = -72.9
+  (DIMENSIONS.md ch. 14 layout). The third A-frame casting of the legacy
+  count is the translational-gearing/output support and belongs to
+  output.SLDASM (M6.4).
+* top-frame x1: the green ring at ring mid-plane Y = 1020.2 (rails 22 x
+  41, y 999.7..1040.7), corner bosses bored around the four columns; its
+  west rail seats the top-lever ball mounts (channel.SLDASM).
 
 Every component is fixed (base) or fully defined by three orthogonal
 plane-plane mates against the base part's principal planes; distance-mate
@@ -39,12 +36,11 @@ re-adding the mate flipped. Final asserts: every component fixed or
 ``swFullyConstrained``, and zero interferences (tangent/coincident contact
 allowed).
 
-The 20-channel pitch grid (reference planes at the channel pitch) is
-deferred to the channel subassembly: the pitch is still unconfirmed
-(DIMENSIONS.md appendix C #3) and belongs with the rocker shaft.
+The 20-channel pitch stations live in the channel subassembly.
 
-Dimensions: cad/DIMENSIONS.md ch. 6 (base/column) + "Legacy part audit"
-(bracket/A-frame); placements photo-derived (med).
+Dimensions: cad/DIMENSIONS.md ch. 6 (base/column), ch. 14 layout
+(supports), "Channel & top-frame layout" (top frame); placements
+photo-derived (med).
 
 Run (SolidWorks already open)::
 
@@ -76,7 +72,9 @@ COLUMN_Z = 112.0
 COLUMN_RADIUS = 1.375 * IN / 2.0  # tube-frame OD/2
 BRACKET_PLATE_T = 0.3 * IN  # corner-bracket upright plate
 BRACKET_X = COLUMN_X - COLUMN_RADIUS - BRACKET_PLATE_T / 2.0  # plate tangent
-SUPPORT_Z = 133.35 - 63.5 / 2.0  # 101.6: gate outer edge flush w/ top plate
+SUPPORT_X = -72.9  # rocker pivot x: arbor -47.5 - 25.4 rod lever (M6.3)
+SUPPORT_Z = 133.35 - 63.5 / 2.0  # 101.6: outer face flush w/ top plate edge
+TOP_FRAME_MID_Y = 1020.2  # ring mid-plane: rails y 999.7..1040.7 (M6.3)
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 ROT_Y_POS90 = [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]
@@ -155,6 +153,7 @@ async def build(adapter) -> dict[str, str]:
     column_path = _part("tube-frame")
     bracket_path = _part("corner-bracket")
     support_path = _part("rocker-arm-support")
+    top_frame_path = _part("top-frame")
 
     check("create_assembly", await adapter.create_assembly())
 
@@ -211,17 +210,17 @@ async def build(adapter) -> dict[str, str]:
         )
         assert_component_placed(adapter, name, target, rows)
 
-    # Rocker-arm gates at the channel-stack ends along Z, as built (window
-    # facing +/-Z); the rocker pivot (along Z) crosses their top rails.
+    # Rocker-pivot support frustums at the channel-stack ends along Z,
+    # apexes under the pivot shaft at x = -72.9.
     for station in (-SUPPORT_Z, SUPPORT_Z):
-        target = [0.0, BASE_TOP_Y, station]
+        target = [SUPPORT_X, BASE_TOP_Y, station]
         res = await adapter.insert_component(
             InsertComponentParameters(file_path=support_path, position=target)
         )
         check(f"insert_component rocker-arm-support @ {target}", res)
         name = res.data["name"]
         await _plane_mate(
-            adapter, name, "Right Plane", "Right Plane", base_name, 0.0, target
+            adapter, name, "Right Plane", "Right Plane", base_name, SUPPORT_X, target
         )
         await _plane_mate(
             adapter, name, "Front Plane", "Front Plane", base_name, station, target
@@ -230,6 +229,24 @@ async def build(adapter) -> dict[str, str]:
             adapter, name, "Top Plane", "Top Plane", base_name, BASE_TOP_Y, target
         )
         assert_component_placed(adapter, name, target, IDENTITY)
+
+    # Top-frame ring clamped around the four columns, mid-plane y 1020.2.
+    target = [0.0, TOP_FRAME_MID_Y, 0.0]
+    res = await adapter.insert_component(
+        InsertComponentParameters(file_path=top_frame_path, position=target)
+    )
+    check(f"insert_component top-frame @ {target}", res)
+    name = res.data["name"]
+    await _plane_mate(
+        adapter, name, "Right Plane", "Right Plane", base_name, 0.0, target
+    )
+    await _plane_mate(
+        adapter, name, "Front Plane", "Front Plane", base_name, 0.0, target
+    )
+    await _plane_mate(
+        adapter, name, "Top Plane", "Top Plane", base_name, TOP_FRAME_MID_Y, target
+    )
+    assert_component_placed(adapter, name, target, IDENTITY)
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)
