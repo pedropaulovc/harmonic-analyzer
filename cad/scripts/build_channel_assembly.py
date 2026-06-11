@@ -14,7 +14,8 @@ the lever tips. 144 components:
   O35 corner-boss bores)
 * rocker-arm x20, pivot-bushing x19, connecting-rod x20,
   amplitude-bar x20, channel-lever x20, lever-bushing x19,
-  channel-spring x20
+  channel-spring-installed x20 (M6.4: the stretched in-machine spring --
+  the free 32 mm part stays for the ch. 17 table-top inset)
 
 Default mechanism state (DIMENSIONS.md "Channel & top-frame layout"):
 cylinder-gear notches +Y (cosine alignment), integral cam lobes -Y, rod
@@ -24,8 +25,12 @@ intersection of the r 25.4 circle about the pivot with the r 127 circle
 about the ring centre (arm tilt ~ -11.54 deg, rod tilt ~ +0.23 deg Rz);
 the bar rests its foot-notch roof on the tilted arm's top-edge arc
 (contact at the bar's -X edge); the bar's top pin height tilts the levers
-(~ +0.36 deg); the spring eye hangs 3.37 below the lever spring hole so
-its ring threads the O4 hole without touching (margins asserted > 0.1).
+(~ +0.36 deg); the spring's top eye hangs 3.37 below the lever spring
+hole so its ring threads the O4 hole without touching (margins asserted
+> 0.1); the bottom lead drops through the summing-lever plate's O4.5
+hole (at z_j - 1.95, one coil mean radius -Z of the spring axis) with
+the end loop hanging under the plate (asserted clearances -- the plate
+itself lives in output.SLDASM, checked at the top level).
 
 Orientation notes: the amplitude bar is rotated 90 deg about its long
 axis (Ry(90)) so its end slots and O2 top pin hole run across Z,
@@ -108,12 +113,21 @@ SUPPORT_Z = 101.6
 RAIL_TOP_Y = 1040.7
 LEVER_MOUNT_Z = 85.0  # clears the top-frame boss bores (DIMENSIONS.md)
 
-# --- spring (build_channel_spring.py locals) --------------------------------
-SPRING_EYE_LOCAL_Y = 34.0  # body 32 + lead 2.0 -> loop centre on the axis
+# --- spring (build_channel_spring_installed.py locals) ----------------------
+from build_channel_spring_installed import (  # noqa: E402
+    BOTTOM_LEAD as SPRING_BOTTOM_LEAD,
+    TOP_EYE_LOCAL_Y as SPRING_EYE_LOCAL_Y,  # 65.05: loop centre on the axis
+)
+
 SPRING_LOOP_R = 2.75  # = coil mean radius
 SPRING_WIRE_DIA = 1.0
-SPRING_EYE_DROP = 3.37  # eye centre below the lever spring hole
+SPRING_EYE_DROP = 3.37  # top eye centre below the lever spring hole
 SPRING_HOLE_DIA = 4.0  # build_channel_lever.py (O3 photo read enlarged: threading)
+
+# --- summing-lever plate interface (build_summing_lever.py) ------------------
+PLATE_TOP_Y = 998.0
+PLATE_THICKNESS = 5.1
+PLATE_HOLE_DIA = 4.5
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 ROT_Y_POS90 = [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]
@@ -265,6 +279,34 @@ def _assert_spring_threading(hole_y: float, eye_y: float) -> None:
     )
 
 
+def _assert_plate_threading(eye_y: float) -> None:
+    """Assert the bottom attachment clears the summing-lever plate.
+
+    The bottom lead (a straight O1 wire one coil mean radius -Z of the
+    spring axis) drops through the plate's O4.5 hole; the end loop hangs
+    fully under the plate. Checks: loop top vs plate bottom, coil bottom
+    wire vs plate top, lead vs bore (lead centred: hole r - wire r).
+    """
+    bottom_eye_y = eye_y - SPRING_EYE_LOCAL_Y - SPRING_BOTTOM_LEAD
+    plate_bottom = PLATE_TOP_Y - PLATE_THICKNESS
+    wire_r = SPRING_WIRE_DIA / 2.0
+    loop_top = bottom_eye_y + SPRING_LOOP_R + wire_r
+    coil_bottom_wire = bottom_eye_y + SPRING_BOTTOM_LEAD - wire_r
+    margin_loop = plate_bottom - loop_top
+    margin_coil = coil_bottom_wire - PLATE_TOP_Y
+    margin_bore = PLATE_HOLE_DIA / 2.0 - wire_r
+    if margin_loop < 0.02 or margin_coil < 0.02:
+        raise RuntimeError(
+            f"plate threading margins too small: loop-under-plate"
+            f" {margin_loop:.3f}, coil-over-plate {margin_coil:.3f}"
+        )
+    log(
+        f"plate threading: bottom eye y {bottom_eye_y:.2f}, loop-under-plate"
+        f" margin {margin_loop:.2f}, coil-over-plate margin {margin_coil:.2f},"
+        f" lead bore clearance {margin_bore:.2f}"
+    )
+
+
 async def build(adapter) -> dict[str, str]:
     state = solve_default_state()
     log(
@@ -281,6 +323,7 @@ async def build(adapter) -> dict[str, str]:
     spring_hole_y = FULCRUM[1] + LEVER_SPRING_X * math.sin(phi)
     eye_y = spring_hole_y - SPRING_EYE_DROP
     _assert_spring_threading(spring_hole_y, eye_y)
+    _assert_plate_threading(eye_y)
 
     # Bushing clearance under the bar foot at d = 0 (geometry gate).
     bar_clearance = state["bar_bottom"] - PIVOT[1]
@@ -351,9 +394,10 @@ async def build(adapter) -> dict[str, str]:
             [0.0, 0.0, state["lever_tilt"]], lever_rows, label=f"channel-lever ch{j:02d}",
         )
         # Spring rotated 90 about Y: eye ring perpendicular to the lever
-        # face; eye centre (local (0, 34)) is on the axis, Ry-invariant.
+        # face; top eye centre (local (0, 65.05)) is on the axis,
+        # Ry-invariant; the bottom lead lands at z_mid - 2.75 (plate hole).
         await _place(
-            adapter, "channel-spring",
+            adapter, "channel-spring-installed",
             [spring_hole_x, eye_y - SPRING_EYE_LOCAL_Y, z_mid],
             [0.0, 90.0, 0.0], ROT_Y_POS90, label=f"channel-spring ch{j:02d}",
         )

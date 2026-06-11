@@ -58,8 +58,16 @@ HOOK_LEAD = 2.0 * WIRE_DIA  # _common.add_spring_end_hooks default
 EYE_C2C = COIL_BODY_LENGTH + 2.0 * HOOK_LEAD  # hook eye centres, 36.0 free
 
 
-async def build_spring(adapter, part_name: str, body_length: float) -> dict[str, str]:
-    """Build a channel spring with the given coil body length (mm)."""
+async def build_spring(
+    adapter,
+    part_name: str,
+    body_length: float,
+    leads: tuple[float, float] | None = None,
+) -> dict[str, str]:
+    """Build a channel spring with the given coil body length (mm).
+
+    ``leads`` = (bottom, top) hook lead lengths; None = 2 x wire both ends.
+    """
     from solidworks_mcp.adapters.base import SweepParameters
 
     pitch = body_length / COIL_COUNT  # whole coils: both ends land at +X
@@ -83,7 +91,7 @@ async def build_spring(adapter, part_name: str, body_length: float) -> dict[str,
         await adapter.create_sweep(SweepParameters(path=helix_name)),
     )
 
-    await add_spring_end_hooks(adapter, MEAN_RADIUS, WIRE_DIA, body_length)
+    await add_spring_end_hooks(adapter, MEAN_RADIUS, WIRE_DIA, body_length, leads=leads)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

@@ -6,10 +6,12 @@ sprocket and the removable gear, ending in the large brass thumb knob
 (simplification -- the reeding recipe needs an X-axis layout and this
 part's stack is sized along its axis).
 
-Layout: axis +Y from the latch-side end at the origin; the assembly
-rotates +Y to -Z (machine front). Shaft y 0..23.5 (latch hub, sprocket,
-removable gear), knob 23.5..30. Dimensions: cad/DIMENSIONS.md ch. 23
-(M6.4, low/derived).
+Layout: axis +Y from the sprocket-side (machine-inboard) end at the
+origin; the assembly rotates +Y to -Z (machine front). The chain plane
+sits inboard at machine z -81 (see build_drive_train_assembly.py), so
+the shaft is long: sprocket near y 0, latch hub at ~y 40, removable
+gear at ~y 50, knob at the outboard end. Dimensions: cad/DIMENSIONS.md
+ch. 23 (M6.4, low/derived).
 
 Run (SolidWorks already open)::
 
@@ -37,7 +39,7 @@ PART_NAME = "transgear-knob-shaft"
 MATERIAL = "Brass"
 
 SHAFT_DIA = 0.375 * IN  # 9.525 (low)
-SHAFT_LEN = 23.5  # latch hub + sprocket + removable gear stack (derived)
+SHAFT_LEN = 62.5  # machine z -77 (sprocket end) .. -139.5 (knob) (derived)
 KNOB_DIA = 20.0  # large brass thumb knob (low)
 KNOB_LEN = 6.5
 
