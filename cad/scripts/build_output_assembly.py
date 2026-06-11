@@ -247,15 +247,20 @@ async def _place(
 
 
 def _assert_counter_spring_hang() -> None:
-    """Bottom ring on the boss-hook arm, hanging with a hair gap."""
-    ring_y = SPRING_POS[1] - CS_BOTTOM_LEAD  # 1012
+    """Bottom ring around the boss-hook arm, a hair of air above the rod.
+
+    Physical hanging would put the ring's inner top ON the rod (contact);
+    we model a 0..0.5 air gap instead so the interference check stays
+    zero (the original sense -- rod top ABOVE the ring inner top -- was
+    inverted and encoded a 0.05 wire/rod overlap)."""
+    ring_y = SPRING_POS[1] - CS_BOTTOM_LEAD  # 1012.1
     ring_inner_top = ring_y + (CS_COIL_OD - CS_WIRE_DIA) / 2.0 - CS_WIRE_DIA / 2.0
     rod_top = BOSS_HOOK_POS[1] + SHANK_RISE + ELBOW_R + HOOK_ROD_DIA / 2.0
-    gap = rod_top - ring_inner_top
+    gap = ring_inner_top - rod_top
     if not 0.0 < gap < 0.5:
-        raise RuntimeError(f"counter-spring ring/rod hang gap {gap:.3f} not in (0, 0.5)")
+        raise RuntimeError(f"counter-spring ring/rod air gap {gap:.3f} not in (0, 0.5)")
     log(f"counter-spring hang: ring inner top {ring_inner_top:.2f}, rod top"
-        f" {rod_top:.2f}, gap {gap:.2f}")
+        f" {rod_top:.2f}, air gap {gap:.2f}")
 
 
 def _assert_rack_mesh() -> None:
