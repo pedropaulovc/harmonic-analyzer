@@ -30,7 +30,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Face-on close-up of the hanging amplitude-bar curtain (parallel flat steel bars, patina texture)"
+   "notes": "Face-on close-up of the hanging amplitude-bar curtain (parallel flat steel bars, patina texture)",
+   "tier": 3
   },
   {
    "id": "amplitude_bar--ch08-p001-img16",
@@ -58,7 +59,8 @@
     "rocker_arm"
    ],
    "status": "rough",
-   "notes": "Daylight oblique view across the fan of amplitude bars/rocker arms; slightly washed out, small thumbnail."
+   "notes": "Daylight oblique view across the fan of amplitude bars/rocker arms; slightly washed out, small thumbnail.",
+   "tier": 4
   },
   {
    "id": "amplitude_bar--ch09-p001-img11",
@@ -86,7 +88,8 @@
     "rocker_arm"
    ],
    "status": "rough",
-   "notes": "Daylight oblique view across amplitude-bar/rocker-arm fan; duplicate of ch08 img16 thumbnail."
+   "notes": "Daylight oblique view across amplitude-bar/rocker-arm fan; duplicate of ch08 img16 thumbnail.",
+   "tier": 4
   },
   {
    "id": "amplitude_bar--ch15-p001-img02",
@@ -113,7 +116,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Macro of amplitude bar upper sections showing wear patterns; faint engraved-style labels 'amplitude bar' and a small mm callout."
+   "notes": "Macro of amplitude bar upper sections showing wear patterns; faint engraved-style labels 'amplitude bar' and a small mm callout.",
+   "tier": 1
   },
   {
    "id": "amplitude_bar--ch15-p002-img01",
@@ -140,7 +144,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Macro of amplitude bar lower ends with stepped hook feet, green support behind, blurred cylinder gears below; no callouts; good tip-geometry reference."
+   "notes": "Macro of amplitude bar lower ends with stepped hook feet, green support behind, blurred cylinder gears below; no callouts; good tip-geometry reference.",
+   "tier": 1
   },
   {
    "id": "amplitude_bar--ch15-p002-img03",
@@ -167,7 +172,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Black-background macro of two amplitude bars; dimension callouts printed: '6.35 mm' bar width and '6.35 mm' gap."
+   "notes": "Black-background macro of two amplitude bars; dimension callouts printed: '6.35 mm' bar width and '6.35 mm' gap.",
+   "tier": 1
   },
   {
    "id": "channel_lever--ch07-p001-img02",
@@ -195,7 +201,8 @@
     "top_frame"
    ],
    "status": "rough",
-   "notes": "Row of ~20 parallel top channel levers lying on the top frame, pivot roller shaft in foreground"
+   "notes": "Row of ~20 parallel top channel levers lying on the top frame, pivot roller shaft in foreground",
+   "tier": 3
   },
   {
    "id": "channel_lever--ch15-p002-img02",
@@ -223,7 +230,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Macro of top levers seated in the slotted heads of the amplitude bars; printed labels 'top lever' and 'amplitude bar'."
+   "notes": "Macro of top levers seated in the slotted heads of the amplitude bars; printed labels 'top lever' and 'amplitude bar'.",
+   "tier": 1
   },
   {
    "id": "channel_lever--ch17-p002-img04",
@@ -251,7 +259,8 @@
     "channel_spring_installed"
    ],
    "status": "rough",
-   "notes": "Small crop of spring tops hooked into lever-end holes"
+   "notes": "Small crop of spring tops hooked into lever-end holes",
+   "tier": 4
   },
   {
    "id": "channel_lever--ch17-p002-img08",
@@ -279,7 +288,8 @@
     "pivot_ball_mount"
    ],
    "status": "rough",
-   "notes": "Extreme macro of top-lever stack pivot end: ball pivot in bracket, black background"
+   "notes": "Extreme macro of top-lever stack pivot end: ball pivot in bracket, black background",
+   "tier": 1
   },
   {
    "id": "channel_spring--ch17-p002-img01",
@@ -306,7 +316,8 @@
     "channel_spring"
    ],
    "status": "rough",
-   "notes": "Small crop of spring hook eyes on installed channel springs"
+   "notes": "Small crop of spring hook eyes on installed channel springs",
+   "tier": 4
   },
   {
    "id": "channel_spring--ch17-p002-img07",
@@ -333,7 +344,8 @@
     "channel_spring"
    ],
    "status": "rough",
-   "notes": "Single channel spring isolated on white; printed dimension callout: 32 mm overall length - prime sizing reference"
+   "notes": "Single channel spring isolated on white; printed dimension callout: 32 mm overall length - prime sizing reference",
+   "tier": 1
   },
   {
    "id": "cone_gear--ch07-p001-img03",
@@ -361,7 +373,8 @@
     "cone_knob_post"
    ],
    "status": "rough",
-   "notes": "Two meshing spiral-toothed brass cone gears, knurled knob post upper left; prime drive-train comparison reference"
+   "notes": "Two meshing spiral-toothed brass cone gears, knurled knob post upper left; prime drive-train comparison reference",
+   "tier": 3
   },
   {
    "id": "cone_gear--ch12-p002-img01",
@@ -389,7 +402,8 @@
     "cylinder_gear"
    ],
    "status": "rough",
-   "notes": "Extreme vertical macro of stacked cone gears meshing with a cylinder gear edge (right); shallow depth of field, focus plane sharp at center."
+   "notes": "Extreme vertical macro of stacked cone gears meshing with a cylinder gear edge (right); shallow depth of field, focus plane sharp at center.",
+   "tier": 1
   },
   {
    "id": "cone_gear--ch12-p003-img01",
@@ -416,7 +430,8 @@
     "cone_gear"
    ],
    "status": "rough",
-   "notes": "Extreme macro of adjacent cone gear tooth rows showing the stepped diameter progression; texture/tooth-form reference only."
+   "notes": "Extreme macro of adjacent cone gear tooth rows showing the stepped diameter progression; texture/tooth-form reference only.",
+   "tier": 1
   },
   {
    "id": "cone_gear--ch12-p003-img03",
@@ -443,7 +458,8 @@
     "cone_gear"
    ],
    "status": "rough",
-   "notes": "Annotated macro at large end: '7 mm' spacing callout, '20th gear 120 teeth', '19th gear 114 teeth', 'This gear engages the crank'; authoritative tooth-count data."
+   "notes": "Annotated macro at large end: '7 mm' spacing callout, '20th gear 120 teeth', '19th gear 114 teeth', 'This gear engages the crank'; authoritative tooth-count data.",
+   "tier": 1
   },
   {
    "id": "cone_gear--ch12-p003-img04",
@@ -470,7 +486,8 @@
     "cone_gear"
    ],
    "status": "rough",
-   "notes": "Ultra-macro of overlapping stepped cone gear teeth (zigzag stack pattern); shallow depth of field, sharp band through center; texture reference."
+   "notes": "Ultra-macro of overlapping stepped cone gear teeth (zigzag stack pattern); shallow depth of field, sharp band through center; texture reference.",
+   "tier": 1
   },
   {
    "id": "connecting_rod--ch13-p002-img04",
@@ -498,7 +515,8 @@
     "cylinder_gear"
    ],
    "status": "rough",
-   "notes": "Extreme macro of black connecting rods between brass gear teeth; small gold 'connecting rod' label printed on one rod."
+   "notes": "Extreme macro of black connecting rods between brass gear teeth; small gold 'connecting rod' label printed on one rod.",
+   "tier": 1
   },
   {
    "id": "counter_spring--ch19-p001-img02",
@@ -526,7 +544,8 @@
     "gooseneck"
    ],
    "status": "rough",
-   "notes": "Extreme macro of counter spring eye looped on slotted screw at gooseneck tip, black background"
+   "notes": "Extreme macro of counter spring eye looped on slotted screw at gooseneck tip, black background",
+   "tier": 1
   },
   {
    "id": "crank_arm--ch11-p002-img03",
@@ -554,7 +573,8 @@
     "crank_handle"
    ],
    "status": "rough",
-   "notes": "Isolated component shot on white: complete crank \u2014 steel arm (printed label 'crank') with turned wooden handle, crankshaft bore and tapered-pin cross hole visible."
+   "notes": "Isolated component shot on white: complete crank \u2014 steel arm (printed label 'crank') with turned wooden handle, crankshaft bore and tapered-pin cross hole visible.",
+   "tier": 1
   },
   {
    "id": "crank_drive_gear--ch23-p003-img05",
@@ -582,7 +602,8 @@
     "transgear_removable"
    ],
    "status": "rough",
-   "notes": "Video-still: medium removable gear meshing the brass crank drive gear; printed label: medium"
+   "notes": "Video-still: medium removable gear meshing the brass crank drive gear; printed label: medium",
+   "tier": 4
   },
   {
    "id": "crank_drive_gear--ch23-p003-img06",
@@ -610,7 +631,8 @@
     "transgear_removable"
    ],
    "status": "rough",
-   "notes": "Video-still: small removable gear meshing crank drive gear; printed label: small"
+   "notes": "Video-still: small removable gear meshing crank drive gear; printed label: small",
+   "tier": 4
   },
   {
    "id": "crank_drive_gear--ch23-p003-img07",
@@ -638,7 +660,8 @@
     "transgear_stub"
    ],
    "status": "rough",
-   "notes": "Video-still: crank drive gear with bare stub, no removable gear; printed label: no gear"
+   "notes": "Video-still: crank drive gear with bare stub, no removable gear; printed label: no gear",
+   "tier": 4
   },
   {
    "id": "crank_drive_gear--ch23-p003-img08",
@@ -666,7 +689,8 @@
     "transgear_removable"
    ],
    "status": "rough",
-   "notes": "Video-still: large removable gear meshing crank drive gear; printed label: large"
+   "notes": "Video-still: large removable gear meshing crank drive gear; printed label: large",
+   "tier": 4
   },
   {
    "id": "crank_pedestal--ch23-p003-img02",
@@ -694,7 +718,8 @@
     "crankshaft"
    ],
    "status": "rough",
-   "notes": "Video-still: bare crankshaft end with no gear mounted; printed labels: no gear, crankshaft"
+   "notes": "Video-still: bare crankshaft end with no gear mounted; printed labels: no gear, crankshaft",
+   "tier": 4
   },
   {
    "id": "crank_pin--ch11-p002-img01",
@@ -721,7 +746,8 @@
     "crank_pin"
    ],
    "status": "rough",
-   "notes": "Isolated component shot on white: tapered crank pin with brass pull ring, printed label 'tapered pin'."
+   "notes": "Isolated component shot on white: tapered crank pin with brass pull ring, printed label 'tapered pin'.",
+   "tier": 1
   },
   {
    "id": "cylinder_gear--ch13-p001-img02",
@@ -749,7 +775,8 @@
     "connecting_rod"
    ],
    "status": "rough",
-   "notes": "Extreme macro of brass cylinder gear teeth with black connecting rods riding between gears; no labels."
+   "notes": "Extreme macro of brass cylinder gear teeth with black connecting rods riding between gears; no labels.",
+   "tier": 1
   },
   {
    "id": "cylinder_gear--ch13-p002-img06",
@@ -777,7 +804,8 @@
     "connecting_rod"
    ],
    "status": "rough",
-   "notes": "Extreme macro of stacked cylinder gear teeth arcs with connecting rods; no labels; good tooth-profile reference."
+   "notes": "Extreme macro of stacked cylinder gear teeth arcs with connecting rods; no labels; good tooth-profile reference.",
+   "tier": 1
   },
   {
    "id": "cylinder_gear--ch25-p002-img02",
@@ -805,7 +833,8 @@
     "pinion_drum"
    ],
    "status": "rough",
-   "notes": "Macro of cylinder gear teeth meshing pinion drum flutes; printed label 'notch' with alignment notch mark on drum end face"
+   "notes": "Macro of cylinder gear teeth meshing pinion drum flutes; printed label 'notch' with alignment notch mark on drum end face",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch02-p001-img01",
@@ -832,7 +861,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Right-side elevation, white background; spring row and amplitude-bar curtain face-on, gooseneck edge-on (cropped), crank handle and counterweight chain at right"
+   "notes": "Right-side elevation, white background; spring row and amplitude-bar curtain face-on, gooseneck edge-on (cropped), crank handle and counterweight chain at right",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch02-p001-img02",
@@ -859,7 +889,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Back elevation (wide face, mirror of front): gooseneck top-left, magnifying wheel seen through open frame, dark back of platen, pinion drum and chain lower-left"
+   "notes": "Back elevation (wide face, mirror of front): gooseneck top-left, magnifying wheel seen through open frame, dark back of platen, pinion drum and chain lower-left",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch02-p001-img03",
@@ -886,7 +917,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Left-side elevation: full gooseneck arc in-plane at top, cone gear profile visible through bottom window (apex toward back), crank handle lower-left"
+   "notes": "Left-side elevation: full gooseneck arc in-plane at top, cone gear profile visible through bottom window (apex toward back), crank handle lower-left",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch02-p001-img04",
@@ -913,7 +945,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Front (operator-face) elevation matching CAD az=0: gooseneck top-right, magnifying wheel face-on, platen without paper, crank drive gear face-on below"
+   "notes": "Front (operator-face) elevation matching CAD az=0: gooseneck top-right, magnifying wheel face-on, platen without paper, crank drive gear face-on below",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch06-p002-img05",
@@ -940,7 +973,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "AUTHORITATIVE annotated envelope photo: printed dimension callouts 147 cm overall / 107 cm frame height, 46 x 28 cm base, weight 69 kg; front-left three-quarter on black"
+   "notes": "AUTHORITATIVE annotated envelope photo: printed dimension callouts 147 cm overall / 107 cm frame height, 46 x 28 cm base, weight 69 kg; front-left three-quarter on black",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch07-p001-img01",
@@ -974,7 +1008,8 @@
     "channel_spring"
    ],
    "status": "rough",
-   "notes": "Top-frame corner close-up: green casting clamped to column, black latch lever, coil spring anchor at upper right"
+   "notes": "Top-frame corner close-up: green casting clamped to column, black latch lever, coil spring anchor at upper right",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch07-p001-img04",
@@ -1008,7 +1043,8 @@
     "connecting_rod"
    ],
    "status": "rough",
-   "notes": "Drive-train cluster: spiral cone gear, black eccentric wheel with brass hub driving flat connecting bar, green counterweight canister behind"
+   "notes": "Drive-train cluster: spiral cone gear, black eccentric wheel with brass hub driving flat connecting bar, green counterweight canister behind",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch07-p001-img07",
@@ -1042,7 +1078,8 @@
     "thumb_screw"
    ],
    "status": "rough",
-   "notes": "Base drive area: grooved brass drum with through-shaft and thumb screws, dark rocker-arm stack above, chain glimpse top right"
+   "notes": "Base drive area: grooved brass drum with through-shaft and thumb screws, dark rocker-arm stack above, chain glimpse top right",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch07-p001-img08",
@@ -1076,7 +1113,8 @@
     "thumb_screw"
    ],
    "status": "rough",
-   "notes": "Engraved brass measuring-stick scale with black slider block and knurled screw among amplitude bars; tick marks visible"
+   "notes": "Engraved brass measuring-stick scale with black slider block and knurled screw among amplitude bars; tick marks visible",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch07-p001-img11",
@@ -1110,7 +1148,8 @@
     "platen"
    ],
    "status": "rough",
-   "notes": "Pen arm assembly: horizontal brass pen rod with hanger clamps beside platen edge, drive cord descending lower left"
+   "notes": "Pen arm assembly: horizontal brass pen rod with hanger clamps beside platen edge, drive cord descending lower left",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch07-p001-img14",
@@ -1148,7 +1187,8 @@
     "platen"
    ],
    "status": "rough",
-   "notes": "Pen close-up: brass counterweight cylinder, green v-block holder and set screw drawing green waveform on white platen paper"
+   "notes": "Pen close-up: brass counterweight cylinder, green v-block holder and set screw drawing green waveform on white platen paper",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch07-p001-img16",
@@ -1184,7 +1224,8 @@
     "crank_pedestal"
    ],
    "status": "rough",
-   "notes": "Crank corner close-up: green crank pedestal, drilled steel crank arm with ball handle, chain over small sprocket"
+   "notes": "Crank corner close-up: green crank pedestal, drilled steel crank arm with ball handle, chain over small sprocket",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch07-p001-img17",
@@ -1211,7 +1252,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Whole machine on display turntable, black background; back-left three-quarter (gooseneck top-left, drum+chain lower-left, rocker-arm fan right)"
+   "notes": "Whole machine on display turntable, black background; back-left three-quarter (gooseneck top-left, drum+chain lower-left, rocker-arm fan right)",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch07-p001-img18",
@@ -1238,7 +1280,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "High-res whole-machine back-left three-quarter on black; all major subsystems visible; same shot as img19 jpeg"
+   "notes": "High-res whole-machine back-left three-quarter on black; all major subsystems visible; same shot as img19 jpeg",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch07-p001-img19",
@@ -1265,7 +1308,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Duplicate of page001_img18.png (jpeg export of same back-left three-quarter display shot)"
+   "notes": "Duplicate of page001_img18.png (jpeg export of same back-left three-quarter display shot)",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch08-p001-img13",
@@ -1299,7 +1343,8 @@
     "channel_spring"
    ],
    "status": "rough",
-   "notes": "Black-background studio detail of green summing-lever pivot casting with amplitude-bar stack at left and spring at upper right; small thumbnail."
+   "notes": "Black-background studio detail of green summing-lever pivot casting with amplitude-bar stack at left and spring at upper right; small thumbnail.",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch08-p001-img15",
@@ -1335,7 +1380,8 @@
     "output"
    ],
    "status": "rough",
-   "notes": "Studio close-up of brass pen assembly tracing a waveform on white paper on the platen; small thumbnail."
+   "notes": "Studio close-up of brass pen assembly tracing a waveform on white paper on the platen; small thumbnail.",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch08-p001-img17",
@@ -1369,7 +1415,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Black-background macro of cone gear set meshing with cylinder gear set; small thumbnail of the ch12 hero shot."
+   "notes": "Black-background macro of cone gear set meshing with cylinder gear set; small thumbnail of the ch12 hero shot.",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch08-p001-img18",
@@ -1409,7 +1456,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Black-background studio shot of crank assembly with chain and sprocket on green pedestal; small thumbnail of the ch11 hero shot."
+   "notes": "Black-background studio shot of crank assembly with chain and sprocket on green pedestal; small thumbnail of the ch11 hero shot.",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch09-p001-img06",
@@ -1443,7 +1491,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Black-background macro of cone gear set meshing with cylinder gear set; duplicate of ch08 img17 thumbnail."
+   "notes": "Black-background macro of cone gear set meshing with cylinder gear set; duplicate of ch08 img17 thumbnail.",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch09-p001-img07",
@@ -1473,7 +1522,8 @@
     "channel"
    ],
    "status": "rough",
-   "notes": "Low-key artistic shot of channel rod array with pale tips against wooden slats; very low contrast, limited reference value."
+   "notes": "Low-key artistic shot of channel rod array with pale tips against wooden slats; very low contrast, limited reference value.",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--ch09-p001-img08",
@@ -1507,7 +1557,8 @@
     "channel_spring"
    ],
    "status": "rough",
-   "notes": "Green summing-lever pivot casting with amplitude-bar stack and spring; duplicate of ch08 img13 thumbnail."
+   "notes": "Green summing-lever pivot casting with amplitude-bar stack and spring; duplicate of ch08 img13 thumbnail.",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch09-p001-img10",
@@ -1543,7 +1594,8 @@
     "output"
    ],
    "status": "rough",
-   "notes": "Brass pen assembly tracing waveform on platen paper; duplicate of ch08 img15 thumbnail."
+   "notes": "Brass pen assembly tracing waveform on platen paper; duplicate of ch08 img15 thumbnail.",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch09-p001-img12",
@@ -1583,7 +1635,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Crank assembly with chain and sprocket on green pedestal; duplicate of ch08 img18 thumbnail."
+   "notes": "Crank assembly with chain and sprocket on green pedestal; duplicate of ch08 img18 thumbnail.",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch11-p001-img01",
@@ -1631,7 +1684,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "White-background close-up of the drive train corner: brass cone/cylinder gears, green crank pedestal, crank arm with printed label 'crank', chain running up to gooseneck."
+   "notes": "White-background close-up of the drive train corner: brass cone/cylinder gears, green crank pedestal, crank arm with printed label 'crank', chain running up to gooseneck.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch11-p001-img02",
@@ -1671,7 +1725,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Macro of crank hub: printed labels 'crank', 'chain', 'tapered pin'; tapered pin with brass keeper ring securing crank arm to sprocket shaft; shallow DOF but subject sharp."
+   "notes": "Macro of crank hub: printed labels 'crank', 'chain', 'tapered pin'; tapered pin with brass keeper ring securing crank arm to sprocket shaft; shallow DOF but subject sharp.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch11-p002-img04",
@@ -1711,7 +1766,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Black-background close-up looking along crankshaft axis at crank boss over chain sprocket; printed annotation 'fiducial mark' pointing to dot on crank arm; tapered pin installed at left."
+   "notes": "Black-background close-up looking along crankshaft axis at crank boss over chain sprocket; printed annotation 'fiducial mark' pointing to dot on crank arm; tapered pin installed at left.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch11-p002-img05",
@@ -1757,7 +1813,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Black-background studio shot of crank installed: arm + wooden handle on sprocket, green crank pedestal with brass bushing, brass cone gear and pivot post behind, cylinder gear teeth at right edge; no printed callouts."
+   "notes": "Black-background studio shot of crank installed: arm + wooden handle on sprocket, green crank pedestal with brass bushing, brass cone gear and pivot post behind, cylinder gear teeth at right edge; no printed callouts.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch11-p002-img06",
@@ -1801,7 +1858,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Black-background studio shot, crank assembly nearly face-on: tapered pin in sprocket hub, two chain runs rising to gooseneck, brass cone gear end at left, green base; no printed callouts."
+   "notes": "Black-background studio shot, crank assembly nearly face-on: tapered pin in sprocket hub, two chain runs rising to gooseneck, brass cone gear end at left, green base; no printed callouts.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch12-p001-img01",
@@ -1837,7 +1895,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Macro of cone gear set meshing with cylinder gear set; printed labels 'cone gear set' and 'cylinder gear set'; large end left, small end at pivot post right; excellent tooth-mesh reference."
+   "notes": "Macro of cone gear set meshing with cylinder gear set; printed labels 'cone gear set' and 'cylinder gear set'; large end left, small end at pivot post right; excellent tooth-mesh reference.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch12-p001-img02",
@@ -1883,7 +1942,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "White-background side view of whole lower drive train: crank arm at left, chain up to sprocket, cone gear set (labeled), cylinder drum, green frustum pedestals; great layout reference."
+   "notes": "White-background side view of whole lower drive train: crank arm at left, chain up to sprocket, cone gear set (labeled), cylinder drum, green frustum pedestals; great layout reference.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch12-p002-img02",
@@ -1917,7 +1977,8 @@
     "crank_pedestal"
    ],
    "status": "rough",
-   "notes": "Macro looking down the cone axis from the large end: steel crank pinion in green pedestal boss meshing with the largest cone gear; clear tooth profile reference."
+   "notes": "Macro looking down the cone axis from the large end: steel crank pinion in green pedestal boss meshing with the largest cone gear; clear tooth profile reference.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch12-p002-img04",
@@ -1961,7 +2022,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Dimension callout '150 mm' printed along the cone gear set length (large end left to small end at pivot post right); cylinder drum and amplitude-bar curtain behind; key sizing reference."
+   "notes": "Dimension callout '150 mm' printed along the cone gear set length (large end left to small end at pivot post right); cylinder drum and amplitude-bar curtain behind; key sizing reference.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch12-p002-img06",
@@ -1995,7 +2057,8 @@
     "crank_pedestal"
    ],
    "status": "rough",
-   "notes": "Side-on macro of crank pinion (in green pedestal) meshing with the largest cone gear; channel bars blurred in background; good mesh-geometry reference."
+   "notes": "Side-on macro of crank pinion (in green pedestal) meshing with the largest cone gear; channel bars blurred in background; good mesh-geometry reference.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch12-p002-img07",
@@ -2031,7 +2094,8 @@
     "cone_pivot_post"
    ],
    "status": "rough",
-   "notes": "Dimension callout '7 mm' printed for gear-to-gear spacing at the small end of the cone; shaft end held in black pivot post at right; cylinder gears above."
+   "notes": "Dimension callout '7 mm' printed for gear-to-gear spacing at the small end of the cone; shaft end held in black pivot post at right; cylinder gears above.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch12-p002-img09",
@@ -2077,7 +2141,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Top-down view of drive train with printed labels: 'cone gear set', 'cylinder gear set', 'amplitude bar', 'rocker arm', 'connecting rod', 'pivot'; prime plan-view layout reference."
+   "notes": "Top-down view of drive train with printed labels: 'cone gear set', 'cylinder gear set', 'amplitude bar', 'rocker arm', 'connecting rod', 'pivot'; prime plan-view layout reference.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch12-p003-img02",
@@ -2111,7 +2176,8 @@
     "cylinder_gear"
    ],
    "status": "rough",
-   "notes": "Extreme macro of the smallest cone gears at the shaft collar (small end), verdigris and debris visible; cylinder gear teeth at top right."
+   "notes": "Extreme macro of the smallest cone gears at the shaft collar (small end), verdigris and debris visible; cylinder gear teeth at top right.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch13-p001-img01",
@@ -2149,7 +2215,8 @@
     "harmonic_base"
    ],
    "status": "rough",
-   "notes": "Black-background studio shot of both cone-shaped cylinder gear stacks; 'cylinder gear set' label printed on large brass end gear; connecting rods hang at top."
+   "notes": "Black-background studio shot of both cone-shaped cylinder gear stacks; 'cylinder gear set' label printed on large brass end gear; connecting rods hang at top.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch13-p002-img01",
@@ -2183,7 +2250,8 @@
     "arbor_pedestal"
    ],
    "status": "rough",
-   "notes": "Small thumbnail of cylinder gear cone; pedestal labeled 'back side' indicating rear view of the gear set."
+   "notes": "Small thumbnail of cylinder gear cone; pedestal labeled 'back side' indicating rear view of the gear set.",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--ch13-p002-img03",
@@ -2219,7 +2287,8 @@
     "arbor_pedestal"
    ],
    "status": "rough",
-   "notes": "Near axis-on studio view of large brass end gear; printed labels 'connecting rod' and 'cam' with dashed overlay circling the eccentric; green chain drum at left suggests back side."
+   "notes": "Near axis-on studio view of large brass end gear; printed labels 'connecting rod' and 'cam' with dashed overlay circling the eccentric; green chain drum at left suggests back side.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch13-p002-img05",
@@ -2257,7 +2326,8 @@
     "thumb_screw"
    ],
    "status": "rough",
-   "notes": "Studio shot of gear set with green chain drum, sprocket, chain and wooden crank handle; pedestal labeled 'front side'; silver tommy-bar knob at left."
+   "notes": "Studio shot of gear set with green chain drum, sprocket, chain and wooden crank handle; pedestal labeled 'front side'; silver tommy-bar knob at left.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch13-p002-img07",
@@ -2293,7 +2363,8 @@
     "cylinder_gear_shaft"
    ],
    "status": "rough",
-   "notes": "Macro of connecting rod end riding the brass cam disc; printed label 'notch' on the rod's notch; knurled shaft at left."
+   "notes": "Macro of connecting rod end riding the brass cam disc; printed label 'notch' on the rod's notch; knurled shaft at left.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch14-p001-img01",
@@ -2327,7 +2398,8 @@
     "connecting_rod"
    ],
    "status": "rough",
-   "notes": "Studio shot of full rocker arm fan on green A-frame support; printed label 'rocker arm' and '140 mm' dimension callout on arm tips; connecting rods hang at left."
+   "notes": "Studio shot of full rocker arm fan on green A-frame support; printed label 'rocker arm' and '140 mm' dimension callout on arm tips; connecting rods hang at left.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch14-p001-img02",
@@ -2361,7 +2433,8 @@
     "fulcrum_shaft"
    ],
    "status": "rough",
-   "notes": "Macro of rocker arms crossing in front of stacked pivot bushings on the fulcrum shaft; faint printed labels 'rocker arm', 'pivot' and a mm callout at right edge."
+   "notes": "Macro of rocker arms crossing in front of stacked pivot bushings on the fulcrum shaft; faint printed labels 'rocker arm', 'pivot' and a mm callout at right edge.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch14-p002-img01",
@@ -2397,7 +2470,8 @@
     "connecting_rod"
    ],
    "status": "rough",
-   "notes": "Wide-strip studio close-up of rocker arm fan edge-on with silver pivot ball clamped in black mount on green support; no printed callouts."
+   "notes": "Wide-strip studio close-up of rocker arm fan edge-on with silver pivot ball clamped in black mount on green support; no printed callouts.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch15-p001-img01",
@@ -2433,7 +2507,8 @@
     "frame"
    ],
    "status": "rough",
-   "notes": "Studio shot of the full amplitude bar stack fanning above the rocker arms on green support; printed label 'amplitude bars'; frame columns at sides."
+   "notes": "Studio shot of the full amplitude bar stack fanning above the rocker arms on green support; printed label 'amplitude bars'; frame columns at sides.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch15-p002-img04",
@@ -2469,7 +2544,8 @@
     "frame"
    ],
    "status": "rough",
-   "notes": "Small full-height side silhouette of the amplitude bar stack with spoked magnifying wheel and green top frame; matches CAD front (az=0) silhouette."
+   "notes": "Small full-height side silhouette of the amplitude bar stack with spoked magnifying wheel and green top frame; matches CAD front (az=0) silhouette.",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--ch16-p002-img01",
@@ -2507,7 +2583,8 @@
     "cylinder_gear"
    ],
    "status": "rough",
-   "notes": "Black-background macro of measuring stick in use at the rocker arms; printed labels 'measuring stick', 'amplitude bar', 'rocker arm', 'cylinder gear set'."
+   "notes": "Black-background macro of measuring stick in use at the rocker arms; printed labels 'measuring stick', 'amplitude bar', 'rocker arm', 'cylinder gear set'.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch16-p002-img02",
@@ -2541,7 +2618,8 @@
     "rocker_arm"
    ],
    "status": "rough",
-   "notes": "Macro of measuring stick rule lying along a rocker arm groove with amplitude bar tip above the '10' graduation; no printed callouts."
+   "notes": "Macro of measuring stick rule lying along a rocker arm groove with amplitude bar tip above the '10' graduation; no printed callouts.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch16-p002-img03",
@@ -2577,7 +2655,8 @@
     "connecting_rod"
    ],
    "status": "rough",
-   "notes": "Macro of measuring stick with slider block clamped, laid across rocker arm tips with black connecting rods below; no printed callouts."
+   "notes": "Macro of measuring stick with slider block clamped, laid across rocker arm tips with black connecting rods below; no printed callouts.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch16-p002-img04",
@@ -2611,7 +2690,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Macro of brass rule graduations (6-10 visible) running across rocker arms to an amplitude bar tip; no printed callouts."
+   "notes": "Macro of brass rule graduations (6-10 visible) running across rocker arms to an amplitude bar tip; no printed callouts.",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch16-p002-img05",
@@ -2645,7 +2725,8 @@
     "rocker_arm"
    ],
    "status": "rough",
-   "notes": "Small close-up of slider block on the rule spanning rocker arm tips; thumbnail size limits sharpness."
+   "notes": "Small close-up of slider block on the rule spanning rocker arm tips; thumbnail size limits sharpness.",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--ch17-p001-img01",
@@ -2679,7 +2760,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Macro of top lever tip with spring hooked below and amplitude bar at right; printed labels: top lever, amplitude bar, spring"
+   "notes": "Macro of top lever tip with spring hooked below and amplitude bar at right; printed labels: top lever, amplitude bar, spring",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch17-p001-img02",
@@ -2713,7 +2795,8 @@
     "top_frame"
    ],
    "status": "rough",
-   "notes": "Full top-lever stack on green top frame, pivot rod at right; printed labels: lever, spring"
+   "notes": "Full top-lever stack on green top frame, pivot rod at right; printed labels: lever, spring",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch17-p002-img03",
@@ -2747,7 +2830,8 @@
     "top_frame"
    ],
    "status": "rough",
-   "notes": "Small crop of top levers with springs attached over green frame"
+   "notes": "Small crop of top levers with springs attached over green frame",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--ch17-p002-img06",
@@ -2783,7 +2867,8 @@
     "summing_lever"
    ],
    "status": "rough",
-   "notes": "Oblique macro down the spring bank from amplitude bar to summing lever; printed labels: amplitude bar, top lever, springs, summing lever"
+   "notes": "Oblique macro down the spring bank from amplitude bar to summing lever; printed labels: amplitude bar, top lever, springs, summing lever",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch17-p002-img09",
@@ -2817,7 +2902,8 @@
     "top_frame"
    ],
    "status": "rough",
-   "notes": "Wide macro across full top-lever stack with spring bank at right; printed labels: top levers, springs"
+   "notes": "Wide macro across full top-lever stack with spring bank at right; printed labels: top levers, springs",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch18-p001-img01",
@@ -2853,7 +2939,8 @@
     "top_frame"
    ],
    "status": "rough",
-   "notes": "Close-up of summing lever casting under top frame, counter spring hook upper right, amplitude bars at left; printed labels: summing lever, counter spring"
+   "notes": "Close-up of summing lever casting under top frame, counter spring hook upper right, amplitude bars at left; printed labels: summing lever, counter spring",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch18-p001-img03",
@@ -2893,7 +2980,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Upper third of machine on white background, gooseneck top right with counter spring; printed label: summing lever"
+   "notes": "Upper third of machine on white background, gooseneck top right with counter spring; printed label: summing lever",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch19-p001-img01",
@@ -2933,7 +3021,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Same upper-machine white-background view as ch18 img03; printed label: counter spring (black coil hanging from gooseneck)"
+   "notes": "Same upper-machine white-background view as ch18 img03; printed label: counter spring (black coil hanging from gooseneck)",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch19-p001-img03",
@@ -2960,7 +3049,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Full machine front view, black-background studio shot; printed label: counter spring; gooseneck top right, magnifying wheel center, chain drive lower right - matches CAD front render"
+   "notes": "Full machine front view, black-background studio shot; printed label: counter spring; gooseneck top right, magnifying wheel center, chain drive lower right - matches CAD front render",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch19-p001-img04",
@@ -2998,7 +3088,8 @@
     "channel_spring_installed"
    ],
    "status": "rough",
-   "notes": "Close-up of counter-spring lower hook linkage passing through top frame to summing lever, chrome columns flanking"
+   "notes": "Close-up of counter-spring lower hook linkage passing through top frame to summing lever, chrome columns flanking",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch19-p001-img05",
@@ -3032,7 +3123,8 @@
     "channel_spring_installed"
    ],
    "status": "rough",
-   "notes": "Macro of summing lever arm tip with counter spring hooked to its eye, channel springs upper left; printed labels: springs, summing lever, counter spring"
+   "notes": "Macro of summing lever arm tip with counter spring hooked to its eye, channel springs upper left; printed labels: springs, summing lever, counter spring",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch20-p001-img01",
@@ -3072,7 +3164,8 @@
     "thumb_screw"
    ],
    "status": "rough",
-   "notes": "Black-background close-up of full brass magnifying lever with vertical rod and thumb-screw clamp at left, pivot bracket at right; printed labels: magnifying lever, amplitude bars, summing lever"
+   "notes": "Black-background close-up of full brass magnifying lever with vertical rod and thumb-screw clamp at left, pivot bracket at right; printed labels: magnifying lever, amplitude bars, summing lever",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch20-p001-img02",
@@ -3108,7 +3201,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Wider studio shot of top-frame underside showing magnifying lever in context; printed label: magnifying lever"
+   "notes": "Wider studio shot of top-frame underside showing magnifying lever in context; printed label: magnifying lever",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch20-p002-img04",
@@ -3144,7 +3238,8 @@
     "thumb_screw"
    ],
    "status": "rough",
-   "notes": "Magnifying lever with vertical rod clamped at far tip (max magnification); printed label: pivot on bracket at right"
+   "notes": "Magnifying lever with vertical rod clamped at far tip (max magnification); printed label: pivot on bracket at right",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch20-p002-img05",
@@ -3180,7 +3275,8 @@
     "thumb_screw"
    ],
    "status": "rough",
-   "notes": "Same view as img04 with vertical rod clamped mid-lever (medium magnification)"
+   "notes": "Same view as img04 with vertical rod clamped mid-lever (medium magnification)",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch20-p002-img06",
@@ -3216,7 +3312,8 @@
     "thumb_screw"
    ],
    "status": "rough",
-   "notes": "Same view as img04 with vertical rod clamped near pivot (min magnification)"
+   "notes": "Same view as img04 with vertical rod clamped near pivot (min magnification)",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch20-p002-img07",
@@ -3252,7 +3349,8 @@
     "thumb_screw"
    ],
    "status": "rough",
-   "notes": "Vertical macro of rod-and-clamp hanging from magnifying lever, wire descending from lower set screw"
+   "notes": "Vertical macro of rod-and-clamp hanging from magnifying lever, wire descending from lower set screw",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch21-p001-img01",
@@ -3286,7 +3384,8 @@
     "support_bar"
    ],
    "status": "rough",
-   "notes": "Face-on close-up of six-spoke magnifying wheel with wire over rim, mounted on support bar, black background"
+   "notes": "Face-on close-up of six-spoke magnifying wheel with wire over rim, mounted on support bar, black background",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch21-p001-img02",
@@ -3326,7 +3425,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Mid-machine front view: wheel above platen, brass pinion drum and chain sprocket below; printed label: magnifying wheel"
+   "notes": "Mid-machine front view: wheel above platen, brass pinion drum and chain sprocket below; printed label: magnifying wheel",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch21-p002-img03",
@@ -3362,7 +3462,8 @@
     "pen_rod"
    ],
    "status": "rough",
-   "notes": "Face-on wheel with wire routed up to magnifying lever and down to pen; printed labels: wire, to magnifying lever, magnifying wheel, pen mechanism"
+   "notes": "Face-on wheel with wire routed up to magnifying lever and down to pen; printed labels: wire, to magnifying lever, magnifying wheel, pen mechanism",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch22-p001-img01",
@@ -3396,7 +3497,8 @@
     "platen_clip"
    ],
    "status": "rough",
-   "notes": "Studio shot of platen back side flat-on: black plate, brass strip, rack teeth along bottom edge, black mounting tabs with screws"
+   "notes": "Studio shot of platen back side flat-on: black plate, brass strip, rack teeth along bottom edge, black mounting tabs with screws",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch22-p001-img02",
@@ -3430,7 +3532,8 @@
     "platen_rack"
    ],
    "status": "rough",
-   "notes": "Platen front face flat-on with brass spring clips at left/right edges and rack at bottom; printed dimension callout: 140 mm height"
+   "notes": "Platen front face flat-on with brass spring clips at left/right edges and rack at bottom; printed dimension callout: 140 mm height",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch22-p001-img05",
@@ -3464,7 +3567,8 @@
     "platen_clip"
    ],
    "status": "rough",
-   "notes": "Oblique macro of platen back corner: black mounting tabs with screws, brass strip, rack teeth at left edge"
+   "notes": "Oblique macro of platen back corner: black mounting tabs with screws, brass strip, rack teeth at left edge",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch22-p001-img06",
@@ -3500,7 +3604,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Front view of output/platen region of real machine; top half faded to white (editorial composite), lower half sharp with crank gear, chain, base"
+   "notes": "Front view of output/platen region of real machine; top half faded to white (editorial composite), lower half sharp with crank gear, chain, base",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch23-p001-img05",
@@ -3534,7 +3639,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Black-background front view of lower machine with paper trace on platen (sparse waveform), crank gear and chain engaged"
+   "notes": "Black-background front view of lower machine with paper trace on platen (sparse waveform), crank gear and chain engaged",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch23-p001-img07",
@@ -3568,7 +3674,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Same front setup as img05 with denser medium-gear trace on platen paper"
+   "notes": "Same front setup as img05 with denser medium-gear trace on platen paper",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch23-p001-img08",
@@ -3602,7 +3709,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Same front setup, third trace variant (compressed green waveform) \u2014 gear-ratio comparison series"
+   "notes": "Same front setup, third trace variant (compressed green waveform) \u2014 gear-ratio comparison series",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch23-p002-img01",
@@ -3636,7 +3744,8 @@
     "crank_pedestal"
    ],
    "status": "rough",
-   "notes": "Macro of drive chain wrapped on sprocket mounted to crank arm, green crank pedestal top behind"
+   "notes": "Macro of drive chain wrapped on sprocket mounted to crank arm, green crank pedestal top behind",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch23-p002-img02",
@@ -3670,7 +3779,8 @@
     "platen_rack"
    ],
    "status": "rough",
-   "notes": "Macro of upper chain sprocket face-on with brass crank drive gear at left and platen rack teeth at top right"
+   "notes": "Macro of upper chain sprocket face-on with brass crank drive gear at left and platen rack teeth at top right",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch23-p002-img03",
@@ -3708,7 +3818,8 @@
     "platen_rack"
    ],
    "status": "rough",
-   "notes": "Macro of knurled brass knob shaft carrying removable gear on splined stub, meshing crank drive gear; rack teeth above"
+   "notes": "Macro of knurled brass knob shaft carrying removable gear on splined stub, meshing crank drive gear; rack teeth above",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch23-p002-img04",
@@ -3748,7 +3859,8 @@
     "chain_sprocket"
    ],
    "status": "rough",
-   "notes": "Macro of translational gearing cluster; printed labels: rack, latch; splined stub, knob shaft and sprocket all visible"
+   "notes": "Macro of translational gearing cluster; printed labels: rack, latch; splined stub, knob shaft and sprocket all visible",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch23-p003-img01",
@@ -3782,7 +3894,8 @@
     "transgear_removable"
    ],
    "status": "rough",
-   "notes": "Video-still: green crank pedestal with small (12-tooth) gear on crankshaft end; printed label: small"
+   "notes": "Video-still: green crank pedestal with small (12-tooth) gear on crankshaft end; printed label: small",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--ch23-p003-img03",
@@ -3816,7 +3929,8 @@
     "transgear_removable"
    ],
    "status": "rough",
-   "notes": "Video-still: medium (18-tooth) gear on crankshaft end; printed label: medium"
+   "notes": "Video-still: medium (18-tooth) gear on crankshaft end; printed label: medium",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--ch23-p003-img04",
@@ -3850,7 +3964,8 @@
     "transgear_removable"
    ],
    "status": "rough",
-   "notes": "Video-still: large (24-tooth) gear on crankshaft end; printed label: large"
+   "notes": "Video-still: large (24-tooth) gear on crankshaft end; printed label: large",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--ch23-p004-img01",
@@ -3888,7 +4003,8 @@
     "platen_rack"
    ],
    "status": "rough",
-   "notes": "Macro under platen rail: splined stub with brass bushings, small pinion teeth above, chain and sprocket below, latch plate at right"
+   "notes": "Macro under platen rail: splined stub with brass bushings, small pinion teeth above, chain and sprocket below, latch plate at right",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch23-p004-img02",
@@ -3928,7 +4044,8 @@
     "cylinder_gear"
    ],
    "status": "rough",
-   "notes": "Oblique from below-front: thin crank drive gear disk meshing pinion under platen rack edge, knurled knob and chain in front, cylinder gear stack in background"
+   "notes": "Oblique from below-front: thin crank drive gear disk meshing pinion under platen rack edge, knurled knob and chain in front, cylinder gear stack in background",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch24-p001-img02",
@@ -3972,7 +4089,8 @@
     "platen_clip"
    ],
    "status": "rough",
-   "notes": "Pen mechanism in situ on platen drawing green trace; rod engraved 'pen mechanism'; set screw with knurled knob below frame; rack teeth at bottom"
+   "notes": "Pen mechanism in situ on platen drawing green trace; rod engraved 'pen mechanism'; set screw with knurled knob below frame; rack teeth at bottom",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch24-p001-img03",
@@ -4008,7 +4126,8 @@
     "pen_set_screw"
    ],
    "status": "rough",
-   "notes": "Studio black-background close-up of assembled pen frame: V-block gripped in rectangular brass frame, vertical rod, set screw with knurled black knob at bottom"
+   "notes": "Studio black-background close-up of assembled pen frame: V-block gripped in rectangular brass frame, vertical rod, set screw with knurled black knob at bottom",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch25-p001-img01",
@@ -4050,7 +4169,8 @@
     "harmonic_base"
    ],
    "status": "rough",
-   "notes": "Wide detail of pinion drum meshing full cylinder gear set, seen through green base window from machine left; printed labels: connecting rod, crank, pinion gear, back side, front side"
+   "notes": "Wide detail of pinion drum meshing full cylinder gear set, seen through green base window from machine left; printed labels: connecting rod, crank, pinion gear, back side, front side",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch25-p001-img02",
@@ -4084,7 +4204,8 @@
     "pinion_bar"
    ],
    "status": "rough",
-   "notes": "Small oblique shot of pinion drum and front cylinder gear with support arms; low resolution but usable"
+   "notes": "Small oblique shot of pinion drum and front cylinder gear with support arms; low resolution but usable",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--ch25-p002-img01",
@@ -4118,7 +4239,8 @@
     "cylinder_gear"
    ],
    "status": "rough",
-   "notes": "Macro of pinion bar support post and lift pin on black base block; annotated white arrows showing engagement rocking motion"
+   "notes": "Macro of pinion bar support post and lift pin on black base block; annotated white arrows showing engagement rocking motion",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch25-p002-img03",
@@ -4152,7 +4274,8 @@
     "pinion_drum"
    ],
    "status": "rough",
-   "notes": "Face-on macro of rear cylinder gear with black support arm over its hub; printed label: back-side; latch arm at right, pinion drum edge at left"
+   "notes": "Face-on macro of rear cylinder gear with black support arm over its hub; printed label: back-side; latch arm at right, pinion drum edge at left",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch25-p002-img04",
@@ -4186,7 +4309,8 @@
     "pinion_bar"
    ],
    "status": "rough",
-   "notes": "Extreme macro of small gear on domed-rivet arm meshing large cylinder gear, brass wire latch spring engaging teeth (back-side latch detail)"
+   "notes": "Extreme macro of small gear on domed-rivet arm meshing large cylinder gear, brass wire latch spring engaging teeth (back-side latch detail)",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch25-p002-img05",
@@ -4220,7 +4344,8 @@
     "cylinder_gear"
    ],
    "status": "rough",
-   "notes": "Macro of ball-ended engagement handle beside front cylinder gear, pinion drum teeth meshed below"
+   "notes": "Macro of ball-ended engagement handle beside front cylinder gear, pinion drum teeth meshed below",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch25-p002-img06",
@@ -4254,7 +4379,8 @@
     "cylinder_gear"
    ],
    "status": "rough",
-   "notes": "Second macro of ball-ended handle and front cylinder gear mesh, handle rocked to alternate position"
+   "notes": "Second macro of ball-ended handle and front cylinder gear mesh, handle rocked to alternate position",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch25-p002-img07",
@@ -4288,7 +4414,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Front-end view of pinion bar T-handle post and lift rod on black block, green pedestal at left; printed dimension callout: 6 mm rod lift gap"
+   "notes": "Front-end view of pinion bar T-handle post and lift rod on black block, green pedestal at left; printed dimension callout: 6 mm rod lift gap",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch25-p002-img08",
@@ -4322,7 +4449,8 @@
     "pinion_bar"
    ],
    "status": "rough",
-   "notes": "Front-oblique detail of pinion drum, front cylinder gear and T-handle on support post; printed labels: pinion gear, cylinder gear set, front side"
+   "notes": "Front-oblique detail of pinion drum, front cylinder gear and T-handle on support post; printed labels: pinion gear, cylinder gear set, front side",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch26-p001-img03",
@@ -4353,7 +4481,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "front low studio shot of base region: rocker-arm fan, cylinder gear row, crank handle at right; nameplate (scale reference) visible on base with printed white arrow annotation '2'"
+   "notes": "front low studio shot of base region: rocker-arm fan, cylinder gear row, crank handle at right; nameplate (scale reference) visible on base with printed white arrow annotation '2'",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch26-p002-img01",
@@ -4380,7 +4509,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "provenance shot: complete machine in glass museum display case on wooden table; near-frontal view, glass reflections soften detail"
+   "notes": "provenance shot: complete machine in glass museum display case on wooden table; near-frontal view, glass reflections soften detail",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--ch26-p002-img05",
@@ -4407,7 +4537,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Gaertner catalogue halftone Fig. A1001: complete 80-element analyzer (taller variant, not the 20-element CAD subject); front-left perspective"
+   "notes": "Gaertner catalogue halftone Fig. A1001: complete 80-element analyzer (taller variant, not the 20-element CAD subject); front-left perspective",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--ch26-p002-img06",
@@ -4434,7 +4565,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Gaertner catalogue page: Fig. A1002 halftone photo of the 20-element analyzer plus caption text crediting Michelson & Stratton, Phil. Mag. May 1898"
+   "notes": "Gaertner catalogue page: Fig. A1002 halftone photo of the 20-element analyzer plus caption text crediting Michelson & Stratton, Phil. Mag. May 1898",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--ch28-p002-img04",
@@ -4474,7 +4606,8 @@
     "cone_gear"
    ],
    "status": "rough",
-   "notes": "Fig 1: clean side-elevation line drawing of one element - eccentric A, lever B, rod R, springs s, counter-spring S, cone D"
+   "notes": "Fig 1: clean side-elevation line drawing of one element - eccentric A, lever B, rod R, springs s, counter-spring S, cone D",
+   "tier": 1
   },
   {
    "id": "harmonic_analyzer--ch28-p004-img01",
@@ -4501,14 +4634,16 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Plate I: halftone photo of the original 80-element machine, 3/4 view (rod bank face-on, output left, cone D right); az approximate, geometry differs from 20-element CAD"
+   "notes": "Plate I: halftone photo of the original 80-element machine, 3/4 view (rod bank face-on, output left, cone D right); az approximate, geometry differs from 20-element CAD",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--ch30-p002-img01",
    "model": "harmonic_analyzer",
    "reference": {
     "path": "references/albert-michelsons-harmonic-analyzer/ch30_images/page002_img01.png",
-    "source": "book ch30"
+    "source": "book ch30",
+    "mirror": true
    },
    "camera": {
     "mode": "euler",
@@ -4516,26 +4651,28 @@
     "zoom": 1.0,
     "target_mm": null,
     "perspective": null,
-    "az_deg": 0,
+    "az_deg": 0.0,
     "el_deg": 0
    },
    "align": {
-    "scale": 1.0,
-    "dx_px": 0,
-    "dy_px": 0
+    "scale": 1.18,
+    "dx_px": 7,
+    "dy_px": -273
    },
    "component_focus": [
     "harmonic_analyzer"
    ],
-   "status": "rough",
-   "notes": "8-views station 1: front - magnifying wheel face-on, platen with waveform, crank/sprocket bottom-right; matches CAD front render"
+   "status": "aligned",
+   "notes": "MIRRORED PRINT (verified vs photogrammetry); 8-views station 1: front - magnifying wheel face-on, platen with waveform, crank/sprocket bottom-right; matches CAD front render",
+   "tier": 0
   },
   {
    "id": "harmonic_analyzer--ch30-p003-img01",
    "model": "harmonic_analyzer",
    "reference": {
     "path": "references/albert-michelsons-harmonic-analyzer/ch30_images/page003_img01.png",
-    "source": "book ch30"
+    "source": "book ch30",
+    "mirror": true
    },
    "camera": {
     "mode": "euler",
@@ -4543,26 +4680,28 @@
     "zoom": 1.0,
     "target_mm": null,
     "perspective": null,
-    "az_deg": 45,
+    "az_deg": -45.0,
     "el_deg": 0
    },
    "align": {
-    "scale": 1.0,
-    "dx_px": 0,
-    "dy_px": 0
+    "scale": 1.13,
+    "dx_px": -20,
+    "dy_px": -233
    },
    "component_focus": [
     "harmonic_analyzer"
    ],
-   "status": "rough",
-   "notes": "8-views station 2: front-right quarter - platen face image-left, crank/chain bottom-center near, body receding right-back"
+   "status": "aligned",
+   "notes": "MIRRORED PRINT (verified vs photogrammetry); 8-views station 2: front-right quarter - platen face image-left, crank/chain bottom-center near, body receding right-back",
+   "tier": 0
   },
   {
    "id": "harmonic_analyzer--ch30-p004-img01",
    "model": "harmonic_analyzer",
    "reference": {
     "path": "references/albert-michelsons-harmonic-analyzer/ch30_images/page004_img01.png",
-    "source": "book ch30"
+    "source": "book ch30",
+    "mirror": true
    },
    "camera": {
     "mode": "euler",
@@ -4570,26 +4709,28 @@
     "zoom": 1.0,
     "target_mm": null,
     "perspective": null,
-    "az_deg": 90,
+    "az_deg": -90.0,
     "el_deg": 0
    },
    "align": {
-    "scale": 1.0,
-    "dx_px": 0,
-    "dy_px": 0
+    "scale": 1.13,
+    "dx_px": -73,
+    "dy_px": -233
    },
    "component_focus": [
     "harmonic_analyzer"
    ],
-   "status": "rough",
-   "notes": "8-views station 3: right side - amplitude-bar bank edge-on, crank handle near at bottom-left, front hardware image-left"
+   "status": "aligned",
+   "notes": "MIRRORED PRINT (verified vs photogrammetry); 8-views station 3: right side - amplitude-bar bank edge-on, crank handle near at bottom-left, front hardware image-left",
+   "tier": 0
   },
   {
    "id": "harmonic_analyzer--ch30-p005-img01",
    "model": "harmonic_analyzer",
    "reference": {
     "path": "references/albert-michelsons-harmonic-analyzer/ch30_images/page005_img01.jpeg",
-    "source": "book ch30"
+    "source": "book ch30",
+    "mirror": true
    },
    "camera": {
     "mode": "euler",
@@ -4597,26 +4738,28 @@
     "zoom": 1.0,
     "target_mm": null,
     "perspective": null,
-    "az_deg": 135,
+    "az_deg": -135.0,
     "el_deg": 0
    },
    "align": {
-    "scale": 1.0,
-    "dx_px": 0,
-    "dy_px": 0
+    "scale": 1.17,
+    "dx_px": -60,
+    "dy_px": -233
    },
    "component_focus": [
     "harmonic_analyzer"
    ],
-   "status": "rough",
-   "notes": "8-views station 4: back-right quarter - platen back panel dark, wheel face-on image-left, lever fan sweeping right, chain bottom-left"
+   "status": "aligned",
+   "notes": "MIRRORED PRINT (verified vs photogrammetry); 8-views station 4: back-right quarter - platen back panel dark, wheel face-on image-left, lever fan sweeping right, chain bottom-left",
+   "tier": 0
   },
   {
    "id": "harmonic_analyzer--ch30-p006-img01",
    "model": "harmonic_analyzer",
    "reference": {
     "path": "references/albert-michelsons-harmonic-analyzer/ch30_images/page006_img01.png",
-    "source": "book ch30"
+    "source": "book ch30",
+    "mirror": true
    },
    "camera": {
     "mode": "euler",
@@ -4624,26 +4767,28 @@
     "zoom": 1.0,
     "target_mm": null,
     "perspective": null,
-    "az_deg": 180,
+    "az_deg": 180.0,
     "el_deg": 0
    },
    "align": {
-    "scale": 1.0,
-    "dx_px": 0,
-    "dy_px": 0
+    "scale": 1.18,
+    "dx_px": -20,
+    "dy_px": -273
    },
    "component_focus": [
     "harmonic_analyzer"
    ],
-   "status": "rough",
-   "notes": "8-views station 5: back - platen back panel, wheel seen through frame, cones/chain bottom-left (mirror of front)"
+   "status": "aligned",
+   "notes": "MIRRORED PRINT (verified vs photogrammetry); 8-views station 5: back - platen back panel, wheel seen through frame, cones/chain bottom-left (mirror of front)",
+   "tier": 0
   },
   {
    "id": "harmonic_analyzer--ch30-p007-img01",
    "model": "harmonic_analyzer",
    "reference": {
     "path": "references/albert-michelsons-harmonic-analyzer/ch30_images/page007_img01.jpeg",
-    "source": "book ch30"
+    "source": "book ch30",
+    "mirror": true
    },
    "camera": {
     "mode": "euler",
@@ -4651,26 +4796,28 @@
     "zoom": 1.0,
     "target_mm": null,
     "perspective": null,
-    "az_deg": -135,
+    "az_deg": 135.0,
     "el_deg": 0
    },
    "align": {
-    "scale": 1.0,
-    "dx_px": 0,
-    "dy_px": 0
+    "scale": 1.14,
+    "dx_px": 20,
+    "dy_px": -233
    },
    "component_focus": [
     "harmonic_analyzer"
    ],
-   "status": "rough",
-   "notes": "8-views station 6: back-left quarter - platen back panel at image-right, rod bank receding, cones bottom-left"
+   "status": "aligned",
+   "notes": "MIRRORED PRINT (verified vs photogrammetry); 8-views station 6: back-left quarter - platen back panel at image-right, rod bank receding, cones bottom-left",
+   "tier": 0
   },
   {
    "id": "harmonic_analyzer--ch30-p008-img01",
    "model": "harmonic_analyzer",
    "reference": {
     "path": "references/albert-michelsons-harmonic-analyzer/ch30_images/page008_img01.png",
-    "source": "book ch30"
+    "source": "book ch30",
+    "mirror": true
    },
    "camera": {
     "mode": "euler",
@@ -4678,26 +4825,28 @@
     "zoom": 1.0,
     "target_mm": null,
     "perspective": null,
-    "az_deg": -90,
+    "az_deg": 90.0,
     "el_deg": 0
    },
    "align": {
-    "scale": 1.0,
-    "dx_px": 0,
-    "dy_px": 0
+    "scale": 1.13,
+    "dx_px": 60,
+    "dy_px": -247
    },
    "component_focus": [
     "harmonic_analyzer"
    ],
-   "status": "rough",
-   "notes": "8-views station 7: left side - rod bank edge-on, crank handle far side at bottom-right, front hardware image-right"
+   "status": "aligned",
+   "notes": "MIRRORED PRINT (verified vs photogrammetry); 8-views station 7: left side - rod bank edge-on, crank handle far side at bottom-right, front hardware image-right",
+   "tier": 0
   },
   {
    "id": "harmonic_analyzer--ch30-p009-img01",
    "model": "harmonic_analyzer",
    "reference": {
     "path": "references/albert-michelsons-harmonic-analyzer/ch30_images/page009_img01.png",
-    "source": "book ch30"
+    "source": "book ch30",
+    "mirror": true
    },
    "camera": {
     "mode": "euler",
@@ -4705,19 +4854,20 @@
     "zoom": 1.0,
     "target_mm": null,
     "perspective": null,
-    "az_deg": -45,
+    "az_deg": 45.0,
     "el_deg": 0
    },
    "align": {
-    "scale": 1.0,
-    "dx_px": 0,
-    "dy_px": 0
+    "scale": 1.12,
+    "dx_px": 73,
+    "dy_px": -207
    },
    "component_focus": [
     "harmonic_analyzer"
    ],
-   "status": "rough",
-   "notes": "8-views station 8: front-left quarter - platen face large at center, crank handle small at right edge, body receding left-back"
+   "status": "aligned",
+   "notes": "MIRRORED PRINT (verified vs photogrammetry); 8-views station 8: front-left quarter - platen face large at center, crank handle small at right edge, body receding left-back",
+   "tier": 0
   },
   {
    "id": "harmonic_analyzer--ch31-p001-img01",
@@ -4757,7 +4907,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Color slide close-up of drive train at base: cone gear stacks, brass gear, chain, crank handle, green pedestal; az approximate"
+   "notes": "Color slide close-up of drive train at base: cone gear stacks, brass gear, chain, crank handle, green pedestal; az approximate",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch31-p001-img02",
@@ -4784,7 +4935,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Color slide full machine, front-left quarter elevated; platen face center, crank protruding right"
+   "notes": "Color slide full machine, front-left quarter elevated; platen face center, crank protruding right",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch31-p001-img03",
@@ -4811,7 +4963,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Color slide full machine, near-frontal slightly elevated; platen face-on, wheel center, chain and crank bottom-right"
+   "notes": "Color slide full machine, near-frontal slightly elevated; platen face-on, wheel center, chain and crank bottom-right",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch31-p001-img04",
@@ -4849,7 +5002,8 @@
     "counter_spring"
    ],
    "status": "rough",
-   "notes": "Mid-machine close-up from back-right: wheel, rod bank, lever fan, cords down to rocker arm stack; az approximate"
+   "notes": "Mid-machine close-up from back-right: wheel, rod bank, lever fan, cords down to rocker arm stack; az approximate",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch31-p001-img05",
@@ -4889,7 +5043,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Close-up of crank arm, wooden handle, double chain run and green crank pedestal, cone gear behind; az approximate"
+   "notes": "Close-up of crank arm, wooden handle, double chain run and green crank pedestal, cone gear behind; az approximate",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch31-p001-img06",
@@ -4927,7 +5082,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Close-up of meshing cone gear pair, dark strap/rocker bank, green arbor support frame, lever fan above"
+   "notes": "Close-up of meshing cone gear pair, dark strap/rocker bank, green arbor support frame, lever fan above",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch31-p001-img07",
@@ -4963,7 +5119,8 @@
     "summing_lever"
    ],
    "status": "rough",
-   "notes": "Close-up of lever stack with cords down to rocker arms; green pedestal with crank arm at left, brass fitting on rail top-left"
+   "notes": "Close-up of lever stack with cords down to rocker arms; green pedestal with crank arm at left, brass fitting on rail top-left",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch31-p001-img08",
@@ -5001,7 +5158,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Close-up of the two meshing cone gears with green pedestal and chain at left, rod cage behind; az approximate"
+   "notes": "Close-up of the two meshing cone gears with green pedestal and chain at left, rod cage behind; az approximate",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--ch31-p001-img09",
@@ -5035,7 +5193,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Extreme close-up of brass gear drum meshing with long fine-toothed pinion, dark straps above; shallow depth of field"
+   "notes": "Extreme close-up of brass gear drum meshing with long fine-toothed pinion, dark straps above; shallow depth of field",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--photo-194105655",
@@ -5065,7 +5224,8 @@
     "top_frame"
    ],
    "status": "rough",
-   "notes": "top casting"
+   "notes": "top casting",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-194121676",
@@ -5095,7 +5255,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "amplitude bars"
+   "notes": "amplitude bars",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-194155944",
@@ -5125,7 +5286,8 @@
     "rocker_arm"
    ],
    "status": "rough",
-   "notes": "rocker arms (top comb)"
+   "notes": "rocker arms (top comb)",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-194204617",
@@ -5155,7 +5317,8 @@
     "connecting_rod"
    ],
    "status": "rough",
-   "notes": "connecting rods / cross shafts"
+   "notes": "connecting rods / cross shafts",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-194217149",
@@ -5185,7 +5348,8 @@
     "harmonic_base"
    ],
    "status": "rough",
-   "notes": "base casting"
+   "notes": "base casting",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-194257019",
@@ -5215,7 +5379,8 @@
     "gooseneck"
    ],
    "status": "rough",
-   "notes": "gooseneck guide tube"
+   "notes": "gooseneck guide tube",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-194629306",
@@ -5245,7 +5410,8 @@
     "summing_lever"
    ],
    "status": "rough",
-   "notes": "summing lever"
+   "notes": "summing lever",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-194633468",
@@ -5275,7 +5441,8 @@
     "summing_lever"
    ],
    "status": "rough",
-   "notes": "summing lever"
+   "notes": "summing lever",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-194711815",
@@ -5307,7 +5474,8 @@
     "platen_rack"
    ],
    "status": "rough",
-   "notes": "platen + rack"
+   "notes": "platen + rack",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-194722591",
@@ -5339,7 +5507,8 @@
     "chain_sprocket"
    ],
    "status": "rough",
-   "notes": "translational gearing / chain"
+   "notes": "translational gearing / chain",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-194726872",
@@ -5369,7 +5538,8 @@
     "cylinder_gear"
    ],
    "status": "rough",
-   "notes": "cylinder gear set"
+   "notes": "cylinder gear set",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-194730962",
@@ -5403,7 +5573,8 @@
     "crankshaft"
    ],
    "status": "rough",
-   "notes": "crank"
+   "notes": "crank",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-194919926",
@@ -5435,7 +5606,8 @@
     "chain_sprocket"
    ],
    "status": "rough",
-   "notes": "translational gearing / chain"
+   "notes": "translational gearing / chain",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-194959036",
@@ -5465,7 +5637,8 @@
     "counter_spring"
    ],
    "status": "rough",
-   "notes": "counter spring"
+   "notes": "counter spring",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195001758",
@@ -5495,7 +5668,8 @@
     "counter_spring"
    ],
    "status": "rough",
-   "notes": "counter spring"
+   "notes": "counter spring",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195108425",
@@ -5525,7 +5699,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "tube frame columns"
+   "notes": "tube frame columns",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195123524",
@@ -5555,7 +5730,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "tube frame columns"
+   "notes": "tube frame columns",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195129822",
@@ -5585,7 +5761,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "tube frame columns"
+   "notes": "tube frame columns",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195135631",
@@ -5615,7 +5792,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "amplitude bars"
+   "notes": "amplitude bars",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195142779",
@@ -5647,7 +5825,8 @@
     "platen_rack"
    ],
    "status": "rough",
-   "notes": "platen + rack"
+   "notes": "platen + rack",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195146795",
@@ -5679,7 +5858,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "rocker arm supports (a-frames)"
+   "notes": "rocker arm supports (a-frames)",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195149704",
@@ -5709,7 +5889,8 @@
     "cone_gear"
    ],
    "status": "rough",
-   "notes": "cone gear set"
+   "notes": "cone gear set",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195200658",
@@ -5739,7 +5920,8 @@
     "harmonic_base"
    ],
    "status": "rough",
-   "notes": "base casting"
+   "notes": "base casting",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195203981",
@@ -5773,7 +5955,8 @@
     "crankshaft"
    ],
    "status": "rough",
-   "notes": "crank"
+   "notes": "crank",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195253322",
@@ -5803,7 +5986,8 @@
     "counter_spring"
    ],
    "status": "rough",
-   "notes": "counter spring"
+   "notes": "counter spring",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195301778",
@@ -5833,7 +6017,8 @@
     "magnifying_lever"
    ],
    "status": "rough",
-   "notes": "magnifying lever"
+   "notes": "magnifying lever",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195308377",
@@ -5863,7 +6048,8 @@
     "channel_spring"
    ],
    "status": "rough",
-   "notes": "channel springs"
+   "notes": "channel springs",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195312620",
@@ -5893,7 +6079,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "amplitude bars"
+   "notes": "amplitude bars",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195326632",
@@ -5923,7 +6110,8 @@
     "magnifying_wheel"
    ],
    "status": "rough",
-   "notes": "magnifying wheel"
+   "notes": "magnifying wheel",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195329322",
@@ -5953,7 +6141,8 @@
     "magnifying_wheel"
    ],
    "status": "rough",
-   "notes": "magnifying wheel"
+   "notes": "magnifying wheel",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195346204",
@@ -5983,7 +6172,8 @@
     "measuring_stick"
    ],
    "status": "rough",
-   "notes": "measuring stick / cord hanger"
+   "notes": "measuring stick / cord hanger",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195405015",
@@ -6013,7 +6203,8 @@
     "cylinder_gear"
    ],
    "status": "rough",
-   "notes": "cylinder gear set"
+   "notes": "cylinder gear set",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195429304",
@@ -6043,7 +6234,8 @@
     "channel_lever"
    ],
    "status": "rough",
-   "notes": "channel levers"
+   "notes": "channel levers",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195433249",
@@ -6073,7 +6265,8 @@
     "measuring_stick"
    ],
    "status": "rough",
-   "notes": "measuring stick / cord hanger"
+   "notes": "measuring stick / cord hanger",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195439951",
@@ -6103,7 +6296,8 @@
     "magnifying_wheel"
    ],
    "status": "rough",
-   "notes": "magnifying wheel"
+   "notes": "magnifying wheel",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195442919",
@@ -6135,7 +6329,8 @@
     "pen_marker"
    ],
    "status": "rough",
-   "notes": "pen mechanism (modern)"
+   "notes": "pen mechanism (modern)",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195445871",
@@ -6169,7 +6364,8 @@
     "crankshaft"
    ],
    "status": "rough",
-   "notes": "crank"
+   "notes": "crank",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195448195",
@@ -6199,7 +6395,8 @@
     "cone_gear"
    ],
    "status": "rough",
-   "notes": "cone gear set"
+   "notes": "cone gear set",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195455836",
@@ -6229,7 +6426,8 @@
     "gooseneck"
    ],
    "status": "rough",
-   "notes": "gooseneck guide tube"
+   "notes": "gooseneck guide tube",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195501735",
@@ -6259,7 +6457,8 @@
     "counter_spring"
    ],
    "status": "rough",
-   "notes": "counter spring"
+   "notes": "counter spring",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195503971",
@@ -6289,7 +6488,8 @@
     "rocker_arm"
    ],
    "status": "rough",
-   "notes": "rocker arms (top comb)"
+   "notes": "rocker arms (top comb)",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195506228",
@@ -6319,7 +6519,8 @@
     "rocker_arm"
    ],
    "status": "rough",
-   "notes": "rocker arms (top comb)"
+   "notes": "rocker arms (top comb)",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195508267",
@@ -6349,7 +6550,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "amplitude bars"
+   "notes": "amplitude bars",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195524565",
@@ -6379,7 +6581,8 @@
     "channel_lever"
    ],
    "status": "rough",
-   "notes": "channel levers"
+   "notes": "channel levers",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195527397",
@@ -6409,7 +6612,8 @@
     "connecting_rod"
    ],
    "status": "rough",
-   "notes": "connecting rods / cross shafts"
+   "notes": "connecting rods / cross shafts",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195530756",
@@ -6439,7 +6643,8 @@
     "cone_gear"
    ],
    "status": "rough",
-   "notes": "cone gear set"
+   "notes": "cone gear set",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195532820",
@@ -6469,7 +6674,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "tube frame columns"
+   "notes": "tube frame columns",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195557281",
@@ -6499,7 +6705,8 @@
     "rocker_arm"
    ],
    "status": "rough",
-   "notes": "rocker arms (top comb)"
+   "notes": "rocker arms (top comb)",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195602046",
@@ -6529,7 +6736,8 @@
     "measuring_stick"
    ],
    "status": "rough",
-   "notes": "measuring stick / cord hanger"
+   "notes": "measuring stick / cord hanger",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195607299",
@@ -6559,7 +6767,8 @@
     "magnifying_wheel"
    ],
    "status": "rough",
-   "notes": "magnifying wheel"
+   "notes": "magnifying wheel",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195610407",
@@ -6591,7 +6800,8 @@
     "platen_rack"
    ],
    "status": "rough",
-   "notes": "platen + rack"
+   "notes": "platen + rack",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--photo-195613527",
@@ -6625,7 +6835,8 @@
     "crankshaft"
    ],
    "status": "rough",
-   "notes": "crank"
+   "notes": "crank",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v1-t0019",
@@ -6657,7 +6868,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Cone gear set close-up, labelled, good tooth geometry"
+   "notes": "Cone gear set close-up, labelled, good tooth geometry",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v1-t0020",
@@ -6689,7 +6901,8 @@
     "connecting_rod"
    ],
    "status": "rough",
-   "notes": "Rocker arm fan from below, cosine curve overlays"
+   "notes": "Rocker arm fan from below, cosine curve overlays",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v1-t0021",
@@ -6727,7 +6940,8 @@
     "top_crossbar"
    ],
    "status": "rough",
-   "notes": "Pivoted summing bar + springs close-up with callouts"
+   "notes": "Pivoted summing bar + springs close-up with callouts",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v1-t0022",
@@ -6759,7 +6973,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Hand over amplitude bar fan, elevated front view"
+   "notes": "Hand over amplitude bar fan, elevated front view",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v1-t0024",
@@ -6793,7 +7008,8 @@
     "pen_marker"
    ],
    "status": "rough",
-   "notes": "Brass pen block on pen rod tracing output curve"
+   "notes": "Brass pen block on pen rod tracing output curve",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v2-t0010",
@@ -6827,7 +7043,8 @@
     "chain_sprocket"
    ],
    "status": "rough",
-   "notes": "Crank macro inset (labeled) + full front view at left"
+   "notes": "Crank macro inset (labeled) + full front view at left",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0011",
@@ -6854,7 +7071,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Full machine on black, drive-train area highlighted; equation overlay"
+   "notes": "Full machine on black, drive-train area highlighted; equation overlay",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0012",
@@ -6886,7 +7104,8 @@
     "eccentric_cam"
    ],
    "status": "rough",
-   "notes": "Inset macro of gears + cams (labeled); full view at left"
+   "notes": "Inset macro of gears + cams (labeled); full view at left",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0014",
@@ -6918,7 +7137,8 @@
     "rocker_arm"
    ],
    "status": "rough",
-   "notes": "Inset: amplitude bars + rocker arms labeled"
+   "notes": "Inset: amplitude bars + rocker arms labeled",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0015",
@@ -6945,7 +7165,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Full machine, top-frame region highlighted"
+   "notes": "Full machine, top-frame region highlighted",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0016",
@@ -6979,7 +7200,8 @@
     "top_frame"
    ],
    "status": "rough",
-   "notes": "Inset of top frame: springs + levers labeled"
+   "notes": "Inset of top frame: springs + levers labeled",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0017",
@@ -7006,7 +7228,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Full machine alone on black"
+   "notes": "Full machine alone on black",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0019",
@@ -7040,7 +7263,8 @@
     "platen"
    ],
    "status": "rough",
-   "notes": "Inset: pen drawing damped waveform on platen paper"
+   "notes": "Inset: pen drawing damped waveform on platen paper",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0020",
@@ -7067,7 +7291,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Full machine, equation overlay"
+   "notes": "Full machine, equation overlay",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0024",
@@ -7101,7 +7326,8 @@
     "chain_sprocket"
    ],
    "status": "rough",
-   "notes": "Cone-shaped set vs cylindrical set labeled, 20 gears each"
+   "notes": "Cone-shaped set vs cylindrical set labeled, 20 gears each",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0025",
@@ -7135,7 +7361,8 @@
     "chain_sprocket"
    ],
    "status": "rough",
-   "notes": "Same gear-set macro unlabeled, hand cranking at edge"
+   "notes": "Same gear-set macro unlabeled, hand cranking at edge",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0026",
@@ -7165,7 +7392,8 @@
     "cone_gear"
    ],
    "status": "rough",
-   "notes": "Extreme macro of cone gear teeth"
+   "notes": "Extreme macro of cone gear teeth",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0027",
@@ -7197,7 +7425,8 @@
     "cylinder_gear"
    ],
    "status": "rough",
-   "notes": "Macro: cone + cylindrical sets meshing"
+   "notes": "Macro: cone + cylindrical sets meshing",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0028",
@@ -7229,7 +7458,8 @@
     "cylinder_gear"
    ],
    "status": "rough",
-   "notes": "Macro mesh, rotate-together/independently labels"
+   "notes": "Macro mesh, rotate-together/independently labels",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0029",
@@ -7261,7 +7491,8 @@
     "cylinder_gear"
    ],
    "status": "rough",
-   "notes": "Shallow-DOF macro of gear rows"
+   "notes": "Shallow-DOF macro of gear rows",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v2-t0030",
@@ -7293,7 +7524,8 @@
     "cylinder_gear"
    ],
    "status": "rough",
-   "notes": "Gear macro with 2x/1x ratio labels"
+   "notes": "Gear macro with 2x/1x ratio labels",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v2-t0031",
@@ -7325,7 +7557,8 @@
     "cylinder_gear"
    ],
    "status": "rough",
-   "notes": "Gear macro with 10x..1x ratio labels"
+   "notes": "Gear macro with 10x..1x ratio labels",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v2-t0032",
@@ -7357,7 +7590,8 @@
     "cylinder_gear"
    ],
    "status": "rough",
-   "notes": "Gear macro, ratio labels"
+   "notes": "Gear macro, ratio labels",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v2-t0033",
@@ -7384,7 +7618,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Full machine alone on black"
+   "notes": "Full machine alone on black",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0035",
@@ -7422,7 +7657,8 @@
     "cone_gear"
    ],
    "status": "rough",
-   "notes": "Connecting rod + rocker arm labeled, drive train frontal"
+   "notes": "Connecting rod + rocker arm labeled, drive train frontal",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0036",
@@ -7454,7 +7690,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Rocker arm fan with hanging bars, 4x playback motion"
+   "notes": "Rocker arm fan with hanging bars, 4x playback motion",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v2-t0037",
@@ -7486,7 +7723,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "cos(nx) light-trace overlays on rocker tips"
+   "notes": "cos(nx) light-trace overlays on rocker tips",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v2-t0038",
@@ -7518,7 +7756,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "cos(1x/10x/20x) traces over rocker fan"
+   "notes": "cos(1x/10x/20x) traces over rocker fan",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v2-t0039",
@@ -7550,7 +7789,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Rocker fan + labeled frequency traces"
+   "notes": "Rocker fan + labeled frequency traces",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v2-t0040",
@@ -7582,7 +7822,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Rocker fan + cos traces, 4x playback"
+   "notes": "Rocker fan + cos traces, 4x playback",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v2-t0041",
@@ -7614,7 +7855,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Rocker fan + cos traces"
+   "notes": "Rocker fan + cos traces",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0042",
@@ -7646,7 +7888,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Rocker fan + cos traces"
+   "notes": "Rocker fan + cos traces",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0043",
@@ -7678,7 +7921,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Full view + small inset of rocker arms/bars (view_guess for wide pane)"
+   "notes": "Full view + small inset of rocker arms/bars (view_guess for wide pane)",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0044",
@@ -7710,7 +7954,8 @@
     "rocker_arm"
    ],
    "status": "rough",
-   "notes": "'long vertical bars' + 'rocker arm' labeled inset"
+   "notes": "'long vertical bars' + 'rocker arm' labeled inset",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0045",
@@ -7746,7 +7991,8 @@
     "rocker_arm"
    ],
    "status": "rough",
-   "notes": "Two insets: top levers/springs + rocker fan"
+   "notes": "Two insets: top levers/springs + rocker fan",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0049",
@@ -7782,7 +8028,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Real macro (not animation): hand positions amplitude bar on rocker scale"
+   "notes": "Real macro (not animation): hand positions amplitude bar on rocker scale",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0053",
@@ -7816,7 +8063,8 @@
     "channel_spring_installed"
    ],
    "status": "rough",
-   "notes": "Numbered tick scale along rocker fan, hand with rod"
+   "notes": "Numbered tick scale along rocker fan, hand with rod",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0055",
@@ -7852,7 +8100,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Insets: springs row + rocker fan with amplitude scale"
+   "notes": "Insets: springs row + rocker fan with amplitude scale",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0058",
@@ -7888,7 +8137,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "12x/10x channel labels on springs + rocker fan"
+   "notes": "12x/10x channel labels on springs + rocker fan",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0059",
@@ -7915,7 +8165,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Full machine, top + bottom regions highlighted"
+   "notes": "Full machine, top + bottom regions highlighted",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0060",
@@ -7953,7 +8204,8 @@
     "top_frame"
    ],
    "status": "rough",
-   "notes": "Summing (pivoted) lever at top frame, springs and brass rod"
+   "notes": "Summing (pivoted) lever at top frame, springs and brass rod",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0063",
@@ -7991,7 +8243,8 @@
     "top_frame"
    ],
    "status": "rough",
-   "notes": "Labeled: large spring, lever, spring, pivoted bar, pivot"
+   "notes": "Labeled: large spring, lever, spring, pivoted bar, pivot",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0064",
@@ -8025,7 +8278,8 @@
     "counter_spring"
    ],
    "status": "rough",
-   "notes": "Inset of summing lever area over full view"
+   "notes": "Inset of summing lever area over full view",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0065",
@@ -8052,7 +8306,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Full machine, top frame highlighted"
+   "notes": "Full machine, top frame highlighted",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0066",
@@ -8086,7 +8341,8 @@
     "channel_spring_installed"
    ],
    "status": "rough",
-   "notes": "Gooseneck with ~40 cm dimension callout, large spring label"
+   "notes": "Gooseneck with ~40 cm dimension callout, large spring label",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0069",
@@ -8122,7 +8378,8 @@
     "top_frame"
    ],
    "status": "rough",
-   "notes": "Top-down: levers, pivoted bar, crank label, large spring crossing"
+   "notes": "Top-down: levers, pivoted bar, crank label, large spring crossing",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0071",
@@ -8158,7 +8415,8 @@
     "top_frame"
    ],
    "status": "rough",
-   "notes": "Large spring hooked to pivoted bar, springs row labeled"
+   "notes": "Large spring hooked to pivoted bar, springs row labeled",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0072",
@@ -8185,7 +8443,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Full machine, top frame highlighted"
+   "notes": "Full machine, top frame highlighted",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0073",
@@ -8212,7 +8471,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Full machine frontal, top frame highlighted"
+   "notes": "Full machine frontal, top frame highlighted",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0074",
@@ -8246,7 +8506,8 @@
     "channel_spring_installed"
    ],
    "status": "rough",
-   "notes": "Extreme macro of summing lever pivot block, spring hook"
+   "notes": "Extreme macro of summing lever pivot block, spring hook",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v2-t0077",
@@ -8273,7 +8534,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Full machine alone on black"
+   "notes": "Full machine alone on black",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0078",
@@ -8307,7 +8569,8 @@
     "magnifying_vertical_rod"
    ],
    "status": "rough",
-   "notes": "Magnifying lever assembly on green bracket, frontal"
+   "notes": "Magnifying lever assembly on green bracket, frontal",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0079",
@@ -8341,7 +8604,8 @@
     "magnifying_vertical_rod"
    ],
    "status": "rough",
-   "notes": "Same view with 'magnifying lever' label"
+   "notes": "Same view with 'magnifying lever' label",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0081",
@@ -8375,7 +8639,8 @@
     "magnifying_lever"
    ],
    "status": "rough",
-   "notes": "Macro of vertical rod linkage with ~6 mm dimension callout"
+   "notes": "Macro of vertical rod linkage with ~6 mm dimension callout",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v2-t0083",
@@ -8407,7 +8672,8 @@
     "magnifying_wheel"
    ],
    "status": "rough",
-   "notes": "Wire from magnifying lever down to concentric wheels"
+   "notes": "Wire from magnifying lever down to concentric wheels",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0088",
@@ -8439,7 +8705,8 @@
     "wheel_axle"
    ],
    "status": "rough",
-   "notes": "Magnifying wheel macro: outer wheel / different wire labels"
+   "notes": "Magnifying wheel macro: outer wheel / different wire labels",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0090",
@@ -8475,7 +8742,8 @@
     "platen"
    ],
    "status": "rough",
-   "notes": "Wheel + pen rod down to pen on platen paper with trace"
+   "notes": "Wheel + pen rod down to pen on platen paper with trace",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0092",
@@ -8513,7 +8781,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Lower front: paper, set of gears, crank labeled; hand cranking, 2x playback"
+   "notes": "Lower front: paper, set of gears, crank labeled; hand cranking, 2x playback",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v2-t0093",
@@ -8551,7 +8820,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Same lower-front shot, hand cranking"
+   "notes": "Same lower-front shot, hand cranking",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v3-t0023",
@@ -8589,7 +8859,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Hand adjusting rocker-arm fan below platen; summing lever pivot at left"
+   "notes": "Hand adjusting rocker-arm fan below platen; summing lever pivot at left",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v3-t0024",
@@ -8627,7 +8898,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Clean view of rocker-arm fan, summing lever, platen rack above"
+   "notes": "Clean view of rocker-arm fan, summing lever, platen rack above",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v3-t0025",
@@ -8665,7 +8937,8 @@
     "magnifying_wheel"
    ],
    "status": "rough",
-   "notes": "Pen on platen paper, start of wavy trace, magnifying wheel teeth at bottom"
+   "notes": "Pen on platen paper, start of wavy trace, magnifying wheel teeth at bottom",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v3-t0026",
@@ -8705,7 +8978,8 @@
     "magnifying_wheel"
    ],
    "status": "rough",
-   "notes": "Sinc-like trace drawn on platen paper, pen mid-stroke, red platen clips at edges"
+   "notes": "Sinc-like trace drawn on platen paper, pen mid-stroke, red platen clips at edges",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v3-t0029",
@@ -8745,7 +9019,8 @@
     "harmonic_base"
    ],
    "status": "rough",
-   "notes": "Hand cranking; cone gear + chain sprocket + bar bank; 'sinusoid' overlay; possibly mirrored"
+   "notes": "Hand cranking; cone gear + chain sprocket + bar bank; 'sinusoid' overlay; possibly mirrored",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v3-t0031",
@@ -8777,7 +9052,8 @@
     "top_frame"
    ],
    "status": "rough",
-   "notes": "Numbered bar tips 20..1 at top comb, high/low labels (original orientation)"
+   "notes": "Numbered bar tips 20..1 at top comb, high/low labels (original orientation)",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v3-t0034",
@@ -8809,7 +9085,8 @@
     "top_frame"
    ],
    "status": "rough",
-   "notes": "Bar tips all level at 'crank 0'"
+   "notes": "Bar tips all level at 'crank 0'",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v3-t0038",
@@ -8841,7 +9118,8 @@
     "top_frame"
    ],
    "status": "rough",
-   "notes": "Bar tips with cos(0.x) axes overlay, crank 0"
+   "notes": "Bar tips with cos(0.x) axes overlay, crank 0",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v3-t0039",
@@ -8873,7 +9151,8 @@
     "top_frame"
    ],
    "status": "rough",
-   "notes": "Bar tips tracing cos(1.0x), plot overlay, crank 2"
+   "notes": "Bar tips tracing cos(1.0x), plot overlay, crank 2",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v3-t0041",
@@ -8905,7 +9184,8 @@
     "top_frame"
    ],
    "status": "rough",
-   "notes": "Bar tips tracing cos(2.5x), plot overlay, crank 5"
+   "notes": "Bar tips tracing cos(2.5x), plot overlay, crank 5",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v3-t0043",
@@ -8943,7 +9223,8 @@
     "platen"
    ],
    "status": "rough",
-   "notes": "Composite: bar tips + pen-on-paper inset, crank 0"
+   "notes": "Composite: bar tips + pen-on-paper inset, crank 0",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v3-t0044",
@@ -8981,7 +9262,8 @@
     "platen"
    ],
    "status": "rough",
-   "notes": "Composite: bar tips cos(2.0x) + pen inset, crank 4"
+   "notes": "Composite: bar tips cos(2.0x) + pen inset, crank 4",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v3-t0045",
@@ -9019,7 +9301,8 @@
     "platen"
    ],
    "status": "rough",
-   "notes": "Composite: bar tips cos(5.2x) + pen inset, crank 11"
+   "notes": "Composite: bar tips cos(5.2x) + pen inset, crank 11",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v3-t0047",
@@ -9057,7 +9340,8 @@
     "platen"
    ],
    "status": "rough",
-   "notes": "Composite: bar tips cos(20.0x) + pen inset, crank 40"
+   "notes": "Composite: bar tips cos(20.0x) + pen inset, crank 40",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v3-t0053",
@@ -9095,7 +9379,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Rocker-arm fan with white/yellow dot markers (overlay) at set positions"
+   "notes": "Rocker-arm fan with white/yellow dot markers (overlay) at set positions",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v3-t0055",
@@ -9133,7 +9418,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Rocker-arm fan, sinc sample dot pattern overlay"
+   "notes": "Rocker-arm fan, sinc sample dot pattern overlay",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v3-t0056",
@@ -9169,7 +9455,8 @@
     "pen_set_screw"
    ],
    "status": "rough",
-   "notes": "Macro: brass pen v-block clamp, set screw, green pen tip at platen edge"
+   "notes": "Macro: brass pen v-block clamp, set screw, green pen tip at platen edge",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v3-t0057",
@@ -9205,7 +9492,8 @@
     "pen_set_screw"
    ],
    "status": "rough",
-   "notes": "Macro: pen starting horizontal trace on paper"
+   "notes": "Macro: pen starting horizontal trace on paper",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v3-t0058",
@@ -9241,7 +9529,8 @@
     "pen_set_screw"
    ],
    "status": "rough",
-   "notes": "Macro: pen drawing step in trace, full v-block visible"
+   "notes": "Macro: pen drawing step in trace, full v-block visible",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v3-t0060",
@@ -9277,7 +9566,8 @@
     "pen_set_screw"
    ],
    "status": "rough",
-   "notes": "Macro: pen mid-trace, near-dup of t0058"
+   "notes": "Macro: pen mid-trace, near-dup of t0058",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0013",
@@ -9311,7 +9601,8 @@
     "measuring_stick"
    ],
    "status": "rough",
-   "notes": "Measuring stick held against rocker-arm fan, 10-0 arc scale"
+   "notes": "Measuring stick held against rocker-arm fan, 10-0 arc scale",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0014",
@@ -9345,7 +9636,8 @@
     "measuring_stick"
    ],
    "status": "rough",
-   "notes": "Hand setting amplitude clamp with measuring stick"
+   "notes": "Hand setting amplitude clamp with measuring stick",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0015",
@@ -9375,7 +9667,8 @@
     "measuring_stick"
    ],
    "status": "rough",
-   "notes": "Labelled measuring stick with sliding stop, macro on white"
+   "notes": "Labelled measuring stick with sliding stop, macro on white",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0016",
@@ -9407,7 +9700,8 @@
     "rocker_arm"
    ],
    "status": "rough",
-   "notes": "'brass bar'+'stop' labels, stick laid across rocker-arm tops"
+   "notes": "'brass bar'+'stop' labels, stick laid across rocker-arm tops",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0017",
@@ -9437,7 +9731,8 @@
     "measuring_stick"
    ],
    "status": "rough",
-   "notes": "Macro of measuring stick scale graduations (0-4)"
+   "notes": "Macro of measuring stick scale graduations (0-4)",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0019",
@@ -9467,7 +9762,8 @@
     "measuring_stick"
    ],
    "status": "rough",
-   "notes": "Hands holding measuring stick with stop block"
+   "notes": "Hands holding measuring stick with stop block",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0020",
@@ -9497,7 +9793,8 @@
     "measuring_stick"
    ],
    "status": "rough",
-   "notes": "Stop set against vertical scale column at 6"
+   "notes": "Stop set against vertical scale column at 6",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0021",
@@ -9531,7 +9828,8 @@
     "cylinder_gear"
    ],
    "status": "rough",
-   "notes": "Rocker-arm fan with drive chain and cylinder gears below left"
+   "notes": "Rocker-arm fan with drive chain and cylinder gears below left",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0022",
@@ -9563,7 +9861,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Hand sliding amplitude clamp along arc scale, 5 highlighted"
+   "notes": "Hand sliding amplitude clamp along arc scale, 5 highlighted",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0023",
@@ -9593,7 +9892,8 @@
     "measuring_stick"
    ],
    "status": "rough",
-   "notes": "Stop block macro near 10 mark"
+   "notes": "Stop block macro near 10 mark",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0024",
@@ -9625,7 +9925,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Clamp positioned near 9-10 on rocker fan arc scale"
+   "notes": "Clamp positioned near 9-10 on rocker fan arc scale",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0025",
@@ -9657,7 +9958,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Fingers placing amplitude clamp at 9"
+   "notes": "Fingers placing amplitude clamp at 9",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0029",
@@ -9695,7 +9997,8 @@
     "frame"
    ],
    "status": "rough",
-   "notes": "Rocker fan below platen, rack and frame posts visible"
+   "notes": "Rocker fan below platen, rack and frame posts visible",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0037",
@@ -9737,7 +10040,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Lower drive train front view, drive path numbered 1-6"
+   "notes": "Lower drive train front view, drive path numbered 1-6",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0040",
@@ -9779,7 +10083,8 @@
     "harmonic_base"
    ],
    "status": "rough",
-   "notes": "Labelled gear 1 / chain / gear 2, lower front view"
+   "notes": "Labelled gear 1 / chain / gear 2, lower front view",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0041",
@@ -9811,7 +10116,8 @@
     "chain_sprocket"
    ],
    "status": "rough",
-   "notes": "Macro of large brass drive gear beside chain sprocket (2)"
+   "notes": "Macro of large brass drive gear beside chain sprocket (2)",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0044",
@@ -9845,7 +10151,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Coaxial sprocket (2) and pinion (3) on shaft, knurled nut"
+   "notes": "Coaxial sprocket (2) and pinion (3) on shaft, knurled nut",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0046",
@@ -9877,7 +10184,8 @@
     "chain_sprocket"
    ],
    "status": "rough",
-   "notes": "'gear 4' labelled large brass gear with chain sprocket"
+   "notes": "'gear 4' labelled large brass gear with chain sprocket",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0049",
@@ -9911,7 +10219,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Gears 4 and 5 meshing, edge-on macro with lever at left"
+   "notes": "Gears 4 and 5 meshing, edge-on macro with lever at left",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0054",
@@ -9947,7 +10256,8 @@
     "rocker_arm"
    ],
    "status": "rough",
-   "notes": "'back of platen' + 'rack' labels, pinion engagement lever"
+   "notes": "'back of platen' + 'rack' labels, pinion engagement lever",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0056",
@@ -9989,7 +10299,8 @@
     "harmonic_base"
    ],
    "status": "rough",
-   "notes": "'gear 1' labelled at crank sprocket, lower front view"
+   "notes": "'gear 1' labelled at crank sprocket, lower front view",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0058",
@@ -10029,7 +10340,8 @@
     "cylinder_gear"
    ],
    "status": "rough",
-   "notes": "'tapered pin' label at crank hub, cylinder gears behind"
+   "notes": "'tapered pin' label at crank hub, cylinder gears behind",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0059",
@@ -10067,7 +10379,8 @@
     "cylinder_gear"
    ],
    "status": "rough",
-   "notes": "Hand removing crank handle from pedestal"
+   "notes": "Hand removing crank handle from pedestal",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0060",
@@ -10107,7 +10420,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Drive train front view with crank removed"
+   "notes": "Drive train front view with crank removed",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0061",
@@ -10141,7 +10455,8 @@
     "platen_rack"
    ],
    "status": "rough",
-   "notes": "Brass gear / sprocket mesh macro under platen rack teeth"
+   "notes": "Brass gear / sprocket mesh macro under platen rack teeth",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0062",
@@ -10181,7 +10496,8 @@
     "crank_pedestal"
    ],
    "status": "rough",
-   "notes": "'latch' labelled, hand at translational gear latch"
+   "notes": "'latch' labelled, hand at translational gear latch",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0063",
@@ -10223,7 +10539,8 @@
     "platen_rack"
    ],
    "status": "rough",
-   "notes": "Latch, both sprockets, chain and cylinder gears in one view"
+   "notes": "Latch, both sprockets, chain and cylinder gears in one view",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0064",
@@ -10259,7 +10576,8 @@
     "chain_sprocket"
    ],
    "status": "rough",
-   "notes": "Side macro: hand flipping latch, gear edge-on, knurled knob"
+   "notes": "Side macro: hand flipping latch, gear edge-on, knurled knob",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0065",
@@ -10293,7 +10611,8 @@
     "platen_rack"
    ],
    "status": "rough",
-   "notes": "Side macro of latch with rack teeth above"
+   "notes": "Side macro of latch with rack teeth above",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0066",
@@ -10333,7 +10652,8 @@
     "thumb_screw"
    ],
    "status": "rough",
-   "notes": "Hand unscrewing sprocket nut on crank pedestal stub"
+   "notes": "Hand unscrewing sprocket nut on crank pedestal stub",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0069",
@@ -10363,7 +10683,8 @@
     "transgear_removable"
    ],
    "status": "rough",
-   "notes": "Real 12/18/24-tooth swap gears labelled on white background"
+   "notes": "Real 12/18/24-tooth swap gears labelled on white background",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0070",
@@ -10397,7 +10718,8 @@
     "transgear_stub"
    ],
    "status": "rough",
-   "notes": "Sprocket on stub shaft at crank pedestal boss, nut removed"
+   "notes": "Sprocket on stub shaft at crank pedestal boss, nut removed",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0071",
@@ -10429,7 +10751,8 @@
     "transgear_stub"
    ],
    "status": "rough",
-   "notes": "Bare stub shaft on pedestal boss after sprocket removal"
+   "notes": "Bare stub shaft on pedestal boss after sprocket removal",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0072",
@@ -10465,7 +10788,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Hand offering swap gear to mesh with large brass gear"
+   "notes": "Hand offering swap gear to mesh with large brass gear",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0073",
@@ -10499,7 +10823,8 @@
     "platen_rack"
    ],
    "status": "rough",
-   "notes": "Swap gear held meshed against drive gear"
+   "notes": "Swap gear held meshed against drive gear",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0074",
@@ -10537,7 +10862,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "'screw on nut', crank and chain lying on base during swap"
+   "notes": "'screw on nut', crank and chain lying on base during swap",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0075",
@@ -10579,7 +10905,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Clean lower front view, swap gear installed, crank on base"
+   "notes": "Clean lower front view, swap gear installed, crank on base",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0076",
@@ -10619,7 +10946,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Arm reaching in to refit crank, drive train visible"
+   "notes": "Arm reaching in to refit crank, drive train visible",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0077",
@@ -10657,7 +10985,8 @@
     "crank_pedestal"
    ],
    "status": "rough",
-   "notes": "'relatch gears' label, hand closing latch"
+   "notes": "'relatch gears' label, hand closing latch",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0078",
@@ -10699,7 +11028,8 @@
     "drive_train"
    ],
    "status": "rough",
-   "notes": "Clean lower front view, chain and crank reassembled"
+   "notes": "Clean lower front view, chain and crank reassembled",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0101",
@@ -10735,7 +11065,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Labelled 'magnifying lever' and 'summing bar', wire hanging"
+   "notes": "Labelled 'magnifying lever' and 'summing bar', wire hanging",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0102",
@@ -10771,7 +11102,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Clamp + thumb screw macro, 'amplitude bar' labelled behind"
+   "notes": "Clamp + thumb screw macro, 'amplitude bar' labelled behind",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0104",
@@ -10807,7 +11139,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Clamp at maximum-gain position, waveform strip overlay below"
+   "notes": "Clamp at maximum-gain position, waveform strip overlay below",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0106",
@@ -10843,7 +11176,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Clamp at half-way position, waveform strip overlay below"
+   "notes": "Clamp at half-way position, waveform strip overlay below",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0108",
@@ -10879,7 +11213,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Offset hanger on magnifying lever below top frame; 'minimum' caption + waveform strip overlay at bottom"
+   "notes": "Offset hanger on magnifying lever below top frame; 'minimum' caption + waveform strip overlay at bottom",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0109",
@@ -10915,7 +11250,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Magnifying lever + vertical offset hanger, output wire descending; no overlay"
+   "notes": "Magnifying lever + vertical offset hanger, output wire descending; no overlay",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0110",
@@ -10951,7 +11287,8 @@
     "magnifying_lever"
    ],
    "status": "rough",
-   "notes": "Close-up of offset rod clamps; caption 'controls the vertical offset of the output'"
+   "notes": "Close-up of offset rod clamps; caption 'controls the vertical offset of the output'",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0112",
@@ -10983,7 +11320,8 @@
     "thumb_screw"
    ],
    "status": "rough",
-   "notes": "Macro of wire-attachment clamp with knurled thumb screw; 'wire' caption"
+   "notes": "Macro of wire-attachment clamp with knurled thumb screw; 'wire' caption",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0113",
@@ -11017,7 +11355,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Underside of green top frame, amplitude-bar stack edge-on, output wire diagonal"
+   "notes": "Underside of green top frame, amplitude-bar stack edge-on, output wire diagonal",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0114",
@@ -11053,7 +11392,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Wire running over magnifying wheel; amplitude-bar stack behind"
+   "notes": "Wire running over magnifying wheel; amplitude-bar stack behind",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0115",
@@ -11093,7 +11433,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "Pen carriage on platen, square pen rod descending from above"
+   "notes": "Pen carriage on platen, square pen rod descending from above",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0116",
@@ -11135,7 +11476,8 @@
     "chain_sprocket"
    ],
    "status": "rough",
-   "notes": "Platen with pen carriage; rack pinion gear + chain sprocket drive at lower right"
+   "notes": "Platen with pen carriage; rack pinion gear + chain sprocket drive at lower right",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0117",
@@ -11175,7 +11517,8 @@
     "rack_pinion"
    ],
    "status": "rough",
-   "notes": "Split-screen: offset hanger (left) and pen on platen (right)"
+   "notes": "Split-screen: offset hanger (left) and pen on platen (right)",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0118",
@@ -11213,7 +11556,8 @@
     "rack_pinion"
    ],
    "status": "rough",
-   "notes": "Hand adjusting offset clamp, 'low' captions; split-screen with pen at low position"
+   "notes": "Hand adjusting offset clamp, 'low' captions; split-screen with pen at low position",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0121",
@@ -11253,7 +11597,8 @@
     "rack_pinion"
    ],
    "status": "rough",
-   "notes": "Split-screen, high/low + small/large captions relating hanger setting to output amplitude"
+   "notes": "Split-screen, high/low + small/large captions relating hanger setting to output amplitude",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0125",
@@ -11282,7 +11627,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Dimension callout overlay on real wheel: 100 mm rim, 20 mm hub; full machine inset left - valuable"
+   "notes": "Dimension callout overlay on real wheel: 100 mm rim, 20 mm hub; full machine inset left - valuable",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0132",
@@ -11320,7 +11666,8 @@
     "harmonic_base"
    ],
    "status": "rough",
-   "notes": "Drive train labelled: cone gear set, cylinder gear set, pinion gear (long roller)"
+   "notes": "Drive train labelled: cone gear set, cylinder gear set, pinion gear (long roller)",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0133",
@@ -11356,7 +11703,8 @@
     "harmonic_base"
    ],
    "status": "rough",
-   "notes": "Cone gear stack meshing cylinder gear row; green post at thick end (cone disengage segment)"
+   "notes": "Cone gear stack meshing cylinder gear row; green post at thick end (cone disengage segment)",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0134",
@@ -11392,7 +11740,8 @@
     "harmonic_base"
    ],
    "status": "rough",
-   "notes": "Caption: 'gears on the cylinder engage gears on the cone'"
+   "notes": "Caption: 'gears on the cylinder engage gears on the cone'",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0137",
@@ -11428,7 +11777,8 @@
     "cone_pivot_post"
    ],
    "status": "rough",
-   "notes": "Cone disengage knob (chrome) between cylinder gear end disc and green post; finger entering frame"
+   "notes": "Cone disengage knob (chrome) between cylinder gear end disc and green post; finger entering frame",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0138",
@@ -11464,7 +11814,8 @@
     "cone_pivot_post"
    ],
    "status": "rough",
-   "notes": "Labels: cylinder gear set, cone gear set, knob (cone disengage knob)"
+   "notes": "Labels: cylinder gear set, cone gear set, knob (cone disengage knob)",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0140",
@@ -11496,7 +11847,8 @@
     "cylinder_gear"
    ],
    "status": "rough",
-   "notes": "Top-down view of cone pulled away from cylinder gears; 'disengaged' caption"
+   "notes": "Top-down view of cone pulled away from cylinder gears; 'disengaged' caption",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0143",
@@ -11530,7 +11882,8 @@
     "connecting_rod"
    ],
    "status": "rough",
-   "notes": "Macro of gear/cam stack tooth detail; finger at top edge"
+   "notes": "Macro of gear/cam stack tooth detail; finger at top edge",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0145",
@@ -11572,7 +11925,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Base linkage: cam + connecting rod up to rocker arm on green pyramid support"
+   "notes": "Base linkage: cam + connecting rod up to rocker arm on green pyramid support",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0147",
@@ -11608,7 +11962,8 @@
     "knife_mount"
    ],
    "status": "rough",
-   "notes": "Split-screen: finger points at gear notch (left); lever knife-edge pivot (right)"
+   "notes": "Split-screen: finger points at gear notch (left); lever knife-edge pivot (right)",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0148",
@@ -11644,7 +11999,8 @@
     "knife_mount"
    ],
    "status": "rough",
-   "notes": "Drawn cam-outline overlay (circle) over real gear; notch/cam segment - keep per overlay rule"
+   "notes": "Drawn cam-outline overlay (circle) over real gear; notch/cam segment - keep per overlay rule",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0149",
@@ -11680,7 +12036,8 @@
     "knife_mount"
    ],
    "status": "rough",
-   "notes": "Drawn teardrop cam profile overlay on real gear; split-screen with knife-edge pivot"
+   "notes": "Drawn teardrop cam profile overlay on real gear; split-screen with knife-edge pivot",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0150",
@@ -11714,7 +12071,8 @@
     "connecting_rod"
    ],
    "status": "rough",
-   "notes": "Cylinder gear row + connecting rods above pinion drum; '20x playback' caption"
+   "notes": "Cylinder gear row + connecting rods above pinion drum; '20x playback' caption",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0151",
@@ -11748,7 +12106,8 @@
     "connecting_rod"
    ],
    "status": "rough",
-   "notes": "Same gear row; presenter arm blurred in background"
+   "notes": "Same gear row; presenter arm blurred in background",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0152",
@@ -11782,7 +12141,8 @@
     "connecting_rod"
    ],
    "status": "rough",
-   "notes": "Same gear row; fingers at top edge"
+   "notes": "Same gear row; fingers at top edge",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0154",
@@ -11816,7 +12176,8 @@
     "connecting_rod"
    ],
    "status": "rough",
-   "notes": "'notches aligned' caption; phase-alignment notches lined up across all gears"
+   "notes": "'notches aligned' caption; phase-alignment notches lined up across all gears",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0155",
@@ -11854,7 +12215,8 @@
     "harmonic_base"
    ],
    "status": "rough",
-   "notes": "'pinion' label on long drum; Wm Gaertner maker plaque visible on green casting"
+   "notes": "'pinion' label on long drum; Wm Gaertner maker plaque visible on green casting",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0158",
@@ -11892,7 +12254,8 @@
     "cone_pivot_post"
    ],
    "status": "rough",
-   "notes": "'notch' caption; transfer gear on latch arm engaging large drive gear (pinion/drum engagement segment)"
+   "notes": "'notch' caption; transfer gear on latch arm engaging large drive gear (pinion/drum engagement segment)",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0161",
@@ -11926,7 +12289,8 @@
     "transgear_latch"
    ],
    "status": "rough",
-   "notes": "Engagement macro: small transfer gear meshing large drive gear at notch; finger blurred behind - valuable"
+   "notes": "Engagement macro: small transfer gear meshing large drive gear at notch; finger blurred behind - valuable",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0163",
@@ -11964,7 +12328,8 @@
     "cone_pivot_post"
    ],
    "status": "rough",
-   "notes": "'cosines' caption on drive gear; cosine engagement position"
+   "notes": "'cosines' caption on drive gear; cosine engagement position",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0166",
@@ -12002,7 +12367,8 @@
     "harmonic_base"
    ],
    "status": "rough",
-   "notes": "Drive train with 'cosines'/'sines' leader-line overlay marking engagement positions"
+   "notes": "Drive train with 'cosines'/'sines' leader-line overlay marking engagement positions",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0169",
@@ -12038,7 +12404,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Labels: rocker arms, max, notches (circled overlay); hand reaching into mechanism"
+   "notes": "Labels: rocker arms, max, notches (circled overlay); hand reaching into mechanism",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0178",
@@ -12074,7 +12441,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Fanned stack of thin channel levers with cross rod; summing/rack region above - good geometry"
+   "notes": "Fanned stack of thin channel levers with cross rod; summing/rack region above - good geometry",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0188",
@@ -12114,7 +12482,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Clean front view of output subsystem: wheel, pen rod down to carriage on platen"
+   "notes": "Clean front view of output subsystem: wheel, pen rod down to carriage on platen",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0189",
@@ -12150,7 +12519,8 @@
     "platen"
    ],
    "status": "rough",
-   "notes": "Hand placing pen carriage at platen; pen + green felt liner visible"
+   "notes": "Hand placing pen carriage at platen; pen + green felt liner visible",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0190",
@@ -12190,7 +12560,8 @@
     "magnifying_bracket"
    ],
    "status": "rough",
-   "notes": "Split-screen; right panel 'top of pen mechanism' = magnifying wheel close-up with wire"
+   "notes": "Split-screen; right panel 'top of pen mechanism' = magnifying wheel close-up with wire",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0194",
@@ -12224,7 +12595,8 @@
     "pen_set_screw"
    ],
    "status": "rough",
-   "notes": "Annotated studio macro of pen frame: square rod, set screw (drawn icon), block of brass"
+   "notes": "Annotated studio macro of pen frame: square rod, set screw (drawn icon), block of brass",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0196",
@@ -12260,7 +12632,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "'frame' caption; pen frame hanging on square rod, knurled screw below; amplitude bars labeled at left"
+   "notes": "'frame' caption; pen frame hanging on square rod, knurled screw below; amplitude bars labeled at left",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0198",
@@ -12294,7 +12667,8 @@
     "pen_set_screw"
    ],
    "status": "rough",
-   "notes": "Pen frame hanging free; rear face relief cuts visible - different angle than t0196"
+   "notes": "Pen frame hanging free; rear face relief cuts visible - different angle than t0196",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0202",
@@ -12332,7 +12706,8 @@
     "rack_pinion"
    ],
    "status": "rough",
-   "notes": "Annotations: 'direction of travel' arrow + 45 deg nib angle callout at pen tip"
+   "notes": "Annotations: 'direction of travel' arrow + 45 deg nib angle callout at pen tip",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0203",
@@ -12370,7 +12745,8 @@
     "rack_pinion"
    ],
    "status": "rough",
-   "notes": "Pen carriage writing on platen; direction-of-travel caption"
+   "notes": "Pen carriage writing on platen; direction-of-travel caption",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0205",
@@ -12408,7 +12784,8 @@
     "rack_pinion"
    ],
    "status": "rough",
-   "notes": "Near-dup of t0203 with pen lifted off paper; thin trace visible"
+   "notes": "Near-dup of t0203 with pen lifted off paper; thin trace visible",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0207",
@@ -12446,7 +12823,8 @@
     "rack_pinion"
    ],
    "status": "rough",
-   "notes": "Pen drawing green waveform trace on platen paper"
+   "notes": "Pen drawing green waveform trace on platen paper",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0209",
@@ -12486,7 +12864,8 @@
     "rack_pinion"
    ],
    "status": "rough",
-   "notes": "Front face of pen carriage showing V-block opening; black fork guide above; trace on paper"
+   "notes": "Front face of pen carriage showing V-block opening; black fork guide above; trace on paper",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0211",
@@ -12526,7 +12905,8 @@
     "rack_pinion"
    ],
    "status": "rough",
-   "notes": "'flat peaks'/'flat troughs' captions on trace; pen carriage front view"
+   "notes": "'flat peaks'/'flat troughs' captions on trace; pen carriage front view",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0212",
@@ -12564,7 +12944,8 @@
     "rack_pinion"
    ],
    "status": "rough",
-   "notes": "Pen frame raised in fork guide; trace below"
+   "notes": "Pen frame raised in fork guide; trace below",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0213",
@@ -12602,7 +12983,8 @@
     "rack_pinion"
    ],
    "status": "rough",
-   "notes": "Three-quarter view of pen carriage with clamp around rod; trace on paper"
+   "notes": "Three-quarter view of pen carriage with clamp around rod; trace on paper",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v4-t0214",
@@ -12640,7 +13022,8 @@
     "rack_pinion"
    ],
    "status": "rough",
-   "notes": "Pen writing square-ish wave; direction caption"
+   "notes": "Pen writing square-ish wave; direction caption",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v4-t0216",
@@ -12678,7 +13061,8 @@
     "rack_pinion"
    ],
    "status": "rough",
-   "notes": "'flatter peaks'/'flatter troughs' captions; pen carriage with trace"
+   "notes": "'flatter peaks'/'flatter troughs' captions; pen carriage with trace",
+   "tier": 3
   },
   {
    "id": "harmonic_analyzer--v5-t0001",
@@ -12712,7 +13096,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Fixed tripod A: canopy of rocker arms from below, connecting rods descending; ch1 highlighted; az approx"
+   "notes": "Fixed tripod A: canopy of rocker arms from below, connecting rods descending; ch1 highlighted; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0016",
@@ -12746,7 +13131,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Fixed tripod B: end-on profile of rocker fan; ch1 light-trace overlay; az approx"
+   "notes": "Fixed tripod B: end-on profile of rocker fan; ch1 light-trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0017",
@@ -12780,7 +13166,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod A canopy view; ch2 highlighted; az approx"
+   "notes": "Tripod A canopy view; ch2 highlighted; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0032",
@@ -12814,7 +13201,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod B profile view; ch2 trace overlay; az approx"
+   "notes": "Tripod B profile view; ch2 trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0041",
@@ -12848,7 +13236,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod B profile view; ch3 trace overlay; az approx"
+   "notes": "Tripod B profile view; ch3 trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0049",
@@ -12882,7 +13271,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod A canopy view; ch4 highlighted; az approx"
+   "notes": "Tripod A canopy view; ch4 highlighted; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0056",
@@ -12916,7 +13306,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod B profile view; ch4 trace overlay; az approx"
+   "notes": "Tripod B profile view; ch4 trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0057",
@@ -12950,7 +13341,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod B profile view; ch4 trace overlay; az approx"
+   "notes": "Tripod B profile view; ch4 trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0059",
@@ -12984,7 +13376,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod B profile view; ch4 trace overlay; az approx"
+   "notes": "Tripod B profile view; ch4 trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0064",
@@ -13018,7 +13411,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod B; wide rocker tilt fan; ch4 trace overlay; az approx"
+   "notes": "Tripod B; wide rocker tilt fan; ch4 trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0079",
@@ -13052,7 +13446,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod B profile view; ch5 trace overlay; az approx"
+   "notes": "Tripod B profile view; ch5 trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0081",
@@ -13086,7 +13481,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod A canopy view; ch5 highlighted; az approx"
+   "notes": "Tripod A canopy view; ch5 highlighted; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0113",
@@ -13120,7 +13516,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod A canopy view; ch7 trace overlay; az approx"
+   "notes": "Tripod A canopy view; ch7 trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0129",
@@ -13154,7 +13551,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod A canopy view; ch8 trace overlay; az approx"
+   "notes": "Tripod A canopy view; ch8 trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0145",
@@ -13188,7 +13586,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod A canopy view; ch9 trace overlay; az approx"
+   "notes": "Tripod A canopy view; ch9 trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0146",
@@ -13222,7 +13621,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod A canopy view; ch10 marker visible on rocker tip; az approx"
+   "notes": "Tripod A canopy view; ch10 marker visible on rocker tip; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0153",
@@ -13256,7 +13656,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod B profile view; ch10 trace overlay; az approx"
+   "notes": "Tripod B profile view; ch10 trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0154",
@@ -13290,7 +13691,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod B profile view; ch10 trace overlay; az approx"
+   "notes": "Tripod B profile view; ch10 trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0161",
@@ -13324,7 +13726,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod A canopy view; ch10 trace overlay; az approx"
+   "notes": "Tripod A canopy view; ch10 trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0170",
@@ -13358,7 +13761,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod B profile view; ch11 trace overlay; az approx"
+   "notes": "Tripod B profile view; ch11 trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0177",
@@ -13392,7 +13796,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod B profile view; ch11 trace overlay; az approx"
+   "notes": "Tripod B profile view; ch11 trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0186",
@@ -13426,7 +13831,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod A canopy view; ch12 trace overlay; az approx"
+   "notes": "Tripod A canopy view; ch12 trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0210",
@@ -13460,7 +13866,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod A canopy view; ch13 trace overlay; long span cluster; az approx"
+   "notes": "Tripod A canopy view; ch13 trace overlay; long span cluster; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0274",
@@ -13494,7 +13901,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod A canopy view; ch17 trace overlay; az approx"
+   "notes": "Tripod A canopy view; ch17 trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0280",
@@ -13528,7 +13936,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod B profile view; ch18 trace overlay; az approx"
+   "notes": "Tripod B profile view; ch18 trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0283",
@@ -13562,7 +13971,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod B profile view; ch18 trace overlay; az approx"
+   "notes": "Tripod B profile view; ch18 trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0290",
@@ -13596,7 +14006,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod A canopy view; ch18 trace overlay; az approx"
+   "notes": "Tripod A canopy view; ch18 trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0323",
@@ -13630,7 +14041,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod A canopy view; ch20 trace overlay; az approx"
+   "notes": "Tripod A canopy view; ch20 trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0334",
@@ -13664,7 +14076,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod A; all 20 channels active, dense light-trace overlay partially obscures machine; az approx"
+   "notes": "Tripod A; all 20 channels active, dense light-trace overlay partially obscures machine; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0337",
@@ -13698,7 +14111,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod B; all channels active, dense trace overlay; az approx"
+   "notes": "Tripod B; all channels active, dense trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v5-t0338",
@@ -13732,7 +14146,8 @@
     "rocker_arm_support"
    ],
    "status": "rough",
-   "notes": "Tripod A; all channels active, dense trace overlay; az approx"
+   "notes": "Tripod A; all channels active, dense trace overlay; az approx",
+   "tier": 4
   },
   {
    "id": "harmonic_analyzer--v6-t0013",
@@ -13759,7 +14174,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Turntable spins ~61.4 deg/s (184 deg per 3s still); rep frame back end-on; az model anchored on platen face at +90; +/-10 deg"
+   "notes": "Turntable spins ~61.4 deg/s (184 deg per 3s still); rep frame back end-on; az model anchored on platen face at +90; +/-10 deg",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0015",
@@ -13786,7 +14202,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Near back end-on"
+   "notes": "Near back end-on",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0016",
@@ -13813,7 +14230,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Near front end-on; platen paper edge visible left of center (matches CAD front)"
+   "notes": "Near front end-on; platen paper edge visible left of center (matches CAD front)",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0017",
@@ -13840,7 +14258,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Back end, slight oblique"
+   "notes": "Back end, slight oblique",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0018",
@@ -13867,7 +14286,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Front end, slight right oblique"
+   "notes": "Front end, slight right oblique",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0019",
@@ -13894,7 +14314,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Back-left oblique"
+   "notes": "Back-left oblique",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0020",
@@ -13921,7 +14342,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Front-right oblique"
+   "notes": "Front-right oblique",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0021",
@@ -13948,7 +14370,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Back-left oblique"
+   "notes": "Back-left oblique",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0022",
@@ -13975,7 +14398,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Front-right oblique; platen paper coming into view"
+   "notes": "Front-right oblique; platen paper coming into view",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0023",
@@ -14002,7 +14426,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Back-left oblique"
+   "notes": "Back-left oblique",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0024",
@@ -14029,7 +14454,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Front-right 45 oblique, similar layout to CAD isometric"
+   "notes": "Front-right 45 oblique, similar layout to CAD isometric",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0025",
@@ -14056,7 +14482,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Back-left oblique"
+   "notes": "Back-left oblique",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0026",
@@ -14083,7 +14510,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Right-front oblique; platen paper visible"
+   "notes": "Right-front oblique; platen paper visible",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0027",
@@ -14110,7 +14538,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Left-back oblique"
+   "notes": "Left-back oblique",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0028",
@@ -14137,7 +14566,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Right-front oblique"
+   "notes": "Right-front oblique",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0029",
@@ -14164,7 +14594,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Left-back oblique"
+   "notes": "Left-back oblique",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0030",
@@ -14191,7 +14622,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Right side approaching square-on; platen paper visible"
+   "notes": "Right side approaching square-on; platen paper visible",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0031",
@@ -14218,7 +14650,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Left side approaching square-on (platen back); cluster spans 90-96s"
+   "notes": "Left side approaching square-on (platen back); cluster spans 90-96s",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0034",
@@ -14245,7 +14678,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Right side near square-on; platen paper face, wheel, summing sector all visible"
+   "notes": "Right side near square-on; platen paper face, wheel, summing sector all visible",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0035",
@@ -14272,7 +14706,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Left side square-on (anchor frame): platen back, magnifying wheel through frame"
+   "notes": "Left side square-on (anchor frame): platen back, magnifying wheel through frame",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0036",
@@ -14299,7 +14734,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Right side square-on; platen paper face"
+   "notes": "Right side square-on; platen paper face",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0037",
@@ -14326,7 +14762,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Left side near square-on; small music-credit text overlay bottom-left"
+   "notes": "Left side near square-on; small music-credit text overlay bottom-left",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0038",
@@ -14353,7 +14790,8 @@
     "harmonic_analyzer"
    ],
    "status": "rough",
-   "notes": "Right side slightly past square-on; music-credit overlay"
+   "notes": "Right side slightly past square-on; music-credit overlay",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0039",
@@ -14391,7 +14829,8 @@
     "arbor_pedestal"
    ],
    "status": "rough",
-   "notes": "Close-up of output base from left-back: platen rack sector, chain and counterweight, drum"
+   "notes": "Close-up of output base from left-back: platen rack sector, chain and counterweight, drum",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0040",
@@ -14429,7 +14868,8 @@
     "pinion_drum"
    ],
    "status": "rough",
-   "notes": "Close-up of platen paper face with pen, rack pinion disc and chain below"
+   "notes": "Close-up of platen paper face with pen, rack pinion disc and chain below",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0041",
@@ -14465,7 +14905,8 @@
     "chain_sprocket"
    ],
    "status": "rough",
-   "notes": "Close-up of sector/summing-lever linkage behind platen (left-back side)"
+   "notes": "Close-up of sector/summing-lever linkage behind platen (left-back side)",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0042",
@@ -14501,7 +14942,8 @@
     "platen"
    ],
    "status": "rough",
-   "notes": "Close-up of magnifying wheel with cord, platen top edge below"
+   "notes": "Close-up of magnifying wheel with cord, platen top edge below",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0043",
@@ -14535,7 +14977,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Magnifying wheel and lever arms seen from opposite (left-back) side"
+   "notes": "Magnifying wheel and lever arms seen from opposite (left-back) side",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0044",
@@ -14569,7 +15012,8 @@
     "magnifying_wheel"
    ],
    "status": "rough",
-   "notes": "Mid-frame close-up: columns and amplitude bars, wheel rim at bottom"
+   "notes": "Mid-frame close-up: columns and amplitude bars, wheel rim at bottom",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0045",
@@ -14605,7 +15049,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Top frame underside with amplitude bar bundle and brass crossbar"
+   "notes": "Top frame underside with amplitude bar bundle and brass crossbar",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0046",
@@ -14639,7 +15084,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Top frame close-up from below; small brass hook fitting visible"
+   "notes": "Top frame close-up from below; small brass hook fitting visible",
+   "tier": 2
   },
   {
    "id": "harmonic_analyzer--v6-t0047",
@@ -14673,7 +15119,8 @@
     "tube_frame"
    ],
    "status": "rough",
-   "notes": "Top frame casting from below, gooseneck stem rising at center"
+   "notes": "Top frame casting from below, gooseneck stem rising at center",
+   "tier": 2
   },
   {
    "id": "harmonic_base--ch26-p001-img01",
@@ -14700,7 +15147,8 @@
     "harmonic_base"
    ],
    "status": "rough",
-   "notes": "NAMEPLATE: 'Wm Gaertner & Co Chicago U.S.A.' brass plate close-up, head-on \u2014 this is the 100x55mm photogrammetric scale reference, mounted on front face of base"
+   "notes": "NAMEPLATE: 'Wm Gaertner & Co Chicago U.S.A.' brass plate close-up, head-on \u2014 this is the 100x55mm photogrammetric scale reference, mounted on front face of base",
+   "tier": 3
   },
   {
    "id": "magnifying_wheel--ch07-p001-img12",
@@ -14728,7 +15176,8 @@
     "magnifying_lever"
    ],
    "status": "rough",
-   "notes": "Magnifying wheel face-on (black spokes, brass hub, cord over rim) with black magnifying lever bar at right"
+   "notes": "Magnifying wheel face-on (black spokes, brass hub, cord over rim) with black magnifying lever bar at right",
+   "tier": 3
   },
   {
    "id": "magnifying_wheel--ch21-p002-img01",
@@ -14755,7 +15204,8 @@
     "magnifying_wheel"
    ],
    "status": "rough",
-   "notes": "Extreme macro of wheel rim groove with wire seated in it"
+   "notes": "Extreme macro of wheel rim groove with wire seated in it",
+   "tier": 1
   },
   {
    "id": "magnifying_wheel--ch21-p002-img02",
@@ -14783,7 +15233,8 @@
     "wheel_axle"
    ],
    "status": "rough",
-   "notes": "Extreme macro of wheel hub: brass hex nut and axle pin, face-on"
+   "notes": "Extreme macro of wheel hub: brass hex nut and axle pin, face-on",
+   "tier": 1
   },
   {
    "id": "magnifying_wheel--ch21-p002-img05",
@@ -14811,7 +15262,8 @@
     "wheel_axle"
    ],
    "status": "rough",
-   "notes": "Three-quarter macro of wheel hub showing brass bushing sleeve and axle end, wire over rim at top"
+   "notes": "Three-quarter macro of wheel hub showing brass bushing sleeve and axle end, wire over rim at top",
+   "tier": 1
   },
   {
    "id": "measuring_stick--ch16-p001-img01",
@@ -14839,7 +15291,8 @@
     "thumb_screw"
    ],
    "status": "rough",
-   "notes": "White-background studio shot of complete measuring stick: brass rule (0-10 scale) with black slider block and knurled thumb screw."
+   "notes": "White-background studio shot of complete measuring stick: brass rule (0-10 scale) with black slider block and knurled thumb screw.",
+   "tier": 1
   },
   {
    "id": "measuring_stick--ch16-p001-img02",
@@ -14867,7 +15320,8 @@
     "thumb_screw"
    ],
    "status": "rough",
-   "notes": "White-background shot of measuring stick disassembled: rule with '200 mm' overall-length dimension callout, slider block separate."
+   "notes": "White-background shot of measuring stick disassembled: rule with '200 mm' overall-length dimension callout, slider block separate.",
+   "tier": 1
   },
   {
    "id": "measuring_stick--ch16-p001-img03",
@@ -14894,7 +15348,8 @@
     "measuring_stick"
    ],
    "status": "rough",
-   "notes": "Flat macro of brass rule graduations 0-4 with '8 mm' width dimension callout printed; scale-pitch reference."
+   "notes": "Flat macro of brass rule graduations 0-4 with '8 mm' width dimension callout printed; scale-pitch reference.",
+   "tier": 1
   },
   {
    "id": "measuring_stick--ch16-p001-img04",
@@ -14922,7 +15377,8 @@
     "thumb_screw"
    ],
    "status": "rough",
-   "notes": "White-background isometric-style close-up of the slider block with knurled thumb screw and rule slot; no callouts."
+   "notes": "White-background isometric-style close-up of the slider block with knurled thumb screw and rule slot; no callouts.",
+   "tier": 1
   },
   {
    "id": "pen_v_block--ch24-p001-img01",
@@ -14950,7 +15406,8 @@
     "pen_rod"
    ],
    "status": "rough",
-   "notes": "Studio black-background close-up of brass pen V-block: U-groove underside, two cross holes on top, square pen rod entering, small side hole"
+   "notes": "Studio black-background close-up of brass pen V-block: U-groove underside, two cross holes on top, square pen rod entering, small side hole",
+   "tier": 1
   },
   {
    "id": "platen_clip--ch22-p001-img03",
@@ -14978,7 +15435,8 @@
     "platen"
    ],
    "status": "rough",
-   "notes": "Macro of brass paper-holding spring clip strips on platen edge with retaining screws"
+   "notes": "Macro of brass paper-holding spring clip strips on platen edge with retaining screws",
+   "tier": 1
   },
   {
    "id": "platen_rack--ch22-p001-img04",
@@ -15006,7 +15464,8 @@
     "platen"
    ],
    "status": "rough",
-   "notes": "Oblique macro of brass rack teeth along underside of platen, countersunk screws visible on plate"
+   "notes": "Oblique macro of brass rack teeth along underside of platen, countersunk screws visible on plate",
+   "tier": 1
   },
   {
    "id": "rocker_arm--ch07-p001-img05",
@@ -15033,7 +15492,8 @@
     "rocker_arm"
    ],
    "status": "rough",
-   "notes": "Fanned cascade of ~20 flat steel lever arms (rocker arm stack) splaying from dark slot down to green rail"
+   "notes": "Fanned cascade of ~20 flat steel lever arms (rocker arm stack) splaying from dark slot down to green rail",
+   "tier": 3
   },
   {
    "id": "rocker_arm--ch14-p002-img02",
@@ -15061,7 +15521,8 @@
     "connecting_rod"
    ],
    "status": "rough",
-   "notes": "Small close-up of zigzag rocker arm tips with connecting rods hanging; '16 mm' dimension callout at right edge."
+   "notes": "Small close-up of zigzag rocker arm tips with connecting rods hanging; '16 mm' dimension callout at right edge.",
+   "tier": 4
   },
   {
    "id": "rocker_arm--ch14-p002-img04",
@@ -15088,7 +15549,8 @@
     "rocker_arm"
    ],
    "status": "rough",
-   "notes": "Dark end view of rocker arm tips after '40 cranks' (label printed); part of 0/6/14/40-crank position sequence."
+   "notes": "Dark end view of rocker arm tips after '40 cranks' (label printed); part of 0/6/14/40-crank position sequence.",
+   "tier": 4
   },
   {
    "id": "rocker_arm--ch14-p002-img05",
@@ -15115,7 +15577,8 @@
     "rocker_arm"
    ],
    "status": "rough",
-   "notes": "Dark end view of rocker arm tips after '14 cranks' (label printed); part of crank-position sequence."
+   "notes": "Dark end view of rocker arm tips after '14 cranks' (label printed); part of crank-position sequence.",
+   "tier": 4
   },
   {
    "id": "rocker_arm--ch14-p002-img06",
@@ -15142,7 +15605,8 @@
     "rocker_arm"
    ],
    "status": "rough",
-   "notes": "Dark end view of rocker arm tips after '6 cranks' (label printed); part of crank-position sequence."
+   "notes": "Dark end view of rocker arm tips after '6 cranks' (label printed); part of crank-position sequence.",
+   "tier": 4
   },
   {
    "id": "rocker_arm--ch14-p002-img07",
@@ -15170,7 +15634,8 @@
     "pivot_bushing"
    ],
    "status": "rough",
-   "notes": "Macro along the rocker arm zigzag at the pivot; printed labels 'rocker arm', 'pivot' and '2.5 mm' thickness callout."
+   "notes": "Macro along the rocker arm zigzag at the pivot; printed labels 'rocker arm', 'pivot' and '2.5 mm' thickness callout.",
+   "tier": 1
   },
   {
    "id": "rocker_arm--ch14-p002-img08",
@@ -15197,7 +15662,8 @@
     "rocker_arm"
    ],
    "status": "rough",
-   "notes": "Dark photo labeled 'end view of rocker arms' at '0 cranks'; baseline of crank-position sequence."
+   "notes": "Dark photo labeled 'end view of rocker arms' at '0 cranks'; baseline of crank-position sequence.",
+   "tier": 4
   },
   {
    "id": "rocker_arm--ch27-p001-img01",
@@ -15225,7 +15691,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "close-up: fanned rocker-arm tails set to a coefficient pattern, amplitude bars descending from above, thin rod lying across the fan; green base visible below"
+   "notes": "close-up: fanned rocker-arm tails set to a coefficient pattern, amplitude bars descending from above, thin rod lying across the fan; green base visible below",
+   "tier": 3
   },
   {
    "id": "rocker_arm--ch27-p003-img03",
@@ -15253,7 +15720,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "small crop: rocker-arm fan set to the coefficient pattern producing the adjacent trace; amplitude bars above, green pedestal below"
+   "notes": "small crop: rocker-arm fan set to the coefficient pattern producing the adjacent trace; amplitude bars above, green pedestal below",
+   "tier": 4
   },
   {
    "id": "rocker_arm--ch27-p003-img04",
@@ -15281,7 +15749,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "small crop: rocker-arm fan in a different amplitude setting, thin rod across fan; oblique close-up"
+   "notes": "small crop: rocker-arm fan in a different amplitude setting, thin rod across fan; oblique close-up",
+   "tier": 4
   },
   {
    "id": "rocker_arm--ch27-p004-img03",
@@ -15309,7 +15778,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "small crop: rocker-arm fan amplitude setting matching adjacent trace; oblique close-up over green pedestal"
+   "notes": "small crop: rocker-arm fan amplitude setting matching adjacent trace; oblique close-up over green pedestal",
+   "tier": 4
   },
   {
    "id": "rocker_arm--ch27-p004-img05",
@@ -15337,7 +15807,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "small crop: rocker-arm fan with alternating-amplitude setting; oblique close-up"
+   "notes": "small crop: rocker-arm fan with alternating-amplitude setting; oblique close-up",
+   "tier": 4
   },
   {
    "id": "rocker_arm--ch27-p005-img03",
@@ -15365,7 +15836,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "small crop: rocker-arm fan viewed nearly end-on from the front, amplitude bars above; dark background"
+   "notes": "small crop: rocker-arm fan viewed nearly end-on from the front, amplitude bars above; dark background",
+   "tier": 4
   },
   {
    "id": "rocker_arm--ch27-p005-img04",
@@ -15393,7 +15865,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "small crop: rocker-arm fan photographed from below, tails spread upward; useful underside geometry"
+   "notes": "small crop: rocker-arm fan photographed from below, tails spread upward; useful underside geometry",
+   "tier": 4
   },
   {
    "id": "rocker_arm--ch27-p006-img03",
@@ -15421,7 +15894,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "small crop: rocker-arm fan nearly uniform (smooth washboard curve), corresponding coefficient setting"
+   "notes": "small crop: rocker-arm fan nearly uniform (smooth washboard curve), corresponding coefficient setting",
+   "tier": 4
   },
   {
    "id": "rocker_arm--ch27-p006-img04",
@@ -15449,7 +15923,8 @@
     "amplitude_bar"
    ],
    "status": "rough",
-   "notes": "small crop: rocker-arm fan with strongly alternating amplitudes (comb-like), oblique close-up"
+   "notes": "small crop: rocker-arm fan with strongly alternating amplitudes (comb-like), oblique close-up",
+   "tier": 4
   },
   {
    "id": "transgear_removable--ch07-p001-img06",
@@ -15476,7 +15951,8 @@
     "transgear_removable"
    ],
    "status": "rough",
-   "notes": "Four removable transmission gears on white background with printed callouts: small 12 teeth, medium 18 teeth, large 24 teeth"
+   "notes": "Four removable transmission gears on white background with printed callouts: small 12 teeth, medium 18 teeth, large 24 teeth",
+   "tier": 3
   },
   {
    "id": "transgear_removable--ch23-p001-img04",
@@ -15503,7 +15979,8 @@
     "transgear_removable"
    ],
    "status": "rough",
-   "notes": "Studio shot of the removable translational gears; printed labels: small 12 teeth, medium 18 teeth, large 24 teeth (two mediums shown)"
+   "notes": "Studio shot of the removable translational gears; printed labels: small 12 teeth, medium 18 teeth, large 24 teeth (two mediums shown)",
+   "tier": 1
   }
  ]
 }
