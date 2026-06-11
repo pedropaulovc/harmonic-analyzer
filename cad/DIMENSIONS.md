@@ -163,6 +163,35 @@ the book — modeled square (3 mm wide × 3 mm deep, low confidence). The
 standalone `eccentric-cam` part (M2 legacy re-author) is superseded by the
 integral cam for assembly purposes.
 
+**M6.2 keyway refutation (kinematic proof):** cylinder gear k turns k/80
+rev per crank (ch. 29 gear law) — every gear at a DIFFERENT speed — so the
+gears cannot be keyed to a common rotating shaft. The cylinder shaft is a
+stationary arbor; gears spin freely on plain bores. This also explains the
+ch. 25 setup pinion (turns all 20 gears as one only after the cone pivots
+out of engagement). The legacy cam keyway + shaft keyseat rows above are
+legacy fiction — both removed in M6.2 (`build_cylinder_gear.py`,
+`build_cylinder_gear_shaft.py`).
+
+### Drive-train layout (M6.2, eight-views 0°/90° + ch. 12 p.18 top-down)
+
+Assembly frame: X = machine length (+ right when viewed from the front),
+Y up from base top face (absolute Y = value + 50.8), Z = depth (− front).
+Scales: front view bottom plate 2750 px / 457 mm = 6.02 px/mm; landmarks
+converted from 400 dpi eight-views extractions (`ch30_images/`).
+
+| item | value | source | confidence |
+|---|---|---|---|
+| Drive height (cylinder arbor AND cone big-end axis) | y = 76 above base top | crank-arm pivot + cone big-end brass blob, front view; side-view cone midline near-level confirms equal heights | med |
+| Mesh offset direction | horizontal (plan), cone beside drum | ch. 12 p.18 top-down: cone converges on the drum toward the small end; side view cone midline ≈ level | high |
+| Cone plan incline | 19.8° = arcsin(2.54/7.5), converging +X→−X toward the drum | mesh condition (appendix C #3) | high |
+| Cone big-end axis | (x, z) = (+58.5, −67.1) | x = crank 122 − 63.5 mesh distance (DP16 64T+16T); photo blob at +55 ± 5 agrees; z = −19/2 × 7.06 (stack centered between gates) | med |
+| Cone gear j (j = 0 big … 19 small) | x_j = 58.5 − 2.54j, z_j = −67.1 + 7.06j, y = 76 | mesh + stack grid | med |
+| Cylinder arbor (stationary) | x = −43.1 (= 58.5 − 101.6), y = 76, along Z | mesh distance at T120; vertical connecting rods reach rocker tips (pivot x = 0, rod side ~100) only for x_cyl ≥ −100 ✓ | med |
+| Cylinder gear j | z_j = −67.1 + 7.06j (same stations as cone gear j) | mesh plane alignment | high |
+| Crankshaft | along Z at (x, y) = (+122, 76); green cylindrical pedestal at front-right; arm + chain sprocket at front end, 16T pinion at back end beside the 64T | front view pedestal at +122 ± 3; crank-to-cone distance 67 ± 5 measured ≈ 63.5 required ✓ ratifies appendix C #9 pair | med |
+| Chain run | crank sprocket (+122, 76) up to the translational-gearing sprocket at the third A-frame apex (x ≈ −7 ≈ 0, centered) | front view; transgear disc center measured x = −7 | med |
+| Cone pivot | at the big end, front (black bracket, p.18 "pivot" label); small end carried by the green knob post — swing is horizontal (out of mesh) | p.18 + ch. 12 notes | high |
+
 ### Connecting rods (ch. 13 pp. 22–25 + ch. 14 p. 29; 20 used)
 
 | dim | value | (in) | source | method | confidence |
@@ -485,16 +514,20 @@ re-measure during their M2 script build.
    2.5 = 7.5 mm. Self-consistent: 20 ends × 60 px ≈ 1140 px of the 1512 px
    strip. The 16 mm candidate is refuted.
    Z-projection refinement: every cone gear must mesh its cylinder gear
-   at center distance r_cone + 50.8 with all cylinder gears at one
-   height, so the vertical drop per 7.5 mm shaft station equals the
-   2.54 mm pitch-radius step: 7.5 sin θ = 2.54 → cone shaft inclined
-   θ = arcsin(2.54/7.5) = 19.8° in the vertical plane (NOT
-   atan = 18.7° — the radius step is per station along the shaft, not
-   per unit Z). Channel grid spacing along the machine depth is
+   at center distance r_cone + 50.8 with the cylinder gears on one
+   common axis, so the axis-to-axis offset shrinks by the 2.54 mm
+   pitch-radius step per 7.5 mm shaft station: 7.5 sin θ = 2.54 → cone
+   shaft inclined θ = arcsin(2.54/7.5) = 19.8° (NOT atan = 18.7° — the
+   radius step is per station along the shaft, not per unit Z). The
+   incline lies in the HORIZONTAL plane: the cone sits beside the drum
+   at the same height and converges on it toward the small end (ch. 12
+   p.18 top-down photo; the eight-views side view shows the cone
+   midline near-level) — see "Drive-train layout (M6.2)" in the ch. 13
+   section. Channel grid spacing along the machine depth is
    7.5 × cos 19.8° = 7.06 mm; channel stack spans 19 × 7.06 ≈ 134.1 mm,
    leaving ~2.8 mm air per side inside the gates' 139.7 mm clear span
    (inner faces at Z = ±69.85). The big-end (T120) cone axis sits
-   exactly 101.6 mm below the cylinder axis (50.8 + 50.8 mesh).
+   exactly 101.6 mm beside the cylinder axis (50.8 + 50.8 mesh).
 4. **Rocker arm working length** — RESOLVED in M2: eight-views view 5/8
    side photo agrees with the ch. 16 derivation (~80 mm working half);
    modeled 100 mm rod side / 70 mm tail (`build_rocker_arm.py`).
@@ -543,6 +576,10 @@ re-measure during their M2 script build.
    Author both as M4 parts at the estimate; re-measure/ratify when the
    drive train is mated in M6 (the 4:1 ratio itself is book-stated and
    fixed — only DP/tooth-count split is estimated).
+   **M6.2 ratification:** the measured crank-axis-to-cone-axis distance
+   (front view, 67 ± 5 mm) matches the DP 16 64T+16T center distance
+   63.5 mm; no other round-PD split at 4:1 fits. Pair confirmed at the
+   estimate (see "Drive-train layout (M6.2)", ch. 13 section).
 
 
 
