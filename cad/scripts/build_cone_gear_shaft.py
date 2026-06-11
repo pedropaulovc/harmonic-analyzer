@@ -12,12 +12,23 @@ attach by means the book never shows (p.21 macro shows solder blobs at
 the small gears) -- no keyseat, the shaft steps are plain.
 
 Sections, large (pivot) end at z = 0, gear seats at the 7.5 mm stack
-pitch (150 mm / 20 gears, annotated p.18):
+pitch (150 mm / 20 gears, annotated p.18). M6.6 (canted gear seats):
+each step ends shy of its nominal seat boundary so the larger section's
+east surface line stays out of the next CANTED gear's vertical slab
+(the inclined cylinder's surface reaches r*sin(19.8) past its end
+station in z, and r/cos(19.8) in plan -- both bit as real
+interferences), and the tip is turned down from the photo-suggested
+1/8 in: the inclined shaft line converges toward the drum as z grows,
+passing only 1.30 mm outside the 120T tip circle at the last drum
+gear's face -- a 1/8 in rod (r 1.59) would rub those tooth tips, the
+0.08 in tip clears them by 0.22:
 
-* 3/8 in x 152.5 -- pivot journal 25 + 17 seats (T120..T024)
-* 1/4 in x 7.5 -- T018 seat
-* 3/16 in x 7.5 -- T012 seat
-* 1/8 in x 57.5 -- T006 seat + thin-tip journal into the green post
+* 3/8 in x 150.5 -- pivot journal 25 + seats T120..T024 (shy of 152.5:
+  east line out of T018's slab)
+* 1/4 in x 8.1 -- T018 seat (shy of 160: east line out of T012's slab)
+* 0.08 in x 66.4 -- T012/T006 region + thin-tip journal into the green
+  post (T012 rides it canted with a loose 1/4 in bore; the parked
+  perpendicular T006 is snug at station 178)
 
 Dimensions: cad/DIMENSIONS.md "Chapter 12" -- base dia legacy (med),
 length derived from the annotated 150 mm stack + p.18 top-down end
@@ -63,13 +74,13 @@ SEAT_PITCH = 7.5  # mm, 150 stack / 20 gears (annotated p.18)
 PIVOT_JOURNAL = 25.0  # mm, large-end journal into the pivot block (low)
 
 # (diameter in inches, section end station in mm from the pivot end).
-# Diameters mirror build_cone_gear.bore_dia_in; stations accumulate
-# 25 pivot journal + 17/1/1/1 seats + 50 thin-tip journal = 225 total.
+# Sections feed build_cone_gear.bore_dia_in; end stations sit shy of the
+# nominal 25 + k * 7.5 seat boundaries and the tip is 0.08 in -- M6.6
+# canted-slab / drum-tip clearances, see docstring. Total 225.
 SECTIONS = [
-    (0.375, PIVOT_JOURNAL + 17 * SEAT_PITCH),  # 152.5: pivot + T120..T024
-    (0.25, PIVOT_JOURNAL + 18 * SEAT_PITCH),  # 160.0: T018 seat
-    (0.1875, PIVOT_JOURNAL + 19 * SEAT_PITCH),  # 167.5: T012 seat
-    (0.125, 225.0),  # T006 seat + 50 thin-tip journal
+    (0.375, 150.5),  # pivot journal + seats T120..T024
+    (0.25, 158.6),  # T018 seat
+    (0.08, 225.0),  # T012/T006 region + thin-tip journal
 ]
 
 
