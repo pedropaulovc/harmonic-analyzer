@@ -1,14 +1,17 @@
 r"""Reproduction script: column clamp (book ch. 21/22, pp. 50-55).
 
 The green cast collar that clamps each output support bar to a front
-column: a ring sliding on the O35 column with a lug whose upward-open
-square notch cradles the 10-square bar (six used: two per bar). The
-book's pinch screws are omitted (simplification).
+column: a ring sliding on the O35 column with an open channel across its
+front face that the 10-square bar lies in -- the bars run tangent IN
+FRONT of the columns (p3 90-degree view: bar band z -129..-139 vs column
+line z -112). The book's pinch screws are omitted (simplification).
 
 Layout: collar axis +Y (column vertical) through the origin at the bar's
-centre height; the lug points +X (rotated per side in the assembly).
-The notch floor sits at y -5.1 so the bar centres on y 0. Dimensions:
-cad/DIMENSIONS.md ch. 21/22 (M6.4, low).
+centre height; the bar channel runs along local Z at x 16.8..27.0 (bar
+centre 21.9 = column-to-bar offset), floor at y -5.1 so the bar centres
+on y 0 with 0.1 clearances all around. The assembly rotates the clamp
+about Y per column so local +X points machine -Z. Dimensions:
+cad/DIMENSIONS.md ch. 21/22 (M6.4, low/derived).
 
 Run (SolidWorks already open)::
 
@@ -38,10 +41,22 @@ MATERIAL = "Gray Cast Iron"  # green casting
 COLLAR_OD = 48.0  # DIMENSIONS.md ch21 (low)
 COLLAR_BORE = 35.2  # slides on the O35 column (derived)
 COLLAR_HALF_H = 8.0  # 16 tall
-LUG_X = (20.0, 44.0)  # overlaps the collar wall, reaches past the bar
-LUG_HALF_Z = 8.0
-NOTCH_HALF = 5.1  # 10.2 square notch for the 10-square bar
-LUG_FLOOR_Y = -COLLAR_HALF_H  # lug bottom flush with the collar
+CHANNEL_X = (16.8, 27.0)  # bar channel walls (bar 16.9..26.9, 0.1 margins)
+CHANNEL_FLOOR_Y = -5.1  # bar bottom -5.0 rests 0.1 above
+
+
+def _channel_removed_volume() -> float:
+    """Annulus material removed by the channel cut (x >= wall, y above
+    floor): circular-segment areas, full z."""
+    def seg(radius: float, d: float) -> float:
+        if d >= radius:
+            return 0.0
+        return radius * radius * math.acos(d / radius) - d * math.sqrt(
+            radius * radius - d * d
+        )
+
+    area = seg(COLLAR_OD / 2.0, CHANNEL_X[0]) - seg(COLLAR_BORE / 2.0, CHANNEL_X[0])
+    return area * (COLLAR_HALF_H - CHANNEL_FLOOR_Y)
 
 
 async def _volume(adapter) -> float:
@@ -86,68 +101,60 @@ async def build(adapter) -> dict[str, str]:
     if abs(vol - expected) > 0.005 * expected:
         raise RuntimeError(f"collar volume {vol:.1f} != {expected:.1f}")
 
-    # Lug floor plate (below the notch).
-    check("create_sketch lug floor", await adapter.create_sketch("Front"))
-    floor = await add_line_chain(
+    # Bar channel: one rectangular cut through the collar front, from the
+    # floor up past the top (Top sketch footprint, offset cut upward).
+    check("create_sketch channel", await adapter.create_sketch("Top"))
+    channel = await add_line_chain(
         adapter,
         [
-            (LUG_X[0], LUG_FLOOR_Y),
-            (LUG_X[1], LUG_FLOOR_Y),
-            (LUG_X[1], -NOTCH_HALF),
-            (LUG_X[0], -NOTCH_HALF),
+            (CHANNEL_X[0], -COLLAR_OD),
+            (CHANNEL_X[1], -COLLAR_OD),
+            (CHANNEL_X[1], COLLAR_OD),
+            (CHANNEL_X[0], COLLAR_OD),
         ],
     )
-    await ensure_fully_defined(adapter, "lug floor sketch", fix_entities=floor)
-    check("exit_sketch lug floor", await adapter.exit_sketch())
-    check(
-        "extrude lug floor",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=2.0 * LUG_HALF_Z, both_directions=True)
-        ),
-    )
-    v_floor = (
-        (LUG_X[1] - LUG_X[0])
-        * (COLLAR_HALF_H - NOTCH_HALF)
-        * 2.0
-        * LUG_HALF_Z
-    )
-    before = expected
-    vol = await _volume(adapter)
-    added = vol - before
-    print(f"  volume after lug floor: {vol:.1f} mm^3 (+{added:.1f}, solid {v_floor:.1f})")
-    if not (0.7 * v_floor <= added <= 1.01 * v_floor):
-        raise RuntimeError(f"lug floor: added {added:.1f}, expected ~{v_floor:.1f}")
-    expected = vol
+    await ensure_fully_defined(adapter, "channel sketch", fix_entities=channel)
+    check("exit_sketch channel", await adapter.exit_sketch())
+    # Cut occupies y CHANNEL_FLOOR_Y .. +COLLAR_HALF_H + 2 (clears the top):
+    # mid-plane trick is unusable (asymmetric), so cut a boss-extruded
+    # region via cut-extrude at a start offset.
+    from _common import feature_name_by_type
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
-    # Lug cheeks flanking the notch (Top sketch, offset extrude up from
-    # the notch floor to the collar top).
-    check("create_sketch lug cheeks", await adapter.create_sketch("Top"))
-    cheeks: list[str] = []
-    for side in (1.0, -1.0):
-        cheeks += await add_line_chain(
-            adapter,
-            [
-                (LUG_X[0], side * NOTCH_HALF),
-                (LUG_X[1], side * NOTCH_HALF),
-                (LUG_X[1], side * LUG_HALF_Z),
-                (LUG_X[0], side * LUG_HALF_Z),
-            ],
-        )
-    await ensure_fully_defined(adapter, "lug cheeks sketch", fix_entities=cheeks)
-    check("exit_sketch lug cheeks", await adapter.exit_sketch())
-    extrude_at_offset(adapter, COLLAR_HALF_H + NOTCH_HALF, -NOTCH_HALF)
-    v_cheeks = (
-        2.0
-        * (LUG_X[1] - LUG_X[0])
-        * (LUG_HALF_Z - NOTCH_HALF)
-        * (COLLAR_HALF_H + NOTCH_HALF)
+    sketch_name = feature_name_by_type(adapter, "ProfileFeature")
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        sketch_name, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError(f"cannot select channel sketch {sketch_name!r}")
+    feature = model.FeatureManager.FeatureCut4(
+        True,  # Sd: single direction
+        False,  # Flip side to cut
+        False,  # Dir
+        0, 0,  # T1, T2: blind
+        (COLLAR_HALF_H + 2.0 - CHANNEL_FLOOR_Y) / 1000.0,  # D1
+        0.0,  # D2
+        False, False, False, False,  # Dchk/Ddir
+        0.0, 0.0,  # Dang
+        False, False,  # OffsetReverse
+        False, False,  # TranslateSurface
+        False,  # NormalCut
+        False, True,  # UseFeatScope, UseAutoSelect
+        False, False, False,  # AssemblyFeatureScope, AutoSelectComponents, PropagateFeatureToParts
+        3,  # T0: swStartOffset
+        CHANNEL_FLOOR_Y / 1000.0,  # StartOffset
+        False,  # FlipStartOffset
     )
-    before = expected
+    model.ClearSelection2(True)
+    if feature is None:
+        raise RuntimeError("channel cut: FeatureCut4 returned None")
+    print(f"  OK  channel cut at offset {CHANNEL_FLOOR_Y}")
+    expected -= _channel_removed_volume()
     vol = await _volume(adapter)
-    added = vol - before
-    print(f"  volume after cheeks: {vol:.1f} mm^3 (+{added:.1f}, solid {v_cheeks:.1f})")
-    if not (0.7 * v_cheeks <= added <= 1.01 * v_cheeks):
-        raise RuntimeError(f"cheeks: added {added:.1f}, expected ~{v_cheeks:.1f}")
+    print(f"  volume after channel: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    if abs(vol - expected) > 0.01 * expected:
+        raise RuntimeError(f"channel volume {vol:.1f} != {expected:.1f}")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
