@@ -41,7 +41,8 @@ COLLAR_HALF_LEN = 5.0  # along X
 ARM_HALF_X = 5.0  # arm 10 wide (x), y -3..+4.5, z 4..15 (low)
 ARM_Y = (-3.0, 4.5)
 ARM_Z = (4.0, 15.0)
-FLANGE_X = (-5.0, 35.0)  # under-plate flange, machine x -45..-5 (low)
+FLANGE_X = (-5.0, 11.0)  # under-plate flange, machine x -45..-29: stops 0.65
+# west of channel spring j=0's helix (west edge x -28.35; M6.5 top-level fit)
 FLANGE_Y = (3.9, 7.9)  # flange top touches the plate bottom (992.9)
 FLANGE_Z = (9.0, 20.0)  # under the plate's front edge band (derived)
 
