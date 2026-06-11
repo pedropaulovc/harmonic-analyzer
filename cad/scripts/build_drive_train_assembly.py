@@ -80,11 +80,12 @@ X_CRANK = X_64 + 63.5 + 0.3  # DP16 64T+16T centres + skew-mesh backlash
 # shrinks by cos19.8 while the x-step stays 2.54), so ideal distance at
 # the big end leaves the last six stations interfering by up to ~0.5 mm
 # (measured live: 2.7 mm^3 tooth overlap at T012). Backing the drum off
-# 1.0 mm clears the small end and widens the big-end gap to ~2.4 mm --
-# the book notes exactly this: "engagement ... at an oblique angle
-# (partial engagement, distinct wear)" (ch. 12).
-DRUM_BACKLASH = 1.0
-X_DRUM = X_T120 - 101.6 - DRUM_BACKLASH  # -47.0
+# 1.5 mm clears the small end (1.0 still left 0.1 mm^3 at T006..T024)
+# and widens the big-end gap to ~2.9 mm -- the book notes exactly this:
+# "engagement ... at an oblique angle (partial engagement, distinct
+# wear)" (ch. 12).
+DRUM_BACKLASH = 1.5
+X_DRUM = X_T120 - 101.6 - DRUM_BACKLASH  # -47.5
 
 # Cone shaft: pivot end at seat station -28.75 from the T120 centre
 # (25 journal + half of the first 7.5 seat -- build_cone_gear_shaft.py).
