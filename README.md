@@ -2,6 +2,10 @@
 
 This repository documents the full reconstruction of Albert A. Michelson’s 20-element harmonic analyzer—an analog mechanical computer that performs Fourier synthesis and analysis via a system of gears, springs, levers, and cams.
 
+<p align="center">
+  <img src="cad/out/png/harmonic-analyzer/harmonic-analyzer_isometric.png" width="520" alt="Top-level SolidWorks assembly, isometric view">
+</p>
+
 ## 📐 Project Scope
 
 This is a high-fidelity, didactic recreation of the original machine described in:
@@ -23,7 +27,13 @@ The analyzer is composed of 20 mechanical channels operating in parallel, each c
 - Magnifying and pen mechanism
 - Platen (paper transport)
 
-See `docs/components/` for engineering drawings and CAD assemblies.
+### CAD renders
+
+| Frame | Drive train | Channels (×20) | Output |
+|:---:|:---:|:---:|:---:|
+| <img src="cad/out/png/frame/frame_isometric.png" alt="Frame sub-assembly"> | <img src="cad/out/png/drive-train/drive-train_isometric.png" alt="Drive train sub-assembly: crank, cone gears, cylinder gears"> | <img src="cad/out/png/channel/channel_isometric.png" alt="Channel sub-assembly: rocker arms, amplitude bars, springs"> | <img src="cad/out/png/output/output_isometric.png" alt="Output sub-assembly: summing lever, magnifying and pen mechanism, platen"> |
+
+All SolidWorks models are generated from C# scripts in [`cad/`](./cad). Build artefacts—per-part renders, eight standard views of the full machine, STEP/STL exports, and the BOM—live in [`cad/out/`](./cad/out).
 
 ## 🛠️ Implementation Plan
 
@@ -39,7 +49,7 @@ The implementation follows a structured seven-phase process:
 | 6. Testing & Validation      | 3 weeks | Compare machine output with known Fourier series |
 | 7. Publication               | 2 weeks | Prepare final documentation and make it open-source |
 
-Full plan: [`Study and Implementation Plan.md`](./Study%20and%20Implementation%20Plan.md)
+Research notes per phase: [`research/`](./research)
 
 ## 🔧 Tooling and Capabilities
 
