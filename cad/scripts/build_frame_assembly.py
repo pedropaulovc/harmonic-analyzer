@@ -16,15 +16,17 @@ depth):
 * corner-bracket x4 beside each column on its inboard-X side, upright
   plate tangent to the column, foot toward the machine centre (ch. 30
   views 1/8 show the green tabs against the column bases).
-* rocker-arm-support x2 (solid tapered frustums, M6.3 re-authoring) at
-  (X, Z) = (-72.9, +/-101.6): apexes under the rocker-pivot shaft (its
-  ball mounts and the shaft itself live in channel.SLDASM), outer faces
-  flush with the top-plate edge (133.35 - 63.5/2 = 101.6). The CHANNEL
-  AXIS runs along Z. The M6.1 windowed-gate placement at X = 0 is
-  superseded: the pivot x = arbor -47.5 minus the 25.4 rod lever = -72.9
-  (DIMENSIONS.md ch. 14 layout). The third A-frame casting of the legacy
-  count is the translational-gearing/output support and belongs to
-  output.SLDASM (M6.4).
+* rocker-arm-support x1 (solid tapered frustum, M6.3 re-authoring) at
+  (X, Z) = (-72.9, +101.6) - the BACK support only: its apex carries the
+  north pivot ball mount (channel.SLDASM) and its east-flank boss clamps
+  the cylinder-arbor north end (drive-train.SLDASM). Outer face flush
+  with the top-plate edge (133.35 - 63.5/2 = 101.6). The CHANNEL AXIS
+  runs along Z. M6.5 photo audit REFUTES the former south instance: the
+  calibrated v3 side view shows no frustum at the front; the south pivot
+  ball is gripped by the transgear A-frame's clevis at z -111
+  (output.SLDASM, build_a_frame.py). The M6.1 windowed-gate placement at
+  X = 0 was already superseded: the pivot x = arbor -47.5 minus the 25.4
+  rod lever = -72.9 (DIMENSIONS.md ch. 14 layout).
 * top-frame x1: the green ring at ring mid-plane Y = 1020.2 (rails 22 x
   41, y 999.7..1040.7), corner bosses bored around the four columns; its
   west rail seats the top-lever ball mounts (channel.SLDASM).
@@ -210,25 +212,24 @@ async def build(adapter) -> dict[str, str]:
         )
         assert_component_placed(adapter, name, target, rows)
 
-    # Rocker-pivot support frustums at the channel-stack ends along Z,
-    # apexes under the pivot shaft at x = -72.9.
-    for station in (-SUPPORT_Z, SUPPORT_Z):
-        target = [SUPPORT_X, BASE_TOP_Y, station]
-        res = await adapter.insert_component(
-            InsertComponentParameters(file_path=support_path, position=target)
-        )
-        check(f"insert_component rocker-arm-support @ {target}", res)
-        name = res.data["name"]
-        await _plane_mate(
-            adapter, name, "Right Plane", "Right Plane", base_name, SUPPORT_X, target
-        )
-        await _plane_mate(
-            adapter, name, "Front Plane", "Front Plane", base_name, station, target
-        )
-        await _plane_mate(
-            adapter, name, "Top Plane", "Top Plane", base_name, BASE_TOP_Y, target
-        )
-        assert_component_placed(adapter, name, target, IDENTITY)
+    # Rocker-pivot support frustum at the BACK channel-stack end (north
+    # only, M6.5), apex under the pivot shaft at x = -72.9.
+    target = [SUPPORT_X, BASE_TOP_Y, SUPPORT_Z]
+    res = await adapter.insert_component(
+        InsertComponentParameters(file_path=support_path, position=target)
+    )
+    check(f"insert_component rocker-arm-support @ {target}", res)
+    name = res.data["name"]
+    await _plane_mate(
+        adapter, name, "Right Plane", "Right Plane", base_name, SUPPORT_X, target
+    )
+    await _plane_mate(
+        adapter, name, "Front Plane", "Front Plane", base_name, SUPPORT_Z, target
+    )
+    await _plane_mate(
+        adapter, name, "Top Plane", "Top Plane", base_name, BASE_TOP_Y, target
+    )
+    assert_component_placed(adapter, name, target, IDENTITY)
 
     # Top-frame ring clamped around the four columns, mid-plane y 1020.2.
     target = [0.0, TOP_FRAME_MID_Y, 0.0]

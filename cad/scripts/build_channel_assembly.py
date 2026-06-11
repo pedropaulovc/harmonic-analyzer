@@ -6,10 +6,14 @@ bank on its pivot shaft, the amplitude bars running UP the spine, and the
 top-lever bank on its fulcrum shaft with the channel springs hanging from
 the lever tips. 144 components:
 
-* pivot-shaft x2 (rocker bank at (-72.9, 253.8), lever bank at
-  (-199.9, 1065.9), both along Z, centred at z = 0)
-* pivot-ball-mount x4 (rocker pair on the support apexes, seats
-  (-72.9, 228.6, +/-101.6); lever pair on the top-frame west rail,
+* pivot-shaft x1 (rocker bank at (-72.9, 253.8), along Z, centred z 0)
+  + fulcrum-shaft x1 (lever bank at (-199.9, 1065.9), 182 long - the
+  228.6 shaft clipped the west columns at top level, M6.5)
+* pivot-ball-mount x4 (rocker pair: north on the rocker-support apex at
+  (-72.9, 228.6, +101.6), south on the A-FRAME clevis saddle at
+  (-72.9, 228.6, -111) - M6.5 photo audit: there is no south frustum,
+  the front stand is the transgear A-frame (output.SLDASM) whose ears
+  flank this mount's O16 base; lever pair on the top-frame west rail,
   seats (-199.9, 1040.7, +/-85) - z 85 keeps the O16 base clear of the
   O35 corner-boss bores)
 * rocker-arm x20, pivot-bushing x19, connecting-rod x20,
@@ -109,7 +113,8 @@ LEVER_THICKNESS = 3.0
 
 # --- supports / mounts ------------------------------------------------------
 SUPPORT_APEX_Y = 228.6
-SUPPORT_Z = 101.6
+SUPPORT_Z = 101.6  # north rocker-support apex (frame.SLDASM)
+AFRAME_MOUNT_Z_ABS = 111.0  # south mount on the A-frame clevis (output.SLDASM)
 RAIL_TOP_Y = 1040.7
 LEVER_MOUNT_Z = 85.0  # clears the top-frame boss bores (DIMENSIONS.md)
 
@@ -338,17 +343,20 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY, label="pivot-shaft (rocker)",
     )
     await _place(
-        adapter, "pivot-shaft", [FULCRUM[0], FULCRUM[1], 0.0], [0.0, 0.0, 0.0],
-        IDENTITY, label="pivot-shaft (lever fulcrum)",
+        adapter, "fulcrum-shaft", [FULCRUM[0], FULCRUM[1], 0.0], [0.0, 0.0, 0.0],
+        IDENTITY, label="fulcrum-shaft (lever bank)",
     )
 
-    # Ball mounts.
-    for sz in (-1.0, 1.0):
+    # Ball mounts. The rocker pair is asymmetric (M6.5): north seats on
+    # the rocker-support apex, south on the A-frame clevis saddle (both
+    # tops at y 228.6).
+    for mount_z in (-AFRAME_MOUNT_Z_ABS, SUPPORT_Z):
         await _place(
             adapter, "pivot-ball-mount",
-            [PIVOT[0], SUPPORT_APEX_Y, sz * SUPPORT_Z],
-            [0.0, 0.0, 0.0], IDENTITY, label=f"ball-mount rocker z{sz * SUPPORT_Z:+.0f}",
+            [PIVOT[0], SUPPORT_APEX_Y, mount_z],
+            [0.0, 0.0, 0.0], IDENTITY, label=f"ball-mount rocker z{mount_z:+.0f}",
         )
+    for sz in (-1.0, 1.0):
         await _place(
             adapter, "pivot-ball-mount",
             [FULCRUM[0], RAIL_TOP_Y, sz * LEVER_MOUNT_Z],
