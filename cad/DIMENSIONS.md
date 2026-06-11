@@ -335,7 +335,7 @@ z_j + 0.8.
 |---|---|---|---|
 | Rocker pivot shaft | Ø6.35 × 228.6 along Z at (−72.9, 253.8) | ch. 14 layout table | med |
 | Top-lever fulcrum shaft | Ø6.35 × 228.6 along Z at (−199.9, 1065.9) | ch. 17 rows | med |
-| Top frame (NEW part) | green cast rectangular ring around the 4 columns: rails 22 wide × 41 tall, corner bosses bored Ø35 at (±197, ±112), y 1024.7…1040.7 top… see build script for the exact profile; clamps the columns 80 below their tops | eight-views: green ring at y ≈ 1010–1055 in all views, columns continue above it to caps ≈ 1090–1120 | med |
+| Top frame (NEW part) | green cast rectangular ring around the 4 columns: rails 22 wide × 41 tall (y 999.7…1040.7, top = lever ball-mount seat 1065.9 − 25.2), corner bosses Ø48 bored Ø35 (column Ø34.925) at (±197, ±112); clamps the columns ~30 below their 1070 tops | eight-views: green ring at y ≈ 1010–1055 in all views, columns continue above it to caps ≈ 1090–1120 | med |
 | Ball mounts ×4 | rocker pair on the support apexes (seats y 228.6); lever pair on the top-frame west rail (seat y 1040.7) | ch. 14 / ch. 17 | med |
 | Amplitude bars (default) | vertical at x = −72.9 (d = 0), foot notch on the arm at y 261.8, top 1072.3 | ch. 15 notes | med |
 | Springs (default) | hanging free from lever tips (+54.1, 1063.4), body 32 + hooks; lower hook joins the summing lever in M6.4 | ch. 17/18 | med |
