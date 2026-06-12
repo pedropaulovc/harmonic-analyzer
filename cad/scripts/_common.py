@@ -25,7 +25,10 @@ driving dims, SolidworksMCP-python PRs #55/#56):
   :func:`anchor_point_to_origin`, then horizontal/vertical constraints and
   per-segment length dimensions fully define the chain. Never anchor a
   second vertex of the same chain — the dims already determine it through
-  the merged vertices and the sketch goes over-defined.
+  the merged vertices and the sketch goes over-defined. For closed
+  axis-parallel chains :func:`define_rectilinear_chain` applies the whole
+  recipe (skipping the one redundant dim per direction that closure
+  implies).
 * **Unsigned distance dims keep the current side**: geometry is created at
   its final coordinates and the dims match, so the solver keeps negative-
   quadrant centres on the negative side through ``ForceRebuild3`` (probed).
@@ -242,6 +245,60 @@ async def add_line_chain(
         result = await adapter.add_line(x1, y1, x2, y2)
         ids.append(check(f"add_line ({x1:g},{y1:g})->({x2:g},{y2:g})", result))
     return ids
+
+
+async def define_rectilinear_chain(
+    adapter: Any,
+    lines: list[str],
+    points: list[tuple[float, float]],
+    anchor: int = 0,
+    label: str = "chain",
+) -> None:
+    """Fully define a CLOSED axis-parallel line chain semantically.
+
+    ``lines``/``points`` are :func:`add_line_chain` output and input (line i
+    runs points[i] -> points[i+1], wrapping). Every segment gets its
+    horizontal/vertical relation; every segment except the LAST one of each
+    direction gets a driving point-pair distance dim — closure makes one dim
+    per direction redundant, and adding it over-defines the sketch. Vertex
+    ``anchor`` is the chain's single origin anchor (one-anchor rule, see the
+    module docstring).
+    """
+    n = len(lines)
+    if n != len(points):
+        raise ValueError(f"{label}: need a closed chain (lines {n} != points {len(points)})")
+    directions: list[str] = []
+    for i, line in enumerate(lines):
+        (x1, y1), (x2, y2) = points[i], points[(i + 1) % n]
+        if y1 == y2 and x1 != x2:
+            direction = "horizontal"
+        elif x1 == x2 and y1 != y2:
+            direction = "vertical"
+        else:
+            raise ValueError(
+                f"{label}: segment {line} ({x1:g},{y1:g})->({x2:g},{y2:g}) "
+                "is not axis-parallel"
+            )
+        directions.append(direction)
+        check(
+            f"{label} {direction} {line}",
+            await adapter.add_sketch_constraint(line, None, direction),
+        )
+    last = {d: max(i for i, d2 in enumerate(directions) if d2 == d) for d in set(directions)}
+    for i, (line, direction) in enumerate(zip(lines, directions, strict=True)):
+        if last[direction] == i:
+            continue  # the closure equation supplies this span
+        (x1, y1), (x2, y2) = points[i], points[(i + 1) % n]
+        if direction == "horizontal":
+            kind, span = "horizontal_distance", abs(x2 - x1)
+        else:
+            kind, span = "vertical_distance", abs(y2 - y1)
+        await dimension_between(
+            adapter, f"{line}.start", f"{line}.end", kind, span, f"{label} {line}"
+        )
+    await anchor_point_to_origin(
+        adapter, f"{lines[anchor]}.start", *points[anchor], f"{label} anchor"
+    )
 
 
 def _read_member(obj: Any, name: str) -> Any:
