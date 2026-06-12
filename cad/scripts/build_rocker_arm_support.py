@@ -5,9 +5,10 @@ z +101.6) end of the rocker-pivot shaft: base 88.9 x 63.5 tapering to
 20 x 16.9 at the apex over 177.8 (7") tall. A ball mount (separate part)
 seats on the apex and holds the Ø6.35 pivot shaft at 25.2 above it,
 putting the pivot axis at machine y = 228.6 + 25.2 = 253.8. An integral
-boss on the east flank (Ø20 about local (+25.4, 76), axis Z) carries a
-Ø9.7 through-bore that clamps the north end of the stationary cylinder
-arbor (machine (x, y) = (-47.5, 126.8)) - the back view (p5) shows the
+boss on the west flank (Ø20 about local (-25.4, 76), axis Z; east before
+the M6.8 machine mirror) carries a Ø9.7 through-bore that clamps the
+north end of the stationary cylinder arbor
+(machine (x, y) = (+47.5, 126.8)) - the back view (p5) shows the
 drum running straight into this casting with no separate pedestal, and
 the v3 side view shows the arbor end buried in the green flank.
 
@@ -79,10 +80,11 @@ MOUNTING_HOLE_DEPTH = 25.0  # socket depth up from the base underside (low)
 WEDGE_CUT_DEPTH = BASE_Z * 2.5  # mid-plane total; > base depth
 HOLE_CUT_DEPTH = 2.0 * MOUNTING_HOLE_DEPTH  # mid-plane total about y = 0
 
-# Arbor clamp boss on the east flank (M6.5): the cylinder arbor at machine
-# (x, y) = (-47.5, 126.8) = local (+25.4, 76.0) clamps into this casting
+# Arbor clamp boss on the west flank (M6.5; east->west in the M6.8 machine
+# mirror): the cylinder arbor at machine
+# (x, y) = (+47.5, 126.8) = local (-25.4, 76.0) clamps into this casting
 # (back view p5: the drum runs into the green flank; no north pedestal).
-BOSS_X = 25.4  # local x of the arbor axis (= -47.5 - (-72.9))
+BOSS_X = -25.4  # local x of the arbor axis (= 47.5 - 72.9)
 BOSS_Y = 76.0  # drive height above the base top
 BOSS_DIA = 20.0  # boss OD around the bore (function-driven, low)
 BOSS_Z_FRONT = -27.5  # boss face: machine z 74.1, 0.6 clear of the j=19 rod ring
