@@ -32,6 +32,7 @@ from _common import (
     apply_color,
     apply_material,
     check,
+    define_rectilinear_chain,
     ensure_fully_defined,
     extrude_at_offset,
     measure_check,
@@ -83,16 +84,15 @@ async def build(adapter) -> dict[str, str]:
 
     # Bottom plate, centered on the origin.
     check("create_sketch bottom", await adapter.create_sketch("Top"))
-    lines = await add_line_chain(
-        adapter,
-        [
-            (-BOTTOM_LENGTH / 2.0, -BOTTOM_WIDTH / 2.0),
-            (BOTTOM_LENGTH / 2.0, -BOTTOM_WIDTH / 2.0),
-            (BOTTOM_LENGTH / 2.0, BOTTOM_WIDTH / 2.0),
-            (-BOTTOM_LENGTH / 2.0, BOTTOM_WIDTH / 2.0),
-        ],
-    )
-    await ensure_fully_defined(adapter, "bottom plate sketch", fix_entities=lines)
+    bottom_rect = [
+        (-BOTTOM_LENGTH / 2.0, -BOTTOM_WIDTH / 2.0),
+        (BOTTOM_LENGTH / 2.0, -BOTTOM_WIDTH / 2.0),
+        (BOTTOM_LENGTH / 2.0, BOTTOM_WIDTH / 2.0),
+        (-BOTTOM_LENGTH / 2.0, BOTTOM_WIDTH / 2.0),
+    ]
+    lines = await add_line_chain(adapter, bottom_rect)
+    await define_rectilinear_chain(adapter, lines, bottom_rect, label="bottom plate")
+    await ensure_fully_defined(adapter, "bottom plate sketch")
     check("exit_sketch bottom", await adapter.exit_sketch())
     check(
         "extrude bottom",
@@ -103,16 +103,15 @@ async def build(adapter) -> dict[str, str]:
 
     # Top plate, centered, starting at the bottom plate's upper face.
     check("create_sketch top", await adapter.create_sketch("Top"))
-    lines = await add_line_chain(
-        adapter,
-        [
-            (-TOP_LENGTH / 2.0, -TOP_WIDTH / 2.0),
-            (TOP_LENGTH / 2.0, -TOP_WIDTH / 2.0),
-            (TOP_LENGTH / 2.0, TOP_WIDTH / 2.0),
-            (-TOP_LENGTH / 2.0, TOP_WIDTH / 2.0),
-        ],
-    )
-    await ensure_fully_defined(adapter, "top plate sketch", fix_entities=lines)
+    top_rect = [
+        (-TOP_LENGTH / 2.0, -TOP_WIDTH / 2.0),
+        (TOP_LENGTH / 2.0, -TOP_WIDTH / 2.0),
+        (TOP_LENGTH / 2.0, TOP_WIDTH / 2.0),
+        (-TOP_LENGTH / 2.0, TOP_WIDTH / 2.0),
+    ]
+    lines = await add_line_chain(adapter, top_rect)
+    await define_rectilinear_chain(adapter, lines, top_rect, label="top plate")
+    await ensure_fully_defined(adapter, "top plate sketch")
     check("exit_sketch top", await adapter.exit_sketch())
     extrude_at_offset(adapter, TOP_THICKNESS, BOTTOM_THICKNESS)
     print(f"  volume after top plate: {await _volume(adapter):.1f} mm^3")
