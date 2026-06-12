@@ -31,6 +31,7 @@ from _common import (
     apply_material,
     check,
     define_circle,
+    define_polygon_chain,
     ensure_fully_defined,
     report_mass_properties,
     run_build,
@@ -100,17 +101,16 @@ async def build(adapter) -> dict[str, str]:
     # 3. Tapered web joining the hubs.
     check("create_sketch web", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    web = await add_line_chain(
-        adapter,
-        [
-            (0.0, -WEB_HALF_AT_BIG),
-            (C2C, -WEB_HALF_AT_SMALL),
-            (C2C, WEB_HALF_AT_SMALL),
-            (0.0, WEB_HALF_AT_BIG),
-        ],
-    )
+    web_pts = [
+        (0.0, -WEB_HALF_AT_BIG),
+        (C2C, -WEB_HALF_AT_SMALL),
+        (C2C, WEB_HALF_AT_SMALL),
+        (0.0, WEB_HALF_AT_BIG),
+    ]
+    web = await add_line_chain(adapter, web_pts)
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "web sketch", fix_entities=web)
+    await define_polygon_chain(adapter, web, web_pts, label="web")
+    await ensure_fully_defined(adapter, "web sketch")
     check("exit_sketch web", await adapter.exit_sketch())
     check(
         "extrude web",
