@@ -4,7 +4,10 @@ The green cast collar that clamps each output support bar to a front
 column: a ring sliding on the O35 column with an open channel across its
 front face that the 10-square bar lies in -- the bars run tangent IN
 FRONT of the columns (p3 90-degree view: bar band z -129..-139 vs column
-line z -112). The book's pinch screws are omitted (simplification).
+line z -112). M6.10 fasteners pass: an O3.2 radial hole through the back
+wall (local -X, machine +Z after the assembly's Ry90) takes the pinch
+screw that locks the collar to the column; the screw is placed BACKED
+OUT in output.SLDASM (tip 0.2 inside the hole, clear of the column).
 
 Layout: collar axis +Y (column vertical) through the origin at the bar's
 centre height; the bar channel runs along local Z at x 16.8..27.0 (bar
@@ -44,6 +47,7 @@ COLLAR_BORE = 35.2  # slides on the O35 column (derived)
 COLLAR_HALF_H = 8.0  # 16 tall
 CHANNEL_X = (16.8, 27.0)  # bar channel walls (bar 16.9..26.9, 0.1 margins)
 CHANNEL_FLOOR_Y = -5.1  # bar bottom -5.0 rests 0.1 above
+PINCH_HOLE_DIA = 3.2  # M6.10: radial pinch-screw hole in the back wall
 
 
 def _channel_removed_volume() -> float:
@@ -159,6 +163,27 @@ async def build(adapter) -> dict[str, str]:
     print(f"  volume after channel: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.01 * expected:
         raise RuntimeError(f"channel volume {vol:.1f} != {expected:.1f}")
+
+    # Pinch-screw hole: radial along X at (y 0, z 0). A mid-plane cut from
+    # the Right plane removes only the back wall -24..-17.6 -- the bore is
+    # air and the front side at y 0 was already channel-cut.
+    check("create_sketch pinch hole", await adapter.create_sketch("Right"))
+    await define_circle(adapter, 0.0, 0.0, PINCH_HOLE_DIA / 2.0, "pinch hole")
+    await ensure_fully_defined(adapter, "pinch hole sketch")
+    check("exit_sketch pinch hole", await adapter.exit_sketch())
+    check(
+        "cut pinch hole",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=2.5 * COLLAR_OD, both_directions=True)
+        ),
+    )
+    expected -= (
+        math.pi * (PINCH_HOLE_DIA / 2.0) ** 2 * (COLLAR_OD - COLLAR_BORE) / 2.0
+    )
+    vol = await _volume(adapter)
+    print(f"  volume after pinch hole: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    if abs(vol - expected) > 0.01 * expected:
+        raise RuntimeError(f"pinch hole volume {vol:.1f} != {expected:.1f}")
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
