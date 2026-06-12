@@ -23,6 +23,7 @@ import sys
 from _common import (
     IN,
     add_line_chain,
+    anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
@@ -102,7 +103,10 @@ async def build(adapter) -> dict[str, str]:
             right, None, "linear", KEYWAY_TOP_Y - KEYWAY_BOTTOM_Y
         ),
     )
-    await ensure_fully_defined(adapter, "keyway sketch", fix_entities=keyway)
+    await anchor_point_to_origin(
+        adapter, f"{bottom}.start", -KEYWAY_HALF_WIDTH, KEYWAY_BOTTOM_Y, "keyway corner"
+    )
+    await ensure_fully_defined(adapter, "keyway sketch")
     check("exit_sketch keyway", await adapter.exit_sketch())
     check(
         "cut keyway",
