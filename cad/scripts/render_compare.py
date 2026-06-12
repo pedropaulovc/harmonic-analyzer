@@ -118,6 +118,43 @@ def camera_axes(az_deg: float, el_deg: float, roll_deg: float = 0.0):
     return r, u, o
 
 
+# --- viewport background -----------------------------------------------------
+
+# swconst values extracted from the installed swconst.tlb (R2026x):
+SW_PREF_BG_APPEARANCE = 305  # swUserPreferenceIntegerValue_e.swColorsBackgroundAppearance
+SW_PREF_VIEWPORT_BG = 99     # swUserPreferenceIntegerValue_e.swSystemColorsViewportBackground
+SW_TOGGLE_GRADIENT_BG = 68   # swUserPreferenceToggle_e.swColorsGradientPartBackground
+BG_PLAIN = 0                 # swColorsBackgroundAppearance_e.swColorsBackgroundAppearance_Plain
+
+
+def force_plain_white_background(adapter: Any) -> dict:
+    """Plain white viewport for the whole capture session; returns old prefs.
+
+    The default scene background is a gradient with an elliptical highlight,
+    which defeats both content trimming and the blend's background knockout.
+    """
+    sw = adapter.swApp
+    _flag(sw, "ISldWorks")
+    old = {
+        "appearance": int(sw.GetUserPreferenceIntegerValue(SW_PREF_BG_APPEARANCE)),
+        "viewport": int(sw.GetUserPreferenceIntegerValue(SW_PREF_VIEWPORT_BG)),
+        "gradient": bool(sw.GetUserPreferenceToggle(SW_TOGGLE_GRADIENT_BG)),
+    }
+    sw.SetUserPreferenceIntegerValue(SW_PREF_BG_APPEARANCE, BG_PLAIN)
+    sw.SetUserPreferenceIntegerValue(SW_PREF_VIEWPORT_BG, 0xFFFFFF)
+    sw.SetUserPreferenceToggle(SW_TOGGLE_GRADIENT_BG, False)
+    log(f"viewport background -> plain white (was {old})")
+    return old
+
+
+def restore_background(adapter: Any, old: dict) -> None:
+    sw = adapter.swApp
+    sw.SetUserPreferenceIntegerValue(SW_PREF_BG_APPEARANCE, old["appearance"])
+    sw.SetUserPreferenceIntegerValue(SW_PREF_VIEWPORT_BG, old["viewport"])
+    sw.SetUserPreferenceToggle(SW_TOGGLE_GRADIENT_BG, old["gradient"])
+    log("viewport background restored")
+
+
 # --- component framing -------------------------------------------------------
 
 def component_boxes(adapter: Any) -> list[tuple[str, tuple[float, ...]]]:
@@ -270,11 +307,13 @@ def _sidecar(pair_id: str) -> Path:
 
 
 def pair_size(ref_png: Path, max_side: int) -> tuple[int, int]:
+    """Capture canvas: ref aspect, oversized 1.4x (capped) — the capture is
+    trimmed to content afterwards, so the slack buys content resolution."""
     from PIL import Image
 
     with Image.open(ref_png) as img:
         rw, rh = img.size
-    scale = max_side / max(rw, rh)
+    scale = min(max_side * 1.4, 2400) / max(rw, rh)
     return max(1, round(rw * scale)), max(1, round(rh * scale))
 
 
@@ -311,6 +350,14 @@ SELFTEST_VIEWS = {
 
 async def selftest(adapter: Any) -> dict[str, str]:
     """Named view vs euler equivalent must capture near-identical pixels."""
+    old_bg = force_plain_white_background(adapter)
+    try:
+        return await _selftest(adapter)
+    finally:
+        restore_background(adapter, old_bg)
+
+
+async def _selftest(adapter: Any) -> dict[str, str]:
     mpath = OUT_SLDPRT / "crank-arm.SLDPRT"
     if not mpath.exists():
         mpath = next(OUT_SLDPRT.glob("*.SLDPRT"))
@@ -385,6 +432,13 @@ def main() -> int:
     print(f"rendering {n_pairs} pairs across {len(order)} models")
 
     async def build(adapter: Any) -> dict[str, str]:
+        old_bg = force_plain_white_background(adapter)
+        try:
+            return await _render_all(adapter)
+        finally:
+            restore_background(adapter, old_bg)
+
+    async def _render_all(adapter: Any) -> dict[str, str]:
         done: dict[str, str] = {}
         n = 0
         for mi, model in enumerate(order, 1):
@@ -415,13 +469,12 @@ def main() -> int:
                     + f" {w}x{h}")
                 set_camera(adapter, cam)
                 await capture(adapter, composite.pair_paths(pid)["render"], w, h)
+                composite.trim_render_file(composite.pair_paths(pid)["render"])
                 write_sidecar(pair, mpath, (w, h))
-                composite.side_by_side(pid)
-                composite.blend_overlay(pid, pair.get("align"))
                 done[pid] = "rendered"
             adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
             log(f"closed {model} ({n}/{n_pairs} pairs done)")
-        composite.regenerate(set(done))  # refresh scores.json for what changed
+        composite.regenerate(set(done))  # composites + scores in one pass
         return done
 
     return run_build(build)
