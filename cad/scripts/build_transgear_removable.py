@@ -170,12 +170,12 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_dimension(side_line, None, "linear", FACE_WIDTH),
     )
     set_sketch_direct_db(adapter, True)
-    centerline = check(
+    check(
         "add_centerline axis",
         await adapter.add_centerline(0.0, -1.0, 0.0, -(FACE_WIDTH - 1.0)),
     )
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "blank sketch", fix_entities=[centerline])
+    await ensure_fully_defined(adapter, "blank sketch")
     check("exit_sketch blank", await adapter.exit_sketch())
     blank_sketch = feature_name_by_type(adapter, "ProfileFeature")
     check(
@@ -263,7 +263,13 @@ async def build(adapter) -> dict[str, str]:
             f'({r_clear:g} + t * ("Ra" - {r_clear:g})) * sin("ThetaU")',
         ),
     ]
-    await ensure_fully_defined(adapter, "gap sketch", fix_entities=gap_curves)
+    # Whitelisted fix escalation: the gap profile is six equation-driven
+    # curves whose shape and position re-solve from the equation globals
+    # on every configuration change (ToothCount 12/18/24) -- no static
+    # relation/dimension scheme can define them without breaking that.
+    await ensure_fully_defined(
+        adapter, "gap sketch", fix_entities=gap_curves, allow_fix_escalation=True
+    )
     check("exit_sketch gap", await adapter.exit_sketch())
     gap_cut = await adapter.create_cut_extrude(
         ExtrusionParameters(depth=FACE_WIDTH + 1.0)
