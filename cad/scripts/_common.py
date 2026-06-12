@@ -28,7 +28,9 @@ driving dims, SolidworksMCP-python PRs #55/#56):
   the merged vertices and the sketch goes over-defined. For closed
   axis-parallel chains :func:`define_rectilinear_chain` applies the whole
   recipe (skipping the one redundant dim per direction that closure
-  implies).
+  implies); for closed sloped chains use :func:`define_polygon_chain`.
+  Revolve profiles whose closing segment lies on the axis need no extra
+  treatment: the merged-in centerline carries no constraints of its own.
 * **Unsigned distance dims keep the current side**: geometry is created at
   its final coordinates and the dims match, so the solver keeps negative-
   quadrant centres on the negative side through ``ForceRebuild3`` (probed).

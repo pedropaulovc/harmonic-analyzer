@@ -22,6 +22,7 @@ from _common import (
     add_line_chain,
     apply_material,
     check,
+    define_polygon_chain,
     ensure_fully_defined,
     report_mass_properties,
     run_build,
@@ -45,23 +46,22 @@ async def build(adapter) -> dict[str, str]:
     r = BARREL_DIA / 2.0
     check("create_sketch profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    centerline = check(
+    check(
         "axis centerline",
         await adapter.add_centerline(0.0, 0.0, 0.0, BARREL_TOP_Y),
     )
-    profile = await add_line_chain(
-        adapter,
-        [
-            (0.0, 0.0),
-            (r, CONE_H),
-            (r, BARREL_TOP_Y),
-            (0.0, BARREL_TOP_Y),
-        ],
-    )
+    profile_pts = [
+        (0.0, 0.0),
+        (r, CONE_H),
+        (r, BARREL_TOP_Y),
+        (0.0, BARREL_TOP_Y),
+    ]
+    profile = await add_line_chain(adapter, profile_pts)
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(
-        adapter, "marker profile", fix_entities=[centerline, *profile]
-    )
+    # The centerline merged into the tip/top profile corners at creation,
+    # so the closed chain's own constraints define it too.
+    await define_polygon_chain(adapter, profile, profile_pts, label="marker")
+    await ensure_fully_defined(adapter, "marker profile")
     check("exit_sketch profile", await adapter.exit_sketch())
     check("revolve marker", await adapter.create_revolve(RevolveParameters(angle=360.0)))
 
