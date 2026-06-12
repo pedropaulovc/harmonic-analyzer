@@ -226,7 +226,13 @@ async def anchor_point_to_point(
     """Pin ``ref2`` at offset (dx, dy) from ``ref1``: an alignment relation
     supplies a zero component (zero-valued dims are invalid), distance dims
     the rest. Offsets are unsigned at the dim level — the solver keeps the
-    side the geometry was created on (probed live)."""
+    side the geometry was created on (probed live). Sub-nanometre offsets
+    snap to zero: trig-derived polygon vertices land within ulps of the
+    axes, and a 1e-16 dim is as invalid as a zero one."""
+    if abs(dx) < 1e-9:
+        dx = 0.0
+    if abs(dy) < 1e-9:
+        dy = 0.0
     if dx == 0.0 and dy == 0.0:
         raise ValueError(f"{label}: coincident points want a merge, not an anchor")
     if dx == 0.0:
