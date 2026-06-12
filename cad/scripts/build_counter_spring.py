@@ -34,6 +34,8 @@ import sys
 from _common import (
     add_spring_end_hooks,
     apply_material,
+    apply_color,
+    SPRING_BLACK,
     blank_sketch,
     check,
     define_circle,
@@ -92,6 +94,7 @@ async def build(adapter) -> dict[str, str]:
     blank_sketch(adapter, "Sketch1")
 
     await apply_material(adapter, MATERIAL)
+    await apply_color(adapter, SPRING_BLACK)  # ch30 plates: see _common palette
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

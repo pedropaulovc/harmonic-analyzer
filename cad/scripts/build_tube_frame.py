@@ -32,6 +32,8 @@ import sys
 from _common import (
     IN,
     apply_material,
+    apply_color,
+    POLISHED_STEEL,
     check,
     define_circle,
     ensure_fully_defined,
@@ -133,6 +135,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     await apply_material(adapter, MATERIAL)
+    await apply_color(adapter, POLISHED_STEEL)  # ch30 plates: see _common palette
 
     # Verify the book-stated 107 cm column height (the dim that
     # contradicted the legacy part) via the end annulus faces.
