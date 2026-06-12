@@ -114,7 +114,14 @@ async def build(adapter) -> dict[str, str]:
             await adapter.add_sketch_dimension(ent, None, "linear", value),
         )
 
-    await ensure_fully_defined(adapter, "bar profile", fix_entities=lines)
+    # The chain's first vertex sits on the origin; with the h/v relations
+    # and the ten dims (closure covers the last two segment lengths) this
+    # single anchor completes the 24-DOF profile.
+    check(
+        "anchor profile corner",
+        await adapter.add_sketch_constraint(f"{lines[0]}.start", "origin", "coincident"),
+    )
+    await ensure_fully_defined(adapter, "bar profile")
     check("exit_sketch profile", await adapter.exit_sketch())
     check(
         "extrude bar",
