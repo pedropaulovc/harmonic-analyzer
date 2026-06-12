@@ -841,6 +841,15 @@ def mirror_placement(
                 raise
             bbox = stl_bbox_mm(part)  # config STLs share the bbox centre
         c = 0.5 * (bbox[axis][0] + bbox[axis][1])
+        if abs(c) < 2.0:
+            # Parts are modeled about their functional axis, so a sub-mm
+            # bbox centre is tessellation/tooth-seed noise (max seen 0.76,
+            # the pivot-ball-mount's coarse ball facets), while genuine
+            # mirror-plane offsets start at 3.0 (gooseneck-clamp). The
+            # noise matters: line-to-line bores turn a 2c shift of microns
+            # into real interference volumes (M6.8 drive-train rebuild:
+            # 19 slivers up to 1.16 mm^3). Snap to the exact axis.
+            c = 0.0
     pos2, rows2 = _mirror_xform(position, rows, axis, c)
     return pos2, euler_from_rows(rows2), rows2
 
