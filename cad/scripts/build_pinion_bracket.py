@@ -40,9 +40,10 @@ PART_NAME = "pinion-bracket"
 MATERIAL = "Plain Carbon Steel"  # p.68: bright steel strap
 
 WIDTH = 22.0  # DIMENSIONS.md ch25: strap width, photo-scaled vs the drum (low)
-C2C = 23.393  # pivot bore to arbor bore -- the p002 photogrammetry triangle:
-# sqrt(3.0^2 + 23.2^2) between the pivot rod (15.154, 62.8) and the pinion
-# axis (12.154, 86.0) in build_drive_train_assembly (derived)
+C2C = 31.0  # pivot bore to arbor bore -- long enough that the engaged
+# pose (c2c 68.58 to the cylinder train) stays reachable from a pivot
+# shaft parked west of the cone-knob post; the rest pose leans the strap
+# 75.6 deg onto the arbor (build_drive_train_assembly geometry, derived)
 THICKNESS = 5.0  # photo-scaled (low)
 BORE = 6.35  # both bores: torque shaft below, drum arbor stub above (derived)
 
