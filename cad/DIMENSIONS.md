@@ -491,13 +491,13 @@ dead centre and the gaps flank it at ±p/2: rack teeth land on those gaps
 | Rack pinion | 96T DP 30: PD 81.28, OD 82.97, ~3 mm face, Ø9.525 (3/8") bore, brass | 3.266 OD | M6.4: REFUTES the M4c "120T, OD 103.3" keyframe read — the calibrated ch. 30 front view (p1, 6.02 px/mm) shows OD ≈ 83 centred on the pinion-bar stud at (0, 253.5) | scaled | med (face: low) |
 | Removable gear module | 2.0 mm (≈ DP 12.7) | — | 24T gear OD ≈ 51 mm in `v4_transgear_030` (scale via DP 30 rack pitch) ⟹ m = OD/(N+2) ≈ 1.96; m = 2.0 makes every swap combo's centre distance m(12+24)/2 = 36 mm exactly | scaled | med |
 | Removable gear face / bore / pins | ≈ 5 thick; common bore Ø12; 2 × Ø3.5 pin holes on Ø19 BC | — | `v4_transgear_015` (catalog shot) + `v4_transgear_020/025/030` (mounted on the oval-pin stub shaft) | scaled | low |
-| Chain sprockets | 17T (both), roller chain ≈ 3/8" pitch, ≈ 4.5 thick, Ø9.525 bore | — | tooth counts from `v4_transgear_012` crops (16–17 counted; modeled equal ⟹ 1:1 chain); pitch from sprocket OD ≈ 56–60 px-scaled mm (17T @ 3/8": PD 51.8) | counted + scaled | low |
+| Chain wheels | the two MOUNTED removable gears themselves (knob shaft T24, crankshaft T12): the bead chain rides their m2 teeth — that is how gear swaps change the platen ratio, and why the latch slackens the chain | — | M6.8 supersedes the M4c "17T sprockets both ends": ch. 23 text + `v4_transgear_002/008/012` (chain visibly wraps the removable's coarse teeth); ch30 p002 full-res: upper wrap tips Ø ≈ 53.6 ≈ T24 OD 52 at post-mirror (−65, ~248); crank wheel small ≈ Ø30 (`v2_gears_010`) ≈ T12 OD 28. `chain-sprocket.SLDPRT` retired from the assemblies | counted + scaled | med |
 | Reduction pinion (coaxial with rack pinion) | est. 24T DP 30, OD ≈ 21 mm measured, face ≈ 6 | — | edge-on views `v4_transgear_002/003/008`: small fine-tooth steel pinion on the rack-pinion shaft | scaled | low |
 | Pinion bar (M6.5) | 12-square steel, x −58 → +178 at machine y 253.5 (M6.5 trim from −95..+197: west end clears the A-frame clevis ears/ball at x −59, east end clears the SE column tangent 179.54); Ø9.6 stud bore along Z at x 0 (9.525 stud + slip clearance); both ends FLOAT (documented simplification — the real machine likely straps the bar to the a-frame and column) | — | ch. 30 views + M6.5 layout | scaled + derived | low/med |
 | A-frame (M6.5) | green cast stand on the base front-west, doubles as the FRONT rocker support: tapered plate 8 thick, foot x −115..−45 on the base top (y 50.8), apex x −87..−59 at the ball-seat saddle y 228.6 (machine); full-width saddle z ±11.1 over the last 19.8 of rise; clevis ears (z ±(8.1..11.1), 20 tall, tops machine 248.6) flank the south pivot-ball mount's Ø16 base (gap 16.2; ball r 9.5 centre 253.8 clears the ear inner faces; pivot shaft bottom 250.65 clears ear tops by 2.05); lightening cutouts omitted | — | p.56–59 + ch. 30 front view: clevis grips the pivot ball at (−72, 252) — M6.5 apex crop; the M6.4 "ears grip the pinion bar" read is REFUTED (bar now floats) | scaled | med |
 | Transgear stud (M6.4) | Ø9.525 (3/8") × 36 plug in the pinion-bar bore, axis −Z from z −101.5; Ø14 × 4 retaining collar at the front end (z −141.5) | — | derived: carries rack pinion (z −137.5), fixed pinion (z −134) and latch big hub (z −122.5); end hardware collapsed to a collar | derived | low |
-| Latch arm (M6.4) | tapered link, 4.5 thick: big hub Ø22 / small hub Ø16, both bores Ø9.6; centre distance 34.26 = (removable 24T m2 PD 48 + fixed 24T DP 30 PD 20.32 + 0.4 backlash) / 2; assembled at −20° below +X (knob shaft clears the pinion-bar underside) | — | `v4_transgear_008` + mesh math | derived | low |
-| Knob shaft (M6.4) | Ø9.525 × 51.4 through the latch small hub at (32.19, 241.78), spanning machine z −76.5 (sprocket end, chain plane) → −127.9; Ø20 × 6.5 brass thumb knob ending at −134.4, 0.1 shy of the rack-pinion disc back face −134.5 (latch C2C 34.26 < disc r 41.49, so the shaft must stop behind the disc) | — | `v4_transgear_008/020` + M6.4 layout | scaled + derived | low |
+| Latch arm (M6.8) | tapered link, 4.5 thick: big hub Ø22 / small hub Ø16, both bores Ø9.6; centre distance 66.05 = ch30 REST state, stud (0, 253.5) → parked knob shaft (pre-mirror +65, 241.78); assembled at −10.22° below +X (knob shaft clears the pinion-bar underside 247.5 by 0.96) | — | ch30 p002 full-res wrap centre (−65, ~248 post-mirror, ±3 chain-plane parallax; y clamped under the bar) — supersedes the M6.4 mesh-derived 34.26/−20°, which is the ENGAGED-state c2c (see Appendix C #8) | scaled + derived | med |
+| Knob shaft (M6.8) | Ø9.525 × 58.0 through the latch small hub at (65.0, 241.78), spanning machine z −76.5 (chain end) → −134.5; carries the mounted T24 removable chain-wrapped at z −81.5..−76.5 and the fine 24T pinion at −134..−128; Ø20 × 6.5 brass thumb knob ending at −141.0, level with the stub collar band | — | `v4_transgear_008/020` + ch. 23 topology (M6.8) | scaled + derived | low/med |
 
 Notes: speed combos — small driving + large driven = slowest platen (smallest
 horizontal scale), large+small = fastest, medium+medium = 1:1. Latch disengages
@@ -511,17 +511,19 @@ to be settled when mating the drive train in M6. Parts authored now:
 `transgear-removable` (one part, T12/T18/T24 configurations), `rack-pinion`,
 `platen-rack`, `chain-sprocket`, `transgear-pinion`.
 
-M6.4 notes (Appendix C #8 partial resolution): the removable gear CANNOT be
-mounted meshed — module 2 teeth against the DP 30 fixed pinion leave ~4.6
-teeth jammed in the overlap zone; the T24 removable gear is placed loose on
-the base (machine (−133, 55.8, −80), M6.5 — plan circle r 26 (OD 52) clears
-the SW corner-bracket region (nearest corner (−160.5, −97.7), 6.7 margin)
-and the a-frame foot (nearest (−115, −107), 6.4 margin)) as the photo's
-spare-gear catalog state,
-and the latch small hub carries only the knob shaft. The knob shaft's
-sprocket plane (machine z −76.5..) does not reach the drive-train chain plane
-mid −78.75 / SPROCKET_Z0 −81 exactly — flagged for M6.5 chain routing. The
-measuring stick (ch. 16, hand tool) lies flat on the base at
+M6.8 notes (Appendix C #8 topology resolution): the six gears are (1) the
+96T DP 30 rack-pinion disc on the stud, meshing (2) the platen rack above;
+(3) the fine 24T DP 30 pinion on the KNOB SHAFT front (z −134..−128),
+which meshes the disc only when the latch swings it in; (4) the T24
+removable on the knob shaft at the chain plane and (5) the T12 removable
+on the crankshaft — the bead chain wraps the removables' own m2 teeth (no
+separate sprockets); (6) is the spare removable (T18) lying loose on the
+base (machine (−133, 55.8, −80), M6.5 clearances). The ch30 plates show
+the DISENGAGED rest state — latch parked at c2c 66.05, the T24's tips
+overlapping the disc rim in XY projection only (chain plane is ~56 north
+of the disc plane). The mixed-pitch jam note (m2 vs DP 30) still bars any
+literal removable-on-pinion mesh; it never happens in the resolved
+topology. The measuring stick (ch. 16, hand tool) lies flat on the base at
 (−158, 53.8, −133), graduations up (M6.5 — the M6.4 spot (−175, .., −135)
 ran it through the SW corner bracket's plate + foot).
 
@@ -704,10 +706,22 @@ re-measure during their M2 script build.
    M4c keyframe measurement: a small fine-tooth steel pinion (≈ Ø21 mm,
    est. 24T DP 30) rides coaxially with the 120T rack pinion
    (`v4_transgear_002/003/008`), but the frames do not show what it meshes,
-   nor which shafts carry the two 17T sprockets vs the removable 12/18/24
-   pair. All six gear parts are authored individually; resolve the shaft
-   layout (and re-check the reduction pinion's tooth count against the
-   required k/80→platen-speed law) when mating the drive train in M6.
+   nor which shafts carry the two chain wheels vs the removable 12/18/24
+   pair.
+   **M6.8 topology resolution** (ch. 23 PDF + `v4_transgear_002/008/012`
+   + ch30 p002 full-res): the stud carries the 96T disc + latch big hub;
+   the KNOB SHAFT (latch small hub) carries the fine 24T pinion — it is
+   NOT coaxial with the disc; the M4c read conflated the two shafts —
+   plus a chain-wrapped removable; the crankshaft carries the second
+   chain-wrapped removable. The bead chain rides the removables' m2
+   teeth directly (no separate sprockets), which is how gear swaps
+   change the platen ratio and why the latch slackens the chain.
+   **Open kinematic riddle:** a rigid latch arm pivoting on the stud has
+   ONE c2c, but engaged mesh needs 51.0 (96T PD 81.28 + 24T PD 20.32 +
+   0.4)/2 while the ch30 rest pose measures 66.05 — the real pivot or a
+   slotted arm must provide the travel; not resolvable from available
+   photos. Modeled: the rest state exactly (latch at c2c 66.05, −10.22°),
+   engagement left conceptual.
 9. **Crank-drive gear pair** (ch. 11/12) — found in M4c: the dark steel
    gear at the cone set's large end ("This gear engages the crank",
    p.20) implements the stated 4:1 crank→cone reduction together with a
