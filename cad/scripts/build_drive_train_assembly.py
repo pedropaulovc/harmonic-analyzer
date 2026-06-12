@@ -197,7 +197,8 @@ X_CRANK = (
     GEAR64_SEAT[0] + R64 * COS_I + 12.7 + (ADD16 * (1.0 + SEC_I) - PEN16_MID)
 )  # 118.00 -- photo: pedestal 122 +- 3 (1.3 sigma, see DIMENSIONS.md)
 
-ARBOR_LENGTH = 200.0  # spans z -100..+100
+ARBOR_LENGTH = 196.0  # spans z -98..+98 (M6.9: 1.0 clear of the a-frame
+# plate back face -99; north end keeps 23.9 in the support boss bore)
 CRANKSHAFT_Z0 = -150.0  # front end; crank-arm hub at +12 (PIN_HOLE_HEIGHT)
 CRANKSHAFT_LENGTH = 120.0  # build_crankshaft.py SHAFT_LENGTH
 CRANK_ARM_Z0 = CRANKSHAFT_Z0 + 8.0  # hub centre 12 - half thickness 4
@@ -207,8 +208,10 @@ REMOVABLE_Z0 = -85.6  # mounted T12 (face 5.0) against the pedestal north face:
 # chain rides its m2 teeth; v2_gears_010 shows the small steel wheel on the
 # crank pedestal), band -85.6..-80.6
 PEDESTAL_Z = -108.6  # crank pedestal centre (front face inside base edge)
-ARBOR_PEDESTAL_Z = 92.0  # south (-z) end only; north end clamps into the
-# rocker-arm-support boss bore at z 74.1..133 (frame.SLDASM, M6.5)
+ARBOR_PEDESTAL_Z = 90.5  # south (-z) end only; north end clamps into the
+# rocker-arm-support boss bore at z 74.1..133 (frame.SLDASM, M6.5).
+# M6.9: 92 -> 90.5 so the block front face -98.5 clears the a-frame
+# plate back face -99 by 0.5 (the portal-frame thickening)
 
 # The pinion must sit fully on the crankshaft.
 if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:

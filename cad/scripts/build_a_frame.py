@@ -80,7 +80,8 @@ RAIL_OVERLAP = 2.0  # sketch offset 2 inside the plate so the solids merge
 TOP_RAIL_X = (62.9, 82.9)  # = frustum apex span (20), inside the 28 apex
 TOP_RAIL_DEPTH = 16.0  # y 161.8..177.8 (machine 212.6..228.6 = photo window top)
 TOP_RAIL_Z1 = 201.45  # machine +90.45: frustum apex face 90.70 at rail bottom - 0.25
-FOOT_RAIL_X = (57.9, 87.9)  # 30 wide centred on the pivot line machine x +72.9
+FOOT_RAIL_X = (59.75, 89.75)  # 30 wide, west face 0.25 east of the
+# arbor-pedestal block (machine x +35.5..+59.5, drive-train.SLDASM)
 FOOT_RAIL_H = 20.0  # photo: bolted foot flange ~20 tall (bolts not modeled)
 FOOT_RAIL_Z1 = 192.35  # machine +81.35: frustum base face +81.6 - 0.25
 
