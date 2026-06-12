@@ -847,6 +847,13 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     # "z" entry relied on (Ry180 stand-in flipped the rails south, 1937
     # mm^3 into the measuring stick) -> re-authored machine-handed
     "a-frame": "x0",
+    # M6.10 fasteners: authored in final orientation (axis along Y or Z),
+    # exactly symmetric about local x = 0; explicit c, no STL at first build
+    "hex-bolt": ("x", 0.0),
+    "lag-screw": ("x", 0.0),
+    "fillister-screw": ("x", 0.0),
+    "pinch-screw": ("x", 0.0),
+    "hanger-screw": ("x", 0.0),
 }
 
 _STL_BBOX_CACHE: dict[str, tuple[tuple[float, float], ...]] = {}
