@@ -223,13 +223,11 @@ STICK_POS = (-158.0, 53.8, -133.0)  # flat on the base, graduations up;
 # through the bracket's plate + foot, 271 mm^3), z band fully on the top
 # plate (edge -133.35) and 3 clear of the a-frame foot (z -115..-107)
 SPARE_GEAR_POS = (-160.0, 55.8, -15.0)  # plan circle r 26 (T24 OD 52,
-# conservative for the T18) about (-160, -15): 14 west of the ch25
-# pinion strip (pivot blocks/straps to x -132.3, z -80..+80 in
-# drive-train.SLDASM -- the M6.5 spot (-133, -80) sat exactly under the
-# front pivot block and the torque-shaft ball), 12 north of the
+# conservative for the T18) about (-160, -15): the ch25 pinion rig now
+# sits front-centre (script x -21..+59 in drive-train.SLDASM), 100+
+# clear, so the old east-flank squeeze is gone; 12 north of the
 # measuring stick band (z <= -118 is far away anyway), tube columns
-# (x <= -179) only start beyond z +-94, and y-separated from the
-# engage lever (rod bottom y 60.8 vs gear top y 55.8)
+# (x <= -179) only start beyond z +-94
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 ROT_Y_POS90 = [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]
