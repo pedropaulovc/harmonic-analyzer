@@ -802,6 +802,9 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     "pen-set-screw": "z",
     "a-frame": "z",
     "column-clamp": "z",
+    # plain x-symmetric slab cornered at origin; explicit c avoids the
+    # STL-bbox dependency for a part newer than the legacy export set
+    "platen-paper": ("x", 129.75),
     # parts whose build scripts are themselves mirrored (M6.8)
     "summing-lever": "x0",
     "magnifying-bracket": "x0",

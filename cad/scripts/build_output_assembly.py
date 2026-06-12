@@ -393,6 +393,11 @@ async def build(adapter) -> dict[str, str]:
                      [PLATE_X0 + dx, CLIP_Y0, PLATE_FRONT_Z - 1.2],
                      [0.0, 0.0, 90.0], rot_z_rows(90.0),
                      label=f"platen-clip x{PLATE_X0 + dx:+.0f}")
+    # Recording paper on the platen front face (ch30 p002/p003/p009): 0.5
+    # proud of the platen, 2.25 clear of each clip band, 6 top/bottom margin.
+    await _place(adapter, "platen-paper",
+                 [PLATE_X0 + 20.25, PLATE_Y0 + 6.0, PLATE_FRONT_Z - 0.5],
+                 [0.0, 0.0, 0.0], IDENTITY)
 
     # --- transgear group ------------------------------------------------------
     await _place(adapter, "a-frame", [0.0, 50.8, -111.0],
