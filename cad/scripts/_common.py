@@ -702,7 +702,11 @@ async def report_mass_properties(adapter: Any) -> None:
 #           which is sub-visible at render scale);
 #   'x0' -- local x = 0 exactly (parts whose build script is itself
 #           mirrored as part of M6.8: summing-lever, magnifying-bracket,
-#           pen-hanger).
+#           pen-hanger);
+#   ('x'|'z', c) -- explicit plane coordinate in mm, bypassing the STL
+#           bbox (amplitude-bar: modeled cornered at origin, exactly
+#           x-symmetric about BAR_WIDTH/2; its on-disk STL was a legacy
+#           inch-unit export).
 #
 # Cosmetic asymmetries knowingly mirrored: measuring-stick engraved scale
 # reads right-to-left (0.4 mm ticks), crank-arm fiducial dimple swaps face.
@@ -711,8 +715,9 @@ async def report_mass_properties(adapter: Any) -> None:
 # the photo comparison renders.
 # ---------------------------------------------------------------------------
 
-MIRROR_PLANE: dict[str, str] = {
+MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     # channel
+    "amplitude-bar": ("x", 3.175),
     "rocker-arm": "z",
     "connecting-rod": "z",
     "channel-lever": "z",
@@ -754,19 +759,32 @@ def stl_bbox_mm(stem: str) -> tuple[tuple[float, float], ...]:
         return cached
     path = OUT_STL / f"{stem}.STL"
     data = path.read_bytes()
-    count = struct.unpack_from("<I", data, 80)[0]
-    if len(data) < 84 + 50 * count:
-        raise RuntimeError(f"{path.name}: truncated binary STL ({count} facets)")
     lo = [math.inf] * 3
     hi = [-math.inf] * 3
-    for rec in struct.iter_unpack("<12fH", data[84 : 84 + 50 * count]):
-        for base in (3, 6, 9):  # skip the facet normal
-            for k in range(3):
-                v = rec[base + k]
-                if v < lo[k]:
-                    lo[k] = v
-                if v > hi[k]:
-                    hi[k] = v
+    count = struct.unpack_from("<I", data, 80)[0] if len(data) >= 84 else -1
+    if count >= 0 and len(data) >= 84 + 50 * count:
+        for rec in struct.iter_unpack("<12fH", data[84 : 84 + 50 * count]):
+            for base in (3, 6, 9):  # skip the facet normal
+                for k in range(3):
+                    v = rec[base + k]
+                    if v < lo[k]:
+                        lo[k] = v
+                    if v > hi[k]:
+                        hi[k] = v
+    elif data[:5].lower() == b"solid":  # ASCII STL
+        for line in data.decode("ascii", "ignore").splitlines():
+            parts = line.split()
+            if len(parts) == 4 and parts[0] == "vertex":
+                for k in range(3):
+                    v = float(parts[k + 1])
+                    if v < lo[k]:
+                        lo[k] = v
+                    if v > hi[k]:
+                        hi[k] = v
+    else:
+        raise RuntimeError(f"{path.name}: not a parsable STL ({count} facets?)")
+    if not all(math.isfinite(v) for v in (*lo, *hi)):
+        raise RuntimeError(f"{path.name}: no vertices found")
     bbox = tuple((lo[k] * 1000.0, hi[k] * 1000.0) for k in range(3))
     _STL_BBOX_CACHE[stem] = bbox
     return bbox
@@ -829,8 +847,13 @@ def mirror_placement(
     if rows is None:
         rows = rows_from_euler(rotation)
     plane = MIRROR_PLANE.get(part, "x")
+    explicit_c = None
+    if isinstance(plane, tuple):
+        plane, explicit_c = plane
     axis = 2 if plane == "z" else 0
-    if plane == "x0":
+    if explicit_c is not None:
+        c = explicit_c
+    elif plane == "x0":
         c = 0.0
     else:
         stem = f"{part}--{configuration}" if configuration else part
