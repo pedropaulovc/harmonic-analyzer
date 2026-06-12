@@ -21,6 +21,7 @@ import sys
 
 from _common import (
     add_line_chain,
+    anchor_point_to_origin,
     apply_material,
     apply_color,
     PANEL_BLACK,
@@ -58,7 +59,24 @@ async def build(adapter) -> dict[str, str]:
             (0.0, CLIP_WIDTH),
         ],
     )
-    await ensure_fully_defined(adapter, "clip outline", fix_entities=lines)
+    bottom, right_edge, top, left_edge = lines
+    for ent, relation in (
+        (bottom, "horizontal"),
+        (top, "horizontal"),
+        (right_edge, "vertical"),
+        (left_edge, "vertical"),
+    ):
+        check(f"outline {relation}", await adapter.add_sketch_constraint(ent, None, relation))
+    await anchor_point_to_origin(adapter, f"{bottom}.start", 0.0, 0.0, "clip corner")
+    for ent, value, label in (
+        (bottom, CLIP_LENGTH, "clip length"),
+        (right_edge, CLIP_WIDTH, "clip width"),
+    ):
+        check(
+            f"dimension {label} = {value:g}",
+            await adapter.add_sketch_dimension(ent, None, "linear", value),
+        )
+    await ensure_fully_defined(adapter, "clip outline")
     check("exit_sketch outline", await adapter.exit_sketch())
     check(
         "extrude clip",
