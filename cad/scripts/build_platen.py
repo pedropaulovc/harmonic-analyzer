@@ -38,6 +38,7 @@ from _common import (
     PANEL_BLACK,
     check,
     define_circle,
+    define_rectilinear_chain,
     ensure_fully_defined,
     measure_check,
     report_mass_properties,
@@ -65,16 +66,15 @@ async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
 
     check("create_sketch outline", await adapter.create_sketch("Front"))
-    lines = await add_line_chain(
-        adapter,
-        [
-            (0.0, 0.0),
-            (PLATE_WIDTH, 0.0),
-            (PLATE_WIDTH, PLATE_HEIGHT),
-            (0.0, PLATE_HEIGHT),
-        ],
-    )
-    await ensure_fully_defined(adapter, "plate outline", fix_entities=lines)
+    plate_rect = [
+        (0.0, 0.0),
+        (PLATE_WIDTH, 0.0),
+        (PLATE_WIDTH, PLATE_HEIGHT),
+        (0.0, PLATE_HEIGHT),
+    ]
+    lines = await add_line_chain(adapter, plate_rect)
+    await define_rectilinear_chain(adapter, lines, plate_rect, label="plate")
+    await ensure_fully_defined(adapter, "plate outline")
     check("exit_sketch outline", await adapter.exit_sketch())
     check(
         "extrude plate",

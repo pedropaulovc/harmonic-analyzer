@@ -36,6 +36,7 @@ import math
 import sys
 
 from _common import (
+    anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
@@ -108,7 +109,50 @@ async def build(adapter) -> dict[str, str]:
         check("strap tail end", await adapter.add_line(*tail_b, *tail_t)),
     ]
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "strap sketch", fix_entities=entities)
+    bottom_arc, rod_end, top_arc, tail_end = entities
+    # 10-DOF profile of two concentric arcs + two radial end lines:
+    # bottom centre anchored on the axis, top centre coincident with it,
+    # one radial dim each, the bottom endpoints spanned from the origin;
+    # each end line is a radial ray, so a point-on-line coincident with
+    # the centre pins the top endpoints' angles (the lines themselves
+    # ride their merged ends).
+    await anchor_point_to_origin(
+        adapter, f"{bottom_arc}.center", 0.0, CENTER_Y, "arc centre"
+    )
+    check(
+        "concentric arcs",
+        await adapter.add_sketch_constraint(
+            f"{top_arc}.center", f"{bottom_arc}.center", "coincident"
+        ),
+    )
+    check(
+        "bottom radius",
+        await adapter.add_sketch_dimension(bottom_arc, None, "radial", R_BOTTOM),
+    )
+    check(
+        "top radius",
+        await adapter.add_sketch_dimension(top_arc, None, "radial", R_TOP),
+    )
+    check(
+        "tail span",
+        await adapter.add_sketch_dimension(
+            f"{bottom_arc}.start", "origin", "horizontal_distance", TAIL_SPAN
+        ),
+    )
+    check(
+        "rod span",
+        await adapter.add_sketch_dimension(
+            f"{bottom_arc}.end", "origin", "horizontal_distance", ROD_SPAN
+        ),
+    )
+    for label, line in (("rod end", rod_end), ("tail end", tail_end)):
+        check(
+            f"{label} radial",
+            await adapter.add_sketch_constraint(
+                f"{bottom_arc}.center", line, "coincident"
+            ),
+        )
+    await ensure_fully_defined(adapter, "strap sketch")
     check("exit_sketch strap", await adapter.exit_sketch())
     check(
         "extrude strap",
