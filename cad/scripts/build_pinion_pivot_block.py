@@ -8,7 +8,7 @@ heads on the plates are simplified away.
 
 Layout: block centred on the origin midway between the bores (at local
 x +-BORE_HALF_SPACING), both bores along Z at y 0 (12 above the base
-seat), block x -22.375..22.375, y -12..4, z 0..12.
+seat), block x -16.5..16.5, y -12..4, z 0..12.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 25".
 
@@ -40,14 +40,15 @@ from _common import (
 PART_NAME = "pinion-pivot-block"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel block (p.68)
 
-WIDTH = 44.75  # spans both bores +9 margin each side (derived)
+WIDTH = 33.0  # spans both bores +9 margin each side (derived)
 HEIGHT = 16.0  # photo-scaled (low); keeps the strap's r 11 bottom cap
 # (PIVOT_Y - 11 = 51.8) swinging clear of the base top 50.8
 DEPTH = 12.0  # photo-scaled (low)
 BORE_UP = 12.0  # bore height above the base seat -- sets PIVOT_Y (derived)
 BORE = 6.35  # rides the Ø6.35 torque shaft / lift rod (derived)
-BORE_HALF_SPACING = 13.377  # half the pivot-to-lift rod spacing 26.754
-# (build_drive_train_assembly: pivot rod x 15.154, lift rod x -11.6)
+BORE_HALF_SPACING = 7.5  # half the pivot-to-lift rod spacing 15.0 -- the
+# lift rod must clear BOTH the cone-pivot-post column (machine x -47.1)
+# and the strap's swinging r 11 bottom cap (build_drive_train_assembly)
 
 
 async def build(adapter) -> dict[str, str]:
