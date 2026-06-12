@@ -29,6 +29,8 @@ import sys
 from _common import (
     add_line_chain,
     apply_material,
+    apply_color,
+    PANEL_BLACK,
     check,
     define_circle,
     ensure_fully_defined,
@@ -160,6 +162,7 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"stud: added {added:.1f}, expected {v_net:.1f}")
 
     await apply_material(adapter, MATERIAL)
+    await apply_color(adapter, PANEL_BLACK)  # ch30 plates: see _common palette
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

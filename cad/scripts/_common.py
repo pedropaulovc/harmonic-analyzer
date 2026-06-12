@@ -653,6 +653,12 @@ async def apply_material(adapter: Any, material: str) -> None:
 
 
 CASTING_GREEN = (0.13, 0.45, 0.42)  # sampled from the ch30 studio photos
+# M6.8 photo-tuning palette, all sampled from the ch30 plates:
+POLISHED_STEEL = (0.65, 0.64, 0.63)  # frame columns (p006 column average)
+PANEL_BLACK = (0.08, 0.08, 0.09)  # platen board / clips / knife hardware
+SPRING_BLACK = (0.12, 0.12, 0.13)  # blued spring wire (counter + channel)
+STAINED_OAK = (0.16, 0.10, 0.07)  # crank handle (dark-stained wood)
+PAPER_WHITE = (0.92, 0.92, 0.88)  # platen paper sheet
 
 
 async def apply_color(adapter: Any, rgb: tuple[float, float, float]) -> None:
