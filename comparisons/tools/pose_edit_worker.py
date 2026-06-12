@@ -97,6 +97,38 @@ class POSE_OT_save(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class POSE_OT_zoom(bpy.types.Operator):
+    """Scale the model against the photo (camera ortho scale = saved zoom).
+
+    The plain scroll wheel only magnifies the camera frame — photo and model
+    together — which never changes the pose; this operator is bound to
+    Ctrl+Wheel and numpad +/- instead."""
+    bl_idname = "pose_edit.zoom"
+    bl_label = "Pose zoom (model vs photo)"
+
+    factor: bpy.props.FloatProperty(default=1.05)
+
+    def execute(self, context):
+        cam = STATE["cam"]
+        cam.data.ortho_scale = max(1e-9, cam.data.ortho_scale * self.factor)
+        return {"FINISHED"}
+
+
+def register_zoom_keymap():
+    kc = bpy.context.window_manager.keyconfigs.addon
+    if not kc:
+        return
+    km = kc.keymaps.new(name="3D View", space_type="VIEW_3D")
+    for key, ctrl, factor in (
+        ("WHEELUPMOUSE", True, 1 / 1.05),   # zoom in -> model larger
+        ("WHEELDOWNMOUSE", True, 1.05),
+        ("NUMPAD_PLUS", False, 1 / 1.05),
+        ("NUMPAD_MINUS", False, 1.05),
+    ):
+        kmi = km.keymap_items.new("pose_edit.zoom", key, "PRESS", ctrl=ctrl)
+        kmi.properties.factor = factor
+
+
 class POSE_PT_panel(bpy.types.Panel):
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
@@ -117,7 +149,8 @@ class POSE_PT_panel(bpy.types.Panel):
         col.prop(bg, "display_depth", text="")
         col.operator("pose_edit.save", icon="EXPORT")
         col.label(text="orbit/pan moves the camera")
-        col.label(text="(viewport is camera-locked)")
+        col.label(text="Ctrl+Wheel / numpad +-: zoom pose")
+        col.label(text="plain wheel: magnify view only")
 
 
 def setup_viewport():
@@ -202,7 +235,9 @@ def _build_editor(job: dict):
     bg.frame_method = "FIT"
 
     bpy.utils.register_class(POSE_OT_save)
+    bpy.utils.register_class(POSE_OT_zoom)
     bpy.utils.register_class(POSE_PT_panel)
+    register_zoom_keymap()
     setup_viewport()
 
     if job.get("smoke"):
