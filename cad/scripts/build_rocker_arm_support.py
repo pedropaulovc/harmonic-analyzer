@@ -35,8 +35,9 @@ symmetric in sketch x, so that plane's handedness does not matter.
 
 Layout: origin at the base centre, height +Y, base 88.9 along X / 63.5
 along Z. Mounting holes are Ø7.9 x 25 sockets up from the base underside
-(hold-down screws come up through the wooden base; fasteners not
-modeled), cut mid-plane so the cut direction never matters. The arbor
+(the hold-down lag-screws come up through the base -- modeled in the
+M6.10 fasteners pass, placed in frame.SLDASM), cut mid-plane so the cut
+direction never matters. The arbor
 boss extrudes from z -27.5 (machine z +74.1: 0.6 clear of the j=19
 connecting-rod ring at z <= +73.5) back to the sketch plane z 0, merging
 into the tapered flank; its added volume and the bore's removal are gated

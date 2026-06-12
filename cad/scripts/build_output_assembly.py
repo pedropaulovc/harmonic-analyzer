@@ -2,7 +2,7 @@ r"""Reproduction script: output subassembly (book ch. 18-24).
 
 Everything downstream of the channel springs, in machine coordinates
 (assembly origin = base origin; base top y = 50.8; channels along Z with
-z_j = -67.1 + 7.0565 j; the output side is -Z). 46 components:
+z_j = -67.1 + 7.0565 j; the output side is -Z). 60 components:
 
 * Summing group (z ~ 0): summing-lever on its knife line (15, 990, 0),
   knife-mount + top-crossbar + knife-stay hanging it from the top frame,
@@ -38,6 +38,15 @@ z_j = -67.1 + 7.0565 j; the output side is -Z). 46 components:
 * Loose hardware on the base top: measuring-stick, one spare
   transgear-removable (T18 -- the T24 is mounted on the knob shaft;
   the T12 rides the crankshaft in drive-train.SLDASM).
+* M6.10 fasteners (14): two hex-bolts down through the a-frame foot
+  rail into the base, four fillister screws holding the platen clips
+  (into the platen's blind sockets), two more up through the
+  magnifying-bracket flange, five pinch screws in the column clamps
+  (backed out), and the pen-hanger screw from behind the wheel bar.
+  All five fastener parts are authored in their final machine
+  orientation and are x-symmetric (MIRROR_PLANE "x0"), so IDENTITY
+  inserts work everywhere; the flange pair turns +Z -> +Y with
+  Rx(-90), which the x-mirror preserves.
 
 Default-state notes / documented simplifications (Appendix C):
 * The pen marker hangs VERTICAL with its tip 8.6 in front of the paper
@@ -54,10 +63,14 @@ Default-state notes / documented simplifications (Appendix C):
   disc, c2c 51.0) and the swing path between the two are not modeled --
   a single rigid arm cannot serve both centre distances (DIMENSIONS.md
   Appendix C #8, unresolved pivot kinematics).
-* The magnifying clamp's thumb screw is modeled backed-out: its shank
-  tip is tangent to the lever rod (a seated screw would overlap the rod
-  it pinches). The output fixture's clamp screw is omitted entirely (its
-  cross hole doubles as the wire hook).
+* The magnifying clamp's thumb screw and the five column-clamp pinch
+  screws are modeled backed-out: a seated screw would overlap the part
+  it pinches (the thumb-screw tip is tangent to the lever rod; the
+  pinch-screw tips stay 0.2 inside their back-wall holes, 0.3 off the
+  columns). The output fixture's clamp screw is omitted entirely (its
+  cross hole doubles as the wire hook). The flange screws stop flush
+  with the coefficients plate's bottom -- their engagement into the
+  summing lever's plate is not modeled.
 * Wires (lever rod -> wheel hub, wheel rim -> pen rod), the drive chain
   and the recording paper are flexible elements, not modeled.
 * The knife-stay strap crosses the channel-lever plane east of the lever
@@ -231,6 +244,40 @@ SPARE_GEAR_POS = (-160.0, 55.8, -15.0)  # plan circle r 26 (T24 OD 52,
 # clear, so the old east-flank squeeze is gone; 12 north of the
 # measuring stick band (z <= -118 is far away anyway), tube columns
 # (x <= -179) only start beyond z +-94
+
+# --- M6.10 fasteners ----------------------------------------------------------
+# A-frame foot-rail hex bolts: machine x +74.75 (the rail's BOLT_HOLE_X),
+# heads on the rail top (y 70.8), O7.8 shanks descending through the rail
+# and 12 into the base's O8.2 through holes.
+HEX_BOLT_Z = (-54.0, 36.0)
+# Platen-clip screws: each clip's own O3.0 end holes land at pre-mirror
+# (clip_pos_x - 5, 320/429) after its Rz(+90); under-head face on the clip
+# front (-144.1), O2.9 shank through the 1.2 strip and 2.8 into the
+# platen's 3.5-deep sockets.
+CLIP_SCREW_XY = ((-245.0, 320.0), (-245.0, 429.0), (27.0, 320.0), (27.0, 429.0))
+# Magnifying-bracket flange screws: Rx(-90) points the shank +Y through the
+# flange band (988.9..992.9), tip flush with the plate bottom (engagement
+# into the summing lever's plate not modeled); the O5.5 heads hang in free
+# air below, 1.9 clear of channel spring j=0.
+FLANGE_SCREW_X = (-33.0, -41.0)  # machine +33/+41: inset 4 from the flange ends
+FLANGE_SCREW_POS_Y = 988.9  # flange bottom
+FLANGE_SCREW_Z = -67.5  # the under-plate strip, clear of the bracket arm
+# Column-clamp pinch screws on each clamp's back face (z -88), backed out:
+# the shank tip (-94.2) stays 0.2 inside the back-wall hole (inner end
+# -94.4) and 0.3 off the column surface (-94.5).
+PINCH_SCREW_Z = -88.0
+PINCH_SCREW_XY = (
+    (COLUMN_X, TOP_RAIL_Y),
+    (-COLUMN_X, TOP_RAIL_Y),
+    (COLUMN_X, BOT_RAIL_Y),
+    (-COLUMN_X, BOT_RAIL_Y),
+    (-COLUMN_X, WHEEL_BAR_Y),  # the single wheel-bar clamp
+)
+# Pen-hanger screw from BEHIND the bar (the wheel rim passes 1.0 in front
+# of the strap, so no front-side head fits): AF-7 head on the bar back
+# face (-128.9), O3.5 shank through the bar + strap holes, tip 0.5 behind
+# the strap front face (-141.9).
+HANGER_SCREW_POS = (5.5, WHEEL_BAR_Y, -128.9)  # machine x -5.5
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 ROT_Y_POS90 = [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]
@@ -514,6 +561,27 @@ async def build(adapter) -> dict[str, str]:
     await _place(adapter, "transgear-removable", list(SPARE_GEAR_POS),
                  [-90.0, 0.0, 0.0], ROT_X_NEG90, configuration="T18",
                  label="transgear-removable (spare T18)")
+
+    # --- fasteners (M6.10) ----------------------------------------------------
+    for z in HEX_BOLT_Z:
+        await _place(adapter, "hex-bolt", [-74.75, 70.8, z],
+                     [0.0, 0.0, 0.0], IDENTITY,
+                     label=f"hex-bolt (a-frame rail z{z:+.0f})")
+    for x, y in CLIP_SCREW_XY:
+        await _place(adapter, "fillister-screw", [x, y, PLATE_FRONT_Z - 1.2],
+                     [0.0, 0.0, 0.0], IDENTITY,
+                     label=f"fillister-screw (clip x{x:+.0f} y{y:.0f})")
+    for x in FLANGE_SCREW_X:
+        await _place(adapter, "fillister-screw",
+                     [x, FLANGE_SCREW_POS_Y, FLANGE_SCREW_Z],
+                     [-90.0, 0.0, 0.0], ROT_X_NEG90,
+                     label=f"fillister-screw (flange x{x:+.0f})")
+    for x, y in PINCH_SCREW_XY:
+        await _place(adapter, "pinch-screw", [x, y, PINCH_SCREW_Z],
+                     [0.0, 0.0, 0.0], IDENTITY,
+                     label=f"pinch-screw (clamp x{x:+.0f} y{y:.0f})")
+    await _place(adapter, "hanger-screw", list(HANGER_SCREW_POS),
+                 [0.0, 0.0, 0.0], IDENTITY)
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)
