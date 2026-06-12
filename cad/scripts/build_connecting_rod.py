@@ -33,6 +33,7 @@ from _common import (
     apply_material,
     check,
     define_circle,
+    define_rectilinear_chain,
     ensure_fully_defined,
     report_mass_properties,
     run_build,
@@ -80,17 +81,16 @@ async def build(adapter) -> dict[str, str]:
     # Shank: flat bar from the strap up to the tip block.
     check("create_sketch shank", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    shank = await add_line_chain(
-        adapter,
-        [
-            (-SHANK_WIDTH / 2.0, SHANK_START_Y),
-            (SHANK_WIDTH / 2.0, SHANK_START_Y),
-            (SHANK_WIDTH / 2.0, BLOCK_START_Y),
-            (-SHANK_WIDTH / 2.0, BLOCK_START_Y),
-        ],
-    )
+    shank_rect = [
+        (-SHANK_WIDTH / 2.0, SHANK_START_Y),
+        (SHANK_WIDTH / 2.0, SHANK_START_Y),
+        (SHANK_WIDTH / 2.0, BLOCK_START_Y),
+        (-SHANK_WIDTH / 2.0, BLOCK_START_Y),
+    ]
+    shank = await add_line_chain(adapter, shank_rect)
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "shank sketch", fix_entities=shank)
+    await define_rectilinear_chain(adapter, shank, shank_rect, label="shank")
+    await ensure_fully_defined(adapter, "shank sketch")
     check("exit_sketch shank", await adapter.exit_sketch())
     check(
         "extrude shank",
@@ -102,17 +102,16 @@ async def build(adapter) -> dict[str, str]:
     # Flattened tip strap, pinned beside the rocker arm at assembly.
     check("create_sketch tip block", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    block = await add_line_chain(
-        adapter,
-        [
-            (-BLOCK_WIDTH / 2.0, BLOCK_START_Y),
-            (BLOCK_WIDTH / 2.0, BLOCK_START_Y),
-            (BLOCK_WIDTH / 2.0, BLOCK_START_Y + BLOCK_LENGTH),
-            (-BLOCK_WIDTH / 2.0, BLOCK_START_Y + BLOCK_LENGTH),
-        ],
-    )
+    block_rect = [
+        (-BLOCK_WIDTH / 2.0, BLOCK_START_Y),
+        (BLOCK_WIDTH / 2.0, BLOCK_START_Y),
+        (BLOCK_WIDTH / 2.0, BLOCK_START_Y + BLOCK_LENGTH),
+        (-BLOCK_WIDTH / 2.0, BLOCK_START_Y + BLOCK_LENGTH),
+    ]
+    block = await add_line_chain(adapter, block_rect)
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "tip block sketch", fix_entities=block)
+    await define_rectilinear_chain(adapter, block, block_rect, label="tip block")
+    await ensure_fully_defined(adapter, "tip block sketch")
     check("exit_sketch tip block", await adapter.exit_sketch())
     check(
         "extrude tip block",

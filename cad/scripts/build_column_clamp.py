@@ -33,6 +33,7 @@ from _common import (
     apply_material,
     check,
     define_circle,
+    define_rectilinear_chain,
     ensure_fully_defined,
     report_mass_properties,
     run_build,
@@ -109,16 +110,15 @@ async def build(adapter) -> dict[str, str]:
     # Bar channel: one rectangular cut through the collar front, from the
     # floor up past the top (Top sketch footprint, offset cut upward).
     check("create_sketch channel", await adapter.create_sketch("Top"))
-    channel = await add_line_chain(
-        adapter,
-        [
-            (CHANNEL_X[0], -COLLAR_OD),
-            (CHANNEL_X[1], -COLLAR_OD),
-            (CHANNEL_X[1], COLLAR_OD),
-            (CHANNEL_X[0], COLLAR_OD),
-        ],
-    )
-    await ensure_fully_defined(adapter, "channel sketch", fix_entities=channel)
+    channel_rect = [
+        (CHANNEL_X[0], -COLLAR_OD),
+        (CHANNEL_X[1], -COLLAR_OD),
+        (CHANNEL_X[1], COLLAR_OD),
+        (CHANNEL_X[0], COLLAR_OD),
+    ]
+    channel = await add_line_chain(adapter, channel_rect)
+    await define_rectilinear_chain(adapter, channel, channel_rect, label="channel")
+    await ensure_fully_defined(adapter, "channel sketch")
     check("exit_sketch channel", await adapter.exit_sketch())
     # Cut occupies y CHANNEL_FLOOR_Y .. +COLLAR_HALF_H + 2 (clears the top):
     # mid-plane trick is unusable (asymmetric), so cut a boss-extruded
