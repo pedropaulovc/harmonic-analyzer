@@ -25,7 +25,9 @@ from __future__ import annotations
 import sys
 
 from _common import (
+    CASTING_GREEN,
     add_line_chain,
+    apply_color,
     apply_material,
     check,
     ensure_fully_defined,
@@ -98,6 +100,7 @@ async def build(adapter) -> dict[str, str]:
     # expected: 99 + 17.5 * 10.5 * 1.5 = 374.625 in^3 = 6,139,003 mm^3
 
     await apply_material(adapter, MATERIAL)
+    await apply_color(adapter, CASTING_GREEN)
 
     # Verify the annotated footprint (ch. 6: 46 x 28 cm callouts = 18.1 x
     # 11.0 in; legacy 18.0 x 11.0 kept). Side-face pairs fail to pick (the

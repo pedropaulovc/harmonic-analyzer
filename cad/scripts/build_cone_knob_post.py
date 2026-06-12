@@ -24,8 +24,10 @@ import math
 import sys
 
 from _common import (
+    CASTING_GREEN,
     IN,
     add_line_chain,
+    apply_color,
     apply_material,
     check,
     define_circle,
@@ -101,6 +103,7 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(adapter, "slot", volume - v_slot, 0.01 * v_slot)
 
     await apply_material(adapter, MATERIAL)
+    await apply_color(adapter, CASTING_GREEN)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

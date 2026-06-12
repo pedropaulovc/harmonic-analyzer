@@ -51,8 +51,10 @@ import math
 import sys
 
 from _common import (
+    CASTING_GREEN,
     IN,
     add_line_chain,
+    apply_color,
     apply_material,
     check,
     define_circle,
@@ -66,7 +68,7 @@ from _common import (
 )
 
 PART_NAME = "rocker-arm-support"
-MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
+MATERIAL = "Gray Cast Iron"  # green-painted frustum (ch30/photogrammetry)
 
 TOTAL_HEIGHT = 7.00 * IN  # 177.8  DIMENSIONS.md ch14 layout: legacy height kept (med)
 BASE_X = 3.50 * IN  # 88.9   ch14 layout: front-view triangle base (photo, med)
@@ -252,6 +254,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "arbor bore", volume - v_bore, 0.02 * v_bore)
 
     await apply_material(adapter, MATERIAL)
+    await apply_color(adapter, CASTING_GREEN)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 
