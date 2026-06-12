@@ -61,7 +61,12 @@ BAND_T = 4.5  # band thickness (z)
 TIP_AIR = 0.41  # band inner edge floats this clear of the tooth tips
 WRAP_R_A = TIP_R_T24 + TIP_AIR + BAND_W / 2.0  # 28.91 (knob T24)
 WRAP_R_B = TIP_R_T12 + TIP_AIR + BAND_W / 2.0  # 16.91 (crank T12)
-SAG = 18.0  # slack-run droop below the straight tangent (p006 crop)
+SAG = 14.0  # slack-run droop below the straight tangent (p006 crop read 18;
+# trimmed so the band's OUTER offset arc (radius SLACK_R + BAND_W/2 about C
+# -- it dips 2.5 * R / sqrt(R^2 - dx^2) below the centreline, ~3.7 near the
+# window edge, NOT a flat 2.5) clears the cone-pivot-post top (y 135.8,
+# rotated-block box to pre-mirror x 77.7) by 0.95: SAG 18 clipped the post
+# corner 10.6 mm^3, SAG 15 left a 0.17 sliver the checker reports as 0.00)
 
 # --- centreline geometry (A = knob = origin, B = crank) ----------------------
 _BX = CRANK_CENTRE[0] - KNOB_CENTRE[0]
