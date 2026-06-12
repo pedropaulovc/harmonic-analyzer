@@ -10,11 +10,13 @@ standalone with uv to regenerate composites/scores without SolidWorks:
     uv run comparisons/tools/composite.py [--only id1,id2]
 
 Per pair (see ../manifest.json):
-    ref/<id>.png                prepared reference (cropped/rotated copy)
-    render/<id>.png             aligned CAD render
-    composite/<id>_sbs.png      side-by-side
-    composite/<id>_blend.png    overlay: grayscale ref under red-tinted render
-                                (render's white background knocked out)
+    ref/<id>.jpg                prepared reference (cropped/rotated copy)
+    render/<id>.jpg             raw CAD render (content-trimmed)
+    composite/<id>_cad.jpg      render fitted into the reference frame (same
+                                scale/offset as the blend layer, black
+                                background) — the gallery's reveal-slider top
+    composite/<id>_blend.jpg    overlay: grayscale ref under red-tinted render
+                                (render background knocked out)
     scores.json                 pair id -> RMS shape-mismatch score
 """
 
@@ -22,15 +24,12 @@ import argparse
 import json
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image, ImageOps
 
 COMP = Path(__file__).resolve().parents[1]
 REPO = COMP.parent
 MANIFEST = COMP / "manifest.json"
 SCORES = COMP / "scores.json"
-
-PANEL_H = 1000
-
 
 def load_manifest(path: Path = MANIFEST) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -45,7 +44,7 @@ def pair_paths(pair_id: str) -> dict[str, Path]:
     return {
         "ref": COMP / "ref" / f"{pair_id}.jpg",
         "render": COMP / "render" / f"{pair_id}.jpg",
-        "sbs": COMP / "composite" / f"{pair_id}_sbs.jpg",
+        "cad": COMP / "composite" / f"{pair_id}_cad.jpg",
         "blend": COMP / "composite" / f"{pair_id}_blend.jpg",
     }
 
@@ -73,11 +72,6 @@ def prepare_reference(pair: dict, max_px: int = 1600) -> Path:
     return out
 
 
-def _fit_height(img: Image.Image, h: int) -> Image.Image:
-    w = max(1, round(img.width * h / img.height))
-    return img.resize((w, h), Image.LANCZOS)
-
-
 def _content_mask(img: Image.Image, thresh: int = 30) -> Image.Image:
     """255 where render content, 0 where viewport background.
 
@@ -95,12 +89,6 @@ def _content_mask(img: Image.Image, thresh: int = 30) -> Image.Image:
             ImageDraw.floodfill(rgb, xy, sentinel, thresh=thresh)
     bg = Image.new("RGB", rgb.size, sentinel)
     return ImageChops.difference(rgb, bg).convert("L").point(lambda v: 255 if v else 0)
-
-
-def _trim_uniform_border(img: Image.Image) -> Image.Image:
-    """Crop the render's background margin (zoom-to-fit underfills)."""
-    bbox = _content_mask(img).getbbox()
-    return img.crop(bbox) if bbox else img
 
 
 def trim_render_file(path: Path, margin_frac: float = 0.01) -> None:
@@ -143,20 +131,19 @@ def _fitted_render(pair_id: str, ref_size: tuple[int, int], align: dict | None):
     return ren, mask, (dx, dy)
 
 
-def side_by_side(pair_id: str) -> Path:
+def aligned_render(pair_id: str, align: dict | None) -> Path:
+    """The render placed in the reference frame — identical scale/offset to
+    the blend's red layer — on black, so the gallery's reveal slider swaps
+    between two pixel-registered images."""
     p = pair_paths(pair_id)
-    ref = _fit_height(Image.open(p["ref"]).convert("RGB"), PANEL_H)
-    ren = _fit_height(_trim_uniform_border(Image.open(p["render"])).convert("RGB"), PANEL_H)
-    gap, bar = 8, 28
-    canvas = Image.new("RGB", (ref.width + gap + ren.width, PANEL_H + bar), "white")
-    canvas.paste(ref, (0, bar))
-    canvas.paste(ren, (ref.width + gap, bar))
-    draw = ImageDraw.Draw(canvas)
-    draw.text((4, 6), f"REF  {pair_id}", fill="black")
-    draw.text((ref.width + gap + 4, 6), "CAD", fill="black")
-    p["sbs"].parent.mkdir(parents=True, exist_ok=True)
-    canvas.save(p["sbs"], **JPEG_OPTS)
-    return p["sbs"]
+    with Image.open(p["ref"]) as ref:
+        ref_size = ref.size
+    ren, mask, offset = _fitted_render(pair_id, ref_size, align)
+    canvas = Image.new("RGB", ref_size, "black")
+    canvas.paste(ren.convert("RGB"), offset, mask)
+    p["cad"].parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(p["cad"], **JPEG_OPTS)
+    return p["cad"]
 
 
 def _render_rgba(render: Image.Image, mask: Image.Image) -> Image.Image:
@@ -200,24 +187,29 @@ def score_pair(pair_id: str, align: dict | None) -> float:
 
 
 def regenerate(only: set[str] | None = None) -> dict[str, float]:
+    import time
+
     manifest = load_manifest()
     scores = json.loads(SCORES.read_text(encoding="utf-8")) if SCORES.exists() else {}
-    for pair in manifest["pairs"]:
+    todo = [p for p in manifest["pairs"] if not only or p["id"] in only]
+    print(f"regenerating composites for {len(todo)} pairs", flush=True)
+    t0 = time.monotonic()
+    for i, pair in enumerate(todo, 1):
         pid = pair["id"]
-        if only and pid not in only:
-            continue
         p = pair_paths(pid)
         if not p["ref"].exists():
             prepare_reference(pair)
         if not p["render"].exists():
-            print(f"  --  {pid}: no render yet, skipping composites")
+            print(f"  --  [{i}/{len(todo)}] {pid}: no render yet, skipping", flush=True)
             continue
         align = pair.get("align")
-        side_by_side(pid)
+        aligned_render(pid, align)
         blend_overlay(pid, align)
         scores[pid] = score_pair(pid, align)
-        print(f"  OK  {pid}: score {scores[pid]}")
+        print(f"  OK  [{i}/{len(todo)}] {pid}: score {scores[pid]}"
+              f"  ({time.monotonic() - t0:.0f}s)", flush=True)
     SCORES.write_text(json.dumps(dict(sorted(scores.items())), indent=1), encoding="utf-8")
+    print(f"composites done: {len(todo)} pairs in {time.monotonic() - t0:.0f}s", flush=True)
     return scores
 
 

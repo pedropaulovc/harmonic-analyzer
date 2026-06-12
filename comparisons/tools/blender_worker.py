@@ -113,12 +113,12 @@ def build_assembly(job):
     meshes = {}
     objs = []
     for comp in components:
-        stem = comp["part"]
-        if stem not in meshes:
-            seed = import_stl(parts_dir / f"{stem}.STL")
-            meshes[stem] = seed.data
+        key = comp.get("mesh") or comp["part"]
+        if key not in meshes:
+            seed = import_stl(parts_dir / f"{key}.STL")
+            meshes[key] = seed.data
             bpy.data.objects.remove(seed)
-        obj = bpy.data.objects.new(comp["name"], meshes[stem])
+        obj = bpy.data.objects.new(comp["name"], meshes[key])
         bpy.context.scene.collection.objects.link(obj)
         obj.matrix_world = sw_matrix(comp["xform"])
         obj.color = (*(comp.get("rgb") or DEFAULT_RGB), 1.0)
