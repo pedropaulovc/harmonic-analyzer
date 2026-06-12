@@ -1,9 +1,10 @@
 r"""Reproduction script: frame subassembly (book ch. 6 / eight-views).
 
-Static structure of the machine: the two-plate cast base, four fluted
-columns at the corners, four corner brackets hugging the columns, the two
-tapered support frustums that carry the rocker-pivot shaft, and the
-top-frame ring clamping the columns just below their tops.
+Static structure of the machine: the two-plate cast base, four smooth
+polished columns at the corners, four corner brackets hugging the
+columns, the two tapered support frustums that carry the rocker-pivot
+shaft, and the top-frame ring capping the columns -- column tops flush
+with the ring's top face at 1040.7 (M6.8 8-view pass: no stub above).
 
 Layout (from the ch. 6 dimension photo and the ch. 30 eight views; assembly
 axes follow the harmonic-base part: X = 46 cm length, Y = up, Z = 28 cm

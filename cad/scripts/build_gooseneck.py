@@ -2,22 +2,28 @@ r"""Reproduction script: gooseneck post (book ch. 19, pp. 44-45).
 
 The tall chrome tube that "towers above the machine" and anchors the top
 of the counter spring: a vertical O16 tube rising from the east column
-line, a 180-degree bend (R 51) at the top, and a short down-pointing tip
-carrying the spring pin. Tension is set by sliding the tube in its clamp
+line, a 90-DEGREE bend (R 51) at the top, and a horizontal arm reaching
+west over the summing-lever boss, carrying the spring pin under its end.
+(M6.8 ch30 8-view pass: 90 degrees, not the earlier 180 candy-cane --
+user-confirmed against the ch. 19 photos; the ch30 plates crop below the
+bend.) Tension is set by sliding the tube in its clamp
 (build_gooseneck_clamp.py).
 
-M6.4 geometry (ch. 19 full-machine photo at gooseneck scale 0.515 px/mm,
-p3 90-degree page): vertical leg at machine x 197 (east column line),
-y 1041..1390 (bottom seats in the clamp bore just above the east rail
-top at 1040.7); bend top ~y 1441; tip leg at machine x 95 -- directly above
-the summing-lever boss hook so the counter spring hangs plumb -- ending
-at y 1378. The book's tip "slotted screw" is modeled as a lug + O4 X-pin
-under the tip for the spring's top loop to encircle (simplification).
+Geometry: vertical leg at machine x 197 (east column line), y 1041
+(seats in the clamp bore just above the east rail top 1040.7) up to the
+bend start 1335; quarter bend to the horizontal arm at centreline
+y 1386, running west to its end face at machine x 85; the spring lug
+hangs under the arm end so the pin stays at machine (95, 1373) --
+directly above the summing-lever boss hook, counter spring hanging
+plumb, loop top 1376.9 clearing the arm underside 1378. The book's tip
+"slotted screw" is modeled as a lug + O4 X-pin for the spring's top
+loop to encircle (simplification).
 
-Layout: part origin at the vertical leg's MID-height (machine
-(197, 1210, 0)): leg y -169..+180, bend arc centre (-51, +180), tip leg at
-x -102 (y 168..180), lug x -109..-103.5 (y 159..168), pin along X at
-(y 163, z 0). Dimensions: cad/DIMENSIONS.md ch. 19 (low/med).
+Layout: part origin at the vertical leg's MID-height of the OLD 180 lay
+(machine (197, 1210, 0), placement preserved): leg y -169..+125, bend
+arc centre (-51, +125), arm centreline y +176 from x -51 to -112, lug
+x -109..-103.5 rising y 159..172 into the arm underside (min 168), pin
+along X at (y 163, z 0). Dimensions: cad/DIMENSIONS.md ch. 19 (low/med).
 
 Run (SolidWorks already open)::
 
@@ -47,16 +53,19 @@ PART_NAME = "gooseneck"
 MATERIAL = "Chrome Stainless Steel"  # polished chrome tube
 
 TUBE_DIA = 16.0  # DIMENSIONS.md ch19: scaled vs frame anchors (med)
-LEG_HALF = 180.0  # vertical leg top y +180 = machine 1390 (med)
+LEG_TOP = 125.0  # bend start = machine 1335 (derived: arm y - bend R)
 LEG_BOTTOM = -169.0  # leg bottom = machine 1041: stops 0.3 above the east
 # rail top (1040.7) -- the tube seats in the clamp bore, not in the rail
-BEND_R = 51.0  # 180-degree bend; tip lands at x -102 = machine 95 (derived:
-# the tip must sit plumb above the boss hook at machine x 95)
-TIP_TOP = 180.0  # tip leg top (bend exit)
-TIP_BOT = 168.0  # tip end face = machine 1378 (low)
+BEND_R = 51.0  # 90-degree bend (med)
+ARM_Y = LEG_TOP + BEND_R  # 176: arm centreline = machine 1386; underside
+# 168 = machine 1378, 1.1 above the spring loop top 1376.9
+ARM_END_X = -112.0  # arm end face = machine 85: covers the lug with margin
+ARM_RUN = -ARM_END_X - BEND_R  # 61: straight run after the bend exit
 LUG_X = (-109.0, -103.5)  # lug plate, machine x 88..93.5 (derived: clear
 # of the spring loop's wire band x 94.1..95.9)
-LUG_Y = (159.0, 168.0)
+LUG_Y = (159.0, 172.0)  # rises 4 past the arm underside so the prism
+# merges into the round tube (the old design met the down-tip's FLAT end
+# face, where exact touch unions; a curved face needs real overlap)
 LUG_HALF_Z = 1.5
 PIN_DIA = 4.0  # spring-loop pin (low)
 PIN_Y = 163.0  # machine 1373: loop centre 1370.6 + (loop mean r 5.35
@@ -64,7 +73,6 @@ PIN_Y = 163.0  # machine 1373: loop centre 1370.6 + (loop mean r 5.35
 PIN_X = (-109.0, -98.0)  # cantilevers past the loop band to machine x 99
 
 TUBE_R = TUBE_DIA / 2.0
-TIP_X = -2.0 * BEND_R
 
 
 async def _volume(adapter) -> float:
@@ -86,42 +94,52 @@ async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
 
     # 1. Vertical leg (start-offset extrude from the Top plane: the leg is
-    # asymmetric -- bottom at LEG_BOTTOM, top at +LEG_HALF into the bend).
+    # asymmetric -- bottom at LEG_BOTTOM, top at +LEG_TOP into the bend).
     check("create_sketch leg", await adapter.create_sketch("Top"))
     await define_circle(adapter, 0.0, 0.0, TUBE_R, "leg")
     await ensure_fully_defined(adapter, "leg sketch")
     check("exit_sketch leg", await adapter.exit_sketch())
-    extrude_at_offset(adapter, LEG_HALF - LEG_BOTTOM, LEG_BOTTOM)
-    expected = math.pi * TUBE_R**2 * (LEG_HALF - LEG_BOTTOM)
+    extrude_at_offset(adapter, LEG_TOP - LEG_BOTTOM, LEG_BOTTOM)
+    expected = math.pi * TUBE_R**2 * (LEG_TOP - LEG_BOTTOM)
     vol = await _volume(adapter)
     print(f"  volume after leg: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.005 * expected:
         raise RuntimeError(f"leg volume {vol:.1f} != {expected:.1f}")
 
-    # 2. 180-degree bend: sweep along an explicit half-circle path (an
-    # equation curve has no direction ambiguity and no free endpoints).
+    # 2. Quarter bend + horizontal arm: ONE sweep along two equation
+    # curves (no direction ambiguity, no free endpoints).
     path_name = check("create_sketch bend path", await adapter.create_sketch("Front"))
     arc = await check_curve(
         adapter,
         CreateEquationCurveParameters(
             x_expression=(
-                f"{fmt(-BEND_R)} + {fmt(BEND_R)} * cos({math.pi:.12g} * t)"
+                f"{fmt(-BEND_R)} + {fmt(BEND_R)} * cos({math.pi / 2.0:.12g} * t)"
             ),
             y_expression=(
-                f"{fmt(LEG_HALF)} + {fmt(BEND_R)} * sin({math.pi:.12g} * t)"
+                f"{fmt(LEG_TOP)} + {fmt(BEND_R)} * sin({math.pi / 2.0:.12g} * t)"
             ),
             range_start="0",
             range_end="1",
         ),
         "bend arc",
     )
-    await ensure_fully_defined(adapter, "bend path", fix_entities=[arc])
+    arm = await check_curve(
+        adapter,
+        CreateEquationCurveParameters(
+            x_expression=f"{fmt(-BEND_R)} - {fmt(ARM_RUN)} * t",
+            y_expression=f"{fmt(ARM_Y)} + 0 * t",
+            range_start="0",
+            range_end="1",
+        ),
+        "arm run",
+    )
+    await ensure_fully_defined(adapter, "bend path", fix_entities=[arc, arm])
     check("exit_sketch bend path", await adapter.exit_sketch())
 
     profile_plane = check(
         "create_plane bend profile",
         await adapter.create_plane(
-            CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=LEG_HALF)
+            CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=LEG_TOP)
         ),
     )
     check(
@@ -138,7 +156,7 @@ async def build(adapter) -> dict[str, str]:
             "create_plane bend profile (flipped)",
             await adapter.create_plane(
                 CreatePlaneParameters(
-                    mode="offset", base_plane="Top Plane", offset=LEG_HALF, flip=True
+                    mode="offset", base_plane="Top Plane", offset=LEG_TOP, flip=True
                 )
             ),
         )
@@ -150,29 +168,16 @@ async def build(adapter) -> dict[str, str]:
         await ensure_fully_defined(adapter, "bend profile sketch (flipped)")
         check("exit_sketch bend profile (flipped)", await adapter.exit_sketch())
         res = await adapter.create_sweep(SweepParameters(path=path_name))
-    check("sweep bend", res)
-    v_bend = math.pi**2 * TUBE_R**2 * BEND_R  # half torus
-    before, expected = expected, expected + v_bend
+    check("sweep bend + arm", res)
+    v_bend = math.pi**2 * TUBE_R**2 * BEND_R / 2.0  # quarter torus
+    v_arm = math.pi * TUBE_R**2 * ARM_RUN
+    expected = expected + v_bend + v_arm
     vol = await _volume(adapter)
-    print(f"  volume after bend: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    print(f"  volume after bend + arm: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.01 * expected:
         raise RuntimeError(f"bend volume {vol:.1f} != {expected:.1f}")
 
-    # 3. Tip leg (down tube), Top-plane sketch extruded at a start offset.
-    check("create_sketch tip", await adapter.create_sketch("Top"))
-    set_sketch_direct_db(adapter, True)
-    await define_circle(adapter, TIP_X, 0.0, TUBE_R, "tip")
-    set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "tip sketch")
-    check("exit_sketch tip", await adapter.exit_sketch())
-    extrude_at_offset(adapter, TIP_TOP - TIP_BOT, TIP_BOT)
-    expected += math.pi * TUBE_R**2 * (TIP_TOP - TIP_BOT)
-    vol = await _volume(adapter)
-    print(f"  volume after tip: {vol:.1f} mm^3 (analytic {expected:.1f})")
-    if abs(vol - expected) > 0.01 * expected:
-        raise RuntimeError(f"tip volume {vol:.1f} != {expected:.1f}")
-
-    # 4. Pin lug under the tip end face.
+    # 3. Pin lug rising into the arm underside.
     check("create_sketch lug", await adapter.create_sketch("Top"))
     lug = await add_line_chain(
         adapter,
@@ -186,7 +191,10 @@ async def build(adapter) -> dict[str, str]:
     await ensure_fully_defined(adapter, "lug sketch", fix_entities=lug)
     check("exit_sketch lug", await adapter.exit_sketch())
     extrude_at_offset(adapter, LUG_Y[1] - LUG_Y[0], LUG_Y[0])
-    v_lug = (LUG_X[1] - LUG_X[0]) * 2.0 * LUG_HALF_Z * (LUG_Y[1] - LUG_Y[0])
+    # Added material = the prism OUTSIDE the tube: height to the tube
+    # underside (~168 + z^2/16 over z +-1.5) ~ 9.05 mean, vs the 9-high
+    # solid reference -> ratio 1.005, inside the (0.95, 1.01) window.
+    v_lug = (LUG_X[1] - LUG_X[0]) * 2.0 * LUG_HALF_Z * 9.0
     before = expected
     vol = await _volume(adapter)
     added = vol - before
@@ -195,7 +203,7 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"lug: added {added:.1f}, expected ~{v_lug:.1f}")
     expected = vol
 
-    # 5. Spring pin along X (revolved in the Front plane -- no Right-plane
+    # 4. Spring pin along X (revolved in the Front plane -- no Right-plane
     # axis-mapping ambiguity).
     check("create_sketch pin", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
