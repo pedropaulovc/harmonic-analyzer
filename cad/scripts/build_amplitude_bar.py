@@ -33,9 +33,11 @@ from _common import (
     IN,
     add_line_chain,
     apply_material,
+    blank_sketch,
     check,
     define_circle,
     ensure_fully_defined,
+    feature_name_by_type,
     measure_check,
     report_mass_properties,
     run_build,
@@ -152,6 +154,11 @@ async def build(adapter) -> dict[str, str]:
                 f"  ..  top pin cut at sketch x={sketch_x:+g} failed"
                 f" ({cut.error}); flipping sign"
             )
+            # The unconsumed sketch would stay SHOWN and render in all 20
+            # assembly instances (floating circles above the top frame).
+            orphan = feature_name_by_type(adapter, "ProfileFeature")
+            if orphan:
+                blank_sketch(adapter, orphan)
             continue
         res = await adapter.get_mass_properties()
         removed = vol_before - res.data.volume

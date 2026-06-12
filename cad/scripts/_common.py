@@ -207,6 +207,27 @@ def feature_name_by_type(adapter: Any, type_name: str) -> str:
     return found
 
 
+def blank_sketch(adapter: Any, sketch_name: str) -> None:
+    """Hide (blank) a sketch so it stops rendering in assemblies.
+
+    Unabsorbed sketches default to SHOWN and render in every assembly
+    instance (caught as floating tick rows above the top frame: 20 helix
+    seed circles + 20 orphan pin-hole circles, one per channel station).
+    """
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    selected = model.Extension.SelectByID2(
+        sketch_name, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
+    )
+    if not selected:
+        raise RuntimeError(f"blank_sketch: cannot select sketch {sketch_name!r}")
+    model.BlankSketch()
+    model.ClearSelection2(True)
+    print(f"  OK  blanked sketch {sketch_name}")
+
+
 def set_sketch_direct_db(adapter: Any, enabled: bool) -> None:
     """Toggle ``SketchManager.AddToDB`` around non-axis-parallel geometry.
 
