@@ -26,6 +26,8 @@ import sys
 from _common import (
     add_line_chain,
     apply_material,
+    apply_color,
+    PANEL_BLACK,
     check,
     ensure_fully_defined,
     measure_check,
@@ -65,6 +67,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     await apply_material(adapter, MATERIAL)
+    await apply_color(adapter, PANEL_BLACK)  # ch30 plates: see _common palette
 
     # Verify the annotated 140 mm front-face height (p.55 callout).
     mid_x, mid_z = PLATE_WIDTH / 2.0, PLATE_THICKNESS / 2.0
