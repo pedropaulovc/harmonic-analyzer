@@ -43,6 +43,8 @@ from _common import (
     apply_material,
     check,
     define_circle,
+    define_polygon_chain,
+    define_rectilinear_chain,
     ensure_fully_defined,
     extrude_at_offset,
     report_mass_properties,
@@ -181,16 +183,15 @@ async def build(adapter) -> dict[str, str]:
 
     # 3. Central slot for the knife-mount stud (Top sketch, sy = -z).
     check("create_sketch slot", await adapter.create_sketch("Top"))
-    slot = await add_line_chain(
-        adapter,
-        [
-            (-SLOT_HALF_X, -SLOT_HALF_Z),
-            (SLOT_HALF_X, -SLOT_HALF_Z),
-            (SLOT_HALF_X, SLOT_HALF_Z),
-            (-SLOT_HALF_X, SLOT_HALF_Z),
-        ],
-    )
-    await ensure_fully_defined(adapter, "slot sketch", fix_entities=slot)
+    slot_rect = [
+        (-SLOT_HALF_X, -SLOT_HALF_Z),
+        (SLOT_HALF_X, -SLOT_HALF_Z),
+        (SLOT_HALF_X, SLOT_HALF_Z),
+        (-SLOT_HALF_X, SLOT_HALF_Z),
+    ]
+    slot = await add_line_chain(adapter, slot_rect)
+    await define_rectilinear_chain(adapter, slot, slot_rect, label="slot")
+    await ensure_fully_defined(adapter, "slot sketch")
     check("exit_sketch slot", await adapter.exit_sketch())
     check(
         "cut slot",
@@ -204,22 +205,21 @@ async def build(adapter) -> dict[str, str]:
     # 4. Coefficients plate with the 20 spring holes (nested contours),
     # extruded at a start offset so its top face lands at PLATE_TOP_Y.
     check("create_sketch plate", await adapter.create_sketch("Top"))
-    outline = await add_line_chain(
-        adapter,
-        [
-            (PLATE_X_MIN, -PLATE_HALF_Z),
-            (PLATE_X_MAX, -PLATE_HALF_Z),
-            (PLATE_X_MAX, PLATE_HALF_Z),
-            (PLATE_X_MIN, PLATE_HALF_Z),
-        ],
-    )
+    plate_rect = [
+        (PLATE_X_MIN, -PLATE_HALF_Z),
+        (PLATE_X_MAX, -PLATE_HALF_Z),
+        (PLATE_X_MAX, PLATE_HALF_Z),
+        (PLATE_X_MIN, PLATE_HALF_Z),
+    ]
+    outline = await add_line_chain(adapter, plate_rect)
     # Direct-to-DB: inference around the freshly dimensioned neighbour
     # makes CreateCircleByRadius fail from the second small hole on.
     set_sketch_direct_db(adapter, True)
     for j, hole_z in enumerate(HOLE_Z):
         await define_circle(adapter, HOLE_X, -hole_z, HOLE_DIA / 2.0, f"hole {j + 1}")
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "plate sketch", fix_entities=outline)
+    await define_rectilinear_chain(adapter, outline, plate_rect, label="plate")
+    await ensure_fully_defined(adapter, "plate sketch")
     check("exit_sketch plate", await adapter.exit_sketch())
     extrude_at_offset(
         adapter, PLATE_THICKNESS, PLATE_TOP_Y - PLATE_THICKNESS
@@ -235,19 +235,19 @@ async def build(adapter) -> dict[str, str]:
     # 5. Twin-rib web arm, tube wall -> boss (Top sketch, both strips).
     check("create_sketch web ribs", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
-    rib_entities: list[str] = []
+    rib_chains: list[tuple[list[str], list[tuple[float, float]]]] = []
     for side in (1.0, -1.0):  # sy = -z: +1 strip is the z<0 rib
-        rib_entities += await add_line_chain(
-            adapter,
-            [
-                (RIB_X0, side * (RIB_Z0 - RIB_HALF_WIDTH)),
-                (RIB_X0, side * (RIB_Z0 + RIB_HALF_WIDTH)),
-                (RIB_X1, side * (RIB_Z1 + RIB_HALF_WIDTH)),
-                (RIB_X1, side * (RIB_Z1 - RIB_HALF_WIDTH)),
-            ],
-        )
+        rib_pts = [
+            (RIB_X0, side * (RIB_Z0 - RIB_HALF_WIDTH)),
+            (RIB_X0, side * (RIB_Z0 + RIB_HALF_WIDTH)),
+            (RIB_X1, side * (RIB_Z1 + RIB_HALF_WIDTH)),
+            (RIB_X1, side * (RIB_Z1 - RIB_HALF_WIDTH)),
+        ]
+        rib_chains.append((await add_line_chain(adapter, rib_pts), rib_pts))
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "web ribs sketch", fix_entities=rib_entities)
+    for i, (rib_lines, rib_pts) in enumerate(rib_chains):
+        await define_polygon_chain(adapter, rib_lines, rib_pts, label=f"rib {i + 1}")
+    await ensure_fully_defined(adapter, "web ribs sketch")
     check("exit_sketch web ribs", await adapter.exit_sketch())
     extrude_at_offset(adapter, WEB_Y_TOP - WEB_Y_BOT, WEB_Y_BOT)
     v_rib_solid = (

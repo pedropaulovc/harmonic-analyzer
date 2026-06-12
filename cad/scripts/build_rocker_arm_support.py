@@ -61,6 +61,7 @@ from _common import (
     apply_material,
     check,
     define_circle,
+    define_polygon_chain,
     ensure_fully_defined,
     extrude_at_offset,
     report_mass_properties,
@@ -141,17 +142,16 @@ async def build(adapter) -> dict[str, str]:
     # Side-view trapezoid (Z taper), extruded mid-plane across X.
     check("create_sketch trapezoid", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
-    lines = await add_line_chain(
-        adapter,
-        [
-            (-BASE_Z / 2.0, 0.0),
-            (BASE_Z / 2.0, 0.0),
-            (TOP_Z / 2.0, TOTAL_HEIGHT),
-            (-TOP_Z / 2.0, TOTAL_HEIGHT),
-        ],
-    )
+    trapezoid_pts = [
+        (-BASE_Z / 2.0, 0.0),
+        (BASE_Z / 2.0, 0.0),
+        (TOP_Z / 2.0, TOTAL_HEIGHT),
+        (-TOP_Z / 2.0, TOTAL_HEIGHT),
+    ]
+    lines = await add_line_chain(adapter, trapezoid_pts)
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "trapezoid sketch", fix_entities=lines)
+    await define_polygon_chain(adapter, lines, trapezoid_pts, label="trapezoid")
+    await ensure_fully_defined(adapter, "trapezoid sketch")
     check("exit_sketch trapezoid", await adapter.exit_sketch())
     check(
         "extrude trapezoid",
@@ -167,26 +167,24 @@ async def build(adapter) -> dict[str, str]:
     check("create_sketch wedges", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     margin = 15.0  # wedge outer edge clear of the base corner
-    left = await add_line_chain(
-        adapter,
-        [
-            (-BASE_X / 2.0, 0.0),
-            (-TOP_X / 2.0, TOTAL_HEIGHT),
-            (-BASE_X / 2.0 - margin, TOTAL_HEIGHT),
-            (-BASE_X / 2.0 - margin, 0.0),
-        ],
-    )
-    right = await add_line_chain(
-        adapter,
-        [
-            (BASE_X / 2.0, 0.0),
-            (TOP_X / 2.0, TOTAL_HEIGHT),
-            (BASE_X / 2.0 + margin, TOTAL_HEIGHT),
-            (BASE_X / 2.0 + margin, 0.0),
-        ],
-    )
+    left_pts = [
+        (-BASE_X / 2.0, 0.0),
+        (-TOP_X / 2.0, TOTAL_HEIGHT),
+        (-BASE_X / 2.0 - margin, TOTAL_HEIGHT),
+        (-BASE_X / 2.0 - margin, 0.0),
+    ]
+    right_pts = [
+        (BASE_X / 2.0, 0.0),
+        (TOP_X / 2.0, TOTAL_HEIGHT),
+        (BASE_X / 2.0 + margin, TOTAL_HEIGHT),
+        (BASE_X / 2.0 + margin, 0.0),
+    ]
+    left = await add_line_chain(adapter, left_pts)
+    right = await add_line_chain(adapter, right_pts)
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "wedges sketch", fix_entities=[*left, *right])
+    await define_polygon_chain(adapter, left, left_pts, label="left wedge")
+    await define_polygon_chain(adapter, right, right_pts, label="right wedge")
+    await ensure_fully_defined(adapter, "wedges sketch")
     check("exit_sketch wedges", await adapter.exit_sketch())
     check(
         "cut wedges",
