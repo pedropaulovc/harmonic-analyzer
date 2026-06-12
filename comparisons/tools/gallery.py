@@ -1,12 +1,13 @@
 # /// script
 # requires-python = ">=3.11"
 # ///
-"""Generate comparisons/index.html — all pairs side by side for inspection.
+"""Generate comparisons/index.html — all pairs for inspection.
 
 Static page, relative image paths, no dependencies. Pairs are grouped by
-model; each row shows reference | render | blend with id, camera pose,
-score, status and notes. A text box filters rows (id/model/source/notes),
-and broken/missing renders are flagged.
+model; each row shows a reveal slider (reference under, the pixel-registered
+composite/<id>_cad.jpg on top — drag to sweep) next to the red-tint blend,
+with id, camera pose, score, status and notes. A text box filters rows
+(id/model/source/notes), and broken/missing renders are flagged.
 
 Usage:
     uv run comparisons/tools/gallery.py
@@ -36,9 +37,17 @@ h2 { padding: .4em 1em 0; margin: .6em 0 0; color: #cdc; font-size: 1em; }
 .pair.hide { display: none; }
 .imgs { display: flex; gap: 6px; flex: 1; min-width: 0; }
 .imgs a { flex: 1; min-width: 0; text-align: center; }
-.imgs img { max-height: 300px; max-width: 100%; object-fit: contain;
+.imgs img { max-height: 340px; max-width: 100%; object-fit: contain;
             background: #000; border-radius: 3px; }
 .imgs .lbl { font-size: .7em; color: #888; }
+.cmpwrap { flex: 1.3; min-width: 0; text-align: center; }
+.cmp { position: relative; display: inline-block; cursor: ew-resize;
+       user-select: none; touch-action: none; }
+.cmp img { display: block; }
+.cmp .over { position: absolute; inset: 0; width: 100%; height: 100%;
+             clip-path: inset(0 50% 0 0); }
+.cmp .divider { position: absolute; top: 0; bottom: 0; left: 50%; width: 2px;
+                background: #7af; opacity: .6; pointer-events: none; }
 .meta { width: 21em; flex: none; font-size: .8em; line-height: 1.5; }
 .meta .id { font-weight: 600; color: #fff; word-break: break-all; }
 .meta .tier { background: #354; color: #cfc; border-radius: 3px; padding: 0 .4em; font-weight: 600; }
@@ -78,6 +87,22 @@ for (const b of tierBtns) {
 }
 q.addEventListener('input', apply);
 apply();
+for (const c of document.querySelectorAll('.cmp')) {
+  const over = c.querySelector('.over');
+  const div = c.querySelector('.divider');
+  const set = (x) => {
+    const r = c.getBoundingClientRect();
+    const v = Math.max(0, Math.min(1, (x - r.left) / r.width));
+    over.style.clipPath = `inset(0 ${(1 - v) * 100}% 0 0)`;
+    div.style.left = (v * 100) + '%';
+  };
+  c.addEventListener('pointerdown', (e) => {
+    c.setPointerCapture(e.pointerId);
+    set(e.clientX);
+    e.preventDefault();
+  });
+  c.addEventListener('pointermove', (e) => { if (e.buttons) set(e.clientX); });
+}
 """
 
 
@@ -87,6 +112,22 @@ def img_cell(rel: str, label: str) -> str:
         return f'<div><span class="missing">missing {html.escape(label)}</span></div>'
     return (f'<a href="{rel}" target="_blank"><img loading="lazy" src="{rel}">'
             f'<div class="lbl">{html.escape(label)}</div></a>')
+
+
+def slider_cell(pid: str) -> str:
+    """Reference under, pixel-registered CAD on top; drag sweeps the reveal."""
+    ref, cad = f"ref/{pid}.jpg", f"composite/{pid}_cad.jpg"
+    if not (COMP / ref).is_file() or not (COMP / cad).is_file():
+        return img_cell(ref, "reference") + img_cell(f"render/{pid}.jpg", "CAD render")
+    return (
+        f'<div class="cmpwrap"><div class="cmp">'
+        f'<img class="under" loading="lazy" src="{ref}">'
+        f'<img class="over" loading="lazy" src="{cad}">'
+        f'<div class="divider"></div></div>'
+        f'<div class="lbl"><a href="{ref}" target="_blank">ref</a> ⇆ '
+        f'<a href="{cad}" target="_blank">cad</a> · '
+        f'<a href="render/{pid}.jpg" target="_blank">raw render</a></div></div>'
+    )
 
 
 def pair_row(pair: dict, score) -> str:
@@ -116,8 +157,7 @@ def pair_row(pair: dict, score) -> str:
         f'<div class="pair" data-text="{html.escape(text)}" data-tier="{tier}">'
         f'<div class="meta">{"".join(meta)}</div>'
         f'<div class="imgs">'
-        + img_cell(f"ref/{pid}.jpg", "reference")
-        + img_cell(f"render/{pid}.jpg", "CAD render")
+        + slider_cell(pid)
         + img_cell(f"composite/{pid}_blend.jpg", "blend")
         + "</div></div>"
     )
