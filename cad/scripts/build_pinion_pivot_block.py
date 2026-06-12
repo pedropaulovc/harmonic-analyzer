@@ -6,7 +6,7 @@ for the Ø6.35 torque shaft the straps pivot on. The slotted screw heads
 on the plates are simplified away.
 
 Layout: shaft bore at the origin along Z, block x -15..15,
-y -10.3..3.7 (bore 10.3 above the base seat), z 0..12.
+y -12..4 (bore 12 above the base seat), z 0..12.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 25".
 
@@ -39,9 +39,10 @@ PART_NAME = "pinion-pivot-block"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel block (p.68)
 
 WIDTH = 30.0  # photo-scaled vs the strap (low)
-HEIGHT = 14.0  # photo-scaled (low)
+HEIGHT = 16.0  # photo-scaled (low); tall enough that the strap's r 11
+# bottom cap (PIVOT_Y - 11 = 51.8) swings clear of the base top 50.8
 DEPTH = 12.0  # photo-scaled (low)
-BORE_UP = 10.3  # bore height above the base seat -- sets PIVOT_Y (derived)
+BORE_UP = 12.0  # bore height above the base seat -- sets PIVOT_Y (derived)
 BORE = 6.35  # rides the Ø6.35 torque shaft (derived)
 
 
