@@ -838,6 +838,8 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     "pinion-pivot-block": ("x", 0.0),
     "pinion-pivot-shaft": ("x", 0.0),
     "pinion-lever": ("x", 0.0),
+    "pinion-lift-rod": ("x", 0.0),
+    "pinion-handle": ("x", 0.0),
     # parts whose build scripts are themselves mirrored (M6.8)
     "summing-lever": "x0",
     "magnifying-bracket": "x0",

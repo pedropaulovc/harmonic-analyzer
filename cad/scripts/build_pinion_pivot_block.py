@@ -1,12 +1,14 @@
 r"""Reproduction script: pinion pivot block (book ch. 25; 2 used).
 
-The black base block that anchors one pinion swing bracket (p. 68
-close-ups): a plain rectangular block screwed to the base, cross-bored
-for the Ø6.35 torque shaft the straps pivot on. The slotted screw heads
-on the plates are simplified away.
+The black base block that anchors one end of the pinion swing rig
+(p. 68 close-ups): a plain rectangular block screwed to the base,
+cross-bored TWICE for the two parallel Ø6.35 rods -- the strap torque
+shaft (east bore) and the lever lift rod (west bore). The slotted screw
+heads on the plates are simplified away.
 
-Layout: shaft bore at the origin along Z, block x -15..15,
-y -12..4 (bore 12 above the base seat), z 0..12.
+Layout: block centred on the origin midway between the bores (at local
+x +-BORE_HALF_SPACING), both bores along Z at y 0 (12 above the base
+seat), block x -22.375..22.375, y -12..4, z 0..12.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 25".
 
@@ -38,12 +40,14 @@ from _common import (
 PART_NAME = "pinion-pivot-block"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel block (p.68)
 
-WIDTH = 30.0  # photo-scaled vs the strap (low)
-HEIGHT = 16.0  # photo-scaled (low); tall enough that the strap's r 11
-# bottom cap (PIVOT_Y - 11 = 51.8) swings clear of the base top 50.8
+WIDTH = 44.75  # spans both bores +9 margin each side (derived)
+HEIGHT = 16.0  # photo-scaled (low); keeps the strap's r 11 bottom cap
+# (PIVOT_Y - 11 = 51.8) swinging clear of the base top 50.8
 DEPTH = 12.0  # photo-scaled (low)
 BORE_UP = 12.0  # bore height above the base seat -- sets PIVOT_Y (derived)
-BORE = 6.35  # rides the Ø6.35 torque shaft (derived)
+BORE = 6.35  # rides the Ø6.35 torque shaft / lift rod (derived)
+BORE_HALF_SPACING = 13.377  # half the pivot-to-lift rod spacing 26.754
+# (build_drive_train_assembly: pivot rod x 15.154, lift rod x -11.6)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -51,8 +55,8 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Block outline + shaft bore in ONE sketch -> single extrude.
-    # Inference OFF: the bore circle sits at the origin.
+    # Block outline + both bores in ONE sketch -> single extrude.
+    # Inference OFF: the bores sit on the sketch x axis.
     check("create_sketch block", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     entities = await add_line_chain(
@@ -64,7 +68,8 @@ async def build(adapter) -> dict[str, str]:
             (-WIDTH / 2.0, HEIGHT - BORE_UP),
         ],
     )
-    await define_circle(adapter, 0.0, 0.0, BORE / 2.0, "shaft bore")
+    await define_circle(adapter, BORE_HALF_SPACING, 0.0, BORE / 2.0, "pivot bore")
+    await define_circle(adapter, -BORE_HALF_SPACING, 0.0, BORE / 2.0, "lift bore")
     set_sketch_direct_db(adapter, False)
     await ensure_fully_defined(adapter, "block sketch", fix_entities=entities)
     check("exit_sketch block", await adapter.exit_sketch())
@@ -72,7 +77,7 @@ async def build(adapter) -> dict[str, str]:
         "extrude block",
         await adapter.create_extrusion(ExtrusionParameters(depth=DEPTH)),
     )
-    area = WIDTH * HEIGHT - math.pi * (BORE / 2.0) ** 2
+    area = WIDTH * HEIGHT - 2.0 * math.pi * (BORE / 2.0) ** 2
     await volume_check(adapter, "block", area * DEPTH, 0.005 * area * DEPTH)
 
     await apply_material(adapter, MATERIAL)
