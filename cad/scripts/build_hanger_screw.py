@@ -31,6 +31,7 @@ from _common import (
     apply_material,
     check,
     define_circle,
+    define_polygon_chain,
     ensure_fully_defined,
     extrude_at_offset,
     report_mass_properties,
@@ -53,10 +54,17 @@ async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
 
     # Hex head 0..+2.5 (Front sketch: sketch (x, y) -> global (X, Y)).
+    # Exact-arithmetic vertices (r/2, AF/2) keep the flats' offsets exactly
+    # axis-parallel for the polygon anchoring scheme.
     radius = HEAD_AF / math.sqrt(3.0)
+    half_flat = HEAD_AF / 2.0
     points = [
-        (radius * math.cos(math.radians(a)), radius * math.sin(math.radians(a)))
-        for a in range(0, 360, 60)
+        (radius, 0.0),
+        (radius / 2.0, half_flat),
+        (-radius / 2.0, half_flat),
+        (-radius, 0.0),
+        (-radius / 2.0, -half_flat),
+        (radius / 2.0, -half_flat),
     ]
     # Direct-db: the AF-7 hexagon's vertices sit close enough to the origin
     # axes for inference snapping to distort the chain (live: head volume
@@ -65,7 +73,8 @@ async def build(adapter) -> dict[str, str]:
     set_sketch_direct_db(adapter, True)
     head = await add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "head sketch", fix_entities=head)
+    await define_polygon_chain(adapter, head, points, label="head")
+    await ensure_fully_defined(adapter, "head sketch")
     check("exit_sketch head", await adapter.exit_sketch())
     extrude_at_offset(adapter, HEAD_H, 0.0)
     v_head = math.sqrt(3.0) / 2.0 * HEAD_AF**2 * HEAD_H
