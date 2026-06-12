@@ -56,6 +56,7 @@ import sys
 from _common import (
     IN,
     add_line_chain,
+    anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
@@ -216,7 +217,10 @@ async def build(adapter) -> dict[str, str]:
             right, None, "linear", NOTCH_OUTER - NOTCH_FLOOR
         ),
     )
-    await ensure_fully_defined(adapter, "notch sketch", fix_entities=notch)
+    await anchor_point_to_origin(
+        adapter, f"{bottom}.start", -NOTCH_WIDTH / 2.0, NOTCH_FLOOR, "notch corner"
+    )
+    await ensure_fully_defined(adapter, "notch sketch")
     check("exit_sketch notch", await adapter.exit_sketch())
     check(
         "cut notch",
