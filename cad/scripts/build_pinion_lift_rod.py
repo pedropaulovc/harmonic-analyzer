@@ -9,7 +9,7 @@ The real pins are longer and bear obliquely on the strap flanks; here
 they are shortened and parked pointing straight DOWN (the disengaged
 rest state) -- documented simplification, DIMENSIONS.md Appendix C.
 
-Layout: rod axis Z, z 0..203; pins along -Y at z 35.5 and 183.5, axis
+Layout: rod axis Z, z 0..210; pins along -Y at z 42.5 and 190.5, axis
 to tip 11.175 (8 proud of the rod surface).
 
 Volume gate: rod exact; each pin adds pi*r^2*L minus the numerically
@@ -45,11 +45,12 @@ PART_NAME = "pinion-lift-rod"
 MATERIAL = "Plain Carbon Steel"  # bright steel (p.68)
 
 ROD_DIA = 6.35  # rides the block bores, same stock as the torque shaft (derived)
-ROD_LEN = 203.0  # machine z -113..+90: front end proud for the lever root,
-# back end 2 proud of the back pivot block face (derived)
+ROD_LEN = 210.0  # machine z -120..+90: front end proud for the lever root
+# (ahead of the forward front block), back end 2 proud of the back pivot
+# block face (derived)
 PIN_DIA = 4.0  # cam pin, photo-scaled vs the rod (low)
 PIN_TIP = 11.175  # rod axis to pin tip -- tip at machine y 51.625 (derived)
-PIN_STATIONS = (35.5, 183.5)  # machine z -77.5 / +70.5: inside each strap's
+PIN_STATIONS = (42.5, 190.5)  # machine z -77.5 / +70.5: inside each strap's
 # z band (straps at -80.25..-75.25 and +68.45..+73.45)
 PIN_END_INSIDE = 2.0  # pin extrusion ends 2.0 up inside the rod: above the
 # deepest rod-surface sag across the pin's width (2.466 at x +-2), so the

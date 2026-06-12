@@ -36,8 +36,9 @@ PART_NAME = "pinion-pivot-shaft"
 MATERIAL = "Plain Carbon Steel"  # bright steel (p.67)
 
 SHAFT_DIA = 6.35  # rides the strap and block bores (derived)
-SHAFT_LEN = 185.0  # machine z -95..+90: through both straps and blocks with
-# 2 proud past each block face (derived)
+SHAFT_LEN = 196.0  # machine z -106..+90: through both straps and blocks
+# with 2 proud past each block face (the front block sits forward at
+# z -104..-92, dodging the cone-pivot-post column) (derived)
 
 SHAFT_R = SHAFT_DIA / 2.0
 V_SHAFT = math.pi * SHAFT_R**2 * SHAFT_LEN

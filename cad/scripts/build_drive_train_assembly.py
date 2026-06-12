@@ -261,15 +261,18 @@ PIVOT_X = PINION_X + math.sqrt(
     STRAP_C2C**2 - (PINION_Y - PIVOT_Y) ** 2
 )  # +27.85: torque shaft parked west-machine of the knob post; the
 # straps lean 75.6 deg onto the arbor in the rest pose
-LIFT_X = PIVOT_X + 26.754  # lift rod in the far bore (2 * block bore spacing)
+LIFT_X = PIVOT_X + 15.0  # lift rod in the far bore (2 * block bore
+# spacing): squeezed between the strap's swinging r 11 bottom cap
+# (0.82 air) and the cone-pivot-post column east face (0.85 air)
 STRAP_LEAN_DEG = math.degrees(
     math.atan2(PIVOT_X - PINION_X, PINION_Y - PIVOT_Y)
 )  # 75.62
-PIVOT_SHAFT_Z0 = -95.0  # plain Ø6.35 x 185: 2 proud past each block face
-LIFT_ROD_Z0 = -113.0  # Ø6.35 x 203: front end proud for the lever root;
+PIVOT_SHAFT_Z0 = -106.0  # plain Ø6.35 x 196: 2 proud past each block face
+LIFT_ROD_Z0 = -120.0  # Ø6.35 x 210: front end proud for the lever root;
 # cam pins land at machine z -77.5 / +70.5, inside each strap's z band
 LEVER_TILT_DEG = 32.0  # from vertical, toward +x script / west machine (p002)
-LEVER_Z = -106.0  # clamp ball flush on the lift rod's front end
+LEVER_Z = -113.0  # clamp ball flush on the lift rod's front end, 1.75
+# ahead of the forward front block face
 HANDLE_Z = -95.0  # ball centre; hub z -88..-81 seats on the front arbor
 # stub (machine -83..-75), 0.75 clear of the front strap face -80.25
 HANDLE_TILT_DEG = 65.0  # cross rod from vertical: long arm toward +x
@@ -278,7 +281,8 @@ HANDLE_TILT_DEG = 65.0  # cross rod from vertical: long arm toward +x
 
 PINION_Z_BACK = PINION_Z_FRONT + PINION_DRUM_LEN  # +68.0
 BLOCK_X = (PIVOT_X + LIFT_X) / 2.0  # block local origin midway the bores
-BLOCK_FRONT_Z0 = PINION_Z_FRONT - STRAP_T - STRAP_AIR - 0.75 - BLOCK_T  # -93.0
+BLOCK_FRONT_Z0 = -104.0  # forward of the cone-pivot-post column's z band
+# (-89.9..-62.3), 1.8 clear; the front strap floats 11.75 ahead of it
 BLOCK_BACK_Z0 = 76.0  # 2.55 behind the back strap; the shaft/lift-rod
 # ends land 2 proud of the back block face at z +88
 
@@ -311,8 +315,23 @@ if (
 _post = cone_station(KNOB_POST_STATION)
 if PINION_Z_BACK + PINION_STUB_BACK > _post[2] - 16.0 - 0.25:
     raise AssertionError("back arbor stub reaches the cone-knob post footprint")
-if BLOCK_X - 22.375 < _post[0] + 16.0 + 0.25:
+if BLOCK_X - 16.5 < _post[0] + 16.0 + 0.25:
     raise AssertionError("pivot blocks reach the cone-knob post footprint")
+# Cone-PIVOT-post column (25 x 20 rotated by the incline, plan half-
+# extents 15.26 x 13.83 about cone_station(-1)): the lift rod passes in
+# front of nothing -- it must thread EAST of the column; the front block
+# dodges it in z instead.
+_ppost = cone_station(PIVOT_POST_STATION)
+_PPOST_HX = 12.5 * COS_I + 10.0 * SIN_I  # 15.26
+_PPOST_HZ = 12.5 * SIN_I + 10.0 * COS_I  # 13.83
+if LIFT_X + 3.175 > _ppost[0] - _PPOST_HX - 0.25:
+    raise AssertionError("lift rod reaches the cone-pivot-post column")
+if BLOCK_FRONT_Z0 + BLOCK_T > _ppost[2] - _PPOST_HZ - 0.25:
+    raise AssertionError("front pivot block reaches the cone-pivot-post column")
+if LIFT_X - PIVOT_X < 11.0 + 3.175 + 0.25:
+    raise AssertionError("lift rod fouls the strap's swinging bottom cap")
+if LEVER_Z + 7.0 > BLOCK_FRONT_Z0 - 0.25:
+    raise AssertionError("lever clamp ball fouls the front pivot block")
 if PINION_X - TIP_PINION < -28.45 + 0.25:
     raise AssertionError("pinion drum reaches the rocker-support frustum")
 if STRAP_C2C < TIP_PINION + 3.175 + 0.25:
