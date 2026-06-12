@@ -1,0 +1,17 @@
+Connecting to SolidWorks ...
+[32m2026-06-11 23:34:25.903[0m | [1mINFO    [0m | [36msolidworks_mcp.adapters.sw_type_info[0m:[36m_load_wrapper[0m:[36m154[0m - [1mSolidWorks type info loaded: 418 interfaces, wrapper=win32com.gen_py.83A33D31-27C5-11CE-BFD4-00400513BB57x0x34x0[0m
+  ..  [    2.3s +  2.3s] connected
+  ..  [    2.4s +  0.1s] CloseAllDocuments (clean session)
+  OK  [    8.3s +  5.9s] open part
+part doc MPV: (0.6470588235294118, 0.6392156862745098, 0.6274509803921569)
+body MPV: None
+faces: 35, with face MPV: 0
+  OK  [   34.6s + 26.3s] open frame asm
+frame comp tube-frame-3 MPV: None
+frame comp tube-frame-4 MPV: None
+frame comp tube-frame-1 MPV: None
+frame comp tube-frame-2 MPV: None
+Disconnected.
+
+Done in 39.9s. Artefacts:
+  diag: done
