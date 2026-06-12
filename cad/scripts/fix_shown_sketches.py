@@ -1,9 +1,13 @@
-r"""One-off: blank any SHOWN sketch in the four affected parts, in place.
+r"""One-off: blank/hide any SHOWN unabsorbed feature in the listed parts.
 
-Shown (unabsorbed) sketches render in every assembly instance — caught as
-floating tick rows above the top frame in the ch30 renders (20 helix seed
-circles + 20 orphan pin-hole circles). Source scripts now blank them at
-build time; this patches the saved SLDPRTs without a full rebuild.
+Shown (Visible == 2) sketches, helix curves and ref planes render in
+every assembly instance — caught twice in the ch30 renders as floating
+tick rows above the top frame (M6.8 round 1: 20 helix seed circles + 20
+orphan pin-hole circles; round 2: amplitude-bar orphan pin sketch back
+after the mirror rebuild, plus never-hidden Helix/Spiral curves and
+profile planes in the three spring parts and the gooseneck). Sketches
+are blanked via BlankSketch, helix curves and planes via BlankRefGeom;
+each hide is verified by re-reading Visible.
 
 Run: C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\fix_shown_sketches.py
 """
@@ -20,11 +24,19 @@ from render_compare import _flag, _read_member  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 PARTS = [
+    "amplitude-bar",
     "channel-spring-installed",
     "channel-spring",
-    "amplitude-bar",
     "counter-spring",
+    "gooseneck",
 ]
+# Solid features legitimately report Visible == 2 (their bodies are shown);
+# only unabsorbed reference/sketch features leak into assembly renders.
+HIDE_TYPES = {
+    "ProfileFeature": "SKETCH",
+    "Helix": "REFERENCECURVES",
+    "RefPlane": "PLANE",
+}
 
 
 async def build(adapter) -> dict[str, str]:
@@ -37,32 +49,37 @@ async def build(adapter) -> dict[str, str]:
         model = adapter.currentModel
         _flag(model, "IModelDoc2")
 
-        blanked = []
+        hidden = []
         feat = _read_member(model, "FirstFeature")
         for _ in range(5000):
             if not feat:
                 break
             _flag(feat, "IFeature")
             tn = str(_read_member(feat, "GetTypeName2"))
-            if tn == "ProfileFeature":
-                vis = _read_member(feat, "Visible")
-                name = str(_read_member(feat, "Name"))
-                if vis == 2:
-                    model.ClearSelection2(True)
-                    ok = model.Extension.SelectByID2(
-                        name, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
-                    )
-                    if not ok:
-                        raise RuntimeError(f"{stem}: cannot select {name}")
+            name = str(_read_member(feat, "Name"))
+            sel_type = HIDE_TYPES.get(tn)
+            if sel_type and name != "Origin" and _read_member(feat, "Visible") == 2:
+                model.ClearSelection2(True)
+                ok = model.Extension.SelectByID2(
+                    name, sel_type, 0, 0, 0, False, 0, null_callout(), 0
+                )
+                if not ok:
+                    raise RuntimeError(f"{stem}: cannot select {name} as {sel_type}")
+                if tn == "ProfileFeature":
                     model.BlankSketch()
-                    model.ClearSelection2(True)
-                    blanked.append(name)
+                else:
+                    model.BlankRefGeom()
+                model.ClearSelection2(True)
+                vis = _read_member(feat, "Visible")
+                if vis == 2:
+                    raise RuntimeError(f"{stem}: {name} [{tn}] still Visible=2")
+                hidden.append(f"{name} [{tn}]")
             feat = _read_member(feat, "GetNextFeature")
 
-        if blanked:
+        if hidden:
             check(f"save {stem}", await adapter.save_file())
-        print(f"  {stem}: blanked {blanked or 'nothing'}")
-        results[stem] = ",".join(blanked) or "none"
+        print(f"  {stem}: hid {hidden or 'nothing'}")
+        results[stem] = ",".join(hidden) or "none"
     return results
 
 
