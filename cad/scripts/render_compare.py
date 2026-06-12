@@ -445,6 +445,12 @@ def main() -> int:
             mpath = model_path(model)
             log(f"model {mi}/{len(order)}: {model} ({len(by_model[model])} pairs)")
             check(f"open {mpath.name}", await adapter.open_model(str(mpath)))
+            # Shaded WITHOUT edges: the book plates have no outline strokes,
+            # and edge ink swamps fine geometry at capture scale (the fluted
+            # columns render solid black from 32 full-length groove edges).
+            mdl = adapter.currentModel
+            _flag(mdl, "IModelDoc2")
+            mdl.ViewDisplayShaded()
             boxes = []
             if mpath.suffix.lower() == ".sldasm" and any(
                 p["camera"].get("frame_components") for p in by_model[model]

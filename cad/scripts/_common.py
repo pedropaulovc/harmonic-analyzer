@@ -670,17 +670,37 @@ async def apply_color(adapter: Any, rgb: tuple[float, float, float]) -> None:
     material ("Gray Cast Iron") renders dark gray — those parts call this
     after apply_material. The comparison render cache reads the same
     override (export_models doc_rgb cascade).
+
+    Set at BOTH the doc and the solid-body level: apply_material attaches
+    the database material's render appearance at part scope, and doc MPV
+    only retints its primary colour — useless against TEXTURED appearances
+    (Oak's wood image kept rendering over PAPER_WHITE). Body appearances
+    sit above part appearances in the display hierarchy, so the body-level
+    colour wins over the texture.
     """
     from solidworks_mcp.adapters.com_variant import double_array
 
+    values = double_array([*rgb, 1.0, 1.0, 0.3, 0.31, 0.0, 0.0])
     doc = adapter.currentModel
     # [R,G,B, ambient, diffuse, specular, shininess, transparency, emission]
-    doc.MaterialPropertyValues = double_array([*rgb, 1.0, 1.0, 0.3, 0.31, 0.0, 0.0])
+    doc.MaterialPropertyValues = values
     back = tuple(float(v) for v in (doc.MaterialPropertyValues or ())[:3])
     # SolidWorks quantises to 8 bits per channel
     if len(back) != 3 or any(abs(b - w) > 1 / 255 for b, w in zip(back, rgb)):
         raise RuntimeError(f"colour readback mismatch: set {rgb}, got {back}")
-    log(f"colour override {tuple(round(v, 3) for v in back)}")
+    n_bodies = 0
+    try:
+        from solidworks_mcp.adapters import sw_type_info
+
+        sw_type_info.flag_methods(doc, "IPartDoc")
+        bodies = doc.GetBodies2(0, True) or []  # solid bodies
+        for body in bodies:
+            sw_type_info.flag_methods(body, "IBody2")
+            body.MaterialPropertyValues2 = values
+            n_bodies += 1
+    except Exception as exc:
+        log(f"body colour skipped ({exc})")
+    log(f"colour override {tuple(round(v, 3) for v in back)} ({n_bodies} bodies)")
 
 
 async def measure_check(
