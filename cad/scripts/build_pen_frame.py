@@ -42,6 +42,9 @@ RAIL_SIDE = 4.0  # long-side rails (local X): read thinner in the photo; the
 # extra 1 mm of window also clears the marker barrel at the platen side in
 # the M6.4 flat-on-the-v-block layout
 RAIL_END = 5.0  # end rails (local Y); the screw rail keeps thread depth
+TRIM_NEAR = 0.75  # local x = 0 edge pulled back: that rail faces the platen
+# (machine z = -143 - local x) and must clear the recording paper's front
+# face at -143.4 by the 0.25+ margin (M6.8 platen-paper)
 FRAME_DEPTH = 10.0  # Z
 SCREW_HOLE_DIA = 3.0  # set screw, bottom rail only
 
@@ -65,10 +68,10 @@ async def build(adapter) -> dict[str, str]:
     outer = await add_line_chain(
         adapter,
         [
-            (0.0, 0.0),
+            (TRIM_NEAR, 0.0),
             (OUTER_WIDTH, 0.0),
             (OUTER_WIDTH, OUTER_HEIGHT),
-            (0.0, OUTER_HEIGHT),
+            (TRIM_NEAR, OUTER_HEIGHT),
         ],
     )
     inner = await add_line_chain(
