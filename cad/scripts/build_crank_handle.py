@@ -25,6 +25,7 @@ import sys
 
 from _common import (
     add_line_chain,
+    anchor_point_to_point,
     apply_material,
     apply_color,
     STAINED_OAK,
@@ -75,9 +76,53 @@ async def build(adapter) -> dict[str, str]:
     )
     lines = await add_line_chain(adapter, PROFILE)
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(
-        adapter, "handle profile", fix_entities=[centerline, *lines]
+    collar_face, collar_top, collar_step = lines[0], lines[1], lines[2]
+    butt_face = lines[8]
+    # 20-DOF profile: collar face on the origin; centerline (merged into
+    # both axis ends) horizontal + length dim; h/v + linear dims on the
+    # collar and butt edges; the four interior silhouette breakpoints
+    # pinned by per-segment run/rise dims -- the (80, 9.5)->(90, 5.5)
+    # segment is skipped, its ends defined by the neighbours (closure).
+    check(
+        "anchor collar face",
+        await adapter.add_sketch_constraint(
+            f"{collar_face}.start", "origin", "coincident"
+        ),
     )
+    check(
+        "axis horizontal",
+        await adapter.add_sketch_constraint(centerline, None, "horizontal"),
+    )
+    check(
+        "handle length",
+        await adapter.add_sketch_dimension(centerline, None, "linear", HANDLE_LENGTH),
+    )
+    for label, ent, relation, value in (
+        ("collar face", collar_face, "vertical", COLLAR_DIA / 2.0),
+        ("collar top", collar_top, "horizontal", COLLAR_LENGTH),
+        ("collar step", collar_step, "vertical", COLLAR_DIA / 2.0 - PROFILE[3][1]),
+        ("butt face", butt_face, "vertical", PROFILE[8][1]),
+    ):
+        check(
+            f"{label} {relation}",
+            await adapter.add_sketch_constraint(ent, None, relation),
+        )
+        check(
+            f"{label} dim",
+            await adapter.add_sketch_dimension(ent, None, "linear", value),
+        )
+    for i in (3, 4, 5, 6):
+        x1, y1 = PROFILE[i]
+        x2, y2 = PROFILE[i + 1]
+        await anchor_point_to_point(
+            adapter,
+            f"{lines[i]}.start",
+            f"{lines[i]}.end",
+            x2 - x1,
+            y2 - y1,
+            f"silhouette segment {i}",
+        )
+    await ensure_fully_defined(adapter, "handle profile")
     check("exit_sketch profile", await adapter.exit_sketch())
 
     check(

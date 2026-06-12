@@ -62,9 +62,36 @@ async def build(adapter) -> dict[str, str]:
         ],
     )
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(
-        adapter, "pin profile", fix_entities=[centerline, *lines]
+    big_end, _taper, small_end = lines
+    # 8-DOF profile: the centerline merged into the (0, 0) /
+    # (PIN_LENGTH, 0) chain ends, so horizontal + a length dim on it keep
+    # the small end on the axis; the taper line rides its pinned
+    # neighbours (no h/v on it -- that is the whole point of the frustum).
+    check(
+        "anchor big end",
+        await adapter.add_sketch_constraint(f"{big_end}.start", "origin", "coincident"),
     )
+    check(
+        "axis horizontal",
+        await adapter.add_sketch_constraint(centerline, None, "horizontal"),
+    )
+    check(
+        "pin length",
+        await adapter.add_sketch_dimension(centerline, None, "linear", PIN_LENGTH),
+    )
+    for label, ent, radius in (
+        ("big end", big_end, BIG_END_DIA / 2.0),
+        ("small end", small_end, SMALL_END_DIA / 2.0),
+    ):
+        check(
+            f"{label} vertical",
+            await adapter.add_sketch_constraint(ent, None, "vertical"),
+        )
+        check(
+            f"{label} radius",
+            await adapter.add_sketch_dimension(ent, None, "linear", radius),
+        )
+    await ensure_fully_defined(adapter, "pin profile")
     check("exit_sketch profile", await adapter.exit_sketch())
 
     check(
