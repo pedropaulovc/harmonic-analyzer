@@ -53,6 +53,8 @@ from _common import (
     apply_material,
     check,
     define_circle,
+    define_polygon_chain,
+    define_rectilinear_chain,
     ensure_fully_defined,
     extrude_at_offset,
     report_mass_properties,
@@ -103,17 +105,16 @@ async def build(adapter) -> dict[str, str]:
     # asymmetric about the clevis mid-plane, see docstring).
     check("create_sketch plate", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    plate = await add_line_chain(
-        adapter,
-        [
-            (FOOT_X[0], 0.0),
-            (FOOT_X[1], 0.0),
-            (APEX_X[1], SEAT_Y),
-            (APEX_X[0], SEAT_Y),
-        ],
-    )
+    plate_pts = [
+        (FOOT_X[0], 0.0),
+        (FOOT_X[1], 0.0),
+        (APEX_X[1], SEAT_Y),
+        (APEX_X[0], SEAT_Y),
+    ]
+    plate = await add_line_chain(adapter, plate_pts)
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "plate sketch", fix_entities=plate)
+    await define_polygon_chain(adapter, plate, plate_pts, label="plate")
+    await ensure_fully_defined(adapter, "plate sketch")
     check("exit_sketch plate", await adapter.exit_sketch())
     plate_t = PLATE_Z[1] - PLATE_Z[0]
     extrude_at_offset(adapter, plate_t, PLATE_Z[0])
@@ -127,16 +128,15 @@ async def build(adapter) -> dict[str, str]:
     # the FRONT ear (the ear band z -11.1..-8.1 sits ahead of the plate
     # front face -6.5 and would otherwise be a detached body).
     check("create_sketch saddle", await adapter.create_sketch("Top"))
-    saddle = await add_line_chain(
-        adapter,
-        [
-            (APEX_X[0], -EAR_HALF_Z),
-            (APEX_X[1], -EAR_HALF_Z),
-            (APEX_X[1], EAR_HALF_Z),
-            (APEX_X[0], EAR_HALF_Z),
-        ],
-    )
-    await ensure_fully_defined(adapter, "saddle sketch", fix_entities=saddle)
+    saddle_rect = [
+        (APEX_X[0], -EAR_HALF_Z),
+        (APEX_X[1], -EAR_HALF_Z),
+        (APEX_X[1], EAR_HALF_Z),
+        (APEX_X[0], EAR_HALF_Z),
+    ]
+    saddle = await add_line_chain(adapter, saddle_rect)
+    await define_rectilinear_chain(adapter, saddle, saddle_rect, label="saddle")
+    await ensure_fully_defined(adapter, "saddle sketch")
     check("exit_sketch saddle", await adapter.exit_sketch())
     extrude_at_offset(adapter, SEAT_Y - SADDLE_Y0, SADDLE_Y0)
     plate_in_saddle = min(PLATE_Z[1], EAR_HALF_Z) - max(PLATE_Z[0], -EAR_HALF_Z)
@@ -146,18 +146,16 @@ async def build(adapter) -> dict[str, str]:
 
     # Clevis ears flanking the ball mount's base (Top sketch, offset extrude).
     check("create_sketch ears", await adapter.create_sketch("Top"))
-    ears: list[str] = []
-    for side in (1.0, -1.0):
-        ears += await add_line_chain(
-            adapter,
-            [
-                (APEX_X[0], side * EAR_HALF_GAP),
-                (APEX_X[1], side * EAR_HALF_GAP),
-                (APEX_X[1], side * EAR_HALF_Z),
-                (APEX_X[0], side * EAR_HALF_Z),
-            ],
-        )
-    await ensure_fully_defined(adapter, "ears sketch", fix_entities=ears)
+    for label, side in (("south ear", 1.0), ("north ear", -1.0)):
+        ear_rect = [
+            (APEX_X[0], side * EAR_HALF_GAP),
+            (APEX_X[1], side * EAR_HALF_GAP),
+            (APEX_X[1], side * EAR_HALF_Z),
+            (APEX_X[0], side * EAR_HALF_Z),
+        ]
+        ear = await add_line_chain(adapter, ear_rect)
+        await define_rectilinear_chain(adapter, ear, ear_rect, label=label)
+    await ensure_fully_defined(adapter, "ears sketch")
     check("exit_sketch ears", await adapter.exit_sketch())
     extrude_at_offset(adapter, EAR_HEIGHT, SEAT_Y)
     v_ears = 2.0 * apex_w * (EAR_HALF_Z - EAR_HALF_GAP) * EAR_HEIGHT
@@ -167,16 +165,15 @@ async def build(adapter) -> dict[str, str]:
     # Top rail: under the ball-mount seats, spanning to the north frustum
     # apex (Front sketch cross-section, offset extrude along +Z).
     check("create_sketch top rail", await adapter.create_sketch("Front"))
-    top_rail = await add_line_chain(
-        adapter,
-        [
-            (TOP_RAIL_X[0], SEAT_Y - TOP_RAIL_DEPTH),
-            (TOP_RAIL_X[1], SEAT_Y - TOP_RAIL_DEPTH),
-            (TOP_RAIL_X[1], SEAT_Y),
-            (TOP_RAIL_X[0], SEAT_Y),
-        ],
-    )
-    await ensure_fully_defined(adapter, "top rail sketch", fix_entities=top_rail)
+    top_rail_rect = [
+        (TOP_RAIL_X[0], SEAT_Y - TOP_RAIL_DEPTH),
+        (TOP_RAIL_X[1], SEAT_Y - TOP_RAIL_DEPTH),
+        (TOP_RAIL_X[1], SEAT_Y),
+        (TOP_RAIL_X[0], SEAT_Y),
+    ]
+    top_rail = await add_line_chain(adapter, top_rail_rect)
+    await define_rectilinear_chain(adapter, top_rail, top_rail_rect, label="top rail")
+    await ensure_fully_defined(adapter, "top rail sketch")
     check("exit_sketch top rail", await adapter.exit_sketch())
     z0 = RAIL_Z0 - RAIL_OVERLAP
     extrude_at_offset(adapter, TOP_RAIL_Z1 - z0, z0)
@@ -189,16 +186,17 @@ async def build(adapter) -> dict[str, str]:
     # Foot rail: on the base top, spanning to the north frustum base
     # (the photo's bolted flange; hex-bolts placed in output.SLDASM, M6.10).
     check("create_sketch foot rail", await adapter.create_sketch("Front"))
-    foot_rail = await add_line_chain(
-        adapter,
-        [
-            (FOOT_RAIL_X[0], 0.0),
-            (FOOT_RAIL_X[1], 0.0),
-            (FOOT_RAIL_X[1], FOOT_RAIL_H),
-            (FOOT_RAIL_X[0], FOOT_RAIL_H),
-        ],
+    foot_rail_rect = [
+        (FOOT_RAIL_X[0], 0.0),
+        (FOOT_RAIL_X[1], 0.0),
+        (FOOT_RAIL_X[1], FOOT_RAIL_H),
+        (FOOT_RAIL_X[0], FOOT_RAIL_H),
+    ]
+    foot_rail = await add_line_chain(adapter, foot_rail_rect)
+    await define_rectilinear_chain(
+        adapter, foot_rail, foot_rail_rect, label="foot rail"
     )
-    await ensure_fully_defined(adapter, "foot rail sketch", fix_entities=foot_rail)
+    await ensure_fully_defined(adapter, "foot rail sketch")
     check("exit_sketch foot rail", await adapter.exit_sketch())
     extrude_at_offset(adapter, FOOT_RAIL_Z1 - z0, z0)
     v_foot_rail = (
