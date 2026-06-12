@@ -188,9 +188,10 @@ MARKER_TIP_Y = 368.0
 # (machine x -25..+7, z -161..-147) spans the marker barrel (-17..-9,
 # z -155.5..-147.5) and the pen rod (-5.5..-0.5, z -154..-149). Mapping:
 # machine x = -29 + local y, machine y = 418 - local z, machine z =
-# -143 - local x; the plate's near edge (z -143) stops 0.1 short of the
-# platen front face (-142.9). The screw hole (local x 11, z 5) lands at
-# machine (y 413, z -154), axis along X through the west end rail.
+# -143 - local x; the ring's near rail is trimmed to local x 0.75
+# (build_pen_frame TRIM_NEAR) so its edge (z -143.75) clears the recording
+# paper's front face (-143.4) by 0.35. The screw hole (local x 11, z 5)
+# lands at machine (y 413, z -154), axis along X through the west end rail.
 FRAME_POS = (-29.0, 418.0, -143.0)
 FRAME_ROWS = [[0.0, 0.0, -1.0], [1.0, 0.0, 0.0], [0.0, -1.0, 0.0]]
 # Set screw along +X (the part's own axis): knob x -38..-33, shank tip at
