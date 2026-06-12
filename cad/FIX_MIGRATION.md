@@ -13,12 +13,19 @@ explicitly justified whitelist, verified by `grep -rn '"fix"' cad/scripts/`.
 | 1 | `_common.define_circle` (fix + driven diameter) | 190 calls / 68 scripts | B1: rewrite to coincident/`*_points`/distance-dims to origin + driving diameter — signature unchanged, all call sites migrate for free |
 | 2 | `_common.ensure_fully_defined` escalation loop | 79 non-empty `fix_entities` call sites / 58 scripts | B1: gate behind `allow_fix_escalation=False` with loud WARN; B2 rebuilds expose which scripts actually relied on it; B3 redesigns those; flag + `fix_entities` param deleted at B3 close |
 
-`add_spring_end_hooks` (_common.py) routes through emitter 2 with
-`fix_entities=[lead_line, loop_arc]` — equation-driven hook curves
-(build_channel_spring, build_counter_spring). **Whitelist candidate**: fixed
-equation curves have no free endpoints; B3 attempts merge/coincident of curve
-endpoints to dimensioned coil geometry first, keeps `fix` with an inline
-justification comment only if no semantic scheme fully defines it.
+Two shared-module consumers route through emitter 2 with **equation-driven
+curves** — the whitelist class (fixed equation curves have no free
+endpoints; nothing to dimension):
+
+- `_common.add_spring_end_hooks` — `fix_entities=[lead_line, loop_arc]`
+  (build_channel_spring, build_counter_spring);
+- `_gear.cut_tooth_gap` — `fix_entities=gap_curves`, six involute/chord/arc
+  curves (every gear-building script, caught at B1 validation).
+
+Both carry `allow_fix_escalation=True` with an inline comment for the
+migration window. B3 attempts merge/coincident of curve endpoints to
+dimensioned geometry first, keeps `fix` with the justification comment only
+if no semantic scheme fully defines the sketch.
 
 ## Per-script burden
 
