@@ -1,13 +1,13 @@
 r"""Reproduction script: pinion swing bracket (book ch. 25; 2 used).
 
 The polished-steel strap that carries one end of the alignment-pinion
-drum (p. 68 close-ups): a rounded-end flat bar, pivot bore at the
-bottom riding the Ø6.35 torque shaft (build_pinion_pivot_shaft.py),
-rounded top capping the drum end face. The top journal hardware (big
-countersunk screw on the plates) is simplified away -- the strap's
-inner face simply butts against the drum end.
+drum (p. 68 close-ups, shot from the BACK side): a short rounded-end
+flat bar with TWO Ø6.35 bores -- the bottom one pivots on the torque
+shaft (build_pinion_pivot_shaft.py), the top one journals the drum's
+arbor stub (build_alignment_pinion.py). The lift rod's cam pin
+(build_pinion_lift_rod.py) bears on the strap flank to swing it.
 
-Layout: pivot bore at the origin, strap up +Y (drum axis at (0, 47)),
+Layout: pivot bore at the origin, arbor bore at (0, C2C), strap up +Y,
 thickness z 0..5.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 25".
@@ -40,9 +40,11 @@ PART_NAME = "pinion-bracket"
 MATERIAL = "Plain Carbon Steel"  # p.68: bright steel strap
 
 WIDTH = 22.0  # DIMENSIONS.md ch25: strap width, photo-scaled vs the drum (low)
-C2C = 47.0  # pivot bore to drum axis -- build_drive_train_assembly PINION_Y
+C2C = 23.393  # pivot bore to arbor bore -- the p002 photogrammetry triangle:
+# sqrt(3.0^2 + 23.2^2) between the pivot rod (15.154, 62.8) and the pinion
+# axis (12.154, 86.0) in build_drive_train_assembly (derived)
 THICKNESS = 5.0  # photo-scaled (low)
-PIVOT_BORE = 6.35  # rides the Ø6.35 torque shaft (derived)
+BORE = 6.35  # both bores: torque shaft below, drum arbor stub above (derived)
 
 R_END = WIDTH / 2.0
 
@@ -52,7 +54,7 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Outer rounded-bar loop + pivot bore in ONE sketch -> single extrude.
+    # Outer rounded-bar loop + both bores in ONE sketch -> single extrude.
     # Inference OFF: the bottom cap arc endpoints sit near the origin.
     check("create_sketch strap", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -68,7 +70,8 @@ async def build(adapter) -> dict[str, str]:
         ),
         check("add left edge", await adapter.add_line(-R_END, C2C, -R_END, 0.0)),
     ]
-    await define_circle(adapter, 0.0, 0.0, PIVOT_BORE / 2.0, "pivot bore")
+    await define_circle(adapter, 0.0, 0.0, BORE / 2.0, "pivot bore")
+    await define_circle(adapter, 0.0, C2C, BORE / 2.0, "arbor bore")
     set_sketch_direct_db(adapter, False)
     await ensure_fully_defined(adapter, "strap sketch", fix_entities=entities)
     check("exit_sketch strap", await adapter.exit_sketch())
@@ -79,7 +82,7 @@ async def build(adapter) -> dict[str, str]:
     area = (
         WIDTH * C2C
         + math.pi * R_END**2
-        - math.pi * (PIVOT_BORE / 2.0) ** 2
+        - 2.0 * math.pi * (BORE / 2.0) ** 2
     )
     await volume_check(adapter, "strap", area * THICKNESS, 0.005 * area * THICKNESS)
 
