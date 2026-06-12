@@ -176,6 +176,7 @@ async def build(adapter) -> dict[str, str]:
     print(f"  volume after bend + arm: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.01 * expected:
         raise RuntimeError(f"bend volume {vol:.1f} != {expected:.1f}")
+    expected = vol  # rebase: keep the sweep's B-rep slack out of the lug delta
 
     # 3. Pin lug rising into the arm underside.
     check("create_sketch lug", await adapter.create_sketch("Top"))
