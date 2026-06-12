@@ -12,26 +12,30 @@ Conventions (see cad/DIMENSIONS.md for the dimension source of truth):
 * Every sketch must pass ``check_sketch_fully_defined`` before it is consumed
   by a feature — use :func:`ensure_fully_defined`.
 
-Fully-defined recipes (probed live on SW 2026):
+Fully-defined recipes (probed live on SW 2026; semantic anchoring via point
+refs ``"<EntityId>.center/.start/.end"`` + ``"origin"`` and point-to-point
+driving dims, SolidworksMCP-python PRs #55/#56):
 
+* **Circles**: :func:`define_circle` anchors the centre point semantically —
+  coincident-to-origin at (0,0), an alignment relation plus one distance dim
+  on-axis, two distance dims in general position — then adds a DRIVING
+  diameter. ``fix`` is never used.
 * **Line chains**: consecutive ``add_line`` calls sharing exact endpoint
-  coordinates get merged/coincident vertices; with one vertex on the sketch
-  origin, horizontal/vertical constraints and per-segment length dimensions
-  fully define the chain — no ``fix`` needed.
-* **Circles**: centre points are not addressable with the current tool
-  surface, so anchor with ``fix`` FIRST, then add the diameter dimension —
-  SolidWorks auto-marks a dimension added to fixed geometry as driven, while
-  the reverse order (dimension, then fix) makes the sketch over-defined. Use
-  :func:`define_circle`.
-* **Off-origin line profiles**: pass the line IDs as ``fix_entities`` —
-  perpendicular fixed lines with merged vertices pin each other's endpoints.
-* **Never mix driving dimensions with fix escalation across a chain**: a
-  driving dim determines geometry downstream through merged vertices;
-  fixing any of that downstream geometry re-pins what the dim already
-  determined and the sketch goes over-defined (consistent-but-redundant
-  counts — caught live on the channel-lever outline). A profile is either
-  constraints+dims with no fixes (amplitude-bar style, needs an origin
-  vertex) or fix-only (crank-pin style).
+  coordinates get merged/coincident vertices; anchor ONE vertex with
+  :func:`anchor_point_to_origin`, then horizontal/vertical constraints and
+  per-segment length dimensions fully define the chain. Never anchor a
+  second vertex of the same chain — the dims already determine it through
+  the merged vertices and the sketch goes over-defined.
+* **Unsigned distance dims keep the current side**: geometry is created at
+  its final coordinates and the dims match, so the solver keeps negative-
+  quadrant centres on the negative side through ``ForceRebuild3`` (probed).
+* **Over-defined triage**: ``adapter.get_over_defining_relations()`` names
+  the conflicting relations; drop the redundant anchor dim, keep the
+  semantic relation.
+* **fix is a last resort** for reference geometry that genuinely cannot be
+  dimensioned (currently only the equation-driven spring-hook curves, which
+  have no free endpoints). Every surviving ``fix`` needs an inline comment
+  justifying it.
 """
 
 from __future__ import annotations
@@ -90,13 +94,21 @@ def check(label: str, result: Any) -> Any:
 
 
 async def ensure_fully_defined(
-    adapter: Any, label: str, fix_entities: Iterable[str] = ()
+    adapter: Any,
+    label: str,
+    fix_entities: Iterable[str] = (),
+    allow_fix_escalation: bool = False,
 ) -> None:
-    """Assert the active sketch is fully defined, escalating to ``fix``.
+    """Assert the active sketch is fully defined.
 
-    Checks ``check_sketch_fully_defined``; when under-defined and
-    ``fix_entities`` are provided, applies a ``fix`` relation to each and
-    re-checks. Raises if the sketch still is not fully defined.
+    Raises when the sketch is under- or over-defined. On over-defined, the
+    error includes ``get_over_defining_relations()`` so the redundant anchor
+    is identifiable without opening SolidWorks.
+
+    ``fix_entities`` + ``allow_fix_escalation=True`` re-enable the legacy
+    fix-escalation loop with a loud WARN — a migration-window escape hatch
+    only (fix-relation retirement, see cad/FIX_MIGRATION.md); both the flag
+    and the parameter are deleted at B3 close.
     """
     async def _state() -> str | None:
         res = await adapter.check_sketch_fully_defined()
@@ -112,11 +124,31 @@ async def ensure_fully_defined(
         print(f"  OK  fully defined: {label}")
         return
 
-    # Escalate one entity at a time: fixing everything at once makes the
-    # driving dimensions redundant and over-defines the sketch. "unknown"
-    # is kept fixable as a safety net: the status probe can transiently fail
-    # (pywin32 property/method resolution drift on GetConstrainedStatus) and
-    # a later read may recover.
+    if state == "over_defined":
+        over = await adapter.get_over_defining_relations()
+        detail = over.data if over.is_success else over.error
+        raise RuntimeError(
+            f"{label}: sketch OVER-defined; over-defining relations: {detail!r}"
+        )
+
+    fix_entities = list(fix_entities)
+    if not (allow_fix_escalation and fix_entities):
+        hint = (
+            " (legacy fix escalation disabled; anchor a point to the origin "
+            "with semantic relations/dims instead)"
+            if fix_entities
+            else ""
+        )
+        raise RuntimeError(
+            f"{label}: sketch not fully defined (state={state!r}){hint}"
+        )
+
+    # Migration-window escape hatch: the legacy escalation, one entity at a
+    # time (fixing everything at once makes the driving dimensions redundant
+    # and over-defines the sketch). "unknown" is kept fixable as a safety
+    # net: the status probe can transiently fail (pywin32 property/method
+    # resolution drift on GetConstrainedStatus) and a later read may recover.
+    print(f"  !!  WARN {label}: fix escalation is deprecated — migrate to semantic anchors")
     for entity_id in fix_entities:
         if state not in ("under_defined", "unknown"):
             break
@@ -132,22 +164,69 @@ async def ensure_fully_defined(
     raise RuntimeError(f"{label}: sketch not fully defined (state={state!r})")
 
 
+async def dimension_between(
+    adapter: Any, ref1: str, ref2: str, kind: str, value: float, label: str
+) -> str:
+    """Driving dimension between two point refs (``horizontal_distance``,
+    ``vertical_distance``, or aligned ``distance``); value in mm."""
+    result = await adapter.add_sketch_dimension(ref1, ref2, kind, value)
+    return check(f"{kind} {label} = {value:g}", result)
+
+
+async def anchor_point_to_origin(
+    adapter: Any, point_ref: str, x: float, y: float, label: str
+) -> None:
+    """Fully anchor a sketch point at (x, y) relative to the sketch origin.
+
+    * (0, 0): coincident to the origin (safe even when creation-time
+      inference already snapped it — probed live).
+    * On-axis: an alignment relation supplies the zero coordinate (zero-
+      valued dims are invalid) plus one distance dim for the other.
+    * General: horizontal + vertical distance dims (absolute values — the
+      solver keeps the side the geometry was created on, probed live).
+    """
+    if x == 0.0 and y == 0.0:
+        check(
+            f"coincident {label} -> origin",
+            await adapter.add_sketch_constraint(point_ref, "origin", "coincident"),
+        )
+        return
+    if y == 0.0:
+        check(
+            f"horizontal_points {label} -> origin",
+            await adapter.add_sketch_constraint(point_ref, "origin", "horizontal_points"),
+        )
+        await dimension_between(
+            adapter, point_ref, "origin", "horizontal_distance", abs(x), label
+        )
+        return
+    if x == 0.0:
+        check(
+            f"vertical_points {label} -> origin",
+            await adapter.add_sketch_constraint(point_ref, "origin", "vertical_points"),
+        )
+        await dimension_between(
+            adapter, point_ref, "origin", "vertical_distance", abs(y), label
+        )
+        return
+    await dimension_between(
+        adapter, point_ref, "origin", "horizontal_distance", abs(x), label
+    )
+    await dimension_between(
+        adapter, point_ref, "origin", "vertical_distance", abs(y), label
+    )
+
+
 async def define_circle(
     adapter: Any, x: float, y: float, radius: float, label: str
 ) -> str:
-    """Add a circle, anchor it with ``fix``, then document its diameter.
-
-    The fix-then-dimension order matters: the dimension lands as driven on the
-    already-fixed circle; dimension-then-fix over-defines the sketch.
-    """
+    """Add a circle, anchor its centre to the origin semantically, then add
+    a DRIVING diameter dimension. No ``fix`` involved."""
     circle = await adapter.add_circle(x, y, radius)
     check(f"add_circle {label}", circle)
+    await anchor_point_to_origin(adapter, f"{circle.data}.center", x, y, label)
     check(
-        f"fix {label}",
-        await adapter.add_sketch_constraint(circle.data, None, "fix"),
-    )
-    check(
-        f"dimension {label} diameter (driven)",
+        f"dimension {label} diameter",
         await adapter.add_sketch_dimension(circle.data, None, "diameter", radius * 2.0),
     )
     return circle.data
@@ -361,8 +440,14 @@ async def add_spring_end_hooks(
             f"{fmt(c[0])} + {fmt(loop_r)} * cos({sweep_rad:.12g} * t)",
             f"{fmt(c[1])} + {fmt(loop_r)} * sin({sweep_rad:.12g} * t)",
         )
+        # Equation-driven curves are the whitelist candidate for fix
+        # (no free endpoints to dimension); B3 attempts a semantic scheme
+        # before keeping this escalation (cad/FIX_MIGRATION.md).
         await ensure_fully_defined(
-            adapter, f"{label} hook path", fix_entities=[lead_line, loop_arc]
+            adapter,
+            f"{label} hook path",
+            fix_entities=[lead_line, loop_arc],
+            allow_fix_escalation=True,
         )
         check(f"exit_sketch {label} hook path", await adapter.exit_sketch())
 
