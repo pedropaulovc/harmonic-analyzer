@@ -43,6 +43,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
 
 from _common import (
@@ -51,6 +52,7 @@ from _common import (
     apply_color,
     apply_material,
     check,
+    define_circle,
     ensure_fully_defined,
     extrude_at_offset,
     report_mass_properties,
@@ -82,8 +84,16 @@ TOP_RAIL_DEPTH = 16.0  # y 161.8..177.8 (machine 212.6..228.6 = photo window top
 TOP_RAIL_Z1 = 201.45  # machine +90.45: frustum apex face 90.70 at rail bottom - 0.25
 FOOT_RAIL_X = (59.75, 89.75)  # 30 wide, west face 0.25 east of the
 # arbor-pedestal block (machine x +35.5..+59.5, drive-train.SLDASM)
-FOOT_RAIL_H = 20.0  # photo: bolted foot flange ~20 tall (bolts not modeled)
+FOOT_RAIL_H = 20.0  # photo: bolted foot flange ~20 tall
 FOOT_RAIL_Z1 = 192.35  # machine +81.35: frustum base face +81.6 - 0.25
+
+# Foot-rail hold-down bolt holes (M6.10, ch30 p008 hex heads): O8.2 for
+# the 5/16" hex-bolt shanks, on the rail centreline. The bolt heads'
+# worst hex corner stays 2.6 clear of the cylinder-train tip circles
+# (r 51.65 about machine (47.5, 126.8)) and 3.2 of cone gear j=1.
+BOLT_HOLE_DIA = 8.2
+BOLT_HOLE_X = (FOOT_RAIL_X[0] + FOOT_RAIL_X[1]) / 2.0  # 74.75
+BOLT_HOLE_Z = (57.0, 147.0)  # machine z -54 / +36 (quarter points, low)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -177,7 +187,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "top rail", expected, 0.02 * v_top_rail)
 
     # Foot rail: on the base top, spanning to the north frustum base
-    # (the photo's bolted flange; hold-down bolts not modeled).
+    # (the photo's bolted flange; hex-bolts placed in output.SLDASM, M6.10).
     check("create_sketch foot rail", await adapter.create_sketch("Front"))
     foot_rail = await add_line_chain(
         adapter,
@@ -196,6 +206,28 @@ async def build(adapter) -> dict[str, str]:
     )
     expected += v_foot_rail
     await volume_check(adapter, "foot rail", expected, 0.02 * v_foot_rail)
+
+    # Hold-down bolt holes through the foot rail (M6.10): Top sketch
+    # (x, y) -> global (X, -Z), mid-plane cut so the direction never
+    # matters (below y 0 is outside the part).
+    from solidworks_mcp.adapters.base import ExtrusionParameters
+
+    check("create_sketch bolt holes", await adapter.create_sketch("Top"))
+    for z in BOLT_HOLE_Z:
+        await define_circle(
+            adapter, BOLT_HOLE_X, -z, BOLT_HOLE_DIA / 2.0, f"bolt hole z{z:.0f}"
+        )
+    await ensure_fully_defined(adapter, "bolt holes sketch")
+    check("exit_sketch bolt holes", await adapter.exit_sketch())
+    check(
+        "cut bolt holes",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=3.0 * FOOT_RAIL_H, both_directions=True)
+        ),
+    )
+    v_holes = 2.0 * math.pi * (BOLT_HOLE_DIA / 2.0) ** 2 * FOOT_RAIL_H
+    expected -= v_holes
+    await volume_check(adapter, "bolt holes", expected, 0.02 * v_holes)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
