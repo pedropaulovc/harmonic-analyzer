@@ -3,7 +3,13 @@ r"""Reproduction script: magnifying-lever bracket (book ch. 20, pp. 46-49).
 The black fitting that affixes the magnifying lever rod to the summing
 lever: a flange screwed under the coefficients plate's front edge and a
 forward arm ending in a collar (O12, bore 6.2) the O6 rod clamps into.
-The p.47 mounting screws are omitted (simplification).
+M6.10 fasteners pass: two O3.2 holes through the flange on its local
+z 17.5 line -- the strip actually under the plate (the plate front edge
+is at local z 15 = machine -70) and clear of the arm (z 4..15) so the
+fillister heads have free air below; the screws thread up flush with
+the plate bottom (992.9 -- engagement into the summing lever's plate not
+modeled). Their heads clear channel spring j=0 (east edge x +28.35) by
+1.9.
 
 Layout: origin at the collar centre (machine (+40, 985, -85)); collar
 axis along X (the rod direction), arm runs +Z (toward the plate, machine
@@ -26,6 +32,7 @@ from _common import (
     add_line_chain,
     apply_material,
     check,
+    define_circle,
     ensure_fully_defined,
     extrude_at_offset,
     report_mass_properties,
@@ -48,6 +55,9 @@ FLANGE_X = (-11.0, 5.0)  # under-plate flange, machine x +29..+45: stops 0.65
 # M6.8-mirrored)
 FLANGE_Y = (3.9, 7.9)  # flange top touches the plate bottom (992.9)
 FLANGE_Z = (9.0, 20.0)  # under the plate's front edge band (derived)
+SCREW_HOLE_DIA = 3.2  # M6.10 mounting-screw holes (O2.9 fillister shanks)
+SCREW_HOLE_X = (-7.0, 1.0)  # machine x +33 / +41: inset 4 from the flange ends
+SCREW_HOLE_Z = 17.5  # machine z -67.5: under the plate, clear of the arm
 
 
 async def _volume(adapter) -> float:
@@ -56,7 +66,7 @@ async def _volume(adapter) -> float:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import RevolveParameters
+    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     check("create_part", await adapter.create_part())
 
@@ -150,6 +160,33 @@ async def build(adapter) -> dict[str, str]:
     print(f"  volume after flange: {vol:.1f} mm^3 (+{added:.1f}, net {v_net:.1f})")
     if abs(added - v_net) > 0.02 * v_net:
         raise RuntimeError(f"flange: added {added:.1f}, expected {v_net:.1f}")
+    expected = vol
+
+    # 4. Mounting-screw holes through the flange (Top sketch (x, y) ->
+    # global (X, -Z), mid-plane cut: only the flange band 3.9..7.9 is
+    # material at that footprint -- the arm stops at z 15).
+    check("create_sketch screw holes", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    for x in SCREW_HOLE_X:
+        await define_circle(
+            adapter, x, -SCREW_HOLE_Z, SCREW_HOLE_DIA / 2.0, f"screw hole x{x:+.0f}"
+        )
+    set_sketch_direct_db(adapter, False)
+    await ensure_fully_defined(adapter, "screw holes sketch")
+    check("exit_sketch screw holes", await adapter.exit_sketch())
+    check(
+        "cut screw holes",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=4.0 * FLANGE_Y[1], both_directions=True)
+        ),
+    )
+    expected -= (
+        2.0 * math.pi * (SCREW_HOLE_DIA / 2.0) ** 2 * (FLANGE_Y[1] - FLANGE_Y[0])
+    )
+    vol = await _volume(adapter)
+    print(f"  volume after screw holes: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    if abs(vol - expected) > 2.0:
+        raise RuntimeError(f"screw holes volume {vol:.1f} != {expected:.1f}")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
