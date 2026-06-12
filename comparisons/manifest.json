@@ -4620,16 +4620,20 @@
    "camera": {
     "mode": "euler",
     "roll_deg": 0.0,
-    "zoom": 1.0,
-    "target_mm": null,
+    "zoom": 1.2155,
+    "target_mm": [
+     10.1,
+     513.7,
+     -22.5
+    ],
     "perspective": null,
     "az_deg": 90.0,
-    "el_deg": 0
+    "el_deg": 0.0
    },
    "align": {
-    "scale": 1.16,
+    "scale": 0.91,
     "dx_px": 33,
-    "dy_px": -260
+    "dy_px": -73
    },
    "component_focus": [
     "harmonic_analyzer"
