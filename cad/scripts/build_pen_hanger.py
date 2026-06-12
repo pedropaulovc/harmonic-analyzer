@@ -7,8 +7,12 @@ a 5.4 square channel the 5-square pen rod slides in -- the rod is
 VERTICAL, so the channel is cut along Y through the block (an M6.4 fix:
 the first build wrongly tunnelled it along Z). The block reaches
 forward (-Z in the machine) so the pen rod hangs clear of the platen
-paper plane while the strap stays flush on the bar. The mounting bolt is
-omitted (simplification).
+paper plane while the strap stays flush on the bar. M6.10 fasteners
+pass: an O3.6 through-hole near the strap top (local (-2.5, 60) =
+machine (-5.5, 565)) takes the hanger-screw shank coming through the
+bar FROM BEHIND (the magnifying wheel's rim back face passes 1.0 in
+front of the strap, so no front-side head fits); the tip sits 0.5
+behind the strap front face.
 
 Layout: origin at the guide block centre (machine (+3, 505, -151.5));
 block z -4..+12.6 (back face flush with the bar front at machine
@@ -25,12 +29,14 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
 
 from _common import (
     add_line_chain,
     apply_material,
     check,
+    define_circle,
     ensure_fully_defined,
     extrude_at_offset,
     report_mass_properties,
@@ -49,6 +55,9 @@ STRAP_Z = (9.6, 12.6)  # strap 3 thick, flush with the block back (derived)
 STRAP_TOP_Y = 65.0  # machine 570: support bar top (derived)
 STRAP_TOP_X = (-16.0, 0.0)  # 16 wide at the bar (low; M6.8-mirrored lean)
 STRAP_BOT_X = (-5.0, 5.0)  # 10 wide at the block (low)
+SCREW_HOLE_DIA = 3.6  # M6.10: hanger-screw hole near the strap top
+SCREW_HOLE_XY = (-2.5, 60.0)  # machine (-5.5, 565): on the bar band, within
+# the 5-wide strap/bar overlap east of the bar's free end (machine -8)
 
 
 async def _volume(adapter) -> float:
@@ -135,6 +144,29 @@ async def build(adapter) -> dict[str, str]:
     print(f"  volume after strap: {vol:.1f} mm^3 (+{added:.1f}, solid {v_strap:.1f})")
     if abs(added - v_strap) > 0.02 * v_strap:
         raise RuntimeError(f"strap: added {added:.1f}, expected {v_strap:.1f}")
+    expected = vol
+
+    # 3. Hanger-screw hole through the strap (mid-plane cut along Z: at
+    # local y 60 only the strap band 9.6..12.6 is material).
+    check("create_sketch screw hole", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    await define_circle(
+        adapter, SCREW_HOLE_XY[0], SCREW_HOLE_XY[1], SCREW_HOLE_DIA / 2.0, "screw hole"
+    )
+    set_sketch_direct_db(adapter, False)
+    await ensure_fully_defined(adapter, "screw hole sketch")
+    check("exit_sketch screw hole", await adapter.exit_sketch())
+    check(
+        "cut screw hole",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=4.0 * STRAP_Z[1], both_directions=True)
+        ),
+    )
+    expected -= math.pi * (SCREW_HOLE_DIA / 2.0) ** 2 * (STRAP_Z[1] - STRAP_Z[0])
+    vol = await _volume(adapter)
+    print(f"  volume after screw hole: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    if abs(vol - expected) > 1.0:
+        raise RuntimeError(f"screw hole volume {vol:.1f} != {expected:.1f}")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
