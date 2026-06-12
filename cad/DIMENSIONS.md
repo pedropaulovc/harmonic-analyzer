@@ -578,6 +578,20 @@ after pivoting the cone set out of engagement. The "small gear" visible on the
 lever arm in the p.68–69 photos is the drum's front end face, not a separate
 idler (video frame `v4_pinion_018` shows the drum receding behind it).
 
+### Alignment-pinion layout (M6.8, built; pre-mirror machine coords)
+
+Modeled in the DISENGAGED rest state (p. 68 "gap"); all parts in
+`build_drive_train_assembly.py`.
+
+| item | value | source / rule |
+|---|---|---|
+| Pinion axis | (−117.75, 109.8), z −75..+64 | c2c = 120T tip 51.65 + 42T tip 18.63 + 2.0 gap = 72.27 from the drum axis (−47.5, 126.8); pivot directly below → straps exactly vertical |
+| Drum length | 139 (`alignment-pinion`) | trimmed from the book's ~150: covers stations 0..18; see Appendix C #9 |
+| Swing strap | 22 × 47 c2c × 5, r 11 ends, Ø6.35 pivot bore (`pinion-bracket`, ×2) | p.68: bright steel strap; inner faces butt the drum end faces (z −75 / +64) |
+| Pivot block | 30 × 16 × 12, bore 12 above seat (`pinion-pivot-block`, ×2) | PIVOT_Y = 62.8; strap bottom cap swings 1.0 clear of the base top |
+| Torque shaft | Ø6.35 × 159, Ø16 end ball + Ø6 T-handle (y 53.8..123.8) at z −89 (`pinion-pivot-shaft`) | shaft z −89..+70; ball 2.9 clear of the A-frame back face (z −99.9) |
+| Engage lever | Ø6 × 72, Ø13 grip ball 14 from root (`pinion-lever`) | roots tangent on the torque shaft at z −59, 32° from vertical toward −x (up = disengaged); axis passes 47·sin 32° = 24.9 from the pinion axis (3.3 rod-to-tip clear) |
+
 ---
 
 ## Appendix A — Legacy constants (cross-check only; POSSIBLY WRONG)
@@ -737,6 +751,19 @@ re-measure during their M2 script build.
    (front view, 67 ± 5 mm) matches the DP 16 64T+16T center distance
    63.5 mm; no other round-PD split at 4:1 fits. Pair confirmed at the
    estimate (see "Drive-train layout (M6.2)", ch. 13 section).
+10. **Alignment-pinion drum trimmed to 19 of 20 stations** (ch. 25,
+   M6.8) — the model's photo-calibrated rocker-support frustum (base
+   88.9 × 63.5 at (x −72.9, z 101.6) pre-mirror: west face to x
+   −117.35, south face from z 69.85 at the base) occupies the space
+   the real machine's slimmer north arbor support leaves for the ch25
+   back swing bracket (the p.68 back-side photo shows the bracket
+   right beside the 96T disc). The drum is therefore 139 long
+   (z −75..+64) instead of the book's ~150, the back strap/block stay
+   under z 69, and the j = 19 drum station (z 65.5..68.5) goes
+   uncovered — engaged alignment would turn 19 of the 20 gears. The
+   region is occluded by the frustum/A-frame in all eight ch30 plates,
+   so render fidelity is unaffected. Revisit only if the frustum is
+   ever re-measured slimmer.
 
 
 
