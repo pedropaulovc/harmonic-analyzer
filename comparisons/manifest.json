@@ -4516,7 +4516,7 @@
     "zoom": 1.0,
     "target_mm": null,
     "perspective": null,
-    "az_deg": 0,
+    "az_deg": 180,
     "el_deg": 0
    },
    "align": {
@@ -4543,7 +4543,7 @@
     "zoom": 1.0,
     "target_mm": null,
     "perspective": null,
-    "az_deg": 45,
+    "az_deg": -135,
     "el_deg": 0
    },
    "align": {
@@ -4570,7 +4570,7 @@
     "zoom": 1.0,
     "target_mm": null,
     "perspective": null,
-    "az_deg": 90,
+    "az_deg": -90,
     "el_deg": 0
    },
    "align": {
@@ -4597,7 +4597,7 @@
     "zoom": 1.0,
     "target_mm": null,
     "perspective": null,
-    "az_deg": 135,
+    "az_deg": -45,
     "el_deg": 0
    },
    "align": {
@@ -4624,7 +4624,7 @@
     "zoom": 1.0,
     "target_mm": null,
     "perspective": null,
-    "az_deg": 180,
+    "az_deg": 0,
     "el_deg": 0
    },
    "align": {
@@ -4651,7 +4651,7 @@
     "zoom": 1.0,
     "target_mm": null,
     "perspective": null,
-    "az_deg": -135,
+    "az_deg": 45,
     "el_deg": 0
    },
    "align": {
@@ -4678,7 +4678,7 @@
     "zoom": 1.0,
     "target_mm": null,
     "perspective": null,
-    "az_deg": -90,
+    "az_deg": 90,
     "el_deg": 0
    },
    "align": {
@@ -4705,7 +4705,7 @@
     "zoom": 1.0,
     "target_mm": null,
     "perspective": null,
-    "az_deg": -45,
+    "az_deg": 135,
     "el_deg": 0
    },
    "align": {
