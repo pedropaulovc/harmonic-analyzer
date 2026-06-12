@@ -36,11 +36,13 @@ import math
 import sys
 
 from _common import (
-    IN,
     add_line_chain,
+    anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
+    define_rectilinear_chain,
+    dimension_between,
     ensure_fully_defined,
     extrude_at_offset,
     report_mass_properties,
@@ -82,14 +84,10 @@ async def _volume(adapter) -> float:
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
-        CreateEquationCurveParameters,
         CreatePlaneParameters,
         RevolveParameters,
         SweepParameters,
     )
-
-    def fmt(value_mm: float) -> str:
-        return f"{value_mm / IN:.12g}"  # document units are inches
 
     check("create_part", await adapter.create_part())
 
@@ -106,34 +104,44 @@ async def build(adapter) -> dict[str, str]:
     if abs(vol - expected) > 0.005 * expected:
         raise RuntimeError(f"leg volume {vol:.1f} != {expected:.1f}")
 
-    # 2. Quarter bend + horizontal arm: ONE sweep along two equation
-    # curves (no direction ambiguity, no free endpoints).
+    # 2. Quarter bend + horizontal arm: ONE sweep along an arc + line
+    # chain (the equation-curve workaround for fix endpoint DOFs reverted
+    # once sketch points became addressable). Direct DB keeps inference
+    # relations off; exact-coordinate joints still merge. add_arc draws
+    # CCW: bend-entry (angle 0 from the centre) to bend-exit (angle 90).
     path_name = check("create_sketch bend path", await adapter.create_sketch("Front"))
-    arc = await check_curve(
-        adapter,
-        CreateEquationCurveParameters(
-            x_expression=(
-                f"{fmt(-BEND_R)} + {fmt(BEND_R)} * cos({math.pi / 2.0:.12g} * t)"
-            ),
-            y_expression=(
-                f"{fmt(LEG_TOP)} + {fmt(BEND_R)} * sin({math.pi / 2.0:.12g} * t)"
-            ),
-            range_start="0",
-            range_end="1",
-        ),
+    set_sketch_direct_db(adapter, True)
+    arc = check(
         "bend arc",
-    )
-    arm = await check_curve(
-        adapter,
-        CreateEquationCurveParameters(
-            x_expression=f"{fmt(-BEND_R)} - {fmt(ARM_RUN)} * t",
-            y_expression=f"{fmt(ARM_Y)} + 0 * t",
-            range_start="0",
-            range_end="1",
+        await adapter.add_arc(
+            -BEND_R, LEG_TOP,  # centre
+            0.0, LEG_TOP,  # start (bend entry, top of the leg)
+            -BEND_R, ARM_Y,  # end (bend exit into the arm)
         ),
-        "arm run",
     )
-    await ensure_fully_defined(adapter, "bend path", fix_entities=[arc, arm])
+    arm = check(
+        "arm run",
+        await adapter.add_line(-BEND_R, ARM_Y, ARM_END_X, ARM_Y),
+    )
+    set_sketch_direct_db(adapter, False)
+    await anchor_point_to_origin(adapter, f"{arc}.center", -BEND_R, LEG_TOP, "bend centre")
+    check(
+        "bend radius",
+        await adapter.add_sketch_dimension(arc, None, "radial", BEND_R),
+    )
+    check(
+        "bend entry level with centre",
+        await adapter.add_sketch_constraint(f"{arc}.start", f"{arc}.center", "horizontal_points"),
+    )
+    check(
+        "bend exit above centre",
+        await adapter.add_sketch_constraint(f"{arc}.end", f"{arc}.center", "vertical_points"),
+    )
+    check("arm horizontal", await adapter.add_sketch_constraint(arm, None, "horizontal"))
+    await dimension_between(
+        adapter, f"{arm}.start", f"{arm}.end", "horizontal_distance", ARM_RUN, "arm run"
+    )
+    await ensure_fully_defined(adapter, "bend path")
     check("exit_sketch bend path", await adapter.exit_sketch())
 
     profile_plane = check(
@@ -180,16 +188,15 @@ async def build(adapter) -> dict[str, str]:
 
     # 3. Pin lug rising into the arm underside.
     check("create_sketch lug", await adapter.create_sketch("Top"))
-    lug = await add_line_chain(
-        adapter,
-        [
-            (LUG_X[0], -LUG_HALF_Z),
-            (LUG_X[1], -LUG_HALF_Z),
-            (LUG_X[1], LUG_HALF_Z),
-            (LUG_X[0], LUG_HALF_Z),
-        ],
-    )
-    await ensure_fully_defined(adapter, "lug sketch", fix_entities=lug)
+    lug_rect = [
+        (LUG_X[0], -LUG_HALF_Z),
+        (LUG_X[1], -LUG_HALF_Z),
+        (LUG_X[1], LUG_HALF_Z),
+        (LUG_X[0], LUG_HALF_Z),
+    ]
+    lug = await add_line_chain(adapter, lug_rect)
+    await define_rectilinear_chain(adapter, lug, lug_rect, label="lug")
+    await ensure_fully_defined(adapter, "lug sketch")
     check("exit_sketch lug", await adapter.exit_sketch())
     extrude_at_offset(adapter, LUG_Y[1] - LUG_Y[0], LUG_Y[0])
     # Added material = the prism OUTSIDE the tube: height to the tube
@@ -208,23 +215,22 @@ async def build(adapter) -> dict[str, str]:
     # axis-mapping ambiguity).
     check("create_sketch pin", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    centerline = check(
+    check(
         "pin centerline",
         await adapter.add_centerline(PIN_X[0], PIN_Y, PIN_X[1], PIN_Y),
     )
-    profile = await add_line_chain(
-        adapter,
-        [
-            (PIN_X[0], PIN_Y),
-            (PIN_X[1], PIN_Y),
-            (PIN_X[1], PIN_Y + PIN_DIA / 2.0),
-            (PIN_X[0], PIN_Y + PIN_DIA / 2.0),
-        ],
-    )
+    pin_rect = [
+        (PIN_X[0], PIN_Y),
+        (PIN_X[1], PIN_Y),
+        (PIN_X[1], PIN_Y + PIN_DIA / 2.0),
+        (PIN_X[0], PIN_Y + PIN_DIA / 2.0),
+    ]
+    profile = await add_line_chain(adapter, pin_rect)
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(
-        adapter, "pin sketch", fix_entities=[centerline, *profile]
-    )
+    # The centerline shares the profile's bottom corners (exact-coordinate
+    # merge, proven live), so the dimensioned profile defines it too.
+    await define_rectilinear_chain(adapter, profile, pin_rect, label="pin")
+    await ensure_fully_defined(adapter, "pin sketch")
     check("exit_sketch pin", await adapter.exit_sketch())
     check("revolve pin", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     pin_len = PIN_X[1] - PIN_X[0]
@@ -244,11 +250,6 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
-
-
-async def check_curve(adapter, params, label: str) -> str:
-    res = await adapter.create_equation_driven_curve(params)
-    return check(f"curve {label}", res)
 
 
 if __name__ == "__main__":

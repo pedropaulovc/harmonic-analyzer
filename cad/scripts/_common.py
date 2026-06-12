@@ -220,6 +220,67 @@ async def anchor_point_to_origin(
     )
 
 
+async def anchor_point_to_point(
+    adapter: Any, ref1: str, ref2: str, dx: float, dy: float, label: str
+) -> None:
+    """Pin ``ref2`` at offset (dx, dy) from ``ref1``: an alignment relation
+    supplies a zero component (zero-valued dims are invalid), distance dims
+    the rest. Offsets are unsigned at the dim level — the solver keeps the
+    side the geometry was created on (probed live)."""
+    if dx == 0.0 and dy == 0.0:
+        raise ValueError(f"{label}: coincident points want a merge, not an anchor")
+    if dx == 0.0:
+        check(
+            f"vertical_points {label}",
+            await adapter.add_sketch_constraint(ref1, ref2, "vertical_points"),
+        )
+        await dimension_between(adapter, ref1, ref2, "vertical_distance", abs(dy), label)
+        return
+    if dy == 0.0:
+        check(
+            f"horizontal_points {label}",
+            await adapter.add_sketch_constraint(ref1, ref2, "horizontal_points"),
+        )
+        await dimension_between(adapter, ref1, ref2, "horizontal_distance", abs(dx), label)
+        return
+    await dimension_between(adapter, ref1, ref2, "horizontal_distance", abs(dx), label)
+    await dimension_between(adapter, ref1, ref2, "vertical_distance", abs(dy), label)
+
+
+async def define_polygon_chain(
+    adapter: Any,
+    lines: list[str],
+    points: list[tuple[float, float]],
+    anchor: int = 0,
+    label: str = "polygon",
+) -> None:
+    """Fully define a CLOSED line chain of arbitrary slopes semantically.
+
+    Vertex ``anchor`` goes to the origin; every segment then pins its end
+    relative to its start via :func:`anchor_point_to_point` — except the
+    segment ENDING at the anchored vertex, whose span the closure supplies
+    (dimensioning it too over-defines the sketch). Prefer
+    :func:`define_rectilinear_chain` for axis-parallel chains: it emits
+    segment-length dims instead of per-axis offsets.
+    """
+    n = len(lines)
+    if n != len(points):
+        raise ValueError(
+            f"{label}: need a closed chain (lines {n} != points {len(points)})"
+        )
+    await anchor_point_to_origin(
+        adapter, f"{lines[anchor]}.start", *points[anchor], f"{label} anchor"
+    )
+    skip = (anchor - 1) % n  # the segment ending at the anchored vertex
+    for i, line in enumerate(lines):
+        if i == skip:
+            continue
+        (x1, y1), (x2, y2) = points[i], points[(i + 1) % n]
+        await anchor_point_to_point(
+            adapter, f"{line}.start", f"{line}.end", x2 - x1, y2 - y1, f"{label} {line}"
+        )
+
+
 async def define_circle(
     adapter: Any, x: float, y: float, radius: float, label: str
 ) -> str:
