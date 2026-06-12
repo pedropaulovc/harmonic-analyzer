@@ -578,19 +578,29 @@ after pivoting the cone set out of engagement. The "small gear" visible on the
 lever arm in the p.68–69 photos is the drum's front end face, not a separate
 idler (video frame `v4_pinion_018` shows the drum receding behind it).
 
-### Alignment-pinion layout (M6.8, built; pre-mirror machine coords)
+### Alignment-pinion layout (M6.8 rework, built; pre-mirror machine coords)
 
-Modeled in the DISENGAGED rest state (p. 68 "gap"); all parts in
-`build_drive_train_assembly.py`.
+Modeled in the DISENGAGED rest state (p. 68 "gap"); all placements in
+`build_drive_train_assembly.py`. The rig sits FRONT-CENTRE on the base
+(ch30 p002: the silver engage-lever + tee-handle cluster just east-machine
+of the midline; the ch25 close-ups are back-side shots), not on the east
+flank as first built. The rest pose threads five hard constraints: tip gap
+2.0 to the cylinder train, per-disc clearance to every cone gear + the 64T,
+drum tips 0.82 above the base top, drum/stub/strap under the cone-knob-post
+footprint (z ≥ 74), lift rod east of the cone-pivot-post column (x to
+−47.1 machine) — and the engaged pose (c2c 68.58, cone swung clear in that
+state) stays reachable from the parked pivot with 0.7 spare.
 
 | item | value | source / rule |
 |---|---|---|
-| Pinion axis | (−117.75, 109.8), z −75..+64 | c2c = 120T tip 51.65 + 42T tip 18.63 + 2.0 gap = 72.27 from the drum axis (−47.5, 126.8); pivot directly below → straps exactly vertical |
-| Drum length | 139 (`alignment-pinion`) | trimmed from the book's ~150: covers stations 0..18; see Appendix C #9 |
-| Swing strap | 22 × 47 c2c × 5, r 11 ends, Ø6.35 pivot bore (`pinion-bracket`, ×2) | p.68: bright steel strap; inner faces butt the drum end faces (z −75 / +64) |
-| Pivot block | 30 × 16 × 12, bore 12 above seat (`pinion-pivot-block`, ×2) | PIVOT_Y = 62.8; strap bottom cap swings 1.0 clear of the base top |
-| Torque shaft | Ø6.35 × 159, Ø16 end ball + Ø6 T-handle (y 53.8..123.8) at z −89 (`pinion-pivot-shaft`) | shaft z −89..+70; ball 2.9 clear of the A-frame back face (z −99.9) |
-| Engage lever | Ø6 × 72, Ø13 grip ball 14 from root (`pinion-lever`) | roots tangent on the torque shaft at z −59, 32° from vertical toward −x (up = disengaged); axis passes 47·sin 32° = 24.9 from the pinion axis (3.3 rod-to-tip clear) |
+| Pinion axis | (−2.18, 70.5), z −75..+68.2 | gap circle: 120T tip 51.65 + 42T tip 18.63 + 2.0 = 72.27 from the drum axis (−47.5, 126.8) at y 70.5 (drum tips 0.82 above the base top) |
+| Drum | 143.2 long, stubs Ø6.35 × 8 front / × 5.5 back (`alignment-pinion`) | back face +68.2 shaves 0.28 of the j = 19 gear face (Appendix C #10); back stub ends z 73.7, 0.27 short of the knob-post footprint |
+| Swing strap | 22 × 31 c2c × 5, r 11 ends, two Ø6.35 bores (`pinion-bracket`, ×2) | leans 75.6° onto the arbor stubs (z −80.25 / +68.45, 0.25 air each side); c2c 31 keeps the engaged swing reachable from the parked pivot |
+| Pivot block | 33 × 16 × 12, bores ±7.5 at 12 above seat (`pinion-pivot-block`, ×2) | front z −104..−92 (dodges the cone-pivot-post column z −89.9..−62.3), back z +76..+88; PIVOT_Y 62.8, strap bottom cap swings 1.0 clear of the base |
+| Torque shaft | Ø6.35 × 196, plain (`pinion-pivot-shaft`) | pivot bore axis (+27.85, 62.8), z −106..+90, 2 proud past each block face |
+| Lift rod | Ø6.35 × 210, two Ø4 cam pins to 11.175, parked down (`pinion-lift-rod`) | far bore (+42.85, 62.8), z −120..+90; squeezed between the strap's swinging r 11 cap (0.82 air) and the cone-pivot-post column east face (0.85 air); pins at z −77.5 / +70.5 inside the strap bands (Appendix C #11) |
+| Engage lever | Ø6 × 72 rod on a Ø14 annular clamp ball bored Ø6.35 (`pinion-lever`) | clamp flush on the lift rod front end at z −113, 32° from vertical toward +x (standing up = disengaged) |
+| Turning handle | Ø12 hub (bore Ø6.35, z 7..14 local), Ø24 ball, Ø6 rod arms −35/+68 (`pinion-handle`) | hub seats 2 deep on the front arbor stub (ball centre z −95); cross rod 65° from vertical, long arm machine-west (p002), short arm tip 2.0 above the base |
 
 ---
 
@@ -751,19 +761,22 @@ re-measure during their M2 script build.
    (front view, 67 ± 5 mm) matches the DP 16 64T+16T center distance
    63.5 mm; no other round-PD split at 4:1 fits. Pair confirmed at the
    estimate (see "Drive-train layout (M6.2)", ch. 13 section).
-10. **Alignment-pinion drum trimmed to 19 of 20 stations** (ch. 25,
-   M6.8) — the model's photo-calibrated rocker-support frustum (base
-   88.9 × 63.5 at (x −72.9, z 101.6) pre-mirror: west face to x
-   −117.35, south face from z 69.85 at the base) occupies the space
-   the real machine's slimmer north arbor support leaves for the ch25
-   back swing bracket (the p.68 back-side photo shows the bracket
-   right beside the 96T disc). The drum is therefore 139 long
-   (z −75..+64) instead of the book's ~150, the back strap/block stay
-   under z 69, and the j = 19 drum station (z 65.5..68.5) goes
-   uncovered — engaged alignment would turn 19 of the 20 gears. The
-   region is occluded by the frustum/A-frame in all eight ch30 plates,
-   so render fidelity is unaffected. Revisit only if the frustum is
-   ever re-measured slimmer.
+10. **Alignment-pinion drum shaves 0.28 mm of the last gear face**
+   (ch. 25, M6.8 rework — supersedes the earlier "19 of 20 stations"
+   east-flank entry). With the rig moved front-centre (p002), the
+   model's cone-KNOB-post footprint (Ø32 column at (−2.1, z 90)
+   pre-mirror, plan circle from z 74) caps drum + back stub + back
+   strap hard: drum back face +68.2, stub end 73.7. The j = 19 gear
+   face spans z 65.48..68.48, so its last 0.28 mm (≈ 10% of the 3 mm
+   face) overhangs the drum — all 20 gears still engage, the last at
+   90% face width. The real machine's knob post plainly sits a touch
+   further back; revisit only if the post is ever re-measured.
+11. **Lift-rod cam pins shortened and parked down** (ch. 25, M6.8) —
+   the real engage mechanism's pins bear obliquely on the swing-strap
+   flanks; the model's Ø4 pins point straight down in the disengaged
+   rest state and stop ~2 mm short of the strap edges (lift rod at 15.0
+   from the pivot bore, pin tips 0.82 above the base top). The
+   lever-cam kinematics are not modeled — visual reproduction only.
 
 
 
