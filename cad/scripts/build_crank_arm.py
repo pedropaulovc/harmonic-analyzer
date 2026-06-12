@@ -93,9 +93,19 @@ async def build(adapter) -> dict[str, str]:
         f"dimension arm length = {ARM_END_X:g}",
         await adapter.add_sketch_dimension(bottom, None, "linear", ARM_END_X),
     )
-    # The dimensioned bottom line stays out of fix_entities: fixing already
-    # dimensioned geometry over-defines the sketch.
-    await ensure_fully_defined(adapter, "arm outline", fix_entities=[arc, top, right])
+    # Boss cap: centre at the origin + radius + both ends on the Y axis
+    # fully pin the semicircle; the merged chain follows.
+    check(
+        "boss centre -> origin",
+        await adapter.add_sketch_constraint(f"{arc}.center", "origin", "coincident"),
+    )
+    check("boss radius", await adapter.add_sketch_dimension(arc, None, "radial", HALF_WIDTH))
+    for point in (f"{arc}.start", f"{arc}.end"):
+        check(
+            f"{point} on Y axis",
+            await adapter.add_sketch_constraint(point, "origin", "vertical_points"),
+        )
+    await ensure_fully_defined(adapter, "arm outline")
     check("exit_sketch outline", await adapter.exit_sketch())
     check(
         "extrude arm",
