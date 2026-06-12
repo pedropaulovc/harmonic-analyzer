@@ -1256,34 +1256,6 @@
    "tier": 3
   },
   {
-   "id": "harmonic_analyzer--ch07-p001-img18",
-   "model": "harmonic_analyzer",
-   "reference": {
-    "path": "references/albert-michelsons-harmonic-analyzer/ch07_images/page001_img18.png",
-    "source": "book ch07"
-   },
-   "camera": {
-    "mode": "euler",
-    "roll_deg": 0.0,
-    "zoom": 1.0,
-    "target_mm": null,
-    "perspective": null,
-    "az_deg": -145,
-    "el_deg": 12
-   },
-   "align": {
-    "scale": 1.0,
-    "dx_px": 0,
-    "dy_px": 0
-   },
-   "component_focus": [
-    "harmonic_analyzer"
-   ],
-   "status": "rough",
-   "notes": "High-res whole-machine back-left three-quarter on black; all major subsystems visible; same shot as img19 jpeg",
-   "tier": 3
-  },
-  {
    "id": "harmonic_analyzer--ch07-p001-img19",
    "model": "harmonic_analyzer",
    "reference": {
@@ -4513,34 +4485,6 @@
    "tier": 4
   },
   {
-   "id": "harmonic_analyzer--ch26-p002-img05",
-   "model": "harmonic_analyzer",
-   "reference": {
-    "path": "references/albert-michelsons-harmonic-analyzer/ch26_images/page002_img05.jpeg",
-    "source": "book ch26"
-   },
-   "camera": {
-    "mode": "euler",
-    "roll_deg": 0.0,
-    "zoom": 1.0,
-    "target_mm": null,
-    "perspective": null,
-    "az_deg": -25,
-    "el_deg": 10
-   },
-   "align": {
-    "scale": 1.0,
-    "dx_px": 0,
-    "dy_px": 0
-   },
-   "component_focus": [
-    "harmonic_analyzer"
-   ],
-   "status": "rough",
-   "notes": "Gaertner catalogue halftone Fig. A1001: complete 80-element analyzer (taller variant, not the 20-element CAD subject); front-left perspective",
-   "tier": 4
-  },
-  {
    "id": "harmonic_analyzer--ch26-p002-img06",
    "model": "harmonic_analyzer",
    "reference": {
@@ -4608,34 +4552,6 @@
    "status": "rough",
    "notes": "Fig 1: clean side-elevation line drawing of one element - eccentric A, lever B, rod R, springs s, counter-spring S, cone D",
    "tier": 1
-  },
-  {
-   "id": "harmonic_analyzer--ch28-p004-img01",
-   "model": "harmonic_analyzer",
-   "reference": {
-    "path": "references/albert-michelsons-harmonic-analyzer/ch28_images/page004_img01.jpeg",
-    "source": "book ch28"
-   },
-   "camera": {
-    "mode": "euler",
-    "roll_deg": 0.0,
-    "zoom": 1.0,
-    "target_mm": null,
-    "perspective": null,
-    "az_deg": 60,
-    "el_deg": 15
-   },
-   "align": {
-    "scale": 1.0,
-    "dx_px": 0,
-    "dy_px": 0
-   },
-   "component_focus": [
-    "harmonic_analyzer"
-   ],
-   "status": "rough",
-   "notes": "Plate I: halftone photo of the original 80-element machine, 3/4 view (rod bank face-on, output left, cone D right); az approximate, geometry differs from 20-element CAD",
-   "tier": 4
   },
   {
    "id": "harmonic_analyzer--ch30-p002-img01",
@@ -11733,43 +11649,6 @@
    ],
    "status": "rough",
    "notes": "Caption: 'gears on the cylinder engage gears on the cone'",
-   "tier": 3
-  },
-  {
-   "id": "harmonic_analyzer--v4-t0137",
-   "model": "harmonic_analyzer",
-   "reference": {
-    "path": "references/engineerguy-youtube/stills/full/v4_t00408.png",
-    "source": "engineerguy video 4 @ 408s"
-   },
-   "camera": {
-    "mode": "euler",
-    "roll_deg": 0.0,
-    "zoom": 1.0,
-    "target_mm": null,
-    "perspective": null,
-    "az_deg": 15,
-    "el_deg": 8,
-    "frame_components": [
-     "cone_knob_post",
-     "cone_gear",
-     "cylinder_gear",
-     "cone_pivot_post"
-    ]
-   },
-   "align": {
-    "scale": 1.0,
-    "dx_px": 0,
-    "dy_px": 0
-   },
-   "component_focus": [
-    "cone_knob_post",
-    "cone_gear",
-    "cylinder_gear",
-    "cone_pivot_post"
-   ],
-   "status": "rough",
-   "notes": "Cone disengage knob (chrome) between cylinder gear end disc and green post; finger entering frame",
    "tier": 3
   },
   {
