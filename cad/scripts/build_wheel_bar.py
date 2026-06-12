@@ -35,6 +35,7 @@ from _common import (
     apply_material,
     check,
     define_circle,
+    define_rectilinear_chain,
     ensure_fully_defined,
     report_mass_properties,
     run_build,
@@ -58,16 +59,15 @@ async def build(adapter) -> dict[str, str]:
 
     half = BAR_SIDE / 2.0
     check("create_sketch bar", await adapter.create_sketch("Front"))
-    outline = await add_line_chain(
-        adapter,
-        [
-            (-BAR_LENGTH / 2.0, -half),
-            (BAR_LENGTH / 2.0, -half),
-            (BAR_LENGTH / 2.0, half),
-            (-BAR_LENGTH / 2.0, half),
-        ],
-    )
-    await ensure_fully_defined(adapter, "bar sketch", fix_entities=outline)
+    bar_rect = [
+        (-BAR_LENGTH / 2.0, -half),
+        (BAR_LENGTH / 2.0, -half),
+        (BAR_LENGTH / 2.0, half),
+        (-BAR_LENGTH / 2.0, half),
+    ]
+    outline = await add_line_chain(adapter, bar_rect)
+    await define_rectilinear_chain(adapter, outline, bar_rect, label="bar")
+    await ensure_fully_defined(adapter, "bar sketch")
     check("exit_sketch bar", await adapter.exit_sketch())
     check(
         "extrude bar",
