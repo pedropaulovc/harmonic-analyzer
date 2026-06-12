@@ -258,10 +258,11 @@ CLIP_SCREW_XY = ((-245.0, 320.0), (-245.0, 429.0), (27.0, 320.0), (27.0, 429.0))
 # Magnifying-bracket flange screws: Rx(-90) points the shank +Y through the
 # flange band (988.9..992.9), tip flush with the plate bottom (engagement
 # into the summing lever's plate not modeled); the O5.5 heads hang in free
-# air below, 1.9 clear of channel spring j=0.
+# air below, 1.9 clear of channel spring j=0 and 0.25 off the arm's z -70
+# face.
 FLANGE_SCREW_X = (-33.0, -41.0)  # machine +33/+41: inset 4 from the flange ends
 FLANGE_SCREW_POS_Y = 988.9  # flange bottom
-FLANGE_SCREW_Z = -67.5  # the under-plate strip, clear of the bracket arm
+FLANGE_SCREW_Z = -67.0  # the under-plate strip (bracket SCREW_HOLE_Z 18.0)
 # Column-clamp pinch screws on each clamp's back face (z -88), backed out:
 # the shank tip (-94.2) stays 0.2 inside the back-wall hole (inner end
 # -94.4) and 0.3 off the column surface (-94.5).

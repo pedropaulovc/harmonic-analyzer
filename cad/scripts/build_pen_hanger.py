@@ -8,9 +8,10 @@ VERTICAL, so the channel is cut along Y through the block (an M6.4 fix:
 the first build wrongly tunnelled it along Z). The block reaches
 forward (-Z in the machine) so the pen rod hangs clear of the platen
 paper plane while the strap stays flush on the bar. M6.10 fasteners
-pass: an O3.6 through-hole near the strap top (local (-2.5, 60) =
-machine (-5.5, 565)) takes the hanger-screw shank coming through the
-bar FROM BEHIND (the magnifying wheel's rim back face passes 1.0 in
+pass: an O3.6 through-hole near the strap top (local (-8.5, 60) =
+machine (-5.5, 565): the "x0" placement mirrors the ORIGIN to +3 and
+keeps locals as-authored) takes the hanger-screw shank coming through
+the bar FROM BEHIND (the magnifying wheel's rim back face passes 1.0 in
 front of the strap, so no front-side head fits); the tip sits 0.5
 behind the strap front face.
 
@@ -56,8 +57,10 @@ STRAP_TOP_Y = 65.0  # machine 570: support bar top (derived)
 STRAP_TOP_X = (-16.0, 0.0)  # 16 wide at the bar (low; M6.8-mirrored lean)
 STRAP_BOT_X = (-5.0, 5.0)  # 10 wide at the block (low)
 SCREW_HOLE_DIA = 3.6  # M6.10: hanger-screw hole near the strap top
-SCREW_HOLE_XY = (-2.5, 60.0)  # machine (-5.5, 565): on the bar band, within
-# the 5-wide strap/bar overlap east of the bar's free end (machine -8)
+SCREW_HOLE_XY = (-8.5, 60.0)  # machine (-5.5, 565) = block centre +3 + local:
+# within the 5-wide strap/bar overlap east of the bar's free end (machine
+# -8); strap band at y 60 is local -15.1..0.4, so the hole sits 4.8/7.1
+# from the strap edges
 
 
 async def _volume(adapter) -> float:
