@@ -33,6 +33,8 @@ from _common import (
     PANEL_BLACK,
     check,
     define_circle,
+    define_polygon_chain,
+    define_rectilinear_chain,
     ensure_fully_defined,
     extrude_at_offset,
     report_mass_properties,
@@ -90,17 +92,16 @@ async def build(adapter) -> dict[str, str]:
     # 1. Diamond knife bar (Front sketch, mid-plane along Z).
     check("create_sketch bar", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    diamond = await add_line_chain(
-        adapter,
-        [
-            (0.0, 0.0),
-            (HALF_DIAG, -HALF_DIAG),
-            (0.0, -2.0 * HALF_DIAG),
-            (-HALF_DIAG, -HALF_DIAG),
-        ],
-    )
+    diamond_pts = [
+        (0.0, 0.0),
+        (HALF_DIAG, -HALF_DIAG),
+        (0.0, -2.0 * HALF_DIAG),
+        (-HALF_DIAG, -HALF_DIAG),
+    ]
+    diamond = await add_line_chain(adapter, diamond_pts)
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "bar sketch", fix_entities=diamond)
+    await define_polygon_chain(adapter, diamond, diamond_pts, label="diamond")
+    await ensure_fully_defined(adapter, "bar sketch")
     check("exit_sketch bar", await adapter.exit_sketch())
     check(
         "extrude bar",
@@ -116,16 +117,15 @@ async def build(adapter) -> dict[str, str]:
 
     # 2. Block; the bar's lower vee sinks into its top (merged).
     check("create_sketch block", await adapter.create_sketch("Front"))
-    block = await add_line_chain(
-        adapter,
-        [
-            (-BLOCK_HALF_X, BLOCK_TOP_Y - BLOCK_HEIGHT),
-            (BLOCK_HALF_X, BLOCK_TOP_Y - BLOCK_HEIGHT),
-            (BLOCK_HALF_X, BLOCK_TOP_Y),
-            (-BLOCK_HALF_X, BLOCK_TOP_Y),
-        ],
-    )
-    await ensure_fully_defined(adapter, "block sketch", fix_entities=block)
+    block_rect = [
+        (-BLOCK_HALF_X, BLOCK_TOP_Y - BLOCK_HEIGHT),
+        (BLOCK_HALF_X, BLOCK_TOP_Y - BLOCK_HEIGHT),
+        (BLOCK_HALF_X, BLOCK_TOP_Y),
+        (-BLOCK_HALF_X, BLOCK_TOP_Y),
+    ]
+    block = await add_line_chain(adapter, block_rect)
+    await define_rectilinear_chain(adapter, block, block_rect, label="block")
+    await ensure_fully_defined(adapter, "block sketch")
     check("exit_sketch block", await adapter.exit_sketch())
     check(
         "extrude block",
