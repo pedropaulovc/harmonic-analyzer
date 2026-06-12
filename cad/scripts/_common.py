@@ -828,6 +828,8 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     # flat z-extrusion (x-asymmetric slack run); explicit c = BAND_T/2,
     # no STL yet at first build
     "drive-chain": ("z", 2.25),
+    # centred symmetric bar; explicit c, no STL yet at first build
+    "wheel-bar": ("x", 0.0),
     # parts whose build scripts are themselves mirrored (M6.8)
     "summing-lever": "x0",
     "magnifying-bracket": "x0",

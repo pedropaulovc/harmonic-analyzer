@@ -131,6 +131,7 @@ FIXTURE_Y0 = 926.0  # collar y 926..934 on the vertical rod
 
 # --- wheel -------------------------------------------------------------------
 WHEEL_X = -53.0
+WHEEL_BAR_X0 = -92.0  # wheel-bar centre: span -192 (west clamp) .. +8
 from build_wheel_axle import FLANGE_LEN, STUD_LEN  # noqa: E402
 
 WHEEL_MID_Z = BAR_FRONT_Z - FLANGE_LEN - (STUD_LEN - 4.0) / 2.0  # -146.9:
@@ -370,8 +371,7 @@ async def build(adapter) -> dict[str, str]:
                  [0.0, 0.0, 0.0], IDENTITY)
 
     # --- support bars + clamps -----------------------------------------------
-    for label, bar_y in (("wheel", WHEEL_BAR_Y), ("top-rail", TOP_RAIL_Y),
-                         ("bot-rail", BOT_RAIL_Y)):
+    for label, bar_y in (("top-rail", TOP_RAIL_Y), ("bot-rail", BOT_RAIL_Y)):
         await _place(adapter, "support-bar", [0.0, bar_y, BAR_Z],
                      [0.0, 0.0, 0.0], IDENTITY, label=f"support-bar ({label})")
         for sx in (-1.0, 1.0):
@@ -379,6 +379,15 @@ async def build(adapter) -> dict[str, str]:
             await _place(adapter, "column-clamp", [sx * COLUMN_X, bar_y, COLUMN_Z],
                          [0.0, 90.0, 0.0], ROT_Y_POS90,
                          label=f"column-clamp ({label} x{sx * COLUMN_X:+.0f})")
+    # Magnifying-wheel bar: HALF-width (every ch30 plate shows it clamped
+    # at ONE column with a free end just past the pen hanger -- M6.8
+    # 8-view pass). Span -192..+8 covers the axle (-53) and the hanger
+    # strap top (-19..-3).
+    await _place(adapter, "wheel-bar", [WHEEL_BAR_X0, WHEEL_BAR_Y, BAR_Z],
+                 [0.0, 0.0, 0.0], IDENTITY)
+    await _place(adapter, "column-clamp", [-COLUMN_X, WHEEL_BAR_Y, COLUMN_Z],
+                 [0.0, 90.0, 0.0], ROT_Y_POS90,
+                 label=f"column-clamp (wheel x{-COLUMN_X:.0f})")
 
     # --- magnifying wheel -----------------------------------------------------
     # Rx(-90): the axle's +Y axis points -Z (flange on the bar front face).
