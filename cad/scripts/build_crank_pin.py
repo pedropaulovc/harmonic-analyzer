@@ -62,7 +62,7 @@ async def build(adapter) -> dict[str, str]:
         ],
     )
     set_sketch_direct_db(adapter, False)
-    big_end, _taper, small_end = lines
+    big_end, _taper, small_end, _axis_closure = lines
     # 8-DOF profile: the centerline merged into the (0, 0) /
     # (PIN_LENGTH, 0) chain ends, so horizontal + a length dim on it keep
     # the small end on the axis; the taper line rides its pinned

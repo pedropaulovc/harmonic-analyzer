@@ -24,6 +24,7 @@ from _common import (
     add_line_chain,
     apply_material,
     check,
+    define_rectilinear_chain,
     ensure_fully_defined,
     report_mass_properties,
     run_build,
@@ -48,25 +49,24 @@ async def build(adapter) -> dict[str, str]:
     y_tip = SHAFT_LEN + COLLAR_LEN
     check("create_sketch profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    centerline = check(
+    check(
         "axis centerline",
         await adapter.add_centerline(0.0, 0.0, 0.0, y_tip),
     )
-    profile = await add_line_chain(
-        adapter,
-        [
-            (0.0, 0.0),
-            (SHAFT_DIA / 2.0, 0.0),
-            (SHAFT_DIA / 2.0, SHAFT_LEN),
-            (COLLAR_DIA / 2.0, SHAFT_LEN),
-            (COLLAR_DIA / 2.0, y_tip),
-            (0.0, y_tip),
-        ],
-    )
+    profile_pts = [
+        (0.0, 0.0),
+        (SHAFT_DIA / 2.0, 0.0),
+        (SHAFT_DIA / 2.0, SHAFT_LEN),
+        (COLLAR_DIA / 2.0, SHAFT_LEN),
+        (COLLAR_DIA / 2.0, y_tip),
+        (0.0, y_tip),
+    ]
+    profile = await add_line_chain(adapter, profile_pts)
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(
-        adapter, "stub profile", fix_entities=[centerline, *profile]
-    )
+    # The centerline merged into the (0, 0)/(0, y_tip) profile corners at
+    # creation, so the closed chain's own constraints define it too.
+    await define_rectilinear_chain(adapter, profile, profile_pts, label="stub")
+    await ensure_fully_defined(adapter, "stub profile")
     check("exit_sketch profile", await adapter.exit_sketch())
     check("revolve stub", await adapter.create_revolve(RevolveParameters(angle=360.0)))
 
