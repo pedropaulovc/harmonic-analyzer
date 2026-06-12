@@ -21,6 +21,26 @@ from ``adapter._sketch_entities`` — no adapter changes required yet:
 Run (SolidWorks already open)::
 
     C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\probe_point_anchoring.py
+
+Results (2026-06-12, SW 2026 / 3DEXPERIENCE, 11/11 PASS):
+
+* Point accessors resolve as METHOD CALLS after ``flag_methods`` (the
+  bare-attribute pattern is not needed).
+* Origin: ``SelectByID2("Point1@Origin", "EXTSKETCHPOINT", ...)`` works,
+  but ONLY with the typed ``com_variant.null_callout()`` — a bare ``None``
+  callout makes SelectByID2 return False for every name.
+* Explicit coincident centre->origin is safe even when creation-time
+  inference already anchored the point (no over-definition).
+* Unsigned H/V point-to-point driving dims keep a (-20,-15) centre on the
+  negative side through ForceRebuild3; sketch fully defined. No
+  construction-line fallback needed.
+* Diameter dims on non-fixed circles land DRIVING (DrivenState=2).
+* Plain ``horizontal`` (enum 4) works directly between two points —
+  HORIZPOINTS(25) not required.
+* MERGEPOINTS(42) works but destroys the absorbed point's COM handle
+  ("disconnected from its clients") — point refs must be re-resolved after
+  a merge, which the lazy suffix-resolution adapter design does naturally.
+* ATMIDDLE(12) works (point onto line).
 """
 
 from __future__ import annotations
@@ -64,8 +84,30 @@ def _get_point(adapter: Any, entity: Any, iface: str, member: str) -> tuple[Any,
     return None, "unresolved"
 
 
+def _origin_feature_names(adapter: Any) -> list[str]:
+    """Names of origin-typed features in the tree (locale-proof candidates)."""
+    from _common import _read_member
+
+    names: list[str] = []
+    feat = _read_member(adapter.currentModel, "FirstFeature")
+    for _ in range(200):
+        if not feat:
+            break
+        _flag(adapter, feat, "IFeature")
+        if _read_member(feat, "GetTypeName2") == "OriginProfileFeature":
+            names.append(str(_read_member(feat, "Name")))
+        feat = _read_member(feat, "GetNextFeature")
+    return names
+
+
 def _resolve_origin(adapter: Any) -> tuple[Any, str]:
-    """Try SelectByID2 name candidates; recover the dispatch from the selmgr."""
+    """Try SelectByID2 name candidates; recover the dispatch from the selmgr.
+
+    Callout must be the typed null from ``com_variant.null_callout`` — a bare
+    ``None`` makes SelectByID2 fail outright on this build.
+    """
+    from solidworks_mcp.adapters.com_variant import null_callout
+
     model = adapter.currentModel
     _flag(adapter, model, "IModelDoc2")
     ext = model.Extension
@@ -73,33 +115,33 @@ def _resolve_origin(adapter: Any) -> tuple[Any, str]:
     sel_mgr = model.SelectionManager
     _flag(adapter, sel_mgr, "ISelectionMgr")
 
-    sketch_name = adapter._attempt(
-        lambda: model.GetActiveSketch2().Name, default=""
-    ) or ""
-    candidates = [
-        ("Point1@Origin", "EXTSKETCHPOINT"),
-        (f"Point1@Origin@{sketch_name}", "EXTSKETCHPOINT"),
-        ("Point1@@Origin", "EXTSKETCHPOINT"),
-        ("", "EXTSKETCHPOINT"),  # empty name = select by location (0,0,0)
-    ]
+    candidates = [("Point1@Origin", "EXTSKETCHPOINT")]
+    for feature_name in _origin_feature_names(adapter):
+        candidates.append((f"Point1@{feature_name}", "EXTSKETCHPOINT"))
+    candidates.append(("", "EXTSKETCHPOINT"))  # select by location (0,0,0)
+
+    attempts: list[str] = []
     for name, type_name in candidates:
         model.ClearSelection2(True)
         ok = adapter._attempt(
             lambda n=name, t=type_name: bool(
-                ext.SelectByID2(n, t, 0.0, 0.0, 0.0, False, 0, None, 0)
+                ext.SelectByID2(n, t, 0.0, 0.0, 0.0, False, 0, null_callout(), 0)
             ),
             default=False,
         )
         if not ok:
+            attempts.append(f"{name or '<empty>'}:select=False")
             continue
         obj = adapter._attempt(lambda: sel_mgr.GetSelectedObject6(1, -1), default=None)
         model.ClearSelection2(True)
         if obj is None:
+            attempts.append(f"{name or '<empty>'}:no-dispatch")
             continue
         xyz = _xyz(adapter, obj)
         if xyz is not None and max(abs(c) for c in xyz) < 1e-6:
             return obj, f"SelectByID2({name or '<empty>'!r}, {type_name!r})"
-    return None, "all candidates failed"
+        attempts.append(f"{name or '<empty>'}:xyz={xyz}")
+    return None, "; ".join(attempts)
 
 
 def _add_relation_raw(adapter: Any, objs: list[Any], enum_value: int) -> Any:
@@ -213,10 +255,11 @@ async def build(adapter) -> dict[str, str]:
     # Step 3: coincident centre -> origin. Creation-time inference may have
     # anchored it already, so capture the state before and after.
     state_before = await _sketch_state(adapter)
-    coincident_ok = False
+    coincident_result = "skipped (no origin)"
     if center_a is not None and origin is not None:
         rel = _add_relation_raw(adapter, [center_a, origin], 9)
-        coincident_ok = rel is not None
+        coincident_result = "ok" if rel is not None else "None/failed"
+    state_mid = await _sketch_state(adapter)
     dia_a = check(
         "diameter dim A (16)",
         await adapter.add_sketch_dimension(circle_a, None, "diameter", 16.0),
@@ -225,8 +268,8 @@ async def build(adapter) -> dict[str, str]:
     record(
         "3 coincident centre->origin",
         state_a == "fully_defined",
-        f"AddRelation(9)={'ok' if coincident_ok else 'None/failed'}, "
-        f"state before={state_before}, after dia={state_a}",
+        f"AddRelation(9)={coincident_result}, state: created={state_before}, "
+        f"+coincident={state_mid}, +dia={state_a}",
     )
     dia_a_driven = _driven_state(adapter, adapter._sketch_entities[dia_a])
 
@@ -303,11 +346,18 @@ async def build(adapter) -> dict[str, str]:
 
     if l1_end is not None and l2_start is not None:
         rel42 = _add_relation_raw(adapter, [l1_end, l2_start], 42)
-        xyz_l2 = _xyz(adapter, l2_start)
+        # Merging destroys one of the point objects — the old handle throws
+        # "disconnected from its clients". Re-resolve freshly (the lazy-ref
+        # lesson the adapter design relies on).
+        l2_start_fresh, _ = _get_point(
+            adapter, adapter._sketch_entities[line_2], "ISketchLine", "GetStartPoint2"
+        )
+        xyz_l2 = _xyz(adapter, l2_start_fresh) if l2_start_fresh is not None else None
+        merged = xyz_l2 is not None and abs(xyz_l2[0] - 20.0) < 1e-3 and abs(xyz_l2[1] - (-30.0)) < 1e-3
         record(
             "7a MERGEPOINTS(42)",
-            rel42 is not None,
-            f"L2.start after merge={xyz_l2} (expect (20,-30))",
+            rel42 is not None and merged,
+            f"AddRelation={'ok' if rel42 else 'failed'}, L2.start re-resolved={xyz_l2} (expect (20,-30))",
         )
     else:
         record("7a MERGEPOINTS(42)", False, "endpoint resolution failed")
