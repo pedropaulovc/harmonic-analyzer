@@ -173,7 +173,12 @@ KNOB_SHAFT_XY = (
     PINION_AXIS[0] + LATCH_C2C * math.cos(math.radians(LATCH_ANGLE_DEG)),
     PINION_AXIS[1] + LATCH_C2C * math.sin(math.radians(LATCH_ANGLE_DEG)),
 )
-SPROCKET_Z0 = -81.0  # = drive-train SPROCKET_Z0: shared chain plane -78.75
+SPROCKET_Z0 = -81.0  # knob sprocket band -81..-76.5 (mid -78.75); the crank
+# sprocket sits one face-width south (drive-train SPROCKET_Z0 -85.6, mid
+# -83.35) -- the real chain bridges the 4.6 offset with a 1.8 deg skew
+CHAIN_Z0 = -83.3  # flat drive-chain band -83.3..-78.8 splits the two sprocket
+# mid-planes; the band floats radially outside the tooth tips so the z
+# overlap with either sprocket cannot interfere
 
 # --- pen ---------------------------------------------------------------------
 PEN_ROD_X = -3.0
@@ -419,6 +424,12 @@ async def build(adapter) -> dict[str, str]:
                  [-90.0, 0.0, 0.0], ROT_X_NEG90)
     await _place(adapter, "chain-sprocket",
                  [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], SPROCKET_Z0],
+                 [0.0, 0.0, 0.0], IDENTITY)
+    # Local origin = knob sprocket centre; the crank-side wrap reaches the
+    # drive-train sprocket at (118, 126.8) (build_drive_chain KNOB_CENTRE/
+    # CRANK_CENTRE -- keep in sync with KNOB_SHAFT_XY).
+    await _place(adapter, "drive-chain",
+                 [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], CHAIN_Z0],
                  [0.0, 0.0, 0.0], IDENTITY)
 
     # --- pen group ------------------------------------------------------------
