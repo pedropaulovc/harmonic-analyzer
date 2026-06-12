@@ -631,6 +631,29 @@ async def apply_material(adapter: Any, material: str) -> None:
     )
 
 
+CASTING_GREEN = (0.13, 0.45, 0.42)  # sampled from the ch30 studio photos
+
+
+async def apply_color(adapter: Any, rgb: tuple[float, float, float]) -> None:
+    """Explicit part display colour, overriding the material appearance.
+
+    The real machine's frame castings are green-painted, but their database
+    material ("Gray Cast Iron") renders dark gray — those parts call this
+    after apply_material. The comparison render cache reads the same
+    override (export_models doc_rgb cascade).
+    """
+    from solidworks_mcp.adapters.com_variant import double_array
+
+    doc = adapter.currentModel
+    # [R,G,B, ambient, diffuse, specular, shininess, transparency, emission]
+    doc.MaterialPropertyValues = double_array([*rgb, 1.0, 1.0, 0.3, 0.31, 0.0, 0.0])
+    back = tuple(float(v) for v in (doc.MaterialPropertyValues or ())[:3])
+    # SolidWorks quantises to 8 bits per channel
+    if len(back) != 3 or any(abs(b - w) > 1 / 255 for b, w in zip(back, rgb)):
+        raise RuntimeError(f"colour readback mismatch: set {rgb}, got {back}")
+    log(f"colour override {tuple(round(v, 3) for v in back)}")
+
+
 async def measure_check(
     adapter: Any,
     label: str,

@@ -28,7 +28,9 @@ from __future__ import annotations
 import sys
 
 from _common import (
+    CASTING_GREEN,
     add_line_chain,
+    apply_color,
     apply_material,
     check,
     ensure_fully_defined,
@@ -144,6 +146,7 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"ears: added {added:.1f}, expected {v_ears:.1f}")
 
     await apply_material(adapter, MATERIAL)
+    await apply_color(adapter, CASTING_GREEN)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

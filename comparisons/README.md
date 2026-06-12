@@ -8,12 +8,13 @@ to iteratively tune the models toward the physical device. See
 
 | path | content |
 |---|---|
-| `manifest.json` | source of truth: pair id → reference, model, camera pose, 2D align, status |
-| `ref/<id>.png` | prepared reference (cropped/rotated, ≤1600 px) |
-| `render/<id>.png` | aligned CAD render (+ `.meta.json` staleness sidecar) |
-| `composite/<id>_sbs.png` | side-by-side |
-| `composite/<id>_blend.png` | red-tinted render over grayscale ref — misalignment is instantly visible |
-| `scores.json` | pair → RMS shape score (regression trend only; compare across commits) |
+| `manifest.json` | source of truth: pair id → reference, model, camera pose, 2D align, tier, status |
+| `index.html` | inspection gallery (tier + text filters; drag the ref⇆cad reveal slider) — `uv run comparisons/tools/gallery.py` |
+| `ref/<id>.jpg` | prepared reference (cropped/rotated, ≤1600 px) |
+| `render/<id>.jpg` | raw CAD render, content-trimmed, black background (+ `.meta.json` staleness/engine sidecar) |
+| `composite/<id>_cad.jpg` | render fitted into the reference frame (same scale/offset as the blend layer) — the slider's top image |
+| `composite/<id>_blend.jpg` | red-tinted render over grayscale ref — misalignment is instantly visible |
+| `scores.json` | pair → RMS shape score (regression trend only; compare across commits, same engine) |
 | `findings/iter_NNN.json` | per-iteration vision findings |
 
 ## Workflow
@@ -26,11 +27,23 @@ uv run comparisons/tools/merge_catalog.py
 uv run comparisons/tools/extract_frames.py          # full-res video keepers
 uv run comparisons/tools/seed_manifest.py
 
-# 2. render (SolidWorks open; sibling venv)
+# 2a. render via SolidWorks (SolidWorks open; sibling venv)
 C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\render_compare.py --stale-only
 #    --selftest validates the euler camera against named views pixel-wise
 
-# 3. recompute composites/scores without SolidWorks (e.g. after align edits)
+# 2b. or render offline (no SolidWorks): refresh the STL cache once after
+#     any rebuild, then Blender replays the same manifest cameras
+C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\export_models.py
+uv run comparisons/tools/render_offline.py [--only id,..] [--stale-only]
+#    parts render from their own STL; assemblies instance per-part STLs
+#    (metres, untranslated) through the scene graph in cad/out/boxes/*.json,
+#    with each component's SolidWorks appearance RGB as Workbench object
+#    colour. Ortho only; sidecars carry "engine" — score trends are only
+#    comparable within one engine. parity_check.py measures silhouette IoU
+#    between the backed-up and current renders (instanced-vs-monolith
+#    baseline: 0.99+).
+
+# 3. recompute composites/scores without rendering (e.g. after align edits)
 uv run comparisons/tools/composite.py [--only id1,id2]
 
 # 4. selective model rebuild after fixing a part script

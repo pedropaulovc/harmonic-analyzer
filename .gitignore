@@ -331,3 +331,12 @@ cad/output.*
 cad/project.toml
 cad/**/project.toml
 cad/**/thumbnail.png
+
+# Offline-render cache (regenerable: cad/scripts/export_models.py;
+# the assembly STL alone is >100 MB — over GitHub's file limit)
+cad/out/stl/
+cad/out/step/
+cad/out/boxes/
+
+# Parity-test scratch (comparisons/tools/parity_check.py)
+comparisons/.parity_sw/
