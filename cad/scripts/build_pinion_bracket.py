@@ -24,6 +24,7 @@ import sys
 
 from _common import (
     POLISHED_STEEL,
+    anchor_point_to_origin,
     apply_color,
     apply_material,
     check,
@@ -59,22 +60,52 @@ async def build(adapter) -> dict[str, str]:
     # Inference OFF: the bottom cap arc endpoints sit near the origin.
     check("create_sketch strap", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    entities = [
-        check(
-            "add bottom cap arc",
-            await adapter.add_arc(0.0, 0.0, -R_END, 0.0, R_END, 0.0),
-        ),
-        check("add right edge", await adapter.add_line(R_END, 0.0, R_END, C2C)),
-        check(
-            "add top cap arc",
-            await adapter.add_arc(0.0, C2C, R_END, C2C, -R_END, C2C),
-        ),
-        check("add left edge", await adapter.add_line(-R_END, C2C, -R_END, 0.0)),
-    ]
+    bottom_cap = check(
+        "add bottom cap arc",
+        await adapter.add_arc(0.0, 0.0, -R_END, 0.0, R_END, 0.0),
+    )
+    check("add right edge", await adapter.add_line(R_END, 0.0, R_END, C2C))
+    top_cap = check(
+        "add top cap arc",
+        await adapter.add_arc(0.0, C2C, R_END, C2C, -R_END, C2C),
+    )
+    check("add left edge", await adapter.add_line(-R_END, C2C, -R_END, 0.0))
     await define_circle(adapter, 0.0, 0.0, BORE / 2.0, "pivot bore")
     await define_circle(adapter, 0.0, C2C, BORE / 2.0, "arbor bore")
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "strap sketch", fix_entities=entities)
+    # Cap arcs: centre + radius + endpoint alignment (one angle constraint
+    # per endpoint -- centre + radius + both endpoints fully located would
+    # over-define an arc's 5 DOF). The side edges carry no relations of
+    # their own: their endpoints merged with the cap endpoints at creation,
+    # so the four h-aligned cap ends pin them too.
+    check(
+        "anchor bottom cap centre",
+        await adapter.add_sketch_constraint(
+            f"{bottom_cap}.center", "origin", "coincident"
+        ),
+    )
+    check(
+        "bottom cap radius",
+        await adapter.add_sketch_dimension(bottom_cap, None, "radial", R_END),
+    )
+    await anchor_point_to_origin(adapter, f"{top_cap}.center", 0.0, C2C, "top cap centre")
+    check(
+        "top cap radius",
+        await adapter.add_sketch_dimension(top_cap, None, "radial", R_END),
+    )
+    for cap, end in (
+        (bottom_cap, "start"),
+        (bottom_cap, "end"),
+        (top_cap, "start"),
+        (top_cap, "end"),
+    ):
+        check(
+            f"cap {end} level",
+            await adapter.add_sketch_constraint(
+                f"{cap}.{end}", f"{cap}.center", "horizontal_points"
+            ),
+        )
+    await ensure_fully_defined(adapter, "strap sketch")
     check("exit_sketch strap", await adapter.exit_sketch())
     check(
         "extrude strap",
