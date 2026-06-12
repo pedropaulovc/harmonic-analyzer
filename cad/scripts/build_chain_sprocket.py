@@ -29,9 +29,11 @@ import sys
 from _common import (
     IN,
     add_line_chain,
+    anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
+    dimension_between,
     ensure_fully_defined,
     report_mass_properties,
     run_build,
@@ -93,7 +95,10 @@ async def build(adapter) -> dict[str, str]:
     v_blank = math.pi * OUTER_RADIUS**2 * FACE_WIDTH
     volume = await volume_check(adapter, "blank", v_blank, 0.005 * v_blank)
 
-    # One roller notch on +X (fix-only recipe, inference off near the OD).
+    # One roller notch on +X (inference off near the OD). The flanks are
+    # sloped, so the trapezoid is anchored at the seat corner and spanned
+    # with point-pair dims: flank run/flare locate the tip corner, the two
+    # vertical edges carry the seat/tip widths.
     check("create_sketch notch", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     notch = await add_line_chain(
@@ -106,7 +111,29 @@ async def build(adapter) -> dict[str, str]:
         ],
     )
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "notch sketch", fix_entities=notch)
+    lower_flank, outer_edge, upper_flank, inner_edge = notch
+    for edge in (outer_edge, inner_edge):
+        check(f"notch vertical {edge}", await adapter.add_sketch_constraint(edge, None, "vertical"))
+    await anchor_point_to_origin(
+        adapter, f"{lower_flank}.start", SEAT_RADIUS, -SEAT_HALF_WIDTH, "seat corner"
+    )
+    await dimension_between(
+        adapter, f"{lower_flank}.start", f"{lower_flank}.end",
+        "horizontal_distance", NOTCH_OUTER - SEAT_RADIUS, "flank run",
+    )
+    await dimension_between(
+        adapter, f"{lower_flank}.start", f"{lower_flank}.end",
+        "vertical_distance", TIP_HALF_WIDTH - SEAT_HALF_WIDTH, "flank flare",
+    )
+    await dimension_between(
+        adapter, f"{outer_edge}.start", f"{outer_edge}.end",
+        "vertical_distance", 2.0 * TIP_HALF_WIDTH, "tip width",
+    )
+    await dimension_between(
+        adapter, f"{inner_edge}.start", f"{inner_edge}.end",
+        "vertical_distance", 2.0 * SEAT_HALF_WIDTH, "seat width",
+    )
+    await ensure_fully_defined(adapter, "notch sketch")
     check("exit_sketch notch", await adapter.exit_sketch())
     notch_cut = await adapter.create_cut_extrude(
         ExtrusionParameters(depth=FACE_WIDTH + 1.0)

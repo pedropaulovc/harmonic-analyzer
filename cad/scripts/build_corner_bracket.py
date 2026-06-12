@@ -15,8 +15,9 @@ Dimensions: cad/DIMENSIONS.md "Legacy part audit" - legacy (med).
 Layout: profile on the Front plane (width X, height +Y), plate extruded
 mid-plane in Z, foot extending +Z. The legacy file has height along Z and
 foot along +Y; this script uses the natural upright orientation instead
-(legacy y -> +Z, legacy z -> +Y). Tangent points of the tapered sides are
-computed exactly, so the sketch is fix-only (no driving dims, see _common).
+(legacy y -> +Z, legacy z -> +Y). The tapered sides carry tangent relations
+to the crown arc; the lines are still authored at the exact tangent points
+so the solver starts (and stays) on the legacy geometry.
 
 Run (SolidWorks already open)::
 
@@ -32,10 +33,12 @@ from _common import (
     CASTING_GREEN,
     IN,
     add_line_chain,
+    anchor_point_to_origin,
     apply_color,
     apply_material,
     check,
     define_circle,
+    dimension_between,
     ensure_fully_defined,
     extrude_at_offset,
     report_mass_properties,
@@ -92,20 +95,33 @@ async def build(adapter) -> dict[str, str]:
     # Upright plate: tombstone profile, extruded mid-plane in Z.
     check("create_sketch plate", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    entities = [
-        check(
-            "plate bottom edge",
-            await adapter.add_line(-HALF_BASE, 0.0, HALF_BASE, 0.0),
-        ),
-        check("plate right side", await adapter.add_line(HALF_BASE, 0.0, tx, ty)),
-        check(
-            "plate crown arc",
-            await adapter.add_arc(0.0, ARC_CENTER_Y, tx, ty, -tx, ty),
-        ),
-        check("plate left side", await adapter.add_line(-tx, ty, -HALF_BASE, 0.0)),
-    ]
+    bottom = check(
+        "plate bottom edge",
+        await adapter.add_line(-HALF_BASE, 0.0, HALF_BASE, 0.0),
+    )
+    right_side = check("plate right side", await adapter.add_line(HALF_BASE, 0.0, tx, ty))
+    crown = check(
+        "plate crown arc",
+        await adapter.add_arc(0.0, ARC_CENTER_Y, tx, ty, -tx, ty),
+    )
+    left_side = check("plate left side", await adapter.add_line(-tx, ty, -HALF_BASE, 0.0))
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "plate sketch", fix_entities=entities)
+    # The tangent relations replace the exact-coordinate construction: the
+    # solver derives the tangent points from base width + crown centre/radius.
+    check("bottom horizontal", await adapter.add_sketch_constraint(bottom, None, "horizontal"))
+    await anchor_point_to_origin(adapter, f"{bottom}.start", -HALF_BASE, 0.0, "base corner")
+    await dimension_between(
+        adapter, f"{bottom}.start", f"{bottom}.end",
+        "horizontal_distance", BASE_WIDTH, "base width",
+    )
+    await anchor_point_to_origin(adapter, f"{crown}.center", 0.0, ARC_CENTER_Y, "crown centre")
+    check(
+        "crown radius",
+        await adapter.add_sketch_dimension(crown, None, "radial", TOP_RADIUS),
+    )
+    check("right side tangent", await adapter.add_sketch_constraint(right_side, crown, "tangent"))
+    check("left side tangent", await adapter.add_sketch_constraint(left_side, crown, "tangent"))
+    await ensure_fully_defined(adapter, "plate sketch")
     check("exit_sketch plate", await adapter.exit_sketch())
     check(
         "extrude plate",
@@ -121,7 +137,7 @@ async def build(adapter) -> dict[str, str]:
     foot_half_top = HALF_BASE - side_slope * FOOT_HEIGHT
     check("create_sketch foot", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    lines = await add_line_chain(
+    foot_base, foot_right, foot_top, foot_left = await add_line_chain(
         adapter,
         [
             (-HALF_BASE, 0.0),
@@ -131,7 +147,28 @@ async def build(adapter) -> dict[str, str]:
         ],
     )
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "foot sketch", fix_entities=lines)
+    # Trapezoid: base/top horizontal, base anchored; the sloped right side
+    # is located by its own run/rise point-pair dims, the top by its length.
+    for edge in (foot_base, foot_top):
+        check(f"foot horizontal {edge}", await adapter.add_sketch_constraint(edge, None, "horizontal"))
+    await anchor_point_to_origin(adapter, f"{foot_base}.start", -HALF_BASE, 0.0, "foot corner")
+    await dimension_between(
+        adapter, f"{foot_base}.start", f"{foot_base}.end",
+        "horizontal_distance", BASE_WIDTH, "foot base width",
+    )
+    await dimension_between(
+        adapter, f"{foot_right}.start", f"{foot_right}.end",
+        "horizontal_distance", HALF_BASE - foot_half_top, "foot taper run",
+    )
+    await dimension_between(
+        adapter, f"{foot_right}.start", f"{foot_right}.end",
+        "vertical_distance", FOOT_HEIGHT, "foot height",
+    )
+    await dimension_between(
+        adapter, f"{foot_top}.start", f"{foot_top}.end",
+        "horizontal_distance", 2.0 * foot_half_top, "foot top width",
+    )
+    await ensure_fully_defined(adapter, "foot sketch")
     check("exit_sketch foot", await adapter.exit_sketch())
     extrude_at_offset(adapter, FOOT_EXTENSION, PLATE_THICKNESS / 2.0)
     print(f"  volume after foot: {await _volume(adapter):.1f} mm^3")
