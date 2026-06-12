@@ -222,6 +222,41 @@ if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
 PIVOT_POST_STATION = -1.0
 KNOB_POST_STATION = 177.0  # thin-tip journal; z 90.0, x -2.1 (p.18)
 
+# --- alignment pinion (ch. 25): carried DISENGAGED (p. 68 "gap") ---
+# The 42T DP 30 pinion drum spans all 20 drum stations on the drum's
+# far (-x) side, low (p. 67: opposite the cone/crank, hidden behind
+# the A-frame in the ch30 front plates); two swing straps butt against
+# the drum end faces and pivot on a torque shaft through base blocks;
+# the engage lever stands up (p. 68: up = disengaged, flat = engaged).
+# The straps hang exactly vertical in this pose (the pivot sits
+# directly below the pinion axis) and PINION_X backs the tip circles
+# off to the PINION_GAP clearance.
+PINION_TEETH = 42
+TIP_DRUM = (122.0 / DP_TRAIN) * 25.4 / 2.0  # 51.647: 120T tip radius
+TIP_PINION = ((PINION_TEETH + 2.0) / DP_TRAIN) * 25.4 / 2.0  # 18.627
+PINION_GAP = 2.0  # disengaged tip clearance
+PINION_DRUM_LEN = 150.0  # build_alignment_pinion FACE_WIDTH
+PIVOT_Y = Y_BASE_TOP + 10.3  # 61.1: pivot-block bore height
+PINION_Y = PIVOT_Y + 47.0  # 108.1: strap c2c (build_pinion_bracket C2C)
+PINION_X = X_DRUM - math.sqrt(
+    (TIP_DRUM + TIP_PINION + PINION_GAP) ** 2 - (Y_DRIVE - PINION_Y) ** 2
+)  # -117.31
+STRAP_T = 5.0  # build_pinion_bracket THICKNESS
+BLOCK_T = 12.0  # build_pinion_pivot_block DEPTH
+PINION_SHAFT_Z0 = -89.0  # ball centre; the Ø16 ball reaches z -97, 2.9
+# clear of the A-frame back face (frame.SLDASM: z -99.9 pre-mirror)
+LEVER_TILT_DEG = 32.0  # from vertical, toward -x: the lever axis passes
+# 47*sin(tilt) = 24.9 from the pinion axis -> 3.3 clear of rod vs tips
+LEVER_Z = -59.0  # rod surface 1.0 behind the front block's back face
+
+# Drum coverage and lever clearance self-checks.
+if Z_DRUM0 - DRUM_FACE / 2.0 < -PINION_DRUM_LEN / 2.0 + 1.0:
+    raise AssertionError("alignment pinion too short at the front station")
+if Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0 > PINION_DRUM_LEN / 2.0 - 1.0:
+    raise AssertionError("alignment pinion too short at the back station")
+if 47.0 * math.sin(math.radians(LEVER_TILT_DEG)) - TIP_PINION - 3.0 < 1.0:
+    raise AssertionError("engage lever fouls the pinion drum")
+
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 ROT_X_POS90 = [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0]]
 ROT_Y_POS90 = [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]
@@ -432,6 +467,59 @@ async def build(adapter) -> dict[str, str]:
         [post[0], Y_BASE_TOP, post[2]],
         [0.0, -INCLINE_DEG, 0.0],
         ROT_Y_INCLINE,
+    )
+
+    # --- alignment pinion (ch. 25, disengaged rest state) ---
+    await _place(
+        adapter,
+        "alignment-pinion",
+        [PINION_X, PINION_Y, -PINION_DRUM_LEN / 2.0],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+    )
+    for tag, z0 in (
+        ("front", -PINION_DRUM_LEN / 2.0 - STRAP_T),
+        ("back", PINION_DRUM_LEN / 2.0),
+    ):
+        await _place(
+            adapter,
+            "pinion-bracket",
+            [PINION_X, PIVOT_Y, z0],
+            [0.0, 0.0, 0.0],
+            IDENTITY,
+            label=f"pinion-bracket {tag}",
+        )
+    for tag, z0 in (
+        ("front", -PINION_DRUM_LEN / 2.0),
+        ("back", PINION_DRUM_LEN / 2.0 - BLOCK_T),
+    ):
+        await _place(
+            adapter,
+            "pinion-pivot-block",
+            [PINION_X, PIVOT_Y, z0],
+            [0.0, 0.0, 0.0],
+            IDENTITY,
+            label=f"pinion-pivot-block {tag}",
+        )
+    await _place(
+        adapter,
+        "pinion-pivot-shaft",
+        [PINION_X, PIVOT_Y, PINION_SHAFT_Z0],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+    )
+    tilt = math.radians(LEVER_TILT_DEG)
+    await _place(
+        adapter,
+        "pinion-lever",
+        [
+            PINION_X - 3.175 * math.sin(tilt),
+            PIVOT_Y + 3.175 * math.cos(tilt),
+            LEVER_Z,
+        ],
+        [0.0, 0.0, LEVER_TILT_DEG],
+        rot_z_rows(LEVER_TILT_DEG),
+        label="pinion-lever (root tangent on the torque shaft)",
     )
 
     assert_components_fully_defined(adapter)
