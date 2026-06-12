@@ -43,10 +43,17 @@ uv run comparisons/tools/render_offline.py [--only id,..] [--stale-only]
 #    between the backed-up and current renders (instanced-vs-monolith
 #    baseline: 0.99+).
 
-# 3. recompute composites/scores without rendering (e.g. after align edits)
+# 3. hand-tune a pose: windowed Blender opens the pair's render scene with
+#    the photo as a half-transparent camera background; the viewport is
+#    locked to the render camera, so orbit/pan IS the adjustment (sidebar
+#    N > Pose: ortho scale = zoom, photo opacity, Save pose to manifest).
+#    Saved az/el/roll/target_mm/zoom re-render via --stale-only above.
+uv run comparisons/tools/pose_edit.py <pair-id>    # --selftest: math check
+
+# 4. recompute composites/scores without rendering (e.g. after align edits)
 uv run comparisons/tools/composite.py [--only id1,id2]
 
-# 4. selective model rebuild after fixing a part script
+# 5. selective model rebuild after fixing a part script
 C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_all.py --rebuild cone_gear
 ```
 

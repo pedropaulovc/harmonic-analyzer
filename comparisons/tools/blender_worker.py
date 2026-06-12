@@ -128,9 +128,13 @@ def build_assembly(job):
 
 
 def resolve_framing(cam, boxes, mesh_lo, mesh_hi):
+    zoom = float(cam.get("zoom") or 1.0)
+    t_mm = cam.get("target_mm")
+    if t_mm:
+        # hand-tuned pose (pose_edit.py) — explicit target wins over framing
+        return tuple(v / 1000.0 for v in t_mm), zoom
     focus = cam.get("frame_components") or []
     target = None
-    zoom = float(cam.get("zoom") or 1.0)
     if focus and boxes:
         pats = [re.compile(re.escape(f.replace("_", "-")) + r"(-\d+)?$") for f in focus]
         hits = [b for n, b in boxes if any(p.fullmatch(n.split("/")[-1].lower()) for p in pats)]
