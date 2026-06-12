@@ -104,7 +104,12 @@ async def cut_tooth_gap(
             f"({rc} + t * ({ra} - {rc})) * {fmt(math.sin(facts['ThetaU']))}",
         ),
     ]
-    await ensure_fully_defined(adapter, "gap sketch", fix_entities=gap_curves)
+    # Equation-driven curves are the whitelist class for fix (no free
+    # endpoints to dimension); B3 attempts a semantic scheme before keeping
+    # this escalation (cad/FIX_MIGRATION.md).
+    await ensure_fully_defined(
+        adapter, "gap sketch", fix_entities=gap_curves, allow_fix_escalation=True
+    )
     check("exit_sketch gap", await adapter.exit_sketch())
     gap_cut = await adapter.create_cut_extrude(ExtrusionParameters(depth=depth))
     check("cut tooth gap", gap_cut)
