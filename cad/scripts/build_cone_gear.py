@@ -527,8 +527,13 @@ async def build(adapter) -> dict[str, str]:
             f'({R_CLEAR_IN:g} + t * ("Ra" - {R_CLEAR_IN:g})) * sin("ThetaU")',
         ),
     ]
+    # Whitelisted fix escalation: equation-driven curves re-solve from the
+    # equation globals on regeneration -- no static relation/dimension
+    # scheme can define them without breaking that.
     try:
-        await ensure_fully_defined(adapter, "gap sketch", fix_entities=gap_curves)
+        await ensure_fully_defined(
+            adapter, "gap sketch", fix_entities=gap_curves, allow_fix_escalation=True
+        )
     except RuntimeError as exc:
         findings.append(str(exc))
         print(f"  FINDING  {exc}")
