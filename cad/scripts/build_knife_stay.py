@@ -32,6 +32,7 @@ from _common import (
     apply_material,
     check,
     define_circle,
+    define_polygon_chain,
     ensure_fully_defined,
     extrude_at_offset,
     report_mass_properties,
@@ -103,17 +104,16 @@ async def build(adapter) -> dict[str, str]:
     px, py = -dy / length * STRAP_HALF_T, dx / length * STRAP_HALF_T
     check("create_sketch strap", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    strap = await add_line_chain(
-        adapter,
-        [
-            (STRAP_TOP[0] - px, STRAP_TOP[1] - py),
-            (STRAP_TOP[0] + px, STRAP_TOP[1] + py),
-            (STRAP_BOT[0] + px, STRAP_BOT[1] + py),
-            (STRAP_BOT[0] - px, STRAP_BOT[1] - py),
-        ],
-    )
+    strap_pts = [
+        (STRAP_TOP[0] - px, STRAP_TOP[1] - py),
+        (STRAP_TOP[0] + px, STRAP_TOP[1] + py),
+        (STRAP_BOT[0] + px, STRAP_BOT[1] + py),
+        (STRAP_BOT[0] - px, STRAP_BOT[1] - py),
+    ]
+    strap = await add_line_chain(adapter, strap_pts)
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "strap sketch", fix_entities=strap)
+    await define_polygon_chain(adapter, strap, strap_pts, label="strap")
+    await ensure_fully_defined(adapter, "strap sketch")
     check("exit_sketch strap", await adapter.exit_sketch())
     # Raw-COM start-offset extrude: the adapter's mid-plane extrusion fails
     # on this direct-db quad ("Failed to create extrusion feature"), while
