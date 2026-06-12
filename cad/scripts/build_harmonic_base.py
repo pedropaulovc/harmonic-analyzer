@@ -22,9 +22,11 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
 
 from _common import (
+    define_circle,
     CASTING_GREEN,
     add_line_chain,
     apply_color,
@@ -48,6 +50,23 @@ BOTTOM_THICKNESS = 0.5 * IN  # legacy HarmonicBase.cs (photo-verify M2 note)
 TOP_LENGTH = 17.5 * IN  # legacy: 0.25" reveal per side
 TOP_WIDTH = 10.5 * IN
 TOP_THICKNESS = 1.5 * IN
+
+# M6.10 fastener holes (machine = part-local: frame.SLDASM places the
+# base unrotated at the origin). All through-drilled O8.2 (documented
+# simplification -- the rail-bolt holes need only 12.5-deep sockets):
+# 2x a-frame foot-rail hex-bolts at (74.75, z -54/+36) and 2x rocker-
+# support lag-screws at (72.9 +/- 31.75, z 101.6), the latter with O15
+# x 4.5 head counterbores up from the underside.
+HOLE_DIA = 8.2
+HOLE_XZ = (
+    (74.75, -54.0),  # a-frame foot-rail bolt (south)
+    (74.75, 36.0),  # a-frame foot-rail bolt (north)
+    (41.15, 101.6),  # rocker-support lag screw (west)
+    (104.65, 101.6),  # rocker-support lag screw (east)
+)
+CBORE_DIA = 15.0
+CBORE_DEPTH = 4.5  # lag head 14 x 4 recessed 0.5
+CBORE_XZ = HOLE_XZ[2:]
 
 MM3_PER_IN3 = IN**3
 
@@ -98,6 +117,56 @@ async def build(adapter) -> dict[str, str]:
     extrude_at_offset(adapter, TOP_THICKNESS, BOTTOM_THICKNESS)
     print(f"  volume after top plate: {await _volume(adapter):.1f} mm^3")
     # expected: 99 + 17.5 * 10.5 * 1.5 = 374.625 in^3 = 6,139,003 mm^3
+
+    # M6.10 fastener holes: Top sketch (x, y) -> global (X, -Z), mid-plane
+    # cuts so the direction never matters (below y 0 is outside the part).
+    total = BOTTOM_THICKNESS + TOP_THICKNESS
+    pre_holes = await _volume(adapter)
+    check("create_sketch fastener holes", await adapter.create_sketch("Top"))
+    for x, z in HOLE_XZ:
+        await define_circle(adapter, x, -z, HOLE_DIA / 2.0, f"hole ({x:.2f}, {z:.1f})")
+    await ensure_fully_defined(adapter, "fastener holes sketch")
+    check("exit_sketch fastener holes", await adapter.exit_sketch())
+    check(
+        "cut fastener holes",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=3.0 * total, both_directions=True)
+        ),
+    )
+    before = await _volume(adapter)
+    v_holes = len(HOLE_XZ) * math.pi * (HOLE_DIA / 2.0) ** 2 * total
+    print(f"  volume after holes: {before:.1f} mm^3 (removed analytic {v_holes:.1f})")
+    if abs((pre_holes - before) - v_holes) > 0.02 * v_holes:
+        raise RuntimeError(
+            f"holes removed {pre_holes - before:.1f}, expected {v_holes:.1f}"
+        )
+
+    # Lag-screw head counterbores up from the underside: a both-directions
+    # cut of 2x depth about the bottom plane lands exactly 0..4.5 in
+    # material (the lower half is air).
+    check("create_sketch counterbores", await adapter.create_sketch("Top"))
+    for x, z in CBORE_XZ:
+        await define_circle(adapter, x, -z, CBORE_DIA / 2.0, f"cbore ({x:.2f})")
+    await ensure_fully_defined(adapter, "counterbores sketch")
+    check("exit_sketch counterbores", await adapter.exit_sketch())
+    check(
+        "cut counterbores",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=2.0 * CBORE_DEPTH, both_directions=True)
+        ),
+    )
+    after = await _volume(adapter)
+    v_cbore = (
+        len(CBORE_XZ)
+        * math.pi
+        * ((CBORE_DIA / 2.0) ** 2 - (HOLE_DIA / 2.0) ** 2)
+        * CBORE_DEPTH
+    )
+    print(f"  volume after counterbores: {after:.1f} mm^3 (removed analytic {v_cbore:.1f})")
+    if abs((before - after) - v_cbore) > 0.02 * v_cbore:
+        raise RuntimeError(
+            f"counterbores removed {before - after:.1f}, expected {v_cbore:.1f}"
+        )
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
