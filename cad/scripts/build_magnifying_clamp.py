@@ -28,6 +28,7 @@ from _common import (
     apply_material,
     check,
     define_circle,
+    define_rectilinear_chain,
     ensure_fully_defined,
     report_mass_properties,
     run_build,
@@ -61,16 +62,15 @@ async def build(adapter) -> dict[str, str]:
 
     # Block outline: rectangle with a corner vertex on the origin.
     check("create_sketch outline", await adapter.create_sketch("Front"))
-    lines = await add_line_chain(
-        adapter,
-        [
-            (-BLOCK_WIDTH / 2.0, 0.0),
-            (BLOCK_WIDTH / 2.0, 0.0),
-            (BLOCK_WIDTH / 2.0, BLOCK_HEIGHT),
-            (-BLOCK_WIDTH / 2.0, BLOCK_HEIGHT),
-        ],
-    )
-    await ensure_fully_defined(adapter, "block outline", fix_entities=lines)
+    block_rect = [
+        (-BLOCK_WIDTH / 2.0, 0.0),
+        (BLOCK_WIDTH / 2.0, 0.0),
+        (BLOCK_WIDTH / 2.0, BLOCK_HEIGHT),
+        (-BLOCK_WIDTH / 2.0, BLOCK_HEIGHT),
+    ]
+    lines = await add_line_chain(adapter, block_rect)
+    await define_rectilinear_chain(adapter, lines, block_rect, label="block")
+    await ensure_fully_defined(adapter, "block outline")
     check("exit_sketch outline", await adapter.exit_sketch())
     check(
         "extrude block",
