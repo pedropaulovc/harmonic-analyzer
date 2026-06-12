@@ -20,6 +20,7 @@ from __future__ import annotations
 import sys
 
 from _common import (
+    anchor_point_to_origin,
     apply_material,
     check,
     ensure_fully_defined,
@@ -45,7 +46,7 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_sketch profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    centerline = check(
+    check(
         "add_centerline axis",
         await adapter.add_centerline(0.0, 0.0, ROD_LENGTH, 0.0),
     )
@@ -66,11 +67,41 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_arc(R, 0.0, R, R, 0.0, 0.0),
     )
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(
-        adapter,
-        "rod profile",
-        fix_entities=[centerline, top, cap_right, axis_line, cap_left],
+    # Same scheme as build_magnifying_lever: origin corner + dome centres
+    # anchored, one radial dim (the left dome's radius is forced by its
+    # anchored centre + the anchored origin end), top edge horizontal and
+    # aligned over the left centre; merged centerline unconstrained.
+    check(
+        "anchor origin corner",
+        await adapter.add_sketch_constraint(
+            f"{axis_line}.end", "origin", "coincident"
+        ),
     )
+    check(
+        "axis line horizontal",
+        await adapter.add_sketch_constraint(axis_line, None, "horizontal"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{cap_left}.center", R, 0.0, "left dome centre"
+    )
+    await anchor_point_to_origin(
+        adapter, f"{cap_right}.center", ROD_LENGTH - R, 0.0, "right dome centre"
+    )
+    check(
+        "right dome radius",
+        await adapter.add_sketch_dimension(cap_right, None, "radial", R),
+    )
+    check(
+        "top horizontal",
+        await adapter.add_sketch_constraint(top, None, "horizontal"),
+    )
+    check(
+        "top start over left centre",
+        await adapter.add_sketch_constraint(
+            f"{top}.start", f"{cap_left}.center", "vertical_points"
+        ),
+    )
+    await ensure_fully_defined(adapter, "rod profile")
     check("exit_sketch profile", await adapter.exit_sketch())
 
     check(
