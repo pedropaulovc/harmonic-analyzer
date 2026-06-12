@@ -25,6 +25,7 @@ import sys
 
 from _common import (
     add_line_chain,
+    anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
@@ -104,7 +105,8 @@ async def build(adapter) -> dict[str, str]:
         check(f"spoke constraint {relation}", await adapter.add_sketch_constraint(ent, None, relation))
     check("spoke width dim", await adapter.add_sketch_dimension(bottom, None, "linear", SPOKE_WIDTH))
     check("spoke length dim", await adapter.add_sketch_dimension(right, None, "linear", y1 - y0))
-    await ensure_fully_defined(adapter, "spoke sketch", fix_entities=spoke_lines)
+    await anchor_point_to_origin(adapter, f"{bottom}.start", -half, y0, "spoke corner")
+    await ensure_fully_defined(adapter, "spoke sketch")
     check("exit_sketch spoke", await adapter.exit_sketch())
     spoke_feature = await adapter.create_extrusion(
         ExtrusionParameters(depth=SPOKE_AXIAL, both_directions=True)
