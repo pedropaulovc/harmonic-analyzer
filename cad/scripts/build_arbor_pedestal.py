@@ -31,6 +31,7 @@ from _common import (
     apply_material,
     check,
     define_circle,
+    define_rectilinear_chain,
     ensure_fully_defined,
     report_mass_properties,
     run_build,
@@ -61,17 +62,16 @@ async def build(adapter) -> dict[str, str]:
     half_d = BLOCK_DEPTH / 2.0
     check("create_sketch block", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
-    lines = await add_line_chain(
-        adapter,
-        [
-            (-half_w, -half_d),
-            (half_w, -half_d),
-            (half_w, half_d),
-            (-half_w, half_d),
-        ],
-    )
+    footprint = [
+        (-half_w, -half_d),
+        (half_w, -half_d),
+        (half_w, half_d),
+        (-half_w, half_d),
+    ]
+    lines = await add_line_chain(adapter, footprint)
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "block sketch", fix_entities=lines)
+    await define_rectilinear_chain(adapter, lines, footprint, label="block")
+    await ensure_fully_defined(adapter, "block sketch")
     check("exit_sketch block", await adapter.exit_sketch())
     check(
         "extrude block",
