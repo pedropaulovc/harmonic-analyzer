@@ -28,6 +28,7 @@ from _common import (
     apply_color,
     apply_material,
     check,
+    define_rectilinear_chain,
     ensure_fully_defined,
     report_mass_properties,
     run_build,
@@ -49,16 +50,15 @@ async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
 
     check("create_sketch outline", await adapter.create_sketch("Front"))
-    lines = await add_line_chain(
-        adapter,
-        [
-            (0.0, 0.0),
-            (PAPER_WIDTH, 0.0),
-            (PAPER_WIDTH, PAPER_HEIGHT),
-            (0.0, PAPER_HEIGHT),
-        ],
-    )
-    await ensure_fully_defined(adapter, "paper outline", fix_entities=lines)
+    paper_rect = [
+        (0.0, 0.0),
+        (PAPER_WIDTH, 0.0),
+        (PAPER_WIDTH, PAPER_HEIGHT),
+        (0.0, PAPER_HEIGHT),
+    ]
+    lines = await add_line_chain(adapter, paper_rect)
+    await define_rectilinear_chain(adapter, lines, paper_rect, label="paper")
+    await ensure_fully_defined(adapter, "paper outline")
     check("exit_sketch outline", await adapter.exit_sketch())
     check(
         "extrude paper",

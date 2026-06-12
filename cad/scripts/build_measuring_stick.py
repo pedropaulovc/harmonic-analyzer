@@ -25,6 +25,7 @@ import sys
 
 from _common import (
     add_line_chain,
+    anchor_point_to_origin,
     apply_material,
     check,
     ensure_fully_defined,
@@ -87,7 +88,14 @@ async def _cut_tick(adapter, label: str, x_center: float, length: float) -> str:
             right, None, "linear", length + TICK_OVERHANG
         ),
     )
-    await ensure_fully_defined(adapter, f"{label} sketch", fix_entities=lines)
+    await anchor_point_to_origin(
+        adapter,
+        f"{bottom}.start",
+        x_center - half,
+        BODY_WIDTH - length,
+        f"{label} corner",
+    )
+    await ensure_fully_defined(adapter, f"{label} sketch")
     check(f"exit_sketch {label}", await adapter.exit_sketch())
     cut = await adapter.create_cut_extrude(ExtrusionParameters(depth=TICK_DEPTH))
     check(f"cut {label}", cut)
