@@ -4,9 +4,10 @@ The black fitting that affixes the magnifying lever rod to the summing
 lever: a flange screwed under the coefficients plate's front edge and a
 forward arm ending in a collar (O12, bore 6.2) the O6 rod clamps into.
 M6.10 fasteners pass: two O3.2 holes through the flange on its local
-z 17.5 line -- the strip actually under the plate (the plate front edge
-is at local z 15 = machine -70) and clear of the arm (z 4..15) so the
-fillister heads have free air below; the screws thread up flush with
+z 18.0 line -- the strip actually under the plate (the plate front edge
+is at local z 15 = machine -70) and clear of the arm (z 4..15): the O5.5
+fillister heads (r 2.75) reach down to z 15.25, 0.25 off the arm face,
+with free air below; the screws thread up flush with
 the plate bottom (992.9 -- engagement into the summing lever's plate not
 modeled). Their heads clear channel spring j=0 (east edge x +28.35) by
 1.9.
@@ -57,7 +58,8 @@ FLANGE_Y = (3.9, 7.9)  # flange top touches the plate bottom (992.9)
 FLANGE_Z = (9.0, 20.0)  # under the plate's front edge band (derived)
 SCREW_HOLE_DIA = 3.2  # M6.10 mounting-screw holes (O2.9 fillister shanks)
 SCREW_HOLE_X = (-7.0, 1.0)  # machine x +33 / +41: inset 4 from the flange ends
-SCREW_HOLE_Z = 17.5  # machine z -67.5: under the plate, clear of the arm
+SCREW_HOLE_Z = 18.0  # machine z -67.0: under the plate; head edge 0.25 off
+# the arm's z 15 face, hole edge 0.4 off the flange end (z 20)
 
 
 async def _volume(adapter) -> float:
