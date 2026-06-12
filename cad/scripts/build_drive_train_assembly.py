@@ -13,9 +13,11 @@ origin; base top face at y = 50.8, drive height 76 above it):
   rocker-arm-support's boss bore in frame.SLDASM; notches up = cosine
   setup (pp. 66-67).
 * crankshaft along Z in the green crank pedestal: crank arm + handle at
-  the front, chain sprocket and the 16T DP 16 pinion inboard (the
-  removable tapered pin is OMITTED: a tapered pin cannot sit in the
-  straight 5 mm cross-holes without solid interference).
+  the front, the T12 removable chain wheel (ch. 23: the bead chain
+  rides the removable's m2 teeth -- swapping removables changes the
+  platen ratio) and the 16T DP 16 pinion inboard (the removable
+  tapered pin is OMITTED: a tapered pin cannot sit in the straight
+  5 mm cross-holes without solid interference).
 
 TRUE-CONE MESH GEOMETRY (M6.7; supersedes the M6.6 canted-vertical
 seats, which satisfied the interference checker but visibly deformed
@@ -200,7 +202,10 @@ CRANKSHAFT_Z0 = -150.0  # front end; crank-arm hub at +12 (PIN_HOLE_HEIGHT)
 CRANKSHAFT_LENGTH = 120.0  # build_crankshaft.py SHAFT_LENGTH
 CRANK_ARM_Z0 = CRANKSHAFT_Z0 + 8.0  # hub centre 12 - half thickness 4
 ARM_C2C = 150.0  # handle pivot from the shaft axis
-SPROCKET_Z0 = -85.6  # face 4.5 against the pedestal north face
+REMOVABLE_Z0 = -85.6  # mounted T12 (face 5.0) against the pedestal north face:
+# the crank-end chain wheel is the small removable gear (ch. 23 -- the bead
+# chain rides its m2 teeth; v2_gears_010 shows the small steel wheel on the
+# crank pedestal), band -85.6..-80.6
 PEDESTAL_Z = -108.6  # crank pedestal centre (front face inside base edge)
 ARBOR_PEDESTAL_Z = 92.0  # south (-z) end only; north end clamps into the
 # rocker-arm-support boss bore at z 74.1..133 (frame.SLDASM, M6.5)
@@ -370,10 +375,12 @@ async def build(adapter) -> dict[str, str]:
     )
     await _place(
         adapter,
-        "chain-sprocket",
-        [X_CRANK, Y_DRIVE, SPROCKET_Z0],
+        "transgear-removable",
+        [X_CRANK, Y_DRIVE, REMOVABLE_Z0],
         [0.0, 0.0, 0.0],
         IDENTITY,
+        configuration="T12",
+        label="transgear-removable (crank chain wheel T12)",
     )
     await _place(
         adapter,
