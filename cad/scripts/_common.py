@@ -659,6 +659,8 @@ PANEL_BLACK = (0.08, 0.08, 0.09)  # platen board / clips / knife hardware
 SPRING_BLACK = (0.12, 0.12, 0.13)  # blued spring wire (counter + channel)
 STAINED_OAK = (0.16, 0.10, 0.07)  # crank handle (dark-stained wood)
 PAPER_WHITE = (0.92, 0.92, 0.88)  # platen paper sheet
+BAR_STEEL = (0.42, 0.41, 0.39)  # amplitude-bar curtain (p004 edge-on 0.56,
+# back views read darker from shadowing; mid value chosen)
 
 
 async def apply_color(adapter: Any, rgb: tuple[float, float, float]) -> None:

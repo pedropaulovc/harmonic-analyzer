@@ -33,6 +33,8 @@ from _common import (
     IN,
     add_line_chain,
     apply_material,
+    apply_color,
+    BAR_STEEL,
     blank_sketch,
     check,
     define_circle,
@@ -182,6 +184,7 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError("top pin hole cut removed no material on either side")
 
     await apply_material(adapter, MATERIAL)
+    await apply_color(adapter, BAR_STEEL)  # ch30 plates: see _common palette
 
     # Verify the two book-sourced dims on the built solid (ch. 15).
     mid_y, mid_z = BAR_LENGTH / 2.0, BAR_DEPTH / 2.0
