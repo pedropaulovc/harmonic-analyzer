@@ -10,7 +10,8 @@ riding its swing bracket's top bore (build_pinion_bracket.py); the front
 stub runs on through the strap to take the turning handle
 (build_pinion_handle.py). The knurled end collars are simplified away.
 
-Layout: axis Z, drum z 0..150, front stub z -9..0, back stub z 150..164.
+Layout: axis Z, drum z 0..143.2, front stub z -8..0, back stub z
+143.2..148.7.
 The ch30/M6.8 model carries it in the DISENGAGED rest state (p. 68
 "gap"), so no tooth-phase seed is needed.
 
@@ -43,11 +44,15 @@ PART_NAME = "alignment-pinion"
 MATERIAL = "Brass"  # p.67: brass drum, same finish as the cylinder train
 
 TEETH = 42  # DIMENSIONS.md ch25: counted on the p.67 plate (high)
-FACE_WIDTH = 150.0  # DIMENSIONS.md ch25: covers all 20 drum stations (derived)
+FACE_WIDTH = 143.2  # DIMENSIONS.md ch25: spans all 20 drum stations, but
+# the back face (machine z +68.2) shaves the last 0.28 of the j = 19
+# gear face (ends +68.48) -- the cone-knob post footprint (machine z >=
+# 74) caps the drum + stub hard; documented in Appendix C (derived)
 STUB_DIA = 6.35  # arbor stubs riding the strap top bores (derived)
 STUB_FRONT = 8.0  # through the 5 strap, seating 2 deep in the handle hub
 # bore and stopping 0.43 clear of the handle's internal ball solid (derived)
-STUB_BACK = 14.0  # through the 5 strap + 9 tail (photo-scaled, low)
+STUB_BACK = 5.5  # through the 5 strap (+0.25 air each side), stopping
+# 0.5 clear of the cone-knob post footprint at machine z 74 (derived)
 
 STUB_R = STUB_DIA / 2.0
 
