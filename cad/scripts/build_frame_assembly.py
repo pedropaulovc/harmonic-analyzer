@@ -17,16 +17,16 @@ depth):
   plate tangent to the column, foot toward the machine centre (ch. 30
   views 1/8 show the green tabs against the column bases).
 * rocker-arm-support x1 (solid tapered frustum, M6.3 re-authoring) at
-  (X, Z) = (-72.9, +101.6) - the BACK support only: its apex carries the
-  north pivot ball mount (channel.SLDASM) and its east-flank boss clamps
+  (X, Z) = (+72.9, +101.6) - the BACK support only: its apex carries the
+  north pivot ball mount (channel.SLDASM) and its west-flank boss clamps
   the cylinder-arbor north end (drive-train.SLDASM). Outer face flush
   with the top-plate edge (133.35 - 63.5/2 = 101.6). The CHANNEL AXIS
   runs along Z. M6.5 photo audit REFUTES the former south instance: the
   calibrated v3 side view shows no frustum at the front; the south pivot
   ball is gripped by the transgear A-frame's clevis at z -111
   (output.SLDASM, build_a_frame.py). The M6.1 windowed-gate placement at
-  X = 0 was already superseded: the pivot x = arbor -47.5 minus the 25.4
-  rod lever = -72.9 (DIMENSIONS.md ch. 14 layout).
+  X = 0 was already superseded: the pivot x = arbor 47.5 plus the 25.4
+  rod lever = 72.9 (DIMENSIONS.md ch. 14 layout, M6.8-mirrored).
 * top-frame x1: the green ring at ring mid-plane Y = 1020.2 (rails 22 x
   41, y 999.7..1040.7), corner bosses bored around the four columns; its
   west rail seats the top-lever ball mounts (channel.SLDASM).
@@ -74,7 +74,7 @@ COLUMN_Z = 112.0
 COLUMN_RADIUS = 1.375 * IN / 2.0  # tube-frame OD/2
 BRACKET_PLATE_T = 0.3 * IN  # corner-bracket upright plate
 BRACKET_X = COLUMN_X - COLUMN_RADIUS - BRACKET_PLATE_T / 2.0  # plate tangent
-SUPPORT_X = -72.9  # rocker pivot x: arbor -47.5 - 25.4 rod lever (M6.3)
+SUPPORT_X = 72.9  # rocker pivot x: arbor 47.5 + 25.4 rod lever (M6.3, M6.8 mirror)
 SUPPORT_Z = 133.35 - 63.5 / 2.0  # 101.6: outer face flush w/ top plate edge
 TOP_FRAME_MID_Y = 1020.2  # ring mid-plane: rails y 999.7..1040.7 (M6.3)
 
@@ -213,7 +213,8 @@ async def build(adapter) -> dict[str, str]:
         assert_component_placed(adapter, name, target, rows)
 
     # Rocker-pivot support frustum at the BACK channel-stack end (north
-    # only, M6.5), apex under the pivot shaft at x = -72.9.
+    # only, M6.5), apex under the pivot shaft at x = +72.9 (M6.8 mirror;
+    # the part's boss is on its west flank, so identity placement holds).
     target = [SUPPORT_X, BASE_TOP_Y, SUPPORT_Z]
     res = await adapter.insert_component(
         InsertComponentParameters(file_path=support_path, position=target)
