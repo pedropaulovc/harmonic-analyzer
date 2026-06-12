@@ -23,9 +23,12 @@ measuring stick at z <= -118, output.SLDASM) and back face machine
 z -99.0 (the ch25 handle cross-rod plane assert in
 build_drive_train_assembly.py needs HANDLE_Z - 3 = -98 behind it).
 
-Layout: local x = machine x, local y 0 = base top (machine 50.8), local
-z 0 = clevis mid-plane (machine z -111). Plate foot x -115..-45 tapering
-to the apex x -87..-59 at the ball-mount seat y 177.8 (machine 228.6);
+Layout: local x = MACHINE x (the script is authored machine-handed and
+declared "x0" in MIRROR_PLANE - the part lost its local-z symmetry to
+the one-sided rails, so the old "z" Ry180 stand-in would flip the rails
+to the south), local y 0 = base top (machine 50.8), local z 0 = clevis
+mid-plane (machine z -111). Plate foot x +45..+115 tapering
+to the apex x +59..+87 at the ball-mount seat y 177.8 (machine 228.6);
 ears rise 20 above the seat, gap 16.2 flanking the mount's diameter-16
 base. The diameter-6.35 pivot shaft (bottom 250.65) clears the ear tops
 (248.6) by 2. Top rail 20 x 16 (y 161.8..177.8 = machine 212.6..228.6,
@@ -60,8 +63,8 @@ from _common import (
 PART_NAME = "a-frame"
 MATERIAL = "Gray Cast Iron"  # green casting
 
-FOOT_X = (-115.0, -45.0)  # foot span on the base top (med)
-APEX_X = (-87.0, -59.0)  # 28-wide top centred near the pivot x -72.9 (med)
+FOOT_X = (45.0, 115.0)  # foot span on the base top, machine x (med)
+APEX_X = (59.0, 87.0)  # 28-wide top centred near the pivot machine x +72.9 (med)
 SEAT_Y = 177.8  # ball-mount seat: machine 228.6 = pivot 253.8 - ball rise 25.2
 PLATE_Z = (-6.5, 12.0)  # machine -117.5..-99.0: stick / ch25-handle pinch (docstring)
 EAR_HALF_GAP = 8.1  # ears flank the ball mount's diameter-16 base + 0.1 clearance
@@ -74,10 +77,10 @@ SADDLE_Y0 = 158.0  # saddle block bridges the plate to the wider clevis ears
 # (build_rocker_arm_support.py at machine z +101.6, BASE_Z 40 / TOP_Z 20).
 RAIL_Z0 = PLATE_Z[1]  # rails' net volume starts at the plate back face
 RAIL_OVERLAP = 2.0  # sketch offset 2 inside the plate so the solids merge
-TOP_RAIL_X = (-82.9, -62.9)  # = frustum apex span (20), inside the 28 apex
+TOP_RAIL_X = (62.9, 82.9)  # = frustum apex span (20), inside the 28 apex
 TOP_RAIL_DEPTH = 16.0  # y 161.8..177.8 (machine 212.6..228.6 = photo window top)
 TOP_RAIL_Z1 = 201.45  # machine +90.45: frustum apex face 90.70 at rail bottom - 0.25
-FOOT_RAIL_X = (-87.9, -57.9)  # 30 wide centred on the pivot line x -72.9
+FOOT_RAIL_X = (57.9, 87.9)  # 30 wide centred on the pivot line machine x +72.9
 FOOT_RAIL_H = 20.0  # photo: bolted foot flange ~20 tall (bolts not modeled)
 FOOT_RAIL_Z1 = 192.35  # machine +81.35: frustum base face +81.6 - 0.25
 

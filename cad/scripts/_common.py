@@ -820,7 +820,6 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     "pen-v-block": "z",
     "pen-frame": "z",
     "pen-set-screw": "z",
-    "a-frame": "z",
     "column-clamp": "z",
     # plain x-symmetric slab cornered at origin; explicit c avoids the
     # STL-bbox dependency for a part newer than the legacy export set
@@ -844,6 +843,10 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     "summing-lever": "x0",
     "magnifying-bracket": "x0",
     "pen-hanger": "x0",
+    # M6.9: the portal-frame rails killed the local-z symmetry the old
+    # "z" entry relied on (Ry180 stand-in flipped the rails south, 1937
+    # mm^3 into the measuring stick) -> re-authored machine-handed
+    "a-frame": "x0",
 }
 
 _STL_BBOX_CACHE: dict[str, tuple[tuple[float, float], ...]] = {}
