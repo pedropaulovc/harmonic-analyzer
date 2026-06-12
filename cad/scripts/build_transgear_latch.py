@@ -1,15 +1,20 @@
 r"""Reproduction script: transgear latch arm (book ch. 23, pp. 56-59).
 
-The tapered link that carries the removable-gear shaft and swings it
-into mesh with the fixed pinion (engineerguy v4_transgear_008: latch arm
-with a hole, pivoting on the rack-pinion stud): a big hub riding the
-stud, a small hub carrying the knob shaft, joined by a tapered web at
-the exact DP-mesh centre distance 34.26 (removable 24T m2 PD 48 /
-fixed-pinion 24T DP30 PD 20.32 -> (48 + 20.32 + 0.4 backlash) / 2).
+The tapered link that carries the knob shaft and swings its fine 24T
+pinion into mesh with the rack-pinion disc (engineerguy v4_transgear_008:
+latch arm with a hole, pivoting on the rack-pinion stud): a big hub
+riding the stud, a small hub carrying the knob shaft, joined by a
+tapered web. C2C 66.05 is the ch30 REST (disengaged) state -- the plates
+show the knob shaft parked at post-mirror (-65, ~242), its mounted
+removable's tips overlapping the disc rim only in XY projection (the
+chain plane sits ~56 north of the disc). The ENGAGED state (24T DP30
+pinion on the disc, c2c (81.28 + 20.32 + 0.4)/2 = 51.0) is NOT modeled;
+how the original single arm serves both centre distances is the open
+kinematic riddle of DIMENSIONS.md Appendix C #8.
 
 Layout: big hub on the origin (stud axis along Z), small hub at
-(+34.26, 0) -- the assembly rotates the c2c line to the photo direction.
-4.5 thick along Z. Dimensions: cad/DIMENSIONS.md ch. 23 (M6.4, derived).
+(+66.05, 0) -- the assembly rotates the c2c line to the photo direction.
+4.5 thick along Z. Dimensions: cad/DIMENSIONS.md ch. 23 (M6.8, derived).
 
 Run (SolidWorks already open)::
 
@@ -39,7 +44,8 @@ MATERIAL = "Plain Carbon Steel"
 BIG_HUB_DIA = 22.0  # rides the rack-pinion stud (low)
 SMALL_HUB_DIA = 16.0  # carries the knob shaft (low)
 BORE_DIA = 9.6  # both bores ride O9.5 shafts (derived)
-C2C = 34.26  # mesh-exact centre distance (derived)
+C2C = 66.0482  # ch30 rest-state centre distance: stud (0, 253.5) to the
+# parked knob shaft (pre-mirror +65.0, 241.78) = hypot(65, 11.72) (scaled)
 THICKNESS = 4.5  # along Z (low)
 WEB_HALF_AT_BIG = 9.0  # tapered web half-widths (derived: inside hub ODs)
 WEB_HALF_AT_SMALL = 6.5

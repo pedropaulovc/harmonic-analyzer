@@ -19,29 +19,39 @@ z_j = -67.1 + 7.0565 j; the output side is -Z). 46 components:
   face-flush on the rails, platen-rack on its back (teeth down, meshing
   the rack pinion with 0.3 backlash and tooth-on-gap phasing), two
   platen-clips on the paper face.
-* Transgear group: a-frame (M6.5: its clevis grips the SOUTH PIVOT BALL
-  MOUNT from channel.SLDASM - the front stand doubles as the rocker-shaft
-  support; ball-mount seat at machine 228.6) + pinion-bar (y 253.5,
-  z -105..-117, x -58..+178: west end floats just east of the clevis),
-  transgear-stub carrying rack-pinion (96T) + fixed transgear-pinion +
-  latch big hub; the latch (at -20 deg, so the knob shaft clears the
-  pinion bar) carries the knob shaft with the chain sprocket at the
-  drive-train chain plane (mid z -78.75) and the brass knob outboard.
+* Transgear group (ch. 23 topology, M6.8): a-frame (M6.5: its clevis
+  grips the SOUTH PIVOT BALL MOUNT from channel.SLDASM - the front stand
+  doubles as the rocker-shaft support; ball-mount seat at machine 228.6)
+  + pinion-bar (y 253.5, z -105..-117, x -58..+178: west end floats just
+  east of the clevis), transgear-stub carrying rack-pinion (96T disc) +
+  latch big hub; the latch (c2c 66.05, ch30 rest state) carries the knob
+  shaft with the mounted T24 removable CHAIN-WRAPPED at the drive-train
+  chain plane (the bead chain rides the removable's m2 teeth -- that is
+  how gear swaps change the platen ratio), the fine 24T DP30
+  transgear-pinion near the front (engageable on the disc), and the
+  brass knob outboard.
 * Pen group: pen-hanger on the wheel bar, pen-rod (guide hole at
   (-3, z -151.5)), pen-v-block, pen-marker (vertical), pen-frame ring
   around the rod on the v-block top, pen-set-screw in its bottom rail.
 * Loose hardware on the base top: measuring-stick, one spare
-  transgear-removable (T24).
+  transgear-removable (T18 -- the T24 is mounted on the knob shaft;
+  the T12 rides the crankshaft in drive-train.SLDASM).
 
 Default-state notes / documented simplifications (Appendix C):
 * The pen marker hangs VERTICAL with its tip 8.6 in front of the paper
   plane (plate front z -142.9): the real pen tilts ~12 deg in angled
   v-block bores; our bores are vertical, so a tilted marker would cut
   the bore walls. Pen-to-paper contact is therefore not modeled.
-* The removable speed-change gears cannot mesh the fixed DP30 pinion
-  (they are module 2 / DP 12.7 -- mixed pitches collide over the ~70 deg
-  overlap arc), so no removable gear is mounted; one T24 lies on the
-  base as a spare.
+* The transgear is modeled in the ch30 REST (disengaged) state: the
+  latch parks the knob shaft at c2c 66.05 from the stud, so the fine
+  24T pinion sits 13.1 clear of the disc tips. The mounted removables
+  are CHAIN wheels (m2 teeth carry the bead chain, ch. 23), so they
+  never mesh another gear; the T24's tips overlap the disc rim in XY
+  projection only (chain plane z -81.5..-76.5 vs disc -137.5..-134.5),
+  exactly as the ch30 plates show. The ENGAGED pose (pinion on the
+  disc, c2c 51.0) and the swing path between the two are not modeled --
+  a single rigid arm cannot serve both centre distances (DIMENSIONS.md
+  Appendix C #8, unresolved pivot kinematics).
 * The magnifying clamp's thumb screw is modeled backed-out: its shank
   tip is tangent to the lever rod (a seated screw would overlap the rod
   it pinches). The output fixture's clamp screw is omitted entirely (its
@@ -168,18 +178,20 @@ CLIP_FRONT_DX = (18.0, 290.0)  # clip x bands (p - 10 .. p) inside the plate;
 # --- transgear ---------------------------------------------------------------
 from build_transgear_latch import C2C as LATCH_C2C  # noqa: E402
 
-LATCH_ANGLE_DEG = -20.0  # small hub swung low: the knob shaft's top surface
-# (y 241.78 + 4.76 = 246.5) clears the pinion bar's underside (247.5)
-KNOB_SHAFT_XY = (
-    PINION_AXIS[0] + LATCH_C2C * math.cos(math.radians(LATCH_ANGLE_DEG)),
-    PINION_AXIS[1] + LATCH_C2C * math.sin(math.radians(LATCH_ANGLE_DEG)),
-)
-SPROCKET_Z0 = -81.0  # knob sprocket band -81..-76.5 (mid -78.75); the crank
-# sprocket sits one face-width south (drive-train SPROCKET_Z0 -85.6, mid
-# -83.35) -- the real chain bridges the 4.6 offset with a 1.8 deg skew
-CHAIN_Z0 = -83.3  # flat drive-chain band -83.3..-78.8 splits the two sprocket
+# Ch30 rest state (M6.8): the plates show the knob-shaft cluster parked at
+# post-mirror (-65, ~248 +- 3, chain-plane parallax); y is clamped to 241.78
+# so the shaft top (246.5) keeps clearing the pinion bar's underside (247.5).
+KNOB_SHAFT_XY = (65.0, 241.78)
+LATCH_ANGLE_DEG = math.degrees(
+    math.atan2(KNOB_SHAFT_XY[1] - PINION_AXIS[1], KNOB_SHAFT_XY[0] - PINION_AXIS[0])
+)  # -10.22: small hub swung low toward the crank
+REMOVABLE_Z0 = -81.5  # mounted T24 band -81.5..-76.5, flush with the shaft's
+# chain end; the crank-end T12 sits south (drive-train REMOVABLE_Z0 -85.6,
+# mid -83.1) -- the real chain bridges the 4.35 offset with a ~1.7 deg skew
+CHAIN_Z0 = -83.3  # flat drive-chain band -83.3..-78.8 splits the two wrap
 # mid-planes; the band floats radially outside the tooth tips so the z
-# overlap with either sprocket cannot interfere
+# overlap with either chain wheel cannot interfere
+REMOVABLE_TIP_R = {"T12": 14.0, "T18": 20.0, "T24": 26.0}  # m2: OD (T+2)*2
 
 # --- pen ---------------------------------------------------------------------
 PEN_ROD_X = -3.0
@@ -243,6 +255,7 @@ async def _place(
     position: list[float],
     rotation: list[float],
     rows: list[list[float]],
+    configuration: str = "",
     label: str = "",
 ) -> str:
     """Insert at the exact final transform, fix, and assert the read-back.
@@ -254,13 +267,18 @@ async def _place(
         InsertComponentParameters,
     )
 
-    position, rotation, rows = mirror_placement(part, position, rotation, rows)
+    position, rotation, rows = mirror_placement(
+        part, position, rotation, rows, configuration
+    )
     label = label or part
     data = check(
         f"insert {label} @ ({position[0]:.2f}, {position[1]:.2f}, {position[2]:.2f})",
         await adapter.insert_component(
             InsertComponentParameters(
-                file_path=_part(part), position=position, rotation=rotation
+                file_path=_part(part),
+                position=position,
+                rotation=rotation,
+                configuration=configuration,
             )
         ),
     )
@@ -310,7 +328,14 @@ def _assert_rack_mesh() -> None:
 
 
 def _assert_knob_shaft_clearance() -> None:
-    """The knob shaft must run under the pinion bar (z -105..-117 band)."""
+    """The knob shaft must run under the pinion bar (z -105..-117 band),
+    on the latch arm's exact c2c, with the rest-state air gaps intact."""
+    arm = math.hypot(
+        KNOB_SHAFT_XY[0] - PINION_AXIS[0], KNOB_SHAFT_XY[1] - PINION_AXIS[1]
+    )
+    if abs(arm - LATCH_C2C) > 1e-3:
+        raise RuntimeError(f"knob shaft sits {arm:.4f} from the stud, latch c2c"
+                           f" is {LATCH_C2C}")
     shaft_top = KNOB_SHAFT_XY[1] + 0.375 * IN / 2.0
     bar_bottom = PINION_AXIS[1] - 6.0
     if shaft_top >= bar_bottom - 0.5:
@@ -318,8 +343,17 @@ def _assert_knob_shaft_clearance() -> None:
             f"knob shaft top {shaft_top:.2f} too close to the pinion bar"
             f" underside {bar_bottom:.2f}"
         )
+    # Rest state: the fine pinion (tip r 11) stays clear of the disc tips,
+    # and the chain-plane T24 clears the STUB shaft (O14) it floats past.
+    pinion_gap = arm - (41.49 + 11.0)  # disc tip r + pinion tip r
+    if pinion_gap < 5.0:
+        raise RuntimeError(f"rest-state pinion/disc tip gap {pinion_gap:.2f} < 5")
+    t24_stub_gap = arm - (26.0 + 7.0)  # T24 tip r + stub shaft r
+    if t24_stub_gap < 0.5:
+        raise RuntimeError(f"mounted T24 to stub-shaft gap {t24_stub_gap:.2f} < 0.5")
     log(f"knob shaft at ({KNOB_SHAFT_XY[0]:.2f}, {KNOB_SHAFT_XY[1]:.2f}),"
-        f" {bar_bottom - shaft_top:.2f} under the bar")
+        f" {bar_bottom - shaft_top:.2f} under the bar; rest-state gaps:"
+        f" pinion/disc {pinion_gap:.1f}, T24/stub {t24_stub_gap:.1f}")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -424,19 +458,27 @@ async def build(adapter) -> dict[str, str]:
                  [-90.0, 0.0, 0.0], ROT_X_NEG90)
     await _place(adapter, "rack-pinion", [PINION_AXIS[0], PINION_AXIS[1], -137.5],
                  [0.0, 0.0, 0.0], IDENTITY)
-    await _place(adapter, "transgear-pinion", [PINION_AXIS[0], PINION_AXIS[1], -134.0],
-                 [0.0, 0.0, 0.0], IDENTITY)
     await _place(adapter, "transgear-latch", [PINION_AXIS[0], PINION_AXIS[1], -122.5],
                  [0.0, 0.0, LATCH_ANGLE_DEG], rot_z_rows(LATCH_ANGLE_DEG))
     await _place(adapter, "transgear-knob-shaft",
                  [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], -76.5],
                  [-90.0, 0.0, 0.0], ROT_X_NEG90)
-    await _place(adapter, "chain-sprocket",
-                 [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], SPROCKET_Z0],
+    # Fine 24T DP30 pinion on the knob shaft, just behind the knob face
+    # (z -134..-128): engageable on the disc, parked clear in the rest state.
+    await _place(adapter, "transgear-pinion",
+                 [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], -134.0],
                  [0.0, 0.0, 0.0], IDENTITY)
-    # Local origin = knob sprocket centre; the crank-side wrap reaches the
-    # drive-train sprocket at (118, 126.8) (build_drive_chain KNOB_CENTRE/
-    # CRANK_CENTRE -- keep in sync with KNOB_SHAFT_XY).
+    # Mounted T24 removable = the knob-end chain wheel (ch. 23: the bead
+    # chain rides the removable's teeth; swapping removables changes the
+    # platen ratio). Band -81.5..-76.5, flush with the shaft's chain end.
+    await _place(adapter, "transgear-removable",
+                 [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], REMOVABLE_Z0],
+                 [0.0, 0.0, 0.0], IDENTITY, configuration="T24",
+                 label="transgear-removable (mounted T24)")
+    # Local origin = knob wrap centre; the crank-side wrap reaches the
+    # drive-train T12 at (118, 126.8) (build_drive_chain KNOB_CENTRE/
+    # CRANK_CENTRE/WRAP radii -- keep in sync with KNOB_SHAFT_XY and
+    # REMOVABLE_TIP_R).
     await _place(adapter, "drive-chain",
                  [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], CHAIN_Z0],
                  [0.0, 0.0, 0.0], IDENTITY)
@@ -463,9 +505,13 @@ async def build(adapter) -> dict[str, str]:
     # Rx(+90): the stick lies flat, graduated face up.
     await _place(adapter, "measuring-stick", list(STICK_POS),
                  [90.0, 0.0, 0.0], ROT_X_POS90)
-    # Rx(-90): the spare T24 gear lies flat on the base top.
+    # Rx(-90): the spare T18 gear lies flat on the base top (the T24 is
+    # mounted on the knob shaft, the T12 on the crankshaft; clearances in
+    # the SPARE_GEAR_POS comment were computed for the larger T24, so the
+    # T18's r 20 plan circle keeps them all with 6 mm to spare).
     await _place(adapter, "transgear-removable", list(SPARE_GEAR_POS),
-                 [-90.0, 0.0, 0.0], ROT_X_NEG90, label="transgear-removable (spare)")
+                 [-90.0, 0.0, 0.0], ROT_X_NEG90, configuration="T18",
+                 label="transgear-removable (spare T18)")
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)
