@@ -38,6 +38,8 @@ from _common import (
     apply_material,
     check,
     define_circle,
+    define_polygon_chain,
+    define_rectilinear_chain,
     ensure_fully_defined,
     extrude_at_offset,
     report_mass_properties,
@@ -75,16 +77,15 @@ async def build(adapter) -> dict[str, str]:
 
     # 1. Solid guide block.
     check("create_sketch block", await adapter.create_sketch("Front"))
-    outline = await add_line_chain(
-        adapter,
-        [
-            (-BLOCK_HALF, -BLOCK_HALF),
-            (BLOCK_HALF, -BLOCK_HALF),
-            (BLOCK_HALF, BLOCK_HALF),
-            (-BLOCK_HALF, BLOCK_HALF),
-        ],
-    )
-    await ensure_fully_defined(adapter, "block sketch", fix_entities=outline)
+    block_rect = [
+        (-BLOCK_HALF, -BLOCK_HALF),
+        (BLOCK_HALF, -BLOCK_HALF),
+        (BLOCK_HALF, BLOCK_HALF),
+        (-BLOCK_HALF, BLOCK_HALF),
+    ]
+    outline = await add_line_chain(adapter, block_rect)
+    await define_rectilinear_chain(adapter, outline, block_rect, label="block")
+    await ensure_fully_defined(adapter, "block sketch")
     check("exit_sketch block", await adapter.exit_sketch())
     extrude_at_offset(adapter, BLOCK_Z[1] - BLOCK_Z[0], BLOCK_Z[0])
     expected = (2.0 * BLOCK_HALF) ** 2 * (BLOCK_Z[1] - BLOCK_Z[0])
@@ -97,16 +98,15 @@ async def build(adapter) -> dict[str, str]:
     # The +-2.7 footprint stays inside the block's z -4..12.6 band and well
     # clear of the strap's z 9.6..12.6 band, so a through cut is safe.
     check("create_sketch channel", await adapter.create_sketch("Top"))
-    channel = await add_line_chain(
-        adapter,
-        [
-            (-GUIDE_HOLE_HALF, -GUIDE_HOLE_HALF),
-            (GUIDE_HOLE_HALF, -GUIDE_HOLE_HALF),
-            (GUIDE_HOLE_HALF, GUIDE_HOLE_HALF),
-            (-GUIDE_HOLE_HALF, GUIDE_HOLE_HALF),
-        ],
-    )
-    await ensure_fully_defined(adapter, "channel sketch", fix_entities=channel)
+    channel_rect = [
+        (-GUIDE_HOLE_HALF, -GUIDE_HOLE_HALF),
+        (GUIDE_HOLE_HALF, -GUIDE_HOLE_HALF),
+        (GUIDE_HOLE_HALF, GUIDE_HOLE_HALF),
+        (-GUIDE_HOLE_HALF, GUIDE_HOLE_HALF),
+    ]
+    channel = await add_line_chain(adapter, channel_rect)
+    await define_rectilinear_chain(adapter, channel, channel_rect, label="channel")
+    await ensure_fully_defined(adapter, "channel sketch")
     check("exit_sketch channel", await adapter.exit_sketch())
     check(
         "cut channel",
@@ -123,17 +123,16 @@ async def build(adapter) -> dict[str, str]:
     # 2. Tapered strap rising to the support bar.
     check("create_sketch strap", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    strap = await add_line_chain(
-        adapter,
-        [
-            (STRAP_BOT_X[0], BLOCK_HALF),
-            (STRAP_BOT_X[1], BLOCK_HALF),
-            (STRAP_TOP_X[1], STRAP_TOP_Y),
-            (STRAP_TOP_X[0], STRAP_TOP_Y),
-        ],
-    )
+    strap_pts = [
+        (STRAP_BOT_X[0], BLOCK_HALF),
+        (STRAP_BOT_X[1], BLOCK_HALF),
+        (STRAP_TOP_X[1], STRAP_TOP_Y),
+        (STRAP_TOP_X[0], STRAP_TOP_Y),
+    ]
+    strap = await add_line_chain(adapter, strap_pts)
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "strap sketch", fix_entities=strap)
+    await define_polygon_chain(adapter, strap, strap_pts, label="strap")
+    await ensure_fully_defined(adapter, "strap sketch")
     check("exit_sketch strap", await adapter.exit_sketch())
     extrude_at_offset(adapter, STRAP_Z[1] - STRAP_Z[0], STRAP_Z[0])
     bot_w = STRAP_BOT_X[1] - STRAP_BOT_X[0]
