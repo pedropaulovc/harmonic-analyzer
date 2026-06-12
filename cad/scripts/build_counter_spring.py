@@ -34,6 +34,7 @@ import sys
 from _common import (
     add_spring_end_hooks,
     apply_material,
+    blank_sketch,
     check,
     define_circle,
     ensure_fully_defined,
@@ -85,6 +86,10 @@ async def build(adapter) -> dict[str, str]:
         COIL_BODY_LENGTH,
         leads=(BOTTOM_LEAD, TOP_LEAD),
     )
+
+    # Helix base sketch stays unabsorbed-and-shown after InsertHelix (see
+    # build_channel_spring) — blank it so it doesn't render in assemblies.
+    blank_sketch(adapter, "Sketch1")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

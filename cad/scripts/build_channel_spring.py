@@ -36,6 +36,7 @@ import sys
 from _common import (
     add_spring_end_hooks,
     apply_material,
+    blank_sketch,
     check,
     define_circle,
     ensure_fully_defined,
@@ -92,6 +93,11 @@ async def build_spring(
     )
 
     await add_spring_end_hooks(adapter, MEAN_RADIUS, WIRE_DIA, body_length, leads=leads)
+
+    # The helix base sketch stays unabsorbed-and-shown after InsertHelix;
+    # shown sketches render in every assembly instance (20 floating seed
+    # circles above the top frame in the ch30 views).
+    blank_sketch(adapter, "Sketch1")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
