@@ -5,10 +5,12 @@ lever: a flange screwed under the coefficients plate's front edge and a
 forward arm ending in a collar (O12, bore 6.2) the O6 rod clamps into.
 The p.47 mounting screws are omitted (simplification).
 
-Layout: origin at the collar centre (machine (-40, 985, -85)); collar
+Layout: origin at the collar centre (machine (+40, 985, -85)); collar
 axis along X (the rod direction), arm runs +Z (toward the plate, machine
--85 -> -70), flange under the plate at local z 9..20. Dimensions:
-cad/DIMENSIONS.md ch. 20 (M6.4, low).
+-85 -> -70), flange under the plate at local z 9..20. M6.8: the flange
+is the part's only x-asymmetric feature, so the machine mirror is
+authored here (FLANGE_X negated) and the assembly places the part with
+MIRROR_PLANE 'x0'. Dimensions: cad/DIMENSIONS.md ch. 20 (M6.4, low).
 
 Run (SolidWorks already open)::
 
@@ -41,8 +43,9 @@ COLLAR_HALF_LEN = 5.0  # along X
 ARM_HALF_X = 5.0  # arm 10 wide (x), y -3..+4.5, z 4..15 (low)
 ARM_Y = (-3.0, 4.5)
 ARM_Z = (4.0, 15.0)
-FLANGE_X = (-5.0, 11.0)  # under-plate flange, machine x -45..-29: stops 0.65
-# west of channel spring j=0's helix (west edge x -28.35; M6.5 top-level fit)
+FLANGE_X = (-11.0, 5.0)  # under-plate flange, machine x +29..+45: stops 0.65
+# east of channel spring j=0's helix (east edge x +28.35; M6.5 top-level fit,
+# M6.8-mirrored)
 FLANGE_Y = (3.9, 7.9)  # flange top touches the plate bottom (992.9)
 FLANGE_Z = (9.0, 20.0)  # under the plate's front edge band (derived)
 

@@ -11,15 +11,18 @@ views:
   tube clears the knife-mount stud that hangs the knife bar from the
   top crossbar.
 * The coefficients plate (20 spring holes at the channel-lever tab line)
-  hangs off the tube on the -X side, top face 8 above the knife line.
-* A twin-rib web arm runs +X from the tube to a round boss; the counter
+  hangs off the tube on the +X side, top face 8 above the knife line.
+* A twin-rib web arm runs -X from the tube to a round boss; the counter
   spring hangs from a J-hook (build_boss_hook.py) whose shank plants in
   a vertical O2.6 hole in the boss top (the p.43 black hook + chrome
   ring chain collapsed to one hook part -- simplification).
 
-Part-local origin = the knife-edge line (machine (+15, 990, 0)); X +ve
-toward the boss/counter spring, Y up, Z along the knife edge (channel
-direction). Dimensions: cad/DIMENSIONS.md ch. 18 (M6.4 revision; med/low).
+Part-local origin = the knife-edge line (machine (-15, 990, 0)); X +ve
+toward the coefficients plate, Y up, Z along the knife edge (channel
+direction). M6.8: the part is genuinely chiral, so the machine mirror is
+authored here (all local x constants negated) and the assembly places it
+with MIRROR_PLANE 'x0'. Dimensions: cad/DIMENSIONS.md ch. 18 (M6.4
+revision; med/low).
 
 Volume audit: tube/bore/slot/plate/boss-hole are asserted analytically
 (the plate-tube overlap by midpoint-rule integration); the web ribs and
@@ -59,14 +62,14 @@ TUBE_CY = BORE_DIA / 2.0  # tube/bore centre sits one bore radius up
 SLOT_HALF_Z = 16.0  # central slot clears the knife-mount stud (low)
 SLOT_HALF_X = 9.0  # slot stays inside the tube walls (derived)
 
-PLATE_X_MIN = -60.0  # coefficients plate, machine x -45 (med)
-PLATE_X_MAX = -10.0  # machine x +5: plate edge merges into the tube (med)
+PLATE_X_MIN = 10.0  # machine x -5: plate edge merges into the tube (med)
+PLATE_X_MAX = 60.0  # coefficients plate, machine x +45 (med)
 PLATE_TOP_Y = 8.0  # plate top = machine y 998 (med)
 PLATE_THICKNESS = 5.1  # 0.2" plate (legacy, uncontradicted)
 PLATE_HALF_Z = 76.2  # plate length 152.4 = 6" (legacy, uncontradicted)
 HOLE_DIA = 4.5  # spring holes: the installed eye must thread 5.1 plate
 # (sqrt(3.25^2 - 2.55^2) = 2.0 reach) -- see build_channel_assembly.py
-HOLE_X = -37.10  # machine x -22.10 = channel-lever tab line (derived)
+HOLE_X = 37.10  # machine x +22.10 = channel-lever tab line (derived)
 HOLE_COUNT = 20
 CHANNEL_Z0 = -67.1  # frame channel j=0 (DIMENSIONS.md ch6)
 CHANNEL_PITCH = 7.0565
@@ -77,18 +80,18 @@ HOLE_Z_OFFSET = 0.8 - 2.75  # the spring's bottom lead hangs one coil mean
 
 WEB_Y_BOT = 2.0  # twin-rib web band above the knife line (low)
 WEB_Y_TOP = 12.0
-RIB_X0 = 9.0  # ribs spring from the tube wall at the slot edge (derived)
-RIB_X1 = 80.0  # ribs merge into the boss (med)
+RIB_X0 = -9.0  # ribs spring from the tube wall at the slot edge (derived)
+RIB_X1 = -80.0  # ribs merge into the boss (med)
 RIB_HALF_WIDTH = 1.5  # ~3 wide cast ribs (low)
 RIB_Z0 = 17.18  # |z| of the rib centreline at RIB_X0 (p.43 plan, low)
 RIB_Z1 = 4.27  # |z| at the boss (low)
 
-BOSS_X = 80.0  # machine x 95: counter-spring anchor (med)
+BOSS_X = -80.0  # machine x -95: counter-spring anchor (med)
 BOSS_DIA = 14.0
 BOSS_LENGTH = 12.0  # z +-6 (low)
 HOOK_HOLE_DIA = 3.0  # boss-hook O3 shank seats here (low; the real joint is
 # a 2.6 tap drill + M3 thread -- modeled at shank size for a zero-volume fit)
-HOOK_HOLE_X = 75.5  # machine x 90.5: hook rod tip reaches x 97 (derived)
+HOOK_HOLE_X = -75.5  # machine x -90.5: hook rod tip reaches x -97 (derived)
 HOOK_HOLE_DEPTH = 14.0  # half-depth of the mid-plane cut; clears the boss
 # top at this x (y 12.36) and bottom (y 1.64)
 
@@ -108,10 +111,10 @@ def _slot_removed_volume() -> float:
 
 
 def _plate_tube_overlap_volume() -> float:
-    """Plate slab (y band) clipped to the tube outer disc, x -12.5..-10,
+    """Plate slab (y band) clipped to the tube outer disc, x +10..+12.5,
     prism along the full tube length (midpoint rule)."""
     n = 400
-    x0, x1 = -TUBE_R, PLATE_X_MAX
+    x0, x1 = PLATE_X_MIN, TUBE_R
     y_bot = PLATE_TOP_Y - PLATE_THICKNESS
     area = 0.0
     for i in range(n):
@@ -248,7 +251,7 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch web ribs", await adapter.exit_sketch())
     extrude_at_offset(adapter, WEB_Y_TOP - WEB_Y_BOT, WEB_Y_BOT)
     v_rib_solid = (
-        2.0 * (RIB_X1 - RIB_X0) * 2.0 * RIB_HALF_WIDTH * (WEB_Y_TOP - WEB_Y_BOT)
+        2.0 * abs(RIB_X1 - RIB_X0) * 2.0 * RIB_HALF_WIDTH * (WEB_Y_TOP - WEB_Y_BOT)
     )
     before = expected
     vol = await _volume(adapter)

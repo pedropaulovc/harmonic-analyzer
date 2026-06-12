@@ -10,10 +10,13 @@ forward (-Z in the machine) so the pen rod hangs clear of the platen
 paper plane while the strap stays flush on the bar. The mounting bolt is
 omitted (simplification).
 
-Layout: origin at the guide block centre (machine (-3, 505, -151.5));
+Layout: origin at the guide block centre (machine (+3, 505, -151.5));
 block z -4..+12.6 (back face flush with the bar front at machine
 z -138.9), strap in the z = 9.6..12.6 band rising +Y to the bar band
-(machine y 560..570). Dimensions: cad/DIMENSIONS.md ch. 24 (M6.4, low).
+(machine y 560..570). M6.8: the strap's sideways lean is the part's only
+x-asymmetric feature, so the machine mirror is authored here
+(STRAP_TOP_X negated) and the assembly places the part with MIRROR_PLANE
+'x0'. Dimensions: cad/DIMENSIONS.md ch. 24 (M6.4, low).
 
 Run (SolidWorks already open)::
 
@@ -44,7 +47,7 @@ BLOCK_Z = (-4.0, 12.6)  # deep block: back face on the bar front (derived)
 GUIDE_HOLE_HALF = 2.7  # 5.4 square: the 5-square pen rod slides (derived)
 STRAP_Z = (9.6, 12.6)  # strap 3 thick, flush with the block back (derived)
 STRAP_TOP_Y = 65.0  # machine 570: support bar top (derived)
-STRAP_TOP_X = (0.0, 16.0)  # 16 wide at the bar (low)
+STRAP_TOP_X = (-16.0, 0.0)  # 16 wide at the bar (low; M6.8-mirrored lean)
 STRAP_BOT_X = (-5.0, 5.0)  # 10 wide at the block (low)
 
 

@@ -39,6 +39,7 @@ from __future__ import annotations
 import asyncio
 import math
 import os
+import struct
 import sys
 import time
 import traceback
@@ -50,6 +51,7 @@ CAD_ROOT = Path(__file__).resolve().parents[1]
 OUT_SLDPRT = CAD_ROOT / "out" / "sldprt"
 OUT_SLDASM = CAD_ROOT / "out" / "sldasm"
 OUT_PNG = CAD_ROOT / "out" / "png"
+OUT_STL = CAD_ROOT / "out" / "stl"
 
 SW_MCP_ROOT = Path(os.environ.get("SOLIDWORKS_MCP_ROOT", r"C:\src\SolidworksMCP-python"))
 sys.path.insert(0, str(SW_MCP_ROOT / "src"))
@@ -679,6 +681,214 @@ async def report_mass_properties(adapter: Any) -> None:
 # ---------------------------------------------------------------------------
 
 # swConstrainedStatus_e
+# ---------------------------------------------------------------------------
+# Machine-chirality mirror (M6.8). The original assembly was built as the
+# mirror image of the real machine (crank at +X with the paper facing -Z;
+# every ch. 30 plate and the Altgeld Hall photogrammetry put the crank at the
+# viewer's RIGHT when facing the paper, i.e. machine -X). The fix reflects
+# every component placement about the machine YZ plane (x -> -x) at the
+# `_place()` boundary of each subassembly script, leaving all derivation
+# math, solvers and checker-arbitrated slacks untouched.
+#
+# A reflection is not a rigid placement, so each mirrored placement is
+# realised as M(T(part)) = (M o T o S)(part), valid only when S(part) == part
+# for a part-local mirror symmetry S. MIRROR_PLANE declares S per part:
+#
+#   'x'  -- local YZ plane through the part STL bbox x-centre (default:
+#           solids of revolution, x-symmetric castings, even-tooth gears
+#           seeded with a tooth on local +X);
+#   'z'  -- local XY plane through the bbox z-centre (flat or planar-XY
+#           x-asymmetric linkages and wire forms; helix springs flip hand,
+#           which is sub-visible at render scale);
+#   'x0' -- local x = 0 exactly (parts whose build script is itself
+#           mirrored as part of M6.8: summing-lever, magnifying-bracket,
+#           pen-hanger).
+#
+# Cosmetic asymmetries knowingly mirrored: measuring-stick engraved scale
+# reads right-to-left (0.4 mm ticks), crank-arm fiducial dimple swaps face.
+# Correctness is arbitrated downstream by assert_component_placed readback,
+# the zero-interference gate, the analytic spring/rack/clearance gates and
+# the photo comparison renders.
+# ---------------------------------------------------------------------------
+
+MIRROR_PLANE: dict[str, str] = {
+    # channel
+    "rocker-arm": "z",
+    "connecting-rod": "z",
+    "channel-lever": "z",
+    "channel-spring-installed": "z",
+    # drive train
+    "crank-arm": "z",
+    "crank-handle": "z",
+    "transgear-latch": "z",
+    # output
+    "knife-stay": "z",
+    "boss-hook": "z",
+    "counter-spring": "z",
+    "gooseneck": "z",
+    "gooseneck-clamp": "z",
+    "magnifying-lever": "z",
+    "magnifying-clamp": "z",
+    "thumb-screw": "z",
+    "magnifying-vertical-rod": "z",
+    "pen-v-block": "z",
+    "pen-frame": "z",
+    "pen-set-screw": "z",
+    "a-frame": "z",
+    "column-clamp": "z",
+    # parts whose build scripts are themselves mirrored (M6.8)
+    "summing-lever": "x0",
+    "magnifying-bracket": "x0",
+    "pen-hanger": "x0",
+}
+
+_STL_BBOX_CACHE: dict[str, tuple[tuple[float, float], ...]] = {}
+
+
+def stl_bbox_mm(stem: str) -> tuple[tuple[float, float], ...]:
+    """((xmin, xmax), (ymin, ymax), (zmin, zmax)) of ``out/stl/<stem>.STL``
+    in mm, part-local frame (export_models.py writes binary STLs in metres,
+    untranslated)."""
+    cached = _STL_BBOX_CACHE.get(stem)
+    if cached is not None:
+        return cached
+    path = OUT_STL / f"{stem}.STL"
+    data = path.read_bytes()
+    count = struct.unpack_from("<I", data, 80)[0]
+    if len(data) < 84 + 50 * count:
+        raise RuntimeError(f"{path.name}: truncated binary STL ({count} facets)")
+    lo = [math.inf] * 3
+    hi = [-math.inf] * 3
+    for rec in struct.iter_unpack("<12fH", data[84 : 84 + 50 * count]):
+        for base in (3, 6, 9):  # skip the facet normal
+            for k in range(3):
+                v = rec[base + k]
+                if v < lo[k]:
+                    lo[k] = v
+                if v > hi[k]:
+                    hi[k] = v
+    bbox = tuple((lo[k] * 1000.0, hi[k] * 1000.0) for k in range(3))
+    _STL_BBOX_CACHE[stem] = bbox
+    return bbox
+
+
+def rows_from_euler(rotation_deg: list[float]) -> list[list[float]]:
+    """Transform2 rotation rows for adapter euler angles (applied Rx, Ry, Rz
+    to row vectors -- the convention assert_component_placed reads back)."""
+    a, b, g = (math.radians(v) for v in rotation_deg)
+    ca, sa, cb, sb, cg, sg = (
+        math.cos(a), math.sin(a), math.cos(b), math.sin(b), math.cos(g), math.sin(g),
+    )
+    return [
+        [cb * cg, cb * sg, -sb],
+        [sa * sb * cg - ca * sg, sa * sb * sg + ca * cg, sa * cb],
+        [ca * sb * cg + sa * sg, ca * sb * sg - sa * cg, ca * cb],
+    ]
+
+
+def euler_from_rows(rows: list[list[float]]) -> list[float]:
+    """Inverse of rows_from_euler (degrees). At the b = +/-90 gimbal lock the
+    g = 0 representative is returned."""
+    sb = max(-1.0, min(1.0, -rows[0][2]))
+    b = math.asin(sb)
+    if abs(sb) > 1.0 - 1e-9:
+        # row1 collapses to [sin(a -+ g), cos(a -+ g), 0]; pick g = 0.
+        a = math.atan2(rows[1][0] * (1.0 if sb > 0 else -1.0), rows[1][1])
+        return [math.degrees(a), math.degrees(b), 0.0]
+    a = math.atan2(rows[1][2], rows[2][2])
+    g = math.atan2(rows[0][1], rows[0][0])
+    return [math.degrees(a), math.degrees(b), math.degrees(g)]
+
+
+def _mirror_xform(
+    position: list[float], rows: list[list[float]], axis: int, c: float
+) -> tuple[list[float], list[list[float]]]:
+    """Reflect a placement about the machine YZ plane, realising the result
+    as a proper transform via the part-local mirror plane ``axis``-coord = c:
+    pos' = mirror_x(pos + 2c * rows[axis]), rows' = (I - 2 e e^T) R Mx."""
+    shifted = [position[k] + 2.0 * c * rows[axis][k] for k in range(3)]
+    pos2 = [-shifted[0], shifted[1], shifted[2]]
+    rows2 = [
+        [rows[i][j] * (-1.0 if (i == axis) != (j == 0) else 1.0) for j in range(3)]
+        for i in range(3)
+    ]
+    return pos2, rows2
+
+
+def mirror_placement(
+    part: str,
+    position: list[float],
+    rotation: list[float],
+    rows: list[list[float]] | None = None,
+    configuration: str = "",
+) -> tuple[list[float], list[float], list[list[float]]]:
+    """Mirror one component placement about the machine YZ plane.
+
+    Returns (position_mm, rotation_deg, rotation_rows) ready for
+    insert_component + assert_component_placed."""
+    if rows is None:
+        rows = rows_from_euler(rotation)
+    plane = MIRROR_PLANE.get(part, "x")
+    axis = 2 if plane == "z" else 0
+    if plane == "x0":
+        c = 0.0
+    else:
+        stem = f"{part}--{configuration}" if configuration else part
+        try:
+            bbox = stl_bbox_mm(stem)
+        except FileNotFoundError:
+            if not configuration:
+                raise
+            bbox = stl_bbox_mm(part)  # config STLs share the bbox centre
+        c = 0.5 * (bbox[axis][0] + bbox[axis][1])
+    pos2, rows2 = _mirror_xform(position, rows, axis, c)
+    return pos2, euler_from_rows(rows2), rows2
+
+
+def _selftest_mirror_math() -> None:
+    cases = [
+        [0.0, 0.0, 0.0],
+        [90.0, 0.0, 0.0],
+        [0.0, -21.0976, 0.0],
+        [0.0, 0.0, 1.5],
+        [13.0, 47.0, -152.0],
+        [90.0, 90.0, 0.0],
+        [-90.0, -90.0, 0.0],
+        [180.0, 30.0, 180.0],
+    ]
+    for euler in cases:
+        rows = rows_from_euler(euler)
+        back = rows_from_euler(euler_from_rows(rows))
+        drift = max(
+            abs(a - b) for ra, rb in zip(rows, back, strict=True)
+            for a, b in zip(ra, rb, strict=True)
+        )
+        if drift > 1e-9:
+            raise AssertionError(f"euler roundtrip drift {drift} for {euler}")
+        for axis, c in ((0, 7.25), (2, -3.5)):
+            pos2, rows2 = _mirror_xform([11.0, -2.0, 5.0], rows, axis, c)
+            det = (
+                rows2[0][0] * (rows2[1][1] * rows2[2][2] - rows2[1][2] * rows2[2][1])
+                - rows2[0][1] * (rows2[1][0] * rows2[2][2] - rows2[1][2] * rows2[2][0])
+                + rows2[0][2] * (rows2[1][0] * rows2[2][1] - rows2[1][1] * rows2[2][0])
+            )
+            if abs(det - 1.0) > 1e-9:
+                raise AssertionError(f"mirror rows not proper (det {det}) for {euler}")
+            pos3, rows3 = _mirror_xform(pos2, rows2, axis, c)
+            drift = max(
+                max(abs(a - b) for a, b in zip(pos3, [11.0, -2.0, 5.0], strict=True)),
+                max(
+                    abs(a - b) for ra, rb in zip(rows3, rows, strict=True)
+                    for a, b in zip(ra, rb, strict=True)
+                ),
+            )
+            if drift > 1e-9:
+                raise AssertionError(f"mirror not involutive (drift {drift}) for {euler}")
+
+
+_selftest_mirror_math()
+
+
 UNDER_CONSTRAINED = 2
 FULLY_CONSTRAINED = 3
 

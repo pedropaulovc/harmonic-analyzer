@@ -81,6 +81,7 @@ from _common import (
     check,
     check_no_interference,
     log,
+    mirror_placement,
     run_build,
     save_assembly_and_images,
 )
@@ -237,12 +238,16 @@ async def _place(
     rows: list[list[float]],
     label: str = "",
 ) -> str:
-    """Insert at the exact final transform, fix, and assert the read-back."""
+    """Insert at the exact final transform, fix, and assert the read-back.
+
+    All placements are derived in the original (pre-M6.8) frame and mirrored
+    about the machine YZ plane here, at the insert boundary."""
     from solidworks_mcp.adapters.base import (
         ComponentRefParameters,
         InsertComponentParameters,
     )
 
+    position, rotation, rows = mirror_placement(part, position, rotation, rows)
     label = label or part
     data = check(
         f"insert {label} @ ({position[0]:.2f}, {position[1]:.2f}, {position[2]:.2f})",
