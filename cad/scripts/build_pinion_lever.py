@@ -91,15 +91,58 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(
-        adapter, "ball profile", fix_entities=[centerline, bore_wall, arc]
+    # Arc (5 DOF): centre on the origin + radius + one constraint per
+    # endpoint angle -- the wall's vertical ties the far end, a single
+    # horizontal distance sets the near end at the bore wall. The
+    # centerline floats apart from the profile (its ends sit on the axis,
+    # not on profile points), so it gets pinned through the arc ends.
+    check(
+        "anchor ball centre",
+        await adapter.add_sketch_constraint(f"{arc}.center", "origin", "coincident"),
     )
+    check(
+        "ball radius",
+        await adapter.add_sketch_dimension(arc, None, "radial", BALL_R),
+    )
+    check(
+        "bore wall vertical",
+        await adapter.add_sketch_constraint(bore_wall, None, "vertical"),
+    )
+    check(
+        "bore wall offset",
+        await adapter.add_sketch_dimension(
+            f"{arc}.start", "origin", "horizontal_distance", BORE_R
+        ),
+    )
+    check(
+        "axis vertical",
+        await adapter.add_sketch_constraint(centerline, None, "vertical"),
+    )
+    check(
+        "axis on origin",
+        await adapter.add_sketch_constraint(
+            f"{centerline}.start", "origin", "vertical_points"
+        ),
+    )
+    check(
+        "axis start level",
+        await adapter.add_sketch_constraint(
+            f"{centerline}.start", f"{arc}.start", "horizontal_points"
+        ),
+    )
+    check(
+        "axis end level",
+        await adapter.add_sketch_constraint(
+            f"{centerline}.end", f"{arc}.end", "horizontal_points"
+        ),
+    )
+    await ensure_fully_defined(adapter, "ball profile")
     check("exit_sketch ball", await adapter.exit_sketch())
     check(
         "revolve ball",
         await adapter.create_revolve(RevolveParameters(angle=360.0)),
     )
-    volume = await volume_check(
+    await volume_check(
         adapter, "annular ball", V_ANNULAR_BALL, 0.005 * V_ANNULAR_BALL
     )
 
