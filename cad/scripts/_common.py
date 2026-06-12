@@ -726,12 +726,21 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     "crank-arm": "z",
     "crank-handle": "z",
     "transgear-latch": "z",
+    # odd sprocket teeth break the 'x' tooth-pattern closure; the hub is
+    # z-symmetric about the bbox centre (mesh resid 0.000)
+    "chain-sprocket": "z",
     # output
     "knife-stay": "z",
     "boss-hook": "z",
     "counter-spring": "z",
     "gooseneck": "z",
-    "gooseneck-clamp": "z",
+    # gooseneck-clamp: default 'x' (block/bore/screw-head all x-centred);
+    # 'z' was invalid -- the screw head sits one-sided at local z 12..18
+    # (M6.8 rebuild: 2280 mm^3 clamp-vs-gooseneck interference)
+    # pinion-bar / platen-rack: stub bore and tooth grid are NOT centred
+    # in the bbox x-span, but both parts are exact z-extrusions
+    "pinion-bar": "z",
+    "platen-rack": "z",
     "magnifying-lever": "z",
     "magnifying-clamp": "z",
     "thumb-screw": "z",
