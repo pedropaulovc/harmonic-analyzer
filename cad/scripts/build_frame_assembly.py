@@ -34,6 +34,11 @@ depth):
 * top-frame x1: the green ring at ring mid-plane Y = 1020.2 (rails 22 x
   41, y 999.7..1040.7), corner bosses bored around the four columns; its
   west rail seats the top-lever ball mounts (channel.SLDASM).
+* lag-screw x2 (M6.10 fasteners): the rocker-arm-support hold-downs,
+  coming UP through the base from below -- heads recessed in the base
+  underside's counterbores (y 0.5..4.5 in the O15 x 4.5 pockets), O7.8
+  shanks through the base's O8.2 holes and 19.7 into the support's
+  O7.94 x 25 sockets (tips at y 70.5).
 
 Every component is fixed (base) or fully defined by three orthogonal
 plane-plane mates against the base part's principal planes; distance-mate
@@ -80,6 +85,9 @@ BRACKET_PLATE_T = 0.3 * IN  # corner-bracket upright plate
 BRACKET_X = COLUMN_X - COLUMN_RADIUS - BRACKET_PLATE_T / 2.0  # plate tangent
 SUPPORT_X = 72.9  # rocker pivot x: arbor 47.5 + 25.4 rod lever (M6.3, M6.8 mirror)
 SUPPORT_Z = 133.35 - 63.5 / 2.0  # 101.6: outer face flush w/ top plate edge
+LAG_SCREW_X = (SUPPORT_X - 31.75, SUPPORT_X + 31.75)  # 41.15 / 104.65: the
+# support's mounting-hole pitch (base HOLE_XZ[2:] / counterbores match)
+LAG_SCREW_Y = 4.5  # under-head face = counterbore top; head 0.5..4.5
 TOP_FRAME_MID_Y = 1020.2  # ring mid-plane: rails y 999.7..1040.7 (M6.3)
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
@@ -235,6 +243,28 @@ async def build(adapter) -> dict[str, str]:
         adapter, name, "Top Plane", "Top Plane", base_name, BASE_TOP_Y, target
     )
     assert_component_placed(adapter, name, target, IDENTITY)
+
+    # Support hold-down lag screws (M6.10): authored axis +Y with the
+    # under-head face on the part's Top plane, so the column-style
+    # plane-mate triple pins them exactly.
+    lag_path = _part("lag-screw")
+    for lx in LAG_SCREW_X:
+        target = [lx, LAG_SCREW_Y, SUPPORT_Z]
+        res = await adapter.insert_component(
+            InsertComponentParameters(file_path=lag_path, position=target)
+        )
+        check(f"insert_component lag-screw @ {target}", res)
+        name = res.data["name"]
+        await _plane_mate(
+            adapter, name, "Right Plane", "Right Plane", base_name, lx, target
+        )
+        await _plane_mate(
+            adapter, name, "Front Plane", "Front Plane", base_name, SUPPORT_Z, target
+        )
+        await _plane_mate(
+            adapter, name, "Top Plane", "Top Plane", base_name, LAG_SCREW_Y, target
+        )
+        assert_component_placed(adapter, name, target, IDENTITY)
 
     # Top-frame ring clamped around the four columns, mid-plane y 1020.2.
     target = [0.0, TOP_FRAME_MID_Y, 0.0]
