@@ -830,6 +830,14 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     "drive-chain": ("z", 2.25),
     # centred symmetric bar; explicit c, no STL yet at first build
     "wheel-bar": ("x", 0.0),
+    # ch25 alignment-pinion set: every part exactly symmetric about its
+    # local x = 0 plane (gear/rod axes, strap/block mid-planes); explicit
+    # c, no STLs yet at first build
+    "alignment-pinion": ("x", 0.0),
+    "pinion-bracket": ("x", 0.0),
+    "pinion-pivot-block": ("x", 0.0),
+    "pinion-pivot-shaft": ("x", 0.0),
+    "pinion-lever": ("x", 0.0),
     # parts whose build scripts are themselves mirrored (M6.8)
     "summing-lever": "x0",
     "magnifying-bracket": "x0",
