@@ -34,6 +34,8 @@ from _common import (
     add_line_chain,
     apply_material,
     check,
+    define_polygon_chain,
+    define_rectilinear_chain,
     ensure_fully_defined,
     report_mass_properties,
     run_build,
@@ -83,32 +85,15 @@ async def build(adapter) -> dict[str, str]:
 
     # Bar blank: origin-cornered rectangle.
     check("create_sketch bar", await adapter.create_sketch("Front"))
-    bar_lines = await add_line_chain(
-        adapter,
-        [
-            (0.0, 0.0),
-            (BAR_LENGTH, 0.0),
-            (BAR_LENGTH, BAR_HEIGHT),
-            (0.0, BAR_HEIGHT),
-        ],
-    )
-    bottom, right, top, left = bar_lines
-    for ent, relation in (
-        (bottom, "horizontal"),
-        (right, "vertical"),
-        (top, "horizontal"),
-        (left, "vertical"),
-    ):
-        check(f"bar {relation}", await adapter.add_sketch_constraint(ent, None, relation))
-    check(
-        "bar length dim",
-        await adapter.add_sketch_dimension(bottom, None, "linear", BAR_LENGTH),
-    )
-    check(
-        "bar height dim",
-        await adapter.add_sketch_dimension(left, None, "linear", BAR_HEIGHT),
-    )
-    await ensure_fully_defined(adapter, "bar sketch", fix_entities=bar_lines)
+    bar_rect = [
+        (0.0, 0.0),
+        (BAR_LENGTH, 0.0),
+        (BAR_LENGTH, BAR_HEIGHT),
+        (0.0, BAR_HEIGHT),
+    ]
+    bar_lines = await add_line_chain(adapter, bar_rect)
+    await define_rectilinear_chain(adapter, bar_lines, bar_rect, label="bar")
+    await ensure_fully_defined(adapter, "bar sketch")
     check("exit_sketch bar", await adapter.exit_sketch())
     check(
         "extrude bar",
@@ -122,17 +107,16 @@ async def build(adapter) -> dict[str, str]:
     # cylinder-gear notch finding).
     check("create_sketch gap", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    gap = await add_line_chain(
-        adapter,
-        [
-            (FIRST_GAP_X - half_width(ROOT_Y), ROOT_Y),
-            (FIRST_GAP_X - half_width(CUT_TOP_Y), CUT_TOP_Y),
-            (FIRST_GAP_X + half_width(CUT_TOP_Y), CUT_TOP_Y),
-            (FIRST_GAP_X + half_width(ROOT_Y), ROOT_Y),
-        ],
-    )
+    gap_pts = [
+        (FIRST_GAP_X - half_width(ROOT_Y), ROOT_Y),
+        (FIRST_GAP_X - half_width(CUT_TOP_Y), CUT_TOP_Y),
+        (FIRST_GAP_X + half_width(CUT_TOP_Y), CUT_TOP_Y),
+        (FIRST_GAP_X + half_width(ROOT_Y), ROOT_Y),
+    ]
+    gap = await add_line_chain(adapter, gap_pts)
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "gap sketch", fix_entities=gap)
+    await define_polygon_chain(adapter, gap, gap_pts, label="gap")
+    await ensure_fully_defined(adapter, "gap sketch")
     check("exit_sketch gap", await adapter.exit_sketch())
     gap_cut = await adapter.create_cut_extrude(
         ExtrusionParameters(depth=BAR_THICKNESS + 1.0)
