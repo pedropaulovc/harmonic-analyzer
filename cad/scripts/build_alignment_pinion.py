@@ -36,7 +36,12 @@ PART_NAME = "alignment-pinion"
 MATERIAL = "Brass"  # p.67: brass drum, same finish as the cylinder train
 
 TEETH = 42  # DIMENSIONS.md ch25: counted on the p.67 plate (high)
-FACE_WIDTH = 150.0  # DIMENSIONS.md ch25: spans the 20-station stack (derived)
+FACE_WIDTH = 139.0  # DIMENSIONS.md ch25: covers drum stations 0..18 (derived).
+# The real drum spans all 20, but the model's photo-calibrated rocker-support
+# frustum (base 88.9 x 63.5 at z 69.85..133.35) fills the space the real
+# machine's slimmer north support leaves for the back swing bracket, so the
+# drum is trimmed to z -75..+64 and the j = 19 station (z 65.5..68.5) goes
+# uncovered -- documented in DIMENSIONS.md Appendix C.
 
 
 async def build(adapter) -> dict[str, str]:

@@ -11,10 +11,10 @@ Layout: shaft axis Z, shaft z 0..173, ball centred at the ORIGIN (the
 front half protrudes as the end knob), handle along Y from -9 to +61
 (asymmetric: the short side stops above the machine base).
 
-Volume gate (exact union, mm^3): shaft 5478.78 + ball 2144.66 + handle
+Volume gate (exact union, mm^3): shaft 5035.41 + ball 2144.66 + handle
 1979.20 - ball/shaft half-pass 243.10 - ball/handle full-pass 436.10
 (the handle/shaft Steinmetz region lies entirely inside the ball, so
-its -V and +V inclusion-exclusion terms cancel) = 8923.44.
+its -V and +V inclusion-exclusion terms cancel) = 8480.07.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 25".
 
@@ -47,7 +47,8 @@ PART_NAME = "pinion-pivot-shaft"
 MATERIAL = "Plain Carbon Steel"  # bright steel (p.67)
 
 SHAFT_DIA = 6.35  # rides the strap and block bores (derived)
-SHAFT_LEN = 173.0  # front strap z -80 to 4 proud of the back strap (derived)
+SHAFT_LEN = 159.0  # ball centre z -89 to z +70: 1 proud of the back strap,
+# 1.4 clear of the rocker-support frustum's tapered west corner (derived)
 BALL_DIA = 16.0  # end ball, photo-scaled vs the 6 mm rod (low)
 HANDLE_DIA = 6.0  # T-handle rod, p.68 "6 mm" annotation (high)
 HANDLE_DOWN = 9.0  # below the ball centre -- stops 1.3 above the base (derived)

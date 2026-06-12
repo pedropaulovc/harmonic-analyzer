@@ -223,24 +223,34 @@ PIVOT_POST_STATION = -1.0
 KNOB_POST_STATION = 177.0  # thin-tip journal; z 90.0, x -2.1 (p.18)
 
 # --- alignment pinion (ch. 25): carried DISENGAGED (p. 68 "gap") ---
-# The 42T DP 30 pinion drum spans all 20 drum stations on the drum's
-# far (-x) side, low (p. 67: opposite the cone/crank, hidden behind
-# the A-frame in the ch30 front plates); two swing straps butt against
-# the drum end faces and pivot on a torque shaft through base blocks;
-# the engage lever stands up (p. 68: up = disengaged, flat = engaged).
-# The straps hang exactly vertical in this pose (the pivot sits
-# directly below the pinion axis) and PINION_X backs the tip circles
-# off to the PINION_GAP clearance.
+# The 42T DP 30 pinion drum rides low on the drum's far (-x) side
+# (p. 67: opposite the cone/crank, hidden behind the A-frame in the
+# ch30 front plates); two swing straps butt against the drum end faces
+# and pivot on a torque shaft through base blocks; the engage lever
+# stands up (p. 68: up = disengaged, flat = engaged). The straps hang
+# exactly vertical in this pose (the pivot sits directly below the
+# pinion axis) and PINION_X backs the tip circles off to PINION_GAP.
+#
+# The photo-calibrated rocker-support frustum (frame.SLDASM: base
+# 88.9 x 63.5 at (x -72.9, z 101.6), so x to -117.35 / z from 69.85 at
+# the base, tapering up) fills the space the real machine's slimmer
+# north support leaves for the back bracket. The drum is therefore
+# trimmed to z -75..+64: stations 0..18 covered, the j = 19 station
+# (z 65.5..68.5) NOT reached -- engaged alignment would turn 19 of the
+# 20 gears (Appendix C). Back strap/block stay under z 69, the torque
+# shaft ends at z 70 (the frustum corner above it is at z 71.4).
 PINION_TEETH = 42
 TIP_DRUM = (122.0 / DP_TRAIN) * 25.4 / 2.0  # 51.647: 120T tip radius
 TIP_PINION = ((PINION_TEETH + 2.0) / DP_TRAIN) * 25.4 / 2.0  # 18.627
 PINION_GAP = 2.0  # disengaged tip clearance
-PINION_DRUM_LEN = 150.0  # build_alignment_pinion FACE_WIDTH
-PIVOT_Y = Y_BASE_TOP + 10.3  # 61.1: pivot-block bore height
-PINION_Y = PIVOT_Y + 47.0  # 108.1: strap c2c (build_pinion_bracket C2C)
+PINION_DRUM_LEN = 139.0  # build_alignment_pinion FACE_WIDTH
+PINION_Z_FRONT = -75.0  # drum front end face (front strap inner face)
+PIVOT_Y = Y_BASE_TOP + 12.0  # 62.8: pivot-block bore height; the strap's
+# r 11 bottom cap swings 1.0 clear of the base top
+PINION_Y = PIVOT_Y + 47.0  # 109.8: strap c2c (build_pinion_bracket C2C)
 PINION_X = X_DRUM - math.sqrt(
     (TIP_DRUM + TIP_PINION + PINION_GAP) ** 2 - (Y_DRIVE - PINION_Y) ** 2
-)  # -117.31
+)  # -117.75
 STRAP_T = 5.0  # build_pinion_bracket THICKNESS
 BLOCK_T = 12.0  # build_pinion_pivot_block DEPTH
 PINION_SHAFT_Z0 = -89.0  # ball centre; the Ø16 ball reaches z -97, 2.9
@@ -249,13 +259,19 @@ LEVER_TILT_DEG = 32.0  # from vertical, toward -x: the lever axis passes
 # 47*sin(tilt) = 24.9 from the pinion axis -> 3.3 clear of rod vs tips
 LEVER_Z = -59.0  # rod surface 1.0 behind the front block's back face
 
-# Drum coverage and lever clearance self-checks.
-if Z_DRUM0 - DRUM_FACE / 2.0 < -PINION_DRUM_LEN / 2.0 + 1.0:
+PINION_Z_BACK = PINION_Z_FRONT + PINION_DRUM_LEN  # 64.0
+
+# Drum coverage and clearance self-checks.
+if Z_DRUM0 - DRUM_FACE / 2.0 < PINION_Z_FRONT + 1.0:
     raise AssertionError("alignment pinion too short at the front station")
-if Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0 > PINION_DRUM_LEN / 2.0 - 1.0:
-    raise AssertionError("alignment pinion too short at the back station")
+if Z_DRUM0 + 18 * Z_PITCH + DRUM_FACE / 2.0 > PINION_Z_BACK - 1.0:
+    raise AssertionError("alignment pinion misses the j = 18 station")
+if PINION_Z_BACK + STRAP_T > 69.85 - 0.5:
+    raise AssertionError("back strap reaches the rocker-support frustum")
 if 47.0 * math.sin(math.radians(LEVER_TILT_DEG)) - TIP_PINION - 3.0 < 1.0:
     raise AssertionError("engage lever fouls the pinion drum")
+if PIVOT_Y - 11.0 < Y_BASE_TOP + 0.5:
+    raise AssertionError("strap bottom cap dips into the base top")
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 ROT_X_POS90 = [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0]]
@@ -473,13 +489,13 @@ async def build(adapter) -> dict[str, str]:
     await _place(
         adapter,
         "alignment-pinion",
-        [PINION_X, PINION_Y, -PINION_DRUM_LEN / 2.0],
+        [PINION_X, PINION_Y, PINION_Z_FRONT],
         [0.0, 0.0, 0.0],
         IDENTITY,
     )
     for tag, z0 in (
-        ("front", -PINION_DRUM_LEN / 2.0 - STRAP_T),
-        ("back", PINION_DRUM_LEN / 2.0),
+        ("front", PINION_Z_FRONT - STRAP_T),
+        ("back", PINION_Z_BACK),
     ):
         await _place(
             adapter,
@@ -490,8 +506,8 @@ async def build(adapter) -> dict[str, str]:
             label=f"pinion-bracket {tag}",
         )
     for tag, z0 in (
-        ("front", -PINION_DRUM_LEN / 2.0),
-        ("back", PINION_DRUM_LEN / 2.0 - BLOCK_T),
+        ("front", PINION_Z_FRONT),
+        ("back", PINION_Z_BACK - BLOCK_T),
     ):
         await _place(
             adapter,
