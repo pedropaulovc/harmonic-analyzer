@@ -27,6 +27,7 @@ from _common import (
     apply_material,
     check,
     define_circle,
+    define_rectilinear_chain,
     ensure_fully_defined,
     report_mass_properties,
     run_build,
@@ -70,26 +71,24 @@ async def build(adapter) -> dict[str, str]:
     # volume reading untrimmed 4600).
     check("create_sketch ring", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    outer = await add_line_chain(
-        adapter,
-        [
-            (TRIM_NEAR, 0.0),
-            (OUTER_WIDTH, 0.0),
-            (OUTER_WIDTH, OUTER_HEIGHT),
-            (TRIM_NEAR, OUTER_HEIGHT),
-        ],
-    )
+    outer_rect = [
+        (TRIM_NEAR, 0.0),
+        (OUTER_WIDTH, 0.0),
+        (OUTER_WIDTH, OUTER_HEIGHT),
+        (TRIM_NEAR, OUTER_HEIGHT),
+    ]
+    outer = await add_line_chain(adapter, outer_rect)
     set_sketch_direct_db(adapter, False)
-    inner = await add_line_chain(
-        adapter,
-        [
-            (RAIL_SIDE, RAIL_END),
-            (OUTER_WIDTH - RAIL_SIDE, RAIL_END),
-            (OUTER_WIDTH - RAIL_SIDE, OUTER_HEIGHT - RAIL_END),
-            (RAIL_SIDE, OUTER_HEIGHT - RAIL_END),
-        ],
-    )
-    await ensure_fully_defined(adapter, "ring sketch", fix_entities=[*outer, *inner])
+    inner_rect = [
+        (RAIL_SIDE, RAIL_END),
+        (OUTER_WIDTH - RAIL_SIDE, RAIL_END),
+        (OUTER_WIDTH - RAIL_SIDE, OUTER_HEIGHT - RAIL_END),
+        (RAIL_SIDE, OUTER_HEIGHT - RAIL_END),
+    ]
+    inner = await add_line_chain(adapter, inner_rect)
+    await define_rectilinear_chain(adapter, outer, outer_rect, label="outer ring")
+    await define_rectilinear_chain(adapter, inner, inner_rect, label="inner ring")
+    await ensure_fully_defined(adapter, "ring sketch")
     check("exit_sketch ring", await adapter.exit_sketch())
     check(
         "extrude ring",
