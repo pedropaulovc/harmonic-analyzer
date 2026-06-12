@@ -97,6 +97,45 @@ class POSE_OT_save(bpy.types.Operator):
         return {"FINISHED"}
 
 
+def orbit_step(dx_px: float, dy_px: float, slow: bool) -> None:
+    """Rotate the camera about the current target so the MODEL follows the
+    drag (grab-the-model feel — Blender's camera-locked orbit is inverted).
+    Decompose -> nudge az/el -> recompose keeps target, zoom and roll."""
+    job = STATE["job"]
+    sens = 0.05 if slow else 0.25  # degrees per pixel
+    vals = decompose_camera(STATE["cam"], STATE["lo"], STATE["hi"],
+                            job["width"], job["height"])
+    vals["az_deg"] -= dx_px * sens
+    vals["el_deg"] = max(-89.5, min(89.5, vals["el_deg"] + dy_px * sens))
+    compose_camera(STATE["cam"], vals, STATE["lo"], STATE["hi"],
+                   job["width"], job["height"])
+
+
+class POSE_OT_orbit(bpy.types.Operator):
+    """Middle-mouse drag: rotate the model in the drag direction"""
+    bl_idname = "pose_edit.orbit"
+    bl_label = "Pose orbit (grab the model)"
+
+    def invoke(self, context, event):
+        self.last = (event.mouse_x, event.mouse_y)
+        context.window_manager.modal_handler_add(self)
+        return {"RUNNING_MODAL"}
+
+    def modal(self, context, event):
+        if event.type == "MOUSEMOVE":
+            dx = event.mouse_x - self.last[0]
+            dy = event.mouse_y - self.last[1]
+            self.last = (event.mouse_x, event.mouse_y)
+            orbit_step(dx, dy, event.shift)
+            context.area.tag_redraw()
+            return {"RUNNING_MODAL"}
+        if event.type == "MIDDLEMOUSE" and event.value == "RELEASE":
+            return {"FINISHED"}
+        if event.type in ("RIGHTMOUSE", "ESC"):
+            return {"FINISHED"}
+        return {"RUNNING_MODAL"}
+
+
 class POSE_OT_zoom(bpy.types.Operator):
     """Scale the model against the photo (camera ortho scale = saved zoom).
 
@@ -127,6 +166,9 @@ def register_zoom_keymap():
     ):
         kmi = km.keymap_items.new("pose_edit.zoom", key, "PRESS", ctrl=ctrl)
         kmi.properties.factor = factor
+    # plain MMB drag -> grab-the-model orbit (shadows view3d.rotate;
+    # Shift+MMB pan keeps the default binding)
+    km.keymap_items.new("pose_edit.orbit", "MIDDLEMOUSE", "PRESS")
 
 
 class POSE_PT_panel(bpy.types.Panel):
@@ -148,7 +190,9 @@ class POSE_PT_panel(bpy.types.Panel):
         col.prop(bg, "alpha", text="Photo opacity")
         col.prop(bg, "display_depth", text="")
         col.operator("pose_edit.save", icon="EXPORT")
-        col.label(text="orbit/pan moves the camera")
+        col.label(text="MMB drag: rotate (Shift held in")
+        col.label(text="  the drag = slow/precise)")
+        col.label(text="Shift+MMB: pan")
         col.label(text="Ctrl+Wheel / numpad +-: zoom pose")
         col.label(text="plain wheel: magnify view only")
 
@@ -236,6 +280,7 @@ def _build_editor(job: dict):
 
     bpy.utils.register_class(POSE_OT_save)
     bpy.utils.register_class(POSE_OT_zoom)
+    bpy.utils.register_class(POSE_OT_orbit)
     bpy.utils.register_class(POSE_PT_panel)
     register_zoom_keymap()
     setup_viewport()

@@ -4563,16 +4563,20 @@
    "camera": {
     "mode": "euler",
     "roll_deg": 0.0,
-    "zoom": 1.0,
-    "target_mm": null,
+    "zoom": 1.2111,
+    "target_mm": [
+     -6.8,
+     514.2,
+     -46.2
+    ],
     "perspective": null,
-    "az_deg": 0,
-    "el_deg": 0
+    "az_deg": 0.0,
+    "el_deg": 0.0
    },
    "align": {
-    "scale": 1.21,
-    "dx_px": 20,
-    "dy_px": -300
+    "scale": 1.0,
+    "dx_px": 7,
+    "dy_px": -73
    },
    "component_focus": [
     "harmonic_analyzer"
@@ -4620,20 +4624,20 @@
    "camera": {
     "mode": "euler",
     "roll_deg": 0.0,
-    "zoom": 1.2155,
+    "zoom": 1.2763,
     "target_mm": [
      10.1,
-     513.7,
-     -22.5
+     492.7,
+     -15.1
     ],
     "perspective": null,
     "az_deg": 90.0,
     "el_deg": 0.0
    },
    "align": {
-    "scale": 0.91,
+    "scale": 0.86,
     "dx_px": 33,
-    "dy_px": -73
+    "dy_px": -20
    },
    "component_focus": [
     "harmonic_analyzer"
