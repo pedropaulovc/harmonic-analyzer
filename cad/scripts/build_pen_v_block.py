@@ -28,6 +28,8 @@ from _common import (
     apply_material,
     check,
     define_circle,
+    define_polygon_chain,
+    define_rectilinear_chain,
     ensure_fully_defined,
     report_mass_properties,
     run_build,
@@ -66,19 +68,18 @@ async def build(adapter) -> dict[str, str]:
     # direct-to-DB so inference cannot snap them).
     check("create_sketch outline", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    lines = await add_line_chain(
-        adapter,
-        [
-            (0.0, 0.0),
-            (BLOCK_LENGTH, 0.0),
-            (BLOCK_LENGTH, BLOCK_HEIGHT - CHAMFER),
-            (BLOCK_LENGTH - CHAMFER, BLOCK_HEIGHT),
-            (CHAMFER, BLOCK_HEIGHT),
-            (0.0, BLOCK_HEIGHT - CHAMFER),
-        ],
-    )
+    outline_pts = [
+        (0.0, 0.0),
+        (BLOCK_LENGTH, 0.0),
+        (BLOCK_LENGTH, BLOCK_HEIGHT - CHAMFER),
+        (BLOCK_LENGTH - CHAMFER, BLOCK_HEIGHT),
+        (CHAMFER, BLOCK_HEIGHT),
+        (0.0, BLOCK_HEIGHT - CHAMFER),
+    ]
+    lines = await add_line_chain(adapter, outline_pts)
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "block outline", fix_entities=lines)
+    await define_polygon_chain(adapter, lines, outline_pts, label="block outline")
+    await ensure_fully_defined(adapter, "block outline")
     check("exit_sketch outline", await adapter.exit_sketch())
     check(
         "extrude block",
@@ -106,16 +107,15 @@ async def build(adapter) -> dict[str, str]:
 
     # Stopped clamp slit through Z from the x=0 end.
     check("create_sketch slit", await adapter.create_sketch("Front"))
-    slit = await add_line_chain(
-        adapter,
-        [
-            (0.0, SLIT_Y[0]),
-            (SLIT_LENGTH, SLIT_Y[0]),
-            (SLIT_LENGTH, SLIT_Y[1]),
-            (0.0, SLIT_Y[1]),
-        ],
-    )
-    await ensure_fully_defined(adapter, "slit sketch", fix_entities=slit)
+    slit_rect = [
+        (0.0, SLIT_Y[0]),
+        (SLIT_LENGTH, SLIT_Y[0]),
+        (SLIT_LENGTH, SLIT_Y[1]),
+        (0.0, SLIT_Y[1]),
+    ]
+    slit = await add_line_chain(adapter, slit_rect)
+    await define_rectilinear_chain(adapter, slit, slit_rect, label="slit")
+    await ensure_fully_defined(adapter, "slit sketch")
     check("exit_sketch slit", await adapter.exit_sketch())
     check(
         "cut slit",
