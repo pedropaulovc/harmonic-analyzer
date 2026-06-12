@@ -21,7 +21,9 @@ z_j = -67.1 + 7.0565 j; the output side is -Z). 46 components:
   platen-clips on the paper face.
 * Transgear group (ch. 23 topology, M6.8): a-frame (M6.5: its clevis
   grips the SOUTH PIVOT BALL MOUNT from channel.SLDASM - the front stand
-  doubles as the rocker-shaft support; ball-mount seat at machine 228.6)
+  doubles as the rocker-shaft support; ball-mount seat at machine 228.6;
+  M6.9: the part also carries the portal-frame top/foot rails running
+  north to 0.25 short of the rocker-arm-support frustum in frame.SLDASM)
   + pinion-bar (y 253.5, z -105..-117, x -58..+178: west end floats just
   east of the clevis), transgear-stub carrying rack-pinion (96T disc) +
   latch big hub; the latch (c2c 66.05, ch30 rest state) carries the knob
@@ -221,7 +223,8 @@ STICK_POS = (-158.0, 53.8, -133.0)  # flat on the base, graduations up;
 # Rx+90 footprint x -158..+42, z -133..-118: west end 2.5 east of the SW
 # corner-bracket foot tip (x -160.5, M6.5 - the old -175 ran the stick
 # through the bracket's plate + foot, 271 mm^3), z band fully on the top
-# plate (edge -133.35) and 3 clear of the a-frame foot (z -115..-107)
+# plate (edge -133.35) and 0.5 clear of the a-frame plate front face
+# (z -117.5: the M6.9 portal-frame thickening was capped by this stick)
 SPARE_GEAR_POS = (-160.0, 55.8, -15.0)  # plan circle r 26 (T24 OD 52,
 # conservative for the T18) about (-160, -15): the ch25 pinion rig now
 # sits front-centre (script x -21..+59 in drive-train.SLDASM), 100+

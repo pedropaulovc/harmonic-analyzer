@@ -351,7 +351,7 @@ if (
     raise AssertionError("handle cross-rod short arm dips into the base top")
 if abs(HANDLE_Z - LEVER_Z) < 6.0 + 1.0:
     raise AssertionError("engage lever plane fouls the handle cross-rod plane")
-if HANDLE_Z - 3.0 < -99.9 + 0.25:
+if HANDLE_Z - 3.0 < -99.0 + 0.25:
     raise AssertionError("handle cross-rod plane reaches the A-frame band")
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
