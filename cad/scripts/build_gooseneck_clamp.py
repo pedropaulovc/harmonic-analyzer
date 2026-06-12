@@ -30,6 +30,7 @@ from _common import (
     apply_material,
     check,
     define_circle,
+    define_rectilinear_chain,
     ensure_fully_defined,
     extrude_at_offset,
     report_mass_properties,
@@ -69,16 +70,15 @@ async def build(adapter) -> dict[str, str]:
 
     # Block (Front sketch, mid-plane in Z).
     check("create_sketch block", await adapter.create_sketch("Front"))
-    outline = await add_line_chain(
-        adapter,
-        [
-            (-BLOCK_HALF_X, 0.0),
-            (BLOCK_HALF_X, 0.0),
-            (BLOCK_HALF_X, BLOCK_HEIGHT),
-            (-BLOCK_HALF_X, BLOCK_HEIGHT),
-        ],
-    )
-    await ensure_fully_defined(adapter, "block sketch", fix_entities=outline)
+    block_rect = [
+        (-BLOCK_HALF_X, 0.0),
+        (BLOCK_HALF_X, 0.0),
+        (BLOCK_HALF_X, BLOCK_HEIGHT),
+        (-BLOCK_HALF_X, BLOCK_HEIGHT),
+    ]
+    outline = await add_line_chain(adapter, block_rect)
+    await define_rectilinear_chain(adapter, outline, block_rect, label="block")
+    await ensure_fully_defined(adapter, "block sketch")
     check("exit_sketch block", await adapter.exit_sketch())
     check(
         "extrude block",
@@ -105,16 +105,15 @@ async def build(adapter) -> dict[str, str]:
 
     # Square screw head (+Z face).
     check("create_sketch head", await adapter.create_sketch("Front"))
-    head = await add_line_chain(
-        adapter,
-        [
-            (-HEAD_HALF, SCREW_Y - HEAD_HALF),
-            (HEAD_HALF, SCREW_Y - HEAD_HALF),
-            (HEAD_HALF, SCREW_Y + HEAD_HALF),
-            (-HEAD_HALF, SCREW_Y + HEAD_HALF),
-        ],
-    )
-    await ensure_fully_defined(adapter, "head sketch", fix_entities=head)
+    head_rect = [
+        (-HEAD_HALF, SCREW_Y - HEAD_HALF),
+        (HEAD_HALF, SCREW_Y - HEAD_HALF),
+        (HEAD_HALF, SCREW_Y + HEAD_HALF),
+        (-HEAD_HALF, SCREW_Y + HEAD_HALF),
+    ]
+    head = await add_line_chain(adapter, head_rect)
+    await define_rectilinear_chain(adapter, head, head_rect, label="head")
+    await ensure_fully_defined(adapter, "head sketch")
     check("exit_sketch head", await adapter.exit_sketch())
     extrude_at_offset(adapter, HEAD_Z[1] - HEAD_Z[0], HEAD_Z[0])
     expected += (2.0 * HEAD_HALF) ** 2 * (HEAD_Z[1] - HEAD_Z[0])

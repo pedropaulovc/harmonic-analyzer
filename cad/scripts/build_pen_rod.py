@@ -24,6 +24,7 @@ from _common import (
     apply_material,
     check,
     define_circle,
+    define_rectilinear_chain,
     ensure_fully_defined,
     report_mass_properties,
     run_build,
@@ -46,16 +47,15 @@ async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
 
     check("create_sketch section", await adapter.create_sketch("Front"))
-    lines = await add_line_chain(
-        adapter,
-        [
-            (-ROD_SECTION / 2.0, 0.0),
-            (ROD_SECTION / 2.0, 0.0),
-            (ROD_SECTION / 2.0, ROD_LENGTH),
-            (-ROD_SECTION / 2.0, ROD_LENGTH),
-        ],
-    )
-    await ensure_fully_defined(adapter, "rod outline", fix_entities=lines)
+    section_rect = [
+        (-ROD_SECTION / 2.0, 0.0),
+        (ROD_SECTION / 2.0, 0.0),
+        (ROD_SECTION / 2.0, ROD_LENGTH),
+        (-ROD_SECTION / 2.0, ROD_LENGTH),
+    ]
+    lines = await add_line_chain(adapter, section_rect)
+    await define_rectilinear_chain(adapter, lines, section_rect, label="rod")
+    await ensure_fully_defined(adapter, "rod outline")
     check("exit_sketch section", await adapter.exit_sketch())
     check(
         "extrude rod",
