@@ -34,6 +34,7 @@ import sys
 from _common import (
     POLISHED_STEEL,
     add_line_chain,
+    anchor_point_to_origin,
     apply_color,
     apply_material,
     check,
@@ -90,14 +91,14 @@ async def build(adapter) -> dict[str, str]:
     await ensure_fully_defined(adapter, "hub sketch")
     check("exit_sketch hub", await adapter.exit_sketch())
     extrude_at_offset(adapter, HUB_Z[1] - HUB_Z[0], HUB_Z[0])
-    volume = await volume_check(adapter, "hub", V_HUB, 0.005 * V_HUB)
+    await volume_check(adapter, "hub", V_HUB, 0.005 * V_HUB)
 
     # Ball + cross rod as one revolved profile about +Y (revolve LAST).
     from solidworks_mcp.adapters.base import RevolveParameters
 
     check("create_sketch ball+rod", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    centerline = check(
+    check(
         "add_centerline rod axis",
         await adapter.add_centerline(0.0, -ROD_DOWN, 0.0, ROD_UP),
     )
@@ -127,9 +128,52 @@ async def build(adapter) -> dict[str, str]:
         close=False,
     )
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(
-        adapter, "ball+rod profile", fix_entities=[centerline, *lines, arc, *tail]
+    rod_base, rod_wall = lines
+    upper_wall, rod_top, axis_edge = tail
+    # 13-DOF profile: ball arc centre on the origin + radius; h/v on the
+    # five chain edges; the arc chord vertical ties the upper endpoint's
+    # angle; rod radius + the two arm lengths as dims. The centerline
+    # merged into the (0, -ROD_DOWN) / (0, ROD_UP) profile corners at
+    # creation, so it carries no constraints of its own.
+    check(
+        "anchor ball centre",
+        await adapter.add_sketch_constraint(f"{arc}.center", "origin", "coincident"),
     )
+    check(
+        "ball radius",
+        await adapter.add_sketch_dimension(arc, None, "radial", BALL_R),
+    )
+    for label, ent, relation in (
+        ("rod base", rod_base, "horizontal"),
+        ("rod wall", rod_wall, "vertical"),
+        ("upper wall", upper_wall, "vertical"),
+        ("rod top", rod_top, "horizontal"),
+        ("axis edge", axis_edge, "vertical"),
+    ):
+        check(
+            f"{label} {relation}",
+            await adapter.add_sketch_constraint(ent, None, relation),
+        )
+    check(
+        "arc chord vertical",
+        await adapter.add_sketch_constraint(
+            f"{arc}.end", f"{arc}.start", "vertical_points"
+        ),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{rod_base}.start", 0.0, -ROD_DOWN, "rod base corner"
+    )
+    check(
+        "long arm length",
+        await adapter.add_sketch_dimension(
+            f"{axis_edge}.start", "origin", "vertical_distance", ROD_UP
+        ),
+    )
+    check(
+        "rod radius",
+        await adapter.add_sketch_dimension(rod_base, None, "linear", ROD_R),
+    )
+    await ensure_fully_defined(adapter, "ball+rod profile")
     check("exit_sketch ball+rod", await adapter.exit_sketch())
     check(
         "revolve ball+rod",
