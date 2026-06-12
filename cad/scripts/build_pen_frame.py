@@ -31,6 +31,7 @@ from _common import (
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_sketch_direct_db,
 )
 
 PART_NAME = "pen-frame"
@@ -63,8 +64,12 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Outer + inner rectangles in one sketch -> ring on extrude.
+    # Outer + inner rectangles in one sketch -> ring on extrude. Inference
+    # OFF for the outer chain: the TRIM_NEAR corners sit 0.75 from the
+    # origin/axes and snap back to x = 0 with it on (caught by the extrude
+    # volume reading untrimmed 4600).
     check("create_sketch ring", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
     outer = await add_line_chain(
         adapter,
         [
@@ -74,6 +79,7 @@ async def build(adapter) -> dict[str, str]:
             (TRIM_NEAR, OUTER_HEIGHT),
         ],
     )
+    set_sketch_direct_db(adapter, False)
     inner = await add_line_chain(
         adapter,
         [
@@ -90,7 +96,16 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=FRAME_DEPTH)),
     )
     vol = await _volume(adapter)
-    print(f"  volume after extrude: {vol:.1f} mm^3")
+    ring_expected = (
+        (OUTER_WIDTH - TRIM_NEAR) * OUTER_HEIGHT
+        - (OUTER_WIDTH - 2.0 * RAIL_SIDE) * (OUTER_HEIGHT - 2.0 * RAIL_END)
+    ) * FRAME_DEPTH
+    print(f"  volume after extrude: {vol:.1f} mm^3 (analytic {ring_expected:.1f})")
+    if abs(vol - ring_expected) > 0.005 * ring_expected:
+        raise RuntimeError(
+            f"ring volume {vol:.1f} != {ring_expected:.1f} — TRIM_NEAR corner"
+            " likely snapped back to x = 0"
+        )
 
     # Set-screw hole up through the bottom rail.
     check("create_sketch screw hole", await adapter.create_sketch("Top"))
