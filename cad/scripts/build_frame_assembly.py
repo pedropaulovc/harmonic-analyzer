@@ -2,9 +2,10 @@ r"""Reproduction script: frame subassembly (book ch. 6 / eight-views).
 
 Static structure of the machine: the two-plate cast base, four smooth
 polished columns at the corners, four corner brackets hugging the
-columns, the two tapered support frustums that carry the rocker-pivot
-shaft, and the top-frame ring capping the columns -- column tops flush
-with the ring's top face at 1040.7 (M6.8 8-view pass: no stub above).
+columns, the north tapered support frustum that carries the back end of
+the rocker-pivot shaft, and the top-frame ring capping the columns --
+column tops flush with the ring's top face at 1040.7 (M6.8 8-view pass:
+no stub above).
 
 Layout (from the ch. 6 dimension photo and the ch. 30 eight views; assembly
 axes follow the harmonic-base part: X = 46 cm length, Y = up, Z = 28 cm
@@ -17,17 +18,19 @@ depth):
 * corner-bracket x4 beside each column on its inboard-X side, upright
   plate tangent to the column, foot toward the machine centre (ch. 30
   views 1/8 show the green tabs against the column bases).
-* rocker-arm-support x1 (solid tapered frustum, M6.3 re-authoring) at
-  (X, Z) = (+72.9, +101.6) - the BACK support only: its apex carries the
-  north pivot ball mount (channel.SLDASM) and its west-flank boss clamps
-  the cylinder-arbor north end (drive-train.SLDASM). Outer face flush
-  with the top-plate edge (133.35 - 63.5/2 = 101.6). The CHANNEL AXIS
-  runs along Z. M6.5 photo audit REFUTES the former south instance: the
-  calibrated v3 side view shows no frustum at the front; the south pivot
-  ball is gripped by the transgear A-frame's clevis at z -111
-  (output.SLDASM, build_a_frame.py). The M6.1 windowed-gate placement at
-  X = 0 was already superseded: the pivot x = arbor 47.5 plus the 25.4
-  rod lever = 72.9 (DIMENSIONS.md ch. 14 layout, M6.8-mirrored).
+* rocker-arm-support x1 (solid tapered frustum, M6.3 re-authoring;
+  M6.9 side depth 40 -> 20 per ch30 p008) at (X, Z) = (+72.9, +101.6) -
+  the BACK support only: its apex carries the north pivot ball mount
+  (channel.SLDASM) and its west-flank boss clamps the cylinder-arbor
+  north end (drive-train.SLDASM). Z anchored by the pivot ball at
+  +101.6. The CHANNEL AXIS runs along Z. The frustum is the NORTH
+  upright of the rocker-support portal frame the ch30 p008 view shows
+  (M6.9): the SOUTH upright is the transgear A-frame at z -111, which
+  grips the south pivot ball and carries the frame's top/foot rails
+  (output.SLDASM, build_a_frame.py). M6.5's refutation of a second
+  free-standing south frustum stands. The M6.1 windowed-gate placement
+  at X = 0 was already superseded: the pivot x = arbor 47.5 plus the
+  25.4 rod lever = 72.9 (DIMENSIONS.md ch. 14 layout, M6.8-mirrored).
 * top-frame x1: the green ring at ring mid-plane Y = 1020.2 (rails 22 x
   41, y 999.7..1040.7), corner bosses bored around the four columns; its
   west rail seats the top-lever ball mounts (channel.SLDASM).

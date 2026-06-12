@@ -1,8 +1,8 @@
 r"""Reproduction script: rocker arm support (book ch. 14 / ch. 30 views; 1 used).
 
 Solid green-painted cast-iron tapered frustum carrying the BACK (north,
-z +101.6) end of the rocker-pivot shaft: base 88.9 x 63.5 tapering to
-20 x 16.9 at the apex over 177.8 (7") tall. A ball mount (separate part)
+z +101.6) end of the rocker-pivot shaft: base 88.9 x 40 tapering to
+20 x 20 at the apex over 177.8 (7") tall. A ball mount (separate part)
 seats on the apex and holds the Ø6.35 pivot shaft at 25.2 above it,
 putting the pivot axis at machine y = 228.6 + 25.2 = 253.8. An integral
 boss on the west flank (Ø20 about local (-25.4, 76), axis Z; east before
@@ -12,15 +12,17 @@ north end of the stationary cylinder arbor
 drum running straight into this casting with no separate pedestal, and
 the v3 side view shows the arbor end buried in the green flank.
 
-M6.3 REFUTES the legacy windowed-square-frame `rocker-arm-support`
-(184 wide with a 127 square window): no such face appears in any ch. 30
-view. M6.5 photo audit REFUTES the second (south) instance entirely: the
-calibrated v3 side view shows NO green frustum anywhere in z -133..-60
-(the "solid triangle" the front view shows at x -130..-44 is the
-transgear A-FRAME at z -111, whose clevis grips the south pivot ball
-directly - see build_a_frame.py). Only the back (p5) view's frustum is
-real. Only the legacy side taper (2.5" -> 2/3") and 7" height survive
-into this re-authoring.
+M6.9 REINSTATES the windowed-frame reading that M6.3/M6.5 refuted: the
+brightened ch. 30 p008 (+x side) view plainly shows the legacy windowed
+portal frame (~184 wide, ~127 window) - this frustum is its NORTH
+upright, the transgear A-frame its SOUTH upright (z -111, clevis grips
+the south pivot ball - see build_a_frame.py, which also carries the
+frame's top and foot rails). The earlier refutation came from the -x
+side view, where the cone/drum hides the frame. What M6.5 did refute and
+stays refuted: a second free-standing SOUTH frustum. The p008 uprights
+read ~28-40 deep and near-uniform, so the legacy strong side taper
+(63.5 -> 16.9) is replaced by 40 -> 20; the front-view X-taper
+(88.9 -> 20) and 7" height are photo-confirmed and survive.
 
 Dimensions: cad/DIMENSIONS.md ch. 14 "Rocker pivot & supports layout"
 (photo + legacy height, med); mounting holes legacy 5/16" (low).
@@ -72,9 +74,9 @@ MATERIAL = "Gray Cast Iron"  # green-painted frustum (ch30/photogrammetry)
 
 TOTAL_HEIGHT = 7.00 * IN  # 177.8  DIMENSIONS.md ch14 layout: legacy height kept (med)
 BASE_X = 3.50 * IN  # 88.9   ch14 layout: front-view triangle base (photo, med)
-BASE_Z = 2.50 * IN  # 63.5   ch14 layout: side-view trapezoid base (legacy, med)
+BASE_Z = 40.0  # ch14 layout: side-view depth at the base (ch30 p008, M6.9, med)
 TOP_X = 20.0  # ch14 layout: apex width under the ball-mount foot (photo, med)
-TOP_Z = 16.9  # ch14 layout: side-view trapezoid top (legacy 2/3", med)
+TOP_Z = 20.0  # ch14 layout: side-view depth at the apex (ch30 p008, M6.9, med)
 MOUNTING_HOLE_DIA = 0.3125 * IN  # 7.94  legacy 5/16" hold-down (low)
 MOUNTING_HOLE_SPACING = 2.5 * IN  # 63.5  legacy hole pitch across X (low)
 MOUNTING_HOLE_DEPTH = 25.0  # socket depth up from the base underside (low)
