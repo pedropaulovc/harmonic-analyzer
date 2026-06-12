@@ -30,6 +30,7 @@ import sys
 
 from _common import (
     add_line_chain,
+    anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
@@ -65,7 +66,7 @@ async def build(adapter) -> dict[str, str]:
     # Revolved profile about +Y: base disc -> stem -> ball.
     check("create_sketch profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    centerline = check(
+    check(
         "add_centerline axis",
         await adapter.add_centerline(0.0, 0.0, 0.0, BALL_TOP_Y),
     )
@@ -93,9 +94,53 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_line(0.0, BALL_TOP_Y, 0.0, 0.0),
     )
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(
-        adapter, "ball mount profile", fix_entities=[centerline, *lines, arc, closing]
+    base_bottom, base_wall, shoulder, stem_wall = lines
+    # 13-DOF profile: seat corner on the origin; h/v on the chain edges
+    # and the axis closure; ball centre anchored on the axis + radius;
+    # the stem-wall vertical and the closure vertical each consume one
+    # arc-endpoint angle. The centerline merged into the (0, 0) /
+    # (0, BALL_TOP_Y) profile corners at creation -- no constraints.
+    check(
+        "anchor seat corner",
+        await adapter.add_sketch_constraint(
+            f"{base_bottom}.start", "origin", "coincident"
+        ),
     )
+    for label, ent, relation in (
+        ("base bottom", base_bottom, "horizontal"),
+        ("base wall", base_wall, "vertical"),
+        ("shoulder", shoulder, "horizontal"),
+        ("stem wall", stem_wall, "vertical"),
+        ("axis closure", closing, "vertical"),
+    ):
+        check(
+            f"{label} {relation}",
+            await adapter.add_sketch_constraint(ent, None, relation),
+        )
+    await anchor_point_to_origin(
+        adapter, f"{arc}.center", 0.0, BALL_CENTER_H, "ball centre"
+    )
+    check(
+        "ball radius",
+        await adapter.add_sketch_dimension(arc, None, "radial", BALL_R),
+    )
+    check(
+        "base radius",
+        await adapter.add_sketch_dimension(
+            base_bottom, None, "linear", BASE_DIA / 2.0
+        ),
+    )
+    check(
+        "base height",
+        await adapter.add_sketch_dimension(base_wall, None, "linear", BASE_H),
+    )
+    check(
+        "shoulder run",
+        await adapter.add_sketch_dimension(
+            shoulder, None, "linear", (BASE_DIA - STEM_DIA) / 2.0
+        ),
+    )
+    await ensure_fully_defined(adapter, "ball mount profile")
     check("exit_sketch profile", await adapter.exit_sketch())
     check(
         "revolve ball mount",

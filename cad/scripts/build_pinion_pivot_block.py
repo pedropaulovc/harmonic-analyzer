@@ -29,6 +29,7 @@ from _common import (
     check,
     add_line_chain,
     define_circle,
+    define_rectilinear_chain,
     ensure_fully_defined,
     report_mass_properties,
     run_build,
@@ -60,19 +61,18 @@ async def build(adapter) -> dict[str, str]:
     # Inference OFF: the bores sit on the sketch x axis.
     check("create_sketch block", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    entities = await add_line_chain(
-        adapter,
-        [
-            (-WIDTH / 2.0, -BORE_UP),
-            (WIDTH / 2.0, -BORE_UP),
-            (WIDTH / 2.0, HEIGHT - BORE_UP),
-            (-WIDTH / 2.0, HEIGHT - BORE_UP),
-        ],
-    )
+    block_rect = [
+        (-WIDTH / 2.0, -BORE_UP),
+        (WIDTH / 2.0, -BORE_UP),
+        (WIDTH / 2.0, HEIGHT - BORE_UP),
+        (-WIDTH / 2.0, HEIGHT - BORE_UP),
+    ]
+    entities = await add_line_chain(adapter, block_rect)
     await define_circle(adapter, BORE_HALF_SPACING, 0.0, BORE / 2.0, "pivot bore")
     await define_circle(adapter, -BORE_HALF_SPACING, 0.0, BORE / 2.0, "lift bore")
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "block sketch", fix_entities=entities)
+    await define_rectilinear_chain(adapter, entities, block_rect, label="block")
+    await ensure_fully_defined(adapter, "block sketch")
     check("exit_sketch block", await adapter.exit_sketch())
     check(
         "extrude block",
