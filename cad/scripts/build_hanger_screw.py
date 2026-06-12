@@ -36,6 +36,7 @@ from _common import (
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_sketch_direct_db,
     volume_check,
 )
 
@@ -57,8 +58,13 @@ async def build(adapter) -> dict[str, str]:
         (radius * math.cos(math.radians(a)), radius * math.sin(math.radians(a)))
         for a in range(0, 360, 60)
     ]
+    # Direct-db: the AF-7 hexagon's vertices sit close enough to the origin
+    # axes for inference snapping to distort the chain (live: head volume
+    # 87.8 vs 106.1 analytic without it; the AF-12.7 hex-bolt survived).
     check("create_sketch head", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
     head = await add_line_chain(adapter, points)
+    set_sketch_direct_db(adapter, False)
     await ensure_fully_defined(adapter, "head sketch", fix_entities=head)
     check("exit_sketch head", await adapter.exit_sketch())
     extrude_at_offset(adapter, HEAD_H, 0.0)
