@@ -39,6 +39,7 @@ from _common import (
     apply_material,
     check,
     define_circle,
+    define_rectilinear_chain,
     ensure_fully_defined,
     report_mass_properties,
     run_build,
@@ -95,17 +96,16 @@ def _boss_extra_area() -> float:
 
 async def _rectangle(adapter, label: str, half_x: float, half_z: float) -> None:
     set_sketch_direct_db(adapter, True)
-    lines = await add_line_chain(
-        adapter,
-        [
-            (-half_x, -half_z),
-            (half_x, -half_z),
-            (half_x, half_z),
-            (-half_x, half_z),
-        ],
-    )
+    rect = [
+        (-half_x, -half_z),
+        (half_x, -half_z),
+        (half_x, half_z),
+        (-half_x, half_z),
+    ]
+    lines = await add_line_chain(adapter, rect)
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, label, fix_entities=lines)
+    await define_rectilinear_chain(adapter, lines, rect, label=label)
+    await ensure_fully_defined(adapter, label)
 
 
 async def build(adapter) -> dict[str, str]:
