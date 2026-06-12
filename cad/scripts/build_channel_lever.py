@@ -39,9 +39,11 @@ import sys
 
 from _common import (
     add_line_chain,
+    anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
+    dimension_between,
     ensure_fully_defined,
     report_mass_properties,
     run_build,
@@ -117,9 +119,45 @@ async def build(adapter) -> dict[str, str]:
         close=False,
     )
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(
-        adapter, "lever outline", fix_entities=[nose, *lower, tip, *upper]
+    # Semantic scheme: bar/tab edges horizontal, steps vertical; the nose
+    # semicircle is pinned by centre-at-origin + radius + both ends on the
+    # Y axis; the tip arc by its centre on the X axis at TIP_ARC_CX +
+    # radius + both ends vertically aligned with its centre. One alignment
+    # ties the lower step to the upper, one dim carries the bar length.
+    lower_bar, lower_step, tab_bottom = lower
+    tab_top, upper_step, upper_bar = upper
+    for edge in (lower_bar, tab_bottom, tab_top, upper_bar):
+        check(f"horizontal {edge}", await adapter.add_sketch_constraint(edge, None, "horizontal"))
+    for edge in (lower_step, upper_step):
+        check(f"vertical {edge}", await adapter.add_sketch_constraint(edge, None, "vertical"))
+    check(
+        "nose centre -> origin",
+        await adapter.add_sketch_constraint(f"{nose}.center", "origin", "coincident"),
     )
+    check("nose radius", await adapter.add_sketch_dimension(nose, None, "radial", HALF_BAR))
+    for point in (f"{nose}.start", f"{nose}.end"):
+        check(
+            f"{point} on Y axis",
+            await adapter.add_sketch_constraint(point, "origin", "vertical_points"),
+        )
+    await anchor_point_to_origin(adapter, f"{tip}.center", TIP_ARC_CX, 0.0, "tip centre")
+    check("tip radius", await adapter.add_sketch_dimension(tip, None, "radial", TIP_RADIUS))
+    for point in (f"{tip}.start", f"{tip}.end"):
+        check(
+            f"{point} above/below tip centre",
+            await adapter.add_sketch_constraint(point, f"{tip}.center", "vertical_points"),
+        )
+    check(
+        "tab steps aligned",
+        await adapter.add_sketch_constraint(
+            f"{lower_step}.start", f"{upper_step}.start", "vertical_points"
+        ),
+    )
+    await dimension_between(
+        adapter, f"{lower_bar}.start", f"{lower_bar}.end",
+        "horizontal_distance", TAB_START_X, "bar length",
+    )
+    await ensure_fully_defined(adapter, "lever outline")
     check("exit_sketch outline", await adapter.exit_sketch())
     check(
         "extrude lever",

@@ -16,7 +16,9 @@ at machine x 97 so the ring's wire band (x 94.1..95.9) sits mid-rod.
 
 Layout: shank axis +Y from the origin (machine (90.5, 1000, 0)); path =
 vertical line, 90-degree elbow (R 3), horizontal line +X. Single sweep
-along equation-driven curves (the fixed-curve fully-defined recipe).
+along a line/arc/line chain — the old equation-curve workaround (fix on
+lines/arcs left endpoint DOFs) reverted once sketch points became
+addressable (semantic anchors, SolidworksMCP-python PRs #55/#56).
 
 Run (SolidWorks already open)::
 
@@ -29,14 +31,16 @@ import math
 import sys
 
 from _common import (
-    IN,
+    anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
+    dimension_between,
     ensure_fully_defined,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_sketch_direct_db,
 )
 
 PART_NAME = "boss-hook"
@@ -51,41 +55,58 @@ ARM_RUN = 3.5  # straight run after the elbow; tip at x 6.5 (derived)
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import (
-        CreateEquationCurveParameters,
-        SweepParameters,
-    )
-
-    def fmt(value_mm: float) -> str:
-        return f"{value_mm / IN:.12g}"  # document units are inches
-
-    async def _curve(label: str, x_expr: str, y_expr: str) -> str:
-        res = await adapter.create_equation_driven_curve(
-            CreateEquationCurveParameters(
-                x_expression=x_expr,
-                y_expression=y_expr,
-                range_start="0",
-                range_end="1",
-            )
-        )
-        return check(f"curve {label}", res)
+    from solidworks_mcp.adapters.base import SweepParameters
 
     check("create_part", await adapter.create_part())
 
     # Path in the Front plane: rise, quarter-arc elbow, horizontal arm.
+    # Direct DB keeps inference relations off the chain (auto-tangent at
+    # the elbow would collide with the explicit alignment scheme below);
+    # exact-coordinate joints still merge. add_arc draws CCW, so the elbow
+    # runs from the arm joint (top) back to the rise joint.
     path_name = check("create_sketch hook path", await adapter.create_sketch("Front"))
-    rise = await _curve("shank rise", "0 * t", f"{fmt(SHANK_RISE)} * t")
-    elbow = await _curve(
-        "elbow",
-        f"{fmt(ELBOW_R)} - {fmt(ELBOW_R)} * cos({math.pi / 2.0:.12g} * t)",
-        f"{fmt(SHANK_RISE)} + {fmt(ELBOW_R)} * sin({math.pi / 2.0:.12g} * t)",
+    set_sketch_direct_db(adapter, True)
+    rise = check("rise line", await adapter.add_line(0.0, 0.0, 0.0, SHANK_RISE))
+    elbow = check(
+        "elbow arc",
+        await adapter.add_arc(
+            ELBOW_R, SHANK_RISE,  # centre
+            ELBOW_R, SHANK_RISE + ELBOW_R,  # start (arm joint)
+            0.0, SHANK_RISE,  # end (rise joint)
+        ),
     )
-    arm = await _curve(
-        "arm",
-        f"{fmt(ELBOW_R)} + {fmt(ARM_RUN)} * t",
-        f"{fmt(SHANK_RISE + ELBOW_R)} + 0 * t",
+    arm = check(
+        "arm line",
+        await adapter.add_line(
+            ELBOW_R, SHANK_RISE + ELBOW_R, ELBOW_R + ARM_RUN, SHANK_RISE + ELBOW_R
+        ),
     )
-    await ensure_fully_defined(adapter, "hook path", fix_entities=[rise, elbow, arm])
+    set_sketch_direct_db(adapter, False)
+    check("rise vertical", await adapter.add_sketch_constraint(rise, None, "vertical"))
+    check(
+        "rise start -> origin",
+        await adapter.add_sketch_constraint(f"{rise}.start", "origin", "coincident"),
+    )
+    await dimension_between(
+        adapter, f"{rise}.start", f"{rise}.end", "vertical_distance", SHANK_RISE, "rise"
+    )
+    # Elbow centre at (R, rise top); the arm joint sits straight above it,
+    # which is the tangency condition without an inference-style relation.
+    # No radius dim: the merged rise joint already sets r = ELBOW_R.
+    await anchor_point_to_origin(
+        adapter, f"{elbow}.center", ELBOW_R, SHANK_RISE, "elbow centre"
+    )
+    check(
+        "arm joint above elbow centre",
+        await adapter.add_sketch_constraint(
+            f"{elbow}.start", f"{elbow}.center", "vertical_points"
+        ),
+    )
+    check("arm horizontal", await adapter.add_sketch_constraint(arm, None, "horizontal"))
+    await dimension_between(
+        adapter, f"{arm}.start", f"{arm}.end", "horizontal_distance", ARM_RUN, "arm run"
+    )
+    await ensure_fully_defined(adapter, "hook path")
     check("exit_sketch hook path", await adapter.exit_sketch())
 
     # Wire profile at the path start (origin, Top plane).
