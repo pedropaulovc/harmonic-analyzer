@@ -9,10 +9,10 @@ to iteratively tune the models toward the physical device. See
 | path | content |
 |---|---|
 | `manifest.json` | source of truth: pair id → reference, model, camera pose, 2D align, tier, status |
-| `index.html` | inspection gallery (tier + text filters) — `uv run comparisons/tools/gallery.py` |
+| `index.html` | inspection gallery (tier + text filters; drag the ref⇆cad reveal slider) — `uv run comparisons/tools/gallery.py` |
 | `ref/<id>.jpg` | prepared reference (cropped/rotated, ≤1600 px) |
-| `render/<id>.jpg` | aligned CAD render (+ `.meta.json` staleness/engine sidecar) |
-| `composite/<id>_sbs.jpg` | side-by-side |
+| `render/<id>.jpg` | raw CAD render, content-trimmed, black background (+ `.meta.json` staleness/engine sidecar) |
+| `composite/<id>_cad.jpg` | render fitted into the reference frame (same scale/offset as the blend layer) — the slider's top image |
 | `composite/<id>_blend.jpg` | red-tinted render over grayscale ref — misalignment is instantly visible |
 | `scores.json` | pair → RMS shape score (regression trend only; compare across commits, same engine) |
 | `findings/iter_NNN.json` | per-iteration vision findings |

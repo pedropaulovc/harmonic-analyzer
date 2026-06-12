@@ -6,13 +6,14 @@ comparisons/tools/render_offline.py —
 
 * parts: fine binary STL in METERS, untranslated (cad/out/stl/<dashed>.STL)
   plus an appearance colour in cad/out/stl/colors.json;
-* assemblies: NO monolithic STL. cad/out/boxes/<dashed>.json gets per-
-  component bounding boxes (framing) and a scene graph: one entry per
-  visible leaf component with its part stem, assembly-space transform
-  (IMathTransform.ArrayData, row-vector convention, translation in metres)
-  and RGB. Every referenced part gets its own STL, shared across
-  assemblies and instanced by the Blender worker (so 20 cone gears cost
-  one mesh).
+* assemblies: a monolithic cad/out/stl/<dashed>.STL in MILLIMETRES
+  (viewer/slicer-friendly; not used for rendering) and cad/out/boxes/
+  <dashed>.json with per-component bounding boxes (framing) plus a scene
+  graph: one entry per visible leaf component with its part stem,
+  assembly-space transform (IMathTransform.ArrayData, row-vector
+  convention, translation in metres) and RGB. Every referenced part gets
+  its own STL, shared across assemblies and instanced by the Blender
+  worker (so 20 cone gears cost one mesh).
 
 Colours cascade: component-level override -> part doc colour -> the
 material-name table below (the build scripts only ever assign database
@@ -132,6 +133,20 @@ def comp_rgb(comp: Any, part_colors: dict[str, tuple[float, float, float]],
     return part_colors.get(stem, DEFAULT_RGB)
 
 
+def _safe_cfg(name: str) -> str:
+    return "".join(c if c.isalnum() else "-" for c in name.strip().lower()).strip("-")
+
+
+def mesh_key(stem: str, cfg: str) -> str:
+    """STL cache key: configured components get their own mesh per config
+    (e.g. the 20 cone gears are one part with 20 tooth-count configs).
+    Separator is a double dash — SolidWorks SaveAs3 rejects '@' in file
+    names (swFileSaveError 8, swFileNameContainsAtSign)."""
+    if not cfg or cfg.lower() == "default":
+        return stem
+    return f"{stem}--{_safe_cfg(cfg)}"
+
+
 def comp_xform(comp: Any) -> list[float] | None:
     try:
         xf = _read_member(comp, "Transform2")
@@ -149,8 +164,8 @@ def comp_xform(comp: Any) -> list[float] | None:
     return None
 
 
-def scan_assembly(adapter: Any, part_colors: dict) -> tuple[list, list, set[str]]:
-    """(boxes, scene components, referenced part stems) for the open assembly."""
+def scan_assembly(adapter: Any, part_colors: dict) -> tuple[list, list, set[tuple]]:
+    """(boxes, scene components, referenced (stem, cfg, mesh) keys)."""
     model = adapter.currentModel
     _flag(model, "IModelDoc2")
     _flag(model, "IAssemblyDoc")
@@ -182,18 +197,22 @@ def scan_assembly(adapter: Any, part_colors: dict) -> tuple[list, list, set[str]
             log(f"  !! no transform for {name}, skipped")
             continue
         stem = path.stem.lower()
-        if stem not in part_colors:
+        cfg = str(_read_member(comp, "ReferencedConfiguration") or "")
+        mesh = mesh_key(stem, cfg)
+        if mesh not in part_colors:
             try:
                 doc = comp.GetModelDoc2()
-                part_colors[stem] = doc_rgb(doc) if doc else DEFAULT_RGB
+                part_colors[mesh] = doc_rgb(doc) if doc else DEFAULT_RGB
             except Exception:
-                part_colors[stem] = DEFAULT_RGB
-        stems.add(stem)
+                part_colors[mesh] = DEFAULT_RGB
+        stems.add((stem, cfg, mesh))
         scene.append({
             "name": short,
             "part": stem,
+            "cfg": cfg,
+            "mesh": mesh,
             "xform": xform,
-            "rgb": list(comp_rgb(comp, part_colors, stem)),
+            "rgb": list(comp_rgb(comp, part_colors, mesh)),
         })
     return boxes, scene, stems
 
@@ -210,11 +229,11 @@ def save_colors(colors: dict) -> None:
         {k: list(v) for k, v in sorted(colors.items())}, indent=1), encoding="utf-8")
 
 
-def part_stl_stale(stem: str, colors: dict) -> bool:
+def part_stl_stale(stem: str, mesh: str, colors: dict) -> bool:
     src = OUT_SLDPRT / f"{stem}.SLDPRT"
-    stl = OUT_STL / f"{stem}.STL"
+    stl = OUT_STL / f"{mesh}.STL"
     return (not stl.exists() or stl.stat().st_mtime < src.stat().st_mtime
-            or stem not in colors)
+            or mesh not in colors)
 
 
 def main() -> int:
@@ -226,17 +245,20 @@ def main() -> int:
     assemblies = [m for m in models if m not in parts]
 
     stale_parts = [m for m in parts if force
-                   or part_stl_stale(m.replace("_", "-"), colors)
+                   or part_stl_stale(m.replace("_", "-"), m.replace("_", "-"), colors)
                    or not (OUT_STEP / f"{m.replace('_', '-')}.STEP").exists()]
     stale_asms = []
     for m in assemblies:
         src, bj = model_path(m), OUT_BOXES / f"{m.replace('_', '-')}.json"
-        if force or not bj.exists() or bj.stat().st_mtime < src.stat().st_mtime:
+        mono = OUT_STL / f"{m.replace('_', '-')}.STL"
+        if (force or not bj.exists() or bj.stat().st_mtime < src.stat().st_mtime
+                or not mono.exists() or mono.stat().st_mtime < src.stat().st_mtime):
             stale_asms.append(m)
             continue
         data = json.loads(bj.read_text(encoding="utf-8"))
-        if "components" not in data or any(
-                part_stl_stale(c["part"], colors) for c in data["components"]):
+        comps = data.get("components") or []
+        if (not comps or any("mesh" not in c for c in comps) or any(
+                part_stl_stale(c["part"], c["mesh"], colors) for c in comps)):
             stale_asms.append(m)
 
     if not stale_parts and not stale_asms:
@@ -250,16 +272,37 @@ def main() -> int:
         old = set_export_prefs(adapter)
         done: dict[str, str] = {}
 
-        async def export_part_stl(stem: str) -> None:
+        def active_cfg(doc: Any) -> str:
+            try:
+                cm = _read_member(doc, "ConfigurationManager")
+                ac = _read_member(cm, "ActiveConfiguration") if cm is not None else None
+                return str(_read_member(ac, "Name") or "") if ac is not None else ""
+            except Exception:
+                return ""
+
+        async def export_part_stls(stem: str, cfg_meshes: list[tuple[str, str]]) -> None:
+            """One open per part; one STL per referenced configuration."""
             src = OUT_SLDPRT / f"{stem}.SLDPRT"
             check(f"open {src.name}", await adapter.open_model(str(src)))
             doc = adapter.currentModel
-            out = OUT_STL / f"{stem}.STL"
-            ok = doc.SaveAs3(str(out), 0, 0)
-            if not out.exists():
-                raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={ok})")
-            colors[stem] = doc_rgb(doc)
-            log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB) rgb={colors[stem]}")
+            for cfg, mesh in cfg_meshes:
+                if cfg and cfg.lower() != "default" and active_cfg(doc) != cfg:
+                    ok_cfg = doc.ShowConfiguration2(cfg)
+                    # ShowConfiguration2 returns False when cfg was already
+                    # active — only fail if it's genuinely not active now
+                    if not ok_cfg and active_cfg(doc) != cfg:
+                        try:
+                            names = list(doc.GetConfigurationNames() or [])
+                        except Exception:
+                            names = None
+                        raise RuntimeError(
+                            f"{stem}: ShowConfiguration2({cfg!r}) failed (has {names})")
+                out = OUT_STL / f"{mesh}.STL"
+                ok = doc.SaveAs3(str(out), 0, 0)
+                if not out.exists():
+                    raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={ok})")
+                colors[mesh] = doc_rgb(doc)
+                log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB) rgb={colors[mesh]}")
             adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
         try:
@@ -288,6 +331,13 @@ def main() -> int:
                 if not out.exists():
                     raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={ok})")
                 log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB)")
+                mono = OUT_STL / f"{dashed}.STL"
+                adapter.swApp.SetUserPreferenceIntegerValue(PREF_STL_UNITS, 0)  # mm
+                ok = doc.SaveAs3(str(mono), 0, 0)
+                adapter.swApp.SetUserPreferenceIntegerValue(PREF_STL_UNITS, 2)
+                if not mono.exists():
+                    raise RuntimeError(f"SaveAs3 produced no file: {mono} (rc={ok})")
+                log(f"saved {mono.name} ({mono.stat().st_size / 1e6:.1f} MB, mm)")
                 # fresh cache: preloaded colors.json entries would mask
                 # colour changes made to part docs since the last export
                 scan_colors: dict = {}
@@ -299,12 +349,15 @@ def main() -> int:
                     "components": scene,
                 }), encoding="utf-8")
                 log(f"saved boxes+scene {dashed}.json "
-                    f"({len(boxes)} boxes, {len(scene)} instances, {len(stems)} parts)")
+                    f"({len(boxes)} boxes, {len(scene)} instances, {len(stems)} meshes)")
                 adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
-                for stem in sorted(stems):
-                    if force or part_stl_stale(stem, colors):
-                        await export_part_stl(stem)
+                by_stem: dict[str, list[tuple[str, str]]] = {}
+                for stem, cfg, mesh in sorted(stems):
+                    if force or part_stl_stale(stem, mesh, colors):
+                        by_stem.setdefault(stem, []).append((cfg, mesh))
+                for stem, cfg_meshes in sorted(by_stem.items()):
+                    await export_part_stls(stem, cfg_meshes)
                 done[m] = "exported"
             return done
         finally:

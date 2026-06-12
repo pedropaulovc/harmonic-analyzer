@@ -57,11 +57,12 @@ def model_paths(model: str) -> tuple[Path, dict]:
         scene = CAD_OUT / "boxes" / f"{dashed}.json"
         _stale(scene, asm, scene.name)
         data = json.loads(scene.read_text(encoding="utf-8"))
-        if not data.get("components"):
-            raise RuntimeError(f"{scene.name} has no scene graph — re-run export_models.py")
-        for stem in {c["part"] for c in data["components"]}:
+        comps = data.get("components") or []
+        if not comps or any("mesh" not in c for c in comps):
+            raise RuntimeError(f"{scene.name} has no mesh scene graph — re-run export_models.py")
+        for stem, mesh in {(c["part"], c["mesh"]) for c in comps}:
             part_src = CAD_OUT / "sldprt" / f"{stem}.SLDPRT"
-            _stale(STL_DIR / f"{stem}.STL", part_src, f"{stem}.STL")
+            _stale(STL_DIR / f"{mesh}.STL", part_src, f"{mesh}.STL")
         return asm, {"scene": str(scene), "parts_dir": str(STL_DIR)}
     if not prt.exists():
         raise FileNotFoundError(f"no artefact for {model}")
@@ -121,7 +122,7 @@ def main() -> int:
         return 0
 
     n_total = sum(len(v) for v in by_model.values())
-    print(f"offline-rendering {n_total} pairs across {len(by_model)} models")
+    print(f"offline-rendering {n_total} pairs across {len(by_model)} models", flush=True)
     rendered: set[str] = set()
     with tempfile.TemporaryDirectory(prefix="harm_render_") as tmp:
         tmpdir = Path(tmp)
@@ -140,7 +141,7 @@ def main() -> int:
                 geom | {"pairs": [{k: v for k, v in j.items() if k != "_size"}
                                   for j in jobs]}),
                 encoding="utf-8")
-            print(f"  {model}: {len(pairs)} pairs ...")
+            print(f"  {model}: {len(pairs)} pairs, blender starting ...", flush=True)
             proc = subprocess.run(
                 [str(BLENDER), "-b", "--factory-startup", "-P", str(WORKER),
                  "--", str(job_file)],
@@ -153,18 +154,20 @@ def main() -> int:
             for pair, j in zip(pairs, jobs, strict=True):
                 png = Path(j["out"])
                 img = Image.open(png).convert("RGBA")
-                white = Image.new("RGB", img.size, "white")
-                white.paste(img, mask=img.getchannel("A"))
+                # black background: matches the black-studio references in
+                # the gallery's reveal slider
+                bg = Image.new("RGB", img.size, "black")
+                bg.paste(img, mask=img.getchannel("A"))
                 out = composite.pair_paths(pair["id"])["render"]
                 out.parent.mkdir(parents=True, exist_ok=True)
-                white.save(out, **composite.JPEG_OPTS)
+                bg.save(out, **composite.JPEG_OPTS)
                 composite.trim_render_file(out)
                 _sidecar(pair["id"]).write_text(json.dumps({
                     "camera": pair["camera"], "reference": pair["reference"],
                     "size": list(j["_size"]), "model_mtime": src.stat().st_mtime,
                     "engine": "blender"}), encoding="utf-8")
                 rendered.add(pair["id"])
-                print(f"  OK  {pair['id']}")
+                print(f"  OK  {pair['id']}", flush=True)
 
     composite.regenerate(rendered)
     return 0
