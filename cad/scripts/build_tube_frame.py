@@ -1,20 +1,21 @@
 r"""Reproduction script: tube frame column (legacy part; book ch. 5-6).
 
-Hollow brass column carrying the upper frame rails: Ø1.375 in tube with a
+Hollow steel column carrying the upper frame rails: Ø1.375 in tube with a
 0.12 in wall (legacy SLDPRT, interrogated live - no source survives).
-Length corrected to the book: ch. 6 states the frame columns are 107 cm
-tall, while the legacy file was 1016 mm (40 in); the book annotation wins
-per the M1 source hierarchy, so this re-author uses 1070 mm.
 
-M4 finishing pass: the photogrammetry (PHOTOS.md 195108425/195123524)
-shows the columns fluted/reeded, not plain round. Modeled as 16 shallow
-Ø3 mm full-length grooves (one seed cut at the OD, circular-patterned
-about the column axis): both photos show ~5-6 ridges across the visible
-face, ~16 around (estimate, cosmetic -- groove depth 1.5 mm stays well
-inside the 3.05 mm wall).
+Surface: SMOOTH polished tube (M6.8 ch30 8-view pass, user-confirmed).
+The M4 fluting (16 grooves, photogrammetry estimate) is retired: every
+ch30 plate shows plain reflective columns, and the groove edges also
+painted the columns black at capture scale.
+
+Length: 989.9 so the column top lands flush with the top-frame ring's
+top face (1040.7 = base top 50.8 + 989.9) - all eight ch30 plates show
+the columns capped by the ring's corner bosses, with NO stub above
+(user-confirmed; supersedes the ch. 6 "107 cm" reading, which matches
+the overall frame height, not the bare column).
 
 Dimensions: cad/DIMENSIONS.md "Legacy part audit" - legacy diameters
-(med), book length (stated, high), flute count/size photo-estimated (low).
+(med), length photo-locked to the top-frame stack (med).
 
 Layout: tube axis along +Y (column standing upright), annulus sketched on
 the Top plane at the origin, extruded upward.
@@ -37,7 +38,6 @@ from _common import (
     check,
     define_circle,
     ensure_fully_defined,
-    lens_area,
     measure_check,
     report_mass_properties,
     run_build,
@@ -51,22 +51,13 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 OUTER_DIA = 1.375 * IN  # legacy: Ø34.925 (no book numerics)
 WALL_THICKNESS = 0.12 * IN  # legacy: 3.048 wall -> Ø28.829 bore
-COLUMN_LENGTH = 1070.0  # ch.6: 107 cm column height (supersedes legacy 1016)
+COLUMN_LENGTH = 989.9  # top flush with the top-frame top face (see docstring)
 
 INNER_DIA = OUTER_DIA - 2.0 * WALL_THICKNESS
 
-FLUTE_COUNT = 16  # photo estimate: ~5-6 ridges per visible face (low)
-FLUTE_DIA = 3.0  # groove cutter dia; depth ~1.5 < 3.05 wall (low)
-# At the OD the 16 grooves sit pi*34.925/16 = 6.86 mm apart, ~3 mm wide
-# each -> no overlap, lens areas simply add.
-
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import (
-        CircularPatternParameters,
-        CreateAxisParameters,
-        ExtrusionParameters,
-    )
+    from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
@@ -86,63 +77,14 @@ async def build(adapter) -> dict[str, str]:
     )
     await volume_check(adapter, "annulus column", v_annulus, 0.001 * v_annulus)
 
-    # M4 fluting: one Ø3 mm groove cut on the OD, patterned about the
-    # column (Y) axis. See the docstring for the photo rationale.
-    check("create_sketch flute", await adapter.create_sketch("Top"))
-    set_sketch_direct_db(adapter, True)
-    await define_circle(adapter, OUTER_DIA / 2.0, 0.0, FLUTE_DIA / 2.0, "flute seed")
-    set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "flute sketch")
-    check("exit_sketch flute", await adapter.exit_sketch())
-    flute_cut = await adapter.create_cut_extrude(
-        ExtrusionParameters(depth=COLUMN_LENGTH)
-    )
-    check("cut flute seed", flute_cut)
-    v_flute = lens_area(FLUTE_DIA / 2.0, OUTER_DIA / 2.0) * COLUMN_LENGTH
-    await volume_check(adapter, "seed flute", v_annulus - v_flute, 0.01 * v_flute)
-
-    check(
-        "create_axis Y (Front x Right)",
-        await adapter.create_axis(
-            CreateAxisParameters(mode="two_planes", planes=["Front Plane", "Right Plane"])
-        ),
-    )
-    adapter._zoom_to_fit(adapter.currentModel)
-    pattern = None
-    for axis_point in (
-        [0.0, COLUMN_LENGTH / 2.0, 0.0],
-        [0.0, 0.0, 0.0],
-        [0.0, COLUMN_LENGTH, 0.0],
-    ):
-        res = await adapter.circular_pattern_feature(
-            CircularPatternParameters(
-                axis_point=axis_point,
-                features=[flute_cut.data.name],
-                count=FLUTE_COUNT,
-                geometry_pattern=True,
-            )
-        )
-        if res.is_success:
-            print(f"  OK  circular pattern axis via point {axis_point}")
-            pattern = res
-            break
-        print(f"  ..  axis candidate {axis_point} failed: {res.error}")
-    if pattern is None:
-        raise RuntimeError("flute pattern: no axis candidate selectable")
-    v_fluted = v_annulus - FLUTE_COUNT * v_flute
-    await volume_check(
-        adapter, "fluted column", v_fluted, 0.01 * FLUTE_COUNT * v_flute
-    )
-
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)  # ch30 plates: see _common palette
 
-    # Verify the book-stated 107 cm column height (the dim that
-    # contradicted the legacy part) via the end annulus faces.
+    # Verify the photo-locked column height via the end annulus faces.
     mid_r = (OUTER_DIA + INNER_DIA) / 4.0
     await measure_check(
         adapter,
-        "column length (stated 107 cm)",
+        "column length (top-frame flush 989.9)",
         [
             {"entity_type": "FACE", "point": [mid_r, 0.0, 0.0]},
             {"entity_type": "FACE", "point": [mid_r, COLUMN_LENGTH, 0.0]},
