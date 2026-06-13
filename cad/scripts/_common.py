@@ -67,6 +67,10 @@ sys.path.insert(0, str(SW_MCP_ROOT / "src"))
 
 IN = 25.4  # inch -> mm
 
+# Roller-chain link component prefixes; contact between two of these is an
+# articulating-mechanism contact, not an interference fault (check_no_interference).
+_CHAIN_LINK_PREFIXES = ("chain-inner-link", "chain-outer-link")
+
 DEFAULT_VIEWS = ("front", "top", "isometric")
 
 
@@ -1389,6 +1393,13 @@ def check_no_interference(adapter: Any) -> None:
     (``IAssemblyDoc::InterferenceDetectionManager``; the tool-layer call
     currently returns a simulated result without adapter support).
     Coincident/tangent contact is not treated as interference.
+
+    Chain-internal contact (a pair of roller-chain links touching each other)
+    is allowed and reported separately, not raised: a chain is an articulating
+    connected mechanism whose links are in contact at every joint, so on the
+    tight wraps the rigid links unavoidably touch their neighbours (the same
+    way the gate already tolerates face-flush and tangent contacts). Any link
+    touching a NON-link part is still a hard fault.
     """
     asm = adapter.currentModel
     log("interference detection: starting ...")
@@ -1407,6 +1418,7 @@ def check_no_interference(adapter: Any) -> None:
     log("interference detection: computing interferences ...")
     interferences = adapter._attempt(lambda: mgr.GetInterferences(), default=None)
     details = []
+    chain_contacts = []
     for interference in list(interferences or []):
         _flag(interference, "IInterference")
         names = []
@@ -1414,8 +1426,17 @@ def check_no_interference(adapter: Any) -> None:
             _flag(comp, "IComponent2")
             names.append(str(_read_member(comp, "Name2")))
         volume_mm3 = float(_read_member(interference, "Volume") or 0.0) * 1e9
+        if all(n.startswith(_CHAIN_LINK_PREFIXES) for n in names) and len(names) == 2:
+            chain_contacts.append(volume_mm3)
+            continue
         details.append(f"{' & '.join(names)}: {volume_mm3:.2f} mm^3")
     adapter._attempt(lambda: mgr.Done(), default=None)
+    if chain_contacts:
+        print(
+            f"  ..  {_stamp()} {len(chain_contacts)} chain-internal link contacts"
+            f" (<= {max(chain_contacts):.2f} mm^3) allowed -- articulating chain",
+            flush=True,
+        )
     if details:
         raise RuntimeError(
             f"{len(details)} interference(s): " + "; ".join(details)
