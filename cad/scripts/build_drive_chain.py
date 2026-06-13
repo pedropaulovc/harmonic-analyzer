@@ -36,6 +36,7 @@ import sys
 
 from _common import (
     BAR_STEEL,
+    anchor_point_to_origin,
     apply_color,
     apply_material,
     check,
@@ -162,7 +163,7 @@ async def build(adapter) -> dict[str, str]:
     # OFF: arc endpoints sit near the origin-centred wrap circle and snap.
     check("create_sketch chain band", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    entities = []
+    loops = []
     for off in (BAND_W / 2.0, -BAND_W / 2.0):
         ra = WRAP_R_A + off
         rb = WRAP_R_B + off
@@ -185,10 +186,48 @@ async def build(adapter) -> dict[str, str]:
                 _BX + rb * _TNX, _BY + rb * _TNY, ra * _TNX, ra * _TNY
             ),
         ]
-        for label, res in zip(("wrap-knob", "slack", "wrap-crank", "taut"), ents):
-            entities.append(check(f"add {label} (off {off:+.1f})", res))
+        named = [
+            check(f"add {label} (off {off:+.1f})", res)
+            for label, res in zip(("wrap-knob", "slack", "wrap-crank", "taut"), ents)
+        ]
+        loops.append((off, named))
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "chain band sketch", fix_entities=entities)
+    # Each loop is 11-DOF (3 arcs + taut line, 4 merged junctions): both
+    # wrap centres anchored, all three radii dimensioned, and the four
+    # junction angles pinned by tangency -- the internal-tangency layout
+    # placed the junction points exactly coincident, so they merged and the
+    # tangent relations carry the direction continuity.
+    for off, (wrap_knob, slack, wrap_crank, taut) in loops:
+        tag = f"off {off:+.1f}"
+        ra = WRAP_R_A + off
+        rb = WRAP_R_B + off
+        rs = SLACK_R + off
+        await anchor_point_to_origin(
+            adapter, f"{wrap_knob}.center", 0.0, 0.0, f"knob wrap centre ({tag})"
+        )
+        await anchor_point_to_origin(
+            adapter, f"{wrap_crank}.center", _BX, _BY, f"crank wrap centre ({tag})"
+        )
+        for label, arc, radius in (
+            ("knob wrap", wrap_knob, ra),
+            ("slack", slack, rs),
+            ("crank wrap", wrap_crank, rb),
+        ):
+            check(
+                f"{label} radius ({tag})",
+                await adapter.add_sketch_dimension(arc, None, "radial", radius),
+            )
+        for label, ent1, ent2 in (
+            ("knob-slack", wrap_knob, slack),
+            ("slack-crank", slack, wrap_crank),
+            ("crank-taut", wrap_crank, taut),
+            ("taut-knob", taut, wrap_knob),
+        ):
+            check(
+                f"tangent {label} ({tag})",
+                await adapter.add_sketch_constraint(ent1, ent2, "tangent"),
+            )
+    await ensure_fully_defined(adapter, "chain band sketch")
     check("exit_sketch chain band", await adapter.exit_sketch())
     check(
         "extrude chain band",
