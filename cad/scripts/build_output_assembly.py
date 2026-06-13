@@ -2,7 +2,8 @@ r"""Reproduction script: output subassembly (book ch. 18-24).
 
 Everything downstream of the channel springs, in machine coordinates
 (assembly origin = base origin; base top y = 50.8; channels along Z with
-z_j = -67.1 + 7.0565 j; the output side is -Z). 60 components:
+z_j = -67.1 + 7.0565 j; the output side is -Z). 122 components (59 placed
++ the 63-bead drive chain, a chain component pattern):
 
 * Summing group (z ~ 0): summing-lever on its knife line (15, 990, 0),
   knife-mount + top-crossbar + knife-stay hanging it from the top frame,
@@ -71,8 +72,10 @@ Default-state notes / documented simplifications (Appendix C):
   cross hole doubles as the wire hook). The flange screws stop flush
   with the coefficients plate's bottom -- their engagement into the
   summing lever's plate is not modeled.
-* Wires (lever rod -> wheel hub, wheel rim -> pen rod), the drive chain
-  and the recording paper are flexible elements, not modeled.
+* Wires (lever rod -> wheel hub, wheel rim -> pen rod) and the bead
+  chain's connecting wire are flexible elements, not modeled; the chain's
+  BALLS are (chain-bead pattern, see _insert_bead_chain), and the
+  recording paper rides the platen as a rigid sheet (platen-paper).
 * The knife-stay strap crosses the channel-lever plane east of the lever
   tab TIPS (x > -14.1 including the 8 mm overhang past the spring-hole
   line; M6.5 moved the rod hook -40 -> -10 after the strap clipped the
@@ -98,18 +101,43 @@ from __future__ import annotations
 import math
 import sys
 
+from _chain import (
+    BEAD_COUNT,
+    BEAD_PITCH,
+    CENTRELINE_LEN,
+    CRANK_CENTRE as CHAIN_CRANK_CENTRE,
+    KNOB_CENTRE as CHAIN_KNOB_CENTRE,
+    SLACK_R,
+    TIP_AIR,
+    TIP_R_T12,
+    TIP_R_T24,
+    TNX,
+    TNY,
+    WRAP_R_A,
+    WRAP_R_B,
+    centreline_distance,
+    loop_segments,
+)
 from _common import (
     IN,
     OUT_SLDPRT,
+    anchor_point_to_origin,
     assert_component_placed,
     assert_components_fully_defined,
+    blank_sketch,
     check,
     check_no_interference,
+    component_names,
+    component_transform,
+    create_chain_component_pattern,
+    ensure_fully_defined,
     log,
     mirror_placement,
     run_build,
     save_assembly_and_images,
+    set_sketch_direct_db,
 )
+from build_chain_bead import AXIS_NAME as BEAD_AXIS_NAME
 
 ASM_NAME = "output"
 
@@ -203,9 +231,12 @@ LATCH_ANGLE_DEG = math.degrees(
 REMOVABLE_Z0 = -81.5  # mounted T24 band -81.5..-76.5, flush with the shaft's
 # chain end; the crank-end T12 sits south (drive-train REMOVABLE_Z0 -85.6,
 # mid -83.1) -- the real chain bridges the 4.35 offset with a ~1.7 deg skew
-CHAIN_Z0 = -83.3  # flat drive-chain band -83.3..-78.8 splits the two wrap
-# mid-planes; the band floats radially outside the tooth tips so the z
-# overlap with either chain wheel cannot interfere
+T24_MID_Z = REMOVABLE_Z0 + 2.5  # -79.0 (face 5.0)
+T12_MID_Z = -83.1  # drive-train REMOVABLE_Z0 -85.6 + face 5.0 / 2
+CHAIN_MID_Z = (T24_MID_Z + T12_MID_Z) / 2.0  # -81.05: the bead centres ride
+# the plane splitting the two wrap mid-planes (the retired flat band
+# spanned -83.3..-78.8 about the same plane); the chain floats radially
+# outside the tooth tips so the z overlap with either wheel cannot interfere
 REMOVABLE_TIP_R = {"T12": 14.0, "T18": 20.0, "T24": 26.0}  # m2: OD (T+2)*2
 
 # --- pen ---------------------------------------------------------------------
@@ -406,10 +437,159 @@ def _assert_knob_shaft_clearance() -> None:
         f" pinion/disc {pinion_gap:.1f}, T24/stub {t24_stub_gap:.1f}")
 
 
+def _assert_chain_layout() -> None:
+    """_chain.py derives the loop from OUR anchors -- pin them together."""
+    if CHAIN_KNOB_CENTRE != KNOB_SHAFT_XY:
+        raise RuntimeError(
+            f"_chain KNOB_CENTRE {CHAIN_KNOB_CENTRE} != KNOB_SHAFT_XY {KNOB_SHAFT_XY}"
+        )
+    if CHAIN_CRANK_CENTRE != (118.0, 126.8):  # drive-train X_CRANK, Y_DRIVE
+        raise RuntimeError(f"_chain CRANK_CENTRE {CHAIN_CRANK_CENTRE} moved")
+    if (TIP_R_T24, TIP_R_T12) != (REMOVABLE_TIP_R["T24"], REMOVABLE_TIP_R["T12"]):
+        raise RuntimeError("_chain tip radii diverged from REMOVABLE_TIP_R")
+    log(
+        f"bead chain layout: loop {CENTRELINE_LEN:.2f}, {BEAD_COUNT} beads at"
+        f" {BEAD_PITCH:.4f}, wrap air {TIP_AIR}, plane z {CHAIN_MID_Z}"
+    )
+
+
+async def _insert_bead_chain(adapter) -> None:
+    """The drive chain: a chain component pattern of chain-bead spheres.
+
+    Ch. 23: the bead chain rides the two mounted removables' m2 teeth (T24
+    knob shaft, T12 crank shaft). Path = the _chain.py centreline loop,
+    sketched on a reference plane at CHAIN_MID_Z DIRECTLY in final
+    post-mirror machine coordinates (x negated, arc ends swapped) -- an
+    assembly sketch has no part-local mirror shim to lean on. Constraint
+    scheme proven in diag_chain_loop.py: both wrap centres anchored, the
+    three radial dims, and ALL FOUR junction tangents explicit.
+
+    The seed bead is inserted UNFIXED at the taut-line/knob-wrap junction
+    (the pattern drives its seed); the raw-COM chain pattern then fills the
+    loop with BEAD_COUNT beads at the exact-closure BEAD_PITCH. Gates:
+    bead count, and every bead centre back-read onto the loop at the chain
+    z -- which also arbitrates the offset plane's flip and the mirroring
+    (a flipped plane or unmirrored path misses by tens of mm).
+    """
+    from solidworks_mcp.adapters.base import (
+        CreatePlaneParameters,
+        InsertComponentParameters,
+    )
+
+    plane = check(
+        "create_plane chain mid-plane",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset",
+                base_plane="Front Plane",
+                offset=abs(CHAIN_MID_Z),
+                flip=True,
+            )
+        ),
+    )
+    sketch_name = check(
+        "create_sketch chain path",
+        await adapter.create_sketch(getattr(plane, "name", plane)),
+    )
+    set_sketch_direct_db(adapter, True)
+    knob_xy, slack_xy, crank_xy, taut_xy = loop_segments(
+        dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1], mirror_x=True
+    )
+    wrap_knob = check("add knob wrap", await adapter.add_arc(*knob_xy))
+    slack = check("add slack", await adapter.add_arc(*slack_xy))
+    wrap_crank = check("add crank wrap", await adapter.add_arc(*crank_xy))
+    taut = check("add taut", await adapter.add_line(*taut_xy))
+    set_sketch_direct_db(adapter, False)
+    await anchor_point_to_origin(
+        adapter, f"{wrap_knob}.center", knob_xy[0], knob_xy[1], "knob wrap centre"
+    )
+    await anchor_point_to_origin(
+        adapter, f"{wrap_crank}.center", crank_xy[0], crank_xy[1], "crank wrap centre"
+    )
+    for label, arc, radius in (
+        ("knob wrap", wrap_knob, WRAP_R_A),
+        ("slack", slack, SLACK_R),
+        ("crank wrap", wrap_crank, WRAP_R_B),
+    ):
+        check(
+            f"{label} radius",
+            await adapter.add_sketch_dimension(arc, None, "radial", radius),
+        )
+    for label, ent1, ent2 in (
+        ("crank-taut", wrap_crank, taut),
+        ("taut-knob", taut, wrap_knob),
+        ("knob-slack", wrap_knob, slack),
+        ("slack-crank", slack, wrap_crank),
+    ):
+        check(
+            f"tangent {label}",
+            await adapter.add_sketch_constraint(ent1, ent2, "tangent"),
+        )
+    await ensure_fully_defined(adapter, "chain path sketch")
+    check("exit_sketch chain path", await adapter.exit_sketch())
+
+    seed_pre_mirror = [
+        KNOB_SHAFT_XY[0] + WRAP_R_A * TNX,
+        KNOB_SHAFT_XY[1] + WRAP_R_A * TNY,
+        CHAIN_MID_Z,
+    ]
+    position, rotation, rows = mirror_placement(
+        "chain-bead", seed_pre_mirror, [0.0, 0.0, 0.0], IDENTITY
+    )
+    data = check(
+        f"insert chain-bead seed @ ({position[0]:.2f}, {position[1]:.2f},"
+        f" {position[2]:.2f})",
+        await adapter.insert_component(
+            InsertComponentParameters(
+                file_path=_part("chain-bead"), position=position, rotation=rotation
+            )
+        ),
+    )
+    seed_name = data["name"]
+    if data.get("fixed"):
+        raise RuntimeError("chain-bead seed must stay unfixed (the pattern drives it)")
+    assert_component_placed(adapter, seed_name, position, rows)
+
+    instance_count = create_chain_component_pattern(
+        adapter,
+        sketch_name,
+        f"{seed_name}@{ASM_NAME}",
+        f"{BEAD_AXIS_NAME}@{seed_name}@{ASM_NAME}",
+        f"Front Plane@{seed_name}@{ASM_NAME}",
+        BEAD_PITCH,
+    )
+    blank_sketch(adapter, sketch_name)
+
+    beads = [n for n in component_names(adapter) if n.startswith("chain-bead")]
+    if len(beads) != BEAD_COUNT:
+        raise RuntimeError(
+            f"chain pattern made {len(beads)} beads, expected {BEAD_COUNT}"
+            f" (SolidWorks InstanceCount {instance_count})"
+        )
+    worst = 0.0
+    for name in beads:
+        array = component_transform(adapter, name)
+        x, y, z = (array[9] * 1000.0, array[10] * 1000.0, array[11] * 1000.0)
+        if abs(z - CHAIN_MID_Z) > 0.1:
+            raise RuntimeError(
+                f"{name}: bead z {z:.3f} off the chain plane {CHAIN_MID_Z}"
+            )
+        dist = centreline_distance(
+            x, y, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1], mirror_x=True
+        )
+        worst = max(worst, dist)
+        if dist > 0.1:
+            raise RuntimeError(
+                f"{name}: bead ({x:.2f}, {y:.2f}) sits {dist:.3f} off the chain path"
+            )
+    log(f"bead chain: {len(beads)} beads on the path (worst off-path {worst:.4f})")
+
+
 async def build(adapter) -> dict[str, str]:
     _assert_counter_spring_hang()
     _assert_rack_mesh()
     _assert_knob_shaft_clearance()
+    _assert_chain_layout()
 
     check("create_assembly", await adapter.create_assembly())
 
@@ -525,13 +705,9 @@ async def build(adapter) -> dict[str, str]:
                  [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], REMOVABLE_Z0],
                  [0.0, 0.0, 0.0], IDENTITY, configuration="T24",
                  label="transgear-removable (mounted T24)")
-    # Local origin = knob wrap centre; the crank-side wrap reaches the
-    # drive-train T12 at (118, 126.8) (build_drive_chain KNOB_CENTRE/
-    # CRANK_CENTRE/WRAP radii -- keep in sync with KNOB_SHAFT_XY and
-    # REMOVABLE_TIP_R).
-    await _place(adapter, "drive-chain",
-                 [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], CHAIN_Z0],
-                 [0.0, 0.0, 0.0], IDENTITY)
+    # The bead chain looping both removables (_assert_chain_layout pins the
+    # _chain.py anchors to KNOB_SHAFT_XY / the drive-train crank).
+    await _insert_bead_chain(adapter)
 
     # --- pen group ------------------------------------------------------------
     await _place(adapter, "pen-hanger", list(HANGER_POS),

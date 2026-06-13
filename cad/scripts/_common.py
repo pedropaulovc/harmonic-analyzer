@@ -1356,6 +1356,80 @@ def assert_components_fully_defined(adapter: Any) -> None:
         raise RuntimeError("components not fully defined: " + ", ".join(problems))
 
 
+def component_names(adapter: Any) -> list[str]:
+    """Top-level component names (``Name2``) of the active assembly."""
+    asm = adapter.currentModel
+    components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
+    names = []
+    for component in components:
+        _flag(component, "IComponent2")
+        names.append(str(_read_member(component, "Name2")))
+    return names
+
+
+def create_chain_component_pattern(
+    adapter: Any,
+    path_sketch: str,
+    component: str,
+    axis: str,
+    align_plane: str,
+    spacing_mm: float,
+) -> int:
+    """Create a Distance-method chain component pattern; return InstanceCount.
+
+    Raw-COM stopgap (``FeatureManager::CreateDefinition(swFmLocalChainPattern)``
+    -> ``IChainPatternFeatureData`` -> ``CreateFeature``) until the MCP
+    adapter grows a chain-pattern tool. Selection marks per the API example
+    (Create_and_Modify_Distance_Chain_Pattern_Feature): path sketch 2, seed
+    component 1, path-alignment geometry 256, alignment plane 16384.
+    Distance pitch method, fill path, align to seed, STATIC (instances sit
+    at the pattern spacing, not draggable). The seed component must be
+    UNFIXED -- the pattern drives it onto the path. The returned
+    InstanceCount is SolidWorks' own fill count; callers should still gate
+    on the actual component list."""
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    model = adapter.currentModel
+    ext = model.Extension
+    model.ClearSelection2(True)
+    append = False
+    for name, type_name, mark in (
+        (path_sketch, "SKETCH", 2),
+        (component, "COMPONENT", 1),
+        (axis, "AXIS", 256),
+        (align_plane, "PLANE", 16384),
+    ):
+        if not ext.SelectByID2(name, type_name, 0, 0, 0, append, mark, null_callout(), 0):
+            raise RuntimeError(
+                f"chain pattern: cannot select {name!r} ({type_name}, mark {mark})"
+            )
+        append = True
+    manager = model.FeatureManager
+    data = manager.CreateDefinition(112)  # swFeatureNameID_e.swFmLocalChainPattern
+    if data is None:
+        raise RuntimeError("CreateDefinition(swFmLocalChainPattern) returned None")
+    _flag(data, "IChainPatternFeatureData")
+    data.PitchMethod = 0  # swChainPatternDistance
+    data.AlignMethod = 0  # swChainPatternAlignToSeed
+    data.Options = 0  # swChainPatternStatic
+    data.Spacing = spacing_mm / 1000.0
+    data.FillPath = True
+    feature = manager.CreateFeature(data)
+    model.ClearSelection2(True)
+    if feature is None:
+        raise RuntimeError("CreateFeature(chain pattern) returned None")
+    _flag(feature, "IFeature")
+    definition = _read_member(feature, "GetDefinition")
+    _flag(definition, "IChainPatternFeatureData")
+    count = int(_read_member(definition, "InstanceCount") or 0)
+    print(
+        f"  OK  {_stamp()} chain pattern {_read_member(feature, 'Name')}:"
+        f" {count} instances at {spacing_mm:.4f}",
+        flush=True,
+    )
+    return count
+
+
 def check_no_interference(adapter: Any) -> None:
     """Run interference detection on the active assembly; raise on any hit.
 
