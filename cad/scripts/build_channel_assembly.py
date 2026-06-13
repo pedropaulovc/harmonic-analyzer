@@ -277,6 +277,14 @@ async def _revolute(
     The spin/axial dims are the per-channel suppressible drivers.
     """
     tgt = _org(adapter, comp)
+    # Capture the off-axis (spin) target at the PLACED design pose, BEFORE the
+    # radial/axial mates run. Measuring it afterwards freezes whatever sub-mm
+    # pose the mate solve drifted to -- for the connecting-rod that drift (~0.4
+    # mm swing about the rocker pin) threw the cam ring off the cylinder-gear
+    # lobe and broke the top-level interference gate (38.92 mm^3 x 20). Each
+    # part is inserted on its exact mirrored transform, so the design pose IS
+    # the on-solution target.
+    off_design = world_point(adapter, comp, off_axis_local)
     radial = concentric_mate if concentric else coincident_mate
     await radial(adapter, axis_a, axis_b, label=f"{label} radial", verify=(comp, tgt))
     # Bar is Ry(90): its Right Plane (local x=0) is the Z mid reference; the
@@ -291,14 +299,60 @@ async def _revolute(
         label=f"{label} axial d={abs(tgt[2]):.2f}",
         verify=(comp, tgt),
     )
-    off = world_point(adapter, comp, off_axis_local)
     await spin_driver(
         adapter,
         named_ref(f"{off_axis_name}@{comp}", "AXIS"),
         pivot_xy,
-        (off[0], off[1]),
-        label=f"{label} spin -> {off[0]:.1f},{off[1]:.1f}",
+        (off_design[0], off_design[1]),
+        label=f"{label} spin -> {off_design[0]:.1f},{off_design[1]:.1f}",
         verify=(comp, tgt),
+    )
+
+
+async def _pin_design_pose(
+    adapter,
+    comp: str,
+    *,
+    ring_local: list[float],
+    pin_local: list[float],
+    label: str,
+) -> None:
+    """Pin a planar Z-aligned link at its exact placed (design) pose.
+
+    The connecting-rod bridges a channel-internal joint (its pin bore rides the
+    rocker rod-bore) and an EXTERNAL one (its cam ring rides a drive-train
+    cylinder-gear lobe, a 0.1 mm-clearance journal resolved at the top level).
+    Those two spans are 0.39 mm inconsistent with the rod's fixed 127 mm bore
+    spacing -- a pre-existing layout slack the old fix-all build hid by letting
+    the pin float 0.4 mm off the rocker bore. A proper pin<->bore coincident
+    instead snaps the pin exact and throws the ring 0.39 mm off the lobe ->
+    top-level interference. The cam journal is the tight constraint, so pin the
+    RING exactly (on the lobe centre) and let the 0.39 mm sit at the loose pin,
+    exactly as the green build did. The real rod<->rocker + rod<->cam revolutes
+    are established in the motion study (artifact B), where the rod is flexible.
+
+    Scheme = the validated prismatic pattern (slide axis Z = Axis1, the ring
+    bore): two axis-to-plane distances pin X/Y (and the two axis tilts), a spin
+    driver pins rotation about Z via the pin bore, a Front-plane distance pins Z.
+    """
+    ring = world_point(adapter, comp, ring_local)
+    pin = world_point(adapter, comp, pin_local)
+    await distance_driver(
+        adapter, named_ref(f"Axis1@{comp}", "AXIS"), named_ref("Right Plane", "PLANE"),
+        abs(ring[0]), label=f"{label} ring-X", verify=(comp, ring),
+    )
+    await distance_driver(
+        adapter, named_ref(f"Axis1@{comp}", "AXIS"), named_ref("Top Plane", "PLANE"),
+        abs(ring[1]), label=f"{label} ring-Y", verify=(comp, ring),
+    )
+    await spin_driver(
+        adapter, named_ref(f"Axis2@{comp}", "AXIS"),
+        (ring[0], ring[1]), (pin[0], pin[1]),
+        label=f"{label} swing -> pin {pin[0]:.1f},{pin[1]:.1f}", verify=(comp, ring),
+    )
+    await distance_driver(
+        adapter, named_ref(f"Front Plane@{comp}", "PLANE"), named_ref("Front Plane", "PLANE"),
+        abs(ring[2]), label=f"{label} ring-Z", verify=(comp, ring),
     )
 
 
@@ -484,14 +538,14 @@ async def build(adapter) -> dict[str, str]:
             off_axis_local=ROCKER_ROD_BORE_LOCAL, pivot_xy=pivot_w,
             label=f"J1 rocker ch{j:02d}",
         )
-        # J2 rod revolute (rod pin ↔ rocker rod bore; spin via the strap bore,
-        # swinging about the rod pin).
-        rod_pin = world_point(adapter, rod, ROD_PIN_BORE_LOCAL)
-        await _revolute(
+        # J2 connecting-rod: pinned at its exact design pose so the cam ring sits
+        # ON the cylinder-gear lobe centre (the tight external journal), not
+        # snapped to the rocker pin (which would throw the ring 0.39 mm off the
+        # lobe -- see _pin_design_pose). The rod<->rocker revolute lives in the
+        # motion study where the rod is flexible.
+        await _pin_design_pose(
             adapter, rod,
-            named_ref(f"Axis2@{rocker}", "AXIS"), named_ref(f"Axis2@{rod}", "AXIS"),
-            concentric=False, off_axis_name="Axis1",
-            off_axis_local=ROD_STRAP_BORE_LOCAL, pivot_xy=(rod_pin[0], rod_pin[1]),
+            ring_local=ROD_STRAP_BORE_LOCAL, pin_local=ROD_PIN_BORE_LOCAL,
             label=f"J2 rod ch{j:02d}",
         )
         # J4 lever revolute (fulcrum OD ↔ fulcrum bore; spin via the bar pin).
