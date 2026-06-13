@@ -1068,6 +1068,11 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     # sphere; explicit c, no STL yet at first build (the chain itself is a
     # chain component pattern of these along the _chain.py loop)
     "chain-bead": ("x", 0.0),
+    # roller-chain links: flat XY parts, exactly symmetric about local z=0
+    # (plates at +-plate_z, round bodies centred on z=0); achiral, so the
+    # YZ-mirror is a proper rotation. Explicit c, no STL at first build.
+    "chain-inner-link": ("z", 0.0),
+    "chain-outer-link": ("z", 0.0),
     # centred symmetric bar; explicit c, no STL yet at first build
     "wheel-bar": ("x", 0.0),
     # ch25 alignment-pinion set: every part exactly symmetric about its
@@ -1375,81 +1380,6 @@ def component_names(adapter: Any) -> list[str]:
         _flag(component, "IComponent2")
         names.append(str(_read_member(component, "Name2")))
     return names
-
-
-def create_chain_component_pattern(
-    adapter: Any,
-    path_sketch: str,
-    seed_component: str,
-    axis_name: str,
-    align_plane_name: str,
-    spacing_mm: float,
-    instance_count: int,
-) -> int:
-    """Create a Distance-method chain component pattern; return InstanceCount.
-
-    Raw-COM stopgap (``FeatureManager::CreateDefinition(swFmLocalChainPattern)``
-    -> ``IChainPatternFeatureData`` -> ``CreateFeature``) until the MCP
-    adapter grows a chain-pattern tool. Selection marks per the API example
-    (Create_and_Modify_Distance_Chain_Pattern_Feature): path sketch 2, seed
-    component 1, path-alignment geometry 256, alignment plane 16384.
-    ``seed_component`` is the component Name2 (e.g. ``chain-bead-1``);
-    ``axis_name``/``align_plane_name`` are part-local feature names inside
-    it -- the doc-title select suffix is derived here (an unsaved assembly
-    is still ``AssemN``). Distance pitch method with an EXPLICIT
-    ``instance_count`` (FillPath under-filled a closed loop live: 61 of 63
-    beads), align to seed, STATIC (instances sit at the pattern spacing,
-    not draggable). The seed component must be UNFIXED -- the pattern
-    drives it onto the path. The returned InstanceCount is read back from
-    the created feature; callers should still gate on the actual component
-    list."""
-    from solidworks_mcp.adapters.pywin32_adapter import null_callout
-
-    model = adapter.currentModel
-    ext = model.Extension
-    title = str(_read_member(model, "GetTitle") or "")
-    if title.lower().endswith((".sldasm", ".sldprt")):
-        title = title.rsplit(".", 1)[0]
-    if not title:
-        raise RuntimeError("chain pattern: cannot read the assembly title")
-    model.ClearSelection2(True)
-    append = False
-    for name, type_name, mark in (
-        (path_sketch, "SKETCH", 2),
-        (f"{seed_component}@{title}", "COMPONENT", 1),
-        (f"{axis_name}@{seed_component}@{title}", "AXIS", 256),
-        (f"{align_plane_name}@{seed_component}@{title}", "PLANE", 16384),
-    ):
-        if not ext.SelectByID2(name, type_name, 0, 0, 0, append, mark, null_callout(), 0):
-            raise RuntimeError(
-                f"chain pattern: cannot select {name!r} ({type_name}, mark {mark})"
-            )
-        append = True
-    manager = model.FeatureManager
-    data = manager.CreateDefinition(112)  # swFeatureNameID_e.swFmLocalChainPattern
-    if data is None:
-        raise RuntimeError("CreateDefinition(swFmLocalChainPattern) returned None")
-    _flag(data, "IChainPatternFeatureData")
-    data.PitchMethod = 0  # swChainPatternDistance
-    data.AlignMethod = 0  # swChainPatternAlignToSeed
-    data.Options = 0  # swChainPatternStatic
-    data.FillPath = False  # InstanceCount is only honoured with fill off
-    data.InstanceCount = instance_count
-    data.Spacing = spacing_mm / 1000.0
-    feature = manager.CreateFeature(data)
-    model.ClearSelection2(True)
-    if feature is None:
-        raise RuntimeError("CreateFeature(chain pattern) returned None")
-    _flag(feature, "IFeature")
-    definition = _read_member(feature, "GetDefinition")
-    _flag(definition, "IChainPatternFeatureData")
-    count = int(_read_member(definition, "InstanceCount") or 0)
-    print(
-        f"  OK  {_stamp()} chain pattern {_read_member(feature, 'Name')}:"
-        f" {count} instances at {spacing_mm:.4f}",
-        flush=True,
-    )
-    return count
 
 
 def check_no_interference(adapter: Any) -> None:
