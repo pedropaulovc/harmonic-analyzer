@@ -191,12 +191,16 @@ async def build(adapter) -> dict[str, str]:
     else:
         raise RuntimeError("top pin hole cut removed no material on either side")
 
-    # Named bore axis for the top-pin joint (concentric to the channel lever's
-    # bar pin). The hole runs along local X at (y = pin_y, z = mid-depth), so
-    # the axis is (Top + pin_y) ∩ (Front + depth/2) -- view-independent name
-    # selection (the bore wall never picks by screen-projected point).
+    # Named axes (parallel to the top-pin bore, view-independent selection):
+    # Axis1 = top-pin bore at (y = pin_y, z = mid-depth) -- the hole runs along
+    # local X, so the axis is (Top + pin_y) ∩ (Front + depth/2); Axis2 = a foot
+    # reference axis at the bar bottom (y = 0), an ~806 mm lever arm from the
+    # top pin that the assembly spin driver uses to pin the bar's swing.
     await name_bore_axis(
         adapter, "Top Plane", pin_y, "Front Plane", BAR_DEPTH / 2.0, "top pin bore"
+    )
+    await name_bore_axis(
+        adapter, "Top Plane", 0.0, "Front Plane", BAR_DEPTH / 2.0, "foot axis"
     )
 
     await apply_material(adapter, MATERIAL)
