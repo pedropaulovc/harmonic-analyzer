@@ -28,6 +28,7 @@ from _common import (
     check,
     define_circle,
     ensure_fully_defined,
+    name_bore_axis,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -74,6 +75,11 @@ async def build(adapter) -> dict[str, str]:
     res = await adapter.get_mass_properties()
     print(f"  volume after pin hole: {res.data.volume:.1f} mm^3")
     # expected: -178 (O5 cross-drill) -> ~8,373 mm^3
+
+    # Named central axis (shaft axis = local +Y through the origin) so the
+    # crankshaft mates concentric in the pedestal and the crank parts /
+    # pinion / chain wheel lock to it (M6 mated-DOF drive train).
+    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "shaft axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

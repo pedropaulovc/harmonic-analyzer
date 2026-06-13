@@ -27,6 +27,7 @@ from _common import (
     add_line_chain,
     anchor_point_to_point,
     apply_material,
+    name_bore_axis,
     apply_color,
     STAINED_OAK,
     check,
@@ -129,6 +130,10 @@ async def build(adapter) -> dict[str, str]:
         "revolve handle",
         await adapter.create_revolve(RevolveParameters(angle=360.0)),
     )
+
+    # Named bore/central axis for view-independent assembly mate
+    # selection (M6 mated-DOF drive train).
+    await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "handle axis")
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, STAINED_OAK)  # ch30 plates: see _common palette

@@ -29,6 +29,7 @@ from _common import (
     check,
     define_circle,
     ensure_fully_defined,
+    name_bore_axis,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -59,6 +60,10 @@ async def build(adapter) -> dict[str, str]:
     res = await adapter.get_mass_properties()
     print(f"  volume after shaft: {res.data.volume:.1f} mm^3")
     # expected: pi * 4.7625^2 * 200 = ~14,251 mm^3
+
+    # Named central axis (arbor axis along +Y through the origin) so the
+    # cylinder gears ride it coincident axis-to-axis in the assembly.
+    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "shaft axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

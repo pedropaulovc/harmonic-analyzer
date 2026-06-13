@@ -28,6 +28,7 @@ from _common import (
     IN,
     add_line_chain,
     apply_material,
+    name_bore_axis,
     check,
     define_circle,
     define_rectilinear_chain,
@@ -91,6 +92,10 @@ async def build(adapter) -> dict[str, str]:
     )
     v_bore = math.pi * BORE_RADIUS**2 * BLOCK_DEPTH
     volume = await volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
+
+    # Named bore/central axis for view-independent assembly mate
+    # selection (M6 mated-DOF drive train).
+    await name_bore_axis(adapter, "Top Plane", 76.0, "Right Plane", 0.0, "journal axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
