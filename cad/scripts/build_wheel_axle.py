@@ -26,6 +26,7 @@ from _common import (
     check,
     define_rectilinear_chain,
     ensure_fully_defined,
+    name_bore_axis,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -86,6 +87,10 @@ async def build(adapter) -> dict[str, str]:
     print(f"  volume: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.005 * expected:
         raise RuntimeError(f"volume {vol:.1f} != analytic {expected:.1f}")
+
+    # Named stud axis (local Y through the origin = the revolve axis) so the
+    # magnifying wheel revolves on it in the M6 mated-DOF assembly.
+    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "stud axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

@@ -617,10 +617,27 @@ async def build(adapter) -> dict[str, str]:
                           [0.0, 0.0, 0.0], IDENTITY)
 
     # --- magnifying group ----------------------------------------------------
-    await _place(adapter, "magnifying-bracket", [-40.0, LEVER_ROD_Y, LEVER_ROD_Z],
-                 [0.0, 0.0, 0.0], IDENTITY)
-    await _place(adapter, "magnifying-lever", [-200.0, LEVER_ROD_Y, LEVER_ROD_Z],
-                 [0.0, 0.0, 0.0], IDENTITY)
+    # Bracket = ground (bolted under the plate). The lever rides its collar bore
+    # as a revolute about X; the rock (Rx, driven by the summing lever in the M6
+    # Motion study) is a suppressible angle snapshot. Both rod axis and collar
+    # axis are local X (Front∩Top), collinear at machine (985, -85). Axial slide
+    # pinned on the Right plane (x~200, non-degenerate); rock via Top-plane angle
+    # (Y-normal, mirror-invariant -> no flip, unlike the dy=0 off-axis spin).
+    mb = await _place(adapter, "magnifying-bracket", [-40.0, LEVER_ROD_Y, LEVER_ROD_Z],
+                      [0.0, 0.0, 0.0], IDENTITY)
+    ml = await place_component(adapter, "magnifying-lever",
+                               [-200.0, LEVER_ROD_Y, LEVER_ROD_Z],
+                               [0.0, 0.0, 0.0], IDENTITY, ground=False)
+    ml_o = _org(adapter, ml)
+    await coincident_mate(adapter, named_ref(f"Axis1@{ml}", "AXIS"),
+                          named_ref(f"Axis1@{mb}", "AXIS"),
+                          label="mag-lever collar pivot", verify=(ml, ml_o))
+    await distance_driver(adapter, named_ref(f"Right Plane@{ml}", "PLANE"),
+                          named_ref("Right Plane", "PLANE"), abs(ml_o[0]),
+                          label="mag-lever axial", verify=(ml, ml_o))
+    await angle_driver(adapter, named_ref(f"Top Plane@{ml}", "PLANE"),
+                       named_ref("Top Plane", "PLANE"), 0.0,
+                       label="mag-lever rock snapshot", verify=(ml, ml_o))
     # Ry(+90): the clamp's lever bore (local Z) turns onto the rod axis (X).
     await _place(adapter, "magnifying-clamp", list(CLAMP_POS),
                  [0.0, 90.0, 0.0], ROT_Y_POS90)
