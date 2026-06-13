@@ -180,6 +180,41 @@ def loop_segments(
     return _arc(knob), _arc(slack), _arc(crank), line
 
 
+def loop_parameter(
+    x: float, y: float, dx: float = 0.0, dy: float = 0.0, mirror_x: bool = False
+) -> float:
+    """Arc-length position s in [0, CENTRELINE_LEN) of the loop point nearest
+    (x, y), in the same (dx, dy, mirror_x) frame as :func:`loop_segments`.
+
+    s runs along the CCW traversal (knob wrap from the taut normal, slack,
+    crank wrap, taut line). Meant for points already gated ON the loop by
+    :func:`centreline_distance` -- bead spacing/closure checks."""
+    if mirror_x:
+        x = -x
+    x, y = x - dx, y - dy
+    two_pi = 2.0 * math.pi
+    candidates: list[tuple[float, float]] = []  # (distance to segment, s)
+    base = 0.0
+    for cx, cy, r, ang0, span in (
+        (0.0, 0.0, WRAP_R_A, _ANG_N, SPAN_A),
+        (CX, CY, SLACK_R, _ANG_GA, SPAN_SLACK),
+        (BX, BY, WRAP_R_B, _ANG_GB, SPAN_B),
+    ):
+        wedge = (math.atan2(y - cy, x - cx) - ang0) % two_pi
+        if wedge <= span:
+            candidates.append(
+                (abs(math.hypot(x - cx, y - cy) - r), base + r * wedge)
+            )
+        base += r * span
+    x1, y1 = BX + WRAP_R_B * TNX, BY + WRAP_R_B * TNY
+    x2, y2 = WRAP_R_A * TNX, WRAP_R_A * TNY
+    t = ((x - x1) * (x2 - x1) + (y - y1) * (y2 - y1)) / (TAUT_LEN * TAUT_LEN)
+    t = max(0.0, min(1.0, t))
+    dist = math.hypot(x - (x1 + t * (x2 - x1)), y - (y1 + t * (y2 - y1)))
+    candidates.append((dist, base + t * TAUT_LEN))
+    return min(candidates)[1] % CENTRELINE_LEN
+
+
 def centreline_distance(
     x: float, y: float, dx: float = 0.0, dy: float = 0.0, mirror_x: bool = False
 ) -> float:
