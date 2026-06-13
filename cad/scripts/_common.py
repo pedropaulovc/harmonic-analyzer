@@ -1717,6 +1717,7 @@ async def place_component(
     rows: list[list[float]],
     *,
     ground: bool = True,
+    configuration: str = "",
     label: str = "",
 ) -> str:
     """Insert a part at its exact final (mirrored) transform and assert it.
@@ -1724,15 +1725,19 @@ async def place_component(
     ``ground=True`` fixes the component (structure: shafts, mounts, bushings,
     supports, frame, fasteners, cosmetic springs). ``ground=False`` leaves it
     free for the caller's mates to constrain -- the moving parts whose DOF are
-    driven from the crank. Either way the part is inserted on-solution so mate
-    flip-recovery has a clean reference and the read-back assert holds.
+    driven from the crank. ``configuration`` selects a part configuration (the
+    cone-gear tooth counts, the transgear-removable wheels). Either way the
+    part is inserted on-solution so mate flip-recovery has a clean reference
+    and the read-back assert holds.
     """
     from solidworks_mcp.adapters.base import (
         ComponentRefParameters,
         InsertComponentParameters,
     )
 
-    position, rotation, rows = mirror_placement(part, position, rotation, rows)
+    position, rotation, rows = mirror_placement(
+        part, position, rotation, rows, configuration
+    )
     label = label or part
     path = (OUT_SLDPRT / f"{part}.SLDPRT").resolve()
     if not path.exists():
@@ -1743,7 +1748,10 @@ async def place_component(
         f"insert {label} @ ({position[0]:.2f}, {position[1]:.2f}, {position[2]:.2f})",
         await adapter.insert_component(
             InsertComponentParameters(
-                file_path=str(path), position=position, rotation=rotation
+                file_path=str(path),
+                position=position,
+                rotation=rotation,
+                configuration=configuration,
             )
         ),
     )

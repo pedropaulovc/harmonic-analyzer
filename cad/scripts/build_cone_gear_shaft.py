@@ -56,6 +56,7 @@ import sys
 from _common import (
     IN,
     apply_material,
+    name_bore_axis,
     check,
     define_circle,
     ensure_fully_defined,
@@ -104,6 +105,10 @@ async def build(adapter) -> dict[str, str]:
         volume += math.pi * (dia_in * IN / 2.0) ** 2 * (end_z - prev_end)
         await volume_check(adapter, label, volume, 0.005 * volume)
         prev_end = end_z
+
+    # Named bore/central axis for view-independent assembly mate
+    # selection (M6 mated-DOF drive train).
+    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "shaft axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

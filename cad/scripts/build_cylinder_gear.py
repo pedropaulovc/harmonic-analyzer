@@ -61,6 +61,7 @@ from _common import (
     check,
     define_circle,
     ensure_fully_defined,
+    name_bore_axis,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -245,6 +246,11 @@ async def build(adapter) -> dict[str, str]:
     )
     v_bore = math.pi * BORE_RADIUS**2 * (FACE_WIDTH + CAM_THICKNESS)
     volume = await volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
+
+    # Named bore axis (gear axis = Z through the origin) for view-independent
+    # assembly mate selection: the gear rides the arbor coincident axis-to-axis
+    # and meshes its cone gear via a gear mate (M6 mated-DOF drive train).
+    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "bore axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
