@@ -155,20 +155,29 @@ BEAD_PITCH = CENTRELINE_LEN / BEAD_COUNT  # exact closure: count * pitch = loop
 LINK_COUNT = 2 * round(CENTRELINE_LEN / (2.0 * BEAD_PITCH_NOMINAL))  # 64 (even)
 LINK_PITCH = CENTRELINE_LEN / LINK_COUNT  # exact closure: count * pitch = loop
 
+# Every clearance is >= 0.3 mm and nothing relies on exact tangency: the
+# M6.x interference checker flags ~0.00 mm^3 slivers, so the links FLOAT as a
+# multibody (disconnected bodies in a part are allowed). The whole envelope
+# stays inside the retired bead's +-2.4 (in-plane h == BEAD_R*2/2; |z| <= 2.1
+# < 2.4), so the band-tuned M6.8/M6.9 clearances transfer with margin.
 PLATE_HEIGHT = 4.8  # obround plate height == retired bead diameter (envelope)
+PLATE_HALF_H = PLATE_HEIGHT / 2.0  # 2.4, the obround end-arc radius
 PLATE_THICK = 0.8  # side-plate thickness (z)
-ROLLER_DIA = 3.2  # roller/bushing outer diameter (#25 ~3.30, trimmed to grid)
-ROLLER_R = ROLLER_DIA / 2.0
-ROLLER_WIDTH = 1.0  # roller length along the pin axis (between the inner plates)
-PIN_DIA = 1.8  # pin/bushing pin diameter (#25 ~2.31, trimmed for clearance)
-PIN_R = PIN_DIA / 2.0
-# z stack (pin axis), symmetric about the chain mid-plane, |z| <= 2.2 < 2.4:
-#   inner plates centred at +-1.0 (faces +-0.6..+-1.4), rollers width 1.0 in
-#   the +-0.6 gap, outer plates centred at +-1.8 (faces +-1.4..+-2.2), pins
-#   span the full +-2.2.
-INNER_PLATE_Z = 1.0
-OUTER_PLATE_Z = 1.8
-PIN_HALF_LEN = OUTER_PLATE_Z + PLATE_THICK / 2.0  # 2.2
+
+ROLLER_DIA = 2.5  # roller/bushing outer diameter (~0.52 of plate height, #25)
+ROLLER_R = ROLLER_DIA / 2.0  # 1.25
+BUSH_BORE_R = 1.0  # bushing through-bore; pin floats inside (0.35 clearance)
+BUSH_HALF_LEN = 1.0  # bushing reach along the pin axis (z -1.0..1.0)
+INNER_PLATE_HOLE_R = 1.55  # bushing OD floats inside (0.30); web 0.85
+
+PIN_DIA = 1.3  # outer-link pin (floats in the bushing bore and plate holes)
+PIN_R = PIN_DIA / 2.0  # 0.65
+PIN_HALF_LEN = 2.1  # pin reach along the pin axis (z -2.1..2.1)
+OUTER_PLATE_HOLE_R = 0.95  # pin floats inside (0.30); web 1.45
+
+# z stack (pin axis), symmetric about the chain mid-plane:
+INNER_PLATE_Z = 0.6  # inner-plate centre (faces 0.2..1.0)
+OUTER_PLATE_Z = 1.7  # outer-plate centre (faces 1.3..2.1, 0.3 gap to inner)
 
 
 def loop_point_tangent(
