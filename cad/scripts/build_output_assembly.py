@@ -551,12 +551,7 @@ async def _insert_bead_chain(adapter) -> None:
     assert_component_placed(adapter, seed_name, position, rows)
 
     instance_count = create_chain_component_pattern(
-        adapter,
-        sketch_name,
-        f"{seed_name}@{ASM_NAME}",
-        f"{BEAD_AXIS_NAME}@{seed_name}@{ASM_NAME}",
-        f"Front Plane@{seed_name}@{ASM_NAME}",
-        BEAD_PITCH,
+        adapter, sketch_name, seed_name, BEAD_AXIS_NAME, "Front Plane", BEAD_PITCH
     )
     blank_sketch(adapter, sketch_name)
 
