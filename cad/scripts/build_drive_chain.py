@@ -193,10 +193,12 @@ async def build(adapter) -> dict[str, str]:
         loops.append((off, named))
     set_sketch_direct_db(adapter, False)
     # Each loop is 11-DOF (3 arcs + taut line, 4 merged junctions): both
-    # wrap centres anchored, all three radii dimensioned, and the four
-    # junction angles pinned by tangency -- the internal-tangency layout
-    # placed the junction points exactly coincident, so they merged and the
-    # tangent relations carry the direction continuity.
+    # wrap centres anchored and all three radii dimensioned. The four
+    # junction angles are pinned by tangency, but those relations must NOT
+    # be added here: the internal-tangency layout placed the junction
+    # points exactly coincident, they merged at creation, and SolidWorks
+    # auto-added the tangent relations itself -- explicit duplicates
+    # over-define the sketch (caught live, 14 redundant tangents).
     for off, (wrap_knob, slack, wrap_crank, taut) in loops:
         tag = f"off {off:+.1f}"
         ra = WRAP_R_A + off
@@ -216,16 +218,6 @@ async def build(adapter) -> dict[str, str]:
             check(
                 f"{label} radius ({tag})",
                 await adapter.add_sketch_dimension(arc, None, "radial", radius),
-            )
-        for label, ent1, ent2 in (
-            ("knob-slack", wrap_knob, slack),
-            ("slack-crank", slack, wrap_crank),
-            ("crank-taut", wrap_crank, taut),
-            ("taut-knob", taut, wrap_knob),
-        ):
-            check(
-                f"tangent {label} ({tag})",
-                await adapter.add_sketch_constraint(ent1, ent2, "tangent"),
             )
     await ensure_fully_defined(adapter, "chain band sketch")
     check("exit_sketch chain band", await adapter.exit_sketch())
