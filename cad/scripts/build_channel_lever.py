@@ -45,6 +45,7 @@ from _common import (
     define_circle,
     dimension_between,
     ensure_fully_defined,
+    name_bore_axis,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -211,6 +212,14 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(
             f"hole-cut volume {vol:.1f} != analytic {expected:.1f}"
         )
+
+    # Named bore axes for assembly mates (view-independent name selection):
+    # Axis1 = fulcrum bore (origin, rides the fulcrum shaft), Axis2 = bar-pin
+    # bore (127, 0, the amplitude bar's top pin).
+    await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "fulcrum bore")
+    await name_bore_axis(
+        adapter, "Right Plane", BAR_PIN_X, "Top Plane", 0.0, "bar pin bore"
+    )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

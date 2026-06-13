@@ -35,6 +35,7 @@ from _common import (
     define_circle,
     define_rectilinear_chain,
     ensure_fully_defined,
+    name_bore_axis,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -151,6 +152,13 @@ async def build(adapter) -> dict[str, str]:
     res = await adapter.get_mass_properties()
     print(f"  volume after cuts: {res.data.volume:.1f} mm^3")
     # expected: -6128 bore -8 sliver -8 pin -> ~4,824 mm^3
+
+    # Named bore axes for assembly mates (view-independent name selection):
+    # Axis1 = strap bore on the cam (origin), Axis2 = rocker pin bore (0, 127).
+    await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "strap bore")
+    await name_bore_axis(
+        adapter, "Right Plane", 0.0, "Top Plane", CENTER_DISTANCE, "rod pin bore"
+    )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
