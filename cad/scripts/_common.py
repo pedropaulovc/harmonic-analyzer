@@ -1065,9 +1065,9 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     # plain x-symmetric slab cornered at origin; explicit c avoids the
     # STL-bbox dependency for a part newer than the legacy export set
     "platen-paper": ("x", 129.75),
-    # flat z-extrusion (x-asymmetric slack run); explicit c = BAND_T/2,
-    # no STL yet at first build
-    "drive-chain": ("z", 2.25),
+    # sphere; explicit c, no STL yet at first build (the chain itself is a
+    # chain component pattern of these along the _chain.py loop)
+    "chain-bead": ("x", 0.0),
     # centred symmetric bar; explicit c, no STL yet at first build
     "wheel-bar": ("x", 0.0),
     # ch25 alignment-pinion set: every part exactly symmetric about its

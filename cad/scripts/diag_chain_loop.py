@@ -1,12 +1,12 @@
 r"""Diagnostic: find the exact constraint scheme for the chain centreline loop.
 
 One tangent-continuous loop (knob wrap arc, slack arc, crank wrap arc, taut
-line — build_drive_chain geometry at centreline radii, no band offsets),
-constraints added stepwise with a definition-state probe after each step.
-Earlier evidence: all 4 junction tangents explicit -> OVER-defined (SW
-auto-adds some at the merged tangent junctions); line-junction tangents
-only -> UNDER-defined. This pins down which junctions need explicit
-relations.
+line — the _chain.py centreline), constraints added stepwise with a
+definition-state probe after each step. Outcome (proven live): the single
+loop is fully defined by the two centre anchors, the three radial dims and
+ALL FOUR explicit junction tangents — the band's over-definition came from
+its two offset loops' concentric arc centres merging at creation and being
+double-anchored, not from SW auto-tangents.
 
 Run (SolidWorks already open)::
 
@@ -18,22 +18,22 @@ from __future__ import annotations
 import sys
 from typing import Any
 
-from _common import anchor_point_to_origin, check, run_build, set_sketch_direct_db
-from build_drive_chain import (
-    _BX,
-    _BY,
-    _CX,
-    _CY,
-    _GAX,
-    _GAY,
-    _GBX,
-    _GBY,
-    _TNX,
-    _TNY,
+from _chain import (
+    BX as _BX,
+    BY as _BY,
+    CX as _CX,
+    CY as _CY,
+    GAX as _GAX,
+    GAY as _GAY,
+    GBX as _GBX,
+    GBY as _GBY,
     SLACK_R,
+    TNX as _TNX,
+    TNY as _TNY,
     WRAP_R_A,
     WRAP_R_B,
 )
+from _common import anchor_point_to_origin, check, run_build, set_sketch_direct_db
 
 
 async def _state(adapter: Any) -> str:
