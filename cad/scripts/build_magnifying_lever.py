@@ -30,6 +30,7 @@ from _common import (
     apply_material,
     check,
     ensure_fully_defined,
+    name_bore_axis,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -118,6 +119,10 @@ async def build(adapter) -> dict[str, str]:
         "revolve rod",
         await adapter.create_revolve(RevolveParameters(angle=360.0)),
     )
+
+    # Named rod axis (local X through the origin = the revolve axis) so the rod
+    # rides the bracket collar as a revolute in the M6 mated-DOF assembly.
+    await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "rod axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
