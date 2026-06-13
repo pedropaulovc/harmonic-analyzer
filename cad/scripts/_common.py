@@ -110,10 +110,13 @@ async def ensure_fully_defined(
     error includes ``get_over_defining_relations()`` so the redundant anchor
     is identifiable without opening SolidWorks.
 
-    ``fix_entities`` + ``allow_fix_escalation=True`` re-enable the legacy
-    fix-escalation loop with a loud WARN — a migration-window escape hatch
-    only (fix-relation retirement, see cad/FIX_MIGRATION.md); both the flag
-    and the parameter are deleted at B3 close.
+    ``fix_entities`` + ``allow_fix_escalation=True`` enable the fix-escalation
+    loop with a loud WARN. The only legitimate users are the whitelisted
+    equation-driven gear-gap sketches (_gear.cut_tooth_gap and its cone/
+    removable variants): those curves re-solve from equation globals on
+    configuration changes, so no static relation/dimension scheme can define
+    them without breaking regeneration. Everything else anchors points to the
+    origin with semantic relations/dims.
     """
     async def _state() -> str | None:
         res = await adapter.check_sketch_fully_defined()
@@ -148,12 +151,15 @@ async def ensure_fully_defined(
             f"{label}: sketch not fully defined (state={state!r}){hint}"
         )
 
-    # Migration-window escape hatch: the legacy escalation, one entity at a
-    # time (fixing everything at once makes the driving dimensions redundant
+    # Whitelisted equation-curve path: escalate one entity at a time
+    # (fixing everything at once makes the driving dimensions redundant
     # and over-defines the sketch). "unknown" is kept fixable as a safety
     # net: the status probe can transiently fail (pywin32 property/method
     # resolution drift on GetConstrainedStatus) and a later read may recover.
-    print(f"  !!  WARN {label}: fix escalation is deprecated — migrate to semantic anchors")
+    print(
+        f"  !!  WARN {label}: fix escalation (equation-curve whitelist only"
+        " — anything else must use semantic anchors)"
+    )
     for entity_id in fix_entities:
         if state not in ("under_defined", "unknown"):
             break
