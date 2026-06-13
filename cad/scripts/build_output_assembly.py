@@ -119,15 +119,23 @@ from _common import (
     IN,
     OUT_SLDPRT,
     assert_component_placed,
+    angle_driver,
     assert_components_fully_defined,
     check,
     check_no_interference,
+    coincident_mate,
     component_names,
     component_transform,
+    distance_driver,
+    lock_mate,
     log,
     mirror_placement,
+    named_ref,
+    place_component,
     run_build,
     save_assembly_and_images,
+    spin_driver,
+    world_point,
 )
 
 ASM_NAME = "output"
@@ -144,6 +152,7 @@ COLUMN_Z = -112.0
 
 # --- counter-spring chain (build_boss_hook / build_counter_spring) ----------
 from build_boss_hook import ELBOW_R, ROD_DIA as HOOK_ROD_DIA, SHANK_RISE  # noqa: E402
+from build_summing_lever import HOOK_HOLE_X as SL_SPIN_REF_X  # noqa: E402
 from build_counter_spring import (  # noqa: E402
     BOTTOM_LEAD as CS_BOTTOM_LEAD,
     COIL_OD as CS_COIL_OD,
@@ -312,6 +321,12 @@ ROT_X_NEG90 = [[1.0, 0.0, 0.0], [0.0, 0.0, -1.0], [0.0, 1.0, 0.0]]
 def rot_z_rows(deg: float) -> list[list[float]]:
     c, s = math.cos(math.radians(deg)), math.sin(math.radians(deg))
     return [[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]]
+
+
+def _org(adapter, name: str) -> list[float]:
+    """A component's current origin (mm) in the assembly frame."""
+    a = component_transform(adapter, name)
+    return [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
 
 
 def _part(name: str) -> str:
@@ -551,28 +566,55 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_assembly", await adapter.create_assembly())
 
-    # --- summing group (first insert auto-fixes) ----------------------------
-    await _place(adapter, "summing-lever", [KNIFE[0], KNIFE[1], 0.0],
-                 [0.0, 0.0, 0.0], IDENTITY)
-    await _place(adapter, "knife-mount", [KNIFE[0], KNIFE[1], 0.0],
-                 [0.0, 0.0, 0.0], IDENTITY)
+    # --- summing group ------------------------------------------------------
+    # knife-mount FIRST so the auto-fixed assembly seed is structure, not the
+    # mated summing lever.
+    km = await place_component(adapter, "knife-mount", [KNIFE[0], KNIFE[1], 0.0],
+                               [0.0, 0.0, 0.0], IDENTITY)
     # Crossbar band y 1010..1051: 0.5 above the summing-lever tube top
     # (1009.5), ends face-flush on the ring rail inner faces (y to 1040.7),
     # stud pokes 14 above for the nut seat.
-    await _place(adapter, "top-crossbar", [KNIFE[0], 1010.0, 0.0],
-                 [0.0, 0.0, 0.0], IDENTITY)
-    await _place(adapter, "knife-stay", [0.0, 1086.0, 0.0],
-                 [0.0, 0.0, 0.0], IDENTITY)
-    await _place(adapter, "boss-hook", list(BOSS_HOOK_POS),
-                 [0.0, 0.0, 0.0], IDENTITY)
+    await place_component(adapter, "top-crossbar", [KNIFE[0], 1010.0, 0.0],
+                          [0.0, 0.0, 0.0], IDENTITY)
+    await place_component(adapter, "knife-stay", [0.0, 1086.0, 0.0],
+                          [0.0, 0.0, 0.0], IDENTITY)
+    # Summing lever: knife-edge revolute = coincident axis-to-axis on the knife
+    # line (the bore-bottom rocking edge) + a Front-plane axial coincident,
+    # leaving the rock DOF, pinned by a suppressible spin-snapshot driver via
+    # the boss "spin ref" axis. This is the part the counter spring + channel
+    # springs drive in the M6 Motion study.
+    sl = await place_component(adapter, "summing-lever", [KNIFE[0], KNIFE[1], 0.0],
+                               [0.0, 0.0, 0.0], IDENTITY, ground=False)
+    sl_o = _org(adapter, sl)
+    # summing-lever: Axis1 = knife axis, Axis2 = spin ref (creation order).
+    await coincident_mate(adapter, named_ref(f"Axis1@{sl}", "AXIS"),
+                          named_ref(f"Axis1@{km}", "AXIS"),
+                          label="summing-lever knife pivot", verify=(sl, sl_o))
+    # Axial Z-slide pinned by a Front-plane distance (value 0: the lever sits on
+    # the assembly Front plane). Then the rock (Rz about the knife line) is the
+    # suppressible snapshot driver -- an ANGLE between Right planes, NOT the
+    # off-axis spin_driver: the boss "spin ref" sits directly -X of the pivot
+    # (Δy=0), so its distance-to-Top is degenerate and over-defines, whereas the
+    # angle is well-conditioned and (inserted on-solution) holds without a flip.
+    await distance_driver(adapter, named_ref(f"Front Plane@{sl}", "PLANE"),
+                          named_ref("Front Plane", "PLANE"), abs(sl_o[2]),
+                          label="summing-lever axial", verify=(sl, sl_o))
+    await angle_driver(adapter, named_ref(f"Right Plane@{sl}", "PLANE"),
+                       named_ref("Right Plane", "PLANE"), 0.0,
+                       label="summing-lever rock snapshot", verify=(sl, sl_o))
+    # Boss hook: rigidly rides the lever (locked), carrying the counter spring.
+    bh = await place_component(adapter, "boss-hook", list(BOSS_HOOK_POS),
+                               [0.0, 0.0, 0.0], IDENTITY, ground=False)
+    await lock_mate(adapter, named_ref(f"Axis1@{bh}", "AXIS"),
+                    named_ref(f"Axis1@{sl}", "AXIS"), label="boss-hook keyed")
     # Ry(+90): the end loops land in the YZ plane, encircling the hook arm
     # (bottom) and the gooseneck pin (top) nail-through-ring style.
-    await _place(adapter, "counter-spring", list(SPRING_POS),
-                 [0.0, 90.0, 0.0], ROT_Y_POS90)
-    await _place(adapter, "gooseneck", [COLUMN_X, 1210.0, 0.0],
-                 [0.0, 0.0, 0.0], IDENTITY)
-    await _place(adapter, "gooseneck-clamp", [COLUMN_X, 1040.7, 0.0],
-                 [0.0, 0.0, 0.0], IDENTITY)
+    await place_component(adapter, "counter-spring", list(SPRING_POS),
+                          [0.0, 90.0, 0.0], ROT_Y_POS90)
+    await place_component(adapter, "gooseneck", [COLUMN_X, 1210.0, 0.0],
+                          [0.0, 0.0, 0.0], IDENTITY)
+    await place_component(adapter, "gooseneck-clamp", [COLUMN_X, 1040.7, 0.0],
+                          [0.0, 0.0, 0.0], IDENTITY)
 
     # --- magnifying group ----------------------------------------------------
     await _place(adapter, "magnifying-bracket", [-40.0, LEVER_ROD_Y, LEVER_ROD_Z],

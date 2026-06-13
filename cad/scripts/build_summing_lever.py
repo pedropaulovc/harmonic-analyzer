@@ -47,6 +47,7 @@ from _common import (
     define_rectilinear_chain,
     ensure_fully_defined,
     extrude_at_offset,
+    name_bore_axis,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -311,6 +312,14 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(
             f"hook hole: removed {removed:.1f}, expected ~{v_hole:.1f}"
         )
+
+    # Named axes for the M6 mated-DOF assembly. "knife axis" is the local Z
+    # through the origin = the bore-bottom knife line (the rocking pivot,
+    # coincident with the knife-mount's edge). "spin ref" is an off-pivot
+    # Z-parallel reference at the boss x, for the suppressible spin-snapshot
+    # driver that pins the lever's rock angle in artifact A.
+    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "knife axis")
+    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", HOOK_HOLE_X, "spin ref")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
