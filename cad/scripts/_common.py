@@ -1442,6 +1442,8 @@ async def _add_mate(
     alignment: str = "closest",
     lock_rotation: bool = False,
     gear_ratio: Iterable[float] | None = None,
+    pinion_pitch_diameter: float = 0.0,
+    rack_travel_per_revolution: float = 0.0,
     flip: bool = False,
 ) -> Any:
     from solidworks_mcp.adapters.base import AddMateParameters
@@ -1456,6 +1458,8 @@ async def _add_mate(
             angle=angle,
             lock_rotation=lock_rotation,
             gear_ratio=list(gear_ratio) if gear_ratio else [],
+            pinion_pitch_diameter=pinion_pitch_diameter,
+            rack_travel_per_revolution=rack_travel_per_revolution,
         )
     )
 
@@ -1707,6 +1711,35 @@ async def cam_follower_mate(
 ) -> Any:
     """Cam-follower mate; the adapter applies the cam selection mark (8)."""
     return await _mate(adapter, label, "cam_follower", [cam_ref, follower_ref])
+
+
+async def rack_pinion_mate(
+    adapter: Any,
+    rack_ref: Any,
+    pinion_ref: Any,
+    *,
+    pinion_pitch_diameter: float = 0.0,
+    rack_travel_per_revolution: float = 0.0,
+    label: str = "rack_pinion",
+    verify: tuple[str, list[float]] | None = None,
+) -> Any:
+    """Rack-pinion mate coupling a linear rack to a rotating pinion.
+
+    ``rack_ref`` selects a linear rack edge/axis, ``pinion_ref`` the pinion's
+    cylindrical face/axis. Set EITHER ``pinion_pitch_diameter`` (mm) OR
+    ``rack_travel_per_revolution`` (mm) -- the adapter writes it into the mate
+    definition (AddMate5 has no parameter for it). Verify the feed direction
+    with a kinematic rotate, per the plan's gear-ratio risk.
+    """
+    return await _mate(
+        adapter,
+        label,
+        "rack_pinion",
+        [rack_ref, pinion_ref],
+        pinion_pitch_diameter=pinion_pitch_diameter,
+        rack_travel_per_revolution=rack_travel_per_revolution,
+        verify=verify,
+    )
 
 
 async def place_component(
