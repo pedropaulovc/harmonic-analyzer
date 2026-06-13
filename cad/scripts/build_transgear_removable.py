@@ -339,6 +339,11 @@ async def build(adapter) -> dict[str, str]:
     # two drive-pin holes on the +/-X axis.
     # ------------------------------------------------------------------
     check("create_sketch bore+pins", await adapter.create_sketch("Front"))
+    # Direct-to-DB: the on-axis-revolved blank leaves its seam edge along +X
+    # on this face, exactly under the pin centres -- creation-time inference
+    # snaps the circles to it and the auto-relation then makes every driving
+    # point-pair dim fail (diag_onaxis_pin.py scenarios G/H vs I).
+    set_sketch_direct_db(adapter, True)
     await define_circle(adapter, 0.0, 0.0, BORE_DIAMETER / 2.0, "bore")
     await define_circle(
         adapter, PIN_CIRCLE_RADIUS, 0.0, PIN_HOLE_DIAMETER / 2.0, "pin hole +X"
@@ -346,6 +351,7 @@ async def build(adapter) -> dict[str, str]:
     await define_circle(
         adapter, -PIN_CIRCLE_RADIUS, 0.0, PIN_HOLE_DIAMETER / 2.0, "pin hole -X"
     )
+    set_sketch_direct_db(adapter, False)
     await ensure_fully_defined(adapter, "bore+pins sketch")
     check("exit_sketch bore+pins", await adapter.exit_sketch())
     check(
