@@ -1327,12 +1327,17 @@ def assert_component_placed(
 
 
 def assert_components_fully_defined(adapter: Any) -> None:
-    """Raise when any top-level component is neither fixed nor fully defined.
+    """Raise when any top-level component is neither fixed, fully defined,
+    nor a pattern instance.
 
     ``IComponent2::GetConstrainedStatus`` returns swConstrainedStatus_e
-    (2 = under, 3 = fully, 4 = over constrained). ``GetComponents`` hands
-    back unflagged dispatches, so the IComponent2 methods must be flagged
-    first or the call resolves as a property and raises.
+    (2 = under, 3 = fully, 4 = over constrained). Component-pattern
+    instances (chain pattern beads) report under-constrained even though
+    the owning feature drives their transforms -- ``IsPatternInstance``
+    exempts them; their actual positions are gate-asserted by the pattern
+    creator. ``GetComponents`` hands back unflagged dispatches, so the
+    IComponent2 methods must be flagged first or the call resolves as a
+    property and raises.
     """
     asm = adapter.currentModel
     components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
@@ -1343,6 +1348,11 @@ def assert_components_fully_defined(adapter: Any) -> None:
         comp_name = str(_read_member(component, "Name2"))
         if bool(_read_member(component, "IsFixed")):
             log(f"{comp_name}: fixed")
+            continue
+        if bool(
+            adapter._attempt(lambda c=component: c.IsPatternInstance(), default=False)
+        ):
+            log(f"{comp_name}: pattern instance (feature-driven)")
             continue
         status = int(
             adapter._attempt(lambda c=component: c.GetConstrainedStatus(), default=-1)

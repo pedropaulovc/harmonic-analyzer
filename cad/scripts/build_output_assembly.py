@@ -556,6 +556,16 @@ async def _insert_bead_chain(adapter) -> None:
         BEAD_PITCH, BEAD_COUNT,
     )
     blank_sketch(adapter, sketch_name)
+    # The instances are feature-driven (IsPatternInstance exempts them from
+    # the DOF gate); the seed itself is not -- fix it now that the pattern
+    # exists. The back-read below covers the seed too, so a fix-vs-pattern
+    # displacement would be caught immediately.
+    from solidworks_mcp.adapters.base import ComponentRefParameters
+
+    check(
+        "fix chain-bead seed",
+        await adapter.fix_component(ComponentRefParameters(name=seed_name)),
+    )
 
     beads = [n for n in component_names(adapter) if n.startswith("chain-bead")]
     if len(beads) != BEAD_COUNT:
