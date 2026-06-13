@@ -494,19 +494,18 @@ async def add_spring_end_hooks(
     rebuilt flipped and the sweep retried (the dead sketch/plane stay in
     the tree -- harmless, never consumed).
 
-    The path is drawn as two equation-driven curves, not add_line/add_arc:
-    a ``fix`` on a line or arc pins the curve but its endpoints still slide
-    along the fixed locus, so the sketch stays under-defined (caught live
-    on this path -- the loop's open end has a genuine DOF). Fixed equation
-    curves have no free endpoints (the gear-gap recipe). Expressions are in
-    document units (inches), trig in radians.
+    The path is a vertical lead line plus a tangent 270-degree arc.
+    (Historically these were equation-driven curves: a ``fix`` on a line
+    or arc pins the curve but its endpoints still slide along the fixed
+    locus. With sketch points addressable the path is defined
+    semantically -- the loop's one genuine DOF, the open end's angle, is
+    pinned by a ``vertical_points`` relation to the loop centre.)
 
     Each sweep is volume-asserted: Pappus gives the exact added volume for
     a planar path; the junction where the hook tube merges into the coil
     end may absorb up to a full Steinmetz lens (16 r^3 / 3).
     """
     from solidworks_mcp.adapters.base import (
-        CreateEquationCurveParameters,
         CreatePlaneParameters,
         SweepParameters,
     )
@@ -529,20 +528,6 @@ async def add_spring_end_hooks(
         await ensure_fully_defined(adapter, f"{label} hook profile")
         check(f"exit_sketch {label} hook profile", await adapter.exit_sketch())
 
-    def fmt(value_mm: float) -> str:
-        return f"{value_mm / IN:.12g}"  # document units are inches
-
-    async def _curve(label: str, x_expr: str, y_expr: str) -> str:
-        res = await adapter.create_equation_driven_curve(
-            CreateEquationCurveParameters(
-                x_expression=x_expr,
-                y_expression=y_expr,
-                range_start="0",
-                range_end="1",
-            )
-        )
-        return check(f"curve {label}", res)
-
     for (label, y_end, d), lead in zip(
         (("bottom", 0.0, -1.0), ("top", body_length, 1.0)), lead_by_end, strict=True
     ):
@@ -552,29 +537,68 @@ async def add_spring_end_hooks(
         v_hook = (lead + 1.5 * math.pi * loop_r) * wire_area
         p1 = (mean_radius, y_end + d * lead)
         c = (mean_radius - loop_r, p1[1])
+        open_pt = (c[0], c[1] - d * loop_r)  # 270 deg around from the junction
         path_name = check(
             f"create_sketch {label} hook path", await adapter.create_sketch("Front")
         )
-        lead_line = await _curve(
+        set_sketch_direct_db(adapter, True)
+        lead_line = check(
             f"{label} hook lead",
-            f"{fmt(mean_radius)} + 0 * t",
-            f"{fmt(y_end)} + {fmt(d * lead)} * t",
+            await adapter.add_line(mean_radius, y_end, p1[0], p1[1]),
         )
-        sweep_rad = d * 1.5 * math.pi  # 270 deg from angle 0 at the junction
-        loop_arc = await _curve(
-            f"{label} hook loop",
-            f"{fmt(c[0])} + {fmt(loop_r)} * cos({sweep_rad:.12g} * t)",
-            f"{fmt(c[1])} + {fmt(loop_r)} * sin({sweep_rad:.12g} * t)",
+        # add_arc draws CCW: below the coil (d < 0) the 270-degree loop runs
+        # open end -> junction, above it junction -> open end.
+        if d < 0:
+            loop_arc = check(
+                f"{label} hook loop",
+                await adapter.add_arc(
+                    c[0], c[1], open_pt[0], open_pt[1], p1[0], p1[1]
+                ),
+            )
+            open_ref = f"{loop_arc}.start"
+        else:
+            loop_arc = check(
+                f"{label} hook loop",
+                await adapter.add_arc(
+                    c[0], c[1], p1[0], p1[1], open_pt[0], open_pt[1]
+                ),
+            )
+            open_ref = f"{loop_arc}.end"
+        set_sketch_direct_db(adapter, False)
+        # 7-DOF path (line 4 + arc 5 - the merged junction): vertical lead
+        # anchored to the origin with its length dimensioned, tangency at
+        # the junction, the loop radius, and the open end pinned directly
+        # across the loop centre (the arc's radius intrinsic does the rest).
+        check(
+            f"{label} hook lead vertical",
+            await adapter.add_sketch_constraint(lead_line, None, "vertical"),
         )
-        # Equation-driven curves are the whitelist candidate for fix
-        # (no free endpoints to dimension); B3 attempts a semantic scheme
-        # before keeping this escalation (cad/FIX_MIGRATION.md).
-        await ensure_fully_defined(
+        await anchor_point_to_origin(
             adapter,
-            f"{label} hook path",
-            fix_entities=[lead_line, loop_arc],
-            allow_fix_escalation=True,
+            f"{lead_line}.start",
+            mean_radius,
+            y_end,
+            f"{label} hook lead start",
         )
+        check(
+            f"{label} hook lead length",
+            await adapter.add_sketch_dimension(lead_line, None, "linear", lead),
+        )
+        check(
+            f"{label} hook tangent",
+            await adapter.add_sketch_constraint(lead_line, loop_arc, "tangent"),
+        )
+        check(
+            f"{label} hook loop radius",
+            await adapter.add_sketch_dimension(loop_arc, None, "radial", loop_r),
+        )
+        check(
+            f"{label} hook open end over centre",
+            await adapter.add_sketch_constraint(
+                open_ref, f"{loop_arc}.center", "vertical_points"
+            ),
+        )
+        await ensure_fully_defined(adapter, f"{label} hook path")
         check(f"exit_sketch {label} hook path", await adapter.exit_sketch())
 
         if d > 0:
