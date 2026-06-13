@@ -31,9 +31,11 @@ import sys
 
 from _common import (
     add_line_chain,
+    anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
+    define_rectilinear_chain,
     ensure_fully_defined,
     extrude_at_offset,
     report_mass_properties,
@@ -79,19 +81,32 @@ async def build(adapter) -> dict[str, str]:
         "collar centerline",
         await adapter.add_centerline(-COLLAR_HALF_LEN, 0.0, COLLAR_HALF_LEN, 0.0),
     )
-    profile = await add_line_chain(
-        adapter,
-        [
-            (-COLLAR_HALF_LEN, COLLAR_BORE / 2.0),
-            (COLLAR_HALF_LEN, COLLAR_BORE / 2.0),
-            (COLLAR_HALF_LEN, COLLAR_OD / 2.0),
-            (-COLLAR_HALF_LEN, COLLAR_OD / 2.0),
-        ],
-    )
+    profile_rect = [
+        (-COLLAR_HALF_LEN, COLLAR_BORE / 2.0),
+        (COLLAR_HALF_LEN, COLLAR_BORE / 2.0),
+        (COLLAR_HALF_LEN, COLLAR_OD / 2.0),
+        (-COLLAR_HALF_LEN, COLLAR_OD / 2.0),
+    ]
+    profile = await add_line_chain(adapter, profile_rect)
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(
-        adapter, "collar sketch", fix_entities=[centerline, *profile]
+    await define_rectilinear_chain(adapter, profile, profile_rect, label="collar")
+    # The centerline shares no vertex with the off-axis profile rectangle,
+    # so it carries its own scheme: horizontal on the axis, length dim,
+    # start anchored to the origin.
+    check(
+        "centerline horizontal",
+        await adapter.add_sketch_constraint(centerline, None, "horizontal"),
     )
+    check(
+        "centerline length",
+        await adapter.add_sketch_dimension(
+            centerline, None, "linear", 2.0 * COLLAR_HALF_LEN
+        ),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{centerline}.start", -COLLAR_HALF_LEN, 0.0, "centerline start"
+    )
+    await ensure_fully_defined(adapter, "collar sketch")
     check("exit_sketch collar", await adapter.exit_sketch())
     check(
         "revolve collar", await adapter.create_revolve(RevolveParameters(angle=360.0))
@@ -109,16 +124,15 @@ async def build(adapter) -> dict[str, str]:
 
     # 2. Arm from the collar shell toward the plate (+Z), Top sketch.
     check("create_sketch arm", await adapter.create_sketch("Top"))
-    arm = await add_line_chain(
-        adapter,
-        [
-            (-ARM_HALF_X, -ARM_Z[1]),
-            (ARM_HALF_X, -ARM_Z[1]),
-            (ARM_HALF_X, -ARM_Z[0]),
-            (-ARM_HALF_X, -ARM_Z[0]),
-        ],
-    )
-    await ensure_fully_defined(adapter, "arm sketch", fix_entities=arm)
+    arm_rect = [
+        (-ARM_HALF_X, -ARM_Z[1]),
+        (ARM_HALF_X, -ARM_Z[1]),
+        (ARM_HALF_X, -ARM_Z[0]),
+        (-ARM_HALF_X, -ARM_Z[0]),
+    ]
+    arm = await add_line_chain(adapter, arm_rect)
+    await define_rectilinear_chain(adapter, arm, arm_rect, label="arm")
+    await ensure_fully_defined(adapter, "arm sketch")
     check("exit_sketch arm", await adapter.exit_sketch())
     extrude_at_offset(adapter, ARM_Y[1] - ARM_Y[0], ARM_Y[0])
     v_arm = 2.0 * ARM_HALF_X * (ARM_Z[1] - ARM_Z[0]) * (ARM_Y[1] - ARM_Y[0])
@@ -132,16 +146,15 @@ async def build(adapter) -> dict[str, str]:
 
     # 3. Flange under the plate's front edge.
     check("create_sketch flange", await adapter.create_sketch("Top"))
-    flange = await add_line_chain(
-        adapter,
-        [
-            (FLANGE_X[0], -FLANGE_Z[1]),
-            (FLANGE_X[1], -FLANGE_Z[1]),
-            (FLANGE_X[1], -FLANGE_Z[0]),
-            (FLANGE_X[0], -FLANGE_Z[0]),
-        ],
-    )
-    await ensure_fully_defined(adapter, "flange sketch", fix_entities=flange)
+    flange_rect = [
+        (FLANGE_X[0], -FLANGE_Z[1]),
+        (FLANGE_X[1], -FLANGE_Z[1]),
+        (FLANGE_X[1], -FLANGE_Z[0]),
+        (FLANGE_X[0], -FLANGE_Z[0]),
+    ]
+    flange = await add_line_chain(adapter, flange_rect)
+    await define_rectilinear_chain(adapter, flange, flange_rect, label="flange")
+    await ensure_fully_defined(adapter, "flange sketch")
     check("exit_sketch flange", await adapter.exit_sketch())
     extrude_at_offset(adapter, FLANGE_Y[1] - FLANGE_Y[0], FLANGE_Y[0])
     v_flange = (
