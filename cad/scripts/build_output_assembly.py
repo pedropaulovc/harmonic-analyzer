@@ -693,22 +693,55 @@ async def build(adapter) -> dict[str, str]:
                        label="magnifying-wheel rock snapshot", verify=(wh, wh_o))
 
     # --- platen group ---------------------------------------------------------
-    await _place(adapter, "platen", [PLATE_X0, PLATE_Y0, PLATE_FRONT_Z],
-                 [0.0, 0.0, 0.0], IDENTITY)
+    # The platen runs as a prismatic slider along X (the paper feed): its local
+    # slide axis is held parallel to the Top + Front planes at the slide-line
+    # offsets (axis-to-plane distance, no rotational redundancy), an angle
+    # snapshot kills the residual spin, and an X distance snapshot pins the
+    # feed position (suppressed in the Motion study). Probed FULLY(3),
+    # probe_platen.py. The rack, clips and paper ride it via Lock mates; the
+    # transgear cluster stays fixed (parked/disengaged in the ch30 rest state,
+    # and the roller chain breaks the kinematic path -- the crank->platen feed
+    # is driven directly in artifact B's Motion study).
+    platen = await place_component(adapter, "platen",
+                                   [PLATE_X0, PLATE_Y0, PLATE_FRONT_Z],
+                                   [0.0, 0.0, 0.0], IDENTITY, ground=False)
+    pl_o = _org(adapter, platen)
+    await distance_driver(adapter, named_ref(f"Axis1@{platen}", "AXIS"),
+                          named_ref("Top Plane", "PLANE"), abs(pl_o[1]),
+                          label="platen slide height", verify=(platen, pl_o))
+    await distance_driver(adapter, named_ref(f"Axis1@{platen}", "AXIS"),
+                          named_ref("Front Plane", "PLANE"), abs(pl_o[2]),
+                          label="platen slide depth", verify=(platen, pl_o))
+    await angle_driver(adapter, named_ref(f"Top Plane@{platen}", "PLANE"),
+                       named_ref("Top Plane", "PLANE"), 0.0,
+                       label="platen spin snapshot", verify=(platen, pl_o))
+    await distance_driver(adapter, named_ref(f"Right Plane@{platen}", "PLANE"),
+                          named_ref("Right Plane", "PLANE"), abs(pl_o[0]),
+                          label="platen feed snapshot", verify=(platen, pl_o))
     # Rz(180): teeth point down at the rack pinion below.
-    await _place(adapter, "platen-rack", [RACK_X0, RACK_Y0, BAR_FRONT_Z],
-                 [0.0, 0.0, 180.0], rot_z_rows(180.0))
+    rack = await place_component(adapter, "platen-rack",
+                                 [RACK_X0, RACK_Y0, BAR_FRONT_Z],
+                                 [0.0, 0.0, 180.0], rot_z_rows(180.0), ground=False)
+    await lock_mate(adapter, named_ref(f"Front Plane@{rack}", "PLANE"),
+                    named_ref(f"Front Plane@{platen}", "PLANE"),
+                    label="platen-rack locked to platen")
     for dx in CLIP_FRONT_DX:
         # Rz(+90): the clip strip stands vertical on the paper face.
-        await _place(adapter, "platen-clip",
-                     [PLATE_X0 + dx, CLIP_Y0, PLATE_FRONT_Z - 1.2],
-                     [0.0, 0.0, 90.0], rot_z_rows(90.0),
-                     label=f"platen-clip x{PLATE_X0 + dx:+.0f}")
+        clip = await place_component(adapter, "platen-clip",
+                                     [PLATE_X0 + dx, CLIP_Y0, PLATE_FRONT_Z - 1.2],
+                                     [0.0, 0.0, 90.0], rot_z_rows(90.0), ground=False,
+                                     label=f"platen-clip x{PLATE_X0 + dx:+.0f}")
+        await lock_mate(adapter, named_ref(f"Front Plane@{clip}", "PLANE"),
+                        named_ref(f"Front Plane@{platen}", "PLANE"),
+                        label=f"platen-clip x{PLATE_X0 + dx:+.0f} locked to platen")
     # Recording paper on the platen front face (ch30 p002/p003/p009): 0.5
     # proud of the platen, 2.25 clear of each clip band, 6 top/bottom margin.
-    await _place(adapter, "platen-paper",
-                 [PLATE_X0 + 20.25, PLATE_Y0 + 6.0, PLATE_FRONT_Z - 0.5],
-                 [0.0, 0.0, 0.0], IDENTITY)
+    paper = await place_component(adapter, "platen-paper",
+                                  [PLATE_X0 + 20.25, PLATE_Y0 + 6.0, PLATE_FRONT_Z - 0.5],
+                                  [0.0, 0.0, 0.0], IDENTITY, ground=False)
+    await lock_mate(adapter, named_ref(f"Front Plane@{paper}", "PLANE"),
+                    named_ref(f"Front Plane@{platen}", "PLANE"),
+                    label="platen-paper locked to platen")
 
     # --- transgear group ------------------------------------------------------
     await _place(adapter, "a-frame", [0.0, 50.8, -111.0],
