@@ -1374,6 +1374,7 @@ def create_chain_component_pattern(
     axis_name: str,
     align_plane_name: str,
     spacing_mm: float,
+    instance_count: int,
 ) -> int:
     """Create a Distance-method chain component pattern; return InstanceCount.
 
@@ -1385,11 +1386,13 @@ def create_chain_component_pattern(
     ``seed_component`` is the component Name2 (e.g. ``chain-bead-1``);
     ``axis_name``/``align_plane_name`` are part-local feature names inside
     it -- the doc-title select suffix is derived here (an unsaved assembly
-    is still ``AssemN``). Distance pitch method, fill path, align to seed,
-    STATIC (instances sit at the pattern spacing, not draggable). The seed
-    component must be UNFIXED -- the pattern drives it onto the path. The
-    returned InstanceCount is SolidWorks' own fill count; callers should
-    still gate on the actual component list."""
+    is still ``AssemN``). Distance pitch method with an EXPLICIT
+    ``instance_count`` (FillPath under-filled a closed loop live: 61 of 63
+    beads), align to seed, STATIC (instances sit at the pattern spacing,
+    not draggable). The seed component must be UNFIXED -- the pattern
+    drives it onto the path. The returned InstanceCount is read back from
+    the created feature; callers should still gate on the actual component
+    list."""
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
     model = adapter.currentModel
@@ -1420,8 +1423,9 @@ def create_chain_component_pattern(
     data.PitchMethod = 0  # swChainPatternDistance
     data.AlignMethod = 0  # swChainPatternAlignToSeed
     data.Options = 0  # swChainPatternStatic
+    data.FillPath = False  # InstanceCount is only honoured with fill off
+    data.InstanceCount = instance_count
     data.Spacing = spacing_mm / 1000.0
-    data.FillPath = True
     feature = manager.CreateFeature(data)
     model.ClearSelection2(True)
     if feature is None:
