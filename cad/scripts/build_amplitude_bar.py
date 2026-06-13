@@ -41,6 +41,7 @@ from _common import (
     ensure_fully_defined,
     feature_name_by_type,
     measure_check,
+    name_bore_axis,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -189,6 +190,14 @@ async def build(adapter) -> dict[str, str]:
         )
     else:
         raise RuntimeError("top pin hole cut removed no material on either side")
+
+    # Named bore axis for the top-pin joint (concentric to the channel lever's
+    # bar pin). The hole runs along local X at (y = pin_y, z = mid-depth), so
+    # the axis is (Top + pin_y) ∩ (Front + depth/2) -- view-independent name
+    # selection (the bore wall never picks by screen-projected point).
+    await name_bore_axis(
+        adapter, "Top Plane", pin_y, "Front Plane", BAR_DEPTH / 2.0, "top pin bore"
+    )
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, BAR_STEEL)  # ch30 plates: see _common palette
