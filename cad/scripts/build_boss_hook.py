@@ -37,6 +37,7 @@ from _common import (
     define_circle,
     dimension_between,
     ensure_fully_defined,
+    name_bore_axis,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -128,6 +129,11 @@ async def build(adapter) -> dict[str, str]:
     print(f"  volume: {vol:.1f} mm^3 (Pappus {v_expected:.1f})")
     if abs(vol - v_expected) > 0.02 * v_expected:
         raise RuntimeError(f"hook volume {vol:.1f} != Pappus {v_expected:.1f}")
+
+    # Named shank axis (local Y through the origin) so the hook locks to the
+    # summing lever and rides it (the counter spring pulls through the hook in
+    # the M6 Motion study).
+    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "shank axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

@@ -37,6 +37,7 @@ from _common import (
     define_rectilinear_chain,
     ensure_fully_defined,
     extrude_at_offset,
+    name_bore_axis,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -160,6 +161,10 @@ async def build(adapter) -> dict[str, str]:
     print(f"  volume after stud: {vol:.1f} mm^3 (+{added:.1f}, net {v_net:.1f})")
     if abs(added - v_net) > 0.02 * v_net:
         raise RuntimeError(f"stud: added {added:.1f}, expected {v_net:.1f}")
+
+    # Named axis = local Z through the origin = the diamond knife edge line,
+    # which the summing lever's bore-bottom rocks on (M6 mated-DOF revolute).
+    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "knife axis")
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)  # ch30 plates: see _common palette
