@@ -1372,6 +1372,51 @@ def bore_axis_ref(point_mm: list[float], entity_type: str = "FACE") -> Any:
     return MateEntityRef(entity_type=entity_type, point=list(point_mm))
 
 
+async def name_bore_axis(
+    adapter: Any,
+    plane_a: str,
+    offset_a: float,
+    plane_b: str,
+    offset_b: float,
+    label: str,
+) -> str:
+    """Create a named reference axis through a bore, view-independently.
+
+    The axis is the intersection of two planes, each either a principal plane
+    (``offset`` 0, used by name) or a plane offset from one. Coordinate
+    face/edge selection is view-dependent (``SelectByID2`` picks at the screen
+    projection), so an internal/occluded bore wall never selects by point; a
+    name-selected axis does. Assembly mates then pick the axis as
+    ``named_ref("Axis<N>@<comp>", "AXIS")``.
+
+    Returns the new axis's resolved name (e.g. ``"Axis1"``).
+    """
+    from solidworks_mcp.adapters.base import (
+        CreateAxisParameters,
+        CreatePlaneParameters,
+    )
+
+    planes: list[str] = []
+    for base, off, tag in ((plane_a, offset_a, "A"), (plane_b, offset_b, "B")):
+        if abs(off) < 1e-9:
+            planes.append(base)
+            continue
+        planes.append(
+            check(
+                f"plane {label} {tag} ({base} + {off:g})",
+                await adapter.create_plane(
+                    CreatePlaneParameters(mode="offset", base_plane=base, offset=off)
+                ),
+            ).name
+        )
+    return check(
+        f"axis {label} ({planes[0]} ∩ {planes[1]})",
+        await adapter.create_axis(
+            CreateAxisParameters(mode="two_planes", planes=planes)
+        ),
+    ).name
+
+
 async def _add_mate(
     adapter: Any,
     kind: str,
