@@ -775,14 +775,40 @@ async def build(adapter) -> dict[str, str]:
     await _insert_roller_chain(adapter)
 
     # --- pen group ------------------------------------------------------------
+    # The pen carriage (rod + marker) slides vertically through the fixed
+    # v-block bores: the magnifying wheel's wire (flexible, not modeled as
+    # geometry -- DIMENSIONS.md ch24) raises/lowers it to trace the curve. The
+    # rod runs as a Y-prismatic -- its local slide axis held parallel to the
+    # Front + Right planes (axis-to-plane distance, no rotational overlap), an
+    # angle(Front) snapshot killing spin, a Y distance snapshot pinning travel
+    # (this is the compliant-chain snapshot the wire would set; suppressed in
+    # the Motion study, where the wheel-rim->rod coupling drives it). The marker
+    # rides the rod via a Lock mate. Probed FULLY(3), probe_pen.py.
     await _place(adapter, "pen-hanger", list(HANGER_POS),
-                 [0.0, 0.0, 0.0], IDENTITY)
-    await _place(adapter, "pen-rod", list(PEN_ROD_POS),
                  [0.0, 0.0, 0.0], IDENTITY)
     await _place(adapter, "pen-v-block", list(VBLOCK_POS),
                  [0.0, 0.0, 0.0], IDENTITY)
-    await _place(adapter, "pen-marker", [MARKER_X, MARKER_TIP_Y, PEN_Z_MID],
-                 [0.0, 0.0, 0.0], IDENTITY)
+    pen_rod = await place_component(adapter, "pen-rod", list(PEN_ROD_POS),
+                                    [0.0, 0.0, 0.0], IDENTITY, ground=False)
+    rod_o = _org(adapter, pen_rod)
+    await distance_driver(adapter, named_ref(f"Axis1@{pen_rod}", "AXIS"),
+                          named_ref("Front Plane", "PLANE"), abs(rod_o[2]),
+                          label="pen-rod slide depth", verify=(pen_rod, rod_o))
+    await distance_driver(adapter, named_ref(f"Axis1@{pen_rod}", "AXIS"),
+                          named_ref("Right Plane", "PLANE"), abs(rod_o[0]),
+                          label="pen-rod slide across", verify=(pen_rod, rod_o))
+    await angle_driver(adapter, named_ref(f"Front Plane@{pen_rod}", "PLANE"),
+                       named_ref("Front Plane", "PLANE"), 0.0,
+                       label="pen-rod spin snapshot", verify=(pen_rod, rod_o))
+    await distance_driver(adapter, named_ref(f"Top Plane@{pen_rod}", "PLANE"),
+                          named_ref("Top Plane", "PLANE"), abs(rod_o[1]),
+                          label="pen-rod travel snapshot", verify=(pen_rod, rod_o))
+    pen_marker = await place_component(adapter, "pen-marker",
+                                       [MARKER_X, MARKER_TIP_Y, PEN_Z_MID],
+                                       [0.0, 0.0, 0.0], IDENTITY, ground=False)
+    await lock_mate(adapter, named_ref(f"Front Plane@{pen_marker}", "PLANE"),
+                    named_ref(f"Front Plane@{pen_rod}", "PLANE"),
+                    label="pen-marker locked to rod")
     # Ry(+90)*Rx(+90): the ring lies flat on the v-block top, long axis
     # along X, window over the marker + pen rod (see FRAME_POS comment).
     await _place(adapter, "pen-frame", list(FRAME_POS),
