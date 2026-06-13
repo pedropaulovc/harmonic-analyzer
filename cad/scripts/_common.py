@@ -1332,6 +1332,332 @@ def assert_component_placed(
     print(f"  OK  {_stamp()} {name} placed at {[round(v, 3) for v in actual]}", flush=True)
 
 
+# ---------------------------------------------------------------------------
+# Mate family: semantic kinematic joints + driving dimensions.
+#
+# Generalised from build_frame_assembly's plane-plane mate. Every component is
+# inserted at its exact final (mirrored) transform, so a correctly solved mate
+# must NOT move it. distance / angle / coincident (and alignment-sensitive
+# concentric) mates can pick the far-side solution; pass ``verify=(comp_name,
+# origin_mm)`` and the helper reads back ``Transform2`` and re-adds the mate
+# flipped when the origin drifts past tolerance -- the same readback-and-flip
+# recovery the frame used inline, now shared.
+#
+# A ``distance``/``angle`` mate IS a driving dimension: ``distance_driver`` /
+# ``angle_driver`` are those mates used to pin a residual DOF to a coefficient
+# value (the 21 machine inputs + computed-equilibrium snapshot dims).
+# ---------------------------------------------------------------------------
+
+_MATE_TOL_MM = 0.5
+
+
+def named_ref(name: str, entity_type: str) -> Any:
+    """A ``MateEntityRef`` selecting an entity by qualified name."""
+    from solidworks_mcp.adapters.base import MateEntityRef
+
+    return MateEntityRef(entity_type=entity_type, name=name)
+
+
+def bore_axis_ref(point_mm: list[float], entity_type: str = "FACE") -> Any:
+    """A ``MateEntityRef`` selecting a cylindrical face/axis by a point on it.
+
+    ``point_mm`` is in the FINAL (mirrored) machine frame -- the same frame the
+    component occupies after :func:`place_component` -- so concentric /
+    coincident selections land on the as-built geometry. Use a point on the
+    bore wall at mid-depth; ``entity_type="AXIS"`` with a name is the fallback
+    when no stable face point exists.
+    """
+    from solidworks_mcp.adapters.base import MateEntityRef
+
+    return MateEntityRef(entity_type=entity_type, point=list(point_mm))
+
+
+async def _add_mate(
+    adapter: Any,
+    kind: str,
+    entities: list[Any],
+    *,
+    distance: float = 0.0,
+    angle: float = 0.0,
+    alignment: str = "closest",
+    lock_rotation: bool = False,
+    gear_ratio: Iterable[float] | None = None,
+    flip: bool = False,
+) -> Any:
+    from solidworks_mcp.adapters.base import AddMateParameters
+
+    return await adapter.add_mate(
+        AddMateParameters(
+            mate_type=kind,
+            entities=entities,
+            alignment=alignment,
+            flip=flip,
+            distance=abs(distance),
+            angle=angle,
+            lock_rotation=lock_rotation,
+            gear_ratio=list(gear_ratio) if gear_ratio else [],
+        )
+    )
+
+
+async def _mate(
+    adapter: Any,
+    label: str,
+    kind: str,
+    entities: list[Any],
+    *,
+    verify: tuple[str, list[float]] | None = None,
+    **kw: Any,
+) -> Any:
+    """Add a mate and ``check`` it; recover a far-side flip when ``verify`` set.
+
+    ``verify=(comp_name, target_origin_mm)`` enables readback-and-flip: after
+    the mate solves, the component origin must stay within ``_MATE_TOL_MM`` of
+    ``target_origin_mm`` (it was inserted there); otherwise the mate is deleted
+    and re-added flipped, then re-checked. Returns the (final) mate result data.
+    """
+    from solidworks_mcp.adapters.base import MateRefParameters
+
+    res = check(label, await _add_mate(adapter, kind, entities, flip=False, **kw))
+    if verify is None:
+        return res
+    comp_name, target_origin = verify
+    array = component_transform(adapter, comp_name)
+    moved = max(abs(array[9 + i] * 1000.0 - target_origin[i]) for i in range(3))
+    if moved <= _MATE_TOL_MM:
+        return res
+    log(f"{label}: moved {moved:.2f} mm -> re-adding flipped")
+    check(
+        f"{label} (delete wrong side)",
+        await adapter.delete_mate(MateRefParameters(name=res.get("name", ""))),
+    )
+    res = check(
+        f"{label} (flipped)",
+        await _add_mate(adapter, kind, entities, flip=True, **kw),
+    )
+    array = component_transform(adapter, comp_name)
+    moved = max(abs(array[9 + i] * 1000.0 - target_origin[i]) for i in range(3))
+    if moved > _MATE_TOL_MM:
+        raise RuntimeError(f"{label}: component still off target by {moved:.2f} mm")
+    return res
+
+
+async def plane_distance_mate(
+    adapter: Any,
+    comp_name: str,
+    comp_plane: str,
+    base_plane: str,
+    base_name: str,
+    distance: float,
+    target_origin: list[float],
+) -> Any:
+    """Plane-plane distance (or coincident, when ``distance==0``) mate.
+
+    The structural-placement workhorse: three orthogonal calls fully define a
+    grounded part against a reference part's principal planes, with far-side
+    flip recovery from the inserted-on-solution transform.
+    """
+    kind = "distance" if abs(distance) > 1e-9 else "coincident"
+    label = f"mate {comp_plane}@{comp_name} <-> {base_plane}@{base_name} d={distance:g}"
+    entities = [
+        named_ref(f"{comp_plane}@{comp_name}", "PLANE"),
+        named_ref(f"{base_plane}@{base_name}", "PLANE"),
+    ]
+    return await _mate(
+        adapter,
+        label,
+        kind,
+        entities,
+        distance=abs(distance),
+        verify=(comp_name, target_origin),
+    )
+
+
+async def concentric_mate(
+    adapter: Any,
+    ref_a: Any,
+    ref_b: Any,
+    *,
+    lock_rotation: bool = False,
+    alignment: str = "closest",
+    label: str = "concentric",
+    verify: tuple[str, list[float]] | None = None,
+) -> Any:
+    """Concentric (coaxial) mate; ``lock_rotation`` removes the spin DOF too."""
+    return await _mate(
+        adapter,
+        label,
+        "concentric",
+        [ref_a, ref_b],
+        lock_rotation=lock_rotation,
+        alignment=alignment,
+        verify=verify,
+    )
+
+
+async def coincident_mate(
+    adapter: Any,
+    ref_a: Any,
+    ref_b: Any,
+    *,
+    alignment: str = "closest",
+    label: str = "coincident",
+    verify: tuple[str, list[float]] | None = None,
+) -> Any:
+    """Coincident mate between two faces / planes / points."""
+    return await _mate(
+        adapter,
+        label,
+        "coincident",
+        [ref_a, ref_b],
+        alignment=alignment,
+        verify=verify,
+    )
+
+
+async def distance_driver(
+    adapter: Any,
+    ref_a: Any,
+    ref_b: Any,
+    distance: float,
+    *,
+    label: str = "",
+    verify: tuple[str, list[float]] | None = None,
+) -> Any:
+    """A distance mate used as a driving dimension pinning one slide DOF."""
+    label = label or f"distance driver d={distance:g}"
+    return await _mate(
+        adapter,
+        label,
+        "distance",
+        [ref_a, ref_b],
+        distance=abs(distance),
+        verify=verify,
+    )
+
+
+async def angle_driver(
+    adapter: Any,
+    ref_a: Any,
+    ref_b: Any,
+    angle: float,
+    *,
+    label: str = "",
+    verify: tuple[str, list[float]] | None = None,
+) -> Any:
+    """An angle mate used as a driving dimension pinning one rotational DOF."""
+    label = label or f"angle driver a={angle:g}"
+    return await _mate(
+        adapter,
+        label,
+        "angle",
+        [ref_a, ref_b],
+        angle=angle,
+        verify=verify,
+    )
+
+
+async def tangent_mate(
+    adapter: Any,
+    ref_a: Any,
+    ref_b: Any,
+    *,
+    alignment: str = "closest",
+    label: str = "tangent",
+    verify: tuple[str, list[float]] | None = None,
+) -> Any:
+    """Tangent mate (e.g. an amplitude-bar notch riding a rocker arc)."""
+    return await _mate(
+        adapter,
+        label,
+        "tangent",
+        [ref_a, ref_b],
+        alignment=alignment,
+        verify=verify,
+    )
+
+
+async def lock_mate(adapter: Any, ref_a: Any, ref_b: Any, *, label: str = "lock") -> Any:
+    """Lock mate: rigidly fix two components' relative pose (e.g. crank parts)."""
+    return await _mate(adapter, label, "lock", [ref_a, ref_b])
+
+
+async def gear_mate(
+    adapter: Any,
+    ref_a: Any,
+    ref_b: Any,
+    ratio: Iterable[float],
+    *,
+    alignment: str = "closest",
+    label: str = "",
+) -> Any:
+    """Gear mate coupling two rotations at ``ratio=[numerator, denominator]``.
+
+    The ratio is tooth counts (driver:driven); verify the sign/direction with a
+    kinematic rotate after meshing, per the plan's gear-ratio risk.
+    """
+    ratio = list(ratio)
+    label = label or f"gear {ratio[0]:g}:{ratio[1]:g}"
+    return await _mate(
+        adapter, label, "gear", [ref_a, ref_b], gear_ratio=ratio, alignment=alignment
+    )
+
+
+async def cam_follower_mate(
+    adapter: Any, cam_ref: Any, follower_ref: Any, *, label: str = "cam_follower"
+) -> Any:
+    """Cam-follower mate; the adapter applies the cam selection mark (8)."""
+    return await _mate(adapter, label, "cam_follower", [cam_ref, follower_ref])
+
+
+async def place_component(
+    adapter: Any,
+    part: str,
+    position: list[float],
+    rotation: list[float],
+    rows: list[list[float]],
+    *,
+    ground: bool = True,
+    label: str = "",
+) -> str:
+    """Insert a part at its exact final (mirrored) transform and assert it.
+
+    ``ground=True`` fixes the component (structure: shafts, mounts, bushings,
+    supports, frame, fasteners, cosmetic springs). ``ground=False`` leaves it
+    free for the caller's mates to constrain -- the moving parts whose DOF are
+    driven from the crank. Either way the part is inserted on-solution so mate
+    flip-recovery has a clean reference and the read-back assert holds.
+    """
+    from solidworks_mcp.adapters.base import (
+        ComponentRefParameters,
+        InsertComponentParameters,
+    )
+
+    position, rotation, rows = mirror_placement(part, position, rotation, rows)
+    label = label or part
+    path = (OUT_SLDPRT / f"{part}.SLDPRT").resolve()
+    if not path.exists():
+        raise RuntimeError(
+            f"missing part {path}; run build_{part.replace('-', '_')}.py first"
+        )
+    data = check(
+        f"insert {label} @ ({position[0]:.2f}, {position[1]:.2f}, {position[2]:.2f})",
+        await adapter.insert_component(
+            InsertComponentParameters(
+                file_path=str(path), position=position, rotation=rotation
+            )
+        ),
+    )
+    name = data["name"]
+    if ground and not data.get("fixed"):
+        check(
+            f"fix {label}",
+            await adapter.fix_component(ComponentRefParameters(name=name)),
+        )
+    assert_component_placed(adapter, name, position, rows)
+    return name
+
+
 def assert_components_fully_defined(adapter: Any) -> None:
     """Raise when any top-level component is neither fixed, fully defined,
     nor a pattern instance.

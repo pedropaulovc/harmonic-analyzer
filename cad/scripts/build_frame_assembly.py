@@ -69,8 +69,7 @@ from _common import (
     assert_components_fully_defined,
     check,
     check_no_interference,
-    component_transform,
-    log,
+    plane_distance_mate,
     run_build,
     save_assembly_and_images,
 )
@@ -102,64 +101,6 @@ def _part(name: str) -> str:
     return str(path)
 
 
-async def _plane_mate(
-    adapter,
-    comp_name: str,
-    comp_plane: str,
-    base_plane: str,
-    base_name: str,
-    distance: float,
-    target_origin: list[float],
-) -> None:
-    """Plane-plane mate with wrong-side flip recovery.
-
-    The component is inserted at its exact final transform, so a correctly
-    solved mate must not move it; any move beyond tolerance means the
-    distance mate picked the far-side solution and is re-added flipped.
-    """
-    from solidworks_mcp.adapters.base import (
-        AddMateParameters,
-        MateEntityRef,
-        MateRefParameters,
-    )
-
-    label = f"mate {comp_plane}@{comp_name} <-> {base_plane}@{base_name} d={distance:g}"
-    entities = [
-        MateEntityRef(entity_type="PLANE", name=f"{comp_plane}@{comp_name}"),
-        MateEntityRef(entity_type="PLANE", name=f"{base_plane}@{base_name}"),
-    ]
-
-    async def _add(flip: bool):
-        kind = "distance" if abs(distance) > 1e-9 else "coincident"
-        return await adapter.add_mate(
-            AddMateParameters(
-                mate_type=kind,
-                entities=entities,
-                distance=abs(distance),
-                flip=flip,
-            )
-        )
-
-    res = check(label, await _add(flip=False))
-    array = component_transform(adapter, comp_name)
-    moved = max(
-        abs(array[9 + i] * 1000.0 - target_origin[i]) for i in range(3)
-    )
-    if moved <= 0.5:
-        return
-    mate_name = res.get("name", "")
-    log(f"{label}: moved {moved:.2f} mm -> re-adding flipped")
-    check(
-        f"{label} (delete wrong side)",
-        await adapter.delete_mate(MateRefParameters(name=mate_name)),
-    )
-    check(f"{label} (flipped)", await _add(flip=True))
-    array = component_transform(adapter, comp_name)
-    moved = max(abs(array[9 + i] * 1000.0 - target_origin[i]) for i in range(3))
-    if moved > 0.5:
-        raise RuntimeError(f"{label}: component still off target by {moved:.2f} mm")
-
-
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import InsertComponentParameters
 
@@ -188,13 +129,13 @@ async def build(adapter) -> dict[str, str]:
         )
         check(f"insert_component tube-frame @ {target}", res)
         name = res.data["name"]
-        await _plane_mate(
+        await plane_distance_mate(
             adapter, name, "Right Plane", "Right Plane", base_name, COLUMN_X, target
         )
-        await _plane_mate(
+        await plane_distance_mate(
             adapter, name, "Front Plane", "Front Plane", base_name, COLUMN_Z, target
         )
-        await _plane_mate(
+        await plane_distance_mate(
             adapter, name, "Top Plane", "Top Plane", base_name, BASE_TOP_Y, target
         )
         assert_component_placed(adapter, name, target, IDENTITY)
@@ -213,13 +154,13 @@ async def build(adapter) -> dict[str, str]:
         )
         check(f"insert_component corner-bracket @ {target}", res)
         name = res.data["name"]
-        await _plane_mate(
+        await plane_distance_mate(
             adapter, name, "Front Plane", "Right Plane", base_name, BRACKET_X, target
         )
-        await _plane_mate(
+        await plane_distance_mate(
             adapter, name, "Right Plane", "Front Plane", base_name, COLUMN_Z, target
         )
-        await _plane_mate(
+        await plane_distance_mate(
             adapter, name, "Top Plane", "Top Plane", base_name, BASE_TOP_Y, target
         )
         assert_component_placed(adapter, name, target, rows)
@@ -233,13 +174,13 @@ async def build(adapter) -> dict[str, str]:
     )
     check(f"insert_component rocker-arm-support @ {target}", res)
     name = res.data["name"]
-    await _plane_mate(
+    await plane_distance_mate(
         adapter, name, "Right Plane", "Right Plane", base_name, SUPPORT_X, target
     )
-    await _plane_mate(
+    await plane_distance_mate(
         adapter, name, "Front Plane", "Front Plane", base_name, SUPPORT_Z, target
     )
-    await _plane_mate(
+    await plane_distance_mate(
         adapter, name, "Top Plane", "Top Plane", base_name, BASE_TOP_Y, target
     )
     assert_component_placed(adapter, name, target, IDENTITY)
@@ -255,13 +196,13 @@ async def build(adapter) -> dict[str, str]:
         )
         check(f"insert_component lag-screw @ {target}", res)
         name = res.data["name"]
-        await _plane_mate(
+        await plane_distance_mate(
             adapter, name, "Right Plane", "Right Plane", base_name, lx, target
         )
-        await _plane_mate(
+        await plane_distance_mate(
             adapter, name, "Front Plane", "Front Plane", base_name, SUPPORT_Z, target
         )
-        await _plane_mate(
+        await plane_distance_mate(
             adapter, name, "Top Plane", "Top Plane", base_name, LAG_SCREW_Y, target
         )
         assert_component_placed(adapter, name, target, IDENTITY)
@@ -273,13 +214,13 @@ async def build(adapter) -> dict[str, str]:
     )
     check(f"insert_component top-frame @ {target}", res)
     name = res.data["name"]
-    await _plane_mate(
+    await plane_distance_mate(
         adapter, name, "Right Plane", "Right Plane", base_name, 0.0, target
     )
-    await _plane_mate(
+    await plane_distance_mate(
         adapter, name, "Front Plane", "Front Plane", base_name, 0.0, target
     )
-    await _plane_mate(
+    await plane_distance_mate(
         adapter, name, "Top Plane", "Top Plane", base_name, TOP_FRAME_MID_Y, target
     )
     assert_component_placed(adapter, name, target, IDENTITY)
