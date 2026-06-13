@@ -48,7 +48,7 @@ from __future__ import annotations
 import sys
 from typing import Any
 
-from _common import check, log, run_build
+from _common import check, run_build
 
 RESULTS: list[tuple[str, bool, str]] = []
 
