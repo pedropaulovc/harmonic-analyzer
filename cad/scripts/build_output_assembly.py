@@ -116,6 +116,7 @@ from _chain import (
     WRAP_R_A,
     WRAP_R_B,
     centreline_distance,
+    loop_parameter,
     loop_segments,
 )
 from _common import (
@@ -551,7 +552,8 @@ async def _insert_bead_chain(adapter) -> None:
     assert_component_placed(adapter, seed_name, position, rows)
 
     instance_count = create_chain_component_pattern(
-        adapter, sketch_name, seed_name, BEAD_AXIS_NAME, "Front Plane", BEAD_PITCH
+        adapter, sketch_name, seed_name, BEAD_AXIS_NAME, "Front Plane",
+        BEAD_PITCH, BEAD_COUNT,
     )
     blank_sketch(adapter, sketch_name)
 
@@ -562,6 +564,7 @@ async def _insert_bead_chain(adapter) -> None:
             f" (SolidWorks InstanceCount {instance_count})"
         )
     worst = 0.0
+    params = []
     for name in beads:
         array = component_transform(adapter, name)
         x, y, z = (array[9] * 1000.0, array[10] * 1000.0, array[11] * 1000.0)
@@ -577,7 +580,26 @@ async def _insert_bead_chain(adapter) -> None:
             raise RuntimeError(
                 f"{name}: bead ({x:.2f}, {y:.2f}) sits {dist:.3f} off the chain path"
             )
-    log(f"bead chain: {len(beads)} beads on the path (worst off-path {worst:.4f})")
+        params.append(
+            loop_parameter(x, y, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1], mirror_x=True)
+        )
+    # Spacing/closure gate: consecutive arc-length gaps (incl. wraparound)
+    # within +-50% of the pitch -- catches a missing bead (2x gap) or
+    # bunching/coincidence (~0 gap) while tolerating the pattern's
+    # chord-stepping drift on the tight crank wrap.
+    params.sort()
+    gaps = [b - a for a, b in zip(params, params[1:], strict=False)]
+    gaps.append(params[0] + CENTRELINE_LEN - params[-1])
+    bad = [g for g in gaps if not 0.5 * BEAD_PITCH < g < 1.5 * BEAD_PITCH]
+    if bad:
+        raise RuntimeError(
+            f"bead spacing broken: gaps {[round(g, 3) for g in bad]} vs pitch"
+            f" {BEAD_PITCH:.4f}"
+        )
+    log(
+        f"bead chain: {len(beads)} beads on the path (worst off-path"
+        f" {worst:.4f}; gaps {min(gaps):.3f}..{max(gaps):.3f})"
+    )
 
 
 async def build(adapter) -> dict[str, str]:
