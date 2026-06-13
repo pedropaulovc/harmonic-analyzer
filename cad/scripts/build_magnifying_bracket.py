@@ -37,6 +37,7 @@ from _common import (
     define_circle,
     define_rectilinear_chain,
     ensure_fully_defined,
+    name_bore_axis,
     extrude_at_offset,
     report_mass_properties,
     run_build,
@@ -202,6 +203,10 @@ async def build(adapter) -> dict[str, str]:
     print(f"  volume after screw holes: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 2.0:
         raise RuntimeError(f"screw holes volume {vol:.1f} != {expected:.1f}")
+
+    # Named collar axis (local X through the origin) so the magnifying lever
+    # rides this bore as a revolute in the M6 mated-DOF assembly.
+    await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "collar axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

@@ -30,6 +30,7 @@ from _common import (
     define_circle,
     define_rectilinear_chain,
     ensure_fully_defined,
+    name_bore_axis,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -112,6 +113,12 @@ async def build(adapter) -> dict[str, str]:
     )
     vol = await _volume(adapter)
     print(f"  volume after y-bores: {vol:.1f} mm^3")
+
+    # Named lever-bore axis (local Z through (0, LEVER_BORE_Y)) so the clamp
+    # rides the magnifying rod as a concentric slider in the M6 assembly.
+    await name_bore_axis(
+        adapter, "Top Plane", LEVER_BORE_Y, "Right Plane", 0.0, "lever bore axis"
+    )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

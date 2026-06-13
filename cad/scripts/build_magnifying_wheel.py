@@ -31,6 +31,7 @@ from _common import (
     define_circle,
     ensure_fully_defined,
     measure_check,
+    name_bore_axis,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -155,6 +156,11 @@ async def build(adapter) -> dict[str, str]:
         "diameter",
         HUB_DIA,
     )
+
+    # Named wheel axis (local Z through the origin = the central bore axis) so
+    # the wheel revolves on the axle stud in the M6 mated-DOF assembly
+    # (circular_pattern's axis_point does NOT create a persistent ref axis).
+    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "wheel axis")
 
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
