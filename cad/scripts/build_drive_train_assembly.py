@@ -69,14 +69,24 @@ at azimuth 180, the contact azimuth) and the drum gears are
 pre-rotated +1.5 deg (half a 3 deg pitch) to receive it tooth-in-gap;
 the crank pinion +11.25 deg (half of 22.5) likewise.
 
-Every component is inserted at its exact final transform and FIXED
-(saved state fully defined; the inclined components cannot be fully
-constrained by axis-aligned plane mates, and the meshed/locked gear
-phases ARE the book's cosine setup state). Kinematic gear-ratio
-verification is deferred to a dedicated motion script that floats the
-gears (M6 acceptance). Final asserts: every component fixed or fully
-constrained, placement read-back exact, and zero interferences
-(tangent/coincident contact allowed -- bores ride their shafts).
+Mated-DOF strategy (M6 operation simulation): the structure -- the
+stationary arbor, the pedestals/posts, and the disengaged alignment rig
+-- is grounded; the crank chain, the cone cluster and the 20 cylinder
+gears are inserted on their exact mirrored transforms (so mate
+flip-recovery has a clean reference and the tuned tooth phases are
+preserved) and joined by real kinematic joints. The crankshaft and the
+cone shaft each get a revolute (coincident axis-to-axis + an axial plane
+distance); the crank arm/handle/T12 wheel/16T pinion are keyed to the
+crankshaft and the 64T + 20 cone gears keyed to the cone shaft (lock
+mates); a 16T:64T gear mate drives the cone cluster from the crank, and
+each cylinder gear meshes its cone gear k at ratio [120-6k : 120]. The
+gear mate is each cylinder gear's sole rotational constraint, so it
+holds the cosine-setup phase without nudging the gear. The whole train
+is left with exactly ONE free DOF -- the crank angle -- pinned by a
+single spin driver on the handle (DRIVER #1, suppressible for the Motion
+study). Saved state: every component fixed or fully defined, zero
+interferences (tangent/coincident contact allowed -- bores ride their
+shafts). Gear-ratio sign is verified kinematically by a motion script.
 
 Run (SolidWorks already open)::
 
@@ -89,14 +99,19 @@ import math
 import sys
 
 from _common import (
-    OUT_SLDPRT,
-    assert_component_placed,
     assert_components_fully_defined,
     check,
     check_no_interference,
-    mirror_placement,
+    coincident_mate,
+    component_transform,
+    distance_driver,
+    gear_mate,
+    lock_mate,
+    named_ref,
+    place_component,
     run_build,
     save_assembly_and_images,
+    spin_driver,
 )
 
 ASM_NAME = "drive-train"
@@ -372,62 +387,28 @@ def rot_z_rows(deg: float) -> list[list[float]]:
     return [[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]]
 
 
-def _part(name: str) -> str:
-    path = (OUT_SLDPRT / f"{name}.SLDPRT").resolve()
-    if not path.exists():
-        raise RuntimeError(f"missing part {path}; run build_{name.replace('-', '_')}.py first")
-    return str(path)
-
-
-async def _place(
-    adapter,
-    part: str,
-    position: list[float],
-    rotation: list[float],
-    rows: list[list[float]],
-    configuration: str = "",
-    label: str = "",
-) -> str:
-    """Insert at the exact final transform, fix, and assert the read-back.
-
-    All placements are derived in the original (pre-M6.8) frame and mirrored
-    about the machine YZ plane here, at the insert boundary."""
-    from solidworks_mcp.adapters.base import (
-        ComponentRefParameters,
-        InsertComponentParameters,
-    )
-
-    position, rotation, rows = mirror_placement(
-        part, position, rotation, rows, configuration
-    )
-    label = label or part
-    data = check(
-        f"insert {label} @ ({position[0]:.1f}, {position[1]:.1f}, {position[2]:.1f})",
-        await adapter.insert_component(
-            InsertComponentParameters(
-                file_path=_part(part),
-                position=position,
-                rotation=rotation,
-                configuration=configuration,
-            )
-        ),
-    )
-    name = data["name"]
-    if not data.get("fixed"):
-        check(
-            f"fix {label}",
-            await adapter.fix_component(ComponentRefParameters(name=name)),
-        )
-    assert_component_placed(adapter, name, position, rows)
-    return name
+def _org(adapter, name: str) -> list[float]:
+    """A component's current origin (mm) in the assembly frame."""
+    a = component_transform(adapter, name)
+    return [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
 
 
 async def _place_on_shaft(
-    adapter, part: str, station: float, face: float, configuration: str = "", label: str = ""
+    adapter,
+    part: str,
+    station: float,
+    face: float,
+    *,
+    configuration: str = "",
+    label: str = "",
 ) -> str:
-    """Insert a gear perpendicular on the cone shaft, centred at station."""
+    """Insert a gear perpendicular on the cone shaft (free), centred at station.
+
+    The gear's central reference axis ends up collinear with the inclined cone
+    shaft axis, so a lock / gear mate against the shaft holds the tuned phase.
+    """
     centre = cone_station(station)
-    return await _place(
+    return await place_component(
         adapter,
         part,
         [
@@ -437,6 +418,7 @@ async def _place_on_shaft(
         ],
         [0.0, -INCLINE_DEG, 0.0],
         ROT_Y_INCLINE,
+        ground=False,
         configuration=configuration,
         label=label,
     )
@@ -445,192 +427,253 @@ async def _place_on_shaft(
 async def build(adapter) -> dict[str, str]:
     check("create_assembly", await adapter.create_assembly())
 
-    # --- cone set: true cone, every gear perpendicular on the shaft ---
-    await _place(
-        adapter,
-        "cone-gear-shaft",
-        CONE_ORIGIN,
-        [0.0, -INCLINE_DEG, 0.0],
-        ROT_Y_INCLINE,
-    )
-    await _place_on_shaft(
-        adapter,
-        "crank-drive-gear",
-        GEAR64_STATION,
-        GEAR64_FACE,
-        label="crank-drive-gear (perpendicular, journal seat)",
-    )
-    for j in range(20):
-        teeth = 120 - 6 * j
-        cfg = f"T{teeth:03d}"
-        await _place_on_shaft(
-            adapter,
-            "cone-gear",
-            SHAFT_T120_STATION + j * SEAT_PITCH,
-            CONE_FACE,
-            configuration=cfg,
-            label=f"cone-gear {cfg}",
-        )
-
-    # --- cylinder drum (stationary arbor, free gears locked notch-up) ---
-    await _place(
-        adapter,
-        "cylinder-gear-shaft",
+    # =================== structure (ground = fixed) ====================
+    # Stationary arbor, the pedestals/posts, and the disengaged alignment
+    # rig are the fixed reference frame the moving train mates against.
+    arbor = await place_component(
+        adapter, "cylinder-gear-shaft",
         [X_DRUM, Y_DRIVE, -ARBOR_LENGTH / 2.0],
-        [90.0, 0.0, 0.0],
-        ROT_X_POS90,
-        label="cylinder arbor",
+        [90.0, 0.0, 0.0], ROT_X_POS90, label="cylinder arbor",
     )
-    for j in range(20):
-        z_j = Z_DRUM0 + Z_PITCH * j
-        await _place(
-            adapter,
-            "cylinder-gear",
-            [X_DRUM, Y_DRIVE, z_j - DRUM_FACE / 2.0],
-            [0.0, 0.0, 1.5],
-            rot_z_rows(1.5),
-            label=f"cylinder-gear {j}",
-        )
-
-    # --- crank ---
-    await _place(
-        adapter,
-        "crankshaft",
-        [X_CRANK, Y_DRIVE, CRANKSHAFT_Z0],
-        [90.0, 0.0, 0.0],
-        ROT_X_POS90,
-    )
-    await _place(
-        adapter,
-        "crank-pinion",
-        [X_CRANK, Y_DRIVE, PINION_TOOTH_Z - PINION_FACE / 2.0],
-        [0.0, 0.0, 11.25],  # +11.25 = half pitch, tooth-in-gap
-        rot_z_rows(11.25),
-        label="crank-pinion (centred on the 64T contact tooth)",
-    )
-    await _place(
-        adapter,
-        "transgear-removable",
-        [X_CRANK, Y_DRIVE, REMOVABLE_Z0],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
-        configuration="T12",
-        label="transgear-removable (crank chain wheel T12)",
-    )
-    await _place(
-        adapter,
-        "crank-arm",
-        [X_CRANK, Y_DRIVE, CRANK_ARM_Z0],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
-    )
-    await _place(
-        adapter,
-        "crank-handle",
-        [X_CRANK + ARM_C2C, Y_DRIVE, CRANK_ARM_Z0],
-        [0.0, 90.0, 0.0],
-        ROT_Y_POS90,
-    )
-
-    # --- supports ---
-    await _place(
-        adapter,
-        "crank-pedestal",
-        [X_CRANK, Y_BASE_TOP, PEDESTAL_Z],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
+    pedestal = await place_component(
+        adapter, "crank-pedestal",
+        [X_CRANK, Y_BASE_TOP, PEDESTAL_Z], [0.0, 0.0, 0.0], IDENTITY,
     )
     # South pedestal only (M6.5): the arbor's north end clamps into the
     # rocker-arm-support's east-flank boss bore (frame.SLDASM) - the back
     # view (p5) shows the drum running straight into that casting, and a
     # pedestal at z +92 cannot coexist with the frustum footprint.
-    await _place(
-        adapter,
-        "arbor-pedestal",
-        [X_DRUM, Y_BASE_TOP, -ARBOR_PEDESTAL_Z],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
+    await place_component(
+        adapter, "arbor-pedestal",
+        [X_DRUM, Y_BASE_TOP, -ARBOR_PEDESTAL_Z], [0.0, 0.0, 0.0], IDENTITY,
         label=f"arbor-pedestal z={-ARBOR_PEDESTAL_Z:g}",
     )
-    post = cone_station(PIVOT_POST_STATION)
-    await _place(
-        adapter,
-        "cone-pivot-post",
-        [post[0], Y_BASE_TOP, post[2]],
-        [0.0, -INCLINE_DEG, 0.0],
-        ROT_Y_INCLINE,
+    ppost = cone_station(PIVOT_POST_STATION)
+    pivot_post = await place_component(
+        adapter, "cone-pivot-post",
+        [ppost[0], Y_BASE_TOP, ppost[2]], [0.0, -INCLINE_DEG, 0.0], ROT_Y_INCLINE,
     )
-    post = cone_station(KNOB_POST_STATION)
-    await _place(
-        adapter,
-        "cone-knob-post",
-        [post[0], Y_BASE_TOP, post[2]],
-        [0.0, -INCLINE_DEG, 0.0],
-        ROT_Y_INCLINE,
+    kpost = cone_station(KNOB_POST_STATION)
+    await place_component(
+        adapter, "cone-knob-post",
+        [kpost[0], Y_BASE_TOP, kpost[2]], [0.0, -INCLINE_DEG, 0.0], ROT_Y_INCLINE,
     )
 
-    # --- alignment pinion (ch. 25, disengaged rest state) ---
-    await _place(
-        adapter,
-        "alignment-pinion",
-        [PINION_X, PINION_Y, PINION_Z_FRONT],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
+    # alignment pinion (ch. 25, disengaged rest state -- all ground)
+    await place_component(
+        adapter, "alignment-pinion",
+        [PINION_X, PINION_Y, PINION_Z_FRONT], [0.0, 0.0, 0.0], IDENTITY,
     )
     for tag, z0 in (
         ("front", PINION_Z_FRONT - STRAP_T - STRAP_AIR),
         ("back", PINION_Z_BACK + STRAP_AIR),
     ):
-        await _place(
-            adapter,
-            "pinion-bracket",
-            [PIVOT_X, PIVOT_Y, z0],
-            [0.0, 0.0, STRAP_LEAN_DEG],
-            rot_z_rows(STRAP_LEAN_DEG),
+        await place_component(
+            adapter, "pinion-bracket",
+            [PIVOT_X, PIVOT_Y, z0], [0.0, 0.0, STRAP_LEAN_DEG], rot_z_rows(STRAP_LEAN_DEG),
             label=f"pinion-bracket {tag} (leaning onto the arbor stub)",
         )
-    for tag, z0 in (
-        ("front", BLOCK_FRONT_Z0),
-        ("back", BLOCK_BACK_Z0),
-    ):
-        await _place(
-            adapter,
-            "pinion-pivot-block",
-            [BLOCK_X, PIVOT_Y, z0],
-            [0.0, 0.0, 0.0],
-            IDENTITY,
+    for tag, z0 in (("front", BLOCK_FRONT_Z0), ("back", BLOCK_BACK_Z0)):
+        await place_component(
+            adapter, "pinion-pivot-block",
+            [BLOCK_X, PIVOT_Y, z0], [0.0, 0.0, 0.0], IDENTITY,
             label=f"pinion-pivot-block {tag}",
         )
-    await _place(
-        adapter,
-        "pinion-pivot-shaft",
-        [PIVOT_X, PIVOT_Y, PIVOT_SHAFT_Z0],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
+    await place_component(
+        adapter, "pinion-pivot-shaft",
+        [PIVOT_X, PIVOT_Y, PIVOT_SHAFT_Z0], [0.0, 0.0, 0.0], IDENTITY,
     )
-    await _place(
-        adapter,
-        "pinion-lift-rod",
-        [LIFT_X, PIVOT_Y, LIFT_ROD_Z0],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
+    await place_component(
+        adapter, "pinion-lift-rod",
+        [LIFT_X, PIVOT_Y, LIFT_ROD_Z0], [0.0, 0.0, 0.0], IDENTITY,
         label="pinion-lift-rod (cam pins parked down)",
     )
-    await _place(
-        adapter,
-        "pinion-lever",
-        [LIFT_X, PIVOT_Y, LEVER_Z],
-        [0.0, 0.0, -LEVER_TILT_DEG],
-        rot_z_rows(-LEVER_TILT_DEG),
+    await place_component(
+        adapter, "pinion-lever",
+        [LIFT_X, PIVOT_Y, LEVER_Z], [0.0, 0.0, -LEVER_TILT_DEG], rot_z_rows(-LEVER_TILT_DEG),
         label="pinion-lever (clamp on the lift rod front end)",
     )
-    await _place(
-        adapter,
-        "pinion-handle",
-        [PINION_X, PINION_Y, HANDLE_Z],
-        [0.0, 0.0, -HANDLE_TILT_DEG],
-        rot_z_rows(-HANDLE_TILT_DEG),
+    await place_component(
+        adapter, "pinion-handle",
+        [PINION_X, PINION_Y, HANDLE_Z], [0.0, 0.0, -HANDLE_TILT_DEG], rot_z_rows(-HANDLE_TILT_DEG),
         label="pinion-handle (on the front arbor stub)",
+    )
+
+    # =================== cone cluster (driven, on-solution) ====================
+    cone_shaft = await place_component(
+        adapter, "cone-gear-shaft",
+        CONE_ORIGIN, [0.0, -INCLINE_DEG, 0.0], ROT_Y_INCLINE, ground=False,
+    )
+    gear64 = await _place_on_shaft(
+        adapter, "crank-drive-gear", GEAR64_STATION, GEAR64_FACE,
+        label="crank-drive-gear (perpendicular, journal seat)",
+    )
+    cone_gears: list[tuple[int, str]] = []
+    for j in range(20):
+        teeth = 120 - 6 * j
+        cfg = f"T{teeth:03d}"
+        cg = await _place_on_shaft(
+            adapter, "cone-gear", SHAFT_T120_STATION + j * SEAT_PITCH, CONE_FACE,
+            configuration=cfg, label=f"cone-gear {cfg}",
+        )
+        cone_gears.append((teeth, cg))
+
+    # =================== cylinder drum (driven, free on the arbor) =============
+    cyl_gears: list[str] = []
+    for j in range(20):
+        z_j = Z_DRUM0 + Z_PITCH * j
+        cyl = await place_component(
+            adapter, "cylinder-gear",
+            [X_DRUM, Y_DRIVE, z_j - DRUM_FACE / 2.0], [0.0, 0.0, 1.5], rot_z_rows(1.5),
+            ground=False, label=f"cylinder-gear {j}",
+        )
+        cyl_gears.append(cyl)
+
+    # =================== crank (driven, on-solution) ===========================
+    crankshaft = await place_component(
+        adapter, "crankshaft",
+        [X_CRANK, Y_DRIVE, CRANKSHAFT_Z0], [90.0, 0.0, 0.0], ROT_X_POS90, ground=False,
+    )
+    pinion = await place_component(
+        adapter, "crank-pinion",
+        [X_CRANK, Y_DRIVE, PINION_TOOTH_Z - PINION_FACE / 2.0],
+        [0.0, 0.0, 11.25], rot_z_rows(11.25),  # +11.25 = half pitch, tooth-in-gap
+        ground=False, label="crank-pinion (centred on the 64T contact tooth)",
+    )
+    removable = await place_component(
+        adapter, "transgear-removable",
+        [X_CRANK, Y_DRIVE, REMOVABLE_Z0], [0.0, 0.0, 0.0], IDENTITY,
+        ground=False, configuration="T12",
+        label="transgear-removable (crank chain wheel T12)",
+    )
+    arm = await place_component(
+        adapter, "crank-arm",
+        [X_CRANK, Y_DRIVE, CRANK_ARM_Z0], [0.0, 0.0, 0.0], IDENTITY, ground=False,
+    )
+    handle = await place_component(
+        adapter, "crank-handle",
+        [X_CRANK + ARM_C2C, Y_DRIVE, CRANK_ARM_Z0], [0.0, 90.0, 0.0], ROT_Y_POS90,
+        ground=False,
+    )
+
+    # =================== joints ================================================
+    # Crankshaft revolute in the green pedestal: coincident axis-to-axis
+    # (4 DOF) + an axial plane distance (1 DOF). Its spin is the single crank
+    # driver, pinned via the handle below. The crankshaft axis is local +Y ->
+    # assembly Z (ROT_X_POS90), so its Top Plane is the axial reference.
+    cs_o = _org(adapter, crankshaft)
+    await coincident_mate(
+        adapter,
+        named_ref(f"Axis1@{crankshaft}", "AXIS"),
+        named_ref(f"Axis1@{pedestal}", "AXIS"),
+        label="crankshaft radial", verify=(crankshaft, cs_o),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Top Plane@{crankshaft}", "PLANE"),
+        named_ref("Front Plane", "PLANE"),
+        abs(cs_o[2]),
+        label=f"crankshaft axial d={abs(cs_o[2]):.2f}", verify=(crankshaft, cs_o),
+    )
+    # Keyed crank chain: arm, handle, the T12 chain wheel and the 16T pinion
+    # all turn rigidly with the crankshaft (a lock preserves the inserted
+    # pose and shares the crankshaft's single spin DOF).
+    crank_axis = named_ref(f"Axis1@{crankshaft}", "AXIS")
+    await lock_mate(
+        adapter, named_ref(f"Axis1@{arm}", "AXIS"), crank_axis, label="crank-arm keyed",
+    )
+    await lock_mate(
+        adapter, named_ref(f"Axis1@{handle}", "AXIS"), crank_axis, label="crank-handle keyed",
+    )
+    await lock_mate(
+        adapter, named_ref(f"Axis1@{removable}", "AXIS"), crank_axis,
+        label="T12 chain wheel keyed",
+    )
+    await lock_mate(
+        adapter, named_ref(f"Axis2@{pinion}", "AXIS"), crank_axis, label="16T pinion keyed",
+    )
+
+    # Cone shaft revolute in the black pivot post: coincident + an axial plane
+    # distance along the inclined axis (the shaft's local Z, read live). Its
+    # spin is driven by the 16T -> 64T mesh, not pinned here.
+    a_s = component_transform(adapter, cone_shaft)
+    cone_o = [a_s[9] * 1000.0, a_s[10] * 1000.0, a_s[11] * 1000.0]
+    cone_axis_dir = [a_s[6], a_s[7], a_s[8]]  # image of local Z = inclined shaft axis
+    post_o = _org(adapter, pivot_post)
+    d_axial = abs(sum((cone_o[k] - post_o[k]) * cone_axis_dir[k] for k in range(3)))
+    await coincident_mate(
+        adapter,
+        named_ref(f"Axis1@{cone_shaft}", "AXIS"),
+        named_ref(f"Axis1@{pivot_post}", "AXIS"),
+        label="cone-shaft radial", verify=(cone_shaft, cone_o),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Front Plane@{cone_shaft}", "PLANE"),
+        named_ref(f"Front Plane@{pivot_post}", "PLANE"),
+        d_axial,
+        label=f"cone-shaft axial d={d_axial:.2f}", verify=(cone_shaft, cone_o),
+    )
+    # The 64T crank-drive gear and the 20 cone gears are one rigid stepped
+    # cluster keyed to the cone shaft.
+    cone_axis = named_ref(f"Axis1@{cone_shaft}", "AXIS")
+    await lock_mate(
+        adapter, named_ref(f"Axis2@{gear64}", "AXIS"), cone_axis,
+        label="64T keyed to cone shaft",
+    )
+    for teeth, cg in cone_gears:
+        await lock_mate(
+            adapter, named_ref(f"Axis1@{cg}", "AXIS"), cone_axis,
+            label=f"cone-gear T{teeth:03d} keyed",
+        )
+    # 16T pinion (keyed to the crank) drives the 64T -> the cone cluster turns.
+    await gear_mate(
+        adapter,
+        named_ref(f"Axis2@{pinion}", "AXIS"),
+        named_ref(f"Axis2@{gear64}", "AXIS"),
+        [16, 64], label="16T:64T crank drive",
+    )
+
+    # Each cylinder gear runs free on the stationary arbor (coincident + axial,
+    # leaving its spin) and meshes its cone gear k at ratio [120-6k : 120] --
+    # the gear mate is the sole rotational constraint, so it holds the tuned
+    # tooth phase without nudging the gear (validated keystone, M6).
+    for j, cyl in enumerate(cyl_gears):
+        cyl_o = _org(adapter, cyl)
+        await coincident_mate(
+            adapter,
+            named_ref(f"Axis2@{cyl}", "AXIS"),
+            named_ref(f"Axis1@{arbor}", "AXIS"),
+            label=f"cylinder-gear {j} radial", verify=(cyl, cyl_o),
+        )
+        await distance_driver(
+            adapter,
+            named_ref(f"Front Plane@{cyl}", "PLANE"),
+            named_ref("Front Plane", "PLANE"),
+            abs(cyl_o[2]),
+            label=f"cylinder-gear {j} axial d={abs(cyl_o[2]):.2f}", verify=(cyl, cyl_o),
+        )
+        teeth, cg = cone_gears[j]
+        await gear_mate(
+            adapter,
+            named_ref(f"Axis1@{cg}", "AXIS"),
+            named_ref(f"Axis2@{cyl}", "AXIS"),
+            [teeth, 120], label=f"cone T{teeth:03d}:cyl120 ch{j:02d}",
+        )
+
+    # DRIVER #1 (the single machine input): the crank angle, pinned by the
+    # handle ball's height. The handle is keyed to the crankshaft and its axis
+    # sits ARM_C2C from the crank axis, so the spin_driver's y-sensitivity is
+    # well-conditioned (Top-plane distance picked, |Δx| >> |Δy|).
+    crank_o = _org(adapter, crankshaft)
+    handle_o = _org(adapter, handle)
+    await spin_driver(
+        adapter,
+        named_ref(f"Axis1@{handle}", "AXIS"),
+        (crank_o[0], crank_o[1]),
+        (handle_o[0], handle_o[1]),
+        label="crank angle driver (#1)",
+        verify=(handle, handle_o),
     )
 
     assert_components_fully_defined(adapter)
