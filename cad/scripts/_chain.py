@@ -1,15 +1,15 @@
 """Drive-chain centreline geometry (book ch. 23/30).
 
-The bead chain loops the two CHAIN-WRAPPED removable gears (crank shaft
+The roller chain loops the two CHAIN-WRAPPED removable gears (crank shaft
 T12 -> knob shaft T24; ch. 23: the chain rides the removables' m2 teeth --
 swapping them is what changes the platen ratio). Every chain-side ch30
 plate (p002/p005/p006) shows it: a taut run on the pinion-bar side and a
 visibly drooping slack run on the other.
 
-Pure math only -- shared by the chain-bead part script and the output
-assembly's chain-component-pattern path sketch (the chain is a SolidWorks
-chain component pattern of chain-bead spheres along that path; the M6.8
-rigid-band stand-in part is retired).
+Pure math only -- the roller chain's alternating inner/outer links are
+explicitly placed along this centreline loop (build_output_assembly
+._insert_roller_chain); the M6.8 rigid-band stand-in and the #13 bead-chain
+stand-in are both retired.
 
 Geometry (local frame: knob wrap centre at the origin, machine xy
 pre-mirror; crank centre from build_drive_train_assembly X_CRANK / Y_DRIVE
@@ -132,33 +132,23 @@ CENTRELINE_LEN = (
     WRAP_R_A * SPAN_A + WRAP_R_B * SPAN_B + SLACK_R * SPAN_SLACK + TAUT_LEN
 )
 
-# --- bead chain ---------------------------------------------------------------
-BEAD_DIA = 4.8  # ball-chain trade size #13: ball O0.1875 in (4.76), the
-# largest stock size -- matching the chunky beads the ch30 plates show;
-# rounded to the model grid and kept under REACH (2.5) so the band-tuned
-# clearances hold. The connecting wire is not modeled (flexible element).
-BEAD_R = BEAD_DIA / 2.0
-BEAD_PITCH_NOMINAL = 6.35  # #13 ball chain pitch (1/4 in)
-BEAD_COUNT = round(CENTRELINE_LEN / BEAD_PITCH_NOMINAL)
-BEAD_PITCH = CENTRELINE_LEN / BEAD_COUNT  # exact closure: count * pitch = loop
-
-
 # --- roller chain ------------------------------------------------------------
-# The bead chain is retired in favour of a real ANSI-#25-proportioned roller
-# chain (pitch ~1/4 in): alternating INNER links (2 inner plates + 2 rollers)
-# and OUTER links (2 outer plates + 2 pins), laid along the same centreline
-# loop by a two-group Connected-Linkage chain component pattern. A roller
-# chain closes a loop only with an EVEN number of pitches (inner/outer must
-# alternate back to the seam), so the link count is forced even -- unlike the
-# 63 odd beads. Every dimension stays inside the retired bead's +-2.4 envelope
-# (BEAD_DIA 4.8) so the band-tuned M6.8/M6.9 clearances transfer untouched.
-LINK_COUNT = 2 * round(CENTRELINE_LEN / (2.0 * BEAD_PITCH_NOMINAL))  # 64 (even)
+# A real ANSI-#25-proportioned roller chain (pitch ~1/4 in): alternating INNER
+# links (2 inner plates + 2 rollers) and OUTER links (2 outer plates + 2 pins),
+# explicitly placed along the centreline loop (build_output_assembly
+# ._insert_roller_chain). A roller chain closes a loop only with an EVEN number
+# of pitches (inner/outer must alternate back to the seam), so the link count is
+# forced even. Every dimension stays inside a +-2.4 in-plane / +-2.1 z envelope
+# (the retired #13 ball chain's 4.8 bead) so the band-tuned M6.8/M6.9 clearances
+# transfer untouched.
+PITCH_NOMINAL = 6.35  # #25 chain / #13 ball-chain pitch (1/4 in), the seed
+LINK_COUNT = 2 * round(CENTRELINE_LEN / (2.0 * PITCH_NOMINAL))  # 64 (even)
 LINK_PITCH = CENTRELINE_LEN / LINK_COUNT  # exact closure: count * pitch = loop
 
 # Every clearance is >= 0.3 mm and nothing relies on exact tangency: the
 # M6.x interference checker flags ~0.00 mm^3 slivers, so the links FLOAT as a
 # multibody (disconnected bodies in a part are allowed). The whole envelope
-# stays inside the retired bead's +-2.4 (in-plane h == BEAD_R*2/2; |z| <= 2.1
+# stays inside the retired bead's +-2.4 (in-plane half-height 2.4; |z| <= 2.1
 # < 2.4), so the band-tuned M6.8/M6.9 clearances transfer with margin.
 PLATE_HEIGHT = 4.8  # obround plate height == retired bead diameter (envelope)
 PLATE_HALF_H = PLATE_HEIGHT / 2.0  # 2.4, the obround end-arc radius
@@ -270,7 +260,7 @@ def loop_parameter(
 
     s runs along the CCW traversal (knob wrap from the taut normal, slack,
     crank wrap, taut line). Meant for points already gated ON the loop by
-    :func:`centreline_distance` -- bead spacing/closure checks."""
+    :func:`centreline_distance` -- link spacing/closure checks."""
     if mirror_x:
         x = -x
     x, y = x - dx, y - dy
@@ -304,8 +294,8 @@ def centreline_distance(
     (dx, dy, mirror_x) frame as :func:`loop_segments`.
 
     The wrap/slack arcs are treated as FULL circles -- ample for the
-    bead-on-path gate: a mirrored, mis-planed or unmirrored loop misses
-    by tens of millimetres, while a bead ON the path sits within solver
+    link-on-path gate: a mirrored, mis-planed or unmirrored loop misses
+    by tens of millimetres, while a link pin0 ON the path sits within solver
     tolerance of one of the true sub-arcs.
     """
     if mirror_x:

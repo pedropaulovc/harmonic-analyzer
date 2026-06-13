@@ -1069,9 +1069,6 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     # plain x-symmetric slab cornered at origin; explicit c avoids the
     # STL-bbox dependency for a part newer than the legacy export set
     "platen-paper": ("x", 129.75),
-    # sphere; explicit c, no STL yet at first build (the chain itself is a
-    # chain component pattern of these along the _chain.py loop)
-    "chain-bead": ("x", 0.0),
     # roller-chain links: flat XY parts, exactly symmetric about local z=0
     # (plates at +-plate_z, round bodies centred on z=0); achiral, so the
     # YZ-mirror is a proper rotation. Explicit c, no STL at first build.
