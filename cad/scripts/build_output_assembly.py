@@ -672,10 +672,25 @@ async def build(adapter) -> dict[str, str]:
 
     # --- magnifying wheel -----------------------------------------------------
     # Rx(-90): the axle's +Y axis points -Z (flange on the bar front face).
-    await _place(adapter, "wheel-axle", [WHEEL_X, WHEEL_BAR_Y, BAR_FRONT_Z],
-                 [-90.0, 0.0, 0.0], ROT_X_NEG90)
-    await _place(adapter, "magnifying-wheel", [WHEEL_X, WHEEL_BAR_Y, WHEEL_MID_Z],
-                 [0.0, 0.0, 0.0], IDENTITY)
+    # The axle is structure (fixed); the wheel spins on its stud (revolute).
+    ax = await _place(adapter, "wheel-axle", [WHEEL_X, WHEEL_BAR_Y, BAR_FRONT_Z],
+                      [-90.0, 0.0, 0.0], ROT_X_NEG90)
+    wh = await place_component(adapter, "magnifying-wheel",
+                               [WHEEL_X, WHEEL_BAR_Y, WHEEL_MID_Z], [0.0, 0.0, 0.0],
+                               IDENTITY, ground=False)
+    wh_o = _org(adapter, wh)
+    # Revolute: radial coincident (wheel axis Z || axle stud Z) + axial
+    # distance(Front, |z|) + angle(Right, 0) rock snapshot. Probed FULLY(3),
+    # no flip (probe_wheel.py).
+    await coincident_mate(adapter, named_ref(f"Axis1@{wh}", "AXIS"),
+                          named_ref(f"Axis1@{ax}", "AXIS"),
+                          label="magnifying-wheel pivot", verify=(wh, wh_o))
+    await distance_driver(adapter, named_ref(f"Front Plane@{wh}", "PLANE"),
+                          named_ref("Front Plane", "PLANE"), abs(wh_o[2]),
+                          label="magnifying-wheel axial", verify=(wh, wh_o))
+    await angle_driver(adapter, named_ref(f"Right Plane@{wh}", "PLANE"),
+                       named_ref("Right Plane", "PLANE"), 0.0,
+                       label="magnifying-wheel rock snapshot", verify=(wh, wh_o))
 
     # --- platen group ---------------------------------------------------------
     await _place(adapter, "platen", [PLATE_X0, PLATE_Y0, PLATE_FRONT_Z],
