@@ -44,10 +44,17 @@ so its end-hook ring lies perpendicular to the lever face. Channel
 stations: z_j = -67.1 + 7.0565 j, arm/bar/lever mid-planes at z_j + 0.8,
 cam/rod plane z_j + 3.3 (rod tip strap face-flush against the arm).
 
-Fix-all strategy (M6.2): every component inserted at its exact final
-transform and fixed; transforms asserted by read-back. Saved state is
-fully defined by construction. Zero interference required (face-flush
-and tangent contacts allowed).
+Mated-DOF strategy: structure (shafts, ball mounts, bushings, cosmetic
+springs) is grounded; the four moving parts per channel are inserted on
+their exact mirrored transform and joined by real revolute joints
+(rocker/lever concentric on the shaft OD, rod/bar coincident axis-to-axis
+on the named bore axes), each pinned to its on-solution pose by an axial
+distance + an off-pivot spin driver. The spin/axial dims are the per-
+channel suppressible drivers, so the saved state stays fully defined
+(0 DOF) for the gate while the joints stay free for a Motion study to
+drive. Far-side mate flips are caught by reading back the origin and
+re-adding flipped. Saved state: every component fixed or fully defined,
+zero interference (face-flush and tangent contacts allowed).
 
 The cams themselves live in drive-train.SLDASM (integral with the
 cylinder gears); the frame, supports and top-frame ring in frame.SLDASM.
@@ -67,21 +74,29 @@ import math
 import sys
 
 from _common import (
-    OUT_SLDPRT,
-    assert_component_placed,
     assert_components_fully_defined,
+    bore_axis_ref,
     check,
     check_no_interference,
+    coincident_mate,
+    concentric_mate,
+    component_transform,
+    distance_driver,
     log,
-    mirror_placement,
+    named_ref,
+    place_component,
     run_build,
     save_assembly_and_images,
+    spin_driver,
+    world_point,
 )
 
 ASM_NAME = "channel"
 
 # --- machine stations -------------------------------------------------------
-CHANNELS = 20
+import os  # noqa: E402
+
+CHANNELS = int(os.environ.get("CHANNEL_COUNT", "20"))  # test hook: build fewer
 Z0 = -67.1  # channel 0 gear plane
 PITCH = 7.0565
 ARM_MID_DZ = 0.8  # arm/bar/lever mid-planes at z_j + 0.8
@@ -114,6 +129,16 @@ BAR_WIDTH = 6.35
 BAR_LENGTH = 812.8
 BAR_FOOT_NOTCH = 2.381
 BAR_TOP_PIN_DROP = 6.35
+# The bar foot-notch roof rests on the rocker's top-edge arc. In the legacy
+# fix-all build the bar sat at the exact tangent (0-volume line contact,
+# filtered as coincidence). Mated, the solver lands a sub-0.005 mm^3
+# penetration sliver that trips the interference gate, so the foot is lifted
+# a hairline above the arc (the documented "design a margin, not a tangent"
+# pattern). The penetration sliver is only ~0.001 mm deep, so a 0.02 mm lift
+# clears it with 20x margin; the lift cascades through the lever tilt into the
+# spring eye, and the plate-threading loop margin (~0.11 mm) bounds it -- 0.02
+# keeps that margin clear, 0.1 broke it.
+BAR_CONTACT_GAP = 0.02
 
 # --- lever bank -------------------------------------------------------------
 FULCRUM = (-199.9, 1065.9)  # lever fulcrum shaft axis (x, y)
@@ -160,11 +185,22 @@ def z_station(j: int) -> float:
     return Z0 + PITCH * j
 
 
-def _part(name: str) -> str:
-    path = (OUT_SLDPRT / f"{name}.SLDPRT").resolve()
-    if not path.exists():
-        raise RuntimeError(f"missing part {path}; run build_{name.replace('-', '_')}.py first")
-    return str(path)
+# --- mate scheme (validated single-channel probe) ---------------------------
+# Both rocker-pivot and lever-fulcrum shafts ride O6.35 bores.
+SHAFT_R = 6.35 / 2.0
+# Off-pivot bore locals (mm, part frame) used by the spin drivers + world_point.
+ROCKER_ROD_BORE_LOCAL = [25.4, 8.39937, 0.0]  # rocker Axis2 (rod pin)
+ROD_STRAP_BORE_LOCAL = [0.0, 0.0, 0.0]  # rod Axis1 (cam ring centre = origin)
+ROD_PIN_BORE_LOCAL = [0.0, 127.0, 0.0]  # rod Axis2 (rocker pin = swing pivot)
+LEVER_BAR_PIN_BORE_LOCAL = [127.0, 0.0, 0.0]  # lever Axis2 (bar pin)
+BAR_TOP_PIN_LOCAL = [3.175, 806.45, 3.175]  # bar Axis1 (swing pivot)
+BAR_FOOT_LOCAL = [3.175, 0.0, 3.175]  # bar Axis2 (foot, ~806 mm arm)
+
+
+def _org(adapter, name: str) -> list[float]:
+    """A component's current origin (mm) in the assembly frame."""
+    a = component_transform(adapter, name)
+    return [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
 
 
 def solve_default_state() -> dict[str, float]:
@@ -204,7 +240,7 @@ def solve_default_state() -> dict[str, float]:
     if contact_alt > contact_y:
         raise RuntimeError("bar contact expected at the -X edge; check tilt sign")
 
-    bar_bottom = contact_y - BAR_FOOT_NOTCH
+    bar_bottom = contact_y - BAR_FOOT_NOTCH + BAR_CONTACT_GAP
     pin_y = bar_bottom + BAR_LENGTH - BAR_TOP_PIN_DROP
     lever_tilt = math.degrees(math.asin((pin_y - FULCRUM[1]) / LEVER_BAR_PIN_X))
     return {
@@ -219,41 +255,51 @@ def solve_default_state() -> dict[str, float]:
     }
 
 
-async def _place(
+async def _revolute(
     adapter,
-    part: str,
-    position: list[float],
-    rotation: list[float],
-    rows: list[list[float]],
-    label: str = "",
-) -> str:
-    """Insert at the exact final transform, fix, and assert the read-back.
+    comp: str,
+    axis_a,
+    axis_b,
+    *,
+    concentric: bool,
+    off_axis_name: str,
+    off_axis_local: list[float],
+    pivot_xy: tuple[float, float],
+    label: str,
+) -> None:
+    """Build one revolute joint pinned to its on-solution pose.
 
-    All placements are derived in the original (pre-M6.8) frame and mirrored
-    about the machine YZ plane here, at the insert boundary."""
-    from solidworks_mcp.adapters.base import (
-        ComponentRefParameters,
-        InsertComponentParameters,
+    ``concentric`` selects the radial mate kind: a cylindrical-face ↔ named-axis
+    pair is *concentric* (shaft OD vs bore), two named axes are *coincident*
+    (collinear lines = coaxial; AddMate5 rejects concentric on two axes). Then
+    a Front/Right-plane *axial* distance pins the Z slide, and a ``spin_driver``
+    on an off-pivot bore pins the residual spin -> fully defined, on-target.
+    The spin/axial dims are the per-channel suppressible drivers.
+    """
+    tgt = _org(adapter, comp)
+    radial = concentric_mate if concentric else coincident_mate
+    await radial(adapter, axis_a, axis_b, label=f"{label} radial", verify=(comp, tgt))
+    # Bar is Ry(90): its Right Plane (local x=0) is the Z mid reference; the
+    # Rz parts use their Front Plane (the sketch mid-plane). off-axis [_,_,z]
+    # locals carry the marker.
+    axial_plane = "Right Plane" if comp.startswith("amplitude-bar") else "Front Plane"
+    await distance_driver(
+        adapter,
+        named_ref(f"{axial_plane}@{comp}", "PLANE"),
+        named_ref("Front Plane", "PLANE"),
+        abs(tgt[2]),
+        label=f"{label} axial d={abs(tgt[2]):.2f}",
+        verify=(comp, tgt),
     )
-
-    position, rotation, rows = mirror_placement(part, position, rotation, rows)
-    label = label or part
-    data = check(
-        f"insert {label} @ ({position[0]:.2f}, {position[1]:.2f}, {position[2]:.2f})",
-        await adapter.insert_component(
-            InsertComponentParameters(
-                file_path=_part(part), position=position, rotation=rotation
-            )
-        ),
+    off = world_point(adapter, comp, off_axis_local)
+    await spin_driver(
+        adapter,
+        named_ref(f"{off_axis_name}@{comp}", "AXIS"),
+        pivot_xy,
+        (off[0], off[1]),
+        label=f"{label} spin -> {off[0]:.1f},{off[1]:.1f}",
+        verify=(comp, tgt),
     )
-    name = data["name"]
-    if not data.get("fixed"):
-        check(
-            f"fix {label}",
-            await adapter.fix_component(ComponentRefParameters(name=name)),
-        )
-    assert_component_placed(adapter, name, position, rows)
-    return name
 
 
 def _assert_spring_threading(hole_y: float, eye_y: float) -> None:
@@ -354,33 +400,40 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_assembly", await adapter.create_assembly())
 
-    # Shafts (first insert auto-fixes).
-    await _place(
+    # Shafts (ground; first insert auto-fixes). The shaft axes in the FINAL
+    # mirrored frame (x -> -x) anchor the rocker/lever concentrics.
+    await place_component(
         adapter, "pivot-shaft", [PIVOT[0], PIVOT[1], 0.0], [0.0, 0.0, 0.0],
         IDENTITY, label="pivot-shaft (rocker)",
     )
-    await _place(
+    await place_component(
         adapter, "fulcrum-shaft", [FULCRUM[0], FULCRUM[1], 0.0], [0.0, 0.0, 0.0],
         IDENTITY, label="fulcrum-shaft (lever bank)",
     )
+    pivot_w = (-PIVOT[0], PIVOT[1])  # (72.9, 253.8)
+    fulc_w = (-FULCRUM[0], FULCRUM[1])  # (199.9, 1065.9)
+    pivot_od = [pivot_w[0] + SHAFT_R, pivot_w[1], 0.0]
+    fulc_od = [fulc_w[0] + SHAFT_R, fulc_w[1], 0.0]
 
-    # Ball mounts. The rocker pair is asymmetric (M6.5): north seats on
-    # the rocker-support apex, south on the A-frame clevis saddle (both
+    # Ball mounts (ground). The rocker pair is asymmetric (M6.5): north seats
+    # on the rocker-support apex, south on the A-frame clevis saddle (both
     # tops at y 228.6).
     for mount_z in (-AFRAME_MOUNT_Z_ABS, SUPPORT_Z):
-        await _place(
+        await place_component(
             adapter, "pivot-ball-mount",
             [PIVOT[0], SUPPORT_APEX_Y, mount_z],
             [0.0, 0.0, 0.0], IDENTITY, label=f"ball-mount rocker z{mount_z:+.0f}",
         )
     for sz in (-1.0, 1.0):
-        await _place(
+        await place_component(
             adapter, "pivot-ball-mount",
             [FULCRUM[0], RAIL_TOP_Y, sz * LEVER_MOUNT_Z],
             [0.0, 0.0, 0.0], IDENTITY, label=f"ball-mount lever z{sz * LEVER_MOUNT_Z:+.0f}",
         )
 
-    # Per-channel chain.
+    # Per-channel chain: the four moving parts are inserted on-solution
+    # (ground=False) and joined by revolutes whose spin/axial dims are the
+    # per-channel suppressible drivers (see _revolute).
     arm_rows = rot_z_rows(state["arm_tilt"])
     rod_rows = rot_z_rows(state["rod_tilt"])
     lever_rows = rot_z_rows(state["lever_tilt"])
@@ -392,48 +445,90 @@ async def build(adapter) -> dict[str, str]:
         zj = z_station(j)
         z_mid = zj + ARM_MID_DZ
 
-        await _place(
+        rocker = await place_component(
             adapter, "rocker-arm",
             [PIVOT[0] + arm_origin_dx, PIVOT[1] - arm_origin_dy, z_mid],
-            [0.0, 0.0, state["arm_tilt"]], arm_rows, label=f"rocker-arm ch{j:02d}",
+            [0.0, 0.0, state["arm_tilt"]], arm_rows,
+            ground=False, label=f"rocker-arm ch{j:02d}",
         )
-        await _place(
+        rod = await place_component(
             adapter, "connecting-rod",
             [RING_CENTER[0], RING_CENTER[1], zj + CAM_DZ],
-            [0.0, 0.0, state["rod_tilt"]], rod_rows, label=f"connecting-rod ch{j:02d}",
+            [0.0, 0.0, state["rod_tilt"]], rod_rows,
+            ground=False, label=f"connecting-rod ch{j:02d}",
         )
         # Bar rotated 90 about Y: local X (slot direction) -> -Z, local
         # Z (depth) -> +X; slot centre (local x 3.175) lands on z_mid.
-        await _place(
+        bar = await place_component(
             adapter, "amplitude-bar",
             [
                 PIVOT[0] - BAR_WIDTH / 2.0,
                 state["bar_bottom"],
                 z_mid + BAR_WIDTH / 2.0,
             ],
-            [0.0, 90.0, 0.0], ROT_Y_POS90, label=f"amplitude-bar ch{j:02d}",
+            [0.0, 90.0, 0.0], ROT_Y_POS90,
+            ground=False, label=f"amplitude-bar ch{j:02d}",
         )
-        await _place(
+        lever = await place_component(
             adapter, "channel-lever",
             [FULCRUM[0], FULCRUM[1], z_mid],
-            [0.0, 0.0, state["lever_tilt"]], lever_rows, label=f"channel-lever ch{j:02d}",
+            [0.0, 0.0, state["lever_tilt"]], lever_rows,
+            ground=False, label=f"channel-lever ch{j:02d}",
         )
-        # Spring rotated 90 about Y: eye ring perpendicular to the lever
-        # face; top eye centre (local (0, 65.05)) is on the axis,
-        # Ry-invariant; the bottom lead lands at z_mid - 2.75 (plate hole).
-        await _place(
+
+        # J1 rocker revolute (shaft OD ↔ pivot bore; spin via the rod bore).
+        await _revolute(
+            adapter, rocker,
+            bore_axis_ref(pivot_od), named_ref(f"Axis1@{rocker}", "AXIS"),
+            concentric=True, off_axis_name="Axis2",
+            off_axis_local=ROCKER_ROD_BORE_LOCAL, pivot_xy=pivot_w,
+            label=f"J1 rocker ch{j:02d}",
+        )
+        # J2 rod revolute (rod pin ↔ rocker rod bore; spin via the strap bore,
+        # swinging about the rod pin).
+        rod_pin = world_point(adapter, rod, ROD_PIN_BORE_LOCAL)
+        await _revolute(
+            adapter, rod,
+            named_ref(f"Axis2@{rocker}", "AXIS"), named_ref(f"Axis2@{rod}", "AXIS"),
+            concentric=False, off_axis_name="Axis1",
+            off_axis_local=ROD_STRAP_BORE_LOCAL, pivot_xy=(rod_pin[0], rod_pin[1]),
+            label=f"J2 rod ch{j:02d}",
+        )
+        # J4 lever revolute (fulcrum OD ↔ fulcrum bore; spin via the bar pin).
+        await _revolute(
+            adapter, lever,
+            bore_axis_ref(fulc_od), named_ref(f"Axis1@{lever}", "AXIS"),
+            concentric=True, off_axis_name="Axis2",
+            off_axis_local=LEVER_BAR_PIN_BORE_LOCAL, pivot_xy=fulc_w,
+            label=f"J4 lever ch{j:02d}",
+        )
+        # J3 bar revolute (bar top pin ↔ lever bar pin; swing via the foot
+        # axis, an ~806 mm arm = the amplitude-coefficient driver).
+        bar_pin = world_point(adapter, bar, BAR_TOP_PIN_LOCAL)
+        await _revolute(
+            adapter, bar,
+            named_ref(f"Axis2@{lever}", "AXIS"), named_ref(f"Axis1@{bar}", "AXIS"),
+            concentric=False, off_axis_name="Axis2",
+            off_axis_local=BAR_FOOT_LOCAL, pivot_xy=(bar_pin[0], bar_pin[1]),
+            label=f"J3 bar ch{j:02d}",
+        )
+
+        # Spring (ground; cosmetic in artifact A). Rotated 90 about Y: eye ring
+        # perpendicular to the lever face; top eye centre (local (0, 65.05)) is
+        # on the axis, Ry-invariant; bottom lead lands at z_mid - 2.75.
+        await place_component(
             adapter, "channel-spring-installed",
             [spring_hole_x, eye_y - SPRING_EYE_LOCAL_Y, z_mid],
             [0.0, 90.0, 0.0], ROT_Y_POS90, label=f"channel-spring ch{j:02d}",
         )
         if j < CHANNELS - 1:
             z_gap = z_mid + PITCH / 2.0
-            await _place(
+            await place_component(
                 adapter, "pivot-bushing",
                 [PIVOT[0], PIVOT[1], z_gap],
                 [0.0, 0.0, 0.0], IDENTITY, label=f"pivot-bushing {j:02d}/{j + 1:02d}",
             )
-            await _place(
+            await place_component(
                 adapter, "lever-bushing",
                 [FULCRUM[0], FULCRUM[1], z_gap],
                 [0.0, 0.0, 0.0], IDENTITY, label=f"lever-bushing {j:02d}/{j + 1:02d}",

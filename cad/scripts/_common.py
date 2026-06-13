@@ -1302,6 +1302,21 @@ def component_transform(adapter: Any, name: str) -> list[float]:
     ]
 
 
+def world_point(adapter: Any, name: str, local_mm: list[float]) -> list[float]:
+    """Map a component-local point (mm) to the assembly frame (mm).
+
+    Uses the live ``Transform2`` ArrayData: world = local·R + t. Lets callers
+    locate a named bore (its sketch-local centre) in the assembly after the
+    component has been placed/mated, without re-deriving the mirror algebra.
+    """
+    a = component_transform(adapter, name)
+    r, t = a[0:9], a[9:12]
+    return [
+        sum(local_mm[i] * r[i * 3 + k] for i in range(3)) + t[k] * 1000.0
+        for k in range(3)
+    ]
+
+
 def assert_component_placed(
     adapter: Any,
     name: str,
@@ -1602,6 +1617,45 @@ async def angle_driver(
     )
 
 
+async def spin_driver(
+    adapter: Any,
+    off_axis_ref: Any,
+    pivot_xy: tuple[float, float],
+    target_xy: tuple[float, float],
+    *,
+    label: str = "",
+    verify: tuple[str, list[float]] | None = None,
+) -> Any:
+    """Pin a revolute's spin via a distance from an off-pivot bore to a plane.
+
+    A plane-plane *angle* mate is unreliable here: a mirrored part flips its
+    plane normals, so the true dihedral is ``180 - tilt`` and both flip
+    solutions miss. Instead lock the better-conditioned in-plane coordinate of
+    a bore that is offset from the rotation axis (``off_axis_ref``, a named
+    AXIS): a Z-parallel axis's distance to the Top plane is its ``y``, to the
+    Right plane its ``x``. Rotating by ``dφ`` moves the bore's ``x`` by
+    ``-Δy·dφ`` and its ``y`` by ``+Δx·dφ`` (Δ = bore − pivot), so pin ``y``
+    (Top) when the offset is mostly horizontal (``|Δx| ≥ |Δy|``), else ``x``
+    (Right) -- whichever has the larger rotation sensitivity. ``target_xy`` is
+    the bore's on-solution assembly position (see :func:`world_point`).
+    """
+    dx = target_xy[0] - pivot_xy[0]
+    dy = target_xy[1] - pivot_xy[1]
+    if abs(dx) >= abs(dy):
+        plane, target = "Top Plane", target_xy[1]
+    else:
+        plane, target = "Right Plane", target_xy[0]
+    label = label or f"spin driver via {plane} d={abs(target):g}"
+    return await distance_driver(
+        adapter,
+        off_axis_ref,
+        named_ref(plane, "PLANE"),
+        abs(target),
+        label=label,
+        verify=verify,
+    )
+
+
 async def tangent_mate(
     adapter: Any,
     ref_a: Any,
@@ -1717,6 +1771,12 @@ def assert_components_fully_defined(adapter: Any) -> None:
     property and raises.
     """
     asm = adapter.currentModel
+    # Inserting/fixing a component marks the mate solver dirty: until the
+    # assembly is rebuilt, GetConstrainedStatus returns a STALE swNoSolution
+    # (5) for every mated part even though the mates are consistent and the
+    # parts have not moved (probed live -- a ForceRebuild3 restores the true
+    # status). Always re-solve before reading the gate.
+    adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
     components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
     log(f"checking {len(components)} components for free DOF ...")
     problems = []
