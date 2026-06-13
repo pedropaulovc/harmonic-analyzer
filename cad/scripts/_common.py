@@ -1370,9 +1370,9 @@ def component_names(adapter: Any) -> list[str]:
 def create_chain_component_pattern(
     adapter: Any,
     path_sketch: str,
-    component: str,
-    axis: str,
-    align_plane: str,
+    seed_component: str,
+    axis_name: str,
+    align_plane_name: str,
     spacing_mm: float,
 ) -> int:
     """Create a Distance-method chain component pattern; return InstanceCount.
@@ -1382,22 +1382,30 @@ def create_chain_component_pattern(
     adapter grows a chain-pattern tool. Selection marks per the API example
     (Create_and_Modify_Distance_Chain_Pattern_Feature): path sketch 2, seed
     component 1, path-alignment geometry 256, alignment plane 16384.
-    Distance pitch method, fill path, align to seed, STATIC (instances sit
-    at the pattern spacing, not draggable). The seed component must be
-    UNFIXED -- the pattern drives it onto the path. The returned
-    InstanceCount is SolidWorks' own fill count; callers should still gate
-    on the actual component list."""
+    ``seed_component`` is the component Name2 (e.g. ``chain-bead-1``);
+    ``axis_name``/``align_plane_name`` are part-local feature names inside
+    it -- the doc-title select suffix is derived here (an unsaved assembly
+    is still ``AssemN``). Distance pitch method, fill path, align to seed,
+    STATIC (instances sit at the pattern spacing, not draggable). The seed
+    component must be UNFIXED -- the pattern drives it onto the path. The
+    returned InstanceCount is SolidWorks' own fill count; callers should
+    still gate on the actual component list."""
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
     model = adapter.currentModel
     ext = model.Extension
+    title = str(_read_member(model, "GetTitle") or "")
+    if title.lower().endswith((".sldasm", ".sldprt")):
+        title = title.rsplit(".", 1)[0]
+    if not title:
+        raise RuntimeError("chain pattern: cannot read the assembly title")
     model.ClearSelection2(True)
     append = False
     for name, type_name, mark in (
         (path_sketch, "SKETCH", 2),
-        (component, "COMPONENT", 1),
-        (axis, "AXIS", 256),
-        (align_plane, "PLANE", 16384),
+        (f"{seed_component}@{title}", "COMPONENT", 1),
+        (f"{axis_name}@{seed_component}@{title}", "AXIS", 256),
+        (f"{align_plane_name}@{seed_component}@{title}", "PLANE", 16384),
     ):
         if not ext.SelectByID2(name, type_name, 0, 0, 0, append, mark, null_callout(), 0):
             raise RuntimeError(
