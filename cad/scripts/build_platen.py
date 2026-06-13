@@ -41,6 +41,7 @@ from _common import (
     define_rectilinear_chain,
     ensure_fully_defined,
     measure_check,
+    name_bore_axis,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -123,6 +124,12 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)  # ch30 plates: see _common palette
+
+    # Named slide axis (local X through the origin = Front Plane ∩ Top Plane) so
+    # the platen runs as a prismatic joint along the rails in the M6 mated-DOF
+    # assembly: collinear with an assembly axis at the slide line, an angle snap
+    # kills the residual spin, an X distance snapshot pins the feed position.
+    await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "slide axis")
 
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)

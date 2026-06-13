@@ -26,6 +26,7 @@ from _common import (
     define_circle,
     define_rectilinear_chain,
     ensure_fully_defined,
+    name_bore_axis,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -72,6 +73,11 @@ async def build(adapter) -> dict[str, str]:
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
+
+    # Named slide axis (local Y through the origin = Front Plane ∩ Right Plane,
+    # the square rod's long axis) so the pen rod runs as a prismatic joint along
+    # the v-block guide in the M6 mated-DOF assembly (vertical pen travel).
+    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "slide axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
