@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from _common import OUT_SLDPRT, check, mirror_placement, run_build  # noqa: E402
+from _common import OUT_SLDPRT, check, run_build  # noqa: E402
 from _common import _flag, _read_member  # type: ignore[attr-defined]  # noqa: E402
 
 # Placements copied from the assembly scripts (pre-mirror frames).
@@ -29,10 +29,6 @@ ROT_Y_INCLINE = [[C, 0.0, S], [0.0, 1.0, 0.0], [-S, 0.0, C]]
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import (
-        ComponentRefParameters,
-        InsertComponentParameters,
-    )
 
     # Recover the post's exact placement from the saved drive-train.SLDASM
     # instead of duplicating its derivation: open it and read the comp box.
