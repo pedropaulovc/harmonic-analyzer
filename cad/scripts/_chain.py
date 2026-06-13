@@ -143,6 +143,79 @@ BEAD_COUNT = round(CENTRELINE_LEN / BEAD_PITCH_NOMINAL)
 BEAD_PITCH = CENTRELINE_LEN / BEAD_COUNT  # exact closure: count * pitch = loop
 
 
+# --- roller chain ------------------------------------------------------------
+# The bead chain is retired in favour of a real ANSI-#25-proportioned roller
+# chain (pitch ~1/4 in): alternating INNER links (2 inner plates + 2 rollers)
+# and OUTER links (2 outer plates + 2 pins), laid along the same centreline
+# loop by a two-group Connected-Linkage chain component pattern. A roller
+# chain closes a loop only with an EVEN number of pitches (inner/outer must
+# alternate back to the seam), so the link count is forced even -- unlike the
+# 63 odd beads. Every dimension stays inside the retired bead's +-2.4 envelope
+# (BEAD_DIA 4.8) so the band-tuned M6.8/M6.9 clearances transfer untouched.
+LINK_COUNT = 2 * round(CENTRELINE_LEN / (2.0 * BEAD_PITCH_NOMINAL))  # 64 (even)
+LINK_PITCH = CENTRELINE_LEN / LINK_COUNT  # exact closure: count * pitch = loop
+
+PLATE_HEIGHT = 4.8  # obround plate height == retired bead diameter (envelope)
+PLATE_THICK = 0.8  # side-plate thickness (z)
+ROLLER_DIA = 3.2  # roller/bushing outer diameter (#25 ~3.30, trimmed to grid)
+ROLLER_R = ROLLER_DIA / 2.0
+ROLLER_WIDTH = 1.0  # roller length along the pin axis (between the inner plates)
+PIN_DIA = 1.8  # pin/bushing pin diameter (#25 ~2.31, trimmed for clearance)
+PIN_R = PIN_DIA / 2.0
+# z stack (pin axis), symmetric about the chain mid-plane, |z| <= 2.2 < 2.4:
+#   inner plates centred at +-1.0 (faces +-0.6..+-1.4), rollers width 1.0 in
+#   the +-0.6 gap, outer plates centred at +-1.8 (faces +-1.4..+-2.2), pins
+#   span the full +-2.2.
+INNER_PLATE_Z = 1.0
+OUTER_PLATE_Z = 1.8
+PIN_HALF_LEN = OUTER_PLATE_Z + PLATE_THICK / 2.0  # 2.2
+
+
+def loop_point_tangent(
+    s: float, dx: float = 0.0, dy: float = 0.0, mirror_x: bool = False
+) -> tuple[float, float, float]:
+    """Point (x, y) and CCW tangent angle (rad) at arc length ``s`` along the
+    loop, in the same (dx, dy, mirror_x) frame as :func:`loop_segments`.
+
+    ``s`` is taken mod CENTRELINE_LEN. The tangent points in the direction of
+    increasing ``s`` (the CCW traversal: knob wrap from the taut normal, slack
+    arc, crank wrap, taut line). Used to seat the chain-pattern seeds tangent
+    to the path at their stations.
+    """
+    s %= CENTRELINE_LEN
+    base = 0.0
+    for cx, cy, r, ang0, span in (
+        (0.0, 0.0, WRAP_R_A, _ANG_N, SPAN_A),
+        (CX, CY, SLACK_R, _ANG_GA, SPAN_SLACK),
+        (BX, BY, WRAP_R_B, _ANG_GB, SPAN_B),
+    ):
+        arc_len = r * span
+        if s <= base + arc_len:
+            ang = ang0 + (s - base) / r
+            x, y = cx + r * math.cos(ang), cy + r * math.sin(ang)
+            theta = ang + math.pi / 2.0  # CCW tangent
+            return _frame_point_tangent(x, y, theta, dx, dy, mirror_x)
+        base += arc_len
+    # taut line, from crank tangent point back to knob tangent point
+    x1, y1 = BX + WRAP_R_B * TNX, BY + WRAP_R_B * TNY
+    x2, y2 = WRAP_R_A * TNX, WRAP_R_A * TNY
+    t = (s - base) / TAUT_LEN
+    x, y = x1 + t * (x2 - x1), y1 + t * (y2 - y1)
+    theta = math.atan2(y2 - y1, x2 - x1)
+    return _frame_point_tangent(x, y, theta, dx, dy, mirror_x)
+
+
+def _frame_point_tangent(
+    x: float, y: float, theta: float, dx: float, dy: float, mirror_x: bool
+) -> tuple[float, float, float]:
+    x, y = x + dx, y + dy
+    if not mirror_x:
+        return x, y, theta
+    # reflect about machine x = 0: (x, y) -> (-x, y); a direction angle theta
+    # -> pi - theta (cos flips sign, sin keeps it).
+    return -x, y, math.pi - theta
+
+
 def loop_segments(
     dx: float = 0.0, dy: float = 0.0, mirror_x: bool = False
 ) -> tuple[
