@@ -26,6 +26,7 @@ import sys
 from _chain import BEAD_R
 from _common import (
     BAR_STEEL,
+    _flag,
     anchor_point_to_origin,
     apply_color,
     apply_material,
@@ -40,6 +41,31 @@ from _common import (
 PART_NAME = "chain-bead"
 MATERIAL = "Plain Carbon Steel"  # bead chain reads mid-grey in the plates
 AXIS_NAME = "Axis1"  # build_output_assembly selects "<AXIS_NAME>@<comp>@output"
+
+
+def _assert_clean_sphere(adapter) -> None:
+    """Fail unless the single solid body is exactly one spherical face.
+
+    Catches the un-merged revolve-cap regression (sphere + two semicircular
+    planar membranes) that a volume-only check sails straight past.
+    """
+    model = adapter.currentModel
+    _flag(model, "IPartDoc")
+    bodies = model.GetBodies2(0, True) or []
+    if len(bodies) != 1:
+        raise RuntimeError(f"bead has {len(bodies)} solid bodies, expected 1")
+    _flag(bodies[0], "IBody2")
+    kinds = []
+    for face in bodies[0].GetFaces() or []:
+        _flag(face, "IFace2")
+        surf = face.GetSurface()
+        _flag(surf, "ISurface")
+        kinds.append("sphere" if surf.IsSphere() else "plane" if surf.IsPlane() else "other")
+    if kinds != ["sphere"]:
+        raise RuntimeError(
+            f"bead is not a clean sphere: faces={kinds} (un-merged revolve caps?)"
+        )
+    print(f"  clean sphere: 1 face {kinds}")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -91,6 +117,14 @@ async def build(adapter) -> dict[str, str]:
     print(f"  volume: {vol:.2f} mm^3 (analytic {expected:.2f})")
     if abs(vol - expected) > 0.005 * expected:
         raise RuntimeError(f"bead volume {vol:.2f} != {expected:.2f}")
+
+    # Volume alone does NOT prove a clean sphere: a 360 revolve that falls a
+    # hair short of 2*pi (e.g. a truncated-pi angle) leaves the start/end
+    # cap membranes un-merged -- the body then has one spherical face PLUS
+    # two coincident semicircular planar caps that hijack the tessellation,
+    # so it renders/exports as a flat half-disc while volume still reads
+    # 57.9. Gate on the B-rep: a clean ball is exactly one spherical face.
+    _assert_clean_sphere(adapter)
 
     # Path-alignment axis for the chain component pattern: part Z (the
     # bead is authored with the machine chain plane as its XY plane).
