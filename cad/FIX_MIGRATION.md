@@ -13,19 +13,22 @@ explicitly justified whitelist, verified by `grep -rn '"fix"' cad/scripts/`.
 | 1 | `_common.define_circle` (fix + driven diameter) | 190 calls / 68 scripts | B1: rewrite to coincident/`*_points`/distance-dims to origin + driving diameter — signature unchanged, all call sites migrate for free |
 | 2 | `_common.ensure_fully_defined` escalation loop | 79 non-empty `fix_entities` call sites / 58 scripts | B1: gate behind `allow_fix_escalation=False` with loud WARN; B2 rebuilds expose which scripts actually relied on it; B3 redesigns those; flag + `fix_entities` param deleted at B3 close |
 
-Two shared-module consumers route through emitter 2 with **equation-driven
-curves** — the whitelist class (fixed equation curves have no free
-endpoints; nothing to dimension):
+Two shared-module consumers routed through emitter 2 with **equation-driven
+curves** — the whitelist class candidates. B3 resolution:
 
-- `_common.add_spring_end_hooks` — `fix_entities=[lead_line, loop_arc]`
-  (build_channel_spring, build_counter_spring);
-- `_gear.cut_tooth_gap` — `fix_entities=gap_curves`, six involute/chord/arc
-  curves (every gear-building script, caught at B1 validation).
+- `_common.add_spring_end_hooks` — **migrated**: the equation curves existed
+  only because `fix` left endpoint DOFs; reverted to a real line + 270° arc
+  with a 7-constraint semantic scheme (vertical lead anchored + dimensioned,
+  tangent junction merge, radial, open end `vertical_points` to the centre).
+- `_gear.cut_tooth_gap` + the cone/removable variants — **whitelisted**
+  (`_gear.py:111`, `build_cone_gear.py:~535`, `build_transgear_removable.py:~271`):
+  the involute/chord/arc curves re-solve from equation globals on
+  configuration changes (ToothCount 12/18/24), so no static
+  relation/dimension scheme can define them without breaking regeneration.
+  Each site carries `allow_fix_escalation=True` + a justification comment.
 
-Both carry `allow_fix_escalation=True` with an inline comment for the
-migration window. B3 attempts merge/coincident of curve endpoints to
-dimensioned geometry first, keeps `fix` with the justification comment only
-if no semantic scheme fully defines the sketch.
+The escalation branch in `ensure_fully_defined` stays, gated behind the
+explicit `allow_fix_escalation=True` flag, exclusively for the whitelist.
 
 ## Per-script burden
 
@@ -61,3 +64,14 @@ if no semantic scheme fully defines the sketch.
 4. **B4**: full 90-script rebuild, top-level assembly, zero-interference,
    render comparisons. Closing sweep: `grep -rn '"fix"' cad/scripts/` must
    return only whitelisted, comment-justified sites (target ≤ 1).
+
+## Status (2026-06-12)
+
+- B1/B2 done; all 36 B2 FAILs migrated. **Source migration complete**: the
+  sweep returns only the 3 whitelisted gear-gap sites + the gated escalation
+  machinery in `_common.ensure_fully_defined`.
+- Live validation: batch 1 (22 scripts) ALL PASS; batch 2 (26 scripts,
+  `.b3_queue2.txt`) running; batch 3 (`.b3_queue3.txt`, 10 scripts incl.
+  both springs exercising the new hook scheme) queued behind it.
+- Remaining: batch 2/3 green → B4 full rebuild + assembly + interference +
+  renders → delete this file.
