@@ -638,18 +638,39 @@ async def build(adapter) -> dict[str, str]:
     await angle_driver(adapter, named_ref(f"Top Plane@{ml}", "PLANE"),
                        named_ref("Top Plane", "PLANE"), 0.0,
                        label="mag-lever rock snapshot", verify=(ml, ml_o))
+    # The clamp + vertical rod + output fixture + thumb screw are clamped to the
+    # lever at the set magnification radius (the thumb screw locks the clamp on
+    # the rod): they ride the lever as one rigid body. The output fixture is
+    # where WIRE 1 to the wheel hub hooks -- its (mostly vertical) travel as the
+    # lever rotates is what drives the magnifying wheel in the Motion study, so
+    # these must move WITH the lever, not stay fixed. Lock each to the lever.
     # Ry(+90): the clamp's lever bore (local Z) turns onto the rod axis (X).
-    await _place(adapter, "magnifying-clamp", list(CLAMP_POS),
-                 [0.0, 90.0, 0.0], ROT_Y_POS90)
+    clamp = await place_component(adapter, "magnifying-clamp", list(CLAMP_POS),
+                                  [0.0, 90.0, 0.0], ROT_Y_POS90, ground=False)
+    await lock_mate(adapter, named_ref(f"Front Plane@{clamp}", "PLANE"),
+                    named_ref(f"Front Plane@{ml}", "PLANE"),
+                    label="mag-clamp locked to lever")
     # Backed-out thumb screw: shank tip tangent to the rod top (a seated
     # screw would overlap the rod it pinches -- see module docstring).
-    await _place(adapter, "thumb-screw",
-                 [CLAMP_X, LEVER_ROD_Y + 3.0 + 12.0 + 5.0, LEVER_ROD_Z],
-                 [0.0, 0.0, -90.0], rot_z_rows(-90.0), label="thumb-screw (clamp)")
-    await _place(adapter, "magnifying-vertical-rod", [CLAMP_X, VROD_TOP_Y, VROD_Z],
-                 [0.0, 0.0, -90.0], rot_z_rows(-90.0))
-    await _place(adapter, "output-fixture", [CLAMP_X, FIXTURE_Y0, VROD_Z],
-                 [0.0, 0.0, 0.0], IDENTITY)
+    tscrew = await place_component(adapter, "thumb-screw",
+                                   [CLAMP_X, LEVER_ROD_Y + 3.0 + 12.0 + 5.0, LEVER_ROD_Z],
+                                   [0.0, 0.0, -90.0], rot_z_rows(-90.0), ground=False,
+                                   label="thumb-screw (clamp)")
+    await lock_mate(adapter, named_ref(f"Front Plane@{tscrew}", "PLANE"),
+                    named_ref(f"Front Plane@{clamp}", "PLANE"),
+                    label="thumb-screw locked to clamp")
+    vrod = await place_component(adapter, "magnifying-vertical-rod",
+                                 [CLAMP_X, VROD_TOP_Y, VROD_Z],
+                                 [0.0, 0.0, -90.0], rot_z_rows(-90.0), ground=False)
+    await lock_mate(adapter, named_ref(f"Front Plane@{vrod}", "PLANE"),
+                    named_ref(f"Front Plane@{clamp}", "PLANE"),
+                    label="vertical-rod locked to clamp")
+    fixture = await place_component(adapter, "output-fixture",
+                                    [CLAMP_X, FIXTURE_Y0, VROD_Z],
+                                    [0.0, 0.0, 0.0], IDENTITY, ground=False)
+    await lock_mate(adapter, named_ref(f"Front Plane@{fixture}", "PLANE"),
+                    named_ref(f"Front Plane@{vrod}", "PLANE"),
+                    label="output-fixture locked to vertical-rod")
 
     # --- support bars + clamps -----------------------------------------------
     for label, bar_y in (("top-rail", TOP_RAIL_Y), ("bot-rail", BOT_RAIL_Y)):
