@@ -85,7 +85,11 @@ def _mid_y(x: float) -> float:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import (
+        CreateAxisParameters,
+        CreatePlaneParameters,
+        ExtrusionParameters,
+    )
 
     check("create_part", await adapter.create_part())
 
@@ -175,6 +179,25 @@ async def build(adapter) -> dict[str, str]:
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
+    # Named axis through the pivot bore (Axis1): assembly mates select it by
+    # NAME. Coordinate face/edge selection is view-dependent (SelectByID2 picks
+    # at the screen projection), so an internal bore wall -- occluded by the
+    # body in every orientation, and doubly so once the pivot shaft overlaps
+    # the same region in the assembly -- never selects by point. The bore axis
+    # is instead the intersection of two name-selected planes: the Right plane
+    # (x=0, through this bore) and a plane offset from Top to the bore-centre y.
+    pivot_y_plane = check(
+        "plane pivot-y (Top + 8)",
+        await adapter.create_plane(
+            CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=_mid_y(0.0))
+        ),
+    ).name
+    check(
+        f"axis pivot bore (Axis1 = Right ∩ {pivot_y_plane})",
+        await adapter.create_axis(
+            CreateAxisParameters(mode="two_planes", planes=["Right Plane", pivot_y_plane])
+        ),
+    )
 
     # Connecting-rod pin hole 1 inch from the pivot, mid-depth.
     rod_x = ROD_HOLE_X
@@ -186,6 +209,25 @@ async def build(adapter) -> dict[str, str]:
         "cut rod hole",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+        ),
+    )
+    # Named axis through the rod-pin bore (Axis2 = (Right+rod_x) ∩ (Top+mid_y)).
+    rod_x_plane = check(
+        "plane rod-x (Right + rod_x)",
+        await adapter.create_plane(
+            CreatePlaneParameters(mode="offset", base_plane="Right Plane", offset=rod_x)
+        ),
+    ).name
+    rod_y_plane = check(
+        "plane rod-y (Top + mid_y)",
+        await adapter.create_plane(
+            CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=_mid_y(rod_x))
+        ),
+    ).name
+    check(
+        f"axis rod bore (Axis2 = {rod_x_plane} ∩ {rod_y_plane})",
+        await adapter.create_axis(
+            CreateAxisParameters(mode="two_planes", planes=[rod_x_plane, rod_y_plane])
         ),
     )
 
