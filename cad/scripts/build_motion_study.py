@@ -388,13 +388,27 @@ async def _suppress_drivers(adapter, level, dump=False):
         adapter, "drive-train-1", ("crank-handle",), (DISTANCE, ANGLE),
         "crank driver")
 
-    # channel: free the cam-follower chain -- the rocker spin + the rod ring
-    # X/Y/swing pose drivers (recurring values). Keep every per-station axial
-    # hold, and leave the amplitude-bar + channel-lever pinned (they move only
-    # once the bar tangent / output wires are added, later stages).
+    # channel: free the cam-follower chain. Two DIFFERENT rules per family:
+    #
+    #  * rocker-arm -> recurring-only: suppress the constant spin driver, KEEP
+    #    the per-station axial-Z hold so each rocker stays at its channel station
+    #    (the rocker pivot revolute is a real two-part mate, untouched).
+    #
+    #  * connecting-rod -> suppress ALL of its drivers (ring-X/Y/Z AND the swing,
+    #    which spin_driver implements as a DISTANCE mate). Artifact A pins the rod
+    #    purely with these four drivers and deliberately omits the rod<->rocker
+    #    and rod<->cam revolutes -- the rod's 127 mm bore spacing is 0.39 mm
+    #    inconsistent with the cam-lobe<->rocker-bore span, so the loop only
+    #    closes if the rod is FREE (build_channel_assembly._pin_design_pose). A
+    #    recurring-only suppress leaves the per-channel-unique ring-Z pinned, and
+    #    then cam-ring<->lobe (-4 DOF) + pin<->rocker (-2) over-constrains the
+    #    Z-pinned rod by one -> AddMate5 "unknown error". Freeing the rod fully
+    #    lets the two new revolutes define it via the 1-DOF four-bar loop.
     await _suppress_recurring(
-        adapter, "channel-1", ("rocker-arm", "connecting-rod"),
-        "channel cam-follower drivers")
+        adapter, "channel-1", ("rocker-arm",), "channel rocker spin drivers")
+    await _suppress_named(
+        adapter, "channel-1", ("connecting-rod",), (DISTANCE, ANGLE),
+        "channel rod drivers (free the rod fully)")
 
 
 # ---- stage 4: per-channel cam + rod couplings (named axes) -------------------
