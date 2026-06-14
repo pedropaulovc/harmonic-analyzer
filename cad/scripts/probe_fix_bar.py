@@ -23,7 +23,7 @@ from __future__ import annotations
 import asyncio
 
 from _common import _read_member, coincident_mate, log, named_ref
-from build_motion_study import OUT_SLDASM, _find_family, _sub_model
+from build_motion_study import OUT_SLDASM, _find_family, _find_one, _sub_model
 from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
 
 
@@ -85,21 +85,37 @@ async def main():
     adapter.currentModel = active or ch_doc
     await _try_fix(adapter, adapter.currentModel, "amplitude-bar-1", "c:activate-sub")
 
-    # (d) + (e): select the dispatch directly via IComponent2.Select4, then call
-    # FixComponent on the sub doc (d) and the top doc (e). No name string.
-    bars = _find_family(adapter, "amplitude-bar", model=ch_doc)
-    bar_c = bars[0][0] if bars else None
-    for tag, fix_model in (("d:select4+subfix", ch_doc), ("e:select4+topfix", top)):
-        if bar_c is None:
-            break
-        adapter.currentModel = fix_model
-        adapter._attempt(lambda: fix_model.ClearSelection2(True), default=None)
-        sel = adapter._attempt(lambda: bar_c.Select4(False, None, False), default=None)
-        adapter._attempt(lambda: fix_model.FixComponent(), default=None)
-        isfix = bool(_read_member(bar_c, "IsFixed"))
-        log(f"  [{tag}] Select4->{sel!r} after FixComponent IsFixed={isfix}")
-        if isfix:
-            adapter._attempt(lambda: fix_model.UnfixComponent(), default=None)
+    # (d)/(e): the CADBooster recipe -- get the component from the TOP-LEVEL
+    # assembly (NOT the sub's ModelDoc2; those objects "behave unpredictably"),
+    # then Select4 the dispatch directly and FixComponent. The earlier sub-doc
+    # objects were the bug. Try fixing on the top doc (d) and (e) via the proper
+    # SelectByID2 string from GetSelectByIDString.
+    adapter.currentModel = top
+    bar_top_c, bar_top_n = _find_one(adapter, "amplitude-bar-1", model=top)
+    log(f"  top-level bar component: {bar_top_n!r}")
+    sel_str = adapter._attempt(lambda: bar_top_c.GetSelectByIDString(), default=None) if bar_top_c else None
+    log(f"  GetSelectByIDString -> {sel_str!r}")
+
+    # (d) top component object + Select4 + top.FixComponent
+    adapter._attempt(lambda: top.ClearSelection2(True), default=None)
+    sel = adapter._attempt(lambda: bar_top_c.Select4(False, None, False), default=None) if bar_top_c else None
+    adapter._attempt(lambda: top.FixComponent(), default=None)
+    isfix_d = bool(_read_member(bar_top_c, "IsFixed")) if bar_top_c else False
+    log(f"  [d:topobj+Select4+topfix] Select4->{sel!r} IsFixed={isfix_d}")
+    if isfix_d:
+        adapter._attempt(lambda: top.UnfixComponent(), default=None)
+
+    # (e) SelectByID2 with the proper full string + top.FixComponent
+    if sel_str:
+        adapter._attempt(lambda: top.ClearSelection2(True), default=None)
+        ok = adapter._attempt(lambda: top.Extension.SelectByID2(
+            sel_str, "COMPONENT", 0.0, 0.0, 0.0, False, 0, None, 0), default=False)
+        adapter._attempt(lambda: top.FixComponent(), default=None)
+        isfix_e = bool(_read_member(bar_top_c, "IsFixed")) if bar_top_c else False
+        log(f"  [e:GetSelectByIDString+topfix] SelectByID2->{ok!r} IsFixed={isfix_e}")
+        if isfix_e:
+            adapter._attempt(lambda: top.UnfixComponent(), default=None)
+    bar_c = bar_top_c
 
     adapter._attempt(
         lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()), default=None)
