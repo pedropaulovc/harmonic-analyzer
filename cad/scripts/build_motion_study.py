@@ -62,6 +62,12 @@ from _common import (
     OUT_PNG, OUT_SLDASM, _flag, _read_member, check, coincident_mate,
     component_named_ref, log, named_ref, run_build,
 )
+from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
+
+# A point on the connecting-rod's Ø51 ring-bore circular edge (part-local mm); its
+# arc centre is the ring centre = the rod origin (the cam pin point). See the
+# phase-f motion-study memory (point-on-axis cam de-redundancy).
+ROD_BORE_EDGE_MM = [25.5, 0.0, 1.5]
 
 # ---- study constants --------------------------------------------------------
 ASM = "harmonic-analyzer"
@@ -502,18 +508,60 @@ async def _add_rod_rocker_revolutes(adapter):
     return ok
 
 
-async def _add_cam_couplings(adapter):
-    """Per channel, at TOP level: cam lobe Axis3 <-> rod ring Axis1 (cross-sub).
+async def _add_ring_centre_point(adapter):
+    """Create a mateable ring-centre RefPoint on the SHARED connecting-rod part.
 
-    A two-axis COINCIDENT mate on named reference axes (AddMate rejects
-    concentric on two axes): Axis3@cylinder-gear is the eccentric cam-lobe axis,
-    Axis1@connecting-rod the ring axis. Cross-sub (drive-train<->channel), so it
-    is allowed at the top level. Named axes are fast (no face walk on the geared
-    part) and mirror-agnostic. The cam lobe orbits as the gear turns -> the rod
-    ring follows -> via the in-sub rod<->rocker revolute (added by
-    _add_rod_rocker_revolutes) the rod pin drives the rocker -> the rocker
-    oscillates about its (artifact-A) pivot revolute.
+    The cam pin must be POSITION-ONLY (point-on-axis, 2 constraints) -- a
+    collinear-axes pin re-fixes the rod orientation the rod<->rocker pin already
+    fixes, over-constraining 20 parallel loops so Basic Motion solves erratically
+    (proven: the same model recalcs to 11.9/0/0 deg). The rod's ORIGIN feature is
+    NOT mateable (AddMate5 unknown error), so create a real RefPoint at the ring
+    centre: the arc centre of the Ø51 bore edge. All 20 instances share
+    connecting-rod.SLDPRT, so ONE point on that part doc is inherited by every
+    instance via GetCorresponding; the part is NEVER saved (artifact A on disk is
+    untouched). Selection in a component's part doc requires it be the ACTIVE doc
+    -> ActivateDoc3 round-trip. Returns the point feature name (e.g. "Point2").
     """
+    from solidworks_mcp.adapters.base import CreateReferencePointParameters
+    top = adapter.currentModel
+    top_title = str(_read_member(top, "GetTitle"))
+    rod_comp, _ = _find_one(adapter, "connecting-rod-1")
+    if rod_comp is None:
+        raise RuntimeError("connecting-rod-1 not found for ring-centre point")
+    part = adapter._attempt(lambda: rod_comp.GetModelDoc2(), default=None)
+    if part is None:
+        raise RuntimeError("connecting-rod part doc unresolved")
+    part_title = str(_read_member(part, "GetTitle"))
+    adapter._attempt(
+        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, _byref_i4()), default=None)
+    adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
+    pt = check("create ring-centre RefPoint", await adapter.create_reference_point(
+        CreateReferencePointParameters(mode="arc_center", edge_point=ROD_BORE_EDGE_MM)))
+    name = pt.get("name") if isinstance(pt, dict) else getattr(pt, "name", None)
+    adapter._attempt(
+        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()), default=None)
+    adapter.currentModel = top
+    if not name:
+        raise RuntimeError("ring-centre RefPoint creation returned no name")
+    log(f"  ring-centre point on {part_title} = {name!r} (shared by all rods)")
+    return name
+
+
+async def _add_cam_couplings(adapter):
+    """Per channel, at TOP level: rod ring-centre POINT on cam lobe Axis3 (cross-sub).
+
+    A POINT-ON-AXIS coincident: the rod ring-centre RefPoint
+    (_add_ring_centre_point) on Axis3@cylinder-gear (the eccentric cam-lobe axis).
+    This is 2 constraints (position only) -- it pins the ring to the orbiting lobe
+    WITHOUT re-fixing the rod orientation that the rod<->rocker pin already fixes,
+    so the 20 parallel four-bar loops are NOT over-constrained and Basic Motion
+    solves reliably (a collinear-axes pin made the solve erratic; see memory).
+    Cross-sub (drive-train<->channel), allowed at top level. The cam lobe orbits
+    as the gear turns -> the rod ring follows -> via the in-sub rod<->rocker
+    revolute the rod pin drives the rocker -> the rocker oscillates about its
+    (artifact-A) pivot revolute.
+    """
+    point_name = await _add_ring_centre_point(adapter)
     log("  enumerating components for cam pairing (single full-tree walk) ...")
     comps = _components(adapter)
     gears = _by_z_rank(adapter, "cylinder-gear", comps=comps)
@@ -524,12 +572,12 @@ async def _add_cam_couplings(adapter):
     for i in range(n):
         gear_n, rod_n = gears[i][1], rods[i][1]
         if i == 0:
-            log(f"    ch00 names: gear={gear_n!r} rod={rod_n!r}")
+            log(f"    ch00 names: gear={gear_n!r} rod={rod_n!r} point={point_name!r}")
         try:
             cam = await coincident_mate(
-                adapter, _entity_ref(rod_n, "Axis1", "AXIS"),
+                adapter, _entity_ref(rod_n, point_name, "POINT"),
                 _entity_ref(gear_n, "Axis3", "AXIS"),
-                label=f"ch{i:02d} cam lobe <-> rod ring")
+                label=f"ch{i:02d} cam lobe <-> rod ring point")
             cam_ok += 1 if cam.get("name") else 0
         except Exception as exc:  # noqa: BLE001 -- first-run diagnostics
             log(f"    ch{i:02d} cam coupling FAILED: {exc}")
@@ -622,6 +670,21 @@ async def _sample_rockers(adapter, study_name="", n_probe=3):
     return spans
 
 
+async def _reset_to_assembled(adapter):
+    """Return the model to its assembled pose before calculate_motion.
+
+    calculate_motion is POSE-DEPENDENT: solving from a previous run's moved/
+    settled pose makes the closed-loop cam mechanism lock (proven: identical
+    recalcs gave 11.9/0/0 deg), whereas solving from the assembled pose reliably
+    moves. set_motion_time(0) then a forced rebuild restores the mate-solved pose.
+    """
+    from solidworks_mcp.adapters.base import MotionTimeParameters
+    await adapter.set_motion_time(MotionTimeParameters(time=0.0, study_name=""))
+    adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
+    adapter._attempt(lambda: adapter.currentModel.EditRebuild3(), default=None)
+    log("  reset to assembled pose (set_time 0 + rebuild) before solve")
+
+
 # ---- main -------------------------------------------------------------------
 async def build(adapter):
     stage = sys.argv[1] if len(sys.argv) > 1 else "kinematic"
@@ -660,6 +723,7 @@ async def build(adapter):
         from build_motion_study_springs import add_wires_gravity
         await add_wires_gravity(adapter)
 
+    await _reset_to_assembled(adapter)
     log("  Calculate() -- blocking solve of the whole device, expect ~270s ...")
     check("calculate_motion", await adapter.calculate_motion(
         MotionStudyRefParameters(name="")))
