@@ -1913,10 +1913,161 @@ def check_no_interference(adapter: Any) -> None:
     print(f"  OK  {_stamp()} interference check: none found", flush=True)
 
 
+# swFeatureError_e: the codes GetWhatsWrong returns. >1 (warning=False) is a
+# hard rebuild fault; code 1 with the warning flag is informational.
+_FEATURE_ERROR = {
+    0: "none",
+    1: "warning",
+    2: "rebuild-error",
+    3: "dangling-no-members",
+    4: "dangling-has-members",
+    5: "sketch-overdefined",
+    6: "sketch-nosolution",
+    7: "sketch-overdefined-dangling",
+}
+
+
+def _byref_variant() -> Any:
+    """An in/out ``VT_BYREF | VT_VARIANT`` for ``out object`` COM params.
+
+    ``IModelDocExtension::GetWhatsWrong`` takes three ``out object`` arrays;
+    under pywin32 late binding a bare call RAISES and bare ``None`` mis-types.
+    Mirrors :func:`com_variant.byref_long`; read the filled value via ``.value``.
+    """
+    import pythoncom
+    from win32com.client import VARIANT
+
+    return VARIANT(pythoncom.VT_BYREF | pythoncom.VT_VARIANT, None)
+
+
+def whats_wrong(adapter: Any, model: Any) -> list[tuple[str, int, bool]]:
+    """Return ``[(feature_name, error_code, is_warning), ...]`` for a model.
+
+    Reads the What's Wrong dialog via ``GetWhatsWrong`` (byref out-params).
+    Empty when the model is clean or the call is unavailable.
+    """
+    ext = _read_member(model, "Extension")
+    if ext is None:
+        return []
+    f, e, w = _byref_variant(), _byref_variant(), _byref_variant()
+
+    def _call() -> tuple[Any, Any, Any]:
+        ext.GetWhatsWrong(f, e, w)
+        return f.value, e.value, w.value
+
+    res = adapter._attempt(_call, default=None)
+    if not res:
+        return []
+    feats, codes, warns = res
+    feats = list(feats or [])
+    codes = list(codes or [])
+    warns = list(warns or [])
+    out: list[tuple[str, int, bool]] = []
+    for i, feat in enumerate(feats):
+        name = "?"
+        if feat is not None:
+            _flag(feat, "IFeature")
+            name = str(_read_member(feat, "Name"))
+        code = int(codes[i]) if i < len(codes) else -1
+        warn = bool(warns[i]) if i < len(warns) else False
+        out.append((name, code, warn))
+    return out
+
+
+def assert_model_healthy(
+    adapter: Any, *, label: str = "", model: Any = None, deep: bool = True
+) -> None:
+    """Force-rebuild and raise on any ERROR-state feature/mate -- fail fast.
+
+    The motion build mutates the assembly (float, flexible, suppress, cross-sub
+    mates, motor); a single failed step leaves a component with a red rebuild
+    error (the drive-train red-X) that otherwise survives silently into the
+    study and only surfaces as garbage motion. This names the culprit the
+    instant it appears.
+
+    A non-warning What's Wrong entry, or ``ForceRebuild3`` returning False, is a
+    hard fault and raises. Warnings (under-defined flexible subs, etc.) are
+    logged, not raised. With ``deep`` each top-level component's own document is
+    also checked -- a flexible subassembly's internal mate error does NOT appear
+    in the parent's What's Wrong, only in the sub document's.
+    """
+    model = model or adapter.currentModel
+    _flag(model, "IModelDoc2")
+    rebuilt = adapter._attempt(lambda: model.ForceRebuild3(False), default=None)
+
+    targets = [(label or "top", model)]
+    if deep:
+        comps = adapter._attempt(lambda: model.GetComponents(False), default=None) or []
+        for comp in comps:
+            _flag(comp, "IComponent2")
+            name = str(_read_member(comp, "Name2"))
+            if "/" in name:  # top-level instances only; their docs cover nested parts
+                continue
+            sub = adapter._attempt(lambda c=comp: c.GetModelDoc2(), default=None)
+            if sub is not None and sub is not model:
+                targets.append((name, sub))
+
+    errors: list[str] = []
+    warnings: list[str] = []
+    for tlabel, doc in targets:
+        for name, code, warn in whats_wrong(adapter, doc):
+            entry = f"{tlabel}:{name} [{_FEATURE_ERROR.get(code, code)}]"
+            (warnings if warn else errors).append(entry)
+    if rebuilt is False:
+        errors.append(f"{label or 'top'}: ForceRebuild3 returned False")
+
+    if warnings:
+        print(
+            f"  ..  {_stamp()} {len(warnings)} warning(s): " + "; ".join(warnings[:12]),
+            flush=True,
+        )
+    if errors:
+        raise RuntimeError(
+            f"model unhealthy ({label or 'top'}): {len(errors)} error(s) -- "
+            + "; ".join(errors[:20])
+        )
+    print(f"  OK  {_stamp()} model healthy ({label or 'top'})", flush=True)
+
+
+def body_faults(adapter: Any, model: Any) -> list[tuple[str, int]]:
+    """Return ``[(body_name, fault_count), ...]`` for any faulty solid bodies.
+
+    ``IBody2.Check3`` -> ``IFaultEntity`` flags degenerate geometry (touching
+    edge vertices, sub-tolerance faces/edges, poorly defined curves) that a
+    rebuild can leave behind after a boolean on a near-singular feature -- the
+    on-axis-revolve / 0.00 mm^3 sliver failure class. Catches part-level
+    corruption that What's Wrong (feature/mate state) does not. Empty = clean.
+    """
+    bodies = adapter._attempt(lambda: model.GetBodies2(0, False), default=None)
+    if bodies is None:
+        return []
+    if not isinstance(bodies, (list, tuple)):
+        bodies = [bodies]
+    faults: list[tuple[str, int]] = []
+    for body in bodies:
+        if body is None:
+            continue
+        _flag(body, "IBody2")
+        fault = adapter._attempt(lambda b=body: b.Check3, default=None)
+        if fault is None:
+            continue
+        _flag(fault, "IFaultEntity")
+        count = int(_read_member(fault, "Count") or 0)
+        if count > 0:
+            faults.append((str(_read_member(body, "Name")), count))
+    return faults
+
+
 async def save_assembly_and_images(
     adapter: Any, asm_name: str, views: Iterable[str] = DEFAULT_VIEWS
 ) -> dict[str, str]:
     """Save the assembly to ``cad/out/sldasm`` and PNG views to ``cad/out/png``."""
+    # Fail fast: never save a broken assembly. Catches mate errors (e.g. a gear
+    # mate whose entity went suppressed = the silent drive-train corruption) that
+    # the DOF and interference gates miss -- a fixed/grounded component passes
+    # the DOF gate even with broken mates. deep=True also inspects each
+    # subassembly's own document, where a sub's internal mate errors live.
+    assert_model_healthy(adapter, label=asm_name, deep=True)
     OUT_SLDASM.mkdir(parents=True, exist_ok=True)
     asm_path = (OUT_SLDASM / f"{asm_name}.SLDASM").resolve()
     check(f"save_file -> {asm_path}", await adapter.save_file(str(asm_path)))
