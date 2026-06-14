@@ -234,7 +234,7 @@ async def _add_wire1_gear(adapter):
     raise RuntimeError(f"WIRE1 gear failed both alignments: {last}")
 
 
-async def add_wires_gravity(adapter):
+async def add_wires_gravity(adapter, with_gravity=False):
     """Stage `full`: the two amplifying wires (motion couplings) + gravity.
 
       WIRE1  gear summing-lever(Z) <-> magnifying-wheel(Z)  (parallel, lumped 5x)
@@ -279,9 +279,17 @@ async def add_wires_gravity(adapter):
         adapter._attempt(lambda: out_doc.ForceRebuild3(False), default=None)
         adapter.currentModel = top
 
-    # 4) gravity (-Y): the device settles under its own weight against the springs.
-    g = await adapter.add_gravity(MotionGravityParameters(
-        axis="y", reverse=True, study_name=""))
-    log(f"  gravity -Y: {'OK' if g.is_success else 'FAIL ' + str(g.error)}")
+    # 4) gravity (-Y), OPT-IN: on a ~1 m steel mechanism gravity forces dwarf the
+    #    weak channel/counter springs (k ~ 0.5-2 kN/m) and can destabilise the
+    #    dynamic Basic Motion solve; the harmonic trace is a crank+spring-balance
+    #    result, so gravity is noise here. Off by default; pass `grav` to enable.
+    grav_ok = None
+    if with_gravity:
+        g = await adapter.add_gravity(MotionGravityParameters(
+            axis="y", reverse=True, study_name=""))
+        grav_ok = g.is_success
+        log(f"  gravity -Y: {'OK' if g.is_success else 'FAIL ' + str(g.error)}")
+    else:
+        log("  gravity: SKIPPED (pass `grav` to enable)")
     return {"wire1": w1.get("name") if w1 else None, "wire2": True,
-            "gravity": g.is_success}
+            "gravity": grav_ok}
