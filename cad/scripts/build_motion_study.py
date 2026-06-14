@@ -92,6 +92,8 @@ FRAME_SUB = "frame-1"
 CRANK_RPM = 20.0          # gentle: 1 rev / 3 s at 20 RPM
 DURATION_S = 6.0          # two crank revolutions
 N_CHANNELS = 20
+ROCKER_MIN_DEG = 1.0      # dead-output gate: largest rocker swing must exceed this
+PEN_MIN_MM = 0.5          # dead-output gate: pen-tip travel must exceed this
 
 # swMateType_e
 COINCIDENT, CONCENTRIC, DISTANCE, ANGLE = 0, 1, 5, 6
@@ -939,8 +941,17 @@ async def _sample_pen(adapter, study_name=""):
         log(f"    t={t:5.2f}s pen tip=({tip[0]:.2f},{tip[1]:.2f},{tip[2]:.2f})")
     if samples:
         ys = [tip[1] for _t, tip in samples]
-        log(f"  pen-tip Y span = {max(ys) - min(ys):.3f} mm "
-            f"(0 => the pen never moved)")
+        span = max(ys) - min(ys)
+        log(f"  pen-tip Y span = {span:.3f} mm (0 => the pen never moved)")
+        # Dead-output gate: the pen is the device's whole point. A solve can
+        # complete with a frozen pen (compliant chain decoupled / springs not
+        # transmitting); fail fast rather than export a dead trace.
+        if span < PEN_MIN_MM:
+            raise RuntimeError(
+                f"DEAD OUTPUT: pen-tip travelled only {span:.3f} mm "
+                f"(< {PEN_MIN_MM}) over the run -- the summing->wheel->pen chain "
+                f"never moved. The solve completed but the output is dead; check "
+                f"the spring force elements and the compliant-chain mates.")
     return samples
 
 
@@ -1027,6 +1038,7 @@ async def _sample_rockers(adapter, study_name="", n_probe=3):
         probes = probes + [(crank, "crankshaft")]
     base = {}
     spans = {}
+    crank_samples = []
     for s in range(13):
         t = DURATION_S * s / 12.0
         check(f"set_time {t:.2f}", await adapter.set_motion_time(
@@ -1034,6 +1046,8 @@ async def _sample_rockers(adapter, study_name="", n_probe=3):
         row = []
         for comp, name in probes:
             a = _comp_xform(adapter, comp)
+            if name == "crankshaft":
+                crank_samples.append((t, a))
             if a is None:
                 row.append("  n/a")
                 continue
@@ -1044,6 +1058,24 @@ async def _sample_rockers(adapter, study_name="", n_probe=3):
         log(f"    t={t:4.2f}s rock(deg)=[{', '.join(row)}] (last=crank)")
     log(f"  rock spans: {dict((k, round(v, 1)) for k, v in spans.items())} "
         f"(crank 0 => motor didn't drive; rockers 0 w/ crank>0 => cam chain broke)")
+
+    # Two complementary fail-fast gates (Basic Motion has no solver-status API):
+    #  1. solve-lock: the motor-driven crank must track its constant rate the
+    #     whole run -- a stalled tail is an aborted solve (red timeline).
+    #  2. dead-output: a solve can complete with the crank spinning yet the
+    #     cam-follower chain decoupled, so the rockers never move. Watching the
+    #     crank alone misses that -- gate the rockers too.
+    if crank is not None:
+        assert_motion_progressed(crank_samples, DURATION_S, "crankshaft")
+        rocker_max = max((v for k, v in spans.items() if k != "crankshaft"),
+                         default=0.0)
+        if rocker_max < ROCKER_MIN_DEG:
+            raise RuntimeError(
+                f"DEAD OUTPUT: crank drove the full run but the largest rocker "
+                f"swing was only {rocker_max:.1f} deg (< {ROCKER_MIN_DEG}) -- the "
+                f"cam-follower chain is decoupled (the solve can complete cleanly "
+                f"with a dead output, so the solve-lock check passes; this gate is "
+                f"what catches it). Check the cam couplings and the foot mates.")
     return spans
 
 
