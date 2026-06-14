@@ -29,14 +29,26 @@ import asyncio
 import math
 import sys
 
-from _common import coincident_mate, gear_mate, log, named_ref
+from _common import OUT_PNG, coincident_mate, gear_mate, log, named_ref
 from build_motion_study import (
     OUT_SLDASM, _by_z_rank, _comp_xform, _components, _entity_ref, _find_one,
-    _rot_angle, _sub_model, _suppress_recurring,
+    _freeze_bars, _rot_angle, _sub_model, _suppress_recurring,
 )
 
 RATIO = [float(sys.argv[1]) if len(sys.argv) > 1 else 1.0, 1.0]
 ROCK_DEG = 10.0  # kinematic test rotation applied to the rocker
+
+
+async def _shot(adapter, tag):
+    """Export iso + front PNGs so the bar pose can be inspected visually."""
+    out = OUT_PNG / "probe-gear"
+    out.mkdir(parents=True, exist_ok=True)
+    for view in ("Isometric", "Front"):
+        path = (out / f"gear_{tag}_{view.lower()}.png").resolve()
+        await adapter.export_image({
+            "file_path": str(path), "format_type": "png",
+            "width": 1600, "height": 1000, "view_orientation": view})
+        log(f"  shot {tag}/{view} -> {path}")
 
 
 async def _flex_channel(adapter):
@@ -87,6 +99,9 @@ async def main():
     await _suppress_recurring(
         adapter, "channel-1", ("rocker-arm", "channel-lever"),
         "free rocker + lever (bar stays pinned)")
+    # decouple the bars from the levers + fix them at design pose (no flop, and
+    # the freed lever can follow the gear without fighting the pinned bar).
+    await _freeze_bars(adapter)
 
     # add the ch0 gear INSIDE channel.SLDASM (both parts in the one flexible sub).
     _, ch_doc = _sub_model(adapter, "channel-1")
@@ -116,6 +131,8 @@ async def main():
     finally:
         adapter.currentModel = top
 
+    await _shot(adapter, "before")  # assembled, bars frozen, gear added
+
     # measure: rotate the rocker kinematically, read the lever rotation AND the
     # bar rotation (must stay ~0 -- the bar is a coefficient setting; if it
     # rotates it is flopping). The in-sub names ('rocker-arm-1') lack the
@@ -134,6 +151,7 @@ async def main():
         axis_point=[ra[9] * 1000.0, ra[10] * 1000.0, ra[11] * 1000.0],
         mode="kinematic"))
     adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
+    await _shot(adapter, "after")  # rocker rotated: bars must look unchanged
     a1 = _comp_xform(adapter, lever_c)
     ra1 = _comp_xform(adapter, rocker_c)
     ba1 = _comp_xform(adapter, bar_c)
