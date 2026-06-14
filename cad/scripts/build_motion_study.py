@@ -953,6 +953,66 @@ def _rot_angle(a0, a1):
     return math.degrees(math.acos(max(-1.0, min(1.0, (tr - 1.0) / 2.0))))
 
 
+def assert_motion_progressed(samples, duration, label="driven",
+                             min_frac=0.85, stall_frac=0.25):
+    """Fail fast on a LOCKED / corrupted Basic Motion solve.
+
+    Basic Motion exposes NO solver-status API. The red timeline is internal UI
+    state with no COM getter, and ``IMotionStudy.Calculate()`` returns True even
+    when the solve aborts mid-run (it reports that the calc *ran*, not that it
+    converged). The Motion-Analysis results object
+    (``GetResults``/``IMotionStudyResults.IsOutOfDate``/plots) that *would* carry
+    per-frame validity needs the SOLIDWORKS Motion add-in, which the Makers seat
+    lacks. So the only signal available is the solved POSES themselves.
+
+    A solve that aborts mid-run replays the last computed frame for every later
+    sample time, so the motor-driven member's pose plateaus. A constant-speed
+    motor must advance the driven member by ~the same angle every equal step, so
+    we self-calibrate the healthy per-step advance (the median of the moving
+    steps -- no need to know the motor's units) and flag the point where the tail
+    drops below ``stall_frac`` of it. This pins the exact abort frame AND catches
+    a partial stall a binary "moved at all" test would miss (an over-constrained
+    closed loop -- the distance-mate foot is the proven culprit, the
+    coincident-axis foot is not).
+
+    ``samples`` is ``[(t, xform_or_None), ...]`` for the driven member over the
+    run. Raises RuntimeError naming the stall time if the member stops tracking
+    the motor before ``min_frac`` of ``duration``.
+    """
+    steps = [(t1, _rot_angle(a0, a1))
+             for (t0, a0), (t1, a1) in zip(samples, samples[1:])
+             if a0 is not None and a1 is not None]
+    if not steps:
+        log(f"  solve-lock check: '{label}' no valid pose samples (skipped)")
+        return
+
+    moving = sorted(d for _t, d in steps if d > 1e-4)
+    if not moving:
+        raise RuntimeError(
+            f"MOTION SOLVE LOCKED: '{label}' never moved -- the motor-driven "
+            f"member is frozen for the entire run. The solve produced no motion "
+            f"(corrupted study / red timeline); Basic Motion has no solver-status "
+            f"API so this pose check is the only signal.")
+
+    typical = moving[len(moving) // 2]          # median healthy step (deg)
+    floor = stall_frac * typical
+    last_good = 0.0
+    for t1, d in steps:
+        if d >= floor:
+            last_good = t1
+    if last_good < min_frac * duration:
+        raise RuntimeError(
+            f"MOTION SOLVE LOCKED: '{label}' tracked the motor (>= {floor:.3f} "
+            f"deg/step) only through t={last_good:.2f}s of {duration:.2f}s "
+            f"-- typical healthy step was {typical:.3f} deg, the tail stalled to "
+            f"~0. A stalled tail = an aborted Basic Motion solve (corrupted study "
+            f"/ red timeline); Basic Motion exposes no solver-status API, so this "
+            f"pose-rate check is the signal. Likely an over-constrained closed "
+            f"loop; use the coincident-axis foot, not distance mates.")
+    log(f"  solve-lock check: '{label}' tracked motor to t={last_good:.2f}s/"
+        f"{duration:.2f}s (typical {typical:.3f} deg/step, OK)")
+
+
 async def _sample_rockers(adapter, study_name="", n_probe=3):
     """Sample crank + a few rockers' rotation over the run -- the motion signal.
 
