@@ -76,8 +76,12 @@ ROD_BORE_EDGE_MM = [25.5, 0.0, 1.5]
 # (0, CENTER_Y=816); the top edge passes through (0, 16) at the +Z face (z =
 # +ARM_THICKNESS/2 = 1.25). A point on that top arc edge lets create_reference_
 # point(arc_center) recover the (0,816) centre on the SHARED rocker part.
-ROCKER_ARC_EDGE_MM = [0.0, 16.0, 1.25]
 ROCKER_ARC_CENTER_LOCAL = [0.0, 816.0, 0.0]  # R800 arc centre (the foot's circle)
+ARC_R = 800.0                                # rocker R800 top-edge radius
+FOOT_COEFF_MM = 60.0  # uniform foot offset along the arc = the amplitude coeff.
+# Proven on the minimal rig: lever swings ~10 deg at 60 mm, ~0.7 deg (dead) near
+# the neutral ~0. A solid uniform value makes every channel transmit; per-channel
+# variation (the harmonic synthesis) layers on later via coeff_fn.
 ROCKER_PIVOT_LOCAL = [0.0, 8.0, 0.0]         # pivot bore = rocker Axis1
 # Amplitude-bar foot axis (build_channel_assembly BAR_FOOT_LOCAL = bar Axis2) and
 # top-pin (bar Axis1, the swing pivot, BAR_TOP_PIN_LOCAL); part-local mm.
@@ -442,7 +446,7 @@ async def _suppress_channel(adapter):
     top pin (book ch.17: the bars "drive the spring-loaded levers up and down",
     modulated by the bar's slide position -- they are swinging couplers, not
     rigid). The bar keeps its J3 top-pin coincident (rides the lever) and its
-    axial-Z hold; _add_foot_arc_joints then re-couples the freed foot to the
+    axial-Z hold; _add_foot_axis_joints then re-couples the freed foot to the
     rocker's R800 arc, closing the rocker->bar->lever four-bar (no gear). An
     earlier lock-to-lever made the bar rigid -> it swept the lever arc into a
     slab; keeping the spin_driver made it stay rigidly vertical -- both wrong.
@@ -568,7 +572,7 @@ async def _suppress_drivers(adapter, level, dump=False):
     # rocker spin, lever spin, bar foot-X and rod drivers are classified +
     # suppressed in ONE mate walk (_suppress_channel) -- the flexible-sub walk is
     # the dominant cost, so the earlier separate walks were collapsed to one. The
-    # freed bar foot is re-pinned to the rocker arc by _add_foot_arc_joints (the
+    # freed bar foot is re-pinned to the rocker arc by _add_foot_axis_joints (the
     # four-bar coupler -- see above).
     await _suppress_channel(adapter)
 
@@ -780,106 +784,110 @@ async def _add_cam_couplings(adapter):
 # placed transforms (relative XY in the sub frame, mirror-/frame-invariant) so the
 # mates start exactly on-solution per channel. NOTE neutral coefficient ~0 means
 # little lever travel until the bars are repositioned to real coefficients (F6c).
-async def _add_rocker_arc_point(adapter, comps=None):
-    """Create the R800 arc-centre RefPoint on the SHARED rocker-arm part.
+def _arc_y(x):
+    """Part-local Y of the R800 foot arc at offset x from the pivot centre."""
+    return ROCKER_ARC_CENTER_LOCAL[1] - math.sqrt(ARC_R ** 2 - x * x)
 
-    Mirror of :func:`_add_ring_centre_point`: all 20 rockers share rocker-arm.
-    SLDPRT, so ONE RefPoint at the arc centre (arc_center of the top R800 edge)
-    is inherited by every instance via GetCorresponding; the part is NEVER saved.
-    Selection in the part doc needs it ACTIVE -> ActivateDoc3 round-trip. Pass
-    ``comps`` to reuse a full-tree walk (the lookup is otherwise a ~170 s walk).
+
+async def _make_rocker_foot_axis(adapter, rk_comp, coeff):
+    """Create a Z foot-pin axis at rocker-local (coeff, arc_y(coeff)).
+
+    Built on the SHARED rocker-arm.SLDPRT (any instance's GetModelDoc2) so all
+    20 rockers inherit it via GetCorresponding; the part is NEVER saved. The axis
+    is the intersection of a Right-Plane offset (x = coeff) and a Top-Plane
+    offset (y = arc_y) -- the same construction proven on the minimal rig. Part
+    geometry is in PART-local coords, so it is mirror-independent (the rocker
+    instances' handedness doesn't matter). Returns the new axis name.
     """
-    from solidworks_mcp.adapters.base import CreateReferencePointParameters
+    from solidworks_mcp.adapters.base import CreateAxisParameters, CreatePlaneParameters
     top = adapter.currentModel
     top_title = str(_read_member(top, "GetTitle"))
-    rk_comp, _ = _find_one(adapter, "rocker-arm-1", comps=comps)
-    if rk_comp is None:
-        raise RuntimeError("rocker-arm-1 not found for arc-centre point")
     part = adapter._attempt(lambda: rk_comp.GetModelDoc2(), default=None)
     if part is None:
-        raise RuntimeError("rocker-arm part doc unresolved")
+        raise RuntimeError("rocker-arm part doc unresolved for foot axis")
     part_title = str(_read_member(part, "GetTitle"))
+    y_off = _arc_y(coeff)
     adapter._attempt(
         lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, _byref_i4()), default=None)
     adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
-    pt = check("create rocker arc-centre RefPoint", await adapter.create_reference_point(
-        CreateReferencePointParameters(mode="arc_center", edge_point=ROCKER_ARC_EDGE_MM)))
-    name = pt.get("name") if isinstance(pt, dict) else getattr(pt, "name", None)
-    adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()), default=None)
-    adapter.currentModel = top
-    if not name:
-        raise RuntimeError("rocker arc-centre RefPoint creation returned no name")
-    log(f"  arc-centre point on {part_title} = {name!r} (shared by all rockers)")
-    return name
+    try:
+        px = ("Right Plane" if abs(coeff) <= 1e-9 else
+              check("foot-pin plane x", await adapter.create_plane(CreatePlaneParameters(
+                  mode="offset", base_plane="Right Plane",
+                  offset=abs(coeff), flip=(coeff < 0)))).name)
+        py = check("foot-pin plane y", await adapter.create_plane(CreatePlaneParameters(
+            mode="offset", base_plane="Top Plane",
+            offset=abs(y_off), flip=(y_off < 0)))).name
+        ax = check("foot-pin axis", await adapter.create_axis(CreateAxisParameters(
+            mode="two_planes", planes=[px, py]))).name
+    finally:
+        adapter._attempt(
+            lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()), default=None)
+        adapter.currentModel = top
+    log(f"  rocker foot-pin axis = {ax!r} at part-local ({coeff:.2f}, {y_off:.2f})")
+    return ax
 
 
-def _xy_dist(p, q):
-    return math.hypot(p[0] - q[0], p[1] - q[1])
+async def _add_foot_axis_joints(adapter, coeff_fn=None):
+    """Per channel, INSIDE channel.SLDASM: coincident bar foot <-> rocker arc axis.
 
+    The PROVEN coincident-axis foot (build_fourbar_test). ONE coincident mate
+    pins the bar foot (Axis2) to a Z-axis built into the rocker at the
+    coefficient point on the R800 arc (_make_rocker_foot_axis): as the rocker
+    rocks, the foot rides the arc, closing the rocker->bar->lever four-bar.
 
-async def _add_foot_arc_joints(adapter, coeff_fn=None):
-    """Per channel, INSIDE channel.SLDASM: pin the bar foot to the rocker arc.
+    This REPLACES the old two-distance-mate foot, which left the output DEAD --
+    the distance pair pinned WHERE the foot could be but never forced the bar to
+    follow the swinging arc, so the rocker rocked under a near-stationary bar
+    (verified A/B on the rig: distance lever 0.7 deg vs coincident 10.5 deg). A
+    coincident axis-on-axis transmits; two distance mates do not.
 
-    Two DISTANCE mates from bar Axis2 (foot): to the rocker arc-centre RefPoint
-    (= R, foot on the R800 arc) and to rocker Axis1 (= r_foot, the coefficient
-    radius). Together they pin the foot to the rocker, closing the rocker->bar->
-    lever four-bar (see the section header). Authored in the sub doc (both parts
-    nested in the same flexible sub -> a top-level mate is rejected, proven for
-    the rod<->rocker revolute); currentModel retargeted then restored, sub NEVER
-    saved.
+    Authored in the sub doc (both parts nested in the same flexible sub -> a
+    top-level mate is rejected, proven for the rod<->rocker revolute);
+    currentModel retargeted then restored, sub NEVER saved.
 
-    ``coeff_fn(i)`` returns the TARGET foot pivot-radius (mm) for channel i = its
-    integration coefficient; the pivot mate slides the foot out along the arc to
-    that radius. Default None = the measured neutral radius (~6.5 mm, ~zero
-    coefficient -> little lever travel). d_arc is always the measured radius (the
-    foot stays on the arc); only d_pivot encodes the coefficient.
+    ``coeff_fn(i)`` -> the channel-i coefficient (mm along the arc from the
+    pivot); default a uniform solid coefficient so every channel transmits.
     """
-    from _common import distance_driver
-    point_name = await _add_rocker_arc_point(adapter)
+    coeff_fn = coeff_fn or (lambda i: FOOT_COEFF_MM)
     _, ch_doc = _sub_model(adapter, "channel-1")
     top = adapter.currentModel
+
+    # Phase 1 (top active): enumerate channels, then create the foot-pin axes on
+    # the shared rocker part (cached per distinct coefficient).
     adapter.currentModel = ch_doc
-    ok = n = 0
+    comps = _components(adapter, ch_doc)
+    rockers = _by_z_rank(adapter, "rocker-arm", comps=comps)
+    bars = _by_z_rank(adapter, "amplitude-bar", comps=comps)
+    n = min(len(rockers), len(bars))
+    adapter.currentModel = top
+    log(f"  foot-axis: {len(rockers)} rockers, {len(bars)} bars -> {n} channels")
+    coeffs = [coeff_fn(i) for i in range(n)]
+    axis_by_coeff = {}
+    for c in coeffs:
+        key = round(c, 3)
+        if key not in axis_by_coeff:
+            axis_by_coeff[key] = await _make_rocker_foot_axis(adapter, rockers[0][0], c)
+
+    # Phase 2 (ch_doc active): author the per-channel coincident foot mates.
+    adapter.currentModel = ch_doc
+    ok = 0
     try:
-        log("  enumerating channel.SLDASM parts for in-sub foot-arc joints ...")
-        comps = _components(adapter, ch_doc)
-        rockers = _by_z_rank(adapter, "rocker-arm", comps=comps)
-        bars = _by_z_rank(adapter, "amplitude-bar", comps=comps)
-        n = min(len(rockers), len(bars))
-        log(f"  in-sub foot-arc: {len(rockers)} rockers, {len(bars)} bars "
-            f"-> {n} channels")
         for i in range(n):
-            (rk_c, rk_n), (bar_c, bar_n) = rockers[i], bars[i]
-            ra = _comp_xform(adapter, rk_c)
-            ba = _comp_xform(adapter, bar_c)
-            if ra is None or ba is None:
-                log(f"    ch{i:02d} foot-arc SKIP: transform unreadable")
-                continue
-            arc_c = _world(ra, ROCKER_ARC_CENTER_LOCAL)
-            pivot = _world(ra, ROCKER_PIVOT_LOCAL)
-            foot = _world(ba, BAR_FOOT_LOCAL)
-            d_arc = _xy_dist(foot, arc_c)
-            d_pivot = coeff_fn(i) if coeff_fn else _xy_dist(foot, pivot)
-            if i == 0:
-                log(f"    ch00 foot-arc: R={d_arc:.2f} d_pivot={d_pivot:.2f} "
-                    f"(neutral {_xy_dist(foot, pivot):.2f}) point={point_name!r}")
+            bar_n, rk_n = bars[i][1], rockers[i][1]
+            ax = axis_by_coeff[round(coeffs[i], 3)]
             try:
-                a = await distance_driver(
-                    adapter, _entity_ref(rk_n, point_name, "POINT"),
-                    _entity_ref(bar_n, "Axis2", "AXIS"), d_arc,
-                    label=f"ch{i:02d} foot on R800 arc")
-                p = await distance_driver(
-                    adapter, _entity_ref(rk_n, "Axis1", "AXIS"),
-                    _entity_ref(bar_n, "Axis2", "AXIS"), d_pivot,
-                    label=f"ch{i:02d} foot radius (coeff)")
-                ok += 1 if (a.get("name") and p.get("name")) else 0
+                res = await coincident_mate(
+                    adapter, _entity_ref(bar_n, "Axis2", "AXIS"),
+                    _entity_ref(rk_n, ax, "AXIS"),
+                    label=f"ch{i:02d} foot <-> rocker arc axis (coeff {coeffs[i]:.0f})")
+                ok += 1 if res.get("name") else 0
             except Exception as exc:  # noqa: BLE001 -- first-run diagnostics
-                log(f"    ch{i:02d} foot-arc FAILED: {exc}")
+                log(f"    ch{i:02d} foot-axis FAILED: {exc}")
         adapter._attempt(lambda: ch_doc.ForceRebuild3(False), default=None)
     finally:
         adapter.currentModel = top
-    log(f"  in-sub foot-arc joints: {ok}/{n}")
+    log(f"  in-sub foot-axis joints: {ok}/{n}")
     return ok
 
 
@@ -1173,7 +1181,7 @@ async def build(adapter):
 
     await _add_rod_rocker_revolutes(adapter)
     await _add_cam_couplings(adapter)
-    await _add_foot_arc_joints(adapter)
+    await _add_foot_axis_joints(adapter)
     check("ensure_motion_addin", await adapter.ensure_motion_addin())
     from solidworks_mcp.adapters.base import MotionStudyParameters, MotionStudyRefParameters
     made = check("create_motion_study", await adapter.create_motion_study(
