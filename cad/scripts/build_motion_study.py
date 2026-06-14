@@ -181,10 +181,30 @@ def _iter_mates(adapter, model):
         feat = _read_member(feat, "GetNextFeature")
 
 
-def _single_part(parts):
-    """The lone PART name when a mate references exactly one part, else None."""
-    uniq = sorted(set(parts))
-    return uniq[0] if len(uniq) == 1 else None
+def _root_title(sub_name):
+    """Sub instance name -> the doc-root part name it shows up as in its own
+    mate group ("drive-train-1" -> "drive-train")."""
+    return sub_name.rsplit("-", 1)[0]
+
+
+def _real_parts(parts, root):
+    """Distinct real part names, dropping the assembly-root pseudo-part.
+
+    A driver dim references one real part + the sub root (the root plane the dim
+    is measured against, which GetMateEntity reports as a component named after
+    the sub doc). Structural mates reference two real parts.
+    """
+    return sorted({p for p in parts if p != root})
+
+
+def _lone_real(parts, root):
+    rp = _real_parts(parts, root)
+    return rp[0] if len(rp) == 1 else None
+
+
+def _family(part_name):
+    """"rocker-arm-12" -> "rocker-arm" (strip the trailing instance suffix)."""
+    return part_name.rsplit("-", 1)[0]
 
 
 # ---- stage 2: float + ground + flex -----------------------------------------
@@ -209,15 +229,62 @@ async def _flex_subs(adapter):
 
 
 # ---- stage 3: suppress the driver dims inside each sub -----------------------
-async def _suppress_in_sub(adapter, sub_name, predicate, label):
-    """Suppress every mate in SUB_NAME's doc matching PREDICATE(name,mtype,parts,val)."""
+# A driver dim references ONE real part + the sub root, and splits into:
+#   * POSE / SPIN drivers -- the SAME value across all 20 channels (the rocker
+#     spin angle, the rod ring X/Y + swing). These pin the DOF the cam should
+#     control -> SUPPRESS.
+#   * AXIAL-Z station holds -- a value that VARIES per channel (the part's Z
+#     along the pitch). These hold the part at its station -> KEEP.
+# So bucket single-real-part distance values by family: a value recurring across
+# many instances is a pose driver; a per-instance-unique value is an axial hold.
+SUPPRESS_RECUR = 5  # a value seen in >= this many instances == pose/spin driver
+
+
+async def _suppress_named(adapter, sub_name, families, mtypes, label):
+    """Suppress every single-real-part mate whose part is in FAMILIES.
+
+    For unique drivers (e.g. the crank angle) where bucketing does not apply.
+    """
     from solidworks_mcp.adapters.base import SuppressMateParameters
     _, model = _sub_model(adapter, sub_name)
+    root = _root_title(sub_name)
     targets = []
     for _f, _m, name, mtype, parts, val in _iter_mates(adapter, model):
-        if predicate(name, mtype, parts, val):
+        if mtype not in mtypes:
+            continue
+        lone = _lone_real(parts, root)
+        if lone is not None and _family(lone) in families:
             targets.append(name)
-    log(f"  {label}: {len(targets)} mates to suppress in {sub_name}: {targets}")
+    await _do_suppress(adapter, sub_name, model, targets, label)
+    return targets
+
+
+async def _suppress_recurring(adapter, sub_name, families, label):
+    """Suppress single-real-part DISTANCE mates whose value recurs across
+    instances (pose/spin), keeping per-instance-unique values (axial holds)."""
+    from collections import Counter
+    _, model = _sub_model(adapter, sub_name)
+    root = _root_title(sub_name)
+    items = []  # (mate_name, family, rounded_value)
+    for _f, _m, name, mtype, parts, val in _iter_mates(adapter, model):
+        if mtype != DISTANCE or val is None:
+            continue
+        lone = _lone_real(parts, root)
+        if lone is None or _family(lone) not in families:
+            continue
+        items.append((name, _family(lone), round(val * 1000.0, 1)))
+    counts = Counter((fam, v) for _n, fam, v in items)
+    targets = [n for n, fam, v in items if counts[(fam, v)] >= SUPPRESS_RECUR]
+    kept = [(fam, v) for (fam, v), c in counts.items() if c < SUPPRESS_RECUR]
+    log(f"  {label}: pose buckets {sorted({(f, v) for _n, f, v in items if counts[(f, v)] >= SUPPRESS_RECUR})}")
+    log(f"  {label}: keeping {len(kept)} per-instance axial values")
+    await _do_suppress(adapter, sub_name, model, targets, label)
+    return targets
+
+
+async def _do_suppress(adapter, sub_name, model, targets, label):
+    from solidworks_mcp.adapters.base import SuppressMateParameters
+    log(f"  {label}: suppressing {len(targets)} mates in {sub_name}")
     saved = adapter.currentModel
     try:
         adapter.currentModel = model
@@ -228,67 +295,42 @@ async def _suppress_in_sub(adapter, sub_name, predicate, label):
     finally:
         adapter.currentModel = saved
     adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
-    return targets
 
 
 def _dump_sub_mates(adapter, sub_name):
-    """Log every mate in a sub doc -- ground truth for the suppress predicates."""
+    """Log every mate in a sub doc -- ground truth for the suppress classifier."""
     _, model = _sub_model(adapter, sub_name)
-    log(f"  --- mates in {sub_name} ---")
+    root = _root_title(sub_name)
+    log(f"  --- mates in {sub_name} (root={root}) ---")
     for _f, _m, name, mtype, parts, val in _iter_mates(adapter, model):
-        single = _single_part(parts)
+        lone = _lone_real(parts, root)
         vstr = ""
         if val is not None and mtype == DISTANCE:
             vstr = f" val={val * 1000.0:.2f}mm"
         elif val is not None and mtype == ANGLE:
             vstr = f" val={math.degrees(val):.2f}deg"
         log(f"    {name:16s} {_MATE_NAME.get(mtype, mtype)!s:11s} "
-            f"single={single} parts={sorted(set(parts))}{vstr}")
+            f"lone={lone} parts={_real_parts(parts, root)}{vstr}")
 
 
-async def _suppress_drivers(adapter):
-    # Ground truth first (cheap, and documents what the predicates act on).
-    for sub in MOVING_SUBS:
-        _dump_sub_mates(adapter, sub)
+async def _suppress_drivers(adapter, level, dump=False):
+    if dump:
+        for sub in MOVING_SUBS:
+            _dump_sub_mates(adapter, sub)
 
-    # drive-train: the crank-angle driver -- the lone distance/angle mate that
-    # references crank-handle (a single part). Frees the whole gear train.
-    await _suppress_in_sub(
-        adapter, "drive-train-1",
-        lambda nm, mt, parts, val: mt in (DISTANCE, ANGLE)
-        and _single_part(parts) is not None
-        and _single_part(parts).startswith("crank-handle"),
+    # drive-train: the crank-angle driver (crank-handle <-> root) -- unique, so
+    # matched by name. Frees the whole gear train to spin from the motor.
+    await _suppress_named(
+        adapter, "drive-train-1", ("crank-handle",), (DISTANCE, ANGLE),
         "crank driver")
 
-    # channel: single-part distance drivers on rocker-arm / connecting-rod
-    # (spin + ring X/Y/Z + rod swing) -- free the cam followers. Keep the
-    # amplitude-bar slides (coefficient settings) and all 2-part structural
-    # axials + concentrics.
-    await _suppress_in_sub(
-        adapter, "channel-1",
-        lambda nm, mt, parts, val: mt == DISTANCE
-        and _single_part(parts) is not None
-        and _single_part(parts).startswith(("rocker-arm", "connecting-rod")),
-        "channel rocker/rod drivers")
-
-    # output: the 4 compliant-chain snapshot drivers. summing-lever /
-    # magnifying-lever / magnifying-wheel ANGLE rocks + the pen-rod travel
-    # DISTANCE (the largest pen-rod distance == its Y position ~398 mm; the
-    # small slide-depth/across stay pinned).
-    await _suppress_in_sub(
-        adapter, "output-1",
-        lambda nm, mt, parts, val: mt == ANGLE
-        and _single_part(parts) is not None
-        and _single_part(parts).startswith(
-            ("summing-lever", "magnifying-lever", "magnifying-wheel")),
-        "output rock snapshots")
-    await _suppress_in_sub(
-        adapter, "output-1",
-        lambda nm, mt, parts, val: mt == DISTANCE
-        and _single_part(parts) is not None
-        and _single_part(parts).startswith("pen-rod")
-        and val is not None and val * 1000.0 > 200.0,
-        "pen-rod travel snapshot")
+    # channel: free the cam-follower chain -- the rocker spin + the rod ring
+    # X/Y/swing pose drivers (recurring values). Keep every per-station axial
+    # hold, and leave the amplitude-bar + channel-lever pinned (they move only
+    # once the bar tangent / output wires are added, later stages).
+    await _suppress_recurring(
+        adapter, "channel-1", ("rocker-arm", "connecting-rod"),
+        "channel cam-follower drivers")
 
 
 # ---- stage 4: per-channel cam + rod couplings (named axes) -------------------
@@ -419,6 +461,39 @@ async def _sample_pen(adapter, study_name=""):
     return samples
 
 
+def _rot_angle(a0, a1):
+    """Relative rotation magnitude (deg) between two component transforms."""
+    def cols(a):
+        return ((a[0], a[1], a[2]), (a[3], a[4], a[5]), (a[6], a[7], a[8]))
+    c0, c1 = cols(a0), cols(a1)
+    tr = sum(c1[k][i] * c0[k][i] for k in range(3) for i in range(3))
+    return math.degrees(math.acos(max(-1.0, min(1.0, (tr - 1.0) / 2.0))))
+
+
+async def _sample_rockers(adapter, study_name="", n_probe=3):
+    """Sample a few rockers' rotation over the run -- the kinematic-stage motion
+    signal (the cam-follower chain, before the output wires exist)."""
+    from solidworks_mcp.adapters.base import MotionTimeParameters
+    rockers = _by_z_rank(adapter, "rocker-arm")[:n_probe]
+    base = {}
+    spans = {}
+    for s in range(13):
+        t = DURATION_S * s / 12.0
+        check(f"set_time {t:.2f}", await adapter.set_motion_time(
+            MotionTimeParameters(time=t, study_name=study_name)))
+        row = []
+        for comp, name in rockers:
+            a = _comp_xform(adapter, comp)
+            base.setdefault(name, a)
+            ang = _rot_angle(base[name], a)
+            spans[name] = max(spans.get(name, 0.0), ang)
+            row.append(f"{ang:5.1f}")
+        log(f"    t={t:4.2f}s rock(deg)=[{', '.join(row)}]")
+    log(f"  rocker rock spans: {[f'{v:.1f}' for v in spans.values()]} "
+        f"(0 => the cam chain never moved)")
+    return spans
+
+
 # ---- main -------------------------------------------------------------------
 async def build(adapter):
     stage = sys.argv[1] if len(sys.argv) > 1 else "kinematic"
@@ -426,14 +501,15 @@ async def build(adapter):
     if stage not in order:
         raise RuntimeError(f"unknown stage {stage!r}; pick {sorted(order)}")
     level = order[stage]
-    log(f"stage = {stage} (level {level})")
+    dump = "dump" in sys.argv[2:]  # the mate-inventory walk is ~10 min; opt-in
+    log(f"stage = {stage} (level {level}) dump={dump}")
 
     asm_path = str((OUT_SLDASM / f"{ASM}.SLDASM").resolve())
     check("open harmonic-analyzer", await adapter.open_model(asm_path))
     log(f"opened {asm_path}")
 
     await _flex_subs(adapter)
-    await _suppress_drivers(adapter)
+    await _suppress_drivers(adapter, level, dump=dump)
     if level < 1:
         log("stage flex complete (no motor/solve)")
         return {}
@@ -457,7 +533,8 @@ async def build(adapter):
 
     check("calculate_motion", await adapter.calculate_motion(
         MotionStudyRefParameters(name="")))
-    samples = await _sample_pen(adapter)
+    await _sample_rockers(adapter)
+    samples = await _sample_pen(adapter) if level >= 3 else []
 
     artefacts = {}
     if level >= 3 and samples:
