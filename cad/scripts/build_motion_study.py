@@ -621,8 +621,16 @@ async def _add_crank_motor(adapter):
 
 # ---- pen sampling -----------------------------------------------------------
 def _comp_xform(adapter, comp):
+    """Component world transform as a 16-float array, or None if unreadable.
+
+    After a heavy Basic Motion solve, Transform2 (or its ArrayData) occasionally
+    returns None on a set_motion_time sample -- a transient COM read, not a real
+    error. Return None so callers skip that sample instead of crashing the run."""
     t = _read_member(comp, "Transform2")
-    return [float(v) for v in _read_member(t, "ArrayData")]
+    data = _read_member(t, "ArrayData") if t is not None else None
+    if data is None:
+        return None
+    return [float(v) for v in data]
 
 
 def _world(a, local_mm):
@@ -643,7 +651,11 @@ async def _sample_pen(adapter, study_name=""):
         t = DURATION_S * s / steps
         check(f"set_time {t:.2f}", await adapter.set_motion_time(
             MotionTimeParameters(time=t, study_name=study_name)))
-        tip = _world(_comp_xform(adapter, marker), [0.0, 0.0, 0.0])
+        a = _comp_xform(adapter, marker)
+        if a is None:
+            log(f"    t={t:5.2f}s pen tip=n/a (transient transform read)")
+            continue
+        tip = _world(a, [0.0, 0.0, 0.0])
         samples.append((t, tip))
         log(f"    t={t:5.2f}s pen tip=({tip[0]:.2f},{tip[1]:.2f},{tip[2]:.2f})")
     if samples:
@@ -663,10 +675,17 @@ def _rot_angle(a0, a1):
 
 
 async def _sample_rockers(adapter, study_name="", n_probe=3):
-    """Sample a few rockers' rotation over the run -- the kinematic-stage motion
-    signal (the cam-follower chain, before the output wires exist)."""
+    """Sample crank + a few rockers' rotation over the run -- the motion signal.
+
+    The crankshaft is sampled last in every row so a single look distinguishes
+    the two failure modes: crank span 0 => the motor never drove (solve/over-
+    constraint failure); crank span > 0 with rockers 0 => the cam-follower chain
+    failed to transmit under the dynamic solve."""
     from solidworks_mcp.adapters.base import MotionTimeParameters
-    rockers = _by_z_rank(adapter, "rocker-arm")[:n_probe]
+    probes = _by_z_rank(adapter, "rocker-arm")[:n_probe]
+    crank, _ = _find_one(adapter, "crankshaft-1")
+    if crank is not None:
+        probes = probes + [(crank, "crankshaft")]
     base = {}
     spans = {}
     for s in range(13):
@@ -674,15 +693,18 @@ async def _sample_rockers(adapter, study_name="", n_probe=3):
         check(f"set_time {t:.2f}", await adapter.set_motion_time(
             MotionTimeParameters(time=t, study_name=study_name)))
         row = []
-        for comp, name in rockers:
+        for comp, name in probes:
             a = _comp_xform(adapter, comp)
+            if a is None:
+                row.append("  n/a")
+                continue
             base.setdefault(name, a)
             ang = _rot_angle(base[name], a)
             spans[name] = max(spans.get(name, 0.0), ang)
             row.append(f"{ang:5.1f}")
-        log(f"    t={t:4.2f}s rock(deg)=[{', '.join(row)}]")
-    log(f"  rocker rock spans: {[f'{v:.1f}' for v in spans.values()]} "
-        f"(0 => the cam chain never moved)")
+        log(f"    t={t:4.2f}s rock(deg)=[{', '.join(row)}] (last=crank)")
+    log(f"  rock spans: {dict((k, round(v, 1)) for k, v in spans.items())} "
+        f"(crank 0 => motor didn't drive; rockers 0 w/ crank>0 => cam chain broke)")
     return spans
 
 
@@ -758,7 +780,7 @@ async def build(adapter):
         await add_springs(adapter)
     if level >= 3:
         from build_motion_study_springs import add_wires_gravity
-        await add_wires_gravity(adapter)
+        await add_wires_gravity(adapter, with_gravity="grav" in sys.argv[2:])
 
     await _reset_to_assembled(adapter)
     log("  Calculate() -- blocking solve of the whole device, expect ~270s ...")
