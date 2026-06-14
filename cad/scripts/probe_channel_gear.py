@@ -31,34 +31,12 @@ import sys
 
 from _common import coincident_mate, gear_mate, log, named_ref
 from build_motion_study import (
-    ANGLE, DISTANCE, OUT_SLDASM, _by_z_rank, _comp_xform, _components,
-    _entity_ref, _family, _find_one, _iter_mates, _lone_real, _mate_value,
-    _rot_angle, _sub_model,
+    OUT_SLDASM, _by_z_rank, _comp_xform, _components, _entity_ref, _find_one,
+    _rot_angle, _sub_model, _suppress_recurring,
 )
 
 RATIO = [float(sys.argv[1]) if len(sys.argv) > 1 else 1.0, 1.0]
 ROCK_DEG = 10.0  # kinematic test rotation applied to the rocker
-
-
-async def _suppress_family_drivers(adapter, sub_name, family, mtypes):
-    """Suppress every single-real-part driver of FAMILY (frees that part)."""
-    from solidworks_mcp.adapters.base import SuppressMateParameters
-    _, model = _sub_model(adapter, sub_name)
-    root = sub_name.rsplit("-", 1)[0]
-    targets = []
-    for _f, _m, name, mtype, parts, _v in _iter_mates(
-            adapter, model, read_values=False, progress_every=40):
-        if mtype not in mtypes:
-            continue
-        lone = _lone_real(parts, root)
-        if lone is not None and _family(lone) == family:
-            targets.append(name)
-    log(f"  suppress {family}: {len(targets)} drivers")
-    for name in targets:
-        await adapter.suppress_mate(SuppressMateParameters(
-            name=name, suppress=True, component=sub_name))
-    adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
-    return targets
 
 
 async def _flex_channel(adapter):
@@ -97,9 +75,14 @@ async def main():
     log(f"opened {asm_path}")
 
     await _flex_channel(adapter)
-    # free the rocker spin + the bar (foot->plane driver) so the lever can move.
-    await _suppress_family_drivers(adapter, "channel-1", "rocker-arm", (DISTANCE, ANGLE))
-    await _suppress_family_drivers(adapter, "channel-1", "amplitude-bar", (DISTANCE, ANGLE))
+    # Free the WHOLE rocker->bar->lever chain: suppress the recurring pose/spin
+    # drivers of all three families (the lever has its OWN J4 bar-pin spin driver
+    # -- missing that is why the first gear test left the lever locked). Recurring
+    # = the uniform default pose/spin; per-channel axial-Z holds are KEPT so the
+    # parts stay at their stations.
+    await _suppress_recurring(
+        adapter, "channel-1", ("rocker-arm", "amplitude-bar", "channel-lever"),
+        "free rocker/bar/lever chain")
 
     # add the ch0 gear INSIDE channel.SLDASM (both parts in the one flexible sub).
     _, ch_doc = _sub_model(adapter, "channel-1")
