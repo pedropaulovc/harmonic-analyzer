@@ -56,6 +56,7 @@ solve can be brought up incrementally:
 from __future__ import annotations
 
 import math
+import os
 import sys
 
 from _common import (
@@ -92,6 +93,16 @@ G_STEEL = 79.3e9  # Pa
 CH_SPRING = dict(d=1.0, D=5.5, n=28.0, free_mm=32.0)
 # counter spring: wire d 1.8, OD 12.5 -> mean D 10.7, n 165, free body 315mm
 CT_SPRING = dict(d=1.8, D=10.7, n=165.0, free_mm=315.0)
+
+# Basic Motion spring-rate OVERRIDE (N/m). The geometric steel rates are
+# k_ch ~ 2130 N/m, k_ct ~ 514 N/m -- the isolated POC (poc_spring_adder.py)
+# proved k~2000 N/m ABORTS the fixed-step solve (omega too high), while k in the
+# low-N/m..tens-of-N/m band tracks the moving-anchor sum cleanly. The full-model
+# levers are heavier than the POC's 1.6 g bushing so they tolerate a higher rate,
+# but 2 kN/m is over the line -- default to a solver-safe band and sweep via env.
+# 0 or negative => fall back to the geometric helical rate.
+SPRING_KCH = float(os.environ.get("SPRING_KCH", "50.0"))   # N/m, channel springs
+SPRING_KCT = float(os.environ.get("SPRING_KCT", "25.0"))   # N/m, counter spring
 
 
 def _k_helical(d_mm: float, D_mm: float, n: float) -> float:
