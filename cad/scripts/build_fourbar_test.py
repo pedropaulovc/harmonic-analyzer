@@ -47,7 +47,7 @@ from _common import (
     coincident_mate, component_transform, concentric_mate, distance_driver,
     log, named_ref, place_component,
 )
-from build_motion_study import _entity_ref, _rot_angle
+from build_motion_study import _entity_ref, _rot_angle, assert_motion_progressed
 from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
 
 # --- geometry (design / pre-mirror frame, mm) -------------------------------
@@ -58,7 +58,16 @@ ARC_R = 800.0
 # coefficient. +ve one side, 0 = above the pivot (zero amplitude), -ve = the
 # other side of the see-saw (inverted amplitude). Override via FOURBAR_COEFF.
 COEFF = float(os.environ.get("FOURBAR_COEFF", "60.0"))
-TAG = os.environ.get("FOURBAR_TAG", f"coeff_{COEFF:+.0f}")
+# Foot-pin scheme under test:
+#   "coincident" -- bar foot Axis2 COINCIDENT to a Z-axis built on the rocker at
+#                   (COEFF, arc_y); the proven minimal-rig pin.
+#   "distance"   -- bar foot Axis2 pinned by TWO DISTANCE mates (to the rocker
+#                   arc-centre point = R, to the pivot axis = r_foot), exactly
+#                   the full-study _add_foot_arc_joints scheme. This A/B test
+#                   decides whether the distance-foot transmits at a REAL
+#                   coefficient (the full assembly only ever ran it at ~0).
+FOOT_MODE = os.environ.get("FOURBAR_FOOT", "coincident")
+TAG = os.environ.get("FOURBAR_TAG", f"coeff_{COEFF:+.0f}_{FOOT_MODE}")
 
 # eccentric cam + connecting rod (build_eccentric_cam.py / build_connecting_rod.py)
 CAM_R = 50.8 / 2.0            # disc OD radius (the journal the rod strap rides)
@@ -70,6 +79,11 @@ ARM_ROD_X = 25.4
 ARM_DEPTH = 16.0
 R_TOP = 800.0
 R_BOT = R_TOP + ARM_DEPTH     # 816
+
+# rocker arc-centre + pivot locals (build_motion_study.py) for the distance foot
+ROCKER_ARC_EDGE_MM = [0.0, 16.0, 1.25]      # a point on the R800 top edge
+ROCKER_ARC_CENTER_LOCAL = [0.0, 816.0, 0.0]  # R800 arc centre
+ROCKER_PIVOT_LOCAL = [0.0, 8.0, 0.0]        # pivot bore = rocker Axis1
 
 # bar / lever named-bore locals (from build_channel_assembly.py)
 BAR_FOOT_LOCAL = [3.175, 0.0, 3.175]        # bar Axis2 (foot)
@@ -157,6 +171,39 @@ async def _make_part_z_axis(adapter, comp_name: str, x_off: float, y_off: float,
     return ax
 
 
+async def _make_part_arc_point(adapter, comp_name: str, edge_mm: list[float],
+                               label: str) -> str:
+    """Create an arc-centre RefPoint on a SHARED part doc (round-trip, not saved).
+
+    Mirrors build_motion_study._add_rocker_arc_point: select a point on a
+    circular edge, RefPoint at its arc centre. Returns the point feature name."""
+    from solidworks_mcp.adapters.base import CreateReferencePointParameters
+
+    comp = adapter.currentModel.GetComponentByName(comp_name)
+    _flag(comp, "IComponent2")
+    part = adapter._attempt(lambda: comp.GetModelDoc2(), default=None)
+    if part is None:
+        raise RuntimeError(f"{comp_name} part doc unresolved")
+    top = adapter.currentModel
+    top_title = str(_read_member(top, "GetTitle"))
+    part_title = str(_read_member(part, "GetTitle"))
+    adapter._attempt(
+        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, _byref_i4()), default=None)
+    adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
+    try:
+        pt = check(f"{label} RefPoint", await adapter.create_reference_point(
+            CreateReferencePointParameters(mode="arc_center", edge_point=edge_mm)))
+        name = pt.get("name") if isinstance(pt, dict) else getattr(pt, "name", None)
+    finally:
+        adapter._attempt(
+            lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()), default=None)
+        adapter.currentModel = top
+    if not name:
+        raise RuntimeError(f"{label} RefPoint returned no name")
+    log(f"  {label} point = {name!r} on {part_title}")
+    return name
+
+
 async def _axial_lock(adapter, comp: str, plane: str = "Front Plane") -> None:
     """Pin a part's slide along its (Z) pin axis to its placed Z.
 
@@ -232,9 +279,13 @@ async def build(adapter) -> None:
                                   [fulcrum_xy[0], fulcrum_xy[1], Z_LEVER],
                                   [0.0, 0.0, 0.0], IDENT, ground=False, label="channel-lever")
 
-    # reference axes on the shared part docs (parts never saved)
-    pin_axis = await _make_part_z_axis(adapter, rocker, COEFF, _arc_y(COEFF), "foot-pin")
+    # reference geometry on the shared part docs (parts never saved)
     cam_axis = await _make_part_z_axis(adapter, cam, 0.0, 0.0, "cam bore")
+    pin_axis = arc_point = None
+    if FOOT_MODE == "coincident":
+        pin_axis = await _make_part_z_axis(adapter, rocker, COEFF, _arc_y(COEFF), "foot-pin")
+    else:
+        arc_point = await _make_part_arc_point(adapter, rocker, ROCKER_ARC_EDGE_MM, "rocker arc")
 
     # mirrored-frame shaft OD / cam disc OD pick points (a point on the cylinder)
     pivot_od = [-pivot_xy[0] + SHAFT_R, pivot_xy[1], Z_ROCKER]
@@ -271,12 +322,30 @@ async def build(adapter) -> None:
                           label="J2b rod pin on rocker", verify=(rod, _org(adapter, rod)))
     await _axial_lock(adapter, rod)
 
-    # J3 bar: foot coincident to the rocker arc-point axis, top pin coincident to
-    # the lever bar-pin. The foot rides a fixed coefficient on the R800 arc.
-    await coincident_mate(adapter, _entity_ref(bar, "Axis2", "AXIS"),
-                          _entity_ref(rocker, pin_axis, "AXIS"),
-                          label="J3a foot pin (bar foot on rocker arc)",
-                          verify=(bar, _org(adapter, bar)))
+    # J3a foot: ride a fixed coefficient on the rocker R800 arc.
+    if FOOT_MODE == "coincident":
+        await coincident_mate(adapter, _entity_ref(bar, "Axis2", "AXIS"),
+                              _entity_ref(rocker, pin_axis, "AXIS"),
+                              label="J3a foot pin (coincident to rocker arc axis)",
+                              verify=(bar, _org(adapter, bar)))
+    else:
+        # full-study scheme: two DISTANCE mates from the bar foot to rocker
+        # features (arc-centre point = R, pivot axis = r_foot coefficient).
+        foot = world_point(adapter, bar, BAR_FOOT_LOCAL)
+        arc_c = world_point(adapter, rocker, ROCKER_ARC_CENTER_LOCAL)
+        pivot = world_point(adapter, rocker, ROCKER_PIVOT_LOCAL)
+        d_arc = math.hypot(foot[0] - arc_c[0], foot[1] - arc_c[1])
+        d_pivot = math.hypot(foot[0] - pivot[0], foot[1] - pivot[1])
+        log(f"  distance foot: d_arc={d_arc:.2f} d_pivot={d_pivot:.2f}")
+        await distance_driver(adapter, _entity_ref(rocker, arc_point, "POINT"),
+                              _entity_ref(bar, "Axis2", "AXIS"), d_arc,
+                              label="J3a foot on R800 arc (distance)",
+                              verify=(bar, _org(adapter, bar)))
+        await distance_driver(adapter, _entity_ref(rocker, "Axis1", "AXIS"),
+                              _entity_ref(bar, "Axis2", "AXIS"), d_pivot,
+                              label="J3a foot radius coeff (distance)",
+                              verify=(bar, _org(adapter, bar)))
+    # J3b top pin: lever bar-pin coincident to bar top pin.
     await coincident_mate(adapter, _entity_ref(lever, "Axis2", "AXIS"),
                           _entity_ref(bar, "Axis1", "AXIS"),
                           label="J3b top pin (bar top on lever)",
@@ -301,6 +370,7 @@ async def build(adapter) -> None:
     base, spans = {}, {}
     probes = [("cam", cam), ("rocker", rocker), ("bar", bar), ("lever", lever)]
     best_t, best_rocker = 0.0, -1.0   # park at peak ROCKER swing (moves at any coeff)
+    cam_samples = []                  # (t, xform) of the motor-driven member
     for s in range(STEPS + 1):
         t = DURATION_S * s / STEPS
         await adapter.set_motion_time(MotionTimeParameters(time=t, study_name=""))
@@ -311,22 +381,43 @@ async def build(adapter) -> None:
             ang = _rot_angle(base[name], a)
             spans[name] = max(spans.get(name, 0.0), ang)
             row.append(f"{name}={ang:6.2f}")
+            if name == "cam":
+                cam_samples.append((t, a))
             if name == "rocker" and ang > best_rocker:
                 best_rocker, best_t = ang, t
         log(f"    t={t:4.2f}s  {'  '.join(row)}")
     log(f"  spans(deg): {dict((k, round(v, 2)) for k, v in spans.items())}")
+    # Fail fast on a locked/corrupted solve (the motor-driven cam must keep
+    # turning every step; a frozen tail = an aborted Basic Motion solve).
+    assert_motion_progressed(cam_samples, DURATION_S, "cam")
 
     cm, rk, br, lv = (spans.get(k, 0) for k in ("cam", "rocker", "bar", "lever"))
-    if cm > 90.0 and 3.0 < rk < 90.0 and lv > 0.5 and br > 0.05:
+    # The LEVER is the true output signal: the bar mostly TRANSLATES along the
+    # arc, so its rotation span is misleadingly tiny (~0.5 deg) in both the
+    # working and broken schemes -- only the lever rotation reveals whether the
+    # rocker->bar->lever chain actually transmits. The distance-mate foot lets
+    # the rocker swing under a near-stationary bar (lever ~0.7 deg = dead); the
+    # coincident-axis foot drives the lever ~10 deg. Watching the driven cam
+    # alone (assert_motion_progressed) cannot catch a dead output -- the cam
+    # spins happily either way -- so gate the OUTPUT here too.
+    LEVER_MIN = 3.0
+    if cm > 90.0 and 3.0 < rk < 90.0 and lv >= LEVER_MIN:
         log(f"  PASS: cam spins ({cm:.0f}>=180 wraps) -> rocker OSCILLATES {rk:.1f} deg "
-            f"-> bar {br:.1f} -> lever {lv:.1f} (cam-driven channel transmits)")
+            f"-> lever {lv:.1f} deg (cam-driven channel transmits to output)")
     elif cm <= 90.0:
-        log(f"  FAIL: cam barely turned ({cm:.1f}) -- motor/over-constraint")
+        raise RuntimeError(f"FAIL: cam barely turned ({cm:.1f} deg) -- motor not "
+                           f"driving / over-constrained loop")
     elif rk >= 90.0:
-        log(f"  FAIL: rocker swung {rk:.1f} deg -- still spinning, not oscillating")
-    else:
-        log(f"  FAIL: cam {cm:.0f} rocker {rk:.1f} but bar {br:.2f}/lever {lv:.2f} "
-            f"-- chain not transmitting")
+        raise RuntimeError(f"FAIL: rocker swung {rk:.1f} deg -- still spinning, "
+                           f"not oscillating (cam/rod coupling wrong)")
+    elif lv < LEVER_MIN:
+        raise RuntimeError(
+            f"DEAD OUTPUT: rocker swung {rk:.1f} deg but the lever moved only "
+            f"{lv:.1f} deg (< {LEVER_MIN}) -- the rocker->bar->lever chain is "
+            f"decoupled (the amplitude bar isn't being driven). The solve can "
+            f"complete cleanly with a dead output, so the solve-lock check passes "
+            f"-- this output-amplitude gate is what catches it. Use the "
+            f"coincident-axis foot, not the distance-mate foot.")
 
     # --- artefacts: an mp4 + nine views at the peak-deflection pose ------------
     out_dir = OUT_PNG / "fourbar-test" / TAG
