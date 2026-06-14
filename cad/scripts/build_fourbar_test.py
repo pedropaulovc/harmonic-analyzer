@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+import os
 import sys
 
 from _common import (
@@ -53,7 +54,11 @@ from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
 SHAFT_R = 6.35 / 2.0
 ARC_CENTER_Y = 816.0          # rocker R800 arc centre, local
 ARC_R = 800.0
-COEFF = 60.0                  # foot offset along the arc from the pivot = lever arm
+# foot offset along the rocker arc from the pivot = the per-channel amplitude
+# coefficient. +ve one side, 0 = above the pivot (zero amplitude), -ve = the
+# other side of the see-saw (inverted amplitude). Override via FOURBAR_COEFF.
+COEFF = float(os.environ.get("FOURBAR_COEFF", "60.0"))
+TAG = os.environ.get("FOURBAR_TAG", f"coeff_{COEFF:+.0f}")
 
 # eccentric cam + connecting rod (build_eccentric_cam.py / build_connecting_rod.py)
 CAM_R = 50.8 / 2.0            # disc OD radius (the journal the rod strap rides)
@@ -295,7 +300,7 @@ async def build(adapter) -> None:
 
     base, spans = {}, {}
     probes = [("cam", cam), ("rocker", rocker), ("bar", bar), ("lever", lever)]
-    best_t, best_lever = 0.0, -1.0
+    best_t, best_rocker = 0.0, -1.0   # park at peak ROCKER swing (moves at any coeff)
     for s in range(STEPS + 1):
         t = DURATION_S * s / STEPS
         await adapter.set_motion_time(MotionTimeParameters(time=t, study_name=""))
@@ -306,8 +311,8 @@ async def build(adapter) -> None:
             ang = _rot_angle(base[name], a)
             spans[name] = max(spans.get(name, 0.0), ang)
             row.append(f"{name}={ang:6.2f}")
-            if name == "lever" and ang > best_lever:
-                best_lever, best_t = ang, t
+            if name == "rocker" and ang > best_rocker:
+                best_rocker, best_t = ang, t
         log(f"    t={t:4.2f}s  {'  '.join(row)}")
     log(f"  spans(deg): {dict((k, round(v, 2)) for k, v in spans.items())}")
 
@@ -324,7 +329,7 @@ async def build(adapter) -> None:
             f"-- chain not transmitting")
 
     # --- artefacts: an mp4 + nine views at the peak-deflection pose ------------
-    out_dir = OUT_PNG / "fourbar-test"
+    out_dir = OUT_PNG / "fourbar-test" / TAG
     out_dir.mkdir(parents=True, exist_ok=True)
     try:
         from solidworks_mcp.adapters.base import MotionExportParameters
@@ -336,7 +341,7 @@ async def build(adapter) -> None:
     except Exception as exc:  # noqa: BLE001
         log(f"  video export skipped: {exc}")
     await adapter.set_motion_time(MotionTimeParameters(time=best_t, study_name=""))
-    log(f"  stills parked at peak lever pose t={best_t:.2f}s ({best_lever:.1f} deg)")
+    log(f"  stills parked at peak rocker pose t={best_t:.2f}s ({best_rocker:.1f} deg)")
     for view in ("front", "back", "top", "bottom", "isometric", "dimetric",
                  "trimetric", "right", "left"):
         img = (out_dir / f"fourbar_{view}.png").resolve()
