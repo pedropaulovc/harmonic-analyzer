@@ -90,20 +90,33 @@ def _k_helical(d_mm: float, D_mm: float, n: float) -> float:
 
 
 # ---- nested-component helpers (GetComponentByName fails on 'sub/part') -------
-def _components(adapter, model=None):
+# GetComponents(False) returns the WHOLE nested tree -- and once the moving subs
+# are flexible that is hundreds of nodes, each costing a Name2 COM round-trip.
+# It is the dominant hidden cost of the silent stretches, so every walk is timed
+# (logged) and callers that need it more than once enumerate ONCE and pass the
+# (comp, name) list down. ``toplevel=True`` returns only the top-level instances
+# (the moving subs) -- a tiny, fast list; use it whenever no nested part is
+# needed (e.g. verifying a sub's Solving state).
+def _components(adapter, model=None, toplevel=False):
+    """``[(comp, Name2), ...]`` for every component; logs the walk + its cost."""
+    import time as _t
     model = model or adapter.currentModel
-    return adapter._attempt(lambda: model.GetComponents(False), default=None) or []
-
-
-def _find_comps(adapter, needle, model=None):
-    """All components whose Name2 contains ``needle`` (dispatch, name)."""
+    t0 = _t.perf_counter()
+    raw = adapter._attempt(lambda: model.GetComponents(bool(toplevel)), default=None) or []
     out = []
-    for c in _components(adapter, model):
+    for c in raw:
         _flag(c, "IComponent2")
-        nm = str(_read_member(c, "Name2"))
-        if needle in nm:
-            out.append((c, nm))
+        out.append((c, str(_read_member(c, "Name2"))))
+    scope = "top-level" if toplevel else "full-tree"
+    log(f"    [enumerated {len(out)} components, {scope}, {_t.perf_counter() - t0:.1f}s]")
     return out
+
+
+def _find_comps(adapter, needle, model=None, comps=None):
+    """Components whose Name2 contains ``needle``; pass ``comps`` to reuse a walk."""
+    if comps is None:
+        comps = _components(adapter, model)
+    return [(c, nm) for c, nm in comps if needle in nm]
 
 
 def _part_family(name2):
@@ -118,28 +131,28 @@ def _part_family(name2):
     return part.rsplit("-", 1)[0]
 
 
-def _find_family(adapter, family, model=None):
-    """All components whose part family equals ``family`` EXACTLY (dispatch, name).
+def _find_family(adapter, family, model=None, comps=None):
+    """Components whose part family equals ``family`` EXACTLY (dispatch, name).
 
     Use this, not :func:`_find_comps`, whenever the needle is a prefix of a
-    longer real part name (``cylinder-gear`` vs ``cylinder-gear-shaft``).
+    longer real part name (``cylinder-gear`` vs ``cylinder-gear-shaft``). Pass
+    ``comps`` to reuse a single enumeration.
     """
-    out = []
-    for c in _components(adapter, model):
-        _flag(c, "IComponent2")
-        nm = str(_read_member(c, "Name2"))
-        if _part_family(nm) == family:
-            out.append((c, nm))
-    return out
+    if comps is None:
+        comps = _components(adapter, model)
+    return [(c, nm) for c, nm in comps if _part_family(nm) == family]
 
 
-def _find_one(adapter, needle, model=None):
-    hits = _find_comps(adapter, needle, model)
+def _find_one(adapter, needle, model=None, comps=None, toplevel=False):
+    if comps is None:
+        comps = _components(adapter, model, toplevel=toplevel)
+    hits = [(c, nm) for c, nm in comps if needle in nm]
     return hits[0] if hits else (None, None)
 
 
 def _sub_model(adapter, sub_name):
-    comp, _ = _find_one(adapter, sub_name)
+    log(f"  resolving {sub_name} model doc ...")
+    comp, _ = _find_one(adapter, sub_name, toplevel=True)
     if comp is None:
         raise RuntimeError(f"sub component not found: {sub_name}")
     model = adapter._attempt(lambda: comp.GetModelDoc2(), default=None)
@@ -263,7 +276,9 @@ async def _flex_subs(adapter):
         log(f"  set {sub} FLEXIBLE -- blocking solve, expect ~50-200s ...")
         check(f"flexible {sub}", await adapter.set_component_solving(
             SetComponentSolvingParameters(name=sub, solving=FLEXIBLE)))
-        comp, _ = _find_one(adapter, sub)
+        log(f"  verify {sub} Solving (top-level walk; first tree access may "
+            f"trigger the deferred flex solve) ...")
+        comp, _ = _find_one(adapter, sub, toplevel=True)
         solving = int(adapter._attempt(lambda c=comp: c.Solving, default=-1))
         log(f"  {sub} Solving={solving} (1=flexible)")
     adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
@@ -292,7 +307,7 @@ async def _suppress_named(adapter, sub_name, families, mtypes, label):
     targets = []
     log(f"  {label}: scanning {sub_name} mates ...")
     for _f, _m, name, mtype, parts, val in _iter_mates(
-            adapter, model, read_values=False, progress_every=50):
+            adapter, model, read_values=False, progress_every=20):
         if mtype not in mtypes:
             continue
         lone = _lone_real(parts, root)
@@ -313,7 +328,7 @@ async def _suppress_recurring(adapter, sub_name, families, label):
     # Walk WITHOUT values (the slow DisplayDimension2 round-trip); read the value
     # lazily only for the family-matching single-real-part DISTANCE candidates.
     for _f, mate, name, mtype, parts, _val in _iter_mates(
-            adapter, model, read_values=False, progress_every=50):
+            adapter, model, read_values=False, progress_every=20):
         if mtype != DISTANCE:
             continue
         lone = _lone_real(parts, root)
@@ -401,7 +416,7 @@ def _comp_z_mm(adapter, comp):
     return _comp_xform(adapter, comp)[11] * 1000.0
 
 
-def _by_z_rank(adapter, family):
+def _by_z_rank(adapter, family, comps=None):
     """Components of part FAMILY, sorted by world Z (station order).
 
     The 20 instances of each moving part span the 20 channel stations
@@ -409,9 +424,9 @@ def _by_z_rank(adapter, family):
     station -- robust pairing without trusting instance-suffix order (a rod's
     Z sits between its own gear and the next station's gear, so nearest-Z
     pairing would mis-match). Exact-family match so ``cylinder-gear`` does not
-    also drag in ``cylinder-gear-shaft``.
+    also drag in ``cylinder-gear-shaft``. Pass ``comps`` to reuse one walk.
     """
-    hits = _find_family(adapter, family)
+    hits = _find_family(adapter, family, comps=comps)
     return sorted(hits, key=lambda t: _comp_z_mm(adapter, t[0]))
 
 
@@ -427,9 +442,11 @@ async def _add_cam_couplings(adapter):
     oscillates about its (artifact-A) pivot revolute. Proven on the 1-channel
     rig (probe_one_channel_motion.py).
     """
-    gears = _by_z_rank(adapter, "cylinder-gear")
-    rods = _by_z_rank(adapter, "connecting-rod")
-    rockers = _by_z_rank(adapter, "rocker-arm")
+    log("  enumerating components for cam pairing (single full-tree walk) ...")
+    comps = _components(adapter)
+    gears = _by_z_rank(adapter, "cylinder-gear", comps=comps)
+    rods = _by_z_rank(adapter, "connecting-rod", comps=comps)
+    rockers = _by_z_rank(adapter, "rocker-arm", comps=comps)
     n = min(len(gears), len(rods), len(rockers))
     log(f"  cam couplings: {len(gears)} gears, {len(rods)} rods, "
         f"{len(rockers)} rockers -> {n} channels")
@@ -470,7 +487,7 @@ async def _add_crank_motor(adapter):
     # component+name ref maps via GetCorresponding (depth-2 safe through the
     # flexible drive-train sub).
     axis = _entity_ref(cs_name, "Axis1", "AXIS")
-    log(f"  crank motor on {axis.name}")
+    log(f"  crank motor on {axis.name}@{axis.component} ({CRANK_RPM} RPM) ...")
     res = check("add_motor crank", await adapter.add_motor(MotionMotorParameters(
         motor_type="rotary", entity=axis, speed=CRANK_RPM, study_name="")))
     return res
@@ -492,14 +509,14 @@ async def _sample_pen(adapter, study_name=""):
     from solidworks_mcp.adapters.base import MotionTimeParameters
     samples = []
     steps = 24
+    marker, _ = _find_one(adapter, "pen-marker")  # enumerate ONCE, not per step
+    if marker is None:
+        log("    pen-marker not found")
+        return samples
     for s in range(steps + 1):
         t = DURATION_S * s / steps
         check(f"set_time {t:.2f}", await adapter.set_motion_time(
             MotionTimeParameters(time=t, study_name=study_name)))
-        marker, _ = _find_one(adapter, "pen-marker")
-        if marker is None:
-            log("    pen-marker not found")
-            break
         tip = _world(adapter, _comp_xform(adapter, marker), [0.0, 0.0, 0.0])
         samples.append((t, tip))
         log(f"    t={t:5.2f}s pen tip=({tip[0]:.2f},{tip[1]:.2f},{tip[2]:.2f})")
