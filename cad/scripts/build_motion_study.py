@@ -182,15 +182,20 @@ def _mate_value(adapter, mate, mtype):
     return adapter._attempt(lambda: dim.Value, default=None)
 
 
-def _iter_mates(adapter, model, read_values=True):
+def _iter_mates(adapter, model, read_values=True, progress_every=0):
     """Yield (feature, mate, name, mtype, parts, value) for MODEL's mate group.
 
     ``read_values=False`` skips the per-mate DisplayDimension2 round-trip (the
     slow part) for callers that classify by family/type alone -- e.g. the
     drive-train crank driver, found by name, needs no value.
+
+    ``progress_every`` > 0 logs a heartbeat every N mates walked -- the mate
+    walk on a flexible sub is ~1-2s/mate (parts walk), so a few hundred mates
+    is minutes of otherwise-silent work.
     """
     _flag(model, "IModelDoc2")
     feat = _read_member(model, "FirstFeature")
+    seen = 0
     for _ in range(50000):
         if not feat:
             break
@@ -208,6 +213,9 @@ def _iter_mates(adapter, model, read_values=True):
                     mtype = int(adapter._attempt(lambda m=mate: m.Type, default=-1))
                     parts = _mate_parts(adapter, mate)
                     val = _mate_value(adapter, mate, mtype) if read_values else None
+                    seen += 1
+                    if progress_every and seen % progress_every == 0:
+                        log(f"    ... walked {seen} mates")
                     yield sub, mate, name, mtype, parts, val
                 sub = _read_member(sub, "GetNextSubFeature")
         feat = _read_member(feat, "GetNextFeature")
@@ -252,6 +260,7 @@ async def _flex_subs(adapter):
                 adapter, named_ref(f"{plane}@{sub}", "PLANE"),
                 named_ref(plane, "PLANE"), label=f"ground {sub} {plane}")
         adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
+        log(f"  set {sub} FLEXIBLE -- blocking solve, expect ~50-200s ...")
         check(f"flexible {sub}", await adapter.set_component_solving(
             SetComponentSolvingParameters(name=sub, solving=FLEXIBLE)))
         comp, _ = _find_one(adapter, sub)
@@ -281,7 +290,9 @@ async def _suppress_named(adapter, sub_name, families, mtypes, label):
     _, model = _sub_model(adapter, sub_name)
     root = _root_title(sub_name)
     targets = []
-    for _f, _m, name, mtype, parts, val in _iter_mates(adapter, model, read_values=False):
+    log(f"  {label}: scanning {sub_name} mates ...")
+    for _f, _m, name, mtype, parts, val in _iter_mates(
+            adapter, model, read_values=False, progress_every=50):
         if mtype not in mtypes:
             continue
         lone = _lone_real(parts, root)
@@ -298,9 +309,11 @@ async def _suppress_recurring(adapter, sub_name, families, label):
     _, model = _sub_model(adapter, sub_name)
     root = _root_title(sub_name)
     items = []  # (mate_name, family, rounded_value)
+    log(f"  {label}: scanning {sub_name} mates ...")
     # Walk WITHOUT values (the slow DisplayDimension2 round-trip); read the value
     # lazily only for the family-matching single-real-part DISTANCE candidates.
-    for _f, mate, name, mtype, parts, _val in _iter_mates(adapter, model, read_values=False):
+    for _f, mate, name, mtype, parts, _val in _iter_mates(
+            adapter, model, read_values=False, progress_every=50):
         if mtype != DISTANCE:
             continue
         lone = _lone_real(parts, root)
@@ -567,6 +580,7 @@ async def build(adapter):
         from build_motion_study_springs import add_wires_gravity
         await add_wires_gravity(adapter)
 
+    log("  Calculate() -- blocking solve of the whole device, expect ~270s ...")
     check("calculate_motion", await adapter.calculate_motion(
         MotionStudyRefParameters(name="")))
     await _sample_rockers(adapter)
