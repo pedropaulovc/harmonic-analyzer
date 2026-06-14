@@ -33,8 +33,13 @@ from build_motion_study import (
 
 STUDY = ""                   # active study
 SUM_RPM = 6.0                # gentle drive on the summing-lever stand-in
-RATIO_SUM_MAG = [1.0, 1.0]   # summing -> magnifying lever linkage
-RATIO_WIRE1 = [5.0, 1.0]     # mag-lever -> wheel (clamp radius : hub radius)
+# WIRE1 (lumped): summing-lever(Z) <-> magnifying-wheel(Z) are PARALLEL axes, so
+# a gear mate is accepted (the skew mag-lever(X) gear over-defines -- proven by
+# probe_couple_types). This rotary-rotary gear stands in for the faithful
+# "summing -> mag-lever -> WIRE1 -> hub O20" transmission (both ends rotary).
+# [1,1] here just to maximise the validation signal; the real 5x amplification is
+# tuned in F6 via this ratio + the WIRE2 pitch diameter.
+RATIO_SUM_WHEEL = [1.0, 1.0]
 WIRE2_PITCH_MM = 100.0       # wheel rim pitch diameter -> pen travel = pi*100/rev
 TIMES = [DURATION_S * s / 8.0 for s in range(9)]
 
@@ -89,17 +94,19 @@ async def main():
     print("Connecting ...", flush=True)
     await adapter.connect()
     asm_path = str((OUT_SLDASM / f"{ASM}.SLDASM").resolve())
-    check("open", await adapter.open_model(asm_path))
-    adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=None)
+    check("open", await adapter.open_model(asm_path))  # sets adapter.currentModel
     log(f"opened {asm_path}")
 
     # 1) only output-1 flexible; the other subs stay rigid (isolate the chain).
     await _flex_output(adapter)
 
-    # 2) free the output chain DOF (3 rock snapshots + pen travel).
+    # 2) free the driven DOF: summing rock (springs/motor), wheel rock (gear),
+    #    pen travel (rack-pinion). The mag-lever rock stays PINNED at its set
+    #    position (its skew X-axis can't be geared; its motion is lumped into the
+    #    summing<->wheel gear ratio).
     await _suppress_named(adapter, "output-1",
-                          ("summing-lever", "magnifying-lever", "magnifying-wheel"),
-                          (ANGLE,), "summing+mag-lever+wheel rock")
+                          ("summing-lever", "magnifying-wheel"),
+                          (ANGLE,), "summing+wheel rock")
     await _suppress_pen_travel(adapter)
 
     # 3) study + the 3 couplings authored INSIDE the output sub doc.
@@ -113,17 +120,10 @@ async def main():
     top = adapter.currentModel
     adapter.currentModel = out_doc
     try:
-        link = await gear_mate(adapter, _entity_ref("summing-lever-1", "Axis1", "AXIS"),
-                               _entity_ref("magnifying-lever-1", "Axis1", "AXIS"),
-                               RATIO_SUM_MAG, label="LINK summing->mag")
-        log(f"  LINK summing->mag: {link.get('name')}")
-    except Exception as exc:  # noqa: BLE001
-        log(f"  LINK FAILED: {exc}")
-    try:
-        w1 = await gear_mate(adapter, _entity_ref("magnifying-lever-1", "Axis1", "AXIS"),
+        w1 = await gear_mate(adapter, _entity_ref("summing-lever-1", "Axis1", "AXIS"),
                              _entity_ref("magnifying-wheel-1", "Axis1", "AXIS"),
-                             RATIO_WIRE1, label="WIRE1 mag->wheel")
-        log(f"  WIRE1 mag->wheel: {w1.get('name')}")
+                             RATIO_SUM_WHEEL, label="WIRE1 summing->wheel (parallel Z)")
+        log(f"  WIRE1 summing->wheel: {w1.get('name')}")
     except Exception as exc:  # noqa: BLE001
         log(f"  WIRE1 FAILED: {exc}")
     try:
