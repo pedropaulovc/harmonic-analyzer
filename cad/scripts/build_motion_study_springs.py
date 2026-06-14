@@ -33,10 +33,11 @@ edge points validated live (probe_eye_points.py).
 
 from __future__ import annotations
 
-from _common import check, component_named_ref, log
+from _common import check, coincident_mate, component_named_ref, gear_mate, log
 from build_motion_study import (
-    ANGLE, CH_SPRING, CT_SPRING, _by_z_rank, _components, _find_one, _k_helical,
-    _read_member, _suppress_named,
+    ANGLE, CH_SPRING, CT_SPRING, DISTANCE, _by_z_rank, _components, _entity_ref,
+    _family, _find_one, _iter_mates, _k_helical, _lone_real, _mate_value,
+    _read_member, _sub_model, _suppress_named,
 )
 from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
 
@@ -139,10 +140,148 @@ async def add_springs(adapter):
     return ok + (1 if cres.is_success else 0)
 
 
+# WIRE1 lumped gear ratio summing-lever(Z) <-> magnifying-wheel(Z). [1,1] for
+# transmission validation; the real 5x amplification is calibrated in F6 via this
+# ratio together with the WIRE2 rim radius. The mag-lever rock stays pinned (its
+# skew X-axis cannot be geared) -- its motion is lumped into this gear ratio.
+RATIO_SUM_WHEEL = [1.0, 1.0]
+# Part-local points on the magnifying-wheel Ø100 rim OD edge (mm); the rim is
+# extruded both-directions about the Front plane so the edge z is +/-4 or +/-8 --
+# try a few until one selects (validated live in probe_yoke_only.py: z=+4).
+RIM_EDGE_CANDIDATES = [[50.0, 0.0, 4.0], [50.0, 0.0, 8.0], [50.0, 0.0, -4.0],
+                       [50.0, 0.0, -8.0], [0.0, 50.0, 4.0]]
+
+
+async def _suppress_pen_travel(adapter):
+    """Suppress the pen-rod Y-travel snapshot (the largest-value pen-rod DISTANCE
+    = the Top<->Top plane Y position; confirmed Distance12 via probe_pen_mates) so
+    the WIRE2 yoke can drag the pen freely in Y."""
+    from solidworks_mcp.adapters.base import SuppressMateParameters
+    _, model = _sub_model(adapter, "output-1")
+    best = (None, -1.0)
+    for _f, mate, name, mtype, parts, _v in _iter_mates(adapter, model, read_values=False):
+        lone = _lone_real(parts, "output")
+        if mtype != DISTANCE or lone is None or _family(lone) != "pen-rod":
+            continue
+        val = _mate_value(adapter, mate, mtype) or 0.0
+        if val > best[1]:
+            best = (name, val)
+    if best[0] is None:
+        raise RuntimeError("pen-rod Y-travel snapshot not found")
+    log(f"  suppress pen-rod Y-travel {best[0]}")
+    check("suppress pen travel", await adapter.suppress_mate(
+        SuppressMateParameters(name=best[0], suppress=True, component="output-1")))
+
+
+async def _rim_point(adapter, comps=None):
+    """RefPoint at radius 50 on the magnifying-wheel rim, on the SHARED wheel part
+    doc (inherited by every instance via GetCorresponding; never saved). Selection
+    in the part doc requires it be ACTIVE -> ActivateDoc3 round-trip. Returns the
+    point feature name (e.g. "Point3")."""
+    from solidworks_mcp.adapters.base import CreateReferencePointParameters
+    top = adapter.currentModel
+    top_title = str(_read_member(top, "GetTitle"))
+    wh, _ = _find_one(adapter, "magnifying-wheel-1", comps=comps)
+    if wh is None:
+        raise RuntimeError("magnifying-wheel-1 not found for rim point")
+    part = adapter._attempt(lambda: wh.GetModelDoc2(), default=None)
+    if part is None:
+        raise RuntimeError("magnifying-wheel part doc unresolved")
+    part_title = str(_read_member(part, "GetTitle"))
+    adapter._attempt(
+        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, _byref_i4()), default=None)
+    adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
+    name = None
+    for ep in RIM_EDGE_CANDIDATES:
+        res = await adapter.create_reference_point(CreateReferencePointParameters(
+            mode="along_curve", edge_point=ep, along="percentage", percentage=0.0))
+        if res.is_success:
+            name = res.data.get("name") if isinstance(res.data, dict) else getattr(
+                res.data, "name", None)
+            log(f"  rim RefPoint edge_point={ep} -> {name!r}")
+            break
+    adapter._attempt(
+        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()), default=None)
+    adapter.currentModel = top
+    if not name:
+        raise RuntimeError("rim RefPoint creation failed on the wheel")
+    return name
+
+
+async def _add_wire1_gear(adapter):
+    """WIRE1 gear summing-lever(Z) <-> magnifying-wheel(Z), parallel axes.
+
+    The gear over-defines intermittently with alignment="closest": a fresh open
+    resolves the closest side to "aligned" on some runs and "anti_aligned" on
+    others, and only one side is consistent with the suppressed rocks (the other
+    over-defines). Within a single run the pose is fixed, so DON'T rely on
+    "closest" -- try both explicit alignments; one is always accepted. A failed
+    AddMate5 creates no mate, so no cleanup is needed between attempts.
+    """
+    last = None
+    for alignment in ("aligned", "anti_aligned"):
+        try:
+            w1 = await gear_mate(
+                adapter, _entity_ref("summing-lever-1", "Axis1", "AXIS"),
+                _entity_ref("magnifying-wheel-1", "Axis1", "AXIS"),
+                RATIO_SUM_WHEEL, alignment=alignment, label="WIRE1 summing->wheel")
+            if w1.get("name"):
+                log(f"  WIRE1 gear: {w1['name']} (alignment={alignment})")
+                return w1
+        except Exception as exc:  # noqa: BLE001
+            last = exc
+            log(f"    WIRE1 gear alignment={alignment} rejected: {exc}")
+    raise RuntimeError(f"WIRE1 gear failed both alignments: {last}")
+
+
 async def add_wires_gravity(adapter):
     """Stage `full`: the two amplifying wires (motion couplings) + gravity.
 
-    Implemented in F5; for now this is a placeholder so the level>=3 import
-    resolves. (Stage `springs` never calls this.)
+      WIRE1  gear summing-lever(Z) <-> magnifying-wheel(Z)  (parallel, lumped 5x)
+      WIRE2  scotch-yoke: a RefPoint on the wheel Ø100 rim (radius 50) held
+             COINCIDENT to the pen-rod's horizontal Top plane. As the wheel turns,
+             the rim point's Y excursion drags the pen-rod in Y (its X excursion
+             slides freely along the infinite plane); pen_Y ~= 50*sin(theta_wheel),
+             linear in the small operating angles. Basic Motion does NOT enforce a
+             rack-pinion mate in-sub (proven), but DOES enforce gears and the
+             coincident point-on-plane -- so both wires use enforced primitives.
+
+    Both are authored INSIDE output.SLDASM's doc: the four chain parts share the
+    one output-1 flexible sub, so a top-level mate between any two is rejected.
+    Run after add_springs (which suppressed the summing-lever rock). NEVER saves.
     """
-    raise NotImplementedError("add_wires_gravity: F5 (wires + gravity) pending")
+    from solidworks_mcp.adapters.base import MotionGravityParameters
+
+    comps = _components(adapter)
+
+    # 1) free the driven output DOF the wires control: wheel rock (WIRE1 spins it)
+    #    + pen-rod Y travel (WIRE2 yoke drags it). The mag-lever rock stays pinned.
+    await _suppress_named(adapter, "output-1", ("magnifying-wheel",), (ANGLE,),
+                          "wheel rock (free for WIRE1)")
+    await _suppress_pen_travel(adapter)
+
+    # 2) rim datum point on the shared wheel doc (before retargeting currentModel).
+    rim_pt = await _rim_point(adapter, comps=comps)
+
+    # 3) both wires authored INSIDE output.SLDASM's own document.
+    _, out_doc = _sub_model(adapter, "output-1")
+    top = adapter.currentModel
+    adapter.currentModel = out_doc
+    w1 = None
+    try:
+        w1 = await _add_wire1_gear(adapter)
+        w2 = await coincident_mate(
+            adapter, _entity_ref("magnifying-wheel-1", rim_pt, "POINT"),
+            _entity_ref("pen-rod-1", "Top Plane", "PLANE"),
+            label="WIRE2 yoke rim->pen")
+        log(f"  WIRE2 yoke: {w2.get('name')}")
+    finally:
+        adapter._attempt(lambda: out_doc.ForceRebuild3(False), default=None)
+        adapter.currentModel = top
+
+    # 4) gravity (-Y): the device settles under its own weight against the springs.
+    g = await adapter.add_gravity(MotionGravityParameters(
+        axis="y", reverse=True, study_name=""))
+    log(f"  gravity -Y: {'OK' if g.is_success else 'FAIL ' + str(g.error)}")
+    return {"wire1": w1.get("name") if w1 else None, "wire2": True,
+            "gravity": g.is_success}
