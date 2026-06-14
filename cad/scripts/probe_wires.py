@@ -24,8 +24,9 @@ import asyncio
 
 from _common import _flag, _read_member, check, gear_mate, log, rack_pinion_mate
 from build_motion_study import (
-    ANGLE, DISTANCE, _comp_xform, _components, _entity_ref, _find_one, _iter_mates,
-    _lone_real, _mate_value, _rot_angle, _sub_model, _suppress_named, _world,
+    ANGLE, DISTANCE, _comp_xform, _components, _entity_ref, _family, _find_one,
+    _iter_mates, _lone_real, _mate_value, _rot_angle, _sub_model, _suppress_named,
+    _world,
 )
 
 STUDY = "Motion Study 2"
@@ -43,7 +44,8 @@ async def _suppress_pen_travel(adapter):
     _, model = _sub_model(adapter, "output-1")
     best = (None, -1.0)
     for _f, mate, name, mtype, parts, _v in _iter_mates(adapter, model, read_values=False):
-        if mtype != DISTANCE or _lone_real(parts, "output") != "pen-rod":
+        lone = _lone_real(parts, "output")
+        if mtype != DISTANCE or lone is None or _family(lone) != "pen-rod":
             continue
         val = _mate_value(adapter, mate, mtype) or 0.0
         if val > best[1]:
@@ -95,8 +97,14 @@ async def main():
     except Exception as exc:  # noqa: BLE001
         log(f"  WIRE1 FAILED: {exc}")
     try:
-        w2 = await rack_pinion_mate(adapter, _entity_ref("pen-rod-1", "Axis1", "AXIS"),
-                                    _entity_ref("magnifying-wheel-1", "Axis1", "AXIS"),
+        # rack-pinion needs Mark=64 (rack) / Mark=128 (pinion) -- the adapter's
+        # default mark 1 makes AddMate5 fail "unknown error" (swRackPinionMate
+        # EntityType remark). Axes ARE valid rack+pinion entities; the marks fix it.
+        rack_ref = _entity_ref("pen-rod-1", "Axis1", "AXIS")
+        rack_ref.mark = 64
+        pinion_ref = _entity_ref("magnifying-wheel-1", "Axis1", "AXIS")
+        pinion_ref.mark = 128
+        w2 = await rack_pinion_mate(adapter, rack_ref, pinion_ref,
                                     pinion_pitch_diameter=WIRE2_PITCH_MM,
                                     label="WIRE2 wheel->pen")
         log(f"  WIRE2 wheel->pen: {w2.get('name')}")
@@ -120,7 +128,7 @@ async def main():
     for t in TIMES:
         await adapter.set_motion_time(MotionTimeParameters(time=t, study_name=STUDY))
         if marker is not None:
-            ys.append(_world(adapter, _comp_xform(adapter, marker), [0, 0, 0])[1])
+            ys.append(_world(_comp_xform(adapter, marker), [0, 0, 0])[1])
         for key, comp in (("summing", sl), ("wheel", wh)):
             if comp is None:
                 continue
