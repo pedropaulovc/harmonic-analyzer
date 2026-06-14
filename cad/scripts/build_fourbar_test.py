@@ -35,7 +35,7 @@ import math
 import sys
 
 from _common import (
-    OUT_PNG, OUT_SLDASM, _read_member, assert_model_healthy, check,
+    OUT_PNG, OUT_SLDASM, _flag, _read_member, assert_model_healthy, check,
     coincident_mate, component_transform, concentric_mate, bore_axis_ref,
     log, named_ref, place_component,
 )
@@ -54,6 +54,9 @@ BAR_TOP_PIN_LOCAL = [3.175, 806.45, 3.175]  # bar Axis1 (top pin)
 LEVER_BAR_PIN_LOCAL = [127.0, 0.0, 0.0]     # lever Axis2 (bar pin)
 
 IDENT = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+# Bar bores run along its LOCAL X (Top ∩ Front planes); the bar must be rotated
+# Ry(90) so they become the assembly Z (rotation) axis -- as build_channel does.
+ROT_Y_POS90 = [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]
 
 # motor / solve
 ROCK_SPEED = 2.0   # rotary motor speed (Basic Motion: ~115 deg/s at 2)
@@ -77,6 +80,7 @@ async def _make_rocker_pin_axis(adapter, rocker_name: str) -> str:
     from solidworks_mcp.adapters.base import CreateAxisParameters, CreatePlaneParameters
 
     comp = adapter.currentModel.GetComponentByName(rocker_name)
+    _flag(comp, "IComponent2")
     part = adapter._attempt(lambda: comp.GetModelDoc2(), default=None)
     if part is None:
         raise RuntimeError("rocker part doc unresolved")
@@ -126,12 +130,17 @@ async def build(adapter) -> None:
     rocker = await place_component(adapter, "rocker-arm",
                                    [0.0, -8.0, 0.0], [0.0, 0.0, 0.0], IDENT,
                                    ground=False, label="rocker-arm")
+    # All three moving parts coplanar about z=0 so the bar straddles the rocker
+    # (foot) and lever (top) like the real channel -- pins short, looks connected.
+    # Ry(90): foot world = (local_z + tx, local_y + ty, -local_x + tz); tz=+half
+    # width centres the bar's Z span on 0. (Z position along a pin axis is free,
+    # so this is cosmetic only -- the kinematics are identical to any stagger.)
     bar = await place_component(adapter, "amplitude-bar",
-                                [foot_w[0] - BAR_FOOT_LOCAL[0], foot_w[1],
-                                 12.0 - BAR_FOOT_LOCAL[2]],
-                                [0.0, 0.0, 0.0], IDENT, ground=False, label="amplitude-bar")
+                                [foot_w[0] - BAR_FOOT_LOCAL[2], foot_w[1], 3.175],
+                                [0.0, 90.0, 0.0], ROT_Y_POS90,
+                                ground=False, label="amplitude-bar")
     lever = await place_component(adapter, "channel-lever",
-                                  [fulcrum_xy[0], fulcrum_xy[1], 24.0],
+                                  [fulcrum_xy[0], fulcrum_xy[1], 0.0],
                                   [0.0, 0.0, 0.0], IDENT, ground=False, label="channel-lever")
 
     # rocker foot-pin axis on the part doc
@@ -214,12 +223,15 @@ async def build(adapter) -> None:
         log(f"  video -> {mp4}")
     except Exception as exc:  # noqa: BLE001
         log(f"  video export skipped: {exc}")
-    await adapter.set_motion_time(MotionTimeParameters(time=DURATION_S * 0.5, study_name=""))
-    still = (out_dir / "fourbar_iso.png").resolve()
-    check("export_image", await adapter.export_image(
-        {"file_path": str(still), "format_type": "png", "width": 1600,
-         "height": 1000, "view_orientation": "isometric"}))
-    log(f"  still -> {still}")
+    # Park at a clearly deflected pose (lever near peak) so the linkage reads.
+    await adapter.set_motion_time(MotionTimeParameters(time=DURATION_S * 0.375, study_name=""))
+    for view in ("front", "back", "top", "bottom", "isometric", "dimetric",
+                 "trimetric", "right", "left"):
+        img = (out_dir / f"fourbar_{view}.png").resolve()
+        check(f"export_image {view}", await adapter.export_image(
+            {"file_path": str(img), "format_type": "png", "width": 1600,
+             "height": 1000, "view_orientation": view}))
+    log(f"  views -> {out_dir}")
 
 
 async def _main() -> int:
