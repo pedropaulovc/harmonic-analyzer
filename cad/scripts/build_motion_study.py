@@ -643,7 +643,7 @@ async def _sample_pen(adapter, study_name=""):
         t = DURATION_S * s / steps
         check(f"set_time {t:.2f}", await adapter.set_motion_time(
             MotionTimeParameters(time=t, study_name=study_name)))
-        tip = _world(adapter, _comp_xform(adapter, marker), [0.0, 0.0, 0.0])
+        tip = _world(_comp_xform(adapter, marker), [0.0, 0.0, 0.0])
         samples.append((t, tip))
         log(f"    t={t:5.2f}s pen tip=({tip[0]:.2f},{tip[1]:.2f},{tip[2]:.2f})")
     if samples:
