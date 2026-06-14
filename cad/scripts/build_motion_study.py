@@ -22,9 +22,14 @@ Pipeline (see plan from-other-conversation-current-tender-meteor.md, Part 3):
                       the platen + clamp settings stay pinned
      -- all via suppress_mate(component=<sub>), resolved inside the sub doc,
      never saving the sub.
-  4. add 20 cross-assembly CAM concentrics: each channel connecting-rod ring
-     bore rides its drive-train cylinder-gear eccentric lobe (the coupling that
-     turns crank rotation into the per-channel rocker oscillation).
+  4a. add 20 rod-pin<->rocker-bore coincident revolutes INSIDE channel.SLDASM
+      (currentModel retargeted to the sub doc, never saved): the rod<->rocker
+      pin joint cannot be a top-level mate because AddMate5 refuses a mate
+      between two parts both nested in the same flexible sub (proven).
+  4b. add 20 cross-assembly CAM couplings: each channel connecting-rod ring axis
+      rides its drive-train cylinder-gear eccentric lobe axis (cross-sub, so it
+      IS allowed at the top level). 4a + 4b are the 1-DOF four-bar that turns
+      crank rotation into the per-channel rocker oscillation.
   5. crank MOTOR: a rotary constant-speed motor on the crankshaft axis -- the
      one physical input that runs the device.
   6. 21 SPRING force elements: 20 channel springs + 1 counter spring, k from
@@ -397,13 +402,16 @@ async def _suppress_drivers(adapter, level, dump=False):
     #  * connecting-rod -> suppress ALL of its drivers (ring-X/Y/Z AND the swing,
     #    which spin_driver implements as a DISTANCE mate). Artifact A pins the rod
     #    purely with these four drivers and deliberately omits the rod<->rocker
-    #    and rod<->cam revolutes -- the rod's 127 mm bore spacing is 0.39 mm
-    #    inconsistent with the cam-lobe<->rocker-bore span, so the loop only
-    #    closes if the rod is FREE (build_channel_assembly._pin_design_pose). A
-    #    recurring-only suppress leaves the per-channel-unique ring-Z pinned, and
-    #    then cam-ring<->lobe (-4 DOF) + pin<->rocker (-2) over-constrains the
-    #    Z-pinned rod by one -> AddMate5 "unknown error". Freeing the rod fully
-    #    lets the two new revolutes define it via the 1-DOF four-bar loop.
+    #    and rod<->cam revolutes (build_channel_assembly._pin_design_pose). The
+    #    rod must be FULLY free so the two new revolutes can define it: the in-sub
+    #    rod-pin<->rocker-bore coincident (_add_rod_rocker_revolutes, authored in
+    #    channel.SLDASM's own context) pins the pin to the rocker bore, and the
+    #    top-level cam ring<->lobe (_add_cam_couplings, cross-sub) pins the ring
+    #    to the eccentric lobe; together they are the 1-DOF four-bar driven by the
+    #    crank. (Earlier theory that a kept ring-Z over-constrains was WRONG --
+    #    probe_axis_isolate proved the real blocker is that AddMate5 refuses ANY
+    #    top-level mate between two parts both nested in the same flexible sub, so
+    #    pin<->rocker had to move INSIDE the sub, not be dropped for over-defn.)
     await _suppress_recurring(
         adapter, "channel-1", ("rocker-arm",), "channel rocker spin drivers")
     await _suppress_named(
@@ -444,31 +452,79 @@ def _by_z_rank(adapter, family, comps=None):
     return sorted(hits, key=lambda t: _comp_z_mm(adapter, t[0]))
 
 
-async def _add_cam_couplings(adapter):
-    """Per channel: cam lobe <-> rod ring, then rod pin <-> rocker bore.
+async def _add_rod_rocker_revolutes(adapter):
+    """Per channel, INSIDE channel.SLDASM: rod pin Axis2 <-> rocker bore Axis2.
 
-    Both are two-axis COINCIDENT mates on named reference axes (AddMate rejects
+    This is the rod<->rocker pin joint of the four-bar, and it CANNOT be a
+    top-level mate. AddMate5 rejects a mate between two components that are both
+    nested in the SAME flexible sub -- proven decisively (probe_axis_isolate):
+    the same rod.Axis2 mates fine CROSS-sub to gear.Axis3 (OK), but same-sub to
+    rocker.Axis2 it FAILS "unknown error" on every alignment, coincident AND
+    concentric; rod.Axis1<->rocker.Axis2 (also same-sub) fails too. Authored as a
+    SIBLING mate in the channel sub's own document it succeeds, and with the
+    top-level cam coupling added afterwards the four-bar closes (the 0.39 mm
+    layout slack is absorbed by a ~0.2 deg rocker rotation -- the
+    circle-intersection test holds: |127-120.92| <= 178.6 <= 127+120.92). Proven
+    end-to-end by probe_sub_mate.py (sub pin<->bore OK, cam-after OK).
+
+    Run AFTER the rod ring drivers are suppressed (rod free) and BEFORE the
+    top-level cam couplings. currentModel is retargeted to the sub doc for the
+    AddMate then restored; the sub is dirtied but NEVER saved (artifact A stays
+    fully-defined on disk). coincident, not concentric (concentric on two axes is
+    rejected by AddMate5 even cross-sub).
+    """
+    _, ch_doc = _sub_model(adapter, "channel-1")
+    top = adapter.currentModel
+    adapter.currentModel = ch_doc
+    ok = n = 0
+    try:
+        log("  enumerating channel.SLDASM parts for in-sub rod<->rocker ...")
+        comps = _components(adapter, ch_doc)
+        rods = _by_z_rank(adapter, "connecting-rod", comps=comps)
+        rockers = _by_z_rank(adapter, "rocker-arm", comps=comps)
+        n = min(len(rods), len(rockers))
+        log(f"  in-sub rod<->rocker: {len(rods)} rods, {len(rockers)} rockers "
+            f"-> {n} channels")
+        for i in range(n):
+            rod_n, rk_n = rods[i][1], rockers[i][1]
+            try:
+                res = await coincident_mate(
+                    adapter, _entity_ref(rod_n, "Axis2", "AXIS"),
+                    _entity_ref(rk_n, "Axis2", "AXIS"),
+                    label=f"ch{i:02d} rod pin <-> rocker bore (in channel)")
+                ok += 1 if res.get("name") else 0
+            except Exception as exc:  # noqa: BLE001 -- first-run diagnostics
+                log(f"    ch{i:02d} in-sub rod->rocker FAILED: {exc}")
+        adapter._attempt(lambda: ch_doc.ForceRebuild3(False), default=None)
+    finally:
+        adapter.currentModel = top
+    log(f"  in-sub rod<->rocker revolutes: {ok}/{n}")
+    return ok
+
+
+async def _add_cam_couplings(adapter):
+    """Per channel, at TOP level: cam lobe Axis3 <-> rod ring Axis1 (cross-sub).
+
+    A two-axis COINCIDENT mate on named reference axes (AddMate rejects
     concentric on two axes): Axis3@cylinder-gear is the eccentric cam-lobe axis,
-    Axis1@connecting-rod the ring axis, Axis2@connecting-rod the rod-pin axis,
-    Axis2@rocker-arm the rocker rod-bore axis. Named axes are fast (no face walk
-    on the geared part) and mirror-agnostic. The cam lobe orbits as the gear
-    turns -> the rod ring follows -> the rod pin drives the rocker -> the rocker
-    oscillates about its (artifact-A) pivot revolute. Proven on the 1-channel
-    rig (probe_one_channel_motion.py).
+    Axis1@connecting-rod the ring axis. Cross-sub (drive-train<->channel), so it
+    is allowed at the top level. Named axes are fast (no face walk on the geared
+    part) and mirror-agnostic. The cam lobe orbits as the gear turns -> the rod
+    ring follows -> via the in-sub rod<->rocker revolute (added by
+    _add_rod_rocker_revolutes) the rod pin drives the rocker -> the rocker
+    oscillates about its (artifact-A) pivot revolute.
     """
     log("  enumerating components for cam pairing (single full-tree walk) ...")
     comps = _components(adapter)
     gears = _by_z_rank(adapter, "cylinder-gear", comps=comps)
     rods = _by_z_rank(adapter, "connecting-rod", comps=comps)
-    rockers = _by_z_rank(adapter, "rocker-arm", comps=comps)
-    n = min(len(gears), len(rods), len(rockers))
-    log(f"  cam couplings: {len(gears)} gears, {len(rods)} rods, "
-        f"{len(rockers)} rockers -> {n} channels")
-    cam_ok = rod_ok = 0
+    n = min(len(gears), len(rods))
+    log(f"  cam couplings: {len(gears)} gears, {len(rods)} rods -> {n} channels")
+    cam_ok = 0
     for i in range(n):
-        gear_n, rod_n, rk_n = gears[i][1], rods[i][1], rockers[i][1]
+        gear_n, rod_n = gears[i][1], rods[i][1]
         if i == 0:
-            log(f"    ch00 names: gear={gear_n!r} rod={rod_n!r} rocker={rk_n!r}")
+            log(f"    ch00 names: gear={gear_n!r} rod={rod_n!r}")
         try:
             cam = await coincident_mate(
                 adapter, _entity_ref(rod_n, "Axis1", "AXIS"),
@@ -477,17 +533,9 @@ async def _add_cam_couplings(adapter):
             cam_ok += 1 if cam.get("name") else 0
         except Exception as exc:  # noqa: BLE001 -- first-run diagnostics
             log(f"    ch{i:02d} cam coupling FAILED: {exc}")
-        try:
-            rod = await coincident_mate(
-                adapter, _entity_ref(rod_n, "Axis2", "AXIS"),
-                _entity_ref(rk_n, "Axis2", "AXIS"),
-                label=f"ch{i:02d} rod pin <-> rocker bore")
-            rod_ok += 1 if rod.get("name") else 0
-        except Exception as exc:  # noqa: BLE001 -- first-run diagnostics
-            log(f"    ch{i:02d} rod->rocker FAILED: {exc}")
     adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
-    log(f"  couplings: cam {cam_ok}/{n}, rod->rocker {rod_ok}/{n}")
-    return cam_ok, rod_ok
+    log(f"  cam couplings: {cam_ok}/{n}")
+    return cam_ok
 
 
 # ---- stage 5: crank motor ---------------------------------------------------
@@ -594,6 +642,7 @@ async def build(adapter):
         log("stage flex complete (no motor/solve)")
         return {}
 
+    await _add_rod_rocker_revolutes(adapter)
     await _add_cam_couplings(adapter)
     check("ensure_motion_addin", await adapter.ensure_motion_addin())
     from solidworks_mcp.adapters.base import MotionStudyParameters, MotionStudyRefParameters
