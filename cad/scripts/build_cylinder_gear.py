@@ -55,6 +55,8 @@ import sys
 
 from _common import (
     IN,
+    _flag,
+    _read_member,
     add_line_chain,
     anchor_point_to_origin,
     apply_material,
@@ -129,6 +131,56 @@ def notch_solid_area(step: float = 0.004) -> float:
             if is_solid(x, y):  # notch at +Y: window coords are (x, y) global
                 hits += 1
     return hits * dx * dy
+
+
+def _ref_axis_start_mm(adapter, axis_name: str) -> list[float] | None:
+    """Start point (mm) of a named reference axis via IRefAxis.GetRefAxisParams."""
+    model = adapter.currentModel
+    feat = _read_member(model, "FirstFeature")
+    for _ in range(50000):
+        if not feat:
+            return None
+        _flag(feat, "IFeature")
+        if str(_read_member(feat, "Name")) == axis_name:
+            axis = adapter._attempt(lambda f=feat: f.GetSpecificFeature2(), default=None)
+            if axis is None:
+                return None
+            _flag(axis, "IRefAxis")
+            p = adapter._attempt(lambda a=axis: a.GetRefAxisParams(), default=None)
+            if p is None:
+                return None
+            return [float(p[0]) * 1000.0, float(p[1]) * 1000.0, float(p[2]) * 1000.0]
+        feat = _read_member(feat, "GetNextFeature")
+    return None
+
+
+async def _name_lobe_axis(adapter) -> str:
+    """Named reference axis through the eccentric cam-lobe centre (part-local
+    x 0, y -ECCENTRICITY), along Z, for the motion study's cam->rod coupling.
+
+    The Henrici cam coupling (artifact B) makes each connecting-rod ring
+    (Axis1@connecting-rod) coaxial with its drive-train cylinder-gear lobe. A
+    face-based concentric on this geared part is catastrophic (walking ~thousands
+    of tooth faces) and the lobe face will not select through the nested,
+    flexible sub. A *named* axis is fast, mirror-agnostic and selects by name --
+    the same pattern the bore axis already uses. The offset-plane sign for
+    "Top Plane - ECC" is verified against GetRefAxisParams (Y must land at the
+    lobe side, -ECC), so a flipped SW offset convention fails loudly here rather
+    than silently building a wrong-side cam axis.
+    """
+    axis_name = await name_bore_axis(
+        adapter, "Right Plane", 0.0, "Top Plane", -ECCENTRICITY, "cam lobe axis"
+    )
+    start = _ref_axis_start_mm(adapter, axis_name)
+    if start is None:
+        raise RuntimeError(f"could not read lobe axis {axis_name} params")
+    if abs(start[0]) > 0.1 or abs(start[1] - (-ECCENTRICITY)) > 0.1:
+        raise RuntimeError(
+            f"lobe axis misplaced at (x={start[0]:.3f}, y={start[1]:.3f}); "
+            f"expected (0, {-ECCENTRICITY:.3f}) -- Top Plane offset sign flipped"
+        )
+    print(f"  OK  lobe axis {axis_name} at (x {start[0]:.3f}, y {start[1]:.3f})")
+    return axis_name
 
 
 async def build(adapter) -> dict[str, str]:
@@ -251,6 +303,9 @@ async def build(adapter) -> dict[str, str]:
     # assembly mate selection: the gear rides the arbor coincident axis-to-axis
     # and meshes its cone gear via a gear mate (M6 mated-DOF drive train).
     await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "bore axis")
+
+    # Axis3: the eccentric cam-lobe centre axis (motion-study cam->rod coupling).
+    await _name_lobe_axis(adapter)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
