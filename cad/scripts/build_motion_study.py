@@ -686,6 +686,27 @@ async def _sample_rockers(adapter, study_name="", n_probe=3):
     return spans
 
 
+async def _sample_part_rot(adapter, needle, study_name="", n_steps=12):
+    """Rotation span (deg) of a single named part over the run -- e.g. the
+    summing-lever rocking under the spring force balance (the analogue SUM)."""
+    from solidworks_mcp.adapters.base import MotionTimeParameters
+    comp, name = _find_one(adapter, needle)
+    if comp is None:
+        log(f"    {needle} not found")
+        return 0.0
+    base = None
+    span = 0.0
+    for s in range(n_steps + 1):
+        t = DURATION_S * s / n_steps
+        await adapter.set_motion_time(MotionTimeParameters(time=t, study_name=study_name))
+        a = _comp_xform(adapter, comp)
+        if base is None:
+            base = a
+        span = max(span, _rot_angle(base, a))
+    log(f"  {needle} rock span = {span:.2f} deg (0 => the springs never moved it)")
+    return span
+
+
 async def _reset_to_assembled(adapter):
     """Return the model to its assembled pose before calculate_motion.
 
@@ -744,6 +765,8 @@ async def build(adapter):
     check("calculate_motion", await adapter.calculate_motion(
         MotionStudyRefParameters(name="")))
     await _sample_rockers(adapter)
+    if level >= 2:
+        await _sample_part_rot(adapter, "summing-lever-1")
     samples = await _sample_pen(adapter) if level >= 3 else []
 
     artefacts = {}
