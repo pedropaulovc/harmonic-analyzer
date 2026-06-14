@@ -27,7 +27,7 @@ CANDIDATES = [
     ("channel-lever-1", [179.8, 0.0, 0.0]),
     ("summing-lever-1", [39.35, 8.0, -69.05]),
     ("gooseneck-1", [-109.0, 165.0, 0.0]),
-    ("boss-hook-1", [5.25, 16.5, 0.0]),
+    ("boss-hook-1", [6.5, 16.5, 0.0]),  # rod end-face circle @ X=6.5 (was on the side)
 ]
 
 
@@ -48,7 +48,7 @@ async def _try_point(adapter, top, top_title, comp_needle, edge_point):
     try:
         res = await adapter.create_reference_point(
             CreateReferencePointParameters(mode="arc_center", edge_point=edge_point))
-        name = res.data.get("name") if res.is_success else None
+        name = getattr(res.data, "name", None) if res.is_success else None
         log(f"  {comp_needle} ({part_title}) edge={edge_point} -> "
             f"{'OK ' + str(name) if name else 'FAIL ' + str(res.error)}")
     except Exception as exc:  # noqa: BLE001
