@@ -27,14 +27,14 @@ import asyncio
 
 from _common import OUT_PNG, coincident_mate, distance_driver, log, named_ref
 from build_motion_study import (
-    BAR_FOOT_LOCAL, OUT_SLDASM, ROCKER_ARC_CENTER_LOCAL,
+    BAR_FOOT_LOCAL, BAR_TOP_PIN_LOCAL, OUT_SLDASM, ROCKER_ARC_CENTER_LOCAL,
     _add_rocker_arc_point, _by_z_rank, _comp_xform, _components, _entity_ref,
     _find_one, _rot_angle, _suppress_channel, _sub_model, _world, _xy_dist,
 )
 
-ROCK_RPM = 2.0       # gentle: 12 deg/s, kept inside the rocker's real ROM
-DURATION_S = 0.75    # ~9 deg of rocker travel
-COEFF_DPIVOT = 60.0  # target foot pivot-radius (mm) = a real amplitude coefficient
+ROCK_SPEED = 2.0     # motor speed (rad/s in Basic Motion -> ~115 deg/s)
+DURATION_S = 0.75    # keep the rocker inside its real ROM
+PERTURB_DEG = 5.0    # swing the freed bar off dead centre before pinning the foot
 
 
 async def _flex_channel(adapter):
@@ -55,9 +55,30 @@ async def _flex_channel(adapter):
     adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
 
 
-async def _add_ch0_foot_arc(adapter, point_name, d_pivot_target):
-    """Add ONLY ch0's foot-arc pair (fast probe). d_arc = measured (foot on the
-    arc); d_pivot = the target coefficient (slides the foot out along the arc)."""
+async def _perturb_bar(adapter, bar_c, bar_n, deg):
+    """Swing the freed bar ``deg`` about its top pin so the foot leaves dead
+    centre (foot ~on the pivot -> rocker rotation gives ~zero foot travel = a
+    singular four-bar). Rotating about the top-pin Z axis keeps the top-pin
+    coincident + axial-Z satisfied (it IS the bar's free swing DOF), so no mate
+    errors; the freed bar holds the new pose (no force pulls it back)."""
+    from solidworks_mcp.adapters.base import RotateComponentParameters
+    ba = _comp_xform(adapter, bar_c)
+    foot0 = _world(ba, BAR_FOOT_LOCAL)
+    top_pin = _world(ba, BAR_TOP_PIN_LOCAL)
+    await adapter.rotate_component(RotateComponentParameters(
+        name=bar_n, angle=deg, axis_vector=[0.0, 0.0, 1.0],
+        axis_point=[top_pin[0], top_pin[1], top_pin[2]], mode="exact"))
+    adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
+    foot1 = _world(_comp_xform(adapter, bar_c), BAR_FOOT_LOCAL)
+    log(f"  perturb bar {deg:+.1f} deg about top-pin: foot "
+        f"({foot0[0]:.1f},{foot0[1]:.1f}) -> ({foot1[0]:.1f},{foot1[1]:.1f}) "
+        f"moved {_xy_dist(foot0, foot1):.1f} mm")
+
+
+async def _add_ch0_foot_arc(adapter, point_name):
+    """Add ONLY ch0's foot-arc pair at the CURRENT (perturbed) pose -- both
+    distances MEASURED so each mate starts already satisfied (no errored far
+    target). d_arc = foot<->arc-centre, d_pivot = foot<->pivot (the coefficient)."""
     _, ch_doc = _sub_model(adapter, "channel-1")
     top = adapter.currentModel
     adapter.currentModel = ch_doc
@@ -68,17 +89,20 @@ async def _add_ch0_foot_arc(adapter, point_name, d_pivot_target):
         bar_c, bar_n = _by_z_rank(adapter, "amplitude-bar", comps=comps)[0]
         ra, ba = _comp_xform(adapter, rk_c), _comp_xform(adapter, bar_c)
         arc_c = _world(ra, ROCKER_ARC_CENTER_LOCAL)
+        from build_motion_study import ROCKER_PIVOT_LOCAL
+        pivot = _world(ra, ROCKER_PIVOT_LOCAL)
         foot = _world(ba, BAR_FOOT_LOCAL)
         d_arc = _xy_dist(foot, arc_c)
+        d_pivot = _xy_dist(foot, pivot)
         log(f"  ch0 rocker={rk_n!r} bar={bar_n!r} R={d_arc:.2f} "
-            f"d_pivot target={d_pivot_target:.2f} (neutral was ~6.5)")
+            f"d_pivot={d_pivot:.2f} (measured at perturbed pose)")
         a = await distance_driver(
             adapter, _entity_ref(rk_n, point_name, "POINT"),
             _entity_ref(bar_n, "Axis2", "AXIS"), d_arc, label="ch0 foot on R800 arc")
         log(f"    arc dist mate: {a.get('name')!r}")
         p = await distance_driver(
             adapter, _entity_ref(rk_n, "Axis1", "AXIS"),
-            _entity_ref(bar_n, "Axis2", "AXIS"), d_pivot_target,
+            _entity_ref(bar_n, "Axis2", "AXIS"), d_pivot,
             label="ch0 foot radius (coeff)")
         log(f"    pivot dist mate: {p.get('name')!r}")
         adapter._attempt(lambda: ch_doc.ForceRebuild3(False), default=None)
@@ -105,13 +129,18 @@ async def main():
     await _flex_channel(adapter)
     await _suppress_channel(adapter)            # cached -> fast
     point_name = await _add_rocker_arc_point(adapter)
-    rocker_in, bar_in = await _add_ch0_foot_arc(adapter, point_name, COEFF_DPIVOT)
 
-    # ONE full-tree walk; reuse the comp objects for the motor target + sampling.
+    # ONE full-tree walk; reuse the comp objects for perturb + motor + sampling.
     comps = _components(adapter)
     rocker_c, rocker_n = _find_one(adapter, "rocker-arm-1", comps=comps)
     lever_c, lever_n = _find_one(adapter, "channel-lever-1", comps=comps)
-    bar_c, _ = _find_one(adapter, "amplitude-bar-1", comps=comps)
+    bar_c, bar_n = _find_one(adapter, "amplitude-bar-1", comps=comps)
+
+    # Swing the freed bar off dead centre FIRST, then pin the foot at the measured
+    # (non-degenerate, already-satisfied) pose -- avoids the singular four-bar and
+    # the errored far-target mate that froze the last run.
+    await _perturb_bar(adapter, bar_c, bar_n, PERTURB_DEG)
+    await _add_ch0_foot_arc(adapter, point_name)
 
     check = lambda tag, r: log(f"  {tag}: {getattr(r, 'is_success', r)}")
     await adapter.ensure_motion_addin()
@@ -123,7 +152,7 @@ async def main():
     # cam chain. Component+name AXIS ref maps through the flexible sub.
     res = await adapter.add_motor(MotionMotorParameters(
         motor_type="rotary", entity=_entity_ref(rocker_n, "Axis1", "AXIS"),
-        speed=ROCK_RPM, study_name=""))
+        speed=ROCK_SPEED, study_name=""))
     check("add_motor rocker", res)
 
     log("  Calculate() -- Basic Motion solve of the ch0 four-bar ...")

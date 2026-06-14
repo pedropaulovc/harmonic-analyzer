@@ -79,8 +79,10 @@ ROD_BORE_EDGE_MM = [25.5, 0.0, 1.5]
 ROCKER_ARC_EDGE_MM = [0.0, 16.0, 1.25]
 ROCKER_ARC_CENTER_LOCAL = [0.0, 816.0, 0.0]  # R800 arc centre (the foot's circle)
 ROCKER_PIVOT_LOCAL = [0.0, 8.0, 0.0]         # pivot bore = rocker Axis1
-# Amplitude-bar foot axis (build_channel_assembly BAR_FOOT_LOCAL = bar Axis2).
+# Amplitude-bar foot axis (build_channel_assembly BAR_FOOT_LOCAL = bar Axis2) and
+# top-pin (bar Axis1, the swing pivot, BAR_TOP_PIN_LOCAL); part-local mm.
 BAR_FOOT_LOCAL = [3.175, 0.0, 3.175]
+BAR_TOP_PIN_LOCAL = [3.175, 806.45, 3.175]
 
 # ---- study constants --------------------------------------------------------
 ASM = "harmonic-analyzer"
@@ -814,7 +816,7 @@ def _xy_dist(p, q):
     return math.hypot(p[0] - q[0], p[1] - q[1])
 
 
-async def _add_foot_arc_joints(adapter):
+async def _add_foot_arc_joints(adapter, coeff_fn=None):
     """Per channel, INSIDE channel.SLDASM: pin the bar foot to the rocker arc.
 
     Two DISTANCE mates from bar Axis2 (foot): to the rocker arc-centre RefPoint
@@ -823,8 +825,13 @@ async def _add_foot_arc_joints(adapter):
     lever four-bar (see the section header). Authored in the sub doc (both parts
     nested in the same flexible sub -> a top-level mate is rejected, proven for
     the rod<->rocker revolute); currentModel retargeted then restored, sub NEVER
-    saved. Values measured from the placed sub-frame transforms (relative XY, so
-    frame-invariant) so each pair starts on-solution.
+    saved.
+
+    ``coeff_fn(i)`` returns the TARGET foot pivot-radius (mm) for channel i = its
+    integration coefficient; the pivot mate slides the foot out along the arc to
+    that radius. Default None = the measured neutral radius (~6.5 mm, ~zero
+    coefficient -> little lever travel). d_arc is always the measured radius (the
+    foot stays on the arc); only d_pivot encodes the coefficient.
     """
     from _common import distance_driver
     point_name = await _add_rocker_arc_point(adapter)
@@ -851,10 +858,10 @@ async def _add_foot_arc_joints(adapter):
             pivot = _world(ra, ROCKER_PIVOT_LOCAL)
             foot = _world(ba, BAR_FOOT_LOCAL)
             d_arc = _xy_dist(foot, arc_c)
-            d_pivot = _xy_dist(foot, pivot)
+            d_pivot = coeff_fn(i) if coeff_fn else _xy_dist(foot, pivot)
             if i == 0:
-                log(f"    ch00 foot-arc: R={d_arc:.2f} r_foot={d_pivot:.2f} "
-                    f"point={point_name!r}")
+                log(f"    ch00 foot-arc: R={d_arc:.2f} d_pivot={d_pivot:.2f} "
+                    f"(neutral {_xy_dist(foot, pivot):.2f}) point={point_name!r}")
             try:
                 a = await distance_driver(
                     adapter, _entity_ref(rk_n, point_name, "POINT"),
