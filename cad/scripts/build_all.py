@@ -35,12 +35,24 @@ CAD_OUT = SCRIPTS_DIR.parent / "out"
 
 ASSEMBLY_ORDER = ("frame", "drive_train", "channel", "output", "harmonic_analyzer")
 
+# Throwaway motion/test deliverables that match build_*.py but produce no
+# .SLDPRT part -- they consume the saved assemblies, they don't build the
+# machine. Excluded from the from-scratch part queue.
+NON_PART_SCRIPTS = frozenset(
+    {
+        "build_all.py",
+        "build_motion_study.py",
+        "build_motion_study_springs.py",
+        "build_fourbar_test.py",
+    }
+)
+
 
 def part_scripts() -> list[Path]:
-    """Every build_*.py except the assemblies and this orchestrator."""
+    """Every build_*.py except the assemblies, motion scripts and this orchestrator."""
     out = []
     for path in sorted(SCRIPTS_DIR.glob("build_*.py")):
-        if path.name == "build_all.py" or path.name.endswith("_assembly.py"):
+        if path.name in NON_PART_SCRIPTS or path.name.endswith("_assembly.py"):
             continue
         out.append(path)
     return out
