@@ -35,9 +35,9 @@ from __future__ import annotations
 
 from _common import check, coincident_mate, component_named_ref, gear_mate, log
 from build_motion_study import (
-    ANGLE, CH_SPRING, CT_SPRING, DISTANCE, _by_z_rank, _components, _entity_ref,
-    _family, _find_one, _iter_mates, _k_helical, _lone_real, _mate_value,
-    _read_member, _sub_model, _suppress_named,
+    ANGLE, CH_SPRING, CT_SPRING, DISTANCE, SPRING_KCH, SPRING_KCT, _by_z_rank,
+    _components, _entity_ref, _family, _find_one, _iter_mates, _k_helical,
+    _lone_real, _mate_value, _read_member, _sub_model, _suppress_named,
 )
 from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
 
@@ -107,8 +107,10 @@ async def add_springs(adapter):
 
     sum_name = _find_one(adapter, "summing-lever-1", comps=comps)[1]
     levers = _by_z_rank(adapter, "channel-lever", comps=comps)
-    k_ch = _k_helical(CH_SPRING["d"], CH_SPRING["D"], CH_SPRING["n"])
-    log(f"  channel spring k = {k_ch:.1f} N/m ; {len(levers)} channel-levers")
+    k_geom = _k_helical(CH_SPRING["d"], CH_SPRING["D"], CH_SPRING["n"])
+    k_ch = SPRING_KCH if SPRING_KCH > 0 else k_geom
+    log(f"  channel spring k = {k_ch:.1f} N/m (geometric {k_geom:.0f} N/m, "
+        f"override {SPRING_KCH:.1f}) ; {len(levers)} channel-levers")
 
     # 3) 20 channel springs: channel-lever tab eye <-> shared summing-lever eye.
     ok = 0
@@ -129,8 +131,10 @@ async def add_springs(adapter):
     # 4) counter spring: gooseneck (structural) <-> boss-hook (on summing-lever).
     goose_n = _find_one(adapter, "gooseneck-1", comps=comps)[1]
     hook_n = _find_one(adapter, "boss-hook-1", comps=comps)[1]
-    k_ct = _k_helical(CT_SPRING["d"], CT_SPRING["D"], CT_SPRING["n"])
-    log(f"  counter spring k = {k_ct:.1f} N/m")
+    k_ct_geom = _k_helical(CT_SPRING["d"], CT_SPRING["D"], CT_SPRING["n"])
+    k_ct = SPRING_KCT if SPRING_KCT > 0 else k_ct_geom
+    log(f"  counter spring k = {k_ct:.1f} N/m (geometric {k_ct_geom:.0f} N/m, "
+        f"override {SPRING_KCT:.1f})")
     cres = await adapter.add_motion_spring(MotionSpringParameters(
         spring_type="linear",
         endpoints=[component_named_ref(goose_n, goose_pt, "POINT"),
