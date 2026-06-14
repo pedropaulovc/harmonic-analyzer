@@ -561,6 +561,7 @@ async def _add_cam_couplings(adapter):
     revolute the rod pin drives the rocker -> the rocker oscillates about its
     (artifact-A) pivot revolute.
     """
+    from solidworks_mcp.adapters.base import RotateComponentParameters
     point_name = await _add_ring_centre_point(adapter)
     log("  enumerating components for cam pairing (single full-tree walk) ...")
     comps = _components(adapter)
@@ -570,7 +571,22 @@ async def _add_cam_couplings(adapter):
     log(f"  cam couplings: {len(gears)} gears, {len(rods)} rods -> {n} channels")
     cam_ok = 0
     for i in range(n):
-        gear_n, rod_n = gears[i][1], rods[i][1]
+        gear_comp, gear_n = gears[i]
+        rod_n = rods[i][1]
+        # PERTURB before mating: at the EXACT design pose the rod ring point lies
+        # ON the eccentric lobe Axis3 (degenerate zero-distance), and AddMate5
+        # rejects a point-on-axis there as "over-defines the assembly". Spin the
+        # gear ~20 deg about its own axis so the eccentric lobe orbits the axis OFF
+        # the stationary rod ring point -> non-degenerate -> the mate adds cleanly
+        # (proven decisively: control FAIL vs perturbed 3/3, probe_perturb_cam).
+        # The closing ForceRebuild3 snaps every gear back to its concentric+axial
+        # mate pose, dragging the ring back onto the lobe; the added mate then just
+        # holds. Read the gear's spin axis from its world transform (local Z ->
+        # cols 6..8, origin -> cols 9..11 in metres).
+        a = _comp_xform(adapter, gear_comp)
+        await adapter.rotate_component(RotateComponentParameters(
+            name=gear_n, angle=20.0, axis_vector=[a[6], a[7], a[8]],
+            axis_point=[a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0], mode="exact"))
         if i == 0:
             log(f"    ch00 names: gear={gear_n!r} rod={rod_n!r} point={point_name!r}")
         try:
