@@ -1,29 +1,36 @@
-r"""MINIMAL four-bar test: does rocker -> amplitude-bar -> channel-lever transmit?
+r"""MINIMAL channel test: cam -> rod -> rocker -> amplitude-bar -> channel-lever.
 
-A throwaway 5-part assembly that isolates ONE channel's transmission from the
-full 144-part channel.SLDASM (240 mates, flexible sub, ~13 min/iteration). Built
-from scratch with a deliberately NON-degenerate coefficient so the answer is
-unambiguous, then driven under Basic Motion -- the same solver the deliverable
-uses.
+A throwaway test rig that isolates ONE channel's full drive chain from the
+144-part channel.SLDASM, built from scratch and driven under Basic Motion (the
+same solver the deliverable uses). Updated per user review of the first cut:
 
-Why the full-assembly probes kept failing: the default channel state parks the
-bar foot ~9 mm from the rocker pivot (the near-zero "neutral" coefficient), so
-rocking the arm gives ~zero foot travel -- a singular four-bar. Here the foot is
-pinned on the R800 arc at COEFF=60 mm out from the pivot: a real lever arm.
+  1. The rocker must OSCILLATE, not spin 360 deg. The motor no longer sits on
+     the rocker pivot -- it spins the ECCENTRIC CAM, exactly as the real
+     machine does. Cam (5.08 mm eccentricity) -> connecting-rod (127 c2c) ->
+     rocker rod-pin (25.4 from the pivot) is a Grashof crank-rocker: the cam
+     turns fully, the rocker rocks ~+/-11 deg (= asin(5.08/25.4)). That swing
+     is set by the real cam geometry, not chosen.
+  2. The rocker and lever could slide along their shaft axes and pull off the
+     amplitude bar (a concentric/coincident pin leaves the axial DOF free).
+     Every moving part now gets an axial plane lock (a coincident/distance
+     mate, held rigid by Basic Motion) so nothing drifts off its pin.
 
-The kinematic chain (planar, all pin axes along Z):
-  * rocker pivot   -- concentric on the pivot-shaft (revolute, MOTOR-driven)
-  * foot pin       -- bar Axis2 (foot) COINCIDENT to a Z-axis built into the
-                      rocker at local (COEFF, arc_y): the foot rides a fixed
-                      point on the arc (operating coefficient = clamped slide)
-  * top pin        -- lever Axis2 (bar pin) COINCIDENT to bar Axis1 (top pin)
-  * lever fulcrum  -- concentric on the fulcrum-shaft (revolute, the output)
+Parts: pivot-shaft + fulcrum-shaft + arbor (3 grounded shafts = the frame) and
+eccentric-cam + connecting-rod + rocker-arm + amplitude-bar + channel-lever
+(5 moving parts). The kinematic chain (all pin axes along Z):
 
-Grashof crank-rocker (shortest link = rocker arm, 60.9 mm): the rocker can turn
-fully and the lever oscillates -- so the motor sweep clearly exercises the chain.
-The rocker pin axis is created on the SHARED rocker-arm part doc (ActivateDoc3
-round-trip, part NEVER saved). The assembly is NEVER saved either -- this is a
-diagnostic, the result is the printed spans + an exported mp4.
+  * cam bore     -- concentric on the arbor (revolute, MOTOR-driven)
+  * cam disc OD  -- connecting-rod strap bore concentric on it (the eccentric)
+  * rod pin      -- connecting-rod Axis2 coincident to the rocker rod-bore
+  * rocker pivot -- concentric on the pivot-shaft (the see-saw)
+  * foot pin     -- bar Axis2 (foot) coincident to a Z-axis built into the
+                    rocker at local (COEFF, arc_y): the operating coefficient
+  * top pin      -- lever Axis2 (bar pin) coincident to bar Axis1 (top pin)
+  * lever fulcrum-- concentric on the fulcrum-shaft (the output)
+
+Reference axes (rocker arc-point, cam bore) are created on the SHARED part docs
+(ActivateDoc3 round-trip, parts NEVER saved). The assembly is NEVER saved --
+this is a diagnostic; the result is the printed spans + an exported mp4 + views.
 
   C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_fourbar_test.py
 """
@@ -35,8 +42,8 @@ import math
 import sys
 
 from _common import (
-    OUT_PNG, OUT_SLDASM, _flag, _read_member, assert_model_healthy, check,
-    coincident_mate, component_transform, concentric_mate, bore_axis_ref,
+    OUT_PNG, _flag, _read_member, assert_model_healthy, bore_axis_ref, check,
+    coincident_mate, component_transform, concentric_mate, distance_driver,
     log, named_ref, place_component,
 )
 from build_motion_study import _entity_ref, _rot_angle
@@ -48,20 +55,38 @@ ARC_CENTER_Y = 816.0          # rocker R800 arc centre, local
 ARC_R = 800.0
 COEFF = 60.0                  # foot offset along the arc from the pivot = lever arm
 
+# eccentric cam + connecting rod (build_eccentric_cam.py / build_connecting_rod.py)
+CAM_R = 50.8 / 2.0            # disc OD radius (the journal the rod strap rides)
+CAM_ECC = 5.08               # disc centre offset -Y from the bore (the throw)
+ROD_C2C = 127.0              # rod strap centre -> rod pin
+
+# rocker rod-pin local (build_rocker_arm.py: ROD_HOLE_X, _mid_y(ROD_HOLE_X))
+ARM_ROD_X = 25.4
+ARM_DEPTH = 16.0
+R_TOP = 800.0
+R_BOT = R_TOP + ARM_DEPTH     # 816
+
 # bar / lever named-bore locals (from build_channel_assembly.py)
 BAR_FOOT_LOCAL = [3.175, 0.0, 3.175]        # bar Axis2 (foot)
 BAR_TOP_PIN_LOCAL = [3.175, 806.45, 3.175]  # bar Axis1 (top pin)
 LEVER_BAR_PIN_LOCAL = [127.0, 0.0, 0.0]     # lever Axis2 (bar pin)
 
 IDENT = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
-# Bar bores run along its LOCAL X (Top ∩ Front planes); the bar must be rotated
+# Bar bores run along its LOCAL X (Top n Front planes); the bar must be rotated
 # Ry(90) so they become the assembly Z (rotation) axis -- as build_channel does.
 ROT_Y_POS90 = [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]
 
+# Z stations (mm): parts stacked so pin-mated faces sit beside each other.
+Z_ROCKER = 0.0
+Z_LEVER = 0.0
+Z_BAR = 3.175      # bar slot centred on z=0 after Ry(90)
+Z_ROD = 2.5        # rod tip strap face-flush beside the 2.5 arm; ring at z 2.5
+Z_CAM = -2.5       # cam disc (10.16 thick) spans the rod ring at z 2.5
+
 # motor / solve
-ROCK_SPEED = 2.0   # rotary motor speed (Basic Motion: ~115 deg/s at 2)
-DURATION_S = 2.0
-STEPS = 16
+CAM_SPEED = 2.0    # rotary motor on the cam (Basic Motion: ~115 deg/s at 2)
+DURATION_S = 4.0   # ~1.3 cam revolutions -> a full rocker oscillation cycle
+STEPS = 32
 
 # Set True if the foot-pin coincident yanks the bar (plane offset normal flipped).
 FLIP_PIN_PLANE = False
@@ -71,19 +96,33 @@ def _arc_y(x: float) -> float:
     return ARC_CENTER_Y - math.sqrt(ARC_R**2 - x * x)
 
 
-async def _make_rocker_pin_axis(adapter, rocker_name: str) -> str:
-    """Create a Z-axis at rocker-local (COEFF, arc_y) on the shared rocker part.
+def _mid_y(x: float) -> float:
+    """Rocker top/bottom-edge mid height at local x (= bore-axis y)."""
+    by = R_BOT - math.sqrt(R_BOT**2 - x * x)
+    ty = R_BOT - math.sqrt(R_TOP**2 - x * x)
+    return (by + ty) / 2.0
 
-    Intersection of an offset-from-Right plane (x = COEFF) and an offset-from-Top
-    plane (y = arc_y). Built in the PART doc (ActivateDoc3 round-trip) so it moves
-    with the rocker; the part is NEVER saved. Returns the new axis name."""
+
+def _org(adapter, comp: str) -> list[float]:
+    a = component_transform(adapter, comp)
+    return [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
+
+
+async def _make_part_z_axis(adapter, comp_name: str, x_off: float, y_off: float,
+                            label: str) -> str:
+    """Create a Z-axis at part-local (x_off, y_off) on a SHARED part doc.
+
+    Intersection of an offset-from-Right plane (x) and an offset-from-Top plane
+    (y); a zero offset uses the principal plane by name. Built in the PART doc
+    (ActivateDoc3 round-trip) so it moves with the component; NEVER saved.
+    Returns the new axis name."""
     from solidworks_mcp.adapters.base import CreateAxisParameters, CreatePlaneParameters
 
-    comp = adapter.currentModel.GetComponentByName(rocker_name)
+    comp = adapter.currentModel.GetComponentByName(comp_name)
     _flag(comp, "IComponent2")
     part = adapter._attempt(lambda: comp.GetModelDoc2(), default=None)
     if part is None:
-        raise RuntimeError("rocker part doc unresolved")
+        raise RuntimeError(f"{comp_name} part doc unresolved")
     top = adapter.currentModel
     top_title = str(_read_member(top, "GetTitle"))
     part_title = str(_read_member(part, "GetTitle"))
@@ -91,18 +130,45 @@ async def _make_rocker_pin_axis(adapter, rocker_name: str) -> str:
         lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, _byref_i4()), default=None)
     adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
     try:
-        px = check("plane x=COEFF", await adapter.create_plane(CreatePlaneParameters(
-            mode="offset", base_plane="Right Plane", offset=COEFF, flip=FLIP_PIN_PLANE)))
-        py = check("plane y=arc_y", await adapter.create_plane(CreatePlaneParameters(
-            mode="offset", base_plane="Top Plane", offset=_arc_y(COEFF))))
-        ax = check("axis foot-pin", await adapter.create_axis(CreateAxisParameters(
-            mode="two_planes", planes=[px.name, py.name])))
+        if abs(x_off) > 1e-9:
+            px = check(f"{label} plane x", await adapter.create_plane(CreatePlaneParameters(
+                mode="offset", base_plane="Right Plane",
+                offset=abs(x_off), flip=(x_off < 0) ^ FLIP_PIN_PLANE))).name
+        else:
+            px = "Right Plane"
+        if abs(y_off) > 1e-9:
+            py = check(f"{label} plane y", await adapter.create_plane(CreatePlaneParameters(
+                mode="offset", base_plane="Top Plane",
+                offset=abs(y_off), flip=(y_off < 0)))).name
+        else:
+            py = "Top Plane"
+        ax = check(f"{label} axis", await adapter.create_axis(CreateAxisParameters(
+            mode="two_planes", planes=[px, py]))).name
     finally:
         adapter._attempt(
             lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()), default=None)
         adapter.currentModel = top
-    log(f"  rocker foot-pin axis = {ax.name!r} at local ({COEFF}, {_arc_y(COEFF):.2f})")
-    return ax.name
+    log(f"  {label} axis = {ax!r} at part-local ({x_off:.2f}, {y_off:.2f})")
+    return ax
+
+
+async def _axial_lock(adapter, comp: str, plane: str = "Front Plane") -> None:
+    """Pin a part's slide along its (Z) pin axis to its placed Z.
+
+    A revolute/pin leaves translation along the axis free, so the rocker/lever
+    could drift off the amplitude bar. A coincident (z=0) or distance plane
+    mate removes it; Basic Motion holds it rigid, leaving the spin DOF intact.
+    """
+    z = _org(adapter, comp)[2]
+    ref_comp = named_ref(f"{plane}@{comp}", "PLANE")
+    ref_asm = named_ref("Front Plane", "PLANE")
+    tgt = _org(adapter, comp)
+    if abs(z) < 1e-6:
+        await coincident_mate(adapter, ref_comp, ref_asm,
+                              label=f"{comp} axial lock z=0", verify=(comp, tgt))
+        return
+    await distance_driver(adapter, ref_comp, ref_asm, abs(z),
+                          label=f"{comp} axial lock z={abs(z):.2f}", verify=(comp, tgt))
 
 
 async def build(adapter) -> None:
@@ -120,75 +186,116 @@ async def build(adapter) -> None:
     fulcrum_xy = (top_pin_w[0] - LEVER_BAR_PIN_LOCAL[0], top_pin_w[1])
     log(f"design: pivot{pivot_xy} foot{foot_w} top_pin{top_pin_w} fulcrum{fulcrum_xy}")
 
-    # frame: the two grounded shafts (rocker pivot + lever fulcrum)
+    # frame shafts: rocker pivot + lever fulcrum (the cam arbor is added once we
+    # know the rod-pin's true world position).
     await place_component(adapter, "pivot-shaft", [pivot_xy[0], pivot_xy[1], 0.0],
                           [0.0, 0.0, 0.0], IDENT, label="pivot-shaft")
     await place_component(adapter, "fulcrum-shaft", [fulcrum_xy[0], fulcrum_xy[1], 0.0],
                           [0.0, 0.0, 0.0], IDENT, label="fulcrum-shaft")
 
-    # moving parts, inserted on-solution (z staggered so they don't overlap)
+    # rocker first, so we can read the rod-pin's mirrored world coords and place
+    # the cam/arbor/rod 127 mm below it (the rod runs ~vertical at the default).
     rocker = await place_component(adapter, "rocker-arm",
-                                   [0.0, -8.0, 0.0], [0.0, 0.0, 0.0], IDENT,
+                                   [0.0, -8.0, Z_ROCKER], [0.0, 0.0, 0.0], IDENT,
                                    ground=False, label="rocker-arm")
-    # All three moving parts coplanar about z=0 so the bar straddles the rocker
-    # (foot) and lever (top) like the real channel -- pins short, looks connected.
-    # Ry(90): foot world = (local_z + tx, local_y + ty, -local_x + tz); tz=+half
-    # width centres the bar's Z span on 0. (Z position along a pin axis is free,
-    # so this is cosmetic only -- the kinematics are identical to any stagger.)
+    from _common import world_point
+    rod_pin_w = world_point(adapter, rocker, [ARM_ROD_X, _mid_y(ARM_ROD_X), 0.0])
+    log(f"  rocker rod-pin world = ({rod_pin_w[0]:.2f}, {rod_pin_w[1]:.2f})")
+
+    # cam bore is the rotation axis: ECC above the disc, the disc 127 below the
+    # rod pin. World x is mirrored, so un-mirror (negate x) for place_component.
+    ring_w = (rod_pin_w[0], rod_pin_w[1] - ROD_C2C)             # disc / rod strap centre
+    bore_w = (ring_w[0], ring_w[1] + CAM_ECC)                   # cam rotation axis
+    arbor_design = (-bore_w[0], bore_w[1])
+    rod_design = (-ring_w[0], ring_w[1])
+    log(f"  cam bore world ({bore_w[0]:.2f}, {bore_w[1]:.2f}); "
+        f"disc/ring world ({ring_w[0]:.2f}, {ring_w[1]:.2f})")
+
+    await place_component(adapter, "pivot-shaft", [arbor_design[0], arbor_design[1], 0.0],
+                          [0.0, 0.0, 0.0], IDENT, label="arbor (cam shaft)")
+    cam = await place_component(adapter, "eccentric-cam",
+                                [arbor_design[0], arbor_design[1], Z_CAM],
+                                [0.0, 0.0, 0.0], IDENT, ground=False, label="eccentric-cam")
+    rod = await place_component(adapter, "connecting-rod",
+                                [rod_design[0], rod_design[1], Z_ROD],
+                                [0.0, 0.0, 0.0], IDENT, ground=False, label="connecting-rod")
     bar = await place_component(adapter, "amplitude-bar",
-                                [foot_w[0] - BAR_FOOT_LOCAL[2], foot_w[1], 3.175],
+                                [foot_w[0] - BAR_FOOT_LOCAL[2], foot_w[1], Z_BAR],
                                 [0.0, 90.0, 0.0], ROT_Y_POS90,
                                 ground=False, label="amplitude-bar")
     lever = await place_component(adapter, "channel-lever",
-                                  [fulcrum_xy[0], fulcrum_xy[1], 0.0],
+                                  [fulcrum_xy[0], fulcrum_xy[1], Z_LEVER],
                                   [0.0, 0.0, 0.0], IDENT, ground=False, label="channel-lever")
 
-    # rocker foot-pin axis on the part doc
-    pin_axis = await _make_rocker_pin_axis(adapter, rocker)
+    # reference axes on the shared part docs (parts never saved)
+    pin_axis = await _make_part_z_axis(adapter, rocker, COEFF, _arc_y(COEFF), "foot-pin")
+    cam_axis = await _make_part_z_axis(adapter, cam, 0.0, 0.0, "cam bore")
 
-    # mirrored-frame shaft OD pick points (x -> -x; shafts centre on their axis)
-    pivot_od = [-pivot_xy[0] + SHAFT_R, pivot_xy[1], 0.0]
-    fulc_od = [-fulcrum_xy[0] + SHAFT_R, fulcrum_xy[1], 0.0]
-    rk_org = [component_transform(adapter, rocker)[9 + i] * 1000.0 for i in range(3)]
-    lv_org = [component_transform(adapter, lever)[9 + i] * 1000.0 for i in range(3)]
+    # mirrored-frame shaft OD / cam disc OD pick points (a point on the cylinder)
+    pivot_od = [-pivot_xy[0] + SHAFT_R, pivot_xy[1], Z_ROCKER]
+    fulc_od = [-fulcrum_xy[0] + SHAFT_R, fulcrum_xy[1], Z_LEVER]
+    arbor_od = [bore_w[0] + SHAFT_R, bore_w[1], 0.0]
+    disc_od = [ring_w[0] + CAM_R, ring_w[1], Z_CAM + 5.08]  # mid-thickness of the disc
 
-    # J1 rocker revolute (spin freed for the motor)
+    # J0 cam revolute on the arbor (the driven member) + axial lock.
+    await concentric_mate(adapter, _entity_ref(cam, cam_axis, "AXIS"),
+                          bore_axis_ref(arbor_od), label="J0 cam on arbor",
+                          verify=(cam, _org(adapter, cam)))
+    await _axial_lock(adapter, cam)
+
+    # J1 rocker revolute on the pivot shaft + axial lock.
     await concentric_mate(adapter, named_ref(f"Axis1@{rocker}", "AXIS"),
                           bore_axis_ref(pivot_od), label="J1 rocker pivot",
-                          verify=(rocker, rk_org))
-    # J4 lever revolute (the output)
+                          verify=(rocker, _org(adapter, rocker)))
+    await _axial_lock(adapter, rocker)
+
+    # J4 lever revolute on the fulcrum shaft (the output) + axial lock.
     await concentric_mate(adapter, named_ref(f"Axis1@{lever}", "AXIS"),
                           bore_axis_ref(fulc_od), label="J4 lever fulcrum",
-                          verify=(lever, lv_org))
-    # J3a foot pin: bar foot COINCIDENT to the rocker arc-point axis
-    bar_org = [component_transform(adapter, bar)[9 + i] * 1000.0 for i in range(3)]
+                          verify=(lever, _org(adapter, lever)))
+    await _axial_lock(adapter, lever)
+
+    # J2 connecting-rod: strap bore concentric on the cam disc OD (the eccentric
+    # journal), pin coincident to the rocker rod-bore. Spinning the cam drags
+    # the strap on a 5.08 mm orbit -> the rod sees-saws the rocker.
+    await concentric_mate(adapter, named_ref(f"Axis1@{rod}", "AXIS"),
+                          bore_axis_ref(disc_od), label="J2a rod strap on cam",
+                          verify=(rod, _org(adapter, rod)))
+    await coincident_mate(adapter, _entity_ref(rod, "Axis2", "AXIS"),
+                          _entity_ref(rocker, "Axis2", "AXIS"),
+                          label="J2b rod pin on rocker", verify=(rod, _org(adapter, rod)))
+    await _axial_lock(adapter, rod)
+
+    # J3 bar: foot coincident to the rocker arc-point axis, top pin coincident to
+    # the lever bar-pin. The foot rides a fixed coefficient on the R800 arc.
     await coincident_mate(adapter, _entity_ref(bar, "Axis2", "AXIS"),
                           _entity_ref(rocker, pin_axis, "AXIS"),
                           label="J3a foot pin (bar foot on rocker arc)",
-                          verify=(bar, bar_org))
-    # J3b top pin: lever bar-pin COINCIDENT to bar top pin
+                          verify=(bar, _org(adapter, bar)))
     await coincident_mate(adapter, _entity_ref(lever, "Axis2", "AXIS"),
                           _entity_ref(bar, "Axis1", "AXIS"),
                           label="J3b top pin (bar top on lever)",
-                          verify=(bar, bar_org))
+                          verify=(bar, _org(adapter, bar)))
+    await _axial_lock(adapter, bar, plane="Right Plane")
 
-    assert_model_healthy(adapter, label="fourbar", deep=False)
+    assert_model_healthy(adapter, label="channel-rig", deep=False)
 
-    # --- Basic Motion: motor on the rocker, calculate, sample the chain --------
+    # --- Basic Motion: motor on the CAM, calculate, sample the chain -----------
     await adapter.ensure_motion_addin()
     made = check("create_motion_study", await adapter.create_motion_study(
         MotionStudyParameters(name="", study_type="physical_simulation",
                               duration=DURATION_S, activate=True)))
     log(f"  study {made}")
-    check("add_motor rocker", await adapter.add_motor(MotionMotorParameters(
-        motor_type="rotary", entity=_entity_ref(rocker, "Axis1", "AXIS"),
-        speed=ROCK_SPEED, study_name="")))
+    check("add_motor cam", await adapter.add_motor(MotionMotorParameters(
+        motor_type="rotary", entity=_entity_ref(cam, cam_axis, "AXIS"),
+        speed=CAM_SPEED, study_name="")))
     log("  Calculate() ...")
     check("calculate_motion", await adapter.calculate_motion(
         MotionStudyRefParameters(name="")))
 
     base, spans = {}, {}
-    probes = [("rocker", rocker), ("bar", bar), ("lever", lever)]
+    probes = [("cam", cam), ("rocker", rocker), ("bar", bar), ("lever", lever)]
+    best_t, best_lever = 0.0, -1.0
     for s in range(STEPS + 1):
         t = DURATION_S * s / STEPS
         await adapter.set_motion_time(MotionTimeParameters(time=t, study_name=""))
@@ -199,19 +306,24 @@ async def build(adapter) -> None:
             ang = _rot_angle(base[name], a)
             spans[name] = max(spans.get(name, 0.0), ang)
             row.append(f"{name}={ang:6.2f}")
+            if name == "lever" and ang > best_lever:
+                best_lever, best_t = ang, t
         log(f"    t={t:4.2f}s  {'  '.join(row)}")
     log(f"  spans(deg): {dict((k, round(v, 2)) for k, v in spans.items())}")
 
-    rk, br, lv = spans.get("rocker", 0), spans.get("bar", 0), spans.get("lever", 0)
-    if rk > 1.0 and lv > 1.0 and br > 0.1:
-        log(f"  PASS: rocker {rk:.1f} -> bar swings {br:.1f} -> lever {lv:.1f} deg "
-            f"(four-bar transmits)")
-    elif rk <= 1.0:
-        log(f"  FAIL: rocker barely moved ({rk:.2f}) -- motor/over-constraint")
+    cm, rk, br, lv = (spans.get(k, 0) for k in ("cam", "rocker", "bar", "lever"))
+    if cm > 90.0 and 3.0 < rk < 90.0 and lv > 0.5 and br > 0.05:
+        log(f"  PASS: cam spins ({cm:.0f}>=180 wraps) -> rocker OSCILLATES {rk:.1f} deg "
+            f"-> bar {br:.1f} -> lever {lv:.1f} (cam-driven channel transmits)")
+    elif cm <= 90.0:
+        log(f"  FAIL: cam barely turned ({cm:.1f}) -- motor/over-constraint")
+    elif rk >= 90.0:
+        log(f"  FAIL: rocker swung {rk:.1f} deg -- still spinning, not oscillating")
     else:
-        log(f"  FAIL: rocker {rk:.1f} but lever {lv:.2f} -- not transmitting")
+        log(f"  FAIL: cam {cm:.0f} rocker {rk:.1f} but bar {br:.2f}/lever {lv:.2f} "
+            f"-- chain not transmitting")
 
-    # --- artefacts to show: an mp4 + an isometric still ------------------------
+    # --- artefacts: an mp4 + nine views at the peak-deflection pose ------------
     out_dir = OUT_PNG / "fourbar-test"
     out_dir.mkdir(parents=True, exist_ok=True)
     try:
@@ -223,8 +335,8 @@ async def build(adapter) -> None:
         log(f"  video -> {mp4}")
     except Exception as exc:  # noqa: BLE001
         log(f"  video export skipped: {exc}")
-    # Park at a clearly deflected pose (lever near peak) so the linkage reads.
-    await adapter.set_motion_time(MotionTimeParameters(time=DURATION_S * 0.375, study_name=""))
+    await adapter.set_motion_time(MotionTimeParameters(time=best_t, study_name=""))
+    log(f"  stills parked at peak lever pose t={best_t:.2f}s ({best_lever:.1f} deg)")
     for view in ("front", "back", "top", "bottom", "isometric", "dimetric",
                  "trimetric", "right", "left"):
         img = (out_dir / f"fourbar_{view}.png").resolve()
