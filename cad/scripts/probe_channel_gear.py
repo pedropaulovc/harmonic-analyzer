@@ -75,14 +75,18 @@ async def main():
     log(f"opened {asm_path}")
 
     await _flex_channel(adapter)
-    # Free the WHOLE rocker->bar->lever chain: suppress the recurring pose/spin
-    # drivers of all three families (the lever has its OWN J4 bar-pin spin driver
-    # -- missing that is why the first gear test left the lever locked). Recurring
-    # = the uniform default pose/spin; per-channel axial-Z holds are KEPT so the
-    # parts stay at their stations.
+    # Free ONLY the rocker + lever (NOT the bar). The lever has its OWN J4 spin
+    # driver -- freeing it is what lets the gear drive it. The amplitude bar is a
+    # COEFFICIENT SETTING: keep its drivers so it stays upright + frozen at its
+    # slide station (its X/Y ride the lever pin via J3, so it translates upright
+    # with the geared lever -- it neither flops nor locks the lever). Suppressing
+    # the bar instead (an earlier probe) left all 20 bars free to swing about
+    # their lever pins; with the foot support being an ignored CONTACT they
+    # flopped up into a black slab. This probe asserts the bar's rotation stays
+    # ~0 (no flop) while the lever follows the rocker through the gear.
     await _suppress_recurring(
-        adapter, "channel-1", ("rocker-arm", "amplitude-bar", "channel-lever"),
-        "free rocker/bar/lever chain")
+        adapter, "channel-1", ("rocker-arm", "channel-lever"),
+        "free rocker + lever (bar stays pinned)")
 
     # add the ch0 gear INSIDE channel.SLDASM (both parts in the one flexible sub).
     _, ch_doc = _sub_model(adapter, "channel-1")
@@ -93,8 +97,10 @@ async def main():
         comps = _components(adapter, ch_doc)
         rockers = _by_z_rank(adapter, "rocker-arm", comps=comps)
         levers = _by_z_rank(adapter, "channel-lever", comps=comps)
+        bars = _by_z_rank(adapter, "amplitude-bar", comps=comps)
         rocker_n, lever_n = rockers[0][1], levers[0][1]
-        log(f"  ch0 rocker={rocker_n!r} lever={lever_n!r}")
+        bar_n = bars[0][1]
+        log(f"  ch0 rocker={rocker_n!r} lever={lever_n!r} bar={bar_n!r}")
         for alignment in ("aligned", "anti_aligned"):
             try:
                 g = await gear_mate(
@@ -110,13 +116,17 @@ async def main():
     finally:
         adapter.currentModel = top
 
-    # measure: rotate the rocker kinematically, read the lever rotation. The
-    # in-sub names ('rocker-arm-1') lack the 'channel-1/' prefix they carry at
-    # the top level -- resolve the TOP-level component + name via _find_one.
+    # measure: rotate the rocker kinematically, read the lever rotation AND the
+    # bar rotation (must stay ~0 -- the bar is a coefficient setting; if it
+    # rotates it is flopping). The in-sub names ('rocker-arm-1') lack the
+    # 'channel-1/' prefix they carry at the top level -- resolve the TOP-level
+    # component + name via _find_one.
     rocker_c, rocker_top = _find_one(adapter, rocker_n.split("/")[-1])
     lever_c, _ = _find_one(adapter, lever_n.split("/")[-1])
+    bar_c, _ = _find_one(adapter, bar_n.split("/")[-1])
     a0 = _comp_xform(adapter, lever_c)
     ra = _comp_xform(adapter, rocker_c)
+    ba0 = _comp_xform(adapter, bar_c)
     # rocker pivot axis = its world Z column (cols 6..8) through its origin.
     await adapter.rotate_component(RotateComponentParameters(
         name=rocker_top,
@@ -126,12 +136,21 @@ async def main():
     adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
     a1 = _comp_xform(adapter, lever_c)
     ra1 = _comp_xform(adapter, rocker_c)
+    ba1 = _comp_xform(adapter, bar_c)
     lever_moved = _rot_angle(a0, a1) if (a0 and a1) else 0.0
     rocker_moved = _rot_angle(ra, ra1) if (ra and ra1) else 0.0
-    log(f"  rocker rotated {rocker_moved:.2f} deg -> channel-lever {lever_moved:.2f} deg")
-    if lever_moved > 0.3:
+    bar_rot = _rot_angle(ba0, ba1) if (ba0 and ba1) else 0.0
+    log(f"  rocker rotated {rocker_moved:.2f} deg -> channel-lever {lever_moved:.2f} deg "
+        f"| amplitude-bar rotated {bar_rot:.2f} deg (want ~0 = no flop)")
+    transmits = lever_moved > 0.3
+    no_flop = bar_rot < 1.0
+    if transmits and no_flop:
         log(f"  PASS: gear transmits rocker->lever (ratio {lever_moved/rocker_moved:.3f} "
-            f"effective) -> wire into build_motion_study for all 20 channels")
+            f"effective) AND bar stays put ({bar_rot:.2f} deg) -> wire into "
+            f"build_motion_study for all 20 channels")
+    elif transmits and not no_flop:
+        log(f"  PARTIAL: gear transmits but bar FLOPPED {bar_rot:.2f} deg -- bar "
+            f"drivers must be KEPT (do not suppress amplitude-bar)")
     else:
         log("  FAIL: lever did not follow -> gear not enforced kinematically; "
             "try four-bar foot-pin instead")

@@ -410,11 +410,28 @@ async def _suppress_drivers(adapter, level, dump=False):
         adapter, "drive-train-1", ("crank-handle",), (DISTANCE, ANGLE),
         "crank driver")
 
-    # channel: free the cam-follower chain. Two DIFFERENT rules per family:
+    # channel: free the cam-follower chain. THREE families, three rules:
     #
     #  * rocker-arm -> recurring-only: suppress the constant spin driver, KEEP
     #    the per-station axial-Z hold so each rocker stays at its channel station
     #    (the rocker pivot revolute is a real two-part mate, untouched).
+    #
+    #  * channel-lever -> recurring-only: suppress the constant J4 spin driver so
+    #    the lever is FREE to rotate about its fulcrum, KEEP its per-station
+    #    axial-Z hold and its J4 fulcrum revolute. The lever is then driven by the
+    #    in-sub gear off the rocker (_add_lever_gears, ratio = the channel
+    #    coefficient), replacing the dead bar-foot-on-rocker CONTACT that Basic
+    #    Motion ignores.
+    #
+    #  * amplitude-bar -> NOT suppressed. The bar is a COEFFICIENT SETTING: it
+    #    must stay frozen at its slide station, NOT move during a run. Its spin +
+    #    axial drivers are KEPT so it stays upright and pinned; its X/Y are not
+    #    ground-pinned but ride the lever pin via the J3 coincident, so as the
+    #    geared lever rotates the bar simply TRANSLATES upright with it (no foot
+    #    constraint to fight, no closed loop, no over-constraint). Suppressing the
+    #    bar drivers instead (the earlier probe) left all 20 bars free to swing
+    #    about their lever pins -- with the foot support being an ignored CONTACT
+    #    they flopped up into a black slab. Keep them pinned.
     #
     #  * connecting-rod -> suppress ALL of its drivers (ring-X/Y/Z AND the swing,
     #    which spin_driver implements as a DISTANCE mate). Artifact A pins the rod
@@ -431,6 +448,8 @@ async def _suppress_drivers(adapter, level, dump=False):
     #    pin<->rocker had to move INSIDE the sub, not be dropped for over-defn.)
     await _suppress_recurring(
         adapter, "channel-1", ("rocker-arm",), "channel rocker spin drivers")
+    await _suppress_recurring(
+        adapter, "channel-1", ("channel-lever",), "channel lever spin drivers")
     await _suppress_named(
         adapter, "channel-1", ("connecting-rod",), (DISTANCE, ANGLE),
         "channel rod drivers (free the rod fully)")
@@ -611,6 +630,61 @@ async def _add_cam_couplings(adapter):
     adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
     log(f"  cam couplings: {cam_ok}/{n}")
     return cam_ok
+
+
+# ---- stage 4c: per-channel rocker->lever transmission gear -------------------
+# The integration coefficient of channel k is the linkage gain dtheta_lever /
+# dtheta_rocker, set by the amplitude bar's slide position: rotating the rocker
+# by dtheta moves the foot contact (at radius R_foot up the rocker arc) by
+# ~R_foot*dtheta, which pushes the lever bar-pin (at radius L_lever from the
+# fulcrum) by ~R_foot/L_lever * dtheta. So coefficient = R_foot / L_lever, and
+# MOVING the bar (changing R_foot) changes the coefficient -- exactly the machine
+# input. Basic Motion ignores the bar-foot-on-rocker CONTACT, so the gain cannot
+# come from the physical linkage; we encode it as a GEAR ratio rocker<->lever
+# (gears ARE enforced in-sub -- proven, probe_channel_gear). ``ratio_fn(i)``
+# returns the [rocker, lever] ratio for channel i; default 1:1 (the F6b wiring +
+# flop-fix gate -- the geometry-derived per-bar coefficient is the F6c tuning
+# step). The bar stays pinned (frozen at its slide station) and rides the geared
+# lever via the J3 coincident, so it neither flops nor locks the lever.
+async def _add_lever_gears(adapter, ratio_fn=None):
+    from _common import gear_mate
+    _, ch_doc = _sub_model(adapter, "channel-1")
+    top = adapter.currentModel
+    adapter.currentModel = ch_doc
+    ok = n = 0
+    try:
+        log("  enumerating channel.SLDASM parts for in-sub rocker<->lever gears ...")
+        comps = _components(adapter, ch_doc)
+        rockers = _by_z_rank(adapter, "rocker-arm", comps=comps)
+        levers = _by_z_rank(adapter, "channel-lever", comps=comps)
+        n = min(len(rockers), len(levers))
+        log(f"  in-sub lever gears: {len(rockers)} rockers, {len(levers)} levers "
+            f"-> {n} channels")
+        for i in range(n):
+            rocker_n, lever_n = rockers[i][1], levers[i][1]
+            ratio = ratio_fn(i) if ratio_fn else [1.0, 1.0]
+            done = False
+            for alignment in ("aligned", "anti_aligned"):
+                try:
+                    g = await gear_mate(
+                        adapter, _entity_ref(rocker_n, "Axis1", "AXIS"),
+                        _entity_ref(lever_n, "Axis1", "AXIS"),
+                        ratio, alignment=alignment,
+                        label=f"ch{i:02d} rocker->lever gear (coeff)")
+                    if g.get("name"):
+                        ok += 1
+                        done = True
+                        break
+                except Exception as exc:  # noqa: BLE001 -- first-run diagnostics
+                    if i == 0:
+                        log(f"    ch00 gear alignment={alignment} rejected: {exc}")
+            if not done and i == 0:
+                log("    ch00 gear FAILED both alignments")
+        adapter._attempt(lambda: ch_doc.ForceRebuild3(False), default=None)
+    finally:
+        adapter.currentModel = top
+    log(f"  in-sub rocker<->lever gears: {ok}/{n}")
+    return ok
 
 
 # ---- stage 5: crank motor ---------------------------------------------------
@@ -813,6 +887,7 @@ async def build(adapter):
 
     await _add_rod_rocker_revolutes(adapter)
     await _add_cam_couplings(adapter)
+    await _add_lever_gears(adapter)
     check("ensure_motion_addin", await adapter.ensure_motion_addin())
     from solidworks_mcp.adapters.base import MotionStudyParameters, MotionStudyRefParameters
     made = check("create_motion_study", await adapter.create_motion_study(
