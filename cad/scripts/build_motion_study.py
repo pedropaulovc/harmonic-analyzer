@@ -291,99 +291,97 @@ async def _suppress_drivers(adapter):
         "pen-rod travel snapshot")
 
 
-# ---- stage 4: 20 cross-assembly cam concentrics -----------------------------
-def _largest_cyl_face(adapter, comp, target_r_mm=None):
-    """GetCorrespondingEntity for a cylindrical face on COMP's part.
+# ---- stage 4: per-channel cam + rod couplings (named axes) -------------------
+def _asm_title(adapter):
+    t = str(_read_member(adapter.currentModel, "GetTitle"))
+    return t[:-7] if t.lower().endswith(".sldasm") else t
 
-    Ranks by |radius - target_r_mm| when target given (the cam lobe is the
-    Ø50.8 face, r 25.4; the gear bore is r 4.76), else by area.
+
+def _entity_ref(name2, prefix, etype, asm_title):
+    """A named ``MateEntityRef`` for an entity inside a nested component.
+
+    ``name2`` is the top-level component path ("channel-1/connecting-rod-1");
+    SelectByID2 wants it reversed and @-joined with the entity and assembly:
+    "Axis1@connecting-rod-1@channel-1@harmonic-analyzer".
     """
-    part = adapter._attempt(lambda: comp.GetModelDoc2(), default=None)
-    if part is None:
-        return None
-    bodies = adapter._attempt(lambda: part.GetBodies2(0, False), default=None)
-    if bodies is None:
-        return None
-    if not isinstance(bodies, (list, tuple)):
-        bodies = [bodies]
-    cyls = []  # (rank_key, radius, face)
-    for body in bodies:
-        if body is None:
-            continue
-        _flag(body, "IBody2")
-        face = adapter._attempt(lambda b=body: b.GetFirstFace(), default=None)
-        for _ in range(200000):
-            if not face:
-                break
-            _flag(face, "IFace2")
-            surf = adapter._attempt(lambda f=face: f.GetSurface(), default=None)
-            if surf is not None:
-                _flag(surf, "ISurface")
-                if bool(adapter._attempt(lambda s=surf: s.IsCylinder(), default=False)):
-                    p = adapter._attempt(lambda s=surf: s.CylinderParams, default=None)
-                    area = float(adapter._attempt(lambda f=face: f.GetArea(), default=0.0))
-                    if p is not None:
-                        radius = float(p[6]) * 1000.0
-                        if target_r_mm is None:
-                            key = -area
-                        else:
-                            key = abs(radius - target_r_mm)
-                        cyls.append((key, radius, area, face))
-            face = adapter._attempt(lambda f=face: f.GetNextFace(), default=None)
-    if not cyls:
-        return None
-    cyls.sort(key=lambda c: c[0])
-    best = cyls[0]
-    log(f"    cyl face r={best[1]:.2f}mm area={best[2] * 1e6:.0f}mm^2")
-    return adapter._attempt(lambda: comp.GetCorrespondingEntity(best[3]), default=None)
+    segs = name2.split("/")
+    return named_ref(f"{prefix}@" + "@".join(reversed(segs)) + f"@{asm_title}", etype)
 
 
-async def _add_cam_concentrics(adapter):
-    """One concentric per channel: connecting-rod ring bore <-> cam lobe OD.
+def _comp_z_mm(adapter, comp):
+    return _comp_xform(adapter, comp)[11] * 1000.0
 
-    The connecting rod ring (r ~25.5 bore) rides the cylinder-gear eccentric
-    lobe (Ø50.8, r 25.4). Concentric on the two cylindrical faces makes the
-    ring centre orbit with the lobe -> the crank rotation becomes the channel's
-    rocker oscillation. Faces resolved by GetCorrespondingEntity (nesting- and
-    flexible-agnostic).
+
+def _by_z_rank(adapter, needle):
+    """Components matching NEEDLE, sorted by world Z (station order).
+
+    The 20 instances of each moving part span the 20 channel stations
+    monotonically in Z, so the i-th entry of two such lists is the same
+    station -- robust pairing without trusting instance-suffix order (a rod's
+    Z sits between its own gear and the next station's gear, so nearest-Z
+    pairing would mis-match).
     """
-    from solidworks_mcp.adapters.base import AddMateParameters
-    rods = sorted(_find_comps(adapter, "connecting-rod"), key=lambda t: t[1])
-    gears = sorted(_find_comps(adapter, "cylinder-gear"), key=lambda t: t[1])
-    log(f"  cam coupling: {len(rods)} rods, {len(gears)} gears")
-    made = 0
-    for i, ((rod_c, rod_n), (gear_c, gear_n)) in enumerate(zip(rods, gears)):
-        ring_face = _largest_cyl_face(adapter, rod_c, target_r_mm=25.5)
-        lobe_face = _largest_cyl_face(adapter, gear_c, target_r_mm=25.4)
-        if ring_face is None or lobe_face is None:
-            log(f"    ch{i:02d}: face missing (ring={ring_face}, lobe={lobe_face})")
-            continue
-        adapter._attempt(lambda: adapter.currentModel.ClearSelection2(True))
-        adapter._attempt(lambda f=ring_face: f.Select4(True, None))
-        adapter._attempt(lambda f=lobe_face: f.Select4(True, None))
-        res = await adapter.add_mate(AddMateParameters(
-            mate_type="concentric", entities=[], alignment="closest"))
-        adapter._attempt(lambda: adapter.currentModel.ClearSelection2(True))
-        if res.is_success:
-            made += 1
-        else:
-            log(f"    ch{i:02d} cam concentric failed: {res.error}")
+    hits = _find_comps(adapter, needle)
+    return sorted(hits, key=lambda t: _comp_z_mm(adapter, t[0]))
+
+
+async def _add_cam_couplings(adapter):
+    """Per channel: cam lobe <-> rod ring, then rod pin <-> rocker bore.
+
+    Both are two-axis COINCIDENT mates on named reference axes (AddMate rejects
+    concentric on two axes): Axis3@cylinder-gear is the eccentric cam-lobe axis,
+    Axis1@connecting-rod the ring axis, Axis2@connecting-rod the rod-pin axis,
+    Axis2@rocker-arm the rocker rod-bore axis. Named axes are fast (no face walk
+    on the geared part) and mirror-agnostic. The cam lobe orbits as the gear
+    turns -> the rod ring follows -> the rod pin drives the rocker -> the rocker
+    oscillates about its (artifact-A) pivot revolute. Proven on the 1-channel
+    rig (probe_one_channel_motion.py).
+    """
+    asm = _asm_title(adapter)
+    gears = _by_z_rank(adapter, "cylinder-gear")
+    rods = _by_z_rank(adapter, "connecting-rod")
+    rockers = _by_z_rank(adapter, "rocker-arm")
+    n = min(len(gears), len(rods), len(rockers))
+    log(f"  cam couplings: {len(gears)} gears, {len(rods)} rods, "
+        f"{len(rockers)} rockers -> {n} channels")
+    cam_ok = rod_ok = 0
+    for i in range(n):
+        gear_n, rod_n, rk_n = gears[i][1], rods[i][1], rockers[i][1]
+        if i == 0:
+            log(f"    ch00 names: gear={gear_n!r} rod={rod_n!r} rocker={rk_n!r}")
+        try:
+            cam = await coincident_mate(
+                adapter, _entity_ref(rod_n, "Axis1", "AXIS", asm),
+                _entity_ref(gear_n, "Axis3", "AXIS", asm),
+                label=f"ch{i:02d} cam lobe <-> rod ring")
+            cam_ok += 1 if cam.get("name") else 0
+        except Exception as exc:  # noqa: BLE001 -- first-run diagnostics
+            log(f"    ch{i:02d} cam coupling FAILED: {exc}")
+        try:
+            rod = await coincident_mate(
+                adapter, _entity_ref(rod_n, "Axis2", "AXIS", asm),
+                _entity_ref(rk_n, "Axis2", "AXIS", asm),
+                label=f"ch{i:02d} rod pin <-> rocker bore")
+            rod_ok += 1 if rod.get("name") else 0
+        except Exception as exc:  # noqa: BLE001 -- first-run diagnostics
+            log(f"    ch{i:02d} rod->rocker FAILED: {exc}")
     adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
-    log(f"  cam concentrics created: {made}/{len(rods)}")
-    return made
+    log(f"  couplings: cam {cam_ok}/{n}, rod->rocker {rod_ok}/{n}")
+    return cam_ok, rod_ok
 
 
 # ---- stage 5: crank motor ---------------------------------------------------
 async def _add_crank_motor(adapter):
-    from solidworks_mcp.adapters.base import MateEntityRef, MotionMotorParameters
+    from solidworks_mcp.adapters.base import MotionMotorParameters
     cs_comp, cs_name = _find_one(adapter, "crankshaft")
     if cs_comp is None:
         raise RuntimeError("crankshaft component not found")
-    log(f"  crank motor on {cs_name}")
+    # Motor on the crankshaft BORE axis by name (Axis1) -- a component-face ref
+    # walks the sprocket faces; the named axis is fast and nested-safe.
+    axis = _entity_ref(cs_name, "Axis1", "AXIS", _asm_title(adapter))
+    log(f"  crank motor on {axis.name}")
     res = check("add_motor crank", await adapter.add_motor(MotionMotorParameters(
-        motor_type="rotary",
-        entity=MateEntityRef(entity_type="FACE", component=cs_name),
-        speed=CRANK_RPM, study_name="")))
+        motor_type="rotary", entity=axis, speed=CRANK_RPM, study_name="")))
     return res
 
 
@@ -440,7 +438,7 @@ async def build(adapter):
         log("stage flex complete (no motor/solve)")
         return {}
 
-    await _add_cam_concentrics(adapter)
+    await _add_cam_couplings(adapter)
     check("ensure_motion_addin", await adapter.ensure_motion_addin())
     from solidworks_mcp.adapters.base import MotionStudyParameters, MotionStudyRefParameters
     made = check("create_motion_study", await adapter.create_motion_study(
