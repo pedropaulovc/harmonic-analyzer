@@ -55,6 +55,7 @@ solve can be brought up incrementally:
 
 from __future__ import annotations
 
+import json
 import math
 import os
 import sys
@@ -328,6 +329,41 @@ async def _flex_subs(adapter):
 # many instances is a pose driver; a per-instance-unique value is an axial hold.
 SUPPRESS_RECUR = 5  # a value seen in >= this many instances == pose/spin driver
 
+# The channel-1 mate-classify walk reads ~240 mates (~1-3 s each through the
+# flexible sub) -- the dominant per-iteration cost (~500 s). The result is
+# DETERMINISTIC for a given channel.SLDASM, and the suppressible mate NAMES
+# (Distance17@channel-1 ...) are stable as long as the file is not rebuilt. Cache
+# the name list keyed on channel.SLDASM's mtime so repeat runs skip the walk and
+# just re-apply the ~140 suppresses (~150 s). Set MOTION_NOCACHE=1 to force a
+# fresh walk (e.g. after the classifier logic changes). The cache is throwaway
+# build state -- it never touches artifact A.
+SUPPRESS_CACHE = OUT_SLDASM / "_motion_cache" / "channel_suppress.json"
+CHANNEL_SLDASM = OUT_SLDASM / "channel.SLDASM"
+
+
+def _channel_mtime():
+    return CHANNEL_SLDASM.stat().st_mtime if CHANNEL_SLDASM.exists() else 0.0
+
+
+def _load_suppress_cache():
+    if os.environ.get("MOTION_NOCACHE"):
+        return None
+    try:
+        data = json.loads(SUPPRESS_CACHE.read_text())
+    except (OSError, ValueError):
+        return None
+    if abs(float(data.get("mtime", -1.0)) - _channel_mtime()) > 1.0:
+        log("  channel suppress cache STALE (channel.SLDASM changed) -- re-walking")
+        return None
+    return list(data.get("names", []))
+
+
+def _save_suppress_cache(names):
+    SUPPRESS_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    SUPPRESS_CACHE.write_text(json.dumps(
+        {"mtime": _channel_mtime(), "names": list(names)}, indent=0))
+    log(f"  cached {len(names)} channel suppress names -> {SUPPRESS_CACHE.name}")
+
 
 async def _suppress_named(adapter, sub_name, families, mtypes, label):
     """Suppress every single-real-part mate whose part is in FAMILIES.
@@ -411,6 +447,12 @@ async def _suppress_channel(adapter):
     """
     from collections import Counter
     sub_name = "channel-1"
+    cached = _load_suppress_cache()
+    if cached is not None:
+        log(f"  channel drivers: CACHED classification ({len(cached)} mates) -- "
+            f"skipping the ~500 s walk (MOTION_NOCACHE=1 to force a re-walk)")
+        await _do_suppress(adapter, sub_name, cached, "channel drivers (cached)")
+        return cached
     _, model = _sub_model(adapter, sub_name)
     root = _root_title(sub_name)
     targets = []
@@ -436,6 +478,7 @@ async def _suppress_channel(adapter):
     targets.extend(spin)
     log(f"  channel pose buckets {sorted({(f, v) for _n, f, v in recur if counts[(f, v)] >= SUPPRESS_RECUR})}")
     log(f"  channel keeping {len(kept)} per-instance axial holds")
+    _save_suppress_cache(targets)
     await _do_suppress(adapter, sub_name, targets, "channel drivers (single pass)")
     return targets
 
@@ -733,18 +776,19 @@ async def _add_cam_couplings(adapter):
 # placed transforms (relative XY in the sub frame, mirror-/frame-invariant) so the
 # mates start exactly on-solution per channel. NOTE neutral coefficient ~0 means
 # little lever travel until the bars are repositioned to real coefficients (F6c).
-async def _add_rocker_arc_point(adapter):
+async def _add_rocker_arc_point(adapter, comps=None):
     """Create the R800 arc-centre RefPoint on the SHARED rocker-arm part.
 
     Mirror of :func:`_add_ring_centre_point`: all 20 rockers share rocker-arm.
     SLDPRT, so ONE RefPoint at the arc centre (arc_center of the top R800 edge)
     is inherited by every instance via GetCorresponding; the part is NEVER saved.
-    Selection in the part doc needs it ACTIVE -> ActivateDoc3 round-trip.
+    Selection in the part doc needs it ACTIVE -> ActivateDoc3 round-trip. Pass
+    ``comps`` to reuse a full-tree walk (the lookup is otherwise a ~170 s walk).
     """
     from solidworks_mcp.adapters.base import CreateReferencePointParameters
     top = adapter.currentModel
     top_title = str(_read_member(top, "GetTitle"))
-    rk_comp, _ = _find_one(adapter, "rocker-arm-1")
+    rk_comp, _ = _find_one(adapter, "rocker-arm-1", comps=comps)
     if rk_comp is None:
         raise RuntimeError("rocker-arm-1 not found for arc-centre point")
     part = adapter._attempt(lambda: rk_comp.GetModelDoc2(), default=None)
