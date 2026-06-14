@@ -393,6 +393,65 @@ async def _suppress_pair(adapter, sub_name, fam_pair, mtype, label):
     return targets
 
 
+async def _suppress_channel(adapter):
+    """ONE classify-once pass over channel-1's mate group -- replaces the five
+    separate flexible-sub walks (rocker spin, lever spin, rod drivers, bar ground
+    drivers, J3 bar<->lever) with a single walk. The mate walk on a flexible sub
+    is the dominant per-iteration cost (hundreds of seconds; one walk hit 635s),
+    so 5 -> 1 is a ~5x iteration speedup with zero classification change. The
+    five rules, applied per mate:
+
+      * J3 bar<->lever COINCIDENT (two real parts {amplitude-bar, channel-lever})
+        -> decouple, so the freed lever is not dragged by the bar.
+      * connecting-rod single-part DISTANCE/ANGLE -> free the rod fully (the two
+        new revolutes define it).
+      * amplitude-bar single-part DISTANCE -> free the bar's ground drivers (the
+        in-sub lock in _freeze_bars becomes its sole pin).
+      * rocker-arm / channel-lever single-part DISTANCE with a value RECURRING
+        across >= SUPPRESS_RECUR instances -> a pose/spin driver -> suppress;
+        a per-instance-unique value -> an axial-Z station hold -> KEEP.
+
+    Returns the suppressed mate names. _freeze_bars runs AFTER this (bar already
+    decoupled + ground-free) and only adds the locks.
+    """
+    from collections import Counter
+    sub_name = "channel-1"
+    _, model = _sub_model(adapter, sub_name)
+    root = _root_title(sub_name)
+    targets = []
+    recur = []  # (name, family, rounded_mm) for rocker/lever DISTANCE bucketing
+    log("  classify channel-1 mates (single pass) ...")
+    for _f, mate, name, mtype, parts, _val in _iter_mates(
+            adapter, model, read_values=False, progress_every=40):
+        reals = _real_parts(parts, root)
+        fams = {_family(p) for p in reals}
+        if mtype == COINCIDENT and fams == {"amplitude-bar", "channel-lever"}:
+            targets.append(name)  # J3 decouple
+            continue
+        lone = reals[0] if len(reals) == 1 else None
+        lone_fam = _family(lone) if lone else None
+        if lone_fam is None:
+            continue
+        if lone_fam == "connecting-rod" and mtype in (DISTANCE, ANGLE):
+            targets.append(name)  # free the rod fully
+            continue
+        if lone_fam == "amplitude-bar" and mtype == DISTANCE:
+            targets.append(name)  # free bar ground drivers
+            continue
+        if lone_fam in ("rocker-arm", "channel-lever") and mtype == DISTANCE:
+            val = _mate_value(adapter, mate, mtype)  # lazy: candidates only
+            if val is not None:
+                recur.append((name, lone_fam, round(val * 1000.0, 1)))
+    counts = Counter((fam, v) for _n, fam, v in recur)
+    spin = [n for n, fam, v in recur if counts[(fam, v)] >= SUPPRESS_RECUR]
+    kept = [(fam, v) for (fam, v), c in counts.items() if c < SUPPRESS_RECUR]
+    targets.extend(spin)
+    log(f"  channel pose buckets {sorted({(f, v) for _n, f, v in recur if counts[(f, v)] >= SUPPRESS_RECUR})}")
+    log(f"  channel keeping {len(kept)} per-instance axial holds")
+    await _do_suppress(adapter, sub_name, targets, "channel drivers (single pass)")
+    return targets
+
+
 async def _do_suppress(adapter, sub_name, targets, label):
     # currentModel MUST stay the top assembly: suppress_mate(component=sub_name)
     # resolves the component against currentModel then retargets to its model doc
@@ -447,17 +506,18 @@ async def _suppress_drivers(adapter, level, dump=False):
     #    coefficient), replacing the dead bar-foot-on-rocker CONTACT that Basic
     #    Motion ignores.
     #
-    #  * amplitude-bar -> DECOUPLED + FIXED (see _freeze_bars). The bar is a
-    #    COEFFICIENT SETTING: it must stay frozen at its slide station, NOT move
-    #    during a run. Two failed approaches proved the path: (1) suppressing the
-    #    bar drivers freed all 20 bars to swing about their lever pins into a
-    #    flopped black slab (the foot-on-rocker support is an ignored CONTACT);
-    #    (2) KEEPING the bar drivers makes its foot-to-plane spin driver (which
-    #    couples to translation) fight the geared lever through the J3 coincident
-    #    -- the lever reached only 47 deg of the rocker's 159 and the bar still
-    #    twisted ~3 deg. So suppress the J3 bar<->lever coincident (decouple) and
-    #    FIX the bar rigidly at its design (= coefficient) pose; the coefficient
-    #    then lives entirely in the rocker<->lever gear ratio.
+    #  * amplitude-bar -> DECOUPLED + LOCKED to its lever (see _freeze_bars). The
+    #    bar is a COEFFICIENT SETTING; the integration coefficient lives in the
+    #    rocker<->lever gear ratio, and the bar rides the geared lever rigidly so
+    #    it neither flops nor fights. Two failed approaches proved the path: (1)
+    #    suppressing the bar drivers freed all 20 bars to swing about their lever
+    #    pins into a flopped black slab (the foot-on-rocker support is an ignored
+    #    CONTACT); (2) KEEPING the bar drivers makes its foot-to-plane spin driver
+    #    (which couples to translation) fight the geared lever through the J3
+    #    coincident -- the lever reached only 47 deg of the rocker's 159 and the
+    #    bar still twisted ~3 deg. So decouple the J3 bar<->lever coincident, free
+    #    the bar's ground drivers, then LOCK the bar to its lever at its design (=
+    #    coefficient) slide station.
     #
     #  * connecting-rod -> suppress ALL of its drivers (ring-X/Y/Z AND the swing,
     #    which spin_driver implements as a DISTANCE mate). Artifact A pins the rod
@@ -472,43 +532,41 @@ async def _suppress_drivers(adapter, level, dump=False):
     #    probe_axis_isolate proved the real blocker is that AddMate5 refuses ANY
     #    top-level mate between two parts both nested in the same flexible sub, so
     #    pin<->rocker had to move INSIDE the sub, not be dropped for over-defn.)
-    await _suppress_recurring(
-        adapter, "channel-1", ("rocker-arm",), "channel rocker spin drivers")
-    await _suppress_recurring(
-        adapter, "channel-1", ("channel-lever",), "channel lever spin drivers")
-    await _suppress_named(
-        adapter, "channel-1", ("connecting-rod",), (DISTANCE, ANGLE),
-        "channel rod drivers (free the rod fully)")
+    #
+    # All four channel families are classified + suppressed in ONE mate walk
+    # (_suppress_channel) -- the flexible-sub walk is the dominant cost, so the
+    # earlier five separate walks were collapsed to one. _freeze_bars then only
+    # adds the in-sub bar<->lever locks (no further walks).
+    await _suppress_channel(adapter)
     await _freeze_bars(adapter)
 
 
 async def _freeze_bars(adapter):
-    """Decouple the (coefficient-setting) amplitude bars from the geared levers
-    and LOCK them to the grounded pivot-shaft, so they neither flop nor lock the
-    lever. The integration coefficient lives entirely in the rocker<->lever gear
-    ratio (derived from the bar slide position); the frozen bar is the visual
-    record of that setting.
+    """LOCK each (coefficient-setting) amplitude bar rigidly to its channel-lever,
+    so it rides the geared lever without flopping or fighting it. The integration
+    coefficient lives in the rocker<->lever gear ratio (derived from the bar slide
+    position); the locked bar is the moving visual record of that setting.
 
-    fix_component CANNOT pin a component nested in a FLEXIBLE subassembly -- the
-    parent solves the sub's poses, so neither SelectByID2 nor IComponent2.Select4
-    can select it for FixComponent (proven, probe_fix_bar: all paths -> IsFixed
-    False). The only way to pin it is an in-sub MATE, the same context the gear
-    and rod<->rocker revolutes use. So:
-      1. suppress the J3 bar<->lever coincident (cut the coupling);
-      2. suppress the bar's own ground drivers (so the lock is the SOLE pin --
-         redundant mates destabilise the flexible solve);
-      3. in-sub LOCK each bar to the (grounded) pivot-shaft -> frozen at design
-         pose. A free-but-placed component stays put on a plain ForceRebuild3
-         (only a kinematic rotate propagates through mates), so the lock captures
-         the design pose. Authored with currentModel = the sub doc; NEVER saved.
+    Runs AFTER _suppress_channel, which has already (1) decoupled the J3
+    bar<->lever coincident and (2) freed the bar's ground drivers -- so each bar
+    is free and the lock becomes its SOLE pin (redundant mates destabilise the
+    flexible solve). fix_component CANNOT pin a flexible-sub child (the parent
+    solves its poses; SelectByID2/Select4 all -> IsFixed False, proven by
+    probe_fix_bar), so the pin must be an in-sub MATE -- the same context the gear
+    and rod<->rocker revolutes use.
+
+    A LOCK mate (swMateLOCK) holds the CURRENT relative pose of the two picked
+    components -- it does NOT move parts to align the picked entities -- so locking
+    bar.Axis1 to lever.Axis1 freezes the bar at its present design (= coefficient)
+    slide station relative to the lever. A free-but-placed bar stays at its design
+    pose on a plain ForceRebuild3 (only a kinematic rotate propagates through
+    mates), and the gear is added later, so the lock captures the correct relative
+    pose. Lock-to-lever (not to the grounded shaft) keeps the bar attached to and
+    riding the lever -- the grounded pivot-shaft has no named Axis1 to lock to
+    anyway, and a ground lock would visibly detach the lever from the bar top-pin.
+    Authored with currentModel = the sub doc; NEVER saved.
     """
     from _common import lock_mate
-    await _suppress_pair(
-        adapter, "channel-1", ("amplitude-bar", "channel-lever"), COINCIDENT,
-        "decouple bar<->lever (J3)")
-    await _suppress_named(
-        adapter, "channel-1", ("amplitude-bar",), (DISTANCE,),
-        "free bar ground drivers (lock will be the sole pin)")
     _, ch_doc = _sub_model(adapter, "channel-1")
     top = adapter.currentModel
     adapter.currentModel = ch_doc
@@ -516,19 +574,16 @@ async def _freeze_bars(adapter):
     try:
         comps = _components(adapter, ch_doc)
         bars = _by_z_rank(adapter, "amplitude-bar", comps=comps)
-        shafts = _find_family(adapter, "pivot-shaft", comps=comps)
-        if not shafts:
-            raise RuntimeError("pivot-shaft not found in channel sub")
-        shaft_n = shafts[0][1]
-        n = len(bars)
-        log(f"  freezing {n} bars: in-sub lock to {shaft_n!r} ...")
+        levers = _by_z_rank(adapter, "channel-lever", comps=comps)
+        n = min(len(bars), len(levers))
+        log(f"  freezing {n} bars: in-sub LOCK bar<->channel-lever ...")
         for i in range(n):
-            bar_n = bars[i][1]
+            bar_n, lever_n = bars[i][1], levers[i][1]
             try:
                 res = await lock_mate(
                     adapter, _entity_ref(bar_n, "Axis1", "AXIS"),
-                    _entity_ref(shaft_n, "Axis1", "AXIS"),
-                    label=f"ch{i:02d} bar frozen")
+                    _entity_ref(lever_n, "Axis1", "AXIS"),
+                    label=f"ch{i:02d} bar locked to lever")
                 locked += 1 if res.get("name") else 0
             except Exception as exc:  # noqa: BLE001 -- first-run diagnostics
                 if i == 0:
@@ -537,7 +592,7 @@ async def _freeze_bars(adapter):
     finally:
         adapter.currentModel = top
     adapter._attempt(lambda: top.ForceRebuild3(False), default=None)
-    log(f"  froze {locked}/{n} amplitude bars (J3 decoupled + locked to shaft)")
+    log(f"  froze {locked}/{n} amplitude bars (locked rigid to their levers)")
     return locked
 
 
