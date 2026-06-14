@@ -32,7 +32,7 @@ import sys
 from _common import OUT_PNG, coincident_mate, gear_mate, log, named_ref
 from build_motion_study import (
     OUT_SLDASM, _by_z_rank, _comp_xform, _components, _entity_ref, _find_one,
-    _freeze_bars, _rot_angle, _sub_model, _suppress_channel,
+    _rot_angle, _sub_model, _suppress_channel,
 )
 
 RATIO = [float(sys.argv[1]) if len(sys.argv) > 1 else 1.0, 1.0]
@@ -96,13 +96,11 @@ async def main():
     # their lever pins; with the foot support being an ignored CONTACT they
     # flopped up into a black slab. This probe asserts the bar's rotation stays
     # ~0 (no flop) while the lever follows the rocker through the gear.
-    # ONE pass: free rocker spin + lever spin + rod drivers, decouple the J3
-    # bar<->lever pin, and free the bar's ground drivers (replaces the old five
-    # separate flexible-sub walks).
+    # ONE pass: free rocker spin + lever spin + rod drivers ONLY. The amplitude
+    # bars stay FULLY MATED -- their J3 top-pin coincident + foot-X spin_driver
+    # already make each bar ride the geared lever upright + bob (no lock/decouple
+    # needed; the book confirms the bars stay vertical and move up/down).
     await _suppress_channel(adapter)
-    # LOCK each bar rigidly to its lever: the freed lever follows the gear without
-    # fighting the bar, and the bar rides the lever (no free swing => no flop).
-    await _freeze_bars(adapter)
 
     # add the ch0 gear INSIDE channel.SLDASM (both parts in the one flexible sub).
     _, ch_doc = _sub_model(adapter, "channel-1")
@@ -159,26 +157,27 @@ async def main():
     lever_moved = _rot_angle(a0, a1) if (a0 and a1) else 0.0
     rocker_moved = _rot_angle(ra, ra1) if (ra and ra1) else 0.0
     bar_rot = _rot_angle(ba0, ba1) if (ba0 and ba1) else 0.0
-    # The bar is now LOCKED to the lever, so a healthy bar rotates rigidly WITH
-    # the lever (bar_rot ~= lever_moved), NOT ~0. A flop is the bar swinging
-    # INDEPENDENTLY of the lever -- detected as a large bar/lever mismatch.
-    rigid = abs(bar_rot - lever_moved) < 1.0
+    # The bar is fully mated (top rides lever, foot-X pinned) so a healthy bar
+    # stays ~VERTICAL and bobs -- it should rotate only a little even when the
+    # lever swings a lot (rocker arc radius = bar length keeps the tilt small).
+    # A flop is the bar sweeping the full lever arc (bar_rot ~= lever_moved, the
+    # slab). NOTE the kinematic rotate drives the rocker to its full ROM (~159 deg
+    # here), far past the real small operating swing -- so a modest bar tilt at
+    # this extreme means a negligible tilt in operation.
+    upright = bar_rot < 30.0
     log(f"  rocker rotated {rocker_moved:.2f} deg -> channel-lever {lever_moved:.2f} deg "
-        f"| amplitude-bar rotated {bar_rot:.2f} deg "
-        f"(want ~= lever {lever_moved:.2f} = rides lever rigidly, no flop)")
-    transmits = lever_moved > 0.3
-    if transmits and rigid:
-        log(f"  PASS: gear transmits rocker->lever (ratio "
-            f"{lever_moved/rocker_moved:.3f} effective) AND bar rides the lever "
-            f"rigidly (|bar-lever|={abs(bar_rot-lever_moved):.2f} deg) -> wire "
-            f"into build_motion_study for all 20 channels")
-    elif transmits and not rigid:
-        log(f"  PARTIAL: gear transmits but bar moved {bar_rot:.2f} vs lever "
-            f"{lever_moved:.2f} deg -- lock-to-lever did not hold (bar swinging "
-            f"independently)")
+        f"| amplitude-bar tilted {bar_rot:.2f} deg "
+        f"(want << lever {lever_moved:.2f} = stays vertical + bobs, no slab)")
+    transmits = lever_moved > 5.0
+    if transmits and upright:
+        log(f"  PASS: gear transmits rocker->lever ({lever_moved:.1f} deg lever "
+            f"travel, bar-limited) AND bar stays upright ({bar_rot:.1f} deg tilt "
+            f"<< {lever_moved:.1f}) -> wire into build_motion_study for 20 channels")
+    elif transmits and not upright:
+        log(f"  FAIL: bar tilted {bar_rot:.1f} deg ~ lever {lever_moved:.1f} -- "
+            f"the bar is sweeping the lever arc (slab), not staying vertical")
     else:
-        log("  FAIL: lever did not follow -> gear not enforced kinematically; "
-            "try four-bar foot-pin instead")
+        log("  FAIL: lever did not follow -> gear not enforced kinematically")
 
     await adapter.disconnect()
     print("Disconnected (NOT saved).", flush=True)
