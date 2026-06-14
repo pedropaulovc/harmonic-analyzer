@@ -484,51 +484,61 @@ async def _suppress_drivers(adapter, level, dump=False):
 
 async def _freeze_bars(adapter):
     """Decouple the (coefficient-setting) amplitude bars from the geared levers
-    and FIX them at their design pose, so they neither flop nor lock the lever.
+    and LOCK them to the grounded pivot-shaft, so they neither flop nor lock the
+    lever. The integration coefficient lives entirely in the rocker<->lever gear
+    ratio (derived from the bar slide position); the frozen bar is the visual
+    record of that setting.
 
-    Suppress the J3 bar<->lever coincident (the only bar+lever two-part mate) to
-    cut the coupling, then fix every bar rigidly. The bars are fixed in the sub
-    doc; the sub is grounded at identity (3 plane mates in _flex_subs), so
-    fixed-in-sub == fixed-in-world. The integration coefficient lives entirely in
-    the rocker<->lever gear ratio (derived from the bar slide position), and the
-    frozen bar is the visual record of that setting. NEVER saves the sub.
+    fix_component CANNOT pin a component nested in a FLEXIBLE subassembly -- the
+    parent solves the sub's poses, so neither SelectByID2 nor IComponent2.Select4
+    can select it for FixComponent (proven, probe_fix_bar: all paths -> IsFixed
+    False). The only way to pin it is an in-sub MATE, the same context the gear
+    and rod<->rocker revolutes use. So:
+      1. suppress the J3 bar<->lever coincident (cut the coupling);
+      2. suppress the bar's own ground drivers (so the lock is the SOLE pin --
+         redundant mates destabilise the flexible solve);
+      3. in-sub LOCK each bar to the (grounded) pivot-shaft -> frozen at design
+         pose. A free-but-placed component stays put on a plain ForceRebuild3
+         (only a kinematic rotate propagates through mates), so the lock captures
+         the design pose. Authored with currentModel = the sub doc; NEVER saved.
     """
-    from solidworks_mcp.adapters.base import ComponentRefParameters
+    from _common import lock_mate
     await _suppress_pair(
         adapter, "channel-1", ("amplitude-bar", "channel-lever"), COINCIDENT,
         "decouple bar<->lever (J3)")
-    # Fix the bars in the channel sub's OWN document. FixComponent acts on the
-    # ACTIVE doc's selection, and the flexible sub's doc is not active (it is held
-    # in-context under the top assembly), so an in-context fix no-ops -> IsFixed
-    # stays False. ActivateDoc3 the sub doc (same round-trip _add_ring_centre_point
-    # uses for the part doc), fix there, then reactivate the top. A component fixed
-    # inside a subassembly stays fixed relative to it regardless of flexible/rigid;
-    # the sub is grounded at identity (_flex_subs) so that is world-fixed. The sub
-    # doc is dirtied but NEVER saved (artifact A stays fully-defined on disk).
+    await _suppress_named(
+        adapter, "channel-1", ("amplitude-bar",), (DISTANCE,),
+        "free bar ground drivers (lock will be the sole pin)")
     _, ch_doc = _sub_model(adapter, "channel-1")
     top = adapter.currentModel
-    top_title = str(_read_member(top, "GetTitle"))
-    ch_title = str(_read_member(ch_doc, "GetTitle"))
-    bars = _find_family(adapter, "amplitude-bar", model=ch_doc)
-    adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(ch_title, False, 2, _byref_i4()), default=None)
-    adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=ch_doc)
-    fixed = 0
+    adapter.currentModel = ch_doc
+    locked = n = 0
     try:
-        log(f"  freezing {len(bars)} amplitude bars at design pose (sub doc active) ...")
-        for _c, name in bars:
-            res = await adapter.fix_component(
-                ComponentRefParameters(name=name.split("/")[-1]))
-            data = res.data if getattr(res, "is_success", False) else None
-            fixed += 1 if (data and data.get("fixed")) else 0
-        adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
+        comps = _components(adapter, ch_doc)
+        bars = _by_z_rank(adapter, "amplitude-bar", comps=comps)
+        shafts = _find_family(adapter, "pivot-shaft", comps=comps)
+        if not shafts:
+            raise RuntimeError("pivot-shaft not found in channel sub")
+        shaft_n = shafts[0][1]
+        n = len(bars)
+        log(f"  freezing {n} bars: in-sub lock to {shaft_n!r} ...")
+        for i in range(n):
+            bar_n = bars[i][1]
+            try:
+                res = await lock_mate(
+                    adapter, _entity_ref(bar_n, "Axis1", "AXIS"),
+                    _entity_ref(shaft_n, "Axis1", "AXIS"),
+                    label=f"ch{i:02d} bar frozen")
+                locked += 1 if res.get("name") else 0
+            except Exception as exc:  # noqa: BLE001 -- first-run diagnostics
+                if i == 0:
+                    log(f"    ch00 bar lock FAILED: {exc}")
+        adapter._attempt(lambda: ch_doc.ForceRebuild3(False), default=None)
     finally:
-        adapter._attempt(
-            lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()), default=None)
         adapter.currentModel = top
     adapter._attempt(lambda: top.ForceRebuild3(False), default=None)
-    log(f"  froze {fixed}/{len(bars)} amplitude bars (J3 decoupled + fixed)")
-    return fixed
+    log(f"  froze {locked}/{n} amplitude bars (J3 decoupled + locked to shaft)")
+    return locked
 
 
 # ---- stage 4: per-channel cam + rod couplings (named axes) -------------------
