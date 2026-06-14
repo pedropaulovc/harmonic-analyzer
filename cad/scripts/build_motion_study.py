@@ -729,6 +729,42 @@ async def _sample_part_rot(adapter, needle, study_name="", n_steps=12):
     return span
 
 
+async def _sample_chain(adapter, study_name="", n_steps=12):
+    """Per-timestep rotation of the spring-driven summing chain -- the F6 signal.
+
+    Samples channel-lever (the spring's moving end, driven by the cam->bar->lever
+    linkage), summing-lever (the analogue SUM = force balance of the 20 springs),
+    and magnifying-wheel (geared to the summing-lever). If the channel-lever
+    oscillates but the summing-lever jumps once and holds, the spring force
+    balance is snapping to a static equilibrium instead of tracking the inputs."""
+    from solidworks_mcp.adapters.base import MotionTimeParameters
+    parts = []
+    for needle in ("channel-lever-1", "summing-lever-1", "magnifying-wheel-1"):
+        comp, name = _find_one(adapter, needle)
+        if comp is not None:
+            parts.append((needle, comp))
+    if not parts:
+        return
+    base = {}
+    spans = {}
+    for s in range(n_steps + 1):
+        t = DURATION_S * s / n_steps
+        await adapter.set_motion_time(MotionTimeParameters(time=t, study_name=study_name))
+        row = []
+        for needle, comp in parts:
+            a = _comp_xform(adapter, comp)
+            if a is None:
+                row.append(f"{needle.split('-1')[0]}=  n/a")
+                continue
+            base.setdefault(needle, a)
+            ang = _rot_angle(base[needle], a)
+            spans[needle] = max(spans.get(needle, 0.0), ang)
+            row.append(f"{needle.split('-1')[0]}={ang:6.2f}")
+        log(f"    t={t:4.2f}s  {'  '.join(row)}")
+    log(f"  chain spans(deg): {dict((k.split('-1')[0], round(v, 1)) for k, v in spans.items())}")
+    return spans
+
+
 async def _reset_to_assembled(adapter):
     """Return the model to its assembled pose before calculate_motion.
 
@@ -788,7 +824,7 @@ async def build(adapter):
         MotionStudyRefParameters(name="")))
     await _sample_rockers(adapter)
     if level >= 2:
-        await _sample_part_rot(adapter, "summing-lever-1")
+        await _sample_chain(adapter)
     samples = await _sample_pen(adapter) if level >= 3 else []
 
     artefacts = {}
