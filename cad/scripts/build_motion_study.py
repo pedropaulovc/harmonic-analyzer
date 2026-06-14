@@ -497,20 +497,36 @@ async def _freeze_bars(adapter):
     await _suppress_pair(
         adapter, "channel-1", ("amplitude-bar", "channel-lever"), COINCIDENT,
         "decouple bar<->lever (J3)")
+    # Fix the bars in the channel sub's OWN document. FixComponent acts on the
+    # ACTIVE doc's selection, and the flexible sub's doc is not active (it is held
+    # in-context under the top assembly), so an in-context fix no-ops -> IsFixed
+    # stays False. ActivateDoc3 the sub doc (same round-trip _add_ring_centre_point
+    # uses for the part doc), fix there, then reactivate the top. A component fixed
+    # inside a subassembly stays fixed relative to it regardless of flexible/rigid;
+    # the sub is grounded at identity (_flex_subs) so that is world-fixed. The sub
+    # doc is dirtied but NEVER saved (artifact A stays fully-defined on disk).
     _, ch_doc = _sub_model(adapter, "channel-1")
     top = adapter.currentModel
-    adapter.currentModel = ch_doc
+    top_title = str(_read_member(top, "GetTitle"))
+    ch_title = str(_read_member(ch_doc, "GetTitle"))
+    bars = _find_family(adapter, "amplitude-bar", model=ch_doc)
+    adapter._attempt(
+        lambda: adapter.swApp.ActivateDoc3(ch_title, False, 2, _byref_i4()), default=None)
+    adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=ch_doc)
     fixed = 0
     try:
-        bars = _find_family(adapter, "amplitude-bar", model=ch_doc)
-        log(f"  freezing {len(bars)} amplitude bars at design pose ...")
+        log(f"  freezing {len(bars)} amplitude bars at design pose (sub doc active) ...")
         for _c, name in bars:
             res = await adapter.fix_component(
                 ComponentRefParameters(name=name.split("/")[-1]))
-            fixed += 1 if getattr(res, "is_success", False) else 0
-        adapter._attempt(lambda: ch_doc.ForceRebuild3(False), default=None)
+            data = res.data if getattr(res, "is_success", False) else None
+            fixed += 1 if (data and data.get("fixed")) else 0
+        adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
     finally:
+        adapter._attempt(
+            lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()), default=None)
         adapter.currentModel = top
+    adapter._attempt(lambda: top.ForceRebuild3(False), default=None)
     log(f"  froze {fixed}/{len(bars)} amplitude bars (J3 decoupled + fixed)")
     return fixed
 
