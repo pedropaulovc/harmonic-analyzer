@@ -86,6 +86,12 @@ async def main():
     adapter = PyWin32Adapter({})
     print(f"Connecting ... (ratio={RATIO})", flush=True)
     await adapter.connect()
+    # Close any docs left open in the session: a prior run's motion study lingers
+    # in the in-memory doc and triggers the blocking "Update Initial Animation
+    # State" modal on suppress/rotate (and no-ops the rotate). CloseAllDocuments
+    # (True = discard unsaved) gives a fresh disk load -- artifact A is never
+    # saved, so nothing is lost.
+    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     asm_path = str((OUT_SLDASM / "harmonic-analyzer.SLDASM").resolve())
     await adapter.open_model(asm_path)
     log(f"opened {asm_path}")
