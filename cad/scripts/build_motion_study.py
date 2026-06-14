@@ -54,8 +54,8 @@ import math
 import sys
 
 from _common import (
-    OUT_PNG, OUT_SLDASM, _flag, _read_member, check, coincident_mate, log,
-    named_ref, run_build,
+    OUT_PNG, OUT_SLDASM, _flag, _read_member, check, coincident_mate,
+    component_named_ref, log, named_ref, run_build,
 )
 
 # ---- study constants --------------------------------------------------------
@@ -102,6 +102,33 @@ def _find_comps(adapter, needle, model=None):
         _flag(c, "IComponent2")
         nm = str(_read_member(c, "Name2"))
         if needle in nm:
+            out.append((c, nm))
+    return out
+
+
+def _part_family(name2):
+    """Component Name2 -> exact part family.
+
+    ``"drive-train-1/cylinder-gear-1"`` -> ``"cylinder-gear"`` and
+    ``"drive-train-1/cylinder-gear-shaft-1"`` -> ``"cylinder-gear-shaft"`` --
+    so a family match never confuses a part with another whose name it is a
+    prefix of (the substring ``"cylinder-gear"`` matched the shaft too).
+    """
+    part = name2.split("/")[-1]
+    return part.rsplit("-", 1)[0]
+
+
+def _find_family(adapter, family, model=None):
+    """All components whose part family equals ``family`` EXACTLY (dispatch, name).
+
+    Use this, not :func:`_find_comps`, whenever the needle is a prefix of a
+    longer real part name (``cylinder-gear`` vs ``cylinder-gear-shaft``).
+    """
+    out = []
+    for c in _components(adapter, model):
+        _flag(c, "IComponent2")
+        nm = str(_read_member(c, "Name2"))
+        if _part_family(nm) == family:
             out.append((c, nm))
     return out
 
@@ -343,36 +370,35 @@ async def _suppress_drivers(adapter, level, dump=False):
 
 
 # ---- stage 4: per-channel cam + rod couplings (named axes) -------------------
-def _asm_title(adapter):
-    t = str(_read_member(adapter.currentModel, "GetTitle"))
-    return t[:-7] if t.lower().endswith(".sldasm") else t
+def _entity_ref(name2, prefix, etype):
+    """A depth-2-safe ``MateEntityRef`` for a named axis inside a nested part.
 
-
-def _entity_ref(name2, prefix, etype, asm_title):
-    """A named ``MateEntityRef`` for an entity inside a nested component.
-
-    ``name2`` is the top-level component path ("channel-1/connecting-rod-1");
-    SelectByID2 wants it reversed and @-joined with the entity and assembly:
-    "Axis1@connecting-rod-1@channel-1@harmonic-analyzer".
+    ``name2`` is the top-level component path ("channel-1/connecting-rod-1") and
+    ``prefix`` the part-local named feature ("Axis1"). The hand-built reversed
+    string ``Axis1@connecting-rod-1@channel-1@harmonic-analyzer`` resolves only
+    one level deep and returns False for a part nested in a flexible sub; the
+    component+name ref maps the base IFeature through GetCorresponding instead
+    (PR #64). ``GetCorresponding`` is depth-agnostic, so the assembly title is
+    no longer threaded through.
     """
-    segs = name2.split("/")
-    return named_ref(f"{prefix}@" + "@".join(reversed(segs)) + f"@{asm_title}", etype)
+    return component_named_ref(name2, prefix, etype)
 
 
 def _comp_z_mm(adapter, comp):
     return _comp_xform(adapter, comp)[11] * 1000.0
 
 
-def _by_z_rank(adapter, needle):
-    """Components matching NEEDLE, sorted by world Z (station order).
+def _by_z_rank(adapter, family):
+    """Components of part FAMILY, sorted by world Z (station order).
 
     The 20 instances of each moving part span the 20 channel stations
     monotonically in Z, so the i-th entry of two such lists is the same
     station -- robust pairing without trusting instance-suffix order (a rod's
     Z sits between its own gear and the next station's gear, so nearest-Z
-    pairing would mis-match).
+    pairing would mis-match). Exact-family match so ``cylinder-gear`` does not
+    also drag in ``cylinder-gear-shaft``.
     """
-    hits = _find_comps(adapter, needle)
+    hits = _find_family(adapter, family)
     return sorted(hits, key=lambda t: _comp_z_mm(adapter, t[0]))
 
 
@@ -388,7 +414,6 @@ async def _add_cam_couplings(adapter):
     oscillates about its (artifact-A) pivot revolute. Proven on the 1-channel
     rig (probe_one_channel_motion.py).
     """
-    asm = _asm_title(adapter)
     gears = _by_z_rank(adapter, "cylinder-gear")
     rods = _by_z_rank(adapter, "connecting-rod")
     rockers = _by_z_rank(adapter, "rocker-arm")
@@ -402,16 +427,16 @@ async def _add_cam_couplings(adapter):
             log(f"    ch00 names: gear={gear_n!r} rod={rod_n!r} rocker={rk_n!r}")
         try:
             cam = await coincident_mate(
-                adapter, _entity_ref(rod_n, "Axis1", "AXIS", asm),
-                _entity_ref(gear_n, "Axis3", "AXIS", asm),
+                adapter, _entity_ref(rod_n, "Axis1", "AXIS"),
+                _entity_ref(gear_n, "Axis3", "AXIS"),
                 label=f"ch{i:02d} cam lobe <-> rod ring")
             cam_ok += 1 if cam.get("name") else 0
         except Exception as exc:  # noqa: BLE001 -- first-run diagnostics
             log(f"    ch{i:02d} cam coupling FAILED: {exc}")
         try:
             rod = await coincident_mate(
-                adapter, _entity_ref(rod_n, "Axis2", "AXIS", asm),
-                _entity_ref(rk_n, "Axis2", "AXIS", asm),
+                adapter, _entity_ref(rod_n, "Axis2", "AXIS"),
+                _entity_ref(rk_n, "Axis2", "AXIS"),
                 label=f"ch{i:02d} rod pin <-> rocker bore")
             rod_ok += 1 if rod.get("name") else 0
         except Exception as exc:  # noqa: BLE001 -- first-run diagnostics
@@ -428,8 +453,10 @@ async def _add_crank_motor(adapter):
     if cs_comp is None:
         raise RuntimeError("crankshaft component not found")
     # Motor on the crankshaft BORE axis by name (Axis1) -- a component-face ref
-    # walks the sprocket faces; the named axis is fast and nested-safe.
-    axis = _entity_ref(cs_name, "Axis1", "AXIS", _asm_title(adapter))
+    # walks the sprocket faces; the named axis is fast and nested-safe. The
+    # component+name ref maps via GetCorresponding (depth-2 safe through the
+    # flexible drive-train sub).
+    axis = _entity_ref(cs_name, "Axis1", "AXIS")
     log(f"  crank motor on {axis.name}")
     res = check("add_motor crank", await adapter.add_motor(MotionMotorParameters(
         motor_type="rotary", entity=axis, speed=CRANK_RPM, study_name="")))

@@ -1373,6 +1373,26 @@ def named_ref(name: str, entity_type: str) -> Any:
     return MateEntityRef(entity_type=entity_type, name=name)
 
 
+def component_named_ref(
+    component: str, name: str, entity_type: str = "AXIS",
+) -> Any:
+    """A ``MateEntityRef`` selecting a named reference feature inside a nested
+    component via ``IComponent2.GetCorresponding``.
+
+    ``component`` is the slash path ``"sub/part"`` (e.g.
+    ``"channel-1/connecting-rod-1"``); ``name`` is the part-local named feature
+    (e.g. ``"Axis1"``). This is the depth-2-safe selection path: a hand-built
+    ``Axis1@part@sub@title`` string resolves one level deep but returns False
+    for a part nested in a flexible subassembly, whereas the adapter maps the
+    base ``IFeature`` through the component's ``GetCorresponding`` (depth-
+    agnostic, mirror-safe, ~600x faster than a cylindrical-face walk). See the
+    phase-f-motion-study memory + PR #64.
+    """
+    from solidworks_mcp.adapters.base import MateEntityRef
+
+    return MateEntityRef(entity_type=entity_type, component=component, name=name)
+
+
 def bore_axis_ref(point_mm: list[float], entity_type: str = "FACE") -> Any:
     """A ``MateEntityRef`` selecting a cylindrical face/axis by a point on it.
 
