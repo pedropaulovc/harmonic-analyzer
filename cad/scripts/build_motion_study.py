@@ -155,8 +155,13 @@ def _mate_value(adapter, mate, mtype):
     return adapter._attempt(lambda: dim.Value, default=None)
 
 
-def _iter_mates(adapter, model):
-    """Yield (feature, mate, name, mtype, parts, value) for MODEL's mate group."""
+def _iter_mates(adapter, model, read_values=True):
+    """Yield (feature, mate, name, mtype, parts, value) for MODEL's mate group.
+
+    ``read_values=False`` skips the per-mate DisplayDimension2 round-trip (the
+    slow part) for callers that classify by family/type alone -- e.g. the
+    drive-train crank driver, found by name, needs no value.
+    """
     _flag(model, "IModelDoc2")
     feat = _read_member(model, "FirstFeature")
     for _ in range(50000):
@@ -175,7 +180,7 @@ def _iter_mates(adapter, model):
                     _flag(mate, "IMate2")
                     mtype = int(adapter._attempt(lambda m=mate: m.Type, default=-1))
                     parts = _mate_parts(adapter, mate)
-                    val = _mate_value(adapter, mate, mtype)
+                    val = _mate_value(adapter, mate, mtype) if read_values else None
                     yield sub, mate, name, mtype, parts, val
                 sub = _read_member(sub, "GetNextSubFeature")
         feat = _read_member(feat, "GetNextFeature")
@@ -249,13 +254,13 @@ async def _suppress_named(adapter, sub_name, families, mtypes, label):
     _, model = _sub_model(adapter, sub_name)
     root = _root_title(sub_name)
     targets = []
-    for _f, _m, name, mtype, parts, val in _iter_mates(adapter, model):
+    for _f, _m, name, mtype, parts, val in _iter_mates(adapter, model, read_values=False):
         if mtype not in mtypes:
             continue
         lone = _lone_real(parts, root)
         if lone is not None and _family(lone) in families:
             targets.append(name)
-    await _do_suppress(adapter, sub_name, model, targets, label)
+    await _do_suppress(adapter, sub_name, targets, label)
     return targets
 
 
@@ -266,11 +271,16 @@ async def _suppress_recurring(adapter, sub_name, families, label):
     _, model = _sub_model(adapter, sub_name)
     root = _root_title(sub_name)
     items = []  # (mate_name, family, rounded_value)
-    for _f, _m, name, mtype, parts, val in _iter_mates(adapter, model):
-        if mtype != DISTANCE or val is None:
+    # Walk WITHOUT values (the slow DisplayDimension2 round-trip); read the value
+    # lazily only for the family-matching single-real-part DISTANCE candidates.
+    for _f, mate, name, mtype, parts, _val in _iter_mates(adapter, model, read_values=False):
+        if mtype != DISTANCE:
             continue
         lone = _lone_real(parts, root)
         if lone is None or _family(lone) not in families:
+            continue
+        val = _mate_value(adapter, mate, mtype)
+        if val is None:
             continue
         items.append((name, _family(lone), round(val * 1000.0, 1)))
     counts = Counter((fam, v) for _n, fam, v in items)
@@ -278,22 +288,21 @@ async def _suppress_recurring(adapter, sub_name, families, label):
     kept = [(fam, v) for (fam, v), c in counts.items() if c < SUPPRESS_RECUR]
     log(f"  {label}: pose buckets {sorted({(f, v) for _n, f, v in items if counts[(f, v)] >= SUPPRESS_RECUR})}")
     log(f"  {label}: keeping {len(kept)} per-instance axial values")
-    await _do_suppress(adapter, sub_name, model, targets, label)
+    await _do_suppress(adapter, sub_name, targets, label)
     return targets
 
 
-async def _do_suppress(adapter, sub_name, model, targets, label):
+async def _do_suppress(adapter, sub_name, targets, label):
+    # currentModel MUST stay the top assembly: suppress_mate(component=sub_name)
+    # resolves the component against currentModel then retargets to its model doc
+    # itself (GetModelDoc2). Switching currentModel to the sub doc here makes that
+    # component lookup fail ("Component not found: 'drive-train-1'").
     from solidworks_mcp.adapters.base import SuppressMateParameters
     log(f"  {label}: suppressing {len(targets)} mates in {sub_name}")
-    saved = adapter.currentModel
-    try:
-        adapter.currentModel = model
-        for name in targets:
-            check(f"suppress {name}@{sub_name}",
-                  await adapter.suppress_mate(SuppressMateParameters(
-                      name=name, suppress=True, component=sub_name)))
-    finally:
-        adapter.currentModel = saved
+    for name in targets:
+        check(f"suppress {name}@{sub_name}",
+              await adapter.suppress_mate(SuppressMateParameters(
+                  name=name, suppress=True, component=sub_name)))
     adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
 
 
