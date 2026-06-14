@@ -1207,10 +1207,14 @@ async def build(adapter):
         await _sample_chain(adapter)
     samples = await _sample_pen(adapter) if level >= 3 else []
 
+    # Export the operating-device mp4 for every stage that solves (kinematic and
+    # up) -- the crank-driven motion is worth capturing even before the springs.
+    # The file is stage-tagged so the kinematic clip and the eventual full clip
+    # don't clobber each other.
     artefacts = {}
-    if level >= 3 and samples:
+    if level >= 1:
         from solidworks_mcp.adapters.base import MotionExportParameters
-        vid = (OUT_PNG.parent / f"{ASM}-operation.mp4").resolve()
+        vid = (OUT_PNG.parent / f"{ASM}-operation-{stage}.mp4").resolve()
         res = await adapter.export_motion_video(MotionExportParameters(
             file_path=str(vid), study_name="", frames_per_second=25.0))
         if res.is_success:
