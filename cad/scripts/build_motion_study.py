@@ -369,6 +369,30 @@ async def _suppress_recurring(adapter, sub_name, families, label):
     return targets
 
 
+async def _suppress_pair(adapter, sub_name, fam_pair, mtype, label):
+    """Suppress every MTYPE mate that references EXACTLY the two part families.
+
+    For two-real-part joints (e.g. the J3 bar<->lever coincident), which the
+    single-real-part :func:`_suppress_recurring`/:func:`_suppress_named` rules
+    never see. ``fam_pair`` is matched as a set against the mate's real parts,
+    so it ignores the assembly-root pseudo-part and instance suffixes.
+    """
+    _, model = _sub_model(adapter, sub_name)
+    root = _root_title(sub_name)
+    want = set(fam_pair)
+    targets = []
+    log(f"  {label}: scanning {sub_name} mates ...")
+    for _f, _m, name, mt, parts, _val in _iter_mates(
+            adapter, model, read_values=False, progress_every=40):
+        if mt != mtype:
+            continue
+        fams = {_family(p) for p in _real_parts(parts, root)}
+        if fams == want:
+            targets.append(name)
+    await _do_suppress(adapter, sub_name, targets, label)
+    return targets
+
+
 async def _do_suppress(adapter, sub_name, targets, label):
     # currentModel MUST stay the top assembly: suppress_mate(component=sub_name)
     # resolves the component against currentModel then retargets to its model doc
@@ -423,15 +447,17 @@ async def _suppress_drivers(adapter, level, dump=False):
     #    coefficient), replacing the dead bar-foot-on-rocker CONTACT that Basic
     #    Motion ignores.
     #
-    #  * amplitude-bar -> NOT suppressed. The bar is a COEFFICIENT SETTING: it
-    #    must stay frozen at its slide station, NOT move during a run. Its spin +
-    #    axial drivers are KEPT so it stays upright and pinned; its X/Y are not
-    #    ground-pinned but ride the lever pin via the J3 coincident, so as the
-    #    geared lever rotates the bar simply TRANSLATES upright with it (no foot
-    #    constraint to fight, no closed loop, no over-constraint). Suppressing the
-    #    bar drivers instead (the earlier probe) left all 20 bars free to swing
-    #    about their lever pins -- with the foot support being an ignored CONTACT
-    #    they flopped up into a black slab. Keep them pinned.
+    #  * amplitude-bar -> DECOUPLED + FIXED (see _freeze_bars). The bar is a
+    #    COEFFICIENT SETTING: it must stay frozen at its slide station, NOT move
+    #    during a run. Two failed approaches proved the path: (1) suppressing the
+    #    bar drivers freed all 20 bars to swing about their lever pins into a
+    #    flopped black slab (the foot-on-rocker support is an ignored CONTACT);
+    #    (2) KEEPING the bar drivers makes its foot-to-plane spin driver (which
+    #    couples to translation) fight the geared lever through the J3 coincident
+    #    -- the lever reached only 47 deg of the rocker's 159 and the bar still
+    #    twisted ~3 deg. So suppress the J3 bar<->lever coincident (decouple) and
+    #    FIX the bar rigidly at its design (= coefficient) pose; the coefficient
+    #    then lives entirely in the rocker<->lever gear ratio.
     #
     #  * connecting-rod -> suppress ALL of its drivers (ring-X/Y/Z AND the swing,
     #    which spin_driver implements as a DISTANCE mate). Artifact A pins the rod
@@ -453,6 +479,40 @@ async def _suppress_drivers(adapter, level, dump=False):
     await _suppress_named(
         adapter, "channel-1", ("connecting-rod",), (DISTANCE, ANGLE),
         "channel rod drivers (free the rod fully)")
+    await _freeze_bars(adapter)
+
+
+async def _freeze_bars(adapter):
+    """Decouple the (coefficient-setting) amplitude bars from the geared levers
+    and FIX them at their design pose, so they neither flop nor lock the lever.
+
+    Suppress the J3 bar<->lever coincident (the only bar+lever two-part mate) to
+    cut the coupling, then fix every bar rigidly. The bars are fixed in the sub
+    doc; the sub is grounded at identity (3 plane mates in _flex_subs), so
+    fixed-in-sub == fixed-in-world. The integration coefficient lives entirely in
+    the rocker<->lever gear ratio (derived from the bar slide position), and the
+    frozen bar is the visual record of that setting. NEVER saves the sub.
+    """
+    from solidworks_mcp.adapters.base import ComponentRefParameters
+    await _suppress_pair(
+        adapter, "channel-1", ("amplitude-bar", "channel-lever"), COINCIDENT,
+        "decouple bar<->lever (J3)")
+    _, ch_doc = _sub_model(adapter, "channel-1")
+    top = adapter.currentModel
+    adapter.currentModel = ch_doc
+    fixed = 0
+    try:
+        bars = _find_family(adapter, "amplitude-bar", model=ch_doc)
+        log(f"  freezing {len(bars)} amplitude bars at design pose ...")
+        for _c, name in bars:
+            res = await adapter.fix_component(
+                ComponentRefParameters(name=name.split("/")[-1]))
+            fixed += 1 if getattr(res, "is_success", False) else 0
+        adapter._attempt(lambda: ch_doc.ForceRebuild3(False), default=None)
+    finally:
+        adapter.currentModel = top
+    log(f"  froze {fixed}/{len(bars)} amplitude bars (J3 decoupled + fixed)")
+    return fixed
 
 
 # ---- stage 4: per-channel cam + rod couplings (named axes) -------------------
