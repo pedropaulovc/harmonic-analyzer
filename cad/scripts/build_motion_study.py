@@ -70,6 +70,17 @@ from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
 # phase-f motion-study memory (point-on-axis cam de-redundancy).
 ROD_BORE_EDGE_MM = [25.5, 0.0, 1.5]
 
+# Rocker-arm part-local geometry (build_rocker_arm.py): part origin at the strap
+# bottom, pivot bore at (0, 8), the R800 concave TOP edge has its arc centre at
+# (0, CENTER_Y=816); the top edge passes through (0, 16) at the +Z face (z =
+# +ARM_THICKNESS/2 = 1.25). A point on that top arc edge lets create_reference_
+# point(arc_center) recover the (0,816) centre on the SHARED rocker part.
+ROCKER_ARC_EDGE_MM = [0.0, 16.0, 1.25]
+ROCKER_ARC_CENTER_LOCAL = [0.0, 816.0, 0.0]  # R800 arc centre (the foot's circle)
+ROCKER_PIVOT_LOCAL = [0.0, 8.0, 0.0]         # pivot bore = rocker Axis1
+# Amplitude-bar foot axis (build_channel_assembly BAR_FOOT_LOCAL = bar Axis2).
+BAR_FOOT_LOCAL = [3.175, 0.0, 3.175]
+
 # ---- study constants --------------------------------------------------------
 ASM = "harmonic-analyzer"
 MOVING_SUBS = ("drive-train-1", "channel-1", "output-1")  # frame-1 stays fixed
@@ -371,25 +382,30 @@ async def _suppress_recurring(adapter, sub_name, families, label):
 
 async def _suppress_channel(adapter):
     """ONE classify-once pass over channel-1's mate group -- replaces the
-    separate flexible-sub walks (rocker spin, lever spin, rod drivers) with a
-    single walk. The mate walk on a flexible sub is the dominant per-iteration
-    cost (hundreds of seconds; one walk hit 635s), so collapsing the walks is a
-    big iteration speedup with zero classification change. Three rules, per mate:
+    separate flexible-sub walks (rocker spin, lever spin, rod drivers, bar spin)
+    with a single walk. The mate walk on a flexible sub is the dominant per-
+    iteration cost (hundreds of seconds; one walk hit 635s), so collapsing the
+    walks is a big iteration speedup with zero classification change. Two rules:
 
       * connecting-rod single-part DISTANCE/ANGLE -> free the rod fully (the two
         new revolutes define it).
-      * rocker-arm / channel-lever single-part DISTANCE with a value RECURRING
-        across >= SUPPRESS_RECUR instances -> a pose/spin driver -> suppress;
-        a per-instance-unique value -> an axial-Z station hold -> KEEP.
+      * rocker-arm / channel-lever / amplitude-bar single-part DISTANCE with a
+        value RECURRING across >= SUPPRESS_RECUR instances -> a pose/spin driver
+        -> suppress; a per-instance-unique value -> an axial-Z station hold ->
+        KEEP. All channels share one solved state (only Z varies), so each
+        part's spin value (rocker spin, lever spin, bar foot-X) is identical
+        across the 20 instances (recurring) while its axial-Z = the station Z is
+        unique -- the bucket split frees the swing of all three moving parts and
+        keeps every part at its Z station.
 
-    The amplitude bars are deliberately LEFT FULLY MATED -- their J3 top-pin
-    coincident (rides the lever), axial-Z hold, and spin_driver (foot-X = stays
-    vertical) together make each bar bob up/down with the geared lever while
-    staying upright (Synthesis transcript: "the amplitude bars drive the
-    spring-loaded levers up and down"; Rocker Arms: rocker radius of curvature =
-    bar length keeps the tilt small). No lock/decouple/freeze is needed; the bar
-    also correctly LIMITS the lever's travel to the linkage's real range (the old
-    "lever only 47 of 159 deg" reading was that physical limit, not a fight).
+    Freeing the amplitude bar's foot-X spin_driver lets the bar SWING about its
+    top pin (book ch.17: the bars "drive the spring-loaded levers up and down",
+    modulated by the bar's slide position -- they are swinging couplers, not
+    rigid). The bar keeps its J3 top-pin coincident (rides the lever) and its
+    axial-Z hold; _add_foot_arc_joints then re-couples the freed foot to the
+    rocker's R800 arc, closing the rocker->bar->lever four-bar (no gear). An
+    earlier lock-to-lever made the bar rigid -> it swept the lever arc into a
+    slab; keeping the spin_driver made it stay rigidly vertical -- both wrong.
 
     Returns the suppressed mate names.
     """
@@ -398,7 +414,7 @@ async def _suppress_channel(adapter):
     _, model = _sub_model(adapter, sub_name)
     root = _root_title(sub_name)
     targets = []
-    recur = []  # (name, family, rounded_mm) for rocker/lever DISTANCE bucketing
+    recur = []  # (name, family, rounded_mm) for spin-vs-axial bucketing
     log("  classify channel-1 mates (single pass) ...")
     for _f, mate, name, mtype, parts, _val in _iter_mates(
             adapter, model, read_values=False, progress_every=40):
@@ -410,7 +426,7 @@ async def _suppress_channel(adapter):
         if lone_fam == "connecting-rod" and mtype in (DISTANCE, ANGLE):
             targets.append(name)  # free the rod fully
             continue
-        if lone_fam in ("rocker-arm", "channel-lever") and mtype == DISTANCE:
+        if lone_fam in ("rocker-arm", "channel-lever", "amplitude-bar") and mtype == DISTANCE:
             val = _mate_value(adapter, mate, mtype)  # lazy: candidates only
             if val is not None:
                 recur.append((name, lone_fam, round(val * 1000.0, 1)))
@@ -419,7 +435,7 @@ async def _suppress_channel(adapter):
     kept = [(fam, v) for (fam, v), c in counts.items() if c < SUPPRESS_RECUR]
     targets.extend(spin)
     log(f"  channel pose buckets {sorted({(f, v) for _n, f, v in recur if counts[(f, v)] >= SUPPRESS_RECUR})}")
-    log(f"  channel keeping {len(kept)} per-instance axial holds + all bar mates")
+    log(f"  channel keeping {len(kept)} per-instance axial holds")
     await _do_suppress(adapter, sub_name, targets, "channel drivers (single pass)")
     return targets
 
@@ -473,24 +489,20 @@ async def _suppress_drivers(adapter, level, dump=False):
     #
     #  * channel-lever -> recurring-only: suppress the constant J4 spin driver so
     #    the lever is FREE to rotate about its fulcrum, KEEP its per-station
-    #    axial-Z hold and its J4 fulcrum revolute. The lever is then driven by the
-    #    in-sub gear off the rocker (_add_lever_gears, ratio = the channel
-    #    coefficient), replacing the dead bar-foot-on-rocker CONTACT that Basic
-    #    Motion ignores.
+    #    axial-Z hold and its J4 fulcrum revolute. The lever is driven by the
+    #    rocker THROUGH the amplitude bar (the real four-bar -- _add_foot_arc_
+    #    joints), not a gear: the bar foot rides the rocker arc and its top swings
+    #    on the lever pin, so the seesawing rocker drives the lever up/down.
     #
-    #  * amplitude-bar -> LEFT FULLY MATED (no suppress/lock). The book settles
-    #    the bar behaviour: "Twenty long vertical rods ... drive the spring-loaded
-    #    levers up and down" (Synthesis) -- the bars stay VERTICAL and bob, they
-    #    do NOT rotate. Their artifact-A J3 mates already do exactly this: the
-    #    top-pin coincident rides the lever, the axial-Z holds depth, and the
-    #    spin_driver (a foot-X distance) keeps each bar vertical so it can only
-    #    bob in Y as the geared lever drives it. (An earlier lock-to-lever made
-    #    the bars rigid with the lever -> they swept the full lever arc into a
-    #    flopped slab; the references rule that out.) The bar also correctly
-    #    LIMITS the lever travel to the linkage's real range -- the old "lever
-    #    only 47 of 159 deg" was that physical limit, not a fight. The coefficient
-    #    lives in the per-channel rocker<->lever gear ratio (F6c: derive it from
-    #    each bar's slide position so moving a bar changes its coefficient).
+    #  * amplitude-bar -> recurring-only: suppress the foot-X spin_driver so the
+    #    bar can SWING about its top pin (book ch.15/17 + user-confirmed: the bars
+    #    are swinging couplers, NOT rigid with the lever -- keeping the spin_driver
+    #    made the bar a rigid vertical stick; an earlier lock-to-lever made it
+    #    sweep the whole lever arc into a slab -- both wrong). KEEP its per-station
+    #    axial-Z hold and its J3 top-pin coincident (rides the lever). _add_foot_
+    #    arc_joints then re-pins the freed foot to the rocker via two distance
+    #    mates (R800 arc-centre + pivot radius), closing the four-bar. The
+    #    coefficient = the foot's pivot radius (F6c: set per bar from its slide).
     #
     #  * connecting-rod -> suppress ALL of its drivers (ring-X/Y/Z AND the swing,
     #    which spin_driver implements as a DISTANCE mate). Artifact A pins the rod
@@ -506,10 +518,11 @@ async def _suppress_drivers(adapter, level, dump=False):
     #    top-level mate between two parts both nested in the same flexible sub, so
     #    pin<->rocker had to move INSIDE the sub, not be dropped for over-defn.)
     #
-    # rocker spin, lever spin and rod drivers are classified + suppressed in ONE
-    # mate walk (_suppress_channel) -- the flexible-sub walk is the dominant cost,
-    # so the earlier separate walks were collapsed to one. The amplitude bars are
-    # left fully mated (they ride the geared lever upright -- see above).
+    # rocker spin, lever spin, bar foot-X and rod drivers are classified +
+    # suppressed in ONE mate walk (_suppress_channel) -- the flexible-sub walk is
+    # the dominant cost, so the earlier separate walks were collapsed to one. The
+    # freed bar foot is re-pinned to the rocker arc by _add_foot_arc_joints (the
+    # four-bar coupler -- see above).
     await _suppress_channel(adapter)
 
 
@@ -690,58 +703,130 @@ async def _add_cam_couplings(adapter):
     return cam_ok
 
 
-# ---- stage 4c: per-channel rocker->lever transmission gear -------------------
-# The integration coefficient of channel k is the linkage gain dtheta_lever /
-# dtheta_rocker, set by the amplitude bar's slide position: rotating the rocker
-# by dtheta moves the foot contact (at radius R_foot up the rocker arc) by
-# ~R_foot*dtheta, which pushes the lever bar-pin (at radius L_lever from the
-# fulcrum) by ~R_foot/L_lever * dtheta. So coefficient = R_foot / L_lever, and
-# MOVING the bar (changing R_foot) changes the coefficient -- exactly the machine
-# input. Basic Motion ignores the bar-foot-on-rocker CONTACT, so the gain cannot
-# come from the physical linkage; we encode it as a GEAR ratio rocker<->lever
-# (gears ARE enforced in-sub -- proven, probe_channel_gear). ``ratio_fn(i)``
-# returns the [rocker, lever] ratio for channel i; default 1:1 (the F6b wiring +
-# flop-fix gate -- the geometry-derived per-bar coefficient is the F6c tuning
-# step). The bar stays pinned (frozen at its slide station) and rides the geared
-# lever via the J3 coincident, so it neither flops nor locks the lever.
-async def _add_lever_gears(adapter, ratio_fn=None):
-    from _common import gear_mate
+# ---- stage 4c: per-channel rocker->bar->lever four-bar (no gear) -------------
+# The amplitude bar is the REAL transmission: a long (~806 mm) swinging COUPLER
+# whose foot rides the rocker's R800 concave arc and whose top pin swings on the
+# spring-loaded channel lever (book ch.15/17 -- "twenty long vertical rods drive
+# the spring-loaded levers up and down", modulated by each bar's slide position).
+# As the crank turns, the cam chain seesaws the rocker; the foot bobs up/down;
+# the rigid bar pushes/pulls the lever pin; the lever rotates. The bar SWINGS as
+# a four-bar coupler (it is NOT rigid with the lever -- user-confirmed from ch.17:
+# "amplitude bars are not solid with pivoted bar / top lever, they can swing").
+#
+# Basic Motion cannot solve the point-on-curve CONTACT of the foot on the arc, so
+# the faithful discrete joint PINS the foot to the rocker at its contact point via
+# TWO in-sub DISTANCE mates from the bar foot axis (bar Axis2):
+#   * to the R800 arc-centre RefPoint  -> distance R (~800): the foot stays on the
+#     rocker's R800 arc (the "rides the arc" constraint).
+#   * to the pivot bore axis (rocker Axis1) -> distance r_foot: the foot's radius
+#     from the pivot = the integration COEFFICIENT (moving the bar changes it).
+# The intersection of the two circles is one point on the rocker, so the pair
+# rigidly pins the foot to the rocker (it orbits with the rocker), giving a clean
+# 1-DOF four-bar: rocker(driven) -> bar(coupler, swings) -> lever. ONE distance
+# alone leaves the loop 1-DOF loose (the lever uncoupled from the rocker); two
+# close it. The bar's foot-X spin_driver is freed in _suppress_channel (so the
+# foot is not double-pinned) and the lever spin is freed (so the four-bar can
+# move); the bar keeps its J3 top-pin coincident + axial-Z hold.
+#
+# All 20 channels share one solved neutral state (foot ~above the pivot), so r_arc
+# and r_pivot are identical across instances -- but each pair is MEASURED from the
+# placed transforms (relative XY in the sub frame, mirror-/frame-invariant) so the
+# mates start exactly on-solution per channel. NOTE neutral coefficient ~0 means
+# little lever travel until the bars are repositioned to real coefficients (F6c).
+async def _add_rocker_arc_point(adapter):
+    """Create the R800 arc-centre RefPoint on the SHARED rocker-arm part.
+
+    Mirror of :func:`_add_ring_centre_point`: all 20 rockers share rocker-arm.
+    SLDPRT, so ONE RefPoint at the arc centre (arc_center of the top R800 edge)
+    is inherited by every instance via GetCorresponding; the part is NEVER saved.
+    Selection in the part doc needs it ACTIVE -> ActivateDoc3 round-trip.
+    """
+    from solidworks_mcp.adapters.base import CreateReferencePointParameters
+    top = adapter.currentModel
+    top_title = str(_read_member(top, "GetTitle"))
+    rk_comp, _ = _find_one(adapter, "rocker-arm-1")
+    if rk_comp is None:
+        raise RuntimeError("rocker-arm-1 not found for arc-centre point")
+    part = adapter._attempt(lambda: rk_comp.GetModelDoc2(), default=None)
+    if part is None:
+        raise RuntimeError("rocker-arm part doc unresolved")
+    part_title = str(_read_member(part, "GetTitle"))
+    adapter._attempt(
+        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, _byref_i4()), default=None)
+    adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
+    pt = check("create rocker arc-centre RefPoint", await adapter.create_reference_point(
+        CreateReferencePointParameters(mode="arc_center", edge_point=ROCKER_ARC_EDGE_MM)))
+    name = pt.get("name") if isinstance(pt, dict) else getattr(pt, "name", None)
+    adapter._attempt(
+        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()), default=None)
+    adapter.currentModel = top
+    if not name:
+        raise RuntimeError("rocker arc-centre RefPoint creation returned no name")
+    log(f"  arc-centre point on {part_title} = {name!r} (shared by all rockers)")
+    return name
+
+
+def _xy_dist(p, q):
+    return math.hypot(p[0] - q[0], p[1] - q[1])
+
+
+async def _add_foot_arc_joints(adapter):
+    """Per channel, INSIDE channel.SLDASM: pin the bar foot to the rocker arc.
+
+    Two DISTANCE mates from bar Axis2 (foot): to the rocker arc-centre RefPoint
+    (= R, foot on the R800 arc) and to rocker Axis1 (= r_foot, the coefficient
+    radius). Together they pin the foot to the rocker, closing the rocker->bar->
+    lever four-bar (see the section header). Authored in the sub doc (both parts
+    nested in the same flexible sub -> a top-level mate is rejected, proven for
+    the rod<->rocker revolute); currentModel retargeted then restored, sub NEVER
+    saved. Values measured from the placed sub-frame transforms (relative XY, so
+    frame-invariant) so each pair starts on-solution.
+    """
+    from _common import distance_driver
+    point_name = await _add_rocker_arc_point(adapter)
     _, ch_doc = _sub_model(adapter, "channel-1")
     top = adapter.currentModel
     adapter.currentModel = ch_doc
     ok = n = 0
     try:
-        log("  enumerating channel.SLDASM parts for in-sub rocker<->lever gears ...")
+        log("  enumerating channel.SLDASM parts for in-sub foot-arc joints ...")
         comps = _components(adapter, ch_doc)
         rockers = _by_z_rank(adapter, "rocker-arm", comps=comps)
-        levers = _by_z_rank(adapter, "channel-lever", comps=comps)
-        n = min(len(rockers), len(levers))
-        log(f"  in-sub lever gears: {len(rockers)} rockers, {len(levers)} levers "
+        bars = _by_z_rank(adapter, "amplitude-bar", comps=comps)
+        n = min(len(rockers), len(bars))
+        log(f"  in-sub foot-arc: {len(rockers)} rockers, {len(bars)} bars "
             f"-> {n} channels")
         for i in range(n):
-            rocker_n, lever_n = rockers[i][1], levers[i][1]
-            ratio = ratio_fn(i) if ratio_fn else [1.0, 1.0]
-            done = False
-            for alignment in ("aligned", "anti_aligned"):
-                try:
-                    g = await gear_mate(
-                        adapter, _entity_ref(rocker_n, "Axis1", "AXIS"),
-                        _entity_ref(lever_n, "Axis1", "AXIS"),
-                        ratio, alignment=alignment,
-                        label=f"ch{i:02d} rocker->lever gear (coeff)")
-                    if g.get("name"):
-                        ok += 1
-                        done = True
-                        break
-                except Exception as exc:  # noqa: BLE001 -- first-run diagnostics
-                    if i == 0:
-                        log(f"    ch00 gear alignment={alignment} rejected: {exc}")
-            if not done and i == 0:
-                log("    ch00 gear FAILED both alignments")
+            (rk_c, rk_n), (bar_c, bar_n) = rockers[i], bars[i]
+            ra = _comp_xform(adapter, rk_c)
+            ba = _comp_xform(adapter, bar_c)
+            if ra is None or ba is None:
+                log(f"    ch{i:02d} foot-arc SKIP: transform unreadable")
+                continue
+            arc_c = _world(ra, ROCKER_ARC_CENTER_LOCAL)
+            pivot = _world(ra, ROCKER_PIVOT_LOCAL)
+            foot = _world(ba, BAR_FOOT_LOCAL)
+            d_arc = _xy_dist(foot, arc_c)
+            d_pivot = _xy_dist(foot, pivot)
+            if i == 0:
+                log(f"    ch00 foot-arc: R={d_arc:.2f} r_foot={d_pivot:.2f} "
+                    f"point={point_name!r}")
+            try:
+                a = await distance_driver(
+                    adapter, _entity_ref(rk_n, point_name, "POINT"),
+                    _entity_ref(bar_n, "Axis2", "AXIS"), d_arc,
+                    label=f"ch{i:02d} foot on R800 arc")
+                p = await distance_driver(
+                    adapter, _entity_ref(rk_n, "Axis1", "AXIS"),
+                    _entity_ref(bar_n, "Axis2", "AXIS"), d_pivot,
+                    label=f"ch{i:02d} foot radius (coeff)")
+                ok += 1 if (a.get("name") and p.get("name")) else 0
+            except Exception as exc:  # noqa: BLE001 -- first-run diagnostics
+                log(f"    ch{i:02d} foot-arc FAILED: {exc}")
         adapter._attempt(lambda: ch_doc.ForceRebuild3(False), default=None)
     finally:
         adapter.currentModel = top
-    log(f"  in-sub rocker<->lever gears: {ok}/{n}")
+    log(f"  in-sub foot-arc joints: {ok}/{n}")
     return ok
 
 
@@ -945,7 +1030,7 @@ async def build(adapter):
 
     await _add_rod_rocker_revolutes(adapter)
     await _add_cam_couplings(adapter)
-    await _add_lever_gears(adapter)
+    await _add_foot_arc_joints(adapter)
     check("ensure_motion_addin", await adapter.ensure_motion_addin())
     from solidworks_mcp.adapters.base import MotionStudyParameters, MotionStudyRefParameters
     made = check("create_motion_study", await adapter.create_motion_study(
