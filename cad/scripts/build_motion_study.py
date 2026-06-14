@@ -659,7 +659,7 @@ async def _sample_pen(adapter, study_name=""):
         samples.append((t, tip))
         log(f"    t={t:5.2f}s pen tip=({tip[0]:.2f},{tip[1]:.2f},{tip[2]:.2f})")
     if samples:
-        ys = [p[1][1] for _t, p in samples]
+        ys = [tip[1] for _t, tip in samples]
         log(f"  pen-tip Y span = {max(ys) - min(ys):.3f} mm "
             f"(0 => the pen never moved)")
     return samples
