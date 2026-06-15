@@ -96,6 +96,13 @@ async def build(adapter) -> dict[str, str]:
     # Named bore/central axis for view-independent assembly mate
     # selection (M6 mated-DOF drive train).
     await name_bore_axis(adapter, "Top Plane", 76.0, "Right Plane", 0.0, "journal axis")
+    # Vertical swing pivot (Axis2): the local Y centreline through the plan
+    # centre. The whole cone set swings HORIZONTALLY out of mesh about this post
+    # (ch.12, p.18 "pivot"); the drive-train floats the post and rotates it about
+    # this axis -- the p1 disengage DOF. The post is inserted with a pure Ry
+    # incline, which leaves this axis vertical, so a rotation about it is the
+    # horizontal swing the book describes.
+    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "swing pivot")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
