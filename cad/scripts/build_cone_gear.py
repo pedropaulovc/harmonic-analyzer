@@ -71,6 +71,7 @@ import math
 import sys
 from typing import Any
 
+import _config
 from _common import (
     OUT_PNG,
     _read_member,
@@ -86,7 +87,7 @@ from _common import (
 PART_NAME = "cone-gear"
 MATERIAL = "Brass"  # ch. 13 text: polished brass gear stock; cone set matches
 
-DP = 30.0  # teeth per inch of pitch diameter, DIMENSIONS.md ch12 (high)
+DP = _config.machine("gear_train", "diametral_pitch")  # cad/config/machine.yaml (DIMENSIONS.md ch12)
 PA_DEG = 14.5  # pressure angle, period-typical assumption (low)
 # M6.7: the exact-tracking mesh (assembly docstring) fixes the seat
 # pitch along the shaft at Z_PITCH*cos(21.1 deg) = 6.584 mm, so the
