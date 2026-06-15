@@ -22,6 +22,7 @@ Per pair (see ../manifest.json):
 
 import argparse
 import json
+import time
 from pathlib import Path
 
 from PIL import Image, ImageOps
@@ -98,14 +99,27 @@ def trim_render_file(path: Path, margin_frac: float = 0.01) -> None:
     so raw captures carry large background margins. render_compare captures
     on an oversized canvas and calls this to store a content-tight image.
     """
-    img = Image.open(path)
-    bbox = _content_mask(img).getbbox()
-    if not bbox:
-        return
-    m = round(max(img.size) * margin_frac)
-    img.crop((max(0, bbox[0] - m), max(0, bbox[1] - m),
-              min(img.width, bbox[2] + m), min(img.height, bbox[3] + m))).save(
-        path, **JPEG_OPTS)
+    # Load + close the source handle BEFORE writing back to the same path:
+    # Image.open is lazy and keeps `path` open for reading, so saving to the same
+    # path reopens it for w+b while the read handle is live -- a Windows sharing
+    # race. An external scanner (Defender/indexer) touching the freshly-written
+    # JPEG makes it intermittent (random EINVAL/EACCES across a 400-file batch).
+    with Image.open(path) as src:
+        src.load()
+        bbox = _content_mask(src).getbbox()
+        if not bbox:
+            return
+        m = round(max(src.size) * margin_frac)
+        cropped = src.crop((max(0, bbox[0] - m), max(0, bbox[1] - m),
+                            min(src.width, bbox[2] + m), min(src.height, bbox[3] + m)))
+    for attempt in range(8):
+        try:
+            cropped.save(path, **JPEG_OPTS)
+            return
+        except OSError:
+            if attempt == 7:
+                raise
+            time.sleep(0.25)
 
 
 def _fitted_render(pair_id: str, ref_size: tuple[int, int], align: dict | None):
