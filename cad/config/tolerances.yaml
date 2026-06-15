@@ -1,0 +1,41 @@
+# Fits & clearances — applied UNIFORMLY across channels (see docs/tolerance-policy.md).
+#
+# Because the output is a force balance, channel-to-channel consistency matters
+# more than absolute precision: these are shared named classes, never per-part
+# magic numbers. Build scripts assert their analytic clearance margins against
+# these values and raise on violation.
+units: mm
+
+general:
+  machined_block:    { tolerance: "+/-0.10", applies_to: "milled blocks, brackets, plates" }
+  plate_profile:     { tolerance: "+/-0.20", applies_to: "noncritical exterior profiles" }
+  visual_noncritical: { tolerance: "+/-0.50", applies_to: "cosmetic/decorative geometry" }
+
+fits:
+  shaft_in_bushing:        # crank / rocker / lever pivots — hand-cranked, low-speed slip fit
+    diametral_clearance_mm: [0.025, 0.075]
+    applies_to: [crank pivots, rocker pivots, lever pivots]
+
+  gear_mesh:               # cone<->cylinder and platen rack-pinion
+    backlash_mm: [0.05, 0.20]
+    rack_backlash_mm: 0.30           # RACK_BACKLASH (build_output_assembly.py)
+    note: "zero-backlash-in-CAD gears bind in brass"
+
+  cone_drum_oblique_mesh:  # the inclined cone partial engagement
+    edge_slack_mm: 0.55              # PEN_EDGE_SLACK — deepest-tooth penetration guard
+    note: "oblique partial engagement; checker-arbitrated edge slacks 0.00..1.14"
+
+  cam_follower_contact:
+    min_clearance_to_adjacent_channel_mm: 0.50
+    contact_gap_mm: 0.02             # BAR_CONTACT_GAP — design margin, not a tangent
+
+  sliding_amplitude_bar_on_rocker:
+    side_clearance_mm: [0.05, 0.20]
+    note: "bar slides without binding through the full rocker sweep"
+
+  spring_eye_threading:
+    min_margin_mm: 0.10              # plate-threading loop margin bound (~0.11 observed)
+
+  fastener_clearance:
+    close_mm: 0.10
+    normal_mm: 0.25
