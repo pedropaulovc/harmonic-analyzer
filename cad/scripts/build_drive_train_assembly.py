@@ -459,19 +459,25 @@ async def build(adapter) -> dict[str, str]:
         [kpost[0], Y_BASE_TOP, kpost[2]], [0.0, -INCLINE_DEG, 0.0], ROT_Y_INCLINE,
     )
 
-    # alignment pinion (ch. 25, disengaged rest state -- all ground)
-    await place_component(
+    # alignment pinion SWING GROUP (ch. 25, p.66): the two brackets pivot on the
+    # torque shaft and journal the pinion drum; the whole group swings to engage
+    # the cylinder train (p2). Floated (ground=False) and joined by a swing
+    # revolute + suppressible park driver in the joints section -- the rest pose
+    # is today's DISENGAGED state (p.68 "gap").
+    align_pinion = await place_component(
         adapter, "alignment-pinion",
         [PINION_X, PINION_Y, PINION_Z_FRONT], [0.0, 0.0, 0.0], IDENTITY,
+        ground=False, label="alignment-pinion (disengaged rest)",
     )
+    pinion_brackets: dict[str, str] = {}
     for tag, z0 in (
         ("front", PINION_Z_FRONT - STRAP_T - STRAP_AIR),
         ("back", PINION_Z_BACK + STRAP_AIR),
     ):
-        await place_component(
+        pinion_brackets[tag] = await place_component(
             adapter, "pinion-bracket",
             [PIVOT_X, PIVOT_Y, z0], [0.0, 0.0, STRAP_LEAN_DEG], rot_z_rows(STRAP_LEAN_DEG),
-            label=f"pinion-bracket {tag} (leaning onto the arbor stub)",
+            ground=False, label=f"pinion-bracket {tag} (leaning onto the arbor stub)",
         )
     for tag, z0 in (("front", BLOCK_FRONT_Z0), ("back", BLOCK_BACK_Z0)):
         await place_component(
@@ -479,7 +485,7 @@ async def build(adapter) -> dict[str, str]:
             [BLOCK_X, PIVOT_Y, z0], [0.0, 0.0, 0.0], IDENTITY,
             label=f"pinion-pivot-block {tag}",
         )
-    await place_component(
+    pivot_shaft = await place_component(
         adapter, "pinion-pivot-shaft",
         [PIVOT_X, PIVOT_Y, PIVOT_SHAFT_Z0], [0.0, 0.0, 0.0], IDENTITY,
     )
@@ -674,6 +680,61 @@ async def build(adapter) -> dict[str, str]:
         (handle_o[0], handle_o[1]),
         label="crank angle driver (#1)",
         verify=(handle, handle_o),
+    )
+
+    # =================== pinion swing group (p2 engage DOF) ====================
+    # The two brackets + the alignment-pinion are ONE rigid body that pivots on
+    # the torque shaft to swing the pinion into mesh with the cylinder train
+    # (ch.25, p.66). Lock the group rigid (crank-chain pattern), ground it with
+    # ONE revolute about the pivot shaft (coincident axes + an axial plane
+    # distance), and pin the swing with a suppressible PARK DRIVER at today's
+    # DISENGAGED pose. `rest` is bit-exact; suppress the driver (motion study /
+    # a pinion_engaged config) to articulate the engage swing. The pinion-handle
+    # stays grounded for now -- it coincides at rest; floating + locking it is
+    # deferred to the engaged config (where the swung pose would otherwise
+    # detach it).
+    fb = pinion_brackets["front"]
+    bb = pinion_brackets["back"]
+    fb_o = _org(adapter, fb)
+    # Rigid group: back bracket + pinion locked to the front bracket. The pivot
+    # bores (Axis1) of both straps are collinear on the shaft; the pinion axis
+    # (Axis1) is collinear with each strap's arbor bore (Axis2) -- STRAP_C2C spans
+    # pivot->pinion exactly (geometry self-check above), so the locks preserve the
+    # inserted pose.
+    await lock_mate(
+        adapter, named_ref(f"Axis1@{bb}", "AXIS"), named_ref(f"Axis1@{fb}", "AXIS"),
+        label="pinion back-bracket keyed",
+    )
+    await lock_mate(
+        adapter, named_ref(f"Axis1@{align_pinion}", "AXIS"), named_ref(f"Axis2@{fb}", "AXIS"),
+        label="alignment-pinion keyed to the front bracket",
+    )
+    # Swing revolute on the torque shaft: the front strap's pivot bore (Axis1)
+    # coincident with the shaft central axis (Axis1) + an axial plane distance.
+    # Leaves exactly the swing DOF.
+    await coincident_mate(
+        adapter,
+        named_ref(f"Axis1@{fb}", "AXIS"), named_ref(f"Axis1@{pivot_shaft}", "AXIS"),
+        label="pinion swing radial", verify=(fb, fb_o),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Front Plane@{fb}", "PLANE"), named_ref("Front Plane", "PLANE"),
+        abs(fb_o[2]),
+        label=f"pinion swing axial d={abs(fb_o[2]):.2f}", verify=(fb, fb_o),
+    )
+    # Swing PARK DRIVER (suppressible): pin the swing via the pinion axis, which
+    # sits STRAP_C2C off the pivot, so the spin_driver's in-plane sensitivity is
+    # well-conditioned. Suppressing it frees the engage articulation.
+    shaft_o = _org(adapter, pivot_shaft)
+    pin_o = _org(adapter, align_pinion)
+    await spin_driver(
+        adapter,
+        named_ref(f"Axis1@{align_pinion}", "AXIS"),
+        (shaft_o[0], shaft_o[1]),
+        (pin_o[0], pin_o[1]),
+        label="pinion swing park driver (p2, disengaged rest)",
+        verify=(align_pinion, pin_o),
     )
 
     assert_components_fully_defined(adapter)

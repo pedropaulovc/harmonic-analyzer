@@ -78,6 +78,9 @@ async def build(adapter) -> dict[str, str]:
     extrude_at_offset(adapter, STUB_BACK, FACE_WIDTH)
     v_back = math.pi * STUB_R**2 * STUB_BACK
     await volume_check(adapter, "back stub", v_gear + v_back, 0.02 * v_back)
+    # The gear's central reference axis (Axis1@alignment-pinion, Top∩Right from
+    # build_fixed_gear) is the pinion spin/lock axis used by the p2 swing group
+    # in build_drive_train -- same convention as the cone gears.
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

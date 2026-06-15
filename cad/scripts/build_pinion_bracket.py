@@ -30,6 +30,7 @@ from _common import (
     check,
     define_circle,
     ensure_fully_defined,
+    name_bore_axis,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -117,6 +118,12 @@ async def build(adapter) -> dict[str, str]:
         - 2.0 * math.pi * (BORE / 2.0) ** 2
     )
     await volume_check(adapter, "strap", area * THICKNESS, 0.005 * area * THICKNESS)
+
+    # Named bore axes for the assembly: the pivot bore (Axis1) rides the torque
+    # shaft, the arbor bore (Axis2) journals the pinion. The p2 swing group keys
+    # off these (concentric to the shaft + lock the pinion in -- build_drive_train).
+    await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "pivot bore")
+    await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", C2C, "arbor bore")
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
