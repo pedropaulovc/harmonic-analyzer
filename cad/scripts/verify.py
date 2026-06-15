@@ -311,6 +311,50 @@ def verify_truth(report: Report) -> None:
         ),
     )
 
+    def _single_channel_term() -> None:
+        # The output proof, per channel: setting only a_k=1 must make the pen trace
+        # the single term magnify·cos(j_k·x + φ_k) -- the geometry's per-channel
+        # sinusoid that Basic Motion is later asked to reproduce (handoff §10).
+        mag, js, ph = truth_model.magnify(), truth_model.harmonics(), truth_model.phases_rad()
+        for k in range(len(js)):
+            e_k = [1.0 if i == k else 0.0 for i in range(len(js))]
+            for i in range(7):
+                x = i * truth_model.TWO_PI / 7.0
+                want = mag * math.cos(js[k] * x + ph[k])
+                got = truth_model.pen_y(x, e_k)
+                _expect(abs(got - want) < 1e-9,
+                        f"channel {k} (j={js[k]}) term wrong at x={x:.3f}: {got:+.4f} vs {want:+.4f}")
+
+    report.gate("truth:single-channel-term", _single_channel_term)
+
+    def _superposition() -> None:
+        # The summation IS the machine's job: the pen for an arbitrary coefficient
+        # vector must equal the sum of the per-channel single-term traces. This is
+        # the linearity the 21-spring force balance realises in hardware and the
+        # truth model realises numerically (docs/motion-policy.md).
+        js = truth_model.harmonics()
+        coeffs = truth_model.coefficients("sawtooth")
+        for i in range(11):
+            x = i * truth_model.TWO_PI / 11.0
+            whole = truth_model.pen_y(x, coeffs)
+            parts = sum(
+                truth_model.pen_y(x, [c if t == k else 0.0 for t, c in enumerate(coeffs)])
+                for k in range(len(js))
+            )
+            _expect(abs(whole - parts) < 1e-9,
+                    f"superposition broken at x={x:.3f}: whole {whole:+.5f} != Σ parts {parts:+.5f}")
+
+    report.gate("truth:superposition", _superposition)
+
+    def _sawtooth_band_limited() -> None:
+        # The textbook target vector (all harmonics 1/j) must populate every one of
+        # the 20 representable harmonics -- the machine's full bandwidth exercised.
+        saw = truth_model.coefficients("sawtooth")
+        _expect(all(a > 0 for a in saw) and len(saw) == 20,
+                f"sawtooth must fill all 20 harmonics: {saw}")
+
+    report.gate("truth:sawtooth-band-limited", _sawtooth_band_limited)
+
 
 def _expect(condition: bool, message: str) -> None:
     if not condition:
