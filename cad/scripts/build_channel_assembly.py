@@ -80,6 +80,7 @@ from _common import (
     check_no_interference,
     coincident_mate,
     concentric_mate,
+    component_names,
     component_transform,
     distance_driver,
     log,
@@ -183,6 +184,36 @@ def rot_z_rows(deg: float) -> list[list[float]]:
 
 def z_station(j: int) -> float:
     return Z0 + PITCH * j
+
+
+def _verify_pattern_z(
+    adapter, prefix: str, expected: list[float], label: str
+) -> None:
+    """Assert a patterned family's instances sit on the expected Z planes.
+
+    A LocalLinearPattern's direction sense is taken from the reference entity;
+    a flipped sense would mis-place the copies WITHOUT necessarily interfering
+    (they can land in empty Z), so the interference gate alone cannot vouch for
+    them. Read each instance's origin Z and compare the sorted set to the
+    channel/gap planes.
+    """
+    got = sorted(
+        component_transform(adapter, n)[11] * 1000.0
+        for n in component_names(adapter)
+        if n.rsplit("-", 1)[0] == prefix
+    )
+    want = sorted(expected)
+    if len(got) != len(want):
+        raise RuntimeError(
+            f"{label}: {len(got)} instances, expected {len(want)}"
+        )
+    for g, w in zip(got, want):
+        if abs(g - w) > 0.05:
+            raise RuntimeError(
+                f"{label}: instance at z={g:.2f} off plane z={w:.2f}"
+                " -- pattern direction sense flipped?"
+            )
+    log(f"{label}: {len(got)} instances on-plane (z {got[0]:.1f}..{got[-1]:.1f})")
 
 
 # --- mate scheme (validated single-channel probe) ---------------------------
@@ -430,6 +461,8 @@ def _assert_plate_threading(eye_y: float) -> None:
 
 
 async def build(adapter) -> dict[str, str]:
+    from solidworks_mcp.adapters.base import ComponentLinearPatternParameters
+
     state = solve_default_state()
     log(
         "default state: arm tilt %.3f deg, rod tilt %.3f deg, pin (%.2f, %.2f),"
@@ -494,6 +527,15 @@ async def build(adapter) -> dict[str, str]:
     t = math.radians(state["arm_tilt"])
     arm_origin_dx = ARM_PIVOT_LOCAL_Y * math.sin(t)  # -(0,8)*Rz offset
     arm_origin_dy = ARM_PIVOT_LOCAL_Y * math.cos(t)
+
+    # Grounded repeated structure (spring x20, two bushing banks x19) is placed
+    # ONCE as a seed in channel 0 and replicated by a LocalLinearPattern along
+    # the Z shaft axis after the loop. The moving parts stay individual mated
+    # instances: a pattern instance is a rigid slave with no DOF, and the
+    # channels must articulate independently (each runs at a different harmonic
+    # frequency) for the Motion study. pivot_od (a shaft-OD point) selects the
+    # Z-parallel cylindrical face = the pattern direction axis.
+    spring_seed = pivot_bush_seed = lever_bush_seed = ""
 
     for j in range(CHANNELS):
         zj = z_station(j)
@@ -567,26 +609,65 @@ async def build(adapter) -> dict[str, str]:
             label=f"J3 bar ch{j:02d}",
         )
 
-        # Spring (ground; cosmetic in artifact A). Rotated 90 about Y: eye ring
-        # perpendicular to the lever face; top eye centre (local (0, 65.05)) is
-        # on the axis, Ry-invariant; bottom lead lands at z_mid - 2.75.
-        await place_component(
-            adapter, "channel-spring-installed",
-            [spring_hole_x, eye_y - SPRING_EYE_LOCAL_Y, z_mid],
-            [0.0, 90.0, 0.0], ROT_Y_POS90, label=f"channel-spring ch{j:02d}",
-        )
-        if j < CHANNELS - 1:
-            z_gap = z_mid + PITCH / 2.0
-            await place_component(
-                adapter, "pivot-bushing",
-                [PIVOT[0], PIVOT[1], z_gap],
-                [0.0, 0.0, 0.0], IDENTITY, label=f"pivot-bushing {j:02d}/{j + 1:02d}",
+        # Spring + bushing SEEDS (ground; cosmetic in artifact A) -- inserted
+        # only at the TOP channel, then replicated DOWN the spine by a pattern
+        # after the loop. The shaft-OD direction reference (pivot_od) evaluates
+        # to the -Z sense, so the seed sits at the high-Z end and the copies
+        # fill toward channel 0 (verified on-plane after the loop). The spring
+        # is rotated 90 about Y: eye ring perpendicular to the lever face; top
+        # eye centre (local (0, 65.05)) is on the axis, Ry-invariant; bottom
+        # lead lands at z_mid - 2.75.
+        if j == CHANNELS - 1:
+            spring_seed = await place_component(
+                adapter, "channel-spring-installed",
+                [spring_hole_x, eye_y - SPRING_EYE_LOCAL_Y, z_mid],
+                [0.0, 90.0, 0.0], ROT_Y_POS90,
+                label=f"channel-spring seed ch{j:02d}",
             )
-            await place_component(
-                adapter, "lever-bushing",
-                [FULCRUM[0], FULCRUM[1], z_gap],
-                [0.0, 0.0, 0.0], IDENTITY, label=f"lever-bushing {j:02d}/{j + 1:02d}",
+            if CHANNELS > 1:
+                z_gap_top = z_mid - PITCH / 2.0  # gap below the top channel
+                pivot_bush_seed = await place_component(
+                    adapter, "pivot-bushing",
+                    [PIVOT[0], PIVOT[1], z_gap_top],
+                    [0.0, 0.0, 0.0], IDENTITY,
+                    label=f"pivot-bushing seed {j - 1:02d}/{j:02d}",
+                )
+                lever_bush_seed = await place_component(
+                    adapter, "lever-bushing",
+                    [FULCRUM[0], FULCRUM[1], z_gap_top],
+                    [0.0, 0.0, 0.0], IDENTITY,
+                    label=f"lever-bushing seed {j - 1:02d}/{j:02d}",
+                )
+
+    # Replicate the grounded seeds along the Z shaft axis (pivot_od selects the
+    # shaft's Z-parallel cylindrical face). Springs span all CHANNELS; the two
+    # bushing banks fill the CHANNELS-1 inter-channel gaps. Moving parts are
+    # deliberately NOT patterned (each must keep its own DOF).
+    if CHANNELS > 1:
+        for seed, n, lbl in (
+            (spring_seed, CHANNELS, "channel-spring"),
+            (pivot_bush_seed, CHANNELS - 1, "pivot-bushing"),
+            (lever_bush_seed, CHANNELS - 1, "lever-bushing"),
+        ):
+            check(
+                f"linear-pattern {lbl} x{n}",
+                await adapter.pattern_components_linear(
+                    ComponentLinearPatternParameters(
+                        components=[seed],
+                        count=n,
+                        spacing=PITCH,
+                        direction_point=pivot_od,
+                    )
+                ),
             )
+        # Positively confirm the copies landed on the channel/gap planes.
+        z_mid_planes = [z_station(k) + ARM_MID_DZ for k in range(CHANNELS)]
+        z_gap_planes = [
+            z_station(k) + ARM_MID_DZ + PITCH / 2.0 for k in range(CHANNELS - 1)
+        ]
+        _verify_pattern_z(adapter, "channel-spring-installed", z_mid_planes, "spring pattern")
+        _verify_pattern_z(adapter, "pivot-bushing", z_gap_planes, "pivot-bushing pattern")
+        _verify_pattern_z(adapter, "lever-bushing", z_gap_planes, "lever-bushing pattern")
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)
