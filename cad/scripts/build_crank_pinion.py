@@ -23,6 +23,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _config
 from _common import (
     IN,
     apply_material,
@@ -40,7 +41,7 @@ PART_NAME = "crank-pinion"
 MATERIAL = "Plain Carbon Steel"  # steel like its mate (p.19/20)
 
 TEETH = 16  # DIMENSIONS.md ch12 / Appendix C #9 estimate (low)
-DP = 16.0  # matches the crank-drive gear (low)
+DP = _config.machine("gear_train", "crank_drive_diametral_pitch")  # cad/config/machine.yaml (low)
 FACE_WIDTH = 12.0  # mm, slightly wider than the drive gear's 10 (low)
 BORE_DIAMETER = 0.375 * IN  # 9.525 -- crankshaft dia (med)
 

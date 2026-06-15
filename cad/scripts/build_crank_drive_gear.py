@@ -25,6 +25,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _config
 from _common import (
     IN,
     apply_material,
@@ -42,7 +43,7 @@ PART_NAME = "crank-drive-gear"
 MATERIAL = "Plain Carbon Steel"  # p.20: dark gear, distinct from the brass train
 
 TEETH = 64  # DIMENSIONS.md ch12 / Appendix C #9 estimate (low)
-DP = 16.0  # coarser than the DP 30 train; round-PD estimate (low)
+DP = _config.machine("gear_train", "crank_drive_diametral_pitch")  # cad/config/machine.yaml (low)
 FACE_WIDTH = 10.0  # mm, p.20 -- wider than the 7 mm cone faces (low)
 # M6.7: seated perpendicular on the cone shaft's 3/8" pivot journal
 # like the cone gears (true cone, p.20); the oblique crank-pinion mesh

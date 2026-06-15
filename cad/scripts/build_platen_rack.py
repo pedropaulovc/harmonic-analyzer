@@ -29,6 +29,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _config
 from _common import (
     IN,
     add_line_chain,
@@ -47,7 +48,7 @@ from _gear import volume_check
 PART_NAME = "platen-rack"
 MATERIAL = "Brass"  # ch. 22/23 photos: brass
 
-DP = 30.0  # 1/in, DIMENSIONS.md ch23 (med -- scale anchor of the chapter)
+DP = _config.machine("gear_train", "diametral_pitch")  # cad/config/machine.yaml (DIMENSIONS.md ch23)
 PA_DEG = 14.5  # period-typical, same as the gear train
 BAR_LENGTH = 300.0  # DIMENSIONS.md ch22: = platen width (low)
 BAR_HEIGHT = 30.0  # DIMENSIONS.md ch22: back-side brass strip (low)

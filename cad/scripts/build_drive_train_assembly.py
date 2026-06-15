@@ -157,7 +157,7 @@ PINION_FACE = 12.0
 # flank slivers at the five smallest stations, 0.35 still skinned the
 # last four.
 DRUM_TIP_X = X_DRUM + (122.0 / DP_TRAIN) * 25.4 / 2.0  # 4.147
-PEN_EDGE_SLACK = 0.55
+PEN_EDGE_SLACK = _config.fit("cone_drum_oblique_mesh", "edge_slack_mm")  # cad/config/tolerances.yaml
 PEN_MID = WORKING_DEPTH - PEN_EDGE_SLACK - (DRUM_FACE / 2.0) * TAN_I  # 0.565
 X_PITCH = DRUM_TIP_X + ADDENDUM * SEC_I - PEN_MID  # 4.490
 

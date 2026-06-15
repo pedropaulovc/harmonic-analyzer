@@ -16,6 +16,7 @@ gear_train:
   fundamental_cone_teeth: 120      # largest cone gear; per-channel = 120 - 6*index
   cylinder_teeth: 120              # equal-size cylinder gears
   crank_drive_ratio: [16, 64]      # 16T pinion on crankshaft : 64T on cone shaft
+  crank_drive_diametral_pitch: 16.0  # coarser than the DP-30 train; round-PD estimate (low)
   source: "DIMENSIONS.md ch12 (DP), ch29/ch8 (gear law)"
   confidence: high
   notes: >-

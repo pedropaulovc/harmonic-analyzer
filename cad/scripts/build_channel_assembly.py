@@ -73,6 +73,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _config
 from _common import (
     assert_components_fully_defined,
     bore_axis_ref,
@@ -98,8 +99,8 @@ ASM_NAME = "channel"
 import os  # noqa: E402
 
 CHANNELS = int(os.environ.get("CHANNEL_COUNT", "20"))  # test hook: build fewer
-Z0 = -67.1  # channel 0 gear plane
-PITCH = 7.0565
+Z0 = _config.machine("channels", "station_z0_mm")  # channel 0 gear plane (machine.yaml)
+PITCH = _config.machine("channels", "station_pitch_mm")
 ARM_MID_DZ = 0.8  # arm/bar/lever mid-planes at z_j + 0.8
 CAM_DZ = 3.3  # cam / rod-ring mid-plane at z_j + 3.3
 
@@ -139,7 +140,7 @@ BAR_TOP_PIN_DROP = 6.35
 # clears it with 20x margin; the lift cascades through the lever tilt into the
 # spring eye, and the plate-threading loop margin (~0.11 mm) bounds it -- 0.02
 # keeps that margin clear, 0.1 broke it.
-BAR_CONTACT_GAP = 0.02
+BAR_CONTACT_GAP = _config.fit("cam_follower_contact", "contact_gap_mm")  # cad/config/tolerances.yaml
 
 # --- lever bank -------------------------------------------------------------
 FULCRUM = (-199.9, 1065.9)  # lever fulcrum shaft axis (x, y)
