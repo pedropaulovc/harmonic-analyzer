@@ -49,6 +49,41 @@ REST = "Default"  # cone engaged -- the rest/render pose, drive-train @ Default
 CONE_DISENGAGED = "cone_disengaged"  # drive-train @ its own cone_disengaged
 CHILD_REST = "Default"  # the drive-train config referenced at rest
 
+# operating: the full device with the crank FREE to turn. The drive-train is
+# inserted rigid + FIXED, so its internal crank DOF cannot move at the top level
+# in Default. operating floats the drive-train and sets it FLEXIBLE (so its
+# internal mates solve with the parent) and references the sub's own ``operating``
+# child (crank park driver suppressed) -- the crank is then hand-draggable /
+# motor-drivable in the full model. The floated flexible sub does NOT drift: its
+# base (arbor, pedestals, posts) is grounded INSIDE drive-train.SLDASM, so those
+# internal fixes hold it at the insert pose -- no external grounding mates, so
+# Default is not polluted. Default keeps the sub fixed + rigid + @ Default child,
+# bit-exact. (reset_pose.py returns the full model here.)
+OPERATING = "operating"
+CHILD_OPERATING = "operating"  # the drive-train child config: crank driver freed
+_SOLVING_NAME = {0: "rigid", 1: "flexible"}
+
+
+def _solving(adapter: Any, comp_name: str) -> str:
+    """``"rigid"``/``"flexible"`` for ``comp_name`` (IComponent2::Solving)."""
+    from solidworks_mcp.adapters.solidworks.assembly import _get_component
+
+    comp = _get_component(adapter, comp_name)
+    if comp is None:
+        raise RuntimeError(f"{comp_name} not found in {ASM_NAME}")
+    code = int(adapter._attempt(lambda: comp.Solving, default=-1))
+    return _SOLVING_NAME.get(code, f"code{code}")
+
+
+def _is_fixed(adapter: Any, comp_name: str) -> bool:
+    """True when ``comp_name`` is fixed in the ACTIVE config (IComponent2::IsFixed)."""
+    from solidworks_mcp.adapters.solidworks.assembly import _get_component
+
+    comp = _get_component(adapter, comp_name)
+    if comp is None:
+        raise RuntimeError(f"{comp_name} not found in {ASM_NAME}")
+    return bool(adapter._attempt(lambda: comp.IsFixed(), default=False))
+
 
 def _referenced_config(adapter: Any, comp_name: str) -> str:
     """Child configuration ``comp_name`` references in the ACTIVE assembly config.
@@ -100,14 +135,56 @@ def _save_assembly_in_place(adapter: Any) -> None:
 
 
 async def _verify_rest(adapter: Any) -> None:
-    """rest is the bit-exact render pose: drive-train references its Default."""
+    """rest is the bit-exact render pose: drive-train @ Default, fixed + rigid.
+
+    The fixed + rigid + Default-child assertions are the leak gate: operating
+    floats/flexes/re-references the SAME component, and if any of those changes
+    bled into Default (fix/solve not config-scoped) the rest pose would silently
+    stop being the deterministic 0-DOF render pose. Catch it here, before save.
+    """
     check(f"activate {REST}", await adapter.set_active_configuration(REST))
     ref = _referenced_config(adapter, DRIVE_TRAIN_COMP)
     if ref != CHILD_REST:
         raise RuntimeError(
             f"{REST}: {DRIVE_TRAIN_COMP} references {ref!r}, expected "
             f"{CHILD_REST!r} -- rest pose is not bit-exact")
-    log(f"{REST}: {DRIVE_TRAIN_COMP} -> {ref} (cone engaged, bit-exact)")
+    solving = _solving(adapter, DRIVE_TRAIN_COMP)
+    if solving != "rigid":
+        raise RuntimeError(
+            f"{REST}: {DRIVE_TRAIN_COMP} is {solving}, expected rigid -- the "
+            f"operating flex leaked into Default (solve mode not config-scoped)")
+    if not _is_fixed(adapter, DRIVE_TRAIN_COMP):
+        raise RuntimeError(
+            f"{REST}: {DRIVE_TRAIN_COMP} is floated, expected fixed -- the "
+            f"operating float leaked into Default (fix state not config-scoped)")
+    log(f"{REST}: {DRIVE_TRAIN_COMP} -> {ref}, fixed + rigid (bit-exact)")
+
+
+async def _verify_operating(adapter: Any) -> None:
+    """operating: drive-train floated + flexible + referencing its operating child.
+
+    The crank is free here (the operating child suppressed its park driver, and
+    flexible lets that DOF solve at the top), so this is NOT a 0-DOF pose -- by
+    design. The gate is that the three enabling changes actually took.
+    """
+    check(f"activate {OPERATING}", await adapter.set_active_configuration(OPERATING))
+    ref = _referenced_config(adapter, DRIVE_TRAIN_COMP)
+    solving = _solving(adapter, DRIVE_TRAIN_COMP)
+    fixed = _is_fixed(adapter, DRIVE_TRAIN_COMP)
+    if ref != CHILD_OPERATING:
+        raise RuntimeError(
+            f"{OPERATING}: {DRIVE_TRAIN_COMP} references {ref!r}, expected "
+            f"{CHILD_OPERATING!r} -- the operating child reference did not take")
+    if solving != "flexible":
+        raise RuntimeError(
+            f"{OPERATING}: {DRIVE_TRAIN_COMP} is {solving}, expected flexible -- "
+            f"the sub's internal crank DOF cannot solve at the top while rigid")
+    if fixed:
+        raise RuntimeError(
+            f"{OPERATING}: {DRIVE_TRAIN_COMP} is still fixed -- a fixed sub "
+            f"silently refuses to go flexible; it must be floated first")
+    log(f"{OPERATING}: {DRIVE_TRAIN_COMP} -> {ref}, flexible + floated "
+        f"(crank free to turn in the full model)")
 
 
 async def _verify_cone_disengaged(adapter: Any) -> None:
@@ -120,6 +197,48 @@ async def _verify_cone_disengaged(adapter: Any) -> None:
             f"{CONE_DISENGAGED}: {DRIVE_TRAIN_COMP} references {ref!r}, expected "
             f"{CONE_DISENGAGED!r} -- the child config reference did not take")
     log(f"{CONE_DISENGAGED}: {DRIVE_TRAIN_COMP} -> {ref} (cone train decoupled)")
+
+
+async def _build_operating(adapter: Any, configs: list[str]) -> None:
+    """Add the operating config: float -> flex -> reference the operating child.
+
+    ORDER IS LOAD-BEARING. set_component_solving writes CompConfigProperties5 with
+    an EMPTY RefConfigName, which resets the child reference to Default -- so flex
+    MUST come before the reference, and set_component_configuration (which carries
+    the now-flexible solve mode through unchanged) writes the operating child last.
+    Float comes first because a fixed sub silently refuses to go flexible.
+    """
+    from solidworks_mcp.adapters.base import (
+        ComponentRefParameters,
+        CreateConfigurationParameters,
+        SetComponentConfigurationParameters,
+        SetComponentSolvingParameters,
+    )
+
+    if OPERATING in configs:
+        log(f"{OPERATING} already present ({configs}) -- re-verifying only")
+        await _verify_operating(adapter)
+        return
+
+    check(f"create {OPERATING}", await adapter.create_configuration(
+        CreateConfigurationParameters(
+            name=OPERATING, parent=REST,
+            comment="full device, crank FREE: drive-train floated + flexible, "
+            "references its operating child (crank park driver suppressed)",
+            description="Crank hand-draggable / motor-drivable in the full model; "
+            "the floated flexible sub is held by its own grounded base.")))
+    # create_configuration activates operating, so all three changes land here.
+    check(f"float {DRIVE_TRAIN_COMP}", await adapter.float_component(
+        ComponentRefParameters(name=DRIVE_TRAIN_COMP)))
+    check(f"flexible {DRIVE_TRAIN_COMP}", await adapter.set_component_solving(
+        SetComponentSolvingParameters(name=DRIVE_TRAIN_COMP, solving="flexible")))
+    res = check(
+        f"reference {DRIVE_TRAIN_COMP} -> {CHILD_OPERATING}",
+        await adapter.set_component_configuration(
+            SetComponentConfigurationParameters(
+                name=DRIVE_TRAIN_COMP, configuration=CHILD_OPERATING)))
+    log(f"  set_component_configuration -> {res}")
+    await _verify_operating(adapter)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -157,14 +276,20 @@ async def build(adapter: Any) -> dict[str, str]:
 
     await _verify_cone_disengaged(adapter)
 
-    # Back to rest: the reference must still be Default (the change was scoped
-    # to cone_disengaged only) so the rendered pose is untouched.
+    # operating: the full device with the crank free to turn (float + flex +
+    # reference the operating child). Re-list so an idempotent re-run sees it.
+    configs = check("list configurations", await adapter.list_configurations())
+    await _build_operating(adapter, configs)
+
+    # Back to rest: the reference must still be Default AND the drive-train fixed
+    # + rigid (the cone_disengaged + operating changes were scoped to their own
+    # configs only) so the rendered pose is untouched and bit-exact.
     await _verify_rest(adapter)
 
     assert_model_healthy(adapter, label=ASM_NAME, deep=True)
     _save_assembly_in_place(adapter)
     return {"assembly": str(OUT_SLDASM / f"{ASM_NAME}.SLDASM"),
-            "configs": f"{REST},{CONE_DISENGAGED}"}
+            "configs": f"{REST},{CONE_DISENGAGED},{OPERATING}"}
 
 
 if __name__ == "__main__":
