@@ -31,7 +31,7 @@ Confidence: **high** (annotated/stated, or legacy confirmed by book), **med**
 must be re-measured against photos during the M2 build of that part).
 
 Photo evidence: besides the book, 89 first-party photos of the machine exist in
-`photogrammetry/raw/` — indexed per component in `cad/PHOTOS.md`. Use them for
+`photogrammetry/raw/` — indexed per component in `photogrammetry/raw/README.md`. Use them for
 detail inspection (fasteners, cross-sections, routing) and secondary scaling
 (the 100 × 55 mm nameplate appears in-frame with the gear stack).
 
@@ -650,7 +650,7 @@ audit detail in the M1 extraction; key values referenced by the chapter tables:
 | rocker-arm-support ×3 | none | M6.3 refuted the legacy windowed square frame (184 wide); M6.9 PARTIALLY REINSTATES it — ch30 p008 (brightened) shows exactly that frame: north frustum + A-frame south upright + top/foot rails (ch. 14 layout table). The ×3 count stays refuted (ONE frame: two uprights; the legacy third instance at x ≈ 0 under the transgear is the pinion-bar/stud's job in this model); re-authored |
 | oscilating-arms | ch.14 re-read: the "12.5 mm width" was a misread (callout is 2.5 mm plate thickness) | SUPERSEDED — re-authored as rocker-arm with corrected dims (`build_rocker_arm.py`) |
 | corner-bracket | none — no source either; geometry interrogated live from the SLDPRT (face inventory): base 1.125" × 0.75", height 2.3", plate 0.3" thick, sides tangent-tapered to R0.5" crown (centre 1.8" up), Ø0.4" lug hole, #9 (Ø0.196") foot hole | RE-AUTHORED — `build_corner_bracket.py` reproduces it to 13,035 mm³ (exact volume match) |
-| tube-frame | ch.6: frame column height 107 cm — legacy file measured 1016 mm (40"), CONTRADICTS the book | RE-AUTHORED — `build_tube_frame.py` at 1070 mm (book wins), Ø1.375" × 0.12" wall from legacy. M4: fluted/reeded per PHOTOS.md `195108425`/`195123524` — 16 × Ø3 mm full-length grooves, 1.5 mm deep (count/size photo-estimated, low) |
+| tube-frame | ch.6: frame column height 107 cm — legacy file measured 1016 mm (40"), CONTRADICTS the book | RE-AUTHORED — `build_tube_frame.py` at 1070 mm (book wins), Ø1.375" × 0.12" wall from legacy. M4: fluted/reeded per the photo index `195108425`/`195123524` — 16 × Ø3 mm full-length grooves, 1.5 mm deep (count/size photo-estimated, low) |
 
 No legacy part contradicts a book annotation. Every part still gets re-authored
 as a reproduction script (project requirement); UNVERIFIED parts get their photo

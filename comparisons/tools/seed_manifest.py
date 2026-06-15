@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.11"
 # ///
-"""Seed comparisons/manifest.json from the curation catalog + cad/PHOTOS.md.
+"""Seed comparisons/manifest.json from the curation catalog + the photo index.
 
 Rules (all poses start status="rough"; the discrepancy loop refines them):
 - catalog keep=true entries:
@@ -9,7 +9,7 @@ Rules (all poses start status="rough"; the discrepancy loop refines them):
     book sources (isolated studio shots)          -> model = first component part
     video sources (in-context close-ups)          -> enclosing subsystem assembly
   camera az/el from the curation view_guess.
-- photogrammetry: the "Component -> best photos" table in cad/PHOTOS.md,
+- photogrammetry: the "Component -> best photos" table in photogrammetry/raw/README.md,
   first-claim-wins per photo; az/el from the full-index view phrases.
   Model = enclosing subsystem assembly (machine photographed assembled).
 - video references point at stills/full/v<N>_t<sssss>.png (run
@@ -30,7 +30,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 SCRIPTS = REPO / "cad" / "scripts"
 CATALOG = REPO / "references" / "curation" / "stills_catalog.json"
-PHOTOS_MD = REPO / "cad" / "PHOTOS.md"
+PHOTOS_MD = REPO / "photogrammetry" / "raw" / "README.md"
 MANIFEST = REPO / "comparisons" / "manifest.json"
 
 def part_stems() -> set[str]:
@@ -43,7 +43,7 @@ def part_stems() -> set[str]:
 
 # --- photogrammetry ----------------------------------------------------------
 
-# component label in PHOTOS.md -> focus part stems ("" label rows are skipped)
+# component label in the photo index -> focus part stems ("" label rows are skipped)
 PHOTO_FOCUS = {
     "crank": ["crank_arm", "crank_handle", "crankshaft"],
     "cone gear set": ["cone_gear"],
