@@ -15,7 +15,16 @@
 # amplitude_mm a_j coefficient = amplitude-bar station along the rocker
 #              (neutral demo default; override per preset in amplitudes.yaml)
 units: mm
-source: "cone_teeth = 120 - 6*index, derived from the [120-6k:120] mesh ratio (book ch12); high confidence"
+source: "DIMENSIONS.md ch8/ch12/ch29 gear law"
+confidence: high
+notes: >-
+  Every per-channel number is DERIVED from one rule, so provenance is file-level
+  not per-row: cone_teeth = 120 - 6·index (range 120..6), cylinder_teeth = 120,
+  harmonic_n = cone_teeth/6 = 20 - index, ratio = [cone_teeth, 120]. The
+  [120-6k : 120] mesh law is annotated in the book (ch.29 p.99) and stated ch.8 —
+  high confidence. phase_deg / amplitude_mm are the SETTABLE inputs (the cam
+  phase and amplitude-bar station per channel); the zeros here are the neutral
+  demo pose, overridden per preset (see truth_model.coefficients).
 channels:
   - index: 0
     cone_teeth: 120

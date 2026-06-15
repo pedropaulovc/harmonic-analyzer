@@ -62,6 +62,24 @@ def fit(group: str, *keys: str) -> Any:
     return node
 
 
+def provenance(doc: str, *keys: str) -> dict[str, Any]:
+    """The ``source``/``confidence``/``notes`` triple for a config node.
+
+    Provenance is preserved INLINE in the YAML (rather than regenerated into
+    DIMENSIONS.md, which stays the curated narrative). This reads it back so the
+    Part D custom-property writer can stamp ``Source``/``Confidence``/``Notes``
+    onto the parts. ``doc`` is the file stem; ``keys`` walk into it (empty = the
+    file's top-level provenance, as on channels.yaml).
+
+        provenance("machine", "cone_incline")   # -> {source, confidence, notes}
+        provenance("channels")                  # -> file-level triple
+    """
+    node: Any = _doc(doc)
+    for key in keys:
+        node = node[key]
+    return {k: node[k] for k in ("source", "confidence", "notes") if k in node}
+
+
 def materials() -> dict[str, Any]:
     return _doc("materials")
 

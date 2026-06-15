@@ -6,6 +6,15 @@ scripts in `cad/scripts/`. Built in Milestone 1 from the book
 each), cross-checked against the legacy `cad/Parts/*.cs` / `cad/kcl-archive/*.kcl`
 dimensions.
 
+> **This document is curated, not generated.** The build *inputs* (tooth counts,
+> pitches, fits, the cone incline) live in `cad/config/*.yaml`, which the scripts
+> read directly; each config node carries an inline `source`/`confidence`/`notes`
+> triple — the machine-readable digest of the provenance reasoned out below.
+> This file remains the human narrative (chapter-by-chapter measurement, photo
+> citations, cross-validation). The two are kept in sync by hand, deliberately:
+> nothing here is overwritten by a generator. Same confidence ladder applies to
+> both (annotated → stated → scaled → legacy → derived).
+
 ## Source hierarchy (authoritative → weakest)
 
 1. **annotated** — dimension callouts printed on the book's photos. AUTHORITATIVE.
