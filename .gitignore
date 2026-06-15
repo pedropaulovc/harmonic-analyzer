@@ -341,6 +341,9 @@ cad/out/png/
 cad/out/demo/
 cad/out/*.mp4
 
+# Generated verify.py reports (rebuild with `verify.py --suite config|all`)
+cad/out/reports/
+
 # Offline-render cache (regenerable: cad/scripts/export_models.py;
 # the assembly STL alone is >100 MB — over GitHub's file limit)
 cad/out/stl/

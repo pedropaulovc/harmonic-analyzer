@@ -15,7 +15,11 @@ Suites (``--suite``):
                       BOM/part-count envelope.
   truth               analytic self-check of ``truth_model`` (no SolidWorks):
                       the synthesis math is symmetric / band-limited / correct.
-  all                 static + truth.
+  config              no-SolidWorks cross-checks: build config (machine/channels)
+                      vs the cited DIMENSIONS rows, DIMENSIONS.md freshness, and
+                      the tolerance/metadata audit (parts.yaml <-> build scripts;
+                      emits cad/out/reports/tolerance_audit.csv).
+  all                 static + truth + config.
 
 Unlike the build gates (fail-fast), ``static`` runs every gate and reports the
 full set of failures at the end, so one run tells you everything that is wrong.
@@ -39,6 +43,7 @@ NOT YET WIRED (tracked, not silently skipped):
 from __future__ import annotations
 
 import argparse
+import csv
 import math
 import re
 import sys
@@ -82,6 +87,17 @@ _COMPONENT_BAND = {
     "drive-train": (55, 70),
     "harmonic-analyzer": (90, 130),
 }
+
+# Tolerance audit (Part D / handoff §14.2 Gate E): every built part must carry
+# these custom-property-bearing fields, and the named classes must resolve.
+SCRIPTS_DIR = Path(__file__).resolve().parent
+REPORTS_DIR = SCRIPTS_DIR.parent / "out" / "reports"
+_PART_NAME_RE = re.compile(r'^PART_NAME\s*=\s*["\']([a-z0-9-]+)["\']', re.MULTILINE)
+_REQUIRED_PART_FIELDS = ("material", "tolerance_class", "process")
+_AUDIT_COLUMNS = (
+    "part", "number", "material", "tolerance_class", "fit_class",
+    "process", "confidence", "status", "issues",
+)
 
 
 @dataclass
@@ -371,6 +387,126 @@ def verify_dimensions_fresh(report: Report) -> None:
     report.gate("dims:not-stale", run)
 
 
+def _declared_part_names() -> set[str]:
+    """Every ``PART_NAME = "..."`` declared by a ``build_*.py`` script.
+
+    This is the set of parts the build actually saves -- the ground truth the
+    registry is audited against. Scanning the source (not ``cad/out``) keeps the
+    audit runnable with no SolidWorks and no prior build.
+    """
+    names: set[str] = set()
+    for script in SCRIPTS_DIR.glob("build_*.py"):
+        names.update(_PART_NAME_RE.findall(script.read_text(encoding="utf-8")))
+    return names
+
+
+def _audit_rows() -> tuple[list[dict[str, str]], dict[str, list[str]]]:
+    """Build the per-part audit rows plus the cross-cut problem buckets.
+
+    A row is emitted for the union of declared build parts and registry parts,
+    so drift in either direction is visible in the CSV. ``problems`` collects the
+    hard-fail sets the gates assert on (missing required field, unregistered
+    build, orphan registry entry, dangling class reference).
+    """
+    declared = _declared_part_names()
+    registry = _config.parts()
+    tol = _config._doc("tolerances")
+    tol_classes = set(tol.get("general", {}))
+    fit_classes = set(tol.get("fits", {}))
+
+    problems: dict[str, list[str]] = {
+        "missing_field": [], "unregistered_build": [], "orphan_registry": [],
+        "bad_tolerance_class": [], "bad_fit_class": [],
+    }
+    rows: list[dict[str, str]] = []
+    for part in sorted(declared | set(registry)):
+        issues: list[str] = []
+        rec = registry.get(part)
+        if rec is None:
+            issues.append("not in parts.yaml registry")
+            problems["unregistered_build"].append(part)
+            rows.append({"part": part, "status": "FAIL", "issues": "; ".join(issues),
+                         **{c: "" for c in _AUDIT_COLUMNS if c not in ("part", "status", "issues")}})
+            continue
+        if part not in declared:
+            issues.append("registry entry has no build_*.py PART_NAME")
+            problems["orphan_registry"].append(part)
+        merged = {**_config.parts().get(part, {}), **{k: rec[k] for k in rec}}
+        confidence = merged.get("confidence", _config._doc("parts").get("defaults", {}).get("confidence", ""))
+        for fieldname in _REQUIRED_PART_FIELDS:
+            value = merged.get(fieldname)
+            if value in (None, "", "None"):
+                issues.append(f"missing {fieldname}")
+                problems["missing_field"].append(f"{part}.{fieldname}")
+        tclass = merged.get("tolerance_class")
+        if tclass and tclass not in tol_classes:
+            issues.append(f"unknown tolerance_class {tclass!r}")
+            problems["bad_tolerance_class"].append(f"{part}:{tclass}")
+        fclass = merged.get("fit_class")
+        if fclass and fclass not in fit_classes:
+            issues.append(f"unknown fit_class {fclass!r}")
+            problems["bad_fit_class"].append(f"{part}:{fclass}")
+        rows.append({
+            "part": part,
+            "number": str(merged.get("number", "")),
+            "material": str(merged.get("material", "")),
+            "tolerance_class": str(tclass or ""),
+            "fit_class": str(fclass or ""),
+            "process": str(merged.get("process", "")),
+            "confidence": str(confidence or ""),
+            "status": "FAIL" if issues else "OK",
+            "issues": "; ".join(issues),
+        })
+    return rows, problems
+
+
+def verify_tolerance_audit(report: Report) -> None:
+    """Tolerance / metadata audit (handoff §14.2 Gate E), emits a CSV report.
+
+    Reconciles the parts.yaml registry against the parts the build scripts
+    actually save, and asserts every part carries the custom-property fields
+    (material / tolerance class / process) with class names that resolve in
+    tolerances.yaml. Writes ``cad/out/reports/tolerance_audit.csv`` whether or
+    not the gates pass, so the artifact always reflects the current state.
+    """
+    rows, problems = _audit_rows()
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    csv_path = REPORTS_DIR / "tolerance_audit.csv"
+    with csv_path.open("w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=_AUDIT_COLUMNS)
+        writer.writeheader()
+        writer.writerows(rows)
+    n_fit = sum(1 for r in rows if r.get("fit_class"))
+    print(f"  ..  tolerance audit -> {csv_path} ({len(rows)} parts, "
+          f"{n_fit} with a fit class)", flush=True)
+
+    report.gate(
+        "audit:registry-matches-builds",
+        lambda: _expect(
+            not problems["unregistered_build"] and not problems["orphan_registry"],
+            "registry/build drift -- "
+            f"built but unregistered: {problems['unregistered_build'] or 'none'}; "
+            f"registered but never built: {problems['orphan_registry'] or 'none'}",
+        ),
+    )
+    report.gate(
+        "audit:required-fields",
+        lambda: _expect(
+            not problems["missing_field"],
+            f"parts missing required metadata: {problems['missing_field']}",
+        ),
+    )
+    report.gate(
+        "audit:class-refs-resolve",
+        lambda: _expect(
+            not problems["bad_tolerance_class"] and not problems["bad_fit_class"],
+            "dangling class refs -- "
+            f"tolerance_class: {problems['bad_tolerance_class'] or 'none'}; "
+            f"fit_class: {problems['bad_fit_class'] or 'none'}",
+        ),
+    )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     """Entry for ``run_build``: dispatch to the requested suite(s)."""
     suite, names = _ARGS.suite, _ARGS.names
@@ -384,6 +520,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if suite in ("config", "all"):
         verify_config_vs_dimensions(report)
         verify_dimensions_fresh(report)
+        verify_tolerance_audit(report)
 
     _print_summary(report)
     if report.failed:
@@ -424,6 +561,7 @@ if __name__ == "__main__":
         else:
             verify_config_vs_dimensions(_report)
             verify_dimensions_fresh(_report)
+            verify_tolerance_audit(_report)
         _print_summary(_report)
         sys.exit(1 if _report.failed else 0)
     sys.exit(run_build(build))
