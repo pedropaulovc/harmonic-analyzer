@@ -46,6 +46,7 @@ driving dims, SolidworksMCP-python PRs #55/#56):
 from __future__ import annotations
 
 import asyncio
+import functools
 import math
 import os
 import struct
@@ -862,6 +863,9 @@ async def save_part_and_images(
 
     png_dir = OUT_PNG / part_name
     png_dir.mkdir(parents=True, exist_ok=True)
+    apply_custom_properties(adapter, part_properties(part_name))
+    check(f"re-save with properties -> {part_path}", await adapter.save_file(str(part_path)))
+
     artefacts = {"part": str(part_path)}
     for view in views:
         img_path = (png_dir / f"{part_name}_{view}.png").resolve()
@@ -879,6 +883,90 @@ async def save_part_and_images(
         )
         artefacts[view] = str(img_path)
     return artefacts
+
+
+_SW_CUSTOM_TEXT = 30  # swCustomInfoType_e.swCustomInfoText
+_SW_PROP_REPLACE = 2  # swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
+
+
+@functools.lru_cache(maxsize=1)
+def _git_sha() -> str:
+    """Short HEAD sha (+ '-dirty'), for a reproducible Generator stamp.
+
+    Deterministic per source state — no wall-clock — so a rebuild from the same
+    commit writes the same property (see Part D determinism decision).
+    """
+    import subprocess
+
+    try:
+        sha = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=str(CAD_ROOT), capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        dirty = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(CAD_ROOT), capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        return f"{sha}{'-dirty' if dirty else ''}"
+    except Exception:  # noqa: BLE001 -- not in a git checkout / no git
+        return "unknown"
+
+
+def part_properties(part_name: str) -> dict[str, str]:
+    """SolidWorks custom properties for ``part_name`` from the parts.yaml registry.
+
+    Pulls Number/Revision/Material/Tolerance Class/Fit Class/Process/Confidence
+    from ``cad/config/parts.yaml`` (merged over its defaults) and stamps a
+    reproducible Generator (git sha). Title is the part name. Parts absent from
+    the registry get the minimal set (Title + Generator) and are flagged by the
+    verify.py tolerance audit.
+    """
+    import _config
+
+    props: dict[str, str] = {"Title": part_name, "Generator": f"harmonic-analyzer @ {_git_sha()}"}
+    try:
+        reg = _config.parts(part_name)
+    except KeyError:
+        return props
+    field_map = {
+        "Number": "number", "Revision": "revision", "Material": "material",
+        "Tolerance Class": "tolerance_class", "Fit Class": "fit_class",
+        "Process": "process", "Confidence": "confidence",
+    }
+    for prop, key in field_map.items():
+        if key in reg and reg[key] is not None:
+            props[prop] = str(reg[key])
+    return props
+
+
+def apply_custom_properties(adapter: Any, props: dict[str, str]) -> None:
+    """Write file-level custom properties via the CustomPropertyManager, verified.
+
+    The PyWin32 adapter exposes no property writer, so this drives raw COM
+    (``IModelDocExtension.CustomPropertyManager("").Add3`` with replace), then
+    reads each value back through ``GetCustomInfoValue`` and raises on mismatch
+    — same fail-fast posture as the build's other gates. Empty values are skipped.
+    """
+    model = adapter.currentModel
+    ext = _read_member(model, "Extension")
+    mgr = adapter._attempt(lambda: ext.CustomPropertyManager(""), default=None)
+    if mgr is None:
+        raise RuntimeError("CustomPropertyManager unavailable")
+    _flag(mgr, "ICustomPropertyManager")
+    written = []
+    for name, value in props.items():
+        if value in (None, ""):
+            continue
+        text = str(value)
+        adapter._attempt(
+            lambda n=name, v=text: mgr.Add3(n, _SW_CUSTOM_TEXT, v, _SW_PROP_REPLACE),
+            default=None,
+        )
+        back = str(adapter._attempt(lambda n=name: model.GetCustomInfoValue("", n), default=""))
+        if back != text:
+            raise RuntimeError(f"custom property {name!r} readback {back!r} != {text!r}")
+        written.append(name)
+    log(f"custom properties [{len(written)}]: {', '.join(written)}")
 
 
 async def apply_material(adapter: Any, material: str) -> None:
