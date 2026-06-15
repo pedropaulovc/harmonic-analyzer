@@ -1,0 +1,38 @@
+# Materials & display palette.
+#
+# `material` = the SolidWorks material applied (mass properties + default
+# appearance). `palette` = photo-sampled display-colour overrides applied at
+# body scope AFTER the material (SolidWorks quantises to 8 bit/channel; compare
+# readback with 1/255 tolerance). RGB are 0..1 linear, sampled from the ch30
+# studio plates. See _common.apply_material / apply_color.
+units: mm
+
+palette:                              # name: [r, g, b]
+  casting_green:  [0.13, 0.45, 0.42]  # cast-iron frame parts (studio green)
+  polished_steel: [0.65, 0.64, 0.63]  # frame columns
+  panel_black:    [0.08, 0.08, 0.09]  # platen board / clips / knife hardware
+  spring_black:   [0.12, 0.12, 0.13]  # blued spring wire
+  stained_oak:    [0.16, 0.10, 0.07]  # crank handle (dark-stained wood)
+  paper_white:    [0.92, 0.92, 0.88]  # platen paper sheet
+  bar_steel:      [0.42, 0.41, 0.39]  # amplitude-bar curtain
+
+# Parts that take the cast-iron green frame appearance (memory: M6.x green castings).
+casting_green_parts:
+  - a-frame
+  - arbor-pedestal
+  - column-clamp
+  - cone-knob-post
+  - corner-bracket
+  - crank-pedestal
+  - gooseneck-clamp
+  - harmonic-base
+  - rocker-arm-support
+  - top-crossbar
+  - top-frame
+
+# Default SolidWorks materials by part class (per-part override lives in parts.yaml).
+materials:
+  brass:  { sw_name: "Brass",  applies_to: "gears, pinion drum, knobs, fine fittings" }
+  steel:  { sw_name: "Plain Carbon Steel", applies_to: "shafts, bars, levers, rods, springs" }
+  cast_iron: { sw_name: "Cast Iron", applies_to: "frame castings (casting_green_parts)" }
+  wood:   { sw_name: "Oak", applies_to: "crank handle" }
