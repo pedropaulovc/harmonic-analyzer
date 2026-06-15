@@ -81,8 +81,8 @@ async def _reset_one(adapter: Any, name: str, do_save: bool) -> str:
         return f"{name}: skipped (missing)"
 
     check(f"open {name}", await adapter.open_model(str(sldasm)))
-    active_before = check("list configurations", await adapter.list_configurations())
-    log(f"{name}: activating {REST} (was the {sldasm.name} active config)")
+    log(f"{name}: configs = {check('list configurations', await adapter.list_configurations())}")
+    log(f"{name}: activating {REST}")
     check(f"activate {REST}", await adapter.set_active_configuration(REST))
 
     log(f"--- {name}: verifying deterministic pose ({REST}, strict 0 DOF) ---")
