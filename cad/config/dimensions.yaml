@@ -34,7 +34,7 @@ sections:
       must be re-measured against photos during the M2 build of that part).
 
       Photo evidence: besides the book, 89 first-party photos of the machine exist in
-      `photogrammetry/raw/` — indexed per component in `cad/PHOTOS.md`. Use them for
+      `photogrammetry/raw/` — indexed per component in `photogrammetry/raw/README.md`. Use them for
       detail inspection (fasteners, cross-sections, routing) and secondary scaling
       (the 100 × 55 mm nameplate appears in-frame with the gear stack).
 
@@ -1740,7 +1740,7 @@ sections:
         - RE-AUTHORED — `build_corner_bracket.py` reproduces it to 13,035 mm³ (exact volume match)
       - - tube-frame
         - 'ch.6: frame column height 107 cm — legacy file measured 1016 mm (40"), CONTRADICTS the book'
-        - 'RE-AUTHORED — `build_tube_frame.py` at 1070 mm (book wins), Ø1.375" × 0.12" wall from legacy. M4: fluted/reeded per PHOTOS.md `195108425`/`195123524` — 16 × Ø3 mm full-length grooves, 1.5 mm deep (count/size photo-estimated, low)'
+        - 'RE-AUTHORED — `build_tube_frame.py` at 1070 mm (book wins), Ø1.375" × 0.12" wall from legacy. M4: fluted/reeded per the photo index `195108425`/`195123524` — 16 × Ø3 mm full-length grooves, 1.5 mm deep (count/size photo-estimated, low)'
   - prose: |2
 
       No legacy part contradicts a book annotation. Every part still gets re-authored
