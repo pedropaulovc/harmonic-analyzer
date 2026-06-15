@@ -40,12 +40,14 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
 import _config
+import gen_dimensions
 import truth_model
 from _common import (
     OUT_SLDASM,
@@ -299,6 +301,76 @@ def _expect(condition: bool, message: str) -> None:
         raise RuntimeError(message)
 
 
+def _num(pattern: str, text: str) -> float:
+    """First regex group in ``text`` as a float (raises if the cell changed shape)."""
+    m = re.search(pattern, text)
+    if not m:
+        raise RuntimeError(f"no {pattern!r} in dimension cell {text!r}")
+    return float(m.group(1))
+
+
+def verify_config_vs_dimensions(report: Report) -> None:
+    """Cross-check the build config against the cited DIMENSIONS rows (no SolidWorks).
+
+    This is the drift gate that a prose-only DIMENSIONS.md cannot give: the
+    numbers the scripts actually build with (machine.yaml / channels.yaml) must
+    equal the numbers the research record cites. Each check locates the row by
+    chapter + dimension name and parses its value cell, so an edit to either side
+    that breaks the agreement fails here.
+    """
+    doc = gen_dimensions.load_doc()
+
+    def _check(label: str, heading: str, dim: str, fn: Callable[[list[str]], None]) -> None:
+        def run() -> None:
+            row = gen_dimensions.find_row(doc, heading, dim)
+            if row is None:
+                raise RuntimeError(f"dimension row not found: {heading} / {dim}")
+            fn(row)
+        report.gate(label, run)
+
+    _check("dims:cone-DP", "Chapter 12", "Diametral pitch",
+           lambda r: _expect(_num(r"DP\s*(\d+)", r[1]) == _config.machine("gear_train", "diametral_pitch"),
+                             f"cone DP: dims {r[1]!r} != machine.yaml {_config.machine('gear_train','diametral_pitch')}"))
+    _check("dims:cylinder-teeth", "Chapter 13", "Tooth count",
+           lambda r: _expect(_num(r"(\d+)", r[1]) == _config.machine("gear_train", "cylinder_teeth"),
+                             f"cylinder teeth: dims {r[1]!r} != machine.yaml"))
+    _check("dims:pinion-teeth", "Chapter 25", "Tooth count",
+           lambda r: _expect(_num(r"(\d+)", r[1]) == _config.machine("alignment_pinion", "teeth"),
+                             f"alignment-pinion teeth: dims {r[1]!r} != machine.yaml"))
+    _check("dims:crank-reduction", "Chapter 12", "Crank→cone reduction",
+           lambda r: _expect(_num(r"(\d+):1", r[1]) == _crank_reduction(),
+                             f"crank reduction: dims {r[1]!r} != crank_drive_ratio {_config.machine('gear_train','crank_drive_ratio')}"))
+    _check("dims:cone-teeth-series", "Chapter 12", "Tooth counts",
+           lambda r: _expect("120" in r[1] and "step 6" in r[1] and _cone_series_ok(),
+                             f"cone tooth series: dims {r[1]!r} != channels.yaml 120-6*index"))
+    _check("dims:cone-incline", "Chapter 13", "Cone plan incline",
+           lambda r: _expect(abs(_num(r"(\d+\.\d+)", r[1]) - _config.machine("cone_incline", "derived_incline_deg")) < 1e-3,
+                             f"cone incline: dims {r[1]!r} != machine.yaml {_config.machine('cone_incline','derived_incline_deg')}"))
+    _check("dims:magnify", "Chapter 20", "Magnification",
+           lambda r: _expect(_num(r"(\d+)×", r[1]) == _config.machine("output", "magnify_factor"),
+                             f"magnify: dims {r[1]!r} != output.magnify_factor"))
+
+
+def _crank_reduction() -> float:
+    num, den = _config.machine("gear_train", "crank_drive_ratio")
+    return max(num, den) / min(num, den)
+
+
+def _cone_series_ok() -> bool:
+    fund = int(_config.machine("gear_train", "fundamental_cone_teeth"))
+    return all(ch["cone_teeth"] == fund - 6 * ch["index"] for ch in _config.channels())
+
+
+def verify_dimensions_fresh(report: Report) -> None:
+    """Gate that DIMENSIONS.md is not stale relative to dimensions.yaml."""
+    def run() -> None:
+        doc = gen_dimensions.load_doc()
+        rendered = gen_dimensions.render_markdown(doc)
+        current = gen_dimensions.DIMENSIONS_MD.read_text(encoding="utf-8")
+        _expect(rendered == current, "DIMENSIONS.md is stale -- run gen_dimensions.py")
+    report.gate("dims:not-stale", run)
+
+
 async def build(adapter: Any) -> dict[str, str]:
     """Entry for ``run_build``: dispatch to the requested suite(s)."""
     suite, names = _ARGS.suite, _ARGS.names
@@ -309,6 +381,9 @@ async def build(adapter: Any) -> dict[str, str]:
             await _verify_static_one(adapter, name, report)
     if suite in ("truth", "all"):
         verify_truth(report)
+    if suite in ("config", "all"):
+        verify_config_vs_dimensions(report)
+        verify_dimensions_fresh(report)
 
     _print_summary(report)
     if report.failed:
@@ -331,20 +406,24 @@ def _built_assemblies() -> list[str]:
 def _parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("names", nargs="*", help="assembly stem(s); default = all built")
-    ap.add_argument("--suite", default="static", choices=["static", "truth", "all"])
+    ap.add_argument("--suite", default="static", choices=["static", "truth", "config", "all"])
     args = ap.parse_args()
     if not args.names:
-        # truth needs no model; static/all default to whatever has been built.
-        args.names = [] if args.suite == "truth" else _built_assemblies()
+        # truth/config need no model; static/all default to whatever has been built.
+        args.names = [] if args.suite in ("truth", "config") else _built_assemblies()
     return args
 
 
 if __name__ == "__main__":
     _ARGS = _parse_args()
-    if _ARGS.suite == "truth":
+    if _ARGS.suite in ("truth", "config"):
         # No SolidWorks needed -- run directly without connecting.
         _report = Report()
-        verify_truth(_report)
+        if _ARGS.suite == "truth":
+            verify_truth(_report)
+        else:
+            verify_config_vs_dimensions(_report)
+            verify_dimensions_fresh(_report)
         _print_summary(_report)
         sys.exit(1 if _report.failed else 0)
     sys.exit(run_build(build))
