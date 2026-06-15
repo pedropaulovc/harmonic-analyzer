@@ -102,6 +102,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _config
 from _chain import (
     CENTRELINE_LEN,
     CRANK_CENTRE as CHAIN_CRANK_CENTRE,
@@ -203,7 +204,7 @@ PLATE_Y0 = 305.0
 PLATE_FRONT_Z = BAR_FRONT_Z - PLATE_THICKNESS  # -142.9
 PINION_AXIS = (0.0, 253.5)  # transgear stud on the pinion bar
 PINION_PD_R = RACK_PINION_TEETH / 30.0 * IN / 2.0  # 40.64 (DP 30)
-RACK_BACKLASH = 0.3
+RACK_BACKLASH = _config.fit("gear_mesh", "rack_backlash_mm")  # cad/config/tolerances.yaml
 # Rz(180) placement: machine x = RACK_X0 - x_local, y = RACK_Y0 - y_local.
 # Tooth centres sit at x_local = k * PITCH. The gear's seed gap is centred
 # at +gamma/2 (the _gear.py flanks cross the pitch circle at +pi/(2N) and
