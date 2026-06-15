@@ -222,6 +222,34 @@ current `assert_components_fully_defined` + interference gates and a render diff
 Each step commits independently; `rest` must pass the existing gates after every
 step so the static deliverable never regresses.
 
+## Refined joint topology (from code reading — for execution)
+
+* **p0 amplitude (`build_rocker_arm.py` + `build_channel_assembly.py`):** the rocker
+  top edge is the R800 concave arc, centre local `(0, 816)`; the book ties the
+  radius to the bar length *"minimizing nonlinearity as the bar slides"* — the
+  foot sliding ±88 mm along this arc IS the amplitude. Joint: bar foot-notch roof
+  tangent/coincident to the rocker top-edge R800 face (leave slide free) + top-pin
+  revolute to the lever (exists). Park: **distance driver** = foot station along
+  the arc (default = today's solved contact). Bar `foot axis` = `Axis2@amplitude-bar`
+  (local y=0); rocker pivot bore = `Axis1@rocker-arm` (local (0,8)).
+* **p1 cone disengage (`build_cone_pivot_post.py` + `build_drive_train_assembly.py`):**
+  the cone swings **horizontally (about a vertical/Y axis) through the big-end
+  journal** in the pivot-post — explicitly *"not modeled"* today (post is a fixed
+  Z-bore block, journal axis = `Axis1@cone-pivot-post` at Top+76). The current
+  cone↔post **coincident** mate makes them coaxial (spin journal) and *blocks the
+  swing* — so the swing must be a config-conditional joint: `rest` keeps the
+  coaxial journal + 20 gear mates; `cone_disengaged` swaps to a Y-axis revolute
+  at the journal point (angle driver to the clear pose) and `suppress_mate`s the
+  coaxial journal mate + 20 `cone Tk:cyl120` + `16T:64T`. (Hardest of the three —
+  needs live probing.)
+* **p2 pinion engage (`build_pinion_pivot_shaft.py` + `build_drive_train_assembly.py`):**
+  cleanest — the swinging group (`alignment-pinion` + both `pinion-bracket`s +
+  `pinion-handle`) revolutes about the `pinion-pivot-shaft` **Z-axis** at
+  `(PIVOT_X 27.85, PIVOT_Y 62.8)`. `float_component` that group; concentric the
+  brackets' pivot bore to the shaft; **angle park driver** at the rest lean
+  (`STRAP_LEAN_DEG 75.62`). `pinion_engaged` config: angle to mesh (`ENGAGED_C2C
+  68.58`) + unsuppress a `pinion:cyl` gear mate (created suppressed).
+
 ## Risk register
 
 * **Under-defining without a park driver → non-deterministic pose → broken
