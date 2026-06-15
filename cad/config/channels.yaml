@@ -1,0 +1,159 @@
+# Per-channel harmonic parametrics — SINGLE SOURCE OF TRUTH for the 20 channels.
+#
+# The build loop (build_channel_assembly.py / build_drive_train_assembly.py)
+# reads this file; change a number here and `build_all.py --rebuild channel`
+# (or drive_train) regenerates a valid machine. Derived geometry (centre
+# distances, cam grids, z-stations) is COMPUTED in code from machine.yaml +
+# these tooth counts — it is not duplicated here.
+#
+# index        0-based channel, matches the z-station build order (j)
+# cone_teeth   cone gear k tooth count = 120 - 6*index  (range 120..6)
+# cylinder_teeth   always 120 (equal-size cylinder gears)
+# harmonic_n   synthesised harmonic = cone_teeth/6 = 20 - index
+# ratio        gear-mate ratio [cone_teeth, 120]  (cylinder ang.vel / cone)
+# phase_deg    eccentric/cam phase offset for this channel
+# amplitude_mm a_j coefficient = amplitude-bar station along the rocker
+#              (neutral demo default; override per preset in amplitudes.yaml)
+units: mm
+source: "cone_teeth = 120 - 6*index, derived from the [120-6k:120] mesh ratio (book ch12); high confidence"
+channels:
+  - index: 0
+    cone_teeth: 120
+    cylinder_teeth: 120
+    harmonic_n: 20
+    ratio: [120, 120]
+    phase_deg: 0.0
+    amplitude_mm: 0.0
+  - index: 1
+    cone_teeth: 114
+    cylinder_teeth: 120
+    harmonic_n: 19
+    ratio: [114, 120]
+    phase_deg: 0.0
+    amplitude_mm: 0.0
+  - index: 2
+    cone_teeth: 108
+    cylinder_teeth: 120
+    harmonic_n: 18
+    ratio: [108, 120]
+    phase_deg: 0.0
+    amplitude_mm: 0.0
+  - index: 3
+    cone_teeth: 102
+    cylinder_teeth: 120
+    harmonic_n: 17
+    ratio: [102, 120]
+    phase_deg: 0.0
+    amplitude_mm: 0.0
+  - index: 4
+    cone_teeth: 96
+    cylinder_teeth: 120
+    harmonic_n: 16
+    ratio: [96, 120]
+    phase_deg: 0.0
+    amplitude_mm: 0.0
+  - index: 5
+    cone_teeth: 90
+    cylinder_teeth: 120
+    harmonic_n: 15
+    ratio: [90, 120]
+    phase_deg: 0.0
+    amplitude_mm: 0.0
+  - index: 6
+    cone_teeth: 84
+    cylinder_teeth: 120
+    harmonic_n: 14
+    ratio: [84, 120]
+    phase_deg: 0.0
+    amplitude_mm: 0.0
+  - index: 7
+    cone_teeth: 78
+    cylinder_teeth: 120
+    harmonic_n: 13
+    ratio: [78, 120]
+    phase_deg: 0.0
+    amplitude_mm: 0.0
+  - index: 8
+    cone_teeth: 72
+    cylinder_teeth: 120
+    harmonic_n: 12
+    ratio: [72, 120]
+    phase_deg: 0.0
+    amplitude_mm: 0.0
+  - index: 9
+    cone_teeth: 66
+    cylinder_teeth: 120
+    harmonic_n: 11
+    ratio: [66, 120]
+    phase_deg: 0.0
+    amplitude_mm: 0.0
+  - index: 10
+    cone_teeth: 60
+    cylinder_teeth: 120
+    harmonic_n: 10
+    ratio: [60, 120]
+    phase_deg: 0.0
+    amplitude_mm: 0.0
+  - index: 11
+    cone_teeth: 54
+    cylinder_teeth: 120
+    harmonic_n: 9
+    ratio: [54, 120]
+    phase_deg: 0.0
+    amplitude_mm: 0.0
+  - index: 12
+    cone_teeth: 48
+    cylinder_teeth: 120
+    harmonic_n: 8
+    ratio: [48, 120]
+    phase_deg: 0.0
+    amplitude_mm: 0.0
+  - index: 13
+    cone_teeth: 42
+    cylinder_teeth: 120
+    harmonic_n: 7
+    ratio: [42, 120]
+    phase_deg: 0.0
+    amplitude_mm: 0.0
+  - index: 14
+    cone_teeth: 36
+    cylinder_teeth: 120
+    harmonic_n: 6
+    ratio: [36, 120]
+    phase_deg: 0.0
+    amplitude_mm: 0.0
+  - index: 15
+    cone_teeth: 30
+    cylinder_teeth: 120
+    harmonic_n: 5
+    ratio: [30, 120]
+    phase_deg: 0.0
+    amplitude_mm: 0.0
+  - index: 16
+    cone_teeth: 24
+    cylinder_teeth: 120
+    harmonic_n: 4
+    ratio: [24, 120]
+    phase_deg: 0.0
+    amplitude_mm: 0.0
+  - index: 17
+    cone_teeth: 18
+    cylinder_teeth: 120
+    harmonic_n: 3
+    ratio: [18, 120]
+    phase_deg: 0.0
+    amplitude_mm: 0.0
+  - index: 18
+    cone_teeth: 12
+    cylinder_teeth: 120
+    harmonic_n: 2
+    ratio: [12, 120]
+    phase_deg: 0.0
+    amplitude_mm: 0.0
+  - index: 19
+    cone_teeth: 6
+    cylinder_teeth: 120
+    harmonic_n: 1
+    ratio: [6, 120]
+    phase_deg: 0.0
+    amplitude_mm: 0.0
