@@ -1,1 +1,0 @@
-{"camera": {"mode": "euler", "roll_deg": 0.0, "zoom": 1.0, "target_mm": null, "perspective": null, "az_deg": -90, "el_deg": 5, "frame_components": ["cone_gear", "cylinder_gear", "drive_train"]}, "reference": {"path": "references/albert-michelsons-harmonic-analyzer/ch08_images/page001_img17.jpeg", "source": "book ch08"}, "size": [1600, 1049], "model_mtime": 1781202733.717478}

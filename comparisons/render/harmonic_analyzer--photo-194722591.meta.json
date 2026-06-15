@@ -1,1 +1,0 @@
-{"camera": {"mode": "euler", "roll_deg": 0.0, "zoom": 1.0, "target_mm": null, "perspective": null, "az_deg": 0, "el_deg": -5, "frame_components": ["transgear_pinion", "chain_sprocket"]}, "reference": {"path": "photogrammetry/raw/20250828_194722591_iOS.jpg", "source": "photogrammetry 194722591 (front 3/4 lower)"}, "size": [1600, 1200], "model_mtime": 1781202733.717478}

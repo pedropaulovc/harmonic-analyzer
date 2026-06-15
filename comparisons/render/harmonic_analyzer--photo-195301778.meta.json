@@ -1,1 +1,0 @@
-{"camera": {"mode": "euler", "roll_deg": 0.0, "zoom": 1.0, "target_mm": null, "perspective": null, "az_deg": 0, "el_deg": 8, "frame_components": ["magnifying_lever"]}, "reference": {"path": "photogrammetry/raw/20250828_195301778_iOS.jpg", "source": "photogrammetry 195301778 (front close-up)"}, "size": [1600, 1200], "model_mtime": 1781202733.717478}

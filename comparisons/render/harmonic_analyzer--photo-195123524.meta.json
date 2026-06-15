@@ -1,1 +1,0 @@
-{"camera": {"mode": "euler", "roll_deg": 0.0, "zoom": 1.0, "target_mm": null, "perspective": null, "az_deg": 0, "el_deg": 8, "frame_components": ["tube_frame"]}, "reference": {"path": "photogrammetry/raw/20250828_195123524_iOS.jpg", "source": "photogrammetry 195123524 (close mid-height)"}, "size": [1600, 1200], "model_mtime": 1781202733.717478}

@@ -1,1 +1,0 @@
-{"camera": {"mode": "euler", "roll_deg": 0.0, "zoom": 1.0, "target_mm": null, "perspective": null, "az_deg": 0, "el_deg": -5, "frame_components": ["connecting_rod"]}, "reference": {"path": "photogrammetry/raw/20250828_194204617_iOS.jpg", "source": "photogrammetry 194204617 (front close-up low)"}, "size": [1600, 1200], "model_mtime": 1781202733.717478}

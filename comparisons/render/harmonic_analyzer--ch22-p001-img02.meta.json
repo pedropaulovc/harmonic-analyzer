@@ -1,1 +1,0 @@
-{"camera": {"mode": "euler", "roll_deg": 0.0, "zoom": 1.0, "target_mm": null, "perspective": null, "az_deg": 15, "el_deg": 8, "frame_components": ["platen", "platen_clip", "platen_rack"]}, "reference": {"path": "references/albert-michelsons-harmonic-analyzer/ch22_images/page001_img02.jpeg", "source": "book ch22"}, "size": [1600, 699], "model_mtime": 1781202733.717478}

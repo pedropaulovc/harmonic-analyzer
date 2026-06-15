@@ -1,1 +1,0 @@
-{"camera": {"mode": "euler", "roll_deg": 0.0, "zoom": 1.0, "target_mm": null, "perspective": null, "az_deg": -35, "el_deg": 8, "frame_components": ["a_frame", "rocker_arm_support"]}, "reference": {"path": "photogrammetry/raw/20250828_195146795_iOS.jpg", "source": "photogrammetry 195146795 (oblique left)"}, "size": [1600, 1200], "model_mtime": 1781202733.717478}

@@ -1,1 +1,0 @@
-{"camera": {"mode": "euler", "roll_deg": 0.0, "zoom": 1.0, "target_mm": null, "perspective": null, "az_deg": 0, "el_deg": 8, "frame_components": ["crank_arm", "crank_handle", "crankshaft"]}, "reference": {"path": "photogrammetry/raw/20250828_194730962_iOS.jpg", "source": "photogrammetry 194730962 (front wide)"}, "size": [1600, 1200], "model_mtime": 1781202733.717478}

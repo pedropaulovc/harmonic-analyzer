@@ -1,1 +1,0 @@
-{"camera": {"mode": "euler", "roll_deg": 0.0, "zoom": 1.0, "target_mm": null, "perspective": null, "az_deg": 0, "el_deg": 30, "frame_components": ["pen_frame", "pen_marker"]}, "reference": {"path": "photogrammetry/raw/20250828_195442919_iOS.jpg", "source": "photogrammetry 195442919 (elevated close-up)"}, "size": [1600, 1200], "model_mtime": 1781202733.717478}
