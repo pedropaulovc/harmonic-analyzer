@@ -26,6 +26,7 @@ from _common import (
     check,
     define_circle,
     ensure_fully_defined,
+    name_bore_axis,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -58,6 +59,10 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=SHAFT_LEN)),
     )
     await volume_check(adapter, "shaft", V_SHAFT, 0.005 * V_SHAFT)
+
+    # Named central axis (Axis1) for the assembly swing revolute: the pinion
+    # swing group pivots on this shaft (p2 engage DOF, build_drive_train).
+    await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "shaft axis")
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
