@@ -6,14 +6,14 @@ scripts in `cad/scripts/`. Built in Milestone 1 from the book
 each), cross-checked against the legacy `cad/Parts/*.cs` / `cad/kcl-archive/*.kcl`
 dimensions.
 
-> **This document is curated, not generated.** The build *inputs* (tooth counts,
-> pitches, fits, the cone incline) live in `cad/config/*.yaml`, which the scripts
-> read directly; each config node carries an inline `source`/`confidence`/`notes`
-> triple — the machine-readable digest of the provenance reasoned out below.
-> This file remains the human narrative (chapter-by-chapter measurement, photo
-> citations, cross-validation). The two are kept in sync by hand, deliberately:
-> nothing here is overwritten by a generator. Same confidence ladder applies to
-> both (annotated → stated → scaled → legacy → derived).
+> **This file is GENERATED from `cad/config/dimensions.yaml` — do not edit it
+> directly.** The dimension tables live there as structured rows and the
+> narrative as `prose` properties; `cad/scripts/gen_dimensions.py` renders this
+> view (`--check` gates that the two never drift). The build *inputs* the scripts
+> actually read (tooth counts, pitches, fits, the cone incline) live in the
+> sibling `machine.yaml` / `channels.yaml` / `tolerances.yaml`; `verify.py`
+> cross-checks those against the dimension rows here. Confidence ladder:
+> annotated → stated → scaled → legacy → derived.
 
 ## Source hierarchy (authoritative → weakest)
 
