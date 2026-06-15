@@ -1,0 +1,472 @@
+# Part registry — drives custom properties (Part D) + BOM identity.
+#
+# Each part the build scripts save gets these stamped into its SolidWorks custom
+# properties (see _common.apply_custom_properties). Part numbers are arbitrary
+# stable identifiers (MHA-###, assigned in sorted order). tolerance_class names a
+# cad/config/tolerances.yaml `general:` class; fit_class (when present) names a
+# `fits:` group for the part's moving interface. revision/process/confidence are
+# first-pass defaults — refine per part as needed.
+defaults:
+  revision: A
+  confidence: med
+parts:
+  a-frame:
+    number: MHA-001
+    material: Gray Cast Iron
+    tolerance_class: machined_block
+    process: "cast + machined"
+  alignment-pinion:
+    number: MHA-002
+    material: Brass
+    tolerance_class: machined_block
+    fit_class: gear_mesh
+    process: "gear cutting (hob/shaper)"
+  amplitude-bar:
+    number: MHA-003
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    fit_class: sliding_amplitude_bar_on_rocker
+    process: "machined (steel)"
+  arbor-pedestal:
+    number: MHA-004
+    material: Gray Cast Iron
+    tolerance_class: machined_block
+    fit_class: shaft_in_bushing
+    process: "cast + machined"
+  boss-hook:
+    number: MHA-005
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    process: "machined (steel)"
+  chain-inner-link:
+    number: MHA-006
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    process: "machined (steel)"
+  chain-outer-link:
+    number: MHA-007
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    process: "machined (steel)"
+  chain-sprocket:
+    number: MHA-008
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    process: "machined (steel)"
+  channel-lever:
+    number: MHA-009
+    material: Gray Cast Iron
+    tolerance_class: machined_block
+    process: "cast + machined"
+  channel-spring:
+    number: MHA-010
+    material: Alloy Steel
+    tolerance_class: machined_block
+    fit_class: spring_eye_threading
+    process: "coiled wire"
+  channel-spring-installed:
+    number: MHA-011
+    material: Alloy Steel
+    tolerance_class: machined_block
+    fit_class: spring_eye_threading
+    process: "coiled wire"
+  column-clamp:
+    number: MHA-012
+    material: Gray Cast Iron
+    tolerance_class: machined_block
+    process: "cast + machined"
+  cone-gear:
+    number: MHA-013
+    material: Brass
+    tolerance_class: machined_block
+    fit_class: gear_mesh
+    process: "gear cutting (hob/shaper)"
+  cone-gear-shaft:
+    number: MHA-014
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    fit_class: shaft_in_bushing
+    process: "machined (steel)"
+  cone-knob-post:
+    number: MHA-015
+    material: Gray Cast Iron
+    tolerance_class: machined_block
+    process: "cast + machined"
+  cone-pivot-post:
+    number: MHA-016
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    process: "machined (steel)"
+  connecting-rod:
+    number: MHA-017
+    material: Gray Cast Iron
+    tolerance_class: machined_block
+    fit_class: cam_follower_contact
+    process: "cast + machined"
+  corner-bracket:
+    number: MHA-018
+    material: Gray Cast Iron
+    tolerance_class: machined_block
+    process: "cast + machined"
+  counter-spring:
+    number: MHA-019
+    material: Alloy Steel
+    tolerance_class: machined_block
+    fit_class: spring_eye_threading
+    process: "coiled wire"
+  crank-arm:
+    number: MHA-020
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    process: "machined (steel)"
+  crank-drive-gear:
+    number: MHA-021
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    fit_class: gear_mesh
+    process: "gear cutting (hob/shaper)"
+  crank-handle:
+    number: MHA-022
+    material: Oak
+    tolerance_class: visual_noncritical
+    process: "turned (wood)"
+  crank-pedestal:
+    number: MHA-023
+    material: Gray Cast Iron
+    tolerance_class: machined_block
+    process: "cast + machined"
+  crank-pin:
+    number: MHA-024
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    fit_class: fastener_clearance
+    process: "machined (steel)"
+  crank-pinion:
+    number: MHA-025
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    fit_class: gear_mesh
+    process: "gear cutting (hob/shaper)"
+  crankshaft:
+    number: MHA-026
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    fit_class: shaft_in_bushing
+    process: "machined (steel)"
+  cylinder-gear:
+    number: MHA-027
+    material: Brass
+    tolerance_class: machined_block
+    fit_class: gear_mesh
+    process: "gear cutting (hob/shaper)"
+  cylinder-gear-shaft:
+    number: MHA-028
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    fit_class: shaft_in_bushing
+    process: "machined (steel)"
+  eccentric-cam:
+    number: MHA-029
+    material: Brass
+    tolerance_class: machined_block
+    fit_class: cam_follower_contact
+    process: "machined (brass)"
+  fillister-screw:
+    number: MHA-030
+    material: Brass
+    tolerance_class: machined_block
+    fit_class: fastener_clearance
+    process: "machined (brass)"
+  fulcrum-shaft:
+    number: MHA-031
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    fit_class: shaft_in_bushing
+    process: "machined (steel)"
+  gooseneck:
+    number: MHA-032
+    material: Chrome Stainless Steel
+    tolerance_class: machined_block
+    process: "machined (steel)"
+  gooseneck-clamp:
+    number: MHA-033
+    material: Gray Cast Iron
+    tolerance_class: machined_block
+    process: "cast + machined"
+  hanger-screw:
+    number: MHA-034
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    fit_class: fastener_clearance
+    process: "machined (steel)"
+  harmonic-base:
+    number: MHA-035
+    material: Gray Cast Iron
+    tolerance_class: machined_block
+    process: "cast + machined"
+  hex-bolt:
+    number: MHA-036
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    fit_class: fastener_clearance
+    process: "machined (steel)"
+  knife-mount:
+    number: MHA-037
+    material: Brass
+    tolerance_class: machined_block
+    process: "machined (brass)"
+  knife-stay:
+    number: MHA-038
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    process: "machined (steel)"
+  lag-screw:
+    number: MHA-039
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    fit_class: fastener_clearance
+    process: "machined (steel)"
+  lever-bushing:
+    number: MHA-040
+    material: Brass
+    tolerance_class: machined_block
+    fit_class: shaft_in_bushing
+    process: "machined (brass)"
+  magnifying-bracket:
+    number: MHA-041
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    process: "machined (steel)"
+  magnifying-clamp:
+    number: MHA-042
+    material: Brass
+    tolerance_class: machined_block
+    process: "machined (brass)"
+  magnifying-lever:
+    number: MHA-043
+    material: Brass
+    tolerance_class: machined_block
+    process: "machined (brass)"
+  magnifying-vertical-rod:
+    number: MHA-044
+    material: Brass
+    tolerance_class: machined_block
+    process: "machined (brass)"
+  magnifying-wheel:
+    number: MHA-045
+    material: Gray Cast Iron
+    tolerance_class: machined_block
+    process: "cast + machined"
+  measuring-stick:
+    number: MHA-046
+    material: Brass
+    tolerance_class: plate_profile
+    process: "machined (brass)"
+  output-fixture:
+    number: MHA-047
+    material: Brass
+    tolerance_class: machined_block
+    process: "machined (brass)"
+  pen-frame:
+    number: MHA-048
+    material: Brass
+    tolerance_class: machined_block
+    process: "machined (brass)"
+  pen-hanger:
+    number: MHA-049
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    fit_class: fastener_clearance
+    process: "machined (steel)"
+  pen-marker:
+    number: MHA-050
+    material: Brass
+    tolerance_class: machined_block
+    process: "machined (brass)"
+  pen-rod:
+    number: MHA-051
+    material: Brass
+    tolerance_class: machined_block
+    process: "machined (brass)"
+  pen-set-screw:
+    number: MHA-052
+    material: Brass
+    tolerance_class: machined_block
+    fit_class: fastener_clearance
+    process: "machined (brass)"
+  pen-v-block:
+    number: MHA-053
+    material: Brass
+    tolerance_class: machined_block
+    process: "machined (brass)"
+  pinch-screw:
+    number: MHA-054
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    fit_class: fastener_clearance
+    process: "machined (steel)"
+  pinion-bar:
+    number: MHA-055
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    process: "machined (steel)"
+  pinion-bracket:
+    number: MHA-056
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    process: "machined (steel)"
+  pinion-drum:
+    number: MHA-057
+    material: Brass
+    tolerance_class: machined_block
+    fit_class: gear_mesh
+    process: "gear cutting (hob/shaper)"
+  pinion-handle:
+    number: MHA-058
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    process: "machined (steel)"
+  pinion-lever:
+    number: MHA-059
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    process: "machined (steel)"
+  pinion-lift-rod:
+    number: MHA-060
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    process: "machined (steel)"
+  pinion-pivot-block:
+    number: MHA-061
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    process: "machined (steel)"
+  pinion-pivot-shaft:
+    number: MHA-062
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    fit_class: shaft_in_bushing
+    process: "machined (steel)"
+  pivot-ball-mount:
+    number: MHA-063
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    process: "machined (steel)"
+  pivot-bushing:
+    number: MHA-064
+    material: Brass
+    tolerance_class: machined_block
+    fit_class: shaft_in_bushing
+    process: "machined (brass)"
+  pivot-shaft:
+    number: MHA-065
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    fit_class: shaft_in_bushing
+    process: "machined (steel)"
+  platen:
+    number: MHA-066
+    material: Brass
+    tolerance_class: plate_profile
+    process: "machined (brass)"
+  platen-clip:
+    number: MHA-067
+    material: Brass
+    tolerance_class: machined_block
+    process: "machined (brass)"
+  platen-paper:
+    number: MHA-068
+    material: Oak
+    tolerance_class: plate_profile
+    process: "turned (wood)"
+  platen-rack:
+    number: MHA-069
+    material: Brass
+    tolerance_class: machined_block
+    fit_class: gear_mesh
+    process: "gear cutting (hob/shaper)"
+  rack-pinion:
+    number: MHA-070
+    material: Brass
+    tolerance_class: machined_block
+    fit_class: gear_mesh
+    process: "gear cutting (hob/shaper)"
+  rocker-arm:
+    number: MHA-071
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    process: "machined (steel)"
+  rocker-arm-support:
+    number: MHA-072
+    material: Gray Cast Iron
+    tolerance_class: machined_block
+    process: "cast + machined"
+  summing-lever:
+    number: MHA-073
+    material: Gray Cast Iron
+    tolerance_class: machined_block
+    process: "cast + machined"
+  support-bar:
+    number: MHA-074
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    process: "machined (steel)"
+  thumb-screw:
+    number: MHA-075
+    material: Brass
+    tolerance_class: machined_block
+    fit_class: fastener_clearance
+    process: "machined (brass)"
+  top-crossbar:
+    number: MHA-076
+    material: Gray Cast Iron
+    tolerance_class: machined_block
+    process: "cast + machined"
+  top-frame:
+    number: MHA-077
+    material: Gray Cast Iron
+    tolerance_class: machined_block
+    process: "cast + machined"
+  transgear-knob-shaft:
+    number: MHA-078
+    material: Brass
+    tolerance_class: machined_block
+    fit_class: shaft_in_bushing
+    process: "machined (brass)"
+  transgear-latch:
+    number: MHA-079
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    process: "machined (steel)"
+  transgear-pinion:
+    number: MHA-080
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    fit_class: gear_mesh
+    process: "gear cutting (hob/shaper)"
+  transgear-removable:
+    number: MHA-081
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    fit_class: gear_mesh
+    process: "gear cutting (hob/shaper)"
+  transgear-stub:
+    number: MHA-082
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    process: "machined (steel)"
+  tube-frame:
+    number: MHA-083
+    material: Plain Carbon Steel
+    tolerance_class: plate_profile
+    process: "machined (steel)"
+  wheel-axle:
+    number: MHA-084
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    process: "machined (steel)"
+  wheel-bar:
+    number: MHA-085
+    material: Plain Carbon Steel
+    tolerance_class: machined_block
+    process: "machined (steel)"

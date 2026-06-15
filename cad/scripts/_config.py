@@ -80,6 +80,17 @@ def provenance(doc: str, *keys: str) -> dict[str, Any]:
     return {k: node[k] for k in ("source", "confidence", "notes") if k in node}
 
 
+def parts(stem: str | None = None) -> dict[str, Any]:
+    """The part registry (parts.yaml). With ``stem``, one part's record merged
+    over the file ``defaults:`` (so revision/confidence fall through)."""
+    doc = _doc("parts")
+    if stem is None:
+        return doc["parts"]
+    if stem not in doc["parts"]:
+        raise KeyError(f"part not in registry: {stem}")
+    return {**doc.get("defaults", {}), **doc["parts"][stem]}
+
+
 def materials() -> dict[str, Any]:
     return _doc("materials")
 
