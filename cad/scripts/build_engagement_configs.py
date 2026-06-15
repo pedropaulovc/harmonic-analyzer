@@ -39,7 +39,6 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 from typing import Any
 
 from _common import (
@@ -76,64 +75,52 @@ def _gear_mate_names(mates: list[dict[str, Any]]) -> list[str]:
 
 
 def _save_assembly_in_place(adapter: Any) -> None:
-    """Save drive-train.SLDASM in place via the blocking ModelDoc2.Save(), with a
-    watchdog that auto-clicks the "Component documents must be saved -> Save All"
-    dialog.
+    """Save drive-train.SLDASM in place with a silent ``ModelDoc2.Save3``.
 
-    Why this and not the obvious silent calls (all PROVEN to fail on this
-    3DEXPERIENCE Makers seat):
-      * ``adapter.save_file(PATH)`` -> SaveAs branch CloseDoc(PATH)+os.remove(PATH)
-        before SaveAs3; the active doc IS that path, so CloseDoc disconnects the
-        doc and SaveAs3 crashes ("disconnected from its clients") AFTER the file
-        is deleted -- it destroyed drive-train.SLDASM twice.
-      * ``ModelDoc2.Save3(Silent[, ...])`` silently writes NOTHING for a dirty
-        assembly (mtime unchanged, no dialog), with or without SaveReferenced.
-      * ``ModelDocExtension.SaveAs(..., Silent, ...)`` raises a COM error.
+    The doc was OPENED from this path, so the active doc IS the file. The correct
+    save is therefore an in-place ``Save3(swSaveAsOptions_Silent | SaveReferenced,
+    &err, &warn)`` -- NOT the adapter's ``save_file``, both of whose branches are
+    wrong for an opened-in-place doc:
 
-    The ONLY save that persists the modified component references is the
-    interactive one: ``Save()`` raises the "Save All" dialog and BLOCKS until it
-    is answered. So launch ``_click_save_all.ps1`` (a UIAutomation watchdog) first
-    -- it polls for the "Save All" button and physically clicks it -- then call
-    ``Save()``; the watchdog answers the modal and the save completes headlessly.
-    The on-disk mtime advancing confirms the write. A clean idempotent re-run is
-    skipped up front (Save() would not prompt and there is nothing to write).
+      * ``save_file(PATH)`` -> SaveAs branch does ``CloseDoc(PATH)`` +
+        ``os.remove(PATH)`` before ``SaveAs3``; when the active doc IS that path
+        this disconnects the doc and deletes the file -- it destroyed
+        drive-train.SLDASM twice.
+      * ``save_file()`` (no path) -> ``Save3(1, None, None)``; ``None`` for the two
+        [out] byref params fails the COM call, so it falls through to the blocking
+        parameterless ``Save()`` that raises the "Component documents must be
+        saved" modal -- which is what spawned the (now-deleted) UIAutomation
+        Save-All watchdog.
+
+    Passing the two [out] params as real pywin32 BYREF VARIANTs makes ``Save3``
+    write silently and return the error/warning codes. The referenced part docs
+    are untouched here (only assembly-level config + mate-suppression changes), so
+    there is nothing to prompt about; ``SaveReferenced`` is included so any dirty
+    reference would still be written without a dialog. Proven end-to-end by
+    ``repro_inplace_save.py`` (ret=True, err=0, warn=0, config persists on reopen).
     """
-    import subprocess
-    import time
+    import pythoncom
+    from win32com.client import VARIANT
 
     asm = adapter.currentModel
     sldasm = OUT_SLDASM / f"{ASM_NAME}.SLDASM"
-    asm_dirty = bool(adapter._attempt(lambda: asm.GetSaveFlag(), default=True))
-    if not asm_dirty:
+    if not bool(adapter._attempt(lambda: asm.GetSaveFlag(), default=True)):
         log(f"{sldasm.name} already clean -- nothing to save")
         return
 
     before = sldasm.stat().st_mtime
-    ps_script = Path(__file__).resolve().parent / "_click_save_all.ps1"
-    watchdog = subprocess.Popen(
-        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
-         "-File", str(ps_script), "-ButtonName", "Save All",
-         "-TimeoutSeconds", "180"],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    time.sleep(1.0)  # let the watchdog start polling before Save() blocks
-
-    # Save() (parameterless) is the one call that drives the full save-all and
-    # raises the modal; it blocks until the watchdog clicks Save All.
-    adapter._attempt(lambda: asm.Save())
-
-    try:
-        out, _ = watchdog.communicate(timeout=15)
-        log(f"save-all watchdog: {out.strip()}")
-    except subprocess.TimeoutExpired:
-        watchdog.kill()
-        log("save-all watchdog did not exit -- killed")
+    err = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
+    warn = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
+    options = 1 | 8  # swSaveAsOptions_Silent | swSaveAsOptions_SaveReferenced
+    ret = adapter._attempt(lambda: asm.Save3(options, err, warn), default=False)
 
     after = sldasm.stat().st_mtime
     if after <= before:
         raise RuntimeError(
-            f"{sldasm.name} mtime unchanged after Save() (asm_dirty=True) -- the "
-            "Save All dialog was not answered / save did not write")
-    log(f"saved {sldasm.name} (Save() + Save-All watchdog)")
+            f"{sldasm.name} mtime unchanged after Save3(Silent) "
+            f"(ret={ret}, err={err.value}, warn={warn.value})")
+    log(f"saved {sldasm.name} via Save3(Silent) (ret={ret}, err={err.value}, "
+        f"warn={warn.value})")
 
 
 async def _verify_rest(adapter: Any) -> None:
