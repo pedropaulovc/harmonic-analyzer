@@ -64,18 +64,23 @@ CHILD_REST = "Default"  # the drive-train config referenced at rest
 #
 #   Default / cone_disengaged  drive-train RIGID, grounding mates ACTIVE -> the
 #                              mates fully define it at identity (bit-exact pose).
-#   operating                  drive-train FLEXIBLE + grounding mates SUPPRESSED
-#                              (config-scoped): the flexible sub self-grounds via
-#                              its own internal fixed base (arbor/pedestals/posts),
-#                              and the suppressed crank driver in the operating
-#                              child frees the crank -> hand-drag / motor-drive.
+#   operating                  drive-train FLEXIBLE, grounding mates STILL ACTIVE
+#                              (they anchor the sub frame; a flexible sub does NOT
+#                              self-ground via internal fixes), and the suppressed
+#                              crank driver in the operating child frees the crank
+#                              -> hand-drag / motor-drive turns the gears in place
+#                              while the frame stays put.
 #
 # reset_pose.py returns the full model to Default (rigid, grounding mates live).
 OPERATING = "operating"
 CHILD_OPERATING = "operating"  # the drive-train child config: crank driver freed
 # The drive-train's principal planes -> the assembly's, a non-drifting full
 # grounding at identity (SW reports principal-plane-to-principal-plane as fully
-# defined, not over-defined). Suppressed in operating, where the sub is flexible.
+# defined, not over-defined). ACTIVE in EVERY config -- a flexible subassembly is
+# NOT grounded at the top by its own internal fixes (proven: with these suppressed
+# in operating, hand-dragging the crank dragged the whole sub as a rigid body). The
+# mates ground only the sub FRAME (its planes), not the internal crank DOF, so the
+# crank stays free to turn while the frame is anchored.
 GROUNDING_PLANES = ("Front Plane", "Top Plane", "Right Plane")
 _SOLVING_NAME = {0: "rigid", 1: "flexible"}
 
@@ -200,8 +205,19 @@ async def _verify_operating(adapter: Any) -> None:
         raise RuntimeError(
             f"{OPERATING}: {DRIVE_TRAIN_COMP} is still fixed -- a fixed sub "
             f"silently refuses to go flexible; it must be floated first")
-    log(f"{OPERATING}: {DRIVE_TRAIN_COMP} -> {ref}, flexible + floated "
-        f"(crank free to turn in the full model)")
+    # Anti-drift gate: the grounding mates must stay ACTIVE here, or the flexible
+    # sub drifts as a rigid body when the crank is hand-dragged (proven live). The
+    # only top-level mates are the 3 drive-train grounding coincidents.
+    mates = check("list mates", await adapter.list_mates())
+    suppressed = [m["name"] for m in mates if m.get("suppressed")]
+    if suppressed:
+        raise RuntimeError(
+            f"{OPERATING}: grounding mates suppressed {suppressed} -- the flexible "
+            f"sub would drift as a rigid body when dragged; they must stay active "
+            f"to anchor the frame (the crank is freed by the operating child's "
+            f"suppressed crank driver, not by un-grounding the frame)")
+    log(f"{OPERATING}: {DRIVE_TRAIN_COMP} -> {ref}, flexible + floated, frame "
+        f"grounded ({len(mates)} mates active) -- crank free, gears turn in place")
 
 
 async def _verify_cone_disengaged(adapter: Any) -> None:
@@ -268,16 +284,17 @@ async def _build_cone_disengaged(adapter: Any, configs: list[str]) -> None:
 
 
 async def _build_operating(adapter: Any, configs: list[str]) -> None:
-    """Add the operating config: re-ground, then flex + reference + suppress mates.
+    """Add the operating config: re-ground, then flex + reference operating child.
 
     Float/fix is GLOBAL, so the durable path re-grounds the drive-train with plane
-    mates (live in Default/cone_disengaged), then in operating: flex the sub,
-    reference its operating child, and config-scope-suppress the grounding mates
-    (the flexible sub self-grounds via its internal fixed base). ORDER IS
-    LOAD-BEARING: set_component_solving writes an EMPTY RefConfigName (resetting the
-    child to Default), so flex MUST precede the reference; set_component_configuration
-    carries the now-flexible solve mode through unchanged and writes the operating
-    child last.
+    mates (live in EVERY config -- they anchor the sub frame and a flexible sub does
+    NOT self-ground via its internal fixes), then in operating: flex the sub and
+    reference its operating child (crank driver freed). The grounding mates touch
+    only the sub frame, not the internal crank DOF, so the crank still turns. ORDER
+    IS LOAD-BEARING: set_component_solving writes an EMPTY RefConfigName (resetting
+    the child to Default), so flex MUST precede the reference; set_component_
+    configuration carries the now-flexible solve mode through and writes the
+    operating child last.
     """
     from solidworks_mcp.adapters.base import (
         CreateConfigurationParameters,
@@ -287,7 +304,17 @@ async def _build_operating(adapter: Any, configs: list[str]) -> None:
     )
 
     if OPERATING in configs:
-        log(f"{OPERATING} already present ({configs}) -- skipping build")
+        # Repair path: an earlier build wrongly suppressed the grounding mates in
+        # operating (the flexible sub then drifted on drag). Re-activate operating
+        # and un-suppress every top-level mate (all are grounding coincidents), so
+        # a re-run heals the saved config; the final verify + save persist it.
+        log(f"{OPERATING} already present -- ensuring grounding mates active")
+        check(f"activate {OPERATING}", await adapter.set_active_configuration(OPERATING))
+        for mate in check("list mates", await adapter.list_mates()):
+            if mate.get("suppressed"):
+                check(f"unsuppress {mate['name']}@{OPERATING}",
+                      await adapter.suppress_mate(SuppressMateParameters(
+                          name=mate["name"], suppress=False, configuration=OPERATING)))
         return
 
     if not _is_fixed(adapter, DRIVE_TRAIN_COMP):
@@ -296,17 +323,17 @@ async def _build_operating(adapter: Any, configs: list[str]) -> None:
             f"inconsistent grounding state; rebuild the assembly from scratch")
     # Re-ground in Default (active here) so Default + cone_disengaged inherit the
     # float + the plane mates; Default must stay 0 DOF afterwards.
-    ground_mates = await _ground_drive_train(adapter)
+    await _ground_drive_train(adapter)
     await _verify_rest(adapter)
 
     check(f"create {OPERATING}", await adapter.create_configuration(
         CreateConfigurationParameters(
             name=OPERATING, parent=REST,
-            comment="full device, crank FREE: drive-train flexible + grounding "
-            "mates suppressed, references its operating child (crank driver freed)",
+            comment="full device, crank FREE: drive-train flexible, grounding "
+            "mates still anchor the frame, references its operating child",
             description="Crank hand-draggable / motor-drivable in the full model; "
-            "the flexible sub self-grounds via its internal fixed base.")))
-    # create_configuration activates operating, so all changes land here.
+            "the gears turn in place while the grounded frame stays put.")))
+    # create_configuration activates operating, so both changes land here.
     check(f"flexible {DRIVE_TRAIN_COMP}", await adapter.set_component_solving(
         SetComponentSolvingParameters(name=DRIVE_TRAIN_COMP, solving="flexible")))
     res = check(
@@ -315,10 +342,6 @@ async def _build_operating(adapter: Any, configs: list[str]) -> None:
             SetComponentConfigurationParameters(
                 name=DRIVE_TRAIN_COMP, configuration=CHILD_OPERATING)))
     log(f"  set_component_configuration -> {res}")
-    for mate in ground_mates:
-        check(f"suppress {mate}@{OPERATING}", await adapter.suppress_mate(
-            SuppressMateParameters(
-                name=mate, suppress=True, configuration=OPERATING)))
 
 
 async def build(adapter: Any) -> dict[str, str]:
