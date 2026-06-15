@@ -98,6 +98,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _config
 from _common import (
     angle_driver,
     assert_components_fully_defined,
@@ -120,16 +121,17 @@ ASM_NAME = "drive-train"
 Y_BASE_TOP = 50.8  # harmonic-base top face
 Y_DRIVE = Y_BASE_TOP + 76.0  # 126.8: crank, cone big end and arbor axes
 
-DP_TRAIN = 30.0  # cone/cylinder train diametral pitch (DIMENSIONS.md ch12)
+DP_TRAIN = _config.machine("gear_train", "diametral_pitch")  # cad/config/machine.yaml (DIMENSIONS.md ch12)
 ADDENDUM = 25.4 / DP_TRAIN  # 0.847
 WORKING_DEPTH = 2.0 * ADDENDUM  # 1.693: full tooth interleave depth
 RADIUS_STEP = 3.0 * 25.4 / DP_TRAIN  # 2.54: pitch-radius step per 6 teeth
 
 # Frame-locked machine grid (M6.3 lineage -- the drum planes anchor the
 # gates, cams, rockers and bars; nothing here may move them).
-Z_PITCH = 7.5 * math.cos(math.asin(2.54 / 7.5))  # 7.0568: drum z-pitch
+_DRUM_SEAT_NOMINAL = _config.machine("cone_incline", "drum_seat_nominal_mm")  # 7.5
+Z_PITCH = _DRUM_SEAT_NOMINAL * math.cos(math.asin(RADIUS_STEP / _DRUM_SEAT_NOMINAL))  # 7.0568: drum z-pitch
 X_DRUM = -47.5  # rocker-support boss bore + arbor pedestal
-Z_DRUM0 = -67.1  # drum gear 0 plane: stack centred between the gates
+Z_DRUM0 = _config.machine("channels", "station_z0_mm")  # -67.1 drum gear 0 plane (shared station anchor)
 
 # True-cone incline (M6.7, exact tracking -- see module docstring).
 SIN_I = RADIUS_STEP / Z_PITCH  # 0.35993
@@ -522,7 +524,7 @@ async def build(adapter) -> dict[str, str]:
     )
     cone_gears: list[tuple[int, str]] = []
     for j in range(20):
-        teeth = 120 - 6 * j
+        teeth = _config.cone_teeth(j)
         cfg = f"T{teeth:03d}"
         cg = await _place_on_shaft(
             adapter, "cone-gear", SHAFT_T120_STATION + j * SEAT_PITCH, CONE_FACE,
@@ -680,7 +682,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         named_ref(f"Axis2@{pinion}", "AXIS"),
         named_ref(f"Axis2@{gear64}", "AXIS"),
-        [16, 64], label="16T:64T crank drive",
+        _config.machine("gear_train", "crank_drive_ratio"), label="16T:64T crank drive",
     )
 
     # Each cylinder gear runs free on the stationary arbor (coincident + axial,
