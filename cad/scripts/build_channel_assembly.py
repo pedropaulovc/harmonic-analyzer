@@ -598,15 +598,41 @@ async def build(adapter) -> dict[str, str]:
             off_axis_local=LEVER_BAR_PIN_BORE_LOCAL, pivot_xy=fulc_w,
             label=f"J4 lever ch{j:02d}",
         )
-        # J3 bar revolute (bar top pin ↔ lever bar pin; swing via the foot
-        # axis, an ~806 mm arm = the amplitude-coefficient driver).
-        bar_pin = world_point(adapter, bar, BAR_TOP_PIN_LOCAL)
-        await _revolute(
-            adapter, bar,
+        # J3 bar — the amplitude-setting joint (p0). A real revolute hinges the
+        # bar at its top pin (Axis1@bar) coaxial with the lever's bar pin
+        # (Axis2@lever). The bar length equals the rocker's R800 arc radius, so
+        # the top pin rides the arc CENTRE while the foot rides the R800 arc
+        # itself (build_rocker_arm docstring): swinging the bar about the top pin
+        # slides the foot ALONG the arc, and that swing IS the amplitude DOF
+        # (±88 mm seesaw, ch.15). The swing is pinned by ONE suppressible PARK
+        # DRIVER — a distance from the foot axis (Axis2@bar) to the assembly
+        # Right Plane, i.e. the foot's X = the amplitude position. Default =
+        # today's solved contact, so `rest` is bit-exact; suppressing it (the
+        # motion study / an amplitude config) frees the bar to swing = slide the
+        # foot along the arc. The driver MUST stay a part↔root-plane distance
+        # (NOT part↔part): the motion study's driver classifier only recognises
+        # dims that reference one real part + the sub root. This is the explicit
+        # form of the generic foot-X spin_driver the other revolutes use.
+        bar_tgt = _org(adapter, bar)
+        foot = world_point(adapter, bar, BAR_FOOT_LOCAL)
+        amplitude = foot[0] - pivot_w[0]  # foot X relative to the rocker pivot
+        await coincident_mate(
+            adapter,
             named_ref(f"Axis2@{lever}", "AXIS"), named_ref(f"Axis1@{bar}", "AXIS"),
-            concentric=False, off_axis_name="Axis2",
-            off_axis_local=BAR_FOOT_LOCAL, pivot_xy=(bar_pin[0], bar_pin[1]),
-            label=f"J3 bar ch{j:02d}",
+            label=f"J3 bar ch{j:02d} radial (top-pin hinge)", verify=(bar, bar_tgt),
+        )
+        await distance_driver(
+            adapter,
+            named_ref(f"Right Plane@{bar}", "PLANE"), named_ref("Front Plane", "PLANE"),
+            abs(bar_tgt[2]),
+            label=f"J3 bar ch{j:02d} axial d={abs(bar_tgt[2]):.2f}", verify=(bar, bar_tgt),
+        )
+        await distance_driver(
+            adapter,
+            named_ref(f"Axis2@{bar}", "AXIS"), named_ref("Right Plane", "PLANE"),
+            abs(foot[0]),
+            label=f"J3 bar ch{j:02d} AMPLITUDE park foot-X={foot[0]:.2f} (amp {amplitude:+.1f})",
+            verify=(bar, bar_tgt),
         )
 
         # Spring + bushing SEEDS (ground; cosmetic in artifact A) -- inserted
