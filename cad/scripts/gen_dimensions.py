@@ -171,6 +171,28 @@ def dump_yaml(doc: dict[str, Any]) -> str:
     return yaml.dump(doc, sort_keys=False, allow_unicode=True, width=10_000)
 
 
+def load_doc() -> dict[str, Any]:
+    """The parsed dimensions.yaml (sections with structured tables + prose)."""
+    return yaml.safe_load(DIMENSIONS_YAML.read_text(encoding="utf-8"))
+
+
+def find_row(doc: dict[str, Any], heading_prefix: str, dim_prefix: str) -> list[str] | None:
+    """First structured table row whose section heading and first cell match.
+
+    ``heading_prefix`` matches the chapter heading (e.g. ``"Chapter 12"``),
+    ``dim_prefix`` the row's first cell (e.g. ``"Diametral pitch"``). Returns the
+    cell list, or ``None`` if absent / only present as a verbatim (raw) row.
+    """
+    for section in doc["sections"]:
+        if not section["heading"].startswith(heading_prefix):
+            continue
+        for el in section["elements"]:
+            for row in el.get("table", {}).get("rows", []):
+                if isinstance(row, list) and row and row[0].startswith(dim_prefix):
+                    return row
+    return None
+
+
 def _main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--import", dest="do_import", action="store_true",
