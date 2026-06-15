@@ -99,6 +99,7 @@ import math
 import sys
 
 from _common import (
+    angle_driver,
     assert_components_fully_defined,
     check,
     check_no_interference,
@@ -449,9 +450,14 @@ async def build(adapter) -> dict[str, str]:
         label=f"arbor-pedestal z={-ARBOR_PEDESTAL_Z:g}",
     )
     ppost = cone_station(PIVOT_POST_STATION)
+    # The cone-pivot-post is the SWING BRACKET (ch.12, p.18 "pivot"): floated so
+    # the whole cone set can swing horizontally out of mesh about its vertical
+    # axis (p1). Pinned at the engaged rest pose by a suppressible angle driver
+    # in the joints section.
     pivot_post = await place_component(
         adapter, "cone-pivot-post",
         [ppost[0], Y_BASE_TOP, ppost[2]], [0.0, -INCLINE_DEG, 0.0], ROT_Y_INCLINE,
+        ground=False, label="cone-pivot-post (swing bracket, engaged rest)",
     )
     kpost = cone_station(KNOB_POST_STATION)
     await place_component(
@@ -597,6 +603,43 @@ async def build(adapter) -> dict[str, str]:
     )
     await lock_mate(
         adapter, named_ref(f"Axis2@{pinion}", "AXIS"), crank_axis, label="16T pinion keyed",
+    )
+
+    # =============== cone pivot post swing (p1 disengage DOF) ==============
+    # The post is the swing bracket: the whole cone set swings horizontally out
+    # of mesh about its vertical pivot (ch.12, p.18). Pin the floated post with
+    # three locating drivers that leave ONLY the rotation about the vertical
+    # axis (Axis2): a Top-plane distance (upright + height) and the vertical
+    # axis's distance to the Right/Front planes (plan X/Z). Then a suppressible
+    # ANGLE PARK DRIVER holds today's ENGAGED orientation (the incline dihedral).
+    # The cone shaft stays journaled to the post (below) and rides the swing, so
+    # the validated 20-gear mesh is untouched in `rest`; suppress the angle
+    # driver to articulate the disengage.
+    post_o = _org(adapter, pivot_post)
+    await distance_driver(
+        adapter,
+        named_ref(f"Top Plane@{pivot_post}", "PLANE"), named_ref("Top Plane", "PLANE"),
+        abs(post_o[1]),
+        label=f"cone-post height d={abs(post_o[1]):.2f}", verify=(pivot_post, post_o),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Axis2@{pivot_post}", "AXIS"), named_ref("Right Plane", "PLANE"),
+        abs(post_o[0]),
+        label=f"cone-post pivot-X d={abs(post_o[0]):.2f}", verify=(pivot_post, post_o),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Axis2@{pivot_post}", "AXIS"), named_ref("Front Plane", "PLANE"),
+        abs(post_o[2]),
+        label=f"cone-post pivot-Z d={abs(post_o[2]):.2f}", verify=(pivot_post, post_o),
+    )
+    await angle_driver(
+        adapter,
+        named_ref(f"Right Plane@{pivot_post}", "PLANE"), named_ref("Right Plane", "PLANE"),
+        INCLINE_DEG,
+        label=f"cone-post swing park (p1, engaged a={INCLINE_DEG:.2f})",
+        verify=(pivot_post, post_o),
     )
 
     # Cone shaft revolute in the black pivot post: coincident + an axial plane
