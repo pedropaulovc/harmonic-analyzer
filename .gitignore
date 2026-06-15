@@ -332,6 +332,15 @@ cad/project.toml
 cad/**/project.toml
 cad/**/thumbnail.png
 
+# Generated CAD artifacts — the build scripts are the source of truth, so
+# none of these are versioned as living documents. Rebuild with
+# `build_all.py`; snapshot binaries only at tagged releases (see README).
+cad/out/sldprt/
+cad/out/sldasm/
+cad/out/png/
+cad/out/demo/
+cad/out/*.mp4
+
 # Offline-render cache (regenerable: cad/scripts/export_models.py;
 # the assembly STL alone is >100 MB — over GitHub's file limit)
 cad/out/stl/
