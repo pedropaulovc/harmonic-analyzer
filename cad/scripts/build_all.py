@@ -151,20 +151,31 @@ def close_solidworks_documents() -> None:
 
 
 def robust_remove(target: Path, attempts: int = 6) -> None:
-    """Delete a file/dir, tolerating SolidWorks' lingering file handles.
+    """Delete a file, or empty+remove a directory, tolerating two Windows locks:
 
-    CloseAllDocuments releases part-file handles ASYNCHRONOUSLY, so an immediate
-    wipe of cad/out hits ``WinError 32`` (a just-closed .SLDPRT still open at the
-    OS level keeps its directory non-empty, so even the rmdir fails). Retry with
-    backoff, re-issuing CloseAllDocuments between tries, instead of failing the
-    whole rebuild on a transient lock.
+    * Transient file locks -- CloseAllDocuments releases .SLDPRT handles
+      ASYNCHRONOUSLY, so an immediate unlink can hit ``WinError 32``. Retry with
+      backoff, re-closing docs between tries.
+    * A handle-pinned directory NODE -- a held handle on the directory itself (a
+      SolidWorks reference root, an open Explorer window) blocks removing the dir
+      even when its files are deletable and it is empty. An EMPTY directory is
+      equivalent to a removed one for a from-empty rebuild (parts re-save into
+      it; a dir handle does not block creating files inside), so clear the
+      contents and treat an emptied-but-unremovable node as success.
     """
     for n in range(1, attempts + 1):
         try:
-            if target.is_dir():
-                shutil.rmtree(target)
-            else:
+            if target.is_file() or target.is_symlink():
                 target.unlink()
+                return
+            for child in list(target.iterdir()):
+                robust_remove(child)
+            try:
+                target.rmdir()
+            except OSError:
+                if any(target.iterdir()):
+                    raise
+                print(f"--  {target.name}: dir handle pinned but emptied -- ok")
             return
         except (PermissionError, OSError) as exc:
             if n == attempts:
