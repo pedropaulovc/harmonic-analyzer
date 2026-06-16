@@ -378,6 +378,12 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
         print(f"  XX  {sldasm.name} not built -- run build_all.py", flush=True)
         return
 
+    # Fresh session per assembly: accumulating open docs across the multi-assembly
+    # run degrades the COM session -- the InterferenceDetectionManager comes back
+    # null on the 5th open (output, the last in the static set), failing its
+    # interference gate spuriously. Reset first, exactly as the isolation and
+    # motion suites do (see _verify_isolation_one / _verify_motion_one).
+    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     check(f"open {name}", await adapter.open_model(str(sldasm)))
     configs = check("list configurations", await adapter.list_configurations())
     if REST in (configs or []):
