@@ -64,6 +64,22 @@ output:
     to the pen (ch.26-28). The summation is COMPUTED, not force-simulated — see
     docs/motion-policy.md and truth_model.py.
 
+amplitude:                         # ch15 — the amplitude bars set the Fourier coefficients
+  preset: square                   # the waveform the bar stations encode
+  fundamental_station_mm: 80.0     # a_1 bar station; a_j = this / harmonic_n (odd j), 0 (even j)
+  max_travel_mm: 88.0              # ±88 mm amplitude-bar seesaw range (ch.15)
+  source: "DIMENSIONS.md ch15; truth_model.py"
+  confidence: med
+  notes: >-
+    The amplitude bar station along the rocker IS the Fourier coefficient a_j.
+    channels.yaml amplitude_mm is DERIVED from this scale: for the `square`
+    preset a_j = fundamental_station_mm / harmonic_n on the ODD harmonics and 0
+    on the even ones (the textbook square-wave partial sum, odd terms ∝ 1/n).
+    truth_model.py reads the same amplitude_mm vector, so the computed pen curve
+    always matches the as-built bar stations; verify.py --suite config asserts
+    channels.yaml obeys this law. Change the preset/scale here and regenerate the
+    channel bar stations to retune the machine.
+
 alignment_pinion:                  # ch25 — engages the cylinder-gear set for zeroing
   teeth: 42
   disengaged_tip_gap_mm: 2.0       # PINION_GAP
