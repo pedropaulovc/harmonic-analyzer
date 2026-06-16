@@ -30,7 +30,6 @@ a concurrent build_all/verify deadlocks):
 from __future__ import annotations
 
 import argparse
-import asyncio
 import re
 import subprocess
 import sys
@@ -39,12 +38,19 @@ import traceback
 from pathlib import Path
 from typing import Any
 
-from _common import CAD_ROOT, OUT_SLDASM, check, log
+from _common import CAD_ROOT, OUT_SLDASM, log
 
 REPO_ROOT = CAD_ROOT.parent
 TOP_ASSEMBLY = "harmonic-analyzer"
 RELEASE_DIR = CAD_ROOT / "out" / "release"
 _VERSION_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
+
+# SolidWorks COM type library (SldWorks); the version pins the same revision the
+# pywin32 gen_py module exposes (...x0x34x0) so comtypes generates matching stubs.
+SW_TYPELIB = "{83A33D31-27C5-11CE-BFD4-00400513BB57}"
+SW_TYPELIB_VER = (34, 0)
+SW_DOC_ASSEMBLY = 2  # swDocumentTypes_e.swDocASSEMBLY
+SW_OPEN_SILENT = 1  # swOpenDocOptions_e.swOpenDocOptions_Silent
 
 
 # --------------------------------------------------------------------------- #
@@ -118,43 +124,41 @@ def preflight(version: str, allow_dirty: bool) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# SolidWorks Pack-and-Go (COM)
+# SolidWorks Pack-and-Go (COM via comtypes)
 # --------------------------------------------------------------------------- #
-async def _pack_and_go(adapter: Any, zip_path: Path) -> dict[str, Any]:
-    """Open the top assembly and Pack-and-Go it (flattened) into ``zip_path``.
+def package(zip_path: Path) -> dict[str, Any]:
+    """Attach to the running SolidWorks, Pack-and-Go the top assembly into ``zip_path``.
 
     Pack-and-Go bundles a document with every file it references; SetSaveToName2
     with a ``.zip`` target writes a single archive, FlattenToSingleFolder drops
     the original folder tree so the zip opens cleanly anywhere.
+
+    Uses comtypes, NOT the pywin32 adapter: ``GetPackAndGo`` returns an
+    ``[out, retval] IPackAndGo**`` param that win32com cannot marshal (it returns
+    null across every invocation style -- pywin32 issues #1303/#622), whereas
+    comtypes generates correct [out,retval] handling straight from the typelib.
+    GetActiveObject attaches to the SW instance the user already launched from the
+    3DEXPERIENCE Platform shortcut (never start sldworks.exe -- the Makers seat
+    rejects a COM-launched instance as unlicensed).
     """
+    import comtypes
+    import comtypes.client
+
     top = OUT_SLDASM / f"{TOP_ASSEMBLY}.SLDASM"
-    check(f"open {TOP_ASSEMBLY}", await adapter.open_model(str(top)))
-    model = adapter.currentModel
 
-    import pythoncom
-    from win32com.client import Dispatch, VARIANT
+    mod = comtypes.client.GetModule((comtypes.GUID(SW_TYPELIB), *SW_TYPELIB_VER))
+    sw = comtypes.client.GetActiveObject("SldWorks.Application", interface=mod.ISldWorks)
+    revision = sw.RevisionNumber()
+    log(f"attached to SolidWorks, revision {revision}")
 
-    from solidworks_mcp.adapters import sw_type_info
+    sw.CloseAllDocuments(True)  # clean session: stale open docs poison Pack-and-Go refs
+    sw.OpenDoc6(str(top), SW_DOC_ASSEMBLY, SW_OPEN_SILENT, "", 0, 0)
+    log(f"opened {TOP_ASSEMBLY}")
 
-    ext = sw_type_info.early_bound(model.Extension, "IModelDocExtension")
-
-    # GetPackAndGo's result is an [out, retval] IPackAndGo** parameter
-    # (VT_BYREF|VT_DISPATCH), but makepy emitted it as a zero-arg method, so
-    # pywin32 never supplies the byref out-buffer and SW raises
-    # DISP_E_PARAMNOTOPTIONAL ("Parameter not optional"). Invoke dispid 207
-    # directly, passing the byref out-param, and read the PackAndGo back out of
-    # it -- the same byref-VARIANT pattern reset_pose uses for Save3, confirmed
-    # against this build's type-info (SW forum #74577 ends unresolved otherwise).
-    byref_dispatch = pythoncom.VT_BYREF | pythoncom.VT_DISPATCH
-    png_out = VARIANT(byref_dispatch, None)
-    ext._oleobj_.InvokeTypes(
-        207, 0, pythoncom.DISPATCH_METHOD, (pythoncom.VT_VOID, 0),
-        ((byref_dispatch, 2),),  # one [out] arg: VT_BYREF|VT_DISPATCH, PARAMFLAG_FOUT
-        png_out,
-    )
-    if png_out.value is None:
-        raise RuntimeError("GetPackAndGo returned no PackAndGo object")
-    pg = sw_type_info.early_bound(Dispatch(png_out.value), "IPackAndGo")
+    ext = sw.IActiveDoc2.Extension
+    pg = ext.GetPackAndGo()
+    if pg is None:
+        raise RuntimeError("GetPackAndGo returned None")
 
     names_count = pg.GetDocumentNamesCount()
     log(f"pack-and-go: {names_count} referenced documents")
@@ -177,36 +181,12 @@ async def _pack_and_go(adapter: Any, zip_path: Path) -> dict[str, Any]:
     if not zip_path.exists() or zip_path.stat().st_size == 0:
         raise RuntimeError(f"Pack-and-Go produced no zip at {zip_path}")
 
-    revision = adapter._attempt(lambda: adapter.swApp.RevisionNumber(), default="unknown")
     return {
         "zip": zip_path,
         "size_mb": zip_path.stat().st_size / 1e6,
         "documents": names_count,
         "sw_revision": revision,
     }
-
-
-def package(zip_path: Path) -> dict[str, Any]:
-    """Connect, Pack-and-Go, disconnect; return the bundle facts."""
-    from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
-
-    async def _run() -> dict[str, Any]:
-        adapter = PyWin32Adapter({})
-        print("Connecting to SolidWorks ...", flush=True)
-        await adapter.connect()
-        log("connected")
-        adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-        log("CloseAllDocuments (clean session)")
-        try:
-            return await _pack_and_go(adapter, zip_path)
-        finally:
-            try:
-                await adapter.disconnect()
-                print("Disconnected.", flush=True)
-            except Exception as exc:  # noqa: BLE001
-                print(f"  WARN disconnect failed: {exc}", flush=True)
-
-    return asyncio.run(_run())
 
 
 # --------------------------------------------------------------------------- #
