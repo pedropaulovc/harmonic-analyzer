@@ -851,8 +851,14 @@ def _parse_args() -> argparse.Namespace:
                     choices=["static", "truth", "config", "isolation", "motion", "all"])
     args = ap.parse_args()
     if not args.names:
-        # truth/config need no model; static/isolation/all default to all built.
-        args.names = [] if args.suite in ("truth", "config") else _built_assemblies()
+        # truth/config need no model; motion always targets MOTION_OWNER (output);
+        # static/isolation/all default to all built.
+        if args.suite in ("truth", "config"):
+            args.names = []
+        elif args.suite == "motion":
+            args.names = [MOTION_OWNER]
+        else:
+            args.names = _built_assemblies()
     return args
 
 
