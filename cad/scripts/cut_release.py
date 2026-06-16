@@ -15,9 +15,13 @@ What it does, in order:
   3. SolidWorks (COM): open harmonic-analyzer.SLDASM, run Pack-and-Go flattened
      into ``cad/out/release/harmonic-analyzer-<version>.zip``. Records the SW
      revision for the notes.
-  4. git: annotated tag at HEAD, pushed to origin.
-  5. gh: create the GitHub release for the tag (auto-generated notes header +
-     our provenance block) and upload the zip as a release asset.
+  4. SolidWorks (COM, same session): export every built part and assembly to
+     AP214 STEP + fine binary STL, zipped into
+     ``cad/out/release/harmonic-analyzer-<version>-cad.zip`` (neutral CAD a
+     consumer without SolidWorks can open).
+  5. git: annotated tag at HEAD, pushed to origin.
+  6. gh: create the GitHub release for the tag (auto-generated notes header +
+     our provenance block) and upload both zips as release assets.
 
 Run (SolidWorks already open, NOTHING else driving it -- single STA COM server,
 a concurrent build_all/verify deadlocks):
@@ -31,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -38,7 +43,7 @@ import traceback
 from pathlib import Path
 from typing import Any
 
-from _common import CAD_ROOT, OUT_SLDASM, log
+from _common import CAD_ROOT, OUT_SLDASM, OUT_SLDPRT, log
 
 REPO_ROOT = CAD_ROOT.parent
 TOP_ASSEMBLY = "harmonic-analyzer"
@@ -49,8 +54,24 @@ _VERSION_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 # pywin32 gen_py module exposes (...x0x34x0) so comtypes generates matching stubs.
 SW_TYPELIB = "{83A33D31-27C5-11CE-BFD4-00400513BB57}"
 SW_TYPELIB_VER = (34, 0)
+SW_DOC_PART = 1  # swDocumentTypes_e.swDocPART
 SW_DOC_ASSEMBLY = 2  # swDocumentTypes_e.swDocASSEMBLY
 SW_OPEN_SILENT = 1  # swOpenDocOptions_e.swOpenDocOptions_Silent
+
+# Neutral-format export user preferences (swUserPreferenceIntegerValue_e /
+# swUserPreferenceToggle_e ids, mirrored from export_models.py). STEP AP214
+# carries colours; STL is fine binary, in MILLIMETRES (viewer/slicer-friendly --
+# the release ships consumer geometry, NOT the metre-unit render cache), with the
+# model origin preserved so assembly STLs keep their components aligned.
+PREF_STL_QUALITY = 78        # int: swSTLQuality -> 2 = fine
+PREF_STEP_AP = 75            # int: swStepAP -> 214 (carries colours)
+PREF_STL_UNITS = 211         # int: swExportStlUnits -> 0 = swMM
+TOGGLE_STL_BINARY = 69       # swSTLBinaryFormat
+TOGGLE_STL_ONE_FILE = 72     # swSTLComponentsIntoOneFile (monolithic asm STL)
+TOGGLE_STL_NO_TRANSLATE = 71  # swSTLDontTranslateToPositive: keep model origin
+_EXPORT_INTS = {PREF_STL_QUALITY: 2, PREF_STEP_AP: 214, PREF_STL_UNITS: 0}
+_EXPORT_TOGGLES = {TOGGLE_STL_BINARY: True, TOGGLE_STL_ONE_FILE: True,
+                   TOGGLE_STL_NO_TRANSLATE: True}
 
 
 # --------------------------------------------------------------------------- #
@@ -126,6 +147,20 @@ def preflight(version: str, allow_dirty: bool) -> None:
 # --------------------------------------------------------------------------- #
 # SolidWorks Pack-and-Go (COM via comtypes)
 # --------------------------------------------------------------------------- #
+def _close_active_documents(sw: Any) -> None:
+    """Close every open document WITHOUT a "Save Modified Documents" prompt.
+
+    ``CloseDoc`` closes a dirty document WITHOUT saving it (documented: a dirty
+    name "closes the document without saving it"), and ``CloseDoc("")`` closes the
+    ACTIVE doc (plus hidden/referenced ones). Loop it until no document is active.
+    Bounded so a misbehaving session can't spin.
+    """
+    for _ in range(500):
+        if sw.IActiveDoc2 is None:
+            break
+        sw.CloseDoc("")  # "" -> close the ACTIVE doc, discarding unsaved changes
+
+
 def _discard_open_documents(sw: Any) -> None:
     """Close every open document WITHOUT a "Save Modified Documents" prompt.
 
@@ -135,25 +170,15 @@ def _discard_open_documents(sw: Any) -> None:
     ``operating`` / ``pinion_engaged`` config, which re-solves and dirties the
     drive-train child. Headless, that modal hangs the release forever.
 
-    ``CloseDoc`` closes a dirty document WITHOUT saving it (documented: a dirty
-    name "closes the document without saving it"), and ``CloseDoc("")`` closes the
-    ACTIVE doc (plus hidden/referenced ones). Loop it until no document is active,
-    then ``CloseAllDocuments(True)`` as a backstop -- with nothing dirty left, it
-    has nothing to prompt about. Bounded so a misbehaving session can't spin.
+    Discard the active docs first (above), then ``CloseAllDocuments(True)`` as a
+    backstop -- with nothing dirty left, it has nothing to prompt about.
     """
-    for _ in range(500):
-        if sw.IActiveDoc2 is None:
-            break
-        sw.CloseDoc("")  # "" -> close the ACTIVE doc, discarding unsaved changes
+    _close_active_documents(sw)
     sw.CloseAllDocuments(True)
 
 
-def package(zip_path: Path) -> dict[str, Any]:
-    """Attach to the running SolidWorks, Pack-and-Go the top assembly into ``zip_path``.
-
-    Pack-and-Go bundles a document with every file it references; SetSaveToName2
-    with a ``.zip`` target writes a single archive, FlattenToSingleFolder drops
-    the original folder tree so the zip opens cleanly anywhere.
+def attach_solidworks() -> tuple[Any, str]:
+    """Attach to the running SolidWorks via comtypes; return (ISldWorks, revision).
 
     Uses comtypes, NOT the pywin32 adapter: ``GetPackAndGo`` returns an
     ``[out, retval] IPackAndGo**`` param that win32com cannot marshal (it returns
@@ -166,12 +191,21 @@ def package(zip_path: Path) -> dict[str, Any]:
     import comtypes
     import comtypes.client
 
-    top = OUT_SLDASM / f"{TOP_ASSEMBLY}.SLDASM"
-
     mod = comtypes.client.GetModule((comtypes.GUID(SW_TYPELIB), *SW_TYPELIB_VER))
     sw = comtypes.client.GetActiveObject("SldWorks.Application", interface=mod.ISldWorks)
     revision = sw.RevisionNumber()
     log(f"attached to SolidWorks, revision {revision}")
+    return sw, revision
+
+
+def package(sw: Any, revision: str, zip_path: Path) -> dict[str, Any]:
+    """Pack-and-Go the top assembly into ``zip_path``.
+
+    Pack-and-Go bundles a document with every file it references; SetSaveToName2
+    with a ``.zip`` target writes a single archive, FlattenToSingleFolder drops
+    the original folder tree so the zip opens cleanly anywhere.
+    """
+    top = OUT_SLDASM / f"{TOP_ASSEMBLY}.SLDASM"
 
     # Discard any open docs silently first: a dirty referenced child (left by a
     # prior engagement/motion verify) would make CloseAllDocuments(True) prompt.
@@ -214,21 +248,113 @@ def package(zip_path: Path) -> dict[str, Any]:
     }
 
 
+def _set_export_prefs(sw: Any) -> dict[str, dict[int, Any]]:
+    """Apply the neutral-format export preferences, returning the prior values."""
+    old = {
+        "ints": {k: int(sw.GetUserPreferenceIntegerValue(k)) for k in _EXPORT_INTS},
+        "toggles": {k: bool(sw.GetUserPreferenceToggle(k)) for k in _EXPORT_TOGGLES},
+    }
+    for k, v in _EXPORT_INTS.items():
+        sw.SetUserPreferenceIntegerValue(k, v)
+    for k, v in _EXPORT_TOGGLES.items():
+        sw.SetUserPreferenceToggle(k, v)
+    return old
+
+
+def _restore_export_prefs(sw: Any, old: dict[str, dict[int, Any]]) -> None:
+    for k, v in old["ints"].items():
+        sw.SetUserPreferenceIntegerValue(k, v)
+    for k, v in old["toggles"].items():
+        sw.SetUserPreferenceToggle(k, v)
+
+
+def export_neutral(sw: Any, version: str) -> dict[str, Any]:
+    """Export every built part and assembly to STEP + STL, then zip them.
+
+    Pack-and-Go ships the native (.SLDPRT/.SLDASM) bundle; this attaches the
+    *neutral* CAD a consumer without SolidWorks can open -- AP214 STEP (exact
+    archival B-rep, colours carried) and fine binary STL (mesh, for
+    viewers/slicers), one of each per part and per assembly.
+
+    Opens each document with the comtypes session already attached for
+    Pack-and-Go and SaveAs3-exports it; assemblies write a monolithic STL and a
+    single assembly STEP (all components). Staged under the gitignored release
+    dir -- NEVER cad/out/stl, whose metre-unit untranslated meshes the render
+    cache (stl_bbox_mm / MIRROR_PLANE) depends on. Each file is closed with
+    CloseDoc (discards unsaved changes) so an under-defined config that re-solves
+    on open never pops a save modal.
+    """
+    stage = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}-cad"
+    if stage.exists():
+        shutil.rmtree(stage)  # regenerate-don't-repair: stale exports never shipped
+    step_dir = stage / "step"
+    stl_dir = stage / "stl"
+    step_dir.mkdir(parents=True, exist_ok=True)
+    stl_dir.mkdir(parents=True, exist_ok=True)
+
+    # parts first (assemblies reference them), each (path, swDocType).
+    parts = sorted(OUT_SLDPRT.glob("*.SLDPRT"))
+    assemblies = sorted(OUT_SLDASM.glob("*.SLDASM"))
+    docs = [(p, SW_DOC_PART) for p in parts] + [(a, SW_DOC_ASSEMBLY) for a in assemblies]
+    log(f"neutral export: {len(parts)} parts + {len(assemblies)} assemblies")
+
+    _discard_open_documents(sw)
+    old_prefs = _set_export_prefs(sw)
+    exported = 0
+    try:
+        for i, (src, doc_type) in enumerate(docs, 1):
+            sw.OpenDoc6(str(src), doc_type, SW_OPEN_SILENT, "", 0, 0)
+            doc = sw.IActiveDoc2
+            if doc is None:
+                raise RuntimeError(f"failed to open {src.name}")
+            for out in (step_dir / f"{src.stem}.STEP", stl_dir / f"{src.stem}.STL"):
+                rc = doc.SaveAs3(str(out), 0, 0)
+                if not out.exists() or out.stat().st_size == 0:
+                    raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={rc})")
+            _close_active_documents(sw)  # CloseDoc -> discards, never prompts
+            if i % 10 == 0 or i == len(docs):
+                log(f"neutral export: {i}/{len(docs)} documents")
+        exported = len(docs)
+    finally:
+        _restore_export_prefs(sw, old_prefs)
+
+    zip_path = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}-cad.zip"
+    if zip_path.exists():
+        zip_path.unlink()
+    shutil.make_archive(str(zip_path.with_suffix("")), "zip", root_dir=str(stage))
+    if not zip_path.exists() or zip_path.stat().st_size == 0:
+        raise RuntimeError(f"neutral CAD zip not produced at {zip_path}")
+    log(f"neutral CAD zip: {zip_path.name} "
+        f"({zip_path.stat().st_size / 1e6:.1f} MB, {exported} documents x STEP+STL)")
+    return {
+        "zip": zip_path,
+        "size_mb": zip_path.stat().st_size / 1e6,
+        "documents": exported,
+        "parts": len(parts),
+        "assemblies": len(assemblies),
+    }
+
+
 # --------------------------------------------------------------------------- #
 # Release notes + publish
 # --------------------------------------------------------------------------- #
-def release_notes(version: str, facts: dict[str, Any]) -> str:
+def release_notes(version: str, facts: dict[str, Any], neutral: dict[str, Any]) -> str:
     sha = _git("rev-parse", "--short", "HEAD")
     return (
         f"Scripted SolidWorks reproduction of Michelson's 20-channel harmonic "
         f"analyzer.\n\n"
         f"The repository is source-of-truth (`build_all.py` regenerates every "
-        f"part). This release attaches a **Pack-and-Go CAD bundle** so the model "
-        f"can be opened without rebuilding.\n\n"
-        f"**Bundle** `harmonic-analyzer-{version}.zip`\n"
+        f"part). This release attaches a **Pack-and-Go CAD bundle** (native "
+        f"SolidWorks) plus a **neutral CAD bundle** (STEP + STL) so the model can "
+        f"be opened without rebuilding -- and without SolidWorks.\n\n"
+        f"**Native bundle** `harmonic-analyzer-{version}.zip`\n"
         f"- Top assembly: `{TOP_ASSEMBLY}.SLDASM` + {facts['documents']} "
         f"referenced documents (flattened)\n"
         f"- Size: {facts['size_mb']:.1f} MB\n\n"
+        f"**Neutral bundle** `harmonic-analyzer-{version}-cad.zip`\n"
+        f"- `step/` AP214 STEP + `stl/` fine binary STL (mm), one of each per "
+        f"document: {neutral['parts']} parts + {neutral['assemblies']} assemblies\n"
+        f"- Size: {neutral['size_mb']:.1f} MB\n\n"
         f"**Provenance**\n"
         f"- Commit: `{sha}`\n"
         f"- Built with SOLIDWORKS 3DEXPERIENCE R2026x, revision "
@@ -236,16 +362,17 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
     )
 
 
-def publish(version: str, zip_path: Path, facts: dict[str, Any], draft: bool) -> str:
+def publish(version: str, assets: list[Path], facts: dict[str, Any],
+            neutral: dict[str, Any], draft: bool) -> str:
     """Annotated tag -> push -> gh release + asset upload. Returns release URL."""
     log(f"tagging {version} at HEAD")
     _git("tag", "-a", version, "-m", f"Release {version}")
     _git("push", "origin", version)
 
     args = [
-        "release", "create", version, str(zip_path),
+        "release", "create", version, *(str(a) for a in assets),
         "--title", f"harmonic-analyzer {version}",
-        "--notes", release_notes(version, facts),
+        "--notes", release_notes(version, facts, neutral),
     ]
     if draft:
         args.append("--draft")
@@ -277,15 +404,19 @@ def main() -> int:
 
     started = time.perf_counter()
     try:
-        facts = package(zip_path)
+        sw, revision = attach_solidworks()
+        facts = package(sw, revision, zip_path)
+        neutral = export_neutral(sw, version)
     except Exception:
         traceback.print_exc()
         return 1
 
-    url = publish(version, zip_path, facts, opts.draft)
+    url = publish(version, [zip_path, neutral["zip"]], facts, neutral, opts.draft)
     print(f"\nDone in {time.perf_counter() - started:.1f}s.", flush=True)
     print(f"  version: {version}")
     print(f"  bundle:  {zip_path} ({facts['size_mb']:.1f} MB)")
+    print(f"  neutral: {neutral['zip']} ({neutral['size_mb']:.1f} MB, "
+          f"{neutral['documents']} docs x STEP+STL)")
     print(f"  release: {url}")
     return 0
 
