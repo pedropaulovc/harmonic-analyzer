@@ -643,6 +643,13 @@ async def build(adapter) -> dict[str, str]:
     volumes: dict[str, float] = {}
     for name, teeth in CONFIGS:
         check(f"activate {name}", await adapter.set_active_configuration(name))
+        # Config switches regenerate LAZILY: get_mass_properties can otherwise
+        # sample a half-regenerated solid. Seen once in a from-empty build_all run
+        # (T006 read 182.7 vs 108.3 -- a partially re-patterned state -- while
+        # standalone it reads 108.2 deterministically). Force a full rebuild so the
+        # gap pattern is fully applied for THIS config before any measurement.
+        adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
+        adapter._attempt(lambda: adapter.currentModel.EditRebuild3(), default=None)
 
         count = read_dimension(adapter, count_dim)
         if abs(count - teeth) > 1e-9:
