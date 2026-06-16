@@ -130,28 +130,37 @@ async def _pack_and_go(adapter: Any, zip_path: Path) -> dict[str, Any]:
     top = OUT_SLDASM / f"{TOP_ASSEMBLY}.SLDASM"
     check(f"open {TOP_ASSEMBLY}", await adapter.open_model(str(top)))
     model = adapter.currentModel
-    ext = model.Extension
 
-    pg = adapter._attempt(lambda: ext.GetPackAndGo(), default=None)
+    # pywin32 late binding resolves zero-arg COM methods (GetPackAndGo,
+    # GetDocumentNamesCount) as tuple-valued PROPERTIES -- calling them then
+    # raises, and wrapping in adapter._attempt silently masks it to None. Bind
+    # both dispatches EARLY (dispid invoke via the makepy wrapper) so every
+    # member resolves, and call directly so any COM error surfaces in the
+    # traceback. (Fork learning #2 / the GetMotionStudyManager case documented
+    # in sw_type_info.early_bound.)
+    from solidworks_mcp.adapters import sw_type_info
+
+    ext = sw_type_info.early_bound(model.Extension, "IModelDocExtension")
+    pg = ext.GetPackAndGo()
     if pg is None:
         raise RuntimeError("GetPackAndGo returned None (assembly not active?)")
+    pg = sw_type_info.early_bound(pg, "IPackAndGo")
 
-    names_count = adapter._attempt(lambda: pg.GetDocumentNamesCount(), default=-1)
+    names_count = pg.GetDocumentNamesCount()
     log(f"pack-and-go: {names_count} referenced documents")
 
     # Bundle exactly the CAD: no drawings/sim/toolbox, but DO include components
     # suppressed in the active config so every engagement config's parts ship.
-    adapter._attempt(lambda: setattr(pg, "IncludeDrawings", False), default=None)
-    adapter._attempt(lambda: setattr(pg, "IncludeSimulationResults", False), default=None)
-    adapter._attempt(lambda: setattr(pg, "IncludeToolboxComponents", False), default=None)
-    adapter._attempt(lambda: setattr(pg, "IncludeSuppressed", True), default=None)
-    adapter._attempt(lambda: setattr(pg, "FlattenToSingleFolder", True), default=None)
+    pg.IncludeDrawings = False
+    pg.IncludeSimulationResults = False
+    pg.IncludeToolboxComponents = False
+    pg.IncludeSuppressed = True
+    pg.FlattenToSingleFolder = True
 
-    ok = adapter._attempt(lambda: pg.SetSaveToName2(True, str(zip_path)), default=False)
-    if not ok:
+    if not pg.SetSaveToName2(True, str(zip_path)):
         raise RuntimeError(f"SetSaveToName2 rejected {zip_path}")
 
-    statuses = adapter._attempt(lambda: ext.SavePackAndGo(pg), default=None)
+    statuses = ext.SavePackAndGo(pg)
     log(f"pack-and-go: SavePackAndGo statuses = {statuses}")
 
     # Run-don't-build: the only proof Pack-and-Go succeeded is the file on disk.
