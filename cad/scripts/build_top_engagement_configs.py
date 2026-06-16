@@ -14,6 +14,11 @@ configurations that point the drive-train component at the right child config:
                        this top config now decouples the cone train through the
                        whole device, so set_active_configuration on the FULL
                        assembly demonstrates the disengage (ch.12).
+    operating          drive-train-1 FLEXIBLE -> drive-train/operating -- the crank
+                       DOF is free through the full device (hand-drag / motor).
+    pinion_engaged     drive-train-1 FLEXIBLE -> drive-train/pinion_engaged -- the
+                       alignment-pinion swing DOF is free, so the 42T drum swings
+                       into the cylinder mesh through the full device (ch.25 zeroing).
 
 The mechanism is the new ``set_component_configuration`` adapter call
 (IAssemblyDoc::CompConfigProperties5 RefConfigName), scoped to the active
@@ -74,6 +79,15 @@ CHILD_REST = "Default"  # the drive-train config referenced at rest
 # reset_pose.py returns the full model to Default (rigid, grounding mates live).
 OPERATING = "operating"
 CHILD_OPERATING = "operating"  # the drive-train child config: crank driver freed
+# pinion_engaged: the full device with the alignment-pinion swing FREE so the 42T
+# drum can swing into the cylinder-gear mesh (ch.25 zeroing). Same mechanism as
+# operating -- drive-train FLEXIBLE + grounding mates active -- but it references
+# the drive-train's pinion_engaged child (swing park driver suppressed) instead of
+# operating (crank driver suppressed). The grounded frame stays put; only the swing
+# group articulates. (The two child configs free DIFFERENT internal DOFs, so the
+# top configs are independent; Default stays rigid @ Default.)
+PINION_ENGAGED = "pinion_engaged"
+CHILD_PINION_ENGAGED = "pinion_engaged"  # drive-train child: swing driver freed
 # The drive-train's principal planes -> the assembly's, a non-drifting full
 # grounding at identity (SW reports principal-plane-to-principal-plane as fully
 # defined, not over-defined). ACTIVE in EVERY config -- a flexible subassembly is
@@ -220,6 +234,45 @@ async def _verify_operating(adapter: Any) -> None:
         f"grounded ({len(mates)} mates active) -- crank free, gears turn in place")
 
 
+async def _verify_pinion_engaged(adapter: Any) -> None:
+    """pinion_engaged: drive-train flexible + referencing its pinion_engaged child.
+
+    The alignment-pinion swing is free here (the pinion_engaged child suppressed
+    its swing park driver, and flexible lets that DOF solve at the top), so this is
+    NOT a 0-DOF pose -- by design, the drum swings into the cylinder mesh. Same
+    three enabling changes as operating: the child reference took, the sub is
+    flexible + floated, and the grounding mates stay active so the frame is anchored
+    (only the swing group articulates, not the whole sub).
+    """
+    check(f"activate {PINION_ENGAGED}", await adapter.set_active_configuration(
+        PINION_ENGAGED))
+    ref = _referenced_config(adapter, DRIVE_TRAIN_COMP)
+    solving = _solving(adapter, DRIVE_TRAIN_COMP)
+    fixed = _is_fixed(adapter, DRIVE_TRAIN_COMP)
+    if ref != CHILD_PINION_ENGAGED:
+        raise RuntimeError(
+            f"{PINION_ENGAGED}: {DRIVE_TRAIN_COMP} references {ref!r}, expected "
+            f"{CHILD_PINION_ENGAGED!r} -- the pinion_engaged child reference did not take")
+    if solving != "flexible":
+        raise RuntimeError(
+            f"{PINION_ENGAGED}: {DRIVE_TRAIN_COMP} is {solving}, expected flexible -- "
+            f"the sub's internal swing DOF cannot solve at the top while rigid")
+    if fixed:
+        raise RuntimeError(
+            f"{PINION_ENGAGED}: {DRIVE_TRAIN_COMP} is still fixed -- a fixed sub "
+            f"silently refuses to go flexible; it must be floated first")
+    mates = check("list mates", await adapter.list_mates())
+    suppressed = [m["name"] for m in mates if m.get("suppressed")]
+    if suppressed:
+        raise RuntimeError(
+            f"{PINION_ENGAGED}: grounding mates suppressed {suppressed} -- the flexible "
+            f"sub would drift as a rigid body when dragged; they must stay active to "
+            f"anchor the frame (the swing is freed by the pinion_engaged child's "
+            f"suppressed swing driver, not by un-grounding the frame)")
+    log(f"{PINION_ENGAGED}: {DRIVE_TRAIN_COMP} -> {ref}, flexible + floated, frame "
+        f"grounded ({len(mates)} mates active) -- pinion swing free, drum engages")
+
+
 async def _verify_cone_disengaged(adapter: Any) -> None:
     """cone_disengaged: drive-train references its own cone_disengaged config."""
     check(f"activate {CONE_DISENGAGED}", await adapter.set_active_configuration(
@@ -344,6 +397,48 @@ async def _build_operating(adapter: Any, configs: list[str]) -> None:
     log(f"  set_component_configuration -> {res}")
 
 
+async def _build_pinion_engaged(adapter: Any, configs: list[str]) -> None:
+    """Add the pinion_engaged top config: flex + reference the pinion_engaged child.
+
+    Runs AFTER _build_operating, which already re-grounded the drive-train with
+    plane mates (live in every config) and floated it. So this config needs no
+    re-grounding -- only flex the sub and reference its pinion_engaged child (swing
+    driver freed). ORDER IS LOAD-BEARING, same as operating: set_component_solving
+    writes an EMPTY RefConfigName (resetting the child to Default), so flex MUST
+    precede the reference.
+    """
+    from solidworks_mcp.adapters.base import (
+        CreateConfigurationParameters,
+        SetComponentConfigurationParameters,
+        SetComponentSolvingParameters,
+    )
+
+    if PINION_ENGAGED in configs:
+        log(f"{PINION_ENGAGED} already present -- skipping create")
+        return
+    if _is_fixed(adapter, DRIVE_TRAIN_COMP):
+        raise RuntimeError(
+            f"{DRIVE_TRAIN_COMP} is still fixed when building {PINION_ENGAGED} -- "
+            f"_build_operating should have floated + plane-grounded it first; "
+            f"rebuild the assembly from scratch")
+    check(f"create {PINION_ENGAGED}", await adapter.create_configuration(
+        CreateConfigurationParameters(
+            name=PINION_ENGAGED, parent=REST,
+            comment="full device, alignment-pinion swing FREE: drive-train flexible, "
+            "grounding mates still anchor the frame, references its pinion_engaged child",
+            description="Alignment pinion swingable into the cylinder mesh in the full "
+            "model (ch.25 zeroing); the frame stays put while only the drum swings.")))
+    # create_configuration activates pinion_engaged, so both changes land here.
+    check(f"flexible {DRIVE_TRAIN_COMP}", await adapter.set_component_solving(
+        SetComponentSolvingParameters(name=DRIVE_TRAIN_COMP, solving="flexible")))
+    res = check(
+        f"reference {DRIVE_TRAIN_COMP} -> {CHILD_PINION_ENGAGED}",
+        await adapter.set_component_configuration(
+            SetComponentConfigurationParameters(
+                name=DRIVE_TRAIN_COMP, configuration=CHILD_PINION_ENGAGED)))
+    log(f"  set_component_configuration -> {res}")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     path = str(OUT_SLDASM / f"{ASM_NAME}.SLDASM")
     check(f"open {ASM_NAME}", await adapter.open_model(path))
@@ -355,17 +450,19 @@ async def build(adapter: Any) -> dict[str, str]:
     configs = check("list configurations", await adapter.list_configurations())
     await _build_cone_disengaged(adapter, configs)
     await _build_operating(adapter, configs)
+    await _build_pinion_engaged(adapter, configs)
 
-    # Final verification of all three states after every change. rest LAST so the
+    # Final verification of all four states after every change. rest LAST so the
     # doc is left on the deterministic render pose.
     await _verify_operating(adapter)
+    await _verify_pinion_engaged(adapter)
     await _verify_cone_disengaged(adapter)
     await _verify_rest(adapter)
 
     assert_model_healthy(adapter, label=ASM_NAME, deep=True)
     _save_assembly_in_place(adapter)
     return {"assembly": str(OUT_SLDASM / f"{ASM_NAME}.SLDASM"),
-            "configs": f"{REST},{CONE_DISENGAGED},{OPERATING}"}
+            "configs": f"{REST},{CONE_DISENGAGED},{OPERATING},{PINION_ENGAGED}"}
 
 
 if __name__ == "__main__":
