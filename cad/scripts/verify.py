@@ -31,6 +31,13 @@ Suites (``--suite``):
                       simulated summation realised through the equation-driven
                       pen-rod mate (pen_driver.py / docs/motion-policy.md). Needs
                       SolidWorks.
+  engagement          per-configuration DOF + state checks (plan F4): open
+                      drive-train + harmonic-analyzer and assert each engagement
+                      configuration (Default / cone_disengaged / operating /
+                      pinion_engaged) frees EXACTLY the expected DOF set (and no
+                      structural leak), and that the top references the matching
+                      child sub-config with the right solve mode. Reuses the build
+                      scripts' own per-config verifiers. Needs SolidWorks.
   all                 static + truth + config + motion.
 
 Unlike the build gates (fail-fast), ``static``/``isolation`` run every gate and
@@ -92,6 +99,8 @@ OVER_CONSTRAINED = 4  # swConstrainedStatus_e
 # references it flexibly, so its own MateGroup has none -- they are verified
 # when this sub is verified, not duplicated at the top.
 GEAR_OWNER = "drive-train"
+# The top assembly that references the drive-train child engagement configs.
+TOP_OWNER = "harmonic-analyzer"
 # The channel assembly carries the 20 independent moving stations. These four
 # stems are mated instances (one per channel), NOT pattern slaves -- the
 # isolation suite asserts 20 of each, the structural precondition for the
@@ -152,6 +161,22 @@ class Report:
         """Run ``fn``; record pass or the exception text. Never propagates."""
         try:
             fn()
+        except Exception as exc:  # noqa: BLE001 -- a gate failure is data, not a crash
+            self.failed.append((label, str(exc)))
+            print(f"  XX  GATE FAILED [{label}]: {exc}", flush=True)
+            return
+        self.passed.append(label)
+        print(f"  OK  GATE PASSED [{label}]", flush=True)
+
+    async def agate(self, label: str, coro_factory: Callable[[], Any]) -> None:
+        """Async sibling of ``gate``: await ``coro_factory()``; record the outcome.
+
+        The engagement verifiers are async (they activate a config, then read DOF
+        / references), so they cannot run inside the sync ``gate``. Same
+        record-don't-propagate contract: one run reports every config's outcome.
+        """
+        try:
+            await coro_factory()
         except Exception as exc:  # noqa: BLE001 -- a gate failure is data, not a crash
             self.failed.append((label, str(exc)))
             print(f"  XX  GATE FAILED [{label}]: {exc}", flush=True)
@@ -465,6 +490,91 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
         f"motion:{name}:dof-fully-defined",
         lambda: assert_components_fully_defined(adapter),
     )
+
+
+async def _open_isolated(adapter: Any, name: str) -> bool:
+    """Close any open doc, then open ``name``. Returns False if it isn't built.
+
+    A fresh session per assembly: the engagement suite opens two assemblies with
+    interference checks, and accumulating open docs degrades the COM session (the
+    InterferenceDetectionManager came back null on the 5th open in the isolation
+    suite). CloseAllDocuments between opens keeps each assembly's checks clean.
+    """
+    sldasm = OUT_SLDASM / f"{name}.SLDASM"
+    if not sldasm.exists():
+        print(f"  XX  {sldasm.name} not built -- run build_all.py", flush=True)
+        return False
+    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+    check(f"open {name}", await adapter.open_model(str(sldasm)))
+    return True
+
+
+async def _verify_engagement(adapter: Any, report: Report) -> None:
+    """Per-configuration DOF + state checks for both engagement enums (plan F4).
+
+    The engagement state is modelled as assembly CONFIGURATIONS, and each build
+    script that creates a config also ships a self-contained verifier that asserts
+    the config frees EXACTLY the right DOF set (no structural leak) -- the
+    physically-honest meaning of engaged/disengaged. This suite promotes those
+    verifiers into the standalone acceptance pass (the same "verify pass IS the
+    test suite" move B3 made for the build gates), so plan verification step 9 is
+    one runnable target instead of four separate build-script re-runs.
+
+    drive-train.SLDASM (where the cone/pinion meshes live):
+      Default          0 DOF, fully defined, interference-free (engaged rest pose).
+      cone_disengaged  the 21 gear meshes cut -> exactly the 42-member gear train
+                       decouples (under-defined), nothing structural leaks.
+      operating        crank park driver cut, meshes live -> only the rotating
+                       train is free (one shared crank DOF).
+      pinion_engaged   pinion swing driver cut -> only the 3-member swing group is
+                       free (the drum swings into the cylinder mesh).
+
+    harmonic-analyzer.SLDASM (the top references the matching child sub-config):
+      Default          drive-train rigid @ its Default child, top fully defined.
+      cone_disengaged  drive-train references its cone_disengaged child.
+      operating        drive-train flexible + floated @ its operating child,
+                       grounding mates still anchoring the frame.
+      pinion_engaged   drive-train flexible + floated @ its pinion_engaged child.
+    """
+    # Lazy import: these drag in build_motion_study / build_mobility_probe, which
+    # the no-SolidWorks truth/config suites must not need. They only define the
+    # per-config verifiers (execution is guarded under __main__).
+    import build_engagement_configs as _bec
+    import build_operating_config as _boc
+    import build_pinion_engagement_configs as _bpc
+    import build_top_engagement_configs as _btc
+
+    if await _open_isolated(adapter, GEAR_OWNER):
+        log(f"--- engagement: {GEAR_OWNER} (4 configs) ---")
+        await report.agate(f"engagement:{GEAR_OWNER}:Default(0-DOF engaged)",
+                           lambda: _boc._verify_rest(adapter))
+        await report.agate(f"engagement:{GEAR_OWNER}:cone_disengaged",
+                           lambda: _bec._verify_cone_disengaged(adapter))
+        await report.agate(f"engagement:{GEAR_OWNER}:operating(crank free)",
+                           lambda: _boc._verify_operating(adapter))
+        await report.agate(f"engagement:{GEAR_OWNER}:pinion_engaged(swing free)",
+                           lambda: _bpc._verify_pinion_engaged(adapter))
+        check(f"reset {GEAR_OWNER} -> Default",
+              await adapter.set_active_configuration(REST))
+    else:
+        report.failed.append((f"engagement:{GEAR_OWNER}:open",
+                              f"not built: {GEAR_OWNER}.SLDASM"))
+
+    if await _open_isolated(adapter, TOP_OWNER):
+        log(f"--- engagement: {TOP_OWNER} (4 configs, child-referenced) ---")
+        await report.agate(f"engagement:{TOP_OWNER}:Default(child rigid, 0-DOF)",
+                           lambda: _btc._verify_rest(adapter))
+        await report.agate(f"engagement:{TOP_OWNER}:cone_disengaged(child)",
+                           lambda: _btc._verify_cone_disengaged(adapter))
+        await report.agate(f"engagement:{TOP_OWNER}:operating(flexible child)",
+                           lambda: _btc._verify_operating(adapter))
+        await report.agate(f"engagement:{TOP_OWNER}:pinion_engaged(flexible child)",
+                           lambda: _btc._verify_pinion_engaged(adapter))
+        check(f"reset {TOP_OWNER} -> Default",
+              await adapter.set_active_configuration(REST))
+    else:
+        report.failed.append((f"engagement:{TOP_OWNER}:open",
+                              f"not built: {TOP_OWNER}.SLDASM"))
 
 
 def verify_truth(report: Report) -> None:
@@ -816,6 +926,8 @@ async def build(adapter: Any) -> dict[str, str]:
             await _verify_isolation_one(adapter, name, report)
     if suite in ("motion", "all"):
         await _verify_motion_one(adapter, report)
+    if suite == "engagement":
+        await _verify_engagement(adapter, report)
     if suite in ("truth", "all"):
         verify_truth(report)
     if suite in ("config", "all"):
@@ -848,15 +960,19 @@ def _parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("names", nargs="*", help="assembly stem(s); default = all built")
     ap.add_argument("--suite", default="static",
-                    choices=["static", "truth", "config", "isolation", "motion", "all"])
+                    choices=["static", "truth", "config", "isolation", "motion",
+                             "engagement", "all"])
     args = ap.parse_args()
     if not args.names:
-        # truth/config need no model; motion always targets MOTION_OWNER (output);
-        # static/isolation/all default to all built.
+        # truth/config need no model; motion targets MOTION_OWNER (output) and
+        # engagement targets its own fixed owners; static/isolation/all default to
+        # all built.
         if args.suite in ("truth", "config"):
             args.names = []
         elif args.suite == "motion":
             args.names = [MOTION_OWNER]
+        elif args.suite == "engagement":
+            args.names = [GEAR_OWNER, TOP_OWNER]
         else:
             args.names = _built_assemblies()
     return args
