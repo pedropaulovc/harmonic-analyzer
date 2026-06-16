@@ -19,10 +19,15 @@ Suites (``--suite``):
                       vs the cited DIMENSIONS rows, DIMENSIONS.md freshness, and
                       the tolerance/metadata audit (parts.yaml <-> build scripts;
                       emits cad/out/reports/tolerance_audit.csv).
+  isolation           subsystem pass/fail runs (plan F1): open EACH built
+                      (sub)assembly and prove it sound in isolation -- the
+                      drive-train as the crank+gear test, the channel assembly as
+                      the 20-way independence test, output/frame/top as
+                      structural/smoke. Needs SolidWorks.
   all                 static + truth + config.
 
-Unlike the build gates (fail-fast), ``static`` runs every gate and reports the
-full set of failures at the end, so one run tells you everything that is wrong.
+Unlike the build gates (fail-fast), ``static``/``isolation`` run every gate and
+report the full set of failures at the end, so one run tells you everything wrong.
 
 Run (SolidWorks already open for any suite touching geometry)::
 
@@ -79,13 +84,28 @@ OVER_CONSTRAINED = 4  # swConstrainedStatus_e
 # references it flexibly, so its own MateGroup has none -- they are verified
 # when this sub is verified, not duplicated at the top.
 GEAR_OWNER = "drive-train"
+# The channel assembly carries the 20 independent moving stations. These four
+# stems are mated instances (one per channel), NOT pattern slaves -- the
+# isolation suite asserts 20 of each, the structural precondition for the
+# channels articulating at independent harmonics (only grounded spring/bushing
+# structure is LocalLinearPattern'd; see build_channel_assembly.py).
+CHANNEL_OWNER = "channel"
+CHANNELS = 20
+_MOVING_CHANNEL_STEMS = ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever")
+_INSTANCE_SUFFIX = re.compile(r"-\d+$")
 # Crank-drive gear mate: either side carries one of these in its component name.
 _CRANK_GEAR_TOKENS = ("crank-pinion", "crank-drive-gear")
-# Expected top-level component-count band per assembly (instances, not parts):
-# a tripwire for "a build dropped/duplicated a channel", not a tight count.
+# Expected TOP-LEVEL component-count band per assembly: a tripwire for "a build
+# dropped/duplicated a channel (or a whole subassembly)", not a tight count.
+# component_names counts top-level components only (GetComponents(TopLevelOnly)),
+# so harmonic-analyzer's count is its 4 child subassemblies -- NOT the ~340
+# flattened parts. Bands measured live (verify.py --suite isolation) with margin.
 _COMPONENT_BAND = {
-    "drive-train": (55, 70),
-    "harmonic-analyzer": (90, 130),
+    "frame": (11, 16),          # measured 13
+    "drive-train": (55, 70),    # measured 61
+    "channel": (138, 150),      # measured 144 (20 channels x moving + patterned structure)
+    "output": (117, 129),       # measured 123
+    "harmonic-analyzer": (3, 6),  # 4 subassemblies: frame, drive-train, channel, output
 }
 
 # Tolerance audit (Part D / handoff §14.2 Gate E): every built part must carry
@@ -238,6 +258,71 @@ def assert_component_count(adapter: Any, name: str) -> None:
     if not (lo <= count <= hi):
         raise RuntimeError(f"{name}: {count} components outside expected band [{lo}, {hi}]")
     print(f"  OK  {name}: {count} components within [{lo}, {hi}]", flush=True)
+
+
+def assert_channel_independence(adapter: Any) -> None:
+    """Assert the channel assembly holds 20 INDEPENDENT instances of each moving stem.
+
+    The decoherence test the docs ask for (each channel runs at its own harmonic)
+    is a motion-solver run -- tracked, not wired here. But its structural
+    precondition IS statically checkable: the four moving parts must be 20
+    individually-mated instances, not pattern slaves (a pattern instance is a
+    rigid, DOF-less copy and could never articulate independently). Counting 20 of
+    each stem is the tripwire that a rebuild did not collapse the channels into a
+    component pattern -- the single most important "no pattern for moving parts"
+    invariant (spec §5 / handoff §8), checked at the level that owns them.
+    """
+    stems = [_INSTANCE_SUFFIX.sub("", n) for n in component_names(adapter)]
+    counts = {stem: stems.count(stem) for stem in _MOVING_CHANNEL_STEMS}
+    wrong = {s: c for s, c in counts.items() if c != CHANNELS}
+    if wrong:
+        raise RuntimeError(
+            f"channel moving parts are not {CHANNELS} independent instances: {wrong} "
+            f"(a count != {CHANNELS} means a channel was dropped/duplicated, or the "
+            f"moving parts were collapsed into a component pattern)")
+    print(f"  OK  {CHANNELS} independent instances of each moving stem "
+          f"{_MOVING_CHANNEL_STEMS} (not pattern slaves)", flush=True)
+
+
+async def _verify_isolation_one(adapter: Any, name: str, report: Report) -> None:
+    """Subsystem isolation pass for one built (sub)assembly (plan F1).
+
+    Runs the gates that prove a subsystem is sound in isolation -- it opens,
+    rebuilds, fully constrains, carries no redundant mates, and is
+    interference-free -- plus the gates specific to what that subsystem proves:
+    the drive-train's gear ratios (crank reduction + channel meshes) and the
+    channel assembly's 20-way instance independence. The motion-dependent rows of
+    the F1 table (gear decoherence, cam-follower travel vs truth_model) need the
+    Basic Motion solver and stay tracked in the module docstring, not silently
+    skipped.
+    """
+    sldasm = OUT_SLDASM / f"{name}.SLDASM"
+    if not sldasm.exists():
+        report.failed.append((f"{name}:open", f"not built: {sldasm}"))
+        print(f"  XX  {sldasm.name} not built -- run build_all.py", flush=True)
+        return
+
+    # Isolation means a FRESH session per subsystem: close any prior assembly
+    # before opening this one. Accumulating open docs across a multi-assembly run
+    # degrades the COM session (the InterferenceDetectionManager came back null on
+    # the 5th open), and a subsystem test that depends on what ran before it is not
+    # an isolation test.
+    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+    check(f"open {name}", await adapter.open_model(str(sldasm)))
+    configs = check("list configurations", await adapter.list_configurations())
+    if REST in (configs or []):
+        check(f"activate {REST}", await adapter.set_active_configuration(REST))
+    log(f"--- isolation: {name} ({REST} pose) ---")
+
+    report.gate(f"iso:{name}:dof-fully-defined", lambda: assert_components_fully_defined(adapter))
+    report.gate(f"iso:{name}:no-over-constrained", lambda: assert_no_over_constrained(adapter))
+    report.gate(f"iso:{name}:model-healthy", lambda: assert_model_healthy(adapter, label=name, deep=True))
+    report.gate(f"iso:{name}:interference-free", lambda: check_no_interference(adapter))
+    report.gate(f"iso:{name}:component-count", lambda: assert_component_count(adapter, name))
+    if name == GEAR_OWNER:
+        report.gate(f"iso:{name}:gear-ratios", lambda: assert_gear_ratios(adapter, name))
+    if name == CHANNEL_OWNER:
+        report.gate(f"iso:{name}:channel-independence", lambda: assert_channel_independence(adapter))
 
 
 async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
@@ -559,6 +644,9 @@ async def build(adapter: Any) -> dict[str, str]:
     if suite in ("static", "all"):
         for name in names:
             await _verify_static_one(adapter, name, report)
+    if suite == "isolation":
+        for name in names:
+            await _verify_isolation_one(adapter, name, report)
     if suite in ("truth", "all"):
         verify_truth(report)
     if suite in ("config", "all"):
@@ -581,16 +669,19 @@ def _print_summary(report: Report) -> None:
 
 
 def _built_assemblies() -> list[str]:
-    return sorted(p.stem for p in OUT_SLDASM.glob("*.SLDASM"))
+    # Skip SolidWorks lock files (``~$<name>.SLDASM``), the transient temp file SW
+    # creates while a doc is open -- it is not a built assembly and won't open.
+    return sorted(p.stem for p in OUT_SLDASM.glob("*.SLDASM") if not p.name.startswith("~$"))
 
 
 def _parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("names", nargs="*", help="assembly stem(s); default = all built")
-    ap.add_argument("--suite", default="static", choices=["static", "truth", "config", "all"])
+    ap.add_argument("--suite", default="static",
+                    choices=["static", "truth", "config", "isolation", "all"])
     args = ap.parse_args()
     if not args.names:
-        # truth/config need no model; static/all default to whatever has been built.
+        # truth/config need no model; static/isolation/all default to all built.
         args.names = [] if args.suite in ("truth", "config") else _built_assemblies()
     return args
 
