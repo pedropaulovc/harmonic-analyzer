@@ -150,6 +150,31 @@ def close_solidworks_documents() -> None:
         print(f"--  CloseAllDocuments skipped ({exc})")
 
 
+def robust_remove(target: Path, attempts: int = 6) -> None:
+    """Delete a file/dir, tolerating SolidWorks' lingering file handles.
+
+    CloseAllDocuments releases part-file handles ASYNCHRONOUSLY, so an immediate
+    wipe of cad/out hits ``WinError 32`` (a just-closed .SLDPRT still open at the
+    OS level keeps its directory non-empty, so even the rmdir fails). Retry with
+    backoff, re-issuing CloseAllDocuments between tries, instead of failing the
+    whole rebuild on a transient lock.
+    """
+    for n in range(1, attempts + 1):
+        try:
+            if target.is_dir():
+                shutil.rmtree(target)
+            else:
+                target.unlink()
+            return
+        except (PermissionError, OSError) as exc:
+            if n == attempts:
+                raise
+            print(f"--  {target.name} locked ({type(exc).__name__}); "
+                  f"retry {n}/{attempts - 1} after re-closing docs")
+            close_solidworks_documents()
+            time.sleep(2.0 * n)
+
+
 def script_for(stem: str) -> Path:
     if stem in ASSEMBLY_ORDER:
         return SCRIPTS_DIR / f"build_{stem}_assembly.py"
@@ -182,10 +207,7 @@ def delete_artefacts(stem: str) -> None:
     for target in (artefact, png_dir):
         if not target.exists():
             continue
-        if target.is_dir():
-            shutil.rmtree(target)
-        else:
-            target.unlink()
+        robust_remove(target)
         print(f"--  deleted {target.relative_to(CAD_OUT)}")
 
 
@@ -208,7 +230,7 @@ def main() -> int:
         for sub in ("sldprt", "sldasm", "png"):
             target = CAD_OUT / sub
             if target.exists():
-                shutil.rmtree(target)
+                robust_remove(target)
                 print(f"--  cleaned {target}")
 
     parts = part_scripts()
