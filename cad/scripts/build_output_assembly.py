@@ -137,7 +137,9 @@ from _common import (
     save_assembly_and_images,
     spin_driver,
     world_point,
+    _read_member,
 )
+import pen_driver  # noqa: E402  (kinematic pen driver, plan F5)
 
 ASM_NAME = "output"
 
@@ -822,15 +824,36 @@ async def build(adapter) -> dict[str, str]:
     await angle_driver(adapter, named_ref(f"Front Plane@{pen_rod}", "PLANE"),
                        named_ref("Front Plane", "PLANE"), 0.0,
                        label="pen-rod spin snapshot", verify=(pen_rod, rod_o))
-    await distance_driver(adapter, named_ref(f"Top Plane@{pen_rod}", "PLANE"),
-                          named_ref("Top Plane", "PLANE"), abs(rod_o[1]),
-                          label="pen-rod travel snapshot", verify=(pen_rod, rod_o))
+    pen_travel = await distance_driver(
+        adapter, named_ref(f"Top Plane@{pen_rod}", "PLANE"),
+        named_ref("Top Plane", "PLANE"), abs(rod_o[1]),
+        label="pen-rod travel snapshot", verify=(pen_rod, rod_o))
     pen_marker = await place_component(adapter, "pen-marker",
                                        [MARKER_X, MARKER_TIP_Y, PEN_Z_MID],
                                        [0.0, 0.0, 0.0], IDENTITY, ground=False)
     await lock_mate(adapter, named_ref(f"Front Plane@{pen_marker}", "PLANE"),
                     named_ref(f"Front Plane@{pen_rod}", "PLANE"),
                     label="pen-marker locked to rod")
+
+    # Kinematic pen driver (plan F5): re-drive the Y-travel mate from a CrankDeg
+    # global through the chained Fourier sum, so the pose reproduces
+    # truth_model.pen_y with no force solver (the 21-spring summation is
+    # computed, not simulated -- docs/motion-policy.md). The mate stays a
+    # distance mate (still fully defines the rod); only its value is now an
+    # equation. At pen_rest_crank_deg the equation evaluates to the build datum,
+    # so this snapshot pose is byte-for-byte the previous fixed-value pose.
+    travel_mate = pen_travel.get("name")
+    base_mm = abs(rod_o[1])
+    param = adapter._attempt(
+        lambda: adapter.currentModel.Parameter(f"D1@{travel_mate}"), default=None)
+    if param is None:
+        raise RuntimeError(f"cannot read D1@{travel_mate} for the pen driver")
+    base_doc = float(_read_member(param, "Value"))  # IPS doc -> inches
+    factor = base_doc / base_mm  # document units per mm
+    info = await pen_driver.install(adapter, travel_mate, base_doc, factor)
+    log(f"pen driver: {info['links']}-link chain, scale "
+        f"{info['scale_mm_per_unit']:.4g} mm/unit, rest {info['rest_deg']:g} deg")
+    log(f"  equation: {info['equation']}")
     # Ry(+90)*Rx(+90): the ring lies flat on the v-block top, long axis
     # along X, window over the marker + pen rod (see FRAME_POS comment).
     await _place(adapter, "pen-frame", list(FRAME_POS),

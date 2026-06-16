@@ -24,7 +24,14 @@ Suites (``--suite``):
                       drive-train as the crank+gear test, the channel assembly as
                       the 20-way independence test, output/frame/top as
                       structural/smoke. Needs SolidWorks.
-  all                 static + truth + config.
+  motion              kinematic pen-driver fidelity (plan F5): open output.SLDASM,
+                      sweep the CrankDeg global, and assert the pen-marker tip
+                      traces truth_model.pen_y (mapped to the physical
+                      half-stroke) with NO force solver -- the computed-not-
+                      simulated summation realised through the equation-driven
+                      pen-rod mate (pen_driver.py / docs/motion-policy.md). Needs
+                      SolidWorks.
+  all                 static + truth + config + motion.
 
 Unlike the build gates (fail-fast), ``static``/``isolation`` run every gate and
 report the full set of failures at the end, so one run tells you everything wrong.
@@ -34,16 +41,15 @@ Run (SolidWorks already open for any suite touching geometry)::
     C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\verify.py [name ...] [--suite static|truth|all]
 
 ``name`` defaults to every built assembly in ``cad/out/sldasm`` (drive-train,
-harmonic-analyzer). ``truth`` needs no SolidWorks and no assembly.
+harmonic-analyzer). ``truth``/``config`` need no SolidWorks and no assembly.
 
 NOT YET WIRED (tracked, not silently skipped):
-  * Stepped-crank interference across the operating config and the motion-study
-    pen-vs-truth_model comparison both require turning the crank, which only the
-    Basic Motion solver does correctly here (the lock mates that key the cone
-    cluster are outside the gear-mate graph, so a kinematic rotate desyncs the
-    train -- see docs/motion-policy.md). They land with the motion suite once the
-    real per-channel amplitudes replace the channels.yaml placeholders.
-  * ``--suite isolation`` (subsystem pass/fail targets) is plan Part F.
+  * Stepped-crank interference across the FULL operating config (turning the real
+    crank through the gear train) needs the Basic Motion solver -- the lock mates
+    that key the cone cluster are outside the gear-mate graph, so a kinematic
+    rotate desyncs the train (see docs/motion-policy.md). The pen-vs-truth_model
+    output proof, by contrast, IS wired: ``--suite motion`` drives the pen
+    kinematically off the CrankDeg global (no train rotation needed).
 """
 from __future__ import annotations
 
@@ -58,6 +64,7 @@ from typing import Any, Callable
 
 import _config
 import gen_dimensions
+import pen_driver
 import truth_model
 from _common import (
     OUT_SLDASM,
@@ -66,6 +73,7 @@ from _common import (
     check,
     check_no_interference,
     component_names,
+    component_transform,
     log,
     run_build,
 )
@@ -91,6 +99,19 @@ GEAR_OWNER = "drive-train"
 # structure is LocalLinearPattern'd; see build_channel_assembly.py).
 CHANNEL_OWNER = "channel"
 CHANNELS = 20
+# The kinematic pen driver (plan F5) lives in this sub: its pen-rod travel mate
+# is equation-linked to a CrankDeg global through the chained Fourier sum
+# (pen_driver.install, run at build time). The motion suite sweeps CrankDeg here
+# and proves the pen tip traces truth_model.pen_y -- the computed-not-simulated
+# summation, with no force solver (docs/motion-policy.md).
+MOTION_OWNER = "output"
+PEN_MARKER_STEM = "pen-marker"  # the carriage tip whose Y traces the curve
+# CrankDeg angles to sample; spans a full fundamental period (0..360) so both
+# stroke extremes (the square-wave preset peaks at 0 and 180) are exercised.
+_MOTION_SWEEP_DEG = [0.0, 30.0, 45.0, 90.0, 135.0, 180.0, 225.0, 270.0, 315.0, 360.0]
+# Generous vs the 5.25e-05 mm the de-risk probe achieved -- this is a fidelity
+# gate on the equation chain + doc-unit handling, not a numeric-precision race.
+_MOTION_TOL_MM = 1e-2
 _MOVING_CHANNEL_STEMS = ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever")
 _INSTANCE_SUFFIX = re.compile(r"-\d+$")
 # Crank-drive gear mate: either side carries one of these in its component name.
@@ -344,6 +365,106 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
     report.gate(f"{name}:interference-free", lambda: check_no_interference(adapter))
     report.gate(f"{name}:gear-ratios", lambda: assert_gear_ratios(adapter, name))
     report.gate(f"{name}:component-count", lambda: assert_component_count(adapter, name))
+
+
+def _rebuild(adapter: Any) -> None:
+    """Re-solve after a CrankDeg change so the pen-driver equation re-evaluates
+    the whole partial-sum chain and the mate-driven pose updates."""
+    adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
+    adapter._attempt(lambda: adapter.currentModel.EditRebuild3(), default=None)
+
+
+def _pen_marker_name(adapter: Any) -> str:
+    for n in component_names(adapter):
+        if _INSTANCE_SUFFIX.sub("", n) == PEN_MARKER_STEM:
+            return n
+    raise RuntimeError(f"{PEN_MARKER_STEM!r} instance not in this assembly")
+
+
+def _tip_y_mm(adapter: Any, marker: str) -> float:
+    """Pen-tip Y in the assembly frame (mm) -- the Transform2 translation Y."""
+    return component_transform(adapter, marker)[10] * 1000.0
+
+
+async def _verify_motion_one(adapter: Any, report: Report) -> None:
+    """Kinematic pen-driver fidelity (plan F5): sweep CrankDeg, prove the tip traces truth_model.
+
+    output.SLDASM's pen-rod travel mate is equation-linked to a CrankDeg global
+    through the chained Fourier sum (installed by pen_driver.install at build).
+    Setting CrankDeg and rebuilding must displace the pen-marker tip by exactly
+    ``pen_driver.expected_tip_disp_mm(theta)`` from the rest pose -- the computed
+    (not force-simulated) summation, mapped onto the physical half-stroke. The
+    async sweep runs first (collecting the worst deviation + any stroke-extreme
+    interference); the sync gates then assert on what it collected.
+    """
+    name = MOTION_OWNER
+    sldasm = OUT_SLDASM / f"{name}.SLDASM"
+    if not sldasm.exists():
+        report.failed.append((f"motion:{name}:open", f"not built: {sldasm}"))
+        print(f"  XX  {sldasm.name} not built -- run build_all.py", flush=True)
+        return
+
+    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+    check(f"open {name}", await adapter.open_model(str(sldasm)))
+    log(f"--- motion: {name} pen-driver sweep (rest {pen_driver.rest_crank_deg():g} deg, "
+        f"stroke +-{pen_driver.stroke_half_mm():g} mm) ---")
+    marker = _pen_marker_name(adapter)
+
+    # Rest pose: at pen_rest_crank_deg the driver equation subtracts pen_y(rest),
+    # so the mate sits at its build datum -- tip0 is the saved render pose.
+    await pen_driver.set_crank_deg(adapter, pen_driver.rest_crank_deg())
+    _rebuild(adapter)
+    tip0 = _tip_y_mm(adapter, marker)
+
+    sweep: list[tuple[float, float, float]] = []  # (theta_deg, got_mm, want_mm)
+    for theta in _MOTION_SWEEP_DEG:
+        await pen_driver.set_crank_deg(adapter, theta)
+        _rebuild(adapter)
+        got = _tip_y_mm(adapter, marker) - tip0
+        want = pen_driver.expected_tip_disp_mm(math.radians(theta))
+        sweep.append((theta, got, want))
+        err = abs(got - want)
+        flag = "OK " if err <= _MOTION_TOL_MM else "XX "
+        print(f"  {flag} CrankDeg={theta:6.1f}  tipDisp={got:+8.4f}  "
+              f"want={want:+8.4f}  |err|={err:.2e}", flush=True)
+    worst = max((abs(g - w) for _, g, w in sweep), default=0.0)
+
+    # Interference at the two poses furthest from the rest datum (the stroke
+    # extremes the pen carriage is most likely to bind at).
+    far = sorted(_MOTION_SWEEP_DEG,
+                 key=lambda t: abs(pen_driver.expected_tip_disp_mm(math.radians(t))))[-2:]
+    interference: list[tuple[float, str]] = []
+    for theta in far:
+        await pen_driver.set_crank_deg(adapter, theta)
+        _rebuild(adapter)
+        try:
+            check_no_interference(adapter)
+        except Exception as exc:  # noqa: BLE001 -- collect, gate below
+            interference.append((theta, str(exc)))
+
+    # Leave the doc at its deterministic rest datum (matches the saved pose).
+    await pen_driver.set_crank_deg(adapter, pen_driver.rest_crank_deg())
+    _rebuild(adapter)
+
+    report.gate(
+        f"motion:{name}:tip-traces-truth",
+        lambda: _expect(
+            worst <= _MOTION_TOL_MM,
+            f"pen tip deviates from truth_model by {worst:.3e} mm "
+            f"(> {_MOTION_TOL_MM} mm) over the CrankDeg sweep",
+        ),
+    )
+    report.gate(
+        f"motion:{name}:stroke-interference-free",
+        lambda: _expect(
+            not interference,
+            f"interference at stroke extremes (CrankDeg deg): {interference}",
+        ),
+    )
+    report.gate(
+        f"motion:{name}:dof-fully-defined",
+        lambda: assert_components_fully_defined(adapter),
+    )
 
 
 def verify_truth(report: Report) -> None:
@@ -693,6 +814,8 @@ async def build(adapter: Any) -> dict[str, str]:
     if suite == "isolation":
         for name in names:
             await _verify_isolation_one(adapter, name, report)
+    if suite in ("motion", "all"):
+        await _verify_motion_one(adapter, report)
     if suite in ("truth", "all"):
         verify_truth(report)
     if suite in ("config", "all"):
@@ -725,7 +848,7 @@ def _parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("names", nargs="*", help="assembly stem(s); default = all built")
     ap.add_argument("--suite", default="static",
-                    choices=["static", "truth", "config", "isolation", "all"])
+                    choices=["static", "truth", "config", "isolation", "motion", "all"])
     args = ap.parse_args()
     if not args.names:
         # truth/config need no model; static/isolation/all default to all built.
