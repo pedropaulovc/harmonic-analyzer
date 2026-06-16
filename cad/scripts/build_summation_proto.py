@@ -41,9 +41,9 @@ import os
 import sys
 
 from _common import (
-    FULLY_CONSTRAINED, UNDER_CONSTRAINED, _flag, _read_member, check,
-    component_transform, concentric_mate, distance_driver, log, name_bore_axis,
-    named_ref, world_point,
+    FULLY_CONSTRAINED, UNDER_CONSTRAINED, _flag, _read_member, bore_axis_ref,
+    check, component_transform, concentric_mate, distance_driver, log,
+    name_bore_axis, named_ref, world_point,
 )
 from build_channel_spring import MEAN_RADIUS, build_spring
 from build_channel_spring_installed import (
@@ -67,6 +67,12 @@ TOP_EYE_LOCAL_Y = PROTO_BODY + TOP_LEAD                  # 65.05 above part orig
 X0 = 50.0
 ROT_Y_POS90 = [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]
 
+# The lever-tab pin = a grounded pivot-shaft laid horizontal (axis along +X), so
+# the spring top eye hooks a real cylindrical face (fourbar's proven
+# concentric(axis, bore_axis_ref) pattern -- assembly-level reference axes do not
+# select by bare name in AddMate5).
+SHAFT_R = 6.35 / 2.0  # pivot-shaft OD radius (build_fourbar_test SHAFT_R)
+
 BOTTOM_MODE = os.environ.get("SUMMATION_BOTTOM", "spinlock")  # spinlock | concentric
 
 
@@ -83,22 +89,31 @@ def _status(adapter, comp: str) -> int:
 
 
 async def build(adapter) -> None:
-    from solidworks_mcp.adapters.base import InsertComponentParameters
+    from solidworks_mcp.adapters.base import (
+        ComponentRefParameters, InsertComponentParameters,
+    )
 
     log(f"proto gap (eye c2c) = {EYE_C2C:.2f} -> body {PROTO_BODY:.2f} "
         f"(leads bottom {BOTTOM_LEAD}, top {TOP_LEAD}); bottom mode = {BOTTOM_MODE}")
 
-    # 1. Build the proto spring (baked eye axes) -- separate name, never the real part.
-    axes = await build_spring(
-        adapter, PROTO_PART, PROTO_BODY, leads=(BOTTOM_LEAD, TOP_LEAD), eye_axes=True)
-    bottom_axis = axes["bottom_lead_axis"]
-    top_axis = axes["top_eye_axis"]
-    log(f"  baked axes: bottom-lead={bottom_axis!r} top-eye={top_axis!r}")
+    from _common import OUT_SLDPRT
+    path = (OUT_SLDPRT / f"{PROTO_PART}.SLDPRT").resolve()
+
+    # 1. Build the proto spring (baked eye axes) -- separate name, never the real
+    #    part. Reuse a prior build (deterministic Axis1/Axis2) to skip ~115 s.
+    if path.exists():
+        bottom_axis, top_axis = "Axis1", "Axis2"
+        log(f"  reusing existing {PROTO_PART}.SLDPRT (axes {bottom_axis}/{top_axis})")
+    else:
+        axes = await build_spring(
+            adapter, PROTO_PART, PROTO_BODY, leads=(BOTTOM_LEAD, TOP_LEAD),
+            eye_axes=True)
+        bottom_axis = axes["bottom_lead_axis"]
+        top_axis = axes["top_eye_axis"]
+        log(f"  baked axes: bottom-lead={bottom_axis!r} top-eye={top_axis!r}")
 
     # 2. Fresh assembly; insert the spring on-solution (Ry90), unfixed.
     check("create_assembly", await adapter.create_assembly())
-    from _common import OUT_SLDPRT
-    path = (OUT_SLDPRT / f"{PROTO_PART}.SLDPRT").resolve()
     data = check("insert proto spring", await adapter.insert_component(
         InsertComponentParameters(file_path=str(path), position=[X0, 0.0, 0.0],
                                   rotation=[0.0, 90.0, 0.0], configuration="")))
@@ -113,16 +128,23 @@ async def build(adapter) -> None:
         f"bottom eye {[round(v, 2) for v in bot_eye]}  "
         f"c2c {((top_eye[1] - bot_eye[1])):.2f}")
 
-    # 3. Grounded assembly anchors. Top pin = horizontal axis along X at the top
-    #    eye height; bottom-lead distance targets read from the as-placed axis.
-    top_pin = await name_bore_axis(
-        adapter, "Top Plane", TOP_EYE_LOCAL_Y, "Front Plane", 0.0, "lever-tab pin")
+    # 3. Grounded lever-tab pin: a pivot-shaft laid horizontal so its axis is the
+    #    line y = TOP_EYE_LOCAL_Y, z = 0 (collinear with the spring top-eye axis).
+    shaft_path = (OUT_SLDPRT / "pivot-shaft.SLDPRT").resolve()
+    pin_data = check("insert lever-tab pin", await adapter.insert_component(
+        InsertComponentParameters(file_path=str(shaft_path),
+                                  position=[X0, TOP_EYE_LOCAL_Y, 0.0],
+                                  rotation=[0.0, 90.0, 0.0], configuration="")))
+    pin = pin_data["name"]
+    if not pin_data.get("fixed"):
+        check("fix pin", await adapter.fix_component(ComponentRefParameters(name=pin)))
+    pin_od = [X0, TOP_EYE_LOCAL_Y + SHAFT_R, 0.0]  # a point on the pin's lateral face
     z_swing = MEAN_RADIUS  # |z| of the bottom-lead axis (at part-local x = mean_radius)
     x_slide = X0           # |x| of the bottom-lead axis (the rig offset)
 
-    # TOP hinge: top-eye axis concentric on the lever-tab pin.
+    # TOP hinge: top-eye axis concentric on the lever-tab pin face.
     await concentric_mate(
-        adapter, _entity_ref(spring, top_axis, "AXIS"), named_ref(top_pin, "AXIS"),
+        adapter, _entity_ref(spring, top_axis, "AXIS"), bore_axis_ref(pin_od),
         label="top hinge (eye on lever-tab pin)", verify=(spring, placed))
 
     if BOTTOM_MODE == "concentric":
