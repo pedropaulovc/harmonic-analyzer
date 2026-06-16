@@ -636,6 +636,52 @@ def verify_tolerance_audit(report: Report) -> None:
     )
 
 
+def verify_amplitude_preset(report: Report) -> None:
+    """The amplitude-bar stations in channels.yaml obey the machine.yaml preset law.
+
+    machine.yaml ``amplitude:`` declares the waveform the bars encode and the
+    fundamental station; channels.yaml ``amplitude_mm`` is the per-channel a_j the
+    geometry is actually built to. This gate asserts the two cannot drift: for the
+    ``square`` preset a_j = fundamental_station_mm / harmonic_n on the ODD harmonics
+    and 0 on the even ones, every station is within the seesaw travel, and the
+    vector matches what truth_model synthesises from the same file (so the computed
+    pen curve always equals the as-built bar stations).
+    """
+    preset = _config.machine("amplitude", "preset")
+    fundamental = float(_config.machine("amplitude", "fundamental_station_mm"))
+    max_travel = float(_config.machine("amplitude", "max_travel_mm"))
+    rows = _config.channels()
+
+    def _law() -> None:
+        _expect(preset == "square", f"amplitude preset is {preset!r}, not 'square' (update this gate)")
+        for ch in rows:
+            n = ch["harmonic_n"]
+            want = fundamental / n if n % 2 == 1 else 0.0
+            got = float(ch["amplitude_mm"])
+            _expect(abs(got - want) < 5e-4,
+                    f"channel {ch['index']} (n={n}): amplitude_mm {got} != 80/n law {want:.4f}")
+
+    report.gate("amplitude:square-law", _law)
+    report.gate(
+        "amplitude:within-travel",
+        lambda: _expect(
+            all(abs(float(ch["amplitude_mm"])) <= max_travel for ch in rows),
+            f"a bar station exceeds the ±{max_travel} mm seesaw travel: "
+            f"{[ch['amplitude_mm'] for ch in rows if abs(float(ch['amplitude_mm'])) > max_travel]}",
+        ),
+    )
+
+    def _matches_truth() -> None:
+        # truth_model.coefficients('config') reads the same amplitude_mm vector, so the
+        # computed curve is guaranteed to be what the geometry is set to (F3 / handoff §10).
+        a_yaml = _config.amplitudes()
+        a_truth = truth_model.coefficients("config")
+        _expect(a_yaml == a_truth,
+                f"truth_model 'config' vector {a_truth} != channels.yaml {a_yaml}")
+
+    report.gate("amplitude:truth-reads-same-vector", _matches_truth)
+
+
 async def build(adapter: Any) -> dict[str, str]:
     """Entry for ``run_build``: dispatch to the requested suite(s)."""
     suite, names = _ARGS.suite, _ARGS.names
@@ -653,6 +699,7 @@ async def build(adapter: Any) -> dict[str, str]:
         verify_config_vs_dimensions(report)
         verify_dimensions_fresh(report)
         verify_tolerance_audit(report)
+        verify_amplitude_preset(report)
 
     _print_summary(report)
     if report.failed:
@@ -697,6 +744,7 @@ if __name__ == "__main__":
             verify_config_vs_dimensions(_report)
             verify_dimensions_fresh(_report)
             verify_tolerance_audit(_report)
+            verify_amplitude_preset(_report)
         _print_summary(_report)
         sys.exit(1 if _report.failed else 0)
     sys.exit(run_build(build))
