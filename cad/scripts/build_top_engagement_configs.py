@@ -374,8 +374,17 @@ async def _build_operating(adapter: Any, configs: list[str]) -> None:
         raise RuntimeError(
             f"{DRIVE_TRAIN_COMP} is already floated but {OPERATING} is absent -- "
             f"inconsistent grounding state; rebuild the assembly from scratch")
-    # Re-ground in Default (active here) so Default + cone_disengaged inherit the
-    # float + the plane mates; Default must stay 0 DOF afterwards.
+    # Re-ground in Default so Default + cone_disengaged inherit the float + the
+    # plane mates; Default must stay 0 DOF afterwards. CRITICAL: activate Default
+    # FIRST. _build_cone_disengaged ran just before and left cone_disengaged active
+    # (its set_component_configuration leaves the new config active). Adding the
+    # grounding plane mates while cone_disengaged is active -- where the drive-train
+    # references its INTERNALLY-DECOUPLED child (42 gear DOF free) -- solves the
+    # mates against that config's geometry, so they fully constrain cone_disengaged
+    # yet leave Default UNDER-defined (proven: float reports an anomalous solve
+    # state, and Default reads status 2 after the third plane). Grounding in Default
+    # constrains the Default child placement and both configs inherit it.
+    check(f"activate {REST}", await adapter.set_active_configuration(REST))
     await _ground_drive_train(adapter)
     await _verify_rest(adapter)
 
