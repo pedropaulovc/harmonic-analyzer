@@ -58,6 +58,14 @@ SW_DOC_PART = 1  # swDocumentTypes_e.swDocPART
 SW_DOC_ASSEMBLY = 2  # swDocumentTypes_e.swDocASSEMBLY
 SW_OPEN_SILENT = 1  # swOpenDocOptions_e.swOpenDocOptions_Silent
 
+# SaveAs3 Options bitmask (swSaveAsOptions_e): Silent suppresses the "rebuild the
+# document before saving?" modal that a cold-opened assembly pops (its flexible
+# configs re-solve on open -> dirty); AvoidRebuildOnSave skips the needless
+# rebuild (the on-disk geometry is what the release ships).
+SW_SAVE_SILENT = 1  # swSaveAsOptions_Silent
+SW_SAVE_AVOID_REBUILD = 8  # swSaveAsOptions_AvoidRebuildOnSave
+SW_SAVE_OPTS = SW_SAVE_SILENT | SW_SAVE_AVOID_REBUILD
+
 # Neutral-format export user preferences (swUserPreferenceIntegerValue_e /
 # swUserPreferenceToggle_e ids, mirrored from export_models.py). STEP AP214
 # carries colours; STL is fine binary, in MILLIMETRES (viewer/slicer-friendly --
@@ -318,7 +326,7 @@ def export_neutral(sw: Any, version: str) -> dict[str, Any]:
             if doc is None:
                 raise RuntimeError(f"failed to open {src.name}")
             for out in (step_dir / f"{src.stem}.STEP", stl_dir / f"{src.stem}.STL"):
-                rc = doc.SaveAs3(str(out), 0, 0)
+                rc = doc.SaveAs3(str(out), 0, SW_SAVE_OPTS)
                 if not out.exists() or out.stat().st_size == 0:
                     raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={rc})")
             _close_active_documents(sw)  # CloseDoc -> discards, never prompts
