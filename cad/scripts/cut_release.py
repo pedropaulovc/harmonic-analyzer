@@ -126,6 +126,28 @@ def preflight(version: str, allow_dirty: bool) -> None:
 # --------------------------------------------------------------------------- #
 # SolidWorks Pack-and-Go (COM via comtypes)
 # --------------------------------------------------------------------------- #
+def _discard_open_documents(sw: Any) -> None:
+    """Close every open document WITHOUT a "Save Modified Documents" prompt.
+
+    ``CloseAllDocuments(True)`` still pops that modal in 3DX R2026x when an open
+    assembly has a DIRTY referenced child -- e.g. after a ``verify.py --suite
+    engagement/motion`` run (or a manual config switch) activated the flexible
+    ``operating`` / ``pinion_engaged`` config, which re-solves and dirties the
+    drive-train child. Headless, that modal hangs the release forever.
+
+    ``CloseDoc`` closes a dirty document WITHOUT saving it (documented: a dirty
+    name "closes the document without saving it"), and ``CloseDoc("")`` closes the
+    ACTIVE doc (plus hidden/referenced ones). Loop it until no document is active,
+    then ``CloseAllDocuments(True)`` as a backstop -- with nothing dirty left, it
+    has nothing to prompt about. Bounded so a misbehaving session can't spin.
+    """
+    for _ in range(500):
+        if sw.IActiveDoc2 is None:
+            break
+        sw.CloseDoc("")  # "" -> close the ACTIVE doc, discarding unsaved changes
+    sw.CloseAllDocuments(True)
+
+
 def package(zip_path: Path) -> dict[str, Any]:
     """Attach to the running SolidWorks, Pack-and-Go the top assembly into ``zip_path``.
 
@@ -151,7 +173,10 @@ def package(zip_path: Path) -> dict[str, Any]:
     revision = sw.RevisionNumber()
     log(f"attached to SolidWorks, revision {revision}")
 
-    sw.CloseAllDocuments(True)  # clean session: stale open docs poison Pack-and-Go refs
+    # Discard any open docs silently first: a dirty referenced child (left by a
+    # prior engagement/motion verify) would make CloseAllDocuments(True) prompt.
+    _discard_open_documents(sw)
+    log("discarded any open documents (clean session)")
     sw.OpenDoc6(str(top), SW_DOC_ASSEMBLY, SW_OPEN_SILENT, "", 0, 0)
     log(f"opened {TOP_ASSEMBLY}")
 
