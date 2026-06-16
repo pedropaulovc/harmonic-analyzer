@@ -131,20 +131,30 @@ async def _pack_and_go(adapter: Any, zip_path: Path) -> dict[str, Any]:
     check(f"open {TOP_ASSEMBLY}", await adapter.open_model(str(top)))
     model = adapter.currentModel
 
-    # pywin32 late binding resolves zero-arg COM methods (GetPackAndGo,
-    # GetDocumentNamesCount) as tuple-valued PROPERTIES -- calling them then
-    # raises, and wrapping in adapter._attempt silently masks it to None. Bind
-    # both dispatches EARLY (dispid invoke via the makepy wrapper) so every
-    # member resolves, and call directly so any COM error surfaces in the
-    # traceback. (Fork learning #2 / the GetMotionStudyManager case documented
-    # in sw_type_info.early_bound.)
+    import pythoncom
+    from win32com.client import Dispatch, VARIANT
+
     from solidworks_mcp.adapters import sw_type_info
 
     ext = sw_type_info.early_bound(model.Extension, "IModelDocExtension")
-    pg = ext.GetPackAndGo()
-    if pg is None:
-        raise RuntimeError("GetPackAndGo returned None (assembly not active?)")
-    pg = sw_type_info.early_bound(pg, "IPackAndGo")
+
+    # GetPackAndGo's result is an [out, retval] IPackAndGo** parameter
+    # (VT_BYREF|VT_DISPATCH), but makepy emitted it as a zero-arg method, so
+    # pywin32 never supplies the byref out-buffer and SW raises
+    # DISP_E_PARAMNOTOPTIONAL ("Parameter not optional"). Invoke dispid 207
+    # directly, passing the byref out-param, and read the PackAndGo back out of
+    # it -- the same byref-VARIANT pattern reset_pose uses for Save3, confirmed
+    # against this build's type-info (SW forum #74577 ends unresolved otherwise).
+    byref_dispatch = pythoncom.VT_BYREF | pythoncom.VT_DISPATCH
+    png_out = VARIANT(byref_dispatch, None)
+    ext._oleobj_.InvokeTypes(
+        207, 0, pythoncom.DISPATCH_METHOD, (pythoncom.VT_VOID, 0),
+        ((byref_dispatch, 2),),  # one [out] arg: VT_BYREF|VT_DISPATCH, PARAMFLAG_FOUT
+        png_out,
+    )
+    if png_out.value is None:
+        raise RuntimeError("GetPackAndGo returned no PackAndGo object")
+    pg = sw_type_info.early_bound(Dispatch(png_out.value), "IPackAndGo")
 
     names_count = pg.GetDocumentNamesCount()
     log(f"pack-and-go: {names_count} referenced documents")
