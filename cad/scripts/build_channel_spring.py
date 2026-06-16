@@ -32,6 +32,7 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import sys
+from typing import Iterable
 
 from _common import (
     add_spring_end_hooks,
@@ -68,6 +69,7 @@ async def build_spring(
     body_length: float,
     leads: tuple[float, float] | None = None,
     eye_axes: bool = False,
+    views: Iterable[str] | None = None,
 ) -> dict[str, str]:
     """Build a channel spring with the given coil body length (mm).
 
@@ -134,7 +136,13 @@ async def build_spring(
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, SPRING_BLACK)  # ch30 plates: see _common palette
     await report_mass_properties(adapter)
-    result = await save_part_and_images(adapter, part_name)
+    # ``views=[]`` saves the part with no PNG exports -- used when build_channel_
+    # assembly mass-produces the 10 per-channel stretched variants (the slow
+    # image step would dominate; the canonical part still renders its views).
+    if views is None:
+        result = await save_part_and_images(adapter, part_name)
+    else:
+        result = await save_part_and_images(adapter, part_name, views)
     # The two eye axes are baked into the .SLDPRT by the names captured above, so
     # the summation assembly can mate both ends without re-deriving them.
     return {**result, **eye_axis_names}
