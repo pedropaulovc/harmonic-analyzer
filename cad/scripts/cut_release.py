@@ -12,16 +12,15 @@ What it does, in order:
      latest ``v*`` tag (``--bump major|minor|patch``, default patch).
   2. Pre-flight: tag must not already exist; the committed tree must be clean
      (``--allow-dirty`` to override); harmonic-analyzer.SLDASM must be built.
-  3. SolidWorks (COM): open harmonic-analyzer.SLDASM, run Pack-and-Go flattened
-     into ``cad/out/release/harmonic-analyzer-<version>.zip``. Records the SW
+  3. SolidWorks (COM): open harmonic-analyzer.SLDASM, run Pack-and-Go flattened,
+     and -- in the same session -- export every built part and assembly to AP214
+     STEP + fine binary STL + multi-angle PNG previews. Everything is staged and
+     zipped into ONE bundle ``cad/out/release/harmonic-analyzer-<version>.zip``
+     (``solidworks/`` native + ``step/`` + ``stl/`` + ``png/``). Records the SW
      revision for the notes.
-  4. SolidWorks (COM, same session): export every built part and assembly to
-     AP214 STEP + fine binary STL, zipped into
-     ``cad/out/release/harmonic-analyzer-<version>-cad.zip`` (neutral CAD a
-     consumer without SolidWorks can open).
-  5. git: annotated tag at HEAD, pushed to origin.
-  6. gh: create the GitHub release for the tag (auto-generated notes header +
-     our provenance block) and upload both zips as release assets.
+  4. git: annotated tag at HEAD, pushed to origin.
+  5. gh: create the GitHub release for the tag (auto-generated notes header +
+     our provenance block) and upload the bundle as the release asset.
 
 Run (SolidWorks already open, NOTHING else driving it -- single STA COM server,
 a concurrent build_all/verify deadlocks):
@@ -311,14 +310,15 @@ def _export_pngs(doc: Any, png_dir: Path, stem: str) -> int:
     return len(PNG_VIEWS)
 
 
-def export_neutral(sw: Any, version: str) -> dict[str, Any]:
-    """Export every built part and assembly to STEP + STL + PNGs, then zip them.
+def export_neutral(sw: Any, stage: Path) -> dict[str, Any]:
+    """Export every built part and assembly to STEP + STL + PNGs under ``stage``.
 
-    Pack-and-Go ships the native (.SLDPRT/.SLDASM) bundle; this attaches the
-    *neutral* CAD a consumer without SolidWorks can open -- AP214 STEP (exact
-    archival B-rep, colours carried), fine binary STL (mesh, for
-    viewers/slicers), and a multi-angle PNG preview set (PNG_VIEWS), one of each
-    per part and per assembly.
+    Alongside the Pack-and-Go native files (``stage/solidworks``), this fills the
+    *neutral* CAD a consumer without SolidWorks can open -- ``stage/step`` AP214
+    STEP (exact archival B-rep, colours carried), ``stage/stl`` fine binary STL
+    (mesh, for viewers/slicers), and ``stage/png`` a multi-angle PNG preview set
+    (PNG_VIEWS), one of each per part and per assembly. The caller zips the whole
+    ``stage`` into the single release bundle.
 
     Opens each document with the comtypes session already attached for
     Pack-and-Go and SaveAs3-exports it; assemblies write a monolithic STL and a
@@ -328,13 +328,10 @@ def export_neutral(sw: Any, version: str) -> dict[str, Any]:
     CloseDoc (discards unsaved changes) so an under-defined config that re-solves
     on open never pops a save modal.
     """
-    stage = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}-cad"
-    if stage.exists():
-        shutil.rmtree(stage)  # regenerate-don't-repair: stale exports never shipped
     step_dir = stage / "step"
     stl_dir = stage / "stl"
-    png_dir = stage / "png"
-    for d in (step_dir, stl_dir, png_dir):
+    png_root = stage / "png"
+    for d in (step_dir, stl_dir, png_root):
         d.mkdir(parents=True, exist_ok=True)
 
     # Close the top assembly Pack-and-Go left open BEFORE enumerating: while an
@@ -363,7 +360,7 @@ def export_neutral(sw: Any, version: str) -> dict[str, Any]:
                 rc = doc.SaveAs3(str(out), 0, SW_SAVE_OPTS)
                 if not out.exists() or out.stat().st_size == 0:
                     raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={rc})")
-            pngs += _export_pngs(doc, png_dir / src.stem, src.stem)
+            pngs += _export_pngs(doc, png_root / src.stem, src.stem)
             _close_active_documents(sw)  # CloseDoc -> discards, never prompts
             if i % 10 == 0 or i == len(docs):
                 log(f"neutral export: {i}/{len(docs)} documents ({pngs} PNGs)")
@@ -371,17 +368,7 @@ def export_neutral(sw: Any, version: str) -> dict[str, Any]:
     finally:
         _restore_export_prefs(sw, old_prefs)
 
-    zip_path = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}-cad.zip"
-    if zip_path.exists():
-        zip_path.unlink()
-    shutil.make_archive(str(zip_path.with_suffix("")), "zip", root_dir=str(stage))
-    if not zip_path.exists() or zip_path.stat().st_size == 0:
-        raise RuntimeError(f"neutral CAD zip not produced at {zip_path}")
-    log(f"neutral CAD zip: {zip_path.name} ({zip_path.stat().st_size / 1e6:.1f} MB, "
-        f"{exported} documents x STEP+STL + {pngs} PNGs)")
     return {
-        "zip": zip_path,
-        "size_mb": zip_path.stat().st_size / 1e6,
         "documents": exported,
         "parts": len(parts),
         "assemblies": len(assemblies),
@@ -391,27 +378,68 @@ def export_neutral(sw: Any, version: str) -> dict[str, Any]:
 
 
 # --------------------------------------------------------------------------- #
+# Bundle assembly (single zip)
+# --------------------------------------------------------------------------- #
+def bundle(sw: Any, revision: str, version: str) -> tuple[Path, dict[str, Any]]:
+    """Assemble the single release zip: Pack-and-Go + neutral STEP/STL/PNG.
+
+    One ``harmonic-analyzer-<version>.zip`` with everything a consumer needs:
+    ``solidworks/`` the native Pack-and-Go files (open as-is in SolidWorks),
+    ``step/`` + ``stl/`` neutral geometry, ``png/`` multi-angle previews. Staged
+    under the gitignored release dir, then zipped whole.
+    """
+    stage = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}"
+    if stage.exists():
+        shutil.rmtree(stage)  # regenerate-don't-repair: stale staging never shipped
+    stage.mkdir(parents=True)
+
+    # 1. Pack-and-Go writes a .zip (the proven comtypes path); extract it flat
+    #    into stage/solidworks so the native files ride in the one bundle.
+    pg_tmp = RELEASE_DIR / f"_{TOP_ASSEMBLY}-{version}-packandgo.zip"
+    if pg_tmp.exists():
+        pg_tmp.unlink()
+    facts = package(sw, revision, pg_tmp)
+    sw_dir = stage / "solidworks"
+    sw_dir.mkdir()
+    shutil.unpack_archive(str(pg_tmp), str(sw_dir), "zip")
+    pg_tmp.unlink()
+    facts["solidworks_files"] = sum(1 for _ in sw_dir.iterdir())
+
+    # 2. Neutral exports (STEP / STL / PNG) into the same stage.
+    facts.update(export_neutral(sw, stage))
+
+    # 3. One zip of the whole stage.
+    zip_path = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}.zip"
+    if zip_path.exists():
+        zip_path.unlink()
+    shutil.make_archive(str(zip_path.with_suffix("")), "zip", root_dir=str(stage))
+    if not zip_path.exists() or zip_path.stat().st_size == 0:
+        raise RuntimeError(f"release bundle not produced at {zip_path}")
+    facts["size_mb"] = zip_path.stat().st_size / 1e6
+    log(f"release bundle: {zip_path.name} ({facts['size_mb']:.1f} MB) -- "
+        f"solidworks/ + {facts['documents']} docs x STEP+STL + {facts['pngs']} PNGs")
+    return zip_path, facts
+
+
+# --------------------------------------------------------------------------- #
 # Release notes + publish
 # --------------------------------------------------------------------------- #
-def release_notes(version: str, facts: dict[str, Any], neutral: dict[str, Any]) -> str:
+def release_notes(version: str, facts: dict[str, Any]) -> str:
     sha = _git("rev-parse", "--short", "HEAD")
     return (
         f"Scripted SolidWorks reproduction of Michelson's 20-channel harmonic "
         f"analyzer.\n\n"
         f"The repository is source-of-truth (`build_all.py` regenerates every "
-        f"part). This release attaches a **Pack-and-Go CAD bundle** (native "
-        f"SolidWorks) plus a **neutral CAD bundle** (STEP + STL + preview PNGs) so "
-        f"the model can be opened without rebuilding -- and without SolidWorks.\n\n"
-        f"**Native bundle** `harmonic-analyzer-{version}.zip`\n"
-        f"- Top assembly: `{TOP_ASSEMBLY}.SLDASM` + {facts['documents']} "
-        f"referenced documents (flattened)\n"
+        f"part). This release attaches a single **CAD bundle** "
+        f"`harmonic-analyzer-{version}.zip` so the model can be opened without "
+        f"rebuilding -- with or without SolidWorks:\n\n"
+        f"- `solidworks/` -- native Pack-and-Go ({facts['documents']} referenced "
+        f"documents, flattened): open `{TOP_ASSEMBLY}.SLDASM` as-is\n"
+        f"- `step/` -- AP214 STEP + `stl/` fine binary STL (mm), one of each per "
+        f"document: {facts['parts']} parts + {facts['assemblies']} assemblies\n"
+        f"- `png/` -- {facts['views']}-angle preview renders "
+        f"({facts['pngs']} images)\n"
         f"- Size: {facts['size_mb']:.1f} MB\n\n"
-        f"**Neutral bundle** `harmonic-analyzer-{version}-cad.zip`\n"
-        f"- `step/` AP214 STEP + `stl/` fine binary STL (mm), one of each per "
-        f"document: {neutral['parts']} parts + {neutral['assemblies']} assemblies\n"
-        f"- `png/` {neutral['views']}-angle preview renders "
-        f"({neutral['pngs']} images)\n"
-        f"- Size: {neutral['size_mb']:.1f} MB\n\n"
         f"**Provenance**\n"
         f"- Commit: `{sha}`\n"
         f"- Built with SOLIDWORKS 3DEXPERIENCE R2026x, revision "
@@ -419,17 +447,16 @@ def release_notes(version: str, facts: dict[str, Any], neutral: dict[str, Any]) 
     )
 
 
-def publish(version: str, assets: list[Path], facts: dict[str, Any],
-            neutral: dict[str, Any], draft: bool) -> str:
+def publish(version: str, zip_path: Path, facts: dict[str, Any], draft: bool) -> str:
     """Annotated tag -> push -> gh release + asset upload. Returns release URL."""
     log(f"tagging {version} at HEAD")
     _git("tag", "-a", version, "-m", f"Release {version}")
     _git("push", "origin", version)
 
     args = [
-        "release", "create", version, *(str(a) for a in assets),
+        "release", "create", version, str(zip_path),
         "--title", f"harmonic-analyzer {version}",
-        "--notes", release_notes(version, facts, neutral),
+        "--notes", release_notes(version, facts),
     ]
     if draft:
         args.append("--draft")
@@ -455,25 +482,20 @@ def main() -> int:
     preflight(version, opts.allow_dirty)
 
     RELEASE_DIR.mkdir(parents=True, exist_ok=True)
-    zip_path = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}.zip"
-    if zip_path.exists():
-        zip_path.unlink()  # regenerate-don't-repair: stale bundle never shipped
 
     started = time.perf_counter()
     try:
         sw, revision = attach_solidworks()
-        facts = package(sw, revision, zip_path)
-        neutral = export_neutral(sw, version)
+        zip_path, facts = bundle(sw, revision, version)
     except Exception:
         traceback.print_exc()
         return 1
 
-    url = publish(version, [zip_path, neutral["zip"]], facts, neutral, opts.draft)
+    url = publish(version, zip_path, facts, opts.draft)
     print(f"\nDone in {time.perf_counter() - started:.1f}s.", flush=True)
     print(f"  version: {version}")
-    print(f"  bundle:  {zip_path} ({facts['size_mb']:.1f} MB)")
-    print(f"  neutral: {neutral['zip']} ({neutral['size_mb']:.1f} MB, "
-          f"{neutral['documents']} docs x STEP+STL)")
+    print(f"  bundle:  {zip_path} ({facts['size_mb']:.1f} MB) -- solidworks/ + "
+          f"{facts['documents']} docs x STEP+STL + {facts['pngs']} PNGs")
     print(f"  release: {url}")
     return 0
 
