@@ -39,7 +39,7 @@ channels:
     harmonic_n: 19
     ratio: [114, 120]
     phase_deg: 0.0
-    amplitude_mm: 1.2632   # square preset: 24 / harmonic_n (19, odd)
+    amplitude_mm: 4.2105   # square preset: 80 / harmonic_n (19, odd)
   - index: 2
     cone_teeth: 108
     cylinder_teeth: 120
@@ -53,7 +53,7 @@ channels:
     harmonic_n: 17
     ratio: [102, 120]
     phase_deg: 0.0
-    amplitude_mm: 1.4118   # square preset: 24 / harmonic_n (17, odd)
+    amplitude_mm: 4.7059   # square preset: 80 / harmonic_n (17, odd)
   - index: 4
     cone_teeth: 96
     cylinder_teeth: 120
@@ -67,7 +67,7 @@ channels:
     harmonic_n: 15
     ratio: [90, 120]
     phase_deg: 0.0
-    amplitude_mm: 1.6   # square preset: 24 / harmonic_n (15, odd)
+    amplitude_mm: 5.3333   # square preset: 80 / harmonic_n (15, odd)
   - index: 6
     cone_teeth: 84
     cylinder_teeth: 120
@@ -81,7 +81,7 @@ channels:
     harmonic_n: 13
     ratio: [78, 120]
     phase_deg: 0.0
-    amplitude_mm: 1.8462   # square preset: 24 / harmonic_n (13, odd)
+    amplitude_mm: 6.1538   # square preset: 80 / harmonic_n (13, odd)
   - index: 8
     cone_teeth: 72
     cylinder_teeth: 120
@@ -95,7 +95,7 @@ channels:
     harmonic_n: 11
     ratio: [66, 120]
     phase_deg: 0.0
-    amplitude_mm: 2.1818   # square preset: 24 / harmonic_n (11, odd)
+    amplitude_mm: 7.2727   # square preset: 80 / harmonic_n (11, odd)
   - index: 10
     cone_teeth: 60
     cylinder_teeth: 120
@@ -109,7 +109,7 @@ channels:
     harmonic_n: 9
     ratio: [54, 120]
     phase_deg: 0.0
-    amplitude_mm: 2.6667   # square preset: 24 / harmonic_n (9, odd)
+    amplitude_mm: 8.8889   # square preset: 80 / harmonic_n (9, odd)
   - index: 12
     cone_teeth: 48
     cylinder_teeth: 120
@@ -123,7 +123,7 @@ channels:
     harmonic_n: 7
     ratio: [42, 120]
     phase_deg: 0.0
-    amplitude_mm: 3.4286   # square preset: 24 / harmonic_n (7, odd)
+    amplitude_mm: 11.4286   # square preset: 80 / harmonic_n (7, odd)
   - index: 14
     cone_teeth: 36
     cylinder_teeth: 120
@@ -137,7 +137,7 @@ channels:
     harmonic_n: 5
     ratio: [30, 120]
     phase_deg: 0.0
-    amplitude_mm: 4.8   # square preset: 24 / harmonic_n (5, odd)
+    amplitude_mm: 16.0   # square preset: 80 / harmonic_n (5, odd)
   - index: 16
     cone_teeth: 24
     cylinder_teeth: 120
@@ -151,7 +151,7 @@ channels:
     harmonic_n: 3
     ratio: [18, 120]
     phase_deg: 0.0
-    amplitude_mm: 8.0   # square preset: 24 / harmonic_n (3, odd)
+    amplitude_mm: 26.6667   # square preset: 80 / harmonic_n (3, odd)
   - index: 18
     cone_teeth: 12
     cylinder_teeth: 120
@@ -165,4 +165,4 @@ channels:
     harmonic_n: 1
     ratio: [6, 120]
     phase_deg: 0.0
-    amplitude_mm: 24.0   # square preset: 24 / harmonic_n (1, odd)
+    amplitude_mm: 80.0   # square preset: 80 / harmonic_n (1, odd)
