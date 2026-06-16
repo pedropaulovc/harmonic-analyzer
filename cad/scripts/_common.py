@@ -924,8 +924,14 @@ def part_properties(part_name: str) -> dict[str, str]:
     import _config
 
     props: dict[str, str] = {"Title": part_name, "Generator": f"harmonic-analyzer @ {_git_sha()}"}
+    # Per-channel stretched springs (build_channel_assembly) are length variants of
+    # the registered base part -- they inherit its material / tolerance / fit so
+    # the tolerance audit stays clean without 10 redundant registry rows.
+    registry_name = part_name
+    if part_name.startswith("channel-spring-installed-stretch"):
+        registry_name = "channel-spring-installed"
     try:
-        reg = _config.parts(part_name)
+        reg = _config.parts(registry_name)
     except KeyError:
         return props
     field_map = {
