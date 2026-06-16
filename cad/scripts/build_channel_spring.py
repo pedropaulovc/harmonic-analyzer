@@ -43,6 +43,7 @@ from _common import (
     define_circle,
     ensure_fully_defined,
     insert_helix,
+    name_bore_axis,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -66,10 +67,29 @@ async def build_spring(
     part_name: str,
     body_length: float,
     leads: tuple[float, float] | None = None,
+    eye_axes: bool = False,
 ) -> dict[str, str]:
     """Build a channel spring with the given coil body length (mm).
 
     ``leads`` = (bottom, top) hook lead lengths; None = 2 x wire both ends.
+
+    ``eye_axes`` adds two named reference axes so the spring can be MATED at
+    both ends (vs. the legacy grounded-by-transform placement). They are
+    plane-intersection axes (view-independent, the ``name_bore_axis`` pattern),
+    derived from the same geometry the hooks are built from:
+
+      * bottom lead axis -- the straight bottom lead is a wire cylinder at
+        ``x = mean_radius`` running along the coil axis (+Y), ``z = 0``. It
+        threads the summing-lever plate hole, so its axis = ``Right Plane`` +
+        mean_radius (x = mean_radius) intersect ``Front Plane`` (z = 0).
+      * top eye axis -- the top loop's centre is at ``x = 0`` (mean_radius -
+        loop_r, and loop_r = mean_radius), ``y = body + top_lead``, with the
+        loop drawn in the Front plane so its axis is along Z. It hooks the
+        lever tab pin, so its axis = ``Right Plane`` (x = 0) intersect
+        ``Top Plane`` + (body + top_lead).
+
+    Off by default: the existing parts stay byte-identical until the summation
+    reorg adopts mated springs.
     """
     from solidworks_mcp.adapters.base import SweepParameters
 
@@ -95,6 +115,15 @@ async def build_spring(
     )
 
     await add_spring_end_hooks(adapter, MEAN_RADIUS, WIRE_DIA, body_length, leads=leads)
+
+    if eye_axes:
+        top_lead = leads[1] if leads is not None else HOOK_LEAD
+        await name_bore_axis(
+            adapter, "Right Plane", MEAN_RADIUS, "Front Plane", 0.0,
+            "bottom-lead axis (threads the plate hole)")
+        await name_bore_axis(
+            adapter, "Right Plane", 0.0, "Top Plane", body_length + top_lead,
+            "top-eye axis (hooks the lever tab)")
 
     # The helix base sketch stays unabsorbed-and-shown after InsertHelix;
     # shown sketches render in every assembly instance (20 floating seed
