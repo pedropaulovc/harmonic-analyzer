@@ -85,6 +85,7 @@ from _common import (
     component_transform,
     distance_driver,
     log,
+    MIRROR_PLANE,
     named_ref,
     place_component,
     rows_from_euler,
@@ -160,9 +161,13 @@ RAIL_TOP_Y = 1040.7
 LEVER_MOUNT_Z = 85.0  # clears the top-frame boss bores (DIMENSIONS.md)
 
 # --- spring (build_channel_spring_installed.py locals) ----------------------
+from build_channel_spring import build_spring  # noqa: E402
 from build_channel_spring_installed import (  # noqa: E402
     BOTTOM_LEAD as SPRING_BOTTOM_LEAD,
+    INSTALLED_BODY_LENGTH as SPRING_BASE_BODY,  # 63.05: the neutral installed body
+    PLATE_EYE_Y,  # 989.5: fixed summing-plate bottom-eye y (the spring's lower anchor)
     TOP_EYE_LOCAL_Y as SPRING_EYE_LOCAL_Y,  # 65.05: loop centre on the axis
+    TOP_LEAD as SPRING_TOP_LEAD,  # 2.0
 )
 
 SPRING_LOOP_R = 2.75  # = coil mean radius
@@ -524,6 +529,33 @@ def _assert_plate_threading(eye_y: float) -> None:
     )
 
 
+def _spring_spec(amplitude: float, hole_x_0: float) -> dict[str, float]:
+    """Per-channel stretched-spring geometry (parametric-springs memory, task #10).
+
+    The lever lifts/tilts with the amplitude, so the top eye moves to
+    ``(hole_x, eye_y)``; the bottom eye stays at the FIXED summing-plate hole
+    ``(hole_x_0, PLATE_EYE_Y)`` -- the neutral bottom-eye position the plate was
+    built around. The spring is grounded along that line at the EXACT gap length
+    (length = gap - top_lead - bottom_lead), instead of a fixed 63 mm body lifted
+    bodily into the plate (the F3 80 mm interference regression). The tilt is tiny
+    (<=1.1 deg) -- the span is almost pure stretch.
+    """
+    st = solve_state(amplitude)
+    phi = math.radians(st["lever_tilt"])
+    hole_x = FULCRUM[0] + LEVER_SPRING_X * math.cos(phi)
+    hole_y = FULCRUM[1] + LEVER_SPRING_X * math.sin(phi)
+    eye_y = hole_y - SPRING_EYE_DROP
+    dx = hole_x - hole_x_0
+    dy = eye_y - PLATE_EYE_Y
+    gap = math.hypot(dx, dy)
+    return {
+        "hole_y": hole_y, "eye_y": eye_y, "gap": gap,
+        "body": gap - SPRING_TOP_LEAD - SPRING_BOTTOM_LEAD,
+        "ux": dx / gap, "uy": dy / gap,
+        "theta": math.degrees(math.atan2(-dx, dy)),
+    }
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ComponentLinearPatternParameters
 
@@ -567,6 +599,36 @@ async def build(adapter) -> dict[str, str]:
     bar_clearance = state["bar_bottom"] - PIVOT[1]
     if bar_clearance < 5.5:
         raise RuntimeError(f"bar passes only {bar_clearance:.2f} above the shaft")
+
+    # Per-channel stretched springs (task #10): each spans the moving lever eye to
+    # the fixed plate hole at its measured gap length. Even (a_j=0) channels reuse
+    # the base part; the rest get a distinct stretched variant, built ONCE here
+    # (lean -- no PNG views; the canonical part renders its own). The variants are
+    # length variants of channel-spring-installed, so MIRROR_PLANE inherits its
+    # z-symmetry and part_properties inherits its registry row.
+    phi_0 = math.radians(state["lever_tilt"])  # state = solve_state(0.0)
+    hole_x_0 = FULCRUM[0] + LEVER_SPRING_X * math.cos(phi_0)
+    spring_specs = [_spring_spec(a, hole_x_0) for a in amplitudes]
+    variant_by_body: dict[float, str] = {}
+    for spec in spring_specs:
+        if abs(spec["body"] - SPRING_BASE_BODY) < 0.05:
+            spec["part"] = "channel-spring-installed"
+            continue
+        key = round(spec["body"], 2)
+        name = variant_by_body.get(key)
+        if name is None:
+            name = f"channel-spring-installed-stretch{len(variant_by_body):02d}"
+            variant_by_body[key] = name
+            MIRROR_PLANE[name] = ("z", 0.0)  # z-symmetric like the base spring
+        spec["part"] = name
+    log(f"spring variants: base 63.05 + {len(variant_by_body)} stretched bodies "
+        f"{sorted(variant_by_body)}")
+    for key, name in variant_by_body.items():
+        log(f"  building {name} body={key:.2f} (no views)")
+        await build_spring(
+            adapter, name, key,
+            leads=(SPRING_BOTTOM_LEAD, SPRING_TOP_LEAD), views=[])
+    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
     check("create_assembly", await adapter.create_assembly())
 
@@ -720,28 +782,29 @@ async def build(adapter) -> dict[str, str]:
             verify=(bar, bar_tgt),
         )
 
-        # Return spring (ground; cosmetic) -- placed PER CHANNEL hanging from
-        # this channel's lever tab, NOT patterned from one seed: the lever tilts
-        # with the amplitude, so a single-seed pattern would leave every other
-        # channel's spring detached from (and interfering with) its tilted lever.
-        # The spring stays vertical (Ry90: eye ring perpendicular to the lever
-        # face, top eye local (0, 65.05) on the axis); _assert_spring_threading
-        # is tilt-invariant (eye 3.37 below the hole either way), so the eye
-        # threads the lever hole at any tilt. The bottom hangs free here -- the
-        # summing-lever plate lives in output.SLDASM, so the rigid fixed-length
-        # spring's plate fit (it must stretch by the lever lift to reach the
-        # fixed plate) is a TOP-LEVEL concern; the parametric-length spring is
-        # the follow-up there (see the parametric-springs memory).
-        phi_j = math.radians(st["lever_tilt"])
-        hole_x_j = FULCRUM[0] + LEVER_SPRING_X * math.cos(phi_j)
-        hole_y_j = FULCRUM[1] + LEVER_SPRING_X * math.sin(phi_j)
-        eye_y_j = hole_y_j - SPRING_EYE_DROP
-        _assert_spring_threading(hole_y_j, eye_y_j)
+        # Return spring (ground; cosmetic) -- placed PER CHANNEL spanning this
+        # channel's (moving) lever eye to the FIXED summing-plate hole, at the
+        # measured gap length (parametric-springs memory / task #10). NOT a fixed
+        # 63 mm body and NOT patterned: the lever tilts/lifts with the amplitude,
+        # so a fixed-length vertical spring lifts its bottom bodily into the plate
+        # (the F3 80 mm interference regression). `spec` carries the per-channel
+        # length variant + the unit span direction (coil axis, bottom->top).
+        # _assert_spring_threading is tilt-invariant (eye 3.37 below the hole),
+        # so the top eye threads the lever hole; the bottom eye lands on the fixed
+        # plate hole at (hole_x_0, PLATE_EYE_Y) by construction.
+        spec = spring_specs[j]
+        _assert_spring_threading(spec["hole_y"], spec["eye_y"])
+        ux, uy = spec["ux"], spec["uy"]
+        # rows = Rz(theta).Ry90: local +Y (coil axis) -> the span direction,
+        # local +Z (eye axis) -> the in-plane normal. theta=0 recovers ROT_Y_POS90.
+        spring_rows = [[0.0, 0.0, -1.0], [ux, uy, 0.0], [uy, -ux, 0.0]]
         await place_component(
-            adapter, "channel-spring-installed",
-            [hole_x_j, eye_y_j - SPRING_EYE_LOCAL_Y, z_mid],
-            [0.0, 90.0, 0.0], ROT_Y_POS90,
-            label=f"channel-spring ch{j:02d} lift={hole_y_j - spring_hole_y:+.2f}",
+            adapter, spec["part"],
+            [hole_x_0 + SPRING_BOTTOM_LEAD * ux,
+             PLATE_EYE_Y + SPRING_BOTTOM_LEAD * uy, z_mid],
+            [0.0, 0.0, 0.0], spring_rows,
+            label=(f"channel-spring ch{j:02d} {spec['part'].rsplit('-', 1)[-1]} "
+                   f"body={spec['body']:.2f} tilt={spec['theta']:+.2f}"),
         )
 
         # Bushing SEEDS (ground; cosmetic) -- inserted only at the TOP channel,
