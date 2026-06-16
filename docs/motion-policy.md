@@ -32,13 +32,37 @@ counter spring, magnified ~4× to the pen. This cannot be faithfully simulated h
 pen Y(θ) = magnify · Σ aⱼ · cos(j·θ)      (aⱼ = amplitude-bar positions)
 ```
 
-`cad/scripts/truth_model.py` computes `Y(θ)` deterministically, and the pen is driven by an
-explicit equation-driven / path mate synced to the crank so the animation shows the correct
-trace with no force solver. This is acceptable because the machine is slow and
-equilibrium-dominated (inertia negligible) — it is reproduced **numerically**, not dynamically.
+`cad/scripts/truth_model.py` computes `Y(θ)` deterministically, and the pen is driven
+**kinematically** off that math — no force solver. Concretely (`cad/scripts/pen_driver.py`,
+installed by `build_output_assembly.py`):
+
+- a manual **`CrankDeg`** global in `output.SLDASM` is the curve's phase input (a standalone
+  global, deliberately *not* coupled to the drive-train crank — the summation is computed, so
+  the pen need not be mechanically slaved to the train, and `output.SLDASM` stays testable in
+  isolation);
+- the Fourier sum is accumulated through a chain of partial-sum globals `S1..S20`
+  (`Sₖ = Sₖ₋₁ + aₖ·cos(k·CrankDeg + φₖ)`) — SW's equation manager rejects a single 20-term
+  expression, so it is chained — then `PenY = Magnify · S20`;
+- the **pen-rod travel mate** dimension is equation-linked to `PenY`, mapped onto a physical
+  half-stroke (`machine.yaml output.pen_trace_half_mm`) since the demo coefficients are
+  dimensionless. At `output.pen_rest_crank_deg` the equation subtracts `pen_y(rest)` (via a
+  `PenRest` global) so the pen sits at its build datum and the saved render pose is unchanged.
+
+This is acceptable because the machine is slow and equilibrium-dominated (inertia negligible) —
+it is reproduced **numerically**, not dynamically.
 
 **Secondary cost:** no force/torque results from the sim, so crank effort and spring-rate
 sizing are done **analytically** (external spring calculations), not read off a study.
+
+## How the summation is verified
+
+- **Numerically** (no SolidWorks): `verify.py --suite truth` proves `truth_model` is a correct
+  band-limited synthesiser — per-channel single-term traces, superposition, the canonical
+  square/sawtooth/fundamental presets against their analytic targets.
+- **Kinematically** (in SolidWorks): `verify.py --suite motion` opens `output.SLDASM`, sweeps
+  `CrankDeg` over a full period, and asserts the sampled pen-marker tip traces
+  `truth_model.pen_y` (to the mapped half-stroke) within tolerance — the geometry realises the
+  computed curve.
 
 ## Where contact *is* tested
 
