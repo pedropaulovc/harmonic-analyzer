@@ -116,12 +116,13 @@ async def build_spring(
 
     await add_spring_end_hooks(adapter, MEAN_RADIUS, WIRE_DIA, body_length, leads=leads)
 
+    eye_axis_names: dict[str, str] = {}
     if eye_axes:
         top_lead = leads[1] if leads is not None else HOOK_LEAD
-        await name_bore_axis(
+        eye_axis_names["bottom_lead_axis"] = await name_bore_axis(
             adapter, "Right Plane", MEAN_RADIUS, "Front Plane", 0.0,
             "bottom-lead axis (threads the plate hole)")
-        await name_bore_axis(
+        eye_axis_names["top_eye_axis"] = await name_bore_axis(
             adapter, "Right Plane", 0.0, "Top Plane", body_length + top_lead,
             "top-eye axis (hooks the lever tab)")
 
@@ -133,7 +134,10 @@ async def build_spring(
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, SPRING_BLACK)  # ch30 plates: see _common palette
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, part_name)
+    result = await save_part_and_images(adapter, part_name)
+    # The two eye axes are baked into the .SLDPRT by the names captured above, so
+    # the summation assembly can mate both ends without re-deriving them.
+    return {**result, **eye_axis_names}
 
 
 async def build(adapter) -> dict[str, str]:
