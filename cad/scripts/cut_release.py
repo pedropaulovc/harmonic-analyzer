@@ -84,6 +84,15 @@ _EXPORT_INTS = {PREF_STL_QUALITY: 2, PREF_STEP_AP: 214, PREF_STL_UNITS: 0}
 _EXPORT_TOGGLES = {TOGGLE_STL_BINARY: True, TOGGLE_STL_ONE_FILE: True,
                    TOGGLE_STL_NO_TRANSLATE: True, TOGGLE_STL_SHOW_INFO: False}
 
+# Preview renders per document: (name, swStandardViews_e id). SaveBMP captures
+# the active viewport at an exact pixel size (the only screenshot API that does);
+# Pillow then transcodes the BMP to compressed PNG.
+PNG_VIEWS = (
+    ("isometric", 7), ("front", 1), ("back", 2),
+    ("left", 3), ("right", 4), ("top", 5),
+)
+PNG_WIDTH, PNG_HEIGHT = 1600, 1000
+
 
 # --------------------------------------------------------------------------- #
 # git / gh helpers (plain subprocess -- no SolidWorks involvement)
@@ -279,13 +288,37 @@ def _restore_export_prefs(sw: Any, old: dict[str, dict[int, Any]]) -> None:
         sw.SetUserPreferenceToggle(k, v)
 
 
+def _export_pngs(doc: Any, png_dir: Path, stem: str) -> int:
+    """Render the active document to a PNG per PNG_VIEWS angle; return the count.
+
+    SaveBMP is the only screenshot API honouring an explicit pixel size, but it
+    only writes BMP; capture to a temp .bmp at PNG_WIDTH x PNG_HEIGHT then
+    transcode to PNG with Pillow (kills the ~5x-larger BMP). ShowNamedView2 sets
+    the standard view, ViewZoomToFit2 frames the model before each shot.
+    """
+    from PIL import Image
+
+    png_dir.mkdir(parents=True, exist_ok=True)
+    for name, view_const in PNG_VIEWS:
+        doc.ShowNamedView2("", view_const)
+        doc.ViewZoomToFit2()
+        bmp = png_dir / f"{stem}_{name}.bmp"
+        if not doc.SaveBMP(str(bmp), PNG_WIDTH, PNG_HEIGHT) or not bmp.exists():
+            raise RuntimeError(f"SaveBMP produced no file: {bmp}")
+        with Image.open(bmp) as img:
+            img.save(png_dir / f"{stem}_{name}.png")
+        bmp.unlink()
+    return len(PNG_VIEWS)
+
+
 def export_neutral(sw: Any, version: str) -> dict[str, Any]:
-    """Export every built part and assembly to STEP + STL, then zip them.
+    """Export every built part and assembly to STEP + STL + PNGs, then zip them.
 
     Pack-and-Go ships the native (.SLDPRT/.SLDASM) bundle; this attaches the
     *neutral* CAD a consumer without SolidWorks can open -- AP214 STEP (exact
-    archival B-rep, colours carried) and fine binary STL (mesh, for
-    viewers/slicers), one of each per part and per assembly.
+    archival B-rep, colours carried), fine binary STL (mesh, for
+    viewers/slicers), and a multi-angle PNG preview set (PNG_VIEWS), one of each
+    per part and per assembly.
 
     Opens each document with the comtypes session already attached for
     Pack-and-Go and SaveAs3-exports it; assemblies write a monolithic STL and a
@@ -300,8 +333,9 @@ def export_neutral(sw: Any, version: str) -> dict[str, Any]:
         shutil.rmtree(stage)  # regenerate-don't-repair: stale exports never shipped
     step_dir = stage / "step"
     stl_dir = stage / "stl"
-    step_dir.mkdir(parents=True, exist_ok=True)
-    stl_dir.mkdir(parents=True, exist_ok=True)
+    png_dir = stage / "png"
+    for d in (step_dir, stl_dir, png_dir):
+        d.mkdir(parents=True, exist_ok=True)
 
     # Close the top assembly Pack-and-Go left open BEFORE enumerating: while an
     # assembly is loaded SolidWorks writes a per-component lock file (~$<name>)
@@ -318,7 +352,7 @@ def export_neutral(sw: Any, version: str) -> dict[str, Any]:
     log(f"neutral export: {len(parts)} parts + {len(assemblies)} assemblies")
 
     old_prefs = _set_export_prefs(sw)
-    exported = 0
+    exported = pngs = 0
     try:
         for i, (src, doc_type) in enumerate(docs, 1):
             sw.OpenDoc6(str(src), doc_type, SW_OPEN_SILENT, "", 0, 0)
@@ -329,9 +363,10 @@ def export_neutral(sw: Any, version: str) -> dict[str, Any]:
                 rc = doc.SaveAs3(str(out), 0, SW_SAVE_OPTS)
                 if not out.exists() or out.stat().st_size == 0:
                     raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={rc})")
+            pngs += _export_pngs(doc, png_dir / src.stem, src.stem)
             _close_active_documents(sw)  # CloseDoc -> discards, never prompts
             if i % 10 == 0 or i == len(docs):
-                log(f"neutral export: {i}/{len(docs)} documents")
+                log(f"neutral export: {i}/{len(docs)} documents ({pngs} PNGs)")
         exported = len(docs)
     finally:
         _restore_export_prefs(sw, old_prefs)
@@ -342,14 +377,16 @@ def export_neutral(sw: Any, version: str) -> dict[str, Any]:
     shutil.make_archive(str(zip_path.with_suffix("")), "zip", root_dir=str(stage))
     if not zip_path.exists() or zip_path.stat().st_size == 0:
         raise RuntimeError(f"neutral CAD zip not produced at {zip_path}")
-    log(f"neutral CAD zip: {zip_path.name} "
-        f"({zip_path.stat().st_size / 1e6:.1f} MB, {exported} documents x STEP+STL)")
+    log(f"neutral CAD zip: {zip_path.name} ({zip_path.stat().st_size / 1e6:.1f} MB, "
+        f"{exported} documents x STEP+STL + {pngs} PNGs)")
     return {
         "zip": zip_path,
         "size_mb": zip_path.stat().st_size / 1e6,
         "documents": exported,
         "parts": len(parts),
         "assemblies": len(assemblies),
+        "pngs": pngs,
+        "views": len(PNG_VIEWS),
     }
 
 
@@ -363,8 +400,8 @@ def release_notes(version: str, facts: dict[str, Any], neutral: dict[str, Any]) 
         f"analyzer.\n\n"
         f"The repository is source-of-truth (`build_all.py` regenerates every "
         f"part). This release attaches a **Pack-and-Go CAD bundle** (native "
-        f"SolidWorks) plus a **neutral CAD bundle** (STEP + STL) so the model can "
-        f"be opened without rebuilding -- and without SolidWorks.\n\n"
+        f"SolidWorks) plus a **neutral CAD bundle** (STEP + STL + preview PNGs) so "
+        f"the model can be opened without rebuilding -- and without SolidWorks.\n\n"
         f"**Native bundle** `harmonic-analyzer-{version}.zip`\n"
         f"- Top assembly: `{TOP_ASSEMBLY}.SLDASM` + {facts['documents']} "
         f"referenced documents (flattened)\n"
@@ -372,6 +409,8 @@ def release_notes(version: str, facts: dict[str, Any], neutral: dict[str, Any]) 
         f"**Neutral bundle** `harmonic-analyzer-{version}-cad.zip`\n"
         f"- `step/` AP214 STEP + `stl/` fine binary STL (mm), one of each per "
         f"document: {neutral['parts']} parts + {neutral['assemblies']} assemblies\n"
+        f"- `png/` {neutral['views']}-angle preview renders "
+        f"({neutral['pngs']} images)\n"
         f"- Size: {neutral['size_mb']:.1f} MB\n\n"
         f"**Provenance**\n"
         f"- Commit: `{sha}`\n"
