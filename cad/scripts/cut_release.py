@@ -67,11 +67,14 @@ PREF_STL_QUALITY = 78        # int: swSTLQuality -> 2 = fine
 PREF_STEP_AP = 75            # int: swStepAP -> 214 (carries colours)
 PREF_STL_UNITS = 211         # int: swExportStlUnits -> 0 = swMM
 TOGGLE_STL_BINARY = 69       # swSTLBinaryFormat
+TOGGLE_STL_SHOW_INFO = 70    # swSTLShowInfoOnSave: the "Save <name>.STL?" modal
 TOGGLE_STL_ONE_FILE = 72     # swSTLComponentsIntoOneFile (monolithic asm STL)
 TOGGLE_STL_NO_TRANSLATE = 71  # swSTLDontTranslateToPositive: keep model origin
 _EXPORT_INTS = {PREF_STL_QUALITY: 2, PREF_STEP_AP: 214, PREF_STL_UNITS: 0}
+# swSTLShowInfoOnSave -> False: SaveAs3 to .STL otherwise pops a per-file
+# triangle-count info dialog that hangs the headless export on the first part.
 _EXPORT_TOGGLES = {TOGGLE_STL_BINARY: True, TOGGLE_STL_ONE_FILE: True,
-                   TOGGLE_STL_NO_TRANSLATE: True}
+                   TOGGLE_STL_NO_TRANSLATE: True, TOGGLE_STL_SHOW_INFO: False}
 
 
 # --------------------------------------------------------------------------- #
@@ -292,13 +295,20 @@ def export_neutral(sw: Any, version: str) -> dict[str, Any]:
     step_dir.mkdir(parents=True, exist_ok=True)
     stl_dir.mkdir(parents=True, exist_ok=True)
 
+    # Close the top assembly Pack-and-Go left open BEFORE enumerating: while an
+    # assembly is loaded SolidWorks writes a per-component lock file (~$<name>)
+    # alongside each .SLDPRT, which would otherwise double the work list.
+    _discard_open_documents(sw)
+
+    def _models(folder: Path, ext: str) -> list[Path]:
+        return sorted(p for p in folder.glob(f"*.{ext}") if not p.name.startswith("~"))
+
     # parts first (assemblies reference them), each (path, swDocType).
-    parts = sorted(OUT_SLDPRT.glob("*.SLDPRT"))
-    assemblies = sorted(OUT_SLDASM.glob("*.SLDASM"))
+    parts = _models(OUT_SLDPRT, "SLDPRT")
+    assemblies = _models(OUT_SLDASM, "SLDASM")
     docs = [(p, SW_DOC_PART) for p in parts] + [(a, SW_DOC_ASSEMBLY) for a in assemblies]
     log(f"neutral export: {len(parts)} parts + {len(assemblies)} assemblies")
 
-    _discard_open_documents(sw)
     old_prefs = _set_export_prefs(sw)
     exported = 0
     try:
