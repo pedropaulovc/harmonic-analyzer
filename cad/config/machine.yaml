@@ -66,7 +66,7 @@ output:
 
 amplitude:                         # ch15 — the amplitude bars set the Fourier coefficients
   preset: square                   # the waveform the bar stations encode
-  fundamental_station_mm: 24.0     # a_1 bar station; a_j = this / harmonic_n (odd j), 0 (even j)
+  fundamental_station_mm: 80.0     # a_1 bar station; a_j = this / harmonic_n (odd j), 0 (even j)
   max_travel_mm: 88.0              # ±88 mm amplitude-bar seesaw range (ch.15)
   source: "DIMENSIONS.md ch15; truth_model.py"
   confidence: med
