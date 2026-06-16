@@ -87,6 +87,7 @@ from _common import (
     log,
     MIRROR_PLANE,
     named_ref,
+    OUT_SLDPRT,
     place_component,
     rows_from_euler,
     run_build,
@@ -624,6 +625,9 @@ async def build(adapter) -> dict[str, str]:
     log(f"spring variants: base 63.05 + {len(variant_by_body)} stretched bodies "
         f"{sorted(variant_by_body)}")
     for key, name in variant_by_body.items():
+        if (OUT_SLDPRT / f"{name}.SLDPRT").exists():
+            log(f"  skip {name} body={key:.2f} (.SLDPRT exists)")
+            continue
         log(f"  building {name} body={key:.2f} (no views)")
         await build_spring(
             adapter, name, key,
