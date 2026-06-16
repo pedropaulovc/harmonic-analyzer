@@ -87,6 +87,7 @@ from _common import (
     log,
     named_ref,
     place_component,
+    rows_from_euler,
     run_build,
     save_assembly_and_images,
     spin_driver,
@@ -235,13 +236,23 @@ def _org(adapter, name: str) -> list[float]:
     return [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
 
 
-def solve_default_state() -> dict[str, float]:
-    """Solve the default-state kinematics; all downstream placements follow.
+# Top-pin-to-foot span of the rigid bar (Axis1 local y - Axis2 local y); the
+# amplitude swing pivots the bar about its top pin over this lever arm.
+BAR_TOP_TO_FOOT = BAR_TOP_PIN_LOCAL[1] - BAR_FOOT_LOCAL[1]  # 806.45
+# Foot-axis -> notch-roof contact offset in the bar's UNtilted (vertical) XY
+# frame: the roof sits at the bar's -X edge (-BAR_WIDTH/2) and BAR_FOOT_NOTCH up,
+# lifted BAR_CONTACT_GAP off the arc. Rotating this by the bar tilt keeps the
+# contact-on-arc constraint exact as the bar swings.
+_CONTACT_OFF_X = -BAR_WIDTH / 2.0
+_CONTACT_OFF_Y = BAR_FOOT_NOTCH - BAR_CONTACT_GAP
+
+
+def _arc_geometry() -> dict[str, float]:
+    """Amplitude-independent rocker/rod kinematics + the top-edge arc centre.
 
     Rod-pin point P: |P - pivot| = 25.4 and |P - ring centre| = 127, +X
-    branch (rod side). Bar contact: highest point of the tilted arm's
-    top-edge R800 arc within the bar's 6.35 footprint centred on the
-    pivot x. Lever tilt: bar-pin chain height vs the fulcrum.
+    branch (rod side). The R800 arc the bar foot rides has its centre 808 mm
+    out along the tilted arm's +Y, about the pivot hole at local (0, 8).
     """
     ox, oy = PIVOT
     cx, cy = RING_CENTER
@@ -256,35 +267,87 @@ def solve_default_state() -> dict[str, float]:
     px = ox + a * ux - h * uy
     py = oy + a * uy + h * ux
     arm_tilt = math.degrees(math.atan2(py - oy, px - ox))
-    rod_tilt = math.degrees(math.atan2(px - cx, py - cy))
-    rod_tilt = -rod_tilt  # atan2(x, y) measures from +Y; Rz is CCW from +X
+    rod_tilt = -math.degrees(math.atan2(px - cx, py - cy))  # Rz is CCW from +X
 
-    # Tilted arm: local arc centre (0, 816) about the pivot hole (0, 8).
     t = math.radians(arm_tilt)
     rel = ARM_ARC_CENTER_LOCAL_Y - ARM_PIVOT_LOCAL_Y
     acx = ox - rel * math.sin(t)
     acy = oy + rel * math.cos(t)
-    bar_left = ox - BAR_WIDTH / 2.0  # contact at the bar's -X edge (arc max)
-    contact_y = acy - math.sqrt(ARM_TOP_RADIUS**2 - (bar_left - acx) ** 2)
-    contact_alt = acy - math.sqrt(
-        ARM_TOP_RADIUS**2 - (ox + BAR_WIDTH / 2.0 - acx) ** 2
-    )
-    if contact_alt > contact_y:
-        raise RuntimeError("bar contact expected at the -X edge; check tilt sign")
+    return {"arm_tilt": arm_tilt, "rod_tilt": rod_tilt,
+            "pin_x": px, "pin_y": py, "acx": acx, "acy": acy}
 
-    bar_bottom = contact_y - BAR_FOOT_NOTCH + BAR_CONTACT_GAP
-    pin_y = bar_bottom + BAR_LENGTH - BAR_TOP_PIN_DROP
-    lever_tilt = math.degrees(math.asin((pin_y - FULCRUM[1]) / LEVER_BAR_PIN_X))
+
+_ARC = _arc_geometry()
+
+
+def solve_state(amplitude: float = 0.0) -> dict[str, float]:
+    """Solve one channel's kinematics for an amplitude-bar station ``amplitude``.
+
+    ``amplitude`` is the foot-axis X offset from the rocker pivot (mm), the
+    Fourier coefficient a_j (channels.yaml ``amplitude_mm``); 0 reproduces the
+    neutral pose bit-exactly. The mechanism is a 4-bar loop: the bar top pin
+    rides the lever's 127 mm crank, the rigid bar (806.45 mm) hangs to the foot,
+    and the foot-notch roof rests on the rocker's R800 top-edge arc. Positive
+    amplitude slides the foot -X along the arc (the lifting side, clear of the
+    pivot shaft), tilting the bar by ``bar_tilt`` and the lever by ``lever_tilt``.
+    Solved by driving the lever-reach residual to zero over the bar tilt.
+    """
+    ox, _oy = PIVOT
+    acx, acy = _ARC["acx"], _ARC["acy"]
+    fx = ox - amplitude  # foot-axis X (-X = the lifting side)
+
+    def foot_y(beta: float) -> float:
+        s, c = math.sin(beta), math.cos(beta)
+        cx_c = fx + _CONTACT_OFF_X * c - _CONTACT_OFF_Y * s
+        ky = _CONTACT_OFF_X * s + _CONTACT_OFF_Y * c
+        disc = ARM_TOP_RADIUS**2 - (cx_c - acx) ** 2
+        if disc <= 0.0:
+            raise RuntimeError(f"foot station {amplitude:.1f} mm runs off the R800 arc")
+        return acy - ky - math.sqrt(disc)
+
+    def residual(beta: float) -> float:
+        fy = foot_y(beta)
+        tx = fx + BAR_TOP_TO_FOOT * math.sin(beta)
+        ty = fy + BAR_TOP_TO_FOOT * math.cos(beta)
+        return math.hypot(tx - FULCRUM[0], ty - FULCRUM[1]) - LEVER_BAR_PIN_X
+
+    beta = _bisect(residual, -0.20, 0.30)
+    fy = foot_y(beta)
+    tx = fx + BAR_TOP_TO_FOOT * math.sin(beta)
+    ty = fy + BAR_TOP_TO_FOOT * math.cos(beta)
+    contact_y = fy + _CONTACT_OFF_X * math.sin(beta) + _CONTACT_OFF_Y * math.cos(beta)
     return {
-        "arm_tilt": arm_tilt,
-        "rod_tilt": rod_tilt,
-        "pin_x": px,
-        "pin_y": py,
+        "arm_tilt": _ARC["arm_tilt"],
+        "rod_tilt": _ARC["rod_tilt"],
+        "pin_x": _ARC["pin_x"],
+        "pin_y": _ARC["pin_y"],
+        "bar_tilt": math.degrees(beta),
+        "bar_bottom": fy,                # foot-axis Y
+        "bar_origin_x": fx - (BAR_WIDTH / 2.0) * math.cos(beta),
+        "bar_origin_y": fy + (BAR_WIDTH / 2.0) * math.sin(beta),
         "contact_y": contact_y,
-        "bar_bottom": bar_bottom,
-        "bar_pin_y": pin_y,
-        "lever_tilt": lever_tilt,
+        "bar_pin_y": ty,
+        "lever_tilt": math.degrees(math.atan2(ty - FULCRUM[1], tx - FULCRUM[0])),
     }
+
+
+def _bisect(f, lo: float, hi: float, tol: float = 1e-10, iters: int = 80) -> float:
+    """Root of monotone ``f`` on [lo, hi] (the bar-tilt that closes the loop)."""
+    flo, fhi = f(lo), f(hi)
+    if flo == 0.0:
+        return lo
+    if flo * fhi > 0.0:
+        raise RuntimeError(f"bar-tilt root not bracketed: f({lo})={flo:.3f}, f({hi})={fhi:.3f}")
+    for _ in range(iters):
+        mid = 0.5 * (lo + hi)
+        fmid = f(mid)
+        if abs(fmid) < tol or (hi - lo) < tol:
+            return mid
+        if (fmid > 0.0) == (fhi > 0.0):
+            hi, fhi = mid, fmid
+        else:
+            lo, flo = mid, fmid
+    return 0.5 * (lo + hi)
 
 
 async def _revolute(
@@ -464,18 +527,37 @@ def _assert_plate_threading(eye_y: float) -> None:
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ComponentLinearPatternParameters
 
-    state = solve_default_state()
+    # The amplitude-bar station per channel IS the Fourier coefficient a_j
+    # (channels.yaml amplitude_mm, the square-wave preset). solve_state(a_j)
+    # repositions that channel's bar + lever; a_j = 0 is the neutral pose. The
+    # neutral state still anchors the amplitude-independent rocker/rod and the
+    # cosmetic spring/threading seed.
+    amplitudes = _config.amplitudes()
+    if any(a < 0.0 for a in amplitudes):
+        raise RuntimeError(
+            "amplitude_mm must be >= 0 (the lifting side keeps the foot clear of"
+            f" the pivot shaft); got {amplitudes}"
+        )
+    state = solve_state(0.0)
     log(
-        "default state: arm tilt %.3f deg, rod tilt %.3f deg, pin (%.2f, %.2f),"
+        "neutral state: arm tilt %.3f deg, rod tilt %.3f deg, pin (%.2f, %.2f),"
         % (state["arm_tilt"], state["rod_tilt"], state["pin_x"], state["pin_y"])
     )
     log(
         "  bar contact %.3f, bar bottom %.3f, bar pin y %.3f, lever tilt %.3f deg"
         % (state["contact_y"], state["bar_bottom"], state["bar_pin_y"], state["lever_tilt"])
     )
+    log(
+        "amplitude preset: a_j stations (mm) = %s"
+        % ", ".join(f"{a:.2f}" for a in amplitudes)
+    )
 
+    # Neutral reference design: the spring/plate threading is asserted at the
+    # neutral lever pose (the as-photographed installed length). Per-channel
+    # springs translate up with their levers (placed in the loop); their fit to
+    # the fixed summing plate is realised at the top level by the parametric
+    # spring length (parametric-springs memory).
     phi = math.radians(state["lever_tilt"])
-    spring_hole_x = FULCRUM[0] + LEVER_SPRING_X * math.cos(phi)
     spring_hole_y = FULCRUM[1] + LEVER_SPRING_X * math.sin(phi)
     eye_y = spring_hole_y - SPRING_EYE_DROP
     _assert_spring_threading(spring_hole_y, eye_y)
@@ -522,9 +604,10 @@ async def build(adapter) -> dict[str, str]:
     # Per-channel chain: the four moving parts are inserted on-solution
     # (ground=False) and joined by revolutes whose spin/axial dims are the
     # per-channel suppressible drivers (see _revolute).
+    # Rocker + rod are amplitude-independent (same tilt every channel); the bar
+    # and lever are placed per channel from solve_state(a_j).
     arm_rows = rot_z_rows(state["arm_tilt"])
     rod_rows = rot_z_rows(state["rod_tilt"])
-    lever_rows = rot_z_rows(state["lever_tilt"])
     t = math.radians(state["arm_tilt"])
     arm_origin_dx = ARM_PIVOT_LOCAL_Y * math.sin(t)  # -(0,8)*Rz offset
     arm_origin_dy = ARM_PIVOT_LOCAL_Y * math.cos(t)
@@ -536,11 +619,14 @@ async def build(adapter) -> dict[str, str]:
     # channels must articulate independently (each runs at a different harmonic
     # frequency) for the Motion study. pivot_od (a shaft-OD point) selects the
     # Z-parallel cylindrical face = the pattern direction axis.
-    spring_seed = pivot_bush_seed = lever_bush_seed = ""
+    pivot_bush_seed = lever_bush_seed = ""
 
     for j in range(CHANNELS):
         zj = z_station(j)
         z_mid = zj + ARM_MID_DZ
+        st = solve_state(amplitudes[j])  # this channel's bar/lever pose
+        bar_rows = rows_from_euler([st["bar_tilt"], 90.0, 0.0])
+        lever_rows = rot_z_rows(st["lever_tilt"])
 
         rocker = await place_component(
             adapter, "rocker-arm",
@@ -554,22 +640,20 @@ async def build(adapter) -> dict[str, str]:
             [0.0, 0.0, state["rod_tilt"]], rod_rows,
             ground=False, label=f"connecting-rod ch{j:02d}",
         )
-        # Bar rotated 90 about Y: local X (slot direction) -> -Z, local
-        # Z (depth) -> +X; slot centre (local x 3.175) lands on z_mid.
+        # Bar rotated 90 about Y (local X slot -> -Z, local Z depth -> +X) then
+        # swung by st['bar_tilt'] about Z to set the foot station: rows_from_euler
+        # ([tilt, 90, 0]) is exactly that Ry90 . Rz(-tilt). Origin places the foot
+        # axis at (PIVOT[0] - a_j, bar_bottom); the swing keeps the foot on the arc.
         bar = await place_component(
             adapter, "amplitude-bar",
-            [
-                PIVOT[0] - BAR_WIDTH / 2.0,
-                state["bar_bottom"],
-                z_mid + BAR_WIDTH / 2.0,
-            ],
-            [0.0, 90.0, 0.0], ROT_Y_POS90,
-            ground=False, label=f"amplitude-bar ch{j:02d}",
+            [st["bar_origin_x"], st["bar_origin_y"], z_mid + BAR_WIDTH / 2.0],
+            [st["bar_tilt"], 90.0, 0.0], bar_rows,
+            ground=False, label=f"amplitude-bar ch{j:02d} a={amplitudes[j]:.2f}",
         )
         lever = await place_component(
             adapter, "channel-lever",
             [FULCRUM[0], FULCRUM[1], z_mid],
-            [0.0, 0.0, state["lever_tilt"]], lever_rows,
+            [0.0, 0.0, st["lever_tilt"]], lever_rows,
             ground=False, label=f"channel-lever ch{j:02d}",
         )
 
@@ -636,43 +720,57 @@ async def build(adapter) -> dict[str, str]:
             verify=(bar, bar_tgt),
         )
 
-        # Spring + bushing SEEDS (ground; cosmetic in artifact A) -- inserted
-        # only at the TOP channel, then replicated DOWN the spine by a pattern
-        # after the loop. The shaft-OD direction reference (pivot_od) evaluates
-        # to the -Z sense, so the seed sits at the high-Z end and the copies
-        # fill toward channel 0 (verified on-plane after the loop). The spring
-        # is rotated 90 about Y: eye ring perpendicular to the lever face; top
-        # eye centre (local (0, 65.05)) is on the axis, Ry-invariant; bottom
-        # lead lands at z_mid - 2.75.
-        if j == CHANNELS - 1:
-            spring_seed = await place_component(
-                adapter, "channel-spring-installed",
-                [spring_hole_x, eye_y - SPRING_EYE_LOCAL_Y, z_mid],
-                [0.0, 90.0, 0.0], ROT_Y_POS90,
-                label=f"channel-spring seed ch{j:02d}",
-            )
-            if CHANNELS > 1:
-                z_gap_top = z_mid - PITCH / 2.0  # gap below the top channel
-                pivot_bush_seed = await place_component(
-                    adapter, "pivot-bushing",
-                    [PIVOT[0], PIVOT[1], z_gap_top],
-                    [0.0, 0.0, 0.0], IDENTITY,
-                    label=f"pivot-bushing seed {j - 1:02d}/{j:02d}",
-                )
-                lever_bush_seed = await place_component(
-                    adapter, "lever-bushing",
-                    [FULCRUM[0], FULCRUM[1], z_gap_top],
-                    [0.0, 0.0, 0.0], IDENTITY,
-                    label=f"lever-bushing seed {j - 1:02d}/{j:02d}",
-                )
+        # Return spring (ground; cosmetic) -- placed PER CHANNEL hanging from
+        # this channel's lever tab, NOT patterned from one seed: the lever tilts
+        # with the amplitude, so a single-seed pattern would leave every other
+        # channel's spring detached from (and interfering with) its tilted lever.
+        # The spring stays vertical (Ry90: eye ring perpendicular to the lever
+        # face, top eye local (0, 65.05) on the axis); _assert_spring_threading
+        # is tilt-invariant (eye 3.37 below the hole either way), so the eye
+        # threads the lever hole at any tilt. The bottom hangs free here -- the
+        # summing-lever plate lives in output.SLDASM, so the rigid fixed-length
+        # spring's plate fit (it must stretch by the lever lift to reach the
+        # fixed plate) is a TOP-LEVEL concern; the parametric-length spring is
+        # the follow-up there (see the parametric-springs memory).
+        phi_j = math.radians(st["lever_tilt"])
+        hole_x_j = FULCRUM[0] + LEVER_SPRING_X * math.cos(phi_j)
+        hole_y_j = FULCRUM[1] + LEVER_SPRING_X * math.sin(phi_j)
+        eye_y_j = hole_y_j - SPRING_EYE_DROP
+        _assert_spring_threading(hole_y_j, eye_y_j)
+        await place_component(
+            adapter, "channel-spring-installed",
+            [hole_x_j, eye_y_j - SPRING_EYE_LOCAL_Y, z_mid],
+            [0.0, 90.0, 0.0], ROT_Y_POS90,
+            label=f"channel-spring ch{j:02d} lift={hole_y_j - spring_hole_y:+.2f}",
+        )
 
-    # Replicate the grounded seeds along the Z shaft axis (pivot_od selects the
-    # shaft's Z-parallel cylindrical face). Springs span all CHANNELS; the two
-    # bushing banks fill the CHANNELS-1 inter-channel gaps. Moving parts are
-    # deliberately NOT patterned (each must keep its own DOF).
+        # Bushing SEEDS (ground; cosmetic) -- inserted only at the TOP channel,
+        # then replicated DOWN the spine by a pattern after the loop. These ride
+        # the shafts and are amplitude-independent, so a single-seed pattern is
+        # correct (unlike the springs). pivot_od selects the -Z shaft-OD sense,
+        # so the seed sits at the high-Z end and copies fill toward channel 0.
+        if j == CHANNELS - 1 and CHANNELS > 1:
+            z_gap_top = z_mid - PITCH / 2.0  # gap below the top channel
+            pivot_bush_seed = await place_component(
+                adapter, "pivot-bushing",
+                [PIVOT[0], PIVOT[1], z_gap_top],
+                [0.0, 0.0, 0.0], IDENTITY,
+                label=f"pivot-bushing seed {j - 1:02d}/{j:02d}",
+            )
+            lever_bush_seed = await place_component(
+                adapter, "lever-bushing",
+                [FULCRUM[0], FULCRUM[1], z_gap_top],
+                [0.0, 0.0, 0.0], IDENTITY,
+                label=f"lever-bushing seed {j - 1:02d}/{j:02d}",
+            )
+
+    # Replicate the grounded bushing seeds along the Z shaft axis (pivot_od
+    # selects the shaft's Z-parallel cylindrical face). The two bushing banks
+    # fill the CHANNELS-1 inter-channel gaps. Moving parts AND the springs are
+    # deliberately NOT patterned (the springs follow their per-channel levers,
+    # the moving parts each keep their own DOF).
     if CHANNELS > 1:
         for seed, n, lbl in (
-            (spring_seed, CHANNELS, "channel-spring"),
             (pivot_bush_seed, CHANNELS - 1, "pivot-bushing"),
             (lever_bush_seed, CHANNELS - 1, "lever-bushing"),
         ):
@@ -687,12 +785,10 @@ async def build(adapter) -> dict[str, str]:
                     )
                 ),
             )
-        # Positively confirm the copies landed on the channel/gap planes.
-        z_mid_planes = [z_station(k) + ARM_MID_DZ for k in range(CHANNELS)]
+        # Positively confirm the copies landed on the inter-channel gap planes.
         z_gap_planes = [
             z_station(k) + ARM_MID_DZ + PITCH / 2.0 for k in range(CHANNELS - 1)
         ]
-        _verify_pattern_z(adapter, "channel-spring-installed", z_mid_planes, "spring pattern")
         _verify_pattern_z(adapter, "pivot-bushing", z_gap_planes, "pivot-bushing pattern")
         _verify_pattern_z(adapter, "lever-bushing", z_gap_planes, "lever-bushing pattern")
 
