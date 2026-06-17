@@ -1214,8 +1214,8 @@ _STL_BBOX_CACHE: dict[str, tuple[tuple[float, float], ...]] = {}
 
 def stl_bbox_mm(stem: str) -> tuple[tuple[float, float], ...]:
     """((xmin, xmax), (ymin, ymax), (zmin, zmax)) of ``out/stl/<stem>.STL``
-    in mm, part-local frame (export_models.py writes binary STLs in metres,
-    untranslated)."""
+    in mm, part-local frame (export_models.py writes binary STLs in
+    millimetres, untranslated)."""
     cached = _STL_BBOX_CACHE.get(stem)
     if cached is not None:
         return cached
@@ -1247,7 +1247,7 @@ def stl_bbox_mm(stem: str) -> tuple[tuple[float, float], ...]:
         raise RuntimeError(f"{path.name}: not a parsable STL ({count} facets?)")
     if not all(math.isfinite(v) for v in (*lo, *hi)):
         raise RuntimeError(f"{path.name}: no vertices found")
-    bbox = tuple((lo[k] * 1000.0, hi[k] * 1000.0) for k in range(3))
+    bbox = tuple((lo[k], hi[k]) for k in range(3))  # STL already in mm
     _STL_BBOX_CACHE[stem] = bbox
     return bbox
 

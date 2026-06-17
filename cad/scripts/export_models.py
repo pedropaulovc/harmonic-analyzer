@@ -4,16 +4,16 @@ For every model referenced by comparisons/manifest.json: AP214 STEP (exact
 archival geometry) and the offline-render feed consumed by
 comparisons/tools/render_offline.py —
 
-* parts: fine binary STL in METERS, untranslated (cad/out/stl/<dashed>.STL)
+* parts: fine binary STL in MILLIMETRES, untranslated (cad/out/stl/<dashed>.STL)
   plus an appearance colour in cad/out/stl/colors.json;
-* assemblies: a monolithic cad/out/stl/<dashed>.STL in MILLIMETRES
-  (viewer/slicer-friendly; not used for rendering) and cad/out/boxes/
+* assemblies: a monolithic cad/out/stl/<dashed>.STL and cad/out/boxes/
   <dashed>.json with per-component bounding boxes (framing) plus a scene
   graph: one entry per visible leaf component with its part stem,
   assembly-space transform (IMathTransform.ArrayData, row-vector
-  convention, translation in metres) and RGB. Every referenced part gets
+  convention, translation in millimetres) and RGB. Every referenced part gets
   its own STL, shared across assemblies and instanced by the Blender
-  worker (so 20 cone gears cost one mesh).
+  worker (so 20 cone gears cost one mesh). All geometry is in millimetres
+  (mesh units == the scene-graph transform units, so they pair directly).
 
 Colours cascade: component-level override -> part doc colour -> the
 material-name table below (the build scripts only ever assign database
@@ -44,7 +44,7 @@ COLORS = OUT_STL / "colors.json"
 # swconst ids (extracted from the installed swconst.tlb, R2026x)
 PREF_STL_QUALITY = 78        # int: swSTLQuality -> 2 = fine
 PREF_STEP_AP = 75            # int: swStepAP -> 214 (carries colours)
-PREF_STL_UNITS = 211         # int: swExportStlUnits -> 2 = swMETER
+PREF_STL_UNITS = 211         # int: swExportStlUnits -> 0 = swMM
 TOGGLE_STL_BINARY = 69       # swSTLBinaryFormat
 TOGGLE_STL_ONE_FILE = 72     # swSTLComponentsIntoOneFile
 TOGGLE_STL_NO_TRANSLATE = 71  # swSTLDontTranslateToPositive: keep model origin
@@ -61,7 +61,7 @@ MATERIAL_RGB = {
 }
 DEFAULT_RGB = (0.55, 0.55, 0.55)
 
-INT_PREFS = {PREF_STL_QUALITY: 2, PREF_STEP_AP: 214, PREF_STL_UNITS: 2}
+INT_PREFS = {PREF_STL_QUALITY: 2, PREF_STEP_AP: 214, PREF_STL_UNITS: 0}
 TOGGLES = {TOGGLE_STL_BINARY: True, TOGGLE_STL_ONE_FILE: True, TOGGLE_STL_NO_TRANSLATE: True}
 
 
@@ -165,7 +165,11 @@ def comp_xform(comp: Any) -> list[float] | None:
 
 
 def scan_assembly(adapter: Any, part_colors: dict) -> tuple[list, list, set[tuple]]:
-    """(boxes, scene components, referenced (stem, cfg, mesh) keys)."""
+    """(boxes, scene components, referenced (stem, cfg, mesh) keys).
+
+    The SolidWorks API reports boxes and transforms in metres (system units);
+    they are scaled to MILLIMETRES here so the persisted scene graph matches the
+    millimetre STL meshes it is rendered against."""
     model = adapter.currentModel
     _flag(model, "IModelDoc2")
     _flag(model, "IAssemblyDoc")
@@ -183,7 +187,7 @@ def scan_assembly(adapter: Any, part_colors: dict) -> tuple[list, list, set[tupl
         if not box:
             continue  # suppressed / no graphics
         short = name.split("/")[-1].lower()
-        boxes.append((short, tuple(float(v) for v in box)))
+        boxes.append((short, tuple(float(v) * 1000.0 for v in box)))  # m -> mm
         try:
             path = Path(str(comp.GetPathName()))
         except Exception:
@@ -196,6 +200,9 @@ def scan_assembly(adapter: Any, part_colors: dict) -> tuple[list, list, set[tupl
         if not xform:
             log(f"  !! no transform for {name}, skipped")
             continue
+        # translation (xform[9:12]) m -> mm; rotation [0:9] and scale [12] unitless
+        xform = [*xform[:9], xform[9] * 1000.0, xform[10] * 1000.0,
+                 xform[11] * 1000.0, *xform[12:]]
         stem = path.stem.lower()
         cfg = str(_read_member(comp, "ReferencedConfiguration") or "")
         mesh = mesh_key(stem, cfg)
@@ -331,10 +338,8 @@ def main() -> int:
                 if not out.exists():
                     raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={ok})")
                 log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB)")
-                mono = OUT_STL / f"{dashed}.STL"
-                adapter.swApp.SetUserPreferenceIntegerValue(PREF_STL_UNITS, 0)  # mm
+                mono = OUT_STL / f"{dashed}.STL"  # mm, like every other STL
                 ok = doc.SaveAs3(str(mono), 0, 0)
-                adapter.swApp.SetUserPreferenceIntegerValue(PREF_STL_UNITS, 2)
                 if not mono.exists():
                     raise RuntimeError(f"SaveAs3 produced no file: {mono} (rc={ok})")
                 log(f"saved {mono.name} ({mono.stat().st_size / 1e6:.1f} MB, mm)")
@@ -344,7 +349,7 @@ def main() -> int:
                 boxes, scene, stems = scan_assembly(adapter, scan_colors)
                 colors.update(scan_colors)
                 (OUT_BOXES / f"{dashed}.json").write_text(json.dumps({
-                    "unit": "m",
+                    "unit": "mm",
                     "boxes": [{"name": n, "box": list(b)} for n, b in boxes],
                     "components": scene,
                 }), encoding="utf-8")

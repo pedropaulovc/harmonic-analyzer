@@ -13,11 +13,14 @@ job.json (assembly model):
    "scene": "<abs path of boxes/scene JSON>",      # boxes + components
    "pairs": [...]}
 
-Geometry is exported in metres, untranslated (export_models.py sets
-swExportStlUnits/swSTLDontTranslateToPositive), so component transforms
+Geometry is exported in millimetres, untranslated (export_models.py sets
+swExportStlUnits/swSTLDontTranslateToPositive); the scene-graph transforms
+and boxes are scaled to the same millimetres, so component transforms
 (IMathTransform.ArrayData: row-vector convention, 9 rotation + 3
 translation + scale) place instanced part meshes exactly in assembly
-space, and component boxes need no normalisation.
+space, and component boxes need no normalisation. (Framing is unit-agnostic
+anyway — it derives from bbox ratios — but mesh and transform units must
+agree, and now both are mm.)
 
 Camera convention matches cad/scripts/render_compare.py: model space has +Y
 up, az 0 / el 0 looks from +Z (SolidWorks Front), +az moves the camera
