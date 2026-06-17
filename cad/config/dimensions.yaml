@@ -1008,7 +1008,7 @@ sections:
         - legacy
         - med
       - - Hex knife-edge trunnions ×2
-        - vertex-up hex 5.09 wide (x) × 6.04 tall (y, vertex-to-vertex) × 21.717 deep (z), one PROTRUDING beyond each body end (z 76.2..97.92); top vertex ridge = knife edge = rock axis (≈3.0 above the cylinder centreline); rest on top-plate bearing supports (not yet modeled)
+        - vertex-up hex 8.653 wide (x) × 10.268 tall (y, vertex-to-vertex) × 21.717 deep (z), one PROTRUDING beyond each body end (z 76.2..97.92); top vertex ridge = knife edge = rock axis (≈5.1 above the cylinder centreline); rest on top-plate bearing supports (not yet modeled)
         - —
         - measured (user, ch18)
         - measured
