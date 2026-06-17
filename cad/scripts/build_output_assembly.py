@@ -153,6 +153,12 @@ BOT_RAIL_Y = 334.0  # above the rack band (top 323.6); clamp bottom 326
 COLUMN_X = 197.0
 COLUMN_Z = -112.0
 
+# --- knife bearing supports (build_knife_mount) -----------------------------
+from build_summing_lever import HEX_H, HEX_Z_INNER, HEX_Z_OUTER  # noqa: E402
+
+KNIFE_CONTACT_Y = KNIFE[1] + HEX_H / 2.0  # knife-edge contact ridge line (995.13)
+HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
+
 # --- counter-spring chain (build_boss_hook / build_counter_spring) ----------
 from build_boss_hook import ELBOW_R, ROD_DIA as HOOK_ROD_DIA, SHANK_RISE  # noqa: E402
 from build_counter_spring import (  # noqa: E402
@@ -569,10 +575,18 @@ async def build(adapter) -> dict[str, str]:
     check("create_assembly", await adapter.create_assembly())
 
     # --- summing group ------------------------------------------------------
-    # knife-mount FIRST so the auto-fixed assembly seed is structure, not the
-    # mated summing lever.
-    km = await place_component(adapter, "knife-mount", [KNIFE[0], KNIFE[1], 0.0],
-                               [0.0, 0.0, 0.0], IDENTITY)
+    # Two knife bearing supports, one per hex trunnion (overhanging the lever
+    # body at |z| ~ 87). The front support is FIRST so the auto-fixed assembly
+    # seed is structure, not the mated summing lever. Each support's circular
+    # bore is much larger than the hex, so only the trunnion's top vertex line
+    # (the knife edge) nears the upper inner wall. The named "knife axis" is that
+    # contact ridge line; the lever's Axis3 (hex ridge) mates coincident to it.
+    km = await place_component(adapter, "knife-mount",
+                               [KNIFE[0], KNIFE_CONTACT_Y, HEX_Z_MID],
+                               [0.0, 0.0, 0.0], IDENTITY, label="knife-mount (front)")
+    await place_component(adapter, "knife-mount",
+                          [KNIFE[0], KNIFE_CONTACT_Y, -HEX_Z_MID],
+                          [0.0, 0.0, 0.0], IDENTITY, label="knife-mount (back)")
     # Crossbar band y 1010..1051: 0.5 above the summing-lever tube top
     # (1009.5), ends face-flush on the ring rail inner faces (y to 1040.7),
     # stud pokes 14 above for the nut seat.
@@ -589,11 +603,12 @@ async def build(adapter) -> dict[str, str]:
                                [0.0, 0.0, 0.0], IDENTITY, ground=False)
     sl_o = _org(adapter, sl)
     # summing-lever axes (creation order): Axis1 = pivot (cylinder centre),
-    # Axis2 = anchor, Axis3 = knife ridge. Static pivot mates to Axis1 (cylinder
-    # centre = knife line, no lever drop); the revolute moves to Axis3 (the true
-    # rock ridge) once the top-plate bearing supports replace the tube-era
-    # knife-mount.
-    await coincident_mate(adapter, named_ref(f"Axis1@{sl}", "AXIS"),
+    # Axis2 = anchor, Axis3 = knife ridge (hex top vertex). The lever rocks on
+    # the true knife edge: Axis3 mates coincident to the support's contact ridge
+    # ("knife axis" = Axis1@knife-mount). Same pose as the cylinder-centre mate
+    # (ridge is 5.13 above the centre, both collinear along Z), but the freed
+    # rock DOF is now about the knife edge, per the bearing-support design.
+    await coincident_mate(adapter, named_ref(f"Axis3@{sl}", "AXIS"),
                           named_ref(f"Axis1@{km}", "AXIS"),
                           label="summing-lever knife pivot", verify=(sl, sl_o))
     # Axial Z-slide pinned by a Front-plane distance (value 0: the lever sits on
