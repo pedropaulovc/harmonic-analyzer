@@ -155,7 +155,6 @@ COLUMN_Z = -112.0
 
 # --- counter-spring chain (build_boss_hook / build_counter_spring) ----------
 from build_boss_hook import ELBOW_R, ROD_DIA as HOOK_ROD_DIA, SHANK_RISE  # noqa: E402
-from build_summing_lever import HOOK_HOLE_X as SL_SPIN_REF_X  # noqa: E402
 from build_counter_spring import (  # noqa: E402
     BOTTOM_LEAD as CS_BOTTOM_LEAD,
     COIL_OD as CS_COIL_OD,
@@ -589,7 +588,11 @@ async def build(adapter) -> dict[str, str]:
     sl = await place_component(adapter, "summing-lever", [KNIFE[0], KNIFE[1], 0.0],
                                [0.0, 0.0, 0.0], IDENTITY, ground=False)
     sl_o = _org(adapter, sl)
-    # summing-lever: Axis1 = knife axis, Axis2 = spin ref (creation order).
+    # summing-lever axes (creation order): Axis1 = pivot (cylinder centre),
+    # Axis2 = anchor, Axis3 = knife ridge. Static pivot mates to Axis1 (cylinder
+    # centre = knife line, no lever drop); the revolute moves to Axis3 (the true
+    # rock ridge) once the top-plate bearing supports replace the tube-era
+    # knife-mount.
     await coincident_mate(adapter, named_ref(f"Axis1@{sl}", "AXIS"),
                           named_ref(f"Axis1@{km}", "AXIS"),
                           label="summing-lever knife pivot", verify=(sl, sl_o))
@@ -606,10 +609,14 @@ async def build(adapter) -> dict[str, str]:
                        named_ref("Right Plane", "PLANE"), 0.0,
                        label="summing-lever rock snapshot", verify=(sl, sl_o))
     # Boss hook: rigidly rides the lever (locked), carrying the counter spring.
+    # Keyed to the lever's anchor axis (Axis2, the summation-anchor eye the
+    # counter spring hangs from at machine ~(-91, 990)) rather than the pivot
+    # axis -- the lock just freezes the current pose, so the handle is chosen for
+    # physical meaning (the eye), not the rock centre.
     bh = await place_component(adapter, "boss-hook", list(BOSS_HOOK_POS),
                                [0.0, 0.0, 0.0], IDENTITY, ground=False)
     await lock_mate(adapter, named_ref(f"Axis1@{bh}", "AXIS"),
-                    named_ref(f"Axis1@{sl}", "AXIS"), label="boss-hook keyed")
+                    named_ref(f"Axis2@{sl}", "AXIS"), label="boss-hook keyed")
     # Ry(+90): the end loops land in the YZ plane, encircling the hook arm
     # (bottom) and the gooseneck pin (top) nail-through-ring style.
     await place_component(adapter, "counter-spring", list(SPRING_POS),
