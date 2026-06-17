@@ -170,6 +170,10 @@ def main():
     scene.display.shading.light = "STUDIO"
     scene.display.shading.color_type = "OBJECT"
     scene.display.render_aa = "11"
+    # Display colours as-authored: factory-startup defaults to AgX, a film
+    # tone-map that desaturates the part RGBs (washed-out vs SolidWorks, which
+    # shows plain sRGB). Standard keeps the appearance colours faithful.
+    scene.view_settings.view_transform = "Standard"
     scene.render.film_transparent = True
     scene.render.image_settings.file_format = "PNG"
 
