@@ -1,32 +1,56 @@
 r"""Reproduction script: summing lever (book ch. 18, pp. 42-43).
 
-The cast-iron knife-edge lever that sums the pull of the 20 channel
-springs. M6.4 FULL REWRITE: the legacy SummingLever.cs shape (solid pivot
-cylinder + edge ribs + tapering summation tongue + anchor boss on the
-plate side) is REFUTED by the p.42/43 close-ups and the calibrated ch. 30
-views:
+The cast-iron lever that sums the pull of the 20 channel springs and balances
+them against the master (counter) spring -- a FIRST-CLASS LEVER hung in
+suspension on a knife edge.
 
-* The pivot is a TUBE (O25, O14 bore) riding a knife-edge bar: the bore
-  bottom line IS the pivot line. A central slot (|z| <= 16) through the
-  tube clears the knife-mount stud that hangs the knife bar from the
-  top crossbar.
-* The coefficients plate (20 spring holes at the channel-lever tab line)
-  hangs off the tube on the +X side, top face 8 above the knife line.
-* A twin-rib web arm runs -X from the tube to a round boss; the counter
-  spring hangs from a J-hook (build_boss_hook.py) whose shank plants in
-  a vertical O2.6 hole in the boss top (the p.43 black hook + chrome
-  ring chain collapsed to one hook part -- simplification).
+PROVENANCE / REVERT NOTICE: this restores the legacy ``cad/SummingLever.cs``
+shape (commit 9eb1710, itself translated from ``summing-lever.kcl``) at the
+user's explicit direction (2026-06-16), superseding the M6.4 "knife-edge tube +
+Ø14 bore" model. Two corrections the user made over the raw .cs:
 
-Part-local origin = the knife-edge line (machine (-15, 990, 0)); X +ve
-toward the coefficients plate, Y up, Z along the knife edge (channel
-direction). M6.8: the part is genuinely chiral, so the machine mirror is
-authored here (all local x constants negated) and the assembly places it
-with MIRROR_PLANE 'x0'. Dimensions: cad/DIMENSIONS.md ch. 18 (M6.4
-revision; med/low).
+* The real lever has **NO bore** -- the M6.4 bored tube was wrong. The .cs
+  solid pivot cylinder is correct.
+* The .cs was **missing the two hexagonal protrusions at the pivot** that form
+  the **knife edge** the lever hangs/rocks on. They are added here (``_hex_knife_
+  edges``); exact size/clocking is LOW confidence (museum-glass photos:
+  references/.../ch18_images/page001_img0{1,3}, photogrammetry 194637152 /
+  194651412) and is tuned against the knife-mount fit + ch30 parity.
 
-Volume audit: tube/bore/slot/plate/boss-hole are asserted analytically
-(the plate-tube overlap by midpoint-rule integration); the web ribs and
-boss merge into curved neighbours, so they get bounded-range checks.
+Seven features (the six .cs features + the hex knife edge):
+
+1. Coefficients plate  -- Top-plane rectangle on the +X (channel-spring) arm,
+   carrying the 20 spring holes; mid-plane extrude centred on the pivot (local
+   y 0). Machine-y registration (M6.4 plate-top-at-998) is set at placement.
+2. Pivot cylinder      -- Front-plane solid circle at the origin, symmetric
+   extrude along the long edge (the pivot/rock axis = local Z).
+3. Hex knife edges     -- two hexagonal collars flanking the pivot centre,
+   vertex-up, presenting the knife edge the lever is suspended on.
+4. Edge ribs (x2)      -- Front-plane line/line/semicircle wrapping the cylinder
+   at the plate ends, blind-extruded at a start offset.
+5. Summation plate     -- Top-plane leaf on the -X (counter-spring) arm: vertical
+   base edge, two curved sides, short tip edge.
+6. Summation anchor    -- Top-plane concentric ring (outer + bore) at the -X tip,
+   the eye the counter-spring hangs from.
+7. Middle rib          -- Front-plane elongated diamond spanning the lever, two
+   tangent lines per side meeting two coradial arcs that wrap the cylinder.
+
+Part-local frame: origin = the knife-edge line (placed at machine (15, 990, 0)),
++X = the channel-spring (coefficients-plate) arm, -X = the counter-spring
+(summation-anchor) arm, +Y up, +Z along the knife edge (channel direction). The
+.cs is authored with all X negated so this frame matches the M6.4 part the rest
+of the machine was built against: the spring holes stay at their registered
+local positions (so the 20 channel springs need no change) and the summation
+anchor lands where the counter-spring boss-hook attaches (local x -76 ~ machine
+91 ~ the M6.4 hook at 90.5). MIRROR_PLANE 'x0' (see _common) still applies.
+
+Sketches follow the repo fully-defined convention (cad/scripts/_common.py): the
+prismatic/polygon profiles via point-ref anchors + driving dims; each arc via
+its neighbours' fixed endpoints plus a radial dim. Organic-arc volumes are not
+analytically gated -- rely on the mass-properties report + ch30 renders.
+
+Dimensions: cad/DIMENSIONS.md ch. 18 (legacy KCL values + M6.4 registration;
+low/med confidence).
 
 Run (SolidWorks already open)::
 
@@ -39,12 +63,15 @@ import math
 import sys
 
 from _common import (
+    IN,
     add_line_chain,
+    anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
     define_polygon_chain,
     define_rectilinear_chain,
+    dimension_between,
     ensure_fully_defined,
     extrude_at_offset,
     name_bore_axis,
@@ -57,269 +84,368 @@ from _common import (
 PART_NAME = "summing-lever"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
-# DIMENSIONS.md ch18 (M6.4 revision; calibrated p1/p3 + p.42-43 close-ups)
-TUBE_OD = 25.0  # pivot tube OD (med)
-TUBE_LENGTH = 114.0  # tube span along the knife edge, z +-57 (med)
-BORE_DIA = 14.0  # knife bore; bore bottom = knife line (med)
-TUBE_CY = BORE_DIA / 2.0  # tube/bore centre sits one bore radius up
-SLOT_HALF_Z = 16.0  # central slot clears the knife-mount stud (low)
-SLOT_HALF_X = 9.0  # slot stays inside the tube walls (derived)
+# The .cs is authored with the coefficients plate on -X; the machine wants it on
+# the +X arm (to match the M6.4 frame the rest of the assembly registers to), so
+# every .cs-derived X is multiplied by SX.
+SX = -1.0
 
-PLATE_X_MIN = 10.0  # machine x -5: plate edge merges into the tube (med)
-PLATE_X_MAX = 60.0  # coefficients plate, machine x +45 (med)
-PLATE_TOP_Y = 8.0  # plate top = machine y 998 (med)
-PLATE_THICKNESS = 5.1  # 0.2" plate (legacy, uncontradicted)
-PLATE_HALF_Z = 76.2  # plate length 152.4 = 6" (legacy, uncontradicted)
-HOLE_DIA = 4.5  # spring holes: the installed eye must thread 5.1 plate
-# (sqrt(3.25^2 - 2.55^2) = 2.0 reach) -- see build_channel_assembly.py
-HOLE_X = 37.10  # machine x +22.10 = channel-lever tab line (derived)
+# --- SummingLever.cs constants (inches -> mm) ------------------------------
+PLATE_W = 1.75 * IN  # coefficients plate width (along the arm, X)   44.45
+PLATE_L = 6.0 * IN  # coefficients/pivot length (along Z)           152.40
+PLATE_T = 0.2 * IN  # plate thickness                                5.08
+CYL_R = 0.5 * IN  # pivot cylinder radius                          12.70
+RIB_T = 0.2 * IN  # edge / middle rib thickness                     5.08
+RIB_PAD = 0.1 * IN  # rib arc padding over the cylinder              2.54
+SUM_H = 3.0 * IN  # summation plate height (tip reach)             76.20
+SUM_CURV = 0.3 * IN  # summation plate side curvature                7.62
+ANCHOR_R = 0.375 * IN  # summation anchor outer radius               9.525
+ANCHOR_H = 0.75 * IN  # summation anchor height                     19.05
+
+# --- spring-hole registration (machine channel bank, NOT the tiny .cs holes) -
+# The 20 channel springs thread these holes; positions reused verbatim from the
+# M6.4 part so build_channel_assembly / build_channel_spring_installed need no
+# change (cad/DIMENSIONS.md ch18 row 4).
+HOLE_DIA = 4.5  # installed eye threads the 5.1 plate (med)
+HOLE_X = 37.10  # local +X = machine x +22.10 = channel-lever tab line (derived)
 HOLE_COUNT = 20
 CHANNEL_Z0 = -67.1  # frame channel j=0 (DIMENSIONS.md ch6)
 CHANNEL_PITCH = 7.0565
-HOLE_Z_OFFSET = 0.8 - 2.75  # the spring's bottom lead hangs one coil mean
-# radius (2.75) off the spring axis (z_j + 0.8) on the helix-start side,
-# which the assembly's Ry(+90) maps to -Z -- the hole sits under the LEAD
-# (see build_channel_spring_installed.py)
+HOLE_Z_OFFSET = 0.8 - 2.75  # -1.95: hole under the spring's bottom lead
+PLATE_TOP_Y = 998.0  # machine-y the plate top registers to at PLACEMENT (med);
+# the part itself is centred on the pivot (mid-plane), so this is consumed by
+# build_output_assembly's component Y, not by any extrude here.
 
-WEB_Y_BOT = 2.0  # twin-rib web band above the knife line (low)
-WEB_Y_TOP = 12.0
-RIB_X0 = -9.0  # ribs spring from the tube wall at the slot edge (derived)
-RIB_X1 = -80.0  # ribs merge into the boss (med)
-RIB_HALF_WIDTH = 1.5  # ~3 wide cast ribs (low)
-RIB_Z0 = 17.18  # |z| of the rib centreline at RIB_X0 (p.43 plan, low)
-RIB_Z1 = 4.27  # |z| at the boss (low)
+# --- hex knife-edge protrusions (NEW; LOW confidence -- tune vs ch30) -------
+HEX_R = 16.0  # vertex radius of the knife-edge hex collar (> CYL_R so it
+# protrudes); vertex-up so the top vertex line is the knife edge (low)
+HEX_Z_INNER = 9.0  # inner face |z|: leaves a central gap for the suspension stud
+HEX_Z_OUTER = 20.0  # outer face |z|: each collar spans |z| 9..20 (low)
 
-BOSS_X = -80.0  # machine x -95: counter-spring anchor (med)
-BOSS_DIA = 14.0
-BOSS_LENGTH = 12.0  # z +-6 (low)
-HOOK_HOLE_DIA = 3.0  # boss-hook O3 shank seats here (low; the real joint is
-# a 2.6 tap drill + M3 thread -- modeled at shank size for a zero-volume fit)
-HOOK_HOLE_X = -75.5  # machine x -90.5: hook rod tip reaches x -97 (derived)
-HOOK_HOLE_DEPTH = 14.0  # half-depth of the mid-plane cut; clears the boss
-# top at this x (y 12.36) and bottom (y 1.64)
+# --- derived ---------------------------------------------------------------
+SUM_BASE = PLATE_L / 2.0  # summation plate base length             76.20
+TIP_X = SX * SUM_H  # summation tip / anchor x (counter-spring arm) -76.20
+ARC_R = CYL_R + RIB_PAD  # rib arc radius wrapping the cylinder     15.24
+RIB_OFFSET = PLATE_L / 2.0 - RIB_T  # edge-rib start offset along Z 71.12
+ANCHOR_BORE_R = 1.5  # summation-anchor centre hole (counter-spring hook seat)
 
-TUBE_R = TUBE_OD / 2.0
-BORE_R = BORE_DIA / 2.0
-HOLE_Z = [
-    CHANNEL_Z0 + CHANNEL_PITCH * j + HOLE_Z_OFFSET for j in range(HOLE_COUNT)
-]
+# Spring-hole Z stations (world Z); the Top-plane sketch maps world Z to -sketchY.
+HOLE_Z = [CHANNEL_Z0 + CHANNEL_PITCH * j + HOLE_Z_OFFSET for j in range(HOLE_COUNT)]
+
+# Assembly-facing exports (build_output_assembly imports these).
+SPIN_REF_X = TIP_X  # local X of the summation-anchor bore = counter-spring ref
 
 
-def _slot_removed_volume() -> float:
-    """Annulus cross-section area within |x| <= SLOT_HALF_X, times slot span."""
-    r, big, x = BORE_R, TUBE_R, SLOT_HALF_X
-    a_outer = 2.0 * (x * math.sqrt(big * big - x * x) + big * big * math.asin(x / big))
-    a_inner = math.pi * r * r  # bore disc lies fully inside |x| <= 9
-    return (a_outer - a_inner) * 2.0 * SLOT_HALF_Z
+def _circumcenter(
+    p1: tuple[float, float], p2: tuple[float, float], p3: tuple[float, float]
+) -> tuple[float, float]:
+    """Centre of the circle through three non-collinear points."""
+    (ax, ay), (bx, by), (cx, cy) = p1, p2, p3
+    d = 2.0 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
+    if abs(d) < 1e-12:
+        raise ValueError("circumcenter: collinear points")
+    a2, b2, c2 = ax * ax + ay * ay, bx * bx + by * by, cx * cx + cy * cy
+    ux = (a2 * (by - cy) + b2 * (cy - ay) + c2 * (ay - by)) / d
+    uy = (a2 * (cx - bx) + b2 * (ax - cx) + c2 * (bx - ax)) / d
+    return ux, uy
 
 
-def _plate_tube_overlap_volume() -> float:
-    """Plate slab (y band) clipped to the tube outer disc, x +10..+12.5,
-    prism along the full tube length (midpoint rule)."""
-    n = 400
-    x0, x1 = PLATE_X_MIN, TUBE_R
-    y_bot = PLATE_TOP_Y - PLATE_THICKNESS
-    area = 0.0
-    for i in range(n):
-        x = x0 + (i + 0.5) * (x1 - x0) / n
-        h = TUBE_R * TUBE_R - x * x
-        if h <= 0.0:
-            continue
-        half = math.sqrt(h)
-        lo = max(y_bot, TUBE_CY - half)
-        hi = min(PLATE_TOP_Y, TUBE_CY + half)
-        if hi > lo:
-            area += (hi - lo) * (x1 - x0) / n
-    return area * TUBE_LENGTH
+async def _three_point_arc(
+    adapter,
+    start: tuple[float, float],
+    end: tuple[float, float],
+    interior: tuple[float, float],
+    label: str,
+) -> tuple[str, tuple[float, float], float]:
+    """Draw the arc through ``start``/``interior``/``end`` (add_arc is CCW, so
+    pick the start/end order whose CCW sweep passes the interior point).
+
+    Returns ``(arc_id, centre, radius)``. The endpoints land exactly on
+    ``start``/``end`` regardless of the chosen order, so neighbours still merge.
+    """
+    cx, cy = _circumcenter(start, end, interior)
+    radius = math.hypot(start[0] - cx, start[1] - cy)
+
+    def sweep(a: tuple[float, float], b: tuple[float, float]) -> float:
+        t = math.atan2(b[1] - cy, b[0] - cx) - math.atan2(a[1] - cy, a[0] - cx)
+        return t % (2.0 * math.pi)
+
+    if sweep(start, interior) <= sweep(start, end):
+        s, e = start, end
+    else:
+        s, e = end, start
+    arc = await adapter.add_arc(cx, cy, s[0], s[1], e[0], e[1])
+    return check(f"add_arc {label}", arc), (cx, cy), radius
 
 
-async def _volume(adapter) -> float:
-    res = await adapter.get_mass_properties()
-    return res.data.volume if res.is_success else float("nan")
+async def _coefficients_plate(adapter) -> None:
+    """Feature 1: Top-plane plate on the +X arm (x in [0, w]) carrying the 20
+    spring holes; mid-plane extrude (PLATE_T total, centred on the pivot at
+    local y 0) so the whole casting stays coplanar with the cylinder and ribs.
+
+    Machine-y registration (the M6.4 plate-top-at-998 convention) is set at
+    PLACEMENT, not baked here -- see PLATE_TOP_Y and the Phase 2/3 plan."""
+    from solidworks_mcp.adapters.base import ExtrusionParameters
+
+    check("create_sketch plate", await adapter.create_sketch("Top"))
+    # +X arm: x in [0, PLATE_W], length along sketch Y (= world Z) in [-L/2, L/2].
+    rect = [
+        (0.0, -PLATE_L / 2.0),
+        (PLATE_W, -PLATE_L / 2.0),
+        (PLATE_W, PLATE_L / 2.0),
+        (0.0, PLATE_L / 2.0),
+    ]
+    outline = await add_line_chain(adapter, rect)
+    # Direct-to-DB: inference around the freshly dimensioned neighbour makes
+    # add_circle fail from the second hole on (proven on the M6.4 plate).
+    set_sketch_direct_db(adapter, True)
+    for j, z in enumerate(HOLE_Z):
+        # Top-plane sketch Y = -world Z, so a hole at world z sits at sketch -z.
+        await define_circle(adapter, HOLE_X, -z, HOLE_DIA / 2.0, f"hole {j + 1}")
+    set_sketch_direct_db(adapter, False)
+    await define_rectilinear_chain(adapter, outline, rect, label="plate")
+    await ensure_fully_defined(adapter, "coefficients plate sketch")
+    check("exit_sketch plate", await adapter.exit_sketch())
+    check(
+        "extrude coefficients plate",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=PLATE_T, both_directions=True)
+        ),
+    )
 
 
-async def _assert_volume(adapter, label: str, expected: float, rel_tol: float) -> float:
-    vol = await _volume(adapter)
-    print(f"  volume after {label}: {vol:.1f} mm^3 (analytic {expected:.1f})")
-    if abs(vol - expected) > rel_tol * expected:
-        raise RuntimeError(
-            f"{label}: volume {vol:.1f} != analytic {expected:.1f} "
-            f"(tol {rel_tol * 100:.1f}%)"
+async def _pivot_cylinder(adapter) -> None:
+    """Feature 2: Front-plane solid circle at origin, symmetric extrude along the
+    long edge -- the pivot/rock axis (local Z). NO bore."""
+    from solidworks_mcp.adapters.base import ExtrusionParameters
+
+    check("create_sketch cylinder", await adapter.create_sketch("Front"))
+    await define_circle(adapter, 0.0, 0.0, CYL_R, "pivot cylinder")
+    await ensure_fully_defined(adapter, "pivot cylinder sketch")
+    check("exit_sketch cylinder", await adapter.exit_sketch())
+    check(
+        "extrude cylinder",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=PLATE_L, both_directions=True)
+        ),
+    )
+
+
+async def _hex_collar(adapter, flip: bool, name: str) -> None:
+    """One hexagonal knife-edge collar around the pivot, vertex-up, blind-
+    extruded along Z from |z| HEX_Z_INNER to HEX_Z_OUTER (flip = the -Z side).
+
+    Front-plane regular hexagon centred on the pivot axis, a vertex at the top
+    (the knife edge runs along Z at that top vertex line)."""
+    check(f"create_sketch {name}", await adapter.create_sketch("Front"))
+    # Vertex-up hexagon: vertices at 90, 150, 210, 270, 330, 30 degrees.
+    verts = [
+        (HEX_R * math.cos(math.radians(a)), HEX_R * math.sin(math.radians(a)))
+        for a in (90.0, 150.0, 210.0, 270.0, 330.0, 30.0)
+    ]
+    set_sketch_direct_db(adapter, True)
+    lines = await add_line_chain(adapter, verts)
+    set_sketch_direct_db(adapter, False)
+    await define_polygon_chain(adapter, lines, verts, label=name)
+    await ensure_fully_defined(adapter, f"{name} sketch")
+    check(f"exit_sketch {name}", await adapter.exit_sketch())
+    extrude_at_offset(adapter, HEX_Z_OUTER - HEX_Z_INNER, HEX_Z_INNER, flip=flip)
+
+
+async def _edge_rib(adapter, flip: bool, name: str) -> None:
+    """Feature 4: Front-plane rib -- two lines to the plate-edge tip and a
+    semicircle (radius ARC_R, centred at the origin) wrapping the cylinder,
+    blind-extruded at the +-RIB_OFFSET start offset along Z.
+
+    Vertices (A, C on the arc, B the +X plate tip): the arc centre is the origin
+    (the two y-symmetric ends + the cylinder-side interior point force it there),
+    so it defines off a coincident-to-origin centre + a radial dim, with A/C
+    pinned on the y-axis."""
+    check(f"create_sketch {name}", await adapter.create_sketch("Front"))
+    a, b, c = (0.0, ARC_R), (SX * -PLATE_W, 0.0), (0.0, -ARC_R)
+    interior = (SX * ARC_R, 0.0)  # cylinder-side point the arc passes through
+    set_sketch_direct_db(adapter, True)
+    line_ab = check(f"{name} line A-B", await adapter.add_line(*a, *b))
+    line_bc = check(f"{name} line B-C", await adapter.add_line(*b, *c))
+    arc, _, _ = await _three_point_arc(adapter, c, a, interior, f"{name} arc")
+    set_sketch_direct_db(adapter, False)
+    check(
+        f"{name} arc centre -> origin",
+        await adapter.add_sketch_constraint(f"{arc}.center", "origin", "coincident"),
+    )
+    check(
+        f"{name} arc radius",
+        await adapter.add_sketch_dimension(arc, None, "radial", ARC_R),
+    )
+    check(
+        f"{name} arc start on y-axis",
+        await adapter.add_sketch_constraint(f"{arc}.start", "origin", "vertical_points"),
+    )
+    check(
+        f"{name} arc end on y-axis",
+        await adapter.add_sketch_constraint(f"{arc}.end", "origin", "vertical_points"),
+    )
+    await anchor_point_to_origin(adapter, f"{line_ab}.end", *b, f"{name} tip")
+    _ = line_bc
+    await ensure_fully_defined(adapter, f"{name} sketch")
+    check(f"exit_sketch {name}", await adapter.exit_sketch())
+    extrude_at_offset(adapter, RIB_T, RIB_OFFSET, flip=flip)
+
+
+async def _summation_plate(adapter) -> None:
+    """Feature 5: Top-plane leaf on the -X arm -- vertical base edge (x=0), two
+    curved sides, short tip edge at the anchor (x=TIP_X)."""
+    from solidworks_mcp.adapters.base import ExtrusionParameters
+
+    check("create_sketch summation plate", await adapter.create_sketch("Top"))
+    p1 = (0.0, -SUM_BASE)
+    p2 = (0.0, SUM_BASE)
+    p3 = (TIP_X, ANCHOR_R)
+    p4 = (TIP_X, -ANCHOR_R)
+    top_int = (SX * SUM_H / 2.0, SUM_BASE / 2.0 - SUM_CURV)
+    bot_int = (SX * SUM_H / 2.0, -SUM_BASE / 2.0 + SUM_CURV)
+
+    set_sketch_direct_db(adapter, True)
+    base = check("summation base edge", await adapter.add_line(*p1, *p2))
+    top_arc, top_c, _ = await _three_point_arc(adapter, p2, p3, top_int, "summation top")
+    tip = check("summation tip edge", await adapter.add_line(*p3, *p4))
+    bot_arc, bot_c, _ = await _three_point_arc(adapter, p4, p1, bot_int, "summation bottom")
+    set_sketch_direct_db(adapter, False)
+
+    check(
+        "summation base vertical",
+        await adapter.add_sketch_constraint(base, None, "vertical"),
+    )
+    await anchor_point_to_origin(adapter, f"{base}.start", *p1, "summation base start")
+    await dimension_between(
+        adapter, f"{base}.start", f"{base}.end", "vertical_distance", PLATE_L, "summation base"
+    )
+    check(
+        "summation tip vertical",
+        await adapter.add_sketch_constraint(tip, None, "vertical"),
+    )
+    await anchor_point_to_origin(adapter, f"{tip}.end", *p4, "summation tip end")
+    await dimension_between(
+        adapter, f"{tip}.start", f"{tip}.end", "vertical_distance", 2.0 * ANCHOR_R, "summation tip"
+    )
+    # The base/tip lines pin all four corners; each curved side is then defined
+    # by anchoring its (circumcentre) centre -- endpoints already lie on the arc,
+    # so the radius is implied and a radial dim would over-define (cf. the
+    # magnifying-lever dome caps).
+    await anchor_point_to_origin(adapter, f"{top_arc}.center", *top_c, "summation top centre")
+    await anchor_point_to_origin(adapter, f"{bot_arc}.center", *bot_c, "summation bottom centre")
+    await ensure_fully_defined(adapter, "summation plate sketch")
+    check("exit_sketch summation plate", await adapter.exit_sketch())
+    check(
+        "extrude summation plate",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=PLATE_T, both_directions=True)
+        ),
+    )
+
+
+async def _summation_anchor(adapter) -> None:
+    """Feature 6: Top-plane concentric ring (outer ANCHOR_R, bore ANCHOR_BORE_R)
+    at the -X tip -- the eye the counter-spring hook hangs from."""
+    from solidworks_mcp.adapters.base import ExtrusionParameters
+
+    check("create_sketch summation anchor", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    await define_circle(adapter, TIP_X, 0.0, ANCHOR_R, "anchor outer")
+    await define_circle(adapter, TIP_X, 0.0, ANCHOR_BORE_R, "anchor bore")
+    set_sketch_direct_db(adapter, False)
+    await ensure_fully_defined(adapter, "summation anchor sketch")
+    check("exit_sketch summation anchor", await adapter.exit_sketch())
+    check(
+        "extrude summation anchor",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=ANCHOR_H, both_directions=True)
+        ),
+    )
+
+
+async def _middle_rib(adapter) -> None:
+    """Feature 7: Front-plane elongated diamond spanning the lever. Two tangent
+    lines run from each end vertex (left = +X plate edge, right = -X summation
+    tip) to two coradial arcs that wrap the cylinder -- the C# tangent / coradial
+    construction, pinned to scale by the end-vertex anchors, the arc centre at
+    the origin, and the arc radius."""
+    from solidworks_mcp.adapters.base import ExtrusionParameters
+
+    check("create_sketch middle rib", await adapter.create_sketch("Front"))
+    left = (SX * -PLATE_W, 0.0)  # +X plate-edge vertex
+    right = (TIP_X, 0.0)  # -X summation-tip vertex
+    r = ARC_R
+    # Tangent points from each end vertex to the radius-r circle at the origin.
+    tx_l, ty_l = (r * r) / left[0], r * math.sqrt(1.0 - (r * r) / (left[0] ** 2))
+    tx_r, ty_r = (r * r) / right[0], r * math.sqrt(1.0 - (r * r) / (right[0] ** 2))
+    tl_up, tr_up = (tx_l, ty_l), (tx_r, ty_r)
+    tl_dn, tr_dn = (tx_l, -ty_l), (tx_r, -ty_r)
+
+    set_sketch_direct_db(adapter, True)
+    line1 = check("middle rib line1", await adapter.add_line(*left, *tl_up))
+    arc1, _, _ = await _three_point_arc(adapter, tl_up, tr_up, (0.0, r), "middle rib upper")
+    line2 = check("middle rib line2", await adapter.add_line(*tr_up, *right))
+    line3 = check("middle rib line3", await adapter.add_line(*right, *tr_dn))
+    arc2, _, _ = await _three_point_arc(adapter, tr_dn, tl_dn, (0.0, -r), "middle rib lower")
+    line4 = check("middle rib line4", await adapter.add_line(*tl_dn, *left))
+    set_sketch_direct_db(adapter, False)
+
+    for seg_a, seg_b, lbl in (
+        (line1, arc1, "line1-arc1"),
+        (arc1, line2, "arc1-line2"),
+        (line3, arc2, "line3-arc2"),
+        (arc2, line4, "arc2-line4"),
+    ):
+        check(
+            f"middle rib tangent {lbl}",
+            await adapter.add_sketch_constraint(seg_a, seg_b, "tangent"),
         )
-    return vol
+    # coradial forces arc2 to share arc1's centre AND radius (one circle); each
+    # tangent line runs from a fixed end-vertex to that fixed circle, so the four
+    # tangent points are pinned without an explicit symmetric relation (which,
+    # over the already-symmetric coordinates, would over-define).
+    check(
+        "middle rib coradial",
+        await adapter.add_sketch_constraint(arc1, arc2, "coradial"),
+    )
+    check(
+        "middle rib arc centre -> origin",
+        await adapter.add_sketch_constraint(f"{arc1}.center", "origin", "coincident"),
+    )
+    check(
+        "middle rib arc radius",
+        await adapter.add_sketch_dimension(arc1, None, "radial", r),
+    )
+    await anchor_point_to_origin(adapter, f"{line1}.start", *left, "middle rib left vertex")
+    await anchor_point_to_origin(adapter, f"{line2}.end", *right, "middle rib right vertex")
+    await ensure_fully_defined(adapter, "middle rib sketch")
+    check("exit_sketch middle rib", await adapter.exit_sketch())
+    check(
+        "extrude middle rib",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=RIB_T, both_directions=True)
+        ),
+    )
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
-
     check("create_part", await adapter.create_part())
 
-    # 1. Pivot tube along Z (Front sketch -> mid-plane extrude).
-    check("create_sketch tube", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, TUBE_CY, TUBE_R, "tube OD")
-    await ensure_fully_defined(adapter, "tube sketch")
-    check("exit_sketch tube", await adapter.exit_sketch())
-    check(
-        "extrude tube",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=TUBE_LENGTH, both_directions=True)
-        ),
-    )
-    expected = math.pi * TUBE_R**2 * TUBE_LENGTH
-    await _assert_volume(adapter, "tube", expected, 0.005)
+    await _coefficients_plate(adapter)
+    await _pivot_cylinder(adapter)
+    await _hex_collar(adapter, flip=False, name="hex knife edge front")
+    await _hex_collar(adapter, flip=True, name="hex knife edge back")
+    await _edge_rib(adapter, flip=False, name="edge rib front")
+    await _edge_rib(adapter, flip=True, name="edge rib back")
+    await _summation_plate(adapter)
+    await _summation_anchor(adapter)
+    await _middle_rib(adapter)
 
-    # 2. Knife bore: bore bottom = the part-local origin = knife line.
-    check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, TUBE_CY, BORE_R, "knife bore")
-    await ensure_fully_defined(adapter, "bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
-    check(
-        "cut bore",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=TUBE_LENGTH + 6.0, both_directions=True)
-        ),
-    )
-    expected -= math.pi * BORE_R**2 * TUBE_LENGTH
-    await _assert_volume(adapter, "bore", expected, 0.005)
-
-    # 3. Central slot for the knife-mount stud (Top sketch, sy = -z).
-    check("create_sketch slot", await adapter.create_sketch("Top"))
-    slot_rect = [
-        (-SLOT_HALF_X, -SLOT_HALF_Z),
-        (SLOT_HALF_X, -SLOT_HALF_Z),
-        (SLOT_HALF_X, SLOT_HALF_Z),
-        (-SLOT_HALF_X, SLOT_HALF_Z),
-    ]
-    slot = await add_line_chain(adapter, slot_rect)
-    await define_rectilinear_chain(adapter, slot, slot_rect, label="slot")
-    await ensure_fully_defined(adapter, "slot sketch")
-    check("exit_sketch slot", await adapter.exit_sketch())
-    check(
-        "cut slot",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=60.0, both_directions=True)
-        ),
-    )
-    expected -= _slot_removed_volume()
-    await _assert_volume(adapter, "slot", expected, 0.005)
-
-    # 4. Coefficients plate with the 20 spring holes (nested contours),
-    # extruded at a start offset so its top face lands at PLATE_TOP_Y.
-    check("create_sketch plate", await adapter.create_sketch("Top"))
-    plate_rect = [
-        (PLATE_X_MIN, -PLATE_HALF_Z),
-        (PLATE_X_MAX, -PLATE_HALF_Z),
-        (PLATE_X_MAX, PLATE_HALF_Z),
-        (PLATE_X_MIN, PLATE_HALF_Z),
-    ]
-    outline = await add_line_chain(adapter, plate_rect)
-    # Direct-to-DB: inference around the freshly dimensioned neighbour
-    # makes CreateCircleByRadius fail from the second small hole on.
-    set_sketch_direct_db(adapter, True)
-    for j, hole_z in enumerate(HOLE_Z):
-        await define_circle(adapter, HOLE_X, -hole_z, HOLE_DIA / 2.0, f"hole {j + 1}")
-    set_sketch_direct_db(adapter, False)
-    await define_rectilinear_chain(adapter, outline, plate_rect, label="plate")
-    await ensure_fully_defined(adapter, "plate sketch")
-    check("exit_sketch plate", await adapter.exit_sketch())
-    extrude_at_offset(
-        adapter, PLATE_THICKNESS, PLATE_TOP_Y - PLATE_THICKNESS
-    )
-    v_plate = (
-        (PLATE_X_MAX - PLATE_X_MIN) * 2.0 * PLATE_HALF_Z * PLATE_THICKNESS
-        - HOLE_COUNT * math.pi * (HOLE_DIA / 2.0) ** 2 * PLATE_THICKNESS
-        - _plate_tube_overlap_volume()
-    )
-    expected += v_plate
-    await _assert_volume(adapter, "plate", expected, 0.01)
-
-    # 5. Twin-rib web arm, tube wall -> boss (Top sketch, both strips).
-    check("create_sketch web ribs", await adapter.create_sketch("Top"))
-    set_sketch_direct_db(adapter, True)
-    rib_chains: list[tuple[list[str], list[tuple[float, float]]]] = []
-    for side in (1.0, -1.0):  # sy = -z: +1 strip is the z<0 rib
-        rib_pts = [
-            (RIB_X0, side * (RIB_Z0 - RIB_HALF_WIDTH)),
-            (RIB_X0, side * (RIB_Z0 + RIB_HALF_WIDTH)),
-            (RIB_X1, side * (RIB_Z1 + RIB_HALF_WIDTH)),
-            (RIB_X1, side * (RIB_Z1 - RIB_HALF_WIDTH)),
-        ]
-        rib_chains.append((await add_line_chain(adapter, rib_pts), rib_pts))
-    set_sketch_direct_db(adapter, False)
-    for i, (rib_lines, rib_pts) in enumerate(rib_chains):
-        await define_polygon_chain(adapter, rib_lines, rib_pts, label=f"rib {i + 1}")
-    await ensure_fully_defined(adapter, "web ribs sketch")
-    check("exit_sketch web ribs", await adapter.exit_sketch())
-    extrude_at_offset(adapter, WEB_Y_TOP - WEB_Y_BOT, WEB_Y_BOT)
-    v_rib_solid = (
-        2.0 * abs(RIB_X1 - RIB_X0) * 2.0 * RIB_HALF_WIDTH * (WEB_Y_TOP - WEB_Y_BOT)
-    )
-    before = expected
-    vol = await _volume(adapter)
-    added = vol - before
-    print(f"  volume after web ribs: {vol:.1f} mm^3 (+{added:.1f}, solid {v_rib_solid:.1f})")
-    if not (0.55 * v_rib_solid <= added <= 1.01 * v_rib_solid):
-        raise RuntimeError(
-            f"web ribs: added {added:.1f}, expected 55-100% of {v_rib_solid:.1f}"
-        )
-    expected = vol
-
-    # 6. Counter-spring boss (cylinder along Z at the arm tip).
-    check("create_sketch boss", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    await define_circle(adapter, BOSS_X, TUBE_CY, BOSS_DIA / 2.0, "boss")
-    set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "boss sketch")
-    check("exit_sketch boss", await adapter.exit_sketch())
-    check(
-        "extrude boss",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=BOSS_LENGTH, both_directions=True)
-        ),
-    )
-    v_boss_solid = math.pi * (BOSS_DIA / 2.0) ** 2 * BOSS_LENGTH
-    before = expected
-    vol = await _volume(adapter)
-    added = vol - before
-    print(f"  volume after boss: {vol:.1f} mm^3 (+{added:.1f}, solid {v_boss_solid:.1f})")
-    if not (0.7 * v_boss_solid <= added <= 1.01 * v_boss_solid):
-        raise RuntimeError(
-            f"boss: added {added:.1f}, expected 70-100% of {v_boss_solid:.1f}"
-        )
-    expected = vol
-
-    # 7. Vertical O2.6 hook-shank hole in the boss top (Top sketch).
-    check("create_sketch hook hole", await adapter.create_sketch("Top"))
-    set_sketch_direct_db(adapter, True)
-    await define_circle(adapter, HOOK_HOLE_X, 0.0, HOOK_HOLE_DIA / 2.0, "hook hole")
-    set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "hook hole sketch")
-    check("exit_sketch hook hole", await adapter.exit_sketch())
-    check(
-        "cut hook hole",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=2.0 * HOOK_HOLE_DEPTH, both_directions=True)
-        ),
-    )
-    # Boss chord height at the hole x (the hole passes top-to-bottom).
-    chord = 2.0 * math.sqrt((BOSS_DIA / 2.0) ** 2 - (HOOK_HOLE_X - BOSS_X) ** 2)
-    v_hole = math.pi * (HOOK_HOLE_DIA / 2.0) ** 2 * chord
-    before = expected
-    vol = await _volume(adapter)
-    removed = before - vol
-    print(f"  volume after hook hole: {vol:.1f} mm^3 (-{removed:.1f}, chord {v_hole:.1f})")
-    if not (0.8 * v_hole <= removed <= 1.15 * v_hole):
-        raise RuntimeError(
-            f"hook hole: removed {removed:.1f}, expected ~{v_hole:.1f}"
-        )
-
-    # Named axes for the M6 mated-DOF assembly. "knife axis" is the local Z
-    # through the origin = the bore-bottom knife line (the rocking pivot,
-    # coincident with the knife-mount's edge). "spin ref" is an off-pivot
-    # Z-parallel reference at the boss x, for the suppressible spin-snapshot
-    # driver that pins the lever's rock angle in artifact A.
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "knife axis")
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", HOOK_HOLE_X, "spin ref")
+    # pivot axis = local Z through the origin = the knife/rock axis (the
+    # suspension line). anchor axis = local Z through the summation-anchor bore
+    # = the counter-spring/boss-hook reference (replaces the M6.4 "spin ref").
+    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "pivot axis")
+    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", TIP_X, "anchor axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
