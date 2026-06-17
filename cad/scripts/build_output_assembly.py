@@ -295,12 +295,12 @@ HEX_BOLT_Z = (-54.0, 36.0)
 # platen's 3.5-deep sockets.
 CLIP_SCREW_XY = ((-245.0, 320.0), (-245.0, 429.0), (27.0, 320.0), (27.0, 429.0))
 # Magnifying-bracket flange screws: Rx(-90) points the shank +Y through the
-# flange band (988.9..992.9), tip flush with the plate bottom (engagement
-# into the summing lever's plate not modeled); the O5.5 heads hang in free
-# air below, 1.9 clear of channel spring j=0 and 0.25 off the arm's z -70
-# face.
+# flange band (983.46..987.46), tip flush with the corrected .cs plate bottom
+# (987.46; engagement into the summing lever's plate not modeled); the O5.5
+# heads hang in free air below. Dropped 5.44 with the flange when the coplanar
+# plate fell from 992.9 to 987.46 (see build_magnifying_bracket FLANGE_Y).
 FLANGE_SCREW_X = (-33.0, -41.0)  # machine +33/+41: inset 4 from the flange ends
-FLANGE_SCREW_POS_Y = 988.9  # flange bottom
+FLANGE_SCREW_POS_Y = 983.46  # flange bottom
 FLANGE_SCREW_Z = -67.0  # the under-plate strip (bracket SCREW_HOLE_Z 18.0)
 # Column-clamp pinch screws on each clamp's back face (z -88), backed out:
 # the shank tip (-94.2) stays 0.2 inside the back-wall hole (inner end

@@ -112,9 +112,13 @@ HOLE_COUNT = 20
 CHANNEL_Z0 = -67.1  # frame channel j=0 (DIMENSIONS.md ch6)
 CHANNEL_PITCH = 7.0565
 HOLE_Z_OFFSET = 0.8 - 2.75  # -1.95: hole under the spring's bottom lead
-PLATE_TOP_Y = 998.0  # machine-y the plate top registers to at PLACEMENT (med);
-# the part itself is centred on the pivot (mid-plane), so this is consumed by
-# build_output_assembly's component Y, not by any extrude here.
+# The plate is a true coplanar casting -- mid-plane ON the pivot (.cs shape):
+# placed at the knife line y=990 it spans 987.46..992.54, so the top registers at
+# machine 992.54 (NOT the old M6.4 998). The channel springs + magnifying bracket
+# were dropped to meet it (build_channel_*: PLATE_TOP_Y/PLATE_EYE_Y;
+# build_magnifying_bracket: FLANGE_Y). Consumed at PLACEMENT (the part is
+# pivot-centred), not by any extrude here.
+PLATE_TOP_Y = 992.54
 
 # --- hex knife-edge protrusions (NEW; LOW confidence -- tune vs ch30) -------
 # TWO trunnion stubs, one PROTRUDING BEYOND each body end (not flush inside):

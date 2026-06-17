@@ -177,7 +177,11 @@ SPRING_EYE_DROP = 3.37  # top eye centre below the lever spring hole
 SPRING_HOLE_DIA = 4.0  # build_channel_lever.py (O3 photo read enlarged: threading)
 
 # --- summing-lever plate interface (build_summing_lever.py) ------------------
-PLATE_TOP_Y = 998.0
+# The corrected .cs lever is a coplanar casting: the plate is mid-plane ON the
+# pivot (knife line y=990), so its top is 992.54 -- 5.46 BELOW the old M6.4 998.
+# The 20 channel springs were dropped to meet it (PLATE_EYE_Y, below) and so they
+# elongate 5.46 against the fixed channel-lever tabs at 1063.65.
+PLATE_TOP_Y = 992.54
 PLATE_THICKNESS = 5.1
 PLATE_HOLE_DIA = 4.5
 
