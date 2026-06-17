@@ -38,6 +38,7 @@ from _common import (
     assert_components_fully_defined,
     check,
     check_no_interference,
+    remap_front_to_machine_front,
     run_build,
     save_assembly_and_images,
 )
@@ -101,6 +102,12 @@ async def build(adapter) -> dict[str, str]:
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)
+
+    # The machine is authored output-side -Z, so SolidWorks' native Front view
+    # shows the BACK. Redefine the document's standard views so Front (and the
+    # eight-views gallery below, which goes through ShowNamedView2) shows the
+    # machine front, and the file opens on it. Geometry is untouched.
+    remap_front_to_machine_front(adapter)
     artefacts = await save_assembly_and_images(adapter, ASM_NAME)
 
     # Ch. 30 eight-views gallery (after the save: gallery + BOM leave the
