@@ -366,20 +366,21 @@ assemblies.
 
 ## Chapter 18 — Summing Lever (pp. 42–43)
 
-No annotated or stated numeric dimensions in this chapter. M6.4 REVISION: the
-legacy SummingLever.cs shape (solid pivot cylinder + edge ribs + tapering
-summation tongue + anchor boss) is REFUTED by the p.42/43 close-ups and the
-calibrated ch. 30 views — the pivot is a TUBE riding a knife-edge bar hung
-from a top crossbar, the plate hangs off the tube's −X side, and a twin-rib
-web arm runs +X to a round boss carrying the counter-spring hook. Plate
-thickness and length keep the uncontradicted legacy values. Lever-local
-coords below: origin on the knife line (machine (15, 990, 0)), X toward the
-boss, Z along the knife edge.
+No annotated or stated numeric dimensions in this chapter. The lever follows the
+SummingLever.cs shape: a solid pivot cylinder, edge ribs, a tapering summation
+tongue, an anchor eye, and a middle rib. Two hexagonal knife-edge trunnions
+protrude beyond the body ends, vertex-up, their top vertex ridge forming the
+knife edge the first-class lever hangs/rocks on; the stubs rest on bearing
+supports standing on the top plate (ch30-p003 — not yet modeled). Lever-local
+coords: origin on the pivot axis (cylinder centreline); the knife edge (rock
+axis) is the hex top ridge, just above it. The 20 spring holes use the channel
+registration. The build is authored x-negated so the hole plate lands on the
+channel arm and the anchor eye on the counter-spring arm.
 
 | dim | value | (in) | source | method | confidence |
 |---|---|---|---|---|---|
-| Pivot tube | Ø25 OD × 114 long (z ±57), Ø14 bore; bore bottom = knife line | — | calibrated p1/p3 + p.42–43 close-ups | scaled | med |
-| Tube slot | central slot \|z\| ≤ 16, \|x\| ≤ 9 — clears the knife-mount stud | — | p.42 close-up | scaled | low |
+| Pivot cylinder | Ø25.4 (1.0") OD × 152.4 long (z ±76.2), solid (no bore); mid-plane on the pivot axis | 1.0 | SummingLever.cs + p.42–43 close-ups | legacy | med |
+| Hex knife-edge trunnions ×2 | vertex-up hex 5.09 wide (x) × 6.04 tall (y, vertex-to-vertex) × 21.717 deep (z), one PROTRUDING beyond each body end (z 76.2..97.92); top vertex ridge = knife edge = rock axis (≈3.0 above the cylinder centreline); rest on top-plate bearing supports (not yet modeled) | — | measured (user, ch18) | measured | med |
 | Coefficients plate | x −60..−10 (machine −45..+5), top y 8, 5.1 thick, z ±76.2 | — | calibrated p1; thickness/length legacy (uncontradicted) | scaled + legacy | med |
 | Spring holes | 20 × Ø4.5 at x −37.10 (machine x −22.10 = channel-lever tab line), z = z_j − 1.95 | — | derived: installed-spring eye reach √(3.25²−2.55²) = 2.0 through the 5.1 plate; z offset puts the hole under the helix lead | derived | med |
 | Web + boss | twin ribs 3 wide, y 2..12, x 9..80, z taper ±17.18 → ±4.27; boss Ø14 × 12 at x 80 (machine 95) | — | p.43 plan | scaled | low |

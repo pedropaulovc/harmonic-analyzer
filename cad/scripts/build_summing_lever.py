@@ -121,11 +121,14 @@ PLATE_TOP_Y = 998.0  # machine-y the plate top registers to at PLACEMENT (med);
 # the lever's pivot overhangs the body so the knife edges rest on bearing
 # supports standing on the top plate (ch30-p003). Each stub's top vertex line
 # is the knife edge the lever is suspended/rocks on.
-HEX_R = 16.0  # vertex radius of the knife-edge hex stub (> CYL_R so it
-# protrudes); vertex-up so the top vertex line is the knife edge (low)
-HEX_WIDTH = 20.0  # axial length each stub protrudes past the body end (low)
+# Measured (user, ch18): vertex-up hex 5.09 wide (X) x 6.04 tall (Y, vertex to
+# vertex) x 21.717 deep (Z protrusion). The top vertex ridge is the knife edge
+# (= the rock axis, above the cylinder centreline).
+HEX_W = 5.09  # across-flats width (X)
+HEX_H = 6.04  # vertex-to-vertex height (Y) -- vertex-up
+HEX_DEPTH = 21.717  # axial length each stub protrudes past the body end
 HEX_Z_INNER = PLATE_L / 2.0  # inboard face flush with the body end (76.20)
-HEX_Z_OUTER = HEX_Z_INNER + HEX_WIDTH  # outboard face overhangs the body (96.20)
+HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92)
 
 # --- derived ---------------------------------------------------------------
 SUM_BASE = PLATE_L / 2.0  # summation plate base length             76.20
@@ -242,13 +245,20 @@ async def _hex_collar(adapter, flip: bool, name: str) -> None:
     from the body end face out into open air (flip = the -Z end). The overhang
     lets the knife edge rest on a bearing support standing on the top plate.
 
-    Front-plane regular hexagon centred on the pivot axis, a vertex at the top
-    (the knife edge runs along Z at that top vertex line)."""
+    Front-plane vertex-up hexagon (HEX_W x HEX_H bounding box) centred on the
+    pivot axis, a vertex at the top (the knife edge runs along Z at that top
+    vertex line)."""
     check(f"create_sketch {name}", await adapter.create_sketch("Front"))
-    # Vertex-up hexagon: vertices at 90, 150, 210, 270, 330, 30 degrees.
+    # Vertex-up hexagon fit to the measured box: top/bottom vertices on the
+    # y-axis, shoulders at +-W/2 and +-H/4 (CCW from the top vertex).
+    w2, h2, h4 = HEX_W / 2.0, HEX_H / 2.0, HEX_H / 4.0
     verts = [
-        (HEX_R * math.cos(math.radians(a)), HEX_R * math.sin(math.radians(a)))
-        for a in (90.0, 150.0, 210.0, 270.0, 330.0, 30.0)
+        (0.0, h2),  # top vertex (the knife edge ridge)
+        (-w2, h4),  # upper-left shoulder
+        (-w2, -h4),  # lower-left shoulder
+        (0.0, -h2),  # bottom vertex
+        (w2, -h4),  # lower-right shoulder
+        (w2, h4),  # upper-right shoulder
     ]
     set_sketch_direct_db(adapter, True)
     lines = await add_line_chain(adapter, verts)
