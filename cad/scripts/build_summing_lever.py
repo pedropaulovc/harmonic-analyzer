@@ -459,11 +459,17 @@ async def build(adapter) -> dict[str, str]:
     await _summation_anchor(adapter)
     await _middle_rib(adapter)
 
-    # pivot axis = local Z through the origin = the knife/rock axis (the
-    # suspension line). anchor axis = local Z through the summation-anchor bore
-    # = the counter-spring/boss-hook reference (replaces the M6.4 "spin ref").
+    # pivot axis (Axis1) = cylinder centreline along Z -- the static mate
+    # reference to the knife-mount (keeps the lever at the knife line with no
+    # drop until the ridge bearing supports exist).
+    # anchor axis (Axis2) = Z line at the summation anchor -- counter-spring rock
+    # reference (the anchor BORE itself is vertical, along Y).
+    # knife axis (Axis3) = the hex top-vertex ridge (local y +HEX_H/2) = the true
+    # rock/suspension line the lever hangs from; the pivot revolute moves here
+    # once the top-plate bearing supports are modeled.
     await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "pivot axis")
     await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", TIP_X, "anchor axis")
+    await name_bore_axis(adapter, "Top Plane", HEX_H / 2.0, "Right Plane", 0.0, "knife axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
