@@ -1248,6 +1248,19 @@ def stl_bbox_mm(stem: str) -> tuple[tuple[float, float], ...]:
     if not all(math.isfinite(v) for v in (*lo, *hi)):
         raise RuntimeError(f"{path.name}: no vertices found")
     bbox = tuple((lo[k], hi[k]) for k in range(3))  # STL already in mm
+    # Unit guard: export_models writes mm STLs and stl_bbox_mm consumes them as
+    # mm. A stale metres-unit cache (pre the 2026-06 mm normalization, which
+    # dropped the *1000 here) yields a ~1000x-too-small bbox, which silently
+    # mis-mirrors STL-bbox-mirrored parts -- platen-rack's z-centre read 0.003
+    # instead of ~3 mm, shifting it ~6 mm into its neighbours. No real machine
+    # part spans under a millimetre, so fail loud and force a cache rebuild
+    # rather than place parts a few mm off.
+    span = max(hi[k] - lo[k] for k in range(3))
+    if span < 1.0:
+        raise RuntimeError(
+            f"{path.name}: bbox span {span:.4f} mm is implausibly small -- "
+            "stale metres-unit STL cache? regenerate with "
+            "`export_models.py --force`")
     _STL_BBOX_CACHE[stem] = bbox
     return bbox
 
