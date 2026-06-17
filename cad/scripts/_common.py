@@ -1192,6 +1192,10 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     "pinion-lever": ("x", 0.0),
     "pinion-lift-rod": ("x", 0.0),
     "pinion-handle": ("x", 0.0),
+    # knife bearing support: X-symmetric (bore + block centred on x0); explicit
+    # so placement never depends on a stale/absent STL bbox (it mirrors with the
+    # summing lever so the bore stays around the hex trunnion).
+    "knife-mount": ("x", 0.0),
     # parts whose build scripts are themselves mirrored (M6.8)
     "summing-lever": "x0",
     "magnifying-bracket": "x0",

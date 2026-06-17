@@ -8,9 +8,9 @@ z 18.0 line -- the strip actually under the plate (the plate front edge
 is at local z 15 = machine -70) and clear of the arm (z 4..15): the O5.5
 fillister heads (r 2.75) reach down to z 15.25, 0.25 off the arm face,
 with free air below; the screws thread up flush with
-the plate bottom (992.9 -- engagement into the summing lever's plate not
-modeled). Their heads clear channel spring j=0 (east edge x +28.35) by
-1.9.
+the plate bottom (987.46 -- the corrected coplanar .cs plate, engagement
+into the summing lever's plate not modeled). Their heads clear channel
+spring j=0 (east edge x +28.35) by 1.9.
 
 Layout: origin at the collar centre (machine (+40, 985, -85)); collar
 axis along X (the rod direction), arm runs +Z (toward the plate, machine
@@ -57,7 +57,9 @@ ARM_Z = (4.0, 15.0)
 FLANGE_X = (-11.0, 5.0)  # under-plate flange, machine x +29..+45: stops 0.65
 # east of channel spring j=0's helix (east edge x +28.35; M6.5 top-level fit,
 # M6.8-mirrored)
-FLANGE_Y = (3.9, 7.9)  # flange top touches the plate bottom (992.9)
+FLANGE_Y = (-1.54, 2.46)  # flange top (machine 987.46) touches the corrected
+# .cs plate bottom (987.46); dropped 5.44 from the old (3.9, 7.9)/992.9 when the
+# coplanar plate fell to 987.46..992.54 (see build_summing_lever)
 FLANGE_Z = (9.0, 20.0)  # under the plate's front edge band (derived)
 SCREW_HOLE_DIA = 3.2  # M6.10 mounting-screw holes (O2.9 fillister shanks)
 SCREW_HOLE_X = (-7.0, 1.0)  # machine x +33 / +41: inset 4 from the flange ends
