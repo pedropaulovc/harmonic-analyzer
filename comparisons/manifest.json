@@ -18,13 +18,13 @@
         "zoom": 1.0,
         "target_mm": null,
         "perspective": null,
-        "az_deg": 180,
-        "el_deg": 0
+        "az_deg": 178,
+        "el_deg": -3
       },
       "align": {
-        "scale": 1.21,
-        "dx_px": 20,
-        "dy_px": -300
+        "scale": 1.13,
+        "dx_px": 33,
+        "dy_px": -233
       },
       "component_focus": [
         "harmonic_analyzer"
@@ -46,13 +46,13 @@
         "zoom": 1.0,
         "target_mm": null,
         "perspective": null,
-        "az_deg": -135,
-        "el_deg": 0
+        "az_deg": -139,
+        "el_deg": 8
       },
       "align": {
-        "scale": 1.12,
-        "dx_px": 60,
-        "dy_px": -220
+        "scale": 1.05,
+        "dx_px": -7,
+        "dy_px": -180
       },
       "component_focus": [
         "harmonic_analyzer"
@@ -75,11 +75,11 @@
         "target_mm": null,
         "perspective": null,
         "az_deg": -90,
-        "el_deg": 0
+        "el_deg": 3
       },
       "align": {
-        "scale": 1.15,
-        "dx_px": 87,
+        "scale": 1.16,
+        "dx_px": -33,
         "dy_px": -260
       },
       "component_focus": [
@@ -102,13 +102,13 @@
         "zoom": 1.0,
         "target_mm": null,
         "perspective": null,
-        "az_deg": -45,
-        "el_deg": 0
+        "az_deg": -40,
+        "el_deg": -7
       },
       "align": {
-        "scale": 1.1,
-        "dx_px": -100,
-        "dy_px": -220
+        "scale": 1.12,
+        "dx_px": -47,
+        "dy_px": -207
       },
       "component_focus": [
         "harmonic_analyzer"
@@ -130,13 +130,13 @@
         "zoom": 1.0,
         "target_mm": null,
         "perspective": null,
-        "az_deg": 0,
-        "el_deg": 0
+        "az_deg": 2,
+        "el_deg": 10
       },
       "align": {
-        "scale": 1.18,
-        "dx_px": -20,
-        "dy_px": -287
+        "scale": 1.13,
+        "dx_px": 7,
+        "dy_px": -247
       },
       "component_focus": [
         "harmonic_analyzer"
@@ -154,17 +154,17 @@
       },
       "camera": {
         "mode": "euler",
-        "roll_deg": 0.0,
+        "roll_deg": -1.0,
         "zoom": 1.0,
         "target_mm": null,
         "perspective": null,
-        "az_deg": 45,
-        "el_deg": 0
+        "az_deg": 38,
+        "el_deg": 4
       },
       "align": {
-        "scale": 1.11,
-        "dx_px": -73,
-        "dy_px": -233
+        "scale": 1.08,
+        "dx_px": 20,
+        "dy_px": -193
       },
       "component_focus": [
         "harmonic_analyzer"
@@ -187,12 +187,12 @@
         "target_mm": null,
         "perspective": null,
         "az_deg": 90,
-        "el_deg": 0
+        "el_deg": 3
       },
       "align": {
-        "scale": 1.13,
-        "dx_px": -60,
-        "dy_px": -247
+        "scale": 1.12,
+        "dx_px": 47,
+        "dy_px": -233
       },
       "component_focus": [
         "harmonic_analyzer"
@@ -215,12 +215,12 @@
         "target_mm": null,
         "perspective": null,
         "az_deg": 135,
-        "el_deg": 0
+        "el_deg": 7
       },
       "align": {
         "scale": 1.1,
-        "dx_px": -20,
-        "dy_px": -207
+        "dx_px": 60,
+        "dy_px": -180
       },
       "component_focus": [
         "harmonic_analyzer"
