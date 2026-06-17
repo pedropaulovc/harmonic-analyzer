@@ -14,10 +14,14 @@ What it does, in order:
      (``--allow-dirty`` to override); harmonic-analyzer.SLDASM must be built.
   3. SolidWorks (COM): open harmonic-analyzer.SLDASM, run Pack-and-Go flattened,
      and -- in the same session -- export every built part and assembly to AP214
-     STEP + fine binary STL + multi-angle PNG previews. Everything is staged and
-     zipped into ONE bundle ``cad/out/release/harmonic-analyzer-<version>.zip``
-     (``solidworks/`` native + ``step/`` + ``stl/`` + ``png/``). Records the SW
-     revision for the notes.
+     STEP + fine binary STL + multi-angle PNG previews. The STL set is
+     one-per-part plus a per-configuration STL for the parts whose configs are
+     distinct geometry (cone gears / transgears). Also copies the millimetre
+     scene graph (``cad/out/boxes/harmonic-analyzer.json`` from export_models.py)
+     so the comparison gallery renders from the bundle with no SolidWorks.
+     Everything is staged and zipped into ONE bundle
+     ``cad/out/release/harmonic-analyzer-<version>.zip`` (``solidworks/`` native +
+     ``step/`` + ``stl/`` + ``boxes/`` + ``png/``). Records the SW revision.
   4. git: annotated tag at HEAD, pushed to origin.
   5. gh: create the GitHub release for the tag (auto-generated notes header +
      our provenance block) and upload the bundle as the release asset.
@@ -33,6 +37,7 @@ a concurrent build_all/verify deadlocks):
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import shutil
 import subprocess
@@ -47,6 +52,10 @@ from _common import CAD_ROOT, OUT_SLDASM, OUT_SLDPRT, log
 REPO_ROOT = CAD_ROOT.parent
 TOP_ASSEMBLY = "harmonic-analyzer"
 RELEASE_DIR = CAD_ROOT / "out" / "release"
+# export_models.py render cache: the millimetre scene graph (component transforms
+# + per-config mesh keys + colours) that lets a consumer render the bundle with
+# comparisons/tools/render_offline.py without SolidWorks.
+SCENE_JSON = CAD_ROOT / "out" / "boxes" / f"{TOP_ASSEMBLY}.json"
 _VERSION_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 
 # SolidWorks COM type library (SldWorks); the version pins the same revision the
@@ -161,6 +170,21 @@ def preflight(version: str, allow_dirty: bool) -> None:
     if not top.exists():
         raise SystemExit(
             f"!!  {top} not built -- run build_all.py first")
+
+    # The bundle ships the render-cache scene graph; it must exist, be in the
+    # post-normalization millimetre units (so it pairs with the mm STLs), and be
+    # no older than the assembly it describes.
+    if not SCENE_JSON.exists():
+        raise SystemExit(
+            f"!!  {SCENE_JSON} missing -- run export_models.py first")
+    scene = json.loads(SCENE_JSON.read_text(encoding="utf-8"))
+    if scene.get("unit") != "mm":
+        raise SystemExit(
+            f"!!  {SCENE_JSON.name} unit={scene.get('unit')!r}, expected 'mm' -- "
+            "re-run export_models.py (post mm-normalization)")
+    if SCENE_JSON.stat().st_mtime < top.stat().st_mtime:
+        raise SystemExit(
+            f"!!  {SCENE_JSON.name} older than {top.name} -- re-run export_models.py")
 
 
 # --------------------------------------------------------------------------- #
@@ -348,8 +372,25 @@ def export_neutral(sw: Any, stage: Path) -> dict[str, Any]:
     docs = [(p, SW_DOC_PART) for p in parts] + [(a, SW_DOC_ASSEMBLY) for a in assemblies]
     log(f"neutral export: {len(parts)} parts + {len(assemblies)} assemblies")
 
+    # Per-config STL meshes the scene graph references: a single SLDPRT whose
+    # configurations are distinct geometry used simultaneously (the 20 cone gears,
+    # the 3 transgears). One-per-part covers everything else; these get an extra
+    # STL per referenced config, named to match the scene graph's mesh key so
+    # render_offline resolves them.
+    scene = json.loads(SCENE_JSON.read_text(encoding="utf-8"))
+    cfg_meshes: dict[str, list[tuple[str, str]]] = {}
+    for comp in scene.get("components", []):
+        mesh = comp.get("mesh")
+        if mesh and mesh != comp["part"]:
+            entry = (comp.get("cfg") or "", mesh)
+            bucket = cfg_meshes.setdefault(comp["part"], [])
+            if entry not in bucket:
+                bucket.append(entry)
+    n_cfg = sum(len(v) for v in cfg_meshes.values())
+    log(f"neutral export: {n_cfg} per-config meshes across {len(cfg_meshes)} parts")
+
     old_prefs = _set_export_prefs(sw)
-    exported = pngs = 0
+    exported = pngs = cfg_done = 0
     try:
         for i, (src, doc_type) in enumerate(docs, 1):
             sw.OpenDoc6(str(src), doc_type, SW_OPEN_SILENT, "", 0, 0)
@@ -360,6 +401,15 @@ def export_neutral(sw: Any, stage: Path) -> dict[str, Any]:
                 rc = doc.SaveAs3(str(out), 0, SW_SAVE_OPTS)
                 if not out.exists() or out.stat().st_size == 0:
                     raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={rc})")
+            # one extra STL per referenced configuration (cone gears / transgears)
+            for cfg, mesh in cfg_meshes.get(src.stem, ()):
+                if not doc.ShowConfiguration2(cfg):
+                    raise RuntimeError(f"{src.name}: ShowConfiguration2({cfg!r}) failed")
+                out = stl_dir / f"{mesh}.STL"
+                rc = doc.SaveAs3(str(out), 0, SW_SAVE_OPTS)
+                if not out.exists() or out.stat().st_size == 0:
+                    raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={rc})")
+                cfg_done += 1
             pngs += _export_pngs(doc, png_root / src.stem, src.stem)
             _close_active_documents(sw)  # CloseDoc -> discards, never prompts
             if i % 10 == 0 or i == len(docs):
@@ -374,6 +424,7 @@ def export_neutral(sw: Any, stage: Path) -> dict[str, Any]:
         "assemblies": len(assemblies),
         "pngs": pngs,
         "views": len(PNG_VIEWS),
+        "config_meshes": cfg_done,
     }
 
 
@@ -408,7 +459,14 @@ def bundle(sw: Any, revision: str, version: str) -> tuple[Path, dict[str, Any]]:
     # 2. Neutral exports (STEP / STL / PNG) into the same stage.
     facts.update(export_neutral(sw, stage))
 
-    # 3. One zip of the whole stage.
+    # 3. Scene graph (mm): per-component transforms + mesh keys + colours, so a
+    #    consumer can render the bundle with render_offline.py (no SolidWorks).
+    boxes_dst = stage / "boxes"
+    boxes_dst.mkdir(exist_ok=True)
+    shutil.copy2(SCENE_JSON, boxes_dst / SCENE_JSON.name)
+    facts["scene_json"] = SCENE_JSON.name
+
+    # 4. One zip of the whole stage.
     zip_path = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}.zip"
     if zip_path.exists():
         zip_path.unlink()
@@ -417,7 +475,8 @@ def bundle(sw: Any, revision: str, version: str) -> tuple[Path, dict[str, Any]]:
         raise RuntimeError(f"release bundle not produced at {zip_path}")
     facts["size_mb"] = zip_path.stat().st_size / 1e6
     log(f"release bundle: {zip_path.name} ({facts['size_mb']:.1f} MB) -- "
-        f"solidworks/ + {facts['documents']} docs x STEP+STL + {facts['pngs']} PNGs")
+        f"solidworks/ + {facts['documents']} docs x STEP+STL "
+        f"(+{facts['config_meshes']} per-config STLs) + {facts['pngs']} PNGs + boxes/")
     return zip_path, facts
 
 
@@ -435,8 +494,13 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         f"rebuilding -- with or without SolidWorks:\n\n"
         f"- `solidworks/` -- native Pack-and-Go ({facts['documents']} referenced "
         f"documents, flattened): open `{TOP_ASSEMBLY}.SLDASM` as-is\n"
-        f"- `step/` -- AP214 STEP + `stl/` fine binary STL (mm), one of each per "
-        f"document: {facts['parts']} parts + {facts['assemblies']} assemblies\n"
+        f"- `step/` -- AP214 STEP + `stl/` fine binary STL (mm), one per "
+        f"document ({facts['parts']} parts + {facts['assemblies']} assemblies) "
+        f"plus {facts['config_meshes']} per-configuration STLs (cone gears / "
+        f"transgears)\n"
+        f"- `boxes/{TOP_ASSEMBLY}.json` -- assembly scene graph (mm): per-component "
+        f"transform, mesh key and colour, so the comparison gallery renders from "
+        f"this bundle with `comparisons/tools/render_offline.py` (no SolidWorks)\n"
         f"- `png/` -- {facts['views']}-angle preview renders "
         f"({facts['pngs']} images)\n"
         f"- Size: {facts['size_mb']:.1f} MB\n\n"
@@ -495,7 +559,8 @@ def main() -> int:
     print(f"\nDone in {time.perf_counter() - started:.1f}s.", flush=True)
     print(f"  version: {version}")
     print(f"  bundle:  {zip_path} ({facts['size_mb']:.1f} MB) -- solidworks/ + "
-          f"{facts['documents']} docs x STEP+STL + {facts['pngs']} PNGs")
+          f"{facts['documents']} docs x STEP+STL (+{facts['config_meshes']} "
+          f"per-config) + {facts['pngs']} PNGs + boxes/")
     print(f"  release: {url}")
     return 0
 
