@@ -24,8 +24,9 @@ Seven features (the six .cs features + the hex knife edge):
    y 0). Machine-y registration (M6.4 plate-top-at-998) is set at placement.
 2. Pivot cylinder      -- Front-plane solid circle at the origin, symmetric
    extrude along the long edge (the pivot/rock axis = local Z).
-3. Hex knife edges     -- two hexagonal collars flanking the pivot centre,
-   vertex-up, presenting the knife edge the lever is suspended on.
+3. Hex knife edges     -- two hexagonal collars at the pivot ENDS (one per
+   side of the shaft), vertex-up, each presenting the knife edge the lever is
+   suspended on (two end bearings = a stable suspension).
 4. Edge ribs (x2)      -- Front-plane line/line/semicircle wrapping the cylinder
    at the plate ends, blind-extruded at a start offset.
 5. Summation plate     -- Top-plane leaf on the -X (counter-spring) arm: vertical
@@ -116,10 +117,15 @@ PLATE_TOP_Y = 998.0  # machine-y the plate top registers to at PLACEMENT (med);
 # build_output_assembly's component Y, not by any extrude here.
 
 # --- hex knife-edge protrusions (NEW; LOW confidence -- tune vs ch30) -------
+# TWO collars, one at EACH END of the pivot trunnion (the "sides", not the
+# centre): each is the bearing whose top vertex line is the knife edge the
+# lever is suspended/rocks on -- two end bearings give a stable suspension.
 HEX_R = 16.0  # vertex radius of the knife-edge hex collar (> CYL_R so it
 # protrudes); vertex-up so the top vertex line is the knife edge (low)
-HEX_Z_INNER = 9.0  # inner face |z|: leaves a central gap for the suspension stud
-HEX_Z_OUTER = 20.0  # outer face |z|: each collar spans |z| 9..20 (low)
+HEX_WIDTH = 18.0  # z-length of each end collar (low)
+HEX_Z_OUTER = PLATE_L / 2.0  # outboard face = the cylinder end (76.20)
+HEX_Z_INNER = HEX_Z_OUTER - HEX_WIDTH  # inboard face |z| (58.20): each collar
+# spans |z| 58.2..76.2 at its end of the shaft (low)
 
 # --- derived ---------------------------------------------------------------
 SUM_BASE = PLATE_L / 2.0  # summation plate base length             76.20
@@ -231,8 +237,9 @@ async def _pivot_cylinder(adapter) -> None:
 
 
 async def _hex_collar(adapter, flip: bool, name: str) -> None:
-    """One hexagonal knife-edge collar around the pivot, vertex-up, blind-
-    extruded along Z from |z| HEX_Z_INNER to HEX_Z_OUTER (flip = the -Z side).
+    """One hexagonal knife-edge collar at a pivot END (the "sides", not the
+    centre), vertex-up, blind-extruded along Z over |z| HEX_Z_INNER..HEX_Z_OUTER
+    -- i.e. the outboard span of the shaft (flip = the -Z end).
 
     Front-plane regular hexagon centred on the pivot axis, a vertex at the top
     (the knife edge runs along Z at that top vertex line)."""
