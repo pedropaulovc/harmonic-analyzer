@@ -2176,6 +2176,32 @@ def body_faults(adapter: Any, model: Any) -> list[tuple[str, int]]:
     return faults
 
 
+def remap_front_to_machine_front(adapter: Any) -> None:
+    """Redefine the active document's standard views so SolidWorks ``Front``
+    shows the MACHINE front (the paper/output side at -Z).
+
+    The machine is authored in machine coordinates with the output side at -Z
+    (see build_harmonic_analyzer_assembly), so SolidWorks' native Front view --
+    which looks toward -Z from the +Z side -- renders the BACK. The machine front
+    is exactly what SolidWorks currently calls the Back view (camera on the -Z
+    side, crank at the viewer's right). ``IModelDocExtension.UpdateStandardViews``
+    re-bases the whole orthographic set so that orientation becomes Front; NO
+    geometry moves, so the comparison-render euler azimuth convention (az 0 = +Z)
+    is untouched -- only the named standard views and the interactive open-on-Front
+    change. Leaves Front active so the saved document opens on the machine front.
+    """
+    SW_FRONT, SW_BACK = 1, 2  # swStandardViews_e
+    model = adapter.currentModel
+    _flag(model, "IModelDoc2")
+    model.ShowNamedView2("", SW_BACK)  # orient to the machine front
+    ok = model.Extension.UpdateStandardViews("", SW_FRONT)
+    if not ok:
+        raise RuntimeError("UpdateStandardViews(swFrontView) returned False")
+    model.ShowNamedView2("", SW_FRONT)  # activate the (now machine-front) Front
+    adapter._zoom_to_fit(model)
+    log("standard views remapped: Front now shows the machine front (-Z paper side)")
+
+
 async def save_assembly_and_images(
     adapter: Any, asm_name: str, views: Iterable[str] = DEFAULT_VIEWS
 ) -> dict[str, str]:
