@@ -18,8 +18,8 @@
         "zoom": 1.0,
         "target_mm": null,
         "perspective": null,
-        "az_deg": 180,
-        "el_deg": 0
+        "az_deg": 178,
+        "el_deg": -3
       },
       "align": {
         "scale": 1.21,
@@ -46,8 +46,8 @@
         "zoom": 1.0,
         "target_mm": null,
         "perspective": null,
-        "az_deg": -135,
-        "el_deg": 0
+        "az_deg": -139,
+        "el_deg": 8
       },
       "align": {
         "scale": 1.12,
@@ -75,7 +75,7 @@
         "target_mm": null,
         "perspective": null,
         "az_deg": -90,
-        "el_deg": 0
+        "el_deg": 3
       },
       "align": {
         "scale": 1.15,
@@ -102,8 +102,8 @@
         "zoom": 1.0,
         "target_mm": null,
         "perspective": null,
-        "az_deg": -45,
-        "el_deg": 0
+        "az_deg": -40,
+        "el_deg": -7
       },
       "align": {
         "scale": 1.1,
@@ -130,8 +130,8 @@
         "zoom": 1.0,
         "target_mm": null,
         "perspective": null,
-        "az_deg": 0,
-        "el_deg": 0
+        "az_deg": 2,
+        "el_deg": 10
       },
       "align": {
         "scale": 1.18,
@@ -154,12 +154,12 @@
       },
       "camera": {
         "mode": "euler",
-        "roll_deg": 0.0,
+        "roll_deg": -1.0,
         "zoom": 1.0,
         "target_mm": null,
         "perspective": null,
-        "az_deg": 45,
-        "el_deg": 0
+        "az_deg": 38,
+        "el_deg": 4
       },
       "align": {
         "scale": 1.11,
@@ -187,7 +187,7 @@
         "target_mm": null,
         "perspective": null,
         "az_deg": 90,
-        "el_deg": 0
+        "el_deg": 3
       },
       "align": {
         "scale": 1.13,
@@ -215,7 +215,7 @@
         "target_mm": null,
         "perspective": null,
         "az_deg": 135,
-        "el_deg": 0
+        "el_deg": 7
       },
       "align": {
         "scale": 1.1,
