@@ -200,7 +200,15 @@ async def anchor_point_to_origin(
       valued dims are invalid) plus one distance dim for the other.
     * General: horizontal + vertical distance dims (absolute values — the
       solver keeps the side the geometry was created on, probed live).
+
+    Sub-nanometre coordinates snap to zero (as in :func:`anchor_point_to_point`):
+    trig-derived vertices land within ulps of an axis, and a 1e-16 distance dim
+    is as invalid to SolidWorks as a zero one.
     """
+    if abs(x) < 1e-9:
+        x = 0.0
+    if abs(y) < 1e-9:
+        y = 0.0
     if x == 0.0 and y == 0.0:
         check(
             f"coincident {label} -> origin",
