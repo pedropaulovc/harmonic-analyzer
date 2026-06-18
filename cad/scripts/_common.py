@@ -2302,6 +2302,15 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
     """Connect, run ``build(adapter)``, disconnect; return a process exit code."""
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
+    # Build output carries non-ASCII (e.g. the "A ∩ B" named-axis labels). When
+    # stdout is redirected to a file/pipe Windows defaults it to cp1252, so the
+    # first such print would raise UnicodeEncodeError and abort the build. Force
+    # UTF-8 so a piped from-scratch build doesn't depend on PYTHONUTF8=1.
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="replace")
+
     async def _run() -> dict[str, str]:
         adapter = PyWin32Adapter({})
         print("Connecting to SolidWorks ...", flush=True)
