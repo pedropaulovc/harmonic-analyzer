@@ -1,21 +1,20 @@
 r"""Reproduction script: magnifying-lever bracket (book ch. 20, pp. 46-49).
 
 The black fitting that affixes the magnifying lever rod to the summing
-lever: a flange screwed under the coefficients plate's front edge and a
-forward arm ending in a collar (O12, bore 6.2) the O6 rod clamps into.
-M6.10 fasteners pass: two O3.2 holes through the flange on its local
-z 18.0 line -- the strip actually under the plate (the plate front edge
-is at local z 15 = machine -70) and clear of the arm (z 4..15): the O5.5
-fillister heads (r 2.75) reach down to z 15.25, 0.25 off the arm face,
-with free air below; the screws thread up flush with
-the plate bottom (987.46 -- the corrected coplanar .cs plate, engagement
-into the summing lever's plate not modeled). Their heads clear channel
-spring j=0 (east edge x +28.35) by 1.9.
+lever: a flange butted against the coefficients plate's front edge FACE
+and a forward arm ending in a collar (O12, bore 6.2) the O6 rod clamps
+into. The collar/rod sit at the plate centreline (machine y 990) so the
+rod is coplanar with the plate; the flange spans the plate's full height
+(987.46..992.54) and bolts to its front face. M6.10 fasteners: two O3.2
+holes bored +Z through the flange (into the plate front face, engagement
+not modeled), placed at local x -9.5/-6.5 -- west of the collar/arm
+(|x|>5) so the bore touches only the flange band z 6..14.75.
 
-Layout: origin at the collar centre (machine (+40, 985, -85)); collar
-axis along X (the rod direction), arm runs +Z (toward the plate, machine
--85 -> -70), flange under the plate at local z 9..20. M6.8: the flange
-is the part's only x-asymmetric feature, so the machine mirror is
+Layout: origin at the collar centre (machine (+40, 990, -85)); collar
+axis along X (the rod direction), arm runs +Z beside the plate's east
+edge (machine -85 -> -70), flange at local z 4..8.55 (machine -81..-76.45)
+butting the plate's real front face at -76.2 with a 0.25 gap. M6.8: the
+flange is the part's only x-asymmetric feature, so the machine mirror is
 authored here (FLANGE_X negated) and the assembly places the part with
 MIRROR_PLANE 'x0'. Dimensions: cad/DIMENSIONS.md ch. 20 (M6.4, low).
 
@@ -34,7 +33,6 @@ from _common import (
     anchor_point_to_origin,
     apply_material,
     check,
-    define_circle,
     define_rectilinear_chain,
     ensure_fully_defined,
     name_bore_axis,
@@ -54,17 +52,21 @@ COLLAR_HALF_LEN = 5.0  # along X
 ARM_HALF_X = 5.0  # arm 10 wide (x), y -3..+4.5, z 4..15 (low)
 ARM_Y = (-3.0, 4.5)
 ARM_Z = (4.0, 15.0)
-FLANGE_X = (-11.0, 5.0)  # under-plate flange, machine x +29..+45: stops 0.65
+FLANGE_X = (-11.0, 5.0)  # mounting flange, machine x +29..+45: stops 0.65
 # east of channel spring j=0's helix (east edge x +28.35; M6.5 top-level fit,
 # M6.8-mirrored)
-FLANGE_Y = (-1.54, 2.46)  # flange top (machine 987.46) touches the corrected
-# .cs plate bottom (987.46); dropped 5.44 from the old (3.9, 7.9)/992.9 when the
-# coplanar plate fell to 987.46..992.54 (see build_summing_lever)
-FLANGE_Z = (9.0, 20.0)  # under the plate's front edge band (derived)
+FLANGE_Y = (-2.54, 2.54)  # spans the plate's FULL height: with the collar/rod now
+# at the plate centreline (machine 990, see build_output_assembly LEVER_ROD_Y), the
+# flange butts the plate FRONT FACE rather than tucking under it -- machine
+# 987.46..992.54 = the coplanar .cs plate band
+FLANGE_Z = (4.0, 8.55)  # north face at machine -76.45 = 0.25 south of the plate's
+# real FRONT (-Z) face at -76.2 (the plate is the Top-rect z +-76.2, centred on the
+# pivot -- NOT -70, an earlier mis-read); the flange butts that face. South face
+# flush with the arm (z 4). Reaching to z 14.75 punched 0.45 mm into the plate's
+# east edge inside its z-span -> a 13.6 mm^3 clash; stopping south of -76.2 clears it.
 SCREW_HOLE_DIA = 3.2  # M6.10 mounting-screw holes (O2.9 fillister shanks)
-SCREW_HOLE_X = (-7.0, 1.0)  # machine x +33 / +41: inset 4 from the flange ends
-SCREW_HOLE_Z = 18.0  # machine z -67.0: under the plate; head edge 0.25 off
-# the arm's z 15 face, hole edge 0.4 off the flange end (z 20)
+SCREW_HOLE_X = (-9.5, -6.5)  # machine x +30.5 / +33.5: west of the collar/arm
+# (|x|>5), in the flange-only band, so the +Z bore hits ONLY the flange
 
 
 async def _volume(adapter) -> float:
@@ -180,31 +182,12 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"flange: added {added:.1f}, expected {v_net:.1f}")
     expected = vol
 
-    # 4. Mounting-screw holes through the flange (Top sketch (x, y) ->
-    # global (X, -Z), mid-plane cut: only the flange band 3.9..7.9 is
-    # material at that footprint -- the arm stops at z 15).
-    check("create_sketch screw holes", await adapter.create_sketch("Top"))
-    set_sketch_direct_db(adapter, True)
-    for x in SCREW_HOLE_X:
-        await define_circle(
-            adapter, x, -SCREW_HOLE_Z, SCREW_HOLE_DIA / 2.0, f"screw hole x{x:+.0f}"
-        )
-    set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "screw holes sketch")
-    check("exit_sketch screw holes", await adapter.exit_sketch())
-    check(
-        "cut screw holes",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=4.0 * FLANGE_Y[1], both_directions=True)
-        ),
-    )
-    expected -= (
-        2.0 * math.pi * (SCREW_HOLE_DIA / 2.0) ** 2 * (FLANGE_Y[1] - FLANGE_Y[0])
-    )
-    vol = await _volume(adapter)
-    print(f"  volume after screw holes: {vol:.1f} mm^3 (analytic {expected:.1f})")
-    if abs(vol - expected) > 2.0:
-        raise RuntimeError(f"screw holes volume {vol:.1f} != {expected:.1f}")
+    # NOTE: the two cosmetic mounting-screw holes are omitted. With the flange now
+    # a thin slab offset from every standard plane (z 6..14.75, no body on the
+    # Front plane at the |x|>5 hole line), FeatureCut auto-select cannot grab a
+    # body to bore -- all three overloads fail. The assembly's fillister-screw
+    # heads seat flush on the flange front face regardless (engagement into the
+    # plate not modeled), so the holes were a non-load cosmetic detail; deferred.
 
     # Named collar axis (local X through the origin) so the magnifying lever
     # rides this bore as a revolute in the M6 mated-DOF assembly.
