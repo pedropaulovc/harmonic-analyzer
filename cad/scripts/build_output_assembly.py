@@ -172,7 +172,10 @@ SPRING_POS = (95.0, 1052.1, 0.0)  # coil-bottom origin; ring at y 1012.1
 # (1052.0 left the hook rod poking 0.05 past the ring inner top)
 
 # --- magnifying group --------------------------------------------------------
-LEVER_ROD_Y = 985.0
+# Rod at the plate centreline (990) so it is coplanar with the coefficients plate
+# (raised from 985); the bracket flange butts the plate front face. The clamp +
+# vertical rod ride up with it (CLAMP_POS and VROD_TOP_Y derive from LEVER_ROD_Y).
+LEVER_ROD_Y = 990.0
 LEVER_ROD_Z = -85.0
 CLAMP_X = -150.0  # sliding clamp default position (p.46/48 insets)
 from build_magnifying_clamp import (  # noqa: E402
@@ -187,7 +190,7 @@ CLAMP_POS = (
     LEVER_ROD_Z,
 )
 VROD_Z = LEVER_ROD_Z - CLAMP_ROD_DX  # -91.5 (local +x -> machine -z)
-VROD_TOP_Y = 990.0  # dome inside the clamp's rod bore
+VROD_TOP_Y = LEVER_ROD_Y + 5.0  # dome inside the clamp's rod bore (rides the rod)
 FIXTURE_Y0 = 926.0  # collar y 926..934 on the vertical rod
 
 # --- wheel -------------------------------------------------------------------
@@ -294,14 +297,6 @@ HEX_BOLT_Z = (-54.0, 36.0)
 # front (-144.1), O2.9 shank through the 1.2 strip and 2.8 into the
 # platen's 3.5-deep sockets.
 CLIP_SCREW_XY = ((-245.0, 320.0), (-245.0, 429.0), (27.0, 320.0), (27.0, 429.0))
-# Magnifying-bracket flange screws: Rx(-90) points the shank +Y through the
-# flange band (983.46..987.46), tip flush with the corrected .cs plate bottom
-# (987.46; engagement into the summing lever's plate not modeled); the O5.5
-# heads hang in free air below. Dropped 5.44 with the flange when the coplanar
-# plate fell from 992.9 to 987.46 (see build_magnifying_bracket FLANGE_Y).
-FLANGE_SCREW_X = (-33.0, -41.0)  # machine +33/+41: inset 4 from the flange ends
-FLANGE_SCREW_POS_Y = 983.46  # flange bottom
-FLANGE_SCREW_Z = -67.0  # the under-plate strip (bracket SCREW_HOLE_Z 18.0)
 # Column-clamp pinch screws on each clamp's back face (z -88), backed out:
 # the shank tip (-94.2) stays 0.2 inside the back-wall hole (inner end
 # -94.4) and 0.3 off the column surface (-94.5).
@@ -906,11 +901,10 @@ async def build(adapter) -> dict[str, str]:
         await _place(adapter, "fillister-screw", [x, y, PLATE_FRONT_Z - 1.2],
                      [0.0, 0.0, 0.0], IDENTITY,
                      label=f"fillister-screw (clip x{x:+.0f} y{y:.0f})")
-    for x in FLANGE_SCREW_X:
-        await _place(adapter, "fillister-screw",
-                     [x, FLANGE_SCREW_POS_Y, FLANGE_SCREW_Z],
-                     [-90.0, 0.0, 0.0], ROT_X_NEG90,
-                     label=f"fillister-screw (flange x{x:+.0f})")
+    # (Magnifying-bracket flange screws removed: with the rod raised to the plate
+    # centreline the flange tucks directly in front of the collar, leaving no room
+    # for a fillister head -- the heads bored into the collar/each other. The flange
+    # butts the plate front face on its own; the bolts were a cosmetic detail.)
     for x, y in PINCH_SCREW_XY:
         await _place(adapter, "pinch-screw", [x, y, PINCH_SCREW_Z],
                      [0.0, 0.0, 0.0], IDENTITY,
