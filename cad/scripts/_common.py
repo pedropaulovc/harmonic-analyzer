@@ -2210,23 +2210,18 @@ def remap_front_to_machine_front(adapter: Any) -> None:
     log("standard views remapped: Front now shows the machine front (-Z paper side)")
 
 
-async def save_assembly_and_images(
-    adapter: Any, asm_name: str, views: Iterable[str] = DEFAULT_VIEWS
+async def _export_assembly_images(
+    adapter: Any, asm_name: str, views: Iterable[str]
 ) -> dict[str, str]:
-    """Save the assembly to ``cad/out/sldasm`` and PNG views to ``cad/out/png``."""
-    # Fail fast: never save a broken assembly. Catches mate errors (e.g. a gear
-    # mate whose entity went suppressed = the silent drive-train corruption) that
-    # the DOF and interference gates miss -- a fixed/grounded component passes
-    # the DOF gate even with broken mates. deep=True also inspects each
-    # subassembly's own document, where a sub's internal mate errors live.
-    assert_model_healthy(adapter, label=asm_name, deep=True)
-    OUT_SLDASM.mkdir(parents=True, exist_ok=True)
-    asm_path = (OUT_SLDASM / f"{asm_name}.SLDASM").resolve()
-    check(f"save_file -> {asm_path}", await adapter.save_file(str(asm_path)))
+    """Export PNG views to ``cad/out/png/<asm>`` and trim the README render.
 
+    Factored out of :func:`save_assembly_and_images` so the refresh primitive
+    (:func:`refresh_assembly`) shares the exact same export tail. Returns
+    ``{<view>: path, ["readme": path]}``; the caller adds the assembly path.
+    """
     png_dir = OUT_PNG / asm_name
     png_dir.mkdir(parents=True, exist_ok=True)
-    artefacts = {"assembly": str(asm_path)}
+    artefacts: dict[str, str] = {}
     for view in views:
         img_path = (png_dir / f"{asm_name}_{view}.png").resolve()
         check(
@@ -2249,6 +2244,148 @@ async def save_assembly_and_images(
     if trimmed:
         print(f"  OK  trim README render {trimmed}")
         artefacts["readme"] = trimmed.split(":")[0]
+    return artefacts
+
+
+async def save_assembly_and_images(
+    adapter: Any, asm_name: str, views: Iterable[str] = DEFAULT_VIEWS
+) -> dict[str, str]:
+    """Save the assembly to ``cad/out/sldasm`` and PNG views to ``cad/out/png``."""
+    # Fail fast: never save a broken assembly. Catches mate errors (e.g. a gear
+    # mate whose entity went suppressed = the silent drive-train corruption) that
+    # the DOF and interference gates miss -- a fixed/grounded component passes
+    # the DOF gate even with broken mates. deep=True also inspects each
+    # subassembly's own document, where a sub's internal mate errors live.
+    assert_model_healthy(adapter, label=asm_name, deep=True)
+    OUT_SLDASM.mkdir(parents=True, exist_ok=True)
+    asm_path = (OUT_SLDASM / f"{asm_name}.SLDASM").resolve()
+    check(f"save_file -> {asm_path}", await adapter.save_file(str(asm_path)))
+
+    artefacts = {"assembly": str(asm_path)}
+    artefacts.update(await _export_assembly_images(adapter, asm_name, views))
+    return artefacts
+
+
+def save_assembly_in_place(adapter: Any, asm_name: str) -> None:
+    """Save ``<asm_name>.SLDASM`` in place with a silent ``ModelDoc2.Save3``.
+
+    For an assembly OPENED from its own path (a refresh or a config-hook reopen)
+    the active doc IS the file, so the correct save is an in-place
+    ``Save3(swSaveAsOptions_Silent | SaveReferenced, &err, &warn)`` -- NOT the
+    adapter's ``save_file``, both of whose branches are wrong for an
+    opened-in-place doc:
+
+      * ``save_file(PATH)`` -> SaveAs branch does ``CloseDoc(PATH)`` +
+        ``os.remove(PATH)`` before ``SaveAs3``; when the active doc IS that path
+        this disconnects the doc and deletes the file -- it destroyed
+        drive-train.SLDASM twice.
+      * ``save_file()`` (no path) -> ``Save3(1, None, None)``; ``None`` for the
+        two [out] byref params fails the COM call, so it falls through to the
+        blocking parameterless ``Save()`` "Component documents must be saved"
+        modal.
+
+    Passing the two [out] params as real pywin32 BYREF VARIANTs makes ``Save3``
+    write silently and return the error/warning codes. ``SaveReferenced`` writes
+    any dirty reference without a dialog. The GetSaveFlag short-circuit skips a
+    no-op save; the mtime assertion proves the file was rewritten (never
+    deleted). Generalised from ``build_engagement_configs._save_assembly_in_place``
+    (proven by ``repro_inplace_save.py``: ret=True, err=0, warn=0, config persists
+    on reopen).
+    """
+    import pythoncom
+    from win32com.client import VARIANT
+
+    asm = adapter.currentModel
+    sldasm = OUT_SLDASM / f"{asm_name}.SLDASM"
+    if not bool(adapter._attempt(lambda: asm.GetSaveFlag(), default=True)):
+        log(f"{sldasm.name} already clean -- nothing to save")
+        return
+
+    before = sldasm.stat().st_mtime
+    err = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
+    warn = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
+    options = 1 | 8  # swSaveAsOptions_Silent | swSaveAsOptions_SaveReferenced
+    ret = adapter._attempt(lambda: asm.Save3(options, err, warn), default=False)
+
+    after = sldasm.stat().st_mtime
+    if after <= before:
+        raise RuntimeError(
+            f"{sldasm.name} mtime unchanged after Save3(Silent) "
+            f"(ret={ret}, err={err.value}, warn={warn.value})")
+    log(f"saved {sldasm.name} via Save3(Silent) (ret={ret}, err={err.value}, "
+        f"warn={warn.value})")
+
+
+async def refresh_assembly(
+    adapter: Any, asm_name: str, views: Iterable[str] = DEFAULT_VIEWS
+) -> dict[str, str]:
+    """Reload an assembly's parts in place -- the cheap incremental rebuild.
+
+    A ``.SLDASM`` is a thin reference layer over its part files (component refs +
+    mates + transforms, not baked geometry), so when only a referenced
+    ``.SLDPRT``/sub-``.SLDASM`` changed, reopening the assembly + per-config
+    ``ForceRebuild3`` loads the new geometry WITHOUT re-inserting/re-mating the
+    ~122 components a from-scratch ``create_assembly`` costs (~500 s). This is the
+    cheap path of the incremental build graph (see ``dodo.py``).
+
+    Fail loud, no fallback. Every configuration is force-rebuilt and any
+    non-warning What's Wrong fault raises immediately, naming the config + the
+    broken feature/mate. Then the rest/export pose is re-activated and the
+    standard gates run: ``assert_components_fully_defined`` (free DOF),
+    ``check_no_interference`` (overlaps), ``assert_model_healthy`` (deep mate
+    health). Any gate raises a ``RuntimeError`` naming the culprit and the
+    ``.SLDASM`` is left untouched (the in-place save never runs) -- so a
+    re-authored part that re-IDed a mated face (dangling mate) or a geometry
+    change that grows into a neighbour (interference) HALTS the build rather than
+    saving a stale/broken artefact. The caller escalates to a full from-scratch
+    rebuild via the ``full`` escape (delete the target + ``doit assembly:<stem>``).
+    """
+    asm_path = (OUT_SLDASM / f"{asm_name}.SLDASM").resolve()
+    if not asm_path.exists():
+        raise RuntimeError(
+            f"missing assembly {asm_path}; build it from scratch first")
+    check(f"open {asm_name}", await adapter.open_model(str(asm_path)))
+
+    configs = check("list configurations", await adapter.list_configurations())
+    log(f"refresh {asm_name}: {len(configs)} configuration(s): {configs}")
+    # The deterministic export/rest pose. Default is the saved, rendered pose the
+    # top-level assembly references; engagement configs (cone_disengaged etc.) are
+    # intentionally under-defined, so the DOF gate only runs on rest.
+    rest = "Default" if "Default" in configs else (configs[0] if configs else None)
+
+    # Per-config rebuild: load the new part geometry into EVERY configuration so a
+    # config-specific break (an engagement config whose mesh entity moved) is
+    # caught here, not silently saved. Under-defined-by-design configs are NOT a
+    # fault -- whats_wrong reports feature/mate rebuild errors, not free DOF.
+    for cfg in configs:
+        check(f"activate {cfg}", await adapter.set_active_configuration(cfg))
+        adapter._attempt(
+            lambda: adapter.currentModel.ForceRebuild3(False), default=None)
+        faults = [
+            f"{name} [{_FEATURE_ERROR.get(code, code)}]"
+            for name, code, warn in whats_wrong(adapter, adapter.currentModel)
+            if not warn
+        ]
+        if faults:
+            raise RuntimeError(
+                f"refresh {asm_name}: configuration {cfg!r} has rebuild faults "
+                f"after reloading parts (dangling mate / re-IDed face?): "
+                + ", ".join(faults))
+        log(f"refresh {asm_name}: configuration {cfg} rebuilt clean")
+
+    # Back to the rest pose for the gates + save: the saved active config and the
+    # exported PNGs must match the from-scratch build's deterministic pose.
+    if rest is not None:
+        check(f"re-activate {rest}", await adapter.set_active_configuration(rest))
+
+    # Gates -- each already raises a RuntimeError naming the culprit. No fallback.
+    assert_components_fully_defined(adapter)
+    check_no_interference(adapter)
+    assert_model_healthy(adapter, label=asm_name, deep=True)
+
+    save_assembly_in_place(adapter, asm_name)
+    artefacts = {"assembly": str(asm_path)}
+    artefacts.update(await _export_assembly_images(adapter, asm_name, views))
     return artefacts
 
 

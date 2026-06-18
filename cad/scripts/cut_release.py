@@ -169,7 +169,7 @@ def preflight(version: str, allow_dirty: bool) -> None:
     top = OUT_SLDASM / f"{TOP_ASSEMBLY}.SLDASM"
     if not top.exists():
         raise SystemExit(
-            f"!!  {top} not built -- run build_all.py first")
+            f"!!  {top} not built -- run doit first")
 
     # The bundle ships the render-cache scene graph; it must exist, be in the
     # post-normalization millimetre units (so it pairs with the mm STLs), and be
@@ -488,7 +488,7 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
     return (
         f"Scripted SolidWorks reproduction of Michelson's 20-channel harmonic "
         f"analyzer.\n\n"
-        f"The repository is source-of-truth (`build_all.py` regenerates every "
+        f"The repository is source-of-truth (`doit` regenerates every "
         f"part). This release attaches a single **CAD bundle** "
         f"`harmonic-analyzer-{version}.zip` so the model can be opened without "
         f"rebuilding -- with or without SolidWorks:\n\n"
