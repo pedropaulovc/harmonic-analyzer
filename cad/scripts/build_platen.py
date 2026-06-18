@@ -36,11 +36,11 @@ from _common import (
     apply_material,
     apply_color,
     PANEL_BLACK,
+    bbox_extent_check,
     check,
     define_circle,
     define_rectilinear_chain,
     ensure_fully_defined,
-    measure_check,
     name_bore_axis,
     report_mass_properties,
     run_build,
@@ -88,16 +88,8 @@ async def build(adapter) -> dict[str, str]:
     pre = await adapter.get_mass_properties()
     # Verify the annotated 140 mm front-face height BEFORE the socket cut
     # (the post-cut view broke the screen-projected face pick live).
-    mid_x, mid_z = PLATE_WIDTH / 2.0, PLATE_THICKNESS / 2.0
-    await measure_check(
-        adapter,
-        "plate height (annotated 140)",
-        [
-            {"entity_type": "FACE", "point": [mid_x, 0.0, mid_z]},
-            {"entity_type": "FACE", "point": [mid_x, PLATE_HEIGHT, mid_z]},
-        ],
-        "normal_distance",
-        PLATE_HEIGHT,
+    await bbox_extent_check(
+        adapter, "plate height (annotated 140)", "y", PLATE_HEIGHT
     )
 
     # Direct-db: the sketch plane is coplanar with the plate's front face,

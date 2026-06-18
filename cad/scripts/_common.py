@@ -1086,6 +1086,52 @@ async def measure_check(
     print(f"  OK  measure {label}: {key}={value:.4f} (expected {expected:g})")
 
 
+async def bbox_extent_check(
+    adapter: Any,
+    label: str,
+    axis: str,
+    expected: float,
+    tol: float = 0.05,
+) -> None:
+    """Assert the part's solid bounding-box extent along ``axis`` (mm).
+
+    The view-independent replacement for a face-to-face ``normal_distance``
+    measure of an overall width/height/length. ``measure_check`` selected the
+    two opposite faces by a screen-projected point each, but mutually-occluding
+    faces collapse to a single pick in every standard view (one face hides the
+    other), so the measure came back single-faced -- the same screen-projection
+    trap the bar-length measure already dodges with a silhouette edge. Reading
+    the bounding box needs no face picking at all.
+
+    Unions the solid bodies' boxes (``IBody2::GetBodyBox``) so an unabsorbed,
+    shown sketch can't inflate the extent. Only valid when the measured faces
+    ARE the part's bounding faces along ``axis`` (true for these overall-size
+    annotations); a feature protruding past them would read larger.
+    """
+    from solidworks_mcp.adapters import sw_type_info
+
+    index = {"x": 0, "y": 1, "z": 2}[axis]
+    doc = adapter.currentModel
+    sw_type_info.flag_methods(doc, "IPartDoc")
+    bodies = adapter._attempt(lambda: doc.GetBodies2(0, False)) or []  # solid
+    if not bodies:
+        raise RuntimeError(f"bbox {label}: part has no solid bodies")
+    lo, hi = float("inf"), float("-inf")
+    for body in bodies:
+        sw_type_info.flag_methods(body, "IBody2")
+        box = adapter._attempt(lambda b=body: b.GetBodyBox())  # 6 doubles, metres
+        if not box or len(box) != 6:
+            raise RuntimeError(f"bbox {label}: GetBodyBox returned {box!r}")
+        lo = min(lo, box[index] * 1000.0)
+        hi = max(hi, box[index + 3] * 1000.0)
+    extent = hi - lo
+    if abs(extent - expected) > tol:
+        raise RuntimeError(
+            f"bbox {label}: {axis}-extent={extent:.4f} outside {expected} +/- {tol}"
+        )
+    print(f"  OK  bbox {label}: {axis}-extent={extent:.4f} (expected {expected:g})")
+
+
 async def report_mass_properties(adapter: Any) -> None:
     """Print volume/bounding data for the eyeball-vs-DIMENSIONS.md check."""
     res = await adapter.get_mass_properties()
