@@ -17,7 +17,8 @@
 - **`doit` (`dodo.py` at the repo root) is the build entrypoint** — it replaced `build_all.py`
   (now a deprecated shim). Run it with the Windows SolidWorks build venv python
   (`C:\src\SolidworksMCP-python\.venv\Scripts\python.exe -m doit`); SolidWorks must already be
-  open. Install once: `…\.venv\Scripts\python.exe -m pip install doit`.
+  open. Install once: `…\.venv\Scripts\python.exe -m pip install doit pillow` (pillow backs the
+  PNG export + README-render trim that both the full build and the refresh tail run).
 - **Refresh vs full.** doit hashes script + config content (immune to git/worktree mtime churn)
   and propagates a part → assembly DAG. When only a part changed, the dependent assembly is
   *refreshed* — reopen + per-config `ForceRebuild3` + health/DOF/interference gates + in-place
