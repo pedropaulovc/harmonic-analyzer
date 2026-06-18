@@ -861,10 +861,57 @@ def extrude_at_offset(
     return name
 
 
+# STL export user-preferences (swUserPreferenceIntegerValue / Toggle ids,
+# swconst R2026x) -- shared with export_models.py so a build-time part STL and
+# the render-cache STL are byte-identical: a fine BINARY mesh in MILLIMETRES,
+# left at the model origin. stl_bbox_mm parses exactly this.
+PREF_STL_QUALITY = 78          # swSTLQuality -> 2 = fine
+PREF_STL_UNITS = 211           # swExportStlUnits -> 0 = swMM
+TOGGLE_STL_BINARY = 69         # swSTLBinaryFormat
+TOGGLE_STL_ONE_FILE = 72       # swSTLComponentsIntoOneFile
+TOGGLE_STL_NO_TRANSLATE = 71   # swSTLDontTranslateToPositive: keep model origin
+
+_STL_INT_PREFS = {PREF_STL_QUALITY: 2, PREF_STL_UNITS: 0}
+_STL_TOGGLES = {TOGGLE_STL_BINARY: True, TOGGLE_STL_ONE_FILE: True, TOGGLE_STL_NO_TRANSLATE: True}
+
+
+async def export_part_stl(adapter: Any, out_path: Path) -> None:
+    """Write the active part's fine binary STL (mm, model origin) to ``out_path``.
+
+    The assembly build reads these via ``stl_bbox_mm`` to place each
+    bbox-mirrored part, so a part build must emit its STL alongside the SLDPRT --
+    ``export_models.py`` only refreshes the render cache and can't bootstrap a
+    from-empty assembly (its part list is manifest-driven and otherwise needs an
+    already-built assembly to scan). Prefs are set then restored so the export
+    doesn't perturb later steps.
+    """
+    sw = adapter.swApp
+    old_ints = {k: int(sw.GetUserPreferenceIntegerValue(k)) for k in _STL_INT_PREFS}
+    old_toggles = {k: bool(sw.GetUserPreferenceToggle(k)) for k in _STL_TOGGLES}
+    for k, v in _STL_INT_PREFS.items():
+        sw.SetUserPreferenceIntegerValue(k, v)
+    for k, v in _STL_TOGGLES.items():
+        sw.SetUserPreferenceToggle(k, v)
+    try:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        rc = adapter._attempt(lambda: adapter.currentModel.SaveAs3(str(out_path), 0, 0))
+        if not out_path.exists():
+            raise RuntimeError(f"STL export produced no file: {out_path} (rc={rc})")
+        print(f"  OK  export STL -> {out_path.name}"
+              f" ({out_path.stat().st_size / 1e6:.1f} MB)")
+    finally:
+        for k, v in old_ints.items():
+            sw.SetUserPreferenceIntegerValue(k, v)
+        for k, v in old_toggles.items():
+            sw.SetUserPreferenceToggle(k, v)
+
+
 async def save_part_and_images(
     adapter: Any, part_name: str, views: Iterable[str] = DEFAULT_VIEWS
 ) -> dict[str, str]:
-    """Save the part to ``cad/out/sldprt`` and PNG views to ``cad/out/png``."""
+    """Save the part to ``cad/out/sldprt``, its STL to ``cad/out/stl`` (the
+    assembly build reads it for mirror placement), and PNG views to
+    ``cad/out/png``."""
     OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
     part_path = (OUT_SLDPRT / f"{part_name}.SLDPRT").resolve()
     check(f"save_file -> {part_path}", await adapter.save_file(str(part_path)))
@@ -874,7 +921,10 @@ async def save_part_and_images(
     apply_custom_properties(adapter, part_properties(part_name))
     check(f"re-save with properties -> {part_path}", await adapter.save_file(str(part_path)))
 
-    artefacts = {"part": str(part_path)}
+    stl_path = (OUT_STL / f"{part_name}.STL").resolve()
+    await export_part_stl(adapter, stl_path)
+
+    artefacts = {"part": str(part_path), "stl": str(stl_path)}
     for view in views:
         img_path = (png_dir / f"{part_name}_{view}.png").resolve()
         check(
