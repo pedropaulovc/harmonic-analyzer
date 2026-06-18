@@ -46,8 +46,8 @@ uv run comparisons/tools/render_offline.py [--only id,..] [--stale-only]
 # 3. recompute composites/scores without rendering (e.g. after align edits)
 uv run comparisons/tools/composite.py [--only id1,id2]
 
-# 4. selective model rebuild after fixing a part script
-C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_all.py --rebuild cone_gear
+# 4. selective model rebuild after fixing a part script (dependent assemblies refresh)
+C:\src\SolidworksMCP-python\.venv\Scripts\python.exe -m doit part:cone_gear
 ```
 
 Pair ids are `<model>--<source-id>`; `model` maps to
