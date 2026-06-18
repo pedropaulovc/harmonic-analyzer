@@ -311,6 +311,15 @@ def _restore_export_prefs(sw: Any, old: dict[str, dict[int, Any]]) -> None:
         sw.SetUserPreferenceToggle(k, v)
 
 
+def _active_config(doc: Any) -> str:
+    """Name of the document's active configuration ('' if unreadable)."""
+    try:
+        ac = doc.ConfigurationManager.ActiveConfiguration
+        return str(ac.Name or "") if ac is not None else ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def _export_pngs(doc: Any, png_dir: Path, stem: str) -> int:
     """Render the active document to a PNG per PNG_VIEWS angle; return the count.
 
@@ -403,7 +412,11 @@ def export_neutral(sw: Any, stage: Path) -> dict[str, Any]:
                     raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={rc})")
             # one extra STL per referenced configuration (cone gears / transgears)
             for cfg, mesh in cfg_meshes.get(src.stem, ()):
-                if not doc.ShowConfiguration2(cfg):
+                # ShowConfiguration2 returns False when cfg is ALREADY active (the
+                # part opened in it -- e.g. transgear-removable saved with T18
+                # active) -- only a real failure if it's still not active after.
+                if _active_config(doc) != cfg and not doc.ShowConfiguration2(cfg) \
+                        and _active_config(doc) != cfg:
                     raise RuntimeError(f"{src.name}: ShowConfiguration2({cfg!r}) failed")
                 out = stl_dir / f"{mesh}.STL"
                 rc = doc.SaveAs3(str(out), 0, SW_SAVE_OPTS)
