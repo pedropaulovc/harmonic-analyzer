@@ -140,6 +140,15 @@ TIP_X = SX * SUM_H  # summation tip / anchor x (counter-spring arm) -76.20
 ARC_R = CYL_R + RIB_PAD  # rib arc radius wrapping the cylinder     15.24
 RIB_OFFSET = PLATE_L / 2.0 - RIB_T  # edge-rib start offset along Z 71.12
 ANCHOR_BORE_R = 1.5  # summation-anchor centre hole (counter-spring hook seat)
+# The middle rib spans the lever to the +X plate edge (PLATE_W), but its z-span
+# (+-RIB_T/2 = +-2.54) crosses the channel-hole column at HOLE_X. The rib extrude
+# (feature 7) runs AFTER the holes (feature 1), so it re-fills the one hole whose
+# z lands inside that span -- j=10 at z+1.515 -- leaving its spring no clear bore
+# (the 4.21 mm^3 channel-spring-installed-6 clash). Stop the +X vertex inboard of
+# the hole column by the spring coil radius (~3.25) + margin so every hole stays
+# open; the rib still stiffens the inner lever, the outer plate arm is the (thin)
+# spring-hole field.
+MID_RIB_PLATE_REACH = HOLE_X - 4.1  # 33.0 local +X: clears hole column + coil
 
 # Spring-hole Z stations (world Z); the Top-plane sketch maps world Z to -sketchY.
 HOLE_Z = [CHANNEL_Z0 + CHANNEL_PITCH * j + HOLE_Z_OFFSET for j in range(HOLE_COUNT)]
@@ -394,7 +403,7 @@ async def _middle_rib(adapter) -> None:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_sketch middle rib", await adapter.create_sketch("Front"))
-    left = (SX * -PLATE_W, 0.0)  # +X plate-edge vertex
+    left = (SX * -MID_RIB_PLATE_REACH, 0.0)  # +X arm vertex, short of hole column
     right = (TIP_X, 0.0)  # -X summation-tip vertex
     r = ARC_R
     # Tangent points from each end vertex to the radius-r circle at the origin.
