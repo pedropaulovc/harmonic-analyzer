@@ -135,7 +135,6 @@ from _common import (
     place_component,
     run_build,
     save_assembly_and_images,
-    spin_driver,
     world_point,
     _read_member,
 )
@@ -155,7 +154,6 @@ COLUMN_Z = -112.0
 
 # --- counter-spring chain (build_boss_hook / build_counter_spring) ----------
 from build_boss_hook import ELBOW_R, ROD_DIA as HOOK_ROD_DIA, SHANK_RISE  # noqa: E402
-from build_summing_lever import HOOK_HOLE_X as SL_SPIN_REF_X  # noqa: E402
 from build_counter_spring import (  # noqa: E402
     BOTTOM_LEAD as CS_BOTTOM_LEAD,
     COIL_OD as CS_COIL_OD,
