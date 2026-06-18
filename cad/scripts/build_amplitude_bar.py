@@ -40,6 +40,7 @@ from _common import (
     define_circle,
     ensure_fully_defined,
     feature_name_by_type,
+    bbox_extent_check,
     measure_check,
     name_bore_axis,
     report_mass_properties,
@@ -207,17 +208,8 @@ async def build(adapter) -> dict[str, str]:
     await apply_color(adapter, BAR_STEEL)  # ch30 plates: see _common palette
 
     # Verify the two book-sourced dims on the built solid (ch. 15).
-    mid_y, mid_z = BAR_LENGTH / 2.0, BAR_DEPTH / 2.0
-    await measure_check(
-        adapter,
-        "bar width (annotated 6.35)",
-        [
-            {"entity_type": "FACE", "point": [0.0, mid_y, mid_z]},
-            {"entity_type": "FACE", "point": [BAR_WIDTH, mid_y, mid_z]},
-        ],
-        "normal_distance",
-        BAR_WIDTH,
-    )
+    mid_y = BAR_LENGTH / 2.0
+    await bbox_extent_check(adapter, "bar width (annotated 6.35)", "x", BAR_WIDTH)
     # End-face pair selection fails (the far face is hidden in the active
     # view and point picking is screen-projected) — use a long silhouette
     # edge instead; the notches only cut the end faces, so it runs full
