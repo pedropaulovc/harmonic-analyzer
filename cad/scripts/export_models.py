@@ -32,7 +32,17 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import CAD_ROOT, check, log, run_build  # noqa: E402
+from _common import (  # noqa: E402
+    CAD_ROOT,
+    PREF_STL_QUALITY,
+    PREF_STL_UNITS,
+    TOGGLE_STL_BINARY,
+    TOGGLE_STL_NO_TRANSLATE,
+    TOGGLE_STL_ONE_FILE,
+    check,
+    log,
+    run_build,
+)
 from render_compare import _flag, _read_member, model_path  # noqa: E402
 
 OUT_STL = CAD_ROOT / "out" / "stl"
@@ -41,13 +51,9 @@ OUT_BOXES = CAD_ROOT / "out" / "boxes"
 OUT_SLDPRT = CAD_ROOT / "out" / "sldprt"
 COLORS = OUT_STL / "colors.json"
 
-# swconst ids (extracted from the installed swconst.tlb, R2026x)
-PREF_STL_QUALITY = 78        # int: swSTLQuality -> 2 = fine
+# swconst ids (extracted from the installed swconst.tlb, R2026x). The STL ids
+# live in _common (shared with the part-build STL export); STEP is export-only.
 PREF_STEP_AP = 75            # int: swStepAP -> 214 (carries colours)
-PREF_STL_UNITS = 211         # int: swExportStlUnits -> 0 = swMM
-TOGGLE_STL_BINARY = 69       # swSTLBinaryFormat
-TOGGLE_STL_ONE_FILE = 72     # swSTLComponentsIntoOneFile
-TOGGLE_STL_NO_TRANSLATE = 71  # swSTLDontTranslateToPositive: keep model origin
 
 # Workbench-friendly equivalents of the SolidWorks material appearances
 # actually used by the build scripts (see _common.apply_material).
