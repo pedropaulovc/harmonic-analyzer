@@ -210,15 +210,33 @@ def sw_matrix(xform):
     ])
 
 
-def _hausdorff(pa, pb, n=60000):
+def _hausdorff(pa, pb, n=40000, budget=4_000_000):
+    """Approximate symmetric Hausdorff (mm) between two STL meshes.
+
+    Query set per direction = vertices (deterministic feature points where the
+    max deviation almost always sits) plus surface samples, so a small local
+    change is not missed by random sampling alone. Point-to-surface distance is
+    queried in chunks sized to keep points*triangles under ``budget`` -- bounds
+    peak memory (trimesh's closest-point is brute force).
+    """
     a = trimesh.load(pa, process=False)
     b = trimesh.load(pb, process=False)
 
+    def query_points(mesh):
+        v = np.asarray(mesh.vertices)
+        if len(v) >= n:                       # stride huge meshes
+            return v[np.linspace(0, len(v) - 1, n).astype(int)]
+        return np.vstack([v, mesh.sample(n - len(v))])
+
     def directed(src, dst):
-        pts = src.sample(min(n, max(2000, len(src.vertices))))
-        _, dist, _ = dst.nearest.on_surface(pts)
-        return dist
-    return float(max(directed(a, b).max(), directed(b, a).max()))
+        pts = query_points(src)
+        chunk = max(256, budget // max(1, len(dst.faces)))
+        m = 0.0
+        for i in range(0, len(pts), chunk):
+            _, d, _ = dst.nearest.on_surface(pts[i:i + chunk])
+            m = max(m, float(d.max()))
+        return m
+    return max(directed(a, b), directed(b, a))
 
 
 def classify(old, new, keys, tol=0.01):
@@ -239,7 +257,7 @@ def classify(old, new, keys, tol=0.01):
         if d > tol:
             changed.add(k)
             verdict = "CHANGED"
-        print(f"  verify {k:34s} Hausdorff={d:8.3f} mm -> {verdict}", flush=True)
+        print(f"  verify {k:34s} ~Hausdorff={d:8.3f} mm -> {verdict}", flush=True)
     return changed, devs
 
 
@@ -291,7 +309,9 @@ def main():
             continue
         m = pv.read(p)
         m.transform(sw_matrix(c["xform"]), inplace=True)
-        is_changed = base_part(key) in changed_bases
+        # colour by the EXACT mesh key (per-configuration): only the configs whose
+        # own Hausdorff check changed go red, not every config of the base part.
+        is_changed = key in changed
         n_hi += is_changed
         pl.add_mesh(m, color=HILITE if is_changed else GHOST,
                     opacity=1.0 if is_changed else args.ghost_opacity,

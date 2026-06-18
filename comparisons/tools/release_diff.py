@@ -27,7 +27,6 @@ never the whole 460 MB asset.
 import argparse
 import os
 import struct
-import sys
 import urllib.request
 import zlib
 from pathlib import Path
@@ -80,11 +79,14 @@ def central_dir(url):
             blk, bp = extra[ep + 4:ep + 4 + hsz], 0
             if hid == 1:
                 if uncomp == 0xFFFFFFFF:
-                    uncomp = struct.unpack("<Q", blk[bp:bp + 8])[0]; bp += 8
+                    uncomp = struct.unpack("<Q", blk[bp:bp + 8])[0]
+                    bp += 8
                 if comp == 0xFFFFFFFF:
-                    comp = struct.unpack("<Q", blk[bp:bp + 8])[0]; bp += 8
+                    comp = struct.unpack("<Q", blk[bp:bp + 8])[0]
+                    bp += 8
                 if lho == 0xFFFFFFFF:
-                    lho = struct.unpack("<Q", blk[bp:bp + 8])[0]; bp += 8
+                    lho = struct.unpack("<Q", blk[bp:bp + 8])[0]
+                    bp += 8
             ep += 4 + hsz
         out[name] = dict(name=name, method=method, comp=comp,
                          uncomp=uncomp, lho=lho, crc=f[7])
@@ -150,10 +152,37 @@ def boolean_cut(tag_a, tag_b, base):
 # --------------------------------------------------------------------------- #
 # (3c) mesh deviation on STL meshes
 # --------------------------------------------------------------------------- #
-def _directed(src, dst, n=60000):
-    pts = src.sample(min(n, max(2000, len(src.vertices))))
-    _, dist, _ = dst.nearest.on_surface(pts)
-    return dist
+def _query_points(mesh, n=40000):
+    """Deterministic feature points (vertices) + surface samples, capped at n.
+
+    Vertices are corners/edges -- where the max surface deviation almost always
+    sits -- so including them keeps a small local change from being missed when
+    no random sample lands on it. Capped at n points (a huge mesh's vertices are
+    strided deterministically) to bound work; samples top up the budget.
+    """
+    v = np.asarray(mesh.vertices)
+    if len(v) >= n:
+        return v[np.linspace(0, len(v) - 1, n).astype(int)]
+    return np.vstack([v, mesh.sample(n - len(v))])
+
+
+def _surface_dist(dst, pts, budget=4_000_000):
+    """Nearest point-to-surface distance for each pt, chunked.
+
+    trimesh's closest-point is brute force (O(points x triangles)), so query in
+    chunks sized to keep points*triangles under ``budget`` -- bounds peak memory
+    regardless of how many query points or triangles a mesh has.
+    """
+    chunk = max(256, budget // max(1, len(dst.faces)))
+    out = np.empty(len(pts))
+    for i in range(0, len(pts), chunk):
+        _, d, _ = dst.nearest.on_surface(pts[i:i + chunk])
+        out[i:i + chunk] = d
+    return out
+
+
+def _directed(src, dst):
+    return _surface_dist(dst, _query_points(src))
 
 
 def mesh_deviation(tag_a, tag_b, base):
@@ -185,7 +214,7 @@ def main():
     args = ap.parse_args()
 
     ua, ub = asset_url(args.tag_a), asset_url(args.tag_b)
-    print(f"reading central directories ...", flush=True)
+    print("reading central directories ...", flush=True)
     ca, cb = central_dir(ua), central_dir(ub)
 
     def steps(cd):
@@ -194,53 +223,66 @@ def main():
     sa, sb = steps(ca), steps(cb)
     common = sorted(set(sa) & set(sb))
 
-    # free signal: STEP uncompressed-size delta, used for --top ranking
-    deltas = sorted(((k, sb[k]["uncomp"] - sa[k]["uncomp"]) for k in common),
-                    key=lambda r: -abs(r[1]))
+    # CRC32 (from the central directory) is the change signal: a geometry edit can
+    # rewrite coordinates while preserving the exact byte count, so STEP size is
+    # NOT a reliable gate. Rank CRC-different parts by |size delta| only for a
+    # stable, readable order.
+    changed_crc = [k for k in common if sa[k]["crc"] != sb[k]["crc"]]
+    same_crc = [k for k in common if sa[k]["crc"] == sb[k]["crc"]]
+    changed_crc.sort(key=lambda k: -abs(sb[k]["uncomp"] - sa[k]["uncomp"]))
 
     if args.parts:
         parts = [p.strip().lower() for p in args.parts.split(",")]
     elif args.top:
-        parts = [k for k, _ in deltas[:args.top]]
+        parts = changed_crc[:args.top]
     else:
-        # default: every part whose STEP size moved at all, capped, plus a
-        # zero-delta control so "identical" output is demonstrated too
-        parts = [k for k, d in deltas if d != 0][:6]
-        ctrl = next((k for k, d in deltas if d == 0), None)
-        if ctrl:
-            parts.append(ctrl)
+        # default: every CRC-changed part, capped, plus a CRC-identical control
+        # so "identical" output is demonstrated too
+        parts = changed_crc[:6]
+        if same_crc:
+            parts.append(same_crc[0])
 
     print(f"\n{args.tag_a} vs {args.tag_b}: {len(common)} common parts; "
           f"analyzing {len(parts)}: {', '.join(parts)}\n")
 
     for base in parts:
-        # fetch the two STEP + two STL members for this part
-        for tag, url, cd in ((args.tag_a, ua, ca), (args.tag_b, ub, cb)):
-            for sub, ext in (("step", ".step"), ("stl", ".stl")):
+        # fetch the two STEP + two STL members for this part, tracking which
+        # (sub-folder) are present in BOTH bundles -- an analysis whose input is
+        # missing from either side must be skipped, never run against a stale
+        # cache file left by an earlier part.
+        present = {"step": True, "stl": True}
+        for sub, ext in (("step", ".step"), ("stl", ".stl")):
+            for tag, url, cd in ((args.tag_a, ua, ca), (args.tag_b, ub, cb)):
                 e = member(cd, sub, base, ext)
                 if e is None:
                     print(f"  !! {tag}: missing {sub}/{base}{ext}")
+                    present[sub] = False
                     continue
                 extract(url, e, CACHE / tag / f"{base}{ext}")
 
         print(f"### {base}")
-        try:
-            md = mesh_deviation(args.tag_a, args.tag_b, base)
-            verdict = ("IDENTICAL (within mesh tol)"
-                       if md["hausdorff_mm"] < 1e-3 else "CHANGED")
-            print(f"  (3c) mesh:    Hausdorff={md['hausdorff_mm']:.4f} mm  "
-                  f"mean={md['mean_dev_mm']:.5f} mm  -> {verdict}")
-            print(f"               vol {md['vol_a_mm3']:.1f} -> "
-                  f"{md['vol_b_mm3']:.1f} mm^3 "
-                  f"({md['vol_b_mm3'] - md['vol_a_mm3']:+.1f})   "
-                  f"tris {md['tris_a']} -> {md['tris_b']}")
-            bb_a = "x".join(f"{v:.1f}" for v in md["bbox_a"])
-            bb_b = "x".join(f"{v:.1f}" for v in md["bbox_b"])
-            print(f"               bbox {bb_a} -> {bb_b} mm")
-        except Exception as ex:
-            print(f"  (3c) mesh:    FAILED ({ex})")
+        if not present["stl"]:
+            print("  (3c) mesh:    SKIPPED (member missing from a bundle)")
+        else:
+            try:
+                md = mesh_deviation(args.tag_a, args.tag_b, base)
+                verdict = ("IDENTICAL (within mesh tol)"
+                           if md["hausdorff_mm"] < 1e-3 else "CHANGED")
+                print(f"  (3c) mesh:    ~Hausdorff={md['hausdorff_mm']:.4f} mm  "
+                      f"mean={md['mean_dev_mm']:.5f} mm  -> {verdict}")
+                print(f"               vol {md['vol_a_mm3']:.1f} -> "
+                      f"{md['vol_b_mm3']:.1f} mm^3 "
+                      f"({md['vol_b_mm3'] - md['vol_a_mm3']:+.1f})   "
+                      f"tris {md['tris_a']} -> {md['tris_b']}")
+                bb_a = "x".join(f"{v:.1f}" for v in md["bbox_a"])
+                bb_b = "x".join(f"{v:.1f}" for v in md["bbox_b"])
+                print(f"               bbox {bb_a} -> {bb_b} mm")
+            except Exception as ex:
+                print(f"  (3c) mesh:    FAILED ({ex})")
 
-        if not args.no_boolean:
+        if not args.no_boolean and not present["step"]:
+            print("  (3b) solid:   SKIPPED (member missing from a bundle)")
+        elif not args.no_boolean:
             try:
                 bc = boolean_cut(args.tag_a, args.tag_b, base)
                 eq = bc["removed"] < 1e-3 and bc["added"] < 1e-3
