@@ -87,7 +87,7 @@ def central_dir(url):
                     lho = struct.unpack("<Q", blk[bp:bp + 8])[0]; bp += 8
             ep += 4 + hsz
         out[name] = dict(name=name, method=method, comp=comp,
-                         uncomp=uncomp, lho=lho)
+                         uncomp=uncomp, lho=lho, crc=f[7])
         p += 46 + n + m + k
     return out
 
