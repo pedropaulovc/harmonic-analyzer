@@ -61,8 +61,12 @@ $py = "C:\src\SolidworksMCP-python\.venv\Scripts\python.exe"
 # Full build/refresh of everything stale, in dependency order
 & $py -m doit
 
-# Just one part and the assemblies that depend on it (they refresh)
+# Just one part (doit selection does NOT run reverse dependents -- the dependent
+# .SLDASM/renders stay stale until you run plain `doit` or select them explicitly)
 & $py -m doit part:cone_gear
+
+# One part AND every assembly that refreshes from it: run the default graph
+& $py -m doit                  # rebuilds the part, then refreshes its dependents
 
 # Just one assembly (+ its stale prerequisites)
 & $py -m doit assembly:output
@@ -94,7 +98,7 @@ del cad\out\sldasm\output.SLDASM
 cad/
   scripts/        Python reproduction scripts (build_<part>.py, build_<sub>_assembly.py),
                   shared helpers (_common.py, _gear.py, _chain.py); refresh_assembly.py,
-                  _buildgraph.py (build_all.py is a deprecated doit shim)
+                  _buildgraph.py (the doit build graph lives in dodo.py at the repo root)
   scripts/diagnostics/   archived one-off probe/diag scripts (not part of the build)
   config/         YAML source-of-truth for parametrics, tolerances, materials (data layer)
   DIMENSIONS.md   dimension provenance (book/photo source + confidence per dim)

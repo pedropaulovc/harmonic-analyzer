@@ -14,8 +14,8 @@
 - You must use uv if using python tools
 
 ## Building the model
-- **`doit` (`dodo.py` at the repo root) is the build entrypoint** — it replaced `build_all.py`
-  (now a deprecated shim). Run it with the Windows SolidWorks build venv python
+- **`doit` (`dodo.py` at the repo root) is the build entrypoint** — it replaced the hand-rolled
+  `build_all.py` orchestrator (removed). Run it with the Windows SolidWorks build venv python
   (`C:\src\SolidworksMCP-python\.venv\Scripts\python.exe -m doit`); SolidWorks must already be
   open. Install once: `…\.venv\Scripts\python.exe -m pip install doit pillow` (pillow backs the
   PNG export + README-render trim that both the full build and the refresh tail run).

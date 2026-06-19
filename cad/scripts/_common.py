@@ -2297,9 +2297,17 @@ def save_assembly_in_place(adapter: Any, asm_name: str) -> None:
 
     asm = adapter.currentModel
     sldasm = OUT_SLDASM / f"{asm_name}.SLDASM"
+    # A refresh that only reloaded changed PART geometry leaves the assembly's own
+    # data (component refs + mates + transforms) untouched, so SolidWorks can
+    # report the .SLDASM clean (GetSaveFlag false). But parent assemblies key off
+    # this file's md5 for two-hop propagation -- a refreshed channel.SLDASM MUST
+    # invalidate drive-train/harmonic-analyzer -- so force a rewrite rather than
+    # skip it: SetSaveFlag marks the doc dirty, and Save3 then writes fresh save
+    # metadata (new bytes -> new md5). The mtime assertion below proves the file
+    # was actually rewritten (codex review #5).
     if not bool(adapter._attempt(lambda: asm.GetSaveFlag(), default=True)):
-        log(f"{sldasm.name} already clean -- nothing to save")
-        return
+        log(f"{sldasm.name} reported clean -- forcing rewrite for md5 propagation")
+        adapter._attempt(lambda: asm.SetSaveFlag(), default=None)
 
     before = sldasm.stat().st_mtime
     err = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
