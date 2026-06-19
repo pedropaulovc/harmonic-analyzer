@@ -239,7 +239,9 @@ ARBOR_LENGTH = 196.0  # spans z -98..+98 (M6.9: 1.0 clear of the a-frame
 CRANKSHAFT_Z0 = -150.0  # front end; crank-arm hub at +12 (PIN_HOLE_HEIGHT)
 CRANKSHAFT_LENGTH = 120.0  # build_crankshaft.py SHAFT_LENGTH
 CRANK_ARM_Z0 = CRANKSHAFT_Z0 + 8.0  # hub centre 12 - half thickness 4
-ARM_C2C = 150.0  # handle pivot from the shaft axis
+ARM_C2C = 66.0  # handle pivot from the shaft axis (rederived from the ch30
+# eight-views, see build_crank_arm.py; was 150 -- a down-pointing 150 arm put
+# the handle below the table)
 REMOVABLE_Z0 = -85.6  # mounted T12 (face 5.0) against the pedestal north face:
 # the crank-end chain wheel is the small removable gear (ch. 23 -- the bead
 # chain rides its m2 teeth; v2_gears_010 shows the small steel wheel on the
@@ -422,13 +424,20 @@ async def build(adapter) -> dict[str, str]:
         ground=False, configuration="T12",
         label="transgear-removable (crank chain wheel T12)",
     )
+    # Crank rest pose: the arm hangs straight DOWN (ch30 eight-views -- the
+    # handle reads "down" in all eight roll angles, which only a -Y arm does,
+    # since a downward vector lies on the views' vertical rotation axis). The
+    # arm part extrudes along its local +X; rot_z(-90) maps that to assembly -Y.
     arm = await place_component(
         adapter, "crank-arm",
-        [X_CRANK, Y_DRIVE, CRANK_ARM_Z0], [0.0, 0.0, 0.0], IDENTITY, ground=False,
+        [X_CRANK, Y_DRIVE, CRANK_ARM_Z0], [0.0, 0.0, -90.0], rot_z_rows(-90.0),
+        ground=False,
     )
+    # Handle pivot rides the arm tip, now ARM_C2C below the crankshaft. Its grip
+    # axis stays parallel to the crankshaft (ROT_Y_POS90 -> assembly -Z).
     handle = await place_component(
         adapter, "crank-handle",
-        [X_CRANK + ARM_C2C, Y_DRIVE, CRANK_ARM_Z0], [0.0, 90.0, 0.0], ROT_Y_POS90,
+        [X_CRANK, Y_DRIVE - ARM_C2C, CRANK_ARM_Z0], [0.0, 90.0, 0.0], ROT_Y_POS90,
         ground=False,
     )
 
@@ -575,9 +584,9 @@ async def build(adapter) -> dict[str, str]:
         )
 
     # DRIVER #1 (the single machine input): the crank angle, pinned by the
-    # handle ball's height. The handle is keyed to the crankshaft and its axis
-    # sits ARM_C2C from the crank axis, so the spin_driver's y-sensitivity is
-    # well-conditioned (Top-plane distance picked, |Δx| >> |Δy|).
+    # handle pivot's offset from the crank axis. The handle is keyed to the
+    # crankshaft and sits ARM_C2C straight below it, so |Δy| >> |Δx| and
+    # spin_driver auto-picks the well-conditioned Right-plane (x) distance.
     crank_o = _org(adapter, crankshaft)
     handle_o = _org(adapter, handle)
     await spin_driver(
