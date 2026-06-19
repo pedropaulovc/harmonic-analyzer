@@ -44,7 +44,12 @@ from _common import (
 PART_NAME = "crank-arm"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
-ARM_C2C = 150.0  # DIMENSIONS.md ch11: shaft-to-handle-pivot centres (low)
+ARM_C2C = 66.0  # DIMENSIONS.md ch11: shaft-to-handle-pivot centres -- REDERIVED
+# from the ch30 eight-views (angle 90 side view, scaled to the 280 mm base depth):
+# the crank hangs straight down, handle pivot 66 mm below the crankshaft axis,
+# landing the handle ~10 mm above the base top. The former 150 (cone-axial scaled,
+# low) was >2x too long -- a down-pointing 150 arm would drive the handle below
+# the table (med).
 ARM_WIDTH = 16.0  # DIMENSIONS.md ch11: arm width (low)
 ARM_THICKNESS = 8.0  # DIMENSIONS.md ch11: ~half the arm width, p.12 photo (low)
 SQUARE_END_OVERHANG = 10.0  # DIMENSIONS.md ch11: square end past the pivot (low)

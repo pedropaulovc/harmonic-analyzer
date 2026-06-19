@@ -98,7 +98,7 @@ No annotated or stated numeric dimensions in this chapter.
 
 | dim | value | (in) | source | method | confidence |
 |---|---|---|---|---|---|
-| Crank arm length (center-to-center) | ~150 mm | ~5.9 | p.14 photo vs cone-gear 150 mm axial length in frame | scaled | low |
+| Crank arm length (center-to-center) | ~66 mm | ~2.6 | REDERIVED from the ch30 eight-views (angle 90 side view): crankshaft axis to handle-pivot axis, scaled to the 280 mm base depth (ch6, annotated). The crank hangs straight DOWN (the handle reads "down" in all eight roll views, so the arm is on the views' vertical rotation axis), putting the handle ~10 mm above the base top. SUPERSEDES the former ~150 (cone-axial scaled, low), which was >2x too long — a down-pointing 150 arm would drop the handle below the table | scaled | med |
 | Handle length | ~90 mm | ~3.5 | p.12 photo, proportion of arm length | scaled | low |
 | Handle diameter | ~22 mm | ~0.87 | p.12 photo, proportion of arm length | scaled | low |
 | Crank arm width | ~16 mm | ~0.63 | p.12 photo | scaled | low |
@@ -113,6 +113,11 @@ No annotated or stated numeric dimensions in this chapter.
 Construction (stated): wooden handle stained black, rotates on a pivot; metal crank
 arm with fiducial indentations for alignment; tapered pin affixes crank to shaft
 (removable — crankshaft gear is changeable); small chain eyelet (chain lost).
+
+Rest pose (ch30 eight-views): the crank arm hangs straight down (−Y), the handle
+pivot ~66 mm below the crankshaft axis with the grip axis parallel to the shaft —
+modeled in `build_drive_train_assembly.py` as a −90° arm rotation about the crank
+axis with the handle relocated below the crankshaft.
 
 ## Chapter 12 — Cone Gear Set (pp. 16–21)
 
