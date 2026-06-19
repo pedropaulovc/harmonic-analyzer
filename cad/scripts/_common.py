@@ -681,9 +681,9 @@ def import_dxf_to_sketch(
     Drives the documented "Import DXF File into Part Sketch" recipe through the
     adapter's ``ISldWorks`` (``adapter.swApp``): ``GetImportFileData`` ->
     ``ImportMethod = swImportDxfDwg_ImportToPartSketch`` -> ``LoadFile4``. The DXF
-    is authored in build plate millimetres (corner origin, see
-    cad/tools/make_engraving_dxf.py), so it lands in-place on the part's default
-    sketch plane (Front); the caller cut-extrudes the returned sketch.
+    is authored in build plate millimetres (corner origin), so it lands in-place
+    on the part's default sketch plane (Front); the caller cut-extrudes the
+    returned sketch.
 
     Cosmetic engraving import: no auto-relations / dimensions / hatch; coincident
     endpoints are merged (``merge_dist_mm``) so each glyph loop closes.
