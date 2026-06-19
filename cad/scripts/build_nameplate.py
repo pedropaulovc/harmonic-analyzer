@@ -9,11 +9,19 @@ the only hard provenance fact on the machine; the '2' stamped a few centimetres
 away in the baseplate corner is a separate base feature, not modelled here.
 
 The lettering, ornament and pinstripe are reproduced from the actual photo, not a
-font: the polished engraving was traced off the p.71 macro into two vendored DXFs
-in plate millimetres -- cad/assets/nameplate-engraving.dxf (smoothed letters +
-cartouche, cut into the field floor) and cad/assets/nameplate-border.dxf (the
-pinstripe frame, cut shallow on the raised border). This script imports each and
-cuts it.
+font: the polished engraving was traced off the p.71 macro into two DXFs in plate
+millimetres. This script no longer imports those DXFs -- it draws the same traced
+geometry with native SolidWorks **sketch primitives**:
+
+* the glyph + scroll-cartouche contours are drawn as closed line chains from the
+  vendored ``_nameplate_geometry.LETTERING_LOOPS`` (extracted from the engraving
+  DXF; see tools/gen_nameplate_geometry.py) and cut into the field floor;
+* the pinstripe frame is two concentric rounded rectangles (true corner arcs via
+  :func:`sketch_rounded_rect`), cut shallow on the raised border.
+
+The DXFs stay in cad/assets only as the trace provenance and the golden reference
+for ``test_nameplate_geometry``, which proves the primitive geometry reproduces
+them to >=98% (engraving 100%, pinstripe band 99.99%, finished volume 100%).
 
 Dimensions: cad/DIMENSIONS.md ch.26 -- 100 x 55 stated (high); thickness, corner
 radius, border, recess, pinstripe and screw inset are photo-plausible reads off
@@ -21,10 +29,6 @@ the p.71 macro (low). The engraving geometry IS the traced photo.
 
 Layout: width along +X, height along +Y from the origin corner, decorated face on
 the Front plane at z = 0, thickness extruded +Z (same scheme as build_platen).
-
-NOTE: the DXF-import + cut path (import_dxf_to_sketch) is not yet exercised on the
-SolidWorks COM seat -- first live run is the validation pass (raw-COM stopgap
-posture).
 
 Run (SolidWorks already open)::
 
@@ -35,7 +39,6 @@ from __future__ import annotations
 
 import math
 import sys
-from pathlib import Path
 
 from _common import (
     add_line_chain,
@@ -45,13 +48,14 @@ from _common import (
     define_circle,
     define_rectilinear_chain,
     ensure_fully_defined,
-    import_dxf_to_sketch,
     report_mass_properties,
     run_build,
     save_part_and_images,
     set_sketch_direct_db,
+    sketch_polyline_loops,
     sketch_rounded_rect,
 )
+from _nameplate_geometry import BORDER_INNER, BORDER_OUTER, LETTERING_LOOPS
 
 PART_NAME = "nameplate"
 MATERIAL = "Brass"  # bright cast/engraved brass plate (see _common.apply_material)
@@ -66,11 +70,6 @@ BORDER_W = 8.0
 RECESS_DEPTH = 0.4
 ENGRAVE_DEPTH = 0.3  # incise depth of letters / ornament / pinstripe
 
-# Traced-photo engravings (cad/assets), authored in this script's plate frame.
-ASSETS = Path(__file__).resolve().parent.parent / "assets"
-LETTERING_DXF = str((ASSETS / "nameplate-engraving.dxf").resolve())
-BORDER_DXF = str((ASSETS / "nameplate-border.dxf").resolve())
-
 # Four corner mounting screws (the shared brass fillister part), in the border band.
 SCREW_DIA = 2.6
 SCREW_INSET = 4.5
@@ -82,36 +81,66 @@ SCREW_XY = (
 )
 
 
-def _select_sketch(adapter, name: str) -> None:
-    """Select an existing sketch by name as the next feature's profile (raw COM)."""
-    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+def _shoelace(loop: list[tuple[float, float]]) -> float:
+    """Signed polygon area (CCW positive)."""
+    a = 0.0
+    n = len(loop)
+    for i in range(n):
+        x1, y1 = loop[i]
+        x2, y2 = loop[(i + 1) % n]
+        a += x1 * y2 - x2 * y1
+    return a / 2.0
 
-    model = adapter.currentModel
-    model.ClearSelection2(True)
-    ok = model.Extension.SelectByID2(name, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0)
-    if not ok:
-        raise RuntimeError(f"could not select imported sketch {name!r} for the cut")
+
+def _engraving_area() -> float:
+    """Even-odd filled area of the traced engraving (mm^2).
+
+    The loops follow nesting parity -- outer glyph/ornament contours run CCW
+    (positive), the 9 enclosed counters run CW (negative) -- so the signed-area
+    sum is exactly the even-odd filled region the single cut removes.
+    """
+    return abs(sum(_shoelace(loop) for loop in LETTERING_LOOPS))
 
 
-async def _cut_dxf(adapter, dxf_path, depth, *, label):
-    """Import a DXF to a sketch, select it, and both-directions cut it `depth`
-    into the front face. Returns the volume removed (mm^3)."""
+def _rrect_area(spec: tuple[float, float, float, float, float]) -> float:
+    """Area of a rounded rectangle ``(cx, cy, w, h, r)``."""
+    _cx, _cy, w, h, r = spec
+    return w * h - (4.0 - math.pi) * r * r
+
+
+def _rrect_to_args(spec: tuple[float, float, float, float, float]):
+    """Reorder a ``(cx, cy, w, h, r)`` spec to sketch_rounded_rect's (w, h, r, cx, cy)."""
+    cx, cy, w, h, r = spec
+    return (w, h, r, cx, cy)
+
+
+async def _cut_region(adapter, depth, *, label, expected_removed):
+    """Exit the OPEN engraving/border sketch and both-directions cut it `depth`
+    into the front face, asserting the analytically expected removed volume.
+
+    ``depth`` is the half-reach; the cut runs 2*depth both ways about the z=0
+    Front plane, landing 0..depth in material (-z half is air), same scheme as
+    the field recess. ``expected_removed`` is the NEW volume this cut removes
+    (overlap with the already-sunk recess excluded by the caller).
+    """
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     pre = await adapter.get_mass_properties()
-    sketch = import_dxf_to_sketch(adapter, dxf_path, label=label)
-    _select_sketch(adapter, sketch)
+    check(f"exit_sketch {label}", await adapter.exit_sketch())
     check(
         f"cut {label}",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=2.0 * depth, both_directions=True)
         ),
     )
-    post = await adapter.get_mass_properties()
-    removed = float(pre.data.volume) - float(post.data.volume)
-    print(f"  {label} removed {removed:.1f} mm^3")
+    removed = float(pre.data.volume) - float((await adapter.get_mass_properties()).data.volume)
+    print(f"  {label} removed {removed:.1f} mm^3 (analytic {expected_removed:.1f})")
     if removed <= 0.0:
-        raise RuntimeError(f"cut {label}: nothing removed (import/cut/plane -> live)")
+        raise RuntimeError(f"cut {label}: nothing removed (sketch/cut/plane -> live)")
+    if abs(removed - expected_removed) > 0.02 * expected_removed:
+        raise RuntimeError(
+            f"cut {label}: removed {removed:.1f} mm^3, expected {expected_removed:.1f}"
+        )
     return removed
 
 
@@ -163,11 +192,32 @@ async def build(adapter) -> dict[str, str]:
     if abs(removed - v_field) > 0.02 * v_field:
         raise RuntimeError(f"field recess removed {removed:.1f}, expected {v_field:.1f}")
 
-    # Traced-photo engravings. Lettering + cartouche incise the recessed field
-    # floor (cut clears the RECESS_DEPTH of air first, so reach = RECESS+ENGRAVE);
-    # the pinstripe frame incises ENGRAVE_DEPTH on the raised border (front face).
-    await _cut_dxf(adapter, LETTERING_DXF, RECESS_DEPTH + ENGRAVE_DEPTH, label="lettering")
-    await _cut_dxf(adapter, BORDER_DXF, ENGRAVE_DEPTH, label="pinstripe")
+    # Traced-photo engraving, drawn as native sketch line-loops (was a DXF import).
+    # Lettering + cartouche incise the recessed field floor: the cut reaches
+    # RECESS+ENGRAVE but the recess already cleared the first RECESS_DEPTH over the
+    # field, so the NEW material removed is the engraving area x ENGRAVE_DEPTH.
+    eng_area = _engraving_area()
+    check("create_sketch lettering", await adapter.create_sketch("Front"))
+    await sketch_polyline_loops(adapter, LETTERING_LOOPS, label="lettering")
+    await _cut_region(
+        adapter,
+        RECESS_DEPTH + ENGRAVE_DEPTH,
+        label="lettering",
+        expected_removed=eng_area * ENGRAVE_DEPTH,
+    )
+
+    # Pinstripe frame: two concentric rounded rectangles (even-odd -> thin band),
+    # incised ENGRAVE_DEPTH on the raised border (front face).
+    band_area = _rrect_area(BORDER_OUTER) - _rrect_area(BORDER_INNER)
+    check("create_sketch pinstripe", await adapter.create_sketch("Front"))
+    await sketch_rounded_rect(adapter, *_rrect_to_args(BORDER_OUTER))
+    await sketch_rounded_rect(adapter, *_rrect_to_args(BORDER_INNER))
+    await _cut_region(
+        adapter,
+        ENGRAVE_DEPTH,
+        label="pinstripe",
+        expected_removed=band_area * ENGRAVE_DEPTH,
+    )
 
     # Four corner screw through-holes (both-directions 2x thickness clears the slab).
     pre = await adapter.get_mass_properties()

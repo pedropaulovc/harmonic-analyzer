@@ -532,6 +532,52 @@ async def sketch_rounded_rect(
     print(f"  OK  rounded_rect {w:g}x{h:g} r{r:g} @ ({cx:g}, {cy:g})")
 
 
+async def sketch_polyline_loops(
+    adapter: Any, loops: Iterable[Iterable[tuple[float, float]]], *, label: str = "loops"
+) -> int:
+    """Draw closed line-segment loops into the OPEN sketch; return the loop count.
+
+    Each loop is a sequence of (x, y) plate-millimetre vertices, drawn as a chain
+    of straight :func:`add_line` segments and closed back to its first vertex --
+    the native sketch-primitive equivalent of importing a polyline DXF. Used for
+    the nameplate's traced engraving (glyph + scroll-cartouche contours): a
+    cosmetic profile, so callers skip :func:`ensure_fully_defined` and let the
+    single cut's even-odd fill turn each enclosed counter loop into a hole, just
+    as the DXF import + cut did.
+
+    Inference is suppressed via ``AddToDB`` (like the other raw draws here): the
+    traced contours have many near-collinear short segments that the inference
+    engine would otherwise snap to spurious horizontal/vertical relations.
+    Exactly-coincident endpoints still merge in the sketch DB, so every loop
+    closes. Zero-length segments (coincident consecutive vertices) are skipped so
+    a degenerate ``add_line`` cannot fail the draw.
+    """
+    sketch_mgr = adapter.currentSketchManager
+    prev = bool(sketch_mgr.AddToDB)
+    sketch_mgr.AddToDB = True
+    count = 0
+    segments = 0
+    try:
+        for loop in loops:
+            pts = list(loop)
+            if len(pts) < 3:
+                raise ValueError(f"{label}: loop {count} has < 3 vertices")
+            verts = pts + [pts[0]]  # close the loop
+            for (x1, y1), (x2, y2) in zip(verts, verts[1:], strict=False):
+                if abs(x2 - x1) < 1e-9 and abs(y2 - y1) < 1e-9:
+                    continue  # skip a zero-length segment
+                check(
+                    f"{label}[{count}] seg ({x1:g},{y1:g})->({x2:g},{y2:g})",
+                    await adapter.add_line(x1, y1, x2, y2),
+                )
+                segments += 1
+            count += 1
+    finally:
+        sketch_mgr.AddToDB = prev
+    print(f"  OK  sketch_polyline_loops {label}: {count} loops, {segments} segments")
+    return count
+
+
 def insert_helix(
     adapter: Any, height: float, pitch: float, clockwise: bool = True
 ) -> str:
@@ -644,81 +690,6 @@ def add_ellipse(
     adapter.currentModel.ClearSelection2(True)
     print(f"  OK  ellipse {label!r} r({rx_mm:g}, {ry_mm:g}) @ ({cx_mm:g}, {cy_mm:g})")
     return seg
-
-
-# swImportDxfDwg_ImportMethod_e.swImportDxfDwg_ImportToPartSketch (declaration order
-# in the swconst enum; import the DXF as 2D geometry in the ACTIVE part's sketch
-# rather than a new drawing/part). Verify the integer on the live seat.
-_SW_IMPORT_TO_PART_SKETCH = 2
-
-
-def _dxf_put(obj: Any, name: str, value: Any) -> bool:
-    """Set an IImportDxfDwgData option (parameterized on a sheet-name index "").
-
-    These are property-puts with an index arg, which late-bound pywin32 exposes
-    awkwardly; try the plain attribute put first (uses the default ""), then a
-    low-level IDispatch PROPERTYPUT. Returns True on success.
-    """
-    try:
-        setattr(obj, name, value)
-        return True
-    except Exception:
-        pass
-    try:
-        import pythoncom
-        dispid = obj._oleobj_.GetIDsOfNames(name)
-        obj._oleobj_.Invoke(dispid, 0, pythoncom.DISPATCH_PROPERTYPUT, False, value)
-        return True
-    except Exception:
-        return False
-
-
-def import_dxf_to_sketch(
-    adapter: Any, dxf_path: Any, *, merge_dist_mm: float = 0.02, label: str = "dxf"
-) -> str:
-    """Import a DXF as a 2D sketch in the ACTIVE part; return the new sketch name.
-
-    Drives the documented "Import DXF File into Part Sketch" recipe through the
-    adapter's ``ISldWorks`` (``adapter.swApp``): ``GetImportFileData`` ->
-    ``ImportMethod = swImportDxfDwg_ImportToPartSketch`` -> ``LoadFile4``. The DXF
-    is authored in build plate millimetres (corner origin), so it lands in-place
-    on the part's default sketch plane (Front); the caller cut-extrudes the
-    returned sketch.
-
-    Cosmetic engraving import: no auto-relations / dimensions / hatch; coincident
-    endpoints are merged (``merge_dist_mm``) so each glyph loop closes.
-
-    NOT exercised on the SolidWorks COM seat. Live-validation surface (raw-COM
-    stopgap posture, like :func:`insert_helix` / :func:`extrude_at_offset`):
-      * the ``ImportMethod`` enum integer and the parameterized property-put;
-      * the target sketch PLANE (the recipe imports to the default plane -- the
-        build authors the plate on Front so it should align, but confirm);
-      * ``LoadFile4``'s ``Errors`` out-parameter marshalling.
-    """
-    app = adapter.swApp
-    path = str(dxf_path)
-    imp = app.GetImportFileData(path)
-    if imp is None:
-        raise RuntimeError(f"import_dxf_to_sketch {label!r}: GetImportFileData(None) for {path}")
-    if not _dxf_put(imp, "ImportMethod", _SW_IMPORT_TO_PART_SKETCH):
-        raise RuntimeError(
-            f"import_dxf_to_sketch {label!r}: could not set ImportMethod=ImportToPartSketch"
-        )
-    adapter._attempt(lambda: _dxf_put(imp, "AddSketchConstraints", False), default=None)
-    adapter._attempt(lambda: imp.SetMergePoints("", True, merge_dist_mm / 1000.0), default=None)
-    adapter._attempt(lambda: _dxf_put(imp, "ImportDimensions", False), default=None)
-    adapter._attempt(lambda: _dxf_put(imp, "ImportHatch", False), default=None)
-    doc = adapter._attempt(lambda: app.LoadFile4(path, "", imp, 0), default=None)
-    if doc is None:
-        raise RuntimeError(
-            f"import_dxf_to_sketch {label!r}: LoadFile4 returned None (check Errors out-param live)"
-        )
-    adapter.currentModel.ClearSelection2(True)
-    name = feature_name_by_type(adapter, "ProfileFeature")
-    if not name:
-        raise RuntimeError(f"import_dxf_to_sketch {label!r}: no sketch created by the import")
-    print(f"  OK  import_dxf_to_sketch {label!r} -> sketch {name!r}")
-    return name
 
 
 async def add_spring_end_hooks(
