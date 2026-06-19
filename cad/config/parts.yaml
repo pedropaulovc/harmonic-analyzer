@@ -15,12 +15,6 @@ parts:
     material: Gray Cast Iron
     tolerance_class: machined_block
     process: "cast + machined"
-  alignment-pinion:
-    number: MHA-002
-    material: Brass
-    tolerance_class: machined_block
-    fit_class: gear_mesh
-    process: "gear cutting (hob/shaper)"
   amplitude-bar:
     number: MHA-003
     material: Plain Carbon Steel
@@ -309,43 +303,6 @@ parts:
     number: MHA-055
     material: Plain Carbon Steel
     tolerance_class: machined_block
-    process: "machined (steel)"
-  pinion-bracket:
-    number: MHA-056
-    material: Plain Carbon Steel
-    tolerance_class: machined_block
-    process: "machined (steel)"
-  pinion-drum:
-    number: MHA-057
-    material: Brass
-    tolerance_class: machined_block
-    fit_class: gear_mesh
-    process: "gear cutting (hob/shaper)"
-  pinion-handle:
-    number: MHA-058
-    material: Plain Carbon Steel
-    tolerance_class: machined_block
-    process: "machined (steel)"
-  pinion-lever:
-    number: MHA-059
-    material: Plain Carbon Steel
-    tolerance_class: machined_block
-    process: "machined (steel)"
-  pinion-lift-rod:
-    number: MHA-060
-    material: Plain Carbon Steel
-    tolerance_class: machined_block
-    process: "machined (steel)"
-  pinion-pivot-block:
-    number: MHA-061
-    material: Plain Carbon Steel
-    tolerance_class: machined_block
-    process: "machined (steel)"
-  pinion-pivot-shaft:
-    number: MHA-062
-    material: Plain Carbon Steel
-    tolerance_class: machined_block
-    fit_class: shaft_in_bushing
     process: "machined (steel)"
   pivot-ball-mount:
     number: MHA-063

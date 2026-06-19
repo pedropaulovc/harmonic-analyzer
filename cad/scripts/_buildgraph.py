@@ -46,10 +46,11 @@ POST_ASSEMBLY = {
     "drive_train": (
         "build_engagement_configs.py",          # + cone_disengaged
         "build_operating_config.py",            # + operating (crank free)
-        "build_pinion_engagement_configs.py",   # + pinion_engaged (swing free)
+        # pinion_engaged retired with the alignment-pinion (OD-62.2 re-anchor left
+        # no room for the drum; deferred for rework). Restore this hook then.
     ),
     "harmonic_analyzer": (
-        "build_top_engagement_configs.py",      # + the 4 top configs (child refs)
+        "build_top_engagement_configs.py",      # + the 3 top configs (child refs)
     ),
 }
 _POST_SCRIPT_NAMES = frozenset(s for v in POST_ASSEMBLY.values() for s in v)
