@@ -33,7 +33,15 @@ edge points validated live (probe_eye_points.py).
 
 from __future__ import annotations
 
-from _common import check, coincident_mate, component_named_ref, gear_mate, log
+from _common import (
+    check,
+    log,
+)
+from _assembly import (
+    coincident_mate,
+    component_named_ref,
+    gear_mate,
+)
 from build_motion_study import (
     ANGLE, CH_SPRING, CT_SPRING, DISTANCE, SPRING_KCH, SPRING_KCT, _by_z_rank,
     _components, _entity_ref, _family, _find_one, _iter_mates, _k_helical,

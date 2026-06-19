@@ -35,8 +35,14 @@ from __future__ import annotations
 import asyncio
 
 from _common import (
-    bore_axis_ref, check, component_named_ref, component_transform,
-    concentric_mate, log,
+    check,
+    log,
+)
+from _assembly import (
+    bore_axis_ref,
+    component_named_ref,
+    component_transform,
+    concentric_mate,
 )
 from build_motion_study_springs import _eye_point
 

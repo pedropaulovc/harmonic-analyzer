@@ -69,6 +69,7 @@ from _buildgraph import (  # noqa: E402
     POST_ASSEMBLY,
     SCRIPTS_DIR,
     artefact_for,
+    module_deps_of,
     part_scripts,
     references_of,
     script_for,
@@ -76,8 +77,6 @@ from _buildgraph import (  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent
 CONFIG_DIR = REPO_ROOT / "cad" / "config"
-COMMON = SCRIPTS_DIR / "_common.py"
-CONFIG_PY = SCRIPTS_DIR / "_config.py"
 
 # --- Parallel guard: a single SolidWorks STA session, so any parallel run
 # deadlocks. doit's parallelism is CLI-only (-n/--process/-P/--parallel-type);
@@ -125,21 +124,26 @@ def _run(cmd: list[str], label: str) -> None:
         raise RuntimeError(f"{label} failed (exit {proc.returncode})")
 
 
-# --- Shared build inputs that can invalidate ANY part or assembly geometry: the
-# helper modules every build script imports (_common, _config, _gear, _chain,
-# _chain_link) plus the YAML data layer. Coarse but correct -- a helper or YAML
-# edit can change any body, and content-hashing means an edit that does not change
-# a given part's bytes still costs only that one rebuild. (Excludes _buildgraph.py:
-# it is the build-GRAPH helper imported here, not a geometry input.) Without these,
-# editing e.g. _gear.py leaves every gear .SLDPRT reported up to date and
-# downstream assemblies refresh from stale parts (codex review #1).
-_HELPER_MODULES = [
-    str(p.resolve())
-    for p in sorted(SCRIPTS_DIR.glob("_*.py"))
-    if p.name != "_buildgraph.py"
-]
+# --- Per-script helper dependencies, computed from each build script's REAL
+# transitive imports (``module_deps_of``) instead of a blanket "every ``_*.py`` is
+# a dep of every build". A leaf part that imports only ``_common`` no longer
+# rebuilds when an assembly-only helper (``_assembly``) or an unrelated one
+# (``_gear``) changes; the closure follows imports (``_chain_link -> _chain ->
+# _common``; ``_common -> _config``) so it never under-invalidates as long as a
+# script imports what it uses. (Excludes _buildgraph.py: the build-GRAPH helper
+# imported here, not a geometry input.)
+#
+# The YAML data layer stays a blanket dep of EVERY build: ``parts.yaml`` is read
+# transitively by ``_common.part_properties`` for almost every part (custom-
+# property stamping), and a placement YAML edit can move any body. Coarse but
+# correct, and content-hashing means an edit that doesn't change a given part's
+# inputs still costs only that one rebuild.
 _CONFIG_YAMLS = [str(p.resolve()) for p in sorted(CONFIG_DIR.glob("*.yaml"))]
-_SHARED_BUILD_DEPS = _HELPER_MODULES + _CONFIG_YAMLS
+
+
+def _helper_deps(script) -> list[str]:
+    """This build script's transitive ``_*.py`` helper imports (resolved paths)."""
+    return module_deps_of(script if isinstance(script, Path) else Path(script))
 
 
 def task_part():
@@ -148,7 +152,7 @@ def task_part():
         stem = script.stem.removeprefix("build_")
         yield {
             "name": stem,
-            "file_dep": [str(script.resolve()), *_SHARED_BUILD_DEPS],
+            "file_dep": [str(script.resolve()), *_helper_deps(script), *_CONFIG_YAMLS],
             "targets": [_sldprt(stem)],
             "actions": [CmdAction([sys.executable, str(script)], cwd=str(REPO_ROOT))],
             "clean": True,
@@ -292,10 +296,14 @@ def task_assembly():
         ]
         # Recipe = everything whose change needs a FULL rebuild (re-insert/re-mate),
         # not a part-only refresh: the assembly script, its hooks, the helper
-        # modules, AND the _config/YAML data layer -- a placement like
-        # channels.station_pitch_mm changing means components must be re-inserted at
-        # new coordinates, which an in-place reload cannot do (codex review #2).
-        recipe_files = [str(asm_script.resolve()), *hooks, *_SHARED_BUILD_DEPS]
+        # modules it transitively imports (incl. _assembly/_transforms), AND the
+        # _config/YAML data layer -- a placement like channels.station_pitch_mm
+        # changing means components must be re-inserted at new coordinates, which an
+        # in-place reload cannot do (codex review #2).
+        recipe_files = [
+            str(asm_script.resolve()), *hooks,
+            *_helper_deps(asm_script), *_CONFIG_YAMLS,
+        ]
         yield {
             "name": stem,
             "file_dep": [*recipe_files, *ref_targets],

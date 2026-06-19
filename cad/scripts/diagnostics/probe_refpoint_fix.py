@@ -18,7 +18,14 @@ from __future__ import annotations
 import asyncio
 
 from _common import (
-    _flag, _read_member, check, coincident_mate, component_named_ref, log,
+    _flag,
+    _read_member,
+    check,
+    log,
+)
+from _assembly import (
+    coincident_mate,
+    component_named_ref,
 )
 from build_motion_study import (
     _by_z_rank, _comp_xform, _components, _find_one, _iter_mates, _rot_angle, _sub_model,
