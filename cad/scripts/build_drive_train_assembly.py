@@ -107,6 +107,7 @@ import sys
 import _config
 from _common import (
     angle_driver,
+    apply_component_color,
     assert_components_fully_defined,
     check,
     check_no_interference,
@@ -130,6 +131,12 @@ Y_DRIVE = Y_BASE_TOP + 76.0  # 126.8: crank, cone big end and arbor axes
 DP_TRAIN = _config.machine("gear_train", "diametral_pitch")  # cad/config/machine.yaml (DIMENSIONS.md ch12)
 DP_CRANK = _config.machine("gear_train", "crank_drive_diametral_pitch")  # 26.57: 64T==cone T120 radius
 ADDENDUM = 25.4 / DP_TRAIN  # 0.510 at DP 49.82
+
+# The four smallest cone gears read "more yellow ... a harder metal" (ch.12 p.21):
+# a high-zinc yellow metal (Muntz/manganese bronze). Tinted per-INSTANCE here (see
+# apply_component_color / build_cone_gear.py rationale), the part stays brass.
+MUNTZ_YELLOW = _config.palette("muntz_yellow")
+TIP_TEETH = {int(c[1:]) for c in _config.materials().get("cone_tip_gear_configs", [])}
 WORKING_DEPTH = 2.0 * ADDENDUM  # 1.020: full tooth interleave depth
 RADIUS_STEP = 3.0 * 25.4 / DP_TRAIN  # 1.5295: pitch-radius step per 6 teeth
 CONE_T120_PITCH_R = (120.0 / DP_TRAIN) * 25.4 / 2.0  # 30.59: largest cone gear pitch radius
@@ -372,6 +379,8 @@ async def build(adapter) -> dict[str, str]:
             adapter, "cone-gear", SHAFT_T120_STATION + j * SEAT_PITCH, CONE_FACE,
             configuration=cfg, label=f"cone-gear {cfg}",
         )
+        if teeth in TIP_TEETH:  # the four hard yellow tip gears
+            await apply_component_color(adapter, cg, MUNTZ_YELLOW)
         cone_gears.append((teeth, cg))
 
     # =================== cylinder drum (driven, free on the arbor) =============
