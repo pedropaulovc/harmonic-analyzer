@@ -917,7 +917,7 @@ sections:
         - derived
         - med
       - - Lever fulcrum
-        - 'Ø6.5 pivot hole at 0; common Ø6.35 × 182 shaft (`fulcrum-shaft`, M6.5 — shortened from 228.6: tips ±91 clear the west columns'' Ø34.925 surfaces at (−197, ±112), where 228.6 tips overlapped them by 0.09 mm) along Z at (x, y) = (−199.9, 1065.9), 2 ball mounts (same part as the rocker pivot''s) on the top-frame west rail at z ±85; Ø12 × 4.0565 spacer bushings ×19'
+        - 'Ø6.5 pivot hole at 0; common Ø6.35 × 182 shaft (`fulcrum-shaft`, M6.5 — shortened from 228.6: tips ±91 clear the west columns'' Ø25.4 surfaces at (−197, ±112) by ~5.3 (was 0.6 at the old Ø34.925; OD rederived from the 8-views, M6.11), where the 228.6 tips still overlap) along Z at (x, y) = (−199.9, 1065.9), 2 ball mounts (same part as the rocker pivot''s) on the top-frame west rail at z ±85; Ø12 × 4.0565 spacer bushings ×19'
         - —
         - p.40 bottom-left clevis+ball = the shaft END mount (mirror of the rocker pivot design); rail top = 1065.9 − 25.2 = 1040.7
         - derived
@@ -958,11 +958,11 @@ sections:
         - ch. 17 rows
         - med
       - - Top frame (NEW part)
-        - 'green cast rectangular ring around the 4 columns: rails 22 wide × 41 tall (y 999.7…1040.7, top = lever ball-mount seat 1065.9 − 25.2), corner bosses Ø48 bored Ø35 (column Ø34.925) at (±197, ±112); clamps the columns 80 below their tops (1120.8 − 1040.7)'
+        - 'green cast rectangular ring around the 4 columns: rails 22 wide × 41 tall (y 999.7…1040.7, top = lever ball-mount seat 1065.9 − 25.2), corner bosses Ø48 bored Ø25.5 (column Ø25.4, OD rederived from the 8-views M6.11) at (±197, ±112); clamps the columns 80 below their tops (1120.8 − 1040.7)'
         - 'eight-views: green ring at y ≈ 1010–1055 in all views, columns continue above it to caps ≈ 1090–1120'
         - med
       - - Ball mounts ×4
-        - 'rocker pair at seats y 228.6: north on the support apex (z +101.6), south on the A-frame saddle (z −111, M6.5); lever pair on the top-frame west rail (seat y 1040.7) at z ±85 — any further out the Ø16 base overhangs the Ø35 boss bores (need √(2.9² + dz²) ≥ 17.5 + 8 → dz ≥ 25.3 from the boss at z 112)'
+        - 'rocker pair at seats y 228.6: north on the support apex (z +101.6), south on the A-frame saddle (z −111, M6.5); lever pair on the top-frame west rail (seat y 1040.7) at z ±85 — the Ø16 base must clear the Ø25.5 boss bores (need √(2.9² + dz²) ≥ 12.75 + 8 → dz ≥ 20.5 from the boss at z 112; z 85 gives dz 27, comfortably clear after the OD rederivation M6.11 loosened the old dz ≥ 25.3)'
         - ch. 14 / ch. 17; lever z from boss-bore clearance
         - med
       - - Amplitude bars (default)
@@ -1265,19 +1265,19 @@ sections:
         - scaled
         - low
       - - Support bar (×3, M6.4)
-        - '10-square steel, 384 long (M6.5 — trimmed from 400: at the bar''s z band −138.9..−128.9 the Ø34.925 column surfaces reach x ±192.6, so ends at ±192 stay just inside); wheel bar y 565, platen top rail y 440, bottom rail y 334 — all on the column-clamp axis z −133.9 (front face −138.9)'
+        - '10-square steel, 384 long (ends at x ±192, seated in the clamp channels; with the Ø25.4 columns (OD rederived from the 8-views M6.11) the column cylinders z −99.3..−124.7 no longer reach the bar''s z band −138.9..−128.9, a 4.2 gap — the old M6.5 column-corner trim from 400 is moot, length now held by the clamp seating); wheel bar y 565, platen top rail y 440, bottom rail y 334 — all on the column-clamp axis z −133.9 (front face −138.9)'
         - —
         - 'M6.4 layout; p3 90° view: bars run tangent IN FRONT of the columns (z −112)'
         - derived
         - low
       - - Column clamp (×5, M6.4; count M6.8 — the half-width wheel bar takes ONE clamp)
-        - green cast collar Ø48 × 16, bore Ø35.2 sliding on the Ø35 column; open channel across the front face (10.2 wide, floor 5.1 below bar centre) at column-to-bar offset 21.9; Ø3.2 radial pinch-screw hole through the back wall (M6.10)
+        - green cast collar Ø48 × 16, bore Ø25.6 sliding on the Ø25.4 column (OD rederived from the 8-views M6.11; was Ø35.2 on Ø35); open channel across the front face (10.2 wide, floor 5.1 below bar centre) at column-to-bar offset 21.9 (offset to column CENTRE, unchanged — the channel now stands ~4 off the smaller column surface, the collar still grips); Ø3.2 radial pinch-screw hole through the back wall (M6.10)
         - —
         - p.50–55
         - scaled + derived
         - low
       - - Pinch screws ×5 (M6.10)
-        - 'Ø6 × 2.5 head + Ø2.9 × 6.2 shank in each clamp''s back-wall hole, BACKED OUT (a seated screw would overlap the column it pinches): heads on the clamp back faces (z −88..−85.5), shank tips at z −94.2 — 0.2 inside the hole, 0.3 off the column surface'
+        - 'Ø6 × 2.5 head + Ø2.9 × 6.2 shank in each clamp''s back-wall hole, BACKED OUT (a seated screw would overlap the column it pinches): heads bear on the clamp back faces; with the Ø25.4 column (OD rederived from the 8-views M6.11) the back wall is now 11.2 thick, so the 6.2 shank seats mid-wall and the tip stands ~5 off the column surface (was 0.3 at the old Ø35 bore) — further backed out, still non-contacting'
         - —
         - p.50–55 (screw heads on the clamp backs)
         - scaled + derived
@@ -1456,7 +1456,7 @@ sections:
         - scaled
         - low
       - - Pinion bar (M6.5)
-        - '12-square steel, x −58 → +178 at machine y 253.5 (M6.5 trim from −95..+197: west end clears the A-frame clevis ears/ball at x −59, east end clears the SE column tangent 179.54); Ø9.6 stud bore along Z at x 0 (9.525 stud + slip clearance); both ends FLOAT (documented simplification — the real machine likely straps the bar to the a-frame and column)'
+        - '12-square steel, x −58 → +178 at machine y 253.5 (M6.5 trim from −95..+197: west end clears the A-frame clevis ears/ball at x −59, east end clears the SE column tangent 184.3 (was 179.54 at the old Ø34.925; OD rederived from the 8-views M6.11 — 6.3 clearance now)); Ø9.6 stud bore along Z at x 0 (9.525 stud + slip clearance); both ends FLOAT (documented simplification — the real machine likely straps the bar to the a-frame and column)'
         - —
         - ch. 30 views + M6.5 layout
         - scaled + derived
@@ -1719,7 +1719,7 @@ sections:
         - RE-AUTHORED — `build_corner_bracket.py` reproduces it to 13,035 mm³ (exact volume match)
       - - tube-frame
         - 'ch.6: frame column height 107 cm — legacy file measured 1016 mm (40"), CONTRADICTS the book'
-        - 'RE-AUTHORED — `build_tube_frame.py` at 1070 mm (book wins), Ø1.375" × 0.12" wall from legacy. M4: fluted/reeded per the photo index `195108425`/`195123524` — 16 × Ø3 mm full-length grooves, 1.5 mm deep (count/size photo-estimated, low)'
+        - 'RE-AUTHORED — `build_tube_frame.py` at 1070 mm (book wins). OD REDERIVED Ø25.4 (1") from the ch30 8-views (M6.11): 4 quarter views isolate single columns, apparent width = OD × scale (scale fit from the ±197/±112 stations + azimuth, R² 0.94–0.99, cross-checked by the 460 mm base ~1500 px) → 7 reads = Ø23.8 ± 1.0, rounded to 1" stock; SUPERSEDES legacy Ø1.375" (~45% oversize). Wall kept legacy 0.12" → Ø19.3 bore. M4 fluting retired (M6.8: plain reflective columns)'
   - prose: |2
 
       No legacy part contradicts a book annotation. Every part still gets re-authored
