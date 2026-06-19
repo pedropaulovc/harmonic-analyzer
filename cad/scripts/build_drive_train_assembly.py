@@ -260,13 +260,20 @@ if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
 # engaging the first 9 mm of the journal bore (blind-bearing look,
 # p.18: the shaft end disappears into the black bracket).
 PIVOT_POST_STATION = -1.0
-# Thin-tip journal support (p.18: z 90.0, x -2.1, originally photo-scaled to 177).
-# The OD-62.2 re-anchor widened SEAT_PITCH (6.589 -> 6.889), pushing the T006 tip
-# gear's far face out to ~162.4, so the post's inboard half clipped it (~0.7 mm^3).
-# Derive it just past the gear stack instead: last cone face + the post's ~16 mm
-# half-footprint (cone-knob-post STL is +/-16) + 2.5 mm clearance. Lands ~181,
-# still on the 1/32" shaft tip (155.7-190), and tracks any future pitch change.
-KNOB_POST_STATION = SHAFT_T120_STATION + 19 * SEAT_PITCH + CONE_FACE / 2.0 + 16.0 + 2.5  # ~180.9
+# --- cone-knob-post placement: REMOVED 2026-06-19, pending rework -------------
+# The green Ø32 round tip-rest post (p.18) no longer fits the rescaled north
+# region at OD 62.2 -- the SAME cramped channel that forced out the alignment
+# pinion. The cone shaft tip sits at machine x ~+19.2; the post's Ø32 body
+# reaches +35.2, but the rocker-arm-support frustum's west base is at x +28.45
+# (~9 mm of room for a 16 mm radius). It cannot be re-stationed (higher station
+# slides -x but the 1/32" shaft tip ends at station 190, only ~9 mm out, while
+# moving the post the ~45 mm needed would run it off the tip; lower station digs
+# into the gear stack), narrowed (Ø32 is the p.18 spec), or moved off-axis
+# (it would no longer cup the shaft tip). It carries NO mate -- the cone shaft's
+# revolute is in the pivot-post (below) -- so dropping the placement frees no DOF
+# and breaks nothing; build_cone_knob_post.py + its registry entries stay so the
+# part still builds, ready to re-place once the north region is reworked.
+# Was: KNOB_POST_STATION = SHAFT_T120_STATION + 19*SEAT_PITCH + CONE_FACE/2 + 18.5
 
 # --- alignment pinion: REMOVED 2026-06-18 ---------------------------
 # The 42T zeroing pinion no longer fits the rescaled frame at OD 62.2:
@@ -363,11 +370,8 @@ async def build(adapter) -> dict[str, str]:
         [ppost[0], Y_BASE_TOP, ppost[2]], [0.0, -INCLINE_DEG, 0.0], ROT_Y_INCLINE,
         ground=False, label="cone-pivot-post (swing bracket, engaged rest)",
     )
-    kpost = cone_station(KNOB_POST_STATION)
-    await place_component(
-        adapter, "cone-knob-post",
-        [kpost[0], Y_BASE_TOP, kpost[2]], [0.0, -INCLINE_DEG, 0.0], ROT_Y_INCLINE,
-    )
+    # cone-knob-post placement removed (see note above KNOB_POST_STATION): the
+    # Ø32 tip-rest post does not fit the rescaled north region at OD 62.2.
 
     # =================== cone cluster (driven, on-solution) ====================
     cone_shaft = await place_component(
