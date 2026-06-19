@@ -22,6 +22,7 @@ from _common import (
     _stamp,
     check,
     log,
+    set_isometric_view,
 )
 from _transforms import mirror_placement
 
@@ -909,6 +910,10 @@ async def save_assembly_and_images(
     assert_model_healthy(adapter, label=asm_name, deep=True)
     OUT_SLDASM.mkdir(parents=True, exist_ok=True)
     asm_path = (OUT_SLDASM / f"{asm_name}.SLDASM").resolve()
+    # Save on isometric so the .SLDASM opens isometric; runs AFTER any
+    # remap_front_to_machine_front (which re-bases the standard views) so the
+    # re-based Front/Back/etc. used by the gallery stay correct.
+    set_isometric_view(adapter)
     check(f"save_file -> {asm_path}", await adapter.save_file(str(asm_path)))
 
     artefacts = {"assembly": str(asm_path)}
@@ -1037,6 +1042,7 @@ async def refresh_assembly(
     check_no_interference(adapter)
     assert_model_healthy(adapter, label=asm_name, deep=True)
 
+    set_isometric_view(adapter)  # save on isometric so the refreshed .SLDASM opens isometric
     save_assembly_in_place(adapter, asm_name)
     artefacts = {"assembly": str(asm_path)}
     artefacts.update(await _export_assembly_images(adapter, asm_name, views))

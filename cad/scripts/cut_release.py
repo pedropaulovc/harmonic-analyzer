@@ -191,14 +191,26 @@ def render_diff(stage: Path, prev_tag: str) -> dict[str, Any] | None:
     diff_dir = stage / "diff"
     summary = diff_dir / "diff_summary.json"
     log(f"rendering changed-parts diff vs {prev_tag} ...")
-    proc = subprocess.run(
+    # Stream the renderer's stdout line-by-line: the geometry verify (a
+    # brute-force Hausdorff per changed mesh) and the per-view render take
+    # minutes, so capturing-and-swallowing left the release looking hung.
+    proc = subprocess.Popen(
         ["uv", "run", str(RENDER_DIFF),
          "--old-release", prev_tag, "--new-local", str(stage),
          "--out", str(diff_dir), "--summary-json", str(summary)],
-        cwd=str(REPO_ROOT), capture_output=True, text=True,
+        cwd=str(REPO_ROOT), stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT, text=True, bufsize=1,
     )
-    if proc.returncode != 0 or not summary.exists():
-        log(f"!!  diff render skipped: {(proc.stderr or proc.stdout).strip()[-400:]}")
+    tail: list[str] = []
+    assert proc.stdout is not None
+    for raw in proc.stdout:
+        line = raw.rstrip()
+        log(f"    diff| {line}")
+        tail.append(line)
+        if len(tail) > 50:
+            del tail[0]
+    if proc.wait() != 0 or not summary.exists():
+        log(f"!!  diff render skipped: {' / '.join(tail)[-400:]}")
         return None
     data = json.loads(summary.read_text(encoding="utf-8"))
     data["prev"] = prev_tag
