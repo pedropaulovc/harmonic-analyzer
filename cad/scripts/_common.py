@@ -870,9 +870,14 @@ PREF_STL_UNITS = 211           # swExportStlUnits -> 0 = swMM
 TOGGLE_STL_BINARY = 69         # swSTLBinaryFormat
 TOGGLE_STL_ONE_FILE = 72       # swSTLComponentsIntoOneFile
 TOGGLE_STL_NO_TRANSLATE = 71   # swSTLDontTranslateToPositive: keep model origin
+TOGGLE_STL_SHOW_INFO = 70      # swSTLShowInfoOnSave: the per-file "Save <name>.STL?" modal
 
 _STL_INT_PREFS = {PREF_STL_QUALITY: 2, PREF_STL_UNITS: 0}
-_STL_TOGGLES = {TOGGLE_STL_BINARY: True, TOGGLE_STL_ONE_FILE: True, TOGGLE_STL_NO_TRANSLATE: True}
+# SHOW_INFO -> False: every part build now exports an STL, so leaving the modal on
+# would block an unattended `doit` run on the first export (cut_release.py disables
+# it for the same reason; codex review #12).
+_STL_TOGGLES = {TOGGLE_STL_BINARY: True, TOGGLE_STL_ONE_FILE: True,
+                TOGGLE_STL_NO_TRANSLATE: True, TOGGLE_STL_SHOW_INFO: False}
 
 
 async def export_part_stl(adapter: Any, out_path: Path) -> None:
@@ -894,9 +899,16 @@ async def export_part_stl(adapter: Any, out_path: Path) -> None:
         sw.SetUserPreferenceToggle(k, v)
     try:
         out_path.parent.mkdir(parents=True, exist_ok=True)
+        # Delete any prior STL first so a failed SaveAs3 (locked target, export
+        # error) cannot leave a stale file that the existence check below would
+        # accept as a fresh export (codex review #10). SaveAs3's return is not a
+        # reliable success flag here (it yields 0 on a successful write), so the
+        # post-delete "file exists" check is the real gate.
+        if out_path.exists():
+            out_path.unlink()
         rc = adapter._attempt(lambda: adapter.currentModel.SaveAs3(str(out_path), 0, 0))
         if not out_path.exists():
-            raise RuntimeError(f"STL export produced no file: {out_path} (rc={rc})")
+            raise RuntimeError(f"STL export produced no file (SaveAs3 rc={rc!r}): {out_path}")
         print(f"  OK  export STL -> {out_path.name}"
               f" ({out_path.stat().st_size / 1e6:.1f} MB)")
     finally:
@@ -1153,14 +1165,38 @@ async def bbox_extent_check(
     trap the bar-length measure already dodges with a silhouette edge. Reading
     the bounding box needs no face picking at all.
 
-    Unions the solid bodies' boxes (``IBody2::GetBodyBox``) so an unabsorbed,
-    shown sketch can't inflate the extent. Only valid when the measured faces
-    ARE the part's bounding faces along ``axis`` (true for these overall-size
+    Unions the solid bodies' precise extreme points along ``axis`` so an
+    unabsorbed, shown sketch can't inflate the extent. Only valid when the measured
+    faces ARE the part's bounding faces along ``axis`` (true for these overall-size
     annotations); a feature protruding past them would read larger.
+
+    Uses ``IBody2::GetExtremePoint`` (the exact farthest vertex in a direction),
+    NOT ``IBody2::GetBodyBox`` -- the latter is documented as an approximate box
+    that varies after rebuilds, so a 0.05 mm gate on it can pass/fail
+    nondeterministically (codex review #9).
     """
+    import pythoncom
+    from win32com.client import VARIANT
+
     from solidworks_mcp.adapters import sw_type_info
 
     index = {"x": 0, "y": 1, "z": 2}[axis]
+    pos = [1.0 if i == index else 0.0 for i in range(3)]
+    neg = [-v for v in pos]
+
+    def _extreme(body: Any, direction: list[float]) -> float:
+        # IBody2::GetExtremePoint(Px,Py,Pz, &X,&Y,&Z): direction in, the extreme
+        # point comes back through three [out] byref doubles (metres). Returns the
+        # axis coordinate in mm.
+        out = [VARIANT(pythoncom.VT_BYREF | pythoncom.VT_R8, 0.0) for _ in range(3)]
+        res = adapter._attempt(
+            lambda: body.GetExtremePoint(
+                direction[0], direction[1], direction[2], out[0], out[1], out[2]),
+            default="__err__")
+        if res == "__err__":
+            raise RuntimeError(f"bbox {label}: GetExtremePoint failed")
+        return out[index].value * 1000.0
+
     doc = adapter.currentModel
     sw_type_info.flag_methods(doc, "IPartDoc")
     bodies = adapter._attempt(lambda: doc.GetBodies2(0, False)) or []  # solid
@@ -1169,11 +1205,8 @@ async def bbox_extent_check(
     lo, hi = float("inf"), float("-inf")
     for body in bodies:
         sw_type_info.flag_methods(body, "IBody2")
-        box = adapter._attempt(lambda b=body: b.GetBodyBox())  # 6 doubles, metres
-        if not box or len(box) != 6:
-            raise RuntimeError(f"bbox {label}: GetBodyBox returned {box!r}")
-        lo = min(lo, box[index] * 1000.0)
-        hi = max(hi, box[index + 3] * 1000.0)
+        lo = min(lo, _extreme(body, neg))
+        hi = max(hi, _extreme(body, pos))
     extent = hi - lo
     if abs(extent - expected) > tol:
         raise RuntimeError(
