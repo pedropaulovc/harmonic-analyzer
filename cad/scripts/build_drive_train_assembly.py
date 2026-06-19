@@ -583,18 +583,29 @@ async def build(adapter) -> dict[str, str]:
             [teeth, 120], label=f"cone T{teeth:03d}:cyl120 ch{j:02d}",
         )
 
-    # DRIVER #1 (the single machine input): the crank angle, pinned by the
-    # handle pivot's offset from the crank axis. The handle is keyed to the
-    # crankshaft and sits ARM_C2C straight below it, so |Δy| >> |Δx| and
-    # spin_driver auto-picks the well-conditioned Right-plane (x) distance.
-    crank_o = _org(adapter, crankshaft)
+    # DRIVER #1 (the single machine input): the crank angle. The arm hangs at
+    # bottom-dead-centre (straight down, ch30), which is a kinematic SINGULARITY
+    # for a single-coordinate distance driver -- the two distance solutions
+    # merge there, so SW reports the pin as over-defining (rank-deficient
+    # against the lock+axial mates) even though a free spin DOF remains, and the
+    # build hard-fails. An ANGLE mate's Jacobian is non-degenerate at every
+    # pose, so it pins the spin cleanly at BDC (the same formulation the
+    # cone-post swing-park above uses). The arm, handle, T12 wheel and pinion
+    # are one locked rigid body, so pinning the arm's angle pins the crank.
+    # Read the dihedral live from the arm's rest transform (the assembly-x
+    # component of its local +X = its Right-plane normal); _mate's flip-recovery
+    # resolves the sign, and the handle-origin verify (the arm origin sits ON
+    # the spin axis, so only the offset handle proves the pose) confirms the
+    # rigid crank landed back on its book-accurate down pose.
     handle_o = _org(adapter, handle)
-    await spin_driver(
+    a_arm = component_transform(adapter, arm)
+    crank_angle = math.degrees(math.acos(max(-1.0, min(1.0, a_arm[0]))))
+    await angle_driver(
         adapter,
-        named_ref(f"Axis1@{handle}", "AXIS"),
-        (crank_o[0], crank_o[1]),
-        (handle_o[0], handle_o[1]),
-        label="crank angle driver (#1)",
+        named_ref(f"Right Plane@{arm}", "PLANE"),
+        named_ref("Right Plane", "PLANE"),
+        crank_angle,
+        label=f"crank angle driver (#1, BDC a={crank_angle:.2f})",
         verify=(handle, handle_o),
     )
 
