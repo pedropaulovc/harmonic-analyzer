@@ -9,13 +9,11 @@ the only hard provenance fact on the machine; the '2' stamped a few centimetres
 away in the baseplate corner is a separate base feature, not modelled here.
 
 The lettering, ornament and pinstripe are reproduced from the actual photo, not a
-font: cad/tools/extract_engraving.py traces the polished engraving off the p.71
-macro and cad/tools/make_engraving_dxf.py emits two DXFs in plate millimetres --
-nameplate-engraving.dxf (smoothed letters + cartouche, cut into the field floor)
-and nameplate-border.dxf (the pinstripe frame, cut shallow on the raised border).
-This script imports each and cuts it. cad/tools/preview_nameplate.py renders the
-result off-Windows (CadQuery) -- the photo-faithful cross-check this build can't
-do on the SolidWorks-only seat.
+font: the polished engraving was traced off the p.71 macro into two vendored DXFs
+in plate millimetres -- cad/assets/nameplate-engraving.dxf (smoothed letters +
+cartouche, cut into the field floor) and cad/assets/nameplate-border.dxf (the
+pinstripe frame, cut shallow on the raised border). This script imports each and
+cuts it.
 
 Dimensions: cad/DIMENSIONS.md ch.26 -- 100 x 55 stated (high); thickness, corner
 radius, border, recess, pinstripe and screw inset are photo-plausible reads off
@@ -26,7 +24,7 @@ the Front plane at z = 0, thickness extruded +Z (same scheme as build_platen).
 
 NOTE: the DXF-import + cut path (import_dxf_to_sketch) is not yet exercised on the
 SolidWorks COM seat -- first live run is the validation pass (raw-COM stopgap
-posture). cad/tools/preview_nameplate.py verifies the geometry the DXFs encode.
+posture).
 
 Run (SolidWorks already open)::
 
@@ -68,7 +66,7 @@ BORDER_W = 8.0
 RECESS_DEPTH = 0.4
 ENGRAVE_DEPTH = 0.3  # incise depth of letters / ornament / pinstripe
 
-# Traced-photo engravings (cad/tools), authored in this script's plate frame.
+# Traced-photo engravings (cad/assets), authored in this script's plate frame.
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
 LETTERING_DXF = str((ASSETS / "nameplate-engraving.dxf").resolve())
 BORDER_DXF = str((ASSETS / "nameplate-border.dxf").resolve())
