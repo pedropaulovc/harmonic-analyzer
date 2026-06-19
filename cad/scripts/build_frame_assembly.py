@@ -1,11 +1,10 @@
 r"""Reproduction script: frame subassembly (book ch. 6 / eight-views).
 
 Static structure of the machine: the two-plate cast base, four smooth
-polished columns at the corners, four corner brackets hugging the
-columns, the north tapered support frustum that carries the back end of
-the rocker-pivot shaft, and the top-frame ring capping the columns --
-column tops flush with the ring's top face at 1040.7 (M6.8 8-view pass:
-no stub above).
+polished columns at the corners, the north tapered support frustum that
+carries the back end of the rocker-pivot shaft, and the top-frame ring
+capping the columns -- column tops flush with the ring's top face at
+1040.7 (M6.8 8-view pass: no stub above).
 
 Layout (from the ch. 6 dimension photo and the ch. 30 eight views; assembly
 axes follow the harmonic-base part: X = 46 cm length, Y = up, Z = 28 cm
@@ -15,9 +14,6 @@ depth):
 * tube-frame x4 standing on the base top face near the top-plate corners,
   centres at (+/-197, +/-112) — 25.25/21.35 mm inset from the top-plate
   edges (eight views: columns sit at the extreme corners).
-* corner-bracket x4 beside each column on its inboard-X side, upright
-  plate tangent to the column, foot toward the machine centre (ch. 30
-  views 1/8 show the green tabs against the column bases).
 * rocker-arm-support x1 (solid tapered frustum, M6.3 re-authoring;
   M6.9 side depth 40 -> 20 per ch30 p008) at (X, Z) = (+72.9, +101.6) -
   the BACK support only: its apex carries the north pivot ball mount
@@ -79,9 +75,6 @@ ASM_NAME = "frame"
 BASE_TOP_Y = 50.8  # harmonic-base: 0.5 in bottom + 1.5 in top plate
 COLUMN_X = 197.0  # column centres, from the ch. 6 / ch. 30 corner placement
 COLUMN_Z = 112.0
-COLUMN_RADIUS = 1.0 * IN / 2.0  # tube-frame OD/2 (Ø25.4, rederived from 8-views)
-BRACKET_PLATE_T = 0.3 * IN  # corner-bracket upright plate
-BRACKET_X = COLUMN_X - COLUMN_RADIUS - BRACKET_PLATE_T / 2.0  # plate tangent
 SUPPORT_X = 72.9  # rocker pivot x: arbor 47.5 + 25.4 rod lever (M6.3, M6.8 mirror)
 SUPPORT_Z = 133.35 - 63.5 / 2.0  # 101.6: outer face flush w/ top plate edge
 LAG_SCREW_X = (SUPPORT_X - 31.75, SUPPORT_X + 31.75)  # 41.15 / 104.65: the
@@ -90,8 +83,6 @@ LAG_SCREW_Y = 4.5  # under-head face = counterbore top; head 0.5..4.5
 TOP_FRAME_MID_Y = 1020.2  # ring mid-plane: rails y 999.7..1040.7 (M6.3)
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
-ROT_Y_POS90 = [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]
-ROT_Y_NEG90 = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]]
 
 
 def _part(name: str) -> str:
@@ -106,7 +97,6 @@ async def build(adapter) -> dict[str, str]:
 
     base_path = _part("harmonic-base")
     column_path = _part("tube-frame")
-    bracket_path = _part("corner-bracket")
     support_path = _part("rocker-arm-support")
     top_frame_path = _part("top-frame")
 
@@ -139,31 +129,6 @@ async def build(adapter) -> dict[str, str]:
             adapter, name, "Top Plane", "Top Plane", base_name, BASE_TOP_Y, target
         )
         assert_component_placed(adapter, name, target, IDENTITY)
-
-    # Corner brackets: plate tangent to the column inboard side, foot toward
-    # the machine centre. +X side needs Ry(-90) (+Z_part -> -X), -X side
-    # Ry(+90).
-    for sx, sz in ((1, 1), (-1, 1), (1, -1), (-1, -1)):
-        target = [sx * BRACKET_X, BASE_TOP_Y, sz * COLUMN_Z]
-        rotation = [0.0, -90.0 * sx, 0.0]
-        rows = ROT_Y_NEG90 if sx > 0 else ROT_Y_POS90
-        res = await adapter.insert_component(
-            InsertComponentParameters(
-                file_path=bracket_path, position=target, rotation=rotation
-            )
-        )
-        check(f"insert_component corner-bracket @ {target}", res)
-        name = res.data["name"]
-        await plane_distance_mate(
-            adapter, name, "Front Plane", "Right Plane", base_name, BRACKET_X, target
-        )
-        await plane_distance_mate(
-            adapter, name, "Right Plane", "Front Plane", base_name, COLUMN_Z, target
-        )
-        await plane_distance_mate(
-            adapter, name, "Top Plane", "Top Plane", base_name, BASE_TOP_Y, target
-        )
-        assert_component_placed(adapter, name, target, rows)
 
     # Rocker-pivot support frustum at the BACK channel-stack end (north
     # only, M6.5), apex under the pivot shaft at x = +72.9 (M6.8 mirror;
