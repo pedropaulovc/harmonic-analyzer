@@ -122,6 +122,7 @@ Y_BASE_TOP = 50.8  # harmonic-base top face
 Y_DRIVE = Y_BASE_TOP + 76.0  # 126.8: crank, cone big end and arbor axes
 
 DP_TRAIN = _config.machine("gear_train", "diametral_pitch")  # cad/config/machine.yaml (DIMENSIONS.md ch12)
+DP_CRANK = _config.machine("gear_train", "crank_drive_diametral_pitch")  # 26.57: 64T==cone T120 radius
 ADDENDUM = 25.4 / DP_TRAIN  # 0.510 at DP 49.82
 WORKING_DEPTH = 2.0 * ADDENDUM  # 1.020: full tooth interleave depth
 RADIUS_STEP = 3.0 * 25.4 / DP_TRAIN  # 1.5295: pitch-radius step per 6 teeth
@@ -199,7 +200,8 @@ for _j in range(20):
 # the T120 south face (p.20: directly beside).
 GEAR64_STATION = SHAFT_T120_STATION - (CONE_FACE + GEAR64_FACE) / 2.0 - 0.1  # 19.9
 GEAR64_SEAT = cone_station(GEAR64_STATION)  # (54.49, , -56.61)
-R64 = 2.0 * 25.4  # DP 16, 64T pitch radius
+R64 = (64.0 / DP_CRANK) * 25.4 / 2.0  # 30.59: 64T pitch radius (== cone T120 by design)
+R16 = (16.0 / DP_CRANK) * 25.4 / 2.0  # 7.65: 16T crank-pinion pitch radius
 
 # Crank: the 64T's contact tooth (azimuth 0, toward +x) sits R64*sin(i)
 # north of its centre; the pinion is centred on that plane and the mesh
@@ -207,14 +209,16 @@ R64 = 2.0 * 25.4  # DP 16, 64T pitch radius
 # 1.10 is checker-arbitrated like the drum mesh's (the long +-1.8 dive
 # across the 64T face squeezes flanks: 0.15 left 1.48 mm^3, 0.60 left
 # 0.23, 0.90 a 0.00 skin).
-ADD16 = 25.4 / 16.0
-WORK16 = 2.0 * ADD16  # 3.175
+ADD16 = 25.4 / DP_CRANK  # crank-pinion addendum
+WORK16 = 2.0 * ADD16  # 1.912 at DP 26.57
 PEN16_EDGE_SLACK = 1.10
 PEN16_MID = WORK16 - PEN16_EDGE_SLACK - (GEAR64_FACE / 2.0) * SIN_I  # 0.275
 PINION_TOOTH_Z = GEAR64_SEAT[2] + R64 * SIN_I  # -38.32
 X_CRANK = (
-    GEAR64_SEAT[0] + R64 * COS_I + 12.7 + (ADD16 * (1.0 + SEC_I) - PEN16_MID)
-)  # 118.00 -- photo: pedestal 122 +- 3 (1.3 sigma, see DIMENSIONS.md)
+    GEAR64_SEAT[0] + R64 * COS_I + R16 + (ADD16 * (1.0 + SEC_I) - PEN16_MID)
+)  # ~58 at DP 26.57 -- the crank-drive pair scaled with the cone, so the
+# crankshaft moved well inboard of the old +118 (the +122 pedestal photo no
+# longer holds; flagged in DIMENSIONS.md as a 62.2-anchor consequence)
 
 ARBOR_LENGTH = 196.0  # spans z -98..+98 (M6.9: 1.0 clear of the a-frame
 # plate back face -99; north end keeps 23.9 in the support boss bore)
@@ -260,29 +264,34 @@ KNOB_POST_STATION = 177.0  # thin-tip journal; z 90.0, x -2.1 (p.18)
 # footprint, and the engaged pose (c2c 68.58, cone swung clear in that
 # state) still reachable from the parked pivot with 0.7 spare.
 PINION_TEETH = 42
-TIP_DRUM = (122.0 / DP_TRAIN) * 25.4 / 2.0  # 51.647: 120T tip radius
-TIP_PINION = ((PINION_TEETH + 2.0) / DP_TRAIN) * 25.4 / 2.0  # 18.627
-ENGAGED_C2C = (120.0 + PINION_TEETH) / 2.0 * 25.4 / DP_TRAIN  # 68.58
+TIP_DRUM = (122.0 / DP_TRAIN) * 25.4 / 2.0  # 31.10: 120T tip radius (DP 49.82)
+TIP_PINION = ((PINION_TEETH + 2.0) / DP_TRAIN) * 25.4 / 2.0  # 11.22
+ENGAGED_C2C = (120.0 + PINION_TEETH) / 2.0 * 25.4 / DP_TRAIN  # 41.30
 PINION_GAP = 2.0  # disengaged tip clearance
 PINION_DRUM_LEN = 143.2  # build_alignment_pinion FACE_WIDTH
 PINION_STUB_BACK = 5.5  # build_alignment_pinion STUB_BACK
 PINION_Z_FRONT = -75.0  # drum front end face
-PINION_Y = 70.5  # drum tips 0.82 above the base top -- the only band the
-# rest pose fits: higher crowds the cone fan / 64T discs, lower the base
+PINION_Y = 90.0  # RE-SOLVED for the 62.2 anchor: the small pinion (tip r
+# 11.22) must engage a c2c of only 41.30, so its centre must ride within
+# ~41 of the drum -- it can no longer hang low at 70.5 (the disengage
+# tip-circle span 44.32 < the 56.3 drop to 70.5 made that pose impossible).
+# 90 keeps Y_DRIVE-PINION_Y = 36.8 < 44.32 (valid disengage) and the cone
+# fan / 64T still clear. NO LONGER matches the p002 low-front-centre photo.
 PINION_X = X_DRUM + math.sqrt(
     (TIP_DRUM + TIP_PINION + PINION_GAP) ** 2 - (Y_DRIVE - PINION_Y) ** 2
-)  # -2.18: tip circles backed off to PINION_GAP, just east-machine of
-# the midline (p002 front-bottom-centre cluster)
+)  # -22.80: tip circles backed off to PINION_GAP, east-machine of the drum
 PIVOT_Y = Y_BASE_TOP + 12.0  # 62.8: block bore height; the strap's r 11
 # bottom cap swings 1.0 clear of the base top
 STRAP_T = 5.0  # build_pinion_bracket THICKNESS
 STRAP_C2C = 31.0  # build_pinion_bracket C2C
 STRAP_AIR = 0.25  # axial air each side of each strap
 BLOCK_T = 12.0  # build_pinion_pivot_block DEPTH
-PIVOT_X = PINION_X + math.sqrt(
+PIVOT_X = PINION_X - math.sqrt(
     STRAP_C2C**2 - (PINION_Y - PIVOT_Y) ** 2
-)  # +27.85: torque shaft parked west-machine of the knob post; the
-# straps lean 75.6 deg onto the arbor in the rest pose
+)  # -37.67: RE-SOLVED to the DRUM side (west) of the pinion -- at the
+# small c2c the pivot must sit nearer the drum for the engaged pose to be
+# reachable (pivot->drum 64.75 <= c2c+strap 72.05); the straps lean onto
+# the arbor from the drum side in the rest pose
 LIFT_X = PIVOT_X + 15.0  # lift rod in the far bore (2 * block bore
 # spacing): squeezed between the strap's swinging r 11 bottom cap
 # (0.82 air) and the cone-pivot-post column east face (0.85 air)
