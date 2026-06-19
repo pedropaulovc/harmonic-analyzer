@@ -252,11 +252,11 @@ sections:
       - confidence
       rows:
       - - Gear face width
-        - 7 mm annotated; modeled 6.5
+        - 7 mm
         - '0.276'
-        - 'photo callout p.18; M6.7: the exact-tracking seat pitch 6.584 (see Axial gear pitch row) cannot carry 7 mm faces (0.42 overlap) — the annotated 7/7.5/150 trio is mutually inconsistent with the frame-locked drum grid, which wins'
-        - annotated (callout), derived (modeled)
-        - high/low
+        - 'photo callout p.18 — the annotated 7/7.5/150 trio is mutually inconsistent with the frame-locked drum grid; the build trims the as-built face to clear the seat pitch (a model detail, see build_cone_gear.py)'
+        - annotated
+        - high
       - - Cone set axial length
         - 150 mm
         - '5.91'
@@ -282,9 +282,9 @@ sections:
         - stated
         - high
       - - Axial gear pitch
-        - 7.5 mm annotated lineage; modeled 6.584 along the shaft
+        - 7.5 mm
         - '0.295'
-        - '150 mm / 20 gears gave 7.5, whose Z-projection 7.0568 became the frame-locked drum grid (gates, channels — Appendix C #3); M6.7 exact tracking then fixes the along-shaft seat pitch at 7.0568 × cos 21.1° = 6.5839 (the drum grid is the survivor, the 7.5 annotation only its lineage)'
+        - '150 mm / 20 gears = 7.5 along the cone axis; its Z-projection 7.0568 is the frame-locked drum grid (gates, channels — Appendix C #3). The build trims the along-shaft seat pitch to clear the 21.1° incline — a model detail.'
         - derived
         - med
       - - Diametral pitch / module
