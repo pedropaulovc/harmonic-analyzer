@@ -1112,6 +1112,43 @@ async def apply_color(adapter: Any, rgb: tuple[float, float, float]) -> None:
     log(f"colour override {tuple(round(v, 3) for v in back)} ({n_bodies} bodies)")
 
 
+async def apply_component_color(
+    adapter: Any,
+    name: str,
+    rgb: tuple[float, float, float],
+) -> None:
+    """Per-INSTANCE component display colour in an assembly.
+
+    A part colour cannot tint one instance of a multi-config part differently
+    from another: a per-config part colour loses to the part's material
+    appearance, and a body colour is global to the part document. The component
+    instance appearance sits above both and is per-occurrence, so the four
+    muntz_yellow cone tip-gear instances tint without touching the brass part or
+    the other 16 cone gears. It is also exactly what the render pipeline reads
+    (export_models comp_rgb -> IComponent2.GetMaterialPropertyValues2).
+
+    Sets via IComponent2.SetMaterialPropertyValues2(values, swThisConfiguration,
+    None) and asserts the readback (SW quantises to 8 bit/channel).
+    """
+    from solidworks_mcp.adapters.com_variant import double_array
+
+    comp = adapter.currentModel.GetComponentByName(name)
+    if comp is None:
+        raise RuntimeError(f"component not found for colour: {name!r}")
+    _flag(comp, "IComponent2")
+    values = double_array([*rgb, 1.0, 1.0, 0.3, 0.31, 0.0, 0.0])
+    # [R,G,B, ambient, diffuse, specular, shininess, transparency, emission]
+    comp.SetMaterialPropertyValues2(values, 1, None)  # swThisConfiguration
+    back_raw = adapter._attempt(
+        lambda: comp.GetMaterialPropertyValues2(1, None), default=None
+    )
+    back = tuple(float(v) for v in (back_raw or ())[:3])
+    if len(back) != 3 or any(abs(b - w) > 1 / 255 for b, w in zip(back, rgb)):
+        raise RuntimeError(f"component colour readback mismatch on {name}: set {rgb}, got {back}")
+    adapter._attempt(lambda: adapter.currentModel.GraphicsRedraw2(), default=None)
+    log(f"component colour {name}: {tuple(round(v, 3) for v in back)}")
+
+
 async def measure_check(
     adapter: Any,
     label: str,
