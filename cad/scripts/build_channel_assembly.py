@@ -106,7 +106,10 @@ ASM_NAME = "channel"
 # --- machine stations -------------------------------------------------------
 import os  # noqa: E402
 
-CHANNELS = int(os.environ.get("CHANNEL_COUNT", "20"))  # test hook: build fewer
+# Channels physically built. Default = machine.yaml channels.active_count (the
+# TEMPORARY 3-channel build-performance reduction; recover by setting it back to
+# 20 — see _config.active_count). CHANNEL_COUNT env still overrides for tests.
+CHANNELS = int(os.environ.get("CHANNEL_COUNT", str(_config.active_count())))
 Z0 = _config.machine("channels", "station_z0_mm")  # channel 0 gear plane (machine.yaml)
 PITCH = _config.machine("channels", "station_pitch_mm")
 ARM_MID_DZ = 0.8  # arm/bar/lever mid-planes at z_j + 0.8
