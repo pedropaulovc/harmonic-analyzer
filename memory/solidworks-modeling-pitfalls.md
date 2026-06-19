@@ -211,6 +211,6 @@ discovered during harmonic-analyzer M6.4:
   rotation is pinned by ONE crank park driver flowing THROUGH the meshes, so
   cutting the 21 meshes drops exactly the 42-member train to under-defined; that is
   physically correct for "disengaged" (assert no STRUCTURAL part leaks instead of
-  asserting full-definition). See [[dof-refactor]].
+  asserting full-definition). See dof-refactor (dropped memory).
 
 See [[solidworks-3dx-launch]] for session/launch rules.

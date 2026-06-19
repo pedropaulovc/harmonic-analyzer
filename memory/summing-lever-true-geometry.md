@@ -31,7 +31,7 @@ Evidence: book `references/.../ch18_images/page001_img01.png` + `page001_img03.j
 of the arm, below the crossbar). Hex exact size/clocking is LOW confidence (museum-glass
 photos) — tune against the knife-mount fit + ch30 parity. Plan:
 `~/.claude/plans/serialized-wobbling-lerdorf.md`. See [[harmonic-analyzer-project]],
-[[dof-refactor]], [[parametric-springs]].
+dof-refactor (dropped memory), [[parametric-springs]].
 
 **Knife mount = BORED bearing support (2026-06-17, user-confirmed):** the hex trunnion
 (vertex-up, on the lever) rides inside an OVERSIZED circular bore on the fixed support so
