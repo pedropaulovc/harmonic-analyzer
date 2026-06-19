@@ -629,9 +629,11 @@ async def build(adapter) -> dict[str, str]:
     log(f"spring variants: base 63.05 + {len(variant_by_body)} stretched bodies "
         f"{sorted(variant_by_body)}")
     for key, name in variant_by_body.items():
-        if (OUT_SLDPRT / f"{name}.SLDPRT").exists():
-            log(f"  skip {name} body={key:.2f} (.SLDPRT exists)")
-            continue
+        # Always rebuild: a skip-if-exists short-circuit could reuse a stale
+        # stretchNN body of a different length after amplitudes/spring lengths
+        # change, because these dynamic .SLDPRTs are not declared doit targets and
+        # so survive `doit clean` of the part graph (codex review #4; clean now
+        # wipes them, and this rebuilds them fresh).
         log(f"  building {name} body={key:.2f} (no views)")
         await build_spring(
             adapter, name, key,

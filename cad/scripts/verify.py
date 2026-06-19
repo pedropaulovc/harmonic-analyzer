@@ -345,7 +345,7 @@ async def _verify_isolation_one(adapter: Any, name: str, report: Report) -> None
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
     if not sldasm.exists():
         report.failed.append((f"{name}:open", f"not built: {sldasm}"))
-        print(f"  XX  {sldasm.name} not built -- run build_all.py", flush=True)
+        print(f"  XX  {sldasm.name} not built -- run doit", flush=True)
         return
 
     # Isolation means a FRESH session per subsystem: close any prior assembly
@@ -375,7 +375,7 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
     if not sldasm.exists():
         report.failed.append((f"{name}:open", f"not built: {sldasm}"))
-        print(f"  XX  {sldasm.name} not built -- run build_all.py", flush=True)
+        print(f"  XX  {sldasm.name} not built -- run doit", flush=True)
         return
 
     # Fresh session per assembly: accumulating open docs across the multi-assembly
@@ -432,7 +432,7 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
     if not sldasm.exists():
         report.failed.append((f"motion:{name}:open", f"not built: {sldasm}"))
-        print(f"  XX  {sldasm.name} not built -- run build_all.py", flush=True)
+        print(f"  XX  {sldasm.name} not built -- run doit", flush=True)
         return
 
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
@@ -508,7 +508,7 @@ async def _open_isolated(adapter: Any, name: str) -> bool:
     """
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
     if not sldasm.exists():
-        print(f"  XX  {sldasm.name} not built -- run build_all.py", flush=True)
+        print(f"  XX  {sldasm.name} not built -- run doit", flush=True)
         return False
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     check(f"open {name}", await adapter.open_model(str(sldasm)))
