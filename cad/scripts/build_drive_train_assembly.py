@@ -28,6 +28,12 @@ tooth sits r*sin(i) SOUTH (along the shaft) of the gear centre and
 reaches x = x_centre - r*cos(i). Meshing every station therefore
 needs:
 
+NOTE: the worked numbers in this docstring (incline 21.1 deg, radius step
+2.54, z-pitch 7.5, seat 6.5839, DP 30, 50.8 radii) illustrate the METHOD
+at the retired DP-30 geometry. The live values are computed from config
+at OD 62.2 / DP 49.82 (incline 12.5188 deg, step 1.5295, seat 6.889, 64T
+rescaled to DP 26.57); the alignment pinion has been REMOVED (see below).
+
 * a centre-x grid stepping by the PROJECTED radius step 2.54*cos(i),
 * each centre z at z_drum_j + r_j*sin(i) -- NORTH of its drum plane,
   so the contact tooth lands exactly in that plane.
@@ -70,8 +76,8 @@ pre-rotated +1.5 deg (half a 3 deg pitch) to receive it tooth-in-gap;
 the crank pinion +11.25 deg (half of 22.5) likewise.
 
 Mated-DOF strategy (M6 operation simulation): the structure -- the
-stationary arbor, the pedestals/posts, and the disengaged alignment rig
--- is grounded; the crank chain, the cone cluster and the 20 cylinder
+stationary arbor and the pedestals/posts -- is grounded; the crank
+chain, the cone cluster and the 20 cylinder
 gears are inserted on their exact mirrored transforms (so mate
 flip-recovery has a clean reference and the tuned tooth phases are
 preserved) and joined by real kinematic joints. The crankshaft and the
@@ -248,142 +254,14 @@ if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
 PIVOT_POST_STATION = -1.0
 KNOB_POST_STATION = 177.0  # thin-tip journal; z 90.0, x -2.1 (p.18)
 
-# --- alignment pinion (ch. 25): carried DISENGAGED (p. 68 "gap") ---
-# The 42T DP 30 pinion drum hangs low and FRONT-CENTRE on the base,
-# just east-machine of the midline (p002: the silver lever + tee handle
-# cluster; the ch25 close-ups are BACK-side shots -- "front side"
-# labels the post, not the viewpoint). Two swing straps journal the
-# drum's arbor stubs and pivot on a plain torque shaft parked west-
-# machine of the cone-knob post; a parallel LIFT ROD through the same
-# blocks carries two cam pins and the engage lever (root clamp on its
-# front end, standing up+out = disengaged); the turning HANDLE (big
-# ball + cross rod) rides the drum's front arbor stub. The rest pose
-# threads five hard constraints: tip gap 2.0 to the cylinder train,
-# per-disc clearance to every cone gear and the 64T, drum tips 0.8
-# above the base top, the back stub 0.5 short of the knob-post
-# footprint, and the engaged pose (c2c 68.58, cone swung clear in that
-# state) still reachable from the parked pivot with 0.7 spare.
-PINION_TEETH = 42
-TIP_DRUM = (122.0 / DP_TRAIN) * 25.4 / 2.0  # 31.10: 120T tip radius (DP 49.82)
-TIP_PINION = ((PINION_TEETH + 2.0) / DP_TRAIN) * 25.4 / 2.0  # 11.22
-ENGAGED_C2C = (120.0 + PINION_TEETH) / 2.0 * 25.4 / DP_TRAIN  # 41.30
-PINION_GAP = 2.0  # disengaged tip clearance
-PINION_DRUM_LEN = 143.2  # build_alignment_pinion FACE_WIDTH
-PINION_STUB_BACK = 5.5  # build_alignment_pinion STUB_BACK
-PINION_Z_FRONT = -75.0  # drum front end face
-PINION_Y = 90.0  # RE-SOLVED for the 62.2 anchor: the small pinion (tip r
-# 11.22) must engage a c2c of only 41.30, so its centre must ride within
-# ~41 of the drum -- it can no longer hang low at 70.5 (the disengage
-# tip-circle span 44.32 < the 56.3 drop to 70.5 made that pose impossible).
-# 90 keeps Y_DRIVE-PINION_Y = 36.8 < 44.32 (valid disengage) and the cone
-# fan / 64T still clear. NO LONGER matches the p002 low-front-centre photo.
-PINION_X = X_DRUM + math.sqrt(
-    (TIP_DRUM + TIP_PINION + PINION_GAP) ** 2 - (Y_DRIVE - PINION_Y) ** 2
-)  # -22.80: tip circles backed off to PINION_GAP, east-machine of the drum
-PIVOT_Y = Y_BASE_TOP + 12.0  # 62.8: block bore height; the strap's r 11
-# bottom cap swings 1.0 clear of the base top
-STRAP_T = 5.0  # build_pinion_bracket THICKNESS
-STRAP_C2C = 31.0  # build_pinion_bracket C2C
-STRAP_AIR = 0.25  # axial air each side of each strap
-BLOCK_T = 12.0  # build_pinion_pivot_block DEPTH
-PIVOT_X = PINION_X - math.sqrt(
-    STRAP_C2C**2 - (PINION_Y - PIVOT_Y) ** 2
-)  # -37.67: RE-SOLVED to the DRUM side (west) of the pinion -- at the
-# small c2c the pivot must sit nearer the drum for the engaged pose to be
-# reachable (pivot->drum 64.75 <= c2c+strap 72.05); the straps lean onto
-# the arbor from the drum side in the rest pose
-LIFT_X = PIVOT_X + 15.0  # lift rod in the far bore (2 * block bore
-# spacing): squeezed between the strap's swinging r 11 bottom cap
-# (0.82 air) and the cone-pivot-post column east face (0.85 air)
-STRAP_LEAN_DEG = math.degrees(
-    math.atan2(PIVOT_X - PINION_X, PINION_Y - PIVOT_Y)
-)  # 75.62
-PIVOT_SHAFT_Z0 = -106.0  # plain Ø6.35 x 196: 2 proud past each block face
-LIFT_ROD_Z0 = -120.0  # Ø6.35 x 210: front end proud for the lever root;
-# cam pins land at machine z -77.5 / +70.5, inside each strap's z band
-LEVER_TILT_DEG = 32.0  # from vertical, toward +x script / west machine (p002)
-LEVER_Z = -113.0  # clamp ball flush on the lift rod's front end, 1.75
-# ahead of the forward front block face
-HANDLE_Z = -95.0  # ball centre; hub z -88..-81 seats on the front arbor
-# stub (machine -83..-75), 0.75 clear of the front strap face -80.25
-HANDLE_TILT_DEG = 65.0  # cross rod from vertical: long arm toward +x
-# script / machine west (p002: the tee leans up-left in the front
-# view), short arm down-east stopping 1.7 above the base top
+# --- alignment pinion: REMOVED 2026-06-18 ---------------------------
+# The 42T zeroing pinion no longer fits the rescaled frame at OD 62.2:
+# its Ø22.4 drum cannot thread the 12.6 mm channel between the rocker-
+# support frustum (x -28.45) and the rescaled 64T (west edge x -15.89).
+# The whole swing group (drum, 2 straps, 2 blocks, torque shaft, lift
+# rod, lever, handle) is dropped from the assembly pending a rework.
+# See dimensions.yaml ch.25 + the build docstring.
 
-PINION_Z_BACK = PINION_Z_FRONT + PINION_DRUM_LEN  # +68.0
-BLOCK_X = (PIVOT_X + LIFT_X) / 2.0  # block local origin midway the bores
-BLOCK_FRONT_Z0 = -104.0  # forward of the cone-pivot-post column's z band
-# (-89.9..-62.3), 1.8 clear; the front strap floats 11.75 ahead of it
-BLOCK_BACK_Z0 = 76.0  # 2.55 behind the back strap; the shaft/lift-rod
-# ends land 2 proud of the back block face at z +88
-
-# Geometry self-checks (all 20 stations covered; everything clears).
-if abs(math.hypot(PIVOT_X - PINION_X, PINION_Y - PIVOT_Y) - STRAP_C2C) > 0.001:
-    raise AssertionError("strap c2c does not span pivot -> pinion axis")
-if Z_DRUM0 - DRUM_FACE / 2.0 < PINION_Z_FRONT + 1.0:
-    raise AssertionError("alignment pinion too short at the front station")
-if Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0 > PINION_Z_BACK + 0.5:
-    # The knob-post footprint (z >= 74) caps drum + stub + strap; the
-    # drum back face may shave at most 0.5 off the j = 19 gear face
-    # (actual 0.28 -- 90% face coverage at that one station, Appendix C).
-    raise AssertionError("alignment pinion misses the j = 19 station")
-if math.hypot(PINION_X - X_DRUM, Y_DRIVE - PINION_Y) < TIP_DRUM + TIP_PINION + 1.0:
-    raise AssertionError("alignment pinion crowds the cylinder train")
-if math.hypot(PIVOT_X - X_DRUM, Y_DRIVE - PIVOT_Y) > ENGAGED_C2C + STRAP_C2C - 0.25:
-    raise AssertionError("engaged pose unreachable from the parked pivot")
-for _j in range(20):
-    _tip = CONE_T120_PITCH_R - RADIUS_STEP * _j + ADDENDUM
-    if (
-        math.hypot(PINION_X - cone_seat(_j)[0], Y_DRIVE - PINION_Y)
-        < _tip + TIP_PINION + 0.25
-    ):
-        raise AssertionError(f"pinion drum crowds cone gear {_j}")
-if (
-    math.hypot(PINION_X - GEAR64_SEAT[0], Y_DRIVE - PINION_Y)
-    < R64 + ADD16 + TIP_PINION + 0.25
-):
-    raise AssertionError("pinion drum crowds the 64T crank-drive gear")
-_post = cone_station(KNOB_POST_STATION)
-if PINION_Z_BACK + PINION_STUB_BACK > _post[2] - 16.0 - 0.25:
-    raise AssertionError("back arbor stub reaches the cone-knob post footprint")
-if BLOCK_X - 16.5 < _post[0] + 16.0 + 0.25:
-    raise AssertionError("pivot blocks reach the cone-knob post footprint")
-# Cone-PIVOT-post column (25 x 20 rotated by the incline, plan half-
-# extents 15.26 x 13.83 about cone_station(-1)): the lift rod passes in
-# front of nothing -- it must thread EAST of the column; the front block
-# dodges it in z instead.
-_ppost = cone_station(PIVOT_POST_STATION)
-_PPOST_HX = 12.5 * COS_I + 10.0 * SIN_I  # 15.26
-_PPOST_HZ = 12.5 * SIN_I + 10.0 * COS_I  # 13.83
-if LIFT_X + 3.175 > _ppost[0] - _PPOST_HX - 0.25:
-    raise AssertionError("lift rod reaches the cone-pivot-post column")
-if BLOCK_FRONT_Z0 + BLOCK_T > _ppost[2] - _PPOST_HZ - 0.25:
-    raise AssertionError("front pivot block reaches the cone-pivot-post column")
-if LIFT_X - PIVOT_X < 11.0 + 3.175 + 0.25:
-    raise AssertionError("lift rod fouls the strap's swinging bottom cap")
-if LEVER_Z + 7.0 > BLOCK_FRONT_Z0 - 0.25:
-    raise AssertionError("lever clamp ball fouls the front pivot block")
-if PINION_X - TIP_PINION < -28.45 + 0.25:
-    raise AssertionError("pinion drum reaches the rocker-support frustum")
-if STRAP_C2C < TIP_PINION + 3.175 + 0.25:
-    raise AssertionError("pivot shaft fouls the pinion drum tips")
-if math.hypot(LIFT_X - PINION_X, PINION_Y - PIVOT_Y) < TIP_PINION + 3.175 + 0.25:
-    raise AssertionError("lift rod fouls the pinion drum tips")
-if PIVOT_Y - 11.0 < Y_BASE_TOP + 0.5:
-    raise AssertionError("strap bottom cap dips into the base top")
-if PIVOT_Y - 11.175 < Y_BASE_TOP + 0.5:
-    raise AssertionError("lift-rod cam pin tips dip into the base top")
-if (
-    PINION_Y
-    - 35.0 * math.cos(math.radians(HANDLE_TILT_DEG))
-    - 3.0 * math.sin(math.radians(HANDLE_TILT_DEG))
-    < Y_BASE_TOP + 0.5
-):
-    raise AssertionError("handle cross-rod short arm dips into the base top")
-if abs(HANDLE_Z - LEVER_Z) < 6.0 + 1.0:
-    raise AssertionError("engage lever plane fouls the handle cross-rod plane")
-if HANDLE_Z - 3.0 < -99.0 + 0.25:
-    raise AssertionError("handle cross-rod plane reaches the A-frame band")
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 ROT_X_POS90 = [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0]]
@@ -475,52 +353,6 @@ async def build(adapter) -> dict[str, str]:
     await place_component(
         adapter, "cone-knob-post",
         [kpost[0], Y_BASE_TOP, kpost[2]], [0.0, -INCLINE_DEG, 0.0], ROT_Y_INCLINE,
-    )
-
-    # alignment pinion SWING GROUP (ch. 25, p.66): the two brackets pivot on the
-    # torque shaft and journal the pinion drum; the whole group swings to engage
-    # the cylinder train (p2). Floated (ground=False) and joined by a swing
-    # revolute + suppressible park driver in the joints section -- the rest pose
-    # is today's DISENGAGED state (p.68 "gap").
-    align_pinion = await place_component(
-        adapter, "alignment-pinion",
-        [PINION_X, PINION_Y, PINION_Z_FRONT], [0.0, 0.0, 0.0], IDENTITY,
-        ground=False, label="alignment-pinion (disengaged rest)",
-    )
-    pinion_brackets: dict[str, str] = {}
-    for tag, z0 in (
-        ("front", PINION_Z_FRONT - STRAP_T - STRAP_AIR),
-        ("back", PINION_Z_BACK + STRAP_AIR),
-    ):
-        pinion_brackets[tag] = await place_component(
-            adapter, "pinion-bracket",
-            [PIVOT_X, PIVOT_Y, z0], [0.0, 0.0, STRAP_LEAN_DEG], rot_z_rows(STRAP_LEAN_DEG),
-            ground=False, label=f"pinion-bracket {tag} (leaning onto the arbor stub)",
-        )
-    for tag, z0 in (("front", BLOCK_FRONT_Z0), ("back", BLOCK_BACK_Z0)):
-        await place_component(
-            adapter, "pinion-pivot-block",
-            [BLOCK_X, PIVOT_Y, z0], [0.0, 0.0, 0.0], IDENTITY,
-            label=f"pinion-pivot-block {tag}",
-        )
-    pivot_shaft = await place_component(
-        adapter, "pinion-pivot-shaft",
-        [PIVOT_X, PIVOT_Y, PIVOT_SHAFT_Z0], [0.0, 0.0, 0.0], IDENTITY,
-    )
-    await place_component(
-        adapter, "pinion-lift-rod",
-        [LIFT_X, PIVOT_Y, LIFT_ROD_Z0], [0.0, 0.0, 0.0], IDENTITY,
-        label="pinion-lift-rod (cam pins parked down)",
-    )
-    await place_component(
-        adapter, "pinion-lever",
-        [LIFT_X, PIVOT_Y, LEVER_Z], [0.0, 0.0, -LEVER_TILT_DEG], rot_z_rows(-LEVER_TILT_DEG),
-        label="pinion-lever (clamp on the lift rod front end)",
-    )
-    await place_component(
-        adapter, "pinion-handle",
-        [PINION_X, PINION_Y, HANDLE_Z], [0.0, 0.0, -HANDLE_TILT_DEG], rot_z_rows(-HANDLE_TILT_DEG),
-        label="pinion-handle (on the front arbor stub)",
     )
 
     # =================== cone cluster (driven, on-solution) ====================
@@ -735,61 +567,6 @@ async def build(adapter) -> dict[str, str]:
         (handle_o[0], handle_o[1]),
         label="crank angle driver (#1)",
         verify=(handle, handle_o),
-    )
-
-    # =================== pinion swing group (p2 engage DOF) ====================
-    # The two brackets + the alignment-pinion are ONE rigid body that pivots on
-    # the torque shaft to swing the pinion into mesh with the cylinder train
-    # (ch.25, p.66). Lock the group rigid (crank-chain pattern), ground it with
-    # ONE revolute about the pivot shaft (coincident axes + an axial plane
-    # distance), and pin the swing with a suppressible PARK DRIVER at today's
-    # DISENGAGED pose. `rest` is bit-exact; suppress the driver (motion study /
-    # a pinion_engaged config) to articulate the engage swing. The pinion-handle
-    # stays grounded for now -- it coincides at rest; floating + locking it is
-    # deferred to the engaged config (where the swung pose would otherwise
-    # detach it).
-    fb = pinion_brackets["front"]
-    bb = pinion_brackets["back"]
-    fb_o = _org(adapter, fb)
-    # Rigid group: back bracket + pinion locked to the front bracket. The pivot
-    # bores (Axis1) of both straps are collinear on the shaft; the pinion axis
-    # (Axis1) is collinear with each strap's arbor bore (Axis2) -- STRAP_C2C spans
-    # pivot->pinion exactly (geometry self-check above), so the locks preserve the
-    # inserted pose.
-    await lock_mate(
-        adapter, named_ref(f"Axis1@{bb}", "AXIS"), named_ref(f"Axis1@{fb}", "AXIS"),
-        label="pinion back-bracket keyed",
-    )
-    await lock_mate(
-        adapter, named_ref(f"Axis1@{align_pinion}", "AXIS"), named_ref(f"Axis2@{fb}", "AXIS"),
-        label="alignment-pinion keyed to the front bracket",
-    )
-    # Swing revolute on the torque shaft: the front strap's pivot bore (Axis1)
-    # coincident with the shaft central axis (Axis1) + an axial plane distance.
-    # Leaves exactly the swing DOF.
-    await coincident_mate(
-        adapter,
-        named_ref(f"Axis1@{fb}", "AXIS"), named_ref(f"Axis1@{pivot_shaft}", "AXIS"),
-        label="pinion swing radial", verify=(fb, fb_o),
-    )
-    await distance_driver(
-        adapter,
-        named_ref(f"Front Plane@{fb}", "PLANE"), named_ref("Front Plane", "PLANE"),
-        abs(fb_o[2]),
-        label=f"pinion swing axial d={abs(fb_o[2]):.2f}", verify=(fb, fb_o),
-    )
-    # Swing PARK DRIVER (suppressible): pin the swing via the pinion axis, which
-    # sits STRAP_C2C off the pivot, so the spin_driver's in-plane sensitivity is
-    # well-conditioned. Suppressing it frees the engage articulation.
-    shaft_o = _org(adapter, pivot_shaft)
-    pin_o = _org(adapter, align_pinion)
-    await spin_driver(
-        adapter,
-        named_ref(f"Axis1@{align_pinion}", "AXIS"),
-        (shaft_o[0], shaft_o[1]),
-        (pin_o[0], pin_o[1]),
-        label="pinion swing park driver (p2, disengaged rest)",
-        verify=(align_pinion, pin_o),
     )
 
     assert_components_fully_defined(adapter)

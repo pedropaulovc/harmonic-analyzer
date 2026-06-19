@@ -604,29 +604,22 @@ after pivoting the cone set out of engagement. The "small gear" visible on the
 lever arm in the p.68–69 photos is the drum's front end face, not a separate
 idler (video frame `v4_pinion_018` shows the drum receding behind it).
 
-### Alignment-pinion layout (M6.8 rework, built; pre-mirror machine coords)
+### Alignment-pinion layout — REMOVED 2026-06-18, pending rework
 
-Modeled in the DISENGAGED rest state (p. 68 "gap"); all placements in
-`build_drive_train_assembly.py`. The rig sits FRONT-CENTRE on the base
-(ch30 p002: the silver engage-lever + tee-handle cluster just east-machine
-of the midline; the ch25 close-ups are back-side shots), not on the east
-flank as first built. The rest pose threads five hard constraints: tip gap
-2.0 to the cylinder train, per-disc clearance to every cone gear + the 64T,
-drum tips 0.82 above the base top, drum/stub/strap under the cone-knob-post
-footprint (z ≥ 74), lift rod east of the cone-pivot-post column (x to
-−47.1 machine) — and the engaged pose (c2c 68.58, cone swung clear in that
-state) stays reachable from the parked pivot with 0.7 spare.
+The alignment pinion (the 42T zeroing drum + its swing straps, pivot
+blocks, torque shaft, lift rod, lever and handle) has been DROPPED from
+`build_drive_train_assembly.py`. At the re-anchored OD 62.2 / DP 49.82 the
+Ø22.4 mm pinion drum no longer fits the machine: a single rigid drum
+spanning the cylinder set (z −75..+68) sits at one x for its whole length,
+and the channel between the rocker-support frustum (east face x −28.45) and
+the rescaled 64T (tip west edge x −15.89, where the 64T crosses the drum
+face) is only 12.56 mm wide — a ~9.9 mm shortfall that no position or pivot
+topology can resolve. This is the sixth geometric impossibility the 62.2
+eyeball reading forces (after the cam-through-roots, the 0.79 mm T006 tip
+journal, the 67 mm crank-pedestal shift, the impossible disengage pose, and
+the pivot-block straddle). The mechanism is to be re-solved once the gear
+OD is confirmed; the retired DP-30 layout it replaced is in git history.
 
-| item | value | source / rule |
-|---|---|---|
-| Pinion axis | (−2.18, 70.5), z −75..+68.2 | gap circle: 120T tip 51.65 + 42T tip 18.63 + 2.0 = 72.27 from the drum axis (−47.5, 126.8) at y 70.5 (drum tips 0.82 above the base top) |
-| Drum | 143.2 long, stubs Ø6.35 × 8 front / × 5.5 back (`alignment-pinion`) | back face +68.2 shaves 0.28 of the j = 19 gear face (Appendix C #10); back stub ends z 73.7, 0.27 short of the knob-post footprint |
-| Swing strap | 22 × 31 c2c × 5, r 11 ends, two Ø6.35 bores (`pinion-bracket`, ×2) | leans 75.6° onto the arbor stubs (z −80.25 / +68.45, 0.25 air each side); c2c 31 keeps the engaged swing reachable from the parked pivot |
-| Pivot block | 33 × 16 × 12, bores ±7.5 at 12 above seat (`pinion-pivot-block`, ×2) | front z −104..−92 (dodges the cone-pivot-post column z −89.9..−62.3), back z +76..+88; PIVOT_Y 62.8, strap bottom cap swings 1.0 clear of the base |
-| Torque shaft | Ø6.35 × 196, plain (`pinion-pivot-shaft`) | pivot bore axis (+27.85, 62.8), z −106..+90, 2 proud past each block face |
-| Lift rod | Ø6.35 × 210, two Ø4 cam pins to 11.175, parked down (`pinion-lift-rod`) | far bore (+42.85, 62.8), z −120..+90; squeezed between the strap's swinging r 11 cap (0.82 air) and the cone-pivot-post column east face (0.85 air); pins at z −77.5 / +70.5 inside the strap bands (Appendix C #11) |
-| Engage lever | Ø6 × 72 rod on a Ø14 annular clamp ball bored Ø6.35 (`pinion-lever`) | clamp flush on the lift rod front end at z −113, 32° from vertical toward +x (standing up = disengaged) |
-| Turning handle | Ø12 hub (bore Ø6.35, z 7..14 local), Ø24 ball, Ø6 rod arms −35/+68 (`pinion-handle`) | hub seats 2 deep on the front arbor stub (ball centre z −95); cross rod 65° from vertical, long arm machine-west (p002), short arm tip 2.0 above the base |
 
 ---
 
@@ -776,33 +769,29 @@ re-measure during their M2 script build.
    gear at the cone set's large end ("This gear engages the crank",
    p.20) implements the stated 4:1 crank→cone reduction together with a
    pinion on the crankshaft; neither part is in any legacy source. Teeth
-   are visibly ~1.5–2× coarser than the DP 30 train and not countable in
-   the available photos. Working estimate (round-PD argument, mirrors
-   the DP 30 resolution): DP 16, drive gear 64T (PD 4.000", OD ≈ the
-   120T cone gear's, matching p.20), crank pinion 16T (PD 1.000").
-   Author both as M4 parts at the estimate; re-measure/ratify when the
-   drive train is mated in M6 (the 4:1 ratio itself is book-stated and
-   fixed — only DP/tooth-count split is estimated).
-   **M6.2 ratification:** the measured crank-axis-to-cone-axis distance
-   (front view, 67 ± 5 mm) matches the DP 16 64T+16T center distance
-   63.5 mm; no other round-PD split at 4:1 fits. Pair confirmed at the
-   estimate (see "Drive-train layout (M6.2)", ch. 13 section).
-10. **Alignment-pinion drum shaves 0.28 mm of the last gear face**
-   (ch. 25, M6.8 rework — supersedes the earlier "19 of 20 stations"
-   east-flank entry). With the rig moved front-centre (p002), the
-   model's cone-KNOB-post footprint (Ø32 column at (−2.1, z 90)
-   pre-mirror, plan circle from z 74) caps drum + back stub + back
-   strap hard: drum back face +68.2, stub end 73.7. The j = 19 gear
-   face spans z 65.48..68.48, so its last 0.28 mm (≈ 10% of the 3 mm
-   face) overhangs the drum — all 20 gears still engage, the last at
-   90% face width. The real machine's knob post plainly sits a touch
-   further back; revisit only if the post is ever re-measured.
-11. **Lift-rod cam pins shortened and parked down** (ch. 25, M6.8) —
-   the real engage mechanism's pins bear obliquely on the swing-strap
-   flanks; the model's Ø4 pins point straight down in the disengaged
-   rest state and stop ~2 mm short of the strap edges (lift rod at 15.0
-   from the pivot bore, pin tips 0.82 above the base top). The
-   lever-cam kinematics are not modeled — visual reproduction only.
+   are visibly ~1.5–2× coarser than the train and not countable in the
+   available photos. Estimate, RE-ANCHORED with the OD 62.2 train: DP
+   26.57 (= DP_TRAIN·64/120), drive gear 64T (PD 61.18 mm, OD ≈ 63.1 ≈
+   the 120T cone gear's 62.2 — the p.20 "OD ≈ cone 120T" match holds),
+   crank pinion 16T (PD 15.3). The 4:1 ratio is book-stated and fixed;
+   only the DP/tooth split is estimated.
+   **M6.2 ratification (now BROKEN by the 62.2 anchor):** the rescaled
+   64T+16T centre distance is 38.24 mm, no longer the 63.5 that matched
+   the measured 67 ± 5 mm crank-to-cone distance. The whole drive train
+   shrank with the 62.2 OD, pulling the crank ~67 mm inboard (pedestal
+   derived +55 vs photo +122) — flagged with the crankshaft row. Either
+   the crank-distance photo or the 62.2 reading is wrong.
+10. **Alignment-pinion mechanism removed** (ch. 25) — 2026-06-18. At the
+   re-anchored OD 62.2 / DP 49.82 the Ø22.4 mm pinion drum cannot thread
+   the 12.56 mm channel between the rocker-support frustum (x −28.45) and
+   the rescaled 64T (tip west edge x −15.89): a ~9.9 mm shortfall no
+   position or pivot topology can resolve (the drum is one rigid cylinder
+   at a single x for its whole z-length). The drum + straps + blocks +
+   torque shaft + lift rod + lever + handle were dropped from
+   `build_drive_train_assembly.py` pending a rework once the gear OD is
+   confirmed. The retired DP-30 layout (and the former entries #10/#11 on
+   the 0.28 mm face shave and the parked lift-rod cam pins) are in git
+   history. See the "Alignment-pinion layout — REMOVED" section above.
 
 
 
