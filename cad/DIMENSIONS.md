@@ -255,7 +255,7 @@ ch. 14 layout) and are plain thin straps at the top.
 | Arm depth (end-face height) | 16 mm | 0.630 | photo callout p.29 — M2 zoom shows the arrows span the arm's end face vertically (NOT channel pitch) | annotated | high |
 | Top-surface curvature radius | = amplitude bar length ≈ 800 mm | ≈ 31.5 | text pp. 26–27 ("equal to the length of amplitude bars" — minimizes nonlinearity) | stated | high |
 | Arm count | 20 | — | photos/text | stated | high |
-| Arm length | symmetric ±114.3 mm (4.5") about the pivot (228.6 = 9" total) | 4.5 | REDERIVED from p.29 broadside photo (img 285): pivot ball, rod-pin hole and the 16 mm depth callout give a dual scale (~8.1–8.6 px/mm), pivot→tip span measures 113–119 mm (central ~116) → adopt the clean imperial 4.5" half (9" total = the 9" pivot shaft). Supersedes the indirect M6.3 "80 mm bar travel + 8 mm margin" = 88 (never measured) and the M2 100/70 asymmetric read; ch. 15 symmetry retained | photo-scaled | med |
+| Arm length | symmetric ±88 mm about the pivot (176 total) | ~6.9 | M6.3: ch. 15 text — positive amplitudes one side of the pivot, negative the OPPOSITE side, both up to the 80 mm measuring-stick span (+8 mm notch margin); supersedes the M2 100/70 asymmetric read | derived | med |
 | Rod-pin hole | Ø2 at +25.4 (1") from the pivot, rod side, mid-depth | 1.0 | M6.3 closure: vertical connecting rods hang at the cylinder-arbor x = −47.5; pivot ball measured x ≈ −66 (back view, base-edge calibration) … −81 (front view) → designer value 1" lever arm, pivot at −72.9 | derived | med |
 | Pivot pin hole | Ø6.5 (rides the Ø6.35 pivot shaft), mid-depth | 0.256 | function-driven (common pivot shaft, see layout below); the M2 "Ø3 dark dots" read was the rod-pin holes | derived | low |
 
@@ -314,19 +314,15 @@ top at ≈ 1072.3, pin at ≈ 1065.9.
 | Overall length | 200 mm | 7.87 | photo callout pp. 34–35 | annotated | high |
 | Stick width | 8 mm | 0.315 | photo callout pp. 34–35 | annotated | high |
 | Scale | 0–10, hand-stamped — 10 equal divisions of one half of the rocker arm | — | text p. 34 | stated | high |
-| Scale span (10 divisions) | 80 mm (OPEN — see note) | 3.15 | text: "10 equal divisions of one half of the rocker arm". The ch. 14 rocker half-length was rederived from the p.29 photo to 4.5" (≈114 mm), so this span likely follows to ≈114 mm; `build_measuring_stick.py` still models 80 mm/8 mm pending a direct re-measure of pp. 34–35 | derived | low |
+| Scale span (10 divisions) | 80 mm | 3.15 | one half of the rocker-arm working length (p.34; ch.14 → ~160 mm) | derived | med |
 | Body thickness | ~3 mm | ~0.12 | pp. 34–35 photo proportion | scaled | low |
 
 Notes: ruled brass gauge (Wm. Gaertner & Co.) with a sliding/locking stop. The
-0–10 scale spans "the 10 equal divisions of one half of the rocker arm". The
-ch. 14 rocker half-length was rederived from the p.29 broadside photo to 4.5"
-(≈114 mm), so by this text the scale span should follow to ≈114 mm (≈11.4 mm
-per division) — superseding the earlier ≈80 mm/160 mm read, which rested on the
-now-refuted 88 mm arm. A ≈114 mm scale also fits the 200 mm stick better than
-80 mm (which left 120 mm idle). OPEN ITEM: `build_measuring_stick.py` still
-models the 80 mm/8 mm span; revisit once pp. 34–35 are re-measured directly
-(the bar rides the full half — ch. 15 "can slide completely off"). Model the
-nominal spacing, not the hand-stamping error.
+0–10 scale spans "the 10 equal divisions of one half of the rocker arm" → half
+rocker-arm working length ≈ 80 mm → rocker-arm working length ≈ 160 mm. This is
+the top-down channel-geometry anchor; cross-check against the 16 mm callout in
+ch. 14 and photo scaling during M2. Model the nominal 8 mm spacing (not the
+hand-stamping error).
 
 ## Chapter 17 — Springs and Levers (pp. 38–41)
 
