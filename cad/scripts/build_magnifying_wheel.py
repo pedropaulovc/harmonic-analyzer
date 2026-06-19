@@ -35,6 +35,7 @@ from _common import (
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_isometric_view,
 )
 
 PART_NAME = "magnifying-wheel"
@@ -62,6 +63,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    set_isometric_view(adapter)
 
     # Rim ring (annulus, mid-plane symmetric).
     check("create_sketch rim", await adapter.create_sketch("Front"))

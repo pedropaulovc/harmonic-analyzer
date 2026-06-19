@@ -120,6 +120,7 @@ from _common import (
     place_component,
     run_build,
     save_assembly_and_images,
+    set_isometric_view,
     spin_driver,
 )
 
@@ -340,6 +341,7 @@ async def _place_on_shaft(
 
 async def build(adapter) -> dict[str, str]:
     check("create_assembly", await adapter.create_assembly())
+    set_isometric_view(adapter)
 
     # =================== structure (ground = fixed) ====================
     # Stationary arbor, the pedestals/posts, and the disengaged alignment

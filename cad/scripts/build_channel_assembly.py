@@ -92,6 +92,7 @@ from _common import (
     rows_from_euler,
     run_build,
     save_assembly_and_images,
+    set_isometric_view,
     spin_driver,
     world_point,
 )
@@ -658,6 +659,7 @@ async def build(adapter) -> dict[str, str]:
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
     check("create_assembly", await adapter.create_assembly())
+    set_isometric_view(adapter)
 
     # Shafts (ground; first insert auto-fixes). The shaft axes in the FINAL
     # mirrored frame (x -> -x) anchor the rocker/lever concentrics.

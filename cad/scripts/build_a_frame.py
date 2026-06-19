@@ -60,6 +60,7 @@ from _common import (
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_isometric_view,
     set_sketch_direct_db,
     volume_check,
 )
@@ -100,6 +101,7 @@ BOLT_HOLE_Z = (57.0, 147.0)  # machine z -54 / +36 (quarter points, low)
 
 async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
+    set_isometric_view(adapter)
 
     # Tapered plate (Front sketch trapezoid, offset extrude along +Z:
     # asymmetric about the clevis mid-plane, see docstring).

@@ -82,6 +82,7 @@ from _common import (
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_isometric_view,
 )
 
 PART_NAME = "cone-gear"
@@ -311,6 +312,7 @@ async def build(adapter) -> dict[str, str]:
     findings: list[str] = []
 
     check("create_part", await adapter.create_part())
+    set_isometric_view(adapter)
 
     # ------------------------------------------------------------------
     # Equation-manager globals. Probes first: live-verified on SW 2026, the

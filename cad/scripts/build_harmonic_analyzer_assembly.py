@@ -41,6 +41,7 @@ from _common import (
     remap_front_to_machine_front,
     run_build,
     save_assembly_and_images,
+    set_isometric_view,
 )
 
 ASM_NAME = "harmonic-analyzer"
@@ -80,6 +81,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_assembly", await adapter.create_assembly())
+    set_isometric_view(adapter)
 
     for name in SUBASSEMBLIES:
         data = check(

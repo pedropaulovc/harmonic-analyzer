@@ -68,6 +68,7 @@ from _common import (
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_isometric_view,
     set_sketch_direct_db,
 )
 from _gear import build_fixed_gear, volume_check
@@ -193,6 +194,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    set_isometric_view(adapter)
 
     # Toothed disc (blank + gap + 120x pattern, z = 0..FACE_WIDTH); the
     # volume must reproduce the cone gear's T120 configuration.

@@ -37,6 +37,7 @@ from _common import (
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_isometric_view,
     set_sketch_direct_db,
     volume_check,
 )
@@ -52,6 +53,7 @@ SHANK_LEN = 12.5  # bar 10 + 2.5 into the 3-thick strap (tip 0.5 recessed)
 
 async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
+    set_isometric_view(adapter)
 
     # Hex head 0..+2.5 (Front sketch: sketch (x, y) -> global (X, Y)).
     # Exact-arithmetic vertices (r/2, AF/2) keep the flats' offsets exactly

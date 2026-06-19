@@ -33,6 +33,7 @@ from _common import (
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_isometric_view,
     volume_check,
 )
 
@@ -47,6 +48,7 @@ SHANK_LEN = 66.0  # base 50.8 + 19.2 socket reach (socket 25 deep)
 
 async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
+    set_isometric_view(adapter)
 
     # Head -4..0 (Top sketch, offset extrude up to the under-head plane).
     check("create_sketch head", await adapter.create_sketch("Top"))

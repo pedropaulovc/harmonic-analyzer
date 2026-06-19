@@ -42,6 +42,7 @@ from _common import (
     extrude_at_offset,
     report_mass_properties,
     save_part_and_images,
+    set_isometric_view,
     set_sketch_direct_db,
 )
 
@@ -125,6 +126,7 @@ async def build_link(
     from solidworks_mcp.adapters.base import CreateAxisParameters, CreatePlaneParameters
 
     check("create_part", await adapter.create_part())
+    set_isometric_view(adapter)
 
     # Offset plane at the x=P pin station (Right Plane normal is +X, so
     # flip=False steps +P); created first so the axes name as Axis1/Axis2.

@@ -32,6 +32,7 @@ from _common import (
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_isometric_view,
     set_sketch_direct_db,
 )
 
@@ -64,6 +65,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
+    set_isometric_view(adapter)
 
     # Outer + inner rectangles in one sketch -> ring on extrude. Inference
     # OFF for the outer chain: the TRIM_NEAR corners sit 0.75 from the

@@ -48,6 +48,7 @@ from _common import (
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_isometric_view,
 )
 
 PART_NAME = "channel-spring"
@@ -98,6 +99,7 @@ async def build_spring(
     pitch = body_length / COIL_COUNT  # whole coils: both ends land at +X
 
     check("create_part", await adapter.create_part())
+    set_isometric_view(adapter)
 
     # Helix path from a base circle on the Top plane (consumed while open).
     check("create_sketch helix base", await adapter.create_sketch("Top"))

@@ -33,6 +33,7 @@ from _common import (
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_isometric_view,
 )
 
 PART_NAME = "measuring-stick"
@@ -119,6 +120,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_part", await adapter.create_part())
+    set_isometric_view(adapter)
 
     # Body: plain rectangular bar.
     check("create_sketch body", await adapter.create_sketch("Front"))
