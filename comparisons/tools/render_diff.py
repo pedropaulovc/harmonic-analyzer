@@ -35,11 +35,21 @@ import json
 import os
 import re
 import struct
+import sys
 import urllib.request
 import zlib
 from pathlib import Path
 
 import numpy as np
+
+# Headless software OpenGL (Mesa OSMesa) for VTK on this no-GPU box. MUST run
+# before pyvista/vtk import so VTK selects the OSMesa render window. No-op off
+# Windows (platform GL / xvfb serves offscreen there).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from osmesa_win import enable_offscreen_gl
+
+enable_offscreen_gl()
+
 import pyvista as pv
 import trimesh
 
