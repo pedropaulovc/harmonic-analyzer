@@ -178,15 +178,16 @@ def _repo_slug() -> str:
     return m.group(1) if m else "pedropaulovc/harmonic-analyzer"
 
 
-def render_diff(stage: Path, prev_tag: str) -> dict[str, Any] | None:
+def render_diff(stage: Path, prev_tag: str) -> dict[str, Any]:
     """Render the changed-parts diff (this staged bundle vs the previous release).
 
     Runs ``comparisons/tools/render_diff.py`` via ``uv run`` (isolated deps): the
     NEW side is this on-disk stage (the release isn't published yet), the OLD side
     is the previous release fetched from GitHub over HTTP ranges. Writes PNGs +
     ``diff_summary.json`` into ``stage/diff`` so they ride inside the bundle zip.
-    Non-fatal: a pre-bundle previous release (no scene graph) or any render error
-    just skips the diff -- the release is still cut.
+    FATAL: any render error (non-zero exit or missing summary) raises so the
+    release is blocked rather than shipping with an empty/absent diff. The diff is
+    only skipped *upstream* (caller passes no ``prev_tag``) for the first release.
     """
     diff_dir = stage / "diff"
     summary = diff_dir / "diff_summary.json"
@@ -210,8 +211,8 @@ def render_diff(stage: Path, prev_tag: str) -> dict[str, Any] | None:
         if len(tail) > 50:
             del tail[0]
     if proc.wait() != 0 or not summary.exists():
-        log(f"!!  diff render skipped: {' / '.join(tail)[-400:]}")
-        return None
+        raise RuntimeError(
+            f"diff render FAILED (release blocked): {' / '.join(tail)[-400:]}")
     data = json.loads(summary.read_text(encoding="utf-8"))
     data["prev"] = prev_tag
     data["image_paths"] = [diff_dir / n for n in data.get("images", [])]
