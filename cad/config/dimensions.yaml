@@ -1517,8 +1517,7 @@ sections:
       of the disc plane). The mixed-pitch jam note (m2 vs DP 30) still bars any
       literal removable-on-pinion mesh; it never happens in the resolved
       topology. The measuring stick (ch. 16, hand tool) lies flat on the base at
-      (−158, 53.8, −133), graduations up (M6.5 — the M6.4 spot (−175, .., −135)
-      ran it through the SW corner bracket's plate + foot).
+      (−158, 53.8, −133), graduations up (M6.5).
 - heading: Chapter 24 — Pen Mechanism (pp. 60–61)
   elements:
   - prose: |2
@@ -1719,9 +1718,6 @@ sections:
       - - oscilating-arms
         - 'ch.14 re-read: the "12.5 mm width" was a misread (callout is 2.5 mm plate thickness)'
         - SUPERSEDED — re-authored as rocker-arm with corrected dims (`build_rocker_arm.py`)
-      - - corner-bracket
-        - 'none — no source either; geometry interrogated live from the SLDPRT (face inventory): base 1.125" × 0.75", height 2.3", plate 0.3" thick, sides tangent-tapered to R0.5" crown (centre 1.8" up), Ø0.4" lug hole, #9 (Ø0.196") foot hole'
-        - RE-AUTHORED — `build_corner_bracket.py` reproduces it to 13,035 mm³ (exact volume match)
       - - tube-frame
         - 'ch.6: frame column height 107 cm — legacy file measured 1016 mm (40"), CONTRADICTS the book'
         - 'RE-AUTHORED — `build_tube_frame.py` at 1070 mm (book wins). OD REDERIVED Ø25.4 (1") from the ch30 8-views (M6.11): 4 quarter views isolate single columns, apparent width = OD × scale (scale fit from the ±197/±112 stations + azimuth, R² 0.94–0.99, cross-checked by the 460 mm base ~1500 px) → 7 reads = Ø23.8 ± 1.0, rounded to 1" stock; SUPERSEDES legacy Ø1.375" (~45% oversize). Wall kept legacy 0.12" → Ø19.3 bore. M4 fluting retired (M6.8: plain reflective columns)'
