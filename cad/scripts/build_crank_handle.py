@@ -1,14 +1,23 @@
 r"""Reproduction script: crank handle (book ch. 11, pp. 12-15).
 
 The pear-shaped wooden handle (stained black) that rotates on the crank-arm
-pivot. The brass collar at the crank end is modelled as an integral
+pivot -- the book calls it "a smooth piece of wood ... well-suited for a firm
+grip" (p.12). The brass collar at the crank end is modelled as an integral
 cylindrical section of the revolve profile (it gets its own appearance at
 M3 material assignment); the slotted pivot screw is a separate part
-(grouped with the plain shafts/pins). The pear silhouette is approximated
-by straight profile segments — smooth circumferentially after the revolve,
-faceted axially; good enough until Phase 3 tooling allows spline profiles.
+(grouped with the plain shafts/pins).
 
-Dimensions: cad/DIMENSIONS.md "Chapter 11" — handle ~90 long x Ø22 max,
+The silhouette is now genuinely SMOOTH (the earlier revision approximated it
+with straight, axially-faceted segments). Two internally-tangent circular
+arcs span the wood body: a long, gentle front arc swells from the neck to the
+maximum diameter, and a tighter rear arc rounds off into the blunt domed butt
+(truncated by a small flat where the end-cap/screw seats -- see the p.15
+photo). The arcs share a horizontal tangent at the swell, so the wood reads as
+one continuous curve; the only edges are the deliberate ones in the photo (the
+brass-collar shoulder and the butt cap rim). Circumferentially smooth after
+the revolve, as before.
+
+Dimensions: cad/DIMENSIONS.md "Chapter 11" -- handle ~90 long x Ø22 max,
 photo-scaled (low).
 
 Layout: handle axis along +X from the origin (collar face at x=0), profile
@@ -25,7 +34,7 @@ import sys
 
 from _common import (
     add_line_chain,
-    anchor_point_to_point,
+    anchor_point_to_origin,
     apply_material,
     name_bore_axis,
     apply_color,
@@ -46,20 +55,29 @@ HANDLE_MAX_DIA = 22.0  # DIMENSIONS.md ch11: handle diameter (low)
 COLLAR_LENGTH = 6.0  # DIMENSIONS.md ch11: brass collar, p.12 photo (low)
 COLLAR_DIA = 11.0  # DIMENSIONS.md ch11: brass collar, p.12 photo (low)
 
-# Pear silhouette as (x, radius) breakpoints: collar cylinder, wood neck,
-# swell to the maximum near the free end, rounded-off butt.
-PROFILE = [
-    (0.0, 0.0),
-    (0.0, COLLAR_DIA / 2.0),
-    (COLLAR_LENGTH, COLLAR_DIA / 2.0),
-    (COLLAR_LENGTH, 4.8),
-    (20.0, 6.0),
-    (45.0, 9.0),
-    (62.0, HANDLE_MAX_DIA / 2.0),
-    (80.0, 9.5),
-    (HANDLE_LENGTH, 5.5),
-    (HANDLE_LENGTH, 0.0),
-]
+COLLAR_R = COLLAR_DIA / 2.0
+PEAK_R = HANDLE_MAX_DIA / 2.0
+NECK_R = 4.8  # waist just below the collar (p.12 photo); < collar -> shoulder
+PEAK_X = 62.0  # axial station of the maximum diameter (p.15 photo, ~0.69 L)
+CAP_R = 3.5  # flat butt cap (metal disc + slot screw seat), p.15 photo
+
+# Smooth pear silhouette = two circular arcs that meet at the swell (PEAK_X,
+# PEAK_R) with a common horizontal tangent (both centres sit directly below
+# the swell on x = PEAK_X), so the join is curvature-side-consistent and the
+# wood is tangent-continuous from neck to butt.
+#   front arc: through the neck (COLLAR_LENGTH, NECK_R) and the swell.
+#   rear arc : through the swell and the butt cap rim (HANDLE_LENGTH, CAP_R).
+# For a chord that rises dh over run dx to a horizontal-tangent apex, the
+# radius is R = (dx^2 + dh^2) / (2 dh) and the centre is PEAK_R - R below.
+_dx_f, _dh_f = PEAK_X - COLLAR_LENGTH, PEAK_R - NECK_R
+FRONT_R = (_dx_f**2 + _dh_f**2) / (2.0 * _dh_f)
+FRONT_CY = PEAK_R - FRONT_R
+_dx_r, _dh_r = HANDLE_LENGTH - PEAK_X, PEAK_R - CAP_R
+REAR_R = (_dx_r**2 + _dh_r**2) / (2.0 * _dh_r)
+REAR_CY = PEAK_R - REAR_R
+# Both circles pass through the swell apex (their common top point) and share
+# x = PEAK_X centres -> they are internally tangent there (|ΔCY| == ΔR):
+assert abs(abs(FRONT_CY - REAR_CY) - abs(FRONT_R - REAR_R)) < 1e-6
 
 
 async def build(adapter) -> dict[str, str]:
@@ -68,22 +86,56 @@ async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
 
     check("create_sketch profile", await adapter.create_sketch("Front"))
-    # Direct-to-DB: inferencing would snap the shallow pear-silhouette
-    # segments to auto horizontal relations (see crank pin lesson).
+    # Direct-to-DB: inferencing would snap the shallow front arc / collar
+    # shoulder to auto relations (see crank pin lesson).
     set_sketch_direct_db(adapter, True)
     centerline = check(
         "add_centerline axis",
         await adapter.add_centerline(0.0, 0.0, HANDLE_LENGTH, 0.0),
     )
-    lines = await add_line_chain(adapter, PROFILE)
+    # Brass collar as three lines: face -> outer cylinder -> shoulder step.
+    collar = await add_line_chain(
+        adapter,
+        [
+            (0.0, 0.0),
+            (0.0, COLLAR_R),
+            (COLLAR_LENGTH, COLLAR_R),
+            (COLLAR_LENGTH, NECK_R),
+        ],
+        close=False,
+    )
+    collar_face, collar_top, collar_step = collar
+    # add_arc draws CCW from start to end; order each so the CCW sweep is the
+    # minor (silhouette) arc over the top of its big circle.
+    front_arc = check(
+        "front swell arc",
+        await adapter.add_arc(
+            PEAK_X, FRONT_CY, PEAK_X, PEAK_R, COLLAR_LENGTH, NECK_R
+        ),
+    )
+    rear_arc = check(
+        "rear butt arc",
+        await adapter.add_arc(
+            PEAK_X, REAR_CY, HANDLE_LENGTH, CAP_R, PEAK_X, PEAK_R
+        ),
+    )
+    cap_face = check(
+        "butt cap face",
+        await adapter.add_line(HANDLE_LENGTH, CAP_R, HANDLE_LENGTH, 0.0),
+    )
+    check(
+        "axis closure",
+        await adapter.add_line(HANDLE_LENGTH, 0.0, 0.0, 0.0),
+    )
     set_sketch_direct_db(adapter, False)
-    collar_face, collar_top, collar_step = lines[0], lines[1], lines[2]
-    butt_face = lines[8]
-    # 20-DOF profile: collar face on the origin; centerline (merged into
-    # both axis ends) horizontal + length dim; h/v + linear dims on the
-    # collar and butt edges; the four interior silhouette breakpoints
-    # pinned by per-segment run/rise dims -- the (80, 9.5)->(90, 5.5)
-    # segment is skipped, its ends defined by the neighbours (closure).
+
+    # 16-DOF profile. The centerline merged into the (0, 0) / (HANDLE_LENGTH,
+    # 0) chain ends, so horizontal + a length dim on it pin the axis (as in
+    # crank-pin). The collar face/top/step get h/v + linear dims; each arc
+    # centre is anchored (radius then derives from a pinned point -- the neck
+    # for the front arc, the tangency for the rear), and a single tangent
+    # relation locks the swell join and sizes the rear arc. Dimensioning a
+    # radius on top of that would over-define, so neither arc carries one.
     check(
         "anchor collar face",
         await adapter.add_sketch_constraint(
@@ -99,30 +151,30 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_dimension(centerline, None, "linear", HANDLE_LENGTH),
     )
     for label, ent, relation, value in (
-        ("collar face", collar_face, "vertical", COLLAR_DIA / 2.0),
+        ("collar face", collar_face, "vertical", COLLAR_R),
         ("collar top", collar_top, "horizontal", COLLAR_LENGTH),
-        ("collar step", collar_step, "vertical", COLLAR_DIA / 2.0 - PROFILE[3][1]),
-        ("butt face", butt_face, "vertical", PROFILE[8][1]),
+        ("collar step", collar_step, "vertical", COLLAR_R - NECK_R),
+        ("cap face", cap_face, "vertical", None),
     ):
         check(
             f"{label} {relation}",
             await adapter.add_sketch_constraint(ent, None, relation),
         )
-        check(
-            f"{label} dim",
-            await adapter.add_sketch_dimension(ent, None, "linear", value),
-        )
-    for i in (3, 4, 5, 6):
-        x1, y1 = PROFILE[i]
-        x2, y2 = PROFILE[i + 1]
-        await anchor_point_to_point(
-            adapter,
-            f"{lines[i]}.start",
-            f"{lines[i]}.end",
-            x2 - x1,
-            y2 - y1,
-            f"silhouette segment {i}",
-        )
+        if value is not None:
+            check(
+                f"{label} dim",
+                await adapter.add_sketch_dimension(ent, None, "linear", value),
+            )
+    await anchor_point_to_origin(
+        adapter, f"{front_arc}.center", PEAK_X, FRONT_CY, "front arc centre"
+    )
+    await anchor_point_to_origin(
+        adapter, f"{rear_arc}.center", PEAK_X, REAR_CY, "rear arc centre"
+    )
+    check(
+        "swell tangent",
+        await adapter.add_sketch_constraint(front_arc, rear_arc, "tangent"),
+    )
     await ensure_fully_defined(adapter, "handle profile")
     check("exit_sketch profile", await adapter.exit_sketch())
 
