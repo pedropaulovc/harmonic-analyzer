@@ -21,10 +21,14 @@ What it does, in order:
      so the comparison gallery renders from the bundle with no SolidWorks.
      Everything is staged and zipped into ONE bundle
      ``cad/out/release/harmonic-analyzer-<version>.zip`` (``solidworks/`` native +
-     ``step/`` + ``stl/`` + ``boxes/`` + ``png/``). Records the SW revision.
-  4. git: annotated tag at HEAD, pushed to origin.
-  5. gh: create the GitHub release for the tag (auto-generated notes header +
-     our provenance block) and upload the bundle as the release asset.
+     ``step/`` + ``stl/`` + ``boxes/`` + ``png/`` + ``diff/``). Records the SW
+     revision.
+  4. diff: render the changed-parts highlight (this staged bundle vs the previous
+     release, fetched from GitHub) into ``stage/diff`` so it ships in the zip.
+  5. git: annotated tag at HEAD, pushed to origin.
+  6. gh: create the GitHub release for the tag (auto-generated notes header + our
+     provenance block + an inline changed-parts gallery) and upload the bundle
+     plus the diff PNGs as release assets.
 
 Run (SolidWorks already open, NOTHING else driving it -- single STA COM server,
 a concurrent build_all/verify deadlocks):
@@ -52,6 +56,9 @@ from _common import CAD_ROOT, OUT_SLDASM, OUT_SLDPRT, log
 REPO_ROOT = CAD_ROOT.parent
 TOP_ASSEMBLY = "harmonic-analyzer"
 RELEASE_DIR = CAD_ROOT / "out" / "release"
+# Geometry-diff renderer (offscreen pyvista, isolated PEP-723 deps via `uv run`):
+# highlights parts whose geometry changed vs the previous release. No SolidWorks.
+RENDER_DIFF = REPO_ROOT / "comparisons" / "tools" / "render_diff.py"
 # export_models.py render cache: the millimetre scene graph (component transforms
 # + per-config mesh keys + colours) that lets a consumer render the bundle with
 # comparisons/tools/render_offline.py without SolidWorks.
@@ -151,6 +158,54 @@ def resolve_version(explicit: str | None, bump: str) -> str:
     if bump == "minor":
         return f"v{major}.{minor + 1}.0"
     return f"v{major}.{minor}.{patch + 1}"
+
+
+def previous_tag(version: str) -> str | None:
+    """Highest existing ``vX.Y.Z`` tag strictly below ``version`` (or None)."""
+    m = _VERSION_RE.match(version)
+    cur = (int(m[1]), int(m[2]), int(m[3]))
+    prior = [t for t in _existing_tags() if t < cur]
+    if not prior:
+        return None
+    a, b, c = prior[-1]
+    return f"v{a}.{b}.{c}"
+
+
+def _repo_slug() -> str:
+    """``owner/repo`` from the origin remote, for building asset URLs."""
+    url = _git("config", "--get", "remote.origin.url", check_rc=False)
+    m = re.search(r"github\.com[:/](.+?)(?:\.git)?$", url or "")
+    return m.group(1) if m else "pedropaulovc/harmonic-analyzer"
+
+
+def render_diff(stage: Path, prev_tag: str) -> dict[str, Any] | None:
+    """Render the changed-parts diff (this staged bundle vs the previous release).
+
+    Runs ``comparisons/tools/render_diff.py`` via ``uv run`` (isolated deps): the
+    NEW side is this on-disk stage (the release isn't published yet), the OLD side
+    is the previous release fetched from GitHub over HTTP ranges. Writes PNGs +
+    ``diff_summary.json`` into ``stage/diff`` so they ride inside the bundle zip.
+    Non-fatal: a pre-bundle previous release (no scene graph) or any render error
+    just skips the diff -- the release is still cut.
+    """
+    diff_dir = stage / "diff"
+    summary = diff_dir / "diff_summary.json"
+    log(f"rendering changed-parts diff vs {prev_tag} ...")
+    proc = subprocess.run(
+        ["uv", "run", str(RENDER_DIFF),
+         "--old-release", prev_tag, "--new-local", str(stage),
+         "--out", str(diff_dir), "--summary-json", str(summary)],
+        cwd=str(REPO_ROOT), capture_output=True, text=True,
+    )
+    if proc.returncode != 0 or not summary.exists():
+        log(f"!!  diff render skipped: {(proc.stderr or proc.stdout).strip()[-400:]}")
+        return None
+    data = json.loads(summary.read_text(encoding="utf-8"))
+    data["prev"] = prev_tag
+    data["image_paths"] = [diff_dir / n for n in data.get("images", [])]
+    log(f"diff render: {len(data.get('changed_parts', []))} changed parts, "
+        f"{len(data['image_paths'])} views")
+    return data
 
 
 def preflight(version: str, allow_dirty: bool) -> None:
@@ -311,6 +366,15 @@ def _restore_export_prefs(sw: Any, old: dict[str, dict[int, Any]]) -> None:
         sw.SetUserPreferenceToggle(k, v)
 
 
+def _active_config(doc: Any) -> str:
+    """Name of the document's active configuration ('' if unreadable)."""
+    try:
+        ac = doc.ConfigurationManager.ActiveConfiguration
+        return str(ac.Name or "") if ac is not None else ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def _export_pngs(doc: Any, png_dir: Path, stem: str) -> int:
     """Render the active document to a PNG per PNG_VIEWS angle; return the count.
 
@@ -403,7 +467,11 @@ def export_neutral(sw: Any, stage: Path) -> dict[str, Any]:
                     raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={rc})")
             # one extra STL per referenced configuration (cone gears / transgears)
             for cfg, mesh in cfg_meshes.get(src.stem, ()):
-                if not doc.ShowConfiguration2(cfg):
+                # ShowConfiguration2 returns False when cfg is ALREADY active (the
+                # part opened in it -- e.g. transgear-removable saved with T18
+                # active) -- only a real failure if it's still not active after.
+                if _active_config(doc) != cfg and not doc.ShowConfiguration2(cfg) \
+                        and _active_config(doc) != cfg:
                     raise RuntimeError(f"{src.name}: ShowConfiguration2({cfg!r}) failed")
                 out = stl_dir / f"{mesh}.STL"
                 rc = doc.SaveAs3(str(out), 0, SW_SAVE_OPTS)
@@ -431,7 +499,8 @@ def export_neutral(sw: Any, stage: Path) -> dict[str, Any]:
 # --------------------------------------------------------------------------- #
 # Bundle assembly (single zip)
 # --------------------------------------------------------------------------- #
-def bundle(sw: Any, revision: str, version: str) -> tuple[Path, dict[str, Any]]:
+def bundle(sw: Any, revision: str, version: str,
+           prev_tag: str | None = None) -> tuple[Path, dict[str, Any]]:
     """Assemble the single release zip: Pack-and-Go + neutral STEP/STL/PNG.
 
     One ``harmonic-analyzer-<version>.zip`` with everything a consumer needs:
@@ -466,7 +535,12 @@ def bundle(sw: Any, revision: str, version: str) -> tuple[Path, dict[str, Any]]:
     shutil.copy2(SCENE_JSON, boxes_dst / SCENE_JSON.name)
     facts["scene_json"] = SCENE_JSON.name
 
-    # 4. One zip of the whole stage.
+    # 4. Changed-parts diff render vs the previous release (into stage/diff, so
+    #    it ships inside the bundle). Optional: skipped for the first release or
+    #    a previous release that predates the neutral bundle.
+    facts["diff"] = render_diff(stage, prev_tag) if prev_tag else None
+
+    # 5. One zip of the whole stage.
     zip_path = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}.zip"
     if zip_path.exists():
         zip_path.unlink()
@@ -483,6 +557,39 @@ def bundle(sw: Any, revision: str, version: str) -> tuple[Path, dict[str, Any]]:
 # --------------------------------------------------------------------------- #
 # Release notes + publish
 # --------------------------------------------------------------------------- #
+def _diff_section(version: str, diff: dict[str, Any] | None) -> str:
+    """Markdown 'changed parts' block with inline diff renders, or ''.
+
+    Images are embedded by their release-asset download URL -- deterministic from
+    tag + filename, so the notes can reference assets uploaded in the same
+    ``gh release create`` call. GitHub renders ``![](.../releases/download/...)``
+    image assets inline, so no extra attachment-upload extension is needed.
+    """
+    if not diff:
+        return ""
+    changed = diff.get("changed_parts", [])
+    if not changed:
+        return (f"\n## Changed parts vs {diff['prev']}\n\n"
+                f"No part geometry changed since `{diff['prev']}`.\n")
+    base = (f"https://github.com/{_repo_slug()}/releases/download/{version}")
+    parts = ", ".join(f"`{p}`" for p in changed)
+    imgs = "".join(
+        f'<img src="{base}/{name}" width="420" alt="diff {name}">\n'
+        for name in diff.get("images", [])[:2])
+    extra = diff.get("images", [])[2:]
+    more = ("".join(f'<img src="{base}/{n}" width="420">\n' for n in extra))
+    return (
+        f"\n## Changed parts vs {diff['prev']}\n\n"
+        f"**{len(changed)} part(s)** changed geometry "
+        f"(red = changed, confirmed by Hausdorff distance; tessellation/byte "
+        f"noise excluded): {parts}\n\n"
+        f"{imgs}"
+        + (f"<details><summary>more views</summary>\n\n{more}</details>\n"
+           if extra else "")
+        + "\n_Generated by `comparisons/tools/render_diff.py`; renders also ship "
+        "in the bundle under `diff/`._\n")
+
+
 def release_notes(version: str, facts: dict[str, Any]) -> str:
     sha = _git("rev-parse", "--short", "HEAD")
     return (
@@ -503,8 +610,11 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         f"this bundle with `comparisons/tools/render_offline.py` (no SolidWorks)\n"
         f"- `png/` -- {facts['views']}-angle preview renders "
         f"({facts['pngs']} images)\n"
-        f"- Size: {facts['size_mb']:.1f} MB\n\n"
-        f"**Provenance**\n"
+        + (f"- `diff/` -- changed-parts diff renders vs "
+           f"{facts['diff']['prev']} (see below)\n" if facts.get("diff") else "")
+        + f"- Size: {facts['size_mb']:.1f} MB\n"
+        + _diff_section(version, facts.get("diff"))
+        + "\n**Provenance**\n"
         f"- Commit: `{sha}`\n"
         f"- Built with SOLIDWORKS 3DEXPERIENCE R2026x, revision "
         f"`{facts['sw_revision']}`\n"
@@ -517,8 +627,14 @@ def publish(version: str, zip_path: Path, facts: dict[str, Any], draft: bool) ->
     _git("tag", "-a", version, "-m", f"Release {version}")
     _git("push", "origin", version)
 
+    # Upload the bundle plus the diff PNGs as standalone assets so the notes can
+    # embed them by their (deterministic) release-asset download URLs.
+    assets = [str(zip_path)]
+    if facts.get("diff"):
+        assets += [str(p) for p in facts["diff"]["image_paths"]]
+
     args = [
-        "release", "create", version, str(zip_path),
+        "release", "create", version, *assets,
         "--title", f"harmonic-analyzer {version}",
         "--notes", release_notes(version, facts),
     ]
@@ -547,10 +663,13 @@ def main() -> int:
 
     RELEASE_DIR.mkdir(parents=True, exist_ok=True)
 
+    prev = previous_tag(version)
+    log(f"previous release for diff: {prev or '(none -- first bundle)'}")
+
     started = time.perf_counter()
     try:
         sw, revision = attach_solidworks()
-        zip_path, facts = bundle(sw, revision, version)
+        zip_path, facts = bundle(sw, revision, version, prev)
     except Exception:
         traceback.print_exc()
         return 1

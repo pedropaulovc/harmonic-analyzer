@@ -24,9 +24,9 @@ Seven features (the six .cs features + the hex knife edge):
    y 0). Machine-y registration (M6.4 plate-top-at-998) is set at placement.
 2. Pivot cylinder      -- Front-plane solid circle at the origin, symmetric
    extrude along the long edge (the pivot/rock axis = local Z).
-3. Hex knife edges     -- two hexagonal collars at the pivot ENDS (one per
-   side of the shaft), vertex-up, each presenting the knife edge the lever is
-   suspended on (two end bearings = a stable suspension).
+3. Hex knife edges     -- two hexagonal trunnion stubs PROTRUDING beyond the
+   body ends (one per side), vertex-up; the pivot overhangs the body so each
+   knife edge rests on a bearing support on the top plate (ch30-p003).
 4. Edge ribs (x2)      -- Front-plane line/line/semicircle wrapping the cylinder
    at the plate ends, blind-extruded at a start offset.
 5. Summation plate     -- Top-plane leaf on the -X (counter-spring) arm: vertical
@@ -112,20 +112,27 @@ HOLE_COUNT = 20
 CHANNEL_Z0 = -67.1  # frame channel j=0 (DIMENSIONS.md ch6)
 CHANNEL_PITCH = 7.0565
 HOLE_Z_OFFSET = 0.8 - 2.75  # -1.95: hole under the spring's bottom lead
-PLATE_TOP_Y = 998.0  # machine-y the plate top registers to at PLACEMENT (med);
-# the part itself is centred on the pivot (mid-plane), so this is consumed by
-# build_output_assembly's component Y, not by any extrude here.
+# The plate is a true coplanar casting -- mid-plane ON the pivot (.cs shape):
+# placed at the knife line y=990 it spans 987.46..992.54, so the top registers at
+# machine 992.54 (NOT the old M6.4 998). The channel springs + magnifying bracket
+# were dropped to meet it (build_channel_*: PLATE_TOP_Y/PLATE_EYE_Y;
+# build_magnifying_bracket: FLANGE_Y). Consumed at PLACEMENT (the part is
+# pivot-centred), not by any extrude here.
+PLATE_TOP_Y = 992.54
 
 # --- hex knife-edge protrusions (NEW; LOW confidence -- tune vs ch30) -------
-# TWO collars, one at EACH END of the pivot trunnion (the "sides", not the
-# centre): each is the bearing whose top vertex line is the knife edge the
-# lever is suspended/rocks on -- two end bearings give a stable suspension.
-HEX_R = 16.0  # vertex radius of the knife-edge hex collar (> CYL_R so it
-# protrudes); vertex-up so the top vertex line is the knife edge (low)
-HEX_WIDTH = 18.0  # z-length of each end collar (low)
-HEX_Z_OUTER = PLATE_L / 2.0  # outboard face = the cylinder end (76.20)
-HEX_Z_INNER = HEX_Z_OUTER - HEX_WIDTH  # inboard face |z| (58.20): each collar
-# spans |z| 58.2..76.2 at its end of the shaft (low)
+# TWO trunnion stubs, one PROTRUDING BEYOND each body end (not flush inside):
+# the lever's pivot overhangs the body so the knife edges rest on bearing
+# supports standing on the top plate (ch30-p003). Each stub's top vertex line
+# is the knife edge the lever is suspended/rocks on.
+# Knife-edge trunnion cross-section: vertex-up hex, 8.653 wide (X) x 10.268 tall
+# (Y, vertex to vertex) x 21.717 deep (Z protrusion). The top vertex ridge is
+# the knife edge (= the rock axis, above the cylinder centreline).
+HEX_W = 8.653  # across-flats width (X)
+HEX_H = 10.268  # vertex-to-vertex height (Y) -- vertex-up
+HEX_DEPTH = 21.717  # axial length each stub protrudes past the body end
+HEX_Z_INNER = PLATE_L / 2.0  # inboard face flush with the body end (76.20)
+HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92)
 
 # --- derived ---------------------------------------------------------------
 SUM_BASE = PLATE_L / 2.0  # summation plate base length             76.20
@@ -133,6 +140,15 @@ TIP_X = SX * SUM_H  # summation tip / anchor x (counter-spring arm) -76.20
 ARC_R = CYL_R + RIB_PAD  # rib arc radius wrapping the cylinder     15.24
 RIB_OFFSET = PLATE_L / 2.0 - RIB_T  # edge-rib start offset along Z 71.12
 ANCHOR_BORE_R = 1.5  # summation-anchor centre hole (counter-spring hook seat)
+# The middle rib spans the lever to the +X plate edge (PLATE_W), but its z-span
+# (+-RIB_T/2 = +-2.54) crosses the channel-hole column at HOLE_X. The rib extrude
+# (feature 7) runs AFTER the holes (feature 1), so it re-fills the one hole whose
+# z lands inside that span -- j=10 at z+1.515 -- leaving its spring no clear bore
+# (the 4.21 mm^3 channel-spring-installed-6 clash). Stop the +X vertex inboard of
+# the hole column by the spring coil radius (~3.25) + margin so every hole stays
+# open; the rib still stiffens the inner lever, the outer plate arm is the (thin)
+# spring-hole field.
+MID_RIB_PLATE_REACH = HOLE_X - 4.1  # 33.0 local +X: clears hole column + coil
 
 # Spring-hole Z stations (world Z); the Top-plane sketch maps world Z to -sketchY.
 HOLE_Z = [CHANNEL_Z0 + CHANNEL_PITCH * j + HOLE_Z_OFFSET for j in range(HOLE_COUNT)]
@@ -237,17 +253,25 @@ async def _pivot_cylinder(adapter) -> None:
 
 
 async def _hex_collar(adapter, flip: bool, name: str) -> None:
-    """One hexagonal knife-edge collar at a pivot END (the "sides", not the
-    centre), vertex-up, blind-extruded along Z over |z| HEX_Z_INNER..HEX_Z_OUTER
-    -- i.e. the outboard span of the shaft (flip = the -Z end).
+    """One hexagonal knife-edge trunnion stub PROTRUDING beyond a body end,
+    vertex-up, blind-extruded along Z over |z| HEX_Z_INNER..HEX_Z_OUTER -- i.e.
+    from the body end face out into open air (flip = the -Z end). The overhang
+    lets the knife edge rest on a bearing support standing on the top plate.
 
-    Front-plane regular hexagon centred on the pivot axis, a vertex at the top
-    (the knife edge runs along Z at that top vertex line)."""
+    Front-plane vertex-up hexagon (HEX_W x HEX_H bounding box) centred on the
+    pivot axis, a vertex at the top (the knife edge runs along Z at that top
+    vertex line)."""
     check(f"create_sketch {name}", await adapter.create_sketch("Front"))
-    # Vertex-up hexagon: vertices at 90, 150, 210, 270, 330, 30 degrees.
+    # Vertex-up hexagon fit to the measured box: top/bottom vertices on the
+    # y-axis, shoulders at +-W/2 and +-H/4 (CCW from the top vertex).
+    w2, h2, h4 = HEX_W / 2.0, HEX_H / 2.0, HEX_H / 4.0
     verts = [
-        (HEX_R * math.cos(math.radians(a)), HEX_R * math.sin(math.radians(a)))
-        for a in (90.0, 150.0, 210.0, 270.0, 330.0, 30.0)
+        (0.0, h2),  # top vertex (the knife edge ridge)
+        (-w2, h4),  # upper-left shoulder
+        (-w2, -h4),  # lower-left shoulder
+        (0.0, -h2),  # bottom vertex
+        (w2, -h4),  # lower-right shoulder
+        (w2, h4),  # upper-right shoulder
     ]
     set_sketch_direct_db(adapter, True)
     lines = await add_line_chain(adapter, verts)
@@ -379,7 +403,7 @@ async def _middle_rib(adapter) -> None:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_sketch middle rib", await adapter.create_sketch("Front"))
-    left = (SX * -PLATE_W, 0.0)  # +X plate-edge vertex
+    left = (SX * -MID_RIB_PLATE_REACH, 0.0)  # +X arm vertex, short of hole column
     right = (TIP_X, 0.0)  # -X summation-tip vertex
     r = ARC_R
     # Tangent points from each end vertex to the radius-r circle at the origin.
@@ -448,11 +472,17 @@ async def build(adapter) -> dict[str, str]:
     await _summation_anchor(adapter)
     await _middle_rib(adapter)
 
-    # pivot axis = local Z through the origin = the knife/rock axis (the
-    # suspension line). anchor axis = local Z through the summation-anchor bore
-    # = the counter-spring/boss-hook reference (replaces the M6.4 "spin ref").
+    # pivot axis (Axis1) = cylinder centreline along Z -- the static mate
+    # reference to the knife-mount (keeps the lever at the knife line with no
+    # drop until the ridge bearing supports exist).
+    # anchor axis (Axis2) = Z line at the summation anchor -- counter-spring rock
+    # reference (the anchor BORE itself is vertical, along Y).
+    # knife axis (Axis3) = the hex top-vertex ridge (local y +HEX_H/2) = the true
+    # rock/suspension line the lever hangs from; the pivot revolute moves here
+    # once the top-plate bearing supports are modeled.
     await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "pivot axis")
     await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", TIP_X, "anchor axis")
+    await name_bore_axis(adapter, "Top Plane", HEX_H / 2.0, "Right Plane", 0.0, "knife axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
