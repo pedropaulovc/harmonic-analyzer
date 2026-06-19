@@ -1,7 +1,20 @@
 r"""Reproduction script: tube frame column (legacy part; book ch. 5-6).
 
-Hollow steel column carrying the upper frame rails: Ø1.375 in tube with a
-0.12 in wall (legacy SLDPRT, interrogated live - no source survives).
+Hollow steel column carrying the upper frame rails: Ø1.0 in (25.4 mm) tube
+with a 0.12 in wall.
+
+Diameter: REDERIVED from the ch30 8-view set (supersedes the legacy
+Ø1.375 in, which had no book numeric and overstated the OD by ~45%). The
+four quarter views (p003/p005/p007/p009) resolve the frame into four
+isolated single columns; under the manifest's orthographic cameras a
+vertical cylinder's apparent width = diameter x scale, with the per-view
+scale fit from the known column corner stations (±197, ±112) and azimuth
+(R^2 0.94-0.99) and cross-checked against the base plate (460 mm -> ~1500
+px in the front view, matching the column-spacing scale and confirming
+the ±197 stations). Seven isolated-column reads gave Ø23.8 ± 1.0 mm;
+rounded to the standard 1 in tube stock the machine (1896 Gaertner & Co.)
+would have used. The wall is the uncontradicted legacy 0.12 in (no
+view-based interior numeric). See cad/DIMENSIONS.md tube-frame row.
 
 Surface: SMOOTH polished tube (M6.8 ch30 8-view pass, user-confirmed).
 The M4 fluting (16 grooves, photogrammetry estimate) is retired: every
@@ -14,8 +27,9 @@ the columns capped by the ring's corner bosses, with NO stub above
 (user-confirmed; supersedes the ch. 6 "107 cm" reading, which matches
 the overall frame height, not the bare column).
 
-Dimensions: cad/DIMENSIONS.md "Legacy part audit" - legacy diameters
-(med), length photo-locked to the top-frame stack (med).
+Dimensions: cad/DIMENSIONS.md "Legacy part audit" - OD rederived from the
+ch30 8-views (med), wall legacy (med), length photo-locked to the
+top-frame stack (med).
 
 Layout: tube axis along +Y (column standing upright), annulus sketched on
 the Top plane at the origin, extruded upward.
@@ -49,8 +63,8 @@ from _common import (
 PART_NAME = "tube-frame"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
-OUTER_DIA = 1.375 * IN  # legacy: Ø34.925 (no book numerics)
-WALL_THICKNESS = 0.12 * IN  # legacy: 3.048 wall -> Ø28.829 bore
+OUTER_DIA = 1.0 * IN  # Ø25.4: rederived from the ch30 8-views (Ø23.8±1.0 -> 1in stock)
+WALL_THICKNESS = 0.12 * IN  # legacy: 3.048 wall -> Ø19.304 bore
 COLUMN_LENGTH = 989.9  # top flush with the top-frame top face (see docstring)
 
 INNER_DIA = OUTER_DIA - 2.0 * WALL_THICKNESS
