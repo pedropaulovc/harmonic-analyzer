@@ -562,6 +562,8 @@ def _spring_spec(amplitude: float, hole_x_0: float) -> dict[str, float]:
 
 
 async def build(adapter) -> dict[str, str]:
+    from solidworks_mcp.adapters.base import ComponentLinearPatternParameters
+
     # The amplitude-bar station per channel IS the Fourier coefficient a_j
     # (channels.yaml amplitude_mm, the square-wave preset). solve_state(a_j)
     # repositions that channel's bar + lever; a_j = 0 is the neutral pose. The
@@ -682,15 +684,15 @@ async def build(adapter) -> dict[str, str]:
     arm_origin_dx = ARM_PIVOT_LOCAL_Y * math.sin(t)  # -(0,8)*Rz offset
     arm_origin_dy = ARM_PIVOT_LOCAL_Y * math.cos(t)
 
-    # The springs and the two bushing banks are grounded repeated structure, but
-    # they are placed EXPLICITLY per channel (springs in the loop, bushings in
-    # each inter-channel gap) rather than seeded once and replicated by a
-    # LocalLinearPattern. The pattern's direction sense is read from the shaft's
-    # cylindrical face and SolidWorks resolves it unreliably at full scale -- it
-    # flipped the bushing bank to +Z at 20 channels (clean at 3), and the API
-    # exposes no sense override, so the seed+pattern is not deterministic. The
-    # moving parts stay individual mated instances so each channel articulates
-    # independently (a different harmonic frequency) for the Motion study.
+    # Grounded repeated structure (spring x20, two bushing banks x19) is placed
+    # ONCE as a seed in channel 0 and replicated by a LocalLinearPattern along
+    # the Z shaft axis after the loop. The moving parts stay individual mated
+    # instances: a pattern instance is a rigid slave with no DOF, and the
+    # channels must articulate independently (each runs at a different harmonic
+    # frequency) for the Motion study. pivot_od (a shaft-OD point) selects the
+    # Z-parallel cylindrical face = the pattern direction axis.
+    pivot_bush_seed = lever_bush_seed = ""
+
     for j in range(CHANNELS):
         zj = z_station(j)
         z_mid = zj + ARM_MID_DZ
@@ -815,34 +817,53 @@ async def build(adapter) -> dict[str, str]:
                    f"body={spec['body']:.2f} tilt={spec['theta']:+.2f}"),
         )
 
-        # Bushings (ground; cosmetic) ride the shafts in the inter-channel gaps:
-        # one pivot + one lever bushing in the gap BELOW every channel j>=1,
-        # placed explicitly (deterministic) instead of seed + LocalLinearPattern
-        # -- see the note above the channel loop.
-        if CHANNELS > 1 and j >= 1:
-            z_gap = z_mid - PITCH / 2.0  # gap between channels j-1 and j
-            await place_component(
+        # Bushing SEEDS (ground; cosmetic) -- inserted only at the TOP channel,
+        # then replicated DOWN the spine by a pattern after the loop. These ride
+        # the shafts and are amplitude-independent, so a single-seed pattern is
+        # correct (unlike the springs). pivot_od selects the -Z shaft-OD sense,
+        # so the seed sits at the high-Z end and copies fill toward channel 0.
+        if j == CHANNELS - 1 and CHANNELS > 1:
+            z_gap_top = z_mid - PITCH / 2.0  # gap below the top channel
+            pivot_bush_seed = await place_component(
                 adapter, "pivot-bushing",
-                [PIVOT[0], PIVOT[1], z_gap],
+                [PIVOT[0], PIVOT[1], z_gap_top],
                 [0.0, 0.0, 0.0], IDENTITY,
-                label=f"pivot-bushing gap {j - 1:02d}/{j:02d}",
+                label=f"pivot-bushing seed {j - 1:02d}/{j:02d}",
             )
-            await place_component(
+            lever_bush_seed = await place_component(
                 adapter, "lever-bushing",
-                [FULCRUM[0], FULCRUM[1], z_gap],
+                [FULCRUM[0], FULCRUM[1], z_gap_top],
                 [0.0, 0.0, 0.0], IDENTITY,
-                label=f"lever-bushing gap {j - 1:02d}/{j:02d}",
+                label=f"lever-bushing seed {j - 1:02d}/{j:02d}",
             )
 
-    # Confirm both bushing banks landed on the inter-channel gap planes. The
-    # explicit placements above are deterministic; this guards a future off-by-one
-    # in the gap arithmetic (the prefix read also flags a stray instance).
+    # Replicate the grounded bushing seeds along the Z shaft axis (pivot_od
+    # selects the shaft's Z-parallel cylindrical face). The two bushing banks
+    # fill the CHANNELS-1 inter-channel gaps. Moving parts AND the springs are
+    # deliberately NOT patterned (the springs follow their per-channel levers,
+    # the moving parts each keep their own DOF).
     if CHANNELS > 1:
+        for seed, n, lbl in (
+            (pivot_bush_seed, CHANNELS - 1, "pivot-bushing"),
+            (lever_bush_seed, CHANNELS - 1, "lever-bushing"),
+        ):
+            check(
+                f"linear-pattern {lbl} x{n}",
+                await adapter.pattern_components_linear(
+                    ComponentLinearPatternParameters(
+                        components=[seed],
+                        count=n,
+                        spacing=PITCH,
+                        direction_point=pivot_od,
+                    )
+                ),
+            )
+        # Positively confirm the copies landed on the inter-channel gap planes.
         z_gap_planes = [
             z_station(k) + ARM_MID_DZ + PITCH / 2.0 for k in range(CHANNELS - 1)
         ]
-        _verify_pattern_z(adapter, "pivot-bushing", z_gap_planes, "pivot-bushing bank")
-        _verify_pattern_z(adapter, "lever-bushing", z_gap_planes, "lever-bushing bank")
+        _verify_pattern_z(adapter, "pivot-bushing", z_gap_planes, "pivot-bushing pattern")
+        _verify_pattern_z(adapter, "lever-bushing", z_gap_planes, "lever-bushing pattern")
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)
