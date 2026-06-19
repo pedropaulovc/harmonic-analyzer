@@ -132,7 +132,7 @@ _CRANK_GEAR_TOKENS = ("crank-pinion", "crank-drive-gear")
 # flattened parts. Bands measured live (verify.py --suite isolation) with margin.
 _COMPONENT_BAND = {
     "frame": (11, 16),          # measured 13
-    "drive-train": (55, 70),    # measured 61
+    "drive-train": (49, 58),    # measured 52 (was 61; alignment-pinion swing group removed)
     "channel": (138, 150),      # measured 144 (20 channels x moving + patterned structure)
     "output": (117, 129),       # measured 123
     "harmonic-analyzer": (3, 6),  # 4 subassemblies: frame, drive-train, channel, output
