@@ -7,9 +7,11 @@ of the build venv (run via `uv run --with ...`).
 
 ## Source
 
-`cad/assets/nameplate-source.jpg` — the p.71 nameplate macro from the public book
-*Albert Michelson's Harmonic Analyzer* (engineerguy.com). The engraving is
-polished brass on a blackened field, so it segments by local-adaptive threshold.
+The p.71 nameplate macro from the public book *Albert Michelson's Harmonic
+Analyzer* (engineerguy.com). The image itself is **not committed** — to
+regenerate, extract page 71 of the book PDF, crop the nameplate, and save it as
+`cad/assets/nameplate-source.jpg` (git-ignored). The engraving is polished brass
+on a blackened field, so it segments by local-adaptive threshold.
 
 ## Pipeline
 
