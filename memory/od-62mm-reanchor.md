@@ -1,6 +1,6 @@
 ---
 name: od-62mm-reanchor
-description: gear train re-anchored OD 103.3->62.2mm (low conf); alignment pinion removed; SW rebuild DONE+green & landed on main (PR#12 Fix#8 reverted to land it, must re-apply)
+description: gear train re-anchored OD 103.3->62.2mm (low conf); alignment pinion removed; SW rebuild DONE+green & landed on main (PR#12 Fix#8 reverted to land it, then RE-LANDED clean in PR#13 e0bb8d7)
 metadata: 
   node_type: memory
   type: project
@@ -65,10 +65,11 @@ at 20 channels) merged to origin/main** and conflicted with the re-anchor in
 build_channel_assembly.py / _common.py / build_measuring_stick.py. User chose
 **"Revert main"**: reverted PR#12 (revert commit, kept in history), then replayed
 the 18 re-anchor commits on top → tree byte-for-byte == validated green build, no
-rebuild needed. **Fix #8 is therefore UNDONE on main and must be re-applied on top
-of the re-anchored channel script** (revert the revert + re-resolve, or redo the
-explicit-bushing-placement change against the 3.06 channel). The seed+pattern
-bushing determinism bug it fixed is back until then.
+rebuild needed. Fix #8 was briefly UNDONE by that revert, then **RE-LANDED clean on
+main in PR #13 (fix-8-inference-interference-2, commit e0bb8d7, 2026-06-19; merged
+into HEAD 0ca20cd "#8 reland")** — re-resolved against the 3.06 re-anchored channel
+script, so the seed+pattern bushing determinism bug is fixed again. See
+[[headless-render-no-gl]] (the #8 root-cause/render note).
 
 If 62.2 is ever revised, the whole cascade re-propagates from machine.yaml
 (config-driven, build scripts auto-rescale).
