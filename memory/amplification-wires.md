@@ -34,6 +34,14 @@ snapshots are SUPPRESSED and replaced by:
 - WIRE 2 = rack_pinion mate, `Axis1@magnifying-wheel` (pitch dia = rim Ø100)
   ↔ `Axis1@pen-rod` slide axis (pen travel = 50·θ_wheel).
 
+AS-BUILT (`build_motion_study_springs.add_wires_gravity`, stage `full`): WIRE1 =
+the gear option (lumped 5×, summing-lever(Z) ↔ magnifying-wheel(Z)); WIRE2 is NOT
+a rack-pinion mate — Basic Motion does NOT enforce rack-pinion in-sub (proven), so
+it's a SCOTCH-YOKE: a RefPoint on the Ø100 rim (radius 50) held COINCIDENT to the
+pen-rod's Top plane → `pen_Y ≈ 50·sin(θ_wheel)`, linear in the small operating
+angles. Both wires use Motion-enforced primitives (gears + coincident
+point-on-plane).
+
 The named part axes added in Phase D (magnifying-lever, magnifying-wheel,
 pen-rod slide axis) are exactly the refs these couplings select — Phase D is
 the groundwork. `rack_pinion_mate` helper already in _common.py. See
