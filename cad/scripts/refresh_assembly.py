@@ -36,7 +36,15 @@ def main() -> int:
     asm_name = sys.argv[1].removesuffix(".SLDASM").replace("_", "-")
 
     async def build(adapter):
-        return await refresh_assembly(adapter, asm_name)
+        artefacts = await refresh_assembly(adapter, asm_name)
+        if asm_name == "harmonic-analyzer":
+            # The top assembly's eight-views gallery + parts-only BOM are not part
+            # of the generic refresh tail; regenerate them on the still-open doc so
+            # a subassembly change does not leave them stale (codex review #6).
+            from build_harmonic_analyzer_assembly import export_gallery_and_bom
+
+            artefacts.update(await export_gallery_and_bom(adapter))
+        return artefacts
 
     return run_build(build)
 

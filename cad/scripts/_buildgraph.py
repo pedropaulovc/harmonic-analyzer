@@ -29,7 +29,6 @@ ASSEMBLY_ORDER = ("frame", "drive_train", "channel", "output", "harmonic_analyze
 # mobility probes), they don't build the machine. Excluded from the part queue.
 NON_PART_SCRIPTS = frozenset(
     {
-        "build_all.py",
         "build_motion_study.py",
         "build_motion_study_springs.py",
         "build_motion_setup_drives.py",
