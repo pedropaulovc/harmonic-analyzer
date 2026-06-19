@@ -597,6 +597,24 @@ async def build(adapter) -> dict[str, str]:
     # spin_driver auto-picks the well-conditioned Right-plane (x) distance.
     crank_o = _org(adapter, crankshaft)
     handle_o = _org(adapter, handle)
+    # PERTURB before driving: at reduced channel counts the gear solve can converge
+    # with the crank EXACTLY on its design pose, where this driver's distance target
+    # equals the handle's current position -- a degenerate zero-motion distance mate
+    # that AddMate5 rejects as "over-defines the assembly" (the same failure/fix as
+    # the cam-lobe perturb in build_motion_study). The What's Wrong + mobility probes
+    # proved the reduced train is a healthy 1-DOF mechanism, NOT over-constrained: an
+    # off-design distance target adds cleanly (0 What's Wrong) and the crank rotates
+    # to meet it (handle moved the full 15 mm). At 20 channels the solve lands just
+    # off the pose, so the driver adds without perturbation. Spin the crank ~15 deg
+    # about its own axis (local +Y -> transform cols 3..5, origin cols 9..11 in
+    # metres) so the target is non-degenerate; spin_driver's far-side verify + the
+    # closing ForceRebuild3 snap the crank back onto the design pose.
+    from solidworks_mcp.adapters.base import RotateComponentParameters  # noqa: PLC0415
+
+    cx = component_transform(adapter, crankshaft)
+    await adapter.rotate_component(RotateComponentParameters(
+        name=crankshaft, angle=15.0, axis_vector=[cx[3], cx[4], cx[5]],
+        axis_point=[cx[9] * 1000.0, cx[10] * 1000.0, cx[11] * 1000.0], mode="exact"))
     await spin_driver(
         adapter,
         named_ref(f"Axis1@{handle}", "AXIS"),
