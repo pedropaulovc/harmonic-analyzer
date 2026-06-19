@@ -33,6 +33,11 @@ sections:
       (scaled with a good reference, or uncontradicted legacy), **low** (rough estimate,
       must be re-measured against photos during the M2 build of that part).
 
+      **A derived row is NEVER high.** A value computed from other rows inherits one
+      step below its strongest cited input: derived from high → **med**, derived from
+      med → **low** (derived from low stays low). The cited inputs and formula are
+      recorded per row so the cascade is auditable.
+
       Photo evidence: besides the book, 89 first-party photos of the machine exist in
       `photogrammetry/raw/` — indexed per component in `photogrammetry/raw/README.md`. Use them for
       detail inspection (fasteners, cross-sections, routing) and secondary scaling
@@ -251,7 +256,7 @@ sections:
         - '0.276'
         - 'photo callout p.18; M6.7: the exact-tracking seat pitch 6.584 (see Axial gear pitch row) cannot carry 7 mm faces (0.42 overlap) — the annotated 7/7.5/150 trio is mutually inconsistent with the frame-locked drum grid, which wins'
         - annotated (callout), derived (modeled)
-        - high/med
+        - high/low
       - - Cone set axial length
         - 150 mm
         - '5.91'
@@ -356,7 +361,7 @@ sections:
         - —
         - derived from gear law k/80 (ch.29) + 4:1 + cone teeth 6k — see ch.6/26/29 section
         - derived
-        - high
+        - med
       - - Alignment notch depth
         - 3 mm
         - '0.118'
@@ -374,7 +379,7 @@ sections:
         - '0.278'
         - 'frame-locked drum grid = the cone-set 7.5 annotation''s Z-projection (Appendix C #3); M6 cross-check: rocker-arm end-view pitch measures ≈ 7.5 within photo error (ch. 14 note)'
         - derived
-        - high
+        - med
       - - Gear face width
         - 3.0 mm
         - '0.118'
@@ -386,7 +391,7 @@ sections:
         - '4.067'
         - (120+2)/DP30; PD = 4.000" exactly (module closed — ch. 12 row)
         - derived
-        - high
+        - med
       - - Cam diameter (integral cam per gear)
         - 50.8 mm (2.0")
         - '2.0'
@@ -557,7 +562,7 @@ sections:
         - '5.0'
         - 'M6.3: rocker pivot axis y = 253.8 (apex ball mounts, front + back eight-views) minus drive height y = 126.8 = exactly 5" with the arm level; supersedes the earlier ~105 scaling (which used the wrong "rocker tip" attachment reading)'
         - derived
-        - high
+        - med
       - - Cam ring bore
         - 51.0 mm
         - '2.008'
@@ -1615,13 +1620,13 @@ sections:
         - '1.400'
         - 42 / DP 30 — round-inch PD corroborates both the count and DP 30
         - derived
-        - high
+        - med
       - - Outer diameter
         - 37.25 mm (1.467")
         - '1.467'
         - (42+2)/30
         - derived
-        - high
+        - med
       - - Drum length
         - ~150 mm
         - ~5.9
