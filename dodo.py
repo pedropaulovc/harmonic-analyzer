@@ -40,6 +40,7 @@ build_or_refresh takes the FULL branch when the target is absent)::
 
 from __future__ import annotations
 
+import hashlib
 import shutil
 import subprocess
 import sys
@@ -145,6 +146,46 @@ def task_part():
         }
 
 
+# --- Recipe-change detection (FULL vs REFRESH), robust to failed tasks.
+#
+# doit injects a ``changed`` arg into the action listing this task's stale
+# file_deps, but it is UNRELIABLE after an intervening task FAILS: it then
+# falsely flags pristine recipe files (and omits the real change), forcing a
+# spurious FULL (measured -- "D2"). Instead we track the recipe (assembly script
+# / _common.py / hooks) with an ``uptodate`` callable modelled on doit's own
+# ``config_changed``: it compares an md5 of the recipe CONTENT against the value
+# saved on the last *successful* run (value_savers only fire on success), so a
+# failed task never corrupts it. It stashes the changed-bit into _RECIPE_CHANGED
+# for build_or_refresh to read in the same (serial) process.
+_RECIPE_CHANGED: dict[str, bool] = {}
+
+
+class _RecipeTracker:
+    """uptodate: True (up-to-date) when the recipe is unchanged since last success."""
+
+    def __init__(self, stem: str, recipe_files: list[str]):
+        self.stem = stem
+        self.recipe_files = sorted(recipe_files)
+        self.digest: str | None = None
+
+    def _calc(self) -> str:
+        h = hashlib.md5()
+        for f in self.recipe_files:
+            h.update(f.encode())
+            try:
+                h.update(Path(f).read_bytes())
+            except OSError:
+                h.update(b"<missing>")
+        return h.hexdigest()
+
+    def __call__(self, task, values):
+        self.digest = self._calc()
+        task.value_savers.append(lambda: {"_recipe_digest": self.digest})
+        last = values.get("_recipe_digest")
+        _RECIPE_CHANGED[self.stem] = (last is None or last != self.digest)
+        return (last is not None and last == self.digest)
+
+
 def build_or_refresh(stem, dependencies, changed, targets):
     """FULL rebuild vs cheap REFRESH for one assembly stem.
 
@@ -153,17 +194,18 @@ def build_or_refresh(stem, dependencies, changed, targets):
     script) -- the engagement configs only exist after a fresh create_assembly, so
     the hooks must re-run. Otherwise only referenced parts changed: REFRESH
     (refresh_assembly.py, no hooks -- reopening preserves the existing configs).
+
+    The recipe-changed bit comes from _RecipeTracker (uptodate), NOT doit's
+    ``changed`` arg -- the latter is corrupted by a prior failed task (D2).
     """
     asm_script = SCRIPTS_DIR / f"build_{stem}_assembly.py"
     hooks = [SCRIPTS_DIR / h for h in POST_ASSEMBLY.get(stem, ())]
-    recipe = {str(asm_script.resolve()), str(COMMON.resolve())}
-    recipe |= {str(h.resolve()) for h in hooks}
 
     target_missing = not Path(targets[0]).exists()
-    changed_recipe = {str(Path(c).resolve()) for c in (changed or [])} & recipe
+    recipe_changed = _RECIPE_CHANGED.get(stem, True)  # default FULL = fail-safe
 
-    if target_missing or changed_recipe:
-        why = "target missing" if target_missing else f"recipe changed {sorted(changed_recipe)}"
+    if target_missing or recipe_changed:
+        why = "target missing" if target_missing else "recipe changed"
         _run([sys.executable, str(asm_script)], f"FULL build {stem} ({why})")
         for hook in hooks:
             _run([sys.executable, str(hook)], f"hook {hook.name}")
@@ -197,11 +239,12 @@ def task_assembly():
         ref_targets = [
             _sldasm(r) if r in ASSEMBLY_ORDER else _sldprt(r) for r in refs
         ]
+        recipe_files = [str(asm_script.resolve()), str(COMMON.resolve()), *hooks]
         yield {
             "name": stem,
-            "file_dep": [str(asm_script.resolve()), str(COMMON.resolve()),
-                         *hooks, *ref_targets],
+            "file_dep": [*recipe_files, *ref_targets],
             "targets": [_sldasm(stem)],
+            "uptodate": [_RecipeTracker(stem, recipe_files)],
             "actions": [(build_or_refresh, [stem])],
             "clean": [(_clean_assembly, [stem])],
             "verbosity": 2,
