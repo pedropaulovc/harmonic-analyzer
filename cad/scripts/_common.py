@@ -312,21 +312,9 @@ async def define_circle(
     adapter: Any, x: float, y: float, radius: float, label: str
 ) -> str:
     """Add a circle, anchor its centre to the origin semantically, then add
-    a DRIVING diameter dimension. No ``fix`` involved.
-
-    The raw ``add_circle`` runs with sketch inference SUPPRESSED (restored
-    afterwards): with it on, a second concentric/near circle snaps to the first
-    and the call fails (proven live on the coefficients-plate hole column).
-    Same rationale as :func:`add_line_chain` -- the centre/diameter are pinned
-    explicitly below, so inference during the draw only ever hurts."""
-    sketch_mgr = adapter.currentSketchManager
-    prev_add_to_db = bool(sketch_mgr.AddToDB)
-    sketch_mgr.AddToDB = True
-    try:
-        circle = await adapter.add_circle(x, y, radius)
-        check(f"add_circle {label}", circle)
-    finally:
-        sketch_mgr.AddToDB = prev_add_to_db
+    a DRIVING diameter dimension. No ``fix`` involved."""
+    circle = await adapter.add_circle(x, y, radius)
+    check(f"add_circle {label}", circle)
     await anchor_point_to_origin(adapter, f"{circle.data}.center", x, y, label)
     check(
         f"dimension {label} diameter",
@@ -338,31 +326,12 @@ async def define_circle(
 async def add_line_chain(
     adapter: Any, points: list[tuple[float, float]], close: bool = True
 ) -> list[str]:
-    """Draw consecutive lines through ``points`` and return their entity IDs.
-
-    The raw segments are placed with sketch inference SUPPRESSED
-    (``SketchManager.AddToDB``); the horizontal/vertical/dimension relations
-    are added afterwards by :func:`define_rectilinear_chain` /
-    :func:`define_polygon_chain` (or the caller's explicit constraints). Drawing
-    through the inference engine is nondeterministic and purely harmful here: it
-    snaps a not-quite-axis-parallel segment to an auto relation, or collapses a
-    vertex onto a neighbour/axis -- the documented cause of vanished hex
-    vertices (a 2/3-volume head) and intermittent "failed to create line" when a
-    segment runs near existing geometry. Exact-coordinate endpoints still merge
-    in the sketch DB, so the loop closes regardless. The prior ``AddToDB`` state
-    is restored, so the manual :func:`set_sketch_direct_db` wraps some callers
-    still use nest harmlessly (they are no longer required)."""
+    """Draw consecutive lines through ``points`` and return their entity IDs."""
     vertices = list(points) + ([points[0]] if close else [])
-    sketch_mgr = adapter.currentSketchManager
-    prev_add_to_db = bool(sketch_mgr.AddToDB)
-    sketch_mgr.AddToDB = True
     ids: list[str] = []
-    try:
-        for (x1, y1), (x2, y2) in zip(vertices, vertices[1:], strict=False):
-            result = await adapter.add_line(x1, y1, x2, y2)
-            ids.append(check(f"add_line ({x1:g},{y1:g})->({x2:g},{y2:g})", result))
-    finally:
-        sketch_mgr.AddToDB = prev_add_to_db
+    for (x1, y1), (x2, y2) in zip(vertices, vertices[1:], strict=False):
+        result = await adapter.add_line(x1, y1, x2, y2)
+        ids.append(check(f"add_line ({x1:g},{y1:g})->({x2:g},{y2:g})", result))
     return ids
 
 

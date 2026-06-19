@@ -129,14 +129,6 @@ async def build(adapter) -> dict[str, str]:
         check(f"body constraint {relation}", await adapter.add_sketch_constraint(ent, None, relation))
     check("body length dim", await adapter.add_sketch_dimension(bottom, None, "linear", BODY_LENGTH))
     check("body width dim", await adapter.add_sketch_dimension(right, None, "linear", BODY_WIDTH))
-    # Pin the (0, 0) corner to the origin. The h/v relations + the two dims fix
-    # the bar's shape but not its position; that corner was previously located
-    # only by SolidWorks snapping it onto the origin during the (inference-on)
-    # line draw -- a crutch removed now that add_line_chain suppresses inference.
-    check(
-        "body corner -> origin",
-        await adapter.add_sketch_constraint(f"{bottom}.start", "origin", "coincident"),
-    )
     await ensure_fully_defined(adapter, "body sketch")
     check("exit_sketch body", await adapter.exit_sketch())
     check(
