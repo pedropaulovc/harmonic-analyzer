@@ -135,7 +135,6 @@ from _common import (
     place_component,
     run_build,
     save_assembly_and_images,
-    spin_driver,
     world_point,
     _read_member,
 )
@@ -153,9 +152,14 @@ BOT_RAIL_Y = 334.0  # above the rack band (top 323.6); clamp bottom 326
 COLUMN_X = 197.0
 COLUMN_Z = -112.0
 
+# --- knife bearing supports (build_knife_mount) -----------------------------
+from build_summing_lever import HEX_H, HEX_Z_INNER, HEX_Z_OUTER  # noqa: E402
+
+KNIFE_CONTACT_Y = KNIFE[1] + HEX_H / 2.0  # knife-edge contact ridge line (995.13)
+HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
+
 # --- counter-spring chain (build_boss_hook / build_counter_spring) ----------
 from build_boss_hook import ELBOW_R, ROD_DIA as HOOK_ROD_DIA, SHANK_RISE  # noqa: E402
-from build_summing_lever import HOOK_HOLE_X as SL_SPIN_REF_X  # noqa: E402
 from build_counter_spring import (  # noqa: E402
     BOTTOM_LEAD as CS_BOTTOM_LEAD,
     COIL_OD as CS_COIL_OD,
@@ -167,7 +171,10 @@ SPRING_POS = (95.0, 1052.1, 0.0)  # coil-bottom origin; ring at y 1012.1
 # (1052.0 left the hook rod poking 0.05 past the ring inner top)
 
 # --- magnifying group --------------------------------------------------------
-LEVER_ROD_Y = 985.0
+# Rod at the plate centreline (990) so it is coplanar with the coefficients plate
+# (raised from 985); the bracket flange butts the plate front face. The clamp +
+# vertical rod ride up with it (CLAMP_POS and VROD_TOP_Y derive from LEVER_ROD_Y).
+LEVER_ROD_Y = 990.0
 LEVER_ROD_Z = -85.0
 CLAMP_X = -150.0  # sliding clamp default position (p.46/48 insets)
 from build_magnifying_clamp import (  # noqa: E402
@@ -182,7 +189,7 @@ CLAMP_POS = (
     LEVER_ROD_Z,
 )
 VROD_Z = LEVER_ROD_Z - CLAMP_ROD_DX  # -91.5 (local +x -> machine -z)
-VROD_TOP_Y = 990.0  # dome inside the clamp's rod bore
+VROD_TOP_Y = LEVER_ROD_Y + 5.0  # dome inside the clamp's rod bore (rides the rod)
 FIXTURE_Y0 = 926.0  # collar y 926..934 on the vertical rod
 
 # --- wheel -------------------------------------------------------------------
@@ -289,14 +296,6 @@ HEX_BOLT_Z = (-54.0, 36.0)
 # front (-144.1), O2.9 shank through the 1.2 strip and 2.8 into the
 # platen's 3.5-deep sockets.
 CLIP_SCREW_XY = ((-245.0, 320.0), (-245.0, 429.0), (27.0, 320.0), (27.0, 429.0))
-# Magnifying-bracket flange screws: Rx(-90) points the shank +Y through the
-# flange band (988.9..992.9), tip flush with the plate bottom (engagement
-# into the summing lever's plate not modeled); the O5.5 heads hang in free
-# air below, 1.9 clear of channel spring j=0 and 0.25 off the arm's z -70
-# face.
-FLANGE_SCREW_X = (-33.0, -41.0)  # machine +33/+41: inset 4 from the flange ends
-FLANGE_SCREW_POS_Y = 988.9  # flange bottom
-FLANGE_SCREW_Z = -67.0  # the under-plate strip (bracket SCREW_HOLE_Z 18.0)
 # Column-clamp pinch screws on each clamp's back face (z -88), backed out:
 # the shank tip (-94.2) stays 0.2 inside the back-wall hole (inner end
 # -94.4) and 0.3 off the column surface (-94.5).
@@ -570,10 +569,18 @@ async def build(adapter) -> dict[str, str]:
     check("create_assembly", await adapter.create_assembly())
 
     # --- summing group ------------------------------------------------------
-    # knife-mount FIRST so the auto-fixed assembly seed is structure, not the
-    # mated summing lever.
-    km = await place_component(adapter, "knife-mount", [KNIFE[0], KNIFE[1], 0.0],
-                               [0.0, 0.0, 0.0], IDENTITY)
+    # Two knife bearing supports, one per hex trunnion (overhanging the lever
+    # body at |z| ~ 87). The front support is FIRST so the auto-fixed assembly
+    # seed is structure, not the mated summing lever. Each support's circular
+    # bore is much larger than the hex, so only the trunnion's top vertex line
+    # (the knife edge) nears the upper inner wall. The named "knife axis" is that
+    # contact ridge line; the lever's Axis3 (hex ridge) mates coincident to it.
+    km = await place_component(adapter, "knife-mount",
+                               [KNIFE[0], KNIFE_CONTACT_Y, HEX_Z_MID],
+                               [0.0, 0.0, 0.0], IDENTITY, label="knife-mount (front)")
+    await place_component(adapter, "knife-mount",
+                          [KNIFE[0], KNIFE_CONTACT_Y, -HEX_Z_MID],
+                          [0.0, 0.0, 0.0], IDENTITY, label="knife-mount (back)")
     # Crossbar band y 1010..1051: 0.5 above the summing-lever tube top
     # (1009.5), ends face-flush on the ring rail inner faces (y to 1040.7),
     # stud pokes 14 above for the nut seat.
@@ -589,8 +596,13 @@ async def build(adapter) -> dict[str, str]:
     sl = await place_component(adapter, "summing-lever", [KNIFE[0], KNIFE[1], 0.0],
                                [0.0, 0.0, 0.0], IDENTITY, ground=False)
     sl_o = _org(adapter, sl)
-    # summing-lever: Axis1 = knife axis, Axis2 = spin ref (creation order).
-    await coincident_mate(adapter, named_ref(f"Axis1@{sl}", "AXIS"),
+    # summing-lever axes (creation order): Axis1 = pivot (cylinder centre),
+    # Axis2 = anchor, Axis3 = knife ridge (hex top vertex). The lever rocks on
+    # the true knife edge: Axis3 mates coincident to the support's contact ridge
+    # ("knife axis" = Axis1@knife-mount). Same pose as the cylinder-centre mate
+    # (ridge is 5.13 above the centre, both collinear along Z), but the freed
+    # rock DOF is now about the knife edge, per the bearing-support design.
+    await coincident_mate(adapter, named_ref(f"Axis3@{sl}", "AXIS"),
                           named_ref(f"Axis1@{km}", "AXIS"),
                           label="summing-lever knife pivot", verify=(sl, sl_o))
     # Axial Z-slide pinned by a Front-plane distance (value 0: the lever sits on
@@ -606,10 +618,14 @@ async def build(adapter) -> dict[str, str]:
                        named_ref("Right Plane", "PLANE"), 0.0,
                        label="summing-lever rock snapshot", verify=(sl, sl_o))
     # Boss hook: rigidly rides the lever (locked), carrying the counter spring.
+    # Keyed to the lever's anchor axis (Axis2, the summation-anchor eye the
+    # counter spring hangs from at machine ~(-91, 990)) rather than the pivot
+    # axis -- the lock just freezes the current pose, so the handle is chosen for
+    # physical meaning (the eye), not the rock centre.
     bh = await place_component(adapter, "boss-hook", list(BOSS_HOOK_POS),
                                [0.0, 0.0, 0.0], IDENTITY, ground=False)
     await lock_mate(adapter, named_ref(f"Axis1@{bh}", "AXIS"),
-                    named_ref(f"Axis1@{sl}", "AXIS"), label="boss-hook keyed")
+                    named_ref(f"Axis2@{sl}", "AXIS"), label="boss-hook keyed")
     # Ry(+90): the end loops land in the YZ plane, encircling the hook arm
     # (bottom) and the gooseneck pin (top) nail-through-ring style.
     await place_component(adapter, "counter-spring", list(SPRING_POS),
@@ -884,11 +900,10 @@ async def build(adapter) -> dict[str, str]:
         await _place(adapter, "fillister-screw", [x, y, PLATE_FRONT_Z - 1.2],
                      [0.0, 0.0, 0.0], IDENTITY,
                      label=f"fillister-screw (clip x{x:+.0f} y{y:.0f})")
-    for x in FLANGE_SCREW_X:
-        await _place(adapter, "fillister-screw",
-                     [x, FLANGE_SCREW_POS_Y, FLANGE_SCREW_Z],
-                     [-90.0, 0.0, 0.0], ROT_X_NEG90,
-                     label=f"fillister-screw (flange x{x:+.0f})")
+    # (Magnifying-bracket flange screws removed: with the rod raised to the plate
+    # centreline the flange tucks directly in front of the collar, leaving no room
+    # for a fillister head -- the heads bored into the collar/each other. The flange
+    # butts the plate front face on its own; the bolts were a cosmetic detail.)
     for x, y in PINCH_SCREW_XY:
         await _place(adapter, "pinch-screw", [x, y, PINCH_SCREW_Z],
                      [0.0, 0.0, 0.0], IDENTITY,

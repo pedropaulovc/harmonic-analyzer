@@ -30,6 +30,11 @@ Confidence: **high** (annotated/stated, or legacy confirmed by book), **med**
 (scaled with a good reference, or uncontradicted legacy), **low** (rough estimate,
 must be re-measured against photos during the M2 build of that part).
 
+**A derived row is NEVER high.** A value computed from other rows inherits one
+step below its strongest cited input: derived from high → **med**, derived from
+med → **low** (derived from low stays low). The cited inputs and formula are
+recorded per row so the cascade is auditable.
+
 Photo evidence: besides the book, 89 first-party photos of the machine exist in
 `photogrammetry/raw/` — indexed per component in `photogrammetry/raw/README.md`. Use them for
 detail inspection (fasteners, cross-sections, routing) and secondary scaling
@@ -113,13 +118,13 @@ arm with fiducial indentations for alignment; tapered pin affixes crank to shaft
 
 | dim | value | (in) | source | method | confidence |
 |---|---|---|---|---|---|
-| Gear face width | 7 mm annotated; modeled 6.5 | 0.276 | photo callout p.18; M6.7: the exact-tracking seat pitch 6.584 (see Axial gear pitch row) cannot carry 7 mm faces (0.42 overlap) — the annotated 7/7.5/150 trio is mutually inconsistent with the frame-locked drum grid, which wins | annotated (callout), derived (modeled) | high/med |
+| Gear face width | 7 mm | 0.276 | photo callout p.18 — the annotated 7/7.5/150 trio is mutually inconsistent with the frame-locked drum grid; the build trims the as-built face to clear the seat pitch (a model detail, see build_cone_gear.py) | annotated | high |
 | Cone set axial length | 150 mm | 5.91 | photo callout p.18; M6.7 reconciliation: gear stack 19 × 6.584 + 6.5 ≈ 131.6 + 64T face 10 + air ≈ 145 — the arrow plausibly spans gears + 64T | annotated | high |
 | Gear count | 20 | — | text p.16 | stated | high |
 | Tooth counts | 6, 12, 18 … 120 (step 6) | — | text p.16 | stated | high |
 | Crank→cone reduction | 4:1 (1 crank turn = 1/4 cone turn) | — | text p.16 | stated | high |
-| Axial gear pitch | 7.5 mm annotated lineage; modeled 6.584 along the shaft | 0.295 | 150 mm / 20 gears gave 7.5, whose Z-projection 7.0568 became the frame-locked drum grid (gates, channels — Appendix C #3); M6.7 exact tracking then fixes the along-shaft seat pitch at 7.0568 × cos 21.1° = 6.5839 (the drum grid is the survivor, the 7.5 annotation only its lineage) | derived | med |
-| Diametral pitch / module | DP 30 (m = 0.8467 mm) | — | M4 prep, two independent measurements converge (see Appendix C #1 — resolved): p.18 photo tooth pitch 2.69 mm via 7 mm-callout scale; largest-gear OD ≈ 105 ± 5 mm via 150 mm-arrow scale (DP 30 → 103.3). Gives round-inch PDs: largest cone / cylinder gear PD = 120/30 = 4.000", pinion PD = 1.400" | scaled ×2 + period argument | high |
+| Axial gear pitch | 7.5 mm | 0.295 | 150 mm / 20 gears = 7.5 along the cone axis; its Z-projection 7.0568 is the frame-locked drum grid (gates, channels — Appendix C #3). The build trims the along-shaft seat pitch to clear the 21.1° incline — a model detail. | derived | med |
+| Diametral pitch / module | DP 30 (m = 0.8467 mm) | — | M4 prep, two independent measurements converge (see Appendix C #1 — resolved): p.18 photo tooth pitch 2.69 mm via 7 mm-callout scale; largest-gear OD ≈ 105 ± 5 mm via 150 mm-arrow scale (DP 30 → 103.3). Gives round-inch PDs: largest cone / cylinder gear PD = 120/30 = 4.000", pinion PD = 1.400" | derived (2 scalings converge + round-inch period argument) | med |
 | Pressure angle | 14.5° assumed | — | period-typical; not stated anywhere | derived | low |
 | Cone shaft length | 190 mm | 7.5 | M6.7: pivot journal 25 + stack 19 × 6.584 + 6.5 ≈ 131.6 + thin-tip journal through the knob post at station 177 | derived | low |
 | Cone shaft diameter | stepped: 9.5 (3/8") z 0–136.88, 6.35 (1/4") to 143.47, 4.76 (3/16") to 150.05, 3.18 (1/8") to 190 (large/pivot end at z 0) | 0.375/0.25/0.1875/0.125 | base dia legacy `parameters.kcl` ShaftDiameter; p.18 shows a visibly thin rod past the smallest gears. M6.7: each step station lands in the 0.08 mm air gap between adjacent gear faces (seats at 28.25 + 6.584j ± 3.25); the M6.7 shaft line passes 0.39 clear of the last drum gear's tooth tips, so the photo-true 1/8" tip needs no narrowing — `build_cone_gear_shaft.py` | legacy + derived | med |
@@ -145,12 +150,12 @@ drive component — Appendix C #9.
 | dim | value | (in) | source | method | confidence |
 |---|---|---|---|---|---|
 | Gear count | 20, all identical size | — | text p.22 | stated | high |
-| Tooth count | 120 (each gear) | — | derived from gear law k/80 (ch.29) + 4:1 + cone teeth 6k — see ch.6/26/29 section | derived | high |
+| Tooth count | 120 (each gear) | — | derived from gear law k/80 (ch.29) + 4:1 + cone teeth 6k — see ch.6/26/29 section | derived | med |
 | Alignment notch depth | 3 mm | 0.118 | text p.22 (also pp. 66–67) | stated | high |
 | Gear material | brass (polished) | — | text p.22 | stated | high |
-| Axial pitch (z) | 7.0568 mm | 0.278 | frame-locked drum grid = the cone-set 7.5 annotation's Z-projection (Appendix C #3); M6 cross-check: rocker-arm end-view pitch measures ≈ 7.5 within photo error (ch. 14 note) | derived | high |
+| Axial pitch (z) | 7.0568 mm | 0.278 | frame-locked drum grid = the cone-set 7.5 annotation's Z-projection (Appendix C #3); M6 cross-check: rocker-arm end-view pitch measures ≈ 7.5 within photo error (ch. 14 note) | derived | med |
 | Gear face width | 3.0 mm | 0.118 | M6 (Appendix C #6): p.22 stack macro face/pitch = 190/497 px ≈ 0.38 × 7.5 axial pitch ≈ 2.9, rounded 3.0 (the ch. 12 "7 mm" callout is the CONE gear face; the cylinder sandwich must also fit cam + rod ring) | scaled | med |
-| Gear outer diameter | 103.3 mm (4.067") | 4.067 | (120+2)/DP30; PD = 4.000" exactly (module closed — ch. 12 row) | derived | high |
+| Gear outer diameter | 103.3 mm (4.067") | 4.067 | (120+2)/DP30; PD = 4.000" exactly (module closed — ch. 12 row) | derived | med |
 | Cam diameter (integral cam per gear) | 50.8 mm (2.0") | 2.0 | legacy `parameters.kcl`; M2 check: p.25 printed outline measures cam OD ≈ 0.52 × cylinder-gear OD → 0.52 × 103.3 = 53.7 vs legacy 50.8 (5% — within the outline-measurement error); keep the legacy round 2.0" | legacy + scaled ratio | med |
 | Cam thickness | 3.5 mm | 0.138 | M6 (Appendix C #6): inter-face gap 7.5 − 3.0 = 4.5 minus 0.5 air per side; REFUTES legacy 10.2 (0.4"), which alone exceeds the axial pitch | derived | med |
 | Cam eccentricity | 5.1 mm (0.2") | 0.2 | legacy `parameters.kcl`; sets rocker-arm stroke; p.25 photo shows ≈ 4 mm center offset (within photo error) | legacy | med |
@@ -221,7 +226,7 @@ toward the horizon (e.g. the crank pedestal at x +122.3 reads at ratio
 
 | dim | value | (in) | source | method | confidence |
 |---|---|---|---|---|---|
-| Centre distance (cam ring → rocker pin) | 127.0 mm (5") | 5.0 | M6.3: rocker pivot axis y = 253.8 (apex ball mounts, front + back eight-views) minus drive height y = 126.8 = exactly 5" with the arm level; supersedes the earlier ~105 scaling (which used the wrong "rocker tip" attachment reading) | derived | high |
+| Centre distance (cam ring → rocker pin) | 127.0 mm (5") | 5.0 | M6.3: rocker pivot axis y = 253.8 (apex ball mounts, front + back eight-views) minus drive height y = 126.8 = exactly 5" with the arm level; supersedes the earlier ~105 scaling (which used the wrong "rocker tip" attachment reading) | derived | med |
 | Cam ring bore | 51.0 mm | 2.008 | cam OD 50.8 + 0.1 running clearance per side | derived | med |
 | Cam ring radial wall | 5 mm (OD 61) | 0.20 | ch.13 photos, strap proportion vs cam | scaled | low |
 | Ring / shank / tip-strap thickness | 3 / 2.5 / 2.5 mm | — | sandwich budget (7.5 axial pitch); tip strap = arm thickness so the pin joint is strap-beside-arm inside the 7.06 channel pitch (M6.3 — the "thick tip blocks" read of p.29 was wrong, see ch. 14 note) | scaled/derived | med |
@@ -301,10 +306,9 @@ top at ≈ 1072.3, pin at ≈ 1065.9.
 | dim | value | (in) | source | method | confidence |
 |---|---|---|---|---|---|
 | Overall length | 200 mm | 7.87 | photo callout pp. 34–35 | annotated | high |
-| Division spacing | 8 mm | 0.315 | photo callout pp. 34–35 | annotated | high |
-| Scale | 0–10, hand-stamped, uneven | — | text pp. 34–35 (0.5 tick longest; 0.4–0.5 gap < 0.5–0.6 gap) | stated | high |
-| Scale span (10 divisions) | 80 mm | 3.15 | 10 × 8 mm | derived | med |
-| Body width | ~15 mm | ~0.59 | pp. 34–35 photo proportion vs 200 mm length | scaled | low |
+| Stick width | 8 mm | 0.315 | photo callout pp. 34–35 | annotated | high |
+| Scale | 0–10, hand-stamped — 10 equal divisions of one half of the rocker arm | — | text p. 34 | stated | high |
+| Scale span (10 divisions) | 80 mm | 3.15 | one half of the rocker-arm working length (p.34; ch.14 → ~160 mm) | derived | med |
 | Body thickness | ~3 mm | ~0.12 | pp. 34–35 photo proportion | scaled | low |
 
 Notes: ruled brass gauge (Wm. Gaertner & Co.) with a sliding/locking stop. The
@@ -366,20 +370,21 @@ assemblies.
 
 ## Chapter 18 — Summing Lever (pp. 42–43)
 
-No annotated or stated numeric dimensions in this chapter. M6.4 REVISION: the
-legacy SummingLever.cs shape (solid pivot cylinder + edge ribs + tapering
-summation tongue + anchor boss) is REFUTED by the p.42/43 close-ups and the
-calibrated ch. 30 views — the pivot is a TUBE riding a knife-edge bar hung
-from a top crossbar, the plate hangs off the tube's −X side, and a twin-rib
-web arm runs +X to a round boss carrying the counter-spring hook. Plate
-thickness and length keep the uncontradicted legacy values. Lever-local
-coords below: origin on the knife line (machine (15, 990, 0)), X toward the
-boss, Z along the knife edge.
+No annotated or stated numeric dimensions in this chapter. The lever follows the
+SummingLever.cs shape: a solid pivot cylinder, edge ribs, a tapering summation
+tongue, an anchor eye, and a middle rib. Two hexagonal knife-edge trunnions
+protrude beyond the body ends, vertex-up, their top vertex ridge forming the
+knife edge the first-class lever hangs/rocks on; the stubs rest on bearing
+supports standing on the top plate (ch30-p003 — not yet modeled). Lever-local
+coords: origin on the pivot axis (cylinder centreline); the knife edge (rock
+axis) is the hex top ridge, just above it. The 20 spring holes use the channel
+registration. The build is authored x-negated so the hole plate lands on the
+channel arm and the anchor eye on the counter-spring arm.
 
 | dim | value | (in) | source | method | confidence |
 |---|---|---|---|---|---|
-| Pivot tube | Ø25 OD × 114 long (z ±57), Ø14 bore; bore bottom = knife line | — | calibrated p1/p3 + p.42–43 close-ups | scaled | med |
-| Tube slot | central slot \|z\| ≤ 16, \|x\| ≤ 9 — clears the knife-mount stud | — | p.42 close-up | scaled | low |
+| Pivot cylinder | Ø25.4 (1.0") OD × 152.4 long (z ±76.2), solid (no bore); mid-plane on the pivot axis | 1.0 | SummingLever.cs + p.42–43 close-ups | legacy | med |
+| Hex knife-edge trunnions ×2 | vertex-up hex 8.653 wide (x) × 10.268 tall (y, vertex-to-vertex) × 21.717 deep (z), one PROTRUDING beyond each body end (z 76.2..97.92); top vertex ridge = knife edge = rock axis (≈5.1 above the cylinder centreline); rest on top-plate bearing supports (not yet modeled) | — | measured (user, ch18) | measured | med |
 | Coefficients plate | x −60..−10 (machine −45..+5), top y 8, 5.1 thick, z ±76.2 | — | calibrated p1; thickness/length legacy (uncontradicted) | scaled + legacy | med |
 | Spring holes | 20 × Ø4.5 at x −37.10 (machine x −22.10 = channel-lever tab line), z = z_j − 1.95 | — | derived: installed-spring eye reach √(3.25²−2.55²) = 2.0 through the 5.1 plate; z offset puts the hole under the helix lead | derived | med |
 | Web + boss | twin ribs 3 wide, y 2..12, x 9..80, z taper ±17.18 → ±4.27; boss Ø14 × 12 at x 80 (machine 95) | — | p.43 plan | scaled | low |
@@ -581,8 +586,8 @@ the west end rail (x −29..−24), tip at −18, 1 shy of the marker barrel.
 | dim | value | (in) | source | method | confidence |
 |---|---|---|---|---|---|
 | Tooth count | 42 | — | counted on the drum end view (engineerguy video 4/4 @ 8:00, frame `v4_pinion_018`): 7 tips per 60° sector × 6; tip-radius ratio to the meshing 120T cylinder gear = 0.36 = 44/122 confirms same DP | counted | high |
-| Pitch diameter | 35.56 mm (1.400") | 1.400 | 42 / DP 30 — round-inch PD corroborates both the count and DP 30 | derived | high |
-| Outer diameter | 37.25 mm (1.467") | 1.467 | (42+2)/30 | derived | high |
+| Pitch diameter | 35.56 mm (1.400") | 1.400 | 42 / DP 30 — round-inch PD corroborates both the count and DP 30 | derived | med |
+| Outer diameter | 37.25 mm (1.467") | 1.467 | (42+2)/30 | derived | med |
 | Drum length | ~150 mm | ~5.9 | spans/engages all 20 cylinder gears at once (p.67 photo: drum ≈ cylinder stack length = 20 × 7.5 axial pitch) | derived | med |
 | Material | brass | — | photos | stated | high |
 
