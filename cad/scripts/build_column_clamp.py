@@ -1,7 +1,8 @@
 r"""Reproduction script: column clamp (book ch. 21/22, pp. 50-55).
 
 The green cast collar that clamps each output support bar to a front
-column: a ring sliding on the O35 column with an open channel across its
+column: a ring sliding on the Ø25.4 column (OD rederived from the ch30
+8-views, M6.11) with an open channel across its
 front face that the 10-square bar lies in -- the bars run tangent IN
 FRONT of the columns (p3 90-degree view: bar band z -129..-139 vs column
 line z -112). M6.10 fasteners pass: an O3.2 radial hole through the back
@@ -44,7 +45,7 @@ PART_NAME = "column-clamp"
 MATERIAL = "Gray Cast Iron"  # green casting
 
 COLLAR_OD = 48.0  # DIMENSIONS.md ch21 (low)
-COLLAR_BORE = 35.2  # slides on the O35 column (derived)
+COLLAR_BORE = 25.6  # slides on the Ø25.4 column (0.2 slip; OD rederived from 8-views)
 COLLAR_HALF_H = 8.0  # 16 tall
 CHANNEL_X = (16.8, 27.0)  # bar channel walls (bar 16.9..26.9, 0.1 margins)
 CHANNEL_FLOOR_Y = -5.1  # bar bottom -5.0 rests 0.1 above

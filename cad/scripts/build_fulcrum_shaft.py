@@ -3,10 +3,11 @@ r"""Reproduction script: lever fulcrum shaft (book ch. 17; 1 used).
 Plain Ø6.35 (1/4") x 182 steel shaft: the top levers' common fulcrum at
 machine (x, y) = (-199.9, 1065.9). M6.5 split this off the 228.6
 pivot-shaft: the fulcrum line sits on the west column line, and a 228.6
-shaft's tips (z +-114.3) clipped the west columns (within 20.6 of the
-column axes for |z| 91.6..132.4, ~87 mm^3 each at top level). 182 ends
-the shaft at z +-91, 0.6 clear, still 6 past each lever ball-mount's
-cross-bore centre at z +-85.
+shaft's tips (z +-114.3) still clip the Ø25.4 columns (tip 3.7 from the
+column axis vs the 12.7 surface; OD rederived from the 8-views, M6.11).
+182 ends the shaft at z +-91, ~5.3 clear of the column surface (was 0.6
+at the old Ø34.925), still 6 past each lever ball-mount's cross-bore
+centre at z +-85.
 
 Dimensions: cad/DIMENSIONS.md "Channel & top-frame layout" (med; dia low).
 

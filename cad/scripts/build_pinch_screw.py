@@ -1,15 +1,18 @@
 r"""Reproduction script: column-clamp pinch screw (book ch. 21/22; 5 used).
 
-The screw that locks each column clamp's collar to its O35 column (the
-clamp docstring's "pinch screws are omitted" -- modeled in the M6.10
-fasteners pass). It enters the collar's back wall through a radial O3.2
-hole (build_column_clamp.py) and is modeled BACKED OUT: the shank tip
-stops 0.2 inside the hole, clear of the column it would pinch (same
+The screw that locks each column clamp's collar to its Ø25.4 column (OD
+rederived from the 8-views, M6.11; the clamp docstring's "pinch screws
+are omitted" -- modeled in the M6.10 fasteners pass). It enters the
+collar's back wall through a radial O3.2 hole (build_column_clamp.py) and
+is modeled BACKED OUT: the head bears on the collar back face and the
+6.2 shank seats mid-wall, well clear of the column it would pinch (same
 convention as the magnifying clamp's thumb screw). Plain head, slot and
 thread not modeled.
 
-Dimensions: cad/DIMENSIONS.md ch. 21 (M6.10) -- shank sized to the
-collar wall (24 - 17.6 = 6.4 thick); head photo-plausible (low).
+Dimensions: cad/DIMENSIONS.md ch. 21 (M6.10) -- shank rides the radial
+hole; the collar wall is now 24 - 12.8 = 11.2 thick (was 6.4 at the old
+Ø35 bore), so the backed-out tip stands further off the column than
+before; head photo-plausible (low).
 
 Layout: axis along Z, AUTHORED IN FINAL ORIENTATION (pointing -Z =
 machine south, into the clamp's back face): under-head face on the Front
@@ -44,7 +47,7 @@ MATERIAL = "Plain Carbon Steel"  # black hardware
 HEAD_DIA = 6.0  # bears on the collar's curved back face (tangent line, low)
 HEAD_H = 2.5
 SHANK_DIA = 2.9  # rides the collar's O3.2 radial hole
-SHANK_LEN = 6.2  # wall 6.4: tip stays 0.2 inside the hole (backed out)
+SHANK_LEN = 6.2  # wall now 11.2 (Ø25.4 column, M6.11): tip seats mid-hole, backed out
 
 
 async def build(adapter) -> dict[str, str]:

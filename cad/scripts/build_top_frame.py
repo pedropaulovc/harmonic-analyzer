@@ -1,8 +1,9 @@
 r"""Reproduction script: top frame ring (ch. 30 eight-views; NEW part, 1 used).
 
 Green cast rectangular ring clamping the four brass columns just below
-their tops: rails 22 wide x 41 tall, corner bosses Ø48 bored Ø35 around
-the Ø34.925 columns at (x, z) = (+/-197, +/-112). In the machine it sits
+their tops: rails 22 wide x 41 tall, corner bosses Ø48 bored Ø25.5 around
+the Ø25.4 columns (OD rederived from the ch30 8-views, M6.11) at (x, z) =
+(+/-197, +/-112). In the machine it sits
 at y 999.7..1040.7; its west rail carries the two ball mounts of the
 top-lever fulcrum shaft (seat 1040.7 + ball rise 25.2 = axis 1065.9) and
 the summing lever hangs below it (M6.4). Identified in M6.3 from the
@@ -17,7 +18,7 @@ both ways in Y (y -20.5..+20.5) - the assembly lifts it to 1020.2. Build
 order: outer slab, window cut, THEN corner bosses, then column bores -
 bosses after the window so the full Ø48 cylinder survives at the window
 corners (the window rectangle passes within 15.6 of the boss centres,
-inside the Ø35 bore wall). All Top-plane sketches are symmetric in both
+well inside the Ø48 boss). All Top-plane sketches are symmetric in both
 axes, so the (x, y) -> (X, -Z) handedness never matters. Boss volume
 contribution is verified against a grid-integrated plan area (the
 boss/band/window overlaps have no tidy closed form).
@@ -56,7 +57,7 @@ COLUMN_Z = 112.0
 RAIL_WIDTH = 22.0  # DIMENSIONS.md top-frame row (photo, med)
 RING_HEIGHT = 41.0  # DIMENSIONS.md top-frame row (photo, med)
 BOSS_DIA = 48.0  # corner boss around the column (scaled, low)
-BORE_DIA = 35.0  # clamps the Ø34.925 column (derived)
+BORE_DIA = 25.5  # clamps the Ø25.4 column (0.1 slip; OD rederived from 8-views)
 
 OUTER_X = COLUMN_X + RAIL_WIDTH / 2.0  # 208
 OUTER_Z = COLUMN_Z + RAIL_WIDTH / 2.0  # 123
