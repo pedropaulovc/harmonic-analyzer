@@ -9,7 +9,7 @@ distinguishable).
 
 M4 (Phase 3 landed): bent-wire end hooks per the p. 41 inset -- each is an
 axial lead + 270-degree loop at the coil mean radius, swept in the Front
-plane (see ``_common.add_spring_end_hooks``). The top hook's wire profile
+plane (see ``_features.add_spring_end_hooks``). The top hook's wire profile
 sits on an offset reference plane at the coil's far end.
 
 M6.4: this script builds the FREE spring (32 body, as photographed on the
@@ -61,7 +61,7 @@ WIRE_DIA = 1.0  # DIMENSIONS.md ch17: scaled from p.41 inset (low)
 COIL_COUNT = 28  # close-wound: body length / ~1.14 mm pitch (derived, low)
 
 MEAN_RADIUS = (COIL_OD - WIRE_DIA) / 2.0
-HOOK_LEAD = 2.0 * WIRE_DIA  # _common.add_spring_end_hooks default
+HOOK_LEAD = 2.0 * WIRE_DIA  # _features.add_spring_end_hooks default
 EYE_C2C = COIL_BODY_LENGTH + 2.0 * HOOK_LEAD  # hook eye centres, 36.0 free
 
 

@@ -3,7 +3,7 @@ r"""Reproduction script: reeded thumb screw (book ch. 20, p. 48).
 The knurled ("reeded") thumb screw that locks the magnifying-lever clamp
 block (a second identical one locks the output fixture). M4 finishing
 pass: head reeded with 24 axial Ø1 mm grooves (tube-frame fluting recipe,
-``_common.add_reeded_head_and_thread``) and a cosmetic M3 thread on the
+``_features.add_reeded_head_and_thread``) and a cosmetic M3 thread on the
 shank (annotation only -- keeps M6 interference checks clean).
 
 The stepped body is two coaxial merged extrusions (cone-gear-shaft
