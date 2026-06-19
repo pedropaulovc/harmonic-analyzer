@@ -359,6 +359,10 @@ cad/out/boxes/
 # Changed-parts diff renders (regenerable: comparisons/tools/render_diff.py)
 cad/out/diff/
 
+# Mesa OSMesa software-GL DLL fetched on demand for headless VTK rendering
+# (comparisons/tools/osmesa_win.py; ~55 MB, regenerable from pal1000/mesa-dist-win)
+comparisons/tools/.osmesa-cache/
+
 # Parity-test scratch (comparisons/tools/parity_check.py)
 comparisons/.parity_sw/
 
