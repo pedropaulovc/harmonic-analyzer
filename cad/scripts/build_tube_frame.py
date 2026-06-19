@@ -36,9 +36,9 @@ from _common import (
     apply_color,
     POLISHED_STEEL,
     check,
+    bbox_extent_check,
     define_circle,
     ensure_fully_defined,
-    measure_check,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -80,17 +80,10 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)  # ch30 plates: see _common palette
 
-    # Verify the photo-locked column height via the end annulus faces.
-    mid_r = (OUTER_DIA + INNER_DIA) / 4.0
-    await measure_check(
-        adapter,
-        "column length (top-frame flush 989.9)",
-        [
-            {"entity_type": "FACE", "point": [mid_r, 0.0, 0.0]},
-            {"entity_type": "FACE", "point": [mid_r, COLUMN_LENGTH, 0.0]},
-        ],
-        "normal_distance",
-        COLUMN_LENGTH,
+    # Verify the photo-locked column height via the solid bounding box (the
+    # end-annulus face pair was screen-projected and collapsed to one face).
+    await bbox_extent_check(
+        adapter, "column length (top-frame flush 989.9)", "y", COLUMN_LENGTH
     )
 
     await report_mass_properties(adapter)

@@ -26,7 +26,7 @@ from _common import (
     _flag,
     _read_member,
 )
-from build_summing_lever import HOOK_HOLE_X as SL_SPIN_REF_X
+from build_summing_lever import SPIN_REF_X as SL_SPIN_REF_X
 
 KNIFE = (15.0, 990.0)
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]

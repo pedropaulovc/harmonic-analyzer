@@ -39,9 +39,12 @@ PART_NAME = "measuring-stick"
 MATERIAL = "Brass"  # see _common.apply_material docstring
 
 BODY_LENGTH = 200.0  # DIMENSIONS.md ch16: annotated (high)
-BODY_WIDTH = 15.0  # DIMENSIONS.md ch16: scaled (low)
+BODY_WIDTH = 8.0  # DIMENSIONS.md ch16: stick width, annotated (high) — the 8 mm
+# callout is the stick WIDTH (bd992c6 re-read), not the division spacing; the
+# superseded ~15 mm scaled body-width is retired.
 BODY_THICKNESS = 3.0  # DIMENSIONS.md ch16: scaled (low)
-DIVISION_SPACING = 8.0  # DIMENSIONS.md ch16: annotated (high)
+DIVISION_SPACING = 8.0  # DIMENSIONS.md ch16: scale span 80 mm / 10 divisions
+# (derived, med) — one half of the rocker-arm working length, NOT 10×8 mm.
 DIVISION_COUNT = 11  # ticks 0..10 (stated 0-10 scale)
 SCALE_START_X = (BODY_LENGTH - 10 * DIVISION_SPACING) / 2.0  # centre the scale
 

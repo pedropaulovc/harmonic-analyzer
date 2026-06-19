@@ -57,7 +57,7 @@ STRAP_BOT = (9.7, -33.0)  # knife-mount stud west flank at machine y 1053:
 # west tangent plane (x 11) and the strap's low corner (y 1052.5) stays
 # 1.5 above the raised crossbar top 1051 (derived: a drop to the knife
 # block itself would cross the summing-lever plate band x -45..+5 at
-# y 992.9..998)
+# y 987.46..992.54 -- the corrected coplanar .cs plate)
 STRAP_HALF_W = 4.0  # strap 8 wide (z), 2 thick (low)
 STRAP_HALF_T = 1.0
 

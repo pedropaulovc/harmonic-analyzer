@@ -861,10 +861,69 @@ def extrude_at_offset(
     return name
 
 
+# STL export user-preferences (swUserPreferenceIntegerValue / Toggle ids,
+# swconst R2026x) -- shared with export_models.py so a build-time part STL and
+# the render-cache STL are byte-identical: a fine BINARY mesh in MILLIMETRES,
+# left at the model origin. stl_bbox_mm parses exactly this.
+PREF_STL_QUALITY = 78          # swSTLQuality -> 2 = fine
+PREF_STL_UNITS = 211           # swExportStlUnits -> 0 = swMM
+TOGGLE_STL_BINARY = 69         # swSTLBinaryFormat
+TOGGLE_STL_ONE_FILE = 72       # swSTLComponentsIntoOneFile
+TOGGLE_STL_NO_TRANSLATE = 71   # swSTLDontTranslateToPositive: keep model origin
+TOGGLE_STL_SHOW_INFO = 70      # swSTLShowInfoOnSave: the per-file "Save <name>.STL?" modal
+
+_STL_INT_PREFS = {PREF_STL_QUALITY: 2, PREF_STL_UNITS: 0}
+# SHOW_INFO -> False: every part build now exports an STL, so leaving the modal on
+# would block an unattended `doit` run on the first export (cut_release.py disables
+# it for the same reason; codex review #12).
+_STL_TOGGLES = {TOGGLE_STL_BINARY: True, TOGGLE_STL_ONE_FILE: True,
+                TOGGLE_STL_NO_TRANSLATE: True, TOGGLE_STL_SHOW_INFO: False}
+
+
+async def export_part_stl(adapter: Any, out_path: Path) -> None:
+    """Write the active part's fine binary STL (mm, model origin) to ``out_path``.
+
+    The assembly build reads these via ``stl_bbox_mm`` to place each
+    bbox-mirrored part, so a part build must emit its STL alongside the SLDPRT --
+    ``export_models.py`` only refreshes the render cache and can't bootstrap a
+    from-empty assembly (its part list is manifest-driven and otherwise needs an
+    already-built assembly to scan). Prefs are set then restored so the export
+    doesn't perturb later steps.
+    """
+    sw = adapter.swApp
+    old_ints = {k: int(sw.GetUserPreferenceIntegerValue(k)) for k in _STL_INT_PREFS}
+    old_toggles = {k: bool(sw.GetUserPreferenceToggle(k)) for k in _STL_TOGGLES}
+    for k, v in _STL_INT_PREFS.items():
+        sw.SetUserPreferenceIntegerValue(k, v)
+    for k, v in _STL_TOGGLES.items():
+        sw.SetUserPreferenceToggle(k, v)
+    try:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        # Delete any prior STL first so a failed SaveAs3 (locked target, export
+        # error) cannot leave a stale file that the existence check below would
+        # accept as a fresh export (codex review #10). SaveAs3's return is not a
+        # reliable success flag here (it yields 0 on a successful write), so the
+        # post-delete "file exists" check is the real gate.
+        if out_path.exists():
+            out_path.unlink()
+        rc = adapter._attempt(lambda: adapter.currentModel.SaveAs3(str(out_path), 0, 0))
+        if not out_path.exists():
+            raise RuntimeError(f"STL export produced no file (SaveAs3 rc={rc!r}): {out_path}")
+        print(f"  OK  export STL -> {out_path.name}"
+              f" ({out_path.stat().st_size / 1e6:.1f} MB)")
+    finally:
+        for k, v in old_ints.items():
+            sw.SetUserPreferenceIntegerValue(k, v)
+        for k, v in old_toggles.items():
+            sw.SetUserPreferenceToggle(k, v)
+
+
 async def save_part_and_images(
     adapter: Any, part_name: str, views: Iterable[str] = DEFAULT_VIEWS
 ) -> dict[str, str]:
-    """Save the part to ``cad/out/sldprt`` and PNG views to ``cad/out/png``."""
+    """Save the part to ``cad/out/sldprt``, its STL to ``cad/out/stl`` (the
+    assembly build reads it for mirror placement), and PNG views to
+    ``cad/out/png``."""
     OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
     part_path = (OUT_SLDPRT / f"{part_name}.SLDPRT").resolve()
     check(f"save_file -> {part_path}", await adapter.save_file(str(part_path)))
@@ -874,7 +933,10 @@ async def save_part_and_images(
     apply_custom_properties(adapter, part_properties(part_name))
     check(f"re-save with properties -> {part_path}", await adapter.save_file(str(part_path)))
 
-    artefacts = {"part": str(part_path)}
+    stl_path = (OUT_STL / f"{part_name}.STL").resolve()
+    await export_part_stl(adapter, stl_path)
+
+    artefacts = {"part": str(part_path), "stl": str(stl_path)}
     for view in views:
         img_path = (png_dir / f"{part_name}_{view}.png").resolve()
         check(
@@ -1086,6 +1148,73 @@ async def measure_check(
     print(f"  OK  measure {label}: {key}={value:.4f} (expected {expected:g})")
 
 
+async def bbox_extent_check(
+    adapter: Any,
+    label: str,
+    axis: str,
+    expected: float,
+    tol: float = 0.05,
+) -> None:
+    """Assert the part's solid bounding-box extent along ``axis`` (mm).
+
+    The view-independent replacement for a face-to-face ``normal_distance``
+    measure of an overall width/height/length. ``measure_check`` selected the
+    two opposite faces by a screen-projected point each, but mutually-occluding
+    faces collapse to a single pick in every standard view (one face hides the
+    other), so the measure came back single-faced -- the same screen-projection
+    trap the bar-length measure already dodges with a silhouette edge. Reading
+    the bounding box needs no face picking at all.
+
+    Unions the solid bodies' precise extreme points along ``axis`` so an
+    unabsorbed, shown sketch can't inflate the extent. Only valid when the measured
+    faces ARE the part's bounding faces along ``axis`` (true for these overall-size
+    annotations); a feature protruding past them would read larger.
+
+    Uses ``IBody2::GetExtremePoint`` (the exact farthest vertex in a direction),
+    NOT ``IBody2::GetBodyBox`` -- the latter is documented as an approximate box
+    that varies after rebuilds, so a 0.05 mm gate on it can pass/fail
+    nondeterministically (codex review #9).
+    """
+    import pythoncom
+    from win32com.client import VARIANT
+
+    from solidworks_mcp.adapters import sw_type_info
+
+    index = {"x": 0, "y": 1, "z": 2}[axis]
+    pos = [1.0 if i == index else 0.0 for i in range(3)]
+    neg = [-v for v in pos]
+
+    def _extreme(body: Any, direction: list[float]) -> float:
+        # IBody2::GetExtremePoint(Px,Py,Pz, &X,&Y,&Z): direction in, the extreme
+        # point comes back through three [out] byref doubles (metres). Returns the
+        # axis coordinate in mm.
+        out = [VARIANT(pythoncom.VT_BYREF | pythoncom.VT_R8, 0.0) for _ in range(3)]
+        res = adapter._attempt(
+            lambda: body.GetExtremePoint(
+                direction[0], direction[1], direction[2], out[0], out[1], out[2]),
+            default="__err__")
+        if res == "__err__":
+            raise RuntimeError(f"bbox {label}: GetExtremePoint failed")
+        return out[index].value * 1000.0
+
+    doc = adapter.currentModel
+    sw_type_info.flag_methods(doc, "IPartDoc")
+    bodies = adapter._attempt(lambda: doc.GetBodies2(0, False)) or []  # solid
+    if not bodies:
+        raise RuntimeError(f"bbox {label}: part has no solid bodies")
+    lo, hi = float("inf"), float("-inf")
+    for body in bodies:
+        sw_type_info.flag_methods(body, "IBody2")
+        lo = min(lo, _extreme(body, neg))
+        hi = max(hi, _extreme(body, pos))
+    extent = hi - lo
+    if abs(extent - expected) > tol:
+        raise RuntimeError(
+            f"bbox {label}: {axis}-extent={extent:.4f} outside {expected} +/- {tol}"
+        )
+    print(f"  OK  bbox {label}: {axis}-extent={extent:.4f} (expected {expected:g})")
+
+
 async def report_mass_properties(adapter: Any) -> None:
     """Print volume/bounding data for the eyeball-vs-DIMENSIONS.md check."""
     res = await adapter.get_mass_properties()
@@ -1192,6 +1321,10 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     "pinion-lever": ("x", 0.0),
     "pinion-lift-rod": ("x", 0.0),
     "pinion-handle": ("x", 0.0),
+    # knife bearing support: X-symmetric (bore + block centred on x0); explicit
+    # so placement never depends on a stale/absent STL bbox (it mirrors with the
+    # summing lever so the bore stays around the hex trunnion).
+    "knife-mount": ("x", 0.0),
     # parts whose build scripts are themselves mirrored (M6.8)
     "summing-lever": "x0",
     "magnifying-bracket": "x0",
@@ -1248,6 +1381,19 @@ def stl_bbox_mm(stem: str) -> tuple[tuple[float, float], ...]:
     if not all(math.isfinite(v) for v in (*lo, *hi)):
         raise RuntimeError(f"{path.name}: no vertices found")
     bbox = tuple((lo[k], hi[k]) for k in range(3))  # STL already in mm
+    # Unit guard: export_models writes mm STLs and stl_bbox_mm consumes them as
+    # mm. A stale metres-unit cache (pre the 2026-06 mm normalization, which
+    # dropped the *1000 here) yields a ~1000x-too-small bbox, which silently
+    # mis-mirrors STL-bbox-mirrored parts -- platen-rack's z-centre read 0.003
+    # instead of ~3 mm, shifting it ~6 mm into its neighbours. No real machine
+    # part spans under a millimetre, so fail loud and force a cache rebuild
+    # rather than place parts a few mm off.
+    span = max(hi[k] - lo[k] for k in range(3))
+    if span < 1.0:
+        raise RuntimeError(
+            f"{path.name}: bbox span {span:.4f} mm is implausibly small -- "
+            "stale metres-unit STL cache? regenerate with "
+            "`export_models.py --force`")
     _STL_BBOX_CACHE[stem] = bbox
     return bbox
 
@@ -2400,6 +2546,15 @@ async def refresh_assembly(
 def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
     """Connect, run ``build(adapter)``, disconnect; return a process exit code."""
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
+
+    # Build output carries non-ASCII (e.g. the "A ∩ B" named-axis labels). When
+    # stdout is redirected to a file/pipe Windows defaults it to cp1252, so the
+    # first such print would raise UnicodeEncodeError and abort the build. Force
+    # UTF-8 so a piped from-scratch build doesn't depend on PYTHONUTF8=1.
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="replace")
 
     async def _run() -> dict[str, str]:
         adapter = PyWin32Adapter({})
