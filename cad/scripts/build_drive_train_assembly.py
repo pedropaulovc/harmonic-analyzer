@@ -143,18 +143,19 @@ CONE_T120_PITCH_R = (120.0 / DP_TRAIN) * 25.4 / 2.0  # 30.59: largest cone gear 
 
 # Frame-locked machine grid (M6.3 lineage -- the drum planes anchor the
 # gates, cams, rockers and bars; nothing here may move them).
-_DRUM_SEAT_NOMINAL = _config.machine("cone_incline", "drum_seat_nominal_mm")  # 7.5
-Z_PITCH = _DRUM_SEAT_NOMINAL * math.cos(math.asin(RADIUS_STEP / _DRUM_SEAT_NOMINAL))  # 7.0568: drum z-pitch
+_DRUM_SEAT_NOMINAL = _config.machine("cone_incline", "drum_seat_nominal_mm")  # 7.2204 (OD 62.2)
+Z_PITCH = _DRUM_SEAT_NOMINAL * math.cos(math.asin(RADIUS_STEP / _DRUM_SEAT_NOMINAL))  # 7.0566: drum z-pitch
 X_DRUM = -47.5  # rocker-support boss bore + arbor pedestal
 Z_DRUM0 = _config.machine("channels", "station_z0_mm")  # -67.1 drum gear 0 plane (shared station anchor)
 
-# True-cone incline (M6.7, exact tracking -- see module docstring).
-SIN_I = RADIUS_STEP / Z_PITCH  # 0.35993
-COS_I = math.sqrt(1.0 - SIN_I * SIN_I)  # 0.93299
+# True-cone incline (M6.7, exact tracking -- see module docstring). Values are
+# at the OD-62.2 / DP 49.82 re-anchor (was 21.10 deg at the retired DP 30).
+SIN_I = RADIUS_STEP / Z_PITCH  # 0.21675
+COS_I = math.sqrt(1.0 - SIN_I * SIN_I)  # 0.97623
 TAN_I = SIN_I / COS_I
 SEC_I = 1.0 / COS_I
-INCLINE_DEG = math.degrees(math.asin(SIN_I))  # 21.0976
-SEAT_PITCH = Z_PITCH * COS_I  # 6.5839: seat pitch along the shaft
+INCLINE_DEG = math.degrees(math.asin(SIN_I))  # 12.5182
+SEAT_PITCH = Z_PITCH * COS_I  # 6.8888: seat pitch along the shaft
 
 CONE_FACE = 6.5  # M6.7 mesh packing (annotated 7 -- build_cone_gear.py)
 GEAR64_FACE = 10.0
@@ -171,10 +172,10 @@ PINION_FACE = 12.0
 # teeth barely drift out of the drum band) -- 0.15 left <=0.06 mm^3
 # flank slivers at the five smallest stations, 0.35 still skinned the
 # last four.
-DRUM_TIP_X = X_DRUM + (122.0 / DP_TRAIN) * 25.4 / 2.0  # 4.147
+DRUM_TIP_X = X_DRUM + (122.0 / DP_TRAIN) * 25.4 / 2.0  # -16.40 at DP 49.82
 PEN_EDGE_SLACK = _config.fit("cone_drum_oblique_mesh", "edge_slack_mm")  # cad/config/tolerances.yaml
 PEN_MID = WORKING_DEPTH - PEN_EDGE_SLACK - (DRUM_FACE / 2.0) * TAN_I  # 0.565
-X_PITCH = DRUM_TIP_X + ADDENDUM * SEC_I - PEN_MID  # 4.490
+X_PITCH = DRUM_TIP_X + ADDENDUM * SEC_I - PEN_MID  # -16.01 at DP 49.82
 
 
 def cone_seat(j: int) -> tuple[float, float]:
@@ -259,7 +260,13 @@ if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
 # engaging the first 9 mm of the journal bore (blind-bearing look,
 # p.18: the shaft end disappears into the black bracket).
 PIVOT_POST_STATION = -1.0
-KNOB_POST_STATION = 177.0  # thin-tip journal; z 90.0, x -2.1 (p.18)
+# Thin-tip journal support (p.18: z 90.0, x -2.1, originally photo-scaled to 177).
+# The OD-62.2 re-anchor widened SEAT_PITCH (6.589 -> 6.889), pushing the T006 tip
+# gear's far face out to ~162.4, so the post's inboard half clipped it (~0.7 mm^3).
+# Derive it just past the gear stack instead: last cone face + the post's ~16 mm
+# half-footprint (cone-knob-post STL is +/-16) + 2.5 mm clearance. Lands ~181,
+# still on the 1/32" shaft tip (155.7-190), and tracks any future pitch change.
+KNOB_POST_STATION = SHAFT_T120_STATION + 19 * SEAT_PITCH + CONE_FACE / 2.0 + 16.0 + 2.5  # ~180.9
 
 # --- alignment pinion: REMOVED 2026-06-18 ---------------------------
 # The 42T zeroing pinion no longer fits the rescaled frame at OD 62.2:
