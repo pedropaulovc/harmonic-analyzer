@@ -499,6 +499,39 @@ def set_sketch_direct_db(adapter: Any, enabled: bool) -> None:
     print(f"  OK  sketch AddToDB = {enabled}")
 
 
+async def sketch_rounded_rect(
+    adapter: Any, w: float, h: float, r: float, cx: float = 0.0, cy: float = 0.0
+) -> None:
+    """Draw a CCW rounded rectangle (4 edges + 4 corner arcs) into the OPEN sketch.
+
+    Centred at ``(cx, cy)``, width ``w`` x height ``h``, corner radius ``r`` (mm).
+    A cosmetic outline (the nameplate's rounded plate edge) -- the arcs leave it
+    under-defined, so callers skip :func:`ensure_fully_defined`. ``add_arc`` draws
+    CCW from start to end; the four corner arcs are ordered so the loop runs CCW.
+    Inference suppressed via ``AddToDB`` like the other raw draws here.
+    """
+    a, b = w / 2.0, h / 2.0
+    e = [(cx - (a - r), cy - b), (cx + (a - r), cy - b),   # bottom edge endpoints
+         (cx + a, cy - (b - r)), (cx + a, cy + (b - r)),   # right edge
+         (cx + (a - r), cy + b), (cx - (a - r), cy + b),   # top edge
+         (cx - a, cy + (b - r)), (cx - a, cy - (b - r))]   # left edge
+    corners = [(cx + (a - r), cy - (b - r), e[1], e[2]),   # BR (center, start, end)
+               (cx + (a - r), cy + (b - r), e[3], e[4]),   # TR
+               (cx - (a - r), cy + (b - r), e[5], e[6]),   # TL
+               (cx - (a - r), cy - (b - r), e[7], e[0])]   # BL
+    sketch_mgr = adapter.currentSketchManager
+    prev = bool(sketch_mgr.AddToDB)
+    sketch_mgr.AddToDB = True
+    try:
+        for (x1, y1), (x2, y2) in [(e[0], e[1]), (e[2], e[3]), (e[4], e[5]), (e[6], e[7])]:
+            check(f"rrect edge ({x1:g},{y1:g})", await adapter.add_line(x1, y1, x2, y2))
+        for ccx, ccy, (sx, sy), (ex, ey) in corners:
+            check(f"rrect arc @({ccx:g},{ccy:g})", await adapter.add_arc(ccx, ccy, sx, sy, ex, ey))
+    finally:
+        sketch_mgr.AddToDB = prev
+    print(f"  OK  rounded_rect {w:g}x{h:g} r{r:g} @ ({cx:g}, {cy:g})")
+
+
 def insert_helix(
     adapter: Any, height: float, pitch: float, clockwise: bool = True
 ) -> str:
@@ -516,6 +549,175 @@ def insert_helix(
     if not name:
         raise RuntimeError("InsertHelix did not create a helix feature")
     print(f"  OK  insert_helix -> {name}")
+    return name
+
+
+def insert_sketch_text(
+    adapter: Any,
+    text: str,
+    x_mm: float,
+    y_mm: float,
+    *,
+    height_mm: float,
+    width_pct: int = 100,
+    space_pct: int = 100,
+    alignment: int = 0,
+    label: str = "text",
+) -> Any:
+    """Insert sized sketch text into the OPEN 2D sketch; return the ISketchText.
+
+    Raw-COM helper (``IModelDoc2::InsertSketchText`` to place the glyph
+    contours, then ``ISketchText::GetTextFormat`` + ``ITextFormat::CharHeight``
+    + ``ISketchText::SetTextFormat`` to size them) -- the MCP adapter wraps no
+    text primitive, so engraved lettering reaches past it the same way
+    :func:`insert_helix` / :func:`extrude_at_offset` reach ``InsertHelix`` /
+    ``FeatureExtrusion3``. The caller owns the sketch: open it (``create_sketch``)
+    before, ``exit_sketch`` + ``create_cut_extrude`` after to incise the glyphs.
+
+    ``x_mm``/``y_mm`` are the text-block insertion point in the Front-sketch
+    frame (= model X/Y for the origin sketch this project authors on). Without a
+    selected guide curve ``alignment`` is ignored and the block is left-anchored
+    at the insertion point (SOLIDWORKS API remark) -- callers centre by pre-
+    computing the left x. ``height_mm`` is the cap height; ``width_pct`` evenly
+    widens each glyph (6..1667), ``space_pct`` the inter-character spacing.
+
+    NOTE: not yet exercised on the SolidWorks COM seat (this repo runs the build
+    on Windows); the call shapes follow the 2023 API reference verbatim. Treat
+    the first live run as the validation pass, same posture as the other raw-COM
+    stopgaps here.
+    """
+    model = adapter.currentModel
+    sketch_mgr = adapter.currentSketchManager
+    prev_add_to_db = bool(sketch_mgr.AddToDB)
+    sketch_mgr.AddToDB = True
+    try:
+        sk_text = model.InsertSketchText(
+            x_mm / 1000.0,
+            y_mm / 1000.0,
+            0.0,
+            text,
+            int(alignment),  # 0=left 1=centre 2=right 3=justified
+            0,  # FlipDirection (guide-curve only)
+            0,  # HorizontalMirror
+            int(width_pct),  # WidthFactor %
+            int(space_pct),  # SpaceBetweenChars %
+        )
+    finally:
+        sketch_mgr.AddToDB = prev_add_to_db
+    if sk_text is None:
+        raise RuntimeError(f"insert_sketch_text {label!r}: InsertSketchText returned None")
+    fmt = _read_member(sk_text, "GetTextFormat")
+    if fmt is None:
+        raise RuntimeError(f"insert_sketch_text {label!r}: GetTextFormat returned None")
+    fmt.CharHeight = height_mm / 1000.0  # ITextFormat.CharHeight is metres
+    ok = adapter._attempt(lambda: sk_text.SetTextFormat(False, fmt), default=False)
+    if not ok:
+        raise RuntimeError(f"insert_sketch_text {label!r}: SetTextFormat returned False")
+    model.ClearSelection2(True)
+    print(f"  OK  sketch text {label!r} h{height_mm:g} @ ({x_mm:g}, {y_mm:g})")
+    return sk_text
+
+
+def add_ellipse(
+    adapter: Any, cx_mm: float, cy_mm: float, rx_mm: float, ry_mm: float, label: str = "ellipse"
+) -> Any:
+    """Add a full ellipse to the OPEN 2D sketch; return the sketch segment.
+
+    Raw-COM (``ISketchManager::CreateEllipse``: centre + a point on each axis,
+    metres). ``rx_mm``/``ry_mm`` are the semi-axes along sketch X/Y. Inference is
+    suppressed via ``AddToDB`` like the other raw draws here. Used for the
+    nameplate's central cartouche oval (no ellipse primitive on the adapter).
+    """
+    sketch_mgr = adapter.currentSketchManager
+    prev_add_to_db = bool(sketch_mgr.AddToDB)
+    sketch_mgr.AddToDB = True
+    try:
+        seg = sketch_mgr.CreateEllipse(
+            cx_mm / 1000.0, cy_mm / 1000.0, 0.0,
+            (cx_mm + rx_mm) / 1000.0, cy_mm / 1000.0, 0.0,  # major-axis point (+X)
+            cx_mm / 1000.0, (cy_mm + ry_mm) / 1000.0, 0.0,  # minor-axis point (+Y)
+        )
+    finally:
+        sketch_mgr.AddToDB = prev_add_to_db
+    if seg is None:
+        raise RuntimeError(f"add_ellipse {label!r}: CreateEllipse returned None")
+    adapter.currentModel.ClearSelection2(True)
+    print(f"  OK  ellipse {label!r} r({rx_mm:g}, {ry_mm:g}) @ ({cx_mm:g}, {cy_mm:g})")
+    return seg
+
+
+# swImportDxfDwg_ImportMethod_e.swImportDxfDwg_ImportToPartSketch (declaration order
+# in the swconst enum; import the DXF as 2D geometry in the ACTIVE part's sketch
+# rather than a new drawing/part). Verify the integer on the live seat.
+_SW_IMPORT_TO_PART_SKETCH = 2
+
+
+def _dxf_put(obj: Any, name: str, value: Any) -> bool:
+    """Set an IImportDxfDwgData option (parameterized on a sheet-name index "").
+
+    These are property-puts with an index arg, which late-bound pywin32 exposes
+    awkwardly; try the plain attribute put first (uses the default ""), then a
+    low-level IDispatch PROPERTYPUT. Returns True on success.
+    """
+    try:
+        setattr(obj, name, value)
+        return True
+    except Exception:
+        pass
+    try:
+        import pythoncom
+        dispid = obj._oleobj_.GetIDsOfNames(name)
+        obj._oleobj_.Invoke(dispid, 0, pythoncom.DISPATCH_PROPERTYPUT, False, value)
+        return True
+    except Exception:
+        return False
+
+
+def import_dxf_to_sketch(
+    adapter: Any, dxf_path: Any, *, merge_dist_mm: float = 0.02, label: str = "dxf"
+) -> str:
+    """Import a DXF as a 2D sketch in the ACTIVE part; return the new sketch name.
+
+    Drives the documented "Import DXF File into Part Sketch" recipe through the
+    adapter's ``ISldWorks`` (``adapter.swApp``): ``GetImportFileData`` ->
+    ``ImportMethod = swImportDxfDwg_ImportToPartSketch`` -> ``LoadFile4``. The DXF
+    is authored in build plate millimetres (corner origin), so it lands in-place
+    on the part's default sketch plane (Front); the caller cut-extrudes the
+    returned sketch.
+
+    Cosmetic engraving import: no auto-relations / dimensions / hatch; coincident
+    endpoints are merged (``merge_dist_mm``) so each glyph loop closes.
+
+    NOT exercised on the SolidWorks COM seat. Live-validation surface (raw-COM
+    stopgap posture, like :func:`insert_helix` / :func:`extrude_at_offset`):
+      * the ``ImportMethod`` enum integer and the parameterized property-put;
+      * the target sketch PLANE (the recipe imports to the default plane -- the
+        build authors the plate on Front so it should align, but confirm);
+      * ``LoadFile4``'s ``Errors`` out-parameter marshalling.
+    """
+    app = adapter.swApp
+    path = str(dxf_path)
+    imp = app.GetImportFileData(path)
+    if imp is None:
+        raise RuntimeError(f"import_dxf_to_sketch {label!r}: GetImportFileData(None) for {path}")
+    if not _dxf_put(imp, "ImportMethod", _SW_IMPORT_TO_PART_SKETCH):
+        raise RuntimeError(
+            f"import_dxf_to_sketch {label!r}: could not set ImportMethod=ImportToPartSketch"
+        )
+    adapter._attempt(lambda: _dxf_put(imp, "AddSketchConstraints", False), default=None)
+    adapter._attempt(lambda: imp.SetMergePoints("", True, merge_dist_mm / 1000.0), default=None)
+    adapter._attempt(lambda: _dxf_put(imp, "ImportDimensions", False), default=None)
+    adapter._attempt(lambda: _dxf_put(imp, "ImportHatch", False), default=None)
+    doc = adapter._attempt(lambda: app.LoadFile4(path, "", imp, 0), default=None)
+    if doc is None:
+        raise RuntimeError(
+            f"import_dxf_to_sketch {label!r}: LoadFile4 returned None (check Errors out-param live)"
+        )
+    adapter.currentModel.ClearSelection2(True)
+    name = feature_name_by_type(adapter, "ProfileFeature")
+    if not name:
+        raise RuntimeError(f"import_dxf_to_sketch {label!r}: no sketch created by the import")
+    print(f"  OK  import_dxf_to_sketch {label!r} -> sketch {name!r}")
     return name
 
 
