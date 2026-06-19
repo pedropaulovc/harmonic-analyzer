@@ -71,7 +71,7 @@ from _common import (
     set_sketch_direct_db,
 )
 from _gear import build_fixed_gear, volume_check
-from build_cone_gear import gear_facts
+from build_cone_gear import DP, gear_facts  # DP = train diametral_pitch (machine.yaml)
 
 PART_NAME = "cylinder-gear"
 MATERIAL = "Brass"  # ch. 13 text p.22: polished brass
@@ -89,7 +89,7 @@ NOTCH_WIDTH = 3.0  # DIMENSIONS.md ch13: square notch, width estimated = depth (
 
 BORE_RADIUS = BORE_DIAMETER / 2.0
 
-FACTS = gear_facts(TEETH)  # inches; same DP/PA as the cone set by construction
+FACTS = gear_facts(TEETH, DP)  # inches; same DP/PA as the cone set by construction
 RA_MM = FACTS["Ra"] * IN  # 31.10 -- gear OD/2 = 2.449"/2 = 62.2/2 (low, ch13 scaling)
 RB_MM = FACTS["Rb"] * IN
 NOTCH_FLOOR = RA_MM - NOTCH_DEPTH
@@ -196,7 +196,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Toothed disc (blank + gap + 120x pattern, z = 0..FACE_WIDTH); the
     # volume must reproduce the cone gear's T120 configuration.
-    v_teeth = await build_fixed_gear(adapter, TEETH, FACE_WIDTH)
+    v_teeth = await build_fixed_gear(adapter, TEETH, FACE_WIDTH, dp=DP)
     volume = v_teeth
 
     # ------------------------------------------------------------------
