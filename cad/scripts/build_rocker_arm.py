@@ -6,10 +6,17 @@ book states the radius equals the amplitude-bar length, minimizing
 nonlinearity as the bar slides); bottom edge concentric, giving a uniform
 16 mm depth (p.29 photo callout spans the end face). Plate thickness
 2.5 mm (p.27 callout - the M1 table misread this as a 12.5 mm "arm
-width"). Mid-pivot SEESAW, symmetric +/-88 mm: the amplitude bar rides
-either side of the pivot up to the measuring stick's 80 mm span (positive
-one side, negative the other - ch. 15 text); the connecting rod pins at
-+25.4 (1") on the +X side, closing the vertical-rod geometry against the
+width"). Mid-pivot SEESAW, symmetric +/-114.3 mm (4.5"): the arm half-length
+is rederived from the p.29 broadside photo (img id 285) - pivot ball,
+rod-pin hole and the 16 mm depth callout give a dual scale (~8.1-8.6 px/mm),
+and the pivot->tip span measures 113-119 mm (central ~116), adopted as the
+clean imperial 4.5" (9" total arm = the 9" pivot shaft). This supersedes the
+indirect "80 mm bar travel + 8 mm margin" estimate (88) the M6.3 row used.
+The amplitude bar rides either side of the pivot the full half-length
+(positive one side, negative the other - ch. 15 text: the bar "can slide
+completely off the rocker"); the connecting rod pins at
++25.4 (1") on the +X side (photo-confirmed at +25 mm), closing the
+vertical-rod geometry against the
 cylinder arbor (M6.3, DIMENSIONS.md ch. 14 layout table). The "stepped
 blocks" at the arm tips on p.29 are amplitude-bar feet parked near max
 amplitude, not part of this strap.
@@ -54,8 +61,8 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 CURVE_RADIUS = 800.0  # DIMENSIONS.md ch14: = amplitude bar length (stated)
 ARM_DEPTH = 16.0  # ch14: p.29 photo callout, end-face height (annotated)
 ARM_THICKNESS = 2.5  # ch14: p.27 photo callout (annotated)
-ROD_SPAN = 88.0  # pivot -> rod-side end: 80 amplitude travel + 8 margin (derived)
-TAIL_SPAN = 88.0  # pivot -> opposite end, symmetric seesaw (derived)
+ROD_SPAN = 114.3  # pivot -> rod-side end = 4.5" (p.29 broadside photo, med)
+TAIL_SPAN = 114.3  # pivot -> opposite end, symmetric seesaw (ch.15)
 PIVOT_HOLE_DIA = 6.5  # rides the 6.35 pivot shaft (DIMENSIONS.md ch14, derived)
 ROD_HOLE_DIA = 2.0  # connecting-rod pin (photo-scaled, low)
 ROD_HOLE_X = 25.4  # rod pin 1" from the pivot, +X side (derived, M6.3)
@@ -163,7 +170,7 @@ async def build(adapter) -> dict[str, str]:
     )
     res = await adapter.get_mass_properties()
     print(f"  volume after strap: {res.data.volume:.1f} mm^3")
-    # expected: asin(88/816) * (816^2 - 800^2) * 2.5 = ~6,985 mm^3
+    # expected: asin(114.3/816) * (816^2 - 800^2) * 2.5 = ~9,084 mm^3
 
     # Pivot pin hole at the origin, mid-depth.
     check("create_sketch pivot hole", await adapter.create_sketch("Front"))
