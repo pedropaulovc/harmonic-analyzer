@@ -233,7 +233,7 @@ async def build(adapter):
 
 
 def _org(adapter, name):
-    a = __import__("_common", fromlist=["component_transform"]).component_transform(adapter, name)
+    a = __import__("_assembly", fromlist=["component_transform"]).component_transform(adapter, name)
     return [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
 
 
