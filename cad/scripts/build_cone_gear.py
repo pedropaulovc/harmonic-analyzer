@@ -75,6 +75,7 @@ import _config
 from _common import (
     OUT_PNG,
     _read_member,
+    apply_color,
     apply_material,
     check,
     ensure_fully_defined,
@@ -86,6 +87,12 @@ from _common import (
 
 PART_NAME = "cone-gear"
 MATERIAL = "Brass"  # ch. 13 text: polished brass gear stock; cone set matches
+# The four smallest tip gears read "more yellow ... a harder metal" (ch.12
+# p.21) -- a high-zinc yellow metal (Muntz/manganese bronze). Modeled as the
+# muntz_yellow appearance over the brass material, applied per-configuration
+# (SW MaterialPropertyValues are config-scoped). See cad/config/materials.yaml.
+TIP_CONFIGS = set(_config.materials().get("cone_tip_gear_configs", []))
+MUNTZ_YELLOW = _config.palette("muntz_yellow")
 
 DP = _config.machine("gear_train", "diametral_pitch")  # cad/config/machine.yaml (DIMENSIONS.md ch12)
 PA_DEG = 14.5  # pressure angle, period-typical assumption (low)
@@ -655,6 +662,12 @@ async def build(adapter) -> dict[str, str]:
         # gap pattern is fully applied for THIS config before any measurement.
         adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
         adapter._attempt(lambda: adapter.currentModel.EditRebuild3(), default=None)
+
+        # The four yellow tip gears get the muntz_yellow appearance over brass;
+        # MaterialPropertyValues are configuration-scoped, so this tints only
+        # this config (the larger gears keep the brass material appearance).
+        if name in TIP_CONFIGS:
+            await apply_color(adapter, MUNTZ_YELLOW)
 
         count = read_dimension(adapter, count_dim)
         if abs(count - teeth) > 1e-9:
