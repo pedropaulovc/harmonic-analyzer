@@ -519,6 +519,100 @@ def insert_helix(
     return name
 
 
+def insert_sketch_text(
+    adapter: Any,
+    text: str,
+    x_mm: float,
+    y_mm: float,
+    *,
+    height_mm: float,
+    width_pct: int = 100,
+    space_pct: int = 100,
+    alignment: int = 0,
+    label: str = "text",
+) -> Any:
+    """Insert sized sketch text into the OPEN 2D sketch; return the ISketchText.
+
+    Raw-COM helper (``IModelDoc2::InsertSketchText`` to place the glyph
+    contours, then ``ISketchText::GetTextFormat`` + ``ITextFormat::CharHeight``
+    + ``ISketchText::SetTextFormat`` to size them) -- the MCP adapter wraps no
+    text primitive, so engraved lettering reaches past it the same way
+    :func:`insert_helix` / :func:`extrude_at_offset` reach ``InsertHelix`` /
+    ``FeatureExtrusion3``. The caller owns the sketch: open it (``create_sketch``)
+    before, ``exit_sketch`` + ``create_cut_extrude`` after to incise the glyphs.
+
+    ``x_mm``/``y_mm`` are the text-block insertion point in the Front-sketch
+    frame (= model X/Y for the origin sketch this project authors on). Without a
+    selected guide curve ``alignment`` is ignored and the block is left-anchored
+    at the insertion point (SOLIDWORKS API remark) -- callers centre by pre-
+    computing the left x. ``height_mm`` is the cap height; ``width_pct`` evenly
+    widens each glyph (6..1667), ``space_pct`` the inter-character spacing.
+
+    NOTE: not yet exercised on the SolidWorks COM seat (this repo runs the build
+    on Windows); the call shapes follow the 2023 API reference verbatim. Treat
+    the first live run as the validation pass, same posture as the other raw-COM
+    stopgaps here.
+    """
+    model = adapter.currentModel
+    sketch_mgr = adapter.currentSketchManager
+    prev_add_to_db = bool(sketch_mgr.AddToDB)
+    sketch_mgr.AddToDB = True
+    try:
+        sk_text = model.InsertSketchText(
+            x_mm / 1000.0,
+            y_mm / 1000.0,
+            0.0,
+            text,
+            int(alignment),  # 0=left 1=centre 2=right 3=justified
+            0,  # FlipDirection (guide-curve only)
+            0,  # HorizontalMirror
+            int(width_pct),  # WidthFactor %
+            int(space_pct),  # SpaceBetweenChars %
+        )
+    finally:
+        sketch_mgr.AddToDB = prev_add_to_db
+    if sk_text is None:
+        raise RuntimeError(f"insert_sketch_text {label!r}: InsertSketchText returned None")
+    fmt = _read_member(sk_text, "GetTextFormat")
+    if fmt is None:
+        raise RuntimeError(f"insert_sketch_text {label!r}: GetTextFormat returned None")
+    fmt.CharHeight = height_mm / 1000.0  # ITextFormat.CharHeight is metres
+    ok = adapter._attempt(lambda: sk_text.SetTextFormat(False, fmt), default=False)
+    if not ok:
+        raise RuntimeError(f"insert_sketch_text {label!r}: SetTextFormat returned False")
+    model.ClearSelection2(True)
+    print(f"  OK  sketch text {label!r} h{height_mm:g} @ ({x_mm:g}, {y_mm:g})")
+    return sk_text
+
+
+def add_ellipse(
+    adapter: Any, cx_mm: float, cy_mm: float, rx_mm: float, ry_mm: float, label: str = "ellipse"
+) -> Any:
+    """Add a full ellipse to the OPEN 2D sketch; return the sketch segment.
+
+    Raw-COM (``ISketchManager::CreateEllipse``: centre + a point on each axis,
+    metres). ``rx_mm``/``ry_mm`` are the semi-axes along sketch X/Y. Inference is
+    suppressed via ``AddToDB`` like the other raw draws here. Used for the
+    nameplate's central cartouche oval (no ellipse primitive on the adapter).
+    """
+    sketch_mgr = adapter.currentSketchManager
+    prev_add_to_db = bool(sketch_mgr.AddToDB)
+    sketch_mgr.AddToDB = True
+    try:
+        seg = sketch_mgr.CreateEllipse(
+            cx_mm / 1000.0, cy_mm / 1000.0, 0.0,
+            (cx_mm + rx_mm) / 1000.0, cy_mm / 1000.0, 0.0,  # major-axis point (+X)
+            cx_mm / 1000.0, (cy_mm + ry_mm) / 1000.0, 0.0,  # minor-axis point (+Y)
+        )
+    finally:
+        sketch_mgr.AddToDB = prev_add_to_db
+    if seg is None:
+        raise RuntimeError(f"add_ellipse {label!r}: CreateEllipse returned None")
+    adapter.currentModel.ClearSelection2(True)
+    print(f"  OK  ellipse {label!r} r({rx_mm:g}, {ry_mm:g}) @ ({cx_mm:g}, {cy_mm:g})")
+    return seg
+
+
 async def add_spring_end_hooks(
     adapter: Any,
     mean_radius: float,
