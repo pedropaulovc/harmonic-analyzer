@@ -597,31 +597,39 @@ async def build(adapter) -> dict[str, str]:
     # spin_driver auto-picks the well-conditioned Right-plane (x) distance.
     crank_o = _org(adapter, crankshaft)
     handle_o = _org(adapter, handle)
-    # PERTURB before driving: at reduced channel counts the gear solve can converge
-    # with the crank EXACTLY on its design pose, where this driver's distance target
-    # equals the handle's current position -- a degenerate zero-motion distance mate
-    # that AddMate5 rejects as "over-defines the assembly" (the same failure/fix as
-    # the cam-lobe perturb in build_motion_study). The What's Wrong + mobility probes
-    # proved the reduced train is a healthy 1-DOF mechanism, NOT over-constrained: an
-    # off-design distance target adds cleanly (0 What's Wrong) and the crank rotates
-    # to meet it (handle moved the full 15 mm). At 20 channels the solve lands just
-    # off the pose, so the driver adds without perturbation. Spin the crank ~15 deg
-    # about its own axis (local +Y -> transform cols 3..5, origin cols 9..11 in
-    # metres) so the target is non-degenerate; spin_driver's far-side verify + the
-    # closing ForceRebuild3 snap the crank back onto the design pose.
-    from solidworks_mcp.adapters.base import RotateComponentParameters  # noqa: PLC0415
+    # The crank angle is the machine's single free input -- any angle is a valid
+    # fully-defined pose. It must stay a DISTANCE mate (crank-handle <-> Right plane)
+    # because build_motion_study finds this driver by name and suppresses it to free
+    # the train for the crank motor; fixing the crankshaft would break that.
+    #
+    # Degeneracy: at reduced channel counts the gear solve converges with the crank
+    # EXACTLY on its inserted pose, so a driver whose distance equals the handle's
+    # current position is a zero-motion mate AddMate5 rejects as "over-defines the
+    # assembly". What's Wrong + mobility probes proved the train is a healthy 1-DOF
+    # mechanism (an off-design target adds with 0 What's Wrong and the crank rotates
+    # to meet it) -- NOT over-constrained. At 20 channels the extra gears leave a small
+    # residual so the solve lands just off the pose and the driver adds with a tiny
+    # motion, which the slack-1.10 crank-mesh back-off (a clearance dead-band: PEN16
+    # slack 0.90 already a 0.00 skin) absorbs without interference.
+    #
+    # So mimic that: seed the SAME small off-pose residual deterministically. flip=True
+    # keeps the handle on its inserted -X side (mobility probe: flip=True at d=70.377
+    # parked it at x=-70.377). A big seed re-anchors the gear phase past the dead-band
+    # (15 mm -> 0.6 mm^3 crank-mesh dig); DRIVER_SEED_MM is small enough to stay inside
+    # it while clearing the degenerate zero-motion add. The crank rests this hair off
+    # the design pose -- kinematically irrelevant for a static neutral snapshot.
+    from _common import _add_mate  # noqa: PLC0415
 
-    cx = component_transform(adapter, crankshaft)
-    await adapter.rotate_component(RotateComponentParameters(
-        name=crankshaft, angle=15.0, axis_vector=[cx[3], cx[4], cx[5]],
-        axis_point=[cx[9] * 1000.0, cx[10] * 1000.0, cx[11] * 1000.0], mode="exact"))
-    await spin_driver(
-        adapter,
-        named_ref(f"Axis1@{handle}", "AXIS"),
-        (crank_o[0], crank_o[1]),
-        (handle_o[0], handle_o[1]),
-        label="crank angle driver (#1)",
-        verify=(handle, handle_o),
+    handle_axis = named_ref(f"Axis1@{handle}", "AXIS")
+    right_plane = named_ref("Right Plane", "PLANE")
+    rest_d = abs(handle_o[0])
+    DRIVER_SEED_MM = 2.0
+    check(
+        f"crank angle driver (#1, +{DRIVER_SEED_MM:g} mm off-pose seed)",
+        await _add_mate(
+            adapter, "distance", [handle_axis, right_plane],
+            distance=rest_d + DRIVER_SEED_MM, flip=True,
+        ),
     )
 
     assert_components_fully_defined(adapter)
