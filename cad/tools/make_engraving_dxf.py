@@ -32,8 +32,9 @@ PKL = ASSETS / "nameplate-engraving.pkl"
 W, H = 100.0, 55.0
 TW, TH = 80.0, 36.0        # field lettering envelope (mm)
 PCX, PCY = 50.0, 27.5      # plate centre (corner-origin build frame)
-# Pinstripe frame: a thin rounded-rect band on the raised border, ringing the field.
-P_INSET, P_WIDTH, P_RADIUS = 4.5, 0.7, 4.0
+# Pinstripe frame: a thin rounded-rect band on the raised border, ringing the
+# field close to its edge (p.71).
+P_INSET, P_WIDTH, P_RADIUS = 6.0, 0.7, 3.5
 
 
 def _rrect(inset, rr):
