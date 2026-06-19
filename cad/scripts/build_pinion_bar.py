@@ -3,7 +3,7 @@ r"""Reproduction script: transgear pinion bar (book ch. 23, pp. 56-59).
 The square steel bar that carries the translational-gearing stud: it
 runs from just east of the A-frame clevis (machine x -58: the clevis ears
 end at -59 and grip the south pivot ball mount, M6.5) to just short of
-the east column (x +178: the column's near tangent is 179.54) at y 253.5
+the east column (x +178: the Ø25.4 column's near tangent is 184.3, M6.11) at y 253.5
 on the output side, with a O9.6 hole along Z at the rack-pinion stud
 position (machine x 0). The stud (build_transgear_stub.py) plugs into
 this hole; the rack pinion, fixed pinion and latch ride it. In the real

@@ -14,7 +14,7 @@ Cross-subassembly fits proven by the top-level interference check:
 * top-crossbar ends face-flush on the top-frame ring rail inner faces
   (frame.SLDASM), knife-stay rod above the ring, gooseneck-clamp around
   the east column;
-* column-clamps (output) ride the O34.925 columns (frame) with a 35.2
+* column-clamps (output) ride the Ø25.4 columns (frame) with a 25.6
   bore;
 * chain sprockets (drive-train crankshaft + output knob shaft) share the
   z -81 chain plane;
