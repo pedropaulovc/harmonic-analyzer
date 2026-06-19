@@ -273,12 +273,16 @@ FRAME_ROWS = [[0.0, 0.0, -1.0], [1.0, 0.0, 0.0], [0.0, -1.0, 0.0]]
 SET_SCREW_POS = (-38.0, 413.0, -154.0)
 
 # --- loose hardware ----------------------------------------------------------
-STICK_POS = (-158.0, 53.8, -133.0)  # flat on the base, graduations up;
-# Rx+90 footprint x -158..+42, z -133..-118: west end 2.5 east of the SW
-# corner-bracket foot tip (x -160.5, M6.5 - the old -175 ran the stick
-# through the bracket's plate + foot, 271 mm^3), z band fully on the top
-# plate (edge -133.35) and 0.5 clear of the a-frame plate front face
-# (z -117.5: the M6.9 portal-frame thickening was capped by this stick)
+STICK_POS = (-100.0, 53.8, 123.5)  # flat on the base, graduations up; loose tool.
+# Re-parked to the BACK top-plate edge 2026-06-19. The OD-62.2 re-anchor moved
+# the crank-drive (DP 26.57), pushing the crank-pedestal onto the front edge at
+# post-mirror x -78..-32, z -131.6..-85.6 -- its front face sits ~2 mm off the
+# plate edge (-133.35), so the 200 mm stick can no longer pass in front of it,
+# and the clear east front span (pedestal -32.38 -> corner-bracket foot 160.49 =
+# 192.9 mm) is 7 mm too short. The back band, between the rocker-arm-support
+# (z-max 121.6) and the back plate edge (133.35), is clear for 320 mm in x
+# (corner brackets only start at |x| 160.49): Rx+90 footprint post-mirror
+# x -100..100, z 123.5..131.5, ~1.9 mm box gaps to the frustum and plate edge.
 SPARE_GEAR_POS = (-160.0, 55.8, -15.0)  # plan circle r 26 (T24 OD 52,
 # conservative for the T18) about (-160, -15): the ch25 pinion rig now
 # sits front-centre (script x -21..+59 in drive-train.SLDASM), 100+
