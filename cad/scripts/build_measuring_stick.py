@@ -49,8 +49,15 @@ DIVISION_COUNT = 11  # ticks 0..10 (stated 0-10 scale)
 SCALE_START_X = (BODY_LENGTH - 10 * DIVISION_SPACING) / 2.0  # centre the scale
 
 TICK_WIDTH = 0.4
-TICK_LENGTH = 6.0  # main ticks, from the top edge down
-HALF_TICK_LENGTH = 7.0  # the special 0.5 tick ("longer than any other")
+# Graduation-mark lengths are modelling choices: ch16 pins only the 200×8 body and
+# the 0–10 / 80 mm scale, not how far the marks reach across the width. Sized to the
+# 8 mm body at ~the original 15 mm-body proportions (≈0.40 / 0.50 of width) so they
+# stay short edge graduations and the 0.5 tick reads "longer than any other". The old
+# 6/7 mm predated the width 15→8 re-read (bd992c6) and spanned 75/87 % of the new
+# width — that put the 0.5 tick's bottom corner 1 mm off the edge, which SolidWorks
+# rejected when dimensioning that corner to the origin (vertical_distance = 1).
+TICK_LENGTH = 3.0  # main ticks, from the top edge down
+HALF_TICK_LENGTH = 4.0  # the special 0.5 tick ("longer than any other")
 TICK_DEPTH = 0.5  # engraving depth
 TICK_OVERHANG = 1.0  # sketch reaches past the top edge: a line drawn exactly
 # on a model edge picks up an inferred collinear relation that over-defines
