@@ -8,7 +8,7 @@ A ``.SLDASM`` is a thin reference layer over its part files, so when only a
 referenced ``.SLDPRT`` changed, an assembly is REFRESHED (reopen + per-config
 ForceRebuild3 + gates + in-place Save3 -- seconds) instead of rebuilt from
 scratch (re-insert + re-mate ~122 components -- ~500 s). The recipe escalates to a
-FULL rebuild (+ engagement-config hooks) when the assembly script / _common.py / a
+FULL rebuild (+ any post-assembly hooks) when the assembly script / _common.py / a
 hook changed, or the target is missing. A refresh that hits a dangling mate, free
 DOF, or interference FAILS LOUD (non-zero exit, .SLDASM untouched); recover with
 the full escape below.
@@ -199,11 +199,10 @@ class _RecipeTracker:
 def build_or_refresh(stem, dependencies, changed, targets):
     """FULL rebuild vs cheap REFRESH for one assembly stem.
 
-    FULL (run build_<stem>_assembly.py + its POST_ASSEMBLY hooks) when the target
+    FULL (run build_<stem>_assembly.py + any POST_ASSEMBLY hooks) when the target
     is missing OR the recipe itself changed (assembly script / _common.py / a hook
-    script) -- the engagement configs only exist after a fresh create_assembly, so
-    the hooks must re-run. Otherwise only referenced parts changed: REFRESH
-    (refresh_assembly.py, no hooks -- reopening preserves the existing configs).
+    script). Otherwise only referenced parts changed: REFRESH (refresh_assembly.py,
+    no hooks -- reopening preserves the existing configuration).
 
     The recipe-changed bit comes from _RecipeTracker (uptodate), NOT doit's
     ``changed`` arg -- the latter is corrupted by a prior failed task (D2).
