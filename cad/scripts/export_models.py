@@ -245,7 +245,14 @@ def save_colors(colors: dict) -> None:
 def part_stl_stale(stem: str, mesh: str, colors: dict) -> bool:
     src = OUT_SLDPRT / f"{stem}.SLDPRT"
     stl = OUT_STL / f"{mesh}.STL"
+    step = OUT_STEP / f"{stem}.STEP"
+    # STEP staleness matters even when the STL looks fresh: a part build now writes
+    # a build-time STL (newer than the SLDPRT) but does NOT refresh the STEP or the
+    # cached colour, so a rebuilt part would otherwise be skipped here with a stale
+    # STEP/colour (codex review #11). A missing/older STEP -> re-export, which also
+    # re-reads the appearance colour.
     return (not stl.exists() or stl.stat().st_mtime < src.stat().st_mtime
+            or not step.exists() or step.stat().st_mtime < src.stat().st_mtime
             or mesh not in colors)
 
 
@@ -258,8 +265,7 @@ def main() -> int:
     assemblies = [m for m in models if m not in parts]
 
     stale_parts = [m for m in parts if force
-                   or part_stl_stale(m.replace("_", "-"), m.replace("_", "-"), colors)
-                   or not (OUT_STEP / f"{m.replace('_', '-')}.STEP").exists()]
+                   or part_stl_stale(m.replace("_", "-"), m.replace("_", "-"), colors)]
     stale_asms = []
     for m in assemblies:
         src, bj = model_path(m), OUT_BOXES / f"{m.replace('_', '-')}.json"
