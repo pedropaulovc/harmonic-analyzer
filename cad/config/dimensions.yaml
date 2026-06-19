@@ -291,8 +291,8 @@ sections:
         - DP 30 (m = 0.8467 mm)
         - —
         - 'M4 prep, two independent measurements converge (see Appendix C #1 — resolved): p.18 photo tooth pitch 2.69 mm via 7 mm-callout scale; largest-gear OD ≈ 105 ± 5 mm via 150 mm-arrow scale (DP 30 → 103.3). Gives round-inch PDs: largest cone / cylinder gear PD = 120/30 = 4.000", pinion PD = 1.400"'
-        - scaled ×2 + period argument
-        - high
+        - derived (2 scalings converge + round-inch period argument)
+        - med
       - - Pressure angle
         - 14.5° assumed
         - —
@@ -806,30 +806,24 @@ sections:
         - photo callout pp. 34–35
         - annotated
         - high
-      - - Division spacing
+      - - Stick width
         - 8 mm
         - '0.315'
         - photo callout pp. 34–35
         - annotated
         - high
       - - Scale
-        - 0–10, hand-stamped, uneven
+        - 0–10, hand-stamped — 10 equal divisions of one half of the rocker arm
         - —
-        - text pp. 34–35 (0.5 tick longest; 0.4–0.5 gap < 0.5–0.6 gap)
+        - text p. 34
         - stated
         - high
       - - Scale span (10 divisions)
         - 80 mm
         - '3.15'
-        - 10 × 8 mm
+        - one half of the rocker-arm working length (p.34; ch.14 → ~160 mm)
         - derived
         - med
-      - - Body width
-        - ~15 mm
-        - ~0.59
-        - pp. 34–35 photo proportion vs 200 mm length
-        - scaled
-        - low
       - - Body thickness
         - ~3 mm
         - ~0.12
