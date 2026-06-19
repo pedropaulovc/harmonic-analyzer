@@ -645,10 +645,10 @@ sections:
         - stated
         - high
       - - Arm length
-        - symmetric ±88 mm about the pivot (176 total)
-        - ~6.9
-        - 'M6.3: ch. 15 text — positive amplitudes one side of the pivot, negative the OPPOSITE side, both up to the 80 mm measuring-stick span (+8 mm notch margin); supersedes the M2 100/70 asymmetric read'
-        - derived
+        - 'symmetric ±114.3 mm (4.5") about the pivot (228.6 = 9" total)'
+        - '4.5'
+        - 'REDERIVED from the p.29 broadside photo: pivot ball, rod-pin hole and the 16 mm depth callout give a dual scale (~8.1–8.6 px/mm), and the pivot→tip span measures 113–119 mm (central ~116) → adopt the clean imperial 4.5" half (9" total = the 9" pivot shaft). Supersedes the indirect M6.3 "80 mm bar travel + 8 mm margin" = 88 (never measured) and the M2 100/70 asymmetric read; ch. 15 symmetry retained'
+        - photo-scaled
         - med
       - - Rod-pin hole
         - Ø2 at +25.4 (1") from the pivot, rod side, mid-depth
@@ -1777,9 +1777,10 @@ sections:
          section. Cross-check: tan(cone half-angle) = 2.54/6.5839 = tan θ,
          so the cone's drum-side generator runs parallel to the drum axis —
          exactly the p.18 seam.
-      4. **Rocker arm working length** — RE-RESOLVED in M6.3 (supersedes the
-         M2 100/70 model): symmetric ±88 about the pivot, rod pin at +25.4 —
-         see the ch. 14 "Rocker pivot & supports layout" table. The M2 read
+      4. **Rocker arm working length** — RE-RESOLVED in M6.3, then REDERIVED
+         from the p.29 broadside photo (supersedes the indirect ±88 and the
+         M2 100/70 model): symmetric ±114.3 (4.5") about the pivot, rod pin at
+         +25.4 — see the ch. 14 "Rocker pivot & supports layout" table. The M2 read
          put the connecting rods at the arm tips; ch. 15's "positive one side,
          negative the opposite side" plus the vertical-rod/arbor-x closure
          refutes that.
