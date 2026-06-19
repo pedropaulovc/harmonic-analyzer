@@ -2492,9 +2492,8 @@ def save_assembly_in_place(adapter: Any, asm_name: str) -> None:
     write silently and return the error/warning codes. ``SaveReferenced`` writes
     any dirty reference without a dialog. The GetSaveFlag short-circuit skips a
     no-op save; the mtime assertion proves the file was rewritten (never
-    deleted). Generalised from ``build_engagement_configs._save_assembly_in_place``
-    (proven by ``repro_inplace_save.py``: ret=True, err=0, warn=0, config persists
-    on reopen).
+    deleted). Proven by ``repro_inplace_save.py`` (ret=True, err=0, warn=0, the
+    active config persists on reopen).
     """
     import pythoncom
     from win32com.client import VARIANT
@@ -2560,15 +2559,14 @@ async def refresh_assembly(
 
     configs = check("list configurations", await adapter.list_configurations())
     log(f"refresh {asm_name}: {len(configs)} configuration(s): {configs}")
-    # The deterministic export/rest pose. Default is the saved, rendered pose the
-    # top-level assembly references; engagement configs (cone_disengaged etc.) are
-    # intentionally under-defined, so the DOF gate only runs on rest.
+    # The deterministic export/rest pose: Default is the saved, rendered pose the
+    # top-level assembly references, and the DOF gate runs on it.
     rest = "Default" if "Default" in configs else (configs[0] if configs else None)
 
     # Per-config rebuild: load the new part geometry into EVERY configuration so a
-    # config-specific break (an engagement config whose mesh entity moved) is
-    # caught here, not silently saved. Under-defined-by-design configs are NOT a
-    # fault -- whats_wrong reports feature/mate rebuild errors, not free DOF.
+    # config-specific break (a config whose mesh entity moved) is caught here, not
+    # silently saved. Any under-defined-by-design config is NOT a fault --
+    # whats_wrong reports feature/mate rebuild errors, not free DOF.
     for cfg in configs:
         check(f"activate {cfg}", await adapter.set_active_configuration(cfg))
         adapter._attempt(

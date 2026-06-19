@@ -37,22 +37,14 @@ NON_PART_SCRIPTS = frozenset(
     }
 )
 
-# Config-mutator scripts: each adds engagement CONFIGURATIONS to an already-built
-# assembly IN PLACE (no new artefact), so they run as POST-build hooks after their
-# base assembly, not in the part queue. Keyed by assembly stem; run in listed
-# order. The drive-train child configs must exist before the top hook references
-# them -- which holds naturally, drive_train precedes harmonic_analyzer.
-POST_ASSEMBLY = {
-    "drive_train": (
-        "build_engagement_configs.py",          # + cone_disengaged
-        "build_operating_config.py",            # + operating (crank free)
-        # pinion_engaged retired with the alignment-pinion (OD-62.2 re-anchor left
-        # no room for the drum; deferred for rework). Restore this hook then.
-    ),
-    "harmonic_analyzer": (
-        "build_top_engagement_configs.py",      # + the 3 top configs (child refs)
-    ),
-}
+# Post-assembly hooks: scripts that mutate an already-built assembly IN PLACE (no
+# new artefact), run after their base assembly rather than in the part queue.
+# Keyed by assembly stem; run in listed order.
+#
+# Empty: the engagement-CONFIGURATION mutators (cone_disengaged / operating) were
+# removed -- every assembly now carries only its Default configuration. Re-add a
+# stem -> (script, ...) entry here if a future in-place post-build step is needed.
+POST_ASSEMBLY: dict[str, tuple[str, ...]] = {}
 _POST_SCRIPT_NAMES = frozenset(s for v in POST_ASSEMBLY.values() for s in v)
 
 
