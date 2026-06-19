@@ -118,12 +118,12 @@ arm with fiducial indentations for alignment; tapered pin affixes crank to shaft
 
 | dim | value | (in) | source | method | confidence |
 |---|---|---|---|---|---|
-| Gear face width | 7 mm annotated; modeled 6.5 | 0.276 | photo callout p.18; M6.7: the exact-tracking seat pitch 6.584 (see Axial gear pitch row) cannot carry 7 mm faces (0.42 overlap) — the annotated 7/7.5/150 trio is mutually inconsistent with the frame-locked drum grid, which wins | annotated (callout), derived (modeled) | high/low |
+| Gear face width | 7 mm | 0.276 | photo callout p.18 — the annotated 7/7.5/150 trio is mutually inconsistent with the frame-locked drum grid; the build trims the as-built face to clear the seat pitch (a model detail, see build_cone_gear.py) | annotated | high |
 | Cone set axial length | 150 mm | 5.91 | photo callout p.18; M6.7 reconciliation: gear stack 19 × 6.584 + 6.5 ≈ 131.6 + 64T face 10 + air ≈ 145 — the arrow plausibly spans gears + 64T | annotated | high |
 | Gear count | 20 | — | text p.16 | stated | high |
 | Tooth counts | 6, 12, 18 … 120 (step 6) | — | text p.16 | stated | high |
 | Crank→cone reduction | 4:1 (1 crank turn = 1/4 cone turn) | — | text p.16 | stated | high |
-| Axial gear pitch | 7.5 mm annotated lineage; modeled 6.584 along the shaft | 0.295 | 150 mm / 20 gears gave 7.5, whose Z-projection 7.0568 became the frame-locked drum grid (gates, channels — Appendix C #3); M6.7 exact tracking then fixes the along-shaft seat pitch at 7.0568 × cos 21.1° = 6.5839 (the drum grid is the survivor, the 7.5 annotation only its lineage) | derived | med |
+| Axial gear pitch | 7.5 mm | 0.295 | 150 mm / 20 gears = 7.5 along the cone axis; its Z-projection 7.0568 is the frame-locked drum grid (gates, channels — Appendix C #3). The build trims the along-shaft seat pitch to clear the 21.1° incline — a model detail. | derived | med |
 | Diametral pitch / module | DP 30 (m = 0.8467 mm) | — | M4 prep, two independent measurements converge (see Appendix C #1 — resolved): p.18 photo tooth pitch 2.69 mm via 7 mm-callout scale; largest-gear OD ≈ 105 ± 5 mm via 150 mm-arrow scale (DP 30 → 103.3). Gives round-inch PDs: largest cone / cylinder gear PD = 120/30 = 4.000", pinion PD = 1.400" | scaled ×2 + period argument | high |
 | Pressure angle | 14.5° assumed | — | period-typical; not stated anywhere | derived | low |
 | Cone shaft length | 190 mm | 7.5 | M6.7: pivot journal 25 + stack 19 × 6.584 + 6.5 ≈ 131.6 + thin-tip journal through the knob post at station 177 | derived | low |
