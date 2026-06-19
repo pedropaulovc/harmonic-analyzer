@@ -9,19 +9,17 @@ the only hard provenance fact on the machine; the '2' stamped a few centimetres
 away in the baseplate corner is a separate base feature, not modelled here.
 
 The lettering, ornament and pinstripe are reproduced from the actual photo, not a
-font: the polished engraving was traced off the p.71 macro into two DXFs in plate
-millimetres. This script no longer imports those DXFs -- it draws the same traced
-geometry with native SolidWorks **sketch primitives**:
+font: the polished engraving was traced off the p.71 macro (originally into DXFs,
+since retired) and is now drawn with native SolidWorks **sketch primitives**:
 
 * the glyph + scroll-cartouche contours are drawn as closed line chains from the
-  vendored ``_nameplate_geometry.LETTERING_LOOPS`` (extracted from the engraving
-  DXF; see tools/gen_nameplate_geometry.py) and cut into the field floor;
+  vendored ``_nameplate_geometry.LETTERING_LOOPS`` and cut into the field floor;
 * the pinstripe frame is two concentric rounded rectangles (true corner arcs via
   :func:`sketch_rounded_rect`), cut shallow on the raised border.
 
-The DXFs stay in cad/assets only as the trace provenance and the golden reference
-for ``test_nameplate_geometry``, which proves the primitive geometry reproduces
-them to >=98% (engraving 100%, pinstripe band 99.99%, finished volume 100%).
+``test_nameplate_geometry`` rebuilds the plate in CadQuery (a SolidWorks stand-in)
+and guards the vendored geometry against the golden analytic targets the primitives
+were validated to (engraving 100%, pinstripe band 99.99%, finished volume 100%).
 
 Dimensions: cad/DIMENSIONS.md ch.26 -- 100 x 55 stated (high); thickness, corner
 radius, border, recess, pinstripe and screw inset are photo-plausible reads off

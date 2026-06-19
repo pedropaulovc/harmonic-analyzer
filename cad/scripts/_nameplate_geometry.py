@@ -1,17 +1,16 @@
 """Vendored nameplate engraving geometry -- native sketch line-loops.
 
-Provenance: the maker's-plate engraving (book ch.26 p.71 macro) was traced
-off the photo into ``cad/assets/nameplate-engraving.dxf`` (smoothed letters +
-scroll cartouche) and ``cad/assets/nameplate-border.dxf`` (the pinstripe frame).
-This module re-expresses that exact traced geometry as plain coordinate loops so
+Provenance: the maker's-plate engraving (book ch.26 p.71 macro) was traced off
+the photo (originally into smoothed-letter / pinstripe DXFs, since retired).
+This module is that exact traced geometry as plain coordinate loops, so
 ``build_nameplate`` can draw it with SolidWorks **sketch primitives** (line
-chains + rounded-rectangle arcs) instead of importing the DXFs at build time.
-The DXFs are retained only as the trace provenance and the golden reference for
-``test_nameplate_geometry`` (which asserts this data reproduces them to >=98%).
+chains for the glyphs + cartouche, rounded-rectangle arcs for the pinstripe
+frame) with no DXF import at build time.
 
 Coordinates are plate millimetres in the build frame (origin = plate corner,
 +X width, +Y height); each loop is implicitly closed (no repeated end vertex).
-Generated from the DXFs -- do not hand-edit; re-run tools/gen_nameplate_geometry.py.
+This is the source of truth for the engraving -- hand-edit deliberately; the
+even-odd nesting (outer glyph loops vs counters) must be preserved.
 """
 
 from __future__ import annotations
