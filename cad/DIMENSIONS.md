@@ -124,7 +124,7 @@ arm with fiducial indentations for alignment; tapered pin affixes crank to shaft
 | Tooth counts | 6, 12, 18 … 120 (step 6) | — | text p.16 | stated | high |
 | Crank→cone reduction | 4:1 (1 crank turn = 1/4 cone turn) | — | text p.16 | stated | high |
 | Axial gear pitch | 7.5 mm | 0.295 | 150 mm / 20 gears = 7.5 along the cone axis; its Z-projection 7.0568 is the frame-locked drum grid (gates, channels — Appendix C #3). The build trims the along-shaft seat pitch to clear the 21.1° incline — a model detail. | derived | med |
-| Diametral pitch / module | DP 30 (m = 0.8467 mm) | — | M4 prep, two independent measurements converge (see Appendix C #1 — resolved): p.18 photo tooth pitch 2.69 mm via 7 mm-callout scale; largest-gear OD ≈ 105 ± 5 mm via 150 mm-arrow scale (DP 30 → 103.3). Gives round-inch PDs: largest cone / cylinder gear PD = 120/30 = 4.000", pinion PD = 1.400" | scaled ×2 + period argument | high |
+| Diametral pitch / module | DP 30 (m = 0.8467 mm) | — | M4 prep, two independent measurements converge (see Appendix C #1 — resolved): p.18 photo tooth pitch 2.69 mm via 7 mm-callout scale; largest-gear OD ≈ 105 ± 5 mm via 150 mm-arrow scale (DP 30 → 103.3). Gives round-inch PDs: largest cone / cylinder gear PD = 120/30 = 4.000", pinion PD = 1.400" | derived (2 scalings converge + round-inch period argument) | med |
 | Pressure angle | 14.5° assumed | — | period-typical; not stated anywhere | derived | low |
 | Cone shaft length | 190 mm | 7.5 | M6.7: pivot journal 25 + stack 19 × 6.584 + 6.5 ≈ 131.6 + thin-tip journal through the knob post at station 177 | derived | low |
 | Cone shaft diameter | stepped: 9.5 (3/8") z 0–136.88, 6.35 (1/4") to 143.47, 4.76 (3/16") to 150.05, 3.18 (1/8") to 190 (large/pivot end at z 0) | 0.375/0.25/0.1875/0.125 | base dia legacy `parameters.kcl` ShaftDiameter; p.18 shows a visibly thin rod past the smallest gears. M6.7: each step station lands in the 0.08 mm air gap between adjacent gear faces (seats at 28.25 + 6.584j ± 3.25); the M6.7 shaft line passes 0.39 clear of the last drum gear's tooth tips, so the photo-true 1/8" tip needs no narrowing — `build_cone_gear_shaft.py` | legacy + derived | med |
@@ -306,10 +306,9 @@ top at ≈ 1072.3, pin at ≈ 1065.9.
 | dim | value | (in) | source | method | confidence |
 |---|---|---|---|---|---|
 | Overall length | 200 mm | 7.87 | photo callout pp. 34–35 | annotated | high |
-| Division spacing | 8 mm | 0.315 | photo callout pp. 34–35 | annotated | high |
-| Scale | 0–10, hand-stamped, uneven | — | text pp. 34–35 (0.5 tick longest; 0.4–0.5 gap < 0.5–0.6 gap) | stated | high |
-| Scale span (10 divisions) | 80 mm | 3.15 | 10 × 8 mm | derived | med |
-| Body width | ~15 mm | ~0.59 | pp. 34–35 photo proportion vs 200 mm length | scaled | low |
+| Stick width | 8 mm | 0.315 | photo callout pp. 34–35 | annotated | high |
+| Scale | 0–10, hand-stamped — 10 equal divisions of one half of the rocker arm | — | text p. 34 | stated | high |
+| Scale span (10 divisions) | 80 mm | 3.15 | one half of the rocker-arm working length (p.34; ch.14 → ~160 mm) | derived | med |
 | Body thickness | ~3 mm | ~0.12 | pp. 34–35 photo proportion | scaled | low |
 
 Notes: ruled brass gauge (Wm. Gaertner & Co.) with a sliding/locking stop. The
