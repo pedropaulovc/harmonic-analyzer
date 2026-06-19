@@ -109,9 +109,21 @@ async def build(adapter) -> dict[str, str]:
     # machine front, and the file opens on it. Geometry is untouched.
     remap_front_to_machine_front(adapter)
     artefacts = await save_assembly_and_images(adapter, ASM_NAME)
+    artefacts.update(await export_gallery_and_bom(adapter))
+    return artefacts
 
-    # Ch. 30 eight-views gallery (after the save: gallery + BOM leave the
-    # doc dirty, the SLDASM on disk stays table-free).
+
+async def export_gallery_and_bom(adapter) -> dict[str, str]:
+    """The top-only artefacts beyond the standard save + DEFAULT_VIEWS: the Ch.30
+    eight-views gallery and the parts-only BOM CSV.
+
+    Factored out of :func:`build` so the cheap REFRESH path (refresh_assembly.py)
+    regenerates them after a subassembly change -- otherwise the generic refresh
+    saves only the .SLDASM + three default views and these top-level deliverables
+    go stale (codex review #6). The standard-view remap is already baked into the
+    saved .SLDASM, so the gallery's ShowNamedView2 views are correct on reopen; the
+    gallery + BOM leave the doc dirty but the .SLDASM on disk stays table-free."""
+    artefacts: dict[str, str] = {}
     for view in EIGHT_VIEWS:
         img_path = (OUT_PNG / f"eight-views-{view}.png").resolve()
         check(
@@ -128,7 +140,6 @@ async def build(adapter) -> dict[str, str]:
         )
         artefacts[f"eight-views-{view}"] = str(img_path)
 
-    # Parts-only BOM (flattened through the subassemblies) -> CSV.
     from solidworks_mcp.adapters.base import CreateBomParameters
 
     bom_path = (OUT_PNG.parent / "harmonic-analyzer-bom.csv").resolve()
