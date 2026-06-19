@@ -164,12 +164,12 @@ RAIL_TOP_Y = 1040.7
 LEVER_MOUNT_Z = 85.0  # clears the top-frame boss bores (DIMENSIONS.md)
 
 # --- spring (build_channel_spring_installed.py locals) ----------------------
-from build_channel_spring import build_spring  # noqa: E402
+from build_channel_spring import COIL_BODY_LENGTH, build_spring  # noqa: E402
 from build_channel_spring_installed import (  # noqa: E402
-    BOTTOM_LEAD as SPRING_BOTTOM_LEAD,
-    INSTALLED_BODY_LENGTH as SPRING_BASE_BODY,  # 63.05: the neutral installed body
-    PLATE_EYE_Y,  # 989.5: fixed summing-plate bottom-eye y (the spring's lower anchor)
-    TOP_EYE_LOCAL_Y as SPRING_EYE_LOCAL_Y,  # 65.05: loop centre on the axis
+    BOTTOM_LEAD as SPRING_BOTTOM_LEAD,  # 9.1: lead spanning the plate thickness
+    INSTALLED_BODY_LENGTH as SPRING_BASE_BODY,  # 68.51: the neutral installed body
+    PLATE_EYE_Y,  # 984.04: fixed summing-plate bottom-eye y (the spring's lower anchor)
+    TOP_EYE_LOCAL_Y as SPRING_EYE_LOCAL_Y,  # 70.51: loop centre on the axis
     TOP_LEAD as SPRING_TOP_LEAD,  # 2.0
 )
 
@@ -509,14 +509,23 @@ def _assert_spring_threading(hole_y: float, eye_y: float) -> None:
 
 
 def _assert_plate_threading(eye_y: float) -> None:
-    """Assert the bottom attachment clears the summing-lever plate.
+    """Assert the spring's plate end threads the summing-lever plate.
 
-    The bottom lead (a straight O1 wire one coil mean radius -Z of the
-    spring axis) drops through the plate's O4.5 hole; the end loop hangs
-    fully under the plate. Checks: loop top vs plate bottom, coil bottom
-    wire vs plate top, lead vs bore (lead centred: hole r - wire r).
+    The channel spring is a tension coil hooked at BOTH ends: the top eye
+    rides the lever at ``eye_y`` (pose-dependent) while the bottom eye is
+    pinned to the FIXED summing-plate hole at ``PLATE_EYE_Y`` -- the body
+    stretches between (see ``_spring_spec``). So the plate-end geometry is
+    anchored at the plate, NOT hung a fixed distance below the moving top eye:
+    the bottom lead (a straight O1 wire one coil mean radius -Z of the axis)
+    drops through the plate's O4.5 hole and the end loop hangs fully under the
+    plate, regardless of the rest pose. (Deriving the bottom from ``eye_y`` --
+    the old rigid-spring model -- only matched at the exact design pose; the
+    OD-62.2 re-anchor dropped the neutral eye 0.5 mm and the parametric spring
+    absorbed it by stretching 0.5 mm less, but the rigid check drifted and
+    false-flagged the coil.) Checks the pose-independent plate-end fit plus the
+    genuine pose-dependent invariant: the neutral body must stay stretched.
     """
-    bottom_eye_y = eye_y - SPRING_EYE_LOCAL_Y - SPRING_BOTTOM_LEAD
+    bottom_eye_y = PLATE_EYE_Y  # pinned at the plate hole, not hung off the top eye
     plate_bottom = PLATE_TOP_Y - PLATE_THICKNESS
     wire_r = SPRING_WIRE_DIA / 2.0
     loop_top = bottom_eye_y + SPRING_LOOP_R + wire_r
@@ -524,15 +533,23 @@ def _assert_plate_threading(eye_y: float) -> None:
     margin_loop = plate_bottom - loop_top
     margin_coil = coil_bottom_wire - PLATE_TOP_Y
     margin_bore = PLATE_HOLE_DIA / 2.0 - wire_r
+    body = (eye_y - PLATE_EYE_Y) - SPRING_TOP_LEAD - SPRING_BOTTOM_LEAD
     if margin_loop < 0.02 or margin_coil < 0.02:
         raise RuntimeError(
             f"plate threading margins too small: loop-under-plate"
             f" {margin_loop:.3f}, coil-over-plate {margin_coil:.3f}"
         )
+    if body < COIL_BODY_LENGTH:
+        raise RuntimeError(
+            f"neutral spring body {body:.2f} mm below the free coil"
+            f" {COIL_BODY_LENGTH:.2f} mm: the rest pose dropped the lever eye too"
+            f" far -- the spring would be in compression, not tension"
+        )
     log(
         f"plate threading: bottom eye y {bottom_eye_y:.2f}, loop-under-plate"
         f" margin {margin_loop:.2f}, coil-over-plate margin {margin_coil:.2f},"
-        f" lead bore clearance {margin_bore:.2f}"
+        f" lead bore clearance {margin_bore:.2f}, neutral body {body:.2f}"
+        f" (free {COIL_BODY_LENGTH:.2f})"
     )
 
 
