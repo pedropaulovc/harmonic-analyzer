@@ -28,7 +28,6 @@ import math
 import sys
 
 from _common import (
-    add_reeded_head_and_thread,
     apply_material,
     check,
     define_circle,
@@ -38,6 +37,7 @@ from _common import (
     save_part_and_images,
     volume_check,
 )
+from _features import add_reeded_head_and_thread
 
 PART_NAME = "thumb-screw"
 MATERIAL = "Brass"  # see _common.apply_material docstring
