@@ -44,6 +44,7 @@ import hashlib
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 # Part tasks run via doit ``CmdAction(verbosity=2)``, which pipes each build
@@ -124,12 +125,21 @@ def _run(cmd: list[str], label: str) -> None:
         raise RuntimeError(f"{label} failed (exit {proc.returncode})")
 
 
-# --- Parts: build_<stem>.py -> out/sldprt/<dashed>.SLDPRT. A part is stale when
-# its own script, the shared modules, or any config yaml changed (coarse but
-# correct: a _common/_config/yaml edit can invalidate any part -- rare).
-_SHARED_PART_DEPS = [str(COMMON.resolve()), str(CONFIG_PY.resolve())] + [
-    str(p.resolve()) for p in sorted(CONFIG_DIR.glob("*.yaml"))
+# --- Shared build inputs that can invalidate ANY part or assembly geometry: the
+# helper modules every build script imports (_common, _config, _gear, _chain,
+# _chain_link) plus the YAML data layer. Coarse but correct -- a helper or YAML
+# edit can change any body, and content-hashing means an edit that does not change
+# a given part's bytes still costs only that one rebuild. (Excludes _buildgraph.py:
+# it is the build-GRAPH helper imported here, not a geometry input.) Without these,
+# editing e.g. _gear.py leaves every gear .SLDPRT reported up to date and
+# downstream assemblies refresh from stale parts (codex review #1).
+_HELPER_MODULES = [
+    str(p.resolve())
+    for p in sorted(SCRIPTS_DIR.glob("_*.py"))
+    if p.name != "_buildgraph.py"
 ]
+_CONFIG_YAMLS = [str(p.resolve()) for p in sorted(CONFIG_DIR.glob("*.yaml"))]
+_SHARED_BUILD_DEPS = _HELPER_MODULES + _CONFIG_YAMLS
 
 
 def task_part():
@@ -138,7 +148,7 @@ def task_part():
         stem = script.stem.removeprefix("build_")
         yield {
             "name": stem,
-            "file_dep": [str(script.resolve()), *_SHARED_PART_DEPS],
+            "file_dep": [str(script.resolve()), *_SHARED_BUILD_DEPS],
             "targets": [_sldprt(stem)],
             "actions": [CmdAction([sys.executable, str(script)], cwd=str(REPO_ROOT))],
             "clean": True,
@@ -214,14 +224,56 @@ def build_or_refresh(stem, dependencies, changed, targets):
          f"REFRESH {stem}")
 
 
+def _close_sw_documents() -> None:
+    """Best-effort: close every open SolidWorks document to release file locks.
+
+    A live or recently-failed build session holds .SLDASM/.png paths open on
+    Windows, so a bare unlink/rmtree raises PermissionError. Swallows everything
+    (no SolidWorks running, COM unavailable, ...) -- this is only a lock-release
+    nudge before a retry."""
+    try:
+        sys.path.insert(0, str(SCRIPTS_DIR))
+        from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
+
+        adapter = PyWin32Adapter({})
+        import asyncio
+
+        asyncio.run(adapter.connect())
+        adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+    except Exception:  # noqa: BLE001 -- pure best-effort
+        pass
+
+
+def _force_remove(path: Path) -> None:
+    """Unlink/rmtree a generated CAD output, retrying past a transient SolidWorks
+    file lock; closes open SW documents before the final attempt. Never silently
+    ignores a persistent failure -- the last attempt re-raises (codex review #7)."""
+    if not path.exists():
+        return
+    remove = (lambda: shutil.rmtree(path)) if path.is_dir() else path.unlink
+    for attempt in range(3):
+        try:
+            remove()
+            return
+        except PermissionError:
+            if attempt == 0:
+                _close_sw_documents()
+            time.sleep(0.5)
+    remove()  # final attempt: surface the error loudly rather than leave a stale lock
+
+
 def _clean_assembly(stem):
-    """Remove the .SLDASM target and wipe its png/<dashed> render dir."""
-    target = Path(_sldasm(stem))
-    png_dir = CAD_OUT / "png" / stem.replace("_", "-")
-    if target.exists():
-        target.unlink()
-    if png_dir.exists():
-        shutil.rmtree(png_dir, ignore_errors=True)
+    """Remove the .SLDASM target, its png/<dashed> render dir, and -- for channel
+    -- the dynamically-generated stretched-spring variants (which are not any
+    task's declared target, so a stale stretchNN body would otherwise be reused on
+    the next build; codex review #4)."""
+    _force_remove(Path(_sldasm(stem)))
+    _force_remove(CAD_OUT / "png" / stem.replace("_", "-"))
+    if stem == "channel":
+        for variant in sorted(
+            (CAD_OUT / "sldprt").glob("channel-spring-installed-stretch*.SLDPRT")
+        ):
+            _force_remove(variant)
 
 
 def task_assembly():
@@ -239,7 +291,12 @@ def task_assembly():
         ref_targets = [
             _sldasm(r) if r in ASSEMBLY_ORDER else _sldprt(r) for r in refs
         ]
-        recipe_files = [str(asm_script.resolve()), str(COMMON.resolve()), *hooks]
+        # Recipe = everything whose change needs a FULL rebuild (re-insert/re-mate),
+        # not a part-only refresh: the assembly script, its hooks, the helper
+        # modules, AND the _config/YAML data layer -- a placement like
+        # channels.station_pitch_mm changing means components must be re-inserted at
+        # new coordinates, which an in-place reload cannot do (codex review #2).
+        recipe_files = [str(asm_script.resolve()), *hooks, *_SHARED_BUILD_DEPS]
         yield {
             "name": stem,
             "file_dep": [*recipe_files, *ref_targets],
