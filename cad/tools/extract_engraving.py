@@ -2,9 +2,11 @@
 outlines (shapely), pickled for make_engraving_dxf.py.
 
 Source: the p.71 macro of the Wm. Gaertner & Co. nameplate from the public book
-"Albert Michelson's Harmonic Analyzer" (engineerguy.com), vendored beside this
-script as ``cad/assets/nameplate-source.jpg``. The engraving is bright polished
-brass on a blackened field, so it segments cleanly by local-adaptive threshold;
+"Albert Michelson's Harmonic Analyzer" (engineerguy.com). The image is NOT
+committed -- crop page 71 of the book PDF and save it (git-ignored) as
+``cad/assets/nameplate-source.jpg`` to regenerate. The engraving is bright
+polished brass on a blackened field, so it segments cleanly by local-adaptive
+threshold;
 the border / screws (which touch the crop edge) and speckle are dropped, the
 central ornament band is closed + hole-filled so the cartouche lens reads as the
 solid engraved pad the maker intended (not the century of tarnish in the photo).
