@@ -242,14 +242,25 @@ def _hausdorff(pa, pb, n=40000, budget=4_000_000):
 def classify(old, new, keys, tol=0.01):
     """Return ({changed mesh keys}, {key: hausdorff_mm})."""
     changed, devs = set(), {}
+    # Cheap CRC32 pass first (zip CRC / file hash): an identical signature is an
+    # unchanged mesh for free, so the expensive Hausdorff verify -- and the
+    # per-key HTTP range fetch of the OLD release -- only runs on the meshes
+    # whose bytes actually differ. Surface those counts up front so the verify
+    # loop below reads as measurable progress, not a stall.
+    to_verify = []
     for k in sorted(keys):
-        c_old, c_new = old.crc(k), new.crc(k)
+        c_old = old.crc(k)
         if c_old is None:
             changed.add(k)            # new part -> changed
             devs[k] = float("inf")
             continue
-        if c_old == c_new:
+        if c_old == new.crc(k):
             continue                  # identical signature -> unchanged (free)
+        to_verify.append(k)
+    identical = len(keys) - len(changed) - len(to_verify)
+    print(f"CRC pass: {len(changed)} new, {len(to_verify)} to geometry-verify, "
+          f"{identical} identical (of {len(keys)} meshes)", flush=True)
+    for i, k in enumerate(to_verify, 1):
         po, pn = old.stl(k), new.stl(k)
         d = _hausdorff(po, pn) if (po and pn) else float("inf")
         devs[k] = d
@@ -257,7 +268,8 @@ def classify(old, new, keys, tol=0.01):
         if d > tol:
             changed.add(k)
             verdict = "CHANGED"
-        print(f"  verify {k:34s} ~Hausdorff={d:8.3f} mm -> {verdict}", flush=True)
+        print(f"  [{i}/{len(to_verify)}] verify {k:34s} ~Hausdorff={d:8.3f} mm "
+              f"-> {verdict}", flush=True)
     return changed, devs
 
 
@@ -302,7 +314,7 @@ def main():
     pl = pv.Plotter(off_screen=True, window_size=(args.res, args.res))
     pl.set_background("white")
     n_hi = 0
-    for c in comps:
+    for idx, c in enumerate(comps, 1):
         key = c.get("mesh") or c["part"]
         p = new.stl(key)
         if p is None:
@@ -317,13 +329,16 @@ def main():
                     opacity=1.0 if is_changed else args.ghost_opacity,
                     smooth_shading=True, specular=0.2,
                     backface_culling=not is_changed)
+        if idx % 50 == 0 or idx == len(comps):
+            print(f"  scene build {idx}/{len(comps)} instances ...", flush=True)
     print(f"highlighted {n_hi} component instances", flush=True)
     pl.add_text(f"{old.label} -> {new.label}  (red = changed geometry)",
                 font_size=11, color="black")
 
     images = []
-    for name, cpos in (("iso", "iso"), ("front", "xy"),
-                       ("right", "yz"), ("top", "xz")):
+    views = (("iso", "iso"), ("front", "xy"), ("right", "yz"), ("top", "xz"))
+    print(f"rendering {len(views)} camera views at {args.res}px ...", flush=True)
+    for name, cpos in views:
         pl.camera_position = cpos
         if name == "iso":
             pl.camera.azimuth = 35
