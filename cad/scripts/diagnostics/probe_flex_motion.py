@@ -224,8 +224,7 @@ def _entity_path(name2: str, feature: str, title: str) -> str:
 
 async def build(adapter):
     from solidworks_mcp.adapters.base import (
-        ComponentRefParameters, InsertComponentParameters, MateEntityRef,
-        MotionMotorParameters, MotionStudyParameters, MotionStudyRefParameters,
+        ComponentRefParameters, InsertComponentParameters, MotionStudyParameters, MotionStudyRefParameters,
         MotionTimeParameters, SuppressMateParameters,
     )
 

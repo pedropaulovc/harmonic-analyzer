@@ -59,7 +59,6 @@ from __future__ import annotations
 import sys
 
 from _common import (
-    IN,
     OUT_SLDPRT,
     check,
     run_build,

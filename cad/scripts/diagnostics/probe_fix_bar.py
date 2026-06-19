@@ -30,7 +30,7 @@ from _assembly import (
     coincident_mate,
     named_ref,
 )
-from build_motion_study import OUT_SLDASM, _find_family, _find_one, _sub_model
+from build_motion_study import OUT_SLDASM, _find_one, _sub_model
 from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
 
 

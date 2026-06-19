@@ -76,7 +76,6 @@ import sys
 import _config
 from _common import (
     MIRROR_PLANE,
-    OUT_SLDPRT,
     check,
     log,
     run_build,
@@ -171,7 +170,6 @@ from build_channel_spring_installed import (  # noqa: E402
     BOTTOM_LEAD as SPRING_BOTTOM_LEAD,  # 9.1: lead spanning the plate thickness
     INSTALLED_BODY_LENGTH as SPRING_BASE_BODY,  # 68.51: the neutral installed body
     PLATE_EYE_Y,  # 984.04: fixed summing-plate bottom-eye y (the spring's lower anchor)
-    TOP_EYE_LOCAL_Y as SPRING_EYE_LOCAL_Y,  # 70.51: loop centre on the axis
     TOP_LEAD as SPRING_TOP_LEAD,  # 2.0
 )
 

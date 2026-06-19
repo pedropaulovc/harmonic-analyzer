@@ -28,8 +28,8 @@ import math
 import sys
 
 from build_channel_assembly import (
-    ARM_MID_DZ, ARM_PIVOT_LOCAL_Y, BAR_WIDTH, CAM_DZ, FULCRUM, PIVOT,
-    RING_CENTER, ROT_Y_POS90, SHAFT_R, rot_z_rows, solve_default_state,
+    ARM_MID_DZ, ARM_PIVOT_LOCAL_Y, CAM_DZ, PIVOT,
+    RING_CENTER, SHAFT_R, rot_z_rows, solve_default_state,
     z_station,
 )
 from _common import (
@@ -129,7 +129,7 @@ async def _concentric_faces(adapter, face_a, face_b, label):
 
 async def build(adapter):
     from solidworks_mcp.adapters.base import (
-        ComponentRefParameters, MateEntityRef, MotionMotorParameters,
+        MateEntityRef, MotionMotorParameters,
         MotionStudyParameters, MotionStudyRefParameters, MotionTimeParameters,
     )
     stage = sys.argv[1] if len(sys.argv) > 1 else "rod"
