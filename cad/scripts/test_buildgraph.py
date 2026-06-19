@@ -88,6 +88,15 @@ def test_module_deps_are_transitive():
     assert "_config" in _helper_names("build_lever_bushing.py"), "lazy _config edge lost"
 
 
+def test_closure_follows_reused_build_scripts():
+    """A part that reuses another build script inherits that script's helper
+    closure: channel-spring-installed imports build_channel_spring (which imports
+    _features), so an edit to _features must mark it stale (codex review #2)."""
+    deps = _helper_names("build_channel_spring_installed.py")
+    assert "build_channel_spring" in deps, deps
+    assert "_features" in deps, deps
+
+
 def test_specialized_helper_blast_radius_is_narrow():
     """_gear / _nameplate_geometry reach only their real importers, not the fleet."""
     gear_users = [s for s in part_stems() if "_gear" in _helper_names(f"build_{s}.py")]
@@ -96,7 +105,8 @@ def test_specialized_helper_blast_radius_is_narrow():
     assert 0 < len(gear_users) < len(part_stems()), gear_users
     assert np_users == ["nameplate"], np_users
     # spring/screw/nameplate feature builders reach only their handful of parts
-    assert 0 < len(feat_users) <= 6, feat_users
+    # (their direct importers + any part that reuses one of those build scripts)
+    assert 0 < len(feat_users) <= 8, feat_users
 
 
 def _run() -> int:
