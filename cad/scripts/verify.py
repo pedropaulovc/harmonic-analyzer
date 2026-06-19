@@ -33,11 +33,12 @@ Suites (``--suite``):
                       SolidWorks.
   engagement          per-configuration DOF + state checks (plan F4): open
                       drive-train + harmonic-analyzer and assert each engagement
-                      configuration (Default / cone_disengaged / operating /
-                      pinion_engaged) frees EXACTLY the expected DOF set (and no
-                      structural leak), and that the top references the matching
-                      child sub-config with the right solve mode. Reuses the build
-                      scripts' own per-config verifiers. Needs SolidWorks.
+                      configuration (Default / cone_disengaged / operating) frees
+                      EXACTLY the expected DOF set (and no structural leak), and
+                      that the top references the matching child sub-config with the
+                      right solve mode. Reuses the build scripts' own per-config
+                      verifiers. (pinion_engaged retired with the alignment-pinion.)
+                      Needs SolidWorks.
   all                 static + truth + config + motion.
 
 Unlike the build gates (fail-fast), ``static``/``isolation`` run every gate and
@@ -526,28 +527,25 @@ async def _verify_engagement(adapter: Any, report: Report) -> None:
     test suite" move B3 made for the build gates), so plan verification step 9 is
     one runnable target instead of four separate build-script re-runs.
 
-    drive-train.SLDASM (where the cone/pinion meshes live):
+    drive-train.SLDASM (where the cone meshes live):
       Default          0 DOF, fully defined, interference-free (engaged rest pose).
       cone_disengaged  the 21 gear meshes cut -> exactly the 42-member gear train
                        decouples (under-defined), nothing structural leaks.
       operating        crank park driver cut, meshes live -> only the rotating
                        train is free (one shared crank DOF).
-      pinion_engaged   pinion swing driver cut -> only the 3-member swing group is
-                       free (the drum swings into the cylinder mesh).
+      (pinion_engaged retired with the alignment-pinion -- deferred for rework.)
 
     harmonic-analyzer.SLDASM (the top references the matching child sub-config):
       Default          drive-train rigid @ its Default child, top fully defined.
       cone_disengaged  drive-train references its cone_disengaged child.
       operating        drive-train flexible + floated @ its operating child,
                        grounding mates still anchoring the frame.
-      pinion_engaged   drive-train flexible + floated @ its pinion_engaged child.
     """
     # Lazy import: these drag in build_motion_study / build_mobility_probe, which
     # the no-SolidWorks truth/config suites must not need. They only define the
     # per-config verifiers (execution is guarded under __main__).
     import build_engagement_configs as _bec
     import build_operating_config as _boc
-    import build_pinion_engagement_configs as _bpc
     import build_top_engagement_configs as _btc
 
     if await _open_isolated(adapter, GEAR_OWNER):
@@ -558,8 +556,6 @@ async def _verify_engagement(adapter: Any, report: Report) -> None:
                            lambda: _bec._verify_cone_disengaged(adapter))
         await report.agate(f"engagement:{GEAR_OWNER}:operating(crank free)",
                            lambda: _boc._verify_operating(adapter))
-        await report.agate(f"engagement:{GEAR_OWNER}:pinion_engaged(swing free)",
-                           lambda: _bpc._verify_pinion_engaged(adapter))
         check(f"reset {GEAR_OWNER} -> Default",
               await adapter.set_active_configuration(REST))
     else:
@@ -574,8 +570,6 @@ async def _verify_engagement(adapter: Any, report: Report) -> None:
                            lambda: _btc._verify_cone_disengaged(adapter))
         await report.agate(f"engagement:{TOP_OWNER}:operating(flexible child)",
                            lambda: _btc._verify_operating(adapter))
-        await report.agate(f"engagement:{TOP_OWNER}:pinion_engaged(flexible child)",
-                           lambda: _btc._verify_pinion_engaged(adapter))
         check(f"reset {TOP_OWNER} -> Default",
               await adapter.set_active_configuration(REST))
     else:
