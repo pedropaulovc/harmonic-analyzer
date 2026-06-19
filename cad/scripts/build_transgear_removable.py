@@ -169,15 +169,6 @@ async def build(adapter) -> dict[str, str]:
         "blank width dim (D2)",
         await adapter.add_sketch_dimension(side_line, None, "linear", FACE_WIDTH),
     )
-    # Pin the (0, 0) corner to the origin explicitly. The h/v relations + the
-    # two dims fix the rectangle's shape but not its position; previously the
-    # corner was only located by SolidWorks snapping it onto the origin during
-    # the (inference-on) line draw -- a crutch removed now that add_line_chain
-    # suppresses inference. Same explicit anchor the sibling blanks use.
-    check(
-        "blank corner -> origin",
-        await adapter.add_sketch_constraint(f"{radial_line}.start", "origin", "coincident"),
-    )
     set_sketch_direct_db(adapter, True)
     check(
         "add_centerline axis",
