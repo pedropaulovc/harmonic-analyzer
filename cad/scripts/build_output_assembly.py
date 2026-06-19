@@ -135,7 +135,6 @@ from _common import (
     place_component,
     run_build,
     save_assembly_and_images,
-    set_isometric_view,
     world_point,
     _read_member,
 )
@@ -566,7 +565,6 @@ async def build(adapter) -> dict[str, str]:
     _assert_chain_layout()
 
     check("create_assembly", await adapter.create_assembly())
-    set_isometric_view(adapter)
 
     # --- summing group ------------------------------------------------------
     # Two knife bearing supports, one per hex trunnion (overhanging the lever

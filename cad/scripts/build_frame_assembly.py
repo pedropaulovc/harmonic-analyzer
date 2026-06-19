@@ -68,7 +68,6 @@ from _common import (
     plane_distance_mate,
     run_build,
     save_assembly_and_images,
-    set_isometric_view,
 )
 
 ASM_NAME = "frame"
@@ -102,7 +101,6 @@ async def build(adapter) -> dict[str, str]:
     top_frame_path = _part("top-frame")
 
     check("create_assembly", await adapter.create_assembly())
-    set_isometric_view(adapter)
 
     # Base: first insert is auto-fixed by SolidWorks.
     res = await adapter.insert_component(

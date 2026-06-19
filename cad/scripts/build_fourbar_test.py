@@ -46,7 +46,6 @@ from _common import (
     OUT_PNG, _flag, _read_member, assert_model_healthy, bore_axis_ref, check,
     coincident_mate, component_transform, concentric_mate, distance_driver,
     log, named_ref, place_component,
-    set_isometric_view,
 )
 from build_motion_study import _entity_ref, _rot_angle, assert_motion_progressed
 from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
@@ -231,7 +230,6 @@ async def build(adapter) -> None:
     )
 
     check("create_assembly", await adapter.create_assembly())
-    set_isometric_view(adapter)
 
     # --- design-frame placements (place_component applies the machine mirror) --
     pivot_xy = (0.0, 0.0)

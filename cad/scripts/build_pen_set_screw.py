@@ -34,7 +34,6 @@ from _common import (
     report_mass_properties,
     run_build,
     save_part_and_images,
-    set_isometric_view,
     volume_check,
 )
 
@@ -51,7 +50,6 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
-    set_isometric_view(adapter)
 
     for label, dia, length in (
         ("knob", KNOB_DIA, KNOB_LENGTH),

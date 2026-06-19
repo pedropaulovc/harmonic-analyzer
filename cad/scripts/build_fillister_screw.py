@@ -36,7 +36,6 @@ from _common import (
     report_mass_properties,
     run_build,
     save_part_and_images,
-    set_isometric_view,
     volume_check,
 )
 
@@ -51,7 +50,6 @@ SHANK_LEN = 4.0  # clip 1.2 + 2.8 platen socket; = flange thickness 4
 
 async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
-    set_isometric_view(adapter)
 
     # Head -2.2..0 (Front sketch, offset extrude up to the under-head plane).
     check("create_sketch head", await adapter.create_sketch("Front"))

@@ -36,7 +36,6 @@ from _common import (
     report_mass_properties,
     run_build,
     save_part_and_images,
-    set_isometric_view,
 )
 
 PART_NAME = "gooseneck-clamp"
@@ -68,7 +67,6 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
-    set_isometric_view(adapter)
 
     # Block (Front sketch, mid-plane in Z).
     check("create_sketch block", await adapter.create_sketch("Front"))
