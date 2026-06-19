@@ -16,11 +16,11 @@ The argument, per subassembly:
 
 So with all park drivers active the device is 0-DOF (deterministic exports); drop
 the crank driver and the whole gear train is free to be turned (the 1 operating
-DOF); drop a setup driver (p0 amplitude / p1 cone swing / p2 pinion swing) and
-just that quasi-static freedom opens. The probe NEVER saves.
+DOF); drop a setup driver (p0 amplitude / p1 cone swing) and just that
+quasi-static freedom opens. The probe NEVER saves.
 
 Park drivers live as TOP-LEVEL mates of each standalone subassembly (drive-train
-carries crank + p1 + p2; channel carries the 20 p0 amplitude slides), so they are
+carries crank + p1; channel carries the 20 p0 amplitude slides), so they are
 suppressible by name without the flexible-sub indirection the motion study needs.
 
 Run (SolidWorks already open)::
@@ -59,7 +59,6 @@ from build_motion_study import (
 PROBES = [
     ("drive-train", "crank-handle", "crank input (the 1 operating DOF)"),
     ("drive-train", "cone-pivot-post", "p1 cone swing-to-disengage"),
-    ("drive-train", "alignment-pinion", "p2 pinion swing-to-engage"),
     ("channel", "amplitude-bar", "p0 amplitude slides (all 20)"),
 ]
 
