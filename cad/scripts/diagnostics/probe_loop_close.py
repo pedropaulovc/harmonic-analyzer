@@ -45,7 +45,7 @@ async def _flex_channel(adapter):
     from solidworks_mcp.adapters.base import (
         ComponentRefParameters, SetComponentSolvingParameters,
     )
-    from _common import coincident_mate, named_ref
+    from _assembly import coincident_mate, named_ref
     asm = adapter.currentModel
     sub = "channel-1"
     check(f"float {sub}", await adapter.float_component(ComponentRefParameters(name=sub)))

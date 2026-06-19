@@ -34,12 +34,14 @@ import sys
 from _common import (
     OUT_PNG,
     OUT_SLDASM,
+    check,
+    run_build,
+)
+from _assembly import (
     assert_component_placed,
     assert_components_fully_defined,
-    check,
     check_no_interference,
     remap_front_to_machine_front,
-    run_build,
     save_assembly_and_images,
 )
 

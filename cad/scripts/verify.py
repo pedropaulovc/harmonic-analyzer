@@ -68,14 +68,16 @@ import pen_driver
 import truth_model
 from _common import (
     OUT_SLDASM,
+    check,
+    log,
+    run_build,
+)
+from _assembly import (
     assert_components_fully_defined,
     assert_model_healthy,
-    check,
     check_no_interference,
     component_names,
     component_transform,
-    log,
-    run_build,
 )
 from _common import _flag, _read_member  # component iteration helpers (read-only)
 

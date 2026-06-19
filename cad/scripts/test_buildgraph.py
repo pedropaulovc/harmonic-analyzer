@@ -14,10 +14,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _buildgraph import (  # noqa: E402
     ASSEMBLY_ORDER,
+    SCRIPTS_DIR,
     dependents_of,
+    module_deps_of,
     part_stems,
     references_of,
+    script_for,
 )
+
+
+def _helper_names(stem_script: str) -> set[str]:
+    return {Path(p).stem for p in module_deps_of(SCRIPTS_DIR / stem_script)}
 
 
 def test_references_is_inverse_of_dependents():
@@ -53,6 +60,40 @@ def test_top_references_the_four_subassemblies():
     """harmonic-analyzer mates the four subs (and no leaf parts directly)."""
     refs = references_of("harmonic_analyzer")
     assert set(refs) == {"frame", "drive_train", "channel", "output"}, refs
+
+
+def test_leaf_parts_do_not_depend_on_assembly_helpers():
+    """A leaf part must NOT pull in _assembly/_transforms -- the whole point of
+    splitting them out of _common is that assembly-only edits skip every part."""
+    for stem in part_stems():
+        helpers = _helper_names(f"build_{stem}.py")
+        assert "_assembly" not in helpers, f"{stem} wrongly depends on _assembly"
+        assert "_transforms" not in helpers, f"{stem} wrongly depends on _transforms"
+        assert "_common" in helpers, f"{stem} lost its _common dependency"
+
+
+def test_assemblies_depend_on_assembly_helpers():
+    """Every assembly imports _assembly (mates/placement) and _common."""
+    for stem in ASSEMBLY_ORDER:
+        helpers = _helper_names(script_for(stem).name)
+        assert {"_assembly", "_common"} <= helpers, f"{stem}: {helpers}"
+
+
+def test_module_deps_are_transitive():
+    """The closure follows imports through helper chains: a chain-link part pulls
+    _chain_link -> _chain -> _common, and _config arrives via _common's lazy
+    import (so parts.yaml-driven custom properties stay correctly tracked)."""
+    links = _helper_names("build_chain_inner_link.py")
+    assert {"_chain_link", "_chain", "_common"} <= links, links
+    assert "_config" in _helper_names("build_lever_bushing.py"), "lazy _config edge lost"
+
+
+def test_specialized_helper_blast_radius_is_narrow():
+    """_gear / _nameplate_geometry reach only their real importers, not the fleet."""
+    gear_users = [s for s in part_stems() if "_gear" in _helper_names(f"build_{s}.py")]
+    np_users = [s for s in part_stems() if "_nameplate_geometry" in _helper_names(f"build_{s}.py")]
+    assert 0 < len(gear_users) < len(part_stems()), gear_users
+    assert np_users == ["nameplate"], np_users
 
 
 def _run() -> int:

@@ -33,8 +33,18 @@ from build_channel_assembly import (
     z_station,
 )
 from _common import (
-    _flag, _read_member, bore_axis_ref, check, coincident_mate, concentric_mate,
-    log, named_ref, place_component, run_build,
+    _flag,
+    _read_member,
+    check,
+    log,
+    run_build,
+)
+from _assembly import (
+    bore_axis_ref,
+    coincident_mate,
+    concentric_mate,
+    named_ref,
+    place_component,
 )
 
 # drive-train cam (build_drive_train_assembly / build_cylinder_gear)

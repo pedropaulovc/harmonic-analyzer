@@ -75,26 +75,28 @@ import sys
 
 import _config
 from _common import (
+    MIRROR_PLANE,
+    OUT_SLDPRT,
+    check,
+    log,
+    run_build,
+)
+from _assembly import (
     assert_components_fully_defined,
     bore_axis_ref,
-    check,
     check_no_interference,
     coincident_mate,
-    concentric_mate,
     component_names,
     component_transform,
+    concentric_mate,
     distance_driver,
-    log,
-    MIRROR_PLANE,
     named_ref,
-    OUT_SLDPRT,
     place_component,
-    rows_from_euler,
-    run_build,
     save_assembly_and_images,
     spin_driver,
     world_point,
 )
+from _transforms import rows_from_euler
 from build_cylinder_gear import ECCENTRICITY as CAM_ECC  # cam lobe throw (mm):
 # imported, NOT copied, so the rod ring stays concentric with the cam when the
 # throw is rescaled. A stale 5.08 hardcode (the pre-re-anchor throw) survived the
