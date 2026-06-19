@@ -12,34 +12,45 @@
 units: mm
 
 gear_train:
-  diametral_pitch: 30.0            # DP_TRAIN — cone/cylinder train
+  diametral_pitch: 49.82           # DP_TRAIN — cone/cylinder train (= 122*25.4/62.2)
   fundamental_cone_teeth: 120      # largest cone gear; per-channel = 120 - 6*index
   cylinder_teeth: 120              # equal-size cylinder gears
   crank_drive_ratio: [16, 64]      # 16T pinion on crankshaft : 64T on cone shaft
-  crank_drive_diametral_pitch: 16.0  # coarser than the DP-30 train; round-PD estimate (low)
-  source: "DIMENSIONS.md ch12 (DP), ch29/ch8 (gear law)"
-  confidence: high
+  crank_drive_diametral_pitch: 16.0  # coarser than the train; round-PD estimate (low)
+  source: "DIMENSIONS.md ch13 (cylinder gear OD scaling), ch29/ch8 (gear law)"
+  confidence: low
   notes: >-
-    Tooth counts counted directly on the book plates; DP 30 stated ch12.
-    Gear law (ch.29 p.99, annotated): cylinder gear k turns k/80 rev per crank
-    turn; ch.8 p.7 (stated): gear n spins n× gear 1. Crank reduction 16:64 = 1:4
-    sets the cone-shaft input speed.
+    Tooth counts counted directly on the book plates (high). DP is now ANCHORED
+    on the measured cylinder-gear OD = 62.2 mm (DIMENSIONS.md ch13, scaled p.25
+    bottom-left vs the back-view gear brackets, LOW confidence): m = 62.2/(120+2)
+    = 0.50984 mm, DP = 25.4/m = 49.82, pitch dia = 120*m = 61.18 mm. This
+    SUPERSEDES the former DP 30 round-inch derivation (which gave OD 103.3) — see
+    the ch12/ch13 discrepancy notes. Cone T120 shares this module (it meshes the
+    cylinder set). Gear law (ch.29 p.99, annotated): cylinder gear k turns k/80
+    rev per crank turn; ch.8 p.7 (stated): gear n spins n× gear 1. Crank reduction
+    16:64 = 1:4 sets the cone-shaft input speed.
 
 cone_incline:
   # True-cone incline derived from exact tracking: sin(i) = radius_step / z_pitch.
-  # radius_step = 3*25.4/DP = 2.54 (pitch-radius step per 6 teeth);
-  # z_pitch = 7.5*cos(asin(2.54/7.5)) = 7.0568. -> incline = 21.0976 deg.
-  # NOT arcsin(2.54/7.5)=19.8 — see solidworks-modeling-pitfalls.
-  radius_step_mm: 2.54
-  drum_seat_nominal_mm: 7.5
-  derived_incline_deg: 21.0976     # documentation only; code recomputes from the two inputs
-  source: "M6.7 true-cone derivation"
-  confidence: high
+  # radius_step = 3*25.4/DP = 1.5295 (pitch-radius step per 6 teeth at DP 49.82);
+  # z_pitch = drum_seat*cos(asin(radius_step/drum_seat)) = 7.0565. -> incline = 12.5188 deg.
+  # NOTE drum_seat_nominal is RE-TUNED (7.5 -> 7.2204) so z_pitch stays 7.0565 =
+  # the channels.station_pitch grid: holding the channel spine fixed keeps the
+  # rocker/lever/spring/output machinery in place when the gear module shrinks.
+  radius_step_mm: 1.5295
+  drum_seat_nominal_mm: 7.2204
+  derived_incline_deg: 12.5188     # documentation only; code recomputes from the two inputs
+  source: "M6.7 true-cone derivation, re-tuned for DP 49.82 (ch13 OD 62.2)"
+  confidence: low
   notes: >-
     Incline is DERIVED, not measured: sin(i)=radius_step/z_pitch where
-    z_pitch=7.5·cos(asin(2.54/7.5))=7.0568, giving i=21.0976°. The naive
-    arcsin(2.54/7.5)=19.8° is wrong (mistakes the drum chord for the pitch
-    advance) — see the solidworks-modeling-pitfalls memory.
+    z_pitch=sqrt(drum_seat^2 - radius_step^2)=7.0565, giving i=12.5188°. The
+    smaller radius_step (1.5295 vs the old 2.54) follows from the finer module
+    DP 49.82 (ch13 OD 62.2); drum_seat_nominal is re-tuned to 7.2204 so z_pitch
+    stays locked to the channels.station_pitch 7.0565 grid (the cone seat pitch
+    along the shaft is now z_pitch*cos(i) = 6.8888, cone stack ~137.8 mm). The
+    naive arcsin(radius_step/drum_seat) is wrong (mistakes the drum chord for the
+    pitch advance) — see the solidworks-modeling-pitfalls memory.
 
 channels:
   count: 20
@@ -91,10 +102,11 @@ amplitude:                         # ch15 — the amplitude bars set the Fourier
 alignment_pinion:                  # ch25 — engages the cylinder-gear set for zeroing
   teeth: 42
   disengaged_tip_gap_mm: 2.0       # PINION_GAP
-  engaged_center_distance_mm: 68.58  # ENGAGED_C2C = (120+42)/2 * 25.4/DP
+  engaged_center_distance_mm: 41.30  # ENGAGED_C2C = (120+42)/2 * 25.4/DP (DP 49.82)
   source: "DIMENSIONS.md ch25"
-  confidence: high
+  confidence: low
   notes: >-
-    42T pinion counted on the ch25 plate; swings into the 120T cylinder set to
-    zero all channels. Engaged centre distance = (120+42)/2 · 25.4/DP = 68.58 mm;
-    disengaged it stands off with a 2 mm tip gap.
+    42T pinion counted on the ch25 plate (high); swings into the 120T cylinder set
+    to zero all channels. Engaged centre distance = (120+42)/2 · 25.4/DP = 41.30 mm
+    at the new DP 49.82 (was 68.58 at DP 30); disengaged it stands off with a 2 mm
+    tip gap.
