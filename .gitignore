@@ -341,6 +341,10 @@ cad/out/png/
 cad/out/demo/
 cad/out/*.mp4
 
+# Downloaded release bundles (gh release download); large binaries, never
+# committed — the release on GitHub is the snapshot.
+download/
+
 # Generated verify.py reports (rebuild with `verify.py --suite config|all`)
 cad/out/reports/
 
