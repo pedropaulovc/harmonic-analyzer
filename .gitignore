@@ -366,4 +366,11 @@ comparisons/.parity_sw/
 .generated/docs-index/
 
 # verify.py run logs
-.logs/
+.logs/.render-venv/
+.render-mesa*
+.render-osmesa/
+.render_diff_v020/
+.7zr.exe
+.mesalib.conda
+.gl_test.png
+.cf_repo.json
