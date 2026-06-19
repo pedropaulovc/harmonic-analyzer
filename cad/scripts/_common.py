@@ -1130,6 +1130,7 @@ async def save_part_and_images(
     ``cad/out/png``."""
     OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
     part_path = (OUT_SLDPRT / f"{part_name}.SLDPRT").resolve()
+    set_isometric_view(adapter)  # save on isometric so the .SLDPRT opens isometric
     check(f"save_file -> {part_path}", await adapter.save_file(str(part_path)))
 
     png_dir = OUT_PNG / part_name
@@ -2587,6 +2588,32 @@ def remap_front_to_machine_front(adapter: Any) -> None:
     log("standard views remapped: Front now shows the machine front (-Z paper side)")
 
 
+def set_isometric_view(adapter: Any) -> None:
+    """Orient the active document to the standard Isometric view (+ zoom to fit).
+
+    Every part/assembly build calls this at the START (right after
+    ``create_part``/``create_assembly``) and the shared save helpers call it again
+    just before writing the document, so every ``.SLDPRT``/``.SLDASM`` OPENS on
+    isometric -- the convention the user asked for. ``ShowNamedView2`` with an
+    empty ``VName`` and ``swIsometricView`` (7) is the documented orient call (see
+    the SolidWorks "Change to Isometric and Zoom to Fit" example); the same
+    ``ShowNamedView2``/``_zoom_to_fit`` pair as :func:`remap_front_to_machine_front`.
+
+    Independent of :func:`remap_front_to_machine_front`'s standard-view re-basing:
+    on the top assembly that runs AFTER the remap, so the file still opens
+    isometric while the gallery's re-based Front/Back/etc. stay correct. Tolerant
+    of an empty just-created document -- the orient + zoom-to-fit are best-effort.
+    """
+    SW_ISOMETRIC = 7  # swStandardViews_e.swIsometricView
+    model = adapter.currentModel
+    if model is None:
+        return
+    _flag(model, "IModelDoc2")
+    adapter._attempt(lambda: model.ShowNamedView2("", SW_ISOMETRIC), default=None)
+    adapter._zoom_to_fit(model)
+    log("view set to isometric")
+
+
 async def _export_assembly_images(
     adapter: Any, asm_name: str, views: Iterable[str]
 ) -> dict[str, str]:
@@ -2636,6 +2663,10 @@ async def save_assembly_and_images(
     assert_model_healthy(adapter, label=asm_name, deep=True)
     OUT_SLDASM.mkdir(parents=True, exist_ok=True)
     asm_path = (OUT_SLDASM / f"{asm_name}.SLDASM").resolve()
+    # Save on isometric so the .SLDASM opens isometric; runs AFTER any
+    # remap_front_to_machine_front (which re-bases the standard views) so the
+    # re-based Front/Back/etc. used by the gallery stay correct.
+    set_isometric_view(adapter)
     check(f"save_file -> {asm_path}", await adapter.save_file(str(asm_path)))
 
     artefacts = {"assembly": str(asm_path)}
@@ -2766,6 +2797,7 @@ async def refresh_assembly(
     check_no_interference(adapter)
     assert_model_healthy(adapter, label=asm_name, deep=True)
 
+    set_isometric_view(adapter)  # save on isometric so the refreshed .SLDASM opens isometric
     save_assembly_in_place(adapter, asm_name)
     artefacts = {"assembly": str(asm_path)}
     artefacts.update(await _export_assembly_images(adapter, asm_name, views))
