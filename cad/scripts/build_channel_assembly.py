@@ -95,6 +95,11 @@ from _common import (
     spin_driver,
     world_point,
 )
+from build_cylinder_gear import ECCENTRICITY as CAM_ECC  # cam lobe throw (mm):
+# imported, NOT copied, so the rod ring stays concentric with the cam when the
+# throw is rescaled. A stale 5.08 hardcode (the pre-re-anchor throw) survived the
+# OD-62.2 re-anchor that moved ECCENTRICITY to 3.06, mislocating the ring 2.02 mm
+# south of the lobe -> the Ø30.8 bore dug into the Ø30.6 cam (20 x 171.67 mm^3).
 
 ASM_NAME = "channel"
 
@@ -117,16 +122,13 @@ ARM_TOP_RADIUS = 800.0
 # --- drive interface (default state) ----------------------------------------
 GEAR_PHASE_DEG = 1.5  # drive-train locks each cylinder gear at Rz(+1.5):
 # half the T120 tooth pitch, so a TOOTH faces the cone mesh (see
-# build_drive_train_assembly.py). The integral cam (local (0, -5.08))
-# swings with the gear, so the true cam centre sits 5.08*sin(1.5deg) =
-# 0.133 east of the arbor; assuming an unrotated cam dug every rod ring
-# (bore R 25.5) 0.033 into its cam (R 25.4) - the 20 x 2.40 mm^3 M6.5
-# top-level interferences.
-CAM_ECC = 5.08  # build_cylinder_gear.ECCENTRICITY
+# build_drive_train_assembly.py). The integral cam (local (0, -CAM_ECC))
+# swings with the gear by GEAR_PHASE_DEG, so the rod ring rides the PHASED cam
+# centre, not a point straight south of the arbor. CAM_ECC is imported above.
 RING_CENTER = (
     -47.5 + CAM_ECC * math.sin(math.radians(GEAR_PHASE_DEG)),
     126.8 - CAM_ECC * math.cos(math.radians(GEAR_PHASE_DEG)),
-)  # phased cam centre: (-47.367, 121.721)
+)  # phased cam centre at ECC 3.06: (-47.420, 123.741)
 ROD_C2C = 127.0
 
 # --- amplitude bars ---------------------------------------------------------
