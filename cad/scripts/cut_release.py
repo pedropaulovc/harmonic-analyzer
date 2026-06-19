@@ -264,9 +264,8 @@ def _discard_open_documents(sw: Any) -> None:
 
     ``CloseAllDocuments(True)`` still pops that modal in 3DX R2026x when an open
     assembly has a DIRTY referenced child -- e.g. after a ``verify.py --suite
-    engagement/motion`` run (or a manual config switch) activated the flexible
-    ``operating`` / ``pinion_engaged`` config, which re-solves and dirties the
-    drive-train child. Headless, that modal hangs the release forever.
+    motion`` run re-solved a child, or an interrupted build left a doc un-saved.
+    Headless, that modal hangs the release forever.
 
     Discard the active docs first (above), then ``CloseAllDocuments(True)`` as a
     backstop -- with nothing dirty left, it has nothing to prompt about.
@@ -306,7 +305,7 @@ def package(sw: Any, revision: str, zip_path: Path) -> dict[str, Any]:
     top = OUT_SLDASM / f"{TOP_ASSEMBLY}.SLDASM"
 
     # Discard any open docs silently first: a dirty referenced child (left by a
-    # prior engagement/motion verify) would make CloseAllDocuments(True) prompt.
+    # prior motion verify) would make CloseAllDocuments(True) prompt.
     _discard_open_documents(sw)
     log("discarded any open documents (clean session)")
     sw.OpenDoc6(str(top), SW_DOC_ASSEMBLY, SW_OPEN_SILENT, "", 0, 0)
@@ -321,7 +320,7 @@ def package(sw: Any, revision: str, zip_path: Path) -> dict[str, Any]:
     log(f"pack-and-go: {names_count} referenced documents")
 
     # Bundle exactly the CAD: no drawings/sim/toolbox, but DO include components
-    # suppressed in the active config so every engagement config's parts ship.
+    # suppressed in the active config so no part is dropped from the archive.
     pg.IncludeDrawings = False
     pg.IncludeSimulationResults = False
     pg.IncludeToolboxComponents = False
