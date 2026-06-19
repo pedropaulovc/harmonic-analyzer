@@ -35,7 +35,6 @@ import sys
 from typing import Any
 
 from _common import OUT_PNG, OUT_SLDASM, check, log, run_build
-from build_engagement_configs import _gear_mate_names
 from build_motion_study import (
     ANGLE,
     DISTANCE,
@@ -57,6 +56,11 @@ from build_motion_study import (
 SWING_RPM = 3.0
 SWING_DURATION = 2.0
 SWING_MIN_DEG = 5.0  # the driven member must advance at least this far to pass
+
+
+def _gear_mate_names(mates: list[dict[str, Any]]) -> list[str]:
+    """Names of every gear mate in ``mates`` (mate type contains 'gear')."""
+    return [m["name"] for m in mates if "gear" in str(m.get("type", "")).lower()]
 
 
 def _family_driver_names(adapter: Any, root: str, family: str,
@@ -174,9 +178,9 @@ async def _run_swing_study(adapter: Any, motor_axis, driven_needle: str,
 
 async def _drive_p1(adapter: Any) -> dict[str, str]:
     """p1: cone set swings out of mesh. Decouple the 21 gear meshes (the cone
-    cluster cannot stay velocity-coupled to the cylinders while leaving mesh --
-    the cone_disengaged config makes exactly this cut) and free the post's swing
-    (its lone ANGLE park driver), then motor the post about its vertical pivot."""
+    cluster cannot stay velocity-coupled to the cylinders while leaving mesh, so
+    suppress every gear mesh) and free the post's swing (its lone ANGLE park
+    driver), then motor the post about its vertical pivot."""
     path = str(OUT_SLDASM / "drive-train.SLDASM")
     check("open drive-train", await adapter.open_model(path))
     mates = check("list mates", await adapter.list_mates())
