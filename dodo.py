@@ -45,6 +45,18 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Part tasks run via doit ``CmdAction(verbosity=2)``, which pipes each build
+# script's stdout and RE-EMITS it through this doit parent process. Build output
+# carries non-ASCII (e.g. the "A ∩ B" gate labels); on Windows the parent stdout
+# defaults to cp1252, so re-emitting that glyph raises UnicodeEncodeError and kills
+# doit's reader thread (which can then hang the child on a full pipe). The child's
+# own run_build reconfigure does not help here -- the crash is in the PARENT. Force
+# UTF-8 on the parent too, mirroring run_build (_common.py).
+for _stream in (sys.stdout, sys.stderr):
+    _reconfigure = getattr(_stream, "reconfigure", None)
+    if _reconfigure is not None:
+        _reconfigure(encoding="utf-8", errors="replace")
+
 from doit.action import CmdAction
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "cad" / "scripts"))
