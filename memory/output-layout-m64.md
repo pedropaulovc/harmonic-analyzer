@@ -58,11 +58,14 @@ constants + `cad/DIMENSIONS.md` ch. 18–24 M6.4 rows. Machine coords: Y up
   IDENTITY — its own +X axis presses east through the west end-rail hole
   (machine y 413, z −154 = frame local x 11, z 5), tip −18, 1 shy of the
   marker.
-- **Loose (M6.5 final)**: measuring-stick (−158, 53.8, −133) Rx+90
-  (footprint x −158..42, z −133..−118 — clears the SW corner bracket,
-  whose plate+foot occupy x −179.5..−160.5 / z −126.3..−97.7); spare T24
-  (−133, 55.8, −80) Rx−90 (plan circle r 26 = OD radius, NOT the 20.7 hub
-  radius that botched the first move; ≥6.4 clear of bracket + a-frame).
+- **Loose (reparked by the OD-62.2 re-anchor, commit 2c22311, 2026-06-19 —
+  the crank-pedestal shift consumed the old front-edge spots; see
+  [[od-62mm-reanchor]])**: measuring-stick now `STICK_POS = (−100, 53.8, 123.5)`
+  Rx+90 (moved to the clear back-plate edge); spare T24 now
+  `SPARE_GEAR_POS = (−160, 55.8, −15)` Rx−90. (M6.5-era values were
+  measuring-stick (−158, 53.8, −133) / spare T24 (−133, 55.8, −80); the
+  spare's plan circle r 26 = OD radius, NOT the 20.7 hub radius that botched
+  the first move.)
 - **Knife-stay strap (M6.5)**: rod hook moved −40 → −10; strap
   (−10, 1086) → (9.7, 1053). The channel levers' spring tabs OVERHANG 8
   past the hole line to x −14.1 (tab tops ~1070.1) and clipped the old

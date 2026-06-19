@@ -1,6 +1,6 @@
 ---
 name: config-dirty-on-activate
-description: "engagement/operating/pinion configs are under-defined by design → activating them dirties the doc; NOT a determinism bug, no script change"
+description: "cone_disengaged/operating configs are under-defined by design → activating them dirties the doc; NOT a determinism bug, no script change"
 metadata: 
   node_type: memory
   type: project
@@ -9,12 +9,14 @@ metadata:
 
 harmonic-analyzer.SLDASM (and drive-train.SLDASM) open **CLEAN on Default**
 (GetSaveFlag=False) — Default is the rendered, photo-gated, Pack-and-Go output
-pose, so deterministic output is fine. Activating ANY of the 3 non-Default
-engagement configs (`cone_disengaged`, `operating`, `pinion_engaged`) flips
+pose, so deterministic output is fine. Activating either of the 2 non-Default
+engagement configs (`cone_disengaged`, `operating`) flips
 GetSaveFlag=True and it stays dirty. This is **by design, not a bug**: those
 configs are INTENTIONALLY under-defined (free DOF — cone_disengaged decouples the
-42-member gear train; operating frees the crank; pinion_engaged frees the swing),
-and SW re-solves the freed bodies on activation → dirty flag. The verify
+42-member gear train; operating frees the crank),
+and SW re-solves the freed bodies on activation → dirty flag.
+(`pinion_engaged` was a 3rd such config but the alignment-pinion machinery was
+retired 2026-06-18, commit d32c110 — see [[od-62mm-reanchor]].) The verify
 isolation/engagement suites *assert* these freed-DOF sets, so a "configs must open
 clean" gate would FALSE-FAIL.
 
@@ -32,5 +34,5 @@ Documents" modal in 3DX R2026x (hangs headless) → close-without-save / discard
 Diagnostics live in `cad/scripts/diagnostics/`: `probe_clean_open.py`
 (close→open→GetPackAndGo→activate each config, read GetSaveFlag) and
 `probe_dirty_on_open.py` (read-only attach to a live doc, per-doc GetSaveFlag +
-What's Wrong via sw_type_info flagging). See [[dof-refactor]] (the under-defined
+What's Wrong via sw_type_info flagging). See dof-refactor (dropped memory) (the under-defined
 configs) and [[harmonic-analyzer-project]].
