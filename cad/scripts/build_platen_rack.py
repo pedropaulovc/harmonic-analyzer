@@ -29,7 +29,6 @@ from __future__ import annotations
 import math
 import sys
 
-import _config
 from _common import (
     IN,
     add_line_chain,
@@ -48,7 +47,15 @@ from _gear import volume_check
 PART_NAME = "platen-rack"
 MATERIAL = "Brass"  # ch. 22/23 photos: brass
 
-DP = _config.machine("gear_train", "diametral_pitch")  # cad/config/machine.yaml (DIMENSIONS.md ch23)
+# The platen recording rack-pinion is its OWN gear pair — ch23 measured it as DP 30
+# ("the scale anchor of the chapter") — independent of the cone/cylinder drive train.
+# It MUST match the pinion (build_rack_pinion via _gear.build_fixed_gear, default
+# dp=30) and the output assembly's PINION_PD_R (/30.0). Do NOT couple this to
+# machine.yaml gear_train.diametral_pitch: the value-preserving _config migration
+# (2bc0b10) tied them while both were 30, then the OD-62.2 re-anchor moved the train
+# DP to 49.82 — silently shrinking the rack pitch to 1.60 mm against the DP-30 pinion
+# (2.66 mm) so the mesh interfered (output interference gate, 8 hits ≤ 1.93 mm³).
+DP = 30.0  # 1/in, DIMENSIONS.md ch23 (med — scale anchor of the chapter)
 PA_DEG = 14.5  # period-typical, same as the gear train
 BAR_LENGTH = 300.0  # DIMENSIONS.md ch22: = platen width (low)
 BAR_HEIGHT = 30.0  # DIMENSIONS.md ch22: back-side brass strip (low)
