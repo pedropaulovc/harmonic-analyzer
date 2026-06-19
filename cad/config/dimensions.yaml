@@ -288,11 +288,11 @@ sections:
         - derived
         - med
       - - Diametral pitch / module
-        - DP 30 (m = 0.8467 mm)
+        - DP 49.82 (m = 0.5098 mm)
         - —
-        - 'M4 prep, two independent measurements converge (see Appendix C #1 — resolved): p.18 photo tooth pitch 2.69 mm via 7 mm-callout scale; largest-gear OD ≈ 105 ± 5 mm via 150 mm-arrow scale (DP 30 → 103.3). Gives round-inch PDs: largest cone / cylinder gear PD = 120/30 = 4.000", pinion PD = 1.400"'
-        - derived (2 scalings converge + round-inch period argument)
-        - med
+        - 'ANCHORED on the measured cylinder-gear OD = 62.2 mm (ch13, scaled p.25 bottom-left vs the back-view gear brackets, LOW): m = 62.2/(120+2) = 0.5098, DP = 25.4/m = 49.82, so largest cone / cylinder PD = 120·m = 61.18 mm. The cone T120 shares this module (it meshes the cylinder set). SUPERSEDES the former DP 30 round-inch derivation (p.18 tooth pitch 2.69 mm + 150 mm-arrow OD ≈ 105 → DP 30 → OD 103.3), which the 62.2 reading REFUTES — the p.18 scalings and the round-inch PD do not survive (logged discrepancy, user-directed 2026-06-18)'
+        - derived from the ch13 OD scaling (low)
+        - low
       - - Pressure angle
         - 14.5° assumed
         - —
@@ -387,11 +387,11 @@ sections:
         - scaled
         - med
       - - Gear outer diameter
-        - 103.3 mm (4.067")
-        - '4.067'
-        - (120+2)/DP30; PD = 4.000" exactly (module closed — ch. 12 row)
-        - derived
-        - med
+        - 62.2 mm (2.449")
+        - '2.449'
+        - 'scaled p.25 bottom-left picture against the gear-bracket sizes on the full-device back view (user, 2026-06-18). This is now the ANCHOR for the whole train module: DP = (120+2)·25.4/62.2 = 49.82, m = 0.5098 (ch. 12 row). REFUTES the former (120+2)/DP30 = 103.3 / round-inch-PD derivation.'
+        - scaled
+        - low
       - - Cam diameter (integral cam per gear)
         - 50.8 mm (2.0")
         - '2.0'
@@ -475,9 +475,9 @@ sections:
         - 'ch. 12 p.18 top-down: cone converges on the drum toward the small end; side view cone midline ≈ level'
         - high
       - - Cone plan incline
-        - 21.0976° = arcsin(2.54/7.0568), converging +X→−X toward the drum
-        - 'M6.7 exact-tracking mesh condition (appendix C #3): the radius step tracks per DRUM z-pitch, not per along-shaft station — arcsin(2.54/7.5) = 19.8° was the wrong leg of the triangle (0.44/station z-drift, 0.15/station radial error: "most gears not meshing")'
-        - high
+        - 12.5188° = arcsin(1.5295/7.0565), converging +X→−X toward the drum
+        - 'M6.7 exact-tracking mesh condition (appendix C #3): the radius step (now 1.5295 at DP 49.82) tracks per DRUM z-pitch 7.0565, which is held fixed by re-tuning the cone drum-seat to 7.2204 (machine.yaml) so the channel grid does not move. Shallower than the old 21.0976° because the finer module shrinks the per-gear radius step (was arcsin(2.54/7.0568))'
+        - low
       - - Cone mesh grid (X_PITCH)
         - 'every cone gear''s pitch section crosses x = 4.490 at the contact azimuth: X_PITCH = drum tip x 4.147 + addendum·sec 21.1° − mid-face penetration 0.565'
         - 'M6.7 oblique partial engagement (book ch. 12 "partial engagement, distinct wear"): the contact tooth crosses the 3 mm drum face obliquely, penetration varying ±1.5·tan 21.1° = ±0.58 about mid → tip interleave 0.00..1.14, identical at all 20 stations, T006 included; the 0.55 edge slack is interference-checker-arbitrated (the oblique crossing distorts the flank match beyond plain backlash math, worst at the smallest gears)'

@@ -711,7 +711,7 @@ def verify_config_vs_dimensions(report: Report) -> None:
         report.gate(label, run)
 
     _check("dims:cone-DP", "Chapter 12", "Diametral pitch",
-           lambda r: _expect(_num(r"DP\s*(\d+)", r[1]) == _config.machine("gear_train", "diametral_pitch"),
+           lambda r: _expect(_num(r"DP\s*(\d+(?:\.\d+)?)", r[1]) == _config.machine("gear_train", "diametral_pitch"),
                              f"cone DP: dims {r[1]!r} != machine.yaml {_config.machine('gear_train','diametral_pitch')}"))
     _check("dims:cylinder-teeth", "Chapter 13", "Tooth count",
            lambda r: _expect(_num(r"(\d+)", r[1]) == _config.machine("gear_train", "cylinder_teeth"),
