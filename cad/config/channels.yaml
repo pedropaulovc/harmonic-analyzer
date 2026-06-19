@@ -1,7 +1,7 @@
 # Per-channel harmonic parametrics — SINGLE SOURCE OF TRUTH for the 20 channels.
 #
 # The build loop (build_channel_assembly.py / build_drive_train_assembly.py)
-# reads this file; change a number here and `build_all.py --rebuild channel`
+# reads this file; change a number here and `doit assembly:channel`
 # (or drive_train) regenerates a valid machine. Derived geometry (centre
 # distances, cam grids, z-stations) is COMPUTED in code from machine.yaml +
 # these tooth counts — it is not duplicated here.
@@ -13,7 +13,20 @@
 # ratio        gear-mate ratio [cone_teeth, 120]  (cylinder ang.vel / cone)
 # phase_deg    eccentric/cam phase offset for this channel
 # amplitude_mm a_j coefficient = amplitude-bar station along the rocker
-#              (neutral demo default; override per preset in amplitudes.yaml)
+#
+# ALL 20 ROWS ARE KEPT regardless of how many channels the build instantiates:
+# the cone-gear stack and the gear law / ratios / synthesis truth model are
+# derived from the full table (see machine.yaml channels.active_count). Only the
+# FIRST machine.yaml channels.active_count channels get a physical cylinder gear,
+# cam follower, rocker, amplitude bar, top lever and spring built.
+#
+# TEMPORARY (2026-06-19): every amplitude_mm has been RESET TO NEUTRAL (0.0) —
+# all amplitude bars sit at their neutral position, so the synthesised pen trace
+# is flat. This pairs with the temporary channels.active_count reduction and was
+# done ONLY to speed the build while the remaining parts are certified. RECOVER by
+# restoring machine.yaml amplitude:preset to `square` and regenerating these
+# amplitude_mm by the square law (a_j = 80 / harmonic_n on ODD harmonics, 0 on
+# even), together with setting channels.active_count back to 20.
 units: mm
 source: "DIMENSIONS.md ch8/ch12/ch29 gear law"
 confidence: high
@@ -23,8 +36,9 @@ notes: >-
   harmonic_n = cone_teeth/6 = 20 - index, ratio = [cone_teeth, 120]. The
   [120-6k : 120] mesh law is annotated in the book (ch.29 p.99) and stated ch.8 —
   high confidence. phase_deg / amplitude_mm are the SETTABLE inputs (the cam
-  phase and amplitude-bar station per channel); the zeros here are the neutral
-  demo pose, overridden per preset (see truth_model.coefficients).
+  phase and amplitude-bar station per channel); amplitude_mm is currently the
+  NEUTRAL pose (all 0.0, see the temporary note above — the square-wave preset is
+  restored on recovery per machine.yaml amplitude.notes).
 channels:
   - index: 0
     cone_teeth: 120
@@ -39,7 +53,7 @@ channels:
     harmonic_n: 19
     ratio: [114, 120]
     phase_deg: 0.0
-    amplitude_mm: 4.2105   # square preset: 80 / harmonic_n (19, odd)
+    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/19 = 4.2105)
   - index: 2
     cone_teeth: 108
     cylinder_teeth: 120
@@ -53,7 +67,7 @@ channels:
     harmonic_n: 17
     ratio: [102, 120]
     phase_deg: 0.0
-    amplitude_mm: 4.7059   # square preset: 80 / harmonic_n (17, odd)
+    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/17 = 4.7059)
   - index: 4
     cone_teeth: 96
     cylinder_teeth: 120
@@ -67,7 +81,7 @@ channels:
     harmonic_n: 15
     ratio: [90, 120]
     phase_deg: 0.0
-    amplitude_mm: 5.3333   # square preset: 80 / harmonic_n (15, odd)
+    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/15 = 5.3333)
   - index: 6
     cone_teeth: 84
     cylinder_teeth: 120
@@ -81,7 +95,7 @@ channels:
     harmonic_n: 13
     ratio: [78, 120]
     phase_deg: 0.0
-    amplitude_mm: 6.1538   # square preset: 80 / harmonic_n (13, odd)
+    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/13 = 6.1538)
   - index: 8
     cone_teeth: 72
     cylinder_teeth: 120
@@ -95,7 +109,7 @@ channels:
     harmonic_n: 11
     ratio: [66, 120]
     phase_deg: 0.0
-    amplitude_mm: 7.2727   # square preset: 80 / harmonic_n (11, odd)
+    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/11 = 7.2727)
   - index: 10
     cone_teeth: 60
     cylinder_teeth: 120
@@ -109,7 +123,7 @@ channels:
     harmonic_n: 9
     ratio: [54, 120]
     phase_deg: 0.0
-    amplitude_mm: 8.8889   # square preset: 80 / harmonic_n (9, odd)
+    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/9 = 8.8889)
   - index: 12
     cone_teeth: 48
     cylinder_teeth: 120
@@ -123,7 +137,7 @@ channels:
     harmonic_n: 7
     ratio: [42, 120]
     phase_deg: 0.0
-    amplitude_mm: 11.4286   # square preset: 80 / harmonic_n (7, odd)
+    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/7 = 11.4286)
   - index: 14
     cone_teeth: 36
     cylinder_teeth: 120
@@ -137,7 +151,7 @@ channels:
     harmonic_n: 5
     ratio: [30, 120]
     phase_deg: 0.0
-    amplitude_mm: 16.0   # square preset: 80 / harmonic_n (5, odd)
+    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/5 = 16.0)
   - index: 16
     cone_teeth: 24
     cylinder_teeth: 120
@@ -151,7 +165,7 @@ channels:
     harmonic_n: 3
     ratio: [18, 120]
     phase_deg: 0.0
-    amplitude_mm: 26.6667   # square preset: 80 / harmonic_n (3, odd)
+    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/3 = 26.6667)
   - index: 18
     cone_teeth: 12
     cylinder_teeth: 120
@@ -165,4 +179,4 @@ channels:
     harmonic_n: 1
     ratio: [6, 120]
     phase_deg: 0.0
-    amplitude_mm: 80.0   # square preset: 80 / harmonic_n (1, odd)
+    amplitude_mm: 0.0   # TEMP neutral (square preset would be 80/1 = 80.0)

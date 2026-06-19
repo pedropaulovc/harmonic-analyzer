@@ -1,5 +1,7 @@
 # Memory index
 
+- [Temporary 3-channel build reduction](temp-3channel-build-reduction.md) — 2026-06-19 user-requested TEMP cut to 3 active channels + neutral amplitude bars for build perf (cone gears KEPT at 20); single knob machine.yaml channels.active_count, recover to 20 + square preset after part certification
+
 - [Tube column OD rederive (M6.11)](tube-column-od-rederive.md) — column OD rederived from ch30 8-views to Ø25.4 (1"), was legacy Ø1.375"; quarter views isolate single columns, base-plate cross-checks scale; full cascade (top-frame bore, clamp bore, clearances), NOT yet SW-rebuilt
 - [OD 62.2mm gear re-anchor](od-62mm-reanchor.md) — user re-anchored gear OD 103.3->62.2mm (LOW conf eyeball), "fix everything downstream"; DP 30->49.82, crank-drive DP->26.57 (64T==cone T120 match restored), cam/rod/cone all scaled 0.6; forced impossibilities → REMOVE alignment pinion (others didn't block); **SW rebuild DONE+green, all 88 verify gates, render diff vs v0.2.0 shown, LANDED on main fde40f2**; throw scaled to 3.06 (only fallout = 1-fn plate-threading fix); to land it user chose **revert PR#12 "Fix#8"** (sketch-inference suppression), then **Fix#8 RE-LANDED clean in PR#13 (e0bb8d7, HEAD 0ca20cd)** against the 3.06 channel — determinism bug fixed again
 
