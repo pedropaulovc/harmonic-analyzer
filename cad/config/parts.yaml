@@ -97,11 +97,6 @@ parts:
     tolerance_class: machined_block
     fit_class: cam_follower_contact
     process: "cast + machined"
-  corner-bracket:
-    number: MHA-018
-    material: Gray Cast Iron
-    tolerance_class: machined_block
-    process: "cast + machined"
   counter-spring:
     number: MHA-019
     material: Alloy Steel

@@ -468,7 +468,7 @@ omitted at assembly level.
 | Magnification | 5× | — | text; consistent: 100/20 = 5 ✓ | stated | high |
 | Spoke count | 6 | — | counted on the full-page photo p.51 (and photogrammetry `195607299`); an earlier extraction said 5 — wrong | stated | high |
 | Wheel axle (M6.4) | flange Ø35 × 3 seated on the bar front face; Ø5 stud × 14 the wheel bore rides; Ø9 × 4 retaining collar (photo's washer + hex nut collapsed to a collar — simplification) | — | p.50–51 | scaled | low |
-| Support bar (×3, M6.4) | 10-square steel, 384 long (ends at x ±192, seated in the clamp channels; with the Ø25.4 columns (OD rederived from the 8-views M6.11) the column cylinders z −99.3..−124.7 no longer reach the bar's z band −138.9..−128.9, a 4.2 gap — the old M6.5 column-corner trim from 400 is moot, length now held by the clamp seating); wheel bar y 565, platen top rail y 440, bottom rail y 334 — all on the column-clamp axis z −133.9 (front face −138.9) | — | M6.4 layout; p3 90° view: bars run IN FRONT of the columns (z −112) | derived | low |
+| Support bar (×3, M6.4) | 10-square steel, 384 long (ends at x ±192, seated in the clamp channels; with the Ø25.4 columns (OD rederived from the 8-views M6.11) the column cylinders z −99.3..−124.7 no longer reach the bar's z band −138.9..−128.9, a 4.2 gap — the old M6.5 column-corner trim from 400 is moot, length now held by the clamp seating); wheel bar y 565, platen top rail y 440, bottom rail y 334 — all on the column-clamp axis z −133.9 (front face −138.9) | — | M6.4 layout; p3 90° view: bars run tangent IN FRONT of the columns (z −112) | derived | low |
 | Column clamp (×5, M6.4; count M6.8 — the half-width wheel bar takes ONE clamp) | green cast collar Ø48 × 16, bore Ø25.6 sliding on the Ø25.4 column (OD rederived from the 8-views M6.11; was Ø35.2 on Ø35); open channel across the front face (10.2 wide, floor 5.1 below bar centre) at column-to-bar offset 21.9 (offset to column CENTRE, unchanged — the channel now stands ~4 off the smaller column surface, the collar still grips); Ø3.2 radial pinch-screw hole through the back wall (M6.10) | — | p.50–55 | scaled + derived | low |
 | Pinch screws ×5 (M6.10) | Ø6 × 2.5 head + Ø2.9 × 6.2 shank in each clamp's back-wall hole, BACKED OUT (a seated screw would overlap the column it pinches): heads bear on the clamp back faces; with the Ø25.4 column (OD rederived from the 8-views M6.11) the back wall is now 11.2 thick, so the 6.2 shank seats mid-wall and the tip stands ~5 off the column surface (was 0.3 at the old Ø35 bore) — further backed out, still non-contacting | — | p.50–55 (screw heads on the clamp backs) | scaled + derived | low |
 
@@ -554,8 +554,7 @@ overlapping the disc rim in XY projection only (chain plane is ~56 north
 of the disc plane). The mixed-pitch jam note (m2 vs DP 30) still bars any
 literal removable-on-pinion mesh; it never happens in the resolved
 topology. The measuring stick (ch. 16, hand tool) lies flat on the base at
-(−158, 53.8, −133), graduations up (M6.5 — the M6.4 spot (−175, .., −135)
-ran it through the SW corner bracket's plate + foot).
+(−158, 53.8, −133), graduations up (M6.5).
 
 ## Chapter 24 — Pen Mechanism (pp. 60–61)
 
@@ -658,8 +657,7 @@ audit detail in the M1 extraction; key values referenced by the chapter tables:
 | summing-lever | none | UNVERIFIED — p.42–43 proportion check in M2 |
 | rocker-arm-support ×3 | none | M6.3 refuted the legacy windowed square frame (184 wide); M6.9 PARTIALLY REINSTATES it — ch30 p008 (brightened) shows exactly that frame: north frustum + A-frame south upright + top/foot rails (ch. 14 layout table). The ×3 count stays refuted (ONE frame: two uprights; the legacy third instance at x ≈ 0 under the transgear is the pinion-bar/stud's job in this model); re-authored |
 | oscilating-arms | ch.14 re-read: the "12.5 mm width" was a misread (callout is 2.5 mm plate thickness) | SUPERSEDED — re-authored as rocker-arm with corrected dims (`build_rocker_arm.py`) |
-| corner-bracket | none — no source either; geometry interrogated live from the SLDPRT (face inventory): base 1.125" × 0.75", height 2.3", plate 0.3" thick, sides tangent-tapered to R0.5" crown (centre 1.8" up), Ø0.4" lug hole, #9 (Ø0.196") foot hole | RE-AUTHORED — `build_corner_bracket.py` reproduces it to 13,035 mm³ (exact volume match) |
-| tube-frame | ch.6: frame column height 107 cm — legacy file measured 1016 mm (40"), CONTRADICTS the book | RE-AUTHORED — `build_tube_frame.py` at 1070 mm (book wins). **OD REDERIVED Ø25.4 (1") from the ch30 8-views (M6.11)**: the 4 quarter views (p003/p005/p007/p009) isolate single columns; under the orthographic cameras apparent width = OD × scale, scale fit from the (±197, ±112) stations + azimuth (R² 0.94–0.99) and cross-checked by the 460 mm base plate (~1500 px front view) → 7 reads = Ø23.8 ± 1.0 mm, rounded to 1" stock. SUPERSEDES legacy Ø1.375" (no book numeric, ~45% oversize). Wall kept legacy 0.12" (interior, not view-derivable) → Ø19.3 bore. M4 fluting retired (M6.8: plain reflective columns) |
+| tube-frame | ch.6: frame column height 107 cm — legacy file measured 1016 mm (40"), CONTRADICTS the book | RE-AUTHORED — `build_tube_frame.py` at 1070 mm (book wins). OD REDERIVED Ø25.4 (1") from the ch30 8-views (M6.11): 4 quarter views isolate single columns, apparent width = OD × scale (scale fit from the ±197/±112 stations + azimuth, R² 0.94–0.99, cross-checked by the 460 mm base ~1500 px) → 7 reads = Ø23.8 ± 1.0, rounded to 1" stock; SUPERSEDES legacy Ø1.375" (~45% oversize). Wall kept legacy 0.12" → Ø19.3 bore. M4 fluting retired (M6.8: plain reflective columns) |
 
 No legacy part contradicts a book annotation. Every part still gets re-authored
 as a reproduction script (project requirement); UNVERIFIED parts get their photo
