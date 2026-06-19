@@ -1348,16 +1348,6 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     "chain-outer-link": ("z", 0.0),
     # centred symmetric bar; explicit c, no STL yet at first build
     "wheel-bar": ("x", 0.0),
-    # ch25 alignment-pinion set: every part exactly symmetric about its
-    # local x = 0 plane (gear/rod axes, strap/block mid-planes); explicit
-    # c, no STLs yet at first build
-    "alignment-pinion": ("x", 0.0),
-    "pinion-bracket": ("x", 0.0),
-    "pinion-pivot-block": ("x", 0.0),
-    "pinion-pivot-shaft": ("x", 0.0),
-    "pinion-lever": ("x", 0.0),
-    "pinion-lift-rod": ("x", 0.0),
-    "pinion-handle": ("x", 0.0),
     # knife bearing support: X-symmetric (bore + block centred on x0); explicit
     # so placement never depends on a stale/absent STL bbox (it mirrors with the
     # summing lever so the bore stays around the hex trunnion).
