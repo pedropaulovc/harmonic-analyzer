@@ -318,9 +318,9 @@ sections:
         - derived
         - low
       - - Crank-drive gear (dark steel gear at the large end, "This gear engages the crank" p.20)
-        - 'coarser pitch than the train, est. DP 16: ~64T, PD 4" (OD ≈ 104.8 mm — now LARGER than the cone 120T''s 62.2, no longer a visual match); mates a ~16T crank pinion (4:1)'
+        - 'coarser pitch than the train, est. DP 26.57 (= DP_TRAIN·64/120): ~64T, PD 61.18 mm (OD ≈ 63.1 mm ≈ the cone 120T''s 62.2 — visual match RESTORED); mates a ~16T crank pinion (4:1, PD 15.3, OD 17.2)'
         - —
-        - 'p.20 annotation + visibly coarser teeth than the 120T beside it. With the cone 120T re-anchored to OD 62.2 the old "OD ≈ cone 120T" cross-check is VOID (the 64T at DP 16 is unchanged and now visibly larger than the cone big-end); tooth counts NOT countable in available photos — est. from the stated 4:1 + round-PD argument (see Appendix C #9)'
+        - 'p.20 annotation + visibly coarser teeth than the 120T beside it. Re-anchored with the 62.2 OD: the crank-drive DP was rescaled to 26.57 so the 64T pitch radius again equals the cone big-end''s (the book''s "OD ≈ cone 120T" cross-check holds, and the 64T stays ~1.9× coarser than the train DP 49.82). Tooth counts NOT countable in photos — split est. from the stated 4:1 + the OD-match argument (Appendix C #9)'
         - scaled
         - low
   - prose: |2
@@ -493,8 +493,8 @@ sections:
         - 'M6.7: a perpendicular gear''s contact tooth sits r·sin i along-shaft south of its centre, so each centre rides r_j·sin i NORTH of its drum plane. The +55 ± 5 photo blob NO LONGER agrees in x (the smaller cone pulled the big-end inboard to +13.9) — flagged consequence of the 62.2 anchor'
         - low
       - - 64T drive gear
-        - perpendicular on the 3/8" pivot journal at shaft station 19.9, centre (x, z) = (+15.67, −68.62), 0.1 air to the T120 south face
-        - p.20 (directly beside the 120T); its contact tooth (toward the crank) sits 50.8·sin i = 11.0 north of centre at z = −57.61 (the 64T is DP 16, unchanged size, but rides the inboard-shifted cone)
+        - perpendicular on the 3/8" pivot journal at shaft station 19.9, centre (x, z) = (+15.66, −68.62), 0.1 air to the T120 south face
+        - p.20 (directly beside the 120T); rescaled to DP 26.57 (r 30.59 = cone T120), its contact tooth (toward the crank) sits 30.59·sin i = 6.63 north of centre at z = −61.99
         - low
       - - Cone gear j (j = 0 big … 19 small)
         - shaft seat station 28.25 + 6.889j; centre x_j = −16.01 + (30.59 − 1.5295j)·cos i, z_j = −67.1 + 7.0565j + (30.59 − 1.5295j)·sin i, y = 76; ALL 20 perpendicular to the shaft (true cone, p.18)
@@ -509,8 +509,8 @@ sections:
         - mesh plane alignment
         - high
       - - Crankshaft
-        - along Z at (x, y) = (+80.18, 76) = 64T contact x (15.67 + 50.8 cos i) + 63.5 DP 16 centre distance + oblique backoff (pinion centred on the 64T contact-tooth plane z −57.61; the 64T/16T pair is DP 16, unchanged — only its x shifted inboard with the cone)
-        - 'FLAG: the front-view pedestal at +122 ± 3 NO LONGER matches the derived +80.18 — the smaller cone pulled the 64T (and thus the crank) ~38 mm inboard. This is a new discrepancy from the 62.2 OD anchor: either the crank pedestal photo position or the 62.2 reading is wrong (appendix C #9 pair no longer ratifies)'
+        - along Z at (x, y) = (+55.38, 76) = 64T contact x (15.66 + 30.59 cos i) + 38.24 DP 26.57 centre distance (R64 30.59 + R16 7.65) + oblique backoff (pinion centred on the 64T contact-tooth plane z −61.99)
+        - 'FLAG: the front-view pedestal at +122 ± 3 NO LONGER matches the derived +55.4 — rescaling the whole drive train (cone + crank-drive) with the 62.2 anchor pulled the crank ~67 mm inboard. This is a new discrepancy from the 62.2 OD anchor: either the crank pedestal photo position or the 62.2 reading is wrong (appendix C #9 distance no longer ratifies)'
         - low
       - - Chain run
         - crank sprocket (+80, 76, the inboard-shifted crank) up to the translational-gearing sprocket at the third A-frame apex (x ≈ −7 ≈ 0, centered)
