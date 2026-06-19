@@ -1,35 +1,40 @@
 r"""Reproduction script: maker's nameplate (book ch. 26, pp. 70-71).
 
 The small brass plate screwed to the base near the platen that dates and
-attributes the machine: raised polished lettering "WM. GAERTNER & CO /
-CHICAGO, U.S.A." on a blackened (oxidised) recessed field, framed by a
-raised polished border and pinned by four slotted corner screws (p.71
-macro). The book states the plate is 100 mm x 55 mm (ch.26 p.70) -- the
-only hard provenance fact on the machine, alongside the '2' stamped a few
-centimetres away in the baseplate corner (a separate base feature, not
-modelled here).
+attributes the machine: "WM. GAERTNER & CO / CHICAGO, U.S.A." split by a
+central scroll cartouche, on a recessed field framed by a raised border and
+pinned by four slotted corner screws (p.71 macro). The book states the plate
+is 100 mm x 55 mm (ch.26 p.70) -- the only hard provenance fact on the
+machine, alongside the '2' stamped a few centimetres away in the baseplate
+corner (a separate base feature, not modelled here).
 
-Geometry modelled (the photo-readable relief):
+Geometry modelled:
   * 100 x 55 plate slab;
   * a shallow rectangular recess (the darkened field) inset from the edge,
     leaving the raised perimeter border;
+  * the two engraved text lines + an oval cartouche, incised into the field
+    floor (SketchText, via the new _common.insert_sketch_text / add_ellipse
+    raw-COM helpers -- see below);
   * four corner through-holes for the mounting screws (the screws are the
     shared brass fillister part, placed at assembly).
 
-The raised lettering + central scroll cartouche are a finish/appearance
-detail, NOT geometry: there is no glyph primitive in the build toolkit and
-the strokes sit far below the rectangle/circle modelling vocabulary -- the
-same documented-simplification posture as the omitted fillister-screw slot.
-The two-tone polished-border / blackened-field finish is likewise left to
-appearance (deferred), so the part reads as a single brass body here.
+SketchText: the lettering is real cut geometry now, drawn with
+``IModelDoc2::InsertSketchText`` reached through the adapter (the MCP wrapper
+exposes no text primitive) -- the same raw-COM route :func:`insert_helix`
+uses. Engraved INTO the field rather than raised proud of it (the photo shows
+raised polished letters): an incise is unambiguous to build from the z=0 sketch
+plane, where raised glyphs would need the field cut around them as islands. The
+scroll flourishes are simplified to the central oval. The polished-border /
+blackened-field two-tone finish stays appearance-level (deferred).
 
 Dimensions: cad/DIMENSIONS.md ch.26 -- 100 x 55 stated (high); thickness,
-border width and screw inset are photo-plausible reads off the p.71 macro
-(low).
+border, recess, screw inset, the engraving heights and the rough text centring
+are photo-plausible reads off the p.71 macro (low). The text x-centring uses an
+average-glyph-advance estimate and wants a tuning pass on the live seat.
 
-Layout: width along +X, height along +Y from the origin corner, decorated
-face on the Front plane at z = 0, thickness extruded +Z (same scheme as
-build_platen / build_platen_paper).
+Layout: width along +X, height along +Y from the origin corner, decorated face
+on the Front plane at z = 0, thickness extruded +Z (same scheme as
+build_platen).
 
 Run (SolidWorks already open)::
 
@@ -42,6 +47,7 @@ import math
 import sys
 
 from _common import (
+    add_ellipse,
     add_line_chain,
     apply_material,
     bbox_extent_check,
@@ -49,6 +55,7 @@ from _common import (
     define_circle,
     define_rectilinear_chain,
     ensure_fully_defined,
+    insert_sketch_text,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -65,9 +72,33 @@ PLATE_THICKNESS = 1.5  # thin brass plate; p.71 edge read (low)
 
 # Raised border framing the blackened field. Border width and recess depth are
 # photo reads off the p.71 macro (low); the recess is what makes the polished
-# perimeter stand proud of the sunk lettering field.
+# perimeter (and the lettering) stand against the sunk field.
 BORDER_W = 8.0
 RECESS_DEPTH = 0.4
+
+# Engraving: glyphs + cartouche incised into the field floor. The cut is taken
+# from the z=0 Front plane, so it must pass the RECESS_DEPTH of air over the
+# field before biting ENGRAVE_DEPTH into the floor (see the cut below).
+ENGRAVE_DEPTH = 0.3
+TITLE = "WM. GAERTNER & CO"
+SUBTITLE = "CHICAGO, U.S.A."
+TITLE_H = 7.0   # cap height (low)
+SUB_H = 6.0
+# Average glyph advance ~= 0.62 * cap height for this condensed sans; used only
+# to left-anchor each line near plate-centre (InsertSketchText ignores the
+# centre alignment without a guide curve). Refine live.
+_ADVANCE = 0.62
+TITLE_BASELINE_Y = 33.0
+SUB_BASELINE_Y = 11.0
+ORNAMENT_CY = 27.5          # between the two lines
+ORNAMENT_RX = 9.0           # oval half-width
+ORNAMENT_RY = 2.2           # oval half-height
+
+
+def _centre_left_x(text: str, height: float) -> float:
+    """Left-anchor x that centres ``text`` on the plate (advance estimate)."""
+    return PLATE_WIDTH / 2.0 - (len(text) * _ADVANCE * height) / 2.0
+
 
 # Four corner mounting screws (the shared brass fillister part), centred in the
 # border band so they clear the recessed field. Through-holes; the screws seat
@@ -80,6 +111,11 @@ SCREW_XY = (
     (SCREW_INSET, PLATE_HEIGHT - SCREW_INSET),
     (PLATE_WIDTH - SCREW_INSET, PLATE_HEIGHT - SCREW_INSET),
 )
+
+
+async def _removed(adapter, pre_vol: float) -> float:
+    post = await adapter.get_mass_properties()
+    return pre_vol - float(post.data.volume)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -105,18 +141,16 @@ async def build(adapter) -> dict[str, str]:
     )
     v_slab = PLATE_WIDTH * PLATE_HEIGHT * PLATE_THICKNESS
     await volume_check(adapter, "plate slab", v_slab, 0.005 * v_slab)
-
-    # Confirm the stated 100 x 55 footprint before sinking the field.
     await bbox_extent_check(adapter, "plate width (stated 100)", "x", PLATE_WIDTH)
     await bbox_extent_check(adapter, "plate height (stated 55)", "y", PLATE_HEIGHT)
 
-    # Sink the central field (the blackened, lettered area), leaving the raised
-    # border. A both-directions cut of 2x depth about the z=0 Front plane lands
-    # exactly 0..RECESS_DEPTH in material (the -z half is air) -- the platen
-    # socket trick (build_platen). Direct-db: the sketch plane is coplanar with
-    # the front face, where inference picks misbehave live.
+    # Sink the central field (raised border). A both-directions cut of 2x depth
+    # about the z=0 Front plane lands exactly 0..RECESS_DEPTH in material (the
+    # -z half is air) -- the platen socket trick. Direct-db: the sketch plane is
+    # coplanar with the front face, where inference picks misbehave live.
     field_w = PLATE_WIDTH - 2.0 * BORDER_W
     field_h = PLATE_HEIGHT - 2.0 * BORDER_W
+    pre = await adapter.get_mass_properties()
     check("create_sketch field", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     field_rect = [
@@ -137,10 +171,51 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     v_field = field_w * field_h * RECESS_DEPTH
-    await volume_check(adapter, "after field recess", v_slab - v_field, 0.02 * v_field)
+    removed = await _removed(adapter, float(pre.data.volume))
+    print(f"  field recess removed {removed:.1f} mm^3 (analytic {v_field:.1f})")
+    if abs(removed - v_field) > 0.02 * v_field:
+        raise RuntimeError(f"field recess removed {removed:.1f}, expected {v_field:.1f}")
+
+    # Engrave the two lines + the cartouche oval into the field floor. The cut
+    # starts at z=0 and must clear the RECESS_DEPTH of air over the field before
+    # cutting ENGRAVE_DEPTH into the floor, so its +z reach is RECESS+ENGRAVE
+    # (both-directions => 2x). Glyph area is not analytic, so this is gated by a
+    # loose sanity bound (something was cut, but not the whole field) rather than
+    # an exact volume.
+    pre = await adapter.get_mass_properties()
+    check("create_sketch engraving", await adapter.create_sketch("Front"))
+    insert_sketch_text(
+        adapter, TITLE, _centre_left_x(TITLE, TITLE_H), TITLE_BASELINE_Y,
+        height_mm=TITLE_H, label="title",
+    )
+    insert_sketch_text(
+        adapter, SUBTITLE, _centre_left_x(SUBTITLE, SUB_H), SUB_BASELINE_Y,
+        height_mm=SUB_H, label="subtitle",
+    )
+    add_ellipse(adapter, PLATE_WIDTH / 2.0, ORNAMENT_CY, ORNAMENT_RX, ORNAMENT_RY,
+                label="cartouche")
+    check("exit_sketch engraving", await adapter.exit_sketch())
+    check(
+        "cut engraving",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(
+                depth=2.0 * (RECESS_DEPTH + ENGRAVE_DEPTH), both_directions=True
+            )
+        ),
+    )
+    removed = await _removed(adapter, float(pre.data.volume))
+    field_cap = field_w * field_h * ENGRAVE_DEPTH
+    print(f"  engraving removed {removed:.1f} mm^3 (0 < x < field cap {field_cap:.1f})")
+    if not (0.0 < removed < field_cap):
+        raise RuntimeError(
+            f"engraving removed {removed:.1f} mm^3, outside (0, {field_cap:.1f}) -- "
+            "expected some glyph area, less than the whole field incised"
+        )
 
     # Four corner screw through-holes (both-directions 2x thickness clears the
-    # full slab; the -z half is air).
+    # full slab; the -z half is air). They sit in the full-thickness border, so
+    # the removed volume is the clean cylinder analytic.
+    pre = await adapter.get_mass_properties()
     check("create_sketch screws", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     for x, y in SCREW_XY:
@@ -155,9 +230,10 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     v_holes = len(SCREW_XY) * math.pi * (SCREW_DIA / 2.0) ** 2 * PLATE_THICKNESS
-    await volume_check(
-        adapter, "after screw holes", v_slab - v_field - v_holes, 0.02 * v_holes
-    )
+    removed = await _removed(adapter, float(pre.data.volume))
+    print(f"  screw holes removed {removed:.1f} mm^3 (analytic {v_holes:.1f})")
+    if abs(removed - v_holes) > 0.02 * v_holes:
+        raise RuntimeError(f"screw holes removed {removed:.1f}, expected {v_holes:.1f}")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
