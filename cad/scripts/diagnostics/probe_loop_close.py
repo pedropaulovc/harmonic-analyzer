@@ -28,7 +28,7 @@ from __future__ import annotations
 import asyncio
 import math
 
-from _common import OUT_SLDASM, _flag, _read_member, check, log
+from _common import OUT_SLDASM, check, log
 from build_motion_study import (
     ASM, _by_z_rank, _comp_xform, _components, _entity_ref, _find_one,
     _suppress_named, _suppress_recurring, _world,

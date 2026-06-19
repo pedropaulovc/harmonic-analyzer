@@ -28,7 +28,7 @@ from _assembly import (
     component_named_ref,
 )
 from build_motion_study import (
-    _by_z_rank, _comp_xform, _components, _find_one, _iter_mates, _rot_angle, _sub_model,
+    _by_z_rank, _comp_xform, _components, _find_one, _iter_mates, _rot_angle,
 )
 from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
 

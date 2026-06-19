@@ -26,7 +26,6 @@ and measure the channel-lever's rotation. Lever span > 0 => the gear transmits
 from __future__ import annotations
 
 import asyncio
-import math
 import sys
 
 from _common import (

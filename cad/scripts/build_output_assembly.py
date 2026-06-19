@@ -137,7 +137,6 @@ from _assembly import (
     named_ref,
     place_component,
     save_assembly_and_images,
-    world_point,
 )
 from _transforms import mirror_placement
 import pen_driver  # noqa: E402  (kinematic pen driver, plan F5)
