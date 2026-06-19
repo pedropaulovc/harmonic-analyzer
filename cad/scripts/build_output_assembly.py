@@ -135,7 +135,6 @@ from _common import (
     place_component,
     run_build,
     save_assembly_and_images,
-    spin_driver,
     world_point,
     _read_member,
 )
