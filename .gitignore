@@ -356,6 +356,8 @@ cad/out/reports/
 cad/out/stl/
 cad/out/step/
 cad/out/boxes/
+# Changed-parts diff renders (regenerable: comparisons/tools/render_diff.py)
+cad/out/diff/
 
 # Parity-test scratch (comparisons/tools/parity_check.py)
 comparisons/.parity_sw/
