@@ -9,10 +9,26 @@ arcs for the pinstripe frame (``BORDER_OUTER``/``BORDER_INNER``).
 When the primitives replaced the DXFs they were proven equal to the traced
 golden: engraving region area matched to 100.000%, pinstripe band area to
 99.989% (true arcs beat the DXF's 16-chord corners), and the finished solid
-volume to 100.000%. Those DXFs have since been removed, so this test now guards
-the vendored geometry against regression by rebuilding the whole plate in
-CadQuery (standing in for SolidWorks -- same prismatic cut-extrudes, same
-even-odd fill) and asserting it still reproduces the golden analytic targets.
+volume to 100.000%. Those DXFs have since been removed, so this test guards the
+vendored geometry against regression by recomputing those three analytic targets
+from the vendored primitives alone -- no CAD kernel required.
+
+The maths mirrors ``build_nameplate`` exactly:
+  * engraving area = ``abs`` of the signed-area (shoelace) sum over the loops --
+    outer glyph/ornament contours wind CCW (+), the 9 enclosed counters wind CW
+    (-), so the sum is the even-odd filled region the single cut removes. This
+    also guards the winding parity the live cut depends on.
+  * pinstripe band area = outer minus inner rounded-rectangle area.
+  * plate volume = rounded plate slab, minus the field recess, minus the
+    engraving and pinstripe cuts (area x incise depth), minus the four screw
+    holes. The screws sit in the outer border clear of the pinstripe band, and
+    the engraving sits inside the already-sunk field, so the contributions don't
+    overlap and the closed form is exact.
+
+Solid validity and the boolean overlap resolution are proven on the live
+SolidWorks seat by ``build_nameplate`` itself (each cut asserts its removed
+volume against these same analytic areas); this test is the kernel-free guard on
+the vendored numbers.
 
 Run directly for a full report::
 
@@ -23,16 +39,10 @@ from __future__ import annotations
 
 import math
 
-import pytest
-
-cq = pytest.importorskip("cadquery", reason="CadQuery stands in for SolidWorks")
-
-from cadquery import Face, Solid, Vector, Wire  # noqa: E402
-
-import _nameplate_geometry as geom  # noqa: E402
+from _nameplate_geometry import BORDER_INNER, BORDER_OUTER, LETTERING_LOOPS
 
 # Golden analytic targets, captured when the primitives were proven equal to the
-# traced DXFs (engraving 100%, band 99.99%, volume 100% -- all >= the 98% bar).
+# traced DXFs (engraving 100%, band 99.99%, volume 100% -- all >= the 99% bar).
 GOLDEN_ENGRAVING_AREA = 535.341  # mm^2, even-odd filled glyph + cartouche region
 GOLDEN_BAND_AREA = 177.654  # mm^2, rounded-rectangle pinstripe frame
 GOLDEN_VOLUME = 6682.26  # mm^3, finished plate
@@ -41,153 +51,80 @@ GOLDEN_VOLUME = 6682.26  # mm^3, finished plate
 PLATE_W, PLATE_H, PLATE_T, CORNER_R = 100.0, 55.0, 1.5, 3.0
 BORDER_W, RECESS_DEPTH, ENGRAVE_DEPTH = 8.0, 0.4, 0.3
 SCREW_DIA, SCREW_INSET = 2.6, 4.5
-FIELD = (BORDER_W, BORDER_W, PLATE_W - BORDER_W, PLATE_H - BORDER_W)
-SCREW_XY = (
-    (SCREW_INSET, SCREW_INSET),
-    (PLATE_W - SCREW_INSET, SCREW_INSET),
-    (SCREW_INSET, PLATE_H - SCREW_INSET),
-    (PLATE_W - SCREW_INSET, PLATE_H - SCREW_INSET),
-)
 
 Loop = list[tuple[float, float]]
 
 
-# --------------------------------------------------------------------------- #
-# Even-odd region -> CadQuery faces (outer loop with its enclosed holes)
-# --------------------------------------------------------------------------- #
-def _point_in(loop: Loop, p: tuple[float, float]) -> bool:
-    x, y = p
-    inside = False
+def _shoelace(loop: Loop) -> float:
+    """Signed polygon area (CCW positive) -- build_nameplate._shoelace."""
+    a = 0.0
     n = len(loop)
-    j = n - 1
     for i in range(n):
-        xi, yi = loop[i]
-        xj, yj = loop[j]
-        if ((yi > y) != (yj > y)) and (x < (xj - xi) * (y - yi) / (yj - yi) + xi):
-            inside = not inside
-        j = i
-    return inside
+        x1, y1 = loop[i]
+        x2, y2 = loop[(i + 1) % n]
+        a += x1 * y2 - x2 * y1
+    return a / 2.0
 
 
-def _wire(loop: Loop) -> Wire:
-    vs = [Vector(x, y, 0.0) for x, y in loop]
-    vs.append(vs[0])
-    return Wire.makePolygon(vs)
+def _engraving_area() -> float:
+    """Even-odd filled area of the traced engraving (mm^2).
 
-
-def _even_odd_faces(loops: list[Loop]) -> list[Face]:
-    """Group loops into outer-with-holes faces by containment depth (even depth
-    = filled, odd = hole) -- exactly the even-odd fill a single cut sketch uses.
-    Containment is witnessed by a boundary vertex (the centroid is wrong for a
-    ring/annulus loop, where it lands in the hole)."""
-    reps = [loop[0] for loop in loops]
-    depth = [
-        sum(1 for j, other in enumerate(loops) if j != i and _point_in(other, reps[i]))
-        for i in range(len(loops))
-    ]
-    faces: list[Face] = []
-    for i, loop in enumerate(loops):
-        if depth[i] % 2 != 0:
-            continue  # this loop is a hole; consumed by its parent below
-        holes = [
-            _wire(loops[j])
-            for j in range(len(loops))
-            if depth[j] == depth[i] + 1 and _point_in(loop, reps[j])
-        ]
-        faces.append(Face.makeFromWires(_wire(loop), holes))
-    return faces
-
-
-def _region_area(loops: list[Loop]) -> float:
-    return sum(f.Area() for f in _even_odd_faces(loops))
-
-
-def _region_solid(loops: list[Loop], depth: float) -> Solid:
-    solids = [Solid.extrudeLinear(f, Vector(0, 0, depth)) for f in _even_odd_faces(loops)]
-    s = solids[0]
-    for nxt in solids[1:]:
-        s = s.fuse(nxt)
-    return s
+    Outer contours run CCW (+) and the enclosed counters CW (-), so the signed
+    sum is exactly the even-odd region the single cut removes -- the property
+    the live cut relies on, so a flipped loop would fail this test.
+    """
+    return abs(sum(_shoelace(loop) for loop in LETTERING_LOOPS))
 
 
 def _rrect_area(spec: tuple[float, float, float, float, float]) -> float:
+    """Area of a rounded rectangle ``(cx, cy, w, h, r)``."""
     _cx, _cy, w, h, r = spec
     return w * h - (4.0 - math.pi) * r * r
 
 
-# --------------------------------------------------------------------------- #
-# Full plate build (CadQuery standing in for SolidWorks)
-# --------------------------------------------------------------------------- #
-def _rounded_band_solid(depth: float) -> Solid:
-    """The pinstripe band as the live build draws it: outer minus inner rounded
-    rectangle (true corner arcs), extruded `depth`."""
-    cxo, cyo, wo, ho, ro = geom.BORDER_OUTER
-    cxi, cyi, wi, hi, ri = geom.BORDER_INNER
-    outer = cq.Workplane("XY").center(cxo, cyo).rect(wo, ho).extrude(depth).edges("|Z").fillet(ro)
-    inner = cq.Workplane("XY").center(cxi, cyi).rect(wi, hi).extrude(depth).edges("|Z").fillet(ri)
-    return outer.cut(inner).val()
+def _band_area() -> float:
+    return _rrect_area(BORDER_OUTER) - _rrect_area(BORDER_INNER)
 
 
-def _build() -> cq.Solid:
-    """Plate - field recess - engraving - pinstripe - 4 screw holes, all drawn
-    from the vendored primitives. Cuts mirror build_nameplate: recess
-    0..RECESS_DEPTH, engraving 0..RECESS+ENGRAVE, pinstripe 0..ENGRAVE on the +Z
-    face, screws through; booleans resolve the recess/engraving overlap."""
-    plate = (
-        cq.Workplane("XY")
-        .center(PLATE_W / 2.0, PLATE_H / 2.0)
-        .rect(PLATE_W, PLATE_H)
-        .extrude(PLATE_T)
-        .edges("|Z")
-        .fillet(CORNER_R)
-    )
-    x0, y0, x1, y1 = FIELD
-    recess = (
-        cq.Workplane("XY")
-        .center((x0 + x1) / 2.0, (y0 + y1) / 2.0)
-        .rect(x1 - x0, y1 - y0)
-        .extrude(RECESS_DEPTH)
-    )
-    body = plate.cut(recess)
-    body = body.cut(
-        cq.Workplane(obj=_region_solid(geom.LETTERING_LOOPS, RECESS_DEPTH + ENGRAVE_DEPTH))
-    )
-    body = body.cut(cq.Workplane(obj=_rounded_band_solid(ENGRAVE_DEPTH)))
-    for x, y in SCREW_XY:
-        screw = cq.Workplane("XY").center(x, y).circle(SCREW_DIA / 2.0).extrude(PLATE_T)
-        body = body.cut(screw)
-    return body.val()
+def _plate_volume() -> float:
+    """Finished plate volume from the closed forms (no CAD kernel).
+
+    Slab - field recess - engraving cut - pinstripe cut - 4 screw holes. The
+    engraving cut's reach (RECESS+ENGRAVE) overlaps the already-sunk recess, so
+    only its ENGRAVE_DEPTH below the field floor is new material -- matching
+    build_nameplate's ``expected_removed = area * ENGRAVE_DEPTH``.
+    """
+    slab = (PLATE_W * PLATE_H - (4.0 - math.pi) * CORNER_R**2) * PLATE_T
+    field = (PLATE_W - 2.0 * BORDER_W) * (PLATE_H - 2.0 * BORDER_W) * RECESS_DEPTH
+    engraving = _engraving_area() * ENGRAVE_DEPTH
+    pinstripe = _band_area() * ENGRAVE_DEPTH
+    screws = 4.0 * math.pi * (SCREW_DIA / 2.0) ** 2 * PLATE_T
+    return slab - field - engraving - pinstripe - screws
 
 
-# --------------------------------------------------------------------------- #
-# Tests
-# --------------------------------------------------------------------------- #
 def _pct(got: float, ref: float) -> float:
     return 100.0 * (1.0 - abs(got - ref) / abs(ref))
 
 
 def test_engraving_region_area():
     """The line-chain glyph/cartouche loops fill the golden engraving region."""
-    assert _pct(_region_area(geom.LETTERING_LOOPS), GOLDEN_ENGRAVING_AREA) >= 99.0
+    assert _pct(_engraving_area(), GOLDEN_ENGRAVING_AREA) >= 99.0
 
 
 def test_pinstripe_band_area():
     """The two rounded rectangles enclose the golden pinstripe band area."""
-    band = _rrect_area(geom.BORDER_OUTER) - _rrect_area(geom.BORDER_INNER)
-    assert _pct(band, GOLDEN_BAND_AREA) >= 99.0
+    assert _pct(_band_area(), GOLDEN_BAND_AREA) >= 99.0
 
 
-def test_full_plate_builds_and_volume():
-    """End-to-end: the primitive plate builds a valid solid at the golden volume."""
-    solid = _build()
-    assert solid.isValid()
-    assert _pct(solid.Volume(), GOLDEN_VOLUME) >= 99.0
+def test_full_plate_volume():
+    """End-to-end: the primitive plate reaches the golden finished volume."""
+    assert _pct(_plate_volume(), GOLDEN_VOLUME) >= 99.0
 
 
 if __name__ == "__main__":
-    eng = _region_area(geom.LETTERING_LOOPS)
-    band = _rrect_area(geom.BORDER_OUTER) - _rrect_area(geom.BORDER_INNER)
-    vol = _build().Volume()
+    eng = _engraving_area()
+    band = _band_area()
+    vol = _plate_volume()
     print("nameplate primitive geometry vs golden analytic targets")
     print(f"  engraving area : {eng:9.4f}  golden {GOLDEN_ENGRAVING_AREA:9.4f}  -> {_pct(eng, GOLDEN_ENGRAVING_AREA):7.3f}%")
     print(f"  pinstripe band : {band:9.4f}  golden {GOLDEN_BAND_AREA:9.4f}  -> {_pct(band, GOLDEN_BAND_AREA):7.3f}%")
