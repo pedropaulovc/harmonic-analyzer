@@ -22,7 +22,16 @@ from __future__ import annotations
 
 import asyncio
 
-from _common import _flag, _read_member, check, gear_mate, log, rack_pinion_mate
+from _common import (
+    _flag,
+    _read_member,
+    check,
+    log,
+)
+from _assembly import (
+    gear_mate,
+    rack_pinion_mate,
+)
 from build_motion_study import (
     ANGLE, DISTANCE, _comp_xform, _components, _entity_ref, _family, _find_one,
     _iter_mates, _lone_real, _mate_value, _rot_angle, _sub_model, _suppress_named,

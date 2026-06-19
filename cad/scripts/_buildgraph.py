@@ -14,6 +14,8 @@ Lifted verbatim from the original ``build_all.py`` (constants + ``part_scripts``
 
 from __future__ import annotations
 
+import ast
+import functools
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -107,6 +109,63 @@ def references_of(asm_stem: str) -> list[str]:
     """
     candidates = part_stems() + [a for a in ASSEMBLY_ORDER if a != asm_stem]
     return [stem for stem in candidates if _references(asm_stem, stem)]
+
+
+@functools.lru_cache(maxsize=1)
+def _local_helper_modules() -> dict[str, Path]:
+    """The ``_*.py`` helper modules a build script may import, by module name.
+
+    Excludes ``_buildgraph.py`` (the build-GRAPH helper, not a geometry input)
+    and ``__init__``-style/private tooling that isn't an importable helper.
+    """
+    out: dict[str, Path] = {}
+    for p in sorted(SCRIPTS_DIR.glob("_*.py")):
+        if p.name in {"_buildgraph.py", "_extract.py", "_rewrite_imports.py"}:
+            continue
+        out[p.stem] = p
+    return out
+
+
+@functools.lru_cache(maxsize=None)
+def _direct_helper_imports(path: Path) -> frozenset[str]:
+    """Local helper module names imported ANYWHERE in ``path`` (top-level or
+    lazily inside a function, e.g. ``_common``'s ``import _config``). An absolute
+    or dotted import keeps only its leading segment so ``import _common`` and
+    ``from _common import x`` both resolve to ``_common``."""
+    helpers = _local_helper_modules()
+    found: set[str] = set()
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for a in node.names:
+                found.add(a.name.split(".")[0])
+        elif isinstance(node, ast.ImportFrom):
+            if node.level == 0 and node.module:
+                found.add(node.module.split(".")[0])
+    return frozenset(found & helpers.keys())
+
+
+def module_deps_of(script: Path) -> list[str]:
+    """Resolved paths of every local ``_*.py`` helper ``script`` transitively
+    imports -- the EXACT geometry-input edges for doit's ``file_dep``.
+
+    This replaces the old blanket "every ``_*.py`` is a dep of every build"
+    rule: a leaf part that imports only ``_common`` no longer rebuilds when an
+    assembly-only helper (``_assembly``) or an unrelated one (``_gear``) changes.
+    Because it follows REAL Python imports transitively (``_chain_link -> _chain
+    -> _common``; ``_common -> _config``), it can never under-invalidate so long
+    as a script imports what it uses -- which Python enforces at run time.
+    """
+    helpers = _local_helper_modules()
+    result: set[str] = set()
+    frontier = set(_direct_helper_imports(script.resolve()))
+    while frontier:
+        mod = frontier.pop()
+        if mod in result:
+            continue
+        result.add(mod)
+        frontier |= set(_direct_helper_imports(helpers[mod].resolve())) - result
+    return sorted(str(helpers[m].resolve()) for m in result)
 
 
 def dependents_of(stem: str) -> list[str]:

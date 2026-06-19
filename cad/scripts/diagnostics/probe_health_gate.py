@@ -4,7 +4,15 @@ from __future__ import annotations
 
 import asyncio
 
-from _common import _flag, _read_member, assert_model_healthy, log, whats_wrong
+from _common import (
+    _flag,
+    _read_member,
+    log,
+)
+from _assembly import (
+    assert_model_healthy,
+    whats_wrong,
+)
 
 
 async def main():

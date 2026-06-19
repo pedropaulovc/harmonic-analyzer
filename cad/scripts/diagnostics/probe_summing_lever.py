@@ -12,19 +12,21 @@ from __future__ import annotations
 import sys
 
 from _common import (
-    angle_driver,
+    _flag,
+    _read_member,
     check,
+    log,
+    run_build,
+)
+from _assembly import (
+    angle_driver,
     coincident_mate,
     component_transform,
     distance_driver,
-    log,
     named_ref,
     place_component,
     spin_driver,
     world_point,
-    run_build,
-    _flag,
-    _read_member,
 )
 from build_summing_lever import SPIN_REF_X as SL_SPIN_REF_X
 

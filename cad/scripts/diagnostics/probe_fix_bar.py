@@ -22,7 +22,14 @@ from __future__ import annotations
 
 import asyncio
 
-from _common import _read_member, coincident_mate, log, named_ref
+from _common import (
+    _read_member,
+    log,
+)
+from _assembly import (
+    coincident_mate,
+    named_ref,
+)
 from build_motion_study import OUT_SLDASM, _find_family, _find_one, _sub_model
 from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
 

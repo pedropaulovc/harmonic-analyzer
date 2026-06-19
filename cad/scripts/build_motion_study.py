@@ -61,8 +61,18 @@ import os
 import sys
 
 from _common import (
-    OUT_PNG, OUT_SLDASM, _flag, _read_member, check, coincident_mate,
-    component_named_ref, log, named_ref, run_build,
+    OUT_PNG,
+    OUT_SLDASM,
+    _flag,
+    _read_member,
+    check,
+    log,
+    run_build,
+)
+from _assembly import (
+    coincident_mate,
+    component_named_ref,
+    named_ref,
 )
 from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
 

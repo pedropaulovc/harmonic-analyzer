@@ -106,10 +106,13 @@ import sys
 
 import _config
 from _common import (
+    check,
+    run_build,
+)
+from _assembly import (
     angle_driver,
     apply_component_color,
     assert_components_fully_defined,
-    check,
     check_no_interference,
     coincident_mate,
     component_transform,
@@ -118,7 +121,6 @@ from _common import (
     lock_mate,
     named_ref,
     place_component,
-    run_build,
     save_assembly_and_images,
     spin_driver,
 )
