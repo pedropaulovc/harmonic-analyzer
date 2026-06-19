@@ -256,6 +256,11 @@ parts:
     material: Brass
     tolerance_class: plate_profile
     process: "machined (brass)"
+  nameplate:
+    number: MHA-086
+    material: Brass
+    tolerance_class: visual_noncritical
+    process: "engraved brass plate"
   output-fixture:
     number: MHA-047
     material: Brass
