@@ -18,12 +18,10 @@ from _common import (
     _read_member,
     check,
     log,
-    name_bore_axis,
     run_build,
 )
 from _assembly import (
     angle_driver,
-    coincident_mate,
     component_transform,
     distance_driver,
     named_ref,

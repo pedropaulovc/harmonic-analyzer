@@ -25,7 +25,6 @@ from _assembly import (
     distance_driver,
     named_ref,
     place_component,
-    spin_driver,
     world_point,
 )
 from build_summing_lever import SPIN_REF_X as SL_SPIN_REF_X

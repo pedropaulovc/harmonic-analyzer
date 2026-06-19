@@ -388,7 +388,6 @@ async def _suppress_named(adapter, sub_name, families, mtypes, label):
 
     For unique drivers (e.g. the crank angle) where bucketing does not apply.
     """
-    from solidworks_mcp.adapters.base import SuppressMateParameters
     _, model = _sub_model(adapter, sub_name)
     root = _root_title(sub_name)
     targets = []

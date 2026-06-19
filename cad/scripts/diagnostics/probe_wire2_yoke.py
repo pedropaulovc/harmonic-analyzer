@@ -31,7 +31,6 @@ from _common import (
 )
 from _assembly import (
     coincident_mate,
-    component_named_ref,
     gear_mate,
     named_ref,
 )
