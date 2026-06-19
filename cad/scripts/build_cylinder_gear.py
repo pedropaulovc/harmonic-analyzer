@@ -9,17 +9,18 @@ units = inches, trig in radians inside curve expressions).
 
 Features, in order:
 
-1. Gear blank: disc at tip radius ``Ra`` (OD 4.067"), face width 3 mm,
+1. Gear blank: disc at tip radius ``Ra`` (OD 2.449" = 62.2 mm), face width 3 mm,
    extruded z = 0..3 from the Front plane. The face width comes from the
    M6 axial-budget resolution (Appendix C #6): face/pitch = 0.38 measured
    on the p.22 stack macro x the 7.5 mm axial pitch.
 2. One tooth gap (six equation curves: two involute flanks, base chord, two
    radial extensions, outer clearance arc) cut through, then circular-
    patterned 120x about the gear axis (reference axis Top x Right = Z).
-3. Integral eccentric cam: disc OD 2.0", thickness 3.5 mm (the 4.5 mm
-   inter-face gap minus 0.5 mm air per side; supersedes the legacy 0.4"
-   which alone exceeded the 7.5 mm pitch), centre offset -Y by the 0.2"
-   eccentricity, boss-extruded z = 3..6.5 from an offset reference
+3. Integral eccentric cam: disc OD 30.6 mm, thickness 3.5 mm (the 4.5 mm
+   inter-face gap minus 0.5 mm air per side; the axial budget rides the
+   unchanged 7.0565 channel pitch), centre offset -Y by the 3.06 mm
+   eccentricity (OD and offset both scaled 0.6022 with the gear so the
+   lobe clears the finer tooth-root circle), boss-extruded z = 3..6.5 from an offset reference
    plane (the cam shares the layout of the superseded standalone
    ``build_eccentric_cam.py``: lobe -Y).
 4. Alignment notch: 3 mm deep square notch (width estimated = depth) cut
@@ -32,7 +33,7 @@ Features, in order:
    refutation"). The legacy keyway was fiction and was removed in M6.2.
 
 Every feature's volume delta is asserted against an analytic expectation
-(same DP 30 / PA 14.5 deg tooth profile as the cone set, narrower face).
+(same DP 49.82 / PA 14.5 deg tooth profile as the cone set, narrower face).
 The notch delta integrates the
 exact involute solid-fraction over the notch window (the notch floor sits
 below the base circle, so part of the window is full annulus and part is
@@ -77,9 +78,11 @@ MATERIAL = "Brass"  # ch. 13 text p.22: polished brass
 
 TEETH = 120  # DIMENSIONS.md ch13: derived from gear law k/80 (high)
 FACE_WIDTH = 3.0  # DIMENSIONS.md ch13: 0.38 face/pitch x 7.5 axial pitch (scaled, med)
-CAM_DIAMETER = 2.0 * IN  # 50.8  DIMENSIONS.md ch13: integral cam diameter (legacy, med)
-CAM_THICKNESS = 3.5  # DIMENSIONS.md ch13: axial-budget resolution, Appendix C #6 (derived, med)
-ECCENTRICITY = 0.2 * IN  # 5.08  DIMENSIONS.md ch13: cam eccentricity (legacy, med)
+CAM_DIAMETER = 30.6  # DIMENSIONS.md ch13: integral cam diameter, scaled 0.6022 with the
+# gear OD (50.8 -> 30.6) so the eccentric lobe clears the new tooth-root circle (low)
+CAM_THICKNESS = 3.5  # DIMENSIONS.md ch13: axial-budget (7.0565 channel pitch, unchanged) (med)
+ECCENTRICITY = 3.06  # DIMENSIONS.md ch13: cam eccentricity, scaled 0.6022 (5.08 -> 3.06);
+# rocker stroke shrinks proportionally (user-directed 2026-06-18) (low)
 BORE_DIAMETER = 0.375 * IN  # 9.525 DIMENSIONS.md ch13: cam bore (legacy, med)
 NOTCH_DEPTH = 3.0  # DIMENSIONS.md ch13: alignment notch depth, text p.22 (high)
 NOTCH_WIDTH = 3.0  # DIMENSIONS.md ch13: square notch, width estimated = depth (low)
@@ -87,7 +90,7 @@ NOTCH_WIDTH = 3.0  # DIMENSIONS.md ch13: square notch, width estimated = depth (
 BORE_RADIUS = BORE_DIAMETER / 2.0
 
 FACTS = gear_facts(TEETH)  # inches; same DP/PA as the cone set by construction
-RA_MM = FACTS["Ra"] * IN  # 51.6467 -- gear OD/2 = 4.067"/2 (high)
+RA_MM = FACTS["Ra"] * IN  # 31.10 -- gear OD/2 = 2.449"/2 = 62.2/2 (low, ch13 scaling)
 RB_MM = FACTS["Rb"] * IN
 NOTCH_FLOOR = RA_MM - NOTCH_DEPTH
 NOTCH_OUTER = RA_MM + 1.5  # clearance past the OD so the cut always opens
@@ -286,7 +289,7 @@ async def build(adapter) -> dict[str, str]:
 
     # ------------------------------------------------------------------
     # Shaft bore through gear + cam (the bore circle is fully inside the
-    # eccentric cam disc: 5.08 + 4.76 < 25.4).
+    # eccentric cam disc: ecc 3.06 + bore_r 4.76 = 7.82 < cam_r 15.3).
     # ------------------------------------------------------------------
     check("create_sketch bore", await adapter.create_sketch("Front"))
     await define_circle(adapter, 0.0, 0.0, BORE_RADIUS, "bore")

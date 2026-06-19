@@ -122,9 +122,10 @@ Y_BASE_TOP = 50.8  # harmonic-base top face
 Y_DRIVE = Y_BASE_TOP + 76.0  # 126.8: crank, cone big end and arbor axes
 
 DP_TRAIN = _config.machine("gear_train", "diametral_pitch")  # cad/config/machine.yaml (DIMENSIONS.md ch12)
-ADDENDUM = 25.4 / DP_TRAIN  # 0.847
-WORKING_DEPTH = 2.0 * ADDENDUM  # 1.693: full tooth interleave depth
-RADIUS_STEP = 3.0 * 25.4 / DP_TRAIN  # 2.54: pitch-radius step per 6 teeth
+ADDENDUM = 25.4 / DP_TRAIN  # 0.510 at DP 49.82
+WORKING_DEPTH = 2.0 * ADDENDUM  # 1.020: full tooth interleave depth
+RADIUS_STEP = 3.0 * 25.4 / DP_TRAIN  # 1.5295: pitch-radius step per 6 teeth
+CONE_T120_PITCH_R = (120.0 / DP_TRAIN) * 25.4 / 2.0  # 30.59: largest cone gear pitch radius
 
 # Frame-locked machine grid (M6.3 lineage -- the drum planes anchor the
 # gates, cams, rockers and bars; nothing here may move them).
@@ -164,7 +165,7 @@ X_PITCH = DRUM_TIP_X + ADDENDUM * SEC_I - PEN_MID  # 4.490
 
 def cone_seat(j: int) -> tuple[float, float]:
     """(x, z) centre of cone gear j: pitch-projected x, r*sin(i) north."""
-    r = 2.0 * 25.4 - RADIUS_STEP * j
+    r = CONE_T120_PITCH_R - RADIUS_STEP * j
     return X_PITCH + r * COS_I, Z_DRUM0 + Z_PITCH * j + r * SIN_I
 
 
@@ -322,7 +323,7 @@ if math.hypot(PINION_X - X_DRUM, Y_DRIVE - PINION_Y) < TIP_DRUM + TIP_PINION + 1
 if math.hypot(PIVOT_X - X_DRUM, Y_DRIVE - PIVOT_Y) > ENGAGED_C2C + STRAP_C2C - 0.25:
     raise AssertionError("engaged pose unreachable from the parked pivot")
 for _j in range(20):
-    _tip = 2.0 * 25.4 - RADIUS_STEP * _j + ADDENDUM
+    _tip = CONE_T120_PITCH_R - RADIUS_STEP * _j + ADDENDUM
     if (
         math.hypot(PINION_X - cone_seat(_j)[0], Y_DRIVE - PINION_Y)
         < _tip + TIP_PINION + 0.25

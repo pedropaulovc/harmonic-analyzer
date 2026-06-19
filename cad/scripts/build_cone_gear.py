@@ -90,10 +90,10 @@ MATERIAL = "Brass"  # ch. 13 text: polished brass gear stock; cone set matches
 DP = _config.machine("gear_train", "diametral_pitch")  # cad/config/machine.yaml (DIMENSIONS.md ch12)
 PA_DEG = 14.5  # pressure angle, period-typical assumption (low)
 # M6.7: the exact-tracking mesh (assembly docstring) fixes the seat
-# pitch along the shaft at Z_PITCH*cos(21.1 deg) = 6.584 mm, so the
-# photo's 7 mm face callout cannot hold (faces would overlap 0.42);
-# 6.5 leaves 0.08 air -- the annotated cone figures are mutually
-# inconsistent with the drum grid, see DIMENSIONS.md ch. 12 notes.
+# pitch along the shaft at Z_PITCH*cos(12.52 deg) = 6.889 mm (the finer
+# DP 49.82 module gives a shallower incline); face 6.5 leaves 0.39 air,
+# and the photo's 7 mm callout still cannot hold -- the annotated cone
+# figures stay inconsistent with the drum grid, see DIMENSIONS.md ch. 12.
 FACE_WIDTH = 6.5  # mm, derived (photo callout 7, see above)
 
 # Cut clearance radius (inches -- document units, see module docstring)
@@ -115,21 +115,26 @@ def bore_dia_in(teeth: int) -> float:
 
     All 20 gears seat PERPENDICULAR to the shaft (true cone, p.18 --
     M6.7; the M6.6 canted-vertical experiment is retired: it met the
-    interference checker but visibly deformed the cone). At DP 30 the
-    small gears cannot clear the 9.5 mm shaft (6T OD is 6.77 mm), so the
-    shaft steps down at the tip (`build_cone_gear_shaft.py`) and each
-    bore matches its section: 3/8" T024..T120, 1/4" T018, 3/16" T012,
-    1/8" T006 (0.8 mm wall, matching the visibly thin tip rod in the
-    p.18 photos). No keyway: the book never shows the attachment and the
-    p.21 macro shows solder at the small gears.
+    interference checker but visibly deformed the cone). At the finer
+    module DP 49.82 (ch13 OD 62.2) the tip gears are tiny -- T006 OD is
+    only 4.08 mm with a 0.89 mm root radius -- so the shaft steps down
+    much further (`build_cone_gear_shaft.py`) and each bore matches its
+    section AND stays inside the gear's root circle:
+      3/8" T024..T120, 1/4" T018, 1/8" T012, 1/32" T006.
+    The four tip gears (T006..T024, more yellow + harder in the book, p.21)
+    are a harder high-zinc yellow metal (Muntz/manganese bronze) cut from
+    drawn rod and SOLDERED to the shaft (p.21 macro shows solder blobs) --
+    no keyway. WARNING: the 1/32" (0.79 mm) tip journal carrying T006 is
+    mechanically marginal; it follows directly from the 62.2 OD anchor
+    (low confidence) and is flagged for Phase 3 rebuild validation.
     """
     if teeth <= 6:
-        return 0.125
+        return 0.03125  # 0.79 mm -- T006 root r 0.89 mm leaves a 0.49 mm wall (marginal)
     if teeth <= 12:
-        return 0.1875
+        return 0.125  # 3.18 mm -- T012 root r 2.42 mm, 0.83 mm wall
     if teeth <= 18:
-        return 0.25
-    return 0.375
+        return 0.25  # 6.35 mm -- T018 root r 3.95 mm, 0.78 mm wall
+    return 0.375  # 9.53 mm -- T024 root r 5.48 mm, 0.71 mm wall
 
 
 def gear_facts(teeth: int, dp: float = DP, pa_deg: float = PA_DEG) -> dict[str, float]:

@@ -36,10 +36,10 @@ from _common import (
 PART_NAME = "eccentric-cam"
 MATERIAL = "Brass"  # see _common.apply_material docstring
 
-CAM_DIAMETER = 2.0 * IN  # 50.8  DIMENSIONS.md ch13: cam diameter (legacy, med)
+CAM_DIAMETER = 30.6  # DIMENSIONS.md ch13: cam diameter, scaled 0.6022 with the gear OD (low)
 CAM_THICKNESS = 0.4 * IN  # 10.16 DIMENSIONS.md ch13: cam thickness (legacy, med)
 BORE_DIAMETER = 0.375 * IN  # 9.525 DIMENSIONS.md ch13: cam bore (legacy, med)
-ECCENTRICITY = 0.2 * IN  # 5.08  DIMENSIONS.md ch13: cam eccentricity (legacy, med)
+ECCENTRICITY = 3.06  # DIMENSIONS.md ch13: cam eccentricity, scaled 0.6022 (5.08 -> 3.06) (low)
 KEYWAY_WIDTH = 0.125 * IN  # 3.175 DIMENSIONS.md ch13: keyway width (legacy, med)
 KEYWAY_DEPTH = 0.06 * IN  # 1.524 DIMENSIONS.md ch13: keyway depth past bore (legacy, med)
 

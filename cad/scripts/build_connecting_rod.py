@@ -1,7 +1,7 @@
 r"""Reproduction script: connecting rod (book ch. 13 pp. 22-25 / ch. 14 p. 29; 20 used).
 
 Black rough-finished rod converting each cam's rotation into the rocker
-arm's see-saw: a full ring (strap) riding the Ø50.8 eccentric cam (cast
+arm's see-saw: a full ring (strap) riding the Ø30.6 eccentric cam (cast
 integral with each cylinder gear), a thin flat shank, and a flattened tip
 strap pinned (Ø2) to the rocker arm's rod-pin hole 1" from the arm pivot.
 Centre distance is exactly 5" (127): rocker pivot height 253.8 minus
@@ -46,8 +46,8 @@ PART_NAME = "connecting-rod"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
 CENTER_DISTANCE = 127.0  # ch13 rods: 5" cam ring centre -> rocker pin (derived)
-RING_BORE_DIA = 51.0  # ch13 rods: cam OD 50.8 + 0.1 clearance per side
-RING_WALL = 5.0  # ch13 rods: radial strap wall (scaled)
+RING_BORE_DIA = 30.8  # ch13 rods: cam OD 30.6 + 0.1 clearance per side (cam scaled 0.6022)
+RING_WALL = 5.0  # ch13 rods: radial strap wall, kept (scaled)
 RING_THICKNESS = 3.0  # ch13 rods: sandwich budget (scaled)
 SHANK_WIDTH = 8.0  # ch13 rods: silhouette vs 7 mm gear face (scaled)
 SHANK_THICKNESS = 2.5  # ch13 rods: thinner than the ring (scaled)
@@ -57,7 +57,7 @@ BLOCK_THICKNESS = 2.5  # = arm thickness: pin joint stacks beside the arm (M6.3)
 PIN_HOLE_DIA = 2.0  # ch14: rocker arm rod-end pin
 THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > any local thickness
 
-RING_OUTER_RADIUS = RING_BORE_DIA / 2.0 + RING_WALL  # 30.5
+RING_OUTER_RADIUS = RING_BORE_DIA / 2.0 + RING_WALL  # 20.4
 SHANK_START_Y = RING_BORE_DIA / 2.0 - 0.5  # overlaps the strap annulus
 BLOCK_START_Y = CENTER_DISTANCE - BLOCK_LENGTH / 2.0  # pin hole centred
 
@@ -122,7 +122,8 @@ async def build(adapter) -> dict[str, str]:
     )
     res = await adapter.get_mass_properties()
     print(f"  volume after bosses: {res.data.volume:.1f} mm^3")
-    # expected: 8767 disc + 1860 shank - 109 overlap + 450 block = ~10,968
+    # ring strap shrank with the 0.6022-scaled cam (bore 30.8, outer r 20.4) ->
+    # disc ~3922 + shank ~2062 + block ~450 - overlap; Phase 3 rebuild confirms
 
     # Strap bore - rides the eccentric cam.
     check("create_sketch bore", await adapter.create_sketch("Front"))
@@ -151,7 +152,7 @@ async def build(adapter) -> dict[str, str]:
     )
     res = await adapter.get_mass_properties()
     print(f"  volume after cuts: {res.data.volume:.1f} mm^3")
-    # expected: -6128 bore -8 sliver -8 pin -> ~4,824 mm^3
+    # bore now -2234 (r 15.4 x 3) - sliver - pin; Phase 3 rebuild confirms
 
     # Named bore axes for assembly mates (view-independent name selection):
     # Axis1 = strap bore on the cam (origin), Axis2 = rocker pin bore (0, 127).

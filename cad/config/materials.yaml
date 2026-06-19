@@ -15,6 +15,18 @@ palette:                              # name: [r, g, b]
   stained_oak:    [0.16, 0.10, 0.07]  # crank handle (dark-stained wood)
   paper_white:    [0.92, 0.92, 0.88]  # platen paper sheet
   bar_steel:      [0.42, 0.41, 0.39]  # amplitude-bar curtain
+  muntz_yellow:   [0.72, 0.56, 0.18]  # the 4 hard yellow cone tip gears (T006-T024);
+  # ESTIMATE (golder + more saturated than the brass default) -- NOT yet ch30-sampled,
+  # refine against the p.21 macro during the Phase 3 rebuild
+
+# The four smallest cone gears (T006, T012, T018, T024 — the cone tip) read
+# "slightly more yellow … a different, perhaps harder metal" (book ch.12 p.21).
+# Period-accurate reading: a harder high-zinc yellow metal (Muntz metal 60/40
+# Cu-Zn / manganese bronze — both more golden and markedly harder than the
+# ~70/30 alpha brass of the larger gears), cut from drawn rod on a wheel-cutting
+# engine and soldered to the shaft. Modeled as the muntz_yellow appearance over
+# the brass material on those four configurations (applied in the Phase 3 rebuild).
+cone_tip_gear_configs: [T006, T012, T018, T024]
 
 # Parts that take the cast-iron green frame appearance (memory: M6.x green castings).
 casting_green_parts:
