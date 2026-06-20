@@ -6,7 +6,13 @@ from __future__ import annotations
 
 import asyncio
 
-from _common import OUT_SLDASM, _flag, _read_member, log, whats_wrong
+from _common import (
+    OUT_SLDASM,
+    _flag,
+    _read_member,
+    log,
+)
+from _assembly import whats_wrong
 
 ORDER = ["frame", "channel", "drive-train", "output", "harmonic-analyzer"]
 

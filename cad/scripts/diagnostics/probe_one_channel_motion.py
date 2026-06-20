@@ -28,13 +28,23 @@ import math
 import sys
 
 from build_channel_assembly import (
-    ARM_MID_DZ, ARM_PIVOT_LOCAL_Y, BAR_WIDTH, CAM_DZ, FULCRUM, PIVOT,
-    RING_CENTER, ROT_Y_POS90, SHAFT_R, rot_z_rows, solve_default_state,
+    ARM_MID_DZ, ARM_PIVOT_LOCAL_Y, CAM_DZ, PIVOT,
+    RING_CENTER, SHAFT_R, rot_z_rows, solve_default_state,
     z_station,
 )
 from _common import (
-    _flag, _read_member, bore_axis_ref, check, coincident_mate, concentric_mate,
-    log, named_ref, place_component, run_build,
+    _flag,
+    _read_member,
+    check,
+    log,
+    run_build,
+)
+from _assembly import (
+    bore_axis_ref,
+    coincident_mate,
+    concentric_mate,
+    named_ref,
+    place_component,
 )
 
 # drive-train cam (build_drive_train_assembly / build_cylinder_gear)
@@ -119,7 +129,7 @@ async def _concentric_faces(adapter, face_a, face_b, label):
 
 async def build(adapter):
     from solidworks_mcp.adapters.base import (
-        ComponentRefParameters, MateEntityRef, MotionMotorParameters,
+        MateEntityRef, MotionMotorParameters,
         MotionStudyParameters, MotionStudyRefParameters, MotionTimeParameters,
     )
     stage = sys.argv[1] if len(sys.argv) > 1 else "rod"
@@ -223,7 +233,7 @@ async def build(adapter):
 
 
 def _org(adapter, name):
-    a = __import__("_common", fromlist=["component_transform"]).component_transform(adapter, name)
+    a = __import__("_assembly", fromlist=["component_transform"]).component_transform(adapter, name)
     return [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
 
 

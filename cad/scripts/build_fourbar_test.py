@@ -43,9 +43,21 @@ import os
 import sys
 
 from _common import (
-    OUT_PNG, _flag, _read_member, assert_model_healthy, bore_axis_ref, check,
-    coincident_mate, component_transform, concentric_mate, distance_driver,
-    log, named_ref, place_component,
+    OUT_PNG,
+    _flag,
+    _read_member,
+    check,
+    log,
+)
+from _assembly import (
+    assert_model_healthy,
+    bore_axis_ref,
+    coincident_mate,
+    component_transform,
+    concentric_mate,
+    distance_driver,
+    named_ref,
+    place_component,
 )
 from build_motion_study import _entity_ref, _rot_angle, assert_motion_progressed
 from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
@@ -250,7 +262,7 @@ async def build(adapter) -> None:
     rocker = await place_component(adapter, "rocker-arm",
                                    [0.0, -8.0, Z_ROCKER], [0.0, 0.0, 0.0], IDENT,
                                    ground=False, label="rocker-arm")
-    from _common import world_point
+    from _assembly import world_point
     rod_pin_w = world_point(adapter, rocker, [ARM_ROD_X, _mid_y(ARM_ROD_X), 0.0])
     log(f"  rocker rod-pin world = ({rod_pin_w[0]:.2f}, {rod_pin_w[1]:.2f})")
 

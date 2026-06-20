@@ -119,25 +119,26 @@ from _chain import (
 from _common import (
     IN,
     OUT_SLDPRT,
-    assert_component_placed,
-    angle_driver,
-    assert_components_fully_defined,
+    _read_member,
     check,
+    log,
+    run_build,
+)
+from _assembly import (
+    angle_driver,
+    assert_component_placed,
+    assert_components_fully_defined,
     check_no_interference,
     coincident_mate,
     component_names,
     component_transform,
     distance_driver,
     lock_mate,
-    log,
-    mirror_placement,
     named_ref,
     place_component,
-    run_build,
     save_assembly_and_images,
-    world_point,
-    _read_member,
 )
+from _transforms import mirror_placement
 import pen_driver  # noqa: E402  (kinematic pen driver, plan F5)
 
 ASM_NAME = "output"

@@ -37,12 +37,24 @@ import json
 import os
 import re
 import struct
+import sys
 import urllib.request
 import zlib
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import numpy as np
+
+# Headless software OpenGL (Mesa OSMesa) for VTK on this no-GPU box. MUST run
+# before any pyvista/vtk import so VTK selects the OSMesa render window. No-op off
+# Windows (platform GL / xvfb serves offscreen there). pyvista itself stays a lazy
+# import inside main() (see note below) so the Hausdorff pool workers never pay the
+# VTK import cost -- they re-run this cheap env setup but never import pyvista.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from osmesa_win import enable_offscreen_gl
+
+enable_offscreen_gl()
+
 import trimesh
 
 # NOTE: pyvista (heavy, pulls in VTK) is imported lazily inside main() -- only the
@@ -276,15 +288,26 @@ def classify(old, new, keys, tol=0.01, jobs=0):
     pool workers receive plain file paths and never touch the network.
     """
     changed, devs = set(), {}
-    pending = []  # [(key, old_path, new_path)] -- needs a Hausdorff check
+    # Cheap CRC32 pass first (zip CRC / file hash): an identical signature is an
+    # unchanged mesh for free, so the expensive Hausdorff verify -- and the
+    # per-key HTTP range fetch of the OLD release -- only runs on the meshes
+    # whose bytes actually differ. Surface those counts up front so the verify
+    # loop below reads as measurable progress, not a stall.
+    to_verify = []                # [key] -- CRC signature differs, needs geometry verify
+    pending = []                  # [(key, old_path, new_path)] -- materialised for the pool
     for k in sorted(keys):
-        c_old, c_new = old.crc(k), new.crc(k)
+        c_old = old.crc(k)
         if c_old is None:
             changed.add(k)            # new part -> changed
             devs[k] = float("inf")
             continue
-        if c_old == c_new:
+        if c_old == new.crc(k):
             continue                  # identical signature -> unchanged (free)
+        to_verify.append(k)
+    identical = len(keys) - len(changed) - len(to_verify)
+    print(f"CRC pass: {len(changed)} new, {len(to_verify)} to geometry-verify, "
+          f"{identical} identical (of {len(keys)} meshes)", flush=True)
+    for k in to_verify:
         po, pn = old.stl(k), new.stl(k)
         if not (po and pn):
             changed.add(k)            # signature differs but a side is missing
@@ -295,24 +318,25 @@ def classify(old, new, keys, tol=0.01, jobs=0):
     if not pending:
         return changed, devs
 
-    def record(k, d):
+    def record(i, k, d):
         devs[k] = d
         verdict = "CHANGED" if d > tol else "identical"
         if d > tol:
             changed.add(k)
-        print(f"  verify {k:34s} ~Hausdorff={d:8.3f} mm -> {verdict}", flush=True)
+        print(f"  [{i}/{len(pending)}] verify {k:34s} ~Hausdorff={d:8.3f} mm "
+              f"-> {verdict}", flush=True)
 
     n_jobs = jobs if jobs > 0 else _auto_jobs(len(pending))
     if n_jobs == 1 or len(pending) == 1:
-        for task in pending:
-            record(*_hausdorff_job(task))
+        for i, task in enumerate(pending, 1):
+            record(i, *_hausdorff_job(task))
     else:
         print(f"  (Hausdorff over {len(pending)} meshes on {n_jobs} workers)",
               flush=True)
         with ProcessPoolExecutor(max_workers=n_jobs) as ex:
             futures = [ex.submit(_hausdorff_job, task) for task in pending]
-            for fut in as_completed(futures):
-                record(*fut.result())
+            for i, fut in enumerate(as_completed(futures), 1):
+                record(i, *fut.result())
     return changed, devs
 
 
@@ -363,7 +387,7 @@ def main():
     pl = pv.Plotter(off_screen=True, window_size=(args.res, args.res))
     pl.set_background("white")
     n_hi = 0
-    for c in comps:
+    for idx, c in enumerate(comps, 1):
         key = c.get("mesh") or c["part"]
         p = new.stl(key)
         if p is None:
@@ -378,13 +402,16 @@ def main():
                     opacity=1.0 if is_changed else args.ghost_opacity,
                     smooth_shading=True, specular=0.2,
                     backface_culling=not is_changed)
+        if idx % 50 == 0 or idx == len(comps):
+            print(f"  scene build {idx}/{len(comps)} instances ...", flush=True)
     print(f"highlighted {n_hi} component instances", flush=True)
     pl.add_text(f"{old.label} -> {new.label}  (red = changed geometry)",
                 font_size=11, color="black")
 
     images = []
-    for name, cpos in (("iso", "iso"), ("front", "xy"),
-                       ("right", "yz"), ("top", "xz")):
+    views = (("iso", "iso"), ("front", "xy"), ("right", "yz"), ("top", "xz"))
+    print(f"rendering {len(views)} camera views at {args.res}px ...", flush=True)
+    for name, cpos in views:
         pl.camera_position = cpos
         if name == "iso":
             pl.camera.azimuth = 35

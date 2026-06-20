@@ -204,18 +204,17 @@ async def _coefficients_plate(adapter) -> None:
     (PLATE_T total, centred on the pivot at local y 0) so the whole casting stays
     coplanar with the cylinder and ribs.
 
-    The 20 spring holes are now a SINGLE seed cut at the first (most -Z) station
-    LINEAR-PATTERNED along the channel axis (+Z), spacing CHANNEL_PITCH, count
-    HOLE_COUNT -- one dim pair + the pattern replaces the 20 hand-placed circles,
-    so the whole field edits as a unit and the channel-spring registration stays
-    at the identical HOLE_Z stations (HOLE_Z[k] = HOLE_Z[0] + k*CHANNEL_PITCH).
+    The HOLE_COUNT spring holes are cut OUTRIGHT -- one Top-plane sketch holding
+    a circle at every registered station HOLE_Z[0..HOLE_COUNT-1], a single
+    cut-extrude. (Earlier this was a seed cut + FeatureLinearPattern5; the
+    pattern marches along an auto-selected plate edge whose natural sense is
+    ambiguous, and it silently reversed the field off the -Z plate edge -- only
+    j=0 stayed cut, so every other spring eye clashed the un-cut bore. Explicit
+    per-station circles are direction-free and deterministic.)
 
     Machine-y registration (the M6.4 plate-top-at-998 convention) is set at
     PLACEMENT, not baked here -- see PLATE_TOP_Y and the Phase 2/3 plan."""
-    from solidworks_mcp.adapters.base import (
-        ExtrusionParameters,
-        LinearPatternParameters,
-    )
+    from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_sketch plate", await adapter.create_sketch("Top"))
     # +X arm: x in [0, PLATE_W], length along sketch Y (= world Z) in [-L/2, L/2].
@@ -236,32 +235,24 @@ async def _coefficients_plate(adapter) -> None:
         ),
     )
 
-    # Seed hole at the j=0 station. Top-plane sketch Y = -world Z, so the world
-    # HOLE_Z[0] hole sits at sketch -HOLE_Z[0]; cut through BOTH sides of the
-    # mid-plane plate (both_directions covers the +-PLATE_T/2 spread, + margin).
-    check("create_sketch spring-hole seed", await adapter.create_sketch("Top"))
-    await define_circle(adapter, HOLE_X, -HOLE_Z[0], HOLE_DIA / 2.0, "spring hole seed")
-    await ensure_fully_defined(adapter, "spring-hole seed sketch")
-    check("exit_sketch spring-hole seed", await adapter.exit_sketch())
-    seed = await adapter.create_cut_extrude(
-        ExtrusionParameters(depth=PLATE_T + 2.0, both_directions=True)
-    )
-    check("cut spring-hole seed", seed)
-
-    # Linear-pattern the seed up the channel axis (+Z): direction_point is the +Z
-    # vector, spacing the channel pitch, HOLE_COUNT instances -> the registered
-    # stations HOLE_Z[0..19]. Organic casting (no analytic volume gate): a
-    # reversed/short pattern surfaces in the mass-properties report + ch30 render,
-    # per the module docstring.
+    # All HOLE_COUNT spring holes in ONE sketch at the registered stations.
+    # Top-plane sketch Y = -world Z, so world HOLE_Z[j] sits at sketch -HOLE_Z[j];
+    # a single cut through BOTH sides of the mid-plane plate (both_directions
+    # covers the +-PLATE_T/2 spread, + margin). Cutting every station outright
+    # (no seed + linear pattern) keeps the field direction-free: a directional
+    # FeatureLinearPattern5 marched along an auto-selected edge whose natural
+    # sense reversed the field off the -Z plate edge, leaving all but j=0 solid.
+    check("create_sketch spring holes", await adapter.create_sketch("Top"))
+    for j in range(HOLE_COUNT):
+        await define_circle(
+            adapter, HOLE_X, -HOLE_Z[j], HOLE_DIA / 2.0, f"spring hole {j}"
+        )
+    await ensure_fully_defined(adapter, "spring-holes sketch")
+    check("exit_sketch spring holes", await adapter.exit_sketch())
     check(
-        "linear pattern spring holes",
-        await adapter.linear_pattern_feature(
-            LinearPatternParameters(
-                direction_point=[0.0, 0.0, PLATE_L / 2.0],
-                features=[seed.data.name],
-                count=HOLE_COUNT,
-                spacing=CHANNEL_PITCH,
-            )
+        "cut spring holes",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=PLATE_T + 2.0, both_directions=True)
         ),
     )
 

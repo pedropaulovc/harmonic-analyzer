@@ -14,6 +14,8 @@ Lifted verbatim from the original ``build_all.py`` (constants + ``part_scripts``
 
 from __future__ import annotations
 
+import ast
+import functools
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -107,6 +109,79 @@ def references_of(asm_stem: str) -> list[str]:
     """
     candidates = part_stems() + [a for a in ASSEMBLY_ORDER if a != asm_stem]
     return [stem for stem in candidates if _references(asm_stem, stem)]
+
+
+@functools.lru_cache(maxsize=1)
+def _local_modules() -> dict[str, Path]:
+    """Every local importable module a build script may pull in transitively, by
+    module name: the ``_*.py`` helpers AND sibling ``build_*.py`` scripts.
+
+    A part can reuse another build script -- e.g.
+    ``build_channel_spring_installed`` imports ``build_channel_spring.build_spring``,
+    which in turn imports ``_features`` -- so the closure must follow build-script
+    edges too, or an edit to that reused script (or the helper IT pulls in) would
+    leave the dependent ``.SLDPRT`` reported up to date (codex review #2).
+
+    Excludes the build-GRAPH tooling itself (``_buildgraph.py`` and the one-shot
+    extraction scripts), which is never a geometry input.
+    """
+    skip = {"_buildgraph.py", "_extract.py", "_rewrite_imports.py"}
+    out: dict[str, Path] = {}
+    for p in sorted([*SCRIPTS_DIR.glob("_*.py"), *SCRIPTS_DIR.glob("build_*.py")]):
+        if p.name not in skip:
+            out[p.stem] = p
+    return out
+
+
+@functools.lru_cache(maxsize=None)
+def _direct_local_imports(path: Path) -> frozenset[str]:
+    """Local module names (helpers + build scripts) imported ANYWHERE in ``path``
+    -- top-level or lazily inside a function, e.g. ``_common``'s ``import
+    _config`` or ``build_channel_spring_installed``'s ``from build_channel_spring
+    import ...``. A dotted import keeps only its leading segment so ``import
+    _common`` and ``from _common import x`` both resolve to ``_common``.
+
+    Only the import MODULE is matched against the local set; imported NAMES are
+    ignored, so ``from _gear import build_fixed_gear`` resolves to ``_gear`` (a
+    helper) and never mistakes the ``build_fixed_gear`` function for a module.
+    """
+    mods = _local_modules()
+    found: set[str] = set()
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for a in node.names:
+                found.add(a.name.split(".")[0])
+        elif isinstance(node, ast.ImportFrom):
+            if node.level == 0 and node.module:
+                found.add(node.module.split(".")[0])
+    return frozenset(found & mods.keys())
+
+
+def module_deps_of(script: Path) -> list[str]:
+    """Resolved paths of every local module (``_*.py`` helper or sibling
+    ``build_*.py`` script) ``script`` transitively imports -- the EXACT
+    geometry-input edges for doit's ``file_dep``.
+
+    This replaces the old blanket "every ``_*.py`` is a dep of every build"
+    rule: a leaf part that imports only ``_common`` no longer rebuilds when an
+    assembly-only helper (``_assembly``) or an unrelated one (``_gear``) changes.
+    Because it follows REAL Python imports transitively (``_chain_link -> _chain
+    -> _common``; ``_common -> _config``; ``build_channel_spring_installed ->
+    build_channel_spring -> _features``), it can never under-invalidate so long as
+    a script imports what it uses -- which Python enforces at run time. The BFS is
+    cycle-safe (``build_motion_study`` <-> ``build_motion_study_springs``).
+    """
+    mods = _local_modules()
+    result: set[str] = set()
+    frontier = set(_direct_local_imports(script.resolve()))
+    while frontier:
+        mod = frontier.pop()
+        if mod in result:
+            continue
+        result.add(mod)
+        frontier |= set(_direct_local_imports(mods[mod].resolve())) - result
+    return sorted(str(mods[m].resolve()) for m in result)
 
 
 def dependents_of(stem: str) -> list[str]:

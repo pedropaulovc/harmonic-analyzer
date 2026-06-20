@@ -32,18 +32,20 @@ from __future__ import annotations
 import sys
 
 from _common import (
-    add_spring_end_hooks,
-    apply_material,
-    apply_color,
     SPRING_BLACK,
+    apply_color,
+    apply_material,
     blank_sketch,
     check,
     define_circle,
     ensure_fully_defined,
-    insert_helix,
     report_mass_properties,
     run_build,
     save_part_and_images,
+)
+from _features import (
+    add_spring_end_hooks,
+    insert_helix,
 )
 
 PART_NAME = "counter-spring"
