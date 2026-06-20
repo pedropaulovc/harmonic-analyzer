@@ -24,8 +24,11 @@ agree, and now both are mm.)
 
 Camera convention matches cad/scripts/render_compare.py: model space has +Y
 up, az 0 / el 0 looks from +Z (SolidWorks Front), +az moves the camera
-toward +X. Orthographic only (the SolidWorks pipeline is ortho too). Pairs
-with camera.frame_components replicate resolve_framing(): centre on the
+toward +X. Orthographic by default; a pair whose camera.perspective is set
+(focal_length_mm = the book's 100 mm lens, or a raw object_sizes_away) renders
+with a matching perspective camera — see object_sizes_away(), which mirrors
+render_compare.resolve_object_sizes_away so both engines frame the same lens.
+Pairs with camera.frame_components replicate resolve_framing(): centre on the
 matched components' union box, zoom = clamp(0.75 * whole/box, 1, 15).
 Workbench renders with per-object colours (the components' appearance RGB);
 background is transparent and the CLI composites it onto white.
@@ -41,6 +44,32 @@ import bpy
 from mathutils import Matrix, Vector
 
 DEFAULT_RGB = (0.55, 0.55, 0.55)
+
+# Book camera (references/.../31_Notes_on_the_Design): Nikon D60 dSLR, APS-C
+# "DX" sensor 23.6 x 15.8 mm, Tokina 100 mm macro. Kept in sync with
+# render_compare.py so the SolidWorks and Blender pipelines render the same
+# lens. SolidWorks parameterises perspective as ObjectSizesAway = distance /
+# object-size; for a lens of focal length f filling sensor dimension d that
+# reduces to f / d (diagonal by default). Blender is a true focal-length
+# camera, but driving it from the same ObjectSizesAway keeps the field of view
+# and framing distance identical to the SolidWorks render.
+DX_SENSOR_MM = (23.6, 15.8)
+DX_SENSOR_DIAG_MM = math.hypot(*DX_SENSOR_MM)    # ~28.41 mm
+DEFAULT_OBJECT_SIZES_AWAY = 4.0
+
+
+def object_sizes_away(c):
+    """ObjectSizesAway for a pair's camera, or None for orthographic.
+
+    Mirrors render_compare.resolve_object_sizes_away: focal_length_mm (optional
+    sensor_dim_mm, default DX diagonal) wins over a raw object_sizes_away.
+    """
+    p = c.get("perspective")
+    if not p:
+        return None
+    if p.get("focal_length_mm") is not None:
+        return float(p["focal_length_mm"]) / float(p.get("sensor_dim_mm", DX_SENSOR_DIAG_MM))
+    return float(p.get("object_sizes_away", DEFAULT_OBJECT_SIZES_AWAY))
 
 
 def camera_axes(az_deg, el_deg, roll_deg=0.0):
@@ -161,10 +190,9 @@ def main():
     ext = max(hi - lo for hi, lo in zip(mesh_hi, mesh_lo))
 
     cam_data = bpy.data.cameras.new("cam")
-    cam_data.type = "ORTHO"
-    cam_data.sensor_fit = "HORIZONTAL"
+    cam_data.sensor_fit = "HORIZONTAL"  # framing fits horizontal world extent
     cam_data.clip_start = ext * 0.001
-    cam_data.clip_end = ext * 20
+    cam_data.clip_end = ext * 40        # perspective pulls the eye back ~osa*frame
     cam = bpy.data.objects.new("cam", cam_data)
     scene.collection.objects.link(cam)
     scene.camera = cam
@@ -184,17 +212,33 @@ def main():
         c = pair["camera"]
         r, u, o = camera_axes(c.get("az_deg", 0.0), c.get("el_deg", 0.0), c.get("roll_deg", 0.0))
         target, zoom = resolve_framing(c, boxes, mesh_lo, mesh_hi)
-        rot = Matrix(((r[0], u[0], o[0]), (r[1], u[1], o[1]), (r[2], u[2], o[2])))
-        m = rot.to_4x4()
-        m.translation = Vector(target) + Vector(o) * ext * 3
-        cam.matrix_world = m
 
         w, h = pair["width"], pair["height"]
         scene.render.resolution_x = w
         scene.render.resolution_y = h
         need_w = max(_proj_extent(mesh_lo, mesh_hi, r),
                      _proj_extent(mesh_lo, mesh_hi, u) * w / h)
-        cam_data.ortho_scale = need_w * 1.05 / zoom
+        frame_w = need_w * 1.05 / zoom  # world width that fills the frame at target
+
+        # Orthographic unless the pair requests a lens. For perspective, the eye
+        # sits osa*frame_w back so distance/size == ObjectSizesAway, and the lens
+        # (sensor_width/osa half-angle) makes frame_w exactly fill the frame —
+        # the same fit as ortho at the target plane, with near parts enlarged.
+        osa = object_sizes_away(c)
+        if osa is None:
+            cam_data.type = "ORTHO"
+            cam_data.ortho_scale = frame_w
+            cam_dist = ext * 3
+        else:
+            cam_data.type = "PERSP"
+            cam_data.sensor_width = DX_SENSOR_MM[0]  # cosmetic; FOV set by lens
+            cam_data.lens = osa * cam_data.sensor_width
+            cam_dist = osa * frame_w
+
+        rot = Matrix(((r[0], u[0], o[0]), (r[1], u[1], o[1]), (r[2], u[2], o[2])))
+        m = rot.to_4x4()
+        m.translation = Vector(target) + Vector(o) * cam_dist
+        cam.matrix_world = m
 
         scene.render.filepath = pair["out"]
         bpy.ops.render.render(write_still=True)
