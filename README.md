@@ -45,44 +45,68 @@ Binaries are snapshotted only at tagged releases.
 The model is generated headlessly from a clean checkout. SolidWorks must be installed and
 running (launched via the 3DEXPERIENCE desktop shortcut, not `sldworks.exe` directly).
 
-The build graph is driven by [`doit`](https://pydoit.org) (`dodo.py` at the repo root). It
-hashes script + config content (immune to git/worktree mtime churn) to decide what is stale,
+The **entire** pipeline — build → verify → export → release — is one
+[`doit`](https://pydoit.org) graph (`dodo.py` at the repo root). doit hashes
+script + config content (immune to git/worktree mtime churn) to decide what is stale,
 and propagates a part → assembly dependency DAG. When only a part changed, the dependent
 assembly is **refreshed** (reopen + per-config `ForceRebuild3` + health/DOF/interference
 gates + in-place save — seconds) instead of rebuilt from scratch (re-insert + re-mate ~122
 components — ~500 s). A refresh that hits a dangling mate, free DOF, or interference **fails
 loud** (non-zero exit, the `.SLDASM` left untouched).
 
-One-off: install doit into the build venv — `…\.venv\Scripts\python.exe -m pip install doit`.
+Tasks are grouped by whether they need SolidWorks — the prefix tells you at a glance:
+
+| group | needs SW? | what it does |
+|-------|:---:|--------------|
+| `part:<stem>` / `assembly:<stem>` | yes | build/refresh a part or assembly |
+| `verify:soundness` / `verify:subsystems` / `verify:kinematics` | yes | DOF/interference/ratio gates · per-sub-assembly · motion-study pen sweep |
+| `check:math` / `check:config` / `check:graph` / `check:nameplate` / `check:recipe` | **no** | Fourier math · config audit · pure-python unit tests |
+| `export` | yes | neutral STEP/STL + scene-graph export |
+| `release` | yes | Pack-and-Go + exports + diff + GitHub release (opt-in) |
+| **`build`** | yes | **every** part + assembly + **every** gate — the one fully-safe entry |
+| `build_bare` | yes | parts + assemblies only — a quick rebuild |
+
+One-off: install the build deps —
+`…\.venv\Scripts\python.exe -m pip install doit pillow pytest`.
 
 ```powershell
 $py = "C:\src\SolidworksMCP-python\.venv\Scripts\python.exe"
 
-# Full build/refresh of everything stale, in dependency order
+# The one fully-safe build: every part + assembly + every gate (= default task)
 & $py -m doit
+
+# Same, but fan the SolidWorks-free check:* gates out across 4 workers while the
+# COM build/verify stream stays serial (safe -- see "Parallelism" below)
+& $py -m doit -n 4
+
+# Quick rebuild -- parts + assemblies only, no gates or export
+& $py -m doit build_bare
 
 # Just one part (doit selection does NOT run reverse dependents -- the dependent
 # .SLDASM/renders stay stale until you run plain `doit` or select them explicitly)
 & $py -m doit part:cone_gear
 
-# One part AND every assembly that refreshes from it: run the default graph
-& $py -m doit                  # rebuilds the part, then refreshes its dependents
-
-# Just one assembly (+ its stale prerequisites)
+# Just one assembly (+ its stale prerequisites), or a single gate
 & $py -m doit assembly:output
+& $py -m doit verify:soundness        # one SW gate
+& $py -m doit check:math              # one offline gate
 
-# Inspect the graph
-& $py -m doit list --all       # every part + assembly task
-& $py -m doit list --deps      # tasks with their file_deps
+# Neutral export, then cut a release (args after `--`; opt-in)
+& $py -m doit export
+& $py -m doit release -- v0.2.0
 
-# Clean: remove targets (+ wipe png/<asm>)
+# Inspect the graph / clean
+& $py -m doit list --all
 & $py -m doit clean
 ```
 
-**Never pass `-n`/`-P`** (doit's parallel flags): a single SolidWorks STA session means
-parallel tasks deadlock — `dodo.py` hard-fails if it sees them. doit's md5 up-to-date check
-is the checkpoint: a crashed run re-runs only what is still stale. Outputs land in `cad/out/`
-(gitignored).
+**Parallelism.** There is one SolidWorks STA seat, so COM work must stay serial — but
+the SolidWorks-*free* `check:*` gates need not. `dodo.py` chains every COM task into a
+single linear `task_dep` **spine**, so at most one COM task is ever runnable: the seat is
+never contended **even under `-n N`**, while `check:*` tasks fan out in parallel. (This
+replaces the old "never pass `-n`" rule — `-n` is now safe.) Tradeoff: a COM failure
+mid-spine skips the later COM tasks in that run; fix and re-run (doit re-runs only what is
+still stale). Outputs land in `cad/out/` (gitignored).
 
 **Force a full from-scratch rebuild of one assembly** (bypass the cheap refresh) by deleting
 its target — a missing target makes doit take the FULL branch (hooks included):
