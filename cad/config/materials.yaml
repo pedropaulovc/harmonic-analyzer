@@ -30,14 +30,12 @@ cone_tip_gear_configs: [T006, T012, T018, T024]
 
 # Parts that take the cast-iron green frame appearance (memory: M6.x green castings).
 casting_green_parts:
-  - a-frame
   - arbor-pedestal
   - column-clamp
-  - cone-knob-post
   - crank-pedestal
   - gooseneck-clamp
   - harmonic-base
-  - rocker-arm-support
+  - rocker-arm-portal
   - top-crossbar
   - top-frame
 

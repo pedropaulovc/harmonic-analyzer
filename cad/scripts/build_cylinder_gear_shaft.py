@@ -39,7 +39,10 @@ PART_NAME = "cylinder-gear-shaft"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 SHAFT_DIA = 0.375 * IN  # ch13: = cam bore (legacy parameters.kcl)
-SHAFT_LENGTH = 200.0  # ch13: 134 stack + journal/clamp each end (derived)
+SHAFT_LENGTH = 176.0  # ch13 stack + journals; shortened from 200 (2026-06-19)
+# so the arbor's north end clears the now-solid rocker-arm-portal north upright
+# (the old support boss bore that held the north end is gone). See
+# build_drive_train_assembly.ARBOR_LENGTH / ARBOR_SOUTH_Z.
 
 SHAFT_RADIUS = SHAFT_DIA / 2.0
 
@@ -59,7 +62,7 @@ async def build(adapter) -> dict[str, str]:
     )
     res = await adapter.get_mass_properties()
     print(f"  volume after shaft: {res.data.volume:.1f} mm^3")
-    # expected: pi * 4.7625^2 * 200 = ~14,251 mm^3
+    # expected: pi * 4.7625^2 * 176 = ~12,541 mm^3
 
     # Named central axis (arbor axis along +Y through the origin) so the
     # cylinder gears ride it coincident axis-to-axis in the assembly.
