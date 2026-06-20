@@ -50,10 +50,17 @@ from _common import (
     run_build,
     save_part_and_images,
     set_sketch_direct_db,
+    sketch_closed_splines,
     sketch_polyline_loops,
     sketch_rounded_rect,
 )
-from _nameplate_geometry import BORDER_INNER, BORDER_OUTER, LETTERING_LOOPS
+from _nameplate_geometry import (
+    BORDER_INNER,
+    BORDER_OUTER,
+    CARTOUCHE_LOOPS,
+    GLYPH_LOOPS,
+    engraving_loops,
+)
 
 PART_NAME = "nameplate"
 MATERIAL = "Brass"  # bright cast/engraved brass plate (see _common.apply_material)
@@ -94,10 +101,13 @@ def _engraving_area() -> float:
     """Even-odd filled area of the traced engraving (mm^2).
 
     The loops follow nesting parity -- outer glyph/ornament contours run CCW
-    (positive), the 9 enclosed counters run CW (negative) -- so the signed-area
-    sum is exactly the even-odd filled region the single cut removes.
+    (positive), the enclosed counters run CW (negative) -- so the signed-area
+    sum is exactly the even-odd filled region the single cut removes. The
+    cartouche is now spline-fitted, so its contours come from
+    ``engraving_loops`` (glyph line-loops + cartouche spline loops) rather than
+    the raw traced points.
     """
-    return abs(sum(_shoelace(loop) for loop in LETTERING_LOOPS))
+    return abs(sum(_shoelace(loop) for loop in engraving_loops()))
 
 
 def _rrect_area(spec: tuple[float, float, float, float, float]) -> float:
@@ -201,9 +211,11 @@ async def build(adapter) -> dict[str, str]:
     # reads correctly head-on. Area is unchanged -- the even-odd nesting and the
     # golden engraving-area gate are both mirror-invariant.
     eng_area = _engraving_area()
-    lettering = [[(PLATE_WIDTH - x, y) for x, y in loop] for loop in LETTERING_LOOPS]
+    glyphs = [[(PLATE_WIDTH - x, y) for x, y in loop] for loop in GLYPH_LOOPS]
+    cartouche = [[(PLATE_WIDTH - x, y) for x, y in loop] for loop in CARTOUCHE_LOOPS]
     check("create_sketch lettering", await adapter.create_sketch("Front"))
-    await sketch_polyline_loops(adapter, lettering, label="lettering")
+    await sketch_polyline_loops(adapter, glyphs, label="glyphs")
+    await sketch_closed_splines(adapter, cartouche, label="cartouche")
     await _cut_region(
         adapter,
         RECESS_DEPTH + ENGRAVE_DEPTH,

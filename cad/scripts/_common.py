@@ -578,6 +578,39 @@ async def sketch_polyline_loops(
     return count
 
 
+async def sketch_closed_splines(
+    adapter: Any,
+    loops: Iterable[Iterable[tuple[float, float]]],
+    *,
+    label: str = "splines",
+) -> int:
+    """Draw each closed point-loop as one native closed spline; return loop count.
+
+    Each loop's vertices go to a single :func:`add_spline` with the first vertex
+    repeated at the end, so the spline closes by construction into a closed
+    contour the even-odd cut fills -- the smooth-curve counterpart of
+    :func:`sketch_polyline_loops`, carrying each scroll-cartouche loop with far
+    fewer points. Piecewise open splines were rejected: their endpoints do not
+    merge into a closed cut profile, whereas one closed spline always does.
+    Inference is left ON (unlike the polyline draw) so the spline solves cleanly;
+    the cartouche sits clear of the glyph line-loops, so no spurious relations
+    form.
+    """
+    count = 0
+    for loop in loops:
+        pts = list(loop)
+        if len(pts) < 3:
+            raise ValueError(f"{label}: loop {count} has < 3 vertices")
+        closed = pts + [pts[0]]  # repeat first vertex -> closed spline
+        check(
+            f"{label}[{count}] closed spline ({len(pts)} pts)",
+            await adapter.add_spline([{"x": x, "y": y} for x, y in closed]),
+        )
+        count += 1
+    print(f"  OK  sketch_closed_splines {label}: {count} loops")
+    return count
+
+
 def insert_helix(
     adapter: Any, height: float, pitch: float, clockwise: bool = True
 ) -> str:

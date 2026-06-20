@@ -39,7 +39,7 @@ from __future__ import annotations
 
 import math
 
-from _nameplate_geometry import BORDER_INNER, BORDER_OUTER, LETTERING_LOOPS
+from _nameplate_geometry import BORDER_INNER, BORDER_OUTER, engraving_loops
 
 # Golden analytic targets, captured when the primitives were proven equal to the
 # traced DXFs (engraving 100%, band 99.99%, volume 100% -- all >= the 99% bar).
@@ -71,9 +71,12 @@ def _engraving_area() -> float:
 
     Outer contours run CCW (+) and the enclosed counters CW (-), so the signed
     sum is exactly the even-odd region the single cut removes -- the property
-    the live cut relies on, so a flipped loop would fail this test.
+    the live cut relies on, so a flipped loop would fail this test. The
+    cartouche is spline-fitted, so its loops come from ``engraving_loops``
+    (glyph line-loops + cartouche spline loops); staying >= 99% of the golden
+    proves the fit did not drift the engraving area.
     """
-    return abs(sum(_shoelace(loop) for loop in LETTERING_LOOPS))
+    return abs(sum(_shoelace(loop) for loop in engraving_loops()))
 
 
 def _rrect_area(spec: tuple[float, float, float, float, float]) -> float:
