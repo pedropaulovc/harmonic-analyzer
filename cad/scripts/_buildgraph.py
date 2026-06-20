@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import ast
 import functools
+import re
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -88,14 +89,19 @@ def _references(asm_stem: str, candidate_stem: str) -> bool:
     in ``asm_stem``'s build script.
 
     The single primitive both ``references_of`` and ``dependents_of`` share, so
-    they are exact inverses. Prefix scan on ``"<dashed>`` (no closing quote), so
-    a shared prefix over-matches (e.g. ``"cone-gear`` also hits
-    ``"cone-gear-shaft"``); an extra edge costs at worst one extra refresh, never
-    a stale artefact -- identical to the legacy behaviour.
+    they are exact inverses. Scan for ``"<dashed>`` at a stem boundary -- the
+    next char must be ``"`` (exact name) or ``-`` (a longer stem). A shared
+    *stem* prefix still over-matches (e.g. ``"cone-gear`` also hits
+    ``"cone-gear-shaft"``); an extra edge there costs at worst one extra refresh,
+    never a stale artefact. But an *alphanumeric* continuation is a DIFFERENT
+    word, not a longer stem, so it must NOT match: e.g. the config key
+    ``"channels"`` must not read as a reference to the ``channel`` assembly --
+    that spurious edge, harmless before the COM spine, closes a build cycle once
+    ``channel`` also task_dep's back onto its spine predecessor.
     """
     dashed = candidate_stem.replace("_", "-")
     src = script_for(asm_stem).read_text(encoding="utf-8")
-    return f'"{dashed}' in src
+    return re.search(rf'"{re.escape(dashed)}(?![0-9A-Za-z])', src) is not None
 
 
 def references_of(asm_stem: str) -> list[str]:
