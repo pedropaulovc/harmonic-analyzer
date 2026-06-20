@@ -22,7 +22,7 @@ depth):
   pivot ball mount and the south clevis the south ball mount (both
   channel.SLDASM); the CHANNEL AXIS runs along Z. This supersedes the
   former two-part split (rocker-arm-support frustum here + a-frame upright
-  in output.SLDASM) - one casting, re-derived from the ch30 side views
+  in the former output assembly) - one casting, re-derived from the ch30 side views
   (2026-06-19). The old arbor-clamp boss is GONE (the cone/arbor no longer
   rests on the support; the arbor is shortened to clear the solid portal and
   is carried by its south pedestal only, drive-train.SLDASM, with the north-end
@@ -37,7 +37,7 @@ depth):
   the base's O8.2 holes and 19.7 into the support's O7.94 x 25 sockets
   (tips at y 70.5).
 * hex-bolt x2 (M6.10 fasteners): the SOUTH foot-rail hold-downs (moved
-  here from output.SLDASM with the rails), at (X, Z) = (+74.75, -54 / +36),
+  here from the former output assembly with the rails), at (X, Z) = (+74.75, -54 / +36),
   heads on the rail top (y 70.8), shanks descending into the base.
 
 Every component is fixed (base) or fully defined by three orthogonal
@@ -85,8 +85,8 @@ SUPPORT_Z = 133.35 - 63.5 / 2.0  # 101.6: outer face flush w/ top plate edge
 LAG_SCREW_X = (SUPPORT_X - 31.75, SUPPORT_X + 31.75)  # 41.15 / 104.65: the
 # support's mounting-hole pitch (base HOLE_XZ[2:] / counterbores match)
 LAG_SCREW_Y = 4.5  # under-head face = counterbore top; head 0.5..4.5
-# South foot-rail hold-down hex bolts (moved here from output.SLDASM with the
-# rails: the foot rail now belongs to rocker-arm-portal in this assembly).
+# South foot-rail hold-down hex bolts (moved here from the former output assembly
+# with the rails: the foot rail now belongs to rocker-arm-portal in this assembly).
 # Heads on the rail top (y 70.8), Ø7.8 shanks descending into the base; authored
 # machine-handed at x +74.75 (frame does NOT mirror), the bolt being x-symmetric.
 HEX_BOLT_X = 74.75

@@ -56,7 +56,7 @@ COIL_OD = 12.5  # DIMENSIONS.md ch19: scaled vs gooseneck tube O16 (low)
 WIRE_DIA = 1.8  # DIMENSIONS.md ch19: close-wound dark coil (low)
 COIL_COUNT = 165  # close-wound: pitch 1.91 leaves a 0.11 sweep-merge gap (derived)
 BOTTOM_LEAD = 40.0  # straight drop, coil bottom -> boss-hook ring centre
-# (body bottom y 1052 - ring centre y 1012; see build_output_assembly.py)
+# (body bottom y 1052 - ring centre y 1012; see build_summing_assembly.py)
 TOP_LEAD = 2.0 * WIRE_DIA  # standard short hook onto the gooseneck tip pin
 
 MEAN_RADIUS = (COIL_OD - WIRE_DIA) / 2.0
