@@ -55,15 +55,15 @@ TOP_THICKNESS = 1.5 * IN
 # M6.10 fastener holes (machine = part-local: frame.SLDASM places the
 # base unrotated at the origin). All through-drilled O8.2 (documented
 # simplification -- the rail-bolt holes need only 12.5-deep sockets):
-# 2x a-frame foot-rail hex-bolts at (74.75, z -54/+36) and 2x rocker-
-# support lag-screws at (72.9 +/- 31.75, z 101.6), the latter with O15
-# x 4.5 head counterbores up from the underside.
+# 2x portal south foot-rail hex-bolts at (74.75, z -54/+36) and 2x
+# portal north lag-screws at (72.9 +/- 31.75, z 101.6), the latter with
+# O15 x 4.5 head counterbores up from the underside.
 HOLE_DIA = 8.2
 HOLE_XZ = (
-    (74.75, -54.0),  # a-frame foot-rail bolt (south)
-    (74.75, 36.0),  # a-frame foot-rail bolt (north)
-    (41.15, 101.6),  # rocker-support lag screw (west)
-    (104.65, 101.6),  # rocker-support lag screw (east)
+    (74.75, -54.0),  # portal south foot-rail bolt
+    (74.75, 36.0),  # portal south foot-rail bolt
+    (41.15, 101.6),  # portal north lag screw (west)
+    (104.65, 101.6),  # portal north lag screw (east)
 )
 CBORE_DIA = 15.0
 CBORE_DEPTH = 4.5  # lag head 14 x 4 recessed 0.5
