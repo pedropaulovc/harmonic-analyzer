@@ -29,9 +29,13 @@ The analyzer is composed of 20 mechanical channels operating in parallel, each c
 
 ### CAD renders
 
-| Frame | Drive train | Channels (×20) | Output |
+| Frame | Drive train | Channels (×20) | Summing |
 |:---:|:---:|:---:|:---:|
-| <img src="docs/images/frame.png" alt="Frame sub-assembly"> | <img src="docs/images/drive-train.png" alt="Drive train sub-assembly: crank, cone gears, cylinder gears"> | <img src="docs/images/channel.png" alt="Channel sub-assembly: rocker arms, amplitude bars, springs"> | <img src="docs/images/output.png" alt="Output sub-assembly: summing lever, magnifying and pen mechanism, platen"> |
+| <img src="docs/images/frame.png" alt="Frame sub-assembly"> | <img src="docs/images/drive-train.png" alt="Drive train sub-assembly: crank, cone gears, cylinder gears"> | <img src="docs/images/channel.png" alt="Channel sub-assembly: rocker arms, amplitude bars, springs"> | <img src="docs/images/summing.png" alt="Summing sub-assembly: knife-edge lever, counter-spring chain"> |
+
+| Magnifier | Pen | Paper drive |
+|:---:|:---:|:---:|
+| <img src="docs/images/magnifier.png" alt="Magnifier sub-assembly: magnifying lever and wheel"> | <img src="docs/images/pen.png" alt="Pen sub-assembly: pen carriage and kinematic driver"> | <img src="docs/images/paper-drive.png" alt="Paper-drive sub-assembly: platen, transgear, roller chain"> |
 
 Every part and assembly is generated from **Python reproduction scripts** in
 [`cad/scripts/`](./cad/scripts) that drive SolidWorks over its COM API (via the
@@ -87,7 +91,7 @@ $py = "C:\src\SolidworksMCP-python\.venv\Scripts\python.exe"
 & $py -m doit part:cone_gear
 
 # Just one assembly (+ its stale prerequisites), or a single gate
-& $py -m doit assembly:output
+& $py -m doit assembly:paper_drive
 & $py -m doit verify:soundness        # one SW gate
 & $py -m doit check:math              # one offline gate
 
@@ -112,8 +116,8 @@ still stale). Outputs land in `cad/out/` (gitignored).
 its target — a missing target makes doit take the FULL branch (hooks included):
 
 ```powershell
-del cad\out\sldasm\output.SLDASM
-& $py -m doit assembly:output
+del cad\out\sldasm\paper-drive.SLDASM
+& $py -m doit assembly:paper_drive
 ```
 
 ### Repository layout

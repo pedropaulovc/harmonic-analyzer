@@ -34,11 +34,11 @@ pen Y(θ) = magnify · Σ aⱼ · cos(j·θ)      (aⱼ = amplitude-bar position
 
 `cad/scripts/truth_model.py` computes `Y(θ)` deterministically, and the pen is driven
 **kinematically** off that math — no force solver. Concretely (`cad/scripts/pen_driver.py`,
-installed by `build_output_assembly.py`):
+installed by `build_pen_assembly.py`):
 
-- a manual **`CrankDeg`** global in `output.SLDASM` is the curve's phase input (a standalone
+- a manual **`CrankDeg`** global in `pen.SLDASM` is the curve's phase input (a standalone
   global, deliberately *not* coupled to the drive-train crank — the summation is computed, so
-  the pen need not be mechanically slaved to the train, and `output.SLDASM` stays testable in
+  the pen need not be mechanically slaved to the train, and `pen.SLDASM` stays testable in
   isolation);
 - the Fourier sum is accumulated through a chain of partial-sum globals `S1..S20`
   (`Sₖ = Sₖ₋₁ + aₖ·cos(k·CrankDeg + φₖ)`) — SW's equation manager rejects a single 20-term
@@ -60,7 +60,7 @@ sizing are done **analytically** (external spring calculations), not read off a 
   `truth_model` is a correct band-limited synthesiser — per-channel single-term traces,
   superposition, the canonical square/sawtooth/fundamental presets against their analytic targets.
 - **Kinematically** (in SolidWorks): `verify.py --suite kinematics` (doit: `verify:kinematics`)
-  opens `output.SLDASM`, sweeps
+  opens `pen.SLDASM`, sweeps
   `CrankDeg` over a full period, and asserts the sampled pen-marker tip traces
   `truth_model.pen_y` (to the mapped half-stroke) within tolerance — the geometry realises the
   computed curve.
