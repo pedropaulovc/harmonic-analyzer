@@ -17,7 +17,7 @@
         "roll_deg": 0.0,
         "zoom": 1.0,
         "target_mm": null,
-        "perspective": null,
+        "perspective": {"focal_length_mm": 100},
         "az_deg": 178,
         "el_deg": -3
       },
@@ -45,7 +45,7 @@
         "roll_deg": 0.0,
         "zoom": 1.0,
         "target_mm": null,
-        "perspective": null,
+        "perspective": {"focal_length_mm": 100},
         "az_deg": -139,
         "el_deg": 8
       },
@@ -73,7 +73,7 @@
         "roll_deg": 0.0,
         "zoom": 1.0,
         "target_mm": null,
-        "perspective": null,
+        "perspective": {"focal_length_mm": 100},
         "az_deg": -90,
         "el_deg": 3
       },
@@ -101,7 +101,7 @@
         "roll_deg": 0.0,
         "zoom": 1.0,
         "target_mm": null,
-        "perspective": null,
+        "perspective": {"focal_length_mm": 100},
         "az_deg": -40,
         "el_deg": -7
       },
@@ -129,7 +129,7 @@
         "roll_deg": 0.0,
         "zoom": 1.0,
         "target_mm": null,
-        "perspective": null,
+        "perspective": {"focal_length_mm": 100},
         "az_deg": 2,
         "el_deg": 10
       },
@@ -157,7 +157,7 @@
         "roll_deg": -1.0,
         "zoom": 1.0,
         "target_mm": null,
-        "perspective": null,
+        "perspective": {"focal_length_mm": 100},
         "az_deg": 38,
         "el_deg": 4
       },
@@ -185,7 +185,7 @@
         "roll_deg": 0.0,
         "zoom": 1.0,
         "target_mm": null,
-        "perspective": null,
+        "perspective": {"focal_length_mm": 100},
         "az_deg": 90,
         "el_deg": 3
       },
@@ -213,7 +213,7 @@
         "roll_deg": 0.0,
         "zoom": 1.0,
         "target_mm": null,
-        "perspective": null,
+        "perspective": {"focal_length_mm": 100},
         "az_deg": 135,
         "el_deg": 7
       },
