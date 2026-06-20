@@ -23,9 +23,11 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 CAD_OUT = SCRIPTS_DIR.parent / "out"
 
 # Sub-assemblies in build order; the top-level harmonic-analyzer references the
-# four subs, so it is last. doit derives ordering from file_dep, but this tuple
-# still enumerates the assembly tasks.
-ASSEMBLY_ORDER = ("frame", "drive_train", "channel", "output", "harmonic_analyzer")
+# six subs, so it is last. doit derives ordering from file_dep, but this tuple
+# still enumerates the assembly tasks. The former monolithic ``output`` is split
+# by function into summing -> magnifier -> pen (the value chain) + paper-drive.
+ASSEMBLY_ORDER = ("frame", "drive_train", "channel", "summing", "magnifier", "pen",
+                  "paper_drive", "harmonic_analyzer")
 
 # Throwaway motion/diagnostic deliverables that match build_*.py but produce no
 # .SLDPRT part -- they consume/probe the saved assemblies (Basic Motion sweeps,
@@ -107,8 +109,9 @@ def _references(asm_stem: str, candidate_stem: str) -> bool:
 def references_of(asm_stem: str) -> list[str]:
     """Part + sub-assembly stems this assembly's build script references.
 
-    These are the prerequisite artefacts (the DAG edges): ``output`` references
-    its leaf parts; ``harmonic_analyzer`` references the four sub-assemblies
+    These are the prerequisite artefacts (the DAG edges): each output sub
+    (summing/magnifier/pen/paper_drive) references its leaf parts;
+    ``harmonic_analyzer`` references the six sub-assemblies
     (build_harmonic_analyzer_assembly.SUBASSEMBLIES). doit turns each into a
     ``file_dep`` on the referenced ``.SLDPRT``/sub-``.SLDASM`` target, so order
     and the refresh/full decision fall out of the graph.
