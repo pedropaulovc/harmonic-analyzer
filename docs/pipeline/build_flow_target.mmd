@@ -3,7 +3,7 @@ flowchart TD
 
     subgraph COM["🔒 SolidWorks Zone — COM SPINE (linear task_dep ⇒ one seat at a time; subprocess-per-task unchanged)"]
         direction TB
-        PART["part:&lt;stem&gt; (×77)"] ==> ASM["assembly:&lt;stem&gt; (×8)<br/>frame→drive_train→channel→summing→<br/>magnifier→pen→paper_drive→harmonic_analyzer"]
+        PART["part:&lt;stem&gt; (×77)"] ==> ASM["assembly:&lt;stem&gt; (×5)<br/>frame→drive_train→channel→<br/>output→harmonic_analyzer"]
         ASM ==> VS["verify:soundness<br/>DOF · interference · ratios · BOM"]
         VS ==> VSUB["verify:subsystems<br/>each sub-assembly alone"]
         VSUB ==> VKIN["verify:kinematics<br/>motion-study pen sweep"]

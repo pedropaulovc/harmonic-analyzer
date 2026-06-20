@@ -31,7 +31,7 @@ flowchart TD
     FULL --> AG{DOF resolved?<br/>Model healthy?<br/>Zero interference?}
     REFRESH --> AG
     AG -->|fail| FAIL2["✗ exit non-zero<br/>.SLDASM untouched"]
-    AG -->|pass| ASMOUT["⑥ assembly<br/>frame→drive_train→channel→summing→<br/>magnifier→pen→paper_drive→harmonic_analyzer (TOP)"]
+    AG -->|pass| ASMOUT["⑥ assembly<br/>frame→drive_train→channel→<br/>output→harmonic_analyzer (TOP)"]
     ASMOUT -.->|ASSETS| AASM[("cad/out/sldasm/&lt;stem&gt;.SLDASM<br/>cad/out/png/&lt;stem&gt;/*.png (6 views)")]
 
     ASMOUT --> VERIFY["⑦ verify.py --suite all<br/>static · truth · config ·<br/>isolation · motion"]

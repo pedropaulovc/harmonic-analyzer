@@ -3,7 +3,7 @@ r"""Reproduction script: rocker-arm support portal (book ch. 14 + ch. 30 views).
 ONE green cast-iron windowed PORTAL FRAME carrying the rocker-pivot shaft -
 recreated from scratch (2026-06-19) to replace the former two-part split
 (``rocker-arm-support`` north frustum in frame.SLDASM + ``a-frame`` south
-upright/rails in the former output assembly). The true side view (ch30 p008, looking along
+upright/rails in output.SLDASM). The true side view (ch30 p008, looking along
 X) shows a WINDOWED RECTANGLE; the front/back views (ch30 p002/p006, along Z)
 show a TRIANGLE; the perspective side views (p005/p007) show both. This
 reconciles as a single casting: two tapered triangular UPRIGHTS - north at

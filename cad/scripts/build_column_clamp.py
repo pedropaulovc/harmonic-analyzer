@@ -8,7 +8,7 @@ FRONT of the columns (p3 90-degree view: bar band z -129..-139 vs column
 line z -112). M6.10 fasteners pass: an O3.2 radial hole through the back
 wall (local -X, machine +Z after the assembly's Ry90) takes the pinch
 screw that locks the collar to the column; the screw is placed BACKED
-OUT in magnifier.SLDASM / paper-drive.SLDASM (tip 0.2 inside the hole, clear of the column).
+OUT in output.SLDASM (tip 0.2 inside the hole, clear of the column).
 
 Layout: collar axis +Y (column vertical) through the origin at the bar's
 centre height; the bar channel runs along local Z at x 16.8..27.0 (bar

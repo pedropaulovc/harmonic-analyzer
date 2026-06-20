@@ -59,7 +59,7 @@ FLANGE_X = (-20.0, 5.0)  # mounting flange, machine x +20..+45. The collar sits
 # a 0.45-wide corner sliver -> it read as floating in the top view.) The west tab
 # clears channel spring j=0 (z -67.1) -- the flange sits at z <= -76.45, well south.
 FLANGE_Y = (-2.54, 2.54)  # spans the plate's FULL height: with the collar/rod now
-# at the plate centreline (machine 990, see build_magnifier_assembly LEVER_ROD_Y), the
+# at the plate centreline (machine 990, see build_output_assembly LEVER_ROD_Y), the
 # flange butts the plate FRONT FACE rather than tucking under it -- machine
 # 987.46..992.54 = the coplanar .cs plate band
 FLANGE_Z = (4.0, 8.55)  # north face at machine -76.45 = 0.25 south of the plate's

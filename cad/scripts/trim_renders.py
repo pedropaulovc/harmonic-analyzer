@@ -29,10 +29,7 @@ README_RENDERS = {
     "frame": "frame.png",
     "drive-train": "drive-train.png",
     "channel": "channel.png",
-    "summing": "summing.png",
-    "magnifier": "magnifier.png",
-    "pen": "pen.png",
-    "paper-drive": "paper-drive.png",
+    "output": "output.png",
 }
 
 

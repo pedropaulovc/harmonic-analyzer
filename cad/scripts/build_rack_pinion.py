@@ -5,7 +5,7 @@ The M4c "120 teeth / OD 103.3" keyframe read is REFUTED by the calibrated
 ch. 30 front view (p1, 6.02 px/mm): the gear OD spans ~83 mm centred on
 the pinion-bar stud at (0, 253.5) -- 96T DP 30 gives PD 81.28 / OD 82.97.
 ~3 mm disc, plain 3/8" shaft bore (the latch/stud hardware is modeled in
-build_paper_drive_assembly.py; Appendix C #8).
+build_output_assembly.py; Appendix C #8).
 
 Layout: gear axis = Z through the origin, disc z = 0..3 mm.
 

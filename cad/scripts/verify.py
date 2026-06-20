@@ -19,11 +19,10 @@ is the single fully-safe entry point that runs every gate.
   subsystems          NEEDS SOLIDWORKS. Subsystem pass/fail runs (plan F1): open
                       EACH built (sub)assembly and prove it sound in isolation --
                       the drive-train as the crank+gear test, the channel assembly
-                      as the 20-way independence test, the output subs
-                      (summing/magnifier/pen/paper-drive)/frame/top as
+                      as the 20-way independence test, output/frame/top as
                       structural/smoke.
   kinematics          NEEDS SOLIDWORKS. Kinematic pen-driver fidelity (plan F5):
-                      open pen.SLDASM, sweep the CrankDeg global, and assert
+                      open output.SLDASM, sweep the CrankDeg global, and assert
                       the pen-marker tip traces truth_model.pen_y (mapped to the
                       physical half-stroke) with NO force solver -- the computed-
                       not-simulated summation realised through the equation-driven
@@ -113,7 +112,7 @@ CHANNELS = _config.active_count()
 # (pen_driver.install, run at build time). The motion suite sweeps CrankDeg here
 # and proves the pen tip traces truth_model.pen_y -- the computed-not-simulated
 # summation, with no force solver (docs/motion-policy.md).
-MOTION_OWNER = "pen"
+MOTION_OWNER = "output"
 PEN_MARKER_STEM = "pen-marker"  # the carriage tip whose Y traces the curve
 # CrankDeg angles to sample; spans a full fundamental period (0..360) so both
 # stroke extremes (the square-wave preset peaks at 0 and 180) are exercised.
@@ -128,10 +127,8 @@ _CRANK_GEAR_TOKENS = ("crank-pinion", "crank-drive-gear")
 # Expected TOP-LEVEL component-count band per assembly: a tripwire for "a build
 # dropped/duplicated a channel (or a whole subassembly)", not a tight count.
 # component_names counts top-level components only (GetComponents(TopLevelOnly)),
-# so harmonic-analyzer's count is its 7 child subassemblies + 1 loose part (the
-# measuring-stick; the spare gear rides inside paper-drive) -- NOT the ~340
-# flattened parts. Bands measured live (verify.py --suite subsystems)
-# with margin.
+# so harmonic-analyzer's count is its 4 child subassemblies -- NOT the ~340
+# flattened parts. Bands measured live (verify.py --suite subsystems) with margin.
 # The channel + drive-train bands scale with the built channel count N (the
 # TEMPORARY active_count): channel = 7N + 4 (N×{rocker,rod,bar,lever,spring} + 2
 # shafts + 4 ball-mounts + 2 bushings per inter-channel gap), drive-train = 32 + N
@@ -142,13 +139,8 @@ _COMPONENT_BAND = {
     "frame": (7, 12),           # measured 9 (corner brackets removed, #21)
     "drive-train": (32 + _N_CH - 4, 32 + _N_CH + 4),  # N=20 -> (48,56), measured 52
     "channel": (7 * _N_CH + 4 - 6, 7 * _N_CH + 4 + 6),  # N=20 -> (138,150), measured 144
-    # The former monolithic output split by function (no per-channel parts here);
-    # bands tightened to the measured green-build counts (verify:subsystems).
-    "summing": (8, 10),         # ch 18-19, measured 9
-    "magnifier": (10, 12),      # ch 20-21, measured 11
-    "pen": (6, 8),              # ch 24, measured 7
-    "paper-drive": (89, 93),    # ch 22-23-25, measured 91 (27 placed + 64-link chain)
-    "harmonic-analyzer": (7, 9),  # measured 8: 7 subassemblies + 1 loose part (measuring-stick)
+    "output": (117, 129),       # measured 123 (no per-channel parts here)
+    "harmonic-analyzer": (3, 6),  # 4 subassemblies: frame, drive-train, channel, output
 }
 
 # Tolerance audit (Part D / handoff §14.2 Gate E): every built part must carry
@@ -384,8 +376,8 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
 
     # Fresh session per assembly: accumulating open docs across the multi-assembly
     # run degrades the COM session -- the InterferenceDetectionManager comes back
-    # null after several opens, failing its interference gate spuriously. Reset
-    # first, exactly as the isolation and
+    # null on the 5th open (output, the last in the static set), failing its
+    # interference gate spuriously. Reset first, exactly as the isolation and
     # motion suites do (see _verify_isolation_one / _verify_motion_one).
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     check(f"open {name}", await adapter.open_model(str(sldasm)))
@@ -424,7 +416,7 @@ def _tip_y_mm(adapter: Any, marker: str) -> float:
 async def _verify_motion_one(adapter: Any, report: Report) -> None:
     """Kinematic pen-driver fidelity (plan F5): sweep CrankDeg, prove the tip traces truth_model.
 
-    pen.SLDASM's pen-rod travel mate is equation-linked to a CrankDeg global
+    output.SLDASM's pen-rod travel mate is equation-linked to a CrankDeg global
     through the chained Fourier sum (installed by pen_driver.install at build).
     Setting CrankDeg and rebuilding must displace the pen-marker tip by exactly
     ``pen_driver.expected_tip_disp_mm(theta)`` from the rest pose -- the computed
@@ -894,7 +886,7 @@ def _parse_args() -> argparse.Namespace:
                              "config"])
     args = ap.parse_args()
     if not args.names:
-        # math/config need no model; kinematics targets MOTION_OWNER (pen);
+        # math/config need no model; kinematics targets MOTION_OWNER (output);
         # soundness/subsystems default to all built. (There is no aggregate
         # "all" suite -- `doit build` is the one fully-safe entry point.)
         if args.suite in ("math", "config"):

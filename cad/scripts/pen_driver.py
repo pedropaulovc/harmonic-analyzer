@@ -3,7 +3,7 @@ a crank-angle global so the SW pose reproduces ``truth_model.pen_y`` with NO
 force solver. The 21-spring summation is computed, not simulated — see
 ``docs/motion-policy.md``.
 
-Shared by ``build_pen_assembly.py`` (installs the driver inline as the pen
+Shared by ``build_output_assembly.py`` (installs the driver inline as the pen
 group is built) and ``verify.py`` (sweeps the global, samples the pen tip, and
 asserts it matches ``truth_model``).
 
@@ -12,7 +12,7 @@ Mechanics (all proven live, see the pen-equation-driver memory):
 * SW's equation manager rejects a 20-term sum in one expression, so the curve
   is accumulated through a chain of partial-sum globals ``S1..S20`` (each
   references the prior partial + one term), then ``PenY = Magnify * S20``.
-* pen.SLDASM is an IPS (inch) document, and mate-dimension equations
+* output.SLDASM is an IPS (inch) document, and mate-dimension equations
   evaluate in DOCUMENT units — so the base + scale are expressed in doc units
   via the ``factor`` (doc units per mm) the caller reads off the mate's D1.
 * The config coefficients are a math demo (square wave -> ~682 mm peak), so the

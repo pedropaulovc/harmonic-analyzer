@@ -7,7 +7,7 @@ dark board. Consumable media, but modeled for photo fidelity (M6.8
 photo-tuning).
 
 Sized to sit between the two platen clips (clip bands at platen-local
-x 8..18 and 280..290 - see build_paper_drive_assembly CLIP_FRONT_DX) with a
+x 8..18 and 280..290 - see build_output_assembly CLIP_FRONT_DX) with a
 6 mm top/bottom margin, 0.5 mm proud of the platen front face.
 
 Layout: width along +X, height along +Y from the origin corner,

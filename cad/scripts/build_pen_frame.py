@@ -7,7 +7,7 @@ sketch contours (outer + inner rectangle) extrude directly into the ring.
 Dimensions: cad/DIMENSIONS.md "Chapter 24" — scaled from the p.64-65
 photos vs the ~5 mm square rod (low). Side rails 4, end rails 5 (the
 window must span the marker + pen rod when the frame lies flat on the
-v-block, long axis along machine X -- see build_pen_assembly.py).
+v-block, long axis along machine X -- see build_output_assembly.py).
 
 Layout: width along +X, height along +Y from the origin corner, depth
 extruded +Z; set-screw hole cut along Y from a Top-plane sketch with a

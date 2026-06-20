@@ -9,7 +9,7 @@ the chain is collapsed to this single hook with the spring's own loop as
 the ring (simplification, see build_counter_spring.py).
 
 Dimensions: cad/DIMENSIONS.md ch. 18/19 (M6.4, low). Geometry constraints
-that size it (see build_summing_assembly.py): shank at machine x 90.5
+that size it (see build_output_assembly.py): shank at machine x 90.5
 (boss hole), rod centreline at machine y 1015 so the spring ring (mean
 r 5.35, wire 1.8) hanging at centre y 1012 touches the rod top; rod tip
 at machine x 97 so the ring's wire band (x 94.1..95.9) sits mid-rod.

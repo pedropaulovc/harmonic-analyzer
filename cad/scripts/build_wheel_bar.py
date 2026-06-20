@@ -8,7 +8,7 @@ one) with a free end just past the pen hanger; there is no second clamp
 on the far column at this height.
 
 Square 10 section like the support-bar, 200 long. Placed in
-build_magnifier_assembly at centre x -92 (pre-mirror): clamped end -192
+build_output_assembly at centre x -92 (pre-mirror): clamped end -192
 (in the west clamp's front channel, off the column cylinder -- same
 clearance logic as build_support_bar.py), free end +8, covering the
 wheel axle (-53) and the pen-hanger strap top (-19..-3) with margin.
