@@ -30,18 +30,23 @@ depth):
 * top-frame x1: the green ring at ring mid-plane Y = 1020.2 (rails 22 x
   41, y 999.7..1040.7), corner bosses bored around the four columns; its
   west rail seats the top-lever ball mounts (channel.SLDASM).
+* nameplate x1 (book ch. 26): the 100 x 55 brass maker's plate screwed
+  flat to the base top near the platen, engraved face up. Rx(+90) flat-
+  lay, grounded at its transform (the lay permutes its principal planes,
+  so the plane-mate triple does not apply); front-center, X centred,
+  underside flush on the base top at y = 50.8.
 * lag-screw x2 (M6.10 fasteners): the rocker-arm-support hold-downs,
   coming UP through the base from below -- heads recessed in the base
   underside's counterbores (y 0.5..4.5 in the O15 x 4.5 pockets), O7.8
   shanks through the base's O8.2 holes and 19.7 into the support's
   O7.94 x 25 sockets (tips at y 70.5).
 
-Every component is fixed (base) or fully defined by three orthogonal
-plane-plane mates against the base part's principal planes; distance-mate
-flips are caught by reading back ``Transform2`` after each mate and
-re-adding the mate flipped. Final asserts: every component fixed or
-``swFullyConstrained``, and zero interferences (tangent/coincident contact
-allowed).
+Every component is fixed (base, nameplate) or fully defined by three
+orthogonal plane-plane mates against the base part's principal planes;
+distance-mate flips are caught by reading back ``Transform2`` after each
+mate and re-adding the mate flipped. Final asserts: every component fixed
+or ``swFullyConstrained``, and zero interferences (tangent/coincident
+contact allowed).
 
 The 20-channel pitch stations live in the channel subassembly.
 
@@ -66,6 +71,7 @@ from _common import (
     check,
     check_no_interference,
     plane_distance_mate,
+    rows_from_euler,
     run_build,
     save_assembly_and_images,
 )
@@ -84,6 +90,19 @@ TOP_FRAME_MID_Y = 1020.2  # ring mid-plane: rails y 999.7..1040.7 (M6.3)
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 
+# Maker's nameplate (book ch. 26): the 100 x 55 x 1.5 brass plate screwed flat
+# to the base top, engraved face up, near the platen at the front (-Z) edge.
+# build_nameplate authors it upright in the XY plane (width +X, height +Y from
+# the corner origin, engraved face on z=0, thickness +Z); Rx(+90) lays it flat
+# with the engraving facing +Y. With those rotation rows the transform maps
+# part (x, y, z) -> machine (x, -z, y) + T, so the plate runs 100 along +X and
+# 55 along +Z and the z=0 engraved face is uppermost (at y = Ty).
+NAMEPLATE_ROT = [90.0, 0.0, 0.0]
+# Underside flush on the base top (Ty - PLATE_THICKNESS 1.5 = 50.8 -> Ty 52.3);
+# X centred [-50, 50] clear of the front columns (x +/-197) and a-frame foot
+# bolts (x 74.75); Z [-128, -73], 5.35 mm in from the front edge (z -133.35).
+NAMEPLATE_POS = [-50.0, 52.3, -128.0]
+
 
 def _part(name: str) -> str:
     path = (OUT_SLDPRT / f"{name}.SLDPRT").resolve()
@@ -93,7 +112,10 @@ def _part(name: str) -> str:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import InsertComponentParameters
+    from solidworks_mcp.adapters.base import (
+        ComponentRefParameters,
+        InsertComponentParameters,
+    )
 
     base_path = _part("harmonic-base")
     column_path = _part("tube-frame")
@@ -189,6 +211,29 @@ async def build(adapter) -> dict[str, str]:
         adapter, name, "Top Plane", "Top Plane", base_name, TOP_FRAME_MID_Y, target
     )
     assert_component_placed(adapter, name, target, IDENTITY)
+
+    # Maker's nameplate: a static plate screwed flat to the base top. The
+    # Rx(+90) flat-lay permutes the part's principal planes (Top -> +Z, Front
+    # -> -Y), so the axis-aligned plane-distance triple used above does not
+    # apply; ground it at its exact transform instead (the place_component
+    # idiom for cosmetic structure), and read back the rotated rows.
+    nameplate_path = _part("nameplate")
+    nameplate_rows = rows_from_euler(NAMEPLATE_ROT)
+    res = await adapter.insert_component(
+        InsertComponentParameters(
+            file_path=nameplate_path,
+            position=NAMEPLATE_POS,
+            rotation=NAMEPLATE_ROT,
+        )
+    )
+    check(f"insert_component nameplate @ {NAMEPLATE_POS}", res)
+    name = res.data["name"]
+    if not res.data.get("fixed"):
+        check(
+            "fix nameplate",
+            await adapter.fix_component(ComponentRefParameters(name=name)),
+        )
+    assert_component_placed(adapter, name, NAMEPLATE_POS, nameplate_rows)
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)

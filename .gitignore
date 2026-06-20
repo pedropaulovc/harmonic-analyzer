@@ -380,3 +380,6 @@ comparisons/.parity_sw/
 .mesalib.conda
 .gl_test.png
 .cf_repo.json
+
+# Downloaded GitHub release artefacts (scratch)
+.release/

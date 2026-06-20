@@ -194,9 +194,16 @@ async def build(adapter) -> dict[str, str]:
     # Lettering + cartouche incise the recessed field floor: the cut reaches
     # RECESS+ENGRAVE but the recess already cleared the first RECESS_DEPTH over the
     # field, so the NEW material removed is the engraving area x ENGRAVE_DEPTH.
+    # The engraving is cut into the z=0 face, whose display normal is -Z. The
+    # loops were traced to read from the +Z reference (front) view, so cutting
+    # them as-is leaves the engraving mirrored on the display side (only visible
+    # once the plate is assembled face-up). Reflect about the plate centre so it
+    # reads correctly head-on. Area is unchanged -- the even-odd nesting and the
+    # golden engraving-area gate are both mirror-invariant.
     eng_area = _engraving_area()
+    lettering = [[(PLATE_WIDTH - x, y) for x, y in loop] for loop in LETTERING_LOOPS]
     check("create_sketch lettering", await adapter.create_sketch("Front"))
-    await sketch_polyline_loops(adapter, LETTERING_LOOPS, label="lettering")
+    await sketch_polyline_loops(adapter, lettering, label="lettering")
     await _cut_region(
         adapter,
         RECESS_DEPTH + ENGRAVE_DEPTH,
