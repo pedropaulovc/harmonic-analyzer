@@ -1,0 +1,45 @@
+flowchart TD
+    DOIT{{"dodo.py — single command: doit -n N<br/>default task = build · cad/out/.doit.db"}}
+
+    subgraph COM["🔒 SolidWorks Zone — COM SPINE (linear task_dep ⇒ one seat at a time; subprocess-per-task unchanged)"]
+        direction TB
+        PART["part:&lt;stem&gt; (×77)"] ==> ASM["assembly:&lt;stem&gt; (×5)<br/>frame→drive_train→channel→<br/>output→harmonic_analyzer"]
+        ASM ==> VS["verify:soundness<br/>DOF · interference · ratios · BOM"]
+        VS ==> VSUB["verify:subsystems<br/>each sub-assembly alone"]
+        VSUB ==> VKIN["verify:kinematics<br/>motion-study pen sweep"]
+        VKIN ==> EXP["export<br/>STEP · STL · scene boxes"]
+        EXP ==> REL["release (opt-in)<br/>Pack-and-Go + diff + gh release"]
+    end
+
+    DOIT --> PART
+
+    subgraph CPU["⚡ SolidWorks-free Zone — check:* run in PARALLEL under -n N (off the spine)"]
+        direction TB
+        CM["check:math<br/>Fourier self-check"]
+        CC["check:config<br/>config/dims/tolerance audit"]
+        CG["check:graph<br/>test_buildgraph"]
+        CN["check:nameplate<br/>test_nameplate_geometry"]
+        CR["check:recipe<br/>test_dodo_recipe"]
+    end
+
+    DOIT --> CM
+
+    %% build = every part + assembly + every gate (the one safe entry)
+    BUILD{{"build (default) = parts + assemblies<br/>+ verify:* + check:* — fully safe"}}
+    ASM -.-> BUILD
+    VKIN -.-> BUILD
+    CM -.-> BUILD
+    CR -.-> BUILD
+    BBARE["build_bare = parts + assemblies only (quick)"]
+    ASM -.-> BBARE
+
+    REL -.->|ASSET| OUT[("GitHub Release vX.Y.Z<br/>bundle.zip + diff PNGs + notes")]
+
+    classDef gate fill:#fff3cd,stroke:#d39e00,color:#000;
+    classDef serial fill:#f8d7da,stroke:#c0392b,color:#000;
+    classDef par fill:#d4edda,stroke:#28a745,color:#000;
+    classDef asset fill:#cce5ff,stroke:#004085,color:#000;
+    class BUILD,BBARE gate;
+    class PART,ASM,VS,VSUB,VKIN,EXP,REL serial;
+    class CM,CC,CG,CN,CR par;
+    class OUT asset;
