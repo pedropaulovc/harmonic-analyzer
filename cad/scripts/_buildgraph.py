@@ -200,7 +200,7 @@ def dependents_of(stem: str) -> list[str]:
     parity (and the ``--rebuild`` shim). Includes the transitive top-add: any part
     pulled into a sub-assembly also flows up to harmonic_analyzer, so the top is
     appended whenever a direct dependent exists. The doit graph does not need this
-    transitive edge -- it propagates through ``output.SLDASM -> harmonic-analyzer
+    transitive edge -- it propagates through ``<sub>.SLDASM -> harmonic-analyzer
     .SLDASM`` -- so ``references_of`` is the DIRECT inverse only.
     """
     deps = [asm for asm in ASSEMBLY_ORDER if asm != stem and _references(asm, stem)]

@@ -422,7 +422,7 @@ spring exits the page top). Recalibrated against the ch. 19 full-machine photo
 | Coil OD | 12.5 mm | 0.49 | vs the Ø16 gooseneck tube in the same frame (supersedes ~22) | scaled | low |
 | Wire dia | 1.8 mm | 0.071 | close-wound dark coil, no light through (supersedes ~2.5) | scaled | low |
 | Coil count | 165 | — | close-wound: pitch 1.91 leaves a 0.11 sweep-merge gap | derived | low |
-| Bottom lead | straight 40 mm drop, coil bottom → ring that hangs on the boss hook (ring centre machine y 1012, rod top 1015) | — | M6.4 hang solve (`build_output_assembly.py`: ring inner top 1016.45 vs rod top 1016.5) | derived | low |
+| Bottom lead | straight 40 mm drop, coil bottom → ring that hangs on the boss hook (ring centre machine y 1012, rod top 1015) | — | M6.4 hang solve (`build_summing_assembly.py`: ring inner top 1016.45 vs rod top 1016.5) | derived | low |
 | Adjustment post | square-head screw on adjustable post | — | text pp. 44–45 | stated | high (feature) |
 | Gooseneck | Ø16 chrome tube: vertical leg machine x 197 (east column line), y 1041..1390; 180° bend R 51; tip leg x 95 — plumb above the boss hook — ending y 1378; lug + Ø4 X-pin at y 1373 carries the spring's top loop | — | ch. 19 photo 0.515 px/mm + p3 90° page; the tip "slotted screw" modeled as lug + pin (simplification) | scaled + derived | med |
 | Gooseneck clamp | green cast block 30 × 29 × 24 at machine (197, 1040.7, 0) on the east rail end; Ø16.5 vertical bore; square-head pinch screw (10 × 10 × 6 head, Ø5 shank stopped at the bore wall) | — | p.45: "a square-head screw pinches the post in its socket" | scaled | low |
