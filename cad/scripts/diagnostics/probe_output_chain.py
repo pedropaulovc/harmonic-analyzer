@@ -20,7 +20,15 @@ from __future__ import annotations
 
 import asyncio
 
-from _common import OUT_SLDASM, check, coincident_mate, log, named_ref
+from _common import (
+    OUT_SLDASM,
+    check,
+    log,
+)
+from _assembly import (
+    coincident_mate,
+    named_ref,
+)
 from build_motion_study import (
     ANGLE, ASM, DURATION_S, FLEXIBLE, _comp_xform, _entity_ref, _find_one,
     _rot_angle, _sub_model, _suppress_named, _world,

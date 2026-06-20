@@ -14,7 +14,16 @@ from __future__ import annotations
 
 import sys
 
-from _common import component_transform, log, run_build, world_point, _flag, _read_member
+from _common import (
+    _flag,
+    _read_member,
+    log,
+    run_build,
+)
+from _assembly import (
+    component_transform,
+    world_point,
+)
 
 # Local bore coords (mm) mirrored from build_channel_assembly.
 ROCKER_ROD_BORE_LOCAL = [25.4, 8.39937, 0.0]

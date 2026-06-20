@@ -75,26 +75,27 @@ import sys
 
 import _config
 from _common import (
+    MIRROR_PLANE,
+    check,
+    log,
+    run_build,
+)
+from _assembly import (
     assert_components_fully_defined,
     bore_axis_ref,
-    check,
     check_no_interference,
     coincident_mate,
-    concentric_mate,
     component_names,
     component_transform,
+    concentric_mate,
     distance_driver,
-    log,
-    MIRROR_PLANE,
     named_ref,
-    OUT_SLDPRT,
     place_component,
-    rows_from_euler,
-    run_build,
     save_assembly_and_images,
     spin_driver,
     world_point,
 )
+from _transforms import rows_from_euler
 from build_cylinder_gear import ECCENTRICITY as CAM_ECC  # cam lobe throw (mm):
 # imported, NOT copied, so the rod ring stays concentric with the cam when the
 # throw is rescaled. A stale 5.08 hardcode (the pre-re-anchor throw) survived the
@@ -106,7 +107,10 @@ ASM_NAME = "channel"
 # --- machine stations -------------------------------------------------------
 import os  # noqa: E402
 
-CHANNELS = int(os.environ.get("CHANNEL_COUNT", "20"))  # test hook: build fewer
+# Channels physically built. Default = machine.yaml channels.active_count (the
+# TEMPORARY 3-channel build-performance reduction; recover by setting it back to
+# 20 — see _config.active_count). CHANNEL_COUNT env still overrides for tests.
+CHANNELS = int(os.environ.get("CHANNEL_COUNT", str(_config.active_count())))
 Z0 = _config.machine("channels", "station_z0_mm")  # channel 0 gear plane (machine.yaml)
 PITCH = _config.machine("channels", "station_pitch_mm")
 ARM_MID_DZ = 0.8  # arm/bar/lever mid-planes at z_j + 0.8
@@ -169,7 +173,6 @@ from build_channel_spring_installed import (  # noqa: E402
     BOTTOM_LEAD as SPRING_BOTTOM_LEAD,  # 9.1: lead spanning the plate thickness
     INSTALLED_BODY_LENGTH as SPRING_BASE_BODY,  # 68.51: the neutral installed body
     PLATE_EYE_Y,  # 984.04: fixed summing-plate bottom-eye y (the spring's lower anchor)
-    TOP_EYE_LOCAL_Y as SPRING_EYE_LOCAL_Y,  # 70.51: loop centre on the axis
     TOP_LEAD as SPRING_TOP_LEAD,  # 2.0
 )
 

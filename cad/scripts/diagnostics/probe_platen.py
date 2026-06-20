@@ -14,19 +14,19 @@ from __future__ import annotations
 import sys
 
 from _common import (
-    angle_driver,
+    _flag,
+    _read_member,
     check,
-    coincident_mate,
+    log,
+    run_build,
+)
+from _assembly import (
+    angle_driver,
     component_transform,
     distance_driver,
-    log,
-    name_bore_axis,
     named_ref,
     place_component,
     world_point,
-    run_build,
-    _flag,
-    _read_member,
 )
 
 PLATE_X0 = -258.0
@@ -96,7 +96,7 @@ async def build(adapter):
 
     # Lock a ride-along (platen-rack) to the platen via Front planes -- a Lock
     # mate freezes relative pose regardless of the selected entities.
-    from _common import lock_mate
+    from _assembly import lock_mate
     rot_z180 = [[-1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, 1.0]]
     RACK_X0, RACK_Y0, RACK_Z = 41.23, 296.5, -138.9
     rk = await place_component(adapter, "platen-rack", [RACK_X0, RACK_Y0, RACK_Z],
