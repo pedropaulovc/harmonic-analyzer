@@ -358,6 +358,11 @@ cad/out/step/
 cad/out/boxes/
 # Changed-parts diff renders (regenerable: comparisons/tools/render_diff.py)
 cad/out/diff/
+# CadQuery stand-in outputs (regenerable: cad/scripts/*_cadquery.py); STEP/STL/
+# PNG written to cad/out/ root, e.g. cylinder-gear-cq.*, rocker-arm-cq.*
+cad/out/*.step
+cad/out/*.stl
+cad/out/*.png
 # Parts BOM (regenerable build output: build_harmonic_analyzer_assembly.py;
 # write-only, no repo consumer — keeping it tracked dirtied the tree on every
 # build and blocked doit release's clean-tree preflight)
