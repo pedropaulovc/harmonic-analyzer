@@ -692,7 +692,7 @@ sections:
         - med
       - - Hold-down lag screws ×2 (M6.10)
         - 'round head Ø14 × 4 + Ø7.8 × 66 shank, axis +Y at machine (x, z) = (72.9 ± 31.75, 101.6) — UP through the base from below: heads recessed in the underside''s Ø15 × 4.5 counterbores (y 0.5..4.5), shanks through the base''s Ø8.2 through-holes into the frustum''s Ø7.94 × 25 sockets (tips y 70.5, 5.3 short of the socket bottoms)'
-        - the support's 63.5 mounting-hole pitch (`build_rocker_arm_support.py`); placed in frame.SLDASM (`build_lag_screw.py`)
+        - the support's 63.5 mounting-hole pitch (`build_rocker_arm_portal.py`); placed in frame.SLDASM (`build_lag_screw.py`)
         - low
       - - Ball mounts ×2
         - clevis + Ø19 ball, ball centre 25.2 above its seat; Ø6.5 shaft cross-bore
@@ -1461,7 +1461,7 @@ sections:
         - scaled
         - low
       - - Pinion bar (M6.5)
-        - '12-square steel, x −58 → +178 at machine y 253.5 (M6.5 trim from −95..+197: west end clears the A-frame clevis ears/ball at x −59, east end clears the SE column tangent 184.3 (was 179.54 at the old Ø34.925; OD rederived from the 8-views M6.11 — 6.3 clearance now)); Ø9.6 stud bore along Z at x 0 (9.525 stud + slip clearance); both ends FLOAT (documented simplification — the real machine likely straps the bar to the a-frame and column)'
+        - '12-square steel, x −58 → +178 at machine y 253.5 (M6.5 trim from −95..+197: west end clears the portal south-upright clevis ears/ball at x −59, east end clears the SE column tangent 184.3 (was 179.54 at the old Ø34.925; OD rederived from the 8-views M6.11 — 6.3 clearance now)); Ø9.6 stud bore along Z at x 0 (9.525 stud + slip clearance); both ends FLOAT (documented simplification — the real machine likely straps the bar to the portal south upright and column)'
         - —
         - ch. 30 views + M6.5 layout
         - scaled + derived
