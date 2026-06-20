@@ -348,7 +348,7 @@ cad/out/.doit.db*
 # committed — the release on GitHub is the snapshot.
 download/
 
-# Generated verify.py reports (rebuild with `verify.py --suite config|all`)
+# Generated verify.py reports + doit gate stamps (rebuild with `doit build`)
 cad/out/reports/
 
 # Offline-render cache (regenerable: cad/scripts/export_models.py;
