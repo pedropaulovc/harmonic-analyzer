@@ -416,6 +416,24 @@ def _export_pngs(doc: Any, png_dir: Path, stem: str) -> int:
     return len(PNG_VIEWS)
 
 
+def _assert_configs_distinct(stem: str, crc_by_mesh: dict[str, str]) -> None:
+    """Every configuration of a multi-config part is distinct geometry by design
+    (cone-gear / transgear tooth counts all differ). Two configs hashing equal
+    means the per-config export captured a stale, un-rebuilt configuration -- fail
+    loud rather than ship a mislabelled mesh (the lazy-regenerate race that shipped
+    --t18 as 12-tooth in v0.5.1)."""
+    if len(crc_by_mesh) < 2:
+        return
+    seen: dict[str, str] = {}
+    for mesh, h in crc_by_mesh.items():
+        if h in seen:
+            raise RuntimeError(
+                f"{stem}: per-config STLs {seen[h]!r} and {mesh!r} are "
+                f"byte-identical -- the config switch did not rebuild before "
+                f"export; the mesh holds a stale configuration")
+        seen[h] = mesh
+
+
 def export_neutral(sw: Any, stage: Path) -> dict[str, Any]:
     """Export every built part and assembly to STEP + STL + PNGs under ``stage``.
 
@@ -484,6 +502,7 @@ def export_neutral(sw: Any, stage: Path) -> dict[str, Any]:
                 if not out.exists() or out.stat().st_size == 0:
                     raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={rc})")
             # one extra STL per referenced configuration (cone gears / transgears)
+            cfg_crc: dict[str, str] = {}
             for cfg, mesh in cfg_meshes.get(src.stem, ()):
                 # ShowConfiguration2 returns False when cfg is ALREADY active (the
                 # part opened in it -- e.g. transgear-removable saved with T18
@@ -491,11 +510,18 @@ def export_neutral(sw: Any, stage: Path) -> dict[str, Any]:
                 if _active_config(doc) != cfg and not doc.ShowConfiguration2(cfg) \
                         and _active_config(doc) != cfg:
                     raise RuntimeError(f"{src.name}: ShowConfiguration2({cfg!r}) failed")
+                # Config switches regenerate LAZILY: force a full rebuild so SaveAs3
+                # captures THIS config, not the prior one's stale tessellation (the
+                # race that shipped --t18 as 12-tooth geometry in v0.5.1).
+                doc.ForceRebuild3(False)
+                doc.EditRebuild3()
                 out = stl_dir / f"{mesh}.STL"
                 rc = doc.SaveAs3(str(out), 0, SW_SAVE_OPTS)
                 if not out.exists() or out.stat().st_size == 0:
                     raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={rc})")
+                cfg_crc[mesh] = _sha256(out)
                 cfg_done += 1
+            _assert_configs_distinct(src.stem, cfg_crc)
             pngs += _export_pngs(doc, png_root / src.stem, src.stem)
             _close_active_documents(sw)  # CloseDoc -> discards, never prompts
             if i % 10 == 0 or i == len(docs):
