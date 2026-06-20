@@ -6,12 +6,14 @@ origin; base top face at y = 50.8, drive height 76 above it):
 * cone set: a TRUE CONE -- all 20 gears AND the 64T crank-drive gear
   seated perpendicular to the stepped shaft (p.18/p.20 photos), the
   shaft inclined 21.1 deg in PLAN, big-end journal in the black pivot
-  post, thin 1/8" tip resting in the green knob post's U-slot.
+  post, thin 1/8" tip UNSUPPORTED for now (the cone is mis-positioned;
+  its small-end bracket is deferred to the cone-position rework, 2026-06-19).
 * cylinder drum: 20 identical 120T gears spinning freely on the
   stationary arbor along Z at (-47.5, 126.8) (M6.2 keyway refutation),
-  clamped by the south arbor pedestal and (at the north end) the
-  rocker-arm-support's boss bore in frame.SLDASM; notches up = cosine
-  setup (pp. 66-67).
+  carried by the SOUTH arbor pedestal; the arbor is shortened (200 -> 176) so
+  its north end clears the now-solid rocker-arm-portal (the old support boss
+  bore is gone), the north-end support deferred to the cone-position rework;
+  notches up = cosine setup (pp. 66-67).
 * crankshaft along Z in the green crank pedestal: crank arm + handle at
   the front, the T12 removable chain wheel (ch. 23: the bead chain
   rides the removable's m2 teeth -- swapping removables changes the
@@ -236,8 +238,14 @@ X_CRANK = (
 # crankshaft moved well inboard of the old +118 (the +122 pedestal photo no
 # longer holds; flagged in DIMENSIONS.md as a 62.2-anchor consequence)
 
-ARBOR_LENGTH = 196.0  # spans z -98..+98 (M6.9: 1.0 clear of the a-frame
-# plate back face -99; north end keeps 23.9 in the support boss bore)
+ARBOR_SOUTH_Z = -98.0  # arbor south end: 1.0 clear of the portal south-plate
+# back face -99 (= cylinder-gear-shaft origin, placed by its south end).
+ARBOR_LENGTH = 176.0  # shortened from 200 (2026-06-19): the now-solid portal
+# north upright occupies the arbor's old north reach, so the arbor stops at
+# z -98+176 = +78, clearing the frustum south face (~+85.6 at the drive axis
+# y 126.8) by ~7.6 and still covering the drum stack (north end z +70.6). North
+# end unsupported for now -- the north pedestal is DEFERRED to the cone-position
+# rework. Must match cylinder-gear-shaft SHAFT_LENGTH.
 CRANKSHAFT_Z0 = -150.0  # front end; crank-arm hub at +12 (PIN_HOLE_HEIGHT)
 CRANKSHAFT_LENGTH = 120.0  # build_crankshaft.py SHAFT_LENGTH
 CRANK_ARM_Z0 = CRANKSHAFT_Z0 + 8.0  # hub centre 12 - half thickness 4
@@ -249,10 +257,10 @@ REMOVABLE_Z0 = -85.6  # mounted T12 (face 5.0) against the pedestal north face:
 # chain rides its m2 teeth; v2_gears_010 shows the small steel wheel on the
 # crank pedestal), band -85.6..-80.6
 PEDESTAL_Z = -108.6  # crank pedestal centre (front face inside base edge)
-ARBOR_PEDESTAL_Z = 90.5  # south (-z) end only; north end clamps into the
-# rocker-arm-support boss bore at z 74.1..133 (frame.SLDASM, M6.5).
-# M6.9: 92 -> 90.5 so the block front face -98.5 clears the a-frame
-# plate back face -99 by 0.5 (the portal-frame thickening)
+ARBOR_PEDESTAL_Z = 90.5  # SOUTH end only (at z -90.5): the rocker support no
+# longer clamps the arbor, but the solid portal north upright leaves no room for
+# a north pedestal where the arbor's north end was. South block front face -98.5
+# clears the portal south-plate back face -99 by 0.5. North-end support deferred.
 
 # The pinion must sit fully on the crankshaft.
 if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
@@ -264,20 +272,13 @@ if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
 # engaging the first 9 mm of the journal bore (blind-bearing look,
 # p.18: the shaft end disappears into the black bracket).
 PIVOT_POST_STATION = -1.0
-# --- cone-knob-post placement: REMOVED 2026-06-19, pending rework -------------
-# The green Ø32 round tip-rest post (p.18) no longer fits the rescaled north
-# region at OD 62.2 -- the SAME cramped channel that forced out the alignment
-# pinion. The cone shaft tip sits at machine x ~+19.2; the post's Ø32 body
-# reaches +35.2, but the rocker-arm-support frustum's west base is at x +28.45
-# (~9 mm of room for a 16 mm radius). It cannot be re-stationed (higher station
-# slides -x but the 1/32" shaft tip ends at station 190, only ~9 mm out, while
-# moving the post the ~45 mm needed would run it off the tip; lower station digs
-# into the gear stack), narrowed (Ø32 is the p.18 spec), or moved off-axis
-# (it would no longer cup the shaft tip). It carries NO mate -- the cone shaft's
-# revolute is in the pivot-post (below) -- so dropping the placement frees no DOF
-# and breaks nothing; build_cone_knob_post.py + its registry entries stay so the
-# part still builds, ready to re-place once the north region is reworked.
-# Was: KNOB_POST_STATION = SHAFT_T120_STATION + 19*SEAT_PITCH + CONE_FACE/2 + 18.5
+# --- cone small-end support: DEFERRED to the cone-position rework -------------
+# The old green Ø32 round tip-rest post (cone-knob-post, p.18) never fit the
+# rescaled north region at OD 62.2 and was retired. A dedicated small-end bracket
+# is the right fix, but the cone is currently mis-positioned and the whole north
+# drive region will be re-laid out; placing a bracket now (against the wrong cone
+# axis) only collides with the solid portal, so the cone tip is left unsupported
+# until that rework (2026-06-19).
 
 # --- alignment pinion: REMOVED 2026-06-18 ---------------------------
 # The 42T zeroing pinion no longer fits the rescaled frame at OD 62.2:
@@ -348,17 +349,20 @@ async def build(adapter) -> dict[str, str]:
     # rig are the fixed reference frame the moving train mates against.
     arbor = await place_component(
         adapter, "cylinder-gear-shaft",
-        [X_DRUM, Y_DRIVE, -ARBOR_LENGTH / 2.0],
+        [X_DRUM, Y_DRIVE, ARBOR_SOUTH_Z],
         [90.0, 0.0, 0.0], ROT_X_POS90, label="cylinder arbor",
     )
     pedestal = await place_component(
         adapter, "crank-pedestal",
         [X_CRANK, Y_BASE_TOP, PEDESTAL_Z], [0.0, 0.0, 0.0], IDENTITY,
     )
-    # South pedestal only (M6.5): the arbor's north end clamps into the
-    # rocker-arm-support's east-flank boss bore (frame.SLDASM) - the back
-    # view (p5) shows the drum running straight into that casting, and a
-    # pedestal at z +92 cannot coexist with the frustum footprint.
+    # South arbor pedestal only (2026-06-19): the rocker support's arbor-clamp
+    # boss is gone with the portal unification, AND the now-solid portal north
+    # upright occupies the space the arbor's north end used to pass through. The
+    # arbor is shortened to clear the portal (ARBOR_LENGTH) and its north end is
+    # left unsupported for now -- the dedicated north-end support (pedestal) and
+    # the cone small-end bracket are DEFERRED to the cone-position rework, since
+    # the cone is currently mis-positioned and that region will be re-laid out.
     await place_component(
         adapter, "arbor-pedestal",
         [X_DRUM, Y_BASE_TOP, -ARBOR_PEDESTAL_Z], [0.0, 0.0, 0.0], IDENTITY,
@@ -374,8 +378,8 @@ async def build(adapter) -> dict[str, str]:
         [ppost[0], Y_BASE_TOP, ppost[2]], [0.0, -INCLINE_DEG, 0.0], ROT_Y_INCLINE,
         ground=False, label="cone-pivot-post (swing bracket, engaged rest)",
     )
-    # cone-knob-post placement removed (see note above KNOB_POST_STATION): the
-    # Ø32 tip-rest post does not fit the rescaled north region at OD 62.2.
+    # (cone small-end support deferred to the cone-position rework -- see the
+    # note above PIVOT_POST_STATION; the cone tip is unsupported for now.)
 
     # =================== cone cluster (driven, on-solution) ====================
     cone_shaft = await place_component(

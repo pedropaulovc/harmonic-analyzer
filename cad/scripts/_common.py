@@ -1041,10 +1041,9 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     "summing-lever": "x0",
     "magnifying-bracket": "x0",
     "pen-hanger": "x0",
-    # M6.9: the portal-frame rails killed the local-z symmetry the old
-    # "z" entry relied on (Ry180 stand-in flipped the rails south, 1937
-    # mm^3 into the measuring stick) -> re-authored machine-handed
-    "a-frame": "x0",
+    # rocker-arm-portal (the unified support casting) is authored machine-handed
+    # and lives in the non-mirroring frame.SLDASM -> NO mirror entry (it replaced
+    # the old split rocker-arm-support + a-frame "x0" pair, 2026-06-19).
     # M6.10 fasteners: authored in final orientation (axis along Y or Z),
     # exactly symmetric about local x = 0; explicit c, no STL at first build
     "hex-bolt": ("x", 0.0),

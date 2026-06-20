@@ -1,10 +1,10 @@
 r"""Reproduction script: frame subassembly (book ch. 6 / eight-views).
 
 Static structure of the machine: the two-plate cast base, four smooth
-polished columns at the corners, the north tapered support frustum that
-carries the back end of the rocker-pivot shaft, and the top-frame ring
-capping the columns -- column tops flush with the ring's top face at
-1040.7 (M6.8 8-view pass: no stub above).
+polished columns at the corners, the rocker-arm-support PORTAL FRAME that
+carries the rocker-pivot shaft, and the top-frame ring capping the columns
+-- column tops flush with the ring's top face at 1040.7 (M6.8 8-view pass:
+no stub above).
 
 Layout (from the ch. 6 dimension photo and the ch. 30 eight views; assembly
 axes follow the harmonic-base part: X = 46 cm length, Y = up, Z = 28 cm
@@ -14,27 +14,31 @@ depth):
 * tube-frame x4 standing on the base top face near the top-plate corners,
   centres at (+/-197, +/-112) — 25.25/21.35 mm inset from the top-plate
   edges (eight views: columns sit at the extreme corners).
-* rocker-arm-support x1 (solid tapered frustum, M6.3 re-authoring;
-  M6.9 side depth 40 -> 20 per ch30 p008) at (X, Z) = (+72.9, +101.6) -
-  the BACK support only: its apex carries the north pivot ball mount
-  (channel.SLDASM) and its west-flank boss clamps the cylinder-arbor
-  north end (drive-train.SLDASM). Z anchored by the pivot ball at
-  +101.6. The CHANNEL AXIS runs along Z. The frustum is the NORTH
-  upright of the rocker-support portal frame the ch30 p008 view shows
-  (M6.9): the SOUTH upright is the transgear A-frame at z -111, which
-  grips the south pivot ball and carries the frame's top/foot rails
-  (output.SLDASM, build_a_frame.py). M6.5's refutation of a second
-  free-standing south frustum stands. The M6.1 windowed-gate placement
-  at X = 0 was already superseded: the pivot x = arbor 47.5 plus the
-  25.4 rod lever = 72.9 (DIMENSIONS.md ch. 14 layout, M6.8-mirrored).
+* rocker-arm-portal x1 (single green cast WINDOWED PORTAL FRAME,
+  build_rocker_arm_portal.py) at (X, Z) = (+72.9, +101.6) - the north
+  frustum centre. Two tapered triangular uprights (north z +101.6, south
+  z -111) tied by a top rail (under the ball-mount seats) and a foot rail
+  (on the base), open window between. The north apex carries the north
+  pivot ball mount and the south clevis the south ball mount (both
+  channel.SLDASM); the CHANNEL AXIS runs along Z. This supersedes the
+  former two-part split (rocker-arm-support frustum here + a-frame upright
+  in output.SLDASM) - one casting, re-derived from the ch30 side views
+  (2026-06-19). The old arbor-clamp boss is GONE (the cone/arbor no longer
+  rests on the support; the arbor is shortened to clear the solid portal and
+  is carried by its south pedestal only, drive-train.SLDASM, with the north-end
+  support deferred to the cone-position rework). The pivot x = arbor 47.5 + 25.4 rod lever = 72.9
+  (DIMENSIONS.md ch. 14 layout, M6.8-mirrored).
 * top-frame x1: the green ring at ring mid-plane Y = 1020.2 (rails 22 x
   41, y 999.7..1040.7), corner bosses bored around the four columns; its
   west rail seats the top-lever ball mounts (channel.SLDASM).
-* lag-screw x2 (M6.10 fasteners): the rocker-arm-support hold-downs,
-  coming UP through the base from below -- heads recessed in the base
-  underside's counterbores (y 0.5..4.5 in the O15 x 4.5 pockets), O7.8
-  shanks through the base's O8.2 holes and 19.7 into the support's
-  O7.94 x 25 sockets (tips at y 70.5).
+* lag-screw x2 (M6.10 fasteners): the NORTH upright hold-downs, coming
+  UP through the base from below -- heads recessed in the base underside's
+  counterbores (y 0.5..4.5 in the O15 x 4.5 pockets), O7.8 shanks through
+  the base's O8.2 holes and 19.7 into the support's O7.94 x 25 sockets
+  (tips at y 70.5).
+* hex-bolt x2 (M6.10 fasteners): the SOUTH foot-rail hold-downs (moved
+  here from output.SLDASM with the rails), at (X, Z) = (+74.75, -54 / +36),
+  heads on the rail top (y 70.8), shanks descending into the base.
 
 Every component is fixed (base) or fully defined by three orthogonal
 plane-plane mates against the base part's principal planes; distance-mate
@@ -81,6 +85,13 @@ SUPPORT_Z = 133.35 - 63.5 / 2.0  # 101.6: outer face flush w/ top plate edge
 LAG_SCREW_X = (SUPPORT_X - 31.75, SUPPORT_X + 31.75)  # 41.15 / 104.65: the
 # support's mounting-hole pitch (base HOLE_XZ[2:] / counterbores match)
 LAG_SCREW_Y = 4.5  # under-head face = counterbore top; head 0.5..4.5
+# South foot-rail hold-down hex bolts (moved here from output.SLDASM with the
+# rails: the foot rail now belongs to rocker-arm-portal in this assembly).
+# Heads on the rail top (y 70.8), Ø7.8 shanks descending into the base; authored
+# machine-handed at x +74.75 (frame does NOT mirror), the bolt being x-symmetric.
+HEX_BOLT_X = 74.75
+HEX_BOLT_Y = 70.8
+HEX_BOLT_Z = (-54.0, 36.0)  # rail quarter points (machine z)
 TOP_FRAME_MID_Y = 1020.2  # ring mid-plane: rails y 999.7..1040.7 (M6.3)
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
@@ -98,7 +109,7 @@ async def build(adapter) -> dict[str, str]:
 
     base_path = _part("harmonic-base")
     column_path = _part("tube-frame")
-    support_path = _part("rocker-arm-support")
+    support_path = _part("rocker-arm-portal")
     top_frame_path = _part("top-frame")
 
     check("create_assembly", await adapter.create_assembly())
@@ -131,14 +142,20 @@ async def build(adapter) -> dict[str, str]:
         )
         assert_component_placed(adapter, name, target, IDENTITY)
 
-    # Rocker-pivot support frustum at the BACK channel-stack end (north
-    # only, M6.5), apex under the pivot shaft at x = +72.9 (M6.8 mirror;
-    # the part's boss is on its west flank, so identity placement holds).
+    # Rocker-pivot support: the single windowed PORTAL FRAME (north + south
+    # tapered uprights + top/foot rails, build_rocker_arm_portal.py). Authored
+    # machine-handed with its local origin at the north frustum base centre, so
+    # it inserts here at the SAME transform the former two-part split used:
+    # apex/north centre at machine (x, z) = (+72.9, +101.6), feet on the base
+    # top. Its north apex carries the north pivot ball mount and its south clevis
+    # the south ball mount (both channel.SLDASM). The old arbor-clamp boss is
+    # gone (the arbor is shortened to clear the solid portal, carried by its
+    # south pedestal only; north-end support deferred to the cone rework).
     target = [SUPPORT_X, BASE_TOP_Y, SUPPORT_Z]
     res = await adapter.insert_component(
         InsertComponentParameters(file_path=support_path, position=target)
     )
-    check(f"insert_component rocker-arm-support @ {target}", res)
+    check(f"insert_component rocker-arm-portal @ {target}", res)
     name = res.data["name"]
     await plane_distance_mate(
         adapter, name, "Right Plane", "Right Plane", base_name, SUPPORT_X, target
@@ -170,6 +187,28 @@ async def build(adapter) -> dict[str, str]:
         )
         await plane_distance_mate(
             adapter, name, "Top Plane", "Top Plane", base_name, LAG_SCREW_Y, target
+        )
+        assert_component_placed(adapter, name, target, IDENTITY)
+
+    # South foot-rail hold-down hex bolts (M6.10): heads on the rail top, axis
+    # +Y, x-symmetric -> the column-style plane-mate triple pins them at
+    # identity (same idiom as the lag screws).
+    hex_path = _part("hex-bolt")
+    for hz in HEX_BOLT_Z:
+        target = [HEX_BOLT_X, HEX_BOLT_Y, hz]
+        res = await adapter.insert_component(
+            InsertComponentParameters(file_path=hex_path, position=target)
+        )
+        check(f"insert_component hex-bolt @ {target}", res)
+        name = res.data["name"]
+        await plane_distance_mate(
+            adapter, name, "Right Plane", "Right Plane", base_name, HEX_BOLT_X, target
+        )
+        await plane_distance_mate(
+            adapter, name, "Front Plane", "Front Plane", base_name, hz, target
+        )
+        await plane_distance_mate(
+            adapter, name, "Top Plane", "Top Plane", base_name, HEX_BOLT_Y, target
         )
         assert_component_placed(adapter, name, target, IDENTITY)
 

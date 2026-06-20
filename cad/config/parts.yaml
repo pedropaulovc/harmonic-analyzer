@@ -10,11 +10,6 @@ defaults:
   revision: A
   confidence: med
 parts:
-  a-frame:
-    number: MHA-001
-    material: Gray Cast Iron
-    tolerance_class: machined_block
-    process: "cast + machined"
   amplitude-bar:
     number: MHA-003
     material: Plain Carbon Steel
@@ -81,11 +76,6 @@ parts:
     tolerance_class: machined_block
     fit_class: shaft_in_bushing
     process: "machined (steel)"
-  cone-knob-post:
-    number: MHA-015
-    material: Gray Cast Iron
-    tolerance_class: machined_block
-    process: "cast + machined"
   cone-pivot-post:
     number: MHA-016
     material: Plain Carbon Steel
@@ -353,8 +343,8 @@ parts:
     material: Plain Carbon Steel
     tolerance_class: machined_block
     process: "machined (steel)"
-  rocker-arm-support:
-    number: MHA-072
+  rocker-arm-portal:
+    number: MHA-088
     material: Gray Cast Iron
     tolerance_class: machined_block
     process: "cast + machined"

@@ -20,13 +20,13 @@ z_j = -67.1 + 7.0565 j; the output side is -Z). 123 components (59 placed
   face-flush on the rails, platen-rack on its back (teeth down, meshing
   the rack pinion with 0.3 backlash and tooth-on-gap phasing), two
   platen-clips on the paper face.
-* Transgear group (ch. 23 topology, M6.8): a-frame (M6.5: its clevis
-  grips the SOUTH PIVOT BALL MOUNT from channel.SLDASM - the front stand
-  doubles as the rocker-shaft support; ball-mount seat at machine 228.6;
-  M6.9: the part also carries the portal-frame top/foot rails running
-  north to 0.25 short of the rocker-arm-support frustum in frame.SLDASM)
-  + pinion-bar (y 253.5, z -105..-117, x -58..+178: west end floats just
-  east of the clevis), transgear-stub carrying rack-pinion (96T disc) +
+* Transgear group (ch. 23 topology, M6.8): the rocker-support A-frame that
+  used to live here is now part of the single rocker-arm-portal casting in
+  frame.SLDASM (its south clevis grips the south pivot ball mount,
+  channel.SLDASM, seat at machine 228.6; it carries the portal top/foot
+  rails). What remains here: pinion-bar (y 253.5, z -105..-117, x -58..+178:
+  west end floats just east of where the clevis sits, never mated to it),
+  transgear-stub carrying rack-pinion (96T disc) +
   latch big hub; the latch (c2c 66.05, ch30 rest state) carries the knob
   shaft with the mounted T24 removable CHAIN-WRAPPED at the drive-train
   chain plane (the roller chain rides the removable's m2 teeth -- that is
@@ -39,11 +39,9 @@ z_j = -67.1 + 7.0565 j; the output side is -Z). 123 components (59 placed
 * Loose hardware on the base top: measuring-stick, one spare
   transgear-removable (T18 -- the T24 is mounted on the knob shaft;
   the T12 rides the crankshaft in drive-train.SLDASM).
-* M6.10 fasteners (14): two hex-bolts down through the a-frame foot
-  rail into the base, four fillister screws holding the platen clips
-  (into the platen's blind sockets), two more up through the
-  magnifying-bracket flange, five pinch screws in the column clamps
-  (backed out), and the pen-hanger screw from behind the wheel bar.
+* M6.10 fasteners (10): four fillister screws holding the platen clips
+  (into the platen's blind sockets), five pinch screws in the column
+  clamps (backed out), and the pen-hanger screw from behind the wheel bar.
   All five fastener parts are authored in their final machine
   orientation and are x-symmetric (MIRROR_PLANE "x0"), so IDENTITY
   inserts work everywhere; the flange pair turns +Z -> +Y with
@@ -275,8 +273,8 @@ SET_SCREW_POS = (-38.0, 413.0, -154.0)
 
 # --- loose hardware ----------------------------------------------------------
 STICK_POS = (-100.0, 53.8, 123.5)  # flat on the base, graduations up; loose tool.
-# Parked in the BACK band, between the rocker-arm-support (z-max 121.6) and the
-# back plate edge (133.35), clear for 320 mm in x: Rx+90 footprint post-mirror
+# Parked in the BACK band, between the rocker-arm-portal north frustum (z-max
+# 121.6) and the back plate edge (133.35), clear for 320 mm in x: Rx+90 footprint post-mirror
 # x -100..100, z 123.5..131.5, ~1.9 mm box gaps to the frustum and plate edge.
 SPARE_GEAR_POS = (-160.0, 55.8, -15.0)  # plan circle r 26 (T24 OD 52,
 # conservative for the T18) about (-160, -15): the ch25 pinion rig now
@@ -286,10 +284,7 @@ SPARE_GEAR_POS = (-160.0, 55.8, -15.0)  # plan circle r 26 (T24 OD 52,
 # (x <= -179) only start beyond z +-94
 
 # --- M6.10 fasteners ----------------------------------------------------------
-# A-frame foot-rail hex bolts: machine x +74.75 (the rail's BOLT_HOLE_X),
-# heads on the rail top (y 70.8), O7.8 shanks descending through the rail
-# and 12 into the base's O8.2 through holes.
-HEX_BOLT_Z = (-54.0, 36.0)
+# (The A-frame foot-rail hex bolts moved to frame.SLDASM with the foot rail.)
 # Platen-clip screws: each clip's own O3.0 end holes land at pre-mirror
 # (clip_pos_x - 5, 320/429) after its Rz(+90); under-head face on the clip
 # front (-144.1), O2.9 shank through the 1.2 strip and 2.8 into the
@@ -783,8 +778,9 @@ async def build(adapter) -> dict[str, str]:
                     label="platen-paper locked to platen")
 
     # --- transgear group ------------------------------------------------------
-    await _place(adapter, "a-frame", [0.0, 50.8, -111.0],
-                 [0.0, 0.0, 0.0], IDENTITY)
+    # (The rocker-support A-frame that used to stand here is now part of the
+    # single rocker-arm-portal casting in frame.SLDASM; the pinion-bar west end
+    # floats and was never mated to it, so it is simply gone from this assembly.)
     await _place(adapter, "pinion-bar", [PINION_AXIS[0], PINION_AXIS[1], -111.0],
                  [0.0, 0.0, 0.0], IDENTITY)
     # Rx(-90): stud +Y -> -Z; shaft z -101.5..-137.5, collar to -141.5.
@@ -891,10 +887,7 @@ async def build(adapter) -> dict[str, str]:
                  label="transgear-removable (spare T18)")
 
     # --- fasteners (M6.10) ----------------------------------------------------
-    for z in HEX_BOLT_Z:
-        await _place(adapter, "hex-bolt", [-74.75, 70.8, z],
-                     [0.0, 0.0, 0.0], IDENTITY,
-                     label=f"hex-bolt (a-frame rail z{z:+.0f})")
+    # (A-frame foot-rail hex bolts moved to frame.SLDASM with the foot rail.)
     for x, y in CLIP_SCREW_XY:
         await _place(adapter, "fillister-screw", [x, y, PLATE_FRONT_Z - 1.2],
                      [0.0, 0.0, 0.0], IDENTITY,
