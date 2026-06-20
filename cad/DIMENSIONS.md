@@ -181,10 +181,15 @@ to top = cosine mode; rotated 90° = sine mode (pp. 66–67).
 M4 build (`build_cylinder_gear.py`): single non-configured part — 120T involute
 ring (cone-gear equation-curve technique, toothed-disc volume reproduces the
 cone gear's T120 configuration), integral cam boss (lobe −Y), plain bore
-through gear and cam, alignment notch at +Y. Notch width is unstated in
-the book — modeled square (3 mm wide × 3 mm deep, low confidence). The
-standalone `eccentric-cam` part (M2 legacy re-author) is superseded by the
-integral cam for assembly purposes.
+through gear and cam, alignment notch at +Y. The book states only the notch
+**depth** (3 mm); the p.23 close-up labelled "notch" shows the mark as a thin
+radial **slit** — in effect one missing tooth, not a square pocket — so it is
+modeled as a 1 mm-wide slit (≈0.6× the 1.63 mm tip pitch), centred on the +Y
+tooth crest (90° = 30·γ at 120 T). This SUPERSEDES the former 3 mm square
+(width estimated = depth, low). The standalone `eccentric-cam` part (M2 legacy
+re-author) is superseded by the integral cam for assembly purposes. A CadQuery
+stand-in (`build_cylinder_gear_cadquery.py`) reproduces the same geometry head-
+less (STEP/STL + render) for environments without a live SolidWorks seat.
 
 **M6.2 keyway refutation (kinematic proof):** cylinder gear k turns k/80
 rev per crank (ch. 29 gear law) — every gear at a DIFFERENT speed — so the

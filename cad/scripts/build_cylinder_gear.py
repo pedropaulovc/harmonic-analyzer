@@ -23,9 +23,12 @@ Features, in order:
    lobe clears the finer tooth-root circle), boss-extruded z = 3..6.5 from an offset reference
    plane (the cam shares the layout of the superseded standalone
    ``build_eccentric_cam.py``: lobe -Y).
-4. Alignment notch: 3 mm deep square notch (width estimated = depth) cut
-   into the gear rim at +Y ("notches aligned to top = cosine mode",
-   pp. 66-67) -- gear face only, after the pattern so it is not replicated.
+4. Alignment notch: 3 mm deep radial SLIT (one missing tooth -- the p.23
+   "notch" photo shows a thin saw-kerf mark, not a square pocket) cut into
+   the gear rim at +Y ("notches aligned to top = cosine mode", pp. 66-67).
+   +Y (90 deg = 30*gamma) is a tooth crest at 120 T, so the slit reads as a
+   single missing tooth. Gear face only, after the pattern so it is not
+   replicated.
 5. Plain shaft bore 3/8" through gear + cam, on the gear axis. No keyway:
    gear k turns k/80 rev per crank turn (ch. 29 gear law), so the 20 gears
    all spin at DIFFERENT speeds and cannot be keyed to a common shaft --
@@ -85,7 +88,11 @@ ECCENTRICITY = 3.06  # DIMENSIONS.md ch13: cam eccentricity, scaled 0.6022 (5.08
 # rocker stroke shrinks proportionally (user-directed 2026-06-18) (low)
 BORE_DIAMETER = 0.375 * IN  # 9.525 DIMENSIONS.md ch13: cam bore (legacy, med)
 NOTCH_DEPTH = 3.0  # DIMENSIONS.md ch13: alignment notch depth, text p.22 (high)
-NOTCH_WIDTH = 3.0  # DIMENSIONS.md ch13: square notch, width estimated = depth (low)
+# The notch is "just a slit" -- the p.23 photo labelled "notch" shows a thin
+# radial cut (one missing tooth), NOT a square pocket. The book states only the
+# 3 mm depth; the slit width is modeled at ~0.6x the 1.63 mm tip pitch so the
+# mark reads as a single missing tooth (low; supersedes the legacy 3.0 square).
+NOTCH_WIDTH = 1.0  # DIMENSIONS.md ch13: alignment-notch slit width (low)
 
 BORE_RADIUS = BORE_DIAMETER / 2.0
 
@@ -237,7 +244,8 @@ async def build(adapter) -> dict[str, str]:
     print(f"  OK  cam placement: COM y {com[1]:.3f} z {com[2]:.3f}")
 
     # ------------------------------------------------------------------
-    # Alignment notch at +Y (top = cosine mode), gear face only.
+    # Alignment notch at +Y (top = cosine mode): a thin radial SLIT (one
+    # missing tooth, per the p.23 "notch" photo), gear face only.
     # ------------------------------------------------------------------
     check("create_sketch notch", await adapter.create_sketch("Front"))
     # Inference OFF: with it on, the bottom corners snap coincident onto the
