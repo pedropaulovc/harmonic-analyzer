@@ -26,10 +26,17 @@ and measure the channel-lever's rotation. Lever span > 0 => the gear transmits
 from __future__ import annotations
 
 import asyncio
-import math
 import sys
 
-from _common import OUT_PNG, coincident_mate, gear_mate, log, named_ref
+from _common import (
+    OUT_PNG,
+    log,
+)
+from _assembly import (
+    coincident_mate,
+    gear_mate,
+    named_ref,
+)
 from build_motion_study import (
     OUT_SLDASM, _by_z_rank, _comp_xform, _components, _entity_ref, _find_one,
     _rot_angle, _sub_model, _suppress_channel,
