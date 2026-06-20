@@ -70,10 +70,21 @@ Gates produce no CAD artefact, so each writes a stamp under `cad/out/reports/`
 (`verify-*.ok` / `check-*.ok`) as its doit target — re-runs only when a `file_dep`
 changes. `cad/out/` is gitignored.
 
-## Deferred (not yet implemented)
+## Release-diff parallelism
 
-- `transcode:<stem>` — split BMP capture from Pillow transcode.
-- `diff:<stem>` — per-changed-part render fan-out, extracted from `cut_release`.
+`comparisons/tools/render_diff.py` (the SolidWorks-free diff `cut_release` runs)
+parallelizes its per-mesh Hausdorff classification across a process pool
+(`--jobs`, default auto). `cut_release` benefits with no change. `--jobs 1`
+forces serial (debugging / a fallback if the spawn-mode pool misbehaves).
 
-Both are SolidWorks-free parallel wins but touch `_common.py` / `cut_release.py`
-internals; land them only when runnable against a real SolidWorks seat.
+## Considered but NOT done (with reasons)
+
+- **`transcode:<stem>` — dropped.** The build writes PNGs via a single COM
+  `export_image()` call (`_common.save_part_and_images`); there is no separable
+  Pillow/BMP step in the build path to move off the seat, so there is nothing to
+  parallelize. (BMP→Pillow transcode exists only in `cut_release._export_pngs`,
+  inside the already-serial release job — not worth extracting.)
+- **`diff:<stem>` per-part doit fan-out — not a fit.** `render_diff` renders the
+  *whole* assembly in 4 views, not per-part images; the expensive, parallelizable
+  work is the Hausdorff loop, which is now parallelized inside the script (above)
+  rather than as separate doit tasks.
