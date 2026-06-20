@@ -179,6 +179,20 @@ def world_point(adapter: Any, name: str, local_mm: list[float]) -> list[float]:
         for k in range(3)
     ]
 
+def component_origin(adapter: Any, name: str) -> list[float]:
+    """A component's current origin (mm) in the assembly frame."""
+    a = component_transform(adapter, name)
+    return [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
+
+def part_path(part: str) -> str:
+    """Resolve ``<part>.SLDPRT`` under the part-output dir, or raise."""
+    path = (OUT_SLDPRT / f"{part}.SLDPRT").resolve()
+    if not path.exists():
+        raise RuntimeError(
+            f"missing part {path}; run build_{part.replace('-', '_')}.py first"
+        )
+    return str(path)
+
 def assert_component_placed(
     adapter: Any,
     name: str,
