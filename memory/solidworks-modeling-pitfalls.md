@@ -50,6 +50,22 @@ discovered during harmonic-analyzer M6.4:
   it gives "Parameter not optional". The default cut direction from a
   Top-plane sketch is **−Y**; pass Dir=True to cut +Y (verified live in
   `build_column_clamp.py`: the un-flipped cut removed the wrong band).
+- **Piecewise open splines don't close into a cut profile; a single closed
+  spline does** (nameplate cartouche, M26). Drawing a contour as several
+  `add_spline` (`CreateSpline2`, an interpolating fit-spline THROUGH the points)
+  open runs that merely SHARE exact endpoints does NOT merge them into a closed
+  region — `FeatureCut3/4` then fails with the same generic `-2147352561
+  "Parameter not optional"` (the legacy fallback's masked symptom of "no closed
+  profile"). Coincident-endpoint merge works for `add_line` chains (they reuse an
+  existing point) but NOT for spline endpoints, with `AddToDB` either on OR off.
+  Fix: draw each loop as ONE closed spline — `add_spline(points + [points[0]])`
+  (repeat the first vertex) closes by construction. To keep cusps sharp, let the
+  point-fit stay DENSE near the corners; the single periodic spline then tracks
+  X-terminals to ~0.15 mm (better than per-run open splines, which wiggle at the
+  not-a-knot ends). `_common.sketch_closed_splines` is the helper; the even-odd
+  cut fills mixed line-loops + closed-spline-loops in one sketch fine. The stored
+  point-loop's polygon area ≈ the closed-spline area to <0.3% (well inside the
+  cut's 2% volume gate), so area gates can keep using the polygon shoelace.
 - **Helix/spring volume gates need slack ∝ base volume**: helix-body
   tessellation noise in mass-property diffs is ~0.02–0.03% of the WHOLE
   part, which can dwarf a small added feature. `_common.add_spring_end_hooks`
