@@ -1,0 +1,68 @@
+flowchart TD
+    DOIT{{"dodo.py — single command: doit -n N<br/>content-hash DAG · cad/out/.doit.db"}}
+
+    subgraph COM["🔒 SolidWorks Zone — COM SPINE (linear task_dep ⇒ one seat at a time; subprocess-per-task unchanged)"]
+        direction TB
+        PART1["part:&lt;a&gt;"] ==> PART2["part:&lt;b&gt;"] ==> PARTN["… part:&lt;n&gt; (×91)"]
+        PARTN ==> ASM1["assembly:frame"] ==> ASM2["assembly:drive_train→<br/>channel→output"] ==> ASMT["assembly:harmonic_analyzer (TOP)"]
+        ASMT ==> VS["verify_static / verify_isolation /<br/>verify_motion (open models)"]
+        VS ==> EXP["export_step:&lt;doc&gt; · export_stl:&lt;doc&gt;<br/>export_boxes (SaveAs3, per-config)"]
+        EXP ==> PG["packandgo (IPackAndGo)<br/>+ SW-revision read"]
+    end
+
+    DOIT --> PART1
+    NOTE["══ heavy edges = task_dep spine ══<br/>only one COM task ever 'ready' ⇒<br/>seat never contended (no lock, no -n=1)"]:::note
+
+    subgraph CPU["⚡ SolidWorks-free Zone — PARALLEL under same -n N (no COM; hangs off real artifacts, not the spine)"]
+        direction TB
+        TRANS["transcode:&lt;stem&gt; (×91)<br/>Pillow BMP→PNG + trim"]
+        TRANSA["transcode_asm:&lt;stem&gt;"]
+        VT["verify_truth (Fourier math)"]
+        VC["verify_config (dims/tol audit)"]
+        VB["verify_buildgraph / gen_dimensions"]
+        CHK["tolerance_audit.csv"]
+        BOM["bom.csv"]
+        DIFF["diff:&lt;stem&gt; (×changed)<br/>render_diff.py — pyvista, Hausdorff<br/>(downloads prev release)"]
+    end
+
+    %% CPU tasks depend on real COM artifacts, NOT on the spine → free to run in parallel
+    PART1 -.->|"raw BMP"| TRANS
+    PARTN -.->|"raw BMP"| TRANS
+    ASMT  -.->|"raw BMP"| TRANSA
+    EXP -.->|"STL/STEP/boxes"| DIFF
+    EXP -.->|"boxes json"| BOM
+    EXP -.->|"STL"| CHK
+
+    %% release gate: every verify_* must be green
+    VS --> GATE{{"release gate: all verify_* green"}}
+    VT --> GATE
+    VC --> GATE
+    VB --> GATE
+
+    GATE --> PRE{"preflight (doit uptodate):<br/>tag free · tree clean ·<br/>TOP .SLDASM · boxes fresh + mm"}
+
+    subgraph RELZ["⚡ Release tasks — PARALLEL-eligible (no COM)"]
+        direction TB
+        BUNDLE["bundle (make_archive)<br/>solidworks+step+stl+boxes+png+diff"]
+        TAG["tag: git tag -a vX.Y.Z + push"]
+        GH["release: gh release create<br/>+ assets + notes"]
+        BUNDLE --> TAG --> GH
+    end
+
+    PRE -->|pass| BUNDLE
+    PG    -.->|"stage/solidworks"| BUNDLE
+    TRANS --> BUNDLE
+    TRANSA --> BUNDLE
+    DIFF --> BUNDLE
+
+    GH -.->|ASSET| OUT[("GitHub Release vX.Y.Z<br/>bundle.zip + diff PNGs<br/>notes: SHA · SW rev · inventory")]
+
+    classDef gate fill:#fff3cd,stroke:#d39e00,color:#000;
+    classDef serial fill:#f8d7da,stroke:#c0392b,color:#000;
+    classDef par fill:#d4edda,stroke:#28a745,color:#000;
+    classDef asset fill:#cce5ff,stroke:#004085,color:#000;
+    classDef note fill:#fbeee0,stroke:#b5651d,color:#000,font-style:italic;
+    class PG1,AG,GATE,PRE gate;
+    class PART1,PART2,PARTN,ASM1,ASM2,ASMT,VS,EXP,PG serial;
+    class TRANS,TRANSA,VT,VC,VB,CHK,BOM,DIFF,BUNDLE,TAG,GH par;
+    class OUT asset;
