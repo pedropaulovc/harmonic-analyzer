@@ -81,7 +81,7 @@ output:
     force solver. pen_trace_half_mm maps the (dimensionless-amplitude) computed
     curve onto a physical pen half-stroke; at pen_rest_crank_deg the pen sits at
     its build datum so the saved render pose is unchanged. verify.py --suite
-    motion sweeps CrankDeg and asserts the sampled tip matches truth_model.
+    kinematics sweeps CrankDeg and asserts the sampled tip matches truth_model.
 
 amplitude:                         # ch15 — the amplitude bars set the Fourier coefficients
   preset: square                   # the waveform the bar stations encode
