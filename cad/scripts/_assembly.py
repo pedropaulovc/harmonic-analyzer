@@ -865,11 +865,16 @@ def remap_front_to_machine_front(adapter: Any) -> None:
 async def _export_assembly_images(
     adapter: Any, asm_name: str, views: Iterable[str]
 ) -> dict[str, str]:
-    """Export PNG views to ``cad/out/png/<asm>`` and trim the README render.
+    """Export PNG views to ``cad/out/png/<asm>`` (gitignored build output).
 
     Factored out of :func:`save_assembly_and_images` so the refresh primitive
     (:func:`refresh_assembly`) shares the exact same export tail. Returns
-    ``{<view>: path, ["readme": path]}``; the caller adds the assembly path.
+    ``{<view>: path}``; the caller adds the assembly path.
+
+    Does NOT touch the committed ``docs/images`` README renders -- those are
+    refreshed deliberately via ``python cad/scripts/trim_renders.py`` and
+    committed on purpose, so a model build never dirties a tracked file (which
+    would otherwise block ``doit release``'s clean-tree preflight).
     """
     png_dir = OUT_PNG / asm_name
     png_dir.mkdir(parents=True, exist_ok=True)
@@ -890,12 +895,6 @@ async def _export_assembly_images(
         )
         artefacts[view] = str(img_path)
 
-    from trim_renders import trim_readme_render
-
-    trimmed = trim_readme_render(asm_name)
-    if trimmed:
-        print(f"  OK  trim README render {trimmed}")
-        artefacts["readme"] = trimmed.split(":")[0]
     return artefacts
 
 async def save_assembly_and_images(
