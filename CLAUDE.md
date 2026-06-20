@@ -14,20 +14,30 @@
 - You must use uv if using python tools
 
 ## Building the model
-- **`doit` (`dodo.py` at the repo root) is the build entrypoint** — it replaced the hand-rolled
-  `build_all.py` orchestrator (removed). Run it with the Windows SolidWorks build venv python
+- **`doit` (`dodo.py` at the repo root) is the single entrypoint for the WHOLE pipeline** —
+  build → verify → export → release. Run it with the Windows SolidWorks build venv python
   (`C:\src\SolidworksMCP-python\.venv\Scripts\python.exe -m doit`); SolidWorks must already be
-  open. Install once: `…\.venv\Scripts\python.exe -m pip install doit pillow` (pillow backs the
-  PNG export + README-render trim that both the full build and the refresh tail run).
+  open. Install once: `…\.venv\Scripts\python.exe -m pip install doit pillow pytest` (pillow
+  backs PNG export/trim; pytest backs the `check:*` unit tests).
+- **One safe entry: `doit build`** (= the default task) runs every part + assembly + EVERY
+  gate. `doit build_bare` is the quick parts+assemblies-only rebuild. `doit export` / `doit
+  release -- vX.Y.Z` are opt-in. Task groups are named by SolidWorks-dependence:
+  `verify:*` (soundness/subsystems/kinematics) and `part:`/`assembly:`/`export`/`release`
+  need SW; `check:*` (math/config/graph/nameplate/recipe) are SolidWorks-free.
 - **Refresh vs full.** doit hashes script + config content (immune to git/worktree mtime churn)
   and propagates a part → assembly DAG. When only a part changed, the dependent assembly is
   *refreshed* — reopen + per-config `ForceRebuild3` + health/DOF/interference gates + in-place
   `Save3` (seconds) — instead of a from-scratch re-insert/re-mate (~500 s). It escalates to a
-  *full* rebuild (+ engagement-config hooks) when the assembly script / `_common.py` / a hook
+  *full* rebuild (+ any post-assembly hooks) when the assembly script / `_common.py` / a hook
   changed, or the target is missing. Force a full rebuild of one assembly by deleting its
   `.SLDASM` target, then `doit assembly:<stem>`.
 - **Fail loud.** A refresh that hits a dangling mate, free DOF, or interference exits non-zero
   and leaves the `.SLDASM` untouched — never a stale artefact.
-- **Serial only — NEVER pass `-n`/`-P`** (doit's parallel flags). A single SolidWorks STA
-  session means parallel tasks deadlock the COM seat; `dodo.py` hard-fails if it sees them.
-  Corollary: never run two SolidWorks build scripts at once.
+- **Parallelism via the COM spine — `-n` is now SAFE.** A single SolidWorks STA seat still
+  means COM work must be serial, but `dodo.py` enforces that with a linear `task_dep` *spine*
+  through every COM task (parts → assemblies → verify:* → export → release), so at most one
+  COM task is ever runnable even under `doit -n N`. The SolidWorks-free `check:*` tasks sit
+  off the spine and fan out in parallel. Do NOT remove a COM task's spine edge or add a new
+  COM task without extending `_COM_TAIL`/`_spine_dep` in `dodo.py` (a gap would let two COM
+  tasks run at once and deadlock the seat). Corollary still holds: never launch two SolidWorks
+  build scripts by hand at once.
