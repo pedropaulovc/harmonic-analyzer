@@ -207,6 +207,12 @@ VERIFY_PY = (SCRIPTS_DIR / "verify.py").resolve()
 EXPORT_PY = (SCRIPTS_DIR / "export_models.py").resolve()
 RELEASE_PY = (SCRIPTS_DIR / "cut_release.py").resolve()
 
+# The gate suites, by SolidWorks-dependence -- the single source of truth for the
+# verify:/check: task names (reused by build + release so a new gate is wired in
+# one place).
+_VERIFY_NAMES = ("soundness", "subsystems", "kinematics")   # need SW (spine)
+_CHECK_NAMES = ("math", "config", "graph", "nameplate", "recipe")  # offline
+
 
 def _run_stamped(cmd: list[str], label: str, stamp: str) -> None:
     """Run a gate subprocess; on success write its stamp target. _run raises on
@@ -214,6 +220,39 @@ def _run_stamped(cmd: list[str], label: str, stamp: str) -> None:
     _run(cmd, label)
     Path(stamp).parent.mkdir(parents=True, exist_ok=True)
     Path(stamp).write_text(f"{label}\n", encoding="utf-8")
+
+
+def _digest_files(files: list[str]) -> str:
+    """md5 over the *content* of each file (sorted, name-tagged) -- the recipe
+    fingerprint shared by _RecipeTracker (the run/skip uptodate) and
+    build_or_refresh (the FULL/REFRESH decision), so the two never disagree."""
+    h = hashlib.md5()
+    for f in sorted(files):
+        h.update(f.encode())
+        try:
+            h.update(Path(f).read_bytes())
+        except OSError:
+            h.update(b"<missing>")
+    return h.hexdigest()
+
+
+def _recipe_files(stem: str) -> list[str]:
+    """Files whose change forces a FULL rebuild of <stem> (re-insert/re-mate)
+    rather than a part-only refresh: the assembly script, its hooks, and the
+    shared helper/_config/YAML data layer (a placement like
+    channels.station_pitch_mm changing must re-insert components at new
+    coordinates, which an in-place reload cannot do)."""
+    asm_script = script_for(stem)
+    hooks = [str((SCRIPTS_DIR / h).resolve()) for h in POST_ASSEMBLY.get(stem, ())]
+    return [str(asm_script.resolve()), *hooks, *_SHARED_BUILD_DEPS]
+
+
+def _recipe_sidecar(stem: str) -> Path:
+    """Sidecar holding the recipe digest of the last SUCCESSFUL build of <stem>,
+    next to the .SLDASM (cad/out, gitignored). build_or_refresh reads it so the
+    FULL/REFRESH decision needs no process-local state and stays correct under
+    ``doit -n`` workers (which may run the action in a separate process)."""
+    return CAD_OUT / "sldasm" / f".{stem.replace('_', '-')}.recipe.md5"
 
 
 def task_part():
@@ -241,8 +280,11 @@ def task_part():
 # / _common.py / hooks) with an ``uptodate`` callable modelled on doit's own
 # ``config_changed``: it compares an md5 of the recipe CONTENT against the value
 # saved on the last *successful* run (value_savers only fire on success), so a
-# failed task never corrupts it. It stashes the changed-bit into _RECIPE_CHANGED
-# for build_or_refresh to read in the same (serial) process.
+# failed task never corrupts it. It also stashes the changed-bit into
+# _RECIPE_CHANGED -- this drives the run/skip ``uptodate`` (and is asserted by
+# test_dodo_recipe). The FULL-vs-REFRESH decision itself no longer reads this
+# global: build_or_refresh recomputes it from an on-disk sidecar so it is correct
+# under ``doit -n`` process workers (codex review).
 _RECIPE_CHANGED: dict[str, bool] = {}
 
 
@@ -255,14 +297,7 @@ class _RecipeTracker:
         self.digest: str | None = None
 
     def _calc(self) -> str:
-        h = hashlib.md5()
-        for f in self.recipe_files:
-            h.update(f.encode())
-            try:
-                h.update(Path(f).read_bytes())
-            except OSError:
-                h.update(b"<missing>")
-        return h.hexdigest()
+        return _digest_files(self.recipe_files)
 
     def __call__(self, task, values):
         self.digest = self._calc()
@@ -280,23 +315,38 @@ def build_or_refresh(stem, dependencies, changed, targets):
     script). Otherwise only referenced parts changed: REFRESH (refresh_assembly.py,
     no hooks -- reopening preserves the existing configuration).
 
-    The recipe-changed bit comes from _RecipeTracker (uptodate), NOT doit's
-    ``changed`` arg -- the latter is corrupted by a prior failed task (D2).
+    The recipe-changed decision is recomputed HERE from a sidecar digest (the
+    last successful recipe digest), NOT read from the _RECIPE_CHANGED module
+    global: under ``doit -n`` the action may run in a worker process that never
+    saw the parent's global, which would force a spurious FULL on every stale
+    assembly and silently defeat the incremental refresh (codex review). The
+    sidecar is on disk (process-shared) and updated only on success. doit's own
+    ``changed`` arg is likewise avoided -- it is corrupted by a prior failed
+    task (D2).
     """
+    target_missing = not Path(targets[0]).exists()
+    digest = _digest_files(_recipe_files(stem))
+    sidecar = _recipe_sidecar(stem)
+    try:
+        last = sidecar.read_text(encoding="utf-8").strip()
+    except OSError:
+        last = None
+    recipe_changed = (last is None or last != digest)  # missing sidecar = FULL
+
     asm_script = SCRIPTS_DIR / f"build_{stem}_assembly.py"
     hooks = [SCRIPTS_DIR / h for h in POST_ASSEMBLY.get(stem, ())]
-
-    target_missing = not Path(targets[0]).exists()
-    recipe_changed = _RECIPE_CHANGED.get(stem, True)  # default FULL = fail-safe
-
     if target_missing or recipe_changed:
         why = "target missing" if target_missing else "recipe changed"
         _run([sys.executable, str(asm_script)], f"FULL build {stem} ({why})")
         for hook in hooks:
             _run([sys.executable, str(hook)], f"hook {hook.name}")
-        return
-    _run([sys.executable, str(SCRIPTS_DIR / "refresh_assembly.py"), stem],
-         f"REFRESH {stem}")
+    else:
+        _run([sys.executable, str(SCRIPTS_DIR / "refresh_assembly.py"), stem],
+             f"REFRESH {stem}")
+    # _run raised if the build failed, so we only get here on success: record this
+    # build's recipe digest for the next run's FULL/REFRESH decision.
+    sidecar.parent.mkdir(parents=True, exist_ok=True)
+    sidecar.write_text(digest + "\n", encoding="utf-8")
 
 
 def _close_sw_documents() -> None:
@@ -343,6 +393,7 @@ def _clean_assembly(stem):
     task's declared target, so a stale stretchNN body would otherwise be reused on
     the next build; codex review #4)."""
     _force_remove(Path(_sldasm(stem)))
+    _force_remove(_recipe_sidecar(stem))
     _force_remove(CAD_OUT / "png" / stem.replace("_", "-"))
     if stem == "channel":
         for variant in sorted(
@@ -360,18 +411,14 @@ def task_assembly():
     changed -> refresh).
     """
     for stem in ASSEMBLY_ORDER:
-        asm_script = script_for(stem)
-        hooks = [str((SCRIPTS_DIR / h).resolve()) for h in POST_ASSEMBLY.get(stem, ())]
         refs = references_of(stem)
         ref_targets = [
             _sldasm(r) if r in ASSEMBLY_ORDER else _sldprt(r) for r in refs
         ]
-        # Recipe = everything whose change needs a FULL rebuild (re-insert/re-mate),
-        # not a part-only refresh: the assembly script, its hooks, the helper
-        # modules, AND the _config/YAML data layer -- a placement like
-        # channels.station_pitch_mm changing means components must be re-inserted at
-        # new coordinates, which an in-place reload cannot do (codex review #2).
-        recipe_files = [str(asm_script.resolve()), *hooks, *_SHARED_BUILD_DEPS]
+        # Recipe = the files whose change forces a FULL rebuild (vs a part-only
+        # refresh) -- factored into _recipe_files so build_or_refresh computes the
+        # identical digest.
+        recipe_files = _recipe_files(stem)
         yield {
             "name": stem,
             "file_dep": [*recipe_files, *ref_targets],
@@ -403,9 +450,17 @@ def task_verify():
             str((SCRIPTS_DIR / "truth_model.py").resolve()),
         ],
     }
+    # Pass the graph's assemblies EXPLICITLY (dashed names) rather than letting
+    # verify.py glob every *.SLDASM under cad/out/sldasm -- a stray/scratch
+    # assembly left in a worktree must not be verified (codex review). kinematics
+    # targets only output (verify.py's own default), so it needs no names.
+    asm_names = [s.replace("_", "-") for s in ASSEMBLY_ORDER]
     for suite, deps in suite_deps.items():
         stamp = str(REPORTS / f"verify-{suite}.ok")
-        cmd = [sys.executable, str(VERIFY_PY), "--suite", suite]
+        cmd = [sys.executable, str(VERIFY_PY)]
+        if suite in ("soundness", "subsystems"):
+            cmd += asm_names
+        cmd += ["--suite", suite]
         yield {
             "name": suite,
             "file_dep": [str(VERIFY_PY), *deps],
@@ -426,18 +481,26 @@ def task_check():
     pytest. None is on the COM spine.
     """
     dims = str((REPO_ROOT / "cad" / "DIMENSIONS.md").resolve())
+    config_py = str((SCRIPTS_DIR / "_config.py").resolve())
+    # The tolerance audit (check:config) scans every build_*.py for PART_NAME, so a
+    # part script added/renamed without touching YAML/DIMENSIONS must still
+    # invalidate the stamp (codex review).
+    part_script_deps = [str(p.resolve()) for p in part_scripts()]
     pytest_cmd = [sys.executable, "-m", "pytest", "-q"]
     specs = {
         "math": {
+            # truth_model reads harmonics/phases/amplitudes/magnification from
+            # _config + the YAML layer, so those must invalidate the math stamp
+            # too (codex review).
             "file_dep": [str(VERIFY_PY),
-                         str((SCRIPTS_DIR / "truth_model.py").resolve())],
+                         str((SCRIPTS_DIR / "truth_model.py").resolve()),
+                         config_py, *_CONFIG_YAMLS],
             "cmd": [sys.executable, str(VERIFY_PY), "--suite", "math"],
         },
         "config": {
             "file_dep": [str(VERIFY_PY),
                          str((SCRIPTS_DIR / "gen_dimensions.py").resolve()),
-                         str((SCRIPTS_DIR / "_config.py").resolve()),
-                         dims, *_CONFIG_YAMLS],
+                         config_py, dims, *_CONFIG_YAMLS, *part_script_deps],
             "cmd": [sys.executable, str(VERIFY_PY), "--suite", "config"],
         },
         "graph": {
@@ -471,8 +534,11 @@ def task_check():
 def task_export():
     """Neutral-format export (STEP / STL / scene boxes). Needs SW; COM spine.
 
-    Wraps ``export_models.py`` (which self-checks per-file staleness). file_dep on
-    every part + assembly target; the spine edge keeps it after the verify gates.
+    Always runs ``export_models.py`` (``uptodate: False``) -- it self-checks every
+    output's per-file staleness cheaply and prints "all exports fresh" when there
+    is nothing to do. We do NOT gate on a single declared target: a deleted
+    STEP/STL/colors output (with the boxes JSON + CAD inputs unchanged) must still
+    be regenerated, which doit would otherwise skip (codex review).
     """
     target = str((CAD_OUT / "boxes" / "harmonic-analyzer.json").resolve())
     deps = ([_sldprt(s) for s in part_stems()]
@@ -481,6 +547,7 @@ def task_export():
         "file_dep": [str(EXPORT_PY), *deps],
         "targets": [target],
         "task_dep": _spine_dep("export"),
+        "uptodate": [False],
         "actions": [CmdAction([sys.executable, str(EXPORT_PY)], cwd=str(REPO_ROOT))],
         "verbosity": 2,
     }
@@ -497,10 +564,12 @@ def task_release():
 
     Publishing is a side effect (no doit target), so it always runs. Forward
     args after ``--``: ``doit release -- v0.2.0 --draft`` (default auto patch-bump).
-    Depends on ``export`` (and via the spine, every SW verify gate).
+    Gated on EVERY gate: ``export`` pulls the SW ``verify:*`` chain via the spine,
+    and the offline ``check:*`` gates are added explicitly so a release cannot
+    publish past a stale/failing math/config/unit-test gate (codex review).
     """
     return {
-        "task_dep": _spine_dep("release"),
+        "task_dep": [*_spine_dep("release"), *(f"check:{c}" for c in _CHECK_NAMES)],
         "uptodate": [False],
         "pos_arg": "relargs",
         "actions": [(_run_release,)],
@@ -521,9 +590,8 @@ def task_build():
         "task_dep": (
             [f"part:{s}" for s in part_stems()]
             + [f"assembly:{s}" for s in ASSEMBLY_ORDER]
-            + [f"verify:{s}" for s in ("soundness", "subsystems", "kinematics")]
-            + [f"check:{s}" for s in
-               ("math", "config", "graph", "nameplate", "recipe")]
+            + [f"verify:{s}" for s in _VERIFY_NAMES]
+            + [f"check:{s}" for s in _CHECK_NAMES]
         ),
     }
 
