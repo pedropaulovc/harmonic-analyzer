@@ -67,8 +67,17 @@ in `docs/motion-policy.md`, `cad/config/machine.yaml`, `.gitignore`. New dep:
 `task_dep`; `doit list --deps` builds with no cycle; `check:graph` / `check:nameplate`
 / `check:recipe` run green through doit with incremental stamps; `py_compile` clean.
 
-## Deferred (need a SolidWorks seat to validate)
+## Follow-up work (resolved)
 
-- `transcode:<stem>` — split BMP capture from Pillow transcode.
-- `diff:<stem>` — per-changed-part render fan-out extracted from `cut_release`
-  (the biggest release-time parallel win).
+The two items originally deferred turned out differently once the capture/diff
+internals were read:
+
+- **`transcode:<stem>` — dropped (not applicable).** The build writes PNGs with a
+  single COM `export_image()` call; there is no separable Pillow/BMP step in the
+  build path, so nothing to move off the seat. (The only BMP→Pillow transcode is
+  in `cut_release._export_pngs`, inside the already-serial release job.)
+- **Release diff — parallelized in place.** `render_diff` renders the whole
+  assembly (4 views), so a per-part doit fan-out doesn't fit. Instead its
+  CPU-bound, mutually independent per-mesh Hausdorff classification now runs
+  across a process pool (`--jobs`, default auto). `cut_release` benefits with no
+  change; validated offline (serial == parallel results).
