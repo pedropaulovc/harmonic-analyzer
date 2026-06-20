@@ -358,6 +358,10 @@ cad/out/step/
 cad/out/boxes/
 # Changed-parts diff renders (regenerable: comparisons/tools/render_diff.py)
 cad/out/diff/
+# Parts BOM (regenerable build output: build_harmonic_analyzer_assembly.py;
+# write-only, no repo consumer — keeping it tracked dirtied the tree on every
+# build and blocked doit release's clean-tree preflight)
+cad/out/harmonic-analyzer-bom.csv
 
 # Mesa OSMesa software-GL DLL fetched on demand for headless VTK rendering
 # (comparisons/tools/osmesa_win.py; ~55 MB, regenerable from pal1000/mesa-dist-win)
