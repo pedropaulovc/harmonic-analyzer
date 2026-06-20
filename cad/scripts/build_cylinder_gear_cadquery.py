@@ -61,11 +61,12 @@ ECCENTRICITY = 3.06  # DIMENSIONS.md ch13: cam eccentricity, scaled 0.6022
 BORE_DIAMETER = 0.375 * IN  # 9.525 -- plain bore, NO keyway (M6.2 refutation)
 
 NOTCH_DEPTH = 3.0  # DIMENSIONS.md ch13: alignment notch depth, text p.22 (high)
-# The notch is "just a slit" -- the p.23 "notch" photo shows a thin radial cut
-# (one missing tooth), NOT the legacy 3 mm square. The book states only the
-# depth; the slit width is modeled at ~0.6x the 1.63 mm tip pitch so the mark
-# reads as a single missing tooth (low confidence; supersedes the 3.0 square).
-SLIT_WIDTH = 1.0
+# The notch is "just a slit" cut with a SAW between two teeth -- the p.23 photo
+# labelled "notch" shows a thin kerf, and the real gears are NOT missing a tooth
+# (all 120 stay complete). So it is a narrow saw kerf seated in the tooth VALLEY
+# nearest +Y, 3 mm deep; the flanking tooth crests are untouched. The book gives
+# only the depth; the kerf width is a slitting-saw value (low confidence).
+KERF_WIDTH = 0.4
 
 BORE_RADIUS = BORE_DIAMETER / 2.0
 
@@ -171,17 +172,20 @@ def build() -> cq.Workplane:
     )
     part = gear.union(cam)
 
-    # 3) Alignment notch: a thin radial SLIT at +Y (one missing tooth), 3 mm
-    #    deep, cut through the full face width. +Y (90 deg) lands on a tooth
-    #    crest at 120 T, so the slit reads as the missing tooth the photos show.
-    slit = (
+    # 3) Alignment notch: a thin saw KERF seated in the tooth valley nearest
+    #    +Y, 3 mm deep, cut through the full face width. +Y (90 deg = 30*gamma)
+    #    is a tooth CREST at 120 T, so the kerf is rotated by +gamma/2 (1.5 deg)
+    #    to sit in the adjacent root valley -- it deepens one gap without
+    #    removing any tooth (all 120 crests stay intact).
+    kerf = (
         cq.Workplane("XY")
         .workplane(offset=-0.5)
         .center(0.0, (NOTCH_FLOOR + NOTCH_OUTER) / 2.0)
-        .rect(SLIT_WIDTH, NOTCH_OUTER - NOTCH_FLOOR)
+        .rect(KERF_WIDTH, NOTCH_OUTER - NOTCH_FLOOR)
         .extrude(FACE_WIDTH + 1.0)
+        .rotate((0, 0, 0), (0, 0, 1), math.degrees(FACTS["Gamma"] / 2.0))
     )
-    part = part.cut(slit)
+    part = part.cut(kerf)
 
     # 4) Shaft bore through gear + cam on the gear axis (no keyway).
     bore = (
@@ -235,7 +239,7 @@ def render_mpl(stl_path: Path, png_path: Path) -> None:
     panel(
         a1, 90, -90,
         "face-on (+Y up): 120 T involute, OD 62.2 mm,\n"
-        "alignment notch = thin radial slit at +Y (one missing tooth)",
+        "alignment notch = thin saw kerf in the valley near +Y (teeth intact)",
         (1, 1, 1),
     )
     a1.set_zticks([])
@@ -243,12 +247,45 @@ def render_mpl(stl_path: Path, png_path: Path) -> None:
     panel(
         a2, 22, -68,
         "3/4 iso: integral eccentric cam (lobe -Y, z 3..6.5),\n"
-        "Ø3/8 in plain bore, slit notch +Y",
+        "Ø3/8 in plain bore, kerf notch near +Y",
         (1, 1, 1),
     )
     fig.tight_layout()
     fig.savefig(str(png_path), bbox_inches="tight", facecolor="white")
     print(f"wrote {png_path} (matplotlib)")
+
+
+def _point_in_solid(solid: cq.Solid, x: float, y: float, z: float) -> bool:
+    """True if (x, y, z) mm is inside/on the solid (OCC point classifier)."""
+    from OCP.BRepClass3d import BRepClass3d_SolidClassifier
+    from OCP.gp import gp_Pnt
+    from OCP.TopAbs import TopAbs_IN, TopAbs_ON
+
+    cls = BRepClass3d_SolidClassifier(solid.wrapped)
+    cls.Perform(gp_Pnt(x, y, z), 1e-6)
+    return cls.State() in (TopAbs_IN, TopAbs_ON)
+
+
+def _verify_teeth_intact(solid: cq.Solid) -> None:
+    """The kerf must NOT remove a tooth: every tooth crest stays solid, and
+    the kerf itself must have bitten the valley below the base circle."""
+    gamma = FACTS["Gamma"]
+    z = FACE_WIDTH / 2.0
+    missing = []
+    for k in range(TEETH):  # crest centres at (k+1)*gamma, tip just inside Ra
+        a = (k + 1) * gamma
+        if not _point_in_solid(solid, (RA_MM - 0.15) * math.cos(a),
+                               (RA_MM - 0.15) * math.sin(a), z):
+            missing.append(k)
+    if missing:
+        raise RuntimeError(f"{len(missing)} tooth crest(s) removed (idx {missing[:5]}...)")
+    # Kerf bite: a point in the +Y valley, below the base circle (normally
+    # solid web), must now be empty.
+    av = math.pi / 2.0 + gamma / 2.0
+    rk = (NOTCH_FLOOR + RB_MM) / 2.0  # between kerf floor and base circle
+    if _point_in_solid(solid, rk * math.cos(av), rk * math.sin(av), z):
+        raise RuntimeError("kerf did not cut the +Y valley")
+    print(f"  OK  all {TEETH} tooth crests intact; kerf seated in +Y valley")
 
 
 def main() -> int:
@@ -257,6 +294,7 @@ def main() -> int:
     part = build()
 
     solid = part.val()
+    _verify_teeth_intact(solid)
     vol = solid.Volume()
     bb = solid.BoundingBox()
     print(f"volume: {vol:,.1f} mm^3")

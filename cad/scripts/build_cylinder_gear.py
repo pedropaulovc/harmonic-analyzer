@@ -23,12 +23,12 @@ Features, in order:
    lobe clears the finer tooth-root circle), boss-extruded z = 3..6.5 from an offset reference
    plane (the cam shares the layout of the superseded standalone
    ``build_eccentric_cam.py``: lobe -Y).
-4. Alignment notch: 3 mm deep radial SLIT (one missing tooth -- the p.23
-   "notch" photo shows a thin saw-kerf mark, not a square pocket) cut into
-   the gear rim at +Y ("notches aligned to top = cosine mode", pp. 66-67).
-   +Y (90 deg = 30*gamma) is a tooth crest at 120 T, so the slit reads as a
-   single missing tooth. Gear face only, after the pattern so it is not
-   replicated.
+4. Alignment notch: 3 mm deep saw KERF cut between two teeth (the p.23
+   "notch" photo shows a thin kerf -- the real gears keep all 120 teeth, NOT
+   a missing tooth). +Y (90 deg = 30*gamma) is a tooth crest at 120 T, so the
+   kerf is seated in the adjacent root valley (90 deg + gamma/2); the flanking
+   crests stay intact. "Notches aligned to top = cosine mode" (pp. 66-67).
+   Gear face only, after the pattern so it is not replicated.
 5. Plain shaft bore 3/8" through gear + cam, on the gear axis. No keyway:
    gear k turns k/80 rev per crank turn (ch. 29 gear law), so the 20 gears
    all spin at DIFFERENT speeds and cannot be keyed to a common shaft --
@@ -88,11 +88,13 @@ ECCENTRICITY = 3.06  # DIMENSIONS.md ch13: cam eccentricity, scaled 0.6022 (5.08
 # rocker stroke shrinks proportionally (user-directed 2026-06-18) (low)
 BORE_DIAMETER = 0.375 * IN  # 9.525 DIMENSIONS.md ch13: cam bore (legacy, med)
 NOTCH_DEPTH = 3.0  # DIMENSIONS.md ch13: alignment notch depth, text p.22 (high)
-# The notch is "just a slit" -- the p.23 photo labelled "notch" shows a thin
-# radial cut (one missing tooth), NOT a square pocket. The book states only the
-# 3 mm depth; the slit width is modeled at ~0.6x the 1.63 mm tip pitch so the
-# mark reads as a single missing tooth (low; supersedes the legacy 3.0 square).
-NOTCH_WIDTH = 1.0  # DIMENSIONS.md ch13: alignment-notch slit width (low)
+# The notch is "just a slit" cut with a SAW between two teeth -- the p.23 photo
+# labelled "notch" shows a thin kerf, and the real gears are NOT missing a tooth
+# (all 120 stay complete). So it is a narrow saw kerf seated in the tooth VALLEY
+# nearest +Y, 3 mm deep, leaving the flanking crests intact. The book gives only
+# the depth; the kerf width is a slitting-saw value (low; supersedes the legacy
+# 3.0 square and the interim missing-tooth slit).
+NOTCH_WIDTH = 0.4  # DIMENSIONS.md ch13: alignment-notch saw-kerf width (low)
 
 BORE_RADIUS = BORE_DIAMETER / 2.0
 
@@ -101,6 +103,13 @@ RA_MM = FACTS["Ra"] * IN  # 31.10 -- gear OD/2 = 2.449"/2 = 62.2/2 (low, ch13 sc
 RB_MM = FACTS["Rb"] * IN
 NOTCH_FLOOR = RA_MM - NOTCH_DEPTH
 NOTCH_OUTER = RA_MM + 1.5  # clearance past the OD so the cut always opens
+# +Y (90 deg = 30*gamma) is a tooth CREST at 120 T, so the kerf cannot sit on
+# +Y without deleting that tooth. Seat the (axis-aligned, near-vertical) kerf in
+# the adjacent root valley at 90 deg + gamma/2: its centreline x is the valley
+# radius projected onto X. Over the kerf's short radial span the valley is ~1.5
+# deg off vertical, so a vertical slot at this x stays inside the gap (verified:
+# all 120 crests remain, removed solid ~0.60 mm^2).
+NOTCH_X = (NOTCH_FLOOR + RA_MM) / 2.0 * math.cos(math.pi / 2.0 + FACTS["Gamma"] / 2.0)
 
 THROUGH_ALL = FACE_WIDTH + CAM_THICKNESS + 2.0  # bore cut depth
 
@@ -128,17 +137,22 @@ def is_solid(x: float, y: float) -> bool:
 
 
 def notch_solid_area(step: float = 0.004) -> float:
-    """Solid area (mm^2) of the toothed disc inside the notch window."""
+    """Solid area (mm^2) of the toothed disc inside the kerf window.
+
+    The kerf is the vertical slot ``x in [NOTCH_X +- W/2], y in [floor, outer]``
+    seated in the +Y valley; most of the window is empty gap, so the removed
+    solid is small (~0.60 mm^2) -- the kerf only bites the root web, not teeth.
+    """
     nx = max(2, round(NOTCH_WIDTH / step))
     ny = max(2, round((NOTCH_OUTER - NOTCH_FLOOR) / step))
     dx = NOTCH_WIDTH / nx
     dy = (NOTCH_OUTER - NOTCH_FLOOR) / ny
     hits = 0
     for i in range(nx):
-        x = -NOTCH_WIDTH / 2.0 + (i + 0.5) * dx
+        x = NOTCH_X - NOTCH_WIDTH / 2.0 + (i + 0.5) * dx
         for j in range(ny):
             y = NOTCH_FLOOR + (j + 0.5) * dy
-            if is_solid(x, y):  # notch at +Y: window coords are (x, y) global
+            if is_solid(x, y):  # kerf in the +Y valley: window coords are global
                 hits += 1
     return hits * dx * dy
 
@@ -244,8 +258,10 @@ async def build(adapter) -> dict[str, str]:
     print(f"  OK  cam placement: COM y {com[1]:.3f} z {com[2]:.3f}")
 
     # ------------------------------------------------------------------
-    # Alignment notch at +Y (top = cosine mode): a thin radial SLIT (one
-    # missing tooth, per the p.23 "notch" photo), gear face only.
+    # Alignment notch at +Y (top = cosine mode): a thin saw KERF seated in
+    # the tooth valley nearest +Y (between two teeth, no tooth removed --
+    # p.23 "notch" photo), gear face only. The slot is axis-aligned at
+    # x = NOTCH_X (the valley centreline projected onto X).
     # ------------------------------------------------------------------
     check("create_sketch notch", await adapter.create_sketch("Front"))
     # Inference OFF: with it on, the bottom corners snap coincident onto the
@@ -256,10 +272,10 @@ async def build(adapter) -> dict[str, str]:
     notch = await add_line_chain(
         adapter,
         [
-            (-NOTCH_WIDTH / 2.0, NOTCH_FLOOR),
-            (NOTCH_WIDTH / 2.0, NOTCH_FLOOR),
-            (NOTCH_WIDTH / 2.0, NOTCH_OUTER),
-            (-NOTCH_WIDTH / 2.0, NOTCH_OUTER),
+            (NOTCH_X - NOTCH_WIDTH / 2.0, NOTCH_FLOOR),
+            (NOTCH_X + NOTCH_WIDTH / 2.0, NOTCH_FLOOR),
+            (NOTCH_X + NOTCH_WIDTH / 2.0, NOTCH_OUTER),
+            (NOTCH_X - NOTCH_WIDTH / 2.0, NOTCH_OUTER),
         ],
     )
     set_sketch_direct_db(adapter, False)
@@ -282,7 +298,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     await anchor_point_to_origin(
-        adapter, f"{bottom}.start", -NOTCH_WIDTH / 2.0, NOTCH_FLOOR, "notch corner"
+        adapter, f"{bottom}.start", NOTCH_X - NOTCH_WIDTH / 2.0, NOTCH_FLOOR, "notch corner"
     )
     await ensure_fully_defined(adapter, "notch sketch")
     check("exit_sketch notch", await adapter.exit_sketch())
@@ -293,7 +309,9 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     v_notch = notch_solid_area() * FACE_WIDTH
-    volume = await volume_check(adapter, "notch", volume - v_notch, 0.03 * v_notch)
+    # Looser band than the old square: the kerf removes only ~1.8 mm^3, so the
+    # grid-integration error on notch_solid_area is relatively larger.
+    volume = await volume_check(adapter, "notch", volume - v_notch, 0.06 * v_notch)
 
     # ------------------------------------------------------------------
     # Shaft bore through gear + cam (the bore circle is fully inside the
