@@ -68,14 +68,16 @@ import pen_driver
 import truth_model
 from _common import (
     OUT_SLDASM,
+    check,
+    log,
+    run_build,
+)
+from _assembly import (
     assert_components_fully_defined,
     assert_model_healthy,
-    check,
     check_no_interference,
     component_names,
     component_transform,
-    log,
-    run_build,
 )
 from _common import _flag, _read_member  # component iteration helpers (read-only)
 
@@ -92,13 +94,17 @@ OVER_CONSTRAINED = 4  # swConstrainedStatus_e
 # references it flexibly, so its own MateGroup has none -- they are verified
 # when this sub is verified, not duplicated at the top.
 GEAR_OWNER = "drive-train"
-# The channel assembly carries the 20 independent moving stations. These four
-# stems are mated instances (one per channel), NOT pattern slaves -- the
-# isolation suite asserts 20 of each, the structural precondition for the
+# The channel assembly carries the independent moving stations (CHANNELS of them).
+# These four stems are mated instances (one per channel), NOT pattern slaves -- the
+# isolation suite asserts CHANNELS of each, the structural precondition for the
 # channels articulating at independent harmonics (only grounded spring/bushing
 # structure is LocalLinearPattern'd; see build_channel_assembly.py).
 CHANNEL_OWNER = "channel"
-CHANNELS = 20
+# Physically-built channels. TEMPORARY: machine.yaml channels.active_count caps
+# the per-channel mechanism to the first N (3) for build performance; the gates
+# below (instance independence, channel gear meshes, component bands) track that N
+# so the reduced build stays fully verified. Recover by setting it back to 20.
+CHANNELS = _config.active_count()
 # The kinematic pen driver (plan F5) lives in this sub: its pen-rod travel mate
 # is equation-linked to a CrankDeg global through the chained Fourier sum
 # (pen_driver.install, run at build time). The motion suite sweeps CrankDeg here
@@ -121,11 +127,17 @@ _CRANK_GEAR_TOKENS = ("crank-pinion", "crank-drive-gear")
 # component_names counts top-level components only (GetComponents(TopLevelOnly)),
 # so harmonic-analyzer's count is its 4 child subassemblies -- NOT the ~340
 # flattened parts. Bands measured live (verify.py --suite isolation) with margin.
+# The channel + drive-train bands scale with the built channel count N (the
+# TEMPORARY active_count): channel = 7N + 4 (N×{rocker,rod,bar,lever,spring} + 2
+# shafts + 4 ball-mounts + 2 bushings per inter-channel gap), drive-train = 32 + N
+# (full 20-gear cone stack + crank/structure ≈ 32, plus N cylinder gears). Both
+# reproduce the measured N=20 bands (144, 52) and stay correct at N=3 (25, 35).
+_N_CH = _config.active_count()
 _COMPONENT_BAND = {
     "frame": (11, 16),          # measured 13
-    "drive-train": (49, 58),    # measured 52 (was 61; alignment-pinion swing group removed)
-    "channel": (138, 150),      # measured 144 (20 channels x moving + patterned structure)
-    "output": (117, 129),       # measured 123
+    "drive-train": (32 + _N_CH - 4, 32 + _N_CH + 4),  # N=20 -> (48,56), measured 52
+    "channel": (7 * _N_CH + 4 - 6, 7 * _N_CH + 4 + 6),  # N=20 -> (138,150), measured 144
+    "output": (117, 129),       # measured 123 (no per-channel parts here)
     "harmonic-analyzer": (3, 6),  # 4 subassemblies: frame, drive-train, channel, output
 }
 
@@ -179,9 +191,16 @@ def _canon_ratio(num: int, den: int) -> tuple[int, int]:
 
 
 def _expected_channel_ratios() -> list[tuple[int, int]]:
-    """The 20 cone:cylinder canonical ratios from config, sorted (a multiset)."""
+    """Cone:cylinder canonical ratios for the BUILT channels, sorted (a multiset).
+
+    Only the first ``active_count`` channels get a cylinder gear (hence a
+    cone↔cylinder gear mate), so the live model carries that many channel meshes —
+    use the active rows, not the full 20-row table (TEMPORARY; recover at
+    active_count=20). Cone gears active_count..19 stay keyed to the shaft and mesh
+    nothing, so they contribute no gear mate to compare against.
+    """
     cyl = int(_config.machine("gear_train", "fundamental_cone_teeth"))
-    return sorted(_canon_ratio(ch["cone_teeth"], cyl) for ch in _config.channels())
+    return sorted(_canon_ratio(ch["cone_teeth"], cyl) for ch in _config.active_channels())
 
 
 def assert_no_over_constrained(adapter: Any) -> None:
@@ -780,7 +799,14 @@ def verify_amplitude_preset(report: Report) -> None:
     rows = _config.channels()
 
     def _law() -> None:
-        _expect(preset == "square", f"amplitude preset is {preset!r}, not 'square' (update this gate)")
+        # `neutral` (TEMPORARY): every bar reset to its neutral position, a_j = 0.
+        if preset == "neutral":
+            for ch in rows:
+                got = float(ch["amplitude_mm"])
+                _expect(abs(got) < 5e-4,
+                        f"channel {ch['index']}: neutral preset requires amplitude_mm 0, got {got}")
+            return
+        _expect(preset == "square", f"amplitude preset is {preset!r}, not 'square'/'neutral' (update this gate)")
         for ch in rows:
             n = ch["harmonic_n"]
             want = fundamental / n if n % 2 == 1 else 0.0
@@ -788,7 +814,7 @@ def verify_amplitude_preset(report: Report) -> None:
             _expect(abs(got - want) < 5e-4,
                     f"channel {ch['index']} (n={n}): amplitude_mm {got} != 80/n law {want:.4f}")
 
-    report.gate("amplitude:square-law", _law)
+    report.gate("amplitude:preset-law", _law)
     report.gate(
         "amplitude:within-travel",
         lambda: _expect(

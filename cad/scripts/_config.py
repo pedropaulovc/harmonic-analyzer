@@ -36,6 +36,25 @@ def channels() -> list[dict[str, Any]]:
     return sorted(rows, key=lambda r: r["index"])
 
 
+def active_count() -> int:
+    """How many channels the build PHYSICALLY instantiates (machine.yaml).
+
+    TEMPORARY (2026-06-19): reduced from the full 20 to cut build/refresh time
+    while the remaining parts are certified. Caps the per-channel mechanism — the
+    cylinder gear + cam-follower in drive-train and the rocker/amplitude-bar/
+    top-lever/spring in channel — to the FIRST ``active_count`` channels. The 20
+    cone gears and all 20 channels.yaml rows (gear law, ratios, synthesis truth
+    model) are KEPT. Recover by setting machine.yaml channels.active_count back to
+    20. See the channels.active_count note in machine.yaml.
+    """
+    return int(machine("channels", "active_count"))
+
+
+def active_channels() -> list[dict[str, Any]]:
+    """The first ``active_count`` channel rows — the physically-built channels."""
+    return channels()[: active_count()]
+
+
 def cone_teeth(index: int) -> int:
     """Cone-gear tooth count for 0-based channel ``index``."""
     return channels()[index]["cone_teeth"]
