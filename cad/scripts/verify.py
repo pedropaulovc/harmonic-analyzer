@@ -128,8 +128,9 @@ _CRANK_GEAR_TOKENS = ("crank-pinion", "crank-drive-gear")
 # Expected TOP-LEVEL component-count band per assembly: a tripwire for "a build
 # dropped/duplicated a channel (or a whole subassembly)", not a tight count.
 # component_names counts top-level components only (GetComponents(TopLevelOnly)),
-# so harmonic-analyzer's count is its 7 child subassemblies + 2 loose parts --
-# NOT the ~340 flattened parts. Bands measured live (verify.py --suite subsystems)
+# so harmonic-analyzer's count is its 7 child subassemblies + 1 loose part (the
+# measuring-stick; the spare gear rides inside paper-drive) -- NOT the ~340
+# flattened parts. Bands measured live (verify.py --suite subsystems)
 # with margin.
 # The channel + drive-train bands scale with the built channel count N (the
 # TEMPORARY active_count): channel = 7N + 4 (N×{rocker,rod,bar,lever,spring} + 2
@@ -146,8 +147,8 @@ _COMPONENT_BAND = {
     "summing": (6, 13),         # ch 18-19 (~9)
     "magnifier": (8, 15),       # ch 20-21 (~11)
     "pen": (4, 11),             # ch 24 (~7)
-    "paper-drive": (84, 96),    # ch 22-23-25 incl. 64-link chain (~90)
-    "harmonic-analyzer": (7, 11),  # 7 subassemblies + 2 loose parts (measuring-stick, spare gear)
+    "paper-drive": (85, 97),    # ch 22-23-25 incl. 64-link chain + spare T18 (~91)
+    "harmonic-analyzer": (7, 11),  # 7 subassemblies + 1 loose part (measuring-stick)
 }
 
 # Tolerance audit (Part D / handoff §14.2 Gate E): every built part must carry

@@ -3,7 +3,7 @@ r"""Reproduction script: paper-drive subassembly (book ch. 22-23, 25).
 The orthogonal time-base of the plotter: the platen carries the recording paper
 across the pen as the operator turns the crank, driven through the translational
 gearing, in machine coordinates (assembly origin = base origin; base top
-y = 50.8; the output side is -Z). 84 components (20 placed + the 64-link roller
+y = 50.8; the output side is -Z). 85 components (21 placed + the 64-link roller
 drive chain, explicitly placed).
 
 * Support rails (front of the columns, centres z -133.9): platen top rail
@@ -22,6 +22,12 @@ drive chain, explicitly placed).
 * Fasteners (M6.10): four fillister screws holding the platen clips (into the
   platen's blind sockets), four pinch screws in the platen-rail column clamps
   (backed out).
+* Spare transgear-removable (T18 chain wheel) stored loose on the base top
+  (y 50.8): the swap gear for changing the platen ratio (ch. 23). A spare for
+  THIS subsystem -- so it lives here (flat sibling of the mounted T24, exactly as
+  the book's single output group held both) rather than floating at the top level
+  where its leaf name would collide with the T12/T24 instances nested in the
+  drive-train / this sub.
 
 Cross-subassembly fits (checked at the top level): the column-clamps ride the
 O25.4 columns (frame.SLDASM); the roller chain spans this sub's knob shaft and
@@ -157,6 +163,14 @@ CHAIN_MID_Z = (T24_MID_Z + T12_MID_Z) / 2.0  # -81.05: the link pin0 stations ri
 # spanned -83.3..-78.8 about the same plane); the chain floats radially
 # outside the tooth tips so the z overlap with either wheel cannot interfere
 REMOVABLE_TIP_R = {"T12": 14.0, "T18": 20.0, "T24": 26.0}  # m2: OD (T+2)*2
+
+# Spare T18 removable: the swap chain wheel, stored flat on the base top
+# (y 50.8 + the part's 5.0 half-thickness about the z -15 mid-plane), well west
+# of the platen, axis +Z laid flat -> Rx(-90). A spare for this subsystem, so it
+# rides here as a flat sibling of the mounted T24 (the book's single output group
+# held both); placing it loose at the TOP level would clash on leaf name with the
+# T12/T24 instances nested in drive-train / this sub.
+SPARE_GEAR_POS = (-160.0, 55.8, -15.0)
 
 # --- M6.10 fasteners ---------------------------------------------------------
 # Platen-clip screws: each clip's own O3.0 end holes land at pre-mirror
@@ -450,6 +464,12 @@ async def build(adapter) -> dict[str, str]:
         await place_component(adapter, "pinch-screw", [x, y, PINCH_SCREW_Z],
                               [0.0, 0.0, 0.0], IDENTITY,
                               label=f"pinch-screw (clamp x{x:+.0f} y{y:.0f})")
+
+    # Spare T18 removable: the swap chain wheel resting loose on the base, west
+    # of the platen (a flat sibling of the mounted T24 above).
+    await place_component(adapter, "transgear-removable", list(SPARE_GEAR_POS),
+                          [-90.0, 0.0, 0.0], ROT_X_NEG90, configuration="T18",
+                          label="transgear-removable (spare T18)")
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)

@@ -24,8 +24,11 @@ Cross-subassembly fits proven by the top-level interference check:
   z -81 chain plane;
 * rocker-arm connecting-rod rings (channel) ride the cam lobes integral
   to the drive-train's cylinder gears;
-* the loose measuring-stick + spare transgear-removable sit on the base top
-  (y 50.8).
+* the loose measuring-stick sits on the base top (y 50.8). The spare T18
+  transgear-removable, a swap part for the platen drive, rides inside
+  paper-drive (a flat sibling of its mounted T24) rather than floating here --
+  at the top level its leaf name would collide with the T12/T24 instances
+  nested in drive-train / paper-drive.
 
 Run (SolidWorks already open)::
 
@@ -50,21 +53,17 @@ from _assembly import (
     remap_front_to_machine_front,
     save_assembly_and_images,
 )
-from _transforms import IDENTITY, ROT_X_NEG90, ROT_X_POS90
+from _transforms import IDENTITY, ROT_X_POS90
 
 ASM_NAME = "harmonic-analyzer"
 
 SUBASSEMBLIES = ("frame", "drive-train", "channel", "summing", "magnifier", "pen",
                  "paper-drive")
 
-# Loose hardware on the base top -- accessories, not part of any mechanism.
+# Loose hardware on the base top -- a generic tool, not part of any mechanism.
 STICK_POS = (-100.0, 53.8, 123.5)  # flat on the base, graduations up; loose tool.
 # Parked in the BACK band, between the rocker-arm-portal north frustum (z-max
 # 121.6) and the back plate edge (133.35), clear for 320 mm in x.
-SPARE_GEAR_POS = (-160.0, 55.8, -15.0)  # spare T18 chain wheel (the T24 is
-# mounted on the knob shaft in paper-drive, the T12 on the crankshaft in
-# drive-train); plan circle r 26 about (-160, -15), 100+ clear of the ch25
-# pinion rig.
 
 # Render gallery mirroring the book's ch. 30 "Eight Views" chapter: the six
 # orthographic faces plus two 3/4 views (the photos walk 45-degree steps
@@ -118,12 +117,9 @@ async def build(adapter) -> dict[str, str]:
         assert_component_placed(adapter, comp, [0.0, 0.0, 0.0], IDENTITY)
 
     # Loose hardware on the base top (not part of any mechanism). Rx(+90): the
-    # stick lies flat, graduated face up. Rx(-90): the spare T18 gear lies flat.
+    # stick lies flat, graduated face up.
     await place_component(adapter, "measuring-stick", list(STICK_POS),
                           [90.0, 0.0, 0.0], ROT_X_POS90)
-    await place_component(adapter, "transgear-removable", list(SPARE_GEAR_POS),
-                          [-90.0, 0.0, 0.0], ROT_X_NEG90, configuration="T18",
-                          label="transgear-removable (spare T18)")
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)
