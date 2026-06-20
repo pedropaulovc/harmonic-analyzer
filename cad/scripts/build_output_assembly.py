@@ -273,8 +273,8 @@ SET_SCREW_POS = (-38.0, 413.0, -154.0)
 
 # --- loose hardware ----------------------------------------------------------
 STICK_POS = (-100.0, 53.8, 123.5)  # flat on the base, graduations up; loose tool.
-# Parked in the BACK band, between the rocker-arm-support (z-max 121.6) and the
-# back plate edge (133.35), clear for 320 mm in x: Rx+90 footprint post-mirror
+# Parked in the BACK band, between the rocker-arm-portal north frustum (z-max
+# 121.6) and the back plate edge (133.35), clear for 320 mm in x: Rx+90 footprint post-mirror
 # x -100..100, z 123.5..131.5, ~1.9 mm box gaps to the frustum and plate edge.
 SPARE_GEAR_POS = (-160.0, 55.8, -15.0)  # plan circle r 26 (T24 OD 52,
 # conservative for the T18) about (-160, -15): the ch25 pinion rig now
