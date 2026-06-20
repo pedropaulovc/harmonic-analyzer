@@ -76,6 +76,20 @@ def rows_from_euler(rotation_deg: list[float]) -> list[list[float]]:
         [ca * sb * cg + sa * sg, ca * sb * sg - sa * cg, ca * cb],
     ]
 
+# Common component-placement rotation rows (Transform2 convention): IDENTITY plus
+# the right-angle turns the assembly scripts reach for. They match rows_from_euler
+# at the same angles; ``rot_z_rows`` builds an arbitrary spin about Z.
+IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+ROT_Y_POS90 = [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]
+ROT_X_POS90 = [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0]]
+ROT_X_NEG90 = [[1.0, 0.0, 0.0], [0.0, 0.0, -1.0], [0.0, 1.0, 0.0]]
+
+
+def rot_z_rows(deg: float) -> list[list[float]]:
+    """Transform2 rotation rows for a spin of ``deg`` about the local Z axis."""
+    c, s = math.cos(math.radians(deg)), math.sin(math.radians(deg))
+    return [[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]]
+
 def euler_from_rows(rows: list[list[float]]) -> list[float]:
     """Inverse of rows_from_euler (degrees). At the b = +/-90 gimbal lock the
     g = 0 representative is returned."""
