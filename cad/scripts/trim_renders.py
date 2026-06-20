@@ -1,8 +1,15 @@
 """Trim background margins from assembly renders into README copies.
 
-``save_assembly_and_images`` calls :func:`trim_readme_render` after each
-export, so ``docs/images`` stays in sync with the build. Runnable
-standalone to refresh all five README images from existing renders.
+Run this explicitly after a model change to refresh the committed
+``docs/images`` README renders from the latest ``cad/out/png`` build output,
+then commit the result::
+
+    python cad/scripts/trim_renders.py
+
+Decoupled from the build on purpose: ``save_assembly_and_images`` no longer
+writes ``docs/images``, so a normal build/release never dirties a tracked file
+(which would block ``doit release``'s clean-tree preflight). The crop is
+deterministic, so re-running on unchanged renders is a no-op.
 """
 
 from __future__ import annotations
