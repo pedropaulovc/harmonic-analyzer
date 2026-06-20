@@ -115,3 +115,26 @@ RETAINED as-is, NOT tuned — the ch30 8-views occlude the pivot/hex and the pho
 (20250828_1946*) are museum-glass/reflective/low-res, so there's no reliable signal to re-dimension
 it; blind tuning would risk regressing. Current hex (vertex-up 8.653 W x 10.268 H x 21.717 deep) is a
 sound reading. All 5 phases done; commits: rib-trim fix + render/BOM artifacts + ch30 comparisons.
+
+**Reversed linear-pattern of the spring holes — FIXED+VALIDATED (2026-06-19, commit 4e55028):** during
+the PR #67 + #26/#27 integration build, the top harmonic-analyzer level threw TWO 3.99 mm³
+`summing-lever-1 ↔ channel-spring-installed-stretch00-{2,3}` clashes (3-channel neutral config). ROOT
+CAUSE: the 20 coefficient-plate spring holes were a single SEED cut at station j=0 then replicated by
+`adapter.linear_pattern_feature` → `FeatureLinearPattern5`. That adapter picks the pattern DIRECTION by
+auto-selecting an edge at `direction_point=[0,0,+76.2]` and marches with `FlipDir1=False` (the edge's
+NATURAL parametric sense). That sense resolved to **−Z**, so the 19 patterned holes marched off the −Z
+plate edge into air — only the seed (j=0) stayed cut. Every other spring eye threaded SOLID plate. The
+j=0-clears / j≥1-clashes discrimination is the tell: seed cut present, pattern instances absent. (At
+3-channel the springs sit on the first 3 stations, so j=1,2 clashed; the build's own gate had been
+passing earlier only because the validated full build predates whatever nudged the auto-selected edge's
+sense.) DIAGNOSIS METHOD that nailed it precisely: `IInterference.GetInterferenceBody().GetBodyBox()`
+(mm) → each clash was a **1.0 mm (=WIRE_DIA) × 5.08 mm (=full PLATE_T) × 1.0 mm** sliver centered exactly
+on `HOLE_Z[1]`=−61.99 / `HOLE_Z[2]`=−54.94 = a wire through an un-cut bore (component AABBs were too loose
+to see it; the interference-body box is the right tool). FIX: drop the seed + edge-directed pattern;
+cut a circle at EVERY `HOLE_Z[j]` station in one Top-plane sketch + a single `create_cut_extrude`
+(`build_summing_lever.py` `_coefficients_plate`). Direction-free, deterministic, identical 20-hole
+geometry. Full-assembly gate now "interference check: none found"; `diag_sl_clash.py` (extended with the
+GetInterferenceBody box dump) confirms 0 interferences; top-view render shows all 20 holes cut with the
+3 active springs threading cleanly. LESSON: never trust `FeatureLinearPattern5`'s auto-selected-edge
+direction for a field that must land on exact stations — cut the stations explicitly. See
+[[temp-3channel-build-reduction]], [[parametric-springs]].
