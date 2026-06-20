@@ -32,7 +32,7 @@ def test_references_is_inverse_of_dependents():
 
     ``dependents_of`` adds a transitive ``harmonic_analyzer`` edge whenever a part
     flows into any sub-assembly (the old --rebuild's "rebuild the top too"). The
-    doit graph propagates that through ``output.SLDASM -> harmonic-analyzer.SLDASM``
+    doit graph propagates that through ``<sub>.SLDASM -> harmonic-analyzer.SLDASM``
     instead, so ``references_of`` carries only direct edges. The two must agree
     exactly once that documented transitive add is accounted for.
     """
@@ -47,19 +47,28 @@ def test_references_is_inverse_of_dependents():
             assert legacy == direct, f"{s}: legacy {legacy} != direct {direct}"
 
 
-def test_output_references_its_parts_only():
-    """The output assembly inserts leaf parts, never a sub-assembly."""
-    refs = references_of("output")
-    assert refs, "output should reference its parts"
-    parts = set(part_stems())
-    assert set(refs) <= parts, f"output references non-parts: {set(refs) - parts}"
-    assert not (set(refs) & set(ASSEMBLY_ORDER)), "output must not reference a sub-assembly"
+def test_output_subs_reference_their_parts_only():
+    """Each output sub inserts leaf parts, never another sub-assembly."""
+    for stem in ("summing", "magnifier", "pen", "paper_drive"):
+        refs = references_of(stem)
+        assert refs, f"{stem} should reference its parts"
+        parts = set(part_stems())
+        assert set(refs) <= parts, f"{stem} references non-parts: {set(refs) - parts}"
+        assert not (set(refs) & set(ASSEMBLY_ORDER)), \
+            f"{stem} must not reference a sub-assembly"
 
 
-def test_top_references_the_four_subassemblies():
-    """harmonic-analyzer mates the four subs (and no leaf parts directly)."""
-    refs = references_of("harmonic_analyzer")
-    assert set(refs) == {"frame", "drive_train", "channel", "output"}, refs
+def test_top_references_subassemblies_and_loose_parts():
+    """harmonic-analyzer mates the seven subs plus the one loose top-level part:
+    the generic measuring-stick sits directly on the base. The spare
+    transgear-removable rides inside paper-drive (a flat sibling of its mounted
+    T24), not here -- at the top level its leaf name would collide with the
+    T12/T24 instances nested in drive-train / paper-drive."""
+    refs = set(references_of("harmonic_analyzer"))
+    subs = {"frame", "drive_train", "channel", "summing", "magnifier", "pen",
+            "paper_drive"}
+    loose = {"measuring_stick"}
+    assert refs == subs | loose, refs
 
 
 def test_leaf_parts_do_not_depend_on_assembly_helpers():

@@ -1,26 +1,34 @@
 r"""Reproduction script: harmonic-analyzer.SLDASM (top level, M6.5).
 
-The complete machine: the four subassemblies mated to the frame. Every
-subassembly is authored in MACHINE coordinates (assembly origin = base
-origin, Y up, base top y 50.8, channels along Z, output side -Z), so each
-one is inserted at the identity transform and fixed -- the fix-all
-strategy of M6.2-M6.4 lifted one level.
+The complete machine: the seven subassemblies plus the loose hardware, mated
+to the frame. Every subassembly is authored in MACHINE coordinates (assembly
+origin = base origin, Y up, base top y 50.8, channels along Z, output side -Z),
+so each one is inserted at the identity transform and fixed -- the fix-all
+strategy of M6.2-M6.4 lifted one level. The output is split by function into
+the signal-flow chain summing -> magnifier -> pen (the value) plus paper-drive
+(the orthogonal time-base).
 
 Cross-subassembly fits proven by the top-level interference check:
 
-* channel springs (channel.SLDASM) thread the summing plate's O4.5 holes
-  (output.SLDASM) -- gated analytically by
+* channel springs (channel.SLDASM) thread the summing-lever plate's O4.5 holes
+  (summing.SLDASM) -- gated analytically by
   build_channel_assembly._assert_plate_threading;
 * top-crossbar ends face-flush on the top-frame ring rail inner faces
   (frame.SLDASM), knife-stay rod above the ring, gooseneck-clamp around
-  the east column;
-* column-clamps (output) ride the Ø25.4 columns (frame) with a 25.6
-  bore;
-* chain sprockets (drive-train crankshaft + output knob shaft) share the
+  the east column (all summing.SLDASM);
+* column-clamps (magnifier + paper-drive) ride the Ø25.4 columns (frame) with
+  a 25.6 bore;
+* the pen-hanger (pen.SLDASM) clamps the wheel-bar (magnifier.SLDASM), and the
+  wheel rim -> pen-rod wire couples the two;
+* chain sprockets (drive-train crankshaft + paper-drive knob shaft) share the
   z -81 chain plane;
 * rocker-arm connecting-rod rings (channel) ride the cam lobes integral
   to the drive-train's cylinder gears;
-* A-frame foot and loose hardware sit on the base top (y 50.8).
+* the loose measuring-stick sits on the base top (y 50.8). The spare T18
+  transgear-removable, a swap part for the platen drive, rides inside
+  paper-drive (a flat sibling of its mounted T24) rather than floating here --
+  at the top level its leaf name would collide with the T12/T24 instances
+  nested in drive-train / paper-drive.
 
 Run (SolidWorks already open)::
 
@@ -41,13 +49,21 @@ from _assembly import (
     assert_component_placed,
     assert_components_fully_defined,
     check_no_interference,
+    place_component,
     remap_front_to_machine_front,
     save_assembly_and_images,
 )
+from _transforms import IDENTITY, ROT_X_POS90
 
 ASM_NAME = "harmonic-analyzer"
 
-SUBASSEMBLIES = ("frame", "drive-train", "channel", "output")
+SUBASSEMBLIES = ("frame", "drive-train", "channel", "summing", "magnifier", "pen",
+                 "paper-drive")
+
+# Loose hardware on the base top -- a generic tool, not part of any mechanism.
+STICK_POS = (-100.0, 53.8, 123.5)  # flat on the base, graduations up; loose tool.
+# Parked in the BACK band, between the rocker-arm-portal north frustum (z-max
+# 121.6) and the back plate edge (133.35), clear for 320 mm in x.
 
 # Render gallery mirroring the book's ch. 30 "Eight Views" chapter: the six
 # orthographic faces plus two 3/4 views (the photos walk 45-degree steps
@@ -62,8 +78,6 @@ EIGHT_VIEWS = (
     "isometric",
     "trimetric",
 )
-
-IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 
 
 def _subassembly(name: str) -> str:
@@ -101,6 +115,11 @@ async def build(adapter) -> dict[str, str]:
                 await adapter.fix_component(ComponentRefParameters(name=comp)),
             )
         assert_component_placed(adapter, comp, [0.0, 0.0, 0.0], IDENTITY)
+
+    # Loose hardware on the base top (not part of any mechanism). Rx(+90): the
+    # stick lies flat, graduated face up.
+    await place_component(adapter, "measuring-stick", list(STICK_POS),
+                          [90.0, 0.0, 0.0], ROT_X_POS90)
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)

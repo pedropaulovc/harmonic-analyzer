@@ -153,7 +153,7 @@ MID_RIB_PLATE_REACH = HOLE_X - 4.1  # 33.0 local +X: clears hole column + coil
 # Spring-hole Z stations (world Z); the Top-plane sketch maps world Z to -sketchY.
 HOLE_Z = [CHANNEL_Z0 + CHANNEL_PITCH * j + HOLE_Z_OFFSET for j in range(HOLE_COUNT)]
 
-# Assembly-facing exports (build_output_assembly imports these).
+# Assembly-facing exports (build_summing_assembly imports these).
 SPIN_REF_X = TIP_X  # local X of the summation-anchor bore = counter-spring ref
 
 

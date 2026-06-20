@@ -74,8 +74,8 @@ WALL = 4.0  # material below the bore
 BLK_BOT = BORE_CY - R_BORE - WALL  # -29.15
 
 # Mount: the block top abuts the top-crossbar lower face (held to the top frame).
-KNIFE_Y = 990.0  # machine y of the pivot centreline (build_output_assembly KNIFE)
-CROSSBAR_BOTTOM_Y = 1010.0  # top-crossbar lower face (build_output_assembly)
+KNIFE_Y = 990.0  # machine y of the pivot centreline (build_summing_assembly KNIFE)
+CROSSBAR_BOTTOM_Y = 1010.0  # top-crossbar lower face (build_summing_assembly)
 MOUNT_GAP = 0.25  # design clearance to the crossbar (sliver-flag margin)
 CONTACT_Y = KNIFE_Y + RIDGE_Y  # machine y of the knife-edge contact line (995.13)
 BLK_TOP = CROSSBAR_BOTTOM_Y - CONTACT_Y - MOUNT_GAP  # local top (14.62)

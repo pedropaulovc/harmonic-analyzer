@@ -1,9 +1,9 @@
 r"""Diagnostic: build ONLY the roller chain in a fresh assembly and render it.
 
 Fast iteration harness for the roller chain -- reuses
-build_output_assembly._insert_roller_chain (explicit placement of the 64
+build_paper_drive_assembly._insert_roller_chain (explicit placement of the 64
 alternating inner/outer links along the _chain.py loop + gates) without the
-rest of the output assembly. Renders a few views to cad/out/png/diag-chain/.
+rest of the paper-drive assembly. Renders a few views to cad/out/png/diag-chain/.
 
 Run (SolidWorks already open)::
 
@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 from _common import OUT_PNG, check, run_build
-from build_output_assembly import _insert_roller_chain
+from build_paper_drive_assembly import _insert_roller_chain
 
 
 async def build(adapter) -> dict[str, str]:

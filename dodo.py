@@ -40,7 +40,7 @@ Run with that same venv's python (SolidWorks already open)::
     %DOIT%                       # = `build`: every part + assembly + every gate
     %DOIT% -n 4                  # same, fanning out the SolidWorks-free checks
     %DOIT% build_bare            # quick: parts + assemblies only, no gates
-    %DOIT% assembly:output       # just that assembly + its stale prereqs
+    %DOIT% assembly:paper_drive  # just that assembly + its stale prereqs
     %DOIT% part:summing_lever    # just that part
     %DOIT% verify:soundness      # one SW gate; check:math one offline gate
     %DOIT% export                # neutral STEP/STL/scene export
@@ -51,9 +51,9 @@ Run with that same venv's python (SolidWorks already open)::
 Full-rebuild escape (idiomatic doit -- a missing target forces a run, and
 build_or_refresh takes the FULL branch when the target is absent)::
 
-    del cad\out\sldasm\output.SLDASM
-    %DOIT% forget assembly:output    # optional: also drop the cached hash
-    %DOIT% assembly:output
+    del cad\out\sldasm\paper-drive.SLDASM
+    %DOIT% forget assembly:paper_drive    # optional: also drop the cached hash
+    %DOIT% assembly:paper_drive
 """
 
 from __future__ import annotations
@@ -412,8 +412,8 @@ def task_assembly():
 
     file_dep edges -- the assembly script, _common.py, this stem's hooks, and the
     referenced .SLDPRT/sub-.SLDASM targets -- give doit both ordering (top depends
-    on output.SLDASM, so it runs after) and the refresh/full decision (only parts
-    changed -> refresh).
+    on the sub .SLDASMs, so it runs after) and the refresh/full decision (only
+    parts changed -> refresh).
     """
     for stem in ASSEMBLY_ORDER:
         refs = references_of(stem)
@@ -453,7 +453,7 @@ def task_verify():
         "soundness": asm_targets,
         "subsystems": asm_targets,
         "kinematics": [
-            _sldasm("output"),
+            _sldasm("pen"),
             str((SCRIPTS_DIR / "pen_driver.py").resolve()),
             str((SCRIPTS_DIR / "truth_model.py").resolve()),
         ],
@@ -461,7 +461,7 @@ def task_verify():
     # Pass the graph's assemblies EXPLICITLY (dashed names) rather than letting
     # verify.py glob every *.SLDASM under cad/out/sldasm -- a stray/scratch
     # assembly left in a worktree must not be verified (codex review). kinematics
-    # targets only output (verify.py's own default), so it needs no names.
+    # targets only the pen sub (verify.py's own default), so it needs no names.
     asm_names = [s.replace("_", "-") for s in ASSEMBLY_ORDER]
     for suite, deps in suite_deps.items():
         stamp = str(REPORTS / f"verify-{suite}.ok")
