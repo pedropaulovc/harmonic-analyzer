@@ -9,9 +9,13 @@ user-confirmed against the ch. 19 photos; the ch30 plates crop below the
 bend.) Tension is set by sliding the tube in its clamp
 (build_gooseneck_clamp.py).
 
-Geometry: vertical leg at machine x 197 (east column line), y 1041
-(seats in the clamp bore just above the east rail top 1040.7) up to the
-bend start 1335; quarter bend to the horizontal arm at centreline
+Geometry: vertical leg at machine x 197 (east column line), y 960 -- the
+post passes through a clearance bore in the east rail (build_top_frame
+gooseneck bore) and drops ~40 below the rail underside (999.7), so the
+support extends lower than the top plate (ch. 19 photos; the true lower
+end is occluded by the coincident east column, low confidence on the
+exact drop) -- up to the bend start 1335; quarter bend to the horizontal
+arm at centreline
 y 1386, running west to its end face at machine x 85; the spring lug
 hangs under the arm end so the pin stays at machine (95, 1373) --
 directly above the summing-lever boss hook, counter spring hanging
@@ -20,7 +24,7 @@ plumb, loop top 1376.9 clearing the arm underside 1378. The book's tip
 loop to encircle (simplification).
 
 Layout: part origin at the vertical leg's MID-height of the OLD 180 lay
-(machine (197, 1210, 0), placement preserved): leg y -169..+125, bend
+(machine (197, 1210, 0), placement preserved): leg y -250..+125, bend
 arc centre (-51, +125), arm centreline y +176 from x -51 to -112, lug
 x -109..-103.5 rising y 159..172 into the arm underside (min 168), pin
 along X at (y 163, z 0). Dimensions: cad/DIMENSIONS.md ch. 19 (low/med).
@@ -56,8 +60,12 @@ MATERIAL = "Chrome Stainless Steel"  # polished chrome tube
 
 TUBE_DIA = 16.0  # DIMENSIONS.md ch19: scaled vs frame anchors (med)
 LEG_TOP = 125.0  # bend start = machine 1335 (derived: arm y - bend R)
-LEG_BOTTOM = -169.0  # leg bottom = machine 1041: stops 0.3 above the east
-# rail top (1040.7) -- the tube seats in the clamp bore, not in the rail
+LEG_BOTTOM = -250.0  # leg bottom = machine 960: the post passes through a
+# clearance bore in the east rail (build_top_frame gooseneck bore) and
+# extends ~40 below the rail underside (999.7) -- ch. 19 photos show the
+# post dropping well below the top plate. Was -169 (machine 1041, stopping
+# 0.3 above the rail top). The true lower end is occluded by the coincident
+# east column, so the 40 drop is functional (grip + slide), low confidence
 BEND_R = 51.0  # 90-degree bend (med)
 ARM_Y = LEG_TOP + BEND_R  # 176: arm centreline = machine 1386; underside
 # 168 = machine 1378, 1.1 above the spring loop top 1376.9

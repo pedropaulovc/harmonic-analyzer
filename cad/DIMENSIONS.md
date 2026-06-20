@@ -424,14 +424,15 @@ spring exits the page top). Recalibrated against the ch. 19 full-machine photo
 | Coil count | 165 | — | close-wound: pitch 1.91 leaves a 0.11 sweep-merge gap | derived | low |
 | Bottom lead | straight 40 mm drop, coil bottom → ring that hangs on the boss hook (ring centre machine y 1012, rod top 1015) | — | M6.4 hang solve (`build_summing_assembly.py`: ring inner top 1016.45 vs rod top 1016.5) | derived | low |
 | Adjustment post | square-head screw on adjustable post | — | text pp. 44–45 | stated | high (feature) |
-| Gooseneck | Ø16 chrome tube: vertical leg machine x 197 (east column line), y 1041..1390; 180° bend R 51; tip leg x 95 — plumb above the boss hook — ending y 1378; lug + Ø4 X-pin at y 1373 carries the spring's top loop | — | ch. 19 photo 0.515 px/mm + p3 90° page; the tip "slotted screw" modeled as lug + pin (simplification) | scaled + derived | med |
+| Gooseneck | Ø16 chrome tube: vertical leg machine x 197 (east column line), y 960..1390 — the post drops below the top plate (≈40 below the rail underside 999.7), passing through a Ø17 clearance bore in the east rail (`build_top_frame`) and gripped by the clamp above; 180° bend R 51; tip leg x 95 — plumb above the boss hook — ending y 1378; lug + Ø4 X-pin at y 1373 carries the spring's top loop | — | ch. 19 photos: the support extends lower than the top plate; true lower end occluded by the coincident east column (drop is functional, low). Leg-top/bend: 0.515 px/mm + p3 90° page; tip "slotted screw" modeled as lug + pin | scaled + derived | leg-top med, drop low |
 | Gooseneck clamp | green cast block 30 × 29 × 24 at machine (197, 1040.7, 0) on the east rail end; Ø16.5 vertical bore; square-head pinch screw (10 × 10 × 6 head, Ø5 shank stopped at the bore wall) | — | p.45: "a square-head screw pinches the post in its socket" | scaled | low |
 
 Notes: single large spring balancing the combined pull of the 20 channel
 springs. Hang chain (machine y): boss hook rod 1015 → bottom ring 1012 →
 coil 1052..1367 → top loop 1370.6 → gooseneck pin 1373. Tension is set by
-sliding the tube in the clamp bore (tube bottom stops 0.3 above the rail
-top at 1040.7).
+sliding the tube in the clamp; the post passes through the east rail's Ø17
+clearance bore and extends ~40 below the plate underside (machine y 960,
+below the rail bottom 999.7) — the support extends lower than the top plate.
 
 ## Chapter 20 — Magnifying Lever (pp. 46–49)
 
