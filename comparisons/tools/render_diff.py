@@ -14,7 +14,9 @@ previous release is fetched from GitHub.
 Pipeline:
   1. classify every scene-graph mesh -- equal signature (zip CRC32 / file
      CRC32) is unchanged for free; differing signature is confirmed with a
-     Hausdorff check so byte/tessellation noise is not highlighted;
+     Hausdorff check so byte/tessellation noise is not highlighted. The
+     Hausdorff checks are mutually independent and CPU-bound, so they run
+     across a process pool (``--jobs``; this is the SolidWorks-free hot path);
   2. assemble the *new* scene graph, placing each instanced part STL by its
      SolidWorks transform, colour red if its mesh changed else ghost grey;
   3. render N camera angles to PNG with an offscreen VTK context and write a
@@ -37,11 +39,16 @@ import re
 import struct
 import urllib.request
 import zlib
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import numpy as np
-import pyvista as pv
 import trimesh
+
+# NOTE: pyvista (heavy, pulls in VTK) is imported lazily inside main() -- only the
+# render step needs it. Keeping it out of module scope means the Hausdorff pool
+# workers (which re-import this module under the Windows 'spawn' start method) do
+# NOT pay the VTK import cost, and the SolidWorks-free classify path stays light.
 
 CACHE = Path(os.environ.get("RELEASE_DIFF_CACHE", "/tmp/release_diff_cache"))
 HILITE = (0.86, 0.12, 0.12)   # changed -> red
@@ -239,9 +246,37 @@ def _hausdorff(pa, pb, n=40000, budget=4_000_000):
     return max(directed(a, b), directed(b, a))
 
 
-def classify(old, new, keys, tol=0.01):
-    """Return ({changed mesh keys}, {key: hausdorff_mm})."""
+def _hausdorff_job(task):
+    """Process-pool worker: (key, old_path, new_path) -> (key, hausdorff_mm).
+
+    Paths are pre-materialized in the parent (release downloads + cache writes stay
+    serial there), so a worker only ever loads two local STL files -- no network,
+    nothing unpicklable crosses the process boundary.
+    """
+    key, po, pn = task
+    return key, _hausdorff(po, pn)
+
+
+def _auto_jobs(n_pending):
+    """Default worker count: one per CPU, capped (memory: each worker loads two
+    meshes) and never more than there is work for."""
+    cpu = os.cpu_count() or 1
+    return max(1, min(cpu, 8, n_pending))
+
+
+def classify(old, new, keys, tol=0.01, jobs=0):
+    """Return ({changed mesh keys}, {key: hausdorff_mm}).
+
+    A cheap CRC pass first -- identical signature is unchanged for free, a missing
+    old mesh is a new part. Only meshes whose signature differs need the expensive
+    Hausdorff confirmation; those are mutually independent, so they run across a
+    process pool (``jobs`` workers; 0 = auto = one per CPU capped at 8, 1 = inline
+    serial). This is the SolidWorks-free hot path -- parallelising it is the
+    release-time win. The serial CRC pass also materialises the STL paths, so the
+    pool workers receive plain file paths and never touch the network.
+    """
     changed, devs = set(), {}
+    pending = []  # [(key, old_path, new_path)] -- needs a Hausdorff check
     for k in sorted(keys):
         c_old, c_new = old.crc(k), new.crc(k)
         if c_old is None:
@@ -251,13 +286,33 @@ def classify(old, new, keys, tol=0.01):
         if c_old == c_new:
             continue                  # identical signature -> unchanged (free)
         po, pn = old.stl(k), new.stl(k)
-        d = _hausdorff(po, pn) if (po and pn) else float("inf")
+        if not (po and pn):
+            changed.add(k)            # signature differs but a side is missing
+            devs[k] = float("inf")
+            continue
+        pending.append((k, str(po), str(pn)))
+
+    if not pending:
+        return changed, devs
+
+    def record(k, d):
         devs[k] = d
-        verdict = "identical"
+        verdict = "CHANGED" if d > tol else "identical"
         if d > tol:
             changed.add(k)
-            verdict = "CHANGED"
         print(f"  verify {k:34s} ~Hausdorff={d:8.3f} mm -> {verdict}", flush=True)
+
+    n_jobs = jobs if jobs > 0 else _auto_jobs(len(pending))
+    if n_jobs == 1 or len(pending) == 1:
+        for task in pending:
+            record(*_hausdorff_job(task))
+    else:
+        print(f"  (Hausdorff over {len(pending)} meshes on {n_jobs} workers)",
+              flush=True)
+        with ProcessPoolExecutor(max_workers=n_jobs) as ex:
+            futures = [ex.submit(_hausdorff_job, task) for task in pending]
+            for fut in as_completed(futures):
+                record(*fut.result())
     return changed, devs
 
 
@@ -273,6 +328,8 @@ def main():
     ap.add_argument("--summary-json", type=Path)
     ap.add_argument("--res", type=int, default=1600)
     ap.add_argument("--ghost-opacity", type=float, default=0.18)
+    ap.add_argument("--jobs", type=int, default=0,
+                    help="Hausdorff worker processes (0=auto per-CPU, 1=serial)")
     args = ap.parse_args()
 
     old_rel = args.old_release or args.old
@@ -292,12 +349,16 @@ def main():
     print(f"scene: {len(comps)} components, {len(keys)} unique meshes")
 
     print("classifying changed meshes ...", flush=True)
-    changed, devs = classify(old, new, keys)
+    changed, devs = classify(old, new, keys, jobs=args.jobs)
     changed_bases = sorted({base_part(k) for k in changed})
     print(f"\nCHANGED parts ({len(changed_bases)}): "
           f"{', '.join(changed_bases) or '(none)'}\n", flush=True)
 
-    # build the scene from the NEW bundle
+    # build the scene from the NEW bundle (pyvista imported here -- see top-of-file
+    # note: keeping it out of module scope spares the Hausdorff pool workers the
+    # VTK import under the Windows 'spawn' start method)
+    import pyvista as pv
+
     pv.OFF_SCREEN = True
     pl = pv.Plotter(off_screen=True, window_size=(args.res, args.res))
     pl.set_background("white")
