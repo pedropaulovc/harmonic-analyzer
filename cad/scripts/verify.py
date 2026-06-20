@@ -7,48 +7,50 @@ and proves it is sound, plus the assertions a build script cannot make about
 itself: that the gear ratios in the live model equal the config, and that the
 component count is the expected "N instances -> 1 part" envelope.
 
-Suites (``--suite``):
+Suites (``--suite``). The doit wrapper groups them by SolidWorks-dependence:
+the SW suites are ``verify:<suite>`` tasks (on the COM spine); the no-SW ones are
+``check:<suite>`` tasks (parallel). There is no aggregate "all" -- ``doit build``
+is the single fully-safe entry point that runs every gate.
 
-  static   (default)  open the Default pose and run, collecting ALL failures:
-                      DOF fully-defined, no over-constrained component, model
-                      healthy (deep), interference-free, gear ratios == config,
-                      BOM/part-count envelope.
-  truth               analytic self-check of ``truth_model`` (no SolidWorks):
-                      the synthesis math is symmetric / band-limited / correct.
+  soundness (default) NEEDS SOLIDWORKS. Open the Default pose and run, collecting
+                      ALL failures: DOF fully-defined, no over-constrained
+                      component, model healthy (deep), interference-free, gear
+                      ratios == config, BOM/part-count envelope.
+  subsystems          NEEDS SOLIDWORKS. Subsystem pass/fail runs (plan F1): open
+                      EACH built (sub)assembly and prove it sound in isolation --
+                      the drive-train as the crank+gear test, the channel assembly
+                      as the 20-way independence test, output/frame/top as
+                      structural/smoke.
+  kinematics          NEEDS SOLIDWORKS. Kinematic pen-driver fidelity (plan F5):
+                      open output.SLDASM, sweep the CrankDeg global, and assert
+                      the pen-marker tip traces truth_model.pen_y (mapped to the
+                      physical half-stroke) with NO force solver -- the computed-
+                      not-simulated summation realised through the equation-driven
+                      pen-rod mate (pen_driver.py / docs/motion-policy.md).
+  math                no-SolidWorks analytic self-check of ``truth_model``: the
+                      synthesis math is symmetric / band-limited / correct.
   config              no-SolidWorks cross-checks: build config (machine/channels)
                       vs the cited DIMENSIONS rows, DIMENSIONS.md freshness, and
                       the tolerance/metadata audit (parts.yaml <-> build scripts;
                       emits cad/out/reports/tolerance_audit.csv).
-  isolation           subsystem pass/fail runs (plan F1): open EACH built
-                      (sub)assembly and prove it sound in isolation -- the
-                      drive-train as the crank+gear test, the channel assembly as
-                      the 20-way independence test, output/frame/top as
-                      structural/smoke. Needs SolidWorks.
-  motion              kinematic pen-driver fidelity (plan F5): open output.SLDASM,
-                      sweep the CrankDeg global, and assert the pen-marker tip
-                      traces truth_model.pen_y (mapped to the physical
-                      half-stroke) with NO force solver -- the computed-not-
-                      simulated summation realised through the equation-driven
-                      pen-rod mate (pen_driver.py / docs/motion-policy.md). Needs
-                      SolidWorks.
-  all                 static + truth + config + motion.
 
-Unlike the build gates (fail-fast), ``static``/``isolation`` run every gate and
-report the full set of failures at the end, so one run tells you everything wrong.
+Unlike the build gates (fail-fast), ``soundness``/``subsystems`` run every gate
+and report the full set of failures at the end, so one run tells you everything
+wrong.
 
 Run (SolidWorks already open for any suite touching geometry)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\verify.py [name ...] [--suite static|truth|all]
+    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\verify.py [name ...] [--suite soundness|math|...]
 
 ``name`` defaults to every built assembly in ``cad/out/sldasm`` (drive-train,
-harmonic-analyzer). ``truth``/``config`` need no SolidWorks and no assembly.
+harmonic-analyzer). ``math``/``config`` need no SolidWorks and no assembly.
 
 NOT YET WIRED (tracked, not silently skipped):
   * Stepped-crank interference across the full gear train (turning the real
     crank through the gear train) needs the Basic Motion solver -- the lock mates
     that key the cone cluster are outside the gear-mate graph, so a kinematic
     rotate desyncs the train (see docs/motion-policy.md). The pen-vs-truth_model
-    output proof, by contrast, IS wired: ``--suite motion`` drives the pen
+    output proof, by contrast, IS wired: ``--suite kinematics`` drives the pen
     kinematically off the CrankDeg global (no train rotation needed).
 """
 from __future__ import annotations
@@ -120,7 +122,7 @@ _CRANK_GEAR_TOKENS = ("crank-pinion", "crank-drive-gear")
 # dropped/duplicated a channel (or a whole subassembly)", not a tight count.
 # component_names counts top-level components only (GetComponents(TopLevelOnly)),
 # so harmonic-analyzer's count is its 4 child subassemblies -- NOT the ~340
-# flattened parts. Bands measured live (verify.py --suite isolation) with margin.
+# flattened parts. Bands measured live (verify.py --suite subsystems) with margin.
 _COMPONENT_BAND = {
     "frame": (11, 16),          # measured 13
     "drive-train": (49, 58),    # measured 52 (was 61; alignment-pinion swing group removed)
@@ -814,17 +816,17 @@ async def build(adapter: Any) -> dict[str, str]:
     suite, names = _ARGS.suite, _ARGS.names
     report = Report()
 
-    if suite in ("static", "all"):
+    if suite == "soundness":
         for name in names:
             await _verify_static_one(adapter, name, report)
-    if suite == "isolation":
+    if suite == "subsystems":
         for name in names:
             await _verify_isolation_one(adapter, name, report)
-    if suite in ("motion", "all"):
+    if suite == "kinematics":
         await _verify_motion_one(adapter, report)
-    if suite in ("truth", "all"):
+    if suite == "math":
         verify_truth(report)
-    if suite in ("config", "all"):
+    if suite == "config":
         verify_config_vs_dimensions(report)
         verify_dimensions_fresh(report)
         verify_tolerance_audit(report)
@@ -853,16 +855,17 @@ def _built_assemblies() -> list[str]:
 def _parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("names", nargs="*", help="assembly stem(s); default = all built")
-    ap.add_argument("--suite", default="static",
-                    choices=["static", "truth", "config", "isolation", "motion",
-                             "all"])
+    ap.add_argument("--suite", default="soundness",
+                    choices=["soundness", "subsystems", "kinematics", "math",
+                             "config"])
     args = ap.parse_args()
     if not args.names:
-        # truth/config need no model; motion targets MOTION_OWNER (output);
-        # static/isolation/all default to all built.
-        if args.suite in ("truth", "config"):
+        # math/config need no model; kinematics targets MOTION_OWNER (output);
+        # soundness/subsystems default to all built. (There is no aggregate
+        # "all" suite -- `doit build` is the one fully-safe entry point.)
+        if args.suite in ("math", "config"):
             args.names = []
-        elif args.suite == "motion":
+        elif args.suite == "kinematics":
             args.names = [MOTION_OWNER]
         else:
             args.names = _built_assemblies()
@@ -871,10 +874,10 @@ def _parse_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     _ARGS = _parse_args()
-    if _ARGS.suite in ("truth", "config"):
+    if _ARGS.suite in ("math", "config"):
         # No SolidWorks needed -- run directly without connecting.
         _report = Report()
-        if _ARGS.suite == "truth":
+        if _ARGS.suite == "math":
             verify_truth(_report)
         else:
             verify_config_vs_dimensions(_report)
