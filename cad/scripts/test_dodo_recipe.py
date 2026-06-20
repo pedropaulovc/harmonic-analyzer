@@ -5,6 +5,7 @@ compared against the value saved on the last SUCCESSFUL run -- never from doit's
 injected ``changed`` arg, which is corrupted after an intervening failed task.
 """
 import importlib.util
+import os
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -89,3 +90,77 @@ def test_recipe_tracker_detects_any_recipe_member(tmp_path):
         up = dodo._RecipeTracker("x", files)(t2, saved)
         assert up is False, f"editing {member.name} must invalidate the recipe"
         member.write_text("v0\n")  # restore for next iteration
+
+
+def test_content_checker_digest_ignores_yaml_noise(tmp_path):
+    """Option A: ContentChecker digests the PARSED yaml, so comment / whitespace /
+    numeric-reflow edits to a shared cad/config/*.yaml leave the digest unchanged
+    (no spurious part rebuild); a real value change still flips it. Non-YAML deps
+    fall through to the stock raw md5 untouched."""
+    from doit.dependency import get_file_md5
+
+    dodo = _load_dodo()
+    digest = dodo.ContentChecker._digest
+
+    cfg = tmp_path / "tolerances.yaml"
+    cfg.write_text("rack_backlash_mm: 0.30\nseat_clearance_mm: 1.5\n")
+    base = digest(str(cfg))
+
+    cfg.write_text("# provenance: retargeted\nrack_backlash_mm: 0.300\nseat_clearance_mm: 1.5\n  \n")
+    assert digest(str(cfg)) == base, "comment/whitespace/0.30->0.300 reflow must be inert"
+
+    cfg.write_text("rack_backlash_mm: 0.31\nseat_clearance_mm: 1.5\n")
+    assert digest(str(cfg)) != base, "a real value change must invalidate"
+
+    nonyaml = tmp_path / "build_x.py"
+    nonyaml.write_text("WIDTH = 3.0\n")
+    assert digest(str(nonyaml)) == get_file_md5(str(nonyaml)), "non-yaml == stock md5"
+
+
+def test_content_checker_check_modified_ignores_comment(tmp_path):
+    """The full check_modified path (mtime + size differ for a comment edit) must
+    still report NOT-modified -- the stock MD5Checker would short-circuit to
+    modified on the size delta before ever comparing content."""
+    dodo = _load_dodo()
+    checker = dodo.ContentChecker()
+    cfg = tmp_path / "c.yaml"
+    cfg.write_text("k: 1\n")
+    state = checker.get_state(str(cfg), None)
+
+    # comment edit + FORCE a distinct mtime so the fast-path can't short-circuit
+    cfg.write_text("# a comment\nk: 1\n")
+    os.utime(str(cfg), (state[0] + 10, state[0] + 10))
+    st = os.stat(str(cfg))
+    assert st.st_mtime != state[0] and st.st_size != state[1]
+    assert checker.check_modified(str(cfg), st, state) is False, "comment edit must be inert"
+
+    # real value change with a distinct mtime -> modified
+    cfg.write_text("k: 2\n")
+    os.utime(str(cfg), (state[0] + 20, state[0] + 20))
+    st = os.stat(str(cfg))
+    assert checker.check_modified(str(cfg), st, state) is True, "value change must invalidate"
+
+
+def test_recipe_digest_ignores_yaml_comments(tmp_path):
+    """Option A reaches the ASSEMBLY recipe digest too: _digest_files folds YAML
+    members in by parsed content, so a comment/reflow edit to a recipe YAML leaves
+    the digest unchanged (no spurious FULL rebuild), while a real value change --
+    or any non-YAML recipe member edit -- still flips it."""
+    dodo = _load_dodo()
+    yaml_cfg = tmp_path / "channels.yaml"
+    script = tmp_path / "build_x_assembly.py"
+    yaml_cfg.write_text("station_pitch_mm: 10\nrows: 3\n")
+    script.write_text("v0\n")
+    files = [str(script), str(yaml_cfg)]
+    base = dodo._digest_files(files)
+
+    yaml_cfg.write_text("# placement note\nstation_pitch_mm: 10\nrows: 3\n  \n")
+    assert dodo._digest_files(files) == base, "yaml comment/whitespace in recipe must be inert"
+
+    yaml_cfg.write_text("station_pitch_mm: 11\nrows: 3\n")
+    assert dodo._digest_files(files) != base, "real placement-value change must FULL-rebuild"
+
+    yaml_cfg.write_text("station_pitch_mm: 10\nrows: 3\n")  # restore yaml -> back to base
+    assert dodo._digest_files(files) == base
+    script.write_text("v1\n")
+    assert dodo._digest_files(files) != base, "assembly-script change must FULL-rebuild"
