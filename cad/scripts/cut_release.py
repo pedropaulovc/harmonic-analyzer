@@ -1,5 +1,9 @@
 r"""Cut a tagged release of the harmonic-analyzer and attach its CAD bundle.
 
+doit task: ``release`` (spine tail, opt-in) -- ``doit release -- v0.2.0 [--draft]``
+forwards args here. Runnable standalone too.
+
+
 The repository is source-of-truth: ``.SLDPRT/.SLDASM`` are gitignored build
 artefacts (Part E). A *release* is therefore the one place a binary snapshot is
 published -- a git tag pins the exact source state, and a SolidWorks Pack-and-Go
