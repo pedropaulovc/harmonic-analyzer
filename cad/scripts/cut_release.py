@@ -1,5 +1,9 @@
 r"""Cut a tagged release of the harmonic-analyzer and attach its CAD bundle.
 
+doit task: ``release`` (spine tail, opt-in) -- ``doit release -- v0.2.0 [--draft]``
+forwards args here. Runnable standalone too.
+
+
 The repository is source-of-truth: ``.SLDPRT/.SLDASM`` are gitignored build
 artefacts (Part E). A *release* is therefore the one place a binary snapshot is
 published -- a git tag pins the exact source state, and a SolidWorks Pack-and-Go
@@ -41,7 +45,9 @@ a concurrent build_all/verify deadlocks):
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import platform
 import re
 import shutil
 import subprocess
@@ -509,6 +515,104 @@ def export_neutral(sw: Any, stage: Path) -> dict[str, Any]:
 
 
 # --------------------------------------------------------------------------- #
+# Provenance manifest (ships INSIDE the zip)
+# --------------------------------------------------------------------------- #
+def _sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _dirty_paths(porcelain: str) -> list[str]:
+    """Paths from ``git status --porcelain`` output. Splits on the 2-col status
+    field rather than slicing fixed columns: ``_git`` strips its output, so the
+    first line loses its leading status space and a column slice would clip a char.
+    (Paths with spaces are git-quoted; the model has none, so maxsplit=1 is safe.)
+    """
+    rows = (ln.split(maxsplit=1) for ln in porcelain.splitlines())
+    return [parts[1] for parts in rows if len(parts) == 2]
+
+
+def _git_provenance(version: str) -> dict[str, Any]:
+    """Exact source identity of this build. ``tree_clean`` is the load-bearing
+    field: when True the tag pins the precise bytes that produced the bundle; the
+    dirty file list is recorded (not hidden) when a build is cut with --allow-dirty
+    so a consumer can see the build did not come from a pristine checkout.
+    """
+    dirty = _git("status", "--porcelain", "--untracked-files=no", check_rc=False)
+    remote = _git("config", "--get", "remote.origin.url", check_rc=False)
+    return {
+        "commit": _git("rev-parse", "HEAD"),
+        "commit_short": _git("rev-parse", "--short", "HEAD"),
+        "describe": _git("describe", "--tags", "--always", "--dirty", check_rc=False),
+        "branch": _git("rev-parse", "--abbrev-ref", "HEAD", check_rc=False),
+        "remote": remote.removesuffix(".git"),
+        "commit_utc": _git("show", "-s", "--format=%cI", "HEAD", check_rc=False),
+        "subject": _git("show", "-s", "--format=%s", "HEAD", check_rc=False),
+        "tag": version,
+        "tree_clean": not dirty,
+        "dirty_files": _dirty_paths(dirty),
+    }
+
+
+def write_provenance(stage: Path, version: str, revision: str,
+                     facts: dict[str, Any]) -> dict[str, Any]:
+    """Write ``SHA256SUMS.txt`` + ``PROVENANCE.json`` into the stage so they ride
+    inside the release zip. The manifest hashes every *other* shipped file (the two
+    provenance files exclude themselves -- self-reference is impossible); the JSON
+    then pins the manifest's own hash as the single root-of-trust a verifier checks.
+    """
+    diff = facts.get("diff") or {}
+    prov = {
+        "schema": "harmonic-analyzer/provenance@1",
+        "release": {
+            "version": version,
+            "previous": diff.get("prev"),
+            "build_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        },
+        "git": _git_provenance(version),
+        "toolchain": {
+            "solidworks_revision": revision,
+            "python": platform.python_version(),
+            "platform": platform.platform(),
+            "builder": (f'{_git("config", "--get", "user.name", check_rc=False)} '
+                        f'<{_git("config", "--get", "user.email", check_rc=False)}>'),
+            "entrypoint": "doit release",
+        },
+        "model": {
+            "documents": facts.get("documents"),
+            "parts": facts.get("parts"),
+            "assemblies": facts.get("assemblies"),
+            "config_meshes": facts.get("config_meshes"),
+            "solidworks_files": facts.get("solidworks_files"),
+            "changed_vs_previous": diff.get("changed_meshes", {}),
+        },
+    }
+
+    # SHA256SUMS over every staged file except the two provenance files themselves.
+    manifest = stage / "SHA256SUMS.txt"
+    prov_json = stage / "PROVENANCE.json"
+    files = sorted(p for p in stage.rglob("*")
+                   if p.is_file() and p not in (manifest, prov_json))
+    lines = [f"{_sha256(p)}  {p.relative_to(stage).as_posix()}" for p in files]
+    manifest.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    prov["integrity"] = {
+        "manifest": manifest.name,
+        "manifest_sha256": _sha256(manifest),
+        "file_count": len(files),
+        "algorithm": "sha256",
+    }
+    prov_json.write_text(json.dumps(prov, indent=2) + "\n", encoding="utf-8")
+    log(f"provenance: commit {prov['git']['commit_short']} "
+        f"(tree {'clean' if prov['git']['tree_clean'] else 'DIRTY'}), "
+        f"{prov['integrity']['file_count']} files hashed")
+    return prov
+
+
+# --------------------------------------------------------------------------- #
 # Bundle assembly (single zip)
 # --------------------------------------------------------------------------- #
 def bundle(sw: Any, revision: str, version: str,
@@ -552,7 +656,11 @@ def bundle(sw: Any, revision: str, version: str,
     #    a previous release that predates the neutral bundle.
     facts["diff"] = render_diff(stage, prev_tag) if prev_tag else None
 
-    # 5. One zip of the whole stage.
+    # 5. Provenance manifest LAST -- it hashes everything staged above, so it must
+    #    run after the diff is written and before the zip is sealed.
+    facts["provenance"] = write_provenance(stage, version, revision, facts)
+
+    # 6. One zip of the whole stage.
     zip_path = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}.zip"
     if zip_path.exists():
         zip_path.unlink()
@@ -603,7 +711,6 @@ def _diff_section(version: str, diff: dict[str, Any] | None) -> str:
 
 
 def release_notes(version: str, facts: dict[str, Any]) -> str:
-    sha = _git("rev-parse", "--short", "HEAD")
     return (
         f"Scripted SolidWorks reproduction of Michelson's 20-channel harmonic "
         f"analyzer.\n\n"
@@ -627,10 +734,34 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         + f"- Size: {facts['size_mb']:.1f} MB\n"
         + _diff_section(version, facts.get("diff"))
         + "\n**Provenance**\n"
-        f"- Commit: `{sha}`\n"
+        + _provenance_section(facts)
+    )
+
+
+def _provenance_section(facts: dict[str, Any]) -> str:
+    """Human-readable provenance for the release notes, mirroring the machine
+    ``PROVENANCE.json`` that ships inside the bundle."""
+    prov = facts.get("provenance") or {}
+    git = prov.get("git", {})
+    integ = prov.get("integrity", {})
+    commit = git.get("commit", "")
+    remote = git.get("remote", "")
+    link = (f"[`{git.get('commit_short', sha_fallback(commit))}`]"
+            f"({remote}/commit/{commit})" if commit else f"`{sha_fallback(commit)}`")
+    tree = "clean" if git.get("tree_clean") else "**DIRTY** (see PROVENANCE.json)"
+    return (
+        f"- Source commit: {link} ({git.get('describe', '?')}), "
+        f"working tree {tree}\n"
         f"- Built with SOLIDWORKS 3DEXPERIENCE R2026x, revision "
         f"`{facts['sw_revision']}`\n"
+        f"- `PROVENANCE.json` + `SHA256SUMS.txt` ship inside the bundle "
+        f"({integ.get('file_count', '?')} files hashed; verify with "
+        f"`sha256sum -c SHA256SUMS.txt`)\n"
     )
+
+
+def sha_fallback(commit: str) -> str:
+    return commit[:7] if commit else _git("rev-parse", "--short", "HEAD")
 
 
 def publish(version: str, zip_path: Path, facts: dict[str, Any], draft: bool) -> str:

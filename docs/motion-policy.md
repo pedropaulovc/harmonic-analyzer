@@ -56,10 +56,11 @@ sizing are done **analytically** (external spring calculations), not read off a 
 
 ## How the summation is verified
 
-- **Numerically** (no SolidWorks): `verify.py --suite truth` proves `truth_model` is a correct
-  band-limited synthesiser — per-channel single-term traces, superposition, the canonical
-  square/sawtooth/fundamental presets against their analytic targets.
-- **Kinematically** (in SolidWorks): `verify.py --suite motion` opens `output.SLDASM`, sweeps
+- **Numerically** (no SolidWorks): `verify.py --suite math` (doit: `check:math`) proves
+  `truth_model` is a correct band-limited synthesiser — per-channel single-term traces,
+  superposition, the canonical square/sawtooth/fundamental presets against their analytic targets.
+- **Kinematically** (in SolidWorks): `verify.py --suite kinematics` (doit: `verify:kinematics`)
+  opens `output.SLDASM`, sweeps
   `CrankDeg` over a full period, and asserts the sampled pen-marker tip traces
   `truth_model.pen_y` (to the mapped half-stroke) within tolerance — the geometry realises the
   computed curve.
@@ -67,5 +68,6 @@ sizing are done **analytically** (external spring calculations), not read off a 
 ## Where contact *is* tested
 
 Local cam/follower and spring/lever contact is exercised only in **small isolated
-subassemblies** (see `verify.py --suite isolation`). The full 21-spring equilibrium is never
+subassemblies** (see `verify.py --suite subsystems`, doit: `verify:subsystems`). The full
+21-spring equilibrium is never
 solved in the top-level assembly.
