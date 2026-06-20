@@ -136,7 +136,7 @@ _CRANK_GEAR_TOKENS = ("crank-pinion", "crank-drive-gear")
 # reproduce the measured N=20 bands (144, 52) and stay correct at N=3 (25, 35).
 _N_CH = _config.active_count()
 _COMPONENT_BAND = {
-    "frame": (11, 16),          # measured 13
+    "frame": (7, 12),           # measured 9 (corner brackets removed, #21)
     "drive-train": (32 + _N_CH - 4, 32 + _N_CH + 4),  # N=20 -> (48,56), measured 52
     "channel": (7 * _N_CH + 4 - 6, 7 * _N_CH + 4 + 6),  # N=20 -> (138,150), measured 144
     "output": (117, 129),       # measured 123 (no per-channel parts here)
