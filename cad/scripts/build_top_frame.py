@@ -6,10 +6,12 @@ the Ø25.4 columns (OD rederived from the ch30 8-views, M6.11) at (x, z) =
 (+/-197, +/-112). In the machine it sits
 at y 999.7..1040.7; its west rail carries the two ball mounts of the
 top-lever fulcrum shaft (seat 1040.7 + ball rise 25.2 = axis 1065.9) and
-the summing lever hangs below it (M6.4). The east rail carries a Ø17
-clearance bore at mid-span (x 197, z 0) for the counter-spring gooseneck
-post, which slides through and drops below the plate (ch. 19; the real
-corner casting is bored for the post). Identified in M6.3 from the
+the summing lever hangs below it (M6.4). One rail carries a Ø17 clearance
+bore at mid-span (z 0) for the counter-spring gooseneck post, which slides
+through and drops below the plate (ch. 19; the real corner casting is bored
+for the post). The post is authored at +197 in summing but its SOLID mirrors
+to x -197 (MIRROR_PLANE 'z'); this part inserts un-mirrored, so the bore is
+cut at part x -197 to meet it (M6.12). Identified in M6.3 from the
 eight views (green ring at y ~ 1010-1055 in every view, columns
 continuing above to their caps); no book chapter covers it directly.
 
@@ -62,10 +64,17 @@ RING_HEIGHT = 41.0  # DIMENSIONS.md top-frame row (photo, med)
 BOSS_DIA = 48.0  # corner boss around the column (scaled, low)
 BORE_DIA = 25.5  # clamps the Ø25.4 column (0.1 slip; OD rederived from 8-views)
 GOOSENECK_BORE_DIA = 17.0  # clearance for the Ø16 counter-spring post sliding
-# through the east rail mid-span (build_gooseneck); the post drops below the
+# through the rail mid-span (build_gooseneck); the post drops below the
 # plate, gripped by the gooseneck-clamp above -- ch. 19. Fully inside the rail
-# band (x 197 in 186..208), so a clean cylindrical cut.
-GOOSENECK_X = COLUMN_X  # east rail, on the column line (sketch X)
+# band (|x| 197 in 186..208), so a clean cylindrical cut.
+GOOSENECK_X = -COLUMN_X  # The counter-spring post is authored at +197 in
+# summing, but it has MIRROR_PLANE 'z', so mirror_placement reflects its SOLID
+# about the machine YZ plane and the post body actually sits at x -197. This
+# part inserts UN-mirrored (direct insert_component; its authored x IS its
+# solid x, proved by the part COM shifting -1.59 toward -x), so the clearance
+# bore must be cut at x -COLUMN_X to coincide with the post's mirrored body.
+# At +COLUMN_X it bored the opposite rail and the post drilled solid casting
+# (full Ø16x41 = 8243 mm^3 top-level interference, M6.12).
 GOOSENECK_Z = 0.0  # rail mid-span (sketch y -> machine -Z; 0 is handedness-free)
 
 OUTER_X = COLUMN_X + RAIL_WIDTH / 2.0  # 208
