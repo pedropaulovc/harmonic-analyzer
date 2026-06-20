@@ -1120,7 +1120,7 @@ sections:
       - - Bottom lead
         - straight 40 mm drop, coil bottom → ring that hangs on the boss hook (ring centre machine y 1012, rod top 1015)
         - —
-        - 'M6.4 hang solve (`build_output_assembly.py`: ring inner top 1016.45 vs rod top 1016.5)'
+        - 'M6.4 hang solve (`build_summing_assembly.py`: ring inner top 1016.45 vs rod top 1016.5)'
         - derived
         - low
       - - Adjustment post

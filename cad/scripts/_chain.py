@@ -7,13 +7,13 @@ plate (p002/p005/p006) shows it: a taut run on the pinion-bar side and a
 visibly drooping slack run on the other.
 
 Pure math only -- the roller chain's alternating inner/outer links are
-explicitly placed along this centreline loop (build_output_assembly
+explicitly placed along this centreline loop (build_paper_drive_assembly
 ._insert_roller_chain); the M6.8 rigid-band stand-in and the #13 bead-chain
 stand-in are both retired.
 
 Geometry (local frame: knob wrap centre at the origin, machine xy
 pre-mirror; crank centre from build_drive_train_assembly X_CRANK / Y_DRIVE
-minus build_output_assembly KNOB_SHAFT_XY): two UNEQUAL wrap arcs whose
+minus build_paper_drive_assembly KNOB_SHAFT_XY): two UNEQUAL wrap arcs whose
 centreline floats clear OUTSIDE the gear tooth tips (a real chain wraps at
 the teeth; rigid model beads there would intersect them), the common
 external tangent taut line on the +n side (the pinion-bar side), and a
@@ -28,7 +28,7 @@ from __future__ import annotations
 import math
 
 # Chain-wheel centres, machine xy pre-mirror.
-KNOB_CENTRE = (65.0, 241.78)  # build_output_assembly KNOB_SHAFT_XY (ch30
+KNOB_CENTRE = (65.0, 241.78)  # build_paper_drive_assembly KNOB_SHAFT_XY (ch30
 # rest state: latch C2C 66.05 from the stud, y clamped under the pinion bar)
 CRANK_CENTRE = (118.0, 126.8)  # build_drive_train_assembly X_CRANK, Y_DRIVE
 
@@ -135,7 +135,7 @@ CENTRELINE_LEN = (
 # --- roller chain ------------------------------------------------------------
 # A real ANSI-#25-proportioned roller chain (pitch ~1/4 in): alternating INNER
 # links (2 inner plates + 2 rollers) and OUTER links (2 outer plates + 2 pins),
-# explicitly placed along the centreline loop (build_output_assembly
+# explicitly placed along the centreline loop (build_paper_drive_assembly
 # ._insert_roller_chain). A roller chain closes a loop only with an EVEN number
 # of pitches (inner/outer must alternate back to the seam), so the link count is
 # forced even. Every dimension stays inside a +-2.4 in-plane / +-2.1 z envelope

@@ -18,7 +18,7 @@ fits:
 
   gear_mesh:               # cone<->cylinder and platen rack-pinion
     backlash_mm: [0.05, 0.20]
-    rack_backlash_mm: 0.30           # RACK_BACKLASH (build_output_assembly.py)
+    rack_backlash_mm: 0.30           # RACK_BACKLASH (build_paper_drive_assembly.py)
     note: "zero-backlash-in-CAD gears bind in brass"
 
   cone_drum_oblique_mesh:  # the inclined cone partial engagement

@@ -12,8 +12,8 @@ the lever tips. 144 components:
 * pivot-ball-mount x4 (rocker pair: north on the rocker-support apex at
   (-72.9, 228.6, +101.6), south on the A-FRAME clevis saddle at
   (-72.9, 228.6, -111) - M6.5 photo audit: there is no south frustum,
-  the front stand is the transgear A-frame (output.SLDASM) whose ears
-  flank this mount's O16 base; lever pair on the top-frame west rail,
+  the front stand is the rocker-arm-portal's transgear-A-frame leg
+  (frame.SLDASM) whose ears flank this mount's O16 base; lever pair on the top-frame west rail,
   seats (-199.9, 1040.7, +/-85) - z 85 keeps the O16 base clear of the
   O35 corner-boss bores)
 * rocker-arm x20, pivot-bushing x19, connecting-rod x20,
@@ -35,7 +35,7 @@ hole so its ring threads the O4 hole without touching (margins asserted
 > 0.1); the bottom lead drops through the summing-lever plate's O4.5
 hole (at z_j - 1.95, one coil mean radius -Z of the spring axis) with
 the end loop hanging under the plate (asserted clearances -- the plate
-itself lives in output.SLDASM, checked at the top level).
+itself (the summing-lever) lives in summing.SLDASM, checked at the top level).
 
 Orientation notes: the amplitude bar is rotated 90 deg about its long
 axis (Ry(90)) so its end slots and O2 top pin hole run across Z,
@@ -163,7 +163,7 @@ LEVER_THICKNESS = 3.0
 # --- supports / mounts ------------------------------------------------------
 SUPPORT_APEX_Y = 228.6
 SUPPORT_Z = 101.6  # north rocker-support apex (frame.SLDASM)
-AFRAME_MOUNT_Z_ABS = 111.0  # south mount on the A-frame clevis (output.SLDASM)
+AFRAME_MOUNT_Z_ABS = 111.0  # south mount on the A-frame clevis (frame.SLDASM)
 RAIL_TOP_Y = 1040.7
 LEVER_MOUNT_Z = 85.0  # clears the top-frame boss bores (DIMENSIONS.md)
 
