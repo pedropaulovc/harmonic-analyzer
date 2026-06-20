@@ -1,5 +1,6 @@
 # Memory index
 
+- [Release needs clean tree; build regenerates tracked artefacts](release-clean-tree-artefacts.md) — cut_release.py aborts on a dirty tree, but the doit build regenerates tracked docs/images PNGs + harmonic-analyzer-bom.csv; commit them (trim_renders.py + refresh_assembly.py harmonic-analyzer) in the model-change PR or the next release fails dirty
 - [Temporary 3-channel build reduction](temp-3channel-build-reduction.md) — 2026-06-19 user-requested TEMP cut to 3 active channels + neutral amplitude bars for build perf (cone gears KEPT at 20); single knob machine.yaml channels.active_count, recover to 20 + square preset after part certification
 - [SW assembly mate diagnostics API](sw-assembly-mate-diagnostics-api.md) — how to fetch "What's Wrong" / "View Mate Errors" / over-define info via COM (GetWhatsWrong + byref VARIANT trap, GetErrorCode2, swFeatureError_e 46/47/48); GetConstrainedStatus is gear-mate-blind so probe a mate to read true DOF
 
