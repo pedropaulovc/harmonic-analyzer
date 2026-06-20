@@ -60,9 +60,20 @@ import math
 import os
 import sys
 
+import _config
 from _common import (
-    OUT_PNG, OUT_SLDASM, _flag, _read_member, check, coincident_mate,
-    component_named_ref, log, named_ref, run_build,
+    OUT_PNG,
+    OUT_SLDASM,
+    _flag,
+    _read_member,
+    check,
+    log,
+    run_build,
+)
+from _assembly import (
+    coincident_mate,
+    component_named_ref,
+    named_ref,
 )
 from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
 
@@ -95,7 +106,7 @@ FRAME_SUB = "frame-1"
 
 CRANK_RPM = 20.0          # gentle: 1 rev / 3 s at 20 RPM
 DURATION_S = 6.0          # two crank revolutions
-N_CHANNELS = 20
+N_CHANNELS = _config.active_count()  # physically-built channels (TEMP 3; see _config)
 ROCKER_MIN_DEG = 1.0      # dead-output gate: largest rocker swing must exceed this
 PEN_MIN_MM = 0.5          # dead-output gate: pen-tip travel must exceed this
 
@@ -378,7 +389,6 @@ async def _suppress_named(adapter, sub_name, families, mtypes, label):
 
     For unique drivers (e.g. the crank angle) where bucketing does not apply.
     """
-    from solidworks_mcp.adapters.base import SuppressMateParameters
     _, model = _sub_model(adapter, sub_name)
     root = _root_title(sub_name)
     targets = []

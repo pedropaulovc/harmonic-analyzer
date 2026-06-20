@@ -28,7 +28,7 @@ from __future__ import annotations
 import asyncio
 import math
 
-from _common import OUT_SLDASM, _flag, _read_member, check, log
+from _common import OUT_SLDASM, check, log
 from build_motion_study import (
     ASM, _by_z_rank, _comp_xform, _components, _entity_ref, _find_one,
     _suppress_named, _suppress_recurring, _world,
@@ -45,7 +45,7 @@ async def _flex_channel(adapter):
     from solidworks_mcp.adapters.base import (
         ComponentRefParameters, SetComponentSolvingParameters,
     )
-    from _common import coincident_mate, named_ref
+    from _assembly import coincident_mate, named_ref
     asm = adapter.currentModel
     sub = "channel-1"
     check(f"float {sub}", await adapter.float_component(ComponentRefParameters(name=sub)))

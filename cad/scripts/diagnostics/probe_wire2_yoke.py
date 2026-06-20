@@ -25,7 +25,13 @@ from __future__ import annotations
 import asyncio
 
 from _common import (
-    OUT_SLDASM, check, coincident_mate, component_named_ref, gear_mate, log,
+    OUT_SLDASM,
+    check,
+    log,
+)
+from _assembly import (
+    coincident_mate,
+    gear_mate,
     named_ref,
 )
 from build_motion_study import (

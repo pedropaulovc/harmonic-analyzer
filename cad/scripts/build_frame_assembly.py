@@ -59,14 +59,15 @@ from __future__ import annotations
 import sys
 
 from _common import (
-    IN,
     OUT_SLDPRT,
+    check,
+    run_build,
+)
+from _assembly import (
     assert_component_placed,
     assert_components_fully_defined,
-    check,
     check_no_interference,
     plane_distance_mate,
-    run_build,
     save_assembly_and_images,
 )
 

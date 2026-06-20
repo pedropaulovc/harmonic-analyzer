@@ -15,18 +15,20 @@ from __future__ import annotations
 import sys
 
 from _common import (
-    angle_driver,
+    _flag,
+    _read_member,
     check,
+    log,
+    run_build,
+)
+from _assembly import (
+    angle_driver,
     component_transform,
     distance_driver,
     lock_mate,
-    log,
     named_ref,
     place_component,
     world_point,
-    run_build,
-    _flag,
-    _read_member,
 )
 
 VBLOCK_POS = (-24.0, 390.0, -159.5)
