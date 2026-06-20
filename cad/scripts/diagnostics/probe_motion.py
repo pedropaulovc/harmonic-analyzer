@@ -21,7 +21,15 @@ from __future__ import annotations
 import math
 import sys
 
-from _common import OUT_SLDASM, check, component_transform, log, run_build, _flag, _read_member
+from _common import (
+    OUT_SLDASM,
+    _flag,
+    _read_member,
+    check,
+    log,
+    run_build,
+)
+from _assembly import component_transform
 
 
 def _mates(adapter):

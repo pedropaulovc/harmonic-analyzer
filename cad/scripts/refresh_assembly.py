@@ -5,7 +5,7 @@ referenced ``.SLDPRT``/sub-``.SLDASM`` changed, reopening the assembly and
 force-rebuilding every configuration loads the new geometry WITHOUT the ~500 s
 from-scratch ``create_assembly`` insert/mate loop. The heavy lifting (per-config
 rebuild, health/DOF/interference gates, in-place ``Save3``, PNG export) lives in
-:func:`_common.refresh_assembly`; this is the thin entrypoint the build graph
+:func:`_assembly.refresh_assembly`; this is the thin entrypoint the build graph
 (``dodo.py``) shells out to for the cheap path.
 
 Fail loud: any dangling mate, free DOF, or interference halts the refresh with a
@@ -24,7 +24,8 @@ from __future__ import annotations
 
 import sys
 
-from _common import refresh_assembly, run_build
+from _common import run_build
+from _assembly import refresh_assembly
 
 USAGE = "usage: refresh_assembly.py <assembly-stem>  (e.g. output, drive-train)"
 

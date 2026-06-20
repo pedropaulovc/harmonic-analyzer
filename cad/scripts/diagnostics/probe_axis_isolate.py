@@ -21,7 +21,12 @@ from __future__ import annotations
 
 import asyncio
 
-from _common import _flag, _read_member, component_named_ref, log
+from _common import (
+    _flag,
+    _read_member,
+    log,
+)
+from _assembly import component_named_ref
 from build_motion_study import _iter_mates
 
 ROD = "channel-1/connecting-rod-1"

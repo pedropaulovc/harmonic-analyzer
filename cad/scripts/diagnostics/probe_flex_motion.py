@@ -32,8 +32,17 @@ import math
 import sys
 
 from _common import (
-    OUT_SLDASM, check, coincident_mate, component_transform, log, named_ref,
-    run_build, _flag, _read_member,
+    OUT_SLDASM,
+    _flag,
+    _read_member,
+    check,
+    log,
+    run_build,
+)
+from _assembly import (
+    coincident_mate,
+    component_transform,
+    named_ref,
 )
 
 RIGID, FLEXIBLE = 0, 1
@@ -215,8 +224,7 @@ def _entity_path(name2: str, feature: str, title: str) -> str:
 
 async def build(adapter):
     from solidworks_mcp.adapters.base import (
-        ComponentRefParameters, InsertComponentParameters, MateEntityRef,
-        MotionMotorParameters, MotionStudyParameters, MotionStudyRefParameters,
+        ComponentRefParameters, InsertComponentParameters, MotionStudyParameters, MotionStudyRefParameters,
         MotionTimeParameters, SuppressMateParameters,
     )
 
