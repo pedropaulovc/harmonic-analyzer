@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import json
 import sys
+import zlib
 from pathlib import Path
 from typing import Any
 
@@ -260,6 +261,25 @@ def part_stl_stale(stem: str, mesh: str, colors: dict) -> bool:
             or mesh not in colors)
 
 
+def assert_configs_distinct(stem: str, crc_by_mesh: dict[str, int]) -> None:
+    """Every configuration of a multi-config part is distinct geometry by design
+    (the cone-gear / transgear tooth counts all differ). Two configs sharing a
+    byte-identical STL means the per-config export captured a stale, un-rebuilt
+    configuration — fail loud rather than ship a mislabelled mesh (the
+    non-deterministic lazy-regenerate race that shipped --t18 as 12-tooth in
+    v0.5.1; see build_cone_gear's ForceRebuild3 note)."""
+    if len(crc_by_mesh) < 2:
+        return
+    seen: dict[int, str] = {}
+    for mesh, crc in crc_by_mesh.items():
+        if crc in seen:
+            raise RuntimeError(
+                f"{stem}: per-config STLs {seen[crc]!r} and {mesh!r} are "
+                f"byte-identical (crc {crc:#010x}) — the config switch did not "
+                f"rebuild before export; the mesh holds a stale configuration")
+        seen[crc] = mesh
+
+
 def main() -> int:
     force = "--force" in sys.argv[1:]
     models = manifest_models()
@@ -308,6 +328,7 @@ def main() -> int:
             src = OUT_SLDPRT / f"{stem}.SLDPRT"
             check(f"open {src.name}", await adapter.open_model(str(src)))
             doc = adapter.currentModel
+            crc_by_mesh: dict[str, int] = {}
             for cfg, mesh in cfg_meshes:
                 if cfg and cfg.lower() != "default" and active_cfg(doc) != cfg:
                     ok_cfg = doc.ShowConfiguration2(cfg)
@@ -320,12 +341,21 @@ def main() -> int:
                             names = None
                         raise RuntimeError(
                             f"{stem}: ShowConfiguration2({cfg!r}) failed (has {names})")
+                # Config switches regenerate LAZILY (see build_cone_gear): without a
+                # forced rebuild SaveAs3 captures the PRIOR config's still-tessellated
+                # solid, so a config's STL non-deterministically holds an adjacent
+                # configuration (observed: --t18.STL carrying 12-tooth geometry). Force
+                # a full rebuild so THIS config is applied before the mesh is written.
+                adapter._attempt(lambda: doc.ForceRebuild3(False), default=None)
+                adapter._attempt(lambda: doc.EditRebuild3(), default=None)
                 out = OUT_STL / f"{mesh}.STL"
                 ok = doc.SaveAs3(str(out), 0, 0)
                 if not out.exists():
                     raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={ok})")
+                crc_by_mesh[mesh] = zlib.crc32(out.read_bytes()) & 0xFFFFFFFF
                 colors[mesh] = doc_rgb(doc)
                 log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB) rgb={colors[mesh]}")
+            assert_configs_distinct(stem, crc_by_mesh)
             adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
         try:
