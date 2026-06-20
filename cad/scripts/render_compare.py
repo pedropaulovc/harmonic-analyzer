@@ -129,23 +129,28 @@ def camera_axes(az_deg: float, el_deg: float, roll_deg: float = 0.0):
 # distance) / (object size), "the smaller the value, the greater the amount of
 # perspective distortion" (API docs). For a lens of focal length f framing a
 # subject that fills a sensor dimension d, that distance/size ratio reduces to
-# f / d (the half-angle tangents cancel), so ObjectSizesAway = f / d. The
-# diagonal is the conventional "angle of view" dimension, so it is the default.
-DX_SENSOR_MM = (23.6, 15.8)                      # Nikon D60 APS-C frame
-DX_SENSOR_DIAG_MM = math.hypot(*DX_SENSOR_MM)    # ~28.41 mm
+# f / d (the half-angle tangents cancel), so ObjectSizesAway = f / d. We
+# reference the sensor's LONG edge (23.6 mm): a photographer orients the long
+# edge along the subject's long axis (the tall machine is shot portrait), so
+# the subject's long dimension -- which dominates the bounding size SolidWorks
+# uses -- fills the frame's long edge at the lens's long-axis angle of view.
+# This is also the dimension comparisons/tools/blender_worker.py fits, so both
+# engines reproduce the same lens.
+DX_SENSOR_MM = (23.6, 15.8)                      # Nikon D60 APS-C (long, short)
+DX_SENSOR_LONG_MM = DX_SENSOR_MM[0]              # 23.6 mm -- long edge
 BOOK_FOCAL_LENGTH_MM = 100.0                     # Tokina 100 mm macro
 DEFAULT_OBJECT_SIZES_AWAY = 4.0                  # fallback if spec gives neither
 
 
 def lens_object_sizes_away(focal_length_mm: float,
-                           sensor_dim_mm: float = DX_SENSOR_DIAG_MM) -> float:
+                           sensor_dim_mm: float = DX_SENSOR_LONG_MM) -> float:
     """SolidWorks ObjectSizesAway that mimics a real lens.
 
     ObjectSizesAway is distance/size (smaller = stronger perspective). A lens
     of focal length f framing a subject that fills sensor dimension d sits at
-    distance/size = f / d, so the book's 100 mm lens on the DX diagonal gives
-    ~3.52 -- a weak, near-orthographic perspective matching the flat telephoto
-    look of the reference photos.
+    distance/size = f / d, so the book's 100 mm lens on the DX long edge gives
+    ~4.24 (13.5 deg long-axis angle of view) -- a weak, near-orthographic
+    perspective matching the flat telephoto look of the reference photos.
     """
     return focal_length_mm / sensor_dim_mm
 
@@ -154,12 +159,12 @@ def resolve_object_sizes_away(persp: dict) -> float:
     """ObjectSizesAway for a manifest perspective spec.
 
     ``focal_length_mm`` (real-lens model, optional ``sensor_dim_mm`` defaulting
-    to the DX diagonal) takes precedence over a raw ``object_sizes_away``.
+    to the DX long edge) takes precedence over a raw ``object_sizes_away``.
     """
     if persp.get("focal_length_mm") is not None:
         return lens_object_sizes_away(
             float(persp["focal_length_mm"]),
-            float(persp.get("sensor_dim_mm", DX_SENSOR_DIAG_MM)),
+            float(persp.get("sensor_dim_mm", DX_SENSOR_LONG_MM)),
         )
     return float(persp.get("object_sizes_away", DEFAULT_OBJECT_SIZES_AWAY))
 
