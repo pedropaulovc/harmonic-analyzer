@@ -1,5 +1,9 @@
 """Export render-cache geometry from SolidWorks: STL + STEP + scene JSON.
 
+doit task: ``export`` (on the COM spine). Normally invoked via ``doit export``
+or as a prerequisite of ``doit release``; runnable standalone too.
+
+
 For every model referenced by comparisons/manifest.json: AP214 STEP (exact
 archival geometry) and the offline-render feed consumed by
 comparisons/tools/render_offline.py —
