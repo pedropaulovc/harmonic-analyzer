@@ -2,14 +2,15 @@ r"""Reproduction script: foot-rail hex bolt (book ch. 30 p008; 2 used).
 
 One of the two hex-head hold-down bolts on the rocker-support portal
 frame's foot rail (ch. 30 p008 side view shows the heads on the rail's
-top face; the rail itself is build_a_frame.py, M6.9). The bolt drops
+top face; the rail itself is build_rocker_arm_portal.py, M6.9/M6.12 -- the
+foot rail was unified into the single portal casting). The bolt drops
 through the rail (20 tall) into the base's top plate -- the base holes
 are through-drilled (build_harmonic_base.py, documented simplification).
 Plain head and shank: thread not modeled (matches the collar/washer
 collapses elsewhere).
 
-Dimensions: cad/DIMENSIONS.md ch. 23 A-frame row (M6.10 fasteners pass)
--- 5/16" shank matching the legacy hold-down size, head photo-plausible
+Dimensions: cad/DIMENSIONS.md ch. 23 portal foot-rail row (M6.10 fasteners
+pass) -- 5/16" shank matching the legacy hold-down size, head photo-plausible
 (low).
 
 Layout: axis along Y, AUTHORED IN FINAL ORIENTATION (head up): under-head

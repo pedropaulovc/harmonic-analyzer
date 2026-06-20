@@ -1,7 +1,7 @@
 r"""Reproduction script: rocker-support hold-down screw (book ch. 14; 2 used).
 
 One of the two hold-down screws that come up through the base into the
-rocker-arm-support's O7.94 x 25 underside sockets (the part docstring's
+rocker-arm-portal north upright's O7.94 x 25 underside sockets (the docstring's
 "fasteners not modeled" -- modeled in the M6.10 fasteners pass). The
 round head sits recessed in a counterbore on the base underside
 (build_harmonic_base.py); plain head and shank, thread not modeled.
