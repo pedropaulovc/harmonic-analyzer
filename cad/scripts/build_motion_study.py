@@ -60,6 +60,7 @@ import math
 import os
 import sys
 
+import _config
 from _common import (
     OUT_PNG,
     OUT_SLDASM,
@@ -105,7 +106,7 @@ FRAME_SUB = "frame-1"
 
 CRANK_RPM = 20.0          # gentle: 1 rev / 3 s at 20 RPM
 DURATION_S = 6.0          # two crank revolutions
-N_CHANNELS = 20
+N_CHANNELS = _config.active_count()  # physically-built channels (TEMP 3; see _config)
 ROCKER_MIN_DEG = 1.0      # dead-output gate: largest rocker swing must exceed this
 PEN_MIN_MM = 0.5          # dead-output gate: pen-tip travel must exceed this
 
