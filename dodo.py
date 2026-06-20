@@ -59,6 +59,7 @@ build_or_refresh takes the FULL branch when the target is absent)::
 from __future__ import annotations
 
 import hashlib
+import os
 import shutil
 import subprocess
 import sys
@@ -77,7 +78,9 @@ for _stream in (sys.stdout, sys.stderr):
     if _reconfigure is not None:
         _reconfigure(encoding="utf-8", errors="replace")
 
+import yaml as _yaml
 from doit.action import CmdAction
+from doit.dependency import CHECKERS, MD5Checker, get_file_md5
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "cad" / "scripts"))
 
@@ -154,9 +157,66 @@ def _assert_spine_complete() -> None:
 
 _assert_spine_complete()
 
+
+# --- Comment/whitespace-insensitive content hashing for cad/config/*.yaml.
+#
+# doit's stock MD5Checker hashes RAW FILE BYTES, so a comment-only or reflow edit
+# to a SHARED config (every part lists cad/config/*.yaml as a file_dep) flips that
+# file's md5 and marks EVERY dependent part stale -> a spurious full rebuild. This
+# bit us once: a provenance-comment retarget in tolerances.yaml (value unchanged)
+# rebuilt 75 parts. ContentChecker digests the *parsed* YAML instead -- key order
+# preserved, comments and formatting discarded -- so only a real data change
+# invalidates. Non-YAML deps (.py, .SLDPRT) fall through to the exact stock md5,
+# so their stored state stays valid across the switch.
+#
+# NB: changing the checker class re-stamps every task's `checker:` field, which
+# doit treats as changed -> run `doit reset-dep` once after this lands to migrate
+# the db in place WITHOUT a rebuild (the on-disk artefacts are already current).
+class ContentChecker(MD5Checker):
+    """MD5Checker that digests the parsed form of YAML configs (comment- and
+    whitespace-insensitive); byte-identical to MD5Checker for every other file."""
+
+    @staticmethod
+    def _digest(file_path: str) -> str:
+        if not file_path.endswith((".yaml", ".yml")):
+            return get_file_md5(file_path)
+        try:
+            with open(file_path, "rb") as fh:
+                data = _yaml.safe_load(fh)
+        except _yaml.YAMLError:
+            return get_file_md5(file_path)  # malformed -> fall back; build fails loud later
+        canon = _yaml.safe_dump(
+            data, default_flow_style=False, sort_keys=False, allow_unicode=True
+        )
+        return hashlib.md5(canon.encode("utf-8")).hexdigest()
+
+    def check_modified(self, file_path, file_stat, state):
+        timestamp, size, digest = state
+        # mtime unchanged -> content unchanged (stock fast path).
+        if file_stat.st_mtime == timestamp:
+            return False
+        # mtime changed: compare the CONTENT digest. (Stock MD5Checker short-
+        # circuits to "modified" on a size difference here -- wrong for us, since a
+        # comment edit changes the byte size while the parsed YAML is identical.)
+        return digest != self._digest(file_path)
+
+    def get_state(self, dep, current_state):
+        timestamp = os.path.getmtime(dep)
+        if current_state and current_state[0] == timestamp:
+            return  # mtime optimization: state unchanged
+        size = os.path.getsize(dep)
+        return timestamp, size, self._digest(dep)
+
+
+CHECKERS["content"] = ContentChecker
+
 DOIT_CONFIG = {
     "backend": "json",
     "dep_file": str(CAD_OUT / ".doit.db"),
+    # Hash the PARSED form of cad/config/*.yaml so comment/whitespace-only edits to
+    # a shared config no longer invalidate every dependent part (see ContentChecker
+    # above). Non-YAML deps keep stock md5 behaviour.
+    "check_file_uptodate": "content",
     # `build` is the one fully-safe entry point (parts + assemblies + every
     # gate). `build_bare` is the quick parts+assemblies rebuild; export/release
     # are opt-in.
@@ -229,12 +289,17 @@ def _run_stamped(cmd: list[str], label: str, stamp: str) -> None:
 def _digest_files(files: list[str]) -> str:
     """md5 over the *content* of each file (sorted, name-tagged) -- the recipe
     fingerprint shared by _RecipeTracker (the run/skip uptodate) and
-    build_or_refresh (the FULL/REFRESH decision), so the two never disagree."""
+    build_or_refresh (the FULL/REFRESH decision), so the two never disagree.
+
+    YAML configs are folded in by their PARSED content (ContentChecker._digest),
+    exactly like the file_dep checker -- so a comment/whitespace-only edit to a
+    shared cad/config/*.yaml doesn't force a spurious assembly FULL rebuild, while
+    a real placement-value change (which needs a re-insert) still does."""
     h = hashlib.md5()
     for f in sorted(files):
         h.update(f.encode())
         try:
-            h.update(Path(f).read_bytes())
+            h.update(ContentChecker._digest(f).encode())
         except OSError:
             h.update(b"<missing>")
     return h.hexdigest()
