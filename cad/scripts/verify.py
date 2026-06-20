@@ -143,12 +143,12 @@ _COMPONENT_BAND = {
     "drive-train": (32 + _N_CH - 4, 32 + _N_CH + 4),  # N=20 -> (48,56), measured 52
     "channel": (7 * _N_CH + 4 - 6, 7 * _N_CH + 4 + 6),  # N=20 -> (138,150), measured 144
     # The former monolithic output split by function (no per-channel parts here);
-    # bands to be tightened to the first green build's measured counts.
-    "summing": (6, 13),         # ch 18-19 (~9)
-    "magnifier": (8, 15),       # ch 20-21 (~11)
-    "pen": (4, 11),             # ch 24 (~7)
-    "paper-drive": (85, 97),    # ch 22-23-25 incl. 64-link chain + spare T18 (~91)
-    "harmonic-analyzer": (7, 11),  # 7 subassemblies + 1 loose part (measuring-stick)
+    # bands tightened to the measured green-build counts (verify:subsystems).
+    "summing": (8, 10),         # ch 18-19, measured 9
+    "magnifier": (10, 12),      # ch 20-21, measured 11
+    "pen": (6, 8),              # ch 24, measured 7
+    "paper-drive": (89, 93),    # ch 22-23-25, measured 91 (27 placed + 64-link chain)
+    "harmonic-analyzer": (7, 9),  # measured 8: 7 subassemblies + 1 loose part (measuring-stick)
 }
 
 # Tolerance audit (Part D / handoff §14.2 Gate E): every built part must carry
