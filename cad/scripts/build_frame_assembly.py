@@ -39,8 +39,14 @@ depth):
 * hex-bolt x2 (M6.10 fasteners): the SOUTH foot-rail hold-downs (moved
   here from the former output assembly with the rails), at (X, Z) = (+74.75, -54 / +36),
   heads on the rail top (y 70.8), shanks descending into the base.
+* nameplate x1 (book ch.26): the engraved brass maker's plate, laid flat on
+  the base top near the platen / output (machine front, -Z) -- "Wm. Gaertner &
+  Co / Chicago, U. S. A." Authored upright (decorated face on its Front plane),
+  it is turned Rx+90 to lie flat (decorated face up) and grounded resting on the
+  base top, 1.5 mm proud. The corner-anchored 100 x 55 plate centres its width
+  on x0 and insets its depth ~10 mm from the front top-plate edge.
 
-Every component is fixed (base) or fully defined by three orthogonal
+Every component is fixed (base, nameplate) or fully defined by three orthogonal
 plane-plane mates against the base part's principal planes; distance-mate
 flips are caught by reading back ``Transform2`` after each mate and
 re-adding the mate flipped. Final asserts: every component fixed or
@@ -74,6 +80,7 @@ from _assembly import (
     plane_distance_mate,
     save_assembly_and_images,
 )
+from _transforms import ROT_X_POS90
 
 ASM_NAME = "frame"
 
@@ -93,6 +100,20 @@ HEX_BOLT_X = 74.75
 HEX_BOLT_Y = 70.8
 HEX_BOLT_Z = (-54.0, 36.0)  # rail quarter points (machine z)
 TOP_FRAME_MID_Y = 1020.2  # ring mid-plane: rails y 999.7..1040.7 (M6.3)
+# Maker's nameplate (book ch.26): the engraved brass plate (100 x 55 x 1.5 mm)
+# screwed flat to the base top near the platen / output side (machine front,
+# -Z; "appears in situ on the base in the p.70 photo"). build_nameplate authors
+# it width +X, height +Y, decorated face on its Front plane with +Z thickness;
+# Rx+90 (ROT_X_POS90) lays it flat -- decorated face up (+Y), lettering reading
+# upright from the front -- with its bottom resting on the base top face. The
+# plate's local origin is its corner, so the insert point is that corner's
+# machine position: x centres the 100 mm width on x0, z insets the 55 mm depth
+# from the front top-plate edge (z -133.35).
+NAMEPLATE_W = 100.0  # build_nameplate PLATE_WIDTH (machine +X span)
+NAMEPLATE_H = 55.0  # build_nameplate PLATE_HEIGHT (machine +Z span once flat)
+NAMEPLATE_T = 1.5  # build_nameplate PLATE_THICKNESS (proud of the base top)
+NAMEPLATE_X = -NAMEPLATE_W / 2.0  # -50.0: width centred on machine x0
+NAMEPLATE_Z = -123.0  # front-inset ~10 mm from the top-plate front edge (-133.35)
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 
@@ -229,6 +250,29 @@ async def build(adapter) -> dict[str, str]:
         adapter, name, "Top Plane", "Top Plane", base_name, TOP_FRAME_MID_Y, target
     )
     assert_component_placed(adapter, name, target, IDENTITY)
+
+    # Maker's nameplate: laid flat on the base top (Rx+90), decorated face up,
+    # bottom face resting on the base top (y BASE_TOP_Y, 1.5 mm proud). Grounded
+    # in place -- a cosmetic plate with no functional DOF -- the same insert-at-
+    # transform + fix + read-back idiom place_component uses for fixed parts, so
+    # the assert verifies BOTH the origin and the Rx+90 orientation on the seat.
+    from solidworks_mcp.adapters.base import ComponentRefParameters
+
+    nameplate_path = _part("nameplate")
+    target = [NAMEPLATE_X, BASE_TOP_Y + NAMEPLATE_T, NAMEPLATE_Z]
+    res = await adapter.insert_component(
+        InsertComponentParameters(
+            file_path=nameplate_path, position=target, rotation=[90.0, 0.0, 0.0]
+        )
+    )
+    check(f"insert_component nameplate @ {target}", res)
+    name = res.data["name"]
+    if not res.data.get("fixed"):
+        check(
+            "fix nameplate",
+            await adapter.fix_component(ComponentRefParameters(name=name)),
+        )
+    assert_component_placed(adapter, name, target, ROT_X_POS90)
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)
