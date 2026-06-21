@@ -1,17 +1,15 @@
 """Regression proof for the nameplate's native sketch-primitive engraving.
 
-``build_nameplate`` used to import two DXFs (``nameplate-engraving.dxf`` and
-``nameplate-border.dxf``) and cut them. It now draws that geometry with
-SolidWorks sketch primitives: line chains for the glyph/cartouche contours
-(vendored in ``_nameplate_geometry.LETTERING_LOOPS``) and two rounded-rectangle
-arcs for the pinstripe frame (``BORDER_OUTER``/``BORDER_INNER``).
+``build_nameplate`` draws the engraving with SolidWorks sketch primitives: line
+chains for the glyph/cartouche contours (vendored in
+``_nameplate_geometry.LETTERING_LOOPS``, re-imported from the source DXF
+``cad/references/nameplate-engraving.dxf``) and two rounded-rectangle arcs for the
+pinstripe frame (``BORDER_OUTER``/``BORDER_INNER``) -- no DXF import at build time.
 
-When the primitives replaced the DXFs they were proven equal to the traced
-golden: engraving region area matched to 100.000%, pinstripe band area to
-99.989% (true arcs beat the DXF's 16-chord corners), and the finished solid
-volume to 100.000%. Those DXFs have since been removed, so this test guards the
-vendored geometry against regression by recomputing those three analytic targets
-from the vendored primitives alone -- no CAD kernel required.
+The golden targets below are the analytic areas/volume of that vendored geometry,
+captured when the loops were re-imported from the DXF. This test guards them
+against regression by recomputing the three targets from the vendored primitives
+alone -- no CAD kernel required.
 
 The maths mirrors ``build_nameplate`` exactly:
   * engraving area = ``abs`` of the signed-area (shoelace) sum over the loops --
@@ -41,11 +39,12 @@ import math
 
 from _nameplate_geometry import BORDER_INNER, BORDER_OUTER, LETTERING_LOOPS
 
-# Golden analytic targets, captured when the primitives were proven equal to the
-# traced DXFs (engraving 100%, band 99.99%, volume 100% -- all >= the 99% bar).
-GOLDEN_ENGRAVING_AREA = 535.341  # mm^2, even-odd filled glyph + cartouche region
+# Golden analytic targets, captured when the loops were re-imported from
+# cad/references/nameplate-engraving.dxf (engraving even-odd region, pinstripe
+# band, finished volume) -- the regression guard recomputes them >= the 99% bar.
+GOLDEN_ENGRAVING_AREA = 533.252  # mm^2, even-odd filled glyph + cartouche region
 GOLDEN_BAND_AREA = 177.654  # mm^2, rounded-rectangle pinstripe frame
-GOLDEN_VOLUME = 6682.26  # mm^3, finished plate
+GOLDEN_VOLUME = 6682.88  # mm^3, finished plate
 
 # Plate / feature dimensions -- mirror build_nameplate.py exactly.
 PLATE_W, PLATE_H, PLATE_T, CORNER_R = 100.0, 55.0, 1.5, 3.0
