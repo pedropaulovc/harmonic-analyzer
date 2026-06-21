@@ -102,11 +102,12 @@ def test_module_deps_are_transitive():
 
 
 def test_closure_follows_reused_build_scripts():
-    """A part that reuses another build script inherits that script's helper
-    closure: channel-spring-installed imports build_channel_spring (which imports
-    _features), so an edit to _features must mark it stale (codex review #2)."""
+    """A part that reuses a shared helper inherits that helper's own closure:
+    channel-spring-installed imports _spring (the shared spring builder, which
+    imports _features), so an edit to _features must mark it stale (codex
+    review #2)."""
     deps = _helper_names("build_channel_spring_installed.py")
-    assert "build_channel_spring" in deps, deps
+    assert "_spring" in deps, deps
     assert "_features" in deps, deps
 
 
@@ -240,7 +241,7 @@ def test_pen_assembly_tracks_pen_driver_config():
 def test_stamps_part_properties_only_genuine_stampers():
     """Only assemblies that GENERATE+stamp an in-script part (no separate part task)
     are flagged, via the function-level call graph. channel calls
-    build_channel_spring.build_spring (-> save_part_and_images) so it stamps its
+    _spring.build_spring (-> save_part_and_images) so it stamps its
     stretched springs; summing/magnifier import part-builder CONSTANTS and
     paper_drive reaches only build_cone_gear MATH helpers, so none of them stamp and
     a registry-row edit only REFRESHES them, no FULL (codex P2)."""

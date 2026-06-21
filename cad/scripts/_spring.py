@@ -1,39 +1,29 @@
-r"""Reproduction script: channel spring (book ch. 17, pp. 38-41).
+r"""Channel-spring geometry: the shared helical extension-spring builder.
 
-One of the 20 helical extension springs that couple each top lever to the
-summing lever. The p. 41 inset photo carries the chapter's only dimension
-callout -- 32 mm spanning the coiled body (resolving the "free length or
-coil OD" ambiguity logged in DIMENSIONS.md). Wire diameter, coil OD and
-coil count are scaled from the same inset (close-wound, coils just
-distinguishable).
+One helper for both the installed channel spring (``build_channel_spring_installed``)
+and the per-channel stretched variants the channel assembly mass-produces
+(``build_channel_assembly``). Holds the wire/coil geometry scaled from the book
+ch. 17 p. 41 inset and :func:`build_spring`, which sweeps a wire circle along a
+helix of a caller-given body length and adds the bent-wire end hooks
+(``_features.add_spring_end_hooks``).
 
-M4 (Phase 3 landed): bent-wire end hooks per the p. 41 inset -- each is an
-axial lead + 270-degree loop at the coil mean radius, swept in the Front
-plane (see ``_features.add_spring_end_hooks``). The top hook's wire profile
-sits on an offset reference plane at the coil's far end.
+The FREE (relaxed) body length and its provenance are the single dimension
+callout in ch. 17 (the p. 41 inset). They live in the part registry
+(``cad/config/parts/channel-spring-installed.yaml`` -> ``free_length_mm``): the
+standalone free-spring part (was ``build_channel_spring.py`` / ``channel-spring``,
+MHA-010) was display-only and is no longer built, so its relaxed length is kept
+there as the source of truth and read back here.
 
-M6.4: this script builds the FREE spring (32 body, as photographed on the
-table). In the machine the springs are visibly stretched ~2x (p. 40-41:
-open coils between lever tab and summing-lever plate); the installed
-geometry is a separate part -- see build_channel_spring_installed.py,
-which reuses :func:`build_spring` with the stretched body length.
-
-Dimensions: cad/DIMENSIONS.md "Chapter 17".
-
-Layout: coil axis along +Y from the origin (helix base circle on the Top
-plane); the helix starts and ends on the +X side (whole number of coils).
-Hook eye centres land at y = -HOOK_LEAD and y = body + HOOK_LEAD.
-
-Run (SolidWorks already open)::
-
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_channel_spring.py
+Layout: coil axis along +Y from the origin (helix base circle on the Top plane);
+the helix starts and ends on the +X side (whole number of coils). Hook eye
+centres land at ``y = -bottom_lead`` and ``y = body + top_lead``.
 """
 
 from __future__ import annotations
 
-import sys
 from typing import Iterable
 
+import _config
 from _common import (
     SPRING_BLACK,
     apply_color,
@@ -44,7 +34,6 @@ from _common import (
     ensure_fully_defined,
     name_bore_axis,
     report_mass_properties,
-    run_build,
     save_part_and_images,
 )
 from _features import (
@@ -52,10 +41,10 @@ from _features import (
     insert_helix,
 )
 
-PART_NAME = "channel-spring"
 MATERIAL = "Alloy Steel"  # see _common.apply_material docstring
 
-COIL_BODY_LENGTH = 32.0  # DIMENSIONS.md ch17: p.41 inset callout (high)
+# Relaxed body length: registry is the source of truth (see module docstring).
+COIL_BODY_LENGTH = float(_config.parts("channel-spring-installed")["free_length_mm"])
 COIL_OD = 6.5  # DIMENSIONS.md ch17: scaled from p.41 inset (low)
 WIRE_DIA = 1.0  # DIMENSIONS.md ch17: scaled from p.41 inset (low)
 COIL_COUNT = 28  # close-wound: body length / ~1.14 mm pitch (derived, low)
@@ -139,7 +128,7 @@ async def build_spring(
     await apply_color(adapter, SPRING_BLACK)  # ch30 plates: see _common palette
     await report_mass_properties(adapter)
     # ``views=[]`` saves the part with no PNG exports -- used when build_channel_
-    # assembly mass-produces the 10 per-channel stretched variants (the slow
+    # assembly mass-produces the per-channel stretched variants (the slow
     # image step would dominate; the canonical part still renders its views).
     if views is None:
         result = await save_part_and_images(adapter, part_name)
@@ -148,11 +137,3 @@ async def build_spring(
     # The two eye axes are baked into the .SLDPRT by the names captured above, so
     # the summation assembly can mate both ends without re-deriving them.
     return {**result, **eye_axis_names}
-
-
-async def build(adapter) -> dict[str, str]:
-    return await build_spring(adapter, PART_NAME, COIL_BODY_LENGTH)
-
-
-if __name__ == "__main__":
-    sys.exit(run_build(build))

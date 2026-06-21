@@ -92,7 +92,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Helix base sketch stays unabsorbed-and-shown after InsertHelix (see
-    # build_channel_spring) — blank it so it doesn't render in assemblies.
+    # _spring.build_spring) — blank it so it doesn't render in assemblies.
     blank_sketch(adapter, "Sketch1")
 
     await apply_material(adapter, MATERIAL)
