@@ -148,7 +148,9 @@ def _rel(paths, root):
     for p in paths:
         rp = Path(p).resolve()
         if root in rp.parents:
-            out.add(str(rp.relative_to(root)))
+            # as_posix() so the "machine/foo.yaml" literals below match on Windows
+            # too (str() would yield OS-native backslashes off-POSIX).
+            out.add(rp.relative_to(root).as_posix())
     return out
 
 
