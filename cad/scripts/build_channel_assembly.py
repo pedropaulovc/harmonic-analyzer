@@ -171,7 +171,7 @@ LEVER_MOUNT_Z = 85.0  # clears the top-frame boss bores (DIMENSIONS.md)
 from _spring import COIL_BODY_LENGTH, build_spring  # noqa: E402
 from build_channel_spring_installed import (  # noqa: E402
     BOTTOM_LEAD as SPRING_BOTTOM_LEAD,  # 9.1: lead spanning the plate thickness
-    INSTALLED_BODY_LENGTH as SPRING_BASE_BODY,  # 68.51: the neutral installed body
+    INSTALLED_BODY_LENGTH as SPRING_BASE_BODY,  # 68.01: the neutral installed body
     PLATE_EYE_Y,  # 984.04: fixed summing-plate bottom-eye y (the spring's lower anchor)
     TOP_LEAD as SPRING_TOP_LEAD,  # 2.0
 )
@@ -634,6 +634,18 @@ async def build(adapter) -> dict[str, str]:
     phi_0 = math.radians(state["lever_tilt"])  # state = solve_state(0.0)
     hole_x_0 = FULCRUM[0] + LEVER_SPRING_X * math.cos(phi_0)
     spring_specs = [_spring_spec(a, hole_x_0) for a in amplitudes]
+    # The canonical channel-spring-installed body MUST equal the neutral gap so
+    # the neutral pose mates that ONE part x20 with no generated stretch variant.
+    # If the lever anchor drifts (another OD re-anchor) they diverge -- fail loud
+    # here (and offline: verify:math spring:neutral-body-canonical) rather than
+    # silently spawning a stretch00. Non-neutral a_j still get real variants.
+    neutral_body = _spring_spec(0.0, hole_x_0)["body"]
+    if abs(neutral_body - SPRING_BASE_BODY) >= 0.05:
+        raise RuntimeError(
+            f"channel-spring-installed body {SPRING_BASE_BODY:.3f} != neutral gap "
+            f"{neutral_body:.3f}: update LEVER_EYE_Y in "
+            f"build_channel_spring_installed.py to the re-anchored neutral eye"
+        )
     variant_by_body: dict[float, str] = {}
     for spec in spring_specs:
         if abs(spec["body"] - SPRING_BASE_BODY) < 0.05:
@@ -646,8 +658,8 @@ async def build(adapter) -> dict[str, str]:
             variant_by_body[key] = name
             MIRROR_PLANE[name] = ("z", 0.0)  # z-symmetric like the base spring
         spec["part"] = name
-    log(f"spring variants: base 63.05 + {len(variant_by_body)} stretched bodies "
-        f"{sorted(variant_by_body)}")
+    log(f"spring variants: base {SPRING_BASE_BODY:.2f} + {len(variant_by_body)} "
+        f"stretched bodies {sorted(variant_by_body)}")
     for key, name in variant_by_body.items():
         # Always rebuild: a skip-if-exists short-circuit could reuse a stale
         # stretchNN body of a different length after amplitudes/spring lengths
