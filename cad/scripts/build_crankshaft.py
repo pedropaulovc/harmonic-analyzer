@@ -20,6 +20,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
 
 from _common import (
@@ -39,13 +40,28 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 SHAFT_DIA = 0.375 * IN  # ch11: legacy ShaftDiameter, uncontradicted
 SHAFT_LENGTH = 120.0  # ch11: derived (crank seat + pedestal bearing + seats)
-PIN_HOLE_DIA = 5.0  # ch11: tapered-pin cross-hole, pin small end (photo)
 PIN_HOLE_HEIGHT = 12.0  # crank hub centre above the outboard end
-THROUGH_CUT_DEPTH = 30.0  # mid-plane total; > shaft dia
+
+# Removable taper pin (build_crank_pin.py): Ø6 big -> Ø5 small over 45 mm. The
+# cross-bore is reamed to MATCH it (a true cone + radial clearance) so the pin
+# seats without solid interference. The pin's small end seats flush at the
+# crank-arm's far boss wall, ARM_BOSS_HALF_WIDTH out from the shaft axis, which
+# fixes the along-pin distance (s) of each cross-section -> the bore radius.
+PIN_BIG_DIA = 6.0  # DIMENSIONS.md ch11: pin big end (low)
+PIN_SMALL_DIA = 5.0  # DIMENSIONS.md ch11: pin small end / cross-hole (low)
+PIN_LEN = 45.0
+PIN_TAPER_SLOPE = (PIN_BIG_DIA - PIN_SMALL_DIA) / 2.0 / PIN_LEN  # bore-radius gain per mm
+PIN_TAPER_DEG = math.degrees(math.atan(PIN_TAPER_SLOPE))  # ~0.637 deg half-angle
+PIN_CLEAR = 0.2  # radial clearance (mid-pin section, generous)
+ARM_BOSS_HALF_WIDTH = 8.0  # build_crank_arm.py HALF_WIDTH: where the pin seats flush
+PIN_BIG_OFFSET = 6.0  # big-end sketch plane, this far to -Z of the shaft axis
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import (
+        CreatePlaneParameters,
+        ExtrusionParameters,
+    )
 
     check("create_part", await adapter.create_part())
 
@@ -61,20 +77,40 @@ async def build(adapter) -> dict[str, str]:
     print(f"  volume after shaft: {res.data.volume:.1f} mm^3")
     # expected: pi * 4.7625^2 * 120 = ~8,551 mm^3
 
-    # Tapered-pin cross-hole through the crank seat (along Z).
-    check("create_sketch pin hole", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, PIN_HOLE_HEIGHT, PIN_HOLE_DIA / 2.0, "pin hole")
+    # Tapered-pin cross-hole through the crank seat (along Z), a true CONE
+    # matching the removable taper pin (build_crank_pin.py). The pin enters
+    # from machine +X (big end); with the drive train's crankshaft re-spin the
+    # part's local +Z maps to machine -X, so the bore is widest at local -Z and
+    # tapers down toward +Z. A drafted cut narrows with depth, so sketch the big
+    # end on an offset plane PIN_BIG_OFFSET to -Z and cut +Z through the shaft.
+    pre = (await adapter.get_mass_properties()).data.volume
+    s_big = ARM_BOSS_HALF_WIDTH + PIN_BIG_OFFSET  # along-pin distance from the seated end
+    r_big = PIN_SMALL_DIA / 2.0 + s_big * PIN_TAPER_SLOPE + PIN_CLEAR
+    plane = check(
+        "create_plane pin big end",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Front Plane", offset=PIN_BIG_OFFSET, flip=True
+            )
+        ),
+    )
+    check("create_sketch pin hole", await adapter.create_sketch(plane.name))
+    await define_circle(adapter, 0.0, PIN_HOLE_HEIGHT, r_big, "pin hole big end")
     await ensure_fully_defined(adapter, "pin hole sketch")
     check("exit_sketch pin hole", await adapter.exit_sketch())
     check(
         "cut pin hole",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+            ExtrusionParameters(depth=2.0 * PIN_BIG_OFFSET, draft_angle=PIN_TAPER_DEG)
         ),
     )
     res = await adapter.get_mass_properties()
-    print(f"  volume after pin hole: {res.data.volume:.1f} mm^3")
-    # expected: -178 (O5 cross-drill) -> ~8,373 mm^3
+    removed = pre - res.data.volume
+    print(f"  pin hole removed {removed:.1f} mm^3 (tapered Ø5 cross-drill) -> {res.data.volume:.1f}")
+    if removed < 100.0:
+        raise RuntimeError(
+            f"pin hole removed only {removed:.1f} mm^3 -- offset plane on the wrong side?"
+        )
 
     # Named central axis (shaft axis = local +Y through the origin) so the
     # crankshaft mates concentric in the pedestal and the crank parts /

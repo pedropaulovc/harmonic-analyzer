@@ -25,6 +25,7 @@ from _common import (
     apply_material,
     check,
     ensure_fully_defined,
+    name_bore_axis,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -98,6 +99,11 @@ async def build(adapter) -> dict[str, str]:
         "revolve pin",
         await adapter.create_revolve(RevolveParameters(angle=360.0)),
     )
+
+    # Named axis along the pin centreline (local +X = Top Plane ∩ Front Plane,
+    # both through the origin) so the drive train can lock the pin rigidly to
+    # the crankshaft via Axis1.
+    await name_bore_axis(adapter, "Top Plane", 0.0, "Front Plane", 0.0, "pin axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

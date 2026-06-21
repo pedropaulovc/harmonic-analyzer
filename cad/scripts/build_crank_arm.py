@@ -12,12 +12,13 @@ the legacy 3/8" crankshaft bore (med).
 
 Layout: arm length along +X from the origin (shaft bore axis = global Z
 through the origin), thickness extruded +Z (0..8). The cross-pin hole runs
-along global Y at mid-thickness: probed live, a Top-plane sketch maps
-(x, y) -> global (X, -Z), so the hole circle sits at sketch (0, -4).
-Through-cuts use mid-plane blind cuts (depth > extent) because the
-ThroughAll+both_directions combination fails live on SW 2026 (MCP issue
-#38); the dimple uses a mid-plane cut of twice its depth so the cut
-direction never matters.
+along global Y at mid-thickness (global Z = 4 -> Top sketch y = -Z): it is a
+true CONE matching the removable taper pin (build_crank_pin.py), reamed from
+an offset big-end plane so the pin seats without interference (see the
+pin-hole block below). The bore/pivot/dimple through-cuts use mid-plane blind
+cuts (depth > extent) because the ThroughAll+both_directions combination fails
+live on SW 2026 (MCP issue #38); the dimple uses a mid-plane cut of twice its
+depth so the cut direction never matters.
 
 Run (SolidWorks already open)::
 
@@ -26,6 +27,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
 
 from _common import (
@@ -59,7 +61,17 @@ PIVOT_BORE_DIA = 6.0  # DIMENSIONS.md ch11: handle pivot screw (low)
 DIMPLE_DIA = 8.0  # DIMENSIONS.md ch11: fiducial indentation (low)
 DIMPLE_DEPTH = 0.5  # DIMENSIONS.md ch11: fiducial indentation (low)
 DIMPLE_X = 30.0  # DIMENSIONS.md ch11: on the arm near the boss (low)
-PIN_HOLE_DIA = 5.0  # DIMENSIONS.md ch11: tapered-pin cross-hole, small end (low)
+# Removable taper pin (build_crank_pin.py): Ø6 big -> Ø5 small over 45 mm. The
+# cross-bore is reamed to MATCH it (a true cone + radial clearance) so the pin
+# seats without solid interference (the straight Ø5 bore it replaced forced the
+# pin to be OMITTED from the drive train).
+PIN_BIG_DIA = 6.0  # DIMENSIONS.md ch11: pin big end (low)
+PIN_SMALL_DIA = 5.0  # DIMENSIONS.md ch11: pin small end / cross-hole (low)
+PIN_LEN = 45.0
+PIN_TAPER_SLOPE = (PIN_BIG_DIA - PIN_SMALL_DIA) / 2.0 / PIN_LEN  # bore-radius gain per mm
+PIN_TAPER_DEG = math.degrees(math.atan(PIN_TAPER_SLOPE))  # ~0.637 deg half-angle
+PIN_CLEAR = 0.15  # radial clearance so the pin seats without interference
+PIN_BIG_OFFSET = 10.0  # big-end sketch plane, this far to -Y of the boss centre
 
 ARM_END_X = ARM_C2C + SQUARE_END_OVERHANG
 HALF_WIDTH = ARM_WIDTH / 2.0
@@ -72,7 +84,10 @@ async def _volume(adapter) -> float:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import (
+        CreatePlaneParameters,
+        ExtrusionParameters,
+    )
 
     check("create_part", await adapter.create_part())
 
@@ -152,21 +167,42 @@ async def build(adapter) -> dict[str, str]:
     print(f"  volume after dimple: {vol:.1f} mm^3")
 
     # Tapered-pin cross-hole along global Y through boss and shaft bore at
-    # mid-thickness (global Z = ARM_THICKNESS/2 -> Top sketch y = -Z).
-    check("create_sketch pin hole", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter, 0.0, -ARM_THICKNESS / 2.0, PIN_HOLE_DIA / 2.0, "pin hole"
+    # mid-thickness (global Z = ARM_THICKNESS/2 -> Top sketch y = -Z). The bore
+    # is a true cone MATCHING build_crank_pin.py (Ø6 big -> Ø5 small over 45 mm,
+    # half-angle ~0.637 deg) so the removable taper pin seats without solid
+    # interference. In the drive train the pin enters from machine +X (big end,
+    # the grab head) and its small end seats flush at the far boss wall; the
+    # arm's local +Y maps to machine -X at rest, so the bore is widest at local
+    # -Y and tapers down toward +Y. A drafted cut narrows with depth (the
+    # adapter pins the draft inward), so sketch the big end on an offset plane
+    # BIG_OFFSET to -Y of the boss and cut +Y through it.
+    pre = await _volume(adapter)
+    s_big = HALF_WIDTH + PIN_BIG_OFFSET  # along-pin distance from the seated (small) end
+    r_big = PIN_SMALL_DIA / 2.0 + s_big * PIN_TAPER_SLOPE + PIN_CLEAR
+    plane = check(
+        "create_plane pin big end",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Top Plane", offset=PIN_BIG_OFFSET, flip=True
+            )
+        ),
     )
+    check("create_sketch pin hole", await adapter.create_sketch(plane.name))
+    await define_circle(adapter, 0.0, -ARM_THICKNESS / 2.0, r_big, "pin hole big end")
     await ensure_fully_defined(adapter, "pin hole sketch")
     check("exit_sketch pin hole", await adapter.exit_sketch())
     check(
         "cut pin hole",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+            ExtrusionParameters(depth=2.0 * PIN_BIG_OFFSET, draft_angle=PIN_TAPER_DEG)
         ),
     )
-    vol = await _volume(adapter)
-    print(f"  volume after pin hole: {vol:.1f} mm^3")
+    removed = pre - await _volume(adapter)
+    print(f"  pin hole removed {removed:.1f} mm^3 (tapered Ø5 cross-drill)")
+    if removed < 50.0:
+        raise RuntimeError(
+            f"pin hole removed only {removed:.1f} mm^3 -- offset plane on the wrong side?"
+        )
 
     # Named bore/central axis for view-independent assembly mate
     # selection (M6 mated-DOF drive train).

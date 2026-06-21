@@ -17,9 +17,12 @@ origin; base top face at y = 50.8, drive height 76 above it):
 * crankshaft along Z in the green crank pedestal: crank arm + handle at
   the front, the T12 removable chain wheel (ch. 23: the bead chain
   rides the removable's m2 teeth -- swapping removables changes the
-  platen ratio) and the 16T DP 16 pinion inboard (the removable
-  tapered pin is OMITTED: a tapered pin cannot sit in the straight
-  5 mm cross-holes without solid interference).
+  platen ratio) and the 16T DP 16 pinion inboard. The removable tapered
+  pin affixes the arm to the crankshaft: both cross-bores are reamed to a
+  CONE matching the pin (Ø6->Ø5 over 45 mm) and the crankshaft is re-spun
+  90 deg about its own axis so its bore is collinear with the arm's, so
+  the pin seats with clearance and is keyed to the crank (it was formerly
+  OMITTED -- the straight 5 mm bores left no room for the Ø6 big end).
 
 TRUE-CONE MESH GEOMETRY (M6.7; supersedes the M6.6 canted-vertical
 seats, which satisfied the interference checker but visibly deformed
@@ -292,6 +295,12 @@ PIVOT_POST_STATION = -1.0
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 ROT_X_POS90 = [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0]]
 ROT_Y_POS90 = [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]
+# Crankshaft re-spun +90 deg about its own axis (= ROT_X_POS90 . rot_z(90),
+# euler [90, 0, 90]) so its tapered cross-bore lands collinear with the crank-
+# arm's (both along machine X) and the removable taper pin can seat. The shaft
+# axis (local +Y -> assembly +Z) and the Top-Plane normal are unchanged from
+# ROT_X_POS90, so the crankshaft revolute + axial driver below are intact.
+ROT_CRANK_PINNED = [[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]]
 ROT_Y_INCLINE = [
     [COS_I, 0.0, SIN_I],
     [0.0, 1.0, 0.0],
@@ -424,7 +433,8 @@ async def build(adapter) -> dict[str, str]:
     # =================== crank (driven, on-solution) ===========================
     crankshaft = await place_component(
         adapter, "crankshaft",
-        [X_CRANK, Y_DRIVE, CRANKSHAFT_Z0], [90.0, 0.0, 0.0], ROT_X_POS90, ground=False,
+        [X_CRANK, Y_DRIVE, CRANKSHAFT_Z0], [90.0, 0.0, 90.0], ROT_CRANK_PINNED,
+        ground=False,
     )
     pinion = await place_component(
         adapter, "crank-pinion",
@@ -453,6 +463,18 @@ async def build(adapter) -> dict[str, str]:
         adapter, "crank-handle",
         [X_CRANK, Y_DRIVE - ARM_C2C, CRANK_ARM_Z0], [0.0, 90.0, 0.0], ROT_Y_POS90,
         ground=False,
+    )
+    # Removable tapered pin affixing the arm to the crankshaft. Placed at its
+    # final machine transform (mirror=False, like the nameplate): axis along
+    # machine X through the now-collinear cross-bores, centred at (-X_CRANK,
+    # Y_DRIVE, CRANKSHAFT_Z0+12). Big end (Ø6) protrudes +X as the grab head;
+    # small end (Ø5) seats flush at the arm's far boss wall. Keyed to the crank
+    # below so it shares the single crank spin DOF.
+    pin = await place_component(
+        adapter, "crank-pin",
+        [-X_CRANK + 37.0, Y_DRIVE, CRANKSHAFT_Z0 + 12.0], [180.0, 0.0, 180.0],
+        [[-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -1.0]],
+        ground=False, mirror=False, label="crank-pin (taper pin, big end +X)",
     )
 
     # =================== joints ================================================
@@ -490,6 +512,9 @@ async def build(adapter) -> dict[str, str]:
     )
     await lock_mate(
         adapter, named_ref(f"Axis2@{pinion}", "AXIS"), crank_axis, label="16T pinion keyed",
+    )
+    await lock_mate(
+        adapter, named_ref(f"Axis1@{pin}", "AXIS"), crank_axis, label="crank-pin keyed",
     )
 
     # =============== cone pivot post swing (p1 disengage DOF) ==============
