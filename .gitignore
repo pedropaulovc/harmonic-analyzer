@@ -362,8 +362,7 @@ cad/out/step/
 cad/out/boxes/
 # Changed-parts diff renders (regenerable: comparisons/tools/render_diff.py)
 cad/out/diff/
-# CadQuery stand-in outputs (regenerable: cad/scripts/*_cadquery.py); STEP/STL/
-# PNG written to cad/out/ root, e.g. cylinder-gear-cq.*, rocker-arm-cq.*
+# Regenerable STEP/STL/PNG exports written to cad/out/ root
 cad/out/*.step
 cad/out/*.stl
 cad/out/*.png

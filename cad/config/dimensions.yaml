@@ -452,10 +452,7 @@ sections:
       solid ≈ 0.60 mm² → v_notch ≈ 1.8 mm³). This SUPERSEDES both the former 3 mm
       square (width estimated = depth, low) and the interim missing-tooth slit. The
       standalone `eccentric-cam` part (M2 legacy re-author) is superseded by the
-      integral cam for assembly purposes. A CadQuery stand-in
-      (`build_cylinder_gear_cadquery.py`) reproduces the same geometry head-less
-      (STEP/STL + render, with an all-120-crests-intact gate) for environments
-      without a live SolidWorks seat.
+      integral cam for assembly purposes.
 
       **M6.2 keyway refutation (kinematic proof):** cylinder gear k turns k/80
       rev per crank (ch. 29 gear law) — every gear at a DIFFERENT speed — so the
