@@ -990,10 +990,6 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     "amplitude-bar": ("x", 3.175),
     "rocker-arm": "z",
     "connecting-rod": "z",
-    # eccentric cam: disc circle, bore and keyway are all centred on local
-    # x=0 (offset only in Y), so it is exactly x-symmetric -- explicit c=0
-    # avoids the STL-bbox dependency (used by the four-bar motion test rig).
-    "eccentric-cam": ("x", 0.0),
     "channel-lever": "z",
     "channel-spring-installed": "z",
     # drive train
