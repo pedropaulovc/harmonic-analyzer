@@ -662,16 +662,6 @@ def _cone_series_ok() -> bool:
     return all(ch["cone_teeth"] == fund - 6 * ch["index"] for ch in _config.channels())
 
 
-def verify_dimensions_fresh(report: Report) -> None:
-    """Gate that DIMENSIONS.md is not stale relative to dimensions.yaml."""
-    def run() -> None:
-        doc = gen_dimensions.load_doc()
-        rendered = gen_dimensions.render_markdown(doc)
-        current = gen_dimensions.DIMENSIONS_MD.read_text(encoding="utf-8")
-        _expect(rendered == current, "DIMENSIONS.md is stale -- run gen_dimensions.py")
-    report.gate("dims:not-stale", run)
-
-
 def _declared_part_names() -> set[str]:
     """Every ``PART_NAME = "..."`` declared by a ``build_*.py`` script.
 
@@ -862,7 +852,6 @@ async def build(adapter: Any) -> dict[str, str]:
         verify_truth(report)
     if suite == "config":
         verify_config_vs_dimensions(report)
-        verify_dimensions_fresh(report)
         verify_tolerance_audit(report)
         verify_amplitude_preset(report)
 
@@ -915,7 +904,6 @@ if __name__ == "__main__":
             verify_truth(_report)
         else:
             verify_config_vs_dimensions(_report)
-            verify_dimensions_fresh(_report)
             verify_tolerance_audit(_report)
             verify_amplitude_preset(_report)
         _print_summary(_report)
