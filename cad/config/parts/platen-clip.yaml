@@ -1,0 +1,5 @@
+platen-clip:
+  number: MHA-067
+  material: Brass
+  tolerance_class: machined_block
+  process: "machined (brass)"

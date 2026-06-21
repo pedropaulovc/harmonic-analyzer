@@ -1,0 +1,5 @@
+rocker-arm:
+  number: MHA-071
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  process: "machined (steel)"

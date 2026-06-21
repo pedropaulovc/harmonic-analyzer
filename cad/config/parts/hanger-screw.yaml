@@ -1,0 +1,6 @@
+hanger-screw:
+  number: MHA-034
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: "machined (steel)"

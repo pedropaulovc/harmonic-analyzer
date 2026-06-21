@@ -1,0 +1,19 @@
+
+gear_train:
+  diametral_pitch: 49.82           # DP_TRAIN — cone/cylinder train (= 122*25.4/62.2)
+  fundamental_cone_teeth: 120      # largest cone gear; per-channel = 120 - 6*index
+  cylinder_teeth: 120              # equal-size cylinder gears
+  crank_drive_ratio: [16, 64]      # 16T pinion on crankshaft : 64T on cone shaft
+  crank_drive_diametral_pitch: 26.57 # = DP_TRAIN*64/120, so the 64T pitch radius equals the cone T120's (30.59) — restores the book's "64T OD ≈ cone 120T OD" read and keeps the 64T ~1.9× coarser than the train (low; rescaled with the 62.2 anchor)
+  source: "DIMENSIONS.md ch13 (cylinder gear OD scaling), ch29/ch8 (gear law)"
+  confidence: low
+  notes: >-
+    Tooth counts counted directly on the book plates (high). DP is now ANCHORED
+    on the measured cylinder-gear OD = 62.2 mm (DIMENSIONS.md ch13, scaled p.25
+    bottom-left vs the back-view gear brackets, LOW confidence): m = 62.2/(120+2)
+    = 0.50984 mm, DP = 25.4/m = 49.82, pitch dia = 120*m = 61.18 mm. This
+    SUPERSEDES the former DP 30 round-inch derivation (which gave OD 103.3) — see
+    the ch12/ch13 discrepancy notes. Cone T120 shares this module (it meshes the
+    cylinder set). Gear law (ch.29 p.99, annotated): cylinder gear k turns k/80
+    rev per crank turn; ch.8 p.7 (stated): gear n spins n× gear 1. Crank reduction
+    16:64 = 1:4 sets the cone-shaft input speed.

@@ -1,0 +1,11 @@
+# Part registry — drives custom properties (Part D) + BOM identity.
+#
+# Each part the build scripts save gets these stamped into its SolidWorks custom
+# properties (see _common.apply_custom_properties). Part numbers are arbitrary
+# stable identifiers (MHA-###, assigned in sorted order). tolerance_class names a
+# cad/config/tolerances.yaml `general:` class; fit_class (when present) names a
+# `fits:` group for the part's moving interface. revision/process/confidence are
+# first-pass defaults — refine per part as needed.
+defaults:
+  revision: A
+  confidence: med

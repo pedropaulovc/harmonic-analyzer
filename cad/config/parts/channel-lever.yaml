@@ -1,0 +1,5 @@
+channel-lever:
+  number: MHA-009
+  material: Gray Cast Iron
+  tolerance_class: machined_block
+  process: "cast + machined"

@@ -1,0 +1,6 @@
+lever-bushing:
+  number: MHA-040
+  material: Brass
+  tolerance_class: machined_block
+  fit_class: shaft_in_bushing
+  process: "machined (brass)"

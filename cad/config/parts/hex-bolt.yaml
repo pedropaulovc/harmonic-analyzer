@@ -1,0 +1,6 @@
+hex-bolt:
+  number: MHA-036
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: "machined (steel)"

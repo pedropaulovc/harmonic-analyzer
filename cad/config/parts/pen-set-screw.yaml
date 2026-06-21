@@ -1,0 +1,6 @@
+pen-set-screw:
+  number: MHA-052
+  material: Brass
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: "machined (brass)"

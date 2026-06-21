@@ -89,12 +89,18 @@ from _buildgraph import (  # noqa: E402
     CAD_OUT,
     POST_ASSEMBLY,
     SCRIPTS_DIR,
+    all_config_files,
     artefact_for,
+    config_files_of,
+    machine_family_files,
     module_deps_of,
+    part_row_files,
     part_scripts,
     part_stems,
+    parts_registry_files,
     references_of,
     script_for,
+    stamps_part_properties,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -250,17 +256,78 @@ def _run(cmd: list[str], label: str) -> None:
 # script imports what it uses. (Excludes _buildgraph.py: the build-GRAPH helper
 # imported here, not a geometry input.)
 #
-# The YAML data layer stays a blanket dep of EVERY build: ``parts.yaml`` is read
-# transitively by ``_common.part_properties`` for almost every part (custom-
-# property stamping), and a placement YAML edit can move any body. Coarse but
-# correct, and content-hashing means an edit that doesn't change a given part's
-# inputs still costs only that one rebuild.
-_CONFIG_YAMLS = [str(p.resolve()) for p in sorted(CONFIG_DIR.glob("*.yaml"))]
+# The YAML data layer is now a FINE-GRAINED dep: each part/assembly depends on
+# ONLY the cad/config FILES it actually reads (``config_files_of`` -> static
+# analysis of the ``_config.<accessor>`` calls across the script's import closure;
+# see _buildgraph). machine.yaml and parts.yaml are split per-subsystem / per-part
+# so the granularity is sub-file: a gear part that reads only
+# machine("gear_train", ...) depends on machine/gear_train.yaml alone, so a
+# channels.active_count edit (machine/channels.yaml) skips it; editing ONE part's
+# registry row rebuilds only that part; and the 98 KB narrative dimensions.yaml
+# (read by NO part) drops out of every part. Conservative by construction -- any
+# unclassifiable ``_config`` use falls back to the whole config (the "**" token)
+# -- so it can only ever over-rebuild, never skip a real change.
+#
+# ``_CONFIG_YAMLS`` (every config file, recursive) is retained only for the
+# offline ``check:math`` / ``check:config`` gates, which audit the config broadly
+# and must stay conservative (a gate that fails to re-run is worse than one that
+# re-runs).
+_CONFIG_YAMLS = all_config_files()
 
 
 def _helper_deps(script) -> list[str]:
     """This build script's transitive ``_*.py`` helper imports (resolved paths)."""
     return module_deps_of(script if isinstance(script, Path) else Path(script))
+
+
+def _expand_parts_token(stem: str | None, kind: str | None, script: Path) -> list[str]:
+    """Per-task expansion of the ``"parts/*"`` registry token (the dynamic part
+    name in ``_common.part_properties``):
+
+      * a PART stamps only its OWN row -> parts/<dashed-stem>.yaml + _defaults
+        (editing one row rebuilds one part);
+      * an ASSEMBLY that stamps in-script (only build_channel_assembly, for its
+        stretched springs) depends on the rows of the parts it references (a
+        superset of the rows it stamps -- conservative); a non-stamping assembly
+        needs NO parts row (a referenced part's row edit rebuilds that PART, whose
+        new .SLDPRT triggers the assembly REFRESH);
+      * any other caller (e.g. an offline check) -> the whole registry.
+    """
+    if kind == "part" and stem is not None:
+        return part_row_files(stem.replace("_", "-"))
+    if kind == "assembly" and stem is not None:
+        if not stamps_part_properties(script):
+            return []
+        files: set[str] = set()
+        defaults = CONFIG_DIR / "parts" / "_defaults.yaml"
+        if defaults.exists():
+            files.add(str(defaults.resolve()))
+        for ref in references_of(stem):
+            files.update(part_row_files(ref.replace("_", "-")))
+        return sorted(files)
+    return parts_registry_files()
+
+
+def _config_deps(script, stem: str | None = None, kind: str | None = None) -> list[str]:
+    """The cad/config FILES this build script actually reads (fine-grained;
+    conservative whole-config fallback on any unclassifiable ``_config`` use).
+
+    Expands the tokens from ``config_files_of`` to concrete paths, narrowing the
+    ``"parts/*"`` registry token to the task's own rows (see _expand_parts_token).
+    """
+    script = script if isinstance(script, Path) else Path(script)
+    tokens = config_files_of(script)
+    if "**" in tokens:
+        return all_config_files()
+    out: set[str] = set()
+    for tok in tokens:
+        if tok == "machine/*":
+            out.update(machine_family_files())
+        elif tok == "parts/*":
+            out.update(_expand_parts_token(stem, kind, script))
+        else:
+            out.add(str((CONFIG_DIR / tok).resolve()))
+    return sorted(out)
 
 # --- Stamp files: the verify:/check: gates produce no CAD artefact, so a stamp
 # under cad/out/reports/ is their doit ``target``. That makes each gate
@@ -309,12 +376,15 @@ def _recipe_files(stem: str) -> list[str]:
     """Files whose change forces a FULL rebuild of <stem> (re-insert/re-mate)
     rather than a part-only refresh: the assembly script, its hooks, the helper
     modules it transitively imports (``_helper_deps`` -> ``module_deps_of``, incl.
-    _assembly/_transforms), and the _config/YAML data layer (a placement like
-    channels.station_pitch_mm changing must re-insert components at new
-    coordinates, which an in-place reload cannot do)."""
+    _assembly/_transforms), and the config docs THIS assembly actually reads
+    (``_config_deps``; a placement like channels.station_pitch_mm changing must
+    re-insert components at new coordinates, which an in-place reload cannot do).
+    The fine-grained config set means an edit to a YAML this assembly never reads
+    no longer forces a spurious ~500 s FULL re-insert."""
     asm_script = script_for(stem)
     hooks = [str((SCRIPTS_DIR / h).resolve()) for h in POST_ASSEMBLY.get(stem, ())]
-    return [str(asm_script.resolve()), *hooks, *_helper_deps(asm_script), *_CONFIG_YAMLS]
+    return [str(asm_script.resolve()), *hooks, *_helper_deps(asm_script),
+            *_config_deps(asm_script, stem, "assembly")]
 
 
 def _recipe_sidecar(stem: str) -> Path:
@@ -331,7 +401,8 @@ def task_part():
         stem = script.stem.removeprefix("build_")
         yield {
             "name": stem,
-            "file_dep": [str(script.resolve()), *_helper_deps(script), *_CONFIG_YAMLS],
+            "file_dep": [str(script.resolve()), *_helper_deps(script),
+                         *_config_deps(script, stem, "part")],
             "targets": [_sldprt(stem)],
             # COM spine: serialize parts on the single SW seat (see _spine_dep).
             "task_dep": _spine_dep(f"part:{stem}"),
@@ -486,11 +557,12 @@ def task_assembly():
             _sldasm(r) if r in ASSEMBLY_ORDER else _sldprt(r) for r in refs
         ]
         # Recipe = the files whose change forces a FULL rebuild (re-insert/re-mate)
-        # vs a part-only refresh: the assembly script, its hooks, AND the shared
-        # helper/_config/YAML data layer (a placement like channels.station_pitch_mm
-        # changing must re-insert components at new coordinates, which an in-place
-        # reload cannot do; codex review #2). Factored into _recipe_files so
-        # build_or_refresh computes the identical digest.
+        # vs a part-only refresh: the assembly script, its hooks, its helper
+        # closure, AND the config docs THIS assembly reads (a placement like
+        # channels.station_pitch_mm changing must re-insert components at new
+        # coordinates, which an in-place reload cannot do; codex review #2).
+        # Factored into _recipe_files so build_or_refresh computes the identical
+        # digest.
         recipe_files = _recipe_files(stem)
         yield {
             "name": stem,
@@ -577,8 +649,13 @@ def task_check():
             "cmd": [sys.executable, str(VERIFY_PY), "--suite", "config"],
         },
         "graph": {
+            # test_config_accessor_coverage reads _config.py, so a new accessor
+            # added there (without an entry in _buildgraph) must invalidate this
+            # stamp -- else the "fails loud" coverage test silently never re-runs
+            # and the perf benefit is lost (codex review).
             "file_dep": [str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
-                         str((SCRIPTS_DIR / "test_buildgraph.py").resolve())],
+                         str((SCRIPTS_DIR / "test_buildgraph.py").resolve()),
+                         config_py],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_buildgraph.py")],
         },
         "nameplate": {

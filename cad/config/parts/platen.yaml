@@ -1,0 +1,5 @@
+platen:
+  number: MHA-066
+  material: Brass
+  tolerance_class: plate_profile
+  process: "machined (brass)"

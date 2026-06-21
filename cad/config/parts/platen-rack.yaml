@@ -1,0 +1,6 @@
+platen-rack:
+  number: MHA-069
+  material: Brass
+  tolerance_class: machined_block
+  fit_class: gear_mesh
+  process: "gear cutting (hob/shaper)"

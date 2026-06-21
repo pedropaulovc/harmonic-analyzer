@@ -1,0 +1,5 @@
+magnifying-bracket:
+  number: MHA-041
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  process: "machined (steel)"

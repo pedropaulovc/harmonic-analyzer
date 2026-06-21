@@ -1,0 +1,6 @@
+eccentric-cam:
+  number: MHA-029
+  material: Brass
+  tolerance_class: machined_block
+  fit_class: cam_follower_contact
+  process: "machined (brass)"

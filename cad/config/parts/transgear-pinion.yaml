@@ -1,0 +1,6 @@
+transgear-pinion:
+  number: MHA-080
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  fit_class: gear_mesh
+  process: "gear cutting (hob/shaper)"

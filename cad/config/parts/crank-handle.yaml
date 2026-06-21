@@ -1,0 +1,5 @@
+crank-handle:
+  number: MHA-022
+  material: Oak
+  tolerance_class: visual_noncritical
+  process: "turned (wood)"
