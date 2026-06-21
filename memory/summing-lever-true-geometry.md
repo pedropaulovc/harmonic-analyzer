@@ -137,4 +137,4 @@ geometry. Full-assembly gate now "interference check: none found"; `diag_sl_clas
 GetInterferenceBody box dump) confirms 0 interferences; top-view render shows all 20 holes cut with the
 3 active springs threading cleanly. LESSON: never trust `FeatureLinearPattern5`'s auto-selected-edge
 direction for a field that must land on exact stations — cut the stations explicitly. See
-[[temp-3channel-build-reduction]], [[parametric-springs]].
+[[channel-amplitude-state]], [[parametric-springs]].
