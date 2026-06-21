@@ -1,23 +1,22 @@
 ---
 name: channel-amplitude-state
-description: Final channel-count + amplitude-preset state — full 20 channels, neutral preset — lives on similarity-tuning branch (63dd47e), NOT for main
+description: Canonical channel-count + amplitude-preset state — full 20 channels active, neutral preset (all a_j=0); landed/landing on main
 metadata:
   type: project
 ---
 
-**Current state (2026-06-20, supersedes the earlier temporary 3-channel cut):** the
-machine is built with **all 20 channels active** and **all amplitude bars at rest**
-(neutral preset, a_j = 0). This is the **chosen final** state for the
-similarity-tuning exercise — NOT a temporary perf cut, and there is no longer any
-"recover to square" plan. Neutral matches the reference photos: every channel return
-spring sits at the same rest length, so one shared spring geometry covers all 20
-channels. The `square` preset (a_j = 80/harmonic_n on ODD harmonics, 0 on even — the
-textbook square-wave partial sum) is documented in the YAML as the alternative.
+**Canonical state (2026-06-20):** the machine is built with **all 20 channels active**
+and **all amplitude bars at rest** (neutral preset, a_j = 0). This is the **chosen
+single state** — not a perf cut, and there is no "recover to square" plan. Neutral
+matches the reference photos: every channel return spring sits at the same rest length,
+so one shared spring geometry covers all 20 channels. The `square` preset
+(a_j = 80/harmonic_n on ODD harmonics, 0 on even — the textbook square-wave partial sum)
+is documented in the YAML as the alternative.
 
-**⚠️ Branch hygiene:** this config lives as a single commit `63dd47e` on
-`claude/similarity-tuning` and is **NOT meant to be merged to `main`** (per user,
-2026-06-20). It is the experimental neutral/20-channel baseline for tuning CAD-vs-photo
-similarity. Keep it on the branch; do not open a PR to main for it.
+**Provenance / main:** this config originated as commit `63dd47e` on
+`claude/similarity-tuning`. The user initially kept it branch-only, then reversed
+(2026-06-20): with incremental builds now effective, the 20-channel/neutral config is
+to be **merged to `main`** as the canonical state, to avoid two states floating around.
 
 **Config knobs (post-#47 split — `machine.yaml` is gone, replaced by `machine/*.yaml`):**
 - `cad/config/machine/channels.yaml` → `active_count: 20`, read via
