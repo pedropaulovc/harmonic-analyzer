@@ -101,6 +101,8 @@ from _buildgraph import (  # noqa: E402
     stamps_part_properties,
 )
 
+import _artifact_cache as _cache  # noqa: E402  (remote build-artefact cache)
+
 REPO_ROOT = Path(__file__).resolve().parent
 CONFIG_DIR = REPO_ROOT / "cad" / "config"
 
@@ -408,6 +410,82 @@ def _digest_files(files: list[str]) -> str:
     return h.hexdigest()
 
 
+# --- Remote artefact cache (opt-in, off by default; see _artifact_cache.py).
+#
+# A COM task's outputs are a pure function of its ``file_dep`` content, so we key a
+# shared cache by that hash and download a prebuilt .SLDPRT/.SLDASM instead of
+# driving SolidWorks. Keys fold each file with ContentChecker._digest -- IDENTICAL
+# to the doit staleness check -- so a cache hit and "doit up-to-date" agree, and a
+# comment-only YAML edit changes neither. A seat-less machine (HARMONIC_CACHE_MODE
+# =ro) pulls; a builder (rw) pulls+pushes. Disabled (off) => zero behaviour change.
+def _png_dir(stem: str) -> Path:
+    return CAD_OUT / "png" / stem.replace("_", "-")
+
+
+def _stl(stem: str) -> Path:
+    """The part's binary STL sidecar (cad/out/stl/<dashed>.STL). save_part_and_images
+    emits it next to the .SLDPRT; assembly placement reads it via stl_bbox_mm, so it
+    MUST be cached alongside the part or a fresh consumer's assembly build fails on a
+    missing bbox source (codex review)."""
+    prt = Path(_sldprt(stem))
+    return prt.parent.parent / "stl" / f"{prt.stem}.STL"
+
+
+def _channel_spring_variants() -> list[Path]:
+    """The dynamically-generated stretched-spring parts the channel assembly inserts
+    for a non-neutral amplitude preset. They are not any task's declared target, so
+    they must be enumerated by glob -- shared by _clean_assembly (remove) and the
+    cache (pack), so a hit restores the components channel.SLDASM references."""
+    return sorted((CAD_OUT / "sldprt").glob("channel-spring-installed-stretch*.SLDPRT"))
+
+
+def _part_cache_outputs(stem: str) -> list[Path]:
+    """Everything a part build emits that downstream tasks read: the .SLDPRT, its STL
+    sidecar, and the render dir. Non-existent entries are skipped at pack time."""
+    return [Path(_sldprt(stem)), _stl(stem), _png_dir(stem)]
+
+
+def _assembly_cache_outputs(stem: str) -> list[Path]:
+    """Everything an assembly build emits beyond its file_dep: the .SLDASM + renders,
+    plus the per-stem extras a hit would otherwise leave missing/stale -- the channel
+    stretch-spring components, and the top assembly's gallery PNGs + parts BOM (which
+    export_gallery_and_bom writes into cad/out, OUTSIDE _png_dir)."""
+    outs = [Path(_sldasm(stem)), _png_dir(stem)]
+    if stem == "channel":
+        outs += _channel_spring_variants()
+    if stem == "harmonic_analyzer":
+        outs += sorted((CAD_OUT / "png").glob("eight-views-*.png"))
+        outs.append(CAD_OUT / "harmonic-analyzer-bom.csv")
+    return outs
+
+
+def _part_file_deps(script: Path, stem: str) -> list[str]:
+    return [str(script.resolve()), *_helper_deps(script),
+            *_config_deps(script, stem, "part")]
+
+
+def _assembly_file_deps(stem: str) -> list[str]:
+    refs = references_of(stem)
+    ref_targets = [_sldasm(r) if r in ASSEMBLY_ORDER else _sldprt(r) for r in refs]
+    return [*_recipe_files(stem), *ref_targets]
+
+
+def _cache_key(file_deps: list[str]) -> str:
+    return _cache.cache_key(file_deps, ContentChecker._digest)
+
+
+def _cached_part_action(stem: str, script: Path) -> None:
+    """Part action with a remote-cache shortcut: on a HIT the .SLDPRT (+ renders)
+    are downloaded and the SolidWorks build is skipped; otherwise build, then push.
+    Falls through to a normal build whenever the cache is off or errors."""
+    key = _cache_key(_part_file_deps(script, stem))
+    outputs = _part_cache_outputs(stem)
+    if _cache.restore(key, outputs, f"part:{stem}"):
+        return
+    _run([sys.executable, str(script)], f"part:{stem}")
+    _cache.store(key, outputs, f"part:{stem}")
+
+
 def _recipe_files(stem: str) -> list[str]:
     """Files whose change forces a FULL rebuild of <stem> (re-insert/re-mate)
     rather than a part-only refresh: the assembly script, its hooks, the helper
@@ -437,12 +515,12 @@ def task_part():
         stem = script.stem.removeprefix("build_")
         yield {
             "name": stem,
-            "file_dep": [str(script.resolve()), *_helper_deps(script),
-                         *_config_deps(script, stem, "part")],
+            "file_dep": _part_file_deps(script, stem),
             "targets": [_sldprt(stem)],
             # COM spine: serialize parts on the single SW seat (see _spine_dep).
             "task_dep": _spine_dep(f"part:{stem}"),
-            "actions": [CmdAction([sys.executable, str(script)], cwd=str(REPO_ROOT))],
+            # Remote-cache shortcut wraps the COM build (no-op when cache is off).
+            "actions": [(_cached_part_action, [stem, script])],
             "clean": True,
             "verbosity": 2,
         }
@@ -501,9 +579,21 @@ def build_or_refresh(stem, dependencies, changed, targets):
     ``changed`` arg is likewise avoided -- it is corrupted by a prior failed
     task (D2).
     """
-    target_missing = not Path(targets[0]).exists()
-    digest = _digest_files(_recipe_files(stem))
     sidecar = _recipe_sidecar(stem)
+    digest = _digest_files(_recipe_files(stem))
+
+    # Remote-cache shortcut: a HIT downloads the .SLDASM (+ renders), skipping the
+    # COM build/refresh entirely. The recipe sidecar is NOT cached -- its digest
+    # tags by absolute path (machine-local) -- so recompute it here, exactly as the
+    # success tail does, to keep the next run's FULL/REFRESH decision correct.
+    cache_key = _cache_key(_assembly_file_deps(stem))
+    cache_outputs = _assembly_cache_outputs(stem)
+    if _cache.restore(cache_key, cache_outputs, f"assembly:{stem}"):
+        sidecar.parent.mkdir(parents=True, exist_ok=True)
+        sidecar.write_text(digest + "\n", encoding="utf-8")
+        return
+
+    target_missing = not Path(targets[0]).exists()
     try:
         last = sidecar.read_text(encoding="utf-8").strip()
     except OSError:
@@ -524,6 +614,12 @@ def build_or_refresh(stem, dependencies, changed, targets):
     # build's recipe digest for the next run's FULL/REFRESH decision.
     sidecar.parent.mkdir(parents=True, exist_ok=True)
     sidecar.write_text(digest + "\n", encoding="utf-8")
+    # Publish the fresh artefacts for other machines (no-op unless mode=rw).
+    # RECOMPUTE the output set here, not reuse the one from the top: the channel
+    # stretch parts and the top-level gallery PNGs are glob-discovered and DID NOT
+    # EXIST yet on a clean builder when cache_outputs was first computed, so the
+    # early list would publish an incomplete archive (codex review). They exist now.
+    _cache.store(cache_key, _assembly_cache_outputs(stem), f"assembly:{stem}")
 
 
 def _close_sw_documents() -> None:
@@ -573,9 +669,7 @@ def _clean_assembly(stem):
     _force_remove(_recipe_sidecar(stem))
     _force_remove(CAD_OUT / "png" / stem.replace("_", "-"))
     if stem == "channel":
-        for variant in sorted(
-            (CAD_OUT / "sldprt").glob("channel-spring-installed-stretch*.SLDPRT")
-        ):
+        for variant in _channel_spring_variants():
             _force_remove(variant)
 
 
