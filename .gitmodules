@@ -1,3 +1,7 @@
 [submodule "references"]
 	path = references
 	url = https://github.com/pedropaulovc/harmonic-analyzer-references.git
+[submodule "SolidworksMCP-python"]
+	path = SolidworksMCP-python
+	url = https://github.com/pedropaulovc/SolidworksMCP-python.git
+	branch = personal
