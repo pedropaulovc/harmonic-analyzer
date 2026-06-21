@@ -80,7 +80,7 @@ for _stream in (sys.stdout, sys.stderr):
 
 import yaml as _yaml
 from doit.action import CmdAction
-from doit.dependency import CHECKERS, MD5Checker, get_file_md5
+from doit.dependency import CHECKERS, Dependency, JsonDB, MD5Checker, get_file_md5
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "cad" / "scripts"))
 
@@ -209,6 +209,44 @@ class ContentChecker(MD5Checker):
 
 
 CHECKERS["content"] = ContentChecker
+
+
+# --- Per-task DB checkpointing so an interrupted build resumes incrementally.
+#
+# doit 0.37's backends (json/dbm/sqlite3 alike) only persist .doit.db on a CLEAN
+# process exit -- Dependency.close() is the sole caller of backend.dump(); set()
+# merely mutates an in-memory dict (sqlite3.set() just caches + marks dirty, and
+# its dump() even closes the connection). So a build killed mid-run (Ctrl-C,
+# TaskStop, crash, SW hang) loses EVERY completed-part record and the next run
+# rebuilds all ~71 parts from scratch (~25 min). Switching backend does not help.
+#
+# Fix: checkpoint after each successful task. JsonDB.dump() is a full-file rewrite
+# that neither closes nor clears state, so it is safe to call repeatedly; we make
+# it atomic (tmp + fsync + os.replace) so a kill mid-write can't corrupt the db,
+# then call it once per task from save_success. Overhead is ~71 small writes per
+# build; correctness is unchanged (same records, just flushed eagerly). Class-level
+# monkeypatch -- adding this to dodo.py changes no task's file_dep, so it does not
+# itself invalidate anything.
+def _atomic_json_dump(self: JsonDB) -> None:
+    tmp = f"{self.name}.tmp"
+    with open(tmp, "w") as fh:
+        fh.write(self.codec.encode(self._db))
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, self.name)
+
+
+JsonDB.dump = _atomic_json_dump
+
+_orig_save_success = Dependency.save_success
+
+
+def _save_success_checkpoint(self: Dependency, task, result_hash=None) -> None:
+    _orig_save_success(self, task, result_hash)
+    self.backend.dump()  # durable checkpoint -> interrupted build resumes here
+
+
+Dependency.save_success = _save_success_checkpoint
 
 DOIT_CONFIG = {
     "backend": "json",
