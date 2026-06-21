@@ -395,3 +395,6 @@ comparisons/.parity_sw/
 .mesalib.conda
 .gl_test.png
 .cf_repo.json
+
+# Per-machine build-cache role (off|ro|rw) read by cad/scripts/_artifact_cache.py
+.harmonic-cache-mode
