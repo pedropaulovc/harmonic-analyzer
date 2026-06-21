@@ -1,0 +1,50 @@
+[project]
+name = "harmonic-analyzer"
+version = "0.1.0"
+description = "Parametric CAD model + build pipeline for a Michelson-style harmonic analyzer (SolidWorks-driven, doit-orchestrated)."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+
+# Core: everything the doit pipeline and the SolidWorks-free gates / comparison
+# diff tooling import directly.
+#   doit      - pipeline orchestrator (dodo.py)
+#   pyyaml    - cad/config registry parsing (_config.py, gen_dimensions.py)
+#   pillow    - PNG export/trim (_common, trim_renders, comparisons/tools)
+#   numpy     - geometry / Hausdorff diff (render_diff, release_diff)
+#   trimesh   - mesh diff (render_diff.py, the SolidWorks-free release diff)
+#   matplotlib- offline render fallback (render_diff_mpl)
+#   pywin32   - SolidWorks COM (win32com/pythoncom) on the COM tasks
+#   comtypes  - SolidWorks COM (alternate binding) on the COM tasks
+dependencies = [
+    "doit>=0.36",
+    "pyyaml>=6.0",
+    "pillow>=10.0",
+    "numpy>=1.26",
+    "trimesh>=4.0",
+    "matplotlib>=3.8",
+    "pywin32>=306 ; sys_platform == 'win32'",
+    "comtypes>=1.4 ; sys_platform == 'win32'",
+    # The SolidWorks COM adapter + gate logic (verify.py, _common.py, _assembly.py
+    # all `from solidworks_mcp...`) lives in the sibling repo. Pulled in editable so
+    # the whole pipeline runs from this one uv venv.
+    "solidworks-mcp-python",
+]
+
+[dependency-groups]
+# Backs the SolidWorks-free `check:*` gates (math/config/graph/nameplate/recipe).
+# Synced by default with `uv sync`.
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.uv]
+# This repo is a workspace of scripts (cad/scripts, comparisons/tools added to
+# sys.path at runtime), not an installable package — don't try to build it.
+package = false
+
+[tool.uv.sources]
+# Vendored as a git submodule (./SolidworksMCP-python, tracking branch `personal`);
+# editable so local edits to the COM adapter are picked up live. Run
+# `git submodule update --init` after cloning so this path exists.
+solidworks-mcp-python = { path = "SolidworksMCP-python", editable = true }
