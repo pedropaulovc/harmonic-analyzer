@@ -36,7 +36,7 @@ from __future__ import annotations
 import sys
 
 from _common import run_build
-from build_channel_spring import COIL_BODY_LENGTH, HOOK_LEAD, build_spring
+from _spring import COIL_BODY_LENGTH, HOOK_LEAD, build_spring
 
 PART_NAME = "channel-spring-installed"
 

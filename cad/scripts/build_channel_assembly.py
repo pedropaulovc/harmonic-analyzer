@@ -168,7 +168,7 @@ RAIL_TOP_Y = 1040.7
 LEVER_MOUNT_Z = 85.0  # clears the top-frame boss bores (DIMENSIONS.md)
 
 # --- spring (build_channel_spring_installed.py locals) ----------------------
-from build_channel_spring import COIL_BODY_LENGTH, build_spring  # noqa: E402
+from _spring import COIL_BODY_LENGTH, build_spring  # noqa: E402
 from build_channel_spring_installed import (  # noqa: E402
     BOTTOM_LEAD as SPRING_BOTTOM_LEAD,  # 9.1: lead spanning the plate thickness
     INSTALLED_BODY_LENGTH as SPRING_BASE_BODY,  # 68.51: the neutral installed body
