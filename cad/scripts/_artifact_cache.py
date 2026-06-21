@@ -30,12 +30,21 @@ Design notes / invariants:
 
 * **Salt / epoch.** The toolchain (SolidWorks major version, the COM adapter) is
   NOT in any file_dep, so a SW upgrade that changes geometry would otherwise serve
-  a stale hit. ``HARMONIC_CACHE_SALT`` (e.g. ``sw2024-sp3``) is mixed into every
-  key; bump it -- or the ``_CACHE_EPOCH`` constant -- to invalidate the whole cache.
+  a stale hit. ``_DEFAULT_SALT`` (e.g. ``sw2024-sp3``, overridable by
+  ``HARMONIC_CACHE_SALT``) is mixed into every key; bump it -- or the
+  ``_CACHE_EPOCH`` constant -- to invalidate the whole cache.
 
-* **Read/write roles.** ``HARMONIC_CACHE_MODE`` = ``ro`` (dev: pull only),
-  ``rw`` (builder: pull + push), or ``off`` (default: disabled, pipeline behaves
-  exactly as before). A miss is never fatal -- it falls through to the real build.
+* **Zero-config defaults.** The account/container/salt are committed constants
+  (``_DEFAULT_*``), so a machine never has to be told where the cache lives -- it
+  only declares a ROLE. Each is still overridable by the matching
+  ``HARMONIC_CACHE_*`` env var (CI, tests, an unlanded salt bump).
+
+* **Read/write roles.** The role is ``ro`` (dev: pull only), ``rw`` (builder:
+  pull + push), or ``off`` (default: disabled, pipeline behaves exactly as
+  before). It comes from ``HARMONIC_CACHE_MODE`` or, failing that, a gitignored
+  one-line ``.harmonic-cache-mode`` file at the repo root -- so a builder/dev box
+  opts in once with no persistent OS env var, and a fresh clone stays ``off``. A
+  miss is never fatal -- it falls through to the real build.
 
 * **Fail-soft.** Any backend error (network, creds, corrupt archive) logs a
   warning and is treated as a miss / no-op push. The cache can only make a build
@@ -73,10 +82,25 @@ from pathlib import Path
 
 # Bump to invalidate EVERY cached entry pipeline-wide (e.g. after a change to the
 # pack format or a build-logic change not captured by any file_dep). Combine with
-# HARMONIC_CACHE_SALT for toolchain-version busting.
+# the salt for toolchain-version busting.
 _CACHE_EPOCH = "1"
 
+# Project-wide defaults, committed so a machine opts in by setting only a MODE --
+# never by rediscovering where the cache lives. Each is still overridable by the
+# matching HARMONIC_CACHE_* env var (CI, tests, or a salt bump before it lands).
+#   account/container -- not secret (RBAC-gated, public blob access off)
+#   salt -- the toolchain epoch; bump it in the SAME commit that adapts to a new
+#           SolidWorks version, so the cache busts in lockstep with the code.
+_DEFAULT_ACCOUNT = "stswbuildcache07aba2"
+_DEFAULT_CONTAINER = "buildcache"
+_DEFAULT_SALT = "sw2024-sp3"
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+# A machine's role (off | ro | rw). Read from HARMONIC_CACHE_MODE, else this
+# gitignored one-line file at the repo root -- so a builder/dev box sets its role
+# once (`rw`/`ro`) without persisting an OS env var, and a fresh clone stays off.
+_MODE_FILE = REPO_ROOT / ".harmonic-cache-mode"
 
 
 def _log(msg: str) -> None:
@@ -108,7 +132,7 @@ def cache_key(file_deps: list[str], digest_one) -> str:
     Each file is tagged by its REPO-RELATIVE path (not absolute, unlike
     ``_digest_files``) so the key is identical across machines and worktrees.
     """
-    salt = os.environ.get("HARMONIC_CACHE_SALT", "")
+    salt = os.environ.get("HARMONIC_CACHE_SALT") or _DEFAULT_SALT
     h = hashlib.sha256()
     h.update(f"epoch={_CACHE_EPOCH}\0salt={salt}\0".encode())
     for path in sorted(file_deps, key=lambda p: _rel(Path(p))):
@@ -186,7 +210,13 @@ class _BlobBackend:
 # Public surface
 # --------------------------------------------------------------------------- #
 def _mode() -> str:
-    return os.environ.get("HARMONIC_CACHE_MODE", "off").lower()
+    env = os.environ.get("HARMONIC_CACHE_MODE")
+    if env:
+        return env.lower()
+    try:
+        return _MODE_FILE.read_text(encoding="utf-8").strip().lower() or "off"
+    except OSError:
+        return "off"
 
 
 def enabled() -> bool:
@@ -202,17 +232,14 @@ _BACKEND = _UNSET
 
 
 def _make_backend():
-    account = os.environ.get("HARMONIC_CACHE_ACCOUNT")
-    if not account:
-        _log("HARMONIC_CACHE_ACCOUNT unset; cache disabled")
-        return None
     try:
         from azure.storage.blob import ContainerClient
     except ImportError:
         _log("azure-storage-blob not installed; cache disabled")
         return None
 
-    container = os.environ.get("HARMONIC_CACHE_CONTAINER", "buildcache")
+    account = os.environ.get("HARMONIC_CACHE_ACCOUNT") or _DEFAULT_ACCOUNT
+    container = os.environ.get("HARMONIC_CACHE_CONTAINER") or _DEFAULT_CONTAINER
     account_url = f"https://{account}.blob.core.windows.net"
     sas = os.environ.get("HARMONIC_CACHE_SAS")
     if sas:
