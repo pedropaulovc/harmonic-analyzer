@@ -134,6 +134,17 @@ then `doit assembly:<stem>`.
 **Fail loud.** A refresh that hits a dangling mate, free DOF, or interference
 exits non-zero and leaves the `.SLDASM` untouched — never a stale artefact.
 
+## Remote build cache (cross-machine)
+
+The cross-machine extension of the above: COM tasks are keyed by their
+`file_dep` content hash and their outputs are pulled from / published to a shared
+**Azure Blob** cache (over 443) instead of rebuilt on the SolidWorks seat.
+Default role is `rw` — a clean checkout on an authorized seat pulls and publishes
+with **zero setup**. Set/override a seat's role with `HARMONIC_CACHE_MODE` or a
+gitignored `.harmonic-cache-mode` file at the repo root (`off`/`ro`/`rw`). Full
+details — roles, auth, salt-busting, provisioning, caveats — in
+[`DEVELOPING.md`](DEVELOPING.md).
+
 ## Fine-grained config deps
 
 Each part/assembly depends on ONLY the `cad/config` files it actually reads,
