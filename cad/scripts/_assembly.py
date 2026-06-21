@@ -5,6 +5,7 @@ build scripts (never by a leaf part), so edits here never invalidate parts.
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import dataclass, field
 from typing import Any
 
 from _common import (
@@ -24,7 +25,7 @@ from _common import (
     log,
     set_isometric_view,
 )
-from _transforms import mirror_placement
+from _transforms import mirror_placement, rows_from_euler
 
 def insert_sketch_text(
     adapter: Any,
@@ -557,6 +558,113 @@ async def rack_pinion_mate(
         verify=verify,
     )
 
+@dataclass
+class ComponentSpec:
+    """One component to place via :func:`place_component` / :func:`place_components`.
+
+    ``kind`` picks the source: ``"part"`` -> ``OUT_SLDPRT/<part>.SLDPRT``,
+    ``"assembly"`` -> ``OUT_SLDASM/<part>.SLDASM``. ``mirror=True`` runs the
+    placement through the YZ-plane mirror (parts are authored on one side of the
+    machine); subassemblies are authored in full machine coords and inserted at
+    the identity, so they pass ``mirror=False``. ``rows`` are the Transform2
+    rotation rows; when ``None`` they are derived from ``rotation`` (mirror=True
+    always re-derives them anyway). The rest mirror :func:`place_component`'s
+    keyword args.
+    """
+    part: str
+    position: list[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
+    rotation: list[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
+    rows: list[list[float]] | None = None
+    ground: bool = True
+    configuration: str = ""
+    label: str = ""
+    mirror: bool = True
+    kind: str = "part"
+
+def _resolve_placement(
+    spec: ComponentSpec,
+) -> tuple[str, list[float], list[float], list[list[float]], str]:
+    """Resolve a spec to ``(path, position_mm, rotation_deg, rows, label)``.
+
+    Shared by the serial (:func:`place_component`) and batched
+    (:func:`place_components`) paths so they place a component identically; only
+    the COM call that consumes the result differs.
+    """
+    rows = spec.rows
+    if spec.mirror:
+        position, rotation, rows = mirror_placement(
+            spec.part, spec.position, spec.rotation, rows, spec.configuration
+        )
+    else:
+        position, rotation = list(spec.position), list(spec.rotation)
+        if rows is None:
+            rows = rows_from_euler(rotation)
+    label = spec.label or spec.part
+    if spec.kind == "assembly":
+        path = (OUT_SLDASM / f"{spec.part}.SLDASM").resolve()
+        hint = f"build_{spec.part.replace('-', '_')}_assembly.py"
+    else:
+        path = (OUT_SLDPRT / f"{spec.part}.SLDPRT").resolve()
+        hint = f"build_{spec.part.replace('-', '_')}.py"
+    if not path.exists():
+        raise RuntimeError(f"missing {spec.kind} {path}; run {hint} first")
+    return str(path), position, rotation, rows, label
+
+def _xform16(position_mm: list[float], rows: list[list[float]]) -> list[float]:
+    """Flat 16-double ``IMathTransform.ArrayData`` for ``AddComponents3``:
+    rows[0:9] (Transform2 rotation), translation in METRES [9:12], scale 1.0
+    [12], [13:16] unused. Exactly the layout :func:`component_transform` /
+    :func:`assert_component_placed` read back (translation * 1000 -> mm).
+
+    NOTE: element 12 is the no-scaling value 1.0; SOLIDWORKS' own
+    AddComponents3 sample zeroes it, but a placed component reads back 1.0 and
+    0.0 would be a degenerate scale. If the live seat ever places a batch part
+    collapsed/exploded, that is the first knob to flip.
+    """
+    return [
+        *(c for row in rows for c in row),
+        position_mm[0] / 1000.0,
+        position_mm[1] / 1000.0,
+        position_mm[2] / 1000.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+    ]
+
+async def _place_one(adapter: Any, spec: ComponentSpec) -> str:
+    """Insert ONE component (its own COM round-trip) + fix + read-back assert.
+
+    The serial primitive: each call fails loud with its own label, so the
+    offending component is named. :func:`place_component` is the thin public
+    wrapper; :func:`place_components` falls back here when batching is off.
+    """
+    from solidworks_mcp.adapters.base import (
+        ComponentRefParameters,
+        InsertComponentParameters,
+    )
+
+    path, position, rotation, rows, label = _resolve_placement(spec)
+    data = check(
+        f"insert {label} @ ({position[0]:.2f}, {position[1]:.2f}, {position[2]:.2f})",
+        await adapter.insert_component(
+            InsertComponentParameters(
+                file_path=path,
+                position=position,
+                rotation=rotation,
+                configuration=spec.configuration,
+            )
+        ),
+    )
+    name = data["name"]
+    if spec.ground and not data.get("fixed"):
+        check(
+            f"fix {label}",
+            await adapter.fix_component(ComponentRefParameters(name=name)),
+        )
+    assert_component_placed(adapter, name, position, rows)
+    return name
+
 async def place_component(
     adapter: Any,
     part: str,
@@ -577,40 +685,126 @@ async def place_component(
     cone-gear tooth counts, the transgear-removable wheels). Either way the
     part is inserted on-solution so mate flip-recovery has a clean reference
     and the read-back assert holds.
-    """
-    from solidworks_mcp.adapters.base import (
-        ComponentRefParameters,
-        InsertComponentParameters,
-    )
 
-    position, rotation, rows = mirror_placement(
-        part, position, rotation, rows, configuration
-    )
-    label = label or part
-    path = (OUT_SLDPRT / f"{part}.SLDPRT").resolve()
-    if not path.exists():
-        raise RuntimeError(
-            f"missing part {path}; run build_{part.replace('-', '_')}.py first"
-        )
-    data = check(
-        f"insert {label} @ ({position[0]:.2f}, {position[1]:.2f}, {position[2]:.2f})",
-        await adapter.insert_component(
-            InsertComponentParameters(
-                file_path=str(path),
-                position=position,
-                rotation=rotation,
-                configuration=configuration,
-            )
+    Thin wrapper over :func:`_place_one` (a mirror=True part spec). Batch many
+    inserts into a single COM call with :func:`place_components`.
+    """
+    return await _place_one(
+        adapter,
+        ComponentSpec(
+            part=part,
+            position=list(position),
+            rotation=list(rotation),
+            rows=rows,
+            ground=ground,
+            configuration=configuration,
+            label=label,
         ),
     )
-    name = data["name"]
-    if ground and not data.get("fixed"):
-        check(
-            f"fix {label}",
-            await adapter.fix_component(ComponentRefParameters(name=name)),
+
+async def _place_components_batch(
+    adapter: Any, specs: list[ComponentSpec]
+) -> list[str]:
+    """Insert every spec in ONE ``IAssemblyDoc::AddComponents3`` call with
+    graphics updates suppressed and a single trailing ``ForceRebuild3``, then
+    fix + read-back assert each returned component.
+
+    Raises on any miss (short/None return, dangling path, flipped placement);
+    :func:`place_components` translates that into the "rerun with
+    defer_rebuild=False" guidance, since AddComponents3 places the batch
+    atomically and cannot say which component was at fault.
+    """
+    from solidworks_mcp.adapters.base import ComponentRefParameters
+
+    resolved = [_resolve_placement(spec) for spec in specs]
+    names_in = [path for path, *_ in resolved]
+    transforms = [
+        v for _, position, _, rows, _ in resolved for v in _xform16(position, rows)
+    ]
+    coordsys = ["" for _ in resolved]  # default (part) coordinate system each
+
+    asm = adapter.currentModel
+    _flag(asm, "IAssemblyDoc")
+
+    # Defer the rebuild: kill graphics updates so AddComponents3 + the fixes
+    # don't repaint per component. Best-effort -- a GL-less headless seat may
+    # have no settable ActiveView, in which case we just skip the toggle.
+    view = _read_member(asm, "ActiveView")
+    if view is not None:
+        _flag(view, "IModelView")
+        adapter._attempt(
+            lambda: setattr(view, "EnableGraphicsUpdate", False), default=None
         )
-    assert_component_placed(adapter, name, position, rows)
-    return name
+    log(
+        f"AddComponents3: inserting {len(specs)} components in one call "
+        "(rebuild deferred, graphics off) ..."
+    )
+    try:
+        added = asm.AddComponents3(names_in, transforms, coordsys)
+    finally:
+        if view is not None:
+            adapter._attempt(
+                lambda: setattr(view, "EnableGraphicsUpdate", True), default=None
+            )
+
+    components = list(added or [])
+    if len(components) != len(specs):
+        raise RuntimeError(
+            f"AddComponents3 returned {len(components)} components for "
+            f"{len(specs)} requested"
+        )
+    # One solve for the whole batch (the per-insert rebuilds were deferred);
+    # mirrors assert_components_fully_defined's pre-read ForceRebuild3.
+    adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
+
+    names_out: list[str] = []
+    for comp, (_, position, _, rows, label) in zip(
+        components, resolved, strict=True
+    ):
+        _flag(comp, "IComponent2")
+        name = str(_read_member(comp, "Name2"))
+        spec = specs[len(names_out)]
+        if spec.ground and not bool(_read_member(comp, "IsFixed")):
+            check(
+                f"fix {label}",
+                await adapter.fix_component(ComponentRefParameters(name=name)),
+            )
+        assert_component_placed(adapter, name, position, rows)
+        names_out.append(name)
+    return names_out
+
+async def place_components(
+    adapter: Any,
+    specs: list[ComponentSpec],
+    *,
+    defer_rebuild: bool = True,
+) -> list[str]:
+    """Place many components, batching the inserts by default.
+
+    ``defer_rebuild=True`` (default) routes every spec through a single
+    ``IAssemblyDoc::AddComponents3`` round-trip with graphics off and one
+    trailing rebuild -- far fewer COM crossings and no per-insert repaint than
+    looping :func:`place_component`. The tradeoff is attribution: the batch is
+    placed atomically, so a bad path or a flipped placement surfaces as "the
+    batch failed", not "part X failed".
+
+    On any batch failure this re-raises with guidance to rerun with
+    ``defer_rebuild=False``, which falls back to the serial one-insert-per-call
+    path (:func:`_place_one`) -- slower, but each component fails loud with its
+    own label and placement assert so the culprit is named.
+
+    Returns the placed components' ``Name2`` in spec order.
+    """
+    if not defer_rebuild:
+        return [await _place_one(adapter, spec) for spec in specs]
+    try:
+        return await _place_components_batch(adapter, specs)
+    except Exception as exc:
+        raise RuntimeError(
+            f"batched insert of {len(specs)} components failed ({exc}); rerun "
+            "with defer_rebuild=False to insert them one-by-one -- each gets its "
+            "own label + placement assert that pinpoints the offending component"
+        ) from exc
 
 def assert_components_fully_defined(adapter: Any) -> None:
     """Raise when any top-level component is neither fixed, fully defined,

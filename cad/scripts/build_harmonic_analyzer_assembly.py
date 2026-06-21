@@ -46,10 +46,10 @@ from _common import (
     run_build,
 )
 from _assembly import (
-    assert_component_placed,
+    ComponentSpec,
     assert_components_fully_defined,
     check_no_interference,
-    place_component,
+    place_components,
     remap_front_to_machine_front,
     save_assembly_and_images,
 )
@@ -90,36 +90,29 @@ def _subassembly(name: str) -> str:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import (
-        ComponentRefParameters,
-        InsertComponentParameters,
-    )
-
     check("create_assembly", await adapter.create_assembly())
 
+    # Every top-level component goes in via ONE AddComponents3 call (rebuild
+    # deferred, graphics off): the seven subassemblies, each authored in machine
+    # coords so it inserts un-mirrored at the identity, plus the loose
+    # measuring-stick (a part, so mirrored; Rx(+90) lays it flat, graduated face
+    # up, on the base top). place_components defaults to defer_rebuild=True; on a
+    # batch failure it raises with a "rerun with defer_rebuild=False" hint that
+    # falls back to a per-component serial insert which names the culprit.
+    specs = [
+        ComponentSpec(part=name, kind="assembly", mirror=False, rows=IDENTITY,
+                      label=f"{name}.SLDASM")
+        for name in SUBASSEMBLIES
+    ]
+    specs.append(
+        ComponentSpec(part="measuring-stick", position=list(STICK_POS),
+                      rotation=[90.0, 0.0, 0.0], rows=ROT_X_POS90)
+    )
+    # Fail early with the same "missing subassembly ... build_*_assembly.py
+    # first" guidance as before, before touching the COM seat.
     for name in SUBASSEMBLIES:
-        data = check(
-            f"insert {name}.SLDASM",
-            await adapter.insert_component(
-                InsertComponentParameters(
-                    file_path=_subassembly(name),
-                    position=[0.0, 0.0, 0.0],
-                    rotation=[0.0, 0.0, 0.0],
-                )
-            ),
-        )
-        comp = data["name"]
-        if not data.get("fixed"):
-            check(
-                f"fix {name}",
-                await adapter.fix_component(ComponentRefParameters(name=comp)),
-            )
-        assert_component_placed(adapter, comp, [0.0, 0.0, 0.0], IDENTITY)
-
-    # Loose hardware on the base top (not part of any mechanism). Rx(+90): the
-    # stick lies flat, graduated face up.
-    await place_component(adapter, "measuring-stick", list(STICK_POS),
-                          [90.0, 0.0, 0.0], ROT_X_POS90)
+        _subassembly(name)
+    await place_components(adapter, specs)
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)
