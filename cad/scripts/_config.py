@@ -22,12 +22,38 @@ import yaml
 CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
 
 
+def _load(path: Path) -> dict[str, Any]:
+    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+
+
 @functools.lru_cache(maxsize=None)
 def _doc(name: str) -> dict[str, Any]:
+    """One config doc as a dict. ``machine`` and ``parts`` are now SPLIT across a
+    directory of per-subsystem / per-part files (so a single value edit invalidates
+    only the parts that read that one file -- see dodo.py); they are re-aggregated
+    here into the exact same shape callers always saw, so every accessor, the
+    verify audit and provenance are unchanged. Other docs are a single file."""
+    split_dir = CONFIG_DIR / name
+    if split_dir.is_dir():
+        if name == "machine":
+            # machine/_base.yaml (units) + one file per subsystem dict.
+            agg: dict[str, Any] = dict(_load(split_dir / "_base.yaml"))
+            for p in sorted(split_dir.glob("*.yaml")):
+                if p.name != "_base.yaml":
+                    agg.update(_load(p))
+            return agg
+        if name == "parts":
+            # parts/_defaults.yaml (defaults:) + one file per registry entry.
+            defaults = _load(split_dir / "_defaults.yaml")
+            entries: dict[str, Any] = {}
+            for p in sorted(split_dir.glob("*.yaml")):
+                if p.name != "_defaults.yaml":
+                    entries.update(_load(p))
+            return {**defaults, "parts": entries}
     path = CONFIG_DIR / f"{name}.yaml"
     if not path.exists():
         raise FileNotFoundError(f"config file missing: {path}")
-    return yaml.safe_load(path.read_text(encoding="utf-8"))
+    return _load(path)
 
 
 def channels() -> list[dict[str, Any]]:

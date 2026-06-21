@@ -1,0 +1,5 @@
+crank-arm:
+  number: MHA-020
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  process: "machined (steel)"

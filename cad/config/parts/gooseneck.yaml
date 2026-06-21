@@ -1,0 +1,5 @@
+gooseneck:
+  number: MHA-032
+  material: Chrome Stainless Steel
+  tolerance_class: machined_block
+  process: "machined (steel)"

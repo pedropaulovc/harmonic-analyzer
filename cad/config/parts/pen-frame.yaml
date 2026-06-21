@@ -1,0 +1,5 @@
+pen-frame:
+  number: MHA-048
+  material: Brass
+  tolerance_class: machined_block
+  process: "machined (brass)"

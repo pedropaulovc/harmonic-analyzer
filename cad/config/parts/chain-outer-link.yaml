@@ -1,0 +1,5 @@
+chain-outer-link:
+  number: MHA-007
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  process: "machined (steel)"

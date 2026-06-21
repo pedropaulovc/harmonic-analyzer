@@ -1,0 +1,22 @@
+
+cone_incline:
+  # True-cone incline derived from exact tracking: sin(i) = radius_step / z_pitch.
+  # radius_step = 3*25.4/DP = 1.5295 (pitch-radius step per 6 teeth at DP 49.82);
+  # z_pitch = drum_seat*cos(asin(radius_step/drum_seat)) = 7.0565. -> incline = 12.5188 deg.
+  # NOTE drum_seat_nominal is RE-TUNED (7.5 -> 7.2204) so z_pitch stays 7.0565 =
+  # the channels.station_pitch grid: holding the channel spine fixed keeps the
+  # rocker/lever/spring/output machinery in place when the gear module shrinks.
+  radius_step_mm: 1.5295
+  drum_seat_nominal_mm: 7.2204
+  derived_incline_deg: 12.5188     # documentation only; code recomputes from the two inputs
+  source: "M6.7 true-cone derivation, re-tuned for DP 49.82 (ch13 OD 62.2)"
+  confidence: low
+  notes: >-
+    Incline is DERIVED, not measured: sin(i)=radius_step/z_pitch where
+    z_pitch=sqrt(drum_seat^2 - radius_step^2)=7.0565, giving i=12.5188°. The
+    smaller radius_step (1.5295 vs the old 2.54) follows from the finer module
+    DP 49.82 (ch13 OD 62.2); drum_seat_nominal is re-tuned to 7.2204 so z_pitch
+    stays locked to the channels.station_pitch 7.0565 grid (the cone seat pitch
+    along the shaft is now z_pitch*cos(i) = 6.8888, cone stack ~137.8 mm). The
+    naive arcsin(radius_step/drum_seat) is wrong (mistakes the drum chord for the
+    pitch advance) — see the solidworks-modeling-pitfalls memory.

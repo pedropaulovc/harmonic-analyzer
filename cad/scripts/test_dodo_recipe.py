@@ -141,6 +141,69 @@ def test_content_checker_check_modified_ignores_comment(tmp_path):
     assert checker.check_modified(str(cfg), st, state) is True, "value change must invalidate"
 
 
+def _rel(paths, root):
+    """Config-relative names of the paths under ``root`` (ignores .py recipe
+    members like the assembly script / helpers)."""
+    out = set()
+    for p in paths:
+        rp = Path(p).resolve()
+        if root in rp.parents:
+            out.add(str(rp.relative_to(root)))
+    return out
+
+
+def test_config_deps_are_fine_grained():
+    """dodo honors the per-script config read-set at SUB-FILE granularity, with
+    machine.yaml/parts.yaml split per-subsystem/per-part. Never dimensions.yaml,
+    and always a subset of the whole-config set it replaced."""
+    dodo = _load_dodo()
+    scripts = dodo.SCRIPTS_DIR
+    cfg = (REPO_ROOT / "cad" / "config").resolve()
+    whole = set(dodo._CONFIG_YAMLS)
+
+    # A gear part reads machine("gear_train", ...) -> machine/gear_train.yaml ONLY
+    # (NOT machine/channels.yaml, where active_count lives) + its own registry row.
+    cone = dodo._config_deps(scripts / "build_cone_gear.py", "cone_gear", "part")
+    assert _rel(cone, cfg) == {
+        "machine/gear_train.yaml", "parts/cone-gear.yaml", "parts/_defaults.yaml",
+    }, _rel(cone, cfg)
+    assert set(cone) <= whole
+
+    # Editing ONE part's registry row rebuilds only that part: a leaf screw depends
+    # on its own row + shared defaults, nothing else.
+    screw = dodo._config_deps(scripts / "build_fillister_screw.py", "fillister_screw", "part")
+    assert _rel(screw, cfg) == {"parts/fillister-screw.yaml", "parts/_defaults.yaml"}
+
+    # No part depends on dimensions.yaml.
+    for stem in dodo.part_stems():
+        deps = {Path(p).name for p in dodo._config_deps(scripts / f"build_{stem}.py", stem, "part")}
+        assert "dimensions.yaml" not in deps, stem
+
+    # A non-stamping assembly needs NO parts row (part-row edits propagate via the
+    # rebuilt .SLDPRT -> REFRESH); a stamping one (channel) tracks the rows it
+    # stamps. _recipe_files is the single source for the FULL/REFRESH digest AND the
+    # file_dep, so narrowing it keeps that parity intact.
+    frame_recipe = _rel(dodo._recipe_files("frame"), cfg)
+    assert not any(t.startswith("parts/") for t in frame_recipe), frame_recipe
+    assert "dimensions.yaml" not in frame_recipe
+    channel_recipe = _rel(dodo._recipe_files("channel"), cfg)
+    assert "parts/channel-spring-installed.yaml" in channel_recipe, channel_recipe
+
+
+def test_config_deps_recipe_digest_skips_unread_yaml():
+    """A change to a config file the assembly does NOT read leaves its recipe digest
+    unchanged (no spurious ~500 s FULL re-insert), while a file it DOES read flips
+    it. Proven structurally: the digest is taken over _recipe_files, which lists
+    only the read files. active_count lives in machine/channels.yaml: drive_train
+    reads it (station geometry), frame does not."""
+    dodo = _load_dodo()
+    cfg = (REPO_ROOT / "cad" / "config").resolve()
+    drive = _rel(dodo._recipe_files("drive_train"), cfg)
+    frame = _rel(dodo._recipe_files("frame"), cfg)
+    assert "machine/channels.yaml" in drive, drive
+    assert "machine/channels.yaml" not in frame, "frame must not FULL on an active_count edit"
+
+
 def test_recipe_digest_ignores_yaml_comments(tmp_path):
     """Option A reaches the ASSEMBLY recipe digest too: _digest_files folds YAML
     members in by parsed content, so a comment/reflow edit to a recipe YAML leaves

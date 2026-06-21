@@ -1,0 +1,5 @@
+knife-stay:
+  number: MHA-038
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  process: "machined (steel)"

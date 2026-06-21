@@ -1,0 +1,5 @@
+nameplate:
+  number: MHA-086
+  material: Brass
+  tolerance_class: visual_noncritical
+  process: "engraved brass plate"
