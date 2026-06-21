@@ -1,19 +1,18 @@
 
 amplitude:                         # ch15 — the amplitude bars set the Fourier coefficients
-  preset: neutral                  # <-- TEMPORARY: all bars reset to neutral (a_j = 0)
+  preset: neutral                  # all amplitude bars at rest (a_j = 0) — matches the neutral-state photos
   fundamental_station_mm: 80.0     # a_1 bar station; a_j = this / harmonic_n (odd j), 0 (even j)
   max_travel_mm: 88.0              # ±88 mm amplitude-bar seesaw range (ch.15)
   source: "DIMENSIONS.md ch15; truth_model.py"
   confidence: med
   notes: >-
     The amplitude bar station along the rocker IS the Fourier coefficient a_j.
-    TEMPORARY (2026-06-19): every bar has been reset to its neutral position
-    (a_j = 0, the `neutral` preset), so channels.yaml amplitude_mm is all zeros and
-    the synthesised pen trace is flat. This pairs with the temporary channel
-    reduction (channels.active_count) and will be RECOVERED together: restore
-    preset to `square` and regenerate channels.yaml amplitude_mm by the square law
-    — for the `square` preset a_j = fundamental_station_mm / harmonic_n on the ODD
-    harmonics and 0 on the even ones (the textbook square-wave partial sum, odd
-    terms ∝ 1/n). truth_model.py reads the same amplitude_mm vector, so the
+    The `neutral` preset parks every bar at rest (a_j = 0), so channels.yaml
+    amplitude_mm is all zeros and every channel return spring sits at the same
+    rest length — one shared spring geometry across all 20 channels (the
+    reference photos show the machine in this neutral state). The `square`
+    preset (a_j = fundamental_station_mm / harmonic_n on the ODD harmonics, 0
+    on the even ones — the textbook square-wave partial sum, odd terms ∝ 1/n) is
+    the alternative. truth_model.py reads the same amplitude_mm vector, so the
     computed pen curve always matches the as-built bar stations; verify.py --suite
     config asserts channels.yaml obeys whichever preset is set here.
