@@ -615,7 +615,11 @@ def build_or_refresh(stem, dependencies, changed, targets):
     sidecar.parent.mkdir(parents=True, exist_ok=True)
     sidecar.write_text(digest + "\n", encoding="utf-8")
     # Publish the fresh artefacts for other machines (no-op unless mode=rw).
-    _cache.store(cache_key, cache_outputs, f"assembly:{stem}")
+    # RECOMPUTE the output set here, not reuse the one from the top: the channel
+    # stretch parts and the top-level gallery PNGs are glob-discovered and DID NOT
+    # EXIST yet on a clean builder when cache_outputs was first computed, so the
+    # early list would publish an incomplete archive (codex review). They exist now.
+    _cache.store(cache_key, _assembly_cache_outputs(stem), f"assembly:{stem}")
 
 
 def _close_sw_documents() -> None:
