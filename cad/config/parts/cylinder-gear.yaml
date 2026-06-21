@@ -2,5 +2,9 @@ cylinder-gear:
   number: MHA-027
   material: Brass
   tolerance_class: machined_block
+  # Gear+cam composite: this part absorbs the former standalone eccentric-cam
+  # (MHA-029, removed). fit_class is the gear's primary interface (gear_mesh);
+  # the integral cam OD is additionally a cam_follower_contact bearing surface
+  # for the connecting-rod strap (cam dims/provenance in build_cylinder_gear.py).
   fit_class: gear_mesh
   process: "gear cutting (hob/shaper)"
