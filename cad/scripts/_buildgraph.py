@@ -44,6 +44,7 @@ NON_PART_SCRIPTS = frozenset(
         "build_fourbar_test.py",
         "build_mobility_probe.py",
         "build_cylinder_gear_cadquery.py",
+        "build_nameplate_cadquery.py",
     }
 )
 

@@ -17,9 +17,12 @@ since retired) and is now drawn with native SolidWorks **sketch primitives**:
 * the pinstripe frame is two concentric rounded rectangles (true corner arcs via
   :func:`sketch_rounded_rect`), cut shallow on the raised border.
 
-``test_nameplate_geometry`` rebuilds the plate in CadQuery (a SolidWorks stand-in)
-and guards the vendored geometry against the golden analytic targets the primitives
-were validated to (engraving 100%, pinstripe band 99.99%, finished volume 100%).
+``test_nameplate_geometry`` guards the vendored geometry against the golden
+analytic targets (engraving 100%, pinstripe band 99.99%, finished volume 100%) --
+no CAD kernel. ``build_nameplate_cadquery`` is the SolidWorks stand-in: it cuts
+these same loops into a real CadQuery solid head-less and asserts each removed
+volume + solid validity, the offline proof the even-odd engraving boolean-resolves
+(reproducing the live seat's per-cut asserts).
 
 Dimensions: cad/DIMENSIONS.md ch.26 -- 100 x 55 stated (high); thickness, corner
 radius, border, recess, pinstripe and screw inset are photo-plausible reads off
