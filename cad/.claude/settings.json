@@ -1,13 +1,13 @@
 {
   "extraKnownMarketplaces": {
-    "personal-marketplace": {
+    "agent-plugins": {
       "source": {
         "source": "github",
-        "repo": "pedropaulovc/personal-marketplace"
+        "repo": "pedropaulovc/agent-plugins"
       }
     }
   },
   "enabledPlugins": {
-    "developing-solidworks@personal-marketplace": true
+    "developing-solidworks@agent-plugins": true
   }
 }
