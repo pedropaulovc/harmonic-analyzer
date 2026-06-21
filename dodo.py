@@ -28,25 +28,23 @@ COM serialization (the single SolidWorks STA seat) is enforced by a linear
 SolidWorks-free ``check:*`` tasks fan out in parallel while COM stays serial.
 ``doit -n N`` is now SAFE (see the _spine_dep / _COM_TAIL block below).
 
-Install (one-off, in the Windows SolidWorks build venv -- this repo has no
-pyproject.toml of its own)::
+Install (this repo is a uv project -- pyproject.toml + uv.lock at the root)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe -m pip install doit pillow pytest
+    git submodule update --init  # ./SolidworksMCP-python (COM adapter, branch personal)
+    uv sync                      # core deps + pytest, from the lockfile
 
-Run with that same venv's python (SolidWorks already open)::
+Run through uv (SolidWorks already open for the COM tasks)::
 
-    set "DOIT=C:\src\SolidworksMCP-python\.venv\Scripts\python.exe -m doit"
-
-    %DOIT%                       # = `build`: every part + assembly + every gate
-    %DOIT% -n 4                  # same, fanning out the SolidWorks-free checks
-    %DOIT% build_bare            # quick: parts + assemblies only, no gates
-    %DOIT% assembly:paper_drive  # just that assembly + its stale prereqs
-    %DOIT% part:summing_lever    # just that part
-    %DOIT% verify:soundness      # one SW gate; check:math one offline gate
-    %DOIT% export                # neutral STEP/STL/scene export
-    %DOIT% release -- v0.2.0     # cut a release (args after --; opt-in)
-    %DOIT% list --all            # every task
-    %DOIT% clean                 # remove targets (+ wipe png/<asm>)
+    uv run python -m doit                       # = `build`: every part + assembly + every gate
+    uv run python -m doit -n 4                  # same, fanning out the SolidWorks-free checks
+    uv run python -m doit build_bare            # quick: parts + assemblies only, no gates
+    uv run python -m doit assembly:paper_drive  # just that assembly + its stale prereqs
+    uv run python -m doit part:summing_lever    # just that part
+    uv run python -m doit verify:soundness      # one SW gate; check:math one offline gate
+    uv run python -m doit export                # neutral STEP/STL/scene export
+    uv run python -m doit release -- v0.2.0     # cut a release (args after --; opt-in)
+    uv run python -m doit list --all            # every task
+    uv run python -m doit clean                 # remove targets (+ wipe png/<asm>)
 
 Full-rebuild escape (idiomatic doit -- a missing target forces a run, and
 build_or_refresh takes the FULL branch when the target is absent)::
