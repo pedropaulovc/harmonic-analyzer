@@ -17,3 +17,26 @@ gear_train:
     cylinder set). Gear law (ch.29 p.99, annotated): cylinder gear k turns k/80
     rev per crank turn; ch.8 p.7 (stated): gear n spins n× gear 1. Crank reduction
     16:64 = 1:4 sets the cone-shaft input speed.
+  citations:                       # research provenance for the values above (was dimensions.yaml rows)
+    - documents: diametral_pitch
+      dimension: "Diametral pitch / module (ch12)"
+      source: >-
+        ANCHORED on the measured cylinder-gear OD = 62.2 mm (ch13, scaled p.25
+        bottom-left vs the back-view gear brackets, LOW): m = 62.2/(120+2) = 0.5098,
+        DP = 25.4/m = 49.82, so largest cone / cylinder PD = 120·m = 61.18 mm. The
+        cone T120 shares this module (it meshes the cylinder set). SUPERSEDES the
+        former DP 30 round-inch derivation (p.18 tooth pitch 2.69 mm + 150 mm-arrow
+        OD ≈ 105 → DP 30 → OD 103.3), which the 62.2 reading REFUTES (logged
+        discrepancy, user-directed 2026-06-18)
+      method: "derived from the ch13 OD scaling (low)"
+      confidence: low
+    - documents: cylinder_teeth
+      dimension: "Tooth count (ch13)"
+      source: "derived from gear law k/80 (ch.29) + 4:1 + cone teeth 6k — see ch.6/26/29 section"
+      method: derived
+      confidence: med
+    - documents: crank_drive_ratio
+      dimension: "Crank→cone reduction (ch12)"
+      source: "text p.16"
+      method: stated
+      confidence: high

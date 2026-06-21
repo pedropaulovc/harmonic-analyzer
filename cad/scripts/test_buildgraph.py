@@ -137,10 +137,11 @@ def test_no_part_reads_retired_dimensions_monolith():
     """The monolithic narrative dimensions.yaml was spread into per-part
     ``dimensions:`` blocks (each rides its own ``parts/<stem>.yaml`` registry row)
     plus standalone ``cad/config/dimensions/*.yaml`` files, then DELETED. The
-    standalone narrative maps to no single part and is read ONLY by the offline
-    drift gate (verify.py via ``_dimensions``), never through a ``_config``
-    accessor -- so no build script's config read-set references it, and the
-    retired monolith must never come back as a dependency token."""
+    standalone narrative maps to no single part and is read by no build script
+    through a ``_config`` accessor (only ``gen_dimensions.py`` aggregates it into
+    the on-demand DIMENSIONS.md view) -- so no build script's config read-set
+    references it, and the retired monolith must never come back as a dependency
+    token."""
     assert not (bg.CONFIG_DIR / "dimensions.yaml").exists()
     for stem in part_stems():
         assert "dimensions.yaml" not in config_files_of(SCRIPTS_DIR / f"build_{stem}.py"), stem

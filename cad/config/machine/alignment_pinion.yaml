@@ -10,3 +10,12 @@ alignment_pinion:                  # ch25 — engages the cylinder-gear set for 
     to zero all channels. Engaged centre distance = (120+42)/2 · 25.4/DP = 41.30 mm
     at the new DP 49.82 (was 68.58 at DP 30); disengaged it stands off with a 2 mm
     tip gap.
+  citations:                       # research provenance for teeth (was dimensions.yaml row)
+    - documents: teeth
+      dimension: "Tooth count (ch25)"
+      source: >-
+        counted on the drum end view (engineerguy video 4/4 @ 8:00, frame
+        `v4_pinion_018`): 7 tips per 60° sector × 6; tip-radius ratio to the meshing
+        120T cylinder gear = 0.36 = 44/122 confirms same DP
+      method: counted
+      confidence: high

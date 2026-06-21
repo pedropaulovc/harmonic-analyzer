@@ -20,3 +20,13 @@ cone_incline:
     along the shaft is now z_pitch*cos(i) = 6.8888, cone stack ~137.8 mm). The
     naive arcsin(radius_step/drum_seat) is wrong (mistakes the drum chord for the
     pitch advance) — see the solidworks-modeling-pitfalls memory.
+  citations:                       # research provenance for derived_incline_deg (was dimensions.yaml row)
+    - documents: derived_incline_deg
+      dimension: "Cone plan incline (ch13)"
+      source: >-
+        M6.7 exact-tracking mesh condition (appendix C #3): the radius step (now
+        1.5295 at DP 49.82) tracks per DRUM z-pitch 7.0565, which is held fixed by
+        re-tuning the cone drum-seat to 7.2204 (machine.yaml) so the channel grid
+        does not move. Shallower than the old 21.0976° because the finer module
+        shrinks the per-gear radius step (was arcsin(2.54/7.0568))
+      confidence: low

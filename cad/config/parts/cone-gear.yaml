@@ -27,29 +27,11 @@ cone-gear:
         source: text p.16
         method: stated
         confidence: high
-      - dim: Tooth counts
-        value: 6, 12, 18 … 120 (step 6)
-        (in): —
-        source: text p.16
-        method: stated
-        confidence: high
-      - dim: Crank→cone reduction
-        value: 4:1 (1 crank turn = 1/4 cone turn)
-        (in): —
-        source: text p.16
-        method: stated
-        confidence: high
       - dim: Axial gear pitch
         value: 7.2204 mm
         (in): '0.284'
         source: 'along the cone axis (= machine.yaml drum_seat_nominal); RE-TUNED from 7.5 so its Z-projection stays 7.0565 = the frame-locked drum grid (gates, channels — Appendix C #3) when the module shrank to DP 49.82. The along-shaft seat pitch is now 6.889 (clears the shallower 12.52° incline) — a model detail.'
         method: derived
-        confidence: low
-      - dim: Diametral pitch / module
-        value: DP 49.82 (m = 0.5098 mm)
-        (in): —
-        source: 'ANCHORED on the measured cylinder-gear OD = 62.2 mm (ch13, scaled p.25 bottom-left vs the back-view gear brackets, LOW): m = 62.2/(120+2) = 0.5098, DP = 25.4/m = 49.82, so largest cone / cylinder PD = 120·m = 61.18 mm. The cone T120 shares this module (it meshes the cylinder set). SUPERSEDES the former DP 30 round-inch derivation (p.18 tooth pitch 2.69 mm + 150 mm-arrow OD ≈ 105 → DP 30 → OD 103.3), which the 62.2 reading REFUTES — the p.18 scalings and the round-inch PD do not survive (logged discrepancy, user-directed 2026-06-18)'
-        method: derived from the ch13 OD scaling (low)
         confidence: low
       - dim: Pressure angle
         value: 14.5° assumed

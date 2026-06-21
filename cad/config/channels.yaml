@@ -39,6 +39,12 @@ notes: >-
   phase and amplitude-bar station per channel); amplitude_mm is currently the
   NEUTRAL pose (all 0.0, see the temporary note above — the square-wave preset is
   restored on recovery per machine.yaml amplitude.notes).
+citations:                         # research provenance for the cone_teeth series (was dimensions.yaml ch12 row)
+  - documents: cone_teeth
+    dimension: "Tooth counts — 6, 12, 18 … 120 (step 6), ch12"
+    source: "text p.16"
+    method: stated
+    confidence: high
 channels:
   - index: 0
     cone_teeth: 120

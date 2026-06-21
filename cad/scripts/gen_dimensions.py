@@ -3,9 +3,10 @@ r"""Render the distributed dimension-provenance blocks into one DIMENSIONS.md vi
 The dimension provenance used to live in a single ``cad/config/dimensions.yaml``;
 it now lives in per-part ``dimensions:`` blocks (``cad/config/parts/<stem>.yaml``)
 plus a few standalone narrative files under ``cad/config/dimensions/`` for content
-that maps to no single part. ``verify.py`` reads those blocks directly (via
-``_dimensions``) as the drift gate; this script just re-aggregates them, in book
-order, into a single human-readable ``cad/DIMENSIONS.md``.
+that maps to no single part. This script re-aggregates them, in book order, into a
+single human-readable ``cad/DIMENSIONS.md``. (The numeric values the build uses
+are NOT duplicated here -- they live solely in machine/*.yaml + channels.yaml,
+with their research provenance in those nodes' ``citations:`` blocks.)
 
 ``DIMENSIONS.md`` is NOT committed (a generated copy under version control kept
 drifting from its source) — it is an untracked, on-demand view. Edit the YAML,
@@ -24,10 +25,10 @@ from typing import Any
 
 import yaml
 
-import _dimensions
-
 ROOT = Path(__file__).resolve().parent.parent
 DIMENSIONS_MD = ROOT / "DIMENSIONS.md"
+PARTS_DIR = ROOT / "config" / "parts"
+STANDALONE_DIR = ROOT / "config" / "dimensions"
 
 # Sources in book order: each is a part stem (its registry-row dimensions block)
 # or a standalone slug under cad/config/dimensions/.
@@ -43,11 +44,11 @@ ORDER = [
 
 def _raw_doc(source: str) -> dict[str, Any]:
     """The full mapping for a source (part dimensions block or standalone file)."""
-    part_file = _dimensions.PARTS_DIR / f"{source}.yaml"
+    part_file = PARTS_DIR / f"{source}.yaml"
     if part_file.exists():
         record = next(iter(yaml.safe_load(part_file.read_text(encoding="utf-8")).values()))
         return record["dimensions"]
-    return yaml.safe_load((_dimensions.STANDALONE_DIR / f"{source}.yaml").read_text(encoding="utf-8"))
+    return yaml.safe_load((STANDALONE_DIR / f"{source}.yaml").read_text(encoding="utf-8"))
 
 
 def _render_table(rows: list[Any]) -> list[str]:

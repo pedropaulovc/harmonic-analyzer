@@ -18,3 +18,9 @@ output:
     curve onto a physical pen half-stroke; at pen_rest_crank_deg the pen sits at
     its build datum so the saved render pose is unchanged. verify.py --suite
     kinematics sweeps CrankDeg and asserts the sampled tip matches truth_model.
+  citations:                       # research provenance for magnify_factor (was dimensions.yaml row)
+    - documents: magnify_factor
+      dimension: "Magnification (ch20)"
+      source: "text pp. 46–49"
+      method: stated
+      confidence: high

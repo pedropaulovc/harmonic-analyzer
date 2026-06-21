@@ -30,11 +30,8 @@ is the single fully-safe entry point that runs every gate.
                       pen-rod mate (pen_driver.py / docs/motion-policy.md).
   math                no-SolidWorks analytic self-check of ``truth_model``: the
                       synthesis math is symmetric / band-limited / correct.
-  config              no-SolidWorks cross-checks: build config (machine/channels)
-                      vs the cited dimension rows (per-part ``dimensions:`` blocks
-                      + cad/config/dimensions/*.yaml), and the tolerance/metadata
-                      audit (parts.yaml <-> build scripts; emits
-                      cad/out/reports/tolerance_audit.csv).
+  config              no-SolidWorks tolerance/metadata audit (parts.yaml <-> build
+                      scripts; emits cad/out/reports/tolerance_audit.csv).
 
 Unlike the build gates (fail-fast), ``soundness``/``subsystems`` run every gate
 and report the full set of failures at the end, so one run tells you everything
@@ -67,7 +64,6 @@ from pathlib import Path
 from typing import Any, Callable
 
 import _config
-import _dimensions
 import pen_driver
 import truth_model
 from _common import (
@@ -603,66 +599,6 @@ def _expect(condition: bool, message: str) -> None:
         raise RuntimeError(message)
 
 
-def _num(pattern: str, text: str) -> float:
-    """First regex group in ``text`` as a float (raises if the cell changed shape)."""
-    m = re.search(pattern, text)
-    if not m:
-        raise RuntimeError(f"no {pattern!r} in dimension cell {text!r}")
-    return float(m.group(1))
-
-
-def verify_config_vs_dimensions(report: Report) -> None:
-    """Cross-check the build config against the cited DIMENSIONS rows (no SolidWorks).
-
-    This is the drift gate that a prose-only narrative cannot give: the numbers
-    the scripts actually build with (machine.yaml / channels.yaml) must equal the
-    numbers the research record cites. The dimensions now live in per-part
-    ``dimensions:`` blocks (and a few standalone ``cad/config/dimensions/`` files);
-    each check locates the row by its source + dimension name and parses the
-    ``value`` cell, so an edit to either side that breaks the agreement fails here.
-    """
-
-    def _check(label: str, source: str, dim: str, fn: Callable[[str], None]) -> None:
-        def run() -> None:
-            row = _dimensions.find_row(source, dim)
-            if row is None:
-                raise RuntimeError(f"dimension row not found: {source} / {dim}")
-            fn(row["value"])
-        report.gate(label, run)
-
-    _check("dims:cone-DP", "cone-gear", "Diametral pitch",
-           lambda v: _expect(_num(r"DP\s*(\d+(?:\.\d+)?)", v) == _config.machine("gear_train", "diametral_pitch"),
-                             f"cone DP: dims {v!r} != machine.yaml {_config.machine('gear_train','diametral_pitch')}"))
-    _check("dims:cylinder-teeth", "cylinder-gear", "Tooth count",
-           lambda v: _expect(_num(r"(\d+)", v) == _config.machine("gear_train", "cylinder_teeth"),
-                             f"cylinder teeth: dims {v!r} != machine.yaml"))
-    _check("dims:pinion-teeth", "chapter-25-pinion-gear", "Tooth count",
-           lambda v: _expect(_num(r"(\d+)", v) == _config.machine("alignment_pinion", "teeth"),
-                             f"alignment-pinion teeth: dims {v!r} != machine.yaml"))
-    _check("dims:crank-reduction", "cone-gear", "Crank→cone reduction",
-           lambda v: _expect(_num(r"(\d+):1", v) == _crank_reduction(),
-                             f"crank reduction: dims {v!r} != crank_drive_ratio {_config.machine('gear_train','crank_drive_ratio')}"))
-    _check("dims:cone-teeth-series", "cone-gear", "Tooth counts",
-           lambda v: _expect("120" in v and "step 6" in v and _cone_series_ok(),
-                             f"cone tooth series: dims {v!r} != channels.yaml 120-6*index"))
-    _check("dims:cone-incline", "cylinder-gear", "Cone plan incline",
-           lambda v: _expect(abs(_num(r"(\d+\.\d+)", v) - _config.machine("cone_incline", "derived_incline_deg")) < 1e-3,
-                             f"cone incline: dims {v!r} != machine.yaml {_config.machine('cone_incline','derived_incline_deg')}"))
-    _check("dims:magnify", "magnifying-lever", "Magnification",
-           lambda v: _expect(_num(r"(\d+)×", v) == _config.machine("output", "magnify_factor"),
-                             f"magnify: dims {v!r} != output.magnify_factor"))
-
-
-def _crank_reduction() -> float:
-    num, den = _config.machine("gear_train", "crank_drive_ratio")
-    return max(num, den) / min(num, den)
-
-
-def _cone_series_ok() -> bool:
-    fund = int(_config.machine("gear_train", "fundamental_cone_teeth"))
-    return all(ch["cone_teeth"] == fund - 6 * ch["index"] for ch in _config.channels())
-
-
 def _declared_part_names() -> set[str]:
     """Every ``PART_NAME = "..."`` declared by a ``build_*.py`` script.
 
@@ -852,7 +788,6 @@ async def build(adapter: Any) -> dict[str, str]:
     if suite == "math":
         verify_truth(report)
     if suite == "config":
-        verify_config_vs_dimensions(report)
         verify_tolerance_audit(report)
         verify_amplitude_preset(report)
 
@@ -904,7 +839,6 @@ if __name__ == "__main__":
         if _ARGS.suite == "math":
             verify_truth(_report)
         else:
-            verify_config_vs_dimensions(_report)
             verify_tolerance_audit(_report)
             verify_amplitude_preset(_report)
         _print_summary(_report)

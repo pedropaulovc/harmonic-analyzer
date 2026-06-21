@@ -15,12 +15,6 @@ cylinder-gear:
         source: text p.22
         method: stated
         confidence: high
-      - dim: Tooth count
-        value: 120 (each gear)
-        (in): —
-        source: derived from gear law k/80 (ch.29) + 4:1 + cone teeth 6k — see ch.6/26/29 section
-        method: derived
-        confidence: med
       - dim: Alignment notch depth
         value: 3 mm
         (in): '0.118'
@@ -136,10 +130,6 @@ cylinder-gear:
         value: horizontal (plan), cone beside drum
         source: 'ch. 12 p.18 top-down: cone converges on the drum toward the small end; side view cone midline ≈ level'
         confidence: high
-      - item: Cone plan incline
-        value: 12.5188° = arcsin(1.5295/7.0565), converging +X→−X toward the drum
-        source: 'M6.7 exact-tracking mesh condition (appendix C #3): the radius step (now 1.5295 at DP 49.82) tracks per DRUM z-pitch 7.0565, which is held fixed by re-tuning the cone drum-seat to 7.2204 (machine.yaml) so the channel grid does not move. Shallower than the old 21.0976° because the finer module shrinks the per-gear radius step (was arcsin(2.54/7.0568))'
-        confidence: low
       - item: Cone mesh grid (X_PITCH)
         value: 'every cone gear''s pitch section crosses x = −16.01 at the contact azimuth: X_PITCH = drum tip x −16.40 + addendum·sec 12.52° − mid-face penetration 0.137'
         source: 'M6.7 oblique partial engagement (book ch. 12 "partial engagement, distinct wear"): the contact tooth crosses the 3 mm drum face obliquely. The grid shifted ~20 mm inboard from the old +4.49 because the drum radius shrank with the module (tip x 51.65→31.10). FLAG: working depth is now only 1.02 mm (vs 1.69 at DP 30), so the 0.55 edge slack (tolerances.yaml) is large relative to it — the cone/drum mesh penetration needs re-tuning in the Phase 3 rebuild'

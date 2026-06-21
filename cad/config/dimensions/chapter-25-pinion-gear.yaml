@@ -2,12 +2,6 @@ title: Chapter 25 — Pinion Gear (pp. 66–69)
 content:
 - notes: ''
 - table:
-  - dim: Tooth count
-    value: '42'
-    (in): —
-    source: 'counted on the drum end view (engineerguy video 4/4 @ 8:00, frame `v4_pinion_018`): 7 tips per 60° sector × 6; tip-radius ratio to the meshing 120T cylinder gear = 0.36 = 44/122 confirms same DP'
-    method: counted
-    confidence: high
   - dim: Pitch diameter
     value: 35.56 mm (1.400")
     (in): '1.400'

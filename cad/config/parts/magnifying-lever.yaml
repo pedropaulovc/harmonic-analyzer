@@ -10,12 +10,6 @@ magnifying-lever:
 
         No annotated or stated numeric dimensions. No legacy part.
     - table:
-      - dim: Magnification
-        value: up to 4× (adjustable)
-        (in): —
-        source: text pp. 46–49
-        method: stated
-        confidence: high
       - dim: Rod diameter
         value: ~6 mm
         (in): ~0.24
