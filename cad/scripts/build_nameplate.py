@@ -26,7 +26,11 @@ radius, border, recess, pinstripe and screw inset are photo-plausible reads off
 the p.71 macro (low). The engraving geometry IS the traced photo.
 
 Layout: width along +X, height along +Y from the origin corner, decorated face on
-the Front plane at z = 0, thickness extruded +Z (same scheme as build_platen).
+the Front plane at z = 0. The body extrudes in -Z (``reverse_direction``) so the
+decorated z=0 face is the EXPOSED FRONT face (outward normal +Z): the traced
+lettering, drawn to read from +Z, then reads correctly on the face you actually
+see, with no mirror. (build_platen is untextured and extrudes +Z; only this
+engraved plate needs the decorated face frontmost.)
 
 Run (SolidWorks already open)::
 
@@ -119,8 +123,8 @@ async def _cut_region(adapter, depth, *, label, expected_removed):
     into the front face, asserting the analytically expected removed volume.
 
     ``depth`` is the half-reach; the cut runs 2*depth both ways about the z=0
-    Front plane, landing 0..depth in material (-z half is air), same scheme as
-    the field recess. ``expected_removed`` is the NEW volume this cut removes
+    Front plane, landing depth into the -z body (the +z half is air), same scheme
+    as the field recess. ``expected_removed`` is the NEW volume this cut removes
     (overlap with the already-sunk recess excluded by the caller).
     """
     from solidworks_mcp.adapters.base import ExtrusionParameters
@@ -157,13 +161,19 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch outline", await adapter.exit_sketch())
     check(
         "extrude plate",
-        await adapter.create_extrusion(ExtrusionParameters(depth=PLATE_THICKNESS)),
+        # Extrude the body in -Z so the decorated z=0 face (where the field recess,
+        # lettering and pinstripe incise) is the EXPOSED FRONT face (normal +Z),
+        # not buried behind the body -- the traced lettering then reads correctly
+        # with no mirror.
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=PLATE_THICKNESS, reverse_direction=True)
+        ),
     )
     await bbox_extent_check(adapter, "plate width (stated 100)", "x", PLATE_WIDTH)
     await bbox_extent_check(adapter, "plate height (stated 55)", "y", PLATE_HEIGHT)
 
     # Sink the central field (raised border). Both-directions 2x depth about the
-    # z=0 Front plane lands exactly 0..RECESS_DEPTH in material (-z half is air).
+    # z=0 Front plane lands exactly RECESS_DEPTH into the -z body (+z half is air).
     field_w = PLATE_WIDTH - 2.0 * BORDER_W
     field_h = PLATE_HEIGHT - 2.0 * BORDER_W
     pre = await adapter.get_mass_properties()
@@ -196,6 +206,9 @@ async def build(adapter) -> dict[str, str]:
     # Lettering + cartouche incise the recessed field floor: the cut reaches
     # RECESS+ENGRAVE but the recess already cleared the first RECESS_DEPTH over the
     # field, so the NEW material removed is the engraving area x ENGRAVE_DEPTH.
+    # The loops are traced to read from +Z; because the body extrudes -Z the
+    # decorated z=0 face is the exposed front (outward normal +Z), so the loops
+    # incise and read correctly drawn exactly as traced -- no mirror.
     eng_area = _engraving_area()
     check("create_sketch lettering", await adapter.create_sketch("Front"))
     await sketch_polyline_loops(adapter, LETTERING_LOOPS, label="lettering")
