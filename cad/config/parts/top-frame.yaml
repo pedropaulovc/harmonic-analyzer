@@ -1,0 +1,5 @@
+top-frame:
+  number: MHA-077
+  material: Gray Cast Iron
+  tolerance_class: machined_block
+  process: "cast + machined"

@@ -1,0 +1,5 @@
+magnifying-lever:
+  number: MHA-043
+  material: Brass
+  tolerance_class: machined_block
+  process: "machined (brass)"

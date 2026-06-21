@@ -1,0 +1,6 @@
+rack-pinion:
+  number: MHA-070
+  material: Brass
+  tolerance_class: machined_block
+  fit_class: gear_mesh
+  process: "gear cutting (hob/shaper)"

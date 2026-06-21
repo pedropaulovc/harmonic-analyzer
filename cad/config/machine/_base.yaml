@@ -1,0 +1,12 @@
+# Global machine inputs — the few independent numbers the geometry derives from.
+#
+# Build scripts read these; everything else (centre distances, cam grids,
+# incline trig, shaft steps) is COMPUTED from them in code. Do not paste
+# derived values back here — keep this to genuine inputs with provenance.
+#
+# Provenance is preserved INLINE here (source / confidence / notes) rather than
+# regenerated into DIMENSIONS.md — the curated 788-line DIMENSIONS.md narrative
+# stays the human research record; these notes are its machine-readable digest,
+# and feed the parts' "Notes" custom property (build_*.py save -> Part D).
+# Confidence ladder (DIMENSIONS.md): annotated > stated > scaled > legacy > derived.
+units: mm

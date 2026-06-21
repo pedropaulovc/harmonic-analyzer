@@ -1,0 +1,5 @@
+tube-frame:
+  number: MHA-083
+  material: Plain Carbon Steel
+  tolerance_class: plate_profile
+  process: "machined (steel)"

@@ -1,0 +1,5 @@
+transgear-stub:
+  number: MHA-082
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  process: "machined (steel)"

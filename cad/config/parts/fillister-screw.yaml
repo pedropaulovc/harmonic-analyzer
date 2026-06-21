@@ -1,0 +1,6 @@
+fillister-screw:
+  number: MHA-030
+  material: Brass
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: "machined (brass)"

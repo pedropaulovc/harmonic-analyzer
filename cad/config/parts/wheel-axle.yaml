@@ -1,0 +1,5 @@
+wheel-axle:
+  number: MHA-084
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  process: "machined (steel)"

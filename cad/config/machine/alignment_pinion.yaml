@@ -1,0 +1,12 @@
+
+alignment_pinion:                  # ch25 — engages the cylinder-gear set for zeroing
+  teeth: 42
+  disengaged_tip_gap_mm: 2.0       # PINION_GAP
+  engaged_center_distance_mm: 41.30  # ENGAGED_C2C = (120+42)/2 * 25.4/DP (DP 49.82)
+  source: "DIMENSIONS.md ch25"
+  confidence: low
+  notes: >-
+    42T pinion counted on the ch25 plate (high); swings into the 120T cylinder set
+    to zero all channels. Engaged centre distance = (120+42)/2 · 25.4/DP = 41.30 mm
+    at the new DP 49.82 (was 68.58 at DP 30); disengaged it stands off with a 2 mm
+    tip gap.

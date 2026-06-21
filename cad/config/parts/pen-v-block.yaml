@@ -1,0 +1,5 @@
+pen-v-block:
+  number: MHA-053
+  material: Brass
+  tolerance_class: machined_block
+  process: "machined (brass)"
