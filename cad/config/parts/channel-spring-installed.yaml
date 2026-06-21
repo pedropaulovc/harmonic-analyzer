@@ -4,3 +4,12 @@ channel-spring-installed:
   tolerance_class: machined_block
   fit_class: spring_eye_threading
   process: "coiled wire"
+  # Relaxed/free spring body length (the only dimension callout in book ch.17 --
+  # the p.41 inset). The standalone free-spring part (was build_channel_spring.py
+  # / channel-spring, MHA-010) was display-only and is no longer built; its
+  # relaxed-length provenance is retained here as the single source of truth. The
+  # installed spring is the SAME wire/OD/coil count stretched to the in-machine
+  # length; _spring.build_spring reads this for the "must be stretched" invariant.
+  free_length_mm: 32.0
+  free_length_source: "DIMENSIONS.md ch17 p.41 inset (close-wound body callout)"
+  free_length_confidence: high

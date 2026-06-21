@@ -1,6 +1,0 @@
-channel-spring:
-  number: MHA-010
-  material: Alloy Steel
-  tolerance_class: machined_block
-  fit_class: spring_eye_threading
-  process: "coiled wire"

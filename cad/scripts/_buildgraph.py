@@ -188,7 +188,7 @@ def module_deps_of(script: Path) -> list[str]:
     assembly-only helper (``_assembly``) or an unrelated one (``_gear``) changes.
     Because it follows REAL Python imports transitively (``_chain_link -> _chain
     -> _common``; ``_common -> _config``; ``build_channel_spring_installed ->
-    build_channel_spring -> _features``), it can never under-invalidate so long as
+    _spring -> _features``), it can never under-invalidate so long as
     a script imports what it uses -- which Python enforces at run time. The BFS is
     cycle-safe (``build_motion_study`` <-> ``build_motion_study_springs``).
     """
@@ -474,7 +474,7 @@ def _stamping_modules() -> frozenset[str]:
     never reaches a stamping primitive and is correctly NOT a stamper -- so a
     registry-row edit rebuilds the relevant PART and merely REFRESHES the assembly,
     no FULL (codex review). An assembly that genuinely generates+stamps an in-script
-    part (``build_channel_assembly`` -> ``build_channel_spring.build_spring`` ->
+    part (``build_channel_assembly`` -> ``_spring.build_spring`` ->
     ``save_part_and_images``) IS a stamper. Stamping is always a by-name call, so
     name-based edges capture every real path (no under-detection)."""
     mods = _local_modules()

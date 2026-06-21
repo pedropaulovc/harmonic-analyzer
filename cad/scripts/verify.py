@@ -597,6 +597,38 @@ def verify_truth(report: Report) -> None:
     report.gate("truth:sawtooth-band-limited", _sawtooth_band_limited)
 
 
+def verify_spring_base(report: Report) -> None:
+    """The canonical channel-spring-installed body must equal the neutral gap.
+
+    At the neutral amplitude pose every channel's return spring spans the same
+    lever-eye -> summing-plate gap, so the assembly should mate the ONE canonical
+    ``channel-spring-installed`` body across all 20 channels with no generated
+    ``stretchNN`` variant. That only holds if the part's built body
+    (``SPRING_BASE_BODY``, from the static ``LEVER_EYE_Y``) matches the live
+    neutral gap the kinematic solver computes. If the lever anchor drifts (e.g.
+    another OD re-anchor), they diverge and the assembly silently spawns a
+    stretch00 again -- this gate fails loud first (SolidWorks-free; pure trig).
+    """
+
+    def _matches_neutral_gap() -> None:
+        import build_channel_assembly as channel  # local: keeps verify import light
+
+        st = channel.solve_state(0.0)
+        phi0 = math.radians(st["lever_tilt"])
+        hole_x_0 = channel.FULCRUM[0] + channel.LEVER_SPRING_X * math.cos(phi0)
+        neutral_body = channel._spring_spec(0.0, hole_x_0)["body"]
+        base = channel.SPRING_BASE_BODY
+        _expect(
+            abs(neutral_body - base) < 0.05,
+            f"channel-spring-installed body {base:.3f} != neutral gap body "
+            f"{neutral_body:.3f} (>= 0.05 mm): neutral would mate a generated "
+            f"stretch variant, not the canonical spring -- update LEVER_EYE_Y in "
+            f"build_channel_spring_installed.py to the re-anchored neutral eye",
+        )
+
+    report.gate("spring:neutral-body-canonical", _matches_neutral_gap)
+
+
 def _expect(condition: bool, message: str) -> None:
     if not condition:
         raise RuntimeError(message)
@@ -850,6 +882,7 @@ async def build(adapter: Any) -> dict[str, str]:
         await _verify_motion_one(adapter, report)
     if suite == "math":
         verify_truth(report)
+        verify_spring_base(report)
     if suite == "config":
         verify_config_vs_dimensions(report)
         verify_tolerance_audit(report)
@@ -902,6 +935,7 @@ if __name__ == "__main__":
         _report = Report()
         if _ARGS.suite == "math":
             verify_truth(_report)
+            verify_spring_base(_report)
         else:
             verify_config_vs_dimensions(_report)
             verify_tolerance_audit(_report)
