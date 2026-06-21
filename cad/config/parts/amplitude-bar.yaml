@@ -1,0 +1,6 @@
+amplitude-bar:
+  number: MHA-003
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  fit_class: sliding_amplitude_bar_on_rocker
+  process: "machined (steel)"

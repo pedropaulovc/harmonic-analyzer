@@ -31,6 +31,20 @@
   *full* rebuild (+ any post-assembly hooks) when the assembly script / `_common.py` / a hook
   changed, or the target is missing. Force a full rebuild of one assembly by deleting its
   `.SLDASM` target, then `doit assembly:<stem>`.
+- **Fine-grained config deps.** Each part/assembly depends on ONLY the `cad/config` files it
+  actually reads, derived by static analysis of its `_config.<accessor>` calls (`config_files_of`
+  in `_buildgraph.py`); dodo.py honors it as the file_dep + assembly-recipe set. `machine.yaml`
+  and `parts.yaml` are SPLIT per-subsystem (`machine/<subsystem>.yaml` + `_base.yaml`) and
+  per-part (`parts/<dashed-name>.yaml` + `_defaults.yaml`); `_config._doc` re-aggregates them
+  transparently, so accessors/verify/provenance are unchanged. Net: editing one part's registry
+  row rebuilds only that part; a `machine channels.active_count` edit (in `machine/channels.yaml`)
+  skips the gear parts (they read `machine/gear_train.yaml`); the narrative `dimensions.yaml`
+  (read by no part) rebuilds nothing. It is CONSERVATIVE — any `_config` use the analyzer can't
+  classify falls back to the whole config — so it can only over-rebuild, never skip a real change.
+  Don't add a new `_config` accessor without mapping it in `_buildgraph` (`check:graph`'s
+  coverage test fails loud otherwise). After this change first lands (file_dep paths moved), run
+  `doit reset-dep` once to migrate the DB in place WITHOUT a rebuild — the artefacts are current
+  (values are byte-identical, only the files moved).
 - **Fail loud.** A refresh that hits a dangling mate, free DOF, or interference exits non-zero
   and leaves the `.SLDASM` untouched — never a stale artefact.
 - **Parallelism via the COM spine — `-n` is now SAFE.** A single SolidWorks STA seat still

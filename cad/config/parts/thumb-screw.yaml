@@ -1,0 +1,6 @@
+thumb-screw:
+  number: MHA-075
+  material: Brass
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: "machined (brass)"

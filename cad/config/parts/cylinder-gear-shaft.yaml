@@ -1,0 +1,6 @@
+cylinder-gear-shaft:
+  number: MHA-028
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  fit_class: shaft_in_bushing
+  process: "machined (steel)"

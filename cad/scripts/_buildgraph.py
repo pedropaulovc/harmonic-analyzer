@@ -194,50 +194,59 @@ def module_deps_of(script: Path) -> list[str]:
     return sorted(str(mods[m].resolve()) for m in result)
 
 
-# --- Per-script CONFIG read-set: which cad/config/*.yaml docs a build script
-# actually reads, so doit can depend each part/assembly on ONLY those files
-# instead of the blanket "every *.yaml is a dep of every build". A whole-config
-# dep meant one value edit to any YAML (e.g. machine.yaml channels.active_count,
-# or even the 98 KB narrative dimensions.yaml that NO part reads) marked all ~71
-# parts stale -> a ~25 min full rebuild on the single SolidWorks seat.
+# --- Per-script CONFIG read-set: which cad/config FILES a build script actually
+# reads, so doit can depend each part/assembly on ONLY those files instead of the
+# blanket "every *.yaml is a dep of every build". A whole-config dep meant one
+# value edit to any YAML (e.g. machine channels.active_count, one part's registry
+# row, or even the 98 KB narrative dimensions.yaml that NO part reads) marked all
+# ~76 parts stale -> a ~25 min full rebuild on the single SolidWorks seat.
+#
+# The two largest data files are SPLIT into per-concern files (see _config.py,
+# which re-aggregates them transparently), so the dependency can be per-subsystem
+# / per-part rather than per-file:
+#     cad/config/machine/<subsystem>.yaml   (+ _base.yaml = units)
+#     cad/config/parts/<dashed-name>.yaml   (+ _defaults.yaml)
+# A gear part that reads only machine("gear_train", ...) no longer rebuilds when
+# machine channels.active_count changes (that lives in machine/channels.yaml), and
+# editing ONE part's registry row rebuilds only that one part.
 #
 # CORRECTNESS FIRST -- this must never UNDER-invalidate (a missed dep = a silent
 # stale-geometry build, far worse than an over-rebuild). The read-set is derived
 # by STATIC analysis of every ``_config.<accessor>(...)`` call across a script's
 # transitive import closure (``module_deps_of`` -- the same closure doit already
-# tracks for .py edits), mapped to the doc each accessor reads. It is conservative
-# by construction: ANY config access it cannot classify -- an unknown accessor, a
-# dynamic (non-literal) doc argument, a ``from _config import ...`` (whose bare
-# names we don't follow), or an unparseable source -- collapses the whole script
-# to "depends on every config" (``config_docs_of`` returns all stems). So the
-# only way to be wrong is to OVER-rebuild, never to skip a real change.
+# tracks for .py edits). It is conservative by construction: ANY config access it
+# cannot classify -- an unmapped accessor, an unresolvable ``provenance``/``_doc``
+# doc argument, a ``from _config import ...`` (whose bare names we don't follow),
+# or an unparseable source -- collapses the whole script to the ``"**"`` token
+# (depends on every config file). So the only way to be wrong is to OVER-rebuild.
 #
-# This is a *derived* declaration (no hand-maintained per-script list to forget to
-# update -- which would itself be an under-invalidation hazard): the dependency
-# follows the real ``_config`` calls, which Python enforces at run time. Adding a
-# new accessor to _config.py without mapping it here is also safe -- it reads as an
-# "unknown accessor" and falls back to the whole config (test_config_*_coverage in
-# test_buildgraph.py fails loud so the perf benefit isn't silently lost).
+# ``config_files_of`` returns config-relative TOKENS: a concrete path
+# (``"channels.yaml"``, ``"machine/gear_train.yaml"``, ``"parts/cone-gear.yaml"``)
+# or one of three globs -- ``"machine/*"`` (whole machine family, for a dynamic
+# subsystem), ``"parts/*"`` (whole parts registry, for the dynamic part name in
+# ``_common.part_properties``), ``"**"`` (whole config, the fallback). dodo.py
+# expands these, narrowing ``"parts/*"`` per task: a part to its OWN row, an
+# assembly to the rows it actually stamps (see _config_deps in dodo.py).
 
-# Each public _config accessor -> the doc stem(s) it reads. Derived from
-# cad/scripts/_config.py (active_channels reads channels + machine via
-# active_count; palette reads materials). Kept in sync by the coverage test.
-_CONFIG_ACCESSOR_DOCS: dict[str, frozenset[str]] = {
-    "channels": frozenset({"channels"}),
-    "active_count": frozenset({"machine"}),
-    "active_channels": frozenset({"channels", "machine"}),
-    "cone_teeth": frozenset({"channels"}),
-    "amplitudes": frozenset({"channels"}),
-    "machine": frozenset({"machine"}),
-    "fit": frozenset({"tolerances"}),
-    "parts": frozenset({"parts"}),
-    "materials": frozenset({"materials"}),
-    "palette": frozenset({"materials"}),
+# Accessors that read a FIXED file (no argument resolution needed). Derived from
+# _config.py; kept in sync by test_config_accessor_coverage. Note active_count
+# reads machine("channels", ...) -> machine/channels.yaml (the machine subsystem),
+# which is a DIFFERENT file from the top-level channels.yaml (the channel table).
+_FIXED_ACCESSOR_TOKENS: dict[str, frozenset[str]] = {
+    "channels": frozenset({"channels.yaml"}),
+    "cone_teeth": frozenset({"channels.yaml"}),
+    "amplitudes": frozenset({"channels.yaml"}),
+    "active_count": frozenset({"machine/channels.yaml"}),
+    "active_channels": frozenset({"channels.yaml", "machine/channels.yaml"}),
+    "fit": frozenset({"tolerances.yaml"}),
+    "materials": frozenset({"materials.yaml"}),
+    "palette": frozenset({"materials.yaml"}),
 }
-# Accessors whose doc is named by their FIRST positional argument (``provenance``,
-# ``_doc``): resolvable only when that arg is a string LITERAL -- otherwise the
-# read-set is unknown -> conservative whole-config fallback.
-_CONFIG_DYNAMIC_ACCESSORS: frozenset[str] = frozenset({"provenance", "_doc"})
+# Accessors whose file(s) are named by their FIRST positional argument:
+#   machine(<subsystem>, ...) -> machine/<subsystem>.yaml   (dynamic -> machine/*)
+#   parts(<dashed-name>)      -> parts/<name>.yaml+_defaults (dynamic -> parts/*)
+#   provenance/_doc(<doc>)    -> that doc's file family      (dynamic -> "**")
+_FAMILY_ACCESSORS: frozenset[str] = frozenset({"machine", "parts", "provenance", "_doc"})
 
 
 class _UnknownConfigUse(Exception):
@@ -246,10 +255,60 @@ class _UnknownConfigUse(Exception):
 
 
 @functools.lru_cache(maxsize=1)
-def _all_config_doc_stems() -> frozenset[str]:
-    """Every config doc stem (``cad/config/<stem>.yaml``) -- the conservative
-    whole-config fallback set."""
+def _top_level_docs() -> frozenset[str]:
+    """Single-file config doc stems (channels, tolerances, materials, dimensions)."""
     return frozenset(p.stem for p in CONFIG_DIR.glob("*.yaml"))
+
+
+@functools.lru_cache(maxsize=1)
+def _machine_subsystems() -> frozenset[str]:
+    """Machine subsystem stems (``machine/<sub>.yaml`` minus the units _base)."""
+    d = CONFIG_DIR / "machine"
+    return frozenset(p.stem for p in d.glob("*.yaml") if p.stem != "_base") if d.is_dir() else frozenset()
+
+
+@functools.lru_cache(maxsize=1)
+def _part_registry_names() -> frozenset[str]:
+    """Per-part registry stems (``parts/<dashed-name>.yaml`` minus _defaults)."""
+    d = CONFIG_DIR / "parts"
+    return frozenset(p.stem for p in d.glob("*.yaml") if p.stem != "_defaults") if d.is_dir() else frozenset()
+
+
+def _doc_family_tokens(doc: str) -> frozenset[str] | None:
+    """The token(s) covering a whole doc by name (for provenance/_doc): the split
+    docs map to their family glob, single-file docs to their file. None = unknown
+    doc name."""
+    if doc == "machine":
+        return frozenset({"machine/*"})
+    if doc == "parts":
+        return frozenset({"parts/*"})
+    if doc in _top_level_docs():
+        return frozenset({f"{doc}.yaml"})
+    return None
+
+
+def _family_tokens(accessor: str, arg: str | None) -> frozenset[str]:
+    """Resolve a family accessor at one call site. ``arg`` is the literal first-arg
+    string, or None when there is no positional arg OR it is non-literal."""
+    if accessor == "machine":
+        if arg is None:
+            return frozenset({"machine/*"})           # dynamic subsystem -> whole family
+        if arg in _machine_subsystems():
+            return frozenset({f"machine/{arg}.yaml"})
+        raise _UnknownConfigUse                        # unknown subsystem
+    if accessor == "parts":
+        if arg is None:
+            return frozenset({"parts/*"})             # dynamic part name (the _common path)
+        if arg in _part_registry_names():
+            return frozenset({f"parts/{arg}.yaml", "parts/_defaults.yaml"})
+        raise _UnknownConfigUse                        # unknown registry row
+    # provenance / _doc: a non-literal doc name is unresolvable -> whole config.
+    if arg is None:
+        raise _UnknownConfigUse
+    fam = _doc_family_tokens(arg)
+    if fam is None:
+        raise _UnknownConfigUse
+    return fam
 
 
 def _config_aliases(tree: ast.AST) -> set[str]:
@@ -268,13 +327,21 @@ def _config_aliases(tree: ast.AST) -> set[str]:
     return names
 
 
-def _docs_in_source(path: Path) -> frozenset[str]:
-    """Config doc stems read by ONE source file via ``_config.<accessor>(...)``.
+def _literal_first_arg(call: ast.Call) -> str | None:
+    """The first positional arg of ``call`` if it is a string literal, else None
+    (no arg, or a non-literal/dynamic arg)."""
+    arg = call.args[0] if call.args else None
+    if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+        return arg.value
+    return None
+
+
+def _config_tokens_in_source(path: Path) -> frozenset[str]:
+    """Config FILE tokens read by ONE source via ``_config.<accessor>(...)``.
 
     Raises ``_UnknownConfigUse`` if the file touches ``_config`` in a way we can't
     classify, so the caller conservatively depends on the whole config.
     """
-    known = _all_config_doc_stems()
     tree = ast.parse(path.read_text(encoding="utf-8"))
     aliases = _config_aliases(tree)
 
@@ -284,65 +351,117 @@ def _docs_in_source(path: Path) -> frozenset[str]:
         if isinstance(node, ast.ImportFrom) and node.module == "_config":
             raise _UnknownConfigUse
 
-    docs: set[str] = set()
-    # First resolve the dynamic accessors at their call sites (need the literal
-    # arg, not just the attribute). Record which attribute nodes we resolved so a
-    # dynamic accessor used in any OTHER position trips the fallback below.
-    resolved_dyn: set[int] = set()
+    tokens: set[str] = set()
+    # Resolve family accessors at their CALL sites (need the literal arg, not just
+    # the attribute). Record which attribute nodes we resolved so a family accessor
+    # used in any OTHER position trips the fallback below.
+    resolved_family: set[int] = set()
     for node in ast.walk(tree):
         if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
                 and isinstance(node.func.value, ast.Name)
                 and node.func.value.id in aliases
-                and node.func.attr in _CONFIG_DYNAMIC_ACCESSORS):
-            arg = node.args[0] if node.args else None
-            if (isinstance(arg, ast.Constant) and isinstance(arg.value, str)
-                    and arg.value in known):
-                docs.add(arg.value)
-                resolved_dyn.add(id(node.func))
-            else:
-                raise _UnknownConfigUse  # non-literal / unknown doc arg
+                and node.func.attr in _FAMILY_ACCESSORS):
+            tokens |= _family_tokens(node.func.attr, _literal_first_arg(node))
+            resolved_family.add(id(node.func))
 
     # Every `<alias>.<attr>` access must be a classified accessor.
     for node in ast.walk(tree):
         if (isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)
                 and node.value.id in aliases):
             attr = node.attr
-            if attr in _CONFIG_ACCESSOR_DOCS:
-                docs |= _CONFIG_ACCESSOR_DOCS[attr]
-            elif attr in _CONFIG_DYNAMIC_ACCESSORS:
-                if id(node) not in resolved_dyn:
-                    raise _UnknownConfigUse  # dynamic accessor not used as a literal call
+            if attr in _FIXED_ACCESSOR_TOKENS:
+                tokens |= _FIXED_ACCESSOR_TOKENS[attr]
+            elif attr in _FAMILY_ACCESSORS:
+                if id(node) not in resolved_family:
+                    raise _UnknownConfigUse  # family accessor not used as a literal call
             else:
                 raise _UnknownConfigUse  # unmapped accessor -> conservative
-    return frozenset(docs)
+    return frozenset(tokens)
 
 
 @functools.lru_cache(maxsize=None)
-def config_docs_of(script: Path) -> frozenset[str]:
-    """Config doc stems a build script reads, across its transitive import closure.
+def config_files_of(script: Path) -> frozenset[str]:
+    """Config file TOKENS a build script reads, across its transitive import
+    closure (see the module comment for the token vocabulary).
 
     The conservative complement of ``module_deps_of``: scans the script plus every
-    local module it imports for ``_config`` accessor calls and unions the docs they
-    read. Returns ALL config stems if any source uses ``_config`` unclassifiably or
-    fails to parse -- so doit over-rebuilds rather than ever skipping a real change.
+    local module it imports for ``_config`` accessor calls and unions the tokens
+    they read. Returns ``frozenset({"**"})`` if any source uses ``_config``
+    unclassifiably or fails to parse -- so doit over-rebuilds rather than ever
+    skipping a real change.
     """
     sources = [script.resolve(), *(Path(p) for p in module_deps_of(script))]
-    docs: set[str] = set()
+    tokens: set[str] = set()
     for src in sources:
         try:
-            docs |= _docs_in_source(src)
+            tokens |= _config_tokens_in_source(src)
         except (_UnknownConfigUse, SyntaxError, OSError):
-            return _all_config_doc_stems()  # conservative: the whole config
-    return frozenset(docs)
+            return frozenset({"**"})  # conservative: the whole config
+    return frozenset(tokens)
 
 
-def config_yamls_of(script: Path) -> list[str]:
-    """Resolved ``cad/config/*.yaml`` paths a build script depends on -- the
-    fine-grained replacement for the blanket ``cad/config/*.yaml`` glob in
-    ``dodo.py``'s part/assembly file_dep and recipe sets."""
-    return sorted(
-        str((CONFIG_DIR / f"{stem}.yaml").resolve()) for stem in config_docs_of(script)
-    )
+# --- Token -> concrete file expansion helpers (pure; dodo.py adds per-task
+# narrowing of the "parts/*" token).
+def all_config_files() -> list[str]:
+    """Every config file (recursive) -- the ``"**"`` whole-config expansion."""
+    return sorted(str(p.resolve()) for p in CONFIG_DIR.rglob("*.yaml"))
+
+
+def machine_family_files() -> list[str]:
+    """Every machine/*.yaml (incl _base) -- the ``"machine/*"`` expansion."""
+    d = CONFIG_DIR / "machine"
+    return sorted(str(p.resolve()) for p in d.glob("*.yaml")) if d.is_dir() else []
+
+
+def parts_registry_files() -> list[str]:
+    """Every parts/*.yaml (incl _defaults) -- the conservative ``"parts/*"``
+    expansion (dodo.py narrows this per task)."""
+    d = CONFIG_DIR / "parts"
+    return sorted(str(p.resolve()) for p in d.glob("*.yaml")) if d.is_dir() else []
+
+
+def part_row_files(dashed_name: str) -> list[str]:
+    """The registry files a single part reads when it stamps its own properties:
+    its row + the shared defaults. Empty if the part is unregistered (then
+    ``part_properties`` reads neither -- see _common)."""
+    row = CONFIG_DIR / "parts" / f"{dashed_name}.yaml"
+    if not row.exists():
+        return []
+    defaults = CONFIG_DIR / "parts" / "_defaults.yaml"
+    return sorted({str(row.resolve()), str(defaults.resolve())})
+
+
+@functools.lru_cache(maxsize=None)
+def stamps_part_properties(script: Path) -> bool:
+    """True if this build script's closure actually CALLS a parts-registry stamping
+    primitive (``part_properties`` / ``apply_custom_properties`` /
+    ``save_part_and_images``) -- i.e. it stamps a registry row in-script. Drives
+    whether an ASSEMBLY depends on parts rows directly (e.g. build_channel_assembly
+    stamps its in-script stretched springs); a non-stamping assembly's parts
+    metadata propagates instead via the rebuilt ``.SLDPRT`` -> REFRESH.
+
+    The whole closure is scanned EXCEPT ``_common.py``: _common is the universal
+    machinery every script imports, and its only stamping calls live INSIDE
+    ``save_part_and_images``/``part_properties`` themselves -- so scanning it would
+    flag everything. Any genuine stamp elsewhere (own script, a ``build_*`` part
+    builder, or a stamping helper like ``_chain_link``) must invoke one of these
+    primitives BY NAME, which is detected here -- so excluding _common cannot cause
+    a miss (no under-invalidation)."""
+    targets = {"part_properties", "apply_custom_properties", "save_part_and_images"}
+    sources = [script.resolve(),
+               *(Path(p) for p in module_deps_of(script) if Path(p).name != "_common.py")]
+    for src in sources:
+        try:
+            tree = ast.parse(src.read_text(encoding="utf-8"))
+        except (SyntaxError, OSError):
+            return True  # can't tell -> assume it stamps (conservative)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                fn = node.func
+                name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", None)
+                if name in targets:
+                    return True
+    return False
 
 
 def dependents_of(stem: str) -> list[str]:

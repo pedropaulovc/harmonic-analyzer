@@ -1,0 +1,6 @@
+pen-hanger:
+  number: MHA-049
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: "machined (steel)"

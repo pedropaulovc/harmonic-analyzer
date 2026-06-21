@@ -1,0 +1,6 @@
+connecting-rod:
+  number: MHA-017
+  material: Gray Cast Iron
+  tolerance_class: machined_block
+  fit_class: cam_follower_contact
+  process: "cast + machined"

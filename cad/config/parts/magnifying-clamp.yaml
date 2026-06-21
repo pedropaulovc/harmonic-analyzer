@@ -1,0 +1,5 @@
+magnifying-clamp:
+  number: MHA-042
+  material: Brass
+  tolerance_class: machined_block
+  process: "machined (brass)"

@@ -1,0 +1,20 @@
+
+output:
+  magnify_factor: 4.0              # magnifying lever / wheel amplification to the pen
+  spring_count_channel: 20         # one return spring per channel
+  spring_count_counter: 1          # single counter spring (force-balance datum)
+  pen_trace_half_mm: 15.0          # physical pen half-stroke the computed curve maps onto
+  pen_rest_crank_deg: 90.0         # crank angle the saved/render pose sits at (pen at datum)
+  source: "DIMENSIONS.md ch19, ch26-28"
+  confidence: med
+  notes: >-
+    20 channel return springs + 1 counter spring (ch.19) float the summing lever
+    in static equilibrium; the magnifying lever/wheel amplifies its travel ~4×
+    to the pen (ch.26-28). The summation is COMPUTED, not force-simulated — see
+    docs/motion-policy.md and truth_model.py. The pen is driven KINEMATICALLY:
+    the pen-rod travel mate is equation-linked to a CrankDeg global through the
+    chained Fourier sum (pen_driver.py), reproducing truth_model.pen_y with no
+    force solver. pen_trace_half_mm maps the (dimensionless-amplitude) computed
+    curve onto a physical pen half-stroke; at pen_rest_crank_deg the pen sits at
+    its build datum so the saved render pose is unchanged. verify.py --suite
+    kinematics sweeps CrankDeg and asserts the sampled tip matches truth_model.

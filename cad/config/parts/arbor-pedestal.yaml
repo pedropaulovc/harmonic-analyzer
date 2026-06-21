@@ -1,0 +1,6 @@
+arbor-pedestal:
+  number: MHA-004
+  material: Gray Cast Iron
+  tolerance_class: machined_block
+  fit_class: shaft_in_bushing
+  process: "cast + machined"

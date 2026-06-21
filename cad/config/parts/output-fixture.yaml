@@ -1,0 +1,5 @@
+output-fixture:
+  number: MHA-047
+  material: Brass
+  tolerance_class: machined_block
+  process: "machined (brass)"
