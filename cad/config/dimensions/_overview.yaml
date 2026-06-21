@@ -8,14 +8,16 @@ preamble: |
   each), cross-checked against the legacy `cad/Parts/*.cs` / `cad/kcl-archive/*.kcl`
   dimensions.
 
-  > **This file is GENERATED from `cad/config/dimensions.yaml` — do not edit it
-  > directly.** The dimension tables live there as structured rows and the
-  > narrative as `prose` properties; `cad/scripts/gen_dimensions.py` renders this
-  > view (`--check` gates that the two never drift). The build *inputs* the scripts
-  > actually read (tooth counts, pitches, fits, the cone incline) live in the
-  > sibling `machine.yaml` / `channels.yaml` / `tolerances.yaml`; `verify.py`
-  > cross-checks those against the dimension rows here. Confidence ladder:
-  > annotated → stated → scaled → legacy → derived.
+  > **This file is hand-maintained provenance, not generated.** The dimension
+  > record was spread out of the former `cad/config/dimensions.yaml` into per-part
+  > `dimensions:` blocks (`cad/config/parts/<stem>.yaml`) plus these standalone
+  > `cad/config/dimensions/*.yaml` files for content that maps to no single part;
+  > `cad/scripts/gen_dimensions.py` renders a read-only `cad/DIMENSIONS.md` view
+  > from them. The build *inputs* the scripts actually read (tooth counts, pitches,
+  > fits, the cone incline) live in the sibling `machine/*.yaml` / `channels.yaml`
+  > / `tolerances.yaml`; any value that overlaps a dimension row lives SOLELY there,
+  > with its research provenance in that node's `citations:` block. Confidence
+  > ladder: annotated → stated → scaled → legacy → derived.
 source_hierarchy: Source hierarchy (authoritative → weakest)
 content:
 - notes: |2
