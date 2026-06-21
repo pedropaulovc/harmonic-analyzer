@@ -54,16 +54,16 @@ def model_paths(model: str) -> tuple[Path, dict]:
     asm = CAD_OUT / "sldasm" / f"{dashed}.SLDASM"
     prt = CAD_OUT / "sldprt" / f"{dashed}.SLDPRT"
     if asm.exists():
-        scene = CAD_OUT / "boxes" / f"{dashed}.json"
-        _stale(scene, asm, scene.name)
-        data = json.loads(scene.read_text(encoding="utf-8"))
-        comps = data.get("components") or []
-        if not comps or any("mesh" not in c for c in comps):
-            raise RuntimeError(f"{scene.name} has no mesh scene graph — re-run export_models.py")
-        for stem, mesh in {(c["part"], c["mesh"]) for c in comps}:
-            part_src = CAD_OUT / "sldprt" / f"{stem}.SLDPRT"
-            _stale(STL_DIR / f"{mesh}.STL", part_src, f"{mesh}.STL")
-        return asm, {"scene": str(scene), "parts_dir": str(STL_DIR)}
+        # Whole-machine ch30 views frame the entire assembly (no
+        # frame_components), so the single posed monolithic assembly STL is
+        # sufficient and far cheaper to keep fresh than the per-part STL + boxes
+        # scene graph: export only re-opens the assembly and dumps one STL, with
+        # no 332-component transform scan and no per-part STL pass each loop. It
+        # renders as one flat-colour mesh; part-parameter tuning leans on
+        # silhouette IoU (colour-independent), with RMS as a secondary signal.
+        stl = STL_DIR / f"{dashed}.STL"
+        _stale(stl, asm, stl.name)
+        return asm, {"stl": str(stl), "rgb": None}
     if not prt.exists():
         raise FileNotFoundError(f"no artefact for {model}")
     stl = STL_DIR / f"{dashed}.STL"

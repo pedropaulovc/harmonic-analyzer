@@ -282,27 +282,40 @@ def assert_configs_distinct(stem: str, crc_by_mesh: dict[str, int]) -> None:
 
 def main() -> int:
     force = "--force" in sys.argv[1:]
+    # Loop mode: the render consumes only the monolithic assembly STL, so emit
+    # just that -- skip STEP, the 332-component boxes scan and the per-part STL
+    # pass. Cuts a part-parameter iteration's export from ~5 min to one STL dump.
+    stl_only = "--stl-only" in sys.argv[1:]
     models = manifest_models()
     colors = load_colors()
 
     parts = [m for m in models if model_path(m).suffix.lower() == ".sldprt"]
     assemblies = [m for m in models if m not in parts]
 
-    stale_parts = [m for m in parts if force
-                   or part_stl_stale(m.replace("_", "-"), m.replace("_", "-"), colors)]
-    stale_asms = []
-    for m in assemblies:
-        src, bj = model_path(m), OUT_BOXES / f"{m.replace('_', '-')}.json"
-        mono = OUT_STL / f"{m.replace('_', '-')}.STL"
-        if (force or not bj.exists() or bj.stat().st_mtime < src.stat().st_mtime
-                or not mono.exists() or mono.stat().st_mtime < src.stat().st_mtime):
-            stale_asms.append(m)
-            continue
-        data = json.loads(bj.read_text(encoding="utf-8"))
-        comps = data.get("components") or []
-        if (not comps or any("mesh" not in c for c in comps) or any(
-                part_stl_stale(c["part"], c["mesh"], colors) for c in comps)):
-            stale_asms.append(m)
+    if stl_only:
+        stale_parts = []
+        stale_asms = []
+        for m in assemblies:
+            mono = OUT_STL / f"{m.replace('_', '-')}.STL"
+            src = model_path(m)
+            if force or not mono.exists() or mono.stat().st_mtime < src.stat().st_mtime:
+                stale_asms.append(m)
+    else:
+        stale_parts = [m for m in parts if force
+                       or part_stl_stale(m.replace("_", "-"), m.replace("_", "-"), colors)]
+        stale_asms = []
+        for m in assemblies:
+            src, bj = model_path(m), OUT_BOXES / f"{m.replace('_', '-')}.json"
+            mono = OUT_STL / f"{m.replace('_', '-')}.STL"
+            if (force or not bj.exists() or bj.stat().st_mtime < src.stat().st_mtime
+                    or not mono.exists() or mono.stat().st_mtime < src.stat().st_mtime):
+                stale_asms.append(m)
+                continue
+            data = json.loads(bj.read_text(encoding="utf-8"))
+            comps = data.get("components") or []
+            if (not comps or any("mesh" not in c for c in comps) or any(
+                    part_stl_stale(c["part"], c["mesh"], colors) for c in comps)):
+                stale_asms.append(m)
 
     if not stale_parts and not stale_asms:
         print("all exports fresh")
@@ -379,16 +392,21 @@ def main() -> int:
                 src = model_path(m)
                 check(f"open {src.name}", await adapter.open_model(str(src)))
                 doc = adapter.currentModel
-                out = OUT_STEP / f"{dashed}.STEP"
-                ok = doc.SaveAs3(str(out), 0, 0)
-                if not out.exists():
-                    raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={ok})")
-                log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB)")
+                if not stl_only:
+                    out = OUT_STEP / f"{dashed}.STEP"
+                    ok = doc.SaveAs3(str(out), 0, 0)
+                    if not out.exists():
+                        raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={ok})")
+                    log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB)")
                 mono = OUT_STL / f"{dashed}.STL"  # mm, like every other STL
                 ok = doc.SaveAs3(str(mono), 0, 0)
                 if not mono.exists():
                     raise RuntimeError(f"SaveAs3 produced no file: {mono} (rc={ok})")
                 log(f"saved {mono.name} ({mono.stat().st_size / 1e6:.1f} MB, mm)")
+                if stl_only:
+                    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+                    done[m] = "exported"
+                    continue
                 # fresh cache: preloaded colors.json entries would mask
                 # colour changes made to part docs since the last export
                 scan_colors: dict = {}
