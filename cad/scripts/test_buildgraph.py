@@ -224,13 +224,30 @@ def test_config_accessor_coverage():
     assert not missing, f"unclassified _config accessors (map them in _buildgraph): {missing}"
 
 
-def test_stamps_part_properties_only_in_script_stampers():
-    """Only assemblies that stamp a registry row IN-SCRIPT are flagged (so only
-    they depend on parts rows directly); a part is always a stamper (it saves its
-    own properties), and _common (universal machinery) must not flag everything."""
+def test_pen_assembly_tracks_pen_driver_config():
+    """REGRESSION (codex P1): build_pen_assembly imports pen_driver -> truth_model,
+    which embed machine/output + channels values into the saved assembly equations.
+    module_deps_of must follow those non-_*/build_* modules so config_files_of sees
+    the files -- else a machine/output.yaml or channels.yaml edit leaves
+    assembly:pen up to date with a stale pen driver."""
+    closure = {Path(p).stem for p in module_deps_of(script_for("pen"))}
+    assert {"pen_driver", "truth_model"} <= closure, closure
+    pen_cfg = config_files_of(script_for("pen"))
+    assert "machine/output.yaml" in pen_cfg, pen_cfg
+    assert "channels.yaml" in pen_cfg, pen_cfg
+
+
+def test_stamps_part_properties_only_genuine_stampers():
+    """Only assemblies that GENERATE+stamp an in-script part (no separate part task)
+    are flagged, via the function-level call graph. channel calls
+    build_channel_spring.build_spring (-> save_part_and_images) so it stamps its
+    stretched springs; summing/magnifier import part-builder CONSTANTS and
+    paper_drive reaches only build_cone_gear MATH helpers, so none of them stamp and
+    a registry-row edit only REFRESHES them, no FULL (codex P2)."""
     assert stamps_part_properties(script_for("channel")), "channel stamps stretched springs"
-    assert not stamps_part_properties(script_for("frame")), "frame only inserts parts"
-    # every part stamps its own properties via save_part_and_images.
+    for non in ("frame", "summing", "magnifier", "paper_drive", "pen", "drive_train"):
+        assert not stamps_part_properties(script_for(non)), f"{non} must not be a stamper"
+    # a part build script genuinely stamps its own properties (sanity on the graph).
     assert stamps_part_properties(SCRIPTS_DIR / "build_fillister_screw.py")
 
 

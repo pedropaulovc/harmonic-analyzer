@@ -124,21 +124,30 @@ def references_of(asm_stem: str) -> list[str]:
 @functools.lru_cache(maxsize=1)
 def _local_modules() -> dict[str, Path]:
     """Every local importable module a build script may pull in transitively, by
-    module name: the ``_*.py`` helpers AND sibling ``build_*.py`` scripts.
+    module name: the ``_*.py`` helpers, sibling ``build_*.py`` scripts, AND any
+    other sibling module a build script imports (e.g. ``pen_driver`` ->
+    ``truth_model``, which ``build_pen_assembly`` pulls in and which read
+    ``_config``).
 
-    A part can reuse another build script -- e.g.
+    A part/assembly can reuse another module -- e.g.
     ``build_channel_spring_installed`` imports ``build_channel_spring.build_spring``,
-    which in turn imports ``_features`` -- so the closure must follow build-script
-    edges too, or an edit to that reused script (or the helper IT pulls in) would
-    leave the dependent ``.SLDPRT`` reported up to date (codex review #2).
+    or ``build_pen_assembly`` imports ``pen_driver.install`` -- so the closure must
+    follow those edges, or an edit to that reused module (or the config IT reads)
+    would leave the dependent target reported up to date (codex review). Following
+    ALL sibling modules (not just ``_*``/``build_*``) closes a config
+    under-invalidation: ``pen_driver``/``truth_model`` embed machine/output +
+    channels values into the saved pen assembly, but were previously invisible to
+    ``module_deps_of``/``config_files_of``.
 
-    Excludes the build-GRAPH tooling itself (``_buildgraph.py`` and the one-shot
-    extraction scripts), which is never a geometry input.
+    Excludes the build-GRAPH tooling (``_buildgraph`` + one-shot extraction
+    scripts) and the test modules, which are never a geometry input. Standalone CLI
+    tools (verify/cut_release/...) stay in the map but are harmless: they are never
+    imported by a build script, so ``_direct_local_imports`` never selects them.
     """
     skip = {"_buildgraph.py", "_extract.py", "_rewrite_imports.py"}
     out: dict[str, Path] = {}
-    for p in sorted([*SCRIPTS_DIR.glob("_*.py"), *SCRIPTS_DIR.glob("build_*.py")]):
-        if p.name not in skip:
+    for p in sorted(SCRIPTS_DIR.glob("*.py")):
+        if p.name not in skip and not p.name.startswith("test_"):
             out[p.stem] = p
     return out
 
@@ -431,37 +440,103 @@ def part_row_files(dashed_name: str) -> list[str]:
     return sorted({str(row.resolve()), str(defaults.resolve())})
 
 
-@functools.lru_cache(maxsize=None)
-def stamps_part_properties(script: Path) -> bool:
-    """True if this build script's closure actually CALLS a parts-registry stamping
-    primitive (``part_properties`` / ``apply_custom_properties`` /
-    ``save_part_and_images``) -- i.e. it stamps a registry row in-script. Drives
-    whether an ASSEMBLY depends on parts rows directly (e.g. build_channel_assembly
-    stamps its in-script stretched springs); a non-stamping assembly's parts
-    metadata propagates instead via the rebuilt ``.SLDPRT`` -> REFRESH.
+# Parts-registry stamping is always a direct, by-name call to one of these.
+_STAMP_PRIMITIVES = frozenset({"part_properties", "apply_custom_properties",
+                               "save_part_and_images"})
 
-    The whole closure is scanned EXCEPT ``_common.py``: _common is the universal
-    machinery every script imports, and its only stamping calls live INSIDE
-    ``save_part_and_images``/``part_properties`` themselves -- so scanning it would
-    flag everything. Any genuine stamp elsewhere (own script, a ``build_*`` part
-    builder, or a stamping helper like ``_chain_link``) must invoke one of these
-    primitives BY NAME, which is detected here -- so excluding _common cannot cause
-    a miss (no under-invalidation)."""
-    targets = {"part_properties", "apply_custom_properties", "save_part_and_images"}
-    sources = [script.resolve(),
-               *(Path(p) for p in module_deps_of(script) if Path(p).name != "_common.py")]
-    for src in sources:
+
+def _function_call_names(node: ast.AST) -> tuple[set[str], set[tuple[str, str]]]:
+    """Within ``node`` (a function or module), the names it calls: bare-name calls
+    ``f(...)`` -> ``{"f"}`` and attribute calls ``m.f(...)`` -> ``{("m", "f")}``."""
+    simple: set[str] = set()
+    attrs: set[tuple[str, str]] = set()
+    for n in ast.walk(node):
+        if isinstance(n, ast.Call):
+            fn = n.func
+            if isinstance(fn, ast.Name):
+                simple.add(fn.id)
+            elif isinstance(fn, ast.Attribute) and isinstance(fn.value, ast.Name):
+                attrs.add((fn.value.id, fn.attr))
+    return simple, attrs
+
+
+@functools.lru_cache(maxsize=1)
+def _stamping_modules() -> frozenset[str]:
+    """Module stems that contain a function which TRANSITIVELY calls a stamping
+    primitive -- a whole-program, function-level call graph over every local
+    module. A script stamps a registry row iff its own module is in this set.
+
+    This is precise where a module-level "is it imported" test is not: an assembly
+    that imports a part builder only for CONSTANTS (``build_summing_assembly`` <-
+    ``build_boss_hook`` values), or that calls only a builder's MATH helpers
+    (``build_paper_drive_assembly`` -> ``_gear`` -> ``build_cone_gear.gap_area_in_disc``),
+    never reaches a stamping primitive and is correctly NOT a stamper -- so a
+    registry-row edit rebuilds the relevant PART and merely REFRESHES the assembly,
+    no FULL (codex review). An assembly that genuinely generates+stamps an in-script
+    part (``build_channel_assembly`` -> ``build_channel_spring.build_spring`` ->
+    ``save_part_and_images``) IS a stamper. Stamping is always a by-name call, so
+    name-based edges capture every real path (no under-detection)."""
+    mods = _local_modules()
+    local_names = frozenset(mods)
+    # Per module: each top-level function's call names, plus import resolution.
+    func_calls: dict[tuple[str, str], tuple[set[str], set[tuple[str, str]]]] = {}
+    imp_name: dict[str, dict[str, tuple[str, str]]] = {}   # stem -> name -> (mod, orig)
+    imp_alias: dict[str, dict[str, str]] = {}              # stem -> alias -> mod
+    for stem, path in mods.items():
         try:
-            tree = ast.parse(src.read_text(encoding="utf-8"))
+            tree = ast.parse(path.read_text(encoding="utf-8"))
         except (SyntaxError, OSError):
-            return True  # can't tell -> assume it stamps (conservative)
+            continue
+        n2q: dict[str, tuple[str, str]] = {}
+        a2m: dict[str, str] = {}
         for node in ast.walk(tree):
-            if isinstance(node, ast.Call):
-                fn = node.func
-                name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", None)
-                if name in targets:
-                    return True
-    return False
+            if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module in local_names:
+                for a in node.names:
+                    n2q[a.asname or a.name] = (node.module, a.name)
+            elif isinstance(node, ast.Import):
+                for a in node.names:
+                    if a.name in local_names:
+                        a2m[a.asname or a.name] = a.name
+        imp_name[stem], imp_alias[stem] = n2q, a2m
+        for fn in tree.body:
+            if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                func_calls[(stem, fn.name)] = _function_call_names(fn)
+
+    # Fixpoint: a function stamps if it calls a primitive, a stamping function in
+    # its own module, or an imported name that resolves to a stamping function.
+    stamping: set[tuple[str, str]] = set()
+    changed = True
+    while changed:
+        changed = False
+        for key, (simple, attrs) in func_calls.items():
+            if key in stamping:
+                continue
+            stem, _ = key
+            hit = bool(simple & _STAMP_PRIMITIVES)
+            if not hit:
+                for s in simple:
+                    if (stem, s) in stamping or imp_name[stem].get(s) in stamping:
+                        hit = True
+                        break
+            if not hit:
+                for v, attr in attrs:
+                    m = imp_alias[stem].get(v)
+                    if m and (m, attr) in stamping:
+                        hit = True
+                        break
+            if hit:
+                stamping.add(key)
+                changed = True
+    return frozenset(stem for stem, _ in stamping)
+
+
+def stamps_part_properties(script: Path) -> bool:
+    """True if this build script stamps a registry row for a part with NO separate
+    part task -- i.e. one it GENERATES in-script (e.g. build_channel_assembly's
+    stretched springs). Drives whether an ASSEMBLY depends on parts rows directly;
+    a non-stamping assembly's parts metadata propagates via the rebuilt ``.SLDPRT``
+    -> REFRESH. Resolved by the function-level call graph in ``_stamping_modules``."""
+    return script.stem in _stamping_modules()
 
 
 def dependents_of(stem: str) -> list[str]:
