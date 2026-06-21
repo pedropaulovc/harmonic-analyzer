@@ -74,6 +74,6 @@ Repo already has working probes for this exact pattern:
 (GetWhatsWrong + GetErrorCode2), and `_add_wire1_gear` / cam-perturb in the
 motion-study scripts handle pose/alignment-dependent gear over-defines.
 
-Related: [[temp-3channel-build-reduction]], [[build-gdi-session-accumulation]],
+Related: [[channel-amplitude-state]], [[build-gdi-session-accumulation]],
 [[sw-document-recovery-dialog]], [[solidworks-modeling-pitfalls]],
 [[fix-relations-last-resort]].

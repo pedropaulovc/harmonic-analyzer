@@ -1,7 +1,7 @@
 
 channels:
   count: 20                        # full channel table size (channels.yaml rows)
-  active_count: 3                  # <-- TEMPORARY (see note below)
+  active_count: 20                 # all 20 channels active (full state)
   station_pitch_mm: 7.0565         # PITCH — z-spacing between channel stations
   station_z0_mm: -67.1             # z_station(j) = station_z0 + station_pitch*j
   source: "DIMENSIONS.md ch12-13 drum grid"
@@ -11,15 +11,11 @@ channels:
     Scaled from the annotated drum photos (ch12-13), re-measured during the M6
     drive-train build.
 
-    TEMPORARY BUILD-PERFORMANCE REDUCTION (2026-06-19): active_count caps the
-    per-channel mechanism the build actually instantiates — the cylinder gear +
-    its cam follower (connecting-rod) in drive-train, and the rocker-arm /
-    amplitude-bar / channel-lever (top lever) / return spring in channel — to the
-    FIRST active_count channels (3). The 20 cone gears are KEPT (the cone stack is
-    derived from the full count: 388/207 in build_drive_train_assembly.py read all
-    20 rows), as are all 20 rows of channels.yaml (gear law, ratios, the synthesis
-    truth model). This was done ONLY to cut the full-build / refresh time while the
-    remaining parts of the device are certified; it WILL BE RECOVERED by setting
-    active_count back to 20 (and restoring amplitude:preset to `square`, then
-    regenerating channels.yaml amplitude_mm by the law below) once certification is
-    complete. _config.active_count()/active_channels() are the single read points.
+    active_count caps the per-channel mechanism the build instantiates — the
+    cylinder gear + its cam follower (connecting-rod) in drive-train, and the
+    rocker-arm / amplitude-bar / channel-lever (top lever) / return spring in
+    channel — to the FIRST active_count channels. At the full count (20) every
+    channel is built. The 20 cone gears are always KEPT (the cone stack is derived
+    from the full count: build_drive_train_assembly.py reads all 20 rows), as are
+    all 20 rows of channels.yaml (gear law, ratios, the synthesis truth model).
+    _config.active_count()/active_channels() are the single read points.
