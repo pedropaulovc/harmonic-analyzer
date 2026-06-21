@@ -7,7 +7,7 @@ from __future__ import annotations
 import math
 import struct
 
-from _common import MIRROR_PLANE, OUT_STL
+from _common import OUT_STL
 
 _STL_BBOX_CACHE: dict[str, tuple[tuple[float, float], ...]] = {}
 
@@ -116,6 +116,107 @@ def _mirror_xform(
         for i in range(3)
     ]
     return pos2, rows2
+
+# Machine-chirality mirror (M6.8). The original assembly was built as the
+# mirror image of the real machine (crank at +X with the paper facing -Z;
+# every ch. 30 plate and the Altgeld Hall photogrammetry put the crank at the
+# viewer's RIGHT when facing the paper, i.e. machine -X). The fix reflects
+# every component placement about the machine YZ plane (x -> -x) at the
+# `_place()` boundary of each subassembly script, leaving all derivation
+# math, solvers and checker-arbitrated slacks untouched.
+#
+# A reflection is not a rigid placement, so each mirrored placement is
+# realised as M(T(part)) = (M o T o S)(part), valid only when S(part) == part
+# for a part-local mirror symmetry S. MIRROR_PLANE declares S per part:
+#
+#   'x'  -- local YZ plane through the part STL bbox x-centre (default:
+#           solids of revolution, x-symmetric castings, even-tooth gears
+#           seeded with a tooth on local +X);
+#   'z'  -- local XY plane through the bbox z-centre (flat or planar-XY
+#           x-asymmetric linkages and wire forms; helix springs flip hand,
+#           which is sub-visible at render scale);
+#   'x0' -- local x = 0 exactly (parts whose build script is itself
+#           mirrored as part of M6.8: summing-lever, magnifying-bracket,
+#           pen-hanger);
+#   ('x'|'z', c) -- explicit plane coordinate in mm, bypassing the STL
+#           bbox (amplitude-bar: modeled cornered at origin, exactly
+#           x-symmetric about BAR_WIDTH/2; its on-disk STL was a legacy
+#           inch-unit export).
+#
+# Cosmetic asymmetries knowingly mirrored: measuring-stick engraved scale
+# reads right-to-left (0.4 mm ticks), crank-arm fiducial dimple swaps face.
+# Correctness is arbitrated downstream by assert_component_placed readback,
+# the zero-interference gate, the analytic spring/rack/clearance gates and
+# the photo comparison renders.
+# ---------------------------------------------------------------------------
+#
+# Lives here (not _common): MIRROR_PLANE is read only by mirror_placement below
+# and the channel-assembly stretched-spring loop -- never by a part build. Keep
+# it off _common so it stays off every part's input hash; a placement-only edit
+# then re-keys the assemblies (which import _transforms), not all ~70 parts.
+MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
+    # channel
+    "amplitude-bar": ("x", 3.175),
+    "rocker-arm": "z",
+    "connecting-rod": "z",
+    "channel-lever": "z",
+    "channel-spring-installed": "z",
+    # drive train
+    "crank-arm": "z",
+    "crank-handle": "z",
+    "transgear-latch": "z",
+    # odd sprocket teeth break the 'x' tooth-pattern closure; the hub is
+    # z-symmetric about the bbox centre (mesh resid 0.000)
+    "chain-sprocket": "z",
+    # output
+    "knife-stay": "z",
+    "boss-hook": "z",
+    "counter-spring": "z",
+    "gooseneck": "z",
+    # gooseneck-clamp: default 'x' (block/bore/screw-head all x-centred);
+    # 'z' was invalid -- the screw head sits one-sided at local z 12..18
+    # (M6.8 rebuild: 2280 mm^3 clamp-vs-gooseneck interference)
+    # pinion-bar / platen-rack: stub bore and tooth grid are NOT centred
+    # in the bbox x-span, but both parts are exact z-extrusions
+    "pinion-bar": "z",
+    "platen-rack": "z",
+    "magnifying-lever": "z",
+    "magnifying-clamp": "z",
+    "thumb-screw": "z",
+    "magnifying-vertical-rod": "z",
+    "pen-v-block": "z",
+    "pen-frame": "z",
+    "pen-set-screw": "z",
+    "column-clamp": "z",
+    # plain x-symmetric slab cornered at origin; explicit c avoids the
+    # STL-bbox dependency for a part newer than the legacy export set
+    "platen-paper": ("x", 129.75),
+    # roller-chain links: flat XY parts, exactly symmetric about local z=0
+    # (plates at +-plate_z, round bodies centred on z=0); achiral, so the
+    # YZ-mirror is a proper rotation. Explicit c, no STL at first build.
+    "chain-inner-link": ("z", 0.0),
+    "chain-outer-link": ("z", 0.0),
+    # centred symmetric bar; explicit c, no STL yet at first build
+    "wheel-bar": ("x", 0.0),
+    # knife bearing support: X-symmetric (bore + block centred on x0); explicit
+    # so placement never depends on a stale/absent STL bbox (it mirrors with the
+    # summing lever so the bore stays around the hex trunnion).
+    "knife-mount": ("x", 0.0),
+    # parts whose build scripts are themselves mirrored (M6.8)
+    "summing-lever": "x0",
+    "magnifying-bracket": "x0",
+    "pen-hanger": "x0",
+    # rocker-arm-portal (the unified support casting) is authored machine-handed
+    # and lives in the non-mirroring frame.SLDASM -> NO mirror entry (it replaced
+    # the old split rocker-arm-support + a-frame "x0" pair, 2026-06-19).
+    # M6.10 fasteners: authored in final orientation (axis along Y or Z),
+    # exactly symmetric about local x = 0; explicit c, no STL at first build
+    "hex-bolt": ("x", 0.0),
+    "lag-screw": ("x", 0.0),
+    "fillister-screw": ("x", 0.0),
+    "pinch-screw": ("x", 0.0),
+    "hanger-screw": ("x", 0.0),
+}
 
 def mirror_placement(
     part: str,
