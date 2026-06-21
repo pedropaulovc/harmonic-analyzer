@@ -80,12 +80,16 @@ import io
 import os
 import sys
 import tarfile
+import time
 from pathlib import Path
 
 # Bump to invalidate EVERY cached entry pipeline-wide (e.g. after a change to the
-# pack format or a build-logic change not captured by any file_dep). Combine with
-# the salt for toolchain-version busting.
-_CACHE_EPOCH = "1"
+# packed OUTPUT set, the pack format, or a build-logic change not captured by any
+# file_dep). Combine with the salt for toolchain-version busting.
+#   2 -- part entries gained the .STL sidecar; assembly entries gained the channel
+#        stretch parts + top-level gallery/BOM. Old epoch-1 blobs are incomplete
+#        for the current pipeline, so they MUST NOT be served (codex review).
+_CACHE_EPOCH = "2"
 
 # Project-wide defaults, committed so a machine opts in by setting only a MODE --
 # never by rediscovering where the cache lives. Each is still overridable by the
@@ -98,6 +102,11 @@ _DEFAULT_CONTAINER = "buildcache"
 _DEFAULT_SALT = "sw2024-sp3"
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+# A cache archive may write ONLY build outputs, all of which live under cad/out/.
+# Constraining extraction here blocks both path traversal and a poisoned blob from
+# overwriting tracked SOURCE (e.g. cad/scripts/*.py) that a later doit task runs.
+_CACHE_OUTPUT_ROOT = REPO_ROOT / "cad" / "out"
 
 # A machine's role (off | ro | rw). Read from HARMONIC_CACHE_MODE, else this
 # gitignored one-line file at the repo root, else _DEFAULT_MODE. Default is rw:
@@ -165,19 +174,34 @@ def _pack(outputs: list[Path]) -> bytes:
 
 def _unpack(blob: bytes) -> None:
     with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tar:
-        for member in tar.getmembers():
-            # Defensive: a corrupt/hostile archive must never write outside the repo.
-            # A link member can redirect a later write anywhere, and the old plain
-            # str.startswith test let a sibling like ``../harmonic-analyzer2/x`` slip
-            # through (it shares the prefix); use real path containment (codex review).
+        members = tar.getmembers()
+        for member in members:
+            # A cache archive may ONLY write build outputs, all under cad/out/.
+            # Enforcing that here blocks path traversal AND -- since any principal
+            # with blob write access could poison a valid key -- stops a hostile
+            # archive from overwriting tracked SOURCE like cad/scripts/*.py that a
+            # later doit task would then execute (codex review). Reject links too.
             if member.islnk() or member.issym():
                 raise RuntimeError(f"link member not allowed in cache archive: {member.name}")
             dest = (REPO_ROOT / member.name).resolve()
             try:
-                dest.relative_to(REPO_ROOT)
+                dest.relative_to(_CACHE_OUTPUT_ROOT)
             except ValueError:
-                raise RuntimeError(f"unsafe path in cache archive: {member.name}")
+                raise RuntimeError(f"cache archive member escapes cad/out/: {member.name}")
         tar.extractall(REPO_ROOT)
+        # tar.add recorded the BUILDER's mtimes; refresh restored files to now so a
+        # pulled native part/assembly is never OLDER than a developer's pre-existing
+        # derived export -- export_models.part_stl_stale compares mtimes, and a stale-
+        # looking native would wrongly skip regeneration and ship old geometry (codex
+        # review). Best-effort: a utime failure must not fail a restore.
+        now = time.time()
+        for member in members:
+            if not member.isreg():
+                continue
+            try:
+                os.utime((REPO_ROOT / member.name).resolve(), (now, now))
+            except OSError:
+                pass
 
 
 # --------------------------------------------------------------------------- #

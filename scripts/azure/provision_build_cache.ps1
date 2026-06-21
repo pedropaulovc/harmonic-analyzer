@@ -91,6 +91,13 @@ try {
 
 function Grant-BlobContributor([string]$PrincipalId, [string]$PrincipalType, [string]$Label) {
   if (-not $PrincipalId) { Write-Host "   (skip $Label -- no principal id)"; return }
+  # Idempotent: `az role assignment create` returns RoleAssignmentExists (non-zero)
+  # on a duplicate, which would abort the whole script under ErrorActionPreference
+  # 'Stop' on a re-run -- so skip when the assignment already exists (codex review).
+  $have = az role assignment list `
+    --assignee $PrincipalId --role 'Storage Blob Data Contributor' --scope $accountId `
+    --query "length(@)" -o tsv 2>$null
+  if ($have -and [int]$have -gt 0) { Write-Host "   ($Label already granted)"; return }
   Write-Host ">> grant Storage Blob Data Contributor to $Label ..."
   az role assignment create `
     --assignee-object-id $PrincipalId `
