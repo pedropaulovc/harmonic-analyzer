@@ -422,6 +422,43 @@ def _png_dir(stem: str) -> Path:
     return CAD_OUT / "png" / stem.replace("_", "-")
 
 
+def _stl(stem: str) -> Path:
+    """The part's binary STL sidecar (cad/out/stl/<dashed>.STL). save_part_and_images
+    emits it next to the .SLDPRT; assembly placement reads it via stl_bbox_mm, so it
+    MUST be cached alongside the part or a fresh consumer's assembly build fails on a
+    missing bbox source (codex review)."""
+    prt = Path(_sldprt(stem))
+    return prt.parent.parent / "stl" / f"{prt.stem}.STL"
+
+
+def _channel_spring_variants() -> list[Path]:
+    """The dynamically-generated stretched-spring parts the channel assembly inserts
+    for a non-neutral amplitude preset. They are not any task's declared target, so
+    they must be enumerated by glob -- shared by _clean_assembly (remove) and the
+    cache (pack), so a hit restores the components channel.SLDASM references."""
+    return sorted((CAD_OUT / "sldprt").glob("channel-spring-installed-stretch*.SLDPRT"))
+
+
+def _part_cache_outputs(stem: str) -> list[Path]:
+    """Everything a part build emits that downstream tasks read: the .SLDPRT, its STL
+    sidecar, and the render dir. Non-existent entries are skipped at pack time."""
+    return [Path(_sldprt(stem)), _stl(stem), _png_dir(stem)]
+
+
+def _assembly_cache_outputs(stem: str) -> list[Path]:
+    """Everything an assembly build emits beyond its file_dep: the .SLDASM + renders,
+    plus the per-stem extras a hit would otherwise leave missing/stale -- the channel
+    stretch-spring components, and the top assembly's gallery PNGs + parts BOM (which
+    export_gallery_and_bom writes into cad/out, OUTSIDE _png_dir)."""
+    outs = [Path(_sldasm(stem)), _png_dir(stem)]
+    if stem == "channel":
+        outs += _channel_spring_variants()
+    if stem == "harmonic_analyzer":
+        outs += sorted((CAD_OUT / "png").glob("eight-views-*.png"))
+        outs.append(CAD_OUT / "harmonic-analyzer-bom.csv")
+    return outs
+
+
 def _part_file_deps(script: Path, stem: str) -> list[str]:
     return [str(script.resolve()), *_helper_deps(script),
             *_config_deps(script, stem, "part")]
@@ -442,7 +479,7 @@ def _cached_part_action(stem: str, script: Path) -> None:
     are downloaded and the SolidWorks build is skipped; otherwise build, then push.
     Falls through to a normal build whenever the cache is off or errors."""
     key = _cache_key(_part_file_deps(script, stem))
-    outputs = [Path(_sldprt(stem)), _png_dir(stem)]
+    outputs = _part_cache_outputs(stem)
     if _cache.restore(key, outputs, f"part:{stem}"):
         return
     _run([sys.executable, str(script)], f"part:{stem}")
@@ -550,7 +587,7 @@ def build_or_refresh(stem, dependencies, changed, targets):
     # tags by absolute path (machine-local) -- so recompute it here, exactly as the
     # success tail does, to keep the next run's FULL/REFRESH decision correct.
     cache_key = _cache_key(_assembly_file_deps(stem))
-    cache_outputs = [Path(targets[0]), _png_dir(stem)]
+    cache_outputs = _assembly_cache_outputs(stem)
     if _cache.restore(cache_key, cache_outputs, f"assembly:{stem}"):
         sidecar.parent.mkdir(parents=True, exist_ok=True)
         sidecar.write_text(digest + "\n", encoding="utf-8")
@@ -628,9 +665,7 @@ def _clean_assembly(stem):
     _force_remove(_recipe_sidecar(stem))
     _force_remove(CAD_OUT / "png" / stem.replace("_", "-"))
     if stem == "channel":
-        for variant in sorted(
-            (CAD_OUT / "sldprt").glob("channel-spring-installed-stretch*.SLDPRT")
-        ):
+        for variant in _channel_spring_variants():
             _force_remove(variant)
 
 

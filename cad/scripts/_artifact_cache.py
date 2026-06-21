@@ -136,9 +136,16 @@ def _pack(outputs: list[Path]) -> bytes:
 def _unpack(blob: bytes) -> None:
     with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tar:
         for member in tar.getmembers():
-            # Defensive: never let an archive escape the repo root (path traversal).
+            # Defensive: a corrupt/hostile archive must never write outside the repo.
+            # A link member can redirect a later write anywhere, and the old plain
+            # str.startswith test let a sibling like ``../harmonic-analyzer2/x`` slip
+            # through (it shares the prefix); use real path containment (codex review).
+            if member.islnk() or member.issym():
+                raise RuntimeError(f"link member not allowed in cache archive: {member.name}")
             dest = (REPO_ROOT / member.name).resolve()
-            if not str(dest).startswith(str(REPO_ROOT)):
+            try:
+                dest.relative_to(REPO_ROOT)
+            except ValueError:
                 raise RuntimeError(f"unsafe path in cache archive: {member.name}")
         tar.extractall(REPO_ROOT)
 
