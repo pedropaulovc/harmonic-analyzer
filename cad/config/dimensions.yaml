@@ -451,8 +451,8 @@ sections:
       rides the adjacent valley at 90° + γ/2; flanking crests stay intact, removed
       solid ≈ 0.60 mm² → v_notch ≈ 1.8 mm³). This SUPERSEDES both the former 3 mm
       square (width estimated = depth, low) and the interim missing-tooth slit. The
-      standalone `eccentric-cam` part (M2 legacy re-author) is superseded by the
-      integral cam for assembly purposes.
+      standalone `eccentric-cam` part (M2 legacy re-author) was removed -- the
+      integral cam on the cylinder gear is the only cam geometry now built.
 
       **M6.2 keyway refutation (kinematic proof):** cylinder gear k turns k/80
       rev per crank (ch. 29 gear law) — every gear at a DIFFERENT speed — so the
@@ -1713,7 +1713,9 @@ sections:
         - PASS — re-author script with same dims
       - - eccentric-cam
         - none annotated; cam outline p.25 available
-        - UNVERIFIED — scale p.25 outline in M2
+        - FOLDED INTO cylinder-gear (integral cam, dims preserved in
+          build_cylinder_gear.py); standalone part removed. p.25 outline
+          photo-scaling cross-check still open against the integral cam.
       - - harmonic-base
         - 'ch.6: base 46 × 28 cm ✓ (= 18.1" × 11.0")'
         - PASS (footprint) — thicknesses photo-verify in M2
