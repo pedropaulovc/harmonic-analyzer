@@ -2,4 +2,130 @@ channel-lever:
   number: MHA-009
   material: Gray Cast Iron
   tolerance_class: machined_block
-  process: "cast + machined"
+  process: cast + machined
+  dimensions:
+    chapter: Chapter 17 — Springs and Levers (pp. 38–41)
+    content:
+    - notes: ''
+    - table:
+      - dim: Spring coil body length
+        value: 32 mm
+        (in): '1.260'
+        source: p.41 inset callout — dimension line spans the coiled body (excludes end hooks); resolved during M2 build
+        method: annotated
+        confidence: high
+      - dim: Spring coil OD
+        value: ~6.5 mm
+        (in): ~0.256
+        source: p.41 inset proportion vs 32 mm body (body/OD ≈ 4.9)
+        method: scaled
+        confidence: low
+      - dim: Spring wire dia
+        value: ~1.0 mm
+        (in): ~0.039
+        source: 'p.41 inset: close-wound, coils just distinguishable'
+        method: scaled
+        confidence: low
+      - dim: Spring coil count
+        value: ~28
+        (in): —
+        source: body length / ~1.14 mm pitch (close-wound)
+        method: derived
+        confidence: low
+      - dim: Spring end hooks
+        value: bent-wire loops, both ends, extend axially
+        (in): —
+        source: 'p.41 inset; M4: modelled as axial lead (2× wire dia) + 270° loop at coil mean radius, both springs (`_common.add_spring_end_hooks`)'
+        method: stated
+        confidence: high (feature), loop geometry estimated (low)
+      - dim: Lever count
+        value: 20, cast metal, third-class
+        (in): —
+        source: text pp. 38–39
+        method: stated
+        confidence: high
+      - dim: Spring count
+        value: '20'
+        (in): —
+        source: text pp. 38–39
+        method: stated
+        confidence: high
+      - dim: Lever length (fulcrum→spring hole c2c)
+        value: 177.8 mm (7")
+        (in): '7.0'
+        source: 'M6.4: the 254 "clean 2:1" guess (and the M2 ~240 scaling) is photo-REFUTED — calibrated ch. 30 front view: the lever bank ends at x ≈ −30, the summing-lever plate (pivot bolt read x ≈ +13..17, plate 44.45 wide) sits directly under the tab line, and the 32 mm springs can only bridge tab → plate at x ≈ −22; p.39 shows the bar pin ~5 bar-heights from the tip (50.8/9.5 ✓, 127/9.5 ✗). Bar pin stays at 127 (bar line −72.9, high) → motion ratio 1.4'
+        method: derived
+        confidence: med
+      - dim: Bar-pin hole
+        value: Ø2 at 127 (5") from the fulcrum, mid-height
+        (in): '5.0'
+        source: amplitude-bar top pin (ch. 15); bar line x = −72.9
+        method: derived
+        confidence: med
+      - dim: Lever bar section
+        value: 9.5 tall × 3.0 thick
+        (in): 0.37 × 0.118
+        source: 'M6.3: 20 levers at the 7.06 channel pitch on a common shaft cap the thickness (the M2 12.5 "width" violated the pitch); 3.0 lets the bar''s 3.2 top slot straddle the lever'
+        method: derived
+        confidence: med
+      - dim: Lever fulcrum
+        value: 'Ø6.5 pivot hole at 0; common Ø6.35 × 182 shaft (`fulcrum-shaft`, M6.5 — shortened from 228.6: tips ±91 clear the west columns'' Ø25.4 surfaces at (−197, ±112) by ~5.3 (was 0.6 at the old Ø34.925; OD rederived from the 8-views, M6.11), where the 228.6 tips still overlap) along Z at (x, y) = (−199.9, 1065.9), 2 ball mounts (same part as the rocker pivot''s) on the top-frame west rail at z ±85; Ø12 × 4.0565 spacer bushings ×19'
+        (in): —
+        source: p.40 bottom-left clevis+ball = the shaft END mount (mirror of the rocker pivot design); rail top = 1065.9 − 25.2 = 1040.7
+        method: derived
+        confidence: low-med
+      - raw: '| Lever tip | bar steps to a 6.0-tall centred tab at x 169 (p.39/p.41), rounded r3 tip, Ø4 spring-hook hole at 177.8, 8 mm overhang; fork/clip fittings deferred (photogrammetry 195527397) | — | p.39, p.40; the Ø3 photo read is infeasible — the spring''s r 2.75 Ø1-wire eye threading the 3.0 plate needs eye-drop margins |√(ρ²−1.5²)−D| ≤ hole_r − 0.1 at ρ = 2.25/3.25, best ~0.05 through Ø3, ~0.3 through Ø4 (M6.3 toroid solve) | scaled→derived | med |'
+    - notes: |2
+
+        Notes: each third-class lever pivots at its end (fulcrum), is driven by its
+        rocker arm/amplitude bar pinned at mid-length, and pulls one of 20 helical
+        springs attached to the pivoted summing lever below. Amplitude bar at rocker
+        pivot → lever motionless; at rocker edge → full amplitude; opposite end →
+        180° phase flip. M6.3 closure: fulcrum height 1065.9 = bar-top pin height
+        (levers level in the d = 0 default state) — consistent with the 1070
+        columns + top frame + 25.2 ball mounts within photo error (ball measured
+        (−205, 1078) on the tilted museum machine). Spring row hangs at
+        x = +54.1 (lever tips), z = lever stations; lower ends reach the summing
+        lever (ch. 18, M6.4).
+
+        ### Channel & top-frame layout (M6.3, eight-views 0°/180° + ch. 14–18)
+
+        Machine coords as in "Drive-train layout". Channel j (j = 0 back … 19
+        front): cylinder gear at z_j = −67.1 + 7.0565 j; integral cam + rod ring
+        plane at z_j + 3.3; rocker arm / amplitude bar / top lever mid-planes at
+        z_j + 0.8.
+    - table:
+      - item: Rocker pivot shaft
+        position / value: Ø6.35 × 228.6 along Z at (−72.9, 253.8)
+        source: ch. 14 layout table
+        confidence: med
+      - item: Top-lever fulcrum shaft
+        position / value: 'Ø6.35 × 182 (`fulcrum-shaft`) along Z at (−199.9, 1065.9) — M6.5: 228.6 tips fell inside the west columns'
+        source: ch. 17 rows
+        confidence: med
+      - item: Top frame (NEW part)
+        position / value: 'green cast rectangular ring around the 4 columns: rails 22 wide × 41 tall (y 999.7…1040.7, top = lever ball-mount seat 1065.9 − 25.2), corner bosses Ø48 bored Ø25.5 (column Ø25.4, OD rederived from the 8-views M6.11) at (±197, ±112); clamps the columns 80 below their tops (1120.8 − 1040.7)'
+        source: 'eight-views: green ring at y ≈ 1010–1055 in all views, columns continue above it to caps ≈ 1090–1120'
+        confidence: med
+      - item: Ball mounts ×4
+        position / value: 'rocker pair at seats y 228.6: north on the support apex (z +101.6), south on the A-frame saddle (z −111, M6.5); lever pair on the top-frame west rail (seat y 1040.7) at z ±85 — the Ø16 base must clear the Ø25.5 boss bores (need √(2.9² + dz²) ≥ 12.75 + 8 → dz ≥ 20.5 from the boss at z 112; z 85 gives dz 27, comfortably clear after the OD rederivation M6.11 loosened the old dz ≥ 25.3)'
+        source: ch. 14 / ch. 17; lever z from boss-bore clearance
+        confidence: med
+      - item: Amplitude bars (default)
+        position / value: 'vertical, slot centred on the pivot x = −72.9 (d = 0, bar rotated 90° about its long axis: slot/pin across Z); foot roof on the tilted arm''s top edge at 262.63 (contact at the bar −X edge, arc max), bar bottom 260.25, top 1073.05, top pin 1066.70'
+        source: ch. 15 notes + M6.3 assembly solve
+        confidence: med
+      - item: Springs (default)
+        position / value: 'hanging free from lever tab holes (−22.10, 1067.02), rotated 90° about Y so the eye ring (r 2.75, plane ⊥ lever face) threads the Ø4 hole; eye centre 3.37 below the hole (torus-swept worst cases at the slab faces: upper branch inside the hole void with 0.31 margin, lower branch clears the tab underside by 2.05); body 32 + hooks (eye centre at spring local y 34 = body 32 + lead 2.0); lower hook centre lands at y 1027.6 = summing-plate level — the 32 mm spring length closes the lever→plate chain only with the 177.8 lever (M6.4)'
+        source: ch. 17/18 + M6.4 threading solve
+        confidence: med
+      - item: Default mechanism state
+        position / value: 'gear notches near +Y with the drive-train''s +1.5° tooth-phase rotation (a T120 tooth faces the cone mesh) → cam centres at (−47.367, 121.721) = arbor + 5.08·(sin 1.5°, −cos 1.5°) → rod rings concentric on the cams there (M6.5 — assuming the unrotated centre (−47.5, 121.72) dug every ring 0.033 into its cam: 20 × 2.40 mm³) → arms tilted −11.54° (pin solve → pin (−48.01, 248.72)), rods leaning Rz +0.29°, levers +0.36° (bar-pin chain vs fulcrum 1065.9)'
+        source: ch. 13 notes + ch. 25 + M6.3 solve, M6.5 phase fix
+        confidence: derived
+    - notes: |2
+
+        The measuring stick (ch. 16) is a loose hand tool — excluded from the
+        assemblies.
+
+        ---

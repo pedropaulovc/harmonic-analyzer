@@ -176,7 +176,8 @@ def test_config_deps_are_fine_grained():
     screw = dodo._config_deps(scripts / "build_fillister_screw.py", "fillister_screw", "part")
     assert _rel(screw, cfg) == {"parts/fillister-screw.yaml", "parts/_defaults.yaml"}
 
-    # No part depends on dimensions.yaml.
+    # No part depends on the retired dimensions.yaml monolith (its content was
+    # spread into per-part `dimensions:` blocks + standalone dimensions/*.yaml).
     for stem in dodo.part_stems():
         deps = {Path(p).name for p in dodo._config_deps(scripts / f"build_{stem}.py", stem, "part")}
         assert "dimensions.yaml" not in deps, stem

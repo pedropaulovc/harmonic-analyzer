@@ -1,0 +1,30 @@
+title: Appendix B — Audit of 10 existing SLDPRT parts
+content:
+- notes: ''
+- table:
+  - part: amplitude-bar
+    book-verifiable dims: width 6.35 mm ✓, length ~80 cm ✓
+    verdict: PASS — re-author script with same dims
+  - part: eccentric-cam
+    book-verifiable dims: none annotated; cam outline p.25 available
+    verdict: UNVERIFIED — scale p.25 outline in M2
+  - part: harmonic-base
+    book-verifiable dims: 'ch.6: base 46 × 28 cm ✓ (= 18.1" × 11.0")'
+    verdict: PASS (footprint) — thicknesses photo-verify in M2
+  - part: summing-lever
+    book-verifiable dims: none
+    verdict: UNVERIFIED — p.42–43 proportion check in M2
+  - part: rocker-arm-support ×3 → `rocker-arm-portal` ×1 (M6.12)
+    book-verifiable dims: none
+    verdict: 'M6.3 refuted the legacy windowed square frame (184 wide); M6.9 PARTIALLY REINSTATED it — ch30 p008 (brightened) shows exactly that frame: north frustum + south upright + top/foot rails (ch. 14 layout table). The ×3 count stays refuted (ONE frame: two uprights; the legacy third instance at x ≈ 0 under the transgear is the pinion-bar/stud''s job). M6.12: the two-part split (rocker-arm-support frustum + a-frame upright) is unified into the single `rocker-arm-portal` casting'
+  - part: oscilating-arms
+    book-verifiable dims: 'ch.14 re-read: the "12.5 mm width" was a misread (callout is 2.5 mm plate thickness)'
+    verdict: SUPERSEDED — re-authored as rocker-arm with corrected dims (`build_rocker_arm.py`)
+  - part: tube-frame
+    book-verifiable dims: 'ch.6: frame column height 107 cm — legacy file measured 1016 mm (40"), CONTRADICTS the book'
+    verdict: 'RE-AUTHORED — `build_tube_frame.py` at 1070 mm (book wins). OD REDERIVED Ø25.4 (1") from the ch30 8-views (M6.11): 4 quarter views isolate single columns, apparent width = OD × scale (scale fit from the ±197/±112 stations + azimuth, R² 0.94–0.99, cross-checked by the 460 mm base ~1500 px) → 7 reads = Ø23.8 ± 1.0, rounded to 1" stock; SUPERSEDES legacy Ø1.375" (~45% oversize). Wall kept legacy 0.12" → Ø19.3 bore. M4 fluting retired (M6.8: plain reflective columns)'
+- notes: |2
+
+    No legacy part contradicts a book annotation. Every part still gets re-authored
+    as a reproduction script (project requirement); UNVERIFIED parts get their photo
+    re-measure during their M2 script build.

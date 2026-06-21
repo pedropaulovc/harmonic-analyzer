@@ -133,10 +133,15 @@ def _tokens(text: str) -> frozenset[str]:
         path.unlink()
 
 
-def test_config_files_no_part_reads_dimensions():
-    """The 98 KB narrative dimensions.yaml is read by NO part/assembly build
-    script (only the offline DIMENSIONS gate touches it), so the fine-grained
-    dependency must never list it -- editing dimensions.yaml rebuilds nothing."""
+def test_no_part_reads_retired_dimensions_monolith():
+    """The monolithic narrative dimensions.yaml was spread into per-part
+    ``dimensions:`` blocks (each rides its own ``parts/<stem>.yaml`` registry row)
+    plus standalone ``cad/config/dimensions/*.yaml`` files, then DELETED. The
+    standalone narrative maps to no single part and is read ONLY by the offline
+    drift gate (verify.py via ``_dimensions``), never through a ``_config``
+    accessor -- so no build script's config read-set references it, and the
+    retired monolith must never come back as a dependency token."""
+    assert not (bg.CONFIG_DIR / "dimensions.yaml").exists()
     for stem in part_stems():
         assert "dimensions.yaml" not in config_files_of(SCRIPTS_DIR / f"build_{stem}.py"), stem
     for stem in ASSEMBLY_ORDER:

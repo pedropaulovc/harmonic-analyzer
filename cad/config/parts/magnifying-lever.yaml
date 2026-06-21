@@ -2,4 +2,76 @@ magnifying-lever:
   number: MHA-043
   material: Brass
   tolerance_class: machined_block
-  process: "machined (brass)"
+  process: machined (brass)
+  dimensions:
+    chapter: Chapter 20 — Magnifying Lever (pp. 46–49)
+    content:
+    - notes: |2
+
+        No annotated or stated numeric dimensions. No legacy part.
+    - table:
+      - dim: Magnification
+        value: up to 4× (adjustable)
+        (in): —
+        source: text pp. 46–49
+        method: stated
+        confidence: high
+      - dim: Rod diameter
+        value: ~6 mm
+        (in): ~0.24
+        source: round brass rod, photo proportion
+        method: scaled
+        confidence: low
+      - dim: Lever rod length
+        value: 165 mm
+        (in): '6.5'
+        source: 'calibrated ch. 30 front view (p1): rod spans x ≈ −200..−35 at y ≈ 982. M6.4: REFUTES the M2 "~310 from the 4× constraint" — the p.46/48 insets show the CLAMP sliding along the rod (magnification = clamp-radius ratio), not a 310 rod'
+        method: scaled
+        confidence: med
+      - dim: Vertical rod
+        value: ~Ø5 × 150, domed ends
+        (in): —
+        source: p.46/48 vs lever rod
+        method: scaled
+        confidence: low
+      - dim: Clamp block
+        value: ~20 × 26 × 12; Ø6.2 lever bore, Ø5.2 rod bore (skew, 6.5 off-axis), Ø3 screw hole
+        (in): —
+        source: p.48 close-up
+        method: scaled
+        confidence: low
+      - dim: Thumb screw
+        value: '~Ø10 × 5 reeded head, Ø3 × 12 shank (×2: clamp + output fixture)'
+        (in): —
+        source: 'p.48; M4: head reeded (24 × Ø1 grooves), cosmetic M3 thread on shank'
+        method: scaled
+        confidence: low
+      - dim: Output fixture
+        value: collar ~Ø10 × 8, Ø5.2 bore, Ø3 cross hole
+        (in): —
+        source: p.48 bottom close-up
+        method: scaled
+        confidence: low
+      - dim: Mounting bracket
+        value: 'collar Ø12 × 10 (bore Ø6.2) at machine (+40, 985, −85) (post-mirror, M6.8), axis along X; arm 10 wide reaching +Z to −70; 16 × 4 flange (machine x +29..+45, M6.5 — trimmed from 40 long: the end stops 0.65 off the j = 0 channel-spring helix at x +28.35) under the plate''s front edge (top touches the plate bottom 992.9)'
+        (in): —
+        source: p.47 close-up
+        method: scaled
+        confidence: low
+      - dim: Bracket flange screws ×2 (M6.10)
+        value: 'fillister Ø5.5 × 2.2 head + Ø2.9 × 4 shank, UP (Rx −90) through Ø3.2 flange holes on the z −67 line (machine x +33/+41, inset 4 from the flange ends): shanks fill the flange band 988.9..992.9, tips flush with the plate bottom (engagement into the summing-lever plate not modeled); heads in free air below, 0.25 off the arm face (z −70), 1.9 off spring j = 0'
+        (in): —
+        source: p.47 close-up (screw heads visible under the flange)
+        method: scaled + derived
+        confidence: low
+    - notes: |2
+
+        Notes: round brass rod lever; magnification set by a reeded (knurled) screw
+        adjustment that moves the effective fulcrum/attachment point. Geometry
+        constraint used in M2: output/input arm ratio = 4 at maximum setting (rod
+        ends domed; both rods revolves with hemispherical caps). M6.4 placement:
+        lever rod axis machine y 985 / z −85; clamp block at x −150; vertical rod
+        at z −91.5 (the clamp's skew bore, 6.5 off the lever axis), top y 990,
+        fixture at y 926; clamp thumb screw modeled BACKED OUT (head tangent above
+        the rod it pinches — seated it would overlap); the fixture's screw is
+        omitted at assembly level.

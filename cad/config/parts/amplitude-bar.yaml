@@ -3,4 +3,75 @@ amplitude-bar:
   material: Plain Carbon Steel
   tolerance_class: machined_block
   fit_class: sliding_amplitude_bar_on_rocker
-  process: "machined (steel)"
+  process: machined (steel)
+  dimensions:
+    chapter: Chapter 15 — Amplitude Bars (pp. 30–33)
+    content:
+    - notes: ''
+    - table:
+      - dim: Bar width
+        value: 6.35 mm
+        (in): '0.250'
+        source: photo callout pp. 32–33 — exactly matches legacy BarWidth 0.25"
+        method: annotated
+        confidence: high
+      - dim: Bar length
+        value: ~800 mm ("about 80 cm")
+        (in): ~31.5
+        source: text pp. 30–31 — legacy BarLength 32.0" (813 mm) consistent
+        method: stated
+        confidence: high
+      - dim: Bar depth (cross-section)
+        value: 6.35 mm
+        (in): '0.250'
+        source: legacy BarDepth, square section consistent with photos
+        method: legacy
+        confidence: med
+      - dim: Bottom notch width
+        value: 3.2 mm
+        (in): '0.125'
+        source: legacy BottomNotchWidth (notch existence stated pp. 30–31)
+        method: legacy
+        confidence: med
+      - dim: Bottom notch height
+        value: 2.4 mm
+        (in): '0.094'
+        source: legacy BottomNotchHeight (3/32")
+        method: legacy
+        confidence: med
+      - dim: Top notch width
+        value: 3.2 mm
+        (in): '0.125'
+        source: legacy TopNotchWidth
+        method: legacy
+        confidence: med
+      - dim: Top notch height
+        value: 12.7 mm
+        (in): '0.5'
+        source: legacy TopNotchHeight
+        method: legacy
+        confidence: med
+      - dim: Top pin hole
+        value: Ø2 through the top-notch cheeks, 6.35 below the top end
+        (in): —
+        source: 'M6.3: p.39 shows the bar pinned to its top lever; the 3.2 top slot straddles the 3.0-thick lever with a Ø2 cross pin (matches the lever''s bar-pin hole at 127 from its fulcrum, ch. 17)'
+        method: derived
+        confidence: low
+      - dim: Bar count
+        value: '20'
+        (in): —
+        source: text
+        method: stated
+        confidence: high
+    - notes: |2
+
+        Notes: bottom notch rides/slides along the rocker arm for positioning (bar at
+        pivot = zero coefficient; opposite ends = 180° phase reversal). Chrome-like
+        finish. Legacy AmplitudeBar.cs survives the audit: both book-verifiable dims
+        (width, length) confirm it. M6.3: the bars run UP the spine from the rocker
+        arms to the top levers (text pp. 30–31) — top pin FIXED on the lever at
+        x = −72.9 (above the rocker pivot), foot slides ±80 along the arm, the bar
+        tilting up to ±5.6° (the "nonlinearity ameliorated" by the 813 length).
+        Default assembly state: all bars at the pivot (d = 0, all coefficients
+        zero), exactly vertical, foot notch on the arm top edge at y ≈ 261.8,
+        top at ≈ 1072.3, pin at ≈ 1065.9.

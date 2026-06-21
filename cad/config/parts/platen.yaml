@@ -2,4 +2,74 @@ platen:
   number: MHA-066
   material: Brass
   tolerance_class: plate_profile
-  process: "machined (brass)"
+  process: machined (brass)
+  dimensions:
+    chapter: Chapter 22 — Platen (pp. 54–55)
+    content:
+    - notes: ''
+    - table:
+      - dim: Front face height
+        value: 140 mm
+        (in): '5.51'
+        source: photo callout p.55
+        method: annotated
+        confidence: high
+      - dim: Width (travel direction)
+        value: ~300 mm
+        (in): ~11.8
+        source: 'p.55 front photo aspect ≈ 2.15:1 vs 140 mm; p.54 inset vs 460 mm frame agrees. M2 revision: supersedes earlier ~200 estimate'
+        method: scaled
+        confidence: low
+      - dim: Plate thickness
+        value: ~4 mm
+        (in): ~0.16
+        source: p.55 top edge-on photo
+        method: scaled
+        confidence: low
+      - dim: Rack bar
+        value: ~300 × 30 × 6, brass
+        (in): —
+        source: 'p.55 back-side photo; M4c: teeth cut at DP 30 / PA 14.5° (ch. 23 measurement), 112 gaps at p = 2.660 mm, crest at bar top, pitch line addendum (0.847) below it — `build_platen_rack.py`; mounting holes deferred to M6 (Appendix C #8)'
+        method: scaled
+        confidence: low
+      - dim: Paper clip strips (×2)
+        value: ~125 × 10 × 1.2, Ø3 end-screw holes
+        (in): —
+        source: p.55 front photo vs 140 mm
+        method: scaled
+        confidence: low
+      - dim: Material
+        value: heavy brass (darkened)
+        (in): —
+        source: text
+        method: stated
+        confidence: high
+      - dim: Platen position (M6.4)
+        value: plate x −258..+42, y 305..445, front face z −142.9 (back face on the rail fronts at −138.9); carried by the y-440 / y-334 support bars
+        (in): —
+        source: 'M6.4 layout: bottom rail raised 318 → 334 so the rack clears the column-clamp collars; top rail 460 → 440 to sit under the plate top 445'
+        method: derived
+        confidence: low
+      - dim: Paper clips position (M6.4)
+        value: 'two vertical strips on the paper face (z −144.1), rising from y 312: left at x −250..−240, right at x +22..+32 — shifted east of the pen v-block''s x band (−24..8)'
+        (in): —
+        source: M6.4 layout
+        method: derived
+        confidence: low
+      - dim: Clip screws ×4 + platen sockets (M6.10)
+        value: brass fillister Ø5.5 × 2.2 head + Ø2.9 × 4 shank through each clip's own Ø3 end holes (machine x +245 / −27, y 320/429) into Ø3 × 3.5 blind sockets in the platen front face (shanks 2.8 into the plate, 0.7 short); under-head faces on the clip fronts (z −144.1); slots below render resolution — omitted
+        (in): —
+        source: p.55 front photo (clip end screws)
+        method: scaled + derived
+        confidence: low
+    - notes: |2
+
+        Notes: toothed brass rack along the bottom edge (driven by ch. 23 gearing for
+        horizontal travel); two brass clips (left/right) retain the recording paper;
+        gearing can be unlatched from the rack for free repositioning/reset.
+        M6.4 rack mesh: rack mounted teeth-down (Rz 180) at y 323.59 = pinion axis
+        253.5 + PD r 40.64 + 0.3 backlash + pitch-line offset; rack x0 = 15.5 × pitch
+        (2.660) ≈ 41.23 — the gear's seed gap is centred at +γ/2 (flanks cross the
+        pitch circle at ±π/(2N) of the gap centreline), so a TOOTH sits at bottom
+        dead centre and the gaps flank it at ±p/2: rack teeth land on those gaps
+        (15 × pitch was tip-to-tip — 7 decaying overlaps, NOT a backlash problem).

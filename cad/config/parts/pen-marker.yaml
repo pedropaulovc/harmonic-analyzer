@@ -2,4 +2,80 @@ pen-marker:
   number: MHA-050
   material: Brass
   tolerance_class: machined_block
-  process: "machined (brass)"
+  process: machined (brass)
+  dimensions:
+    chapter: Chapter 24 — Pen Mechanism (pp. 60–61)
+    content:
+    - notes: |2
+
+        No numeric dimensions; modern reconstruction ("about 100 years younger than any
+        other part").
+    - table:
+      - dim: Square brass rod cross-section
+        value: ~5 mm
+        (in): ~0.2
+        source: photo proportion
+        method: scaled
+        confidence: low
+      - dim: Square rod length
+        value: ~120 mm, Ø2 wire hole near top
+        (in): ~4.7
+        source: p.64 inset; resolved in M2
+        method: scaled
+        confidence: low
+      - dim: Frame (stirrup)
+        value: ~22 × 40 × 10; side rails 4 (long sides), end rails 5; Ø3 set-screw hole in one end rail
+        (in): —
+        source: 'p.64–65 vs 5 mm rod; resolved in M2; M6.4: side rails thinned 5 → 4 (read thinner in the photo; the 14-wide window must clear the marker barrel at the platen side)'
+        method: scaled
+        confidence: low
+      - dim: V-block
+        value: ~32 × 18 × 16; 6 mm 45° top chamfers; 2 × Ø8 vertical bores at x = 11/21; stopped clamp slit 26 long × 4 (y 4–8); Ø2.5 screw hole
+        (in): —
+        source: p.65 close-up
+        method: scaled
+        confidence: low
+      - dim: Set screw
+        value: Ø9 × 5 knurled knob + Ø3 × 15 shank
+        (in): —
+        source: 'p.64–65; M4: knob reeded (22 × Ø1 grooves), cosmetic M3 thread on shank'
+        method: scaled
+        confidence: low
+      - dim: Pen hanger (M6.4)
+        value: black strap (3 thick, tapering 16 → 10 wide) flat on the wheel-bar front face (z −138.9), descending from the bar band (y 560..570) to a 12 × 12 guide block (z −155.5..−138.9) with a 5.4-square VERTICAL channel (cut along Y) the pen rod slides in
+        (in): —
+        source: p.60–63
+        method: scaled + derived
+        confidence: low
+      - dim: Hanger screw ×1 (M6.10)
+        value: 'AF-7 hex head × 2.5 + Ø3.5 × 12.5 shank at machine (−5.5, 565), driven from BEHIND the bar (the wheel rim back face passes 1.0 in front of the strap — no front-side head fits): head on the bar back face (z −128.9), shank through the bar''s Ø3.8 hole + the strap''s Ø3.6 hole, tip 0.5 behind the strap front face (−141.9); hole 0.6 off the bar''s free-end face (machine −8)'
+        (in): —
+        source: p.60–63 (the strap is bolted to the bar)
+        method: scaled + derived
+        confidence: low
+      - dim: Pen marker (M6.4)
+        value: Ø8 brass barrel, 12-tall conical tip, 60 overall; collar/ferrule detail omitted
+        (in): —
+        source: p.60–63
+        method: scaled
+        confidence: low
+    - notes: |2
+
+        Notes: brass frame holds the marker in a v-block; v-block on a square brass rod
+        attached to the wire from the magnifying wheel (vertical motion); platen provides
+        horizontal motion. Small set screw adjusts pen angle to paper to cut friction.
+        Provenance (ch. 5 Preface): the original pen holder was missing — the one in all
+        book photos is a modern replacement designed/built by Mike Harland and Tom
+        Wilson. Model the replacement (it is what the photos document).
+
+        M6.4 pen layout (machine coords): pen rod vertical at x −3, z −151.5 band
+        (rod z −154..−149), y 398..518, Ø2 wire hole at y 513 just above the hanger
+        block top (511); v-block at (−24, 390, −159.5) — rod bore (local x 21) on
+        the rod axis; marker VERTICAL in the x −13 bore, tip at y 368, i.e. 8.6 off
+        the paper plane — the book's ~12° tilt would cut the v-block's vertical
+        bores, so the marker stands plumb (documented deviation, settle in M6.5);
+        pen frame flat on the v-block top (y 408), long axis along X (Ry+90·Rx+90 at
+        (−29, 418, −143)): window machine x −25..+7, z −161..−147 spans marker +
+        rod, the plate's near edge stops 0.1 short of the platen front face −142.9;
+        set screw along +X at (−38, 413, −154) — knob x −38..−33, shank threading
+        the west end rail (x −29..−24), tip at −18, 1 shy of the marker barrel.

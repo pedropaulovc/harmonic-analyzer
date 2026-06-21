@@ -328,9 +328,10 @@ cad/*.png
 cad/*.jpg
 cad/*.txt
 cad/output.*
-# DIMENSIONS.md is an on-demand render of cad/config/dimensions.yaml (the source
-# of truth) — never committed; a versioned copy kept drifting. Render locally
-# with `python cad/scripts/gen_dimensions.py` if you want the readable view.
+# DIMENSIONS.md is an on-demand render of the distributed dimension provenance
+# (per-part `dimensions:` blocks + cad/config/dimensions/*.yaml) — never committed;
+# a versioned copy kept drifting. Render locally with
+# `python cad/scripts/gen_dimensions.py` if you want the readable view.
 cad/DIMENSIONS.md
 cad/project.toml
 cad/**/project.toml

@@ -2,4 +2,87 @@ crank-arm:
   number: MHA-020
   material: Plain Carbon Steel
   tolerance_class: machined_block
-  process: "machined (steel)"
+  process: machined (steel)
+  dimensions:
+    chapter: Chapter 11 — Crank (pp. 12–15)
+    content:
+    - notes: |2
+
+        No annotated or stated numeric dimensions in this chapter.
+    - table:
+      - dim: Crank arm length (center-to-center)
+        value: ~66 mm
+        (in): ~2.6
+        source: 'REDERIVED from the ch30 eight-views (angle 90 side view): crankshaft axis to handle-pivot axis, scaled to the 280 mm base depth (ch6, annotated). The crank hangs straight DOWN (the handle reads "down" in all eight roll views, so the arm is on the views'' vertical rotation axis), putting the handle ~10 mm above the base top. SUPERSEDES the former ~150 (cone-axial scaled, low), which was >2x too long — a down-pointing 150 arm would drop the handle below the table'
+        method: scaled
+        confidence: med
+      - dim: Handle length
+        value: ~90 mm
+        (in): ~3.5
+        source: p.12 photo, proportion of arm length
+        method: scaled
+        confidence: low
+      - dim: Handle diameter
+        value: ~22 mm
+        (in): ~0.87
+        source: p.12 photo, proportion of arm length
+        method: scaled
+        confidence: low
+      - dim: Crank arm width
+        value: ~16 mm
+        (in): ~0.63
+        source: p.12 photo
+        method: scaled
+        confidence: low
+      - dim: Crankshaft diameter
+        value: 9.5 mm (3/8")
+        (in): '0.375'
+        source: legacy `parameters.kcl` ShaftDiameter; uncontradicted
+        method: legacy
+        confidence: med
+      - dim: Arm thickness
+        value: ~8 mm
+        (in): ~0.31
+        source: p.12 photo, ~half the arm width
+        method: scaled
+        confidence: low
+      - dim: Square-end overhang past pivot
+        value: ~10 mm
+        (in): ~0.39
+        source: p.12 photo
+        method: scaled
+        confidence: low
+      - dim: Handle pivot bore
+        value: ~6 mm
+        (in): ~0.24
+        source: p.12 photo, proportion of handle dia
+        method: scaled
+        confidence: low
+      - dim: Fiducial dimple
+        value: ~Ø8 × 0.5 deep
+        (in): —
+        source: p.15 photo
+        method: scaled
+        confidence: low
+      - dim: Tapered-pin cross-hole
+        value: ~Ø5 mm
+        (in): ~0.20
+        source: p.14 photo, pin small end
+        method: scaled
+        confidence: low
+      - dim: Crankshaft length
+        value: ~120 mm
+        (in): ~4.7
+        source: 'derived: crank seat (~30, incl. 10 overhang) + green pedestal bearing (~60, eight-views 8/8) + sprocket/drive-pinion seats (~30)'
+        method: derived
+        confidence: low
+    - notes: |2
+
+        Construction (stated): wooden handle stained black, rotates on a pivot; metal crank
+        arm with fiducial indentations for alignment; tapered pin affixes crank to shaft
+        (removable — crankshaft gear is changeable); small chain eyelet (chain lost).
+
+        Rest pose (ch30 eight-views): the crank arm hangs straight down (−Y), the handle
+        pivot ~66 mm below the crankshaft axis with the grip axis parallel to the shaft —
+        modeled in `build_drive_train_assembly.py` as a −90° arm rotation about the crank
+        axis with the handle relocated below the crankshaft.

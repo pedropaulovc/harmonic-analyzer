@@ -1,0 +1,43 @@
+title: 'Chapter 6 — Introduction: overall machine dimensions (p. 3)'
+content:
+- notes: |2
+
+    The last page of the Introduction is a dedicated "Dimensions" photo with callouts
+    — the authoritative envelope for the whole assembly.
+- table:
+  - dim: Total height (incl. curved counter-spring rod arching over top)
+    value: 147 cm
+    (in): '57.9'
+    source: photo callout p.3
+    method: annotated
+    confidence: high
+  - dim: Frame column height
+    value: 107 cm
+    (in): '42.1'
+    source: photo callout p.3
+    method: annotated
+    confidence: high
+  - dim: Base length
+    value: 46 cm
+    (in): '18.1'
+    source: photo callout p.3
+    method: annotated
+    confidence: high
+  - dim: Base depth
+    value: 28 cm
+    (in): '11.0'
+    source: photo callout p.3
+    method: annotated
+    confidence: high
+  - dim: Weight
+    value: 69 kg
+    (in): 152 lb
+    source: photo callout p.3
+    method: annotated
+    confidence: high
+- notes: |2
+
+    Cross-validation: base 46 × 28 cm = 18.1" × 11.0" **confirms** legacy
+    HarmonicBase.cs bottom plate 18.0" × 11.0" (within rounding of the cm callouts).
+    Frame column 107 cm is the top-down anchor for tube-frame length; 147 − 107 =
+    40 cm of counter-spring rod arc above the frame.

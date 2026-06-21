@@ -5,7 +5,8 @@ this directory that drives SolidWorks through the ``PyWin32Adapter`` from the
 SolidworksMCP-python repo (expected as a sibling checkout at
 ``C:/src/SolidworksMCP-python``, overridable via ``SOLIDWORKS_MCP_ROOT``).
 
-Conventions (see cad/DIMENSIONS.md for the dimension source of truth):
+Conventions (dimension provenance lives in the per-part ``dimensions:`` blocks +
+``cad/config/dimensions/*.yaml``; ``cad/DIMENSIONS.md`` is the rendered view):
 
 * All sketch geometry is in millimetres; dimension constants are declared at
   the top of each script and traceable to a DIMENSIONS.md row.

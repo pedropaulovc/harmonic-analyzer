@@ -1,243 +1,98 @@
-r"""cad/config/dimensions.yaml is the SINGLE SOURCE OF TRUTH for dimensions.
+r"""Render the distributed dimension-provenance blocks into one DIMENSIONS.md view.
 
-The dimension provenance lives in ``cad/config/dimensions.yaml`` as structured
-data: every chapter is a section, every dimension table a list of typed rows
-(value / source / method / confidence), and the curated narrative (construction
-notes, the M2/M4/M6 revision history, the cross-validation reasoning, Appendix C)
-is preserved verbatim as ``prose`` block scalars. The tables being structured
-lets verify.py cross-check the build config (machine/*.yaml, channels.yaml)
-against the cited dimensions — closing the drift gap a prose-only doc leaves open.
+The dimension provenance used to live in a single ``cad/config/dimensions.yaml``;
+it now lives in per-part ``dimensions:`` blocks (``cad/config/parts/<stem>.yaml``)
+plus a few standalone narrative files under ``cad/config/dimensions/`` for content
+that maps to no single part. ``verify.py`` reads those blocks directly (via
+``_dimensions``) as the drift gate; this script just re-aggregates them, in book
+order, into a single human-readable ``cad/DIMENSIONS.md``.
 
-A human-readable ``DIMENSIONS.md`` can be rendered FROM that YAML on demand, but
-it is NO LONGER committed: a generated copy under version control repeatedly
-drifted from its source, so the render is now an untracked, on-demand view
-(``cad/DIMENSIONS.md`` is gitignored). Edit the YAML, never a rendered ``.md``.
+``DIMENSIONS.md`` is NOT committed (a generated copy under version control kept
+drifting from its source) — it is an untracked, on-demand view. Edit the YAML,
+never the rendered ``.md``.
 
 Usage::
 
-    python cad/scripts/gen_dimensions.py            # render YAML -> cad/DIMENSIONS.md (untracked)
-    python cad/scripts/gen_dimensions.py --check     # assert a rendered MD matches the YAML
-    python cad/scripts/gen_dimensions.py --import     # (one-shot) parse an MD back into YAML
+    python cad/scripts/gen_dimensions.py        # render -> cad/DIMENSIONS.md (untracked)
 
 Needs only PyYAML; no SolidWorks. Run with the SW venv python (has PyYAML).
 """
 from __future__ import annotations
 
-import argparse
-import re
-import sys
 from pathlib import Path
 from typing import Any
 
 import yaml
 
+import _dimensions
+
 ROOT = Path(__file__).resolve().parent.parent
 DIMENSIONS_MD = ROOT / "DIMENSIONS.md"
-DIMENSIONS_YAML = ROOT / "config" / "dimensions.yaml"
 
-_UNESCAPED_PIPE = re.compile(r"(?<!\\)\|")
-
-
-# ---------------------------------------------------------------------------
-# Table <-> rows
-# ---------------------------------------------------------------------------
-def _is_table_line(line: str) -> bool:
-    return line.lstrip().startswith("|")
-
-
-def _is_separator(line: str) -> bool:
-    return bool(re.fullmatch(r"\s*\|(?:\s*:?-+:?\s*\|)+\s*", line))
+# Sources in book order: each is a part stem (its registry-row dimensions block)
+# or a standalone slug under cad/config/dimensions/.
+ORDER = [
+    "_overview", "overall-machine", "system-level",
+    "crank-arm", "cone-gear", "cylinder-gear", "rocker-arm", "amplitude-bar",
+    "measuring-stick", "channel-lever", "summing-lever", "counter-spring",
+    "magnifying-lever", "magnifying-wheel", "platen", "transgear-removable",
+    "pen-marker", "chapter-25-pinion-gear",
+    "appendix-a-legacy-constants", "appendix-b-parts-audit", "appendix-c-open-items",
+]
 
 
-def _split_cells(line: str) -> list[str]:
-    """Split a markdown table row on unescaped pipes; strip one pad space per cell."""
-    parts = _UNESCAPED_PIPE.split(line)
-    # A well-formed row starts and ends with '|', so the first/last parts are empty.
-    if parts and parts[0].strip() == "":
-        parts = parts[1:]
-    if parts and parts[-1].strip() == "":
-        parts = parts[:-1]
-    return [c.strip() for c in parts]
+def _raw_doc(source: str) -> dict[str, Any]:
+    """The full mapping for a source (part dimensions block or standalone file)."""
+    part_file = _dimensions.PARTS_DIR / f"{source}.yaml"
+    if part_file.exists():
+        record = next(iter(yaml.safe_load(part_file.read_text(encoding="utf-8")).values()))
+        return record["dimensions"]
+    return yaml.safe_load((_dimensions.STANDALONE_DIR / f"{source}.yaml").read_text(encoding="utf-8"))
 
 
-def _render_row(cells: list[str]) -> str:
-    return "| " + " | ".join(cells) + " |"
-
-
-def _render_table(table: dict[str, Any]) -> list[str]:
-    cols = table["columns"]
-    out = [_render_row(cols), "|" + "|".join("---" for _ in cols) + "|"]
-    for row in table["rows"]:
-        # A row is either a clean cell-list or a verbatim line ({raw: ...}) kept
-        # byte-exact for the few cells with embedded literal pipes / odd spacing.
-        out.append(row["raw"] if isinstance(row, dict) else _render_row(row))
+def _render_table(rows: list[Any]) -> list[str]:
+    # Column order = the first keyed row's keys (matches the source column order).
+    cols: list[str] = []
+    for row in rows:
+        if isinstance(row, dict) and "raw" not in row and "cells" not in row:
+            cols = list(row.keys())
+            break
+    out: list[str] = []
+    if cols:
+        out.append("| " + " | ".join(cols) + " |")
+        out.append("|" + "|".join("---" for _ in cols) + "|")
+    for row in rows:
+        if "raw" in row:
+            out.append(row["raw"])
+        elif "cells" in row:
+            out.append("| " + " | ".join(row["cells"]) + " |")
+        else:
+            out.append("| " + " | ".join(row.get(c, "") for c in cols) + " |")
     return out
 
 
-# ---------------------------------------------------------------------------
-# Parse: markdown -> structured doc
-# ---------------------------------------------------------------------------
-def parse_markdown(text: str) -> dict[str, Any]:
-    r"""Split the markdown into preamble + sections, tables structured, prose verbatim.
-
-    A section starts at a ``## `` heading and runs to the next one. Inside it,
-    contiguous ``|`` lines become a structured table element; every other run of
-    lines (headings, prose, ``---`` rules, blanks) is kept verbatim as a ``prose``
-    element. Reassembling the elements in order reproduces the file byte-for-byte.
-    """
-    lines = text.split("\n")
-    sections: list[dict[str, Any]] = []
-    preamble: list[str] = []
-    current: dict[str, Any] | None = None
-    buf: list[str] = []
-    target = preamble  # where loose lines accumulate before any section
-
-    def flush_prose(into: dict[str, Any] | None) -> None:
-        nonlocal buf
-        if not buf:
-            return
-        text_block = "\n".join(buf)
-        if into is None:
-            preamble.append(text_block)
+def _render_source(source: str) -> str:
+    doc = _raw_doc(source)
+    parts: list[str] = ["## " + (doc.get("chapter") or doc.get("title") or source)]
+    if "preamble" in doc:
+        parts.append(doc["preamble"].rstrip("\n"))
+    if "source_hierarchy" in doc:
+        parts.append("### " + doc["source_hierarchy"])
+    for item in doc["content"]:
+        if "notes" in item:
+            parts.append(item["notes"].rstrip("\n"))
         else:
-            into["elements"].append({"prose": text_block})
-        buf = []
-
-    i = 0
-    while i < len(lines):
-        line = lines[i]
-        if line.startswith("## "):
-            flush_prose(current)
-            current = {"heading": line[3:], "elements": []}
-            sections.append(current)
-            i += 1
-            continue
-        if _is_table_line(line) and current is not None:
-            # Gather the contiguous table block.
-            start = i
-            while i < len(lines) and _is_table_line(lines[i]):
-                i += 1
-            block = lines[start:i]
-            header = _split_cells(block[0])
-            data_lines = [b for b in block[1:] if not _is_separator(b)]
-            # A header that doesn't re-render byte-exact (stray pipes) means this
-            # isn't a clean table — keep the whole block as verbatim prose.
-            if _render_row(header) != block[0]:
-                buf.extend(block)
-                continue
-            flush_prose(current)
-            rows: list[Any] = []
-            for b in data_lines:
-                cells = _split_cells(b)
-                rows.append(cells if _render_row(cells) == b else {"raw": b})
-            current["elements"].append({"table": {"columns": header, "rows": rows}})
-            continue
-        (buf).append(line)
-        i += 1
-    flush_prose(current)
-
-    return {"preamble": "\n".join(preamble), "sections": sections}
+            parts.append("\n".join(_render_table(item["table"])))
+    return "\n\n".join(parts)
 
 
-# ---------------------------------------------------------------------------
-# Render: structured doc -> markdown
-# ---------------------------------------------------------------------------
-def render_markdown(doc: dict[str, Any]) -> str:
-    out: list[str] = [doc["preamble"]]
-    for section in doc["sections"]:
-        parts = ["## " + section["heading"]]
-        for el in section["elements"]:
-            if "prose" in el:
-                parts.append(el["prose"])
-            else:
-                parts.append("\n".join(_render_table(el["table"])))
-        out.append("\n".join(parts))
-    return "\n".join(out)
-
-
-# ---------------------------------------------------------------------------
-# YAML dump with readable block scalars for multi-line prose
-# ---------------------------------------------------------------------------
-def _str_presenter(dumper: yaml.Dumper, data: str) -> yaml.ScalarNode:
-    style = "|" if "\n" in data else None
-    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style=style)
-
-
-yaml.add_representer(str, _str_presenter)
-
-
-def dump_yaml(doc: dict[str, Any]) -> str:
-    return yaml.dump(doc, sort_keys=False, allow_unicode=True, width=10_000)
-
-
-def load_doc() -> dict[str, Any]:
-    """The parsed dimensions.yaml (sections with structured tables + prose)."""
-    return yaml.safe_load(DIMENSIONS_YAML.read_text(encoding="utf-8"))
-
-
-def find_row(doc: dict[str, Any], heading_prefix: str, dim_prefix: str) -> list[str] | None:
-    """First structured table row whose section heading and first cell match.
-
-    ``heading_prefix`` matches the chapter heading (e.g. ``"Chapter 12"``),
-    ``dim_prefix`` the row's first cell (e.g. ``"Diametral pitch"``). Returns the
-    cell list, or ``None`` if absent / only present as a verbatim (raw) row.
-    """
-    for section in doc["sections"]:
-        if not section["heading"].startswith(heading_prefix):
-            continue
-        for el in section["elements"]:
-            for row in el.get("table", {}).get("rows", []):
-                if isinstance(row, list) and row and row[0].startswith(dim_prefix):
-                    return row
-    return None
-
-
-def _main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--import", dest="do_import", action="store_true",
-                    help="(one-shot) parse DIMENSIONS.md into dimensions.yaml")
-    ap.add_argument("--check", action="store_true",
-                    help="assert DIMENSIONS.md matches what the YAML renders (no write)")
-    args = ap.parse_args()
-
-    if args.do_import:
-        md = DIMENSIONS_MD.read_text(encoding="utf-8")
-        doc = parse_markdown(md)
-        roundtrip = render_markdown(doc)
-        if roundtrip != md:
-            _report_diff(md, roundtrip)
-            print("IMPORT ABORTED: round-trip is not byte-identical (see first diff above)", flush=True)
-            return 1
-        DIMENSIONS_YAML.write_text(dump_yaml(doc), encoding="utf-8")
-        print(f"imported -> {DIMENSIONS_YAML} (round-trip byte-identical)")
-        return 0
-
-    doc = yaml.safe_load(DIMENSIONS_YAML.read_text(encoding="utf-8"))
-    rendered = render_markdown(doc)
-
-    if args.check:
-        current = DIMENSIONS_MD.read_text(encoding="utf-8")
-        if rendered != current:
-            _report_diff(current, rendered)
-            print("CHECK FAILED: DIMENSIONS.md is stale — run gen_dimensions.py to regenerate", flush=True)
-            return 1
-        print("CHECK OK: DIMENSIONS.md matches dimensions.yaml")
-        return 0
-
-    DIMENSIONS_MD.write_text(rendered, encoding="utf-8")
+def main() -> int:
+    body = "\n\n".join(_render_source(s) for s in ORDER)
+    DIMENSIONS_MD.write_text("# Harmonic Analyzer — Dimension provenance\n\n" + body + "\n",
+                             encoding="utf-8")
     print(f"generated -> {DIMENSIONS_MD}")
     return 0
 
 
-def _report_diff(a: str, b: str) -> None:
-    al, bl = a.split("\n"), b.split("\n")
-    for n, (x, y) in enumerate(zip(al, bl), 1):
-        if x != y:
-            print(f"first diff at line {n}:\n  expected: {x!r}\n  got:      {y!r}", flush=True)
-            return
-    if len(al) != len(bl):
-        print(f"length differs: {len(al)} vs {len(bl)} lines", flush=True)
-
-
 if __name__ == "__main__":
-    raise SystemExit(_main())
+    raise SystemExit(main())

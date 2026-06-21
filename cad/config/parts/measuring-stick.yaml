@@ -2,4 +2,47 @@ measuring-stick:
   number: MHA-046
   material: Brass
   tolerance_class: plate_profile
-  process: "machined (brass)"
+  process: machined (brass)
+  dimensions:
+    chapter: Chapter 16 — Measuring Stick (pp. 34–37)
+    content:
+    - notes: ''
+    - table:
+      - dim: Overall length
+        value: 200 mm
+        (in): '7.87'
+        source: photo callout pp. 34–35
+        method: annotated
+        confidence: high
+      - dim: Stick width
+        value: 8 mm
+        (in): '0.315'
+        source: photo callout pp. 34–35
+        method: annotated
+        confidence: high
+      - dim: Scale
+        value: 0–10, hand-stamped — 10 equal divisions of one half of the rocker arm
+        (in): —
+        source: text p. 34
+        method: stated
+        confidence: high
+      - dim: Scale span (10 divisions)
+        value: 80 mm
+        (in): '3.15'
+        source: one half of the rocker-arm working length (p.34; ch.14 → ~160 mm)
+        method: derived
+        confidence: med
+      - dim: Body thickness
+        value: ~3 mm
+        (in): ~0.12
+        source: pp. 34–35 photo proportion
+        method: scaled
+        confidence: low
+    - notes: |2
+
+        Notes: ruled brass gauge (Wm. Gaertner & Co.) with a sliding/locking stop. The
+        0–10 scale spans "the 10 equal divisions of one half of the rocker arm" → half
+        rocker-arm working length ≈ 80 mm → rocker-arm working length ≈ 160 mm. This is
+        the top-down channel-geometry anchor; cross-check against the 16 mm callout in
+        ch. 14 and photo scaling during M2. Model the nominal 8 mm spacing (not the
+        hand-stamping error).

@@ -2,4 +2,69 @@ magnifying-wheel:
   number: MHA-045
   material: Gray Cast Iron
   tolerance_class: machined_block
-  process: "cast + machined"
+  process: cast + machined
+  dimensions:
+    chapter: Chapter 21 — Magnifying Wheel (pp. 50–53)
+    content:
+    - notes: ''
+    - table:
+      - dim: Inner hub diameter
+        value: 20 mm
+        (in): '0.787'
+        source: 'photo callout pp. 50–53 (stated in text: "100 mm versus 20 mm")'
+        method: annotated
+        confidence: high
+      - dim: Outer wheel diameter
+        value: 100 mm
+        (in): '3.937'
+        source: photo callout pp. 50–53
+        method: annotated
+        confidence: high
+      - dim: Magnification
+        value: 5×
+        (in): —
+        source: 'text; consistent: 100/20 = 5 ✓'
+        method: stated
+        confidence: high
+      - dim: Spoke count
+        value: '6'
+        (in): —
+        source: counted on the full-page photo p.51 (and photogrammetry `195607299`); an earlier extraction said 5 — wrong
+        method: stated
+        confidence: high
+      - dim: Wheel axle (M6.4)
+        value: flange Ø35 × 3 seated on the bar front face; Ø5 stud × 14 the wheel bore rides; Ø9 × 4 retaining collar (photo's washer + hex nut collapsed to a collar — simplification)
+        (in): —
+        source: p.50–51
+        method: scaled
+        confidence: low
+      - dim: Support bar (×3, M6.4)
+        value: 10-square steel, 384 long (ends at x ±192, seated in the clamp channels; with the Ø25.4 columns (OD rederived from the 8-views M6.11) the column cylinders z −99.3..−124.7 no longer reach the bar's z band −138.9..−128.9, a 4.2 gap — the old M6.5 column-corner trim from 400 is moot, length now held by the clamp seating); wheel bar y 565, platen top rail y 440, bottom rail y 334 — all on the column-clamp axis z −133.9 (front face −138.9)
+        (in): —
+        source: 'M6.4 layout; p3 90° view: bars run tangent IN FRONT of the columns (z −112)'
+        method: derived
+        confidence: low
+      - dim: Column clamp (×5, M6.4; count M6.8 — the half-width wheel bar takes ONE clamp)
+        value: green cast collar Ø48 × 16, bore Ø25.6 sliding on the Ø25.4 column (OD rederived from the 8-views M6.11; was Ø35.2 on Ø35); open channel across the front face (10.2 wide, floor 5.1 below bar centre) at column-to-bar offset 21.9 (offset to column CENTRE, unchanged — the channel now stands ~4 off the smaller column surface, the collar still grips); Ø3.2 radial pinch-screw hole through the back wall (M6.10)
+        (in): —
+        source: p.50–55
+        method: scaled + derived
+        confidence: low
+      - dim: Pinch screws ×5 (M6.10)
+        value: 'Ø6 × 2.5 head + Ø2.9 × 6.2 shank in each clamp''s back-wall hole, BACKED OUT (a seated screw would overlap the column it pinches): heads bear on the clamp back faces; with the Ø25.4 column (OD rederived from the 8-views M6.11) the back wall is now 11.2 thick, so the 6.2 shank seats mid-wall and the tip stands ~5 off the column surface (was 0.3 at the old Ø35 bore) — further backed out, still non-contacting'
+        (in): —
+        source: p.50–55 (screw heads on the clamp backs)
+        method: scaled + derived
+        confidence: low
+    - notes: |2
+
+        Notes: wheel body is black-painted cast metal with a bright machined rim
+        (wire groove on the outer circumference); the inner hub is a grooved brass
+        drum (wire from magnifying lever wraps the hub, wire to pen mechanism leaves
+        the outer rim → 5× motion magnification). Six straight spokes. Hex-nut axle on
+        a horizontal support bar. The two annotated diameters self-validate against
+        the stated magnification — strongest-sourced part in chapters 18–21.
+        M6.4 placement: wheel at machine x −53 on the y-565 bar, wheel mid-plane
+        z −146.9 (axle flange on the bar front −138.9).
+
+        ---

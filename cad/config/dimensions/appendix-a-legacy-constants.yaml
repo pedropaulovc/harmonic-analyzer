@@ -1,0 +1,21 @@
+title: Appendix A — Legacy constants (cross-check only; POSSIBLY WRONG)
+content:
+- notes: |2
+
+    Mined from `cad/Parts/*.cs` (each translated from `cad/kcl-archive/*.kcl`). Full
+    audit detail in the M1 extraction; key values referenced by the chapter tables:
+
+    - **AmplitudeBar.cs**: length 32.0", section 0.25" × 0.25", bottom notch
+      0.125" × 3/32", top notch 0.125" × 0.5" — **CONFIRMED** by ch. 15 (6.35 mm
+      width annotated, ~80 cm length stated).
+    - **EccentricCam.cs**: Ø2.0" × 0.4" thick, bore 0.375", keyway 0.125" × 0.06",
+      eccentricity 0.2" — uncontradicted; verify against the cam outline printed on
+      book p. 25 during M2.
+    - **HarmonicBase.cs**: bottom plate 18.0 × 11.0 × 0.5", top plate
+      17.5 × 10.5 × 1.5", fillets 0.125"/0.0625" — footprint **CONFIRMED** by the
+      ch. 6 base callouts (46 × 28 cm = 18.1" × 11.0"); plate thicknesses still
+      photo-verify in M2.
+    - **RockerArmSupport.cs**: 7.00" tall × 7.25" wide A-frame, trapezoid depth
+      2.50"→0.667", wall 0.25", 5.00" sq window (r 0.625" corners), mounting holes
+      Ø5/16" — no book numerics; verify by photo scaling in M2.
+    - **SummingLever.cs**: see ch. 18 table (carried as primary numeric source there).

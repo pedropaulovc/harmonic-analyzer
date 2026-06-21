@@ -211,8 +211,9 @@ def module_deps_of(script: Path) -> list[str]:
 # reads, so doit can depend each part/assembly on ONLY those files instead of the
 # blanket "every *.yaml is a dep of every build". A whole-config dep meant one
 # value edit to any YAML (e.g. machine channels.active_count, one part's registry
-# row, or even the 98 KB narrative dimensions.yaml that NO part reads) marked all
-# ~76 parts stale -> a ~25 min full rebuild on the single SolidWorks seat.
+# row, or one of the standalone dimensions/*.yaml narrative files that NO part
+# reads) marked all ~76 parts stale -> a ~25 min full rebuild on the single
+# SolidWorks seat.
 #
 # The two largest data files are SPLIT into per-concern files (see _config.py,
 # which re-aggregates them transparently), so the dependency can be per-subsystem

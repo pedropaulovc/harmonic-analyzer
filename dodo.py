@@ -301,8 +301,8 @@ def _run(cmd: list[str], label: str) -> None:
 # so the granularity is sub-file: a gear part that reads only
 # machine("gear_train", ...) depends on machine/gear_train.yaml alone, so a
 # channels.active_count edit (machine/channels.yaml) skips it; editing ONE part's
-# registry row rebuilds only that part; and the 98 KB narrative dimensions.yaml
-# (read by NO part) drops out of every part. Conservative by construction -- any
+# registry row rebuilds only that part; and the standalone narrative
+# dimensions/*.yaml files (read by NO part) drop out of every part. Conservative by construction -- any
 # unclassifiable ``_config`` use falls back to the whole config (the "**" token)
 # -- so it can only ever over-rebuild, never skip a real change.
 #

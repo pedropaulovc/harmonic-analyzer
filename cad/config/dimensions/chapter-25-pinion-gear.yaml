@@ -1,0 +1,61 @@
+title: Chapter 25 — Pinion Gear (pp. 66–69)
+content:
+- notes: ''
+- table:
+  - dim: Tooth count
+    value: '42'
+    (in): —
+    source: 'counted on the drum end view (engineerguy video 4/4 @ 8:00, frame `v4_pinion_018`): 7 tips per 60° sector × 6; tip-radius ratio to the meshing 120T cylinder gear = 0.36 = 44/122 confirms same DP'
+    method: counted
+    confidence: high
+  - dim: Pitch diameter
+    value: 35.56 mm (1.400")
+    (in): '1.400'
+    source: 42 / DP 30 — round-inch PD corroborates both the count and DP 30
+    method: derived
+    confidence: med
+  - dim: Outer diameter
+    value: 37.25 mm (1.467")
+    (in): '1.467'
+    source: (42+2)/30
+    method: derived
+    confidence: med
+  - dim: Drum length
+    value: ~150 mm
+    (in): ~5.9
+    source: 'spans/engages all 20 cylinder gears at once (p.67 photo: drum ≈ cylinder stack length = 20 × 7.5 axial pitch)'
+    method: derived
+    confidence: med
+  - dim: Material
+    value: brass
+    (in): —
+    source: photos
+    method: stated
+    confidence: high
+- notes: |2
+
+    Notes: single pinion — a long toothed drum, engaged via a small ball-handle
+    lever, meshes the cylinder gear set and turns all 20 cylinder gears as one —
+    used only during setup to align the 3 mm notches (top = cosine, 90° = sine)
+    after pivoting the cone set out of engagement. The "small gear" visible on the
+    lever arm in the p.68–69 photos is the drum's front end face, not a separate
+    idler (video frame `v4_pinion_018` shows the drum receding behind it).
+
+    ### Alignment-pinion layout — REMOVED 2026-06-18, pending rework
+
+    The alignment pinion (the 42T zeroing drum + its swing straps, pivot
+    blocks, torque shaft, lift rod, lever and handle) has been DROPPED from
+    `build_drive_train_assembly.py`. At the re-anchored OD 62.2 / DP 49.82 the
+    Ø22.4 mm pinion drum no longer fits the machine: a single rigid drum
+    spanning the cylinder set (z −75..+68) sits at one x for its whole length,
+    and the channel between the rocker-support frustum (east face x −28.45) and
+    the rescaled 64T (tip west edge x −15.89, where the 64T crosses the drum
+    face) is only 12.56 mm wide — a ~9.9 mm shortfall that no position or pivot
+    topology can resolve. This is the sixth geometric impossibility the 62.2
+    eyeball reading forces (after the cam-through-roots, the 0.79 mm T006 tip
+    journal, the 67 mm crank-pedestal shift, the impossible disengage pose, and
+    the pivot-block straddle). The mechanism is to be re-solved once the gear
+    OD is confirmed; the retired DP-30 layout it replaced is in git history.
+
+
+    ---

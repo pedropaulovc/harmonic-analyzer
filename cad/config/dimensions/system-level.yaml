@@ -1,0 +1,49 @@
+title: Chapter 26/29/8/9 — System-level facts (gear law, scale references)
+content:
+- notes: ''
+- table:
+  - fact: Gear law
+    value: cylinder gear k turns k/80 rev per crank turn (k = 1…20)
+    source: ch.29 photo caption p.99
+    method: annotated
+    confidence: high
+  - fact: Sample spacing
+    value: Δ = π/20 per 2 crank turns; 20 arms uniformly subdivide [0, π]
+    source: ch.29 p.99
+    method: annotated
+    confidence: high
+  - fact: Cylinder gear speed ratio
+    value: gear n spins n× gear 1
+    source: ch.8 p.7
+    method: stated
+    confidence: high
+  - fact: Nameplate
+    value: 100 × 55 mm, brass, 4 corner screws, on base near platen
+    source: ch.26 text p.70
+    method: stated
+    confidence: high
+  - fact: Maker / date
+    value: Wm. Gaertner & Co., Chicago; built 1896–1923 (likely 1901–09)
+    source: ch.26
+    method: stated
+    confidence: high
+- notes: |2
+
+    The nameplate's 100 mm width nearly fills the p.71 photo and appears in situ on
+    the base in the p.70 photo — best photogrammetric ruler for the base/platen region.
+
+    **Derived: cylinder gear tooth count = 120.** Cone does 1/4 rev per crank turn
+    (ch.12); cone gear k has 6k teeth (ch.12); cylinder gear k rate = (1/4)·(6k/T) rev
+    per crank = k/80 (ch.29) ⟹ T = 120 for all cylinder gears. Consequence: each
+    cylinder gear has the same tooth count (and pitch diameter) as the largest cone
+    gear — visually checkable against ch.13 photos. Confidence: high (pure arithmetic
+    from three high-confidence facts).
+
+    Chapters scanned with no dimensional content: 01–05, 07, 10, 27, 31. Ch.28
+    (Michelson & Stratton 1898 paper, 80-element machine) gives no absolute
+    dimensions; transferable facts: cone tooth counts proportional 1:2:…:n; sine⇄cosine
+    shift = 90° quarter-turn of all eccentrics via one long pinion engaging all at once
+    (matches ch.25); spring-summation balance y = Σx / [n(l/L + a/b)] with design rule
+    "l/L and a/b as small as possible"; accuracy benchmark 0.65–0.7% of largest term.
+
+    ---

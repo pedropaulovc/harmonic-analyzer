@@ -2,4 +2,85 @@ summing-lever:
   number: MHA-073
   material: Gray Cast Iron
   tolerance_class: machined_block
-  process: "cast + machined"
+  process: cast + machined
+  dimensions:
+    chapter: Chapter 18 — Summing Lever (pp. 42–43)
+    content:
+    - notes: |2
+
+        No annotated or stated numeric dimensions in this chapter. The lever follows the
+        SummingLever.cs shape: a solid pivot cylinder, edge ribs, a tapering summation
+        tongue, an anchor eye, and a middle rib. Two hexagonal knife-edge trunnions
+        protrude beyond the body ends, vertex-up, their top vertex ridge forming the
+        knife edge the first-class lever hangs/rocks on; the stubs rest on bearing
+        supports standing on the top plate (ch30-p003 — not yet modeled). Lever-local
+        coords: origin on the pivot axis (cylinder centreline); the knife edge (rock
+        axis) is the hex top ridge, just above it. The 20 spring holes use the channel
+        registration. The build is authored x-negated so the hole plate lands on the
+        channel arm and the anchor eye on the counter-spring arm.
+    - table:
+      - dim: Pivot cylinder
+        value: Ø25.4 (1.0") OD × 152.4 long (z ±76.2), solid (no bore); mid-plane on the pivot axis
+        (in): '1.0'
+        source: SummingLever.cs + p.42–43 close-ups
+        method: legacy
+        confidence: med
+      - dim: Hex knife-edge trunnions ×2
+        value: vertex-up hex 8.653 wide (x) × 10.268 tall (y, vertex-to-vertex) × 21.717 deep (z), one PROTRUDING beyond each body end (z 76.2..97.92); top vertex ridge = knife edge = rock axis (≈5.1 above the cylinder centreline); rest on top-plate bearing supports (not yet modeled)
+        (in): —
+        source: measured (user, ch18)
+        method: measured
+        confidence: med
+      - dim: Coefficients plate
+        value: x −60..−10 (machine −45..+5), top y 8, 5.1 thick, z ±76.2
+        (in): —
+        source: calibrated p1; thickness/length legacy (uncontradicted)
+        method: scaled + legacy
+        confidence: med
+      - dim: Spring holes
+        value: 20 × Ø4.5 at x −37.10 (machine x −22.10 = channel-lever tab line), z = z_j − 1.95
+        (in): —
+        source: 'derived: installed-spring eye reach √(3.25²−2.55²) = 2.0 through the 5.1 plate; z offset puts the hole under the helix lead'
+        method: derived
+        confidence: med
+      - dim: Web + boss
+        value: twin ribs 3 wide, y 2..12, x 9..80, z taper ±17.18 → ±4.27; boss Ø14 × 12 at x 80 (machine 95)
+        (in): —
+        source: p.43 plan
+        method: scaled
+        confidence: low
+      - dim: Hook hole
+        value: Ø3 vertical in the boss top at x 75.5 (machine 90.5)
+        (in): —
+        source: 'derived: boss-hook shank seat (real joint ≈ 2.6 tap drill + M3 — modeled at shank size for a zero-volume fit)'
+        method: derived
+        confidence: low
+      - dim: Knife mount
+        value: 8-square hardened bar set diamond-wise (edge up), 31.8 long — rides inside the lever tube's slot tunnel (z ±15.9 vs slot ±16; contact bands outside the slot are geometrically impossible — the diamond flanks clash with the tube lower wall); brass block 24 × 28 × 24 below; Ø8 stud through the tube slot rising to machine y 1065
+        (in): —
+        source: p.42/43 (square-head bolt + stirrup strap collapsed to block + stud — simplification)
+        method: scaled
+        confidence: low
+      - dim: Top crossbar
+        value: 22 × 41 rail section (ch. 6), 202 long along Z (M6.5 — the M6.4 372 mistakenly used the ring's inner X half-span 186; the bar spans the ring WINDOW along Z, inner faces at z ±101), Ø8.2 stud hole at centre; bottom face machine y 1010 (0.5 above the summing-lever tube top 1009.5) — the bar floats 10.3 proud of the top-frame ring band (999.7..1040.7), ends face-flush against the north/south rail inner faces over y 1010..1040.7
+        (in): —
+        source: ch. 30 views + top-frame ring inner span
+        method: scaled + derived
+        confidence: med
+      - dim: Knife stay
+        value: Ø3 rod along X at machine (0, 1086), x −197..+20; 8 × 2 strap from the rod at x −10 down to the knife-mount stud west flank at (9.7, 1053) (end corner 0.44 clear of the stud face, low corner 1.5 above the raised crossbar top 1051)
+        (in): —
+        source: 'p.42–43; M6.4 reroute: a drop to the knife block crosses the summing-plate band; M6.5 reroute: the lever spring tabs overhang to x −14.1 (tab tops ~1070.1), so the hook moved −40 → −10 to keep the whole strap east of the tab tips'
+        method: scaled + derived
+        confidence: low
+      - dim: Boss hook
+        value: 'Ø3 J-hook: shank +Y in the boss hole, rise 12, elbow R 3, arm +X 3.5 — rod top machine y 1015, tip x 97'
+        (in): —
+        source: p.43/45 (hook + chrome link ring collapsed to one hook; the spring's own loop is the ring)
+        method: derived
+        confidence: low
+    - notes: |2
+
+        Notes (stated, qualitative): cast iron; pivots on a knife-edge fulcrum; the 20
+        channel springs attach along the wide end; total motion is only a few mm
+        (magnified downstream by ch. 20–21).

@@ -1,0 +1,49 @@
+title: Dimension provenance — overview
+preamble: |
+  # Harmonic Analyzer — Dimension Source of Truth
+
+  Single source of truth for all part/assembly dimensions used by the reproduction
+  scripts in `cad/scripts/`. Built in Milestone 1 from the book
+  `references/albert-michelsons-harmonic-analyzer` (chapters 11–25, one component
+  each), cross-checked against the legacy `cad/Parts/*.cs` / `cad/kcl-archive/*.kcl`
+  dimensions.
+
+  > **This file is GENERATED from `cad/config/dimensions.yaml` — do not edit it
+  > directly.** The dimension tables live there as structured rows and the
+  > narrative as `prose` properties; `cad/scripts/gen_dimensions.py` renders this
+  > view (`--check` gates that the two never drift). The build *inputs* the scripts
+  > actually read (tooth counts, pitches, fits, the cone incline) live in the
+  > sibling `machine.yaml` / `channels.yaml` / `tolerances.yaml`; `verify.py`
+  > cross-checks those against the dimension rows here. Confidence ladder:
+  > annotated → stated → scaled → legacy → derived.
+source_hierarchy: Source hierarchy (authoritative → weakest)
+content:
+- notes: |2
+
+    1. **annotated** — dimension callouts printed on the book's photos. AUTHORITATIVE.
+    2. **stated** — dimensions written in the chapter body text. AUTHORITATIVE.
+    3. **scaled** — proportional scaling from an annotated/stated reference in the same
+       photo (reference and method recorded per row; re-measure during M2 part builds).
+    4. **legacy** — `cad/Parts/*.cs` / `cad/kcl-archive/*.kcl` constants, themselves
+       derived from the book earlier and POSSIBLY WRONG. Cross-check/tiebreaker only;
+       wherever legacy contradicts a book annotation, the book wins (discrepancy logged).
+    5. **derived** — computed from other rows (formula recorded).
+
+    Confidence: **high** (annotated/stated, or legacy confirmed by book), **med**
+    (scaled with a good reference, or uncontradicted legacy), **low** (rough estimate,
+    must be re-measured against photos during the M2 build of that part).
+
+    **A derived row is NEVER high.** A value computed from other rows inherits one
+    step below its strongest cited input: derived from high → **med**, derived from
+    med → **low** (derived from low stays low). The cited inputs and formula are
+    recorded per row so the cascade is auditable.
+
+    Photo evidence: besides the book, 89 first-party photos of the machine exist in
+    `photogrammetry/raw/` — indexed per component in `photogrammetry/raw/README.md`. Use them for
+    detail inspection (fasteners, cross-sections, routing) and secondary scaling
+    (the 100 × 55 mm nameplate appears in-frame with the gear stack).
+
+    Units: original units as found; inches in parentheses (book annotations are metric;
+    legacy code is inches).
+
+    ---

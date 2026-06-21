@@ -286,7 +286,7 @@ PIVOT_POST_STATION = -1.0
 # support frustum (x -28.45) and the rescaled 64T (west edge x -15.89).
 # The whole swing group (drum, 2 straps, 2 blocks, torque shaft, lift
 # rod, lever, handle) is dropped from the assembly pending a rework.
-# See dimensions.yaml ch.25 + the build docstring.
+# See the standalone dimensions/chapter-25-pinion-gear.yaml + the build docstring.
 
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]

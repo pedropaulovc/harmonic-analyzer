@@ -1,0 +1,139 @@
+title: Appendix C — Open items (must close before the milestone that needs them)
+content:
+- notes: |2+
+
+    1. **Gear module + pressure angle** (ch. 12/13/25) — **RESOLVED in M4 prep:
+       DP 30 (m = 0.8467 mm), PA 14.5° (assumed, unchanged).** Two independent
+       measurements converge: (a) p.18 macro (`12_…/page002_img07`, 7 mm-callout
+       scale 16.57 px/mm): rim silhouette striations at 22.3 px are the interleaved
+       near/far tooth serrations (half-pitch — the steel drive gear's visibly
+       coarser teeth in `page002_img02` corroborate), so p = 44.6 px = 2.69 mm vs
+       DP 30's 2.66 mm; (b) p.18 cone view (`page002_img04`, 150 mm-arrow scale
+       ≈ 4.83 px/mm): largest cone gear OD ≈ 105 ± 5 mm vs DP 30's 103.3 mm
+       (m = 0.8 → 97.6 marginal, m = 1.0 → 122 excluded). Clincher: DP 30 makes
+       every key PD a round inch value — largest cone / cylinder gear 4.000",
+       pinion 1.400". The photogrammetry cross-check (`195445871`) was abandoned:
+       through-glass color cast + parallax made the nameplate unusable.
+       NOTE: ch. 23 translational gearing looks coarser than DP 30 in the video
+       frames (`v4_transgear_*`) — its module is a separate question, measure when
+       authoring those parts.
+    2. **Pinion tooth count** (ch. 25) — **RESOLVED in M4 prep: 42 teeth**
+       (counted on engineerguy video 4/4 frame `v4_pinion_018`; see ch. 25
+       section). Video stills live in `references/engineerguy-youtube/`
+       (see its README to re-fetch the videos; mp4/stills not committed).
+    3. **Channel pitch** — **RESOLVED in M6: 7.5 mm along the cone axis,
+       7.06 mm projected on the machine depth (Z)**, uniform with the gear
+       stack (vertical connecting rods, no splay). Measured on all four p.28
+       end-view strips (400 dpi extraction): arm-end tip pitch ≈ 60 px vs tip
+       width ≈ 20 px = the 2.5 mm arm plate (annotated p.27) → pitch ≈ 3.0 ×
+       2.5 = 7.5 mm. Self-consistent: 20 ends × 60 px ≈ 1140 px of the 1512 px
+       strip. The 16 mm candidate is refuted.
+       Z-projection refinement (M6.7 supersedes the M6.2/M6.6 readings):
+       the 7.5 annotation's Z-projection 7.5 × cos(arcsin(2.54/7.5)) =
+       7.0568 mm is the FRAME-LOCKED drum/channel grid — stack spans
+       19 × 7.0568 ≈ 134.1 mm, ~2.8 mm air per side inside the gates'
+       139.7 mm clear span (inner faces at Z = ±69.85). The cone-shaft
+       incline then follows from exact tracking of perpendicular-seated
+       gears (true cone, p.18): a gear square to the shaft contacts the
+       parallel-axis drum via the tooth at the drum-facing azimuth, which
+       sits r·sin θ along-shaft south of the gear centre, so the 20 mesh
+       centres are collinear iff the radius step tracks per DRUM pitch:
+       7.0568 sin θ = 2.54 → θ = arcsin(2.54/7.0568) = 21.0976° (the
+       earlier arcsin(2.54/7.5) = 19.8° put the tracking on the wrong leg
+       of the triangle — 0.44 mm/station z-drift, "most gears not
+       meshing"; atan = 18.7° was doubly wrong). Along-shaft seat pitch
+       7.0568 × cos θ = 6.5839 (forces the 6.5 face, ch. 12 rows). The
+       incline lies in the HORIZONTAL plane: the cone sits beside the drum
+       at the same height and converges on it toward the small end (ch. 12
+       p.18 top-down photo; the eight-views side view shows the cone
+       midline near-level) — see "Drive-train layout" in the ch. 13
+       section. Cross-check: tan(cone half-angle) = 2.54/6.5839 = tan θ,
+       so the cone's drum-side generator runs parallel to the drum axis —
+       exactly the p.18 seam.
+    4. **Rocker arm working length** — RE-RESOLVED in M6.3, then REDERIVED
+       from the p.29 broadside photo (supersedes the indirect ±88 and the
+       M2 100/70 model): symmetric ±114.3 (4.5") about the pivot, rod pin at
+       +25.4 — see the ch. 14 "Rocker pivot & supports layout" table. The M2 read
+       put the connecting rods at the arm tips; ch. 15's "positive one side,
+       negative the opposite side" plus the vertical-rod/arbor-x closure
+       refutes that.
+    5. **Feature mapping of the 16 mm (ch. 14) and 32 mm (ch. 17) callouts** —
+       ch. 14 16 mm RESOLVED in M2 = rocker arm end-face depth (see ch. 14
+       table). ch. 17 32 mm RESOLVED in M2 = spring coil body length (ch. 17
+       table, annotated high).
+    6. **Cylinder-set axial budget** (ch. 13) — **RESOLVED in M6**: p.22
+       stack macro (400 dpi) measures gear face / axial pitch = 190/497 px
+       ≈ 0.38 → face 3.0 mm; budget per 7.5 mm channel = face 3.0 + cam 3.5
+       (0.5 air per side in the 4.5 gap) with the 3.0 rod ring riding the cam
+       (0.25 axial clearance per side). Legacy 10.2 cam thickness refuted;
+       `build_cylinder_gear.py` updated (face 7 → 3, cam 10.16 → 3.5). The
+       ch. 12 "7 mm" face callout applies to the CONE gears, trimmed to 6.5
+       in M6.7 by the 6.584 exact-tracking seat pitch (ch. 12 face row).
+    7. **Small cone gears cannot carry the 9.5 mm shaft bore** (ch. 12) —
+       **RESOLVED in M4c: configured bore + stepped shaft, no keyway.** At
+       DP 30 the 6T gear's OD is 6.77 mm and the 12T root circle is 8.0 mm,
+       both smaller than the 9.5 mm cone shaft. Resolution: the cone-gear
+       part carries a configured `BoreDia` global computed by `bore_dia_in`
+       (snug on the shaft section at the seat: 3/8" T024–T120, 1/4" T018,
+       3/16" T012, 1/8" T006 — M6.7 perpendicular seats need no ellipse
+       margin) and the shaft (`build_cone_gear_shaft.py`)
+       steps 3/8 → 1/4 → 3/16 → 1/8" at stations 136.88/143.47/150.05
+       (each in the 0.08 air gap between gear faces, ch. 12 rows). No
+       keyway anywhere: the book never shows the attachment and the p.21
+       macro shows solder blobs at the small gears, so gears are modeled
+       plain-bored (key/solder hardware out of scope). Implementation note:
+       the configured bore forced the gear blank from a revolve to an
+       extruded disc — on SW 2026 a dimension-driven cut through a revolved
+       body freezes at its creation-time size (skill learning
+       `cut-on-revolved-body-freezes-at-creation-size.md`).
+    8. **Translational gearing fixed-reduction topology** (ch. 23) — found in
+       M4c keyframe measurement: a small fine-tooth steel pinion (≈ Ø21 mm,
+       est. 24T DP 30) rides coaxially with the 120T rack pinion
+       (`v4_transgear_002/003/008`), but the frames do not show what it meshes,
+       nor which shafts carry the two chain wheels vs the removable 12/18/24
+       pair.
+       **M6.8 topology resolution** (ch. 23 PDF + `v4_transgear_002/008/012`
+       + ch30 p002 full-res): the stud carries the 96T disc + latch big hub;
+       the KNOB SHAFT (latch small hub) carries the fine 24T pinion — it is
+       NOT coaxial with the disc; the M4c read conflated the two shafts —
+       plus a chain-wrapped removable; the crankshaft carries the second
+       chain-wrapped removable. The bead chain rides the removables' m2
+       teeth directly (no separate sprockets), which is how gear swaps
+       change the platen ratio and why the latch slackens the chain.
+       **Open kinematic riddle:** a rigid latch arm pivoting on the stud has
+       ONE c2c, but engaged mesh needs 51.0 (96T PD 81.28 + 24T PD 20.32 +
+       0.4)/2 while the ch30 rest pose measures 66.05 — the real pivot or a
+       slotted arm must provide the travel; not resolvable from available
+       photos. Modeled: the rest state exactly (latch at c2c 66.05, −10.22°),
+       engagement left conceptual.
+    9. **Crank-drive gear pair** (ch. 11/12) — found in M4c: the dark steel
+       gear at the cone set's large end ("This gear engages the crank",
+       p.20) implements the stated 4:1 crank→cone reduction together with a
+       pinion on the crankshaft; neither part is in any legacy source. Teeth
+       are visibly ~1.5–2× coarser than the train and not countable in the
+       available photos. Estimate, RE-ANCHORED with the OD 62.2 train: DP
+       26.57 (= DP_TRAIN·64/120), drive gear 64T (PD 61.18 mm, OD ≈ 63.1 ≈
+       the 120T cone gear's 62.2 — the p.20 "OD ≈ cone 120T" match holds),
+       crank pinion 16T (PD 15.3). The 4:1 ratio is book-stated and fixed;
+       only the DP/tooth split is estimated.
+       **M6.2 ratification (now BROKEN by the 62.2 anchor):** the rescaled
+       64T+16T centre distance is 38.24 mm, no longer the 63.5 that matched
+       the measured 67 ± 5 mm crank-to-cone distance. The whole drive train
+       shrank with the 62.2 OD, pulling the crank ~67 mm inboard (pedestal
+       derived +55 vs photo +122) — flagged with the crankshaft row. Either
+       the crank-distance photo or the 62.2 reading is wrong.
+    10. **Alignment-pinion mechanism removed** (ch. 25) — 2026-06-18. At the
+       re-anchored OD 62.2 / DP 49.82 the Ø22.4 mm pinion drum cannot thread
+       the 12.56 mm channel between the rocker-support frustum (x −28.45) and
+       the rescaled 64T (tip west edge x −15.89): a ~9.9 mm shortfall no
+       position or pivot topology can resolve (the drum is one rigid cylinder
+       at a single x for its whole z-length). The drum + straps + blocks +
+       torque shaft + lift rod + lever + handle were dropped from
+       `build_drive_train_assembly.py` pending a rework once the gear OD is
+       confirmed. The retired DP-30 layout (and the former entries #10/#11 on
+       the 0.28 mm face shave and the parked lift-rod cam pins) are in git
+       history. See the "Alignment-pinion layout — REMOVED" section above.
+
+
+
+...

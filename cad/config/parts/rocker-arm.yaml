@@ -2,4 +2,103 @@ rocker-arm:
   number: MHA-071
   material: Plain Carbon Steel
   tolerance_class: machined_block
-  process: "machined (steel)"
+  process: machined (steel)
+  dimensions:
+    chapter: Chapter 14 — Rocker Arms (pp. 26–29)
+    content:
+    - notes: ''
+    - table:
+      - dim: Arm plate thickness
+        value: 2.5 mm
+        (in): '0.098'
+        source: photo callout p.27 (M2 re-read at 400 dpi; the M1 row misread this as a 12.5 mm "arm width")
+        method: annotated
+        confidence: high
+      - dim: Arm depth (end-face height)
+        value: 16 mm
+        (in): '0.630'
+        source: photo callout p.29 — M2 zoom shows the arrows span the arm's end face vertically (NOT channel pitch)
+        method: annotated
+        confidence: high
+      - dim: Top-surface curvature radius
+        value: = amplitude bar length ≈ 800 mm
+        (in): ≈ 31.5
+        source: text pp. 26–27 ("equal to the length of amplitude bars" — minimizes nonlinearity)
+        method: stated
+        confidence: high
+      - dim: Arm count
+        value: '20'
+        (in): —
+        source: photos/text
+        method: stated
+        confidence: high
+      - dim: Arm length
+        value: symmetric ±114.3 mm (4.5") about the pivot (228.6 = 9" total)
+        (in): '4.5'
+        source: 'REDERIVED from the p.29 broadside photo: pivot ball, rod-pin hole and the 16 mm depth callout give a dual scale (~8.1–8.6 px/mm), and the pivot→tip span measures 113–119 mm (central ~116) → adopt the clean imperial 4.5" half (9" total = the 9" pivot shaft). Supersedes the indirect M6.3 "80 mm bar travel + 8 mm margin" = 88 (never measured) and the M2 100/70 asymmetric read; ch. 15 symmetry retained'
+        method: photo-scaled
+        confidence: med
+      - dim: Rod-pin hole
+        value: Ø2 at +25.4 (1") from the pivot, rod side, mid-depth
+        (in): '1.0'
+        source: 'M6.3 closure: vertical connecting rods hang at the cylinder-arbor x = −47.5; pivot ball measured x ≈ −66 (back view, base-edge calibration) … −81 (front view) → designer value 1" lever arm, pivot at −72.9'
+        method: derived
+        confidence: med
+      - dim: Pivot pin hole
+        value: Ø6.5 (rides the Ø6.35 pivot shaft), mid-depth
+        (in): '0.256'
+        source: function-driven (common pivot shaft, see layout below); the M2 "Ø3 dark dots" read was the rod-pin holes
+        method: derived
+        confidence: low
+    - notes: |2
+
+        ### Rocker pivot & supports layout (M6.3, ch. 14 + ch. 30 front/back views)
+    - table:
+      - item: Pivot shaft
+        value: Ø6.35 × 228.6 (9") along Z at (x, y) = (−72.9, 253.8)
+        source: x = arbor −47.5 − 25.4 rod-lever; y = drive 126.8 + 127 rod (arm level at cam mid-stroke); ball x photo-measured −66…−81, ball y 252–255 in both 0°/180° views ✓
+        confidence: med (x, y derived; dia low)
+      - cells:
+        - Support casting ×1 (M6.5, depth re-read M6.9, UNIFIED M6.12)
+        - 'M6.12: the windowed portal that M6.9 confirmed is now ONE green casting, `rocker-arm-portal` (build_rocker_arm_portal.py), replacing the former two-part split (this frustum + the transgear A-frame). NORTH upright = solid tapered frustum, base 88.9 × 40 → top 20 × 20, 177.8 tall (7"); SOUTH upright at machine z −111 = the tapered plate + saddle + clevis ears (former a-frame row); the two are tied by the TOP and FOOT rails, which now run continuously between them (≈2 mm overlap into each upright fuses the casting into a single solid body — gated in the build). The old east-flank arbor-clamp boss Ø20 / Ø9.7 bore is GONE: the cone/arbor no longer rests on the support (the arbor''s north end gets its own pedestal, the cone tip its own bracket, both in drive-train.SLDASM). Authored machine-handed → inserted unmirrored in frame.SLDASM at (x, z) = (+72.9, +101.6), the same transform the frustum used.'
+        - 'front view: triangle base spans x −130…−44 (≈86), apex at −81 ± 6. M6.9 REINSTATED the windowed-frame reading M6.3/M6.5 refuted: ch30 p008 (+x side, brightened) plainly shows the windowed portal frame (~184 wide, ~127 window). The p008 uprights read ~28–40 deep and near-uniform → side depth 40 → 20 (supersedes the legacy 63.5 → 16.9 strong taper). M6.5''s refutation of a second free-standing SOUTH frustum stands (the calibrated v3 side view shows ONE frustum at the back, z +69..+134 footprint; the south ball is gripped by the clevis). M6.12: photo Z-scale is perspective-compressed, so the casting''s Z geometry stays anchored on the mechanically-locked neighbours (both pivot balls, the channel grid, the parked stick z ≤ −118, the ch25 handle z ≥ −98).'
+        - photo + legacy height
+        - med
+      - item: Support position
+        value: apex centred (x, z) = (−72.9, +101.6), feet on the base top
+        source: north (back) only; z anchored by the north pivot ball at +101.6 (the old "outer face flush with the top plate edge" rationale died with the 63.5 base depth); apex top at y = 228.6
+        confidence: med
+      - item: Hold-down lag screws ×2 (M6.10)
+        value: 'round head Ø14 × 4 + Ø7.8 × 66 shank, axis +Y at machine (x, z) = (72.9 ± 31.75, 101.6) — UP through the base from below: heads recessed in the underside''s Ø15 × 4.5 counterbores (y 0.5..4.5), shanks through the base''s Ø8.2 through-holes into the frustum''s Ø7.94 × 25 sockets (tips y 70.5, 5.3 short of the socket bottoms)'
+        source: the support's 63.5 mounting-hole pitch (`build_rocker_arm_portal.py`); placed in frame.SLDASM (`build_lag_screw.py`)
+        confidence: low
+      - cells:
+        - Ball mounts ×2
+        - clevis + Ø19 ball, ball centre 25.2 above its seat; Ø6.5 shaft cross-bore
+        - apex/saddle top 228.6 + 25.2 = 253.8 = pivot axis ✓; north mount on the frustum apex (z +101.6), south mount on the A-frame saddle between its clevis ears (z −111, M6.5); same style at the lever rail (ch. 17)
+        - scaled
+        - low
+      - cells:
+        - Pivot spacer bushings ×19
+        - Ø10 OD × 4.5565 long × Ø6.5 bore (pitch 7.0565 − arm 2.5)
+        - 'M6.3 geometric ceiling: at d = 0 the bar-foot cheeks pass 6.45 above the shaft axis (contact 262.63 − notch 2.381 − axis 253.8), so OD < ~12.9 — REFUTES the p.27 "Ø~25 barrel" read (those barrels are something else); Ø10 keeps 1.45 clearance'
+        - derived
+        - med (OD low)
+      - cells:
+        - Arm stations
+        - arm mid-plane z = z_j + 0.8 (rod strap at z_j + 3.3 sits beside the arm)
+        - cam/ring z budget, ch. 13 sandwich
+        - derived
+        - med
+    - notes: |2
+
+        Notes: concave-upward curved top supports the amplitude bar (R = bar
+        length, minimizing the bar-tilt cosine error — the bar-top pin height is
+        invariant within 0.1 mm across the ±11.6° arm swing). Pivot = zero-
+        coefficient position for the amplitude bar. Matte-black finish. End view
+        p.28 shows the 20-arm array at uniform pitch. Bottom edge concentric with
+        the top (uniform 16 mm depth, R 816/800 arcs). Canonical rest state
+        (cylinder-gear notches at +Y = cosine alignment, integral cam lobes −Y):
+        arms tilt −11.6° (rod side down), rods tilt 0.18°.
+        Re-authored as `cad/scripts/build_rocker_arm.py` (supersedes the legacy
+        `oscilating-arms` part, which had no surviving source).

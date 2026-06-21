@@ -3,4 +3,102 @@ cone-gear:
   material: Brass
   tolerance_class: machined_block
   fit_class: gear_mesh
-  process: "gear cutting (hob/shaper)"
+  process: gear cutting (hob/shaper)
+  dimensions:
+    chapter: Chapter 12 — Cone Gear Set (pp. 16–21)
+    content:
+    - notes: ''
+    - table:
+      - dim: Gear face width
+        value: 7 mm
+        (in): '0.276'
+        source: photo callout p.18 — the annotated 7/7.5/150 trio is mutually inconsistent with the frame-locked drum grid; the build trims the as-built face to clear the seat pitch (a model detail, see build_cone_gear.py)
+        method: annotated
+        confidence: high
+      - dim: Cone set axial length
+        value: 150 mm
+        (in): '5.91'
+        source: photo callout p.18; with the finer DP 49.82 module the gear stack shrank to 19 × 6.889 + 6.5 ≈ 137.4 mm (+ 64T face 10 + air) — the 150 arrow no longer matches cleanly and is flagged (the annotated 7/7.5/150 trio was already inconsistent with the drum grid)
+        method: annotated
+        confidence: high
+      - dim: Gear count
+        value: '20'
+        (in): —
+        source: text p.16
+        method: stated
+        confidence: high
+      - dim: Tooth counts
+        value: 6, 12, 18 … 120 (step 6)
+        (in): —
+        source: text p.16
+        method: stated
+        confidence: high
+      - dim: Crank→cone reduction
+        value: 4:1 (1 crank turn = 1/4 cone turn)
+        (in): —
+        source: text p.16
+        method: stated
+        confidence: high
+      - dim: Axial gear pitch
+        value: 7.2204 mm
+        (in): '0.284'
+        source: 'along the cone axis (= machine.yaml drum_seat_nominal); RE-TUNED from 7.5 so its Z-projection stays 7.0565 = the frame-locked drum grid (gates, channels — Appendix C #3) when the module shrank to DP 49.82. The along-shaft seat pitch is now 6.889 (clears the shallower 12.52° incline) — a model detail.'
+        method: derived
+        confidence: low
+      - dim: Diametral pitch / module
+        value: DP 49.82 (m = 0.5098 mm)
+        (in): —
+        source: 'ANCHORED on the measured cylinder-gear OD = 62.2 mm (ch13, scaled p.25 bottom-left vs the back-view gear brackets, LOW): m = 62.2/(120+2) = 0.5098, DP = 25.4/m = 49.82, so largest cone / cylinder PD = 120·m = 61.18 mm. The cone T120 shares this module (it meshes the cylinder set). SUPERSEDES the former DP 30 round-inch derivation (p.18 tooth pitch 2.69 mm + 150 mm-arrow OD ≈ 105 → DP 30 → OD 103.3), which the 62.2 reading REFUTES — the p.18 scalings and the round-inch PD do not survive (logged discrepancy, user-directed 2026-06-18)'
+        method: derived from the ch13 OD scaling (low)
+        confidence: low
+      - dim: Pressure angle
+        value: 14.5° assumed
+        (in): —
+        source: period-typical; not stated anywhere
+        method: derived
+        confidence: low
+      - dim: Cone shaft length
+        value: 190 mm
+        (in): '7.5'
+        source: 'M6.7: pivot journal 25 + stack 19 × 6.889 + 6.5 ≈ 137.4 + thin-tip journal through the knob post at station 177 (length kept 190; the stack lengthened slightly with the shallower incline)'
+        method: derived
+        confidence: low
+      - dim: Cone shaft diameter
+        value: 'stepped: 9.5 (3/8") z 0–141.9, 6.35 (1/4") to 148.8, 3.18 (1/8") to 155.7, 0.79 (1/32") to 190 (large/pivot end at z 0)'
+        (in): 0.375/0.25/0.125/0.03125
+        source: 'big-end dia kept 3/8" (pivot-post bearing). At DP 49.82 the tip gears are tiny (T006 OD 4.08, root r 0.89), so the shaft steps down MUCH further than the old DP 30 shaft: each step lands in the ~0.39 mm air gap between faces (seats at 28.25 + 6.889j ± 3.25). The 1/32" (0.79 mm) tip journal carrying T006 is mechanically marginal — flagged, follows from the 62.2 OD anchor (low) — `build_cone_gear_shaft.py`'
+        method: legacy + derived
+        confidence: low
+      - dim: Gear bores (configured `BoreDia`)
+        value: 'snug on the stepped shaft (M6.7 perpendicular seats) AND inside each gear''s root circle: 9.5 (3/8") T024–T120; 6.35 (1/4") T018; 3.18 (1/8") T012; 0.79 (1/32") T006; no keyway'
+        (in): —
+        source: 'Appendix C #7: bore = shaft section at the seat (perpendicular gears need no ellipse margin). At the finer module the T012 bore drops to 1/8" (root r 2.42) and T006 to 1/32" (root r 0.89 — marginal 0.49 mm wall); p.21 macro shows solder blobs fixing the small gears — no keyway evidence anywhere'
+        method: derived
+        confidence: low
+      - dim: Crank-drive gear (dark steel gear at the large end, "This gear engages the crank" p.20)
+        value: 'coarser pitch than the train, est. DP 26.57 (= DP_TRAIN·64/120): ~64T, PD 61.18 mm (OD ≈ 63.1 mm ≈ the cone 120T''s 62.2 — visual match RESTORED); mates a ~16T crank pinion (4:1, PD 15.3, OD 17.2)'
+        (in): —
+        source: 'p.20 annotation + visibly coarser teeth than the 120T beside it. Re-anchored with the 62.2 OD: the crank-drive DP was rescaled to 26.57 so the 64T pitch radius again equals the cone big-end''s (the book''s "OD ≈ cone 120T" cross-check holds, and the 64T stays ~1.9× coarser than the train DP 49.82). Tooth counts NOT countable in photos — split est. from the stated 4:1 + the OD-match argument (Appendix C #9)'
+        method: scaled
+        confidence: low
+    - notes: |2
+
+        Notes: all 20 gears fixed to one shaft, rotate together. Engagement with cylinder
+        gears is at an oblique angle (partial engagement → distinct wear). The four smallest
+        gears (T006–T024, the cone tip) look "slightly more yellow … a different, perhaps
+        harder metal" (p.21). Period-accurate reading: a harder high-zinc yellow metal —
+        Muntz metal (60/40 Cu-Zn) or manganese bronze, both more golden and markedly harder
+        than the ~70/30 alpha brass of the larger gears — cut from drawn rod on a wheel-
+        cutting / dividing engine and soldered to the shaft (the p.21 solder blobs), chosen
+        because the finest teeth wear/break most. Modeled as the `muntz_yellow` appearance on
+        those four configs (materials.yaml, applied in the Phase 3 rebuild). Cone set pivots
+        out of engagement via a knob (for sine/cosine alignment, ch. 25). A 6-tooth involute
+        gear is severely undercut at standard proportions — `build_cone_gear.py` (M4) models it
+        stub-form (gap floor at the base-circle chord, no trochoid root), validated against
+        an analytic profile integral to ≤ 0.015% per configuration. All 20 tooth counts are
+        configurations T006..T120 of the single parametric part `cone-gear.SLDPRT`
+        (equation-driven involutes from ToothCount/DP/PA globals) with a configured bore
+        (`BoreDia` global per configuration, no keyway — Appendix C #7 resolved; the
+        mating shaft steps down accordingly, see the shaft rows). The dark coarse-tooth
+        steel gear beside the 120T ("This gear engages the crank", p.20) is a separate
+        drive component — Appendix C #9.

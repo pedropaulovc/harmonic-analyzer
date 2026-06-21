@@ -3,4 +3,139 @@ transgear-removable:
   material: Plain Carbon Steel
   tolerance_class: machined_block
   fit_class: gear_mesh
-  process: "gear cutting (hob/shaper)"
+  process: gear cutting (hob/shaper)
+  dimensions:
+    chapter: Chapter 23 — Translational Gearing (pp. 56–59)
+    content:
+    - notes: ''
+    - table:
+      - dim: Total gear count
+        value: '6'
+        (in): —
+        source: text p.56
+        method: stated
+        confidence: high
+      - dim: Removable gear set tooth counts
+        value: 12 / 18 / 24 (small/medium/large)
+        (in): —
+        source: p.57 diagram captions
+        method: annotated
+        confidence: high
+      - dim: Rack & pinion
+        value: 2 of the 6 gears
+        (in): —
+        source: text
+        method: stated
+        confidence: high
+      - dim: Chain drive
+        value: 2 gears (one at platen front, one on crankshaft)
+        (in): —
+        source: text
+        method: stated
+        confidence: high
+      - dim: Fixed crank-speed reduction
+        value: 2 gears
+        (in): —
+        source: text
+        method: stated
+        confidence: high
+      - dim: Rack & rack pinion pitch
+        value: DP 30 (machine system)
+        (in): —
+        source: 'M4c keyframe measurement: rack pitch 2.66 mm; the DP 30 conclusion stands, but the M4c 120T/OD-105 read of the keyframes is superseded — see the rack-pinion row'
+        method: scaled + counted
+        confidence: med
+      - dim: Rack pinion
+        value: '96T DP 30: PD 81.28, OD 82.97, ~3 mm face, Ø9.525 (3/8") bore, brass'
+        (in): 3.266 OD
+        source: 'M6.4: REFUTES the M4c "120T, OD 103.3" keyframe read — the calibrated ch. 30 front view (p1, 6.02 px/mm) shows OD ≈ 83 centred on the pinion-bar stud at (0, 253.5)'
+        method: scaled
+        confidence: 'med (face: low)'
+      - dim: Removable gear module
+        value: 2.0 mm (≈ DP 12.7)
+        (in): —
+        source: 24T gear OD ≈ 51 mm in `v4_transgear_030` (scale via DP 30 rack pitch) ⟹ m = OD/(N+2) ≈ 1.96; m = 2.0 makes every swap combo's centre distance m(12+24)/2 = 36 mm exactly
+        method: scaled
+        confidence: med
+      - dim: Removable gear face / bore / pins
+        value: ≈ 5 thick; common bore Ø12; 2 × Ø3.5 pin holes on Ø19 BC
+        (in): —
+        source: '`v4_transgear_015` (catalog shot) + `v4_transgear_020/025/030` (mounted on the oval-pin stub shaft)'
+        method: scaled
+        confidence: low
+      - dim: Chain wheels
+        value: 'the two MOUNTED removable gears themselves (knob shaft T24, crankshaft T12): the bead chain rides their m2 teeth — that is how gear swaps change the platen ratio, and why the latch slackens the chain'
+        (in): —
+        source: 'M6.8 supersedes the M4c "17T sprockets both ends": ch. 23 text + `v4_transgear_002/008/012` (chain visibly wraps the removable''s coarse teeth); ch30 p002 full-res: upper wrap tips Ø ≈ 53.6 ≈ T24 OD 52 at post-mirror (−65, ~248); crank wheel small ≈ Ø30 (`v2_gears_010`) ≈ T12 OD 28. `chain-sprocket.SLDPRT` retired from the assemblies'
+        method: counted + scaled
+        confidence: med
+      - dim: Drive chain (bead-chain rework)
+        value: 'ball-chain #13 stand-in: 63 × Ø4.8 spheres (`chain-bead`) at exact-closure pitch 6.387 (nominal 6.35 = 1/4") along the 402.4 closed centreline loop — two wrap arcs floating 0.41 + 2.5 outside the mounted removables'' tip circles (knob T24 r 28.91 about post-mirror (−65, 241.78); crank T12 r 16.91 about (−118, 126.8)), the taut common external tangent on the pinion-bar side, and a slack arc (r 171.8) sagging 14 below the straight tangent (SAG trimmed 18 → 14: outer reach clears the cone-pivot-post top by 0.95); bead centres on the chain mid-plane z −81.05 (splits the T24/T12 wrap mid-planes; the real chain bridges the 4.35 z offset with a ~1.7° skew); connecting wire not modeled (flexible); realised as a SolidWorks chain component pattern over the `_chain.py` path sketch — replaces the rigid flat-band stand-in (5 × 4.5 section, same centreline)'
+        (in): —
+        source: ch30 p002/p005/p006 (taut run + visibly drooping slack run; p006 droop crop read 18) + ch. 23 text
+        method: scaled + derived
+        confidence: low/med
+      - dim: Reduction pinion (coaxial with rack pinion)
+        value: est. 24T DP 30, OD ≈ 21 mm measured, face ≈ 6
+        (in): —
+        source: 'edge-on views `v4_transgear_002/003/008`: small fine-tooth steel pinion on the rack-pinion shaft'
+        method: scaled
+        confidence: low
+      - dim: Pinion bar (M6.5)
+        value: '12-square steel, x −58 → +178 at machine y 253.5 (M6.5 trim from −95..+197: west end clears the portal south-upright clevis ears/ball at x −59, east end clears the SE column tangent 184.3 (was 179.54 at the old Ø34.925; OD rederived from the 8-views M6.11 — 6.3 clearance now)); Ø9.6 stud bore along Z at x 0 (9.525 stud + slip clearance); both ends FLOAT (documented simplification — the real machine likely straps the bar to the portal south upright and column)'
+        (in): —
+        source: ch. 30 views + M6.5 layout
+        method: scaled + derived
+        confidence: low/med
+      - dim: A-frame → folded into `rocker-arm-portal` (M6.5/M6.9, UNIFIED M6.12)
+        value: 'M6.12: no longer a separate part — these are the SOUTH-upright + rail features of the single `rocker-arm-portal` casting (build_rocker_arm_portal.py), re-centred on machine x +72.9 and authored machine-handed in the frame assembly''s frame. The two south-flank hold-down hex bolts move to frame.SLDASM with the foot rail. Geometry below unchanged. The FRONT rocker support — the SOUTH upright of the portal frame (ch30 p008): tapered plate 18.5 thick (machine z −117.5..−99.0 — photo reads ~28-30 but the band is pinned by the parked measuring stick at z ≤ −118 and the ch25 handle plane at z ≥ −98), foot x −115..−45 on the base top (y 50.8), apex x −87..−59 at the ball-seat saddle y 228.6 (machine); full-width saddle z ±11.1 over the last 19.8 of rise; clevis ears (z ±(8.1..11.1), 20 tall, tops machine 248.6) flank the south pivot-ball mount''s Ø16 base (gap 16.2; ball r 9.5 centre 253.8 clears the ear inner faces; pivot shaft bottom 250.65 clears ear tops by 2.05); carries the portal-frame rails to the north frustum (faces −0.25): TOP RAIL 20 (machine x +62.9..+82.9) × 16 (y machine 212.6..228.6 = photo window top) to machine z +90.45, FOOT RAIL 30 (machine x +59.75..+89.75 — west face 0.25 east of the arbor-pedestal block) × 20 on the base top to machine z +81.35, bolted down by two hex bolts (M6.10): AF 12.7 × 5.5 heads + Ø7.8 × 32 shanks at machine (74.75, z −54/+36) through the rail''s Ø8.2 holes, 12 into the base''s through-holes (head corner 2.64 clear of the cylinder train''s 120T tips); M6.12: the part is authored MACHINE-handed with NO MIRROR_PLANE entry (it lives in the non-mirroring frame.SLDASM) — the real machine casts both uprights + rails in one piece, now modeled that way'
+        (in): —
+        source: 'ch. 14 pp. 26–29 + ch. 30 front view: clevis grips the pivot ball at (−72, 252) — M6.5 apex crop; ch30 p008 (brightened) shows the full windowed frame; the M6.4 "ears grip the pinion bar" read is REFUTED (bar now floats)'
+        method: scaled
+        confidence: med
+      - dim: Transgear stud (M6.4)
+        value: Ø9.525 (3/8") × 36 plug in the pinion-bar bore, axis −Z from z −101.5; Ø14 × 4 retaining collar at the front end (z −141.5)
+        (in): —
+        source: 'derived: carries rack pinion (z −137.5), fixed pinion (z −134) and latch big hub (z −122.5); end hardware collapsed to a collar'
+        method: derived
+        confidence: low
+      - dim: Latch arm (M6.8)
+        value: 'tapered link, 4.5 thick: big hub Ø22 / small hub Ø16, both bores Ø9.6; centre distance 66.05 = ch30 REST state, stud (0, 253.5) → parked knob shaft (pre-mirror +65, 241.78); assembled at −10.22° below +X (knob shaft clears the pinion-bar underside 247.5 by 0.96)'
+        (in): —
+        source: 'ch30 p002 full-res wrap centre (−65, ~248 post-mirror, ±3 chain-plane parallax; y clamped under the bar) — supersedes the M6.4 mesh-derived 34.26/−20°, which is the ENGAGED-state c2c (see Appendix C #8)'
+        method: scaled + derived
+        confidence: med
+      - dim: Knob shaft (M6.8)
+        value: Ø9.525 × 58.0 through the latch small hub at (65.0, 241.78), spanning machine z −76.5 (chain end) → −134.5; carries the mounted T24 removable chain-wrapped at z −81.5..−76.5 and the fine 24T pinion at −134..−128; Ø20 × 6.5 brass thumb knob ending at −141.0, level with the stub collar band
+        (in): —
+        source: '`v4_transgear_008/020` + ch. 23 topology (M6.8)'
+        method: scaled + derived
+        confidence: low/med
+    - notes: |2
+
+        Notes: speed combos — small driving + large driven = slowest platen (smallest
+        horizontal scale), large+small = fastest, medium+medium = 1:1. Latch disengages
+        gearing from the platen rack (quick reset; also slackens chain for swapping the
+        removable gears). Brass gears, central bores.
+
+        M4c note: the fixed-reduction pair's exact topology (what the coaxial DP 30
+        pinion meshes, and which shafts carry the two sprockets vs the removable pair)
+        is not fully resolvable from the available frames — logged as Appendix C #8,
+        to be settled when mating the drive train in M6. Parts authored now:
+        `transgear-removable` (one part, T12/T18/T24 configurations), `rack-pinion`,
+        `platen-rack`, `chain-sprocket`, `transgear-pinion`.
+
+        M6.8 notes (Appendix C #8 topology resolution): the six gears are (1) the
+        96T DP 30 rack-pinion disc on the stud, meshing (2) the platen rack above;
+        (3) the fine 24T DP 30 pinion on the KNOB SHAFT front (z −134..−128),
+        which meshes the disc only when the latch swings it in; (4) the T24
+        removable on the knob shaft at the chain plane and (5) the T12 removable
+        on the crankshaft — the bead chain wraps the removables' own m2 teeth (no
+        separate sprockets); (6) is the spare removable (T18) lying loose on the
+        base (machine (−133, 55.8, −80), M6.5 clearances). The ch30 plates show
+        the DISENGAGED rest state — latch parked at c2c 66.05, the T24's tips
+        overlapping the disc rim in XY projection only (chain plane is ~56 north
+        of the disc plane). The mixed-pitch jam note (m2 vs DP 30) still bars any
+        literal removable-on-pinion mesh; it never happens in the resolved
+        topology. The measuring stick (ch. 16, hand tool) lies flat on the base at
+        (−158, 53.8, −133), graduations up (M6.5).

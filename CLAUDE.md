@@ -38,8 +38,8 @@
   per-part (`parts/<dashed-name>.yaml` + `_defaults.yaml`); `_config._doc` re-aggregates them
   transparently, so accessors/verify/provenance are unchanged. Net: editing one part's registry
   row rebuilds only that part; a `machine channels.active_count` edit (in `machine/channels.yaml`)
-  skips the gear parts (they read `machine/gear_train.yaml`); the narrative `dimensions.yaml`
-  (read by no part) rebuilds nothing. It is CONSERVATIVE — any `_config` use the analyzer can't
+  skips the gear parts (they read `machine/gear_train.yaml`); the standalone narrative
+  `dimensions/*.yaml` files (read by no part) rebuild nothing. It is CONSERVATIVE — any `_config` use the analyzer can't
   classify falls back to the whole config — so it can only over-rebuild, never skip a real change.
   Don't add a new `_config` accessor without mapping it in `_buildgraph` (`check:graph`'s
   coverage test fails loud otherwise). After this change first lands (file_dep paths moved), run
