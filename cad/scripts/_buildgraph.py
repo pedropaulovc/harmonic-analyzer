@@ -31,11 +31,9 @@ ASSEMBLY_ORDER = ("frame", "drive_train", "channel", "summing", "magnifier", "pe
                   "paper_drive", "harmonic_analyzer")
 
 # Scripts that match build_*.py but produce no .SLDPRT part in the SolidWorks
-# queue -- excluded from the part list. Two kinds: motion/diagnostic deliverables
-# that consume/probe the saved assemblies (Basic Motion sweeps, mobility probes),
-# and head-less CadQuery stand-ins that reproduce a part's geometry off-session
-# for eyeballing/export but are NOT the production SW part (build_cylinder_gear
-# remains the tracked part). Neither builds the machine.
+# queue -- excluded from the part list: motion/diagnostic deliverables that
+# consume/probe the saved assemblies (Basic Motion sweeps, mobility probes).
+# None builds the machine.
 NON_PART_SCRIPTS = frozenset(
     {
         "build_motion_study.py",
@@ -43,7 +41,6 @@ NON_PART_SCRIPTS = frozenset(
         "build_motion_setup_drives.py",
         "build_fourbar_test.py",
         "build_mobility_probe.py",
-        "build_cylinder_gear_cadquery.py",
     }
 )
 
