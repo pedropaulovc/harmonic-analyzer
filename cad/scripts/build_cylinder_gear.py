@@ -16,13 +16,19 @@ Features, in order:
 2. One tooth gap (six equation curves: two involute flanks, base chord, two
    radial extensions, outer clearance arc) cut through, then circular-
    patterned 120x about the gear axis (reference axis Top x Right = Z).
-3. Integral eccentric cam: disc OD 30.6 mm, thickness 3.5 mm (the 4.5 mm
-   inter-face gap minus 0.5 mm air per side; the axial budget rides the
-   unchanged 7.0565 channel pitch), centre offset -Y by the 3.06 mm
-   eccentricity (OD and offset both scaled 0.6022 with the gear so the
-   lobe clears the finer tooth-root circle), boss-extruded z = 3..6.5 from an offset reference
-   plane (the cam shares the layout of the superseded standalone
-   ``build_eccentric_cam.py``: lobe -Y).
+3. Integral eccentric cam (book ch. 13, pp. 22-25): one of the 20 cams that
+   convert each gear's rotation into the near-sinusoidal reciprocation of its
+   connecting rod (displacement = ECCENTRICITY x sin(theta)). Disc OD 30.6 mm,
+   thickness 3.5 mm (the 4.5 mm inter-face gap minus 0.5 mm air per side; the
+   axial budget rides the unchanged 7.0565 channel pitch), centre offset -Y by
+   the 3.06 mm eccentricity (OD and offset both scaled 0.6022 with the gear so
+   the lobe clears the finer tooth-root circle), boss-extruded z = 3..6.5 from
+   an offset reference plane (cam disc centred on the bore, offset -Y by the
+   eccentricity -- the lobe points -Y). The cam dimensions are legacy
+   parameters.kcl values, uncontradicted by the book; the cam outline printed
+   on p. 25 is still flagged for a photo-scaling cross-check. (This is the
+   former standalone ``build_eccentric_cam.py`` / ``eccentric-cam`` part,
+   MHA-029, now folded into the gear -- the cam was always integral.)
 4. Alignment notch: 3 mm deep saw KERF cut between two teeth (the p.23
    "notch" photo shows a thin kerf -- the real gears keep all 120 teeth, NOT
    a missing tooth). +Y (90 deg = 30*gamma) is a tooth crest at 120 T, so the
