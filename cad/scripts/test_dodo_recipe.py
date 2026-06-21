@@ -141,6 +141,51 @@ def test_content_checker_check_modified_ignores_comment(tmp_path):
     assert checker.check_modified(str(cfg), st, state) is True, "value change must invalidate"
 
 
+def test_config_deps_are_fine_grained():
+    """dodo honors the per-script config read-set: a part/assembly depends only on
+    the cad/config/*.yaml docs it actually reads, never the 98 KB dimensions.yaml,
+    and the set is always a subset of the whole-config glob it replaced."""
+    dodo = _load_dodo()
+    scripts = dodo.SCRIPTS_DIR
+    whole = set(dodo._CONFIG_YAMLS)
+
+    def names(paths):
+        return {Path(p).name for p in paths}
+
+    # A gear part reads machine.yaml (+ parts.yaml via _common); it must NOT pull
+    # in channels/tolerances/materials/dimensions -- so a channels amplitude edit
+    # or a dimensions.yaml narrative edit skips it entirely.
+    cone = dodo._config_deps(scripts / "build_cone_gear.py")
+    assert names(cone) == {"machine.yaml", "parts.yaml"}, names(cone)
+    assert set(cone) <= whole
+
+    # No part depends on dimensions.yaml.
+    for stem in dodo.part_stems():
+        deps = names(dodo._config_deps(scripts / f"build_{stem}.py"))
+        assert "dimensions.yaml" not in deps, stem
+
+    # The assembly recipe set is likewise fine-grained: the frame assembly (parts
+    # only) excludes channels/machine, while drive_train (cone_teeth) includes
+    # channels. _recipe_files is the single source for the FULL/REFRESH digest and
+    # the file_dep, so narrowing it keeps that parity intact.
+    frame_recipe = names(dodo._recipe_files("frame"))
+    assert "channels.yaml" not in frame_recipe and "dimensions.yaml" not in frame_recipe
+    assert "channels.yaml" in names(dodo._recipe_files("drive_train"))
+
+
+def test_config_deps_recipe_digest_skips_unread_yaml():
+    """A change to a config doc the assembly does NOT read leaves its recipe digest
+    unchanged (no spurious ~500 s FULL re-insert), while a doc it DOES read flips
+    it. Proven structurally: the digest is taken over _recipe_files, which lists
+    only the read docs."""
+    dodo = _load_dodo()
+    frame = set(dodo._recipe_files("frame"))
+    drive = set(dodo._recipe_files("drive_train"))
+    channels_yaml = next(p for p in dodo._CONFIG_YAMLS if Path(p).name == "channels.yaml")
+    assert channels_yaml not in frame, "frame must not be invalidated by channels.yaml"
+    assert channels_yaml in drive, "drive_train (cone_teeth) must track channels.yaml"
+
+
 def test_recipe_digest_ignores_yaml_comments(tmp_path):
     """Option A reaches the ASSEMBLY recipe digest too: _digest_files folds YAML
     members in by parsed content, so a comment/reflow edit to a recipe YAML leaves

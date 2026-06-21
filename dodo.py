@@ -90,6 +90,7 @@ from _buildgraph import (  # noqa: E402
     POST_ASSEMBLY,
     SCRIPTS_DIR,
     artefact_for,
+    config_yamls_of,
     module_deps_of,
     part_scripts,
     part_stems,
@@ -250,17 +251,32 @@ def _run(cmd: list[str], label: str) -> None:
 # script imports what it uses. (Excludes _buildgraph.py: the build-GRAPH helper
 # imported here, not a geometry input.)
 #
-# The YAML data layer stays a blanket dep of EVERY build: ``parts.yaml`` is read
-# transitively by ``_common.part_properties`` for almost every part (custom-
-# property stamping), and a placement YAML edit can move any body. Coarse but
-# correct, and content-hashing means an edit that doesn't change a given part's
-# inputs still costs only that one rebuild.
+# The YAML data layer is now a FINE-GRAINED dep: each part/assembly depends on
+# ONLY the ``cad/config/*.yaml`` docs it actually reads (``config_yamls_of`` ->
+# static analysis of the ``_config.<accessor>`` calls across the script's import
+# closure; see _buildgraph). A frame/gear/shaft/screw that never reads
+# ``channels.yaml`` no longer rebuilds when a channel amplitude changes, and the
+# 98 KB narrative ``dimensions.yaml`` (read by NO part) drops out of every part.
+# It is conservative -- any unclassifiable ``_config`` use falls back to the whole
+# config -- so it can only ever over-rebuild, never skip a real change. Almost
+# every part still picks up ``parts.yaml`` (``_common.part_properties`` reads it
+# for custom-property stamping), which content-hashing keeps cheap.
+#
+# ``_CONFIG_YAMLS`` (the whole-config glob) is retained only for the offline
+# ``check:math`` / ``check:config`` gates, which audit the config broadly and must
+# stay conservative (a gate that fails to re-run is worse than one that re-runs).
 _CONFIG_YAMLS = [str(p.resolve()) for p in sorted(CONFIG_DIR.glob("*.yaml"))]
 
 
 def _helper_deps(script) -> list[str]:
     """This build script's transitive ``_*.py`` helper imports (resolved paths)."""
     return module_deps_of(script if isinstance(script, Path) else Path(script))
+
+
+def _config_deps(script) -> list[str]:
+    """The ``cad/config/*.yaml`` docs this build script actually reads (fine-grained;
+    conservative whole-config fallback on any unclassifiable ``_config`` use)."""
+    return config_yamls_of(script if isinstance(script, Path) else Path(script))
 
 # --- Stamp files: the verify:/check: gates produce no CAD artefact, so a stamp
 # under cad/out/reports/ is their doit ``target``. That makes each gate
@@ -309,12 +325,14 @@ def _recipe_files(stem: str) -> list[str]:
     """Files whose change forces a FULL rebuild of <stem> (re-insert/re-mate)
     rather than a part-only refresh: the assembly script, its hooks, the helper
     modules it transitively imports (``_helper_deps`` -> ``module_deps_of``, incl.
-    _assembly/_transforms), and the _config/YAML data layer (a placement like
-    channels.station_pitch_mm changing must re-insert components at new
-    coordinates, which an in-place reload cannot do)."""
+    _assembly/_transforms), and the config docs THIS assembly actually reads
+    (``_config_deps``; a placement like channels.station_pitch_mm changing must
+    re-insert components at new coordinates, which an in-place reload cannot do).
+    The fine-grained config set means an edit to a YAML this assembly never reads
+    no longer forces a spurious ~500 s FULL re-insert."""
     asm_script = script_for(stem)
     hooks = [str((SCRIPTS_DIR / h).resolve()) for h in POST_ASSEMBLY.get(stem, ())]
-    return [str(asm_script.resolve()), *hooks, *_helper_deps(asm_script), *_CONFIG_YAMLS]
+    return [str(asm_script.resolve()), *hooks, *_helper_deps(asm_script), *_config_deps(asm_script)]
 
 
 def _recipe_sidecar(stem: str) -> Path:
@@ -331,7 +349,7 @@ def task_part():
         stem = script.stem.removeprefix("build_")
         yield {
             "name": stem,
-            "file_dep": [str(script.resolve()), *_helper_deps(script), *_CONFIG_YAMLS],
+            "file_dep": [str(script.resolve()), *_helper_deps(script), *_config_deps(script)],
             "targets": [_sldprt(stem)],
             # COM spine: serialize parts on the single SW seat (see _spine_dep).
             "task_dep": _spine_dep(f"part:{stem}"),
@@ -486,11 +504,12 @@ def task_assembly():
             _sldasm(r) if r in ASSEMBLY_ORDER else _sldprt(r) for r in refs
         ]
         # Recipe = the files whose change forces a FULL rebuild (re-insert/re-mate)
-        # vs a part-only refresh: the assembly script, its hooks, AND the shared
-        # helper/_config/YAML data layer (a placement like channels.station_pitch_mm
-        # changing must re-insert components at new coordinates, which an in-place
-        # reload cannot do; codex review #2). Factored into _recipe_files so
-        # build_or_refresh computes the identical digest.
+        # vs a part-only refresh: the assembly script, its hooks, its helper
+        # closure, AND the config docs THIS assembly reads (a placement like
+        # channels.station_pitch_mm changing must re-insert components at new
+        # coordinates, which an in-place reload cannot do; codex review #2).
+        # Factored into _recipe_files so build_or_refresh computes the identical
+        # digest.
         recipe_files = _recipe_files(stem)
         yield {
             "name": stem,

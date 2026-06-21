@@ -21,6 +21,7 @@ from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 CAD_OUT = SCRIPTS_DIR.parent / "out"
+CONFIG_DIR = SCRIPTS_DIR.parent / "config"
 
 # Sub-assemblies in build order; the top-level harmonic-analyzer references the
 # six subs, so it is last. doit derives ordering from file_dep, but this tuple
@@ -191,6 +192,157 @@ def module_deps_of(script: Path) -> list[str]:
         result.add(mod)
         frontier |= set(_direct_local_imports(mods[mod].resolve())) - result
     return sorted(str(mods[m].resolve()) for m in result)
+
+
+# --- Per-script CONFIG read-set: which cad/config/*.yaml docs a build script
+# actually reads, so doit can depend each part/assembly on ONLY those files
+# instead of the blanket "every *.yaml is a dep of every build". A whole-config
+# dep meant one value edit to any YAML (e.g. machine.yaml channels.active_count,
+# or even the 98 KB narrative dimensions.yaml that NO part reads) marked all ~71
+# parts stale -> a ~25 min full rebuild on the single SolidWorks seat.
+#
+# CORRECTNESS FIRST -- this must never UNDER-invalidate (a missed dep = a silent
+# stale-geometry build, far worse than an over-rebuild). The read-set is derived
+# by STATIC analysis of every ``_config.<accessor>(...)`` call across a script's
+# transitive import closure (``module_deps_of`` -- the same closure doit already
+# tracks for .py edits), mapped to the doc each accessor reads. It is conservative
+# by construction: ANY config access it cannot classify -- an unknown accessor, a
+# dynamic (non-literal) doc argument, a ``from _config import ...`` (whose bare
+# names we don't follow), or an unparseable source -- collapses the whole script
+# to "depends on every config" (``config_docs_of`` returns all stems). So the
+# only way to be wrong is to OVER-rebuild, never to skip a real change.
+#
+# This is a *derived* declaration (no hand-maintained per-script list to forget to
+# update -- which would itself be an under-invalidation hazard): the dependency
+# follows the real ``_config`` calls, which Python enforces at run time. Adding a
+# new accessor to _config.py without mapping it here is also safe -- it reads as an
+# "unknown accessor" and falls back to the whole config (test_config_*_coverage in
+# test_buildgraph.py fails loud so the perf benefit isn't silently lost).
+
+# Each public _config accessor -> the doc stem(s) it reads. Derived from
+# cad/scripts/_config.py (active_channels reads channels + machine via
+# active_count; palette reads materials). Kept in sync by the coverage test.
+_CONFIG_ACCESSOR_DOCS: dict[str, frozenset[str]] = {
+    "channels": frozenset({"channels"}),
+    "active_count": frozenset({"machine"}),
+    "active_channels": frozenset({"channels", "machine"}),
+    "cone_teeth": frozenset({"channels"}),
+    "amplitudes": frozenset({"channels"}),
+    "machine": frozenset({"machine"}),
+    "fit": frozenset({"tolerances"}),
+    "parts": frozenset({"parts"}),
+    "materials": frozenset({"materials"}),
+    "palette": frozenset({"materials"}),
+}
+# Accessors whose doc is named by their FIRST positional argument (``provenance``,
+# ``_doc``): resolvable only when that arg is a string LITERAL -- otherwise the
+# read-set is unknown -> conservative whole-config fallback.
+_CONFIG_DYNAMIC_ACCESSORS: frozenset[str] = frozenset({"provenance", "_doc"})
+
+
+class _UnknownConfigUse(Exception):
+    """A ``_config`` usage we cannot statically classify -> fall back to the whole
+    config (never under-invalidate)."""
+
+
+@functools.lru_cache(maxsize=1)
+def _all_config_doc_stems() -> frozenset[str]:
+    """Every config doc stem (``cad/config/<stem>.yaml``) -- the conservative
+    whole-config fallback set."""
+    return frozenset(p.stem for p in CONFIG_DIR.glob("*.yaml"))
+
+
+def _config_aliases(tree: ast.AST) -> set[str]:
+    """Local names bound to the ``_config`` module in this source.
+
+    Always includes the canonical ``_config``; adds any ``import _config as X``
+    alias so ``X.machine(...)`` is still tracked. A ``from _config import name``
+    binds a BARE name we don't follow -- handled separately as a hard fallback.
+    """
+    names = {"_config"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for a in node.names:
+                if a.name == "_config" and a.asname:
+                    names.add(a.asname)
+    return names
+
+
+def _docs_in_source(path: Path) -> frozenset[str]:
+    """Config doc stems read by ONE source file via ``_config.<accessor>(...)``.
+
+    Raises ``_UnknownConfigUse`` if the file touches ``_config`` in a way we can't
+    classify, so the caller conservatively depends on the whole config.
+    """
+    known = _all_config_doc_stems()
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    aliases = _config_aliases(tree)
+
+    # A bare-name import (`from _config import channels`) would need whole-program
+    # name tracking; none exists in this codebase, so treat it as unknown.
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "_config":
+            raise _UnknownConfigUse
+
+    docs: set[str] = set()
+    # First resolve the dynamic accessors at their call sites (need the literal
+    # arg, not just the attribute). Record which attribute nodes we resolved so a
+    # dynamic accessor used in any OTHER position trips the fallback below.
+    resolved_dyn: set[int] = set()
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id in aliases
+                and node.func.attr in _CONFIG_DYNAMIC_ACCESSORS):
+            arg = node.args[0] if node.args else None
+            if (isinstance(arg, ast.Constant) and isinstance(arg.value, str)
+                    and arg.value in known):
+                docs.add(arg.value)
+                resolved_dyn.add(id(node.func))
+            else:
+                raise _UnknownConfigUse  # non-literal / unknown doc arg
+
+    # Every `<alias>.<attr>` access must be a classified accessor.
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)
+                and node.value.id in aliases):
+            attr = node.attr
+            if attr in _CONFIG_ACCESSOR_DOCS:
+                docs |= _CONFIG_ACCESSOR_DOCS[attr]
+            elif attr in _CONFIG_DYNAMIC_ACCESSORS:
+                if id(node) not in resolved_dyn:
+                    raise _UnknownConfigUse  # dynamic accessor not used as a literal call
+            else:
+                raise _UnknownConfigUse  # unmapped accessor -> conservative
+    return frozenset(docs)
+
+
+@functools.lru_cache(maxsize=None)
+def config_docs_of(script: Path) -> frozenset[str]:
+    """Config doc stems a build script reads, across its transitive import closure.
+
+    The conservative complement of ``module_deps_of``: scans the script plus every
+    local module it imports for ``_config`` accessor calls and unions the docs they
+    read. Returns ALL config stems if any source uses ``_config`` unclassifiably or
+    fails to parse -- so doit over-rebuilds rather than ever skipping a real change.
+    """
+    sources = [script.resolve(), *(Path(p) for p in module_deps_of(script))]
+    docs: set[str] = set()
+    for src in sources:
+        try:
+            docs |= _docs_in_source(src)
+        except (_UnknownConfigUse, SyntaxError, OSError):
+            return _all_config_doc_stems()  # conservative: the whole config
+    return frozenset(docs)
+
+
+def config_yamls_of(script: Path) -> list[str]:
+    """Resolved ``cad/config/*.yaml`` paths a build script depends on -- the
+    fine-grained replacement for the blanket ``cad/config/*.yaml`` glob in
+    ``dodo.py``'s part/assembly file_dep and recipe sets."""
+    return sorted(
+        str((CONFIG_DIR / f"{stem}.yaml").resolve()) for stem in config_docs_of(script)
+    )
 
 
 def dependents_of(stem: str) -> list[str]:

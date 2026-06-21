@@ -8,13 +8,17 @@ r"""Static tests for the build-graph enumeration (no SolidWorks required).
 from __future__ import annotations
 
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import _buildgraph as bg  # noqa: E402
 from _buildgraph import (  # noqa: E402
     ASSEMBLY_ORDER,
     SCRIPTS_DIR,
+    config_docs_of,
+    config_yamls_of,
     dependents_of,
     module_deps_of,
     part_stems,
@@ -116,6 +120,101 @@ def test_specialized_helper_blast_radius_is_narrow():
     # spring/screw/nameplate feature builders reach only their handful of parts
     # (their direct importers + any part that reuses one of those build scripts)
     assert 0 < len(feat_users) <= 8, feat_users
+
+
+def _docs_in_src(text: str) -> frozenset[str]:
+    """Run ``_docs_in_source`` on an inline source snippet (single file)."""
+    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as fh:
+        fh.write(text)
+        path = Path(fh.name)
+    try:
+        return bg._docs_in_source(path)
+    finally:
+        path.unlink()
+
+
+def test_config_docs_no_part_reads_dimensions():
+    """The 98 KB narrative dimensions.yaml is read by NO part/assembly build
+    script (only the offline DIMENSIONS gate touches it), so the fine-grained
+    dependency must never list it -- editing dimensions.yaml rebuilds nothing."""
+    for stem in part_stems():
+        assert "dimensions" not in config_docs_of(SCRIPTS_DIR / f"build_{stem}.py"), stem
+    for stem in ASSEMBLY_ORDER:
+        assert "dimensions" not in config_docs_of(script_for(stem)), stem
+
+
+def test_config_docs_track_real_reads():
+    """The read-set follows the actual _config calls: a gear reads machine.yaml,
+    the channel/drive-train assemblies read channels.yaml (amplitudes/cone_teeth),
+    and every part picks up parts.yaml via _common.part_properties."""
+    assert config_docs_of(SCRIPTS_DIR / "build_cone_gear.py") == frozenset({"machine", "parts"})
+    assert "channels" in config_docs_of(script_for("drive_train"))
+    assert "channels" in config_docs_of(script_for("channel"))
+    # a leaf part that only stamps custom properties -> parts.yaml alone (never the
+    # whole config), so a channels/machine/dimensions edit skips it.
+    assert config_docs_of(SCRIPTS_DIR / "build_fillister_screw.py") == frozenset({"parts"})
+
+
+def test_config_docs_subset_of_whole_config():
+    """Every real script's read-set is a subset of the actual config files: the
+    fine-grained set can only ever NARROW the old whole-config dep, never invent a
+    new (e.g. missing-file) dependency."""
+    known = bg._all_config_doc_stems()
+    for stem in part_stems():
+        assert config_docs_of(SCRIPTS_DIR / f"build_{stem}.py") <= known, stem
+    # config_yamls_of returns resolved, existing paths.
+    for path in config_yamls_of(SCRIPTS_DIR / "build_cone_gear.py"):
+        assert Path(path).is_file(), path
+
+
+def test_config_docs_conservative_on_unknown_use():
+    """CORRECTNESS > speed: any _config use we can't classify -- an unmapped
+    accessor, a dynamic (non-literal) doc arg, or a bare-name import -- must raise
+    so the caller falls back to the WHOLE config (never under-invalidate)."""
+    raise_cases = [
+        "import _config\nx = _config.frobnicate()\n",            # unmapped accessor
+        "import _config\nd = 'machine'\nx = _config._doc(d)\n",  # dynamic doc arg
+        "import _config\nx = _config.provenance(name)\n",        # dynamic provenance
+        "import _config\nf = _config._doc\n",                    # dynamic accessor, not a literal call
+        "import _config\nx = _config._doc('nope')\n",            # literal but unknown doc stem
+        "from _config import machine\nx = machine()\n",          # bare-name import (untracked)
+    ]
+    for src in raise_cases:
+        try:
+            _docs_in_src(src)
+        except bg._UnknownConfigUse:
+            continue
+        raise AssertionError(f"expected _UnknownConfigUse for: {src!r}")
+
+
+def test_config_docs_resolve_known_forms():
+    """The classifiable forms resolve to exactly the right doc(s)."""
+    assert _docs_in_src("import _config\nx = _config.machine('a', 'b')\n") == frozenset({"machine"})
+    assert _docs_in_src("import _config\nx = _config.fit('g', 'k')\n") == frozenset({"tolerances"})
+    assert _docs_in_src("import _config\nx = _config._doc('parts')\n") == frozenset({"parts"})
+    assert _docs_in_src("import _config\nx = _config.provenance('channels')\n") == frozenset({"channels"})
+    # an aliased module import is still tracked (cfg.machine -> machine.yaml).
+    assert _docs_in_src("import _config as cfg\nx = cfg.machine('g')\n") == frozenset({"machine"})
+    # no _config use at all -> empty read-set (no config dependency).
+    assert _docs_in_src("WIDTH = 3.0\n") == frozenset()
+
+
+def test_config_accessor_coverage():
+    """Every accessor defined in _config.py is classified here (mapped to a doc or
+    marked dynamic). A new accessor added without an entry reads as 'unknown' and
+    falls back to the whole config -- safe, but this test fails loud so the perf
+    benefit is restored deliberately, not lost silently."""
+    import inspect
+
+    import _config
+
+    accessors = {
+        name for name, fn in inspect.getmembers(_config, inspect.isfunction)
+        if fn.__module__ == "_config" and not name.startswith("__")
+    }
+    classified = set(bg._CONFIG_ACCESSOR_DOCS) | set(bg._CONFIG_DYNAMIC_ACCESSORS)
+    missing = accessors - classified
+    assert not missing, f"unclassified _config accessors (map them in _buildgraph): {missing}"
 
 
 def _run() -> int:
