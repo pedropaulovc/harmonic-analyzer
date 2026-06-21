@@ -1,7 +1,30 @@
 # AGENTS.md — harmonic-analyzer
 
-Orientation for coding agents. Pairs with `CLAUDE.md` (git workflow + build
-rules) and `docs/pipeline/` (flow diagrams + the refactor plan).
+Orientation for coding agents. Pairs with `docs/pipeline/` (flow diagrams + the
+refactor plan).
+
+## Clone with submodules
+
+This repo has submodules (e.g. `references`). Always clone recursively so they
+are pulled in:
+
+```
+git clone --recurse-submodules <repo-url>
+```
+
+Already cloned without `--recurse-submodules`? Initialize them in place:
+
+```
+git submodule update --init --recursive
+```
+
+## Every new session (do this first)
+
+**You MUST invoke the `/developing-solidworks` skill at the start of every
+session**, before any SolidWorks/build work — it carries the SolidWorks COM
+conventions and pitfalls this project depends on.
+
+Python tooling: always use `uv`.
 
 ## The pipeline is one doit graph
 
@@ -16,7 +39,9 @@ python, SolidWorks already open:
 …\.venv\Scripts\python.exe -m doit build_bare # quick: parts + assemblies only
 ```
 
-One-off install: `… -m pip install doit pillow pytest`.
+The venv is `C:\src\SolidworksMCP-python\.venv`. One-off install:
+`…\.venv\Scripts\python.exe -m pip install doit pillow pytest` (pillow backs PNG
+export/trim; pytest backs the `check:*` unit tests).
 
 ## Task groups — the prefix tells you if SolidWorks is needed
 
@@ -46,7 +71,8 @@ part:a → … → assembly:harmonic_analyzer → verify:soundness → verify:su
 ```
 
 So at most one COM task is ever *ready* — the seat is never contended **even
-under `-n N`** — while `check:*` tasks (off the spine) run in parallel.
+under `-n N`** — while `check:*` tasks (off the spine) run in parallel. Corollary:
+never launch two SolidWorks build scripts by hand at once.
 
 **Invariant:** any new COM-touching task MUST be inserted into the spine
 (extend `_COM_TAIL` / the spine order and give it `_spine_dep(...)`). A gap lets
@@ -56,6 +82,37 @@ tripwire, not a full proof — think before you add. The SolidWorks-free tasks m
 
 Tradeoff (documented, accepted): a COM failure mid-spine skips the later COM
 tasks in that run. Fix and re-run; doit re-runs only what is still stale.
+
+## Incremental rebuilds — refresh vs full
+
+doit hashes script + config **content** (immune to git/worktree mtime churn) and
+propagates a part → assembly DAG. When only a part changed, the dependent
+assembly is *refreshed* — reopen + per-config `ForceRebuild3` + health/DOF/
+interference gates + in-place `Save3` (seconds) — instead of a from-scratch
+re-insert/re-mate (~500 s). It escalates to a *full* rebuild (+ any post-assembly
+hooks) when the assembly script / `_common.py` / a hook changed, or the target is
+missing. Force a full rebuild of one assembly by deleting its `.SLDASM` target,
+then `doit assembly:<stem>`.
+
+**Fail loud.** A refresh that hits a dangling mate, free DOF, or interference
+exits non-zero and leaves the `.SLDASM` untouched — never a stale artefact.
+
+## Fine-grained config deps
+
+Each part/assembly depends on ONLY the `cad/config` files it actually reads,
+derived by static analysis of its `_config.<accessor>` calls (`config_files_of`
+in `_buildgraph.py`); `dodo.py` honors it as the file_dep + assembly-recipe set.
+The config is split per-subsystem (`cad/config/machine/<subsystem>.yaml` +
+`_base.yaml`) and per-part (`cad/config/parts/<dashed-name>.yaml` +
+`_defaults.yaml`); `_config._doc` re-aggregates them transparently, so
+accessors/verify/provenance are unchanged. Net: editing one part's registry row
+rebuilds only that part; a `machine channels.active_count` edit (in
+`machine/channels.yaml`) skips the gear parts (they read `machine/gear_train.yaml`);
+the narrative `dimensions.yaml` (read by no part) rebuilds nothing. It is
+CONSERVATIVE — any `_config` use the analyzer can't classify falls back to the
+whole config — so it can only over-rebuild, never skip a real change. Don't add a
+new `_config` accessor without mapping it in `_buildgraph` (`check:graph`'s
+coverage test fails loud otherwise).
 
 ## Verify suites (renamed)
 
