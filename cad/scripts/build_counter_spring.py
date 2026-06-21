@@ -51,10 +51,14 @@ from _features import (
 PART_NAME = "counter-spring"
 MATERIAL = "Alloy Steel"  # see _common.apply_material docstring
 
-COIL_BODY_LENGTH = 315.0  # DIMENSIONS.md ch19: ch.19 photo, gooseneck-scaled (low)
+COIL_BODY_LENGTH = 59.0  # ch30-match: gooseneck slid 256 down in its clamp so
+# the spring no longer towers above the frame (the ch30 plates show only a short
+# top protrusion ~5.6% of the machine height, not the ch.19 full-extension 315).
+# Body shortened by the SAME 256 the gooseneck origin drops (build_summing_assembly)
+# so the top loop still meets the pin and every loop/arm clearance is preserved.
 COIL_OD = 12.5  # DIMENSIONS.md ch19: scaled vs gooseneck tube O16 (low)
 WIRE_DIA = 1.8  # DIMENSIONS.md ch19: close-wound dark coil (low)
-COIL_COUNT = 165  # close-wound: pitch 1.91 leaves a 0.11 sweep-merge gap (derived)
+COIL_COUNT = 31  # close-wound: pitch 1.90 leaves a 0.10 sweep-merge gap (derived)
 BOTTOM_LEAD = 40.0  # straight drop, coil bottom -> boss-hook ring centre
 # (body bottom y 1052 - ring centre y 1012; see build_summing_assembly.py)
 TOP_LEAD = 2.0 * WIRE_DIA  # standard short hook onto the gooseneck tip pin

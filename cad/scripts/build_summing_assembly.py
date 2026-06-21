@@ -163,7 +163,12 @@ async def build(adapter) -> dict[str, str]:
     # (bottom) and the gooseneck pin (top) nail-through-ring style.
     await place_component(adapter, "counter-spring", list(SPRING_POS),
                           [0.0, 90.0, 0.0], ROT_Y_POS90)
-    await place_component(adapter, "gooseneck", [COLUMN_X, 1210.0, 0.0],
+    # ch30-match: slid 256 down in its clamp (origin 1210 -> 954) so the bend/arm
+    # no longer towers above the frame -- the ch30 plates show only a short top
+    # protrusion. The counter-spring body is shortened by the same 256
+    # (build_counter_spring COIL_BODY_LENGTH 315 -> 59) so the top loop still
+    # meets the pin with the original clearances.
+    await place_component(adapter, "gooseneck", [COLUMN_X, 954.0, 0.0],
                           [0.0, 0.0, 0.0], IDENTITY)
     await place_component(adapter, "gooseneck-clamp", [COLUMN_X, 1040.7, 0.0],
                           [0.0, 0.0, 0.0], IDENTITY)

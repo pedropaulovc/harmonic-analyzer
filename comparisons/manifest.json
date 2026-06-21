@@ -24,9 +24,9 @@
     "el_deg": -6.0
    },
    "align": {
-    "scale": 1.1,
+    "scale": 0.97,
     "dx_px": -7,
-    "dy_px": -220
+    "dy_px": -73
    },
    "component_focus": [
     "harmonic_analyzer"
@@ -54,9 +54,9 @@
     "el_deg": 3.5
    },
    "align": {
-    "scale": 1.08,
+    "scale": 1.0,
     "dx_px": -7,
-    "dy_px": -193
+    "dy_px": -33
    },
    "component_focus": [
     "harmonic_analyzer"
@@ -84,9 +84,9 @@
     "el_deg": 3
    },
    "align": {
-    "scale": 1.11,
-    "dx_px": -20,
-    "dy_px": -233
+    "scale": 1.01,
+    "dx_px": -47,
+    "dy_px": -140
    },
    "component_focus": [
     "harmonic_analyzer"
@@ -114,9 +114,9 @@
     "el_deg": -4.0
    },
    "align": {
-    "scale": 1.05,
+    "scale": 0.98,
     "dx_px": 7,
-    "dy_px": -207
+    "dy_px": -60
    },
    "component_focus": [
     "harmonic_analyzer"
@@ -144,9 +144,9 @@
     "el_deg": 3.25
    },
    "align": {
-    "scale": 1.13,
+    "scale": 0.95,
     "dx_px": 20,
-    "dy_px": -247
+    "dy_px": -100
    },
    "component_focus": [
     "harmonic_analyzer"
@@ -174,9 +174,9 @@
     "el_deg": 5.5
    },
    "align": {
-    "scale": 1.08,
-    "dx_px": 7,
-    "dy_px": -193
+    "scale": 0.98,
+    "dx_px": -7,
+    "dy_px": -33
    },
    "component_focus": [
     "harmonic_analyzer"
@@ -204,9 +204,9 @@
     "el_deg": 4.5
    },
    "align": {
-    "scale": 1.1,
-    "dx_px": 47,
-    "dy_px": -233
+    "scale": 0.92,
+    "dx_px": 33,
+    "dy_px": -73
    },
    "component_focus": [
     "harmonic_analyzer"
@@ -234,9 +234,9 @@
     "el_deg": 7
    },
    "align": {
-    "scale": 1.08,
+    "scale": 0.95,
     "dx_px": 7,
-    "dy_px": -167
+    "dy_px": -20
    },
    "component_focus": [
     "harmonic_analyzer"
