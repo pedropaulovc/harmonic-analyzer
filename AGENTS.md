@@ -1,5 +1,12 @@
 # AGENTS.md — harmonic-analyzer
 
+> [!IMPORTANT]
+> **Start every session by invoking the `/developing-solidworks` skill — make it
+> your first tool call, before answering or editing anything.** It loads the
+> SolidWorks COM conventions and pitfalls the rest of this repo assumes you know;
+> reading this file isn't a substitute for loading it. If you've already produced
+> output this session without it, invoke it now rather than skipping it.
+
 Orientation for coding agents. Pairs with `docs/pipeline/` (flow diagrams + the
 refactor plan).
 
@@ -20,11 +27,8 @@ git submodule update --init --recursive
 
 ## Every new session (do this first)
 
-**You MUST invoke the `/developing-solidworks` skill at the start of every
-session**, before any SolidWorks/build work — it carries the SolidWorks COM
-conventions and pitfalls this project depends on.
-
-Python tooling: always use `uv`.
+1. Invoke `/developing-solidworks` first (see the note at the top of this file).
+2. Python tooling: always use `uv`.
 
 ## Initialize the project (uv)
 
