@@ -39,12 +39,14 @@ Design notes / invariants:
   only declares a ROLE. Each is still overridable by the matching
   ``HARMONIC_CACHE_*`` env var (CI, tests, an unlanded salt bump).
 
-* **Read/write roles.** The role is ``ro`` (dev: pull only), ``rw`` (builder:
-  pull + push), or ``off`` (default: disabled, pipeline behaves exactly as
-  before). It comes from ``HARMONIC_CACHE_MODE`` or, failing that, a gitignored
-  one-line ``.harmonic-cache-mode`` file at the repo root -- so a builder/dev box
-  opts in once with no persistent OS env var, and a fresh clone stays ``off``. A
-  miss is never fatal -- it falls through to the real build.
+* **Read/write roles.** The role is ``ro`` (pull only), ``rw`` (pull + push), or
+  ``off`` (disabled). It comes from ``HARMONIC_CACHE_MODE`` or, failing that, a
+  gitignored one-line ``.harmonic-cache-mode`` file at the repo root, or finally
+  ``_DEFAULT_MODE`` = ``rw``: both dev seats publish what they build by default,
+  so neither rebuilds an artefact the other already produced. Drop a seat to
+  ``ro``/``off`` via the file or env. A miss -- or an unauthorised push (RBAC
+  denies a machine without the data-plane role) -- is never fatal: it falls
+  through to the real build.
 
 * **Fail-soft.** Any backend error (network, creds, corrupt archive) logs a
   warning and is treated as a miss / no-op push. The cache can only make a build
@@ -98,9 +100,13 @@ _DEFAULT_SALT = "sw2024-sp3"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # A machine's role (off | ro | rw). Read from HARMONIC_CACHE_MODE, else this
-# gitignored one-line file at the repo root -- so a builder/dev box sets its role
-# once (`rw`/`ro`) without persisting an OS env var, and a fresh clone stays off.
+# gitignored one-line file at the repo root, else _DEFAULT_MODE. Default is rw:
+# both dev seats build and PUBLISH, so each other's artefacts -- including private
+# / experimental ones (content-addressed, so a unique input set => a unique key
+# that never collides with the canonical cache) -- are pulled instead of rebuilt.
+# Set the file/env to `ro` (pull only) or `off` (disabled) to downgrade a seat.
 _MODE_FILE = REPO_ROOT / ".harmonic-cache-mode"
+_DEFAULT_MODE = "rw"
 
 
 def _log(msg: str) -> None:
@@ -214,9 +220,9 @@ def _mode() -> str:
     if env:
         return env.lower()
     try:
-        return _MODE_FILE.read_text(encoding="utf-8").strip().lower() or "off"
+        return _MODE_FILE.read_text(encoding="utf-8").strip().lower() or _DEFAULT_MODE
     except OSError:
-        return "off"
+        return _DEFAULT_MODE
 
 
 def enabled() -> bool:
