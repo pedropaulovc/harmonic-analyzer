@@ -663,10 +663,9 @@ def task_check():
     ``check:nameplate`` / ``check:recipe`` wrap the pure-python unit tests via
     pytest. None is on the COM spine.
     """
-    dims = str((REPO_ROOT / "cad" / "DIMENSIONS.md").resolve())
     config_py = str((SCRIPTS_DIR / "_config.py").resolve())
     # The tolerance audit (check:config) scans every build_*.py for PART_NAME, so a
-    # part script added/renamed without touching YAML/DIMENSIONS must still
+    # part script added/renamed without touching the config YAML must still
     # invalidate the stamp (codex review).
     part_script_deps = [str(p.resolve()) for p in part_scripts()]
     pytest_cmd = [sys.executable, "-m", "pytest", "-q"]
@@ -683,7 +682,7 @@ def task_check():
         "config": {
             "file_dep": [str(VERIFY_PY),
                          str((SCRIPTS_DIR / "gen_dimensions.py").resolve()),
-                         config_py, dims, *_CONFIG_YAMLS, *part_script_deps],
+                         config_py, *_CONFIG_YAMLS, *part_script_deps],
             "cmd": [sys.executable, str(VERIFY_PY), "--suite", "config"],
         },
         "graph": {
