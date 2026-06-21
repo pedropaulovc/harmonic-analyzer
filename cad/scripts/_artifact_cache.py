@@ -41,15 +41,25 @@ Design notes / invariants:
   warning and is treated as a miss / no-op push. The cache can only make a build
   FASTER, never make a correct build FAIL.
 
-Backend: a shared **directory** (``HARMONIC_CACHE_DIR``) -- in production an Azure
-Files SMB share mounted on every builder (see ``scripts/azure/``). Zero extra
-deps: a lookup is a file read, a push an atomic ``tmp + replace``. A cache entry
-is one ``<key>.tar.gz`` under a 2-hex shard dir.
+Backend: an **Azure Blob container** reached over HTTPS (443). Speaks plain object
+storage, so it works from anywhere -- including networks (e.g. residential ISPs)
+that block SMB/445, with no VPN, private endpoint, or mounted drive. A cache entry
+is one ``<key>.tar.gz`` blob under a 2-hex virtual prefix. Configure with:
 
-Eviction is age-based and EXTERNAL (Azure Files has no native lifecycle policy):
-``scripts/azure/cleanup_build_cache.ps1`` deletes entries not written for 7 days.
-To make that LRU rather than FIFO, a HIT *touches* the entry's mtime, so an
-artefact still in active use is kept alive even when its inputs never change.
+* ``HARMONIC_CACHE_ACCOUNT``   -- storage account name (e.g. ``stswbuildcache07aba2``)
+* ``HARMONIC_CACHE_CONTAINER`` -- container name (default ``buildcache``)
+
+Auth is keyless by default: ``DefaultAzureCredential`` picks up ``az login`` on a
+dev box and the VM's managed identity on the builder (grant it *Storage Blob Data
+Contributor*). For a keyed path (CI without RBAC), set ``HARMONIC_CACHE_SAS`` to a
+container SAS token.
+
+Eviction is server-side and MANAGED -- Azure Blob has a native lifecycle policy
+(unlike Azure Files). With account *last-access-time tracking* enabled, a
+``delete daysAfterLastAccessTimeGreaterThan: 7`` rule gives true LRU for free: a
+restore is a blob *read*, which bumps last-access-time, so an artefact still in
+active use is kept alive even when its inputs never change -- no client-side touch
+and no scheduled cleanup job. See ``scripts/azure/provision_build_cache.ps1``.
 """
 
 from __future__ import annotations
@@ -59,7 +69,6 @@ import io
 import os
 import sys
 import tarfile
-import time
 from pathlib import Path
 
 # Bump to invalidate EVERY cached entry pipeline-wide (e.g. after a change to the
@@ -135,40 +144,35 @@ def _unpack(blob: bytes) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Backends
+# Backend -- Azure Blob container over HTTPS (443)
 # --------------------------------------------------------------------------- #
-class _DirBackend:
-    """Shared-directory cache (NFS/SMB/local). Atomic publish via tmp + replace."""
+class _BlobBackend:
+    """One Azure Blob container of content-addressed ``<key>.tar.gz`` entries.
 
-    def __init__(self, root: Path):
-        self.root = root
+    Retention/LRU is server-side (account last-access tracking + a
+    delete-after-N-days lifecycle rule), so a HIT needs no client-side touch -- a
+    download updates last-access-time on its own.
+    """
 
-    def _path(self, key: str) -> Path:
-        # Shard by the first 2 hex chars to avoid one giant flat dir.
-        return self.root / key[:2] / f"{key}.tar.gz"
+    def __init__(self, container_client):
+        self._cc = container_client
+
+    def _name(self, key: str) -> str:
+        # Shard by the first 2 hex chars (virtual prefix) to avoid one giant listing.
+        return f"{key[:2]}/{key}.tar.gz"
 
     def get(self, key: str) -> bytes | None:
-        p = self._path(key)
-        if not p.exists():
-            return None
-        blob = p.read_bytes()
-        # Touch on HIT so the external age-based cleanup is LRU, not FIFO: an
-        # artefact still in active use stays alive even if its inputs never change
-        # (cleanup deletes by last-write time). Best-effort -- a read-only mount or
-        # a clock skew must never fail a restore.
+        from azure.core.exceptions import ResourceNotFoundError
         try:
-            now = time.time()
-            os.utime(p, (now, now))
-        except OSError:
-            pass
-        return blob
+            return self._cc.get_blob_client(self._name(key)).download_blob().readall()
+        except ResourceNotFoundError:
+            return None
 
     def put(self, key: str, blob: bytes) -> None:
-        p = self._path(key)
-        p.parent.mkdir(parents=True, exist_ok=True)
-        tmp = p.with_suffix(".tar.gz.tmp")
-        tmp.write_bytes(blob)
-        os.replace(tmp, p)  # atomic publish -- a concurrent reader sees all-or-nothing
+        # Content-addressed: any concurrent writer stores identical bytes, so
+        # overwrite is a harmless no-op (last-writer-wins). A blob upload commits
+        # atomically, so a concurrent reader never observes a partial entry.
+        self._cc.get_blob_client(self._name(key)).upload_blob(blob, overwrite=True)
 
 
 # --------------------------------------------------------------------------- #
@@ -186,12 +190,38 @@ def writable() -> bool:
     return _mode() == "rw"
 
 
-def _backend():
-    root = os.environ.get("HARMONIC_CACHE_DIR")
-    if not root:
-        _log("HARMONIC_CACHE_DIR unset; cache disabled")
+_UNSET = object()
+_BACKEND = _UNSET
+
+
+def _make_backend():
+    account = os.environ.get("HARMONIC_CACHE_ACCOUNT")
+    if not account:
+        _log("HARMONIC_CACHE_ACCOUNT unset; cache disabled")
         return None
-    return _DirBackend(Path(root))
+    try:
+        from azure.storage.blob import ContainerClient
+    except ImportError:
+        _log("azure-storage-blob not installed; cache disabled")
+        return None
+
+    container = os.environ.get("HARMONIC_CACHE_CONTAINER", "buildcache")
+    account_url = f"https://{account}.blob.core.windows.net"
+    sas = os.environ.get("HARMONIC_CACHE_SAS")
+    if sas:
+        return _BlobBackend(ContainerClient(account_url, container, credential=sas))
+    from azure.identity import DefaultAzureCredential
+    return _BlobBackend(ContainerClient(account_url, container,
+                                        credential=DefaultAzureCredential()))
+
+
+def _backend():
+    """Memoized ContainerClient (one credential handshake per process). Returns
+    None when unconfigured / SDK absent, so the caller treats it as a miss."""
+    global _BACKEND
+    if _BACKEND is _UNSET:
+        _BACKEND = _make_backend()
+    return _BACKEND
 
 
 def restore(key: str, outputs: list[Path], label: str) -> bool:
