@@ -47,6 +47,17 @@ vendored as a **git submodule** (tracking branch `personal`), so
 `pyproject.toml`, re-run `uv sync`; commit `pyproject.toml` **and** `uv.lock`
 (never `.venv/`).
 
+## SolidWorks is the source of truth — CadQuery is local-only
+
+This codebase builds its CAD **primarily with SolidWorks** via the COM API; the
+SolidWorks parts/assemblies are the only artefacts that ship. When a SolidWorks
+seat isn't available, you MAY use **CadQuery** as a head-less stand-in to
+prototype or eyeball a part's geometry — but **for local development ONLY**.
+
+**No CadQuery code may be merged.** Keep stand-ins out of commits and PRs; the
+SolidWorks build script stays the single tracked source for every part. (Any
+CadQuery file that lands on a branch must be removed before merge.)
+
 ## The pipeline is one doit graph
 
 `dodo.py` (repo root) drives the **whole** pipeline: build → verify → export →
