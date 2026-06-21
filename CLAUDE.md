@@ -31,6 +31,20 @@
   *full* rebuild (+ any post-assembly hooks) when the assembly script / `_common.py` / a hook
   changed, or the target is missing. Force a full rebuild of one assembly by deleting its
   `.SLDASM` target, then `doit assembly:<stem>`.
+- **Fine-grained config deps (key-level).** A part/assembly rebuilds only when a
+  `cad/config/*.yaml` value **it actually reads** changes — editing one channel's
+  `amplitude_mm` no longer rebuilds the frame/gear/screw parts. Each build records its
+  config read-set through `_config` (the `HARM_CONFIG_TRACE` hook); a successful build writes
+  a `.cfgdeps.json` read-set sidecar next to the target, and the next run re-digests just
+  those keys' parsed values. **Correctness > speed: a missing/corrupt sidecar forces a rebuild
+  + re-record** (never under-invalidate), and a build-script edit invalidates via the script
+  `file_dep` regardless of config. The read-set is complete because every config read funnels
+  through `_config` (no script parses a YAML directly). The offline `check:*` gates keep a
+  blanket whole-config dep. **Migration:** the first `doit build` after this lands re-records
+  every part/assembly once (read-sets must be observed by a build; the on-disk artefacts are
+  already current, so it is safe but not free — `doit reset-dep` can't skip it). Tested offline
+  by `check:cfgdeps` (`test_config_deps.py`); don't add a config accessor without recording its
+  key-path in `_config.py`.
 - **Fail loud.** A refresh that hits a dangling mate, free DOF, or interference exits non-zero
   and leaves the `.SLDASM` untouched — never a stale artefact.
 - **Parallelism via the COM spine — `-n` is now SAFE.** A single SolidWorks STA seat still

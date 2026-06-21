@@ -12,6 +12,18 @@ hook changed, or the target is missing. A refresh that hits a dangling mate, fre
 DOF, or interference FAILS LOUD (non-zero exit, .SLDASM untouched); recover with
 the full escape below.
 
+Config dependencies are FINE-GRAINED (key-level), not per-file. A part/assembly
+is invalidated only by a cad/config/*.yaml VALUE it actually READS -- editing
+``channels.yaml amplitude_mm`` no longer rebuilds the frame or gear parts. Each
+build records the ``(file, key_path)`` set it reads (via _config's
+HARM_CONFIG_TRACE hook, armed on the build subprocess); a SUCCESSFUL build
+promotes that to a ``.cfgdeps.json`` read-set sidecar next to the target, and
+the next run's up-to-date check re-digests just those key-paths' PARSED values
+(comment/whitespace-insensitive). A MISSING sidecar reads as stale -> rebuild +
+re-record (the bootstrap / conservative path: never under-invalidate). See the
+"_MISSING / fine-grained config" block below. The SolidWorks-free ``check:*``
+gates keep a blanket whole-config dep (they are cheap, so over-running is fine).
+
 Task groups (the prefix says whether SolidWorks is required):
 
   part:<stem>        build one part            (COM -- needs SolidWorks)
@@ -59,12 +71,14 @@ build_or_refresh takes the FULL branch when the target is absent)::
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import shutil
 import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 # Part tasks run via doit ``CmdAction(verbosity=2)``, which pipes each build
 # script's stdout and RE-EMITS it through this doit parent process. Build output
@@ -232,11 +246,14 @@ def _sldasm(stem: str) -> str:
     return str(artefact_for(SCRIPTS_DIR / f"build_{stem}_assembly.py").resolve())
 
 
-def _run(cmd: list[str], label: str) -> None:
+def _run(cmd: list[str], label: str, env: dict | None = None) -> None:
     """Run a build/refresh subprocess from the repo root; raise on non-zero so
-    doit marks the task failed and stops (fail-loud -- no stale artefact)."""
+    doit marks the task failed and stops (fail-loud -- no stale artefact).
+
+    ``env`` (when given) replaces the child environment -- used to arm
+    HARM_CONFIG_TRACE for a FULL assembly build's config read-set recording."""
     print(f">>  {label}: {' '.join(cmd)}", flush=True)
-    proc = subprocess.run(cmd, cwd=str(REPO_ROOT))
+    proc = subprocess.run(cmd, cwd=str(REPO_ROOT), env=env)
     if proc.returncode:
         raise RuntimeError(f"{label} failed (exit {proc.returncode})")
 
@@ -250,17 +267,191 @@ def _run(cmd: list[str], label: str) -> None:
 # script imports what it uses. (Excludes _buildgraph.py: the build-GRAPH helper
 # imported here, not a geometry input.)
 #
-# The YAML data layer stays a blanket dep of EVERY build: ``parts.yaml`` is read
-# transitively by ``_common.part_properties`` for almost every part (custom-
-# property stamping), and a placement YAML edit can move any body. Coarse but
-# correct, and content-hashing means an edit that doesn't change a given part's
-# inputs still costs only that one rebuild.
+# ``_CONFIG_YAMLS`` is the whole YAML data layer. It is no longer a blanket
+# file_dep of every part/assembly (that rebuilt all ~71 parts on ANY value edit
+# to ANY config key); the SolidWorks-free ``check:*`` gates still depend on it
+# wholesale (they are cheap, so over-running is harmless). Parts/assemblies now
+# depend only on the config KEYS they actually read -- see the fine-grained
+# read-set machinery just below.
 _CONFIG_YAMLS = [str(p.resolve()) for p in sorted(CONFIG_DIR.glob("*.yaml"))]
 
 
 def _helper_deps(script) -> list[str]:
     """This build script's transitive ``_*.py`` helper imports (resolved paths)."""
     return module_deps_of(script if isinstance(script, Path) else Path(script))
+
+
+# --- Fine-grained config dependencies: a part/assembly is invalidated only by a
+# config VALUE it actually READS, not by any edit to any cad/config/*.yaml.
+#
+# Each build records the ``(yaml_file, key_path)`` set it reads via _config's
+# HARM_CONFIG_TRACE hook (armed below on the build subprocess). After a
+# SUCCESSFUL build the trace is promoted to a ``.cfgdeps.json`` read-set sidecar
+# next to the target. doit's run/skip decision then recomputes a digest over
+# just those key-paths' PARSED values (comment/whitespace-insensitive, exactly
+# like ContentChecker) and compares it to the digest snapshot in the sidecar.
+#
+# CONSERVATISM (never under-invalidate): a MISSING/corrupt sidecar reads as
+# "not up-to-date" -> the part rebuilds and re-records (the bootstrap path, and
+# the only behaviour available before the first build under this scheme). A
+# build-script / helper edit invalidates via the unchanged ``file_dep`` on the
+# script + its transitive imports, independent of config. The read-set is
+# COMPLETE because every config read funnels through _config (no build/helper
+# script parses a cad/config/*.yaml directly -- verified), and any key that
+# GATES whether another key is read is itself read first, so a value change that
+# would open a new read path rebuilds-and-re-records before it can be missed.
+_MISSING = object()
+
+
+def _parsed_yaml(path) -> Any:  # noqa: ANN401
+    """Parsed YAML doc (comment/whitespace-insensitive), or ``None`` if the file
+    is absent/malformed (treated as "all keys missing" -> a value change)."""
+    try:
+        with open(path, "rb") as fh:
+            return _yaml.safe_load(fh)
+    except (OSError, _yaml.YAMLError):
+        return None
+
+
+def _extract(node, segments):
+    """Value at ``segments`` within a parsed doc; ``"[*]"`` projects the next
+    field across a list. Any missing key yields ``_MISSING`` so that REMOVING a
+    key counts as a change (conservative)."""
+    if node is _MISSING:
+        return _MISSING
+    if not segments:
+        return node
+    head, rest = segments[0], segments[1:]
+    if head == "[*]":
+        if not isinstance(node, list):
+            return _MISSING
+        return [_extract(item, rest) for item in node]
+    if isinstance(node, dict) and head in node:
+        return _extract(node[head], rest)
+    return _MISSING
+
+
+def _canon(value) -> str:
+    """Stable canonical string for a parsed value (key order irrelevant)."""
+    if value is _MISSING:
+        return "\x00<<MISSING>>\x00"
+    return _yaml.safe_dump(value, default_flow_style=False, sort_keys=True,
+                           allow_unicode=True)
+
+
+def _digest_cfgdeps(keys: dict, config_dir=CONFIG_DIR) -> str:
+    """md5 over the PARSED values at each recorded ``(file, key_path)``.
+
+    Comment/whitespace/number-reflow edits are inert (values are parsed and
+    canonicalised); config a script never read does not appear, so it can't
+    invalidate. ``keys`` maps ``"file.yaml" -> [[segment, ...], ...]``. The
+    empty read-set hashes to a fixed value (a config-free build stays
+    up-to-date wrt config forever)."""
+    docs: dict[str, Any] = {}
+    h = hashlib.md5()
+    for fname in sorted(keys):
+        if fname not in docs:
+            docs[fname] = _parsed_yaml(Path(config_dir) / fname)
+        doc = docs[fname]
+        for seg in sorted(keys[fname], key=lambda s: json.dumps(s, sort_keys=True)):
+            h.update(fname.encode())
+            h.update(b"\0")
+            h.update(json.dumps(seg, sort_keys=True).encode())
+            h.update(b"\0")
+            h.update(_canon(_extract(doc, seg)).encode("utf-8"))
+            h.update(b"\0")
+    return h.hexdigest()
+
+
+def _cfgdeps_sidecar(target) -> Path:
+    """The recorded config read-set sidecar next to a ``.SLDPRT``/``.SLDASM``
+    target (e.g. ``cad/out/sldprt/.cone-gear.cfgdeps.json``; gitignored)."""
+    p = Path(target)
+    return p.parent / f".{p.stem}.cfgdeps.json"
+
+
+def _cfgdeps_trace(target) -> Path:
+    """Where the build subprocess dumps its raw read-set (promoted to the
+    sidecar on success); next to the target so ``doit -n`` workers never clash
+    (the COM spine already serialises the builds themselves)."""
+    p = Path(target)
+    return p.parent / f".{p.stem}.cfgdeps.trace.json"
+
+
+def _load_cfgdeps(sidecar):
+    """The saved ``{keys, digest}`` read-set sidecar, or ``None`` if
+    absent/corrupt (-> caller treats as not-up-to-date)."""
+    try:
+        data = json.loads(Path(sidecar).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if (not isinstance(data, dict) or not isinstance(data.get("keys"), dict)
+            or not isinstance(data.get("digest"), str)):
+        return None
+    return data
+
+
+def _cfgdeps_uptodate(sidecar, config_dir=CONFIG_DIR) -> bool:
+    """True iff a read-set sidecar exists AND its recorded config values are
+    unchanged. Missing/corrupt -> False (force a recording (re)build). This is
+    the single shared primitive behind BOTH the part/assembly run/skip
+    ``uptodate`` and the assembly FULL/REFRESH decision, so they cannot
+    disagree (the parity rule)."""
+    data = _load_cfgdeps(sidecar)
+    if data is None:
+        return False
+    return data["digest"] == _digest_cfgdeps(data["keys"], config_dir)
+
+
+class _ConfigUpToDate:
+    """doit ``uptodate``: the part/assembly's recorded config read-set is present
+    and unchanged. (A class, not a closure, so doit can repr it for its db.)"""
+
+    def __init__(self, sidecar):
+        self.sidecar = Path(sidecar)
+
+    def __call__(self, task, values):
+        return _cfgdeps_uptodate(self.sidecar)
+
+
+def _read_trace(trace_path):
+    """Parse a HARM_CONFIG_TRACE dump into ``{file: [key_path, ...]}`` (deduped,
+    order-stable), or ``None`` when the build wrote no trace (died before its
+    atexit flush, or HARM_CONFIG_TRACE was somehow unset)."""
+    try:
+        raw = json.loads(Path(trace_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(raw, list):
+        return None
+    keys: dict[str, list] = {}
+    for entry in raw:
+        fname, seg = entry[0], list(entry[1])
+        bucket = keys.setdefault(fname, [])
+        if seg not in bucket:
+            bucket.append(seg)
+    return keys
+
+
+def _promote_cfgdeps(trace_path, sidecar) -> None:
+    """Turn a SUCCESSFUL build's trace into its ``.cfgdeps.json`` read-set sidecar
+    (recorded key-paths + a digest snapshot of their current values), then drop
+    the trace. No trace dump -> leave any existing sidecar untouched and warn:
+    next run rebuilds (sidecar absent or stale) rather than trusting an
+    unrecorded read-set."""
+    keys = _read_trace(trace_path)
+    if keys is None:
+        print(f"  !!  no config trace at {Path(trace_path).name}; "
+              f"{Path(sidecar).name} not updated (will rebuild next run)",
+              flush=True)
+        return
+    payload = {"keys": keys, "digest": _digest_cfgdeps(keys)}
+    Path(sidecar).parent.mkdir(parents=True, exist_ok=True)
+    Path(sidecar).write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+    try:
+        Path(trace_path).unlink()
+    except OSError:
+        pass
 
 # --- Stamp files: the verify:/check: gates produce no CAD artefact, so a stamp
 # under cad/out/reports/ is their doit ``target``. That makes each gate
@@ -275,7 +466,7 @@ RELEASE_PY = (SCRIPTS_DIR / "cut_release.py").resolve()
 # verify:/check: task names (reused by build + release so a new gate is wired in
 # one place).
 _VERIFY_NAMES = ("soundness", "subsystems", "kinematics")   # need SW (spine)
-_CHECK_NAMES = ("math", "config", "graph", "nameplate", "recipe")  # offline
+_CHECK_NAMES = ("math", "config", "graph", "nameplate", "recipe", "cfgdeps")  # offline
 
 
 def _run_stamped(cmd: list[str], label: str, stamp: str) -> None:
@@ -291,10 +482,12 @@ def _digest_files(files: list[str]) -> str:
     fingerprint shared by _RecipeTracker (the run/skip uptodate) and
     build_or_refresh (the FULL/REFRESH decision), so the two never disagree.
 
-    YAML configs are folded in by their PARSED content (ContentChecker._digest),
-    exactly like the file_dep checker -- so a comment/whitespace-only edit to a
-    shared cad/config/*.yaml doesn't force a spurious assembly FULL rebuild, while
-    a real placement-value change (which needs a re-insert) still does."""
+    The recipe files are now scripts/helpers only (.py); the config DATA layer is
+    tracked separately and at key-level granularity via the ``.cfgdeps.json``
+    read-set sidecar (see _cfgdeps_uptodate), not folded in here. YAML inputs
+    that ARE passed (e.g. by the check:* gates' own digests) still fold in by
+    their PARSED content (ContentChecker._digest), so a comment/whitespace-only
+    edit stays inert."""
     h = hashlib.md5()
     for f in sorted(files):
         h.update(f.encode())
@@ -306,15 +499,19 @@ def _digest_files(files: list[str]) -> str:
 
 
 def _recipe_files(stem: str) -> list[str]:
-    """Files whose change forces a FULL rebuild of <stem> (re-insert/re-mate)
-    rather than a part-only refresh: the assembly script, its hooks, the helper
-    modules it transitively imports (``_helper_deps`` -> ``module_deps_of``, incl.
-    _assembly/_transforms), and the _config/YAML data layer (a placement like
-    channels.station_pitch_mm changing must re-insert components at new
-    coordinates, which an in-place reload cannot do)."""
+    """The SCRIPT/helper files whose change forces a FULL rebuild of <stem>
+    (re-insert/re-mate) rather than a part-only refresh: the assembly script, its
+    hooks, and the helper modules it transitively imports (``_helper_deps`` ->
+    ``module_deps_of``, incl. _assembly/_transforms).
+
+    The config DATA layer is deliberately NOT here: a placement value the
+    assembly reads (e.g. ``channels.station_pitch_mm``) forcing a FULL rebuild is
+    now handled at KEY granularity by the ``.cfgdeps.json`` read-set sidecar
+    (build_or_refresh folds ``_cfgdeps_uptodate`` into its FULL trigger), so an
+    UNRELATED config edit no longer forces a from-scratch re-insert."""
     asm_script = script_for(stem)
     hooks = [str((SCRIPTS_DIR / h).resolve()) for h in POST_ASSEMBLY.get(stem, ())]
-    return [str(asm_script.resolve()), *hooks, *_helper_deps(asm_script), *_CONFIG_YAMLS]
+    return [str(asm_script.resolve()), *hooks, *_helper_deps(asm_script)]
 
 
 def _recipe_sidecar(stem: str) -> Path:
@@ -325,18 +522,40 @@ def _recipe_sidecar(stem: str) -> Path:
     return CAD_OUT / "sldasm" / f".{stem.replace('_', '-')}.recipe.md5"
 
 
+def _clean_part(target, sidecar, trace):
+    """Remove a part's target + its config read-set sidecar/trace (the latter two
+    are not declared targets, so ``clean: True`` would leave them behind)."""
+    for path in (target, sidecar, trace):
+        _force_remove(Path(path))
+
+
 def task_part():
     """One task per part stem; addressable as ``part:<stem>``."""
     for script in part_scripts():
         stem = script.stem.removeprefix("build_")
+        target = _sldprt(stem)
+        sidecar = _cfgdeps_sidecar(target)
+        trace = _cfgdeps_trace(target)
+        # Arm config read-set recording for THIS build only (default runs unset).
+        env = {**os.environ, "HARM_CONFIG_TRACE": str(trace)}
         yield {
             "name": stem,
-            "file_dep": [str(script.resolve()), *_helper_deps(script), *_CONFIG_YAMLS],
-            "targets": [_sldprt(stem)],
+            # No blanket *_CONFIG_YAMLS dep: config is tracked at key level by the
+            # _ConfigUpToDate read-set check below, so an unrelated YAML value
+            # edit no longer rebuilds this part.
+            "file_dep": [str(script.resolve()), *_helper_deps(script)],
+            "targets": [target],
+            "uptodate": [_ConfigUpToDate(sidecar)],
             # COM spine: serialize parts on the single SW seat (see _spine_dep).
             "task_dep": _spine_dep(f"part:{stem}"),
-            "actions": [CmdAction([sys.executable, str(script)], cwd=str(REPO_ROOT))],
-            "clean": True,
+            "actions": [
+                CmdAction([sys.executable, str(script)], cwd=str(REPO_ROOT), env=env),
+                # On build SUCCESS, promote the trace to the read-set sidecar
+                # (doit runs actions in order and stops on failure, so a failed
+                # build never records a partial read-set).
+                (_promote_cfgdeps, [str(trace), str(sidecar)]),
+            ],
+            "clean": [(_clean_part, [target, str(sidecar), str(trace)])],
             "verbosity": 2,
         }
 
@@ -403,13 +622,33 @@ def build_or_refresh(stem, dependencies, changed, targets):
         last = None
     recipe_changed = (last is None or last != digest)  # missing sidecar = FULL
 
+    # A config VALUE this assembly READS changing (e.g. a placement like
+    # channels.station_pitch_mm) needs a from-scratch re-insert at the new
+    # coordinates -- an in-place refresh can't move components -- so it is a FULL
+    # trigger. Recomputed here from the SAME on-disk read-set sidecar the
+    # run/skip _ConfigUpToDate uses, so the two never disagree (the parity rule);
+    # a missing cfgdeps sidecar reads as changed -> FULL -> records it.
+    cfg_target = _sldasm(stem)
+    cfg_sidecar = _cfgdeps_sidecar(cfg_target)
+    cfg_trace = _cfgdeps_trace(cfg_target)
+    config_changed = not _cfgdeps_uptodate(cfg_sidecar)
+
     asm_script = SCRIPTS_DIR / f"build_{stem}_assembly.py"
     hooks = [SCRIPTS_DIR / h for h in POST_ASSEMBLY.get(stem, ())]
-    if target_missing or recipe_changed:
-        why = "target missing" if target_missing else "recipe changed"
-        _run([sys.executable, str(asm_script)], f"FULL build {stem} ({why})")
+    if target_missing or recipe_changed or config_changed:
+        why = ("target missing" if target_missing else
+               "recipe changed" if recipe_changed else "config changed")
+        # Arm config read-set recording on the assembly script (NOT the hooks --
+        # POST_ASSEMBLY is empty, and each process overwrites the trace at exit;
+        # re-add per-hook trace plumbing if a hook ever reads _config).
+        env = {**os.environ, "HARM_CONFIG_TRACE": str(cfg_trace)}
+        _run([sys.executable, str(asm_script)], f"FULL build {stem} ({why})", env=env)
         for hook in hooks:
             _run([sys.executable, str(hook)], f"hook {hook.name}")
+        # On FULL success only: promote the recorded read-set. A REFRESH does not
+        # re-derive geometry from config, so it leaves the existing (still valid)
+        # read-set sidecar untouched.
+        _promote_cfgdeps(str(cfg_trace), str(cfg_sidecar))
     else:
         _run([sys.executable, str(SCRIPTS_DIR / "refresh_assembly.py"), stem],
              f"REFRESH {stem}")
@@ -464,6 +703,8 @@ def _clean_assembly(stem):
     the next build; codex review #4)."""
     _force_remove(Path(_sldasm(stem)))
     _force_remove(_recipe_sidecar(stem))
+    _force_remove(_cfgdeps_sidecar(_sldasm(stem)))
+    _force_remove(_cfgdeps_trace(_sldasm(stem)))
     _force_remove(CAD_OUT / "png" / stem.replace("_", "-"))
     if stem == "channel":
         for variant in sorted(
@@ -485,18 +726,20 @@ def task_assembly():
         ref_targets = [
             _sldasm(r) if r in ASSEMBLY_ORDER else _sldprt(r) for r in refs
         ]
-        # Recipe = the files whose change forces a FULL rebuild (re-insert/re-mate)
-        # vs a part-only refresh: the assembly script, its hooks, AND the shared
-        # helper/_config/YAML data layer (a placement like channels.station_pitch_mm
-        # changing must re-insert components at new coordinates, which an in-place
-        # reload cannot do; codex review #2). Factored into _recipe_files so
-        # build_or_refresh computes the identical digest.
+        # Recipe = the SCRIPT files whose change forces a FULL rebuild
+        # (re-insert/re-mate) vs a part-only refresh: the assembly script, its
+        # hooks, and the shared helpers it imports. Factored into _recipe_files so
+        # build_or_refresh computes the identical digest. The config DATA layer is
+        # tracked separately at key level (_ConfigUpToDate below + the matching
+        # FULL trigger in build_or_refresh): a placement value the assembly reads
+        # still forces a FULL, but an UNRELATED config edit no longer does.
         recipe_files = _recipe_files(stem)
         yield {
             "name": stem,
             "file_dep": [*recipe_files, *ref_targets],
             "targets": [_sldasm(stem)],
-            "uptodate": [_RecipeTracker(stem, recipe_files)],
+            "uptodate": [_RecipeTracker(stem, recipe_files),
+                         _ConfigUpToDate(_cfgdeps_sidecar(_sldasm(stem)))],
             # COM spine: serialize assemblies after every part on the SW seat.
             "task_dep": _spine_dep(f"assembly:{stem}"),
             "actions": [(build_or_refresh, [stem])],
@@ -590,6 +833,16 @@ def task_check():
             "file_dep": [str((REPO_ROOT / "dodo.py").resolve()),
                          str((SCRIPTS_DIR / "test_dodo_recipe.py").resolve())],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_dodo_recipe.py")],
+        },
+        # The fine-grained config read-set machinery spans BOTH _config.py (the
+        # tracing hook) and dodo.py (the digest/uptodate/promote), so this gate
+        # deps on both plus the buildgraph helper its test imports.
+        "cfgdeps": {
+            "file_dep": [str((REPO_ROOT / "dodo.py").resolve()),
+                         str((SCRIPTS_DIR / "_config.py").resolve()),
+                         str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
+                         str((SCRIPTS_DIR / "test_config_deps.py").resolve())],
+            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_config_deps.py")],
         },
     }
     for name, spec in specs.items():

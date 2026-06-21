@@ -14,12 +14,63 @@ data lives in YAML.
 from __future__ import annotations
 
 import functools
+import os
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
+
+
+# --- Optional config read-set tracing (fine-grained build-graph dependencies).
+#
+# When the env var ``HARM_CONFIG_TRACE`` names a path, every accessor below
+# records the ``(yaml_file, key_path)`` it actually reads into a per-process
+# set, flushed to that path at interpreter exit as a JSON list of
+# ``[file, [segment, ...]]`` pairs. ``dodo.py`` turns the trace of a SUCCESSFUL
+# build into the part/assembly's ``.cfgdeps.json`` read-set sidecar, so only a
+# config VALUE the script genuinely read can later invalidate it (a frame part
+# no longer rebuilds when an unrelated ``channels.yaml amplitude_mm`` changes).
+#
+# A ``"[*]"`` segment projects a field across a list, so the amplitude readers
+# (``channels[*].amplitude_mm``) stay decoupled from the cone-teeth readers
+# (``channels[*].cone_teeth``) even though both live in ``channels.yaml``.
+#
+# Unset (the default for every normal/CI run) -> zero overhead, nothing written.
+_TRACE: set[tuple[str, tuple[str, ...]]] | None = None
+
+
+def _trace_init() -> None:
+    """Arm read-set recording iff ``HARM_CONFIG_TRACE`` is set (else a no-op)."""
+    global _TRACE
+    path = os.environ.get("HARM_CONFIG_TRACE")
+    if not path:
+        return
+    _TRACE = set()
+    import atexit
+    import json
+
+    def _flush() -> None:
+        # Best-effort: a build that cannot persist its trace simply gets a
+        # missing sidecar next run (-> rebuild + re-record), never a stale one.
+        try:
+            payload = sorted([fname, list(seg)] for fname, seg in _TRACE)
+            Path(path).write_text(json.dumps(payload), encoding="utf-8")
+        except OSError:
+            pass
+
+    atexit.register(_flush)
+
+
+_trace_init()
+
+
+def _record(name: str, *segments: str) -> None:
+    """Record a read of ``<name>.yaml`` at key-path ``segments`` (no-op unless
+    tracing is armed). ``segments`` empty means the whole file."""
+    if _TRACE is not None:
+        _TRACE.add((f"{name}.yaml", tuple(segments)))
 
 
 @functools.lru_cache(maxsize=None)
@@ -30,10 +81,19 @@ def _doc(name: str) -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
-def channels() -> list[dict[str, Any]]:
-    """The 20 channel rows, ordered by build-loop index (j)."""
+def _channels_raw() -> list[dict[str, Any]]:
+    """Channel rows ordered by index, WITHOUT recording a read -- the shared
+    loader for the projecting accessors (``amplitudes`` / ``cone_teeth``), which
+    record only the single field they touch so they stay decoupled from each
+    other within ``channels.yaml``."""
     rows = _doc("channels")["channels"]
     return sorted(rows, key=lambda r: r["index"])
+
+
+def channels() -> list[dict[str, Any]]:
+    """The 20 channel rows, ordered by build-loop index (j)."""
+    _record("channels", "channels")
+    return _channels_raw()
 
 
 def active_count() -> int:
@@ -57,16 +117,23 @@ def active_channels() -> list[dict[str, Any]]:
 
 def cone_teeth(index: int) -> int:
     """Cone-gear tooth count for 0-based channel ``index``."""
-    return channels()[index]["cone_teeth"]
+    # Records the cone_teeth PROJECTION across all rows (conservative wrt the
+    # specific index), NOT the whole ``channels`` subtree -- so an amplitude_mm
+    # edit does not invalidate the gear parts that read only tooth counts.
+    _record("channels", "channels", "[*]", "cone_teeth")
+    return _channels_raw()[index]["cone_teeth"]
 
 
 def amplitudes() -> list[float]:
     """The a_j coefficient vector, indexed by channel (amplitude-bar stations)."""
-    return [ch["amplitude_mm"] for ch in channels()]
+    # Records only the amplitude_mm projection (see cone_teeth for the rationale).
+    _record("channels", "channels", "[*]", "amplitude_mm")
+    return [ch["amplitude_mm"] for ch in _channels_raw()]
 
 
 def machine(*keys: str) -> Any:
     """Walk machine.yaml, e.g. ``machine('gear_train', 'diametral_pitch')``."""
+    _record("machine", *keys)
     node: Any = _doc("machine")
     for key in keys:
         node = node[key]
@@ -75,6 +142,7 @@ def machine(*keys: str) -> Any:
 
 def fit(group: str, *keys: str) -> Any:
     """A fit value from tolerances.yaml ``fits:``, e.g. ``fit('gear_mesh', 'rack_backlash_mm')``."""
+    _record("tolerances", "fits", group, *keys)
     node: Any = _doc("tolerances")["fits"][group]
     for key in keys:
         node = node[key]
@@ -96,7 +164,10 @@ def provenance(doc: str, *keys: str) -> dict[str, Any]:
     node: Any = _doc(doc)
     for key in keys:
         node = node[key]
-    return {k: node[k] for k in ("source", "confidence", "notes") if k in node}
+    result = {k: node[k] for k in ("source", "confidence", "notes") if k in node}
+    for k in result:
+        _record(doc, *keys, k)
+    return result
 
 
 def parts(stem: str | None = None) -> dict[str, Any]:
@@ -104,15 +175,23 @@ def parts(stem: str | None = None) -> dict[str, Any]:
     over the file ``defaults:`` (so revision/confidence fall through)."""
     doc = _doc("parts")
     if stem is None:
+        _record("parts", "parts")
         return doc["parts"]
     if stem not in doc["parts"]:
         raise KeyError(f"part not in registry: {stem}")
+    # Per-key recording is what decouples the ~71 parts: each reads only its OWN
+    # registry row (+ the shared defaults) for custom-property stamping, so a
+    # parts.yaml edit to one row no longer rebuilds every part.
+    _record("parts", "defaults")
+    _record("parts", "parts", stem)
     return {**doc.get("defaults", {}), **doc["parts"][stem]}
 
 
 def materials() -> dict[str, Any]:
+    _record("materials")  # whole file (callers index arbitrary keys)
     return _doc("materials")
 
 
 def palette(name: str) -> tuple[float, float, float]:
+    _record("materials", "palette", name)
     return tuple(_doc("materials")["palette"][name])  # type: ignore[return-value]
