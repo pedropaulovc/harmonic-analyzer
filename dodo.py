@@ -681,7 +681,6 @@ def task_check():
         },
         "config": {
             "file_dep": [str(VERIFY_PY),
-                         str((SCRIPTS_DIR / "gen_dimensions.py").resolve()),
                          config_py, *_CONFIG_YAMLS, *part_script_deps],
             "cmd": [sys.executable, str(VERIFY_PY), "--suite", "config"],
         },
