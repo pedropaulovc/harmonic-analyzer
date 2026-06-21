@@ -276,6 +276,9 @@ paket-files/
 __pycache__/
 *.pyc
 
+# uv / Python virtual environment (uv.lock IS committed; .venv is not)
+.venv/
+
 # Cake - Uncomment if you are using it
 # tools/**
 # !tools/packages.config
