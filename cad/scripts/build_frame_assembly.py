@@ -31,6 +31,10 @@ depth):
 * top-frame x1: the green ring at ring mid-plane Y = 1020.2 (rails 22 x
   41, y 999.7..1040.7), corner bosses bored around the four columns; its
   west rail seats the top-lever ball mounts (channel.SLDASM).
+* nameplate x1: the maker's plate (book ch. 26), laid FLAT on the base top
+  face on the EAST (+X) side, decorated side up, centred front-back between the
+  two east columns and read by an operator at that face. Cosmetic, so it is
+  grounded at its measured transform (see NAMEPLATE_POS).
 * lag-screw x2 (M6.10 fasteners): the NORTH upright hold-downs, coming
   UP through the base from below -- heads recessed in the base underside's
   counterbores (y 0.5..4.5 in the O15 x 4.5 pockets), O7.8 shanks through
@@ -71,6 +75,7 @@ from _assembly import (
     assert_component_placed,
     assert_components_fully_defined,
     check_no_interference,
+    place_component,
     plane_distance_mate,
     save_assembly_and_images,
 )
@@ -93,6 +98,29 @@ HEX_BOLT_X = 74.75
 HEX_BOLT_Y = 70.8
 HEX_BOLT_Z = (-54.0, 36.0)  # rail quarter points (machine z)
 TOP_FRAME_MID_Y = 1020.2  # ring mid-plane: rails y 999.7..1040.7 (M6.3)
+
+# Maker's nameplate (book ch. 26, pp. 70-71): the 100 x 55 brass plate lies FLAT
+# on the base top, decorated side up, on the EAST (+X) face -- read off the in-situ
+# photos (photogrammetry 195527397 / 195530756 / 195532820: the plate sits on the
+# base top, centred between the two columns of one face, read by an operator
+# standing at that face) and the ch. 30 eight views.
+#
+# The part's decorated face is its FRONT face (+Z local; build_nameplate extrudes
+# the body in -Z so the engraving is frontmost and reads with no mirror).
+# NAMEPLATE_ROWS (euler [-90,90,0]) lays it flat on the EAST face: local +Z
+# (decorated front) -> +Y so the engraving faces up; local +Y (text height) -> -X
+# so the text top faces the machine interior and reads upright to an east operator;
+# local +X (text length, 100) -> -Z so the line runs front-back; the 1.5 body
+# (local -Z) drops onto the base top. The placed point is the part origin CORNER
+# (decorated face, x=0/y=0): Y 52.3 lays the decorated face on top with the 1.5
+# body resting on the base top (50.8); Z 50 centres the 100 mm line at z 0 between
+# the east columns (z +/-112); X 214.25 sets the plate's east edge ~8 mm in from
+# the top-plate east edge (x 222.25), span x 159.25..214.25 -- east of the
+# rocker-arm-portal (x 28..117) and clear of the east columns (which sit at
+# z +/-112, away from the plate's z -50..50), so it grounds 0-DOF, no interference.
+NAMEPLATE_POS = [214.25, 52.3, 50.0]
+NAMEPLATE_EULER = [-90.0, 90.0, 0.0]
+NAMEPLATE_ROWS = [[0.0, 0.0, -1.0], [-1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 
@@ -229,6 +257,20 @@ async def build(adapter) -> dict[str, str]:
         adapter, name, "Top Plane", "Top Plane", base_name, TOP_FRAME_MID_Y, target
     )
     assert_component_placed(adapter, name, target, IDENTITY)
+
+    # Maker's nameplate: laid flat on the base top, decorated face up, on the EAST
+    # face, centred front-back between the two east columns (see NAMEPLATE_POS /
+    # NAMEPLATE_ROWS). Cosmetic + rigid -> grounded.
+    await place_component(
+        adapter,
+        "nameplate",
+        NAMEPLATE_POS,
+        NAMEPLATE_EULER,
+        NAMEPLATE_ROWS,
+        ground=True,
+        mirror=False,  # single handed part: NAMEPLATE_POS is the exact transform
+        label="nameplate",
+    )
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)

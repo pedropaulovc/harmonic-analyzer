@@ -565,6 +565,7 @@ async def place_component(
     rows: list[list[float]],
     *,
     ground: bool = True,
+    mirror: bool = True,
     configuration: str = "",
     label: str = "",
 ) -> str:
@@ -577,15 +578,23 @@ async def place_component(
     cone-gear tooth counts, the transgear-removable wheels). Either way the
     part is inserted on-solution so mate flip-recovery has a clean reference
     and the read-back assert holds.
+
+    ``mirror=True`` (default) routes the placement through ``mirror_placement``,
+    which reflects it about the machine YZ plane using the part's ``MIRROR_PLANE``
+    symmetry (default ``"x"``). Pass ``mirror=False`` for a SINGLE machine-handed
+    part with no mirror twin -- e.g. the maker's nameplate -- whose ``position``/
+    ``rows`` are already the exact machine transform; the default ``"x"`` reflection
+    would otherwise flip it across X (onto the wrong side, text reversed).
     """
     from solidworks_mcp.adapters.base import (
         ComponentRefParameters,
         InsertComponentParameters,
     )
 
-    position, rotation, rows = mirror_placement(
-        part, position, rotation, rows, configuration
-    )
+    if mirror:
+        position, rotation, rows = mirror_placement(
+            part, position, rotation, rows, configuration
+        )
     label = label or part
     path = (OUT_SLDPRT / f"{part}.SLDPRT").resolve()
     if not path.exists():
