@@ -15,10 +15,14 @@
 
 ## Building the model
 - **`doit` (`dodo.py` at the repo root) is the single entrypoint for the WHOLE pipeline** —
-  build → verify → export → release. Run it with the Windows SolidWorks build venv python
-  (`C:\src\SolidworksMCP-python\.venv\Scripts\python.exe -m doit`); SolidWorks must already be
-  open. Install once: `…\.venv\Scripts\python.exe -m pip install doit pillow pytest` (pillow
-  backs PNG export/trim; pytest backs the `check:*` unit tests).
+  build → verify → export → release. This repo is a **uv project**: `uv sync` once (reads
+  `pyproject.toml` + `uv.lock`, creates `.venv/`), then run via `uv run python -m doit`;
+  SolidWorks must already be open for the COM tasks. The lockfile pins `doit`, `pillow` (PNG
+  export/trim), `pytest` (the `check:*` unit tests), `numpy`/`trimesh`/`matplotlib` (diff
+  tooling), the COM bindings (`pywin32`, `comtypes`), and the sibling `solidworks-mcp-python`
+  package (editable path source — `verify.py`/`_common.py`/`_assembly.py` import it).
+  `solidworks-mcp-python` is a git submodule (`./SolidworksMCP-python`, branch `personal`) — run
+  `git submodule update --init` before the first `uv sync`.
 - **One safe entry: `doit build`** (= the default task) runs every part + assembly + EVERY
   gate. `doit build_bare` is the quick parts+assemblies-only rebuild. `doit export` / `doit
   release -- vX.Y.Z` are opt-in. Task groups are named by SolidWorks-dependence:

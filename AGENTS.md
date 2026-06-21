@@ -3,20 +3,44 @@
 Orientation for coding agents. Pairs with `CLAUDE.md` (git workflow + build
 rules) and `docs/pipeline/` (flow diagrams + the refactor plan).
 
+## Initialize the project (uv)
+
+This repo is a **uv project** (`pyproject.toml` + `uv.lock` at the root). One
+command builds the environment from the lockfile — no manual `pip install`:
+
+```
+git submodule update --init   # fetch ./SolidworksMCP-python (the COM adapter, branch `personal`)
+uv sync                       # core deps + the dev group (pytest) — everything the pipeline needs
+```
+
+`uv sync` creates `.venv/` (gitignored) and installs everything pinned in
+`uv.lock`: `doit`, `pyyaml`, `pillow`, `numpy`, `trimesh`, `matplotlib`,
+`pytest`, plus the Windows COM bindings (`pywin32`, `comtypes`) and the
+**`solidworks-mcp-python`** package — wired in as an *editable path source*
+(`[tool.uv.sources]` → `./SolidworksMCP-python`), since `verify.py` /
+`_common.py` / `_assembly.py` all `from solidworks_mcp …`. That package is
+vendored as a **git submodule** (tracking branch `personal`), so
+`git submodule update --init` must run before the first `uv sync`. After editing
+`pyproject.toml`, re-run `uv sync`; commit `pyproject.toml` **and** `uv.lock`
+(never `.venv/`).
+
 ## The pipeline is one doit graph
 
 `dodo.py` (repo root) drives the **whole** pipeline: build → verify → export →
 release. There is no separate orchestrator and no hand-run scripts for the happy
-path — every stage is a doit task. Run with the Windows SolidWorks build venv
-python, SolidWorks already open:
+path — every stage is a doit task. Run it through uv (SolidWorks already open for
+the COM tasks):
 
 ```
-…\.venv\Scripts\python.exe -m doit            # = `build`: everything + every gate
-…\.venv\Scripts\python.exe -m doit -n 4       # same, check:* fanned out in parallel
-…\.venv\Scripts\python.exe -m doit build_bare # quick: parts + assemblies only
+uv run python -m doit             # = `build`: everything + every gate
+uv run python -m doit -n 4        # same, check:* fanned out in parallel
+uv run python -m doit build_bare  # quick: parts + assemblies only
+uv run python -m doit check:math  # one SolidWorks-free gate (no SW needed)
 ```
 
-One-off install: `… -m pip install doit pillow pytest`.
+The SolidWorks-free `check:*` gates and the comparison/diff tooling run from this
+`.venv` with nothing else installed; the COM tasks (`part:`/`assembly:`/
+`verify:*`/`export`/`release`) additionally need SolidWorks open on this machine.
 
 ## Task groups — the prefix tells you if SolidWorks is needed
 
