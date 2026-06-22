@@ -65,7 +65,7 @@ layout" tables.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_channel_assembly.py
+    uv run python cad\scripts\build_channel_assembly.py
 """
 
 from __future__ import annotations

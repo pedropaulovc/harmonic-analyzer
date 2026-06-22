@@ -16,23 +16,30 @@ Layout: arbor axis along +Y from the origin, plain cylinder y 0..200.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_cylinder_gear_shaft.py
+    uv run python cad\scripts\build_cylinder_gear_shaft.py
 """
 
 from __future__ import annotations
 
+import math
 import sys
 
 from _common import (
     IN,
+    SketchDims,
     apply_material,
     check,
     define_circle,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
     name_bore_axis,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
+    volume_check,
 )
 
 PART_NAME = "cylinder-gear-shaft"
@@ -52,17 +59,45 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
+    # Editable knobs (Tools > Equations): the arbor diameter and length. The mm
+    # suffix is load-bearing -- this is an INCH document and the equation manager
+    # reads BARE numbers in document units (an unsuffixed 176 would be 176 in).
+    # ShaftLength is the extrude DEPTH (a feature parameter, not a sketch dim), so
+    # nothing drives it; it stays an editable knob matching the exemplars.
+    await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
+    await set_global(adapter, "ShaftLength", f"{SHAFT_LENGTH}mm")
+
+    drive_jobs: list[tuple[str, str]] = []
+
+    # On-axis circle (centre at the origin): define_circle records ONLY the
+    # diameter dim (the X/Z centre slots are relations, not display dims).
+    shaft = SketchDims()
     check("create_sketch shaft", await adapter.create_sketch("Top"))
-    await define_circle(adapter, 0.0, 0.0, SHAFT_RADIUS, "shaft circle")
+    await define_circle(
+        adapter, 0.0, 0.0, SHAFT_RADIUS, "shaft circle", dims=shaft,
+        names=("ShaftCx", "ShaftCz", "ShaftDia"),
+        drives=(None, None, '"ShaftDia"'),
+    )
     await ensure_fully_defined(adapter, "shaft sketch")
     check("exit_sketch shaft", await adapter.exit_sketch())
+    name_last_feature(adapter, "ShaftProfile")
+    drive_jobs += shaft.apply(adapter, "ShaftProfile")
     check(
         "extrude shaft",
         await adapter.create_extrusion(ExtrusionParameters(depth=SHAFT_LENGTH)),
     )
-    res = await adapter.get_mass_properties()
-    print(f"  volume after shaft: {res.data.volume:.1f} mm^3")
+    name_last_feature(adapter, "Shaft")
+    v_shaft = math.pi * SHAFT_RADIUS**2 * SHAFT_LENGTH
     # expected: pi * 4.7625^2 * 176 = ~12,541 mm^3
+    await volume_check(adapter, "shaft", v_shaft, 0.005 * v_shaft)
+
+    # Deferred drive equations, then re-check neutrality (each evaluates to the
+    # as-built value, so the geometry must not move).
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "driven shaft (equations neutral)", v_shaft, 0.005 * v_shaft)
 
     # Named central axis (arbor axis along +Y through the origin) so the
     # cylinder gears ride it coincident axis-to-axis in the assembly.

@@ -15,7 +15,7 @@ cad/DIMENSIONS.md ch. 21/22 (M6.4, low).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_support_bar.py
+    uv run python cad\scripts\build_support_bar.py
 """
 
 from __future__ import annotations
@@ -23,14 +23,19 @@ from __future__ import annotations
 import sys
 
 from _common import (
-    add_line_chain,
+    SketchDims,
     apply_material,
     check,
-    define_rectilinear_chain,
+    define_centered_rectangle,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
+    volume_check,
 )
 
 PART_NAME = "support-bar"
@@ -45,31 +50,46 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    half = BAR_SIDE / 2.0
+    # Editable knobs (Tools > Equations): the square section and the length. The
+    # mm suffix is load-bearing -- this is an INCH document and the equation
+    # manager reads BARE numbers in document units (an unsuffixed 384 = 384 in).
+    await set_global(adapter, "BarSide", f"{BAR_SIDE}mm")
+    await set_global(adapter, "BarLength", f"{BAR_LENGTH}mm")
+
+    drive_jobs: list[tuple[str, str]] = []
+
+    # Square bar profile: width along X = length, depth along Z = section.
+    bar = SketchDims()
     check("create_sketch bar", await adapter.create_sketch("Front"))
-    bar_rect = [
-        (-BAR_LENGTH / 2.0, -half),
-        (BAR_LENGTH / 2.0, -half),
-        (BAR_LENGTH / 2.0, half),
-        (-BAR_LENGTH / 2.0, half),
-    ]
-    outline = await add_line_chain(adapter, bar_rect)
-    await define_rectilinear_chain(adapter, outline, bar_rect, label="bar")
+    await define_centered_rectangle(
+        adapter, BAR_LENGTH / 2.0, BAR_SIDE / 2.0, "bar", dims=bar,
+        name_width="Length", drive_width='"BarLength"',
+        name_depth="Side", drive_depth='"BarSide"',
+        name_corner=("CornerX", "CornerZ"),
+        drive_corner=('"BarLength" / 2', '"BarSide" / 2'),
+    )
     await ensure_fully_defined(adapter, "bar sketch")
     check("exit_sketch bar", await adapter.exit_sketch())
+    name_last_feature(adapter, "BarProfile")
+    drive_jobs += bar.apply(adapter, "BarProfile")
     check(
         "extrude bar",
         await adapter.create_extrusion(
             ExtrusionParameters(depth=BAR_SIDE, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "Bar")
 
     expected = BAR_SIDE * BAR_SIDE * BAR_LENGTH
-    res = await adapter.get_mass_properties()
-    vol = float(res.data.volume) if res.is_success else float("nan")
-    print(f"  volume: {vol:.1f} mm^3 (analytic {expected:.1f})")
-    if abs(vol - expected) > 0.005 * expected:
-        raise RuntimeError(f"volume {vol:.1f} != analytic {expected:.1f}")
+    await volume_check(adapter, "bar", expected, 0.005 * expected)
+
+    # Apply the deferred drive equations after the model exists, then re-check:
+    # every equation evaluates to the value just built, so geometry must not move.
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "driven bar (equations neutral)", expected, 0.005 * expected)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

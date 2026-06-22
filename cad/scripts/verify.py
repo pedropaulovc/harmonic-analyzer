@@ -41,7 +41,7 @@ wrong.
 
 Run (SolidWorks already open for any suite touching geometry)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\verify.py [name ...] [--suite soundness|math|...]
+    uv run python cad\scripts\verify.py [name ...] [--suite soundness|math|...]
 
 ``name`` defaults to every built assembly in ``cad/out/sldasm`` (drive-train,
 harmonic-analyzer). ``math``/``config`` need no SolidWorks and no assembly.

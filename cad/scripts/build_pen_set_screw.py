@@ -17,7 +17,7 @@ Layout: axis along +X from the knob face at x=0.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_pen_set_screw.py
+    uv run python cad\scripts\build_pen_set_screw.py
 """
 
 from __future__ import annotations
@@ -26,13 +26,18 @@ import math
 import sys
 
 from _common import (
+    SketchDims,
     apply_material,
     check,
     define_circle,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
     volume_check,
 )
 from _features import add_reeded_head_and_thread
@@ -51,22 +56,56 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    for label, dia, length in (
-        ("knob", KNOB_DIA, KNOB_LENGTH),
-        ("shank", SHANK_DIA, KNOB_LENGTH + SHANK_LENGTH),
+    # Editable knobs (Tools > Equations): the two step diameters + lengths. The
+    # mm suffix is load-bearing -- this is an INCH document and the equation
+    # manager reads BARE numbers in document units (an unsuffixed 9 = 9 in).
+    # ShankExtent is the second extrude's depth (knob + shank), a derived global
+    # so it tracks both knobs; it is a feature parameter, so nothing drives it.
+    await set_global(adapter, "KnobDia", f"{KNOB_DIA}mm")
+    await set_global(adapter, "KnobLength", f"{KNOB_LENGTH}mm")
+    await set_global(adapter, "ShankDia", f"{SHANK_DIA}mm")
+    await set_global(adapter, "ShankLength", f"{SHANK_LENGTH}mm")
+    await set_global(adapter, "ShankExtent", '"KnobLength" + "ShankLength"')
+
+    drive_jobs: list[tuple[str, str]] = []
+
+    # Stepped blank: two coaxial on-axis circles (centre at the origin), so each
+    # define_circle records ONLY its diameter dim -- the centre X/Z slots are
+    # ignored. Name + record each sketch BEFORE its extrude absorbs it.
+    for label, dia, length, dia_name, dia_drive in (
+        ("knob", KNOB_DIA, KNOB_LENGTH, "KnobDia", '"KnobDia"'),
+        ("shank", SHANK_DIA, KNOB_LENGTH + SHANK_LENGTH, "ShankDia", '"ShankDia"'),
     ):
+        sd = SketchDims()
         check(f"create_sketch {label}", await adapter.create_sketch("Right"))
-        await define_circle(adapter, 0.0, 0.0, dia / 2.0, label)
+        await define_circle(
+            adapter, 0.0, 0.0, dia / 2.0, label, dims=sd,
+            names=(f"{label}Cx", f"{label}Cz", dia_name),
+            drives=(None, None, dia_drive),
+        )
         await ensure_fully_defined(adapter, f"{label} sketch")
         check(f"exit_sketch {label}", await adapter.exit_sketch())
+        name_last_feature(adapter, f"{label.capitalize()}Profile")
+        drive_jobs += sd.apply(adapter, f"{label.capitalize()}Profile")
         check(
             f"extrude {label}",
             await adapter.create_extrusion(ExtrusionParameters(depth=length)),
         )
+        name_last_feature(adapter, label.capitalize())
     v_blank = math.pi * (
         (KNOB_DIA / 2.0) ** 2 * KNOB_LENGTH + (SHANK_DIA / 2.0) ** 2 * SHANK_LENGTH
     )
     await volume_check(adapter, "stepped blank", v_blank, 0.005 * v_blank)
+
+    # Apply the deferred drive equations after the blank + a rebuild exists (each
+    # equation evaluates to the value just built, so geometry must not move), then
+    # re-check the blank's volume as the neutrality proof -- BEFORE the reeding
+    # pass mutates the volume.
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "driven stepped blank (equations neutral)", v_blank, 0.005 * v_blank)
 
     await add_reeded_head_and_thread(
         adapter, KNOB_DIA, KNOB_LENGTH, SHANK_DIA, SHANK_LENGTH, groove_count=22

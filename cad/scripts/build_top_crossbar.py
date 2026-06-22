@@ -14,7 +14,7 @@ ch. 18 (rail section med, hole low).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_top_crossbar.py
+    uv run python cad\scripts\build_top_crossbar.py
 """
 
 from __future__ import annotations
@@ -24,16 +24,22 @@ import sys
 
 from _common import (
     CASTING_GREEN,
+    SketchDims,
     add_line_chain,
     apply_color,
     apply_material,
     check,
     define_circle,
     define_rectilinear_chain,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
+    volume_check,
 )
 
 PART_NAME = "top-crossbar"
@@ -50,6 +56,23 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
+    # Editable knobs (Tools > Equations): the rail section (half-width + height),
+    # the half-span to the window faces, and the stud-hole diameter. The mm suffix
+    # is load-bearing -- this is an INCH document and the equation manager reads
+    # BARE numbers in document units (an unsuffixed 202 = 202 in, 25.4x too big).
+    await set_global(adapter, "BarHalfX", f"{BAR_HALF_X}mm")
+    await set_global(adapter, "BarHeight", f"{BAR_HEIGHT}mm")
+    await set_global(adapter, "BarHalfZ", f"{BAR_HALF_Z}mm")
+    await set_global(adapter, "HoleDia", f"{HOLE_DIA}mm")
+
+    drive_jobs: list[tuple[str, str]] = []
+
+    # Bar profile in Front (X x Y): base on the X axis (corner at (-BarHalfX, 0)),
+    # NOT origin-centred in Y, so this stays a rectilinear chain rather than
+    # define_centered_rectangle. Emission order = the kept per-segment distance
+    # dims in line order (Width along X, Height along Y), THEN the anchor dims
+    # (corner x != 0 -> one dim; corner y == 0 -> none): Width, Height, CornerX.
+    bar = SketchDims()
     check("create_sketch bar", await adapter.create_sketch("Front"))
     bar_rect = [
         (-BAR_HALF_X, 0.0),
@@ -58,36 +81,58 @@ async def build(adapter) -> dict[str, str]:
         (-BAR_HALF_X, BAR_HEIGHT),
     ]
     outline = await add_line_chain(adapter, bar_rect)
-    await define_rectilinear_chain(adapter, outline, bar_rect, label="bar")
+    await define_rectilinear_chain(
+        adapter, outline, bar_rect, label="bar", dims=bar,
+        names=["Width", "Height", "CornerX"],
+        drives=['2 * "BarHalfX"', '"BarHeight"', '"BarHalfX"'],
+    )
     await ensure_fully_defined(adapter, "bar sketch")
     check("exit_sketch bar", await adapter.exit_sketch())
+    name_last_feature(adapter, "BarProfile")
+    drive_jobs += bar.apply(adapter, "BarProfile")
     check(
         "extrude bar",
         await adapter.create_extrusion(
             ExtrusionParameters(depth=2.0 * BAR_HALF_Z, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "Bar")
 
+    # Stud hole on the bar axis (origin): only the diameter is a dim -- the centre
+    # X + Z are relations -- so define_circle records just one, ignoring the unused
+    # centre name slots.
+    stud = SketchDims()
     check("create_sketch stud hole", await adapter.create_sketch("Top"))
-    await define_circle(adapter, 0.0, 0.0, HOLE_DIA / 2.0, "stud hole")
+    await define_circle(
+        adapter, 0.0, 0.0, HOLE_DIA / 2.0, "stud hole", dims=stud,
+        names=("StudCx", "StudCz", "StudDia"),
+        drives=(None, None, '"HoleDia"'),
+    )
     await ensure_fully_defined(adapter, "stud hole sketch")
     check("exit_sketch stud hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "StudHoleProfile")
+    drive_jobs += stud.apply(adapter, "StudHoleProfile")
     check(
         "cut stud hole",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=2.0 * BAR_HEIGHT + 10.0, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "StudHole")
 
     expected = (
         2.0 * BAR_HALF_X * BAR_HEIGHT * 2.0 * BAR_HALF_Z
         - math.pi * (HOLE_DIA / 2.0) ** 2 * BAR_HEIGHT
     )
-    res = await adapter.get_mass_properties()
-    vol = float(res.data.volume) if res.is_success else float("nan")
-    print(f"  volume: {vol:.1f} mm^3 (analytic {expected:.1f})")
-    if abs(vol - expected) > 0.005 * expected:
-        raise RuntimeError(f"volume {vol:.1f} != analytic {expected:.1f}")
+    await volume_check(adapter, "crossbar", expected, 0.005 * expected)
+
+    # Apply the deferred drive equations after the model exists, then re-check:
+    # every equation evaluates to the value just built, so geometry must not move.
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "driven crossbar (equations neutral)", expected, 0.005 * expected)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)

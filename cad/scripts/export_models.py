@@ -25,7 +25,7 @@ materials) -> gray.
 
 Run after any --rebuild so the render cache tracks geometry:
 
-    C:\\src\\SolidworksMCP-python\\.venv\\Scripts\\python.exe cad\\scripts\\export_models.py
+    uv run python cad\\scripts\\export_models.py
 """
 
 from __future__ import annotations
