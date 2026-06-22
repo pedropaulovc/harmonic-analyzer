@@ -267,15 +267,30 @@ def preflight(version: str, allow_dirty: bool) -> None:
 def _close_active_documents(sw: Any) -> None:
     """Close every open document WITHOUT a "Save Modified Documents" prompt.
 
-    ``CloseDoc`` closes a dirty document WITHOUT saving it (documented: a dirty
-    name "closes the document without saving it"), and ``CloseDoc("")`` closes the
-    ACTIVE doc (plus hidden/referenced ones). Loop it until no document is active.
-    Bounded so a misbehaving session can't spin.
+    Close the active doc by its TITLE, not the empty string: although
+    ``CloseDoc("")`` is documented to close the active doc, in 3DX R2026x it
+    silently NO-OPS on any assembly that has loaded components (it only closes a
+    standalone part) -- so an export that relied on it left every assembly + its
+    components resident. ``CloseDoc(GetTitle())`` closes the assembly AND its
+    hidden components (document count drops to 0), and ``CloseDoc`` still discards
+    a dirty document without saving, so no save modal appears. Loop until no
+    document is active; bounded so a misbehaving session can't spin.
+
+    Refuse an empty title: ``CloseDoc("")`` is the very no-op trap above, so
+    falling back to it would silently spin this loop and leave the doc resident.
+    Fail loud instead of regressing invisibly.
     """
     for _ in range(500):
-        if sw.IActiveDoc2 is None:
+        doc = sw.IActiveDoc2
+        if doc is None:
             break
-        sw.CloseDoc("")  # "" -> close the ACTIVE doc, discarding unsaved changes
+        title = doc.GetTitle()
+        if not title:
+            raise RuntimeError(
+                f"active document has an empty title ({title!r}) -- refusing "
+                f"CloseDoc(''), which silently no-ops on assemblies and would "
+                f"leave the document resident")
+        sw.CloseDoc(title)
 
 
 def _discard_open_documents(sw: Any) -> None:
@@ -291,6 +306,32 @@ def _discard_open_documents(sw: Any) -> None:
     """
     _close_active_documents(sw)
     sw.CloseAllDocuments(True)
+
+
+def _open_and_verify(sw: Any, src: Path, doc_type: int) -> Any:
+    """Open ``src`` and return its document, asserting it IS the active doc.
+
+    With every prior document fully closed (see _close_active_documents),
+    ``OpenDoc6`` of a non-resident file opens AND displays it, so ``IActiveDoc2``
+    is ``src``. The identity assertion is a fail-loud guard: if a document were
+    ever left resident, ``OpenDoc6`` would NOT re-display it (per the SolidWorks
+    docs: "calling OpenDoc6 does not activate nor display the file [already open in
+    memory], [so] IActiveDoc2 will not return a pointer to this document") and
+    ``IActiveDoc2`` would point at the stale prior doc -- exactly how v0.8.0 shipped
+    summing/magnifier/pen/paper-drive as byte-copies of the harmonic-analyzer
+    (hero) render. Crash here rather than silently export a mislabelled
+    STEP/STL/PNG.
+    """
+    sw.OpenDoc6(str(src), doc_type, SW_OPEN_SILENT, "", 0, 0)
+    doc = sw.IActiveDoc2
+    if doc is None:
+        raise RuntimeError(f"failed to open {src.name} (no active document)")
+    active = Path(str(doc.GetPathName())).name
+    if active.casefold() != src.name.casefold():
+        raise RuntimeError(
+            f"active document {active!r} != expected {src.name!r} after open"
+            f" -- refusing to export a mislabelled STEP/STL/PNG")
+    return doc
 
 
 def attach_solidworks() -> tuple[Any, str]:
@@ -493,10 +534,7 @@ def export_neutral(sw: Any, stage: Path) -> dict[str, Any]:
     exported = pngs = cfg_done = 0
     try:
         for i, (src, doc_type) in enumerate(docs, 1):
-            sw.OpenDoc6(str(src), doc_type, SW_OPEN_SILENT, "", 0, 0)
-            doc = sw.IActiveDoc2
-            if doc is None:
-                raise RuntimeError(f"failed to open {src.name}")
+            doc = _open_and_verify(sw, src, doc_type)
             for out in (step_dir / f"{src.stem}.STEP", stl_dir / f"{src.stem}.STL"):
                 rc = doc.SaveAs3(str(out), 0, SW_SAVE_OPTS)
                 if not out.exists() or out.stat().st_size == 0:
