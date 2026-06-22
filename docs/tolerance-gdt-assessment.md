@@ -123,18 +123,34 @@ tolerance.**
    describes (a ~0.10–0.15 mm running fit on Ø6.35 is RC6-ish and perfectly fine for a
    hand-cranked machine) — but the config and the geometry must then agree.
 
-3. **One DP for the whole train.** The cone/cylinder mesh and the rack run **DP 30 / 14.5° PA**,
-   while the gear-train OD anchor re-derives an effective **DP ≈ 49.82**; `build_rack_pinion.py`
-   already carries a hard note that the rack must use DP 30, *not* the machine `gear_train` DP, or
-   it silently interferes. → the supplement must publish **one authoritative `module/DP + pressure
-   angle + tooth-count` table** for the train. The gear book's rule is absolute: **never mix
-   pressure angles** — every gear that meshes must share PA and DP/module.
+3. **Publish a DP/PA table per *meshing domain* — do not unify.** The machine has **several
+   independent gear systems at different pitches**, each internally consistent — they do not mesh
+   across domains, so they must *not* be collapsed to one DP:
+   - **cone↔cylinder train — DP 49.82 / 14.5° PA** (`machine/gear_train.yaml diametral_pitch:
+     49.82`; `build_cylinder_gear.py` imports the train `DP` from `build_cone_gear`, so the whole
+     20-pair train shares it by construction);
+   - **crank-drive pair — DP 26.57** (`gear_train.yaml crank_drive_diametral_pitch`);
+   - **paper-drive rack↔pinion — DP 30** (`build_rack_pinion.py`, which carries a hard note that it
+     must *not* couple to the train DP or the rack silently interferes).
+
+   The gear book's "**never mix pressure angle / pitch**" rule applies **within a meshing pair**, not
+   across the machine. → publish one authoritative `module/DP + PA + tooth-count` row **per domain**;
+   a single unified DP would force distinct non-meshing systems to the wrong pitch. (My earlier draft
+   had the cone/cylinder train at DP 30 — that was backwards; the rack is the DP-30 system.)
 
 4. **The Ø6-tooth gear is marginal by construction.** `build_cone_gear.py` leaves a **0.49 mm wall**
    between the T006 root and its bore (root r 0.89). That is a real machining hazard, not a CAD
    artifact — call it out as the hardest part to make, and note the period-correct mitigation: the
    four tip gears were a **harder yellow metal** (Muntz/manganese bronze), which is why they show
    the most wear yet survived.
+
+5. **Rocker radius vs. bar length disagree in the model.** The book states the rocker's concave
+   radius *equals* the amplitude-bar length (ch. 14), but the CAD implements **R = 800 mm**
+   (`build_rocker_arm.py`) against a **812.8 mm** bar (`build_amplitude_bar.py`, 32″) — a **12.8 mm**
+   gap, and the rocker docstring already flags the book relationship. → spec the rocker radius as the
+   **current 800 mm nominal explicitly** (not "= bar length"), and reconcile the 12.8 mm before it
+   becomes a toleranced callout — otherwise a "R = bar length ±0.5" rule puts the existing model
+   instantly out of tolerance and a generated drawing would force an unintended geometry change.
 
 ---
 
@@ -161,9 +177,9 @@ shop procedure**, never a feature-control frame the reader can't parse:
 | **Runout / TIR** (the one real GD&T idea) | indicate the OD/face while the bore is on a mandrel, or bore-and-cut in one setup | cone gears, cylinder gears + integral cam, both pinions, magnifying wheel, all shaft journals | **≤0.025–0.05 mm TIR** (.001–.002″) |
 | **Bore-to-pitch concentricity** (folds into runout) | 4-jaw indicate the blank true before cutting teeth | every cut gear | *"imperative … no eccentricity"* (gear book) |
 | **Pivot-axis squareness** | bore the pivot hole **in the same setup** that faces the mount; don't drill free-hand | rocker, lever, knife mounts, pedestals | as-machined single-setup |
-| **Knife-edge straightness + sharpness + hardness** | grind/stone a straight, hardened edge; seat in a matching hardened flat/vee | summing-lever knife edge + knife-mount seat | edge straight & ⟂ to the motion plane; hardened |
+| **Knife-edge straightness + sharpness + hardness** | grind/stone a straight edge on a **hardened tool-steel insert** (not the cast/brass parent); seat in a matching **hardened-steel** flat/vee | summing-lever knife edge + knife-mount seat | edge straight & ⟂ to the motion plane; insert + seat hardened (Finding-style material note in §6) |
 | **Knife-support parallelism** | set the two knife mounts coplanar/parallel at assembly (shim to a common height) | the two `knife-mount` blocks | parallel, equal height |
-| **Form: rocker concave radius** (book's one stated geometric req) | turn/mill to the radius; *= amplitude-bar length* by design (ch. 14) | `rocker-arm` top surface | R = bar length, ±0.5 mm |
+| **Form: rocker concave radius** (book's one stated geometric req) | turn/mill to the radius | `rocker-arm` top surface | **R = 800 mm nominal**, ±0.5 mm (book says = bar length 812.8; model uses 800 — reconcile, Finding 5) |
 | **Channel-stack consistency** | machine all 19 spacer bushings to **one length in one setup**; keep the pivot shaft straight | pivot/fulcrum bushing stacks | spacer length scatter ≤0.05 mm |
 
 **Deliberately excluded, with reasons:** true position + datum reference frames, profile-of-surface
@@ -203,12 +219,12 @@ Tier: **T1** = spend the budget here · **T2** = moderate · **T3** = leave loos
 
 | Subsystem · part(s) | Tier | Add |
 |---|---|---|
-| **Summing lever** `summing-lever`, `knife-mount`, `knife-stay` | **T1** | knife-edge **straightness + ⟂ to motion plane + hardened**; matching **hardened seat**; **parallelism/equal height** of the two mounts; `precision` on the seat; `bearing` finish on edge + seat. *Least forgiving interface in the machine.* |
-| **Cylinder gears + cams** `cylinder-gear`, `connecting-rod` | **T1** | cam **eccentricity = amplitude** (hold it), **runout of cam OD to gear bore** ≤0.05 mm; **angular phasing to the ~3 mm alignment notch** (per-channel phase datum — set at assembly); `precision` on bore; cam OD `bearing` finish; rod finish **`none`** (book: rough). *The 20 cams are the function generators.* |
-| **Cone gears** `cone-gear`, `cone-gear-shaft` | **T1** | **bore-to-pitch runout** ≤0.05 mm; **one DP/PA for the whole train** (Finding 3); flag **T006 0.49 mm wall** + harder tip metal (Finding 4); `precision` on bore. Mesh itself stays **loose** (oblique, adjustable centre distance). |
+| **Summing lever** `summing-lever`, `knife-mount`, `knife-stay` | **T1** | knife-edge **straightness + ⟂ to motion plane**; **parallelism/equal height** of the two mounts; `precision` on the seat; `bearing` finish on edge + seat. **Material:** the lever is gray cast iron and the mount brass — neither hardens to a durable edge, so the hardness callout needs a **hardened tool-steel knife-edge insert** (e.g. O1/W1, pinned/screwed into the lever) riding a **hardened-steel seat** set into the mount; spec the insert + seat as separate hardened parts (add to `materials.yaml`), *not* "harden the casting." *Least forgiving interface in the machine.* |
+| **Cylinder gears + cams** `cylinder-gear`, `connecting-rod` | **T1** | cam **eccentricity = amplitude** (hold it), **runout of cam OD to gear bore** ≤0.05 mm; **angular phasing to the ~3 mm alignment notch** (per-channel phase datum — set at assembly); `precision` on bore; cam OD `bearing` finish; **rod cam-bore (the `cam_follower_contact` surface) `bearing`; rod *body* `none`** (book: rough — the exemption is the visible body, not the bearing bore). *The 20 cams are the function generators.* |
+| **Cone gears** `cone-gear`, `cone-gear-shaft` | **T1** | **bore-to-pitch runout** ≤0.05 mm; **DP 49.82 / 14.5° PA shared across the whole cone↔cylinder train** (its own domain — Finding 3); flag **T006 0.49 mm wall** + harder tip metal (Finding 4); `precision` on bore. Mesh itself stays **loose** (oblique, adjustable centre distance). |
 | **Pivots & bushings** `pivot-shaft`, `fulcrum-shaft`, `pivot-bushing`, `lever-bushing` | **T1** | reconcile the **0.15 vs 0.025–0.075 mm** fit (Finding 2); `precision` on bore + journal; `bearing` finish; **all 19 spacers one length, one setup** (channel pitch 7.0565 mm); shaft straightness. |
 | **Rocker arms** `rocker-arm`, `rocker-arm-portal` | **T1** | **concave radius = amplitude-bar length** (form, ±0.5 mm, book ch.14); pivot bore **square** to face; slide surface `bearing` finish. |
-| **Amplitude bars** `amplitude-bar` | **T2** | preserve **length** (~80 cm — it linearizes the transfer; don't shorten); notch fit snug-sliding (`sliding_amplitude_bar_on_rocker`); straightness mild; finish `none`. Precision here is **position repeatability**, not part geometry. |
+| **Amplitude bars** `amplitude-bar` | **T2** | preserve **length** (~80 cm — it linearizes the transfer; don't shorten); notch fit snug-sliding (`sliding_amplitude_bar_on_rocker`); straightness mild; **notch foot (the sliding-contact surface) `bearing`; bar *body* `none`**. Precision here is **position repeatability**, not part geometry. |
 | **Drive train** `crankshaft`, `crank-pin`, `crank-drive-gear`, `crank-pinion`, `crank-arm`, `crank-handle` | **T2** | **taper-pin** crank-to-shaft index (repeatable, zero-backlash angular registration) — ream matching taper; gear bores `precision` + runout; handle/arm loose. |
 | **Paper drive** `rack-pinion`, `platen-rack`, `pinion-bar`, transgear set, chain | **T2/T3** | rack/pinion **DP 30 / 14.5°** (Finding 3); backlash 0.30 mm is fine; chain clearances **loose** (link-to-link contact tolerated). Paper transport is the *time axis*, not the summed signal — moderate. |
 | **Magnifier & pen** `magnifying-wheel`, `magnifying-lever`, `magnifying-bracket/clamp`, `magnifying-vertical-rod`, pen parts | **T2** | wheel/lever bores `precision` + runout on the wheel; linkage pivots squareness. Amplifies output, so play here is visible — but downstream of the sum. |
@@ -261,8 +277,8 @@ surface_finish:
 geometric:
   runout:        { tir_mm: [0.025, 0.05], applies_to: "gear bore->pitch, cam->bore, journals, wheel", how: "indicate / bore-and-cut one setup" }
   pivot_square:  { applies_to: "rocker/lever/mount pivot bores", how: "bore in the setup that faces the mount" }
-  knife_edge:    { applies_to: "summing-lever edge + seat", how: "straight, sharp, hardened, seat parallel/equal-height" }
-  rocker_radius: { value: "R = amplitude-bar length", tol_mm: 0.5, applies_to: "rocker-arm top" }
+  knife_edge:    { applies_to: "summing-lever edge + seat", how: "straight, sharp; hardened tool-steel insert + hardened-steel seat (separate parts, not the cast/brass parent); seat parallel/equal-height" }
+  rocker_radius: { value: 800, tol_mm: 0.5, applies_to: "rocker-arm top", note: "nominal; book says = bar length 812.8 — reconcile (Finding 5)" }
 ```
 
 **`parts/*.yaml`** — add optional fields, required only for the ~10 T1 parts:
