@@ -1408,6 +1408,9 @@ async def name_bore_axis(
     plane_b: str,
     offset_b: float,
     label: str,
+    drive_a: str | None = None,
+    drive_b: str | None = None,
+    drive_jobs: list[tuple[str, str]] | None = None,
 ) -> str:
     """Create a named reference axis through a bore, view-independently.
 
@@ -1418,6 +1421,15 @@ async def name_bore_axis(
     name-selected axis does. Assembly mates then pick the axis as
     ``named_ref("Axis<N>@<comp>", "AXIS")``.
 
+    ``drive_a``/``drive_b`` optionally tie each offset plane's distance to an
+    equation (e.g. ``'"BarDepth" / 2'``) so the axis -- and any assembly mate to
+    it -- TRACKS a GUI edit of those globals instead of staying frozen at the
+    as-built offset. When given, the created plane's distance dim (``D1@<plane>``)
+    is appended to ``drive_jobs`` for the caller's deferred drive batch (same
+    convention as ``_cut_tick``); each equation must evaluate to the as-built
+    offset so the placement stays neutral. A drive on a principal-plane (offset
+    0) side has no dim to drive and is ignored.
+
     Returns the new axis's resolved name (e.g. ``"Axis1"``).
     """
     from solidworks_mcp.adapters.base import (
@@ -1426,18 +1438,22 @@ async def name_bore_axis(
     )
 
     planes: list[str] = []
-    for base, off, tag in ((plane_a, offset_a, "A"), (plane_b, offset_b, "B")):
+    for base, off, tag, drive in (
+        (plane_a, offset_a, "A", drive_a),
+        (plane_b, offset_b, "B", drive_b),
+    ):
         if abs(off) < 1e-9:
             planes.append(base)
             continue
-        planes.append(
-            check(
-                f"plane {label} {tag} ({base} + {off:g})",
-                await adapter.create_plane(
-                    CreatePlaneParameters(mode="offset", base_plane=base, offset=off)
-                ),
-            ).name
-        )
+        plane_name = check(
+            f"plane {label} {tag} ({base} + {off:g})",
+            await adapter.create_plane(
+                CreatePlaneParameters(mode="offset", base_plane=base, offset=off)
+            ),
+        ).name
+        planes.append(plane_name)
+        if drive is not None and drive_jobs is not None:
+            drive_jobs.append((f"D1@{plane_name}", drive))
     return check(
         f"axis {label} ({planes[0]} ∩ {planes[1]})",
         await adapter.create_axis(
