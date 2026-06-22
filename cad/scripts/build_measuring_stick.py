@@ -24,15 +24,21 @@ from __future__ import annotations
 import sys
 
 from _common import (
+    SketchDims,
     add_line_chain,
     anchor_point_to_origin,
     apply_material,
     check,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
     measure_check,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
+    volume_check,
 )
 
 PART_NAME = "measuring-stick"
@@ -64,10 +70,30 @@ TICK_OVERHANG = 1.0  # sketch reaches past the top edge: a line drawn exactly
 # the sketch against the explicit horizontal constraint
 
 
-async def _cut_tick(adapter, label: str, x_center: float, length: float) -> str:
-    """Cut one graduation tick; returns the cut feature name."""
+async def _cut_tick(
+    adapter,
+    label: str,
+    stem: str,
+    x_center: float,
+    length: float,
+    *,
+    drive_jobs: list[tuple[str, str]],
+    drive_xcenter: str,
+    drive_length: str,
+) -> str:
+    """Cut one graduation tick; returns the cut feature name.
+
+    Self-naming: ``stem`` makes the sketch/feature/dim names unique per tick
+    (the equation manager keys dims by ``leaf@feature``). The four sketch dims
+    emit in creation order -- width, length, then the bottom-left corner anchor
+    (x then z, both non-zero) -- recorded into a per-tick :class:`SketchDims` and
+    driven via the deferred ``drive_jobs`` batch. ``drive_xcenter`` is the
+    equation for the tick's centre x; the corner-X dim is an UNSIGNED distance,
+    so it drives to that centre minus half the tick width.
+    """
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
+    dims = SketchDims()
     check(f"create_sketch {label}", await adapter.create_sketch("Front"))
     half = TICK_WIDTH / 2.0
     top_y = BODY_WIDTH + TICK_OVERHANG
@@ -92,12 +118,17 @@ async def _cut_tick(adapter, label: str, x_center: float, length: float) -> str:
         f"{label} width dim",
         await adapter.add_sketch_dimension(bottom, None, "linear", TICK_WIDTH),
     )
+    dims.record(f"{stem}Width", '"TickWidth"')
     check(
         f"{label} length dim",
         await adapter.add_sketch_dimension(
             right, None, "linear", length + TICK_OVERHANG
         ),
     )
+    dims.record(f"{stem}Length", f'{drive_length} + "TickOverhang"')
+    # Corner anchor at (x_center - half, BODY_WIDTH - length): both non-zero, so
+    # two dims (x then z). Both are unsigned distances from the origin and both
+    # land positive here, so the drives evaluate positive directly.
     await anchor_point_to_origin(
         adapter,
         f"{bottom}.start",
@@ -105,11 +136,15 @@ async def _cut_tick(adapter, label: str, x_center: float, length: float) -> str:
         BODY_WIDTH - length,
         f"{label} corner",
     )
+    dims.record(f"{stem}CornerX", f'{drive_xcenter} - "TickWidth" / 2')
+    dims.record(f"{stem}CornerZ", f'"BodyWidth" - ({drive_length})')
     await ensure_fully_defined(adapter, f"{label} sketch")
     check(f"exit_sketch {label}", await adapter.exit_sketch())
+    name_last_feature(adapter, f"{stem}Profile")
+    drive_jobs += dims.apply(adapter, f"{stem}Profile")
     cut = await adapter.create_cut_extrude(ExtrusionParameters(depth=TICK_DEPTH))
     check(f"cut {label}", cut)
-    return cut.data.name
+    return name_last_feature(adapter, f"{stem}Cut")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -120,7 +155,31 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Body: plain rectangular bar.
+    # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this is
+    # an INCH document and the equation manager reads BARE numbers in document
+    # units (an unsuffixed 200 = 200 in, a 25.4x blow-up). ScaleStartX is a
+    # DERIVED global (centres the 80 mm scale on the bar), referencing the others
+    # as an equation string. DivisionSpacing drives the linear-pattern spacing, a
+    # FEATURE parameter -- a knob with nothing in the deferred sketch-dim batch,
+    # like an extrude depth (matches the exemplars).
+    await set_global(adapter, "BodyLength", f"{BODY_LENGTH}mm")
+    await set_global(adapter, "BodyWidth", f"{BODY_WIDTH}mm")
+    await set_global(adapter, "BodyThickness", f"{BODY_THICKNESS}mm")
+    await set_global(adapter, "DivisionSpacing", f"{DIVISION_SPACING}mm")
+    await set_global(adapter, "TickWidth", f"{TICK_WIDTH}mm")
+    await set_global(adapter, "TickLength", f"{TICK_LENGTH}mm")
+    await set_global(adapter, "HalfTickLength", f"{HALF_TICK_LENGTH}mm")
+    await set_global(adapter, "TickOverhang", f"{TICK_OVERHANG}mm")
+    await set_global(
+        adapter, "ScaleStartX", '("BodyLength" - 10 * "DivisionSpacing") / 2'
+    )
+
+    drive_jobs: list[tuple[str, str]] = []
+
+    # Body: plain rectangular bar. Two display dims emit in creation order --
+    # length then width -- recorded as they are added; the (0, 0) corner anchors
+    # by a coincident relation (no dim).
+    body_dims = SketchDims()
     check("create_sketch body", await adapter.create_sketch("Front"))
     body = await add_line_chain(
         adapter,
@@ -135,7 +194,9 @@ async def build(adapter) -> dict[str, str]:
     ):
         check(f"body constraint {relation}", await adapter.add_sketch_constraint(ent, None, relation))
     check("body length dim", await adapter.add_sketch_dimension(bottom, None, "linear", BODY_LENGTH))
+    body_dims.record("BodyLength", '"BodyLength"')
     check("body width dim", await adapter.add_sketch_dimension(right, None, "linear", BODY_WIDTH))
+    body_dims.record("BodyWidth", '"BodyWidth"')
     # Pin the (0, 0) corner to the origin. The h/v relations + the two dims fix
     # the bar's shape but not its position; that corner was previously located
     # only by SolidWorks snapping it onto the origin during the (inference-on)
@@ -146,13 +207,24 @@ async def build(adapter) -> dict[str, str]:
     )
     await ensure_fully_defined(adapter, "body sketch")
     check("exit_sketch body", await adapter.exit_sketch())
+    name_last_feature(adapter, "BodyProfile")
+    drive_jobs += body_dims.apply(adapter, "BodyProfile")
     check(
         "extrude body",
         await adapter.create_extrusion(ExtrusionParameters(depth=BODY_THICKNESS)),
     )
+    name_last_feature(adapter, "Body")
 
-    # Tick 0 (seed) + linear pattern for ticks 1..10.
-    seed_name = await _cut_tick(adapter, "tick 0", SCALE_START_X, TICK_LENGTH)
+    # Tick 0 (seed) + linear pattern for ticks 1..10. The seed cut is RENAMED
+    # ("Tick0Cut"), so the pattern must seed off the NEW name -- a captured
+    # auto-name would go stale the moment name_last_feature ran (M: renamed-feature
+    # references). _cut_tick returns the assigned name for exactly this reason.
+    seed_name = await _cut_tick(
+        adapter, "tick 0", "Tick0", SCALE_START_X, TICK_LENGTH,
+        drive_jobs=drive_jobs,
+        drive_xcenter='"ScaleStartX"',
+        drive_length='"TickLength"',
+    )
     check(
         "linear pattern ticks 1..10",
         await adapter.linear_pattern_feature(
@@ -164,13 +236,33 @@ async def build(adapter) -> dict[str, str]:
             )
         ),
     )
+    name_last_feature(adapter, "TickPattern")
 
     # The hand-stamped artefact the book calls out: a longer 0.5 tick.
     await _cut_tick(
-        adapter, "tick 0.5", SCALE_START_X + DIVISION_SPACING / 2.0, HALF_TICK_LENGTH
+        adapter, "tick 0.5", "TickHalf",
+        SCALE_START_X + DIVISION_SPACING / 2.0, HALF_TICK_LENGTH,
+        drive_jobs=drive_jobs,
+        drive_xcenter='"ScaleStartX" + "DivisionSpacing" / 2',
+        drive_length='"HalfTickLength"',
     )
 
     await apply_material(adapter, MATERIAL)
+
+    # Capture the as-built volume, then apply the deferred drive equations and
+    # re-check: every equation evaluates to the value just built, so the geometry
+    # must not move (the neutrality proof; this part's other checks are measures).
+    mass = await adapter.get_mass_properties()
+    if not mass.is_success:
+        raise RuntimeError(f"measuring stick: get_mass_properties failed: {mass.error}")
+    v_built = float(mass.data.volume)
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(
+        adapter, "driven measuring-stick (equations neutral)", v_built, 0.005 * v_built
+    )
 
     # Verify the annotated 200 mm length and the untouched front face
     # (the 8 mm tick spacing is driven by the linear pattern's spacing).
