@@ -31,17 +31,23 @@ import math
 import sys
 
 from _common import (
+    SketchDims,
     anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
     dimension_between,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
     name_bore_axis,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
     set_sketch_direct_db,
+    volume_check,
 )
 
 PART_NAME = "boss-hook"
@@ -60,11 +66,27 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
+    # Editable knobs (Tools > Equations): rod diameter, the straight rise, the
+    # elbow bend radius and the arm run. The mm suffix is load-bearing -- this is
+    # an INCH document and the equation manager reads BARE numbers in document
+    # units (an unsuffixed 12 = 12 in, blowing the part up 25.4x).
+    await set_global(adapter, "RodDia", f"{ROD_DIA}mm")
+    await set_global(adapter, "ShankRise", f"{SHANK_RISE}mm")
+    await set_global(adapter, "ElbowR", f"{ELBOW_R}mm")
+    await set_global(adapter, "ArmRun", f"{ARM_RUN}mm")
+
+    drive_jobs: list[tuple[str, str]] = []
+
     # Path in the Front plane: rise, quarter-arc elbow, horizontal arm.
     # Direct DB keeps inference relations off the chain (auto-tangent at
     # the elbow would collide with the explicit alignment scheme below);
     # exact-coordinate joints still merge. add_arc draws CCW, so the elbow
     # runs from the arm joint (top) back to the rise joint.
+    # Each manual driving dim is recorded into a per-sketch SketchDims in
+    # creation order; apply() count-asserts the total against the feature's real
+    # display-dim count and renames structurally, then the drive equations run in
+    # one deferred batch after the whole model exists.
+    path = SketchDims()
     path_name = check("create_sketch hook path", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     rise = check("rise line", await adapter.add_line(0.0, 0.0, 0.0, SHANK_RISE))
@@ -91,12 +113,17 @@ async def build(adapter) -> dict[str, str]:
     await dimension_between(
         adapter, f"{rise}.start", f"{rise}.end", "vertical_distance", SHANK_RISE, "rise"
     )
+    path.record("Rise", '"ShankRise"')
     # Elbow centre at (R, rise top); the arm joint sits straight above it,
     # which is the tangency condition without an inference-style relation.
     # No radius dim: the merged rise joint already sets r = ELBOW_R.
     await anchor_point_to_origin(
         adapter, f"{elbow}.center", ELBOW_R, SHANK_RISE, "elbow centre"
     )
+    # Elbow centre is off both axes: anchor_point_to_origin emits a
+    # horizontal_distance (= ElbowR) then a vertical_distance (= ShankRise).
+    path.record("ElbowCx", '"ElbowR"')
+    path.record("ElbowCy", '"ShankRise"')
     check(
         "arm joint above elbow centre",
         await adapter.add_sketch_constraint(
@@ -107,28 +134,47 @@ async def build(adapter) -> dict[str, str]:
     await dimension_between(
         adapter, f"{arm}.start", f"{arm}.end", "horizontal_distance", ARM_RUN, "arm run"
     )
+    path.record("ArmRun", '"ArmRun"')
     await ensure_fully_defined(adapter, "hook path")
     check("exit_sketch hook path", await adapter.exit_sketch())
+    name_last_feature(adapter, "HookPath")
+    drive_jobs += path.apply(adapter, "HookPath")
 
-    # Wire profile at the path start (origin, Top plane).
+    # Wire profile at the path start (origin, Top plane). On-origin circle: only
+    # the diameter is a dim (the centre is a coincident relation).
+    profile = SketchDims()
     check("create_sketch wire profile", await adapter.create_sketch("Top"))
-    await define_circle(adapter, 0.0, 0.0, ROD_DIA / 2.0, "wire profile")
+    await define_circle(
+        adapter, 0.0, 0.0, ROD_DIA / 2.0, "wire profile", dims=profile,
+        names=("WireCx", "WireCz", "RodDia"),
+        drives=(None, None, '"RodDia"'),
+    )
     await ensure_fully_defined(adapter, "wire profile sketch")
     check("exit_sketch wire profile", await adapter.exit_sketch())
+    name_last_feature(adapter, "WireProfile")
+    drive_jobs += profile.apply(adapter, "WireProfile")
 
     check(
         "sweep hook",
-        await adapter.create_sweep(SweepParameters(path=path_name)),
+        # Path sketch was renamed to "HookPath" above; select it by the new name
+        # (the captured path_name still holds the stale auto "Sketch1").
+        await adapter.create_sweep(SweepParameters(path="HookPath")),
     )
+    name_last_feature(adapter, "Hook")
 
     # Pappus: planar path, volume = path length x wire area.
     path_len = SHANK_RISE + math.pi / 2.0 * ELBOW_R + ARM_RUN
     v_expected = path_len * math.pi * (ROD_DIA / 2.0) ** 2
-    res = await adapter.get_mass_properties()
-    vol = float(res.data.volume) if res.is_success else float("nan")
-    print(f"  volume: {vol:.1f} mm^3 (Pappus {v_expected:.1f})")
-    if abs(vol - v_expected) > 0.02 * v_expected:
-        raise RuntimeError(f"hook volume {vol:.1f} != Pappus {v_expected:.1f}")
+    await volume_check(adapter, "hook", v_expected, 0.02 * v_expected)
+
+    # Apply the deferred drive equations now -- after the whole model + a rebuild
+    # exists, so every target resolves. Each equation evaluates to the value just
+    # built, so the geometry must not move -- the re-check below is the proof.
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "driven hook (equations neutral)", v_expected, 0.02 * v_expected)
 
     # Named shank axis (local Y through the origin) so the hook locks to the
     # summing lever and rides it (the counter spring pulls through the hook in

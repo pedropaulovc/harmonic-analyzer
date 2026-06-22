@@ -82,6 +82,13 @@ will tell you.
 - Length globals get `mm`; equations reference globals as `"GlobalName"`.
 - For a derived/trig dim, drive by a DIMENSIONLESS coefficient times a global:
   `f'"Dia" * {coeff!r}'` (see hex-bolt) — unit-safe, avoids SW `sqr()` syntax.
+- **Centre/anchor coordinate dims are UNSIGNED distances from the origin.** A
+  dim for a point at a NEGATIVE coordinate displays as the magnitude, so its
+  driving expression MUST evaluate POSITIVE. If the global holds the signed
+  coordinate (e.g. `ScrewHoleX = -97.5mm`), negate it in the drive:
+  `'-"ScrewHoleX"'`. Driving such a dim to a negative value fails LOUD at
+  equation-add (`Failed to add equation`). Same for any derived span that lands
+  negative — wrap so the expression is positive.
 - If a dim has no meaningful global knob, leave its name/drive `None`
   (auto-named, static). That is acceptable.
 - **Extrude/cut DEPTH is a feature parameter, not a sketch dim** — it will NOT be
