@@ -143,8 +143,15 @@ def _local_modules() -> dict[str, Path]:
     scripts) and the test modules, which are never a geometry input. Standalone CLI
     tools (verify/cut_release/...) stay in the map but are harmless: they are never
     imported by a build script, so ``_direct_local_imports`` never selects them.
+
+    ``_telemetry`` is excluded too: ``_common`` imports it, so leaving it in would
+    pull it into every part/assembly's ``file_dep`` + artefact-cache key, and a
+    logging-only edit would then invalidate the whole remote cache and force every
+    SolidWorks part to rebuild. Telemetry output can never change saved CAD bytes,
+    so dropping it cannot under-invalidate (the one cardinal sin here) -- it only
+    stops a spurious over-rebuild.
     """
-    skip = {"_buildgraph.py", "_extract.py", "_rewrite_imports.py"}
+    skip = {"_buildgraph.py", "_extract.py", "_rewrite_imports.py", "_telemetry.py"}
     out: dict[str, Path] = {}
     for p in sorted(SCRIPTS_DIR.glob("*.py")):
         if p.name not in skip and not p.name.startswith("test_"):
