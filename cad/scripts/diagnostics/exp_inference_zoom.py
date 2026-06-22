@@ -23,6 +23,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import asyncio
 
+import _telemetry
+
 HEAD_AF = 12.7
 HEAD_H = 5.5
 RADIUS = HEAD_AF / math.sqrt(3.0)
@@ -63,7 +65,7 @@ async def main() -> int:
     adapter = PyWin32Adapter({})
     await adapter.connect()
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    print(f"analytic head volume = {ANALYTIC:.2f} mm^3 ; inference path, varying view zoom\n")
+    _telemetry.info(f"analytic head volume = {ANALYTIC:.2f} mm^3 ; inference path, varying view zoom")
     results = []
     for half in ZOOM_HALF_EXTENTS_M:
         await adapter.create_part()
@@ -87,11 +89,11 @@ async def main() -> int:
         mp = await adapter.get_mass_properties()
         vol = mp.data.volume if mp.is_success else float("nan")
         tag = "OK" if abs(vol - ANALYTIC) < 0.5 else "COLLAPSE"
-        print(f"  zoom +-{half*1000:7.1f} mm : volume={vol:8.2f} mm^3  {tag}")
+        _telemetry.info(f"zoom +-{half*1000:7.1f} mm : volume={vol:8.2f} mm^3  {tag}")
         results.append(round(vol, 1))
         adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    print(f"\n  distinct volumes across zoom levels: {sorted(set(results))}")
-    print("  --> view-dependent" if len(set(results)) > 1 else "  --> NOT view-dependent")
+    _telemetry.info(f"distinct volumes across zoom levels: {sorted(set(results))}")
+    _telemetry.info("--> view-dependent" if len(set(results)) > 1 else "--> NOT view-dependent")
     await adapter.disconnect()
     return 0
 

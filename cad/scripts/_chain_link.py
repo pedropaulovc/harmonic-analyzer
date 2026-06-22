@@ -45,6 +45,8 @@ from _common import (
     set_sketch_direct_db,
 )
 
+import _telemetry
+
 
 async def _sketch_plate(adapter: Any, hole_r: float) -> None:
     """Front-plane obround side-plate outline (one LINK_PITCH long) with a
@@ -189,7 +191,7 @@ def _gate_volume(
     ring = math.pi * (outer_r * outer_r - (bore_r * bore_r if bore_r else 0.0))
     bodies = 2.0 * ring * (2.0 * half_len)
     expected = plates + bodies
-    print(f"  volume: {vol:.2f} mm^3 (analytic {expected:.2f})")
+    _telemetry.info(f"volume: {vol:.2f} mm^3 (analytic {expected:.2f})")
     if abs(vol - expected) > 0.02 * expected:
         raise RuntimeError(f"link volume {vol:.2f} != {expected:.2f}")
 

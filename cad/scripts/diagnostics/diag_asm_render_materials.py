@@ -14,6 +14,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 from _common import check, run_build  # noqa: E402
 from render_compare import _flag, _read_member  # noqa: E402
 
+import _telemetry  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[1]
 
 ASMS = ("frame", "output", "harmonic-analyzer")
@@ -23,7 +25,7 @@ async def build(adapter) -> dict[str, str]:
     for asm in ASMS:
         path = ROOT / "out" / "sldasm" / f"{asm}.SLDASM"
         if not path.exists():
-            print(f"{asm}: no file")
+            _telemetry.info(f"{asm}: no file")
             continue
         check(f"open {asm}", await adapter.open_model(str(path)))
         model = adapter.currentModel
@@ -33,9 +35,9 @@ async def build(adapter) -> dict[str, str]:
         try:
             count = ext.GetRenderMaterialsCount2(2, None)
         except Exception as exc:
-            print(f"{asm}: count failed: {exc}")
+            _telemetry.error(f"{asm}: count failed: {exc}")
             continue
-        print(f"{asm}: {count} render material(s)")
+        _telemetry.info(f"{asm}: {count} render material(s)")
         if not count:
             continue
         for m in ext.GetRenderMaterials2(2, None) or []:
@@ -61,7 +63,7 @@ async def build(adapter) -> dict[str, str]:
                         ents.append(name or type(e).__name__)
             except Exception as exc:
                 ents = [f"entities failed: {exc}"]
-            print(f"  file={Path(fn).name if fn else fn} rgb={rgb} entities={ents}")
+            _telemetry.info(f"file={Path(fn).name if fn else fn} rgb={rgb} entities={ents}")
     return {"diag": "done"}
 
 

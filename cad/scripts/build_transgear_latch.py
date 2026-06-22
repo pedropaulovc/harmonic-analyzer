@@ -45,6 +45,8 @@ from _common import (
     volume_check,
 )
 
+import _telemetry
+
 PART_NAME = "transgear-latch"
 MATERIAL = "Plain Carbon Steel"
 
@@ -105,7 +107,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "BigHub")
     expected = math.pi * (BIG_HUB_DIA / 2.0) ** 2 * THICKNESS
     vol = await _volume(adapter)
-    print(f"  volume after big hub: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    _telemetry.info(f"volume after big hub: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.005 * expected:
         raise RuntimeError(f"big hub volume {vol:.1f} != {expected:.1f}")
 
@@ -132,7 +134,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "SmallHub")
     expected += math.pi * (SMALL_HUB_DIA / 2.0) ** 2 * THICKNESS
     vol = await _volume(adapter)
-    print(f"  volume after small hub: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    _telemetry.info(f"volume after small hub: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.005 * expected:
         raise RuntimeError(f"small hub volume {vol:.1f} != {expected:.1f}")
 
@@ -178,7 +180,7 @@ async def build(adapter) -> dict[str, str]:
     before = expected
     vol = await _volume(adapter)
     added = vol - before
-    print(f"  volume after web: {vol:.1f} mm^3 (+{added:.1f}, solid {v_web:.1f})")
+    _telemetry.info(f"volume after web: {vol:.1f} mm^3 (+{added:.1f}, solid {v_web:.1f})")
     if not (0.5 * v_web <= added <= 1.0 * v_web):
         raise RuntimeError(f"web: added {added:.1f}, expected 50-100% of {v_web:.1f}")
     expected = vol
@@ -211,7 +213,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Bores")
     expected -= 2.0 * math.pi * (BORE_DIA / 2.0) ** 2 * THICKNESS
     vol = await _volume(adapter)
-    print(f"  volume after bores: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    _telemetry.info(f"volume after bores: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.005 * expected:
         raise RuntimeError(f"bores volume {vol:.1f} != {expected:.1f}")
 

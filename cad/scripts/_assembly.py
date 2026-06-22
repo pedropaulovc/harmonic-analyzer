@@ -7,6 +7,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
+import _telemetry
 from _common import (
     DEFAULT_VIEWS,
     FULLY_CONSTRAINED,
@@ -19,7 +20,6 @@ from _common import (
     _MATE_TOL_MM,
     _flag,
     _read_member,
-    _stamp,
     check,
     log,
     set_isometric_view,
@@ -88,7 +88,7 @@ def insert_sketch_text(
     if not ok:
         raise RuntimeError(f"insert_sketch_text {label!r}: SetTextFormat returned False")
     model.ClearSelection2(True)
-    print(f"  OK  sketch text {label!r} h{height_mm:g} @ ({x_mm:g}, {y_mm:g})")
+    _telemetry.success(f"sketch text {label!r} h{height_mm:g} @ ({x_mm:g}, {y_mm:g})")
     return sk_text
 
 def add_ellipse(
@@ -115,7 +115,7 @@ def add_ellipse(
     if seg is None:
         raise RuntimeError(f"add_ellipse {label!r}: CreateEllipse returned None")
     adapter.currentModel.ClearSelection2(True)
-    print(f"  OK  ellipse {label!r} r({rx_mm:g}, {ry_mm:g}) @ ({cx_mm:g}, {cy_mm:g})")
+    _telemetry.success(f"ellipse {label!r} r({rx_mm:g}, {ry_mm:g}) @ ({cx_mm:g}, {cy_mm:g})")
     return seg
 
 async def apply_component_color(
@@ -220,7 +220,7 @@ def assert_component_placed(
             raise RuntimeError(
                 f"{name}: rotation {array[0:9]} != expected {flat} (drift {drift:.4f})"
             )
-    print(f"  OK  {_stamp()} {name} placed at {[round(v, 3) for v in actual]}", flush=True)
+    _telemetry.success(f"{name} placed at {[round(v, 3) for v in actual]}")
 
 def named_ref(name: str, entity_type: str) -> Any:
     """A ``MateEntityRef`` selecting an entity by qualified name."""
@@ -662,7 +662,7 @@ def assert_components_fully_defined(adapter: Any) -> None:
         if status != FULLY_CONSTRAINED:
             kind = "under" if status == UNDER_CONSTRAINED else f"status={status}"
             problems.append(f"{comp_name} ({kind})")
-    print(f"  OK  {_stamp()} checked {len(components)} components for free DOF", flush=True)
+    _telemetry.success(f"checked {len(components)} components for free DOF")
     if problems:
         raise RuntimeError("components not fully defined: " + ", ".join(problems))
 
@@ -722,16 +722,15 @@ def check_no_interference(adapter: Any) -> None:
         details.append(f"{' & '.join(names)}: {volume_mm3:.2f} mm^3")
     adapter._attempt(lambda: mgr.Done(), default=None)
     if chain_contacts:
-        print(
-            f"  ..  {_stamp()} {len(chain_contacts)} chain-internal link contacts"
-            f" (<= {max(chain_contacts):.2f} mm^3) allowed -- articulating chain",
-            flush=True,
+        _telemetry.debug(
+            f"{len(chain_contacts)} chain-internal link contacts"
+            f" (<= {max(chain_contacts):.2f} mm^3) allowed -- articulating chain"
         )
     if details:
         raise RuntimeError(
             f"{len(details)} interference(s): " + "; ".join(details)
         )
-    print(f"  OK  {_stamp()} interference check: none found", flush=True)
+    _telemetry.success("interference check: none found")
 
 def _byref_variant() -> Any:
     """An in/out ``VT_BYREF | VT_VARIANT`` for ``out object`` COM params.
@@ -821,16 +820,15 @@ def assert_model_healthy(
         errors.append(f"{label or 'top'}: ForceRebuild3 returned False")
 
     if warnings:
-        print(
-            f"  ..  {_stamp()} {len(warnings)} warning(s): " + "; ".join(warnings[:12]),
-            flush=True,
+        _telemetry.debug(
+            f"{len(warnings)} warning(s): " + "; ".join(warnings[:12])
         )
     if errors:
         raise RuntimeError(
             f"model unhealthy ({label or 'top'}): {len(errors)} error(s) -- "
             + "; ".join(errors[:20])
         )
-    print(f"  OK  {_stamp()} model healthy ({label or 'top'})", flush=True)
+    _telemetry.success(f"model healthy ({label or 'top'})")
 
 def body_faults(adapter: Any, model: Any) -> list[tuple[str, int]]:
     """Return ``[(body_name, fault_count), ...]`` for any faulty solid bodies.

@@ -25,6 +25,8 @@ from PIL import Image
 
 TOOLS = Path(__file__).resolve().parent
 sys.path.insert(0, str(TOOLS))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "cad" / "scripts"))
+import _telemetry  # noqa: E402
 import composite  # noqa: E402
 
 REPO = composite.REPO
@@ -118,11 +120,11 @@ def main() -> int:
             continue
         by_model.setdefault(pair["model"], []).append(pair)
     if not by_model:
-        print("nothing to render")
+        _telemetry.info("nothing to render")
         return 0
 
     n_total = sum(len(v) for v in by_model.values())
-    print(f"offline-rendering {n_total} pairs across {len(by_model)} models", flush=True)
+    _telemetry.info(f"offline-rendering {n_total} pairs across {len(by_model)} models")
     rendered: set[str] = set()
     with tempfile.TemporaryDirectory(prefix="harm_render_") as tmp:
         tmpdir = Path(tmp)
@@ -141,7 +143,7 @@ def main() -> int:
                 geom | {"pairs": [{k: v for k, v in j.items() if k != "_size"}
                                   for j in jobs]}),
                 encoding="utf-8")
-            print(f"  {model}: {len(pairs)} pairs, blender starting ...", flush=True)
+            _telemetry.info(f"{model}: {len(pairs)} pairs, blender starting ...")
             proc = subprocess.run(
                 [str(BLENDER), "-b", "--factory-startup", "-P", str(WORKER),
                  "--", str(job_file)],
@@ -167,7 +169,7 @@ def main() -> int:
                     "size": list(j["_size"]), "model_mtime": src.stat().st_mtime,
                     "engine": "blender"}), encoding="utf-8")
                 rendered.add(pair["id"])
-                print(f"  OK  {pair['id']}", flush=True)
+                _telemetry.success(f"{pair['id']}")
 
     composite.regenerate(rendered)
     return 0

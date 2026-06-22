@@ -25,6 +25,8 @@ from _common import (  # noqa: E402
     run_build,
 )
 
+import _telemetry  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[1]
 
 FIXES = {
@@ -39,7 +41,7 @@ async def build(adapter) -> dict[str, str]:
         check(f"open {part}", await adapter.open_model(str(path)))
         await apply_color(adapter, rgb)
         check(f"save {part}", await adapter.save_file())
-        print(f"  {part}: body colour {rgb}")
+        _telemetry.info(f"{part}: body colour {rgb}")
     return {"diag": "done"}
 
 

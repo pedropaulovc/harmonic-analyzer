@@ -19,12 +19,17 @@ Run with the SW venv python while the dirty assembly is open:
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
-import pythoncom
-import win32com.client
-from win32com.client import VARIANT
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from solidworks_mcp.adapters import sw_type_info
+import _telemetry  # noqa: E402
+
+import pythoncom  # noqa: E402
+import win32com.client  # noqa: E402
+from win32com.client import VARIANT  # noqa: E402
+
+from solidworks_mcp.adapters import sw_type_info  # noqa: E402
 
 _FEATURE_ERROR = {
     0: "none", 1: "warning", 2: "rebuild-error", 3: "dangling-no-members",
@@ -68,28 +73,28 @@ def report(label, model):
         dirty = bool(model.GetSaveFlag())
     except Exception as exc:  # noqa: BLE001
         dirty = f"<GetSaveFlag failed: {exc!r}>"
-    print(f"\n=== {label} ===", flush=True)
-    print(f"  GetSaveFlag (dirty?) = {dirty}", flush=True)
+    _telemetry.info(f"=== {label} ===")
+    _telemetry.debug(f"GetSaveFlag (dirty?) = {dirty}")
     ww = whats_wrong(model)
     if not ww:
-        print("  What's Wrong: clean", flush=True)
+        _telemetry.success("What's Wrong: clean")
     for entry in ww:
-        print(f"  What's Wrong: {entry}", flush=True)
+        _telemetry.info(f"What's Wrong: {entry}")
 
 
 def main() -> int:
     sw = win32com.client.GetActiveObject("SldWorks.Application")
-    print(f"attached to SW revision {sw.RevisionNumber()}", flush=True)
+    _telemetry.info(f"attached to SW revision {sw.RevisionNumber()}")
 
     doc = sw.ActiveDoc
     if doc is None:
-        print("!! no active document -- open harmonic-analyzer.SLDASM first", flush=True)
+        _telemetry.warn("no active document -- open harmonic-analyzer.SLDASM first")
         return 2
     doc = sw_type_info.flagged(doc, "IModelDoc2")
     title = doc.GetTitle()
-    print(f"active doc: {title}", flush=True)
+    _telemetry.info(f"active doc: {title}")
     cfg_names = list(doc.GetConfigurationNames() or [])
-    print(f"configurations: {cfg_names}", flush=True)
+    _telemetry.info(f"configurations: {cfg_names}")
 
     report(f"TOP {title}", doc)
 

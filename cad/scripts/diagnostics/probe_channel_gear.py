@@ -28,6 +28,7 @@ from __future__ import annotations
 import asyncio
 import sys
 
+import _telemetry
 from _common import (
     OUT_PNG,
     log,
@@ -81,7 +82,7 @@ async def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
-    print(f"Connecting ... (ratio={RATIO})", flush=True)
+    _telemetry.info(f"Connecting ... (ratio={RATIO})")
     await adapter.connect()
     # Close any docs left open in the session: a prior run's motion study lingers
     # in the in-memory doc and triggers the blocking "Update Initial Animation
@@ -187,7 +188,7 @@ async def main():
         log("  FAIL: lever did not follow -> gear not enforced kinematically")
 
     await adapter.disconnect()
-    print("Disconnected (NOT saved).", flush=True)
+    _telemetry.info("Disconnected (NOT saved).")
 
 
 if __name__ == "__main__":

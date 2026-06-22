@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import asyncio
 
+import _telemetry  # noqa: E402
 from _common import _flag, _read_member  # noqa: E402
 
 
@@ -45,13 +46,13 @@ async def main() -> int:
     sw = adapter.swApp
     asm = sw.ActiveDoc
     if asm is None:
-        print("No ActiveDoc -- the output assembly is not open.")
+        _telemetry.error("No ActiveDoc -- the output assembly is not open.")
         return 1
     title = str(_read_member(asm, "GetTitle") if not callable(getattr(asm, "GetTitle", None)) else asm.GetTitle())
     dtype = int(asm.GetType())
-    print(f"ActiveDoc: title={title!r} type={dtype} (2=assembly)")
+    _telemetry.info(f"ActiveDoc: title={title!r} type={dtype} (2=assembly)")
     if dtype != 2:
-        print("ActiveDoc is not an assembly -- aborting.")
+        _telemetry.error("ActiveDoc is not an assembly -- aborting.")
         return 1
 
     adapter.currentModel = asm
@@ -59,7 +60,7 @@ async def main() -> int:
     asm.ForceRebuild3(False)
     mgr = _read_member(asm, "InterferenceDetectionManager")
     if mgr is None:
-        print("InterferenceDetectionManager unavailable")
+        _telemetry.error("InterferenceDetectionManager unavailable")
         return 1
     _flag(mgr, "IInterferenceDetectionMgr")
     mgr.TreatCoincidenceAsInterference = False
@@ -68,9 +69,9 @@ async def main() -> int:
     mgr.MakeInterferingPartsTransparent = False
     mgr.CreateFastenersFolder = False
     mgr.UseTransform = False
-    print("computing interferences ...")
+    _telemetry.debug("computing interferences ...")
     interferences = list(mgr.GetInterferences() or [])
-    print(f"{len(interferences)} interference(s):\n")
+    _telemetry.info(f"{len(interferences)} interference(s):")
     for itf in interferences:
         _flag(itf, "IInterference")
         names = []
@@ -80,8 +81,8 @@ async def main() -> int:
         vol = float(_read_member(itf, "Volume") or 0.0) * 1e9
         body = itf.GetInterferenceBody()
         box = _box_mm(body) if body is not None else "(no body)"
-        print(f"  {' & '.join(names):42s} {vol:10.2f} mm^3")
-        print(f"      overlap bbox (machine mm): {box}")
+        _telemetry.info(f"{' & '.join(names):42s} {vol:10.2f} mm^3")
+        _telemetry.info(f"    overlap bbox (machine mm): {box}")
     mgr.Done()
     return 0
 

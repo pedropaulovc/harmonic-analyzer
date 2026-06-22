@@ -43,6 +43,8 @@ from _common import (
     volume_check,
 )
 
+import _telemetry
+
 PART_NAME = "pen-v-block"
 MATERIAL = "Brass"  # see _common.apply_material docstring
 
@@ -134,7 +136,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Block")
     vol = await _volume(adapter)
-    print(f"  volume after extrude: {vol:.1f} mm^3")
+    _telemetry.info(f"volume after extrude: {vol:.1f} mm^3")
 
     # Two vertical bores along Y. Each centre is off both axes (x = bore
     # station, z = -BlockDepth/2), so define_circle emits centre-X, centre-Z,
@@ -160,7 +162,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Bores")
     vol = await _volume(adapter)
-    print(f"  volume after bores: {vol:.1f} mm^3")
+    _telemetry.info(f"volume after bores: {vol:.1f} mm^3")
 
     # Stopped clamp slit through Z from the x=0 end. Rectilinear chain anchored
     # at vertex 0 (0, SlitY0): the last segment of each direction is supplied by
@@ -193,7 +195,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Slit")
     vol = await _volume(adapter)
-    print(f"  volume after slit: {vol:.1f} mm^3")
+    _telemetry.info(f"volume after slit: {vol:.1f} mm^3")
 
     # Front-face screw hole along Z. Centre off both axes -> centre-X,
     # centre-Z, diameter = 3 dims.
@@ -217,7 +219,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "ScrewHole")
     v_final = await _volume(adapter)
-    print(f"  volume after screw hole: {v_final:.1f} mm^3")
+    _telemetry.info(f"volume after screw hole: {v_final:.1f} mm^3")
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just

@@ -47,6 +47,8 @@ from _common import (
     volume_check,
 )
 
+import _telemetry
+
 PART_NAME = "crank-arm"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
@@ -156,7 +158,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Arm")
     vol = await _volume(adapter)
-    print(f"  volume after extrude: {vol:.1f} mm^3")
+    _telemetry.info(f"volume after extrude: {vol:.1f} mm^3")
 
     # Shaft bore + handle pivot bore, one through-cut. The shaft bore sits on the
     # origin (only its diameter is a dim); the pivot bore is off-axis at +X
@@ -185,7 +187,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Bores")
     vol = await _volume(adapter)
-    print(f"  volume after bores: {vol:.1f} mm^3")
+    _telemetry.info(f"volume after bores: {vol:.1f} mm^3")
 
     # Fiducial dimple on the Z=0 face (which face carries it is arbitrary
     # until assembly). Mid-plane cut of 2x depth: only the +Z half removes
@@ -209,7 +211,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Dimple")
     vol = await _volume(adapter)
-    print(f"  volume after dimple: {vol:.1f} mm^3")
+    _telemetry.info(f"volume after dimple: {vol:.1f} mm^3")
 
     # Tapered-pin cross-hole along global Y through boss and shaft bore at
     # mid-thickness (global Z = ARM_THICKNESS/2 -> Top sketch y = -Z).
@@ -237,7 +239,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "PinHole")
     vol = await _volume(adapter)
-    print(f"  volume after pin hole: {vol:.1f} mm^3")
+    _telemetry.info(f"volume after pin hole: {vol:.1f} mm^3")
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just

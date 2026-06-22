@@ -17,6 +17,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 from _common import check, run_build  # noqa: E402
 from render_compare import _flag  # noqa: E402
 
+import _telemetry  # noqa: E402
+
 ASM = Path(__file__).resolve().parents[1] / "out" / "sldasm" / "harmonic-analyzer.SLDASM"
 
 
@@ -27,7 +29,7 @@ async def build(adapter) -> dict[str, str]:
     _flag(model, "IAssemblyDoc")
 
     comps = model.GetComponents(False) or []
-    print(f"--- {len(comps)} components; those with y_max > 1150 mm ---")
+    _telemetry.info(f"--- {len(comps)} components; those with y_max > 1150 mm ---")
     for comp in comps:
         _flag(comp, "IComponent2")
         try:
@@ -40,17 +42,17 @@ async def build(adapter) -> dict[str, str]:
         if y_max <= 1150.0:
             continue
         x0, y0, z0, x1, y1, z1 = [v * 1000.0 for v in box]
-        print(
+        _telemetry.info(
             f"{comp.Name2}: x[{x0:.0f},{x1:.0f}] y[{y0:.0f},{y1:.0f}] "
             f"z[{z0:.0f},{z1:.0f}] supp={comp.GetSuppression2} vis={comp.Visible}"
         )
 
-    print("--- top-level assembly sketch features ---")
+    _telemetry.info("--- top-level assembly sketch features ---")
     feat = model.FirstFeature
     while feat is not None:
         tn = feat.GetTypeName2
         if "Profile" in str(tn) or "Sketch" in str(tn):
-            print(f"sketch: {feat.Name} type={tn}")
+            _telemetry.info(f"sketch: {feat.Name} type={tn}")
         feat = feat.GetNextFeature
 
     return {"diag": "done"}

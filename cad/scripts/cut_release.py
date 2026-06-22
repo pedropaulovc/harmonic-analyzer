@@ -64,6 +64,8 @@ from typing import Any
 
 from _common import CAD_ROOT, OUT_SLDASM, OUT_SLDPRT, log
 
+import _telemetry
+
 REPO_ROOT = CAD_ROOT.parent
 TOP_ASSEMBLY = "harmonic-analyzer"
 RELEASE_DIR = CAD_ROOT / "out" / "release"
@@ -991,7 +993,7 @@ def main() -> int:
     # the finally puts the real streams back and closes the file no matter what.
     log_path, restore = _start_release_log(version)
     try:
-        print(f"==  cutting release {version}", flush=True)
+        _telemetry.info(f"cutting release {version}")
         preflight(version, opts.allow_dirty)
 
         prev = previous_tag(version)
@@ -1010,15 +1012,15 @@ def main() -> int:
             url = None
         else:
             url = publish(version, zip_path, facts, opts.draft, log_path)
-        print(f"\nDone in {time.perf_counter() - started:.1f}s.", flush=True)
-        print(f"  version: {version}")
-        print(f"  bundle:  {zip_path} ({facts['size_mb']:.1f} MB) -- solidworks/ + "
-              f"{facts['documents']} docs x STEP+STL (+{facts['config_meshes']} "
-              f"per-config) + {facts['pngs']} PNGs + boxes/")
-        print(f"  log:     {log_path}")
+        _telemetry.success(f"Done in {time.perf_counter() - started:.1f}s.")
+        _telemetry.info(f"version: {version}")
+        _telemetry.info(f"bundle:  {zip_path} ({facts['size_mb']:.1f} MB) -- solidworks/ + "
+                        f"{facts['documents']} docs x STEP+STL (+{facts['config_meshes']} "
+                        f"per-config) + {facts['pngs']} PNGs + boxes/")
+        _telemetry.info(f"log:     {log_path}")
         if facts.get("logs_asset"):
-            print(f"  logs:    {RELEASE_DIR / facts['logs_asset']}")
-        print(f"  release: {url or '(--no-publish: not published)'}")
+            _telemetry.info(f"logs:    {RELEASE_DIR / facts['logs_asset']}")
+        _telemetry.info(f"release: {url or '(--no-publish: not published)'}")
         return 0
     finally:
         restore()

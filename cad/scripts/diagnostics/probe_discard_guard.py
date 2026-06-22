@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # for cut_relea
 import comtypes
 import comtypes.client
 
+import _telemetry
 from cut_release import SW_TYPELIB, SW_TYPELIB_VER, _discard_open_documents
 
 ASSEMBLY = r"C:\src\harmonic-analyzer\cad\out\sldasm\harmonic-analyzer.SLDASM"
@@ -31,32 +32,32 @@ SW_OPEN_SILENT = 1
 def main() -> int:
     mod = comtypes.client.GetModule((comtypes.GUID(SW_TYPELIB), *SW_TYPELIB_VER))
     sw = comtypes.client.GetActiveObject("SldWorks.Application", interface=mod.ISldWorks)
-    print(f"attached to SW revision {sw.RevisionNumber()}", flush=True)
+    _telemetry.info(f"attached to SW revision {sw.RevisionNumber()}")
 
     # (1) Whatever is currently open -- the prior probe left a dirty child session.
     cur = sw.IActiveDoc2
-    print(f"[1] currently active doc: "
-          f"{cur.GetTitle() if cur is not None else None}", flush=True)
+    _telemetry.info(f"[1] currently active doc: "
+                    f"{cur.GetTitle() if cur is not None else None}")
     _discard_open_documents(sw)
     if sw.IActiveDoc2 is not None:
-        print("!! [1] a doc is still active after discard", flush=True)
+        _telemetry.warn("[1] a doc is still active after discard")
         return 2
-    print("[1] OK -- live dirty session closed silently (no modal)", flush=True)
+    _telemetry.success("[1] live dirty session closed silently (no modal)")
 
     # (2) Freshly create the exact failure state: open top, activate the flexible
     # operating config -> dirties the drive-train child, then discard.
     sw.OpenDoc6(ASSEMBLY, SW_DOC_ASSEMBLY, SW_OPEN_SILENT, "", 0, 0)
     doc = sw.IActiveDoc2
     doc.ShowConfiguration2("operating")
-    print(f"[2] opened top, activated 'operating'; dirty="
-          f"{bool(doc.GetSaveFlag())}", flush=True)
+    _telemetry.info(f"[2] opened top, activated 'operating'; dirty="
+                    f"{bool(doc.GetSaveFlag())}")
     _discard_open_documents(sw)
     if sw.IActiveDoc2 is not None:
-        print("!! [2] a doc is still active after discard", flush=True)
+        _telemetry.warn("[2] a doc is still active after discard")
         return 3
-    print("[2] OK -- freshly-dirtied session closed silently (no modal)", flush=True)
+    _telemetry.success("[2] freshly-dirtied session closed silently (no modal)")
 
-    print("OK guard validated -- no Save Modified Documents prompt", flush=True)
+    _telemetry.success("guard validated -- no Save Modified Documents prompt")
     return 0
 
 

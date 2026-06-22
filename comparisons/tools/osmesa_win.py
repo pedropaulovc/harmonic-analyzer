@@ -20,6 +20,9 @@ import sys
 import urllib.request
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "cad" / "scripts"))
+import _telemetry  # noqa: E402
+
 # Last Mesa release that still ships a standalone osmesa.dll (removed in 25.1.0).
 MESA_VERSION = "25.0.7"
 _REL = f"https://github.com/pal1000/mesa-dist-win/releases/download/{MESA_VERSION}"
@@ -47,8 +50,7 @@ def ensure_osmesa() -> Path:
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     archive = CACHE_DIR / "mesa.7z"
     sevenzip = CACHE_DIR / "7zr.exe"
-    print(f"[osmesa] fetching Mesa {MESA_VERSION} osmesa.dll (one-time, ~68 MB) ...",
-          flush=True)
+    _telemetry.info(f"[osmesa] fetching Mesa {MESA_VERSION} osmesa.dll (one-time, ~68 MB) ...")
     _download(MESA_7Z_URL, archive)
     _download(SEVENZIP_URL, sevenzip)
     # ``e`` extracts flat, so x64/osmesa.dll lands directly as CACHE_DIR/osmesa.dll.
@@ -60,7 +62,7 @@ def ensure_osmesa() -> Path:
     sevenzip.unlink(missing_ok=True)
     if not OSMESA_DLL.exists():
         raise RuntimeError(f"osmesa.dll missing after extracting {MESA_7Z_URL}")
-    print(f"[osmesa] cached {OSMESA_DLL}", flush=True)
+    _telemetry.success(f"[osmesa] cached {OSMESA_DLL}")
     return OSMESA_DLL
 
 

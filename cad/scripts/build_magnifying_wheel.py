@@ -43,6 +43,8 @@ from _common import (
     volume_check,
 )
 
+import _telemetry
+
 PART_NAME = "magnifying-wheel"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
@@ -214,7 +216,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "SpokePattern")
     res = await adapter.get_mass_properties()
     v_built = float(res.data.volume)
-    print(f"  volume after pattern: {v_built:.1f} mm^3")
+    _telemetry.info(f"volume after pattern: {v_built:.1f} mm^3")
 
     await apply_material(adapter, MATERIAL)
 

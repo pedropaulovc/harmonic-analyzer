@@ -20,10 +20,14 @@ Writes references/curation/dedup.json.
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 import imagehash
 from PIL import Image, ImageFilter, ImageStat
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "cad" / "scripts"))
+import _telemetry  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
 STILLS = REPO / "references" / "engineerguy-youtube" / "stills"
@@ -88,7 +92,7 @@ def main() -> int:
     for num, (yt_id, title) in VIDEOS.items():
         vdir = STILLS / num
         if not vdir.is_dir():
-            print(f"video {num}: stills dir missing, skipping")
+            _telemetry.warn(f"video {num}: stills dir missing, skipping")
             continue
         clusters = cluster_video(vdir, THRESHOLD_OVERRIDES.get(num, args.threshold))
         n_frames = sum(len(c["members"]) for c in clusters)
@@ -97,11 +101,11 @@ def main() -> int:
                                  "clusters": clusters}
         total_in += n_frames
         total_out += len(clusters)
-        print(f"video {num} ({title}): {n_frames} thumbs -> {len(clusters)} clusters")
+        _telemetry.info(f"video {num} ({title}): {n_frames} thumbs -> {len(clusters)} clusters")
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(result, indent=1))
-    print(f"total: {total_in} -> {total_out} ({OUT})")
+    _telemetry.success(f"total: {total_in} -> {total_out} ({OUT})")
     return 0
 
 

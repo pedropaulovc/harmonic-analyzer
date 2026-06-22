@@ -24,6 +24,8 @@ from typing import Any
 from _common import IN, check, define_circle, ensure_fully_defined, volume_check
 from build_cone_gear import gap_area_in_disc, gear_facts
 
+import _telemetry
+
 __all__ = ["build_fixed_gear", "cut_tooth_gap", "pattern_about_z", "volume_check"]
 
 # Cut clearance radius (inches -- document units): beyond the largest tip
@@ -146,9 +148,9 @@ async def pattern_about_z(
             )
         )
         if res.is_success:
-            print(f"  OK  circular pattern axis via point {point}")
+            _telemetry.success(f"circular pattern axis via point {point}")
             return res
-        print(f"  ..  axis candidate {point} failed: {res.error}")
+        _telemetry.debug(f"axis candidate {point} failed: {res.error}")
     raise RuntimeError("circular pattern: no axis candidate selectable")
 
 

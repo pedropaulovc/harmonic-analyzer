@@ -55,6 +55,8 @@ from _common import (
     volume_check,
 )
 
+import _telemetry
+
 PART_NAME = "amplitude-bar"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
@@ -195,7 +197,7 @@ async def build(adapter) -> dict[str, str]:
     # hole), so the removed volume is asserted within ±2 of analytic.
     res = await adapter.get_mass_properties()
     vol_before = res.data.volume
-    print(f"  volume before top pin hole: {vol_before:.1f} mm^3")
+    _telemetry.info(f"volume before top pin hole: {vol_before:.1f} mm^3")
     pin_y = BAR_LENGTH - TOP_PIN_DROP
     # cheeks total = bar width - slot width
     expected_removed = (
@@ -231,8 +233,8 @@ async def build(adapter) -> dict[str, str]:
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         )
         if not cut.is_success:
-            print(
-                f"  ..  top pin cut at sketch x={sketch_x:+g} failed"
+            _telemetry.debug(
+                f"top pin cut at sketch x={sketch_x:+g} failed"
                 f" ({cut.error}); flipping sign"
             )
             # The unconsumed sketch would stay SHOWN and render in all 20
@@ -244,8 +246,8 @@ async def build(adapter) -> dict[str, str]:
         res = await adapter.get_mass_properties()
         removed = vol_before - res.data.volume
         if abs(removed - expected_removed) < 2.0:
-            print(
-                f"  OK  top pin hole at sketch x={sketch_x:+g}"
+            _telemetry.success(
+                f"top pin hole at sketch x={sketch_x:+g}"
                 f" removed {removed:.1f} mm^3 (analytic {expected_removed:.1f})"
             )
             name_last_feature(adapter, "TopPinHole")
@@ -253,8 +255,8 @@ async def build(adapter) -> dict[str, str]:
             vol_final = res.data.volume
             break
         if removed < 1.0:
-            print(
-                f"  ..  top pin cut at sketch x={sketch_x:+g} removed nothing;"
+            _telemetry.debug(
+                f"top pin cut at sketch x={sketch_x:+g} removed nothing;"
                 " flipping"
             )
             continue
