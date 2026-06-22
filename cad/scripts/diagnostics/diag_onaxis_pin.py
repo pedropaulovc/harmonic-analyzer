@@ -16,6 +16,7 @@ from __future__ import annotations
 import sys
 from typing import Any
 
+import _telemetry
 from _common import check, run_build, set_sketch_direct_db
 
 PIN_X = 9.5
@@ -29,14 +30,17 @@ async def _try(label: str, coro) -> bool:
     res = await coro
     ok = bool(res.is_success)
     RESULTS.append((label, ok, "" if ok else str(res.error)))
-    print(f"  {'OK ' if ok else 'XX '} {label}" + ("" if ok else f": {res.error}"))
+    if ok:
+        _telemetry.success(label)
+    else:
+        _telemetry.error(f"{label}: {res.error}")
     return ok
 
 
 async def _scenario(adapter: Any, name: str, with_bore: bool, direct_db: bool,
                     dim_first: bool) -> None:
-    print(f"--- scenario {name} (bore={with_bore}, direct_db={direct_db}, "
-          f"dim_first={dim_first})")
+    _telemetry.info(f"scenario {name} (bore={with_bore}, direct_db={direct_db}, "
+                    f"dim_first={dim_first})")
     check(f"{name}: create_sketch", await adapter.create_sketch("Front"))
     if direct_db:
         set_sketch_direct_db(adapter, True)
@@ -63,7 +67,7 @@ async def _scenario(adapter: Any, name: str, with_bore: bool, direct_db: bool,
                adapter.add_sketch_dimension(pin, None, "diameter", 2 * PIN_R))
     res = await adapter.check_sketch_fully_defined()
     state = res.data.get("definition_state") if res.is_success and res.data else "?"
-    print(f"  ..  {name}: sketch state = {state}")
+    _telemetry.debug(f"{name}: sketch state = {state}")
     check(f"{name}: exit_sketch", await adapter.exit_sketch())
 
 
@@ -144,15 +148,18 @@ async def build(adapter: Any) -> dict[str, str]:
                adapter.add_sketch_dimension(pin, None, "diameter", 2 * PIN_R))
     res = await adapter.check_sketch_fully_defined()
     state = res.data.get("definition_state") if res.is_success and res.data else "?"
-    print(f"  ..  H: sketch state = {state}")
+    _telemetry.debug(f"H: sketch state = {state}")
     check("H: exit_sketch", await adapter.exit_sketch())
 
     # I: same on-axis-revolve part, geometry created direct-to-DB (no
     # inference — the pin sits ON the revolve's seam edge along +X).
     await _scenario(adapter, "I", with_bore=True, direct_db=True, dim_first=False)
-    print("\n=== summary ===")
+    _telemetry.info("=== summary ===")
     for label, ok, err in RESULTS:
-        print(f"  {'PASS' if ok else 'FAIL'}  {label}" + ("" if ok else f"  [{err}]"))
+        if ok:
+            _telemetry.success(label)
+        else:
+            _telemetry.error(f"{label}  [{err}]")
     return {}
 
 

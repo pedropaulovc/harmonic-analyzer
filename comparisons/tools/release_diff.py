@@ -27,12 +27,16 @@ never the whole 460 MB asset.
 import argparse
 import os
 import struct
+import sys
 import urllib.request
 import zlib
 from pathlib import Path
 
 import numpy as np
 import trimesh
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "cad" / "scripts"))
+import _telemetry  # noqa: E402
 
 CACHE = Path(os.environ.get("RELEASE_DIFF_CACHE", "/tmp/release_diff_cache"))
 
@@ -214,7 +218,7 @@ def main():
     args = ap.parse_args()
 
     ua, ub = asset_url(args.tag_a), asset_url(args.tag_b)
-    print("reading central directories ...", flush=True)
+    _telemetry.info("reading central directories ...")
     ca, cb = central_dir(ua), central_dir(ub)
 
     def steps(cd):

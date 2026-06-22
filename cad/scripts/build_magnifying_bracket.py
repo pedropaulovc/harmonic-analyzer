@@ -49,6 +49,8 @@ from _common import (
     volume_check,
 )
 
+import _telemetry
+
 PART_NAME = "magnifying-bracket"
 MATERIAL = "Plain Carbon Steel"  # black hardware
 
@@ -181,7 +183,7 @@ async def build(adapter) -> dict[str, str]:
         * COLLAR_HALF_LEN
     )
     vol = await _volume(adapter)
-    print(f"  volume after collar: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    _telemetry.info(f"volume after collar: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.005 * expected:
         raise RuntimeError(f"collar volume {vol:.1f} != {expected:.1f}")
 
@@ -218,7 +220,7 @@ async def build(adapter) -> dict[str, str]:
     before = expected
     vol = await _volume(adapter)
     added = vol - before
-    print(f"  volume after arm: {vol:.1f} mm^3 (+{added:.1f}, solid {v_arm:.1f})")
+    _telemetry.info(f"volume after arm: {vol:.1f} mm^3 (+{added:.1f}, solid {v_arm:.1f})")
     if not (0.85 * v_arm <= added <= 1.01 * v_arm):
         raise RuntimeError(f"arm: added {added:.1f}, expected ~{v_arm:.1f}")
     expected = vol
@@ -268,7 +270,7 @@ async def build(adapter) -> dict[str, str]:
     before = expected
     vol = await _volume(adapter)
     added = vol - before
-    print(f"  volume after flange: {vol:.1f} mm^3 (+{added:.1f}, net {v_net:.1f})")
+    _telemetry.info(f"volume after flange: {vol:.1f} mm^3 (+{added:.1f}, net {v_net:.1f})")
     if abs(added - v_net) > 0.02 * v_net:
         raise RuntimeError(f"flange: added {added:.1f}, expected {v_net:.1f}")
     expected = vol

@@ -50,6 +50,8 @@ from _common import (  # noqa: E402
 )
 from render_compare import _flag, _read_member, model_path  # noqa: E402
 
+import _telemetry  # noqa: E402
+
 OUT_STL = CAD_ROOT / "out" / "stl"
 OUT_STEP = CAD_ROOT / "out" / "step"
 OUT_BOXES = CAD_ROOT / "out" / "boxes"
@@ -305,9 +307,9 @@ def main() -> int:
             stale_asms.append(m)
 
     if not stale_parts and not stale_asms:
-        print("all exports fresh")
+        _telemetry.info("all exports fresh")
         return 0
-    print(f"exporting parts={stale_parts or '[]'} assemblies={stale_asms or '[]'}")
+    _telemetry.info(f"exporting parts={stale_parts or '[]'} assemblies={stale_asms or '[]'}")
     for d in (OUT_STL, OUT_STEP, OUT_BOXES):
         d.mkdir(parents=True, exist_ok=True)
 

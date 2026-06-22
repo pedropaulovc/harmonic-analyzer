@@ -49,6 +49,8 @@ from build_motion_study import (
     assert_motion_progressed,
 )
 
+import _telemetry
+
 # A setup DOF is posed by hand and then held, so the demonstration sweep is
 # short and gentle: 3 RPM for 2 s -> ~36 deg of swing, enough to read the arc
 # without spinning the member through a full turn (these joints have no hard
@@ -231,10 +233,10 @@ async def build(adapter: Any) -> dict[str, str]:
         # Throwaway study lives only in the dirtied in-memory doc -- discard it.
         adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
-    print("\nSETUP-DOF ARTICULATION DRIVES (sub-level Basic Motion sweeps):")
+    _telemetry.info("SETUP-DOF ARTICULATION DRIVES (sub-level Basic Motion sweeps):")
     for r in results:
-        print(f"  {r['dof']:22s} swing {r['span_deg']:>6s} deg"
-              + (f"  -> {r['video']}" if r.get("video") else "  (no video)"))
+        _telemetry.info(f"{r['dof']:22s} swing {r['span_deg']:>6s} deg"
+                        + (f"  -> {r['video']}" if r.get("video") else "  (no video)"))
     return {r["dof"]: r.get("video", r["span_deg"]) for r in results}
 
 

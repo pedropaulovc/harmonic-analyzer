@@ -48,6 +48,8 @@ from _common import (
     volume_check,
 )
 
+import _telemetry
+
 PART_NAME = "connecting-rod"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
@@ -183,7 +185,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "TipBlock")
     res = await adapter.get_mass_properties()
-    print(f"  volume after bosses: {res.data.volume:.1f} mm^3")
+    _telemetry.info(f"volume after bosses: {res.data.volume:.1f} mm^3")
     # ring strap shrank with the 0.6022-scaled cam (bore 30.8, outer r 20.4) ->
     # disc ~3922 + shank ~2062 + block ~450 - overlap; Phase 3 rebuild confirms
 
@@ -232,7 +234,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "PinHole")
     res = await adapter.get_mass_properties()
     v_built = float(res.data.volume)
-    print(f"  volume after cuts: {v_built:.1f} mm^3")
+    _telemetry.info(f"volume after cuts: {v_built:.1f} mm^3")
     # bore now -2234 (r 15.4 x 3) - sliver - pin; Phase 3 rebuild confirms
 
     # Named bore axes for assembly mates (view-independent name selection):

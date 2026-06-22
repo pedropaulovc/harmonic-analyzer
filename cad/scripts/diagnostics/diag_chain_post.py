@@ -13,6 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+import _telemetry  # noqa: E402
 from _common import OUT_SLDPRT, check, run_build  # noqa: E402
 from _common import _flag, _read_member  # type: ignore[attr-defined]  # noqa: E402
 
@@ -45,7 +46,7 @@ async def build(adapter) -> dict[str, str]:
             if box:
                 boxes[name] = [round(float(v) * 1000.0, 2) for v in box]
     for n, b in boxes.items():
-        print(f"  drive-train {n}: x {b[0]}..{b[3]}  y {b[1]}..{b[4]}  z {b[2]}..{b[5]}")
+        _telemetry.info(f"drive-train {n}: x {b[0]}..{b[3]}  y {b[1]}..{b[4]}  z {b[2]}..{b[5]}")
 
     check("open output", await adapter.open_model(
         str((OUT_SLDPRT.parent / "sldasm" / "output.SLDASM").resolve())))
@@ -58,7 +59,7 @@ async def build(adapter) -> dict[str, str]:
             box = adapter._attempt(lambda c=comp: c.GetBox(False, False), default=None)
             if box:
                 b = [round(float(v) * 1000.0, 2) for v in box]
-                print(f"  output {name}: x {b[0]}..{b[3]}  y {b[1]}..{b[4]}  z {b[2]}..{b[5]}")
+                _telemetry.info(f"output {name}: x {b[0]}..{b[3]}  y {b[1]}..{b[4]}  z {b[2]}..{b[5]}")
     return {"ok": "1"}
 
 

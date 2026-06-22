@@ -21,6 +21,8 @@ from _common import (  # noqa: E402
     run_build,
 )
 
+import _telemetry  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[1]
 JOBS = {
     "tube-frame": POLISHED_STEEL,
@@ -41,7 +43,7 @@ async def build(adapter) -> dict[str, str]:
         check(f"open {stem}", await adapter.open_model(str(path)))
         await apply_color(adapter, rgb)
         check(f"save {stem}", await adapter.save_file())
-        print(f"  {stem}: {rgb}")
+        _telemetry.info(f"{stem}: {rgb}")
         results[stem] = str(rgb)
     return results
 

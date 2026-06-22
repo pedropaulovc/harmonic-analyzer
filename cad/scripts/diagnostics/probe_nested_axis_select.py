@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 
+import _telemetry
 from _common import _flag, _read_member, log
 
 
@@ -63,7 +64,7 @@ async def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
-    print("Connecting (ATTACH, no close) ...", flush=True)
+    _telemetry.info("Connecting (ATTACH, no close) ...")
     await adapter.connect()
 
     doc = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=None)
@@ -126,7 +127,7 @@ async def main():
                 log("    GetCorrespondingEntity returned None")
 
     await adapter.disconnect()
-    print("Disconnected (assembly left open).", flush=True)
+    _telemetry.info("Disconnected (assembly left open).")
 
 
 if __name__ == "__main__":

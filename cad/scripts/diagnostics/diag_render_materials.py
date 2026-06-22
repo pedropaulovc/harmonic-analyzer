@@ -19,6 +19,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 from _common import check, run_build  # noqa: E402
 from render_compare import _flag, _read_member  # noqa: E402
 
+import _telemetry  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[1]
 
 PARTS = ("tube-frame", "platen-paper", "crank-handle", "amplitude-bar", "harmonic-base")
@@ -36,14 +38,14 @@ async def build(adapter) -> dict[str, str]:
         if first:
             names = [n for n in dir(ext)
                      if "Render" in n or "Appearance" in n or "DisplayState" in n]
-            print("ext members:", names)
+            _telemetry.info(f"ext members: {names}")
             first = False
         try:
             count = ext.GetRenderMaterialsCount2(2, None)  # swAllDisplayState
         except Exception as exc:
-            print(f"{part}: GetRenderMaterialsCount2 failed: {exc}")
+            _telemetry.error(f"{part}: GetRenderMaterialsCount2 failed: {exc}")
             continue
-        print(f"{part}: {count} render material(s)")
+        _telemetry.info(f"{part}: {count} render material(s)")
         if not count:
             continue
         mats = ext.GetRenderMaterials2(2, None)
@@ -59,8 +61,8 @@ async def build(adapter) -> dict[str, str]:
             rgb = None
             if isinstance(pc, int):
                 rgb = (pc & 0xFF, (pc >> 8) & 0xFF, (pc >> 16) & 0xFF)
-            print(f"  file={fn}")
-            print(f"  primary={pc} rgb={rgb} entities={n_ent}")
+            _telemetry.info(f"file={fn}")
+            _telemetry.info(f"primary={pc} rgb={rgb} entities={n_ent}")
     return {"diag": "done"}
 
 

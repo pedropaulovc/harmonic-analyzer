@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 
+import _telemetry
 from _common import _flag, _read_member, check, log
 from build_motion_study import (
     _by_z_rank, _comp_xform, _components, _find_one, _iter_mates, _rot_angle,
@@ -35,7 +36,7 @@ async def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
-    print("Connecting (ATTACH) ...", flush=True)
+    _telemetry.info("Connecting (ATTACH) ...")
     await adapter.connect()
     doc = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=None)
     if doc is None:
@@ -96,7 +97,7 @@ async def main():
         "0 => the four-bar mate scheme itself locks.")
 
     await adapter.disconnect()
-    print("Disconnected (1 cam unsuppressed, doc not saved).", flush=True)
+    _telemetry.info("Disconnected (1 cam unsuppressed, doc not saved).")
 
 
 if __name__ == "__main__":

@@ -62,6 +62,8 @@ from _common import (
     volume_check,
 )
 
+import _telemetry
+
 PART_NAME = "gooseneck"
 MATERIAL = "Chrome Stainless Steel"  # polished chrome tube
 
@@ -160,7 +162,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Leg")
     expected = math.pi * TUBE_R**2 * (LEG_TOP - LEG_BOTTOM)
     vol = await _volume(adapter)
-    print(f"  volume after leg: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    _telemetry.info(f"volume after leg: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.005 * expected:
         raise RuntimeError(f"leg volume {vol:.1f} != {expected:.1f}")
 
@@ -241,7 +243,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "BendProfile")
     res = await adapter.create_sweep(SweepParameters(path=path_name))
     if not res.is_success:
-        print(f"  ..  bend sweep failed ({res.error}); flipping profile plane")
+        _telemetry.debug(f"bend sweep failed ({res.error}); flipping profile plane")
         profile_plane = check(
             "create_plane bend profile (flipped)",
             await adapter.create_plane(
@@ -267,7 +269,7 @@ async def build(adapter) -> dict[str, str]:
     v_arm = math.pi * TUBE_R**2 * ARM_RUN
     expected = expected + v_bend + v_arm
     vol = await _volume(adapter)
-    print(f"  volume after bend + arm: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    _telemetry.info(f"volume after bend + arm: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.01 * expected:
         raise RuntimeError(f"bend volume {vol:.1f} != {expected:.1f}")
     expected = vol  # rebase: keep the sweep's B-rep slack out of the lug delta
@@ -305,7 +307,7 @@ async def build(adapter) -> dict[str, str]:
     before = expected
     vol = await _volume(adapter)
     added = vol - before
-    print(f"  volume after lug: {vol:.1f} mm^3 (+{added:.1f}, solid {v_lug:.1f})")
+    _telemetry.info(f"volume after lug: {vol:.1f} mm^3 (+{added:.1f}, solid {v_lug:.1f})")
     if not (0.95 * v_lug <= added <= 1.01 * v_lug):
         raise RuntimeError(f"lug: added {added:.1f}, expected ~{v_lug:.1f}")
     expected = vol
@@ -354,7 +356,7 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     added = vol - before
     v_net = v_pin - v_overlap
-    print(f"  volume after pin: {vol:.1f} mm^3 (+{added:.1f}, net {v_net:.1f})")
+    _telemetry.info(f"volume after pin: {vol:.1f} mm^3 (+{added:.1f}, net {v_net:.1f})")
     if not (0.9 * v_net <= added <= 1.1 * v_net):
         raise RuntimeError(f"pin: added {added:.1f}, expected ~{v_net:.1f}")
     final_vol = vol

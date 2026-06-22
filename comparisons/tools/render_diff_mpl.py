@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
 
 import matplotlib
@@ -29,6 +30,9 @@ from mpl_toolkits.mplot3d.art3d import (  # noqa: E402
     Line3DCollection,
     Poly3DCollection,
 )
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "cad" / "scripts"))
+import _telemetry  # noqa: E402
 
 HILITE = "#dc1f1f"
 GHOST = "#c8c8cd"
@@ -116,7 +120,7 @@ def main() -> int:
             n_red += 1
         else:
             edges.extend(box_edges(lo, hi))
-    print(f"red instances={n_red}  red tris={len(red_tris)}  ghost boxes={len(edges)//12}")
+    _telemetry.info(f"red instances={n_red}  red tris={len(red_tris)}  ghost boxes={len(edges)//12}")
 
     allp = np.array(all_pts)
     lo, hi = allp.min(0), allp.max(0)
@@ -153,7 +157,7 @@ def main() -> int:
         fig.savefig(out, bbox_inches="tight", facecolor="white")
         plt.close(fig)
         written.append(out.name)
-        print("wrote", out)
+        _telemetry.success(f"wrote {out}")
     (args.out / "diff_mpl_summary.json").write_text(json.dumps(
         {"old": args.old, "changed": sorted(changed),
          "red_instances": n_red, "images": written}, indent=2))

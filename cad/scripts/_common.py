@@ -50,10 +50,11 @@ import asyncio
 import functools
 import sys
 import time
-import traceback
 from collections.abc import Awaitable, Callable, Iterable
 from pathlib import Path
 from typing import Any
+
+import _telemetry  # observability spine: console logging + tracing, preconfigured
 
 CAD_ROOT = Path(__file__).resolve().parents[1]
 OUT_SLDPRT = CAD_ROOT / "out" / "sldprt"
@@ -71,30 +72,29 @@ DEFAULT_VIEWS = ("front", "top", "isometric")
 
 
 _T0 = time.perf_counter()
-_LAST_TICK = _T0
-
-
-def _stamp() -> str:
-    """``[total +step]`` wall-clock prefix; step = time since the last log."""
-    global _LAST_TICK
-    now = time.perf_counter()
-    prefix = f"[{now - _T0:7.1f}s +{now - _LAST_TICK:5.1f}s]"
-    _LAST_TICK = now
-    return prefix
 
 
 def log(message: str) -> None:
-    """Timestamped, unbuffered progress line (stdout is redirected when the
-    build runs in the background, so unflushed prints sit in the pipe and the
-    build looks hung)."""
-    print(f"  ..  {_stamp()} {message}", flush=True)
+    """Timestamped progress line, now an OpenTelemetry DEBUG record.
+
+    Kept as a thin alias over :func:`_telemetry.progress` so the ~170 scripts
+    importing ``log`` from here are instrumented unchanged: the record is
+    bridged into OTel (correlated to the active span) and rendered to the
+    console with the historical ``  ..  [stamp] message`` styling.
+    """
+    _telemetry.progress(message)
 
 
 def check(label: str, result: Any) -> Any:
-    """Raise when an adapter result is not success; return ``result.data``."""
+    """Raise when an adapter result is not success; return ``result.data``.
+
+    A failure raises inside the active span, where :func:`_telemetry.span`
+    records it (ERROR status + exception event); success emits an OTel SUCCESS
+    record (the historical ``  OK  `` line).
+    """
     if not result.is_success:
         raise RuntimeError(f"{label} failed: {result.error}")
-    print(f"  OK  {_stamp()} {label}", flush=True)
+    _telemetry.success(label)
     return result.data
 
 
@@ -123,13 +123,13 @@ async def ensure_fully_defined(
         if res.is_success and res.data:
             state = res.data.get("definition_state")
             if state not in ("fully_defined", "under_defined", "over_defined"):
-                print(f"  ..  check payload: {res.data!r}")
+                _telemetry.debug(f"check payload: {res.data!r}")
             return state
         return None
 
     state = await _state()
     if state == "fully_defined":
-        print(f"  OK  fully defined: {label}")
+        _telemetry.success(f"fully defined: {label}")
         return
 
     if state == "over_defined":
@@ -156,8 +156,8 @@ async def ensure_fully_defined(
     # and over-defines the sketch). "unknown" is kept fixable as a safety
     # net: the status probe can transiently fail (pywin32 property/method
     # resolution drift on GetConstrainedStatus) and a later read may recover.
-    print(
-        f"  !!  WARN {label}: fix escalation (equation-curve whitelist only"
+    _telemetry.warn(
+        f"{label}: fix escalation (equation-curve whitelist only"
         " — anything else must use semantic anchors)"
     )
     for entity_id in fix_entities:
@@ -167,9 +167,9 @@ async def ensure_fully_defined(
         if not fixed.is_success:
             raise RuntimeError(f"{label}: fix {entity_id} failed: {fixed.error}")
         state = await _state()
-        print(f"  ..  fixed {entity_id} -> {state}")
+        _telemetry.debug(f"fixed {entity_id} -> {state}")
         if state == "fully_defined":
-            print(f"  OK  fully defined after fixing {entity_id}: {label}")
+            _telemetry.success(f"fully defined after fixing {entity_id}: {label}")
             return
 
     raise RuntimeError(f"{label}: sketch not fully defined (state={state!r})")
@@ -693,7 +693,7 @@ def blank_sketch(adapter: Any, sketch_name: str) -> None:
         raise RuntimeError(f"blank_sketch: cannot select sketch {sketch_name!r}")
     model.BlankSketch()
     model.ClearSelection2(True)
-    print(f"  OK  blanked sketch {sketch_name}")
+    _telemetry.success(f"blanked sketch {sketch_name}")
 
 
 def set_sketch_direct_db(adapter: Any, enabled: bool) -> None:
@@ -709,7 +709,7 @@ def set_sketch_direct_db(adapter: Any, enabled: bool) -> None:
     pin chain closed and defined through fixed neighbours).
     """
     adapter.currentSketchManager.AddToDB = enabled
-    print(f"  OK  sketch AddToDB = {enabled}")
+    _telemetry.success(f"sketch AddToDB = {enabled}")
 
 
 
@@ -735,7 +735,7 @@ async def volume_check(adapter: Any, label: str, expected: float, tol: float) ->
             f"{label}: volume {volume:.1f} mm^3, expected {expected:.1f} "
             f"(+/- {tol:.1f})"
         )
-    print(f"  OK  {label}: volume {volume:.1f} mm^3 (analytic {expected:.1f})")
+    _telemetry.success(f"{label}: volume {volume:.1f} mm^3 (analytic {expected:.1f})")
     return volume
 
 
@@ -791,7 +791,9 @@ def extrude_at_offset(
     if feature is None:
         raise RuntimeError("extrude_at_offset: FeatureExtrusion3 returned None")
     name = str(_read_member(feature, "Name"))
-    print(f"  OK  extrude_at_offset {sketch_name} @ {'-' if flip else '+'}{offset:g} -> {name}")
+    _telemetry.success(
+        f"extrude_at_offset {sketch_name} @ {'-' if flip else '+'}{offset:g} -> {name}"
+    )
     return name
 
 
@@ -843,8 +845,9 @@ async def export_part_stl(adapter: Any, out_path: Path) -> None:
         rc = adapter._attempt(lambda: adapter.currentModel.SaveAs3(str(out_path), 0, 0))
         if not out_path.exists():
             raise RuntimeError(f"STL export produced no file (SaveAs3 rc={rc!r}): {out_path}")
-        print(f"  OK  export STL -> {out_path.name}"
-              f" ({out_path.stat().st_size / 1e6:.1f} MB)")
+        _telemetry.success(
+            f"export STL -> {out_path.name} ({out_path.stat().st_size / 1e6:.1f} MB)"
+        )
     finally:
         for k, v in old_ints.items():
             sw.SetUserPreferenceIntegerValue(k, v)
@@ -1082,7 +1085,7 @@ async def measure_check(
         raise RuntimeError(
             f"measure {label}: {key}={value} outside {expected} +/- {tol}"
         )
-    print(f"  OK  measure {label}: {key}={value:.4f} (expected {expected:g})")
+    _telemetry.success(f"measure {label}: {key}={value:.4f} (expected {expected:g})")
 
 
 async def bbox_extent_check(
@@ -1149,16 +1152,16 @@ async def bbox_extent_check(
         raise RuntimeError(
             f"bbox {label}: {axis}-extent={extent:.4f} outside {expected} +/- {tol}"
         )
-    print(f"  OK  bbox {label}: {axis}-extent={extent:.4f} (expected {expected:g})")
+    _telemetry.success(f"bbox {label}: {axis}-extent={extent:.4f} (expected {expected:g})")
 
 
 async def report_mass_properties(adapter: Any) -> None:
     """Print volume/bounding data for the eyeball-vs-DIMENSIONS.md check."""
     res = await adapter.get_mass_properties()
     if res.is_success:
-        print(f"  mass properties: {res.data!r}")
+        _telemetry.debug(f"mass properties: {res.data!r}")
         return
-    print(f"  WARN get_mass_properties failed: {res.error}")
+    _telemetry.warn(f"get_mass_properties failed: {res.error}")
 
 
 # ---------------------------------------------------------------------------
@@ -1247,7 +1250,7 @@ def name_last_feature(adapter: Any, name: str) -> str:
     feat = _last_feature(adapter)
     old = str(_read_member(feat, "Name"))
     feat.Name = name
-    print(f"  OK  feature {old!r} -> {name!r}")
+    _telemetry.success(f"feature {old!r} -> {name!r}")
     return name
 
 
@@ -1292,7 +1295,7 @@ def dump_dimensions(adapter: Any, feature_name: str) -> list[dict[str, Any]]:
         full = str(_read_member(idim, "FullName"))
         val = _dim_value_mm(idim)
         rows.append({"index": i, "full_name": full, "value_mm": val})
-        print(f"  dim[{i}] {full} = {val:.4g} mm")
+        _telemetry.debug(f"dim[{i}] {full} = {val:.4g} mm")
     return rows
 
 
@@ -1316,11 +1319,11 @@ def name_dimensions(adapter: Any, feature_name: str, names: list[str | None]) ->
         old = str(_read_member(idim, "FullName"))
         val = _dim_value_mm(idim)
         if new is None:
-            print(f"  --  dim {old} = {val:.4g} mm (kept)")
+            _telemetry.info(f"dim {old} = {val:.4g} mm (kept)")
             continue
         idim.Name = new
         out.append(f"{new}@{feature_name}")
-        print(f"  OK  dim {old} = {val:.4g} mm -> {new}@{feature_name}")
+        _telemetry.success(f"dim {old} = {val:.4g} mm -> {new}@{feature_name}")
     return out
 
 
@@ -1339,7 +1342,7 @@ async def set_global(adapter: Any, name: str, expr: str | float) -> float:
     if not res.is_success:
         raise RuntimeError(f"set_global {name}={expr!r}: {res.error}")
     value = res.data.get("value") if res.data else None
-    print(f"  OK  global {name} = {expr}  -> {value}")
+    _telemetry.success(f"global {name} = {expr}  -> {value}")
     return float(value) if value is not None else float("nan")
 
 
@@ -1356,7 +1359,7 @@ async def drive_dimension(adapter: Any, dim_name: str, expr: str | float) -> Non
     res = await adapter.create_equation(CreateEquationParameters(equation=equation))
     if not res.is_success:
         raise RuntimeError(f"drive_dimension {equation!r}: {res.error}")
-    print(f"  OK  equation {equation}")
+    _telemetry.success(f"equation {equation}")
 
 
 async def force_rebuild(adapter: Any) -> None:
@@ -1559,30 +1562,42 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
         if reconfigure is not None:
             reconfigure(encoding="utf-8", errors="replace")
 
+    script = Path(sys.argv[0]).stem if sys.argv and sys.argv[0] else "build"
+
     async def _run() -> dict[str, str]:
         adapter = PyWin32Adapter({})
-        print("Connecting to SolidWorks ...", flush=True)
-        await adapter.connect()
-        log("connected")
-        # Re-runnable: a previous (possibly failed) build leaves documents
-        # open, and saving over an open path fails.
-        adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-        log("CloseAllDocuments (clean session)")
+        async with _telemetry.aspan("sw.connect"):
+            _telemetry.info("connecting to SolidWorks")
+            await adapter.connect()
+            _telemetry.success("connected")
+            # Re-runnable: a previous (possibly failed) build leaves documents
+            # open, and saving over an open path fails.
+            adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+            _telemetry.success("CloseAllDocuments (clean session)")
         try:
-            return await build(adapter)
+            async with _telemetry.aspan("build", script=script):
+                return await build(adapter)
         finally:
-            try:
-                await adapter.disconnect()
-                print("Disconnected.", flush=True)
-            except Exception as exc:  # noqa: BLE001
-                print(f"  WARN disconnect failed: {exc}", flush=True)
+            # Teardown is its own span so a disconnect failure is attributable
+            # and never a silent gap between the build span and process exit.
+            async with _telemetry.aspan("sw.disconnect"):
+                try:
+                    await adapter.disconnect()
+                    _telemetry.success("disconnected")
+                except Exception as exc:  # noqa: BLE001
+                    _telemetry.warn(f"disconnect failed: {exc}")
 
-    try:
-        artefacts = asyncio.run(_run())
-    except Exception:
-        traceback.print_exc()
-        return 1
-    print(f"\nDone in {time.perf_counter() - _T0:.1f}s. Artefacts:", flush=True)
-    for key, value in artefacts.items():
-        print(f"  {key}: {value}")
+    # Root span: every connect/build/disconnect child hangs off this, so the
+    # whole invocation is one gapless trace from process start to exit.
+    with _telemetry.run_pipeline_span("part.build", script=script) as root:
+        try:
+            artefacts = asyncio.run(_run())
+        except Exception as exc:  # noqa: BLE001 - recorded on the root span
+            root.record_exception(exc)
+            _telemetry.error(f"build {script} failed: {exc}", exc_info=True)
+            return 1
+        _telemetry.success(f"done in {time.perf_counter() - _T0:.1f}s")
+        for key, value in artefacts.items():
+            _telemetry.info(f"artefact {key}: {value}")
+    _telemetry.shutdown()
     return 0

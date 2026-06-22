@@ -15,6 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+import _telemetry  # noqa: E402
 from _common import check, run_build  # noqa: E402
 from render_compare import _flag, capture, component_boxes, resolve_framing, set_camera  # noqa: E402
 
@@ -44,7 +45,7 @@ async def build(adapter) -> dict[str, str]:
     for c in top:
         _flag(c, "IComponent2")
     names = [c.Name2 for c in top]
-    print("top-level:", names)
+    _telemetry.info(f"top-level: {names}")
 
     boxes = component_boxes(adapter)
     cam = dict(CAM)
@@ -54,7 +55,7 @@ async def build(adapter) -> dict[str, str]:
         set_camera(adapter, cam)
         out = OUT / f"diag-az-90--{tag}.png"
         await capture(adapter, out, 945, 2240)
-        print(f"captured {out.name}")
+        _telemetry.success(f"captured {out.name}")
 
     await shot("baseline")
     for c in top:

@@ -91,7 +91,6 @@ import hashlib
 import io
 import json
 import os
-import sys
 import tarfile
 import time
 from pathlib import Path
@@ -140,7 +139,9 @@ _KEYDIR = _REPORTS / "cache-keys"
 
 
 def _log(msg: str) -> None:
-    print(f"[cache] {msg}", file=sys.stderr, flush=True)
+    import _telemetry  # local import: keeps the cache usable even if telemetry is absent
+
+    _telemetry.info(f"[cache] {msg}")
 
 
 def _debug() -> bool:

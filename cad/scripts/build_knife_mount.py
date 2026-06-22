@@ -61,6 +61,8 @@ from _common import (
 )
 from build_summing_lever import HEX_H, HEX_W
 
+import _telemetry
+
 PART_NAME = "knife-mount"
 MATERIAL = "Gray Cast Iron"  # cast bearing bracket, painted dark (ch18 p.43)
 
@@ -156,7 +158,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Block")
     expected = 2.0 * BLK_HALF_X * (BLK_TOP - BLK_BOT) * SUPPORT_Z_THICK
     vol = await _volume(adapter)
-    print(f"  volume after block: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    _telemetry.info(f"volume after block: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.005 * expected:
         raise RuntimeError(f"block volume {vol:.1f} != {expected:.1f}")
 
@@ -184,7 +186,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "KnifeBore")
     expected -= math.pi * R_BORE**2 * SUPPORT_Z_THICK
     vol = await _volume(adapter)
-    print(f"  volume after bore: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    _telemetry.info(f"volume after bore: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.01 * expected:
         raise RuntimeError(f"bore volume {vol:.1f} != {expected:.1f}")
 
