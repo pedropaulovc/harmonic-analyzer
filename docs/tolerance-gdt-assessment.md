@@ -279,9 +279,13 @@ v3.3.0; **DimXpert is included with every SOLIDWORKS license — confirmed for t
    concentricity, perpendicularity) and datums, author them during the build via
    `IDimXpertManager.DimXpertPart` → `IDimXpertPart.InsertDatum` / `InsertSizeDimension` /
    `InsertLocationDimension` / `InsertGtol` (+ typed interfaces `IDimXpertConcentricityTolerance`,
-   `IDimXpertOrientationTolerance` for perp/parallel, `IDimXpertFlatnessTolerance`…). Runout has no
-   dedicated DimXpert class → place it with classic `IModelDoc2.InsertGtol` +
-   `swGtolGeomCharSymbol_e` (runout), or use DimXpert concentricity-to-datum-axis.
+   `IDimXpertOrientationTolerance` for perp/parallel, `IDimXpertFlatnessTolerance`…). **DimXpert
+   does carry circular & total runout** (exposed on the base `IDimXpertTolerance`; unlike
+   concentricity/position it has no dedicated named subclass — the type is discriminated via
+   `IDimXpertAnnotation::Type`). Author runout with `IDimXpertPart.InsertGtol` (verify the
+   `swDimXpertGtolType_e` runout value on the seat — that enum isn't in the offline bundle), with
+   classic `IModelDoc2.InsertGtol` + `swGcsCIRCRUNOUT` / `swGcsTOTALRUNOUT` (`swGtolGeomCharSymbol_e`)
+   as a guaranteed fallback.
 3. **Surface-finish symbols** from `surface_finish:` → `IModelDoc2.InsertSurfaceFinishSymbol2` on the
    bearing/sliding faces.
 
