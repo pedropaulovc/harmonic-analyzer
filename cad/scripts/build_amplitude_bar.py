@@ -21,7 +21,7 @@ sketch-x sign flipped on a miss (crank-arm cross-hole pattern).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_amplitude_bar.py
+    uv run python cad\scripts\build_amplitude_bar.py
 """
 
 from __future__ import annotations

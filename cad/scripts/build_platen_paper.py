@@ -15,7 +15,7 @@ thickness extruded +Z (same scheme as build_platen).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_platen_paper.py
+    uv run python cad\scripts\build_platen_paper.py
 """
 
 from __future__ import annotations

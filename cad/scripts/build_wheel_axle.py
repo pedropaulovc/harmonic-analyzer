@@ -12,7 +12,7 @@ cad/DIMENSIONS.md ch. 21 (M6.4, low).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_wheel_axle.py
+    uv run python cad\scripts\build_wheel_axle.py
 """
 
 from __future__ import annotations

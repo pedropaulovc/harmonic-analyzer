@@ -19,7 +19,7 @@ cad/DIMENSIONS.md ch. 21/22 (M6.4, low/derived).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_column_clamp.py
+    uv run python cad\scripts\build_column_clamp.py
 """
 
 from __future__ import annotations

@@ -30,7 +30,7 @@ boss/band/window overlaps have no tidy closed form).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_top_frame.py
+    uv run python cad\scripts\build_top_frame.py
 """
 
 from __future__ import annotations
@@ -40,17 +40,20 @@ import sys
 
 from _common import (
     CASTING_GREEN,
-    add_line_chain,
+    SketchDims,
     apply_color,
     apply_material,
     check,
+    define_centered_rectangle,
     define_circle,
-    define_rectilinear_chain,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
-    set_sketch_direct_db,
+    set_global,
     volume_check,
 )
 
@@ -113,113 +116,179 @@ def _boss_extra_area() -> float:
     return extra
 
 
-async def _rectangle(adapter, label: str, half_x: float, half_z: float) -> None:
-    set_sketch_direct_db(adapter, True)
-    rect = [
-        (-half_x, -half_z),
-        (half_x, -half_z),
-        (half_x, half_z),
-        (-half_x, half_z),
-    ]
-    lines = await add_line_chain(adapter, rect)
-    set_sketch_direct_db(adapter, False)
-    await define_rectilinear_chain(adapter, lines, rect, label=label)
-    await ensure_fully_defined(adapter, label)
-
-
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
-    # Outer slab.
+    # Editable knobs: named globals in the equation manager that drive every
+    # dimension below. A GUI fine-tune edits THESE (Tools > Equations) -- e.g.
+    # RailWidth or BossDia -- never an auto "D7@Sketch3". The derived spans
+    # (Outer*/Inner*) are equations of the primitives, so the rail band stays
+    # centred on the column stations when a primitive changes.
+    # Primitives carry an explicit ``mm`` unit: this is an INCH document (like
+    # the rest of the codebase) and the equation manager evaluates BARE numbers
+    # in document units, so an unsuffixed "416" would be read as 416 inches and
+    # blow the part up 25.4x in-plane. Length-valued globals keep the arithmetic
+    # in mm; the derived globals and dimension equations inherit the unit.
+    await set_global(adapter, "ColumnX", f"{COLUMN_X}mm")
+    await set_global(adapter, "ColumnZ", f"{COLUMN_Z}mm")
+    await set_global(adapter, "RailWidth", f"{RAIL_WIDTH}mm")
+    await set_global(adapter, "BossDia", f"{BOSS_DIA}mm")
+    await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
+    await set_global(adapter, "GooseneckBoreDia", f"{GOOSENECK_BORE_DIA}mm")
+    await set_global(adapter, "OuterX", '"ColumnX" + "RailWidth" / 2')
+    await set_global(adapter, "OuterZ", '"ColumnZ" + "RailWidth" / 2')
+    await set_global(adapter, "InnerX", '"ColumnX" - "RailWidth" / 2')
+    await set_global(adapter, "InnerZ", '"ColumnZ" - "RailWidth" / 2')
+
+    # Each sketch DECLARES its dim names + drive equations inline at the
+    # define_* call; a per-sketch SketchDims records each dim in the exact order
+    # the helper emits it, so naming lands structurally -- no positional list to
+    # keep in lockstep with the helper, and a drift fails loud in apply(). The
+    # drive equations are collected here and applied in one deferred batch at the
+    # end (every equation target must resolve against the finished model).
+    drive_jobs: list[tuple[str, str]] = []
+
+    # Outer slab. Name the sketch + its dims BEFORE the extrude absorbs it (an
+    # absorbed sketch drops off the top-level tree the namer walks).
+    outer = SketchDims()
     check("create_sketch outer", await adapter.create_sketch("Top"))
-    await _rectangle(adapter, "outer rectangle", OUTER_X, OUTER_Z)
+    await define_centered_rectangle(
+        adapter, OUTER_X, OUTER_Z, "outer rectangle", dims=outer,
+        name_width="Width", drive_width='2 * "OuterX"',
+        name_depth="Depth", drive_depth='2 * "OuterZ"',
+        name_corner=("CornerX", "CornerZ"), drive_corner=('"OuterX"', '"OuterZ"'),
+    )
+    await ensure_fully_defined(adapter, "outer rectangle")
     check("exit_sketch outer", await adapter.exit_sketch())
+    name_last_feature(adapter, "OuterProfile")
+    drive_jobs += outer.apply(adapter, "OuterProfile")
     check(
         "extrude slab",
         await adapter.create_extrusion(
             ExtrusionParameters(depth=RING_HEIGHT, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "OuterSlab")
     v_slab = 4.0 * OUTER_X * OUTER_Z * RING_HEIGHT
     await volume_check(adapter, "slab", v_slab, 0.001 * v_slab)
 
     # Window, leaving the 22-wide rail band.
+    window = SketchDims()
     check("create_sketch window", await adapter.create_sketch("Top"))
-    await _rectangle(adapter, "window rectangle", INNER_X, INNER_Z)
+    await define_centered_rectangle(
+        adapter, INNER_X, INNER_Z, "window rectangle", dims=window,
+        name_width="Width", drive_width='2 * "InnerX"',
+        name_depth="Depth", drive_depth='2 * "InnerZ"',
+        name_corner=("CornerX", "CornerZ"), drive_corner=('"InnerX"', '"InnerZ"'),
+    )
+    await ensure_fully_defined(adapter, "window rectangle")
     check("exit_sketch window", await adapter.exit_sketch())
+    name_last_feature(adapter, "WindowProfile")
+    drive_jobs += window.apply(adapter, "WindowProfile")
     check(
         "cut window",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "WindowCut")
     v_ring = v_slab - 4.0 * INNER_X * INNER_Z * RING_HEIGHT
     await volume_check(adapter, "rail band", v_ring, 0.001 * v_ring)
 
-    # Corner bosses (full Ø48 cylinders; restore the window corners).
+    # Corner bosses (full Ø48 cylinders; restore the window corners). One circle
+    # per corner, each driven to the column stations + BossDia.
+    bosses = SketchDims()
     check("create_sketch bosses", await adapter.create_sketch("Top"))
+    n = 0
     for sx in (-1.0, 1.0):
         for sz in (-1.0, 1.0):
             await define_circle(
-                adapter,
-                sx * COLUMN_X,
-                sz * COLUMN_Z,
-                BOSS_DIA / 2.0,
-                f"boss ({sx:+.0f}, {sz:+.0f})",
+                adapter, sx * COLUMN_X, sz * COLUMN_Z, BOSS_DIA / 2.0,
+                f"boss ({sx:+.0f}, {sz:+.0f})", dims=bosses,
+                names=(f"C{n}X", f"C{n}Z", f"C{n}Dia"),
+                drives=('"ColumnX"', '"ColumnZ"', '"BossDia"'),
             )
+            n += 1
     await ensure_fully_defined(adapter, "bosses sketch")
     check("exit_sketch bosses", await adapter.exit_sketch())
+    name_last_feature(adapter, "BossProfile")
+    drive_jobs += bosses.apply(adapter, "BossProfile")
     check(
         "extrude bosses",
         await adapter.create_extrusion(
             ExtrusionParameters(depth=RING_HEIGHT, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "CornerBosses")
     v_boss_extra = 4.0 * _boss_extra_area() * RING_HEIGHT
     v_bossed = v_ring + v_boss_extra
     await volume_check(adapter, "bosses", v_bossed, 0.005 * v_boss_extra + 50.0)
 
     # Column bores (entirely inside the bosses).
+    bores = SketchDims()
     check("create_sketch bores", await adapter.create_sketch("Top"))
+    n = 0
     for sx in (-1.0, 1.0):
         for sz in (-1.0, 1.0):
             await define_circle(
-                adapter,
-                sx * COLUMN_X,
-                sz * COLUMN_Z,
-                BORE_DIA / 2.0,
-                f"bore ({sx:+.0f}, {sz:+.0f})",
+                adapter, sx * COLUMN_X, sz * COLUMN_Z, BORE_DIA / 2.0,
+                f"bore ({sx:+.0f}, {sz:+.0f})", dims=bores,
+                names=(f"C{n}X", f"C{n}Z", f"C{n}Dia"),
+                drives=('"ColumnX"', '"ColumnZ"', '"BoreDia"'),
             )
+            n += 1
     await ensure_fully_defined(adapter, "bores sketch")
     check("exit_sketch bores", await adapter.exit_sketch())
+    name_last_feature(adapter, "BoreProfile")
+    drive_jobs += bores.apply(adapter, "BoreProfile")
     check(
         "cut bores",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "ColumnBores")
     v_bores = 4.0 * math.pi * (BORE_DIA / 2.0) ** 2 * RING_HEIGHT
     v_bored = v_bossed - v_bores
     await volume_check(adapter, "bored ring", v_bored, 0.005 * v_boss_extra + 50.0)
 
     # Counter-spring (gooseneck) clearance bore through the east rail mid-span:
     # the post slides through here and drops below the plate (build_gooseneck).
+    # On-axis centre (z 0): only X + diameter are dims (the Z is a relation), so
+    # define_circle records just those two -- the "Z" slot is ignored.
+    gooseneck = SketchDims()
     check("create_sketch gooseneck bore", await adapter.create_sketch("Top"))
     await define_circle(
-        adapter, GOOSENECK_X, GOOSENECK_Z, GOOSENECK_BORE_DIA / 2.0, "gooseneck bore"
+        adapter, GOOSENECK_X, GOOSENECK_Z, GOOSENECK_BORE_DIA / 2.0, "gooseneck bore",
+        dims=gooseneck,
+        names=("X", "Z", "Dia"),
+        drives=('"ColumnX"', None, '"GooseneckBoreDia"'),
     )
     await ensure_fully_defined(adapter, "gooseneck bore sketch")
     check("exit_sketch gooseneck bore", await adapter.exit_sketch())
+    name_last_feature(adapter, "GooseneckProfile")
+    drive_jobs += gooseneck.apply(adapter, "GooseneckProfile")
     check(
         "cut gooseneck bore",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "GooseneckBore")
     v_gn = math.pi * (GOOSENECK_BORE_DIA / 2.0) ** 2 * RING_HEIGHT
-    await volume_check(adapter, "gooseneck bore", v_bored - v_gn, 0.005 * v_boss_extra + 50.0)
+    v_final = v_bored - v_gn
+    await volume_check(adapter, "gooseneck bore", v_final, 0.005 * v_boss_extra + 50.0)
+
+    # Apply the deferred drive equations now -- after the whole model + a rebuild
+    # exists, so every target resolves. Each equation evaluates to the value just
+    # built, so the geometry must not move -- the re-check below is the proof.
+    force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    force_rebuild(adapter)
+    await volume_check(adapter, "driven ring (equations neutral)", v_final, 0.005 * v_boss_extra + 50.0)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)

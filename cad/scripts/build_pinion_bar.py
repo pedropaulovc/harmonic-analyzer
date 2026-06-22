@@ -16,7 +16,7 @@ section centre. Dimensions: cad/DIMENSIONS.md ch. 23 (M6.4, low/med).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_pinion_bar.py
+    uv run python cad\scripts\build_pinion_bar.py
 """
 
 from __future__ import annotations

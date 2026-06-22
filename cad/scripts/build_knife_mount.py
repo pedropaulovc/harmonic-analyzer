@@ -31,7 +31,7 @@ ch30 parity); the only hard constraint is "only the top edge contacts".
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_knife_mount.py
+    uv run python cad\scripts\build_knife_mount.py
 """
 
 from __future__ import annotations

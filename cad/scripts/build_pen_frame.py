@@ -15,7 +15,7 @@ mid-plane depth short enough to spare the top rail.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_pen_frame.py
+    uv run python cad\scripts\build_pen_frame.py
 """
 
 from __future__ import annotations

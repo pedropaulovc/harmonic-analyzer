@@ -15,7 +15,7 @@ Layout: shaft axis along Z, centred (z -91..+91).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_fulcrum_shaft.py
+    uv run python cad\scripts\build_fulcrum_shaft.py
 """
 
 from __future__ import annotations

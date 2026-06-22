@@ -18,7 +18,7 @@ Layout: axis = Z through the origin, body z = 0..4.5 mm, seed gap on +X.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_chain_sprocket.py
+    uv run python cad\scripts\build_chain_sprocket.py
 """
 
 from __future__ import annotations

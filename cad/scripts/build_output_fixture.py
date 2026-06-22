@@ -14,7 +14,7 @@ Layout: collar axis along Y (extruded from a Top-plane sketch, which maps
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_output_fixture.py
+    uv run python cad\scripts\build_output_fixture.py
 """
 
 from __future__ import annotations

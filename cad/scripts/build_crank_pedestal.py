@@ -16,7 +16,7 @@ base top face), bore along Z at y = BORE_HEIGHT.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_crank_pedestal.py
+    uv run python cad\scripts\build_crank_pedestal.py
 """
 
 from __future__ import annotations

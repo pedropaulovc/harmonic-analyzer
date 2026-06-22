@@ -22,7 +22,7 @@ addressable (semantic anchors, SolidworksMCP-python PRs #55/#56).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_boss_hook.py
+    uv run python cad\scripts\build_boss_hook.py
 """
 
 from __future__ import annotations

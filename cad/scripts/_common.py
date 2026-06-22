@@ -2,8 +2,9 @@
 
 Every part/assembly in ``cad/out`` is built by a ``build_<part>.py`` script in
 this directory that drives SolidWorks through the ``PyWin32Adapter`` from the
-SolidworksMCP-python repo (expected as a sibling checkout at
-``C:/src/SolidworksMCP-python``, overridable via ``SOLIDWORKS_MCP_ROOT``).
+``solidworks-mcp-python`` package — vendored as the ``SolidworksMCP-python``
+git submodule and installed editable by ``uv sync`` (``[tool.uv.sources]``), so
+``import solidworks_mcp`` resolves to the submodule with no path juggling.
 
 Conventions (see cad/DIMENSIONS.md for the dimension source of truth):
 
@@ -47,7 +48,6 @@ from __future__ import annotations
 
 import asyncio
 import functools
-import os
 import sys
 import time
 import traceback
@@ -60,9 +60,6 @@ OUT_SLDPRT = CAD_ROOT / "out" / "sldprt"
 OUT_SLDASM = CAD_ROOT / "out" / "sldasm"
 OUT_PNG = CAD_ROOT / "out" / "png"
 OUT_STL = CAD_ROOT / "out" / "stl"
-
-SW_MCP_ROOT = Path(os.environ.get("SOLIDWORKS_MCP_ROOT", r"C:\src\SolidworksMCP-python"))
-sys.path.insert(0, str(SW_MCP_ROOT / "src"))
 
 IN = 25.4  # inch -> mm
 
@@ -306,8 +303,90 @@ async def define_polygon_chain(
         )
 
 
+class SketchDims:
+    """Ordered record of the friendly name + optional driving equation for each
+    dimension a ``define_*`` helper creates, captured AS the dim is created so
+    naming and driving never re-derive creation order downstream.
+
+    This replaces the old, fragile pattern of a hand-written positional list far
+    from the geometry (``RECT_DIMS = ["Width", "Depth", ...]``) cross-fingered to
+    match whatever order the helper happened to emit. The emitting helper owns
+    the order -- crucially, it also owns the count: an on-axis circle centre is
+    ONE dim, an off-axis centre is TWO (see :func:`anchor_point_to_origin`), so a
+    script that hard-codes three-per-circle silently mis-maps the moment a circle
+    sits on an axis. The helper knows ``x``/``y``, so it records exactly the dims
+    it emitted.
+
+    Pass one instance per sketch into the ``define_*`` helpers; after
+    ``exit_sketch`` + :func:`name_sketch`, call :meth:`apply` to rename the dims
+    and collect their (deferred) drive jobs."""
+
+    def __init__(self) -> None:
+        self._rows: list[tuple[str | None, str | None]] = []
+
+    def record(self, name: str | None, drive: str | None = None) -> None:
+        """Append one dim's friendly ``name`` (``None`` = leave it auto-named)
+        and optional ``drive`` equation expression, in creation order."""
+        self._rows.append((name, drive))
+
+    def apply(self, adapter: Any, feature_name: str) -> list[tuple[str, str]]:
+        """Rename this sketch's dims (creation order) to the recorded names and
+        return the ``(dim@feature, expr)`` drive jobs to run once the whole model
+        exists. Naming is immediate; driving is deferred by the caller so every
+        equation target resolves after a final rebuild.
+
+        Asserts the recorded count equals the feature's actual display-dimension
+        count -- the structural guard that fails loud (naming the sketch) if a
+        helper's emission ever drifts from what it recorded, instead of silently
+        mis-naming."""
+        feat = _feature_by_name(adapter, feature_name)
+        actual = len(list(_display_dimensions(feat)))
+        if actual != len(self._rows):
+            raise RuntimeError(
+                f"{feature_name}: recorded {len(self._rows)} dims but the feature "
+                f"has {actual} -- a define_* helper's dim emission drifted from "
+                "what it recorded into SketchDims"
+            )
+        name_dimensions(adapter, feature_name, [name for name, _ in self._rows])
+        return [
+            (f"{name}@{feature_name}", drive)
+            for name, drive in self._rows
+            if name and drive
+        ]
+
+
+def _record_origin_anchor(
+    dims: SketchDims | None,
+    x: float,
+    y: float,
+    name_x: str | None,
+    name_y: str | None,
+    drive_x: str | None,
+    drive_y: str | None,
+) -> None:
+    """Record into ``dims`` exactly the centre/anchor dims that
+    :func:`anchor_point_to_origin` emits for ``(x, y)``: none at the origin, one
+    on an axis, two in general -- so the record mirrors the geometry."""
+    if dims is None:
+        return
+    sx = 0.0 if abs(x) < 1e-9 else x
+    sy = 0.0 if abs(y) < 1e-9 else y
+    if sx != 0.0:
+        dims.record(name_x, drive_x)
+    if sy != 0.0:
+        dims.record(name_y, drive_y)
+
+
 async def define_circle(
-    adapter: Any, x: float, y: float, radius: float, label: str
+    adapter: Any,
+    x: float,
+    y: float,
+    radius: float,
+    label: str,
+    *,
+    dims: "SketchDims | None" = None,
+    names: tuple[str | None, str | None, str | None] | None = None,
+    drives: tuple[str | None, str | None, str | None] | None = None,
 ) -> str:
     """Add a circle, anchor its centre to the origin semantically, then add
     a DRIVING diameter dimension. No ``fix`` involved.
@@ -316,7 +395,13 @@ async def define_circle(
     afterwards): with it on, a second concentric/near circle snaps to the first
     and the call fails (proven live on the coefficients-plate hole column).
     Same rationale as :func:`add_line_chain` -- the centre/diameter are pinned
-    explicitly below, so inference during the draw only ever hurts."""
+    explicitly below, so inference during the draw only ever hurts.
+
+    Self-naming: pass ``dims`` (a per-sketch :class:`SketchDims`) plus ``names`` /
+    ``drives`` as ``(centre_x, centre_z, diameter)`` tuples to record this
+    circle's dims for later renaming/driving. Only the dims actually emitted are
+    recorded -- an on-axis centre drops its zero coordinate -- so the same call
+    is correct whether the circle is on an axis or not."""
     sketch_mgr = adapter.currentSketchManager
     prev_add_to_db = bool(sketch_mgr.AddToDB)
     sketch_mgr.AddToDB = True
@@ -326,11 +411,62 @@ async def define_circle(
     finally:
         sketch_mgr.AddToDB = prev_add_to_db
     await anchor_point_to_origin(adapter, f"{circle.data}.center", x, y, label)
+    n_x, n_z, n_dia = names or (None, None, None)
+    d_x, d_z, d_dia = drives or (None, None, None)
+    _record_origin_anchor(dims, x, y, n_x, n_z, d_x, d_z)
     check(
         f"dimension {label} diameter",
         await adapter.add_sketch_dimension(circle.data, None, "diameter", radius * 2.0),
     )
+    if dims is not None:
+        dims.record(n_dia, d_dia)
     return circle.data
+
+
+async def define_centered_rectangle(
+    adapter: Any,
+    half_x: float,
+    half_z: float,
+    label: str,
+    *,
+    dims: "SketchDims | None" = None,
+    name_width: str | None = None,
+    name_depth: str | None = None,
+    name_corner: tuple[str | None, str | None] = (None, None),
+    drive_width: str | None = None,
+    drive_depth: str | None = None,
+    drive_corner: tuple[str | None, str | None] = (None, None),
+) -> list[str]:
+    """Draw + fully-define an origin-centred rectangle: ``width`` (along X) x
+    ``depth`` (along Z), corner anchored at ``(-half_x, -half_z)``.
+
+    Emits exactly four dims in this creation order -- width, depth, corner-X,
+    corner-Z -- and, when ``dims`` is given, records each one's friendly name +
+    drive expr so a GUI edit references e.g. ``Width@OuterProfile`` and an edit
+    to a global reshapes the band. ``name_corner`` / ``drive_corner`` are
+    ``(x, z)`` 2-tuples (the corner anchor is two dims). The semantic counterpart
+    to the generic :func:`define_rectilinear_chain`."""
+    rect = [
+        (-half_x, -half_z),
+        (half_x, -half_z),
+        (half_x, half_z),
+        (-half_x, half_z),
+    ]
+    lines = await add_line_chain(adapter, rect)
+    await define_rectilinear_chain(adapter, lines, rect, label=label)
+    if dims is not None:
+        dims.record(name_width, drive_width)
+        dims.record(name_depth, drive_depth)
+        _record_origin_anchor(
+            dims,
+            -half_x,
+            -half_z,
+            name_corner[0],
+            name_corner[1],
+            drive_corner[0],
+            drive_corner[1],
+        )
+    return lines
 
 
 async def add_line_chain(
@@ -966,6 +1102,194 @@ def _flag(obj: Any, interface: str) -> None:
         sw_type_info.flag_methods(obj, interface)
     except Exception:
         pass
+
+
+# ---------------------------------------------------------------------------
+# Friendly names: tree (sketches/features) + dimensions, plus globals/equations.
+#
+# The build calls (create_sketch / create_extrusion / add_sketch_dimension)
+# leave SolidWorks' OWN auto names -- ``Sketch1``, ``Boss-Extrude1``,
+# ``D1@Sketch1`` -- so anyone who opens the part to fine-tune it must first
+# reverse-engineer which "D7" is which. These helpers rename the tree and the
+# driving dimensions to stable, human names AS the part is built, so a GUI edit
+# references ``OuterWidth@OuterProfile``, never ``D3@Sketch1``. They also wrap
+# the equation-manager surface (globals + driving equations) so those named
+# dims can later be re-coupled to a handful of editable globals.
+#
+# All raw COM -- the adapter exposes no rename/enumerate surface. APIs (see the
+# developing-solidworks bundle): IFeature.Name (get/set), IFeature.GetFirst/
+# GetNextDisplayDimension, IDisplayDimension.GetDimension2, IDimension.Name/
+# FullName/SystemValue. A name takes effect immediately for the API; the tree
+# label only refreshes on the next rebuild (harmless mid-build).
+# ---------------------------------------------------------------------------
+
+
+def _iter_features(adapter: Any):
+    """Yield every top-level feature of the active doc in tree order.
+
+    NO method flagging here: this walks the SHARED ``adapter.currentModel``, and
+    ``_FlagAsMethod`` mutates that instance in place. Flipping ``FirstFeature`` /
+    ``GetNextFeature`` to method dispatch would break the adapter's OWN bare
+    property reads -- its ``create_cut_extrude`` walks ``FirstFeature`` as a
+    property to find the profile to cut, and a flagged model silently yields no
+    profile (``FeatureCut3 ... Parameter not optional``). ``_read_member`` reads
+    these accessors property-style whether or not they are flagged."""
+    model = adapter.currentModel
+    feat = _read_member(model, "FirstFeature")
+    for _ in range(5000):
+        if not feat:
+            return
+        yield feat
+        feat = _read_member(feat, "GetNextFeature")
+
+
+def _last_feature(adapter: Any) -> Any:
+    """The most-recently created top-level feature: a just-exited sketch, or the
+    boss/cut that just consumed it."""
+    last = None
+    for feat in _iter_features(adapter):
+        last = feat
+    if last is None:
+        raise RuntimeError("name_last_feature: the active document has no features")
+    return last
+
+
+def _feature_by_name(adapter: Any, name: str) -> Any:
+    for feat in _iter_features(adapter):
+        if str(_read_member(feat, "Name")) == name:
+            return feat
+    raise RuntimeError(f"feature {name!r} not found in the active document")
+
+
+def name_last_feature(adapter: Any, name: str) -> str:
+    """Rename the most-recent feature (a sketch right after ``exit_sketch``, or
+    the boss/cut right after its creator) to ``name``. Returns ``name`` so it
+    can be threaded straight into :func:`name_dimensions`."""
+    feat = _last_feature(adapter)
+    old = str(_read_member(feat, "Name"))
+    feat.Name = name
+    print(f"  OK  feature {old!r} -> {name!r}")
+    return name
+
+
+def _display_dimensions(feat: Any):
+    """Yield the IDimension of each display dimension owned by ``feat``, in
+    creation order.
+
+    NO method flagging -- ``_FlagAsMethod`` mutates the gen_py type-shared
+    dispatch repr, so flagging one ``IFeature`` instance flips ``GetTypeName2``
+    to method dispatch on EVERY ``IFeature`` wrapper, including the fresh ones
+    the adapter's ``create_cut_extrude`` walk reads as bare properties (the
+    "Parameter not optional" cut failure). The adapter itself calls arg-taking
+    IFeature methods unflagged (``pf.Select2(...)`` in that same walk), so the
+    arg-taking ``GetNextDisplayDimension`` / ``GetDimension2`` need no flag, and
+    the zero-arg ``GetFirstDisplayDimension`` resolves to its value via
+    ``_read_member``."""
+    disp = _read_member(feat, "GetFirstDisplayDimension")
+    for _ in range(1000):
+        if not disp:
+            return
+        idim = disp.GetDimension2(0)
+        yield idim
+        disp = feat.GetNextDisplayDimension(disp)
+
+
+def _dim_value_mm(idim: Any) -> float:
+    try:
+        return float(_read_member(idim, "SystemValue")) * 1000.0
+    except Exception:
+        return float("nan")
+
+
+def dump_dimensions(adapter: Any, feature_name: str) -> list[dict[str, Any]]:
+    """Print and return every dimension of ``feature_name`` (full name + value).
+
+    The introspection primitive behind 'edit in the GUI, harvest back into the
+    script': run it on any feature to see exactly which named dimensions drive
+    it and what they currently read."""
+    feat = _feature_by_name(adapter, feature_name)
+    rows: list[dict[str, Any]] = []
+    for i, idim in enumerate(_display_dimensions(feat)):
+        full = str(_read_member(idim, "FullName"))
+        val = _dim_value_mm(idim)
+        rows.append({"index": i, "full_name": full, "value_mm": val})
+        print(f"  dim[{i}] {full} = {val:.4g} mm")
+    return rows
+
+
+def name_dimensions(adapter: Any, feature_name: str, names: list[str | None]) -> list[str]:
+    """Rename a feature's display dimensions, in creation order, to ``names``.
+
+    ``names[i]`` renames the i-th dimension (``None`` leaves one untouched).
+    Prints each ``old (value mm) -> new`` so a run reveals at a glance whether
+    the creation order still matches what the ``define_*`` helpers emit -- if a
+    sketch's dimensioning ever changes, cross-check against
+    :func:`dump_dimensions`. Returns the new ``leaf@feature`` names."""
+    feat = _feature_by_name(adapter, feature_name)
+    dims = list(_display_dimensions(feat))
+    if len(names) > len(dims):
+        raise RuntimeError(
+            f"name_dimensions {feature_name}: {len(names)} names for "
+            f"{len(dims)} dimensions"
+        )
+    out: list[str] = []
+    for idim, new in zip(dims, names, strict=False):
+        old = str(_read_member(idim, "FullName"))
+        val = _dim_value_mm(idim)
+        if new is None:
+            print(f"  --  dim {old} = {val:.4g} mm (kept)")
+            continue
+        idim.Name = new
+        out.append(f"{new}@{feature_name}")
+        print(f"  OK  dim {old} = {val:.4g} mm -> {new}@{feature_name}")
+    return out
+
+
+async def set_global(adapter: Any, name: str, expr: str | float) -> float:
+    """Add or update an equation-manager global variable; returns its value.
+
+    Centralises the pen-driver pattern. ``expr`` is the equation-manager
+    expression (a literal like ``197`` or a formula like ``"ColumnX" +
+    "RailWidth" / 2``); the dialect takes degrees for trig and ``sqr`` is the
+    square root (see SetGlobalVariableParameters)."""
+    from solidworks_mcp.adapters.base import SetGlobalVariableParameters
+
+    res = await adapter.set_global_variable(
+        SetGlobalVariableParameters(name=name, expression=str(expr))
+    )
+    if not res.is_success:
+        raise RuntimeError(f"set_global {name}={expr!r}: {res.error}")
+    value = res.data.get("value") if res.data else None
+    print(f"  OK  global {name} = {expr}  -> {value}")
+    return float(value) if value is not None else float("nan")
+
+
+async def drive_dimension(adapter: Any, dim_name: str, expr: str | float) -> None:
+    """Bind a (named) dimension to an equation expression, e.g.::
+
+        await drive_dimension(adapter, "OuterWidth@OuterProfile", '2 * "OuterX"')
+
+    so editing the ``OuterX`` global reshapes the part. ``dim_name`` is the
+    ``leaf@feature`` form returned by :func:`name_dimensions`."""
+    from solidworks_mcp.adapters.base import CreateEquationParameters
+
+    equation = f'"{dim_name}" = {expr}'
+    res = await adapter.create_equation(CreateEquationParameters(equation=equation))
+    if not res.is_success:
+        raise RuntimeError(f"drive_dimension {equation!r}: {res.error}")
+    print(f"  OK  equation {equation}")
+
+
+def force_rebuild(adapter: Any) -> None:
+    """Rebuild the active doc (IModelDoc2.EditRebuild3). Renamed features/
+    dimensions register for the API immediately, but a rebuild makes the new
+    names resolvable as equation targets and refreshes the tree labels.
+
+    Reads EditRebuild3 via ``_read_member`` (no flagging) so the shared
+    ``currentModel`` is never mutated -- see :func:`_iter_features`."""
+    model = adapter.currentModel
+    adapter._attempt(lambda: _read_member(model, "EditRebuild3"))
+    print("  OK  rebuild")
 
 
 

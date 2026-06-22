@@ -19,7 +19,7 @@ machine north for the clips; the flange copies rotate Rx(-90) to point
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_fillister_screw.py
+    uv run python cad\scripts\build_fillister_screw.py
 """
 
 from __future__ import annotations

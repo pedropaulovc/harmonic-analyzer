@@ -10,7 +10,7 @@ y 60. Dimensions: cad/DIMENSIONS.md ch. 24 (M6.4, low).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_pen_marker.py
+    uv run python cad\scripts\build_pen_marker.py
 """
 
 from __future__ import annotations
