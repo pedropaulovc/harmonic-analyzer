@@ -52,6 +52,18 @@ Design notes / invariants:
   warning and is treated as a miss / no-op push. The cache can only make a build
   FASTER, never make a correct build FAIL.
 
+* **Observable.** A cache miss must be explainable WITHOUT scrollback archaeology
+  (issue #73). Three knobs, all best-effort and never able to fail a build:
+  ``HARMONIC_CACHE_DEBUG=1`` logs every ``(relpath, digest)`` that feeds a key plus
+  the final key, so a key shift is a readable diff; every restore/store event is
+  appended to ``cad/out/reports/cache.jsonl`` (key + inputs digest + event), so
+  post-hoc debugging reads a file instead of the terminal; and a per-label
+  ``cad/out/reports/cache-keys/<label>.key`` sidecar records the last key THIS seat
+  published, so on a HIT under a different key we WARN -- surfacing the
+  store-skip-on-hit drift (a HIT returns early and never re-stores, so the seat can
+  serve a key it never published) directly. ``cache_status`` (a doit task) prints
+  all of the above per part/assembly in one command.
+
 Backend: an **Azure Blob container** reached over HTTPS (443). Speaks plain object
 storage, so it works from anywhere -- including networks (e.g. residential ISPs)
 that block SMB/445, with no VPN, private endpoint, or mounted drive. A cache entry
@@ -77,6 +89,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import json
 import os
 import sys
 import tarfile
@@ -117,9 +130,34 @@ _CACHE_OUTPUT_ROOT = REPO_ROOT / "cad" / "out"
 _MODE_FILE = REPO_ROOT / ".harmonic-cache-mode"
 _DEFAULT_MODE = "rw"
 
+# Observability sinks (issue #73), all under the gitignored cad/out/reports/.
+#   cache.jsonl       -- append-only event log (one JSON object per restore/store)
+#   cache-keys/<l>.key -- the last key THIS seat PUBLISHED for label <l>, so a HIT
+#                         under a different key is flagged as store-skip-on-hit drift
+_REPORTS = REPO_ROOT / "cad" / "out" / "reports"
+_EVENTS_LOG = _REPORTS / "cache.jsonl"
+_KEYDIR = _REPORTS / "cache-keys"
+
 
 def _log(msg: str) -> None:
     print(f"[cache] {msg}", file=sys.stderr, flush=True)
+
+
+def _debug() -> bool:
+    """HARMONIC_CACHE_DEBUG=1 (or any non-empty/non-``0`` value) -> log key inputs."""
+    return os.environ.get("HARMONIC_CACHE_DEBUG", "").strip().lower() not in ("", "0", "false")
+
+
+def _salt() -> str:
+    return os.environ.get("HARMONIC_CACHE_SALT") or _DEFAULT_SALT
+
+
+def _account() -> str:
+    return os.environ.get("HARMONIC_CACHE_ACCOUNT") or _DEFAULT_ACCOUNT
+
+
+def _container() -> str:
+    return os.environ.get("HARMONIC_CACHE_CONTAINER") or _DEFAULT_CONTAINER
 
 
 # --------------------------------------------------------------------------- #
@@ -135,29 +173,46 @@ def _rel(path: Path) -> str:
         return path.name
 
 
-def cache_key(file_deps: list[str], digest_one) -> str:
-    """Content hash of a task's ``file_dep`` set -> the cache key.
+def key_inputs(file_deps: list[str], digest_one) -> tuple[str, list[tuple[str, str]]]:
+    """``(key, [(relpath, digest), ...])`` -- the cache key AND the per-file
+    provenance that produced it, sorted by repo-relative path.
 
     ``digest_one(path) -> hex`` is dodo's per-file content digest
     (``ContentChecker._digest``: raw md5 for binaries, PARSED-yaml md5 for configs),
     passed in so the cache and the doit staleness check fold each file identically
     -- a comment-only YAML edit must not change the key, exactly as it must not
-    invalidate the file_dep.
-
-    Each file is tagged by its REPO-RELATIVE path (not absolute, unlike
-    ``_digest_files``) so the key is identical across machines and worktrees.
-    """
-    salt = os.environ.get("HARMONIC_CACHE_SALT") or _DEFAULT_SALT
+    invalidate the file_dep. Each file is tagged by its REPO-RELATIVE path (not
+    absolute, unlike ``_digest_files``) so the key is identical across machines and
+    worktrees. The input list is what ``HARMONIC_CACHE_DEBUG`` / ``cache_status``
+    print so a key shift is a readable per-file diff (issue #73)."""
     h = hashlib.sha256()
-    h.update(f"epoch={_CACHE_EPOCH}\0salt={salt}\0".encode())
+    h.update(f"epoch={_CACHE_EPOCH}\0salt={_salt()}\0".encode())
+    pairs: list[tuple[str, str]] = []
     for path in sorted(file_deps, key=lambda p: _rel(Path(p))):
         rel = _rel(Path(path))
         try:
             content = digest_one(path)
         except OSError:
             content = "<missing>"
+        pairs.append((rel, content))
         h.update(f"{rel}\0{content}\0".encode())
-    return h.hexdigest()
+    return h.hexdigest(), pairs
+
+
+def cache_key(file_deps: list[str], digest_one, label: str | None = None) -> str:
+    """Content hash of a task's ``file_dep`` set -> the cache key (see ``key_inputs``).
+
+    With ``HARMONIC_CACHE_DEBUG`` set, logs each ``(digest, relpath)`` feeding the
+    key and the resulting key, tagged by ``label`` -- so a debugger can see exactly
+    which dep digest moved when a key shifts (issue #73)."""
+    key, pairs = key_inputs(file_deps, digest_one)
+    if _debug():
+        head = label or "?"
+        _log(f"key provenance {head} (epoch={_CACHE_EPOCH} salt={_salt()}):")
+        for rel, content in pairs:
+            _log(f"    {content}  {rel}")
+        _log(f"  => {head} key {key}")
+    return key
 
 
 # --------------------------------------------------------------------------- #
@@ -229,6 +284,11 @@ class _BlobBackend:
         except ResourceNotFoundError:
             return None
 
+    def exists(self, key: str) -> bool:
+        # Presence check without downloading the blob -- the cache_status diagnostic
+        # probes every key, so a HEAD (exists) instead of a GET (download) keeps it cheap.
+        return self._cc.get_blob_client(self._name(key)).exists()
+
     def put(self, key: str, blob: bytes) -> None:
         # Content-addressed: any concurrent writer stores identical bytes, so
         # overwrite is a harmless no-op (last-writer-wins). A blob upload commits
@@ -255,6 +315,58 @@ def enabled() -> bool:
 
 def writable() -> bool:
     return _mode() == "rw"
+
+
+def config_summary() -> dict:
+    """Effective cache config, for the cache_status header (issue #73)."""
+    return {
+        "mode": _mode(),
+        "epoch": _CACHE_EPOCH,
+        "salt": _salt(),
+        "account": _account(),
+        "container": _container(),
+    }
+
+
+# --------------------------------------------------------------------------- #
+# Provenance sinks -- event log + per-label "last published key" sidecar.
+# Every helper here is BEST-EFFORT: a logging failure must never break a build,
+# so each swallows OSError and returns a benign default.
+# --------------------------------------------------------------------------- #
+def _record(event: str, label: str, key: str) -> None:
+    """Append one cache event to cad/out/reports/cache.jsonl. The key encodes the
+    full input set (epoch + salt + every (relpath, digest)), so logging it makes a
+    later key diff explainable without scrollback."""
+    try:
+        _REPORTS.mkdir(parents=True, exist_ok=True)
+        rec = {"ts": round(time.time(), 3), "event": event, "label": label,
+               "key": key, "epoch": _CACHE_EPOCH, "salt": _salt()}
+        with _EVENTS_LOG.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(rec) + "\n")
+    except OSError:
+        pass
+
+
+def _key_sidecar(label: str) -> Path:
+    return _KEYDIR / (label.replace(":", "-").replace("/", "-") + ".key")
+
+
+def last_stored_key(label: str) -> str | None:
+    """The last key THIS seat actually PUBLISHED for ``label`` (None if never).
+    Updated only by a successful ``store`` -- a HIT does NOT update it, so a HIT
+    under a different key reveals the store-skip-on-hit drift."""
+    try:
+        return _key_sidecar(label).read_text(encoding="utf-8").strip() or None
+    except OSError:
+        return None
+
+
+def _save_stored_key(label: str, key: str) -> None:
+    try:
+        _KEYDIR.mkdir(parents=True, exist_ok=True)
+        _key_sidecar(label).write_text(key + "\n", encoding="utf-8")
+    except OSError:
+        pass
 
 
 _UNSET = object()
@@ -288,10 +400,30 @@ def _backend():
     return _BACKEND
 
 
+def probe(key: str) -> bool | None:
+    """Is ``key`` present in the backend, WITHOUT downloading it? True/False when the
+    cache is reachable, None when disabled / unconfigured / unreachable. For the
+    cache_status diagnostic -- never raises, never mutates anything."""
+    if not enabled():
+        return None
+    try:
+        backend = _backend()
+        if backend is None:
+            return None
+        return backend.exists(key)
+    except Exception as exc:  # noqa: BLE001
+        _log(f"probe error for {key[:12]}: {exc!r}")
+        return None
+
+
 def restore(key: str, outputs: list[Path], label: str) -> bool:
     """Try to download+unpack a cached build for ``key``. Return True on a HIT (the
     outputs are now on disk and the COM build can be skipped), False on a miss or
-    any error (caller falls through to the real build). Never raises."""
+    any error (caller falls through to the real build). Never raises.
+
+    On a HIT, if this seat last PUBLISHED a different key for ``label`` (its sidecar
+    differs), WARN: the seat is serving a key it never stored -- the
+    store-skip-on-hit drift from issue #73. Every outcome is appended to cache.jsonl."""
     if not enabled():
         return False
     try:
@@ -301,19 +433,33 @@ def restore(key: str, outputs: list[Path], label: str) -> bool:
         blob = backend.get(key)
         if blob is None:
             _log(f"miss  {label} ({key[:12]})")
+            _record("restore_miss", label, key)
             return False
         _unpack(blob)
         _log(f"HIT   {label} ({key[:12]}) -> skipped COM build")
+        prev = last_stored_key(label)
+        if prev and prev != key:
+            _log(f"WARN  {label}: HIT under {key[:12]} but this seat last published "
+                 f"{prev[:12]} -- store-skip-on-hit drift; {key[:12]} is NOT being "
+                 f"re-published from here")
+            _record("restore_hit_drift", label, key)
+        else:
+            _record("restore_hit", label, key)
         return True
     except Exception as exc:  # noqa: BLE001 -- cache must never break a build
         _log(f"restore error for {label}: {exc!r} -- building locally")
+        _record("restore_error", label, key)
         return False
 
 
 def store(key: str, outputs: list[Path], label: str) -> None:
     """Pack+upload the just-built outputs under ``key``. No-op unless mode=rw.
-    Swallows every error -- a failed push must not fail the build."""
+    Swallows every error -- a failed push must not fail the build. Records the event
+    in cache.jsonl and stamps the per-label "last published key" sidecar so a later
+    HIT under a shifted key can be flagged as drift."""
     if not writable():
+        if enabled():  # ro: pulled but deliberately won't publish -- note the skip
+            _record("store_skip", label, key)
         return
     try:
         backend = _backend()
@@ -322,8 +468,12 @@ def store(key: str, outputs: list[Path], label: str) -> None:
         present = [o for o in outputs if o.exists()]
         if not present:
             _log(f"nothing to store for {label} (no outputs on disk)")
+            _record("store_empty", label, key)
             return
         backend.put(key, _pack(present))
         _log(f"store {label} ({key[:12]})")
+        _save_stored_key(label, key)
+        _record("store", label, key)
     except Exception as exc:  # noqa: BLE001
         _log(f"store error for {label}: {exc!r} -- continuing")
+        _record("store_error", label, key)
