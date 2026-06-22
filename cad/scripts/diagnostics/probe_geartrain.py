@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 
+import _telemetry
 from _common import _flag, _read_member, check, log
 from build_motion_study import _by_z_rank, _comp_xform, _components, _find_one, _rot_angle
 
@@ -42,7 +43,7 @@ async def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
-    print("Connecting (ATTACH) ...", flush=True)
+    _telemetry.info("Connecting (ATTACH) ...")
     await adapter.connect()
     doc = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=None)
     if doc is None:
@@ -81,7 +82,7 @@ async def main():
     log("  the chain breaks at the first stage whose span drops to ~0.")
 
     await adapter.disconnect()
-    print("Disconnected (doc left open).", flush=True)
+    _telemetry.info("Disconnected (doc left open).")
 
 
 if __name__ == "__main__":

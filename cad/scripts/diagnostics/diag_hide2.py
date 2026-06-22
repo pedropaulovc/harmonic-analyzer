@@ -11,6 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+import _telemetry  # noqa: E402
 from _common import check, run_build  # noqa: E402
 from render_compare import _flag, capture, component_boxes, resolve_framing, set_camera  # noqa: E402
 
@@ -50,7 +51,7 @@ async def build(adapter) -> dict[str, str]:
         _flag(c, "IComponent2")
         if c.Name2.startswith("channel-1/"):
             chan.append(c)
-    print(f"channel children: {len(chan)}")
+    _telemetry.info(f"channel children: {len(chan)}")
 
     boxes = component_boxes(adapter)
     cam = dict(CAM)
@@ -60,14 +61,14 @@ async def build(adapter) -> dict[str, str]:
         set_camera(adapter, cam)
         out = OUT / f"diag2-az-90--{tag}.png"
         await capture(adapter, out, 945, 2240)
-        print(f"captured {out.name}")
+        _telemetry.success(f"captured {out.name}")
 
     for tag, prefixes in FAMILIES.items():
         group = [
             c for c in chan
             if any(c.Name2.split("/", 1)[1].startswith(p) for p in prefixes)
         ]
-        print(f"{tag}: hiding {len(group)}")
+        _telemetry.info(f"{tag}: hiding {len(group)}")
         for c in group:
             c.Visible = False
         await shot(f"hide-{tag}")

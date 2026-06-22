@@ -69,6 +69,7 @@ import _config
 import gen_dimensions
 import pen_driver
 import truth_model
+import _telemetry
 from _common import (
     OUT_SLDASM,
     check,
@@ -171,15 +172,23 @@ class Report:
     failed: list[tuple[str, str]] = field(default_factory=list)
 
     def gate(self, label: str, fn: Callable[[], None]) -> None:
-        """Run ``fn``; record pass or the exception text. Never propagates."""
-        try:
-            fn()
-        except Exception as exc:  # noqa: BLE001 -- a gate failure is data, not a crash
-            self.failed.append((label, str(exc)))
-            print(f"  XX  GATE FAILED [{label}]: {exc}", flush=True)
-            return
-        self.passed.append(label)
-        print(f"  OK  GATE PASSED [{label}]", flush=True)
+        """Run ``fn`` inside its own span; record pass or the exception text.
+
+        Never propagates: a gate failure is recorded on the span (ERROR status +
+        exception event) and captured as data, so the suite keeps running while
+        the trace still attributes the failure to this gate — no silent gap.
+        """
+        with _telemetry.span("gate", label=label) as sp:
+            try:
+                fn()
+            except Exception as exc:  # noqa: BLE001 -- a gate failure is data, not a crash
+                self.failed.append((label, str(exc)))
+                sp.record_exception(exc)
+                sp.set_status(_telemetry.Status(_telemetry.StatusCode.ERROR, str(exc)))
+                _telemetry.error(f"GATE FAILED [{label}]: {exc}")
+                return
+            self.passed.append(label)
+            _telemetry.success(f"GATE PASSED [{label}]")
 
     def merge(self, other: "Report") -> None:
         self.passed += other.passed
@@ -235,7 +244,7 @@ def assert_no_over_constrained(adapter: Any) -> None:
             over.append(str(_read_member(comp, "Name2")))
     if over:
         raise RuntimeError("over-constrained (redundant mates): " + ", ".join(over))
-    print("  OK  no over-constrained components (no redundant mates)", flush=True)
+    _telemetry.success("no over-constrained components (no redundant mates)")
 
 
 def assert_gear_ratios(adapter: Any, name: str) -> None:
@@ -254,10 +263,9 @@ def assert_gear_ratios(adapter: Any, name: str) -> None:
     if not links:
         if name == GEAR_OWNER:
             raise RuntimeError(f"{GEAR_OWNER} has no gear mates -- the drive train is broken")
-        print(
-            f"  ..  {name}: no gear mates at this level "
-            f"(they live in the flexible {GEAR_OWNER} sub; verified there)",
-            flush=True,
+        _telemetry.debug(
+            f"{name}: no gear mates at this level "
+            f"(they live in the flexible {GEAR_OWNER} sub; verified there)"
         )
         return
 
@@ -284,10 +292,9 @@ def assert_gear_ratios(adapter: Any, name: str) -> None:
         )
     if problems:
         raise RuntimeError("; ".join(problems))
-    print(
-        f"  OK  gear ratios == config (crank {crank_expected}, "
-        f"{len(channel_links)} channel meshes)",
-        flush=True,
+    _telemetry.success(
+        f"gear ratios == config (crank {crank_expected}, "
+        f"{len(channel_links)} channel meshes)"
     )
 
 
@@ -302,12 +309,12 @@ def assert_component_count(adapter: Any, name: str) -> None:
     band = _COMPONENT_BAND.get(name)
     count = len(component_names(adapter))
     if band is None:
-        print(f"  ..  {name}: {count} components (no band configured)", flush=True)
+        _telemetry.debug(f"{name}: {count} components (no band configured)")
         return
     lo, hi = band
     if not (lo <= count <= hi):
         raise RuntimeError(f"{name}: {count} components outside expected band [{lo}, {hi}]")
-    print(f"  OK  {name}: {count} components within [{lo}, {hi}]", flush=True)
+    _telemetry.success(f"{name}: {count} components within [{lo}, {hi}]")
 
 
 def assert_channel_independence(adapter: Any) -> None:
@@ -330,8 +337,10 @@ def assert_channel_independence(adapter: Any) -> None:
             f"channel moving parts are not {CHANNELS} independent instances: {wrong} "
             f"(a count != {CHANNELS} means a channel was dropped/duplicated, or the "
             f"moving parts were collapsed into a component pattern)")
-    print(f"  OK  {CHANNELS} independent instances of each moving stem "
-          f"{_MOVING_CHANNEL_STEMS} (not pattern slaves)", flush=True)
+    _telemetry.success(
+        f"{CHANNELS} independent instances of each moving stem "
+        f"{_MOVING_CHANNEL_STEMS} (not pattern slaves)"
+    )
 
 
 async def _verify_isolation_one(adapter: Any, name: str, report: Report) -> None:
@@ -349,7 +358,7 @@ async def _verify_isolation_one(adapter: Any, name: str, report: Report) -> None
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
     if not sldasm.exists():
         report.failed.append((f"{name}:open", f"not built: {sldasm}"))
-        print(f"  XX  {sldasm.name} not built -- run doit", flush=True)
+        _telemetry.error(f"{sldasm.name} not built -- run doit")
         return
 
     # Isolation means a FRESH session per subsystem: close any prior assembly
@@ -379,7 +388,7 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
     if not sldasm.exists():
         report.failed.append((f"{name}:open", f"not built: {sldasm}"))
-        print(f"  XX  {sldasm.name} not built -- run doit", flush=True)
+        _telemetry.error(f"{sldasm.name} not built -- run doit")
         return
 
     # Fresh session per assembly: accumulating open docs across the multi-assembly
@@ -436,7 +445,7 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
     if not sldasm.exists():
         report.failed.append((f"motion:{name}:open", f"not built: {sldasm}"))
-        print(f"  XX  {sldasm.name} not built -- run doit", flush=True)
+        _telemetry.error(f"{sldasm.name} not built -- run doit")
         return
 
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
@@ -459,9 +468,9 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
         want = pen_driver.expected_tip_disp_mm(math.radians(theta))
         sweep.append((theta, got, want))
         err = abs(got - want)
-        flag = "OK " if err <= _MOTION_TOL_MM else "XX "
-        print(f"  {flag} CrankDeg={theta:6.1f}  tipDisp={got:+8.4f}  "
-              f"want={want:+8.4f}  |err|={err:.2e}", flush=True)
+        emit = _telemetry.success if err <= _MOTION_TOL_MM else _telemetry.error
+        emit(f"CrankDeg={theta:6.1f}  tipDisp={got:+8.4f}  "
+             f"want={want:+8.4f}  |err|={err:.2e}")
     worst = max((abs(g - w) for _, g, w in sweep), default=0.0)
 
     # Interference at the two poses furthest from the rest datum (the stroke
@@ -784,8 +793,8 @@ def verify_tolerance_audit(report: Report) -> None:
         writer.writeheader()
         writer.writerows(rows)
     n_fit = sum(1 for r in rows if r.get("fit_class"))
-    print(f"  ..  tolerance audit -> {csv_path} ({len(rows)} parts, "
-          f"{n_fit} with a fit class)", flush=True)
+    _telemetry.debug(f"tolerance audit -> {csv_path} ({len(rows)} parts, "
+                     f"{n_fit} with a fit class)")
 
     report.gate(
         "audit:registry-matches-builds",
@@ -895,11 +904,10 @@ async def build(adapter: Any) -> dict[str, str]:
 
 
 def _print_summary(report: Report) -> None:
-    print("\n" + "=" * 64, flush=True)
-    print(f"VERIFY SUMMARY: {len(report.passed)} passed, {len(report.failed)} failed", flush=True)
+    emit = _telemetry.success if not report.failed else _telemetry.error
+    emit(f"VERIFY SUMMARY: {len(report.passed)} passed, {len(report.failed)} failed")
     for label, why in report.failed:
-        print(f"  FAIL  {label}: {why}", flush=True)
-    print("=" * 64, flush=True)
+        _telemetry.error(f"FAIL {label}: {why}")
 
 
 def _built_assemblies() -> list[str]:

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 
+import _telemetry
 from _common import (
     OUT_SLDASM,
     check,
@@ -74,7 +75,7 @@ async def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
-    print("Connecting ...", flush=True)
+    _telemetry.info("Connecting ...")
     await adapter.connect()
     asm_path = str((OUT_SLDASM / f"{ASM}.SLDASM").resolve())
     check("open", await adapter.open_model(asm_path))
@@ -115,7 +116,7 @@ async def main():
             f"(expect ~50*30deg*pi/180 = 26 mm if rack-pinion transmits)")
     adapter.currentModel = top
     await adapter.disconnect()
-    print("Disconnected (NOT saved).", flush=True)
+    _telemetry.info("Disconnected (NOT saved).")
 
 
 if __name__ == "__main__":

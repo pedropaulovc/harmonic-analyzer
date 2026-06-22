@@ -29,6 +29,7 @@ from pathlib import Path
 
 from solidworks_mcp.adapters.com_variant import null_callout
 
+import _telemetry
 from _common import OUT_SLDASM, _flag, _read_member, log
 
 
@@ -96,7 +97,7 @@ async def main():
     log(f"channel.SLDASM = {ch_path} ({ch_path.stat().st_size} bytes)")
 
     adapter = PyWin32Adapter({})
-    print("Connecting ...", flush=True)
+    _telemetry.info("Connecting ...")
     await adapter.connect()
 
     # NEW empty assembly (does not touch the user's open harmonic-analyzer doc).
@@ -200,7 +201,7 @@ async def main():
             log(f"    drive-train insert failed: {res2.error}")
 
     await adapter.disconnect()
-    print("Disconnected (throwaway parent left open, unsaved).", flush=True)
+    _telemetry.info("Disconnected (throwaway parent left open, unsaved).")
 
 
 if __name__ == "__main__":

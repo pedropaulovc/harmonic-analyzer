@@ -31,6 +31,9 @@ from typing import Any
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _telemetry  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 DIMENSIONS_MD = ROOT / "DIMENSIONS.md"
 DIMENSIONS_YAML = ROOT / "config" / "dimensions.yaml"
@@ -206,10 +209,10 @@ def _main() -> int:
         roundtrip = render_markdown(doc)
         if roundtrip != md:
             _report_diff(md, roundtrip)
-            print("IMPORT ABORTED: round-trip is not byte-identical (see first diff above)", flush=True)
+            _telemetry.error("IMPORT ABORTED: round-trip is not byte-identical (see first diff above)")
             return 1
         DIMENSIONS_YAML.write_text(dump_yaml(doc), encoding="utf-8")
-        print(f"imported -> {DIMENSIONS_YAML} (round-trip byte-identical)")
+        _telemetry.success(f"imported -> {DIMENSIONS_YAML} (round-trip byte-identical)")
         return 0
 
     doc = yaml.safe_load(DIMENSIONS_YAML.read_text(encoding="utf-8"))
@@ -219,13 +222,13 @@ def _main() -> int:
         current = DIMENSIONS_MD.read_text(encoding="utf-8")
         if rendered != current:
             _report_diff(current, rendered)
-            print("CHECK FAILED: DIMENSIONS.md is stale — run gen_dimensions.py to regenerate", flush=True)
+            _telemetry.error("CHECK FAILED: DIMENSIONS.md is stale — run gen_dimensions.py to regenerate")
             return 1
-        print("CHECK OK: DIMENSIONS.md matches dimensions.yaml")
+        _telemetry.success("CHECK OK: DIMENSIONS.md matches dimensions.yaml")
         return 0
 
     DIMENSIONS_MD.write_text(rendered, encoding="utf-8")
-    print(f"generated -> {DIMENSIONS_MD}")
+    _telemetry.success(f"generated -> {DIMENSIONS_MD}")
     return 0
 
 
@@ -233,10 +236,10 @@ def _report_diff(a: str, b: str) -> None:
     al, bl = a.split("\n"), b.split("\n")
     for n, (x, y) in enumerate(zip(al, bl), 1):
         if x != y:
-            print(f"first diff at line {n}:\n  expected: {x!r}\n  got:      {y!r}", flush=True)
+            _telemetry.info(f"first diff at line {n}:\n  expected: {x!r}\n  got:      {y!r}")
             return
     if len(al) != len(bl):
-        print(f"length differs: {len(al)} vs {len(bl)} lines", flush=True)
+        _telemetry.info(f"length differs: {len(al)} vs {len(bl)} lines")
 
 
 if __name__ == "__main__":

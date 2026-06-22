@@ -39,6 +39,8 @@ from _assembly import (
 )
 from build_motion_study_springs import _eye_point
 
+import _telemetry
+
 SHAFT_R = 6.35 / 2.0
 BUSH_OD_R = 10.0 / 2.0
 BORE_R = 6.5 / 2.0
@@ -81,7 +83,7 @@ async def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
-    print(f"Connecting ... (POC_C={C_DAMP})", flush=True)
+    _telemetry.info(f"Connecting ... (POC_C={C_DAMP})")
     await adapter.connect()
     check("create_assembly", await adapter.create_assembly())
 
@@ -149,7 +151,7 @@ async def main():
                 f"not integrate dampers")
 
     await adapter.disconnect()
-    print("Disconnected (NOT saved).", flush=True)
+    _telemetry.info("Disconnected (NOT saved).")
 
 
 if __name__ == "__main__":

@@ -46,6 +46,8 @@ from _common import (
     volume_check,
 )
 
+import _telemetry
+
 PART_NAME = "harmonic-base"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
@@ -144,7 +146,7 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=BOTTOM_THICKNESS)),
     )
     name_last_feature(adapter, "BottomPlate")
-    print(f"  volume after bottom plate: {await _volume(adapter):.1f} mm^3")
+    _telemetry.info(f"volume after bottom plate: {await _volume(adapter):.1f} mm^3")
     # expected: 18 * 11 * 0.5 in^3 = 99 in^3 = 1,622,319 mm^3
 
     # Top plate, centered, starting at the bottom plate's upper face.
@@ -163,7 +165,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += top.apply(adapter, "TopProfile")
     extrude_at_offset(adapter, TOP_THICKNESS, BOTTOM_THICKNESS)
     name_last_feature(adapter, "TopPlate")
-    print(f"  volume after top plate: {await _volume(adapter):.1f} mm^3")
+    _telemetry.info(f"volume after top plate: {await _volume(adapter):.1f} mm^3")
     # expected: 99 + 17.5 * 10.5 * 1.5 = 374.625 in^3 = 6,139,003 mm^3
 
     # M6.10 fastener holes: Top sketch (x, y) -> global (X, -Z), mid-plane
@@ -195,7 +197,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "FastenerHoles")
     before = await _volume(adapter)
     v_holes = len(HOLE_XZ) * math.pi * (HOLE_DIA / 2.0) ** 2 * total
-    print(f"  volume after holes: {before:.1f} mm^3 (removed analytic {v_holes:.1f})")
+    _telemetry.info(f"volume after holes: {before:.1f} mm^3 (removed analytic {v_holes:.1f})")
     if abs((pre_holes - before) - v_holes) > 0.02 * v_holes:
         raise RuntimeError(
             f"holes removed {pre_holes - before:.1f}, expected {v_holes:.1f}"
@@ -239,7 +241,7 @@ async def build(adapter) -> dict[str, str]:
         * ((CBORE_DIA / 2.0) ** 2 - (HOLE_DIA / 2.0) ** 2)
         * CBORE_DEPTH
     )
-    print(f"  volume after counterbores: {after:.1f} mm^3 (removed analytic {v_cbore:.1f})")
+    _telemetry.info(f"volume after counterbores: {after:.1f} mm^3 (removed analytic {v_cbore:.1f})")
     if abs((before - after) - v_cbore) > 0.02 * v_cbore:
         raise RuntimeError(
             f"counterbores removed {before - after:.1f}, expected {v_cbore:.1f}"

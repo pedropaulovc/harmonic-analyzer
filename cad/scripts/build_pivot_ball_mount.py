@@ -47,6 +47,8 @@ from _common import (
     volume_check,
 )
 
+import _telemetry
+
 PART_NAME = "pivot-ball-mount"
 MATERIAL = "Plain Carbon Steel"  # chrome-look ball/pillar in the photos
 
@@ -182,7 +184,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "BallMount")
     res = await adapter.get_mass_properties()
-    print(f"  volume after revolve: {res.data.volume:.1f} mm^3")
+    _telemetry.info(f"volume after revolve: {res.data.volume:.1f} mm^3")
     # expected: disc 804.2 + stem 632.5 + sphere cap above the chord 3568.6
     #           = ~5,005 mm^3
 
@@ -209,7 +211,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "ShaftBore")
     res = await adapter.get_mass_properties()
     v_final = float(res.data.volume)
-    print(f"  volume after bore: {v_final:.1f} mm^3")
+    _telemetry.info(f"volume after bore: {v_final:.1f} mm^3")
     # expected: -(4pi/3)(R^3 - (R^2 - r^2)^1.5) = ~-612 -> ~4,393 mm^3
 
     # Apply the deferred drive equations after the model + a rebuild exists, then

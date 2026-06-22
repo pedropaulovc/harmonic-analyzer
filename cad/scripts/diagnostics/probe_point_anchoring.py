@@ -50,12 +50,15 @@ from typing import Any
 
 from _common import check, run_build
 
+import _telemetry
+
 RESULTS: list[tuple[str, bool, str]] = []
 
 
 def record(step: str, ok: bool, detail: str = "") -> None:
     RESULTS.append((step, ok, detail))
-    print(f"  {'PASS' if ok else 'FAIL'}  {step}{': ' + detail if detail else ''}", flush=True)
+    msg = f"{step}{': ' + detail if detail else ''}"
+    (_telemetry.success if ok else _telemetry.error)(msg)
 
 
 def _flag(adapter: Any, obj: Any, iface: str) -> None:
@@ -374,9 +377,10 @@ async def build(adapter) -> dict[str, str]:
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True))
 
     passed = sum(1 for _, ok, _ in RESULTS if ok)
-    print("\n==== PROBE SUMMARY ====", flush=True)
+    _telemetry.info("==== PROBE SUMMARY ====")
     for step, ok, detail in RESULTS:
-        print(f"  {'PASS' if ok else 'FAIL'}  {step}{': ' + detail if detail else ''}", flush=True)
+        msg = f"{step}{': ' + detail if detail else ''}"
+        (_telemetry.success if ok else _telemetry.error)(msg)
     return {"probe": f"{passed}/{len(RESULTS)} PASS"}
 
 

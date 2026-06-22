@@ -15,8 +15,12 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import comtypes
-import comtypes.client
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import _telemetry  # noqa: E402
+
+import comtypes  # noqa: E402
+import comtypes.client  # noqa: E402
 
 SW_TYPELIB = "{83A33D31-27C5-11CE-BFD4-00400513BB57}"  # SldWorks type library
 SW_TYPELIB_VER = (34, 0)  # matches the pywin32 gen_py module ...x0x34x0
@@ -30,24 +34,24 @@ SW_OPEN_SILENT = 1
 def main() -> int:
     mod = comtypes.client.GetModule((comtypes.GUID(SW_TYPELIB), *SW_TYPELIB_VER))
     sw = comtypes.client.GetActiveObject("SldWorks.Application", interface=mod.ISldWorks)
-    print(f"attached to SW; revision {sw.RevisionNumber()}", flush=True)
+    _telemetry.info(f"attached to SW; revision {sw.RevisionNumber()}")
 
     sw.CloseAllDocuments(True)
     res = sw.OpenDoc6(ASSEMBLY, SW_DOC_ASSEMBLY, SW_OPEN_SILENT, "", 0, 0)
-    print(f"OpenDoc6 returned {type(res).__name__}", flush=True)
+    _telemetry.debug(f"OpenDoc6 returned {type(res).__name__}")
 
     doc = sw.IActiveDoc2
     ext = doc.Extension
-    print(f"ext = {ext!r}", flush=True)
+    _telemetry.debug(f"ext = {ext!r}")
 
     pg = ext.GetPackAndGo()
-    print(f"GetPackAndGo -> {pg!r}", flush=True)
+    _telemetry.debug(f"GetPackAndGo -> {pg!r}")
     if pg is None:
-        print("!! comtypes ALSO returned None", flush=True)
+        _telemetry.warn("comtypes ALSO returned None")
         return 2
 
     count = pg.GetDocumentNamesCount()
-    print(f"GetDocumentNamesCount = {count}", flush=True)
+    _telemetry.info(f"GetDocumentNamesCount = {count}")
 
     pg.IncludeDrawings = False
     pg.IncludeSimulationResults = False
@@ -55,19 +59,19 @@ def main() -> int:
     pg.IncludeSuppressed = True
     pg.FlattenToSingleFolder = True
     ok = pg.SetSaveToName2(True, TEST_ZIP)
-    print(f"SetSaveToName2 -> {ok}", flush=True)
+    _telemetry.debug(f"SetSaveToName2 -> {ok}")
 
     Path(TEST_ZIP).parent.mkdir(parents=True, exist_ok=True)
     if Path(TEST_ZIP).exists():
         Path(TEST_ZIP).unlink()
     statuses = ext.SavePackAndGo(pg)
-    print(f"SavePackAndGo statuses = {statuses}", flush=True)
+    _telemetry.debug(f"SavePackAndGo statuses = {statuses}")
 
     zp = Path(TEST_ZIP)
     if zp.exists() and zp.stat().st_size > 0:
-        print(f"OK zip written: {zp} ({zp.stat().st_size/1e6:.1f} MB)", flush=True)
+        _telemetry.success(f"zip written: {zp} ({zp.stat().st_size/1e6:.1f} MB)")
         return 0
-    print("!! no zip produced", flush=True)
+    _telemetry.warn("no zip produced")
     return 3
 
 

@@ -19,6 +19,8 @@ from _common import (
     set_sketch_direct_db,
 )
 
+import _telemetry
+
 async def sketch_rounded_rect(
     adapter: Any, w: float, h: float, r: float, cx: float = 0.0, cy: float = 0.0
 ) -> None:
@@ -49,7 +51,7 @@ async def sketch_rounded_rect(
             check(f"rrect arc @({ccx:g},{ccy:g})", await adapter.add_arc(ccx, ccy, sx, sy, ex, ey))
     finally:
         sketch_mgr.AddToDB = prev
-    print(f"  OK  rounded_rect {w:g}x{h:g} r{r:g} @ ({cx:g}, {cy:g})")
+    _telemetry.success(f"rounded_rect {w:g}x{h:g} r{r:g} @ ({cx:g}, {cy:g})")
 
 async def sketch_polyline_loops(
     adapter: Any, loops: Iterable[Iterable[tuple[float, float]]], *, label: str = "loops"
@@ -93,7 +95,7 @@ async def sketch_polyline_loops(
             count += 1
     finally:
         sketch_mgr.AddToDB = prev
-    print(f"  OK  sketch_polyline_loops {label}: {count} loops, {segments} segments")
+    _telemetry.success(f"sketch_polyline_loops {label}: {count} loops, {segments} segments")
     return count
 
 def insert_helix(
@@ -112,7 +114,7 @@ def insert_helix(
     name = feature_name_by_type(adapter, "Helix")
     if not name:
         raise RuntimeError("InsertHelix did not create a helix feature")
-    print(f"  OK  insert_helix -> {name}")
+    _telemetry.success(f"insert_helix -> {name}")
     return name
 
 async def add_spring_end_hooks(
@@ -264,7 +266,7 @@ async def add_spring_end_hooks(
         before = await _volume()
         res = await adapter.create_sweep(SweepParameters(path=path_name))
         if not res.is_success and d > 0:
-            print(f"  ..  top hook sweep failed ({res.error}); flipping profile plane")
+            _telemetry.debug(f"top hook sweep failed ({res.error}); flipping profile plane")
             plane = check(
                 "create_plane top hook profile (flipped)",
                 await adapter.create_plane(
@@ -295,8 +297,8 @@ async def add_spring_end_hooks(
                 f"{v_hook:.2f} (overlap allowance {max_overlap:.2f}, "
                 f"tessellation slack {slack:.2f})"
             )
-        print(
-            f"  OK  {label} hook: added {added:.2f} mm^3 "
+        _telemetry.success(
+            f"{label} hook: added {added:.2f} mm^3 "
             f"(Pappus {v_hook:.2f}, overlap allowance {max_overlap:.2f}, "
             f"slack {slack:.2f})"
         )
@@ -367,7 +369,7 @@ async def add_reeded_head_and_thread(
             f"reeding seed: volume {after_seed:.2f}, expected "
             f"{before - v_groove:.2f} -- cut direction or lens math wrong"
         )
-    print(f"  OK  reeding seed: removed {before - after_seed:.2f} mm^3 (analytic {v_groove:.2f})")
+    _telemetry.success(f"reeding seed: removed {before - after_seed:.2f} mm^3 (analytic {v_groove:.2f})")
 
     # The screw's axis is buried inside solid material, so point-projected
     # axis selection picks the body face in front of it (live failure) --
@@ -400,7 +402,7 @@ async def add_reeded_head_and_thread(
         raise RuntimeError(
             f"reeded head: volume {after_pattern:.2f}, expected {expected:.2f}"
         )
-    print(f"  OK  reeded head: volume {after_pattern:.2f} mm^3 (analytic {expected:.2f})")
+    _telemetry.success(f"reeded head: volume {after_pattern:.2f} mm^3 (analytic {expected:.2f})")
 
     adapter._zoom_to_fit(adapter.currentModel)
     check(

@@ -50,6 +50,8 @@ from build_motion_study import (
     _real_parts,
 )
 
+import _telemetry
+
 # Mate features are auto-named by SolidWorks ("Distance34"), NOT by the build
 # script's label -- a park driver is identified the way the motion study does:
 # a DISTANCE/ANGLE mate that references exactly ONE real moving part (its pose
@@ -171,10 +173,10 @@ async def build(adapter: Any) -> dict[str, str]:
         rows += await _probe_sub(adapter, sub, PROBES)
         adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
-    print("\nMOBILITY PROBE -- park driver -> freed DOF (rest = 0 DOF baseline):")
-    print("\n".join(rows))
-    print("\n  OK  rest is 0-DOF; each park driver controls a real freedom; "
-          "every probe restored rest.")
+    _telemetry.info("MOBILITY PROBE -- park driver -> freed DOF (rest = 0 DOF baseline):")
+    _telemetry.info("\n".join(rows))
+    _telemetry.success("rest is 0-DOF; each park driver controls a real freedom; "
+                       "every probe restored rest.")
     return {"probes": str(len(rows))}
 
 

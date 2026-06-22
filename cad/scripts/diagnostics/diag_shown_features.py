@@ -16,6 +16,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 from _common import check, run_build  # noqa: E402
 from render_compare import _flag, _read_member  # noqa: E402
 
+import _telemetry  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[1]
 PARTS = [
     "amplitude-bar",
@@ -43,7 +45,7 @@ async def build(adapter) -> dict[str, str]:
             tn = str(_read_member(feat, "GetTypeName2"))
             name = str(_read_member(feat, "Name"))
             vis = _read_member(feat, "Visible")
-            print(f"  {stem}: {name} [{tn}] Visible={vis}")
+            _telemetry.debug(f"{stem}: {name} [{tn}] Visible={vis}")
             if vis == 2:
                 shown.append(f"{name} [{tn}]")
             sub = _read_member(feat, "GetFirstSubFeature")
@@ -54,13 +56,13 @@ async def build(adapter) -> dict[str, str]:
                 stn = str(_read_member(sub, "GetTypeName2"))
                 sname = str(_read_member(sub, "Name"))
                 svis = _read_member(sub, "Visible")
-                print(f"  {stem}:   sub {sname} [{stn}] Visible={svis}")
+                _telemetry.debug(f"{stem}:   sub {sname} [{stn}] Visible={svis}")
                 if svis == 2:
                     shown.append(f"sub {sname} [{stn}]")
                 sub = _read_member(sub, "GetNextSubFeature")
             feat = _read_member(feat, "GetNextFeature")
 
-        print(f"  {stem}: SHOWN -> {shown or 'nothing'}")
+        _telemetry.info(f"{stem}: SHOWN -> {shown or 'nothing'}")
         results[stem] = ",".join(shown) or "none"
     return results
 

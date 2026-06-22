@@ -25,7 +25,11 @@ Usage:
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "cad" / "scripts"))
+import _telemetry  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
 SCRIPTS = REPO / "cad" / "scripts"
@@ -217,7 +221,7 @@ def main() -> int:
     manifest["pairs"] = sorted(existing.values(), key=lambda p: p["id"])
     MANIFEST.write_text(json.dumps(manifest, indent=1), encoding="utf-8")
     models = {p["model"] for p in manifest["pairs"]}
-    print(f"manifest: {len(manifest['pairs'])} pairs ({added} added) across {len(models)} models")
+    _telemetry.success(f"manifest: {len(manifest['pairs'])} pairs ({added} added) across {len(models)} models")
     return 0
 
 

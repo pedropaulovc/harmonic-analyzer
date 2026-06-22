@@ -55,6 +55,8 @@ from _assembly import (
 )
 from _transforms import IDENTITY, ROT_X_POS90
 
+import _telemetry
+
 ASM_NAME = "harmonic-analyzer"
 
 SUBASSEMBLIES = ("frame", "drive-train", "channel", "summing", "magnifier", "pen",
@@ -170,7 +172,7 @@ async def export_gallery_and_bom(adapter) -> dict[str, str]:
             CreateBomParameters(bom_type="parts_only", file_path=str(bom_path))
         ),
     )
-    print(f"  BOM: {data['rows']} rows -> {data['file_path']}", flush=True)
+    _telemetry.info(f"BOM: {data['rows']} rows -> {data['file_path']}")
     artefacts["bom"] = str(bom_path)
     return artefacts
 

@@ -101,6 +101,7 @@ from _buildgraph import (  # noqa: E402
 )
 
 import _artifact_cache as _cache  # noqa: E402  (remote build-artefact cache)
+import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
 
 REPO_ROOT = Path(__file__).resolve().parent
 CONFIG_DIR = REPO_ROOT / "cad" / "config"
@@ -285,27 +286,32 @@ def _run(cmd: list[str], label: str, log_stem: str | None = None) -> None:
     it, output is inherited straight to the terminal -- the cheap path for the
     non-release happy path. Decode the pipe as UTF-8 (errors=replace) so the gate
     labels' non-ASCII glyphs survive on a cp1252 Windows console."""
-    print(f">>  {label}: {' '.join(cmd)}", flush=True)
-    if log_stem is None:
-        rc = subprocess.run(cmd, cwd=str(REPO_ROOT)).returncode
-    else:
-        LOGS.mkdir(parents=True, exist_ok=True)
-        with (LOGS / f"{log_stem}.log").open("w", encoding="utf-8") as fh:
-            fh.write(f">>  {label}: {' '.join(cmd)}\n")
-            fh.flush()
-            proc = subprocess.Popen(
-                cmd, cwd=str(REPO_ROOT), stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT, text=True, encoding="utf-8",
-                errors="replace", bufsize=1)
-            assert proc.stdout is not None
-            for line in proc.stdout:
-                sys.stdout.write(line)
-                sys.stdout.flush()
-                fh.write(line)
+    # One span per task action; inject its trace context into the subprocess env
+    # (TRACEPARENT) so the build script's own root span continues this trace --
+    # the doit task and the process it spawns form one gapless end-to-end trace.
+    with _telemetry.span("task", label=label, cmd=" ".join(cmd)):
+        _telemetry.info(f">> {label}: {' '.join(cmd)}")
+        env = _telemetry.inject_env()
+        if log_stem is None:
+            rc = subprocess.run(cmd, cwd=str(REPO_ROOT), env=env).returncode
+        else:
+            LOGS.mkdir(parents=True, exist_ok=True)
+            with (LOGS / f"{log_stem}.log").open("w", encoding="utf-8") as fh:
+                fh.write(f">>  {label}: {' '.join(cmd)}\n")
                 fh.flush()
-            rc = proc.wait()
-    if rc:
-        raise RuntimeError(f"{label} failed (exit {rc})")
+                proc = subprocess.Popen(
+                    cmd, cwd=str(REPO_ROOT), env=env, stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+                    errors="replace", bufsize=1)
+                assert proc.stdout is not None
+                for line in proc.stdout:
+                    sys.stdout.write(line)
+                    sys.stdout.flush()
+                    fh.write(line)
+                    fh.flush()
+                rc = proc.wait()
+        if rc:
+            raise RuntimeError(f"{label} failed (exit {rc})")
 
 
 # --- Per-script helper dependencies, computed from each build script's REAL
@@ -948,10 +954,10 @@ def _cache_status(statusargs):
     filters = [a for a in args if a not in ("miss", "all")]
 
     cfg = _cache.config_summary()
-    print(f"[cache_status] mode={cfg['mode']} epoch={cfg['epoch']} salt={cfg['salt']} "
-          f"account={cfg['account']} container={cfg['container']}")
+    _telemetry.info(f"[cache_status] mode={cfg['mode']} epoch={cfg['epoch']} salt={cfg['salt']} "
+                    f"account={cfg['account']} container={cfg['container']}")
     if not _cache.enabled():
-        print("[cache_status] cache disabled (mode=off) -- keys computed, backend NOT probed")
+        _telemetry.warn("[cache_status] cache disabled (mode=off) -- keys computed, backend NOT probed")
 
     hits = misses = unknown = 0
     for label, deps in _cache_rows():
@@ -969,11 +975,12 @@ def _cache_status(statusargs):
             continue
         last = _cache.last_stored_key(label)
         drift = f"  DRIFT(last published {last[:12]})" if last and last != key else ""
-        print(f"  {mark} {key[:12]}  {label}{drift}")
+        emit = _telemetry.warn if present is False else _telemetry.info
+        emit(f"{mark} {key[:12]}  {label}{drift}")
         if show_all or present is False:
             for rel, digest in inputs:
-                print(f"           {digest}  {rel}")
-    print(f"[cache_status] {hits} hit / {misses} miss / {unknown} unknown")
+                _telemetry.debug(f"         {digest}  {rel}")
+    _telemetry.success(f"[cache_status] {hits} hit / {misses} miss / {unknown} unknown")
 
 
 def task_cache_status():

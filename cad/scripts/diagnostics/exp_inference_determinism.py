@@ -25,6 +25,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import asyncio
 
+import _telemetry
+
 # Hex-bolt head geometry (verbatim from build_hex_bolt.py).
 HEAD_AF = 12.7
 HEAD_H = 5.5
@@ -70,19 +72,19 @@ async def _one(adapter, add_to_db: bool) -> tuple[float, int]:
 
 
 async def _trial(adapter, add_to_db: bool, label: str) -> None:
-    print(f"\n=== {label}  (AddToDB={add_to_db}, inference {'OFF' if add_to_db else 'ON'}) ===")
+    _telemetry.info(f"=== {label}  (AddToDB={add_to_db}, inference {'OFF' if add_to_db else 'ON'}) ===")
     vols = []
     for i in range(N):
         vol, n_seg = await _one(adapter, add_to_db)
         tag = "OK " if abs(vol - ANALYTIC) < 0.5 else ("COLLAPSE" if vol == vol else "EXTRUDE-FAIL")
-        print(f"  iter {i:02d}: volume={vol:8.2f} mm^3  segments={n_seg}  {tag}")
+        _telemetry.info(f"iter {i:02d}: volume={vol:8.2f} mm^3  segments={n_seg}  {tag}")
         vols.append(round(vol, 1) if vol == vol else float("nan"))
         adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     distinct = sorted({v for v in vols if v == v})
     nan_count = sum(1 for v in vols if v != v)
-    print(f"  --> distinct volumes: {distinct}   extrude-failures: {nan_count}")
+    _telemetry.info(f"--> distinct volumes: {distinct}   extrude-failures: {nan_count}")
     verdict = "NONDETERMINISTIC" if (len(distinct) > 1 or nan_count) else "deterministic"
-    print(f"  --> {label}: {verdict}")
+    _telemetry.info(f"--> {label}: {verdict}")
 
 
 async def main() -> int:
@@ -91,7 +93,7 @@ async def main() -> int:
     adapter = PyWin32Adapter({})
     await adapter.connect()
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    print(f"analytic head volume = {ANALYTIC:.2f} mm^3 ; iterations per trial = {N}")
+    _telemetry.info(f"analytic head volume = {ANALYTIC:.2f} mm^3 ; iterations per trial = {N}")
     await _trial(adapter, False, "INFERENCE PATH")
     await _trial(adapter, True, "SUPPRESSED PATH")
     await adapter.disconnect()

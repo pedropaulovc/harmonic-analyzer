@@ -12,6 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+import _telemetry  # noqa: E402
 from _common import check, run_build  # noqa: E402
 from render_compare import _flag, capture, component_boxes, resolve_framing, set_camera  # noqa: E402
 
@@ -53,9 +54,9 @@ async def build(adapter) -> dict[str, str]:
         if box:
             x0, y0, z0, x1, y1, z1 = [v * 1000.0 for v in box]
             if (y1 - y0) > 800 and (x1 - x0) < 80 and (z1 - z0) < 80:
-                print(f"column-like: {name} x[{x0:.0f},{x1:.0f}] y[{y0:.0f},{y1:.0f}] z[{z0:.0f},{z1:.0f}]")
+                _telemetry.info(f"column-like: {name} x[{x0:.0f},{x1:.0f}] y[{y0:.0f},{y1:.0f}] z[{z0:.0f},{z1:.0f}]")
 
-    print(f"hiding {len(tubes)} tube-frame instances")
+    _telemetry.info(f"hiding {len(tubes)} tube-frame instances")
     boxes = component_boxes(adapter)
     cam = dict(CAM)
     cam.update(resolve_framing(CAM, boxes))
@@ -65,7 +66,7 @@ async def build(adapter) -> dict[str, str]:
     await capture(adapter, OUT / "diag-az0-no-tubeframe.png", 945, 2240)
     for c in tubes:
         c.Visible = True
-    print("captured diag-az0-no-tubeframe.png")
+    _telemetry.success("captured diag-az0-no-tubeframe.png")
     return {"diag": "done"}
 
 
