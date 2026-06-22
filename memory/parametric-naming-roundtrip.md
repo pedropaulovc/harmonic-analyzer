@@ -1,6 +1,6 @@
 ---
 name: parametric-naming-roundtrip
-description: How to make a build script emit human-named SW globals/sketches/features/dimensions so the part is GUI-editable and round-trips; top-frame is the reference; three hard-won COM gotchas
+description: How to make a build script emit human-named SW globals/sketches/features/dimensions so the part is GUI-editable and round-trips; top-frame is the reference; the full 71-part rollout is DONE; hard-won COM gotchas
 metadata:
   type: project
 ---
@@ -13,6 +13,17 @@ dimensions — so a GUI edit (and macro-recorded edits) reference stable names, 
 values can be harvested back. **top-frame is the validated reference** (`build_top_frame.py`,
 landed working 2026-06-21: part builds, "equations neutral" volume check passes,
 renders a correct ring).
+
+**ROLLOUT COMPLETE (2026-06-22).** All **71 non-assembly parts** converted to the
+self-naming pattern and each live-validated geometry-neutral on the seat (deferred
+drive + volume re-check). The shared `_spring.py:build_spring` is converted too
+(covers `channel-spring-installed` + the channel-assembly mass-produced springs).
+The **14 pure assemblies have no sketches** (they only mate pre-built parts —
+`grep -cE create_sketch` = 0), so nothing to drive there. Feature/sketch renames
+are **mate-safe**: SW mates store persistent entity IDs, not display names — no
+assembly mate selects a feature by name (audited). Rolled out on branch
+`parametric-naming-rollout`; main-repo PR opens with NO automerge (standing
+directive). Four more gotchas surfaced during the fan-out — see list below (4-7).
 
 New lib helpers in `cad/scripts/_common.py` (all raw COM — the adapter has no
 rename/enumerate surface): `name_last_feature` (rename most-recent feature via
@@ -64,19 +75,61 @@ Three COM gotchas that each cost a run (see [[solidworks-modeling-pitfalls]]):
    flagged, live-name tree walk) + `SelectByID2` — rename-proof and it finally
    makes the primary path work for all cuts. Repo `name_sketch` workaround
    DELETED; sketches now use plain `name_last_feature`.
-   **Footgun discovered:** `_common.py` injects a SIBLING checkout
-   `C:\src\SolidworksMCP-python` (env `SOLIDWORKS_MCP_ROOT`) onto `sys.path[0]`,
-   OVERRIDING the `uv`-installed editable submodule. So the build runs the
-   sibling (branch `pr67-build`), NOT `harmonic-analyzer/SolidworksMCP-python`
-   (detached `4e7d803`) — adapter edits must go in the SIBLING to take effect;
-   the submodule is just what `uv sync` installs. Reconcile (commit sibling +
-   bump submodule) for reproducibility.
+   **Footgun (RESOLVED 2026-06-22).** `_common.py` USED to inject a SIBLING
+   checkout `C:\src\SolidworksMCP-python` (env `SOLIDWORKS_MCP_ROOT`) onto
+   `sys.path[0]`, overriding the `uv`-installed editable submodule — so edits
+   only took effect in the sibling. Per the user's directive that whole sibling
+   was DELETED: the `sys.path` injection is gone from `_common.py`, the adapter
+   fix was ported + merged to the submodule's `personal` branch (fork PRs auto-
+   complete), and the `SolidworksMCP-python` submodule pointer in this repo was
+   bumped to the merged commit. The submodule (editable path source via
+   `[tool.uv.sources]`) is now the SINGLE source — no sibling, no override.
 3. **Documents are INCH; the equation manager evaluates BARE numbers in DOCUMENT
    units.** Driving `Width = 2*"OuterX"` with `OuterX=208` set the dim to 208
    INCHES → part blew up 25.4x in-plane (645x volume). Fix: give length globals an
    explicit `mm` suffix (`set_global(.., f"{x}mm")`); derived globals + equations
    inherit the unit. Same root fact as the pen-driver's "doc units" note.
 
+Four more gotchas surfaced converting the remaining 70 parts (each cost a seat run):
+4. **The mm unit trap bites ADDITIVE literals too, not just globals.** Gotcha 3
+   covers length GLOBALS needing `mm`. The same fact applies to bare numbers
+   ADDED/SUBTRACTED inside an equation STRING: `set_global("TipArcCx",
+   '"LeverSpringX" + 5')` read the 5 as 5 INCHES (+127mm) → part 43% too big.
+   Fix: `'"LeverSpringX" + 5mm'`. But bare-number MULTIPLIERS/DIVISORS are
+   dimensionless and must stay bare: `'2 * "MeanRadius"'`, `'"OuterX" / 2'` are
+   correct (adding `mm` to a multiplier is itself an error). Rule: literal that
+   is a LENGTH → `mm`; literal that is a RATIO → bare.
+5. **Don't drive BOTH centres of two concentric circles.** A circle centre's
+   position dim is an absolute coordinate; if an inner bore is concentric with an
+   outer ring and you drive BOTH centre dims to the same value, SW over-defines
+   the solve and `force_rebuild` fails ("Failed to rebuild model"). Drive ONE
+   (the outer); record the bore's centre but leave its drive `None` so
+   `SketchDims.apply` renames it (count still matches) but emits no equation. (`apply`
+   only returns drive jobs for rows where BOTH name AND drive are truthy.)
+6. **A circle on a CUSTOM OFFSET plane emits an extra dim.** On Front/Top an
+   x=0 circle centre is anchored by a relation (0 dims) so define_circle records
+   only Z+diameter (2). On a created offset plane the same x=0 centre gets an
+   explicit X dim too (3) — the helper's recorded count (2) then trips the
+   `apply` count-assert. Can't predict it, so name the feature but record NO dims
+   (pass no `dims=`), like the gooseneck/cylinder-gear sweep+cam profiles. The
+   diameter knob stays declared as a global but undriven (acceptable, like an
+   extrude depth).
+7. **Unsigned distance dims can't be driven negative; renamed refs go stale.**
+   (a) A centre/anchor coordinate is an UNSIGNED distance from origin — for a
+   NEGATIVE as-built coordinate, drive the positive magnitude by negating the
+   global: `'-"ScrewHoleX"'` (driving to a negative value fails loud at
+   equation-add). (b) If a sweep `path=`, pattern seed, mirror, or mate selects
+   an earlier sketch/feature BY NAME and you RENAME that sketch/feature, update
+   the reference to the new name (a captured `path_name`/`"Sketch1"` goes stale →
+   "Failed to select sweep path").
+
+The pattern that made the 70-part fan-out safe: push dim recording INTO the
+emitting helpers (`SketchDims`) so the `.apply` count-assert (recorded == actual
+display-dim count) fails LOUD on any drift, and prove geometry-neutrality with a
+deferred-drive + volume re-check per part. Subagents could edit + `py_compile`
+in parallel; the single STA seat validated serially. Net: 82+ runs, 4 systematic
+failure classes found and documented, zero silent geometry changes.
+
 Next: confirm the GUI-edit→harvest loop on top-frame (edit a global, re-open,
-`dump_dimensions`), then roll the naming pattern to other parts. Ties to the
-proposed `harvest`/`verify:drift` doit tasks (not yet built).
+`dump_dimensions`). Ties to the proposed `harvest`/`verify:drift` doit tasks
+(not yet built).
