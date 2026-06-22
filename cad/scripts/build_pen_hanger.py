@@ -34,18 +34,24 @@ import math
 import sys
 
 from _common import (
+    SketchDims,
     add_line_chain,
     apply_material,
     check,
+    define_centered_rectangle,
     define_circle,
     define_polygon_chain,
-    define_rectilinear_chain,
+    drive_dimension,
     ensure_fully_defined,
     extrude_at_offset,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
     set_sketch_direct_db,
+    volume_check,
 )
 
 PART_NAME = "pen-hanger"
@@ -75,19 +81,44 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # 1. Solid guide block.
+    # Editable knobs (Tools > Equations). mm suffix load-bearing: this is an INCH
+    # document and the equation manager reads BARE numbers in document units (an
+    # unsuffixed 65 = 65 in, a 25.4x in-plane blow-up). The strap-edge X knobs and
+    # the screw-hole X hold SIGNED machine coordinates; the dims they drive are
+    # UNSIGNED distances, so the drive expressions below negate / difference them
+    # so each evaluates POSITIVE.
+    await set_global(adapter, "BlockHalf", f"{BLOCK_HALF}mm")
+    await set_global(adapter, "GuideHoleHalf", f"{GUIDE_HOLE_HALF}mm")
+    await set_global(adapter, "StrapTopY", f"{STRAP_TOP_Y}mm")
+    await set_global(adapter, "StrapBotXMin", f"{STRAP_BOT_X[0]}mm")
+    await set_global(adapter, "StrapBotXMax", f"{STRAP_BOT_X[1]}mm")
+    await set_global(adapter, "StrapTopXMin", f"{STRAP_TOP_X[0]}mm")
+    await set_global(adapter, "StrapTopXMax", f"{STRAP_TOP_X[1]}mm")
+    await set_global(adapter, "ScrewHoleDia", f"{SCREW_HOLE_DIA}mm")
+    await set_global(adapter, "ScrewHoleX", f"{SCREW_HOLE_XY[0]}mm")
+    await set_global(adapter, "ScrewHoleY", f"{SCREW_HOLE_XY[1]}mm")
+
+    # Drive equations collected as dims are recorded, applied in one deferred
+    # batch after the whole model + a rebuild exists (every target must resolve).
+    drive_jobs: list[tuple[str, str]] = []
+
+    # 1. Solid guide block: an origin-centred 12 x 12 square -- use
+    # define_centered_rectangle (width/depth/corner named directly).
+    block = SketchDims()
     check("create_sketch block", await adapter.create_sketch("Front"))
-    block_rect = [
-        (-BLOCK_HALF, -BLOCK_HALF),
-        (BLOCK_HALF, -BLOCK_HALF),
-        (BLOCK_HALF, BLOCK_HALF),
-        (-BLOCK_HALF, BLOCK_HALF),
-    ]
-    outline = await add_line_chain(adapter, block_rect)
-    await define_rectilinear_chain(adapter, outline, block_rect, label="block")
+    await define_centered_rectangle(
+        adapter, BLOCK_HALF, BLOCK_HALF, "block", dims=block,
+        name_width="BlockWidth", drive_width='2 * "BlockHalf"',
+        name_depth="BlockDepth", drive_depth='2 * "BlockHalf"',
+        name_corner=("BlockCornerX", "BlockCornerZ"),
+        drive_corner=('"BlockHalf"', '"BlockHalf"'),
+    )
     await ensure_fully_defined(adapter, "block sketch")
     check("exit_sketch block", await adapter.exit_sketch())
+    name_last_feature(adapter, "BlockProfile")
+    drive_jobs += block.apply(adapter, "BlockProfile")
     extrude_at_offset(adapter, BLOCK_Z[1] - BLOCK_Z[0], BLOCK_Z[0])
+    name_last_feature(adapter, "Block")
     expected = (2.0 * BLOCK_HALF) ** 2 * (BLOCK_Z[1] - BLOCK_Z[0])
     vol = await _volume(adapter)
     print(f"  volume after block: {vol:.1f} mm^3 (analytic {expected:.1f})")
@@ -97,30 +128,42 @@ async def build(adapter) -> dict[str, str]:
     # 1b. Square rod channel cut along Y (the pen rod hangs vertically).
     # The +-2.7 footprint stays inside the block's z -4..12.6 band and well
     # clear of the strap's z 9.6..12.6 band, so a through cut is safe.
+    channel = SketchDims()
     check("create_sketch channel", await adapter.create_sketch("Top"))
-    channel_rect = [
-        (-GUIDE_HOLE_HALF, -GUIDE_HOLE_HALF),
-        (GUIDE_HOLE_HALF, -GUIDE_HOLE_HALF),
-        (GUIDE_HOLE_HALF, GUIDE_HOLE_HALF),
-        (-GUIDE_HOLE_HALF, GUIDE_HOLE_HALF),
-    ]
-    channel = await add_line_chain(adapter, channel_rect)
-    await define_rectilinear_chain(adapter, channel, channel_rect, label="channel")
+    await define_centered_rectangle(
+        adapter, GUIDE_HOLE_HALF, GUIDE_HOLE_HALF, "channel", dims=channel,
+        name_width="ChannelWidth", drive_width='2 * "GuideHoleHalf"',
+        name_depth="ChannelDepth", drive_depth='2 * "GuideHoleHalf"',
+        name_corner=("ChannelCornerX", "ChannelCornerZ"),
+        drive_corner=('"GuideHoleHalf"', '"GuideHoleHalf"'),
+    )
     await ensure_fully_defined(adapter, "channel sketch")
     check("exit_sketch channel", await adapter.exit_sketch())
+    name_last_feature(adapter, "ChannelProfile")
+    drive_jobs += channel.apply(adapter, "ChannelProfile")
     check(
         "cut channel",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=4.0 * BLOCK_HALF, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "Channel")
     expected -= (2.0 * GUIDE_HOLE_HALF) ** 2 * 2.0 * BLOCK_HALF
     vol = await _volume(adapter)
     print(f"  volume after channel: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.005 * expected:
         raise RuntimeError(f"channel volume {vol:.1f} != {expected:.1f}")
 
-    # 2. Tapered strap rising to the support bar.
+    # 2. Tapered strap rising to the support bar. Polygon-chain emission order:
+    # anchor vertex 0 = (STRAP_BOT_X[0], BLOCK_HALF) is off both axes -> 2 anchor
+    # dims (x then z), THEN the kept segments' offsets in line order (the segment
+    # ending at the anchor vertex is skipped, closure supplies it):
+    #   seg0 (bottom edge, axis-aligned) -> 1 dim (bottom width)
+    #   seg1 (right taper, general)      -> 2 dims (dx, dy)
+    #   seg2 (top edge, axis-aligned)    -> 1 dim (top run)
+    # = 6 display dims. Anchor/segment dims are UNSIGNED distances; the strap-edge
+    # X knobs are signed, so the drives below difference/negate them to positive.
+    strap = SketchDims()
     check("create_sketch strap", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     strap_pts = [
@@ -129,12 +172,24 @@ async def build(adapter) -> dict[str, str]:
         (STRAP_TOP_X[1], STRAP_TOP_Y),
         (STRAP_TOP_X[0], STRAP_TOP_Y),
     ]
-    strap = await add_line_chain(adapter, strap_pts)
+    strap_lines = await add_line_chain(adapter, strap_pts)
     set_sketch_direct_db(adapter, False)
-    await define_polygon_chain(adapter, strap, strap_pts, label="strap")
+    await define_polygon_chain(
+        adapter, strap_lines, strap_pts, label="strap", dims=strap,
+        names=["StrapAnchorX", "StrapAnchorZ", "StrapBotWidth",
+               "StrapTaperDx", "StrapTaperDy", "StrapTopRun"],
+        drives=['-"StrapBotXMin"', '"BlockHalf"',
+                '"StrapBotXMax" - "StrapBotXMin"',
+                '"StrapBotXMax" - "StrapTopXMax"',
+                '"StrapTopY" - "BlockHalf"',
+                '"StrapTopXMax" - "StrapTopXMin"'],
+    )
     await ensure_fully_defined(adapter, "strap sketch")
     check("exit_sketch strap", await adapter.exit_sketch())
+    name_last_feature(adapter, "StrapProfile")
+    drive_jobs += strap.apply(adapter, "StrapProfile")
     extrude_at_offset(adapter, STRAP_Z[1] - STRAP_Z[0], STRAP_Z[0])
+    name_last_feature(adapter, "Strap")
     bot_w = STRAP_BOT_X[1] - STRAP_BOT_X[0]
     top_w = STRAP_TOP_X[1] - STRAP_TOP_X[0]
     v_strap = (
@@ -150,25 +205,44 @@ async def build(adapter) -> dict[str, str]:
 
     # 3. Hanger-screw hole through the strap (mid-plane cut along Z: at
     # local y 60 only the strap band 9.6..12.6 is material).
+    # Off-axis centre (both nonzero) -> define_circle records X, Z, diameter.
+    # The X centre sits at a NEGATIVE coordinate, so its dim is the magnitude and
+    # the drive negates the signed knob to stay positive.
+    screw = SketchDims()
     check("create_sketch screw hole", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     await define_circle(
-        adapter, SCREW_HOLE_XY[0], SCREW_HOLE_XY[1], SCREW_HOLE_DIA / 2.0, "screw hole"
+        adapter, SCREW_HOLE_XY[0], SCREW_HOLE_XY[1], SCREW_HOLE_DIA / 2.0, "screw hole",
+        dims=screw,
+        names=("ScrewHoleCx", "ScrewHoleCy", "ScrewHoleDiaDim"),
+        drives=('-"ScrewHoleX"', '"ScrewHoleY"', '"ScrewHoleDia"'),
     )
     set_sketch_direct_db(adapter, False)
     await ensure_fully_defined(adapter, "screw hole sketch")
     check("exit_sketch screw hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "ScrewHoleProfile")
+    drive_jobs += screw.apply(adapter, "ScrewHoleProfile")
     check(
         "cut screw hole",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=4.0 * STRAP_Z[1], both_directions=True)
         ),
     )
+    name_last_feature(adapter, "ScrewHole")
     expected -= math.pi * (SCREW_HOLE_DIA / 2.0) ** 2 * (STRAP_Z[1] - STRAP_Z[0])
     vol = await _volume(adapter)
     print(f"  volume after screw hole: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 1.0:
         raise RuntimeError(f"screw hole volume {vol:.1f} != {expected:.1f}")
+
+    # Apply the deferred drive equations after the model + a rebuild exists, then
+    # re-check neutrality: every equation evaluates to the as-built value, so the
+    # geometry must not move.
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "driven pen hanger (equations neutral)", vol, 1.0)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

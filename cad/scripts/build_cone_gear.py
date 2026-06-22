@@ -74,15 +74,26 @@ from typing import Any
 import _config
 from _common import (
     OUT_PNG,
+    SketchDims,
     _read_member,
     apply_material,
     check,
+    drive_dimension,
     ensure_fully_defined,
-    feature_name_by_type,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    volume_check,
 )
+# NOTE: this module keeps its OWN validating ``set_global`` (below) -- it
+# round-trips every gear-math global through the SW equation parser to assert
+# the trig/sqr/pi dialect, which the plain ``_common.set_global`` does not do.
+# So we deliberately do NOT import ``_common.set_global`` (it would be shadowed
+# by the local def anyway). The self-naming helpers above drive only the two
+# ORDINARY circle dims (blank OD, bore); the involute tooth-gap profile is left
+# undimensioned so it stays free to re-solve from the globals and mesh.
 
 PART_NAME = "cone-gear"
 MATERIAL = "Brass"  # ch. 13 text: polished brass gear stock; cone set matches
@@ -310,6 +321,14 @@ async def build(adapter) -> dict[str, str]:
 
     findings: list[str] = []
 
+    # Deferred drive jobs for the ORDINARY (non-tooth) circle dims: each
+    # ``define_*``/``SketchDims.record`` queues a ``(dim@feature, expr)`` here,
+    # applied in one batch after the base model + a rebuild exist (every
+    # equation target must resolve against the finished part). The tooth-gap
+    # profile contributes NOTHING here -- it must mesh with the mating gear, so
+    # its flanks are never pinned to a recorded dim.
+    drive_jobs: list[tuple[str, str]] = []
+
     check("create_part", await adapter.create_part())
 
     # ------------------------------------------------------------------
@@ -371,6 +390,7 @@ async def build(adapter) -> dict[str, str]:
     # passes in probe_bore12). The bore cut below needs an extruded blank.
     # ------------------------------------------------------------------
     ra_default_mm = facts["Ra"] * 25.4
+    blank = SketchDims()
     check("create_sketch blank", await adapter.create_sketch("Front"))
     blank_circle = check(
         "add_circle blank", await adapter.add_circle(0.0, 0.0, ra_default_mm)
@@ -381,6 +401,12 @@ async def build(adapter) -> dict[str, str]:
             blank_circle, None, "diameter", 2.0 * ra_default_mm
         ),
     )
+    # Record the manual driving dim into the per-sketch SketchDims (crank-pin
+    # pattern): one display dim, driven by 2*Ra. This is the SAME link the
+    # blank previously got via an inline ``create_equation`` -- now it is named
+    # ("BlankDia") and deferred into ``drive_jobs`` instead, so the equation
+    # target is the friendly name and resolves after the final rebuild.
+    blank.record("BlankDia", '2 * "Ra"')
     status = await adapter.check_sketch_fully_defined()
     state = status.data.get("definition_state") if status.is_success else None
     if state != "fully_defined":
@@ -390,11 +416,13 @@ async def build(adapter) -> dict[str, str]:
         )
     print("  OK  blank sketch fully defined (driving dim, no fix)")
     check("exit_sketch blank", await adapter.exit_sketch())
-    blank_sketch = feature_name_by_type(adapter, "ProfileFeature")
+    blank_sketch = name_last_feature(adapter, "BlankProfile")
+    drive_jobs += blank.apply(adapter, blank_sketch)
     check(
         "extrude blank",
         await adapter.create_extrusion(ExtrusionParameters(depth=FACE_WIDTH)),
     )
+    name_last_feature(adapter, "Blank")
 
     mass = await adapter.get_mass_properties()
     if not mass.is_success:
@@ -413,10 +441,13 @@ async def build(adapter) -> dict[str, str]:
         )
     print(f"  OK  blank volume {blank_volume:.1f} mm^3 (com z {com_z:.2f})")
 
-    # Equation-link the blank diameter to 2*Ra. Dimension equations
-    # evaluate in DOCUMENT units; probe which unit Parameter().Value reports
-    # so the per-config read-back asserts compare in the right unit.
-    od_dim = f"D1@{blank_sketch}"
+    # The blank diameter is now the named dim ``BlankDia@BlankProfile`` (its
+    # 2*Ra drive is queued in ``drive_jobs``, applied in the deferred batch
+    # below). Dimension values evaluate in DOCUMENT units; probe which unit
+    # Parameter().Value reports so the per-config read-back asserts compare in
+    # the right unit. The probe reads the AS-BUILT value, unchanged by the
+    # rename (the drive is geometry-neutral).
+    od_dim = f"BlankDia@{blank_sketch}"
     before = read_dimension(adapter, od_dim)
     if abs(before - 2.0 * facts["Ra"]) < 1e-6 * facts["Ra"]:
         dim_unit = 1.0  # Value reads in inches
@@ -428,12 +459,6 @@ async def build(adapter) -> dict[str, str]:
             f"nor {2 * ra_default_mm:.6g} mm"
         )
     print(f"  ..  {od_dim} reads {before:g} (unit factor {dim_unit:g})")
-    check(
-        f"link {od_dim} to 2*Ra",
-        await adapter.create_equation(
-            CreateEquationParameters(equation=f'"{od_dim}" = 2 * "Ra"')
-        ),
-    )
 
     # ------------------------------------------------------------------
     # Configured bore (Appendix C #7): origin-snapped circle + DRIVING
@@ -448,6 +473,7 @@ async def build(adapter) -> dict[str, str]:
     # ------------------------------------------------------------------
     bore_default_in = bore_dia_in(DEFAULT_TEETH)
     await set_global(adapter, "BoreDia", f"{bore_default_in:g}", bore_default_in)
+    bore = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Front"))
     bore_circle = check(
         "add_circle bore", await adapter.add_circle(0.0, 0.0, bore_default_in * 12.7)
@@ -458,6 +484,9 @@ async def build(adapter) -> dict[str, str]:
             bore_circle, None, "diameter", bore_default_in * 25.4
         ),
     )
+    # Record the manual driving dim: one display dim, driven by the "BoreDia"
+    # global (the same link the inline equation used, now named + deferred).
+    bore.record("BoreCutDia", '"BoreDia"')
     status = await adapter.check_sketch_fully_defined()
     state = status.data.get("definition_state") if status.is_success else None
     if state != "fully_defined":
@@ -467,24 +496,20 @@ async def build(adapter) -> dict[str, str]:
         )
     print("  OK  bore sketch fully defined (driving dim, no fix)")
     check("exit_sketch bore", await adapter.exit_sketch())
-    bore_sketch = feature_name_by_type(adapter, "ProfileFeature")
+    bore_sketch = name_last_feature(adapter, "BoreProfile")
+    drive_jobs += bore.apply(adapter, bore_sketch)
     check(
         "cut bore",
         await adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH + 2.0)),
     )
-    bore_dim = f"D1@{bore_sketch}"
+    name_last_feature(adapter, "BoreCut")
+    bore_dim = f"BoreCutDia@{bore_sketch}"
     bore_before = read_dimension(adapter, bore_dim)
     if not (
         abs(bore_before - bore_default_in) < 1e-6
         or abs(bore_before - bore_default_in * 25.4) < 1e-4
     ):
         raise RuntimeError(f"{bore_dim} reads {bore_before!r}, not the bore diameter")
-    check(
-        f"link {bore_dim} to BoreDia",
-        await adapter.create_equation(
-            CreateEquationParameters(equation=f'"{bore_dim}" = "BoreDia"')
-        ),
-    )
     mass = await adapter.get_mass_properties()
     bored_volume = float(mass.data.volume)
     expected_bored = expected_blank - math.pi * (bore_default_in * 12.7) ** 2 * FACE_WIDTH
@@ -552,6 +577,12 @@ async def build(adapter) -> dict[str, str]:
         findings.append(str(exc))
         print(f"  FINDING  {exc}")
     check("exit_sketch gap", await adapter.exit_sketch())
+    # Name the gap profile, but record NO SketchDims: the involute flanks must
+    # MESH with the mating gear, so they stay equation-curve-driven and
+    # UNdimensioned -- pinning a recorded dim on them would break the mesh.
+    # (create_cut_extrude still consumes this most-recent sketch by recency,
+    # not by name, so the rename is safe.)
+    name_last_feature(adapter, "ToothGapProfile")
     # Single direction: both_directions splits the depth symmetrically about
     # the sketch plane (caught live: a 10 mm both-ways cut covered only
     # z 0..5 of the 7 mm blank, leaving an uncut full disc at z 5..7).
@@ -609,6 +640,36 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_equation(
             CreateEquationParameters(equation=f'"{count_dim}" = "ToothCount"')
         ),
+    )
+
+    # ------------------------------------------------------------------
+    # Default-config (DEFAULT_TEETH) gear volume, by the same analytic
+    # expectation the per-config loop uses (blank - teeth*gap - bore). This is
+    # the "last check" the neutrality re-check below reuses.
+    # ------------------------------------------------------------------
+    bore_default_mm3 = math.pi * (bore_default_in * 12.7) ** 2 * FACE_WIDTH
+    v_gear = (
+        expected_blank
+        - DEFAULT_TEETH * gap_area_in_disc(DEFAULT_TEETH) * 25.4**2 * FACE_WIDTH
+        - bore_default_mm3
+    )
+    await volume_check(adapter, "cone gear (default config)", v_gear, 0.01 * v_gear)
+
+    # Apply the deferred ORDINARY-circle drive equations now -- after the whole
+    # base model + a rebuild exists, so every target (BlankDia@BlankProfile,
+    # BoreCutDia@BoreProfile) resolves. These REPLACE the old inline
+    # create_equation links and MUST land before the configuration experiment
+    # below, which asserts that the blank OD and volume track ToothCount/BoreDia
+    # per config (it cannot if the equations don't yet exist). Each equation
+    # evaluates to the value just built, so the geometry must not move -- the
+    # re-check is the proof. The tooth-gap profile is absent from drive_jobs by
+    # design (it stays free to mesh).
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(
+        adapter, "driven cone gear (equations neutral)", v_gear, 0.01 * v_gear
     )
 
     await apply_material(adapter, MATERIAL)
