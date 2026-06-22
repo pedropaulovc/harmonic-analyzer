@@ -1,0 +1,491 @@
+# Tolerance & GD&T assessment
+
+> Companion to [`tolerance-policy.md`](./tolerance-policy.md). The policy previously placed GD&T,
+> surface finish, and drawing callouts out of scope; this assessment resolves each of them — *what*
+> to add, *where*, and *how much* — calibrated to the actual audience: **a hobby machinist building
+> from the book supplement on a manual mill + lathe with DROs.** The manufacturing-output scoping
+> (drawings / DXF / CAM) is decided in §11 and reflected back into the policy.
+
+Sources mined for this assessment: the book chapters 10–19
+(`references/albert-michelsons-harmonic-analyzer/`), every `build_*.py` interface in
+`cad/scripts/`, and the hobby-machining + gear-cutting references
+(`references/machining-for-hobbyists-getting-started/`, `references/gears-and-gear-cutting/`,
+`references/machinerys-handbook/`).
+
+---
+
+## 1. The audience is the binding constraint
+
+The two reference books this supplement sits beside teach **`±` limits and fits only — zero
+GD&T.** No feature-control frames, datums, true position, flatness/perpendicularity symbols, or
+MMC modifiers appear anywhere in the measuring, lathe, mill, or drill chapters; the one
+engineering drawing shown is dimensioned nominal-only. The gear book's governing maxim is
+literally *"if it looks right it most likely is all right."*
+
+What the audience already owns and reads:
+
+| Instrument | Resolution | Realistic repeatability |
+|---|---|---|
+| Steel rule | 1/64″ | ~0.4 mm |
+| Caliper (dial/digital) | 0.0005″ / 0.01 mm | ~0.001″ (0.025 mm) |
+| Micrometer | 0.0001″ / 0.01 mm | measurement uncertainty ~0.0005″ (0.013 mm) |
+| Dial indicator on stand | 0.0005″ | the workflow used for "indicating" concentricity/parallelism |
+
+Achievable **on the part**, careful work with a DRO:
+
+| Regime | Band | Basis |
+|---|---|---|
+| Routine | **±0.05–0.13 mm** (±.002–.005″) | trial-cut to a mic; 3-jaw "within a few thou" |
+| Best case, taking pains | **±0.013–0.025 mm** (±.0005–.001″) | 4-jaw indicated; finish cuts on the compound dial |
+| Holes to size | drill **then ream/bore** | a drilled hole "is not precise"; ream for size + finish, bore for concentric/located |
+
+In this audience's own words: **±.001″ is "tight," ±.005″ is "comfortable," ±1/16″ is "loose."**
+
+**Verdict (drives everything below): stay in `±` limits + named fits. Introduce exactly one
+geometric idea — runout/TIR read on a dial indicator — because that workflow is already taught
+and it is the property that actually matters for bores and gears. Translate the handful of real
+geometric requirements (squareness, knife-edge straightness, the rocker radius) into shop
+*procedures* the books already teach (indicate in a 4-jaw, bore don't drill, single-setup
+machining), not into feature-control frames.** A one-page "how to read a runout callout" sidebar
+in the supplement covers the entire GD&T vocabulary a reader needs.
+
+---
+
+## 2. The error model sets where the tolerance budget goes
+
+The output is a **static force balance summed through a knife-edge first-class lever**, with
+total output travel "on the order of only a few millimetres" (ch. 18). Two consequences fix the
+whole allocation:
+
+- **A bias common to all 20 channels largely cancels** at the summing lever (and what survives is
+  absorbed by the counter-spring tare and the amplitude-bar zero). Shared, systematic error is
+  cheap.
+- **A per-channel *inconsistency* injects straight into the sum** as harmonic error: one stiff
+  pivot, one off-phase cam, one mismatched spring. Per-channel scatter is expensive.
+- Because output travel is a few mm, **any friction / lost motion / play at the summing knife edge
+  is a large fraction of the signal** — which is exactly why the original used a knife edge there.
+
+> **Allocation principle.** Spend the tolerance budget on (a) the summing **knife edge**, (b) the
+> 20 **cams**, and (c) **channel-to-channel consistency**. Relax everywhere the book itself shows
+> wear, hand-work, or a designed-in adjustment.
+
+The book is unusually explicit about where it is *forgiving*, and those are direct licences to
+loosen: the cone↔cylinder mesh runs at an oblique angle with "distinct wear patterns" (partial
+engagement is tolerated and the centre distance is deliberately adjustable); the connecting rods
+are "rough-finished"; the measuring stick's graduations are "hand stamped … unevenly spaced"; the
+counter-spring post is gouged by its own set screw. None of these need a tight number.
+
+---
+
+## 3. What's already covered, and the three gaps
+
+**Covered today** (`tolerances.yaml` + Gate-E audit + analytic asserts in the build scripts):
+
+- Three general linear grades — `machined_block` ±0.10, `plate_profile` ±0.20,
+  `visual_noncritical` ±0.50.
+- Named fit classes with clearance/backlash bands — `shaft_in_bushing`, `gear_mesh`,
+  `cone_drum_oblique_mesh`, `cam_follower_contact`, `sliding_amplitude_bar_on_rocker`,
+  `spring_eye_threading`, `fastener_clearance`.
+- Every part carries `material` / `tolerance_class` / `process` (audited), `fit_class` where it
+  moves. Build scripts assert clearance margins and raise on violation.
+
+**Gap 1 — no precision linear grade.** The tightest class (`machined_block` ±0.10 ≈ ±.004″) is
+**too loose to deliver the fits the policy itself specifies** (see §4). There is nothing for the
+"thou" features.
+
+**Gap 2 — no geometric controls.** Runout, the rocker form radius, knife-edge straightness/
+squareness, and the channel-stack coplanarity are entirely unexpressed. These are the few places
+geometry — not size — is the functional requirement.
+
+**Gap 3 — no surface finish.** Sliding/running surfaces (journals, bores, the knife edge and its
+seat, the rocker slide) have no finish spec; a rough bore runs untrue and wears.
+
+---
+
+## 4. Findings — the numbers don't currently close
+
+These are concrete inconsistencies to reconcile, surfaced by cross-checking the fit classes
+against the modeled geometry. **They are pre-existing; flag and fix before publishing any
+tolerance.**
+
+1. **Fit class vs. linear grade.** `shaft_in_bushing` wants **0.025–0.075 mm** diametral
+   clearance, but a bore and a shaft both held to `machined_block` ±0.10 stack to **±0.20 mm** of
+   clearance variation — the tolerance swamps the fit ~3–8×. A fit is only real if the part
+   tolerances are tight enough to deliver it. → fitted features need the new **precision** grade
+   (§5.1), and the audit should *enforce* that any `fit_class` part carries it on the fitted
+   feature.
+
+2. **Modeled clearance vs. fit class.** The CAD pivot/fulcrum bushings are **Ø6.5 bore on a Ø6.35
+   shaft = 0.15 mm** diametral clearance (`build_pivot_bushing.py`, `build_lever_bushing.py`) —
+   itself **2× the top** of the `shaft_in_bushing` band (0.075). The 0.15 mm reads as a deliberate
+   render-friendly visible gap, not a machining fit. → decide one story: either tighten the model
+   to the fit class, or widen the class to the "beginner-safe generous slip fit" the policy
+   describes (a ~0.10–0.15 mm running fit on Ø6.35 is RC6-ish and perfectly fine for a
+   hand-cranked machine) — but the config and the geometry must then agree.
+
+3. **Publish a DP/PA table per *meshing domain* — do not unify.** The machine has **several
+   independent gear systems at different pitches**, each internally consistent — they do not mesh
+   across domains, so they must *not* be collapsed to one DP:
+   - **cone↔cylinder train — DP 49.82 / 14.5° PA** (`machine/gear_train.yaml diametral_pitch:
+     49.82`; `build_cylinder_gear.py` imports the train `DP` from `build_cone_gear`, so the whole
+     20-pair train shares it by construction);
+   - **crank-drive pair — DP 26.57** (`gear_train.yaml crank_drive_diametral_pitch`);
+   - **paper-drive rack↔pinion — DP 30** (`build_rack_pinion.py`, which carries a hard note that it
+     must *not* couple to the train DP or the rack silently interferes).
+
+   The gear book's "**never mix pressure angle / pitch**" rule applies **within a meshing pair**, not
+   across the machine. → publish one authoritative `module/DP + PA + tooth-count` row **per domain**;
+   a single unified DP would force distinct non-meshing systems to the wrong pitch. (My earlier draft
+   had the cone/cylinder train at DP 30 — that was backwards; the rack is the DP-30 system.)
+
+4. **The Ø6-tooth gear is marginal by construction.** `build_cone_gear.py` leaves a **0.49 mm wall**
+   between the T006 root and its bore (root r 0.89). That is a real machining hazard, not a CAD
+   artifact — call it out as the hardest part to make, and note the period-correct mitigation: the
+   four tip gears were a **harder yellow metal** (Muntz/manganese bronze), which is why they show
+   the most wear yet survived.
+
+5. **Rocker radius vs. bar length disagree in the model.** The book states the rocker's concave
+   radius *equals* the amplitude-bar length (ch. 14), but the CAD implements **R = 800 mm**
+   (`build_rocker_arm.py`) against a **812.8 mm** bar (`build_amplitude_bar.py`, 32″) — a **12.8 mm**
+   gap, and the rocker docstring already flags the book relationship. → spec the rocker radius as the
+   **current 800 mm nominal explicitly** (not "= bar length"), and reconcile the 12.8 mm before it
+   becomes a toleranced callout — otherwise a "R = bar length ±0.5" rule puts the existing model
+   instantly out of tolerance and a generated drawing would force an unintended geometry change.
+
+---
+
+## 5. Recommended additions
+
+### 5.1 Add a `precision` linear grade
+
+| New grade | Tolerance | Applies to |
+|---|---|---|
+| `precision` | **±0.025 mm** (±.001″) | any fitted feature: bearing bores, shaft journals, the knife-edge seat, cam-bore/OD, gear bores |
+
+Keep the three existing grades for everything else. The rule becomes: **the feature that carries a
+fit gets `precision`; the rest of the part stays at its block grade.** A part can therefore carry a
+default `tolerance_class` *and* a tighter grade on its critical feature (encode as
+`critical_features`, §8).
+
+### 5.2 GD&T-lite — the only geometric controls to add
+
+Introduce a small `geometric:` vocabulary, every entry expressed as a **dial-indicator number or a
+shop procedure**, never a feature-control frame the reader can't parse:
+
+| Control | How the reader holds it | Where it applies | Target |
+|---|---|---|---|
+| **Runout / TIR** (the one real GD&T idea) | indicate the OD/face while the bore is on a mandrel, or bore-and-cut in one setup | cone gears, cylinder gears + integral cam, both pinions, magnifying wheel, all shaft journals | **≤0.025–0.05 mm TIR** (.001–.002″) |
+| **Bore-to-pitch concentricity** (folds into runout) | 4-jaw indicate the blank true before cutting teeth | every cut gear | *"imperative … no eccentricity"* (gear book) |
+| **Pivot-axis squareness** | bore the pivot hole **in the same setup** that faces the mount; don't drill free-hand | rocker, lever, knife mounts, pedestals | as-machined single-setup |
+| **Knife-edge straightness + sharpness + hardness** | grind/stone a straight edge on a **hardened tool-steel insert** (not the cast/brass parent); seat in a matching **hardened-steel** flat/vee | summing-lever knife edge + knife-mount seat | edge straight & ⟂ to the motion plane; insert + seat hardened (Finding-style material note in §6) |
+| **Knife-support parallelism** | set the two knife mounts coplanar/parallel at assembly (shim to a common height) | the two `knife-mount` blocks | parallel, equal height |
+| **Form: rocker concave radius** (book's one stated geometric req) | turn/mill to the radius | `rocker-arm` top surface | **R = 800 mm nominal**, ±0.5 mm (book says = bar length 812.8; model uses 800 — reconcile, Finding 5) |
+| **Channel-stack consistency** | machine all 19 spacer bushings to **one length in one setup**; keep the pivot shaft straight | pivot/fulcrum bushing stacks | spacer length scatter ≤0.05 mm |
+
+**Deliberately excluded, with reasons:** true position + datum reference frames, profile-of-surface
+FCFs, composite frames, MMC/LMC modifiers. The audience doesn't read them, the references don't
+teach them, and every requirement above is reachable by single-setup machining + indicating. Adding
+them would make the supplement *less* usable.
+
+### 5.3 Add a `surface_finish:` block
+
+| Class | Ra | Where |
+|---|---|---|
+| `bearing` | **0.8–1.6 µm** (32–63 µin) — reamed/finish-bored | shaft journals, running bores, knife edge + seat, rocker slide, amplitude-bar foot |
+| `finish` (default machined) | **3.2 µm** (125 µin) — sharp-tool finish pass | general machined surfaces, gear bores |
+| `none` | — (no callout) | non-contacting faces, gear flanks (form-cut HSS is "good enough"), cosmetic / rough parts |
+
+Most surfaces get **no callout** — that matches the books' silence and the book's "rough-finished"
+connecting rods. Spec finish only where a surface bears or slides. (Handbook rule of thumb if a
+reader wants one: roughness ≤ 1/8 of the dimensional tolerance.)
+
+### 5.4 Datum philosophy (lightweight, per part class)
+
+State a one-line reference per part class, as *"machine off this,"* not a formal DRF:
+
+- **Rotating parts** (gears, wheels, pinions, shafts): datum = the **bore/journal axis**, secondary
+  = a **faced end**. Cut features off the bore in one setup → runout falls out for free.
+- **Pivoting parts** (rockers, levers, knife mounts): datum = the **mounting face**, locate the
+  **pivot bore** square to it in the same setup.
+- **Frame / mounting parts** (base, pedestals, crossbars, portals): datum = the **mating face +
+  bolt pattern**; everything else is reference.
+
+---
+
+## 6. Per-subsystem recommendations (parts)
+
+Tier: **T1** = spend the budget here · **T2** = moderate · **T3** = leave loose / cosmetic.
+"Add" lists only what is *new* beyond the existing `material/tolerance_class/process/fit_class`.
+
+| Subsystem · part(s) | Tier | Add |
+|---|---|---|
+| **Summing lever** `summing-lever`, `knife-mount`, `knife-stay` | **T1** | knife-edge **straightness + ⟂ to motion plane**; **parallelism/equal height** of the two mounts; `precision` on the seat; `bearing` finish on edge + seat. **Material:** the lever is gray cast iron and the mount brass — neither hardens to a durable edge, so the hardness callout needs a **hardened tool-steel knife-edge insert** (e.g. O1/W1, pinned/screwed into the lever) riding a **hardened-steel seat** set into the mount; spec the insert + seat as separate hardened parts (add to `materials.yaml`), *not* "harden the casting." *Least forgiving interface in the machine.* |
+| **Cylinder gears + cams** `cylinder-gear`, `connecting-rod` | **T1** | cam **eccentricity = amplitude** (hold it), **runout of cam OD to gear bore** ≤0.05 mm; **angular phasing to the ~3 mm alignment notch** (per-channel phase datum — set at assembly); `precision` on bore; cam OD `bearing` finish; **rod cam-bore (the `cam_follower_contact` surface) `bearing`; rod *body* `none`** (book: rough — the exemption is the visible body, not the bearing bore). *The 20 cams are the function generators.* |
+| **Cone gears** `cone-gear`, `cone-gear-shaft` | **T1** | **bore-to-pitch runout** ≤0.05 mm; **DP 49.82 / 14.5° PA shared across the whole cone↔cylinder train** (its own domain — Finding 3); flag **T006 0.49 mm wall** + harder tip metal (Finding 4); `precision` on bore. Mesh itself stays **loose** (oblique, adjustable centre distance). |
+| **Pivots & bushings** `pivot-shaft`, `fulcrum-shaft`, `pivot-bushing`, `lever-bushing` | **T1** | reconcile the **0.15 vs 0.025–0.075 mm** fit (Finding 2); `precision` on bore + journal; `bearing` finish; **all 19 spacers one length, one setup** (channel pitch 7.0565 mm); shaft straightness. |
+| **Rocker arms** `rocker-arm`, `rocker-arm-portal` | **T1** | **concave radius R800 nominal** (form, ±0.5 mm; book ch.14 says "= bar length" = 812.8 mm — **reconcile, Finding 5**; stamp the model's R800, never the bar length). Pivot bore **square** to face; slide surface `bearing` finish. |
+| **Amplitude bars** `amplitude-bar` | **T2** | preserve **length** (~80 cm — it linearizes the transfer; don't shorten); notch fit snug-sliding (`sliding_amplitude_bar_on_rocker`); straightness mild; **notch foot (the sliding-contact surface) `bearing`; bar *body* `none`**. Precision here is **position repeatability**, not part geometry. |
+| **Drive train** `crankshaft`, `crank-pin`, `crank-drive-gear`, `crank-pinion`, `crank-arm`, `crank-handle` | **T2** | **taper-pin** crank-to-shaft index (repeatable, zero-backlash angular registration) — ream matching taper; gear bores `precision` + runout; handle/arm loose. |
+| **Paper drive** `rack-pinion`, `platen-rack`, `pinion-bar`, transgear set, chain | **T2/T3** | rack/pinion **DP 30 / 14.5°** (Finding 3); backlash 0.30 mm is fine; chain clearances **loose** (link-to-link contact tolerated). Paper transport is the *time axis*, not the summed signal — moderate. |
+| **Magnifier & pen** `magnifying-wheel`, `magnifying-lever`, `magnifying-bracket/clamp`, `magnifying-vertical-rod`, pen parts | **T2** | wheel/lever bores `precision` + runout on the wheel; linkage pivots squareness. Amplifies output, so play here is visible — but downstream of the sum. |
+| **Frame** `harmonic-base`, `top-frame`, `top-crossbar`, pedestals, clamps, columns, `gooseneck*` | **T3** | mating-face flatness "as-machined" + bolt-pattern location; column slip fits (Ø25.4 in 25.5–25.6) already fine. Cast-iron castings stay forgiving. |
+| **Springs** `channel-spring-installed`, `counter-spring` | **T2** | **match rate + free length across the 20 channels** (consistency, not absolute rate); counter spring is the **coarse tare** — leave loose. |
+| **Measuring stick** `measuring-stick` | **T3** | leave loose — original was hand-stamped & uneven; what matters is **one stick sets all 20 bars**. |
+| **Fasteners / misc** `hex-bolt`, `lag-screw`, `hanger-screw`, `fillister-screw`, `thumb-screw`, `nameplate`, knobs | **T3** | `fastener_clearance` close/normal as-is; no additions. |
+
+---
+
+## 7. Assembly-level tolerances
+
+Express these as **consistency + fit-at-assembly**, not absolute position — that matches both the
+error model and how the machine was actually built and trimmed.
+
+- **Channel pitch & coplanarity (the real assembly precision):** the 7.0565 mm channel spacing and
+  the coplanarity of the 20 rockers / 20 levers are set by the **spacer-bushing lengths** and the
+  **pivot-shaft straightness**, not by 20 independently located holes. → machine the spacers
+  together; ream the pivot bores through a common fixture/stack. This is where "channel-to-channel
+  consistency" is won or lost.
+- **Gear mesh centre distances:** **set at assembly by feel** for light backlash; the cone set
+  *pivots out of engagement* by design, so spec nominal + "adjust for a little backlash, never
+  zero" rather than a tight centre distance.
+- **Knife-edge supports:** shim the two mounts to a **common height + parallel** so the lever rocks
+  true.
+- **Summing-lever spring holes:** the 20 attachment points at a consistent pitch give each spring a
+  consistent moment arm — drill them from one fixture.
+- **Counter-spring height:** the designed-in **tare** — explicitly loose; it exists to absorb the
+  residual imbalance of the 20-spring bank.
+
+---
+
+## 8. How to encode it — config → SLDPRT PMI → drawings (the automation backbone)
+
+The repo's philosophy is "tolerance is design source, lives in config, flows to custom properties +
+gets asserted." Keep that, and **extend it one critical step: the tolerance data must be embedded
+into the SLDPRT *as PMI during the build*, read from YAML — so a drawing consumes it automatically
+instead of anyone re-typing it.** A custom-property *string* (`tolerance_class: machined_block`)
+is metadata; a drawing cannot dimension from it. A driving-dimension tolerance or a DimXpert
+geometric tolerance *is* model geometry a drawing imports for free. So the source of truth stays the
+YAML, but the build script writes it onto the model, three layers deep (all API-verified, bundle
+v3.3.0; **DimXpert is included with every SOLIDWORKS license — confirmed for the Makers seat**, see
+§11):
+
+1. **Size ± tolerances on the driving dimensions.** Where a build script already sets a feature's
+   driving dimension (bore Ø, journal Ø, length), additionally stamp its grade's tolerance:
+   `IDimension.SetToleranceType` (e.g. bilateral) + **`IDimension.SetToleranceValues(max, min)`** for
+   the numeric ± (read from `tolerances.yaml`). **Not `SetToleranceFitValues`** — that one is marked
+   *obsolete* in the API and takes fit-class *strings* (`"H7"`), not numeric values, so it won't
+   stamp `±0.025`; the modern numeric path is `SetToleranceValues` / `IDimensionTolerance`. These are
+   exactly the dimensions a drawing pulls via
+   `IDrawingDoc.InsertModelDimensions` / `InsertModelAnnotations3` — the print inherits every ± with
+   no re-authoring, fully associative.
+2. **Geometric tolerances + datums as DimXpert PMI.** For the `geometric:` controls (runout,
+   concentricity, perpendicularity) and datums, author them during the build via
+   `IDimXpertManager.DimXpertPart` → `IDimXpertPart.InsertDatum` / `InsertSizeDimension` /
+   `InsertLocationDimension` / `InsertGtol` (+ typed interfaces `IDimXpertConcentricityTolerance`,
+   `IDimXpertOrientationTolerance` for perp/parallel, `IDimXpertFlatnessTolerance`…). **DimXpert
+   authors circular & total runout natively** — `IDimXpertPart.InsertGtol` takes a
+   `swDimXpertGtolType_e`, and the online 2026 API reference confirms the members
+   `swDimXpertGtolType_CircularRunout` (12) and `swDimXpertGtolType_TotalRunout` (13) — alongside
+   Perpendicularity (7), Parallelism (8), Position (9), Concentricity (11), etc. (On read-back these
+   share the base `IDimXpertTolerance`, type-discriminated via `IDimXpertAnnotation::Type` — there is
+   no dedicated named *subclass*, which is what misled an earlier draft.) Note: this enum is **absent
+   from offline bundle v3.3.0**; the values above are from help.solidworks.com/2026. Classic
+   `IModelDoc2.InsertGtol` + `swGcsCIRCRUNOUT` / `swGcsTOTALRUNOUT` (`swGtolGeomCharSymbol_e`) remains
+   a fallback.
+3. **Surface-finish symbols** from `surface_finish:` → `IModelDoc2.InsertSurfaceFinishSymbol2` on the
+   bearing/sliding faces.
+
+The PMI lives in **annotation views** on the model; a drawing built from that model imports all of
+it automatically (`InsertModelAnnotations3`) — the drawing script *places views + imports model
+items + arranges*, it does not re-author tolerances. **Edit the YAML → rebuild → the SLDPRT PMI and
+every drawing update together.** The **guaranteed, add-in-free** consumption path is the **2D
+drawing** (drawings are core SOLIDWORKS): `InsertModelAnnotations3` pulls the embedded PMI with no
+MBD license. **STEP AP242 *with PMI* is not add-in-free** — SOLIDWORKS' "Publish to STEP 242" is an
+MBD feature ("The SOLIDWORKS MBD add-in is not part of any role. You need a stand-alone license",
+[SW Help 2025](https://help.solidworks.com/2025/english/solidworks/sldworks/t_share_models_step242.htm)),
+so `PublishSTEP242File` carrying PMI must be **gated behind the same runtime MBD probe** as 3D-PDF
+(§11) — not offered as a guaranteed fallback. (Geometry-only STEP export via the normal Save-As path
+is always available; it just won't carry the tolerances.)
+
+Home it next to the existing per-part stamping: an `apply_pmi(part, features)` in `_common.py`
+alongside `apply_custom_properties` / `apply_material`, driven by the new `critical_features` rows.
+
+Concretely:
+
+**`tolerances.yaml`** — add three blocks:
+
+```yaml
+general:
+  precision: { tolerance: "+/-0.025", applies_to: "fitted features: bearing bores, journals, knife seat, cam/gear bores" }
+  # NB (Finding 1/2): ±0.025 on BOTH mating parts = 0.10 spread — only valid where the fit band ≥0.10.
+  # The shaft_in_bushing band (0.05 wide) needs each feature at ≤±0.012, or the band widened. Reconcile
+  # before enabling Gate-E rule 2; pick ONE — tighter grade OR wider band — and record it here.
+  # ...existing machined_block / plate_profile / visual_noncritical...
+
+surface_finish:
+  bearing: { ra_um: [0.8, 1.6], applies_to: "journals, running bores, knife edge+seat, slide surfaces" }
+  finish:  { ra_um: 3.2,        applies_to: "general machined (default)" }
+  none:    { applies_to: "non-contacting, gear flanks, cosmetic/rough" }
+
+geometric:
+  runout:        { tir_mm: [0.025, 0.05], applies_to: "gear bore->pitch, cam->bore, journals, wheel", how: "indicate / bore-and-cut one setup" }
+  pivot_square:  { applies_to: "rocker/lever/mount pivot bores", how: "bore in the setup that faces the mount" }
+  knife_edge:    { applies_to: "summing-lever edge + seat", how: "straight, sharp; hardened tool-steel insert + hardened-steel seat (separate parts, not the cast/brass parent); seat parallel/equal-height" }
+  rocker_radius: { value: 800, tol_mm: 0.5, applies_to: "rocker-arm top", note: "nominal; book says = bar length 812.8 — reconcile (Finding 5)" }
+```
+
+**`parts/*.yaml`** — add optional fields, required only for the ~10 T1 parts. **Each
+`critical_features` row needs an API-stable *selector*, not just a human label** — `apply_pmi` and
+the write-back audit (Gate-E rule 4) have to resolve the exact model item to attach/query PMI, and a
+free-text `feature:` string can't drive `SelectByID2` / DimXpert. So the build script must give the
+target a **stable handle** the row references — the cleanest is a **named dimension / named feature**
+the build script already creates (`doc.Parameter("knife_seat_dia@Sketch3")`, or rename the feature),
+which is also exactly what a drawing imports by name. (`select:` below is that handle; `feature:` is
+kept only as a human comment.)
+
+```yaml
+summing-lever:
+  # ...existing...
+  surface_finish: bearing
+  critical_features:
+    # select: API-stable model item (named dim / feature) the build script creates and PMI attaches to.
+    - { select: "knife_seat_dia@Sketch3", feature: "knife edge", grade: precision, geometric: knife_edge, finish: bearing }
+```
+
+The build script owns the contract: it must **name** that dimension/feature (not rely on
+auto-generated `D1@Sketch3` names, which churn) so the `select:` key stays valid across rebuilds.
+
+**Gate-E audit (`verify.py`)** — evolve the existing tolerance audit to *enforce the new
+invariant*, not just presence of fields:
+
+1. Any part with a running/locating `fit_class` (`shaft_in_bushing`, `gear_mesh`,
+   `cam_follower_contact`, `sliding_*`) **must** name a `precision` feature + a `surface_finish`
+   on the fitted feature — closes Gap 1 / Finding 1.
+2. **Tolerance-stack check:** for each fit, assert the worst-case feature-tolerance stack stays
+   **inside** the fit's clearance band — i.e. `tol(bore) + tol(shaft) ≤ band_width`. **This is the
+   crux of Finding 1/2 and the current numbers do NOT satisfy it:** the `precision` grade (±0.025 ⇒
+   0.05 total per feature) on *both* mating parts gives a 0.10 mm worst-case clearance spread, which
+   cannot fit the 0.05 mm-wide `shaft_in_bushing` band (0.025–0.075) for *any* nominal. So this rule
+   is **unsatisfiable as written** and must not be enabled until the grade/band are co-designed —
+   either **widen the band to ≥ 0.10** or **add a tighter grade** (each fitted feature ≤ ±0.0125 to
+   live inside a 0.05-wide band). **Gate this check on the Finding 1/2 reconciliation** (one decision,
+   recorded in `tolerances.yaml`); enabling it before then fails every otherwise-compliant pair.
+3. Geometric/finish class names must resolve in the new blocks (same pattern as the existing
+   `tolerance_class` / `fit_class` resolution).
+
+4. **PMI write-back check:** for each `critical_features` row, read the model back and assert the
+   tolerance/GTol/finish was actually applied (DimXpert + annotations are queryable) — so the audit
+   verifies the data reached the SLDPRT, not merely that the YAML named it.
+
+**Build scripts** — they already assert clearances; have them additionally (a) assert the chosen
+tolerance grade is **compatible with** the modeled clearance (the stack check above, at the source),
+and (b) call `apply_pmi(...)` so the embedding happens on every build, not as a later pass. This
+catches a future edit that loosens a grade below its fit, and keeps the model and the drawings in
+lockstep with the config.
+
+---
+
+## 9. Priority roadmap
+
+- **Tier 1 (do first, ~10 parts):** knife-edge trio · cylinder-gear cams + connecting-rod ·
+  cone/cylinder gear bores · pivot/fulcrum shafts + bushings · rocker-arm radius. Plus the three
+  **Findings fixes** (precision grade, reconcile pivot clearance, publish the single DP/PA table).
+- **Tier 2:** rack-pinion + transgear, magnifier/pen linkage, crank taper-pin index, spring matching.
+- **Tier 3 (leave loose / document as forgiving):** frame castings, measuring stick, counter-spring
+  post, chain, fasteners, nameplate, handle.
+
+## 10. What the supplement actually ships
+
+- **Generated 2D PDF shop drawings (Tier-1 first) that auto-consume the PMI embedded in each
+  SLDPRT** (§8) — the tolerance/fit/finish/runout data is authored onto the model from the YAML at
+  build time, so the drawing imports it rather than re-typing it. Pair with a **one-page primer
+  sidebar**: how to read a runout (TIR) callout, what "slip fit / press fit" mean in thou, and
+  "bore don't drill, single setup, indicate true." The GD&T stays **lite** — runout plus the
+  rocker/knife controls — nothing the reader can't parse.
+- **The single authoritative gear table** (DP/module, 14.5° PA, the 20 cone tooth counts 6→120, the
+  120-tooth cylinders, the rack/pinion) — the one place precision *and* internal consistency both
+  matter.
+- Update `tolerance-policy.md` §"Out of scope": GD&T (lite), surface finish, and critical-feature
+  callouts move **in scope**; the drawings/DXF/CAM question is decided in §11 (not deferred).
+
+---
+
+## 11. Manufacturing outputs (drawings / DXF / CAM) — decided, not deferred
+
+The original policy deferred "2D drawings with tolerance callouts, DXF/CAM outputs." Reassessed
+against the actual audience and the stated **manual**-machining toolchain, each is now a decision,
+not a defer.
+
+### 2D shop drawings — IN SCOPE (the vehicle that makes everything above real)
+
+A hobby machinist works from a **dimensioned, toleranced print at the mill/lathe** — not a 3D
+model, a STEP file, or a YAML registry. Every tolerance, fit, runout, and finish spec in §§5–7 only
+reaches the bench on a drawing; custom properties + the Gate-E audit are the metadata/BOM layer, not
+something a person cuts metal from. The book (Hammack) is a *photo* book with **no** shop drawings,
+so supplying them is the single highest-value contribution this supplement makes.
+
+- **Feasible on this seat — API verified (offline bundle v3.3.0).** The repo already drives
+  `SaveAs3` for STEP/STL (`export_models.py`, `cut_release.py`), so PDF export of a drawing is the
+  same mechanism; the COM API creates drawing docs + views (`IDrawingDoc.CreateDrawViewFromModelView3`)
+  and — the key point — **imports the PMI the build already embedded in the SLDPRT (§8)** via
+  `InsertModelAnnotations3` / `InsertModelDimensions`. The drawing script *places views, imports
+  model items, and arranges* — it does **not** re-author tolerances. (The `InsertGtol` /
+  `InsertSurfaceFinishSymbol2` / `InsertDatumTag2` calls live in the **build** per §8, on the model,
+  not on the drawing.)
+- **Consistent with the repo philosophy + single source of truth.** Drawings become **generated
+  artifacts** (`cad/out/drawings/<dashed>.PDF`), scripted from the config — not hand-drawn — exactly
+  like the renders/STL/STEP. Because the tolerances are embedded in the model from the YAML,
+  editing a fit in `tolerances.yaml` and rebuilding updates the SLDPRT PMI **and** every drawing in
+  one pass; nothing dead-ends in metadata.
+- **Scope by tier.** Generate drawings for the **Tier-1 precision-critical parts first** (the ~10
+  in §6/§9), which carry the `precision` grade, runout, finish, and critical-feature notes; then
+  expand to all parts. New doit task `drawing:<stem>` on the **COM spine** (it needs SolidWorks),
+  feeding a `release` PDF set.
+- **Caveat.** Programmatic drawing layout is brittle; expect to hand-finish view placement / leader
+  routing on the first pass and capture the working recipe — the repo already hand-tunes render
+  cameras the same way.
+
+### DXF — optional reference exhibit only (not a build deliverable)
+
+DXF feeds flat-profile cutting (laser / waterjet / plasma / wire-EDM) and 2D CAM. This machine is
+almost entirely turned/milled solid parts and the toolchain has **none** of those cutters — so DXF
+has no consumer on the build path. The only genuinely useful 2D profiles are **inspection/reference
+exhibits**: the cone/cylinder gear tooth flanks, the rack tooth profile, and the few truly flat
+parts (nameplate, clips, platen outline). Export those on request via `IPartDoc.ExportToDWG2`
+(a dedicated face/sketch→DXF call, verified in the bundle; or a drawing `SaveAs` to `.dxf`) as
+comparison aids; they carry no tolerance info a drawing wouldn't carry better. The decision is
+"optional exhibit," not "pending."
+
+### CAM — OUT (not applicable to the build path)
+
+The stated manufacturing method is **manual** milling and turning with DROs (PM-30MV manual mill,
+JET BD-920N manual lathe) — there is **no CNC** in the toolchain. CAM produces toolpaths/G-code for
+CNC, which has no consumer here. This is a definitive scope exclusion tied to the manufacturing
+method, not a deferral. Revisit only if a CNC machine enters the toolchain (e.g., a CNC conversion
+of the mill).
+
+### DimXpert / MBD — DimXpert IS available on the Makers seat (the backbone); 3D-PDF + STEP242-PMI publish are optional
+
+Corrected after checking online — an earlier draft wrongly assumed DimXpert was add-in-gated.
+**DimXpert (authoring PMI — size + geometric tolerances and datums on the model) is included with
+*every* SOLIDWORKS license**, so it runs on the 3DEXPERIENCE **for Makers** seat:
+
+- Hawk Ridge Systems (SOLIDWORKS reseller): *"DimXpert and MBD Dimensions are the exact same
+  toolset. **Both are included with every license of SOLIDWORKS** …"*
+- SOLIDWORKS Help: *"SOLIDWORKS MBD offers 3D PMI definition capabilities using DimXpert …"* — and
+  GoEngineer: the **MBD add-in** is what *publishes* DimXpert models to **3D PDF / eDrawings /
+  STEP242**.
+
+So the split is: **DimXpert authoring = included → embed PMI during the build (§8), this is the
+recommended backbone.** What the **MBD add-in** gates is *publishing* that PMI into a 3D-consumable
+neutral format — **both 3D-PDF *and* STEP 242-with-PMI** ("Publish to STEP 242" is documented as an
+MBD feature needing a stand-alone license,
+[SW Help 2025](https://help.solidworks.com/2025/english/solidworks/sldworks/t_share_models_step242.htm)).
+That is fine, because the bench deliverable is a **2D PDF print**, and the 2D drawing path is **core
+SOLIDWORKS** — `InsertModelAnnotations3` imports the embedded PMI with no add-in. Net: **author PMI
+with DimXpert on every build; ship 2D PDF drawings (the add-in-free vehicle); treat *both* 3D-PDF and
+STEP242-PMI publish as nice-to-haves to be probed at runtime on the seat.** (The probe: try
+`PublishTo3DPDF` / `PublishSTEP242File` once; if either fails for lack of the add-in, the 2D drawing
+path is unaffected — and a geometry-only STEP for the repo's neutral export is always available, it
+simply won't carry the tolerances.)
+```
