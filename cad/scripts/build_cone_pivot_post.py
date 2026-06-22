@@ -26,17 +26,20 @@ import sys
 
 from _common import (
     IN,
-    add_line_chain,
+    SketchDims,
     apply_material,
     name_bore_axis,
     check,
+    define_centered_rectangle,
     define_circle,
-    define_rectilinear_chain,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
-    set_sketch_direct_db,
+    set_global,
     volume_check,
 )
 
@@ -57,41 +60,72 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    half_w = BLOCK_WIDTH / 2.0
-    half_d = BLOCK_DEPTH / 2.0
+    # Editable knobs (Tools > Equations): the block envelope and the journal
+    # bore. The mm suffix is load-bearing -- this is an INCH document and the
+    # equation manager reads BARE numbers in document units (an unsuffixed 85 =
+    # 85 in, blowing the part up 25.4x). BoreDia carries the legacy 0.375" value
+    # already reduced to mm.
+    await set_global(adapter, "BlockWidth", f"{BLOCK_WIDTH}mm")
+    await set_global(adapter, "BlockDepth", f"{BLOCK_DEPTH}mm")
+    await set_global(adapter, "BlockHeight", f"{BLOCK_HEIGHT}mm")
+    await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
+    await set_global(adapter, "BoreHeight", f"{BORE_HEIGHT}mm")
+
+    drive_jobs: list[tuple[str, str]] = []
+
+    # Origin-centred block footprint: width along X, depth along Z.
+    block = SketchDims()
     check("create_sketch block", await adapter.create_sketch("Top"))
-    set_sketch_direct_db(adapter, True)
-    footprint = [
-        (-half_w, -half_d),
-        (half_w, -half_d),
-        (half_w, half_d),
-        (-half_w, half_d),
-    ]
-    lines = await add_line_chain(adapter, footprint)
-    set_sketch_direct_db(adapter, False)
-    await define_rectilinear_chain(adapter, lines, footprint, label="block")
+    await define_centered_rectangle(
+        adapter, BLOCK_WIDTH / 2.0, BLOCK_DEPTH / 2.0, "block", dims=block,
+        name_width="Width", drive_width='"BlockWidth"',
+        name_depth="Depth", drive_depth='"BlockDepth"',
+        name_corner=("CornerX", "CornerZ"),
+        drive_corner=('"BlockWidth" / 2', '"BlockDepth" / 2'),
+    )
     await ensure_fully_defined(adapter, "block sketch")
     check("exit_sketch block", await adapter.exit_sketch())
+    name_last_feature(adapter, "BlockProfile")
+    drive_jobs += block.apply(adapter, "BlockProfile")
     check(
         "extrude block",
         await adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_HEIGHT)),
     )
+    name_last_feature(adapter, "Block")
     v_block = BLOCK_WIDTH * BLOCK_DEPTH * BLOCK_HEIGHT
     volume = await volume_check(adapter, "block", v_block, 0.005 * v_block)
 
-    # Big-end journal bore along Z at the drive height.
+    # Big-end journal bore along Z at the drive height. On-axis in X (centre x 0,
+    # a relation), so define_circle records only the centre-Z + diameter dims.
+    bore = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, BORE_HEIGHT, BORE_RADIUS, "bore")
+    await define_circle(
+        adapter, 0.0, BORE_HEIGHT, BORE_RADIUS, "bore", dims=bore,
+        names=("BoreX", "BoreZ", "BoreDia"),
+        drives=(None, '"BoreHeight"', '"BoreDia"'),
+    )
     await ensure_fully_defined(adapter, "bore sketch")
     check("exit_sketch bore", await adapter.exit_sketch())
+    name_last_feature(adapter, "BoreProfile")
+    drive_jobs += bore.apply(adapter, "BoreProfile")
     check(
         "cut bore",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=BLOCK_DEPTH + 4.0, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "JournalBore")
     v_bore = math.pi * BORE_RADIUS**2 * BLOCK_DEPTH
     volume = await volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
+
+    # Apply the deferred drive equations after the model + a rebuild exist, then
+    # re-check: every equation evaluates to the value just built, so geometry
+    # must not move.
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "driven post (equations neutral)", volume, 0.01 * v_bore)
 
     # Named bore/central axis for view-independent assembly mate
     # selection (M6 mated-DOF drive train).

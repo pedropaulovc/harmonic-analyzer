@@ -40,18 +40,24 @@ import math
 import sys
 
 from _common import (
+    SketchDims,
     add_line_chain,
     apply_color,
     apply_material,
     check,
     define_circle,
     define_rectilinear_chain,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
     name_bore_axis,
+    name_last_feature,
     PANEL_BLACK,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
+    volume_check,
 )
 from build_summing_lever import HEX_H, HEX_W
 
@@ -93,8 +99,32 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
+    # Editable knobs (Tools > Equations): the bore radius + its top clearance,
+    # the block half-width / wall / axial thickness, and the local block top. The
+    # derived globals (BoreCy / BlkBot) are equations of the primitives so the
+    # bore centre and block bottom track when a primitive changes. The mm suffix
+    # is load-bearing -- this is an INCH document and the equation manager reads
+    # BARE numbers in document units (an unsuffixed 12.7 = 12.7 in, 25.4x too big).
+    await set_global(adapter, "RBore", f"{R_BORE}mm")
+    await set_global(adapter, "TopClear", f"{TOP_CLEAR}mm")
+    await set_global(adapter, "SupportZThick", f"{SUPPORT_Z_THICK}mm")
+    await set_global(adapter, "BlkHalfX", f"{BLK_HALF_X}mm")
+    await set_global(adapter, "Wall", f"{WALL}mm")
+    await set_global(adapter, "BlkTop", f"{BLK_TOP}mm")
+    await set_global(adapter, "BoreCy", '"TopClear" - "RBore"')
+    await set_global(adapter, "BlkBot", '"BoreCy" - "RBore" - "Wall"')
+
+    # Each sketch records its dim names + drive equations as the define_* helper
+    # emits them; the equations are collected here and applied in one deferred
+    # batch at the end (every target must resolve against the finished model).
+    drive_jobs: list[tuple[str, str]] = []
+
     # 1. Bearing block: Front-plane rectangle, mid-plane extrude along Z (the
-    #    bore/trunnion axis), straddling the trunnion mid.
+    #    bore/trunnion axis), straddling the trunnion mid. Asymmetric in Y (not
+    #    origin-centred), so a generic rectilinear chain, not define_centered_*.
+    #    Emission order (anchor vertex 0 at (-BlkHalfX, BlkBot)): the width dim
+    #    (seg 0), the height dim (seg 1), then the anchor dims (x, then z).
+    block_dims = SketchDims()
     check("create_sketch block", await adapter.create_sketch("Front"))
     block_rect = [
         (-BLK_HALF_X, BLK_BOT),
@@ -103,15 +133,27 @@ async def build(adapter) -> dict[str, str]:
         (-BLK_HALF_X, BLK_TOP),
     ]
     block = await add_line_chain(adapter, block_rect)
-    await define_rectilinear_chain(adapter, block, block_rect, label="block")
+    await define_rectilinear_chain(
+        adapter, block, block_rect, label="block", dims=block_dims,
+        names=["BlockWidth", "BlockHeight", "BlockAnchorX", "BlockAnchorZ"],
+        drives=[
+            '2 * "BlkHalfX"',
+            '"BlkTop" - "BlkBot"',
+            '"BlkHalfX"',
+            '-"BlkBot"',
+        ],
+    )
     await ensure_fully_defined(adapter, "block sketch")
     check("exit_sketch block", await adapter.exit_sketch())
+    name_last_feature(adapter, "BlockProfile")
+    drive_jobs += block_dims.apply(adapter, "BlockProfile")
     check(
         "extrude block",
         await adapter.create_extrusion(
             ExtrusionParameters(depth=SUPPORT_Z_THICK, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "Block")
     expected = 2.0 * BLK_HALF_X * (BLK_TOP - BLK_BOT) * SUPPORT_Z_THICK
     vol = await _volume(adapter)
     print(f"  volume after block: {vol:.1f} mm^3 (analytic {expected:.1f})")
@@ -120,17 +162,26 @@ async def build(adapter) -> dict[str, str]:
 
     # 2. Circular bore through the block (the trunnion rides inside; only the
     #    hex top vertex nears the upper inner wall). Centred TOP_CLEAR below the
-    #    ridge so the rest of the hex clears.
+    #    ridge so the rest of the hex clears. On the Y-axis (x 0): only the
+    #    centre-Z + diameter are dims (the X is a relation).
+    bore_dims = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, BORE_CY, R_BORE, "knife bore")
+    await define_circle(
+        adapter, 0.0, BORE_CY, R_BORE, "knife bore", dims=bore_dims,
+        names=("BoreCx", "BoreCz", "BoreDia"),
+        drives=(None, '-"BoreCy"', '2 * "RBore"'),
+    )
     await ensure_fully_defined(adapter, "bore sketch")
     check("exit_sketch bore", await adapter.exit_sketch())
+    name_last_feature(adapter, "BoreProfile")
+    drive_jobs += bore_dims.apply(adapter, "BoreProfile")
     check(
         "cut knife bore",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "KnifeBore")
     expected -= math.pi * R_BORE**2 * SUPPORT_Z_THICK
     vol = await _volume(adapter)
     print(f"  volume after bore: {vol:.1f} mm^3 (analytic {expected:.1f})")
@@ -152,6 +203,17 @@ async def build(adapter) -> dict[str, str]:
     # Named axis = the knife-edge contact ridge line (part origin, along Z). The
     # assembly mates Axis3@summing-lever (the hex ridge) coincident to it.
     await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "knife axis")
+
+    # Apply the deferred drive equations after the whole model + a rebuild
+    # exists, then re-check: each equation evaluates to the value just built, so
+    # the geometry must not move -- the re-check below is the proof.
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(
+        adapter, "driven knife mount (equations neutral)", expected, 0.01 * expected
+    )
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)  # ch30 plates: see _common palette

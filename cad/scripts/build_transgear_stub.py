@@ -21,15 +21,21 @@ import sys
 
 from _common import (
     IN,
+    SketchDims,
     add_line_chain,
     apply_material,
     check,
     define_rectilinear_chain,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
     set_sketch_direct_db,
+    volume_check,
 )
 
 PART_NAME = "transgear-stub"
@@ -46,7 +52,19 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
+    # Editable knobs (Tools > Equations): the shaft + collar diameters and
+    # lengths. The mm suffix is load-bearing -- this is an INCH document and the
+    # equation manager reads BARE numbers in document units (so the 3/8" shaft is
+    # carried as its 9.525 mm value, not an unsuffixed 9.525 read as inches).
+    await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
+    await set_global(adapter, "ShaftLen", f"{SHAFT_LEN}mm")
+    await set_global(adapter, "CollarDia", f"{COLLAR_DIA}mm")
+    await set_global(adapter, "CollarLen", f"{COLLAR_LEN}mm")
+
+    drive_jobs: list[tuple[str, str]] = []
+
     y_tip = SHAFT_LEN + COLLAR_LEN
+    profile = SketchDims()
     check("create_sketch profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     check(
@@ -61,23 +79,43 @@ async def build(adapter) -> dict[str, str]:
         (COLLAR_DIA / 2.0, y_tip),
         (0.0, y_tip),
     ]
-    profile = await add_line_chain(adapter, profile_pts)
+    profile_lines = await add_line_chain(adapter, profile_pts)
     set_sketch_direct_db(adapter, False)
     # The centerline merged into the (0, 0)/(0, y_tip) profile corners at
-    # creation, so the closed chain's own constraints define it too.
-    await define_rectilinear_chain(adapter, profile, profile_pts, label="stub")
+    # creation, so the closed chain's own constraints define it too. Emission
+    # order = the kept per-segment distance dims in line order (each direction's
+    # last segment is closure-supplied and skipped): seg0 shaft radius, seg1
+    # shaft length, seg2 collar step (radius rise to the collar), seg3 collar
+    # length; the origin anchor at (0, 0) adds no dim (both coords zero).
+    await define_rectilinear_chain(
+        adapter, profile_lines, profile_pts, label="stub", dims=profile,
+        names=["ShaftRadius", "ShaftLength", "CollarStep", "CollarLength"],
+        drives=[
+            '"ShaftDia" / 2',
+            '"ShaftLen"',
+            '"CollarDia" / 2 - "ShaftDia" / 2',
+            '"CollarLen"',
+        ],
+    )
     await ensure_fully_defined(adapter, "stub profile")
     check("exit_sketch profile", await adapter.exit_sketch())
+    name_last_feature(adapter, "StubProfile")
+    drive_jobs += profile.apply(adapter, "StubProfile")
     check("revolve stub", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    name_last_feature(adapter, "Stub")
 
     expected = math.pi * (
         (SHAFT_DIA / 2.0) ** 2 * SHAFT_LEN + (COLLAR_DIA / 2.0) ** 2 * COLLAR_LEN
     )
-    res = await adapter.get_mass_properties()
-    vol = float(res.data.volume) if res.is_success else float("nan")
-    print(f"  volume: {vol:.1f} mm^3 (analytic {expected:.1f})")
-    if abs(vol - expected) > 0.005 * expected:
-        raise RuntimeError(f"volume {vol:.1f} != analytic {expected:.1f}")
+    await volume_check(adapter, "stub", expected, 0.005 * expected)
+
+    # Deferred drive equations, then re-check neutrality (each evaluates to the
+    # as-built value, so the geometry must not move).
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "driven stub (equations neutral)", expected, 0.005 * expected)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

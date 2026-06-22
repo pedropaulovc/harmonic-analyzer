@@ -27,15 +27,21 @@ import sys
 
 from _common import (
     IN,
+    SketchDims,
     add_line_chain,
     apply_material,
     check,
     define_rectilinear_chain,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
     set_sketch_direct_db,
+    volume_check,
 )
 
 PART_NAME = "transgear-knob-shaft"
@@ -56,7 +62,20 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
+    # Editable knobs (Tools > Equations): the two diameters and the two axial
+    # lengths. The mm suffix is load-bearing -- this is an INCH document and the
+    # equation manager reads BARE numbers in document units (an unsuffixed 58 =
+    # 58 in); SHAFT_DIA is already 0.375 in expressed in mm, so it goes in as
+    # "9.525mm".
+    await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
+    await set_global(adapter, "ShaftLen", f"{SHAFT_LEN}mm")
+    await set_global(adapter, "KnobDia", f"{KNOB_DIA}mm")
+    await set_global(adapter, "KnobLen", f"{KNOB_LEN}mm")
+
+    drive_jobs: list[tuple[str, str]] = []
+
     y_tip = SHAFT_LEN + KNOB_LEN
+    profile = SketchDims()
     check("create_sketch profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     check(
@@ -71,23 +90,44 @@ async def build(adapter) -> dict[str, str]:
         (KNOB_DIA / 2.0, y_tip),
         (0.0, y_tip),
     ]
-    profile = await add_line_chain(adapter, profile_pts)
+    profile_lines = await add_line_chain(adapter, profile_pts)
     set_sketch_direct_db(adapter, False)
     # The centerline merged into the (0, 0)/(0, y_tip) profile corners at
     # creation, so the closed chain's own constraints define it too.
-    await define_rectilinear_chain(adapter, profile, profile_pts, label="shaft")
+    # Emission order (anchor vertex 0 at the origin -> 0 anchor dims): the
+    # per-segment distance dims skipping the last of each direction -- L0 shaft
+    # radius (H), L1 shaft length (V), L2 knob step radius (H), L3 knob length
+    # (V); L4 (knob radius) and L5 (full length) are the closure of their
+    # directions. The step is the radius DIFFERENCE, driven as a derived expr.
+    await define_rectilinear_chain(
+        adapter, profile_lines, profile_pts, label="shaft", dims=profile,
+        names=["ShaftRadius", "ShaftLength", "KnobStep", "KnobLength"],
+        drives=[
+            '"ShaftDia" / 2',
+            '"ShaftLen"',
+            '("KnobDia" - "ShaftDia") / 2',
+            '"KnobLen"',
+        ],
+    )
     await ensure_fully_defined(adapter, "shaft profile")
     check("exit_sketch profile", await adapter.exit_sketch())
+    name_last_feature(adapter, "ShaftProfile")
+    drive_jobs += profile.apply(adapter, "ShaftProfile")
     check("revolve shaft", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    name_last_feature(adapter, "Shaft")
 
     expected = math.pi * (
         (SHAFT_DIA / 2.0) ** 2 * SHAFT_LEN + (KNOB_DIA / 2.0) ** 2 * KNOB_LEN
     )
-    res = await adapter.get_mass_properties()
-    vol = float(res.data.volume) if res.is_success else float("nan")
-    print(f"  volume: {vol:.1f} mm^3 (analytic {expected:.1f})")
-    if abs(vol - expected) > 0.005 * expected:
-        raise RuntimeError(f"volume {vol:.1f} != analytic {expected:.1f}")
+    await volume_check(adapter, "shaft", expected, 0.005 * expected)
+
+    # Deferred drive equations, then re-check neutrality (each evaluates to the
+    # as-built value, so the geometry must not move).
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "driven shaft (equations neutral)", expected, 0.005 * expected)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
