@@ -80,6 +80,18 @@ def test_clean_span_is_ok(capture):
     assert sp.status.status_code.name == "OK"
 
 
+def test_explicit_error_status_survives_clean_exit(capture):
+    """run_build sets ERROR on the root span then returns (a clean exit) when a
+    build fails; span() must NOT overwrite that with OK -- it only fills OK when
+    the status is still UNSET."""
+    spans, _ = capture
+    with _telemetry.span("failed_build") as sp:
+        sp.set_status(_telemetry.Status(_telemetry.StatusCode.ERROR, "build failed"))
+        # no exception raised -- the with-block exits normally, as run_build does
+    (done,) = [s for s in spans.get_finished_spans() if s.name == "failed_build"]
+    assert done.status.status_code.name == "ERROR"
+
+
 def test_logs_correlate_to_active_span(capture):
     spans, logs = capture
     with _telemetry.span("parent"):

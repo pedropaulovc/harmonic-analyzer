@@ -142,6 +142,26 @@ def _telemetry_dir() -> Path | None:
         return None
 
 
+class _LiveStderr:
+    """A write proxy that always targets the CURRENT ``sys.stderr``.
+
+    The console handlers bind to this once (at ``configure`` time), but every
+    write resolves ``sys.stderr`` afresh -- so when a caller swaps the stream
+    AFTER import (e.g. ``cut_release``'s release-log ``_Tee``, installed once the
+    run is under way), telemetry logs + span lines follow into the tee and land
+    in the uploaded ``*-release.log``. A plain ``StreamHandler(stream=sys.stderr)``
+    would capture the original object and bypass the tee, dropping the very
+    progress/summary lines the old ``print()`` calls used to leave there.
+    """
+
+    def write(self, s: str) -> int:
+        return sys.stderr.write(s)
+
+    def flush(self) -> None:
+        with contextlib.suppress(Exception):
+            sys.stderr.flush()
+
+
 def configure(*, console: bool = True, force: bool = False) -> None:
     """Wire up the trace + log providers. Idempotent; safe to call from import.
 
@@ -168,7 +188,9 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     tracer_provider = TracerProvider(resource=resource)
     if want_console:
         tracer_provider.add_span_processor(
-            SimpleSpanProcessor(ConsoleSpanExporter(out=sys.stderr, formatter=_compact_span))
+            SimpleSpanProcessor(
+                ConsoleSpanExporter(out=_LiveStderr(), formatter=_compact_span)
+            )
         )
     tdir = _telemetry_dir()
     if tdir is not None:
@@ -205,7 +227,7 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     # trace/span id onto every record, so logs and traces correlate.
     pylog.addHandler(LoggingHandler(level=logging.DEBUG, logger_provider=logger_provider))
     if want_console:
-        stream = logging.StreamHandler(stream=sys.stderr)
+        stream = logging.StreamHandler(stream=_LiveStderr())
         stream.setFormatter(_FriendlyFormatter())
         stream.setLevel(logging.DEBUG)
         pylog.addHandler(stream)

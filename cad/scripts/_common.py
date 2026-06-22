@@ -1593,8 +1593,14 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
         try:
             artefacts = asyncio.run(_run())
         except Exception as exc:  # noqa: BLE001 - recorded on the root span
+            # A bare `return` here would let the span exit cleanly and be marked
+            # OK, so a failed build (process exits 1) would trace as success.
+            # Set ERROR explicitly before returning -- span() only fills in OK
+            # when the status is still UNSET, so this sticks.
             root.record_exception(exc)
+            root.set_status(_telemetry.Status(_telemetry.StatusCode.ERROR, str(exc)))
             _telemetry.error(f"build {script} failed: {exc}", exc_info=True)
+            _telemetry.shutdown()
             return 1
         _telemetry.success(f"done in {time.perf_counter() - _T0:.1f}s")
         for key, value in artefacts.items():
