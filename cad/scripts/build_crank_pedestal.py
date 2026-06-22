@@ -27,15 +27,20 @@ import sys
 from _common import (
     CASTING_GREEN,
     IN,
+    SketchDims,
     apply_color,
     apply_material,
     name_bore_axis,
     check,
     define_circle,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
     volume_check,
 )
 
@@ -56,29 +61,63 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
+    # Editable knobs (Tools > Equations): pedestal diameter + height, bore
+    # diameter + drive height. The mm suffix is load-bearing -- this is an INCH
+    # document and the equation manager reads BARE numbers in document units (an
+    # unsuffixed 46 = 46 in, blowing the part up 25.4x). PEDESTAL_HEIGHT and the
+    # cut depth are feature parameters (not sketch dims), so nothing drives them;
+    # exposing PedestalHeight is still a useful knob and matches the exemplars.
+    await set_global(adapter, "PedestalDia", f"{PEDESTAL_DIA}mm")
+    await set_global(adapter, "PedestalHeight", f"{PEDESTAL_HEIGHT}mm")
+    await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
+    await set_global(adapter, "BoreHeight", f"{BORE_HEIGHT}mm")
+
+    # Each sketch records its dim names + drive equations inline; the deferred
+    # drive batch at the end runs once the whole model + a rebuild exists.
+    drive_jobs: list[tuple[str, str]] = []
+
+    # Pedestal cylinder. Origin circle: only the diameter is a dim.
+    pedestal = SketchDims()
     check("create_sketch pedestal", await adapter.create_sketch("Top"))
-    await define_circle(adapter, 0.0, 0.0, PEDESTAL_RADIUS, "pedestal circle")
+    await define_circle(
+        adapter, 0.0, 0.0, PEDESTAL_RADIUS, "pedestal circle", dims=pedestal,
+        names=("PedestalCx", "PedestalCz", "PedestalDia"),
+        drives=(None, None, '"PedestalDia"'),
+    )
     await ensure_fully_defined(adapter, "pedestal sketch")
     check("exit_sketch pedestal", await adapter.exit_sketch())
+    name_last_feature(adapter, "PedestalProfile")
+    drive_jobs += pedestal.apply(adapter, "PedestalProfile")
     check(
         "extrude pedestal",
         await adapter.create_extrusion(ExtrusionParameters(depth=PEDESTAL_HEIGHT)),
     )
+    name_last_feature(adapter, "Pedestal")
     v_cyl = math.pi * PEDESTAL_RADIUS**2 * PEDESTAL_HEIGHT
     volume = await volume_check(adapter, "pedestal cylinder", v_cyl, 0.005 * v_cyl)
 
     # Crankshaft bore along Z at the drive height (Front-plane sketch,
-    # symmetric cut clears the full pedestal depth).
+    # symmetric cut clears the full pedestal depth). On-axis in X (x 0), so
+    # define_circle emits only the Z centre dim + the diameter (the X slot is a
+    # coincident relation, not a dim, and is ignored).
+    bore = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, BORE_HEIGHT, BORE_RADIUS, "bore")
+    await define_circle(
+        adapter, 0.0, BORE_HEIGHT, BORE_RADIUS, "bore", dims=bore,
+        names=("BoreCx", "BoreHeight", "BoreDia"),
+        drives=(None, '"BoreHeight"', '"BoreDia"'),
+    )
     await ensure_fully_defined(adapter, "bore sketch")
     check("exit_sketch bore", await adapter.exit_sketch())
+    name_last_feature(adapter, "BoreProfile")
+    drive_jobs += bore.apply(adapter, "BoreProfile")
     check(
         "cut bore",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=PEDESTAL_DIA + 4.0, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "Bore")
     # Bore length through the round pedestal: chord at x integrated over the
     # bore cross-section; bore radius << pedestal radius, so a midpoint
     # integral over x is plenty.
@@ -90,7 +129,19 @@ async def build(adapter) -> dict[str, str]:
         v_bore += 2.0 * math.sqrt(BORE_RADIUS**2 - x * x) * dx * 2.0 * math.sqrt(
             PEDESTAL_RADIUS**2 - x * x
         )
-    volume = await volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
+    v_final = volume - v_bore
+    volume = await volume_check(adapter, "bore", v_final, 0.01 * v_bore)
+
+    # Apply the deferred drive equations now -- after the whole model + a rebuild
+    # exists, so every target resolves. Each equation evaluates to the value just
+    # built, so the geometry must not move -- the re-check below is the proof.
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(
+        adapter, "driven pedestal (equations neutral)", v_final, 0.01 * v_bore
+    )
 
     # Named bore/central axis for view-independent assembly mate
     # selection (M6 mated-DOF drive train).
