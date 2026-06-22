@@ -87,7 +87,8 @@ The SolidWorks-free `check:*` gates and the comparison/diff tooling run from thi
 | `part:<stem>`, `assembly:<stem>` | yes | yes |
 | `verify:soundness`, `verify:subsystems`, `verify:kinematics` | yes | yes |
 | `export`, `release` | yes | yes |
-| `check:math`, `check:config`, `check:graph`, `check:nameplate`, `check:recipe` | **no** | no (parallel) |
+| `check:math`, `check:config`, `check:graph`, `check:nameplate`, `check:recipe`, `check:cache` | **no** | no (parallel) |
+| `cache_status` | **no** | no (diagnostic) |
 | `build` (default), `build_bare` | meta | — |
 
 - `build` is the **one** fully-safe entry: every part + assembly + every gate.
@@ -144,6 +145,25 @@ with **zero setup**. Set/override a seat's role with `HARMONIC_CACHE_MODE` or a
 gitignored `.harmonic-cache-mode` file at the repo root (`off`/`ro`/`rw`). Full
 details — roles, auth, salt-busting, provisioning, caveats — in
 [`DEVELOPING.md`](DEVELOPING.md).
+
+**Debugging a miss.** A cache key is `sha256(epoch + salt + Σ(relpath, digest))`,
+so a key that shifts unexpectedly is usually one dep digest moving. Three tools
+make that visible without scrollback archaeology (all best-effort, never able to
+fail a build):
+
+- **`doit cache_status`** — per part/assembly: HIT/MISS (a backend presence probe,
+  no download) + key + the per-dep digests, so *any miss is explainable in one
+  command*. Positional args after `--`: label substrings to filter
+  (`doit cache_status -- cone_gear`), `miss` (only misses), `all` (dump dep digests
+  for every task, not just misses). A `DRIFT(...)` flag marks a task whose current
+  key differs from the last key this seat published.
+- **`HARMONIC_CACHE_DEBUG=1`** — during a real build, logs every `(digest, relpath)`
+  feeding each key plus the final key, tagged by task.
+- **`cad/out/reports/cache.jsonl`** — append-only event log (key + event:
+  `store`/`restore_hit`/`restore_miss`/`restore_hit_drift`/…), so post-hoc debugging
+  reads a file. On a HIT under a key this seat never published — the
+  store-skip-on-hit drift that bit v0.9.0 — `restore` emits a `WARN` and a
+  `restore_hit_drift` event.
 
 ## Fine-grained config deps
 
