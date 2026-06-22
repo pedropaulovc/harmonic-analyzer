@@ -60,7 +60,7 @@ Dimensions: cad/DIMENSIONS.md ch. 22-23, 25.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_paper_drive_assembly.py
+    uv run python cad\scripts\build_paper_drive_assembly.py
 """
 
 from __future__ import annotations

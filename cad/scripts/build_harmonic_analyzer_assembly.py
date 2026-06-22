@@ -32,7 +32,7 @@ Cross-subassembly fits proven by the top-level interference check:
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_harmonic_analyzer_assembly.py
+    uv run python cad\scripts\build_harmonic_analyzer_assembly.py
 """
 
 from __future__ import annotations

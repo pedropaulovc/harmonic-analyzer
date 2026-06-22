@@ -16,7 +16,7 @@ scale is centred on the bar.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_measuring_stick.py
+    uv run python cad\scripts\build_measuring_stick.py
 """
 
 from __future__ import annotations

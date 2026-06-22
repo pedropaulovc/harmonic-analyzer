@@ -12,7 +12,7 @@ thickness extruded +Z; screw holes inset from the ends.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_platen_clip.py
+    uv run python cad\scripts\build_platen_clip.py
 """
 
 from __future__ import annotations

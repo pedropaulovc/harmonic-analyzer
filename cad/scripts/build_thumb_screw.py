@@ -19,7 +19,7 @@ Layout: screw axis along +X from the origin (head face at x=0).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_thumb_screw.py
+    uv run python cad\scripts\build_thumb_screw.py
 """
 
 from __future__ import annotations

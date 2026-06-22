@@ -34,7 +34,7 @@ Dimensions: cad/DIMENSIONS.md ch. 17 + ch. 18 (M6.4).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_channel_spring_installed.py
+    uv run python cad\scripts\build_channel_spring_installed.py
 """
 
 from __future__ import annotations

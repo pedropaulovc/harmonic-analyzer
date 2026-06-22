@@ -15,7 +15,7 @@ Layout: block standing on the Top plane, centred at the origin in plan
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_arbor_pedestal.py
+    uv run python cad\scripts\build_arbor_pedestal.py
 """
 
 from __future__ import annotations

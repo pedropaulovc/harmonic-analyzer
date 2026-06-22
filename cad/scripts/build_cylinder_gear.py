@@ -55,7 +55,7 @@ cam lobe -Y, notch +Y.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_cylinder_gear.py
+    uv run python cad\scripts\build_cylinder_gear.py
 """
 
 from __future__ import annotations

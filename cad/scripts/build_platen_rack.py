@@ -21,7 +21,7 @@ Layout: bar x = 0..300, y = 0..30, z = 0..6; teeth cut into the top edge.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_platen_rack.py
+    uv run python cad\scripts\build_platen_rack.py
 """
 
 from __future__ import annotations

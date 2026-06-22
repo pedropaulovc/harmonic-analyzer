@@ -16,7 +16,7 @@ global (X, -Z).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_magnifying_clamp.py
+    uv run python cad\scripts\build_magnifying_clamp.py
 """
 
 from __future__ import annotations

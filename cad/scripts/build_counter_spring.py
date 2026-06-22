@@ -24,7 +24,7 @@ y 1012, top loop centre at y 1370.6.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_counter_spring.py
+    uv run python cad\scripts\build_counter_spring.py
 """
 
 from __future__ import annotations

@@ -34,7 +34,7 @@ placements accordingly.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_rocker_arm.py
+    uv run python cad\scripts\build_rocker_arm.py
 """
 
 from __future__ import annotations

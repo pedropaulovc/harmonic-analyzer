@@ -18,7 +18,7 @@ x=0), profile revolved 360 deg about a centerline on the axis.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_magnifying_lever.py
+    uv run python cad\scripts\build_magnifying_lever.py
 """
 
 from __future__ import annotations

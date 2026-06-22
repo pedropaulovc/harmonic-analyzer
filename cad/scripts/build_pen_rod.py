@@ -12,7 +12,7 @@ centred on the origin in X, extruded +Z; wire hole along Z near the top.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_pen_rod.py
+    uv run python cad\scripts\build_pen_rod.py
 """
 
 from __future__ import annotations

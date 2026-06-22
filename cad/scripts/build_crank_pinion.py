@@ -15,7 +15,7 @@ Layout: gear axis = Z through the origin, disc z = 0..12 mm.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_crank_pinion.py
+    uv run python cad\scripts\build_crank_pinion.py
 """
 
 from __future__ import annotations

@@ -16,7 +16,7 @@ about the Front plane.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_magnifying_wheel.py
+    uv run python cad\scripts\build_magnifying_wheel.py
 """
 
 from __future__ import annotations

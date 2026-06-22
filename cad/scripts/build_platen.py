@@ -23,7 +23,7 @@ extruded +Z.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_platen.py
+    uv run python cad\scripts\build_platen.py
 """
 
 from __future__ import annotations

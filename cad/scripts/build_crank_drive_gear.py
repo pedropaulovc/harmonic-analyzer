@@ -17,7 +17,7 @@ Layout: gear axis = Z through the origin, disc z = 0..10 mm.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_crank_drive_gear.py
+    uv run python cad\scripts\build_crank_drive_gear.py
 """
 
 from __future__ import annotations

@@ -16,7 +16,7 @@ global (X, -Z)); slit and front hole from Front-plane sketches.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_pen_v_block.py
+    uv run python cad\scripts\build_pen_v_block.py
 """
 
 from __future__ import annotations

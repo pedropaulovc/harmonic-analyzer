@@ -15,7 +15,7 @@ along Y, screw along +Z. Dimensions: cad/DIMENSIONS.md ch. 19 (low).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_gooseneck_clamp.py
+    uv run python cad\scripts\build_gooseneck_clamp.py
 """
 
 from __future__ import annotations

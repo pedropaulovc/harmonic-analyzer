@@ -16,7 +16,7 @@ Layout: arbor axis along +Y from the origin, plain cylinder y 0..200.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_cylinder_gear_shaft.py
+    uv run python cad\scripts\build_cylinder_gear_shaft.py
 """
 
 from __future__ import annotations

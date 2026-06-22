@@ -17,7 +17,7 @@ upper face via extrude_at_offset (raw-COM stopgap until MCP Phase 3).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_harmonic_base.py
+    uv run python cad\scripts\build_harmonic_base.py
 """
 
 from __future__ import annotations

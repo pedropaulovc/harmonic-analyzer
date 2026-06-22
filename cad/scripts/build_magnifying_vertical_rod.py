@@ -12,7 +12,7 @@ Layout: rod axis along +X from the origin, revolved about a centerline
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_magnifying_vertical_rod.py
+    uv run python cad\scripts\build_magnifying_vertical_rod.py
 """
 
 from __future__ import annotations

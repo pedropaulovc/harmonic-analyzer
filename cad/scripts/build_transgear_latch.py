@@ -18,7 +18,7 @@ Layout: big hub on the origin (stud axis along Z), small hub at
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_transgear_latch.py
+    uv run python cad\scripts\build_transgear_latch.py
 """
 
 from __future__ import annotations

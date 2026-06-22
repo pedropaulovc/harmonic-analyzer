@@ -21,7 +21,7 @@ direction never matters.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_crank_arm.py
+    uv run python cad\scripts\build_crank_arm.py
 """
 
 from __future__ import annotations

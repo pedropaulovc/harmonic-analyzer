@@ -15,7 +15,7 @@ tapered-pin cross-hole along Z at the crank-seat height.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_crankshaft.py
+    uv run python cad\scripts\build_crankshaft.py
 """
 
 from __future__ import annotations

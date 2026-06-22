@@ -18,7 +18,7 @@ Symmetric about local x = 0 (MIRROR_PLANE ("x", 0.0)).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_hanger_screw.py
+    uv run python cad\scripts\build_hanger_screw.py
 """
 
 from __future__ import annotations

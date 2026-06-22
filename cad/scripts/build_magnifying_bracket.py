@@ -20,7 +20,7 @@ MIRROR_PLANE 'x0'. Dimensions: cad/DIMENSIONS.md ch. 20 (M6.4, low).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_magnifying_bracket.py
+    uv run python cad\scripts\build_magnifying_bracket.py
 """
 
 from __future__ import annotations

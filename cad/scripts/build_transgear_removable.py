@@ -22,7 +22,7 @@ Layout: gear axis = Z through the origin, disc z = 0..5 mm.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_transgear_removable.py
+    uv run python cad\scripts\build_transgear_removable.py
 """
 
 from __future__ import annotations
