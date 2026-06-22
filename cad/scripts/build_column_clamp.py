@@ -29,16 +29,22 @@ import sys
 
 from _common import (
     CASTING_GREEN,
+    SketchDims,
     add_line_chain,
     apply_color,
     apply_material,
     check,
     define_circle,
     define_rectilinear_chain,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
+    volume_check,
 )
 
 PART_NAME = "column-clamp"
@@ -76,27 +82,62 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Collar ring.
+    # Editable knobs (Tools > Equations): the two diameters, the half-height and
+    # the bar-channel walls. mm suffix is load-bearing -- this is an INCH document
+    # and the equation manager reads BARE numbers in document units (an unsuffixed
+    # 48 would be 48 inches and blow the part up 25.4x). CHANNEL_FLOOR_Y / the
+    # extrude depths are feature/offset parameters (not sketch dims), exposed here
+    # as constants editors can tune even though nothing drives them.
+    await set_global(adapter, "CollarOD", f"{COLLAR_OD}mm")
+    await set_global(adapter, "CollarBore", f"{COLLAR_BORE}mm")
+    await set_global(adapter, "CollarHalfH", f"{COLLAR_HALF_H}mm")
+    await set_global(adapter, "ChannelX0", f"{CHANNEL_X[0]}mm")
+    await set_global(adapter, "ChannelX1", f"{CHANNEL_X[1]}mm")
+    await set_global(adapter, "PinchHoleDia", f"{PINCH_HOLE_DIA}mm")
+
+    # Each sketch DECLARES its dim names + drive equations inline; a per-sketch
+    # SketchDims records each dim in the helper's emission order, and the drive
+    # equations are collected here and applied in one deferred batch at the end
+    # (every target must resolve against the finished model).
+    drive_jobs: list[tuple[str, str]] = []
+
+    # Collar ring (on-axis origin circle: only the diameter is a dim).
+    collar = SketchDims()
     check("create_sketch collar", await adapter.create_sketch("Top"))
-    await define_circle(adapter, 0.0, 0.0, COLLAR_OD / 2.0, "collar OD")
+    await define_circle(
+        adapter, 0.0, 0.0, COLLAR_OD / 2.0, "collar OD", dims=collar,
+        names=("CollarCx", "CollarCz", "CollarODim"),
+        drives=(None, None, '"CollarOD"'),
+    )
     await ensure_fully_defined(adapter, "collar sketch")
     check("exit_sketch collar", await adapter.exit_sketch())
+    name_last_feature(adapter, "CollarProfile")
+    drive_jobs += collar.apply(adapter, "CollarProfile")
     check(
         "extrude collar",
         await adapter.create_extrusion(
             ExtrusionParameters(depth=2.0 * COLLAR_HALF_H, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "Collar")
+    bore = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Top"))
-    await define_circle(adapter, 0.0, 0.0, COLLAR_BORE / 2.0, "bore")
+    await define_circle(
+        adapter, 0.0, 0.0, COLLAR_BORE / 2.0, "bore", dims=bore,
+        names=("BoreCx", "BoreCz", "BoreDia"),
+        drives=(None, None, '"CollarBore"'),
+    )
     await ensure_fully_defined(adapter, "bore sketch")
     check("exit_sketch bore", await adapter.exit_sketch())
+    name_last_feature(adapter, "BoreProfile")
+    drive_jobs += bore.apply(adapter, "BoreProfile")
     check(
         "cut bore",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=4.0 * COLLAR_HALF_H, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "Bore")
     expected = (
         math.pi
         * ((COLLAR_OD / 2.0) ** 2 - (COLLAR_BORE / 2.0) ** 2)
@@ -110,6 +151,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Bar channel: one rectangular cut through the collar front, from the
     # floor up past the top (Top sketch footprint, offset cut upward).
+    channel_dims = SketchDims()
     check("create_sketch channel", await adapter.create_sketch("Top"))
     channel_rect = [
         (CHANNEL_X[0], -COLLAR_OD),
@@ -118,9 +160,24 @@ async def build(adapter) -> dict[str, str]:
         (CHANNEL_X[0], COLLAR_OD),
     ]
     channel = await add_line_chain(adapter, channel_rect)
-    await define_rectilinear_chain(adapter, channel, channel_rect, label="channel")
+    # Emission order (rectilinear chain): the kept per-segment distance dims in
+    # line order (seg0 width = X1-X0, seg1 height = 2*OD; the other two close),
+    # THEN the anchor dims (x then z, both non-zero). The anchor z is the UNSIGNED
+    # distance from the origin of the y=-OD corner, so its drive is +"CollarOD".
+    await define_rectilinear_chain(
+        adapter, channel, channel_rect, label="channel", dims=channel_dims,
+        names=["ChannelWidth", "ChannelHeight", "ChannelAnchorX", "ChannelAnchorZ"],
+        drives=[
+            '"ChannelX1" - "ChannelX0"',
+            '2 * "CollarOD"',
+            '"ChannelX0"',
+            '"CollarOD"',
+        ],
+    )
     await ensure_fully_defined(adapter, "channel sketch")
     check("exit_sketch channel", await adapter.exit_sketch())
+    name_last_feature(adapter, "ChannelProfile")
+    drive_jobs += channel_dims.apply(adapter, "ChannelProfile")
     # Cut occupies y CHANNEL_FLOOR_Y .. +COLLAR_HALF_H + 2 (clears the top):
     # mid-plane trick is unusable (asymmetric), so cut a boss-extruded
     # region via cut-extrude at a start offset.
@@ -158,6 +215,7 @@ async def build(adapter) -> dict[str, str]:
     model.ClearSelection2(True)
     if feature is None:
         raise RuntimeError("channel cut: FeatureCut4 returned None")
+    name_last_feature(adapter, "BarChannel")
     print(f"  OK  channel cut at offset {CHANNEL_FLOOR_Y}")
     expected -= _channel_removed_volume()
     vol = await _volume(adapter)
@@ -168,16 +226,24 @@ async def build(adapter) -> dict[str, str]:
     # Pinch-screw hole: radial along X at (y 0, z 0). A mid-plane cut from
     # the Right plane removes only the back wall -24..-17.6 -- the bore is
     # air and the front side at y 0 was already channel-cut.
+    pinch = SketchDims()
     check("create_sketch pinch hole", await adapter.create_sketch("Right"))
-    await define_circle(adapter, 0.0, 0.0, PINCH_HOLE_DIA / 2.0, "pinch hole")
+    await define_circle(
+        adapter, 0.0, 0.0, PINCH_HOLE_DIA / 2.0, "pinch hole", dims=pinch,
+        names=("PinchCx", "PinchCz", "PinchHoleDim"),
+        drives=(None, None, '"PinchHoleDia"'),
+    )
     await ensure_fully_defined(adapter, "pinch hole sketch")
     check("exit_sketch pinch hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "PinchHoleProfile")
+    drive_jobs += pinch.apply(adapter, "PinchHoleProfile")
     check(
         "cut pinch hole",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=2.5 * COLLAR_OD, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "PinchHole")
     expected -= (
         math.pi * (PINCH_HOLE_DIA / 2.0) ** 2 * (COLLAR_OD - COLLAR_BORE) / 2.0
     )
@@ -185,6 +251,17 @@ async def build(adapter) -> dict[str, str]:
     print(f"  volume after pinch hole: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.01 * expected:
         raise RuntimeError(f"pinch hole volume {vol:.1f} != {expected:.1f}")
+
+    # Apply the deferred drive equations now -- after the whole model + a rebuild
+    # exists, so every target resolves -- then re-check neutrality (each equation
+    # evaluates to the as-built value, so the geometry must not move).
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(
+        adapter, "driven column clamp (equations neutral)", expected, 0.01 * expected
+    )
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)

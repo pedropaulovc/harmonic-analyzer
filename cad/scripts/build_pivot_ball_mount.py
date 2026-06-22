@@ -29,16 +29,22 @@ import math
 import sys
 
 from _common import (
+    SketchDims,
     add_line_chain,
     anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
     set_sketch_direct_db,
+    volume_check,
 )
 
 PART_NAME = "pivot-ball-mount"
@@ -63,7 +69,23 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
+    # Editable knobs (Tools > Equations): ball/base/stem/bore primitives + the
+    # ball-centre rise. The mm suffix is load-bearing -- this is an INCH document
+    # and the equation manager reads BARE numbers in document units (an
+    # unsuffixed 25.2 = 25.2 in, a 25.4x in-plane blow-up).
+    await set_global(adapter, "BallDia", f"{BALL_DIA}mm")
+    await set_global(adapter, "BallCenterH", f"{BALL_CENTER_H}mm")
+    await set_global(adapter, "BaseDia", f"{BASE_DIA}mm")
+    await set_global(adapter, "BaseH", f"{BASE_H}mm")
+    await set_global(adapter, "StemDia", f"{STEM_DIA}mm")
+    await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
+
+    # Drive equations collected as dims are recorded, applied in one deferred
+    # batch after the whole model + a rebuild exists (every target must resolve).
+    drive_jobs: list[tuple[str, str]] = []
+
     # Revolved profile about +Y: base disc -> stem -> ball.
+    profile = SketchDims()
     check("create_sketch profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     check(
@@ -117,54 +139,89 @@ async def build(adapter) -> dict[str, str]:
             f"{label} {relation}",
             await adapter.add_sketch_constraint(ent, None, relation),
         )
+    # Record each display dim into SketchDims in CREATION order. The ball-centre
+    # anchor is on the Y axis (x=0, y!=0), so anchor_point_to_origin emits ONE
+    # dim (the vertical rise) -- an UNSIGNED distance from the origin, driven by
+    # the positive global. Then the four manual dims follow: ball radius, base
+    # radius, base height, shoulder run. Five display dims total.
     await anchor_point_to_origin(
         adapter, f"{arc}.center", 0.0, BALL_CENTER_H, "ball centre"
     )
+    profile.record("BallRise", '"BallCenterH"')
     check(
         "ball radius",
         await adapter.add_sketch_dimension(arc, None, "radial", BALL_R),
     )
+    profile.record("BallRadius", '"BallDia" / 2')
     check(
         "base radius",
         await adapter.add_sketch_dimension(
             base_bottom, None, "linear", BASE_DIA / 2.0
         ),
     )
+    profile.record("BaseRadius", '"BaseDia" / 2')
     check(
         "base height",
         await adapter.add_sketch_dimension(base_wall, None, "linear", BASE_H),
     )
+    profile.record("BaseHeight", '"BaseH"')
     check(
         "shoulder run",
         await adapter.add_sketch_dimension(
             shoulder, None, "linear", (BASE_DIA - STEM_DIA) / 2.0
         ),
     )
+    profile.record("ShoulderRun", '("BaseDia" - "StemDia") / 2')
     await ensure_fully_defined(adapter, "ball mount profile")
     check("exit_sketch profile", await adapter.exit_sketch())
+    name_last_feature(adapter, "BallMountProfile")
+    drive_jobs += profile.apply(adapter, "BallMountProfile")
     check(
         "revolve ball mount",
         await adapter.create_revolve(RevolveParameters(angle=360.0)),
     )
+    name_last_feature(adapter, "BallMount")
     res = await adapter.get_mass_properties()
     print(f"  volume after revolve: {res.data.volume:.1f} mm^3")
     # expected: disc 804.2 + stem 632.5 + sphere cap above the chord 3568.6
     #           = ~5,005 mm^3
 
-    # Shaft cross-bore through the ball centre, along Z.
+    # Shaft cross-bore through the ball centre, along Z. On-axis in X (x=0,
+    # y=BALL_CENTER_H!=0): define_circle records only the Z centre (an unsigned
+    # rise) + the diameter -- the X slot is ignored.
+    bore = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, BALL_CENTER_H, BORE_DIA / 2.0, "shaft bore")
+    await define_circle(
+        adapter, 0.0, BALL_CENTER_H, BORE_DIA / 2.0, "shaft bore", dims=bore,
+        names=("BoreCx", "BoreCz", "ShaftBoreDia"),
+        drives=(None, '"BallCenterH"', '"BoreDia"'),
+    )
     await ensure_fully_defined(adapter, "bore sketch")
     check("exit_sketch bore", await adapter.exit_sketch())
+    name_last_feature(adapter, "ShaftBoreProfile")
+    drive_jobs += bore.apply(adapter, "ShaftBoreProfile")
     check(
         "cut bore",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "ShaftBore")
     res = await adapter.get_mass_properties()
-    print(f"  volume after bore: {res.data.volume:.1f} mm^3")
+    v_final = float(res.data.volume)
+    print(f"  volume after bore: {v_final:.1f} mm^3")
     # expected: -(4pi/3)(R^3 - (R^2 - r^2)^1.5) = ~-612 -> ~4,393 mm^3
+
+    # Apply the deferred drive equations after the model + a rebuild exists, then
+    # re-check neutrality: every equation evaluates to the as-built value, so the
+    # geometry must not move.
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(
+        adapter, "driven ball mount (equations neutral)", v_final, 0.005 * v_final
+    )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

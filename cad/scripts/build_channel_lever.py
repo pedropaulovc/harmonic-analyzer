@@ -38,18 +38,24 @@ import math
 import sys
 
 from _common import (
+    SketchDims,
     add_line_chain,
     anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
     dimension_between,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
     name_bore_axis,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
     set_sketch_direct_db,
+    volume_check,
 )
 
 PART_NAME = "channel-lever"
@@ -75,18 +81,40 @@ HALF_BAR = BAR_TALL / 2.0
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > extrude width
 
 
-async def _volume(adapter) -> float:
-    res = await adapter.get_mass_properties()
-    return res.data.volume if res.is_success else float("nan")
-
-
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
+    # Editable knobs (Tools > Equations): the lever's design constants. A GUI
+    # fine-tune edits THESE globals -- never an auto "D1@Sketch1". The mm suffix
+    # is load-bearing: this is an INCH document and the equation manager reads
+    # BARE numbers in document units (an unsuffixed 177.8 = 177.8 in, blowing the
+    # part up 25.4x). Derived globals (TipArcCx) reference others as equation
+    # strings so the tip stays a fixed overhang past the spring hole.
+    await set_global(adapter, "LeverSpringX", f"{LEVER_SPRING_X}mm")
+    await set_global(adapter, "BarTall", f"{BAR_TALL}mm")
+    await set_global(adapter, "LeverThickness", f"{LEVER_THICKNESS}mm")
+    await set_global(adapter, "PivotHoleDia", f"{PIVOT_HOLE_DIA}mm")
+    await set_global(adapter, "BarPinHoleDia", f"{BAR_PIN_HOLE_DIA}mm")
+    await set_global(adapter, "BarPinX", f"{BAR_PIN_X}mm")
+    await set_global(adapter, "SpringHoleDia", f"{SPRING_HOLE_DIA}mm")
+    await set_global(adapter, "TabStartX", f"{TAB_START_X}mm")
+    await set_global(adapter, "TabHalf", f"{TAB_HALF}mm")
+    await set_global(adapter, "TipRadius", f"{TIP_RADIUS}mm")
+    await set_global(adapter, "TipArcCx", '"LeverSpringX" + 5mm')
+
+    # Each sketch records its dim names + drive equations into a per-sketch
+    # SketchDims as the dims are created; the drives are collected here and
+    # applied in one deferred batch at the end (every equation target must
+    # resolve against the finished model + a rebuild).
+    drive_jobs: list[tuple[str, str]] = []
+
     # Side profile: round fulcrum nose, flat bar, stepped end tab with a
-    # rounded tip (two arcs + 6-line chain).
+    # rounded tip (two arcs + 6-line chain). The manual constraints/dims below
+    # define the sketch; each driving dim is record()ed into ``outline`` in the
+    # exact order it is added so naming/driving land structurally.
+    outline = SketchDims()
     check("create_sketch outline", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     nose = check(
@@ -135,14 +163,21 @@ async def build(adapter) -> dict[str, str]:
         "nose centre -> origin",
         await adapter.add_sketch_constraint(f"{nose}.center", "origin", "coincident"),
     )
+    # Dim 1 (emission order): nose radius = HALF_BAR = BarTall / 2.
     check("nose radius", await adapter.add_sketch_dimension(nose, None, "radial", HALF_BAR))
+    outline.record("NoseRadius", '"BarTall" / 2')
     for point in (f"{nose}.start", f"{nose}.end"):
         check(
             f"{point} on Y axis",
             await adapter.add_sketch_constraint(point, "origin", "vertical_points"),
         )
+    # Dim 2: tip-centre X (on the X axis, +TIP_ARC_CX, so an unsigned distance
+    # that already evaluates positive -- no negation needed).
     await anchor_point_to_origin(adapter, f"{tip}.center", TIP_ARC_CX, 0.0, "tip centre")
+    outline.record("TipCentreX", '"TipArcCx"')
+    # Dim 3: tip radius.
     check("tip radius", await adapter.add_sketch_dimension(tip, None, "radial", TIP_RADIUS))
+    outline.record("TipRadius", '"TipRadius"')
     for point in (f"{tip}.start", f"{tip}.end"):
         check(
             f"{point} above/below tip centre",
@@ -154,19 +189,23 @@ async def build(adapter) -> dict[str, str]:
             f"{lower_step}.start", f"{upper_step}.start", "vertical_points"
         ),
     )
+    # Dim 4: bar length (TAB_START_X).
     await dimension_between(
         adapter, f"{lower_bar}.start", f"{lower_bar}.end",
         "horizontal_distance", TAB_START_X, "bar length",
     )
+    outline.record("BarLength", '"TabStartX"')
     await ensure_fully_defined(adapter, "lever outline")
     check("exit_sketch outline", await adapter.exit_sketch())
+    name_last_feature(adapter, "LeverOutline")
+    drive_jobs += outline.apply(adapter, "LeverOutline")
     check(
         "extrude lever",
         await adapter.create_extrusion(
             ExtrusionParameters(depth=LEVER_THICKNESS, both_directions=True)
         ),
     )
-    vol = await _volume(adapter)
+    name_last_feature(adapter, "LeverBody")
     area = (
         TAB_START_X * BAR_TALL
         + math.pi * HALF_BAR**2 / 2.0
@@ -174,29 +213,41 @@ async def build(adapter) -> dict[str, str]:
         + math.pi * TIP_RADIUS**2 / 2.0
     )
     expected = area * LEVER_THICKNESS
-    print(f"  volume after extrude: {vol:.1f} mm^3 (analytic {expected:.1f})")
-    if abs(vol - expected) > 0.005 * expected:
-        raise RuntimeError(
-            f"outline volume {vol:.1f} != analytic {expected:.1f} - an arc"
-            " bulged the wrong way or the chain snapped"
-        )
+    await volume_check(adapter, "lever outline", expected, 0.005 * expected)
 
     # Fulcrum hole + bar-pin hole + spring-hook hole, one mid-plane cut.
+    # Emission order across the three circles (all on the X axis, y=0):
+    #   fulcrum (origin) -> diameter only;
+    #   bar pin (127, 0) -> centre X, then diameter;
+    #   spring (177.8, 0) -> centre X, then diameter.  (5 dims total.)
+    holes = SketchDims()
     check("create_sketch holes", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, 0.0, PIVOT_HOLE_DIA / 2.0, "fulcrum hole")
-    await define_circle(adapter, BAR_PIN_X, 0.0, BAR_PIN_HOLE_DIA / 2.0, "bar pin hole")
     await define_circle(
-        adapter, LEVER_SPRING_X, 0.0, SPRING_HOLE_DIA / 2.0, "spring hole"
+        adapter, 0.0, 0.0, PIVOT_HOLE_DIA / 2.0, "fulcrum hole", dims=holes,
+        names=("FulcrumCx", "FulcrumCz", "FulcrumDia"),
+        drives=(None, None, '"PivotHoleDia"'),
+    )
+    await define_circle(
+        adapter, BAR_PIN_X, 0.0, BAR_PIN_HOLE_DIA / 2.0, "bar pin hole", dims=holes,
+        names=("BarPinCx", "BarPinCz", "BarPinDia"),
+        drives=('"BarPinX"', None, '"BarPinHoleDia"'),
+    )
+    await define_circle(
+        adapter, LEVER_SPRING_X, 0.0, SPRING_HOLE_DIA / 2.0, "spring hole", dims=holes,
+        names=("SpringCx", "SpringCz", "SpringDia"),
+        drives=('"LeverSpringX"', None, '"SpringHoleDia"'),
     )
     await ensure_fully_defined(adapter, "holes sketch")
     check("exit_sketch holes", await adapter.exit_sketch())
+    name_last_feature(adapter, "HoleProfile")
+    drive_jobs += holes.apply(adapter, "HoleProfile")
     check(
         "cut holes",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
-    vol = await _volume(adapter)
+    name_last_feature(adapter, "HoleCuts")
     v_holes = (
         math.pi
         * (
@@ -207,11 +258,7 @@ async def build(adapter) -> dict[str, str]:
         * LEVER_THICKNESS
     )
     expected -= v_holes
-    print(f"  volume after holes: {vol:.1f} mm^3 (analytic {expected:.1f})")
-    if abs(vol - expected) > 0.005 * expected:
-        raise RuntimeError(
-            f"hole-cut volume {vol:.1f} != analytic {expected:.1f}"
-        )
+    await volume_check(adapter, "holes", expected, 0.005 * expected)
 
     # Named bore axes for assembly mates (view-independent name selection):
     # Axis1 = fulcrum bore (origin, rides the fulcrum shaft), Axis2 = bar-pin
@@ -220,6 +267,15 @@ async def build(adapter) -> dict[str, str]:
     await name_bore_axis(
         adapter, "Right Plane", BAR_PIN_X, "Top Plane", 0.0, "bar pin bore"
     )
+
+    # Apply the deferred drive equations now -- after the whole model + a rebuild
+    # exists, so every target resolves. Each equation evaluates to the value just
+    # built, so the geometry must not move -- the re-check below is the proof.
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "driven channel lever (equations neutral)", expected, 0.005 * expected)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

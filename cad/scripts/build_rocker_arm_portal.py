@@ -60,6 +60,7 @@ import sys
 from _common import (
     CASTING_GREEN,
     IN,
+    SketchDims,
     add_line_chain,
     apply_color,
     apply_material,
@@ -67,12 +68,16 @@ from _common import (
     define_circle,
     define_polygon_chain,
     define_rectilinear_chain,
+    drive_dimension,
     ensure_fully_defined,
     extrude_at_offset,
+    force_rebuild,
     log,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
     set_sketch_direct_db,
     volume_check,
 )
@@ -142,7 +147,47 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
+    # Editable knobs: named globals in the equation manager that drive the sketch
+    # dims below. A GUI fine-tune edits THESE (Tools > Equations) -- never an auto
+    # "D7@Sketch3". The mm suffix is load-bearing: this is an INCH document and
+    # the equation manager reads BARE numbers in document units, so an unsuffixed
+    # "177.8" would evaluate as inches and blow the part up 25.4x. Signed-position
+    # globals (SZ0, FootRailX0, BoltHoleZ*) hold the local coordinate WITH sign;
+    # the dims they drive are unsigned distances from the origin, so the drive
+    # expressions below negate them where the coordinate is negative.
+    await set_global(adapter, "TotalHeight", f"{TOTAL_HEIGHT}mm")
+    await set_global(adapter, "NBaseX", f"{N_BASE_X}mm")
+    await set_global(adapter, "NTopX", f"{N_TOP_X}mm")
+    await set_global(adapter, "NBaseZ", f"{N_BASE_Z}mm")
+    await set_global(adapter, "NTopZ", f"{N_TOP_Z}mm")
+    await set_global(adapter, "SFootHalfX", f"{S_FOOT_HALF_X}mm")
+    await set_global(adapter, "SApexHalfX", f"{S_APEX_HALF_X}mm")
+    await set_global(adapter, "SZ0", f"{S_Z0}mm")
+    await set_global(adapter, "EarHalfGap", f"{EAR_HALF_GAP}mm")
+    await set_global(adapter, "EarHalfZ", f"{EAR_HALF_Z}mm")
+    await set_global(adapter, "EarHeight", f"{EAR_HEIGHT}mm")
+    await set_global(adapter, "SaddleY0", f"{SADDLE_Y0}mm")
+    await set_global(adapter, "TopRailHalfX", f"{TOP_RAIL_HALF_X}mm")
+    await set_global(adapter, "TopRailDepthY", f"{TOP_RAIL_DEPTH_Y}mm")
+    await set_global(adapter, "FootRailX0", f"{FOOT_RAIL_X[0]}mm")
+    await set_global(adapter, "FootRailX1", f"{FOOT_RAIL_X[1]}mm")
+    await set_global(adapter, "FootRailH", f"{FOOT_RAIL_H}mm")
+    await set_global(adapter, "MountingHoleDia", f"{MOUNTING_HOLE_DIA}mm")
+    await set_global(adapter, "MountingHoleSpacing", f"{MOUNTING_HOLE_SPACING}mm")
+    await set_global(adapter, "MountingHoleDepth", f"{MOUNTING_HOLE_DEPTH}mm")
+    await set_global(adapter, "BoltHoleDia", f"{BOLT_HOLE_DIA}mm")
+    await set_global(adapter, "BoltHoleX", f"{BOLT_HOLE_X}mm")
+    await set_global(adapter, "BoltHoleZ0", f"{BOLT_HOLE_Z[0]}mm")
+    await set_global(adapter, "BoltHoleZ1", f"{BOLT_HOLE_Z[1]}mm")
+
+    # Each sketch records its dim names + drive equations inline as the define_*
+    # helper emits them (a per-sketch SketchDims); drive equations are collected
+    # here and applied in one deferred batch at the end, after the whole model +
+    # a rebuild exists so every equation target resolves.
+    drive_jobs: list[tuple[str, str]] = []
+
     # ============ north upright: trapezoid slab (Z taper), mid-plane X ========
+    n_trap = SketchDims()
     check("create_sketch n-trapezoid", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     trapezoid_pts = [
@@ -153,19 +198,36 @@ async def build(adapter) -> dict[str, str]:
     ]
     lines = await add_line_chain(adapter, trapezoid_pts)
     set_sketch_direct_db(adapter, False)
-    await define_polygon_chain(adapter, lines, trapezoid_pts, label="n-trapezoid")
+    # Emission (anchor vertex 0 at (-NBaseZ/2, 0), on the X axis = 1 anchor dim;
+    # skip segment 3): V0z, S0dx (base width), S1dx + S1dy (taper run + rise),
+    # S2dx (apex width) -- 5 dims.
+    await define_polygon_chain(
+        adapter, lines, trapezoid_pts, label="n-trapezoid", dims=n_trap,
+        names=["NTrapV0z", "NTrapBaseZ", "NTrapTaperZ", "NTrapHeight", "NTrapTopZ"],
+        drives=[
+            '"NBaseZ" / 2',
+            '"NBaseZ"',
+            '("NBaseZ" - "NTopZ") / 2',
+            '"TotalHeight"',
+            '"NTopZ"',
+        ],
+    )
     await ensure_fully_defined(adapter, "n-trapezoid sketch")
     check("exit_sketch n-trapezoid", await adapter.exit_sketch())
+    name_last_feature(adapter, "NTrapProfile")
+    drive_jobs += n_trap.apply(adapter, "NTrapProfile")
     check(
         "extrude n-trapezoid",
         await adapter.create_extrusion(
             ExtrusionParameters(depth=N_BASE_X, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "NTrapSlab")
     v_slab = (N_BASE_Z + N_TOP_Z) / 2.0 * TOTAL_HEIGHT * N_BASE_X
     expected = await volume_check(adapter, "n-trapezoid slab", v_slab, 0.005 * v_slab)
 
     # X taper: two Front-plane wedge cuts (mapping (x, y) -> (X, Y) is exact).
+    n_wedges = SketchDims()
     check("create_sketch n-wedges", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     margin = 15.0
@@ -184,22 +246,39 @@ async def build(adapter) -> dict[str, str]:
     left = await add_line_chain(adapter, left_pts)
     right = await add_line_chain(adapter, right_pts)
     set_sketch_direct_db(adapter, False)
-    await define_polygon_chain(adapter, left, left_pts, label="left wedge")
-    await define_polygon_chain(adapter, right, right_pts, label="right wedge")
+    # Both wedges share this sketch's SketchDims. Per wedge (anchor at the base
+    # corner on the X axis = 1 dim; skip segment 3): V0x, S0dx + S0dy (taper
+    # run + rise), S1dx (top run, depends on the local cut margin -> no knob,
+    # left None/static), S2dy (vertical back edge). 5 dims each, 10 total.
+    _taper_run = '("NBaseX" - "NTopX") / 2'
+    await define_polygon_chain(
+        adapter, left, left_pts, label="left wedge", dims=n_wedges,
+        names=["LWedgeV0x", "LWedgeRun", "LWedgeRise", None, "LWedgeBack"],
+        drives=['"NBaseX" / 2', _taper_run, '"TotalHeight"', None, '"TotalHeight"'],
+    )
+    await define_polygon_chain(
+        adapter, right, right_pts, label="right wedge", dims=n_wedges,
+        names=["RWedgeV0x", "RWedgeRun", "RWedgeRise", None, "RWedgeBack"],
+        drives=['"NBaseX" / 2', _taper_run, '"TotalHeight"', None, '"TotalHeight"'],
+    )
     await ensure_fully_defined(adapter, "n-wedges sketch")
     check("exit_sketch n-wedges", await adapter.exit_sketch())
+    name_last_feature(adapter, "NWedgeProfile")
+    drive_jobs += n_wedges.apply(adapter, "NWedgeProfile")
     check(
         "cut n-wedges",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=WEDGE_CUT_DEPTH, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "NWedgeCut")
     expected = await volume_check(
         adapter, "north frustum", _n_frustum_volume(), 0.005 * _n_frustum_volume()
     )
 
     # ============ south upright: tapered plate (Front sketch, +Z offset) =======
     # Trapezoid in (x, y); offset-extruded along local +z to the plate band.
+    s_plate_dims = SketchDims()
     check("create_sketch s-plate", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     plate_pts = [
@@ -210,11 +289,27 @@ async def build(adapter) -> dict[str, str]:
     ]
     plate = await add_line_chain(adapter, plate_pts)
     set_sketch_direct_db(adapter, False)
-    await define_polygon_chain(adapter, plate, plate_pts, label="s-plate")
+    # Emission (anchor vertex 0 at (-SFootHalfX, 0), on the X axis = 1 dim; skip
+    # segment 3): V0x, S0dx (foot width), S1dx + S1dy (taper run + rise), S2dx
+    # (apex width) -- 5 dims.
+    await define_polygon_chain(
+        adapter, plate, plate_pts, label="s-plate", dims=s_plate_dims,
+        names=["SPlateV0x", "SPlateFootX", "SPlateTaperX", "SPlateHeight", "SPlateApexX"],
+        drives=[
+            '"SFootHalfX"',
+            '"SFootHalfX" * 2',
+            '"SFootHalfX" - "SApexHalfX"',
+            '"TotalHeight"',
+            '"SApexHalfX" * 2',
+        ],
+    )
     await ensure_fully_defined(adapter, "s-plate sketch")
     check("exit_sketch s-plate", await adapter.exit_sketch())
+    name_last_feature(adapter, "SPlateProfile")
+    drive_jobs += s_plate_dims.apply(adapter, "SPlateProfile")
     plate_t = S_PLATE_Z[1] - S_PLATE_Z[0]
     extrude_at_offset(adapter, plate_t, S_PLATE_Z[0])
+    name_last_feature(adapter, "SPlate")
     foot_w = 2.0 * S_FOOT_HALF_X
     apex_w = 2.0 * S_APEX_HALF_X
     v_plate = (foot_w + apex_w) / 2.0 * SEAT_Y * plate_t
@@ -226,6 +321,7 @@ async def build(adapter) -> dict[str, str]:
     # global (X, -Z), so sketch-y = -local-z: the clevis spans local z S_Z0 +-
     # EAR_HALF_Z -> sketch-y = -S_Z0 +- EAR_HALF_Z.
     sy_clevis = -S_Z0  # 212.6
+    saddle_dims = SketchDims()
     check("create_sketch saddle", await adapter.create_sketch("Top"))
     saddle_rect = [
         (-S_APEX_HALF_X, sy_clevis - EAR_HALF_Z),
@@ -234,10 +330,26 @@ async def build(adapter) -> dict[str, str]:
         (-S_APEX_HALF_X, sy_clevis + EAR_HALF_Z),
     ]
     saddle = await add_line_chain(adapter, saddle_rect)
-    await define_rectilinear_chain(adapter, saddle, saddle_rect, label="saddle")
+    # Emission (segment dims first, then the anchor at vertex 0): width (apex X
+    # span), depth (clevis Z thickness = 2*EarHalfZ), then anchor X + anchor Y.
+    # The anchor lands at sketch-y = sy_clevis - EarHalfZ = -SZ0 - EarHalfZ (a
+    # positive distance from the origin; SZ0 is negative so it is negated).
+    await define_rectilinear_chain(
+        adapter, saddle, saddle_rect, label="saddle", dims=saddle_dims,
+        names=["SaddleWidth", "SaddleDepth", "SaddleAnchorX", "SaddleAnchorY"],
+        drives=[
+            '"SApexHalfX" * 2',
+            '"EarHalfZ" * 2',
+            '"SApexHalfX"',
+            '-"SZ0" - "EarHalfZ"',
+        ],
+    )
     await ensure_fully_defined(adapter, "saddle sketch")
     check("exit_sketch saddle", await adapter.exit_sketch())
+    name_last_feature(adapter, "SaddleProfile")
+    drive_jobs += saddle_dims.apply(adapter, "SaddleProfile")
     extrude_at_offset(adapter, SEAT_Y - SADDLE_Y0, SADDLE_Y0)
+    name_last_feature(adapter, "Saddle")
     # Plate overlap inside the saddle z-band (plate z S_PLATE_Z vs clevis +-EAR).
     plate_in_saddle = min(S_PLATE_Z[1], S_Z0 + EAR_HALF_Z) - max(
         S_PLATE_Z[0], S_Z0 - EAR_HALF_Z
@@ -247,8 +359,15 @@ async def build(adapter) -> dict[str, str]:
     expected = await volume_check(adapter, "saddle", expected, 0.02 * v_saddle)
 
     # Clevis ears flanking the south ball-mount base (Top sketch, offset up).
+    # Both ears share this sketch's SketchDims. Per ear (segment dims then anchor):
+    # width (apex X span), depth (gap->edge = EarHalfZ - EarHalfGap), anchor X,
+    # anchor Y (= -SZ0 +- EarHalfGap, the inner edge; SZ0 negative so negated).
+    ears_dims = SketchDims()
     check("create_sketch ears", await adapter.create_sketch("Top"))
-    for label, side in (("south ear", 1.0), ("north ear", -1.0)):
+    for label, side, prefix, anchor_y_drive in (
+        ("south ear", 1.0, "SEar", '-"SZ0" + "EarHalfGap"'),
+        ("north ear", -1.0, "NEar", '-"SZ0" - "EarHalfGap"'),
+    ):
         ear_rect = [
             (-S_APEX_HALF_X, sy_clevis + side * EAR_HALF_GAP),
             (S_APEX_HALF_X, sy_clevis + side * EAR_HALF_GAP),
@@ -256,10 +375,23 @@ async def build(adapter) -> dict[str, str]:
             (-S_APEX_HALF_X, sy_clevis + side * EAR_HALF_Z),
         ]
         ear = await add_line_chain(adapter, ear_rect)
-        await define_rectilinear_chain(adapter, ear, ear_rect, label=label)
+        await define_rectilinear_chain(
+            adapter, ear, ear_rect, label=label, dims=ears_dims,
+            names=[f"{prefix}Width", f"{prefix}Depth", f"{prefix}AnchorX",
+                   f"{prefix}AnchorY"],
+            drives=[
+                '"SApexHalfX" * 2',
+                '"EarHalfZ" - "EarHalfGap"',
+                '"SApexHalfX"',
+                anchor_y_drive,
+            ],
+        )
     await ensure_fully_defined(adapter, "ears sketch")
     check("exit_sketch ears", await adapter.exit_sketch())
+    name_last_feature(adapter, "EarsProfile")
+    drive_jobs += ears_dims.apply(adapter, "EarsProfile")
     extrude_at_offset(adapter, EAR_HEIGHT, SEAT_Y)
+    name_last_feature(adapter, "ClevisEars")
     v_ears = 2.0 * apex_w * (EAR_HALF_Z - EAR_HALF_GAP) * EAR_HEIGHT
     expected += v_ears
     expected = await volume_check(adapter, "clevis ears", expected, 0.02 * v_ears)
@@ -268,6 +400,7 @@ async def build(adapter) -> dict[str, str]:
     # Front-plane section, offset-extruded along local -z (toward the north
     # frustum). Spans z [S_BACK_Z_FACE, N_APEX_Z_FACE] with RAIL_OVERLAP into
     # each end so the two uprights fuse into one body.
+    top_rail_dims = SketchDims()
     check("create_sketch top rail", await adapter.create_sketch("Front"))
     top_rail_rect = [
         (-TOP_RAIL_HALF_X, SEAT_Y - TOP_RAIL_DEPTH_Y),
@@ -276,12 +409,27 @@ async def build(adapter) -> dict[str, str]:
         (-TOP_RAIL_HALF_X, SEAT_Y),
     ]
     top_rail = await add_line_chain(adapter, top_rail_rect)
-    await define_rectilinear_chain(adapter, top_rail, top_rail_rect, label="top rail")
+    # Emission: width (X span = 2*TopRailHalfX), depth (Y = TopRailDepthY), then
+    # anchor X + anchor Y. Anchor at sketch-y = SEAT_Y - TopRailDepthY (the
+    # window-top edge under the ball seats).
+    await define_rectilinear_chain(
+        adapter, top_rail, top_rail_rect, label="top rail", dims=top_rail_dims,
+        names=["TopRailWidth", "TopRailDepth", "TopRailAnchorX", "TopRailAnchorY"],
+        drives=[
+            '"TopRailHalfX" * 2',
+            '"TopRailDepthY"',
+            '"TopRailHalfX"',
+            '"TotalHeight" - "TopRailDepthY"',
+        ],
+    )
     await ensure_fully_defined(adapter, "top rail sketch")
     check("exit_sketch top rail", await adapter.exit_sketch())
+    name_last_feature(adapter, "TopRailProfile")
+    drive_jobs += top_rail_dims.apply(adapter, "TopRailProfile")
     top_z0 = S_BACK_Z_FACE - RAIL_OVERLAP  # -202.6
     top_z1 = N_APEX_Z_FACE + RAIL_OVERLAP  # -8.0
     extrude_at_offset(adapter, top_z1 - top_z0, top_z0)
+    name_last_feature(adapter, "TopRail")
     top_box = 2.0 * TOP_RAIL_HALF_X * TOP_RAIL_DEPTH_Y * (top_z1 - top_z0)
     top_overlap = 2.0 * TOP_RAIL_HALF_X * TOP_RAIL_DEPTH_Y * 2.0 * RAIL_OVERLAP
     expected += top_box - top_overlap
@@ -290,6 +438,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # ============ foot rail: south plate back -> north base face ==============
+    foot_rail_dims = SketchDims()
     check("create_sketch foot rail", await adapter.create_sketch("Front"))
     foot_rail_rect = [
         (FOOT_RAIL_X[0], 0.0),
@@ -298,12 +447,26 @@ async def build(adapter) -> dict[str, str]:
         (FOOT_RAIL_X[0], FOOT_RAIL_H),
     ]
     foot_rail = await add_line_chain(adapter, foot_rail_rect)
-    await define_rectilinear_chain(adapter, foot_rail, foot_rail_rect, label="foot rail")
+    # Emission: width (X span = FootRailX1 - FootRailX0), depth (Y = FootRailH),
+    # then anchor X (anchor on the X axis = 1 dim; FootRailX0 is negative so the
+    # unsigned distance dim negates it). No anchor-Y dim (vertex 0 is on the axis).
+    await define_rectilinear_chain(
+        adapter, foot_rail, foot_rail_rect, label="foot rail", dims=foot_rail_dims,
+        names=["FootRailWidth", "FootRailDepth", "FootRailAnchorX"],
+        drives=[
+            '"FootRailX1" - "FootRailX0"',
+            '"FootRailH"',
+            '-"FootRailX0"',
+        ],
+    )
     await ensure_fully_defined(adapter, "foot rail sketch")
     check("exit_sketch foot rail", await adapter.exit_sketch())
+    name_last_feature(adapter, "FootRailProfile")
+    drive_jobs += foot_rail_dims.apply(adapter, "FootRailProfile")
     foot_z0 = S_BACK_Z_FACE - RAIL_OVERLAP  # -202.6
     foot_z1 = N_BASE_Z_FACE + RAIL_OVERLAP  # -18.0
     extrude_at_offset(adapter, foot_z1 - foot_z0, foot_z0)
+    name_last_feature(adapter, "FootRail")
     foot_rail_w = FOOT_RAIL_X[1] - FOOT_RAIL_X[0]
     foot_box = foot_rail_w * FOOT_RAIL_H * (foot_z1 - foot_z0)
     foot_overlap = foot_rail_w * FOOT_RAIL_H * 2.0 * RAIL_OVERLAP
@@ -322,21 +485,33 @@ async def build(adapter) -> dict[str, str]:
     log(f"merge gate: single solid body confirmed ({n_bodies})")
 
     # ============ north hold-down sockets (up from the base underside) ========
+    # On-axis circles (z 0): only centre-X + diameter are dims (2 each). The two
+    # sockets sit at +-MountingHoleSpacing/2; the unsigned X dim is the half-pitch.
+    holes_dims = SketchDims()
     check("create_sketch holes", await adapter.create_sketch("Top"))
     await define_circle(
-        adapter, -MOUNTING_HOLE_SPACING / 2.0, 0.0, MOUNTING_HOLE_DIA / 2.0, "hole L"
+        adapter, -MOUNTING_HOLE_SPACING / 2.0, 0.0, MOUNTING_HOLE_DIA / 2.0, "hole L",
+        dims=holes_dims,
+        names=("HoleLX", "HoleLZ", "HoleLDia"),
+        drives=('"MountingHoleSpacing" / 2', None, '"MountingHoleDia"'),
     )
     await define_circle(
-        adapter, MOUNTING_HOLE_SPACING / 2.0, 0.0, MOUNTING_HOLE_DIA / 2.0, "hole R"
+        adapter, MOUNTING_HOLE_SPACING / 2.0, 0.0, MOUNTING_HOLE_DIA / 2.0, "hole R",
+        dims=holes_dims,
+        names=("HoleRX", "HoleRZ", "HoleRDia"),
+        drives=('"MountingHoleSpacing" / 2', None, '"MountingHoleDia"'),
     )
     await ensure_fully_defined(adapter, "holes sketch")
     check("exit_sketch holes", await adapter.exit_sketch())
+    name_last_feature(adapter, "MountingHolesProfile")
+    drive_jobs += holes_dims.apply(adapter, "MountingHolesProfile")
     check(
         "cut mounting holes",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=HOLE_CUT_DEPTH, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "MountingHoles")
     v_holes = 2.0 * math.pi * (MOUNTING_HOLE_DIA / 2.0) ** 2 * MOUNTING_HOLE_DEPTH
     expected -= v_holes
     expected = await volume_check(
@@ -344,22 +519,45 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # ============ foot-rail hold-down bolt holes (Top sketch -> X, -Z) ========
+    # Off-axis circles (both centre coords non-zero): 3 dims each -- centre X,
+    # centre Z (= -z, the unsigned distance from the origin; the signed BoltHoleZ*
+    # globals are negative, so the drive negates them), then diameter.
+    bolt_holes_dims = SketchDims()
     check("create_sketch bolt holes", await adapter.create_sketch("Top"))
-    for z in BOLT_HOLE_Z:
+    for z, z_global in zip(BOLT_HOLE_Z, ("BoltHoleZ0", "BoltHoleZ1"), strict=True):
         await define_circle(
-            adapter, BOLT_HOLE_X, -z, BOLT_HOLE_DIA / 2.0, f"bolt hole z{z:.0f}"
+            adapter, BOLT_HOLE_X, -z, BOLT_HOLE_DIA / 2.0, f"bolt hole z{z:.0f}",
+            dims=bolt_holes_dims,
+            names=(f"BoltHoleX{z:.0f}", f"BoltHoleZ{z:.0f}", f"BoltHoleDia{z:.0f}"),
+            drives=('"BoltHoleX"', f'-"{z_global}"', '"BoltHoleDia"'),
         )
     await ensure_fully_defined(adapter, "bolt holes sketch")
     check("exit_sketch bolt holes", await adapter.exit_sketch())
+    name_last_feature(adapter, "BoltHolesProfile")
+    drive_jobs += bolt_holes_dims.apply(adapter, "BoltHolesProfile")
     check(
         "cut bolt holes",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=3.0 * FOOT_RAIL_H, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "BoltHoles")
     v_bolts = 2.0 * math.pi * (BOLT_HOLE_DIA / 2.0) ** 2 * FOOT_RAIL_H
     expected -= v_bolts
-    await volume_check(adapter, "foot-rail bolt holes", expected, 0.02 * v_bolts)
+    expected = await volume_check(
+        adapter, "foot-rail bolt holes", expected, 0.02 * v_bolts
+    )
+
+    # Apply the deferred drive equations now -- after the whole model + a rebuild
+    # exists, so every target resolves. Each equation evaluates to the value just
+    # built, so the geometry must not move -- the re-check below is the proof.
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(
+        adapter, "driven rocker-arm-portal (equations neutral)", expected, 0.02 * v_bolts
+    )
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)

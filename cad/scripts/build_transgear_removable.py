@@ -33,17 +33,26 @@ import sys
 from _common import (
     IN,
     OUT_PNG,
+    SketchDims,
     add_line_chain,
     apply_material,
     check,
     define_circle,
+    drive_dimension,
     ensure_fully_defined,
-    feature_name_by_type,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
     set_sketch_direct_db,
 )
+# ``set_global`` is imported from _common under a distinct name: the gear-math
+# globals below use build_cone_gear's stricter 4-arg ``set_global`` (asserts the
+# round-tripped value to test the equation-parser dialect), while the plain
+# length knobs added for the self-naming conversion use _common's mm-suffixing
+# 3-arg upsert. Keeping both avoids touching the validated involute math.
+from _common import set_global as set_global_mm
 from build_cone_gear import (
     PI_LIT,
     equation_curve,
@@ -138,11 +147,27 @@ async def build(adapter) -> dict[str, str]:
         facts["ThetaU"],
     )
 
+    # Plain length knobs for the config-independent geometry (blank face width +
+    # the mounting interface). mm suffix is load-bearing -- this is an INCH
+    # document, so a bare number would be read as inches and blow the part up
+    # 25.4x. The blank's RADIAL extent is NOT a knob here: it is config-driven by
+    # the "Ra" equation link below, so only the (constant) face width is exposed.
+    await set_global_mm(adapter, "FaceWidth", f"{FACE_WIDTH}mm")
+    await set_global_mm(adapter, "BoreDia", f"{BORE_DIAMETER}mm")
+    await set_global_mm(adapter, "PinHoleDia", f"{PIN_HOLE_DIAMETER}mm")
+    await set_global_mm(adapter, "PinCircleRadius", f"{PIN_CIRCLE_RADIUS}mm")
+
+    # Drive equations are recorded per sketch as the dims are created and applied
+    # in one deferred batch once the whole single-config model exists (every
+    # equation target must resolve against a finished, rebuilt model).
+    drive_jobs: list[tuple[str, str]] = []
+
     # ------------------------------------------------------------------
     # Blank: revolved dimensioned rectangle, radial dim equation-linked to
     # "Ra" (the canonical configuration pattern from build_cone_gear).
     # ------------------------------------------------------------------
     ra_default_mm = facts["Ra"] * IN
+    blank = SketchDims()
     check("create_sketch blank", await adapter.create_sketch("Top"))
     blank_lines = await add_line_chain(
         adapter,
@@ -165,10 +190,15 @@ async def build(adapter) -> dict[str, str]:
         "blank radial dim (D1)",
         await adapter.add_sketch_dimension(radial_line, None, "linear", ra_default_mm),
     )
+    # Record in creation order. The radial dim is left UNDRIVEN here (drive None):
+    # it is bound to the config-driving "Ra" global by the explicit create_equation
+    # block below, so adding it to drive_jobs would double-drive it.
+    blank.record("BlankRadial", None)
     check(
         "blank width dim (D2)",
         await adapter.add_sketch_dimension(side_line, None, "linear", FACE_WIDTH),
     )
+    blank.record("BlankWidth", '"FaceWidth"')
     # Pin the (0, 0) corner to the origin explicitly. The h/v relations + the
     # two dims fix the rectangle's shape but not its position; previously the
     # corner was only located by SolidWorks snapping it onto the origin during
@@ -186,11 +216,13 @@ async def build(adapter) -> dict[str, str]:
     set_sketch_direct_db(adapter, False)
     await ensure_fully_defined(adapter, "blank sketch")
     check("exit_sketch blank", await adapter.exit_sketch())
-    blank_sketch = feature_name_by_type(adapter, "ProfileFeature")
+    blank_sketch = name_last_feature(adapter, "BlankProfile")
+    drive_jobs += blank.apply(adapter, blank_sketch)
     check(
         "revolve blank",
         await adapter.create_revolve(RevolveParameters(angle=360.0)),
     )
+    name_last_feature(adapter, "Blank")
 
     mass = await adapter.get_mass_properties()
     if not mass.is_success:
@@ -208,7 +240,9 @@ async def build(adapter) -> dict[str, str]:
         )
     print(f"  OK  blank volume {blank_volume:.1f} mm^3 (com z {com_z:.2f})")
 
-    radial_dim = f"D1@{blank_sketch}"
+    # The radial dim was renamed D1 -> BlankRadial by blank.apply above, so the
+    # captured auto-name "D1@..." would be stale -- reference the new name.
+    radial_dim = f"BlankRadial@{blank_sketch}"
     before = read_dimension(adapter, radial_dim)
     if abs(before - facts["Ra"]) < 1e-6 * facts["Ra"]:
         dim_unit = 1.0
@@ -280,6 +314,11 @@ async def build(adapter) -> dict[str, str]:
         adapter, "gap sketch", fix_entities=gap_curves, allow_fix_escalation=True
     )
     check("exit_sketch gap", await adapter.exit_sketch())
+    # GEAR-MESHING SKETCH: name only, no SketchDims. The six curves are
+    # equation-driven (they carry no display dimensions to record), and pinning
+    # static dims on them would break the per-configuration re-solve that makes
+    # the teeth mesh -- so the tooth-gap profile is named but never driven here.
+    name_last_feature(adapter, "ToothGapProfile")
     gap_cut = await adapter.create_cut_extrude(
         ExtrusionParameters(depth=FACE_WIDTH + 1.0)
     )
@@ -347,26 +386,68 @@ async def build(adapter) -> dict[str, str]:
     # Mounting interface (config-independent, after the pattern): bore +
     # two drive-pin holes on the +/-X axis.
     # ------------------------------------------------------------------
+    bore_pins = SketchDims()
     check("create_sketch bore+pins", await adapter.create_sketch("Front"))
     # Direct-to-DB: the on-axis-revolved blank leaves its seam edge along +X
     # on this face, exactly under the pin centres -- creation-time inference
     # snaps the circles to it and the auto-relation then makes every driving
     # point-pair dim fail (diag_onaxis_pin.py scenarios G/H vs I).
     set_sketch_direct_db(adapter, True)
-    await define_circle(adapter, 0.0, 0.0, BORE_DIAMETER / 2.0, "bore")
+    # Emission order per circle = its non-zero centre coords (x if x!=0, z if
+    # y!=0) THEN diameter. Bore is on-origin -> diameter only. Both pins sit on
+    # the +/-X axis (y=0) -> one centre-X dim each, then diameter. The -X pin's
+    # centre dim is an UNSIGNED distance (displays 9.5), so it drives to the
+    # POSITIVE "PinCircleRadius" -- not its signed -9.5 coordinate.
     await define_circle(
-        adapter, PIN_CIRCLE_RADIUS, 0.0, PIN_HOLE_DIAMETER / 2.0, "pin hole +X"
+        adapter, 0.0, 0.0, BORE_DIAMETER / 2.0, "bore", dims=bore_pins,
+        names=("BoreCx", "BoreCz", "BoreDiaDim"),
+        drives=(None, None, '"BoreDia"'),
     )
     await define_circle(
-        adapter, -PIN_CIRCLE_RADIUS, 0.0, PIN_HOLE_DIAMETER / 2.0, "pin hole -X"
+        adapter, PIN_CIRCLE_RADIUS, 0.0, PIN_HOLE_DIAMETER / 2.0, "pin hole +X",
+        dims=bore_pins,
+        names=("PinPosX", "PinPosZ", "PinPosDia"),
+        drives=('"PinCircleRadius"', None, '"PinHoleDia"'),
+    )
+    await define_circle(
+        adapter, -PIN_CIRCLE_RADIUS, 0.0, PIN_HOLE_DIAMETER / 2.0, "pin hole -X",
+        dims=bore_pins,
+        names=("PinNegX", "PinNegZ", "PinNegDia"),
+        drives=('"PinCircleRadius"', None, '"PinHoleDia"'),
     )
     set_sketch_direct_db(adapter, False)
     await ensure_fully_defined(adapter, "bore+pins sketch")
     check("exit_sketch bore+pins", await adapter.exit_sketch())
+    name_last_feature(adapter, "BorePinsProfile")
+    drive_jobs += bore_pins.apply(adapter, "BorePinsProfile")
     check(
         "cut bore+pins",
         await adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH + 2.0)),
     )
+    name_last_feature(adapter, "BorePinsCut")
+
+    # ------------------------------------------------------------------
+    # Deferred drive batch + neutrality re-check (still at DEFAULT_TEETH, no
+    # configs yet): apply every recorded equation after a rebuild, then confirm
+    # the single-config geometry did not move (each equation evaluates to its
+    # as-built value). Done BEFORE configurations are spun up so the neutral
+    # baseline is the un-driven default the per-config checks already trust.
+    # ------------------------------------------------------------------
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    mass = await adapter.get_mass_properties()
+    if not mass.is_success:
+        raise RuntimeError(f"post-drive mass properties failed: {mass.error}")
+    driven = float(mass.data.volume)
+    expected_driven = expected_volume(DEFAULT_TEETH)
+    if abs(driven - expected_driven) > 0.01 * expected_driven:
+        raise RuntimeError(
+            f"driven part volume {driven:.1f} mm^3, analytic {expected_driven:.1f} "
+            "-- drive equations are not geometry-neutral"
+        )
+    print(f"  OK  driven part volume {driven:.1f} (equations neutral, analytic {expected_driven:.1f})")
 
     await apply_material(adapter, MATERIAL)
 
