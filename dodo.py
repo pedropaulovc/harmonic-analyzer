@@ -413,7 +413,7 @@ RELEASE_PY = (SCRIPTS_DIR / "cut_release.py").resolve()
 # verify:/check: task names (reused by build + release so a new gate is wired in
 # one place).
 _VERIFY_NAMES = ("soundness", "subsystems", "kinematics")   # need SW (spine)
-_CHECK_NAMES = ("math", "config", "graph", "nameplate", "recipe", "cache")  # offline
+_CHECK_NAMES = ("math", "config", "graph", "nameplate", "recipe", "cache", "telemetry")  # offline
 
 
 def _run_stamped(cmd: list[str], label: str, stamp: str) -> None:
@@ -838,6 +838,15 @@ def task_check():
             "file_dep": [str((SCRIPTS_DIR / "_artifact_cache.py").resolve()),
                          str((SCRIPTS_DIR / "test_artifact_cache.py").resolve())],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_artifact_cache.py")],
+        },
+        "telemetry": {
+            # The OTel observability spine: severity split, no-gap span status,
+            # log<->trace correlation, cross-process propagation. Pure python, so
+            # it runs as an offline gate -- without this the spine could regress
+            # while the required checks stay green.
+            "file_dep": [str((SCRIPTS_DIR / "_telemetry.py").resolve()),
+                         str((SCRIPTS_DIR / "test_telemetry.py").resolve())],
+            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_telemetry.py")],
         },
     }
     for name, spec in specs.items():
