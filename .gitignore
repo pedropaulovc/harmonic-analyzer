@@ -357,6 +357,8 @@ download/
 
 # Generated verify.py reports + doit gate stamps (rebuild with `doit build`)
 cad/out/reports/
+# Per-task build/verify logs teed by dodo.py:_run (shipped in a release bundle)
+cad/out/logs/
 
 # Offline-render cache (regenerable: cad/scripts/export_models.py;
 # the assembly STL alone is >100 MB — over GitHub's file limit)
