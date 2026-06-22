@@ -26,13 +26,17 @@ What it does, in order:
      Everything is staged and zipped into ONE bundle
      ``cad/out/release/harmonic-analyzer-<version>.zip`` (``solidworks/`` native +
      ``step/`` + ``stl/`` + ``boxes/`` + ``png/`` + ``diff/``). Records the SW
-     revision.
+     revision. (Build logs ship as a SEPARATE logs asset, not in this zip.)
   4. diff: render the changed-parts highlight (this staged bundle vs the previous
      release, fetched from GitHub) into ``stage/diff`` so it ships in the zip.
   5. git: annotated tag at HEAD, pushed to origin.
   6. gh: create the GitHub release for the tag (auto-generated notes header + our
-     provenance block + an inline changed-parts gallery) and upload the bundle
-     plus the diff PNGs as release assets.
+     provenance block + an inline changed-parts gallery) and upload the bundle,
+     the diff PNGs, and a LOGS asset -- the per-task build logs (``cad/out/logs``,
+     teed by dodo.py) plus this run's ``*-release.log``, zipped into
+     ``<top>-<version>-logs.zip`` when there are several (a lone log goes up
+     as-is). ``--no-publish`` runs everything EXCEPT this step (no git tag/push,
+     no gh) and just reports the assets it would have uploaded.
 
 Run (SolidWorks already open, NOTHING else driving it -- single STA COM server,
 a concurrent build_all/verify deadlocks):
@@ -54,6 +58,7 @@ import subprocess
 import sys
 import time
 import traceback
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -62,6 +67,11 @@ from _common import CAD_ROOT, OUT_SLDASM, OUT_SLDPRT, log
 REPO_ROOT = CAD_ROOT.parent
 TOP_ASSEMBLY = "harmonic-analyzer"
 RELEASE_DIR = CAD_ROOT / "out" / "release"
+# Per-task build/verify logs teed by dodo.py:_run (part-*, assembly-*, verify-*,
+# check-*). Shipped as a SEPARATE GitHub-release LOGS asset (zipped together with
+# this script's own *-release.log when there are several) -- see _logs_asset. Kept
+# OUT of the main CAD bundle so they aren't buried in a 100s-of-MB zip.
+LOGS_DIR = CAD_ROOT / "out" / "logs"
 # Geometry-diff renderer (offscreen pyvista, isolated PEP-723 deps via `uv run`):
 # highlights parts whose geometry changed vs the previous release. No SolidWorks.
 RENDER_DIFF = REPO_ROOT / "comparisons" / "tools" / "render_diff.py"
@@ -721,7 +731,8 @@ def bundle(sw: Any, revision: str, version: str,
     facts["diff"] = render_diff(stage, prev_tag) if prev_tag else None
 
     # 5. Provenance manifest LAST -- it hashes everything staged above, so it must
-    #    run after the diff is written and before the zip is sealed.
+    #    run after the diff is written and before the zip is sealed. (Build logs
+    #    are NOT staged here: they ship as a separate logs asset, see _logs_asset.)
     facts["provenance"] = write_provenance(stage, version, revision, facts)
 
     # 6. One zip of the whole stage.
@@ -799,6 +810,9 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         + _diff_section(version, facts.get("diff"))
         + "\n**Provenance**\n"
         + _provenance_section(facts)
+        + (f"\n**Logs**: `{facts['logs_asset']}` -- the per-task build logs "
+           f"(parts, assemblies, verify/check gates) plus the full release log -- "
+           f"is attached as a separate asset.\n" if facts.get("logs_asset") else "")
     )
 
 
@@ -828,18 +842,61 @@ def sha_fallback(commit: str) -> str:
     return commit[:7] if commit else _git("rev-parse", "--short", "HEAD")
 
 
-def publish(version: str, zip_path: Path, facts: dict[str, Any], draft: bool) -> str:
+def _logs_asset(version: str, log_path: Path | None) -> Path | None:
+    """The single GitHub-release LOGS asset, or None when there is no log.
+
+    Gathers every per-task build log (``cad/out/logs/*.log``, teed by dodo.py's
+    ``_run``) plus this run's ``*-release.log``. With 2+ logs they are packed into
+    ``<top>-<version>-logs.zip`` -- one tidy asset instead of a scatter of loose
+    files; a lone log is attached as-is. Each build log reflects its task's MOST
+    RECENT run (doit skips up-to-date tasks), so on an incremental release a log
+    may predate this tag.
+    """
+    logs = sorted(LOGS_DIR.glob("*.log")) if LOGS_DIR.exists() else []
+    if log_path is not None and log_path.exists() and log_path not in logs:
+        logs.append(log_path)
+    if not logs:
+        log("logs: none to attach")
+        return None
+    if len(logs) == 1:
+        log(f"logs: 1 file -> attaching loose ({logs[0].name})")
+        return logs[0]
+    zip_path = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}-logs.zip"
+    if zip_path.exists():
+        zip_path.unlink()
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for lg in logs:
+            zf.write(lg, lg.name)
+    log(f"logs: {len(logs)} files -> {zip_path.name} "
+        f"({zip_path.stat().st_size / 1e3:.0f} KB)")
+    return zip_path
+
+
+def _gh_assets(version: str, zip_path: Path, facts: dict[str, Any],
+               log_path: Path | None) -> list[str]:
+    """Asset paths for the release: the CAD bundle, the diff PNGs (embedded in the
+    notes by deterministic download URL), and the LOGS asset. Records the logs
+    asset name in ``facts`` so release_notes can reference it. Building the logs
+    asset here (not in bundle()) keeps the *-release.log as fresh as possible --
+    it is finalized right before the upload."""
+    assets = [str(zip_path)]
+    if facts.get("diff"):
+        assets += [str(p) for p in facts["diff"]["image_paths"]]
+    logs = _logs_asset(version, log_path)
+    if logs is not None:
+        facts["logs_asset"] = logs.name
+        assets.append(str(logs))
+    return assets
+
+
+def publish(version: str, zip_path: Path, facts: dict[str, Any], draft: bool,
+            log_path: Path | None = None) -> str:
     """Annotated tag -> push -> gh release + asset upload. Returns release URL."""
     log(f"tagging {version} at HEAD")
     _git("tag", "-a", version, "-m", f"Release {version}")
     _git("push", "origin", version)
 
-    # Upload the bundle plus the diff PNGs as standalone assets so the notes can
-    # embed them by their (deterministic) release-asset download URLs.
-    assets = [str(zip_path)]
-    if facts.get("diff"):
-        assets += [str(p) for p in facts["diff"]["image_paths"]]
-
+    assets = _gh_assets(version, zip_path, facts, log_path)
     args = [
         "release", "create", version, *assets,
         "--title", f"harmonic-analyzer {version}",
@@ -852,6 +909,65 @@ def publish(version: str, zip_path: Path, facts: dict[str, Any], draft: bool) ->
     return url
 
 
+def report_no_publish(version: str, zip_path: Path, facts: dict[str, Any],
+                      log_path: Path | None = None) -> None:
+    """``--no-publish``: build the assets (incl. the logs zip) and REPORT them.
+    No git tag/push, no gh -- nothing leaves the machine. Used to dry-run a real
+    release (e.g. validate the bundle + logs zip) without publishing."""
+    assets = _gh_assets(version, zip_path, facts, log_path)
+    log("--no-publish: would `gh release create` with these assets (NOT uploaded):")
+    for a in assets:
+        log(f"    asset: {a}")
+    log("release-notes preview follows:")
+    print(release_notes(version, facts), flush=True)
+
+
+# --------------------------------------------------------------------------- #
+# Release log capture (the whole run's output, shipped as a standalone asset)
+# --------------------------------------------------------------------------- #
+class _Tee:
+    """Write-through to several text streams at once (the real console + the
+    release-log file). Flushes every write so a backgrounded release never looks
+    hung and the log file is already current when ``gh`` uploads it mid-run."""
+
+    def __init__(self, *streams: Any) -> None:
+        self._streams = streams
+
+    def write(self, data: str) -> int:
+        for s in self._streams:
+            s.write(data)
+            s.flush()
+        return len(data)
+
+    def flush(self) -> None:
+        for s in self._streams:
+            s.flush()
+
+
+def _start_release_log(version: str) -> tuple[Path, Any]:
+    """Tee this run's stdout+stderr into a per-version ``*-release.log`` so the
+    full progress trace (preflight, Pack-and-Go, neutral export, diff render,
+    provenance) ships as a release asset for post-mortems.
+
+    Returns ``(log_path, restore)``; ``restore()`` puts the original streams back
+    and closes the file (call it in a ``finally``). The uploaded copy necessarily
+    stops at the ``gh release create`` that uploads it -- the publish tail and the
+    final summary print after it are not in the asset (they go to the console).
+    """
+    log_path = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}-release.log"
+    fh = log_path.open("w", encoding="utf-8")
+    saved_out, saved_err = sys.stdout, sys.stderr
+    sys.stdout = _Tee(saved_out, fh)
+    sys.stderr = _Tee(saved_err, fh)
+
+    def restore() -> None:
+        sys.stdout, sys.stderr = saved_out, saved_err
+        fh.flush()
+        fh.close()
+
+    return log_path, restore
+
+
 # --------------------------------------------------------------------------- #
 def main() -> int:
     ap = argparse.ArgumentParser(description="Cut a tagged harmonic-analyzer release.")
@@ -862,33 +978,50 @@ def main() -> int:
                     help="tag even with uncommitted (tracked) changes")
     ap.add_argument("--draft", action="store_true",
                     help="create the GitHub release as a draft")
+    ap.add_argument("--no-publish", action="store_true",
+                    help="build the bundle + logs zip but do NOT tag/push/gh "
+                         "(dry run -- nothing leaves the machine)")
     opts = ap.parse_args()
 
     version = resolve_version(opts.version, opts.bump)
-    print(f"==  cutting release {version}", flush=True)
-    preflight(version, opts.allow_dirty)
-
     RELEASE_DIR.mkdir(parents=True, exist_ok=True)
 
-    prev = previous_tag(version)
-    log(f"previous release for diff: {prev or '(none -- first bundle)'}")
-
-    started = time.perf_counter()
+    # Tee everything below to the per-version release log BEFORE preflight, so the
+    # asset captures the whole run (including a preflight bail-out). restore() in
+    # the finally puts the real streams back and closes the file no matter what.
+    log_path, restore = _start_release_log(version)
     try:
-        sw, revision = attach_solidworks()
-        zip_path, facts = bundle(sw, revision, version, prev)
-    except Exception:
-        traceback.print_exc()
-        return 1
+        print(f"==  cutting release {version}", flush=True)
+        preflight(version, opts.allow_dirty)
 
-    url = publish(version, zip_path, facts, opts.draft)
-    print(f"\nDone in {time.perf_counter() - started:.1f}s.", flush=True)
-    print(f"  version: {version}")
-    print(f"  bundle:  {zip_path} ({facts['size_mb']:.1f} MB) -- solidworks/ + "
-          f"{facts['documents']} docs x STEP+STL (+{facts['config_meshes']} "
-          f"per-config) + {facts['pngs']} PNGs + boxes/")
-    print(f"  release: {url}")
-    return 0
+        prev = previous_tag(version)
+        log(f"previous release for diff: {prev or '(none -- first bundle)'}")
+
+        started = time.perf_counter()
+        try:
+            sw, revision = attach_solidworks()
+            zip_path, facts = bundle(sw, revision, version, prev)
+        except Exception:
+            traceback.print_exc()
+            return 1
+
+        if opts.no_publish:
+            report_no_publish(version, zip_path, facts, log_path)
+            url = None
+        else:
+            url = publish(version, zip_path, facts, opts.draft, log_path)
+        print(f"\nDone in {time.perf_counter() - started:.1f}s.", flush=True)
+        print(f"  version: {version}")
+        print(f"  bundle:  {zip_path} ({facts['size_mb']:.1f} MB) -- solidworks/ + "
+              f"{facts['documents']} docs x STEP+STL (+{facts['config_meshes']} "
+              f"per-config) + {facts['pngs']} PNGs + boxes/")
+        print(f"  log:     {log_path}")
+        if facts.get("logs_asset"):
+            print(f"  logs:    {RELEASE_DIR / facts['logs_asset']}")
+        print(f"  release: {url or '(--no-publish: not published)'}")
+        return 0
+    finally:
+        restore()
 
 
 if __name__ == "__main__":
