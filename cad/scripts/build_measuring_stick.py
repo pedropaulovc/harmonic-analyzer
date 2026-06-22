@@ -214,6 +214,10 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=BODY_THICKNESS)),
     )
     name_last_feature(adapter, "Body")
+    # Drive the body's extrude depth from BodyThickness too (D1 is the blind-
+    # extrude depth dim) so the thickness knob is live, not inert. As-built ->
+    # neutral.
+    drive_jobs.append(("D1@Body", '"BodyThickness"'))
 
     # Tick 0 (seed) + linear pattern for ticks 1..10. The seed cut is RENAMED
     # ("Tick0Cut"), so the pattern must seed off the NEW name -- a captured
@@ -237,6 +241,14 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "TickPattern")
+    # Drive the pattern's spacing from DivisionSpacing too. The seed (Tick0) and
+    # half-tick are driven from ScaleStartX (DivisionSpacing-derived), so the
+    # pattern's own spacing dim MUST track DivisionSpacing or ticks 1..10 keep
+    # the old 8 mm pitch and the ruled scale corrupts on a GUI edit (the Codex
+    # P2). The spacing is D3 (verified by dump_dimensions: D1 is the pattern's
+    # ~11000 mm direction-reference length, NOT the pitch); D3 == as-built 8 mm,
+    # so it stays neutral.
+    drive_jobs.append(("D3@TickPattern", '"DivisionSpacing"'))
 
     # The hand-stamped artefact the book calls out: a longer 0.5 tick.
     await _cut_tick(

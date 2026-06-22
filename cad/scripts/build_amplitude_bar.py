@@ -176,6 +176,12 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=BAR_DEPTH)),
     )
     name_last_feature(adapter, "Bar")
+    # Drive the bar's extrude depth from BarDepth too (D1 is the blind-extrude
+    # depth dim). The top-pin cut is driven to BarDepth/2 and the mate axes below
+    # track BarDepth, so the BODY depth must move with them -- otherwise a GUI
+    # edit of BarDepth leaves the hole/axes referencing a thickness the bar no
+    # longer has. Evaluates to the as-built BAR_DEPTH, so it stays neutral.
+    drive_jobs.append(("D1@Bar", '"BarDepth"'))
 
     # Top pin hole: Ø2 along global X through the top-slot cheeks, hanging
     # the bar from the channel lever's bar pin. Right-plane handedness is
@@ -264,11 +270,19 @@ async def build(adapter) -> dict[str, str]:
     # local X, so the axis is (Top + pin_y) ∩ (Front + depth/2); Axis2 = a foot
     # reference axis at the bar bottom (y = 0), an ~806 mm lever arm from the
     # top pin that the assembly spin driver uses to pin the bar's swing.
+    # Tie each axis's offset planes to the same globals that drive the bore/body,
+    # so a GUI edit moves the named axes (and the channel-assembly mates to them)
+    # in lockstep. pin_y = BarLength - TopPinDrop; mid-depth = BarDepth / 2. The
+    # foot axis sits on the Top plane (offset 0, no dim to drive). Each equation
+    # equals the as-built offset, so the placement stays neutral.
     await name_bore_axis(
-        adapter, "Top Plane", pin_y, "Front Plane", BAR_DEPTH / 2.0, "top pin bore"
+        adapter, "Top Plane", pin_y, "Front Plane", BAR_DEPTH / 2.0, "top pin bore",
+        drive_a='"BarLength" - "TopPinDrop"', drive_b='"BarDepth" / 2',
+        drive_jobs=drive_jobs,
     )
     await name_bore_axis(
-        adapter, "Top Plane", 0.0, "Front Plane", BAR_DEPTH / 2.0, "foot axis"
+        adapter, "Top Plane", 0.0, "Front Plane", BAR_DEPTH / 2.0, "foot axis",
+        drive_b='"BarDepth" / 2', drive_jobs=drive_jobs,
     )
 
     # Apply the deferred drive equations now -- after the whole model + a

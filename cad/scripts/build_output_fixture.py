@@ -82,6 +82,11 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=COLLAR_HEIGHT)),
     )
     name_last_feature(adapter, "Collar")
+    # Drive the collar's extrude depth from CollarHeight too (D1 is the blind-
+    # extrude depth dim). The cross hole is driven to CollarHeight/2, so the body
+    # height must move with it or a GUI edit of CollarHeight leaves the hole
+    # off-centre (or outside the collar). Evaluates to as-built -> neutral.
+    drive_jobs.append(("D1@Collar", '"CollarHeight"'))
     v_collar = math.pi * (COLLAR_DIA / 2.0) ** 2 * COLLAR_HEIGHT
     await volume_check(adapter, "collar", v_collar, 0.005 * v_collar)
 
