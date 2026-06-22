@@ -407,7 +407,7 @@ RELEASE_PY = (SCRIPTS_DIR / "cut_release.py").resolve()
 # verify:/check: task names (reused by build + release so a new gate is wired in
 # one place).
 _VERIFY_NAMES = ("soundness", "subsystems", "kinematics")   # need SW (spine)
-_CHECK_NAMES = ("math", "config", "graph", "nameplate", "recipe")  # offline
+_CHECK_NAMES = ("math", "config", "graph", "nameplate", "recipe", "cache")  # offline
 
 
 def _run_stamped(cmd: list[str], label: str, stamp: str) -> None:
@@ -497,15 +497,15 @@ def _assembly_file_deps(stem: str) -> list[str]:
     return [*_recipe_files(stem), *ref_targets]
 
 
-def _cache_key(file_deps: list[str]) -> str:
-    return _cache.cache_key(file_deps, ContentChecker._digest)
+def _cache_key(file_deps: list[str], label: str | None = None) -> str:
+    return _cache.cache_key(file_deps, ContentChecker._digest, label)
 
 
 def _cached_part_action(stem: str, script: Path) -> None:
     """Part action with a remote-cache shortcut: on a HIT the .SLDPRT (+ renders)
     are downloaded and the SolidWorks build is skipped; otherwise build, then push.
     Falls through to a normal build whenever the cache is off or errors."""
-    key = _cache_key(_part_file_deps(script, stem))
+    key = _cache_key(_part_file_deps(script, stem), f"part:{stem}")
     outputs = _part_cache_outputs(stem)
     if _cache.restore(key, outputs, f"part:{stem}"):
         return
@@ -613,7 +613,7 @@ def build_or_refresh(stem, dependencies, changed, targets):
     # COM build/refresh entirely. The recipe sidecar is NOT cached -- its digest
     # tags by absolute path (machine-local) -- so recompute it here, exactly as the
     # success tail does, to keep the next run's FULL/REFRESH decision correct.
-    cache_key = _cache_key(_assembly_file_deps(stem))
+    cache_key = _cache_key(_assembly_file_deps(stem), f"assembly:{stem}")
     cache_outputs = _assembly_cache_outputs(stem)
     if _cache.restore(cache_key, cache_outputs, f"assembly:{stem}"):
         sidecar.parent.mkdir(parents=True, exist_ok=True)
@@ -826,6 +826,13 @@ def task_check():
                          str((SCRIPTS_DIR / "test_dodo_recipe.py").resolve())],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_dodo_recipe.py")],
         },
+        "cache": {
+            # The artefact-cache provenance/observability unit tests (issue #73):
+            # key derivation, event log, store-skip-on-hit drift. Pure python.
+            "file_dep": [str((SCRIPTS_DIR / "_artifact_cache.py").resolve()),
+                         str((SCRIPTS_DIR / "test_artifact_cache.py").resolve())],
+            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_artifact_cache.py")],
+        },
     }
     for name, spec in specs.items():
         stamp = str(REPORTS / f"check-{name}.ok")
@@ -912,4 +919,75 @@ def task_build_bare():
             [f"part:{s}" for s in part_stems()]
             + [f"assembly:{s}" for s in ASSEMBLY_ORDER]
         ),
+    }
+
+
+# --- Cache diagnostic (issue #73): explain any miss in ONE command.
+#
+# SolidWorks-FREE and OFF the COM spine -- it computes the same key/file_dep set the
+# build does and PROBES the backend (a presence check, no download), so it never
+# touches the seat. For every part + assembly it prints HIT/MISS + key + (for a miss,
+# or with `all`) the per-dep digests that produced the key, plus a drift flag when
+# this seat's last-published key differs from the current one. That is the ad-hoc
+# script we hand-wrote cutting v0.9.0, kept.
+def _cache_rows() -> list[tuple[str, list[str]]]:
+    """(label, file_deps) for every cacheable COM task, in build order."""
+    rows: list[tuple[str, list[str]]] = []
+    for script in part_scripts():
+        stem = script.stem.removeprefix("build_")
+        rows.append((f"part:{stem}", _part_file_deps(script, stem)))
+    for stem in ASSEMBLY_ORDER:
+        rows.append((f"assembly:{stem}", _assembly_file_deps(stem)))
+    return rows
+
+
+def _cache_status(statusargs):
+    args = [a.lower() for a in (statusargs or [])]
+    only_miss = "miss" in args
+    show_all = "all" in args
+    filters = [a for a in args if a not in ("miss", "all")]
+
+    cfg = _cache.config_summary()
+    print(f"[cache_status] mode={cfg['mode']} epoch={cfg['epoch']} salt={cfg['salt']} "
+          f"account={cfg['account']} container={cfg['container']}")
+    if not _cache.enabled():
+        print("[cache_status] cache disabled (mode=off) -- keys computed, backend NOT probed")
+
+    hits = misses = unknown = 0
+    for label, deps in _cache_rows():
+        if filters and not any(f in label.lower() for f in filters):
+            continue
+        key, inputs = _cache.key_inputs(deps, ContentChecker._digest)
+        present = _cache.probe(key)        # True / False / None (disabled|unreachable)
+        if present is True:
+            mark, hits = "HIT ", hits + 1
+        elif present is False:
+            mark, misses = "MISS", misses + 1
+        else:
+            mark, unknown = "?   ", unknown + 1
+        if only_miss and present is not False:
+            continue
+        last = _cache.last_stored_key(label)
+        drift = f"  DRIFT(last published {last[:12]})" if last and last != key else ""
+        print(f"  {mark} {key[:12]}  {label}{drift}")
+        if show_all or present is False:
+            for rel, digest in inputs:
+                print(f"           {digest}  {rel}")
+    print(f"[cache_status] {hits} hit / {misses} miss / {unknown} unknown")
+
+
+def task_cache_status():
+    """Diagnostic: per part/assembly, the cache key + dep digests + backend HIT/MISS,
+    so any miss is explainable in one command (issue #73). SolidWorks-FREE, off the
+    COM spine, never in default_tasks.
+
+    Positional args (after ``--``): label substrings to filter (e.g. ``cone_gear``);
+    ``miss`` to show only misses; ``all`` to dump dep digests for every task (default:
+    only for misses). ``HARMONIC_CACHE_DEBUG=1`` additionally logs key provenance from
+    the build itself."""
+    return {
+        "uptodate": [False],
+        "pos_arg": "statusargs",
+        "actions": [(_cache_status,)],
+        "verbosity": 2,
     }
