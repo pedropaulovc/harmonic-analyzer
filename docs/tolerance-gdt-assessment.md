@@ -1,0 +1,379 @@
+# Tolerance & GD&T assessment
+
+> Companion to [`tolerance-policy.md`](./tolerance-policy.md). The policy previously placed GD&T,
+> surface finish, and drawing callouts out of scope; this assessment resolves each of them — *what*
+> to add, *where*, and *how much* — calibrated to the actual audience: **a hobby machinist building
+> from the book supplement on a manual mill + lathe with DROs.** The manufacturing-output scoping
+> (drawings / DXF / CAM) is decided in §11 and reflected back into the policy.
+
+Sources mined for this assessment: the book chapters 10–19
+(`references/albert-michelsons-harmonic-analyzer/`), every `build_*.py` interface in
+`cad/scripts/`, and the hobby-machining + gear-cutting references
+(`references/machining-for-hobbyists-getting-started/`, `references/gears-and-gear-cutting/`,
+`references/machinerys-handbook/`).
+
+---
+
+## 1. The audience is the binding constraint
+
+The two reference books this supplement sits beside teach **`±` limits and fits only — zero
+GD&T.** No feature-control frames, datums, true position, flatness/perpendicularity symbols, or
+MMC modifiers appear anywhere in the measuring, lathe, mill, or drill chapters; the one
+engineering drawing shown is dimensioned nominal-only. The gear book's governing maxim is
+literally *"if it looks right it most likely is all right."*
+
+What the audience already owns and reads:
+
+| Instrument | Resolution | Realistic repeatability |
+|---|---|---|
+| Steel rule | 1/64″ | ~0.4 mm |
+| Caliper (dial/digital) | 0.0005″ / 0.01 mm | ~0.001″ (0.025 mm) |
+| Micrometer | 0.0001″ / 0.01 mm | measurement uncertainty ~0.0005″ (0.013 mm) |
+| Dial indicator on stand | 0.0005″ | the workflow used for "indicating" concentricity/parallelism |
+
+Achievable **on the part**, careful work with a DRO:
+
+| Regime | Band | Basis |
+|---|---|---|
+| Routine | **±0.05–0.13 mm** (±.002–.005″) | trial-cut to a mic; 3-jaw "within a few thou" |
+| Best case, taking pains | **±0.013–0.025 mm** (±.0005–.001″) | 4-jaw indicated; finish cuts on the compound dial |
+| Holes to size | drill **then ream/bore** | a drilled hole "is not precise"; ream for size + finish, bore for concentric/located |
+
+In this audience's own words: **±.001″ is "tight," ±.005″ is "comfortable," ±1/16″ is "loose."**
+
+**Verdict (drives everything below): stay in `±` limits + named fits. Introduce exactly one
+geometric idea — runout/TIR read on a dial indicator — because that workflow is already taught
+and it is the property that actually matters for bores and gears. Translate the handful of real
+geometric requirements (squareness, knife-edge straightness, the rocker radius) into shop
+*procedures* the books already teach (indicate in a 4-jaw, bore don't drill, single-setup
+machining), not into feature-control frames.** A one-page "how to read a runout callout" sidebar
+in the supplement covers the entire GD&T vocabulary a reader needs.
+
+---
+
+## 2. The error model sets where the tolerance budget goes
+
+The output is a **static force balance summed through a knife-edge first-class lever**, with
+total output travel "on the order of only a few millimetres" (ch. 18). Two consequences fix the
+whole allocation:
+
+- **A bias common to all 20 channels largely cancels** at the summing lever (and what survives is
+  absorbed by the counter-spring tare and the amplitude-bar zero). Shared, systematic error is
+  cheap.
+- **A per-channel *inconsistency* injects straight into the sum** as harmonic error: one stiff
+  pivot, one off-phase cam, one mismatched spring. Per-channel scatter is expensive.
+- Because output travel is a few mm, **any friction / lost motion / play at the summing knife edge
+  is a large fraction of the signal** — which is exactly why the original used a knife edge there.
+
+> **Allocation principle.** Spend the tolerance budget on (a) the summing **knife edge**, (b) the
+> 20 **cams**, and (c) **channel-to-channel consistency**. Relax everywhere the book itself shows
+> wear, hand-work, or a designed-in adjustment.
+
+The book is unusually explicit about where it is *forgiving*, and those are direct licences to
+loosen: the cone↔cylinder mesh runs at an oblique angle with "distinct wear patterns" (partial
+engagement is tolerated and the centre distance is deliberately adjustable); the connecting rods
+are "rough-finished"; the measuring stick's graduations are "hand stamped … unevenly spaced"; the
+counter-spring post is gouged by its own set screw. None of these need a tight number.
+
+---
+
+## 3. What's already covered, and the three gaps
+
+**Covered today** (`tolerances.yaml` + Gate-E audit + analytic asserts in the build scripts):
+
+- Three general linear grades — `machined_block` ±0.10, `plate_profile` ±0.20,
+  `visual_noncritical` ±0.50.
+- Named fit classes with clearance/backlash bands — `shaft_in_bushing`, `gear_mesh`,
+  `cone_drum_oblique_mesh`, `cam_follower_contact`, `sliding_amplitude_bar_on_rocker`,
+  `spring_eye_threading`, `fastener_clearance`.
+- Every part carries `material` / `tolerance_class` / `process` (audited), `fit_class` where it
+  moves. Build scripts assert clearance margins and raise on violation.
+
+**Gap 1 — no precision linear grade.** The tightest class (`machined_block` ±0.10 ≈ ±.004″) is
+**too loose to deliver the fits the policy itself specifies** (see §4). There is nothing for the
+"thou" features.
+
+**Gap 2 — no geometric controls.** Runout, the rocker form radius, knife-edge straightness/
+squareness, and the channel-stack coplanarity are entirely unexpressed. These are the few places
+geometry — not size — is the functional requirement.
+
+**Gap 3 — no surface finish.** Sliding/running surfaces (journals, bores, the knife edge and its
+seat, the rocker slide) have no finish spec; a rough bore runs untrue and wears.
+
+---
+
+## 4. Findings — the numbers don't currently close
+
+These are concrete inconsistencies to reconcile, surfaced by cross-checking the fit classes
+against the modeled geometry. **They are pre-existing; flag and fix before publishing any
+tolerance.**
+
+1. **Fit class vs. linear grade.** `shaft_in_bushing` wants **0.025–0.075 mm** diametral
+   clearance, but a bore and a shaft both held to `machined_block` ±0.10 stack to **±0.20 mm** of
+   clearance variation — the tolerance swamps the fit ~3–8×. A fit is only real if the part
+   tolerances are tight enough to deliver it. → fitted features need the new **precision** grade
+   (§5.1), and the audit should *enforce* that any `fit_class` part carries it on the fitted
+   feature.
+
+2. **Modeled clearance vs. fit class.** The CAD pivot/fulcrum bushings are **Ø6.5 bore on a Ø6.35
+   shaft = 0.15 mm** diametral clearance (`build_pivot_bushing.py`, `build_lever_bushing.py`) —
+   itself **2× the top** of the `shaft_in_bushing` band (0.075). The 0.15 mm reads as a deliberate
+   render-friendly visible gap, not a machining fit. → decide one story: either tighten the model
+   to the fit class, or widen the class to the "beginner-safe generous slip fit" the policy
+   describes (a ~0.10–0.15 mm running fit on Ø6.35 is RC6-ish and perfectly fine for a
+   hand-cranked machine) — but the config and the geometry must then agree.
+
+3. **One DP for the whole train.** The cone/cylinder mesh and the rack run **DP 30 / 14.5° PA**,
+   while the gear-train OD anchor re-derives an effective **DP ≈ 49.82**; `build_rack_pinion.py`
+   already carries a hard note that the rack must use DP 30, *not* the machine `gear_train` DP, or
+   it silently interferes. → the supplement must publish **one authoritative `module/DP + pressure
+   angle + tooth-count` table** for the train. The gear book's rule is absolute: **never mix
+   pressure angles** — every gear that meshes must share PA and DP/module.
+
+4. **The Ø6-tooth gear is marginal by construction.** `build_cone_gear.py` leaves a **0.49 mm wall**
+   between the T006 root and its bore (root r 0.89). That is a real machining hazard, not a CAD
+   artifact — call it out as the hardest part to make, and note the period-correct mitigation: the
+   four tip gears were a **harder yellow metal** (Muntz/manganese bronze), which is why they show
+   the most wear yet survived.
+
+---
+
+## 5. Recommended additions
+
+### 5.1 Add a `precision` linear grade
+
+| New grade | Tolerance | Applies to |
+|---|---|---|
+| `precision` | **±0.025 mm** (±.001″) | any fitted feature: bearing bores, shaft journals, the knife-edge seat, cam-bore/OD, gear bores |
+
+Keep the three existing grades for everything else. The rule becomes: **the feature that carries a
+fit gets `precision`; the rest of the part stays at its block grade.** A part can therefore carry a
+default `tolerance_class` *and* a tighter grade on its critical feature (encode as
+`critical_features`, §8).
+
+### 5.2 GD&T-lite — the only geometric controls to add
+
+Introduce a small `geometric:` vocabulary, every entry expressed as a **dial-indicator number or a
+shop procedure**, never a feature-control frame the reader can't parse:
+
+| Control | How the reader holds it | Where it applies | Target |
+|---|---|---|---|
+| **Runout / TIR** (the one real GD&T idea) | indicate the OD/face while the bore is on a mandrel, or bore-and-cut in one setup | cone gears, cylinder gears + integral cam, both pinions, magnifying wheel, all shaft journals | **≤0.025–0.05 mm TIR** (.001–.002″) |
+| **Bore-to-pitch concentricity** (folds into runout) | 4-jaw indicate the blank true before cutting teeth | every cut gear | *"imperative … no eccentricity"* (gear book) |
+| **Pivot-axis squareness** | bore the pivot hole **in the same setup** that faces the mount; don't drill free-hand | rocker, lever, knife mounts, pedestals | as-machined single-setup |
+| **Knife-edge straightness + sharpness + hardness** | grind/stone a straight, hardened edge; seat in a matching hardened flat/vee | summing-lever knife edge + knife-mount seat | edge straight & ⟂ to the motion plane; hardened |
+| **Knife-support parallelism** | set the two knife mounts coplanar/parallel at assembly (shim to a common height) | the two `knife-mount` blocks | parallel, equal height |
+| **Form: rocker concave radius** (book's one stated geometric req) | turn/mill to the radius; *= amplitude-bar length* by design (ch. 14) | `rocker-arm` top surface | R = bar length, ±0.5 mm |
+| **Channel-stack consistency** | machine all 19 spacer bushings to **one length in one setup**; keep the pivot shaft straight | pivot/fulcrum bushing stacks | spacer length scatter ≤0.05 mm |
+
+**Deliberately excluded, with reasons:** true position + datum reference frames, profile-of-surface
+FCFs, composite frames, MMC/LMC modifiers. The audience doesn't read them, the references don't
+teach them, and every requirement above is reachable by single-setup machining + indicating. Adding
+them would make the supplement *less* usable.
+
+### 5.3 Add a `surface_finish:` block
+
+| Class | Ra | Where |
+|---|---|---|
+| `bearing` | **0.8–1.6 µm** (32–63 µin) — reamed/finish-bored | shaft journals, running bores, knife edge + seat, rocker slide, amplitude-bar foot |
+| `finish` (default machined) | **3.2 µm** (125 µin) — sharp-tool finish pass | general machined surfaces, gear bores |
+| `none` | — (no callout) | non-contacting faces, gear flanks (form-cut HSS is "good enough"), cosmetic / rough parts |
+
+Most surfaces get **no callout** — that matches the books' silence and the book's "rough-finished"
+connecting rods. Spec finish only where a surface bears or slides. (Handbook rule of thumb if a
+reader wants one: roughness ≤ 1/8 of the dimensional tolerance.)
+
+### 5.4 Datum philosophy (lightweight, per part class)
+
+State a one-line reference per part class, as *"machine off this,"* not a formal DRF:
+
+- **Rotating parts** (gears, wheels, pinions, shafts): datum = the **bore/journal axis**, secondary
+  = a **faced end**. Cut features off the bore in one setup → runout falls out for free.
+- **Pivoting parts** (rockers, levers, knife mounts): datum = the **mounting face**, locate the
+  **pivot bore** square to it in the same setup.
+- **Frame / mounting parts** (base, pedestals, crossbars, portals): datum = the **mating face +
+  bolt pattern**; everything else is reference.
+
+---
+
+## 6. Per-subsystem recommendations (parts)
+
+Tier: **T1** = spend the budget here · **T2** = moderate · **T3** = leave loose / cosmetic.
+"Add" lists only what is *new* beyond the existing `material/tolerance_class/process/fit_class`.
+
+| Subsystem · part(s) | Tier | Add |
+|---|---|---|
+| **Summing lever** `summing-lever`, `knife-mount`, `knife-stay` | **T1** | knife-edge **straightness + ⟂ to motion plane + hardened**; matching **hardened seat**; **parallelism/equal height** of the two mounts; `precision` on the seat; `bearing` finish on edge + seat. *Least forgiving interface in the machine.* |
+| **Cylinder gears + cams** `cylinder-gear`, `connecting-rod` | **T1** | cam **eccentricity = amplitude** (hold it), **runout of cam OD to gear bore** ≤0.05 mm; **angular phasing to the ~3 mm alignment notch** (per-channel phase datum — set at assembly); `precision` on bore; cam OD `bearing` finish; rod finish **`none`** (book: rough). *The 20 cams are the function generators.* |
+| **Cone gears** `cone-gear`, `cone-gear-shaft` | **T1** | **bore-to-pitch runout** ≤0.05 mm; **one DP/PA for the whole train** (Finding 3); flag **T006 0.49 mm wall** + harder tip metal (Finding 4); `precision` on bore. Mesh itself stays **loose** (oblique, adjustable centre distance). |
+| **Pivots & bushings** `pivot-shaft`, `fulcrum-shaft`, `pivot-bushing`, `lever-bushing` | **T1** | reconcile the **0.15 vs 0.025–0.075 mm** fit (Finding 2); `precision` on bore + journal; `bearing` finish; **all 19 spacers one length, one setup** (channel pitch 7.0565 mm); shaft straightness. |
+| **Rocker arms** `rocker-arm`, `rocker-arm-portal` | **T1** | **concave radius = amplitude-bar length** (form, ±0.5 mm, book ch.14); pivot bore **square** to face; slide surface `bearing` finish. |
+| **Amplitude bars** `amplitude-bar` | **T2** | preserve **length** (~80 cm — it linearizes the transfer; don't shorten); notch fit snug-sliding (`sliding_amplitude_bar_on_rocker`); straightness mild; finish `none`. Precision here is **position repeatability**, not part geometry. |
+| **Drive train** `crankshaft`, `crank-pin`, `crank-drive-gear`, `crank-pinion`, `crank-arm`, `crank-handle` | **T2** | **taper-pin** crank-to-shaft index (repeatable, zero-backlash angular registration) — ream matching taper; gear bores `precision` + runout; handle/arm loose. |
+| **Paper drive** `rack-pinion`, `platen-rack`, `pinion-bar`, transgear set, chain | **T2/T3** | rack/pinion **DP 30 / 14.5°** (Finding 3); backlash 0.30 mm is fine; chain clearances **loose** (link-to-link contact tolerated). Paper transport is the *time axis*, not the summed signal — moderate. |
+| **Magnifier & pen** `magnifying-wheel`, `magnifying-lever`, `magnifying-bracket/clamp`, `magnifying-vertical-rod`, pen parts | **T2** | wheel/lever bores `precision` + runout on the wheel; linkage pivots squareness. Amplifies output, so play here is visible — but downstream of the sum. |
+| **Frame** `harmonic-base`, `top-frame`, `top-crossbar`, pedestals, clamps, columns, `gooseneck*` | **T3** | mating-face flatness "as-machined" + bolt-pattern location; column slip fits (Ø25.4 in 25.5–25.6) already fine. Cast-iron castings stay forgiving. |
+| **Springs** `channel-spring-installed`, `counter-spring` | **T2** | **match rate + free length across the 20 channels** (consistency, not absolute rate); counter spring is the **coarse tare** — leave loose. |
+| **Measuring stick** `measuring-stick` | **T3** | leave loose — original was hand-stamped & uneven; what matters is **one stick sets all 20 bars**. |
+| **Fasteners / misc** `hex-bolt`, `lag-screw`, `hanger-screw`, `fillister-screw`, `thumb-screw`, `nameplate`, knobs | **T3** | `fastener_clearance` close/normal as-is; no additions. |
+
+---
+
+## 7. Assembly-level tolerances
+
+Express these as **consistency + fit-at-assembly**, not absolute position — that matches both the
+error model and how the machine was actually built and trimmed.
+
+- **Channel pitch & coplanarity (the real assembly precision):** the 7.0565 mm channel spacing and
+  the coplanarity of the 20 rockers / 20 levers are set by the **spacer-bushing lengths** and the
+  **pivot-shaft straightness**, not by 20 independently located holes. → machine the spacers
+  together; ream the pivot bores through a common fixture/stack. This is where "channel-to-channel
+  consistency" is won or lost.
+- **Gear mesh centre distances:** **set at assembly by feel** for light backlash; the cone set
+  *pivots out of engagement* by design, so spec nominal + "adjust for a little backlash, never
+  zero" rather than a tight centre distance.
+- **Knife-edge supports:** shim the two mounts to a **common height + parallel** so the lever rocks
+  true.
+- **Summing-lever spring holes:** the 20 attachment points at a consistent pitch give each spring a
+  consistent moment arm — drill them from one fixture.
+- **Counter-spring height:** the designed-in **tare** — explicitly loose; it exists to absorb the
+  residual imbalance of the 20-spring bank.
+
+---
+
+## 8. How to encode it (extend the existing system, don't bolt on drawings)
+
+The repo's philosophy is "tolerance is design source, lives in config, flows to custom properties +
+gets asserted." Keep that. Concretely:
+
+**`tolerances.yaml`** — add three blocks:
+
+```yaml
+general:
+  precision: { tolerance: "+/-0.025", applies_to: "fitted features: bearing bores, journals, knife seat, cam/gear bores" }
+  # ...existing machined_block / plate_profile / visual_noncritical...
+
+surface_finish:
+  bearing: { ra_um: [0.8, 1.6], applies_to: "journals, running bores, knife edge+seat, slide surfaces" }
+  finish:  { ra_um: 3.2,        applies_to: "general machined (default)" }
+  none:    { applies_to: "non-contacting, gear flanks, cosmetic/rough" }
+
+geometric:
+  runout:        { tir_mm: [0.025, 0.05], applies_to: "gear bore->pitch, cam->bore, journals, wheel", how: "indicate / bore-and-cut one setup" }
+  pivot_square:  { applies_to: "rocker/lever/mount pivot bores", how: "bore in the setup that faces the mount" }
+  knife_edge:    { applies_to: "summing-lever edge + seat", how: "straight, sharp, hardened, seat parallel/equal-height" }
+  rocker_radius: { value: "R = amplitude-bar length", tol_mm: 0.5, applies_to: "rocker-arm top" }
+```
+
+**`parts/*.yaml`** — add optional fields, required only for the ~10 T1 parts:
+
+```yaml
+summing-lever:
+  # ...existing...
+  surface_finish: bearing
+  critical_features:
+    - { feature: "knife edge", grade: precision, geometric: knife_edge, finish: bearing }
+```
+
+**Gate-E audit (`verify.py`)** — evolve the existing tolerance audit to *enforce the new
+invariant*, not just presence of fields:
+
+1. Any part with a running/locating `fit_class` (`shaft_in_bushing`, `gear_mesh`,
+   `cam_follower_contact`, `sliding_*`) **must** name a `precision` feature + a `surface_finish`
+   on the fitted feature — closes Gap 1 / Finding 1.
+2. **Tolerance-stack check:** for each fit, assert the worst-case feature-tolerance stack stays
+   **inside** the fit's clearance band (e.g. bore ±0.025 ⊕ shaft ±0.025 = 0.10 spread must fit the
+   0.025–0.075 window → forces a tighter grade or a wider band — surfaces Finding 1/2 mechanically).
+3. Geometric/finish class names must resolve in the new blocks (same pattern as the existing
+   `tolerance_class` / `fit_class` resolution).
+
+**Build scripts** — they already assert clearances; have them additionally assert the chosen
+tolerance grade is **compatible with** the modeled clearance (the stack check above, at the source).
+This catches a future edit that loosens a grade below its fit.
+
+---
+
+## 9. Priority roadmap
+
+- **Tier 1 (do first, ~10 parts):** knife-edge trio · cylinder-gear cams + connecting-rod ·
+  cone/cylinder gear bores · pivot/fulcrum shafts + bushings · rocker-arm radius. Plus the three
+  **Findings fixes** (precision grade, reconcile pivot clearance, publish the single DP/PA table).
+- **Tier 2:** rack-pinion + transgear, magnifier/pen linkage, crank taper-pin index, spring matching.
+- **Tier 3 (leave loose / document as forgiving):** frame castings, measuring stick, counter-spring
+  post, chain, fasteners, nameplate, handle.
+
+## 10. What the supplement actually ships
+
+- **No full GD&T drawings.** Ship the tolerance/fit/finish/runout data as it already lives — in
+  config, stamped into custom properties, audited — plus a **per-part critical-feature table**
+  (T1 parts) and a **one-page primer sidebar**: how to read a runout (TIR) callout, what "slip fit
+  / press fit" mean in thou, and "bore don't drill, single setup, indicate true." That is the
+  entire GD&T vocabulary a reader needs.
+- **The single authoritative gear table** (DP/module, 14.5° PA, the 20 cone tooth counts 6→120, the
+  120-tooth cylinders, the rack/pinion) — the one place precision *and* internal consistency both
+  matter.
+- Update `tolerance-policy.md` §"Out of scope": GD&T (lite), surface finish, and critical-feature
+  callouts move **in scope**; the drawings/DXF/CAM question is decided in §11 (not deferred).
+
+---
+
+## 11. Manufacturing outputs (drawings / DXF / CAM) — decided, not deferred
+
+The original policy deferred "2D drawings with tolerance callouts, DXF/CAM outputs." Reassessed
+against the actual audience and the stated **manual**-machining toolchain, each is now a decision,
+not a defer.
+
+### 2D shop drawings — IN SCOPE (the vehicle that makes everything above real)
+
+A hobby machinist works from a **dimensioned, toleranced print at the mill/lathe** — not a 3D
+model, a STEP file, or a YAML registry. Every tolerance, fit, runout, and finish spec in §§5–7 only
+reaches the bench on a drawing; custom properties + the Gate-E audit are the metadata/BOM layer, not
+something a person cuts metal from. The book (Hammack) is a *photo* book with **no** shop drawings,
+so supplying them is the single highest-value contribution this supplement makes.
+
+- **Feasible on this seat — API verified (offline bundle v3.3.0).** The repo already drives
+  `SaveAs3` for STEP/STL (`export_models.py`, `cut_release.py`), so PDF export of a drawing is the
+  same mechanism; the COM API creates drawing docs + views (`IDrawingDoc.CreateDrawViewFromModelView3`),
+  pulls in model dimensions (`IDrawingDoc.InsertModelAnnotations3` / `InsertModelDimensions`), and
+  inserts the few annotations needed — runout (`IModelDoc2.InsertGtol`), surface finish
+  (`IModelDoc2.InsertSurfaceFinishSymbol2` / `IModelDocExtension.InsertSurfaceFinishSymbol3`), datum
+  tag (`IModelDoc2.InsertDatumTag2`), notes (`IModelDoc2.InsertNote`). All present in the bundle.
+- **Consistent with the repo philosophy.** Drawings become **generated artifacts**
+  (`cad/out/drawings/<dashed>.PDF`), scripted from the config — not hand-drawn — exactly like the
+  renders/STL/STEP. The tolerance data flows from `tolerances.yaml` + custom properties **into** the
+  drawing instead of dead-ending in metadata.
+- **Scope by tier.** Generate drawings for the **Tier-1 precision-critical parts first** (the ~10
+  in §6/§9), which carry the `precision` grade, runout, finish, and critical-feature notes; then
+  expand to all parts. New doit task `drawing:<stem>` on the **COM spine** (it needs SolidWorks),
+  feeding a `release` PDF set.
+- **Caveat.** Programmatic drawing layout is brittle; expect to hand-finish view placement / leader
+  routing on the first pass and capture the working recipe — the repo already hand-tunes render
+  cameras the same way.
+
+### DXF — optional reference exhibit only (not a build deliverable)
+
+DXF feeds flat-profile cutting (laser / waterjet / plasma / wire-EDM) and 2D CAM. This machine is
+almost entirely turned/milled solid parts and the toolchain has **none** of those cutters — so DXF
+has no consumer on the build path. The only genuinely useful 2D profiles are **inspection/reference
+exhibits**: the cone/cylinder gear tooth flanks, the rack tooth profile, and the few truly flat
+parts (nameplate, clips, platen outline). Export those on request via `IPartDoc.ExportToDWG2`
+(a dedicated face/sketch→DXF call, verified in the bundle; or a drawing `SaveAs` to `.dxf`) as
+comparison aids; they carry no tolerance info a drawing wouldn't carry better. The decision is
+"optional exhibit," not "pending."
+
+### CAM — OUT (not applicable to the build path)
+
+The stated manufacturing method is **manual** milling and turning with DROs (PM-30MV manual mill,
+JET BD-920N manual lathe) — there is **no CNC** in the toolchain. CAM produces toolpaths/G-code for
+CNC, which has no consumer here. This is a definitive scope exclusion tied to the manufacturing
+method, not a deferral. Revisit only if a CNC machine enters the toolchain (e.g., a CNC conversion
+of the mill).
+
+### MBD / 3D PDF — not the path (license-dependent + wrong medium)
+
+Considered as a single-source alternative to 2D drawings (attach 3D PMI, publish a rotatable 3D
+PDF). Rejected: SOLIDWORKS **MBD/DimXpert is a separately-licensed add-in** and is unlikely to be
+exposed in the 3DEXPERIENCE **for Makers** bundle (confirm before relying on it); and the audience
+works from **2D prints** at the bench, not interactive 3D PDFs. Keep only as a possible future
+enhancement *if* the Makers seat turns out to expose DimXpert.
+```

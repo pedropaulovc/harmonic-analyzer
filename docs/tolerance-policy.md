@@ -37,7 +37,19 @@ are the concrete realizations of the classes above, being lifted into `tolerance
 - rack–pinion backlash;
 - bushing clearance under the amplitude-bar foot.
 
-## Out of scope (for now)
+## Scope of manufacturing outputs
 
-2D drawings with tolerance callouts, DXF/CAM outputs, and surface-finish specs are deferred —
-the model is currently a digital/visual artifact with a manual-machining build path.
+Reassessed in [`tolerance-gdt-assessment.md`](./tolerance-gdt-assessment.md) §11 — nothing here is
+left "deferred":
+
+- **GD&T (lite), surface-finish specs, critical-feature callouts — IN SCOPE.** Held in config,
+  stamped into custom properties, audited; geometric intent limited to dial-indicator runout plus
+  the rocker form radius and knife-edge controls (see the assessment §5).
+- **2D shop drawings — IN SCOPE (planned).** A hobby machinist builds from a dimensioned, toleranced
+  print, so generated PDF drawings (Tier-1 precision-critical parts first) are the vehicle that
+  carries the tolerances to the bench. Same `SaveAs3` path the STEP/STL export already uses; a new
+  `drawing:<stem>` doit task on the COM spine.
+- **DXF — optional reference exhibit only** (gear/rack tooth profiles, flat parts); no consumer on
+  the manual build path.
+- **CAM — out, not applicable.** The build path is manual milling/turning with DROs; there is no
+  CNC to consume toolpaths. Revisit only if a CNC machine joins the toolchain.
