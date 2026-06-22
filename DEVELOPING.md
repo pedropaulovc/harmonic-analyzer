@@ -32,6 +32,40 @@ yields a unique key, so an experiment is stored under its own key and never
 collides with the canonical artefacts. Two seats share a blob only when their
 inputs are byte-identical.
 
+### Debugging a miss (provenance & diagnostics)
+
+A key is `sha256(epoch + salt + Σ(relpath, digest))`, so an unexpected key shift
+is almost always **one dep digest moving**. Three best-effort tools surface that
+without reconstructing build history from terminal scrollback (none can fail a
+build):
+
+- **`doit cache_status`** — the one-command answer to *"why did this miss?"*. For
+  every part/assembly it prints `HIT`/`MISS` (a backend presence probe — a HEAD,
+  not a download) + the 12-char key, and for a miss the full `(digest, relpath)`
+  list that produced the key. Compare two seats' output and the moved digest is the
+  culprit. Args after `--`:
+  - label substrings to filter — `doit cache_status -- cone_gear`
+  - `miss` — only the misses
+  - `all` — dump dep digests for **every** task, not just misses
+  - a `DRIFT(last published …)` flag appears when a task's current key differs from
+    the last key *this seat* published (see below).
+- **`HARMONIC_CACHE_DEBUG=1`** — during a real `doit` build, logs each
+  `(digest, relpath)` feeding every key and the resulting key, tagged by task. Turn
+  it on for the build you're diagnosing rather than reasoning after the fact.
+- **`cad/out/reports/cache.jsonl`** — an append-only event log (one JSON object per
+  restore/store: `ts`, `event`, `label`, `key`, `epoch`, `salt`). Events:
+  `store` / `store_skip` (ro seat) / `store_empty` / `store_error`,
+  `restore_hit` / `restore_miss` / `restore_hit_drift` / `restore_error`. Post-hoc
+  debugging reads this file instead of scrollback. Gitignored (under `cad/out/`).
+
+**Store-skip-on-hit drift.** `restore` returns early on a HIT and never re-stores,
+so a seat can *serve* a key it never *published* (this is what bit the v0.9.0 cut:
+key shifts across refactor waves meant the final key was never written for 22 of 73
+parts, even though every one had a valid on-disk SLDPRT). To surface it, each
+successful `store` stamps `cad/out/reports/cache-keys/<label>.key` with the key this
+seat published; on a later HIT under a *different* key, `restore` logs a `WARN` and
+a `restore_hit_drift` event — and `cache_status` shows the `DRIFT(...)` flag.
+
 ### Backend: Azure Blob over HTTPS (443)
 
 One content-addressed `<key>.tar.gz` blob per task in container `buildcache` on
