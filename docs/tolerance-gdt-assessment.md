@@ -280,12 +280,15 @@ v3.3.0; **DimXpert is included with every SOLIDWORKS license — confirmed for t
    `IDimXpertManager.DimXpertPart` → `IDimXpertPart.InsertDatum` / `InsertSizeDimension` /
    `InsertLocationDimension` / `InsertGtol` (+ typed interfaces `IDimXpertConcentricityTolerance`,
    `IDimXpertOrientationTolerance` for perp/parallel, `IDimXpertFlatnessTolerance`…). **DimXpert
-   does carry circular & total runout** (exposed on the base `IDimXpertTolerance`; unlike
-   concentricity/position it has no dedicated named subclass — the type is discriminated via
-   `IDimXpertAnnotation::Type`). Author runout with `IDimXpertPart.InsertGtol` (verify the
-   `swDimXpertGtolType_e` runout value on the seat — that enum isn't in the offline bundle), with
-   classic `IModelDoc2.InsertGtol` + `swGcsCIRCRUNOUT` / `swGcsTOTALRUNOUT` (`swGtolGeomCharSymbol_e`)
-   as a guaranteed fallback.
+   authors circular & total runout natively** — `IDimXpertPart.InsertGtol` takes a
+   `swDimXpertGtolType_e`, and the online 2026 API reference confirms the members
+   `swDimXpertGtolType_CircularRunout` (12) and `swDimXpertGtolType_TotalRunout` (13) — alongside
+   Perpendicularity (7), Parallelism (8), Position (9), Concentricity (11), etc. (On read-back these
+   share the base `IDimXpertTolerance`, type-discriminated via `IDimXpertAnnotation::Type` — there is
+   no dedicated named *subclass*, which is what misled an earlier draft.) Note: this enum is **absent
+   from offline bundle v3.3.0**; the values above are from help.solidworks.com/2026. Classic
+   `IModelDoc2.InsertGtol` + `swGcsCIRCRUNOUT` / `swGcsTOTALRUNOUT` (`swGtolGeomCharSymbol_e`) remains
+   a fallback.
 3. **Surface-finish symbols** from `surface_finish:` → `IModelDoc2.InsertSurfaceFinishSymbol2` on the
    bearing/sliding faces.
 
