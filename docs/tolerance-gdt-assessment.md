@@ -223,7 +223,7 @@ Tier: **T1** = spend the budget here · **T2** = moderate · **T3** = leave loos
 | **Cylinder gears + cams** `cylinder-gear`, `connecting-rod` | **T1** | cam **eccentricity = amplitude** (hold it), **runout of cam OD to gear bore** ≤0.05 mm; **angular phasing to the ~3 mm alignment notch** (per-channel phase datum — set at assembly); `precision` on bore; cam OD `bearing` finish; **rod cam-bore (the `cam_follower_contact` surface) `bearing`; rod *body* `none`** (book: rough — the exemption is the visible body, not the bearing bore). *The 20 cams are the function generators.* |
 | **Cone gears** `cone-gear`, `cone-gear-shaft` | **T1** | **bore-to-pitch runout** ≤0.05 mm; **DP 49.82 / 14.5° PA shared across the whole cone↔cylinder train** (its own domain — Finding 3); flag **T006 0.49 mm wall** + harder tip metal (Finding 4); `precision` on bore. Mesh itself stays **loose** (oblique, adjustable centre distance). |
 | **Pivots & bushings** `pivot-shaft`, `fulcrum-shaft`, `pivot-bushing`, `lever-bushing` | **T1** | reconcile the **0.15 vs 0.025–0.075 mm** fit (Finding 2); `precision` on bore + journal; `bearing` finish; **all 19 spacers one length, one setup** (channel pitch 7.0565 mm); shaft straightness. |
-| **Rocker arms** `rocker-arm`, `rocker-arm-portal` | **T1** | **concave radius = amplitude-bar length** (form, ±0.5 mm, book ch.14); pivot bore **square** to face; slide surface `bearing` finish. |
+| **Rocker arms** `rocker-arm`, `rocker-arm-portal` | **T1** | **concave radius R800 nominal** (form, ±0.5 mm; book ch.14 says "= bar length" = 812.8 mm — **reconcile, Finding 5**; stamp the model's R800, never the bar length). Pivot bore **square** to face; slide surface `bearing` finish. |
 | **Amplitude bars** `amplitude-bar` | **T2** | preserve **length** (~80 cm — it linearizes the transfer; don't shorten); notch fit snug-sliding (`sliding_amplitude_bar_on_rocker`); straightness mild; **notch foot (the sliding-contact surface) `bearing`; bar *body* `none`**. Precision here is **position repeatability**, not part geometry. |
 | **Drive train** `crankshaft`, `crank-pin`, `crank-drive-gear`, `crank-pinion`, `crank-arm`, `crank-handle` | **T2** | **taper-pin** crank-to-shaft index (repeatable, zero-backlash angular registration) — ream matching taper; gear bores `precision` + runout; handle/arm loose. |
 | **Paper drive** `rack-pinion`, `platen-rack`, `pinion-bar`, transgear set, chain | **T2/T3** | rack/pinion **DP 30 / 14.5°** (Finding 3); backlash 0.30 mm is fine; chain clearances **loose** (link-to-link contact tolerated). Paper transport is the *time axis*, not the summed signal — moderate. |
@@ -271,8 +271,11 @@ v3.3.0; **DimXpert is included with every SOLIDWORKS license — confirmed for t
 
 1. **Size ± tolerances on the driving dimensions.** Where a build script already sets a feature's
    driving dimension (bore Ø, journal Ø, length), additionally stamp its grade's tolerance:
-   `IDimension.SetToleranceType` (e.g. bilateral) + `SetToleranceFitValues`/value, read from
-   `tolerances.yaml`. These are exactly the dimensions a drawing pulls via
+   `IDimension.SetToleranceType` (e.g. bilateral) + **`IDimension.SetToleranceValues(max, min)`** for
+   the numeric ± (read from `tolerances.yaml`). **Not `SetToleranceFitValues`** — that one is marked
+   *obsolete* in the API and takes fit-class *strings* (`"H7"`), not numeric values, so it won't
+   stamp `±0.025`; the modern numeric path is `SetToleranceValues` / `IDimensionTolerance`. These are
+   exactly the dimensions a drawing pulls via
    `IDrawingDoc.InsertModelDimensions` / `InsertModelAnnotations3` — the print inherits every ± with
    no re-authoring, fully associative.
 2. **Geometric tolerances + datums as DimXpert PMI.** For the `geometric:` controls (runout,
@@ -295,9 +298,14 @@ v3.3.0; **DimXpert is included with every SOLIDWORKS license — confirmed for t
 The PMI lives in **annotation views** on the model; a drawing built from that model imports all of
 it automatically (`InsertModelAnnotations3`) — the drawing script *places views + imports model
 items + arranges*, it does not re-author tolerances. **Edit the YAML → rebuild → the SLDPRT PMI and
-every drawing update together.** Bonus: STEP **AP242** (`IModelDocExtension.PublishSTEP242File`)
-carries the same PMI into the neutral export the repo already ships — the embedded tolerances
-survive into STEP without the MBD add-in.
+every drawing update together.** The **guaranteed, add-in-free** consumption path is the **2D
+drawing** (drawings are core SOLIDWORKS): `InsertModelAnnotations3` pulls the embedded PMI with no
+MBD license. **STEP AP242 *with PMI* is not add-in-free** — SOLIDWORKS' "Publish to STEP 242" is an
+MBD feature ("The SOLIDWORKS MBD add-in is not part of any role. You need a stand-alone license",
+[SW Help 2025](https://help.solidworks.com/2025/english/solidworks/sldworks/t_share_models_step242.htm)),
+so `PublishSTEP242File` carrying PMI must be **gated behind the same runtime MBD probe** as 3D-PDF
+(§11) — not offered as a guaranteed fallback. (Geometry-only STEP export via the normal Save-As path
+is always available; it just won't carry the tolerances.)
 
 Home it next to the existing per-part stamping: an `apply_pmi(part, features)` in `_common.py`
 alongside `apply_custom_properties` / `apply_material`, driven by the new `critical_features` rows.
@@ -309,6 +317,9 @@ Concretely:
 ```yaml
 general:
   precision: { tolerance: "+/-0.025", applies_to: "fitted features: bearing bores, journals, knife seat, cam/gear bores" }
+  # NB (Finding 1/2): ±0.025 on BOTH mating parts = 0.10 spread — only valid where the fit band ≥0.10.
+  # The shaft_in_bushing band (0.05 wide) needs each feature at ≤±0.012, or the band widened. Reconcile
+  # before enabling Gate-E rule 2; pick ONE — tighter grade OR wider band — and record it here.
   # ...existing machined_block / plate_profile / visual_noncritical...
 
 surface_finish:
@@ -323,15 +334,26 @@ geometric:
   rocker_radius: { value: 800, tol_mm: 0.5, applies_to: "rocker-arm top", note: "nominal; book says = bar length 812.8 — reconcile (Finding 5)" }
 ```
 
-**`parts/*.yaml`** — add optional fields, required only for the ~10 T1 parts:
+**`parts/*.yaml`** — add optional fields, required only for the ~10 T1 parts. **Each
+`critical_features` row needs an API-stable *selector*, not just a human label** — `apply_pmi` and
+the write-back audit (Gate-E rule 4) have to resolve the exact model item to attach/query PMI, and a
+free-text `feature:` string can't drive `SelectByID2` / DimXpert. So the build script must give the
+target a **stable handle** the row references — the cleanest is a **named dimension / named feature**
+the build script already creates (`doc.Parameter("knife_seat_dia@Sketch3")`, or rename the feature),
+which is also exactly what a drawing imports by name. (`select:` below is that handle; `feature:` is
+kept only as a human comment.)
 
 ```yaml
 summing-lever:
   # ...existing...
   surface_finish: bearing
   critical_features:
-    - { feature: "knife edge", grade: precision, geometric: knife_edge, finish: bearing }
+    # select: API-stable model item (named dim / feature) the build script creates and PMI attaches to.
+    - { select: "knife_seat_dia@Sketch3", feature: "knife edge", grade: precision, geometric: knife_edge, finish: bearing }
 ```
+
+The build script owns the contract: it must **name** that dimension/feature (not rely on
+auto-generated `D1@Sketch3` names, which churn) so the `select:` key stays valid across rebuilds.
 
 **Gate-E audit (`verify.py`)** — evolve the existing tolerance audit to *enforce the new
 invariant*, not just presence of fields:
@@ -340,8 +362,14 @@ invariant*, not just presence of fields:
    `cam_follower_contact`, `sliding_*`) **must** name a `precision` feature + a `surface_finish`
    on the fitted feature — closes Gap 1 / Finding 1.
 2. **Tolerance-stack check:** for each fit, assert the worst-case feature-tolerance stack stays
-   **inside** the fit's clearance band (e.g. bore ±0.025 ⊕ shaft ±0.025 = 0.10 spread must fit the
-   0.025–0.075 window → forces a tighter grade or a wider band — surfaces Finding 1/2 mechanically).
+   **inside** the fit's clearance band — i.e. `tol(bore) + tol(shaft) ≤ band_width`. **This is the
+   crux of Finding 1/2 and the current numbers do NOT satisfy it:** the `precision` grade (±0.025 ⇒
+   0.05 total per feature) on *both* mating parts gives a 0.10 mm worst-case clearance spread, which
+   cannot fit the 0.05 mm-wide `shaft_in_bushing` band (0.025–0.075) for *any* nominal. So this rule
+   is **unsatisfiable as written** and must not be enabled until the grade/band are co-designed —
+   either **widen the band to ≥ 0.10** or **add a tighter grade** (each fitted feature ≤ ±0.0125 to
+   live inside a 0.05-wide band). **Gate this check on the Finding 1/2 reconciliation** (one decision,
+   recorded in `tolerances.yaml`); enabling it before then fails every otherwise-compliant pair.
 3. Geometric/finish class names must resolve in the new blocks (same pattern as the existing
    `tolerance_class` / `fit_class` resolution).
 
@@ -436,7 +464,7 @@ CNC, which has no consumer here. This is a definitive scope exclusion tied to th
 method, not a deferral. Revisit only if a CNC machine enters the toolchain (e.g., a CNC conversion
 of the mill).
 
-### DimXpert / MBD — DimXpert IS available on the Makers seat (the backbone); 3D-PDF is optional
+### DimXpert / MBD — DimXpert IS available on the Makers seat (the backbone); 3D-PDF + STEP242-PMI publish are optional
 
 Corrected after checking online — an earlier draft wrongly assumed DimXpert was add-in-gated.
 **DimXpert (authoring PMI — size + geometric tolerances and datums on the model) is included with
@@ -449,11 +477,15 @@ Corrected after checking online — an earlier draft wrongly assumed DimXpert wa
   STEP242**.
 
 So the split is: **DimXpert authoring = included → embed PMI during the build (§8), this is the
-recommended backbone.** Only the **MBD add-in** (the *publish to rotatable 3D PDF* step) may be
-absent on Makers — and it is optional, because (a) the bench deliverable is a **2D PDF print**
-anyway, and (b) STEP **AP242** (`PublishSTEP242File`, present in the API) already carries the
-embedded PMI into the neutral export without the add-in. Net: **author PMI with DimXpert on every
-build; ship 2D PDF drawings; treat 3D-PDF publish as a nice-to-have to be probed at runtime on the
-seat.** (The probe: try `IModelDocExtension.PublishTo3DPDF` once; if it fails for lack of the
-add-in, the 2D + STEP242 path is unaffected.)
+recommended backbone.** What the **MBD add-in** gates is *publishing* that PMI into a 3D-consumable
+neutral format — **both 3D-PDF *and* STEP 242-with-PMI** ("Publish to STEP 242" is documented as an
+MBD feature needing a stand-alone license,
+[SW Help 2025](https://help.solidworks.com/2025/english/solidworks/sldworks/t_share_models_step242.htm)).
+That is fine, because the bench deliverable is a **2D PDF print**, and the 2D drawing path is **core
+SOLIDWORKS** — `InsertModelAnnotations3` imports the embedded PMI with no add-in. Net: **author PMI
+with DimXpert on every build; ship 2D PDF drawings (the add-in-free vehicle); treat *both* 3D-PDF and
+STEP242-PMI publish as nice-to-haves to be probed at runtime on the seat.** (The probe: try
+`PublishTo3DPDF` / `PublishSTEP242File` once; if either fails for lack of the add-in, the 2D drawing
+path is unaffected — and a geometry-only STEP for the repo's neutral export is always available, it
+simply won't carry the tolerances.)
 ```
