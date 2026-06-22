@@ -46,16 +46,21 @@ import sys
 
 from _common import (
     IN,
+    SketchDims,
     apply_material,
     apply_color,
     POLISHED_STEEL,
     check,
     bbox_extent_check,
     define_circle,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
     set_sketch_direct_db,
     volume_check,
 )
@@ -75,21 +80,56 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
+    # Editable knobs (Tools > Equations): outer dia, wall, column length. The mm
+    # suffix is load-bearing (INCH document; the equation manager reads bare
+    # numbers in document units). InnerDia is the derived bore (OuterDia minus two
+    # walls), so editing OuterDia or WallThickness reshapes the annulus. ColumnLength
+    # is the extrude DEPTH (a feature parameter, not a sketch dim) -- an editable
+    # knob that nothing in drive_jobs references.
+    await set_global(adapter, "OuterDia", f"{OUTER_DIA}mm")
+    await set_global(adapter, "WallThickness", f"{WALL_THICKNESS}mm")
+    await set_global(adapter, "ColumnLength", f"{COLUMN_LENGTH}mm")
+    await set_global(adapter, "InnerDia", '"OuterDia" - 2 * "WallThickness"')
+
+    drive_jobs: list[tuple[str, str]] = []
+
+    # Annulus: concentric outer + bore circles on the Top plane, both on-axis
+    # (origin centre) so each records ONLY its diameter dim.
+    annulus = SketchDims()
     check("create_sketch annulus", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
-    await define_circle(adapter, 0.0, 0.0, OUTER_DIA / 2.0, "outer circle")
-    await define_circle(adapter, 0.0, 0.0, INNER_DIA / 2.0, "bore circle")
+    await define_circle(
+        adapter, 0.0, 0.0, OUTER_DIA / 2.0, "outer circle", dims=annulus,
+        names=("OuterCx", "OuterCz", "OuterDia"),
+        drives=(None, None, '"OuterDia"'),
+    )
+    await define_circle(
+        adapter, 0.0, 0.0, INNER_DIA / 2.0, "bore circle", dims=annulus,
+        names=("BoreCx", "BoreCz", "BoreDia"),
+        drives=(None, None, '"InnerDia"'),
+    )
     set_sketch_direct_db(adapter, False)
     await ensure_fully_defined(adapter, "annulus sketch")
     check("exit_sketch annulus", await adapter.exit_sketch())
+    name_last_feature(adapter, "AnnulusProfile")
+    drive_jobs += annulus.apply(adapter, "AnnulusProfile")
     check(
         "extrude column",
         await adapter.create_extrusion(ExtrusionParameters(depth=COLUMN_LENGTH)),
     )
+    name_last_feature(adapter, "Column")
     v_annulus = (
         math.pi * ((OUTER_DIA / 2.0) ** 2 - (INNER_DIA / 2.0) ** 2) * COLUMN_LENGTH
     )
     await volume_check(adapter, "annulus column", v_annulus, 0.001 * v_annulus)
+
+    # Deferred drive equations, then re-check neutrality (each evaluates to the
+    # as-built value, so the geometry must not move).
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "driven annulus column (equations neutral)", v_annulus, 0.001 * v_annulus)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)  # ch30 plates: see _common palette
