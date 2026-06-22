@@ -269,12 +269,31 @@ async def anchor_point_to_point(
     await dimension_between(adapter, ref1, ref2, "vertical_distance", abs(dy), label)
 
 
+def _record_point_to_point_cursor(rec: "Callable[[], None]", dx: float, dy: float) -> None:
+    """Drive ``rec`` once per dim :func:`anchor_point_to_point` emits for offset
+    ``(dx, dy)`` -- one on an axis-aligned segment, two (horizontal then
+    vertical) in general -- keeping a cursor record aligned with its emission."""
+    sdx = 0.0 if abs(dx) < 1e-9 else dx
+    sdy = 0.0 if abs(dy) < 1e-9 else dy
+    if sdx == 0.0 and sdy == 0.0:
+        return
+    if sdx == 0.0 or sdy == 0.0:
+        rec()
+        return
+    rec()
+    rec()
+
+
 async def define_polygon_chain(
     adapter: Any,
     lines: list[str],
     points: list[tuple[float, float]],
     anchor: int = 0,
     label: str = "polygon",
+    *,
+    dims: "SketchDims | None" = None,
+    names: list[str | None] | None = None,
+    drives: list[str | None] | None = None,
 ) -> None:
     """Fully define a CLOSED line chain of arbitrary slopes semantically.
 
@@ -284,15 +303,23 @@ async def define_polygon_chain(
     (dimensioning it too over-defines the sketch). Prefer
     :func:`define_rectilinear_chain` for axis-parallel chains: it emits
     segment-length dims instead of per-axis offsets.
+
+    Self-naming: pass ``dims`` plus ``names`` / ``drives`` aligned to the
+    EMISSION ORDER -- the anchor dims first (x, then z; only the non-zero ones),
+    THEN each kept segment's offset dims in line order (horizontal then vertical
+    per general segment; one for an axis-aligned segment). Unnamed slots stay
+    auto-named/undriven.
     """
     n = len(lines)
     if n != len(points):
         raise ValueError(
             f"{label}: need a closed chain (lines {n} != points {len(points)})"
         )
+    rec = _dim_cursor(dims, names, drives)
     await anchor_point_to_origin(
         adapter, f"{lines[anchor]}.start", *points[anchor], f"{label} anchor"
     )
+    _record_origin_anchor_cursor(rec, *points[anchor])
     skip = (anchor - 1) % n  # the segment ending at the anchored vertex
     for i, line in enumerate(lines):
         if i == skip:
@@ -301,6 +328,7 @@ async def define_polygon_chain(
         await anchor_point_to_point(
             adapter, f"{line}.start", f"{line}.end", x2 - x1, y2 - y1, f"{label} {line}"
         )
+        _record_point_to_point_cursor(rec, x2 - x1, y2 - y1)
 
 
 class SketchDims:
@@ -500,12 +528,53 @@ async def add_line_chain(
     return ids
 
 
+def _dim_cursor(
+    dims: "SketchDims | None",
+    names: list[str | None] | None,
+    drives: list[str | None] | None,
+) -> "Callable[[], None]":
+    """Return a zero-arg ``rec()`` that records the next (name, drive) into
+    ``dims`` in emission order, pulling sequentially from ``names``/``drives``
+    (``None`` once exhausted). The caller calls it once per dim it emits, in the
+    exact order emitted; :meth:`SketchDims.apply` then count-asserts the total
+    against the feature's real display-dim count, so a miscount fails loud."""
+    _names = list(names) if names else []
+    _drives = list(drives) if drives else []
+    state = {"k": 0}
+
+    def rec() -> None:
+        k = state["k"]
+        if dims is not None:
+            nm = _names[k] if k < len(_names) else None
+            dv = _drives[k] if k < len(_drives) else None
+            dims.record(nm, dv)
+        state["k"] = k + 1
+
+    return rec
+
+
+def _record_origin_anchor_cursor(rec: "Callable[[], None]", x: float, y: float) -> None:
+    """Drive ``rec`` once per dim :func:`anchor_point_to_origin` emits for
+    ``(x, y)`` -- none on the origin, one on an axis (x then y), two in general
+    -- so a cursor-based record stays aligned with the anchor's emission."""
+    sx = 0.0 if abs(x) < 1e-9 else x
+    sy = 0.0 if abs(y) < 1e-9 else y
+    if sx != 0.0:
+        rec()
+    if sy != 0.0:
+        rec()
+
+
 async def define_rectilinear_chain(
     adapter: Any,
     lines: list[str],
     points: list[tuple[float, float]],
     anchor: int = 0,
     label: str = "chain",
+    *,
+    dims: "SketchDims | None" = None,
+    names: list[str | None] | None = None,
+    drives: list[str | None] | None = None,
 ) -> None:
     """Fully define a CLOSED axis-parallel line chain semantically.
 
@@ -516,10 +585,18 @@ async def define_rectilinear_chain(
     per direction redundant, and adding it over-defines the sketch. Vertex
     ``anchor`` is the chain's single origin anchor (one-anchor rule, see the
     module docstring).
+
+    Self-naming: pass ``dims`` plus ``names`` / ``drives`` lists aligned to the
+    EMISSION ORDER -- the per-segment distance dims in line order (skipping the
+    one redundant segment per direction), THEN the anchor dims (x, then z; only
+    the non-zero ones). Unnamed slots (``None`` or past the list end) stay
+    auto-named/undriven. For an origin-centred rectangle prefer
+    :func:`define_centered_rectangle`, which names width/depth/corner directly.
     """
     n = len(lines)
     if n != len(points):
         raise ValueError(f"{label}: need a closed chain (lines {n} != points {len(points)})")
+    rec = _dim_cursor(dims, names, drives)
     directions: list[str] = []
     for i, line in enumerate(lines):
         (x1, y1), (x2, y2) = points[i], points[(i + 1) % n]
@@ -549,9 +626,11 @@ async def define_rectilinear_chain(
         await dimension_between(
             adapter, f"{line}.start", f"{line}.end", kind, span, f"{label} {line}"
         )
+        rec()
     await anchor_point_to_origin(
         adapter, f"{lines[anchor]}.start", *points[anchor], f"{label} anchor"
     )
+    _record_origin_anchor_cursor(rec, *points[anchor])
 
 
 def _read_member(obj: Any, name: str) -> Any:
@@ -1280,16 +1359,15 @@ async def drive_dimension(adapter: Any, dim_name: str, expr: str | float) -> Non
     print(f"  OK  equation {equation}")
 
 
-def force_rebuild(adapter: Any) -> None:
-    """Rebuild the active doc (IModelDoc2.EditRebuild3). Renamed features/
-    dimensions register for the API immediately, but a rebuild makes the new
-    names resolvable as equation targets and refreshes the tree labels.
+async def force_rebuild(adapter: Any) -> None:
+    """Force a full rebuild of the active doc, failing loud on error.
 
-    Reads EditRebuild3 via ``_read_member`` (no flagging) so the shared
-    ``currentModel`` is never mutated -- see :func:`_iter_features`."""
-    model = adapter.currentModel
-    adapter._attempt(lambda: _read_member(model, "EditRebuild3"))
-    print("  OK  rebuild")
+    Renamed features/dimensions register for the API immediately, but a rebuild
+    makes the new names resolvable as equation targets and refreshes the tree
+    labels. Delegates to the adapter's ``rebuild_model`` (``ForceRebuild3``) so
+    the COM call runs on the adapter's executor thread and a failed rebuild
+    raises through :func:`check` rather than passing silently."""
+    check("rebuild", await adapter.rebuild_model())
 
 
 

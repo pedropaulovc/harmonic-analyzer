@@ -130,10 +130,10 @@ async def build(adapter) -> dict[str, str]:
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
-    force_rebuild(adapter)
+    await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
-    force_rebuild(adapter)
+    await force_rebuild(adapter)
     await volume_check(adapter, "driven pin (equations neutral)", v_pin, 0.005 * v_pin)
 
     await apply_material(adapter, MATERIAL)
