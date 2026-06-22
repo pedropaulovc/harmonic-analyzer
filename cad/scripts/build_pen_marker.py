@@ -10,7 +10,7 @@ y 60. Dimensions: cad/DIMENSIONS.md ch. 24 (M6.4, low).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_pen_marker.py
+    uv run python cad\scripts\build_pen_marker.py
 """
 
 from __future__ import annotations
@@ -19,15 +19,21 @@ import math
 import sys
 
 from _common import (
+    SketchDims,
     add_line_chain,
     apply_material,
     check,
     define_polygon_chain,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
     set_sketch_direct_db,
+    volume_check,
 )
 
 PART_NAME = "pen-marker"
@@ -43,7 +49,18 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
+    # Editable knobs (Tools > Equations): barrel diameter, the barrel top, and
+    # the tip-cone height. The mm suffix is load-bearing -- this is an INCH
+    # document and the equation manager reads BARE numbers in document units (an
+    # unsuffixed 60 = 60 in, blowing the part up 25.4x).
+    await set_global(adapter, "BarrelDia", f"{BARREL_DIA}mm")
+    await set_global(adapter, "BarrelTopY", f"{BARREL_TOP_Y}mm")
+    await set_global(adapter, "ConeH", f"{CONE_H}mm")
+
+    drive_jobs: list[tuple[str, str]] = []
+
     r = BARREL_DIA / 2.0
+    profile_dims = SketchDims()
     check("create_sketch profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     check(
@@ -60,17 +77,32 @@ async def build(adapter) -> dict[str, str]:
     set_sketch_direct_db(adapter, False)
     # The centerline merged into the tip/top profile corners at creation,
     # so the closed chain's own constraints define it too.
-    await define_polygon_chain(adapter, profile, profile_pts, label="marker")
+    # Emission order (anchor vertex 0 at origin = 0 dims; then segments 0..2,
+    # segment 3 closes onto the anchor): segment 0 is general (cone flank ->
+    # horizontal r then vertical ConeH), segment 1 is vertical (barrel side ->
+    # BarrelTopY - ConeH), segment 2 is horizontal (barrel top -> r).
+    await define_polygon_chain(
+        adapter, profile, profile_pts, label="marker", dims=profile_dims,
+        names=["ConeRadius", "ConeH", "BarrelLen", "BarrelRadius"],
+        drives=['"BarrelDia" / 2', '"ConeH"', '"BarrelTopY" - "ConeH"', '"BarrelDia" / 2'],
+    )
     await ensure_fully_defined(adapter, "marker profile")
     check("exit_sketch profile", await adapter.exit_sketch())
+    name_last_feature(adapter, "MarkerProfile")
+    drive_jobs += profile_dims.apply(adapter, "MarkerProfile")
     check("revolve marker", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    name_last_feature(adapter, "Marker")
 
     expected = math.pi * r * r * (CONE_H / 3.0 + (BARREL_TOP_Y - CONE_H))
-    res = await adapter.get_mass_properties()
-    vol = float(res.data.volume) if res.is_success else float("nan")
-    print(f"  volume: {vol:.1f} mm^3 (analytic {expected:.1f})")
-    if abs(vol - expected) > 0.005 * expected:
-        raise RuntimeError(f"volume {vol:.1f} != analytic {expected:.1f}")
+    await volume_check(adapter, "marker", expected, 0.005 * expected)
+
+    # Deferred drive equations, then re-check neutrality (each evaluates to the
+    # as-built value, so the geometry must not move).
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "driven marker (equations neutral)", expected, 0.005 * expected)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

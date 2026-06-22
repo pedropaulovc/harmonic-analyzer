@@ -34,7 +34,7 @@ placements accordingly.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_rocker_arm.py
+    uv run python cad\scripts\build_rocker_arm.py
 """
 
 from __future__ import annotations
@@ -43,16 +43,22 @@ import math
 import sys
 
 from _common import (
+    SketchDims,
     anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
     name_bore_axis,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
     set_sketch_direct_db,
+    volume_check,
 )
 
 PART_NAME = "rocker-arm"
@@ -97,11 +103,39 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
+    # Editable knobs: named globals in the equation manager that drive every
+    # sketch dimension below. A GUI fine-tune edits THESE (Tools > Equations) --
+    # e.g. CurveRadius or RodSpan -- never an auto "D3@Sketch1". The mm suffix is
+    # load-bearing: this is an INCH document and the equation manager evaluates
+    # BARE numbers in document units, so an unsuffixed "800" would read as 800
+    # inches and blow the part up 25.4x. The derived globals (RTop/RBottom/CenterY
+    # = the concentric arc radii + their shared centre height) are equations of
+    # the primitives, so the two arcs stay concentric and ArmDepth-apart when a
+    # primitive changes.
+    await set_global(adapter, "CurveRadius", f"{CURVE_RADIUS}mm")
+    await set_global(adapter, "ArmDepth", f"{ARM_DEPTH}mm")
+    await set_global(adapter, "ArmThickness", f"{ARM_THICKNESS}mm")
+    await set_global(adapter, "RodSpan", f"{ROD_SPAN}mm")
+    await set_global(adapter, "TailSpan", f"{TAIL_SPAN}mm")
+    await set_global(adapter, "PivotHoleDia", f"{PIVOT_HOLE_DIA}mm")
+    await set_global(adapter, "RodHoleDia", f"{ROD_HOLE_DIA}mm")
+    await set_global(adapter, "RodHoleX", f"{ROD_HOLE_X}mm")
+    await set_global(adapter, "ThroughCutDepth", f"{THROUGH_CUT_DEPTH}mm")
+    await set_global(adapter, "RTop", '"CurveRadius"')
+    await set_global(adapter, "RBottom", '"CurveRadius" + "ArmDepth"')
+    await set_global(adapter, "CenterY", '"CurveRadius" + "ArmDepth"')
+
+    # Each sketch DECLARES its dim names + drive equations as it records them; the
+    # drive equations are collected here and applied in one deferred batch at the
+    # end (every equation target must resolve against the finished model).
+    drive_jobs: list[tuple[str, str]] = []
+
     tail_b = _bottom_point(-TAIL_SPAN)
     rod_b = _bottom_point(ROD_SPAN)
     tail_t = _top_point_radial(-TAIL_SPAN)
     rod_t = _top_point_radial(ROD_SPAN)
 
+    strap = SketchDims()
     check("create_sketch strap", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     entities = [
@@ -124,9 +158,16 @@ async def build(adapter) -> dict[str, str]:
     # each end line is a radial ray, so a point-on-line coincident with
     # the centre pins the top endpoints' angles (the lines themselves
     # ride their merged ends).
+    # Dim EMISSION ORDER for the strap profile (record each into ``strap`` as the
+    # display dim is created): the centre's vertical_distance (x is on-axis, so
+    # anchor_point_to_origin emits ONE dim = CenterY), then bottom radius, top
+    # radius, tail span, rod span -- FIVE display dims. The two ``coincident``
+    # relations (concentric arcs, radial end lines) are RELATIONS, not dims.
     await anchor_point_to_origin(
         adapter, f"{bottom_arc}.center", 0.0, CENTER_Y, "arc centre"
     )
+    # CenterY is at +y, so the unsigned vertical_distance drives positive.
+    strap.record("CenterY", '"CenterY"')
     check(
         "concentric arcs",
         await adapter.add_sketch_constraint(
@@ -137,22 +178,28 @@ async def build(adapter) -> dict[str, str]:
         "bottom radius",
         await adapter.add_sketch_dimension(bottom_arc, None, "radial", R_BOTTOM),
     )
+    strap.record("BottomRadius", '"RBottom"')
     check(
         "top radius",
         await adapter.add_sketch_dimension(top_arc, None, "radial", R_TOP),
     )
+    strap.record("TopRadius", '"RTop"')
+    # Tail endpoint is at x = -TailSpan; the horizontal_distance dim displays the
+    # MAGNITUDE, so its drive must be POSITIVE -- "TailSpan" is already +.
     check(
         "tail span",
         await adapter.add_sketch_dimension(
             f"{bottom_arc}.start", "origin", "horizontal_distance", TAIL_SPAN
         ),
     )
+    strap.record("TailSpan", '"TailSpan"')
     check(
         "rod span",
         await adapter.add_sketch_dimension(
             f"{bottom_arc}.end", "origin", "horizontal_distance", ROD_SPAN
         ),
     )
+    strap.record("RodSpan", '"RodSpan"')
     for label, line in (("rod end", rod_end), ("tail end", tail_end)):
         check(
             f"{label} radial",
@@ -162,27 +209,47 @@ async def build(adapter) -> dict[str, str]:
         )
     await ensure_fully_defined(adapter, "strap sketch")
     check("exit_sketch strap", await adapter.exit_sketch())
+    name_last_feature(adapter, "StrapProfile")
+    drive_jobs += strap.apply(adapter, "StrapProfile")
     check(
         "extrude strap",
         await adapter.create_extrusion(
             ExtrusionParameters(depth=ARM_THICKNESS, both_directions=True)
         ),
     )
-    res = await adapter.get_mass_properties()
-    print(f"  volume after strap: {res.data.volume:.1f} mm^3")
-    # expected: asin(114.3/816) * (816^2 - 800^2) * 2.5 = ~9,084 mm^3
+    name_last_feature(adapter, "Strap")
+    # Annular sector (two concentric arcs + radial ends): area =
+    # 1/2 * 2*asin(span/RBottom) * (RBottom^2 - RTop^2), x thickness.
+    v_strap = (
+        math.asin(ROD_SPAN / R_BOTTOM)
+        * (R_BOTTOM**2 - R_TOP**2)
+        * ARM_THICKNESS
+    )
+    await volume_check(adapter, "strap", v_strap, 0.01 * v_strap)
 
-    # Pivot pin hole at the origin, mid-depth.
+    # Pivot pin hole on the axis (x 0), mid-depth. On-axis centre: define_circle
+    # records only the centre-Z dim (the X is a relation) + the diameter -- TWO
+    # dims, so the "X" name/drive slot is ignored. The centre sits at
+    # _mid_y(0) = ArmDepth/2 (positive), so its unsigned dim drives positive.
+    pivot = SketchDims()
     check("create_sketch pivot hole", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, _mid_y(0.0), PIVOT_HOLE_DIA / 2.0, "pivot hole")
+    await define_circle(
+        adapter, 0.0, _mid_y(0.0), PIVOT_HOLE_DIA / 2.0, "pivot hole",
+        dims=pivot,
+        names=("PivotX", "PivotZ", "PivotDia"),
+        drives=(None, '"ArmDepth" / 2', '"PivotHoleDia"'),
+    )
     await ensure_fully_defined(adapter, "pivot hole sketch")
     check("exit_sketch pivot hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "PivotHoleProfile")
+    drive_jobs += pivot.apply(adapter, "PivotHoleProfile")
     check(
         "cut pivot hole",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "PivotHole")
     # Named axis through the pivot bore (Axis1): assembly mates select it by
     # NAME (Right ∩ Top+8), view-independent -- an internal bore wall never
     # selects by screen-projected point. See _common.name_bore_axis.
@@ -190,21 +257,51 @@ async def build(adapter) -> dict[str, str]:
         adapter, "Right Plane", 0.0, "Top Plane", _mid_y(0.0), "pivot bore"
     )
 
-    # Connecting-rod pin hole 1 inch from the pivot, mid-depth.
+    # Connecting-rod pin hole 1 inch from the pivot, mid-depth. Off-axis centre:
+    # define_circle emits centre-X, centre-Z, then diameter -- THREE dims. X is at
+    # +RodHoleX (positive, drives "RodHoleX"); the centre-Z is the trig-derived
+    # mid-height on the radial ray (no clean global knob) -> name/drive left None.
     rod_x = ROD_HOLE_X
+    rod = SketchDims()
     check("create_sketch rod hole", await adapter.create_sketch("Front"))
-    await define_circle(adapter, rod_x, _mid_y(rod_x), ROD_HOLE_DIA / 2.0, "rod hole")
+    await define_circle(
+        adapter, rod_x, _mid_y(rod_x), ROD_HOLE_DIA / 2.0, "rod hole",
+        dims=rod,
+        names=("RodPinX", None, "RodHoleDia"),
+        drives=('"RodHoleX"', None, '"RodHoleDia"'),
+    )
     await ensure_fully_defined(adapter, "rod hole sketch")
     check("exit_sketch rod hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "RodHoleProfile")
+    drive_jobs += rod.apply(adapter, "RodHoleProfile")
     check(
         "cut rod hole",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "RodHole")
     # Named axis through the rod-pin bore (Axis2 = (Right+rod_x) ∩ (Top+mid_y)).
     await name_bore_axis(
         adapter, "Right Plane", rod_x, "Top Plane", _mid_y(rod_x), "rod bore"
+    )
+
+    # Both bores are full-thickness through the 2.5 strap, entirely inside the
+    # material, so each removes pi*r^2*thickness.
+    v_pivot = math.pi * (PIVOT_HOLE_DIA / 2.0) ** 2 * ARM_THICKNESS
+    v_rod = math.pi * (ROD_HOLE_DIA / 2.0) ** 2 * ARM_THICKNESS
+    v_final = v_strap - v_pivot - v_rod
+    await volume_check(adapter, "bored strap", v_final, 0.01 * v_strap)
+
+    # Apply the deferred drive equations now -- after the whole model + a rebuild
+    # exists, so every target resolves. Each equation evaluates to the value just
+    # built, so the geometry must not move -- the re-check below is the proof.
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(
+        adapter, "driven rocker-arm (equations neutral)", v_final, 0.01 * v_strap
     )
 
     await apply_material(adapter, MATERIAL)

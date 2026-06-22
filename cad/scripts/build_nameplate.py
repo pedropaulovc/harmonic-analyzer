@@ -34,7 +34,7 @@ engraved plate needs the decorated face frontmost.)
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_nameplate.py
+    uv run python cad\scripts\build_nameplate.py
 """
 
 from __future__ import annotations
@@ -43,17 +43,23 @@ import math
 import sys
 
 from _common import (
+    SketchDims,
     add_line_chain,
     apply_material,
     bbox_extent_check,
     check,
     define_circle,
     define_rectilinear_chain,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
     set_sketch_direct_db,
+    volume_check,
 )
 from _features import (
     sketch_polyline_loops,
@@ -153,12 +159,44 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Rounded-corner plate slab (under-defined cosmetic outline -> no fully-defined gate).
+    # Editable knobs (Tools > Equations): the plate envelope, border band, screw
+    # pattern and incise depths. The mm suffix is load-bearing -- this is an INCH
+    # document and the equation manager reads BARE numbers in document units, so an
+    # unsuffixed "100" would evaluate as 100 inches and blow the part up 25.4x. The
+    # depth/radius knobs (PlateThickness, CornerR, RecessDepth, EngraveDepth) are
+    # editable too even though no SKETCH dim drives them -- thickness/recess are
+    # feature (extrude/cut) parameters, the corner radius rides the cosmetic
+    # rounded-rect arcs, and the engraving incises the traced loops; none lands in
+    # drive_jobs. FieldW/FieldH are the recessed-field span, derived from the
+    # envelope minus the border so the field re-centres when a knob changes.
+    await set_global(adapter, "PlateWidth", f"{PLATE_WIDTH}mm")
+    await set_global(adapter, "PlateHeight", f"{PLATE_HEIGHT}mm")
+    await set_global(adapter, "PlateThickness", f"{PLATE_THICKNESS}mm")
+    await set_global(adapter, "CornerR", f"{CORNER_R}mm")
+    await set_global(adapter, "BorderW", f"{BORDER_W}mm")
+    await set_global(adapter, "RecessDepth", f"{RECESS_DEPTH}mm")
+    await set_global(adapter, "EngraveDepth", f"{ENGRAVE_DEPTH}mm")
+    await set_global(adapter, "ScrewDia", f"{SCREW_DIA}mm")
+    await set_global(adapter, "ScrewInset", f"{SCREW_INSET}mm")
+    await set_global(adapter, "FieldW", '"PlateWidth" - 2 * "BorderW"')
+    await set_global(adapter, "FieldH", '"PlateHeight" - 2 * "BorderW"')
+
+    # Each sketch declares its dim names + drive equations inline; a per-sketch
+    # SketchDims records each dim in the order the helper emits it, count-asserts
+    # in apply(), and the drive equations are collected here for one deferred batch
+    # at the end (every target must resolve against the finished model).
+    drive_jobs: list[tuple[str, str]] = []
+
+    # Rounded-corner plate slab (under-defined cosmetic outline -> no fully-defined
+    # gate). The rounded rect is raw lines + corner arcs (sketch_rounded_rect), not
+    # a define_* helper, so it carries NO recordable display dims -- name the sketch
+    # and feature, but record no dims (CornerR is exposed as a global knob above).
     check("create_sketch outline", await adapter.create_sketch("Front"))
     await sketch_rounded_rect(
         adapter, PLATE_WIDTH, PLATE_HEIGHT, CORNER_R, PLATE_WIDTH / 2.0, PLATE_HEIGHT / 2.0
     )
     check("exit_sketch outline", await adapter.exit_sketch())
+    name_last_feature(adapter, "OutlineProfile")
     check(
         "extrude plate",
         # Extrude the body in -Z so the decorated z=0 face (where the field recess,
@@ -169,6 +207,7 @@ async def build(adapter) -> dict[str, str]:
             ExtrusionParameters(depth=PLATE_THICKNESS, reverse_direction=True)
         ),
     )
+    name_last_feature(adapter, "PlateSlab")
     await bbox_extent_check(adapter, "plate width (stated 100)", "x", PLATE_WIDTH)
     await bbox_extent_check(adapter, "plate height (stated 55)", "y", PLATE_HEIGHT)
 
@@ -177,6 +216,7 @@ async def build(adapter) -> dict[str, str]:
     field_w = PLATE_WIDTH - 2.0 * BORDER_W
     field_h = PLATE_HEIGHT - 2.0 * BORDER_W
     pre = await adapter.get_mass_properties()
+    field = SketchDims()
     check("create_sketch field", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     field_rect = [
@@ -186,16 +226,29 @@ async def build(adapter) -> dict[str, str]:
         (BORDER_W, BORDER_W + field_h),
     ]
     field_lines = await add_line_chain(adapter, field_rect)
-    await define_rectilinear_chain(adapter, field_lines, field_rect, label="field")
+    # Not origin-centred (corner anchored at (BorderW, BorderW)), so it stays a
+    # define_rectilinear_chain rather than define_centered_rectangle. Emission
+    # order: the two kept span dims in line order (horizontal field_w on L0, then
+    # vertical field_h on L1; the last segment of each direction is supplied by
+    # closure), THEN the anchor dims (x then z, both non-zero). Both anchor coords
+    # are +BorderW -- unsigned distances, positive, so they drive directly.
+    await define_rectilinear_chain(
+        adapter, field_lines, field_rect, label="field", dims=field,
+        names=["FieldWidth", "FieldDepth", "FieldX", "FieldZ"],
+        drives=['"FieldW"', '"FieldH"', '"BorderW"', '"BorderW"'],
+    )
     set_sketch_direct_db(adapter, False)
     await ensure_fully_defined(adapter, "field sketch")
     check("exit_sketch field", await adapter.exit_sketch())
+    name_last_feature(adapter, "FieldProfile")
+    drive_jobs += field.apply(adapter, "FieldProfile")
     check(
         "cut field recess",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=2.0 * RECESS_DEPTH, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "FieldRecess")
     v_field = field_w * field_h * RECESS_DEPTH
     removed = float(pre.data.volume) - float((await adapter.get_mass_properties()).data.volume)
     print(f"  field recess removed {removed:.1f} mm^3 (analytic {v_field:.1f})")
@@ -209,6 +262,9 @@ async def build(adapter) -> dict[str, str]:
     # The loops are traced to read from +Z; because the body extrudes -Z the
     # decorated z=0 face is the exposed front (outward normal +Z), so the loops
     # incise and read correctly drawn exactly as traced -- no mirror.
+    # Engraving sketch = traced glyph/cartouche line-loops (sketch_polyline_loops):
+    # an UNTOUCHED text/engraving feature -- no SketchDims, no recorded/driven dims
+    # (the loops are the traced photo, not parametric geometry). Name only the cut.
     eng_area = _engraving_area()
     check("create_sketch lettering", await adapter.create_sketch("Front"))
     await sketch_polyline_loops(adapter, LETTERING_LOOPS, label="lettering")
@@ -218,9 +274,13 @@ async def build(adapter) -> dict[str, str]:
         label="lettering",
         expected_removed=eng_area * ENGRAVE_DEPTH,
     )
+    name_last_feature(adapter, "LetteringCut")
 
     # Pinstripe frame: two concentric rounded rectangles (even-odd -> thin band),
     # incised ENGRAVE_DEPTH on the raised border (front face).
+    # Pinstripe = two concentric rounded rects drawn via sketch_rounded_rect (raw
+    # lines + corner arcs, not a define_* helper): cosmetic, under-defined, no
+    # recordable display dims -- like the plate outline, name only the cut.
     band_area = _rrect_area(BORDER_OUTER) - _rrect_area(BORDER_INNER)
     check("create_sketch pinstripe", await adapter.create_sketch("Front"))
     await sketch_rounded_rect(adapter, *_rrect_to_args(BORDER_OUTER))
@@ -231,27 +291,62 @@ async def build(adapter) -> dict[str, str]:
         label="pinstripe",
         expected_removed=band_area * ENGRAVE_DEPTH,
     )
+    name_last_feature(adapter, "PinstripeCut")
 
     # Four corner screw through-holes (both-directions 2x thickness clears the slab).
+    # Every centre is off-axis (both coords non-zero), so define_circle emits three
+    # dims per circle -- centreX, centreZ, diameter -- all UNSIGNED distances from
+    # the origin. Each coord is positive (the pattern sits in the +X/+Y quadrant),
+    # so the drives evaluate positive directly: the near edge is "ScrewInset", the
+    # far edge "PlateWidth"/"PlateHeight" minus it. Drives align to SCREW_XY order.
+    screw_drives = (
+        ('"ScrewInset"', '"ScrewInset"'),
+        ('"PlateWidth" - "ScrewInset"', '"ScrewInset"'),
+        ('"ScrewInset"', '"PlateHeight" - "ScrewInset"'),
+        ('"PlateWidth" - "ScrewInset"', '"PlateHeight" - "ScrewInset"'),
+    )
+    screws = SketchDims()
     pre = await adapter.get_mass_properties()
     check("create_sketch screws", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    for x, y in SCREW_XY:
-        await define_circle(adapter, x, y, SCREW_DIA / 2.0, f"screw ({x:.1f}, {y:.1f})")
+    for n, ((x, y), (dx, dz)) in enumerate(zip(SCREW_XY, screw_drives, strict=True)):
+        await define_circle(
+            adapter, x, y, SCREW_DIA / 2.0, f"screw ({x:.1f}, {y:.1f})",
+            dims=screws,
+            names=(f"S{n}X", f"S{n}Z", f"S{n}Dia"),
+            drives=(dx, dz, '"ScrewDia"'),
+        )
     set_sketch_direct_db(adapter, False)
     await ensure_fully_defined(adapter, "screws sketch")
     check("exit_sketch screws", await adapter.exit_sketch())
+    name_last_feature(adapter, "ScrewProfile")
+    drive_jobs += screws.apply(adapter, "ScrewProfile")
     check(
         "cut screw holes",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=2.0 * PLATE_THICKNESS, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "ScrewHoles")
     v_holes = len(SCREW_XY) * math.pi * (SCREW_DIA / 2.0) ** 2 * PLATE_THICKNESS
     removed = float(pre.data.volume) - float((await adapter.get_mass_properties()).data.volume)
     print(f"  screw holes removed {removed:.1f} mm^3 (analytic {v_holes:.1f})")
     if abs(removed - v_holes) > 0.02 * v_holes:
         raise RuntimeError(f"screw holes removed {removed:.1f}, expected {v_holes:.1f}")
+
+    # Apply the deferred drive equations now -- after the whole model + a rebuild
+    # exists, so every target resolves. Each equation evaluates to the value just
+    # built, so geometry must not move. This part has no single analytic-total
+    # volume_check (its incremental cuts are asserted in place above), so the
+    # neutrality proof captures the as-built volume and re-asserts it unchanged.
+    final_volume = float((await adapter.get_mass_properties()).data.volume)
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(
+        adapter, "driven nameplate (equations neutral)", final_volume, 1e-3 * final_volume
+    )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

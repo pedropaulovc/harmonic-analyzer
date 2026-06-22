@@ -19,7 +19,7 @@ passes ``None, None``, which fails the COM call and falls through to the blockin
 It works on a COPY so the real drive-train.SLDASM stays pristine, and tries the
 candidate save calls in order, logging mtime + GetSaveFlag + error/warning codes.
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\repro_inplace_save.py
+    uv run python cad\scripts\repro_inplace_save.py
 """
 
 from __future__ import annotations

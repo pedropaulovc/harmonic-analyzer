@@ -32,7 +32,7 @@ along X at (y 163, z 0). Dimensions: cad/DIMENSIONS.md ch. 19 (low/med).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_gooseneck.py
+    uv run python cad\scripts\build_gooseneck.py
 """
 
 from __future__ import annotations
@@ -41,6 +41,7 @@ import math
 import sys
 
 from _common import (
+    SketchDims,
     add_line_chain,
     anchor_point_to_origin,
     apply_material,
@@ -48,12 +49,17 @@ from _common import (
     define_circle,
     define_rectilinear_chain,
     dimension_between,
+    drive_dimension,
     ensure_fully_defined,
     extrude_at_offset,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
     set_sketch_direct_db,
+    volume_check,
 )
 
 PART_NAME = "gooseneck"
@@ -103,13 +109,55 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
+    # Editable knobs (Tools > Equations): every module constant above as a named
+    # global that drives the sketch dims below. The ``mm`` suffix is load-bearing
+    # -- this is an INCH document and the equation manager reads BARE numbers in
+    # document units (an unsuffixed 16 would be 16 inches and blow the part up
+    # 25.4x). Signed coordinates keep their sign in the global; the UNSIGNED
+    # distance dims they drive negate them so the equation evaluates positive
+    # (a centre/anchor dim at a negative coordinate displays as the magnitude).
+    # Derived spans (ArmY/ArmRun) reference other globals as equation strings.
+    # LegBottom and the LugY/extrude depths are feature parameters (start-offset
+    # extrudes), NOT sketch dims, so they are editable knobs that nothing drives.
+    await set_global(adapter, "TubeDia", f"{TUBE_DIA}mm")
+    await set_global(adapter, "LegTop", f"{LEG_TOP}mm")
+    await set_global(adapter, "LegBottom", f"{LEG_BOTTOM}mm")
+    await set_global(adapter, "BendR", f"{BEND_R}mm")
+    await set_global(adapter, "ArmEndX", f"{ARM_END_X}mm")
+    await set_global(adapter, "ArmY", '"LegTop" + "BendR"')
+    await set_global(adapter, "ArmRun", '-"ArmEndX" - "BendR"')
+    await set_global(adapter, "LugX0", f"{LUG_X[0]}mm")
+    await set_global(adapter, "LugX1", f"{LUG_X[1]}mm")
+    await set_global(adapter, "LugY0", f"{LUG_Y[0]}mm")
+    await set_global(adapter, "LugY1", f"{LUG_Y[1]}mm")
+    await set_global(adapter, "LugHalfZ", f"{LUG_HALF_Z}mm")
+    await set_global(adapter, "PinDia", f"{PIN_DIA}mm")
+    await set_global(adapter, "PinY", f"{PIN_Y}mm")
+    await set_global(adapter, "PinX0", f"{PIN_X[0]}mm")
+    await set_global(adapter, "PinX1", f"{PIN_X[1]}mm")
+
+    # Per-sketch dim names + drive equations are declared inline at each define_*
+    # / record call; their drive jobs collect here and apply in one deferred batch
+    # after the whole model + a rebuild exist (every equation target must resolve).
+    drive_jobs: list[tuple[str, str]] = []
+
     # 1. Vertical leg (start-offset extrude from the Top plane: the leg is
     # asymmetric -- bottom at LEG_BOTTOM, top at +LEG_TOP into the bend).
+    # On-axis (origin) circle: only the diameter is a dim; the two centre slots
+    # are ignored.
+    leg = SketchDims()
     check("create_sketch leg", await adapter.create_sketch("Top"))
-    await define_circle(adapter, 0.0, 0.0, TUBE_R, "leg")
+    await define_circle(
+        adapter, 0.0, 0.0, TUBE_R, "leg", dims=leg,
+        names=("LegCx", "LegCz", "TubeDia"),
+        drives=(None, None, '"TubeDia"'),
+    )
     await ensure_fully_defined(adapter, "leg sketch")
     check("exit_sketch leg", await adapter.exit_sketch())
+    name_last_feature(adapter, "LegProfile")
+    drive_jobs += leg.apply(adapter, "LegProfile")
     extrude_at_offset(adapter, LEG_TOP - LEG_BOTTOM, LEG_BOTTOM)
+    name_last_feature(adapter, "Leg")
     expected = math.pi * TUBE_R**2 * (LEG_TOP - LEG_BOTTOM)
     vol = await _volume(adapter)
     print(f"  volume after leg: {vol:.1f} mm^3 (analytic {expected:.1f})")
@@ -121,7 +169,8 @@ async def build(adapter) -> dict[str, str]:
     # once sketch points became addressable). Direct DB keeps inference
     # relations off; exact-coordinate joints still merge. add_arc draws
     # CCW: bend-entry (angle 0 from the centre) to bend-exit (angle 90).
-    path_name = check("create_sketch bend path", await adapter.create_sketch("Front"))
+    bend_path = SketchDims()
+    check("create_sketch bend path", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     arc = check(
         "bend arc",
@@ -136,11 +185,20 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_line(-BEND_R, ARM_Y, ARM_END_X, ARM_Y),
     )
     set_sketch_direct_db(adapter, False)
+    # Manual-dim sketch (crank-pin pattern): record each display dim into the
+    # SketchDims as it is created, in creation order. The centre anchor is at
+    # (-BEND_R, LEG_TOP) -- both coords non-zero, so it emits TWO unsigned
+    # distance dims (horizontal then vertical), driven by the magnitudes: the
+    # centre X is BEND_R east of the origin, the centre Y is LEG_TOP up. THEN the
+    # arc radius, THEN the arm run -- four dims total.
     await anchor_point_to_origin(adapter, f"{arc}.center", -BEND_R, LEG_TOP, "bend centre")
+    bend_path.record("BendCentreX", '"BendR"')
+    bend_path.record("BendCentreY", '"LegTop"')
     check(
         "bend radius",
         await adapter.add_sketch_dimension(arc, None, "radial", BEND_R),
     )
+    bend_path.record("BendRadius", '"BendR"')
     check(
         "bend entry level with centre",
         await adapter.add_sketch_constraint(f"{arc}.start", f"{arc}.center", "horizontal_points"),
@@ -153,8 +211,15 @@ async def build(adapter) -> dict[str, str]:
     await dimension_between(
         adapter, f"{arm}.start", f"{arm}.end", "horizontal_distance", ARM_RUN, "arm run"
     )
+    bend_path.record("ArmRun", '"ArmRun"')
     await ensure_fully_defined(adapter, "bend path")
     check("exit_sketch bend path", await adapter.exit_sketch())
+    # The sweep selects this sketch by name below; rename it BEFORE the sweep so
+    # the path reference resolves to the new name (a captured auto-name goes
+    # stale the instant it is renamed). The path sketch is NOT absorbed (it stays
+    # in the tree as the sweep path), so naming it here is permanent.
+    path_name = name_last_feature(adapter, "BendPath")
+    drive_jobs += bend_path.apply(adapter, "BendPath")
 
     profile_plane = check(
         "create_plane bend profile",
@@ -166,9 +231,14 @@ async def build(adapter) -> dict[str, str]:
         "create_sketch bend profile",
         await adapter.create_sketch(getattr(profile_plane, "name", profile_plane)),
     )
+    # The sweep profile rides a custom reference plane and is pierced onto the
+    # path; its dim structure isn't a plain origin circle, and its diameter is
+    # already the TubeDia-driven knob (shared with the Leg profile). So name it
+    # but record no dims -- nothing extra to drive.
     await define_circle(adapter, 0.0, 0.0, TUBE_R, "bend profile")
     await ensure_fully_defined(adapter, "bend profile sketch")
     check("exit_sketch bend profile", await adapter.exit_sketch())
+    name_last_feature(adapter, "BendProfile")
     res = await adapter.create_sweep(SweepParameters(path=path_name))
     if not res.is_success:
         print(f"  ..  bend sweep failed ({res.error}); flipping profile plane")
@@ -187,8 +257,12 @@ async def build(adapter) -> dict[str, str]:
         await define_circle(adapter, 0.0, 0.0, TUBE_R, "bend profile (flipped)")
         await ensure_fully_defined(adapter, "bend profile sketch (flipped)")
         check("exit_sketch bend profile (flipped)", await adapter.exit_sketch())
+        # Distinct name: if the primary sweep failed, the original "BendProfile"
+        # sketch still exists (unconsumed), so reusing the name would collide.
+        name_last_feature(adapter, "BendProfileFlipped")
         res = await adapter.create_sweep(SweepParameters(path=path_name))
     check("sweep bend + arm", res)
+    name_last_feature(adapter, "BendArmSweep")
     v_bend = math.pi**2 * TUBE_R**2 * BEND_R / 2.0  # quarter torus
     v_arm = math.pi * TUBE_R**2 * ARM_RUN
     expected = expected + v_bend + v_arm
@@ -198,7 +272,13 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"bend volume {vol:.1f} != {expected:.1f}")
     expected = vol  # rebase: keep the sweep's B-rep slack out of the lug delta
 
-    # 3. Pin lug rising into the arm underside.
+    # 3. Pin lug rising into the arm underside. NOT origin-centred (offset in X),
+    # so it stays a rectilinear chain. Emission order = per-segment distance dims
+    # in line order skipping the last of each direction (closure supplies it):
+    # the width (line0, |X1-X0|=5.5) then the depth (line1, 2*half-Z=3.0), THEN
+    # the anchor dims at vertex 0 (LUG_X[0], -LUG_HALF_Z) -- both non-zero, so X
+    # then Z, driven by their magnitudes (vertex is at negative X and -Z).
+    lug_dims = SketchDims()
     check("create_sketch lug", await adapter.create_sketch("Top"))
     lug_rect = [
         (LUG_X[0], -LUG_HALF_Z),
@@ -207,10 +287,17 @@ async def build(adapter) -> dict[str, str]:
         (LUG_X[0], LUG_HALF_Z),
     ]
     lug = await add_line_chain(adapter, lug_rect)
-    await define_rectilinear_chain(adapter, lug, lug_rect, label="lug")
+    await define_rectilinear_chain(
+        adapter, lug, lug_rect, label="lug", dims=lug_dims,
+        names=["LugWidth", "LugDepth", "LugAnchorX", "LugAnchorZ"],
+        drives=['"LugX1" - "LugX0"', '2 * "LugHalfZ"', '-"LugX0"', '"LugHalfZ"'],
+    )
     await ensure_fully_defined(adapter, "lug sketch")
     check("exit_sketch lug", await adapter.exit_sketch())
+    name_last_feature(adapter, "LugProfile")
+    drive_jobs += lug_dims.apply(adapter, "LugProfile")
     extrude_at_offset(adapter, LUG_Y[1] - LUG_Y[0], LUG_Y[0])
+    name_last_feature(adapter, "Lug")
     # Added material = the prism OUTSIDE the tube: height to the tube
     # underside (~168 + z^2/16 over z +-1.5) ~ 9.05 mean, vs the 9-high
     # solid reference -> ratio 1.005, inside the (0.95, 1.01) window.
@@ -224,7 +311,12 @@ async def build(adapter) -> dict[str, str]:
     expected = vol
 
     # 4. Spring pin along X (revolved in the Front plane -- no Right-plane
-    # axis-mapping ambiguity).
+    # axis-mapping ambiguity). The centerline shares the profile's bottom corners
+    # (exact-coordinate merge), carries no dim of its own, so the four profile
+    # dims are the whole record. Emission order = width (line0, |X1-X0|=11), then
+    # depth (line1, PIN_DIA/2=2), THEN anchor at vertex 0 (PIN_X[0], PIN_Y): X is
+    # at negative X (driven by its magnitude) and Y is positive.
+    pin_dims = SketchDims()
     check("create_sketch pin", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     check(
@@ -241,10 +333,17 @@ async def build(adapter) -> dict[str, str]:
     set_sketch_direct_db(adapter, False)
     # The centerline shares the profile's bottom corners (exact-coordinate
     # merge, proven live), so the dimensioned profile defines it too.
-    await define_rectilinear_chain(adapter, profile, pin_rect, label="pin")
+    await define_rectilinear_chain(
+        adapter, profile, pin_rect, label="pin", dims=pin_dims,
+        names=["PinLen", "PinRadius", "PinAnchorX", "PinAnchorY"],
+        drives=['"PinX1" - "PinX0"', '"PinDia" / 2', '-"PinX0"', '"PinY"'],
+    )
     await ensure_fully_defined(adapter, "pin sketch")
     check("exit_sketch pin", await adapter.exit_sketch())
+    name_last_feature(adapter, "PinProfile")
+    drive_jobs += pin_dims.apply(adapter, "PinProfile")
     check("revolve pin", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    name_last_feature(adapter, "Pin")
     pin_len = PIN_X[1] - PIN_X[0]
     v_pin = math.pi * (PIN_DIA / 2.0) ** 2 * pin_len
     # The pin passes through the lug: subtract the lens-clipped overlap.
@@ -258,6 +357,18 @@ async def build(adapter) -> dict[str, str]:
     print(f"  volume after pin: {vol:.1f} mm^3 (+{added:.1f}, net {v_net:.1f})")
     if not (0.9 * v_net <= added <= 1.1 * v_net):
         raise RuntimeError(f"pin: added {added:.1f}, expected ~{v_net:.1f}")
+    final_vol = vol
+
+    # Apply the deferred drive equations now -- after the whole model + a rebuild
+    # exists, so every target resolves. Each equation evaluates to the value just
+    # built, so the geometry must not move; the re-check below is the proof.
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(
+        adapter, "driven gooseneck (equations neutral)", final_vol, 0.001 * final_vol
+    )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

@@ -21,7 +21,7 @@ Layout: bar x = 0..300, y = 0..30, z = 0..6; teeth cut into the top edge.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_platen_rack.py
+    uv run python cad\scripts\build_platen_rack.py
 """
 
 from __future__ import annotations
@@ -31,18 +31,23 @@ import sys
 
 from _common import (
     IN,
+    SketchDims,
     add_line_chain,
     apply_material,
     check,
     define_polygon_chain,
     define_rectilinear_chain,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
     set_sketch_direct_db,
+    volume_check,
 )
-from _gear import volume_check
 
 PART_NAME = "platen-rack"
 MATERIAL = "Brass"  # ch. 22/23 photos: brass
@@ -91,7 +96,22 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Bar blank: origin-cornered rectangle.
+    # Editable knobs (Tools > Equations): the ordinary bar section is driven by
+    # these. The tooth GAP geometry is deliberately left undriven -- its flank
+    # angle and pitch-line offsets must MESH with the DP-30 rack pinion, so the
+    # gap sketch is named (for the namer/pattern) but its dims are NOT recorded
+    # or driven; touching them would risk silently breaking the mesh.
+    # mm suffix is load-bearing -- this is an INCH document and the equation
+    # manager reads BARE numbers in document units (an unsuffixed 300 = 300 in,
+    # blowing the part up 25.4x).
+    await set_global(adapter, "BarLength", f"{BAR_LENGTH}mm")
+    await set_global(adapter, "BarHeight", f"{BAR_HEIGHT}mm")
+    await set_global(adapter, "BarThickness", f"{BAR_THICKNESS}mm")
+
+    drive_jobs: list[tuple[str, str]] = []
+
+    # Bar blank: origin-cornered rectangle (the ORDINARY sketch -- fully driven).
+    bar = SketchDims()
     check("create_sketch bar", await adapter.create_sketch("Front"))
     bar_rect = [
         (0.0, 0.0),
@@ -100,13 +120,24 @@ async def build(adapter) -> dict[str, str]:
         (0.0, BAR_HEIGHT),
     ]
     bar_lines = await add_line_chain(adapter, bar_rect)
-    await define_rectilinear_chain(adapter, bar_lines, bar_rect, label="bar")
+    # Emission order (anchor vertex 0 at origin = 0 anchor dims; then the kept
+    # per-segment distance dims in line order, skipping the last of each
+    # direction): line0 horizontal span = BarLength, line1 vertical span =
+    # BarHeight; lines 2/3 close.
+    await define_rectilinear_chain(
+        adapter, bar_lines, bar_rect, label="bar", dims=bar,
+        names=["Length", "Height"],
+        drives=['"BarLength"', '"BarHeight"'],
+    )
     await ensure_fully_defined(adapter, "bar sketch")
     check("exit_sketch bar", await adapter.exit_sketch())
+    name_last_feature(adapter, "BarProfile")
+    drive_jobs += bar.apply(adapter, "BarProfile")
     check(
         "extrude bar",
         await adapter.create_extrusion(ExtrusionParameters(depth=BAR_THICKNESS)),
     )
+    name_last_feature(adapter, "Bar")
     v_bar = BAR_LENGTH * BAR_HEIGHT * BAR_THICKNESS
     volume = await volume_check(adapter, "bar blank", v_bar, 0.005 * v_bar)
 
@@ -123,13 +154,19 @@ async def build(adapter) -> dict[str, str]:
     ]
     gap = await add_line_chain(adapter, gap_pts)
     set_sketch_direct_db(adapter, False)
+    # RACK MESH: the tooth-gap profile (flank angle, pitch-line offsets) MUST
+    # mesh with the DP-30 rack pinion -- do NOT record/drive its dims. Name the
+    # sketch+cut features only so the pattern can reference them and the namer
+    # walks a clean tree; the gap stays fully defined by its literal coordinates.
     await define_polygon_chain(adapter, gap, gap_pts, label="gap")
     await ensure_fully_defined(adapter, "gap sketch")
     check("exit_sketch gap", await adapter.exit_sketch())
+    name_last_feature(adapter, "GapProfile")
     gap_cut = await adapter.create_cut_extrude(
         ExtrusionParameters(depth=BAR_THICKNESS + 1.0)
     )
     check("cut seed gap", gap_cut)
+    gap_cut_name = name_last_feature(adapter, "SeedGap")
     v_gap = GAP_AREA * BAR_THICKNESS
     volume = await volume_check(adapter, "seed gap", volume - v_gap, 0.02 * v_gap)
 
@@ -138,14 +175,27 @@ async def build(adapter) -> dict[str, str]:
     res = await adapter.linear_pattern_feature(
         LinearPatternParameters(
             direction_point=[BAR_LENGTH / 2.0, 0.0, 0.0],
-            features=[gap_cut.data.name],
+            features=[gap_cut_name],
             count=GAP_COUNT,
             spacing=PITCH,
         )
     )
     check("linear pattern gaps", res)
+    name_last_feature(adapter, "ToothPattern")
     v_rack = v_bar - GAP_COUNT * v_gap
     await volume_check(adapter, "toothed rack", v_rack, 0.01 * GAP_COUNT * v_gap)
+
+    # Apply the deferred drive equations after the whole model + a rebuild
+    # exists, then re-check: each equation evaluates to the value just built, so
+    # the geometry (including the patterned mesh) must not move. Only the bar
+    # sketch contributes drive jobs -- the gap is intentionally undriven.
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(
+        adapter, "driven rack (equations neutral)", v_rack, 0.01 * GAP_COUNT * v_gap
+    )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

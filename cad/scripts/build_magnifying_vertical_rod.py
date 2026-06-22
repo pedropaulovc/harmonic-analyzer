@@ -12,22 +12,29 @@ Layout: rod axis along +X from the origin, revolved about a centerline
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_magnifying_vertical_rod.py
+    uv run python cad\scripts\build_magnifying_vertical_rod.py
 """
 
 from __future__ import annotations
 
+import math
 import sys
 
 from _common import (
+    SketchDims,
     anchor_point_to_origin,
     apply_material,
     check,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
     set_sketch_direct_db,
+    volume_check,
 )
 
 PART_NAME = "magnifying-vertical-rod"
@@ -44,6 +51,15 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
+    # Editable knobs (Tools > Equations): rod length + diameter. The mm suffix is
+    # load-bearing -- this is an INCH document and the equation manager reads BARE
+    # numbers in document units (an unsuffixed 150 = 150 in).
+    await set_global(adapter, "RodLength", f"{ROD_LENGTH}mm")
+    await set_global(adapter, "RodDia", f"{ROD_DIA}mm")
+
+    drive_jobs: list[tuple[str, str]] = []
+
+    profile = SketchDims()
     check("create_sketch profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     check(
@@ -81,16 +97,23 @@ async def build(adapter) -> dict[str, str]:
         "axis line horizontal",
         await adapter.add_sketch_constraint(axis_line, None, "horizontal"),
     )
+    # Record each manual dim into SketchDims as it is emitted (creation order):
+    # the two on-axis dome-centre X distances (one dim each -- y is 0, a relation),
+    # then the right dome's radius. Three display dims; the left dome's radius is
+    # forced by its anchored centre + the anchored origin end, so it is not a dim.
     await anchor_point_to_origin(
         adapter, f"{cap_left}.center", R, 0.0, "left dome centre"
     )
+    profile.record("LeftDomeX", '"RodDia" / 2')
     await anchor_point_to_origin(
         adapter, f"{cap_right}.center", ROD_LENGTH - R, 0.0, "right dome centre"
     )
+    profile.record("RightDomeX", '"RodLength" - "RodDia" / 2')
     check(
         "right dome radius",
         await adapter.add_sketch_dimension(cap_right, None, "radial", R),
     )
+    profile.record("DomeRadius", '"RodDia" / 2')
     check(
         "top horizontal",
         await adapter.add_sketch_constraint(top, None, "horizontal"),
@@ -103,11 +126,28 @@ async def build(adapter) -> dict[str, str]:
     )
     await ensure_fully_defined(adapter, "rod profile")
     check("exit_sketch profile", await adapter.exit_sketch())
+    name_last_feature(adapter, "RodProfile")
+    drive_jobs += profile.apply(adapter, "RodProfile")
 
     check(
         "revolve rod",
         await adapter.create_revolve(RevolveParameters(angle=360.0)),
     )
+    name_last_feature(adapter, "Rod")
+
+    # Capsule volume: cylinder body (length L - 2R) + a full sphere of radius R
+    # from the two hemispherical domes.
+    v_rod = math.pi * R**2 * (ROD_LENGTH - 2.0 * R) + (4.0 / 3.0) * math.pi * R**3
+    await volume_check(adapter, "rod", v_rod, 0.005 * v_rod)
+
+    # Apply the deferred drive equations after the model + a rebuild exist, then
+    # re-check: every equation evaluates to the value just built, so geometry
+    # must not move.
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "driven rod (equations neutral)", v_rod, 0.005 * v_rod)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
