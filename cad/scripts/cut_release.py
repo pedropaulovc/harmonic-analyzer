@@ -37,7 +37,7 @@ What it does, in order:
 Run (SolidWorks already open, NOTHING else driving it -- single STA COM server,
 a concurrent build_all/verify deadlocks):
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\cut_release.py [vX.Y.Z] [--bump patch|minor|major] [--allow-dirty] [--draft]
+    uv run python cad\scripts\cut_release.py [vX.Y.Z] [--bump patch|minor|major] [--allow-dirty] [--draft]
 
 ``--draft`` makes the GitHub release a draft (asset uploaded, not published).
 """

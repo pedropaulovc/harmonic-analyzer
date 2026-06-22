@@ -1,5 +1,7 @@
 # Memory index
 
+- [Parametric naming round-trip](parametric-naming-roundtrip.md) — make build scripts emit named SW globals/sketches/features/dims so parts are GUI-editable & round-trip (top-frame = validated reference). 3 COM gotchas: never flag IFeature/currentModel (breaks adapter cut walk → "Parameter not optional"); name_sketch must sync adapter._last_sketch_name; inch docs eval equations in doc units → give globals explicit `mm`
+
 - [Channel-count + amplitude state](channel-amplitude-state.md) — FINAL state on similarity-tuning branch (63dd47e, NOT for main): full 20 active channels + neutral amplitude preset (all a_j=0, matches neutral reference photos). Knobs: machine/channels.yaml active_count=20, machine/amplitude.yaml preset=neutral. Square preset is the documented alternative
 - [Oblique views break on-axis occlusion](oblique-views-break-on-axis-occlusion.md) — a part on a column/axis line (gooseneck post @ east x197 z0) is fused with the column in BOTH front+side elevations; a 3/4 view (ch07-img17 az−150) exposes its free end. Vertical scale = top-frame 41mm; cross-check with the part's azimuth-invariant cylinder-width silhouette. Gooseneck tip → machine 880, ~120 below plate (not the ~40 front-view guess)
 - [SW assembly mate diagnostics API](sw-assembly-mate-diagnostics-api.md) — how to fetch "What's Wrong" / "View Mate Errors" / over-define info via COM (GetWhatsWrong + byref VARIANT trap, GetErrorCode2, swFeatureError_e 46/47/48); GetConstrainedStatus is gear-mate-blind so probe a mate to read true DOF

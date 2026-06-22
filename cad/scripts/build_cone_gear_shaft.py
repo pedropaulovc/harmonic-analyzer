@@ -46,7 +46,7 @@ rotation (DIMENSIONS.md ch. 13 drive-train layout).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_cone_gear_shaft.py
+    uv run python cad\scripts\build_cone_gear_shaft.py
 """
 
 from __future__ import annotations
@@ -56,14 +56,19 @@ import sys
 
 from _common import (
     IN,
+    SketchDims,
     apply_material,
     name_bore_axis,
     check,
     define_circle,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
 )
 from _gear import volume_check
 
@@ -95,21 +100,52 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
+    # Editable knobs (Tools > Equations): one diameter + one end station per
+    # section. The mm suffix is load-bearing -- this is an INCH document and the
+    # equation manager reads BARE numbers in document units. The section diameters
+    # come from SECTIONS in inches (converted to mm here so a single global drives
+    # the on-axis circle's diameter dim). The end stations are extrude DEPTHS
+    # (feature parameters, not sketch dims), so nothing drives them; they stay
+    # editable knobs matching the exemplars.
+    for i, (dia_in, end_z) in enumerate(SECTIONS):
+        await set_global(adapter, f"SecDia{i}", f"{dia_in * IN}mm")
+        await set_global(adapter, f"SecEnd{i}", f"{end_z}mm")
+
+    drive_jobs: list[tuple[str, str]] = []
+
     volume = 0.0
     prev_end = 0.0
-    for dia_in, end_z in SECTIONS:
+    for i, (dia_in, end_z) in enumerate(SECTIONS):
         label = f"section d{dia_in:g}in to z={end_z:g}"
+        # On-axis circle (centre at the origin): define_circle records ONLY the
+        # diameter dim (the X/Z centre slots are relations, not display dims).
+        sec = SketchDims()
         check(f"create_sketch {label}", await adapter.create_sketch("Front"))
-        await define_circle(adapter, 0.0, 0.0, dia_in * IN / 2.0, label)
+        await define_circle(
+            adapter, 0.0, 0.0, dia_in * IN / 2.0, label, dims=sec,
+            names=(f"Sec{i}Cx", f"Sec{i}Cz", f"Sec{i}Dia"),
+            drives=(None, None, f'"SecDia{i}"'),
+        )
         await ensure_fully_defined(adapter, f"{label} sketch")
         check(f"exit_sketch {label}", await adapter.exit_sketch())
+        name_last_feature(adapter, f"Sec{i}Profile")
+        drive_jobs += sec.apply(adapter, f"Sec{i}Profile")
         check(
             f"extrude {label}",
             await adapter.create_extrusion(ExtrusionParameters(depth=end_z)),
         )
+        name_last_feature(adapter, f"Sec{i}")
         volume += math.pi * (dia_in * IN / 2.0) ** 2 * (end_z - prev_end)
         await volume_check(adapter, label, volume, 0.005 * volume)
         prev_end = end_z
+
+    # Deferred drive equations, then re-check neutrality (each evaluates to the
+    # as-built value, so the geometry must not move).
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "driven cone-gear shaft (equations neutral)", volume, 0.005 * volume)
 
     # Named bore/central axis for view-independent assembly mate
     # selection (M6 mated-DOF drive train).

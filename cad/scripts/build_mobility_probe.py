@@ -25,7 +25,7 @@ suppressible by name without the flexible-sub indirection the motion study needs
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_mobility_probe.py
+    uv run python cad\scripts\build_mobility_probe.py
 """
 
 from __future__ import annotations

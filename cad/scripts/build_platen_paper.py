@@ -15,7 +15,7 @@ thickness extruded +Z (same scheme as build_platen).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_platen_paper.py
+    uv run python cad\scripts\build_platen_paper.py
 """
 
 from __future__ import annotations
@@ -24,15 +24,21 @@ import sys
 
 from _common import (
     PAPER_WHITE,
+    SketchDims,
     add_line_chain,
     apply_color,
     apply_material,
     check,
     define_rectilinear_chain,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
+    volume_check,
 )
 
 PART_NAME = "platen-paper"
@@ -49,6 +55,23 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
+    # Editable knobs (Tools > Equations): the sheet width, height, and the proud
+    # thickness (an extrude depth -- a knob, but a feature parameter, so nothing
+    # drives it). The mm suffix is load-bearing -- this is an INCH document and
+    # the equation manager reads BARE numbers in document units (an unsuffixed
+    # 259.5 = 259.5 in).
+    await set_global(adapter, "PaperWidth", f"{PAPER_WIDTH}mm")
+    await set_global(adapter, "PaperHeight", f"{PAPER_HEIGHT}mm")
+    await set_global(adapter, "PaperThickness", f"{PAPER_THICKNESS}mm")
+
+    drive_jobs: list[tuple[str, str]] = []
+
+    # Origin-CORNER rectangle (corner at (0,0)), so define_rectilinear_chain --
+    # not define_centered_rectangle. Emission order: the per-segment distance dims
+    # in line order skipping one redundant span per direction -- width (segment 0,
+    # bottom edge) then height (segment 1, right edge) -- then the anchor dims,
+    # of which there are none (the anchor vertex is the origin).
+    paper = SketchDims()
     check("create_sketch outline", await adapter.create_sketch("Front"))
     paper_rect = [
         (0.0, 0.0),
@@ -57,20 +80,31 @@ async def build(adapter) -> dict[str, str]:
         (0.0, PAPER_HEIGHT),
     ]
     lines = await add_line_chain(adapter, paper_rect)
-    await define_rectilinear_chain(adapter, lines, paper_rect, label="paper")
+    await define_rectilinear_chain(
+        adapter, lines, paper_rect, label="paper", dims=paper,
+        names=["Width", "Height"],
+        drives=['"PaperWidth"', '"PaperHeight"'],
+    )
     await ensure_fully_defined(adapter, "paper outline")
     check("exit_sketch outline", await adapter.exit_sketch())
+    name_last_feature(adapter, "PaperProfile")
+    drive_jobs += paper.apply(adapter, "PaperProfile")
     check(
         "extrude paper",
         await adapter.create_extrusion(ExtrusionParameters(depth=PAPER_THICKNESS)),
     )
+    name_last_feature(adapter, "Paper")
 
-    res = await adapter.get_mass_properties()
-    vol = res.data.volume
     expected = PAPER_WIDTH * PAPER_HEIGHT * PAPER_THICKNESS
-    print(f"  volume: {vol:.1f} mm^3 (analytic {expected:.1f})")
-    if abs(vol - expected) > 0.005 * expected:
-        raise RuntimeError(f"paper volume {vol:.1f} != {expected:.1f}")
+    await volume_check(adapter, "paper", expected, 0.005 * expected)
+
+    # Deferred drive equations, then re-check neutrality (each evaluates to the
+    # as-built value, so the geometry must not move).
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "driven paper (equations neutral)", expected, 0.005 * expected)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PAPER_WHITE)

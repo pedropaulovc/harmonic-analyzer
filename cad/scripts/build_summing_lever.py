@@ -55,7 +55,7 @@ low/med confidence).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_summing_lever.py
+    uv run python cad\scripts\build_summing_lever.py
 """
 
 from __future__ import annotations
@@ -65,6 +65,7 @@ import sys
 
 from _common import (
     IN,
+    SketchDims,
     add_line_chain,
     anchor_point_to_origin,
     apply_material,
@@ -73,13 +74,18 @@ from _common import (
     define_polygon_chain,
     define_rectilinear_chain,
     dimension_between,
+    drive_dimension,
     ensure_fully_defined,
     extrude_at_offset,
+    force_rebuild,
     name_bore_axis,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
     set_sketch_direct_db,
+    volume_check,
 )
 
 PART_NAME = "summing-lever"
@@ -199,7 +205,7 @@ async def _three_point_arc(
     return check(f"add_arc {label}", arc), (cx, cy), radius
 
 
-async def _coefficients_plate(adapter) -> None:
+async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Feature 1: Top-plane plate on the +X arm (x in [0, w]); mid-plane extrude
     (PLATE_T total, centred on the pivot at local y 0) so the whole casting stays
     coplanar with the cylinder and ribs.
@@ -216,8 +222,14 @@ async def _coefficients_plate(adapter) -> None:
     PLACEMENT, not baked here -- see PLATE_TOP_Y and the Phase 2/3 plan."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
+    plate = SketchDims()
     check("create_sketch plate", await adapter.create_sketch("Top"))
     # +X arm: x in [0, PLATE_W], length along sketch Y (= world Z) in [-L/2, L/2].
+    # NOT origin-centred (x runs 0..PLATE_W), so define_rectilinear_chain rather
+    # than define_centered_rectangle. Emission order (rectilinear): the per-segment
+    # distance dims skipping the last of each direction -- width (line0, horizontal
+    # PLATE_W) then length (line1, vertical PLATE_L) -- THEN the anchor dims for the
+    # corner (0, -L/2): x=0 drops, z (=-L/2) is one unsigned vertical distance.
     rect = [
         (0.0, -PLATE_L / 2.0),
         (PLATE_W, -PLATE_L / 2.0),
@@ -225,15 +237,22 @@ async def _coefficients_plate(adapter) -> None:
         (0.0, PLATE_L / 2.0),
     ]
     outline = await add_line_chain(adapter, rect)
-    await define_rectilinear_chain(adapter, outline, rect, label="plate")
+    await define_rectilinear_chain(
+        adapter, outline, rect, label="plate", dims=plate,
+        names=["PlateWidth", "PlateLength", "PlateAnchorZ"],
+        drives=['"PlateW"', '"PlateL"', '"PlateL" / 2'],
+    )
     await ensure_fully_defined(adapter, "coefficients plate sketch")
     check("exit_sketch plate", await adapter.exit_sketch())
+    name_last_feature(adapter, "PlateProfile")
+    drive_jobs += plate.apply(adapter, "PlateProfile")
     check(
         "extrude coefficients plate",
         await adapter.create_extrusion(
             ExtrusionParameters(depth=PLATE_T, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "CoefficientsPlate")
 
     # All HOLE_COUNT spring holes in ONE sketch at the registered stations.
     # Top-plane sketch Y = -world Z, so world HOLE_Z[j] sits at sketch -HOLE_Z[j];
@@ -242,39 +261,61 @@ async def _coefficients_plate(adapter) -> None:
     # (no seed + linear pattern) keeps the field direction-free: a directional
     # FeatureLinearPattern5 marched along an auto-selected edge whose natural
     # sense reversed the field off the -Z plate edge, leaving all but j=0 solid.
+    # Each off-axis circle emits centre-X, centre-Z, diameter (3 dims): X is the
+    # shared HOLE_X column (driven to "HoleX"), diameter to "HoleDia"; the per-
+    # station Z has no single global knob, so its slot stays None (auto-named).
+    holes = SketchDims()
     check("create_sketch spring holes", await adapter.create_sketch("Top"))
     for j in range(HOLE_COUNT):
         await define_circle(
-            adapter, HOLE_X, -HOLE_Z[j], HOLE_DIA / 2.0, f"spring hole {j}"
+            adapter, HOLE_X, -HOLE_Z[j], HOLE_DIA / 2.0, f"spring hole {j}",
+            dims=holes,
+            names=(f"Hole{j}X", None, f"Hole{j}Dia"),
+            drives=('"HoleX"', None, '"HoleDia"'),
         )
     await ensure_fully_defined(adapter, "spring-holes sketch")
     check("exit_sketch spring holes", await adapter.exit_sketch())
+    name_last_feature(adapter, "SpringHolesProfile")
+    drive_jobs += holes.apply(adapter, "SpringHolesProfile")
     check(
         "cut spring holes",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=PLATE_T + 2.0, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "SpringHoles")
 
 
-async def _pivot_cylinder(adapter) -> None:
+async def _pivot_cylinder(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Feature 2: Front-plane solid circle at origin, symmetric extrude along the
     long edge -- the pivot/rock axis (local Z). NO bore."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
+    # Origin circle: only the diameter is a dim (the centre is a coincident
+    # relation), so define_circle records just that one slot.
+    cyl = SketchDims()
     check("create_sketch cylinder", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, 0.0, CYL_R, "pivot cylinder")
+    await define_circle(
+        adapter, 0.0, 0.0, CYL_R, "pivot cylinder", dims=cyl,
+        names=("CylCx", "CylCz", "CylDia"),
+        drives=(None, None, '"CylR" * 2'),
+    )
     await ensure_fully_defined(adapter, "pivot cylinder sketch")
     check("exit_sketch cylinder", await adapter.exit_sketch())
+    name_last_feature(adapter, "CylinderProfile")
+    drive_jobs += cyl.apply(adapter, "CylinderProfile")
     check(
         "extrude cylinder",
         await adapter.create_extrusion(
             ExtrusionParameters(depth=PLATE_L, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "PivotCylinder")
 
 
-async def _hex_collar(adapter, flip: bool, name: str) -> None:
+async def _hex_collar(
+    adapter, flip: bool, name: str, stem: str, drive_jobs: list[tuple[str, str]]
+) -> None:
     """One hexagonal knife-edge trunnion stub PROTRUDING beyond a body end,
     vertex-up, blind-extruded along Z over |z| HEX_Z_INNER..HEX_Z_OUTER -- i.e.
     from the body end face out into open air (flip = the -Z end). The overhang
@@ -283,6 +324,7 @@ async def _hex_collar(adapter, flip: bool, name: str) -> None:
     Front-plane vertex-up hexagon (HEX_W x HEX_H bounding box) centred on the
     pivot axis, a vertex at the top (the knife edge runs along Z at that top
     vertex line)."""
+    hexd = SketchDims()
     check(f"create_sketch {name}", await adapter.create_sketch("Front"))
     # Vertex-up hexagon fit to the measured box: top/bottom vertices on the
     # y-axis, shoulders at +-W/2 and +-H/4 (CCW from the top vertex).
@@ -298,13 +340,39 @@ async def _hex_collar(adapter, flip: bool, name: str) -> None:
     set_sketch_direct_db(adapter, True)
     lines = await add_line_chain(adapter, verts)
     set_sketch_direct_db(adapter, False)
-    await define_polygon_chain(adapter, lines, verts, label=name)
+    # Emission order (polygon, anchor=v0 at (0, +h2)): anchor dims first (x=0
+    # drops, y=h2 is one) THEN each kept segment's offsets in line order; the
+    # segment closing onto v0 (line5) is skipped. All offsets are halves/quarters
+    # of HexW/HexH, so drive every dim off those two globals.
+    _hw = '"HexW" / 2'
+    _hh2 = '"HexH" / 2'
+    _hh4 = '"HexH" / 4'
+    await define_polygon_chain(
+        adapter, lines, verts, label=name, dims=hexd,
+        names=[f"{stem}TopY",
+               f"{stem}S0dx", f"{stem}S0dy",
+               f"{stem}S1dy",
+               f"{stem}S2dx", f"{stem}S2dy",
+               f"{stem}S3dx", f"{stem}S3dy",
+               f"{stem}S4dy"],
+        drives=[_hh2,
+                _hw, _hh4,
+                _hh2,
+                _hw, _hh4,
+                _hw, _hh4,
+                _hh2],
+    )
     await ensure_fully_defined(adapter, f"{name} sketch")
     check(f"exit_sketch {name}", await adapter.exit_sketch())
+    name_last_feature(adapter, f"{stem}Profile")
+    drive_jobs += hexd.apply(adapter, f"{stem}Profile")
     extrude_at_offset(adapter, HEX_Z_OUTER - HEX_Z_INNER, HEX_Z_INNER, flip=flip)
+    name_last_feature(adapter, stem)
 
 
-async def _edge_rib(adapter, flip: bool, name: str) -> None:
+async def _edge_rib(
+    adapter, flip: bool, name: str, stem: str, drive_jobs: list[tuple[str, str]]
+) -> None:
     """Feature 4: Front-plane rib -- two lines to the plate-edge tip and a
     semicircle (radius ARC_R, centred at the origin) wrapping the cylinder,
     blind-extruded at the +-RIB_OFFSET start offset along Z.
@@ -313,6 +381,7 @@ async def _edge_rib(adapter, flip: bool, name: str) -> None:
     (the two y-symmetric ends + the cylinder-side interior point force it there),
     so it defines off a coincident-to-origin centre + a radial dim, with A/C
     pinned on the y-axis."""
+    rib = SketchDims()
     check(f"create_sketch {name}", await adapter.create_sketch("Front"))
     a, b, c = (0.0, ARC_R), (SX * -PLATE_W, 0.0), (0.0, -ARC_R)
     interior = (SX * ARC_R, 0.0)  # cylinder-side point the arc passes through
@@ -325,10 +394,14 @@ async def _edge_rib(adapter, flip: bool, name: str) -> None:
         f"{name} arc centre -> origin",
         await adapter.add_sketch_constraint(f"{arc}.center", "origin", "coincident"),
     )
+    # Two display dims, recorded in creation order: the arc radius (-> "ArcR")
+    # then the tip's horizontal distance from the origin (b is at +PLATE_W since
+    # SX=-1, unsigned magnitude PLATE_W -> "PlateW").
     check(
         f"{name} arc radius",
         await adapter.add_sketch_dimension(arc, None, "radial", ARC_R),
     )
+    rib.record(f"{stem}ArcR", '"ArcR"')
     check(
         f"{name} arc start on y-axis",
         await adapter.add_sketch_constraint(f"{arc}.start", "origin", "vertical_points"),
@@ -338,17 +411,22 @@ async def _edge_rib(adapter, flip: bool, name: str) -> None:
         await adapter.add_sketch_constraint(f"{arc}.end", "origin", "vertical_points"),
     )
     await anchor_point_to_origin(adapter, f"{line_ab}.end", *b, f"{name} tip")
+    rib.record(f"{stem}Tip", '"PlateW"')
     _ = line_bc
     await ensure_fully_defined(adapter, f"{name} sketch")
     check(f"exit_sketch {name}", await adapter.exit_sketch())
+    name_last_feature(adapter, f"{stem}Profile")
+    drive_jobs += rib.apply(adapter, f"{stem}Profile")
     extrude_at_offset(adapter, RIB_T, RIB_OFFSET, flip=flip)
+    name_last_feature(adapter, stem)
 
 
-async def _summation_plate(adapter) -> None:
+async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Feature 5: Top-plane leaf on the -X arm -- vertical base edge (x=0), two
     curved sides, short tip edge at the anchor (x=TIP_X)."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
+    sd = SketchDims()
     check("create_sketch summation plate", await adapter.create_sketch("Top"))
     p1 = (0.0, -SUM_BASE)
     p2 = (0.0, SUM_BASE)
@@ -364,59 +442,94 @@ async def _summation_plate(adapter) -> None:
     bot_arc, bot_c, _ = await _three_point_arc(adapter, p4, p1, bot_int, "summation bottom")
     set_sketch_direct_db(adapter, False)
 
+    # Record each manual dim in creation order. Unsigned-distance anchors at
+    # negative coordinates negate the (negative) source so the drive evaluates
+    # positive: base start at y=-SUM_BASE drives "PlateL" / 2; the tip-end anchor
+    # at (TIP_X<0, -ANCHOR_R) drives |TIP_X|="SumH" then "AnchorR". The two arc
+    # centres are circumcentre-derived (no clean global), left None.
     check(
         "summation base vertical",
         await adapter.add_sketch_constraint(base, None, "vertical"),
     )
     await anchor_point_to_origin(adapter, f"{base}.start", *p1, "summation base start")
+    sd.record("SumBaseStartZ", '"PlateL" / 2')  # vertical_distance = SUM_BASE
     await dimension_between(
         adapter, f"{base}.start", f"{base}.end", "vertical_distance", PLATE_L, "summation base"
     )
+    sd.record("SumBaseLength", '"PlateL"')
     check(
         "summation tip vertical",
         await adapter.add_sketch_constraint(tip, None, "vertical"),
     )
     await anchor_point_to_origin(adapter, f"{tip}.end", *p4, "summation tip end")
+    sd.record("SumTipX", '"SumH"')  # horizontal_distance = |TIP_X| = SUM_H
+    sd.record("SumTipZ", '"AnchorR"')  # vertical_distance = ANCHOR_R
     await dimension_between(
         adapter, f"{tip}.start", f"{tip}.end", "vertical_distance", 2.0 * ANCHOR_R, "summation tip"
     )
+    sd.record("SumTipHeight", '2 * "AnchorR"')
     # The base/tip lines pin all four corners; each curved side is then defined
     # by anchoring its (circumcentre) centre -- endpoints already lie on the arc,
     # so the radius is implied and a radial dim would over-define (cf. the
-    # magnifying-lever dome caps).
+    # magnifying-lever dome caps). Both centres are general points (x, y both
+    # nonzero) -> two dims each, no clean global knob, left auto-named.
     await anchor_point_to_origin(adapter, f"{top_arc}.center", *top_c, "summation top centre")
+    sd.record(None, None)
+    sd.record(None, None)
     await anchor_point_to_origin(adapter, f"{bot_arc}.center", *bot_c, "summation bottom centre")
+    sd.record(None, None)
+    sd.record(None, None)
     await ensure_fully_defined(adapter, "summation plate sketch")
     check("exit_sketch summation plate", await adapter.exit_sketch())
+    name_last_feature(adapter, "SummationPlateProfile")
+    drive_jobs += sd.apply(adapter, "SummationPlateProfile")
     check(
         "extrude summation plate",
         await adapter.create_extrusion(
             ExtrusionParameters(depth=PLATE_T, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "SummationPlate")
 
 
-async def _summation_anchor(adapter) -> None:
+async def _summation_anchor(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Feature 6: Top-plane concentric ring (outer ANCHOR_R, bore ANCHOR_BORE_R)
     at the -X tip -- the eye the counter-spring hook hangs from."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
+    # Both circles share centre (TIP_X, 0): centre-X is a dim (driven to "SumH",
+    # |TIP_X|), centre-Z (=0) is a relation (slot ignored), plus each diameter.
+    sd = SketchDims()
     check("create_sketch summation anchor", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
-    await define_circle(adapter, TIP_X, 0.0, ANCHOR_R, "anchor outer")
-    await define_circle(adapter, TIP_X, 0.0, ANCHOR_BORE_R, "anchor bore")
+    await define_circle(
+        adapter, TIP_X, 0.0, ANCHOR_R, "anchor outer", dims=sd,
+        names=("AnchorOuterX", "AnchorOuterZ", "AnchorOuterDia"),
+        drives=('"SumH"', None, '2 * "AnchorR"'),
+    )
+    await define_circle(
+        adapter, TIP_X, 0.0, ANCHOR_BORE_R, "anchor bore", dims=sd,
+        names=("AnchorBoreX", "AnchorBoreZ", "AnchorBoreDia"),
+        # Bore is concentric with the outer (same centre): the outer's X dim
+        # already locates the ring, so driving the bore's X too over-constrains
+        # the solve (rebuild fails). Record it (count) but leave it undriven.
+        drives=(None, None, '2 * "AnchorBoreR"'),
+    )
     set_sketch_direct_db(adapter, False)
     await ensure_fully_defined(adapter, "summation anchor sketch")
     check("exit_sketch summation anchor", await adapter.exit_sketch())
+    name_last_feature(adapter, "SummationAnchorProfile")
+    drive_jobs += sd.apply(adapter, "SummationAnchorProfile")
     check(
         "extrude summation anchor",
         await adapter.create_extrusion(
             ExtrusionParameters(depth=ANCHOR_H, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "SummationAnchor")
 
 
-async def _middle_rib(adapter) -> None:
+async def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Feature 7: Front-plane elongated diamond spanning the lever. Two tangent
     lines run from each end vertex (left = +X plate edge, right = -X summation
     tip) to two coradial arcs that wrap the cylinder -- the C# tangent / coradial
@@ -424,6 +537,7 @@ async def _middle_rib(adapter) -> None:
     the origin, and the arc radius."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
+    sd = SketchDims()
     check("create_sketch middle rib", await adapter.create_sketch("Front"))
     left = (SX * -MID_RIB_PLATE_REACH, 0.0)  # +X arm vertex, short of hole column
     right = (TIP_X, 0.0)  # -X summation-tip vertex
@@ -465,34 +579,97 @@ async def _middle_rib(adapter) -> None:
         "middle rib arc centre -> origin",
         await adapter.add_sketch_constraint(f"{arc1}.center", "origin", "coincident"),
     )
+    # Three display dims in creation order: the shared arc radius (-> "ArcR"),
+    # then each end-vertex anchor (both on the x-axis -> one horizontal dim each).
+    # left is at +MID_RIB_PLATE_REACH (SX=-1), right at TIP_X<0 -- both unsigned
+    # magnitudes positive, so "MidRibReach" and "SumH" (|TIP_X|).
     check(
         "middle rib arc radius",
         await adapter.add_sketch_dimension(arc1, None, "radial", r),
     )
+    sd.record("MidRibArcR", '"ArcR"')
     await anchor_point_to_origin(adapter, f"{line1}.start", *left, "middle rib left vertex")
+    sd.record("MidRibLeftX", '"MidRibReach"')
     await anchor_point_to_origin(adapter, f"{line2}.end", *right, "middle rib right vertex")
+    sd.record("MidRibRightX", '"SumH"')
     await ensure_fully_defined(adapter, "middle rib sketch")
     check("exit_sketch middle rib", await adapter.exit_sketch())
+    name_last_feature(adapter, "MiddleRibProfile")
+    drive_jobs += sd.apply(adapter, "MiddleRibProfile")
     check(
         "extrude middle rib",
         await adapter.create_extrusion(
             ExtrusionParameters(depth=RIB_T, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "MiddleRib")
 
 
 async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
 
-    await _coefficients_plate(adapter)
-    await _pivot_cylinder(adapter)
-    await _hex_collar(adapter, flip=False, name="hex knife edge front")
-    await _hex_collar(adapter, flip=True, name="hex knife edge back")
-    await _edge_rib(adapter, flip=False, name="edge rib front")
-    await _edge_rib(adapter, flip=True, name="edge rib back")
-    await _summation_plate(adapter)
-    await _summation_anchor(adapter)
-    await _middle_rib(adapter)
+    # Editable knobs: named globals in the equation manager that drive every
+    # sketch dim below (a GUI fine-tune edits THESE -- Tools > Equations -- never
+    # an auto "D3@Sketch5"). Every length carries an explicit ``mm`` unit: this is
+    # an INCH document and the equation manager evaluates BARE numbers in document
+    # units, so an unsuffixed "152.4" would read as 152.4 inches and blow the part
+    # up 25.4x. Derived globals (ArcR, MidRibReach) reference others as equation
+    # strings so a primitive edit propagates. PlateT/RibT/AnchorH/HexDepth are
+    # extrude depths/offsets -- feature params, not sketch dims, so nothing drives
+    # them, but they stay editable knobs (matches the exemplars).
+    await set_global(adapter, "PlateW", f"{PLATE_W}mm")
+    await set_global(adapter, "PlateL", f"{PLATE_L}mm")
+    await set_global(adapter, "PlateT", f"{PLATE_T}mm")
+    await set_global(adapter, "CylR", f"{CYL_R}mm")
+    await set_global(adapter, "RibT", f"{RIB_T}mm")
+    await set_global(adapter, "RibPad", f"{RIB_PAD}mm")
+    await set_global(adapter, "SumH", f"{SUM_H}mm")
+    await set_global(adapter, "AnchorR", f"{ANCHOR_R}mm")
+    await set_global(adapter, "AnchorBoreR", f"{ANCHOR_BORE_R}mm")
+    await set_global(adapter, "AnchorH", f"{ANCHOR_H}mm")
+    await set_global(adapter, "HoleDia", f"{HOLE_DIA}mm")
+    await set_global(adapter, "HoleX", f"{HOLE_X}mm")
+    await set_global(adapter, "HexW", f"{HEX_W}mm")
+    await set_global(adapter, "HexH", f"{HEX_H}mm")
+    await set_global(adapter, "HexDepth", f"{HEX_DEPTH}mm")
+    await set_global(adapter, "ArcR", '"CylR" + "RibPad"')
+    await set_global(adapter, "MidRibReach", '"HoleX" - 4.1mm')
+
+    # Per-sketch SketchDims record each dim in the helper's emission order; their
+    # drive equations are collected here and applied in one deferred batch at the
+    # end (every equation target must resolve against the finished model).
+    drive_jobs: list[tuple[str, str]] = []
+
+    await _coefficients_plate(adapter, drive_jobs)
+    await _pivot_cylinder(adapter, drive_jobs)
+    await _hex_collar(adapter, flip=False, name="hex knife edge front",
+                      stem="HexKnifeFront", drive_jobs=drive_jobs)
+    await _hex_collar(adapter, flip=True, name="hex knife edge back",
+                      stem="HexKnifeBack", drive_jobs=drive_jobs)
+    await _edge_rib(adapter, flip=False, name="edge rib front",
+                    stem="EdgeRibFront", drive_jobs=drive_jobs)
+    await _edge_rib(adapter, flip=True, name="edge rib back",
+                    stem="EdgeRibBack", drive_jobs=drive_jobs)
+    await _summation_plate(adapter, drive_jobs)
+    await _summation_anchor(adapter, drive_jobs)
+    await _middle_rib(adapter, drive_jobs)
+
+    # Apply the deferred drive equations now -- after the whole model + a rebuild
+    # exists, so every target resolves. Each equation evaluates to the value just
+    # built, so the geometry must not move; the neutrality re-check is the proof.
+    # No analytic volume gate exists for this part (organic arcs), so capture the
+    # as-built volume and assert it is unchanged after driving.
+    await force_rebuild(adapter)
+    _mass = await adapter.get_mass_properties()
+    if not _mass.is_success:
+        raise RuntimeError(f"as-built mass props failed: {_mass.error}")
+    v_built = float(_mass.data.volume)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(
+        adapter, "driven summing lever (equations neutral)", v_built, 1e-3 * v_built
+    )
 
     # pivot axis (Axis1) = cylinder centreline along Z -- the static mate
     # reference to the knife-mount (keeps the lever at the knife line with no

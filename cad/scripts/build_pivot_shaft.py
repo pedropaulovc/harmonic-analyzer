@@ -14,7 +14,7 @@ is symmetric about the part origin.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_pivot_shaft.py
+    uv run python cad\scripts\build_pivot_shaft.py
 """
 
 from __future__ import annotations
@@ -24,13 +24,18 @@ import sys
 
 from _common import (
     IN,
+    SketchDims,
     apply_material,
     check,
     define_circle,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
     volume_check,
 )
 
@@ -46,18 +51,44 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
+    # Editable knobs (Tools > Equations): the shaft diameter and length. The mm
+    # suffix is load-bearing -- this is an INCH document and the equation manager
+    # reads BARE numbers in document units (an unsuffixed 228.6 = 228.6 in).
+    await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
+    await set_global(adapter, "ShaftLength", f"{SHAFT_LENGTH}mm")
+
+    drive_jobs: list[tuple[str, str]] = []
+
+    # Shaft section: an on-axis (origin) circle, so define_circle emits only the
+    # diameter dim -- the centre X/Z slots are relations, recorded but ignored.
+    section = SketchDims()
     check("create_sketch section", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, 0.0, SHAFT_DIA / 2.0, "shaft section")
+    await define_circle(
+        adapter, 0.0, 0.0, SHAFT_DIA / 2.0, "shaft section", dims=section,
+        names=("SectionCx", "SectionCz", "ShaftDia"),
+        drives=(None, None, '"ShaftDia"'),
+    )
     await ensure_fully_defined(adapter, "section sketch")
     check("exit_sketch section", await adapter.exit_sketch())
+    name_last_feature(adapter, "SectionProfile")
+    drive_jobs += section.apply(adapter, "SectionProfile")
     check(
         "extrude shaft",
         await adapter.create_extrusion(
             ExtrusionParameters(depth=SHAFT_LENGTH, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "Shaft")
     v = math.pi * (SHAFT_DIA / 2.0) ** 2 * SHAFT_LENGTH
     await volume_check(adapter, "shaft", v, 0.001 * v)
+
+    # Deferred drive equations, then re-check neutrality (each evaluates to the
+    # as-built value, so the geometry must not move).
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "driven shaft (equations neutral)", v, 0.001 * v)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

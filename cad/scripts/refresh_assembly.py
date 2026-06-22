@@ -14,7 +14,7 @@ escape (delete the target + ``doit assembly:<stem>``).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\refresh_assembly.py <stem>
+    uv run python cad\scripts\refresh_assembly.py <stem>
 
 where ``<stem>`` is an assembly stem (``output``, ``drive_train``,
 ``harmonic_analyzer``, ...); ``_`` and ``-`` are interchangeable.

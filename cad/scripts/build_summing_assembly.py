@@ -29,7 +29,7 @@ Dimensions: cad/DIMENSIONS.md ch. 18-19.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_summing_assembly.py
+    uv run python cad\scripts\build_summing_assembly.py
 """
 
 from __future__ import annotations

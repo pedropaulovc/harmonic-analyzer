@@ -16,7 +16,7 @@ about the Front plane.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_magnifying_wheel.py
+    uv run python cad\scripts\build_magnifying_wheel.py
 """
 
 from __future__ import annotations
@@ -24,17 +24,23 @@ from __future__ import annotations
 import sys
 
 from _common import (
+    SketchDims,
     add_line_chain,
     anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
     measure_check,
     name_bore_axis,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
+    volume_check,
 )
 
 PART_NAME = "magnifying-wheel"
@@ -63,32 +69,83 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Rim ring (annulus, mid-plane symmetric).
+    # Editable knobs (Tools > Equations) for every length constant; the rim inner
+    # diameter, the spoke span and its corner height are equations of the
+    # primitives. The mm suffix is load-bearing -- this is an INCH document and the
+    # equation manager reads BARE numbers in document units (an unsuffixed 100 =
+    # 100 in). SPOKE_COUNT is a pattern instance count, not a sketch length, so it
+    # stays a Python constant (no global, nothing to drive).
+    await set_global(adapter, "RimOuterDia", f"{RIM_OUTER_DIA}mm")
+    await set_global(adapter, "HubDia", f"{HUB_DIA}mm")
+    await set_global(adapter, "RimRingRadial", f"{RIM_RING_RADIAL}mm")
+    await set_global(adapter, "RimAxial", f"{RIM_AXIAL}mm")
+    await set_global(adapter, "HubAxial", f"{HUB_AXIAL}mm")
+    await set_global(adapter, "SpokeWidth", f"{SPOKE_WIDTH}mm")
+    await set_global(adapter, "SpokeAxial", f"{SPOKE_AXIAL}mm")
+    await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
+    await set_global(adapter, "SpokeOverlap", f"{SPOKE_OVERLAP}mm")
+    await set_global(adapter, "RimInnerDia", '"RimOuterDia" - 2 * "RimRingRadial"')
+    # Spoke runs from y0 (hub OD, less overlap) to y1 (rim ID, plus overlap); its
+    # length dim is the span, its corner anchor sits at (-SpokeWidth/2, y0).
+    await set_global(adapter, "SpokeY0", '"HubDia" / 2 - "SpokeOverlap"')
+    await set_global(
+        adapter, "SpokeLength",
+        '"RimInnerDia" / 2 - "HubDia" / 2 + 2 * "SpokeOverlap"',
+    )
+
+    drive_jobs: list[tuple[str, str]] = []
+
+    # Rim ring (annulus, mid-plane symmetric). Two on-axis circles: each emits
+    # only its diameter dim.
+    rim_sd = SketchDims()
     check("create_sketch rim", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, 0.0, RIM_OUTER_DIA / 2.0, "rim OD")
-    await define_circle(adapter, 0.0, 0.0, RIM_INNER_DIA / 2.0, "rim ID")
+    await define_circle(
+        adapter, 0.0, 0.0, RIM_OUTER_DIA / 2.0, "rim OD", dims=rim_sd,
+        names=("RimOdCx", "RimOdCz", "RimOuterDiaDim"),
+        drives=(None, None, '"RimOuterDia"'),
+    )
+    await define_circle(
+        adapter, 0.0, 0.0, RIM_INNER_DIA / 2.0, "rim ID", dims=rim_sd,
+        names=("RimIdCx", "RimIdCz", "RimInnerDiaDim"),
+        drives=(None, None, '"RimInnerDia"'),
+    )
     await ensure_fully_defined(adapter, "rim sketch")
     check("exit_sketch rim", await adapter.exit_sketch())
+    name_last_feature(adapter, "RimProfile")
+    drive_jobs += rim_sd.apply(adapter, "RimProfile")
     check(
         "extrude rim",
         await adapter.create_extrusion(
             ExtrusionParameters(depth=RIM_AXIAL, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "Rim")
 
-    # Hub drum.
+    # Hub drum. On-axis circle: diameter only.
+    hub_sd = SketchDims()
     check("create_sketch hub", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, 0.0, HUB_DIA / 2.0, "hub drum")
+    await define_circle(
+        adapter, 0.0, 0.0, HUB_DIA / 2.0, "hub drum", dims=hub_sd,
+        names=("HubCx", "HubCz", "HubDiaDim"),
+        drives=(None, None, '"HubDia"'),
+    )
     await ensure_fully_defined(adapter, "hub sketch")
     check("exit_sketch hub", await adapter.exit_sketch())
+    name_last_feature(adapter, "HubProfile")
+    drive_jobs += hub_sd.apply(adapter, "HubProfile")
     check(
         "extrude hub",
         await adapter.create_extrusion(
             ExtrusionParameters(depth=HUB_AXIAL, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "Hub")
 
-    # Seed spoke along +Y from the hub into the rim ring.
+    # Seed spoke along +Y from the hub into the rim ring. Manual constraints +
+    # dims, so record each display dim into SketchDims in CREATION order: the
+    # width dim, the length dim, then the corner anchor (x, then z) emitted by
+    # anchor_point_to_origin for the off-axis corner (-half, y0).
+    spoke_sd = SketchDims()
     check("create_sketch spoke", await adapter.create_sketch("Front"))
     half = SPOKE_WIDTH / 2.0
     y0 = HUB_DIA / 2.0 - SPOKE_OVERLAP
@@ -105,38 +162,59 @@ async def build(adapter) -> dict[str, str]:
     ):
         check(f"spoke constraint {relation}", await adapter.add_sketch_constraint(ent, None, relation))
     check("spoke width dim", await adapter.add_sketch_dimension(bottom, None, "linear", SPOKE_WIDTH))
+    spoke_sd.record("SpokeWidthDim", '"SpokeWidth"')
     check("spoke length dim", await adapter.add_sketch_dimension(right, None, "linear", y1 - y0))
+    spoke_sd.record("SpokeLengthDim", '"SpokeLength"')
     await anchor_point_to_origin(adapter, f"{bottom}.start", -half, y0, "spoke corner")
+    spoke_sd.record("SpokeCornerX", '"SpokeWidth" / 2')  # unsigned half-width
+    spoke_sd.record("SpokeCornerZ", '"SpokeY0"')
     await ensure_fully_defined(adapter, "spoke sketch")
     check("exit_sketch spoke", await adapter.exit_sketch())
+    name_last_feature(adapter, "SpokeProfile")
+    drive_jobs += spoke_sd.apply(adapter, "SpokeProfile")
     spoke_feature = await adapter.create_extrusion(
         ExtrusionParameters(depth=SPOKE_AXIAL, both_directions=True)
     )
     check("extrude spoke", spoke_feature)
+    name_last_feature(adapter, "Spoke")
 
-    # Axle bore through everything.
+    # Axle bore through everything. On-axis circle: diameter only.
+    bore_sd = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, 0.0, BORE_DIA / 2.0, "bore")
+    await define_circle(
+        adapter, 0.0, 0.0, BORE_DIA / 2.0, "bore", dims=bore_sd,
+        names=("BoreCx", "BoreCz", "BoreDiaDim"),
+        drives=(None, None, '"BoreDia"'),
+    )
     await ensure_fully_defined(adapter, "bore sketch")
     check("exit_sketch bore", await adapter.exit_sketch())
+    name_last_feature(adapter, "BoreProfile")
+    drive_jobs += bore_sd.apply(adapter, "BoreProfile")
     check(
         "cut bore",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=HUB_AXIAL + 2.0, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "Bore")
 
-    # Pattern the spoke about the bore axis.
+    # Pattern the spoke about the bore axis. The seed feature was renamed to
+    # "Spoke" above, so the pattern must select it by the NEW name (the captured
+    # auto-name went stale on rename).
     check(
         f"circular pattern {SPOKE_COUNT} spokes",
         await adapter.circular_pattern_feature(
             CircularPatternParameters(
                 axis_point=[BORE_DIA / 2.0, 0.0, 0.0],
-                features=[spoke_feature.data.name],
+                features=["Spoke"],
                 count=SPOKE_COUNT,
             )
         ),
     )
+    name_last_feature(adapter, "SpokePattern")
+    res = await adapter.get_mass_properties()
+    v_built = float(res.data.volume)
+    print(f"  volume after pattern: {v_built:.1f} mm^3")
 
     await apply_material(adapter, MATERIAL)
 
@@ -161,6 +239,19 @@ async def build(adapter) -> dict[str, str]:
     # the wheel revolves on the axle stud in the M6 mated-DOF assembly
     # (circular_pattern's axis_point does NOT create a persistent ref axis).
     await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "wheel axis")
+
+    # Apply the deferred drive equations after the whole model + a rebuild exists,
+    # so every target resolves. Each equation evaluates to the as-built value (the
+    # spoked wheel's volume has no tidy closed form, so the neutrality gate asserts
+    # the post-drive volume equals the captured as-built value): geometry must not
+    # move.
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(
+        adapter, "driven magnifying wheel (equations neutral)", v_built, 0.001 * v_built
+    )
 
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)

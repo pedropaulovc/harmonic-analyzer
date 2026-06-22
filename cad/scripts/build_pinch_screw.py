@@ -21,7 +21,7 @@ plane at z = 0, head 0..+2.5, shank -6.2..0. Symmetric about local x = 0
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_pinch_screw.py
+    uv run python cad\scripts\build_pinch_screw.py
 """
 
 from __future__ import annotations
@@ -30,14 +30,19 @@ import math
 import sys
 
 from _common import (
+    SketchDims,
     apply_material,
     check,
     define_circle,
+    drive_dimension,
     ensure_fully_defined,
     extrude_at_offset,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
     volume_check,
 )
 
@@ -53,25 +58,61 @@ SHANK_LEN = 6.2  # wall now 11.2 (Ø25.4 column, M6.11): tip seats mid-hole, bac
 async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
 
-    # Head 0..+2.5 (Front sketch).
+    # Editable knobs (Tools > Equations): head dia/height, shank dia/length. The
+    # mm suffix is load-bearing (INCH document; the equation manager reads bare
+    # numbers in document units). HeadH/ShankLen are extrude DEPTHS (feature
+    # parameters, not sketch dims) -- declared here as editable knobs, but nothing
+    # in drive_jobs references them.
+    await set_global(adapter, "HeadDia", f"{HEAD_DIA}mm")
+    await set_global(adapter, "HeadH", f"{HEAD_H}mm")
+    await set_global(adapter, "ShankDia", f"{SHANK_DIA}mm")
+    await set_global(adapter, "ShankLen", f"{SHANK_LEN}mm")
+
+    drive_jobs: list[tuple[str, str]] = []
+
+    # Head 0..+2.5 (Front sketch; on-axis circle: only the diameter is a dim).
+    head_dims = SketchDims()
     check("create_sketch head", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, 0.0, HEAD_DIA / 2.0, "head")
+    await define_circle(
+        adapter, 0.0, 0.0, HEAD_DIA / 2.0, "head", dims=head_dims,
+        names=("HeadCx", "HeadCz", "HeadDia"),
+        drives=(None, None, '"HeadDia"'),
+    )
     await ensure_fully_defined(adapter, "head sketch")
     check("exit_sketch head", await adapter.exit_sketch())
+    name_last_feature(adapter, "HeadProfile")
+    drive_jobs += head_dims.apply(adapter, "HeadProfile")
     extrude_at_offset(adapter, HEAD_H, 0.0)
+    name_last_feature(adapter, "Head")
     v_head = math.pi * (HEAD_DIA / 2.0) ** 2 * HEAD_H
     expected = v_head
     await volume_check(adapter, "head", expected, 0.005 * v_head)
 
-    # Shank -6.2..0.
+    # Shank -6.2..0 (on-axis circle: only the diameter is a dim).
+    shank_dims = SketchDims()
     check("create_sketch shank", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, 0.0, SHANK_DIA / 2.0, "shank")
+    await define_circle(
+        adapter, 0.0, 0.0, SHANK_DIA / 2.0, "shank", dims=shank_dims,
+        names=("ShankCx", "ShankCz", "ShankDia"),
+        drives=(None, None, '"ShankDia"'),
+    )
     await ensure_fully_defined(adapter, "shank sketch")
     check("exit_sketch shank", await adapter.exit_sketch())
+    name_last_feature(adapter, "ShankProfile")
+    drive_jobs += shank_dims.apply(adapter, "ShankProfile")
     extrude_at_offset(adapter, SHANK_LEN, -SHANK_LEN)
+    name_last_feature(adapter, "Shank")
     v_shank = math.pi * (SHANK_DIA / 2.0) ** 2 * SHANK_LEN
     expected += v_shank
     await volume_check(adapter, "shank", expected, 0.005 * v_shank)
+
+    # Deferred drive equations, then re-check neutrality (each evaluates to the
+    # as-built value, so the geometry must not move).
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "driven pinch screw (equations neutral)", expected, 0.005 * v_shank)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

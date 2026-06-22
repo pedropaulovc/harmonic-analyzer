@@ -31,7 +31,7 @@ Dimensions: cad/DIMENSIONS.md ch. 20-21.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_magnifier_assembly.py
+    uv run python cad\scripts\build_magnifier_assembly.py
 """
 
 from __future__ import annotations
