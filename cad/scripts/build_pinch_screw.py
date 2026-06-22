@@ -21,7 +21,7 @@ plane at z = 0, head 0..+2.5, shank -6.2..0. Symmetric about local x = 0
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_pinch_screw.py
+    uv run python cad\scripts\build_pinch_screw.py
 """
 
 from __future__ import annotations

@@ -20,7 +20,7 @@ chain with no tangent-contact sliver.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_pivot_ball_mount.py
+    uv run python cad\scripts\build_pivot_ball_mount.py
 """
 
 from __future__ import annotations

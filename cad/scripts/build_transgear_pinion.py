@@ -10,7 +10,7 @@ Layout: gear axis = Z through the origin, disc z = 0..6 mm.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_transgear_pinion.py
+    uv run python cad\scripts\build_transgear_pinion.py
 """
 
 from __future__ import annotations

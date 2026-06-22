@@ -46,7 +46,7 @@ rotation (DIMENSIONS.md ch. 13 drive-train layout).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_cone_gear_shaft.py
+    uv run python cad\scripts\build_cone_gear_shaft.py
 """
 
 from __future__ import annotations

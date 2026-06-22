@@ -11,7 +11,7 @@ Dimensions: cad/DIMENSIONS.md ch. 23 (M6.4, low/derived).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_transgear_stub.py
+    uv run python cad\scripts\build_transgear_stub.py
 """
 
 from __future__ import annotations

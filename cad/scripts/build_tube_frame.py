@@ -36,7 +36,7 @@ the Top plane at the origin, extruded upward.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_tube_frame.py
+    uv run python cad\scripts\build_tube_frame.py
 """
 
 from __future__ import annotations

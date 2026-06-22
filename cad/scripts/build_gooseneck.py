@@ -32,7 +32,7 @@ along X at (y 163, z 0). Dimensions: cad/DIMENSIONS.md ch. 19 (low/med).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_gooseneck.py
+    uv run python cad\scripts\build_gooseneck.py
 """
 
 from __future__ import annotations

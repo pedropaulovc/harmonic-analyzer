@@ -25,7 +25,7 @@ x-asymmetric feature, so the machine mirror is authored here
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_pen_hanger.py
+    uv run python cad\scripts\build_pen_hanger.py
 """
 
 from __future__ import annotations

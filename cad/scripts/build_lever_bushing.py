@@ -14,7 +14,7 @@ mid-plane extrude).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_lever_bushing.py
+    uv run python cad\scripts\build_lever_bushing.py
 """
 
 from __future__ import annotations

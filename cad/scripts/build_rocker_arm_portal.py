@@ -49,7 +49,7 @@ sockets and the foot-rail bolt holes.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_rocker_arm_portal.py
+    uv run python cad\scripts\build_rocker_arm_portal.py
 """
 
 from __future__ import annotations

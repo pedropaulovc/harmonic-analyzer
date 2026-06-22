@@ -98,7 +98,7 @@ shafts). Gear-ratio sign is verified kinematically by a motion script.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_drive_train_assembly.py
+    uv run python cad\scripts\build_drive_train_assembly.py
 """
 
 from __future__ import annotations

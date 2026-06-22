@@ -9,7 +9,7 @@ build_paper_drive_assembly.py. Geometry and clearances: _chain.py / _chain_link.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_chain_inner_link.py
+    uv run python cad\scripts\build_chain_inner_link.py
 """
 
 from __future__ import annotations

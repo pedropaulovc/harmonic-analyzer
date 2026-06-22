@@ -43,7 +43,7 @@ Basic Motion (physical_simulation) is the licensed solver on this 3DEXPERIENCE
 Makers seat -- MotionAnalysis is NOT licensed here. Basic Motion solves motors,
 springs, gravity and contact, which is what this study needs.
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_motion_study.py [stage]
+    uv run python cad\scripts\build_motion_study.py [stage]
 
 ``stage`` (default ``kinematic``) gates how far the build runs so the heavy
 solve can be brought up incrementally:

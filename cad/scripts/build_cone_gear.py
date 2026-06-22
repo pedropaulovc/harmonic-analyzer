@@ -62,7 +62,7 @@ plane (z = 0..7 mm).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_cone_gear.py
+    uv run python cad\scripts\build_cone_gear.py
 """
 
 from __future__ import annotations

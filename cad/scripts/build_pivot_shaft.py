@@ -14,7 +14,7 @@ is symmetric about the part origin.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_pivot_shaft.py
+    uv run python cad\scripts\build_pivot_shaft.py
 """
 
 from __future__ import annotations

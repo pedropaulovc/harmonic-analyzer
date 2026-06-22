@@ -20,7 +20,7 @@ to -32. Inserted with IDENTITY rotation; symmetric about local x = 0
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_hex_bolt.py
+    uv run python cad\scripts\build_hex_bolt.py
 """
 
 from __future__ import annotations

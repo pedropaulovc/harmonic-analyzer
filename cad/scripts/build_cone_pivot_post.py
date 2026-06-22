@@ -16,7 +16,7 @@ assembly rotates the post 19.8 deg about Y to align with the cone axis).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_cone_pivot_post.py
+    uv run python cad\scripts\build_cone_pivot_post.py
 """
 
 from __future__ import annotations

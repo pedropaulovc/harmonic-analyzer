@@ -34,7 +34,7 @@ engraved plate needs the decorated face frontmost.)
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_nameplate.py
+    uv run python cad\scripts\build_nameplate.py
 """
 
 from __future__ import annotations

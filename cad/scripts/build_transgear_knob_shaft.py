@@ -17,7 +17,7 @@ cad/DIMENSIONS.md ch. 23 (M6.4 dims; M6.8 ch23-topology stack).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_transgear_knob_shaft.py
+    uv run python cad\scripts\build_transgear_knob_shaft.py
 """
 
 from __future__ import annotations

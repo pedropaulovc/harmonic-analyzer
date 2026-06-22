@@ -22,7 +22,7 @@ the hanger).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_wheel_bar.py
+    uv run python cad\scripts\build_wheel_bar.py
 """
 
 from __future__ import annotations

@@ -26,7 +26,7 @@ nothing the sub-level sweep does not prove.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_motion_setup_drives.py [p1|p2|p0|all]
+    uv run python cad\scripts\build_motion_setup_drives.py [p1|p2|p0|all]
 """
 
 from __future__ import annotations

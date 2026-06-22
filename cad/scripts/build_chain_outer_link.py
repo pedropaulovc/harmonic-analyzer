@@ -10,7 +10,7 @@ Geometry and clearances: _chain.py / _chain_link.py.
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_chain_outer_link.py
+    uv run python cad\scripts\build_chain_outer_link.py
 """
 
 from __future__ import annotations

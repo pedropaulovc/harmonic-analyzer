@@ -29,7 +29,7 @@ mid-plane blind cuts (MCP issue #38 workaround).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\build_channel_lever.py
+    uv run python cad\scripts\build_channel_lever.py
 """
 
 from __future__ import annotations
