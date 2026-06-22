@@ -257,10 +257,45 @@ error model and how the machine was actually built and trimmed.
 
 ---
 
-## 8. How to encode it (extend the existing system, don't bolt on drawings)
+## 8. How to encode it — config → SLDPRT PMI → drawings (the automation backbone)
 
 The repo's philosophy is "tolerance is design source, lives in config, flows to custom properties +
-gets asserted." Keep that. Concretely:
+gets asserted." Keep that, and **extend it one critical step: the tolerance data must be embedded
+into the SLDPRT *as PMI during the build*, read from YAML — so a drawing consumes it automatically
+instead of anyone re-typing it.** A custom-property *string* (`tolerance_class: machined_block`)
+is metadata; a drawing cannot dimension from it. A driving-dimension tolerance or a DimXpert
+geometric tolerance *is* model geometry a drawing imports for free. So the source of truth stays the
+YAML, but the build script writes it onto the model, three layers deep (all API-verified, bundle
+v3.3.0; **DimXpert is included with every SOLIDWORKS license — confirmed for the Makers seat**, see
+§11):
+
+1. **Size ± tolerances on the driving dimensions.** Where a build script already sets a feature's
+   driving dimension (bore Ø, journal Ø, length), additionally stamp its grade's tolerance:
+   `IDimension.SetToleranceType` (e.g. bilateral) + `SetToleranceFitValues`/value, read from
+   `tolerances.yaml`. These are exactly the dimensions a drawing pulls via
+   `IDrawingDoc.InsertModelDimensions` / `InsertModelAnnotations3` — the print inherits every ± with
+   no re-authoring, fully associative.
+2. **Geometric tolerances + datums as DimXpert PMI.** For the `geometric:` controls (runout,
+   concentricity, perpendicularity) and datums, author them during the build via
+   `IDimXpertManager.DimXpertPart` → `IDimXpertPart.InsertDatum` / `InsertSizeDimension` /
+   `InsertLocationDimension` / `InsertGtol` (+ typed interfaces `IDimXpertConcentricityTolerance`,
+   `IDimXpertOrientationTolerance` for perp/parallel, `IDimXpertFlatnessTolerance`…). Runout has no
+   dedicated DimXpert class → place it with classic `IModelDoc2.InsertGtol` +
+   `swGtolGeomCharSymbol_e` (runout), or use DimXpert concentricity-to-datum-axis.
+3. **Surface-finish symbols** from `surface_finish:` → `IModelDoc2.InsertSurfaceFinishSymbol2` on the
+   bearing/sliding faces.
+
+The PMI lives in **annotation views** on the model; a drawing built from that model imports all of
+it automatically (`InsertModelAnnotations3`) — the drawing script *places views + imports model
+items + arranges*, it does not re-author tolerances. **Edit the YAML → rebuild → the SLDPRT PMI and
+every drawing update together.** Bonus: STEP **AP242** (`IModelDocExtension.PublishSTEP242File`)
+carries the same PMI into the neutral export the repo already ships — the embedded tolerances
+survive into STEP without the MBD add-in.
+
+Home it next to the existing per-part stamping: an `apply_pmi(part, features)` in `_common.py`
+alongside `apply_custom_properties` / `apply_material`, driven by the new `critical_features` rows.
+
+Concretely:
 
 **`tolerances.yaml`** — add three blocks:
 
@@ -303,9 +338,15 @@ invariant*, not just presence of fields:
 3. Geometric/finish class names must resolve in the new blocks (same pattern as the existing
    `tolerance_class` / `fit_class` resolution).
 
-**Build scripts** — they already assert clearances; have them additionally assert the chosen
-tolerance grade is **compatible with** the modeled clearance (the stack check above, at the source).
-This catches a future edit that loosens a grade below its fit.
+4. **PMI write-back check:** for each `critical_features` row, read the model back and assert the
+   tolerance/GTol/finish was actually applied (DimXpert + annotations are queryable) — so the audit
+   verifies the data reached the SLDPRT, not merely that the YAML named it.
+
+**Build scripts** — they already assert clearances; have them additionally (a) assert the chosen
+tolerance grade is **compatible with** the modeled clearance (the stack check above, at the source),
+and (b) call `apply_pmi(...)` so the embedding happens on every build, not as a later pass. This
+catches a future edit that loosens a grade below its fit, and keeps the model and the drawings in
+lockstep with the config.
 
 ---
 
@@ -320,11 +361,12 @@ This catches a future edit that loosens a grade below its fit.
 
 ## 10. What the supplement actually ships
 
-- **No full GD&T drawings.** Ship the tolerance/fit/finish/runout data as it already lives — in
-  config, stamped into custom properties, audited — plus a **per-part critical-feature table**
-  (T1 parts) and a **one-page primer sidebar**: how to read a runout (TIR) callout, what "slip fit
-  / press fit" mean in thou, and "bore don't drill, single setup, indicate true." That is the
-  entire GD&T vocabulary a reader needs.
+- **Generated 2D PDF shop drawings (Tier-1 first) that auto-consume the PMI embedded in each
+  SLDPRT** (§8) — the tolerance/fit/finish/runout data is authored onto the model from the YAML at
+  build time, so the drawing imports it rather than re-typing it. Pair with a **one-page primer
+  sidebar**: how to read a runout (TIR) callout, what "slip fit / press fit" mean in thou, and
+  "bore don't drill, single setup, indicate true." The GD&T stays **lite** — runout plus the
+  rocker/knife controls — nothing the reader can't parse.
 - **The single authoritative gear table** (DP/module, 14.5° PA, the 20 cone tooth counts 6→120, the
   120-tooth cylinders, the rack/pinion) — the one place precision *and* internal consistency both
   matter.
@@ -349,15 +391,17 @@ so supplying them is the single highest-value contribution this supplement makes
 
 - **Feasible on this seat — API verified (offline bundle v3.3.0).** The repo already drives
   `SaveAs3` for STEP/STL (`export_models.py`, `cut_release.py`), so PDF export of a drawing is the
-  same mechanism; the COM API creates drawing docs + views (`IDrawingDoc.CreateDrawViewFromModelView3`),
-  pulls in model dimensions (`IDrawingDoc.InsertModelAnnotations3` / `InsertModelDimensions`), and
-  inserts the few annotations needed — runout (`IModelDoc2.InsertGtol`), surface finish
-  (`IModelDoc2.InsertSurfaceFinishSymbol2` / `IModelDocExtension.InsertSurfaceFinishSymbol3`), datum
-  tag (`IModelDoc2.InsertDatumTag2`), notes (`IModelDoc2.InsertNote`). All present in the bundle.
-- **Consistent with the repo philosophy.** Drawings become **generated artifacts**
-  (`cad/out/drawings/<dashed>.PDF`), scripted from the config — not hand-drawn — exactly like the
-  renders/STL/STEP. The tolerance data flows from `tolerances.yaml` + custom properties **into** the
-  drawing instead of dead-ending in metadata.
+  same mechanism; the COM API creates drawing docs + views (`IDrawingDoc.CreateDrawViewFromModelView3`)
+  and — the key point — **imports the PMI the build already embedded in the SLDPRT (§8)** via
+  `InsertModelAnnotations3` / `InsertModelDimensions`. The drawing script *places views, imports
+  model items, and arranges* — it does **not** re-author tolerances. (The `InsertGtol` /
+  `InsertSurfaceFinishSymbol2` / `InsertDatumTag2` calls live in the **build** per §8, on the model,
+  not on the drawing.)
+- **Consistent with the repo philosophy + single source of truth.** Drawings become **generated
+  artifacts** (`cad/out/drawings/<dashed>.PDF`), scripted from the config — not hand-drawn — exactly
+  like the renders/STL/STEP. Because the tolerances are embedded in the model from the YAML,
+  editing a fit in `tolerances.yaml` and rebuilding updates the SLDPRT PMI **and** every drawing in
+  one pass; nothing dead-ends in metadata.
 - **Scope by tier.** Generate drawings for the **Tier-1 precision-critical parts first** (the ~10
   in §6/§9), which carry the `precision` grade, runout, finish, and critical-feature notes; then
   expand to all parts. New doit task `drawing:<stem>` on the **COM spine** (it needs SolidWorks),
@@ -385,11 +429,24 @@ CNC, which has no consumer here. This is a definitive scope exclusion tied to th
 method, not a deferral. Revisit only if a CNC machine enters the toolchain (e.g., a CNC conversion
 of the mill).
 
-### MBD / 3D PDF — not the path (license-dependent + wrong medium)
+### DimXpert / MBD — DimXpert IS available on the Makers seat (the backbone); 3D-PDF is optional
 
-Considered as a single-source alternative to 2D drawings (attach 3D PMI, publish a rotatable 3D
-PDF). Rejected: SOLIDWORKS **MBD/DimXpert is a separately-licensed add-in** and is unlikely to be
-exposed in the 3DEXPERIENCE **for Makers** bundle (confirm before relying on it); and the audience
-works from **2D prints** at the bench, not interactive 3D PDFs. Keep only as a possible future
-enhancement *if* the Makers seat turns out to expose DimXpert.
+Corrected after checking online — an earlier draft wrongly assumed DimXpert was add-in-gated.
+**DimXpert (authoring PMI — size + geometric tolerances and datums on the model) is included with
+*every* SOLIDWORKS license**, so it runs on the 3DEXPERIENCE **for Makers** seat:
+
+- Hawk Ridge Systems (SOLIDWORKS reseller): *"DimXpert and MBD Dimensions are the exact same
+  toolset. **Both are included with every license of SOLIDWORKS** …"*
+- SOLIDWORKS Help: *"SOLIDWORKS MBD offers 3D PMI definition capabilities using DimXpert …"* — and
+  GoEngineer: the **MBD add-in** is what *publishes* DimXpert models to **3D PDF / eDrawings /
+  STEP242**.
+
+So the split is: **DimXpert authoring = included → embed PMI during the build (§8), this is the
+recommended backbone.** Only the **MBD add-in** (the *publish to rotatable 3D PDF* step) may be
+absent on Makers — and it is optional, because (a) the bench deliverable is a **2D PDF print**
+anyway, and (b) STEP **AP242** (`PublishSTEP242File`, present in the API) already carries the
+embedded PMI into the neutral export without the add-in. Net: **author PMI with DimXpert on every
+build; ship 2D PDF drawings; treat 3D-PDF publish as a nice-to-have to be probed at runtime on the
+seat.** (The probe: try `IModelDocExtension.PublishTo3DPDF` once; if it fails for lack of the
+add-in, the 2D + STEP242 path is unaffected.)
 ```
