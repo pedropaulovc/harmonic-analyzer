@@ -31,16 +31,21 @@ import math
 import sys
 
 from _common import (
-    add_line_chain,
+    SketchDims,
     apply_material,
     check,
+    define_centered_rectangle,
     define_circle,
-    define_rectilinear_chain,
+    drive_dimension,
     ensure_fully_defined,
+    force_rebuild,
+    name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
     set_sketch_direct_db,
+    volume_check,
 )
 
 PART_NAME = "wheel-bar"
@@ -57,51 +62,83 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    half = BAR_SIDE / 2.0
+    # Editable knobs (Tools > Equations): the square section, the bar length, and
+    # the pen-hanger screw hole (diameter + its X station). The mm suffix is
+    # load-bearing -- this is an INCH document and the equation manager reads BARE
+    # numbers in document units (an unsuffixed 200 = 200 in). BAR_SIDE doubles as
+    # the extrude DEPTH (a feature parameter, not a sketch dim), so it drives the
+    # profile's depth dim only; the depth itself is static, matching the exemplars.
+    await set_global(adapter, "BarSide", f"{BAR_SIDE}mm")
+    await set_global(adapter, "BarLength", f"{BAR_LENGTH}mm")
+    await set_global(adapter, "ScrewHoleDia", f"{SCREW_HOLE_DIA}mm")
+    await set_global(adapter, "ScrewHoleX", f"{SCREW_HOLE_X}mm")
+
+    drive_jobs: list[tuple[str, str]] = []
+
+    # Square bar profile: width along X = length, depth along Z = section,
+    # origin-centred. The old add_line_chain + define_rectilinear_chain pair is
+    # an origin-centred rectangle, so switch it to define_centered_rectangle
+    # (cleaner; emits exactly width, depth, cornerX, cornerZ).
+    bar = SketchDims()
     check("create_sketch bar", await adapter.create_sketch("Front"))
-    bar_rect = [
-        (-BAR_LENGTH / 2.0, -half),
-        (BAR_LENGTH / 2.0, -half),
-        (BAR_LENGTH / 2.0, half),
-        (-BAR_LENGTH / 2.0, half),
-    ]
-    outline = await add_line_chain(adapter, bar_rect)
-    await define_rectilinear_chain(adapter, outline, bar_rect, label="bar")
+    await define_centered_rectangle(
+        adapter, BAR_LENGTH / 2.0, BAR_SIDE / 2.0, "bar", dims=bar,
+        name_width="Length", drive_width='"BarLength"',
+        name_depth="Side", drive_depth='"BarSide"',
+        name_corner=("CornerX", "CornerZ"),
+        drive_corner=('"BarLength" / 2', '"BarSide" / 2'),
+    )
     await ensure_fully_defined(adapter, "bar sketch")
     check("exit_sketch bar", await adapter.exit_sketch())
+    name_last_feature(adapter, "BarProfile")
+    drive_jobs += bar.apply(adapter, "BarProfile")
     check(
         "extrude bar",
         await adapter.create_extrusion(
             ExtrusionParameters(depth=BAR_SIDE, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "Bar")
 
-    res = await adapter.get_mass_properties()
-    vol = res.data.volume
     expected = BAR_LENGTH * BAR_SIDE * BAR_SIDE
-    print(f"  volume: {vol:.1f} mm^3 (analytic {expected:.1f})")
-    if abs(vol - expected) > 0.005 * expected:
-        raise RuntimeError(f"bar volume {vol:.1f} != {expected:.1f}")
+    await volume_check(adapter, "bar", expected, 0.005 * expected)
 
-    # Pen-hanger screw hole (mid-plane cut along Z, bar is z-symmetric).
+    # Pen-hanger screw hole (mid-plane cut along Z, bar is z-symmetric). On-axis
+    # in Z (y 0): only X + diameter are dims, so define_circle records just those
+    # two -- the "Z" slot is ignored.
+    hole = SketchDims()
     check("create_sketch screw hole", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    await define_circle(adapter, SCREW_HOLE_X, 0.0, SCREW_HOLE_DIA / 2.0, "screw hole")
+    await define_circle(
+        adapter, SCREW_HOLE_X, 0.0, SCREW_HOLE_DIA / 2.0, "screw hole",
+        dims=hole,
+        names=("ScrewHoleCx", "ScrewHoleCz", "ScrewHoleDiaDim"),
+        # The centre-X dim is an unsigned distance from the origin, so drive it
+        # by the ABS value of the (negative) X station: -ScrewHoleX = +97.5.
+        drives=('-"ScrewHoleX"', None, '"ScrewHoleDia"'),
+    )
     set_sketch_direct_db(adapter, False)
     await ensure_fully_defined(adapter, "screw hole sketch")
     check("exit_sketch screw hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "ScrewHoleProfile")
+    drive_jobs += hole.apply(adapter, "ScrewHoleProfile")
     check(
         "cut screw hole",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=3.0 * BAR_SIDE, both_directions=True)
         ),
     )
+    name_last_feature(adapter, "ScrewHole")
     expected -= math.pi * (SCREW_HOLE_DIA / 2.0) ** 2 * BAR_SIDE
-    res = await adapter.get_mass_properties()
-    vol = res.data.volume
-    print(f"  volume after screw hole: {vol:.1f} mm^3 (analytic {expected:.1f})")
-    if abs(vol - expected) > 1.0:
-        raise RuntimeError(f"screw hole volume {vol:.1f} != {expected:.1f}")
+    await volume_check(adapter, "bar with screw hole", expected, 1.0)
+
+    # Deferred drive equations after the model + a rebuild exists, then re-check:
+    # each equation evaluates to the as-built value, so geometry must not move.
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "driven wheel bar (equations neutral)", expected, 1.0)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
