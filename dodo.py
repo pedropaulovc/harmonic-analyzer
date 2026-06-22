@@ -64,20 +64,19 @@ import sys
 import time
 from pathlib import Path
 
-# Part tasks run via doit ``CmdAction(verbosity=2)``, which pipes each build
-# script's stdout and RE-EMITS it through this doit parent process. Build output
-# carries non-ASCII (e.g. the "A ∩ B" gate labels); on Windows the parent stdout
-# defaults to cp1252, so re-emitting that glyph raises UnicodeEncodeError and kills
-# doit's reader thread (which can then hang the child on a full pipe). The child's
-# own run_build reconfigure does not help here -- the crash is in the PARENT. Force
-# UTF-8 on the parent too, mirroring run_build (_common.py).
+# Every build/verify/export task routes its subprocess through ``_run``, which
+# streams the child's stdout through this doit parent process -- and tees it to
+# cad/out/logs when a log_stem is given. Build output carries non-ASCII (e.g. the
+# "A ∩ B" gate labels); on Windows the parent stdout defaults to cp1252, so
+# re-emitting that glyph raises UnicodeEncodeError and kills the reader (which can
+# then hang the child on a full pipe). Force UTF-8 on the parent too, mirroring
+# run_build (_common.py).
 for _stream in (sys.stdout, sys.stderr):
     _reconfigure = getattr(_stream, "reconfigure", None)
     if _reconfigure is not None:
         _reconfigure(encoding="utf-8", errors="replace")
 
 import yaml as _yaml
-from doit.action import CmdAction
 from doit.dependency import CHECKERS, Dependency, JsonDB, MD5Checker, get_file_md5
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "cad" / "scripts"))
@@ -276,13 +275,37 @@ def _sldasm(stem: str) -> str:
     return str(artefact_for(SCRIPTS_DIR / f"build_{stem}_assembly.py").resolve())
 
 
-def _run(cmd: list[str], label: str) -> None:
+def _run(cmd: list[str], label: str, log_stem: str | None = None) -> None:
     """Run a build/refresh subprocess from the repo root; raise on non-zero so
-    doit marks the task failed and stops (fail-loud -- no stale artefact)."""
+    doit marks the task failed and stops (fail-loud -- no stale artefact).
+
+    With ``log_stem`` the subprocess output is teed to ``cad/out/logs/<stem>.log``
+    AND echoed live to the console, so a release can ship the part/assembly/gate
+    build logs as an artefact (cut_release.py collects ``cad/out/logs``). Without
+    it, output is inherited straight to the terminal -- the cheap path for the
+    non-release happy path. Decode the pipe as UTF-8 (errors=replace) so the gate
+    labels' non-ASCII glyphs survive on a cp1252 Windows console."""
     print(f">>  {label}: {' '.join(cmd)}", flush=True)
-    proc = subprocess.run(cmd, cwd=str(REPO_ROOT))
-    if proc.returncode:
-        raise RuntimeError(f"{label} failed (exit {proc.returncode})")
+    if log_stem is None:
+        rc = subprocess.run(cmd, cwd=str(REPO_ROOT)).returncode
+    else:
+        LOGS.mkdir(parents=True, exist_ok=True)
+        with (LOGS / f"{log_stem}.log").open("w", encoding="utf-8") as fh:
+            fh.write(f">>  {label}: {' '.join(cmd)}\n")
+            fh.flush()
+            proc = subprocess.Popen(
+                cmd, cwd=str(REPO_ROOT), stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+                errors="replace", bufsize=1)
+            assert proc.stdout is not None
+            for line in proc.stdout:
+                sys.stdout.write(line)
+                sys.stdout.flush()
+                fh.write(line)
+                fh.flush()
+            rc = proc.wait()
+    if rc:
+        raise RuntimeError(f"{label} failed (exit {rc})")
 
 
 # --- Per-script helper dependencies, computed from each build script's REAL
@@ -372,6 +395,10 @@ def _config_deps(script, stem: str | None = None, kind: str | None = None) -> li
 # incremental (re-runs only when a file_dep changes) and individually
 # addressable, exactly like a part/assembly target.
 REPORTS = CAD_OUT / "reports"
+# Per-task build/verify logs (parts, assemblies, gates), teed by _run when a
+# log_stem is passed; cut_release.py folds these into the release bundle so a
+# release ships the logs that produced it. Gitignored (cad/out/logs/).
+LOGS = CAD_OUT / "logs"
 VERIFY_PY = (SCRIPTS_DIR / "verify.py").resolve()
 EXPORT_PY = (SCRIPTS_DIR / "export_models.py").resolve()
 RELEASE_PY = (SCRIPTS_DIR / "cut_release.py").resolve()
@@ -386,7 +413,7 @@ _CHECK_NAMES = ("math", "config", "graph", "nameplate", "recipe")  # offline
 def _run_stamped(cmd: list[str], label: str, stamp: str) -> None:
     """Run a gate subprocess; on success write its stamp target. _run raises on
     non-zero, so a failed gate never writes a stamp (stays stale -> re-runs)."""
-    _run(cmd, label)
+    _run(cmd, label, log_stem=Path(stamp).stem)
     Path(stamp).parent.mkdir(parents=True, exist_ok=True)
     Path(stamp).write_text(f"{label}\n", encoding="utf-8")
 
@@ -482,7 +509,7 @@ def _cached_part_action(stem: str, script: Path) -> None:
     outputs = _part_cache_outputs(stem)
     if _cache.restore(key, outputs, f"part:{stem}"):
         return
-    _run([sys.executable, str(script)], f"part:{stem}")
+    _run([sys.executable, str(script)], f"part:{stem}", log_stem=f"part-{stem}")
     _cache.store(key, outputs, f"part:{stem}")
 
 
@@ -604,12 +631,14 @@ def build_or_refresh(stem, dependencies, changed, targets):
     hooks = [SCRIPTS_DIR / h for h in POST_ASSEMBLY.get(stem, ())]
     if target_missing or recipe_changed:
         why = "target missing" if target_missing else "recipe changed"
-        _run([sys.executable, str(asm_script)], f"FULL build {stem} ({why})")
+        _run([sys.executable, str(asm_script)], f"FULL build {stem} ({why})",
+             log_stem=f"assembly-{stem}")
         for hook in hooks:
-            _run([sys.executable, str(hook)], f"hook {hook.name}")
+            _run([sys.executable, str(hook)], f"hook {hook.name}",
+                 log_stem=f"hook-{stem}-{hook.stem}")
     else:
         _run([sys.executable, str(SCRIPTS_DIR / "refresh_assembly.py"), stem],
-             f"REFRESH {stem}")
+             f"REFRESH {stem}", log_stem=f"assembly-{stem}")
     # _run raised if the build failed, so we only get here on success: record this
     # build's recipe digest for the next run's FULL/REFRESH decision.
     sidecar.parent.mkdir(parents=True, exist_ok=True)
@@ -827,7 +856,7 @@ def task_export():
         "targets": [target],
         "task_dep": _spine_dep("export"),
         "uptodate": [False],
-        "actions": [CmdAction([sys.executable, str(EXPORT_PY)], cwd=str(REPO_ROOT))],
+        "actions": [(_run, [[sys.executable, str(EXPORT_PY)], "export", "export"])],
         "verbosity": 2,
     }
 
