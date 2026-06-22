@@ -284,10 +284,10 @@ async def build(adapter) -> dict[str, str]:
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
     # built, so the geometry must not move -- the re-check below is the proof.
-    force_rebuild(adapter)
+    await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
-    force_rebuild(adapter)
+    await force_rebuild(adapter)
     await volume_check(adapter, "driven ring (equations neutral)", v_final, 0.005 * v_boss_extra + 50.0)
 
     await apply_material(adapter, MATERIAL)

@@ -85,10 +85,10 @@ async def build(adapter) -> dict[str, str]:
 
     # Apply the deferred drive equations after the model exists, then re-check:
     # every equation evaluates to the value just built, so geometry must not move.
-    force_rebuild(adapter)
+    await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
-    force_rebuild(adapter)
+    await force_rebuild(adapter)
     await volume_check(adapter, "driven bar (equations neutral)", expected, 0.005 * expected)
 
     await apply_material(adapter, MATERIAL)
