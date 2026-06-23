@@ -35,8 +35,10 @@ import contextlib
 import contextvars
 import logging
 import os
+import socket
 import sys
 import time
+import urllib.parse
 from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Any
@@ -80,6 +82,44 @@ _GLYPH = {
 
 _SERVICE_NAME = "harmonic-analyzer"
 _LOGGER_NAME = "harmonic"
+
+# Project default: ship OTLP to a local **.NET Aspire dashboard** (standalone
+# image's OTLP/HTTP port) with zero env. So `doit ...` / a build script lights up
+# the dashboard's traces+logs the moment it's running -- no OTEL_* exports needed.
+# Override or disable with OTEL_EXPORTER_OTLP_ENDPOINT (set it empty to turn off).
+_DEFAULT_OTLP_ENDPOINT = "http://localhost:18890"
+
+
+def _endpoint_listening(endpoint: str, timeout: float = 0.15) -> bool:
+    """True if something is accepting TCP on ``endpoint``'s host:port.
+
+    A cheap reachability probe so the DEFAULT endpoint is used only when the
+    Aspire dashboard is actually up: without it a build with no dashboard would
+    pay per-span OTLP export retries (a headless/CI build must never slow down
+    just because telemetry has nowhere to go). An explicit env endpoint skips the
+    probe -- if you set it, you mean it.
+    """
+    try:
+        parsed = urllib.parse.urlsplit(endpoint)
+        host = parsed.hostname or "localhost"
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def _resolve_otlp_endpoint() -> str | None:
+    """The OTLP base endpoint to export to, or ``None`` to export nowhere.
+
+    Precedence: an explicit ``OTEL_EXPORTER_OTLP_ENDPOINT`` always wins (empty
+    string disables export); otherwise fall back to the local Aspire dashboard
+    default, but only when it is actually listening.
+    """
+    env = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+    if env is not None:
+        return env or None
+    return _DEFAULT_OTLP_ENDPOINT if _endpoint_listening(_DEFAULT_OTLP_ENDPOINT) else None
 
 _T0 = time.perf_counter()
 _LAST_TICK = _T0
@@ -177,6 +217,14 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     quiet = os.environ.get("HARMONIC_OTEL_QUIET") == "1"
     want_console = console and not quiet
 
+    # Resolve the OTLP target ONCE (probes the Aspire default if no env is set)
+    # and pin it into the environment so the OTLP exporters read it AND every
+    # build subprocess inherits the same decision via inject_env -- the parent
+    # pays the reachability probe, children don't re-probe.
+    otlp_endpoint = _resolve_otlp_endpoint()
+    if otlp_endpoint:
+        os.environ.setdefault("OTEL_EXPORTER_OTLP_ENDPOINT", otlp_endpoint)
+
     resource = Resource.create(
         {
             "service.name": _SERVICE_NAME,
@@ -203,6 +251,16 @@ def configure(*, console: bool = True, force: bool = False) -> None:
                     )
                 )
             )
+    # OTLP export to the resolved endpoint (Aspire dashboard by default, see
+    # _resolve_otlp_endpoint). SimpleSpanProcessor so short-lived build
+    # subprocesses flush each span on end without relying on an explicit shutdown.
+    if otlp_endpoint:
+        with contextlib.suppress(Exception):
+            from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+                OTLPSpanExporter,
+            )
+
+            tracer_provider.add_span_processor(SimpleSpanProcessor(OTLPSpanExporter()))
     trace.set_tracer_provider(tracer_provider)
 
     # ---- logs ---------------------------------------------------------- #
@@ -216,6 +274,15 @@ def configure(*, console: bool = True, force: bool = False) -> None:
                         out=logs, formatter=lambda r: r.to_json(indent=None) + "\n"
                     )
                 )
+            )
+    if otlp_endpoint:
+        with contextlib.suppress(Exception):
+            from opentelemetry.exporter.otlp.proto.http._log_exporter import (
+                OTLPLogExporter,
+            )
+
+            logger_provider.add_log_record_processor(
+                SimpleLogRecordProcessor(OTLPLogExporter())
             )
     set_logger_provider(logger_provider)
 
