@@ -309,28 +309,33 @@ async def _mate(
     """
     from solidworks_mcp.adapters.base import MateRefParameters
 
-    res = check(label, await _add_mate(adapter, kind, entities, flip=False, **kw))
-    if verify is None:
+    # Span every mate (the single chokepoint all mate helpers funnel through),
+    # including flip-recovery, so the full-build waterfall stays contiguous
+    # between part spans instead of leaving the mate time as a gap.
+    async with _telemetry.aspan(f"mate {kind}", kind=kind, label=label) as msp:
+        res = check(label, await _add_mate(adapter, kind, entities, flip=False, **kw))
+        if verify is None:
+            return res
+        comp_name, target_origin = verify
+        array = component_transform(adapter, comp_name)
+        moved = max(abs(array[9 + i] * 1000.0 - target_origin[i]) for i in range(3))
+        if moved <= _MATE_TOL_MM:
+            return res
+        msp.set_attribute("flipped", True)
+        log(f"{label}: moved {moved:.2f} mm -> re-adding flipped")
+        check(
+            f"{label} (delete wrong side)",
+            await adapter.delete_mate(MateRefParameters(name=res.get("name", ""))),
+        )
+        res = check(
+            f"{label} (flipped)",
+            await _add_mate(adapter, kind, entities, flip=True, **kw),
+        )
+        array = component_transform(adapter, comp_name)
+        moved = max(abs(array[9 + i] * 1000.0 - target_origin[i]) for i in range(3))
+        if moved > _MATE_TOL_MM:
+            raise RuntimeError(f"{label}: component still off target by {moved:.2f} mm")
         return res
-    comp_name, target_origin = verify
-    array = component_transform(adapter, comp_name)
-    moved = max(abs(array[9 + i] * 1000.0 - target_origin[i]) for i in range(3))
-    if moved <= _MATE_TOL_MM:
-        return res
-    log(f"{label}: moved {moved:.2f} mm -> re-adding flipped")
-    check(
-        f"{label} (delete wrong side)",
-        await adapter.delete_mate(MateRefParameters(name=res.get("name", ""))),
-    )
-    res = check(
-        f"{label} (flipped)",
-        await _add_mate(adapter, kind, entities, flip=True, **kw),
-    )
-    array = component_transform(adapter, comp_name)
-    moved = max(abs(array[9 + i] * 1000.0 - target_origin[i]) for i in range(3))
-    if moved > _MATE_TOL_MM:
-        raise RuntimeError(f"{label}: component still off target by {moved:.2f} mm")
-    return res
 
 async def plane_distance_mate(
     adapter: Any,
@@ -591,35 +596,43 @@ async def place_component(
         InsertComponentParameters,
     )
 
-    if mirror:
-        position, rotation, rows = mirror_placement(
-            part, position, rotation, rows, configuration
-        )
     label = label or part
-    path = (OUT_SLDPRT / f"{part}.SLDPRT").resolve()
-    if not path.exists():
-        raise RuntimeError(
-            f"missing part {path}; run build_{part.replace('-', '_')}.py first"
-        )
-    data = check(
-        f"insert {label} @ ({position[0]:.2f}, {position[1]:.2f}, {position[2]:.2f})",
-        await adapter.insert_component(
-            InsertComponentParameters(
-                file_path=str(path),
-                position=position,
-                rotation=rotation,
-                configuration=configuration,
+    # One span per part: insert + (fix) + placement assert for THIS component, so
+    # the full-build waterfall shows where each part's time went and a failed
+    # insert/mate is attributed to the part by name.
+    async with _telemetry.aspan(
+        f"part {label}", part=part, ground=ground,
+        configuration=configuration or "default",
+    ) as psp:
+        if mirror:
+            position, rotation, rows = mirror_placement(
+                part, position, rotation, rows, configuration
             )
-        ),
-    )
-    name = data["name"]
-    if ground and not data.get("fixed"):
-        check(
-            f"fix {label}",
-            await adapter.fix_component(ComponentRefParameters(name=name)),
+        path = (OUT_SLDPRT / f"{part}.SLDPRT").resolve()
+        if not path.exists():
+            raise RuntimeError(
+                f"missing part {path}; run build_{part.replace('-', '_')}.py first"
+            )
+        data = check(
+            f"insert {label} @ ({position[0]:.2f}, {position[1]:.2f}, {position[2]:.2f})",
+            await adapter.insert_component(
+                InsertComponentParameters(
+                    file_path=str(path),
+                    position=position,
+                    rotation=rotation,
+                    configuration=configuration,
+                )
+            ),
         )
-    assert_component_placed(adapter, name, position, rows)
-    return name
+        name = data["name"]
+        psp.set_attribute("component", name)
+        if ground and not data.get("fixed"):
+            check(
+                f"fix {label}",
+                await adapter.fix_component(ComponentRefParameters(name=name)),
+            )
+        assert_component_placed(adapter, name, position, rows)
+        return name
 
 def assert_components_fully_defined(adapter: Any) -> None:
     """Raise when any top-level component is neither fixed, fully defined,
@@ -640,29 +653,39 @@ def assert_components_fully_defined(adapter: Any) -> None:
     # (5) for every mated part even though the mates are consistent and the
     # parts have not moved (probed live -- a ForceRebuild3 restores the true
     # status). Always re-solve before reading the gate.
-    adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
-    components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
-    log(f"checking {len(components)} components for free DOF ...")
     problems = []
-    for component in components:
-        _flag(component, "IComponent2")
-        comp_name = str(_read_member(component, "Name2"))
-        if bool(_read_member(component, "IsFixed")):
-            log(f"{comp_name}: fixed")
-            continue
-        if bool(
-            adapter._attempt(lambda c=component: c.IsPatternInstance(), default=False)
-        ):
-            log(f"{comp_name}: pattern instance (feature-driven)")
-            continue
-        status = int(
-            adapter._attempt(lambda c=component: c.GetConstrainedStatus(), default=-1)
-        )
-        log(f"{comp_name}: constrained status {status}")
-        if status != FULLY_CONSTRAINED:
-            kind = "under" if status == UNDER_CONSTRAINED else f"status={status}"
-            problems.append(f"{comp_name} ({kind})")
-    _telemetry.success(f"checked {len(components)} components for free DOF")
+    with _telemetry.span("gate.dof") as gsp:
+        # Re-solve the mate solver before reading the gate (stale-status reason
+        # above) -- the ForceRebuild3 is the bulk of the gate's wall-clock, so it
+        # gets its own child span rather than sitting in an unspanned gap.
+        with _telemetry.span("dof.resolve"):
+            adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
+            components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
+        gsp.set_attribute("components", len(components))
+        log(f"checking {len(components)} components for free DOF ...")
+        for component in components:
+            _flag(component, "IComponent2")
+            comp_name = str(_read_member(component, "Name2"))
+            with _telemetry.span("dof.check", component=comp_name) as csp:
+                if bool(_read_member(component, "IsFixed")):
+                    csp.set_attribute("result", "fixed")
+                    log(f"{comp_name}: fixed")
+                    continue
+                if bool(
+                    adapter._attempt(lambda c=component: c.IsPatternInstance(), default=False)
+                ):
+                    csp.set_attribute("result", "pattern")
+                    log(f"{comp_name}: pattern instance (feature-driven)")
+                    continue
+                status = int(
+                    adapter._attempt(lambda c=component: c.GetConstrainedStatus(), default=-1)
+                )
+                csp.set_attribute("status", status)
+                log(f"{comp_name}: constrained status {status}")
+                if status != FULLY_CONSTRAINED:
+                    kind = "under" if status == UNDER_CONSTRAINED else f"status={status}"
+                    problems.append(f"{comp_name} ({kind})")
+        _telemetry.success(f"checked {len(components)} components for free DOF")
     if problems:
         raise RuntimeError("components not fully defined: " + ", ".join(problems))
 
@@ -692,45 +715,49 @@ def check_no_interference(adapter: Any) -> None:
     touching a NON-link part is still a hard fault.
     """
     asm = adapter.currentModel
-    log("interference detection: starting ...")
-    _flag(asm, "IAssemblyDoc")
-    adapter._attempt(lambda: asm.ToolsCheckInterference(), default=None)
-    mgr = _read_member(asm, "InterferenceDetectionManager")
-    if mgr is None:
-        raise RuntimeError("InterferenceDetectionManager unavailable")
-    _flag(mgr, "IInterferenceDetectionMgr")
-    mgr.TreatCoincidenceAsInterference = False
-    mgr.TreatSubAssembliesAsComponents = True
-    mgr.IncludeMultibodyPartInterferences = True
-    mgr.MakeInterferingPartsTransparent = False
-    mgr.CreateFastenersFolder = False
-    mgr.UseTransform = False
-    log("interference detection: computing interferences ...")
-    interferences = adapter._attempt(lambda: mgr.GetInterferences(), default=None)
-    details = []
-    chain_contacts = []
-    for interference in list(interferences or []):
-        _flag(interference, "IInterference")
-        names = []
-        for comp in list(_read_member(interference, "Components") or []):
-            _flag(comp, "IComponent2")
-            names.append(str(_read_member(comp, "Name2")))
-        volume_mm3 = float(_read_member(interference, "Volume") or 0.0) * 1e9
-        if all(n.startswith(_CHAIN_LINK_PREFIXES) for n in names) and len(names) == 2:
-            chain_contacts.append(volume_mm3)
-            continue
-        details.append(f"{' & '.join(names)}: {volume_mm3:.2f} mm^3")
-    adapter._attempt(lambda: mgr.Done(), default=None)
-    if chain_contacts:
-        _telemetry.debug(
-            f"{len(chain_contacts)} chain-internal link contacts"
-            f" (<= {max(chain_contacts):.2f} mm^3) allowed -- articulating chain"
-        )
-    if details:
-        raise RuntimeError(
-            f"{len(details)} interference(s): " + "; ".join(details)
-        )
-    _telemetry.success("interference check: none found")
+    with _telemetry.span("gate.interference") as isp:
+        log("interference detection: starting ...")
+        _flag(asm, "IAssemblyDoc")
+        adapter._attempt(lambda: asm.ToolsCheckInterference(), default=None)
+        mgr = _read_member(asm, "InterferenceDetectionManager")
+        if mgr is None:
+            raise RuntimeError("InterferenceDetectionManager unavailable")
+        _flag(mgr, "IInterferenceDetectionMgr")
+        mgr.TreatCoincidenceAsInterference = False
+        mgr.TreatSubAssembliesAsComponents = True
+        mgr.IncludeMultibodyPartInterferences = True
+        mgr.MakeInterferingPartsTransparent = False
+        mgr.CreateFastenersFolder = False
+        mgr.UseTransform = False
+        with _telemetry.span("interference.compute"):
+            log("interference detection: computing interferences ...")
+            interferences = adapter._attempt(lambda: mgr.GetInterferences(), default=None)
+        details = []
+        chain_contacts = []
+        for interference in list(interferences or []):
+            _flag(interference, "IInterference")
+            names = []
+            for comp in list(_read_member(interference, "Components") or []):
+                _flag(comp, "IComponent2")
+                names.append(str(_read_member(comp, "Name2")))
+            volume_mm3 = float(_read_member(interference, "Volume") or 0.0) * 1e9
+            if all(n.startswith(_CHAIN_LINK_PREFIXES) for n in names) and len(names) == 2:
+                chain_contacts.append(volume_mm3)
+                continue
+            details.append(f"{' & '.join(names)}: {volume_mm3:.2f} mm^3")
+        adapter._attempt(lambda: mgr.Done(), default=None)
+        isp.set_attribute("hits", len(details))
+        isp.set_attribute("chain_contacts", len(chain_contacts))
+        if chain_contacts:
+            _telemetry.debug(
+                f"{len(chain_contacts)} chain-internal link contacts"
+                f" (<= {max(chain_contacts):.2f} mm^3) allowed -- articulating chain"
+            )
+        if details:
+            raise RuntimeError(
+                f"{len(details)} interference(s): " + "; ".join(details)
+            )
+        _telemetry.success("interference check: none found")
 
 def _byref_variant() -> Any:
     """An in/out ``VT_BYREF | VT_VARIANT`` for ``out object`` COM params.
@@ -796,39 +823,48 @@ def assert_model_healthy(
     """
     model = model or adapter.currentModel
     _flag(model, "IModelDoc2")
-    rebuilt = adapter._attempt(lambda: model.ForceRebuild3(False), default=None)
+    with _telemetry.span("gate.health", label=label or "top", deep=deep) as hsp:
+        # The deep ForceRebuild3 + sub-document collection is the bulk of the
+        # gate's wall-clock; span it so it is not an unspanned leading gap before
+        # the per-target whats_wrong checks.
+        with _telemetry.span("health.rebuild"):
+            rebuilt = adapter._attempt(lambda: model.ForceRebuild3(False), default=None)
 
-    targets = [(label or "top", model)]
-    if deep:
-        comps = adapter._attempt(lambda: model.GetComponents(False), default=None) or []
-        for comp in comps:
-            _flag(comp, "IComponent2")
-            name = str(_read_member(comp, "Name2"))
-            if "/" in name:  # top-level instances only; their docs cover nested parts
-                continue
-            sub = adapter._attempt(lambda c=comp: c.GetModelDoc2(), default=None)
-            if sub is not None and sub is not model:
-                targets.append((name, sub))
+            targets = [(label or "top", model)]
+            if deep:
+                comps = adapter._attempt(lambda: model.GetComponents(False), default=None) or []
+                for comp in comps:
+                    _flag(comp, "IComponent2")
+                    name = str(_read_member(comp, "Name2"))
+                    if "/" in name:  # top-level instances only; their docs cover nested parts
+                        continue
+                    sub = adapter._attempt(lambda c=comp: c.GetModelDoc2(), default=None)
+                    if sub is not None and sub is not model:
+                        targets.append((name, sub))
 
-    errors: list[str] = []
-    warnings: list[str] = []
-    for tlabel, doc in targets:
-        for name, code, warn in whats_wrong(adapter, doc):
-            entry = f"{tlabel}:{name} [{_FEATURE_ERROR.get(code, code)}]"
-            (warnings if warn else errors).append(entry)
-    if rebuilt is False:
-        errors.append(f"{label or 'top'}: ForceRebuild3 returned False")
+        errors: list[str] = []
+        warnings: list[str] = []
+        for tlabel, doc in targets:
+            with _telemetry.span("health.whats_wrong", target=tlabel):
+                for name, code, warn in whats_wrong(adapter, doc):
+                    entry = f"{tlabel}:{name} [{_FEATURE_ERROR.get(code, code)}]"
+                    (warnings if warn else errors).append(entry)
+        if rebuilt is False:
+            errors.append(f"{label or 'top'}: ForceRebuild3 returned False")
 
-    if warnings:
-        _telemetry.debug(
-            f"{len(warnings)} warning(s): " + "; ".join(warnings[:12])
-        )
-    if errors:
-        raise RuntimeError(
-            f"model unhealthy ({label or 'top'}): {len(errors)} error(s) -- "
-            + "; ".join(errors[:20])
-        )
-    _telemetry.success(f"model healthy ({label or 'top'})")
+        hsp.set_attribute("targets", len(targets))
+        hsp.set_attribute("warnings", len(warnings))
+        hsp.set_attribute("errors", len(errors))
+        if warnings:
+            _telemetry.warn(
+                f"{len(warnings)} health warning(s): " + "; ".join(warnings[:12])
+            )
+        if errors:
+            raise RuntimeError(
+                f"model unhealthy ({label or 'top'}): {len(errors)} error(s) -- "
+                + "; ".join(errors[:20])
+            )
+        _telemetry.success(f"model healthy ({label or 'top'})")
 
 def body_faults(adapter: Any, model: Any) -> list[tuple[str, int]]:
     """Return ``[(body_name, fault_count), ...]`` for any faulty solid bodies.
@@ -900,21 +936,24 @@ async def _export_assembly_images(
     png_dir = OUT_PNG / asm_name
     png_dir.mkdir(parents=True, exist_ok=True)
     artefacts: dict[str, str] = {}
-    for view in views:
-        img_path = (png_dir / f"{asm_name}_{view}.png").resolve()
-        check(
-            f"export_image {view}",
-            await adapter.export_image(
-                {
-                    "file_path": str(img_path),
-                    "format_type": "png",
-                    "width": 1600,
-                    "height": 1000,
-                    "view_orientation": view,
-                }
-            ),
-        )
-        artefacts[view] = str(img_path)
+    views = list(views)
+    async with _telemetry.aspan("export_images", count=len(views)):
+        for view in views:
+            img_path = (png_dir / f"{asm_name}_{view}.png").resolve()
+            async with _telemetry.aspan("export_image", view=view):
+                check(
+                    f"export_image {view}",
+                    await adapter.export_image(
+                        {
+                            "file_path": str(img_path),
+                            "format_type": "png",
+                            "width": 1600,
+                            "height": 1000,
+                            "view_orientation": view,
+                        }
+                    ),
+                )
+            artefacts[view] = str(img_path)
 
     return artefacts
 
@@ -1024,9 +1063,9 @@ async def refresh_assembly(
     if not asm_path.exists():
         raise RuntimeError(
             f"missing assembly {asm_path}; build it from scratch first")
-    check(f"open {asm_name}", await adapter.open_model(str(asm_path)))
-
-    configs = check("list configurations", await adapter.list_configurations())
+    with _telemetry.span("open", asm=asm_name):
+        check(f"open {asm_name}", await adapter.open_model(str(asm_path)))
+        configs = check("list configurations", await adapter.list_configurations())
     log(f"refresh {asm_name}: {len(configs)} configuration(s): {configs}")
     # The deterministic export/rest pose: Default is the saved, rendered pose the
     # top-level assembly references, and the DOF gate runs on it.
@@ -1036,34 +1075,38 @@ async def refresh_assembly(
     # config-specific break (a config whose mesh entity moved) is caught here, not
     # silently saved. Any under-defined-by-design config is NOT a fault --
     # whats_wrong reports feature/mate rebuild errors, not free DOF.
-    for cfg in configs:
-        check(f"activate {cfg}", await adapter.set_active_configuration(cfg))
-        adapter._attempt(
-            lambda: adapter.currentModel.ForceRebuild3(False), default=None)
-        faults = [
-            f"{name} [{_FEATURE_ERROR.get(code, code)}]"
-            for name, code, warn in whats_wrong(adapter, adapter.currentModel)
-            if not warn
-        ]
-        if faults:
-            raise RuntimeError(
-                f"refresh {asm_name}: configuration {cfg!r} has rebuild faults "
-                f"after reloading parts (dangling mate / re-IDed face?): "
-                + ", ".join(faults))
-        log(f"refresh {asm_name}: configuration {cfg} rebuilt clean")
+    with _telemetry.span("rebuild_configs", count=len(configs)):
+        for cfg in configs:
+            with _telemetry.span("rebuild_config", config=cfg):
+                check(f"activate {cfg}", await adapter.set_active_configuration(cfg))
+                adapter._attempt(
+                    lambda: adapter.currentModel.ForceRebuild3(False), default=None)
+                faults = [
+                    f"{name} [{_FEATURE_ERROR.get(code, code)}]"
+                    for name, code, warn in whats_wrong(adapter, adapter.currentModel)
+                    if not warn
+                ]
+                if faults:
+                    raise RuntimeError(
+                        f"refresh {asm_name}: configuration {cfg!r} has rebuild faults "
+                        f"after reloading parts (dangling mate / re-IDed face?): "
+                        + ", ".join(faults))
+                log(f"refresh {asm_name}: configuration {cfg} rebuilt clean")
 
     # Back to the rest pose for the gates + save: the saved active config and the
     # exported PNGs must match the from-scratch build's deterministic pose.
     if rest is not None:
-        check(f"re-activate {rest}", await adapter.set_active_configuration(rest))
+        with _telemetry.span("reactivate", config=rest):
+            check(f"re-activate {rest}", await adapter.set_active_configuration(rest))
 
     # Gates -- each already raises a RuntimeError naming the culprit. No fallback.
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)
     assert_model_healthy(adapter, label=asm_name, deep=True)
 
-    set_isometric_view(adapter)  # save on isometric so the refreshed .SLDASM opens isometric
-    save_assembly_in_place(adapter, asm_name)
+    with _telemetry.span("save", asm=asm_name):
+        set_isometric_view(adapter)  # save on isometric so the .SLDASM opens isometric
+        save_assembly_in_place(adapter, asm_name)
     artefacts = {"assembly": str(asm_path)}
     artefacts.update(await _export_assembly_images(adapter, asm_name, views))
     return artefacts
