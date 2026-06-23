@@ -1563,6 +1563,14 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
             reconfigure(encoding="utf-8", errors="replace")
 
     script = Path(sys.argv[0]).stem if sys.argv and sys.argv[0] else "build"
+    # The part/assembly this process is building -- surfaced in the span NAMES so
+    # the trace title + waterfall say WHICH target is processing, not a generic
+    # "build". A part script is build_<stem>.py; an assembly script is
+    # build_<stem>_assembly.py; refresh_assembly.py takes the stem as argv[1].
+    if script == "refresh_assembly" and len(sys.argv) > 1:
+        target = sys.argv[1].removesuffix(".SLDASM").replace("_", "-")
+    else:
+        target = script.removeprefix("build_").removesuffix("_assembly")
 
     async def _run() -> dict[str, str]:
         adapter = PyWin32Adapter({})
@@ -1575,7 +1583,7 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
             adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
             _telemetry.success("CloseAllDocuments (clean session)")
         try:
-            async with _telemetry.aspan("build", script=script):
+            async with _telemetry.aspan(f"build {target}", script=script, target=target):
                 return await build(adapter)
         finally:
             # Teardown is its own span so a disconnect failure is attributable
@@ -1589,7 +1597,7 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
 
     # Root span: every connect/build/disconnect child hangs off this, so the
     # whole invocation is one gapless trace from process start to exit.
-    with _telemetry.run_pipeline_span("part.build", script=script) as root:
+    with _telemetry.run_pipeline_span(f"build.{target}", script=script, target=target) as root:
         try:
             artefacts = asyncio.run(_run())
         except Exception as exc:  # noqa: BLE001 - recorded on the root span

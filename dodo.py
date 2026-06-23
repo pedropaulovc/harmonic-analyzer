@@ -289,7 +289,7 @@ def _run(cmd: list[str], label: str, log_stem: str | None = None) -> None:
     # One span per task action; inject its trace context into the subprocess env
     # (TRACEPARENT) so the build script's own root span continues this trace --
     # the doit task and the process it spawns form one gapless end-to-end trace.
-    with _telemetry.span("task", label=label, cmd=" ".join(cmd)):
+    with _telemetry.span(f"task {label}", label=label, cmd=" ".join(cmd)):
         _telemetry.info(f">> {label}: {' '.join(cmd)}")
         env = _telemetry.inject_env()
         if log_stem is None:
