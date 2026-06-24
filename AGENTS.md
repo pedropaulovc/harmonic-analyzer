@@ -210,13 +210,24 @@ scripts that `from _common import log, check` are instrumented unchanged.
   `print()` for status — reserve `print` for machine-readable stdout a caller pipes.
 - **Spans, no gaps.** Wrap work in `with _telemetry.span("name", **attrs):` — it
   sets status OK on clean exit and, on an exception, records it + sets ERROR before
-  re-raising, so a failure is never a silent hole. `run_build` opens a root span
-  (`pipeline.part.build`) over connect/build/disconnect; `verify.Report.gate` and
-  `dodo._run` each open one too. **Any new COM-touching entry point must open a
-  span** (mirrors the COM-spine invariant): an unparented operation is a gap.
+  re-raising, so a failure is never a silent hole. The build is a TREE of operation
+  spans, not a monolith: the per-step `_common` helpers (`define_circle`,
+  `extrude_at_offset`, `volume_check`, `save_part_and_images`, …) carry an
+  `@_telemetry.traced("sketch.circle", label_param="label")` decorator, so each
+  becomes a child span automatically. `verify.Report.gate` opens one per gate.
+  **Any new COM-touching entry point must open a span** (mirrors the COM-spine
+  invariant): an unparented operation is a gap. Add `@traced` to a new operation
+  helper rather than leaving it inside the parent span unsegmented.
+- **One span per build, no duplicate layer.** `dodo._run` opens a span NAMED for
+  the doit task (`part:cone_gear`, `verify:soundness`). `run_build` uses
+  `_telemetry.build_session`, which *continues* that span when the spine injected a
+  parent context (operation spans attach straight to the task span — no second
+  `pipeline.part.build` layer) and opens a local `pipeline.part.build` root only
+  when a build script is run standalone. So a build is one tree, never two
+  stacked roots for the same part.
 - **Cross-process trace continuity.** `dodo._run` injects W3C trace context
   (`TRACEPARENT`) into each subprocess env via `_telemetry.inject_env`; the build
-  script's `run_pipeline_span` extracts it, so the doit task and the process it
+  script's `build_session` extracts it, so the doit task and the process it
   spawns are **one** end-to-end trace. Preserve `env=_telemetry.inject_env()` on any
   new subprocess launch.
 - **Where it goes.** Console (stderr) by default; full span/log JSON is also

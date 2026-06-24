@@ -33,6 +33,8 @@ from __future__ import annotations
 
 import contextlib
 import contextvars
+import functools
+import inspect
 import logging
 import os
 import sys
@@ -347,6 +349,70 @@ async def aspan(name: str, /, **attributes: Any) -> Any:
         raise
     else:
         _exit_span(handle, None)
+
+
+def traced(name: str, *, label_param: str | None = None):
+    """Decorator that runs the wrapped function inside a span named ``name``.
+
+    Works on both sync and async functions. ``label_param`` names a parameter
+    whose value is copied onto the span as a ``label`` attribute (so e.g.
+    ``define_circle(..., label="blank_od")`` traces as ``sketch.circle
+    label=blank_od``). This is how the per-operation ``_common`` helpers turn a
+    build into a tree of operation spans instead of one monolithic ``build`` span.
+    """
+
+    def deco(fn):
+        sig = inspect.signature(fn) if label_param else None
+
+        def _attrs(args, kwargs) -> dict[str, Any]:
+            if sig is None:
+                return {}
+            try:
+                bound = sig.bind_partial(*args, **kwargs)
+                if label_param in bound.arguments:
+                    return {"label": bound.arguments[label_param]}
+            except Exception:  # noqa: BLE001 - tracing must never break the call
+                pass
+            return {}
+
+        if inspect.iscoroutinefunction(fn):
+            @functools.wraps(fn)
+            async def awrap(*args, **kwargs):
+                async with aspan(name, **_attrs(args, kwargs)):
+                    return await fn(*args, **kwargs)
+            return awrap
+
+        @functools.wraps(fn)
+        def wrap(*args, **kwargs):
+            with span(name, **_attrs(args, kwargs)):
+                return fn(*args, **kwargs)
+        return wrap
+
+    return deco
+
+
+@contextlib.contextmanager
+def build_session(label: str, /, **attributes: Any) -> Iterator[Span | None]:
+    """Root context for a build *process* (``_common.run_build``).
+
+    Under the doit spine a parent trace context is injected (``TRACEPARENT``), so
+    this CONTINUES that trace: the build's operation spans attach directly to the
+    doit task span and we yield ``None`` — no second ``pipeline.part.build`` layer
+    duplicating the task. Run standalone (no parent), it opens a local
+    ``pipeline.part.build`` root so nothing is unparented, and yields that span so
+    the caller can mark it ERROR on failure.
+    """
+    configure()
+    parent = _parent_context_from_env()
+    if parent is not None:
+        token = otel_context.attach(parent)
+        try:
+            yield None
+        finally:
+            otel_context.detach(token)
+    else:
+        with span("pipeline.part.build", label=label, **attributes) as root:
+            yield root
 
 
 def inject_env(env: Mapping[str, str] | None = None) -> dict[str, str]:
