@@ -213,4 +213,88 @@ discovered during harmonic-analyzer M6.4:
   physically correct for "disengaged" (assert no STRUCTURAL part leaks instead of
   asserting full-definition). See dof-refactor (dropped memory).
 
+- **Feature-replay of an external part: a volume+bbox match is NECESSARY but
+  NOT SUFFICIENT — a Z-MIRRORED build matches both yet is upside-down.**
+  Reproducing `rocker-arm-support-manual.SLDPRT` (a Z-up trapezoid wedge), the
+  Top-plane sketch maps sketch-y → **−Z**, so the trapezoid's wide foot must be
+  drawn at sketch **+Y** to land at model Z=−88.9 (the real foot). Drawing it at
+  −Y put the foot at +Z: every per-feature volume + the bbox matched the source
+  exactly (symmetric squares/fillets/holes), but the part was mirrored in Z —
+  caught only when real-coordinate chamfer FACE selection points missed. Verify
+  orientation independently of volume (hole axes, an asymmetric face point), not
+  just the mass ladder.
+- **Selecting a whole FACE for chamfer/fillet by a point: use a point on the
+  SOLID region, never a bbox centroid that can fall in a window/void.** New
+  `_select_faces_geometric` (SolidworksMCP PR #69) walks `IFace2.GetClosestPointOn`
+  and picks the nearest face within tol (5 mm). On the cut part the slant face is
+  a frame around a window, so its bbox centre (20.1,0,0) sits 5 mm inside the
+  void → miss; a point in the solid foot band (31.24,0,−85, computed ON the slant
+  plane) hits at 0.00 mm. For a fillet face use an ON-SURFACE point = axis + R·dir
+  (the R12.7 corner fillet at axis (0,50.8,−50.8): (0,59.78,−59.78)), not the
+  bbox centre (~3.8 mm off the cylinder). `add_chamfer` now takes `face_points` +
+  `tangent_propagation` and builds via `IFeatureManager.InsertFeatureChamfer`
+  (options 0x4 = tangent prop, type 1 = swChamferAngleDistance, 45°) instead of
+  the 3-arg `IModelDoc2.FeatureChamfer`, which can take neither faces nor
+  propagation. With faces+prop the replayed `Chamfer2` matched source to +1 mm³.
+- **Standalone external-part repros live in `cad/scripts/` but stay OFF the doit
+  DAG**: add the script to `_buildgraph.NON_PART_SCRIPTS`, and note `verify.py`'s
+  registry audit (`_declared_part_names`) now scans `_buildgraph.part_scripts()`
+  (the canonical part-script set) so such repros are excluded from the
+  `parts.yaml` "built but unregistered" audit exactly as from the graph.
+
+- **Two cuts SHARING one sketch to leave a central WEB = ONE centred square +
+  two Through-All cuts each with a `FromOffsetDistance` start-offset, opposite
+  directions.** This is how `rocker-arm-support-manual`'s Cut-Extrude3 AND
+  Cut-Extrude4 both consume Sketch11 yet leave a 2×3.175 mm web (re-selecting
+  the sketch by name for cut4 → `Sketch11<2>`). The web is NOT a gap in the
+  sketch — the sketch is a SINGLE square; the web is the band between two cuts
+  that each START 3.175 mm off the sketch plane. Probed source defs (the keys):
+  Cut3 `ReverseDirection=False, FromOffsetReverse=True, FromOffsetDistance=3.175,
+  T1=swEndCondThroughAll(1)`; Cut4 `ReverseDirection=True, FromOffsetReverse=
+  False, FromOffsetDistance=3.175`; the cavity Cut2 `BothDirections=True` (reads
+  back as `swEndCondThroughAllBoth=9`). Reproduce with RAW 27-param `FeatureCut4`
+  (the "else" branch; 26-param major-33 throws "Parameter not optional") — the
+  start tail is `…, T0, StartOffset, FlipStartOffset, OptimizeGeometry` where
+  `T0=swStartOffset(3)`, `StartOffset=offset_m`, `FlipStartOffset=
+  FromOffsetReverse`. Select the shared sketch by name (`SelectByID2(name,
+  "SKETCH",…)`) before each cut. Draw the squares with the SW center-rectangle
+  look (4 real sides + 2 construction diagonals) via `define_centered_rectangle`
+  + `_add_construction_diagonals` (raw `CreateLine` with `ConstructionGeometry=
+  True`, endpoints on corners so no DOF added), matching the source's 6-seg /
+  1-contour sketches. Prototyped in `proto_shared_cut.py`; in `build_rocker_arm
+  _support_manual.py` (`_cut_through_all`). This SUPERSEDES the earlier
+  two-rectangle / contour-object `_cut_window` approach (PR #80, removed in
+  #81): that was feature-tree-identical but its SKETCHES did not match the
+  source (two rects on the Right plane vs one centred square on the Front
+  plane). Volumes are byte-identical either way; only the sketch decomposition
+  differs, so match the cut MECHANISM, not just the tree, when sketches matter.
+- **Hole Wizard (HoleWzd) with N points = ONE feature, built single-point
+  then multi-pointed via the placement sketch.** Sequence (live-proven,
+  `_drill_tapped_holes`): `FeatureManager.CreateDefinition(25)` →
+  `IWizardHoleFeatureData2.InitializeHole(genericType, std, fastenerType,
+  size, endType)` (tap=4, ANSI-inch=0, through-next=2, size="9/16-12") → set
+  ThreadClass/EndCondition/ThreadEndCondition → **select the drill FACE as an
+  OBJECT** → `CreateFeature(data)` makes a 1-hole HoleWzd whose sub-features
+  are a 1-pt placement sketch (ProfileFeature), a 6-pt profile sketch, and a
+  CosmeticThread. Then EDIT the placement sketch: move the auto point to hole
+  #0 with `ISketchPoint.SetCoords(sx,sy,sz)` and `SketchManager.CreatePoint`
+  the rest, then `EditRebuild3`. Model→sketch coords via
+  `placeSketch.ModelToSketchTransform` + `MathUtility.CreatePoint(pt)` +
+  `MathPoint.MultiplyTransform(xform)` → `ArrayData[:3]`. **CRITICAL: pass
+  the model point to `CreatePoint` as `VARIANT(pythoncom.VT_ARRAY|VT_R8,[x,y,z])`**
+  — a bare Python list marshals to garbage (sx=sy=0). SetCoords (move auto
+  pt) is cleaner than delete-then-add (ISketchPoint.Select4 errored). Through-
+  next drills from the selected face's normal-opposite direction; correct
+  face → exact source volume. Proven in `probe_hole_wizard.py`/`probe_foot_face.py`.
+- **`SelectByID2(...,"FACE",x,y,z,...)` mis-resolves at a SHARED plane: a pick
+  ON the foot bottom (Y=−88.9) returned the ±X trapezoid END faces (which also
+  touch Y=−88.9), so the wizard drilled along X through the whole part (removed
+  ~7× too much, 224660 vs 243665 mm³). Even the bottom-face CENTER (0,−88.9,0)
+  picked the +X face — coordinate selection is unusable here.** Fix: ENUMERATE
+  `body.GetFaces()`, keep the planar face with `Normal≈(0,−1,0)`, box minY on
+  the target plane, and bbox spanning all hole (X,Z) points, then select that
+  face OBJECT (`face.Select2(False,0)`). Generalises the earlier chamfer-FACE
+  point-picking lesson: when multiple faces meet at the pick plane, select the
+  face object found by enumeration, never by coordinate.
+
 See [[solidworks-3dx-launch]] for session/launch rules.

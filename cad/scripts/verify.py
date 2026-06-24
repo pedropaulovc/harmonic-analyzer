@@ -704,14 +704,19 @@ def _cone_series_ok() -> bool:
 
 
 def _declared_part_names() -> set[str]:
-    """Every ``PART_NAME = "..."`` declared by a ``build_*.py`` script.
+    """Every ``PART_NAME = "..."`` declared by a machine part build script.
 
     This is the set of parts the build actually saves -- the ground truth the
     registry is audited against. Scanning the source (not ``cad/out``) keeps the
-    audit runnable with no SolidWorks and no prior build.
+    audit runnable with no SolidWorks and no prior build. The script set is
+    ``_buildgraph.part_scripts()`` -- the same canonical part-script list the
+    DAG uses, so assemblies, post-hooks and off-graph standalone repros
+    (``NON_PART_SCRIPTS``) are excluded here exactly as they are from the graph.
     """
+    from _buildgraph import part_scripts
+
     names: set[str] = set()
-    for script in SCRIPTS_DIR.glob("build_*.py"):
+    for script in part_scripts():
         names.update(_PART_NAME_RE.findall(script.read_text(encoding="utf-8")))
     return names
 
