@@ -2,7 +2,7 @@ r"""Reproduction script: foot-rail hex bolt (book ch. 30 p008; 2 used).
 
 One of the two hex-head hold-down bolts on the rocker-support portal
 frame's foot rail (ch. 30 p008 side view shows the heads on the rail's
-top face; the rail itself is build_rocker_arm_portal.py, M6.9/M6.12 -- the
+top face; the rail itself is build_rocker_arm_support.py, M6.9/M6.12 -- the
 foot rail was unified into the single portal casting). The bolt drops
 through the rail (20 tall) into the base's top plate -- the base holes
 are through-drilled (build_harmonic_base.py, documented simplification).

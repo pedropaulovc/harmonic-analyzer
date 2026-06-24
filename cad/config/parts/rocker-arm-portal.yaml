@@ -1,5 +1,0 @@
-rocker-arm-portal:
-  number: MHA-088
-  material: Gray Cast Iron
-  tolerance_class: machined_block
-  process: "cast + machined"
