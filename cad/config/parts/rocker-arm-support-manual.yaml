@@ -1,0 +1,5 @@
+rocker-arm-support-manual:
+  number: MHA-089
+  material: Gray Cast Iron
+  tolerance_class: machined_block
+  process: "cast + machined"
