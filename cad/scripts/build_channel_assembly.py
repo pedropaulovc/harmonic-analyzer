@@ -12,7 +12,7 @@ the lever tips. 144 components:
 * pivot-ball-mount x4 (rocker pair: north on the rocker-support apex at
   (-72.9, 228.6, +101.6), south on the A-FRAME clevis saddle at
   (-72.9, 228.6, -111) - M6.5 photo audit: there is no south frustum,
-  the front stand is the rocker-arm-portal's transgear-A-frame leg
+  the front stand is the rocker-arm-support's transgear-A-frame leg
   (frame.SLDASM) whose ears flank this mount's O16 base; lever pair on the top-frame west rail,
   seats (-199.9, 1040.7, +/-85) - z 85 keeps the O16 base clear of the
   O35 corner-boss bores)

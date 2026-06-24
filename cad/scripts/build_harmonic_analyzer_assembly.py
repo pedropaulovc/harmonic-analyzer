@@ -65,7 +65,7 @@ SUBASSEMBLIES = ("frame", "drive-train", "channel", "summing", "magnifier", "pen
 # Loose hardware on the base top -- a generic tool, not part of any mechanism.
 # Re-parked to the FAR-WEST margin lane running along Z (machine x -220..-212,
 # z -100..100, y 50.8..53.8). The old BACK-band slot (z 121.6..133.35) is now
-# filled by the rocker-arm-support-manual foot (z-max 133.35), so the stick moved
+# filled by the rocker-arm-support foot (z-max 133.35), so the stick moved
 # to the ~12.5 mm clear lane between the west columns (west face x -209.7) and the
 # west top-plate edge (x -222.25). Authored as the EXACT machine transform
 # (mirror=False): flat with graduations up, long axis along Z.
