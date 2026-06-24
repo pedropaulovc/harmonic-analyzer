@@ -242,21 +242,32 @@ discovered during harmonic-analyzer M6.4:
   (the canonical part-script set) so such repros are excluded from the
   `parts.yaml` "built but unregistered" audit exactly as from the graph.
 
-- **Two cuts SHARING one sketch (feature-tree identity) = contour-OBJECT
-  selection, NOT SKETCHREGION-by-point.** To reproduce a source where two
-  sketches feed three cuts (`rocker-arm-support-manual`: Sketch11 holds both
-  window rectangles, fed to Cut-Extrude3 AND Cut-Extrude4), draw N CLOSED
-  contours in one sketch, then per cut: `sk.GetSketchContours()`, pick the
-  wanted `ISketchContour` by its segment-endpoint centroid sign,
-  `contour.Select(False, mark=0)` (mark=0 selects the contour object; mark=1
-  and SKETCHREGION-by-point both FAIL on this seat), then a RAW mid-plane
-  `FeatureCut4` (the 27-param "else" branch; 26-param major-33 throws
-  "Parameter not optional"). Each cut consumes one contour; both features'
-  `GetParents()` then list the shared sketch → tree diff sees identical
-  feature names/types/order. The tree diff does NOT inspect intra-sketch
-  contour count, so 2 closed rects satisfy identity even though the source
-  Sketch11 is 1 contour + 2 construction diagonals (the SW center-rectangle
-  artifact). Proven in `probe_contour_cut.py`; ported to `_cut_window`.
+- **Two cuts SHARING one sketch to leave a central WEB = ONE centred square +
+  two Through-All cuts each with a `FromOffsetDistance` start-offset, opposite
+  directions.** This is how `rocker-arm-support-manual`'s Cut-Extrude3 AND
+  Cut-Extrude4 both consume Sketch11 yet leave a 2×3.175 mm web (re-selecting
+  the sketch by name for cut4 → `Sketch11<2>`). The web is NOT a gap in the
+  sketch — the sketch is a SINGLE square; the web is the band between two cuts
+  that each START 3.175 mm off the sketch plane. Probed source defs (the keys):
+  Cut3 `ReverseDirection=False, FromOffsetReverse=True, FromOffsetDistance=3.175,
+  T1=swEndCondThroughAll(1)`; Cut4 `ReverseDirection=True, FromOffsetReverse=
+  False, FromOffsetDistance=3.175`; the cavity Cut2 `BothDirections=True` (reads
+  back as `swEndCondThroughAllBoth=9`). Reproduce with RAW 27-param `FeatureCut4`
+  (the "else" branch; 26-param major-33 throws "Parameter not optional") — the
+  start tail is `…, T0, StartOffset, FlipStartOffset, OptimizeGeometry` where
+  `T0=swStartOffset(3)`, `StartOffset=offset_m`, `FlipStartOffset=
+  FromOffsetReverse`. Select the shared sketch by name (`SelectByID2(name,
+  "SKETCH",…)`) before each cut. Draw the squares with the SW center-rectangle
+  look (4 real sides + 2 construction diagonals) via `define_centered_rectangle`
+  + `_add_construction_diagonals` (raw `CreateLine` with `ConstructionGeometry=
+  True`, endpoints on corners so no DOF added), matching the source's 6-seg /
+  1-contour sketches. Prototyped in `proto_shared_cut.py`; in `build_rocker_arm
+  _support_manual.py` (`_cut_through_all`). This SUPERSEDES the earlier
+  two-rectangle / contour-object `_cut_window` approach (PR #80, removed in
+  #81): that was feature-tree-identical but its SKETCHES did not match the
+  source (two rects on the Right plane vs one centred square on the Front
+  plane). Volumes are byte-identical either way; only the sketch decomposition
+  differs, so match the cut MECHANISM, not just the tree, when sketches matter.
 - **Hole Wizard (HoleWzd) with N points = ONE feature, built single-point
   then multi-pointed via the placement sketch.** Sequence (live-proven,
   `_drill_tapped_holes`): `FeatureManager.CreateDefinition(25)` →
