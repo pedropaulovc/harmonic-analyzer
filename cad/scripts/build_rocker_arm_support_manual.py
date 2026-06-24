@@ -11,49 +11,53 @@ view (along Z) looks square-on at the rounded window; the **Right** view (along
 X) shows the trapezoid taper; the **Top** view (along Y) shows the two channels,
 the central web, and the four foot holes.
 
-The original is hand-built; this rebuilds it feature-for-feature (matching the
-tree Boss-Extrude1 -> Cut-Extrude2/3/4 -> Fillet3 -> 9/16-12 Tapped Hole1
-(HoleWzd) -> Chamfer2) rather than as a simplified parametric equivalent. The
-the trapezoid lives on the **Right plane** (sketch-x -> model Z taper, sketch-y
--> model Y height, mid-plane extrude along X); the window/cavity cuts use SINGLE
-origin-centred squares on the **Front plane** (matching the source's Sketch11/
-Sketch12). The per-stage ``volume_check`` targets are the real part's measured
-volumes (rotation-invariant, so unchanged by orientation), so any geometry drift
-fails loudly:
+The original is hand-built; this rebuilds it feature-for-feature, matching the
+source's tree STRUCTURE and sketch construction but with SEMANTIC feature names
+(the convention of the other tracked parts) rather than the source's generic
+auto-names. The tree is Wall (``Boss-Extrude1``) -> CavityCut/WindowCut1/
+WindowCut2 (``Cut-Extrude2/3/4``) -> CornerFillet (``Fillet3``) ->
+FootTappedHoles (``9/16-12 Tapped Hole1``, HoleWzd) -> RimChamfer
+(``Chamfer2``). The trapezoid lives on the **Right plane** (sketch-x -> model Z
+taper, sketch-y -> model Y height, mid-plane extrude along X); the window/cavity
+cuts use SINGLE origin-centred squares on the **Front plane** (matching the
+source's window/cavity sketches). The per-stage ``volume_check`` targets are the
+real part's measured volumes (rotation-invariant, so unchanged by orientation),
+so any geometry drift fails loudly:
 
-    Boss-Extrude1 1 271 363 | Cut-Extrude2 622 708 | Cut-Extrude3 434 257
-    Cut-Extrude4   245 806 | Fillet3      246 685 | Holes        243 665
-    Chamfer2       240 512
+    Wall      1 271 363 | CavityCut       622 708 | WindowCut1 434 257
+    WindowCut2  245 806 | CornerFillet    246 685 | FootTappedHoles 243 665
+    RimChamfer  240 512
 
 Geometry (mm), all from the source part (model frame: X = extrude/width,
 Y = height with the wide foot at Y=-88.9, Z = wall thickness / window depth):
 
-* **Boss** -- trapezoid, wide foot ``Z ±31.75`` at ``Y=-88.9`` tapering to
+* **Wall** -- trapezoid, wide foot ``Z ±31.75`` at ``Y=-88.9`` tapering to
   ``Z ±8.4665`` at ``Y=+88.9``; mid-plane extrude 177.8 (``X ±88.9``).
-* **Cut-Extrude2** -- 127 mm cavity square (``±63.5``), Through-All-Both -> the
-  central cavity, leaving 6.35 mm shell walls (whole ``Sketch12`` profile).
-* **Cut-Extrude3 / 4** -- ONE shared 165.1 mm window square (``Sketch11``,
-  ``±82.55``). Each cut is a Through-All that STARTS ``WEB`` (3.175) off the
-  sketch plane in the opposite direction (cut3 forward / cut4 reverse, cut4
-  re-selecting Sketch11 -> ``Sketch11<2>``), so the 2*WEB band between them
-  survives as the central web -- the source's ``FromOffsetDistance`` /
-  ``ReverseDirection`` pair, reproducing the two-sketches-feed-three-cuts tree.
-* **Fillet3** -- R12.7 on the four inner-frame corner edges (concave: adds
+* **CavityCut** -- 127 mm cavity square (``±63.5``), Through-All-Both -> the
+  central cavity, leaving 6.35 mm shell walls (whole ``CavityProfile``).
+* **WindowCut1 / WindowCut2** -- ONE shared 165.1 mm window square
+  (``WindowProfile``, ``±82.55``). Each cut is a Through-All that STARTS ``WEB``
+  (3.175) off the sketch plane in the opposite direction (forward / reverse, the
+  second re-selecting ``WindowProfile`` -> a shared-sketch reference), so the
+  2*WEB band between them survives as the central web -- the source's
+  ``FromOffsetDistance`` / ``ReverseDirection`` pair, reproducing the
+  two-sketches-feed-three-cuts tree.
+* **CornerFillet** -- R12.7 on the four inner-frame corner edges (concave: adds
   material).
-* **9/16-12 Tapped Hole1** -- a single Hole Wizard (``HoleWzd``) feature, 4x
+* **FootTappedHoles** -- a single Hole Wizard (``HoleWzd``) feature, 4x
   9/16-12 ANSI-inch bottoming tapped holes (Ø12.30376 tap drill), drilled up
   through the foot from the bottom face (Y=-88.9) at ``(X ±60.32, Z ±17.46)``,
   through-next. One feature with four placement points, matching the source
-  (no separate placement Sketch5).
-* **Chamfer2** -- 1.27 mm / 45° on the 12 inner-frame opening edges plus the
+  (no separate placement sketch).
+* **RimChamfer** -- 1.27 mm / 45° on the 12 inner-frame opening edges plus the
   two slant faces, the two trapezoid (±X) faces, and one fillet face, with
   tangent propagation -- i.e. the whole window rim.
 
 Like the 71 tracked parts, this is **equation-driven and self-naming**: five
 equation-manager globals (``FootHalf``/``TopHalf``/``HalfHeight``/``CavHalf``/
 ``WindowOuter``, all ``mm``) drive every profile sketch's dimensions (named e.g.
-``WallHeight@Sketch1``, ``WinWidth@Sketch11``), the sketches and features carry
-stable names, and the drive equations are applied in one deferred
+``WallHeight@WallProfile``, ``WinWidth@WindowProfile``), the sketches and
+features carry stable names, and the drive equations are applied in one deferred
 batch after a rebuild. A final "equations neutral" ``volume_check`` proves the
 driving did not move the geometry, so a GUI edit to a global reshapes the part
 and round-trips. See ``build_top_frame.py`` for the reference pattern.
@@ -163,8 +167,8 @@ def _add_construction_diagonals(adapter, half_mm: float) -> None:
 
 def _select_sketch(adapter, name: str) -> None:
     """Select a sketch by name for the next feature (shared-sketch friendly: a
-    second select of an already-consumed sketch is how cut4 reuses Sketch11,
-    which SolidWorks then shows as ``Sketch11<2>``)."""
+    second select of an already-consumed sketch is how WindowCut2 reuses
+    WindowProfile, which SolidWorks then shows as a ``<2>`` reference)."""
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
     model = adapter.currentModel
@@ -180,9 +184,9 @@ def _cut_through_all(adapter, sketch_name: str, *, both: bool, reverse_dir: bool
 
     ``both`` -> Through-All-Both (the cavity). A single-direction cut with
     ``start_offset_mm`` reproduces the windows: each window cut shares one
-    centered ``Sketch11`` square but STARTS ``start_offset_mm`` off the sketch
-    plane (cut3 forward / cut4 reverse, opposite ``flip_start``), so the 2*offset
-    band between them survives as the central web -- exactly the source's
+    centered window square but STARTS ``start_offset_mm`` off the sketch plane
+    (forward / reverse, opposite ``flip_start``), so the 2*offset band between
+    them survives as the central web -- exactly the source's
     ``FromOffsetDistance``/``ReverseDirection`` pair.
     """
     model = adapter.currentModel
@@ -383,27 +387,28 @@ async def build(adapter) -> dict[str, str]:
     )
     await ensure_fully_defined(adapter, "trapezoid")
     check("exit boss", await adapter.exit_sketch())
-    name_last_feature(adapter, "Sketch1")
-    drive_jobs += trap.apply(adapter, "Sketch1")
+    name_last_feature(adapter, "WallProfile")
+    drive_jobs += trap.apply(adapter, "WallProfile")
     check("boss", await adapter.create_extrusion(
         ExtrusionParameters(depth=BOSS_DEPTH, both_directions=True)))
-    name_last_feature(adapter, "Boss-Extrude1")
-    await volume_check(adapter, "Boss-Extrude1", 1_271_363, 200)
+    name_last_feature(adapter, "Wall")
+    await volume_check(adapter, "Wall", 1_271_363, 200)
 
-    # 2-4. Two sketches drive three cuts, exactly as the source tree does. Both
+    # 2-4. Two sketches drive three cuts, exactly as the source tree does (only
+    # the names are semantic here, not the source's Sketch11/Cut-ExtrudeN). Both
     # window/cavity sketches are SINGLE origin-centred squares on the Front plane,
     # drawn center-rectangle style (four real sides + two construction diagonals),
-    # matching the source's Sketch11/Sketch12 segment set:
-    #   * Sketch11 -- the 165.1 mm window square. Cut-Extrude3 and Cut-Extrude4
-    #     BOTH consume this ONE sketch (cut4 re-selects it -> "Sketch11<2>"), each
-    #     a Through-All cut that STARTS WEB (3.175) off the sketch plane in the
-    #     opposite direction, so the 2*WEB band between them survives as the
-    #     central web -- the source's FromOffsetDistance/ReverseDirection pair,
-    #     not a sketch gap. The square drives off WindowOuter.
-    #   * Sketch12 -- the 127 mm cavity square; Cut-Extrude2 consumes it whole
+    # matching the source's segment set:
+    #   * WindowProfile -- the 165.1 mm window square. WindowCut1 and WindowCut2
+    #     BOTH consume this ONE sketch (the second re-selects it -> a shared-sketch
+    #     reference), each a Through-All cut that STARTS WEB (3.175) off the sketch
+    #     plane in the opposite direction, so the 2*WEB band between them survives
+    #     as the central web -- the source's FromOffsetDistance/ReverseDirection
+    #     pair, not a sketch gap. The square drives off WindowOuter.
+    #   * CavityProfile -- the 127 mm cavity square; CavityCut consumes it whole
     #     (Through-All-Both). Drives off CavHalf.
-    # Built in the source's creation order (Sketch11, then Sketch12) and cut in
-    # the source's order (cavity, then the two windows).
+    # Built in the source's creation order (window profile, then cavity) and cut
+    # in the source's order (cavity, then the two windows).
     windows = SketchDims()
     check("sketch windows", await adapter.create_sketch("Front"))
     await define_centered_rectangle(
@@ -416,8 +421,8 @@ async def build(adapter) -> dict[str, str]:
     _add_construction_diagonals(adapter, BIG)
     await ensure_fully_defined(adapter, "window")
     check("exit windows", await adapter.exit_sketch())
-    name_last_feature(adapter, "Sketch11")
-    drive_jobs += windows.apply(adapter, "Sketch11")
+    name_last_feature(adapter, "WindowProfile")
+    drive_jobs += windows.apply(adapter, "WindowProfile")
 
     cavity = SketchDims()
     check("sketch cavity", await adapter.create_sketch("Front"))
@@ -431,55 +436,55 @@ async def build(adapter) -> dict[str, str]:
     _add_construction_diagonals(adapter, CAV)
     await ensure_fully_defined(adapter, "cavity")
     check("exit cavity", await adapter.exit_sketch())
-    name_last_feature(adapter, "Sketch12")
-    drive_jobs += cavity.apply(adapter, "Sketch12")
+    name_last_feature(adapter, "CavityProfile")
+    drive_jobs += cavity.apply(adapter, "CavityProfile")
 
-    # Cut-Extrude2: cavity -- whole Sketch12 profile, Through-All-Both.
-    _cut_through_all(adapter, "Sketch12", both=True, reverse_dir=False)
-    name_last_feature(adapter, "Cut-Extrude2")
-    await volume_check(adapter, "Cut-Extrude2", 622_708, 200)
+    # CavityCut: cavity -- whole CavityProfile, Through-All-Both.
+    _cut_through_all(adapter, "CavityProfile", both=True, reverse_dir=False)
+    name_last_feature(adapter, "CavityCut")
+    await volume_check(adapter, "CavityCut", 622_708, 200)
 
-    # Cut-Extrude3: one window -- Through-All forward, started WEB off-plane.
-    _cut_through_all(adapter, "Sketch11", both=False, reverse_dir=False,
+    # WindowCut1: one window -- Through-All forward, started WEB off-plane.
+    _cut_through_all(adapter, "WindowProfile", both=False, reverse_dir=False,
                      start_offset_mm=WEB, flip_start=True)
-    name_last_feature(adapter, "Cut-Extrude3")
-    await volume_check(adapter, "Cut-Extrude3", 434_257, 200)
+    name_last_feature(adapter, "WindowCut1")
+    await volume_check(adapter, "WindowCut1", 434_257, 200)
 
-    # Cut-Extrude4: the other window -- the SAME Sketch11, Through-All reverse,
+    # WindowCut2: the other window -- the SAME WindowProfile, Through-All reverse,
     # started WEB off-plane the other way (leaves the 2*WEB central web).
-    _cut_through_all(adapter, "Sketch11", both=False, reverse_dir=True,
+    _cut_through_all(adapter, "WindowProfile", both=False, reverse_dir=True,
                      start_offset_mm=WEB, flip_start=False)
-    name_last_feature(adapter, "Cut-Extrude4")
-    await volume_check(adapter, "Cut-Extrude4", 245_806, 200)
+    name_last_feature(adapter, "WindowCut2")
+    await volume_check(adapter, "WindowCut2", 245_806, 200)
 
-    # 5. Fillet3: R12.7 on the four inner-frame corner edges (concave -> adds).
+    # 5. CornerFillet: R12.7 on the four inner-frame corner edges (concave -> adds).
     check("fillet", await adapter.add_fillet(FILLET_R, FILLET_EDGES))
-    name_last_feature(adapter, "Fillet3")
-    await volume_check(adapter, "Fillet3", 246_685, 200)
+    name_last_feature(adapter, "CornerFillet")
+    await volume_check(adapter, "CornerFillet", 246_685, 200)
 
-    # 6. 9/16-12 Tapped Hole1: ONE Hole Wizard (HoleWzd) feature with four
-    #    placement points, 9/16-12 ANSI-inch bottoming tapped holes drilled up
-    #    through the foot from the bottom face (Y=-HALF_Y) at (X ±60.32, Z ±17.46),
+    # 6. FootTappedHoles: ONE Hole Wizard (HoleWzd) feature with four placement
+    #    points, 9/16-12 ANSI-inch bottoming tapped holes drilled up through the
+    #    foot from the bottom face (Y=-HALF_Y) at (X ±60.32, Z ±17.46),
     #    through-next. Only the 6.35 mm foot tip (Y -88.9..-82.55) carries
     #    material along the bore -- the window cuts opened everything above -- so
     #    through-next drills exactly that band, matching the source's measured
     #    volume. One feature, no separate placement sketch (matches the source).
     _drill_tapped_holes(adapter, HOLES, y_face_mm=-HALF_Y)
-    name_last_feature(adapter, "9/16-12 Tapped Hole1")
-    await volume_check(adapter, "Holes", 243_665, 200)
+    name_last_feature(adapter, "FootTappedHoles")
+    await volume_check(adapter, "FootTappedHoles", 243_665, 200)
 
-    # 7. Chamfer2: 1.27 mm / 45° around the whole window rim -- the 12 inner-
+    # 7. RimChamfer: 1.27 mm / 45° around the whole window rim -- the 12 inner-
     #    frame opening edges plus the slant/trapezoid/fillet faces, tangent-
     #    propagated.
     check("chamfer", await adapter.add_chamfer(
         CHAMFER, CHAMFER_EDGES, face_points=CHAMFER_FACES, tangent_propagation=True))
-    name_last_feature(adapter, "Chamfer2")
-    await volume_check(adapter, "Chamfer2", 240_512, 200)
+    name_last_feature(adapter, "RimChamfer")
+    await volume_check(adapter, "RimChamfer", 240_512, 200)
 
     # Apply the deferred drive equations now that the whole model + a rebuild
     # exist, so every named-dim target resolves. Each equation evaluates to the
     # value just built, so the geometry must not move -- the re-check below is
-    # the proof (same final volume as Chamfer2 above).
+    # the proof (same final volume as RimChamfer above).
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
