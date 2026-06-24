@@ -1579,6 +1579,14 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
             reconfigure(encoding="utf-8", errors="replace")
 
     script = Path(sys.argv[0]).stem if sys.argv and sys.argv[0] else "build"
+    # The part/assembly this process is building -- surfaced in the span NAMES so
+    # the trace title + waterfall say WHICH target is processing, not a generic
+    # "build". A part script is build_<stem>.py; an assembly script is
+    # build_<stem>_assembly.py; refresh_assembly.py takes the stem as argv[1].
+    if script == "refresh_assembly" and len(sys.argv) > 1:
+        target = sys.argv[1].removesuffix(".SLDASM").replace("_", "-")
+    else:
+        target = script.removeprefix("build_").removesuffix("_assembly")
 
     async def _run() -> dict[str, str]:
         adapter = PyWin32Adapter({})
@@ -1593,7 +1601,7 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
         try:
             # No wrapper span here: the build's own operations (the @traced
             # _common helpers it calls) are the children, so the trace is a tree
-            # of real steps instead of one opaque "build" monolith.
+            # of real steps instead of one opaque "build <target>" monolith.
             return await build(adapter)
         finally:
             # Teardown is its own span so a disconnect failure is attributable
@@ -1606,10 +1614,11 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
                     _telemetry.warn(f"disconnect failed: {exc}")
 
     # build_session continues the doit task span when one was injected (so we add
-    # no duplicate root layer under the spine) and opens a local root only when
-    # run standalone. Either way every connect/operation/disconnect span has a
-    # parent -- one gapless trace from process start to exit.
-    with _telemetry.build_session(script) as root:
+    # no duplicate root layer under the spine) and opens a local root only when run
+    # standalone -- named per-target (build.<target>) so a standalone trace title
+    # says WHICH part. Either way every connect/operation/disconnect span has a
+    # parent: one gapless trace from process start to exit.
+    with _telemetry.build_session(target, script=script) as root:
         try:
             artefacts = asyncio.run(_run())
         except Exception as exc:  # noqa: BLE001 - recorded on the root span

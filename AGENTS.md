@@ -222,7 +222,7 @@ scripts that `from _common import log, check` are instrumented unchanged.
   the doit task (`part:cone_gear`, `verify:soundness`). `run_build` uses
   `_telemetry.build_session`, which *continues* that span when the spine injected a
   parent context (operation spans attach straight to the task span — no second
-  `pipeline.part.build` layer) and opens a local `pipeline.part.build` root only
+  `build.<target>` layer) and opens a local `build.<target>` root only
   when a build script is run standalone. So a build is one tree, never two
   stacked roots for the same part.
 - **Cross-process trace continuity.** `dodo._run` injects W3C trace context
