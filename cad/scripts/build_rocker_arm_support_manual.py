@@ -48,6 +48,15 @@ Y = height with the wide foot at Y=-88.9, Z = wall thickness / window depth):
   two slant faces, the two trapezoid (±X) faces, and one fillet face, with
   tangent propagation -- i.e. the whole window rim.
 
+Like the 71 tracked parts, this is **equation-driven and self-naming**: six
+equation-manager globals (``FootHalf``/``TopHalf``/``HalfHeight``/``CavHalf``/
+``WindowOuter``/``Web``, all ``mm``) drive every profile sketch's dimensions
+(named e.g. ``WallHeight@Sketch1``, ``WinLSpan@Sketch11``), the sketches and
+features carry stable names, and the drive equations are applied in one deferred
+batch after a rebuild. A final "equations neutral" ``volume_check`` proves the
+driving did not move the geometry, so a GUI edit to a global reshapes the part
+and round-trips. See ``build_top_frame.py`` for the reference pattern.
+
 Run (SolidWorks already open)::
 
     uv run python cad\scripts\build_rocker_arm_support_manual.py
@@ -58,13 +67,21 @@ from __future__ import annotations
 import sys
 
 from _common import (
+    SketchDims,
     add_line_chain,
     apply_material,
     check,
+    define_centered_rectangle,
+    define_polygon_chain,
+    define_rectilinear_chain,
+    drive_dimension,
+    ensure_fully_defined,
+    force_rebuild,
     name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
     volume_check,
 )
 
@@ -90,7 +107,6 @@ FILLET_EDGES = [  # four inner-frame corner edges (run along Z through the web)
     [63.5, -63.5, 0.0], [-63.5, -63.5, 0.0],
 ]
 
-HOLE_DIA = 12.3    # 9/16-12 tap-drill diameter
 HOLES = [(60.32, 17.46), (-60.32, 17.46), (60.32, -17.46), (-60.32, -17.46)]
 # Hole Wizard constants (resolved from the SW type library on this seat):
 SW_FM_HOLE_WZD = 25            # swFeatureNameID_e.swFmHoleWzd (CreateDefinition)
@@ -337,15 +353,45 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
+    # Editable knobs: named equation-manager globals (mm) that drive every
+    # profile sketch's dimensions, so a GUI edit to a global reshapes the part
+    # and round-trips into the script (same self-naming treatment as the 71
+    # tracked parts -- see build_top_frame.py). Lengths carry an explicit `mm`:
+    # the part is modelled inch, and the equation manager evaluates bare numbers
+    # in DOCUMENT units, so an unsuffixed global would be read as inches.
+    await set_global(adapter, "FootHalf", f"{WIDE}mm")      # trapezoid foot half-width (Z)
+    await set_global(adapter, "TopHalf", f"{NARROW}mm")     # trapezoid top half-width (Z)
+    await set_global(adapter, "HalfHeight", f"{HALF_Y}mm")  # trapezoid half-height (Y)
+    await set_global(adapter, "CavHalf", f"{CAV}mm")        # cavity square half
+    await set_global(adapter, "WindowOuter", f"{BIG}mm")    # window square half
+    await set_global(adapter, "Web", f"{WEB}mm")            # central web half-thickness
+
+    # Each sketch records its dim names + drive equations inline as it is drawn
+    # (per-sketch SketchDims); the (dim@feature, expr) jobs are collected here and
+    # applied in ONE deferred batch after the whole model + a rebuild exist, so
+    # every equation target resolves. The neutrality volume_check at the end is
+    # the proof that driving did not move the geometry.
+    drive_jobs: list[tuple[str, str]] = []
+
     # 1. Boss: trapezoid on the Right plane (sketch-x -> model Z, sketch-y ->
     #    model Y, so the wide foot sits at Y=-88.9), mid-plane extruded 177.8
-    #    along X.
+    #    along X. A polygon chain (two slanted sides) anchored at the foot's
+    #    -Z corner; the six dims drive off FootHalf/TopHalf/HalfHeight.
+    trap = SketchDims()
     check("sketch boss", await adapter.create_sketch("Right"))
-    await add_line_chain(adapter, [
-        (-WIDE, -HALF_Y), (WIDE, -HALF_Y), (NARROW, HALF_Y), (-NARROW, HALF_Y),
-    ])
+    trap_pts = [(-WIDE, -HALF_Y), (WIDE, -HALF_Y), (NARROW, HALF_Y), (-NARROW, HALF_Y)]
+    trap_lines = await add_line_chain(adapter, trap_pts)
+    await define_polygon_chain(
+        adapter, trap_lines, trap_pts, anchor=0, label="trapezoid", dims=trap,
+        names=["FootAnchorZ", "FootAnchorY", "FootSpan", "TaperRun",
+               "WallHeight", "TopSpan"],
+        drives=['"FootHalf"', '"HalfHeight"', '2 * "FootHalf"',
+                '"FootHalf" - "TopHalf"', '2 * "HalfHeight"', '2 * "TopHalf"'],
+    )
+    await ensure_fully_defined(adapter, "trapezoid")
     check("exit boss", await adapter.exit_sketch())
     name_last_feature(adapter, "Sketch1")
+    drive_jobs += trap.apply(adapter, "Sketch1")
     check("boss", await adapter.create_extrusion(
         ExtrusionParameters(depth=BOSS_DEPTH, both_directions=True)))
     name_last_feature(adapter, "Boss-Extrude1")
@@ -357,22 +403,47 @@ async def build(adapter) -> dict[str, str]:
     #     sketch. Cut-Extrude3 and Cut-Extrude4 each consume ONE contour of this
     #     SAME sketch, so SolidWorks shares it: it appears once in the tree and
     #     the second reference shows as "Sketch11<n>". The central web at Z=±WEB
-    #     is the gap left between the two rectangles.
+    #     is the gap left between the two rectangles. Both rectangles drive off
+    #     WindowOuter/Web (one SketchDims spans the eight dims).
     #   * Sketch12 -- the 127 mm cavity square; Cut-Extrude2 consumes it whole.
     # Built in the source's creation order (Sketch11, then Sketch12) and cut in
     # the source's order (cavity, then the two windows).
+    windows = SketchDims()
     check("sketch windows", await adapter.create_sketch("Right"))
-    await add_line_chain(adapter, [
-        (-BIG, -BIG), (-WEB, -BIG), (-WEB, BIG), (-BIG, BIG)])   # -Z window
-    await add_line_chain(adapter, [
-        (WEB, -BIG), (BIG, -BIG), (BIG, BIG), (WEB, BIG)])       # +Z window
+    nz_pts = [(-BIG, -BIG), (-WEB, -BIG), (-WEB, BIG), (-BIG, BIG)]   # -Z window
+    nz_lines = await add_line_chain(adapter, nz_pts)
+    await define_rectilinear_chain(
+        adapter, nz_lines, nz_pts, anchor=0, label="window -Z", dims=windows,
+        names=["WinLSpan", "WinLHeight", "WinLAnchorZ", "WinLAnchorY"],
+        drives=['"WindowOuter" - "Web"', '2 * "WindowOuter"',
+                '"WindowOuter"', '"WindowOuter"'],
+    )
+    pz_pts = [(WEB, -BIG), (BIG, -BIG), (BIG, BIG), (WEB, BIG)]       # +Z window
+    pz_lines = await add_line_chain(adapter, pz_pts)
+    await define_rectilinear_chain(
+        adapter, pz_lines, pz_pts, anchor=0, label="window +Z", dims=windows,
+        names=["WinRSpan", "WinRHeight", "WinRAnchorZ", "WinRAnchorY"],
+        drives=['"WindowOuter" - "Web"', '2 * "WindowOuter"',
+                '"Web"', '"WindowOuter"'],
+    )
+    await ensure_fully_defined(adapter, "windows")
     check("exit windows", await adapter.exit_sketch())
     name_last_feature(adapter, "Sketch11")
+    drive_jobs += windows.apply(adapter, "Sketch11")
 
+    cavity = SketchDims()
     check("sketch cavity", await adapter.create_sketch("Right"))
-    await add_line_chain(adapter, [(-CAV, -CAV), (CAV, -CAV), (CAV, CAV), (-CAV, CAV)])
+    await define_centered_rectangle(
+        adapter, CAV, CAV, "cavity", dims=cavity,
+        name_width="CavWidth", drive_width='2 * "CavHalf"',
+        name_depth="CavDepth", drive_depth='2 * "CavHalf"',
+        name_corner=("CavCornerZ", "CavCornerY"),
+        drive_corner=('"CavHalf"', '"CavHalf"'),
+    )
+    await ensure_fully_defined(adapter, "cavity")
     check("exit cavity", await adapter.exit_sketch())
     name_last_feature(adapter, "Sketch12")
+    drive_jobs += cavity.apply(adapter, "Sketch12")
 
     # Cut-Extrude2: cavity -- whole Sketch12 profile (the last unconsumed sketch).
     check("cut2", await adapter.create_cut_extrude(
@@ -413,6 +484,16 @@ async def build(adapter) -> dict[str, str]:
         CHAMFER, CHAMFER_EDGES, face_points=CHAMFER_FACES, tangent_propagation=True))
     name_last_feature(adapter, "Chamfer2")
     await volume_check(adapter, "Chamfer2", 240_512, 200)
+
+    # Apply the deferred drive equations now that the whole model + a rebuild
+    # exist, so every named-dim target resolves. Each equation evaluates to the
+    # value just built, so the geometry must not move -- the re-check below is
+    # the proof (same final volume as Chamfer2 above).
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "driven part (equations neutral)", 240_512, 200)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
