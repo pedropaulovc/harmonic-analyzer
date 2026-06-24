@@ -37,6 +37,10 @@ dependencies = [
     "azure-identity>=1.16",
     "opentelemetry-api>=1.20",
     "opentelemetry-sdk>=1.20",
+    # OTLP/HTTP exporter so spans+logs ship to a collector / the .NET Aspire
+    # dashboard out of the box (see _telemetry._DEFAULT_OTLP_ENDPOINT). HTTP, not
+    # gRPC, to avoid a grpcio build on newer Pythons.
+    "opentelemetry-exporter-otlp-proto-http>=1.20",
     # The SolidWorks COM adapter + gate logic (verify.py, _common.py, _assembly.py
     # all `from solidworks_mcp...`) lives in the sibling repo. Pulled in editable so
     # the whole pipeline runs from this one uv venv.

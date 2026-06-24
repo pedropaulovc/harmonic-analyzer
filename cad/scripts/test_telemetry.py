@@ -160,13 +160,13 @@ def test_build_session_standalone_opens_root(capture, monkeypatch):
     spans, _ = capture
     monkeypatch.delenv("TRACEPARENT", raising=False)
     monkeypatch.delenv("TRACESTATE", raising=False)
-    with _telemetry.build_session("build_cone_gear") as root:
+    with _telemetry.build_session("cone_gear") as root:
         assert root is not None
         with _telemetry.span("op"):
             pass
-    rootspan = [s for s in spans.get_finished_spans() if s.name == "pipeline.part.build"][-1]
+    rootspan = [s for s in spans.get_finished_spans() if s.name == "build.cone_gear"][-1]
     op = [s for s in spans.get_finished_spans() if s.name == "op"][-1]
-    assert rootspan.attributes["label"] == "build_cone_gear"
+    assert rootspan.attributes["label"] == "cone_gear"
     assert op.parent.span_id == rootspan.context.span_id
 
 
