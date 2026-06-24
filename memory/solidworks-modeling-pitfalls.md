@@ -213,4 +213,33 @@ discovered during harmonic-analyzer M6.4:
   physically correct for "disengaged" (assert no STRUCTURAL part leaks instead of
   asserting full-definition). See dof-refactor (dropped memory).
 
+- **Feature-replay of an external part: a volume+bbox match is NECESSARY but
+  NOT SUFFICIENT — a Z-MIRRORED build matches both yet is upside-down.**
+  Reproducing `rocker-arm-support-manual.SLDPRT` (a Z-up trapezoid wedge), the
+  Top-plane sketch maps sketch-y → **−Z**, so the trapezoid's wide foot must be
+  drawn at sketch **+Y** to land at model Z=−88.9 (the real foot). Drawing it at
+  −Y put the foot at +Z: every per-feature volume + the bbox matched the source
+  exactly (symmetric squares/fillets/holes), but the part was mirrored in Z —
+  caught only when real-coordinate chamfer FACE selection points missed. Verify
+  orientation independently of volume (hole axes, an asymmetric face point), not
+  just the mass ladder.
+- **Selecting a whole FACE for chamfer/fillet by a point: use a point on the
+  SOLID region, never a bbox centroid that can fall in a window/void.** New
+  `_select_faces_geometric` (SolidworksMCP PR #69) walks `IFace2.GetClosestPointOn`
+  and picks the nearest face within tol (5 mm). On the cut part the slant face is
+  a frame around a window, so its bbox centre (20.1,0,0) sits 5 mm inside the
+  void → miss; a point in the solid foot band (31.24,0,−85, computed ON the slant
+  plane) hits at 0.00 mm. For a fillet face use an ON-SURFACE point = axis + R·dir
+  (the R12.7 corner fillet at axis (0,50.8,−50.8): (0,59.78,−59.78)), not the
+  bbox centre (~3.8 mm off the cylinder). `add_chamfer` now takes `face_points` +
+  `tangent_propagation` and builds via `IFeatureManager.InsertFeatureChamfer`
+  (options 0x4 = tangent prop, type 1 = swChamferAngleDistance, 45°) instead of
+  the 3-arg `IModelDoc2.FeatureChamfer`, which can take neither faces nor
+  propagation. With faces+prop the replayed `Chamfer2` matched source to +1 mm³.
+- **Standalone external-part repros live in `cad/scripts/` but stay OFF the doit
+  DAG**: add the script to `_buildgraph.NON_PART_SCRIPTS`, and note `verify.py`'s
+  registry audit (`_declared_part_names`) now scans `_buildgraph.part_scripts()`
+  (the canonical part-script set) so such repros are excluded from the
+  `parts.yaml` "built but unregistered" audit exactly as from the graph.
+
 See [[solidworks-3dx-launch]] for session/launch rules.
