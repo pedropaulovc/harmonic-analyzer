@@ -242,4 +242,48 @@ discovered during harmonic-analyzer M6.4:
   (the canonical part-script set) so such repros are excluded from the
   `parts.yaml` "built but unregistered" audit exactly as from the graph.
 
+- **Two cuts SHARING one sketch (feature-tree identity) = contour-OBJECT
+  selection, NOT SKETCHREGION-by-point.** To reproduce a source where two
+  sketches feed three cuts (`rocker-arm-support-manual`: Sketch11 holds both
+  window rectangles, fed to Cut-Extrude3 AND Cut-Extrude4), draw N CLOSED
+  contours in one sketch, then per cut: `sk.GetSketchContours()`, pick the
+  wanted `ISketchContour` by its segment-endpoint centroid sign,
+  `contour.Select(False, mark=0)` (mark=0 selects the contour object; mark=1
+  and SKETCHREGION-by-point both FAIL on this seat), then a RAW mid-plane
+  `FeatureCut4` (the 27-param "else" branch; 26-param major-33 throws
+  "Parameter not optional"). Each cut consumes one contour; both features'
+  `GetParents()` then list the shared sketch → tree diff sees identical
+  feature names/types/order. The tree diff does NOT inspect intra-sketch
+  contour count, so 2 closed rects satisfy identity even though the source
+  Sketch11 is 1 contour + 2 construction diagonals (the SW center-rectangle
+  artifact). Proven in `probe_contour_cut.py`; ported to `_cut_window`.
+- **Hole Wizard (HoleWzd) with N points = ONE feature, built single-point
+  then multi-pointed via the placement sketch.** Sequence (live-proven,
+  `_drill_tapped_holes`): `FeatureManager.CreateDefinition(25)` →
+  `IWizardHoleFeatureData2.InitializeHole(genericType, std, fastenerType,
+  size, endType)` (tap=4, ANSI-inch=0, through-next=2, size="9/16-12") → set
+  ThreadClass/EndCondition/ThreadEndCondition → **select the drill FACE as an
+  OBJECT** → `CreateFeature(data)` makes a 1-hole HoleWzd whose sub-features
+  are a 1-pt placement sketch (ProfileFeature), a 6-pt profile sketch, and a
+  CosmeticThread. Then EDIT the placement sketch: move the auto point to hole
+  #0 with `ISketchPoint.SetCoords(sx,sy,sz)` and `SketchManager.CreatePoint`
+  the rest, then `EditRebuild3`. Model→sketch coords via
+  `placeSketch.ModelToSketchTransform` + `MathUtility.CreatePoint(pt)` +
+  `MathPoint.MultiplyTransform(xform)` → `ArrayData[:3]`. **CRITICAL: pass
+  the model point to `CreatePoint` as `VARIANT(pythoncom.VT_ARRAY|VT_R8,[x,y,z])`**
+  — a bare Python list marshals to garbage (sx=sy=0). SetCoords (move auto
+  pt) is cleaner than delete-then-add (ISketchPoint.Select4 errored). Through-
+  next drills from the selected face's normal-opposite direction; correct
+  face → exact source volume. Proven in `probe_hole_wizard.py`/`probe_foot_face.py`.
+- **`SelectByID2(...,"FACE",x,y,z,...)` mis-resolves at a SHARED plane: a pick
+  ON the foot bottom (Y=−88.9) returned the ±X trapezoid END faces (which also
+  touch Y=−88.9), so the wizard drilled along X through the whole part (removed
+  ~7× too much, 224660 vs 243665 mm³). Even the bottom-face CENTER (0,−88.9,0)
+  picked the +X face — coordinate selection is unusable here.** Fix: ENUMERATE
+  `body.GetFaces()`, keep the planar face with `Normal≈(0,−1,0)`, box minY on
+  the target plane, and bbox spanning all hole (X,Z) points, then select that
+  face OBJECT (`face.Select2(False,0)`). Generalises the earlier chamfer-FACE
+  point-picking lesson: when multiple faces meet at the pick plane, select the
+  face object found by enumeration, never by coordinate.
+
 See [[solidworks-3dx-launch]] for session/launch rules.
