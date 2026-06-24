@@ -11,6 +11,7 @@ log<->trace correlation, and cross-process trace-context propagation.
 
 from __future__ import annotations
 
+import asyncio
 import subprocess
 import sys
 from pathlib import Path
@@ -117,6 +118,79 @@ def test_nested_spans_share_one_trace(capture):
             pass
     traces = {s.context.trace_id for s in spans.get_finished_spans()}
     assert len(traces) == 1  # no gaps: every span hangs off the one root trace
+
+
+def test_traced_decorator_wraps_sync_and_async(capture):
+    spans, _ = capture
+
+    @_telemetry.traced("op.async", label_param="label")
+    async def afn(label):
+        return label
+
+    @_telemetry.traced("op.sync")
+    def sfn():
+        return 1
+
+    assert asyncio.run(afn("widget")) == "widget"
+    assert sfn() == 1
+
+    a = [s for s in spans.get_finished_spans() if s.name == "op.async"][-1]
+    s = [s for s in spans.get_finished_spans() if s.name == "op.sync"][-1]
+    assert a.attributes["label"] == "widget"  # label_param copied onto the span
+    assert a.status.status_code.name == "OK"
+    assert s.status.status_code.name == "OK"
+
+
+def test_traced_decorator_records_failure(capture):
+    spans, _ = capture
+
+    @_telemetry.traced("op.boom")
+    def boom():
+        raise ValueError("nope")
+
+    with pytest.raises(ValueError):
+        boom()
+    sp = [s for s in spans.get_finished_spans() if s.name == "op.boom"][-1]
+    assert sp.status.status_code.name == "ERROR"
+
+
+def test_build_session_standalone_opens_root(capture, monkeypatch):
+    """No injected parent -> a local pipeline.part.build root, so the build's
+    operation spans are never unparented."""
+    spans, _ = capture
+    monkeypatch.delenv("TRACEPARENT", raising=False)
+    monkeypatch.delenv("TRACESTATE", raising=False)
+    with _telemetry.build_session("build_cone_gear") as root:
+        assert root is not None
+        with _telemetry.span("op"):
+            pass
+    rootspan = [s for s in spans.get_finished_spans() if s.name == "pipeline.part.build"][-1]
+    op = [s for s in spans.get_finished_spans() if s.name == "op"][-1]
+    assert rootspan.attributes["label"] == "build_cone_gear"
+    assert op.parent.span_id == rootspan.context.span_id
+
+
+def test_build_session_continues_injected_parent_without_duplicate(capture, monkeypatch):
+    """Under the doit spine (a parent TRACEPARENT is injected) build_session
+    yields None and the operation spans attach straight to the injected trace --
+    no second pipeline.part.build layer duplicating the doit task span."""
+    spans, _ = capture
+    monkeypatch.delenv("TRACEPARENT", raising=False)
+    with _telemetry.span("part:cone_gear"):
+        env = _telemetry.inject_env()
+    monkeypatch.setenv("TRACEPARENT", env["TRACEPARENT"])
+    if env.get("TRACESTATE"):
+        monkeypatch.setenv("TRACESTATE", env["TRACESTATE"])
+
+    with _telemetry.build_session("build_cone_gear") as root:
+        assert root is None  # no duplicate root layer
+        with _telemetry.span("op"):
+            pass
+
+    task = [s for s in spans.get_finished_spans() if s.name == "part:cone_gear"][-1]
+    op = [s for s in spans.get_finished_spans() if s.name == "op"][-1]
+    assert op.context.trace_id == task.context.trace_id
+    assert op.parent.trace_id == task.context.trace_id
 
 
 def test_cross_process_trace_propagation(tmp_path):

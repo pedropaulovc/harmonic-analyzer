@@ -98,6 +98,7 @@ def check(label: str, result: Any) -> Any:
     return result.data
 
 
+@_telemetry.traced("sketch.ensure_defined", label_param="label")
 async def ensure_fully_defined(
     adapter: Any,
     label: str,
@@ -284,6 +285,7 @@ def _record_point_to_point_cursor(rec: "Callable[[], None]", dx: float, dy: floa
     rec()
 
 
+@_telemetry.traced("sketch.polygon", label_param="label")
 async def define_polygon_chain(
     adapter: Any,
     lines: list[str],
@@ -405,6 +407,7 @@ def _record_origin_anchor(
         dims.record(name_y, drive_y)
 
 
+@_telemetry.traced("sketch.circle", label_param="label")
 async def define_circle(
     adapter: Any,
     x: float,
@@ -451,6 +454,7 @@ async def define_circle(
     return circle.data
 
 
+@_telemetry.traced("sketch.rectangle", label_param="label")
 async def define_centered_rectangle(
     adapter: Any,
     half_x: float,
@@ -565,6 +569,7 @@ def _record_origin_anchor_cursor(rec: "Callable[[], None]", x: float, y: float) 
         rec()
 
 
+@_telemetry.traced("sketch.rect_chain", label_param="label")
 async def define_rectilinear_chain(
     adapter: Any,
     lines: list[str],
@@ -724,6 +729,7 @@ def set_sketch_direct_db(adapter: Any, enabled: bool) -> None:
 
 
 
+@_telemetry.traced("check.volume", label_param="label")
 async def volume_check(adapter: Any, label: str, expected: float, tol: float) -> float:
     """Assert the part volume (mm^3) and return it."""
     mass = await adapter.get_mass_properties()
@@ -743,6 +749,7 @@ async def volume_check(adapter: Any, label: str, expected: float, tol: float) ->
 
 
 
+@_telemetry.traced("feature.extrude")
 def extrude_at_offset(
     adapter: Any, depth: float, offset: float, flip: bool = False
 ) -> str:
@@ -816,6 +823,7 @@ _STL_TOGGLES = {TOGGLE_STL_BINARY: True, TOGGLE_STL_ONE_FILE: True,
                 TOGGLE_STL_NO_TRANSLATE: True, TOGGLE_STL_SHOW_INFO: False}
 
 
+@_telemetry.traced("export.stl")
 async def export_part_stl(adapter: Any, out_path: Path) -> None:
     """Write the active part's fine binary STL (mm, model origin) to ``out_path``.
 
@@ -855,6 +863,7 @@ async def export_part_stl(adapter: Any, out_path: Path) -> None:
             sw.SetUserPreferenceToggle(k, v)
 
 
+@_telemetry.traced("export.part_images", label_param="part_name")
 async def save_part_and_images(
     adapter: Any, part_name: str, views: Iterable[str] = DEFAULT_VIEWS
 ) -> dict[str, str]:
@@ -983,6 +992,7 @@ def apply_custom_properties(adapter: Any, props: dict[str, str]) -> None:
     log(f"custom properties [{len(written)}]: {', '.join(written)}")
 
 
+@_telemetry.traced("appearance.material", label_param="material")
 async def apply_material(adapter: Any, material: str) -> None:
     """Assign a SolidWorks-database material (saved with the part).
 
@@ -1010,6 +1020,7 @@ BAR_STEEL = (0.42, 0.41, 0.39)  # amplitude-bar curtain (p004 edge-on 0.56,
 # back views read darker from shadowing; mid value chosen)
 
 
+@_telemetry.traced("appearance.color")
 async def apply_color(adapter: Any, rgb: tuple[float, float, float]) -> None:
     """Explicit part display colour, overriding the material appearance.
 
@@ -1052,6 +1063,7 @@ async def apply_color(adapter: Any, rgb: tuple[float, float, float]) -> None:
 
 
 
+@_telemetry.traced("check.measure", label_param="label")
 async def measure_check(
     adapter: Any,
     label: str,
@@ -1088,6 +1100,7 @@ async def measure_check(
     _telemetry.success(f"measure {label}: {key}={value:.4f} (expected {expected:g})")
 
 
+@_telemetry.traced("check.bbox", label_param="label")
 async def bbox_extent_check(
     adapter: Any,
     label: str,
@@ -1327,6 +1340,7 @@ def name_dimensions(adapter: Any, feature_name: str, names: list[str | None]) ->
     return out
 
 
+@_telemetry.traced("param.global", label_param="name")
 async def set_global(adapter: Any, name: str, expr: str | float) -> float:
     """Add or update an equation-manager global variable; returns its value.
 
@@ -1346,6 +1360,7 @@ async def set_global(adapter: Any, name: str, expr: str | float) -> float:
     return float(value) if value is not None else float("nan")
 
 
+@_telemetry.traced("param.dimension", label_param="dim_name")
 async def drive_dimension(adapter: Any, dim_name: str, expr: str | float) -> None:
     """Bind a (named) dimension to an equation expression, e.g.::
 
@@ -1362,6 +1377,7 @@ async def drive_dimension(adapter: Any, dim_name: str, expr: str | float) -> Non
     _telemetry.success(f"equation {equation}")
 
 
+@_telemetry.traced("feature.rebuild")
 async def force_rebuild(adapter: Any) -> None:
     """Force a full rebuild of the active doc, failing loud on error.
 
@@ -1575,11 +1591,13 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
             adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
             _telemetry.success("CloseAllDocuments (clean session)")
         try:
-            async with _telemetry.aspan("build", script=script):
-                return await build(adapter)
+            # No wrapper span here: the build's own operations (the @traced
+            # _common helpers it calls) are the children, so the trace is a tree
+            # of real steps instead of one opaque "build" monolith.
+            return await build(adapter)
         finally:
             # Teardown is its own span so a disconnect failure is attributable
-            # and never a silent gap between the build span and process exit.
+            # and never a silent gap before process exit.
             async with _telemetry.aspan("sw.disconnect"):
                 try:
                     await adapter.disconnect()
@@ -1587,18 +1605,23 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
                 except Exception as exc:  # noqa: BLE001
                     _telemetry.warn(f"disconnect failed: {exc}")
 
-    # Root span: every connect/build/disconnect child hangs off this, so the
-    # whole invocation is one gapless trace from process start to exit.
-    with _telemetry.run_pipeline_span("part.build", script=script) as root:
+    # build_session continues the doit task span when one was injected (so we add
+    # no duplicate root layer under the spine) and opens a local root only when
+    # run standalone. Either way every connect/operation/disconnect span has a
+    # parent -- one gapless trace from process start to exit.
+    with _telemetry.build_session(script) as root:
         try:
             artefacts = asyncio.run(_run())
         except Exception as exc:  # noqa: BLE001 - recorded on the root span
-            # A bare `return` here would let the span exit cleanly and be marked
-            # OK, so a failed build (process exits 1) would trace as success.
-            # Set ERROR explicitly before returning -- span() only fills in OK
-            # when the status is still UNSET, so this sticks.
-            root.record_exception(exc)
-            root.set_status(_telemetry.Status(_telemetry.StatusCode.ERROR, str(exc)))
+            # A bare `return` would let the root exit cleanly and be marked OK, so
+            # a failed build (process exits 1) would trace as success. Mark ERROR
+            # before returning -- span() only fills OK when the status is UNSET, so
+            # it sticks. Under the spine root is None: the build's failing
+            # operation span already carries ERROR, and the doit task span goes
+            # ERROR via the subprocess exit code.
+            if root is not None:
+                root.record_exception(exc)
+                root.set_status(_telemetry.Status(_telemetry.StatusCode.ERROR, str(exc)))
             _telemetry.error(f"build {script} failed: {exc}", exc_info=True)
             _telemetry.shutdown()
             return 1

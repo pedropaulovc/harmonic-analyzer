@@ -286,10 +286,11 @@ def _run(cmd: list[str], label: str, log_stem: str | None = None) -> None:
     it, output is inherited straight to the terminal -- the cheap path for the
     non-release happy path. Decode the pipe as UTF-8 (errors=replace) so the gate
     labels' non-ASCII glyphs survive on a cp1252 Windows console."""
-    # One span per task action; inject its trace context into the subprocess env
-    # (TRACEPARENT) so the build script's own root span continues this trace --
-    # the doit task and the process it spawns form one gapless end-to-end trace.
-    with _telemetry.span("task", label=label, cmd=" ".join(cmd)):
+    # One span per task action, NAMED for the doit task (e.g. ``part:cone_gear``)
+    # so the trace reads as the task itself -- the build subprocess continues this
+    # span (via the injected TRACEPARENT) instead of adding a duplicate
+    # ``pipeline.part.build`` layer under it.
+    with _telemetry.span(label, cmd=" ".join(cmd)):
         _telemetry.info(f">> {label}: {' '.join(cmd)}")
         env = _telemetry.inject_env()
         if log_stem is None:
