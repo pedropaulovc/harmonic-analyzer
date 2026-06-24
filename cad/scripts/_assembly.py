@@ -968,15 +968,30 @@ def _massprops_sidecar(asm_name: str):
 
 async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
     """A deterministic fingerprint of an assembly's RESOLVED geometry across every
-    configuration: exact-BREP mass properties (mass / volume / centre of mass /
-    moments of inertia). It changes iff a component's geometry changed and is immune
-    to SolidWorks' volatile save metadata (unlike the ``.SLDASM`` bytes) and to
-    tessellation noise (unlike an STL hash). Leaves the doc on the rest pose.
+    configuration: exact-BREP mass properties (mass / volume / surface area / centre
+    of mass / moments of inertia). It changes iff a component's geometry changed and
+    is immune to SolidWorks' volatile save metadata (unlike the ``.SLDASM`` bytes) and
+    to tessellation noise (unlike an STL hash). Leaves the doc on the rest pose.
 
-    Used to decide whether an in-place refresh actually changed anything: a part
-    edit that re-solves the assembly shifts the mass properties (so the parent must
-    rebuild -> bump the md5), while a pure reload of unchanged parts does not (keep
-    the file byte-stable -> no phantom cascade)."""
+    Used to decide whether an in-place refresh actually changed anything: a part edit
+    that re-solves the assembly shifts the mass properties (so the parent must rebuild
+    -> bump the md5), while a pure reload of unchanged parts does not (keep the file
+    byte-stable -> no phantom cascade).
+
+    Why NOT hash the referenced part files instead (codex review on #83): a
+    from-scratch part rebuild regenerates the part's persistent reference IDs, so its
+    ``.SLDPRT`` bytes differ for byte-IDENTICAL geometry (observed: pivot-shaft
+    61710 -> 61000 B on a no-change rebuild). A content-hash key would therefore flag
+    every PID-churn-only rebuild as "changed" and force-save -> the very parent-md5
+    cascade this fingerprint exists to suppress. A geometry-derived key is the point.
+
+    Known residual gap (accepted, narrow): a part-APPEARANCE-only edit (a part-level
+    display colour with no geometry change) leaves these values fixed, so it does not
+    bump the .SLDASM md5. The immediate assembly still re-renders (refresh always
+    re-exports its PNGs), but ANCESTOR renders won't auto-regenerate. In practice the
+    colours that matter are applied at assembly scope via ``apply_component_color``
+    (the FULL path -> recipe change -> save), so this only bites a bare part recolour;
+    force a rebuild (delete the .SLDASM target) if one must propagate up."""
     configs = check("list configurations", await adapter.list_configurations())
     rest = "Default" if "Default" in configs else (configs[0] if configs else None)
     # Only switch configs for a genuinely multi-config assembly. A config switch
@@ -999,6 +1014,7 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
             cfg,
             round(float(mp.mass), 6),
             round(float(mp.volume), 3),
+            round(float(mp.surface_area), 3),  # catches edits that preserve mass+volume+inertia
             tuple(round(float(c), 4) for c in mp.center_of_mass),
             tuple(round(float(moi[k]), 4)
                   for k in ("Ixx", "Iyy", "Izz", "Ixy", "Ixz", "Iyz")),
