@@ -53,7 +53,7 @@ from _assembly import (
     remap_front_to_machine_front,
     save_assembly_and_images,
 )
-from _transforms import IDENTITY, ROT_X_POS90
+from _transforms import IDENTITY
 
 import _telemetry
 
@@ -63,9 +63,17 @@ SUBASSEMBLIES = ("frame", "drive-train", "channel", "summing", "magnifier", "pen
                  "paper-drive")
 
 # Loose hardware on the base top -- a generic tool, not part of any mechanism.
-STICK_POS = (-100.0, 53.8, 123.5)  # flat on the base, graduations up; loose tool.
-# Parked in the BACK band, between the rocker-arm-portal north frustum (z-max
-# 121.6) and the back plate edge (133.35), clear for 320 mm in x.
+# Re-parked to the FAR-WEST margin lane running along Z (machine x -220..-212,
+# z -100..100, y 50.8..53.8). The old BACK-band slot (z 121.6..133.35) is now
+# filled by the rocker-arm-support-manual foot (z-max 133.35), so the stick moved
+# to the ~12.5 mm clear lane between the west columns (west face x -209.7) and the
+# west top-plate edge (x -222.25). Authored as the EXACT machine transform
+# (mirror=False): flat with graduations up, long axis along Z.
+#   rows map part X(length)->machine Z, part Y(width)->machine X, part Z(3 thick)
+#   ->machine Y; euler [-90,-90,0] is rows_from_euler of those rows.
+STICK_POS = (-220.0, 50.8, -100.0)
+STICK_EULER = [-90.0, -90.0, 0.0]
+STICK_ROWS = [[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
 
 # Render gallery mirroring the book's ch. 30 "Eight Views" chapter: the six
 # orthographic faces plus two 3/4 views (the photos walk 45-degree steps
@@ -118,10 +126,10 @@ async def build(adapter) -> dict[str, str]:
             )
         assert_component_placed(adapter, comp, [0.0, 0.0, 0.0], IDENTITY)
 
-    # Loose hardware on the base top (not part of any mechanism). Rx(+90): the
-    # stick lies flat, graduated face up.
+    # Loose hardware on the base top (not part of any mechanism). Exact machine
+    # transform (mirror=False): flat, graduated face up, long axis along Z.
     await place_component(adapter, "measuring-stick", list(STICK_POS),
-                          [90.0, 0.0, 0.0], ROT_X_POS90)
+                          STICK_EULER, STICK_ROWS, mirror=False)
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)
