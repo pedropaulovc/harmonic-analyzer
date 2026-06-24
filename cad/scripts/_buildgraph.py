@@ -40,6 +40,9 @@ NON_PART_SCRIPTS = frozenset(
         "build_motion_study_springs.py",
         "build_motion_setup_drives.py",
         "build_mobility_probe.py",
+        # Standalone external-part repro (not a harmonic-analyzer machine part):
+        # runnable on its own, but off the part/assembly DAG and the COM spine.
+        "build_rocker_arm_support_manual.py",
     }
 )
 
