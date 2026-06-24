@@ -47,7 +47,7 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 SHAFT_DIA = 0.375 * IN  # ch13: = cam bore (legacy parameters.kcl)
 SHAFT_LENGTH = 176.0  # ch13 stack + journals; shortened from 200 (2026-06-19)
-# so the arbor's north end clears the now-solid rocker-arm-portal north upright
+# so the arbor's north end clears the now-solid rocker-arm-support north upright
 # (the old support boss bore that held the north end is gone). See
 # build_drive_train_assembly.ARBOR_LENGTH / ARBOR_SOUTH_Z.
 

@@ -1,6 +1,6 @@
 r"""Reproduction script: rocker-arm support (manual feature-tree replay).
 
-An exact feature-tree replay of ``rocker-arm-support-manual.SLDPRT`` -- a
+An exact feature-tree replay of ``rocker-arm-support.SLDPRT`` -- a
 thin-walled cast bracket: a trapezoidal wedge wall (wide foot, narrow top)
 stood **Y-up**, lightened by a square window that opens on the two big front/
 back faces, with a mounting foot drilled by four tapped holes (bored vertically
@@ -64,7 +64,7 @@ and round-trips. See ``build_top_frame.py`` for the reference pattern.
 
 Run (SolidWorks already open)::
 
-    uv run python cad\scripts\build_rocker_arm_support_manual.py
+    uv run python cad\scripts\build_rocker_arm_support.py
 """
 
 from __future__ import annotations
@@ -89,7 +89,7 @@ from _common import (
     volume_check,
 )
 
-PART_NAME = "rocker-arm-support-manual"
+PART_NAME = "rocker-arm-support"
 MATERIAL = "AISI 1020 Steel, Cold Rolled"  # source part's database material
 
 # Trapezoid (Sketch1) -- wide foot / narrow top, half-extents in mm. On the

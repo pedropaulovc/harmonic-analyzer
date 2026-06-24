@@ -11,7 +11,7 @@ origin; base top face at y = 50.8, drive height 76 above it):
 * cylinder drum: 20 identical 120T gears spinning freely on the
   stationary arbor along Z at (-47.5, 126.8) (M6.2 keyway refutation),
   carried by the SOUTH arbor pedestal; the arbor is shortened (200 -> 176) so
-  its north end clears the now-solid rocker-arm-portal (the old support boss
+  its north end clears the now-solid rocker-arm-support (the old support boss
   bore is gone), the north-end support deferred to the cone-position rework;
   notches up = cosine setup (pp. 66-67).
 * crankshaft along Z in the green crank pedestal: crank arm + handle at

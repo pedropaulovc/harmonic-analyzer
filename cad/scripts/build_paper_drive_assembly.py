@@ -425,7 +425,7 @@ async def build(adapter) -> dict[str, str]:
 
     # --- transgear group ------------------------------------------------------
     # (The rocker-support A-frame that used to stand here is now part of the
-    # single rocker-arm-portal casting in frame.SLDASM; the pinion-bar west end
+    # single rocker-arm-support casting in frame.SLDASM; the pinion-bar west end
     # floats and was never mated to it, so it is simply gone from this assembly.)
     await place_component(adapter, "pinion-bar", [PINION_AXIS[0], PINION_AXIS[1], -111.0],
                           [0.0, 0.0, 0.0], IDENTITY)

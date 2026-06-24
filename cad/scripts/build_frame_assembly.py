@@ -14,12 +14,12 @@ depth):
 * tube-frame x4 standing on the base top face near the top-plate corners,
   centres at (+/-197, +/-112) — 25.25/21.35 mm inset from the top-plate
   edges (eight views: columns sit at the extreme corners).
-* rocker-arm-support-manual x1 (the windowed trapezoidal NORTH support,
-  build_rocker_arm_support_manual.py) at (X, Z) = (+72.9, +101.6), foot
+* rocker-arm-support x1 (the windowed trapezoidal NORTH support,
+  build_rocker_arm_support.py) at (X, Z) = (+72.9, +101.6), foot
   seated on the base top. A 177.8 x 177.8 cast plate, 63.5 thick in Z, with
   the central rounded window; its apex carries the north pivot ball mount
   (channel.SLDASM) and the CHANNEL AXIS runs along Z. This REPLACES the
-  rocker-arm-portal casting (north + south unified portal frame) with the
+  rocker-arm-support casting (north + south unified portal frame) with the
   faithful reproduction of the original hand-built support -- the NORTH upright
   ONLY; the south upright and the top/foot rails are not part of this casting.
   The part origin is at the casting centre (bbox +/-88.9 in X and Y), so it
@@ -35,7 +35,7 @@ depth):
   two east columns and read by an operator at that face. Cosmetic, so it is
   grounded at its measured transform (see NAMEPLATE_POS).
 
-No hold-down fasteners are placed for the support: rocker-arm-support-manual's
+No hold-down fasteners are placed for the support: rocker-arm-support's
 own mounting-hole pattern (4 holes at local X +/-60.32, Z +/-17.46) matches
 neither the base's lag-screw sockets (X 41.15 / 104.65) nor the former portal
 foot-rail bolt positions, and at the portal's lag-screw X/Z the screws would
@@ -87,7 +87,7 @@ COLUMN_X = 197.0  # column centres, from the ch. 6 / ch. 30 corner placement
 COLUMN_Z = 112.0
 SUPPORT_X = 72.9  # rocker pivot x: arbor 47.5 + 25.4 rod lever (M6.3, M6.8 mirror)
 SUPPORT_Z = 133.35 - 63.5 / 2.0  # 101.6: outer face flush w/ top plate edge
-SUPPORT_SEAT_Y = BASE_TOP_Y + 88.9  # 139.7: rocker-arm-support-manual's origin is
+SUPPORT_SEAT_Y = BASE_TOP_Y + 88.9  # 139.7: rocker-arm-support's origin is
 # at the casting centre (bbox Y +/-88.9), so seating its foot on the base top
 # lifts the origin by the 88.9 foot half-height.
 TOP_FRAME_MID_Y = 1020.2  # ring mid-plane: rails y 999.7..1040.7 (M6.3)
@@ -109,7 +109,7 @@ TOP_FRAME_MID_Y = 1020.2  # ring mid-plane: rails y 999.7..1040.7 (M6.3)
 # body resting on the base top (50.8); Z 50 centres the 100 mm line at z 0 between
 # the east columns (z +/-112); X 214.25 sets the plate's east edge ~8 mm in from
 # the top-plate east edge (x 222.25), span x 159.25..214.25 -- east of the
-# rocker-arm-portal (x 28..117) and clear of the east columns (which sit at
+# rocker-arm-support (x 28..117) and clear of the east columns (which sit at
 # z +/-112, away from the plate's z -50..50), so it grounds 0-DOF, no interference.
 NAMEPLATE_POS = [214.25, 52.3, 50.0]
 NAMEPLATE_EULER = [-90.0, 90.0, 0.0]
@@ -130,7 +130,7 @@ async def build(adapter) -> dict[str, str]:
 
     base_path = _part("harmonic-base")
     column_path = _part("tube-frame")
-    support_path = _part("rocker-arm-support-manual")
+    support_path = _part("rocker-arm-support")
     top_frame_path = _part("top-frame")
 
     check("create_assembly", await adapter.create_assembly())
@@ -164,8 +164,8 @@ async def build(adapter) -> dict[str, str]:
         assert_component_placed(adapter, name, target, IDENTITY)
 
     # Rocker-pivot support: the windowed trapezoidal NORTH support
-    # (build_rocker_arm_support_manual.py), the faithful reproduction of the
-    # original hand-built casting that REPLACES the unified rocker-arm-portal.
+    # (build_rocker_arm_support.py), the faithful reproduction of the
+    # original hand-built casting that REPLACES the unified rocker-arm-support.
     # Its origin is at the casting centre, so seating the foot on the base top
     # places the origin at machine y = SUPPORT_SEAT_Y (= 139.7); X/Z unchanged
     # (pivot centre x +72.9, north z +101.6, outer Z face flush w/ top-plate
@@ -176,7 +176,7 @@ async def build(adapter) -> dict[str, str]:
     res = await adapter.insert_component(
         InsertComponentParameters(file_path=support_path, position=target)
     )
-    check(f"insert_component rocker-arm-support-manual @ {target}", res)
+    check(f"insert_component rocker-arm-support @ {target}", res)
     name = res.data["name"]
     await plane_distance_mate(
         adapter, name, "Right Plane", "Right Plane", base_name, SUPPORT_X, target
