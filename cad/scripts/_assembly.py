@@ -4,6 +4,7 @@ build scripts (never by a leaf part), so edits here never invalidate parts.
 """
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Iterable
 from typing import Any
 
@@ -937,12 +938,77 @@ async def save_assembly_and_images(
     # re-based Front/Back/etc. used by the gallery stay correct.
     set_isometric_view(adapter)
     check(f"save_file -> {asm_path}", await adapter.save_file(str(asm_path)))
+    # Record the resolved-geometry fingerprint of the just-built assembly so a later
+    # in-place refresh of it (unchanged) is a true no-op and never bumps the md5 --
+    # otherwise the first refresh after a from-scratch build would re-save once and
+    # cascade up the tree (see save_assembly_in_place / _massprops_sidecar).
+    digest = await assembly_geometry_digest(adapter, asm_name)
+    sidecar = _massprops_sidecar(asm_name)
+    sidecar.parent.mkdir(parents=True, exist_ok=True)
+    sidecar.write_text(digest + "\n", encoding="utf-8")
 
     artefacts = {"assembly": str(asm_path)}
     artefacts.update(await _export_assembly_images(adapter, asm_name, views))
     return artefacts
 
-def save_assembly_in_place(adapter: Any, asm_name: str) -> None:
+def _massprops_sidecar(asm_name: str):
+    """Sidecar holding the last-saved resolved-geometry fingerprint of an assembly.
+
+    A parent assembly's doit dependency on a child is the child ``.SLDASM``'s md5,
+    and SolidWorks rewrites a ``.SLDASM`` with fresh save metadata (new bytes -> new
+    md5) on EVERY in-place save. So an unconditional re-save of an *unchanged*
+    assembly bumps its md5 and spuriously invalidates the parent, which then
+    re-saves and invalidates ITS parent -- a no-op "reconciliation" refresh that
+    cascades up the whole tree one level per ``doit`` run (the post-release
+    not-a-no-op). Gating the re-save on a real change to THIS fingerprint keeps a
+    no-op refresh byte-stable, so the build reaches a true fixpoint. Lives under the
+    gitignored ``cad/out/sldasm`` next to the recipe sidecar."""
+    return OUT_SLDASM / f".{asm_name}.massprops.sha"
+
+
+async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
+    """A deterministic fingerprint of an assembly's RESOLVED geometry across every
+    configuration: exact-BREP mass properties (mass / volume / centre of mass /
+    moments of inertia). It changes iff a component's geometry changed and is immune
+    to SolidWorks' volatile save metadata (unlike the ``.SLDASM`` bytes) and to
+    tessellation noise (unlike an STL hash). Leaves the doc on the rest pose.
+
+    Used to decide whether an in-place refresh actually changed anything: a part
+    edit that re-solves the assembly shifts the mass properties (so the parent must
+    rebuild -> bump the md5), while a pure reload of unchanged parts does not (keep
+    the file byte-stable -> no phantom cascade)."""
+    configs = check("list configurations", await adapter.list_configurations())
+    rest = "Default" if "Default" in configs else (configs[0] if configs else None)
+    # Only switch configs for a genuinely multi-config assembly. A config switch
+    # regenerates the whole model (~80-160 s each on the 122-component top), so for
+    # the single-config case (the rest pose is already active after the gates) we
+    # read mass properties in place and never activate/re-activate.
+    multi = len(configs) > 1
+    rows: list[Any] = []
+    for cfg in configs:
+        if multi:
+            check(f"activate {cfg}", await adapter.set_active_configuration(cfg))
+        res = await adapter.get_mass_properties()
+        if not res.is_success:
+            raise RuntimeError(
+                f"{asm_name}: get_mass_properties failed for config {cfg!r}: "
+                f"{res.error}")
+        mp = res.data
+        moi = mp.moments_of_inertia
+        rows.append((
+            cfg,
+            round(float(mp.mass), 6),
+            round(float(mp.volume), 3),
+            tuple(round(float(c), 4) for c in mp.center_of_mass),
+            tuple(round(float(moi[k]), 4)
+                  for k in ("Ixx", "Iyy", "Izz", "Ixy", "Ixz", "Iyz")),
+        ))
+    if multi and rest is not None:
+        check(f"re-activate {rest}", await adapter.set_active_configuration(rest))
+    return hashlib.sha256(repr(rows).encode("utf-8")).hexdigest()
+
+
+def save_assembly_in_place(adapter: Any, asm_name: str, geometry_changed: bool) -> None:
     """Save ``<asm_name>.SLDASM`` in place with a silent ``ModelDoc2.Save3``.
 
     For an assembly OPENED from its own path (a refresh or a config-hook reopen)
@@ -962,24 +1028,33 @@ def save_assembly_in_place(adapter: Any, asm_name: str) -> None:
 
     Passing the two [out] params as real pywin32 BYREF VARIANTs makes ``Save3``
     write silently and return the error/warning codes. ``SaveReferenced`` writes
-    any dirty reference without a dialog. The GetSaveFlag short-circuit skips a
-    no-op save; the mtime assertion proves the file was rewritten (never
-    deleted). Proven by ``repro_inplace_save.py`` (ret=True, err=0, warn=0, the
-    active config persists on reopen).
+    any dirty reference without a dialog. The mtime assertion proves the file was
+    rewritten (never deleted). Proven by ``repro_inplace_save.py`` (ret=True,
+    err=0, warn=0, the active config persists on reopen).
+
+    ``geometry_changed`` gates the bump. Every in-place ``Save3`` rewrites fresh
+    save metadata -> a new md5, and the parent's doit dep is this file's md5, so an
+    unconditional save of an UNCHANGED assembly spuriously invalidates the parent
+    and cascades a no-op reconciliation refresh up the tree (see
+    ``_massprops_sidecar``). When the resolved-geometry fingerprint is unchanged we
+    therefore skip the save outright, leaving the ``.SLDASM`` byte-identical so the
+    parent stays valid. When it changed we force the rewrite even if SolidWorks
+    reports the doc clean (a reload of changed PART geometry leaves the assembly's
+    own data -- component refs + mates + transforms -- untouched, so ``GetSaveFlag``
+    can read false): ``SetSaveFlag`` + ``Save3`` push the new geometry's md5 to the
+    parent (codex review #5).
     """
     import pythoncom
     from win32com.client import VARIANT
 
     asm = adapter.currentModel
     sldasm = OUT_SLDASM / f"{asm_name}.SLDASM"
-    # A refresh that only reloaded changed PART geometry leaves the assembly's own
-    # data (component refs + mates + transforms) untouched, so SolidWorks can
-    # report the .SLDASM clean (GetSaveFlag false). But parent assemblies key off
-    # this file's md5 for two-hop propagation -- a refreshed channel.SLDASM MUST
-    # invalidate drive-train/harmonic-analyzer -- so force a rewrite rather than
-    # skip it: SetSaveFlag marks the doc dirty, and Save3 then writes fresh save
-    # metadata (new bytes -> new md5). The mtime assertion below proves the file
-    # was actually rewritten (codex review #5).
+    if not geometry_changed:
+        # No-op refresh: resolved geometry identical to the last save. Do NOT
+        # rewrite -- a fresh md5 here would invalidate the parent for nothing.
+        log(f"{sldasm.name}: geometry unchanged -- .SLDASM left intact (no md5 bump)")
+        return
+
     if not bool(adapter._attempt(lambda: asm.GetSaveFlag(), default=True)):
         log(f"{sldasm.name} reported clean -- forcing rewrite for md5 propagation")
         adapter._attempt(lambda: asm.SetSaveFlag(), default=None)
@@ -998,6 +1073,65 @@ def save_assembly_in_place(adapter: Any, asm_name: str) -> None:
     log(f"saved {sldasm.name} via Save3(Silent) (ret={ret}, err={err.value}, "
         f"warn={warn.value})")
 
+def _rebuild_faults(adapter: Any) -> list[str]:
+    """Non-warning What's Wrong entries for the active model, formatted for a log."""
+    return [
+        f"{name} [{_FEATURE_ERROR.get(code, code)}]"
+        for name, code, warn in whats_wrong(adapter, adapter.currentModel)
+        if not warn
+    ]
+
+
+def select_mates_folder(adapter: Any) -> bool:
+    """Select the active assembly's Mates folder -- the precondition for
+    ``IAssemblyDoc.AutoMateRepair``. The folder is a ``MateGroup`` feature that sits
+    at/near the END of the top-level tree, so scan from the back (a couple of COM
+    round-trips) instead of walking all ~150 component features forward (~50 s).
+    Falls back to a full forward walk if an in-context feature pushed it off the
+    tail."""
+    model = adapter.currentModel
+    count = int(adapter._attempt(lambda: model.GetFeatureCount(), default=0) or 0)
+    for i in range(min(count, 8)):  # MateGroup is the last top-level feature (i=0)
+        feat = adapter._attempt(lambda i=i: model.FeatureByPositionReverse(i), default=None)
+        if feat is None:
+            continue
+        _flag(feat, "IFeature")
+        if str(adapter._attempt(lambda f=feat: f.GetTypeName2(), default="")) == "MateGroup":
+            return bool(adapter._attempt(lambda f=feat: f.Select2(False, 0), default=False))
+    feat = adapter._attempt(lambda: model.FirstFeature(), default=None)
+    while feat is not None:
+        _flag(feat, "IFeature")
+        if str(adapter._attempt(lambda f=feat: f.GetTypeName2(), default="")) == "MateGroup":
+            return bool(adapter._attempt(lambda f=feat: f.Select2(False, 0), default=False))
+        feat = adapter._attempt(lambda f=feat: f.GetNextFeature(), default=None)
+    return False
+
+
+def repair_dangling_mates(adapter: Any) -> int:
+    """Auto-heal mates whose referenced topology was re-IDed by a from-scratch part
+    rebuild (the "sharp edge"): ``IAssemblyDoc.AutoMateRepair`` re-binds the broken
+    mates in place (~5 s) instead of a ~500 s full re-insert/re-mate.
+
+    Returns the count AutoMateRepair reports as repaired. Its own return code is
+    ADVISORY ONLY -- it returns PartialSuccess with a large FailedMates array (the
+    assembly's already-valid mates, which it cannot "re-repair") even on a fully
+    successful heal -- so the CALLER must judge success from a fresh ``whats_wrong``
+    + the standard DOF/interference/health gates, never from this code.
+    """
+    asm = adapter.currentModel
+    _flag(asm, "IAssemblyDoc")
+    if not select_mates_folder(adapter):
+        log("AutoMateRepair: could not select the Mates folder -- skipping repair")
+        return 0
+    processed, failed = _byref_variant(), _byref_variant()
+    ret = adapter._attempt(lambda: asm.AutoMateRepair(processed, failed), default=-1)
+    n_proc = len(list(processed.value or [])) if processed.value is not None else 0
+    n_fail = len(list(failed.value or [])) if failed.value is not None else 0
+    log(f"AutoMateRepair: ret={ret} (1=PartialSuccess is normal) "
+        f"re-bound {n_proc} mate(s), {n_fail} already-valid skipped")
+    return n_proc
+
+
 async def refresh_assembly(
     adapter: Any, asm_name: str, views: Iterable[str] = DEFAULT_VIEWS
 ) -> dict[str, str]:
@@ -1010,14 +1144,18 @@ async def refresh_assembly(
     ~122 components a from-scratch ``create_assembly`` costs (~500 s). This is the
     cheap path of the incremental build graph (see ``dodo.py``).
 
-    Fail loud, no fallback. Every configuration is force-rebuilt and any
-    non-warning What's Wrong fault raises immediately, naming the config + the
-    broken feature/mate. Then the rest/export pose is re-activated and the
+    Self-healing, then fail loud. Every configuration is force-rebuilt. A
+    non-warning What's Wrong fault -- typically a mate dangled because a
+    from-scratch part rebuild re-IDed the face it selected -- first triggers an
+    in-place ``AutoMateRepair`` (the broken mates re-bind in ~5 s instead of a
+    ~500 s full re-insert/re-mate); only if the re-read is STILL faulted does the
+    refresh raise, naming the config + the broken feature/mate. Then the
+    rest/export pose is re-activated and the
     standard gates run: ``assert_components_fully_defined`` (free DOF),
     ``check_no_interference`` (overlaps), ``assert_model_healthy`` (deep mate
     health). Any gate raises a ``RuntimeError`` naming the culprit and the
-    ``.SLDASM`` is left untouched (the in-place save never runs) -- so a
-    re-authored part that re-IDed a mated face (dangling mate) or a geometry
+    ``.SLDASM`` is left untouched (the in-place save never runs) -- so an
+    UNHEALABLE dangling mate (AutoMateRepair could not re-bind it) or a geometry
     change that grows into a neighbour (interference) HALTS the build rather than
     saving a stale/broken artefact. The caller escalates to a full from-scratch
     rebuild via the ``full`` escape (delete the target + ``doit assembly:<stem>``).
@@ -1038,19 +1176,28 @@ async def refresh_assembly(
     # config-specific break (a config whose mesh entity moved) is caught here, not
     # silently saved. Any under-defined-by-design config is NOT a fault --
     # whats_wrong reports feature/mate rebuild errors, not free DOF.
+    repaired_any = False
     for cfg in configs:
         check(f"activate {cfg}", await adapter.set_active_configuration(cfg))
         adapter._attempt(
             lambda: adapter.currentModel.ForceRebuild3(False), default=None)
-        faults = [
-            f"{name} [{_FEATURE_ERROR.get(code, code)}]"
-            for name, code, warn in whats_wrong(adapter, adapter.currentModel)
-            if not warn
-        ]
+        faults = _rebuild_faults(adapter)
+        if faults:
+            # The sharp edge: a from-scratch part rebuild re-IDs the faces its mates
+            # selected, dangling them. Auto-heal in place with AutoMateRepair before
+            # failing, then rebuild + re-read. Success is judged by the CLEAN re-read
+            # below + the standard gates -- not by AutoMateRepair's own return code.
+            log(f"refresh {asm_name}: configuration {cfg!r} has {len(faults)} "
+                f"rebuild fault(s) (dangling mate / re-IDed face?); auto-healing ...")
+            repaired_any = repair_dangling_mates(adapter) > 0 or repaired_any
+            adapter._attempt(
+                lambda: adapter.currentModel.ForceRebuild3(False), default=None)
+            faults = _rebuild_faults(adapter)
         if faults:
             raise RuntimeError(
-                f"refresh {asm_name}: configuration {cfg!r} has rebuild faults "
-                f"after reloading parts (dangling mate / re-IDed face?): "
+                f"refresh {asm_name}: configuration {cfg!r} STILL has rebuild faults "
+                f"after AutoMateRepair (unhealable -- escalate to a full rebuild: "
+                f"delete the .SLDASM target + `doit assembly:{asm_name}`): "
                 + ", ".join(faults))
         log(f"refresh {asm_name}: configuration {cfg} rebuilt clean")
 
@@ -1064,8 +1211,27 @@ async def refresh_assembly(
     check_no_interference(adapter)
     assert_model_healthy(adapter, label=asm_name, deep=True)
 
-    set_isometric_view(adapter)  # save on isometric so the refreshed .SLDASM opens isometric
-    save_assembly_in_place(adapter, asm_name)
+    # Decide whether this refresh actually changed the resolved geometry before
+    # saving: an in-place Save3 always rewrites a fresh md5, which would invalidate
+    # the parent even for a no-op reload of unchanged parts. Gate the bump on the
+    # mass-properties fingerprint so a true no-op leaves the .SLDASM byte-stable.
+    # A successful AutoMateRepair ALSO forces the save even when the fingerprint is
+    # unchanged (a PID-churn-only rebuild): the re-bound mate PIDs MUST persist, or
+    # every later refresh re-dangles and re-heals the same mates forever.
+    digest = await assembly_geometry_digest(adapter, asm_name)
+    sidecar = _massprops_sidecar(asm_name)
+    try:
+        prev = sidecar.read_text(encoding="utf-8").strip()
+    except OSError:
+        prev = None
+    geometry_changed = prev != digest or repaired_any
+
+    if geometry_changed:
+        set_isometric_view(adapter)  # opens isometric; only when we actually re-save
+    save_assembly_in_place(adapter, asm_name, geometry_changed)
+    sidecar.parent.mkdir(parents=True, exist_ok=True)
+    sidecar.write_text(digest + "\n", encoding="utf-8")
+
     artefacts = {"assembly": str(asm_path)}
     artefacts.update(await _export_assembly_images(adapter, asm_name, views))
     return artefacts
