@@ -12,8 +12,9 @@ X) shows the trapezoid taper; the **Top** view (along Y) shows the two channels,
 the central web, and the four foot holes.
 
 The original is hand-built; this rebuilds it feature-for-feature (matching the
-seven-feature tree Boss-Extrude1 -> Cut-Extrude2/3/4 -> Fillet3 -> Tapped Holes
--> Chamfer2) rather than as a simplified parametric equivalent. The trapezoid +
+tree Boss-Extrude1 -> Cut-Extrude2/3/4 -> Fillet3 -> 9/16-12 Tapped Hole1
+(HoleWzd) -> Chamfer2) rather than as a simplified parametric equivalent. The
+trapezoid +
 the three window cuts all live on the **Right plane** (sketch-x -> model Z taper,
 sketch-y -> model Y height) and extrude mid-plane along X; the per-stage
 ``volume_check`` targets are the real part's measured volumes (rotation-invariant,
@@ -29,17 +30,32 @@ Y = height with the wide foot at Y=-88.9, Z = wall thickness / window depth):
 * **Boss** -- trapezoid, wide foot ``Z ±31.75`` at ``Y=-88.9`` tapering to
   ``Z ±8.4665`` at ``Y=+88.9``; mid-plane extrude 177.8 (``X ±88.9``).
 * **Cut-Extrude2** -- 127 mm square (``±63.5`` in Y,Z), mid-plane depth 127 ->
-  the central cavity, leaving 6.35 mm shell walls.
-* **Cut-Extrude3 / 4** -- the -Z then +Z half of the 165.1 mm square
-  (``±82.55``), mid-plane depth 165.1 -> the two side windows, leaving the
-  central square-ring frame web at ``Z ±3.175``.
+  the central cavity, leaving 6.35 mm shell walls (whole ``Sketch12`` profile).
+* **Cut-Extrude3 / 4** -- the -Z then +Z window of ONE shared sketch
+  (``Sketch11``: the two 165.1 mm-tall window rectangles, left at Z -82.55..
+  -3.175 and right at Z +3.175..+82.55, drawn as two closed contours), mid-plane
+  depth 165.1 -> the two side windows, leaving the central web. Each cut consumes
+  one contour via contour-object selection, so the source's
+  two-sketches-feed-three-cuts tree is reproduced.
 * **Fillet3** -- R12.7 on the four inner-frame corner edges (concave: adds
   material).
-* **Holes** -- 4x Ø12.3 tap-drill (9/16-12 tapped) up through the foot, on the
-  Top plane at ``(X ±60.32, Z ±17.46)``, bored along Y.
+* **9/16-12 Tapped Hole1** -- a single Hole Wizard (``HoleWzd``) feature, 4x
+  9/16-12 ANSI-inch bottoming tapped holes (Ø12.30376 tap drill), drilled up
+  through the foot from the bottom face (Y=-88.9) at ``(X ±60.32, Z ±17.46)``,
+  through-next. One feature with four placement points, matching the source
+  (no separate placement Sketch5).
 * **Chamfer2** -- 1.27 mm / 45° on the 12 inner-frame opening edges plus the
   two slant faces, the two trapezoid (±X) faces, and one fillet face, with
   tangent propagation -- i.e. the whole window rim.
+
+Like the 71 tracked parts, this is **equation-driven and self-naming**: six
+equation-manager globals (``FootHalf``/``TopHalf``/``HalfHeight``/``CavHalf``/
+``WindowOuter``/``Web``, all ``mm``) drive every profile sketch's dimensions
+(named e.g. ``WallHeight@Sketch1``, ``WinLSpan@Sketch11``), the sketches and
+features carry stable names, and the drive equations are applied in one deferred
+batch after a rebuild. A final "equations neutral" ``volume_check`` proves the
+driving did not move the geometry, so a GUI edit to a global reshapes the part
+and round-trips. See ``build_top_frame.py`` for the reference pattern.
 
 Run (SolidWorks already open)::
 
@@ -51,13 +67,21 @@ from __future__ import annotations
 import sys
 
 from _common import (
+    SketchDims,
     add_line_chain,
     apply_material,
     check,
+    define_centered_rectangle,
+    define_polygon_chain,
+    define_rectilinear_chain,
+    drive_dimension,
+    ensure_fully_defined,
+    force_rebuild,
     name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_global,
     volume_check,
 )
 
@@ -83,8 +107,15 @@ FILLET_EDGES = [  # four inner-frame corner edges (run along Z through the web)
     [63.5, -63.5, 0.0], [-63.5, -63.5, 0.0],
 ]
 
-HOLE_DIA = 12.3    # 9/16-12 tap-drill diameter
 HOLES = [(60.32, 17.46), (-60.32, 17.46), (60.32, -17.46), (-60.32, -17.46)]
+# Hole Wizard constants (resolved from the SW type library on this seat):
+SW_FM_HOLE_WZD = 25            # swFeatureNameID_e.swFmHoleWzd (CreateDefinition)
+SW_WZD_TAP = 4                 # swWzdGeneralHoleTypes_e.swWzdTap (straight tap)
+SW_STD_ANSI_INCH = 0           # swWzdHoleStandards_e.swStandardAnsiInch
+SW_HOLE_FASTENER_TYPE = 26     # ANSI-inch "Bottoming Tapped Hole"
+SW_END_THROUGH_NEXT = 2        # swEndCondThroughNext / swEndThreadTypeTHROUGH_NEXT
+HOLE_SSIZE = "9/16-12"
+HOLE_THREAD_CLASS = "1B"
 
 CHAMFER = 1.27     # leg, 45°
 CHAMFER_EDGES = [  # 12 inner-frame opening edges, both web faces (Z = ±WEB)
@@ -100,55 +131,333 @@ CHAMFER_FACES = [  # whole faces whose every edge is chamfered (tangent-propagat
 ]
 
 
+def _flag(obj, iface: str) -> None:
+    from solidworks_mcp.adapters import sw_type_info
+    try:
+        sw_type_info.flag_methods(obj, iface)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _find_sketch(model, name: str):
+    """Return the ISketch named ``name`` (rename-proof live-name walk)."""
+    f = model.FirstFeature()
+    while f is not None:
+        _flag(f, "IFeature")
+        if str(f.Name) == name:
+            sk = f.GetSpecificFeature2()
+            _flag(sk, "ISketch")
+            return sk
+        f = f.GetNextFeature()
+    return None
+
+
+def _contour_centroid_z(contour) -> float:
+    """Average model-Z (sketch-local x, mm) of a contour's segment endpoints."""
+    xs: list[float] = []
+    for s in (contour.GetSketchSegments() or []):
+        _flag(s, "ISketchLine")
+        for getter in ("GetStartPoint2", "GetEndPoint2"):
+            try:
+                p = getattr(s, getter)()
+                _flag(p, "ISketchPoint")
+                xs.append(p.X * 1000.0)
+            except Exception:  # noqa: BLE001
+                pass
+    return sum(xs) / len(xs) if xs else 0.0
+
+
+def _cut_window(adapter, sketch_name: str, sign: int, depth_mm: float):
+    """Cut ONE window contour of a shared sketch, selected by the SIGN of its
+    centroid Z (-1 = the -Z window, +1 = the +Z window).
+
+    This is how cut3/cut4 share a single sketch: each selects its own closed
+    contour OBJECT (``ISketchContour.Select`` with mark 0) and cuts it with a
+    raw mid-plane ``FeatureCut4``. SKETCHREGION-by-point selection does not
+    resolve on this seat, and the adapter's whole-sketch cut would consume both
+    windows -- contour-object selection is the reliable path to a shared sketch.
+    """
+    model = adapter.currentModel
+    _flag(model, "IModelDoc2")
+    fm = model.FeatureManager
+    _flag(fm, "IFeatureManager")
+
+    sk = _find_sketch(model, sketch_name)
+    if sk is None:
+        raise RuntimeError(f"{sketch_name!r} not found")
+    chosen = None
+    for c in (sk.GetSketchContours() or []):
+        _flag(c, "ISketchContour")
+        if _contour_centroid_z(c) * sign > 10.0:
+            chosen = c
+            break
+    if chosen is None:
+        raise RuntimeError(f"{sketch_name}: no contour on side sign={sign}")
+
+    model.ClearSelection2(True)
+    if not chosen.Select(False, 0):
+        raise RuntimeError(f"{sketch_name}: contour Select failed")
+
+    mid = adapter.constants["swEndCondMidPlane"]
+    blind = adapter.constants["swEndCondBlind"]
+    t0 = adapter.constants.get("swStartSketchPlane", 0)
+    depth_m = depth_mm / 1000.0
+    # 27-param FeatureCut4 (verified on this seat); 26-param is the SW-2025 form.
+    args27 = (True, False, False, mid, blind, depth_m, 0.0,
+              False, False, False, False, 0.0, 0.0,
+              False, False, False, False, False,
+              False, True, False, False, False, t0, 0.0, False, False)
+    feat = adapter._attempt(lambda: fm.FeatureCut4(*args27), default=None)
+    if not feat:
+        feat = adapter._attempt(lambda: fm.FeatureCut4(*args27[:-1]), default=None)
+    model.ClearSelection2(True)
+    if not feat:
+        raise RuntimeError(f"{sketch_name}: FeatureCut4 (sign={sign}) failed")
+    return feat
+
+
+def _find_bottom_face(model, holes_xz, y_face_mm: float):
+    """Return the planar foot bottom face (normal ~ (0,-1,0)) whose bounding box
+    spans all ``holes_xz`` -- the face the holes are drilled from.
+
+    SelectByID2 by coordinate is unreliable here: a point on the Y=-88.9 plane
+    resolves to the ±X trapezoid end faces (which also touch that plane), so the
+    drill axis comes out along X. Selecting the face OBJECT found by enumeration
+    is the reliable path.
+    """
+    body = (model.GetBodies2(0, False) or [None])[0]
+    _flag(body, "IBody2")
+    best = None
+    for f in (body.GetFaces() or []):
+        _flag(f, "IFace2")
+        try:
+            n = tuple(f.Normal)
+        except Exception:  # noqa: BLE001
+            continue
+        if not (abs(n[0]) < 0.01 and n[1] < -0.99 and abs(n[2]) < 0.01):
+            continue
+        box = [v * 1000 for v in f.GetBox()]
+        if abs(box[1] - y_face_mm) > 1.0:  # not on the foot bottom plane
+            continue
+        spans = all(box[0] - 1 <= hx <= box[3] + 1 and box[2] - 1 <= hz <= box[5] + 1
+                    for hx, hz in holes_xz)
+        if spans and (best is None or f.GetArea() > best.GetArea()):
+            best = f
+    return best
+
+
+def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
+    """Create ONE Hole Wizard (HoleWzd) feature with a placement point at each
+    of ``holes_xz`` (model X,Z in mm), drilled from the foot bottom face at
+    ``y_face_mm``.
+
+    The face is selected as an OBJECT (coordinate selection mis-resolves to the
+    ±X end faces). The wizard is created on that face (one auto point), then its
+    placement sketch is edited: the auto point is moved to hole #0 (SetCoords)
+    and the other points are added (model->sketch via the sketch's
+    ModelToSketchTransform; MathUtility is marshalled with an explicit VARIANT
+    array since a bare Python list does not pass as a safearray). Rebuilt: one
+    HoleWzd feature, N holes, matching the source tree (no separate placement
+    sketch in the design tree).
+    """
+    import pythoncom
+    from win32com.client import VARIANT
+
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    model = adapter.currentModel
+    _flag(model, "IModelDoc2")
+    fm = model.FeatureManager
+    _flag(fm, "IFeatureManager")
+
+    data = fm.CreateDefinition(SW_FM_HOLE_WZD)
+    _flag(data, "IWizardHoleFeatureData2")
+    data.InitializeHole(
+        SW_WZD_TAP, SW_STD_ANSI_INCH, SW_HOLE_FASTENER_TYPE,
+        HOLE_SSIZE, SW_END_THROUGH_NEXT)
+    for prop, val in (("ThreadClass", HOLE_THREAD_CLASS),
+                      ("EndCondition", SW_END_THROUGH_NEXT),
+                      ("ThreadEndCondition", SW_END_THROUGH_NEXT)):
+        try:
+            setattr(data, prop, val)
+        except Exception:  # noqa: BLE001
+            pass
+
+    bottom = _find_bottom_face(model, holes_xz, y_face_mm)
+    if bottom is None:
+        raise RuntimeError("hole wizard: foot bottom face not found")
+    model.ClearSelection2(True)
+    if not bottom.Select2(False, 0):
+        raise RuntimeError("hole wizard: bottom face Select failed")
+    feat = fm.CreateFeature(data)
+    if feat is None:
+        raise RuntimeError("hole wizard: CreateFeature returned None")
+    _flag(feat, "IFeature")
+
+    # locate the wizard's 1-point placement sketch
+    place_sk = place_name = None
+    sub = feat.GetFirstSubFeature()
+    while sub is not None:
+        _flag(sub, "IFeature")
+        if str(sub.GetTypeName2()) == "ProfileFeature":
+            sk = sub.GetSpecificFeature2()
+            _flag(sk, "ISketch")
+            if len(sk.GetSketchPoints2() or []) == 1:
+                place_sk, place_name = sk, str(sub.Name)
+                break
+        sub = sub.GetNextSubFeature()
+    if place_sk is None:
+        raise RuntimeError("hole wizard: placement sketch not found")
+
+    math = adapter.swApp.GetMathUtility()
+    _flag(math, "IMathUtility")
+    xform = place_sk.ModelToSketchTransform  # model -> sketch
+    _flag(xform, "IMathTransform")
+    y_face = y_face_mm / 1000.0
+
+    def _sketch_xy(hx, hz):
+        arr = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8,
+                      [hx / 1000.0, y_face, hz / 1000.0])
+        mpt = math.CreatePoint(arr)
+        _flag(mpt, "IMathPoint")
+        spt = mpt.MultiplyTransform(xform)
+        _flag(spt, "IMathPoint")
+        return list(spt.ArrayData)[:3]
+
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+            place_name, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0):
+        raise RuntimeError(f"hole wizard: cannot edit {place_name}")
+    model.EditSketch()
+    sm = model.SketchManager
+    _flag(sm, "ISketchManager")
+    auto = (place_sk.GetSketchPoints2() or [None])[0]
+    _flag(auto, "ISketchPoint")
+    sx, sy, sz = _sketch_xy(*holes_xz[0])
+    auto.SetCoords(sx, sy, sz)  # move auto point to hole #0
+    for hx, hz in holes_xz[1:]:
+        sx, sy, sz = _sketch_xy(hx, hz)
+        sm.CreatePoint(sx, sy, sz)
+    model.EditSketch()  # toggle out of the placement sketch
+    model.EditRebuild3()
+
+    npts = len(place_sk.GetSketchPoints2() or [])
+    if npts != len(holes_xz):
+        raise RuntimeError(
+            f"hole wizard: expected {len(holes_xz)} placement points, got {npts}")
+    return feat
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
+    # Editable knobs: named equation-manager globals (mm) that drive every
+    # profile sketch's dimensions, so a GUI edit to a global reshapes the part
+    # and round-trips into the script (same self-naming treatment as the 71
+    # tracked parts -- see build_top_frame.py). Lengths carry an explicit `mm`:
+    # the part is modelled inch, and the equation manager evaluates bare numbers
+    # in DOCUMENT units, so an unsuffixed global would be read as inches.
+    await set_global(adapter, "FootHalf", f"{WIDE}mm")      # trapezoid foot half-width (Z)
+    await set_global(adapter, "TopHalf", f"{NARROW}mm")     # trapezoid top half-width (Z)
+    await set_global(adapter, "HalfHeight", f"{HALF_Y}mm")  # trapezoid half-height (Y)
+    await set_global(adapter, "CavHalf", f"{CAV}mm")        # cavity square half
+    await set_global(adapter, "WindowOuter", f"{BIG}mm")    # window square half
+    await set_global(adapter, "Web", f"{WEB}mm")            # central web half-thickness
+
+    # Each sketch records its dim names + drive equations inline as it is drawn
+    # (per-sketch SketchDims); the (dim@feature, expr) jobs are collected here and
+    # applied in ONE deferred batch after the whole model + a rebuild exist, so
+    # every equation target resolves. The neutrality volume_check at the end is
+    # the proof that driving did not move the geometry.
+    drive_jobs: list[tuple[str, str]] = []
+
     # 1. Boss: trapezoid on the Right plane (sketch-x -> model Z, sketch-y ->
     #    model Y, so the wide foot sits at Y=-88.9), mid-plane extruded 177.8
-    #    along X.
+    #    along X. A polygon chain (two slanted sides) anchored at the foot's
+    #    -Z corner; the six dims drive off FootHalf/TopHalf/HalfHeight.
+    trap = SketchDims()
     check("sketch boss", await adapter.create_sketch("Right"))
-    await add_line_chain(adapter, [
-        (-WIDE, -HALF_Y), (WIDE, -HALF_Y), (NARROW, HALF_Y), (-NARROW, HALF_Y),
-    ])
+    trap_pts = [(-WIDE, -HALF_Y), (WIDE, -HALF_Y), (NARROW, HALF_Y), (-NARROW, HALF_Y)]
+    trap_lines = await add_line_chain(adapter, trap_pts)
+    await define_polygon_chain(
+        adapter, trap_lines, trap_pts, anchor=0, label="trapezoid", dims=trap,
+        names=["FootAnchorZ", "FootAnchorY", "FootSpan", "TaperRun",
+               "WallHeight", "TopSpan"],
+        drives=['"FootHalf"', '"HalfHeight"', '2 * "FootHalf"',
+                '"FootHalf" - "TopHalf"', '2 * "HalfHeight"', '2 * "TopHalf"'],
+    )
+    await ensure_fully_defined(adapter, "trapezoid")
     check("exit boss", await adapter.exit_sketch())
     name_last_feature(adapter, "Sketch1")
+    drive_jobs += trap.apply(adapter, "Sketch1")
     check("boss", await adapter.create_extrusion(
         ExtrusionParameters(depth=BOSS_DEPTH, both_directions=True)))
     name_last_feature(adapter, "Boss-Extrude1")
     await volume_check(adapter, "Boss-Extrude1", 1_271_363, 200)
 
-    # 2. Cut-Extrude2: 127 mm square, mid-plane 127 -> central cavity.
-    check("sketch cut2", await adapter.create_sketch("Right"))
-    await add_line_chain(adapter, [(-CAV, -CAV), (CAV, -CAV), (CAV, CAV), (-CAV, CAV)])
-    check("exit cut2", await adapter.exit_sketch())
-    name_last_feature(adapter, "Sketch2")
+    # 2-4. Two sketches drive three cuts, exactly as the source tree does:
+    #   * Sketch11 -- the two 165.1 mm-tall window rectangles (left at Z -82.55..
+    #     -3.175, right at Z +3.175..+82.55), drawn as two closed contours in one
+    #     sketch. Cut-Extrude3 and Cut-Extrude4 each consume ONE contour of this
+    #     SAME sketch, so SolidWorks shares it: it appears once in the tree and
+    #     the second reference shows as "Sketch11<n>". The central web at Z=±WEB
+    #     is the gap left between the two rectangles. Both rectangles drive off
+    #     WindowOuter/Web (one SketchDims spans the eight dims).
+    #   * Sketch12 -- the 127 mm cavity square; Cut-Extrude2 consumes it whole.
+    # Built in the source's creation order (Sketch11, then Sketch12) and cut in
+    # the source's order (cavity, then the two windows).
+    windows = SketchDims()
+    check("sketch windows", await adapter.create_sketch("Right"))
+    nz_pts = [(-BIG, -BIG), (-WEB, -BIG), (-WEB, BIG), (-BIG, BIG)]   # -Z window
+    nz_lines = await add_line_chain(adapter, nz_pts)
+    await define_rectilinear_chain(
+        adapter, nz_lines, nz_pts, anchor=0, label="window -Z", dims=windows,
+        names=["WinLSpan", "WinLHeight", "WinLAnchorZ", "WinLAnchorY"],
+        drives=['"WindowOuter" - "Web"', '2 * "WindowOuter"',
+                '"WindowOuter"', '"WindowOuter"'],
+    )
+    pz_pts = [(WEB, -BIG), (BIG, -BIG), (BIG, BIG), (WEB, BIG)]       # +Z window
+    pz_lines = await add_line_chain(adapter, pz_pts)
+    await define_rectilinear_chain(
+        adapter, pz_lines, pz_pts, anchor=0, label="window +Z", dims=windows,
+        names=["WinRSpan", "WinRHeight", "WinRAnchorZ", "WinRAnchorY"],
+        drives=['"WindowOuter" - "Web"', '2 * "WindowOuter"',
+                '"Web"', '"WindowOuter"'],
+    )
+    await ensure_fully_defined(adapter, "windows")
+    check("exit windows", await adapter.exit_sketch())
+    name_last_feature(adapter, "Sketch11")
+    drive_jobs += windows.apply(adapter, "Sketch11")
+
+    cavity = SketchDims()
+    check("sketch cavity", await adapter.create_sketch("Right"))
+    await define_centered_rectangle(
+        adapter, CAV, CAV, "cavity", dims=cavity,
+        name_width="CavWidth", drive_width='2 * "CavHalf"',
+        name_depth="CavDepth", drive_depth='2 * "CavHalf"',
+        name_corner=("CavCornerZ", "CavCornerY"),
+        drive_corner=('"CavHalf"', '"CavHalf"'),
+    )
+    await ensure_fully_defined(adapter, "cavity")
+    check("exit cavity", await adapter.exit_sketch())
+    name_last_feature(adapter, "Sketch12")
+    drive_jobs += cavity.apply(adapter, "Sketch12")
+
+    # Cut-Extrude2: cavity -- whole Sketch12 profile (the last unconsumed sketch).
     check("cut2", await adapter.create_cut_extrude(
         ExtrusionParameters(depth=CAV_DEPTH, both_directions=True)))
     name_last_feature(adapter, "Cut-Extrude2")
     await volume_check(adapter, "Cut-Extrude2", 622_708, 200)
 
-    # 3. Cut-Extrude3: -Z half of the 165.1 mm square, mid-plane 165.1 -> one
-    #    window (leaves the web at Z=-WEB).
-    check("sketch cut3", await adapter.create_sketch("Right"))
-    await add_line_chain(adapter, [
-        (-BIG, -BIG), (-WEB, -BIG), (-WEB, BIG), (-BIG, BIG)])
-    check("exit cut3", await adapter.exit_sketch())
-    name_last_feature(adapter, "Sketch3")
-    check("cut3", await adapter.create_cut_extrude(
-        ExtrusionParameters(depth=BIG_DEPTH, both_directions=True)))
+    # Cut-Extrude3: -Z window -- the left contour of the shared Sketch11.
+    _cut_window(adapter, "Sketch11", sign=-1, depth_mm=BIG_DEPTH)
     name_last_feature(adapter, "Cut-Extrude3")
     await volume_check(adapter, "Cut-Extrude3", 434_257, 200)
 
-    # 4. Cut-Extrude4: +Z half, mid-plane 165.1 -> the other window.
-    check("sketch cut4", await adapter.create_sketch("Right"))
-    await add_line_chain(adapter, [
-        (WEB, -BIG), (BIG, -BIG), (BIG, BIG), (WEB, BIG)])
-    check("exit cut4", await adapter.exit_sketch())
-    name_last_feature(adapter, "Sketch4")
-    check("cut4", await adapter.create_cut_extrude(
-        ExtrusionParameters(depth=BIG_DEPTH, both_directions=True)))
+    # Cut-Extrude4: +Z window -- the right contour of the SAME Sketch11 (shared).
+    _cut_window(adapter, "Sketch11", sign=1, depth_mm=BIG_DEPTH)
     name_last_feature(adapter, "Cut-Extrude4")
     await volume_check(adapter, "Cut-Extrude4", 245_806, 200)
 
@@ -157,16 +466,14 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Fillet3")
     await volume_check(adapter, "Fillet3", 246_685, 200)
 
-    # 6. Holes: 4x Ø12.3 on the Top plane, both-directions deep. Only the foot
-    #    band (Y -88.9..-82.55) carries material along the bore, so this drills
-    #    the tapped-hole through-bores. (Cosmetic 9/16-12 thread not modeled.)
-    check("sketch holes", await adapter.create_sketch("Top"))
-    for hx, hy in HOLES:
-        check(f"hole ({hx},{hy})", await adapter.add_circle(hx, hy, HOLE_DIA / 2.0))
-    check("exit holes", await adapter.exit_sketch())
-    name_last_feature(adapter, "Sketch5")
-    check("cut holes", await adapter.create_cut_extrude(
-        ExtrusionParameters(depth=200.0, both_directions=True)))
+    # 6. 9/16-12 Tapped Hole1: ONE Hole Wizard (HoleWzd) feature with four
+    #    placement points, 9/16-12 ANSI-inch bottoming tapped holes drilled up
+    #    through the foot from the bottom face (Y=-HALF_Y) at (X ±60.32, Z ±17.46),
+    #    through-next. Only the 6.35 mm foot tip (Y -88.9..-82.55) carries
+    #    material along the bore -- the window cuts opened everything above -- so
+    #    through-next drills exactly that band, matching the source's measured
+    #    volume. One feature, no separate placement sketch (matches the source).
+    _drill_tapped_holes(adapter, HOLES, y_face_mm=-HALF_Y)
     name_last_feature(adapter, "9/16-12 Tapped Hole1")
     await volume_check(adapter, "Holes", 243_665, 200)
 
@@ -177,6 +484,16 @@ async def build(adapter) -> dict[str, str]:
         CHAMFER, CHAMFER_EDGES, face_points=CHAMFER_FACES, tangent_propagation=True))
     name_last_feature(adapter, "Chamfer2")
     await volume_check(adapter, "Chamfer2", 240_512, 200)
+
+    # Apply the deferred drive equations now that the whole model + a rebuild
+    # exist, so every named-dim target resolves. Each equation evaluates to the
+    # value just built, so the geometry must not move -- the re-check below is
+    # the proof (same final volume as Chamfer2 above).
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "driven part (equations neutral)", 240_512, 200)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
