@@ -476,8 +476,17 @@ def _assembly_cache_outputs(stem: str) -> list[Path]:
     """Everything an assembly build emits beyond its file_dep: the .SLDASM + renders,
     plus the per-stem extras a hit would otherwise leave missing/stale -- the channel
     stretch-spring components, and the top assembly's gallery PNGs + parts BOM (which
-    export_gallery_and_bom writes into cad/out, OUTSIDE _png_dir)."""
-    outs = [Path(_sldasm(stem)), _png_dir(stem)]
+    export_gallery_and_bom writes into cad/out, OUTSIDE _png_dir).
+
+    Includes the `.<stem>.massprops.sha` fingerprint sidecar (refresh_assembly's
+    no-save key): unlike the path-tagged recipe sidecar it is machine-independent
+    content (a geometry hash), so it MUST ride the cache -- else a clean cache
+    consumer restores the .SLDASM without it, the next refresh takes the missing-
+    sidecar path, force-saves a no-op .SLDASM, and reintroduces the parent-md5
+    cascade this whole mechanism exists to kill (codex review on #83)."""
+    sldasm = Path(_sldasm(stem))
+    massprops = sldasm.parent / f".{sldasm.stem}.massprops.sha"
+    outs = [sldasm, _png_dir(stem), massprops]
     if stem == "channel":
         outs += _channel_spring_variants()
     if stem == "harmonic_analyzer":
