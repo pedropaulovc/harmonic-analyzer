@@ -14,11 +14,12 @@ the central web, and the four foot holes.
 The original is hand-built; this rebuilds it feature-for-feature (matching the
 tree Boss-Extrude1 -> Cut-Extrude2/3/4 -> Fillet3 -> 9/16-12 Tapped Hole1
 (HoleWzd) -> Chamfer2) rather than as a simplified parametric equivalent. The
-trapezoid +
-the three window cuts all live on the **Right plane** (sketch-x -> model Z taper,
-sketch-y -> model Y height) and extrude mid-plane along X; the per-stage
-``volume_check`` targets are the real part's measured volumes (rotation-invariant,
-so unchanged by orientation), so any geometry drift fails loudly:
+the trapezoid lives on the **Right plane** (sketch-x -> model Z taper, sketch-y
+-> model Y height, mid-plane extrude along X); the window/cavity cuts use SINGLE
+origin-centred squares on the **Front plane** (matching the source's Sketch11/
+Sketch12). The per-stage ``volume_check`` targets are the real part's measured
+volumes (rotation-invariant, so unchanged by orientation), so any geometry drift
+fails loudly:
 
     Boss-Extrude1 1 271 363 | Cut-Extrude2 622 708 | Cut-Extrude3 434 257
     Cut-Extrude4   245 806 | Fillet3      246 685 | Holes        243 665
@@ -29,14 +30,14 @@ Y = height with the wide foot at Y=-88.9, Z = wall thickness / window depth):
 
 * **Boss** -- trapezoid, wide foot ``Z ±31.75`` at ``Y=-88.9`` tapering to
   ``Z ±8.4665`` at ``Y=+88.9``; mid-plane extrude 177.8 (``X ±88.9``).
-* **Cut-Extrude2** -- 127 mm square (``±63.5`` in Y,Z), mid-plane depth 127 ->
-  the central cavity, leaving 6.35 mm shell walls (whole ``Sketch12`` profile).
-* **Cut-Extrude3 / 4** -- the -Z then +Z window of ONE shared sketch
-  (``Sketch11``: the two 165.1 mm-tall window rectangles, left at Z -82.55..
-  -3.175 and right at Z +3.175..+82.55, drawn as two closed contours), mid-plane
-  depth 165.1 -> the two side windows, leaving the central web. Each cut consumes
-  one contour via contour-object selection, so the source's
-  two-sketches-feed-three-cuts tree is reproduced.
+* **Cut-Extrude2** -- 127 mm cavity square (``±63.5``), Through-All-Both -> the
+  central cavity, leaving 6.35 mm shell walls (whole ``Sketch12`` profile).
+* **Cut-Extrude3 / 4** -- ONE shared 165.1 mm window square (``Sketch11``,
+  ``±82.55``). Each cut is a Through-All that STARTS ``WEB`` (3.175) off the
+  sketch plane in the opposite direction (cut3 forward / cut4 reverse, cut4
+  re-selecting Sketch11 -> ``Sketch11<2>``), so the 2*WEB band between them
+  survives as the central web -- the source's ``FromOffsetDistance`` /
+  ``ReverseDirection`` pair, reproducing the two-sketches-feed-three-cuts tree.
 * **Fillet3** -- R12.7 on the four inner-frame corner edges (concave: adds
   material).
 * **9/16-12 Tapped Hole1** -- a single Hole Wizard (``HoleWzd``) feature, 4x
@@ -48,11 +49,11 @@ Y = height with the wide foot at Y=-88.9, Z = wall thickness / window depth):
   two slant faces, the two trapezoid (±X) faces, and one fillet face, with
   tangent propagation -- i.e. the whole window rim.
 
-Like the 71 tracked parts, this is **equation-driven and self-naming**: six
+Like the 71 tracked parts, this is **equation-driven and self-naming**: five
 equation-manager globals (``FootHalf``/``TopHalf``/``HalfHeight``/``CavHalf``/
-``WindowOuter``/``Web``, all ``mm``) drive every profile sketch's dimensions
-(named e.g. ``WallHeight@Sketch1``, ``WinLSpan@Sketch11``), the sketches and
-features carry stable names, and the drive equations are applied in one deferred
+``WindowOuter``, all ``mm``) drive every profile sketch's dimensions (named e.g.
+``WallHeight@Sketch1``, ``WinWidth@Sketch11``), the sketches and features carry
+stable names, and the drive equations are applied in one deferred
 batch after a rebuild. A final "equations neutral" ``volume_check`` proves the
 driving did not move the geometry, so a GUI edit to a global reshapes the part
 and round-trips. See ``build_top_frame.py`` for the reference pattern.
@@ -73,7 +74,6 @@ from _common import (
     check,
     define_centered_rectangle,
     define_polygon_chain,
-    define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -96,10 +96,8 @@ HALF_Y = 88.9      # trapezoid half-height (Y)
 BOSS_DEPTH = 177.8  # mid-plane extrude along X (X ±88.9)
 
 CAV = 63.5         # 127 mm square half (Cut-Extrude2)
-CAV_DEPTH = 127.0  # mid-plane cavity depth
 BIG = 82.55        # 165.1 mm square half (Cut-Extrude3/4)
-BIG_DEPTH = 165.1  # mid-plane window depth
-WEB = 3.175        # central web half-thickness (Z) left between the two windows
+WEB = 3.175        # window-cut start-offset; the 2*WEB band left as the web
 
 FILLET_R = 12.7
 FILLET_EDGES = [  # four inner-frame corner edges (run along Z through the web)
@@ -139,80 +137,76 @@ def _flag(obj, iface: str) -> None:
         pass
 
 
-def _find_sketch(model, name: str):
-    """Return the ISketch named ``name`` (rename-proof live-name walk)."""
-    f = model.FirstFeature()
-    while f is not None:
-        _flag(f, "IFeature")
-        if str(f.Name) == name:
-            sk = f.GetSpecificFeature2()
-            _flag(sk, "ISketch")
-            return sk
-        f = f.GetNextFeature()
-    return None
+def _add_construction_diagonals(adapter, half_mm: float) -> None:
+    """Add the two corner-to-corner CONSTRUCTION diagonals that the center-
+    rectangle tool draws, so a ``define_centered_rectangle`` square matches the
+    source sketch's segment set (4 real sides + 2 construction diagonals).
+
+    The diagonal endpoints sit on the square's existing corners (exact coords,
+    so the suppressed-inference DB merges them onto the corner vertices); pinned
+    to fully-defined corners, the diagonals add no DOF and the sketch stays
+    fully defined.
+    """
+    sm = adapter.currentSketchManager
+    _flag(sm, "ISketchManager")
+    h = half_mm / 1000.0
+    prev = bool(sm.AddToDB)
+    sm.AddToDB = True
+    try:
+        for (x1, y1), (x2, y2) in (((-h, -h), (h, h)), ((-h, h), (h, -h))):
+            seg = sm.CreateLine(x1, y1, 0.0, x2, y2, 0.0)
+            _flag(seg, "ISketchSegment")
+            seg.ConstructionGeometry = True
+    finally:
+        sm.AddToDB = prev
 
 
-def _contour_centroid_z(contour) -> float:
-    """Average model-Z (sketch-local x, mm) of a contour's segment endpoints."""
-    xs: list[float] = []
-    for s in (contour.GetSketchSegments() or []):
-        _flag(s, "ISketchLine")
-        for getter in ("GetStartPoint2", "GetEndPoint2"):
-            try:
-                p = getattr(s, getter)()
-                _flag(p, "ISketchPoint")
-                xs.append(p.X * 1000.0)
-            except Exception:  # noqa: BLE001
-                pass
-    return sum(xs) / len(xs) if xs else 0.0
+def _select_sketch(adapter, name: str) -> None:
+    """Select a sketch by name for the next feature (shared-sketch friendly: a
+    second select of an already-consumed sketch is how cut4 reuses Sketch11,
+    which SolidWorks then shows as ``Sketch11<2>``)."""
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+            name, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0):
+        raise RuntimeError(f"select sketch {name!r} failed")
 
 
-def _cut_window(adapter, sketch_name: str, sign: int, depth_mm: float):
-    """Cut ONE window contour of a shared sketch, selected by the SIGN of its
-    centroid Z (-1 = the -Z window, +1 = the +Z window).
+def _cut_through_all(adapter, sketch_name: str, *, both: bool, reverse_dir: bool,
+                     start_offset_mm: float = 0.0, flip_start: bool = False):
+    """Through-all ``FeatureCut4`` on the named sketch.
 
-    This is how cut3/cut4 share a single sketch: each selects its own closed
-    contour OBJECT (``ISketchContour.Select`` with mark 0) and cuts it with a
-    raw mid-plane ``FeatureCut4``. SKETCHREGION-by-point selection does not
-    resolve on this seat, and the adapter's whole-sketch cut would consume both
-    windows -- contour-object selection is the reliable path to a shared sketch.
+    ``both`` -> Through-All-Both (the cavity). A single-direction cut with
+    ``start_offset_mm`` reproduces the windows: each window cut shares one
+    centered ``Sketch11`` square but STARTS ``start_offset_mm`` off the sketch
+    plane (cut3 forward / cut4 reverse, opposite ``flip_start``), so the 2*offset
+    band between them survives as the central web -- exactly the source's
+    ``FromOffsetDistance``/``ReverseDirection`` pair.
     """
     model = adapter.currentModel
     _flag(model, "IModelDoc2")
     fm = model.FeatureManager
     _flag(fm, "IFeatureManager")
+    _select_sketch(adapter, sketch_name)
 
-    sk = _find_sketch(model, sketch_name)
-    if sk is None:
-        raise RuntimeError(f"{sketch_name!r} not found")
-    chosen = None
-    for c in (sk.GetSketchContours() or []):
-        _flag(c, "ISketchContour")
-        if _contour_centroid_z(c) * sign > 10.0:
-            chosen = c
-            break
-    if chosen is None:
-        raise RuntimeError(f"{sketch_name}: no contour on side sign={sign}")
-
-    model.ClearSelection2(True)
-    if not chosen.Select(False, 0):
-        raise RuntimeError(f"{sketch_name}: contour Select failed")
-
-    mid = adapter.constants["swEndCondMidPlane"]
-    blind = adapter.constants["swEndCondBlind"]
-    t0 = adapter.constants.get("swStartSketchPlane", 0)
-    depth_m = depth_mm / 1000.0
-    # 27-param FeatureCut4 (verified on this seat); 26-param is the SW-2025 form.
-    args27 = (True, False, False, mid, blind, depth_m, 0.0,
-              False, False, False, False, 0.0, 0.0,
-              False, False, False, False, False,
-              False, True, False, False, False, t0, 0.0, False, False)
-    feat = adapter._attempt(lambda: fm.FeatureCut4(*args27), default=None)
+    through = adapter.constants.get("swEndCondThroughAll", 1)
+    t0 = (adapter.constants.get("swStartOffset", 3) if start_offset_mm
+          else adapter.constants.get("swStartSketchPlane", 0))
+    # 27-param FeatureCut4: T0/StartOffset/FlipStartOffset are the start-condition
+    # tail (26-param is the SW-2025 form).
+    args = (not both, False, reverse_dir, through, through, 0.0, 0.0,
+            False, False, False, False, 0.0, 0.0,
+            False, False, False, False, False,
+            False, True, False, False, False,
+            t0, start_offset_mm / 1000.0, flip_start, False)
+    feat = adapter._attempt(lambda: fm.FeatureCut4(*args), default=None)
     if not feat:
-        feat = adapter._attempt(lambda: fm.FeatureCut4(*args27[:-1]), default=None)
+        feat = adapter._attempt(lambda: fm.FeatureCut4(*args[:-1]), default=None)
     model.ClearSelection2(True)
     if not feat:
-        raise RuntimeError(f"{sketch_name}: FeatureCut4 (sign={sign}) failed")
+        raise RuntimeError(f"FeatureCut4 on {sketch_name} failed")
     return feat
 
 
@@ -364,7 +358,6 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HalfHeight", f"{HALF_Y}mm")  # trapezoid half-height (Y)
     await set_global(adapter, "CavHalf", f"{CAV}mm")        # cavity square half
     await set_global(adapter, "WindowOuter", f"{BIG}mm")    # window square half
-    await set_global(adapter, "Web", f"{WEB}mm")            # central web half-thickness
 
     # Each sketch records its dim names + drive equations inline as it is drawn
     # (per-sketch SketchDims); the (dim@feature, expr) jobs are collected here and
@@ -397,67 +390,65 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Boss-Extrude1")
     await volume_check(adapter, "Boss-Extrude1", 1_271_363, 200)
 
-    # 2-4. Two sketches drive three cuts, exactly as the source tree does:
-    #   * Sketch11 -- the two 165.1 mm-tall window rectangles (left at Z -82.55..
-    #     -3.175, right at Z +3.175..+82.55), drawn as two closed contours in one
-    #     sketch. Cut-Extrude3 and Cut-Extrude4 each consume ONE contour of this
-    #     SAME sketch, so SolidWorks shares it: it appears once in the tree and
-    #     the second reference shows as "Sketch11<n>". The central web at Z=±WEB
-    #     is the gap left between the two rectangles. Both rectangles drive off
-    #     WindowOuter/Web (one SketchDims spans the eight dims).
-    #   * Sketch12 -- the 127 mm cavity square; Cut-Extrude2 consumes it whole.
+    # 2-4. Two sketches drive three cuts, exactly as the source tree does. Both
+    # window/cavity sketches are SINGLE origin-centred squares on the Front plane,
+    # drawn center-rectangle style (four real sides + two construction diagonals),
+    # matching the source's Sketch11/Sketch12 segment set:
+    #   * Sketch11 -- the 165.1 mm window square. Cut-Extrude3 and Cut-Extrude4
+    #     BOTH consume this ONE sketch (cut4 re-selects it -> "Sketch11<2>"), each
+    #     a Through-All cut that STARTS WEB (3.175) off the sketch plane in the
+    #     opposite direction, so the 2*WEB band between them survives as the
+    #     central web -- the source's FromOffsetDistance/ReverseDirection pair,
+    #     not a sketch gap. The square drives off WindowOuter.
+    #   * Sketch12 -- the 127 mm cavity square; Cut-Extrude2 consumes it whole
+    #     (Through-All-Both). Drives off CavHalf.
     # Built in the source's creation order (Sketch11, then Sketch12) and cut in
     # the source's order (cavity, then the two windows).
     windows = SketchDims()
-    check("sketch windows", await adapter.create_sketch("Right"))
-    nz_pts = [(-BIG, -BIG), (-WEB, -BIG), (-WEB, BIG), (-BIG, BIG)]   # -Z window
-    nz_lines = await add_line_chain(adapter, nz_pts)
-    await define_rectilinear_chain(
-        adapter, nz_lines, nz_pts, anchor=0, label="window -Z", dims=windows,
-        names=["WinLSpan", "WinLHeight", "WinLAnchorZ", "WinLAnchorY"],
-        drives=['"WindowOuter" - "Web"', '2 * "WindowOuter"',
-                '"WindowOuter"', '"WindowOuter"'],
+    check("sketch windows", await adapter.create_sketch("Front"))
+    await define_centered_rectangle(
+        adapter, BIG, BIG, "window", dims=windows,
+        name_width="WinWidth", drive_width='2 * "WindowOuter"',
+        name_depth="WinHeight", drive_depth='2 * "WindowOuter"',
+        name_corner=("WinCornerX", "WinCornerY"),
+        drive_corner=('"WindowOuter"', '"WindowOuter"'),
     )
-    pz_pts = [(WEB, -BIG), (BIG, -BIG), (BIG, BIG), (WEB, BIG)]       # +Z window
-    pz_lines = await add_line_chain(adapter, pz_pts)
-    await define_rectilinear_chain(
-        adapter, pz_lines, pz_pts, anchor=0, label="window +Z", dims=windows,
-        names=["WinRSpan", "WinRHeight", "WinRAnchorZ", "WinRAnchorY"],
-        drives=['"WindowOuter" - "Web"', '2 * "WindowOuter"',
-                '"Web"', '"WindowOuter"'],
-    )
-    await ensure_fully_defined(adapter, "windows")
+    _add_construction_diagonals(adapter, BIG)
+    await ensure_fully_defined(adapter, "window")
     check("exit windows", await adapter.exit_sketch())
     name_last_feature(adapter, "Sketch11")
     drive_jobs += windows.apply(adapter, "Sketch11")
 
     cavity = SketchDims()
-    check("sketch cavity", await adapter.create_sketch("Right"))
+    check("sketch cavity", await adapter.create_sketch("Front"))
     await define_centered_rectangle(
         adapter, CAV, CAV, "cavity", dims=cavity,
         name_width="CavWidth", drive_width='2 * "CavHalf"',
         name_depth="CavDepth", drive_depth='2 * "CavHalf"',
-        name_corner=("CavCornerZ", "CavCornerY"),
+        name_corner=("CavCornerX", "CavCornerY"),
         drive_corner=('"CavHalf"', '"CavHalf"'),
     )
+    _add_construction_diagonals(adapter, CAV)
     await ensure_fully_defined(adapter, "cavity")
     check("exit cavity", await adapter.exit_sketch())
     name_last_feature(adapter, "Sketch12")
     drive_jobs += cavity.apply(adapter, "Sketch12")
 
-    # Cut-Extrude2: cavity -- whole Sketch12 profile (the last unconsumed sketch).
-    check("cut2", await adapter.create_cut_extrude(
-        ExtrusionParameters(depth=CAV_DEPTH, both_directions=True)))
+    # Cut-Extrude2: cavity -- whole Sketch12 profile, Through-All-Both.
+    _cut_through_all(adapter, "Sketch12", both=True, reverse_dir=False)
     name_last_feature(adapter, "Cut-Extrude2")
     await volume_check(adapter, "Cut-Extrude2", 622_708, 200)
 
-    # Cut-Extrude3: -Z window -- the left contour of the shared Sketch11.
-    _cut_window(adapter, "Sketch11", sign=-1, depth_mm=BIG_DEPTH)
+    # Cut-Extrude3: one window -- Through-All forward, started WEB off-plane.
+    _cut_through_all(adapter, "Sketch11", both=False, reverse_dir=False,
+                     start_offset_mm=WEB, flip_start=True)
     name_last_feature(adapter, "Cut-Extrude3")
     await volume_check(adapter, "Cut-Extrude3", 434_257, 200)
 
-    # Cut-Extrude4: +Z window -- the right contour of the SAME Sketch11 (shared).
-    _cut_window(adapter, "Sketch11", sign=1, depth_mm=BIG_DEPTH)
+    # Cut-Extrude4: the other window -- the SAME Sketch11, Through-All reverse,
+    # started WEB off-plane the other way (leaves the 2*WEB central web).
+    _cut_through_all(adapter, "Sketch11", both=False, reverse_dir=True,
+                     start_offset_mm=WEB, flip_start=False)
     name_last_feature(adapter, "Cut-Extrude4")
     await volume_check(adapter, "Cut-Extrude4", 245_806, 200)
 
