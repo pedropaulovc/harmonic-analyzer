@@ -15,18 +15,30 @@ depth):
   centres at (+/-197, +/-112) — 25.25/21.35 mm inset from the top-plate
   edges (eight views: columns sit at the extreme corners).
 * rocker-arm-support x1 (the windowed trapezoidal NORTH support,
-  build_rocker_arm_support.py) at (X, Z) = (+72.9, +101.6), foot
-  seated on the base top. A 177.8 x 177.8 cast plate, 63.5 thick in Z, with
-  the central rounded window; its apex carries the north pivot ball mount
-  (channel.SLDASM) and the CHANNEL AXIS runs along Z. This REPLACES the
-  rocker-arm-support casting (north + south unified portal frame) with the
-  faithful reproduction of the original hand-built support -- the NORTH upright
-  ONLY; the south upright and the top/foot rails are not part of this casting.
-  The part origin is at the casting centre (bbox +/-88.9 in X and Y), so it
-  seats at machine Y = base-top 50.8 + 88.9 (foot half-height) = 139.7, IDENTITY
-  rotation (its local X/Y/Z already line up with machine width / up / channel
-  axis). The pivot x = arbor 47.5 + 25.4 rod lever = 72.9 (DIMENSIONS.md ch. 14
-  layout, M6.8-mirrored).
+  build_rocker_arm_support.py) at (X, Z) = (+72.9, +44.45), foot seated on the
+  base top. A 177.8 x 177.8 cast plate, 63.5 thick (tapering to 16.94 at the
+  apex), with the central rounded window; its apex carries the north pivot ball
+  mount (channel.SLDASM, at machine z +101.6) and the rocker-pivot SHAFT runs
+  along Z. This REPLACES the rocker-arm-portal casting (north + south unified
+  portal frame) with the faithful reproduction of the original hand-built
+  support -- the NORTH upright ONLY; the south upright and the top/foot rails
+  are not part of this casting.
+
+  The part is authored with its big windowed faces normal to its LOCAL Z (the
+  thin 63.5 axis) and its 177.8 width along local X. In the machine the window
+  must face +/-X -- it reads face-on in the ch. 30 p008 +X side view, exactly
+  like the portal it replaces -- so the casting is turned +90 deg about Y
+  (ROT_Y_POS90): local Z (window normal) -> machine +X, local X (177.8 width)
+  -> machine Z, local Y (height) -> machine Y. The part origin is at the casting
+  centre (bbox +/-88.9 in X and Y), so the turned wall spans machine
+  Y 50.8..228.6 (foot on the base top, apex at the pivot height) and machine
+  Z -67.3..110.5 -- centred as far as the north pivot ball mount allows: its
+  north face is flush with that mount's north edge (z 110.5; the mount sits at
+  z +101.6, 17.8 deep), so the apex top edge fully seats it while reading nearly
+  centred in the side views. Seat Y =
+  base-top 50.8 + 88.9 (half-height) = 139.7. The pivot x = arbor 47.5 + 25.4
+  rod lever = 72.9 (DIMENSIONS.md ch. 14 layout, M6.8-mirrored). Grounded at its
+  measured transform (structure, like the columns/top-frame).
 * top-frame x1: the green ring at ring mid-plane Y = 1020.2 (rails 22 x
   41, y 999.7..1040.7), corner bosses bored around the four columns; its
   west rail seats the top-lever ball mounts (channel.SLDASM).
@@ -79,6 +91,7 @@ from _assembly import (
     plane_distance_mate,
     save_assembly_and_images,
 )
+from _transforms import ROT_Y_POS90
 
 ASM_NAME = "frame"
 
@@ -86,10 +99,23 @@ BASE_TOP_Y = 50.8  # harmonic-base: 0.5 in bottom + 1.5 in top plate
 COLUMN_X = 197.0  # column centres, from the ch. 6 / ch. 30 corner placement
 COLUMN_Z = 112.0
 SUPPORT_X = 72.9  # rocker pivot x: arbor 47.5 + 25.4 rod lever (M6.3, M6.8 mirror)
-SUPPORT_Z = 133.35 - 63.5 / 2.0  # 101.6: outer face flush w/ top plate edge
+SUPPORT_Z = 101.6 + 8.9 - 88.9  # 21.6: centre the 177.8-deep (+/-88.9) turned
+# wall as much as possible while its apex still fully seats the north pivot
+# ball mount. That mount sits at z +101.6 and is 17.8 deep (z 92.7..110.5), so
+# the support's north face is set flush with the mount's north edge (z 110.5):
+# Zc = 110.5 - 88.9 = 21.6. Any more centred and the mount would overhang the
+# wall's north face. Window centre then reads +21.6 (vs the base half-depth
+# 133.35) -- nearly centred in the side views, matching the book's slight north
+# offset, with the south face at -67.3 (clear of the base edge -133.35 and below
+# the rocker bank, which pivots at y 253.8 well above the apex y 228.6).
 SUPPORT_SEAT_Y = BASE_TOP_Y + 88.9  # 139.7: rocker-arm-support's origin is
 # at the casting centre (bbox Y +/-88.9), so seating its foot on the base top
 # lifts the origin by the 88.9 foot half-height.
+# Turn the support +90deg about Y so its big windowed faces (local Z normal)
+# point along machine +/-X (face-on in the ch. 30 p008 +X side view), matching
+# the portal it replaces; local X (177.8 width) maps to machine Z.
+SUPPORT_EULER = [0.0, 90.0, 0.0]
+SUPPORT_ROWS = ROT_Y_POS90
 TOP_FRAME_MID_Y = 1020.2  # ring mid-plane: rails y 999.7..1040.7 (M6.3)
 
 # Maker's nameplate (book ch. 26, pp. 70-71): the 100 x 55 brass plate lies FLAT
@@ -130,7 +156,7 @@ async def build(adapter) -> dict[str, str]:
 
     base_path = _part("harmonic-base")
     column_path = _part("tube-frame")
-    support_path = _part("rocker-arm-support")
+    _part("rocker-arm-support")  # placed via place_component below; assert it exists
     top_frame_path = _part("top-frame")
 
     check("create_assembly", await adapter.create_assembly())
@@ -164,30 +190,25 @@ async def build(adapter) -> dict[str, str]:
         assert_component_placed(adapter, name, target, IDENTITY)
 
     # Rocker-pivot support: the windowed trapezoidal NORTH support
-    # (build_rocker_arm_support.py), the faithful reproduction of the
-    # original hand-built casting that REPLACES the unified rocker-arm-support.
-    # Its origin is at the casting centre, so seating the foot on the base top
-    # places the origin at machine y = SUPPORT_SEAT_Y (= 139.7); X/Z unchanged
-    # (pivot centre x +72.9, north z +101.6, outer Z face flush w/ top-plate
-    # edge). IDENTITY rotation: local X/Y/Z already map to machine width/up/
-    # channel axis. No hold-down fasteners (see module docstring): the three
-    # plane-plane mates fully constrain it.
-    target = [SUPPORT_X, SUPPORT_SEAT_Y, SUPPORT_Z]
-    res = await adapter.insert_component(
-        InsertComponentParameters(file_path=support_path, position=target)
+    # (build_rocker_arm_support.py), the faithful reproduction of the original
+    # hand-built casting that REPLACES the unified rocker-arm-portal. Turned
+    # +90deg about Y (SUPPORT_ROWS) so its big windowed faces point along
+    # machine +/-X (face-on in the ch. 30 p008 side view), with local X (177.8
+    # width) -> machine Z and the foot on the base top. Its origin is the
+    # casting centre, so the placed point is (SUPPORT_X, SUPPORT_SEAT_Y,
+    # SUPPORT_Z) = (72.9, 139.7, 21.6). A single machine-handed structural
+    # casting -> grounded at its measured transform (mirror=False), like the
+    # nameplate. No hold-down fasteners (see module docstring).
+    await place_component(
+        adapter,
+        "rocker-arm-support",
+        [SUPPORT_X, SUPPORT_SEAT_Y, SUPPORT_Z],
+        SUPPORT_EULER,
+        SUPPORT_ROWS,
+        ground=True,
+        mirror=False,
+        label="rocker-arm-support",
     )
-    check(f"insert_component rocker-arm-support @ {target}", res)
-    name = res.data["name"]
-    await plane_distance_mate(
-        adapter, name, "Right Plane", "Right Plane", base_name, SUPPORT_X, target
-    )
-    await plane_distance_mate(
-        adapter, name, "Front Plane", "Front Plane", base_name, SUPPORT_Z, target
-    )
-    await plane_distance_mate(
-        adapter, name, "Top Plane", "Top Plane", base_name, SUPPORT_SEAT_Y, target
-    )
-    assert_component_placed(adapter, name, target, IDENTITY)
 
     # Top-frame ring clamped around the four columns, mid-plane y 1020.2.
     target = [0.0, TOP_FRAME_MID_Y, 0.0]
