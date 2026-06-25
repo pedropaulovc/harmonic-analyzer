@@ -62,6 +62,7 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
+from _buildgraph import ASSEMBLY_ORDER, part_stems
 from _common import CAD_ROOT, OUT_SLDASM, OUT_SLDPRT, OUT_STL, log
 
 import _telemetry
@@ -500,9 +501,31 @@ def _assert_configs_distinct(stem: str, crc_by_mesh: dict[str, str]) -> None:
         seen[h] = mesh
 
 
-def _models(folder: Path, ext: str) -> list[Path]:
-    """Built documents of one type, excluding SolidWorks ~$ lock files."""
-    return sorted(p for p in folder.glob(f"*.{ext}") if not p.name.startswith("~"))
+def _models(folder: Path, ext: str, manifest: set[str]) -> list[Path]:
+    """Built documents of one type that belong to the build MANIFEST, excluding
+    SolidWorks ~$ lock files.
+
+    cad/out is a persistent cache that ACCUMULATES stale/stray artefacts a blanket
+    glob would silently ship in the release bundle: a retired or renamed part whose
+    old .SLDPRT lingers (``rocker-arm-portal``, ``rocker-arm-support-manual``), or a
+    scratch assembly a diagnostic saved here (``overlay-diag``). So keep only docs in
+    ``manifest`` (the canonical dashed stems from ``part_stems``/``ASSEMBLY_ORDER``),
+    LOG every stray we drop (never silent -- the bundle reads as "everything" only if
+    nothing was hidden), and FAIL LOUD if a manifest doc is absent (a partial/stale
+    build must not ship a hole)."""
+    found = sorted(p for p in folder.glob(f"*.{ext}") if not p.name.startswith("~"))
+    kept = [p for p in found if p.stem in manifest]
+    skipped = sorted(p.stem for p in found if p.stem not in manifest)
+    if skipped:
+        log(f"neutral export: skipping {len(skipped)} non-manifest {ext} in cad/out "
+            f"(stale/stray, NOT shipped): {', '.join(skipped)}")
+    missing = sorted(manifest - {p.stem for p in kept})
+    if missing:
+        raise RuntimeError(
+            f"neutral export: {len(missing)} manifest {ext} missing from cad/out -- "
+            f"refusing to ship an incomplete release (run a full build first): "
+            f"{', '.join(missing)}")
+    return kept
 
 
 def _cfg_meshes_from_scene() -> dict[str, list[tuple[str, str]]]:
@@ -602,9 +625,12 @@ def export_neutral(sw: Any, stage: Path) -> dict[str, Any]:
     # alongside each .SLDPRT, which would otherwise double the work list.
     _discard_open_documents(sw)
 
-    # parts first (assemblies reference them), each (path, swDocType).
-    parts = _models(OUT_SLDPRT, "SLDPRT")
-    assemblies = _models(OUT_SLDASM, "SLDASM")
+    # parts first (assemblies reference them), each (path, swDocType). Restricted to
+    # the build manifest (dashed stems) so stale/stray cad/out artefacts never ship.
+    part_manifest = {s.replace("_", "-") for s in part_stems()}
+    asm_manifest = {a.replace("_", "-") for a in ASSEMBLY_ORDER}
+    parts = _models(OUT_SLDPRT, "SLDPRT", part_manifest)
+    assemblies = _models(OUT_SLDASM, "SLDASM", asm_manifest)
     docs = [(p, SW_DOC_PART) for p in parts] + [(a, SW_DOC_ASSEMBLY) for a in assemblies]
     log(f"neutral export: {len(parts)} parts + {len(assemblies)} assemblies")
 
