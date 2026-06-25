@@ -661,8 +661,8 @@ async def place_components_batch(
     *,
     label: str = "batch",
 ) -> list[str]:
-    """Insert many components in ONE ``AddComponents3`` call, then multiselect-fix
-    the grounded ones in ONE ``MultiSelect2`` + ``FixComponent`` -- the COM-call-
+    """Insert many components in ONE ``AddComponents3`` call, then fix
+    the grounded ones (``Select2`` each, then ONE ``FixComponent``) -- the COM-call-
     cheap path for repeated GROUNDED structure (cosmetic springs, shaft bushings)
     that carries no mates.
 
@@ -692,10 +692,11 @@ async def place_components_batch(
     identical repeated parts (the 19 bushings). Returns the component ``Name2``
     list in ``specs`` order.
 
-    Arrays cross the pywin32 late-binding boundary VARIANT-wrapped (the SAFEARRAY
-    rule): ``VT_ARRAY|VT_BSTR`` names/coord-system-names, ``VT_ARRAY|VT_R8``
-    transforms, ``VT_ARRAY|VT_DISPATCH`` the component pointers for the
-    multiselect.
+    The ``AddComponents3`` arrays cross the pywin32 late-binding boundary
+    VARIANT-wrapped (the SAFEARRAY rule): ``VT_ARRAY|VT_BSTR``
+    names/coord-system-names, ``VT_ARRAY|VT_R8`` transforms. The grounded
+    components are then fixed via per-component ``Select2`` + one ``FixComponent``
+    (see the selection block below for why not ``MultiSelect2``/``Select4``).
     """
     import pythoncom
     from win32com.client import VARIANT
@@ -744,26 +745,44 @@ async def place_components_batch(
             f"expected {len(specs)}"
         )
 
+    _telemetry.debug(f"{label}: AddComponents3 inserted {len(comps)} components")
+
+    # NB: deliberately NO per-component _flag(comp, "IComponent2"). Flagging the
+    # whole interface is 165 _FlagAsMethod calls PER component (~0.45 s each ->
+    # ~26 s for the 58-part grounded bank), and we need none of it: Name2 is a
+    # plain late-bound property read (_read_member), Select2 is a method called
+    # WITH args (so late binding dispatches it as a method unambiguously, no flag
+    # needed), and the read-back uses Transform2/ArrayData property reads. Verified
+    # selecting N/N and reading every name with zero flagging.
     out_names: list[str] = []
     grounded_comps: list[Any] = []
     for comp, is_ground in zip(comps, grounds, strict=True):
-        _flag(comp, "IComponent2")
         out_names.append(str(_read_member(comp, "Name2")))
         if is_ground:
             grounded_comps.append(comp)
 
-    # Multiselect every grounded component (one COM call) and fix the whole
-    # selection (one COM call -> one mate solve, vs. one solve per part).
+    # Append every grounded component to the selection (IComponent2::Select2,
+    # one cheap call per component -- no mate solve), then fix the WHOLE
+    # selection in ONE FixComponent -> ONE solve, vs. one solve per part. Select2
+    # is called on each raw dispatch directly. The alternatives all fail under the
+    # adapter's forced late binding: MultiSelect2 silently selects 0 (a SAFEARRAY
+    # of late-bound dispatch wrappers does not marshal -- raw _oleobj_ pointers
+    # raise "Type mismatch" too), and Select4 raises "Type mismatch" on its
+    # ISelectData arg (None/Missing won't marshal). Select2(Append, Mark) takes
+    # only bool/int -- no object to marshal -- so it is the late-binding-safe path
+    # (verified selecting N/N).
     if grounded_comps:
         adapter._attempt(lambda: asm.ClearSelection2(True), default=None)
-        objs = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, grounded_comps)
-        ext = _read_member(asm, "Extension")
-        n_sel = int(
-            adapter._attempt(lambda: ext.MultiSelect2(objs, False, None), default=0) or 0
+        n_sel = sum(
+            1
+            for comp in grounded_comps
+            if adapter._attempt(
+                lambda c=comp: c.Select2(True, 0), default=False
+            )
         )
         if n_sel != len(grounded_comps):
             raise RuntimeError(
-                f"{label}: MultiSelect2 selected {n_sel}/{len(grounded_comps)} "
+                f"{label}: Select2 selected {n_sel}/{len(grounded_comps)} "
                 f"grounded components"
             )
         adapter._attempt(lambda: asm.FixComponent(), default=None)
@@ -796,11 +815,10 @@ async def place_components_batch(
             )
         used[best_i] = True
 
-    print(
-        f"  OK  {_stamp()} {label}: inserted {len(specs)} components"
+    _telemetry.success(
+        f"{label}: inserted {len(specs)} components"
         f" (1x AddComponents3), fixed {len(grounded_comps)}"
-        f" (1x MultiSelect2 + FixComponent)",
-        flush=True,
+        f" (Select2 + 1x FixComponent)"
     )
     return out_names
 
