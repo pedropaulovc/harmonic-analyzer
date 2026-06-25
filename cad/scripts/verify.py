@@ -16,12 +16,14 @@ is the single fully-safe entry point that runs every gate.
                       ALL failures: DOF fully-defined, no over-constrained
                       component, model healthy (deep), interference-free, gear
                       ratios == config, BOM/part-count envelope.
-  subsystems          NEEDS SOLIDWORKS. Subsystem pass/fail runs (plan F1): open
-                      EACH built (sub)assembly and prove it sound in isolation --
-                      the drive-train as the crank+gear test, the channel assembly
-                      as the 20-way independence test, the output subs
-                      (summing/magnifier/pen/paper-drive)/frame/top as
-                      structural/smoke.
+  subsystems          NEEDS SOLIDWORKS. Subsystem-SPECIFIC structural gates (plan
+                      F1) NOT already covered by soundness -- currently just the
+                      channel assembly's 20-way moving-stem instance independence.
+                      soundness already opens every (sub)assembly standalone and
+                      runs the shared health battery (DOF / over-constrained /
+                      model-healthy / interference / gear-ratios / component-count)
+                      on each, so this pass no longer repeats it (that duplication
+                      was the biggest COM-spine time sink; see release-perf memory).
   kinematics          NEEDS SOLIDWORKS. Kinematic pen-driver fidelity (plan F5):
                       open pen.SLDASM, sweep the CrankDeg global, and assert
                       the pen-marker tip traces truth_model.pen_y (mapped to the
@@ -346,28 +348,36 @@ def assert_channel_independence(adapter: Any) -> None:
 
 
 async def _verify_isolation_one(adapter: Any, name: str, report: Report) -> None:
-    """Subsystem isolation pass for one built (sub)assembly (plan F1).
+    """Subsystem-SPECIFIC structural gates for one built (sub)assembly (plan F1).
 
-    Runs the gates that prove a subsystem is sound in isolation -- it opens,
-    rebuilds, fully constrains, carries no redundant mates, and is
-    interference-free -- plus the gates specific to what that subsystem proves:
-    the drive-train's gear ratios (crank reduction + channel meshes) and the
-    channel assembly's 20-way instance independence. The motion-dependent rows of
-    the F1 table (gear decoherence, cam-follower travel vs truth_model) need the
-    Basic Motion solver and stay tracked in the module docstring, not silently
-    skipped.
+    The ``soundness`` pass already opens EVERY built (sub)assembly standalone (a
+    fresh session per assembly) and runs the shared health battery on each --
+    DOF fully-defined, no redundant mates, model-healthy (deep), interference-free,
+    gear-ratios, component-count. Re-running that whole battery here (the historical
+    "isolation" suite) re-opened all eight assemblies and repeated the single most
+    expensive COM work in the pipeline -- the deep model-healthy rebuild alone is
+    ~140 s for the top assembly -- for ZERO added coverage (see the release-perf
+    memory note). This pass now runs ONLY the gate ``soundness`` does not: the
+    channel assembly's 20-way moving-stem instance independence (the "no component
+    pattern for moving parts" invariant). ``soundness`` runs first on the COM spine,
+    so the shared battery is always proven before this pass.
+
+    The motion-dependent rows of the F1 table (gear decoherence, cam-follower
+    travel vs truth_model) need the Basic Motion solver and stay tracked in the
+    module docstring, not silently skipped.
     """
+    if name != CHANNEL_OWNER:
+        return  # soundness owns the shared battery; only `channel` has a unique gate
+
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
     if not sldasm.exists():
-        report.failed.append((f"{name}:open", f"not built: {sldasm}"))
+        report.failed.append((f"iso:{name}:open", f"not built: {sldasm}"))
         _telemetry.error(f"{sldasm.name} not built -- run doit")
         return
 
-    # Isolation means a FRESH session per subsystem: close any prior assembly
-    # before opening this one. Accumulating open docs across a multi-assembly run
-    # degrades the COM session (the InterferenceDetectionManager came back null on
-    # the 5th open), and a subsystem test that depends on what ran before it is not
-    # an isolation test.
+    # Fresh session: close any prior assembly before opening this one (accumulating
+    # open docs degrades the COM session -- the InterferenceDetectionManager came
+    # back null on the 5th open).
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     check(f"open {name}", await adapter.open_model(str(sldasm)))
     configs = check("list configurations", await adapter.list_configurations())
@@ -375,15 +385,9 @@ async def _verify_isolation_one(adapter: Any, name: str, report: Report) -> None
         check(f"activate {REST}", await adapter.set_active_configuration(REST))
     log(f"--- isolation: {name} ({REST} pose) ---")
 
-    report.gate(f"iso:{name}:dof-fully-defined", lambda: assert_components_fully_defined(adapter))
-    report.gate(f"iso:{name}:no-over-constrained", lambda: assert_no_over_constrained(adapter))
-    report.gate(f"iso:{name}:model-healthy", lambda: assert_model_healthy(adapter, label=name, deep=True))
-    report.gate(f"iso:{name}:interference-free", lambda: check_no_interference(adapter))
-    report.gate(f"iso:{name}:component-count", lambda: assert_component_count(adapter, name))
-    if name == GEAR_OWNER:
-        report.gate(f"iso:{name}:gear-ratios", lambda: assert_gear_ratios(adapter, name))
-    if name == CHANNEL_OWNER:
-        report.gate(f"iso:{name}:channel-independence", lambda: assert_channel_independence(adapter))
+    # Instance independence is read straight off the component tree (GetComponents),
+    # populated on open -- no rebuild needed (soundness already rebuilt this assembly).
+    report.gate(f"iso:{name}:channel-independence", lambda: assert_channel_independence(adapter))
 
 
 async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
