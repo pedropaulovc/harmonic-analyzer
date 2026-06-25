@@ -86,8 +86,10 @@ def _main() -> int:
     coeffs = coefficients(args.preset)
     nonzero = sum(1 for a in coeffs if a)
     _telemetry.info(f"preset={args.preset}  magnify={magnify()}  nonzero a_j={nonzero}")
+    # The sample table is the command's DATA output (the documented `> curve.txt`
+    # use), so it stays on stdout -- telemetry is reserved for status/progress.
     for x, y in pen_curve(coeffs, args.samples):
-        _telemetry.info(f"x={math.degrees(x):6.1f} deg   pen_y={y:+8.4f}")
+        print(f"x={math.degrees(x):6.1f} deg   pen_y={y:+8.4f}")
     return 0
 
 

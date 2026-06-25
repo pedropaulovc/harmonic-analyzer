@@ -11,11 +11,7 @@ Usage:
 """
 
 import json
-import sys
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "cad" / "scripts"))
-import _telemetry  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
 BATCHES = REPO / "references" / "curation" / "batches"
@@ -66,10 +62,10 @@ def main() -> int:
     kept = sum(1 for e in entries.values() if e.get("keep"))
     OUT.write_text(json.dumps({"entries": sorted(entries.values(), key=lambda e: e["id"])},
                               indent=1), encoding="utf-8")
-    _telemetry.success(f"merged {len(entries)} entries ({kept} keep=true) from "
-                       f"{len(list(BATCHES.glob('*.json')))} fragments -> {OUT}")
+    print(f"merged {len(entries)} entries ({kept} keep=true) from "
+          f"{len(list(BATCHES.glob('*.json')))} fragments -> {OUT}")
     for p in problems:
-        _telemetry.warn(f"PROBLEM {p}")
+        print(f"  PROBLEM {p}")
     return 1 if problems else 0
 
 

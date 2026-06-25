@@ -15,11 +15,7 @@ Usage:
 
 import html
 import json
-import sys
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "cad" / "scripts"))
-import _telemetry  # noqa: E402
 
 COMP = Path(__file__).resolve().parents[1]
 OUT = COMP / "index.html"
@@ -201,7 +197,7 @@ def main() -> int:
         + f"<script>{JS}</script>",
         encoding="utf-8",
     )
-    _telemetry.success(f"wrote {OUT} ({len(manifest['pairs'])} pairs, {len(by_model)} models)")
+    print(f"wrote {OUT} ({len(manifest['pairs'])} pairs, {len(by_model)} models)")
     return 0
 
 
