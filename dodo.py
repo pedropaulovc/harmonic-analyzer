@@ -101,6 +101,7 @@ from _buildgraph import (  # noqa: E402
 )
 
 import _artifact_cache as _cache  # noqa: E402  (remote build-artefact cache)
+import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
 
 REPO_ROOT = Path(__file__).resolve().parent
 CONFIG_DIR = REPO_ROOT / "cad" / "config"
@@ -285,27 +286,33 @@ def _run(cmd: list[str], label: str, log_stem: str | None = None) -> None:
     it, output is inherited straight to the terminal -- the cheap path for the
     non-release happy path. Decode the pipe as UTF-8 (errors=replace) so the gate
     labels' non-ASCII glyphs survive on a cp1252 Windows console."""
-    print(f">>  {label}: {' '.join(cmd)}", flush=True)
-    if log_stem is None:
-        rc = subprocess.run(cmd, cwd=str(REPO_ROOT)).returncode
-    else:
-        LOGS.mkdir(parents=True, exist_ok=True)
-        with (LOGS / f"{log_stem}.log").open("w", encoding="utf-8") as fh:
-            fh.write(f">>  {label}: {' '.join(cmd)}\n")
-            fh.flush()
-            proc = subprocess.Popen(
-                cmd, cwd=str(REPO_ROOT), stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT, text=True, encoding="utf-8",
-                errors="replace", bufsize=1)
-            assert proc.stdout is not None
-            for line in proc.stdout:
-                sys.stdout.write(line)
-                sys.stdout.flush()
-                fh.write(line)
+    # One span per task action, NAMED for the doit task (``task part:cone_gear``)
+    # so the trace reads as the task itself; the build subprocess CONTINUES this
+    # span (via the injected TRACEPARENT) instead of adding a duplicate
+    # ``build.<target>`` layer under it.
+    with _telemetry.span(f"task {label}", label=label, cmd=" ".join(cmd)):
+        _telemetry.info(f">> {label}: {' '.join(cmd)}")
+        env = _telemetry.inject_env()
+        if log_stem is None:
+            rc = subprocess.run(cmd, cwd=str(REPO_ROOT), env=env).returncode
+        else:
+            LOGS.mkdir(parents=True, exist_ok=True)
+            with (LOGS / f"{log_stem}.log").open("w", encoding="utf-8") as fh:
+                fh.write(f">>  {label}: {' '.join(cmd)}\n")
                 fh.flush()
-            rc = proc.wait()
-    if rc:
-        raise RuntimeError(f"{label} failed (exit {rc})")
+                proc = subprocess.Popen(
+                    cmd, cwd=str(REPO_ROOT), env=env, stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+                    errors="replace", bufsize=1)
+                assert proc.stdout is not None
+                for line in proc.stdout:
+                    sys.stdout.write(line)
+                    sys.stdout.flush()
+                    fh.write(line)
+                    fh.flush()
+                rc = proc.wait()
+        if rc:
+            raise RuntimeError(f"{label} failed (exit {rc})")
 
 
 # --- Per-script helper dependencies, computed from each build script's REAL
@@ -407,7 +414,7 @@ RELEASE_PY = (SCRIPTS_DIR / "cut_release.py").resolve()
 # verify:/check: task names (reused by build + release so a new gate is wired in
 # one place).
 _VERIFY_NAMES = ("soundness", "subsystems", "kinematics")   # need SW (spine)
-_CHECK_NAMES = ("math", "config", "graph", "nameplate", "recipe", "cache")  # offline
+_CHECK_NAMES = ("math", "config", "graph", "nameplate", "recipe", "cache", "telemetry")  # offline
 
 
 def _run_stamped(cmd: list[str], label: str, stamp: str) -> None:
@@ -842,6 +849,15 @@ def task_check():
                          str((SCRIPTS_DIR / "test_artifact_cache.py").resolve())],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_artifact_cache.py")],
         },
+        "telemetry": {
+            # The OTel observability spine: severity split, no-gap span status,
+            # log<->trace correlation, cross-process propagation. Pure python, so
+            # it runs as an offline gate -- without this the spine could regress
+            # while the required checks stay green.
+            "file_dep": [str((SCRIPTS_DIR / "_telemetry.py").resolve()),
+                         str((SCRIPTS_DIR / "test_telemetry.py").resolve())],
+            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_telemetry.py")],
+        },
     }
     for name, spec in specs.items():
         stamp = str(REPORTS / f"check-{name}.ok")
@@ -957,10 +973,10 @@ def _cache_status(statusargs):
     filters = [a for a in args if a not in ("miss", "all")]
 
     cfg = _cache.config_summary()
-    print(f"[cache_status] mode={cfg['mode']} epoch={cfg['epoch']} salt={cfg['salt']} "
-          f"account={cfg['account']} container={cfg['container']}")
+    _telemetry.info(f"[cache_status] mode={cfg['mode']} epoch={cfg['epoch']} salt={cfg['salt']} "
+                    f"account={cfg['account']} container={cfg['container']}")
     if not _cache.enabled():
-        print("[cache_status] cache disabled (mode=off) -- keys computed, backend NOT probed")
+        _telemetry.warn("[cache_status] cache disabled (mode=off) -- keys computed, backend NOT probed")
 
     hits = misses = unknown = 0
     for label, deps in _cache_rows():
@@ -978,11 +994,12 @@ def _cache_status(statusargs):
             continue
         last = _cache.last_stored_key(label)
         drift = f"  DRIFT(last published {last[:12]})" if last and last != key else ""
-        print(f"  {mark} {key[:12]}  {label}{drift}")
+        emit = _telemetry.warn if present is False else _telemetry.info
+        emit(f"{mark} {key[:12]}  {label}{drift}")
         if show_all or present is False:
             for rel, digest in inputs:
-                print(f"           {digest}  {rel}")
-    print(f"[cache_status] {hits} hit / {misses} miss / {unknown} unknown")
+                _telemetry.debug(f"         {digest}  {rel}")
+    _telemetry.success(f"[cache_status] {hits} hit / {misses} miss / {unknown} unknown")
 
 
 def task_cache_status():

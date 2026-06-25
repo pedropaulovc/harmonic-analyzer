@@ -54,6 +54,8 @@ from _common import (
     volume_check,
 )
 
+import _telemetry
+
 PART_NAME = "platen"
 MATERIAL = "Brass"  # see _common.apply_material docstring
 
@@ -159,7 +161,7 @@ async def build(adapter) -> dict[str, str]:
     post = await adapter.get_mass_properties()
     v_sockets = len(SOCKET_XY) * math.pi * (SOCKET_DIA / 2.0) ** 2 * SOCKET_DEPTH
     removed = pre.data.volume - post.data.volume
-    print(f"  sockets removed {removed:.1f} mm^3 (analytic {v_sockets:.1f})")
+    _telemetry.info(f"sockets removed {removed:.1f} mm^3 (analytic {v_sockets:.1f})")
     if abs(removed - v_sockets) > 0.02 * v_sockets:
         raise RuntimeError(f"sockets removed {removed:.1f}, expected {v_sockets:.1f}")
 

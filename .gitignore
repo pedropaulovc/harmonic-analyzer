@@ -403,3 +403,7 @@ comparisons/.parity_sw/
 
 # playwright-cli skill scratch (machine-local browser session state)
 .playwright-cli/
+
+# machine-local dev-tooling binaries (Jaeger + native Aspire dashboard + dotnet
+# runtime for local OTel trace/log viewing — see memory/otel-trace-local-viewing.md)
+.tools/

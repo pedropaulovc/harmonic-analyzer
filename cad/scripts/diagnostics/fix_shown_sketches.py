@@ -22,6 +22,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 from _common import check, run_build  # noqa: E402
 from render_compare import _flag, _read_member  # noqa: E402
 
+import _telemetry  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[1]
 PARTS = [
     "amplitude-bar",
@@ -78,7 +80,7 @@ async def build(adapter) -> dict[str, str]:
 
         if hidden:
             check(f"save {stem}", await adapter.save_file())
-        print(f"  {stem}: hid {hidden or 'nothing'}")
+        _telemetry.info(f"{stem}: hid {hidden or 'nothing'}")
         results[stem] = ",".join(hidden) or "none"
     return results
 

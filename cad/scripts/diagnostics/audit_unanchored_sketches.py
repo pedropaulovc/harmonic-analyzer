@@ -21,7 +21,12 @@ prove), but every genuine under_defined regression shows up here.
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import _telemetry
 
 SCRIPTS = sorted((Path(__file__).resolve().parents[1]).glob("build_*.py"))
 
@@ -64,11 +69,11 @@ def main() -> int:
             label = re.search(r'create_sketch\([^)]*\)', block)
             suspects.append((f.name, ln, label.group(0) if label else ""))
     if not suspects:
-        print("no unanchored add_line_chain sketches found")
+        _telemetry.info("no unanchored add_line_chain sketches found")
         return 0
-    print(f"{len(suspects)} SUSPECT unanchored add_line_chain sketch block(s):\n")
+    _telemetry.warn(f"{len(suspects)} SUSPECT unanchored add_line_chain sketch block(s):")
     for name, ln, lbl in suspects:
-        print(f"  {name}:{ln}   {lbl}")
+        _telemetry.info(f"{name}:{ln}   {lbl}")
     return 0
 
 

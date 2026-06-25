@@ -65,6 +65,8 @@ from _features import (
     sketch_polyline_loops,
     sketch_rounded_rect,
 )
+
+import _telemetry
 from _nameplate_geometry import BORDER_INNER, BORDER_OUTER, LETTERING_LOOPS
 
 PART_NAME = "nameplate"
@@ -144,7 +146,7 @@ async def _cut_region(adapter, depth, *, label, expected_removed):
         ),
     )
     removed = float(pre.data.volume) - float((await adapter.get_mass_properties()).data.volume)
-    print(f"  {label} removed {removed:.1f} mm^3 (analytic {expected_removed:.1f})")
+    _telemetry.info(f"{label} removed {removed:.1f} mm^3 (analytic {expected_removed:.1f})")
     if removed <= 0.0:
         raise RuntimeError(f"cut {label}: nothing removed (sketch/cut/plane -> live)")
     if abs(removed - expected_removed) > 0.02 * expected_removed:
@@ -251,7 +253,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "FieldRecess")
     v_field = field_w * field_h * RECESS_DEPTH
     removed = float(pre.data.volume) - float((await adapter.get_mass_properties()).data.volume)
-    print(f"  field recess removed {removed:.1f} mm^3 (analytic {v_field:.1f})")
+    _telemetry.info(f"field recess removed {removed:.1f} mm^3 (analytic {v_field:.1f})")
     if abs(removed - v_field) > 0.02 * v_field:
         raise RuntimeError(f"field recess removed {removed:.1f}, expected {v_field:.1f}")
 
@@ -330,7 +332,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "ScrewHoles")
     v_holes = len(SCREW_XY) * math.pi * (SCREW_DIA / 2.0) ** 2 * PLATE_THICKNESS
     removed = float(pre.data.volume) - float((await adapter.get_mass_properties()).data.volume)
-    print(f"  screw holes removed {removed:.1f} mm^3 (analytic {v_holes:.1f})")
+    _telemetry.info(f"screw holes removed {removed:.1f} mm^3 (analytic {v_holes:.1f})")
     if abs(removed - v_holes) > 0.02 * v_holes:
         raise RuntimeError(f"screw holes removed {removed:.1f}, expected {v_holes:.1f}")
 

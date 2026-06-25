@@ -19,9 +19,14 @@ Run with the SW venv python:
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
-import comtypes
-import comtypes.client
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import _telemetry  # noqa: E402
+
+import comtypes  # noqa: E402
+import comtypes.client  # noqa: E402
 
 SW_TYPELIB = "{83A33D31-27C5-11CE-BFD4-00400513BB57}"
 SW_TYPELIB_VER = (34, 0)
@@ -31,32 +36,32 @@ SW_OPEN_SILENT = 1
 
 
 def flag(doc, tag):
-    print(f"  [{tag}] GetSaveFlag (dirty?) = {bool(doc.GetSaveFlag())}", flush=True)
+    _telemetry.debug(f"[{tag}] GetSaveFlag (dirty?) = {bool(doc.GetSaveFlag())}")
 
 
 def main() -> int:
     mod = comtypes.client.GetModule((comtypes.GUID(SW_TYPELIB), *SW_TYPELIB_VER))
     sw = comtypes.client.GetActiveObject("SldWorks.Application", interface=mod.ISldWorks)
-    print(f"attached to SW revision {sw.RevisionNumber()}", flush=True)
+    _telemetry.info(f"attached to SW revision {sw.RevisionNumber()}")
 
     sw.CloseAllDocuments(True)
     sw.OpenDoc6(ASSEMBLY, SW_DOC_ASSEMBLY, SW_OPEN_SILENT, "", 0, 0)
     doc = sw.IActiveDoc2
-    print(f"opened; active config = {doc.ConfigurationManager.ActiveConfiguration.Name}",
-          flush=True)
+    _telemetry.info(
+        f"opened; active config = {doc.ConfigurationManager.ActiveConfiguration.Name}")
 
-    print("[A] immediately after silent open, before any other call:", flush=True)
+    _telemetry.info("[A] immediately after silent open, before any other call:")
     flag(doc, "A:open")
 
-    print("[B] after GetPackAndGo (no SavePackAndGo):", flush=True)
+    _telemetry.info("[B] after GetPackAndGo (no SavePackAndGo):")
     pg = doc.Extension.GetPackAndGo()
-    print(f"    GetPackAndGo -> {'ok' if pg is not None else 'None'}", flush=True)
+    _telemetry.debug(f"GetPackAndGo -> {'ok' if pg is not None else 'None'}")
     flag(doc, "B:getpackandgo")
 
-    print("[C] switching configs:", flush=True)
+    _telemetry.info("[C] switching configs:")
     for cfg in list(doc.GetConfigurationNames() or []):
         doc.ShowConfiguration2(cfg)
-        print(f"    after ShowConfiguration2({cfg!r}):", flush=True)
+        _telemetry.debug(f"after ShowConfiguration2({cfg!r}):")
         flag(doc, f"C:{cfg}")
     doc.ShowConfiguration2("Default")
     flag(doc, "C:back-to-Default")

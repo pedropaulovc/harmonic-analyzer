@@ -46,6 +46,8 @@ from _common import (  # noqa: E402
     run_build,
 )
 
+import _telemetry  # noqa: E402
+
 REPO = CAD_ROOT.parent
 COMP = REPO / "comparisons"
 sys.path.insert(0, str(COMP / "tools"))
@@ -477,12 +479,12 @@ def main() -> int:
         by_model.setdefault(pair["model"], []).append(pair)
 
     if not by_model:
-        print("nothing to render")
+        _telemetry.info("nothing to render")
         return 0
     # Parts before assemblies (assemblies are the slow opens).
     order = sorted(by_model, key=lambda m: (model_path(m).suffix.lower() == ".sldasm", m))
     n_pairs = sum(len(v) for v in by_model.values())
-    print(f"rendering {n_pairs} pairs across {len(order)} models")
+    _telemetry.info(f"rendering {n_pairs} pairs across {len(order)} models")
 
     async def build(adapter: Any) -> dict[str, str]:
         old_bg = force_plain_white_background(adapter)

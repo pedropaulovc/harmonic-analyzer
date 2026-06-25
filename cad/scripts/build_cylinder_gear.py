@@ -92,6 +92,8 @@ from _common import (
 from _gear import build_fixed_gear, volume_check
 from build_cone_gear import DP, gear_facts  # DP = train diametral_pitch (machine.yaml)
 
+import _telemetry
+
 PART_NAME = "cylinder-gear"
 MATERIAL = "Brass"  # ch. 13 text p.22: polished brass
 
@@ -220,7 +222,7 @@ async def _name_lobe_axis(adapter) -> str:
             f"lobe axis misplaced at (x={start[0]:.3f}, y={start[1]:.3f}); "
             f"expected (0, {-ECCENTRICITY:.3f}) -- Top Plane offset sign flipped"
         )
-    print(f"  OK  lobe axis {axis_name} at (x {start[0]:.3f}, y {start[1]:.3f})")
+    _telemetry.success(f"lobe axis {axis_name} at (x {start[0]:.3f}, y {start[1]:.3f})")
     return axis_name
 
 
@@ -303,7 +305,7 @@ async def build(adapter) -> dict[str, str]:
             f"cam misplaced: COM {com}, expected y {com_y:.3f} z {com_z:.3f} "
             "-- offset-plane side or extrude direction flipped"
         )
-    print(f"  OK  cam placement: COM y {com[1]:.3f} z {com[2]:.3f}")
+    _telemetry.success(f"cam placement: COM y {com[1]:.3f} z {com[2]:.3f}")
 
     # ------------------------------------------------------------------
     # Alignment notch at +Y (top = cosine mode): a thin saw KERF seated in

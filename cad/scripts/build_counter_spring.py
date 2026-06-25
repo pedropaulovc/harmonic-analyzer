@@ -57,6 +57,8 @@ from _features import (
     insert_helix,
 )
 
+import _telemetry
+
 PART_NAME = "counter-spring"
 MATERIAL = "Alloy Steel"  # see _common.apply_material docstring
 
@@ -107,7 +109,7 @@ async def build(adapter) -> dict[str, str]:
     # later blank_sketch reference to the new name (the captured "Sketch1"
     # auto-name would go stale otherwise).
     _feature_by_name(adapter, "Sketch1").Name = "HelixBaseProfile"
-    print("  OK  feature 'Sketch1' -> 'HelixBaseProfile'")
+    _telemetry.success("feature 'Sketch1' -> 'HelixBaseProfile'")
     drive_jobs += base_dims.apply(adapter, "HelixBaseProfile")
     helix_name = insert_helix(adapter, COIL_BODY_LENGTH, PITCH)
 
