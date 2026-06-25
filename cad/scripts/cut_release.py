@@ -181,6 +181,7 @@ def resolve_version(explicit: str | None, bump: str) -> str:
 def previous_tag(version: str) -> str | None:
     """Highest existing ``vX.Y.Z`` tag strictly below ``version`` (or None)."""
     m = _VERSION_RE.match(version)
+    assert m is not None, f"previous_tag: version must match vX.Y.Z, got {version!r}"
     cur = (int(m[1]), int(m[2]), int(m[3]))
     prior = [t for t in _existing_tags() if t < cur]
     if not prior:

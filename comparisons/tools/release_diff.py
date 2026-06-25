@@ -30,6 +30,7 @@ import struct
 import urllib.request
 import zlib
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import trimesh
@@ -185,7 +186,7 @@ def _directed(src, dst):
     return _surface_dist(dst, _query_points(src))
 
 
-def mesh_deviation(tag_a, tag_b, base):
+def mesh_deviation(tag_a: str, tag_b: str, base: str) -> dict[str, Any]:
     a = trimesh.load(CACHE / tag_a / f"{base}.stl", process=False)
     b = trimesh.load(CACHE / tag_b / f"{base}.stl", process=False)
     d_ab = _directed(a, b)
