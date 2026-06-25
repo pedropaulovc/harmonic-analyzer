@@ -39,8 +39,8 @@ Default-state notes / documented simplifications (Appendix C):
   the knob shaft at c2c 66.05 from the stud, so the fine 24T pinion sits 13.1
   clear of the disc tips. The mounted removables are CHAIN wheels (m2 teeth carry
   the roller chain, ch. 23), so they never mesh another gear; the T24's tips
-  overlap the disc rim in XY projection only (chain plane z -81.5..-76.5 vs disc
-  -137.5..-134.5), exactly as the ch30 plates show. The ENGAGED pose and the
+  overlap the disc rim in XY projection only (chain plane z -148.5..-143.5 vs disc
+  -137.5..-134.5, 6.5 clear in z), exactly as the ch30 plates show. The ENGAGED pose and the
   swing path between the two are not modeled.
 * The four column-clamp pinch screws are modeled backed-out (tips 0.2 inside
   their back-wall holes, 0.3 off the columns).
@@ -103,7 +103,14 @@ from _assembly import (
     place_component,
     save_assembly_and_images,
 )
-from _transforms import IDENTITY, ROT_X_NEG90, ROT_Y_POS90, mirror_placement, rot_z_rows
+from _transforms import (  # noqa: E402
+    IDENTITY,
+    ROT_X_NEG90,
+    ROT_X_POS90,
+    ROT_Y_POS90,
+    mirror_placement,
+    rot_z_rows,
+)
 
 ASM_NAME = "paper-drive"
 
@@ -153,15 +160,18 @@ KNOB_SHAFT_XY = (65.0, 241.78)
 LATCH_ANGLE_DEG = math.degrees(
     math.atan2(KNOB_SHAFT_XY[1] - PINION_AXIS[1], KNOB_SHAFT_XY[0] - PINION_AXIS[0])
 )  # -10.22: small hub swung low toward the crank
-REMOVABLE_Z0 = -81.5  # mounted T24 band -81.5..-76.5, flush with the shaft's
-# chain end; the crank-end T12 sits south (drive-train REMOVABLE_Z0 -85.6,
-# mid -83.1) -- the real chain bridges the 4.35 offset with a ~1.7 deg skew
-T24_MID_Z = REMOVABLE_Z0 + 2.5  # -79.0 (face 5.0)
-T12_MID_Z = -83.1  # drive-train REMOVABLE_Z0 -85.6 + face 5.0 / 2
-CHAIN_MID_Z = (T24_MID_Z + T12_MID_Z) / 2.0  # -81.05: the link pin0 stations ride
-# the plane splitting the two wrap mid-planes (the retired flat band
-# spanned -83.3..-78.8 about the same plane); the chain floats radially
-# outside the tooth tips so the z overlap with either wheel cannot interfere
+REMOVABLE_Z0 = -148.5  # mounted T24 band -148.5..-143.5, mid -146 = the FRONT
+# chain plane (book ch30 p005/p002: chain a flat loop on the front face, cone
+# behind). South of the stub disc (-134.5..-137.5) by 6.5 and of the fine pinion
+# (-134..-128): the knob shaft is reversed (knob to the north, see its placement)
+# so its plain south length hosts the wheel clear of the disc. The crank-end T12
+# is COPLANAR at -146 (drive-train REMOVABLE_Z0 -148.5) -- the chain runs flat.
+T24_MID_Z = REMOVABLE_Z0 + 2.5  # -146.0 (face 5.0)
+T12_MID_Z = -146.0  # drive-train REMOVABLE_Z0 -148.5 + face 5.0 / 2
+CHAIN_MID_Z = (T24_MID_Z + T12_MID_Z) / 2.0  # -146.0: both wheels coplanar now,
+# so the link pin0 stations ride a single flat front plane (was -81.05, north of
+# the pedestal in the cone-post Z-band -- that collided); the chain floats
+# radially outside the tooth tips so the z overlap with either wheel cannot interfere
 REMOVABLE_TIP_R = {"T12": 14.0, "T18": 20.0, "T24": 26.0}  # m2: OD (T+2)*2
 
 # Spare T18 removable: the swap chain wheel, stored flat on the base top
@@ -244,8 +254,12 @@ def _assert_chain_layout() -> None:
         raise RuntimeError(
             f"_chain KNOB_CENTRE {CHAIN_KNOB_CENTRE} != KNOB_SHAFT_XY {KNOB_SHAFT_XY}"
         )
-    if CHAIN_CRANK_CENTRE != (118.0, 126.8):  # drive-train X_CRANK, Y_DRIVE
-        raise RuntimeError(f"_chain CRANK_CENTRE {CHAIN_CRANK_CENTRE} moved")
+    from build_drive_train_assembly import X_CRANK, Y_DRIVE
+    if CHAIN_CRANK_CENTRE != (X_CRANK, Y_DRIVE):
+        raise RuntimeError(
+            f"_chain CRANK_CENTRE {CHAIN_CRANK_CENTRE} != drive-train crank"
+            f" ({X_CRANK}, {Y_DRIVE})"
+        )
     if (TIP_R_T24, TIP_R_T12) != (REMOVABLE_TIP_R["T24"], REMOVABLE_TIP_R["T12"]):
         raise RuntimeError("_chain tip radii diverged from REMOVABLE_TIP_R")
     log(
@@ -425,7 +439,7 @@ async def build(adapter) -> dict[str, str]:
 
     # --- transgear group ------------------------------------------------------
     # (The rocker-support A-frame that used to stand here is now part of the
-    # single rocker-arm-portal casting in frame.SLDASM; the pinion-bar west end
+    # single rocker-arm-support casting in frame.SLDASM; the pinion-bar west end
     # floats and was never mated to it, so it is simply gone from this assembly.)
     await place_component(adapter, "pinion-bar", [PINION_AXIS[0], PINION_AXIS[1], -111.0],
                           [0.0, 0.0, 0.0], IDENTITY)
@@ -436,9 +450,15 @@ async def build(adapter) -> dict[str, str]:
                           [0.0, 0.0, 0.0], IDENTITY)
     await place_component(adapter, "transgear-latch", [PINION_AXIS[0], PINION_AXIS[1], -122.5],
                           [0.0, 0.0, LATCH_ANGLE_DEG], rot_z_rows(LATCH_ANGLE_DEG))
+    # Reversed (Rx +90, origin at the south end z -149.0): the plain shaft now
+    # runs -149.0..-91.0 with the grab-knob tucked NORTH (-91.0..-84.5), freeing
+    # the south of the shaft for the chain wheel on the front -146 plane. The
+    # fine pinion below stays at -134..-128 (parked clear of the disc, unchanged);
+    # the knob is well north of the pinion bar (-134..-139) and the platen
+    # (front -142.9), so neither overlaps it.
     await place_component(adapter, "transgear-knob-shaft",
-                          [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], -76.5],
-                          [-90.0, 0.0, 0.0], ROT_X_NEG90)
+                          [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], -149.0],
+                          [90.0, 0.0, 0.0], ROT_X_POS90)
     # Fine 24T DP30 pinion on the knob shaft, just behind the knob face
     # (z -134..-128): engageable on the disc, parked clear in the rest state.
     await place_component(adapter, "transgear-pinion",
@@ -446,7 +466,8 @@ async def build(adapter) -> dict[str, str]:
                           [0.0, 0.0, 0.0], IDENTITY)
     # Mounted T24 removable = the knob-end chain wheel (ch. 23: the roller
     # chain rides the removable's teeth; swapping removables changes the
-    # platen ratio). Band -81.5..-76.5, flush with the shaft's chain end.
+    # platen ratio). Band -148.5..-143.5 on the front -146 plane, south of the
+    # stub disc and fine pinion, coplanar with the crank-end T12.
     await place_component(adapter, "transgear-removable",
                           [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], REMOVABLE_Z0],
                           [0.0, 0.0, 0.0], IDENTITY, configuration="T24",

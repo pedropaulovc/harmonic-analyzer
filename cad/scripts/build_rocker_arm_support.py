@@ -1,6 +1,6 @@
 r"""Reproduction script: rocker-arm support (manual feature-tree replay).
 
-An exact feature-tree replay of ``rocker-arm-support-manual.SLDPRT`` -- a
+An exact feature-tree replay of ``rocker-arm-support.SLDPRT`` -- a
 thin-walled cast bracket: a trapezoidal wedge wall (wide foot, narrow top)
 stood **Y-up**, lightened by a square window that opens on the two big front/
 back faces, with a mounting foot drilled by four tapped holes (bored vertically
@@ -64,7 +64,7 @@ and round-trips. See ``build_top_frame.py`` for the reference pattern.
 
 Run (SolidWorks already open)::
 
-    uv run python cad\scripts\build_rocker_arm_support_manual.py
+    uv run python cad\scripts\build_rocker_arm_support.py
 """
 
 from __future__ import annotations
@@ -72,8 +72,10 @@ from __future__ import annotations
 import sys
 
 from _common import (
+    CASTING_GREEN,
     SketchDims,
     add_line_chain,
+    apply_color,
     apply_material,
     check,
     define_centered_rectangle,
@@ -89,8 +91,12 @@ from _common import (
     volume_check,
 )
 
-PART_NAME = "rocker-arm-support-manual"
-MATERIAL = "AISI 1020 Steel, Cold Rolled"  # source part's database material
+PART_NAME = "rocker-arm-support"
+# The source repro was authored in steel, but this casting is now the machine's
+# green rocker-arm-support (it replaced rocker-arm-portal): match the other cast
+# structure (harmonic-base, top-frame) and the registry row (Gray Cast Iron,
+# materials.yaml casting_green_parts) so it renders green, not steel-grey.
+MATERIAL = "Gray Cast Iron"
 
 # Trapezoid (Sketch1) -- wide foot / narrow top, half-extents in mm. On the
 # Right plane: sketch-x -> model Z (taper), sketch-y -> model Y (height).
@@ -492,6 +498,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "driven part (equations neutral)", 240_512, 200)
 
     await apply_material(adapter, MATERIAL)
+    await apply_color(adapter, CASTING_GREEN)  # green-painted casting, like the base/top-frame
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 
