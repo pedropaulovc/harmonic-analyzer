@@ -1,0 +1,13 @@
+{
+  "venvPath": ".",
+  "venv": ".venv",
+  "extraPaths": ["cad/scripts"],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.*",
+    "cad/out",
+    "SolidworksMCP-python",
+    "references"
+  ]
+}
