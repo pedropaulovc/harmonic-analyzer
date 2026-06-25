@@ -63,17 +63,22 @@ SUBASSEMBLIES = ("frame", "drive-train", "channel", "summing", "magnifier", "pen
                  "paper-drive")
 
 # Loose hardware on the base top -- a generic tool, not part of any mechanism.
-# Re-parked to the FAR-WEST margin lane running along Z (machine x -220..-212,
-# z -100..100, y 50.8..53.8). The old BACK-band slot (z 121.6..133.35) is now
-# filled by the rocker-arm-support foot (z-max 133.35), so the stick moved
-# to the ~12.5 mm clear lane between the west columns (west face x -209.7) and the
-# west top-plate edge (x -222.25). Authored as the EXACT machine transform
-# (mirror=False): flat with graduations up, long axis along Z.
-#   rows map part X(length)->machine Z, part Y(width)->machine X, part Z(3 thick)
-#   ->machine Y; euler [-90,-90,0] is rows_from_euler of those rows.
-STICK_POS = (-220.0, 50.8, -100.0)
-STICK_EULER = [-90.0, -90.0, 0.0]
-STICK_ROWS = [[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
+# Parked in the FAR-WEST margin lane running along Z (machine x -220..-212,
+# z -100..100, y 50.8..53.8), the ~12.5 mm clear lane between the west columns
+# (west face x -209.7) and the west top-plate edge (x -222.25); well clear of the
+# rocker-arm-support foot (x 41..105). Authored as the EXACT machine transform
+# (mirror=False): flat, long axis along Z, GRADUATIONS UP. build_measuring_stick
+# cuts the ticks into the local z=0 face (outward normal -Z), so graduations-up
+# requires local -Z -> machine +Y, i.e. local +Z -> -Y. The rows therefore map
+# part X(length 200)->machine +Z, part Y(width 8)->machine -X, part Z(3 thick)->
+# machine -Y; the body hangs in -Y from the graduated face, so the placed corner
+# (part origin, on the z=0 face) sits at y 53.8 = base-top 50.8 + 3 thickness,
+# dropping the body onto the base with the graduated face up. POS.x = -212 so the
+# width runs -X into x -212..-220 (same lane as before, on the base). euler
+# [90,-90,0] is rows_from_euler of those rows.
+STICK_POS = (-212.0, 53.8, -100.0)
+STICK_EULER = [90.0, -90.0, 0.0]
+STICK_ROWS = [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]]
 
 # Render gallery mirroring the book's ch. 30 "Eight Views" chapter: the six
 # orthographic faces plus two 3/4 views (the photos walk 45-degree steps

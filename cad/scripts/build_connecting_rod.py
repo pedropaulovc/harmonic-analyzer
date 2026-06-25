@@ -53,7 +53,13 @@ import _telemetry
 PART_NAME = "connecting-rod"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
-CENTER_DISTANCE = 127.0  # ch13 rods: 5" cam ring centre -> rocker pin (derived)
+CENTER_DISTANCE = 163.18  # cam ring centre -> rocker pin. LONG rod: the cam drum
+# moved out to machine -54.7 (book ch30 view 1/8), so the rod spans pivot->cam
+# d=182.3 obliquely (was 127 near-vertical at the old +47.5 drum). 163.18 is solved
+# to land the rocker rod-pin at the SAME point (-47.68, 250.74) as the old 127 rod,
+# i.e. it preserves the rocker rest tilt (-6.92 deg) so the whole downstream
+# bar/lever/spring chain stays valid; only the rod itself gets longer + 38.9 deg
+# oblique. MUST stay in sync with build_channel_assembly.ROD_C2C.
 RING_BORE_DIA = 30.8  # ch13 rods: cam OD 30.6 + 0.1 clearance per side (cam scaled 0.6022)
 RING_WALL = 5.0  # ch13 rods: radial strap wall, kept (scaled)
 RING_THICKNESS = 3.0  # ch13 rods: sandwich budget (scaled)
