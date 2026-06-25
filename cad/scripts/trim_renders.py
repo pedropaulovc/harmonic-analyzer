@@ -45,7 +45,7 @@ def trim(src: Path, dst: Path) -> str:
     img = Image.open(src).convert("RGB")
     background = Image.new("RGB", img.size, img.getpixel((0, 0)))
     diff = ImageChops.difference(img, background).convert("L")
-    bbox = diff.point(lambda p: 255 if p > THRESHOLD else 0).getbbox()
+    bbox = diff.point(lambda p: 255 if p > THRESHOLD else 0).getbbox()  # type: ignore[operator]  # PIL stubs type ImagePointTransform too broadly
     if bbox is None:
         raise ValueError(f"{src}: no content found above threshold")
     left, top, right, bottom = bbox

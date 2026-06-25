@@ -109,11 +109,11 @@ def restore_export_prefs(adapter: Any, old: dict) -> None:
 
 def _valid_rgb(values: Any) -> tuple[float, float, float] | None:
     try:
-        rgb = tuple(float(v) for v in values[:3])
+        r, g, b = (float(v) for v in values[:3])
     except Exception:
         return None
-    if all(0.0 <= v <= 1.0 for v in rgb):
-        return rgb
+    if all(0.0 <= v <= 1.0 for v in (r, g, b)):
+        return r, g, b
     return None  # SolidWorks reports -1 for "unset"
 
 

@@ -47,7 +47,7 @@ def _paste(canvas_size, mask: Image.Image, scale: float, dx: int, dy: int) -> Im
     w = max(1, round(mask.width * scale))
     h = max(1, round(mask.height * scale))
     canvas = Image.new("L", canvas_size, 0)
-    canvas.paste(mask.resize((w, h), Image.NEAREST),
+    canvas.paste(mask.resize((w, h), Image.Resampling.NEAREST),
                  ((canvas_size[0] - w) // 2 + dx, (canvas_size[1] - h) // 2 + dy))
     return canvas
 
@@ -57,7 +57,7 @@ def tune_pair(pair: dict, ref_thresh: int) -> tuple[dict, float, float]:
     ref = Image.open(composite.pair_paths(pid)["ref"]).convert("L")
     rw, rh = ref.size
     small = (max(1, round(rw * WORK_H / rh)), WORK_H)
-    refmask = ref.resize(small, Image.BILINEAR).point(lambda v: 255 if v > ref_thresh else 0)
+    refmask = ref.resize(small, Image.Resampling.BILINEAR).point(lambda v: 255 if v > ref_thresh else 0)  # type: ignore[operator]  # PIL stubs type ImagePointTransform too broadly
 
     ren = Image.open(composite.pair_paths(pid)["render"])
     mask = composite._content_mask(ren)
@@ -66,7 +66,7 @@ def tune_pair(pair: dict, ref_thresh: int) -> tuple[dict, float, float]:
     # base content-fit scale at work resolution
     s0 = min(small[0] / mask.width, small[1] / mask.height)
     base = mask.resize((max(1, round(mask.width * s0)), max(1, round(mask.height * s0))),
-                       Image.NEAREST)
+                       Image.Resampling.NEAREST)
 
     cur = pair.get("align") or {}
     before = _iou(refmask, _paste(small, base, cur.get("scale", 1.0),

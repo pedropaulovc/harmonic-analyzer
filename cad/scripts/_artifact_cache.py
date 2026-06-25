@@ -370,11 +370,19 @@ def _save_stored_key(label: str, key: str) -> None:
         pass
 
 
-_UNSET = object()
-_BACKEND = _UNSET
+class _Unset:
+    """Singleton sentinel marking '_BACKEND not yet initialised'.
+
+    A dedicated class (rather than plain ``object()``) lets pyright understand
+    the three-state union without a blanket ``# type: ignore`` on every access.
+    """
 
 
-def _make_backend():
+_UNSET = _Unset()
+_BACKEND: _BlobBackend | None | _Unset = _UNSET
+
+
+def _make_backend() -> _BlobBackend | None:
     try:
         from azure.storage.blob import ContainerClient
     except ImportError:
@@ -392,11 +400,11 @@ def _make_backend():
                                         credential=DefaultAzureCredential()))
 
 
-def _backend():
+def _backend() -> _BlobBackend | None:
     """Memoized ContainerClient (one credential handshake per process). Returns
     None when unconfigured / SDK absent, so the caller treats it as a miss."""
     global _BACKEND
-    if _BACKEND is _UNSET:
+    if isinstance(_BACKEND, _Unset):
         _BACKEND = _make_backend()
     return _BACKEND
 
