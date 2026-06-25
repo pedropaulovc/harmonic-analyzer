@@ -33,6 +33,7 @@ from _chain import (
     WRAP_R_A,
     WRAP_R_B,
 )
+import _telemetry
 from _common import anchor_point_to_origin, check, run_build, set_sketch_direct_db
 
 
@@ -47,11 +48,13 @@ async def _step(adapter: Any, label: str, coro) -> None:
     res = await coro
     ok = bool(res.is_success)
     state = await _state(adapter)
-    print(f"  {'OK ' if ok else 'XX '} {label} -> state={state}"
-          + ("" if ok else f"  [{res.error}]"))
+    if ok:
+        _telemetry.success(f"{label} -> state={state}")
+    else:
+        _telemetry.error(f"{label} -> state={state}  [{res.error}]")
     if state == "over_defined":
         over = await adapter.get_over_defining_relations()
-        print(f"  !!  over-defining: {over.data if over.is_success else over.error!r}")
+        _telemetry.warn(f"over-defining: {over.data if over.is_success else over.error!r}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -84,12 +87,12 @@ async def build(adapter: Any) -> dict[str, str]:
         await adapter.add_line(_BX + rb * _TNX, _BY + rb * _TNY, ra * _TNX, ra * _TNY),
     )
     set_sketch_direct_db(adapter, False)
-    print(f"  ..  initial state: {await _state(adapter)}")
+    _telemetry.debug(f"initial state: {await _state(adapter)}")
 
     await anchor_point_to_origin(adapter, f"{wrap_knob}.center", 0.0, 0.0, "knob centre")
-    print(f"  ..  after knob anchor: {await _state(adapter)}")
+    _telemetry.debug(f"after knob anchor: {await _state(adapter)}")
     await anchor_point_to_origin(adapter, f"{wrap_crank}.center", _BX, _BY, "crank centre")
-    print(f"  ..  after crank anchor: {await _state(adapter)}")
+    _telemetry.debug(f"after crank anchor: {await _state(adapter)}")
     for label, arc, radius in (
         ("knob radial", wrap_knob, ra),
         ("slack radial", slack, rs),
@@ -104,7 +107,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ("tangent slack-crank (arc-arc)", slack, wrap_crank),
     ):
         await _step(adapter, label, adapter.add_sketch_constraint(e1, e2, "tangent"))
-    print(f"  ..  final state: {await _state(adapter)}")
+    _telemetry.debug(f"final state: {await _state(adapter)}")
     check("exit_sketch", await adapter.exit_sketch())
     return {}
 

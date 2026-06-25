@@ -195,6 +195,49 @@ Gates produce no CAD artefact, so each writes a stamp under `cad/out/reports/`
 (`verify-*.ok` / `check-*.ok`) as its doit target — re-runs only when a `file_dep`
 changes. `cad/out/` is gitignored.
 
+## Observability — OpenTelemetry (do not `print`)
+
+The pipeline is instrumented with **OpenTelemetry**, not `print()`. `cad/scripts/
+_telemetry.py` is the spine; it is **preconfigured on import** (console logging +
+tracing, zero env, no collector) and re-exported through `_common`, so the ~170
+scripts that `from _common import log, check` are instrumented unchanged.
+
+- **Log, don't print.** Use the severity helpers — `_telemetry.debug` (`..`),
+  `.info` (`--`), `.success` (the old `  OK  `), `.warn` (`!!`), `.error` (`xx`).
+  Each prints the historical glyph line to **stderr** *and* emits a correlated
+  OTel log record at the matching `SeverityNumber`. `_common.log`/`check` are thin
+  aliases (`log`→`debug`, a passing `check`→`success`). New code must not add bare
+  `print()` for status — reserve `print` for machine-readable stdout a caller pipes.
+- **Spans, no gaps.** Wrap work in `with _telemetry.span("name", **attrs):` — it
+  sets status OK on clean exit and, on an exception, records it + sets ERROR before
+  re-raising, so a failure is never a silent hole. The build is a TREE of operation
+  spans, not a monolith: the per-step `_common` helpers (`define_circle`,
+  `extrude_at_offset`, `volume_check`, `save_part_and_images`, …) carry an
+  `@_telemetry.traced("sketch.circle", label_param="label")` decorator, so each
+  becomes a child span automatically. `verify.Report.gate` opens one per gate.
+  **Any new COM-touching entry point must open a span** (mirrors the COM-spine
+  invariant): an unparented operation is a gap. Add `@traced` to a new operation
+  helper rather than leaving it inside the parent span unsegmented.
+- **One span per build, no duplicate layer.** `dodo._run` opens a span NAMED for
+  the doit task (`part:cone_gear`, `verify:soundness`). `run_build` uses
+  `_telemetry.build_session`, which *continues* that span when the spine injected a
+  parent context (operation spans attach straight to the task span — no second
+  `build.<target>` layer) and opens a local `build.<target>` root only
+  when a build script is run standalone. So a build is one tree, never two
+  stacked roots for the same part.
+- **Cross-process trace continuity.** `dodo._run` injects W3C trace context
+  (`TRACEPARENT`) into each subprocess env via `_telemetry.inject_env`; the build
+  script's `build_session` extracts it, so the doit task and the process it
+  spawns are **one** end-to-end trace. Preserve `env=_telemetry.inject_env()` on any
+  new subprocess launch.
+- **Where it goes.** Console (stderr) by default; full span/log JSON is also
+  captured (best-effort, never fatal) under `cad/out/reports/telemetry/`
+  (`traces.jsonl` / `logs.jsonl`, gitignored). `HARMONIC_OTEL_QUIET=1` silences the
+  console channels (CI scrapes) without touching capture.
+- Safety net: `cad/scripts/test_telemetry.py` (SolidWorks-free) asserts the
+  severity split, no-gap span status, log↔trace correlation, and cross-process
+  propagation. Run it after editing `_telemetry.py`.
+
 ## Release-diff parallelism
 
 `comparisons/tools/render_diff.py` (the SolidWorks-free diff `cut_release` runs)

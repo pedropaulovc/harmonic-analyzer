@@ -54,6 +54,8 @@ from _common import (
     volume_check,
 )
 
+import _telemetry
+
 PART_NAME = "pen-hanger"
 MATERIAL = "Plain Carbon Steel"  # black hardware
 
@@ -121,7 +123,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Block")
     expected = (2.0 * BLOCK_HALF) ** 2 * (BLOCK_Z[1] - BLOCK_Z[0])
     vol = await _volume(adapter)
-    print(f"  volume after block: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    _telemetry.info(f"volume after block: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.005 * expected:
         raise RuntimeError(f"block volume {vol:.1f} != {expected:.1f}")
 
@@ -150,7 +152,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Channel")
     expected -= (2.0 * GUIDE_HOLE_HALF) ** 2 * 2.0 * BLOCK_HALF
     vol = await _volume(adapter)
-    print(f"  volume after channel: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    _telemetry.info(f"volume after channel: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.005 * expected:
         raise RuntimeError(f"channel volume {vol:.1f} != {expected:.1f}")
 
@@ -198,7 +200,7 @@ async def build(adapter) -> dict[str, str]:
     before = expected
     vol = await _volume(adapter)
     added = vol - before
-    print(f"  volume after strap: {vol:.1f} mm^3 (+{added:.1f}, solid {v_strap:.1f})")
+    _telemetry.info(f"volume after strap: {vol:.1f} mm^3 (+{added:.1f}, solid {v_strap:.1f})")
     if abs(added - v_strap) > 0.02 * v_strap:
         raise RuntimeError(f"strap: added {added:.1f}, expected {v_strap:.1f}")
     expected = vol
@@ -231,7 +233,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "ScrewHole")
     expected -= math.pi * (SCREW_HOLE_DIA / 2.0) ** 2 * (STRAP_Z[1] - STRAP_Z[0])
     vol = await _volume(adapter)
-    print(f"  volume after screw hole: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    _telemetry.info(f"volume after screw hole: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 1.0:
         raise RuntimeError(f"screw hole volume {vol:.1f} != {expected:.1f}")
 

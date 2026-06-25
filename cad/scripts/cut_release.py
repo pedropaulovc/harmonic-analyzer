@@ -64,6 +64,8 @@ from typing import Any
 
 from _common import CAD_ROOT, OUT_SLDASM, OUT_SLDPRT, log
 
+import _telemetry
+
 REPO_ROOT = CAD_ROOT.parent
 TOP_ASSEMBLY = "harmonic-analyzer"
 RELEASE_DIR = CAD_ROOT / "out" / "release"
@@ -991,35 +993,43 @@ def main() -> int:
     # the finally puts the real streams back and closes the file no matter what.
     log_path, restore = _start_release_log(version)
     try:
-        print(f"==  cutting release {version}", flush=True)
-        preflight(version, opts.allow_dirty)
+        # Wrap the whole release in a span; run_pipeline_span extracts the
+        # TRACEPARENT dodo._run injected (under `doit release`), so the release
+        # COM work + logs continue the doit task span instead of being detached.
+        with _telemetry.run_pipeline_span("release", version=version) as rel:
+            _telemetry.info(f"cutting release {version}")
+            preflight(version, opts.allow_dirty)
 
-        prev = previous_tag(version)
-        log(f"previous release for diff: {prev or '(none -- first bundle)'}")
+            prev = previous_tag(version)
+            log(f"previous release for diff: {prev or '(none -- first bundle)'}")
 
-        started = time.perf_counter()
-        try:
-            sw, revision = attach_solidworks()
-            zip_path, facts = bundle(sw, revision, version, prev)
-        except Exception:
-            traceback.print_exc()
-            return 1
+            started = time.perf_counter()
+            try:
+                sw, revision = attach_solidworks()
+                zip_path, facts = bundle(sw, revision, version, prev)
+            except Exception as exc:
+                # Mark the span ERROR before the early return, else the caught
+                # failure would exit the span cleanly and trace as success.
+                rel.record_exception(exc)
+                rel.set_status(_telemetry.Status(_telemetry.StatusCode.ERROR, str(exc)))
+                traceback.print_exc()
+                return 1
 
-        if opts.no_publish:
-            report_no_publish(version, zip_path, facts, log_path)
-            url = None
-        else:
-            url = publish(version, zip_path, facts, opts.draft, log_path)
-        print(f"\nDone in {time.perf_counter() - started:.1f}s.", flush=True)
-        print(f"  version: {version}")
-        print(f"  bundle:  {zip_path} ({facts['size_mb']:.1f} MB) -- solidworks/ + "
-              f"{facts['documents']} docs x STEP+STL (+{facts['config_meshes']} "
-              f"per-config) + {facts['pngs']} PNGs + boxes/")
-        print(f"  log:     {log_path}")
-        if facts.get("logs_asset"):
-            print(f"  logs:    {RELEASE_DIR / facts['logs_asset']}")
-        print(f"  release: {url or '(--no-publish: not published)'}")
-        return 0
+            if opts.no_publish:
+                report_no_publish(version, zip_path, facts, log_path)
+                url = None
+            else:
+                url = publish(version, zip_path, facts, opts.draft, log_path)
+            _telemetry.success(f"Done in {time.perf_counter() - started:.1f}s.")
+            _telemetry.info(f"version: {version}")
+            _telemetry.info(f"bundle:  {zip_path} ({facts['size_mb']:.1f} MB) -- solidworks/ + "
+                            f"{facts['documents']} docs x STEP+STL (+{facts['config_meshes']} "
+                            f"per-config) + {facts['pngs']} PNGs + boxes/")
+            _telemetry.info(f"log:     {log_path}")
+            if facts.get("logs_asset"):
+                _telemetry.info(f"logs:    {RELEASE_DIR / facts['logs_asset']}")
+            _telemetry.info(f"release: {url or '(--no-publish: not published)'}")
+            return 0
     finally:
         restore()
 

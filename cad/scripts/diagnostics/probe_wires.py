@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 
+import _telemetry
 from _common import (
     _flag,
     _read_member,
@@ -72,7 +73,7 @@ async def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
-    print("Connecting (ATTACH) ...", flush=True)
+    _telemetry.info("Connecting (ATTACH) ...")
     await adapter.connect()
     doc = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=None)
     if doc is None:
@@ -148,7 +149,7 @@ async def main():
         log(f"  pen-marker Y span = {max(ys) - min(ys):.3f} mm")
     log(f"  summing rock={spans.get('summing', 0):.1f}  wheel rock={spans.get('wheel', 0):.1f}")
     await adapter.disconnect()
-    print("Disconnected (NOT saved).", flush=True)
+    _telemetry.info("Disconnected (NOT saved).")
 
 
 async def _calc(adapter):

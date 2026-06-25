@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 
+import _telemetry
 from _common import (
     _flag,
     _read_member,
@@ -54,7 +55,7 @@ async def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
-    print("Connecting (ATTACH) ...", flush=True)
+    _telemetry.info("Connecting (ATTACH) ...")
     await adapter.connect()
     top = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=None)
     if top is None:
@@ -109,7 +110,7 @@ async def main():
         f"cam-after {'OK' if ok else 'FAIL'}")
 
     await adapter.disconnect()
-    print("Disconnected (doc left open).", flush=True)
+    _telemetry.info("Disconnected (doc left open).")
 
 
 if __name__ == "__main__":

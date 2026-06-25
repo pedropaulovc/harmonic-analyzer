@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 
+import _telemetry
 from _common import OUT_SLDASM, _flag, _read_member, log
 
 
@@ -75,7 +76,7 @@ async def main():
     log(f"drive-train.SLDASM = {dt} ({dt.stat().st_size} bytes)")
 
     adapter = PyWin32Adapter({})
-    print("Connecting ...", flush=True)
+    _telemetry.info("Connecting ...")
     await adapter.connect()
 
     # 1) STANDALONE: open drive-train.SLDASM directly, force rebuild, check.
@@ -106,7 +107,7 @@ async def main():
     _report(adapter, doc, "parent (drive-train FLEXIBLE, after ForceRebuild3)")
 
     await adapter.disconnect()
-    print("Disconnected (docs left open).", flush=True)
+    _telemetry.info("Disconnected (docs left open).")
 
 
 if __name__ == "__main__":

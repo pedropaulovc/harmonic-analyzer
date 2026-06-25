@@ -95,6 +95,8 @@ from _common import (
 # ORDINARY circle dims (blank OD, bore); the involute tooth-gap profile is left
 # undimensioned so it stays free to re-solve from the globals and mesh.
 
+import _telemetry
+
 PART_NAME = "cone-gear"
 MATERIAL = "Brass"  # ch. 13 text: polished brass gear stock; cone set matches
 # The four smallest tip gears read "more yellow ... a harder metal" (ch.12 p.21)
@@ -292,7 +294,7 @@ def pattern_count_dimension(adapter: Any, feature_name: str, expected: float) ->
             value = float(_read_member(param, "Value"))
         except (TypeError, ValueError):
             continue
-        print(f"  ..  {full} reads {value:g}")
+        _telemetry.debug(f"{full} reads {value:g}")
         if abs(value - expected) < 1e-9:
             return full
     raise RuntimeError(
@@ -347,7 +349,7 @@ async def build(adapter) -> dict[str, str]:
         atn_rad = "atn(%s)"  # atn returns radians
     else:
         raise RuntimeError(f"atn(1) evaluated to {atn_probe!r} -- unknown dialect")
-    print(f"  ..  atn dialect: atn(1) = {atn_probe:g}")
+    _telemetry.debug(f"atn dialect: atn(1) = {atn_probe:g}")
     atn_tmax = atn_rad % '"Tmax"'
 
     await set_global(adapter, "ToothCount", str(DEFAULT_TEETH), DEFAULT_TEETH)
@@ -414,7 +416,7 @@ async def build(adapter) -> dict[str, str]:
             f"blank sketch is {state!r} -- origin snap missing; a fix would "
             "break the Ra configuration link, aborting"
         )
-    print("  OK  blank sketch fully defined (driving dim, no fix)")
+    _telemetry.success("blank sketch fully defined (driving dim, no fix)")
     check("exit_sketch blank", await adapter.exit_sketch())
     blank_sketch = name_last_feature(adapter, "BlankProfile")
     drive_jobs += blank.apply(adapter, blank_sketch)
@@ -439,7 +441,7 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(
             f"blank volume {blank_volume:.1f} mm^3, expected {expected_blank:.1f}"
         )
-    print(f"  OK  blank volume {blank_volume:.1f} mm^3 (com z {com_z:.2f})")
+    _telemetry.success(f"blank volume {blank_volume:.1f} mm^3 (com z {com_z:.2f})")
 
     # The blank diameter is now the named dim ``BlankDia@BlankProfile`` (its
     # 2*Ra drive is queued in ``drive_jobs``, applied in the deferred batch
@@ -458,7 +460,7 @@ async def build(adapter) -> dict[str, str]:
             f"{od_dim} reads {before!r}, matches neither {2 * facts['Ra']:.6g} in "
             f"nor {2 * ra_default_mm:.6g} mm"
         )
-    print(f"  ..  {od_dim} reads {before:g} (unit factor {dim_unit:g})")
+    _telemetry.debug(f"{od_dim} reads {before:g} (unit factor {dim_unit:g})")
 
     # ------------------------------------------------------------------
     # Configured bore (Appendix C #7): origin-snapped circle + DRIVING
@@ -494,7 +496,7 @@ async def build(adapter) -> dict[str, str]:
             f"bore sketch is {state!r} -- origin snap missing; a fix would "
             "break the BoreDia configuration link, aborting"
         )
-    print("  OK  bore sketch fully defined (driving dim, no fix)")
+    _telemetry.success("bore sketch fully defined (driving dim, no fix)")
     check("exit_sketch bore", await adapter.exit_sketch())
     bore_sketch = name_last_feature(adapter, "BoreProfile")
     drive_jobs += bore.apply(adapter, bore_sketch)
@@ -517,7 +519,7 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(
             f"bored blank volume {bored_volume:.1f} mm^3, expected {expected_bored:.1f}"
         )
-    print(f"  OK  bored blank volume {bored_volume:.1f} mm^3")
+    _telemetry.success(f"bored blank volume {bored_volume:.1f} mm^3")
 
     # ------------------------------------------------------------------
     # One tooth gap, all six profile entities equation-driven (t in [0,1]).
@@ -575,7 +577,7 @@ async def build(adapter) -> dict[str, str]:
         )
     except RuntimeError as exc:
         findings.append(str(exc))
-        print(f"  FINDING  {exc}")
+        _telemetry.warn(f"FINDING  {exc}")
     check("exit_sketch gap", await adapter.exit_sketch())
     # Name the gap profile, but record NO SketchDims: the involute flanks must
     # MESH with the mating gear, so they stay equation-curve-driven and
@@ -629,9 +631,9 @@ async def build(adapter) -> dict[str, str]:
         )
         if res.is_success:
             pattern = res
-            print(f"  OK  circular pattern axis via point {point}")
+            _telemetry.success(f"circular pattern axis via point {point}")
             break
-        print(f"  ..  axis candidate {point} failed: {res.error}")
+        _telemetry.debug(f"axis candidate {point} failed: {res.error}")
     if pattern is None:
         raise RuntimeError("circular pattern: no axis candidate selectable")
     count_dim = pattern_count_dimension(adapter, pattern.data.name, DEFAULT_TEETH)
@@ -730,7 +732,7 @@ async def build(adapter) -> dict[str, str]:
             raise RuntimeError(
                 f"{name}: pattern instance count reads {count:g}, expected {teeth}"
             )
-        print(f"  OK  {name}: pattern count = {count:g}")
+        _telemetry.success(f"{name}: pattern count = {count:g}")
 
         cfg = gear_facts(teeth)
         ra_mm = cfg["Ra"] * 25.4
@@ -752,8 +754,8 @@ async def build(adapter) -> dict[str, str]:
                 "produced wrong geometry"
             )
         volumes[name] = volume
-        print(
-            f"  OK  {name}: volume {volume:.1f} mm^3 "
+        _telemetry.success(
+            f"{name}: volume {volume:.1f} mm^3 "
             f"(analytic {expected:.1f}, blank {blank_mm3:.1f})"
         )
 
@@ -767,7 +769,7 @@ async def build(adapter) -> dict[str, str]:
                 f"{2.0 * cfg['Ra'] * dim_unit:g} -- dimension equation did not "
                 "regenerate"
             )
-        print(f"  OK  {name}: blank diameter dim = {od:g}")
+        _telemetry.success(f"{name}: blank diameter dim = {od:g}")
 
         img = (png_dir / f"{PART_NAME}_{name}_isometric.png").resolve()
         check(
@@ -787,7 +789,7 @@ async def build(adapter) -> dict[str, str]:
     ordered = [volumes[name] for name, _ in CONFIGS]
     if not all(a < b for a, b in zip(ordered, ordered[1:], strict=False)):
         raise RuntimeError(f"volumes not monotonically increasing: {volumes}")
-    print(f"  OK  volumes monotonic: {ordered}")
+    _telemetry.success(f"volumes monotonic: {ordered}")
 
     # Determinism: revisit the first configuration after the full cycle.
     first_name, _ = CONFIGS[0]
@@ -801,7 +803,7 @@ async def build(adapter) -> dict[str, str]:
             f"{first_name} volume drifted on revisit: {revisit} vs "
             f"{volumes[first_name]} -- regeneration is not deterministic"
         )
-    print(f"  OK  {first_name} volume reproduced on revisit: {revisit:.1f} mm^3")
+    _telemetry.success(f"{first_name} volume reproduced on revisit: {revisit:.1f} mm^3")
 
     check("activate T120 for saved views", await adapter.set_active_configuration("T120"))
     await report_mass_properties(adapter)

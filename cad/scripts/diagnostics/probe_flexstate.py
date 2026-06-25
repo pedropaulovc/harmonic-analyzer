@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 
+import _telemetry
 from _common import _flag, _read_member, log
 from build_motion_study import MOVING_SUBS, _components
 
@@ -23,7 +24,7 @@ async def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
-    print("Connecting (ATTACH) ...", flush=True)
+    _telemetry.info("Connecting (ATTACH) ...")
     await adapter.connect()
     doc = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=None)
     if doc is None:
@@ -45,7 +46,7 @@ async def main():
         log(f"  {sub:16s} : Solving={solving} ({SOLVE.get(solving, '?')})  IsFixed={fixed}")
 
     await adapter.disconnect()
-    print("Disconnected.", flush=True)
+    _telemetry.info("Disconnected.")
 
 
 if __name__ == "__main__":

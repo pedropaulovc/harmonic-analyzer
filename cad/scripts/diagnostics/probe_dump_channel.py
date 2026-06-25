@@ -21,6 +21,7 @@ import math
 from build_motion_study import (
     DISTANCE, ANGLE, OUT_SLDASM, _iter_mates, _mate_value, _real_parts, _family,
 )
+import _telemetry
 from _common import log
 
 
@@ -28,7 +29,7 @@ async def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
-    print("Connecting ...", flush=True)
+    _telemetry.info("Connecting ...")
     await adapter.connect()
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     path = str((OUT_SLDASM / "channel.SLDASM").resolve())
@@ -66,7 +67,7 @@ async def main():
         log(f"    {tag:6s} {fam:16s} {v:10.1f} {unit:3s}  x{len(names):2d}  {names[0]}")
 
     await adapter.disconnect()
-    print("Disconnected (NOT saved).", flush=True)
+    _telemetry.info("Disconnected (NOT saved).")
 
 
 if __name__ == "__main__":

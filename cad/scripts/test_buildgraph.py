@@ -13,6 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import _telemetry  # noqa: E402
 import _buildgraph as bg  # noqa: E402
 from _buildgraph import (  # noqa: E402
     ASSEMBLY_ORDER,
@@ -259,12 +260,14 @@ def _run() -> int:
             continue
         try:
             fn()
-            print(f"  OK  {name}")
+            _telemetry.success(name)
         except AssertionError as exc:
             failures += 1
-            print(f"  XX  {name}: {exc}")
-    print(f"\n{'FAIL' if failures else 'PASS'}: "
-          f"{failures} failure(s)")
+            _telemetry.error(f"{name}: {exc}")
+    if failures:
+        _telemetry.error(f"FAIL: {failures} failure(s)")
+    else:
+        _telemetry.success("PASS: 0 failure(s)")
     return 1 if failures else 0
 
 

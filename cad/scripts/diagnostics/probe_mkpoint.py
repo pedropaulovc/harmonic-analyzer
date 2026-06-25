@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 
+import _telemetry
 from _common import _flag, _read_member, check, log
 from build_motion_study import _find_one
 from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
@@ -27,7 +28,7 @@ async def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
-    print("Connecting (ATTACH) ...", flush=True)
+    _telemetry.info("Connecting (ATTACH) ...")
     await adapter.connect()
     top = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=None)
     if top is None:
@@ -67,7 +68,7 @@ async def main():
     log(f"  re-activated {top_title!r}; success={made is not None}")
 
     await adapter.disconnect()
-    print("Disconnected (NOT saved).", flush=True)
+    _telemetry.info("Disconnected (NOT saved).")
 
 
 if __name__ == "__main__":

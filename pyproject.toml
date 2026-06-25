@@ -19,6 +19,11 @@ requires-python = ">=3.11"
 #   azure-storage-blob / azure-identity
 #             - remote build-artefact cache backend (_artifact_cache.py): a Blob
 #               container over HTTPS, keyless auth via DefaultAzureCredential
+#   opentelemetry-api / opentelemetry-sdk
+#             - observability spine (cad/scripts/_telemetry.py): the whole
+#               pipeline is traced + logged through OTel. The SDK ships the
+#               console span/log exporters we preconfigure, so no collector or
+#               extra exporter package is required for the default console path.
 dependencies = [
     "doit>=0.36",
     "pyyaml>=6.0",
@@ -30,6 +35,12 @@ dependencies = [
     "comtypes>=1.4 ; sys_platform == 'win32'",
     "azure-storage-blob>=12.19",
     "azure-identity>=1.16",
+    "opentelemetry-api>=1.20",
+    "opentelemetry-sdk>=1.20",
+    # OTLP/HTTP exporter so spans+logs ship to a collector / the .NET Aspire
+    # dashboard out of the box (see _telemetry._DEFAULT_OTLP_ENDPOINT). HTTP, not
+    # gRPC, to avoid a grpcio build on newer Pythons.
+    "opentelemetry-exporter-otlp-proto-http>=1.20",
     # The SolidWorks COM adapter + gate logic (verify.py, _common.py, _assembly.py
     # all `from solidworks_mcp...`) lives in the sibling repo. Pulled in editable so
     # the whole pipeline runs from this one uv venv.

@@ -64,6 +64,8 @@ from build_cone_gear import (
     set_global_read,
 )
 
+import _telemetry
+
 PART_NAME = "transgear-removable"
 MATERIAL = "Plain Carbon Steel"  # ch. 23 photos: steel, unlike the brass wheels
 
@@ -238,7 +240,7 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(
             f"blank volume {blank_volume:.1f} mm^3, expected {expected_blank:.1f}"
         )
-    print(f"  OK  blank volume {blank_volume:.1f} mm^3 (com z {com_z:.2f})")
+    _telemetry.success(f"blank volume {blank_volume:.1f} mm^3 (com z {com_z:.2f})")
 
     # The radial dim was renamed D1 -> BlankRadial by blank.apply above, so the
     # captured auto-name "D1@..." would be stale -- reference the new name.
@@ -252,7 +254,7 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(
             f"{radial_dim} reads {before!r}, matches neither inches nor mm"
         )
-    print(f"  ..  {radial_dim} reads {before:g} (unit factor {dim_unit:g})")
+    _telemetry.debug(f"{radial_dim} reads {before:g} (unit factor {dim_unit:g})")
     check(
         f"link {radial_dim} to Ra",
         await adapter.create_equation(
@@ -355,9 +357,9 @@ async def build(adapter) -> dict[str, str]:
         )
         if res.is_success:
             pattern = res
-            print(f"  OK  circular pattern axis via point {point}")
+            _telemetry.success(f"circular pattern axis via point {point}")
             break
-        print(f"  ..  axis candidate {point} failed: {res.error}")
+        _telemetry.debug(f"axis candidate {point} failed: {res.error}")
     if pattern is None:
         raise RuntimeError("circular pattern: no axis candidate selectable")
     count_dim = pattern_count_dimension(adapter, pattern.data.name, DEFAULT_TEETH)
@@ -380,7 +382,7 @@ async def build(adapter) -> dict[str, str]:
             f"toothed disc volume {toothed:.1f} mm^3, analytic "
             f"{expected_toothed:.1f} -- pattern produced wrong geometry"
         )
-    print(f"  OK  toothed disc volume {toothed:.1f} (analytic {expected_toothed:.1f})")
+    _telemetry.success(f"toothed disc volume {toothed:.1f} (analytic {expected_toothed:.1f})")
 
     # ------------------------------------------------------------------
     # Mounting interface (config-independent, after the pattern): bore +
@@ -447,7 +449,7 @@ async def build(adapter) -> dict[str, str]:
             f"driven part volume {driven:.1f} mm^3, analytic {expected_driven:.1f} "
             "-- drive equations are not geometry-neutral"
         )
-    print(f"  OK  driven part volume {driven:.1f} (equations neutral, analytic {expected_driven:.1f})")
+    _telemetry.success(f"driven part volume {driven:.1f} (equations neutral, analytic {expected_driven:.1f})")
 
     await apply_material(adapter, MATERIAL)
 
@@ -497,7 +499,7 @@ async def build(adapter) -> dict[str, str]:
                 "regeneration produced wrong geometry"
             )
         volumes[name] = volume
-        print(f"  OK  {name}: count {count:g}, volume {volume:.1f} (analytic {expected:.1f})")
+        _telemetry.success(f"{name}: count {count:g}, volume {volume:.1f} (analytic {expected:.1f})")
 
         radial = read_dimension(adapter, radial_dim)
         if abs(radial - cfg["Ra"] * dim_unit) > 1e-4 * cfg["Ra"] * dim_unit:
@@ -535,7 +537,7 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(
             f"{first_name} volume drifted on revisit: {revisit} vs {volumes[first_name]}"
         )
-    print(f"  OK  {first_name} volume reproduced on revisit: {revisit:.1f} mm^3")
+    _telemetry.success(f"{first_name} volume reproduced on revisit: {revisit:.1f} mm^3")
 
     check("activate T24 for saved views", await adapter.set_active_configuration("T24"))
     await report_mass_properties(adapter)

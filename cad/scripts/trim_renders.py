@@ -14,9 +14,13 @@ deterministic, so re-running on unchanged renders is a no-op.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from PIL import Image, ImageChops
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _telemetry  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT_PNG = ROOT / "cad" / "out" / "png"
@@ -70,4 +74,4 @@ def trim_readme_render(asm_name: str) -> str | None:
 
 if __name__ == "__main__":
     for asm in README_RENDERS:
-        print(trim_readme_render(asm) or f"--  skip {asm} (no isometric render)")
+        _telemetry.info(trim_readme_render(asm) or f"skip {asm} (no isometric render)")

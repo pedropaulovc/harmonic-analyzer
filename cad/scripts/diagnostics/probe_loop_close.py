@@ -28,6 +28,7 @@ from __future__ import annotations
 import asyncio
 import math
 
+import _telemetry
 from _common import OUT_SLDASM, check, log
 from build_motion_study import (
     ASM, _by_z_rank, _comp_xform, _components, _entity_ref, _find_one,
@@ -108,7 +109,7 @@ async def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
-    print("Connecting ...", flush=True)
+    _telemetry.info("Connecting ...")
     await adapter.connect()
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     log("CloseAllDocuments (clean session)")
@@ -176,7 +177,7 @@ async def main():
             adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
 
     await adapter.disconnect()
-    print("Disconnected (doc left open).", flush=True)
+    _telemetry.info("Disconnected (doc left open).")
 
 
 if __name__ == "__main__":

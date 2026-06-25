@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 
+import _telemetry
 from _common import _flag, _read_member, check, log
 from build_motion_study import _by_z_rank, _comp_xform, _components, _find_one, _rot_angle
 
@@ -34,7 +35,7 @@ async def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
-    print("Connecting (ATTACH) ...", flush=True)
+    _telemetry.info("Connecting (ATTACH) ...")
     await adapter.connect()
     doc = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=None)
     if doc is None:
@@ -79,7 +80,7 @@ async def main():
     log("  consistent crank~180 + maxrock>0 => reset-before-calc is reliable.")
 
     await adapter.disconnect()
-    print("Disconnected (NOT saved).", flush=True)
+    _telemetry.info("Disconnected (NOT saved).")
 
 
 if __name__ == "__main__":

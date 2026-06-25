@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import math
 
+import _telemetry
 from _common import _flag, _read_member, log
 
 # part-local bore locals (mm) from build_channel_assembly.py
@@ -81,7 +82,7 @@ async def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
-    print("Connecting (ATTACH) ...", flush=True)
+    _telemetry.info("Connecting (ATTACH) ...")
     await adapter.connect()
     doc = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=None)
     if doc is None:
@@ -131,7 +132,7 @@ async def main():
     await _try_mate(adapter, "distance", rod2, rk2, "closest")
 
     await adapter.disconnect()
-    print("Disconnected (doc left open).", flush=True)
+    _telemetry.info("Disconnected (doc left open).")
 
 
 if __name__ == "__main__":

@@ -47,6 +47,8 @@ from _common import (
     volume_check,
 )
 
+import _telemetry
+
 PART_NAME = "column-clamp"
 MATERIAL = "Gray Cast Iron"  # green casting
 
@@ -145,7 +147,7 @@ async def build(adapter) -> dict[str, str]:
         * COLLAR_HALF_H
     )
     vol = await _volume(adapter)
-    print(f"  volume after collar: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    _telemetry.info(f"volume after collar: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.005 * expected:
         raise RuntimeError(f"collar volume {vol:.1f} != {expected:.1f}")
 
@@ -216,10 +218,10 @@ async def build(adapter) -> dict[str, str]:
     if feature is None:
         raise RuntimeError("channel cut: FeatureCut4 returned None")
     name_last_feature(adapter, "BarChannel")
-    print(f"  OK  channel cut at offset {CHANNEL_FLOOR_Y}")
+    _telemetry.success(f"channel cut at offset {CHANNEL_FLOOR_Y}")
     expected -= _channel_removed_volume()
     vol = await _volume(adapter)
-    print(f"  volume after channel: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    _telemetry.info(f"volume after channel: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.01 * expected:
         raise RuntimeError(f"channel volume {vol:.1f} != {expected:.1f}")
 
@@ -248,7 +250,7 @@ async def build(adapter) -> dict[str, str]:
         math.pi * (PINCH_HOLE_DIA / 2.0) ** 2 * (COLLAR_OD - COLLAR_BORE) / 2.0
     )
     vol = await _volume(adapter)
-    print(f"  volume after pinch hole: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    _telemetry.info(f"volume after pinch hole: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.01 * expected:
         raise RuntimeError(f"pinch hole volume {vol:.1f} != {expected:.1f}")
 
