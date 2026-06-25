@@ -1632,10 +1632,14 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
                 root.record_exception(exc)
                 root.set_status(_telemetry.Status(_telemetry.StatusCode.ERROR, str(exc)))
             _telemetry.error(f"build {script} failed: {exc}", exc_info=True)
-            _telemetry.shutdown()
-            return 1
-        _telemetry.success(f"done in {time.perf_counter() - _T0:.1f}s")
-        for key, value in artefacts.items():
-            _telemetry.info(f"artefact {key}: {value}")
+            rc = 1
+        else:
+            _telemetry.success(f"done in {time.perf_counter() - _T0:.1f}s")
+            for key, value in artefacts.items():
+                _telemetry.info(f"artefact {key}: {value}")
+            rc = 0
+    # Flush AFTER the build_session `with` has closed the root span -- shutting the
+    # providers down inside the block would tear down the exporters before the
+    # ERROR root span is ended/exported, losing exactly the failure trace.
     _telemetry.shutdown()
-    return 0
+    return rc

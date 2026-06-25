@@ -51,8 +51,6 @@ import numpy as np
 # import inside main() (see note below) so the Hausdorff pool workers never pay the
 # VTK import cost -- they re-run this cheap env setup but never import pyvista.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "cad" / "scripts"))
-import _telemetry  # noqa: E402
 from osmesa_win import enable_offscreen_gl
 
 enable_offscreen_gl()
@@ -307,8 +305,8 @@ def classify(old, new, keys, tol=0.01, jobs=0):
             continue                  # identical signature -> unchanged (free)
         to_verify.append(k)
     identical = len(keys) - len(changed) - len(to_verify)
-    _telemetry.info(f"CRC pass: {len(changed)} new, {len(to_verify)} to geometry-verify, "
-                    f"{identical} identical (of {len(keys)} meshes)")
+    print(f"CRC pass: {len(changed)} new, {len(to_verify)} to geometry-verify, "
+          f"{identical} identical (of {len(keys)} meshes)", flush=True)
     for k in to_verify:
         po, pn = old.stl(k), new.stl(k)
         if not (po and pn):
@@ -325,15 +323,16 @@ def classify(old, new, keys, tol=0.01, jobs=0):
         verdict = "CHANGED" if d > tol else "identical"
         if d > tol:
             changed.add(k)
-        _telemetry.debug(f"[{i}/{len(pending)}] verify {k:34s} ~Hausdorff={d:8.3f} mm "
-                         f"-> {verdict}")
+        print(f"  [{i}/{len(pending)}] verify {k:34s} ~Hausdorff={d:8.3f} mm "
+              f"-> {verdict}", flush=True)
 
     n_jobs = jobs if jobs > 0 else _auto_jobs(len(pending))
     if n_jobs == 1 or len(pending) == 1:
         for i, task in enumerate(pending, 1):
             record(i, *_hausdorff_job(task))
     else:
-        _telemetry.debug(f"(Hausdorff over {len(pending)} meshes on {n_jobs} workers)")
+        print(f"  (Hausdorff over {len(pending)} meshes on {n_jobs} workers)",
+              flush=True)
         with ProcessPoolExecutor(max_workers=n_jobs) as ex:
             futures = [ex.submit(_hausdorff_job, task) for task in pending]
             for i, fut in enumerate(as_completed(futures), 1):
@@ -364,20 +363,20 @@ def main():
     args.out.mkdir(parents=True, exist_ok=True)
     CACHE.mkdir(parents=True, exist_ok=True)
 
-    _telemetry.info(f"old: {old_rel or args.old_local}   new: {new_rel or args.new_local}")
+    print(f"old: {old_rel or args.old_local}   new: {new_rel or args.new_local}")
     old = make_source(old_rel, args.old_local)
     new = make_source(new_rel, args.new_local)
 
     scene = new.scene()
     comps = scene["components"]
     keys = {(c.get("mesh") or c["part"]) for c in comps}
-    _telemetry.info(f"scene: {len(comps)} components, {len(keys)} unique meshes")
+    print(f"scene: {len(comps)} components, {len(keys)} unique meshes")
 
-    _telemetry.info("classifying changed meshes ...")
+    print("classifying changed meshes ...", flush=True)
     changed, devs = classify(old, new, keys, jobs=args.jobs)
     changed_bases = sorted({base_part(k) for k in changed})
-    _telemetry.info(f"CHANGED parts ({len(changed_bases)}): "
-                    f"{', '.join(changed_bases) or '(none)'}")
+    print(f"\nCHANGED parts ({len(changed_bases)}): "
+          f"{', '.join(changed_bases) or '(none)'}\n", flush=True)
 
     # build the scene from the NEW bundle (pyvista imported here -- see top-of-file
     # note: keeping it out of module scope spares the Hausdorff pool workers the
@@ -404,14 +403,14 @@ def main():
                     smooth_shading=True, specular=0.2,
                     backface_culling=not is_changed)
         if idx % 50 == 0 or idx == len(comps):
-            _telemetry.debug(f"scene build {idx}/{len(comps)} instances ...")
-    _telemetry.debug(f"highlighted {n_hi} component instances")
+            print(f"  scene build {idx}/{len(comps)} instances ...", flush=True)
+    print(f"highlighted {n_hi} component instances", flush=True)
     pl.add_text(f"{old.label} -> {new.label}  (red = changed geometry)",
                 font_size=11, color="black")
 
     images = []
     views = (("iso", "iso"), ("front", "xy"), ("right", "yz"), ("top", "xz"))
-    _telemetry.info(f"rendering {len(views)} camera views at {args.res}px ...")
+    print(f"rendering {len(views)} camera views at {args.res}px ...", flush=True)
     for name, cpos in views:
         pl.camera_position = cpos
         if name == "iso":
@@ -421,7 +420,7 @@ def main():
         out = args.out / f"diff_{name}.png"
         pl.screenshot(str(out))
         images.append(out.name)
-        _telemetry.success(f"wrote {out}")
+        print("wrote", out, flush=True)
     pl.close()
 
     summary = {
@@ -434,7 +433,7 @@ def main():
     }
     sj = args.summary_json or (args.out / "diff_summary.json")
     sj.write_text(json.dumps(summary, indent=2))
-    _telemetry.info(f"summary: {sj}")
+    print("summary:", sj)
 
 
 if __name__ == "__main__":

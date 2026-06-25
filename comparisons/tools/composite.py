@@ -22,14 +22,10 @@ Per pair (see ../manifest.json):
 
 import argparse
 import json
-import sys
 import time
 from pathlib import Path
 
 from PIL import Image, ImageOps
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "cad" / "scripts"))
-import _telemetry  # noqa: E402
 
 COMP = Path(__file__).resolve().parents[1]
 REPO = COMP.parent
@@ -210,7 +206,7 @@ def regenerate(only: set[str] | None = None) -> dict[str, float]:
     manifest = load_manifest()
     scores = json.loads(SCORES.read_text(encoding="utf-8")) if SCORES.exists() else {}
     todo = [p for p in manifest["pairs"] if not only or p["id"] in only]
-    _telemetry.info(f"regenerating composites for {len(todo)} pairs")
+    print(f"regenerating composites for {len(todo)} pairs", flush=True)
     t0 = time.monotonic()
     for i, pair in enumerate(todo, 1):
         pid = pair["id"]
@@ -218,16 +214,16 @@ def regenerate(only: set[str] | None = None) -> dict[str, float]:
         if not p["ref"].exists():
             prepare_reference(pair)
         if not p["render"].exists():
-            _telemetry.info(f"[{i}/{len(todo)}] {pid}: no render yet, skipping")
+            print(f"  --  [{i}/{len(todo)}] {pid}: no render yet, skipping", flush=True)
             continue
         align = pair.get("align")
         aligned_render(pid, align)
         blend_overlay(pid, align)
         scores[pid] = score_pair(pid, align)
-        _telemetry.success(f"[{i}/{len(todo)}] {pid}: score {scores[pid]}"
-                           f"  ({time.monotonic() - t0:.0f}s)")
+        print(f"  OK  [{i}/{len(todo)}] {pid}: score {scores[pid]}"
+              f"  ({time.monotonic() - t0:.0f}s)", flush=True)
     SCORES.write_text(json.dumps(dict(sorted(scores.items())), indent=1), encoding="utf-8")
-    _telemetry.success(f"composites done: {len(todo)} pairs in {time.monotonic() - t0:.0f}s")
+    print(f"composites done: {len(todo)} pairs in {time.monotonic() - t0:.0f}s", flush=True)
     return scores
 
 
