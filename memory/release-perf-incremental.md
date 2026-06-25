@@ -37,30 +37,29 @@ STEP+STL, and rendered 486 PNGs **every** release. v0.9.1 reported "no part chan
 still spent ~546 s re-rendering byte-identical PNGs + re-exporting STEP/STL the `export`
 task had *just* produced in `cad/out`.
 
-**Fix (two parts, both incremental):**
-- **STEP/STL are now COPIED from `cad/out`** (`_stage_neutral_geometry`) instead of
-  re-SaveAs3'd. They are byte-equivalent: `_common._STL_INT_PREFS`, `export_models`, and
-  `cut_release` ALL export with `PREF_STL_UNITS:0` (= swMM), fine, binary, no-translate,
-  STEP AP214. The old "NEVER cad/out/stl, it's metre-unit" comment was **stale/wrong** —
-  verified all three share mm prefs. `_require_fresh` fails loud if cad/out is
-  stale/missing (export is release's spine predecessor, so fresh in the happy path).
-  Eliminates ~81 document opens.
-- **PNGs are still rendered on the seat but cached** by resolved-geometry fingerprint
-  (`_png_key` → `cad/out/release/png-cache/<key>/`). Part key = sha256(SLDPRT bytes,
-  captures geometry+stored appearance). Assembly key = sha256(monolithic resolved-geometry
-  STL + SLDASM bytes + colors.json) — a changed *child* part regenerates the mono STL, so
-  the assembly re-renders. **Safe-by-construction:** a cache miss only ever re-renders,
-  never serves a wrong image. A geometry-unchanged release opens **nothing**. Cache is
-  pruned to keys used this run (best-effort, never fatal). Bump `PNG_RENDER_REV` when
-  `_export_pngs` rendering params change.
+**Fix — PNG render cache only (STEP/STL still exported here):**
+- **STEP/STL stay re-exported per document via SaveAs3** (the proven v0.9.1 path).
+  ⚠️ A first cut of this work tried to COPY STEP/STL from `cad/out` to skip the 81
+  opens — **WRONG, caught by Codex P1 on PR #91.** `cad/out` is the *render cache*, not
+  the per-document neutral set: `comparisons/manifest.json` lists only `harmonic_analyzer`,
+  so `export_models` writes per-mesh STLs + the top assembly's STEP/STL ONLY — **no
+  per-part STEPs, no subassembly STEP/STL**. Copying would fail on the first missing part
+  STEP. The bundle ships 81 STEPs (73 parts + 8 asms); release must generate them itself.
+- **PNGs are rendered on the seat but cached** by resolved-geometry fingerprint
+  (`_png_key` → `cad/out/release/png-cache/<key>/`). Key = sha256(the just-exported
+  stage STL(s) for the doc) + sha256(source SLDPRT/SLDASM) + colors.json digest +
+  `PNG_RENDER_REV`. The exported STL is the actual resolved geometry being rendered (for
+  an assembly the monolithic STL bakes in every child), so a changed child re-renders the
+  assembly; the source-doc hash catches mate/appearance changes; colors.json catches any
+  other colour change. **Safe-by-construction:** a miss only ever re-renders, never serves
+  a wrong image. `_staged_pngs` copies the cached set on a hit (no SaveBMP) else renders
+  the open doc + populates the cache (atomic rename). Cache pruned to keys used this run
+  (best-effort). Bump `PNG_RENDER_REV` when `_export_pngs` params change.
 
-Net on the v0.9.1 (no-change) case: release ~663 s → ~75 s (pack-and-go + copy + diff +
-zip). On a typical few-parts-changed release: only the changed parts + the top assembly
-re-render.
-
-Dead code removed from cut_release: `_set_export_prefs`, `_restore_export_prefs`,
-`_active_config`, the `SW_SAVE_*` + neutral-export `PREF_*/TOGGLE_*/_EXPORT_*` block
-(release no longer SaveAs3-exports geometry).
+Net: a geometry-unchanged release still OPENS every doc (for STEP/STL) but skips all 486
+SaveBMP renders — the bulk of release time. (Skipping the opens too would need either a
+complete per-document STEP/STL cache or expanding `export_models` to emit the full set;
+deferred as a seat-validated follow-up.) STEP/STL export prefs + SaveAs3 options retained.
 
 ## ⚠️ Validation status
 
