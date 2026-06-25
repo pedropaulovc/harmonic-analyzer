@@ -263,8 +263,9 @@ forces serial (debugging / a fallback if the spawn-mode pool misbehaves).
   inside the already-serial release job — not worth extracting.) The release PNG
   cost is instead addressed by an **incremental render cache** keyed on
   resolved-geometry fingerprint (`cut_release._png_key`), so a geometry-unchanged
-  release re-renders nothing; STEP/STL are copied from `cad/out` rather than
-  re-exported. See `memory/release-perf-incremental.md`.
+  release re-renders nothing. (STEP/STL are still SaveAs3-exported per document —
+  `cad/out` is the manifest-driven render cache, not the full per-document neutral
+  set, so it cannot be copied wholesale.) See `memory/release-perf-incremental.md`.
 - **`diff:<stem>` per-part doit fan-out — not a fit.** `render_diff` renders the
   *whole* assembly in 4 views, not per-part images; the expensive, parallelizable
   work is the Hausdorff loop, which is now parallelized inside the script (above)
