@@ -72,6 +72,7 @@ from __future__ import annotations
 
 import math
 import sys
+from typing import Any
 
 import _config
 from _common import (
@@ -556,7 +557,7 @@ def _assert_plate_threading(eye_y: float) -> None:
     )
 
 
-def _spring_spec(amplitude: float, hole_x_0: float) -> dict[str, float]:
+def _spring_spec(amplitude: float, hole_x_0: float) -> dict[str, Any]:
     """Per-channel stretched-spring geometry (parametric-springs memory, task #10).
 
     The lever lifts/tilts with the amplitude, so the top eye moves to
