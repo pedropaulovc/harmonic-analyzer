@@ -148,7 +148,9 @@ _COMPONENT_BAND = {
     "summing": (8, 10),         # ch 18-19, measured 9
     "magnifier": (10, 12),      # ch 20-21, measured 11
     "pen": (6, 8),              # ch 24, measured 7
-    "paper-drive": (89, 93),    # ch 22-23-25, measured 91 (27 placed + 64-link chain)
+    "paper-drive": (95, 99),    # ch 22-23-25, measured 97 (27 placed + 70-link chain;
+    # chain re-laid to the front plane z-146, PR #82 -- the longer loop grew the
+    # link count 64 -> 70; placed count unchanged, all moves were repositions)
     "harmonic-analyzer": (7, 9),  # measured 8: 7 subassemblies + 1 loose part (measuring-stick)
 }
 
