@@ -51,7 +51,7 @@ import _telemetry  # noqa: E402
 REPO = CAD_ROOT.parent
 COMP = REPO / "comparisons"
 sys.path.insert(0, str(COMP / "tools"))
-import composite  # noqa: E402  (PEP-723 header is inert on import)
+import composite  # type: ignore[import-not-found]  # noqa: E402  -- added to sys.path above at runtime
 
 VIEW_CONSTANTS = {
     "front": 1, "back": 2, "left": 3, "right": 4, "top": 5,
@@ -442,7 +442,7 @@ def _pixel_rms(a: Path, b: Path) -> float:
     if ia.size != ib.size:
         ib = ib.resize(ia.size)
     total = 0
-    for va, vb in zip(ia.getdata(), ib.getdata(), strict=True):
+    for va, vb in zip(ia.getdata(), ib.getdata(), strict=True):  # type: ignore[call-overload]  # ImagingCore is iterable but PIL stubs don't declare it
         d = va - vb
         total += d * d
     return (total / (ia.width * ia.height)) ** 0.5

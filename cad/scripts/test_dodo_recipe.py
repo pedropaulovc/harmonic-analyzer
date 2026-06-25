@@ -13,6 +13,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 def _load_dodo():
     spec = importlib.util.spec_from_file_location("dodo", REPO_ROOT / "dodo.py")
+    assert spec is not None and spec.loader is not None, f"could not locate dodo.py under {REPO_ROOT}"
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
