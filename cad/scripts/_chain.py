@@ -30,7 +30,17 @@ import math
 # Chain-wheel centres, machine xy pre-mirror.
 KNOB_CENTRE = (65.0, 241.78)  # build_paper_drive_assembly KNOB_SHAFT_XY (ch30
 # rest state: latch C2C 66.05 from the stud, y clamped under the pinion bar)
-CRANK_CENTRE = (118.0, 126.8)  # build_drive_train_assembly X_CRANK, Y_DRIVE
+# The crank chain-wheel rides the crankshaft, so its centre IS (X_CRANK, Y_DRIVE).
+# Hardcoded as a literal (like KNOB_CENTRE above) -- NOT imported from
+# build_drive_train_assembly. _chain feeds the leaf chain-link PARTS through
+# _chain_link, and a leaf part must not transitively depend on _assembly
+# (test_buildgraph / check:graph enforces this); importing the drive-train
+# assembly module would drag _assembly into that import chain. Instead,
+# build_paper_drive_assembly._assert_chain_layout pins this value to the live
+# drive-train (X_CRANK, Y_DRIVE) and fails loud on drift, so a stale literal can
+# never silently mis-anchor the chain over the relocated 64T/cone. The cleaner
+# split (leaf-safe geometry vs assembly-time layout, no literal) is issue #86.
+CRANK_CENTRE = (157.57676628832596, 126.8)  # drive-train X_CRANK, Y_DRIVE
 
 TIP_R_T24 = 26.0  # mounted removables, module 2: tip r = (T + 2) * 2 / 2
 TIP_R_T12 = 14.0
