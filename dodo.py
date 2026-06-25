@@ -763,7 +763,11 @@ def task_verify():
     asm_targets = [_sldasm(s) for s in ASSEMBLY_ORDER]
     suite_deps = {
         "soundness": asm_targets,
-        "subsystems": asm_targets,
+        # subsystems now runs ONLY the channel assembly's instance-independence
+        # gate (soundness already runs the shared health battery on every
+        # assembly), so it depends on and targets the channel sub alone -- no
+        # reason to re-run when an unrelated assembly changes.
+        "subsystems": [_sldasm("channel")],
         "kinematics": [
             _sldasm("pen"),
             str((SCRIPTS_DIR / "pen_driver.py").resolve()),
@@ -773,13 +777,14 @@ def task_verify():
     # Pass the graph's assemblies EXPLICITLY (dashed names) rather than letting
     # verify.py glob every *.SLDASM under cad/out/sldasm -- a stray/scratch
     # assembly left in a worktree must not be verified (codex review). kinematics
-    # targets only the pen sub (verify.py's own default), so it needs no names.
+    # targets only the pen sub (verify.py's own default), so it needs no names;
+    # subsystems targets only the channel sub.
     asm_names = [s.replace("_", "-") for s in ASSEMBLY_ORDER]
+    suite_names = {"soundness": asm_names, "subsystems": ["channel"]}
     for suite, deps in suite_deps.items():
         stamp = str(REPORTS / f"verify-{suite}.ok")
         cmd = [sys.executable, str(VERIFY_PY)]
-        if suite in ("soundness", "subsystems"):
-            cmd += asm_names
+        cmd += suite_names.get(suite, [])
         cmd += ["--suite", suite]
         yield {
             "name": suite,
