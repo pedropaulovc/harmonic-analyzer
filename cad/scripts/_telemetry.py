@@ -41,9 +41,9 @@ import socket
 import sys
 import time
 import urllib.parse
-from collections.abc import Iterator, Mapping
+from collections.abc import AsyncGenerator, Generator, Mapping
 from pathlib import Path
-from typing import Any
+from typing import IO, Any, cast
 
 from opentelemetry import context as otel_context
 from opentelemetry import trace
@@ -55,10 +55,9 @@ from opentelemetry.sdk._logs.export import (
     SimpleLogRecordProcessor,
 )
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import (
     ConsoleSpanExporter,
-    ReadableSpan,
     SimpleSpanProcessor,
 )
 from opentelemetry.trace import Span, Status, StatusCode
@@ -155,7 +154,8 @@ class _FriendlyFormatter(logging.Formatter):
 
 def _compact_span(span: ReadableSpan) -> str:
     """One depth-indented line per finished span: ``⟩ name 1.23s OK [attrs]``."""
-    depth = int((span.attributes or {}).get("harmonic.depth", 0))
+    depth_raw = (span.attributes or {}).get("harmonic.depth", 0)
+    depth = int(depth_raw) if isinstance(depth_raw, (int, float, str)) else 0
     dur = (span.end_time - span.start_time) / 1e9 if span.end_time and span.start_time else 0.0
     status = span.status.status_code.name if span.status else "UNSET"
     mark = {"OK": "OK", "ERROR": "xx", "UNSET": "--"}.get(status, status)
@@ -239,7 +239,12 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     if want_console:
         tracer_provider.add_span_processor(
             SimpleSpanProcessor(
-                ConsoleSpanExporter(out=_LiveStderr(), formatter=_compact_span)
+                ConsoleSpanExporter(
+                    # _LiveStderr is a write/flush proxy (duck-typed IO) that
+                    # re-resolves sys.stderr per write; the stub wants a concrete IO.
+                    out=cast(IO[str], _LiveStderr()),
+                    formatter=_compact_span,
+                )
             )
         )
     tdir = _telemetry_dir()
@@ -382,13 +387,15 @@ def _exit_span(handle: Any, exc: BaseException | None) -> None:
         span.record_exception(exc)
         span.set_status(Status(StatusCode.ERROR, str(exc)))
         error(f"{span.name if isinstance(span, ReadableSpan) else 'span'} failed: {exc}")
-    elif span.status.status_code is StatusCode.UNSET:
+    elif cast(ReadableSpan, span).status.status_code is StatusCode.UNSET:
+        # get_current_span() is typed Span (mutable, has set_status); only
+        # ReadableSpan exposes .status -- the live SDK span is both.
         span.set_status(Status(StatusCode.OK))
     cm.__exit__(type(exc) if exc else None, exc, exc.__traceback__ if exc else None)
 
 
 @contextlib.contextmanager
-def span(name: str, /, **attributes: Any) -> Iterator[Span]:
+def span(name: str, /, **attributes: Any) -> Generator[Span, None, None]:
     """Span context manager that leaves no gaps.
 
     On a clean exit the span status is set OK; on an exception it records the
@@ -406,7 +413,7 @@ def span(name: str, /, **attributes: Any) -> Iterator[Span]:
 
 
 @contextlib.asynccontextmanager
-async def aspan(name: str, /, **attributes: Any) -> Any:
+async def aspan(name: str, /, **attributes: Any) -> AsyncGenerator[Span, None]:
     """Async sibling of :func:`span` for ``async with`` build steps."""
     sp, handle, _ = _enter_span(name, attributes)
     try:
@@ -459,7 +466,7 @@ def traced(name: str, *, label_param: str | None = None):
 
 
 @contextlib.contextmanager
-def build_session(label: str, /, **attributes: Any) -> Iterator[Span | None]:
+def build_session(label: str, /, **attributes: Any) -> Generator[Span | None, None, None]:
     """Root context for a build *process* (``_common.run_build``).
 
     Under the doit spine a parent trace context is injected (``TRACEPARENT``), so
@@ -516,7 +523,7 @@ def _parent_context_from_env() -> Any | None:
 
 
 @contextlib.contextmanager
-def run_pipeline_span(stage: str, /, **attributes: Any) -> Iterator[Span]:
+def run_pipeline_span(stage: str, /, **attributes: Any) -> Generator[Span, None, None]:
     """Root span for a whole process invocation (a build script, a doit action,
     a verify suite). Opening this first guarantees every later span has a parent
     — the outermost wrapper that closes the last gap in the trace.
