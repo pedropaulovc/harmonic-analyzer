@@ -149,7 +149,10 @@ CONE_T120_PITCH_R = (120.0 / DP_TRAIN) * 25.4 / 2.0  # 30.59: largest cone gear 
 # gates, cams, rockers and bars; nothing here may move them).
 _DRUM_SEAT_NOMINAL = _config.machine("cone_incline", "drum_seat_nominal_mm")  # 7.2204 (OD 62.2)
 Z_PITCH = _DRUM_SEAT_NOMINAL * math.cos(math.asin(RADIUS_STEP / _DRUM_SEAT_NOMINAL))  # 7.0566: drum z-pitch
-X_DRUM = -47.5  # rocker-support boss bore + arbor pedestal
+X_DRUM = 54.7  # cam-drum machine X = -54.7 (book ch30 view 1/8 line-2 photogrammetry:
+# the drum sits well clear of the rocker-support at +72.9, driving the rockers via
+# LONG connecting rods, not the short near-vertical rods of the old +47.5 placement).
+# The whole cone/64T/crank train cascades rigidly off this (DRUM_TIP_X -> X_PITCH ...).
 Z_DRUM0 = _config.machine("channels", "station_z0_mm")  # -67.1 drum gear 0 plane (shared station anchor)
 
 # True-cone incline (M6.7, exact tracking -- see module docstring). Values are
@@ -246,16 +249,24 @@ ARBOR_LENGTH = 176.0  # shortened from 200 (2026-06-19): the now-solid portal
 # y 126.8) by ~7.6 and still covering the drum stack (north end z +70.6). North
 # end unsupported for now -- the north pedestal is DEFERRED to the cone-position
 # rework. Must match cylinder-gear-shaft SHAFT_LENGTH.
-CRANKSHAFT_Z0 = -150.0  # front end; crank-arm hub at +12 (PIN_HOLE_HEIGHT)
-CRANKSHAFT_LENGTH = 120.0  # build_crankshaft.py SHAFT_LENGTH
-CRANK_ARM_Z0 = CRANKSHAFT_Z0 + 8.0  # hub centre 12 - half thickness 4
+CRANKSHAFT_Z0 = -160.0  # outboard (crank) end, extended 10 mm south (was -150)
+# so the arm seats here, SOUTH of the chain wheel; north end stays at -30
+CRANKSHAFT_LENGTH = 130.0  # build_crankshaft.py SHAFT_LENGTH (-160..-30)
+CRANK_ARM_Z0 = CRANKSHAFT_Z0  # arm hub at the shaft's south end (-160..-152), in
+# FRONT of (south of) the T12 chain wheel (-148.5..-143.5): the arm + the handle
+# (its grip extends -Z, further south) then sweep entirely south of the chain
+# plane (-146) and cannot foul the chain when the crank turns (user, book p005).
 ARM_C2C = 66.0  # handle pivot from the shaft axis (rederived from the ch30
 # eight-views, see build_crank_arm.py; was 150 -- a down-pointing 150 arm put
 # the handle below the table)
-REMOVABLE_Z0 = -85.6  # mounted T12 (face 5.0) against the pedestal north face:
-# the crank-end chain wheel is the small removable gear (ch. 23 -- the bead
-# chain rides its m2 teeth; v2_gears_010 shows the small steel wheel on the
-# crank pedestal), band -85.6..-80.6
+REMOVABLE_Z0 = -148.5  # mounted T12 (face 5.0): band -148.5..-143.5, mid -146 =
+# the front chain plane (book ch30 p005/p002 -- chain a flat loop on the front
+# face, cone behind), between the pedestal (south face -131.6) and the crank arm
+# (now -160..-152). The plane clears the paper-drive stub disc (-134.5..-137.5)
+# by 6.5; the arm sits 3.5 SOUTH of the wheel so the rotating arm/handle never
+# crosses it. Was -85.6 (north of the pedestal) -- that put the chain in the
+# cone-post's Z-band and collided. The small removable gear is the chain wheel
+# (ch. 23 -- bead chain on its m2 teeth; v2_gears_010).
 PEDESTAL_Z = -108.6  # crank pedestal centre (front face inside base edge)
 ARBOR_PEDESTAL_Z = 90.5  # SOUTH end only (at z -90.5): the rocker support no
 # longer clamps the arbor, but the solid portal north upright leaves no room for

@@ -30,7 +30,15 @@ import math
 # Chain-wheel centres, machine xy pre-mirror.
 KNOB_CENTRE = (65.0, 241.78)  # build_paper_drive_assembly KNOB_SHAFT_XY (ch30
 # rest state: latch C2C 66.05 from the stud, y clamped under the pinion bar)
-CRANK_CENTRE = (118.0, 126.8)  # build_drive_train_assembly X_CRANK, Y_DRIVE
+# The crank chain-wheel rides the crankshaft, so its centre IS (X_CRANK, Y_DRIVE).
+# Import it live rather than hardcoding: when the drive train moves (the cam drum
+# relocated to book line-2, cascading X_CRANK outboard), a stale literal leaves the
+# chain drawn over the OLD crank position -- which is now where the relocated
+# 64T/cone sit, so the chain wrap collides with them. (build_drive_train_assembly
+# is side-effect-free at module scope -- pure constants + a self-check assertion.)
+from build_drive_train_assembly import X_CRANK as _X_CRANK, Y_DRIVE as _Y_DRIVE  # noqa: E402
+
+CRANK_CENTRE = (_X_CRANK, _Y_DRIVE)
 
 TIP_R_T24 = 26.0  # mounted removables, module 2: tip r = (T + 2) * 2 / 2
 TIP_R_T12 = 14.0

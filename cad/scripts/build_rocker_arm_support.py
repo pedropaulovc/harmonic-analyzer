@@ -72,8 +72,10 @@ from __future__ import annotations
 import sys
 
 from _common import (
+    CASTING_GREEN,
     SketchDims,
     add_line_chain,
+    apply_color,
     apply_material,
     check,
     define_centered_rectangle,
@@ -90,7 +92,11 @@ from _common import (
 )
 
 PART_NAME = "rocker-arm-support"
-MATERIAL = "AISI 1020 Steel, Cold Rolled"  # source part's database material
+# The source repro was authored in steel, but this casting is now the machine's
+# green rocker-arm-support (it replaced rocker-arm-portal): match the other cast
+# structure (harmonic-base, top-frame) and the registry row (Gray Cast Iron,
+# materials.yaml casting_green_parts) so it renders green, not steel-grey.
+MATERIAL = "Gray Cast Iron"
 
 # Trapezoid (Sketch1) -- wide foot / narrow top, half-extents in mm. On the
 # Right plane: sketch-x -> model Z (taper), sketch-y -> model Y (height).
@@ -492,6 +498,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "driven part (equations neutral)", 240_512, 200)
 
     await apply_material(adapter, MATERIAL)
+    await apply_color(adapter, CASTING_GREEN)  # green-painted casting, like the base/top-frame
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 
