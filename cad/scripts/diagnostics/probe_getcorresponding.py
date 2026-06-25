@@ -18,6 +18,7 @@ import asyncio
 
 from solidworks_mcp.adapters.com_variant import null_callout
 
+import _telemetry
 from _common import OUT_SLDASM, _flag, _read_member, log
 
 
@@ -69,7 +70,7 @@ async def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
-    print("Connecting ...", flush=True)
+    _telemetry.info("Connecting ...")
     await adapter.connect()
 
     await adapter.create_assembly()
@@ -136,7 +137,7 @@ async def main():
                     f"-> {'READY for AddMate5' if cnt == 2 else 'NOT ready'}")
 
     await adapter.disconnect()
-    print("Disconnected.", flush=True)
+    _telemetry.info("Disconnected.")
 
 
 if __name__ == "__main__":

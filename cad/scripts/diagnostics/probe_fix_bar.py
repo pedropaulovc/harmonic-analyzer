@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 
+import _telemetry
 from _common import (
     _read_member,
     log,
@@ -52,7 +53,7 @@ async def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
-    print("Connecting ...", flush=True)
+    _telemetry.info("Connecting ...")
     await adapter.connect()
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     asm_path = str((OUT_SLDASM / "harmonic-analyzer.SLDASM").resolve())
@@ -131,7 +132,7 @@ async def main():
         log(f"  final amplitude-bar-1 IsFixed={bool(_read_member(bar_c, 'IsFixed'))}")
 
     await adapter.disconnect()
-    print("Disconnected (NOT saved).", flush=True)
+    _telemetry.info("Disconnected (NOT saved).")
 
 
 if __name__ == "__main__":

@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 
+import _telemetry
 from _common import (
     _flag,
     _read_member,
@@ -66,7 +67,7 @@ async def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
-    print("Connecting (ATTACH) ...", flush=True)
+    _telemetry.info("Connecting (ATTACH) ...")
     await adapter.connect()
     doc = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=None)
     if doc is None:
@@ -132,7 +133,7 @@ async def main():
         "still erratic/0 => need a different de-redundancy.")
 
     await adapter.disconnect()
-    print("Disconnected (cams now point-on-axis, doc NOT saved).", flush=True)
+    _telemetry.info("Disconnected (cams now point-on-axis, doc NOT saved).")
 
 
 if __name__ == "__main__":

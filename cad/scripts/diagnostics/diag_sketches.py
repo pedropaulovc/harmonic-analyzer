@@ -11,6 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+import _telemetry  # noqa: E402
 from _common import check, run_build  # noqa: E402
 from render_compare import _flag  # noqa: E402
 
@@ -24,7 +25,7 @@ def _get(obj, name):
 
 
 def list_sketches(model, label: str) -> None:
-    print(f"--- features of {label} ---")
+    _telemetry.info(f"features of {label}")
     feat = _get(model, "FirstFeature")
     while feat is not None:
         _flag(feat, "IFeature")
@@ -35,7 +36,7 @@ def list_sketches(model, label: str) -> None:
                 vis = _get(feat, "Visible")
             except Exception:
                 pass
-            print(f"  {_get(feat, 'Name')}  type={tn}  visible={vis}")
+            _telemetry.info(f"{_get(feat, 'Name')}  type={tn}  visible={vis}")
         feat = _get(feat, "GetNextFeature")
 
 

@@ -46,6 +46,8 @@ from _assembly import (
 )
 from build_motion_study_springs import _eye_point
 
+import _telemetry
+
 # --- rig geometry (mm, assembly frame) --------------------------------------
 SHAFT_R = 6.35 / 2.0       # pivot-shaft OD radius
 BORE_R = 6.5 / 2.0         # pivot-bushing bore radius
@@ -166,7 +168,7 @@ async def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
     adapter = PyWin32Adapter({})
-    print("Connecting ...", flush=True)
+    _telemetry.info("Connecting ...")
     await adapter.connect()
     check("create_assembly", await adapter.create_assembly())
     log("created empty POC assembly (never saved)")
@@ -277,7 +279,7 @@ async def main():
             f"moving-anchor springs quasi-statically")
 
     await adapter.disconnect()
-    print("Disconnected (NOT saved).", flush=True)
+    _telemetry.info("Disconnected (NOT saved).")
 
 
 if __name__ == "__main__":

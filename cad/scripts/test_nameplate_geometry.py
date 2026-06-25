@@ -39,6 +39,8 @@ import math
 
 from _nameplate_geometry import BORDER_INNER, BORDER_OUTER, LETTERING_LOOPS
 
+import _telemetry
+
 # Golden analytic targets, captured when the loops were re-imported from
 # cad/references/nameplate-engraving.dxf (engraving even-odd region, pinstripe
 # band, finished volume) -- the regression guard recomputes them >= the 99% bar.
@@ -124,7 +126,7 @@ if __name__ == "__main__":
     eng = _engraving_area()
     band = _band_area()
     vol = _plate_volume()
-    print("nameplate primitive geometry vs golden analytic targets")
-    print(f"  engraving area : {eng:9.4f}  golden {GOLDEN_ENGRAVING_AREA:9.4f}  -> {_pct(eng, GOLDEN_ENGRAVING_AREA):7.3f}%")
-    print(f"  pinstripe band : {band:9.4f}  golden {GOLDEN_BAND_AREA:9.4f}  -> {_pct(band, GOLDEN_BAND_AREA):7.3f}%")
-    print(f"  plate volume   : {vol:9.3f}  golden {GOLDEN_VOLUME:9.3f}  -> {_pct(vol, GOLDEN_VOLUME):7.3f}%")
+    _telemetry.info("nameplate primitive geometry vs golden analytic targets")
+    _telemetry.info(f"engraving area : {eng:9.4f}  golden {GOLDEN_ENGRAVING_AREA:9.4f}  -> {_pct(eng, GOLDEN_ENGRAVING_AREA):7.3f}%")
+    _telemetry.info(f"pinstripe band : {band:9.4f}  golden {GOLDEN_BAND_AREA:9.4f}  -> {_pct(band, GOLDEN_BAND_AREA):7.3f}%")
+    _telemetry.info(f"plate volume   : {vol:9.3f}  golden {GOLDEN_VOLUME:9.3f}  -> {_pct(vol, GOLDEN_VOLUME):7.3f}%")
