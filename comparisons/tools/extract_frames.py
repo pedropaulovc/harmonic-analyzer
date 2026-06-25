@@ -18,11 +18,7 @@ Usage:
 import argparse
 import json
 import subprocess
-import sys
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "cad" / "scripts"))
-import _telemetry  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
 EG = REPO / "references" / "engineerguy-youtube"
@@ -71,9 +67,9 @@ def main() -> int:
              "-frames:v", "1", str(out)],
             check=True,
         )
-        _telemetry.success(f"{e['id']} -> {out.name}")
+        print(f"  OK  {e['id']} -> {out.name}")
         n_done += 1
-    _telemetry.success(f"extracted {n_done}, skipped {n_skip} existing")
+    print(f"extracted {n_done}, skipped {n_skip} existing")
     return 0
 
 
