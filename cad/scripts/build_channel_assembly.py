@@ -730,8 +730,8 @@ async def build(adapter) -> dict[str, str]:
     # (only the _verify_pattern_z banks read the bushings back), so their exact
     # transform IS their final pose. Instead of a per-part insert+fix (~116 COM
     # round-trips, each fix re-solving the assembly) their (part, pose) specs are
-    # COLLECTED here and inserted in ONE AddComponents3 + multiselect-fixed in ONE
-    # MultiSelect2 + FixComponent after the loop (place_components_batch). The
+    # COLLECTED here and inserted in ONE AddComponents3 + fixed in ONE
+    # FixComponent (Select2 each, one solve) after the loop (place_components_batch). The
     # moving parts keep the per-part place_component path -- their insertion pose
     # seeds the mate flip-recovery, so they are not batchable.
     grounded_specs: list[dict[str, object]] = []
@@ -880,9 +880,10 @@ async def build(adapter) -> dict[str, str]:
             })
 
     # Insert + ground the whole grounded cosmetic bank (springs + both bushing
-    # banks) in two COM calls total: one AddComponents3 for all ~58 parts, one
-    # MultiSelect2 + FixComponent to fix them -- versus the per-part insert+fix it
-    # replaces (~116 round-trips, each fix re-solving the assembly). Done after
+    # banks): one AddComponents3 for all ~58 parts, then Select2 each + one
+    # FixComponent (a single mate solve) to fix them -- versus the per-part
+    # insert+fix it replaces (~116 round-trips, each fix re-solving the
+    # assembly). Done after
     # the mating loop because these parts carry no mates and nothing reads them
     # back until the bank checks below.
     await place_components_batch(
