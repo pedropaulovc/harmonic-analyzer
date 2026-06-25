@@ -72,6 +72,7 @@ from __future__ import annotations
 
 import math
 import sys
+from typing import Any
 
 import _config
 from _common import (
@@ -90,6 +91,7 @@ from _assembly import (
     distance_driver,
     named_ref,
     place_component,
+    place_components_batch,
     save_assembly_and_images,
     spin_driver,
     world_point,
@@ -561,7 +563,7 @@ def _assert_plate_threading(eye_y: float) -> None:
     )
 
 
-def _spring_spec(amplitude: float, hole_x_0: float) -> dict[str, float]:
+def _spring_spec(amplitude: float, hole_x_0: float) -> dict[str, Any]:
     """Per-channel stretched-spring geometry (parametric-springs memory, task #10).
 
     The lever lifts/tilts with the amplitude, so the top eye moves to
@@ -730,6 +732,16 @@ async def build(adapter) -> dict[str, str]:
     # exposes no sense override, so the seed+pattern is not deterministic. The
     # moving parts stay individual mated instances so each channel articulates
     # independently (a different harmonic frequency) for the Motion study.
+    #
+    # These grounded parts carry NO mates and are referenced by nobody downstream
+    # (only the _verify_pattern_z banks read the bushings back), so their exact
+    # transform IS their final pose. Instead of a per-part insert+fix (~116 COM
+    # round-trips, each fix re-solving the assembly) their (part, pose) specs are
+    # COLLECTED here and inserted in ONE AddComponents3 + fixed in ONE
+    # FixComponent (Select2 each, one solve) after the loop (place_components_batch). The
+    # moving parts keep the per-part place_component path -- their insertion pose
+    # seeds the mate flip-recovery, so they are not batchable.
+    grounded_specs: list[dict[str, object]] = []
     for j in range(CHANNELS):
         zj = z_station(j)
         z_mid = zj + ARM_MID_DZ
@@ -845,33 +857,45 @@ async def build(adapter) -> dict[str, str]:
         # rows = Rz(theta).Ry90: local +Y (coil axis) -> the span direction,
         # local +Z (eye axis) -> the in-plane normal. theta=0 recovers ROT_Y_POS90.
         spring_rows = [[0.0, 0.0, -1.0], [ux, uy, 0.0], [uy, -ux, 0.0]]
-        await place_component(
-            adapter, spec["part"],
-            [hole_x_0 + SPRING_BOTTOM_LEAD * ux,
-             PLATE_EYE_Y + SPRING_BOTTOM_LEAD * uy, z_mid],
-            [0.0, 0.0, 0.0], spring_rows,
-            label=(f"channel-spring ch{j:02d} {spec['part'].rsplit('-', 1)[-1]} "
-                   f"body={spec['body']:.2f} tilt={spec['theta']:+.2f}"),
-        )
+        grounded_specs.append({
+            "part": spec["part"],
+            "position": [hole_x_0 + SPRING_BOTTOM_LEAD * ux,
+                         PLATE_EYE_Y + SPRING_BOTTOM_LEAD * uy, z_mid],
+            "rotation": [0.0, 0.0, 0.0],
+            "rows": spring_rows,
+            "label": (f"channel-spring ch{j:02d} {spec['part'].rsplit('-', 1)[-1]} "
+                      f"body={spec['body']:.2f} tilt={spec['theta']:+.2f}"),
+        })
 
         # Bushings (ground; cosmetic) ride the shafts in the inter-channel gaps:
         # one pivot + one lever bushing in the gap BELOW every channel j>=1,
         # placed explicitly (deterministic) instead of seed + LocalLinearPattern
-        # -- see the note above the channel loop.
+        # -- see the note above the channel loop. Collected for the batch insert.
         if CHANNELS > 1 and j >= 1:
             z_gap = z_mid - PITCH / 2.0  # gap between channels j-1 and j
-            await place_component(
-                adapter, "pivot-bushing",
-                [PIVOT[0], PIVOT[1], z_gap],
-                [0.0, 0.0, 0.0], IDENTITY,
-                label=f"pivot-bushing gap {j - 1:02d}/{j:02d}",
-            )
-            await place_component(
-                adapter, "lever-bushing",
-                [FULCRUM[0], FULCRUM[1], z_gap],
-                [0.0, 0.0, 0.0], IDENTITY,
-                label=f"lever-bushing gap {j - 1:02d}/{j:02d}",
-            )
+            grounded_specs.append({
+                "part": "pivot-bushing",
+                "position": [PIVOT[0], PIVOT[1], z_gap],
+                "rotation": [0.0, 0.0, 0.0], "rows": IDENTITY,
+                "label": f"pivot-bushing gap {j - 1:02d}/{j:02d}",
+            })
+            grounded_specs.append({
+                "part": "lever-bushing",
+                "position": [FULCRUM[0], FULCRUM[1], z_gap],
+                "rotation": [0.0, 0.0, 0.0], "rows": IDENTITY,
+                "label": f"lever-bushing gap {j - 1:02d}/{j:02d}",
+            })
+
+    # Insert + ground the whole grounded cosmetic bank (springs + both bushing
+    # banks): one AddComponents3 for all ~58 parts, then Select2 each + one
+    # FixComponent (a single mate solve) to fix them -- versus the per-part
+    # insert+fix it replaces (~116 round-trips, each fix re-solving the
+    # assembly). Done after
+    # the mating loop because these parts carry no mates and nothing reads them
+    # back until the bank checks below.
+    await place_components_batch(
+        adapter, grounded_specs, label="grounded bank (springs + bushings)"
+    )
 
     # Confirm both bushing banks landed on the inter-channel gap planes. The
     # explicit placements above are deterministic; this guards a future off-by-one

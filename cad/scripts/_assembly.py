@@ -635,6 +635,222 @@ async def place_component(
         assert_component_placed(adapter, name, position, rows)
         return name
 
+def _placement_transform(rows: list[list[float]], position_mm: list[float]) -> list[float]:
+    """The 16-double ``IMathTransform`` for a component at ``rows``/``position_mm``.
+
+    Matches the ``Transform2.ArrayData`` layout SolidWorks reports (and that
+    :func:`component_transform` / :func:`assert_component_placed` already
+    validate): the 3x3 rotation row-major in [0:9], the translation (METRES) in
+    [9:12], the scale (1.0) at [12], the last three unused. Feeding
+    ``AddComponents3`` this exact layout makes the read-back assert hold by
+    construction -- the same matrix SW would have produced via per-part insert.
+    """
+    flat_rows = [c for row in rows for c in row]
+    return [
+        *flat_rows,
+        position_mm[0] / 1000.0,
+        position_mm[1] / 1000.0,
+        position_mm[2] / 1000.0,
+        1.0, 0.0, 0.0, 0.0,
+    ]
+
+
+async def place_components_batch(
+    adapter: Any,
+    specs: list[dict[str, Any]],
+    *,
+    label: str = "batch",
+) -> list[str]:
+    """Insert many components in ONE ``AddComponents3`` call, then fix
+    the grounded ones (``Select2`` each, then ONE ``FixComponent``) -- the COM-call-
+    cheap path for repeated GROUNDED structure (cosmetic springs, shaft bushings)
+    that carries no mates.
+
+    Each ``spec`` is a dict:
+
+      * ``part`` -- part stem (``<part>.SLDPRT`` under the part-output dir),
+      * ``position`` -- origin (mm) in the pre-mirror machine frame,
+      * ``rows`` -- rotation rows (images of the part X/Y/Z axes), pre-mirror,
+      * ``rotation`` -- Euler angles (optional; carried only for parity with
+        :func:`place_component`, the transform is built from ``rows``),
+      * ``ground`` -- fix the component (default ``True``),
+      * ``mirror`` -- route through ``mirror_placement`` (default ``True``),
+      * ``label`` -- log label (optional).
+
+    Why this is safe to batch where :func:`place_component` is not: these parts
+    are GROUND (no mates) and inserted at an exact transform, so there is no mate
+    flip to recover and no insertion-pose coupling -- the placement IS the final
+    pose. The moving parts (rocker/rod/bar/lever) keep the per-part
+    :func:`place_component` path because their insertion pose seeds mate
+    flip-recovery (see ``_revolute`` / ``_pin_design_pose`` in the channel build).
+
+    A read-back assert runs per component (reading the returned ``IComponent2``'s
+    own ``Transform2``, with NO ``GetComponentByName`` round-trip): it matches each
+    component to its spec by ORIGIN (bijective, so it tolerates ``AddComponents3``
+    returning the array in a different order than ``Names`` rather than
+    false-failing on identical repeated parts -- the 19 bushings), then asserts
+    BOTH the translation and the rotation (``array[0:9]`` vs the spec's mirrored
+    rows -- the same check the per-part ``assert_component_placed`` runs) so a
+    misoriented or mislanded part fails loud immediately. The SAME origin match
+    drives the per-spec ``ground`` flag and the returned ``Name2`` order, so a
+    reorder can never fix/return the wrong component. Returns the component
+    ``Name2`` list in ``specs`` order.
+
+    The ``AddComponents3`` arrays cross the pywin32 late-binding boundary
+    VARIANT-wrapped (the SAFEARRAY rule): ``VT_ARRAY|VT_BSTR``
+    names/coord-system-names, ``VT_ARRAY|VT_R8`` transforms. The grounded
+    components are then fixed via per-component ``Select2`` + one ``FixComponent``
+    (see the selection block below for why not ``MultiSelect2``/``Select4``).
+    """
+    import pythoncom
+    from win32com.client import VARIANT
+
+    if not specs:
+        return []
+
+    names: list[str] = []
+    transforms: list[float] = []
+    finals: list[list[float]] = []  # final (mirrored) origin per spec, mm
+    expected_rows: list[list[float]] = []  # final (mirrored) rotation, flat 9, per spec
+    grounds: list[bool] = []
+    for spec in specs:
+        part = spec["part"]
+        if spec.get("configuration"):
+            raise RuntimeError(
+                f"place_components_batch: per-component configuration "
+                f"{spec['configuration']!r} unsupported (AddComponents3 places the "
+                f"default config); use place_component for {part!r}"
+            )
+        position = list(spec["position"])
+        rotation = list(spec.get("rotation", [0.0, 0.0, 0.0]))
+        rows = [list(r) for r in spec["rows"]]
+        if spec.get("mirror", True):
+            position, rotation, rows = mirror_placement(part, position, rotation, rows, "")
+        names.append(str(part_path(part)))  # raises if the .SLDPRT is missing
+        transforms.extend(_placement_transform(rows, position))
+        finals.append(position)
+        expected_rows.append([c for row in rows for c in row])
+        grounds.append(bool(spec.get("ground", True)))
+
+    asm = adapter.currentModel
+    _flag(asm, "IAssemblyDoc")
+    names_arg = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BSTR, names)
+    xforms_arg = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, transforms)
+    coordsys_arg = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BSTR, [""] * len(names))
+
+    # COM-touching entry point -> open a span (AGENTS.md no-gap tracing invariant),
+    # segmented into insert | readback+assert | fix child spans so the slow batch
+    # op is never an unsegmented hole under the task span.
+    out_names: list[str] = [""] * len(specs)
+    grounded_comps: list[Any] = []
+    async with _telemetry.aspan(
+        f"batch {label}", count=len(specs), grounded=sum(grounds),
+    ):
+        with _telemetry.span("batch.insert", count=len(names)):
+            raw = adapter._attempt(
+                lambda: asm.AddComponents3(names_arg, xforms_arg, coordsys_arg),
+                default=None,
+            )
+        if raw is None:
+            raise RuntimeError(
+                f"{label}: AddComponents3 returned None for {len(names)} components"
+            )
+        comps = list(raw) if isinstance(raw, (list, tuple)) else [raw]
+        if len(comps) != len(specs):
+            raise RuntimeError(
+                f"{label}: AddComponents3 returned {len(comps)} components, "
+                f"expected {len(specs)}"
+            )
+        _telemetry.debug(f"{label}: AddComponents3 inserted {len(comps)} components")
+
+        # Match each returned component to its spec by ORIGIN (bijective, 0.5 mm
+        # tol), then derive the ground flag + name + rotation assert from the
+        # MATCHED spec. AddComponents3 may return the array in a different order
+        # than Names, so zip(comps, specs) is unsafe: a reorder would fix the wrong
+        # component (leaving the intended grounded one floating) and scramble
+        # out_names. One Transform2 read/comp feeds the match AND the placement
+        # assert (translation in [9:12] + rotation in [0:9], same check the per-part
+        # assert_component_placed runs -- a bad AddComponents3 rotation/mirror
+        # packing lands the origin right but the orientation wrong, e.g. spring
+        # eye/threading pose). The pose is set at insert, so reading it before the
+        # fix is correct (FixComponent only pins the current pose).
+        #
+        # NB: deliberately NO per-component _flag(comp, "IComponent2"). Flagging the
+        # whole interface is 165 _FlagAsMethod GetIDsOfNames round-trips PER
+        # component (~0.45 s each -> ~26 s for the 58-part bank) and we need none of
+        # it: Name2/Transform2/ArrayData are property reads and Select2 is a method
+        # called WITH args (late binding dispatches it as a method unambiguously, no
+        # flag). Verified placing + selecting N/N with zero flagging.
+        with _telemetry.span("batch.readback", count=len(comps)):
+            used = [False] * len(specs)
+            for comp in comps:
+                array = [
+                    float(v)
+                    for v in _read_member(_read_member(comp, "Transform2"), "ArrayData")
+                ]
+                actual = [array[9] * 1000.0, array[10] * 1000.0, array[11] * 1000.0]
+                best, best_i = float("inf"), -1
+                for i, exp in enumerate(finals):
+                    if used[i]:
+                        continue
+                    d = max(abs(a - e) for a, e in zip(actual, exp))
+                    if d < best:
+                        best, best_i = d, i
+                if best_i < 0 or best > 0.5:
+                    raise RuntimeError(
+                        f"{label}: a component landed at "
+                        f"{[round(v, 3) for v in actual]} matching no expected "
+                        f"origin (nearest {best:.3f} mm > 0.5 mm tol)"
+                    )
+                rot_drift = max(
+                    abs(a - e)
+                    for a, e in zip(array[0:9], expected_rows[best_i], strict=True)
+                )
+                if rot_drift > 1e-3:
+                    raise RuntimeError(
+                        f"{label}: component at {[round(v, 3) for v in actual]} "
+                        f"rotation {[round(v, 4) for v in array[0:9]]} != expected "
+                        f"{[round(v, 4) for v in expected_rows[best_i]]} "
+                        f"(drift {rot_drift:.4f})"
+                    )
+                used[best_i] = True
+                out_names[best_i] = str(_read_member(comp, "Name2"))
+                if grounds[best_i]:
+                    grounded_comps.append(comp)
+
+        # Append every grounded component to the selection (IComponent2::Select2,
+        # one cheap call per component -- no mate solve), then fix the WHOLE
+        # selection in ONE FixComponent -> ONE solve, vs. one solve per part.
+        # Select2 is called on each raw dispatch directly. The alternatives fail
+        # under the adapter's forced late binding: MultiSelect2 silently selects 0
+        # (a SAFEARRAY of late-bound dispatch wrappers does not marshal -- raw
+        # _oleobj_ pointers raise "Type mismatch" too), and Select4 raises "Type
+        # mismatch" on its ISelectData arg. Select2(Append, Mark) takes only
+        # bool/int -- nothing to marshal -- so it is the late-binding-safe path.
+        if grounded_comps:
+            with _telemetry.span("batch.fix", grounded=len(grounded_comps)):
+                adapter._attempt(lambda: asm.ClearSelection2(True), default=None)
+                n_sel = sum(
+                    1
+                    for comp in grounded_comps
+                    if adapter._attempt(lambda c=comp: c.Select2(True, 0), default=False)
+                )
+                if n_sel != len(grounded_comps):
+                    raise RuntimeError(
+                        f"{label}: Select2 selected {n_sel}/{len(grounded_comps)} "
+                        f"grounded components"
+                    )
+                adapter._attempt(lambda: asm.FixComponent(), default=None)
+                adapter._attempt(lambda: asm.ClearSelection2(True), default=None)
+
+    _telemetry.success(
+        f"{label}: inserted {len(specs)} components"
+        f" (1x AddComponents3), fixed {len(grounded_comps)}"
+        f" (Select2 + 1x FixComponent)"
+    )
+    return out_names
+
+
 def assert_components_fully_defined(adapter: Any) -> None:
     """Raise when any top-level component is neither fixed, fully defined,
     nor a pattern instance.
