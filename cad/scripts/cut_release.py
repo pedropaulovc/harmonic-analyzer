@@ -62,13 +62,20 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
-from _common import CAD_ROOT, OUT_SLDASM, OUT_SLDPRT, log
+from _common import CAD_ROOT, OUT_SLDASM, OUT_SLDPRT, OUT_STL, log
 
 import _telemetry
 
 REPO_ROOT = CAD_ROOT.parent
 TOP_ASSEMBLY = "harmonic-analyzer"
 RELEASE_DIR = CAD_ROOT / "out" / "release"
+# The neutral STEP/STL the `export` task (COM-spine predecessor of release) writes.
+# The bundle COPIES these instead of re-running SaveAs3 on every document: they are
+# byte-equivalent (same AP214 / fine-binary-mm export prefs, same source docs as a
+# fresh export here -- _common, export_models and this file share the prefs), so the
+# re-export was ~81 redundant document opens. cad/out/stl is millimetre, untranslated
+# (units pref 211 -> 0 = swMM everywhere); the old "metre-unit" caveat was stale.
+OUT_STEP = CAD_ROOT / "out" / "step"
 # Per-task build/verify logs teed by dodo.py:_run (part-*, assembly-*, verify-*,
 # check-*). Shipped as a SEPARATE GitHub-release LOGS asset (zipped together with
 # this script's own *-release.log when there are several) -- see _logs_asset. Kept
@@ -91,31 +98,10 @@ SW_DOC_PART = 1  # swDocumentTypes_e.swDocPART
 SW_DOC_ASSEMBLY = 2  # swDocumentTypes_e.swDocASSEMBLY
 SW_OPEN_SILENT = 1  # swOpenDocOptions_e.swOpenDocOptions_Silent
 
-# SaveAs3 Options bitmask (swSaveAsOptions_e): Silent suppresses the "rebuild the
-# document before saving?" modal that a cold-opened assembly pops (its flexible
-# configs re-solve on open -> dirty); AvoidRebuildOnSave skips the needless
-# rebuild (the on-disk geometry is what the release ships).
-SW_SAVE_SILENT = 1  # swSaveAsOptions_Silent
-SW_SAVE_AVOID_REBUILD = 8  # swSaveAsOptions_AvoidRebuildOnSave
-SW_SAVE_OPTS = SW_SAVE_SILENT | SW_SAVE_AVOID_REBUILD
-
-# Neutral-format export user preferences (swUserPreferenceIntegerValue_e /
-# swUserPreferenceToggle_e ids, mirrored from export_models.py). STEP AP214
-# carries colours; STL is fine binary, in MILLIMETRES (viewer/slicer-friendly --
-# the release ships consumer geometry, NOT the metre-unit render cache), with the
-# model origin preserved so assembly STLs keep their components aligned.
-PREF_STL_QUALITY = 78        # int: swSTLQuality -> 2 = fine
-PREF_STEP_AP = 75            # int: swStepAP -> 214 (carries colours)
-PREF_STL_UNITS = 211         # int: swExportStlUnits -> 0 = swMM
-TOGGLE_STL_BINARY = 69       # swSTLBinaryFormat
-TOGGLE_STL_SHOW_INFO = 70    # swSTLShowInfoOnSave: the "Save <name>.STL?" modal
-TOGGLE_STL_ONE_FILE = 72     # swSTLComponentsIntoOneFile (monolithic asm STL)
-TOGGLE_STL_NO_TRANSLATE = 71  # swSTLDontTranslateToPositive: keep model origin
-_EXPORT_INTS = {PREF_STL_QUALITY: 2, PREF_STEP_AP: 214, PREF_STL_UNITS: 0}
-# swSTLShowInfoOnSave -> False: SaveAs3 to .STL otherwise pops a per-file
-# triangle-count info dialog that hangs the headless export on the first part.
-_EXPORT_TOGGLES = {TOGGLE_STL_BINARY: True, TOGGLE_STL_ONE_FILE: True,
-                   TOGGLE_STL_NO_TRANSLATE: True, TOGGLE_STL_SHOW_INFO: False}
+# (The neutral STEP/STL export prefs + SaveAs3 options that used to live here are
+# gone: the bundle now COPIES STEP/STL from cad/out -- written by the `export` task
+# under the SAME prefs (see _common._STL_INT_PREFS / export_models) -- instead of
+# re-running SaveAs3 per document. Only PNG rendering still drives SolidWorks here.)
 
 # Preview renders per document: (name, swStandardViews_e id). SaveBMP captures
 # the active viewport at an exact pixel size (the only screenshot API that does);
@@ -125,6 +111,19 @@ PNG_VIEWS = (
     ("left", 3), ("right", 4), ("top", 5),
 )
 PNG_WIDTH, PNG_HEIGHT = 1600, 1000
+
+# Incremental PNG render cache (gitignored, under the release dir). Rendering the
+# multi-angle previews is the single most expensive release step (~550 s for 486
+# PNGs in v0.9.1) AND the only step that genuinely needs the SolidWorks seat (SaveBMP
+# of the live viewport -- STEP/STL are copied from cad/out). Each document's PNG set
+# is cached under a key derived from its RESOLVED geometry, so a release whose
+# geometry is unchanged (the common case: most releases touch a handful of parts, and
+# v0.9.1 touched none) reuses the prior renders and opens nothing. A cache MISS only
+# ever costs a re-render -- it can never ship a wrong image.
+PNG_CACHE_DIR = RELEASE_DIR / "png-cache"
+# Bump when _export_pngs' rendering (views, pixel size, framing) changes so a code
+# change invalidates every cached render rather than shipping a stale-format image.
+PNG_RENDER_REV = "1"
 
 
 # --------------------------------------------------------------------------- #
@@ -417,35 +416,6 @@ def package(sw: Any, revision: str, zip_path: Path) -> dict[str, Any]:
     }
 
 
-def _set_export_prefs(sw: Any) -> dict[str, dict[int, Any]]:
-    """Apply the neutral-format export preferences, returning the prior values."""
-    old = {
-        "ints": {k: int(sw.GetUserPreferenceIntegerValue(k)) for k in _EXPORT_INTS},
-        "toggles": {k: bool(sw.GetUserPreferenceToggle(k)) for k in _EXPORT_TOGGLES},
-    }
-    for k, v in _EXPORT_INTS.items():
-        sw.SetUserPreferenceIntegerValue(k, v)
-    for k, v in _EXPORT_TOGGLES.items():
-        sw.SetUserPreferenceToggle(k, v)
-    return old
-
-
-def _restore_export_prefs(sw: Any, old: dict[str, dict[int, Any]]) -> None:
-    for k, v in old["ints"].items():
-        sw.SetUserPreferenceIntegerValue(k, v)
-    for k, v in old["toggles"].items():
-        sw.SetUserPreferenceToggle(k, v)
-
-
-def _active_config(doc: Any) -> str:
-    """Name of the document's active configuration ('' if unreadable)."""
-    try:
-        ac = doc.ConfigurationManager.ActiveConfiguration
-        return str(ac.Name or "") if ac is not None else ""
-    except Exception:  # noqa: BLE001
-        return ""
-
-
 def _export_pngs(doc: Any, png_dir: Path, stem: str) -> int:
     """Render the active document to a PNG per PNG_VIEWS angle; return the count.
 
@@ -487,49 +457,16 @@ def _assert_configs_distinct(stem: str, crc_by_mesh: dict[str, str]) -> None:
         seen[h] = mesh
 
 
-def export_neutral(sw: Any, stage: Path) -> dict[str, Any]:
-    """Export every built part and assembly to STEP + STL + PNGs under ``stage``.
+def _models(folder: Path, ext: str) -> list[Path]:
+    """Built documents of one type, excluding SolidWorks ~$ lock files."""
+    return sorted(p for p in folder.glob(f"*.{ext}") if not p.name.startswith("~"))
 
-    Alongside the Pack-and-Go native files (``stage/solidworks``), this fills the
-    *neutral* CAD a consumer without SolidWorks can open -- ``stage/step`` AP214
-    STEP (exact archival B-rep, colours carried), ``stage/stl`` fine binary STL
-    (mesh, for viewers/slicers), and ``stage/png`` a multi-angle PNG preview set
-    (PNG_VIEWS), one of each per part and per assembly. The caller zips the whole
-    ``stage`` into the single release bundle.
 
-    Opens each document with the comtypes session already attached for
-    Pack-and-Go and SaveAs3-exports it; assemblies write a monolithic STL and a
-    single assembly STEP (all components). Staged under the gitignored release
-    dir -- NEVER cad/out/stl, whose metre-unit untranslated meshes the render
-    cache (stl_bbox_mm / MIRROR_PLANE) depends on. Each file is closed with
-    CloseDoc (discards unsaved changes) so an under-defined config that re-solves
-    on open never pops a save modal.
-    """
-    step_dir = stage / "step"
-    stl_dir = stage / "stl"
-    png_root = stage / "png"
-    for d in (step_dir, stl_dir, png_root):
-        d.mkdir(parents=True, exist_ok=True)
-
-    # Close the top assembly Pack-and-Go left open BEFORE enumerating: while an
-    # assembly is loaded SolidWorks writes a per-component lock file (~$<name>)
-    # alongside each .SLDPRT, which would otherwise double the work list.
-    _discard_open_documents(sw)
-
-    def _models(folder: Path, ext: str) -> list[Path]:
-        return sorted(p for p in folder.glob(f"*.{ext}") if not p.name.startswith("~"))
-
-    # parts first (assemblies reference them), each (path, swDocType).
-    parts = _models(OUT_SLDPRT, "SLDPRT")
-    assemblies = _models(OUT_SLDASM, "SLDASM")
-    docs = [(p, SW_DOC_PART) for p in parts] + [(a, SW_DOC_ASSEMBLY) for a in assemblies]
-    log(f"neutral export: {len(parts)} parts + {len(assemblies)} assemblies")
-
-    # Per-config STL meshes the scene graph references: a single SLDPRT whose
-    # configurations are distinct geometry used simultaneously (the 20 cone gears,
-    # the 3 transgears). One-per-part covers everything else; these get an extra
-    # STL per referenced config, named to match the scene graph's mesh key so
-    # render_offline resolves them.
+def _cfg_meshes_from_scene() -> dict[str, list[tuple[str, str]]]:
+    """part-stem -> [(cfg, mesh)] for the multi-config parts whose configurations are
+    distinct geometry the scene graph references (the 20 cone gears, the 3 transgears);
+    one-per-part covers everything else. Mesh keys match the scene graph so
+    render_offline resolves them."""
     scene = json.loads(SCENE_JSON.read_text(encoding="utf-8"))
     cfg_meshes: dict[str, list[tuple[str, str]]] = {}
     for comp in scene.get("components", []):
@@ -539,49 +476,177 @@ def export_neutral(sw: Any, stage: Path) -> dict[str, Any]:
             bucket = cfg_meshes.setdefault(comp["part"], [])
             if entry not in bucket:
                 bucket.append(entry)
-    n_cfg = sum(len(v) for v in cfg_meshes.values())
-    log(f"neutral export: {n_cfg} per-config meshes across {len(cfg_meshes)} parts")
+    return cfg_meshes
 
-    old_prefs = _set_export_prefs(sw)
-    exported = pngs = cfg_done = 0
-    try:
-        for i, (src, doc_type) in enumerate(docs, 1):
+
+def _require_fresh(out: Path, src: Path, kind: str) -> Path:
+    """Assert the cad/out artefact ``out`` exists and is no older than its built
+    source ``src``. The ``export`` task (release's COM-spine predecessor) produces
+    these; a missing/stale one means export did not run or failed for this doc. Fail
+    loud rather than copy stale or partial geometry into the bundle."""
+    if not out.exists() or out.stat().st_size == 0:
+        raise RuntimeError(
+            f"{kind} {out} missing/empty -- run `doit export` (or the full pipeline) "
+            f"before release; the bundle copies neutral geometry from cad/out")
+    if out.stat().st_mtime < src.stat().st_mtime:
+        raise RuntimeError(
+            f"{kind} {out.name} is older than {src.name} -- cad/out is stale; "
+            f"re-run `doit export` before cutting the release")
+    return out
+
+
+def _stage_neutral_geometry(stage: Path, parts: list[Path], assemblies: list[Path],
+                            cfg_meshes: dict[str, list[tuple[str, str]]]) -> int:
+    """Copy the per-document STEP + STL (and per-config STLs) the ``export`` task
+    already wrote to cad/out into ``stage`` -- no SolidWorks needed. These are
+    byte-equivalent to a fresh SaveAs3 here (same AP214 / fine-binary-mm prefs, same
+    source docs), so re-exporting them on the seat was ~81 redundant document opens.
+    Returns the per-config STL count."""
+    step_dir, stl_dir = stage / "step", stage / "stl"
+    for d in (step_dir, stl_dir):
+        d.mkdir(parents=True, exist_ok=True)
+
+    for src in (*parts, *assemblies):
+        step = _require_fresh(OUT_STEP / f"{src.stem}.STEP", src, "STEP")
+        stl = _require_fresh(OUT_STL / f"{src.stem}.STL", src, "STL")
+        shutil.copy2(step, step_dir / step.name)
+        shutil.copy2(stl, stl_dir / stl.name)
+
+    cfg_done = 0
+    for stem, entries in sorted(cfg_meshes.items()):
+        part_src = OUT_SLDPRT / f"{stem}.SLDPRT"
+        crc: dict[str, str] = {}
+        for _cfg, mesh in entries:
+            stl = _require_fresh(OUT_STL / f"{mesh}.STL", part_src, "per-config STL")
+            dst = stl_dir / f"{mesh}.STL"
+            shutil.copy2(stl, dst)
+            crc[mesh] = _sha256(dst)
+            cfg_done += 1
+        # Same fail-loud guard export_models applies: two configs hashing equal means
+        # a stale, un-rebuilt configuration was captured (the v0.5.1 --t18 race).
+        _assert_configs_distinct(stem, crc)
+
+    log(f"neutral geometry: copied {len(parts)} part + {len(assemblies)} assembly "
+        f"STEP/STL (+{cfg_done} per-config STLs) from cad/out")
+    return cfg_done
+
+
+def _png_key(stem: str, src: Path, doc_type: int, colors_digest: str) -> str:
+    """Cache key for a document's PNG set: a fingerprint of its RESOLVED geometry plus
+    the render revision/params. A part is fingerprinted by its SLDPRT bytes (geometry
+    AND stored appearance); an assembly by its monolithic resolved-geometry STL (so a
+    changed CHILD part -- which export regenerates the mono STL for -- re-renders it),
+    its SLDASM bytes, and the shared colors.json (so an appearance-only change does
+    too). A miss can only ever re-render; it can never serve a wrong image."""
+    h = hashlib.sha256()
+    h.update(PNG_RENDER_REV.encode())
+    h.update(repr((PNG_VIEWS, PNG_WIDTH, PNG_HEIGHT)).encode())
+    if doc_type == SW_DOC_ASSEMBLY:
+        h.update(b"asm\0")
+        h.update(_sha256(OUT_STL / f"{stem}.STL").encode())
+        h.update(_sha256(src).encode())
+        h.update(colors_digest.encode())
+    else:
+        h.update(b"part\0")
+        h.update(_sha256(src).encode())
+    return h.hexdigest()
+
+
+def _render_pngs_incremental(sw: Any, stage: Path,
+                             docs: list[tuple[Path, int, str]]) -> int:
+    """Render each document's PNG_VIEWS set into ``stage/png/<stem>``, reusing a cached
+    render whenever the document's geometry fingerprint is unchanged. ONLY documents
+    that miss the cache are opened on the seat -- a geometry-unchanged release opens
+    nothing. Returns the total PNG count."""
+    png_root = stage / "png"
+    png_root.mkdir(parents=True, exist_ok=True)
+    PNG_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    colors_json = OUT_STL / "colors.json"
+    colors_digest = _sha256(colors_json) if colors_json.exists() else ""
+
+    # Pack-and-Go left the top assembly open; close it so an open doc never shadows
+    # the one we mean to render (the mislabelled-export trap _open_and_verify guards).
+    _discard_open_documents(sw)
+
+    pngs = hits = rendered = 0
+    used_keys: set[str] = set()
+    for i, (src, doc_type, stem) in enumerate(docs, 1):
+        key = _png_key(stem, src, doc_type, colors_digest)
+        used_keys.add(key)
+        cache_dir = PNG_CACHE_DIR / key
+        names = [f"{stem}_{view}.png" for view, _ in PNG_VIEWS]
+        dst = png_root / stem
+        dst.mkdir(parents=True, exist_ok=True)
+
+        if cache_dir.is_dir() and all((cache_dir / n).exists() for n in names):
+            for n in names:
+                shutil.copy2(cache_dir / n, dst / n)
+            hits += 1
+        else:
+            # Render into a temp dir, publish it into the cache atomically (rename),
+            # then copy out -- a crash mid-render never leaves a half-populated key
+            # that a later run would mistake for a hit.
+            tmp = PNG_CACHE_DIR / f"_{key}.partial"
+            if tmp.exists():
+                shutil.rmtree(tmp)
+            tmp.mkdir(parents=True)
             doc = _open_and_verify(sw, src, doc_type)
-            for out in (step_dir / f"{src.stem}.STEP", stl_dir / f"{src.stem}.STL"):
-                rc = doc.SaveAs3(str(out), 0, SW_SAVE_OPTS)
-                if not out.exists() or out.stat().st_size == 0:
-                    raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={rc})")
-            # one extra STL per referenced configuration (cone gears / transgears)
-            cfg_crc: dict[str, str] = {}
-            for cfg, mesh in cfg_meshes.get(src.stem, ()):
-                # ShowConfiguration2 returns False when cfg is ALREADY active (the
-                # part opened in it -- e.g. transgear-removable saved with T18
-                # active) -- only a real failure if it's still not active after.
-                if _active_config(doc) != cfg and not doc.ShowConfiguration2(cfg) \
-                        and _active_config(doc) != cfg:
-                    raise RuntimeError(f"{src.name}: ShowConfiguration2({cfg!r}) failed")
-                # Config switches regenerate LAZILY: force a full rebuild so SaveAs3
-                # captures THIS config, not the prior one's stale tessellation (the
-                # race that shipped --t18 as 12-tooth geometry in v0.5.1).
-                doc.ForceRebuild3(False)
-                doc.EditRebuild3()
-                out = stl_dir / f"{mesh}.STL"
-                rc = doc.SaveAs3(str(out), 0, SW_SAVE_OPTS)
-                if not out.exists() or out.stat().st_size == 0:
-                    raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={rc})")
-                cfg_crc[mesh] = _sha256(out)
-                cfg_done += 1
-            _assert_configs_distinct(src.stem, cfg_crc)
-            pngs += _export_pngs(doc, png_root / src.stem, src.stem)
+            _export_pngs(doc, tmp, stem)
             _close_active_documents(sw)  # CloseDoc -> discards, never prompts
-            if i % 10 == 0 or i == len(docs):
-                log(f"neutral export: {i}/{len(docs)} documents ({pngs} PNGs)")
-        exported = len(docs)
-    finally:
-        _restore_export_prefs(sw, old_prefs)
+            if cache_dir.exists():
+                shutil.rmtree(cache_dir)
+            tmp.rename(cache_dir)
+            for n in names:
+                shutil.copy2(cache_dir / n, dst / n)
+            rendered += 1
+
+        pngs += len(PNG_VIEWS)
+        if i % 10 == 0 or i == len(docs):
+            log(f"png render: {i}/{len(docs)} documents "
+                f"({hits} cache-hit, {rendered} rendered, {pngs} PNGs)")
+
+    # Prune cache keys not used this run (best-effort): an unused key is geometry no
+    # longer in the model, and partial dirs are leftovers. Never fatal.
+    for d in PNG_CACHE_DIR.iterdir():
+        if d.is_dir() and d.name not in used_keys:
+            shutil.rmtree(d, ignore_errors=True)
+
+    log(f"png render: {rendered} document(s) rendered on the seat, {hits} reused "
+        f"from cache ({pngs} PNGs total)")
+    return pngs
+
+
+def export_neutral(sw: Any, stage: Path) -> dict[str, Any]:
+    """Fill the bundle's *neutral* CAD under ``stage`` -- ``step/`` AP214 STEP, ``stl/``
+    fine binary STL (mm), and ``png/`` multi-angle previews -- alongside the
+    Pack-and-Go native files (``stage/solidworks``). The caller zips the whole stage.
+
+    Two-part, both incremental:
+
+    * **STEP + STL are COPIED from cad/out** (written by the ``export`` task, release's
+      COM-spine predecessor). They are byte-equivalent to a fresh SaveAs3 here, so the
+      old per-document re-export -- ~81 opens, the bulk of the SaveAs3 time -- was pure
+      duplication. ``_require_fresh`` fails loud if cad/out is stale/missing.
+    * **PNGs are rendered on the seat but cached** by resolved-geometry fingerprint, so
+      a release whose geometry is unchanged (the common case) reuses prior renders and
+      opens nothing -- rendering was ~550 s / 486 PNGs of the old release wall time.
+    """
+    parts = _models(OUT_SLDPRT, "SLDPRT")
+    assemblies = _models(OUT_SLDASM, "SLDASM")
+    cfg_meshes = _cfg_meshes_from_scene()
+    log(f"neutral export: {len(parts)} parts + {len(assemblies)} assemblies")
+    log(f"neutral export: {sum(len(v) for v in cfg_meshes.values())} per-config "
+        f"meshes across {len(cfg_meshes)} parts")
+
+    cfg_done = _stage_neutral_geometry(stage, parts, assemblies, cfg_meshes)
+
+    # parts first (assemblies reference them); (path, swDocType, stem) for rendering.
+    docs = ([(p, SW_DOC_PART, p.stem) for p in parts]
+            + [(a, SW_DOC_ASSEMBLY, a.stem) for a in assemblies])
+    pngs = _render_pngs_incremental(sw, stage, docs)
 
     return {
-        "documents": exported,
+        "documents": len(docs),
         "parts": len(parts),
         "assemblies": len(assemblies),
         "pngs": pngs,

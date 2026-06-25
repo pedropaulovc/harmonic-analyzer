@@ -189,6 +189,15 @@ coverage test fails loud otherwise).
 other three open the model (wrapped as `verify:*`). Old names static/isolation/
 motion/truth and the `all` aggregate are gone.
 
+`soundness` opens EVERY built (sub)assembly standalone and runs the shared health
+battery on each (DOF / over-constrained / model-healthy-deep / interference /
+gear-ratios / component-count). `subsystems` runs ONLY the subsystem-SPECIFIC gate
+soundness doesn't — currently just the `channel` assembly's 20-way moving-stem
+instance independence — so it opens only `channel`. (It used to re-open all 8 and
+repeat the whole battery, ~95% duplicate COM work and the biggest spine time sink;
+see `memory/release-perf-incremental.md`.) soundness runs first on the COM spine, so
+the shared battery is always proven before subsystems.
+
 ## Stamps & incrementality
 
 Gates produce no CAD artefact, so each writes a stamp under `cad/out/reports/`
@@ -251,7 +260,11 @@ forces serial (debugging / a fallback if the spawn-mode pool misbehaves).
   `export_image()` call (`_common.save_part_and_images`); there is no separable
   Pillow/BMP step in the build path to move off the seat, so there is nothing to
   parallelize. (BMP→Pillow transcode exists only in `cut_release._export_pngs`,
-  inside the already-serial release job — not worth extracting.)
+  inside the already-serial release job — not worth extracting.) The release PNG
+  cost is instead addressed by an **incremental render cache** keyed on
+  resolved-geometry fingerprint (`cut_release._png_key`), so a geometry-unchanged
+  release re-renders nothing; STEP/STL are copied from `cad/out` rather than
+  re-exported. See `memory/release-perf-incremental.md`.
 - **`diff:<stem>` per-part doit fan-out — not a fit.** `render_diff` renders the
   *whole* assembly in 4 views, not per-part images; the expensive, parallelizable
   work is the Hausdorff loop, which is now parallelized inside the script (above)
