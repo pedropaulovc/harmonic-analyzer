@@ -15,13 +15,16 @@ import asyncio
 import subprocess
 import sys
 from pathlib import Path
+from typing import cast
 
 import pytest
 from opentelemetry._logs import get_logger_provider
+from opentelemetry.sdk._logs import LoggerProvider as SdkLoggerProvider
 from opentelemetry.sdk._logs.export import (
     InMemoryLogRecordExporter,
     SimpleLogRecordProcessor,
 )
+from opentelemetry.sdk.trace import TracerProvider as SdkTracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
@@ -41,10 +44,10 @@ def capture():
     _telemetry.configure()
 
     spans = InMemorySpanExporter()
-    _telemetry.trace.get_tracer_provider().add_span_processor(SimpleSpanProcessor(spans))
+    cast(SdkTracerProvider, _telemetry.trace.get_tracer_provider()).add_span_processor(SimpleSpanProcessor(spans))
 
     logs = InMemoryLogRecordExporter()
-    get_logger_provider().add_log_record_processor(SimpleLogRecordProcessor(logs))
+    cast(SdkLoggerProvider, get_logger_provider()).add_log_record_processor(SimpleLogRecordProcessor(logs))
     return spans, logs
 
 

@@ -798,7 +798,7 @@ def verify_tolerance_audit(report: Report) -> None:
     with csv_path.open("w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=_AUDIT_COLUMNS)
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows(rows)  # type: ignore[arg-type]  # dict[str, str] is structurally compatible; DictWriter stubs use Literal key union
     n_fit = sum(1 for r in rows if r.get("fit_class"))
     _telemetry.debug(f"tolerance audit -> {csv_path} ({len(rows)} parts, "
                      f"{n_fit} with a fit class)")

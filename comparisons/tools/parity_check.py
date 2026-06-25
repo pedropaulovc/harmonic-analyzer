@@ -31,7 +31,7 @@ def silhouette(path: Path) -> Image.Image:
     if bbox:
         mask = mask.crop(bbox)
     w = max(1, round(mask.width * WORK_H / mask.height))
-    return mask.resize((w, WORK_H), Image.NEAREST)
+    return mask.resize((w, WORK_H), Image.Resampling.NEAREST)
 
 
 def iou(a: Image.Image, b: Image.Image) -> float:
