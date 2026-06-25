@@ -60,7 +60,7 @@ def prepare_reference(pair: dict, max_px: int = 1600) -> Path:
     if pair["reference"].get("mirror"):
         # only for individually-verified flipped reproductions: confirm with a
         # chiral cue (text direction, crank-vs-platen side) before setting.
-        img = img.transpose(Image.FLIP_LEFT_RIGHT)
+        img = img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
     rot = pair["reference"].get("rotate_deg", 0)
     if rot:
         img = img.rotate(-rot, expand=True, fillcolor="white")
@@ -68,7 +68,7 @@ def prepare_reference(pair: dict, max_px: int = 1600) -> Path:
     if crop:
         img = img.crop(tuple(crop))
     if max(img.size) > max_px:
-        img.thumbnail((max_px, max_px), Image.LANCZOS)
+        img.thumbnail((max_px, max_px), Image.Resampling.LANCZOS)
     img.convert("RGB").save(out, **JPEG_OPTS)
     return out
 
@@ -138,8 +138,8 @@ def _fitted_render(pair_id: str, ref_size: tuple[int, int], align: dict | None):
     rw, rh = ref_size
     s = min(rw / ren.width, rh / ren.height) * align.get("scale", 1.0)
     w, h = max(1, round(ren.width * s)), max(1, round(ren.height * s))
-    ren = ren.resize((w, h), Image.LANCZOS)
-    mask = mask.resize((w, h), Image.NEAREST)
+    ren = ren.resize((w, h), Image.Resampling.LANCZOS)
+    mask = mask.resize((w, h), Image.Resampling.NEAREST)
     dx = align.get("dx_px", 0) + (rw - w) // 2
     dy = align.get("dy_px", 0) + (rh - h) // 2
     return ren, mask, (dx, dy)

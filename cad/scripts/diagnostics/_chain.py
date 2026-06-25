@@ -14,6 +14,7 @@ if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
 _spec = importlib.util.spec_from_file_location("_chain_impl", _SCRIPTS / "_chain.py")
+assert _spec is not None and _spec.loader is not None, f"could not locate _chain.py under {_SCRIPTS}"
 _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)
 

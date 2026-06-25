@@ -41,7 +41,7 @@ import socket
 import sys
 import time
 import urllib.parse
-from collections.abc import Iterator, Mapping
+from collections.abc import AsyncIterator, Iterator, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -55,10 +55,9 @@ from opentelemetry.sdk._logs.export import (
     SimpleLogRecordProcessor,
 )
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import (
     ConsoleSpanExporter,
-    ReadableSpan,
     SimpleSpanProcessor,
 )
 from opentelemetry.trace import Span, Status, StatusCode
@@ -155,7 +154,7 @@ class _FriendlyFormatter(logging.Formatter):
 
 def _compact_span(span: ReadableSpan) -> str:
     """One depth-indented line per finished span: ``⟩ name 1.23s OK [attrs]``."""
-    depth = int((span.attributes or {}).get("harmonic.depth", 0))
+    depth = int((span.attributes or {}).get("harmonic.depth", 0))  # type: ignore[arg-type]  # AttributeValue | int but always int here
     dur = (span.end_time - span.start_time) / 1e9 if span.end_time and span.start_time else 0.0
     status = span.status.status_code.name if span.status else "UNSET"
     mark = {"OK": "OK", "ERROR": "xx", "UNSET": "--"}.get(status, status)
@@ -239,7 +238,7 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     if want_console:
         tracer_provider.add_span_processor(
             SimpleSpanProcessor(
-                ConsoleSpanExporter(out=_LiveStderr(), formatter=_compact_span)
+                ConsoleSpanExporter(out=_LiveStderr(), formatter=_compact_span)  # type: ignore[arg-type]  # _LiveStderr is a structural IO[str]
             )
         )
     tdir = _telemetry_dir()
@@ -382,7 +381,7 @@ def _exit_span(handle: Any, exc: BaseException | None) -> None:
         span.record_exception(exc)
         span.set_status(Status(StatusCode.ERROR, str(exc)))
         error(f"{span.name if isinstance(span, ReadableSpan) else 'span'} failed: {exc}")
-    elif span.status.status_code is StatusCode.UNSET:
+    elif span.status.status_code is StatusCode.UNSET:  # type: ignore[attr-defined]  # abstract Span; concrete SDK span always has .status
         span.set_status(Status(StatusCode.OK))
     cm.__exit__(type(exc) if exc else None, exc, exc.__traceback__ if exc else None)
 
@@ -406,7 +405,7 @@ def span(name: str, /, **attributes: Any) -> Iterator[Span]:
 
 
 @contextlib.asynccontextmanager
-async def aspan(name: str, /, **attributes: Any) -> Any:
+async def aspan(name: str, /, **attributes: Any) -> AsyncIterator[Span]:
     """Async sibling of :func:`span` for ``async with`` build steps."""
     sp, handle, _ = _enter_span(name, attributes)
     try:
