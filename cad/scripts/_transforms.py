@@ -206,7 +206,7 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     "summing-lever": "x0",
     "magnifying-bracket": "x0",
     "pen-hanger": "x0",
-    # rocker-arm-portal (the unified support casting) is authored machine-handed
+    # rocker-arm-support (the unified support casting) is authored machine-handed
     # and lives in the non-mirroring frame.SLDASM -> NO mirror entry (it replaced
     # the old split rocker-arm-support + a-frame "x0" pair, 2026-06-19).
     # M6.10 fasteners: authored in final orientation (axis along Y or Z),

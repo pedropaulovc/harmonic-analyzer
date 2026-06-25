@@ -215,7 +215,7 @@ discovered during harmonic-analyzer M6.4:
 
 - **Feature-replay of an external part: a volume+bbox match is NECESSARY but
   NOT SUFFICIENT — a Z-MIRRORED build matches both yet is upside-down.**
-  Reproducing `rocker-arm-support-manual.SLDPRT` (a Z-up trapezoid wedge), the
+  Reproducing `rocker-arm-support.SLDPRT` (a Z-up trapezoid wedge), the
   Top-plane sketch maps sketch-y → **−Z**, so the trapezoid's wide foot must be
   drawn at sketch **+Y** to land at model Z=−88.9 (the real foot). Drawing it at
   −Y put the foot at +Z: every per-feature volume + the bbox matched the source
@@ -244,7 +244,7 @@ discovered during harmonic-analyzer M6.4:
 
 - **Two cuts SHARING one sketch to leave a central WEB = ONE centred square +
   two Through-All cuts each with a `FromOffsetDistance` start-offset, opposite
-  directions.** This is how `rocker-arm-support-manual`'s Cut-Extrude3 AND
+  directions.** This is how `rocker-arm-support`'s Cut-Extrude3 AND
   Cut-Extrude4 both consume Sketch11 yet leave a 2×3.175 mm web (re-selecting
   the sketch by name for cut4 → `Sketch11<2>`). The web is NOT a gap in the
   sketch — the sketch is a SINGLE square; the web is the band between two cuts

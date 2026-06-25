@@ -12,7 +12,7 @@ the lever tips. 144 components:
 * pivot-ball-mount x4 (rocker pair: north on the rocker-support apex at
   (-72.9, 228.6, +101.6), south on the A-FRAME clevis saddle at
   (-72.9, 228.6, -111) - M6.5 photo audit: there is no south frustum,
-  the front stand is the rocker-arm-portal's transgear-A-frame leg
+  the front stand is the rocker-arm-support's transgear-A-frame leg
   (frame.SLDASM) whose ears flank this mount's O16 base; lever pair on the top-frame west rail,
   seats (-199.9, 1040.7, +/-85) - z 85 keeps the O16 base clear of the
   O35 corner-boss bores)
@@ -129,10 +129,16 @@ GEAR_PHASE_DEG = 1.5  # drive-train locks each cylinder gear at Rz(+1.5):
 # swings with the gear by GEAR_PHASE_DEG, so the rod ring rides the PHASED cam
 # centre, not a point straight south of the arbor. CAM_ECC is imported above.
 RING_CENTER = (
-    -47.5 + CAM_ECC * math.sin(math.radians(GEAR_PHASE_DEG)),
+    54.7 + CAM_ECC * math.sin(math.radians(GEAR_PHASE_DEG)),
     126.8 - CAM_ECC * math.cos(math.radians(GEAR_PHASE_DEG)),
-)  # phased cam centre at ECC 3.06: (-47.420, 123.741)
-ROD_C2C = 127.0
+)  # phased cam centre at ECC 3.06: (54.780, 123.741). Authored x +54.7 = machine
+# -54.7, matching the drum's book placement (build_drive_train X_DRUM). MUST stay
+# in sync with X_DRUM.
+ROD_C2C = 163.18  # LONG rod (was 127): cam drum moved out to machine -54.7, so the
+# pivot->cam span is now d=182.3 (oblique), not 127 (near-vertical). 163.18 is
+# solved to land the rocker rod-pin at the SAME point as the old 127 rod, so the
+# rocker rest tilt (-6.92 deg) and the whole downstream bar/lever/spring chain are
+# preserved. See build_connecting_rod.CENTER_DISTANCE.
 
 # --- amplitude bars ---------------------------------------------------------
 BAR_WIDTH = 6.35
@@ -238,7 +244,7 @@ SHAFT_R = 6.35 / 2.0
 # Off-pivot bore locals (mm, part frame) used by the spin drivers + world_point.
 ROCKER_ROD_BORE_LOCAL = [25.4, 8.39937, 0.0]  # rocker Axis2 (rod pin)
 ROD_STRAP_BORE_LOCAL = [0.0, 0.0, 0.0]  # rod Axis1 (cam ring centre = origin)
-ROD_PIN_BORE_LOCAL = [0.0, 127.0, 0.0]  # rod Axis2 (rocker pin = swing pivot)
+ROD_PIN_BORE_LOCAL = [0.0, 163.18, 0.0]  # rod Axis2 (rocker pin = swing pivot); = ROD_C2C
 LEVER_BAR_PIN_BORE_LOCAL = [127.0, 0.0, 0.0]  # lever Axis2 (bar pin)
 BAR_TOP_PIN_LOCAL = [3.175, 806.45, 3.175]  # bar Axis1 (swing pivot)
 BAR_FOOT_LOCAL = [3.175, 0.0, 3.175]  # bar Axis2 (foot, ~806 mm arm)
