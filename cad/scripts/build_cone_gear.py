@@ -79,7 +79,6 @@ from _common import (
     apply_material,
     check,
     drive_dimension,
-    ensure_fully_defined,
     force_rebuild,
     name_last_feature,
     report_mass_properties,
@@ -568,16 +567,11 @@ async def build(adapter) -> dict[str, str]:
             f'({R_CLEAR_IN:g} + t * ("Ra" - {R_CLEAR_IN:g})) * sin("ThetaU")',
         ),
     ]
-    # Whitelisted fix escalation: equation-driven curves re-solve from the
-    # equation globals on regeneration -- no static relation/dimension
-    # scheme can define them without breaking that.
-    try:
-        await ensure_fully_defined(
-            adapter, "gap sketch", fix_entities=gap_curves, allow_fix_escalation=True
-        )
-    except RuntimeError as exc:
-        findings.append(str(exc))
-        _telemetry.warn(f"FINDING  {exc}")
+    # Equation-driven curves re-solve from the equation globals on regeneration
+    # -- no static relation/dimension scheme can define them, and fix relations
+    # are gone -- so the gap sketch is left intentionally under-defined (its
+    # geometry is pinned by the equations, not by the sketch solver).
+    _telemetry.warn(f"gap sketch left under-defined ({len(gap_curves)} equation curves, no fix)")
     check("exit_sketch gap", await adapter.exit_sketch())
     # Name the gap profile, but record NO SketchDims: the involute flanks must
     # MESH with the mating gear, so they stay equation-curve-driven and

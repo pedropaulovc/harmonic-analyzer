@@ -99,25 +99,17 @@ def check(label: str, result: Any) -> Any:
 
 
 @_telemetry.traced("sketch.ensure_defined", label_param="label")
-async def ensure_fully_defined(
-    adapter: Any,
-    label: str,
-    fix_entities: Iterable[str] = (),
-    allow_fix_escalation: bool = False,
-) -> None:
+async def ensure_fully_defined(adapter: Any, label: str) -> None:
     """Assert the active sketch is fully defined.
 
     Raises when the sketch is under- or over-defined. On over-defined, the
     error includes ``get_over_defining_relations()`` so the redundant anchor
     is identifiable without opening SolidWorks.
 
-    ``fix_entities`` + ``allow_fix_escalation=True`` enable the fix-escalation
-    loop with a loud WARN. The only legitimate users are the whitelisted
-    equation-driven gear-gap sketches (_gear.cut_tooth_gap and its cone/
-    removable variants): those curves re-solve from equation globals on
-    configuration changes, so no static relation/dimension scheme can define
-    them without breaking regeneration. Everything else anchors points to the
-    origin with semantic relations/dims.
+    There is no ``fix`` escalation: sketches are fully defined with semantic
+    relations + driving dimensions anchored to the origin/features. The only
+    sketches that cannot be (the equation-driven gear-gap curves) are left
+    intentionally under-defined by their callers and do not call this.
     """
     async def _state() -> str | None:
         res = await adapter.check_sketch_fully_defined()
@@ -139,39 +131,6 @@ async def ensure_fully_defined(
         raise RuntimeError(
             f"{label}: sketch OVER-defined; over-defining relations: {detail!r}"
         )
-
-    fix_entities = list(fix_entities)
-    if not (allow_fix_escalation and fix_entities):
-        hint = (
-            " (legacy fix escalation disabled; anchor a point to the origin "
-            "with semantic relations/dims instead)"
-            if fix_entities
-            else ""
-        )
-        raise RuntimeError(
-            f"{label}: sketch not fully defined (state={state!r}){hint}"
-        )
-
-    # Whitelisted equation-curve path: escalate one entity at a time
-    # (fixing everything at once makes the driving dimensions redundant
-    # and over-defines the sketch). "unknown" is kept fixable as a safety
-    # net: the status probe can transiently fail (pywin32 property/method
-    # resolution drift on GetConstrainedStatus) and a later read may recover.
-    _telemetry.warn(
-        f"{label}: fix escalation (equation-curve whitelist only"
-        " — anything else must use semantic anchors)"
-    )
-    for entity_id in fix_entities:
-        if state not in ("under_defined", "unknown"):
-            break
-        fixed = await adapter.add_sketch_constraint(entity_id, None, "fix")
-        if not fixed.is_success:
-            raise RuntimeError(f"{label}: fix {entity_id} failed: {fixed.error}")
-        state = await _state()
-        _telemetry.debug(f"fixed {entity_id} -> {state}")
-        if state == "fully_defined":
-            _telemetry.success(f"fully defined after fixing {entity_id}: {label}")
-            return
 
     raise RuntimeError(f"{label}: sketch not fully defined (state={state!r})")
 

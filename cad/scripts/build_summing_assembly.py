@@ -12,7 +12,7 @@ spring / gooseneck chain.
 * summing-lever -- rocks on the knife edge (Axis3 coincident to the support
   contact ridge); the part the channel + counter springs drive in the M6
   Motion study.
-* boss-hook (keyed to the lever's anchor eye) + counter-spring + gooseneck +
+* boss-hook (placed at the lever's anchor eye, no lock) + counter-spring + gooseneck +
   gooseneck-clamp -- the counter-balance hung from the east column.
 
 Cross-subassembly fits (checked at the top level): the channel springs
@@ -48,7 +48,6 @@ from _assembly import (
     coincident_mate,
     component_origin,
     distance_driver,
-    lock_mate,
     named_ref,
     place_component,
     save_assembly_and_images,
@@ -125,7 +124,7 @@ async def build(adapter) -> dict[str, str]:
     # the boss "spin ref" axis. This is the part the counter spring + channel
     # springs drive in the M6 Motion study.
     sl = await place_component(adapter, "summing-lever", [KNIFE[0], KNIFE[1], 0.0],
-                               [0.0, 0.0, 0.0], IDENTITY, ground=False)
+                               [0.0, 0.0, 0.0], IDENTITY)
     sl_o = component_origin(adapter, sl)
     # summing-lever axes (creation order): Axis1 = pivot (cylinder centre),
     # Axis2 = anchor, Axis3 = knife ridge (hex top vertex). The lever rocks on
@@ -148,15 +147,11 @@ async def build(adapter) -> dict[str, str]:
     await angle_driver(adapter, named_ref(f"Right Plane@{sl}", "PLANE"),
                        named_ref("Right Plane", "PLANE"), 0.0,
                        label="summing-lever rock snapshot", verify=(sl, sl_o))
-    # Boss hook: rigidly rides the lever (locked), carrying the counter spring.
-    # Keyed to the lever's anchor axis (Axis2, the summation-anchor eye the
-    # counter spring hangs from at machine ~(-91, 990)) rather than the pivot
-    # axis -- the lock just freezes the current pose, so the handle is chosen for
-    # physical meaning (the eye), not the rock centre.
-    bh = await place_component(adapter, "boss-hook", list(BOSS_HOOK_POS),
-                               [0.0, 0.0, 0.0], IDENTITY, ground=False)
-    await lock_mate(adapter, named_ref(f"Axis1@{bh}", "AXIS"),
-                    named_ref(f"Axis2@{sl}", "AXIS"), label="boss-hook keyed")
+    # Boss hook: carries the counter spring, hung from the lever's summation
+    # anchor eye (machine ~(-91, 990)). Placed at its design pose; the lock mate
+    # that keyed it to the lever is gone, so it no longer rides the lever's rock.
+    await place_component(adapter, "boss-hook", list(BOSS_HOOK_POS),
+                          [0.0, 0.0, 0.0], IDENTITY)
     # Ry(+90): the end loops land in the YZ plane, encircling the hook arm
     # (bottom) and the gooseneck pin (top) nail-through-ring style.
     await place_component(adapter, "counter-spring", list(SPRING_POS),

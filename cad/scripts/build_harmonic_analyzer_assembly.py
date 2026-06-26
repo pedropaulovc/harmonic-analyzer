@@ -105,10 +105,7 @@ def _subassembly(name: str) -> str:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import (
-        ComponentRefParameters,
-        InsertComponentParameters,
-    )
+    from solidworks_mcp.adapters.base import InsertComponentParameters
 
     check("create_assembly", await adapter.create_assembly())
 
@@ -124,11 +121,6 @@ async def build(adapter) -> dict[str, str]:
             ),
         )
         comp = data["name"]
-        if not data.get("fixed"):
-            check(
-                f"fix {name}",
-                await adapter.fix_component(ComponentRefParameters(name=comp)),
-            )
         assert_component_placed(adapter, comp, [0.0, 0.0, 0.0], IDENTITY)
 
     # Loose hardware on the base top (not part of any mechanism). Exact machine

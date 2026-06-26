@@ -106,12 +106,12 @@ async def cut_tooth_gap(
             f"({rc} + t * ({ra} - {rc})) * {fmt(math.sin(facts['ThetaU']))}",
         ),
     ]
-    # Equation-driven curves are the whitelist class for fix (no free
-    # endpoints to dimension); B3 attempts a semantic scheme before keeping
-    # this escalation (cad/FIX_MIGRATION.md).
-    await ensure_fully_defined(
-        adapter, "gap sketch", fix_entities=gap_curves, allow_fix_escalation=True
-    )
+    # The gap profile is equation-driven curves that re-solve from the equation
+    # globals on regeneration: no static relation/dimension scheme can define
+    # them, and fix relations are gone -- so the gap sketch is left
+    # intentionally under-defined (its geometry is pinned by the equations, not
+    # by the sketch solver).
+    _telemetry.warn(f"gap sketch left under-defined ({len(gap_curves)} equation curves, no fix)")
     check("exit_sketch gap", await adapter.exit_sketch())
     gap_cut = await adapter.create_cut_extrude(ExtrusionParameters(depth=depth))
     check("cut tooth gap", gap_cut)

@@ -750,9 +750,9 @@ async def build(adapter) -> dict[str, str]:
             [0.0, 0.0, 0.0], IDENTITY, label=f"ball-mount lever z{sz * LEVER_MOUNT_Z:+.0f}",
         )
 
-    # Per-channel chain: the four moving parts are inserted on-solution
-    # (ground=False) and joined by revolutes whose spin/axial dims are the
-    # per-channel suppressible drivers (see _revolute).
+    # Per-channel chain: the four moving parts are inserted on-solution and
+    # joined by revolutes whose spin/axial dims are the per-channel suppressible
+    # drivers (see _revolute).
     # Rocker + rod are amplitude-independent (same tilt every channel); the bar
     # and lever are placed per channel from solve_state(a_j).
     arm_rows = rot_z_rows(state["arm_tilt"])
@@ -761,9 +761,9 @@ async def build(adapter) -> dict[str, str]:
     arm_origin_dx = ARM_PIVOT_LOCAL_Y * math.sin(t)  # -(0,8)*Rz offset
     arm_origin_dy = ARM_PIVOT_LOCAL_Y * math.cos(t)
 
-    # The springs and the two bushing banks are grounded repeated structure, but
-    # they are placed EXPLICITLY per channel (springs in the loop, bushings in
-    # each inter-channel gap) rather than seeded once and replicated by a
+    # The springs and the two bushing banks are repeated cosmetic structure,
+    # placed EXPLICITLY per channel (springs in the loop, bushings in each
+    # inter-channel gap) rather than seeded once and replicated by a
     # LocalLinearPattern. The pattern's direction sense is read from the shaft's
     # cylindrical face and SolidWorks resolves it unreliably at full scale -- it
     # flipped the bushing bank to +Z at 20 channels (clean at 3), and the API
@@ -771,15 +771,14 @@ async def build(adapter) -> dict[str, str]:
     # moving parts stay individual mated instances so each channel articulates
     # independently (a different harmonic frequency) for the Motion study.
     #
-    # These grounded parts carry NO mates and are referenced by nobody downstream
-    # (only the _verify_pattern_z banks read the bushings back), so their exact
-    # transform IS their final pose. Instead of a per-part insert+fix (~116 COM
-    # round-trips, each fix re-solving the assembly) their (part, pose) specs are
-    # COLLECTED here and inserted in ONE AddComponents3 + fixed in ONE
-    # FixComponent (Select2 each, one solve) after the loop (place_components_batch). The
-    # moving parts keep the per-part place_component path -- their insertion pose
-    # seeds the mate flip-recovery, so they are not batchable.
-    grounded_specs: list[dict[str, object]] = []
+    # These parts carry NO mates and are referenced by nobody downstream (only
+    # the _verify_pattern_z banks read the bushings back), so their exact
+    # transform IS their final pose. Instead of a per-part insert (~116 COM
+    # round-trips) their (part, pose) specs are COLLECTED here and inserted in ONE
+    # AddComponents3 after the loop (place_components_batch). The moving parts keep
+    # the per-part place_component path -- their insertion pose seeds the mate
+    # flip-recovery, so they are not batchable.
+    batch_specs: list[dict[str, object]] = []
     for j in range(CHANNELS):
         zj = z_station(j)
         z_mid = zj + ARM_MID_DZ
@@ -791,13 +790,13 @@ async def build(adapter) -> dict[str, str]:
             adapter, "rocker-arm",
             [PIVOT[0] + arm_origin_dx, PIVOT[1] - arm_origin_dy, z_mid],
             [0.0, 0.0, state["arm_tilt"]], arm_rows,
-            ground=False, label=f"rocker-arm ch{j:02d}",
+            label=f"rocker-arm ch{j:02d}",
         )
         rod = await place_component(
             adapter, "connecting-rod",
             [RING_CENTER[0], RING_CENTER[1], zj + CAM_DZ],
             [0.0, 0.0, state["rod_tilt"]], rod_rows,
-            ground=False, label=f"connecting-rod ch{j:02d}",
+            label=f"connecting-rod ch{j:02d}",
         )
         # Bar rotated 90 about Y (local X slot -> -Z, local Z depth -> +X) then
         # swung by st['bar_tilt'] about Z to set the foot station: rows_from_euler
@@ -807,13 +806,13 @@ async def build(adapter) -> dict[str, str]:
             adapter, "amplitude-bar",
             [st["bar_origin_x"], st["bar_origin_y"], z_mid + BAR_WIDTH / 2.0],
             [st["bar_tilt"], 90.0, 0.0], bar_rows,
-            ground=False, label=f"amplitude-bar ch{j:02d} a={amplitudes[j]:.2f}",
+            label=f"amplitude-bar ch{j:02d} a={amplitudes[j]:.2f}",
         )
         lever = await place_component(
             adapter, "channel-lever",
             [FULCRUM[0], FULCRUM[1], z_mid],
             [0.0, 0.0, st["lever_tilt"]], lever_rows,
-            ground=False, label=f"channel-lever ch{j:02d}",
+            label=f"channel-lever ch{j:02d}",
         )
 
         # J1 rocker revolute (shaft OD ↔ pivot bore; spin via the rod bore).
@@ -879,7 +878,7 @@ async def build(adapter) -> dict[str, str]:
             verify=(bar, bar_tgt),
         )
 
-        # Return spring (ground; cosmetic) -- placed PER CHANNEL spanning this
+        # Return spring (cosmetic) -- placed PER CHANNEL spanning this
         # channel's (moving) lever eye to the FIXED summing-plate hole, at the
         # measured gap length (parametric-springs memory / task #10). NOT a fixed
         # 63 mm body and NOT patterned: the lever tilts/lifts with the amplitude,
@@ -895,7 +894,7 @@ async def build(adapter) -> dict[str, str]:
         # rows = Rz(theta).Ry90: local +Y (coil axis) -> the span direction,
         # local +Z (eye axis) -> the in-plane normal. theta=0 recovers ROT_Y_POS90.
         spring_rows = [[0.0, 0.0, -1.0], [ux, uy, 0.0], [uy, -ux, 0.0]]
-        grounded_specs.append({
+        batch_specs.append({
             "part": spec["part"],
             "position": [hole_x_0 + SPRING_BOTTOM_LEAD * ux,
                          PLATE_EYE_Y + SPRING_BOTTOM_LEAD * uy, z_mid],
@@ -905,7 +904,7 @@ async def build(adapter) -> dict[str, str]:
                       f"body={spec['body']:.2f} tilt={spec['theta']:+.2f}"),
         })
 
-        # Spring-hook fastener (ground; cosmetic) -- the SEPARATE little open J-hook
+        # Spring-hook fastener (cosmetic) -- the SEPARATE little open J-hook
         # that connects this channel's spring to the plate (the spring no longer
         # threads the plate itself). It seats shank-UP in the plate bore at
         # (hole_x_0 - arm_offset, z_mid) and presents its +X arm just above the
@@ -913,7 +912,7 @@ async def build(adapter) -> dict[str, str]:
         # PLATE_EYE_Y, z_mid) for every pose). The spring stays vertical; the hook
         # reaches +X back to it. IDENTITY orientation: the eye-axis tilt (<=1.1 deg
         # off +X even at full amplitude) is well inside the bore/ring clearance.
-        grounded_specs.append({
+        batch_specs.append({
             "part": "spring-hook",
             "position": [hole_x_0 - HOOK_ARM_OFFSET_X,
                          PLATE_EYE_Y - HOOK_ARM_HEIGHT, z_mid],
@@ -922,34 +921,31 @@ async def build(adapter) -> dict[str, str]:
             "label": f"spring-hook ch{j:02d} bore-seat",
         })
 
-        # Bushings (ground; cosmetic) ride the shafts in the inter-channel gaps:
+        # Bushings (cosmetic) ride the shafts in the inter-channel gaps:
         # one pivot + one lever bushing in the gap BELOW every channel j>=1,
         # placed explicitly (deterministic) instead of seed + LocalLinearPattern
         # -- see the note above the channel loop. Collected for the batch insert.
         if CHANNELS > 1 and j >= 1:
             z_gap = z_mid - PITCH / 2.0  # gap between channels j-1 and j
-            grounded_specs.append({
+            batch_specs.append({
                 "part": "pivot-bushing",
                 "position": [PIVOT[0], PIVOT[1], z_gap],
                 "rotation": [0.0, 0.0, 0.0], "rows": IDENTITY,
                 "label": f"pivot-bushing gap {j - 1:02d}/{j:02d}",
             })
-            grounded_specs.append({
+            batch_specs.append({
                 "part": "lever-bushing",
                 "position": [FULCRUM[0], FULCRUM[1], z_gap],
                 "rotation": [0.0, 0.0, 0.0], "rows": IDENTITY,
                 "label": f"lever-bushing gap {j - 1:02d}/{j:02d}",
             })
 
-    # Insert + ground the whole grounded cosmetic bank (springs + both bushing
-    # banks): one AddComponents3 for all ~58 parts, then Select2 each + one
-    # FixComponent (a single mate solve) to fix them -- versus the per-part
-    # insert+fix it replaces (~116 round-trips, each fix re-solving the
-    # assembly). Done after
-    # the mating loop because these parts carry no mates and nothing reads them
-    # back until the bank checks below.
+    # Insert the whole cosmetic bank (springs + both bushing banks) in one
+    # AddComponents3 for all ~58 parts -- versus the ~58 per-part inserts it
+    # replaces. Done after the mating loop because these parts carry no mates and
+    # nothing reads them back until the bank checks below.
     await place_components_batch(
-        adapter, grounded_specs, label="grounded bank (springs + bushings)"
+        adapter, batch_specs, label="cosmetic bank (springs + bushings)"
     )
 
     # Confirm both bushing banks landed on the inter-channel gap planes. The

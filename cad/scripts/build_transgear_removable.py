@@ -308,13 +308,12 @@ async def build(adapter) -> dict[str, str]:
             f'({r_clear:g} + t * ("Ra" - {r_clear:g})) * sin("ThetaU")',
         ),
     ]
-    # Whitelisted fix escalation: the gap profile is six equation-driven
-    # curves whose shape and position re-solve from the equation globals
-    # on every configuration change (ToothCount 12/18/24) -- no static
-    # relation/dimension scheme can define them without breaking that.
-    await ensure_fully_defined(
-        adapter, "gap sketch", fix_entities=gap_curves, allow_fix_escalation=True
-    )
+    # The gap profile is six equation-driven curves whose shape and position
+    # re-solve from the equation globals on every configuration change
+    # (ToothCount 12/18/24) -- no static relation/dimension scheme can define
+    # them, and fix relations are gone -- so the gap sketch is left
+    # intentionally under-defined (its geometry is pinned by the equations).
+    _telemetry.warn(f"gap sketch left under-defined ({len(gap_curves)} equation curves, no fix)")
     check("exit_sketch gap", await adapter.exit_sketch())
     # GEAR-MESHING SKETCH: name only, no SketchDims. The six curves are
     # equation-driven (they carry no display dimensions to record), and pinning

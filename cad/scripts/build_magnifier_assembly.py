@@ -49,7 +49,6 @@ from _assembly import (
     coincident_mate,
     component_origin,
     distance_driver,
-    lock_mate,
     named_ref,
     place_component,
     save_assembly_and_images,
@@ -118,7 +117,7 @@ async def build(adapter) -> dict[str, str]:
                                [0.0, 0.0, 0.0], IDENTITY)
     ml = await place_component(adapter, "magnifying-lever",
                                [-200.0, LEVER_ROD_Y, LEVER_ROD_Z],
-                               [0.0, 0.0, 0.0], IDENTITY, ground=False)
+                               [0.0, 0.0, 0.0], IDENTITY)
     ml_o = component_origin(adapter, ml)
     await coincident_mate(adapter, named_ref(f"Axis1@{ml}", "AXIS"),
                           named_ref(f"Axis1@{mb}", "AXIS"),
@@ -129,39 +128,27 @@ async def build(adapter) -> dict[str, str]:
     await angle_driver(adapter, named_ref(f"Top Plane@{ml}", "PLANE"),
                        named_ref("Top Plane", "PLANE"), 0.0,
                        label="mag-lever rock snapshot", verify=(ml, ml_o))
-    # The clamp + vertical rod + output fixture + thumb screw are clamped to the
-    # lever at the set magnification radius (the thumb screw locks the clamp on
-    # the rod): they ride the lever as one rigid body. The output fixture is
-    # where WIRE 1 to the wheel hub hooks -- its (mostly vertical) travel as the
-    # lever rotates is what drives the magnifying wheel in the Motion study, so
-    # these must move WITH the lever, not stay fixed. Lock each to the lever.
+    # The clamp + vertical rod + output fixture + thumb screw sit on the lever at
+    # the set magnification radius. The output fixture is where WIRE 1 to the
+    # wheel hub hooks -- its (mostly vertical) travel as the lever rotates is what
+    # drives the magnifying wheel in the Motion study. They are placed at their
+    # design poses; the lock mates that tied them into one rigid body with the
+    # lever are gone, so each is now free.
     # Ry(+90): the clamp's lever bore (local Z) turns onto the rod axis (X).
-    clamp = await place_component(adapter, "magnifying-clamp", list(CLAMP_POS),
-                                  [0.0, 90.0, 0.0], ROT_Y_POS90, ground=False)
-    await lock_mate(adapter, named_ref(f"Front Plane@{clamp}", "PLANE"),
-                    named_ref(f"Front Plane@{ml}", "PLANE"),
-                    label="mag-clamp locked to lever")
+    await place_component(adapter, "magnifying-clamp", list(CLAMP_POS),
+                          [0.0, 90.0, 0.0], ROT_Y_POS90)
     # Backed-out thumb screw: shank tip tangent to the rod top (a seated
     # screw would overlap the rod it pinches -- see module docstring).
-    tscrew = await place_component(adapter, "thumb-screw",
-                                   [CLAMP_X, LEVER_ROD_Y + 3.0 + 12.0 + 5.0, LEVER_ROD_Z],
-                                   [0.0, 0.0, -90.0], rot_z_rows(-90.0), ground=False,
-                                   label="thumb-screw (clamp)")
-    await lock_mate(adapter, named_ref(f"Front Plane@{tscrew}", "PLANE"),
-                    named_ref(f"Front Plane@{clamp}", "PLANE"),
-                    label="thumb-screw locked to clamp")
-    vrod = await place_component(adapter, "magnifying-vertical-rod",
-                                 [CLAMP_X, VROD_TOP_Y, VROD_Z],
-                                 [0.0, 0.0, -90.0], rot_z_rows(-90.0), ground=False)
-    await lock_mate(adapter, named_ref(f"Front Plane@{vrod}", "PLANE"),
-                    named_ref(f"Front Plane@{clamp}", "PLANE"),
-                    label="vertical-rod locked to clamp")
-    fixture = await place_component(adapter, "output-fixture",
-                                    [CLAMP_X, FIXTURE_Y0, VROD_Z],
-                                    [0.0, 0.0, 0.0], IDENTITY, ground=False)
-    await lock_mate(adapter, named_ref(f"Front Plane@{fixture}", "PLANE"),
-                    named_ref(f"Front Plane@{vrod}", "PLANE"),
-                    label="output-fixture locked to vertical-rod")
+    await place_component(adapter, "thumb-screw",
+                          [CLAMP_X, LEVER_ROD_Y + 3.0 + 12.0 + 5.0, LEVER_ROD_Z],
+                          [0.0, 0.0, -90.0], rot_z_rows(-90.0),
+                          label="thumb-screw (clamp)")
+    await place_component(adapter, "magnifying-vertical-rod",
+                          [CLAMP_X, VROD_TOP_Y, VROD_Z],
+                          [0.0, 0.0, -90.0], rot_z_rows(-90.0))
+    await place_component(adapter, "output-fixture",
+                          [CLAMP_X, FIXTURE_Y0, VROD_Z],
+                          [0.0, 0.0, 0.0], IDENTITY)
 
     # --- wheel bar + clamp ---------------------------------------------------
     # Magnifying-wheel bar: HALF-width (every ch30 plate shows it clamped
@@ -182,7 +169,7 @@ async def build(adapter) -> dict[str, str]:
                                [-90.0, 0.0, 0.0], ROT_X_NEG90)
     wh = await place_component(adapter, "magnifying-wheel",
                                [WHEEL_X, WHEEL_BAR_Y, WHEEL_MID_Z], [0.0, 0.0, 0.0],
-                               IDENTITY, ground=False)
+                               IDENTITY)
     wh_o = component_origin(adapter, wh)
     # Revolute: radial coincident (wheel axis Z || axle stud Z) + axial
     # distance(Front, |z|) + angle(Right, 0) rock snapshot. Probed FULLY(3),

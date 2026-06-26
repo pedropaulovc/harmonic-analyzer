@@ -10,7 +10,7 @@ raises and lowers them to trace the curve.
   guide.
 * pen-rod -- a Y-prismatic, driven through the F5 chained-Fourier pen driver
   (reproduces truth_model.pen_y from a CrankDeg global, no force solver).
-* pen-marker (locked to the rod), pen-frame (over the marker + rod on the
+* pen-marker (placed at its design pose, no lock), pen-frame (over the marker + rod on the
   v-block top), pen-set-screw.
 * hanger-screw -- fastens the pen-hanger from behind the wheel bar.
 
@@ -51,7 +51,6 @@ from _assembly import (
     check_no_interference,
     component_origin,
     distance_driver,
-    lock_mate,
     named_ref,
     place_component,
     save_assembly_and_images,
@@ -106,14 +105,14 @@ async def build(adapter) -> dict[str, str]:
     # angle(Front) snapshot killing spin, a Y distance snapshot pinning travel
     # (this is the compliant-chain snapshot the wire would set; suppressed in
     # the Motion study, where the wheel-rim->rod coupling drives it). The marker
-    # rides the rod via a Lock mate. Probed FULLY(3), probe_pen.py.
-    # The hanger is FIRST so the auto-fixed seed is structure, not the rod.
+    # is placed at its design pose; the lock mate that tied it to the rod is
+    # gone. The hanger is FIRST so the auto-fixed seed is structure, not the rod.
     await place_component(adapter, "pen-hanger", list(HANGER_POS),
                           [0.0, 0.0, 0.0], IDENTITY)
     await place_component(adapter, "pen-v-block", list(VBLOCK_POS),
                           [0.0, 0.0, 0.0], IDENTITY)
     pen_rod = await place_component(adapter, "pen-rod", list(PEN_ROD_POS),
-                                    [0.0, 0.0, 0.0], IDENTITY, ground=False)
+                                    [0.0, 0.0, 0.0], IDENTITY)
     rod_o = component_origin(adapter, pen_rod)
     await distance_driver(adapter, named_ref(f"Axis1@{pen_rod}", "AXIS"),
                           named_ref("Front Plane", "PLANE"), abs(rod_o[2]),
@@ -128,12 +127,9 @@ async def build(adapter) -> dict[str, str]:
         adapter, named_ref(f"Top Plane@{pen_rod}", "PLANE"),
         named_ref("Top Plane", "PLANE"), abs(rod_o[1]),
         label="pen-rod travel snapshot", verify=(pen_rod, rod_o))
-    pen_marker = await place_component(adapter, "pen-marker",
-                                       [MARKER_X, MARKER_TIP_Y, PEN_Z_MID],
-                                       [0.0, 0.0, 0.0], IDENTITY, ground=False)
-    await lock_mate(adapter, named_ref(f"Front Plane@{pen_marker}", "PLANE"),
-                    named_ref(f"Front Plane@{pen_rod}", "PLANE"),
-                    label="pen-marker locked to rod")
+    await place_component(adapter, "pen-marker",
+                          [MARKER_X, MARKER_TIP_Y, PEN_Z_MID],
+                          [0.0, 0.0, 0.0], IDENTITY)
 
     # Kinematic pen driver (plan F5): re-drive the Y-travel mate from a CrankDeg
     # global through the chained Fourier sum, so the pose reproduces

@@ -5,6 +5,7 @@ build scripts (never by a leaf part), so edits here never invalidate parts.
 from __future__ import annotations
 
 import hashlib
+import os
 from collections.abc import Iterable
 from typing import Any
 
@@ -271,7 +272,6 @@ async def _add_mate(
     distance: float = 0.0,
     angle: float = 0.0,
     alignment: str = "closest",
-    lock_rotation: bool = False,
     gear_ratio: Iterable[float] | None = None,
     pinion_pitch_diameter: float = 0.0,
     rack_travel_per_revolution: float = 0.0,
@@ -287,7 +287,6 @@ async def _add_mate(
             flip=flip,
             distance=abs(distance),
             angle=angle,
-            lock_rotation=lock_rotation,
             gear_ratio=list(gear_ratio) if gear_ratio else [],
             pinion_pitch_diameter=pinion_pitch_diameter,
             rack_travel_per_revolution=rack_travel_per_revolution,
@@ -394,18 +393,16 @@ async def concentric_mate(
     ref_a: Any,
     ref_b: Any,
     *,
-    lock_rotation: bool = False,
     alignment: str = "closest",
     label: str = "concentric",
     verify: tuple[str, list[float]] | None = None,
 ) -> Any:
-    """Concentric (coaxial) mate; ``lock_rotation`` removes the spin DOF too."""
+    """Concentric (coaxial) mate; leaves the spin DOF free."""
     return await _mate(
         adapter,
         label,
         "concentric",
         [ref_a, ref_b],
-        lock_rotation=lock_rotation,
         alignment=alignment,
         verify=verify,
     )
@@ -550,10 +547,6 @@ async def tangent_mate(
         verify=verify,
     )
 
-async def lock_mate(adapter: Any, ref_a: Any, ref_b: Any, *, label: str = "lock") -> Any:
-    """Lock mate: rigidly fix two components' relative pose (e.g. crank parts)."""
-    return await _mate(adapter, label, "lock", [ref_a, ref_b])
-
 async def gear_mate(
     adapter: Any,
     ref_a: Any,
@@ -615,20 +608,17 @@ async def place_component(
     rotation: list[float],
     rows: list[list[float]],
     *,
-    ground: bool = True,
     mirror: bool = True,
     configuration: str = "",
     label: str = "",
 ) -> str:
     """Insert a part at its exact final (mirrored) transform and assert it.
 
-    ``ground=True`` fixes the component (structure: shafts, mounts, bushings,
-    supports, frame, fasteners, cosmetic springs). ``ground=False`` leaves it
-    free for the caller's mates to constrain -- the moving parts whose DOF are
-    driven from the crank. ``configuration`` selects a part configuration (the
-    cone-gear tooth counts, the transgear-removable wheels). Either way the
-    part is inserted on-solution so mate flip-recovery has a clean reference
-    and the read-back assert holds.
+    No component is grounded: every part is left free for the caller's mates to
+    constrain. ``configuration`` selects a part configuration (the cone-gear
+    tooth counts, the transgear-removable wheels). The part is inserted
+    on-solution so mate flip-recovery has a clean reference and the read-back
+    assert holds.
 
     ``mirror=True`` (default) routes the placement through ``mirror_placement``,
     which reflects it about the machine YZ plane using the part's ``MIRROR_PLANE``
@@ -637,17 +627,14 @@ async def place_component(
     ``rows`` are already the exact machine transform; the default ``"x"`` reflection
     would otherwise flip it across X (onto the wrong side, text reversed).
     """
-    from solidworks_mcp.adapters.base import (
-        ComponentRefParameters,
-        InsertComponentParameters,
-    )
+    from solidworks_mcp.adapters.base import InsertComponentParameters
 
     label = label or part
-    # One span per part: insert + (fix) + placement assert for THIS component, so
-    # the full-build waterfall shows where each part's time went and a failed
+    # One span per part: insert + placement assert for THIS component, so the
+    # full-build waterfall shows where each part's time went and a failed
     # insert/mate is attributed to the part by name.
     async with _telemetry.aspan(
-        f"part {label}", part=part, ground=ground,
+        f"part {label}", part=part,
         configuration=configuration or "default",
     ) as psp:
         if mirror:
@@ -672,11 +659,6 @@ async def place_component(
         )
         name = data["name"]
         psp.set_attribute("component", name)
-        if ground and not data.get("fixed"):
-            check(
-                f"fix {label}",
-                await adapter.fix_component(ComponentRefParameters(name=name)),
-            )
         assert_component_placed(adapter, name, position, rows)
         return name
 
@@ -706,10 +688,9 @@ async def place_components_batch(
     *,
     label: str = "batch",
 ) -> list[str]:
-    """Insert many components in ONE ``AddComponents3`` call, then fix
-    the grounded ones (``Select2`` each, then ONE ``FixComponent``) -- the COM-call-
-    cheap path for repeated GROUNDED structure (cosmetic springs, shaft bushings)
-    that carries no mates.
+    """Insert many components in ONE ``AddComponents3`` call -- the COM-call-cheap
+    path for repeated structure (cosmetic springs, shaft bushings) that carries
+    no mates.
 
     Each ``spec`` is a dict:
 
@@ -718,12 +699,11 @@ async def place_components_batch(
       * ``rows`` -- rotation rows (images of the part X/Y/Z axes), pre-mirror,
       * ``rotation`` -- Euler angles (optional; carried only for parity with
         :func:`place_component`, the transform is built from ``rows``),
-      * ``ground`` -- fix the component (default ``True``),
       * ``mirror`` -- route through ``mirror_placement`` (default ``True``),
       * ``label`` -- log label (optional).
 
     Why this is safe to batch where :func:`place_component` is not: these parts
-    are GROUND (no mates) and inserted at an exact transform, so there is no mate
+    carry no mates and are inserted at an exact transform, so there is no mate
     flip to recover and no insertion-pose coupling -- the placement IS the final
     pose. The moving parts (rocker/rod/bar/lever) keep the per-part
     :func:`place_component` path because their insertion pose seeds mate
@@ -737,15 +717,12 @@ async def place_components_batch(
     BOTH the translation and the rotation (``array[0:9]`` vs the spec's mirrored
     rows -- the same check the per-part ``assert_component_placed`` runs) so a
     misoriented or mislanded part fails loud immediately. The SAME origin match
-    drives the per-spec ``ground`` flag and the returned ``Name2`` order, so a
-    reorder can never fix/return the wrong component. Returns the component
-    ``Name2`` list in ``specs`` order.
+    drives the returned ``Name2`` order, so a reorder can never return the wrong
+    component. Returns the component ``Name2`` list in ``specs`` order.
 
     The ``AddComponents3`` arrays cross the pywin32 late-binding boundary
     VARIANT-wrapped (the SAFEARRAY rule): ``VT_ARRAY|VT_BSTR``
-    names/coord-system-names, ``VT_ARRAY|VT_R8`` transforms. The grounded
-    components are then fixed via per-component ``Select2`` + one ``FixComponent``
-    (see the selection block below for why not ``MultiSelect2``/``Select4``).
+    names/coord-system-names, ``VT_ARRAY|VT_R8`` transforms.
     """
     import pythoncom
     from win32com.client import VARIANT
@@ -757,7 +734,6 @@ async def place_components_batch(
     transforms: list[float] = []
     finals: list[list[float]] = []  # final (mirrored) origin per spec, mm
     expected_rows: list[list[float]] = []  # final (mirrored) rotation, flat 9, per spec
-    grounds: list[bool] = []
     for spec in specs:
         part = spec["part"]
         if spec.get("configuration"):
@@ -775,7 +751,6 @@ async def place_components_batch(
         transforms.extend(_placement_transform(rows, position))
         finals.append(position)
         expected_rows.append([c for row in rows for c in row])
-        grounds.append(bool(spec.get("ground", True)))
 
     asm = adapter.currentModel
     _flag(asm, "IAssemblyDoc")
@@ -784,12 +759,11 @@ async def place_components_batch(
     coordsys_arg = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BSTR, [""] * len(names))
 
     # COM-touching entry point -> open a span (AGENTS.md no-gap tracing invariant),
-    # segmented into insert | readback+assert | fix child spans so the slow batch
-    # op is never an unsegmented hole under the task span.
+    # segmented into insert | readback+assert child spans so the slow batch op is
+    # never an unsegmented hole under the task span.
     out_names: list[str] = [""] * len(specs)
-    grounded_comps: list[Any] = []
     async with _telemetry.aspan(
-        f"batch {label}", count=len(specs), grounded=sum(grounds),
+        f"batch {label}", count=len(specs),
     ):
         with _telemetry.span("batch.insert", count=len(names)):
             raw = adapter._attempt(
@@ -809,23 +783,20 @@ async def place_components_batch(
         _telemetry.debug(f"{label}: AddComponents3 inserted {len(comps)} components")
 
         # Match each returned component to its spec by ORIGIN (bijective, 0.5 mm
-        # tol), then derive the ground flag + name + rotation assert from the
-        # MATCHED spec. AddComponents3 may return the array in a different order
-        # than Names, so zip(comps, specs) is unsafe: a reorder would fix the wrong
-        # component (leaving the intended grounded one floating) and scramble
-        # out_names. One Transform2 read/comp feeds the match AND the placement
-        # assert (translation in [9:12] + rotation in [0:9], same check the per-part
+        # tol), then derive the name + rotation assert from the MATCHED spec.
+        # AddComponents3 may return the array in a different order than Names, so
+        # zip(comps, specs) is unsafe: a reorder would scramble out_names. One
+        # Transform2 read/comp feeds the match AND the placement assert
+        # (translation in [9:12] + rotation in [0:9], same check the per-part
         # assert_component_placed runs -- a bad AddComponents3 rotation/mirror
         # packing lands the origin right but the orientation wrong, e.g. spring
-        # eye/threading pose). The pose is set at insert, so reading it before the
-        # fix is correct (FixComponent only pins the current pose).
+        # eye/threading pose).
         #
         # NB: deliberately NO per-component _flag(comp, "IComponent2"). Flagging the
         # whole interface is 165 _FlagAsMethod GetIDsOfNames round-trips PER
         # component (~0.45 s each -> ~26 s for the 58-part bank) and we need none of
-        # it: Name2/Transform2/ArrayData are property reads and Select2 is a method
-        # called WITH args (late binding dispatches it as a method unambiguously, no
-        # flag). Verified placing + selecting N/N with zero flagging.
+        # it: Name2/Transform2/ArrayData are property reads. Verified placing N/N
+        # with zero flagging.
         with _telemetry.span("batch.readback", count=len(comps)):
             used = [False] * len(specs)
             for comp in comps:
@@ -860,38 +831,9 @@ async def place_components_batch(
                     )
                 used[best_i] = True
                 out_names[best_i] = str(_read_member(comp, "Name2"))
-                if grounds[best_i]:
-                    grounded_comps.append(comp)
-
-        # Append every grounded component to the selection (IComponent2::Select2,
-        # one cheap call per component -- no mate solve), then fix the WHOLE
-        # selection in ONE FixComponent -> ONE solve, vs. one solve per part.
-        # Select2 is called on each raw dispatch directly. The alternatives fail
-        # under the adapter's forced late binding: MultiSelect2 silently selects 0
-        # (a SAFEARRAY of late-bound dispatch wrappers does not marshal -- raw
-        # _oleobj_ pointers raise "Type mismatch" too), and Select4 raises "Type
-        # mismatch" on its ISelectData arg. Select2(Append, Mark) takes only
-        # bool/int -- nothing to marshal -- so it is the late-binding-safe path.
-        if grounded_comps:
-            with _telemetry.span("batch.fix", grounded=len(grounded_comps)):
-                adapter._attempt(lambda: asm.ClearSelection2(True), default=None)
-                n_sel = sum(
-                    1
-                    for comp in grounded_comps
-                    if adapter._attempt(lambda c=comp: c.Select2(True, 0), default=False)
-                )
-                if n_sel != len(grounded_comps):
-                    raise RuntimeError(
-                        f"{label}: Select2 selected {n_sel}/{len(grounded_comps)} "
-                        f"grounded components"
-                    )
-                adapter._attempt(lambda: asm.FixComponent(), default=None)
-                adapter._attempt(lambda: asm.ClearSelection2(True), default=None)
 
     _telemetry.success(
-        f"{label}: inserted {len(specs)} components"
-        f" (1x AddComponents3), fixed {len(grounded_comps)}"
-        f" (Select2 + 1x FixComponent)"
+        f"{label}: inserted {len(specs)} components (1x AddComponents3)"
     )
     return out_names
 
@@ -959,8 +901,18 @@ def assert_components_fully_defined(adapter: Any) -> None:
         gsp.set_attribute("pattern", pattern)
         gsp.set_attribute("not_fully_defined", len(problems))
         _telemetry.success(f"checked {len(components)} components for free DOF")
-    if problems:
-        raise RuntimeError("components not fully defined: " + ", ".join(problems))
+    if not problems:
+        return
+    # TEMPORARY (revert me): with grounding/lock mates removed, un-mated
+    # components are legitimately under-defined and this gate would abort every
+    # assembly build. HARMONIC_RELAX_DOF=1 downgrades the abort to a warning so
+    # the assembly artefacts still build for inspection. Default stays strict,
+    # so verify:soundness keeps failing loud until the poses are re-constrained.
+    msg = "components not fully defined: " + ", ".join(problems)
+    if os.environ.get("HARMONIC_RELAX_DOF"):
+        _telemetry.warn(f"[RELAXED] {msg} ({len(problems)} under-defined, gate bypassed)")
+        return
+    raise RuntimeError(msg)
 
 def component_names(adapter: Any) -> list[str]:
     """Top-level component names (``Name2``) of the active assembly."""

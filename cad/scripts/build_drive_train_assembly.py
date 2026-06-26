@@ -84,9 +84,10 @@ gears are inserted on their exact mirrored transforms (so mate
 flip-recovery has a clean reference and the tuned tooth phases are
 preserved) and joined by real kinematic joints. The crankshaft and the
 cone shaft each get a revolute (coincident axis-to-axis + an axial plane
-distance); the crank arm/handle/T12 wheel/16T pinion are keyed to the
-crankshaft and the 64T + 20 cone gears keyed to the cone shaft (lock
-mates); a 16T:64T gear mate drives the cone cluster from the crank, and
+distance); the crank arm/handle/T12 wheel/16T pinion and the 64T + 20 cone
+gears are placed at their inserted poses (the lock mates that keyed them to
+the crank/cone shafts are gone); a 16T:64T gear mate drives the cone cluster
+from the crank, and
 each cylinder gear meshes its cone gear k at ratio [120-6k : 120]. The
 gear mate is each cylinder gear's sole rotational constraint, so it
 holds the cosine-setup phase without nudging the gear. The whole train
@@ -120,11 +121,9 @@ from _assembly import (
     component_transform,
     distance_driver,
     gear_mate,
-    lock_mate,
     named_ref,
     place_component,
     save_assembly_and_images,
-    spin_driver,
 )
 
 ASM_NAME = "drive-train"
@@ -346,7 +345,6 @@ async def _place_on_shaft(
         ],
         [0.0, -INCLINE_DEG, 0.0],
         ROT_Y_INCLINE,
-        ground=False,
         configuration=configuration,
         label=label,
     )
@@ -387,7 +385,7 @@ async def build(adapter) -> dict[str, str]:
     pivot_post = await place_component(
         adapter, "cone-pivot-post",
         [ppost[0], Y_BASE_TOP, ppost[2]], [0.0, -INCLINE_DEG, 0.0], ROT_Y_INCLINE,
-        ground=False, label="cone-pivot-post (swing bracket, engaged rest)",
+        label="cone-pivot-post (swing bracket, engaged rest)",
     )
     # (cone small-end support deferred to the cone-position rework -- see the
     # note above PIVOT_POST_STATION; the cone tip is unsupported for now.)
@@ -395,7 +393,7 @@ async def build(adapter) -> dict[str, str]:
     # =================== cone cluster (driven, on-solution) ====================
     cone_shaft = await place_component(
         adapter, "cone-gear-shaft",
-        CONE_ORIGIN, [0.0, -INCLINE_DEG, 0.0], ROT_Y_INCLINE, ground=False,
+        CONE_ORIGIN, [0.0, -INCLINE_DEG, 0.0], ROT_Y_INCLINE,
     )
     gear64 = await _place_on_shaft(
         adapter, "crank-drive-gear", GEAR64_STATION, GEAR64_FACE,
@@ -421,32 +419,32 @@ async def build(adapter) -> dict[str, str]:
     # TEMPORARY: only the first active_count cylinder gears (and, via the channel
     # assembly, their cam followers) are built — the build-performance reduction.
     # Cone gears 0..19 above stay; cone gears active_count..19 simply mesh nothing
-    # (they remain keyed to the cone shaft, fully defined, harmless).
+    # (they simply mesh nothing downstream, harmless).
     cyl_gears: list[str] = []
     for j in range(_config.active_count()):
         z_j = Z_DRUM0 + Z_PITCH * j
         cyl = await place_component(
             adapter, "cylinder-gear",
             [X_DRUM, Y_DRIVE, z_j - DRUM_FACE / 2.0], [0.0, 0.0, 1.5], rot_z_rows(1.5),
-            ground=False, label=f"cylinder-gear {j}",
+            label=f"cylinder-gear {j}",
         )
         cyl_gears.append(cyl)
 
     # =================== crank (driven, on-solution) ===========================
     crankshaft = await place_component(
         adapter, "crankshaft",
-        [X_CRANK, Y_DRIVE, CRANKSHAFT_Z0], [90.0, 0.0, 0.0], ROT_X_POS90, ground=False,
+        [X_CRANK, Y_DRIVE, CRANKSHAFT_Z0], [90.0, 0.0, 0.0], ROT_X_POS90,
     )
     pinion = await place_component(
         adapter, "crank-pinion",
         [X_CRANK, Y_DRIVE, PINION_TOOTH_Z - PINION_FACE / 2.0],
         [0.0, 0.0, 11.25], rot_z_rows(11.25),  # +11.25 = half pitch, tooth-in-gap
-        ground=False, label="crank-pinion (centred on the 64T contact tooth)",
+        label="crank-pinion (centred on the 64T contact tooth)",
     )
-    removable = await place_component(
+    await place_component(
         adapter, "transgear-removable",
         [X_CRANK, Y_DRIVE, REMOVABLE_Z0], [0.0, 0.0, 0.0], IDENTITY,
-        ground=False, configuration="T12",
+        configuration="T12",
         label="transgear-removable (crank chain wheel T12)",
     )
     # Crank rest pose: the arm hangs straight DOWN (ch30 eight-views -- the
@@ -456,14 +454,12 @@ async def build(adapter) -> dict[str, str]:
     arm = await place_component(
         adapter, "crank-arm",
         [X_CRANK, Y_DRIVE, CRANK_ARM_Z0], [0.0, 0.0, -90.0], rot_z_rows(-90.0),
-        ground=False,
     )
     # Handle pivot rides the arm tip, now ARM_C2C below the crankshaft. Its grip
     # axis stays parallel to the crankshaft (ROT_Y_POS90 -> assembly -Z).
     handle = await place_component(
         adapter, "crank-handle",
         [X_CRANK, Y_DRIVE - ARM_C2C, CRANK_ARM_Z0], [0.0, 90.0, 0.0], ROT_Y_POS90,
-        ground=False,
     )
 
     # =================== joints ================================================
@@ -485,23 +481,9 @@ async def build(adapter) -> dict[str, str]:
         abs(cs_o[2]),
         label=f"crankshaft axial d={abs(cs_o[2]):.2f}", verify=(crankshaft, cs_o),
     )
-    # Keyed crank chain: arm, handle, the T12 chain wheel and the 16T pinion
-    # all turn rigidly with the crankshaft (a lock preserves the inserted
-    # pose and shares the crankshaft's single spin DOF).
-    crank_axis = named_ref(f"Axis1@{crankshaft}", "AXIS")
-    await lock_mate(
-        adapter, named_ref(f"Axis1@{arm}", "AXIS"), crank_axis, label="crank-arm keyed",
-    )
-    await lock_mate(
-        adapter, named_ref(f"Axis1@{handle}", "AXIS"), crank_axis, label="crank-handle keyed",
-    )
-    await lock_mate(
-        adapter, named_ref(f"Axis1@{removable}", "AXIS"), crank_axis,
-        label="T12 chain wheel keyed",
-    )
-    await lock_mate(
-        adapter, named_ref(f"Axis2@{pinion}", "AXIS"), crank_axis, label="16T pinion keyed",
-    )
+    # The crank arm, handle, T12 chain wheel and 16T pinion are placed at their
+    # inserted poses; the lock mates that keyed them rigidly to the crankshaft
+    # are gone, so they no longer share the crankshaft's spin DOF.
 
     # =============== cone pivot post swing (p1 disengage DOF) ==============
     # The post is the swing bracket: the whole cone set swings horizontally out
@@ -561,19 +543,10 @@ async def build(adapter) -> dict[str, str]:
         d_axial,
         label=f"cone-shaft axial d={d_axial:.2f}", verify=(cone_shaft, cone_o),
     )
-    # The 64T crank-drive gear and the 20 cone gears are one rigid stepped
-    # cluster keyed to the cone shaft.
-    cone_axis = named_ref(f"Axis1@{cone_shaft}", "AXIS")
-    await lock_mate(
-        adapter, named_ref(f"Axis2@{gear64}", "AXIS"), cone_axis,
-        label="64T keyed to cone shaft",
-    )
-    for teeth, cg in cone_gears:
-        await lock_mate(
-            adapter, named_ref(f"Axis1@{cg}", "AXIS"), cone_axis,
-            label=f"cone-gear T{teeth:03d} keyed",
-        )
-    # 16T pinion (keyed to the crank) drives the 64T -> the cone cluster turns.
+    # The 64T crank-drive gear and the 20 cone gears were keyed to the cone
+    # shaft as one rigid stepped cluster; those lock mates are gone, so each now
+    # carries its own free spin DOF.
+    # 16T pinion drives the 64T -> the cone cluster turns via the gear mesh.
     await gear_mate(
         adapter,
         named_ref(f"Axis2@{pinion}", "AXIS"),
