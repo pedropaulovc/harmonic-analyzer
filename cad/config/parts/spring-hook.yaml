@@ -1,0 +1,5 @@
+spring-hook:
+  number: MHA-090
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  process: "machined (steel)"
