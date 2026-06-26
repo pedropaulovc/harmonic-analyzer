@@ -389,16 +389,35 @@ def assert_channel_independence(adapter: Any) -> None:
 # (``cad/out/.doit.db``) and ``ContentChecker``, so a "stale" verdict here is
 # precisely what ``doit`` would rebuild -- building through doit clears it. Set
 # ``HARMONIC_VERIFY_ALLOW_STALE=1`` to verify a deliberately hand-built model.
-def _producer_tasks(name: str) -> list[str]:
-    """``assembly:<name>`` plus the producer task of every part / sub-assembly it
-    references, transitively. Maps the dashed display name to underscored task
-    stems (``frame`` -> ``assembly:frame``; ``rocker_arm_support`` -> ``part:...``)."""
+def _import_dodo():
+    """dodo.py lives at the repo root (off cad/scripts' path). Importing it gives us
+    the SAME build-graph functions doit uses to derive each task's file_dep + target,
+    plus doit's exact ContentChecker -- so the guard's verdict can never disagree with
+    ``doit``'s own rebuild decision. verify.py always runs as its own process
+    (standalone or a doit-spawned subprocess), so this never races the orchestrator."""
+    repo_root = str(SCRIPTS_DIR.parent.parent)
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+    import dodo
+
+    return dodo
+
+
+def _producers(name: str) -> list[tuple[str, list[str], str]]:
+    """``(task, current file_deps, target)`` for ``assembly:<name>`` plus every part /
+    sub-assembly it references, transitively. The deps and target are recomputed from
+    the build graph (NOT read back from the saved ledger), so a dep ADDED since the
+    last build -- a new hold-down part, a post-assembly hook, a freshly-mapped config
+    -- is still checked, exactly as ``doit`` would (Codex review). Dashed display name
+    -> underscored task stems (``frame`` -> ``assembly:frame``)."""
     from _buildgraph import references_of  # local: keep top-level import light
+
+    dodo = _import_dodo()
 
     def is_assembly(stem: str) -> bool:
         return (SCRIPTS_DIR / f"build_{stem}_assembly.py").exists()
 
-    ordered: list[str] = []
+    out: list[tuple[str, list[str], str]] = []
     visited: set[str] = set()
     stack = [name.replace("-", "_")]
     while stack:
@@ -406,16 +425,20 @@ def _producer_tasks(name: str) -> list[str]:
         if stem in visited:
             continue
         visited.add(stem)
-        asm = is_assembly(stem)
-        ordered.append(f"{'assembly' if asm else 'part'}:{stem}")
-        if asm:
+        if is_assembly(stem):
+            out.append((f"assembly:{stem}",
+                        dodo._assembly_file_deps(stem), dodo._sldasm(stem)))
             stack.extend(references_of(stem))
-    return ordered
+        else:
+            script = SCRIPTS_DIR / f"build_{stem}.py"
+            out.append((f"part:{stem}",
+                        dodo._part_file_deps(script, stem), dodo._sldprt(stem)))
+    return out
 
 
 def _stale_inputs(name: str) -> list[str]:
-    """Producer tasks whose tracked ``file_dep`` content has moved since the on-disk
-    artefact was last built THROUGH doit (empty == current). Reuses doit's exact
+    """Producer tasks whose current ``file_dep`` set / content no longer matches the
+    on-disk artefact built THROUGH doit (empty == current). Reuses doit's exact
     ``ContentChecker`` so it never disagrees with ``doit``'s rebuild decision; its
     mtime-changed path compares the CONTENT digest, so checkout/cache-restore mtime
     churn is not a false positive. Raises on a machinery failure (missing/corrupt
@@ -423,36 +446,34 @@ def _stale_inputs(name: str) -> list[str]:
     import json
 
     db = json.loads((OUT_SLDASM.parent / ".doit.db").read_text(encoding="utf-8"))
-    return _stale_in_db(db, _producer_tasks(name))
+    return _stale_in_db(db, _producers(name))
 
 
-def _stale_in_db(db: dict, tasks: list[str]) -> list[str]:
-    """Pure core of :func:`_stale_inputs` (no I/O beyond stat/digest of the deps):
-    given doit's loaded ledger and the producer tasks to check, return one message
-    per task whose recorded file_dep state no longer matches disk. Split out so it
-    is unit-testable without a real ``.doit.db`` (see ``test_verify_freshness.py``)."""
-    # dodo.py lives at the repo root (off cad/scripts' path); reuse its EXACT
-    # ContentChecker so the guard can't disagree with doit. verify.py always runs
-    # as its own process (standalone or a doit-spawned subprocess), so this import
-    # never races the orchestrator.
-    repo_root = str(SCRIPTS_DIR.parent.parent)
-    if repo_root not in sys.path:
-        sys.path.insert(0, repo_root)
-    from dodo import ContentChecker  # doit's exact checker -> guard can't disagree
-
-    checker = ContentChecker()
+def _stale_in_db(db: dict, producers: list[tuple[str, list[str], str]]) -> list[str]:
+    """Pure core of :func:`_stale_inputs` (I/O only to stat/digest the deps + targets):
+    ``producers`` = ``[(task, current_file_deps, target)]``. Returns one message per
+    task that ``doit`` would rebuild -- never built, target missing, a dep that
+    disappeared, a NEW dep absent from the last build, or a dep whose content changed.
+    Split out so it is unit-testable without a real ``.doit.db`` (test_verify_freshness)."""
+    checker = _import_dodo().ContentChecker()
     stale: list[str] = []
-    for task in tasks:
+    for task, deps, target in producers:
         entry = db.get(task)
         if entry is None:
             stale.append(f"{task} (never built through doit)")
             continue
-        for dep in entry.get("deps:", []):
+        if not os.path.exists(target):  # doit rebuilds a task with a missing target
+            stale.append(f"{task}: target {Path(target).name} missing")
+            continue
+        for dep in deps:  # CURRENT deps, so a dep added since last build is caught
             if not os.path.exists(dep):
                 stale.append(f"{task}: missing dep {Path(dep).name}")
                 break
             state = entry.get(dep)
-            if state is None or checker.check_modified(dep, os.stat(dep), state):
+            if state is None:
+                stale.append(f"{task}: new dep {Path(dep).name} (not in last build)")
+                break
+            if checker.check_modified(dep, os.stat(dep), state):
                 stale.append(f"{task}: {Path(dep).name} changed since build")
                 break
     return stale
