@@ -1323,7 +1323,7 @@ def save_assembly_in_place(adapter: Any, asm_name: str, geometry_changed: bool) 
 
     For an assembly OPENED from its own path (a refresh or a config-hook reopen)
     the active doc IS the file, so the correct save is an in-place
-    ``Save3(swSaveAsOptions_Silent | SaveReferenced, &err, &warn)`` -- NOT the
+    ``Save3(swSaveAsOptions_Silent | AvoidRebuildOnSave, &err, &warn)`` -- NOT the
     adapter's ``save_file``, both of whose branches are wrong for an
     opened-in-place doc:
 
@@ -1337,10 +1337,21 @@ def save_assembly_in_place(adapter: Any, asm_name: str, geometry_changed: bool) 
         modal.
 
     Passing the two [out] params as real pywin32 BYREF VARIANTs makes ``Save3``
-    write silently and return the error/warning codes. ``SaveReferenced`` writes
-    any dirty reference without a dialog. The mtime assertion proves the file was
-    rewritten (never deleted). Proven by ``repro_inplace_save.py`` (ret=True,
-    err=0, warn=0, the active config persists on reopen).
+    write silently and return the error/warning codes. The option mask is
+    ``swSaveAsOptions_Silent (1) | swSaveAsOptions_AvoidRebuildOnSave (8)`` -- the
+    canonical bitmask, NOT ``SaveReferenced`` (which is **4**, long mislabeled as 8
+    here and in the MCP adapter's ``io.py``): ``Silent`` suppresses the save
+    dialogs; ``AvoidRebuildOnSave`` skips the redundant save-time rebuild (the
+    health/DOF/interference gates already ``ForceRebuild3``'d the model, so the
+    in-memory geometry is current) and thereby avoids a save-triggered rebuild
+    re-dirtying the referenced parts. ``SaveReferenced`` (4) is DELIBERATELY
+    omitted: the referenced ``.SLDPRT``/sub-``.SLDASM`` files are the authoritative
+    outputs of their own ``part:``/``assembly:`` tasks, and an assembly save must
+    never rewrite them -- that is the parent-md5 byte-churn the build-idempotency
+    keying in ``dodo.ContentChecker`` exists to neutralise. The mtime assertion
+    proves the file was rewritten (never deleted). Proven by
+    ``repro_inplace_save.py`` (ret=True, err=0, warn=0, the active config persists
+    on reopen).
 
     ``geometry_changed`` gates the bump. Every in-place ``Save3`` rewrites fresh
     save metadata -> a new md5, and the parent's doit dep is this file's md5, so an
@@ -1372,7 +1383,7 @@ def save_assembly_in_place(adapter: Any, asm_name: str, geometry_changed: bool) 
     before = sldasm.stat().st_mtime
     err = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
     warn = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
-    options = 1 | 8  # swSaveAsOptions_Silent | swSaveAsOptions_SaveReferenced
+    options = 1 | 8  # swSaveAsOptions_Silent | swSaveAsOptions_AvoidRebuildOnSave
     ret = adapter._attempt(lambda: asm.Save3(options, err, warn), default=False)
 
     after = sldasm.stat().st_mtime

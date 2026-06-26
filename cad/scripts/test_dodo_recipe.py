@@ -142,6 +142,114 @@ def test_content_checker_check_modified_ignores_comment(tmp_path):
     assert checker.check_modified(str(cfg), st, state) is True, "value change must invalidate"
 
 
+class _FakeStat:
+    """Minimal os.stat stand-in: ContentChecker.check_modified only reads st_mtime."""
+
+    def __init__(self, mtime: float):
+        self.st_mtime = mtime
+
+
+def test_artefact_digest_is_recipe_not_bytes():
+    """A .SLDPRT/.SLDASM digest is its producing task's build-input recipe, NOT the
+    artefact bytes -- so it is computed WITHOUT ever reading the (possibly absent /
+    byte-churned) artefact, and equals the part task's file_dep recipe digest."""
+    dodo = _load_dodo()
+    stem = dodo.part_stems()[0]
+    art = dodo._sldprt(stem)
+    recipe = dodo._digest_files(dodo._part_file_deps(dodo.SCRIPTS_DIR / f"build_{stem}.py", stem))
+    assert dodo.ContentChecker._digest(art) == recipe
+    # Deterministic across calls (memoized), and independent of the bytes on disk:
+    # the artefact need not even exist for the digest to resolve.
+    assert dodo.ContentChecker._digest(art) == recipe
+    assert not os.path.exists(art) or dodo.ContentChecker._digest(art) == recipe
+
+
+def test_artefact_digest_immune_to_byte_churn():
+    """THE idempotency fix: a SolidWorks save rewrites a part's bytes (new mtime +
+    size) without changing its geometry inputs. check_modified must report
+    NOT-modified -- the stored recipe digest still matches -- so the dependent
+    assembly is not refreshed for nothing. A stored BYTE md5 (the one-time migration
+    off the old checker, or a genuine recipe change) still reports modified."""
+    dodo = _load_dodo()
+    stem = dodo.part_stems()[0]
+    art = dodo._sldprt(stem)
+    checker = dodo.ContentChecker()
+    recipe = dodo.ContentChecker._digest(art)
+
+    # Save churn: mtime + size differ, stored digest == recipe digest -> inert.
+    churned = (10.0, 999_999, recipe)
+    assert checker.check_modified(art, _FakeStat(churned[0] + 1234), churned) is False, \
+        "byte churn with an unchanged recipe must NOT mark the artefact modified"
+
+    # A stored byte md5 (pre-migration / real input change) differs from the recipe
+    # digest -> modified, so the one rebuild that re-stamps the ledger still happens.
+    stale = (10.0, 12345, "0" * 32)
+    assert checker.check_modified(art, _FakeStat(stale[0] + 1234), stale) is True
+
+
+def test_assembly_artefact_digest_folds_in_refs():
+    """An assembly's stable digest folds its own recipe together with each referenced
+    artefact's digest, recursively -- so a leaf-part input change propagates up to
+    every ancestor (correct invalidation) while pure save-churn of an unchanged part
+    does not (idempotency)."""
+    dodo = _load_dodo()
+    asm = "frame"
+    got = dodo.ContentChecker._digest(dodo._sldasm(asm))
+
+    import hashlib
+    h = hashlib.md5()
+    h.update(dodo._digest_files(dodo._recipe_files(asm)).encode())
+    for ref in dodo.references_of(asm):
+        rp = dodo._sldasm(ref) if ref in dodo.ASSEMBLY_ORDER else dodo._sldprt(ref)
+        h.update((dodo._stable_artefact_digest(rp) or "").encode())
+    assert got == h.hexdigest()
+    # The refs genuinely contribute -- it is not merely the own-recipe digest.
+    assert got != dodo._digest_files(dodo._recipe_files(asm))
+
+
+def test_unknown_artefact_falls_back_to_byte_md5(tmp_path):
+    """A .SLDPRT that is not a declared part/assembly target (e.g. a channel
+    stretch-spring variant) has no recipe in the graph, so the digest falls back to
+    the stock byte md5 rather than crashing or fabricating one."""
+    from doit.dependency import get_file_md5
+
+    dodo = _load_dodo()
+    orphan = tmp_path / "channel-spring-installed-stretch07.SLDPRT"
+    orphan.write_bytes(b"\x00solidworks-bytes\x01")
+    assert dodo._stable_artefact_digest(str(orphan)) is None
+    assert dodo.ContentChecker._digest(str(orphan)) == get_file_md5(str(orphan))
+
+
+def test_digest_files_is_location_independent(tmp_path):
+    """P2 #1 (PR #103 review): the recipe digest must be IDENTICAL across checkout
+    roots, because it now feeds the cross-machine remote-cache key via
+    ``_stable_artefact_digest``. ``_digest_files`` tags each member by its
+    REPO-RELATIVE path (``_rel_tag``), not its absolute path -- an absolute tag would
+    shift every assembly's key per seat and silently kill cross-machine cache hits."""
+    dodo = _load_dodo()
+
+    def make(root: Path):
+        sub = root / "cad" / "scripts"
+        sub.mkdir(parents=True)
+        (sub / "build_x_assembly.py").write_text("recipe v0\n")
+        (sub / "x.yaml").write_text("station_pitch_mm: 10\n")
+        return [str(sub / "build_x_assembly.py"), str(sub / "x.yaml")]
+
+    files_a, files_b = make(tmp_path / "A"), make(tmp_path / "B")
+    orig = dodo.REPO_ROOT
+    try:
+        setattr(dodo, "REPO_ROOT", tmp_path / "A")
+        a = dodo._digest_files(files_a)
+        tag = dodo._rel_tag(files_a[0])
+        assert tag == "cad/scripts/build_x_assembly.py", tag
+        assert ":" not in tag and not tag.startswith("/"), f"tag not repo-relative: {tag}"
+        setattr(dodo, "REPO_ROOT", tmp_path / "B")
+        b = dodo._digest_files(files_b)
+    finally:
+        setattr(dodo, "REPO_ROOT", orig)
+    assert a == b, "recipe digest must be identical across checkout roots (cross-machine cache key)"
+
+
 def _rel(paths, root):
     """Config-relative names of the paths under ``root`` (ignores .py recipe
     members like the assembly script / helpers)."""
