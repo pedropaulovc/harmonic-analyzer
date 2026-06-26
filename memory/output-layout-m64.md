@@ -15,8 +15,7 @@ constants + `cad/DIMENSIONS.md` ch. 18–24 M6.4 rows. Machine coords: Y up
 - **Summing group (z≈0)**: summing-lever + knife-mount at (15, 990, 0) ID;
   top-crossbar (15, **1010**, 0) — band 1010..1051, 0.5 above the tube top
   1009.5, floats 10.3 proud of the ring band 999.7..1040.7, ends face-flush
-  on rail inner faces; knife-stay (0, 1086, 0), strap −40 → (10, 1053)
-  (end CORNER 0.45 clear of the stud west tangent x 11); boss-hook
+  on rail inner faces; boss-hook
   (90.5, 1000, 0); counter-spring (95, **1052.1**, 0) Ry+90 — ring 1012.1,
   0.05 AIR gap above the hook rod top 1016.5 (the hang assert measures
   ring_inner_top − rod_top ∈ (0, 0.5); the original sense was inverted);
@@ -66,10 +65,10 @@ constants + `cad/DIMENSIONS.md` ch. 18–24 M6.4 rows. Machine coords: Y up
   measuring-stick (−158, 53.8, −133) / spare T24 (−133, 55.8, −80); the
   spare's plan circle r 26 = OD radius, NOT the 20.7 hub radius that botched
   the first move.)
-- **Knife-stay strap (M6.5)**: rod hook moved −40 → −10; strap
-  (−10, 1086) → (9.7, 1053). The channel levers' spring tabs OVERHANG 8
-  past the hole line to x −14.1 (tab tops ~1070.1) and clipped the old
-  strap (6.03/2.75 mm³ on the two levers nearest z 0).
+- **Knife-stay strap (M6.5)** — OBSOLETE, the part was later REMOVED (never
+  in the real device; see [[knife-stay-removed]]). Kept only as history: its
+  rod hook had moved −40 → −10, strap (−10, 1086) → (9.7, 1053), to clear the
+  channel levers' spring tabs (overhang 8 past the hole line to x −14.1).
 - **M6.5 size trims**: top-crossbar half-z 101 (372→202 long; M6.4 had
   mistakenly used the ring inner X span 186); support-bar 384 (columns
   reach x ±192.6 at the bar z band); magnifying-bracket flange machine
@@ -79,8 +78,9 @@ constants + `cad/DIMENSIONS.md` ch. 18–24 M6.4 rows. Machine coords: Y up
   impossible).
 
 **M6.5 open items**: marker plumb vs the book's ~12° tilt;
-cross-subassembly fits (knife-stay rod vs top frame, gooseneck vs column
-caps). RESOLVED (stale flags): the channel-spring chain is reconciled —
+cross-subassembly fits (gooseneck vs column
+caps). (The knife-stay rod-and-strap was REMOVED — it never existed in the
+real device; see [[knife-stay-removed]].) RESOLVED (stale flags): the channel-spring chain is reconciled —
 channel.SLDASM's `_assert_plate_threading` gates spring bottom loops
 against the summing plate (top 998, 5.1 thick, Ø4.5 holes at x −22.10)
 and lever span 177.8 puts spring axes on the hole line; the chain plane

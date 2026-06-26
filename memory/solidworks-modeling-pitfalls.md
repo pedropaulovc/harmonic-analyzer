@@ -28,8 +28,9 @@ discovered during harmonic-analyzer M6.4:
   whose edge lies ON the centerline leaves a degenerate axis edge in the
   b-rep; ANY later boss/cut whose body crosses that axis fails silently
   ("FeatureExtrusion3 returned None", revolve-second also fails). Model
-  rods as EXTRUDED CIRCLES instead (probe matrix in the deleted probe
-  script; recipe in `build_knife_stay.py`). Revolves are fine when nothing
+  rods as EXTRUDED CIRCLES instead (e.g. `build_gooseneck.py`'s vertical
+  leg; the former `build_knife_stay.py` example was removed with that part —
+  see [[knife-stay-removed]]). Revolves are fine when nothing
   later crosses the axis (e.g. `build_pen_marker.py`).
 - **add_circle on a Right-plane sketch** fails unless wrapped in
   `set_sketch_direct_db(True)` … `(False)`.
