@@ -36,7 +36,7 @@ from typing import Any
 from _common import (
     OUT_SLDASM,
     UNDER_CONSTRAINED,
-    _flag,
+    _flag_only,
     _read_member,
     check,
     log,
@@ -75,7 +75,9 @@ def _component_status(adapter: Any) -> dict[str, int]:
     comps = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
     out: dict[str, int] = {}
     for comp in comps:
-        _flag(comp, "IComponent2")
+        # Flag ONLY the two zero-arg methods called below; Name2/IsFixed are
+        # property reads (issue #87 -- not the 165-method IComponent2 flag).
+        _flag_only(comp, "IsPatternInstance", "GetConstrainedStatus")
         name = str(_read_member(comp, "Name2"))
         if bool(_read_member(comp, "IsFixed")):
             continue
