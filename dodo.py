@@ -442,18 +442,34 @@ def _run_stamped(cmd: list[str], label: str, stamp: str) -> None:
     Path(stamp).write_text(f"{label}\n", encoding="utf-8")
 
 
+def _rel_tag(f: str) -> str:
+    """Repo-relative, ``/``-normalised path tag for a recipe member, so
+    ``_digest_files`` is LOCATION-INDEPENDENT: identical sources checked out under
+    different roots (two SolidWorks seats, CI vs a workstation) hash the same.
+    This matters because the recipe digest now feeds the cross-machine REMOTE CACHE
+    KEY via ``_stable_artefact_digest`` -> an absolute tag would shift every
+    assembly's key per checkout path and silently defeat cross-machine hits.
+    Falls back to the basename for a path outside the repo (none today; defensive)."""
+    try:
+        return Path(f).resolve().relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return os.path.basename(f)
+
+
 def _digest_files(files: list[str]) -> str:
-    """md5 over the *content* of each file (sorted, name-tagged) -- the recipe
-    fingerprint shared by _RecipeTracker (the run/skip uptodate) and
-    build_or_refresh (the FULL/REFRESH decision), so the two never disagree.
+    """md5 over the *content* of each file (sorted, repo-relative-name-tagged) --
+    the recipe fingerprint shared by _RecipeTracker (the run/skip uptodate),
+    build_or_refresh (the FULL/REFRESH decision), and the remote cache key, so they
+    never disagree. Tags are repo-relative (``_rel_tag``) so the digest is identical
+    across checkout roots -- required for cross-machine cache hits.
 
     YAML configs are folded in by their PARSED content (ContentChecker._digest),
     exactly like the file_dep checker -- so a comment/whitespace-only edit to a
     shared cad/config/*.yaml doesn't force a spurious assembly FULL rebuild, while
     a real placement-value change (which needs a re-insert) still does."""
     h = hashlib.md5()
-    for f in sorted(files):
-        h.update(f.encode())
+    for tag, f in sorted((_rel_tag(f), f) for f in files):
+        h.update(tag.encode())
         try:
             h.update(ContentChecker._digest(f).encode())
         except OSError:
@@ -618,7 +634,28 @@ def _stable_artefact_digest(path: str) -> str | None:
     every ancestor while a pure save-churn of an unchanged referenced part does
     not. Memoized (the graph is a static DAG within a run), so doit's many digest
     calls stay O(1) after the first compute. The recipe members are .py/.yaml, so
-    this never recurses back into the artefact branch of ``ContentChecker._digest``."""
+    this never recurses back into the artefact branch of ``ContentChecker._digest``.
+
+    KNOWN LIMITATION (recipe != PID identity). Keying on inputs is what makes the
+    digest cross-machine-stable (the cache key) and idempotent (no save-churn
+    refresh), but it is deliberately blind to a part being REBUILT FROM SCRATCH with
+    an UNCHANGED recipe -- e.g. you ``rm`` its ``.SLDPRT`` to force it, or a partial
+    cache mix. SolidWorks assigns fresh persistent-reference IDs on every from-empty
+    rebuild, so such a part's PIDs churn while this digest stays put -> a dependent
+    assembly is NOT marked stale, so ``refresh_assembly``/``AutoMateRepair`` does not
+    re-bind, and the next open can dangle the mates that selected the old PIDs.
+    This cannot be closed inside the digest: cross-machine the SAME inputs yield
+    DIFFERENT PIDs, so any PID-sensitive value breaks the cache key, and any
+    cache-stable value is PID-blind -- the two requirements are contradictory. It is
+    narrow and NOT silent: the normal ``doit build`` flow never hits it (a part
+    rebuilds only on a recipe change -> digest moves -> dependents refresh+heal, or
+    on a missing target during a clean build where the assembly is FULL-built fresh
+    anyway), and any resulting dangle fails the ``model-healthy-deep``/DOF gates in
+    ``verify:soundness`` loud. The proper fix is orthogonal to this digest: have
+    doit force-refresh a part's dependents when its build task ACTUALLY EXECUTED a
+    local SolidWorks build (new PIDs) -- as opposed to a cache-restore / up-to-date
+    skip -- which is an orchestration signal that leaves the recipe cache key intact.
+    Tracked as a follow-up; see AGENTS.md "Idempotent" note and PR #103 review."""
     key = _artefact_key(path)
     cached = _ARTEFACT_DIGEST_MEMO.get(key)
     if cached is not None:
