@@ -1,7 +1,7 @@
 r"""Reproduction script: pivot ball mount (book ch. 14 p. 27 / ch. 17 p. 40; 4 used).
 
 The ball-end pillar that carries each pivot shaft end: a short pedestal
-rising from its seat to a Ø19 ball whose centre sits 25.2 above the seat,
+rising from its seat to a Ø13 ball whose centre sits 25.2 above the seat,
 cross-bored Ø6.5 for the Ø6.35 shaft. Two seat on the rocker-support
 apexes (seat y 228.6 -> pivot axis 253.8); two on the top-frame west rail
 (seat y 1040.7 -> fulcrum axis 1065.9). The book's clevis-and-ball detail
@@ -52,9 +52,11 @@ import _telemetry
 PART_NAME = "pivot-ball-mount"
 MATERIAL = "Plain Carbon Steel"  # chrome-look ball/pillar in the photos
 
-BALL_DIA = 19.0  # DIMENSIONS.md ch14 layout: Ø19 ball (scaled, low)
+BALL_DIA = 13.0  # narrowed from Ø19 so the north mount's z-footprint [75.0,
+# 88.0] fits the 14.8 mm window between the channel-19 bar (z 74.1) and the
+# support north edge (z 88.9); the other 3 mounts shrink to match (scaled, low)
 BALL_CENTER_H = 25.2  # ball centre above the seat (derived: 253.8 - 228.6)
-BASE_DIA = 16.0  # seat pad on the 20 x 16.9 support apex (scaled, low)
+BASE_DIA = 13.0  # seat pad, narrowed with the ball to fit the support window (low)
 BASE_H = 4.0  # seat pad height (scaled, low)
 STEM_DIA = 8.0  # pillar between pad and ball (scaled, low)
 BORE_DIA = 6.5  # shaft cross-bore, rides the Ø6.35 pivot shaft (derived)
