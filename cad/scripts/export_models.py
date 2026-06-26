@@ -48,7 +48,7 @@ from _common import (  # noqa: E402
     log,
     run_build,
 )
-from render_compare import _flag, _read_member, model_path  # noqa: E402
+from render_compare import _flag, _flag_only, _read_member, model_path  # noqa: E402
 
 import _telemetry  # noqa: E402
 
@@ -191,7 +191,11 @@ def scan_assembly(adapter: Any, part_colors: dict) -> tuple[list, list, set[tupl
     for i, comp in enumerate(comps, 1):
         if i % 50 == 0:
             log(f"component scan {i}/{len(comps)} ...")
-        _flag(comp, "IComponent2")
+        # Flag ONLY the zero-arg methods called below (GetPathName always;
+        # GetXform in comp_xform's fallback). Name2/Visible/Transform2 are
+        # property reads and GetBox/GetMaterialPropertyValues2 take args, so
+        # none of those need flagging (issue #87 -- not the 165-method flag).
+        _flag_only(comp, "GetPathName", "GetXform")
         try:
             name = str(_read_member(comp, "Name2") or "")
             box = comp.GetBox(False, False)

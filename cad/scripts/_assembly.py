@@ -20,6 +20,7 @@ from _common import (
     _FEATURE_ERROR,
     _MATE_TOL_MM,
     _flag,
+    _flag_only,
     _read_member,
     check,
     log,
@@ -142,7 +143,8 @@ async def apply_component_color(
     comp = adapter.currentModel.GetComponentByName(name)
     if comp is None:
         raise RuntimeError(f"component not found for colour: {name!r}")
-    _flag(comp, "IComponent2")
+    # No flag: Set/GetMaterialPropertyValues2 are both called WITH args, so late
+    # binding dispatches them as methods unambiguously (issue #87).
     values = double_array([*rgb, 1.0, 1.0, 0.3, 0.31, 0.0, 0.0])
     # [R,G,B, ambient, diffuse, specular, shininess, transparency, emission]
     comp.SetMaterialPropertyValues2(values, 1, None)  # swThisConfiguration
@@ -900,7 +902,9 @@ def assert_components_fully_defined(adapter: Any) -> None:
         gsp.set_attribute("components", len(components))
         log(f"checking {len(components)} components for free DOF ...")
         for component in components:
-            _flag(component, "IComponent2")
+            # Flag ONLY the two zero-arg methods called below; Name2/IsFixed are
+            # property reads (issue #87 -- not the 165-method IComponent2 flag).
+            _flag_only(component, "IsPatternInstance", "GetConstrainedStatus")
             comp_name = str(_read_member(component, "Name2"))
             with _telemetry.span("dof.check", component=comp_name) as csp:
                 if bool(_read_member(component, "IsFixed")):
@@ -931,7 +935,7 @@ def component_names(adapter: Any) -> list[str]:
     components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
     names = []
     for component in components:
-        _flag(component, "IComponent2")
+        # No flag: Name2 is a property read (issue #87).
         names.append(str(_read_member(component, "Name2")))
     return names
 
@@ -974,7 +978,7 @@ def check_no_interference(adapter: Any) -> None:
             _flag(interference, "IInterference")
             names = []
             for comp in list(_read_member(interference, "Components") or []):
-                _flag(comp, "IComponent2")
+                # No flag: Name2 is a property read (issue #87).
                 names.append(str(_read_member(comp, "Name2")))
             volume_mm3 = float(_read_member(interference, "Volume") or 0.0) * 1e9
             if all(n.startswith(_CHAIN_LINK_PREFIXES) for n in names) and len(names) == 2:
@@ -1070,7 +1074,9 @@ def assert_model_healthy(
             if deep:
                 comps = adapter._attempt(lambda: model.GetComponents(False), default=None) or []
                 for comp in comps:
-                    _flag(comp, "IComponent2")
+                    # Flag ONLY GetModelDoc2 (zero-arg); Name2 is a property
+                    # read (issue #87 -- not the 165-method IComponent2 flag).
+                    _flag_only(comp, "GetModelDoc2")
                     name = str(_read_member(comp, "Name2"))
                     if "/" in name:  # top-level instances only; their docs cover nested parts
                         continue

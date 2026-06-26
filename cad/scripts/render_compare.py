@@ -68,6 +68,22 @@ def _flag(obj: Any, iface: str) -> None:
         pass
 
 
+def _flag_only(obj: Any, *method_names: str) -> None:
+    """Flag ONLY the named zero-arg methods on ``obj`` -- not its whole
+    interface. Avoids the ~165-round-trip whole-interface ``IComponent2`` flag
+    in per-component loops when only one or two zero-arg methods are called
+    (issue #87). ``_FlagAsMethod`` is a pywin32 ``CDispatch`` method, so this
+    needs no gen_py wrapper; unknown names raise inside it and are skipped."""
+    flag = getattr(obj, "_FlagAsMethod", None)
+    if flag is None:
+        return
+    for name in method_names:
+        try:
+            flag(name)
+        except Exception:
+            pass
+
+
 def _put_object(obj: Any, prop: str, value: Any) -> None:
     """Assign an object-valued COM property, escalating to PROPERTYPUTREF."""
     try:
@@ -227,7 +243,8 @@ def component_boxes(adapter: Any) -> list[tuple[str, tuple[float, ...]]]:
     for i, comp in enumerate(comps or [], 1):
         if i % 50 == 0:
             log(f"component boxes {i}/{total} ...")
-        _flag(comp, "IComponent2")
+        # No flag: Name2 is a property read and GetBox is called WITH args, so
+        # late binding dispatches it as a method unambiguously (issue #87).
         try:
             name = str(_read_member(comp, "Name2") or "")
             box = comp.GetBox(False, False)
