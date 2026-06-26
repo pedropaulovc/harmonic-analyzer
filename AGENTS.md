@@ -135,6 +135,43 @@ then `doit assembly:<stem>`.
 **Fail loud.** A refresh that hits a dangling mate, free DOF, or interference
 exits non-zero and leaves the `.SLDASM` untouched — never a stale artefact.
 
+**Idempotent — artefact bytes don't drive rebuilds.** Saving an assembly makes
+SolidWorks rewrite volatile save metadata into every nested `.SLDPRT`/`.SLDASM`
+(the parent-md5 cascade), so a part's *bytes* legitimately churn after its `part:`
+task — and after a lower assembly — recorded them. To stop that churn from
+re-refreshing every dependent on each build, `ContentChecker._digest` keys a
+`.SLDPRT`/`.SLDASM` on its **producing task's build-input recipe** (script + helper
+closure + config it reads, folded transitively through referenced artefacts), not
+its output bytes — see `_stable_artefact_digest` in `dodo.py`. A real
+script/config/referenced-part change still flips the digest; pure save-churn does
+not, so a no-change `doit build` is now a true no-op (no phantom refreshes). It is
+one chokepoint, so doit staleness, the verify freshness guard (which reuses this
+`ContentChecker`), and the remote cache key (also `_digest`) stay in lockstep — and
+the cache now hits cross-machine despite per-build PID/save churn. (The recipe digest
+is built from **repo-relative** path tags via `_rel_tag`, so it is identical across
+checkout roots — an absolute tag would shift every assembly's key per seat and
+silently kill cross-machine hits.) *Migration:* this shifts every assembly's cache
+key and each artefact dep's stored digest once; the build self-heals over one run
+(one rebuild re-stamps the ledger), or run `doit reset-dep` to migrate the `.doit.db`
+in place without a rebuild.
+
+> [!NOTE]
+> **Known limitation — recipe ≠ PID identity (gate-guarded).** Keying on inputs is
+> what buys cross-machine cache stability *and* idempotency, but it is blind to a
+> part rebuilt **from scratch with an unchanged recipe** (you `rm` its `.SLDPRT` to
+> force it, or a partial cache mix): SolidWorks reassigns persistent-reference IDs on
+> every from-empty rebuild, so its PIDs churn while the digest holds, the dependent
+> assembly is not refreshed, and `AutoMateRepair` never re-binds → a later open can
+> dangle. This is unfixable *inside* the digest (cross-machine, identical inputs give
+> different PIDs, so PID-sensitivity and a stable cache key are contradictory). It is
+> narrow — the normal `doit build` flow never hits it (a part rebuilds only on a
+> recipe change → digest moves → dependents refresh+heal; or on a missing target in a
+> clean build, where the assembly is FULL-built fresh anyway) — and **not silent**: a
+> dangle fails the `model-healthy-deep`/DOF gates in `verify:soundness` loud. Proper
+> fix (follow-up): force-refresh a part's dependents when its task *actually executed*
+> a local SolidWorks build (new PIDs), as opposed to a cache-restore/up-to-date skip —
+> an orchestration signal that leaves the recipe-based cache key untouched.
+
 ## Remote build cache (cross-machine)
 
 The cross-machine extension of the above: COM tasks are keyed by their
