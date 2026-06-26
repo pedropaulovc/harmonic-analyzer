@@ -214,7 +214,7 @@ def test_cross_process_trace_propagation(tmp_path):
         assert "TRACEPARENT" in env
         out = subprocess.run(
             [sys.executable, "-c", child],
-            env={**env, "HARMONIC_OTEL_QUIET": "1"},
+            env=env,
             cwd=str(Path(__file__).resolve().parent),
             capture_output=True,
             text=True,

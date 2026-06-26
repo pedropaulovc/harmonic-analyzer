@@ -208,16 +208,15 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     """Wire up the trace + log providers. Idempotent; safe to call from import.
 
     ``console`` toggles the human-readable stderr stream (and the compact span
-    tracer); set ``HARMONIC_OTEL_QUIET=1`` to suppress them in CI scrapes. File
-    capture under ``cad/out/reports/telemetry`` is always attempted (best-effort).
+    tracer). File capture under ``cad/out/reports/telemetry`` is always attempted
+    (best-effort).
     """
     global _configured
     if _configured and not force:
         return
     _configured = True
 
-    quiet = os.environ.get("HARMONIC_OTEL_QUIET") == "1"
-    want_console = console and not quiet
+    want_console = console
 
     # Resolve the OTLP target ONCE (probes the Aspire default if no env is set)
     # and pin it into the environment so the OTLP exporters read it AND every
