@@ -4,11 +4,11 @@ The head of the analyzer's output, where the 20 channel springs converge on
 the summing lever, in machine coordinates (assembly origin = base origin;
 base top y = 50.8; the output side is -Z). The lever rocks on a true knife
 edge carried by two bearing supports, hung from the top frame by the
-crossbar + stay, and counter-balanced from above by the boss-hook / counter-
+crossbar, and counter-balanced from above by the boss-hook / counter-
 spring / gooseneck chain.
 
 * knife-mount x2 -- the bearing supports, one per hex trunnion (|z| ~ 87).
-* top-crossbar + knife-stay -- hang the lever from the top-frame ring.
+* top-crossbar -- hangs the lever from the top-frame ring.
 * summing-lever -- rocks on the knife edge (Axis3 coincident to the support
   contact ridge); the part the channel + counter springs drive in the M6
   Motion study.
@@ -118,8 +118,6 @@ async def build(adapter) -> dict[str, str]:
     # (1009.5), ends face-flush on the ring rail inner faces (y to 1040.7),
     # stud pokes 14 above for the nut seat.
     await place_component(adapter, "top-crossbar", [KNIFE[0], 1010.0, 0.0],
-                          [0.0, 0.0, 0.0], IDENTITY)
-    await place_component(adapter, "knife-stay", [0.0, 1086.0, 0.0],
                           [0.0, 0.0, 0.0], IDENTITY)
     # Summing lever: knife-edge revolute = coincident axis-to-axis on the knife
     # line (the bore-bottom rocking edge) + a Front-plane axial coincident,
