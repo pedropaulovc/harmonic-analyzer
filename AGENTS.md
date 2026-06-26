@@ -241,8 +241,8 @@ scripts that `from _common import log, check` are instrumented unchanged.
   new subprocess launch.
 - **Where it goes.** Console (stderr) by default; full span/log JSON is also
   captured (best-effort, never fatal) under `cad/out/reports/telemetry/`
-  (`traces.jsonl` / `logs.jsonl`, gitignored). `HARMONIC_OTEL_QUIET=1` silences the
-  console channels (CI scrapes) without touching capture.
+  (`traces.jsonl` / `logs.jsonl`, gitignored). Pass `configure(console=False)` to
+  suppress the console channels without touching capture.
 - Safety net: `cad/scripts/test_telemetry.py` (SolidWorks-free) asserts the
   severity split, no-gap span status, log↔trace correlation, and cross-process
   propagation. Run it after editing `_telemetry.py`.
