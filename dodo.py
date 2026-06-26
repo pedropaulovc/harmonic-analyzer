@@ -414,7 +414,8 @@ RELEASE_PY = (SCRIPTS_DIR / "cut_release.py").resolve()
 # verify:/check: task names (reused by build + release so a new gate is wired in
 # one place).
 _VERIFY_NAMES = ("soundness", "subsystems", "kinematics")   # need SW (spine)
-_CHECK_NAMES = ("math", "config", "graph", "nameplate", "recipe", "cache", "telemetry", "verify_telemetry")  # offline
+_CHECK_NAMES = ("math", "config", "graph", "nameplate", "recipe", "cache", "telemetry",
+                "verify_telemetry", "freshness", "flagonly")  # offline; MUST match task_check's specs keys
 
 
 def _run_stamped(cmd: list[str], label: str, stamp: str) -> None:
@@ -876,7 +877,32 @@ def task_check():
                          str((SCRIPTS_DIR / "test_verify_telemetry.py").resolve())],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_verify_telemetry.py")],
         },
+        "freshness": {
+            # verify.py's standalone-staleness guard: reuses doit's .doit.db ledger
+            # + ContentChecker to refuse scoring a stale tree (the gap that let a
+            # never-rebuilt 8-component frame trip component-count). Pure python ->
+            # offline gate, so the guard can't regress while required checks stay green.
+            "file_dep": [str(VERIFY_PY),
+                         str((REPO_ROOT / "dodo.py").resolve()),
+                         str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
+                         str((SCRIPTS_DIR / "test_verify_freshness.py").resolve())],
+            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_verify_freshness.py")],
+        },
+        "flagonly": {
+            # The targeted late-binding flag helper (_flag_only, issue #87) -- pure
+            # dispatch glue. Was merged WITHOUT a check task, so it never ran in CI;
+            # wired here so a regression in _common._flag_only fails an offline gate.
+            "file_dep": [str((SCRIPTS_DIR / "_common.py").resolve()),
+                         str((SCRIPTS_DIR / "test_flag_only.py").resolve())],
+            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_flag_only.py")],
+        },
     }
+    # Tripwire: `build` and `release` depend on f"check:{c}" for c in _CHECK_NAMES, so a
+    # spec added here without the matching name (or vice versa) would silently never run
+    # in the default paths -- exactly the gap Codex caught on freshness/flagonly. Keep
+    # the two in lockstep.
+    assert set(specs) == set(_CHECK_NAMES), \
+        f"check specs vs _CHECK_NAMES drift: {set(specs) ^ set(_CHECK_NAMES)}"
     for name, spec in specs.items():
         stamp = str(REPORTS / f"check-{name}.ok")
         yield {
