@@ -220,6 +220,36 @@ def test_unknown_artefact_falls_back_to_byte_md5(tmp_path):
     assert dodo.ContentChecker._digest(str(orphan)) == get_file_md5(str(orphan))
 
 
+def test_digest_files_is_location_independent(tmp_path):
+    """P2 #1 (PR #103 review): the recipe digest must be IDENTICAL across checkout
+    roots, because it now feeds the cross-machine remote-cache key via
+    ``_stable_artefact_digest``. ``_digest_files`` tags each member by its
+    REPO-RELATIVE path (``_rel_tag``), not its absolute path -- an absolute tag would
+    shift every assembly's key per seat and silently kill cross-machine cache hits."""
+    dodo = _load_dodo()
+
+    def make(root: Path):
+        sub = root / "cad" / "scripts"
+        sub.mkdir(parents=True)
+        (sub / "build_x_assembly.py").write_text("recipe v0\n")
+        (sub / "x.yaml").write_text("station_pitch_mm: 10\n")
+        return [str(sub / "build_x_assembly.py"), str(sub / "x.yaml")]
+
+    files_a, files_b = make(tmp_path / "A"), make(tmp_path / "B")
+    orig = dodo.REPO_ROOT
+    try:
+        setattr(dodo, "REPO_ROOT", tmp_path / "A")
+        a = dodo._digest_files(files_a)
+        tag = dodo._rel_tag(files_a[0])
+        assert tag == "cad/scripts/build_x_assembly.py", tag
+        assert ":" not in tag and not tag.startswith("/"), f"tag not repo-relative: {tag}"
+        setattr(dodo, "REPO_ROOT", tmp_path / "B")
+        b = dodo._digest_files(files_b)
+    finally:
+        setattr(dodo, "REPO_ROOT", orig)
+    assert a == b, "recipe digest must be identical across checkout roots (cross-machine cache key)"
+
+
 def _rel(paths, root):
     """Config-relative names of the paths under ``root`` (ignores .py recipe
     members like the assembly script / helpers)."""
