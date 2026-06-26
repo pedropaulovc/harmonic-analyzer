@@ -227,6 +227,18 @@ scripts that `from _common import log, check` are instrumented unchanged.
   **Any new COM-touching entry point must open a span** (mirrors the COM-spine
   invariant): an unparented operation is a gap. Add `@traced` to a new operation
   helper rather than leaving it inside the parent span unsegmented.
+- **Right granularity — segment the slow, don't span the trivial.** Two failure
+  modes, both regressions: (1) a long gate that is ONE opaque span — the bulk of
+  its wall-clock hidden in an unspanned region (the `no-over-constrained`,
+  `gear-ratios`, `component-count` gates were each a single 80-90 s black box).
+  Split the expensive COM sub-steps into named child spans (`over.rebuild` /
+  `over.scan`, `gear.read_links`, `count.read`, `verify.open`), exactly as
+  `gate.dof`/`gate.health` already do. (2) a tight loop that opens a span PER
+  item — `dof.check` per component, `health.whats_wrong` per target — flooding the
+  trace with hundreds of near-instant "OK" leaves (335 + 343 in one soundness
+  pass) that drown the signal. Do NOT span per item: keep ONE span around the loop
+  and record the aggregate (counts) as attributes; per-item lines stay `debug`
+  logs, and offenders are named in the raised error the gate span records.
 - **One span per build, no duplicate layer.** `dodo._run` opens a span NAMED for
   the doit task (`part:cone_gear`, `verify:soundness`). `run_build` uses
   `_telemetry.build_session`, which *continues* that span when the spine injected a
@@ -243,9 +255,15 @@ scripts that `from _common import log, check` are instrumented unchanged.
   captured (best-effort, never fatal) under `cad/out/reports/telemetry/`
   (`traces.jsonl` / `logs.jsonl`, gitignored). Pass `configure(console=False)` to
   suppress the console channels without touching capture.
-- Safety net: `cad/scripts/test_telemetry.py` (SolidWorks-free) asserts the
-  severity split, no-gap span status, log↔trace correlation, and cross-process
-  propagation. Run it after editing `_telemetry.py`.
+- Safety net: `cad/scripts/test_telemetry.py` (SolidWorks-free, `check:telemetry`)
+  asserts the severity split, no-gap span status, log↔trace correlation, and
+  cross-process propagation. Run it after editing `_telemetry.py`.
+  `cad/scripts/test_verify_telemetry.py` (`check:verify_telemetry`) pins the verify-
+  gate span SHAPE — it drives the REAL gates through a mock SolidWorks whose COM
+  calls sleep at durations calibrated from the release logs (`HARMONIC_MOCK_SCALE`,
+  default 0.01 of real; `… --demo` prints the real console span tree), asserting
+  the per-item floods stay collapsed and the slow gates keep their child spans. Run
+  it after editing a verify gate's span structure (`verify.py` / `_assembly.py`).
 
 ## Release-diff parallelism
 
