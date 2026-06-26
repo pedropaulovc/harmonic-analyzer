@@ -169,7 +169,6 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     # z-symmetric about the bbox centre (mesh resid 0.000)
     "chain-sprocket": "z",
     # output
-    "knife-stay": "z",
     "boss-hook": "z",
     "counter-spring": "z",
     "gooseneck": "z",
