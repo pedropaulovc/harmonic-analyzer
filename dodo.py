@@ -414,7 +414,7 @@ RELEASE_PY = (SCRIPTS_DIR / "cut_release.py").resolve()
 # verify:/check: task names (reused by build + release so a new gate is wired in
 # one place).
 _VERIFY_NAMES = ("soundness", "subsystems", "kinematics")   # need SW (spine)
-_CHECK_NAMES = ("math", "config", "graph", "nameplate", "recipe", "cache", "telemetry")  # offline
+_CHECK_NAMES = ("math", "config", "graph", "nameplate", "recipe", "cache", "telemetry", "verify_telemetry")  # offline
 
 
 def _run_stamped(cmd: list[str], label: str, stamp: str) -> None:
@@ -862,6 +862,19 @@ def task_check():
             "file_dep": [str((SCRIPTS_DIR / "_telemetry.py").resolve()),
                          str((SCRIPTS_DIR / "test_telemetry.py").resolve())],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_telemetry.py")],
+        },
+        "verify_telemetry": {
+            # The verify-gate span SHAPE, driven by a mock SolidWorks whose COM
+            # calls sleep at durations calibrated from the release logs: the
+            # per-component dof.check / per-target whats_wrong floods stay
+            # collapsed, and the slow gates (over-constrained / gear-ratios /
+            # component-count / open) keep their child spans -- no gate regresses
+            # back into one opaque 80-90 s span. Pure python (no SolidWorks).
+            "file_dep": [str((SCRIPTS_DIR / "_telemetry.py").resolve()),
+                         str((SCRIPTS_DIR / "_assembly.py").resolve()),
+                         str((SCRIPTS_DIR / "verify.py").resolve()),
+                         str((SCRIPTS_DIR / "test_verify_telemetry.py").resolve())],
+            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_verify_telemetry.py")],
         },
     }
     for name, spec in specs.items():
