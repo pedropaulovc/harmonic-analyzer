@@ -497,6 +497,22 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven part (equations neutral)", 240_512, 200)
 
+    # FootSeat datum: a reference plane ON the foot BOTTOM face (Y=-HALF_Y),
+    # offset from the Top Plane (its normal is +Y, so a -HALF_Y offset lands on
+    # the foot). frame.SLDASM mates it COINCIDENT to the base's DeckTop datum to
+    # seat the foot physically -- a named datum on the contact face makes the
+    # seat mate robust (no coordinate pick, no face walk) and flip-free.
+    # Geometry-neutral (no volume change), so no volume_check.
+    from solidworks_mcp.adapters.base import CreatePlaneParameters
+
+    check(
+        "create_plane FootSeat (Top Plane, -HALF_Y)",
+        await adapter.create_plane(
+            CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=-HALF_Y)
+        ),
+    )
+    name_last_feature(adapter, "FootSeat")
+
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)  # green-painted casting, like the base/top-frame
     await report_mass_properties(adapter)
