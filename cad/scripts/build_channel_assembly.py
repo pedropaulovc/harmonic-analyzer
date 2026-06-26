@@ -4,7 +4,8 @@ The complete 20-channel motion chain between the drive train and the
 output: connecting rods riding the integral cams, the rocker-arm seesaw
 bank on its pivot shaft, the amplitude bars running UP the spine, and the
 top-lever bank on its fulcrum shaft with the channel springs hanging from
-the lever tips. 144 components:
+the lever tips, each caught at the plate by a little open hook fastener.
+164 components:
 
 * pivot-shaft x1 (rocker bank at (-72.9, 253.8), along Z, centred z 0)
   + fulcrum-shaft x1 (lever bank at (-199.9, 1065.9), 182 long - the
@@ -19,7 +20,9 @@ the lever tips. 144 components:
 * rocker-arm x20, pivot-bushing x19, connecting-rod x20,
   amplitude-bar x20, channel-lever x20, lever-bushing x19,
   channel-spring-installed x20 (M6.4: the stretched in-machine spring --
-  the free 32 mm part stays for the ch. 17 table-top inset)
+  the free 32 mm part stays for the ch. 17 table-top inset),
+  spring-hook x20 (the open J-hook fastener seating each spring's bottom
+  eye in the plate bore -- the spring no longer threads the plate itself)
 
 Default mechanism state (DIMENSIONS.md "Channel & top-frame layout"):
 cylinder-gear notches +Y (cosine alignment), integral cam lobes -Y, rod
@@ -32,10 +35,11 @@ the bar rests its foot-notch roof on the tilted arm's top-edge arc
 (contact at the bar's -X edge); the bar's top pin height tilts the levers
 (~ +0.36 deg); the spring's top eye hangs 3.37 below the lever spring
 hole so its ring threads the O4 hole without touching (margins asserted
-> 0.1); the bottom lead drops through the summing-lever plate's O4.5
-hole (at z_j - 1.95, one coil mean radius -Z of the spring axis) with
-the end loop hanging under the plate (asserted clearances -- the plate
-itself (the summing-lever) lives in summing.SLDASM, checked at the top level).
+> 0.1); the bottom eye now sits just ABOVE the plate (no longer threading
+it) on the arm of a spring-hook fastener whose shank seats in the plate's
+O2.0 bore (at z_j + 0.8, on the spring axis, one arm-offset -X of the eye)
+-- the plate itself (the summing-lever) lives in summing.SLDASM, checked at
+the top level.
 
 Orientation notes: the amplitude bar is rotated 90 deg about its long
 axis (Ry(90)) so its end slots and O2 top pin hole run across Z,
@@ -177,9 +181,9 @@ LEVER_MOUNT_Z = 85.0  # clears the top-frame boss bores (DIMENSIONS.md)
 # --- spring (build_channel_spring_installed.py locals) ----------------------
 from _spring import COIL_BODY_LENGTH, build_spring  # noqa: E402
 from build_channel_spring_installed import (  # noqa: E402
-    BOTTOM_LEAD as SPRING_BOTTOM_LEAD,  # 9.1: lead spanning the plate thickness
-    INSTALLED_BODY_LENGTH as SPRING_BASE_BODY,  # 68.01: the neutral installed body
-    PLATE_EYE_Y,  # 984.04: fixed summing-plate bottom-eye y (the spring's lower anchor)
+    BOTTOM_LEAD as SPRING_BOTTOM_LEAD,  # 2.0: normal hook lead (no longer spans plate)
+    INSTALLED_BODY_LENGTH as SPRING_BASE_BODY,  # 62.61: the neutral installed body
+    PLATE_EYE_Y,  # 996.54: bottom-eye y, ABOVE the plate on the hook arm
     TOP_LEAD as SPRING_TOP_LEAD,  # 2.0
 )
 
@@ -188,6 +192,20 @@ SPRING_WIRE_DIA = 1.0
 SPRING_EYE_DROP = 3.37  # top eye centre below the lever spring hole
 SPRING_HOLE_DIA = 4.0  # build_channel_lever.py (O3 photo read enlarged: threading)
 
+# --- spring-hook fastener (build_spring_hook.py locals) ---------------------
+# A little open J-hook seats shank-up in each plate bore; its +X arm, presented
+# just above the plate, threads the spring's bottom eye. So the shank sits one
+# arm-offset -X of the (vertical) spring eye and the arm reaches back to it.
+from build_spring_hook import (  # noqa: E402
+    ELBOW_R as HOOK_ELBOW_R,
+    ROD_DIA as HOOK_ROD_DIA,
+    ARM_RUN as HOOK_ARM_RUN,
+    SHANK_RISE as HOOK_SHANK_RISE,
+)
+
+HOOK_ARM_OFFSET_X = HOOK_ELBOW_R + HOOK_ARM_RUN / 2.0  # 2.75: shank->arm-mid in +X
+HOOK_ARM_HEIGHT = HOOK_SHANK_RISE + HOOK_ELBOW_R  # 9.1: shank base -> arm centreline
+
 # --- summing-lever plate interface (build_summing_lever.py) ------------------
 # The corrected .cs lever is a coplanar casting: the plate is mid-plane ON the
 # pivot (knife line y=990), so its top is 992.54 -- 5.46 BELOW the old M6.4 998.
@@ -195,7 +213,7 @@ SPRING_HOLE_DIA = 4.0  # build_channel_lever.py (O3 photo read enlarged: threadi
 # elongate 5.46 against the fixed channel-lever tabs at 1063.65.
 PLATE_TOP_Y = 992.54
 PLATE_THICKNESS = 5.1
-PLATE_HOLE_DIA = 4.5
+PLATE_HOLE_DIA = 2.0  # snug bore for the O1.4 hook shank (build_summing_lever.HOLE_DIA)
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 ROT_Y_POS90 = [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]
@@ -518,36 +536,51 @@ def _assert_spring_threading(hole_y: float, eye_y: float) -> None:
     )
 
 
-def _assert_plate_threading(eye_y: float) -> None:
-    """Assert the spring's plate end threads the summing-lever plate.
+def _assert_hook_fastener(eye_y: float) -> None:
+    """Assert the spring-hook fastener bridges the spring to the plate cleanly.
 
-    The channel spring is a tension coil hooked at BOTH ends: the top eye
-    rides the lever at ``eye_y`` (pose-dependent) while the bottom eye is
-    pinned to the FIXED summing-plate hole at ``PLATE_EYE_Y`` -- the body
-    stretches between (see ``_spring_spec``). So the plate-end geometry is
-    anchored at the plate, NOT hung a fixed distance below the moving top eye:
-    the bottom lead (a straight O1 wire one coil mean radius -Z of the axis)
-    drops through the plate's O4.5 hole and the end loop hangs fully under the
-    plate, regardless of the rest pose. (Deriving the bottom from ``eye_y`` --
-    the old rigid-spring model -- only matched at the exact design pose; the
-    OD-62.2 re-anchor dropped the neutral eye 0.5 mm and the parametric spring
-    absorbed it by stretching 0.5 mm less, but the rigid check drifted and
-    false-flagged the coil.) Checks the pose-independent plate-end fit plus the
-    genuine pose-dependent invariant: the neutral body must stay stretched.
+    The spring no longer threads the plate. Its bottom eye sits ABOVE the plate
+    at the FIXED ``PLATE_EYE_Y`` (pose-independent: every channel's bottom eye is
+    pinned there, only the top eye at ``eye_y`` rides the lever). A separate open
+    J-hook (build_spring_hook.py) seats shank-up in the plate's O2.0 bore and
+    presents its +X arm at ``PLATE_EYE_Y``, where the spring eye links on. This
+    checks the pose-independent fastener geometry -- eye clear above the plate,
+    shank filling+poking through the bore, arm threading the eye with clearance --
+    plus the genuine pose-dependent invariant: the neutral body must stay stretched.
     """
-    bottom_eye_y = PLATE_EYE_Y  # pinned at the plate hole, not hung off the top eye
     plate_bottom = PLATE_TOP_Y - PLATE_THICKNESS
     wire_r = SPRING_WIRE_DIA / 2.0
-    loop_top = bottom_eye_y + SPRING_LOOP_R + wire_r
-    coil_bottom_wire = bottom_eye_y + SPRING_BOTTOM_LEAD - wire_r
-    margin_loop = plate_bottom - loop_top
-    margin_coil = coil_bottom_wire - PLATE_TOP_Y
-    margin_bore = PLATE_HOLE_DIA / 2.0 - wire_r
+    hook_r = HOOK_ROD_DIA / 2.0
+    shank_base = PLATE_EYE_Y - HOOK_ARM_HEIGHT  # arm sits HOOK_ARM_HEIGHT above base
+    shank_top = shank_base + HOOK_SHANK_RISE
+    eye_above_plate = PLATE_EYE_Y - PLATE_TOP_Y  # bottom eye clear above the casting
+    # The eye is a torus, ring plane vertical (axis +X): its LOWEST point hangs a
+    # full ring radius + wire below the centre, so the centre clearing the plate is
+    # NOT enough -- the ring bottom is what fouls the casting (the 0.85 mm dip that
+    # got past the centre-only check and showed as 20 top-level interferences).
+    eye_ring_bottom = PLATE_EYE_Y - (SPRING_LOOP_R + wire_r)
+    ring_above_plate = eye_ring_bottom - PLATE_TOP_Y
+    shank_poke = shank_top - PLATE_TOP_Y         # shank fills the bore + protrudes
+    seat_drop = plate_bottom - shank_base        # shank base reaches the bore mouth
+    bore_clear = PLATE_HOLE_DIA / 2.0 - hook_r   # shank O1.4 in O2.0 bore
+    ring_clear = (SPRING_LOOP_R - wire_r) - hook_r  # eye inner radius vs arm wire
     body = (eye_y - PLATE_EYE_Y) - SPRING_TOP_LEAD - SPRING_BOTTOM_LEAD
-    if margin_loop < 0.02 or margin_coil < 0.02:
+    if eye_above_plate < 0.5 or ring_above_plate < 0.3:
         raise RuntimeError(
-            f"plate threading margins too small: loop-under-plate"
-            f" {margin_loop:.3f}, coil-over-plate {margin_coil:.3f}"
+            f"spring bottom eye not clear above the plate: centre {eye_above_plate:.3f}"
+            f" mm, ring bottom {ring_above_plate:.3f} mm (eye {PLATE_EYE_Y:.2f}, ring"
+            f" bottom {eye_ring_bottom:.2f}, plate top {PLATE_TOP_Y:.2f}) -- the eye"
+            f" ring would foul the casting instead of hanging on the hook"
+        )
+    if shank_poke < 0.1 or abs(seat_drop) > 0.5:
+        raise RuntimeError(
+            f"hook shank does not seat the bore: poke-above {shank_poke:.3f},"
+            f" base-vs-bore-mouth {seat_drop:+.3f} (want shank to fill 987.44..992.54)"
+        )
+    if bore_clear < 0.05 or ring_clear < 0.05:
+        raise RuntimeError(
+            f"hook fastener clearances too small: shank-in-bore {bore_clear:.3f},"
+            f" arm-in-eye {ring_clear:.3f}"
         )
     if body < COIL_BODY_LENGTH:
         raise RuntimeError(
@@ -556,10 +589,10 @@ def _assert_plate_threading(eye_y: float) -> None:
             f" far -- the spring would be in compression, not tension"
         )
     log(
-        f"plate threading: bottom eye y {bottom_eye_y:.2f}, loop-under-plate"
-        f" margin {margin_loop:.2f}, coil-over-plate margin {margin_coil:.2f},"
-        f" lead bore clearance {margin_bore:.2f}, neutral body {body:.2f}"
-        f" (free {COIL_BODY_LENGTH:.2f})"
+        f"hook fastener: bottom eye y {PLATE_EYE_Y:.2f} ({eye_above_plate:.2f} above"
+        f" plate, ring bottom {ring_above_plate:.2f} above), shank poke {shank_poke:.2f},"
+        f" bore clearance {bore_clear:.2f}, arm-in-eye {ring_clear:.2f},"
+        f" neutral body {body:.2f} (free {COIL_BODY_LENGTH:.2f})"
     )
 
 
@@ -625,7 +658,7 @@ async def build(adapter) -> dict[str, str]:
     spring_hole_y = FULCRUM[1] + LEVER_SPRING_X * math.sin(phi)
     eye_y = spring_hole_y - SPRING_EYE_DROP
     _assert_spring_threading(spring_hole_y, eye_y)
-    _assert_plate_threading(eye_y)
+    _assert_hook_fastener(eye_y)
 
     # Bushing clearance under the bar foot at d = 0 (geometry gate).
     bar_clearance = state["bar_bottom"] - PIVOT[1]
@@ -865,6 +898,23 @@ async def build(adapter) -> dict[str, str]:
             "rows": spring_rows,
             "label": (f"channel-spring ch{j:02d} {spec['part'].rsplit('-', 1)[-1]} "
                       f"body={spec['body']:.2f} tilt={spec['theta']:+.2f}"),
+        })
+
+        # Spring-hook fastener (ground; cosmetic) -- the SEPARATE little open J-hook
+        # that connects this channel's spring to the plate (the spring no longer
+        # threads the plate itself). It seats shank-UP in the plate bore at
+        # (hole_x_0 - arm_offset, z_mid) and presents its +X arm just above the
+        # plate, threading the spring's bottom eye (fixed at (hole_x_0,
+        # PLATE_EYE_Y, z_mid) for every pose). The spring stays vertical; the hook
+        # reaches +X back to it. IDENTITY orientation: the eye-axis tilt (<=1.1 deg
+        # off +X even at full amplitude) is well inside the bore/ring clearance.
+        grounded_specs.append({
+            "part": "spring-hook",
+            "position": [hole_x_0 - HOOK_ARM_OFFSET_X,
+                         PLATE_EYE_Y - HOOK_ARM_HEIGHT, z_mid],
+            "rotation": [0.0, 0.0, 0.0],
+            "rows": IDENTITY,
+            "label": f"spring-hook ch{j:02d} bore-seat",
         })
 
         # Bushings (ground; cosmetic) ride the shafts in the inter-channel gaps:

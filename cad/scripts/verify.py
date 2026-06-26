@@ -144,7 +144,7 @@ _N_CH = _config.active_count()
 _COMPONENT_BAND = {
     "frame": (7, 12),           # measured 9 (corner brackets removed, #21)
     "drive-train": (32 + _N_CH - 4, 32 + _N_CH + 4),  # N=20 -> (48,56), measured 52
-    "channel": (7 * _N_CH + 4 - 6, 7 * _N_CH + 4 + 6),  # N=20 -> (138,150), measured 144
+    "channel": (8 * _N_CH + 4 - 6, 8 * _N_CH + 4 + 6),  # N=20 -> (158,170), measured 164
     # The former monolithic output split by function (no per-channel parts here);
     # bands tightened to the measured green-build counts (verify:subsystems).
     "summing": (8, 10),         # ch 18-19, measured 9

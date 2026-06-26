@@ -171,6 +171,12 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     # output
     "knife-stay": "z",
     "boss-hook": "z",
+    # spring-hook: the little channel plate hook, the boss-hook idiom one size
+    # down. A planar wire in its local X-Y plane (achiral about local z=0), so
+    # like the channel spring it engages it must take the SAME z-mirror -- the
+    # default "x" would X-flip the chiral hook to the wrong side of the eye with
+    # its arm reversed (it must mirror identically to channel-spring-installed).
+    "spring-hook": ("z", 0.0),
     "counter-spring": "z",
     "gooseneck": "z",
     # gooseneck-clamp: default 'x' (block/bore/screw-head all x-centred);
