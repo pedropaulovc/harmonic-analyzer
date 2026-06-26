@@ -14,8 +14,7 @@ Cross-subassembly fits proven by the top-level interference check:
   (summing.SLDASM) -- gated analytically by
   build_channel_assembly._assert_plate_threading;
 * top-crossbar ends face-flush on the top-frame ring rail inner faces
-  (frame.SLDASM), knife-stay rod above the ring, gooseneck-clamp around
-  the east column (all summing.SLDASM);
+  (frame.SLDASM), gooseneck-clamp around the east column (all summing.SLDASM);
 * column-clamps (magnifier + paper-drive) ride the Ø25.4 columns (frame) with
   a 25.6 bore;
 * the pen-hanger (pen.SLDASM) clamps the wheel-bar (magnifier.SLDASM), and the

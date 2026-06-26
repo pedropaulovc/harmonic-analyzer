@@ -147,7 +147,7 @@ _COMPONENT_BAND = {
     "channel": (7 * _N_CH + 4 - 6, 7 * _N_CH + 4 + 6),  # N=20 -> (138,150), measured 144
     # The former monolithic output split by function (no per-channel parts here);
     # bands tightened to the measured green-build counts (verify:subsystems).
-    "summing": (8, 10),         # ch 18-19, measured 9
+    "summing": (7, 9),          # ch 18-19, measured 8 (knife-stay removed: never in the real device)
     "magnifier": (10, 12),      # ch 20-21, measured 11
     "pen": (6, 8),              # ch 24, measured 7
     "paper-drive": (95, 99),    # ch 22-23-25, measured 97 (27 placed + 70-link chain;
