@@ -85,7 +85,10 @@ from _assembly import (
     component_names,
     component_transform,
 )
-from _common import _flag, _read_member  # component iteration helpers (read-only)
+from _common import (  # component iteration helpers (read-only)
+    _flag_only,
+    _read_member,
+)
 
 # solidworks_mcp internals reused read-only: the live gear-mate ratios are not
 # exposed by any public tool (list_mates returns name/type/suppressed only), so
@@ -240,7 +243,9 @@ def assert_no_over_constrained(adapter: Any) -> None:
     components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
     over = []
     for comp in components:
-        _flag(comp, "IComponent2")
+        # Flag ONLY GetConstrainedStatus (zero-arg); Name2 is a property read
+        # (issue #87 -- not the 165-method IComponent2 flag).
+        _flag_only(comp, "GetConstrainedStatus")
         status = int(
             adapter._attempt(lambda c=comp: c.GetConstrainedStatus(), default=-1)
         )
