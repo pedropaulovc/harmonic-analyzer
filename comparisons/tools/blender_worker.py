@@ -182,6 +182,54 @@ def resolve_framing(cam, boxes, mesh_lo, mesh_hi):
     return target, zoom
 
 
+def aim_camera(cam, cam_data, c, boxes, mesh_lo, mesh_hi, ext, w, h):
+    """Position cam/cam_data for camera spec ``c`` (manifest euler camera dict).
+
+    Single source of truth for the camera placement, shared with the
+    interactive blender_camera_addon.py so a pose adjusted in the viewport
+    reproduces 1:1 on the next render_offline.py run. Returns (target, zoom,
+    cam_dist) for callers that want to invert/inspect the framing.
+    """
+    r, u, o = camera_axes(c.get("az_deg", 0.0), c.get("el_deg", 0.0), c.get("roll_deg", 0.0))
+    target, zoom = resolve_framing(c, boxes, mesh_lo, mesh_hi)
+    need_w = max(_proj_extent(mesh_lo, mesh_hi, r),
+                 _proj_extent(mesh_lo, mesh_hi, u) * w / h)
+    frame_w = need_w * 1.05 / zoom  # world width that fills the frame at target
+
+    # Orthographic unless the pair requests a lens. For perspective, orient the
+    # DX long edge (sensor_long) to the canvas long edge so a portrait canvas
+    # rotates the camera like the book shot, then pull the eye back so the
+    # long-edge world span fills the frame: distance = fit_span * lens /
+    # sensor_long. That keeps the same silhouette fit as ortho at the target
+    # plane (near parts enlarged) while the long-axis angle of view matches the
+    # real f-mm lens (~13.5 deg at 100 mm on 23.6 mm).
+    lp = lens_params(c)
+    if lp is None:
+        cam_data.type = "ORTHO"
+        cam_data.sensor_fit = "HORIZONTAL"
+        cam_data.ortho_scale = frame_w
+        cam_dist = ext * 3
+    else:
+        lens_mm, sensor_long = lp
+        cam_data.type = "PERSP"
+        cam_data.lens = lens_mm
+        if h >= w:  # portrait: long edge runs vertically
+            cam_data.sensor_fit = "VERTICAL"
+            cam_data.sensor_height = sensor_long
+            fit_span = frame_w * h / w  # world height that fills the frame
+        else:       # landscape: long edge runs horizontally
+            cam_data.sensor_fit = "HORIZONTAL"
+            cam_data.sensor_width = sensor_long
+            fit_span = frame_w          # world width that fills the frame
+        cam_dist = fit_span * lens_mm / sensor_long
+
+    rot = Matrix(((r[0], u[0], o[0]), (r[1], u[1], o[1]), (r[2], u[2], o[2])))
+    m = rot.to_4x4()
+    m.translation = Vector(target) + Vector(o) * cam_dist
+    cam.matrix_world = m
+    return target, zoom, cam_dist
+
+
 def main():
     job = json.loads(Path(sys.argv[sys.argv.index("--") + 1]).read_text(encoding="utf-8"))
 
@@ -210,49 +258,10 @@ def main():
     scene.render.image_settings.file_format = "PNG"
 
     for pair in job["pairs"]:
-        c = pair["camera"]
-        r, u, o = camera_axes(c.get("az_deg", 0.0), c.get("el_deg", 0.0), c.get("roll_deg", 0.0))
-        target, zoom = resolve_framing(c, boxes, mesh_lo, mesh_hi)
-
         w, h = pair["width"], pair["height"]
         scene.render.resolution_x = w
         scene.render.resolution_y = h
-        need_w = max(_proj_extent(mesh_lo, mesh_hi, r),
-                     _proj_extent(mesh_lo, mesh_hi, u) * w / h)
-        frame_w = need_w * 1.05 / zoom  # world width that fills the frame at target
-
-        # Orthographic unless the pair requests a lens. For perspective, orient
-        # the DX long edge (sensor_long) to the canvas long edge so a portrait
-        # canvas rotates the camera like the book shot, then pull the eye back
-        # so the long-edge world span fills the frame: distance = fit_span *
-        # lens / sensor_long. That keeps the same silhouette fit as ortho at the
-        # target plane (near parts enlarged) while the long-axis angle of view
-        # matches the real f-mm lens (~13.5 deg at 100 mm on 23.6 mm).
-        lp = lens_params(c)
-        if lp is None:
-            cam_data.type = "ORTHO"
-            cam_data.sensor_fit = "HORIZONTAL"
-            cam_data.ortho_scale = frame_w
-            cam_dist = ext * 3
-        else:
-            lens_mm, sensor_long = lp
-            cam_data.type = "PERSP"
-            cam_data.lens = lens_mm
-            if h >= w:  # portrait: long edge runs vertically
-                cam_data.sensor_fit = "VERTICAL"
-                cam_data.sensor_height = sensor_long
-                fit_span = frame_w * h / w  # world height that fills the frame
-            else:       # landscape: long edge runs horizontally
-                cam_data.sensor_fit = "HORIZONTAL"
-                cam_data.sensor_width = sensor_long
-                fit_span = frame_w          # world width that fills the frame
-            cam_dist = fit_span * lens_mm / sensor_long
-
-        rot = Matrix(((r[0], u[0], o[0]), (r[1], u[1], o[1]), (r[2], u[2], o[2])))
-        m = rot.to_4x4()
-        m.translation = Vector(target) + Vector(o) * cam_dist
-        cam.matrix_world = m
-
+        aim_camera(cam, cam_data, pair["camera"], boxes, mesh_lo, mesh_hi, ext, w, h)
         scene.render.filepath = pair["out"]
         bpy.ops.render.render(write_still=True)
         print(f"RENDERED {pair['id']}")
