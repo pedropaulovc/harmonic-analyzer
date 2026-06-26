@@ -61,6 +61,7 @@ from __future__ import annotations
 import argparse
 import csv
 import math
+import os
 import re
 import sys
 from dataclasses import dataclass, field
@@ -378,6 +379,107 @@ def assert_channel_independence(adapter: Any) -> None:
     )
 
 
+# --- Freshness guard ----------------------------------------------------------
+# Run OUTSIDE the doit DAG (a bare ``python verify.py ...``), this harness opens
+# whatever ``.SLDASM`` is on disk -- there is NO dependency edge forcing a rebuild
+# first, so an artefact whose sources moved scores SILENTLY. That is exactly how a
+# never-rebuilt pre-FootSeat ``frame`` (8 components, no lag-screws) sailed through
+# every health/DOF/interference gate and only tripped component-count: the geometry
+# was old, not wrong. The guard below reuses doit's OWN ledger
+# (``cad/out/.doit.db``) and ``ContentChecker``, so a "stale" verdict here is
+# precisely what ``doit`` would rebuild -- building through doit clears it. Set
+# ``HARMONIC_VERIFY_ALLOW_STALE=1`` to verify a deliberately hand-built model.
+def _producer_tasks(name: str) -> list[str]:
+    """``assembly:<name>`` plus the producer task of every part / sub-assembly it
+    references, transitively. Maps the dashed display name to underscored task
+    stems (``frame`` -> ``assembly:frame``; ``rocker_arm_support`` -> ``part:...``)."""
+    from _buildgraph import references_of  # local: keep top-level import light
+
+    def is_assembly(stem: str) -> bool:
+        return (SCRIPTS_DIR / f"build_{stem}_assembly.py").exists()
+
+    ordered: list[str] = []
+    visited: set[str] = set()
+    stack = [name.replace("-", "_")]
+    while stack:
+        stem = stack.pop()
+        if stem in visited:
+            continue
+        visited.add(stem)
+        asm = is_assembly(stem)
+        ordered.append(f"{'assembly' if asm else 'part'}:{stem}")
+        if asm:
+            stack.extend(references_of(stem))
+    return ordered
+
+
+def _stale_inputs(name: str) -> list[str]:
+    """Producer tasks whose tracked ``file_dep`` content has moved since the on-disk
+    artefact was last built THROUGH doit (empty == current). Reuses doit's exact
+    ``ContentChecker`` so it never disagrees with ``doit``'s rebuild decision; its
+    mtime-changed path compares the CONTENT digest, so checkout/cache-restore mtime
+    churn is not a false positive. Raises on a machinery failure (missing/corrupt
+    db, import error) so the caller can downgrade to a warning -- never a silent pass."""
+    import json
+
+    db = json.loads((OUT_SLDASM.parent / ".doit.db").read_text(encoding="utf-8"))
+    return _stale_in_db(db, _producer_tasks(name))
+
+
+def _stale_in_db(db: dict, tasks: list[str]) -> list[str]:
+    """Pure core of :func:`_stale_inputs` (no I/O beyond stat/digest of the deps):
+    given doit's loaded ledger and the producer tasks to check, return one message
+    per task whose recorded file_dep state no longer matches disk. Split out so it
+    is unit-testable without a real ``.doit.db`` (see ``test_verify_freshness.py``)."""
+    # dodo.py lives at the repo root (off cad/scripts' path); reuse its EXACT
+    # ContentChecker so the guard can't disagree with doit. verify.py always runs
+    # as its own process (standalone or a doit-spawned subprocess), so this import
+    # never races the orchestrator.
+    repo_root = str(SCRIPTS_DIR.parent.parent)
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+    from dodo import ContentChecker  # doit's exact checker -> guard can't disagree
+
+    checker = ContentChecker()
+    stale: list[str] = []
+    for task in tasks:
+        entry = db.get(task)
+        if entry is None:
+            stale.append(f"{task} (never built through doit)")
+            continue
+        for dep in entry.get("deps:", []):
+            if not os.path.exists(dep):
+                stale.append(f"{task}: missing dep {Path(dep).name}")
+                break
+            state = entry.get(dep)
+            if state is None or checker.check_modified(dep, os.stat(dep), state):
+                stale.append(f"{task}: {Path(dep).name} changed since build")
+                break
+    return stale
+
+
+def _assert_fresh(name: str, report: Report) -> bool:
+    """False (and a recorded failure) when ``name``'s on-disk artefacts are stale vs
+    their sources. A guard-machinery failure WARNs and passes -- it must never break
+    a working verify. ``HARMONIC_VERIFY_ALLOW_STALE=1`` bypasses entirely."""
+    if os.environ.get("HARMONIC_VERIFY_ALLOW_STALE") == "1":
+        return True
+    try:
+        stale = _stale_inputs(name)
+    except Exception as exc:  # noqa: BLE001 -- guard must not break a working verify
+        _telemetry.warn(f"{name}: freshness check skipped ({exc})")
+        return True
+    if not stale:
+        return True
+    report.failed.append((
+        f"{name}:fresh-inputs",
+        f"stale on-disk artefact -- run `doit assembly:{name.replace('-', '_')}` "
+        f"(or HARMONIC_VERIFY_ALLOW_STALE=1): " + "; ".join(stale),
+    ))
+    _telemetry.error(f"{name}: STALE artefact, NOT verified -- {'; '.join(stale)}")
+    return False
+
+
 async def _verify_isolation_one(adapter: Any, name: str, report: Report) -> None:
     """Subsystem-SPECIFIC structural gates for one built (sub)assembly (plan F1).
 
@@ -406,6 +508,9 @@ async def _verify_isolation_one(adapter: Any, name: str, report: Report) -> None
         _telemetry.error(f"{sldasm.name} not built -- run doit")
         return
 
+    if not _assert_fresh(name, report):
+        return  # stale on-disk artefact: fail loud rather than verify old geometry
+
     # Fresh session: close any prior assembly before opening this one (accumulating
     # open docs degrades the COM session -- the InterferenceDetectionManager came
     # back null on the 5th open).
@@ -430,6 +535,9 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
         report.failed.append((f"{name}:open", f"not built: {sldasm}"))
         _telemetry.error(f"{sldasm.name} not built -- run doit")
         return
+
+    if not _assert_fresh(name, report):
+        return  # stale on-disk artefact: fail loud rather than verify old geometry
 
     # Fresh session per assembly: accumulating open docs across the multi-assembly
     # run degrades the COM session -- the InterferenceDetectionManager comes back
@@ -490,6 +598,9 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
         report.failed.append((f"motion:{name}:open", f"not built: {sldasm}"))
         _telemetry.error(f"{sldasm.name} not built -- run doit")
         return
+
+    if not _assert_fresh(name, report):
+        return  # stale on-disk artefact: fail loud rather than verify old geometry
 
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     check(f"open {name}", await adapter.open_model(str(sldasm)))
