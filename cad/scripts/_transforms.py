@@ -169,7 +169,6 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     # z-symmetric about the bbox centre (mesh resid 0.000)
     "chain-sprocket": "z",
     # output
-    "knife-stay": "z",
     "boss-hook": "z",
     # spring-hook: the little channel plate hook, the boss-hook idiom one size
     # down. A planar wire in its local X-Y plane (achiral about local z=0), so
