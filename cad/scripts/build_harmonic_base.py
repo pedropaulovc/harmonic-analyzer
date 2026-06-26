@@ -59,22 +59,25 @@ TOP_LENGTH = 17.5 * IN  # legacy: 0.25" reveal per side
 TOP_WIDTH = 10.5 * IN
 TOP_THICKNESS = 1.5 * IN
 
-# M6.10 fastener holes (machine = part-local: frame.SLDASM places the
-# base unrotated at the origin). All through-drilled O8.2 (documented
-# simplification -- the rail-bolt holes need only 12.5-deep sockets):
-# 2x portal south foot-rail hex-bolts at (74.75, z -54/+36) and 2x
-# portal north lag-screws at (72.9 +/- 31.75, z 101.6), the latter with
-# O15 x 4.5 head counterbores up from the underside.
-HOLE_DIA = 8.2
+# Rocker-support hold-down holes (machine = part-local: frame.SLDASM places the
+# base unrotated at the origin). Four through-drilled O13 clearance holes laid out
+# to MATCH the rocker-arm-support foot's 9/16-12 tapped pattern (build_rocker_arm_
+# support.py FootTappedHoles, local X +/-60.32 Z +/-17.46 -> after the part's
+# +90deg-Y turn, machine x 72.9 -/+ 17.46 = 55.44/90.36, z +/-60.32). Every hole
+# gets an O23 x 6.5 head counterbore up from the underside for the recessed lag-
+# screw head, so the four 9/16-12 lag screws (build_lag_screw.py) come up through
+# the base into the foot's tapped holes. The old portal-era pattern (south foot-
+# rail hex-bolts + north lag screws) is gone with the portal it served.
+HOLE_DIA = 13.0  # 9/16 lag-screw shank O12 clearance
 HOLE_XZ = (
-    (74.75, -54.0),  # portal south foot-rail bolt
-    (74.75, 36.0),  # portal south foot-rail bolt
-    (41.15, 101.6),  # portal north lag screw (west)
-    (104.65, 101.6),  # portal north lag screw (east)
+    (55.44, 60.32),   # support foot, west pair
+    (55.44, -60.32),
+    (90.36, 60.32),   # support foot, east pair
+    (90.36, -60.32),
 )
-CBORE_DIA = 15.0
-CBORE_DEPTH = 4.5  # lag head 14 x 4 recessed 0.5
-CBORE_XZ = HOLE_XZ[2:]
+CBORE_DIA = 23.0  # lag head O22, recessed
+CBORE_DEPTH = 6.5  # lag head 22 x 6 recessed 0.5
+CBORE_XZ = HOLE_XZ  # all four heads counterbored
 
 MM3_PER_IN3 = IN**3
 
@@ -208,9 +211,9 @@ async def build(adapter) -> dict[str, str]:
     # material (the lower half is air).
     cbores = SketchDims()
     check("create_sketch counterbores", await adapter.create_sketch("Top"))
-    # CBORE_XZ is HOLE_XZ[2:], so each counterbore is concentric with a fastener
-    # hole -- reuse the same Hole{2,3}{X,Z} station globals so a station edit moves
-    # both. The index offset (2) keeps the global names aligned with the holes.
+    # CBORE_XZ is HOLE_XZ (all four heads recessed), so each counterbore is
+    # concentric with its fastener hole -- reuse the same Hole{i}{X,Z} station
+    # globals so a station edit moves both. cbore_offset (0 here) aligns the names.
     cbore_offset = len(HOLE_XZ) - len(CBORE_XZ)
     for j, (x, z) in enumerate(CBORE_XZ):
         i = cbore_offset + j
@@ -258,6 +261,25 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven base (equations neutral)", after, 0.005 * after
     )
+
+    # DeckTop datum: a reference plane ON the top face (Y = total height), offset
+    # from the Top Plane (its normal is +Y; the base sits entirely at Y>=0).
+    # frame.SLDASM mates the support's FootSeat datum COINCIDENT to it to seat the
+    # foot physically -- a named datum on the contact face makes the seat mate
+    # robust (no coordinate pick, no face walk) and flip-free. Geometry-neutral.
+    from solidworks_mcp.adapters.base import CreatePlaneParameters
+
+    check(
+        "create_plane DeckTop (Top Plane, +height)",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset",
+                base_plane="Top Plane",
+                offset=BOTTOM_THICKNESS + TOP_THICKNESS,
+            )
+        ),
+    )
+    name_last_feature(adapter, "DeckTop")
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)

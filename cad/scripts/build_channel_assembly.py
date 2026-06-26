@@ -169,8 +169,13 @@ LEVER_THICKNESS = 3.0
 
 # --- supports / mounts ------------------------------------------------------
 SUPPORT_APEX_Y = 228.6
-SUPPORT_Z = 101.6  # north rocker-support apex (frame.SLDASM)
+SUPPORT_Z = 81.5  # north mount, seated FULLY on the support: with the Ø13 ball
+# its z-footprint [75.0, 88.0] clears the channel-19 amplitude bar (z 74.1) and
+# stays inside the support north edge (z 88.9). Was 101.6 (cantilevered 12.7).
 AFRAME_MOUNT_Z_ABS = 111.0  # south mount on the A-frame clevis (frame.SLDASM)
+# Pivot shaft placed off-centre so its north end lands at the support edge
+# (z +88.9) while the south end (z -114.3) still reaches the A-frame mount.
+PIVOT_SHAFT_Z = -12.7  # = (88.9 - 114.3) / 2; the 203.2-long shaft spans ±101.6
 RAIL_TOP_Y = 1040.7
 LEVER_MOUNT_Z = 85.0  # clears the top-frame boss bores (DIMENSIONS.md)
 
@@ -684,7 +689,7 @@ async def build(adapter) -> dict[str, str]:
     # Shafts (ground; first insert auto-fixes). The shaft axes in the FINAL
     # mirrored frame (x -> -x) anchor the rocker/lever concentrics.
     await place_component(
-        adapter, "pivot-shaft", [PIVOT[0], PIVOT[1], 0.0], [0.0, 0.0, 0.0],
+        adapter, "pivot-shaft", [PIVOT[0], PIVOT[1], PIVOT_SHAFT_Z], [0.0, 0.0, 0.0],
         IDENTITY, label="pivot-shaft (rocker)",
     )
     await place_component(
