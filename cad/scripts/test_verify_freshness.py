@@ -4,9 +4,12 @@ Run OUTSIDE the doit DAG, ``verify.py`` opens whatever ``.SLDASM`` is on disk wi
 no edge forcing a rebuild -- so an artefact whose sources moved scores SILENTLY
 (a never-rebuilt pre-FootSeat ``frame`` passed every health gate and only tripped
 component-count). ``_assert_fresh`` closes that gap by reusing doit's OWN ledger
-(``cad/out/.doit.db``) + ``ContentChecker``, plus the build graph's CURRENT
-file_dep/target sets, so a "stale" verdict here is exactly what ``doit`` would
-rebuild. These tests exercise the pure core SW-free::
+(``cad/out/.doit.db``) + ``ContentChecker`` over each producer's CURRENT SOURCE
+deps (build scripts/config), so a "stale" verdict means the sources moved without a
+rebuild. Referenced ``.SLDPRT``/``.SLDASM`` artefacts are existence-checked only --
+their bytes churn when a parent assembly re-saves nested docs (the parent-md5
+cascade), which is build non-idempotency, not a source change. These tests exercise
+the pure core SW-free::
 
     python cad/scripts/test_verify_freshness.py     # or: pytest cad/scripts/test_verify_freshness.py
 """
@@ -100,6 +103,44 @@ def test_missing_dep_file_is_flagged(tmp_path: Path) -> None:
     assert stale and "missing dep deleted.py" in stale[0]
 
 
+def test_artefact_dep_byte_churn_is_not_flagged(tmp_path: Path) -> None:
+    """A referenced .SLDPRT/.SLDASM under cad/out whose BYTES changed is NOT staleness.
+    SolidWorks re-saves every nested document when a parent assembly is fully rebuilt
+    (the parent-md5 cascade) -- a re-insert/re-mate grows each child .SLDPRT even though
+    the geometry is identical -- so content-checking it would fail every full build. Its
+    real freshness is covered transitively via its own producer's SOURCE check."""
+    import dodo
+
+    art = tmp_path / "harmonic-base.SLDPRT"
+    art.write_text("v1\n", encoding="utf-8")
+    stored = _state(art)
+    art.write_text("v2 -- re-saved in-context by a parent assembly, +446 bytes\n",
+                   encoding="utf-8")
+    db = {"part:widget": {"deps:": [str(art)], str(art): stored}}
+    old = dodo.CAD_OUT
+    dodo.CAD_OUT = tmp_path  # classify `art` as a build artefact (under cad/out)
+    try:
+        assert verify._stale_in_db(db, [_producer(tmp_path, deps=[art])]) == []
+    finally:
+        dodo.CAD_OUT = old
+
+
+def test_artefact_dep_missing_is_still_flagged(tmp_path: Path) -> None:
+    """Artefact deps skip CONTENT, not EXISTENCE: a referenced part missing from disk
+    is a genuine break (the assembly points at something that isn't there)."""
+    import dodo
+
+    art = tmp_path / "harmonic-base.SLDPRT"  # never created -> missing
+    db = {"part:widget": {"deps:": [str(art)], str(art): [1.0, 1, "x"]}}
+    old = dodo.CAD_OUT
+    dodo.CAD_OUT = tmp_path
+    try:
+        stale = verify._stale_in_db(db, [_producer(tmp_path, deps=[art])])
+    finally:
+        dodo.CAD_OUT = old
+    assert stale and "missing dep harmonic-base.SLDPRT" in stale[0]
+
+
 def test_producers_walk_refs_and_include_current_deps() -> None:
     """frame -> its parts; the top assembly -> sub-assemblies AND their parts. Deps are
     the CURRENT graph: frame must list lag-screw.SLDPRT (added with the hold-downs)."""
@@ -125,6 +166,8 @@ if __name__ == "__main__":
         test_missing_target_is_flagged,
         test_never_built_task_is_flagged,
         test_missing_dep_file_is_flagged,
+        test_artefact_dep_byte_churn_is_not_flagged,
+        test_artefact_dep_missing_is_still_flagged,
     )
     for fn in fs_tests:
         with tempfile.TemporaryDirectory() as d:

@@ -386,15 +386,17 @@ def assert_channel_independence(adapter: Any) -> None:
 # never-rebuilt pre-FootSeat ``frame`` (8 components, no lag-screws) sailed through
 # every health/DOF/interference gate and only tripped component-count: the geometry
 # was old, not wrong. The guard below reuses doit's OWN ledger
-# (``cad/out/.doit.db``) and ``ContentChecker``, so a "stale" verdict here is
-# precisely what ``doit`` would rebuild -- building through doit clears it. Set
+# (``cad/out/.doit.db``) and ``ContentChecker`` over each task's SOURCE deps, so a
+# "stale" verdict here means the build scripts/config moved without a rebuild --
+# building through doit clears it. (Referenced .SLDPRT/.SLDASM byte churn from the
+# parent-md5 cascade is deliberately NOT staleness; see _stale_in_db.) Set
 # ``HARMONIC_VERIFY_ALLOW_STALE=1`` to verify a deliberately hand-built model.
 def _import_dodo():
     """dodo.py lives at the repo root (off cad/scripts' path). Importing it gives us
     the SAME build-graph functions doit uses to derive each task's file_dep + target,
-    plus doit's exact ContentChecker -- so the guard's verdict can never disagree with
-    ``doit``'s own rebuild decision. verify.py always runs as its own process
-    (standalone or a doit-spawned subprocess), so this never races the orchestrator."""
+    plus doit's exact ContentChecker and ``CAD_OUT`` -- so the guard reads the build
+    graph exactly as doit does. verify.py always runs as its own process (standalone or
+    a doit-spawned subprocess), so this never races the orchestrator."""
     repo_root = str(SCRIPTS_DIR.parent.parent)
     if repo_root not in sys.path:
         sys.path.insert(0, repo_root)
@@ -437,12 +439,14 @@ def _producers(name: str) -> list[tuple[str, list[str], str]]:
 
 
 def _stale_inputs(name: str) -> list[str]:
-    """Producer tasks whose current ``file_dep`` set / content no longer matches the
-    on-disk artefact built THROUGH doit (empty == current). Reuses doit's exact
-    ``ContentChecker`` so it never disagrees with ``doit``'s rebuild decision; its
-    mtime-changed path compares the CONTENT digest, so checkout/cache-restore mtime
-    churn is not a false positive. Raises on a machinery failure (missing/corrupt
-    db, import error) so the caller can downgrade to a warning -- never a silent pass."""
+    """Producer tasks whose current SOURCE ``file_dep`` set / content no longer matches
+    the on-disk artefact built THROUGH doit (empty == current). Reuses doit's exact
+    ``ContentChecker`` on the source deps; its mtime-changed path compares the CONTENT
+    digest, so checkout/cache-restore mtime churn is not a false positive. Referenced
+    build artefacts are existence-checked only -- see :func:`_stale_in_db` for why their
+    byte churn (the parent-md5 cascade) is NOT staleness. Raises on a machinery failure
+    (missing/corrupt db, import error) so the caller can downgrade to a warning -- never
+    a silent pass."""
     import json
 
     db = json.loads((OUT_SLDASM.parent / ".doit.db").read_text(encoding="utf-8"))
@@ -452,10 +456,32 @@ def _stale_inputs(name: str) -> list[str]:
 def _stale_in_db(db: dict, producers: list[tuple[str, list[str], str]]) -> list[str]:
     """Pure core of :func:`_stale_inputs` (I/O only to stat/digest the deps + targets):
     ``producers`` = ``[(task, current_file_deps, target)]``. Returns one message per
-    task that ``doit`` would rebuild -- never built, target missing, a dep that
-    disappeared, a NEW dep absent from the last build, or a dep whose content changed.
+    producer whose on-disk artefact no longer reflects its SOURCES -- never built,
+    target missing, a source dep that disappeared, a NEW source dep absent from the
+    last build, or a source dep whose content changed.
+
+    SOURCE deps (build scripts, ``_common.py``, hooks, ``cad/config/*.yaml``) are
+    content-checked with doit's exact ``ContentChecker``; that is the real
+    "sources moved but the artefact was never rebuilt" signal (the pre-FootSeat
+    8-component ``frame``). Build ARTEFACT deps (the referenced ``.SLDPRT`` /
+    ``.SLDASM`` under ``cad/out``) are checked for EXISTENCE only, NOT content:
+    SolidWorks re-saves every nested document when a PARENT assembly is fully
+    rebuilt -- a re-insert/re-mate writes in-context reference data back into each
+    child ``.SLDPRT`` (the "parent-md5 cascade"), so the bytes churn while the
+    geometry is identical. doit would rebuild on that churn, but it is expected
+    build non-idempotency, not a source change -- failing verify on it would make
+    every full ``doit build`` fail at the gate. Each artefact's REAL freshness is
+    still covered transitively: the walk visits its producer (``part:<x>`` /
+    ``assembly:<x>``) and content-checks THAT task's own sources.
+
     Split out so it is unit-testable without a real ``.doit.db`` (test_verify_freshness)."""
-    checker = _import_dodo().ContentChecker()
+    dodo = _import_dodo()
+    checker = dodo.ContentChecker()
+    cad_out = os.path.normcase(os.path.normpath(str(dodo.CAD_OUT)))
+
+    def is_artefact(dep: str) -> bool:
+        return os.path.normcase(os.path.normpath(dep)).startswith(cad_out)
+
     stale: list[str] = []
     for task, deps, target in producers:
         entry = db.get(task)
@@ -469,6 +495,8 @@ def _stale_in_db(db: dict, producers: list[tuple[str, list[str], str]]) -> list[
             if not os.path.exists(dep):
                 stale.append(f"{task}: missing dep {Path(dep).name}")
                 break
+            if is_artefact(dep):  # SW re-save churn != source change -- existence only
+                continue
             state = entry.get(dep)
             if state is None:
                 stale.append(f"{task}: new dep {Path(dep).name} (not in last build)")
