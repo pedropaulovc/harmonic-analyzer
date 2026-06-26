@@ -1199,6 +1199,31 @@ def _flag(obj: Any, interface: str) -> None:
         pass
 
 
+def _flag_only(obj: Any, *method_names: str) -> None:
+    """Flag ONLY the named zero-arg methods on ``obj`` -- not its whole
+    interface.
+
+    Each ``_FlagAsMethod`` is one ``GetIDsOfNames`` COM round-trip (~3 ms over
+    the out-of-process bridge). ``_flag(comp, "IComponent2")`` flags all ~165
+    IComponent2 methods (~0.45 s) -- a steep tax in a loop over every component
+    when only one or two zero-arg methods are actually called (issue #87). Flag
+    just those instead, so the per-component cost drops to a couple of ms.
+
+    Property reads (``Name2``, ``Transform2`` …) and methods called WITH args
+    (``Select2(True, 0)``, ``GetBox(False, False)``) need NO flagging at all --
+    drop the flag entirely there rather than calling this. ``_FlagAsMethod`` is
+    a pywin32 ``CDispatch`` method, so this needs no gen_py wrapper; unknown
+    names raise inside it and are skipped."""
+    flag = getattr(obj, "_FlagAsMethod", None)
+    if flag is None:
+        return
+    for name in method_names:
+        try:
+            flag(name)
+        except Exception:
+            pass
+
+
 # ---------------------------------------------------------------------------
 # Friendly names: tree (sketches/features) + dimensions, plus globals/equations.
 #

@@ -158,7 +158,7 @@ def _components(adapter, model=None, toplevel=False):
     raw = adapter._attempt(lambda: model.GetComponents(bool(toplevel)), default=None) or []
     out = []
     for c in raw:
-        _flag(c, "IComponent2")
+        # No flag: Name2 is a property read (issue #87).
         out.append((c, str(_read_member(c, "Name2"))))
     scope = "top-level" if toplevel else "full-tree"
     log(f"    [enumerated {len(out)} components, {scope}, {_t.perf_counter() - t0:.1f}s]")
@@ -227,7 +227,7 @@ def _mate_parts(adapter, mate):
         if rc is None:
             rc = adapter._attempt(lambda e=me: e.ReferenceComponent, default=None)
         if rc is not None:
-            _flag(rc, "IComponent2")
+            # No flag: Name2 is a property read (issue #87).
             parts.append(str(_read_member(rc, "Name2")))
     return parts
 
