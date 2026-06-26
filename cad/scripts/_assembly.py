@@ -299,6 +299,7 @@ async def _mate(
     entities: list[Any],
     *,
     verify: tuple[str, list[float]] | None = None,
+    flip: bool = False,
     **kw: Any,
 ) -> Any:
     """Add a mate and ``check`` it; recover a far-side flip when ``verify`` set.
@@ -306,7 +307,14 @@ async def _mate(
     ``verify=(comp_name, target_origin_mm)`` enables readback-and-flip: after
     the mate solves, the component origin must stay within ``_MATE_TOL_MM`` of
     ``target_origin_mm`` (it was inserted there); otherwise the mate is deleted
-    and re-added flipped, then re-checked. Returns the (final) mate result data.
+    and re-added with the OPPOSITE flip, then re-checked. Returns the (final)
+    mate result data.
+
+    ``flip`` seeds the FIRST solve's side. Default ``False`` keeps the historic
+    behaviour (lean on the recovery). A caller that already knows the correct
+    side passes the right ``flip`` so the part lands on-target in ONE solve --
+    no delete-and-re-add, so the part never visibly jumps. The recovery stays as
+    a safety net (re-adds with ``not flip``), so a wrong guess still self-heals.
     """
     from solidworks_mcp.adapters.base import MateRefParameters
 
@@ -314,7 +322,7 @@ async def _mate(
     # including flip-recovery, so the full-build waterfall stays contiguous
     # between part spans instead of leaving the mate time as a gap.
     async with _telemetry.aspan(f"mate {kind}", kind=kind, label=label) as msp:
-        res = check(label, await _add_mate(adapter, kind, entities, flip=False, **kw))
+        res = check(label, await _add_mate(adapter, kind, entities, flip=flip, **kw))
         if verify is None:
             return res
         comp_name, target_origin = verify
@@ -330,7 +338,7 @@ async def _mate(
         )
         res = check(
             f"{label} (flipped)",
-            await _add_mate(adapter, kind, entities, flip=True, **kw),
+            await _add_mate(adapter, kind, entities, flip=not flip, **kw),
         )
         array = component_transform(adapter, comp_name)
         moved = max(abs(array[9 + i] * 1000.0 - target_origin[i]) for i in range(3))
@@ -346,12 +354,22 @@ async def plane_distance_mate(
     base_name: str,
     distance: float,
     target_origin: list[float],
+    *,
+    flip: bool = False,
 ) -> Any:
     """Plane-plane distance (or coincident, when ``distance==0``) mate.
 
     The structural-placement workhorse: three orthogonal calls fully define a
-    grounded part against a reference part's principal planes, with far-side
-    flip recovery from the inserted-on-solution transform.
+    grounded part against a reference part's principal planes.
+
+    ``flip`` seeds the first solve's side (passed to :func:`_mate`). The default
+    ``False`` is right for axis-aligned parts. A part placed with a rotation that
+    inverts its plane normals lands on the FAR side under the default sense, so
+    its mates jump there via the delete-and-re-add recovery; pass ``flip=True``
+    on those mates to land on-target in one solve. (An explicit ``"anti_aligned"``
+    swMateAlign would also pick the near side, but on a rotated part it inverts
+    the part's ORIENTATION 180deg -- so flip, not alignment, is the correct knob
+    here: it selects the distance side while keeping the inserted orientation.)
     """
     kind = "distance" if abs(distance) > 1e-9 else "coincident"
     label = f"mate {comp_plane}@{comp_name} <-> {base_plane}@{base_name} d={distance:g}"
@@ -366,6 +384,7 @@ async def plane_distance_mate(
         entities,
         distance=abs(distance),
         verify=(comp_name, target_origin),
+        flip=flip,
     )
 
 async def concentric_mate(
