@@ -109,15 +109,21 @@ ANCHOR_R = 0.375 * IN  # summation anchor outer radius               9.525
 ANCHOR_H = 0.75 * IN  # summation anchor height                     19.05
 
 # --- spring-hole registration (machine channel bank, NOT the tiny .cs holes) -
-# The 20 channel springs thread these holes; positions reused verbatim from the
-# M6.4 part so build_channel_assembly / build_channel_spring_installed need no
-# change (cad/DIMENSIONS.md ch18 row 4).
-HOLE_DIA = 4.5  # installed eye threads the 5.1 plate (med)
-HOLE_X = 37.10  # local +X = machine x +22.10 = channel-lever tab line (derived)
+# The 20 channel SPRING-HOOKS seat in these holes (the springs themselves no
+# longer thread the plate -- a separate open hook fastener does, per
+# build_spring_hook.py / build_channel_assembly.py). Each hole holds a hook shank;
+# its arm reaches +X back to the still-vertical spring eye above the plate.
+HOLE_DIA = 2.0  # snug bore for the O1.4 spring-hook shank (0.3 radial clearance);
+# was O4.5 (sized when the spring eye threaded the plate) -- far too big for the
+# little hook shank that now seats here (the spring eye links the hook arm above)
+HOLE_X = 39.85  # 37.10 (the spring-eye column) + 2.75: local +X maps to WORLD -X
+# (world_x = 15 - local_x), so +2.75 local seats the hook shank one arm-offset to
+# world -X of the eye, where its +X (world) arm reaches back to the eye (derived)
 HOLE_COUNT = 20
 CHANNEL_Z0 = -67.1  # frame channel j=0 (DIMENSIONS.md ch6)
 CHANNEL_PITCH = 7.0565
-HOLE_Z_OFFSET = 0.8 - 2.75  # -1.95: hole under the spring's bottom lead
+HOLE_Z_OFFSET = 0.8  # coaxial with the spring axis (z_j + 0.8): no lead threads
+# the bore anymore, so the old -2.75 lead offset is dropped (hook shank is on-axis)
 # The plate is a true coplanar casting -- mid-plane ON the pivot (.cs shape):
 # placed at the knife line y=990 it spans 987.46..992.54, so the top registers at
 # machine 992.54 (NOT the old M6.4 998). The channel springs + magnifying bracket
@@ -154,7 +160,7 @@ ANCHOR_BORE_R = 1.5  # summation-anchor centre hole (counter-spring hook seat)
 # the hole column by the spring coil radius (~3.25) + margin so every hole stays
 # open; the rib still stiffens the inner lever, the outer plate arm is the (thin)
 # spring-hole field.
-MID_RIB_PLATE_REACH = HOLE_X - 4.1  # 33.0 local +X: clears hole column + coil
+MID_RIB_PLATE_REACH = HOLE_X - 4.1  # 35.75 local +X: clears the (shifted) hole column
 
 # Spring-hole Z stations (world Z); the Top-plane sketch maps world Z to -sketchY.
 HOLE_Z = [CHANNEL_Z0 + CHANNEL_PITCH * j + HOLE_Z_OFFSET for j in range(HOLE_COUNT)]

@@ -138,3 +138,63 @@ GetInterferenceBody box dump) confirms 0 interferences; top-view render shows al
 3 active springs threading cleanly. LESSON: never trust `FeatureLinearPattern5`'s auto-selected-edge
 direction for a field that must land on exact stations — cut the stations explicitly. See
 [[channel-amplitude-state]], [[parametric-springs]].
+
+**Springs join the plate via a SEPARATE hook fastener, NOT a plate-threading eye — DONE+VALIDATED
+(2026-06-25):** book ch.17 (page002_img04/img06) shows the channel spring bank landing on the coefficient
+plate through a row of little open hooks, exactly the boss-hook / counter-spring idiom one size down —
+the spring does NOT thread its own eye through the plate. NEW part **`spring-hook` (MHA-090, Plain
+Carbon Steel, `build_spring_hook.py`)**: the proven line-arc-line open-J idiom (a 270° planar loop
+self-intersects the swept wire and FAILS — use the shank+90°-elbow+arm chain, profile at a true path
+ENDPOINT). It seats shank-UP in the plate's Ø4.5 bore (natural orientation) and presents its +X arm just
+ABOVE the plate where the spring's bottom eye links on. Knobs: `ROD_DIA 1.4`, `SHANK_RISE 7.6`,
+`ELBOW_R 1.5`, `ARM_RUN 2.5` → arm height SHANK_RISE+ELBOW_R = **9.1** above the shank base.
+
+GEOMETRY FORK (user chose "move eye above plate (cascade)", the most faithful): shorten the spring so its
+bottom eye sits ABOVE the plate (the spring no longer passes through it). Cascade — `build_channel_spring_installed.py`
+`PLATE_EYE_Y 984.04→996.54`, `BOTTOM_LEAD 9.1→2.0` (normal hook lead, was plate-spanning), body
+auto-drops to **62.61**; `build_summing_lever.py` `HOLE_DIA 4.5` (hook-shank clearance), `HOLE_X
+37.10→39.85`, `HOLE_Z_OFFSET −1.95→+0.8` (coaxial with the spring axis in Z, shifted one arm-offset −X
+to seat the shank); `verify.py` channel count band `7*→8*` (164, was 144). 20 hook `grounded_specs` added
+in `build_channel_assembly.py` at `[hole_x_0 − HOOK_ARM_OFFSET_X, PLATE_EYE_Y − HOOK_ARM_HEIGHT, z_mid]`
+IDENTITY (grounded specs carry FINAL world transforms — NO `MIRROR_PLANE` entry needed, like the bushings).
+
+FRAME TRAP (cost a wrong-side rebuild): the top assembly inserts every subassembly at [0,0,0] IDENTITY, so
+the summing-lever placed at world (15.0, 990.0) maps its **local +X to world −X**: `world_x = 15.0 −
+local_x` (boss-hook at world 90.5 = 15 − (−76.20) confirms it). So the +2.75 local hole shift lands at
+world −2.75. HOLE_Z is already world Z (no flip). Keep the spring VERTICAL at `hole_x_0` (don't lean it) so
+verify:math `spring:neutral-body-canonical` stays green — move the hole+hook −2.75 in world X instead.
+
+EYE-RING-VS-PLATE TRAP (cost one full top-level rebuild): `_assert_plate_threading` → renamed
+`_assert_hook_fastener`. First pass set PLATE_EYE_Y so the eye CENTRE cleared the plate (4.0 above) but the
+eye is a **torus, ring plane vertical (axis +X), so its LOWEST point hangs a full `SPRING_LOOP_R + wire_r`
+= 3.25 below the centre** → ring bottom dipped 0.85 below the plate top → 20× spring↔plate clashes at 2.04
+mm³ each at the TOP level only (channel-only interference was clean — the plate lives in summing). Fix =
+raise PLATE_EYE_Y to 996.54 (ring bottom 993.29, clears plate top 992.54 by 0.75) + lengthen the hook
+(SHANK_RISE→7.6) to keep the arm at the eye and the shank seated. Added a **ring-bottom clearance check**
+(`ring_above_plate ≥ 0.3`) to the gate so the dip is caught OFFLINE next time, not at a ~500 s COM rebuild.
+Final: spring-hook 19.2 mm³, channel 164 comps 0-DOF interference-NONE, summing/top interference-NONE,
+math 9/9 + config 13/13 (tolerance audit 74 parts, spring-hook picked up). See [[parametric-springs]].
+
+**TWO bugs interference=0 did NOT catch — found by RENDERING (2026-06-25, user-flagged):** the gates
+were all green but the user's screenshots showed (a) the spring eye not engaging the hook, (b) the
+plate holes far bigger than the shanks. interference=0 only proves nothing OVERLAPS, never that two
+parts ENGAGE. Lesson: for an engagement/fit change, render a tight close-up and eyeball it — don't trust
+the interference gate alone. The `diag_hook_engage.py` diagnostic (inserts channel+summing, isolates
+plate+springs+hooks, renders right/front/iso) is the tool; the RIGHT view (along world X) shows each eye
+as a ring with the hook arm end-on as a stub — stub inside ring ⇒ threaded.
+1. **MIRROR FLIP (the real bug).** `place_components_batch` routes EVERY grounded spec through
+   `mirror_placement` (`_assembly.py` ~728, `mirror=True` default), which uses `MIRROR_PLANE.get(part,
+   "x")` — **default "x"**. Grounded specs are authored in a PRE-mirror frame; achiral parts (the
+   z-symmetric springs carry `"z"`; the x-symmetric bushings tolerate the default) place fine, but the
+   CHIRAL spring-hook with no entry got X-mirrored → arm flipped to +X pointing AWAY from the eye, hook
+   on the wrong side (the shank still landed in a hole, so no interference). FIX = add
+   `MIRROR_PLANE["spring-hook"] = ("z", 0.0)` in `_transforms.py` — identical to `channel-spring-installed`
+   and `boss-hook` (the analogous chiral planar hooks). The hook is a planar wire in its local X-Y plane
+   (achiral about local z=0), so the z-mirror is a proper rotation that keeps its shape and makes it
+   mirror IDENTICALLY to the spring it engages → arm mid lands exactly on the eye centre, arm ∥ eye axis.
+   Verify offline by calling `mirror_placement` on both specs and comparing final pos/rows (instant, no COM).
+2. **Hole too big.** `HOLE_DIA` was still O4.5 (sized when the spring eye threaded the plate). Now only
+   the O1.4 shank seats → shrank to **O2.0** (0.3 radial clearance) in `build_summing_lever.HOLE_DIA` +
+   `build_channel_assembly.PLATE_HOLE_DIA`. summing-lever volume rose 134359→135655 (less material removed).
+Re-validated: channel/summing/top interference-NONE, render confirms each eye threads its hook arm and the
+shank fills the snug bore. LESSON for chiral grounded parts: ALWAYS give them a MIRROR_PLANE entry.

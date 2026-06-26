@@ -10,9 +10,10 @@ the signal-flow chain summing -> magnifier -> pen (the value) plus paper-drive
 
 Cross-subassembly fits proven by the top-level interference check:
 
-* channel springs (channel.SLDASM) thread the summing-lever plate's O4.5 holes
-  (summing.SLDASM) -- gated analytically by
-  build_channel_assembly._assert_plate_threading;
+* channel spring-hook fasteners (channel.SLDASM) seat shank-up in the
+  summing-lever plate's O4.5 holes (summing.SLDASM), each presenting its arm
+  just above the plate where the spring's bottom eye links on -- gated
+  analytically by build_channel_assembly._assert_hook_fastener;
 * top-crossbar ends face-flush on the top-frame ring rail inner faces
   (frame.SLDASM), knife-stay rod above the ring, gooseneck-clamp around
   the east column (all summing.SLDASM);
