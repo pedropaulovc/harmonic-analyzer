@@ -414,7 +414,8 @@ RELEASE_PY = (SCRIPTS_DIR / "cut_release.py").resolve()
 # verify:/check: task names (reused by build + release so a new gate is wired in
 # one place).
 _VERIFY_NAMES = ("soundness", "subsystems", "kinematics")   # need SW (spine)
-_CHECK_NAMES = ("math", "config", "graph", "nameplate", "recipe", "cache", "telemetry", "verify_telemetry")  # offline
+_CHECK_NAMES = ("math", "config", "graph", "nameplate", "recipe", "cache", "telemetry",
+                "verify_telemetry", "freshness", "flagonly")  # offline; MUST match task_check's specs keys
 
 
 def _run_stamped(cmd: list[str], label: str, stamp: str) -> None:
@@ -896,6 +897,12 @@ def task_check():
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_flag_only.py")],
         },
     }
+    # Tripwire: `build` and `release` depend on f"check:{c}" for c in _CHECK_NAMES, so a
+    # spec added here without the matching name (or vice versa) would silently never run
+    # in the default paths -- exactly the gap Codex caught on freshness/flagonly. Keep
+    # the two in lockstep.
+    assert set(specs) == set(_CHECK_NAMES), \
+        f"check specs vs _CHECK_NAMES drift: {set(specs) ^ set(_CHECK_NAMES)}"
     for name, spec in specs.items():
         stamp = str(REPORTS / f"check-{name}.ok")
         yield {
