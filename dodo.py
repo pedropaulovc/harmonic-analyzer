@@ -876,6 +876,25 @@ def task_check():
                          str((SCRIPTS_DIR / "test_verify_telemetry.py").resolve())],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_verify_telemetry.py")],
         },
+        "freshness": {
+            # verify.py's standalone-staleness guard: reuses doit's .doit.db ledger
+            # + ContentChecker to refuse scoring a stale tree (the gap that let a
+            # never-rebuilt 8-component frame trip component-count). Pure python ->
+            # offline gate, so the guard can't regress while required checks stay green.
+            "file_dep": [str(VERIFY_PY),
+                         str((REPO_ROOT / "dodo.py").resolve()),
+                         str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
+                         str((SCRIPTS_DIR / "test_verify_freshness.py").resolve())],
+            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_verify_freshness.py")],
+        },
+        "flagonly": {
+            # The targeted late-binding flag helper (_flag_only, issue #87) -- pure
+            # dispatch glue. Was merged WITHOUT a check task, so it never ran in CI;
+            # wired here so a regression in _common._flag_only fails an offline gate.
+            "file_dep": [str((SCRIPTS_DIR / "_common.py").resolve()),
+                         str((SCRIPTS_DIR / "test_flag_only.py").resolve())],
+            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_flag_only.py")],
+        },
     }
     for name, spec in specs.items():
         stamp = str(REPORTS / f"check-{name}.ok")
