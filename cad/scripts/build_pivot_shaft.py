@@ -1,16 +1,18 @@
 r"""Reproduction script: pivot shaft (book ch. 14 / ch. 17; 1 used).
 
-Plain Ø6.35 (1/4") x 228.6 (9") steel shaft carrying the 20 rocker arms
+Plain Ø6.35 (1/4") x 203.2 (8") steel shaft carrying the 20 rocker arms
 at machine (x, y) = (-72.9, 253.8). Each end seats in a pivot-ball-mount's
-Ø6.5 cross-bore (north mount on the rocker-support apex at z +101.6,
+Ø6.5 cross-bore (north mount seated on the rocker-support at z +81.5,
 south mount on the A-frame clevis at z -111, M6.5); pivot-bushing spacers
 set the 7.0565 channel pitch along it. The top levers' fulcrum is the
 shorter build_fulcrum_shaft.py (182), which clears the west columns.
 
 Dimensions: cad/DIMENSIONS.md "Channel & top-frame layout" (med; dia low).
 
-Layout: shaft axis along Z, centred (z -114.3..+114.3) - the channel bank
-is symmetric about the part origin.
+Layout: shaft axis along Z. The PART is symmetric about its origin
+(±101.6), but the assembly places it OFF-CENTRE (z -12.7) so the north end
+lands at the rocker-support edge (z +88.9) while the south end (z -114.3)
+still reaches the A-frame clevis mount (z -111).
 
 Run (SolidWorks already open)::
 
@@ -43,7 +45,8 @@ PART_NAME = "pivot-shaft"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 SHAFT_DIA = 0.25 * IN  # 6.35  DIMENSIONS.md channel layout (low)
-SHAFT_LENGTH = 9.0 * IN  # 228.6  spans the 20-channel bank + ball mounts (med)
+SHAFT_LENGTH = 8.0 * IN  # 203.2  north end trimmed to the support edge (was 9"
+# / 228.6); the PART stays symmetric, the assembly places it off-centre (med)
 
 
 async def build(adapter) -> dict[str, str]:
