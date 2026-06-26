@@ -179,11 +179,27 @@ _assert_spine_complete()
 # doit treats as changed -> run `doit reset-dep` once after this lands to migrate
 # the db in place WITHOUT a rebuild (the on-disk artefacts are already current).
 class ContentChecker(MD5Checker):
-    """MD5Checker that digests the parsed form of YAML configs (comment- and
-    whitespace-insensitive); byte-identical to MD5Checker for every other file."""
+    """MD5Checker with two churn-immunities: it digests the PARSED form of YAML
+    configs (comment-/whitespace-insensitive), and keys ``.SLDPRT``/``.SLDASM``
+    artefacts on their producing task's build-input recipe rather than SolidWorks'
+    volatile output bytes (build idempotency -- see ``_stable_artefact_digest``).
+    Byte-identical to MD5Checker for every other file."""
 
     @staticmethod
     def _digest(file_path: str) -> str:
+        if file_path.lower().endswith((".sldprt", ".sldasm")):
+            # A SolidWorks artefact's BYTES are not idempotent: saving an assembly
+            # rewrites volatile save metadata into every nested .SLDPRT/.SLDASM (the
+            # parent-md5 cascade), so a part's bytes legitimately churn AFTER its
+            # part: task -- and after a lower assembly -- recorded them. Hashing
+            # those bytes marks the dependent assembly stale on EVERY build for no
+            # geometry change (a no-op refresh that never reaches a fixpoint;
+            # follow-up to #102). Key on the producing task's build INPUTS instead
+            # (recipe, transitively), which are churn-immune and flip iff the
+            # geometry's inputs change. None -> not a declared target (e.g. the
+            # channel stretch-spring variants) -> stock byte md5.
+            recipe = _stable_artefact_digest(file_path)
+            return recipe if recipe is not None else get_file_md5(file_path)
         if not file_path.endswith((".yaml", ".yml")):
             return get_file_md5(file_path)
         try:
@@ -551,6 +567,77 @@ def _recipe_sidecar(stem: str) -> Path:
     FULL/REFRESH decision needs no process-local state and stays correct under
     ``doit -n`` workers (which may run the action in a separate process)."""
     return CAD_OUT / "sldasm" / f".{stem.replace('_', '-')}.recipe.md5"
+
+
+# --- Byte-churn-immune artefact digests (build idempotency; follow-up to #102).
+#
+# SolidWorks rewrites volatile save metadata into every nested .SLDPRT/.SLDASM when
+# an assembly is saved (the parent-md5 cascade), so a part's BYTES change after its
+# part: task recorded them -- and again, ~minutes later, when a higher assembly that
+# also references it is saved. doit hashing those bytes marks the dependent assembly
+# stale on EVERY build -> a no-op refresh that never reaches a fixpoint. We break the
+# cascade by keying a .SLDPRT/.SLDASM's ContentChecker digest on the producing task's
+# build INPUTS (its recipe, transitively through referenced artefacts) rather than its
+# output bytes: identical to doit's own "up-to-date" semantics (a real script/config/
+# referenced-part change still flips it), but immune to SolidWorks' save churn. One
+# chokepoint -> doit staleness, the freshness guard (verify.py reuses this
+# ContentChecker), AND the remote cache key (also ContentChecker._digest) stay in
+# lockstep, and the cache now hits cross-machine despite per-build PID/save churn.
+_ARTEFACT_INDEX: dict[str, tuple[str, str]] | None = None
+_ARTEFACT_DIGEST_MEMO: dict[str, str] = {}
+
+
+def _artefact_key(path: str) -> str:
+    """Canonical lookup key for an artefact path (normcased absolute)."""
+    return os.path.normcase(os.path.abspath(path))
+
+
+def _artefact_index() -> dict[str, tuple[str, str]]:
+    """``_artefact_key(path) -> ('part'|'assembly', stem)`` for every declared
+    part/assembly target. Built once; the build graph is static within a run."""
+    global _ARTEFACT_INDEX
+    if _ARTEFACT_INDEX is None:
+        idx: dict[str, tuple[str, str]] = {}
+        for stem in part_stems():
+            idx[_artefact_key(_sldprt(stem))] = ("part", stem)
+        for stem in ASSEMBLY_ORDER:
+            idx[_artefact_key(_sldasm(stem))] = ("assembly", stem)
+        _ARTEFACT_INDEX = idx
+    return _ARTEFACT_INDEX
+
+
+def _stable_artefact_digest(path: str) -> str | None:
+    """Recipe-derived digest of a ``.SLDPRT``/``.SLDASM`` artefact, immune to
+    SolidWorks' save-metadata byte churn; ``None`` when ``path`` is not a declared
+    part/assembly target (caller falls back to the stock byte md5).
+
+    A PART's digest is its build-input recipe (script + helper closure + the config
+    it reads) -- exactly the set doit/cache already track as the part task's
+    file_dep. An ASSEMBLY folds its OWN recipe together with each referenced
+    artefact's digest, recursively, so a leaf-part input change propagates up to
+    every ancestor while a pure save-churn of an unchanged referenced part does
+    not. Memoized (the graph is a static DAG within a run), so doit's many digest
+    calls stay O(1) after the first compute. The recipe members are .py/.yaml, so
+    this never recurses back into the artefact branch of ``ContentChecker._digest``."""
+    key = _artefact_key(path)
+    cached = _ARTEFACT_DIGEST_MEMO.get(key)
+    if cached is not None:
+        return cached
+    info = _artefact_index().get(key)
+    if info is None:
+        return None
+    kind, stem = info
+    if kind == "part":
+        digest = _digest_files(_part_file_deps(SCRIPTS_DIR / f"build_{stem}.py", stem))
+    else:
+        h = hashlib.md5()
+        h.update(_digest_files(_recipe_files(stem)).encode())
+        for ref in references_of(stem):
+            ref_path = _sldasm(ref) if ref in ASSEMBLY_ORDER else _sldprt(ref)
+            h.update((_stable_artefact_digest(ref_path) or "").encode())
+        digest = h.hexdigest()
+    _ARTEFACT_DIGEST_MEMO[key] = digest
+    return digest
 
 
 def task_part():
