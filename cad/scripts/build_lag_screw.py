@@ -1,18 +1,19 @@
-r"""Reproduction script: rocker-support hold-down screw (book ch. 14; 2 used).
+r"""Reproduction script: rocker-support hold-down screw (book ch. 14; 4 used).
 
-One of the two hold-down screws that come up through the base into the
-rocker-arm-support north upright's O7.94 x 25 underside sockets (the docstring's
-"fasteners not modeled" -- modeled in the M6.10 fasteners pass). The
-round head sits recessed in a counterbore on the base underside
-(build_harmonic_base.py); plain head and shank, thread not modeled.
+One of the four hold-down screws that come up through the base into the
+rocker-arm-support north upright's 9/16-12 tapped foot holes (O12.30376 tap
+drill; build_rocker_arm_support.py FootTappedHoles, 25.4 deep up to the window).
+The round head sits recessed in a counterbore on the base underside
+(build_harmonic_base.py); plain head and shank, thread not modeled (the O12
+shank rides the tap-drill foot hole, like the legacy socket fit).
 
-Dimensions: cad/DIMENSIONS.md ch. 14 layout (M6.10) -- shank matches the
-legacy 5/16" socket; head sized to the O15 counterbore (low).
+Dimensions: cad/DIMENSIONS.md ch. 14 layout (M6.10) -- shank sized to the
+9/16-12 tap-drill foot hole; head sized to the O23 base counterbore (low).
 
 Layout: axis along Y, AUTHORED IN FINAL ORIENTATION (pointing up): head
-underside at y = -4 rising to the under-head plane y = 0, shank 0..+66
-(base 50.8 + 19.2 into the 25-deep socket, inserted at machine y 4.5).
-Symmetric about local x = 0 (MIRROR_PLANE ("x", 0.0)).
+underside at y = -6 rising to the under-head plane y = 0, shank 0..+63
+(base 44.3 above the 6.5 cbore + ~18.7 into the support foot, inserted at
+machine y 6.5). Symmetric about local x = 0 (MIRROR_PLANE ("x", 0.0)).
 
 Run (SolidWorks already open)::
 
@@ -44,10 +45,10 @@ from _common import (
 PART_NAME = "lag-screw"
 MATERIAL = "Plain Carbon Steel"  # black hardware
 
-HEAD_DIA = 14.0  # round head in the O15 base counterbore (low)
-HEAD_H = 4.0  # recessed 0.5 below the base bottom (counterbore 4.5)
-SHANK_DIA = 7.8  # rides the O8.2 base hole into the O7.94 support socket
-SHANK_LEN = 66.0  # base 50.8 + 19.2 socket reach (socket 25 deep)
+HEAD_DIA = 22.0  # round head in the O23 base counterbore (low)
+HEAD_H = 6.0  # recessed 0.5 below the base bottom (counterbore 6.5)
+SHANK_DIA = 12.0  # rides the O13 base hole into the O12.30 9/16-12 tapped foot hole
+SHANK_LEN = 63.0  # 44.3 base (above the 6.5 cbore) + 18.7 into the support foot
 
 
 async def build(adapter) -> dict[str, str]:
