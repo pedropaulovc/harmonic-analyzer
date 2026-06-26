@@ -901,30 +901,39 @@ def assert_components_fully_defined(adapter: Any) -> None:
             components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
         gsp.set_attribute("components", len(components))
         log(f"checking {len(components)} components for free DOF ...")
+        # NO span per component. A span per component floods the trace with one
+        # near-instant (~50 ms) "OK" leaf span EACH -- 144 of them for `channel`,
+        # 335 across a soundness pass -- drowning the few spans that carry signal.
+        # The per-component status stays a debug log line (live console detail);
+        # the gate.dof span carries the aggregate verdict (fixed / pattern /
+        # offending counts), and any offender is named in the raised error, which
+        # this gate's span records. Same de-noising as health.whats_wrong below.
+        fixed = pattern = 0
         for component in components:
             # Flag ONLY the two zero-arg methods called below; Name2/IsFixed are
             # property reads (issue #87 -- not the 165-method IComponent2 flag).
             _flag_only(component, "IsPatternInstance", "GetConstrainedStatus")
             comp_name = str(_read_member(component, "Name2"))
-            with _telemetry.span("dof.check", component=comp_name) as csp:
-                if bool(_read_member(component, "IsFixed")):
-                    csp.set_attribute("result", "fixed")
-                    log(f"{comp_name}: fixed")
-                    continue
-                if bool(
-                    adapter._attempt(lambda c=component: c.IsPatternInstance(), default=False)
-                ):
-                    csp.set_attribute("result", "pattern")
-                    log(f"{comp_name}: pattern instance (feature-driven)")
-                    continue
-                status = int(
-                    adapter._attempt(lambda c=component: c.GetConstrainedStatus(), default=-1)
-                )
-                csp.set_attribute("status", status)
-                log(f"{comp_name}: constrained status {status}")
-                if status != FULLY_CONSTRAINED:
-                    kind = "under" if status == UNDER_CONSTRAINED else f"status={status}"
-                    problems.append(f"{comp_name} ({kind})")
+            if bool(_read_member(component, "IsFixed")):
+                fixed += 1
+                log(f"{comp_name}: fixed")
+                continue
+            if bool(
+                adapter._attempt(lambda c=component: c.IsPatternInstance(), default=False)
+            ):
+                pattern += 1
+                log(f"{comp_name}: pattern instance (feature-driven)")
+                continue
+            status = int(
+                adapter._attempt(lambda c=component: c.GetConstrainedStatus(), default=-1)
+            )
+            log(f"{comp_name}: constrained status {status}")
+            if status != FULLY_CONSTRAINED:
+                kind = "under" if status == UNDER_CONSTRAINED else f"status={status}"
+                problems.append(f"{comp_name} ({kind})")
+        gsp.set_attribute("fixed", fixed)
+        gsp.set_attribute("pattern", pattern)
+        gsp.set_attribute("not_fully_defined", len(problems))
         _telemetry.success(f"checked {len(components)} components for free DOF")
     if problems:
         raise RuntimeError("components not fully defined: " + ", ".join(problems))
@@ -1086,11 +1095,18 @@ def assert_model_healthy(
 
         errors: list[str] = []
         warnings: list[str] = []
-        for tlabel, doc in targets:
-            with _telemetry.span("health.whats_wrong", target=tlabel):
+        # ONE span around the WHOLE What's Wrong sweep, not one per target. A span
+        # per target floods the trace with up to N (144 for `channel`, 343 across a
+        # soundness pass) near-instant "OK" leaf spans printed back-to-back -- the
+        # "multiple whats_wrong calls in sequence" noise. The target count is an
+        # attribute; any real error/warning is surfaced in the log + raised error.
+        with _telemetry.span("health.whats_wrong", targets=len(targets)) as wsp:
+            for tlabel, doc in targets:
                 for name, code, warn in whats_wrong(adapter, doc):
                     entry = f"{tlabel}:{name} [{_FEATURE_ERROR.get(code, code)}]"
                     (warnings if warn else errors).append(entry)
+            wsp.set_attribute("errors", len(errors))
+            wsp.set_attribute("warnings", len(warnings))
         if rebuilt is False:
             errors.append(f"{label or 'top'}: ForceRebuild3 returned False")
 

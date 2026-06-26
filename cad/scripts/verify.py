@@ -239,20 +239,31 @@ def assert_no_over_constrained(adapter: Any) -> None:
     does not apply to mates).
     """
     asm = adapter.currentModel
-    adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
-    components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
-    over = []
-    for comp in components:
-        # Flag ONLY GetConstrainedStatus (zero-arg); Name2 is a property read
-        # (issue #87 -- not the 165-method IComponent2 flag).
-        _flag_only(comp, "GetConstrainedStatus")
-        status = int(
-            adapter._attempt(lambda c=comp: c.GetConstrainedStatus(), default=-1)
-        )
-        if status == OVER_CONSTRAINED:
-            over.append(str(_read_member(comp, "Name2")))
-    if over:
-        raise RuntimeError("over-constrained (redundant mates): " + ", ".join(over))
+    # Span the gate as a tree of named sub-steps instead of one opaque ~90 s span
+    # (this gate was a single unspanned 88 s gap for `channel`). The deep rebuild
+    # and the per-component status scan are the two costs -- give each its own
+    # child span so the wall-clock is attributable, mirroring gate.dof/gate.health.
+    with _telemetry.span("gate.over_constrained") as gsp:
+        with _telemetry.span("over.rebuild"):
+            adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
+        with _telemetry.span("over.scan") as ssp:
+            components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
+            over = []
+            for comp in components:
+                # Flag ONLY GetConstrainedStatus (zero-arg); Name2 is a property
+                # read (issue #87 -- not the 165-method IComponent2 flag).
+                _flag_only(comp, "GetConstrainedStatus")
+                status = int(
+                    adapter._attempt(lambda c=comp: c.GetConstrainedStatus(), default=-1)
+                )
+                if status == OVER_CONSTRAINED:
+                    over.append(str(_read_member(comp, "Name2")))
+            ssp.set_attribute("components", len(components))
+            ssp.set_attribute("over_constrained", len(over))
+        gsp.set_attribute("components", len(components))
+        gsp.set_attribute("over_constrained", len(over))
+        if over:
+            raise RuntimeError("over-constrained (redundant mates): " + ", ".join(over))
     _telemetry.success("no over-constrained components (no redundant mates)")
 
 
@@ -268,39 +279,48 @@ def assert_gear_ratios(adapter: Any, name: str) -> None:
     each other AND with the crank (e.g. 30:120 and 16:64 both reduce to 1:4) --
     the count and the value set are what must hold.
     """
-    links = _gear_mate_links(adapter)
-    if not links:
-        if name == GEAR_OWNER:
-            raise RuntimeError(f"{GEAR_OWNER} has no gear mates -- the drive train is broken")
-        _telemetry.debug(
-            f"{name}: no gear mates at this level "
-            f"(they live in the flexible {GEAR_OWNER} sub; verified there)"
-        )
-        return
+    # Span the gate; reading the live gear mates walks the MateGroup over the COM
+    # bridge and is the whole cost (~80 s for drive-train) -- it was a single
+    # unspanned 82 s gap. Give the read its own child span so that wall-clock is
+    # attributable, mirroring gate.dof/gate.health.
+    with _telemetry.span("gate.gear_ratios") as gsp:
+        with _telemetry.span("gear.read_links"):
+            links = _gear_mate_links(adapter)
+        gsp.set_attribute("gear_mates", len(links))
+        if not links:
+            if name == GEAR_OWNER:
+                raise RuntimeError(f"{GEAR_OWNER} has no gear mates -- the drive train is broken")
+            _telemetry.debug(
+                f"{name}: no gear mates at this level "
+                f"(they live in the flexible {GEAR_OWNER} sub; verified there)"
+            )
+            return
 
-    crank_links: list[tuple[int, int]] = []
-    channel_links: list[tuple[int, int]] = []
-    for link in links:
-        ratio = _canon_ratio(round(link["numerator"]), round(link["denominator"]))
-        names = " ".join(side["component"] for side in link["sides"])
-        bucket = crank_links if any(t in names for t in _CRANK_GEAR_TOKENS) else channel_links
-        bucket.append(ratio)
+        crank_links: list[tuple[int, int]] = []
+        channel_links: list[tuple[int, int]] = []
+        for link in links:
+            ratio = _canon_ratio(round(link["numerator"]), round(link["denominator"]))
+            names = " ".join(side["component"] for side in link["sides"])
+            bucket = crank_links if any(t in names for t in _CRANK_GEAR_TOKENS) else channel_links
+            bucket.append(ratio)
 
-    problems = []
-    crank_num, crank_den = (int(v) for v in _config.machine("gear_train", "crank_drive_ratio"))
-    crank_expected = _canon_ratio(crank_num, crank_den)
-    if crank_links != [crank_expected]:
-        problems.append(
-            f"crank drive: live {crank_links} != expected [{crank_expected}]"
-        )
+        problems = []
+        crank_num, crank_den = (int(v) for v in _config.machine("gear_train", "crank_drive_ratio"))
+        crank_expected = _canon_ratio(crank_num, crank_den)
+        if crank_links != [crank_expected]:
+            problems.append(
+                f"crank drive: live {crank_links} != expected [{crank_expected}]"
+            )
 
-    expected = _expected_channel_ratios()
-    if sorted(channel_links) != expected:
-        problems.append(
-            f"channel meshes: live {sorted(channel_links)} != config {expected}"
-        )
-    if problems:
-        raise RuntimeError("; ".join(problems))
+        expected = _expected_channel_ratios()
+        if sorted(channel_links) != expected:
+            problems.append(
+                f"channel meshes: live {sorted(channel_links)} != config {expected}"
+            )
+        gsp.set_attribute("crank_meshes", len(crank_links))
+        gsp.set_attribute("channel_meshes", len(channel_links))
+        if problems:
+            raise RuntimeError("; ".join(problems))
     _telemetry.success(
         f"gear ratios == config (crank {crank_expected}, "
         f"{len(channel_links)} channel meshes)"
@@ -315,14 +335,20 @@ def assert_component_count(adapter: Any, name: str) -> None:
     *instances of one part file*. This gate is the tripwire that a rebuild did
     not drop or duplicate a channel; the exact count band is in ``_COMPONENT_BAND``.
     """
-    band = _COMPONENT_BAND.get(name)
-    count = len(component_names(adapter))
-    if band is None:
-        _telemetry.debug(f"{name}: {count} components (no band configured)")
-        return
-    lo, hi = band
-    if not (lo <= count <= hi):
-        raise RuntimeError(f"{name}: {count} components outside expected band [{lo}, {hi}]")
+    # Span the gate; component_names() re-marshals the whole top-level component
+    # list over the COM bridge (~85 s for `channel`) and was a single unspanned
+    # gap. Give that read its own child span, mirroring gate.dof/gate.health.
+    with _telemetry.span("gate.component_count") as gsp:
+        band = _COMPONENT_BAND.get(name)
+        with _telemetry.span("count.read"):
+            count = len(component_names(adapter))
+        gsp.set_attribute("count", count)
+        if band is None:
+            _telemetry.debug(f"{name}: {count} components (no band configured)")
+            return
+        lo, hi = band
+        if not (lo <= count <= hi):
+            raise RuntimeError(f"{name}: {count} components outside expected band [{lo}, {hi}]")
     _telemetry.success(f"{name}: {count} components within [{lo}, {hi}]")
 
 
@@ -384,10 +410,13 @@ async def _verify_isolation_one(adapter: Any, name: str, report: Report) -> None
     # open docs degrades the COM session -- the InterferenceDetectionManager came
     # back null on the 5th open).
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    check(f"open {name}", await adapter.open_model(str(sldasm)))
-    configs = check("list configurations", await adapter.list_configurations())
-    if REST in (configs or []):
-        check(f"activate {REST}", await adapter.set_active_configuration(REST))
+    # Span the open+activate (see _verify_static_one): the per-assembly load is
+    # COM work that otherwise sits in an unspanned gap before the gates.
+    async with _telemetry.aspan("verify.open", name=name):
+        check(f"open {name}", await adapter.open_model(str(sldasm)))
+        configs = check("list configurations", await adapter.list_configurations())
+        if REST in (configs or []):
+            check(f"activate {REST}", await adapter.set_active_configuration(REST))
     log(f"--- isolation: {name} ({REST} pose) ---")
 
     # Instance independence is read straight off the component tree (GetComponents),
@@ -408,10 +437,13 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
     # first, exactly as the isolation and
     # motion suites do (see _verify_isolation_one / _verify_motion_one).
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    check(f"open {name}", await adapter.open_model(str(sldasm)))
-    configs = check("list configurations", await adapter.list_configurations())
-    if REST in (configs or []):
-        check(f"activate {REST}", await adapter.set_active_configuration(REST))
+    # Span the open+activate: loading and re-posing the document is 8-27 s of COM
+    # work per assembly that otherwise sits in an unspanned gap between gates.
+    async with _telemetry.aspan("verify.open", name=name):
+        check(f"open {name}", await adapter.open_model(str(sldasm)))
+        configs = check("list configurations", await adapter.list_configurations())
+        if REST in (configs or []):
+            check(f"activate {REST}", await adapter.set_active_configuration(REST))
     log(f"--- verifying {name} ({REST} pose) ---")
 
     report.gate(f"{name}:dof-fully-defined", lambda: assert_components_fully_defined(adapter))
