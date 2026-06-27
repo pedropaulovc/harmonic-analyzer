@@ -281,6 +281,65 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "DeckTop")
 
+    # CboreSeat datum: a reference plane on the counterbore SHOULDER (Y = cbore
+    # depth above the Top Plane / underside), the bearing face each lag-screw's
+    # under-head plane seats against. frame.SLDASM mates the screw's under-head
+    # plane (its Top Plane) COINCIDENT to this -- the hold-down's axial stop -- so
+    # a named datum on the bearing face keeps the seat robust and flip-free.
+    check(
+        "create_plane CboreSeat (Top Plane, +cbore depth)",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset",
+                base_plane="Top Plane",
+                offset=CBORE_DEPTH,
+            )
+        ),
+    )
+    name_last_feature(adapter, "CboreSeat")
+
+    # Per-hole reference axes for the lag-screw concentric mates. Built as the
+    # INTERSECTION of a per-X and a per-Z reference plane (two_planes mode), NOT by
+    # picking the hole's cylindrical face -- deterministic, no point-on-curved-face
+    # selection (which is unreliable for a point on the analytic surface). The four
+    # holes share two X values and two Z values, so four planes yield the four axes.
+    # frame.SLDASM mates each lag-screw CONCENTRIC to its hole axis -- the physical
+    # coaxiality of the hold-down -- so the screws are constrained, not grounded,
+    # with no distance mate. HoleAxis{i} is at HOLE_XZ[i], the station frame.SLDASM's
+    # LAG_SCREW_XZ[i] sits at. (Reference geometry only -- volume-neutral.)
+    from solidworks_mcp.adapters.base import CreateAxisParameters
+
+    x_plane: dict[float, str] = {}
+    for k, hx in enumerate(sorted({hx for hx, _ in HOLE_XZ})):
+        check(
+            f"create_plane HoleX{k} (Right Plane, {hx:+.2f})",
+            await adapter.create_plane(
+                CreatePlaneParameters(mode="offset", base_plane="Right Plane", offset=hx)
+            ),
+        )
+        name_last_feature(adapter, f"HoleX{k}")
+        x_plane[hx] = f"HoleX{k}"
+    z_plane: dict[float, str] = {}
+    for k, hz in enumerate(sorted({hz for _, hz in HOLE_XZ})):
+        check(
+            f"create_plane HoleZ{k} (Front Plane, {hz:+.2f})",
+            await adapter.create_plane(
+                CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=hz)
+            ),
+        )
+        name_last_feature(adapter, f"HoleZ{k}")
+        z_plane[hz] = f"HoleZ{k}"
+    for i, (hx, hz) in enumerate(HOLE_XZ):
+        check(
+            f"create_axis HoleAxis{i} ({hx:.2f}, {hz:+.2f})",
+            await adapter.create_axis(
+                CreateAxisParameters(
+                    mode="two_planes", planes=[x_plane[hx], z_plane[hz]]
+                )
+            ),
+        )
+        name_last_feature(adapter, f"HoleAxis{i}")
+
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
 
