@@ -90,11 +90,30 @@ mates); a 16T:64T gear mate drives the cone cluster from the crank, and
 each cylinder gear meshes its cone gear k at ratio [120-6k : 120]. The
 gear mate is each cylinder gear's sole rotational constraint, so it
 holds the cosine-setup phase without nudging the gear. The whole train
-is left with exactly ONE free DOF -- the crank angle -- pinned by a
-single spin driver on the handle (DRIVER #1, suppressible for the Motion
-study). Saved state: every component fixed or fully defined, zero
-interferences (tangent/coincident contact allowed -- bores ride their
-shafts). Gear-ratio sign is verified kinematically by a motion script.
+is left with exactly ONE operational DOF -- the crank angle.
+
+Build mode (``machine/build_lock.yaml`` -> ``_config.machine("build_lock",
+"drive_train")``; default ``free``):
+
+* ``free`` (DEFAULT) -- the saved model is a WORKING kinematic model: the
+  crank angle DOF is left UNLOCKED, so dragging the crank turns the whole
+  geared train (1 DOF). A single ``PARK_crank_angle`` angle mate (the
+  reproducibility "park driver") IS authored at the inserted rest pose but
+  SUPPRESSED, so it pins nothing.
+* ``locked`` -- an explicit opt-in pinned snapshot: the park driver stays
+  ENGAGED, the crank angle is fixed, every component is fully defined
+  (0 DOF), and the saved pose is byte-reproducible. This reproduces the
+  historical grounding exactly.
+
+The model is certified AS BUILT in whichever mode is configured:
+``assert_expected_free_dof(adapter, 1 if free else 0)`` runs the park-driver
+closure check (re-engage every ``PARK_*`` -> ForceRebuild -> assert 0
+under-constrained -> re-suppress -> restore), proving exactly the expected
+free DOF and nothing more; ``check_no_interference`` runs on the as-built
+pose. Zero interferences (tangent/coincident contact allowed -- bores ride
+their shafts). Gear-ratio sign is verified kinematically by a motion script.
+The verify ``soundness`` suite re-runs this same DOF gate plus every other
+gate on the as-built model; only the DOF gate adapts to the mode.
 
 Run (SolidWorks already open)::
 
@@ -114,20 +133,28 @@ from _common import (
 from _assembly import (
     angle_driver,
     apply_component_color,
-    assert_components_fully_defined,
+    assert_expected_free_dof,
     check_no_interference,
     coincident_mate,
     component_transform,
     distance_driver,
     gear_mate,
+    mark_park_driver,
     named_ref,
     parallel_mate,
     place_component,
     save_assembly_and_images,
-    spin_driver,
 )
 
 ASM_NAME = "drive-train"
+
+# Build mode (cad/config/machine/build_lock.yaml). `free` (default) leaves the
+# crank spin -- the single operational DOF -- UNLOCKED: its park driver is
+# authored but suppressed, so the saved model is a working kinematic model.
+# `locked` engages the park driver for a fully-defined reproducible snapshot.
+# The literal accessor tokenises to machine/build_lock.yaml in the doit/cache
+# digest, so flipping it rebuilds ONLY drive-train and keys the cache correctly.
+LOCK = _config.machine("build_lock", "drive_train") == "locked"
 
 Y_BASE_TOP = 50.8  # harmonic-base top face
 Y_DRIVE = Y_BASE_TOP + 76.0  # 126.8: crank, cone big end and arbor axes
@@ -750,16 +777,34 @@ async def build(adapter) -> dict[str, str]:
     handle_o = _org(adapter, handle)
     a_arm = component_transform(adapter, arm)
     crank_angle = math.degrees(math.acos(max(-1.0, min(1.0, a_arm[0]))))
-    await angle_driver(
+    crank_park = await angle_driver(
         adapter,
         named_ref(f"Right Plane@{arm}", "PLANE"),
         named_ref("Right Plane", "PLANE"),
         crank_angle,
-        label=f"crank angle driver (#1, BDC a={crank_angle:.2f})",
+        label=f"crank angle PARK driver (reproducibility lock; freed in default "
+              f"build; BDC a={crank_angle:.2f})",
         verify=(handle, handle_o),
     )
+    # Rename the feature to PARK_crank_angle so the tree documents its role and the
+    # DOF gate can discover it. In the default `free` build, suppress it -- leaving
+    # the crank (and the whole keyed/geared train it pins) free to spin: ONE
+    # operational DOF, the working kinematic model. `locked` leaves it engaged for a
+    # fully-defined reproducible snapshot, byte-compatible with the old grounding.
+    park_name = await mark_park_driver(adapter, crank_park, "crank_angle")
+    if not LOCK:
+        from solidworks_mcp.adapters.base import SuppressMateParameters
+        check(
+            f"suppress {park_name} (free the crank spin)",
+            await adapter.suppress_mate(SuppressMateParameters(name=park_name, suppress=True)),
+        )
+        adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
 
-    assert_components_fully_defined(adapter)
+    # Certify the AS-BUILT model. The DOF gate adapts to the mode: free -> closure
+    # proves exactly 1 free DOF (re-engages the park driver -> 0 under-constrained,
+    # then restores the free pose); locked -> strict 0-DOF. Every other check runs on
+    # the as-built model unchanged.
+    await assert_expected_free_dof(adapter, 0 if LOCK else 1)
     check_no_interference(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)
 

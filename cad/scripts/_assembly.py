@@ -962,6 +962,105 @@ def assert_components_fully_defined(adapter: Any) -> None:
     if problems:
         raise RuntimeError("components not fully defined: " + ", ".join(problems))
 
+
+# ---------------------------------------------------------------------------
+# Park drivers -- suppressible "reproducibility lock" mates
+# ---------------------------------------------------------------------------
+# A PARK driver pins one OPERATIONAL degree of freedom (e.g. the crank spin)
+# purely so the saved model has a deterministic pose. By default the build
+# SUPPRESSES it -- leaving that DOF free (a working kinematic model) -- and only
+# a `locked` build leaves it engaged (today's fully-defined snapshot). They are
+# renamed to a ``PARK_<key>`` feature so the FeatureManager tree documents the
+# role and the DOF gate can discover them by name (the mate *label* is only a
+# build-log string; SW auto-names the feature ``Angle1``/``Distance2`` …).
+PARK_PREFIX = "PARK_"
+
+
+async def mark_park_driver(adapter: Any, mate: Any, key: str) -> str:
+    """Rename a just-created park-driver mate feature to ``PARK_<key>``.
+
+    ``mate`` is the dict a ``*_driver`` helper returns (it carries the SW
+    feature ``name``). Renaming uses ``IFeature::Name`` (a settable property)
+    via the adapter's ``rename_feature`` -- which resolves mates through
+    ``FeatureByName`` like ``delete_mate`` does. ``PARK_<key>`` must be unique
+    in the tree (distinct keys) and free of SW-reserved characters. Returns the
+    new name.
+    """
+    from solidworks_mcp.adapters.base import RenameFeatureParameters
+
+    old = mate.get("name") if isinstance(mate, dict) else str(mate)
+    if not old:
+        raise RuntimeError(f"mark_park_driver: mate has no resolvable name ({mate!r})")
+    new = f"{PARK_PREFIX}{key}"
+    check(
+        f"mark park driver {old!r} -> {new!r}",
+        await adapter.rename_feature(RenameFeatureParameters(old_name=old, new_name=new)),
+    )
+    return new
+
+
+async def find_park_drivers(adapter: Any) -> list[tuple[str, bool]]:
+    """``(name, suppressed)`` for every top-level ``PARK_*`` mate of the active
+    assembly (via ``list_mates``, which returns ``name``/``type``/``suppressed``)."""
+    mates = check("list mates", await adapter.list_mates())
+    return [
+        (str(m["name"]), bool(m["suppressed"]))
+        for m in mates
+        if str(m["name"]).startswith(PARK_PREFIX)
+    ]
+
+
+async def assert_expected_free_dof(adapter: Any, expected_count: int) -> None:
+    """Assert the assembly has EXACTLY ``expected_count`` free operational DOF,
+    pinned only by suppressed ``PARK_*`` park-driver mates.
+
+    The currently-suppressed ``PARK_*`` mates ARE the intended free DOF (each
+    pins one). SolidWorks exposes no scalar DOF count, so this proves the count
+    by CLOSURE: re-engage (unsuppress) every park driver, re-solve, and assert
+    the model is then fully defined (0 under-constrained) -- which proves those
+    drivers are the SOLE remaining freedom, so the true DOF count equals the
+    number suppressed. The original suppression state is then restored, leaving
+    the model exactly as found (the as-built / as-shipped free pose).
+
+    ``expected_count == 0`` (a locked build, or an assembly with no parked DOF)
+    has nothing to cycle and reduces to a plain
+    :func:`assert_components_fully_defined`.
+    """
+    from solidworks_mcp.adapters.base import SuppressMateParameters
+
+    asm = adapter.currentModel
+    with _telemetry.span("gate.dof_expected_free") as gsp:
+        parked = await find_park_drivers(adapter)
+        free = [name for name, suppressed in parked if suppressed]
+        gsp.set_attribute("park_drivers", len(parked))
+        gsp.set_attribute("expected_free_dof", expected_count)
+        gsp.set_attribute("free_dof", len(free))
+        if len(free) != expected_count:
+            raise RuntimeError(
+                f"expected {expected_count} free DOF (suppressed {PARK_PREFIX}* mates) "
+                f"but found {len(free)}: {sorted(free)}"
+            )
+        # Closure: re-engage the park drivers and prove the model is then rigid.
+        for name in free:
+            check(
+                f"unsuppress {name}",
+                await adapter.suppress_mate(SuppressMateParameters(name=name, suppress=False)),
+            )
+        adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
+        assert_components_fully_defined(adapter)  # 0 under-constrained, drivers engaged
+        # Restore the as-built free state (suppress moves no part).
+        for name in free:
+            check(
+                f"re-suppress {name}",
+                await adapter.suppress_mate(SuppressMateParameters(name=name, suppress=True)),
+            )
+        adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
+        _telemetry.success(
+            f"{len(free)} free DOF confirmed (closure: re-engaged "
+            f"{len(free)} park driver(s) -> 0 under-constrained); restored free pose"
+        )
+
+
 def component_names(adapter: Any) -> list[str]:
     """Top-level component names (``Name2``) of the active assembly."""
     asm = adapter.currentModel
