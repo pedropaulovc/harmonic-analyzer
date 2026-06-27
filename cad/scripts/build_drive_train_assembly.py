@@ -77,17 +77,25 @@ at azimuth 180, the contact azimuth) and the drum gears are
 pre-rotated +1.5 deg (half a 3 deg pitch) to receive it tooth-in-gap;
 the crank pinion +11.25 deg (half of 22.5) likewise.
 
-Mated-DOF strategy (M6 operation simulation): the structure -- the
-stationary arbor and the pedestals/posts -- is grounded; the crank
-chain, the cone cluster and the 20 cylinder
-gears are inserted on their exact mirrored transforms (so mate
-flip-recovery has a clean reference and the tuned tooth phases are
-preserved) and joined by real kinematic joints. The crankshaft and the
-cone shaft each get a revolute (coincident axis-to-axis + an axial plane
-distance); the crank arm/handle/T12 wheel/16T pinion are keyed to the
-crankshaft and the 64T + 20 cone gears keyed to the cone shaft (lock
-mates); a 16T:64T gear mate drives the cone cluster from the crank, and
-each cylinder gear meshes its cone gear k at ratio [120-6k : 120]. The
+Mated-DOF strategy (M6 operation simulation): only the stationary arbor
+is grounded (the auto-fixed first component = the reference frame); every
+other part -- the pedestals, the swing post, the crank chain, the cone
+cluster and the 20 cylinder gears -- is inserted on its exact mirrored
+transform (so mate flip-recovery has a clean reference and the tuned tooth
+phases are preserved) and located by SEMANTIC mates only: NO fixed
+components beyond the arbor and NO distance mates. The pedestals are
+located by three coincident plane mates to assembly datums baked at their
+install points; the crankshaft and cone shaft each get a revolute
+(coincident axis-to-axis + a Front/Top plane coincident to a baked axial
+seat datum -- the cone-shaft seat lives on the pivot-post part, the rest
+are assembly datums); the swing post keeps its single vertical-swing DOF
+(Top-plane coincident + its vertical axis lying in two plan-locator
+datums, parked by a suppressible angle driver). The crank
+arm/handle/T12 wheel/16T pinion are keyed to the crankshaft and the 64T +
+20 cone gears keyed to the cone shaft (lock mates); a 16T:64T gear mate
+drives the cone cluster from the crank, and each cylinder gear meshes its
+cone gear k at ratio [120-6k : 120], its axial station set by a coincident
+to a per-station seat datum. The
 gear mate is each cylinder gear's sole rotational constraint, so it
 holds the cosine-setup phase without nudging the gear. The whole train
 is left with exactly ONE free DOF -- the crank angle -- pinned by a
@@ -109,6 +117,7 @@ import sys
 import _config
 from _common import (
     check,
+    name_ref_plane,
     run_build,
 )
 from _assembly import (
@@ -118,7 +127,6 @@ from _assembly import (
     check_no_interference,
     coincident_mate,
     component_transform,
-    distance_driver,
     gear_mate,
     lock_mate,
     named_ref,
@@ -321,6 +329,31 @@ def _org(adapter, name: str) -> list[float]:
     return [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
 
 
+async def _fix_to_origin(adapter, comp: str, tag: str) -> None:
+    """Fully locate an identity-oriented component with semantic mates only.
+
+    Replaces a grounded (fixed) component: three coincident mates pin its
+    principal planes to assembly reference datums baked at its as-placed world
+    origin (one per axis). Three mutually perpendicular plane-coincident mates
+    fully define the part (3 translations + 3 rotations) without redundancy, so
+    no Fixed flag and no distance mate is needed. ``verify`` flip-recovery
+    guards each side.
+    """
+    org = _org(adapter, comp)
+    for axis, base, tail in (
+        (0, "Right Plane", "x"),
+        (1, "Top Plane", "y"),
+        (2, "Front Plane", "z"),
+    ):
+        datum = await name_ref_plane(adapter, base, org[axis], f"{tag}_{tail}")
+        await coincident_mate(
+            adapter,
+            named_ref(f"{base}@{comp}", "PLANE"),
+            named_ref(datum, "PLANE"),
+            label=f"{tag} {tail}", verify=(comp, org),
+        )
+
+
 async def _place_on_shaft(
     adapter,
     part: str,
@@ -366,6 +399,7 @@ async def build(adapter) -> dict[str, str]:
     pedestal = await place_component(
         adapter, "crank-pedestal",
         [X_CRANK, Y_BASE_TOP, PEDESTAL_Z], [0.0, 0.0, 0.0], IDENTITY,
+        ground=False, label="crank-pedestal",
     )
     # South arbor pedestal only (2026-06-19): the rocker support's arbor-clamp
     # boss is gone with the portal unification, AND the now-solid portal north
@@ -374,10 +408,10 @@ async def build(adapter) -> dict[str, str]:
     # left unsupported for now -- the dedicated north-end support (pedestal) and
     # the cone small-end bracket are DEFERRED to the cone-position rework, since
     # the cone is currently mis-positioned and that region will be re-laid out.
-    await place_component(
+    arbor_pedestal = await place_component(
         adapter, "arbor-pedestal",
         [X_DRUM, Y_BASE_TOP, -ARBOR_PEDESTAL_Z], [0.0, 0.0, 0.0], IDENTITY,
-        label=f"arbor-pedestal z={-ARBOR_PEDESTAL_Z:g}",
+        ground=False, label=f"arbor-pedestal z={-ARBOR_PEDESTAL_Z:g}",
     )
     ppost = cone_station(PIVOT_POST_STATION)
     # The cone-pivot-post is the SWING BRACKET (ch.12, p.18 "pivot"): floated so
@@ -467,10 +501,19 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # =================== joints ================================================
+    # The two pedestals are not grounded: each is fully located by three
+    # coincident plane mates to assembly datums baked at its install point (the
+    # semantic replacement for a Fixed flag). Only the arbor stays fixed (the
+    # auto-fixed first component, the reference frame).
+    await _fix_to_origin(adapter, pedestal, "crank_pedestal")
+    await _fix_to_origin(adapter, arbor_pedestal, "arbor_pedestal")
+
     # Crankshaft revolute in the green pedestal: coincident axis-to-axis
-    # (4 DOF) + an axial plane distance (1 DOF). Its spin is the single crank
-    # driver, pinned via the handle below. The crankshaft axis is local +Y ->
-    # assembly Z (ROT_X_POS90), so its Top Plane is the axial reference.
+    # (4 DOF) + an axial plane coincident to a baked seat datum (1 DOF). Its spin
+    # is the single crank driver, pinned via the handle below. The crankshaft
+    # axis is local +Y -> assembly Z (ROT_X_POS90), so its Top Plane is the axial
+    # reference, seated coincident with a datum at its station instead of pinned
+    # by a distance.
     cs_o = _org(adapter, crankshaft)
     await coincident_mate(
         adapter,
@@ -478,12 +521,14 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Axis1@{pedestal}", "AXIS"),
         label="crankshaft radial", verify=(crankshaft, cs_o),
     )
-    await distance_driver(
+    cs_seat = await name_ref_plane(
+        adapter, "Front Plane", cs_o[2], "crankshaft_axial_seat"
+    )
+    await coincident_mate(
         adapter,
         named_ref(f"Top Plane@{crankshaft}", "PLANE"),
-        named_ref("Front Plane", "PLANE"),
-        abs(cs_o[2]),
-        label=f"crankshaft axial d={abs(cs_o[2]):.2f}", verify=(crankshaft, cs_o),
+        named_ref(cs_seat, "PLANE"),
+        label="crankshaft axial", verify=(crankshaft, cs_o),
     )
     # Keyed crank chain: arm, handle, the T12 chain wheel and the 16T pinion
     # all turn rigidly with the crankshaft (a lock preserves the inserted
@@ -506,31 +551,31 @@ async def build(adapter) -> dict[str, str]:
     # =============== cone pivot post swing (p1 disengage DOF) ==============
     # The post is the swing bracket: the whole cone set swings horizontally out
     # of mesh about its vertical pivot (ch.12, p.18). Pin the floated post with
-    # three locating drivers that leave ONLY the rotation about the vertical
-    # axis (Axis2): a Top-plane distance (upright + height) and the vertical
-    # axis's distance to the Right/Front planes (plan X/Z). Then a suppressible
-    # ANGLE PARK DRIVER holds today's ENGAGED orientation (the incline dihedral).
-    # The cone shaft stays journaled to the post (below) and rides the swing, so
-    # the validated 20-gear mesh is untouched in `rest`; suppress the angle
-    # driver to articulate the disengage.
+    # three locating mates that leave ONLY the rotation about the vertical
+    # axis (Axis2): the Top plane coincident to a height datum (upright + height)
+    # and the vertical axis lying in the Right/Front plan-locator datums (plan
+    # X/Z). Then a suppressible ANGLE PARK DRIVER holds today's ENGAGED
+    # orientation (the incline dihedral). The cone shaft stays journaled to the
+    # post (below) and rides the swing, so the validated 20-gear mesh is untouched
+    # in `rest`; suppress the angle driver to articulate the disengage.
     post_o = _org(adapter, pivot_post)
-    await distance_driver(
+    post_y = await name_ref_plane(adapter, "Top Plane", post_o[1], "post_swing_y")
+    await coincident_mate(
         adapter,
-        named_ref(f"Top Plane@{pivot_post}", "PLANE"), named_ref("Top Plane", "PLANE"),
-        abs(post_o[1]),
-        label=f"cone-post height d={abs(post_o[1]):.2f}", verify=(pivot_post, post_o),
+        named_ref(f"Top Plane@{pivot_post}", "PLANE"), named_ref(post_y, "PLANE"),
+        label="cone-post height", verify=(pivot_post, post_o),
     )
-    await distance_driver(
+    post_x = await name_ref_plane(adapter, "Right Plane", post_o[0], "post_swing_x")
+    await coincident_mate(
         adapter,
-        named_ref(f"Axis2@{pivot_post}", "AXIS"), named_ref("Right Plane", "PLANE"),
-        abs(post_o[0]),
-        label=f"cone-post pivot-X d={abs(post_o[0]):.2f}", verify=(pivot_post, post_o),
+        named_ref(f"Axis2@{pivot_post}", "AXIS"), named_ref(post_x, "PLANE"),
+        label="cone-post pivot-X", verify=(pivot_post, post_o),
     )
-    await distance_driver(
+    post_z = await name_ref_plane(adapter, "Front Plane", post_o[2], "post_swing_z")
+    await coincident_mate(
         adapter,
-        named_ref(f"Axis2@{pivot_post}", "AXIS"), named_ref("Front Plane", "PLANE"),
-        abs(post_o[2]),
-        label=f"cone-post pivot-Z d={abs(post_o[2]):.2f}", verify=(pivot_post, post_o),
+        named_ref(f"Axis2@{pivot_post}", "AXIS"), named_ref(post_z, "PLANE"),
+        label="cone-post pivot-Z", verify=(pivot_post, post_o),
     )
     await angle_driver(
         adapter,
@@ -540,26 +585,27 @@ async def build(adapter) -> dict[str, str]:
         verify=(pivot_post, post_o),
     )
 
-    # Cone shaft revolute in the black pivot post: coincident + an axial plane
-    # distance along the inclined axis (the shaft's local Z, read live). Its
-    # spin is driven by the 16T -> 64T mesh, not pinned here.
+    # Cone shaft revolute in the black pivot post: coincident axis-to-axis + the
+    # shaft's pivot-end Front Plane seated coincident to the post's
+    # cone_shaft_axial_seat datum (baked into the post part at the journal
+    # engagement, perpendicular to the shared inclined axis). The seat replaces
+    # the old inclined plane-to-plane distance; the post datum is the only
+    # part-level datum the conversion needs, because an assembly reference plane
+    # cannot be offset from a component's inclined plane. Its spin is driven by
+    # the 16T -> 64T mesh, not pinned here.
     a_s = component_transform(adapter, cone_shaft)
     cone_o = [a_s[9] * 1000.0, a_s[10] * 1000.0, a_s[11] * 1000.0]
-    cone_axis_dir = [a_s[6], a_s[7], a_s[8]]  # image of local Z = inclined shaft axis
-    post_o = _org(adapter, pivot_post)
-    d_axial = abs(sum((cone_o[k] - post_o[k]) * cone_axis_dir[k] for k in range(3)))
     await coincident_mate(
         adapter,
         named_ref(f"Axis1@{cone_shaft}", "AXIS"),
         named_ref(f"Axis1@{pivot_post}", "AXIS"),
         label="cone-shaft radial", verify=(cone_shaft, cone_o),
     )
-    await distance_driver(
+    await coincident_mate(
         adapter,
         named_ref(f"Front Plane@{cone_shaft}", "PLANE"),
-        named_ref(f"Front Plane@{pivot_post}", "PLANE"),
-        d_axial,
-        label=f"cone-shaft axial d={d_axial:.2f}", verify=(cone_shaft, cone_o),
+        named_ref(f"cone_shaft_axial_seat@{pivot_post}", "PLANE"),
+        label="cone-shaft axial", verify=(cone_shaft, cone_o),
     )
     # The 64T crank-drive gear and the 20 cone gears are one rigid stepped
     # cluster keyed to the cone shaft.
@@ -581,10 +627,11 @@ async def build(adapter) -> dict[str, str]:
         _config.machine("gear_train", "crank_drive_ratio"), label="16T:64T crank drive",
     )
 
-    # Each cylinder gear runs free on the stationary arbor (coincident + axial,
-    # leaving its spin) and meshes its cone gear k at ratio [120-6k : 120] --
-    # the gear mate is the sole rotational constraint, so it holds the tuned
-    # tooth phase without nudging the gear (validated keystone, M6).
+    # Each cylinder gear runs free on the stationary arbor (coincident radial +
+    # its Front Plane seated coincident to a per-station datum, leaving its spin)
+    # and meshes its cone gear k at ratio [120-6k : 120] -- the gear mate is the
+    # sole rotational constraint, so it holds the tuned tooth phase without
+    # nudging the gear (validated keystone, M6).
     for j, cyl in enumerate(cyl_gears):
         cyl_o = _org(adapter, cyl)
         await coincident_mate(
@@ -593,12 +640,14 @@ async def build(adapter) -> dict[str, str]:
             named_ref(f"Axis1@{arbor}", "AXIS"),
             label=f"cylinder-gear {j} radial", verify=(cyl, cyl_o),
         )
-        await distance_driver(
+        seat = await name_ref_plane(
+            adapter, "Front Plane", cyl_o[2], f"seat_cyl{j:02d}"
+        )
+        await coincident_mate(
             adapter,
             named_ref(f"Front Plane@{cyl}", "PLANE"),
-            named_ref("Front Plane", "PLANE"),
-            abs(cyl_o[2]),
-            label=f"cylinder-gear {j} axial d={abs(cyl_o[2]):.2f}", verify=(cyl, cyl_o),
+            named_ref(seat, "PLANE"),
+            label=f"cylinder-gear {j} axial", verify=(cyl, cyl_o),
         )
         teeth, cg = cone_gears[j]
         await gear_mate(
