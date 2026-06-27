@@ -110,6 +110,21 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven lag screw (equations neutral)", expected, 0.005 * v_shank)
 
+    # ScrewAxis datum: the screw's central axis = Right Plane ∩ Front Plane (the
+    # Y axis through the origin, the revolve axis of the head + shank). frame.SLDASM
+    # mates it CONCENTRIC to the base hole axis to seat the hold-down coaxially --
+    # constrained, not grounded, no distance mate. Built from the two principal
+    # planes so it needs no face pick.
+    from solidworks_mcp.adapters.base import CreateAxisParameters
+
+    check(
+        "create_axis ScrewAxis (Right ∩ Front)",
+        await adapter.create_axis(
+            CreateAxisParameters(mode="two_planes", planes=["Right Plane", "Front Plane"])
+        ),
+    )
+    name_last_feature(adapter, "ScrewAxis")
+
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
