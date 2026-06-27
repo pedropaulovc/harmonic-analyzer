@@ -36,6 +36,7 @@ from _common import (
     ensure_fully_defined,
     force_rebuild,
     name_last_feature,
+    name_ref_plane,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -51,6 +52,12 @@ BLOCK_DEPTH = 20.0  # Z; p.18 bracket silhouette (scaled, low)
 BLOCK_HEIGHT = 85.0  # journal at 76 + 9 of material above (low)
 BORE_DIA = 0.375 * IN  # 9.525: cone shaft big-end diameter (ch. 12, legacy, med)
 BORE_HEIGHT = 76.0  # ch13 layout: drive height above base top (med)
+# Axial seat for the cone-gear-shaft pivot end (drive-train assembly mate). The
+# shaft's pivot-end Front Plane seats coincident here instead of via a distance
+# mate; the offset is the journal engagement -- the shaft origin sits this far
+# toward the cone (local +Z, increasing cone station) from the post centre, and
+# equals the drive-train assembly's |PIVOT_POST_STATION| (keep the two in sync).
+CONE_SHAFT_SEAT_MM = 1.0
 
 BORE_RADIUS = BORE_DIA / 2.0
 
@@ -137,6 +144,12 @@ async def build(adapter) -> dict[str, str]:
     # incline, which leaves this axis vertical, so a rotation about it is the
     # horizontal swing the book describes.
     await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "swing pivot")
+    # Axial seat datum for the cone-gear-shaft pivot end (see CONE_SHAFT_SEAT_MM):
+    # the assembly mates Front Plane@cone-gear-shaft coincident to this instead of
+    # pinning a distance, so the drive train carries no distance mates.
+    await name_ref_plane(
+        adapter, "Front Plane", CONE_SHAFT_SEAT_MM, "cone_shaft_axial_seat"
+    )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
