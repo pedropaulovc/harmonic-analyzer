@@ -1,0 +1,24 @@
+
+build_lock:
+  # Per-assembly build mode: how the operational DOF are handled in the saved model.
+  #
+  #   free   = leave the predetermined operational DOF UNLOCKED (default). The saved
+  #            model is a working kinematic model -- e.g. the crank spins and the whole
+  #            geared train turns with it. The reproducibility "park driver" mates are
+  #            authored but SUPPRESSED, so they pin nothing.
+  #   locked = engage the park drivers (today's behaviour): every operational DOF is
+  #            pinned, the model is fully defined (0 DOF), the saved pose is a hard,
+  #            reproducible snapshot. An explicit opt-in for a pinned export/snapshot.
+  #
+  # Read by the per-assembly build script as `_config.machine("build_lock", "<stem>")`
+  # with a STRING-LITERAL stem, so it tokenises to machine/build_lock.yaml in the doit
+  # file_dep + remote-cache digest (see _buildgraph._family_tokens): flipping a value
+  # rebuilds ONLY the assembly that reads it, and keys the cache correctly free vs locked.
+  drive_train: free
+  source: "design decision 2026-06 (default-free kinematic model + opt-in lock)"
+  confidence: high
+  notes: >-
+    Only drive-train currently honours this flag (frees the crank spin, 1 DOF). Other
+    assemblies do not read build_lock and stay fully defined. The verify DOF gate adapts:
+    free -> assert exactly the expected free DOF via the park-driver closure check;
+    locked / unread -> strict 0-DOF. See AGENTS.md "Verify suites".

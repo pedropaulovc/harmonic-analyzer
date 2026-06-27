@@ -81,6 +81,7 @@ from _common import (
 )
 from _assembly import (
     assert_components_fully_defined,
+    assert_expected_free_dof,
     assert_model_healthy,
     check_no_interference,
     component_names,
@@ -189,6 +190,25 @@ class Report:
         with _telemetry.span("gate", label=label) as sp:
             try:
                 fn()
+            except Exception as exc:  # noqa: BLE001 -- a gate failure is data, not a crash
+                self.failed.append((label, str(exc)))
+                sp.record_exception(exc)
+                sp.set_status(_telemetry.Status(_telemetry.StatusCode.ERROR, str(exc)))
+                _telemetry.error(f"GATE FAILED [{label}]: {exc}")
+                return
+            self.passed.append(label)
+            _telemetry.success(f"GATE PASSED [{label}]")
+
+    async def agate(self, label: str, fn: Callable[[], Any]) -> None:
+        """Async sibling of :meth:`gate`: ``await`` the coroutine ``fn()`` returns.
+
+        Used by gates that drive async adapter mate-ops (suppress/unsuppress for the
+        free-DOF closure check) rather than only sync COM reads. Same record-don't-
+        propagate contract and span shape as :meth:`gate`.
+        """
+        with _telemetry.span("gate", label=label) as sp:
+            try:
+                await fn()
             except Exception as exc:  # noqa: BLE001 -- a gate failure is data, not a crash
                 self.failed.append((label, str(exc)))
                 sp.record_exception(exc)
@@ -550,6 +570,22 @@ async def _verify_isolation_one(adapter: Any, name: str, report: Report) -> None
     report.gate(f"iso:{name}:channel-independence", lambda: assert_channel_independence(adapter))
 
 
+def _expected_free_dof(name: str) -> int:
+    """Free operational DOF expected in ``name``'s AS-SAVED model.
+
+    drive-train frees the crank spin (1 DOF, a suppressed PARK_* park driver) when
+    built `free`, the default; a `locked` build re-engages it -> 0. Read straight
+    from cad/config/machine/build_lock.yaml -- the same source of truth the build
+    used, and the freshness guard (`_assert_fresh`) guarantees the saved model
+    matches that config. Every other assembly stays fully defined (0). The literal
+    accessor tokenises build_lock.yaml into this gate's recipe deps, so flipping
+    the flag re-runs verify too.
+    """
+    if name != "drive-train":
+        return 0
+    return 0 if _config.machine("build_lock", "drive_train") == "locked" else 1
+
+
 async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
     if not sldasm.exists():
@@ -575,7 +611,17 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
             check(f"activate {REST}", await adapter.set_active_configuration(REST))
     log(f"--- verifying {name} ({REST} pose) ---")
 
-    report.gate(f"{name}:dof-fully-defined", lambda: assert_components_fully_defined(adapter))
+    free_dof = _expected_free_dof(name)
+    if free_dof:
+        # Default-free build: assert EXACTLY the expected operational DOF are free
+        # via the park-driver closure check (it re-engages then restores the free
+        # pose, leaving the model as-shipped for the gates below).
+        await report.agate(
+            f"{name}:dof-expected-free",
+            lambda: assert_expected_free_dof(adapter, free_dof),
+        )
+    else:
+        report.gate(f"{name}:dof-fully-defined", lambda: assert_components_fully_defined(adapter))
     report.gate(f"{name}:no-over-constrained", lambda: assert_no_over_constrained(adapter))
     report.gate(f"{name}:model-healthy", lambda: assert_model_healthy(adapter, label=name, deep=True))
     report.gate(f"{name}:interference-free", lambda: check_no_interference(adapter))
