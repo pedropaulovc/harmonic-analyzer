@@ -281,6 +281,47 @@ def _org(adapter, name: str) -> list[float]:
     return [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
 
 
+async def _locate_to_datum(adapter, name: str, *, roty90: bool = False) -> None:
+    """Locate a grounded structural part to the machine datum planes by three
+    orthogonal plane-distance mates -- the semantic replacement for an explicit
+    fix on a free-space part with no contact partner (the #110 frame-column
+    idiom). Three orthogonal plane pairs fully define the body: each pins one
+    translation and, by forcing the planes parallel, the rotations.
+
+    The part is inserted axis-aligned, so its principal planes map to the
+    assembly planes. ``roty90=False`` (IDENTITY parts -- shafts, ball mounts,
+    spring-hooks, bushings): same-name pairing (Right->X, Top->Y, Front->Z).
+    ``roty90=True`` (the vertical springs, ROT_Y_POS90: local X->world -Z,
+    Y->Y, Z->world +X): swapped pairing (Right plane->Front=Z, Top->Y,
+    Front plane->Right=X). The live origin (read post-mirror) gives the three
+    distances, so it is mirror-agnostic; coord 0 degenerates to a coincident.
+    """
+    o = _org(adapter, name)
+    if roty90:
+        pairs = (("Right Plane", "Front Plane", o[2], "z"),
+                 ("Top Plane", "Top Plane", o[1], "y"),
+                 ("Front Plane", "Right Plane", o[0], "x"))
+    else:
+        pairs = (("Right Plane", "Right Plane", o[0], "x"),
+                 ("Top Plane", "Top Plane", o[1], "y"),
+                 ("Front Plane", "Front Plane", o[2], "z"))
+    for part_plane, asm_plane, coord, axis in pairs:
+        part_ref = named_ref(f"{part_plane}@{name}", "PLANE")
+        asm_ref = named_ref(asm_plane, "PLANE")
+        if abs(coord) < 1e-6:
+            await coincident_mate(
+                adapter, part_ref, asm_ref,
+                label=f"{name} datum {axis}=0 ({part_plane}<->{asm_plane})",
+                verify=(name, o),
+            )
+            continue
+        await distance_driver(
+            adapter, part_ref, asm_ref, abs(coord),
+            label=f"{name} datum {axis} d={abs(coord):.2f}",
+            verify=(name, o),
+        )
+
+
 # Top-pin-to-foot span of the rigid bar (Axis1 local y - Axis2 local y); the
 # amplitude swing pivots the bar about its top pin over this lever arm.
 BAR_TOP_TO_FOOT = BAR_TOP_PIN_LOCAL[1] - BAR_FOOT_LOCAL[1]  # 806.45
@@ -719,36 +760,47 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_assembly", await adapter.create_assembly())
 
-    # Shafts (ground; first insert auto-fixes). The shaft axes in the FINAL
-    # mirrored frame (x -> -x) anchor the rocker/lever concentrics.
+    # Shafts. The pivot-shaft is inserted FIRST, so SolidWorks auto-fixes it as
+    # the assembly seed (ground=False -- the one allowed fixed component, the
+    # #110 idiom). The fulcrum-shaft is free-space structure with no contact
+    # partner, so it is datum-located (three orthogonal plane distances), not
+    # fixed. The shaft axes in the FINAL mirrored frame (x -> -x) anchor the
+    # rocker/lever concentrics.
     await place_component(
         adapter, "pivot-shaft", [PIVOT[0], PIVOT[1], PIVOT_SHAFT_Z], [0.0, 0.0, 0.0],
-        IDENTITY, label="pivot-shaft (rocker)",
+        IDENTITY, ground=False, label="pivot-shaft (rocker, seed)",
     )
-    await place_component(
+    fulcrum = await place_component(
         adapter, "fulcrum-shaft", [FULCRUM[0], FULCRUM[1], 0.0], [0.0, 0.0, 0.0],
-        IDENTITY, label="fulcrum-shaft (lever bank)",
+        IDENTITY, ground=False, label="fulcrum-shaft (lever bank)",
     )
+    await _locate_to_datum(adapter, fulcrum)
     pivot_w = (-PIVOT[0], PIVOT[1])  # (72.9, 253.8)
     fulc_w = (-FULCRUM[0], FULCRUM[1])  # (199.9, 1065.9)
     pivot_od = [pivot_w[0] + SHAFT_R, pivot_w[1], 0.0]
     fulc_od = [fulc_w[0] + SHAFT_R, fulc_w[1], 0.0]
 
-    # Ball mounts (ground). The rocker pair is asymmetric (M6.5): north seats
-    # on the rocker-support apex, south on the A-frame clevis saddle (both
-    # tops at y 228.6).
+    # Ball mounts. Free-space structure with no contact partner, so each is
+    # datum-located (three orthogonal plane distances), not fixed -- the #110
+    # idiom. The rocker pair is asymmetric (M6.5): north seats on the
+    # rocker-support apex, south on the A-frame clevis saddle (both tops at
+    # y 228.6).
     for mount_z in (-AFRAME_MOUNT_Z_ABS, SUPPORT_Z):
-        await place_component(
+        mount = await place_component(
             adapter, "pivot-ball-mount",
             [PIVOT[0], SUPPORT_APEX_Y, mount_z],
-            [0.0, 0.0, 0.0], IDENTITY, label=f"ball-mount rocker z{mount_z:+.0f}",
+            [0.0, 0.0, 0.0], IDENTITY, ground=False,
+            label=f"ball-mount rocker z{mount_z:+.0f}",
         )
+        await _locate_to_datum(adapter, mount)
     for sz in (-1.0, 1.0):
-        await place_component(
+        mount = await place_component(
             adapter, "pivot-ball-mount",
             [FULCRUM[0], RAIL_TOP_Y, sz * LEVER_MOUNT_Z],
-            [0.0, 0.0, 0.0], IDENTITY, label=f"ball-mount lever z{sz * LEVER_MOUNT_Z:+.0f}",
+            [0.0, 0.0, 0.0], IDENTITY, ground=False,
+            label=f"ball-mount lever z{sz * LEVER_MOUNT_Z:+.0f}",
         )
+        await _locate_to_datum(adapter, mount)
 
     # Per-channel chain: the four moving parts are inserted on-solution
     # (ground=False) and joined by revolutes whose spin/axial dims are the
@@ -779,7 +831,7 @@ async def build(adapter) -> dict[str, str]:
     # FixComponent (Select2 each, one solve) after the loop (place_components_batch). The
     # moving parts keep the per-part place_component path -- their insertion pose
     # seeds the mate flip-recovery, so they are not batchable.
-    grounded_specs: list[dict[str, object]] = []
+    grounded_specs: list[dict[str, Any]] = []
     for j in range(CHANNELS):
         zj = z_station(j)
         z_mid = zj + ARM_MID_DZ
@@ -901,6 +953,7 @@ async def build(adapter) -> dict[str, str]:
                          PLATE_EYE_Y + SPRING_BOTTOM_LEAD * uy, z_mid],
             "rotation": [0.0, 0.0, 0.0],
             "rows": spring_rows,
+            "kind": "spring", "theta": spec["theta"],
             "label": (f"channel-spring ch{j:02d} {spec['part'].rsplit('-', 1)[-1]} "
                       f"body={spec['body']:.2f} tilt={spec['theta']:+.2f}"),
         })
@@ -941,16 +994,31 @@ async def build(adapter) -> dict[str, str]:
                 "label": f"lever-bushing gap {j - 1:02d}/{j:02d}",
             })
 
-    # Insert + ground the whole grounded cosmetic bank (springs + both bushing
-    # banks): one AddComponents3 for all ~58 parts, then Select2 each + one
-    # FixComponent (a single mate solve) to fix them -- versus the per-part
-    # insert+fix it replaces (~116 round-trips, each fix re-solving the
-    # assembly). Done after
-    # the mating loop because these parts carry no mates and nothing reads them
-    # back until the bank checks below.
-    await place_components_batch(
-        adapter, grounded_specs, label="grounded bank (springs + bushings)"
+    # Insert the whole structural bank (springs + both bushing banks) in ONE
+    # AddComponents3 for all ~58 parts (ground=False -- no FixComponent pass),
+    # then datum-locate each to the machine planes. Replaces the old fix-the-bank
+    # shortcut: none of these parts is grounded any more (the "drop grounding for
+    # semantic mates" cleanup, #110). The bushings/hooks are IDENTITY-oriented;
+    # the springs are ROT_Y_POS90 (vertical at the uniform neutral preset), so
+    # they take the swapped plane pairing. A non-neutral preset would tilt a
+    # spring (theta != 0) and the plane-locate would silently re-verticalise it,
+    # so guard loud -- a tilted spring needs angle mates (follow-up), not this.
+    for spec in grounded_specs:
+        spec["ground"] = False
+    bank = await place_components_batch(
+        adapter, grounded_specs, label="structural bank (springs + bushings)"
     )
+    for nm, spec in zip(bank, grounded_specs):
+        if spec.get("kind") != "spring":
+            await _locate_to_datum(adapter, nm)
+            continue
+        if abs(float(spec["theta"])) > 0.05:
+            raise RuntimeError(
+                f"spring {nm} tilt={float(spec['theta']):+.3f} deg is not vertical: the "
+                "datum plane-locate assumes the uniform neutral preset "
+                "(ROT_Y_POS90). A tilted preset needs angle mates."
+            )
+        await _locate_to_datum(adapter, nm, roty90=True)
 
     # Confirm both bushing banks landed on the inter-channel gap planes. The
     # explicit placements above are deterministic; this guards a future off-by-one
