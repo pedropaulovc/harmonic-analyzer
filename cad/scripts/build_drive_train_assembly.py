@@ -736,10 +736,18 @@ async def build(adapter) -> dict[str, str]:
         _config.machine("gear_train", "crank_drive_ratio"), label="16T:64T crank drive",
     )
 
-    # Each cylinder gear runs free on the stationary arbor (coincident + axial,
-    # leaving its spin) and meshes its cone gear k at ratio [120-6k : 120] --
-    # the gear mate is the sole rotational constraint, so it holds the tuned
-    # tooth phase without nudging the gear (validated keystone, M6).
+    # The cylinder set is a SANDWICH (book ch.13): brass gears alternate with the
+    # black connecting rods, each riding a cam attached to the gear on its right.
+    # Those rods/cams live in the channel subassembly, so on the bare arbor each
+    # gear sits one stack PITCH from its neighbour (gear face 3 mm + cam to 6.5 ->
+    # Z_PITCH ~= 7.06). The axial locator therefore CHAINS each gear off the
+    # previous one by that physical pitch -- the real stack relationship, one
+    # meaningful constant -- instead of pinning 20 independent absolute coords to
+    # the world datum; only gear 0 anchors the stack's reference end. Radially each
+    # runs free (coincident, leaving its spin) and meshes its cone gear k at ratio
+    # [120-6k : 120] -- the gear mate is the sole rotational constraint, so it holds
+    # the tuned tooth phase without nudging the gear (validated keystone, M6).
+    prev_cyl: str | None = None
     for j, cyl in enumerate(cyl_gears):
         cyl_o = _org(adapter, cyl)
         await coincident_mate(
@@ -748,13 +756,24 @@ async def build(adapter) -> dict[str, str]:
             named_ref(f"Axis1@{arbor}", "AXIS"),
             label=f"cylinder-gear {j} radial", verify=(cyl, cyl_o),
         )
-        await distance_driver(
-            adapter,
-            named_ref(f"Front Plane@{cyl}", "PLANE"),
-            named_ref("Front Plane", "PLANE"),
-            abs(cyl_o[2]),
-            label=f"cylinder-gear {j} axial d={abs(cyl_o[2]):.2f}", verify=(cyl, cyl_o),
-        )
+        if prev_cyl is None:
+            await distance_driver(  # anchor the stack's reference end once
+                adapter,
+                named_ref(f"Front Plane@{cyl}", "PLANE"),
+                named_ref("Front Plane", "PLANE"),
+                abs(cyl_o[2]),
+                label=f"cylinder-gear {j} axial anchor d={abs(cyl_o[2]):.2f}",
+                verify=(cyl, cyl_o),
+            )
+        else:
+            await distance_driver(  # one sandwich pitch off the previous gear
+                adapter,
+                named_ref(f"Front Plane@{cyl}", "PLANE"),
+                named_ref(f"Front Plane@{prev_cyl}", "PLANE"),
+                Z_PITCH,
+                label=f"cylinder-gear {j} axial pitch d={Z_PITCH:.2f}",
+                verify=(cyl, cyl_o),
+            )
         teeth, cg = cone_gears[j]
         await gear_mate(
             adapter,
@@ -762,6 +781,7 @@ async def build(adapter) -> dict[str, str]:
             named_ref(f"Axis2@{cyl}", "AXIS"),
             [teeth, 120], label=f"cone T{teeth:03d}:cyl120 ch{j:02d}",
         )
+        prev_cyl = cyl
 
     # DRIVER #1 (the single machine input): the crank angle. The arm hangs at
     # bottom-dead-centre (straight down, ch30), which is a kinematic SINGULARITY
