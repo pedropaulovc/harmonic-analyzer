@@ -90,11 +90,30 @@ mates); a 16T:64T gear mate drives the cone cluster from the crank, and
 each cylinder gear meshes its cone gear k at ratio [120-6k : 120]. The
 gear mate is each cylinder gear's sole rotational constraint, so it
 holds the cosine-setup phase without nudging the gear. The whole train
-is left with exactly ONE free DOF -- the crank angle -- pinned by a
-single spin driver on the handle (DRIVER #1, suppressible for the Motion
-study). Saved state: every component fixed or fully defined, zero
-interferences (tangent/coincident contact allowed -- bores ride their
-shafts). Gear-ratio sign is verified kinematically by a motion script.
+is left with exactly ONE operational DOF -- the crank angle.
+
+Build mode (``machine/build_lock.yaml`` -> ``_config.machine("build_lock",
+"drive_train")``; default ``free``):
+
+* ``free`` (DEFAULT) -- the saved model is a WORKING kinematic model: the
+  crank angle DOF is left UNLOCKED, so dragging the crank turns the whole
+  geared train (1 DOF). A single ``PARK_crank_angle`` angle mate (the
+  reproducibility "park driver") IS authored at the inserted rest pose but
+  SUPPRESSED, so it pins nothing.
+* ``locked`` -- an explicit opt-in pinned snapshot: the park driver stays
+  ENGAGED, the crank angle is fixed, every component is fully defined
+  (0 DOF), and the saved pose is byte-reproducible. This reproduces the
+  historical grounding exactly.
+
+The model is certified AS BUILT in whichever mode is configured:
+``assert_expected_free_dof(adapter, 1 if free else 0)`` runs the park-driver
+closure check (re-engage every ``PARK_*`` -> ForceRebuild -> assert 0
+under-constrained -> re-suppress -> restore), proving exactly the expected
+free DOF and nothing more; ``check_no_interference`` runs on the as-built
+pose. Zero interferences (tangent/coincident contact allowed -- bores ride
+their shafts). Gear-ratio sign is verified kinematically by a motion script.
+The verify ``soundness`` suite re-runs this same DOF gate plus every other
+gate on the as-built model; only the DOF gate adapts to the mode.
 
 Run (SolidWorks already open)::
 
@@ -114,20 +133,31 @@ from _common import (
 from _assembly import (
     angle_driver,
     apply_component_color,
-    assert_components_fully_defined,
+    assert_expected_free_dof,
     check_no_interference,
     coincident_mate,
     component_transform,
     distance_driver,
     gear_mate,
-    lock_mate,
+    is_locked_build,
+    mark_park_driver,
     named_ref,
+    parallel_mate,
     place_component,
     save_assembly_and_images,
-    spin_driver,
 )
 
 ASM_NAME = "drive-train"
+
+# Build mode (cad/config/machine/build_lock.yaml). `free` (default) leaves the
+# crank spin -- the single operational DOF -- UNLOCKED: its park driver is
+# authored but suppressed, so the saved model is a working kinematic model.
+# `locked` engages the park driver for a fully-defined reproducible snapshot.
+# The literal accessor tokenises to machine/build_lock.yaml in the doit/cache
+# digest, so flipping it rebuilds ONLY drive-train and keys the cache correctly.
+# `is_locked_build` rejects any value other than `free`/`locked` (a typo'd opt-in
+# must fail loud, not silently build free).
+LOCK = is_locked_build(_config.machine("build_lock", "drive_train"))
 
 Y_BASE_TOP = 50.8  # harmonic-base top face
 Y_DRIVE = Y_BASE_TOP + 76.0  # 126.8: crank, cone big end and arbor axes
@@ -321,6 +351,77 @@ def _org(adapter, name: str) -> list[float]:
     return [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
 
 
+async def _locate_to_datum(adapter, name: str) -> None:
+    """Locate a static mount to the machine datum planes (three orthogonal plane
+    distances), replacing an explicit fix for a part with no in-subassembly
+    contact partner. A free-space position relative to the machine origin
+    (strictly necessary) -- the frame-column idiom. The mount is inserted at
+    IDENTITY, so its principal planes are parallel to the assembly's and the
+    three distances are just its origin coordinates."""
+    o = _org(adapter, name)
+    for axis, plane, coord in (
+        ("Y", "Top Plane", o[1]),
+        ("X", "Right Plane", o[0]),
+        ("Z", "Front Plane", o[2]),
+    ):
+        await distance_driver(
+            adapter,
+            named_ref(f"{plane}@{name}", "PLANE"),
+            named_ref(plane, "PLANE"),
+            abs(coord),
+            label=f"{name} datum {axis} d={abs(coord):.2f}",
+            verify=(name, o),
+        )
+
+
+async def _key_to_shaft(
+    adapter, part, part_axis, shaft_axis_ref, shaft, shaft_o, axis_dir, label,
+) -> None:
+    """Key a gear rigidly onto a shaft via SEMANTIC mates, replacing a lock:
+    coaxial (collinear axes) + an axial seat (Front-plane distance along the
+    shaft axis, read live) + a parallel anti-spin. The gear and shaft share the
+    inclined orientation (ROT_Y_INCLINE), so their Right planes are parallel at
+    the keyed phase -- the parallel pins the spin with no tuned angle (the
+    lag-screw idiom). Removes the same 6 DOF the lock did; no fix/lock."""
+    p_o = _org(adapter, part)
+    d_axial = abs(sum((p_o[k] - shaft_o[k]) * axis_dir[k] for k in range(3)))
+    await coincident_mate(
+        adapter, named_ref(f"{part_axis}@{part}", "AXIS"), shaft_axis_ref,
+        label=f"{label} coaxial", verify=(part, p_o),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Front Plane@{part}", "PLANE"),
+        named_ref(f"Front Plane@{shaft}", "PLANE"),
+        d_axial,
+        label=f"{label} axial seat d={d_axial:.2f}", verify=(part, p_o),
+    )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Right Plane@{part}", "PLANE"),
+        named_ref(f"Right Plane@{shaft}", "PLANE"),
+        label=f"{label} anti-spin (keyed phase)", verify=(part, p_o),
+    )
+
+
+async def _seat_on_crank(adapter, part, part_axis, crank_axis) -> list[float]:
+    """Journal a crank-chain part on the crankshaft via SEMANTIC mates: coaxial
+    on the crank axis + an axial seat (the part's Z-normal Front plane to the
+    assembly Front plane, distance read live). Leaves ONLY spin -- the caller
+    pins it with a per-part anti-spin. Returns the part's live origin."""
+    o = _org(adapter, part)
+    await coincident_mate(
+        adapter, named_ref(f"{part_axis}@{part}", "AXIS"), crank_axis,
+        label=f"{part} coaxial on crank", verify=(part, o),
+    )
+    await distance_driver(
+        adapter, named_ref(f"Front Plane@{part}", "PLANE"),
+        named_ref("Front Plane", "PLANE"), abs(o[2]),
+        label=f"{part} axial seat d={abs(o[2]):.2f}", verify=(part, o),
+    )
+    return o
+
+
 async def _place_on_shaft(
     adapter,
     part: str,
@@ -355,18 +456,25 @@ async def _place_on_shaft(
 async def build(adapter) -> dict[str, str]:
     check("create_assembly", await adapter.create_assembly())
 
-    # =================== structure (ground = fixed) ====================
-    # Stationary arbor, the pedestals/posts, and the disengaged alignment
-    # rig are the fixed reference frame the moving train mates against.
+    # =================== structure (located, not fixed) ====================
+    # The stationary arbor is the reference frame the moving train mates
+    # against. Inserted FIRST, so SolidWorks auto-fixes it as the seed (the one
+    # allowed fixed component, mirroring frame's harmonic-base) -- no explicit fix.
     arbor = await place_component(
         adapter, "cylinder-gear-shaft",
         [X_DRUM, Y_DRIVE, ARBOR_SOUTH_Z],
-        [90.0, 0.0, 0.0], ROT_X_POS90, label="cylinder arbor",
+        [90.0, 0.0, 0.0], ROT_X_POS90, ground=False, label="cylinder arbor (seed)",
     )
+    # The crank pedestal and arbor-pedestal are static mounts bolted to the
+    # (absent) base. With no in-subassembly contact partner, each is LOCATED to
+    # the machine datum planes by three orthogonal plane distances (a free-space
+    # machine-frame position, strictly necessary) -- the frame-column pattern,
+    # replacing the explicit fix.
     pedestal = await place_component(
         adapter, "crank-pedestal",
-        [X_CRANK, Y_BASE_TOP, PEDESTAL_Z], [0.0, 0.0, 0.0], IDENTITY,
+        [X_CRANK, Y_BASE_TOP, PEDESTAL_Z], [0.0, 0.0, 0.0], IDENTITY, ground=False,
     )
+    await _locate_to_datum(adapter, pedestal)
     # South arbor pedestal only (2026-06-19): the rocker support's arbor-clamp
     # boss is gone with the portal unification, AND the now-solid portal north
     # upright occupies the space the arbor's north end used to pass through. The
@@ -374,11 +482,12 @@ async def build(adapter) -> dict[str, str]:
     # left unsupported for now -- the dedicated north-end support (pedestal) and
     # the cone small-end bracket are DEFERRED to the cone-position rework, since
     # the cone is currently mis-positioned and that region will be re-laid out.
-    await place_component(
+    arbor_pedestal = await place_component(
         adapter, "arbor-pedestal",
-        [X_DRUM, Y_BASE_TOP, -ARBOR_PEDESTAL_Z], [0.0, 0.0, 0.0], IDENTITY,
+        [X_DRUM, Y_BASE_TOP, -ARBOR_PEDESTAL_Z], [0.0, 0.0, 0.0], IDENTITY, ground=False,
         label=f"arbor-pedestal z={-ARBOR_PEDESTAL_Z:g}",
     )
+    await _locate_to_datum(adapter, arbor_pedestal)
     ppost = cone_station(PIVOT_POST_STATION)
     # The cone-pivot-post is the SWING BRACKET (ch.12, p.18 "pivot"): floated so
     # the whole cone set can swing horizontally out of mesh about its vertical
@@ -485,22 +594,67 @@ async def build(adapter) -> dict[str, str]:
         abs(cs_o[2]),
         label=f"crankshaft axial d={abs(cs_o[2]):.2f}", verify=(crankshaft, cs_o),
     )
-    # Keyed crank chain: arm, handle, the T12 chain wheel and the 16T pinion
-    # all turn rigidly with the crankshaft (a lock preserves the inserted
-    # pose and shares the crankshaft's single spin DOF).
+    # Keyed crank chain: the T12 chain wheel, the 16T pinion and the arm turn
+    # rigidly WITH the crankshaft; the handle rides the arm's pivot pin. Each lock
+    # is replaced by a SEMANTIC keyed joint -- coaxial + axial seat + an anti-spin
+    # -- so the chain shares the crankshaft's single spin DOF with no lock/fix.
+    # The suppressible crank ANGLE DRIVER below pins that spin (via the arm).
     crank_axis = named_ref(f"Axis1@{crankshaft}", "AXIS")
-    await lock_mate(
-        adapter, named_ref(f"Axis1@{arm}", "AXIS"), crank_axis, label="crank-arm keyed",
+    cs_right = named_ref(f"Right Plane@{crankshaft}", "PLANE")
+
+    # T12 chain wheel (IDENTITY): its Right plane is parallel to the crankshaft's
+    # at the keyed phase, so a parallel pins the spin (no tuned angle).
+    rm_o = await _seat_on_crank(adapter, removable, "Axis1", crank_axis)
+    await parallel_mate(
+        adapter, named_ref(f"Right Plane@{removable}", "PLANE"), cs_right,
+        label="T12 wheel anti-spin (keyed phase)", verify=(removable, rm_o),
     )
-    await lock_mate(
-        adapter, named_ref(f"Axis1@{handle}", "AXIS"), crank_axis, label="crank-handle keyed",
+
+    # 16T pinion (placed +half-pitch, tooth-in-gap on the 64T): no plane pair is
+    # parallel at that phase, so pin the spin with an ANGLE anti-spin holding the
+    # live dihedral between its Right plane and the crankshaft's (~11.25 deg). The
+    # pinion origin sits ON the spin axis (flip-recovery can't read it), so a
+    # wrong side surfaces as tooth interference, not a silent miss.
+    pn_o = await _seat_on_crank(adapter, pinion, "Axis2", crank_axis)
+    a_pn = component_transform(adapter, pinion)
+    a_cs = component_transform(adapter, crankshaft)
+    pin_phase = math.degrees(
+        math.acos(max(-1.0, min(1.0, sum(a_pn[k] * a_cs[k] for k in range(3)))))
     )
-    await lock_mate(
-        adapter, named_ref(f"Axis1@{removable}", "AXIS"), crank_axis,
-        label="T12 chain wheel keyed",
+    await angle_driver(
+        adapter, named_ref(f"Right Plane@{pinion}", "PLANE"), cs_right, pin_phase,
+        label=f"16T pinion anti-spin (tooth-in-gap a={pin_phase:.2f})",
+        verify=(pinion, pn_o),
     )
-    await lock_mate(
-        adapter, named_ref(f"Axis2@{pinion}", "AXIS"), crank_axis, label="16T pinion keyed",
+
+    # Crank arm (rest pose -Y, rot_z -90): its Top plane is parallel to the
+    # crankshaft's Right at the keyed phase. The crank angle driver below pins the
+    # arm -- hence the whole keyed chain -- to the assembly.
+    arm_o = await _seat_on_crank(adapter, arm, "Axis1", crank_axis)
+    await parallel_mate(
+        adapter, named_ref(f"Top Plane@{arm}", "PLANE"), cs_right,
+        label="crank-arm anti-spin (keyed phase)", verify=(arm, arm_o),
+    )
+
+    # Crank handle: rides the arm's PIVOT pin (Axis2@arm), NOT the crankshaft --
+    # a real pin joint. Coaxial to the arm pivot bore + an axial seat (its
+    # Z-normal Right plane to the assembly Front) + a parallel holding the grip's
+    # rest orientation (the grip spin is immaterial, like a lag screw).
+    hd_o = _org(adapter, handle)
+    await coincident_mate(
+        adapter, named_ref(f"Axis1@{handle}", "AXIS"),
+        named_ref(f"Axis2@{arm}", "AXIS"),
+        label="handle coaxial on arm pivot", verify=(handle, hd_o),
+    )
+    await distance_driver(
+        adapter, named_ref(f"Right Plane@{handle}", "PLANE"),
+        named_ref("Front Plane", "PLANE"), abs(hd_o[2]),
+        label=f"handle axial seat d={abs(hd_o[2]):.2f}", verify=(handle, hd_o),
+    )
+    await parallel_mate(
+        adapter, named_ref(f"Top Plane@{handle}", "PLANE"),
+        named_ref(f"Right Plane@{arm}", "PLANE"),
+        label="handle anti-spin (grip rest)", verify=(handle, hd_o),
     )
 
     # =============== cone pivot post swing (p1 disengage DOF) ==============
@@ -562,16 +716,17 @@ async def build(adapter) -> dict[str, str]:
         label=f"cone-shaft axial d={d_axial:.2f}", verify=(cone_shaft, cone_o),
     )
     # The 64T crank-drive gear and the 20 cone gears are one rigid stepped
-    # cluster keyed to the cone shaft.
+    # cluster KEYED to the cone shaft -- each via coaxial + axial seat + parallel
+    # anti-spin (see _key_to_shaft), replacing its lock with no fix/lock/tuned
+    # angle. The 64T uses its Axis2 central axis, the cone gears their Axis1.
     cone_axis = named_ref(f"Axis1@{cone_shaft}", "AXIS")
-    await lock_mate(
-        adapter, named_ref(f"Axis2@{gear64}", "AXIS"), cone_axis,
-        label="64T keyed to cone shaft",
+    await _key_to_shaft(
+        adapter, gear64, "Axis2", cone_axis, cone_shaft, cone_o, cone_axis_dir, "64T",
     )
     for teeth, cg in cone_gears:
-        await lock_mate(
-            adapter, named_ref(f"Axis1@{cg}", "AXIS"), cone_axis,
-            label=f"cone-gear T{teeth:03d} keyed",
+        await _key_to_shaft(
+            adapter, cg, "Axis1", cone_axis, cone_shaft, cone_o, cone_axis_dir,
+            f"cone-gear T{teeth:03d}",
         )
     # 16T pinion (keyed to the crank) drives the 64T -> the cone cluster turns.
     await gear_mate(
@@ -581,10 +736,18 @@ async def build(adapter) -> dict[str, str]:
         _config.machine("gear_train", "crank_drive_ratio"), label="16T:64T crank drive",
     )
 
-    # Each cylinder gear runs free on the stationary arbor (coincident + axial,
-    # leaving its spin) and meshes its cone gear k at ratio [120-6k : 120] --
-    # the gear mate is the sole rotational constraint, so it holds the tuned
-    # tooth phase without nudging the gear (validated keystone, M6).
+    # The cylinder set is a SANDWICH (book ch.13): brass gears alternate with the
+    # black connecting rods, each riding a cam attached to the gear on its right.
+    # Those rods/cams live in the channel subassembly, so on the bare arbor each
+    # gear sits one stack PITCH from its neighbour (gear face 3 mm + cam to 6.5 ->
+    # Z_PITCH ~= 7.06). The axial locator therefore CHAINS each gear off the
+    # previous one by that physical pitch -- the real stack relationship, one
+    # meaningful constant -- instead of pinning 20 independent absolute coords to
+    # the world datum; only gear 0 anchors the stack's reference end. Radially each
+    # runs free (coincident, leaving its spin) and meshes its cone gear k at ratio
+    # [120-6k : 120] -- the gear mate is the sole rotational constraint, so it holds
+    # the tuned tooth phase without nudging the gear (validated keystone, M6).
+    prev_cyl: str | None = None
     for j, cyl in enumerate(cyl_gears):
         cyl_o = _org(adapter, cyl)
         await coincident_mate(
@@ -593,13 +756,24 @@ async def build(adapter) -> dict[str, str]:
             named_ref(f"Axis1@{arbor}", "AXIS"),
             label=f"cylinder-gear {j} radial", verify=(cyl, cyl_o),
         )
-        await distance_driver(
-            adapter,
-            named_ref(f"Front Plane@{cyl}", "PLANE"),
-            named_ref("Front Plane", "PLANE"),
-            abs(cyl_o[2]),
-            label=f"cylinder-gear {j} axial d={abs(cyl_o[2]):.2f}", verify=(cyl, cyl_o),
-        )
+        if prev_cyl is None:
+            await distance_driver(  # anchor the stack's reference end once
+                adapter,
+                named_ref(f"Front Plane@{cyl}", "PLANE"),
+                named_ref("Front Plane", "PLANE"),
+                abs(cyl_o[2]),
+                label=f"cylinder-gear {j} axial anchor d={abs(cyl_o[2]):.2f}",
+                verify=(cyl, cyl_o),
+            )
+        else:
+            await distance_driver(  # one sandwich pitch off the previous gear
+                adapter,
+                named_ref(f"Front Plane@{cyl}", "PLANE"),
+                named_ref(f"Front Plane@{prev_cyl}", "PLANE"),
+                Z_PITCH,
+                label=f"cylinder-gear {j} axial pitch d={Z_PITCH:.2f}",
+                verify=(cyl, cyl_o),
+            )
         teeth, cg = cone_gears[j]
         await gear_mate(
             adapter,
@@ -607,6 +781,7 @@ async def build(adapter) -> dict[str, str]:
             named_ref(f"Axis2@{cyl}", "AXIS"),
             [teeth, 120], label=f"cone T{teeth:03d}:cyl120 ch{j:02d}",
         )
+        prev_cyl = cyl
 
     # DRIVER #1 (the single machine input): the crank angle. The arm hangs at
     # bottom-dead-centre (straight down, ch30), which is a kinematic SINGULARITY
@@ -625,16 +800,34 @@ async def build(adapter) -> dict[str, str]:
     handle_o = _org(adapter, handle)
     a_arm = component_transform(adapter, arm)
     crank_angle = math.degrees(math.acos(max(-1.0, min(1.0, a_arm[0]))))
-    await angle_driver(
+    crank_park = await angle_driver(
         adapter,
         named_ref(f"Right Plane@{arm}", "PLANE"),
         named_ref("Right Plane", "PLANE"),
         crank_angle,
-        label=f"crank angle driver (#1, BDC a={crank_angle:.2f})",
+        label=f"crank angle PARK driver (reproducibility lock; freed in default "
+              f"build; BDC a={crank_angle:.2f})",
         verify=(handle, handle_o),
     )
+    # Rename the feature to PARK_crank_angle so the tree documents its role and the
+    # DOF gate can discover it. In the default `free` build, suppress it -- leaving
+    # the crank (and the whole keyed/geared train it pins) free to spin: ONE
+    # operational DOF, the working kinematic model. `locked` leaves it engaged for a
+    # fully-defined reproducible snapshot, byte-compatible with the old grounding.
+    park_name = await mark_park_driver(adapter, crank_park, "crank_angle")
+    if not LOCK:
+        from solidworks_mcp.adapters.base import SuppressMateParameters
+        check(
+            f"suppress {park_name} (free the crank spin)",
+            await adapter.suppress_mate(SuppressMateParameters(name=park_name, suppress=True)),
+        )
+        adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
 
-    assert_components_fully_defined(adapter)
+    # Certify the AS-BUILT model. The DOF gate adapts to the mode: free -> closure
+    # proves exactly 1 free DOF (re-engages the park driver -> 0 under-constrained,
+    # then restores the free pose); locked -> strict 0-DOF. Every other check runs on
+    # the as-built model unchanged.
+    await assert_expected_free_dof(adapter, 0 if LOCK else 1)
     check_no_interference(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)
 
