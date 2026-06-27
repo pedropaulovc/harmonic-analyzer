@@ -86,6 +86,7 @@ from _assembly import (
     check_no_interference,
     component_names,
     component_transform,
+    is_locked_build,
 )
 from _common import (  # component iteration helpers (read-only)
     _flag_only,
@@ -583,7 +584,7 @@ def _expected_free_dof(name: str) -> int:
     """
     if name != "drive-train":
         return 0
-    return 0 if _config.machine("build_lock", "drive_train") == "locked" else 1
+    return 0 if is_locked_build(_config.machine("build_lock", "drive_train")) else 1
 
 
 async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:

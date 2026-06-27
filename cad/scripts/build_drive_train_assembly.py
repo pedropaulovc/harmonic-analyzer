@@ -139,6 +139,7 @@ from _assembly import (
     component_transform,
     distance_driver,
     gear_mate,
+    is_locked_build,
     mark_park_driver,
     named_ref,
     parallel_mate,
@@ -154,7 +155,9 @@ ASM_NAME = "drive-train"
 # `locked` engages the park driver for a fully-defined reproducible snapshot.
 # The literal accessor tokenises to machine/build_lock.yaml in the doit/cache
 # digest, so flipping it rebuilds ONLY drive-train and keys the cache correctly.
-LOCK = _config.machine("build_lock", "drive_train") == "locked"
+# `is_locked_build` rejects any value other than `free`/`locked` (a typo'd opt-in
+# must fail loud, not silently build free).
+LOCK = is_locked_build(_config.machine("build_lock", "drive_train"))
 
 Y_BASE_TOP = 50.8  # harmonic-base top face
 Y_DRIVE = Y_BASE_TOP + 76.0  # 126.8: crank, cone big end and arbor axes

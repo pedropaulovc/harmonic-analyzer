@@ -165,6 +165,12 @@ class MockComponent:
 
     def GetConstrainedStatus(self) -> int:
         _sleep(T_CONSTRAINED_STATUS)
+        # Faithful to the park-driver closure: while the crank PARK mate is
+        # SUPPRESSED (the as-built free pose) the train is under-constrained; when
+        # it is engaged the model is fully defined. Fixed (-1) comps never reach
+        # here (IsFixed short-circuits), so non-fixed status tracks the park state.
+        if getattr(self._model, "_park_suppressed", False):
+            return _assembly.UNDER_CONSTRAINED  # 2 -> the free DOF is real
         return _assembly.FULLY_CONSTRAINED  # 3 -> fully defined, gate passes
 
     def GetModelDoc2(self) -> "MockModel":
@@ -197,6 +203,9 @@ class MockModel:
         self._name = name
         self._comps = [MockComponent(f"{name}-{i + 1}", self) for i in range(n_components)]
         self.InterferenceDetectionManager = MockIDM()
+        # Whether the crank PARK mate is currently suppressed (free pose). Set by
+        # open_model for the default-free drive-train; toggled by suppress_mate.
+        self._park_suppressed = False
 
     def ForceRebuild3(self, _quiet: bool) -> bool:
         _sleep(T_REBUILD_PER_COMP * len(self._comps))
@@ -233,6 +242,8 @@ class MockAdapter:
         _sleep(T_OPEN)
         stem = Path(path).stem
         self._current = MockModel(stem, COMPONENT_COUNTS.get(stem, 8))
+        # The default-free drive-train ships with the crank PARK mate suppressed.
+        self._current._park_suppressed = stem == "drive-train"
         return _Result(True)
 
     async def list_configurations(self) -> _Result:
@@ -253,10 +264,12 @@ class MockAdapter:
             ])
         return _Result([])
 
-    async def suppress_mate(self, _params: Any) -> _Result:
-        # The closure re-engages then re-suppresses the park driver; the mock model
-        # is always fully defined, so the inner strict gate passes either way.
+    async def suppress_mate(self, params: Any) -> _Result:
+        # Track the park state so GetConstrainedStatus reflects it: unsuppress
+        # (suppress=False) engages the driver -> fully defined; suppress=True frees
+        # the crank -> under-constrained. The closure cycles both and restores.
         _sleep(T_SUPPRESS_MATE)
+        self.currentModel._park_suppressed = bool(getattr(params, "suppress", True))
         return _Result(True)
 
 
