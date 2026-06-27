@@ -429,6 +429,30 @@ async def coincident_mate(
         verify=verify,
     )
 
+async def parallel_mate(
+    adapter: Any,
+    ref_a: Any,
+    ref_b: Any,
+    *,
+    alignment: str = "closest",
+    label: str = "parallel",
+    verify: tuple[str, list[float]] | None = None,
+) -> Any:
+    """Parallel mate between two planes / faces; pins ONE rotational DOF.
+
+    The distance-free way to pin a leftover rotation (e.g. the immaterial spin of
+    a concentric-/collinear-mated solid of revolution) -- coincident would force
+    the planes flush (an unwanted translation), parallel only kills the spin.
+    """
+    return await _mate(
+        adapter,
+        label,
+        "parallel",
+        [ref_a, ref_b],
+        alignment=alignment,
+        verify=verify,
+    )
+
 async def distance_driver(
     adapter: Any,
     ref_a: Any,
