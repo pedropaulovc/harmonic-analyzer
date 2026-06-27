@@ -124,6 +124,22 @@ async def _probe_sub(adapter: Any, sub: str, probes: list[tuple]) -> list[str]:
     drivers = _drivers_by_family(adapter, adapter.currentModel, sub)
     log(f"{sub}: driver families {[(f, len(n)) for f, n in sorted(drivers.items())]}")
 
+    # The default-free build leaves operational PARK_* drivers (e.g. the crank
+    # angle) SUPPRESSED, so the saved rest pose is NOT 0-DOF. Re-engage every
+    # PARK_* mate first to establish the fully-defined baseline; the per-driver
+    # suppress/measure loop below then proves each one frees its own family.
+    from _assembly import find_park_drivers
+
+    re_engaged = 0
+    for pname, suppressed in await find_park_drivers(adapter):
+        if suppressed:
+            check(f"re-engage park {pname}", await adapter.suppress_mate(
+                SuppressMateParameters(name=pname, suppress=False)))
+            re_engaged += 1
+    if re_engaged:
+        adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
+        log(f"{sub}: re-engaged {re_engaged} suppressed PARK_* driver(s) for the baseline")
+
     base_under = _under(_component_status(adapter))
     log(f"{sub}: {len(base_under)} under-defined components at rest")
     if base_under:
