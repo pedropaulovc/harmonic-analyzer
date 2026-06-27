@@ -48,7 +48,6 @@ from _assembly import (
     coincident_mate,
     component_origin,
     distance_driver,
-    lock_mate,
     named_ref,
     place_component,
     save_assembly_and_images,
@@ -97,6 +96,52 @@ def _assert_counter_spring_hang() -> None:
         f" {rod_top:.2f}, air gap {gap:.2f}")
 
 
+async def _locate_to_datum(adapter, name: str, *, roty90: bool = False,
+                           base: str | None = None) -> None:
+    """Locate a part by three orthogonal plane-distance mates -- the semantic
+    replacement for a fix (#110 idiom). Each plane pair pins one translation
+    and, by forcing the planes parallel, the rotations.
+
+    ``base=None`` mates to the machine datum planes (a free-space grounded part).
+    ``base=<component>`` mates to THAT component's planes instead, rigidly tying
+    this part to the base's (possibly moving) frame -- the semantic replacement
+    for a rigid-ride lock. Because the mates reference two real parts, the motion
+    classifier leaves them as hard mates, not suppressible drivers, so the part
+    rides the base through the motion.
+
+    ``roty90=False`` (IDENTITY parts): same-name pairing (Right->X, Top->Y,
+    Front->Z). ``roty90=True`` (ROT_Y_POS90, e.g. the vertical counter-spring:
+    local X->world -Z, Y->Y, Z->world +X): swapped pairing (Right plane->Front=Z,
+    Top->Y, Front plane->Right=X). Coord 0 degenerates to a coincident.
+    """
+    o = component_origin(adapter, name)
+    ref0 = component_origin(adapter, base) if base else [0.0, 0.0, 0.0]
+    d = [o[i] - ref0[i] for i in range(3)]
+    suffix = f"@{base}" if base else ""
+    if roty90:
+        pairs = (("Right Plane", "Front Plane", d[2], "z"),
+                 ("Top Plane", "Top Plane", d[1], "y"),
+                 ("Front Plane", "Right Plane", d[0], "x"))
+    else:
+        pairs = (("Right Plane", "Right Plane", d[0], "x"),
+                 ("Top Plane", "Top Plane", d[1], "y"),
+                 ("Front Plane", "Front Plane", d[2], "z"))
+    for part_plane, base_plane, coord, axis in pairs:
+        part_ref = named_ref(f"{part_plane}@{name}", "PLANE")
+        base_ref = named_ref(f"{base_plane}{suffix}", "PLANE")
+        if abs(coord) < 1e-6:
+            await coincident_mate(
+                adapter, part_ref, base_ref,
+                label=f"{name} datum {axis}=0 ({part_plane}<->{base_plane}{suffix})",
+                verify=(name, o),
+            )
+            continue
+        await distance_driver(
+            adapter, part_ref, base_ref, abs(coord),
+            label=f"{name} datum {axis} d={abs(coord):.2f}{suffix}", verify=(name, o),
+        )
+
+
 async def build(adapter) -> dict[str, str]:
     _assert_counter_spring_hang()
 
@@ -110,15 +155,19 @@ async def build(adapter) -> dict[str, str]:
     # contact ridge line; the lever's Axis3 (hex ridge) mates coincident to it.
     km = await place_component(adapter, "knife-mount",
                                [KNIFE[0], KNIFE_CONTACT_Y, HEX_Z_MID],
-                               [0.0, 0.0, 0.0], IDENTITY, label="knife-mount (front)")
-    await place_component(adapter, "knife-mount",
-                          [KNIFE[0], KNIFE_CONTACT_Y, -HEX_Z_MID],
-                          [0.0, 0.0, 0.0], IDENTITY, label="knife-mount (back)")
+                               [0.0, 0.0, 0.0], IDENTITY, ground=False,
+                               label="knife-mount (front, seed)")
+    kmb = await place_component(adapter, "knife-mount",
+                                [KNIFE[0], KNIFE_CONTACT_Y, -HEX_Z_MID],
+                                [0.0, 0.0, 0.0], IDENTITY, ground=False,
+                                label="knife-mount (back)")
+    await _locate_to_datum(adapter, kmb)
     # Crossbar band y 1010..1051: 0.5 above the summing-lever tube top
     # (1009.5), ends face-flush on the ring rail inner faces (y to 1040.7),
     # stud pokes 14 above for the nut seat.
-    await place_component(adapter, "top-crossbar", [KNIFE[0], 1010.0, 0.0],
-                          [0.0, 0.0, 0.0], IDENTITY)
+    crossbar = await place_component(adapter, "top-crossbar", [KNIFE[0], 1010.0, 0.0],
+                                     [0.0, 0.0, 0.0], IDENTITY, ground=False)
+    await _locate_to_datum(adapter, crossbar)
     # Summing lever: knife-edge revolute = coincident axis-to-axis on the knife
     # line (the bore-bottom rocking edge) + a Front-plane axial coincident,
     # leaving the rock DOF, pinned by a suppressible spin-snapshot driver via
@@ -155,16 +204,24 @@ async def build(adapter) -> dict[str, str]:
     # physical meaning (the eye), not the rock centre.
     bh = await place_component(adapter, "boss-hook", list(BOSS_HOOK_POS),
                                [0.0, 0.0, 0.0], IDENTITY, ground=False)
-    await lock_mate(adapter, named_ref(f"Axis1@{bh}", "AXIS"),
-                    named_ref(f"Axis2@{sl}", "AXIS"), label="boss-hook keyed")
+    # Rigid ride on the lever via three orthogonal plane mates to the lever's
+    # frame (was a lock). Both parts are IDENTITY-oriented, so the planes pair
+    # straight; the part-to-part references keep them hard mates (not motion
+    # drivers), so the hook rocks WITH the lever about the knife edge exactly as
+    # the lock froze it -- with no fix.
+    await _locate_to_datum(adapter, bh, base=sl)
     # Ry(+90): the end loops land in the YZ plane, encircling the hook arm
-    # (bottom) and the gooseneck pin (top) nail-through-ring style.
-    await place_component(adapter, "counter-spring", list(SPRING_POS),
-                          [0.0, 90.0, 0.0], ROT_Y_POS90)
-    await place_component(adapter, "gooseneck", [COLUMN_X, 1210.0, 0.0],
-                          [0.0, 0.0, 0.0], IDENTITY)
-    await place_component(adapter, "gooseneck-clamp", [COLUMN_X, 1040.7, 0.0],
-                          [0.0, 0.0, 0.0], IDENTITY)
+    # (bottom) and the gooseneck pin (top) nail-through-ring style. Vertical
+    # (ROT_Y_POS90) free-space part -> datum-located (swapped pairing), not fixed.
+    cspring = await place_component(adapter, "counter-spring", list(SPRING_POS),
+                                    [0.0, 90.0, 0.0], ROT_Y_POS90, ground=False)
+    await _locate_to_datum(adapter, cspring, roty90=True)
+    gn = await place_component(adapter, "gooseneck", [COLUMN_X, 1210.0, 0.0],
+                               [0.0, 0.0, 0.0], IDENTITY, ground=False)
+    await _locate_to_datum(adapter, gn)
+    gnc = await place_component(adapter, "gooseneck-clamp", [COLUMN_X, 1040.7, 0.0],
+                               [0.0, 0.0, 0.0], IDENTITY, ground=False)
+    await _locate_to_datum(adapter, gnc)
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)
