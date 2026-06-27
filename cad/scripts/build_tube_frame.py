@@ -131,6 +131,22 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven annulus column (equations neutral)", v_annulus, 0.001 * v_annulus)
 
+    # TopEnd datum: a reference plane on the column's TOP END face (Y = ColumnLength
+    # above the Top Plane / foot). frame.SLDASM mates the top-frame's RingTop datum
+    # COINCIDENT to it so the ring caps the columns at the physical flush joint
+    # (column top flush with ring top) -- not a measured distance from the base.
+    from solidworks_mcp.adapters.base import CreatePlaneParameters
+
+    check(
+        "create_plane TopEnd (Top Plane, +ColumnLength)",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Top Plane", offset=COLUMN_LENGTH
+            )
+        ),
+    )
+    name_last_feature(adapter, "TopEnd")
+
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)  # ch30 plates: see _common palette
 
