@@ -71,9 +71,9 @@ from _assembly import (
     coincident_mate,
     component_named_ref,
     component_origin,
+    component_transform,
     distance_driver,
     is_locked_build,
-    lock_mate,
     named_ref,
     place_component,
     save_assembly_and_images,
@@ -240,6 +240,65 @@ _WIRE_RIGHT_ANGLE = math.degrees(math.acos(min(1.0, abs(_HW_ROWS[0][0]))))
 PINCH_SCREW_Z = -88.0
 
 
+def _plane_normals_and_origin(adapter, name: str):
+    """World normals of a component's (Right, Top, Front) planes + its origin
+    (mm). Transform2 is row-major (`world = local.R`), so the world image of
+    local axis i -- and hence the world normal of the plane whose local normal
+    is that axis -- is row i."""
+    a = component_transform(adapter, name)
+    rows = [(a[0], a[1], a[2]), (a[3], a[4], a[5]), (a[6], a[7], a[8])]
+    org = [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
+    return rows, org
+
+
+async def _locate_to_datum(adapter, name: str, *, base: str | None = None) -> None:
+    """Locate a part by three orthogonal plane-distance mates -- the semantic
+    replacement for a fix (#110 idiom) or a rigid-ride lock. Each plane pair
+    pins one translation and, by forcing the planes parallel, the rotations.
+
+    Orientation-agnostic: each of the part's three principal planes is paired to
+    the base plane whose world normal is most parallel, and the perpendicular
+    distance is the origin offset projected onto that normal. So it handles ANY
+    part rotation (IDENTITY, ROT_Y_POS90, rot_z(+-90), ROT_X_NEG90, ...) without
+    a per-orientation pairing table.
+
+    ``base=None`` mates to the machine datum planes (a free-space grounded part).
+    ``base=<component>`` mates to THAT component's planes, rigidly tying this part
+    to the base's (possibly moving) frame -- a lock replacement. Because the
+    mates reference two real parts they stay hard mates, not suppressible motion
+    drivers, so the part rides the base through the motion. The base must be
+    axis-aligned-enough at build time for the three pairings to be distinct
+    (true for every base here: levers/clamps sit at their built rest pose).
+    """
+    planes = ("Right Plane", "Top Plane", "Front Plane")
+    part_n, o = _plane_normals_and_origin(adapter, name)
+    if base is not None:
+        base_n, ref0 = _plane_normals_and_origin(adapter, base)
+    else:
+        base_n = [(1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)]
+        ref0 = [0.0, 0.0, 0.0]
+    delta = [o[i] - ref0[i] for i in range(3)]
+    suffix = f"@{base}" if base is not None else ""
+    used: set[int] = set()
+    for li, part_plane in enumerate(planes):
+        n = part_n[li]
+        bi = max((j for j in range(3) if j not in used),
+                 key=lambda j: abs(sum(n[k] * base_n[j][k] for k in range(3))))
+        used.add(bi)
+        bn = base_n[bi]
+        coord = sum(delta[k] * bn[k] for k in range(3))  # signed perp distance
+        part_ref = named_ref(f"{part_plane}@{name}", "PLANE")
+        base_ref = named_ref(f"{planes[bi]}{suffix}", "PLANE")
+        tag = f"{part_plane.split()[0]}->{planes[bi].split()[0]}{suffix}"
+        if abs(coord) < 1e-6:
+            await coincident_mate(adapter, part_ref, base_ref,
+                                  label=f"{name} datum {tag}=0", verify=(name, o))
+            continue
+        await distance_driver(adapter, part_ref, base_ref, abs(coord),
+                              label=f"{name} datum {tag} d={abs(coord):.2f}",
+                              verify=(name, o))
+
+
 async def build(adapter) -> dict[str, str]:
     # `free` (default) DEFERS the freed-DOF park driver (records, does not
     # author); `locked` authors it engaged. Set before the *_driver call below.
@@ -252,9 +311,12 @@ async def build(adapter) -> dict[str, str]:
     # ~1.6 deg knife rock), not a mate. The lever pivots about the summing
     # bar's knife-edge ridge (see the knife-pivot block above); the rock park
     # driver uses the Top-plane angle (Y-normal, mirror-invariant -> no flip).
+    # Seed: NOT explicitly grounded -- SolidWorks auto-fixes the first-inserted
+    # component, so an explicit fix would be redundant (#110 idiom).
     await place_component(adapter, "magnifying-bracket",
                           [-40.0, LEVER_ROD_Y, LEVER_ROD_Z],
-                          [0.0, 0.0, 0.0], IDENTITY)
+                          [0.0, 0.0, 0.0], IDENTITY, ground=False,
+                          label="magnifying-bracket (seed)")
     ml = await place_component(adapter, "magnifying-lever",
                                [LEVER_X0, LEVER_ROD_Y, LEVER_ROD_Z],
                                [0.0, 0.0, 0.0], IDENTITY, ground=False)
@@ -291,48 +353,45 @@ async def build(adapter) -> dict[str, str]:
     # Ry(+90): the clamp's lever bore (local Z) turns onto the rod axis (X).
     clamp = await place_component(adapter, "magnifying-clamp", list(CLAMP_POS),
                                   [0.0, 90.0, 0.0], ROT_Y_POS90, ground=False)
-    await lock_mate(adapter, named_ref(f"Front Plane@{clamp}", "PLANE"),
-                    named_ref(f"Front Plane@{ml}", "PLANE"),
-                    label="mag-clamp locked to lever")
+    await _locate_to_datum(adapter, clamp, base=ml)
     # Backed-out thumb screw: shank tip tangent to the rod top (a seated
     # screw would overlap the rod it pinches -- see module docstring).
     tscrew = await place_component(adapter, "thumb-screw",
                                    [CLAMP_X, LEVER_ROD_Y + 3.0 + 12.0 + 5.0, LEVER_ROD_Z],
                                    [0.0, 0.0, -90.0], rot_z_rows(-90.0), ground=False,
                                    label="thumb-screw (clamp)")
-    await lock_mate(adapter, named_ref(f"Front Plane@{tscrew}", "PLANE"),
-                    named_ref(f"Front Plane@{clamp}", "PLANE"),
-                    label="thumb-screw locked to clamp")
+    await _locate_to_datum(adapter, tscrew, base=clamp)
     vrod = await place_component(adapter, "magnifying-vertical-rod",
                                  [CLAMP_X, VROD_TOP_Y, VROD_Z],
                                  [0.0, 0.0, -90.0], rot_z_rows(-90.0), ground=False)
-    await lock_mate(adapter, named_ref(f"Front Plane@{vrod}", "PLANE"),
-                    named_ref(f"Front Plane@{clamp}", "PLANE"),
-                    label="vertical-rod locked to clamp")
+    await _locate_to_datum(adapter, vrod, base=clamp)
     fixture = await place_component(adapter, "output-fixture",
                                     [CLAMP_X, FIXTURE_Y0, VROD_Z],
                                     [0.0, 0.0, 0.0], IDENTITY, ground=False)
-    await lock_mate(adapter, named_ref(f"Front Plane@{fixture}", "PLANE"),
-                    named_ref(f"Front Plane@{vrod}", "PLANE"),
-                    label="output-fixture locked to vertical-rod")
+    await _locate_to_datum(adapter, fixture, base=vrod)
 
     # --- wheel bar + clamp ---------------------------------------------------
     # Magnifying-wheel bar: HALF-width (every ch30 plate shows it clamped
     # at ONE column with a free end just past the pen hanger -- M6.8
     # 8-view pass). Span -192..+8 covers the axle (-53) and the hanger
     # strap top (-19..-3).
-    await place_component(adapter, "wheel-bar", [WHEEL_BAR_X0, WHEEL_BAR_Y, BAR_Z],
-                          [0.0, 0.0, 0.0], IDENTITY)
-    await place_component(adapter, "column-clamp", [-COLUMN_X, WHEEL_BAR_Y, COLUMN_Z],
-                          [0.0, 90.0, 0.0], ROT_Y_POS90,
-                          label=f"column-clamp (wheel x{-COLUMN_X:.0f})")
+    wheel_bar = await place_component(adapter, "wheel-bar",
+                                      [WHEEL_BAR_X0, WHEEL_BAR_Y, BAR_Z],
+                                      [0.0, 0.0, 0.0], IDENTITY, ground=False)
+    await _locate_to_datum(adapter, wheel_bar)
+    col_clamp = await place_component(adapter, "column-clamp",
+                                      [-COLUMN_X, WHEEL_BAR_Y, COLUMN_Z],
+                                      [0.0, 90.0, 0.0], ROT_Y_POS90, ground=False,
+                                      label=f"column-clamp (wheel x{-COLUMN_X:.0f})")
+    await _locate_to_datum(adapter, col_clamp)
 
     # --- magnifying wheel ----------------------------------------------------
     # Rx(-90): the axle's +Y axis points -Z (flange on the bar front face).
     # The axle is structure (fixed); the wheel spins on its stud (revolute).
     ax = await place_component(adapter, "wheel-axle",
                                [WHEEL_X, WHEEL_BAR_Y, BAR_FRONT_Z],
-                               [-90.0, 0.0, 0.0], ROT_X_NEG90)
+                               [-90.0, 0.0, 0.0], ROT_X_NEG90, ground=False)
+    await _locate_to_datum(adapter, ax)
     wh = await place_component(adapter, "magnifying-wheel",
                                [WHEEL_X, WHEEL_BAR_Y, WHEEL_MID_Z], [0.0, 0.0, 0.0],
                                IDENTITY, ground=False)
@@ -403,10 +462,11 @@ async def build(adapter) -> dict[str, str]:
     assert_component_placed(adapter, wh, wh_pos, wh_rows)
 
     # --- fastener (M6.10) ----------------------------------------------------
-    await place_component(adapter, "pinch-screw",
-                          [-COLUMN_X, WHEEL_BAR_Y, PINCH_SCREW_Z],
-                          [0.0, 0.0, 0.0], IDENTITY,
-                          label=f"pinch-screw (wheel clamp x{-COLUMN_X:.0f})")
+    pinch = await place_component(adapter, "pinch-screw",
+                                  [-COLUMN_X, WHEEL_BAR_Y, PINCH_SCREW_Z],
+                                  [0.0, 0.0, 0.0], IDENTITY, ground=False,
+                                  label=f"pinch-screw (wheel clamp x{-COLUMN_X:.0f})")
+    await _locate_to_datum(adapter, pinch)
 
     # Certify the AS-BUILT model. free -> necessity only (the freed lever DOF is
     # genuinely free, and the yoke-coupled wheel must read under-constrained WITH
