@@ -68,6 +68,20 @@ def _install_solidworks_stub() -> None:
         sti.flag_methods = lambda obj, iface: None  # type: ignore[attr-defined]
         sys.modules[sti_name] = sti
         sys.modules["solidworks_mcp.adapters"].sw_type_info = sti  # type: ignore[attr-defined]
+    # The free-DOF closure gate does `from solidworks_mcp.adapters.base import
+    # SuppressMateParameters` at runtime; the mock's suppress_mate ignores the
+    # params object, so a permissive kwargs holder is enough to satisfy the import.
+    base_name = "solidworks_mcp.adapters.base"
+    if base_name not in sys.modules:
+        base = types.ModuleType(base_name)
+
+        class _Params:  # accepts any kwargs (name=..., suppress=...)
+            def __init__(self, **kw: Any) -> None:
+                self.__dict__.update(kw)
+
+        base.SuppressMateParameters = _Params  # type: ignore[attr-defined]
+        sys.modules[base_name] = base
+        sys.modules["solidworks_mcp.adapters"].base = base  # type: ignore[attr-defined]
 
 
 _install_solidworks_stub()
@@ -99,6 +113,8 @@ T_GEAR_LINKS_OTHER = 0.15
 T_TOOLS_INTERFERENCE = 0.3
 T_GET_INTERFERENCES = 0.7
 T_WHATS_WRONG = 0.03           # per target, the leaf that used to flood the trace
+T_LIST_MATES = 0.2             # MateGroup walk for the PARK_* free-DOF closure
+T_SUPPRESS_MATE = 0.1          # one suppress/unsuppress toggle
 
 
 def _sleep(seconds: float) -> None:
@@ -225,6 +241,22 @@ class MockAdapter:
 
     async def set_active_configuration(self, _cfg: str) -> _Result:
         _sleep(T_ACTIVATE)
+        return _Result(True)
+
+    async def list_mates(self) -> _Result:
+        # drive-train's default-free build leaves the crank PARK driver SUPPRESSED
+        # (1 free DOF); other assemblies have no PARK_* mates (strict 0-DOF path).
+        _sleep(T_LIST_MATES)
+        if self.currentModel._name == "drive-train":
+            return _Result([
+                {"name": "PARK_crank_angle", "type": "MateAngleDim", "suppressed": True}
+            ])
+        return _Result([])
+
+    async def suppress_mate(self, _params: Any) -> _Result:
+        # The closure re-engages then re-suppresses the park driver; the mock model
+        # is always fully defined, so the inner strict gate passes either way.
+        _sleep(T_SUPPRESS_MATE)
         return _Result(True)
 
 

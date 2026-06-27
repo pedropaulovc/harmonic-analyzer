@@ -228,12 +228,49 @@ motion/truth and the `all` aggregate are gone.
 
 `soundness` opens EVERY built (sub)assembly standalone and runs the shared health
 battery on each (DOF / over-constrained / model-healthy-deep / interference /
-gear-ratios / component-count). `subsystems` runs ONLY the subsystem-SPECIFIC gate
+gear-ratios / component-count). The **DOF gate adapts to how the model was built**
+(see "Default-free DOF" below): an assembly with an expected free operational DOF
+(today only drive-train, when built `free`) is checked by the **park-driver closure**
+— assert exactly the expected number of `PARK_*` mates are suppressed, re-engage them,
+confirm the model goes fully defined (0 under-constrained), then restore the free pose
+— instead of the strict "every component fully defined". Every assembly with nothing
+parked-free (the default for all others, and drive-train built `locked`) gets the
+strict 0-DOF check, unchanged. All NON-DOF gates always run on the as-built model.
+`subsystems` runs ONLY the subsystem-SPECIFIC gate
 soundness doesn't — currently just the `channel` assembly's 20-way moving-stem
 instance independence — so it opens only `channel`. (It used to re-open all 8 and
 repeat the whole battery, ~95% duplicate COM work and the biggest spine time sink;
 see `memory/release-perf-incremental.md`.) soundness runs first on the COM spine, so
 the shared battery is always proven before subsystems.
+
+## Default-free DOF (operational kinematics)
+
+The default build saves a **working kinematic model**, NOT a frozen one: the
+predetermined operational DOF are left FREE. Today that is drive-train's **crank
+spin** — drag the crank in the saved `.SLDASM` and the whole geared train turns
+(1 DOF). The cone-post swing and channel amplitude bars stay park-driven at their
+engaged pose (setup/disengage motions, exercised by the motion/mobility suites).
+
+The mechanism is **author-but-suppress**. Every reproducibility-locking mate is
+still authored exactly as before, its feature renamed to `PARK_<key>` (e.g.
+`PARK_crank_angle`) so the tree documents the role and the DOF gate can find it
+(`_assembly.PARK_PREFIX`, `mark_park_driver`, `find_park_drivers`). In the default
+build the `PARK_*` mate is **suppressed** (pins nothing → the DOF is free); a
+`locked` build leaves it **engaged** (today's fully-defined, byte-reproducible
+snapshot — an explicit opt-in for a pinned export).
+
+Per-assembly mode lives in `cad/config/machine/build_lock.yaml`, read as a literal
+`_config.machine("build_lock", "<stem>")` so it tokenises into that assembly's doit
+`file_dep` + remote-cache digest: flipping `free`↔`locked` rebuilds ONLY that
+assembly and keys the cache to a distinct artefact. The flag is the CONFIG value
+(in the digest), never an env var (which would collide free/locked under one key).
+Release/export inherit the configured mode — no force-lock.
+
+There is **no scalar DOF API** in SolidWorks COM. "Exactly N free DOF" is proven by
+the park-driver closure check (`assert_expected_free_dof`) and, end-to-end, by
+`build_mobility_probe.py`, which re-engages all `PARK_*` for its 0-DOF baseline then
+suppresses each driver to show it frees its own part family. See
+`memory/default-free-dof-park-drivers.md`.
 
 ## Stamps & incrementality
 
