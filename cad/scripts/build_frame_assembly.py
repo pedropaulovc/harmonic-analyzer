@@ -46,18 +46,20 @@ depth):
   west rail seats the top-lever ball mounts (channel.SLDASM).
 * nameplate x1: the maker's plate (book ch. 26), laid FLAT on the base top
   face on the EAST (+X) side, decorated side up, centred front-back between the
-  two east columns and read by an operator at that face. Cosmetic, so it is
-  grounded at its measured transform (see NAMEPLATE_POS).
+  two east columns and read by an operator at that face. Cosmetic; constrained
+  at its measured transform by three orthogonal plane mates (see NAMEPLATE_POS).
 
 Hold-down: four 9/16-12 lag screws come up through the base into the support
 foot's tapped holes. The base was re-drilled to the foot's pattern (4 holes at
 local X +/-60.32, Z +/-17.46 -> machine x 55.44/90.36, z +/-60.32; see
 build_harmonic_base.py HOLE_XZ) with O23 head counterbores on its underside, and
-the lag screws (build_lag_screw.py, resized to the 9/16-12 foot tap) are grounded
-coaxial with each. The screws do NOT constrain the support -- three orthogonal
-mates already fully constrain it (one pivot-x distance mate + two flip-free
-coincident mates: the z-centring symmetry planes and the FootSeat<->DeckTop datum
-seat) -- they are structure, grounded like the columns.
+the lag screws (build_lag_screw.py, resized to the 9/16-12 foot tap) are
+CONSTRAINED coaxial with each (concentric to the hole axis + a head-seat
+coincident + a spin pin). The screws do NOT constrain the support -- three
+orthogonal mates already fully constrain it (one pivot-x distance mate + two
+flip-free coincident mates: the z-centring symmetry planes and the
+FootSeat<->DeckTop datum seat) -- they are structure, constrained by their own
+contacts like the columns.
 
 Every component is fixed (base) or fully defined by three orthogonal mates
 against the base part; distance-mate flips are caught by reading back
@@ -92,6 +94,7 @@ from _assembly import (
     check_no_interference,
     coincident_mate,
     named_ref,
+    parallel_mate,
     place_component,
     plane_distance_mate,
     save_assembly_and_images,
@@ -119,8 +122,9 @@ SUPPORT_SEAT_Y = BASE_TOP_Y + 88.9  # 139.7: rocker-arm-support's origin is
 SUPPORT_EULER = [0.0, 90.0, 0.0]
 SUPPORT_ROWS = ROT_Y_POS90
 
-# Rocker-support hold-down: four 9/16-12 lag screws (build_lag_screw.py) grounded
-# coaxial with the support foot's tapped holes and the base clearance holes. The
+# Rocker-support hold-down: four 9/16-12 lag screws (build_lag_screw.py)
+# constrained coaxial with the base clearance holes (and the support foot's tapped
+# holes above them) by concentric + seat mates -- see build(). The
 # stations are the foot's tapped pattern in the machine frame: local X +/-60.32,
 # Z +/-17.46 turned +90deg about Y -> machine x 72.9 -/+ 17.46 = 55.44/90.36,
 # z +/-60.32 (these ARE the base HOLE_XZ machine positions). The screw is authored
@@ -128,7 +132,7 @@ SUPPORT_ROWS = ROT_Y_POS90
 # head plane: machine y 6.5 (the base underside counterbore depth) sets the O22
 # head recessed in the base underside, the O12 shank rising through the base into
 # the O12.30 tapped foot hole. mirror=False (exact machine transform, like the
-# support); grounded like the channel ball mounts.
+# support); constrained by concentric + seat + spin-pin mates (see build()).
 LAG_SCREW_XZ = ((55.44, 60.32), (55.44, -60.32), (90.36, 60.32), (90.36, -60.32))
 LAG_SCREW_UNDER_HEAD_Y = 6.5
 
@@ -188,6 +192,7 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError("base component was not auto-fixed")
 
     # Columns at the four top-plate corners.
+    column_names: list[str] = []
     for sx, sz in ((1, 1), (-1, 1), (1, -1), (-1, -1)):
         target = [sx * COLUMN_X, BASE_TOP_Y, sz * COLUMN_Z]
         res = await adapter.insert_component(
@@ -195,14 +200,24 @@ async def build(adapter) -> dict[str, str]:
         )
         check(f"insert_component tube-frame @ {target}", res)
         name = res.data["name"]
+        column_names.append(name)
         await plane_distance_mate(
             adapter, name, "Right Plane", "Right Plane", base_name, COLUMN_X, target
         )
         await plane_distance_mate(
             adapter, name, "Front Plane", "Front Plane", base_name, COLUMN_Z, target
         )
-        await plane_distance_mate(
-            adapter, name, "Top Plane", "Top Plane", base_name, BASE_TOP_Y, target
+        # Foot seat: the column stands ON the base top -- a physical contact, so
+        # coincident its foot (the column's Top Plane: it extrudes UPWARD from there,
+        # so that default plane sits at the foot) to the base DeckTop datum, not a
+        # measured distance. The Right/Front mates above are genuine free-space
+        # corner offsets (the column touches nothing laterally), so they stay distance.
+        await coincident_mate(
+            adapter,
+            named_ref(f"Top Plane@{name}", "PLANE"),
+            named_ref(f"DeckTop@{base_name}", "PLANE"),
+            label=f"column {name} foot seats on base top (Top Plane <-> DeckTop)",
+            verify=(name, target),
         )
         assert_component_placed(adapter, name, target, IDENTITY)
 
@@ -239,7 +254,6 @@ async def build(adapter) -> dict[str, str]:
         support_target,
         SUPPORT_EULER,
         SUPPORT_ROWS,
-        ground=False,
         mirror=False,
         label="rocker-arm-support",
     )
@@ -286,17 +300,53 @@ async def build(adapter) -> dict[str, str]:
     # its O22 head recessed in the base underside counterbore -- into the O12.30
     # tapped foot hole. Authored head-down (IDENTITY), mirror=False (exact machine
     # transform), grounded like the channel ball mounts.
-    for bx, bz in LAG_SCREW_XZ:
-        await place_component(
+    # Each screw is CONSTRAINED (not grounded) by its two physical contacts plus a
+    # spin pin -- no distance mate:
+    #   coincident  ScrewAxis@screw <-> HoleAxis{i}@base  collinear axes => coaxial
+    #               in the bore (concentric is for cylindrical FACES; two reference
+    #               AXES take a coincident/collinear mate, which AddMate5 rejects as
+    #               a concentric)
+    #   coincident  Top Plane@screw <-> CboreSeat@base     under-head on the cbore
+    #                                                       shoulder (the axial stop)
+    # The screw is a solid of revolution, so those two leave its spin free; SW still
+    # counts that as a DOF, so a single PARALLEL of the screw's Right plane to the
+    # base's pins the (physically immaterial) spin -- the one non-contact mate, and
+    # still distance-free. Each is satisfied at the on-solution insert pose, so it
+    # locks without moving; the readback assert confirms the screw did not jump.
+    # LAG_SCREW_XZ is in HOLE_XZ order, so screw i mates to HoleAxis{i}.
+    for i, (bx, bz) in enumerate(LAG_SCREW_XZ):
+        screw_target = [bx, LAG_SCREW_UNDER_HEAD_Y, bz]
+        screw_name = await place_component(
             adapter,
             "lag-screw",
-            [bx, LAG_SCREW_UNDER_HEAD_Y, bz],
+            screw_target,
             [0.0, 0.0, 0.0],
             IDENTITY,
-            ground=True,
             mirror=False,
             label=f"lag-screw hold-down ({bx:.2f}, {bz:+.2f})",
         )
+        await coincident_mate(
+            adapter,
+            named_ref(f"ScrewAxis@{screw_name}", "AXIS"),
+            named_ref(f"HoleAxis{i}@{base_name}", "AXIS"),
+            label=f"lag-screw {i} coaxial with base hole {i} (collinear axes)",
+            verify=(screw_name, screw_target),
+        )
+        await coincident_mate(
+            adapter,
+            named_ref(f"Top Plane@{screw_name}", "PLANE"),
+            named_ref(f"CboreSeat@{base_name}", "PLANE"),
+            label=f"lag-screw {i} under-head seats on counterbore shoulder",
+            verify=(screw_name, screw_target),
+        )
+        await parallel_mate(
+            adapter,
+            named_ref(f"Right Plane@{screw_name}", "PLANE"),
+            named_ref(f"Right Plane@{base_name}", "PLANE"),
+            label=f"lag-screw {i} anti-spin (immaterial; revolve symmetry)",
+            verify=(screw_name, screw_target),
+        )
+        assert_component_placed(adapter, screw_name, screw_target, IDENTITY)
 
     # Top-frame ring clamped around the four columns, mid-plane y 1020.2.
     target = [0.0, TOP_FRAME_MID_Y, 0.0]
@@ -311,24 +361,65 @@ async def build(adapter) -> dict[str, str]:
     await plane_distance_mate(
         adapter, name, "Front Plane", "Front Plane", base_name, 0.0, target
     )
-    await plane_distance_mate(
-        adapter, name, "Top Plane", "Top Plane", base_name, TOP_FRAME_MID_Y, target
+    # Vertical seat: the ring CAPS the columns -- its top face is flush with the
+    # column top ends (docstring: column tops flush with the ring top at 1040.7).
+    # Express that physical joint as a COINCIDENT of the ring's RingTop datum to a
+    # column's TopEnd datum, NOT a measured distance from the base. One column pins
+    # the ring's Y; the two d=0 plane mates above already pin x/z and keep it level.
+    await coincident_mate(
+        adapter,
+        named_ref(f"RingTop@{name}", "PLANE"),
+        named_ref(f"TopEnd@{column_names[0]}", "PLANE"),
+        label="top-frame caps columns (ring top flush with column top end)",
+        verify=(name, target),
     )
     assert_component_placed(adapter, name, target, IDENTITY)
 
     # Maker's nameplate: laid flat on the base top, decorated face up, on the EAST
     # face, centred front-back between the two east columns (see NAMEPLATE_POS /
-    # NAMEPLATE_ROWS). Cosmetic + rigid -> grounded.
-    await place_component(
+    # NAMEPLATE_ROWS). Cosmetic + rigid -> constrained by datum mates (below).
+    nameplate_name = await place_component(
         adapter,
         "nameplate",
         NAMEPLATE_POS,
         NAMEPLATE_EULER,
         NAMEPLATE_ROWS,
-        ground=True,
         mirror=False,  # single handed part: NAMEPLATE_POS is the exact transform
         label="nameplate",
     )
+    # CONSTRAINED (not grounded) by its physical seating plus one free-space offset:
+    #   coincident  Underside@plate <-> DeckTop@base    plate rests on the base top
+    #                                                    (defines y + both tilts)
+    #   coincident  MidLength@plate <-> Front Plane@base 100 mm line centres on z 0
+    #                                                    (defines the front-back z)
+    #   distance    Top Plane@plate <-> Right Plane@base east-west placement, x =
+    #                                                    214.25 -- a genuine free-
+    #                                                    space offset (the plate
+    #                                                    touches nothing east-west),
+    #                                                    so a distance mate IS the
+    #                                                    strictly-necessary knob here
+    # Same shape as the rocker-arm-support: two coincident datum seats + one
+    # unavoidable distance. The plate's Top plane normal (local Y) maps to machine
+    # -X, so seed flip=True to land the offset on the near side in one solve.
+    await coincident_mate(
+        adapter,
+        named_ref(f"Underside@{nameplate_name}", "PLANE"),
+        named_ref(f"DeckTop@{base_name}", "PLANE"),
+        label="nameplate rests flat on base top (Underside <-> DeckTop)",
+        verify=(nameplate_name, NAMEPLATE_POS),
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"MidLength@{nameplate_name}", "PLANE"),
+        named_ref(f"Front Plane@{base_name}", "PLANE"),
+        label="nameplate length centres on base z-axis (MidLength <-> Front)",
+        verify=(nameplate_name, NAMEPLATE_POS),
+    )
+    await plane_distance_mate(
+        adapter, nameplate_name, "Top Plane", "Right Plane", base_name,
+        NAMEPLATE_POS[0], NAMEPLATE_POS, flip=True,
+    )
+    assert_component_placed(adapter, nameplate_name, NAMEPLATE_POS, NAMEPLATE_ROWS)
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)

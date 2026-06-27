@@ -350,6 +350,41 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven nameplate (equations neutral)", final_volume, 1e-3 * final_volume
     )
 
+    # Assembly datums -- frame.SLDASM seats the plate flat on the base distance-free:
+    #  * Underside: the plate's BACK face. The body extrudes -Z (reverse_direction)
+    #    so it occupies z in [-PlateThickness, 0]; the back/contact face is at
+    #    z = -PlateThickness, an offset from the Front plane along its -Z normal.
+    #    Mated COINCIDENT to the base DeckTop so the plate physically rests on the
+    #    base top (defines the up-axis + both tilts).
+    #  * MidLength: the plate's mid-plane along its 100 mm length (local x = w/2),
+    #    offset from the Right plane. Mated COINCIDENT to the base Front plane so the
+    #    100 mm line centres on the base z-axis (defines the front-back position).
+    # Only the east-west placement is then a single free-space distance mate.
+    from solidworks_mcp.adapters.base import CreatePlaneParameters
+
+    check(
+        "create_plane Underside (Front Plane, -thickness)",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset",
+                base_plane="Front Plane",
+                offset=-PLATE_THICKNESS,
+            )
+        ),
+    )
+    name_last_feature(adapter, "Underside")
+    check(
+        "create_plane MidLength (Right Plane, +width/2)",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset",
+                base_plane="Right Plane",
+                offset=PLATE_WIDTH / 2.0,
+            )
+        ),
+    )
+    name_last_feature(adapter, "MidLength")
+
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
