@@ -1506,6 +1506,52 @@ async def name_bore_axis(
     ).name
 
 
+async def name_ref_plane(
+    adapter: Any,
+    base_plane: str,
+    offset: float,
+    name: str,
+    drive: str | None = None,
+    drive_jobs: list[tuple[str, str]] | None = None,
+) -> str:
+    """Create an offset reference plane and give it a stable, SEMANTIC name.
+
+    ``create_plane`` only auto-names its feature (``Plane1``/``Plane2`` …), which
+    is order-dependent and opaque; this renames it to ``name`` so assembly mates
+    can select it as ``named_ref("<name>@<comp>", "PLANE")`` regardless of how
+    many other planes the part owns (mirrors :func:`name_bore_axis` for axes).
+    ``offset`` is millimetres from ``base_plane`` (a principal plane or planar
+    face); a signed offset places the plane on either side.
+
+    ``drive``/``drive_jobs`` optionally tie the plane's distance dim to an
+    equation so a GUI edit of the driving globals moves the datum (same deferred
+    drive-batch convention as :func:`name_bore_axis` / ``_cut_tick``); the dim is
+    appended as ``D1@<name>`` AFTER the rename so the qualifier matches.
+
+    Returns the assigned ``name``.
+    """
+    from solidworks_mcp.adapters.base import (
+        CreatePlaneParameters,
+        RenameFeatureParameters,
+    )
+
+    auto = check(
+        f"plane {name} ({base_plane} + {offset:g})",
+        await adapter.create_plane(
+            CreatePlaneParameters(mode="offset", base_plane=base_plane, offset=offset)
+        ),
+    ).name
+    check(
+        f"rename {auto} -> {name}",
+        await adapter.rename_feature(
+            RenameFeatureParameters(old_name=auto, new_name=name)
+        ),
+    )
+    if drive is not None and drive_jobs is not None:
+        drive_jobs.append((f"D1@{name}", drive))
+    return name
+
+
 
 
 
