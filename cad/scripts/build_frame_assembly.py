@@ -384,6 +384,10 @@ async def build(adapter) -> dict[str, str]:
         NAMEPLATE_POS,
         NAMEPLATE_EULER,
         NAMEPLATE_ROWS,
+        ground=False,  # constrained by the three datum mates below, NOT grounded:
+                       # a redundant fix on top of them over-defines the 3rd mate on
+                       # a cold re-mate (AddMate5 rejects it). Same as every other
+                       # frame part -- mate-defined, no fix.
         mirror=False,  # single handed part: NAMEPLATE_POS is the exact transform
         label="nameplate",
     )
