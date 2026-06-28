@@ -85,6 +85,18 @@ discovered during harmonic-analyzer M6.4:
 - **`check_no_interference` raises on EVERY returned pair**, including
   0.00 mm³ slivers (TreatCoincidenceAsInterference=False already
   filters true tangency), so design ≥0.25 mm margins, not 0.1.
+- **A `concentric` mate on two named reference AXES fails** with
+  `AddMate5 failed: unknown error` — concentric wants a cylindrical FACE/
+  circular edge, not a reference axis. To make two parts COAXIAL via the
+  named-axis idiom (`name_bore_axis` → `Axis<N>@<comp>`), the mate is a
+  **`coincident` between the two axes** (collinear = coaxial), exactly as
+  drive-train's `_key_to_shaft`/`_seat_on_crank` and summing's
+  `_coaxial_seat` do (#114). Reserve `concentric` for when you actually
+  hold a cylindrical-face ref (`bore_axis_ref` by point) — and avoid that
+  for occluded/internal bore walls (view-dependent point selection, see
+  the `name_bore_axis` docstring). Burned one build cycle assuming the
+  user's word "concentric" meant the mate TYPE; on reference axes it's
+  `coincident`.
 - **Sketch inference snaps small offsets to the origin/axes silently**:
   a rectangle corner 0.75 mm off the origin snapped back to 0 with
   inference on, rebuilding the untrimmed shape with NO error (caught
