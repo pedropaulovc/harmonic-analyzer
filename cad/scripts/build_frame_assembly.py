@@ -254,6 +254,10 @@ async def build(adapter) -> dict[str, str]:
         support_target,
         SUPPORT_EULER,
         SUPPORT_ROWS,
+        ground=False,  # defined by the three mates below (pivot-x distance + foot
+                       # seat + z-centre), NOT grounded: a redundant fix on top of
+                       # them over-defines on a cold re-mate, exactly like the
+                       # nameplate did. Same idiom as every other frame part.
         mirror=False,
         label="rocker-arm-support",
     )
@@ -293,13 +297,13 @@ async def build(adapter) -> dict[str, str]:
     )
     assert_component_placed(adapter, support_name, support_target, SUPPORT_ROWS)
 
-    # Hold-down: four 9/16-12 lag screws grounded coaxial with the support foot's
-    # tapped holes (and the base clearance holes below them). The support's three
-    # mates seat its foot exactly on the base top at the derived machine stations,
-    # so a grounded screw at each station rises through the base clearance hole --
-    # its O22 head recessed in the base underside counterbore -- into the O12.30
-    # tapped foot hole. Authored head-down (IDENTITY), mirror=False (exact machine
-    # transform), grounded like the channel ball mounts.
+    # Hold-down: four 9/16-12 lag screws coaxial with the support foot's tapped
+    # holes (and the base clearance holes below them). The support's three mates
+    # seat its foot exactly on the base top at the derived machine stations, so the
+    # screw at each station rises through the base clearance hole -- its O22 head
+    # recessed in the base underside counterbore -- into the O12.30 tapped foot
+    # hole. Authored head-down (IDENTITY), mirror=False (exact machine transform),
+    # mate-defined (ground=False), not grounded.
     # Each screw is CONSTRAINED (not grounded) by its two physical contacts plus a
     # spin pin -- no distance mate:
     #   coincident  ScrewAxis@screw <-> HoleAxis{i}@base  collinear axes => coaxial
@@ -322,6 +326,8 @@ async def build(adapter) -> dict[str, str]:
             screw_target,
             [0.0, 0.0, 0.0],
             IDENTITY,
+            ground=False,  # defined by coaxial + under-head seat + spin pin below,
+                           # NOT grounded (the redundant fix would over-define).
             mirror=False,
             label=f"lag-screw hold-down ({bx:.2f}, {bz:+.2f})",
         )
