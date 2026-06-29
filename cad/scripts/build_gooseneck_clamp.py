@@ -36,7 +36,6 @@ from _common import (
     ensure_fully_defined,
     extrude_at_offset,
     force_rebuild,
-    name_bore_axis,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -178,11 +177,6 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven clamp (equations neutral)", expected, 0.005 * expected
     )
-
-    # Named bore axis (Front ∩ Right = the vertical Ø16.5 bore centreline, local
-    # +Y). The summing assembly mates the gooseneck post COAXIAL to this so the
-    # clamp rides the post on its real slip-fit, not three datum-plane distances.
-    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "bore axis")
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
