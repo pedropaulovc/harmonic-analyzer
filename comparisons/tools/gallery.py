@@ -21,6 +21,8 @@ COMP = Path(__file__).resolve().parents[1]
 OUT = COMP / "index.html"
 
 CSS = """
+:root { --header-h: 3.2em; }
+html { scroll-snap-type: y mandatory; scroll-padding-top: var(--header-h); }
 body { font-family: system-ui, sans-serif; margin: 0; background: #1b1b1f; color: #ddd; }
 header { position: sticky; top: 0; background: #26262c; padding: .6em 1em; z-index: 9;
          display: flex; gap: 1em; align-items: baseline; box-shadow: 0 2px 6px #0008; }
@@ -32,18 +34,20 @@ header .tiers button { background: #1b1b1f; color: #bbb; border: 1px solid #555;
                        border-radius: 4px; padding: .25em .7em; cursor: pointer; }
 header .tiers button.active { background: #354; color: #cfc; border-color: #7a7; }
 h2 { padding: .4em 1em 0; margin: .6em 0 0; color: #cdc; font-size: 1em; }
-.pair { display: flex; gap: 6px; align-items: flex-start; padding: .5em 1em;
-        border-bottom: 1px solid #2e2e35; }
+.pair { display: flex; gap: 1em; align-items: center; padding: .5em 1em;
+        min-height: calc(100vh - var(--header-h)); box-sizing: border-box;
+        scroll-snap-align: start; border-bottom: 1px solid #2e2e35; }
 .pair.hide { display: none; }
-.imgs { display: flex; gap: 6px; flex: 1; min-width: 0; }
+.imgs { display: flex; gap: 1em; flex: 1; min-width: 0;
+        align-items: center; justify-content: center; }
 .imgs a { flex: 1; min-width: 0; text-align: center; }
-.imgs img { max-height: 340px; max-width: 100%; object-fit: contain;
+.imgs img { max-height: calc(100vh - 5em); max-width: 100%; object-fit: contain;
             background: #000; border-radius: 3px; }
 .imgs .lbl { font-size: .7em; color: #888; }
 .cmpwrap { flex: 1.3; min-width: 0; text-align: center; }
 .cmp { position: relative; display: inline-block; cursor: ew-resize;
        user-select: none; touch-action: none; }
-.cmp img { display: block; }
+.cmp img { display: block; max-height: calc(100vh - 5em); width: auto; }
 .cmp .over { position: absolute; inset: 0; width: 100%; height: 100%;
              clip-path: inset(0 50% 0 0); }
 .cmp .divider { position: absolute; top: 0; bottom: 0; left: 50%; width: 2px;
