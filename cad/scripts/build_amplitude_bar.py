@@ -287,35 +287,6 @@ async def build(adapter) -> dict[str, str]:
         drive_b='"BarDepth" / 2', drive_jobs=drive_jobs,
     )
 
-    # Mid-width reference plane (local x = BarWidth/2, parallel to the Right
-    # plane). The bar straddles the rocker arm and channel lever symmetrically,
-    # so in the assembly -- placed Ry(90) at z_mid + BarWidth/2 -- THIS plane
-    # lands exactly on the channel mid-plane (z_mid). Naming it lets the channel
-    # assembly seat the bar by a COINCIDENT mate to the rocker/lever mid-plane (a
-    # semantic "same channel slice" contact) instead of a bare distance to the
-    # assembly datum. Driven by "BarWidth"/2 so a GUI width edit moves the plane
-    # -- and the assembly mate to it -- in lockstep.
-    from solidworks_mcp.adapters.base import (
-        CreatePlaneParameters,
-        RenameFeatureParameters,
-    )
-
-    mid_plane = check(
-        f"plane mid-width (Right + {BAR_WIDTH / 2.0:g})",
-        await adapter.create_plane(
-            CreatePlaneParameters(
-                mode="offset", base_plane="Right Plane", offset=BAR_WIDTH / 2.0
-            )
-        ),
-    ).name
-    check(
-        "rename mid-width plane -> MidWidth",
-        await adapter.rename_feature(
-            RenameFeatureParameters(old_name=mid_plane, new_name="MidWidth")
-        ),
-    )
-    drive_jobs.append(('D1@MidWidth', '"BarWidth" / 2'))
-
     # Apply the deferred drive equations now -- after the whole model + a
     # rebuild exists, so every target (BarProfile + the winning TopPinProfile)
     # resolves. Each equation evaluates to the value just built, so the
