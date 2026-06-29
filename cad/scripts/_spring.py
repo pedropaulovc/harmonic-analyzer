@@ -148,12 +148,23 @@ async def build_spring(
     eye_axis_names: dict[str, str] = {}
     if eye_axes:
         top_lead = leads[1] if leads is not None else HOOK_LEAD
-        eye_axis_names["bottom_lead_axis"] = await name_bore_axis(
-            adapter, "Right Plane", MEAN_RADIUS, "Front Plane", 0.0,
-            "bottom-lead axis (threads the plate hole)")
-        eye_axis_names["top_eye_axis"] = await name_bore_axis(
-            adapter, "Right Plane", 0.0, "Top Plane", body_length + top_lead,
-            "top-eye axis (hooks the lever tab)")
+        # Two reference axes along LOCAL X (the spring's through-thickness), each
+        # the Top-plane <-> Front-plane intersection at a different height. The
+        # summation assembly inserts the spring ROT_Y(+90).Rz(theta), so local X
+        # ALWAYS images to world Z -- the rotation's first row is [0,0,-1] for
+        # EVERY tilt (theta), independent of the amplitude preset. So these axes
+        # are world-Z-parallel no matter how the spring tilts, and the assembly
+        # pins the (possibly tilted) spring's position + yaw by their in-plane
+        # X/Y distances to the datum planes (the spin_driver idiom), instead of
+        # forcing it vertical with plane-parallel mates (the neutral-only locate).
+        # Axis1 = low (origin height), Axis2 = high (top-eye height): the long
+        # lever arm between them gives a well-conditioned yaw pin.
+        eye_axis_names["mate_axis_low"] = await name_bore_axis(
+            adapter, "Top Plane", 0.0, "Front Plane", 0.0,
+            "low mate axis (X-parallel, origin height)")
+        eye_axis_names["mate_axis_high"] = await name_bore_axis(
+            adapter, "Top Plane", body_length + top_lead, "Front Plane", 0.0,
+            "high mate axis (X-parallel, top-eye height)")
 
     # The helix base sketch stays unabsorbed-and-shown after InsertHelix;
     # shown sketches render in every assembly instance (20 floating seed
@@ -184,6 +195,7 @@ async def build_spring(
         result = await save_part_and_images(adapter, part_name)
     else:
         result = await save_part_and_images(adapter, part_name, views)
-    # The two eye axes are baked into the .SLDPRT by the names captured above, so
-    # the summation assembly can mate both ends without re-deriving them.
+    # The two mate axes are baked into the .SLDPRT (Axis1 low, Axis2 high), so the
+    # summation assembly pins each spring's tilt by their world-Z-parallel
+    # in-plane distances without re-deriving any geometry.
     return {**result, **eye_axis_names}
