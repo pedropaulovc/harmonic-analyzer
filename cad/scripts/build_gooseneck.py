@@ -53,6 +53,7 @@ from _common import (
     ensure_fully_defined,
     extrude_at_offset,
     force_rebuild,
+    name_bore_axis,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -371,6 +372,12 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven gooseneck (equations neutral)", final_vol, 0.001 * final_vol
     )
+
+    # Named post axis (Front ∩ Right = the vertical Ø16 leg centreline, local +Y).
+    # The summing assembly mates the gooseneck-clamp bore COAXIAL to this, so
+    # the clamp rides the post on its real slip-fit, not three datum-plane
+    # distances.
+    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "post axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
