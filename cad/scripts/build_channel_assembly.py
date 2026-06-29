@@ -239,7 +239,6 @@ PLATE_THICKNESS = 5.1
 PLATE_HOLE_DIA = 2.0  # snug bore for the O1.4 hook shank (build_summing_lever.HOLE_DIA)
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
-ROT_Y_POS90 = [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]
 
 
 def rot_z_rows(deg: float) -> list[list[float]]:
@@ -299,30 +298,25 @@ def _org(adapter, name: str) -> list[float]:
     return [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
 
 
-async def _locate_to_datum(adapter, name: str, *, roty90: bool = False) -> None:
+async def _locate_to_datum(adapter, name: str) -> None:
     """Locate a grounded structural part to the machine datum planes by three
     orthogonal plane-distance mates -- the semantic replacement for an explicit
     fix on a free-space part with no contact partner (the #110 frame-column
     idiom). Three orthogonal plane pairs fully define the body: each pins one
     translation and, by forcing the planes parallel, the rotations.
 
-    The part is inserted axis-aligned, so its principal planes map to the
-    assembly planes. ``roty90=False`` (IDENTITY parts -- shafts, ball mounts,
-    spring-hooks, bushings): same-name pairing (Right->X, Top->Y, Front->Z).
-    ``roty90=True`` (the vertical springs, ROT_Y_POS90: local X->world -Z,
-    Y->Y, Z->world +X): swapped pairing (Right plane->Front=Z, Top->Y,
-    Front plane->Right=X). The live origin (read post-mirror) gives the three
-    distances, so it is mirror-agnostic; coord 0 degenerates to a coincident.
+    The part is inserted axis-aligned (IDENTITY parts -- shafts, ball mounts,
+    spring-hooks, bushings), so its principal planes map same-name to the
+    assembly planes (Right->X, Top->Y, Front->Z). The live origin (read
+    post-mirror) gives the three distances, so it is mirror-agnostic; coord 0
+    degenerates to a coincident. (Tilted parts -- the amplitude springs -- can't
+    use plane-parallel locates, which force an axis-aligned pose; see
+    `_locate_spring`.)
     """
     o = _org(adapter, name)
-    if roty90:
-        pairs = (("Right Plane", "Front Plane", o[2], "z"),
-                 ("Top Plane", "Top Plane", o[1], "y"),
-                 ("Front Plane", "Right Plane", o[0], "x"))
-    else:
-        pairs = (("Right Plane", "Right Plane", o[0], "x"),
-                 ("Top Plane", "Top Plane", o[1], "y"),
-                 ("Front Plane", "Front Plane", o[2], "z"))
+    pairs = (("Right Plane", "Right Plane", o[0], "x"),
+             ("Top Plane", "Top Plane", o[1], "y"),
+             ("Front Plane", "Front Plane", o[2], "z"))
     for part_plane, asm_plane, coord, axis in pairs:
         part_ref = named_ref(f"{part_plane}@{name}", "PLANE")
         asm_ref = named_ref(asm_plane, "PLANE")
@@ -377,6 +371,55 @@ async def _seat_bushing_on_shaft(
         named_ref(f"Top Plane@{name}", "PLANE"), named_ref("Top Plane", "PLANE"),
         label=f"{name} anti-spin", verify=(name, o),
     )
+
+
+async def _locate_spring(adapter, name: str, axis2_local_y: float) -> None:
+    """Pin a cosmetic channel spring at its inserted pose -- holds at ANY tilt
+    (amplitude preset), unlike the neutral-only plane-locate it replaces.
+
+    The spring is inserted ROT_Y(+90).Rz(theta), so its LOCAL X always images to
+    world Z (the transform's first row is [0,0,-1] for EVERY theta). Its Right
+    Plane is therefore a horizontal plane (normal world Z) and its two named axes
+    (Axis1 low, Axis2 at the top eye, both along local X) stay world-Z-parallel
+    regardless of the preset. The spring-to-lever / spring-to-hook joints are
+    hook-through-ring linkages with PERPENDICULAR axes (no faithful concentric),
+    so the spring is a computed-pose cosmetic part -- pin it, don't follow:
+
+      * Z + planarity: Right Plane(spring) <-> Front Plane(asm) at z_mid pins the
+        Z station and the two out-of-plane tilts (keeps the spring in its
+        channel's vertical plane), leaving X, Y and yaw.
+      * X, Y of the low axis + X of the high axis: three axis-to-plane DISTANCE
+        mates (the spin_driver idiom -- mirror-safe, no plane-parallel forcing the
+        spring vertical, no fragile angle mate). The high/low X gap pins yaw.
+
+    Four mates = 6 DOF with NO fix, so the ungrounded `fixed=1` invariant holds
+    for any tilt. (#113 forced the spring vertical and raised on theta>0.05 deg.)
+    """
+    o = _org(adapter, name)
+    rp = named_ref(f"Right Plane@{name}", "PLANE")
+    front = named_ref("Front Plane", "PLANE")
+    if abs(o[2]) < 1e-6:
+        await coincident_mate(
+            adapter, rp, front,
+            label=f"{name} spring z=0 + planarity", verify=(name, o))
+    else:
+        await distance_driver(
+            adapter, rp, front, abs(o[2]),
+            label=f"{name} spring z d={abs(o[2]):.2f} + planarity", verify=(name, o))
+    a1 = named_ref(f"Axis1@{name}", "AXIS")
+    a2 = named_ref(f"Axis2@{name}", "AXIS")
+    right = named_ref("Right Plane", "PLANE")
+    top = named_ref("Top Plane", "PLANE")
+    await distance_driver(
+        adapter, a1, right, abs(o[0]),
+        label=f"{name} spring low x d={abs(o[0]):.2f}", verify=(name, o))
+    await distance_driver(
+        adapter, a1, top, abs(o[1]),
+        label=f"{name} spring low y d={abs(o[1]):.2f}", verify=(name, o))
+    p_high = world_point(adapter, name, [0.0, axis2_local_y, 0.0])
+    await distance_driver(
+        adapter, a2, right, abs(p_high[0]),
+        label=f"{name} spring high x d={abs(p_high[0]):.2f} (yaw)", verify=(name, o))
 
 
 # Top-pin-to-foot span of the rigid bar (Axis1 local y - Axis2 local y); the
@@ -829,7 +872,7 @@ async def build(adapter) -> dict[str, str]:
         log(f"  building {name} body={key:.2f} (no views)")
         await build_spring(
             adapter, name, key,
-            leads=(SPRING_BOTTOM_LEAD, SPRING_TOP_LEAD), views=[])
+            leads=(SPRING_BOTTOM_LEAD, SPRING_TOP_LEAD), views=[], eye_axes=True)
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
     check("create_assembly", await adapter.create_assembly())
@@ -1026,7 +1069,9 @@ async def build(adapter) -> dict[str, str]:
         _assert_spring_threading(spec["hole_y"], spec["eye_y"])
         ux, uy = spec["ux"], spec["uy"]
         # rows = Rz(theta).Ry90: local +Y (coil axis) -> the span direction,
-        # local +Z (eye axis) -> the in-plane normal. theta=0 recovers ROT_Y_POS90.
+        # local +Z (eye axis) -> the in-plane normal, local +X -> world -Z for ANY
+        # theta (first row tilt-independent) -- what makes the spring's mate axes
+        # world-Z-parallel so _locate_spring pins any tilt. theta=0 is vertical.
         spring_rows = [[0.0, 0.0, -1.0], [ux, uy, 0.0], [uy, -ux, 0.0]]
         grounded_specs.append({
             "part": spec["part"],
@@ -1035,6 +1080,10 @@ async def build(adapter) -> dict[str, str]:
             "rotation": [0.0, 0.0, 0.0],
             "rows": spring_rows,
             "kind": "spring", "theta": spec["theta"],
+            # Local Y of the spring's high mate axis (Axis2 = top-eye height), so
+            # _locate_spring can read its world X for the yaw pin. Matches the
+            # `body + top_lead` height build_spring places Axis2 at.
+            "axis2_local_y": spec["body"] + SPRING_TOP_LEAD,
             "label": (f"channel-spring ch{j:02d} {spec['part'].rsplit('-', 1)[-1]} "
                       f"body={spec['body']:.2f} tilt={spec['theta']:+.2f}"),
         })
@@ -1085,10 +1134,10 @@ async def build(adapter) -> dict[str, str]:
     #     anti-spin parallel), the pivot idiom (_seat_bushing_on_shaft);
     #   * spring-hooks have no in-subassembly contact partner (they seat in the
     #     summing plate, another subassembly) -> datum-located, IDENTITY-oriented;
-    #   * springs are ROT_Y_POS90 (vertical at the uniform neutral preset) ->
-    #     datum-located with the swapped plane pairing. A non-neutral preset would
-    #     tilt a spring (theta != 0) and the plane-locate would silently
-    #     re-verticalise it, so guard loud -- a tilted spring needs angle mates.
+    #   * springs ride at the per-channel amplitude tilt (theta != 0 off neutral),
+    #     so they are pinned by their world-Z-parallel mate axes (_locate_spring),
+    #     which holds at ANY tilt -- not the plane-parallel locate, which would
+    #     force them vertical.
     for spec in grounded_specs:
         spec["ground"] = False
     bank = await place_components_batch(
@@ -1111,13 +1160,10 @@ async def build(adapter) -> dict[str, str]:
         if spec.get("kind") != "spring":
             await _locate_to_datum(adapter, nm)
             continue
-        if abs(float(spec["theta"])) > 0.05:
-            raise RuntimeError(
-                f"spring {nm} tilt={float(spec['theta']):+.3f} deg is not vertical: the "
-                "datum plane-locate assumes the uniform neutral preset "
-                "(ROT_Y_POS90). A tilted preset needs angle mates."
-            )
-        await _locate_to_datum(adapter, nm, roty90=True)
+        # Springs ride at the per-channel amplitude tilt (theta may be nonzero for
+        # any non-neutral preset). Pin them by their world-Z-parallel mate axes so
+        # the locate holds at ANY tilt -- no vertical-only assumption, no guard.
+        await _locate_spring(adapter, nm, float(spec["axis2_local_y"]))
 
     # Confirm both bushing banks landed on the inter-channel gap planes. The
     # explicit placements above are deterministic; this guards a future off-by-one
