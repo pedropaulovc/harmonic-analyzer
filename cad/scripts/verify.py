@@ -574,17 +574,23 @@ async def _verify_isolation_one(adapter: Any, name: str, report: Report) -> None
 def _expected_free_dof(name: str) -> int:
     """Free operational DOF expected in ``name``'s AS-SAVED model.
 
-    drive-train frees the crank spin (1 DOF, a suppressed PARK_* park driver) when
-    built `free`, the default; a `locked` build re-engages it -> 0. Read straight
-    from cad/config/machine/build_lock.yaml -- the same source of truth the build
-    used, and the freshness guard (`_assert_fresh`) guarantees the saved model
-    matches that config. Every other assembly stays fully defined (0). The literal
-    accessor tokenises build_lock.yaml into this gate's recipe deps, so flipping
-    the flag re-runs verify too.
+    drive-train frees the crank spin (1 DOF); channel frees 3 DOF per active
+    channel (rocker swing + connecting-rod follow + amplitude-bar slide), each a
+    suppressed PARK_* park driver, when built `free` (the default); a `locked`
+    build re-engages them -> 0. Read straight from cad/config/machine/
+    build_lock.yaml -- the same source of truth the build used, and the freshness
+    guard (`_assert_fresh`) guarantees the saved model matches that config. Every
+    other assembly stays fully defined (0). The literal accessor tokenises
+    build_lock.yaml into this gate's recipe deps, so flipping the flag re-runs
+    verify too.
     """
-    if name != "drive-train":
-        return 0
-    return 0 if is_locked_build(_config.machine("build_lock", "drive_train")) else 1
+    if name == "drive-train":
+        return 0 if is_locked_build(_config.machine("build_lock", "drive_train")) else 1
+    if name == "channel":
+        if is_locked_build(_config.machine("build_lock", "channel")):
+            return 0
+        return 3 * _config.active_count()
+    return 0
 
 
 async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
