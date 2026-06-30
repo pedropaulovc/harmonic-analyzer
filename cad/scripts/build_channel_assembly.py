@@ -96,7 +96,7 @@ from _common import (
     run_build,
 )
 from _assembly import (
-    assert_components_fully_defined,
+    assert_expected_free_dof,
     bore_axis_ref,
     check_no_interference,
     coincident_mate,
@@ -104,7 +104,10 @@ from _assembly import (
     component_transform,
     concentric_mate,
     distance_driver,
+    is_locked_build,
+    mark_park_driver,
     named_ref,
+    PARK_PREFIX,
     parallel_mate,
     place_component,
     place_components_batch,
@@ -128,6 +131,15 @@ import os  # noqa: E402
 # TEMPORARY 3-channel build-performance reduction; recover by setting it back to
 # 20 — see _config.active_count). CHANNEL_COUNT env still overrides for tests.
 CHANNELS = int(os.environ.get("CHANNEL_COUNT", str(_config.active_count())))
+
+# Build mode (cad/config/machine/build_lock.yaml). `free` (default) leaves the
+# per-channel operational DOF UNLOCKED -- the rocker swings about its pivot, the
+# connecting rod follows on its pin, and the amplitude bar slides along the arc.
+# Each is authored as a suppressible PARK_* driver, suppressed in the free build
+# so the saved model articulates (the drive-train idiom, extended per channel).
+# `locked` engages every park driver for a fully-defined reproducible snapshot.
+# Literal stem -> tokenises build_lock.yaml into the doit/cache digest.
+LOCK = is_locked_build(_config.machine("build_lock", "channel"))
 Z0 = _config.machine("channels", "station_z0_mm")  # channel 0 gear plane (machine.yaml)
 PITCH = _config.machine("channels", "station_pitch_mm")
 ARM_MID_DZ = 0.8  # arm/bar/lever mid-planes at z_j + 0.8
@@ -547,8 +559,9 @@ async def _revolute(
     off_axis_local: list[float],
     pivot_xy: tuple[float, float],
     label: str,
-    coplanar_with: str | None = None,
-) -> None:
+    axial: tuple = ("datum",),
+    park_spin: str | None = None,
+) -> Any:
     """Build one revolute joint pinned to its on-solution pose.
 
     ``concentric`` selects the radial mate kind: a cylindrical-face ↔ named-axis
@@ -557,47 +570,50 @@ async def _revolute(
     the axial (Z) seat, and a ``spin_driver`` on an off-pivot bore pins the
     residual spin -> fully defined, on-target.
 
-    ``coplanar_with`` chooses the axial seat. ``None`` (the channel's Z ANCHOR --
-    the rocker) pins Z by a *distance* from the part's mid-plane to the assembly
-    Front datum. A name (an already-placed sibling sharing this channel's mid-
-    plane -- the rocker) seats the part by a semantic *coincident* mid-plane mate
-    to that sibling's Front plane instead, so the channel's parts share ONE Z
-    reference. The spin (and the anchor's axial) dims are the suppressible
-    drivers.
+    ``axial`` chooses the Z seat (the #110 "chain off a physical neighbor, not the
+    global datum" idiom):
+
+    * ``("datum",)`` -- distance from the part's mid-plane to the assembly Front
+      datum (= ``|tgt[2]|``). The single global Z anchor (channel 0's rocker).
+    * ``("coincident", sibling)`` -- coincident mid-plane to an already-placed
+      sibling sharing this channel's plane (the lever onto the rocker).
+    * ``("distance", neighbor, d)`` -- distance ``d`` from the part's mid-plane to
+      a NEIGHBOR part's Front plane (each rocker j>=1 onto the pivot-bushing in
+      the gap below it), so Z chains part->part instead of part->global datum.
+
+    ``park_spin`` (a key) renames the spin driver ``PARK_<key>`` so it becomes a
+    suppressible operational DOF (the rocker swing); ``None`` keeps it a hard pin.
+    Returns the spin mate dict (so the caller can collect the park name).
     """
     tgt = _org(adapter, comp)
     # Capture the off-axis (spin) target at the PLACED design pose, BEFORE the
     # radial/axial mates run. Measuring it afterwards freezes whatever sub-mm
-    # pose the mate solve drifted to -- for the connecting-rod that drift (~0.4
-    # mm swing about the rocker pin) threw the cam ring off the cylinder-gear
-    # lobe and broke the top-level interference gate (38.92 mm^3 x 20). Each
-    # part is inserted on its exact mirrored transform, so the design pose IS
-    # the on-solution target.
+    # pose the mate solve drifted to. Each part is inserted on its exact mirrored
+    # transform, so the design pose IS the on-solution target.
     off_design = world_point(adapter, comp, off_axis_local)
     radial = concentric_mate if concentric else coincident_mate
     await radial(adapter, axis_a, axis_b, label=f"{label} radial", verify=(comp, tgt))
-    # Bar is Ry(90): its Right Plane (local x=0) is the Z mid reference; the
-    # Rz parts use their Front Plane (the sketch mid-plane). off-axis [_,_,z]
-    # locals carry the marker.
-    axial_plane = "Right Plane" if comp.startswith("amplitude-bar") else "Front Plane"
-    if coplanar_with is None:
+    part_plane = named_ref(f"Front Plane@{comp}", "PLANE")
+    kind = axial[0]
+    if kind == "datum":
         await distance_driver(
-            adapter,
-            named_ref(f"{axial_plane}@{comp}", "PLANE"),
-            named_ref("Front Plane", "PLANE"),
-            abs(tgt[2]),
-            label=f"{label} axial d={abs(tgt[2]):.2f}",
+            adapter, part_plane, named_ref("Front Plane", "PLANE"), abs(tgt[2]),
+            label=f"{label} axial d={abs(tgt[2]):.2f}", verify=(comp, tgt),
+        )
+    elif kind == "coincident":
+        await coincident_mate(
+            adapter, part_plane, named_ref(f"Front Plane@{axial[1]}", "PLANE"),
+            label=f"{label} axial coincident mid-plane <- {axial[1]}", verify=(comp, tgt),
+        )
+    elif kind == "distance":
+        await distance_driver(
+            adapter, part_plane, named_ref(f"Front Plane@{axial[1]}", "PLANE"), abs(axial[2]),
+            label=f"{label} axial d={abs(axial[2]):.2f} <- neighbor {axial[1]}",
             verify=(comp, tgt),
         )
     else:
-        await coincident_mate(
-            adapter,
-            named_ref(f"{axial_plane}@{comp}", "PLANE"),
-            named_ref(f"Front Plane@{coplanar_with}", "PLANE"),
-            label=f"{label} axial coincident mid-plane <- {coplanar_with}",
-            verify=(comp, tgt),
-        )
-    await spin_driver(
+        raise RuntimeError(f"_revolute: unknown axial spec {axial!r}")
+    spin = await spin_driver(
         adapter,
         named_ref(f"{off_axis_name}@{comp}", "AXIS"),
         pivot_xy,
@@ -605,53 +621,9 @@ async def _revolute(
         label=f"{label} spin -> {off_design[0]:.1f},{off_design[1]:.1f}",
         verify=(comp, tgt),
     )
-
-
-async def _pin_design_pose(
-    adapter,
-    comp: str,
-    *,
-    ring_local: list[float],
-    pin_local: list[float],
-    label: str,
-) -> None:
-    """Pin a planar Z-aligned link at its exact placed (design) pose.
-
-    The connecting-rod bridges a channel-internal joint (its pin bore rides the
-    rocker rod-bore) and an EXTERNAL one (its cam ring rides a drive-train
-    cylinder-gear lobe, a 0.1 mm-clearance journal resolved at the top level).
-    Those two spans are 0.39 mm inconsistent with the rod's fixed 127 mm bore
-    spacing -- a pre-existing layout slack the old fix-all build hid by letting
-    the pin float 0.4 mm off the rocker bore. A proper pin<->bore coincident
-    instead snaps the pin exact and throws the ring 0.39 mm off the lobe ->
-    top-level interference. The cam journal is the tight constraint, so pin the
-    RING exactly (on the lobe centre) and let the 0.39 mm sit at the loose pin,
-    exactly as the green build did. The real rod<->rocker + rod<->cam revolutes
-    are established in the motion study (artifact B), where the rod is flexible.
-
-    Scheme = the validated prismatic pattern (slide axis Z = Axis1, the ring
-    bore): two axis-to-plane distances pin X/Y (and the two axis tilts), a spin
-    driver pins rotation about Z via the pin bore, a Front-plane distance pins Z.
-    """
-    ring = world_point(adapter, comp, ring_local)
-    pin = world_point(adapter, comp, pin_local)
-    await distance_driver(
-        adapter, named_ref(f"Axis1@{comp}", "AXIS"), named_ref("Right Plane", "PLANE"),
-        abs(ring[0]), label=f"{label} ring-X", verify=(comp, ring),
-    )
-    await distance_driver(
-        adapter, named_ref(f"Axis1@{comp}", "AXIS"), named_ref("Top Plane", "PLANE"),
-        abs(ring[1]), label=f"{label} ring-Y", verify=(comp, ring),
-    )
-    await spin_driver(
-        adapter, named_ref(f"Axis2@{comp}", "AXIS"),
-        (ring[0], ring[1]), (pin[0], pin[1]),
-        label=f"{label} swing -> pin {pin[0]:.1f},{pin[1]:.1f}", verify=(comp, ring),
-    )
-    await distance_driver(
-        adapter, named_ref(f"Front Plane@{comp}", "PLANE"), named_ref("Front Plane", "PLANE"),
-        abs(ring[2]), label=f"{label} ring-Z", verify=(comp, ring),
-    )
+    if park_spin is not None:
+        await mark_park_driver(adapter, spin, park_spin)
+    return spin
 
 
 def _assert_spring_threading(hole_y: float, eye_y: float) -> None:
@@ -919,6 +891,39 @@ async def build(adapter) -> dict[str, str]:
         )
         await _locate_to_datum(adapter, mount)
 
+    # Bushings FIRST (before the moving-part loop), so each channel's rocker can
+    # take its axial (Z) seat as a DISTANCE to the pivot-bushing in the gap below
+    # it -- chaining Z part->part off a physical neighbour rather than every rocker
+    # referencing the global Front datum (the #110 neighbour idiom, request #4).
+    # One pivot + one lever bushing ride the shafts in each inter-channel gap
+    # j-1/j (j>=1) at z_gap = z_mid(j) - PITCH/2. They are inserted in ONE batch
+    # (ground=False) then seated concentric on their shaft (_seat_bushing_on_shaft,
+    # the pivot idiom). pivot_bushing_by_gap[j] is the bushing directly below
+    # channel j's rocker.
+    pivot_bushing_by_gap: dict[int, str] = {}
+    if CHANNELS > 1:
+        bushing_specs: list[dict[str, Any]] = []
+        for j in range(1, CHANNELS):
+            z_gap = z_station(j) + ARM_MID_DZ - PITCH / 2.0
+            bushing_specs.append({
+                "part": "pivot-bushing", "position": [PIVOT[0], PIVOT[1], z_gap],
+                "rotation": [0.0, 0.0, 0.0], "rows": IDENTITY, "ground": False,
+                "label": f"pivot-bushing gap {j - 1:02d}/{j:02d}",
+            })
+            bushing_specs.append({
+                "part": "lever-bushing", "position": [FULCRUM[0], FULCRUM[1], z_gap],
+                "rotation": [0.0, 0.0, 0.0], "rows": IDENTITY, "ground": False,
+                "label": f"lever-bushing gap {j - 1:02d}/{j:02d}",
+            })
+        bushings = await place_components_batch(
+            adapter, bushing_specs, label="bushing banks (pivot + lever)")
+        for nm, spec in zip(bushings, bushing_specs):
+            if spec["part"] == "pivot-bushing":
+                await _seat_bushing_on_shaft(adapter, nm, pivot_od, pivot_w, PIVOT_BUSHING_OD / 2.0)
+                pivot_bushing_by_gap[int(spec["label"].split("/")[-1])] = nm
+            else:
+                await _seat_bushing_on_shaft(adapter, nm, fulc_od, fulc_w, LEVER_BUSHING_OD / 2.0)
+
     # Per-channel chain: the four moving parts are inserted on-solution
     # (ground=False) and joined by revolutes whose spin/axial dims are the
     # per-channel suppressible drivers (see _revolute).
@@ -949,6 +954,7 @@ async def build(adapter) -> dict[str, str]:
     # moving parts keep the per-part place_component path -- their insertion pose
     # seeds the mate flip-recovery, so they are not batchable.
     grounded_specs: list[dict[str, Any]] = []
+    park_names: list[str] = []  # PARK_* operational-DOF drivers (suppressed if free)
     for j in range(CHANNELS):
         zj = z_station(j)
         z_mid = zj + ARM_MID_DZ
@@ -985,24 +991,54 @@ async def build(adapter) -> dict[str, str]:
             ground=False, label=f"channel-lever ch{j:02d}",
         )
 
-        # J1 rocker revolute (shaft OD ↔ pivot bore; spin via the rod bore).
+        # J1 rocker revolute (shaft OD ↔ pivot bore). Axial Z chains off the
+        # neighbour pivot-bushing in the gap below (distance = PITCH/2), except
+        # channel 0 which is the single global Z anchor (#110 neighbour idiom,
+        # request #4). The spin is a PARK driver: suppressed in the free build so
+        # the rocker swings about its pivot (request #3).
+        axial = (("distance", pivot_bushing_by_gap[j], PITCH / 2.0)
+                 if j >= 1 else ("datum",))
         await _revolute(
             adapter, rocker,
             bore_axis_ref(pivot_od), named_ref(f"Axis1@{rocker}", "AXIS"),
             concentric=True, off_axis_name="Axis2",
             off_axis_local=ROCKER_ROD_BORE_LOCAL, pivot_xy=pivot_w,
-            label=f"J1 rocker ch{j:02d}",
+            label=f"J1 rocker ch{j:02d}", axial=axial,
+            park_spin=f"rocker_angle_{j:02d}",
         )
-        # J2 connecting-rod: pinned at its exact design pose so the cam ring sits
-        # ON the cylinder-gear lobe centre (the tight external journal), not
-        # snapped to the rocker pin (which would throw the ring 0.39 mm off the
-        # lobe -- see _pin_design_pose). The rod<->rocker revolute lives in the
-        # motion study where the rod is flexible.
-        await _pin_design_pose(
-            adapter, rod,
-            ring_local=ROD_STRAP_BORE_LOCAL, pin_local=ROD_PIN_BORE_LOCAL,
-            label=f"J2 rod ch{j:02d}",
+        park_names.append(f"{PARK_PREFIX}rocker_angle_{j:02d}")
+        # J2 connecting-rod: a REAL revolute on the rocker's rod pin (request #2),
+        # replacing the old design-pose pin to the global datums. The rod's pin
+        # bore (Axis2@rod) is made coaxial with the rocker's rod bore (Axis2@rocker)
+        # -- a coincident of two named axes (AddMate5 rejects concentric on axes);
+        # a distance to the rocker's Front plane pins Z; and a PARK spin driver on
+        # the rod's cam-ring bore (Axis1@rod) pins the swing about the pin, freed in
+        # the free build so the rod follows the rocker. NB the cam ring's external
+        # journal (the cylinder-gear lobe) lives at the TOP level only; this
+        # channel-level revolute lets the ring float there -- validated channel-only
+        # for now (the ~0.39 mm lobe slack the old _pin_design_pose guarded is a
+        # top-level concern, deferred).
+        rod_tgt = _org(adapter, rod)
+        rod_ring = world_point(adapter, rod, ROD_STRAP_BORE_LOCAL)
+        rod_pin = world_point(adapter, rod, ROD_PIN_BORE_LOCAL)
+        await coincident_mate(
+            adapter, named_ref(f"Axis2@{rocker}", "AXIS"), named_ref(f"Axis2@{rod}", "AXIS"),
+            label=f"J2 rod ch{j:02d} coaxial pin <- {rocker}", verify=(rod, rod_tgt),
         )
+        await distance_driver(
+            adapter, named_ref(f"Front Plane@{rod}", "PLANE"), named_ref(f"Front Plane@{rocker}", "PLANE"),
+            abs(rod_tgt[2] - z_mid),
+            label=f"J2 rod ch{j:02d} axial d={abs(rod_tgt[2] - z_mid):.2f} <- {rocker}",
+            verify=(rod, rod_tgt),
+        )
+        rod_spin = await spin_driver(
+            adapter, named_ref(f"Axis1@{rod}", "AXIS"),
+            (rod_pin[0], rod_pin[1]), (rod_ring[0], rod_ring[1]),
+            label=f"J2 rod ch{j:02d} swing -> ring {rod_ring[0]:.1f},{rod_ring[1]:.1f}",
+            verify=(rod, rod_tgt),
+        )
+        await mark_park_driver(adapter, rod_spin, f"rod_swing_{j:02d}")
+        park_names.append(f"{PARK_PREFIX}rod_swing_{j:02d}")
         # J4 lever revolute (fulcrum OD ↔ fulcrum bore; spin via the bar pin).
         # The lever shares the channel mid-plane with the rocker (both mid-plane
         # extruded, both at z_mid), so its axial seat is a COINCIDENT mid-plane
@@ -1012,7 +1048,7 @@ async def build(adapter) -> dict[str, str]:
             bore_axis_ref(fulc_od), named_ref(f"Axis1@{lever}", "AXIS"),
             concentric=True, off_axis_name="Axis2",
             off_axis_local=LEVER_BAR_PIN_BORE_LOCAL, pivot_xy=fulc_w,
-            label=f"J4 lever ch{j:02d}", coplanar_with=rocker,
+            label=f"J4 lever ch{j:02d}", axial=("coincident", rocker),
         )
         # J3 bar — the amplitude-setting joint (p0). A real revolute hinges the
         # bar at its top pin (Axis1@bar) coaxial with the lever's bar pin
@@ -1047,13 +1083,20 @@ async def build(adapter) -> dict[str, str]:
             label=f"J3 bar ch{j:02d} axial coincident mid-plane <- {rocker}",
             verify=(bar, bar_tgt),
         )
-        await distance_driver(
+        bar_park = await distance_driver(
             adapter,
             named_ref(f"Axis2@{bar}", "AXIS"), named_ref("Right Plane", "PLANE"),
             abs(foot[0]),
             label=f"J3 bar ch{j:02d} AMPLITUDE park foot-X={foot[0]:.2f} (amp {amplitude:+.1f})",
             verify=(bar, bar_tgt),
         )
+        # Mark the foot-X driver PARK so the free build suppresses it -> the bar
+        # swings about its top pin = slides the foot along the rocker arc, the
+        # amplitude DOF (request #1). It stays a part<->root-plane distance (the
+        # motion study's driver classifier only recognises one real part + the
+        # sub root), so it is NOT chained off a neighbour like the rocker axial.
+        await mark_park_driver(adapter, bar_park, f"bar_amplitude_{j:02d}")
+        park_names.append(f"{PARK_PREFIX}bar_amplitude_{j:02d}")
 
         # Return spring (ground; cosmetic) -- placed PER CHANNEL spanning this
         # channel's (moving) lever eye to the FIXED summing-plate hole, at the
@@ -1105,33 +1148,13 @@ async def build(adapter) -> dict[str, str]:
             "label": f"spring-hook ch{j:02d} bore-seat",
         })
 
-        # Bushings (ground; cosmetic) ride the shafts in the inter-channel gaps:
-        # one pivot + one lever bushing in the gap BELOW every channel j>=1,
-        # placed explicitly (deterministic) instead of seed + LocalLinearPattern
-        # -- see the note above the channel loop. Collected for the batch insert.
-        if CHANNELS > 1 and j >= 1:
-            z_gap = z_mid - PITCH / 2.0  # gap between channels j-1 and j
-            grounded_specs.append({
-                "part": "pivot-bushing",
-                "position": [PIVOT[0], PIVOT[1], z_gap],
-                "rotation": [0.0, 0.0, 0.0], "rows": IDENTITY,
-                "label": f"pivot-bushing gap {j - 1:02d}/{j:02d}",
-            })
-            grounded_specs.append({
-                "part": "lever-bushing",
-                "position": [FULCRUM[0], FULCRUM[1], z_gap],
-                "rotation": [0.0, 0.0, 0.0], "rows": IDENTITY,
-                "label": f"lever-bushing gap {j - 1:02d}/{j:02d}",
-            })
+        # (Bushings are pre-placed + seated BEFORE this loop so the rocker can
+        # reference its neighbour for the axial Z seat -- see that block above.)
 
-    # Insert the whole structural bank (springs + both bushing banks) in ONE
-    # AddComponents3 for all ~58 parts (ground=False -- no FixComponent pass),
-    # then seat each by its SEMANTIC mate. Replaces the old fix-the-bank
-    # shortcut: none of these parts is grounded any more (the "drop grounding for
-    # semantic mates" cleanup, #110). Each part takes the most contact-faithful
-    # seat available:
-    #   * bushings RIDE their shaft  -> concentric on the shaft OD (+ axial Z +
-    #     anti-spin parallel), the pivot idiom (_seat_bushing_on_shaft);
+    # Insert the cosmetic bank (springs + spring-hooks; the bushings were placed
+    # and seated before the loop) in ONE AddComponents3 (ground=False -- no
+    # FixComponent pass), then seat each by its SEMANTIC mate (the "drop grounding
+    # for semantic mates" cleanup, #110):
     #   * spring-hooks have no in-subassembly contact partner (they seat in the
     #     summing plate, another subassembly) -> datum-located, IDENTITY-oriented;
     #   * springs ride at the per-channel amplitude tilt (theta != 0 off neutral),
@@ -1141,22 +1164,9 @@ async def build(adapter) -> dict[str, str]:
     for spec in grounded_specs:
         spec["ground"] = False
     bank = await place_components_batch(
-        adapter, grounded_specs, label="structural bank (springs + bushings)"
+        adapter, grounded_specs, label="cosmetic bank (springs + hooks)"
     )
     for nm, spec in zip(bank, grounded_specs):
-        part = spec["part"]
-        # Bushings RIDE their shaft -> concentric seat (the #110 pivot idiom),
-        # not a free-space datum-locate. Spring-hooks have no in-subassembly
-        # contact partner (they seat in the summing plate, another subassembly),
-        # so they stay datum-located.
-        if part == "pivot-bushing":
-            await _seat_bushing_on_shaft(
-                adapter, nm, pivot_od, pivot_w, PIVOT_BUSHING_OD / 2.0)
-            continue
-        if part == "lever-bushing":
-            await _seat_bushing_on_shaft(
-                adapter, nm, fulc_od, fulc_w, LEVER_BUSHING_OD / 2.0)
-            continue
         if spec.get("kind") != "spring":
             await _locate_to_datum(adapter, nm)
             continue
@@ -1175,7 +1185,20 @@ async def build(adapter) -> dict[str, str]:
         _verify_pattern_z(adapter, "pivot-bushing", z_gap_planes, "pivot-bushing bank")
         _verify_pattern_z(adapter, "lever-bushing", z_gap_planes, "lever-bushing bank")
 
-    assert_components_fully_defined(adapter)
+    # Default-free kinematic model: suppress the PARK_* drivers so the per-channel
+    # operational DOF (rocker swing + rod follow + bar amplitude) are FREE; `locked`
+    # leaves them engaged for a fully-defined reproducible snapshot. The DOF gate
+    # then adapts -- the park-driver closure proves EXACTLY the freed count (re-engage
+    # -> 0 under-constrained, then restore the free pose); locked -> strict 0-DOF.
+    if not LOCK:
+        from solidworks_mcp.adapters.base import SuppressMateParameters
+        for name in park_names:
+            check(
+                f"suppress {name} (free the operational DOF)",
+                await adapter.suppress_mate(SuppressMateParameters(name=name, suppress=True)),
+            )
+        adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
+    await assert_expected_free_dof(adapter, 0 if LOCK else len(park_names))
     check_no_interference(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)
 
