@@ -6,11 +6,22 @@ metadata:
 ---
 
 **Inverted the always-0-DOF design (2026-06, drive-train first, PR stacked on #110
-`drive-train-unlock`).** The default build now saves a WORKING kinematic model: the
-predetermined operational DOF are left FREE. Today that is drive-train's **crank
-spin** only (1 DOF — drag the crank, the whole geared train turns). Cone-post swing
-and the 20 channel amplitude bars stay park-driven at their engaged pose (setup /
-disengage motions; covered by motion + mobility suites).
+`drive-train-unlock`; extended to channel 2026-06).** The default build now saves a
+WORKING kinematic model: the predetermined operational DOF are left FREE.
+- **drive-train** frees the **crank spin** (1 DOF — drag the crank, the whole geared
+  train turns). Cone-post swing stays park-driven.
+- **channel** frees, per active channel, **3 DOF** — rocker swing + connecting-rod
+  follow + amplitude-bar slide — so a 20-channel build saves 60 free DOF. Validated
+  full-scale 2026-06: `park_drivers=60 expected_free_dof=60 free_dof=60`, interference
+  hits=0, deep-health 165 targets clean. The reorg that introduced this (4 mate
+  changes, see below) replaced the rocker spin_driver + global-Front-Plane axial with:
+  rocker spin→`PARK_rocker_angle` + axial **distance to the neighbour pivot-bushing**
+  (PITCH/2, the #110 neighbour idiom — bushings pre-placed BEFORE the channel loop);
+  rod→**coaxial coincident on the rocker's rod-bore axis** + Z-distance to rocker Front
+  Plane + `PARK_rod_swing` (was `_pin_design_pose`'s 4 global-datum mates, now removed);
+  bar foot-X→`PARK_bar_amplitude`. Channel-level validated only — the top-level
+  cam-ring↔cylinder-gear-lobe interference (~0.39mm slack `_pin_design_pose` guarded) is
+  deferred to a `harmonic_analyzer` build.
 
 **Mechanism — author-but-suppress.** Every reproducibility-locking mate is still
 authored, then its FEATURE renamed to `PARK_<key>` (e.g. `PARK_crank_angle`) — the
@@ -41,10 +52,10 @@ and watch the gears turn, and the artefact didn't represent the device's kinemat
   gate (over-constrained, model-healthy, interference, gear-ratios, component-count)
   runs on the as-built model UNCHANGED. `assert_components_fully_defined` itself is
   unchanged (the 8 build-script callers keep strict 0-DOF).
-- verify `_expected_free_dof(name)` returns 1 only when drive-train was built `free`
-  (it re-reads `build_lock.yaml`; the freshness guard guarantees the saved model
-  matches). The gate then routes to `report.agate(...)` (async) for the closure, else
-  the sync `report.gate(...)`.
+- verify `_expected_free_dof(name)`: drive-train→1 (if free), channel→`3 *
+  _config.active_count()` (if free), else 0 (re-reads `build_lock.yaml`; freshness guard
+  guarantees the saved model matches). The gate routes to `report.agate(...)` (async)
+  for the closure when free, else the sync `report.gate(...)`.
 - `build_mobility_probe.py` re-engages all `PARK_*` BEFORE its 0-DOF baseline (the
   default-free saved model is not 0-DOF), then suppresses each driver to show it frees
   its own part family.

@@ -64,7 +64,8 @@ assert INSTALLED_BODY_LENGTH > COIL_BODY_LENGTH, "installed spring must be stret
 
 async def build(adapter) -> dict[str, str]:
     return await build_spring(
-        adapter, PART_NAME, INSTALLED_BODY_LENGTH, leads=(BOTTOM_LEAD, TOP_LEAD)
+        adapter, PART_NAME, INSTALLED_BODY_LENGTH, leads=(BOTTOM_LEAD, TOP_LEAD),
+        eye_axes=True,
     )
 
 
