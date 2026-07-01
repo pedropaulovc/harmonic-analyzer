@@ -69,7 +69,7 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 CURVE_RADIUS = 800.0  # DIMENSIONS.md ch14: = amplitude bar length (stated)
 ARM_DEPTH = 16.0  # ch14: p.29 photo callout, end-face height (annotated)
 ARM_THICKNESS = 2.5  # ch14: p.27 photo callout (annotated)
-ROD_SPAN = 146.05  # pivot -> rod-side end = 5.75" (11.5" total arm, user override)
+ROD_SPAN = 146.05  # pivot -> rod-side end = 5.75" (11.5" total; ch.30 back view, manual)
 TAIL_SPAN = 146.05  # pivot -> opposite end, symmetric seesaw (ch.15)
 PIVOT_HOLE_DIA = 6.5  # rides the 6.35 pivot shaft (DIMENSIONS.md ch14, derived)
 ROD_HOLE_DIA = 2.0  # connecting-rod pin (photo-scaled, low)
