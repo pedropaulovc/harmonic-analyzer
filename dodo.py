@@ -1073,17 +1073,22 @@ def task_refresh_comparisons():
          harmonic-analyzer.SLDASM and write its STEP + monolithic STL + scene
          boxes. NO code rebuild (never runs an assembly build script) and NO
          whole-machine per-part STEP sweep (~13 min): the render feed reuses the
-         per-part STLs already on disk, so a part STL is re-exported only when
-         it is outright missing.
+         per-part STLs already on disk, re-exporting one only when it is missing
+         OR stale vs its .SLDPRT (so the render step's freshness guard passes).
       2. ``render_offline.py --model harmonic_analyzer`` -- Blender replays the
          manifest cameras against the refreshed scene graph and regenerates the
          gallery composites/scores itself (SolidWorks-free).
 
-    OPT-IN (not in default_tasks) and deliberately OFF the COM spine -- it must
-    not drag the parts/assembly/verify rebuild chain. It DOES open one SolidWorks
-    seat for step 1, so do not run it concurrently with ``doit build``/``-n``
-    (same single-STA-seat rule the spine enforces). ``uptodate: False`` -> always
-    runs; the two scripts each self-check per-output staleness.
+    OPT-IN (not in default_tasks) and deliberately OFF the COM spine. On-spine is
+    architecturally wrong for a fast-refresh loop: a spine position either drags
+    the whole parts/assembly/verify rebuild chain (defeating "minimum needed"), or,
+    inserted mid-spine, pulls this task into every plain ``doit build``. So it
+    stays off-spine at the documented cost that ``_assert_spine_complete`` cannot
+    see it (it validates only tasks already IN the spine) -- meaning the operator,
+    not doit, owns the single-STA-seat rule for THIS task: run it alone, never as
+    ``doit -n2 refresh_comparisons build`` (that could float its export beside a
+    spine COM task and deadlock the seat). ``uptodate: False`` -> always runs; the
+    two scripts each self-check per-output staleness.
     """
     return {
         "uptodate": [False],

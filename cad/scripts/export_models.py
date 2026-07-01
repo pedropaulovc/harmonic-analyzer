@@ -253,6 +253,20 @@ def save_colors(colors: dict) -> None:
         {k: list(v) for k, v in sorted(colors.items())}, indent=1), encoding="utf-8")
 
 
+def part_stl_missing_or_stale(stem: str, mesh: str) -> bool:
+    """--top-only's STL-only staleness: re-export a per-part STL that is missing
+    OR older than its .SLDPRT. It deliberately ignores STEP/colour (the full
+    sweep's extra triggers that make part_stl_stale re-export everything) — but
+    it must NOT reuse a genuinely stale STL: an assembly save bumps every nested
+    .SLDPRT mtime via the parent-md5 cascade without re-exporting its STL, and
+    render_offline._stale then RAISES on that stale STL. Match its criterion
+    exactly (stl.mtime < sldprt.mtime) so the refresh export re-feeds the render
+    (codex review #133)."""
+    src = OUT_SLDPRT / f"{stem}.SLDPRT"
+    stl = OUT_STL / f"{mesh}.STL"
+    return not stl.exists() or stl.stat().st_mtime < src.stat().st_mtime
+
+
 def part_stl_stale(stem: str, mesh: str, colors: dict) -> bool:
     src = OUT_SLDPRT / f"{stem}.SLDPRT"
     stl = OUT_STL / f"{mesh}.STL"
@@ -425,9 +439,12 @@ def main() -> int:
                 by_stem: dict[str, list[tuple[str, str]]] = {}
                 for stem, cfg, mesh in sorted(stems):
                     # --top-only reuses the per-part STLs already on disk (the
-                    # render feed), re-exporting one only if it's outright missing;
-                    # the normal path refreshes any STL/STEP/colour-stale part.
-                    needed = (not (OUT_STL / f"{mesh}.STL").exists()) if top_only \
+                    # render feed), re-exporting one only if it is missing OR
+                    # stale vs its .SLDPRT (render_offline._stale would RAISE on a
+                    # stale STL — the assembly-save parent-md5 cascade bumps nested
+                    # .SLDPRT mtimes); the normal path additionally refreshes any
+                    # STEP/colour-stale part.
+                    needed = part_stl_missing_or_stale(stem, mesh) if top_only \
                         else (force or part_stl_stale(stem, mesh, colors))
                     if needed:
                         by_stem.setdefault(stem, []).append((cfg, mesh))
