@@ -288,27 +288,40 @@ def assert_configs_distinct(stem: str, crc_by_mesh: dict[str, int]) -> None:
 
 def main() -> int:
     force = "--force" in sys.argv[1:]
+    # --top-only: export the manifest's ASSEMBLY geometry (STEP + monolithic STL +
+    # scene boxes) from the current on-disk model, WITHOUT the full per-part STL/STEP
+    # sweep. The render_offline comparison feed instances the per-part STLs already on
+    # disk, so a part is re-exported here only when its STL is genuinely MISSING (never
+    # merely to refresh a stale STEP/colour). This is the minimal "export the top-level
+    # model as-is" path behind the `refresh_comparisons` doit task -- seconds, not the
+    # ~13 min a whole-machine STEP refresh costs. No code rebuild either way: every
+    # branch opens the saved .SLDASM/.SLDPRT and exports it verbatim.
+    top_only = "--top-only" in sys.argv[1:]
     models = manifest_models()
     colors = load_colors()
 
     parts = [m for m in models if model_path(m).suffix.lower() == ".sldprt"]
     assemblies = [m for m in models if m not in parts]
 
-    stale_parts = [m for m in parts if force
-                   or part_stl_stale(m.replace("_", "-"), m.replace("_", "-"), colors)]
-    stale_asms = []
-    for m in assemblies:
-        src, bj = model_path(m), OUT_BOXES / f"{m.replace('_', '-')}.json"
-        mono = OUT_STL / f"{m.replace('_', '-')}.STL"
-        if (force or not bj.exists() or bj.stat().st_mtime < src.stat().st_mtime
-                or not mono.exists() or mono.stat().st_mtime < src.stat().st_mtime):
-            stale_asms.append(m)
-            continue
-        data = json.loads(bj.read_text(encoding="utf-8"))
-        comps = data.get("components") or []
-        if (not comps or any("mesh" not in c for c in comps) or any(
-                part_stl_stale(c["part"], c["mesh"], colors) for c in comps)):
-            stale_asms.append(m)
+    if top_only:
+        # Always (re)export the top-level assembly geometry; never sweep parts.
+        stale_parts, stale_asms = [], assemblies
+    else:
+        stale_parts = [m for m in parts if force
+                       or part_stl_stale(m.replace("_", "-"), m.replace("_", "-"), colors)]
+        stale_asms = []
+        for m in assemblies:
+            src, bj = model_path(m), OUT_BOXES / f"{m.replace('_', '-')}.json"
+            mono = OUT_STL / f"{m.replace('_', '-')}.STL"
+            if (force or not bj.exists() or bj.stat().st_mtime < src.stat().st_mtime
+                    or not mono.exists() or mono.stat().st_mtime < src.stat().st_mtime):
+                stale_asms.append(m)
+                continue
+            data = json.loads(bj.read_text(encoding="utf-8"))
+            comps = data.get("components") or []
+            if (not comps or any("mesh" not in c for c in comps) or any(
+                    part_stl_stale(c["part"], c["mesh"], colors) for c in comps)):
+                stale_asms.append(m)
 
     if not stale_parts and not stale_asms:
         _telemetry.info("all exports fresh")
@@ -411,7 +424,12 @@ def main() -> int:
 
                 by_stem: dict[str, list[tuple[str, str]]] = {}
                 for stem, cfg, mesh in sorted(stems):
-                    if force or part_stl_stale(stem, mesh, colors):
+                    # --top-only reuses the per-part STLs already on disk (the
+                    # render feed), re-exporting one only if it's outright missing;
+                    # the normal path refreshes any STL/STEP/colour-stale part.
+                    needed = (not (OUT_STL / f"{mesh}.STL").exists()) if top_only \
+                        else (force or part_stl_stale(stem, mesh, colors))
+                    if needed:
                         by_stem.setdefault(stem, []).append((cfg, mesh))
                 for stem, cfg_meshes in sorted(by_stem.items()):
                     await export_part_stls(stem, cfg_meshes)

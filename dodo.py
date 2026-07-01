@@ -425,6 +425,9 @@ LOGS = CAD_OUT / "logs"
 VERIFY_PY = (SCRIPTS_DIR / "verify.py").resolve()
 EXPORT_PY = (SCRIPTS_DIR / "export_models.py").resolve()
 RELEASE_PY = (SCRIPTS_DIR / "cut_release.py").resolve()
+_COMPARE_TOOLS = REPO_ROOT / "comparisons" / "tools"
+RENDER_OFFLINE_PY = (_COMPARE_TOOLS / "render_offline.py").resolve()
+COMPOSITE_PY = (_COMPARE_TOOLS / "composite.py").resolve()
 
 # The gate suites, by SolidWorks-dependence -- the single source of truth for the
 # verify:/check: task names (reused by build + release so a new gate is wired in
@@ -1057,6 +1060,40 @@ def task_export():
         "task_dep": _spine_dep("export"),
         "uptodate": [False],
         "actions": [(_run, [[sys.executable, str(EXPORT_PY)], "export", "export"])],
+        "verbosity": 2,
+    }
+
+
+def task_refresh_comparisons():
+    """Minimal photo-vs-CAD refresh: export ONLY the top-level model as-is, then
+    re-render its Blender comparison pairs.
+
+    Two actions, in order:
+      1. ``export_models.py --top-only`` (COM) -- open the CURRENT
+         harmonic-analyzer.SLDASM and write its STEP + monolithic STL + scene
+         boxes. NO code rebuild (never runs an assembly build script) and NO
+         whole-machine per-part STEP sweep (~13 min): the render feed reuses the
+         per-part STLs already on disk, so a part STL is re-exported only when
+         it is outright missing.
+      2. ``render_offline.py --model harmonic_analyzer`` -- Blender replays the
+         manifest cameras against the refreshed scene graph and regenerates the
+         gallery composites/scores itself (SolidWorks-free).
+
+    OPT-IN (not in default_tasks) and deliberately OFF the COM spine -- it must
+    not drag the parts/assembly/verify rebuild chain. It DOES open one SolidWorks
+    seat for step 1, so do not run it concurrently with ``doit build``/``-n``
+    (same single-STA-seat rule the spine enforces). ``uptodate: False`` -> always
+    runs; the two scripts each self-check per-output staleness.
+    """
+    return {
+        "uptodate": [False],
+        "actions": [
+            (_run, [[sys.executable, str(EXPORT_PY), "--top-only"],
+                    "refresh_comparisons:export", "refresh-comparisons-export"]),
+            (_run, [[sys.executable, str(RENDER_OFFLINE_PY),
+                     "--model", "harmonic_analyzer"],
+                    "refresh_comparisons:render", "refresh-comparisons-render"]),
+        ],
         "verbosity": 2,
     }
 
