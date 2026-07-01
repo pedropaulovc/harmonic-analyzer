@@ -656,9 +656,9 @@ sections:
         - stated
         - high
       - - Arm length (tapered profile)
-        - TOP edge arc 11.5" (292.1 mm), BOTTOM edge arc 10.5" (266.7 mm), symmetric about the pivot; 0.22" (5.588 mm) tip chamfer at each top-outer corner
+        - TOP edge arc 11.5" (292.1 mm), BOTTOM edge arc 10.5" (266.7 mm), symmetric about the pivot; 0.22" (5.588 mm) face PERPENDICULAR to the top edge at each tip (90° right-angle mark, cut into the front profile — not a 3D chamfer)
         - '11.5'
-        - 'MEASURED MANUALLY from the ch. 30 back-view sketch. Top edge = R800 arc (11.5"); bottom edge = concentric R816 arc (10.5") — the differing arc lengths taper the ends inward (a shorter lower edge below a longer upper edge is only geometric with non-radial ends). The 0.22" tip chamfer is from the same sketch. Supersedes the earlier p.29 broadside photo-scaled 4.5"/9" read (dual scale ~8.1–8.6 px/mm off the pivot ball / rod-pin hole / 16 mm depth callout, pivot→tip 113–119 mm rounded to a clean imperial half), the indirect M6.3 "80 mm bar travel + 8 mm margin" = 88 (never measured), and the M2 100/70 asymmetric read; ch. 15 symmetry retained. Perpendicular depth stays 16 mm; plate thickness 2.5 mm'
+        - 'MEASURED MANUALLY from the ch. 30 back-view sketch. Top edge = R800 arc (11.5"); bottom edge = concentric R816 arc (10.5") — the differing arc lengths taper the ends inward (a shorter lower edge below a longer upper edge is only geometric with non-radial ends). The 0.22" tip face — square (90°) to the top edge, per the sketch's right-angle marks — is from the same sketch, cut into the front profile as a short radial segment (perpendicular to the top arc) rather than a 3D chamfer feature. Supersedes the earlier p.29 broadside photo-scaled 4.5"/9" read (dual scale ~8.1–8.6 px/mm off the pivot ball / rod-pin hole / 16 mm depth callout, pivot→tip 113–119 mm rounded to a clean imperial half), the indirect M6.3 "80 mm bar travel + 8 mm margin" = 88 (never measured), and the M2 100/70 asymmetric read; ch. 15 symmetry retained. Perpendicular depth stays 16 mm; plate thickness 2.5 mm'
         - manual (ch. 30 back view)
         - med
       - - Rod-pin hole
