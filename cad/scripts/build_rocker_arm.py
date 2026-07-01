@@ -6,12 +6,14 @@ book states the radius equals the amplitude-bar length, minimizing
 nonlinearity as the bar slides); bottom edge concentric, giving a uniform
 16 mm depth (p.29 photo callout spans the end face). Plate thickness
 2.5 mm (p.27 callout - the M1 table misread this as a 12.5 mm "arm
-width"). Mid-pivot SEESAW, symmetric +/-114.3 mm (4.5"): the arm half-length
-is rederived from the p.29 broadside photo (img id 285) - pivot ball,
-rod-pin hole and the 16 mm depth callout give a dual scale (~8.1-8.6 px/mm),
-and the pivot->tip span measures 113-119 mm (central ~116), adopted as the
-clean imperial 4.5" (9" total arm = the 9" pivot shaft). This supersedes the
-indirect "80 mm bar travel + 8 mm margin" estimate (88) the M6.3 row used.
+width"). Mid-pivot SEESAW, symmetric +/-146.05 mm (5.75", 11.5" total arm): measured
+MANUALLY from the ch. 30 back view. The prior photo-scaled value was
++/-114.3 mm (4.5"), read off the p.29 broadside photo (img id 285) - pivot
+ball, rod-pin hole and the 16 mm depth callout gave a dual scale
+(~8.1-8.6 px/mm), pivot->tip span 113-119 mm (central ~116), rounded then to
+a clean imperial 4.5" (9" total); the ch. 30 back view resolves the tips more
+directly. Still supersedes the indirect "80 mm bar travel + 8 mm margin"
+estimate (88) the M6.3 row used.
 The amplitude bar rides either side of the pivot the full half-length
 (positive one side, negative the other - ch. 15 text: the bar "can slide
 completely off the rocker"); the connecting rod pins at
@@ -67,8 +69,8 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 CURVE_RADIUS = 800.0  # DIMENSIONS.md ch14: = amplitude bar length (stated)
 ARM_DEPTH = 16.0  # ch14: p.29 photo callout, end-face height (annotated)
 ARM_THICKNESS = 2.5  # ch14: p.27 photo callout (annotated)
-ROD_SPAN = 114.3  # pivot -> rod-side end = 4.5" (p.29 broadside photo, med)
-TAIL_SPAN = 114.3  # pivot -> opposite end, symmetric seesaw (ch.15)
+ROD_SPAN = 146.05  # pivot -> rod-side end = 5.75" (11.5" total arm, user override)
+TAIL_SPAN = 146.05  # pivot -> opposite end, symmetric seesaw (ch.15)
 PIVOT_HOLE_DIA = 6.5  # rides the 6.35 pivot shaft (DIMENSIONS.md ch14, derived)
 ROD_HOLE_DIA = 2.0  # connecting-rod pin (photo-scaled, low)
 ROD_HOLE_X = 25.4  # rod pin 1" from the pivot, +X side (derived, M6.3)

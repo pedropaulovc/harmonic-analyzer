@@ -656,10 +656,10 @@ sections:
         - stated
         - high
       - - Arm length
-        - symmetric ±114.3 mm (4.5") about the pivot (228.6 = 9" total)
-        - '4.5'
-        - 'REDERIVED from the p.29 broadside photo: pivot ball, rod-pin hole and the 16 mm depth callout give a dual scale (~8.1–8.6 px/mm), and the pivot→tip span measures 113–119 mm (central ~116) → adopt the clean imperial 4.5" half (9" total = the 9" pivot shaft). Supersedes the indirect M6.3 "80 mm bar travel + 8 mm margin" = 88 (never measured) and the M2 100/70 asymmetric read; ch. 15 symmetry retained'
-        - photo-scaled
+        - symmetric ±146.05 mm (5.75") about the pivot (292.1 = 11.5" total)
+        - '5.75'
+        - 'MEASURED MANUALLY from the ch. 30 back view → ±5.75" half (11.5" total arm). Supersedes the earlier p.29 broadside photo-scaled 4.5" (9" total): that read used a dual scale (~8.1–8.6 px/mm) off the pivot ball, rod-pin hole and 16 mm depth callout, with the pivot→tip span at 113–119 mm rounded to a clean imperial 4.5" half — the ch. 30 back view resolves the tips more directly. Still supersedes the indirect M6.3 "80 mm bar travel + 8 mm margin" = 88 (never measured) and the M2 100/70 asymmetric read; ch. 15 symmetry retained'
+        - manual (ch. 30 back view)
         - med
       - - Rod-pin hole
         - Ø2 at +25.4 (1") from the pivot, rod side, mid-depth
@@ -800,8 +800,10 @@ sections:
       finish. Legacy AmplitudeBar.cs survives the audit: both book-verifiable dims
       (width, length) confirm it. M6.3: the bars run UP the spine from the rocker
       arms to the top levers (text pp. 30–31) — top pin FIXED on the lever at
-      x = −72.9 (above the rocker pivot), foot slides ±80 along the arm, the bar
-      tilting up to ±5.6° (the "nonlinearity ameliorated" by the 813 length).
+      x = −72.9 (above the rocker pivot); the foot slides the full arm half-length,
+      now ±146.05 (11.5" arm, ch.14 back-view re-read; the bar "can slide completely
+      off the rocker"), so the bar tilts up to ±10.5° at the tip (asin(146.05/800)) —
+      was ±80 / ±5.6° at the 9" arm — the "nonlinearity ameliorated" by the 813 length.
       Default assembly state: all bars at the pivot (d = 0, all coefficients
       zero), exactly vertical, foot notch on the arm top edge at y ≈ 261.8,
       top at ≈ 1072.3, pin at ≈ 1065.9.
@@ -838,7 +840,7 @@ sections:
       - - Scale span (10 divisions)
         - 80 mm
         - '3.15'
-        - one half of the rocker-arm working length (p.34; ch.14 → ~160 mm)
+        - the p.34 gauge face (0–10 = "one half of the rocker arm"); with the 11.5" arm (ch.14) that half is 146.05 mm, so the face reads coefficient, not mm 1:1 — see notes
         - derived
         - med
       - - Body thickness
@@ -850,11 +852,16 @@ sections:
   - prose: |2
 
       Notes: ruled brass gauge (Wm. Gaertner & Co.) with a sliding/locking stop. The
-      0–10 scale spans "the 10 equal divisions of one half of the rocker arm" → half
-      rocker-arm working length ≈ 80 mm → rocker-arm working length ≈ 160 mm. This is
-      the top-down channel-geometry anchor; cross-check against the 16 mm callout in
-      ch. 14 and photo scaling during M2. Model the nominal 8 mm spacing (not the
-      hand-stamping error).
+      0–10 scale spans "the 10 equal divisions of one half of the rocker arm." With the
+      arm re-read to 11.5" (ch.14 back view), that half is 146.05 mm → full working
+      length ≈ 292 mm (was ≈160 at the 9" arm). CAVEAT: the gauge's physical scale span
+      still measures ~80 mm in the p.34/35 photo, so the 0–10 face is a COEFFICIENT
+      scale (≈14.6 mm of arm travel per division), NOT 1:1 mm — do not rescale the
+      physical stick to 292 without a photo re-read. This working length was also the
+      top-down channel-geometry anchor: if the longer arm is meant to widen the channel
+      span, machine/channels.yaml must be rebuilt to match (flagged, NOT done here — the
+      channel parts still build to the old anchor). Cross-check against the 16 mm callout
+      in ch.14. Model the nominal 8 mm gauge spacing (not the hand-stamping error).
 - heading: Chapter 17 — Springs and Levers (pp. 38–41)
   elements:
   - prose: ''
