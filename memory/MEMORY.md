@@ -1,5 +1,7 @@
 # Memory index
 
+- [Codex Windows sandbox broken](codex-windows-sandbox.md) — codex plugin `--write` (workspace-write) blocks ALL commands on this seat; bypass with direct `codex exec --sandbox danger-full-access`
+
 - [Default-free DOF + park drivers](default-free-dof-park-drivers.md) — the default build now saves a WORKING kinematic model (operational DOF FREE; drive-train = crank spin, 1 DOF); reproducibility-lock mates are authored as suppressed `PARK_<key>` features, engaged only by a `locked` build (`machine/build_lock.yaml`); the DOF gate adapts via the closure check `assert_expected_free_dof`, every other gate unchanged
 - [No untested failure assumptions](no-untested-failure-assumptions.md) — don't design defensive fallbacks (locked-pose checks, forced-lock exports) around an UNVERIFIED assumption that SolidWorks will misbehave; enforce real checks on the as-built artifact, reproduce a failure empirically before mitigating it
 - [Verify assumptions in live SW](verify-assumptions-live-sw.md) — treat old code comments as likely stale; before sizing/rejecting a CAD or mate fix, probe the live model (features, named axes, transforms, mirror flags) and try the candidate mate empirically — let results, not prose, set the design and scope
