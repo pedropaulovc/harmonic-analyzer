@@ -406,9 +406,9 @@ sections:
       - - Cam diameter (integral cam per gear)
         - 30.6 mm
         - '1.205'
-        - 'SCALED 0.6022 with the gear OD (50.8 → 30.6, user-directed 2026-06-18): at the finer module the eccentric lobe (OD/2 + ecc) must clear the new tooth-root circle (root r ≈ 29.95). Cam OD is only a bearing surface, so scaling it is functionally harmless'
+        - 'SCALED 0.6022 with the gear OD (50.8 → 30.6, user-directed 2026-06-18); independently CONFIRMED by the p.25 strap close-up: ring bore scales to Ø29.83, consistent with the Ø30.8 bore riding a Ø30.6 cam (ch14 ROM re-derive 2026-07-02). At the finer module the eccentric lobe (OD/2 + ecc = 23.94) clears the tooth-root circle (root r ≈ 29.95)'
         - scaled
-        - low
+        - med
       - - Cam thickness
         - 3.5 mm
         - '0.138'
@@ -416,11 +416,11 @@ sections:
         - derived
         - med
       - - Cam eccentricity
-        - 3.06 mm
-        - '0.120'
-        - SCALED 0.6022 with the gear (5.08 → 3.06, user-directed 2026-06-18); the rocker-arm stroke shrinks proportionally (accepted). Was legacy 0.2" at the old module
-        - scaled
-        - low
+        - 8.64 mm
+        - '0.340'
+        - 'MEASURED from the ch14 end views (2026-07-02): least-squares cos fit of the 20 rocker-tip heights gives tip half-amplitude 9.458 mm; scaled down the 139.5 tip lever to the 127.37 rod lever → ecc 8.64 (band 8.2–9.1 across plausible scale reads). The p.25 dashed outline is a teardrop TEMPLATE cam (Michelson 1898 closing note: cut metal templates), whose full lift ≈14.7 agrees with the end-view ring travel ~17.3 within its weak scale; modelled as the kinematically-equivalent circular eccentric. SUPERSEDES the scaled 3.06 (0.6022 × legacy 5.08), which shrank the stroke ~2.8×'
+        - measured
+        - med
       - - Cam bore
         - 9.5 mm (3/8")
         - '0.375'
@@ -442,7 +442,9 @@ sections:
 
       M4 build (`build_cylinder_gear.py`): single non-configured part — 120T involute
       ring (cone-gear equation-curve technique, toothed-disc volume reproduces the
-      cone gear's T120 configuration), integral cam boss (lobe −Y), plain bore
+      cone gear's T120 configuration), integral cam boss (lobe +Y, toward the
+      notch: the ch14 end views show the 0-crank tip row LEVEL at the TOP of the
+      stroke — cos mode reads +1 at notch-up, so the lobe points up), plain bore
       through gear and cam, alignment notch near +Y. The book states only the notch
       **depth** (3 mm); the p.23 close-up labelled "notch" shows the mark as a thin
       saw **kerf cut between two teeth** — the real gears keep all 120 teeth, they are
@@ -588,9 +590,9 @@ sections:
       - confidence
       rows:
       - - Centre distance (cam ring → rocker pin)
-        - 144.75 mm
-        - '5.70'
-        - 'ch30 GT 2026-07-02 (vertical-rod closure): every rod hangs PLUMB from the rocker arm''s rod-side tip onto its cam — the ch30 photos show the rod straps dropping vertically onto the drum, and the GT rocker-corner triangulation lands the arm''s rod-side end at machine x −60 (bottom-arc end predicts −58.6). With the pivot at the seesaw mid-span (+72.9) and the rod-pin hole 127.49 out, the pin sits directly above the phased cam centre; 144.75 is solved to preserve the arm rest tilt −7.82° (pin azimuth −3.28° = tilt + lever angle β 4.54° — the rod-pin bore sits at the curved strap''s mid-depth, 10.12 above the pivot bore — downstream bar/lever/spring chain untouched; rod tilt −0.001°). Supersedes the oblique 180.83/163.18 era (its "line-2 photogrammetry" put the drum on the far side of the rocker support) and restores the original 127.0-era vertical-rod topology at the GT-corrected drum position'
+        - 147.6655 mm
+        - '5.81'
+        - 'ch30 GT vertical-rod closure + ch14 ROM re-derive (2026-07-02): every rod hangs PLUMB from the rocker arm''s rod-side tip onto its cam — the ch30 photos show the rod straps dropping vertically onto the drum, and the GT rocker-corner triangulation lands the arm''s rod-side end at machine x −60 (level-pose bottom-arc end predicts −59.9). With the pivot at the seesaw mid-span (+72.9), the rod-pin hole 127.37 out and LOW in the strap (5.3 above the bottom arc), the pin sits directly above the lobe-up phased cam centre (−54.474, 113.437) WITH THE ARM LEVEL (the ch14 end views show the 0-crank tip row flat); 147.6655 = pin y 261.10 − ring y 113.44, arm tilt 0 and rod tilt 0 by construction. Supersedes 144.75 (same closure at the lobe-down phase and −7.82° rest tilt) and the oblique 180.83/163.18 era before it'
         - derived
         - high
       - - Cam ring bore
@@ -617,21 +619,22 @@ sections:
         - ch.13 p.23 rod silhouettes vs 7 mm gear face
         - scaled
         - low
-      - - Tip strap (flattened upper end)
-        - 10 × 18, Ø2 pin hole centred
+      - - Tip head (Y-shaped upper end)
+        - 10 wide × 10.5 tall tombstone (round crown R5, short shoulders), Ø2 pin hole 2.4 below the crown top
         - —
-        - pin matches the rocker's Ø2 rod-pin hole at +127.49 from the pivot, near the rod-side tip (ch. 14, ch30 GT)
-        - scaled
-        - low
+        - 'ch14 fan photo (0.114 mm/px via the 16 mm arm-depth callout): head width ≈10, height ≈10.5 — SHORTER than the 16 arm depth, crown ~8 below the arm top edge; shoulders narrow into the 8 mm shank. Pin matches the rocker''s Ø2 rod-pin hole at +127.37 from the pivot, LOW in the strap (ch. 14). Supersedes the 10 × 18 full-depth strap read'
+        - measured
+        - med
   - prose: |2
 
       M6.3 re-read of p.29: the stepped sawtooth blocks at the rocker-arm tips
       are the AMPLITUDE BARS' notched feet parked near the arm ends (ch. 15
       "slide along its rocker arm … can slide completely off"), NOT the rod
-      tops — that mapping stands. The rods themselves are plain thin straps at
-      the top and attach near the ROD-SIDE tip (rod pin +127.49 from the
-      pivot, ch30 GT vertical-rod closure; M6.3's "near the pivot, +25.4" was
-      tied to the pre-ch30 arbor-47.5 layout — see ch. 14 layout).
+      tops — that mapping stands. The rods themselves are thin straps ending in
+      a short Y-shaped head at the top and attach near the ROD-SIDE tip (rod
+      pin +127.37 from the pivot, ch30 GT vertical-rod closure; M6.3's "near
+      the pivot, +25.4" was tied to the pre-ch30 arbor-47.5 layout — see
+      ch. 14 layout).
 
       ---
 - heading: Chapter 14 — Rocker Arms (pp. 26–29)
@@ -677,9 +680,9 @@ sections:
         - manual (ch. 30 back view)
         - med
       - - Rod-pin hole
-        - Ø2 at +127.49 from the pivot, rod side, mid-depth (5.3 inboard of the bottom-arc end)
-        - '5.02'
-        - 'ch30 GT closure: the rods hang PLUMB onto the cam drum at machine −54.7 with the pivot at the seesaw mid-span +72.9, so the hole sits 127.49 out (solved so the pin lands directly above the phased cam centre at the −7.82° rest tilt). The GT rocker-corner triangulation independently lands the arm''s rod-side end at machine −60 (bottom-arc end predicts −58.6). Supersedes M6.3''s "1-inch lever" (+25.4), which closed the same vertical-rod argument against the OLD arbor x = −47.5 — the GT drum move to −54.7 broke that closure and the ch30 photos re-resolve it at the tip'
+        - Ø2 at +127.37 from the pivot, rod side, LOW in the strap (5.3 above the bottom arc; 5.3 inboard of the bottom-arc end)
+        - '5.01'
+        - 'ch30 GT closure + ch14 ROM re-derive (2026-07-02): the rods hang PLUMB onto the cam drum at machine −54.7 with the pivot at the seesaw mid-span +72.9, so the hole sits 127.37 out (solved so the pin lands directly above the lobe-up phased cam centre WITH THE ARM LEVEL — the ch14 end views show the 0-crank tip row flat). The hole height is the ch14 fan photo''s read: the rod''s Y-head pin sits in the lower third of the strap, 5.3 above the bottom edge, NOT mid-depth like the pivot. The GT rocker-corner triangulation independently lands the arm''s rod-side end at machine −60 (level-pose bottom-arc end predicts −59.9). Supersedes the 127.49/mid-depth solve (same closure at the lobe-down phase, −7.82° rest tilt) and M6.3''s "1-inch lever" (+25.4) before it'
         - derived
         - high
       - - Pivot pin hole
@@ -700,7 +703,7 @@ sections:
       rows:
       - - Pivot shaft
         - Ø6.35 × 228.6 (9") along Z at (x, y) = (−72.9, 253.8)
-        - 'ball x photo-measured −66…−81, ball y 252–255 in both 0°/180° views ✓; y = support apex 228.6 + ball rise 25.2. GT rocker-corner triangulation puts the seesaw mid-span at +72.5 — the pivot value confirmed to 0.4. (The old chained derivation "x = arbor − rod-lever; y = drive + rod" is superseded: the drum sits at (−54.7, 104.8) and the rod hangs plumb from the arm''s rod-side tip, hole 127.49 out, solved link 144.75)'
+        - 'ball x photo-measured −66…−81, ball y 252–255 in both 0°/180° views ✓; y = support apex 228.6 + ball rise 25.2. GT rocker-corner triangulation puts the seesaw mid-span at +72.5 — the pivot value confirmed to 0.4. (The old chained derivation "x = arbor − rod-lever; y = drive + rod" is superseded: the drum sits at (−54.7, 104.8) and the rod hangs plumb from the arm''s rod-side tip, hole 127.37 out, solved link 147.6655)'
         - med (x, y photo + frame; dia low)
       - - Support casting ×1 (M6.5, depth re-read M6.9, UNIFIED M6.12)
         - 'M6.12: the windowed portal that M6.9 confirmed is now ONE green casting, `rocker-arm-support` (build_rocker_arm_support.py), replacing the former two-part split (this frustum + the transgear A-frame). NORTH upright = solid tapered frustum, base 88.9 × 40 → top 20 × 20, 177.8 tall (7"); SOUTH upright at machine z −111 = the tapered plate + saddle + clevis ears (former a-frame row); the two are tied by the TOP and FOOT rails, which now run continuously between them (≈2 mm overlap into each upright fuses the casting into a single solid body — gated in the build). The old east-flank arbor-clamp boss Ø20 / Ø9.7 bore is GONE: the cone/arbor no longer rests on the support (the arbor''s north end gets its own pedestal, the cone tip its own bracket, both in drive-train.SLDASM). Authored machine-handed → inserted unmirrored in frame.SLDASM at (x, z) = (+72.9, +101.6), the same transform the frustum used.'
@@ -722,7 +725,7 @@ sections:
         - low
       - - Pivot spacer bushings ×19
         - Ø10 OD × 4.5565 long × Ø6.5 bore (pitch 7.0565 − arm 2.5)
-        - 'M6.3 geometric ceiling: at d = 0 the bar-foot cheeks pass 6.45 above the shaft axis (contact 262.63 − notch 2.381 − axis 253.8), so OD < ~12.9 — REFUTES the p.27 "Ø~25 barrel" read (those barrels are something else); Ø10 keeps 1.45 clearance'
+        - 'M6.3 geometric ceiling: at d = 0 the bar-foot cheeks pass 5.63 above the shaft axis (contact 261.81 − notch 2.381 − axis 253.8; level rest pose), so OD < ~11.25 — REFUTES the p.27 "Ø~25 barrel" read (those barrels are something else); Ø10 keeps 0.63 clearance'
         - derived
         - med (OD low)
       - - Arm stations
@@ -734,12 +737,14 @@ sections:
 
       Notes: concave-upward curved top supports the amplitude bar (R = bar
       length, minimizing the bar-tilt cosine error — the bar-top pin height is
-      invariant within 0.1 mm across the ±11.6° arm swing). Pivot = zero-
+      invariant within 0.1 mm across the arm swing). Pivot = zero-
       coefficient position for the amplitude bar. Matte-black finish. End view
       p.28 shows the 20-arm array at uniform pitch. Bottom edge concentric with
       the top (uniform 16 mm depth, R 816/800 arcs). Canonical rest state
-      (cylinder-gear notches at +Y = cosine alignment, integral cam lobes −Y):
-      arms tilt −11.6° (rod side down), rods tilt 0.18°.
+      (cylinder-gear notches at +Y = cosine alignment, integral cam lobes +Y):
+      arms rest LEVEL (tilt 0 — the ch14 end views show the 0-crank tip row
+      flat at the TOP of the stroke), rods plumb (tilt 0); the ±ecc 8.64 cam
+      throw swings each tip ±9.46 about that level line.
       Re-authored as `cad/scripts/build_rocker_arm.py` (supersedes the legacy
       `oscilating-arms` part, which had no surviving source).
 - heading: Chapter 15 — Amplitude Bars (pp. 30–33)
@@ -999,16 +1004,16 @@ sections:
         - ch. 14 / ch. 17; lever z from boss-bore clearance
         - med
       - - Amplitude bars (default)
-        - 'vertical, slot centred on the pivot x = −72.9 (d = 0, bar rotated 90° about its long axis: slot/pin across Z); foot roof on the tilted arm''s top edge at 262.63 (contact at the bar −X edge, arc max), bar bottom 260.25, top 1073.05, top pin 1066.70'
-        - ch. 15 notes + M6.3 assembly solve
+        - 'vertical, slot centred on the pivot x = −72.9 (d = 0, bar rotated 90° about its long axis: slot/pin across Z); foot roof on the LEVEL arm''s top edge at 261.81 (contact at the bar −X edge, arc max), bar bottom 259.45, top 1072.25, top pin 1065.90'
+        - ch. 15 notes + assembly solve (level rest pose, ch14 ROM re-derive)
         - med
       - - Springs (default)
-        - 'hanging free from lever tab holes (−22.10, 1067.02), rotated 90° about Y so the eye ring (r 2.75, plane ⊥ lever face) threads the Ø4 hole; eye centre 3.37 below the hole (torus-swept worst cases at the slab faces: upper branch inside the hole void with 0.31 margin, lower branch clears the tab underside by 2.05); body 32 + hooks (eye centre at spring local y 34 = body 32 + lead 2.0); lower hook centre lands at y 1027.6 = summing-plate level — the 32 mm spring length closes the lever→plate chain only with the 177.8 lever (M6.4)'
-        - ch. 17/18 + M6.4 threading solve
+        - 'INSTALLED (stretched) between lever tab holes (−22.10, 1065.89 at the −0.002° neutral lever tilt) and the summing-plate hook arms, rotated 90° about Y so the eye ring (r 2.75, plane ⊥ lever face) threads the Ø4 hole; top eye centre 3.37 below the hole (1062.52), bottom eye on the spring-hook arm at 996.54; installed body 61.98 (canonical channel-spring-installed — verify:math spring:neutral-body-canonical pins it to the solver''s neutral gap)'
+        - ch. 17/18 + assembly solve (level rest pose)
         - med
       - - Default mechanism state
-        - 'gear notches near +Y with the drive-train''s +1.5° tooth-phase rotation (a T120 tooth faces the cone mesh) → cam centres at (−47.367, 121.721) = arbor + 5.08·(sin 1.5°, −cos 1.5°) → rod rings concentric on the cams there (M6.5 — assuming the unrotated centre (−47.5, 121.72) dug every ring 0.033 into its cam: 20 × 2.40 mm³) → arms tilted −11.54° (pin solve → pin (−48.01, 248.72)), rods leaning Rz +0.29°, levers +0.36° (bar-pin chain vs fulcrum 1065.9)'
-        - ch. 13 notes + ch. 25 + M6.3 solve, M6.5 phase fix
+        - 'gear notches near +Y with the drive-train''s +1.5° tooth-phase rotation (a T120 tooth faces the cone mesh) → cam lobes UP: cam centres at (−54.474, 113.437) = drum (−54.7, 104.8) + 8.64·(sin 1.5°, cos 1.5°) → rod rings concentric on the cams there → arms LEVEL (tilt 0, pin (−54.474, 261.103) — the ch14 end views show the 0-crank tip row flat at the top of the stroke), rods plumb (0°), levers −0.002° (bar-pin chain vs fulcrum 1065.9). 0 cranks = cos mode reading +1 on every channel'
+        - ch. 13/14 end views + ch. 25 + assembly solve (ch14 ROM re-derive 2026-07-02)
         - derived
   - prose: |2
 
@@ -1738,7 +1743,11 @@ sections:
         - none annotated; cam outline p.25 available
         - FOLDED INTO cylinder-gear (integral cam, dims preserved in
           build_cylinder_gear.py); standalone part removed. p.25 outline
-          photo-scaling cross-check still open against the integral cam.
+          cross-check RESOLVED (2026-07-02) — the dashed outline is a teardrop
+          TEMPLATE cam (Michelson 1898 closing note), lift ≈14.7, agreeing with
+          the ch14 end-view ring travel within its weak scale; its ring bore
+          scales to Ø29.83, confirming the Ø30.6 integral cam. Modelled as the
+          kinematically-equivalent circular eccentric, ecc 8.64 (ch. 13 rows).
       - - harmonic-base
         - 'ch.6: base 46 × 28 cm ✓ (= 18.1" × 11.0")'
         - PASS (footprint) — thicknesses photo-verify in M2
@@ -1814,7 +1823,7 @@ sections:
       4. **Rocker arm working length** — RE-RESOLVED in M6.3 (±114.3 symmetric),
          superseded by the ch.30 back-view seesaw read (11.5" top arc, see the
          ch. 14 table), rod pin RE-RESOLVED by the ch30 GT vertical-rod closure
-         at +127.49, near the rod-side tip — see the ch. 14 "Rocker pivot &
+         at +127.37, near the rod-side tip — see the ch. 14 "Rocker pivot &
          supports layout" table. M2's rod-at-tip read is thus partially
          vindicated (its asymmetric 100/70 profile stays refuted; the ch. 15
          "positive one side, negative the opposite side" argument constrains
