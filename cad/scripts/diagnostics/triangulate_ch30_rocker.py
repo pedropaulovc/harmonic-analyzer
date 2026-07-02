@@ -4,10 +4,12 @@ Reuses the solved cameras from ``triangulate_ch30_gt`` and ray-intersects the
 ``rocker_arm_corner_*`` GT clusters (left/right x butt/tip; "left/right" are
 machine-left/right as seen facing the FRONT, so each names one END of the
 seesaw strap). Findings that drove the 2026-07-02 vertical-rod re-anchor
-(`ROD_HOLE_X` 25.4 -> 127.49, `ROD_C2C` 180.83 -> 144.75):
+(`ROD_HOLE_X` 25.4 -> 127.49 -> 127.37, `ROD_C2C` 180.83 -> 144.75 -> 147.67;
+the last step is the same-day ch14 ROM re-derive that levelled the rest pose):
 
 * rod-side end (butt_right/tip_right) lands at machine (-60, 253) -- directly
-  OVER the cam drum (-54.7); the arm's bottom-arc end predicts -58.6;
+  OVER the cam drum (-54.7); the arm's bottom-arc end at the LEVEL rest pose
+  predicts -59.9;
 * far end (butt_left) lands at (+216, 247);
 * midpoint of the span = +72.5 = the frame's rocker pivot (+72.9): the pivot
   is the seesaw mid-span and the rod hangs PLUMB from the rod-side tip.
@@ -89,7 +91,7 @@ def main() -> int:
         mid = (ends["butt_right"][0] + ends["butt_left"][0]) / 2.0
         print(f"\nseesaw x-span midpoint = {mid:+.2f}  (frame rocker pivot +72.9)")
         print(f"rod-side end x = {ends['butt_right'][0]:+.2f}  (cam drum -54.7; "
-              f"arm bottom-arc end at the -7.82 deg rest tilt predicts -58.6)")
+              f"arm bottom-arc end at the level rest pose predicts -59.9)")
     return 0
 
 
