@@ -46,9 +46,10 @@ PART_NAME = "cylinder-gear-shaft"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 SHAFT_DIA = 0.375 * IN  # ch13: = cam bore (legacy parameters.kcl)
-SHAFT_LENGTH = 176.0  # ch13 stack + journals; shortened from 200 (2026-06-19)
-# so the arbor's north end clears the now-solid rocker-arm-support north upright
-# (the old support boss bore that held the north end is gone). See
+SHAFT_LENGTH = 168.0  # ch13 stack + journals; north end clears the now-solid
+# rocker-arm-support north upright (shortened from 200, 2026-06-19); south end
+# pulled back to machine z -90 (ch30 GT cyl_front, 2026-07-02: the end stops
+# INSIDE the arbor-pedestal bore, blind-bearing look). See
 # build_drive_train_assembly.ARBOR_LENGTH / ARBOR_SOUTH_Z.
 
 SHAFT_RADIUS = SHAFT_DIA / 2.0

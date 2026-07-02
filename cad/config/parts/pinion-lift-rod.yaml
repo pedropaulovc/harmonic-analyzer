@@ -1,0 +1,5 @@
+pinion-lift-rod:
+  number: MHA-060
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  process: "machined (steel)"

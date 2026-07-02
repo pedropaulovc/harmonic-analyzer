@@ -48,7 +48,7 @@ from _assembly import (
 )
 
 # drive-train cam (build_drive_train_assembly / build_cylinder_gear)
-X_DRUM, Y_DRIVE, Z_DRUM0, Z_PITCH = -47.5, 126.8, -67.1, 7.0568
+X_DRUM, Y_DRIVE, Z_DRUM0, Z_PITCH = -54.7, 104.8, -67.1, 7.0568
 DRUM_FACE = 3.0
 GEAR_PHASE_DEG = 1.5
 CAM_R = 25.4  # cam lobe OD radius (Ø50.8)
