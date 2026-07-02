@@ -273,8 +273,7 @@ async def add_spring_end_hooks(
                     CreatePlaneParameters(
                         mode="offset",
                         base_plane="Top Plane",
-                        offset=body_length,
-                        flip=True,
+                        offset=-body_length,
                     )
                 ),
             )

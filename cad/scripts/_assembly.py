@@ -363,37 +363,51 @@ async def plane_distance_mate(
     base_name: str,
     distance: float,
     target_origin: list[float],
-    *,
-    flip: bool = False,
 ) -> Any:
-    """Plane-plane distance (or coincident, when ``distance==0``) mate.
+    """Place ``comp_plane`` at a SIGNED offset from the base datum, flip-free.
 
     The structural-placement workhorse: three orthogonal calls fully define a
-    grounded part against a reference part's principal planes.
+    grounded part against the reference part's principal planes. The reference
+    part (``base_name``) is the assembly's origin-fixed first component, so its
+    principal planes coincide with the assembly datum planes -- offsetting from
+    ``base_plane`` (an assembly datum) is geometrically the base part's plane.
 
-    ``flip`` seeds the first solve's side (passed to :func:`_mate`). The default
-    ``False`` is right for axis-aligned parts. A part placed with a rotation that
-    inverts its plane normals lands on the FAR side under the default sense, so
-    its mates jump there via the delete-and-re-add recovery; pass ``flip=True``
-    on those mates to land on-target in one solve. (An explicit ``"anti_aligned"``
-    swMateAlign would also pick the near side, but on a rotated part it inverts
-    the part's ORIENTATION 180deg -- so flip, not alignment, is the correct knob
-    here: it selects the distance side while keeping the inserted orientation.)
+    ``distance`` is SIGNED and its sign alone selects the side (a positive offset
+    steps along ``+base_plane`` normal), so there is no mate flip and no
+    delete-and-re-add recovery. For a non-zero offset we build ONE assembly
+    reference plane at ``create_plane(base_plane, offset=distance)`` -- the signed
+    offset lands it on the correct side in a single shot -- and mate
+    ``comp_plane`` COINCIDENT to it. For ``distance == 0`` the datum itself is the
+    target, so ``comp_plane`` is mated coincident straight to ``base_plane@base_name``.
+
+    A coincident cannot put the part on the wrong distance-side the way a distance
+    mate's ambiguous side once did (the offset plane fixes the position;
+    ``alignment="closest"`` keeps the inserted orientation). ``target_origin``
+    still feeds the readback guard in :func:`coincident_mate`, now a pure
+    tripwire: a correct signed offset lands on-target in one solve, so the guard
+    confirms rather than recovers.
     """
-    kind = "distance" if abs(distance) > 1e-9 else "coincident"
     label = f"mate {comp_plane}@{comp_name} <-> {base_plane}@{base_name} d={distance:g}"
-    entities = [
-        named_ref(f"{comp_plane}@{comp_name}", "PLANE"),
-        named_ref(f"{base_plane}@{base_name}", "PLANE"),
-    ]
-    return await _mate(
+    if abs(distance) <= 1e-9:
+        target_ref = named_ref(f"{base_plane}@{base_name}", "PLANE")
+    else:
+        from solidworks_mcp.adapters.base import CreatePlaneParameters
+
+        plane = check(
+            f"create_plane {base_plane}{distance:+g} for {comp_name}",
+            await adapter.create_plane(
+                CreatePlaneParameters(
+                    mode="offset", base_plane=base_plane, offset=distance
+                )
+            ),
+        )
+        target_ref = named_ref(getattr(plane, "name", plane), "PLANE")
+    return await coincident_mate(
         adapter,
-        label,
-        kind,
-        entities,
-        distance=abs(distance),
+        named_ref(f"{comp_plane}@{comp_name}", "PLANE"),
+        target_ref,
+        label=label,
         verify=(comp_name, target_origin),
-        flip=flip,
     )
 
 async def concentric_mate(
