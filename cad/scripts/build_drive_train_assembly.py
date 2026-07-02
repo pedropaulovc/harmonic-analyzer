@@ -195,7 +195,7 @@ _DRUM_SEAT_NOMINAL = _config.machine("cone_incline", "drum_seat_nominal_mm")  # 
 Z_PITCH = _DRUM_SEAT_NOMINAL * math.cos(math.asin(RADIUS_STEP / _DRUM_SEAT_NOMINAL))  # 7.0566: drum z-pitch
 X_DRUM = 54.7  # cam-drum machine X = -54.7 (ch30 GT bundle adjustment, cyl gear
 # solved -52.3 +/- 0.9). The drum sits directly UNDER the rocker arms' rod-side
-# tips: the rocker pivot (+72.9) is the seesaw mid-span, its rod-pin hole 127.49
+# tips: the rocker pivot (+72.9) is the seesaw mid-span, its rod-pin hole 127.37
 # out, and every connecting rod hangs PLUMB from tip to cam (ch30 photos + GT
 # rocker-corner triangulation; the earlier "line-2 photogrammetry" oblique-rod
 # reading -- drum well clear of the support, LONG rods -- is refuted).
