@@ -824,10 +824,10 @@ async def _make_rocker_foot_axis(adapter, rk_comp, coeff):
         px = ("Right Plane" if abs(coeff) <= 1e-9 else
               check("foot-pin plane x", await adapter.create_plane(CreatePlaneParameters(
                   mode="offset", base_plane="Right Plane",
-                  offset=abs(coeff), flip=(coeff < 0)))).name)
+                  offset=coeff))).name)
         py = check("foot-pin plane y", await adapter.create_plane(CreatePlaneParameters(
             mode="offset", base_plane="Top Plane",
-            offset=abs(y_off), flip=(y_off < 0)))).name
+            offset=y_off))).name
         ax = check("foot-pin axis", await adapter.create_axis(CreateAxisParameters(
             mode="two_planes", planes=[px, py]))).name
     finally:
