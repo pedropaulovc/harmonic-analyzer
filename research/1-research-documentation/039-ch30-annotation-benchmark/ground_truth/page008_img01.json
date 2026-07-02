@@ -1,0 +1,82 @@
+{
+  "image": "page008_img01.png",
+  "points": [
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "x": 1117.3,
+      "y": 2981.6
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "x": 1118.5,
+      "y": 2931.3
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "x": 1338.1,
+      "y": 292.8
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "x": 416.1,
+      "y": 290.2
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "x": 1338.6,
+      "y": 3840.5
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "x": 406.9,
+      "y": 3838.5
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cone_gear_center",
+      "reason": "Tapered cone-gear stack is not confidently isolable behind the 20 black spring bars and the front gear from the pure right side (both attempts agree)."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "Rocker fan edge-on / unresolvable in this side view."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "reason": "Rocker fan edge-on / unresolvable in this side view."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "occluded"
+    },
+    {
+      "feature": "pinion_center",
+      "reason": "occluded"
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "reason": "occluded"
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "reason": "occluded"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "reason": "occluded"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "reason": "occluded"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "reason": "occluded"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "reason": "occluded"
+    }
+  ],
+  "source": "human_ground_truth"
+}

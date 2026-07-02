@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ch30 ground truth</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; display: flex; height: 100vh; font: 13px/1.4 system-ui, sans-serif; background: #111; color: #ddd; }
+  #side { width: 340px; min-width: 340px; padding: 10px; overflow-y: auto; background: #1a1a1a; border-right: 1px solid #333; }
+  #stage { flex: 1; position: relative; overflow: hidden; cursor: crosshair; }
+  canvas { position: absolute; top: 0; left: 0; }
+  h1 { font-size: 15px; margin: 0 0 8px; }
+  select, button { background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 4px; padding: 4px 8px; font: inherit; cursor: pointer; }
+  button:hover { background: #333; }
+  #save { background: #1f5c2e; font-weight: 600; width: 100%; margin: 8px 0; padding: 8px; }
+  #save.dirty { background: #7a2f1f; }
+  .feat { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 4px; cursor: pointer; }
+  .feat:hover { background: #262626; }
+  .feat.sel { background: #103a52; outline: 1px solid #2b7cb0; }
+  .chip { width: 12px; height: 12px; border-radius: 3px; border: 1px solid #000; flex: none; }
+  .fname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .st { font-size: 11px; color: #999; width: 86px; text-align: right; flex: none; }
+  .st.placed { color: #7fd08a; }
+  .st.occl { color: #d0a97f; }
+  .mini { padding: 1px 6px; font-size: 11px; }
+  #help { font-size: 11px; color: #888; margin-top: 10px; white-space: pre-line; }
+  #status { font-size: 12px; color: #8ab4f8; min-height: 16px; margin-top: 4px; }
+  #prov { font-size: 11px; margin: 4px 0; }
+  #prov.consensus_prefill { color: #d0a97f; } #prov.ground_truth { color: #7fd08a; }
+</style>
+</head>
+<body>
+<div id="side">
+  <h1>ch30 ground truth</h1>
+  <div style="display:flex; gap:6px; align-items:center;">
+    <button id="prev" class="mini">&#9664;</button>
+    <select id="imgsel" style="flex:1"></select>
+    <button id="next" class="mini">&#9654;</button>
+  </div>
+  <div id="prov"></div>
+  <button id="save">Save ground truth</button>
+  <div id="status"></div>
+  <div id="feats"></div>
+  <div id="help">Click a feature to arm it, then click on the image to place its dot.
+Drag a dot to move it. Arrow keys nudge the armed feature's dot by 1 px (Shift = 10 px).
+O = toggle occluded on armed feature. Delete = remove dot.
+Wheel = zoom at cursor. Drag background = pan. 0 = fit.
+Save writes ground_truth/&lt;stem&gt;.json (button turns red when unsaved).</div>
+</div>
+<div id="stage"><canvas id="cv"></canvas></div>
+<script>
+const COLORS = { red:'#ff0000', orange:'#ff8c00', magenta:'#ff00ff', yellow:'#ffff00', cyan:'#00ffff' };
+let DB = null, stem = null, img = new Image(), pts = {}, occl = {}, armed = null, dirty = false;
+let scale = 0.2, ox = 0, oy = 0, dragging = null, panning = null;
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d'), stage = document.getElementById('stage');
+
+async function init() {
+  DB = await (await fetch('/api/state')).json();
+  const sel = document.getElementById('imgsel');
+  DB.stems.forEach(s => sel.add(new Option(s, s)));
+  sel.onchange = () => loadStem(sel.value);
+  document.getElementById('prev').onclick = () => step(-1);
+  document.getElementById('next').onclick = () => step(1);
+  document.getElementById('save').onclick = save;
+  loadStem(DB.stems[0]);
+}
+function step(d) {
+  const i = DB.stems.indexOf(stem);
+  const s = DB.stems[(i + d + DB.stems.length) % DB.stems.length];
+  document.getElementById('imgsel').value = s;
+  loadStem(s);
+}
+function loadStem(s) {
+  stem = s;
+  const st = DB.states[s];
+  pts = {}; occl = {};
+  st.points.forEach(p => pts[p.feature] = { x: p.x, y: p.y });
+  st.occluded.forEach(o => occl[o.feature] = o.reason || 'occluded');
+  const prov = document.getElementById('prov');
+  prov.textContent = 'loaded from: ' + st.provenance;
+  prov.className = st.provenance;
+  setDirty(false);
+  armed = null;
+  img = new Image();
+  img.onload = () => { fit(); renderFeats(); draw(); };
+  img.src = '/images/' + s + '.' + DB.ext[s];
+}
+function fit() {
+  const r = stage.getBoundingClientRect();
+  cv.width = r.width; cv.height = r.height;
+  scale = Math.min(r.width / img.width, r.height / img.height);
+  ox = (r.width - img.width * scale) / 2; oy = (r.height - img.height * scale) / 2;
+}
+function toImg(e) {
+  const r = cv.getBoundingClientRect();
+  return { x: (e.clientX - r.left - ox) / scale, y: (e.clientY - r.top - oy) / scale };
+}
+function setDirty(d) {
+  dirty = d;
+  document.getElementById('save').className = d ? 'dirty' : '';
+  document.getElementById('save').textContent = d ? 'Save ground truth (unsaved!)' : 'Save ground truth';
+}
+function renderFeats() {
+  const box = document.getElementById('feats');
+  box.innerHTML = '';
+  DB.features.forEach(f => {
+    const row = document.createElement('div');
+    row.className = 'feat' + (armed === f.name ? ' sel' : '');
+    const p = pts[f.name], oc = occl[f.name] !== undefined;
+    row.innerHTML = `<span class="chip" style="background:${COLORS[f.color]}"></span>
+      <span class="fname" title="${f.name}">${f.name}</span>
+      <span class="st ${p ? 'placed' : oc ? 'occl' : ''}">${p ? Math.round(p.x) + ',' + Math.round(p.y) : oc ? 'occluded' : '—'}</span>`;
+    const ob = document.createElement('button'); ob.className = 'mini'; ob.textContent = 'occl';
+    ob.onclick = e => { e.stopPropagation(); toggleOccl(f.name); };
+    const xb = document.createElement('button'); xb.className = 'mini'; xb.textContent = '✕';
+    xb.onclick = e => { e.stopPropagation(); delete pts[f.name]; delete occl[f.name]; setDirty(true); renderFeats(); draw(); };
+    row.append(ob, xb);
+    row.onclick = () => { armed = armed === f.name ? null : f.name; renderFeats(); };
+    box.appendChild(row);
+  });
+}
+function toggleOccl(name) {
+  if (occl[name] !== undefined) delete occl[name];
+  else { occl[name] = 'occluded'; delete pts[name]; }
+  setDirty(true); renderFeats(); draw();
+}
+function colorOf(name) { return COLORS[DB.features.find(f => f.name === name).color]; }
+function draw() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.setTransform(scale, 0, 0, scale, ox, oy);
+  ctx.imageSmoothingEnabled = scale < 1;
+  ctx.drawImage(img, 0, 0);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  for (const [name, p] of Object.entries(pts)) {
+    const sx = p.x * scale + ox, sy = p.y * scale + oy, c = colorOf(name);
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+    cross(sx, sy, 11);
+    ctx.strokeStyle = c; ctx.lineWidth = 1.5;
+    cross(sx, sy, 10);
+    ctx.beginPath(); ctx.arc(sx, sy, 3, 0, 7); ctx.fillStyle = c; ctx.fill();
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.stroke();
+    if (armed === name) { ctx.beginPath(); ctx.arc(sx, sy, 14, 0, 7); ctx.strokeStyle = '#fff'; ctx.stroke(); }
+  }
+}
+function cross(x, y, r) {
+  ctx.beginPath();
+  ctx.moveTo(x - r, y); ctx.lineTo(x - 3, y); ctx.moveTo(x + 3, y); ctx.lineTo(x + r, y);
+  ctx.moveTo(x, y - r); ctx.lineTo(x, y - 3); ctx.moveTo(x, y + 3); ctx.lineTo(x, y + r);
+  ctx.stroke();
+}
+function hit(e) {
+  const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  for (const [name, p] of Object.entries(pts)) {
+    const dx = p.x * scale + ox - mx, dy = p.y * scale + oy - my;
+    if (dx * dx + dy * dy < 144) return name;
+  }
+  return null;
+}
+stage.addEventListener('mousedown', e => {
+  const h = hit(e);
+  if (h) { dragging = h; armed = h; renderFeats(); }
+  else panning = { x: e.clientX, y: e.clientY };
+});
+window.addEventListener('mousemove', e => {
+  if (dragging) { const p = toImg(e); pts[dragging] = { x: p.x, y: p.y }; setDirty(true); draw(); renderFeats(); }
+  else if (panning) { ox += e.clientX - panning.x; oy += e.clientY - panning.y; panning = { x: e.clientX, y: e.clientY }; draw(); }
+});
+window.addEventListener('mouseup', e => {
+  if (!dragging && panning && armed) {
+    const moved = Math.hypot(e.clientX - panning.x, e.clientY - panning.y);
+    // treated as click-to-place only if the mouse didn't pan
+  }
+  dragging = null; panning = null;
+});
+stage.addEventListener('click', e => {
+  if (dragging || hit(e) || !armed) return;
+  const p = toImg(e);
+  if (p.x < 0 || p.y < 0 || p.x > img.width || p.y > img.height) return;
+  pts[armed] = { x: p.x, y: p.y };
+  delete occl[armed];
+  setDirty(true); renderFeats(); draw();
+});
+stage.addEventListener('wheel', e => {
+  e.preventDefault();
+  const k = Math.pow(1.0015, -e.deltaY);
+  const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  ox = mx - (mx - ox) * k; oy = my - (my - oy) * k; scale *= k;
+  draw();
+}, { passive: false });
+window.addEventListener('keydown', e => {
+  if (e.target.tagName === 'SELECT') return;
+  if (e.key === '0') { fit(); draw(); return; }
+  if (e.key.toLowerCase() === 'o' && armed) { toggleOccl(armed); return; }
+  if (e.key === 'Delete' && armed) { delete pts[armed]; delete occl[armed]; setDirty(true); renderFeats(); draw(); return; }
+  const step = e.shiftKey ? 10 : 1, d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
+  if (d && armed && pts[armed]) {
+    e.preventDefault();
+    pts[armed].x += d[0]; pts[armed].y += d[1];
+    setDirty(true); draw(); renderFeats();
+  }
+});
+window.addEventListener('resize', () => { fit(); draw(); });
+async function save() {
+  const body = {
+    stem,
+    points: Object.entries(pts).map(([feature, p]) => ({ feature, x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10 })),
+    occluded: Object.entries(occl).map(([feature, reason]) => ({ feature, reason })),
+  };
+  const res = await (await fetch('/api/save', { method: 'POST', body: JSON.stringify(body) })).json();
+  document.getElementById('status').textContent = res.ok ? 'saved ' + res.saved + ' @ ' + new Date().toLocaleTimeString() : 'ERROR: ' + res.error;
+  if (res.ok) {
+    setDirty(false);
+    DB.states[stem] = { ...DB.states[stem], points: body.points, occluded: body.occluded, provenance: 'ground_truth' };
+    document.getElementById('prov').textContent = 'loaded from: ground_truth';
+    document.getElementById('prov').className = 'ground_truth';
+  }
+}
+init();
+</script>
+</body>
+</html>

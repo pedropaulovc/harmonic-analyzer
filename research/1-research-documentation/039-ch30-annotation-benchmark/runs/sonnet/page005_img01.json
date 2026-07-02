@@ -1,0 +1,113 @@
+{
+  "image": "page005_img01.jpeg",
+  "view": "back-left three-quarter",
+  "model": "sonnet",
+  "width": 1204,
+  "height": 2854,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 413,
+      "y": 1925,
+      "confidence": "high",
+      "note": "Small chain-wrapped sprocket coaxial with the fine-comb pinion roller near the rocker pivot bracket. Dot on the visible gold/brass hub cap."
+    },
+    {
+      "feature": "cone_gear_center_1",
+      "color": "magenta",
+      "x": 589,
+      "y": 2330,
+      "confidence": "medium",
+      "note": "Tapering-diameter roller at the base (matches ch12 cone gear set proportions). Dot on the silver mounting bolt at the small-end brass disc, used as the rotation-axis proxy."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 1053,
+      "y": 1923,
+      "confidence": "high"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 1063,
+      "y": 1957,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 276,
+      "y": 2612,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 1136,
+      "y": 2480,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 84,
+      "y": 2480,
+      "confidence": "medium"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 90,
+      "y": 373,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 300,
+      "y": 373,
+      "confidence": "medium",
+      "note": "Third of three support rods on the left cluster (x approx 90, 205, 320). Chosen as the corner nearer the machine center, the x approx 205 rod treated as a mid-span brace."
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 1142,
+      "y": 385,
+      "confidence": "high"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "crank_axle_sprocket_center",
+      "reason": "Sprocket teeth hidden behind a black bracket and the chain wrap. Only a green post cap and chain are visible, axis point not visible."
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "reason": "No cylinder (constant-diameter) gear roller distinguishable as separate from the cone gear assembly in this back-left angle. Axis point not visible."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "Same as cylinder_gear_center_1, no second roller resolvable at all in this view."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "Wide/butt end of the identified arm is covered by the pivot mounting bracket and ball. Corner not resolvable."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "Same as rocker_arm_corner_butt_left."
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "reason": "Diagonally opposite corner, fully hidden behind the machine body from this back-left angle."
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "reason": "Diagonally opposite corner, fully hidden behind the machine body and other visible posts from this back-left angle."
+    }
+  ],
+  "orientation_note": "Camera views the machine back and left faces (back-left three-quarter view). The front/platen side faces away from the camera. Back-left is the corner nearest the camera. Front-left recedes along the visible left face to the outer/leftmost extent. Back-right recedes along the visible back face toward the frame right edge. Front-right is the diagonally opposite corner and is fully hidden behind the machine body in this view."
+}

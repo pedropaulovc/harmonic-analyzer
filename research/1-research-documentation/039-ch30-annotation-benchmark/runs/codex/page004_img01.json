@@ -1,0 +1,124 @@
+{
+  "image": "page004_img01.png",
+  "view": "left side",
+  "model": "codex",
+  "width": 1776,
+  "height": 4209,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 477,
+      "y": 1788,
+      "confidence": "medium",
+      "note": "upper chain sprocket at platen level, seen edge-on; lower crank-axle sprocket intentionally not marked"
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 1160,
+      "y": 3325,
+      "confidence": "medium",
+      "note": "right-side visible brass cylindrical gear face behind the black connecting rods"
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "color": "orange",
+      "x": 1064,
+      "y": 3325,
+      "confidence": "medium",
+      "note": "adjacent visible brass cylindrical gear face to the left of center_1"
+    },
+    {
+      "feature": "cone_gear_center",
+      "color": "magenta",
+      "x": 1208,
+      "y": 3384,
+      "confidence": "medium",
+      "note": "exposed right-end shaft/axis point of the conical gear stack in side view"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "color": "yellow",
+      "x": 861,
+      "y": 2777,
+      "confidence": "low",
+      "note": "edge-on side view; selected the clearest long silver rocker strip just left of the center column"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "color": "yellow",
+      "x": 882,
+      "y": 2776,
+      "confidence": "low",
+      "note": "edge-on side view; lower pivot/butt end of same visible strip"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 856,
+      "y": 532,
+      "confidence": "low",
+      "note": "edge-on side view; upper visible end of same strip"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 888,
+      "y": 532,
+      "confidence": "low",
+      "note": "edge-on side view; upper visible end of same strip"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 492,
+      "y": 3814,
+      "confidence": "high",
+      "note": "bottom front corner of visible left-side base slab"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 1434,
+      "y": 3813,
+      "confidence": "high",
+      "note": "bottom back corner of visible left-side base slab"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 480,
+      "y": 405,
+      "confidence": "high",
+      "note": "front corner of visible left-side top frame casting"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 1405,
+      "y": 405,
+      "confidence": "high",
+      "note": "back corner of visible left-side top frame casting"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "reason": "far-side base corner hidden behind frame depth in side view"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "reason": "far-side base corner hidden behind frame depth in side view"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "reason": "far-side top-frame corner hidden behind frame depth in side view"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "reason": "far-side top-frame corner hidden behind frame depth in side view"
+    }
+  ],
+  "orientation_note": "Assumed the machine's left side faces the camera; the platen/front side is toward image-left and the back side toward image-right."
+}

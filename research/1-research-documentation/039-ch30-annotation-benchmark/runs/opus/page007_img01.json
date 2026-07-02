@@ -1,0 +1,124 @@
+{
+  "image": "page007_img01.jpeg",
+  "view": "back-right three-quarter",
+  "model": "opus",
+  "width": 1242,
+  "height": 2870,
+  "points": [
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 424,
+      "y": 2333,
+      "confidence": "high",
+      "note": "brass end-disc + black pillow-block hub (ch13 signature)"
+    },
+    {
+      "feature": "cone_gear_center",
+      "color": "magenta",
+      "x": 503,
+      "y": 2344,
+      "confidence": "medium",
+      "note": "near-end shaft of cone set in silver bracket; small end gear above"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 438,
+      "y": 1931,
+      "confidence": "low",
+      "note": "topmost arm tip; fan overlap limits precision"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 446,
+      "y": 1936,
+      "confidence": "low",
+      "note": "topmost arm tip"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "color": "yellow",
+      "x": 600,
+      "y": 1907,
+      "confidence": "low",
+      "note": "topmost arm, pivot/butt end"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "color": "yellow",
+      "x": 611,
+      "y": 1919,
+      "confidence": "low",
+      "note": "topmost arm, pivot/butt end"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 46,
+      "y": 309,
+      "confidence": "medium",
+      "note": "green top-frame corner casting, outer top corner"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 850,
+      "y": 305,
+      "confidence": "medium",
+      "note": "nearest top corner casting, outer top edge"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1120,
+      "y": 302,
+      "confidence": "medium",
+      "note": "far-right top corner casting, top-right vertex"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 82,
+      "y": 2513,
+      "confidence": "medium",
+      "note": "base slab bottom-left corner"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 908,
+      "y": 2620,
+      "confidence": "high",
+      "note": "nearest base corner (lowest)"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1128,
+      "y": 2485,
+      "confidence": "medium",
+      "note": "base slab right/front corner"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "pinion_center",
+      "reason": "crank drive gear and pinion sprocket sit on the machine's right face but are hidden behind the frame posts and the central summing-blade stack; not resolvable from this back-right angle"
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "only one cylinder gear end-face is visible from this angle"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "reason": "far diagonal corner, occluded by the top-frame casting and machine body"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "reason": "far diagonal corner, occluded by the machine body"
+    }
+  ],
+  "orientation_note": "Camera at back-right (azimuth ~60 deg NE): the machine's BACK and RIGHT faces are toward the camera; the FRONT (platen/paper side) faces away. Nearest corner is back_right (lowest in image); back_left is at image-left, front_right recedes to image-right, and front_left is the hidden far diagonal corner."
+}

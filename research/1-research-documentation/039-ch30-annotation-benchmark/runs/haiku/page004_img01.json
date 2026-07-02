@@ -1,0 +1,124 @@
+{
+  "image": "page004_img01.png",
+  "view": "left side",
+  "model": "haiku",
+  "width": 1776,
+  "height": 4209,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 150,
+      "y": 1750,
+      "confidence": "high",
+      "note": "Small brass sprocket rotation axis at top of chain"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "color": "yellow",
+      "x": 250,
+      "y": 2060,
+      "confidence": "medium",
+      "note": "Left edge of wide pivot end"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "color": "yellow",
+      "x": 330,
+      "y": 2060,
+      "confidence": "medium",
+      "note": "Right edge of wide pivot end"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 280,
+      "y": 2200,
+      "confidence": "medium",
+      "note": "Left edge of narrow tip end"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 300,
+      "y": 2200,
+      "confidence": "medium",
+      "note": "Right edge of narrow tip end"
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 920,
+      "y": 1890,
+      "confidence": "high",
+      "note": "Right cylinder gear (more visible)"
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "color": "orange",
+      "x": 480,
+      "y": 1890,
+      "confidence": "medium",
+      "note": "Left cylinder gear (partially behind right gear)"
+    },
+    {
+      "feature": "cone_gear_center",
+      "color": "magenta",
+      "x": 540,
+      "y": 2850,
+      "confidence": "high",
+      "note": "Cone gear base center - rotation axis"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 72,
+      "y": 78,
+      "confidence": "high",
+      "note": "Top-left corner of green frame"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1704,
+      "y": 78,
+      "confidence": "high",
+      "note": "Top-right corner of green frame"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 72,
+      "y": 4131,
+      "confidence": "high",
+      "note": "Bottom-left corner of green base"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1704,
+      "y": 4131,
+      "confidence": "high",
+      "note": "Bottom-right corner of green base"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "reason": "Not visible from left side"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "reason": "Not visible from left side"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "reason": "Not visible from left side"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "reason": "Not visible from left side"
+    }
+  ],
+  "orientation_note": "Left side view. Front of machine (platen/paper side) faces right. Back faces left. Chain and pinion visible on left. Gears and rocker arms in middle/lower sections."
+}

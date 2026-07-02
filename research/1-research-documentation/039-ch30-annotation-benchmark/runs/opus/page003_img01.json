@@ -1,0 +1,96 @@
+{
+  "image": "page003_img01.png",
+  "view": "front-left three-quarter",
+  "model": "opus",
+  "width": 1204,
+  "height": 2854,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 527,
+      "y": 2053,
+      "confidence": "high",
+      "note": "small chain sprocket coaxial in front of the large brass crank drive gear; chain wraps it"
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 639,
+      "y": 2354,
+      "confidence": "low",
+      "note": "brass cylinder-gear end disk (left arc of the disk face visible); projected axis center falls behind the aluminum tension lever"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 1146,
+      "y": 300,
+      "confidence": "medium",
+      "note": "machine-left front outer corner of green top frame casting (image-right)"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 64,
+      "y": 308,
+      "confidence": "medium",
+      "note": "machine-right front outer corner of green top frame casting (image-left)"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 1150,
+      "y": 2490,
+      "confidence": "medium",
+      "note": "machine-left front bottom corner of green base slab (image-right)"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 82,
+      "y": 2490,
+      "confidence": "medium",
+      "note": "machine-right front bottom corner of green base slab (image-left)"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cone_gear_center",
+      "reason": "cone-gear stack is at the base but its base-circle end face / axle point is wedged behind the polished front column and green bearing block; axis point not visible"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "rocker-arm fan is seen nearly end-on at the top of the machine; no single arm's broad face is resolvable, so its butt corners cannot be picked"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "rocker-arm fan seen end-on; individual arm face not resolvable"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "reason": "rocker-arm fan seen end-on; individual arm tip not resolvable"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "reason": "rocker-arm fan seen end-on; individual arm tip not resolvable"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "reason": "machine-left side arm of the top casting recedes nearly edge-on in this shallow (~30 deg) front three-quarter; the back outer corner is not resolvable to ~5 px"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "reason": "far (machine-right/back) side of the top casting is turned away / occluded by the frame body"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "reason": "machine-left side face of the base slab is in deep shadow; the back bottom corner is not resolvable"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "reason": "far (machine-right/back) bottom corner of the base slab is occluded by the slab body"
+    }
+  ],
+  "orientation_note": "Machine-relative, machine-as-person convention. FRONT = platen/paper side. The camera looks at the machine's front, rotated ~30 deg toward the machine's LEFT, so the machine's LEFT side faces the camera and appears on the RIGHT of the image; the machine's front face fills most of the frame. Confirmed by the base slab showing its (machine-left) side face on the image-right and by comparison with the mirror-image front-right view page009_img01. Thus 'front_left' corners are on the image-right, 'front_right' on the image-left; all back corners are on the far/shadowed side and are recorded as occluded."
+}

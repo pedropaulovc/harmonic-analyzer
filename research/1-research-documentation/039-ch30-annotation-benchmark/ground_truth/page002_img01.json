@@ -1,0 +1,83 @@
+{
+  "image": "page002_img01.png",
+  "points": [
+    {
+      "feature": "crank_axle_sprocket_center",
+      "x": 1305.9,
+      "y": 3351
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "x": 1062.7,
+      "y": 3404.5
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "x": 134.6,
+      "y": 296.3
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "x": 1633.8,
+      "y": 289
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "x": 149.7,
+      "y": 3765.7
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "x": 1645,
+      "y": 3759
+    },
+    {
+      "feature": "pinion_center",
+      "x": 932.9,
+      "y": 3442.2
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cone_gear_center",
+      "reason": "The conical gear stack meshes above/behind the cylinder cam-drum and its axis/center is hidden behind the green crank pedestal; only a sliver of brass teeth peeks out, insufficient to locate dead-center."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "Rocker-arm fan is edge-on / occluded behind the platen (front view)."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "reason": "Rocker-arm fan is edge-on / occluded behind the platen (front view)."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "reason": "Rocker-arm fan is edge-on / occluded behind the platen (front view)."
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "reason": "Rear top-frame corner hidden behind the front casting in this front view."
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "reason": "Rear top-frame corner hidden behind the front casting in this front view."
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "reason": "Rear base-slab corner hidden behind the base in this front view."
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "reason": "Rear base-slab corner hidden behind the base in this front view."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "occluded"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "occluded"
+    }
+  ],
+  "source": "human_ground_truth"
+}

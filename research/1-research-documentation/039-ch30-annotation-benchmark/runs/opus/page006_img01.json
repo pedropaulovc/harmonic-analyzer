@@ -1,0 +1,120 @@
+{
+  "image": "page006_img01.png",
+  "view": "back",
+  "model": "opus",
+  "width": 1732,
+  "height": 4104,
+  "points": [
+    {
+      "feature": "crank_axle_sprocket_center",
+      "color": "red",
+      "x": 489,
+      "y": 3140,
+      "confidence": "low",
+      "note": "chain LOWER wrap on crank-axle hub (green bearing block, machine-left base); the target pinion sprocket is on the front/platen side and occluded"
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 694,
+      "y": 3366,
+      "confidence": "high",
+      "note": "cylinder gear set drive end; silver shaft-end hub centered in the black bearing bracket (cf. ch13/ch25)"
+    },
+    {
+      "feature": "cone_gear_center",
+      "color": "magenta",
+      "x": 490,
+      "y": 3298,
+      "confidence": "medium",
+      "note": "cone gear set seen end-on (domed spiral face); center of the circular end-face outline (no distinct hub visible)"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "color": "yellow",
+      "x": 639,
+      "y": 2863,
+      "confidence": "low",
+      "note": "frontmost/lowest arm; wide butt end, lower long-edge corner (against black)"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "color": "yellow",
+      "x": 637,
+      "y": 2813,
+      "confidence": "low",
+      "note": "frontmost/lowest arm; wide butt end, upper long-edge corner (merges into stacked arms)"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 1491,
+      "y": 2877,
+      "confidence": "low",
+      "note": "frontmost/lowest arm; narrow tip end at right frame rod, lower long-edge corner"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 1493,
+      "y": 2843,
+      "confidence": "low",
+      "note": "frontmost/lowest arm; narrow tip end at right frame rod, upper long-edge corner"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 123,
+      "y": 261,
+      "confidence": "high",
+      "note": "near (back) top-frame casting, image-left outer corner"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 1577,
+      "y": 253,
+      "confidence": "high",
+      "note": "near (back) top-frame casting, image-right outer corner"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 122,
+      "y": 3720,
+      "confidence": "high",
+      "note": "near (back) base-slab bottom, image-left outer corner"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 1609,
+      "y": 3734,
+      "confidence": "high",
+      "note": "near (back) base-slab bottom, image-right outer corner"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "pinion_center",
+      "reason": "small chain sprocket coaxial with the large brass crank drive gear (front/platen side); hidden behind the fan of silver rocker/amplitude bars in this back view. Chain top wrap disappears behind the arm stack."
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "reason": "far (front/platen-side) top-frame corner, directly behind the near back beam"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "reason": "far (front/platen-side) top-frame corner, directly behind the near back beam"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "reason": "far (front/platen-side) bottom corner of base slab, occluded by the slab body"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "reason": "far (front/platen-side) bottom corner of base slab, occluded by the slab body"
+    }
+  ],
+  "orientation_note": "Back view: the machine FRONT (platen/paper side) faces AWAY from the camera. Machine-left = image-left, machine-right = image-right (verified: the crank/chain drive, which sits on the machine's left, appears at image-left here). The near (camera-side) corners are therefore the BACK corners; the FRONT (platen-side) top-frame and base corners sit directly behind the near beam/slab and are occluded. Base/cone/cylinder/pinion sit in the base bay: cone gear end-on at image-left, cylinder gear drive-hub center, pinion (chain sprocket) hidden behind the rocker-arm fan. Rocker arms are viewed nearly EDGE-ON and heavily overlapped; the four corner dots are the frontmost/lowest arm, whose long edges appear as the arm's top/bottom (I mapped 'left' = lower long-edge corner, 'right' = upper long-edge corner). Arm width tapers ~51px (butt) to ~34px (tip), confirming butt=left/wide, tip=right/narrow. Rocker corners are low-confidence due to the edge-on stacking."
+}

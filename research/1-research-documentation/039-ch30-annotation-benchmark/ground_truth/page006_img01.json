@@ -1,0 +1,87 @@
+{
+  "image": "page006_img01.png",
+  "points": [
+    {
+      "feature": "crank_axle_sprocket_center",
+      "x": 487.5,
+      "y": 3142
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "x": 695.3,
+      "y": 3372.9
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "x": 125,
+      "y": 262
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "x": 1614.8,
+      "y": 270.1
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "x": 116,
+      "y": 3734
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "x": 1602,
+      "y": 3732
+    },
+    {
+      "feature": "pinion_center",
+      "x": 828.5,
+      "y": 3367.5
+    },
+    {
+      "feature": "cone_gear_center",
+      "x": 604.5,
+      "y": 3380.6
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "x": 678.5,
+      "y": 2852.9
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "x": 1580.9,
+      "y": 2819.7
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "x": 641.3,
+      "y": 2793.1
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "The wide butt/pivot ends of the rocker arms are hidden behind the right frame leg / drive column."
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "reason": "Far (front) side of the top-frame casting; occluded behind the near (back) face in this near-orthographic rear view."
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "reason": "Far (front) side of the top-frame casting; occluded."
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "reason": "Far (front) side of the base slab; occluded behind the near (back) face."
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "reason": "Far (front) side of the base slab; occluded."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "occluded"
+    }
+  ],
+  "source": "human_ground_truth"
+}

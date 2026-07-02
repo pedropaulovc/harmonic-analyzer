@@ -1,0 +1,100 @@
+{
+  "image": "page003_img01.png",
+  "view": "front-left three-quarter",
+  "model": "sonnet",
+  "width": 1204,
+  "height": 2854,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 520,
+      "y": 2050,
+      "confidence": "high",
+      "note": "chain sprocket hub in front of the large brass crank-drive gear; chain runs down to the crank"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 1000,
+      "y": 2582,
+      "confidence": "high",
+      "note": "nearest base corner to camera"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 1152,
+      "y": 2508,
+      "confidence": "medium",
+      "note": "far end of the foreshortened left face, near image right edge"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 108,
+      "y": 2392,
+      "confidence": "medium",
+      "note": "partially occluded by the front-left support pole"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 864,
+      "y": 290,
+      "confidence": "medium",
+      "note": "nearest top-frame corner, at the post cap"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 1105,
+      "y": 295,
+      "confidence": "medium",
+      "note": "far end of the foreshortened left face of the top frame"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 85,
+      "y": 302,
+      "confidence": "medium",
+      "note": "left-most visible top-frame corner"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cylinder_gear_center_1",
+      "reason": "only a small ambiguous arc of the brass end-face disc is visible behind the crank-arm boss and the front-left support pole; not enough visible circumference to locate the rotation-axis point within tolerance. Cross-referencing the front view, this roller (immediately adjacent to the boss) most likely corresponds to the cylinder gear."
+    },
+    {
+      "feature": "cone_gear_center",
+      "reason": "not visible in this framing; cross-referencing the front view, the cone gear sits between the pinion and the cylinder gear and is fully hidden behind the visible roller and the support pole from this angle."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "the rocker-arm fan is viewed nearly edge-on from this angle, compressed into an indistinct comb/stack silhouette near the top crossbar; individual arm boundaries are not distinguishable."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "same as above - fan viewed edge-on, arm boundaries not distinguishable."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "reason": "same as above - fan viewed edge-on, arm boundaries not distinguishable."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "reason": "same as above - fan viewed edge-on, arm boundaries not distinguishable."
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "reason": "diagonally opposite the nearest base corner; fully hidden behind the machine body from this angle."
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "reason": "diagonally opposite the nearest top-frame corner; fully hidden behind the machine body from this angle."
+    }
+  ],
+  "orientation_note": "Camera shows the machine's FRONT face (platen/paper side, spanning roughly image-left to the near base corner around x=1000) and LEFT face (the foreshortened span from the near corner to image-right, ending at the back-left corner near x=1150). The front-left corner is nearest the camera; the back-right corner is fully hidden behind the machine body. Orientation cross-checked against the front view (page002/poster), where the crank, pinion, cone gear, cylinder gear and boss appear in that left-to-right order."
+}

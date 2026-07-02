@@ -1,0 +1,104 @@
+{
+  "image": "page008_img01.png",
+  "view": "right side",
+  "model": "sonnet",
+  "width": 1789,
+  "height": 4239,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 1393,
+      "y": 2805,
+      "confidence": "medium",
+      "note": "small chain sprocket coaxial with the pinion gear roller, right end (visible face, slight angle)"
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "color": "red",
+      "x": 1367,
+      "y": 3119,
+      "confidence": "medium",
+      "note": "sprocket on the hand-crank's own axle, lower down the same chain run; visible pivot pin/ball marks the rotation axis"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1347,
+      "y": 3833,
+      "confidence": "high",
+      "note": "near (right-flank) bottom corner of green base slab, front end"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 403,
+      "y": 3838,
+      "confidence": "high",
+      "note": "near (right-flank) bottom corner of green base slab, back end"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1337,
+      "y": 293,
+      "confidence": "high",
+      "note": "near (right-flank) outer corner of green top frame casting, front end"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 417,
+      "y": 291,
+      "confidence": "high",
+      "note": "near (right-flank) outer corner of green top frame casting, back end"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cylinder_gear_center_1",
+      "reason": "axis point not visible: gear stack only glimpsed as a small out-of-focus diagonal sliver through the base window at a steep grazing angle, occluded by the ~20 connecting-rod bars in front and the box frame; no end-face/hub resolvable"
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "axis point not visible: no second gear stack distinguishable at all from this side angle through the window"
+    },
+    {
+      "feature": "cone_gear_center",
+      "reason": "axis point not visible: cannot even distinguish cone from cylinder gear in the one occluded sliver visible through the window from this side angle"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "the ~20-arm fan is viewed exactly edge-on from the side (bars appear as uniform parallel strips top-to-bottom with no taper or fan spread); individual arm corners and the green pivot bracket are not distinguishable from this angle (confirmed by comparing page004 left-side view, which shows the same edge-on bundle)"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "same edge-on occlusion as butt_left"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "reason": "same edge-on occlusion as butt_left"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "reason": "same edge-on occlusion as butt_left"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "reason": "far (left) flank corner of the base slab, hidden directly behind the near right-flank corner in this pure side view"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "reason": "far (left) flank corner of the base slab, hidden behind the near right-flank corner"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "reason": "far (left) rail corner of the top frame casting, hidden behind the near right-flank corner"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "reason": "far (left) rail corner of the top frame casting, hidden behind the near right-flank corner"
+    }
+  ],
+  "orientation_note": "Camera views the machine's right flank. Established via cross-reference: page009 (front-right 3/4) shows the crank prominently while page007 (back-right 3/4) does not, so the crank/pinion-sprocket assembly sits at the machine's front-right corner. Given the standard 8-view rotation order (front, front-left, left, back-left, back, back-right, right, front-right), the crank appearing in the RIGHT portion of this right-side image is consistent with: within this image, the RIGHT side of the frame = the machine's FRONT (platen/paper side), and the LEFT side of the frame = the machine's BACK. Only the near (machine-right) flank of the base slab and top frame casting is visible; the far (machine-left) flank corners are occluded."
+}

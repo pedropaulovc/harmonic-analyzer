@@ -1,0 +1,136 @@
+{
+  "image": "page006_img01.png",
+  "view": "back",
+  "model": "haiku",
+  "width": 1732,
+  "height": 4104,
+  "points": [
+    {
+      "feature": "cone_gear_center",
+      "color": "magenta",
+      "x": 435,
+      "y": 3430,
+      "confidence": "high",
+      "note": "Left cone gear - axis point at center of conical base"
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 855,
+      "y": 3530,
+      "confidence": "high",
+      "note": "Primary cylinder gear - axis point at center of cylindrical body"
+    },
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 866,
+      "y": 2050,
+      "confidence": "medium",
+      "note": "Pinion gear center - circular sprocket with chain path"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "color": "yellow",
+      "x": 775,
+      "y": 1870,
+      "confidence": "medium",
+      "note": "Left corner of rocker arm pivot (butt) end"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "color": "yellow",
+      "x": 955,
+      "y": 1870,
+      "confidence": "medium",
+      "note": "Right corner of rocker arm pivot (butt) end"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 835,
+      "y": 1600,
+      "confidence": "medium",
+      "note": "Left corner of rocker arm tip (narrow) end"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 895,
+      "y": 1600,
+      "confidence": "medium",
+      "note": "Right corner of rocker arm tip (narrow) end"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 75,
+      "y": 4035,
+      "confidence": "high",
+      "note": "Bottom-left corner of green base slab"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 1655,
+      "y": 4035,
+      "confidence": "high",
+      "note": "Bottom-right corner of green base slab"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 75,
+      "y": 3900,
+      "confidence": "high",
+      "note": "Top-left corner of green base (platen-facing side)"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1655,
+      "y": 3900,
+      "confidence": "high",
+      "note": "Top-right corner of green base (platen-facing side)"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 60,
+      "y": 85,
+      "confidence": "high",
+      "note": "Top-left outer corner of green top frame"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 1670,
+      "y": 85,
+      "confidence": "high",
+      "note": "Top-right outer corner of green top frame"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 60,
+      "y": 260,
+      "confidence": "high",
+      "note": "Front-left outer corner of green top frame"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1670,
+      "y": 260,
+      "confidence": "high",
+      "note": "Front-right outer corner of green top frame"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "Not clearly visible or occluded from back view"
+    }
+  ],
+  "orientation_note": "Back view - camera faces the back of the machine. Front of machine (platen/paper side) is away from camera."
+}

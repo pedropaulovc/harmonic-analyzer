@@ -1,0 +1,124 @@
+{
+  "image": "page007_img01.jpeg",
+  "view": "back-right three-quarter",
+  "model": "sonnet",
+  "width": 1242,
+  "height": 2870,
+  "points": [
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 425,
+      "y": 2335,
+      "confidence": "high",
+      "note": "Only cylinder-gear roller visible from this angle (uniform-diameter knurled cylinder, not tapered, matching ch13 reference). Placed on the bright axle/bearing pin visible through the black mounting bracket at the gear's front end face, which is the true rotation-axis point rather than an estimate from the partly-occluded disc rim."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 404,
+      "y": 1955,
+      "confidence": "high",
+      "note": "Narrow tip end of the single most face-on rocker arm (frontmost blade in the ~20-arm fan, matching the arm etched 'rocker arm' in the ch14 reference). The blade converges to a genuinely sharp point here, so tip_left and tip_right are only ~3px apart."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 407,
+      "y": 1958,
+      "confidence": "high",
+      "note": "See tip_left note - same tip vertex, opposite edge of the blade's thickness."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "color": "yellow",
+      "x": 672,
+      "y": 2011,
+      "confidence": "low",
+      "note": "Wide/pivot end of the same arm, at its upper edge just before the vertical support rod crosses it. Genuine ambiguity here: near the pivot, this arm's material visually merges with a pivot hinge bracket and possibly with the butts of neighboring arms in the fan, so the exact corner vertex is partly occluded by the rod and the hinge casting."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "color": "yellow",
+      "x": 668,
+      "y": 2043,
+      "confidence": "low",
+      "note": "Lower edge counterpart of butt_left, placed near the visible pivot bolt. Same occlusion caveat as butt_left applies."
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 60,
+      "y": 306,
+      "confidence": "high",
+      "note": "Left terminal end of the top green frame casting (rounded boss around the corner support rod)."
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 827,
+      "y": 310,
+      "confidence": "medium",
+      "note": "Near corner of the top frame where the back face meets the right face; a rod collar/boss sits right at the vertex so the precise corner point is estimated from the surrounding casting edges."
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1125,
+      "y": 308,
+      "confidence": "high",
+      "note": "Right terminal end of the top frame casting."
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 67,
+      "y": 2520,
+      "confidence": "high",
+      "note": "Left corner of the green base slab, clearly visible kink in the bottom edge."
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 854,
+      "y": 2513,
+      "confidence": "high",
+      "note": "Near corner of the base where the back face meets the right face, visible as a clear diagonal-to-highlight transition next to the corner support rod."
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1154,
+      "y": 2488,
+      "confidence": "high",
+      "note": "Right corner of the green base slab, rounded terminal edge clearly visible."
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "pinion_center",
+      "reason": "The pinion sprocket and the large brass crank-drive gear sit at platen level on the machine's FRONT face (confirmed by cross-referencing the front view page002_img01.png, which shows this gear pair directly below the paper platen). This back-right three-quarter view shows no paper/platen at all, confirming the front face is fully turned away from the camera; the assembly is hidden by the machine's own frame."
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "reason": "The crank and its axle sprocket (ch11 reference) are mounted at the base on the machine's front-facing side; not visible from this back-right angle - occluded by the black base slab and the green corner post."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "A second cylinder-gear roller would sit alongside/behind the visible one (per ch13 reference, cylinder gears are a meshing pair), but it is fully hidden behind the green pyramidal post and black base slab in this view."
+    },
+    {
+      "feature": "cone_gear_center",
+      "reason": "The conical gear stack (ch12 reference) is mounted at the base but is entirely hidden behind the green pyramidal post and black base slab from this back-right angle; no portion of it is visible."
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "reason": "Far-side corner of the top frame, on the machine's front face; not visible from this back-right three-quarter angle."
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "reason": "Far-side corner of the base slab, on the machine's front face; not visible from this back-right three-quarter angle."
+    }
+  ],
+  "orientation_note": "Back-right three-quarter view: the camera sees the machine's BACK face (wide, spanning the left portion of the frame) and the RIGHT side face (narrower, right portion), meeting at a near corner around x=827-854. The FRONT/platen face (paper holder, pinion/crank drive gear) is fully turned away and not visible anywhere in this image."
+}

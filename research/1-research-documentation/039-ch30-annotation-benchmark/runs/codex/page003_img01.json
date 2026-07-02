@@ -1,0 +1,127 @@
+{
+  "image": "page003_img01.png",
+  "view": "front-left three-quarter",
+  "model": "codex",
+  "width": 1204,
+  "height": 2854,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 528,
+      "y": 2055,
+      "confidence": "high",
+      "note": "small chain sprocket beside large brass crank drive gear at platen level"
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 789,
+      "y": 2338,
+      "confidence": "low",
+      "note": "partly visible right/base cylindrical brass gear end; center inferred from visible circular face behind green post"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "color": "yellow",
+      "x": 610,
+      "y": 422,
+      "confidence": "low",
+      "note": "frontmost visible rocker arm, wide butt end upper/left corner as seen"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "color": "yellow",
+      "x": 608,
+      "y": 464,
+      "confidence": "low",
+      "note": "frontmost visible rocker arm, wide butt end lower/right corner as seen"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 746,
+      "y": 413,
+      "confidence": "low",
+      "note": "frontmost visible rocker arm, narrow tip upper/left corner as seen"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 745,
+      "y": 438,
+      "confidence": "low",
+      "note": "frontmost visible rocker arm, narrow tip lower/right corner as seen"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 66,
+      "y": 305,
+      "confidence": "medium"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 1122,
+      "y": 302,
+      "confidence": "medium"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 69,
+      "y": 398,
+      "confidence": "medium"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1054,
+      "y": 391,
+      "confidence": "medium"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 107,
+      "y": 2398,
+      "confidence": "medium",
+      "note": "upper-left visible corner of green base slab near left post"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 1115,
+      "y": 2405,
+      "confidence": "low",
+      "note": "partly cropped/rounded rear right base corner"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 91,
+      "y": 2506,
+      "confidence": "medium",
+      "note": "lower-left visible corner of front lip of green base slab"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 819,
+      "y": 2612,
+      "confidence": "medium"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cone_gear_center",
+      "reason": "conical gear stack body is visible at lower right, but the base-circle/shaft axis point is hidden by the green post, rod, and foreground structure"
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "second cylindrical gear axis point is not visible from this angle; body is blocked by the cone stack/post and foreground hardware"
+    }
+  ],
+  "orientation_note": "Camera is on the front-left side: the platen/paper side faces the camera, and the machine-left side is also visible. Front/back/left/right labels use machine coordinates with front toward the platen."
+}

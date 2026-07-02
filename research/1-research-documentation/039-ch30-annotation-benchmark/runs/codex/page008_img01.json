@@ -1,0 +1,120 @@
+{
+  "image": "page008_img01.png",
+  "view": "right side",
+  "model": "codex",
+  "width": 1789,
+  "height": 4239,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 1374,
+      "y": 2811,
+      "confidence": "medium",
+      "note": "upper chain sprocket coaxial with the large crank drive gear; center partly obscured by chain and bracket"
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "color": "red",
+      "x": 1373,
+      "y": 3121,
+      "confidence": "low",
+      "note": "optional lower crank-axle sprocket center, mostly behind the chain"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "color": "yellow",
+      "x": 704,
+      "y": 2872,
+      "confidence": "medium",
+      "note": "left edge of selected visible vertical rocker arm at lower pivot/butt end"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "color": "yellow",
+      "x": 731,
+      "y": 2872,
+      "confidence": "medium",
+      "note": "right edge of selected visible vertical rocker arm at lower pivot/butt end"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 704,
+      "y": 436,
+      "confidence": "low",
+      "note": "upper end of same rocker arm, just below top casting"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 727,
+      "y": 436,
+      "confidence": "low",
+      "note": "upper end of same rocker arm, just below top casting"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 415,
+      "y": 293,
+      "confidence": "medium",
+      "note": "near/right-side back corner of top green frame casting"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1329,
+      "y": 293,
+      "confidence": "medium",
+      "note": "near/right-side front corner of top green frame casting"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 402,
+      "y": 3840,
+      "confidence": "medium",
+      "note": "near/right-side back bottom corner of green base slab"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1346,
+      "y": 3836,
+      "confidence": "medium",
+      "note": "near/right-side front bottom corner of green base slab"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cylinder_gear_center_1",
+      "reason": "visible cylinder gear teeth/body are side-on inside the lower frame; no distinct end face, hub, or shaft axis point is resolvable"
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "second cylinder gear axis point is hidden by the lower frame, dark gear stack, and viewing angle"
+    },
+    {
+      "feature": "cone_gear_center",
+      "reason": "cone gear teeth are visible through the lower window, but the base-circle hub/axis point is occluded by rocker links and frame"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "reason": "far/left-side top-frame plan corner is hidden behind the near right-side casting in this side view"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "reason": "far/left-side top-frame plan corner is hidden behind the near right-side casting in this side view"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "reason": "far/left-side base corner is not separable from the side projection of the base slab"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "reason": "far/left-side base corner is not separable from the side projection of the base slab"
+    }
+  ],
+  "orientation_note": "Camera faces the machine's right side (crank/chain side). I assume the platen/roller side is the front, which appears toward image right; only near/right-side front/back frame and base corners are distinctly visible."
+}

@@ -1,0 +1,124 @@
+{
+  "image": "page003_img01.png",
+  "view": "front-left three-quarter",
+  "model": "haiku",
+  "width": 1204,
+  "height": 2854,
+  "points": [
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": {
+        "r": 255,
+        "g": 140,
+        "b": 0
+      },
+      "x": 820,
+      "y": 2460,
+      "confidence": "high",
+      "note": "Main brass cylindrical helical gear at base center"
+    },
+    {
+      "feature": "cone_gear_center",
+      "color": {
+        "r": 255,
+        "g": 0,
+        "b": 255
+      },
+      "x": 300,
+      "y": 2410,
+      "confidence": "high",
+      "note": "Conical gear stack at base left"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": {
+        "r": 0,
+        "g": 255,
+        "b": 255
+      },
+      "x": 85,
+      "y": 2770,
+      "confidence": "high",
+      "note": "Green base slab front-left corner"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": {
+        "r": 0,
+        "g": 255,
+        "b": 255
+      },
+      "x": 1120,
+      "y": 2820,
+      "confidence": "high",
+      "note": "Green base slab front-right corner"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": {
+        "r": 0,
+        "g": 255,
+        "b": 255
+      },
+      "x": 240,
+      "y": 145,
+      "confidence": "high",
+      "note": "Green frame top-left corner"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": {
+        "r": 0,
+        "g": 255,
+        "b": 255
+      },
+      "x": 1020,
+      "y": 180,
+      "confidence": "high",
+      "note": "Green frame top-right corner"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "pinion_center",
+      "reason": "Small chain sprocket at platen level is not clearly visible from this front-left three-quarter angle; either on far side or obscured by platen mechanism"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "Rocker arms are largely hidden/occluded in this three-quarter view; not clearly distinguishable"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "Rocker arms are largely hidden/occluded in this three-quarter view; not clearly distinguishable"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "reason": "Rocker arms are largely hidden/occluded in this three-quarter view; not clearly distinguishable"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "reason": "Rocker arms are largely hidden/occluded in this three-quarter view; not clearly distinguishable"
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "Second cylinder gear is not visible from this angle"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "reason": "Back corners of base are not visible in this front-left view"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "reason": "Back corners of base are not visible in this front-left view"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "reason": "Back corners of top frame are not visible in this front-left view"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "reason": "Back corners of top frame are not visible in this front-left view"
+    }
+  ],
+  "orientation_note": "Front-left three-quarter view: machine's front (platen/paper side) faces toward left; the visible angle shows left side and front of the machine. Back corners and side-facing features are not visible."
+}

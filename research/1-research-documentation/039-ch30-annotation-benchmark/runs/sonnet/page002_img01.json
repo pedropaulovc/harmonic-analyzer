@@ -1,0 +1,112 @@
+{
+  "image": "page002_img01.png",
+  "view": "front",
+  "model": "sonnet",
+  "width": 1749,
+  "height": 4143,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 1046,
+      "y": 2965,
+      "confidence": "high",
+      "note": "Small chain sprocket mounted coaxially in front of the large brass crank drive gear at platen level; chain visibly wraps it and descends to the crank. Axle bore + retaining pin clearly visible and used as the dead-center point."
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "color": "red",
+      "x": 1305,
+      "y": 3347,
+      "confidence": "high",
+      "note": "Second sprocket, at the crank's own pivot on top of the green cylindrical post; identified by cross-reference with ch11_images/page002_img03.jpeg and page002_img04.jpeg ('fiducial mark' pivot boss on the crank arm, matching sprocket+chain arrangement). Not the SPEC pinion target, added as permitted."
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 1055,
+      "y": 3405,
+      "confidence": "medium",
+      "note": "More-visible of two brass fluted rollers at the base, directly behind/below the pinion sprocket and crank drive gear, with fine parallel teeth visible above it matching the cylindrical (non-tapering) 'cylinder gear set' reference photos in ch13_images/page001_img01.jpeg and page002_img01.png. Center taken at the silver retaining pin visible in the mounting bracket that should coincide with the shaft axis; the true hub bore itself is largely covered by the black bracket, so this is an inferred axis point rather than a directly-seen bore."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "color": "orange",
+      "x": 1175,
+      "y": 3390,
+      "confidence": "low",
+      "note": "Second, smaller brass disc immediately to the right of cylinder_gear_center_1, mostly in shadow and partly occluded by the green crank-axle post. Center is a rough estimate from the small visible arc of its rim; could plausibly be the cone gear instead of a second cylinder gear (see cone_gear_center in occluded) - end-on views of a tapered vs. uniform roller look identical, so this identification is uncertain."
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 160,
+      "y": 298,
+      "confidence": "high",
+      "note": "Outer left corner of the green top-frame casting, at the rounded shoulder just below the silver pole-collar."
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1605,
+      "y": 295,
+      "confidence": "high",
+      "note": "Outer right corner of the green top-frame casting, symmetric to the left corner."
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 166,
+      "y": 3748,
+      "confidence": "high",
+      "note": "Bottom-left corner of the green base slab, rounded foot."
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1610,
+      "y": 3750,
+      "confidence": "high",
+      "note": "Bottom-right corner of the green base slab, rounded foot."
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cone_gear_center",
+      "reason": "No tapered/conical gear profile is resolvable anywhere in this front elevation. End-on, a cone gear's cross-section looks identical to a cylinder gear's (both are circular), and this straight-on front view gives no side-length view of any roller to detect tapering, so the cone gear set (ch12_images reference) cannot be confidently located or distinguished from the two brass discs marked as cylinder_gear_center_1/2. It may be one of those two discs, or fully hidden behind the platen carriage / crank drive gear."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "The rocker-arm fan (ch14_images reference) is mounted directly below/behind the black platen recording box; from this straight front elevation the entire fan is hidden behind the platen box and its rack, with no blade edges peeking out at the box's sides."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "Same occlusion as butt_left - fan fully hidden behind the platen box in this front view."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "reason": "Same occlusion as butt_left - fan fully hidden behind the platen box in this front view."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "reason": "Same occlusion as butt_left - fan fully hidden behind the platen box in this front view."
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "reason": "This is a near-orthographic straight-on front elevation; the top-frame casting's back-left corner sits directly behind the front-left corner from this angle and is not distinguishable as a separate point."
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "reason": "Same reasoning as top_back_left - directly behind the front-right corner, not separately resolvable."
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "reason": "Same reasoning as top_back_left - the base slab's back-left corner sits directly behind the front-left corner from this straight elevation angle."
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "reason": "Same reasoning as top_back_left - directly behind the front-right corner, not separately resolvable."
+    }
+  ],
+  "orientation_note": "This is the front view (angle 0deg / view 1-8, confirmed against eight-views-2.png and poster-eight-views-2.png): the camera faces the platen/paper recording box directly, which is the front of the machine. Left/right in feature names are as seen in this image (no mirroring)."
+}

@@ -1,0 +1,86 @@
+{
+  "image": "page003_img01.png",
+  "points": [
+    {
+      "feature": "pinion_center",
+      "x": 492.8,
+      "y": 2360.4
+    },
+    {
+      "feature": "cone_gear_center",
+      "x": 726.8,
+      "y": 2385.9
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "x": 73,
+      "y": 306
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "x": 893,
+      "y": 302
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "x": 1146,
+      "y": 301
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "x": 92,
+      "y": 2508
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "x": 905,
+      "y": 2625
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "x": 1142,
+      "y": 2490
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "x": 649.8,
+      "y": 2327.7
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "x": 625.1,
+      "y": 2349.5
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "Second cylinder gear not separately visible; the prominent brass part behind the post is the cone gear, not a cylinder gear."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "Rocker-arm fan is edge-on behind the central channel-rod column; individual arms unresolvable."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "Rocker-arm fan edge-on / occluded behind central column and platen."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "reason": "Rocker-arm fan edge-on / occluded behind central column and platen."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "reason": "Rocker-arm fan edge-on / occluded behind central column and platen."
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "reason": "Hidden behind the top casting / front-left post from this front-right view."
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "reason": "Back-left base corner is hidden behind the machine body in this front-right view."
+    }
+  ],
+  "source": "human_ground_truth"
+}

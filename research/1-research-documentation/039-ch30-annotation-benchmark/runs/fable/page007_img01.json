@@ -1,0 +1,116 @@
+{
+  "image": "page007_img01.jpeg",
+  "view": "back-right three-quarter",
+  "model": "fable",
+  "width": 1242,
+  "height": 2870,
+  "points": [
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 427,
+      "y": 2337,
+      "confidence": "medium",
+      "note": "Axis point = bright dome shaft-end at the center of the golden end disc gear, seen through the black pillow-block bearing upright (ch13 signature). Believed to be the nearer of the two parallel cylinder gears; the second is hidden behind it."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 402,
+      "y": 1956,
+      "confidence": "high",
+      "note": "Upper/outer corner of the tip end face of the lowest, fully visible rocker arm (the one resting on the gray pivot-pin head). Tip face is nearly edge-on, so the two tip corners stack almost vertically."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 409,
+      "y": 1971,
+      "confidence": "medium",
+      "note": "Lower/inner corner of the same tip end face, at the kink where the tip edge meets the arm's long bottom edge."
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 48,
+      "y": 313,
+      "confidence": "medium",
+      "note": "Outer-top corner of the green clamp boss at the far-left end of the top frame casting (below its silver cap)."
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 866,
+      "y": 304,
+      "confidence": "medium",
+      "note": "Outer-top rim of the near green corner boss of the top frame (the back-right corner, nearest the camera)."
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1124,
+      "y": 310,
+      "confidence": "high",
+      "note": "Outer-top corner of the green top-frame casting at the image-right end (front-right of the machine)."
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 69,
+      "y": 2532,
+      "confidence": "high",
+      "note": "Bottom-left tip of the green base slab skirt at the far end of the long back edge."
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 880,
+      "y": 2640,
+      "confidence": "high",
+      "note": "Nearest bottom corner of the base slab: vertex where the back bottom edge meets the right-side bottom edge."
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1149,
+      "y": 2497,
+      "confidence": "medium",
+      "note": "Outermost bottom corner at the image-right end of the slab, where the right-side bottom edge recedes to the front."
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "pinion_center",
+      "reason": "The pinion sprocket + large brass drive gear sit at platen level on the FRONT face; from this back view they are hidden behind the platen board (only its black back and brass rack are visible)."
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "reason": "Optional feature; the crank and its axle sprocket are on the front face, hidden behind the platen board."
+    },
+    {
+      "feature": "cone_gear_center",
+      "reason": "Axis point not visible: the cone gear stack sits at the machine's center behind the green A-frame pedestal and the cylinder-gear cluster; no end face or shaft point resolvable."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "Axis point not visible: the second cylinder gear is behind the first; only tooth glimpses appear above it, no end disc or shaft end resolvable."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "Butt/pivot end of the marked arm is hidden behind the chain-anchor keyhole boss, the A-frame apex and the stack of neighboring arms."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "Same occlusion as butt_left: the wide pivot end disappears into the stacked fan at the central column."
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "reason": "Far top corner hidden behind the central spring stack and summing-lever hardware."
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "reason": "Far bottom corner hidden behind the black base floor plate and the gear cluster mounted on it."
+    }
+  ],
+  "orientation_note": "Back-right three-quarter view (matches the book's 'eight views' angle-210 rendition). FRONT = platen/paper side, facing away from the camera; the platen's black back and brass rack fill the image-right half. Left/right are machine-relative (stage handedness: the machine's right = viewer's left when facing the front), so the nearest lower slab corner is base_back_right, the long visible bottom edge runs to back_left at image left, and the right-side edge recedes to front_right at image right. The counter-spring drum, chain and the visible cylinder-gear end disc are on the image-left/center."
+}

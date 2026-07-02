@@ -1,0 +1,116 @@
+{
+  "image": "page009_img01.png",
+  "view": "front-right three-quarter",
+  "model": "opus",
+  "width": 1204,
+  "height": 2854,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 831,
+      "y": 2050,
+      "confidence": "high",
+      "note": "small silver chain sprocket coaxial region beside the large brass crank drive gear; chain wraps it and runs down to the crank-axle sprocket. Center = teeth-circle/hub axis."
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 766,
+      "y": 2331,
+      "confidence": "high",
+      "note": "most-visible brass cylindrical (helical) gear disc at the base; center = black hub recess / axle screw. Confirmed vs ch13 cylinder-gear-set."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 128,
+      "y": 1961,
+      "confidence": "low",
+      "note": "topmost/clearest silver rocker arm of the ~20-arm fan (ch14); free tapered TIP end (left, against black). Butt/pivot end hidden under the platen."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 132,
+      "y": 1971,
+      "confidence": "low",
+      "note": "same arm, lower corner of the free tip end."
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 300,
+      "y": 2640,
+      "confidence": "high",
+      "note": "nearest bottom corner of green base slab (front face meets right face)."
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 64,
+      "y": 2496,
+      "confidence": "medium",
+      "note": "far-left bottom corner of green base slab (front face)."
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 1124,
+      "y": 2503,
+      "confidence": "medium",
+      "note": "far bottom corner of green base slab along the right side (rounded convex point)."
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 60,
+      "y": 355,
+      "confidence": "medium",
+      "note": "outer top-left corner of the green top-frame casting (front-left post)."
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 330,
+      "y": 347,
+      "confidence": "low",
+      "note": "front-right outer corner of the green top-frame casting where front face meets right side; low confidence (busy casting)."
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 1115,
+      "y": 350,
+      "confidence": "medium",
+      "note": "far-right outer corner of the green top-frame casting (back-right post)."
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cone_gear_center",
+      "reason": "cone gear body is visible as dark helical teeth behind the cylinder gear, but its base circle is occluded by the brass cylinder gear and the rest recedes into shadow toward the green bearing housing; no end-face/hub/axle point resolvable."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "only one brass cylinder-gear face is clearly presented; the other cylinder gears are edge-on inside the dark stacked bank with no markable circular face."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "pivot/butt (wide) end of the chosen arm is hidden beneath the platen/brass table edge."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "pivot/butt (wide) end of the chosen arm is hidden beneath the platen/brass table edge."
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "reason": "back-left bottom corner of the base slab is behind the machine body."
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "reason": "back-left corner of the top frame is occluded by the black spring roller sitting on the front-left of the casting."
+    }
+  ],
+  "orientation_note": "Camera at front-right three-quarter (ch30 'angle 300 deg', view 8/8). FRONT = platen/paper side, which recedes to the image-left; the machine's RIGHT side (crank + chain) faces the image-right and is the wider, less-foreshortened face. Nearest vertical edge is the front-right corner."
+}

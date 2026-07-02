@@ -1,0 +1,139 @@
+{
+  "image": "page009_img01.png",
+  "view": "front-right three-quarter",
+  "model": "haiku",
+  "width": 1204,
+  "height": 2854,
+  "points": [
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 200,
+      "y": 2780,
+      "confidence": "medium",
+      "note": "Base back-left corner"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 950,
+      "y": 2780,
+      "confidence": "medium",
+      "note": "Base back-right corner"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 300,
+      "y": 2830,
+      "confidence": "high",
+      "note": "Base front-left corner"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1040,
+      "y": 2830,
+      "confidence": "high",
+      "note": "Base front-right corner"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 240,
+      "y": 310,
+      "confidence": "medium",
+      "note": "Top back-left corner, partially visible"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 960,
+      "y": 310,
+      "confidence": "medium",
+      "note": "Top back-right corner, partially visible"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 340,
+      "y": 380,
+      "confidence": "high",
+      "note": "Top front-left corner of frame"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1030,
+      "y": 380,
+      "confidence": "high",
+      "note": "Top front-right corner of frame"
+    },
+    {
+      "feature": "cone_gear_center",
+      "color": "magenta",
+      "x": 1000,
+      "y": 2680,
+      "confidence": "high",
+      "note": "Cone gear stack at base"
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 960,
+      "y": 2540,
+      "confidence": "high",
+      "note": "Main cylinder gear, bottom center area"
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "color": "orange",
+      "x": 900,
+      "y": 2620,
+      "confidence": "medium",
+      "note": "Second cylinder gear, lower position"
+    },
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 1090,
+      "y": 2480,
+      "confidence": "high",
+      "note": "Small brass sprocket, bottom right, chain visible"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "color": "yellow",
+      "x": 540,
+      "y": 1900,
+      "confidence": "high",
+      "note": "Left corner of pivot/butt end of visible arm"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "color": "yellow",
+      "x": 600,
+      "y": 1900,
+      "confidence": "high",
+      "note": "Right corner of pivot/butt end"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 530,
+      "y": 2100,
+      "confidence": "high",
+      "note": "Left corner of narrow tip end"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 610,
+      "y": 2100,
+      "confidence": "high",
+      "note": "Right corner of narrow tip end"
+    }
+  ],
+  "occluded": [],
+  "orientation_note": "Front of machine (platen/paper side) faces left. Right side of machine visible on right of image. Machine rear/inside visible in center. View from front-right three-quarter angle."
+}

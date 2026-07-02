@@ -1,0 +1,112 @@
+{
+  "image": "page002_img01.png",
+  "view": "front",
+  "model": "haiku",
+  "width": 1749,
+  "height": 4143,
+  "points": [
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 74,
+      "y": 108,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1675,
+      "y": 108,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 48,
+      "y": 4106,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1701,
+      "y": 4106,
+      "confidence": "high"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "color": "yellow",
+      "x": 565,
+      "y": 195,
+      "confidence": "high"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "color": "yellow",
+      "x": 615,
+      "y": 195,
+      "confidence": "high"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 490,
+      "y": 320,
+      "confidence": "high"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 700,
+      "y": 320,
+      "confidence": "high"
+    },
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 815,
+      "y": 545,
+      "confidence": "high"
+    },
+    {
+      "feature": "cone_gear_center",
+      "color": "magenta",
+      "x": 675,
+      "y": 3440,
+      "confidence": "high"
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 1355,
+      "y": 3495,
+      "confidence": "high"
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "color": "orange",
+      "x": 1195,
+      "y": 3655,
+      "confidence": "high"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "reason": "back side not visible from front view"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "reason": "back side not visible from front view"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "reason": "back side not visible from front view"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "reason": "back side not visible from front view"
+    }
+  ],
+  "orientation_note": "Front view: platen/paper side toward camera; large brass cone gear and chain drive visible at base"
+}

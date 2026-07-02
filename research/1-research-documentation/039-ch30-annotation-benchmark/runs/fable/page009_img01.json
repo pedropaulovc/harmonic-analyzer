@@ -1,0 +1,124 @@
+{
+  "image": "page009_img01.png",
+  "view": "front-right three-quarter",
+  "model": "fable",
+  "width": 1204,
+  "height": 2854,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 839,
+      "y": 2053,
+      "confidence": "high",
+      "note": "chain sprocket at platen level beside the large brass drive gear; dot on the axle end inside the brass cup hub"
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "color": "red",
+      "x": 952,
+      "y": 2256,
+      "confidence": "low",
+      "note": "second sprocket, on the crank axle; mostly hidden behind the polished crank-arm boss, center estimated from the chain wrap arc"
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 768,
+      "y": 2335,
+      "confidence": "high",
+      "note": "front (camera-side) end face of the single cylinder-gear stack (~20 identical helical gears on one axle); dot on the silver axle pin in the black pivot bracket"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 223,
+      "y": 2045,
+      "confidence": "medium",
+      "note": "frontmost (lowest) arm of the fan; left corner of its stepped tip end face; arm seen nearly edge-on so tip corners span only ~8 px"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 231,
+      "y": 2044,
+      "confidence": "medium",
+      "note": "same arm; right corner of the stepped tip end face"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 61,
+      "y": 353,
+      "confidence": "high",
+      "note": "outer top vertex of the front-left corner boss of the green top frame"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 306,
+      "y": 347,
+      "confidence": "medium",
+      "note": "nearest corner; cylindrical clamp boss - dot on its top rim at the post axis"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 1111,
+      "y": 350,
+      "confidence": "medium",
+      "note": "top-right vertex of the right-end corner boss of the top frame"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 65,
+      "y": 2492,
+      "confidence": "high",
+      "note": "leftmost bottom-flange vertex of the green base slab"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 303,
+      "y": 2641,
+      "confidence": "high",
+      "note": "nearest, lowest silhouette vertex of the base slab (rounded corner)"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 1126,
+      "y": 2525,
+      "confidence": "medium",
+      "note": "rightmost bottom-flange corner of the base slab (rounded)"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cone_gear_center",
+      "reason": "axis point not visible - the cone stack's small front end face is in deep shadow behind the black connecting rod and green crank bearing post; its large base end faces the machine back, away from camera"
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "only one cylinder-gear stack exists; its rear end face points back-left, hidden behind its own front disc and the pedestal (the other brass cylinder at the base is the ch25 pinion gear, not a cylinder-set gear)"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "butt/pivot end of the arm is hidden behind the platen board (fan pivots on the central column behind the platen)"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "butt/pivot end of the arm is hidden behind the platen board"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "reason": "hidden behind the right-side top beam; its post emerges below the beam at ~(856,432)"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "reason": "diagonally opposite the camera, hidden behind the base slab itself"
+    }
+  ],
+  "orientation_note": "Front = platen/paper side. Camera sits between the front and right faces, closer to the right (crank) side: the front face is strongly foreshortened toward image left (front-left corners at the far left edge), while the right face spans most of the frame to the back-right corners at image right. The crank and drive chain are on the right face; the platen assembly is swung so the paper faces the camera more directly than the frame front."
+}
