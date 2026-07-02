@@ -82,6 +82,21 @@ RENDER_DIFF = REPO_ROOT / "comparisons" / "tools" / "render_diff.py"
 # + per-config mesh keys + colours) that lets a consumer render the bundle with
 # comparisons/tools/render_offline.py without SolidWorks.
 SCENE_JSON = CAD_ROOT / "out" / "boxes" / f"{TOP_ASSEMBLY}.json"
+
+# Comparison gallery (reference-photo overlays) refreshed from the STABLE STL/boxes
+# render cache and shipped in the bundle. render_offline.py drives Blender offline
+# (no SolidWorks); gallery.py rebuilds the static index. Both are PEP-723 scripts,
+# run via `uv run`. The refresh is BEST-EFFORT: Blender lives on a separate GPU
+# seat, so a release cut on the SolidWorks seat (no Blender) ships without the
+# refreshed gallery rather than failing (see refresh_comparisons).
+COMPARISONS_DIR = REPO_ROOT / "comparisons"
+RENDER_OFFLINE = COMPARISONS_DIR / "tools" / "render_offline.py"
+GALLERY_PY = COMPARISONS_DIR / "tools" / "gallery.py"
+# The gallery artefacts staged into the bundle's ``comparisons/``: the geometry-
+# derived renders/composites/scores/index are gitignored + regenerated here; the
+# fixed reference photos and the manifest ride along so the bundle is standalone.
+_GALLERY_STAGE = ("ref", "render", "composite", "scores.json", "index.html",
+                  "manifest.json")
 _VERSION_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 
 # SolidWorks COM type library (SldWorks); the version pins the same revision the
@@ -251,6 +266,91 @@ def render_diff(stage: Path, prev_tag: str) -> dict[str, Any]:
     log(f"diff render: {len(data.get('changed_parts', []))} changed parts, "
         f"{len(data['image_paths'])} views")
     return data
+
+
+def _stream_cmd(cmd: list[str], tag: str) -> list[str]:
+    """Run ``cmd`` from the repo root, streaming its output line-by-line (so a
+    minutes-long render never looks hung), and raise on non-zero exit. Returns
+    the last ~50 lines for error context. Mirrors render_diff's streaming."""
+    proc = subprocess.Popen(
+        cmd, cwd=str(REPO_ROOT), stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT, text=True, bufsize=1,
+    )
+    tail: list[str] = []
+    assert proc.stdout is not None
+    for raw in proc.stdout:
+        line = raw.rstrip()
+        log(f"    {tag}| {line}")
+        tail.append(line)
+        if len(tail) > 50:
+            del tail[0]
+    if proc.wait() != 0:
+        raise RuntimeError(f"{cmd[0]} {tag} exited non-zero: {' / '.join(tail)[-400:]}")
+    return tail
+
+
+def refresh_comparisons(stage: Path) -> dict[str, Any] | None:
+    """Refresh the reference-photo comparison gallery from the STABLE STL/boxes
+    render cache and stage it into the bundle (``stage/comparisons``).
+
+    Runs AFTER the neutral STL export ("once STLs are stable"): the offline
+    renderer (``render_offline.py`` -> Blender) reads the settled
+    ``cad/out/stl`` + ``cad/out/boxes`` cache and regenerates each pair's CAD
+    render, the pixel-registered composite and the RMS score, then ``gallery.py``
+    rebuilds the static index. Those artefacts are gitignored, regenerable (they
+    drift as geometry changes), so a release is the place a fresh snapshot is
+    published -- shipped inside the bundle so a consumer sees THIS model scored
+    against Michelson's ch30 photos.
+
+    BEST-EFFORT by design: the offline renderer needs Blender, which lives on a
+    separate GPU seat, so a release cut on the SolidWorks seat (no Blender) logs
+    a warning and returns None -- the release still publishes, just without the
+    refreshed gallery. The standalone refresh is unchanged: run
+    ``uv run comparisons/tools/render_offline.py`` on a Blender-equipped seat.
+    """
+    with _telemetry.span("release.comparisons") as sp:
+        try:
+            log("refreshing comparison gallery from stable STLs (render_offline) ...")
+            _stream_cmd(["uv", "run", str(RENDER_OFFLINE)], "cmp")
+            _stream_cmd(["uv", "run", str(GALLERY_PY)], "gallery")
+        except Exception as exc:  # noqa: BLE001 -- best-effort; never block a release
+            _telemetry.warn(
+                f"comparison gallery not refreshed ({exc}); shipping bundle "
+                "without it -- refresh on a Blender-equipped seat with "
+                "`uv run comparisons/tools/render_offline.py`.")
+            _telemetry.event("comparisons.skipped", reason=str(exc)[:200])
+            sp.set_attribute("refreshed", False)
+            return None
+
+        dst = stage / "comparisons"
+        dst.mkdir(exist_ok=True)
+        staged = 0
+        for name in _GALLERY_STAGE:
+            src = COMPARISONS_DIR / name
+            if not src.exists():
+                continue
+            if src.is_dir():
+                shutil.copytree(src, dst / name, dirs_exist_ok=True)
+                staged += sum(1 for p in (dst / name).rglob("*") if p.is_file())
+            else:
+                shutil.copy2(src, dst / name)
+                staged += 1
+
+        scores_file = COMPARISONS_DIR / "scores.json"
+        scores = (json.loads(scores_file.read_text(encoding="utf-8"))
+                  if scores_file.exists() else {})
+        vals = [v for v in scores.values() if isinstance(v, (int, float))]
+        facts = {
+            "pairs": len(scores),
+            "mean_score": round(sum(vals) / len(vals), 1) if vals else None,
+            "files": staged,
+        }
+        sp.set_attribute("refreshed", True)
+        sp.set_attribute("pairs", facts["pairs"])
+        log(f"comparison gallery: {facts['pairs']} pairs"
+            + (f" (mean RMS score {facts['mean_score']})" if vals else "")
+            + f", {staged} files staged")
+        return facts
 
 
 def preflight(version: str, allow_dirty: bool) -> None:
@@ -849,6 +949,12 @@ def bundle(sw: Any, revision: str, version: str,
     #    a previous release that predates the neutral bundle.
     facts["diff"] = render_diff(stage, prev_tag) if prev_tag else None
 
+    # 4b. Comparison gallery: refresh the reference-photo overlays from the STABLE
+    #     STLs exported above and ship them under stage/comparisons. Best-effort --
+    #     needs Blender (separate GPU seat), so a no-Blender release warns + ships
+    #     without it rather than failing. See refresh_comparisons.
+    facts["comparisons"] = refresh_comparisons(stage)
+
     # 5. Provenance manifest LAST -- it hashes everything staged above, so it must
     #    run after the diff is written and before the zip is sealed. (Build logs
     #    are NOT staged here: they ship as a separate logs asset, see _logs_asset.)
@@ -923,6 +1029,12 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         f"this bundle with `comparisons/tools/render_offline.py` (no SolidWorks)\n"
         f"- `png/` -- {facts['views']}-angle preview renders "
         f"({facts['pngs']} images)\n"
+        + (f"- `comparisons/` -- this model overlaid on Michelson's ch30 photos "
+           f"({facts['comparisons']['pairs']} pairs"
+           + (f", mean RMS score {facts['comparisons']['mean_score']}"
+              if facts['comparisons'].get('mean_score') is not None else "")
+           + "; open `comparisons/index.html`)\n"
+           if facts.get("comparisons") else "")
         + (f"- `diff/` -- changed-parts diff renders vs "
            f"{facts['diff']['prev']} (see below)\n" if facts.get("diff") else "")
         + f"- Size: {facts['size_mb']:.1f} MB\n"

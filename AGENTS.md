@@ -529,6 +529,31 @@ parallelizes its per-mesh Hausdorff classification across a process pool
 (`--jobs`, default auto). `cut_release` benefits with no change. `--jobs 1`
 forces serial (debugging / a fallback if the spawn-mode pool misbehaves).
 
+## Comparison gallery — refreshed during release, shipped in the bundle
+
+The reference-photo comparison gallery (this model overlaid on Michelson's ch30
+photos) is **geometry-derived**: its CAD renders, composites, RMS scores and
+`index.html` drift every time a part changes. Tracking them dirtied the tree on
+every rebuild and shipped a stale showcase, so they are now **gitignored and
+regenerated** — `comparisons/{render,composite}/`, `comparisons/scores.json`,
+`comparisons/index.html`. Only the **fixed benchmark** stays tracked:
+`comparisons/manifest.json` (the pose/align source of truth) and
+`comparisons/ref/` (the prepared reference photos).
+
+`cut_release.py:refresh_comparisons` refreshes them **once the STLs are stable**
+— it runs inside `bundle()` *after* the neutral STL export, so the offline
+renderer reads settled geometry — then stages the whole gallery under the
+bundle's `comparisons/`. Each release therefore publishes a fresh, self-contained
+snapshot (`open comparisons/index.html`) instead of relying on a tracked one.
+
+It is **best-effort**: the offline renderer needs Blender, which lives on a
+separate GPU seat, so a release cut on the SolidWorks seat (no Blender) logs a
+`warn` (`release.comparisons` span, `refreshed=false`, a `comparisons.skipped`
+event) and ships the bundle **without** the gallery rather than failing the
+release. Refresh it standalone anytime — unchanged — with
+`uv run comparisons/tools/render_offline.py` (Blender) or
+`cad/scripts/render_compare.py` (SolidWorks), then `gallery.py`.
+
 ## Considered but NOT done (with reasons)
 
 - **`transcode:<stem>` — dropped.** The build writes PNGs via a single COM
