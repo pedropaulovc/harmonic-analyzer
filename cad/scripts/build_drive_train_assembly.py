@@ -193,9 +193,12 @@ CONE_T120_PITCH_R = (120.0 / DP_TRAIN) * 25.4 / 2.0  # 30.59: largest cone gear 
 # gates, cams, rockers and bars; nothing here may move them).
 _DRUM_SEAT_NOMINAL = _config.machine("cone_incline", "drum_seat_nominal_mm")  # 7.2204 (OD 62.2)
 Z_PITCH = _DRUM_SEAT_NOMINAL * math.cos(math.asin(RADIUS_STEP / _DRUM_SEAT_NOMINAL))  # 7.0566: drum z-pitch
-X_DRUM = 54.7  # cam-drum machine X = -54.7 (book ch30 view 1/8 line-2 photogrammetry:
-# the drum sits well clear of the rocker-support at +72.9, driving the rockers via
-# LONG connecting rods, not the short near-vertical rods of the old +47.5 placement).
+X_DRUM = 54.7  # cam-drum machine X = -54.7 (ch30 GT bundle adjustment, cyl gear
+# solved -52.3 +/- 0.9). The drum sits directly UNDER the rocker arms' rod-side
+# tips: the rocker pivot (+72.9) is the seesaw mid-span, its rod-pin hole 127.49
+# out, and every connecting rod hangs PLUMB from tip to cam (ch30 photos + GT
+# rocker-corner triangulation; the earlier "line-2 photogrammetry" oblique-rod
+# reading -- drum well clear of the support, LONG rods -- is refuted).
 # The whole cone/64T/crank train cascades rigidly off this (DRUM_TIP_X -> X_PITCH ...).
 Z_DRUM0 = _config.machine("channels", "station_z0_mm")  # -67.1 drum gear 0 plane (shared station anchor)
 

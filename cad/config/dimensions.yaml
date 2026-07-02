@@ -588,11 +588,11 @@ sections:
       - confidence
       rows:
       - - Centre distance (cam ring → rocker pin)
-        - 180.83 mm
-        - '7.12'
-        - 'ch30 GT 2026-07-02: the cam drum sits at machine (−54.7, 104.8) — out at the book x AND down at the GT drive height — so the rod spans the pivot→cam gap d = 198.6 obliquely. 180.83 is solved to land the rocker rod-pin at the same point as before (pin azimuth −6.92° preserved; the ARM tilt is −7.82° after subtracting the tapered-strap lever angle β = 0.90° — the rod-pin bore sits at the strap''s mid-depth, 0.4 above the pivot bore — downstream bar/lever/spring chain untouched). Supersedes 163.18 (x-move only) and the original 127.0 = exactly 5" (which assumed the drum under the pivot at drive height 126.8; the clean 5" was a coincidence of the wrong height)'
+        - 144.75 mm
+        - '5.70'
+        - 'ch30 GT 2026-07-02 (vertical-rod closure): every rod hangs PLUMB from the rocker arm''s rod-side tip onto its cam — the ch30 photos show the rod straps dropping vertically onto the drum, and the GT rocker-corner triangulation lands the arm''s rod-side end at machine x −60 (bottom-arc end predicts −58.6). With the pivot at the seesaw mid-span (+72.9) and the rod-pin hole 127.49 out, the pin sits directly above the phased cam centre; 144.75 is solved to preserve the arm rest tilt −7.82° (pin azimuth −3.28° = tilt + lever angle β 4.54° — the rod-pin bore sits at the curved strap''s mid-depth, 10.12 above the pivot bore — downstream bar/lever/spring chain untouched; rod tilt −0.001°). Supersedes the oblique 180.83/163.18 era (its "line-2 photogrammetry" put the drum on the far side of the rocker support) and restores the original 127.0-era vertical-rod topology at the GT-corrected drum position'
         - derived
-        - med
+        - high
       - - Cam ring bore
         - 30.8 mm
         - '1.213'
@@ -620,7 +620,7 @@ sections:
       - - Tip strap (flattened upper end)
         - 10 × 18, Ø2 pin hole centred
         - —
-        - pin matches the rocker's Ø2 rod-pin hole at +25.4 from the pivot (ch. 14)
+        - pin matches the rocker's Ø2 rod-pin hole at +127.49 from the pivot, near the rod-side tip (ch. 14, ch30 GT)
         - scaled
         - low
   - prose: |2
@@ -628,8 +628,10 @@ sections:
       M6.3 re-read of p.29: the stepped sawtooth blocks at the rocker-arm tips
       are the AMPLITUDE BARS' notched feet parked near the arm ends (ch. 15
       "slide along its rocker arm … can slide completely off"), NOT the rod
-      tops. The rods attach near the pivot (rod pin +25.4 from the pivot, see
-      ch. 14 layout) and are plain thin straps at the top.
+      tops — that mapping stands. The rods themselves are plain thin straps at
+      the top and attach near the ROD-SIDE tip (rod pin +127.49 from the
+      pivot, ch30 GT vertical-rod closure; M6.3's "near the pivot, +25.4" was
+      tied to the pre-ch30 arbor-47.5 layout — see ch. 14 layout).
 
       ---
 - heading: Chapter 14 — Rocker Arms (pp. 26–29)
@@ -675,11 +677,11 @@ sections:
         - manual (ch. 30 back view)
         - med
       - - Rod-pin hole
-        - Ø2 at +25.4 (1") from the pivot, rod side, mid-depth
-        - '1.0'
-        - 'M6.3 closure: vertical connecting rods hang at the cylinder-arbor x = −47.5; pivot ball measured x ≈ −66 (back view, base-edge calibration) … −81 (front view) → designer value 1" lever arm, pivot at −72.9'
+        - Ø2 at +127.49 from the pivot, rod side, mid-depth (5.3 inboard of the bottom-arc end)
+        - '5.02'
+        - 'ch30 GT closure: the rods hang PLUMB onto the cam drum at machine −54.7 with the pivot at the seesaw mid-span +72.9, so the hole sits 127.49 out (solved so the pin lands directly above the phased cam centre at the −7.82° rest tilt). The GT rocker-corner triangulation independently lands the arm''s rod-side end at machine −60 (bottom-arc end predicts −58.6). Supersedes M6.3''s "1-inch lever" (+25.4), which closed the same vertical-rod argument against the OLD arbor x = −47.5 — the GT drum move to −54.7 broke that closure and the ch30 photos re-resolve it at the tip'
         - derived
-        - med
+        - high
       - - Pivot pin hole
         - Ø6.5 (rides the Ø6.35 pivot shaft), mid-depth
         - '0.256'
@@ -698,7 +700,7 @@ sections:
       rows:
       - - Pivot shaft
         - Ø6.35 × 228.6 (9") along Z at (x, y) = (−72.9, 253.8)
-        - 'ball x photo-measured −66…−81, ball y 252–255 in both 0°/180° views ✓; y = support apex 228.6 + ball rise 25.2. (The old chained derivation "x = arbor − rod-lever; y = drive + rod" died with the ch30 GT drive re-anchor — the drum moved to (−54.7, 104.8) and the rod is now the solved 180.83 oblique link; the pivot stands on the frame/photo evidence alone, unchanged)'
+        - 'ball x photo-measured −66…−81, ball y 252–255 in both 0°/180° views ✓; y = support apex 228.6 + ball rise 25.2. GT rocker-corner triangulation puts the seesaw mid-span at +72.5 — the pivot value confirmed to 0.4. (The old chained derivation "x = arbor − rod-lever; y = drive + rod" is superseded: the drum sits at (−54.7, 104.8) and the rod hangs plumb from the arm''s rod-side tip, hole 127.49 out, solved link 144.75)'
         - med (x, y photo + frame; dia low)
       - - Support casting ×1 (M6.5, depth re-read M6.9, UNIFIED M6.12)
         - 'M6.12: the windowed portal that M6.9 confirmed is now ONE green casting, `rocker-arm-support` (build_rocker_arm_support.py), replacing the former two-part split (this frustum + the transgear A-frame). NORTH upright = solid tapered frustum, base 88.9 × 40 → top 20 × 20, 177.8 tall (7"); SOUTH upright at machine z −111 = the tapered plate + saddle + clevis ears (former a-frame row); the two are tied by the TOP and FOOT rails, which now run continuously between them (≈2 mm overlap into each upright fuses the casting into a single solid body — gated in the build). The old east-flank arbor-clamp boss Ø20 / Ø9.7 bore is GONE: the cone/arbor no longer rests on the support (the arbor''s north end gets its own pedestal, the cone tip its own bracket, both in drive-train.SLDASM). Authored machine-handed → inserted unmirrored in frame.SLDASM at (x, z) = (+72.9, +101.6), the same transform the frustum used.'
@@ -1809,13 +1811,15 @@ sections:
          section. Cross-check: tan(cone half-angle) = 2.54/6.5839 = tan θ,
          so the cone's drum-side generator runs parallel to the drum axis —
          exactly the p.18 seam.
-      4. **Rocker arm working length** — RE-RESOLVED in M6.3, then REDERIVED
-         from the p.29 broadside photo (supersedes the indirect ±88 and the
-         M2 100/70 model): symmetric ±114.3 (4.5") about the pivot, rod pin at
-         +25.4 — see the ch. 14 "Rocker pivot & supports layout" table. The M2 read
-         put the connecting rods at the arm tips; ch. 15's "positive one side,
-         negative the opposite side" plus the vertical-rod/arbor-x closure
-         refutes that.
+      4. **Rocker arm working length** — RE-RESOLVED in M6.3 (±114.3 symmetric),
+         superseded by the ch.30 back-view seesaw read (11.5" top arc, see the
+         ch. 14 table), rod pin RE-RESOLVED by the ch30 GT vertical-rod closure
+         at +127.49, near the rod-side tip — see the ch. 14 "Rocker pivot &
+         supports layout" table. M2's rod-at-tip read is thus partially
+         vindicated (its asymmetric 100/70 profile stays refuted; the ch. 15
+         "positive one side, negative the opposite side" argument constrains
+         the AMPLITUDE-BAR feet, which do ride both sides of the pivot, not
+         the rod).
       5. **Feature mapping of the 16 mm (ch. 14) and 32 mm (ch. 17) callouts** —
          ch. 14 16 mm RESOLVED in M2 = rocker arm end-face depth (see ch. 14
          table). ch. 17 32 mm RESOLVED in M2 = spring coil body length (ch. 17
