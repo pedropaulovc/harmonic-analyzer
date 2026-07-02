@@ -1140,6 +1140,14 @@ def task_preflight():
         "file_dep": deps,
         "targets": [stamp],
         "task_dep": _spine_dep("preflight"),
+        # Always run (like export/release): the closure reads the per-assembly
+        # `.<stem>.park.json` sidecars, which are NOT declared file_dep (they are
+        # absent for a `locked` build, so a declared dep would error). Were this
+        # gated on the stamp + .SLDASM digest, a deleted/incompletely-restored
+        # sidecar (recipe digest unchanged) would leave preflight.ok "fresh" and
+        # release would SKIP the only sufficiency check. Running unconditionally,
+        # preflight_release.py fails loud when specs are missing (codex review).
+        "uptodate": [False],
         "actions": [(_run_stamped, [[sys.executable, str(PREFLIGHT_PY)],
                                     "release preflight", stamp])],
         "clean": True,
