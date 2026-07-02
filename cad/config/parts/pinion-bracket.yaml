@@ -1,0 +1,5 @@
+pinion-bracket:
+  number: MHA-056
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  process: "machined (steel)"

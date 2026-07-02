@@ -45,10 +45,12 @@ PART_NAME = "crankshaft"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 SHAFT_DIA = 0.375 * IN  # ch11: legacy ShaftDiameter, uncontradicted
-SHAFT_LENGTH = 130.0  # ch11: derived (crank seat + pedestal bearing + seats);
-# +10 over the legacy 120 lengthens the outboard crank seat so the crank arm can
-# sit SOUTH of the chain wheel (book ch30 p005/p002): the arm/handle then sweep
-# entirely in front of the chain plane and cannot foul the chain when turning.
+SHAFT_LENGTH = 145.0  # ch11: derived (crank seat + pedestal bearing + seats);
+# lengthened again with the ch30 GT re-read (2026-07-02): the crank plane moved
+# south (arm hub at machine z -175..-167, T12 at -157.5, pedestal slab at
+# -145..-125) while the inboard 16T station stayed, so the shaft spans
+# -175..-30. The arm/handle sweep entirely in front of the chain plane and
+# cannot foul the chain when turning (book ch30 p005/p002).
 PIN_HOLE_DIA = 5.0  # ch11: tapered-pin cross-hole, pin small end (photo)
 PIN_HOLE_HEIGHT = 12.0  # crank hub centre above the outboard end
 THROUGH_CUT_DEPTH = 30.0  # mid-plane total; > shaft dia

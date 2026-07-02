@@ -171,7 +171,7 @@ sections:
       - - Crank arm length (center-to-center)
         - ~66 mm
         - ~2.6
-        - 'REDERIVED from the ch30 eight-views (angle 90 side view): crankshaft axis to handle-pivot axis, scaled to the 280 mm base depth (ch6, annotated). The crank hangs straight DOWN (the handle reads "down" in all eight roll views, so the arm is on the views'' vertical rotation axis), putting the handle ~10 mm above the base top. SUPERSEDES the former ~150 (cone-axial scaled, low), which was >2x too long — a down-pointing 150 arm would drop the handle below the table'
+        - 'REDERIVED from the ch30 eight-views (angle 90 side view): crankshaft axis to handle-pivot axis, scaled to the 280 mm base depth (ch6, annotated). The crank hangs straight DOWN (the handle reads "down" in all eight roll views, so the arm is on the views'' vertical rotation axis), putting the handle ~28 mm above the base top at the ch30 GT crank height (Y_CRANK 144.96; was ~10 at the old 126.8). SUPERSEDES the former ~150 (cone-axial scaled, low), which was >2x too long — a down-pointing 150 arm would drop the handle below the table'
         - scaled
         - med
       - - Handle length
@@ -229,11 +229,11 @@ sections:
         - scaled
         - low
       - - Crankshaft length
-        - ~120 mm
-        - ~4.7
-        - 'derived: crank seat (~30, incl. 10 overhang) + green pedestal bearing (~60, eight-views 8/8) + sprocket/drive-pinion seats (~30)'
+        - 145 mm
+        - '5.7'
+        - 'derived, lengthened with the ch30 GT re-read (2026-07-02): the crank plane moved south (arm hub z −175..−167, T12 chain wheel −157.5, pedestal slab −145..−125) while the inboard 16T station stayed — the shaft spans z −175..−30 (`build_crankshaft.py`)'
         - derived
-        - low
+        - med
   - prose: |2
 
       Construction (stated): wooden handle stained black, rotates on a pivot; metal crank
@@ -476,6 +476,19 @@ sections:
       D/(D + depth), D ≈ 977 from the near base edge — far objects compress
       toward the horizon (e.g. the crank pedestal at x +122.3 reads at ratio
       0.736 in v3).
+
+      **ch30 GT triangulation (2026-07-02).** The per-view scalings above are
+      superseded for the DRIVE-TRAIN features by a full bundle adjustment over
+      all 8 ch30 eight-views photos (annotated landmarks + tube-silhouette
+      observations; `cad/scripts/diagnostics/triangulate_ch30_gt.py`, ground
+      truth in `research/1-research-documentation/039-ch30-annotation-benchmark/
+      ground_truth/`). Solved features (machine frame, ±1σ ≈ 1.5–2.7 mm):
+      crank_sprocket (−122.84, 144.78, −189.10), cone_front (−127.00, 101.25,
+      −123.07), cone_back (−81.03, 104.60, +101.83), pinion_front (−10.16,
+      104.23, −144.07), pinion_back (−11.41, 106.71, +91.25), cyl_front
+      (−51.93, 100.45, −89.66), cyl_back (−52.73, 105.24, +91.49). These drive
+      the 2026-07-02 re-anchor rows below (drive height 104.8, crank above the
+      64T, alignment pinion restored level-inboard).
   - table:
       columns:
       - item
@@ -484,9 +497,9 @@ sections:
       - confidence
       rows:
       - - Drive height (cylinder arbor AND cone big-end axis)
-        - y = 76 above base top
-        - crank-arm pivot + cone big-end brass blob, front view; side-view cone midline near-level confirms equal heights
-        - med
+        - y = 54.0 above base top (104.8 abs) — ch30 GT 2026-07-02
+        - 'ch30 GT bundle-adjusted triangulation (8 book photos, `triangulate_ch30_gt.py`): cone_front y 101.25 ± 1.5, cyl_front 100.45 ± 1.9, cyl_back 105.24, pinion_back 106.71 — the drive plane solves ~22 BELOW the old 126.8. The old "equal heights" evidence row (crank-arm pivot + cone big-end blob read together) is OVERTURNED: the crank axis is NOT on the drive line, it triangulates at y 144.78 ± 1.7 (≈ 40 ABOVE the drive plane; its 16T meshes the 64T from above). Earlier reading y = 76 above base top; then 126.8 abs (M6.3)'
+        - high (GT)
       - - Mesh offset direction
         - horizontal (plan), cone beside drum
         - 'ch. 12 p.18 top-down: cone converges on the drum toward the small end; side view cone midline ≈ level'
@@ -512,21 +525,21 @@ sections:
         - 'M6.7 exact tracking: the 20 mesh-derived centres are collinear iff sin i = 1.5295/7.0565 (asserted in `build_drive_train_assembly.py`); elegance check: tan(cone half-angle) = 1.5295/6.889 = tan i, so the drum-side generator runs parallel to the drum axis — the p.18 seam'
         - low
       - - Cylinder arbor (stationary)
-        - 'x = −47.5 (frame-locked: SOUTH arbor pedestal only — the rocker boss bore is gone with the portal unification; M6.12 shortened the arbor 200 → 176, north end z +78 unsupported pending the cone rework), y = 76, along Z'
-        - the cone grid is derived FROM the drum (X_PITCH + exact tracking); the book's "oblique partial engagement, distinct wear" (ch. 12) is now modeled literally (M6.7). Vertical connecting rods reach rocker tips only for x_cyl ≥ −100 ✓
-        - med
+        - 'x = −54.7, y = 104.8 (ch30 GT drive height), along Z, spans z −90.0..+78.0 (length 168): south end at the GT cyl_front boss (−89.66 ± 1.9), inside the arbor-pedestal bore; north end +78 unchanged — GT wants the north bearing at z +91.5 (cyl_back), DEFERRED with the portal/back-frame re-layout'
+        - ch30 GT triangulation (cyl_front/cyl_back); the cone grid is derived FROM the drum (X_PITCH + exact tracking); the book's "oblique partial engagement, distinct wear" (ch. 12) is modeled literally (M6.7)
+        - high (GT)
       - - Cylinder gear j
         - z_j = −67.1 + 7.0568j (cone gear j's contact tooth lands in this plane; the cone CENTRES sit r_j·sin i north of it)
         - mesh plane alignment
         - high
       - - Crankshaft
-        - along Z at (x, y) = (+55.38, 76) = 64T contact x (15.66 + 30.59 cos i) + 38.24 DP 26.57 centre distance (R64 30.59 + R16 7.65) + oblique backoff (pinion centred on the 64T contact-tooth plane z −61.99)
-        - 'FLAG: the front-view pedestal at +122 ± 3 NO LONGER matches the derived +55.4 — rescaling the whole drive train (cone + crank-drive) with the 62.2 anchor pulled the crank ~67 mm inboard. This is a new discrepancy from the 62.2 OD anchor: either the crank pedestal photo position or the 62.2 reading is wrong (appendix C #9 distance no longer ratifies)'
-        - low
+        - along Z at (x, y) = (+122.8, 144.96), 16T pinion meshing the 64T from ABOVE (near-vertical mesh azimuth, c2c 40.446 = R64 + R16 + oblique backoff), pinion centred on the 64T contact-tooth plane z −67.83
+        - 'RESOLVED (ch30 GT 2026-07-02): crank_sprocket triangulates at machine (−122.84, 144.78) ± 1.7 — the front-view pedestal at +122 ± 3 was RIGHT all along. The old derivation wrongly assumed the crank sits ON the drive line (horizontal mesh); freeing the 16T:64T mesh azimuth reconciles the 62.2 OD anchor AND the +122 pedestal photo simultaneously: X_CRANK 122.8 (GT 0.03σ), Y_CRANK 144.96 = 104.8 + sqrt(c2c² − 4.824²) (GT 0.13σ). The appendix C #9 "either the photo or 62.2 is wrong" dichotomy was false — the mesh-direction assumption was wrong. `build_drive_train_assembly.py` X_CRANK/Y_CRANK'
+        - high (GT)
       - - Chain run
-        - crank sprocket (+80, 76, the inboard-shifted crank) up to the translational-gearing sprocket at the third A-frame apex (x ≈ −7 ≈ 0, centered)
-        - front view; transgear disc center measured x = −7 (the crank-end of the chain moved inboard with the crankshaft — see the crankshaft flag)
-        - low
+        - crank T12 sprocket (+122.8, 144.96, z −155 chain plane) up to the transgear knob-shaft T24 at post-mirror (−65, 241.78)
+        - ch30 GT crank re-anchor; the chain plane moved south to z −155 (T12 band −157.5..−152.5, in front of the pedestal slab front face −145)
+        - med
       - - Cone pivot
         - at the big end, front (black bracket, p.18 "pivot" label); small end carried by the green knob post — swing is horizontal (out of mesh)
         - p.18 + ch. 12 notes
@@ -538,30 +551,30 @@ sections:
       columns:
       - part
       - dims
-      - position (x, z), bore y = 76
+      - position (x, z)
       - source
       - confidence
       rows:
-      - - '`crank-pedestal`'
-        - green cylinder Ø46 × 110 tall, Ø9.5 bore along Z
-        - (+118.00, −108.6)
-        - 'front view: centre +123 ± 3 (M6.7 mesh-derived x within 1.3σ — crankshaft row), Ø 278 px / 6.02 px/mm, top ~110 above base top; z: standing inside the base front edge (−133.35), shaft stations in front'
-        - low/med
-      - - '`arbor-pedestal` ×1 (M6.5, M6.9 trim, M6.12 south-only)'
-        - green block 24 × 16 × 85, Ø9.5 clamp bore along Z
-        - 'M6.12: SOUTH end only, at (−47.5, −90.5). The rocker support no longer clamps the arbor (its boss/bore went with the portal unification), but the now-solid portal north upright leaves no room for a north pedestal where the arbor''s north end was — so the arbor is SHORTENED (200 → 176, spans z −98..+78) to clear the frustum south face (~+85.6 at the drive axis), and its north end is left unsupported. The dedicated north-end support is DEFERRED to the cone-position rework. South block front face −98.5 clears the portal south-plate back face −99 by 0.5 (M6.9); stack ends ±70.6'
-        - function-driven; v3 side view (6.124 px/mm)
-        - low/med
-      - - '`cone-pivot-post`'
-        - black steel block 25 × 20 × 85, Ø9.5 journal bore (rotated 21.1° in plan with the cone axis)
-        - '(+62.4, −76.1) = shaft station −1 from the pivot end: the shaft engages the first 9 mm of the bore and ends inside (blind-bearing look — p.18 shows the shaft end disappearing into the bracket); the rotated block''s z-reach 13.83 stops 1.0 clear of the perpendicular 64T''s south face'
-        - p.18 "pivot" bracket; journal length from the cone-shaft row (~25)
-        - low
-      - - cone small-end support — DEFERRED (M6.12)
+      - - '`crank-pedestal` (ch30 GT re-anchor 2026-07-02)'
+        - green cast slab 46.2 wide × 20 deep × 110 tall, Ø9.5 bore along Z at height 94.16 (bore abs y 144.96 = Y_CRANK)
+        - '(+122.8, −135): slab z −145..−125, crank shaft stations in front (T12 −157.5, arm hub −175..−167)'
+        - 'front view: centre +123 ± 3 (now matched EXACTLY — crankshaft row RESOLVED), Ø 278 px / 6.02 px/mm, top ~110 above base top; the crank axis rides near the slab top because the crank sits 40.16 above the drive line'
+        - high (GT)
+      - - '`arbor-pedestal` ×1 (M6.5, M6.9 trim, M6.12 south-only; ch30 GT height)'
+        - green block 24 × 16 × 63 tall, Ø9.5 clamp bore along Z at height 54.0 (bore abs y 104.8)
+        - 'SOUTH end only, at (−54.7, −90.5); arbor south end z −90.0 inside the bore (GT cyl_front boss −89.66). Block height dropped 85 → 63 with the drive plane (126.8 → 104.8). North end still unsupported — the GT north bearing (cyl_back z +91.5) is DEFERRED to the portal/back-frame re-layout'
+        - ch30 GT (cyl_front); function-driven
+        - med (GT height)
+      - - '`cone-pivot-post` (p1 swing bracket; ch30 GT re-anchor)'
+        - green cast block 32 × 26 × 63 tall, Ø9.5 journal bore at height 54.0 (bore abs y 104.8 = drive line), CASTING_GREEN (was black steel)
+        - 'centre (+124.83, −100.01) = cone shaft station −12.25, between the 64T (north) and the crank-pedestal slab (south); the cone shaft''s front stub threads the bore and ends proud at z −123.0 = the GT cone_front boss (−123.07 ± 1.6)'
+        - ch30 GT (cone_front); p.18 "pivot" bracket — the ch30 photos read it green cast like the pedestals
+        - high (GT)
+      - - cone small-end support — DEFERRED (M6.12; GT locates it)
         - —
-        - 'M6.12: the cone small end should get its own bracket (the role the old Ø32 `cone-knob-post` filled and the rocker boss wrongly absorbed), but the cone is currently mis-positioned and the whole north drive region will be re-laid out. A bracket placed against the wrong cone axis only collides with the solid portal, so the `cone-knob-post` is retired and the cone tip is left UNSUPPORTED until the cone-position rework, when the bracket is designed and placed properly'
-        - p.18 tip-rest role
-        - deferred
+        - 'ch30 GT 2026-07-02: cone_back triangulates the tip post at (−81.03, 104.60, +101.83) ± 2 — the small-end support the book shows DOES exist and now has solved coordinates. It sits inside the current portal frustum envelope, so placing it stays DEFERRED to the portal/back-frame re-layout (with the arbor north bearing and the helical arbor end gears); the shaft tip currently ends at z 97.4, 4.4 short of the GT boss'
+        - ch30 GT (cone_back); p.18 tip-rest role
+        - deferred (GT-located)
   - prose: |2
 
       ### Connecting rods (ch. 13 pp. 22–25 + ch. 14 p. 29; 20 used)
@@ -575,9 +588,9 @@ sections:
       - confidence
       rows:
       - - Centre distance (cam ring → rocker pin)
-        - 127.0 mm (5")
-        - '5.0'
-        - 'M6.3: rocker pivot axis y = 253.8 (apex ball mounts, front + back eight-views) minus drive height y = 126.8 = exactly 5" with the arm level; supersedes the earlier ~105 scaling (which used the wrong "rocker tip" attachment reading)'
+        - 180.83 mm
+        - '7.12'
+        - 'ch30 GT 2026-07-02: the cam drum sits at machine (−54.7, 104.8) — out at the book x AND down at the GT drive height — so the rod spans the pivot→cam gap d = 198.6 obliquely. 180.83 is solved to land the rocker rod-pin at the same point as before (pin azimuth −6.92° preserved; the ARM tilt is −7.82° after subtracting the tapered-strap lever angle β = 0.90° — the rod-pin bore sits at the strap''s mid-depth, 0.4 above the pivot bore — downstream bar/lever/spring chain untouched). Supersedes 163.18 (x-move only) and the original 127.0 = exactly 5" (which assumed the drum under the pivot at drive height 126.8; the clean 5" was a coincidence of the wrong height)'
         - derived
         - med
       - - Cam ring bore
@@ -658,7 +671,7 @@ sections:
       - - Arm length (tapered profile)
         - TOP edge arc 11.5" (292.1 mm), BOTTOM edge arc 10.5" (266.7 mm), symmetric about the pivot; 0.22" (5.588 mm) face PERPENDICULAR to the top edge at each tip (90° right-angle mark, cut into the front profile — not a 3D chamfer)
         - '11.5'
-        - 'MEASURED MANUALLY from the ch. 30 back-view sketch. Top edge = R800 arc (11.5"); bottom edge = concentric R816 arc (10.5") — the differing arc lengths taper the ends inward (a shorter lower edge below a longer upper edge is only geometric with non-radial ends). The 0.22" tip face — square (90°) to the top edge, per the sketch's right-angle marks — is from the same sketch, cut into the front profile as a short radial segment (perpendicular to the top arc) rather than a 3D chamfer feature. Supersedes the earlier p.29 broadside photo-scaled 4.5"/9" read (dual scale ~8.1–8.6 px/mm off the pivot ball / rod-pin hole / 16 mm depth callout, pivot→tip 113–119 mm rounded to a clean imperial half), the indirect M6.3 "80 mm bar travel + 8 mm margin" = 88 (never measured), and the M2 100/70 asymmetric read; ch. 15 symmetry retained. Perpendicular depth stays 16 mm; plate thickness 2.5 mm'
+        - 'MEASURED MANUALLY from the ch. 30 back-view sketch. Top edge = R800 arc (11.5"); bottom edge = concentric R816 arc (10.5") — the differing arc lengths taper the ends inward (a shorter lower edge below a longer upper edge is only geometric with non-radial ends). The 0.22" tip face — square (90°) to the top edge, per the sketch''s right-angle marks — is from the same sketch, cut into the front profile as a short radial segment (perpendicular to the top arc) rather than a 3D chamfer feature. Supersedes the earlier p.29 broadside photo-scaled 4.5"/9" read (dual scale ~8.1–8.6 px/mm off the pivot ball / rod-pin hole / 16 mm depth callout, pivot→tip 113–119 mm rounded to a clean imperial half), the indirect M6.3 "80 mm bar travel + 8 mm margin" = 88 (never measured), and the M2 100/70 asymmetric read; ch. 15 symmetry retained. Perpendicular depth stays 16 mm; plate thickness 2.5 mm'
         - manual (ch. 30 back view)
         - med
       - - Rod-pin hole
@@ -685,11 +698,11 @@ sections:
       rows:
       - - Pivot shaft
         - Ø6.35 × 228.6 (9") along Z at (x, y) = (−72.9, 253.8)
-        - x = arbor −47.5 − 25.4 rod-lever; y = drive 126.8 + 127 rod (arm level at cam mid-stroke); ball x photo-measured −66…−81, ball y 252–255 in both 0°/180° views ✓
-        - med (x, y derived; dia low)
+        - 'ball x photo-measured −66…−81, ball y 252–255 in both 0°/180° views ✓; y = support apex 228.6 + ball rise 25.2. (The old chained derivation "x = arbor − rod-lever; y = drive + rod" died with the ch30 GT drive re-anchor — the drum moved to (−54.7, 104.8) and the rod is now the solved 180.83 oblique link; the pivot stands on the frame/photo evidence alone, unchanged)'
+        - med (x, y photo + frame; dia low)
       - - Support casting ×1 (M6.5, depth re-read M6.9, UNIFIED M6.12)
         - 'M6.12: the windowed portal that M6.9 confirmed is now ONE green casting, `rocker-arm-support` (build_rocker_arm_support.py), replacing the former two-part split (this frustum + the transgear A-frame). NORTH upright = solid tapered frustum, base 88.9 × 40 → top 20 × 20, 177.8 tall (7"); SOUTH upright at machine z −111 = the tapered plate + saddle + clevis ears (former a-frame row); the two are tied by the TOP and FOOT rails, which now run continuously between them (≈2 mm overlap into each upright fuses the casting into a single solid body — gated in the build). The old east-flank arbor-clamp boss Ø20 / Ø9.7 bore is GONE: the cone/arbor no longer rests on the support (the arbor''s north end gets its own pedestal, the cone tip its own bracket, both in drive-train.SLDASM). Authored machine-handed → inserted unmirrored in frame.SLDASM at (x, z) = (+72.9, +101.6), the same transform the frustum used.'
-        - 'front view: triangle base spans x −130…−44 (≈86), apex at −81 ± 6. M6.9 REINSTATED the windowed-frame reading M6.3/M6.5 refuted: ch30 p008 (+x side, brightened) plainly shows the windowed portal frame (~184 wide, ~127 window). The p008 uprights read ~28–40 deep and near-uniform → side depth 40 → 20 (supersedes the legacy 63.5 → 16.9 strong taper). M6.5''s refutation of a second free-standing SOUTH frustum stands (the calibrated v3 side view shows ONE frustum at the back, z +69..+134 footprint; the south ball is gripped by the clevis). M6.12: photo Z-scale is perspective-compressed, so the casting''s Z geometry stays anchored on the mechanically-locked neighbours (both pivot balls, the channel grid, the parked stick z ≤ −118, the ch25 handle z ≥ −98).'
+        - 'front view: triangle base spans x −130…−44 (≈86), apex at −81 ± 6. M6.9 REINSTATED the windowed-frame reading M6.3/M6.5 refuted: ch30 p008 (+x side, brightened) plainly shows the windowed portal frame (~184 wide, ~127 window). The p008 uprights read ~28–40 deep and near-uniform → side depth 40 → 20 (supersedes the legacy 63.5 → 16.9 strong taper). M6.5''s refutation of a second free-standing SOUTH frustum stands (the calibrated v3 side view shows ONE frustum at the back, z +69..+134 footprint; the south ball is gripped by the clevis). M6.12: photo Z-scale is perspective-compressed, so the casting''s Z geometry stays anchored on the mechanically-locked neighbours (both pivot balls, the channel grid, the parked stick z ≤ −118; the "ch25 handle z ≥ −98" pin is OBSOLETE — the restored ch30-GT alignment pinion carries its tee handle at z −144, well south of the plate — the band now rests on the stick + photo read alone).'
         - photo + legacy height
         - med
       - - Support position
@@ -977,8 +990,8 @@ sections:
         - med
       - - Top frame (NEW part)
         - 'green cast rectangular ring around the 4 columns: rails 22 wide × 41 tall (y 999.7…1040.7, top = lever ball-mount seat 1065.9 − 25.2), corner bosses Ø48 bored Ø25.5 (column Ø25.4, OD rederived from the 8-views M6.11) at (±197, ±112); clamps the columns 80 below their tops (1120.8 − 1040.7)'
-        - 'eight-views: green ring at y ≈ 1010–1055 in all views, columns continue above it to caps ≈ 1090–1120'
-        - med
+        - 'eight-views: green ring at y ≈ 1010–1055 in all views, columns continue above it to caps ≈ 1090–1120. FLAG (ch30 GT 2026-07-02, flag-only — no rebuild yet): the bundle-adjusted corner solve wants the frame WIDER and HIGHER — corners (±221.5, 1074.6, ±137.4) and column centres (±203.8, ±117.5) vs the modeled (±208-nominal-corner, 1040.7, ±123)/(±197, ±112). A ~3–7% global stretch of the whole upper frame; deferred to a dedicated frame re-anchor pass since every column-anchored part (top frame, clamps, pinion bar, fulcrum shaft, wheel-bar) moves together'
+        - med (GT flag pending)
       - - Ball mounts ×4
         - 'rocker pair at seats y 228.6: north on the support apex (z +101.6), south on the A-frame saddle (z −111, M6.5); lever pair on the top-frame west rail (seat y 1040.7) at z ±85 — the Ø16 base must clear the Ø25.5 boss bores (need √(2.9² + dz²) ≥ 12.75 + 8 → dz ≥ 20.5 from the boss at z 112; z 85 gives dz 27, comfortably clear after the OD rederivation M6.11 loosened the old dz ≥ 25.3)'
         - ch. 14 / ch. 17; lever z from boss-bore clearance
@@ -1452,17 +1465,17 @@ sections:
         - scaled
         - low
       - - Chain wheels
-        - 'the two MOUNTED removable gears themselves (knob shaft T24, crankshaft T12): the bead chain rides their m2 teeth — that is how gear swaps change the platen ratio, and why the latch slackens the chain'
+        - 'the two MOUNTED removable gears themselves (knob shaft T24, crankshaft T12): the roller chain rides their m2 teeth — that is how gear swaps change the platen ratio, and why the latch slackens the chain'
         - —
         - 'M6.8 supersedes the M4c "17T sprockets both ends": ch. 23 text + `v4_transgear_002/008/012` (chain visibly wraps the removable''s coarse teeth); ch30 p002 full-res: upper wrap tips Ø ≈ 53.6 ≈ T24 OD 52 at post-mirror (−65, ~248); crank wheel small ≈ Ø30 (`v2_gears_010`) ≈ T12 OD 28. `chain-sprocket.SLDPRT` retired from the assemblies'
         - counted + scaled
         - med
-      - - Drive chain (bead-chain rework)
-        - 'ball-chain #13 stand-in: 63 × Ø4.8 spheres (`chain-bead`) at exact-closure pitch 6.387 (nominal 6.35 = 1/4") along the 402.4 closed centreline loop — two wrap arcs floating 0.41 + 2.5 outside the mounted removables'' tip circles (knob T24 r 28.91 about post-mirror (−65, 241.78); crank T12 r 16.91 about (−118, 126.8)), the taut common external tangent on the pinion-bar side, and a slack arc (r 171.8) sagging 14 below the straight tangent (SAG trimmed 18 → 14: outer reach clears the cone-pivot-post top by 0.95); bead centres on the chain mid-plane z −81.05 (splits the T24/T12 wrap mid-planes; the real chain bridges the 4.35 z offset with a ~1.7° skew); connecting wire not modeled (flexible); realised as a SolidWorks chain component pattern over the `_chain.py` path sketch — replaces the rigid flat-band stand-in (5 × 4.5 section, same centreline)'
+      - - Drive chain (roller chain; ch30 GT crank re-anchor 2026-07-02)
+        - 'real roller chain (alternating `chain-inner-link`/`chain-outer-link`, explicitly placed along the `_chain.py` centreline loop — the #13 bead-chain and the rigid flat-band stand-ins are both retired): two wrap arcs floating 0.41 + 2.5 outside the mounted removables'' tip circles (knob T24 r 28.91 about post-mirror (−65, 241.78); crank T12 r 16.91 about (−122.8, 144.96) = the GT crank axis), the taut common external tangent on the pinion-bar side, and a slack arc (r 142.2 solved) sagging SAG 14 below the straight tangent; link pin plane z −155 (both wheels coplanar: T24 and T12 bands −157.5..−152.5). SAG''s old cone-pivot-post clearance constraint is retired (the post now lives at z −113..−87, out of the chain corridor); 14 kept conservatively vs the p006 crop read 18'
         - —
-        - ch30 p002/p005/p006 (taut run + visibly drooping slack run; p006 droop crop read 18) + ch. 23 text
+        - ch30 p002/p005/p006 (taut run + visibly drooping slack run; p006 droop crop read 18) + ch. 23 text; crank centre from ch30 GT
         - scaled + derived
-        - low/med
+        - med
       - - Reduction pinion (coaxial with rack pinion)
         - est. 24T DP 30, OD ≈ 21 mm measured, face ≈ 6
         - —
@@ -1476,7 +1489,7 @@ sections:
         - scaled + derived
         - low/med
       - - A-frame → folded into `rocker-arm-support` (M6.5/M6.9, UNIFIED M6.12)
-        - 'M6.12: no longer a separate part — these are the SOUTH-upright + rail features of the single `rocker-arm-support` casting (build_rocker_arm_support.py), re-centred on machine x +72.9 and authored machine-handed in the frame assembly''s frame. The two south-flank hold-down hex bolts move to frame.SLDASM with the foot rail. Geometry below unchanged. The FRONT rocker support — the SOUTH upright of the portal frame (ch30 p008): tapered plate 18.5 thick (machine z −117.5..−99.0 — photo reads ~28-30 but the band is pinned by the parked measuring stick at z ≤ −118 and the ch25 handle plane at z ≥ −98), foot x −115..−45 on the base top (y 50.8), apex x −87..−59 at the ball-seat saddle y 228.6 (machine); full-width saddle z ±11.1 over the last 19.8 of rise; clevis ears (z ±(8.1..11.1), 20 tall, tops machine 248.6) flank the south pivot-ball mount''s Ø16 base (gap 16.2; ball r 9.5 centre 253.8 clears the ear inner faces; pivot shaft bottom 250.65 clears ear tops by 2.05); carries the portal-frame rails to the north frustum (faces −0.25): TOP RAIL 20 (machine x +62.9..+82.9) × 16 (y machine 212.6..228.6 = photo window top) to machine z +90.45, FOOT RAIL 30 (machine x +59.75..+89.75 — west face 0.25 east of the arbor-pedestal block) × 20 on the base top to machine z +81.35, bolted down by two hex bolts (M6.10): AF 12.7 × 5.5 heads + Ø7.8 × 32 shanks at machine (74.75, z −54/+36) through the rail''s Ø8.2 holes, 12 into the base''s through-holes (head corner 2.64 clear of the cylinder train''s 120T tips); M6.12: the part is authored MACHINE-handed with NO MIRROR_PLANE entry (it lives in the non-mirroring frame.SLDASM) — the real machine casts both uprights + rails in one piece, now modeled that way'
+        - 'M6.12: no longer a separate part — these are the SOUTH-upright + rail features of the single `rocker-arm-support` casting (build_rocker_arm_support.py), re-centred on machine x +72.9 and authored machine-handed in the frame assembly''s frame. The two south-flank hold-down hex bolts move to frame.SLDASM with the foot rail. Geometry below unchanged. The FRONT rocker support — the SOUTH upright of the portal frame (ch30 p008): tapered plate 18.5 thick (machine z −117.5..−99.0 — photo reads ~28-30 but the band is pinned by the parked measuring stick at z ≤ −118; the former ch25-handle z ≥ −98 pin is obsolete, the restored GT alignment-pinion handle sits at z −144 well clear of the plate), foot x −115..−45 on the base top (y 50.8), apex x −87..−59 at the ball-seat saddle y 228.6 (machine); full-width saddle z ±11.1 over the last 19.8 of rise; clevis ears (z ±(8.1..11.1), 20 tall, tops machine 248.6) flank the south pivot-ball mount''s Ø16 base (gap 16.2; ball r 9.5 centre 253.8 clears the ear inner faces; pivot shaft bottom 250.65 clears ear tops by 2.05); carries the portal-frame rails to the north frustum (faces −0.25): TOP RAIL 20 (machine x +62.9..+82.9) × 16 (y machine 212.6..228.6 = photo window top) to machine z +90.45, FOOT RAIL 30 (machine x +59.75..+89.75 — west face 0.25 east of the arbor-pedestal block) × 20 on the base top to machine z +81.35, bolted down by two hex bolts (M6.10): AF 12.7 × 5.5 heads + Ø7.8 × 32 shanks at machine (74.75, z −54/+36) through the rail''s Ø8.2 holes, 12 into the base''s through-holes (head corner 2.64 clear of the cylinder train''s 120T tips); M6.12: the part is authored MACHINE-handed with NO MIRROR_PLANE entry (it lives in the non-mirroring frame.SLDASM) — the real machine casts both uprights + rails in one piece, now modeled that way'
         - —
         - 'ch. 14 pp. 26–29 + ch. 30 front view: clevis grips the pivot ball at (−72, 252) — M6.5 apex crop; ch30 p008 (brightened) shows the full windowed frame; the M6.4 "ears grip the pinion bar" read is REFUTED (bar now floats)'
         - scaled
@@ -1661,21 +1674,28 @@ sections:
       lever arm in the p.68–69 photos is the drum's front end face, not a separate
       idler (video frame `v4_pinion_018` shows the drum receding behind it).
 
-      ### Alignment-pinion layout — REMOVED 2026-06-18, pending rework
+      ### Alignment-pinion layout — RESTORED 2026-07-02 (ch30 GT), level-inboard
 
-      The alignment pinion (the 42T zeroing drum + its swing straps, pivot
-      blocks, torque shaft, lift rod, lever and handle) has been DROPPED from
-      `build_drive_train_assembly.py`. At the re-anchored OD 62.2 / DP 49.82 the
-      Ø22.4 mm pinion drum no longer fits the machine: a single rigid drum
-      spanning the cylinder set (z −75..+68) sits at one x for its whole length,
-      and the channel between the rocker-support frustum (east face x −28.45) and
-      the rescaled 64T (tip west edge x −15.89, where the 64T crosses the drum
-      face) is only 12.56 mm wide — a ~9.9 mm shortfall that no position or pivot
-      topology can resolve. This is the sixth geometric impossibility the 62.2
-      eyeball reading forces (after the cam-through-roots, the 0.79 mm T006 tip
-      journal, the 67 mm crank-pedestal shift, the impossible disengage pose, and
-      the pivot-block straddle). The mechanism is to be re-solved once the gear
-      OD is confirmed; the retired DP-30 layout it replaced is in git history.
+      The mechanism (42T zeroing drum + swing straps, pivot blocks, torque
+      shaft, lift rod, lever and tee handle) is BACK in
+      `build_drive_train_assembly.py`, re-solved against the ch30 GT
+      triangulation. The 2026-06-18 removal argued the Ø22.4 drum could not
+      thread the 12.56 mm channel between the rocker-support frustum and the
+      64T — but the GT shows the drum never lived there: pinion_front/pinion_back
+      triangulate its axis at machine x −10.16/−11.41, y ~104–107 — LEVEL with
+      the drive line and INBOARD of the cylinder drum (between drum and machine
+      centreline), not in the frustum/64T channel at all. Modeled layout
+      (`APINION_*` constants): axis at pre-mirror (+10.384, 104.8) =
+      X_DRUM − (drum tip 31.10 + pinion tip 11.22 + 2.0 disengaged gap) — GT
+      0.2σ with the config gap untouched; drum z −75.0..+68.2 (face 143.2,
+      spans all 20 stations); front stub runs south to z −132 carrying the tee
+      handle (hub at z −144.0 = the GT handle ball −144.07); back stub free end
+      z +91.25 = GT pinion_back exactly. Straps: pivot y 62.8, bore-to-bore c2c
+      43.0, parked at a −12.38° west lean; the swing rides the torque shaft as
+      the p2 setup DOF (PARK_pinion_swing angle driver, engaged in `free`
+      builds, articulated by the mobility probe / motion drives). At DP 49.82
+      the drum is 42T Ø22.4 (same DP as the cylinder train it must mesh); the
+      table above records the book-vintage DP 30 readings.
 
 
       ---
@@ -1855,23 +1875,25 @@ sections:
          the 120T cone gear's 62.2 — the p.20 "OD ≈ cone 120T" match holds),
          crank pinion 16T (PD 15.3). The 4:1 ratio is book-stated and fixed;
          only the DP/tooth split is estimated.
-         **M6.2 ratification (now BROKEN by the 62.2 anchor):** the rescaled
-         64T+16T centre distance is 38.24 mm, no longer the 63.5 that matched
-         the measured 67 ± 5 mm crank-to-cone distance. The whole drive train
-         shrank with the 62.2 OD, pulling the crank ~67 mm inboard (pedestal
-         derived +55 vs photo +122) — flagged with the crankshaft row. Either
-         the crank-distance photo or the 62.2 reading is wrong.
-      10. **Alignment-pinion mechanism removed** (ch. 25) — 2026-06-18. At the
-         re-anchored OD 62.2 / DP 49.82 the Ø22.4 mm pinion drum cannot thread
-         the 12.56 mm channel between the rocker-support frustum (x −28.45) and
-         the rescaled 64T (tip west edge x −15.89): a ~9.9 mm shortfall no
-         position or pivot topology can resolve (the drum is one rigid cylinder
-         at a single x for its whole z-length). The drum + straps + blocks +
-         torque shaft + lift rod + lever + handle were dropped from
-         `build_drive_train_assembly.py` pending a rework once the gear OD is
-         confirmed. The retired DP-30 layout (and the former entries #10/#11 on
-         the 0.28 mm face shave and the parked lift-rod cam pins) are in git
-         history. See the "Alignment-pinion layout — REMOVED" section above.
+         **M6.2 ratification — RESOLVED by the ch30 GT (2026-07-02):** the
+         "broken" +55-derived vs +122-photo crank position was a false
+         dichotomy. The old derivation assumed the 16T meshes the 64T
+         HORIZONTALLY (crank on the drive line); the GT triangulates the crank
+         axis at (−122.84, 144.78) — ABOVE the 64T, near-vertical mesh azimuth
+         — which satisfies the 62.2 OD anchor, the 40.446 mesh c2c, AND the
+         +122 pedestal photo simultaneously. Neither the photo nor the 62.2
+         reading was wrong; the mesh-direction assumption was.
+      10. **Alignment-pinion mechanism removed (2026-06-18) — RESTORED
+         2026-07-02** (ch. 25). The removal-era impossibility (Ø22.4 drum vs
+         the 12.56 mm frustum/64T channel) dissolved with the ch30 GT: the
+         drum's true position is level-inboard at machine x ≈ −10, nowhere
+         near that channel. All 8 part scripts, their registry rows and
+         MIRROR_PLANE entries are back (adapted: longer stubs, strap c2c 43,
+         torque-shaft/lift-rod spans for the z −155 chain-plane era), the
+         swing is the p2 setup DOF again (mobility probe + motion drive
+         restored). See the "Alignment-pinion layout — RESTORED" section
+         above. The former entries #10/#11 (0.28 mm face shave, parked
+         lift-rod cam pins) remain in git history.
 
 
 

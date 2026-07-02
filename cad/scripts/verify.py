@@ -143,22 +143,25 @@ _CRANK_GEAR_TOKENS = ("crank-pinion", "crank-drive-gear")
 # with margin.
 # The channel + drive-train bands scale with the built channel count N (the
 # TEMPORARY active_count): channel = 7N + 4 (N×{rocker,rod,bar,lever,spring} + 2
-# shafts + 4 ball-mounts + 2 bushings per inter-channel gap), drive-train = 32 + N
-# (full 20-gear cone stack + crank/structure ≈ 32, plus N cylinder gears). Both
-# reproduce the measured N=20 bands (144, 52) and stay correct at N=3 (25, 35).
+# shafts + 4 ball-mounts + 2 bushings per inter-channel gap), drive-train = 40 + N
+# (full 20-gear cone stack + crank/structure ≈ 32 + the restored ch25 pinion
+# swing rig's 8: alignment-pinion, 2 brackets, 2 pivot blocks, pivot shaft,
+# lift rod, handle -- ch30 GT re-anchor, plus N cylinder gears). Both
+# reproduce the measured N=20 bands (164, 60) and stay correct at N=3.
 _N_CH = _config.active_count()
 _COMPONENT_BAND = {
     "frame": (11, 16),          # measured 13 (9 structure + 4 lag-screw hold-downs)
-    "drive-train": (32 + _N_CH - 4, 32 + _N_CH + 4),  # N=20 -> (48,56), measured 52
+    "drive-train": (40 + _N_CH - 4, 40 + _N_CH + 4),  # N=20 -> (56,64), measured 60
     "channel": (8 * _N_CH + 4 - 6, 8 * _N_CH + 4 + 6),  # N=20 -> (158,170), measured 164
     # The former monolithic output split by function (no per-channel parts here);
     # bands tightened to the measured green-build counts (verify:subsystems).
     "summing": (7, 9),          # ch 18-19, measured 8 (knife-stay removed: never in the real device)
     "magnifier": (10, 12),      # ch 20-21, measured 11
     "pen": (6, 8),              # ch 24, measured 7
-    "paper-drive": (95, 99),    # ch 22-23-25, measured 97 (27 placed + 70-link chain;
-    # chain re-laid to the front plane z-146, PR #82 -- the longer loop grew the
-    # link count 64 -> 70; placed count unchanged, all moves were repositions)
+    "paper-drive": (85, 89),    # ch 22-23-25, measured 87 (27 placed + 60-link chain;
+    # the ch30 GT re-anchor moved the crank to (122.8, 144.96) and the chain plane
+    # to z -155 -- the shorter drop shrank the loop 70 -> 60 links at pitch 6.2559;
+    # placed count unchanged, all moves were repositions)
     "harmonic-analyzer": (7, 9),  # measured 8: 7 subassemblies + 1 loose part (measuring-stick)
 }
 

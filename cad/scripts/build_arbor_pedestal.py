@@ -48,9 +48,9 @@ MATERIAL = "Gray Cast Iron"  # green-painted casting like the base
 
 BLOCK_WIDTH = 24.0  # X; estimated, function-driven (low)
 BLOCK_DEPTH = 16.0  # Z; estimated, function-driven (low)
-BLOCK_HEIGHT = 85.0  # bore at 76 + 9 of material above (low)
+BLOCK_HEIGHT = 63.0  # bore at 54 + 9 of material above (low)
 BORE_DIA = 0.375 * IN  # 9.525: arbor diameter (ch. 13, legacy, med)
-BORE_HEIGHT = 76.0  # ch13 layout: drive height above base top (med)
+BORE_HEIGHT = 54.0  # ch30 GT: drive height above base top (was 76)
 
 BORE_RADIUS = BORE_DIA / 2.0
 
