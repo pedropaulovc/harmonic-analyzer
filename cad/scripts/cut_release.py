@@ -1110,6 +1110,10 @@ def main() -> int:
     # the finally puts the real streams back and closes the file no matter what.
     log_path, restore = _start_release_log(version)
     try:
+        # Advertise "release" as this process's telemetry resource (Aspire "resource"
+        # column); fallback-only, so dodo's inherited OTEL_SERVICE_NAME wins under the
+        # spine and this self-labels a standalone `cut_release.py` run.
+        _telemetry.set_service("release")
         # Wrap the whole release in a span; run_pipeline_span extracts the
         # TRACEPARENT dodo._run injected (under `doit release`), so the release
         # COM work + logs continue the doit task span instead of being detached.
