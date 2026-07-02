@@ -4,8 +4,9 @@ Black rough-finished rod converting each cam's rotation into the rocker
 arm's see-saw: a full ring (strap) riding the Ø30.6 eccentric cam (cast
 integral with each cylinder gear), a thin flat shank, and a flattened tip
 strap pinned (Ø2) to the rocker arm's rod-pin hole 1" from the arm pivot.
-Centre distance is exactly 5" (127): rocker pivot height 253.8 minus
-drive height 126.8 (M6.3 closure). The tip strap matches the arm's
+Centre distance 180.83: the cam drum sits at machine (-54.7, 104.8) (ch30
+GT drive height) with the rocker pivot at (-72.9, 253.8), and the rod is
+solved to keep the rocker rest tilt. The tip strap matches the arm's
 2.5 thickness so the pin joint stacks strap-beside-arm inside the 7.06
 channel pitch; the M2 "thick stepped tip blocks" read of p.29 was
 amplitude-bar feet, not these rods.
@@ -53,12 +54,13 @@ import _telemetry
 PART_NAME = "connecting-rod"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
-CENTER_DISTANCE = 163.18  # cam ring centre -> rocker pin. LONG rod: the cam drum
-# moved out to machine -54.7 (book ch30 view 1/8), so the rod spans pivot->cam
-# d=182.3 obliquely (was 127 near-vertical at the old +47.5 drum). 163.18 is solved
-# to land the rocker rod-pin at the SAME point (-47.68, 250.74) as the old 127 rod,
-# i.e. it preserves the rocker rest tilt (-6.92 deg) so the whole downstream
-# bar/lever/spring chain stays valid; only the rod itself gets longer + 38.9 deg
+CENTER_DISTANCE = 180.83  # cam ring centre -> rocker pin. LONG rod: the cam drum
+# sits out at machine -54.7 (book ch30 view 1/8) and DOWN at the ch30 GT drive
+# height 104.8 (was 126.8), so the rod spans pivot->cam d=198.6 obliquely (was
+# 127 near-vertical at the old +47.5/126.8 drum). 180.83 is solved to land the
+# rocker rod-pin at the SAME point (-47.68, 250.74) as the old 127 rod, i.e. it
+# preserves the rocker rest tilt (-6.92 deg) so the whole downstream
+# bar/lever/spring chain stays valid; only the rod itself gets longer + more
 # oblique. MUST stay in sync with build_channel_assembly.ROD_C2C.
 RING_BORE_DIA = 30.8  # ch13 rods: cam OD 30.6 + 0.1 clearance per side (cam scaled 0.6022)
 RING_WALL = 5.0  # ch13 rods: radial strap wall, kept (scaled)

@@ -47,9 +47,11 @@ from _spring import COIL_BODY_LENGTH, HOOK_LEAD, build_spring
 
 PART_NAME = "channel-spring-installed"
 
-LEVER_EYE_Y = 1063.15  # LIVE neutral top eye = lever spring hole 1066.52 - drop
-# 3.37 (OD-62.2 re-anchor; was a stale 1063.65). The assembly's solve_state is
-# the authority -- verify:math spring:neutral-body-canonical guards this value.
+LEVER_EYE_Y = 1063.25  # LIVE neutral top eye = lever spring hole 1066.62 - drop
+# 3.37 (ch30 GT re-anchor: the corrected rocker lever angle nudged the neutral
+# lever tilt to 0.231 deg, lifting the eye 0.10; was 1063.15 at the OD-62.2
+# re-anchor). The assembly's solve_state is the authority --
+# verify:math spring:neutral-body-canonical guards this value.
 PLATE_EYE_Y = 996.54  # bottom eye centre, ABOVE the .cs plate (top 992.54) on the
 # spring-hook arm: plate bottom 987.44 + hook arm height (SHANK_RISE 7.6 + ELBOW_R
 # 1.5 = 9.1). High enough that the eye's O5.5 ring clears the plate (its bottom

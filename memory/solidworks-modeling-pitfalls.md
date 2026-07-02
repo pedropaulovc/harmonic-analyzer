@@ -1,6 +1,6 @@
 ---
 name: solidworks-modeling-pitfalls
-description: "SolidWorks COM modeling pitfalls learned live (SW 2026 via PyWin32Adapter): revolve axis edge breaks booleans, FeatureCut4 27 params + -Y default, direct-db circles, helix tessellation slack, cone-on-drum incline from drum pitch (sin i = step/drum-pitch)"
+description: "SolidWorks COM modeling pitfalls learned live (SW 2026 via PyWin32Adapter): revolve axis edge breaks booleans, FeatureCut4 27 params + -Y default, direct-db circles, helix tessellation slack, cone-on-drum incline from drum pitch (sin i = step/drum-pitch), arc-centre locating dims reject equations"
 metadata:
   node_type: memory
   type: reference
@@ -309,5 +309,22 @@ discovered during harmonic-analyzer M6.4:
   face OBJECT (`face.Select2(False,0)`). Generalises the earlier chamfer-FACE
   point-picking lesson: when multiple faces meet at the pick plane, select the
   face object found by enumeration, never by coordinate.
+
+- **A point-to-origin distance dim LOCATING AN ARC CENTRE rejects ANY equation
+  binding** (SW 2026, live-bisected on `build_pinion_bracket.py`): the sketch is
+  fully defined and consistent, the equation's value equals the as-built dim
+  (43 mm), `IEquationMgr.Add3` succeeds and the RHS evaluates — but the NEXT
+  `ForceRebuild3` fails with only the **Equations folder** flagged in
+  GetWhatsWrong (`('Equations', 1, False)`). A literal RHS (`= 43mm`) fails
+  identically, so it's the DIM, not the global reference; the *same* dim shape
+  on a circle centre (`ArborBoreCz`) takes `= "C2C"` fine, and radius dims on
+  the same arc drive fine. Bisect method: monkeypatch `drive_dimension` to
+  rebuild after EACH equation; on failure dump `whats_wrong` + walk
+  `IEquationMgr` (`Equation(i)`/`Value(i)`; note `Status` is just the last
+  successful index, not an error flag). Fix pattern: don't re-dimension what a
+  constraint can say — the arc centre was concentric-by-intent with the arbor
+  bore, so a point-point `coincident` (arc.center ↔ circle.center) replaced the
+  `anchor_point_to_origin` + equation entirely. Same bug class as the
+  magnifying-lever dome radius (don't drive an already-forced dim).
 
 See [[solidworks-3dx-launch]] for session/launch rules.
