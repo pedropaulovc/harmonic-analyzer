@@ -12,7 +12,7 @@ explicitly placed along this centreline loop (build_paper_drive_assembly
 stand-in are both retired.
 
 Geometry (local frame: knob wrap centre at the origin, machine xy
-pre-mirror; crank centre from build_drive_train_assembly X_CRANK / Y_DRIVE
+pre-mirror; crank centre from build_drive_train_assembly X_CRANK / Y_CRANK
 minus build_paper_drive_assembly KNOB_SHAFT_XY): two UNEQUAL wrap arcs whose
 centreline floats clear OUTSIDE the gear tooth tips (a real chain wraps at
 the teeth; rigid model beads there would intersect them), the common
@@ -30,17 +30,18 @@ import math
 # Chain-wheel centres, machine xy pre-mirror.
 KNOB_CENTRE = (65.0, 241.78)  # build_paper_drive_assembly KNOB_SHAFT_XY (ch30
 # rest state: latch C2C 66.05 from the stud, y clamped under the pinion bar)
-# The crank chain-wheel rides the crankshaft, so its centre IS (X_CRANK, Y_DRIVE).
+# The crank chain-wheel rides the crankshaft, so its centre IS (X_CRANK, Y_CRANK)
+# (the ch30 GT crank axis, ABOVE the drive line since the 2026-07-02 re-anchor).
 # Hardcoded as a literal (like KNOB_CENTRE above) -- NOT imported from
 # build_drive_train_assembly. _chain feeds the leaf chain-link PARTS through
 # _chain_link, and a leaf part must not transitively depend on _assembly
 # (test_buildgraph / check:graph enforces this); importing the drive-train
 # assembly module would drag _assembly into that import chain. Instead,
 # build_paper_drive_assembly._assert_chain_layout pins this value to the live
-# drive-train (X_CRANK, Y_DRIVE) and fails loud on drift, so a stale literal can
+# drive-train (X_CRANK, Y_CRANK) and fails loud on drift, so a stale literal can
 # never silently mis-anchor the chain over the relocated 64T/cone. The cleaner
 # split (leaf-safe geometry vs assembly-time layout, no literal) is issue #86.
-CRANK_CENTRE = (157.57676628832596, 126.8)  # drive-train X_CRANK, Y_DRIVE
+CRANK_CENTRE = (122.8, 144.96)  # drive-train X_CRANK, Y_CRANK
 
 TIP_R_T24 = 26.0  # mounted removables, module 2: tip r = (T + 2) * 2 / 2
 TIP_R_T12 = 14.0
@@ -52,16 +53,17 @@ REACH = 2.5  # centreline-to-tip budget past TIP_AIR: the retired flat band
 WRAP_R_A = TIP_R_T24 + TIP_AIR + REACH  # 28.91 (knob T24)
 WRAP_R_B = TIP_R_T12 + TIP_AIR + REACH  # 16.91 (crank T12)
 SAG = 14.0  # slack-run droop below the straight tangent (p006 crop read 18;
-# trimmed so the chain's OUTER reach (radius SLACK_R + REACH about C -- it
-# dips REACH * R / sqrt(R^2 - dx^2) below the centreline, ~3.7 near the
-# window edge, NOT a flat 2.5) clears the cone-pivot-post top (y 135.8,
-# rotated-block box to pre-mirror x 77.7) by 0.95: SAG 18 clipped the post
-# corner 10.6 mm^3, SAG 15 left a 0.17 sliver the checker reports as 0.00)
+# was trimmed from 18 to clear the cone-pivot-post top, but the ch30 GT
+# re-anchor retired that constraint: the post (now the p1 swing bracket at
+# machine z -113..-87) no longer shares a z corridor with the chain plane
+# (z -155). 14 kept conservatively -- the chain's OUTER reach (radius
+# SLACK_R + REACH about C) still dips ~3.7 below the centreline near the
+# window edge, and every M6.8/M6.9 clearance was tuned at this droop
 
 # --- centreline geometry (A = knob = origin, B = crank) ----------------------
 BX = CRANK_CENTRE[0] - KNOB_CENTRE[0]
 BY = CRANK_CENTRE[1] - KNOB_CENTRE[1]
-D = math.hypot(BX, BY)  # 126.61
+D = math.hypot(BX, BY)  # 112.76
 UX, UY = BX / D, BY / D
 NX, NY = -UY, UX  # taut-side normal (local upper-right)
 

@@ -7,6 +7,8 @@ run, then they hold:
 
     p1  cone disengage  -- the cone set swings horizontally out of mesh about the
                            cone-pivot-post's vertical pivot (ch.12, p.18).
+    p2  pinion engage   -- the strap+alignment-pinion group swings on the torque
+                           shaft to mesh the cylinder train (ch.25, p.66).
     p0  amplitude adjust -- each amplitude bar swings about its top pin; the swing
                            is the channel's amplitude coefficient (ch.17).
 
@@ -199,6 +201,26 @@ async def _drive_p1(adapter: Any) -> dict[str, str]:
         "p1 cone disengage", "drive-train-p1-cone-swing")
 
 
+async def _drive_p2(adapter: Any) -> dict[str, str]:
+    """p2: the strap+pinion rigid group swings on the torque shaft to engage.
+    Free the swing (the front strap's lone ANGLE park driver, PARK_pinion_swing
+    -- the group's axial DISTANCE seats stay engaged, exactly the p1 locator
+    pattern), then motor a strap about its pivot bore (Axis1, collinear with
+    the torque shaft); the journaled pinion must ride the arc."""
+    path = str(OUT_SLDASM / "drive-train.SLDASM")
+    check("open drive-train", await adapter.open_model(path))
+    await _suppress(adapter, _family_driver_names(
+        adapter, "drive-train", "pinion-bracket", only_type=ANGLE),
+        "p2 pinion swing park")
+    bracket, bracket_name = _find_one(adapter, "pinion-bracket")
+    if bracket is None:
+        raise RuntimeError("p2: pinion-bracket not found")
+    motor_axis = _entity_ref(bracket_name, "Axis1", "AXIS")
+    return await _run_swing_study(
+        adapter, motor_axis, "alignment-pinion",
+        "p2 pinion engage", "drive-train-p2-pinion-swing")
+
+
 async def _drive_p0(adapter: Any) -> dict[str, str]:
     """p0: an amplitude bar swings about its top pin (the channel's amplitude
     coefficient). Free ONE bar (suppress its own single-real drivers, leaving the
@@ -216,7 +238,7 @@ async def _drive_p0(adapter: Any) -> dict[str, str]:
         "p0 amplitude adjust", "channel-p0-amplitude-swing")
 
 
-_DRIVES = {"p1": _drive_p1, "p0": _drive_p0}
+_DRIVES = {"p1": _drive_p1, "p2": _drive_p2, "p0": _drive_p0}
 
 
 async def build(adapter: Any) -> dict[str, str]:

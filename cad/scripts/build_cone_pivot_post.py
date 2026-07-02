@@ -1,14 +1,18 @@
 r"""Reproduction script: cone pivot post (book ch. 12, p. 18 "pivot").
 
-Black steel bearing post under the cone shaft's big-end journal, at the
+Green bearing post under the cone shaft's big-end journal, at the
 machine front. The cone set swings horizontally out of mesh about this
-point (ch. 12 notes; p. 18 top-down labels the black bracket "pivot"),
-so the post carries the big-end journal at the drive height; the swing
-function itself is not modeled -- the drive-train assembly places the
-cone in its meshed position. Proportions estimated from the p. 18
-top-down bracket silhouette (low confidence).
+point (ch. 12 notes; p. 18 top-down labels the bracket "pivot"), so the
+post carries the big-end journal at the drive height. The ch30 GT re-read
+(2026-07-02) moved the drive plane down to 54 above the base top and slid
+the post forward (station -12.25): it now sits between the 64T and the
+crank-pedestal slab, the shaft's front stub running on through its bore
+to the proud end boss the photos show (GT cone_front). The eight-views
+show it green, part of one continuous casting complex with the pedestal
+-- repainted CASTING_GREEN and grown to 32 x 26 to match that silhouette.
 
-Dimensions: cad/DIMENSIONS.md ch. 13 "Drive supports" (estimated, low).
+Dimensions: cad/DIMENSIONS.md ch. 13 "Drive supports" (estimated, low;
+heights + colour re-read from the ch30 GT).
 
 Layout: block standing on the Top plane, centred at the origin in plan
 (X width x Z depth), journal bore along Z at y = BORE_HEIGHT (the
@@ -25,8 +29,10 @@ import math
 import sys
 
 from _common import (
+    CASTING_GREEN,
     IN,
     SketchDims,
+    apply_color,
     apply_material,
     name_bore_axis,
     check,
@@ -44,13 +50,14 @@ from _common import (
 )
 
 PART_NAME = "cone-pivot-post"
-MATERIAL = "Plain Carbon Steel"  # p.18: black steel bracket
+MATERIAL = "Gray Cast Iron"  # ch30 GT: green-painted casting, one complex with
+# the crank pedestal (was black steel per the p.18 b/w read)
 
-BLOCK_WIDTH = 25.0  # X; p.18 bracket silhouette (scaled, low)
-BLOCK_DEPTH = 20.0  # Z; p.18 bracket silhouette (scaled, low)
-BLOCK_HEIGHT = 85.0  # journal at 76 + 9 of material above (low)
+BLOCK_WIDTH = 32.0  # X; ch30 eight-views silhouette (scaled, low)
+BLOCK_DEPTH = 26.0  # Z; ch30 eight-views silhouette (scaled, low)
+BLOCK_HEIGHT = 63.0  # journal at 54 + 9 of material above (low)
 BORE_DIA = 0.375 * IN  # 9.525: cone shaft big-end diameter (ch. 12, legacy, med)
-BORE_HEIGHT = 76.0  # ch13 layout: drive height above base top (med)
+BORE_HEIGHT = 54.0  # ch30 GT: drive height above base top (was 76)
 
 BORE_RADIUS = BORE_DIA / 2.0
 
@@ -129,7 +136,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Named bore/central axis for view-independent assembly mate
     # selection (M6 mated-DOF drive train).
-    await name_bore_axis(adapter, "Top Plane", 76.0, "Right Plane", 0.0, "journal axis")
+    await name_bore_axis(adapter, "Top Plane", BORE_HEIGHT, "Right Plane", 0.0, "journal axis")
     # Vertical swing pivot (Axis2): the local Y centreline through the plan
     # centre. The whole cone set swings HORIZONTALLY out of mesh about this post
     # (ch.12, p.18 "pivot"); the drive-train floats the post and rotates it about
@@ -139,6 +146,7 @@ async def build(adapter) -> dict[str, str]:
     await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "swing pivot")
 
     await apply_material(adapter, MATERIAL)
+    await apply_color(adapter, CASTING_GREEN)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

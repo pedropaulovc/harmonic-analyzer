@@ -1,18 +1,21 @@
-r"""Reproduction script: crank pedestal (book ch. 11 / eight-views).
+r"""Reproduction script: crank pedestal (book ch. 11 / eight-views, ch30 GT).
 
-Green cylindrical pedestal at the machine's front-right that carries the
-crankshaft: a plain vertical cylinder standing on the base with a
-horizontal through-bore (along the machine depth Z) at the drive height.
-Front view (eight-views 1/8, `ch30_images/v1_0deg_drivetrain_grid.png`):
-pedestal centre x = +123 +/- 3 (ratifies the +122 layout), diameter
-~46 mm, top ~110 mm above the base top, crank pivot 76 mm above the base
-top (~34 mm below the pedestal top).
+Green pedestal slab at the machine's front-right that carries the
+crankshaft. The ch30 GT photogrammetry (2026-07-02) moved the crank axle
+UP to 94.16 above the base top (the crank meshes the 64T from ABOVE, a
+near-vertical mesh) and pinned the pedestal axis at machine x -122.8; the
+front view still reads width ~46 and top ~110 above the base top. In the
+side views the green casting is a SLAB, not a round column -- it runs
+from the T12 chain-wheel corridor back toward the (green) cone swing
+post, the cone shaft's front stub boss showing between the two (GT
+cone_front). Modeled as a 46.2 x 20 slab, 110 tall, with the crankshaft
+through-bore along Z at y = 94.16.
 
 Dimensions: cad/DIMENSIONS.md ch. 13 "Drive-train layout" + "Drive
-supports" (photo-scaled, low/med).
+supports" (photo-scaled + ch30 GT triangulation).
 
-Layout: pedestal axis = +Y from the origin (assembly: standing on the
-base top face), bore along Z at y = BORE_HEIGHT.
+Layout: slab standing on the Top plane, centred at the origin in plan
+(X width x Z depth), bore along Z at y = BORE_HEIGHT.
 
 Run (SolidWorks already open)::
 
@@ -32,6 +35,7 @@ from _common import (
     apply_material,
     name_bore_axis,
     check,
+    define_centered_rectangle,
     define_circle,
     drive_dimension,
     ensure_fully_defined,
@@ -47,12 +51,13 @@ from _common import (
 PART_NAME = "crank-pedestal"
 MATERIAL = "Gray Cast Iron"  # green-painted casting like the base
 
-PEDESTAL_DIA = 46.0  # ch13 layout: front view, 278 px / 6.02 px/mm (scaled, low)
-PEDESTAL_HEIGHT = 110.0  # ch13 layout: front view top at ~110 above base top (scaled, low)
+PEDESTAL_WIDTH = 46.2  # X; ch13 layout: front view, 278 px / 6.02 px/mm (scaled)
+PEDESTAL_DEPTH = 20.0  # Z; ch30 GT side views: slab band -145..-125 in machine z
+PEDESTAL_HEIGHT = 110.0  # ch13 layout: front view top at ~110 above base top
 BORE_DIA = 0.375 * IN  # 9.525: crankshaft diameter (ch. 11, legacy, med)
-BORE_HEIGHT = 76.0  # ch13 layout: drive height above base top (med)
+BORE_HEIGHT = 94.16  # ch30 GT: crank axle 144.96 machine = 94.16 above base top
+# (must equal build_drive_train_assembly Y_CRANK - Y_BASE_TOP -- asserted there)
 
-PEDESTAL_RADIUS = PEDESTAL_DIA / 2.0
 BORE_RADIUS = BORE_DIA / 2.0
 
 
@@ -61,13 +66,14 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations): pedestal diameter + height, bore
-    # diameter + drive height. The mm suffix is load-bearing -- this is an INCH
-    # document and the equation manager reads BARE numbers in document units (an
-    # unsuffixed 46 = 46 in, blowing the part up 25.4x). PEDESTAL_HEIGHT and the
-    # cut depth are feature parameters (not sketch dims), so nothing drives them;
-    # exposing PedestalHeight is still a useful knob and matches the exemplars.
-    await set_global(adapter, "PedestalDia", f"{PEDESTAL_DIA}mm")
+    # Editable knobs (Tools > Equations): the slab envelope + the bore. The mm
+    # suffix is load-bearing -- this is an INCH document and the equation manager
+    # reads BARE numbers in document units (an unsuffixed 46 = 46 in, blowing the
+    # part up 25.4x). PEDESTAL_HEIGHT and the cut depth are feature parameters
+    # (not sketch dims), so nothing drives them; exposing PedestalHeight is still
+    # a useful knob and matches the exemplars.
+    await set_global(adapter, "PedestalWidth", f"{PEDESTAL_WIDTH}mm")
+    await set_global(adapter, "PedestalDepth", f"{PEDESTAL_DEPTH}mm")
     await set_global(adapter, "PedestalHeight", f"{PEDESTAL_HEIGHT}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
     await set_global(adapter, "BoreHeight", f"{BORE_HEIGHT}mm")
@@ -76,13 +82,15 @@ async def build(adapter) -> dict[str, str]:
     # drive batch at the end runs once the whole model + a rebuild exists.
     drive_jobs: list[tuple[str, str]] = []
 
-    # Pedestal cylinder. Origin circle: only the diameter is a dim.
+    # Origin-centred slab footprint: width along X, depth along Z.
     pedestal = SketchDims()
     check("create_sketch pedestal", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter, 0.0, 0.0, PEDESTAL_RADIUS, "pedestal circle", dims=pedestal,
-        names=("PedestalCx", "PedestalCz", "PedestalDia"),
-        drives=(None, None, '"PedestalDia"'),
+    await define_centered_rectangle(
+        adapter, PEDESTAL_WIDTH / 2.0, PEDESTAL_DEPTH / 2.0, "pedestal", dims=pedestal,
+        name_width="Width", drive_width='"PedestalWidth"',
+        name_depth="Depth", drive_depth='"PedestalDepth"',
+        name_corner=("CornerX", "CornerZ"),
+        drive_corner=('"PedestalWidth" / 2', '"PedestalDepth" / 2'),
     )
     await ensure_fully_defined(adapter, "pedestal sketch")
     check("exit_sketch pedestal", await adapter.exit_sketch())
@@ -93,11 +101,11 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=PEDESTAL_HEIGHT)),
     )
     name_last_feature(adapter, "Pedestal")
-    v_cyl = math.pi * PEDESTAL_RADIUS**2 * PEDESTAL_HEIGHT
-    volume = await volume_check(adapter, "pedestal cylinder", v_cyl, 0.005 * v_cyl)
+    v_slab = PEDESTAL_WIDTH * PEDESTAL_DEPTH * PEDESTAL_HEIGHT
+    volume = await volume_check(adapter, "pedestal slab", v_slab, 0.005 * v_slab)
 
     # Crankshaft bore along Z at the drive height (Front-plane sketch,
-    # symmetric cut clears the full pedestal depth). On-axis in X (x 0), so
+    # symmetric cut clears the full slab depth). On-axis in X (x 0), so
     # define_circle emits only the Z centre dim + the diameter (the X slot is a
     # coincident relation, not a dim, and is ignored).
     bore = SketchDims()
@@ -114,21 +122,11 @@ async def build(adapter) -> dict[str, str]:
     check(
         "cut bore",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=PEDESTAL_DIA + 4.0, both_directions=True)
+            ExtrusionParameters(depth=PEDESTAL_DEPTH + 4.0, both_directions=True)
         ),
     )
     name_last_feature(adapter, "Bore")
-    # Bore length through the round pedestal: chord at x integrated over the
-    # bore cross-section; bore radius << pedestal radius, so a midpoint
-    # integral over x is plenty.
-    n = 2000
-    dx = BORE_DIA / n
-    v_bore = 0.0
-    for i in range(n):
-        x = -BORE_RADIUS + (i + 0.5) * dx
-        v_bore += 2.0 * math.sqrt(BORE_RADIUS**2 - x * x) * dx * 2.0 * math.sqrt(
-            PEDESTAL_RADIUS**2 - x * x
-        )
+    v_bore = math.pi * BORE_RADIUS**2 * PEDESTAL_DEPTH
     v_final = volume - v_bore
     volume = await volume_check(adapter, "bore", v_final, 0.01 * v_bore)
 
@@ -145,7 +143,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Named bore/central axis for view-independent assembly mate
     # selection (M6 mated-DOF drive train).
-    await name_bore_axis(adapter, "Top Plane", 76.0, "Right Plane", 0.0, "bore axis")
+    await name_bore_axis(adapter, "Top Plane", BORE_HEIGHT, "Right Plane", 0.0, "bore axis")
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
