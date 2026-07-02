@@ -1,0 +1,82 @@
+{
+  "image": "page004_img01.png",
+  "points": [
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "x": 741.3,
+      "y": 2819.9
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "x": 742.5,
+      "y": 2866.5
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "x": 514.2,
+      "y": 264.7
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "x": 1409.4,
+      "y": 262.7
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "x": 1422,
+      "y": 3833.2
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "x": 503.1,
+      "y": 3833.2
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "Rocker-arm fan (~20 arms) is edge-on in the side view; the arms overlap as thin angled lines and no single arm's flat face/corners are resolvable."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "reason": "Rocker-arm fan edge-on / unresolvable in the side view."
+    },
+    {
+      "feature": "pinion_center",
+      "reason": "occluded"
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "reason": "occluded"
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "reason": "occluded"
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "occluded"
+    },
+    {
+      "feature": "cone_gear_center",
+      "reason": "occluded"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "reason": "occluded"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "reason": "occluded"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "reason": "occluded"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "reason": "occluded"
+    }
+  ],
+  "source": "human_ground_truth"
+}

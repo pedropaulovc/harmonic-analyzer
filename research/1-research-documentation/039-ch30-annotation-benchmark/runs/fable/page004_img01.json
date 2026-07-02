@@ -1,0 +1,116 @@
+{
+  "image": "page004_img01.png",
+  "view": "left side",
+  "model": "fable",
+  "width": 1776,
+  "height": 4209,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 433,
+      "y": 2861,
+      "confidence": "medium",
+      "note": "Sprocket is edge-on (axis runs front-back); dot on the exposed knurled brass axle nut at the FRONT end of the pinion/sprocket axle at platen level - the chain wraps this sprocket and runs down to the crank. Large brass drive gear is edge-on just behind/above it."
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "color": "red",
+      "x": 425,
+      "y": 3283,
+      "confidence": "low",
+      "note": "Optional second sprocket: axis point taken on the crank-arm boss (front end of the crank axle, y of axle centerline); the sprocket itself is edge-on behind the chain ~55 px to the right."
+    },
+    {
+      "feature": "cone_gear_center",
+      "color": "magenta",
+      "x": 1228,
+      "y": 3385,
+      "confidence": "medium",
+      "note": "Base (big end) face is edge-on and hidden behind the green post + base drive gear, so per spec the exposed shaft point is used: apex-end axle tip where it enters the black pillow-block bearing at the back."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 739,
+      "y": 2872,
+      "confidence": "low",
+      "note": "Front-most arm of the fan (arm nearest the machine front), seen almost end-on from the left; left extreme of the visible tip end (white ID label on this arm just above)."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 754,
+      "y": 2873,
+      "confidence": "low",
+      "note": "Right extreme of the same arm's visible tip end; arm is heavily foreshortened in this side view."
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 502,
+      "y": 269,
+      "confidence": "medium",
+      "note": "Upper outer corner vertex of the rounded front-left corner boss of the green top frame casting."
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 1398,
+      "y": 262,
+      "confidence": "medium",
+      "note": "Upper outer corner vertex of the rounded back-left corner boss; the boss side leans outward slightly below (outermost green ~ (1418, 335))."
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 508,
+      "y": 3835,
+      "confidence": "medium",
+      "note": "Bottom-front corner of green base slab; bottom edge in deep shadow - placed at visible junction of front and bottom silhouette edges (verified on brightness-boosted crop)."
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 1423,
+      "y": 3836,
+      "confidence": "medium",
+      "note": "Bottom-back corner of green base slab, at junction of back edge and floor reflection line (verified on brightness-boosted crop)."
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cylinder_gear_center_1",
+      "reason": "axis point not visible - the ~20 equal-diameter cylinder gears are a stack seen exactly edge-on from the left; no end face, hub or axle end is exposed (front end hidden behind the cone-base drive gear/green post, back end behind the bearing)."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "axis point not visible - same edge-on stack; no second gear presents a face or axle point either."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "butt/pivot end of the chosen (front-most) arm points away from camera toward the central column and is hidden behind the fanned stack of the other arms and amplitude bars."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "same - pivot end not visible in this end-on side view."
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "reason": "directly behind the near (left-side) frame casting in this pure left-side view."
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "reason": "directly behind the near (left-side) frame casting."
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "reason": "far side of the base slab, hidden behind the slab itself (only a glancing sliver of the front face shows, no separable corner)."
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "reason": "far side of the base slab, hidden behind the slab."
+    }
+  ],
+  "orientation_note": "Left-side view: the machine FRONT (platen/paper side, with the crank, chain and pinion sprocket) is at image LEFT; the back (cone-gear apex bearing, central column) is at image right. Camera looks at the machine's left face."
+}

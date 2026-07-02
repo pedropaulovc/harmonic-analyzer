@@ -1,0 +1,132 @@
+{
+  "image": "page005_img01.jpeg",
+  "view": "back-left three-quarter",
+  "model": "fable",
+  "width": 1204,
+  "height": 2854,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 377,
+      "y": 1998,
+      "confidence": "medium",
+      "note": "chain sprocket at platen level; seen ~60 deg off-axis as tall ellipse; center inferred from tooth arc + chain tangents both sides"
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "color": "red",
+      "x": 227,
+      "y": 2162,
+      "confidence": "low",
+      "note": "sprocket on crank axle atop green post, mostly hidden behind the out-of-focus crank-handle knob pointing at camera; center fit to the visible bead-chain wrap arc"
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 587,
+      "y": 2336,
+      "confidence": "high",
+      "note": "rear axle dome in notch of black pedestal, brass end disc behind; physical gear = rear end of the single cylinder gear set (ch13 match)"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "color": "yellow",
+      "x": 421,
+      "y": 1896,
+      "confidence": "medium",
+      "note": "topmost arm of stack; butt end seen nearly edge-on; this is the far-side (upper) butt corner"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "color": "yellow",
+      "x": 425,
+      "y": 1907,
+      "confidence": "medium",
+      "note": "near-side (lower) butt corner of same topmost arm"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 1058,
+      "y": 1938,
+      "confidence": "high",
+      "note": "upper corner of tip end facet of topmost arm, just clear of back-right column"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 1064,
+      "y": 1948,
+      "confidence": "high",
+      "note": "lower corner of same tip facet"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 94,
+      "y": 355,
+      "confidence": "medium",
+      "note": "leftmost silhouette point of front-left clamp boss (outermost projected point; boss is rounded)"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 322,
+      "y": 380,
+      "confidence": "medium",
+      "note": "nearest (back-left) clamp collar; its outer direction points toward camera, so outermost silhouette = lowest point of collar skirt where green meets chrome column"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 1158,
+      "y": 338,
+      "confidence": "medium",
+      "note": "rightmost silhouette edge of back-right clamp collar (verified at 10x: green/black edge at x~1157)"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 68,
+      "y": 2469,
+      "confidence": "medium",
+      "note": "rounded moulded corner; vertex of left+bottom edges"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 325,
+      "y": 2618,
+      "confidence": "high",
+      "note": "nearest corner of base slab, lowest point of bottom silhouette (below the specular skirt highlight)"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 1142,
+      "y": 2497,
+      "confidence": "high",
+      "note": "right vertex of base slab bottom outline where right and bottom edges meet"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cone_gear_center",
+      "reason": "axis point not visible - rear (apex) end is lost in shadow at its bearing block beside the cylinder end disc; large front end faces away from camera"
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "only one cylinder gear set exists; its front end face points away and is hidden by the gear stack itself"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "reason": "directly behind the back-right clamp from this angle"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "reason": "far corner, hidden behind the base slab itself"
+    }
+  ],
+  "orientation_note": "Camera at back-left (~120 deg, view 4/8): the FRONT (platen/paper side) faces away to the image-left; image-left = front-left, image-right = back-right. Left/right follow the book's own view labels (left = the crank/chain flank shown in the ch30 'left side' photo). Nearest base corner (lowest in image, x=325,y=2618) is back-left; the far front-right corner of both base and top casting is hidden."
+}

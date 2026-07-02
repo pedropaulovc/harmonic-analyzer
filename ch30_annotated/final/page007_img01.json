@@ -1,0 +1,120 @@
+{
+  "image": "page007_img01.jpeg",
+  "view": "back-right three-quarter",
+  "width": 1242,
+  "height": 2870,
+  "source": "consensus",
+  "points": [
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 427,
+      "y": 2330,
+      "confidence": "medium",
+      "note": "Large end-on brass helical gear at the base, lower-left; projected face/hub center. Closer/more visible of the two cylinder gears."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "color": "orange",
+      "x": 540,
+      "y": 2300,
+      "confidence": "low",
+      "note": "Side-on horizontal helical cylinder receding back-right toward the cone post; midpoint of the visible cylinder silhouette along its axis (far end occluded)."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 535,
+      "y": 1901,
+      "confidence": "medium",
+      "note": "Upper corner of the topmost/front-most arm's foreshortened tip end-face; the two tip corners nearly collapse in this steeply foreshortened view."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 531,
+      "y": 1920,
+      "confidence": "medium",
+      "note": "Lower corner of the same arm's tip end-face (~19px below tip_left due to foreshortening)."
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 890,
+      "y": 2648,
+      "confidence": "high",
+      "note": "Nearest (lowest, image-center) base corner, where the back face meets the right side face at the bottom = back-right corner for a back-right camera."
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 70,
+      "y": 2533,
+      "confidence": "medium",
+      "note": "Far-left bottom base corner (=back-left, image-left); left/front faces turn away into shadow beyond it."
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1152,
+      "y": 2500,
+      "confidence": "medium",
+      "note": "Far-right bottom base corner (=front-right), receding toward the front; in shadow."
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 47,
+      "y": 312,
+      "confidence": "medium",
+      "note": "Far-left outer top-frame corner (=back-left)."
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 842,
+      "y": 302,
+      "confidence": "medium",
+      "note": "Near-center top-frame corner above the nearest base corner (=back-right); partly obscured by the silver rack/lever above."
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1130,
+      "y": 306,
+      "confidence": "medium",
+      "note": "Image-right outer top-frame corner (=front-right)."
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "pinion_center",
+      "reason": "Chain sprocket sits beside the crank drive gear on the FRONT/platen side of the machine; not visible from the back-right."
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "reason": "Lower crank-axle sprocket is on the front/occluded side (only a hanging chain segment is glimpsed near the fan pivot)."
+    },
+    {
+      "feature": "cone_gear_center",
+      "reason": "Cone gear stack is hidden behind the green triangular cone-post casting and in deep shadow at the base."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "Butt/pivot end of every fan arm converges at the central column and is occluded by the amplitude-rod bundle and the guide post."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "Same as butt_left: pivot end occluded at the central column."
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "reason": "Front-left base corner is on the far side of the machine, occluded."
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "reason": "Front-left top-frame corner is on the far side, occluded behind the casting."
+    }
+  ],
+  "orientation_note": "Camera is off the machine's back-right corner: the long green face receding to image-left is the BACK face, the short face receding to image-right is the RIGHT side, and the nearest (lowest) corner where they meet is the back-right corner. Left/front sides face away and are occluded. Machine-relative corner naming: nearest corner = back-right, image-left = back-left, image-right = front-right."
+}

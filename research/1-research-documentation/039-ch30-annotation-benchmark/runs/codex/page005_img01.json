@@ -1,0 +1,126 @@
+{
+  "image": "page005_img01.jpeg",
+  "view": "back-left three-quarter",
+  "model": "codex",
+  "width": 1204,
+  "height": 2854,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 360,
+      "y": 1841,
+      "confidence": "medium",
+      "note": "Small chain sprocket/drive pinion center at platen level, partly bracketed."
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 591,
+      "y": 2327,
+      "confidence": "medium",
+      "note": "Center of the most visible brass end disk in the base gear cluster."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "color": "yellow",
+      "x": 337,
+      "y": 1823,
+      "confidence": "medium",
+      "note": "Upper exposed rocker arm, broad pivot/butt end, upper-left corner as seen."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "color": "yellow",
+      "x": 348,
+      "y": 1855,
+      "confidence": "medium",
+      "note": "Upper exposed rocker arm, broad pivot/butt end, lower-left corner as seen."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 672,
+      "y": 1808,
+      "confidence": "medium",
+      "note": "Upper exposed rocker arm, narrow tip end, upper-right corner as seen."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 676,
+      "y": 1838,
+      "confidence": "medium",
+      "note": "Upper exposed rocker arm, narrow tip end, lower-right corner as seen."
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 76,
+      "y": 265,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 327,
+      "y": 267,
+      "confidence": "medium"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 1117,
+      "y": 279,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1089,
+      "y": 350,
+      "confidence": "medium"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 78,
+      "y": 2381,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 365,
+      "y": 2608,
+      "confidence": "medium",
+      "note": "Visible lower-left rounded lip of the green base slab."
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 1090,
+      "y": 2392,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 853,
+      "y": 2549,
+      "confidence": "medium",
+      "note": "Visible right-front green base lip just above the shadow."
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "second cylinder gear axis point is hidden by adjacent gear teeth/posts; no exposed hub/end-face center is resolvable"
+    },
+    {
+      "feature": "cone_gear_center",
+      "reason": "conical stack is visible mostly side-on/behind brackets, but its axis point/end-face center is not cleanly visible"
+    }
+  ],
+  "orientation_note": "Back-left three-quarter view: camera sees the back and left side; the platen/paper/front side is the far side of the machine. Corner labels use that machine-relative assumption."
+}

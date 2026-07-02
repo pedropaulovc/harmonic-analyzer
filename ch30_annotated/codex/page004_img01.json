@@ -1,0 +1,87 @@
+{
+  "image": "page004_img01.png",
+  "view": "left side",
+  "width": 1776,
+  "height": 4209,
+  "points": [
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 455,
+      "y": 3295,
+      "confidence": "medium",
+      "note": "Upper/near horizontal brass cylinder gear; dot is on the visible left-side section because the physical midpoint is partly blocked by the foreground upright."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "color": "orange",
+      "x": 870,
+      "y": 3418,
+      "confidence": "low",
+      "note": "Lower/rear horizontal cylinder gear partly hidden by the cone stack and upright."
+    },
+    {
+      "feature": "cone_gear_center",
+      "color": "magenta",
+      "x": 1010,
+      "y": 3392,
+      "confidence": "medium",
+      "note": "Side-on cone gear stack; midpoint between visible apex and base along the rotation axis."
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 367,
+      "y": 283,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 1249,
+      "y": 284,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 336,
+      "y": 3657,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 1255,
+      "y": 3658,
+      "confidence": "high"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "pinion_center",
+      "reason": "Upper chain sprocket next to the front drive gear is hidden edge-on by the side post and chain run."
+    },
+    {
+      "feature": "rocker_arm_corners",
+      "reason": "Rocker-arm fan is edge-on in the left-side view; individual arm corners are not visible."
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "reason": "Far-side top corner hidden by side-on frame geometry."
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "reason": "Far-side top corner hidden by side-on frame geometry."
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "reason": "Far-side base corner hidden by side-on base slab."
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "reason": "Far-side base corner hidden by side-on base slab."
+    }
+  ],
+  "orientation_note": "Machine left side faces the camera; front is toward image left and back is toward image right."
+}

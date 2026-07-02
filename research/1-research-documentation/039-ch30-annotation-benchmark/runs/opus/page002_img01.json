@@ -1,0 +1,76 @@
+{
+  "image": "page002_img01.png",
+  "view": "front",
+  "model": "opus",
+  "width": 1749,
+  "height": 4143,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 1045,
+      "y": 2961,
+      "confidence": "high",
+      "note": "silver ~20-tooth chain sprocket beside the large brass crank drive gear; chain wraps it and runs down to the crank axle. Center from hub bore + tooth circle."
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 1057,
+      "y": 3401,
+      "confidence": "medium",
+      "note": "brass end-face disc of the cylinder gear stack (uniform helical barrel); matches ch13 brass end disc with black bracket arm + central axle screw. Center = axle screw. ID medium (cone vs cylinder), location high."
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "color": "red",
+      "x": 1312,
+      "y": 3322,
+      "confidence": "low",
+      "note": "optional second sprocket at the crank axle where the chain terminates; heavily occluded by the green post and the silver crank arm, center estimated from chain wrap."
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cone_gear_center",
+      "reason": "axis point not visible - the conical gear stack sits behind the cylinder gear / mounting brackets in this head-on front view; no end face or hub resolvable."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "only one cylinder-gear end face is resolvable from the front; any second gear body is occluded behind the first disc and the green post."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "the ~20-arm rocker fan is behind the paper platen and gear train, in deep shadow (confirmed empty/black even at 5x brightness); no single arm resolvable."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "same - rocker fan occluded behind platen/gears in the front view."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "reason": "same - rocker fan occluded behind platen/gears in the front view."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "reason": "same - rocker fan occluded behind platen/gears in the front view."
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "reason": "far (back) corner of the top frame casting, occluded behind the front beam in the head-on view."
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "reason": "far (back) corner of the top frame casting, occluded behind the front beam."
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "reason": "far (back) bottom corner of the green base slab, occluded behind the slab body."
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "reason": "far (back) bottom corner of the green base slab, occluded behind the slab body."
+    }
+  ],
+  "orientation_note": "Camera faces the FRONT (paper-platen) side of the machine at angle 0 deg (matches eight-views-2 'view 1/8'). Left/right are as seen in the image (camera's left = image left). Front corners = platen side (nearest camera) and are marked; the back corners of both the top frame and base slab are self-occluded in this head-on view and listed under occluded."
+}

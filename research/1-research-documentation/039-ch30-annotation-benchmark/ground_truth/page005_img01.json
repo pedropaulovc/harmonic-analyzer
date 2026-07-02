@@ -1,0 +1,88 @@
+{
+  "image": "page005_img01.jpeg",
+  "points": [
+    {
+      "feature": "cylinder_gear_center_1",
+      "x": 588.4,
+      "y": 2334.7
+    },
+    {
+      "feature": "cone_gear_center",
+      "x": 543.1,
+      "y": 2345.3
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "x": 1146.5,
+      "y": 2493.5
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "x": 290.5,
+      "y": 2618
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "x": 317.9,
+      "y": 279.2
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "x": 1157.9,
+      "y": 292.8
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "x": 59,
+      "y": 2469.2
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "x": 80.4,
+      "y": 281.7
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "x": 1054.7,
+      "y": 1956
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "x": 566.4,
+      "y": 1990.7
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "x": 543.4,
+      "y": 1953.6
+    },
+    {
+      "feature": "pinion_center",
+      "x": 665.7,
+      "y": 2320.5
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "Only one cone plus one visible cylinder gear here; the second cylinder gear is hidden behind the green rocker-support pedestal / spring drum."
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "reason": "Optional feature; chain hubs at the crank axle hidden behind the pivot bracket / green bearing housing."
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "reason": "occluded"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "reason": "occluded"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "reason": "occluded"
+    }
+  ],
+  "source": "human_ground_truth"
+}

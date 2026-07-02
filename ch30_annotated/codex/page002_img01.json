@@ -1,0 +1,87 @@
+{
+  "image": "page002_img01.png",
+  "view": "front",
+  "width": 1749,
+  "height": 4143,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 1001,
+      "y": 2967,
+      "confidence": "high",
+      "note": "Upper chain sprocket coaxial with the large brass crank drive gear."
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 1004,
+      "y": 3398,
+      "confidence": "medium",
+      "note": "Nearer visible brass cylinder/gear; center partly obscured by the black support."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "color": "orange",
+      "x": 1156,
+      "y": 3388,
+      "confidence": "low",
+      "note": "Far/right cylinder gear only partly visible behind the chain and green post."
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 139,
+      "y": 285,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1584,
+      "y": 285,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 116,
+      "y": 3655,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1587,
+      "y": 3651,
+      "confidence": "high"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cone_gear_center",
+      "reason": "Hidden by the front support, cylinder gear, and chain drive hardware."
+    },
+    {
+      "feature": "rocker_arm_corners",
+      "reason": "Rocker-arm fan is edge-on/unresolvable from the front view."
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "reason": "Back top-frame corner hidden behind the front casting."
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "reason": "Back top-frame corner hidden behind the front casting."
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "reason": "Back base corner not visible from the front view."
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "reason": "Back base corner not visible from the front view."
+    }
+  ],
+  "orientation_note": "Front of the machine faces the camera; left/right names are machine-relative as seen in the image."
+}

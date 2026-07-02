@@ -1,0 +1,124 @@
+{
+  "image": "page007_img01.jpeg",
+  "view": "back-right three-quarter",
+  "model": "codex",
+  "width": 1242,
+  "height": 2870,
+  "points": [
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 424,
+      "y": 2333,
+      "confidence": "high",
+      "note": "front circular end face / hub of the most visible cylinder gear set wheel"
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "color": "orange",
+      "x": 505,
+      "y": 2338,
+      "confidence": "medium",
+      "note": "visible right support hub/end point for the second cylindrical helical gear"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 413,
+      "y": 1946,
+      "confidence": "medium",
+      "note": "upper visible corner at the narrow tip of the selected foremost rocker arm"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 405,
+      "y": 1973,
+      "confidence": "medium",
+      "note": "lower visible corner at the narrow tip of the selected foremost rocker arm, just above the small bracket"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 69,
+      "y": 2504,
+      "confidence": "medium",
+      "note": "near/back-left lower rounded slab corner"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 1028,
+      "y": 2586,
+      "confidence": "high",
+      "note": "near/back-right lower rounded slab corner"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 66,
+      "y": 2408,
+      "confidence": "low",
+      "note": "far/front-left upper slab corner partly occluded by the left rear column"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1160,
+      "y": 2444,
+      "confidence": "medium",
+      "note": "far/front-right outer slab corner on the platen side"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 58,
+      "y": 331,
+      "confidence": "medium",
+      "note": "back-left outer top-frame casting corner, partly rounded by post cap"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 1093,
+      "y": 331,
+      "confidence": "medium",
+      "note": "back-right outer top-frame casting corner"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 73,
+      "y": 392,
+      "confidence": "medium",
+      "note": "front-left/lower visible outer corner of top-frame casting"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1101,
+      "y": 392,
+      "confidence": "medium",
+      "note": "front-right/lower visible outer corner of top-frame casting"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "pinion_center",
+      "reason": "coaxial chain sprocket beside the large platen-level drive gear is hidden by the platen/columns from this back-right view; no axis point is resolvable"
+    },
+    {
+      "feature": "cone_gear_center",
+      "reason": "conical gear teeth are visible in the base, but the rotation-axis point/end face or hub is not visible enough to mark"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "wide pivot/butt end of the selected rocker arm is hidden by overlapping arms and the central column/plate from this view"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "wide pivot/butt end of the selected rocker arm is hidden by overlapping arms and the central column/plate from this view"
+    }
+  ],
+  "orientation_note": "Camera is on the back-right side; the platen/paper front is the far side toward image right, and the visible base gear side is the back side facing the camera."
+}

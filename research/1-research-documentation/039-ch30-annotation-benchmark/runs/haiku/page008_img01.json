@@ -1,0 +1,144 @@
+{
+  "image": "page008_img01.png",
+  "view": "right side",
+  "model": "haiku",
+  "width": 1789,
+  "height": 4239,
+  "points": [
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 350,
+      "y": 180,
+      "confidence": "high",
+      "note": "Top-left corner of frame, outer edge"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1450,
+      "y": 180,
+      "confidence": "high",
+      "note": "Top-right corner of frame, outer edge"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 350,
+      "y": 250,
+      "confidence": "medium",
+      "note": "Back-left corner (back face recessed)"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 1450,
+      "y": 250,
+      "confidence": "medium",
+      "note": "Back-right corner (back face recessed)"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 350,
+      "y": 4050,
+      "confidence": "high",
+      "note": "Base front-left corner"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1450,
+      "y": 4050,
+      "confidence": "high",
+      "note": "Base front-right corner"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 350,
+      "y": 3950,
+      "confidence": "medium",
+      "note": "Base back-left (recessed)"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 1450,
+      "y": 3950,
+      "confidence": "medium",
+      "note": "Base back-right (recessed)"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "color": "yellow",
+      "x": 600,
+      "y": 2000,
+      "confidence": "low",
+      "note": "Rocker arm butt (pivot) end, left side - partially visible"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "color": "yellow",
+      "x": 800,
+      "y": 2000,
+      "confidence": "low",
+      "note": "Rocker arm butt (pivot) end, right side - partially visible"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 650,
+      "y": 2300,
+      "confidence": "low",
+      "note": "Rocker arm tip end, left side - hard to isolate"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 750,
+      "y": 2300,
+      "confidence": "low",
+      "note": "Rocker arm tip end, right side - hard to isolate"
+    },
+    {
+      "feature": "cone_gear_center",
+      "color": "magenta",
+      "x": 700,
+      "y": 3700,
+      "confidence": "medium",
+      "note": "Conical gear stack base center"
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 850,
+      "y": 3650,
+      "confidence": "medium",
+      "note": "Cylinder gear (more visible) - dark helical gear"
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "color": "orange",
+      "x": 750,
+      "y": 3800,
+      "confidence": "low",
+      "note": "Second cylinder gear (if distinct)"
+    },
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 1600,
+      "y": 1400,
+      "confidence": "low",
+      "note": "Pinion sprocket - on right side, challenging visibility from this angle"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "crank_axle_sprocket_center",
+      "reason": "Not visible from right side - behind/inside the machine"
+    }
+  ],
+  "orientation_note": "Right side view: machine front faces left (platen/paper side)"
+}

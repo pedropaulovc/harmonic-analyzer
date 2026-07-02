@@ -1,0 +1,116 @@
+{
+  "image": "page004_img01.png",
+  "view": "left side",
+  "model": "opus",
+  "width": 1776,
+  "height": 4209,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 457,
+      "y": 2859,
+      "confidence": "high",
+      "note": "upper chain sprocket, coaxial w/ crank drive gear; brass axle end"
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "color": "red",
+      "x": 487,
+      "y": 3297,
+      "confidence": "medium",
+      "note": "lower sprocket at crank axle (secondary, not the pinion)"
+    },
+    {
+      "feature": "cone_gear_center",
+      "color": "magenta",
+      "x": 768,
+      "y": 3389,
+      "confidence": "high",
+      "note": "center of largest (base) disc of conical gear stack; axis to apex at right"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 758,
+      "y": 2796,
+      "confidence": "low",
+      "note": "frontmost arm seen end-on/foreshortened; left corner of tip anchor pad"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 767,
+      "y": 2794,
+      "confidence": "low",
+      "note": "frontmost arm; right corner of tip anchor pad"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 505,
+      "y": 260,
+      "confidence": "high",
+      "note": "near(left)-face front-top outer corner of top frame casting"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 1403,
+      "y": 259,
+      "confidence": "high",
+      "note": "near(left)-face back-top outer corner of top frame casting"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 500,
+      "y": 3838,
+      "confidence": "high",
+      "note": "near(left)-face front-bottom corner of green base slab"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 1420,
+      "y": 3835,
+      "confidence": "high",
+      "note": "near(left)-face back-bottom corner of green base slab"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cylinder_gear_center_1",
+      "reason": "cylinder-gear row runs front-back parallel to cone but is seen edge-on behind the vertical connecting rods; no circular end face or hub resolvable"
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "second cylinder gear indistinguishable within the same edge-on occluded row; axis point not visible"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "arms viewed end-on (extend along camera axis); butt/pivot end merges with connecting rod and neighbor arms, not separable"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "same as butt_left - pivot end not resolvable in this end-on side view"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "reason": "machine-right (far) side, directly behind near face in near-orthographic left-side view"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "reason": "machine-right (far) side, occluded behind near face"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "reason": "machine-right (far) side, occluded behind near face"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "reason": "machine-right (far) side, occluded behind near face"
+    }
+  ],
+  "orientation_note": "Camera on the machine's LEFT side (view 3/8, 90deg). Machine FRONT (platen/paper side) is toward IMAGE-LEFT; machine BACK toward IMAGE-RIGHT; the near face is the machine's LEFT side. Established from the hand crank (operated from the front) projecting image-left and the front-left 3/4 view (page003). Hence only the two machine-LEFT (near) corners of the top frame and base slab are visible per structure; the two machine-RIGHT (far) corners are occluded."
+}

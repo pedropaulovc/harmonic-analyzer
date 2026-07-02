@@ -1,0 +1,131 @@
+{
+  "image": "page007_img01.jpeg",
+  "view": "back-right three-quarter",
+  "model": "haiku",
+  "width": 1242,
+  "height": 2870,
+  "points": [
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 102,
+      "y": 168,
+      "confidence": "high",
+      "note": "Top frame front-left (left edge of frame, at platen level)"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1118,
+      "y": 168,
+      "confidence": "high",
+      "note": "Top frame front-right (right edge of frame, at platen level)"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 102,
+      "y": 250,
+      "confidence": "high",
+      "note": "Top frame back-left (left edge, behind platen)"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 1118,
+      "y": 250,
+      "confidence": "high",
+      "note": "Top frame back-right (right edge, behind platen)"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 102,
+      "y": 2745,
+      "confidence": "high",
+      "note": "Base front-left (left edge, platen side)"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1118,
+      "y": 2745,
+      "confidence": "high",
+      "note": "Base front-right (right edge, platen side)"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 102,
+      "y": 2810,
+      "confidence": "medium",
+      "note": "Base back-left (left edge, back side)"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 1118,
+      "y": 2810,
+      "confidence": "medium",
+      "note": "Base back-right (right edge, back side)"
+    },
+    {
+      "feature": "cone_gear_center",
+      "color": "magenta",
+      "x": 360,
+      "y": 2350,
+      "confidence": "high",
+      "note": "Cone gear rotation axis (brass conical stack center)"
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 710,
+      "y": 2430,
+      "confidence": "medium",
+      "note": "Cylinder gear 1 dead center (more visible)"
+    },
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 810,
+      "y": 800,
+      "confidence": "medium",
+      "note": "Pinion gear rotation axis (helical gear with chain)"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "color": "yellow",
+      "x": 1045,
+      "y": 1110,
+      "confidence": "high",
+      "note": "Rocker arm butt (pivot) end left corner"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "color": "yellow",
+      "x": 1090,
+      "y": 1110,
+      "confidence": "high",
+      "note": "Rocker arm butt (pivot) end right corner"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 955,
+      "y": 2090,
+      "confidence": "medium",
+      "note": "Rocker arm tip end left corner"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 1000,
+      "y": 2090,
+      "confidence": "medium",
+      "note": "Rocker arm tip end right corner"
+    }
+  ],
+  "occluded": [],
+  "orientation_note": "Front of machine (platen/paper side) faces away from camera (to the back). Right side of machine faces toward camera."
+}

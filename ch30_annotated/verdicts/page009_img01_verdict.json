@@ -1,0 +1,142 @@
+{
+  "image": "page009_img01.png",
+  "verdicts": [
+    {
+      "feature": "pinion_center",
+      "claude": [824, 2048],
+      "codex": [822, 2044],
+      "verdict": "tie",
+      "true_point": [823, 2047],
+      "note": "Both land dead-on the hub/bolt center of the small silver chain sprocket beside the large brass crank drive gear; within 5px."
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "claude": [946, 2256],
+      "codex": "absent",
+      "verdict": "claude",
+      "true_point": [946, 2256],
+      "note": "Optional feature. A real lower sprocket/chain-wrap coupling sits atop the green crank pedestal; claude's dot is reasonably placed there though heavily occluded by chain+linkage. codex omitted it (acceptable since optional)."
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "claude": [768, 2333],
+      "codex": [650, 2277],
+      "verdict": "codex",
+      "true_point": [650, 2268],
+      "note": "The cylinder gears are the 20 identical uniform-OD brass gears forming the long horizontal ribbed drum (side-on); codex's dot is on that drum's axis. claude's dot is actually on the bright brass disc, which is the cone-gear base, not a cylinder gear — wrong object."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "claude": "occluded",
+      "codex": "occluded",
+      "verdict": "tie",
+      "true_point": null,
+      "note": "Second cylinder gear not separately resolvable; both reasonably marked occluded."
+    },
+    {
+      "feature": "cone_gear_center",
+      "claude": "occluded",
+      "codex": [693, 2316],
+      "verdict": "codex",
+      "true_point": [758, 2325],
+      "note": "The cone gear (inclined 6-120T stack) presents its large 120T base as the bright brass disc that meshes the cylinder drum; it IS visible. codex correctly identified it but placed the dot ~60px left of center on the toothed rim (true center is the black hub/bolt ~758,2325). claude wrongly called it occluded — and its cylinder_gear_1 dot (768,2333) actually sits on this cone base."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "claude": "occluded",
+      "codex": "occluded",
+      "verdict": "tie",
+      "true_point": null,
+      "note": "Rocker/amplitude-bar fan is near edge-on and interleaved from this front-right angle; both agree no single arm gives clean corners."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "claude": "occluded",
+      "codex": "occluded",
+      "verdict": "tie",
+      "true_point": null,
+      "note": "Same fan; unresolvable in this view (codex grouped all four as one 'rocker_arm_corners' occluded entry)."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "claude": "occluded",
+      "codex": "occluded",
+      "verdict": "tie",
+      "true_point": null,
+      "note": "Fan tips overlap in a staircase; both occluded."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "claude": "occluded",
+      "codex": "occluded",
+      "verdict": "tie",
+      "true_point": null,
+      "note": "Same fan; both occluded."
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "claude": [300, 2642],
+      "codex": "absent",
+      "verdict": "claude",
+      "true_point": [286, 2638],
+      "note": "This is the NEAREST (lowest, image-left) bottom corner. In the correct front-right orientation (machine-right = image-left) it is the front-RIGHT corner. claude's dot is right on it but claude NAMED it base_front_left (mirror error). codex placed no dot on this corner."
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "claude": [1124, 2516],
+      "codex": [1167, 2398],
+      "verdict": "claude",
+      "true_point": [1112, 2514],
+      "note": "True front-left corner = the image-RIGHT bottom corner (far end of the front face). claude's dot (which claude labeled base_front_right) is right on it; codex's dot (labeled base_back_left) floats ~120px too high in the black background. Both mis-named it, claude's placement far better. codex's separate base_front_left dot (797,2530) is spurious — mid front-face, not a corner."
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "claude": [64, 2489],
+      "codex": [46, 2406],
+      "verdict": "claude",
+      "true_point": [63, 2495],
+      "note": "Far-image-left bottom corner (back end of the visible near/right side face). claude's dot (labeled base_back_left) sits on it; codex's dot (labeled base_front_right) is ~90px too high in the black. Both mis-named; claude placement accurate."
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "claude": "occluded",
+      "codex": "occluded",
+      "verdict": "tie",
+      "true_point": null,
+      "note": "The true machine back-left base corner is on the far side and occluded; neither placed a valid dot here (codex's mis-named dots were on other, visible corners)."
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "claude": [62, 353],
+      "codex": [56, 349],
+      "verdict": "codex",
+      "true_point": [58, 351],
+      "note": "Far-image-left outer top corner of the green top casting = front-RIGHT in the front-right orientation. Both dots are on it (within ~5px), but codex NAMED it correctly (top_front_right); claude named it top_front_left (mirror error)."
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "claude": [1113, 345],
+      "codex": [1089, 355],
+      "verdict": "claude",
+      "true_point": [1108, 349],
+      "note": "Far-image-right outer top corner = front-LEFT. claude's dot (labeled top_front_right) sits on the outer corner; codex's dot (labeled top_back_left) is ~20px inside. Both mis-named; claude placement slightly better. codex's separate top_front_left dot (830,349) is spurious — mid front-rail, not an outer corner."
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "claude": "occluded",
+      "codex": [1089, 355],
+      "verdict": "claude",
+      "true_point": null,
+      "note": "True top back-left corner is on the far side / occluded behind the front rail and column; claude correctly occluded it. codex's dot named top_back_left is actually the visible front-left outer corner mis-labeled."
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "claude": "occluded",
+      "codex": "occluded",
+      "verdict": "tie",
+      "true_point": null,
+      "note": "Back-right top corner occluded on the far side; both occluded."
+    }
+  ],
+  "summary": "Orientation is a FRONT-RIGHT three-quarter view: the camera faces the front/platen (which points toward image-left) and sees a side face on the image-left, so machine-right maps to image-left. codex's orientation call is correct; claude concluded 'front-left' and therefore mirror-swapped every left/right corner label (claude did explicitly flag this ambiguity). The two split their strengths: codex was more accurate on the hard semantic calls at the base — it correctly identified the long uniform ribbed drum as the cylinder gear and the bright brass disc as the cone-gear base (claude mislabeled the cone base as a cylinder gear, missed the real cylinder drum, and wrongly declared the cone occluded) and got the orientation and one top-corner name right. claude was more accurate on raw dot placement: all three visible base corners and both top corners are dotted almost exactly on the true outer corners, whereas codex's base-corner dots float ~90-120px into the black or land mid-edge, and codex added two spurious mid-span corner dots. Net: codex wins identity/orientation, claude wins corner precision; pinion is a tie."
+}

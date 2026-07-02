@@ -1,0 +1,116 @@
+{
+  "image": "page008_img01.png",
+  "view": "right side (angle 270, view 7/8)",
+  "model": "opus",
+  "width": 1789,
+  "height": 4239,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 1393,
+      "y": 2800,
+      "confidence": "medium",
+      "note": "top chain sprocket the chain wraps; hub faces camera at front-right (perspective). Coaxial region of big brass drive gear which is edge-on behind it."
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "color": "red",
+      "x": 1388,
+      "y": 3098,
+      "confidence": "low",
+      "note": "lower sprocket/axle bearing carrying the crank arm+handle (offset brass crank-pin ring visible just below). Optional per spec."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "color": "yellow",
+      "x": 734,
+      "y": 2881,
+      "confidence": "low",
+      "note": "arms are near edge-on in this side view; butt/pivot (wide) end at top where arm meets amplitude bar. left/right barely separable."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "color": "yellow",
+      "x": 750,
+      "y": 2881,
+      "confidence": "low",
+      "note": "same arm, wide pivot end, right side (edge-on foreshortening)."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 735,
+      "y": 2953,
+      "confidence": "low",
+      "note": "narrow tip end (bright follower-link cap) of same arm, left."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 748,
+      "y": 2953,
+      "confidence": "low",
+      "note": "narrow tip end of same arm, right."
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1307,
+      "y": 275,
+      "confidence": "high",
+      "note": "green top frame casting, front (image-right) outer top corner, near/right face."
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 419,
+      "y": 290,
+      "confidence": "high",
+      "note": "green top frame casting, back (image-left) outer top corner, near/right face."
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1340,
+      "y": 3835,
+      "confidence": "high",
+      "note": "green base slab, front (image-right) bottom outer corner, near/right face."
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 405,
+      "y": 3836,
+      "confidence": "high",
+      "note": "green base slab, back (image-left) bottom outer corner, near/right face."
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cylinder_gear_center",
+      "reason": "axis point not visible - cylinder gears sit at base center/front, hidden behind the green summing-lever housing and the front-right column in this right-side view (visible openly only from the left side)."
+    },
+    {
+      "feature": "cone_gear_center",
+      "reason": "axis point not visible - cone gear (wide base at front) hidden behind the green summing-lever housing and front-right drive column from the right side."
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "reason": "far (machine-left) side of top frame casting, directly behind the near rail in a side view."
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "reason": "far (machine-left) side of top frame casting, occluded by near rail."
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "reason": "far (machine-left) bottom corner of base slab, occluded behind the slab body."
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "reason": "far (machine-left) bottom corner of base slab, occluded behind the slab body."
+    }
+  ],
+  "orientation_note": "Camera on the machine's RIGHT side. FRONT of the machine (platen/paper + crank/drive) is toward the RIGHT of the image; BACK toward the LEFT; up is up. Verified against the left-side mirror view (page004) and eight-views-8 label 'angle 270 view 7/8', using crank/chain position (front-right corner) as the asymmetry."
+}

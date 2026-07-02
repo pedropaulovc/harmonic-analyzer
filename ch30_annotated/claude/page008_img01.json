@@ -1,0 +1,42 @@
+{
+  "image": "page008_img01.png",
+  "view": "right side",
+  "width": 1789,
+  "height": 4239,
+  "points": [
+    {"feature": "pinion_center", "color": "red", "x": 1390, "y": 2808,
+     "confidence": "high",
+     "note": "Upper chain sprocket next to the large brass crank drive gear (seen edge-on). Center of the brass hub end-face; the chain wraps this sprocket and runs down to the crank-axle sprocket, confirming it is the pinion and not the axle sprocket."},
+    {"feature": "crank_axle_sprocket_center", "color": "red", "x": 1344, "y": 3110,
+     "confidence": "low",
+     "note": "Secondary sprocket at the crank axle (lower end of the chain run). Rotation axis is partly hidden behind the wrapping bead chain, so the center is estimated. This is the NOT-target sprocket, added per spec option."},
+    {"feature": "cylinder_gear_center_1", "color": "orange", "x": 826, "y": 3248,
+     "confidence": "low",
+     "note": "The clearest brass helical gear visible in the base window, seen roughly side-on behind the 20 black spring bars; marked at the midpoint of the visible cylinder silhouette. Identity (cylinder vs cone) is uncertain because the base gear cluster is heavily occluded by the spring comb; appearance is a fairly uniform-height helical band, consistent with a cylinder gear rather than the tapered cone."},
+    {"feature": "analyzer_corner_base_front_right", "color": "cyan", "x": 1344, "y": 3833,
+     "confidence": "high",
+     "note": "Bottom-front outer corner of the green base slab, near (right) face. front = image-right (deduced from the front-mounted crank appearing at the near-front edge)."},
+    {"feature": "analyzer_corner_base_back_right", "color": "cyan", "x": 402, "y": 3834,
+     "confidence": "high",
+     "note": "Bottom-back outer corner of the green base slab, near (right) face."},
+    {"feature": "analyzer_corner_top_front_right", "color": "cyan", "x": 1335, "y": 293,
+     "confidence": "high",
+     "note": "Top-front outer corner of the green top-frame casting, near (right) face. Marked at the outer vertex of the green casting block."},
+    {"feature": "analyzer_corner_top_back_right", "color": "cyan", "x": 415, "y": 293,
+     "confidence": "high",
+     "note": "Top-back outer corner of the green top-frame casting, near (right) face."}
+  ],
+  "occluded": [
+    {"feature": "cone_gear_center", "reason": "Base gear cluster is behind the 20 black spring bars and the front gear; the cone's tapered profile is not separately resolvable from the pure right side. The cone is clearly visible in the left-side and three-quarter views but not confidently isolable here."},
+    {"feature": "cylinder_gear_center_2", "reason": "Second base gear hidden behind the first gear and the spring comb; not separately resolvable."},
+    {"feature": "rocker_arm_corner_butt_left", "reason": "Rocker-arm fan is edge-on in this side view; the ~20 flat arms stack into the central vertical bars and no single arm's corners are resolvable."},
+    {"feature": "rocker_arm_corner_butt_right", "reason": "Same: rocker fan edge-on / unresolvable."},
+    {"feature": "rocker_arm_corner_tip_left", "reason": "Same: rocker fan edge-on / unresolvable."},
+    {"feature": "rocker_arm_corner_tip_right", "reason": "Same: rocker fan edge-on / unresolvable."},
+    {"feature": "analyzer_corner_base_front_left", "reason": "Far (machine-left) face; hidden directly behind the near base-slab face."},
+    {"feature": "analyzer_corner_base_back_left", "reason": "Far (machine-left) face; hidden behind the near base-slab face."},
+    {"feature": "analyzer_corner_top_front_left", "reason": "Far (machine-left) face; hidden behind the near top-frame face."},
+    {"feature": "analyzer_corner_top_back_left", "reason": "Far (machine-left) face; hidden behind the near top-frame face."}
+  ],
+  "orientation_note": "Camera faces the machine's RIGHT side. The front-mounted crank (wooden handle) appears at the lower-right, so front = image-right and back = image-left; the near (camera-facing) face is the machine's right side. Only near-side (right) silhouette corners are visible for both the base slab and top frame; all far-side (machine-left) corners are occluded. Orientation cross-checked against the left-side view (page004, crank at lower-left, cone base at image-left) and the front/three-quarter views (page002/page009)."
+}

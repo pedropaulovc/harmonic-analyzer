@@ -1,0 +1,45 @@
+{
+  "image": "page009_img01.png",
+  "view": "front-left three-quarter (see orientation_note; first-pass hint said 'front-right' but the pixels show the front face receding to image-right with the nearest corner on the image-left)",
+  "width": 1204,
+  "height": 2854,
+  "points": [
+    {"feature": "pinion_center", "color": "red", "x": 824, "y": 2048,
+     "confidence": "high",
+     "note": "Upper small chain sprocket mounted coaxially just right of the large brass drive gear at platen level. Point placed at the center of its toothed disc (rotation axis), which coincides with the brass hub. Verified with a 20px grid: teeth span x~780-902, y~2000-2098."},
+    {"feature": "crank_axle_sprocket_center", "color": "red", "x": 946, "y": 2256,
+     "confidence": "low",
+     "note": "Optional second (lower) sprocket at the crank axle where the chain wraps down at the crank. Heavily occluded by the chain, the green bearing pedestal and the silver crank link, so center is an estimate. NOT the required pinion target."},
+    {"feature": "cylinder_gear_center_1", "color": "orange", "x": 768, "y": 2333,
+     "confidence": "high",
+     "note": "The one clearly resolvable brass helical cylinder gear, seen roughly end-on (flat brass face toward camera, helical rim receding). Point on the black hub recess / central axle bolt. The second cylinder gear is not separately resolvable here (see occluded)."}
+    ,
+    {"feature": "analyzer_corner_base_front_left", "color": "cyan", "x": 300, "y": 2642,
+     "confidence": "high",
+     "note": "Nearest (lowest) bottom corner of the green base slab, where the front face meets the visible image-left side face. Bottommost apex verified with a 10px grid."},
+    {"feature": "analyzer_corner_base_front_right", "color": "cyan", "x": 1124, "y": 2516,
+     "confidence": "medium",
+     "note": "Far bottom corner of the base along the front face (image-right), where the front face turns to the far/back-right. Corner is rounded/beveled so +-8px."},
+    {"feature": "analyzer_corner_base_back_left", "color": "cyan", "x": 64, "y": 2489,
+     "confidence": "low",
+     "note": "Back-bottom-left corner of the base, the leftmost apex of the visible image-left side face. Low contrast (dark green on black); vertex located with a 10px grid."},
+    {"feature": "analyzer_corner_top_front_left", "color": "cyan", "x": 62, "y": 353,
+     "confidence": "high",
+     "note": "Top-left outer corner of the green top-frame cross-member casting (its left end, above the front-left post)."},
+    {"feature": "analyzer_corner_top_front_right", "color": "cyan", "x": 1113, "y": 345,
+     "confidence": "high",
+     "note": "Top-right outer corner of the green top-frame casting (its right end, above the front-right post)."}
+  ],
+  "occluded": [
+    {"feature": "cylinder_gear_center_2", "reason": "Only one brass cylinder gear is separately resolvable; the second lies behind gear 1 / the green crank pedestal and its center cannot be located."},
+    {"feature": "cone_gear_center", "reason": "Not clearly visible from this angle; hidden behind the horizontal spring drums / green A-frame gusset at the base center."},
+    {"feature": "rocker_arm_corner_butt_left", "reason": "Rocker/amplitude-bar fan is heavily foreshortened and seen nearly edge-on from the front; pivot (butt) ends recede behind the platen assembly."},
+    {"feature": "rocker_arm_corner_butt_right", "reason": "Same fan; butt/pivot ends occluded behind the platen frame."},
+    {"feature": "rocker_arm_corner_tip_left", "reason": "Fan tips interleave in a staircase at the image-left edge; no single arm's tip yields two cleanly separable corners."},
+    {"feature": "rocker_arm_corner_tip_right", "reason": "Same fan; tips overlap, single-arm corners not resolvable in this view."},
+    {"feature": "analyzer_corner_base_back_right", "reason": "Far/back-right bottom corner of the base is on the away side of the machine, not visible."},
+    {"feature": "analyzer_corner_top_back_left", "reason": "Back rail of the top frame is occluded by the front rail and the central column mechanism."},
+    {"feature": "analyzer_corner_top_back_right", "reason": "Back rail of the top frame is occluded by the front rail and the central column mechanism."}
+  ],
+  "orientation_note": "The camera faces the machine's FRONT (waveform-paper / platen) face and sees ONE side face at the image-left; the near rocker/amplitude-bar fan protrudes on that image-left side. Perspective is unambiguous: both the base's top-front and bottom-front edges rise toward image-right and the front face is taller (nearer) at image-left, so the front face recedes to the image-right and the NEAREST base corner is at image-left (~300,2642). This reads as a FRONT-LEFT three-quarter view, which conflicts with the 'front-right' first-pass hint. Corner labels here assume the standard non-mirrored orientation: image-left = machine-LEFT (drive gear/crank on the machine's right, appearing at image-right on the far/receding side). If the team's ground-truth convention is that this image is machine-front-RIGHT (machine's right side toward camera), swap every left<->right in the corner names; the pixel coordinates are unaffected."
+}

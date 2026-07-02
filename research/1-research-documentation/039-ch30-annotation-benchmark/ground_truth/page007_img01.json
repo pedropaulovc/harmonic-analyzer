@@ -1,0 +1,89 @@
+{
+  "image": "page007_img01.jpeg",
+  "points": [
+    {
+      "feature": "cylinder_gear_center_1",
+      "x": 425.6,
+      "y": 2336.8
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "x": 958.8,
+      "y": 2028
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "x": 401.9,
+      "y": 1953.1
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "x": 66.1,
+      "y": 2527.8
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "x": 902.8,
+      "y": 2645.3
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "x": 43.6,
+      "y": 311.1
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "x": 866.9,
+      "y": 303
+    },
+    {
+      "feature": "pinion_center",
+      "x": 500.8,
+      "y": 2344.8
+    },
+    {
+      "feature": "cone_gear_center",
+      "x": 362.6,
+      "y": 2338
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "x": 930.7,
+      "y": 2066.7
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "x": 428.3,
+      "y": 1993.1
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "x": 1129.1,
+      "y": 303.5
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "x": 1152.6,
+      "y": 2498.1
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "crank_axle_sprocket_center",
+      "reason": "Lower crank-axle sprocket is on the front/occluded side (only a hanging chain segment is glimpsed near the fan pivot)."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "occluded"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "reason": "occluded"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "reason": "occluded"
+    }
+  ],
+  "source": "human_ground_truth"
+}

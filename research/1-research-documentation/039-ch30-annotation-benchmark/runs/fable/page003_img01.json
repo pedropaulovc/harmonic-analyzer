@@ -1,0 +1,116 @@
+{
+  "image": "page003_img01.png",
+  "view": "front-left three-quarter",
+  "model": "fable",
+  "width": 1204,
+  "height": 2854,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 519,
+      "y": 2053,
+      "confidence": "high",
+      "note": "axle-end pin at center of the brass cup hub of the platen-level chain sprocket"
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "color": "red",
+      "x": 652,
+      "y": 2326,
+      "confidence": "high",
+      "note": "NOT the pinion target: domed axle bolt at crank arm pivot, chain wraps this sprocket"
+    },
+    {
+      "feature": "cone_gear_center",
+      "color": "magenta",
+      "x": 631,
+      "y": 2345,
+      "confidence": "medium",
+      "note": "silver center-bearing screw of the cone set's front drive disc, between crank arm and black bracket"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 69,
+      "y": 316,
+      "confidence": "high",
+      "note": "outer top corner of green clamp casting, image-left end of top frame"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 844,
+      "y": 287,
+      "confidence": "high",
+      "note": "outer top-left corner of the near corner clamp casting's cap rim"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 1141,
+      "y": 308,
+      "confidence": "high",
+      "note": "outer top corner of green corner casting at image-right end of frame"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 87,
+      "y": 2506,
+      "confidence": "high",
+      "note": "bottom-left corner of green base slab (rounded; vertex of bottom+left edges)"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 905,
+      "y": 2636,
+      "confidence": "medium",
+      "note": "nearest bottom corner of base slab (rounded corner vertex)"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 1158,
+      "y": 2496,
+      "confidence": "medium",
+      "note": "rightmost point of base slab where side bottom edge meets back edge"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cylinder_gear_center_1",
+      "reason": "front drive disc of the cylinder gear pair hidden behind tommy-bar handle and black bearing bracket; axis point not visible"
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "second cylinder gear's end face hidden behind base clutter (tommy bar, bracket, green pyramid); axis point not visible"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "entire rocker-arm fan lies behind the platen boards and amplitude connecting rods in this front-left view"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "same: rocker-arm fan fully occluded by platen assembly"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "reason": "same: rocker-arm fan fully occluded by platen assembly"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "reason": "same: rocker-arm fan fully occluded by platen assembly"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "reason": "far corner of top frame hidden behind the frame's front beam"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "reason": "far base corner hidden behind the machine base itself"
+    }
+  ],
+  "orientation_note": "FRONT = platen/paper side, facing the camera; camera stands at the machine's front-LEFT (machine's own left = crank/chain side, which appears at image right in the straight front view page002). So the near lower corner is front_left, image-left is front_right, image-right is back_left; both back-right corners are hidden."
+}

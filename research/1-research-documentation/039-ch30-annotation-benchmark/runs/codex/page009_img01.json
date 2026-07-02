@@ -1,0 +1,132 @@
+{
+  "image": "page009_img01.png",
+  "view": "front-right three-quarter",
+  "model": "codex",
+  "width": 1204,
+  "height": 2854,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 838,
+      "y": 2048,
+      "confidence": "high",
+      "note": "small chain sprocket coaxial with the large brass crank drive gear; lower crank axle sprocket is not marked"
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 760,
+      "y": 2327,
+      "confidence": "medium",
+      "note": "visible circular end face/hub of the front/right cylinder gear set, partly obscured by nearby linkage"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 126,
+      "y": 2009,
+      "confidence": "medium",
+      "note": "selected lower/front visible rocker arm under the platen"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 137,
+      "y": 2018,
+      "confidence": "medium",
+      "note": "selected lower/front visible rocker arm under the platen"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "color": "yellow",
+      "x": 239,
+      "y": 2057,
+      "confidence": "low",
+      "note": "wide end of selected visible rocker arm, partly shadowed by adjacent arm"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "color": "yellow",
+      "x": 254,
+      "y": 2077,
+      "confidence": "low",
+      "note": "wide end of selected visible rocker arm, near the lower exposed edge"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 58,
+      "y": 437,
+      "confidence": "medium",
+      "note": "front is the platen/paper side; camera is front-right"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1105,
+      "y": 438,
+      "confidence": "medium",
+      "note": "front is the platen/paper side; camera is front-right"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 58,
+      "y": 349,
+      "confidence": "medium",
+      "note": "rear edge of top green frame"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 1107,
+      "y": 347,
+      "confidence": "medium",
+      "note": "rear edge of top green frame"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 86,
+      "y": 2630,
+      "confidence": "medium",
+      "note": "front lower footprint corner of green base slab"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1110,
+      "y": 2578,
+      "confidence": "medium",
+      "note": "front lower footprint corner of green base slab"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 62,
+      "y": 2400,
+      "confidence": "medium",
+      "note": "back upper footprint corner of green base slab"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 1083,
+      "y": 2412,
+      "confidence": "low",
+      "note": "back/right footprint corner partly obscured by right-side crank hardware"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cone_gear_center",
+      "reason": "axis point/end face is obscured by the crank drive wheel, columns, and shadow from this front-right view"
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "second cylinder gear axis point is not visible enough to mark; no clear end face/hub/axle point"
+    }
+  ],
+  "orientation_note": "Camera is on the machine's front-right side: the platen/paper side faces the camera, and the crank/chain side is on image right."
+}

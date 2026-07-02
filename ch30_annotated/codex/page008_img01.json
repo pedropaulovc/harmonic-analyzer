@@ -1,0 +1,83 @@
+{
+  "image": "page008_img01.png",
+  "view": "right side",
+  "width": 1789,
+  "height": 4239,
+  "points": [
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 889,
+      "y": 3313,
+      "confidence": "medium",
+      "note": "Lower helical cylinder gear visible through the right-side base opening, seen side-on."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "color": "orange",
+      "x": 955,
+      "y": 3196,
+      "confidence": "low",
+      "note": "Second cylinder gear partially visible behind vertical bars; axis midpoint estimated from visible teeth."
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 275,
+      "y": 279,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1315,
+      "y": 279,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 207,
+      "y": 3623,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1340,
+      "y": 3624,
+      "confidence": "high"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "pinion_center",
+      "reason": "upper pinion is hidden on the far side of the platen/gear train"
+    },
+    {
+      "feature": "cone_gear_center",
+      "reason": "cone gear is hidden by the right-side frame and base window bars"
+    },
+    {
+      "feature": "rocker_arm_corners",
+      "reason": "rocker fan is edge-on and individual flat arm corners are not resolvable"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "reason": "far-side top corner hidden behind side frame"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "reason": "far-side top corner hidden behind side frame"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "reason": "far-side base corner hidden behind side frame"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "reason": "far-side base corner hidden behind side frame"
+    }
+  ],
+  "orientation_note": "Camera faces the machine right side nearly square-on; front/back depth is mostly occluded."
+}

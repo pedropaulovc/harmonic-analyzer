@@ -1,0 +1,116 @@
+{
+  "image": "page006_img01.png",
+  "view": "back",
+  "model": "sonnet",
+  "width": 1732,
+  "height": 4104,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 486,
+      "y": 3137,
+      "confidence": "high",
+      "note": "small chain sprocket on green post, directly adjacent to cone gear; chain visible wrapping it and descending toward crank (crank itself occluded behind base structure in this back view). Matches unlabeled sprocket in ch12_images/page002_img02.png mounted the same way beside the cone gear set."
+    },
+    {
+      "feature": "cone_gear_center",
+      "color": "magenta",
+      "x": 493,
+      "y": 3253,
+      "confidence": "high",
+      "note": "end-face (hub) center of the large coarse-toothed conical gear stack at the base, viewed nearly axis-on from behind; matches 'cone gear' texture/position in ch12/ch13 references."
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 698,
+      "y": 3357,
+      "confidence": "high",
+      "note": "large fine-toothed brass disc with a clearly centered rivet/hub, immediately right of the cone gear; matches the 'back side' / 'notch' end-face disc shown in ch13_images/page002_img01.png."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "color": "orange",
+      "x": 829,
+      "y": 3360,
+      "confidence": "medium",
+      "note": "narrower fine-toothed roller further right, own small hub/rivet visible; plausibly a second cylinder gear for another channel, but could also be an idler/bearing collar - lower certainty than gear 1."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "color": "yellow",
+      "x": 638,
+      "y": 2810,
+      "confidence": "medium",
+      "note": "wide pivot-end corner of the frontmost (bottom-most in the stack) rocker arm, at its small riveted pivot tab. The arm's two wide-end edges converge to a single resolvable point at this viewing angle (near-coincident butt_left), so only one butt corner is marked."
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 138,
+      "y": 261,
+      "confidence": "high",
+      "note": "outer top-left corner of the green top-frame casting, back face (nearest camera in this back view)."
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 1614,
+      "y": 270,
+      "confidence": "high",
+      "note": "outer top-right corner of the green top-frame casting, back face."
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 124,
+      "y": 3732,
+      "confidence": "high",
+      "note": "bottom-left corner of the green base slab, back face."
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 1608,
+      "y": 3717,
+      "confidence": "high",
+      "note": "bottom-right corner of the green base slab, back face."
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "crank_axle_sprocket_center",
+      "reason": "chain descends from the pinion sprocket toward the crank, but the crank and its axle sprocket are hidden behind the black interior structure / green base wall in this back view."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "at this viewing angle the arm's wide end tapers to a single point where it meets the pivot rivet tab; the second (butt_left) corner is not separately resolvable from butt_right at pixel scale."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "reason": "the ~20 rocker arms are stacked edge-on/overlapping in this back view; the single identified (bottom-most) arm cannot be traced reliably across the fan to a distinguishable narrow tip - its silhouette merges with neighboring arms."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "reason": "same as tip_left - individual arm not traceable to a resolvable tip in this stacked back view."
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "reason": "flat-on back view of the top casting shows only the near (back) face; the far (front) face and its corners are not visible / no depth resolved."
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "reason": "same as top_front_left - front face not visible from directly behind."
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "reason": "flat-on back view of the base slab shows only the near (back) face; the far (front) face and its corners are not visible."
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "reason": "same as base_front_left - front face not visible from directly behind."
+    }
+  ],
+  "orientation_note": "This is the back view (angle 180deg / view 5-8 per eight-views-6.png); the platen/paper side (front of the machine) faces away from the camera. Left/right in feature names are as seen in this image."
+}

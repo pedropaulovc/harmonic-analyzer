@@ -1,0 +1,92 @@
+{
+  "image": "page003_img01.png",
+  "view": "front-left three-quarter",
+  "width": 1204,
+  "height": 2854,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 542,
+      "y": 2076,
+      "confidence": "medium",
+      "note": "Upper chain sprocket is partly cut off/occluded, but the visible circular teeth locate the axis."
+    },
+    {
+      "feature": "cone_gear_center",
+      "color": "magenta",
+      "x": 796,
+      "y": 2310,
+      "confidence": "medium",
+      "note": "Side-on cone stack; dot is midpoint along the visible tapered rotation axis."
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 56,
+      "y": 319,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 884,
+      "y": 315,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 1144,
+      "y": 317,
+      "confidence": "medium"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 85,
+      "y": 2503,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1008,
+      "y": 2524,
+      "confidence": "high"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 18,
+      "y": 2397,
+      "confidence": "medium"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 1117,
+      "y": 2398,
+      "confidence": "medium"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cylinder_gear_center_1",
+      "reason": "Cylinder gear center is hidden by the green base housing and cone/drive hardware."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "Second cylinder gear center is not separately visible in this view."
+    },
+    {
+      "feature": "rocker_arm_corners",
+      "reason": "Rocker-arm fan is mostly edge-on and overlapped by cords; individual arm corners are not reliably separable."
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "reason": "Hidden by the top casting and left upright from this angle."
+    }
+  ],
+  "orientation_note": "Camera is at the machine front-left; front edge and left side depth are visible."
+}

@@ -1,0 +1,112 @@
+{
+  "image": "page008_img01.png",
+  "view": "right side",
+  "width": 1789,
+  "height": 4239,
+  "source": "consensus",
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 1371,
+      "y": 2802,
+      "confidence": "high",
+      "note": "Upper chain sprocket next to the large brass crank drive gear, seen edge-on; dot centered on the brass hub end-face (rotation axis). The bead chain wraps this sprocket and runs down to the crank-axle sprocket. Claude call (codex wrongly marked occluded); nudged from claude's (1390,2808) onto the hub center in the consensus pass."
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "color": "red",
+      "x": 1344,
+      "y": 3110,
+      "confidence": "low",
+      "note": "Secondary sprocket at the crank axle (lower end of the chain run), the NOT-target sprocket added per spec option. Center estimated where the bead chain wraps the axle; only claude marked it."
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 889,
+      "y": 3313,
+      "confidence": "low",
+      "note": "Codex call (won the occluded gear-window adjudication): sits on the horizontal brass cylinder form seen side-on through the base opening. Heavily occluded by the 20 black spring bars, so identity and exact center are low-confidence."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "color": "orange",
+      "x": 955,
+      "y": 3196,
+      "confidence": "low",
+      "note": "Codex call (won adjudication): a second brass helical-gear form (diagonal lobed cylinder) faintly visible behind the comb; axis midpoint estimated from visible teeth. Low confidence \u2014 claude had called it occluded."
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1329,
+      "y": 291,
+      "confidence": "high",
+      "note": "Top-front outer vertex of the green top-frame casting, near (right) face; front = image-right. Claude call over codex (codex sat on the inboard silver cap). Nudged onto the casting's outer corner in the consensus pass."
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 419,
+      "y": 290,
+      "confidence": "high",
+      "note": "Top-back outer vertex of the green top-frame casting, near (right) face. Claude call over codex (codex floated ~140px out in the black background). Nudged onto the casting corner in the consensus pass."
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1340,
+      "y": 3838,
+      "confidence": "high",
+      "note": "Bottom-front outer corner of the green base slab, near (right) face. Claude call over codex (codex's y was ~210px too high at the body/slab junction)."
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 401,
+      "y": 3838,
+      "confidence": "high",
+      "note": "Bottom-back outer corner of the green base slab, near (right) face. Claude call over codex (codex floated ~195px left in empty black)."
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cone_gear_center",
+      "reason": "Tapered cone-gear stack is not confidently isolable behind the 20 black spring bars and the front gear from the pure right side (both attempts agree)."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "Rocker-arm fan is edge-on in this side view; the ~20 flat arms stack into the central vertical bars, so no single arm's corners are resolvable (both attempts agree)."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "Rocker fan edge-on / unresolvable in this side view."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "reason": "Rocker fan edge-on / unresolvable in this side view."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "reason": "Rocker fan edge-on / unresolvable in this side view."
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "reason": "Far (machine-left) top corner, hidden behind the near top-frame face (both attempts agree)."
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "reason": "Far (machine-left) top corner, hidden behind the near top-frame face (both attempts agree)."
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "reason": "Far (machine-left) base corner, hidden behind the near base-slab face (both attempts agree)."
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "reason": "Far (machine-left) base corner, hidden behind the near base-slab face (both attempts agree)."
+    }
+  ],
+  "orientation_note": "Camera faces the machine's RIGHT side. The front-mounted crank (wooden handle) appears at lower-right, so front = image-right and back = image-left; the near (camera-facing) face is the machine's right side. Only near-side (right) silhouette corners are visible for both the base slab and top frame; all far-side (machine-left) corners are occluded."
+}

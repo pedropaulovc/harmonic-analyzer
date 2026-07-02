@@ -1,0 +1,142 @@
+{
+  "image": "page005_img01.jpeg",
+  "verdicts": [
+    {
+      "feature": "cone_gear_center",
+      "claude": [430, 2300],
+      "codex": "occluded",
+      "verdict": "claude",
+      "true_point": [410, 2303],
+      "note": "The tapered brass helical stack is unmistakably the cone gear seen side-on (diameter tapers to an apex at left); claude placed it near the visible-axis midpoint, codex wrongly declared the cone occluded."
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "claude": [589, 2330],
+      "codex": [388, 2296],
+      "verdict": "claude",
+      "true_point": [586, 2328],
+      "note": "claude sits dead on the hub of the bright brass end-gear (a real uniform gear seen ~end-on); codex's point lands on the cone body, i.e. it mislabels the cone as a cylinder."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "claude": "occluded",
+      "codex": [522, 2298],
+      "verdict": "claude",
+      "true_point": null,
+      "note": "There is only one cone plus one visible cylinder gear here; codex's second point is just another spot on the single cone, so claude's 'occluded' is the correct call for a second cylinder."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "claude": [1061, 1922],
+      "codex": [838, 1924],
+      "verdict": "claude",
+      "true_point": [1060, 1926],
+      "note": "claude is at the front arm's true right end-face by the vertical post (slightly high into the dark gap); codex is ~200px short at mid-span where the arm crosses the central column."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "claude": [1062, 1949],
+      "codex": [876, 1947],
+      "verdict": "claude",
+      "true_point": [1060, 1950],
+      "note": "claude lands on the front arm's lower end-face corner near the post; codex is again mid-span, well short of the actual tip."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "claude": "occluded",
+      "codex": [352, 1872],
+      "verdict": "claude",
+      "true_point": null,
+      "note": "The wide pivot/butt ends are buried under the silver linkage clamp; codex's point sits on the bracket edge / dark gap, not a resolvable arm corner, so claude's 'occluded' is more honest."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "claude": "occluded",
+      "codex": [411, 1906],
+      "verdict": "claude",
+      "true_point": null,
+      "note": "Same buried pivot cluster; codex's point is on the silver linkage body rather than a clean arm end-corner."
+    },
+    {
+      "feature": "analyzer_corner_base_back_left (near corner; codex labeled it front_left)",
+      "claude": [290, 2605],
+      "codex": [210, 2573],
+      "verdict": "label_mismatch",
+      "true_point": [287, 2606],
+      "note": "Near bottom corner where the broad back face meets the receding left side face = back_left; claude's name is consistent with the back-left view AND sits on the true bottom corner, while codex mirrored the name (front_left) and drifted up onto the face."
+    },
+    {
+      "feature": "analyzer_corner_base_front_left (far-left corner; codex labeled it back_left)",
+      "claude": [77, 2452],
+      "codex": [78, 2471],
+      "verdict": "label_mismatch",
+      "true_point": [73, 2460],
+      "note": "Far-left bottom corner where the left face recedes toward the front = front_left; both placed it near-identically (placement tie, ~15px apart), but codex's label (back_left) is the mirror. claude naming consistent."
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "claude": [1130, 2489],
+      "codex": [1099, 2444],
+      "verdict": "claude",
+      "true_point": [1130, 2492],
+      "note": "Both name it back_right (agree); claude sits on the true bottom-right corner, codex is ~45px up on the face at a screw head."
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "claude": "occluded",
+      "codex": "occluded",
+      "verdict": "tie",
+      "true_point": null,
+      "note": "Far/hidden front-right base corner; both correctly occluded."
+    },
+    {
+      "feature": "analyzer_corner_top_front_left (clean outer top-left corner; codex labeled it back_left)",
+      "claude": [84, 279],
+      "codex": [54, 312],
+      "verdict": "label_mismatch",
+      "true_point": [84, 280],
+      "note": "The clean leftmost/topmost outer corner of the top casting; claude nails it and names it front_left (same mirror convention as its base corners), codex names it back_left (mirror) and is ~30px low-left. claude naming consistent + better placed."
+    },
+    {
+      "feature": "analyzer_corner_top_back_left (near top-left / boss region; codex labeled its point front_left)",
+      "claude": "occluded",
+      "codex": [219, 284],
+      "verdict": "claude",
+      "true_point": null,
+      "note": "codex's second top-left point sits on a mounting boss along the top rail, not a distinct clean outer corner; claude reasonably recorded the near top-back-left as occluded (buried in the boss/rods)."
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "claude": [1149, 293],
+      "codex": [1147, 322],
+      "verdict": "claude",
+      "true_point": [1148, 292],
+      "note": "Both name it back_right (agree); claude on the true top-right corner, codex ~29px low on the right face."
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "claude": "occluded",
+      "codex": "occluded",
+      "verdict": "tie",
+      "true_point": null,
+      "note": "Far/hidden front-right top corner; both correctly occluded."
+    },
+    {
+      "feature": "pinion_center",
+      "claude": "occluded",
+      "codex": "occluded",
+      "verdict": "tie",
+      "true_point": null,
+      "note": "Upper drive sprocket is on the front of the machine, hidden in this back-left view; both correctly occluded."
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "claude": "occluded",
+      "codex": "absent",
+      "verdict": "claude",
+      "true_point": null,
+      "note": "Optional feature; claude noted it as occluded (chain hubs hidden behind the pivot bracket), codex omitted it entirely — no coordinate dispute."
+    }
+  ],
+  "summary": "claude was substantially more accurate on this image. The core identity disputes go to claude: the tapered brass helical stack is a single cone gear seen side-on (claude marked it correctly; codex mis-split it into two 'cylinder gears' and wrongly called the cone occluded), and the one clearly-visible cylinder gear is the bright brass end-gear whose hub claude nailed. On the rocker fan, claude's tip corners sit at the real arm end near the post while codex's were ~200px short at mid-span, and the butt/pivot corners are genuinely buried in the linkage (claude's 'occluded' is right; codex's points are on the bracket). Systematic codex errors: gear misidentification, mid-span rocker tips, a mirrored front/back label convention on the left-side corners (claude's naming is the one consistent with the back-left orientation, with the near corner = back_left), and several analyzer corners drifted up onto the face or onto screw heads instead of the true bottom/outer corners."
+}

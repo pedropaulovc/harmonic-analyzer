@@ -1,0 +1,116 @@
+{
+  "image": "page002_img01.png",
+  "view": "front",
+  "model": "codex",
+  "width": 1749,
+  "height": 4143,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 1039,
+      "y": 2968,
+      "confidence": "medium",
+      "note": "small chain sprocket beside the large brass crank drive gear; center placed on visible circular hub/sprocket face partly crossed by chain highlights"
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 1060,
+      "y": 3405,
+      "confidence": "medium",
+      "note": "more visible front cylinder gear; point is the exposed front bearing/hub on the rotation axis, with brass gear body immediately behind it"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 137,
+      "y": 424,
+      "confidence": "medium",
+      "note": "front lower outside corner of top green frame, image left"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1608,
+      "y": 424,
+      "confidence": "medium",
+      "note": "front lower outside corner of top green frame, image right"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 137,
+      "y": 296,
+      "confidence": "medium",
+      "note": "back upper outside corner of top green frame, image left"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 1608,
+      "y": 296,
+      "confidence": "medium",
+      "note": "back upper outside corner of top green frame, image right"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 140,
+      "y": 3748,
+      "confidence": "medium",
+      "note": "front lower footprint corner of green base, image left"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1595,
+      "y": 3748,
+      "confidence": "medium",
+      "note": "front lower footprint corner of green base, image right"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 159,
+      "y": 3596,
+      "confidence": "medium",
+      "note": "back upper footprint corner of green base, image left"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 1605,
+      "y": 3596,
+      "confidence": "medium",
+      "note": "back upper footprint corner of green base, image right"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "second cylindrical gear is partly visible at the base, but its end face/hub/axis point is hidden by chain, bracket, and green upright in this front view"
+    },
+    {
+      "feature": "cone_gear_center",
+      "reason": "conical teeth are visible, but no end face, hub, or axle point is resolvable from the front view"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "rocker-arm fan is not exposed as a selectable flat arm in this straight-on front view"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "rocker-arm fan is not exposed as a selectable flat arm in this straight-on front view"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "reason": "rocker-arm fan is not exposed as a selectable flat arm in this straight-on front view"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "reason": "rocker-arm fan is not exposed as a selectable flat arm in this straight-on front view"
+    }
+  ],
+  "orientation_note": "Camera faces the front/platen side of the machine; I treat image left/right as machine front-left/front-right respectively, with top/base back corners on the upper/rear visible edges."
+}

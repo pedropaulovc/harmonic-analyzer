@@ -1,0 +1,108 @@
+{
+  "image": "page002_img01.png",
+  "view": "front",
+  "model": "fable",
+  "width": 1749,
+  "height": 4143,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 1046,
+      "y": 2964,
+      "confidence": "high",
+      "note": "Chain sprocket next to/in front of the large brass drive gear at platen level; dot = center of its recessed brass hub cup / axle screw."
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "color": "red",
+      "x": 1304,
+      "y": 3348,
+      "confidence": "medium",
+      "note": "OPTIONAL second sprocket at the crank axle. Dot = center of the exposed crankshaft end cap (dome) on the crank-arm boss = rotation axis; the sprocket ring sits just behind this cap."
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 1060,
+      "y": 3402,
+      "confidence": "high",
+      "note": "Front cylinder-gear drum seen end-on: smooth brass end flange in the black bearing bracket; dot = center of the bright shaft-end boss (rotation axis)."
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 139,
+      "y": 296,
+      "confidence": "high",
+      "note": "Outer top-left corner of the green top-frame casting boss silhouette at the left front column."
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1629,
+      "y": 291,
+      "confidence": "high",
+      "note": "Outer top-right corner of the green top-frame casting at the right front column."
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 147,
+      "y": 3768,
+      "confidence": "medium",
+      "note": "Bottom-left outer corner of the green base slab (rounded corner, in shadow)."
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1640,
+      "y": 3760,
+      "confidence": "medium",
+      "note": "Bottom-right outer corner of the green base slab (rounded corner, in shadow)."
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cone_gear_center",
+      "reason": "Cone gear stack sits behind the green crank pedestal / crank arm / chain in this front view; only a sliver of its teeth peeks out right of the pedestal (x~1350, y~3340-3460) - axis point not visible."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "Second cylinder-gear drum is behind the green crank pedestal; no end face, hub or axle point resolvable - axis point not visible."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "Rocker-arm fan is edge-on behind the platen box and pyramid stand in this front view; no arm corner resolvable (black bars near the base are the amplitude connecting rods, not the silver arms)."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "Rocker-arm fan edge-on / hidden behind the platen box (front view)."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "reason": "Rocker-arm fan edge-on / hidden behind the platen box (front view)."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "reason": "Rocker-arm fan edge-on / hidden behind the platen box (front view)."
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "reason": "Rear top-frame corner hidden behind the front casting in this straight-on front view."
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "reason": "Rear top-frame corner hidden behind the front casting."
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "reason": "Rear base-slab bottom corner hidden behind the slab itself."
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "reason": "Rear base-slab bottom corner hidden behind the slab itself."
+    }
+  ],
+  "orientation_note": "Camera faces the FRONT of the machine: the platen/paper (with the traced waveform) faces the camera and the hand crank is at lower right. Machine left/right = image left/right as seen by the viewer (operator at the front): image-right = crank side."
+}
