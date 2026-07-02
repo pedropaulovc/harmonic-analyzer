@@ -1,0 +1,6 @@
+Read C:\src\harmonic-analyzer\research\1-research-documentation\039-ch30-annotation-benchmark\PROMPT.md and SPEC.md (same folder) and follow them exactly.
+ASSIGNED IMAGE: page008_img01.png
+VIEW HINT: right side
+OUTPUT DIRECTORY: C:\src\harmonic-analyzer\research\1-research-documentation\039-ch30-annotation-benchmark\runs\codex
+MODEL NAME: codex
+SCRATCH DIRECTORY: C:\Users\pedro\AppData\Local\Temp\codex-bench-p008

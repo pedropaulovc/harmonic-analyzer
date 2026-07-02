@@ -1,0 +1,116 @@
+{
+  "image": "page004_img01.png",
+  "view": "left side",
+  "model": "sonnet",
+  "width": 1776,
+  "height": 4209,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 438,
+      "y": 2862,
+      "confidence": "medium",
+      "note": "Brass axle-cap hub of the higher of two chain sprockets visible along the left post; identified as the pinion by elimination (chain runs between exactly two sprockets in this view: this one and the crank-axle sprocket lower down). Hub disc is partly overlapped by an aluminum bracket; the large brass crank drive gear it should be coaxial with is not itself visible from this angle (occluded by the front corner post)."
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "color": "red",
+      "x": 422,
+      "y": 3289,
+      "confidence": "low",
+      "note": "Not the primary target (per spec). Retaining screw at the crank arm's pivot boss, coaxial with the chain sprocket the crank turns; the sprocket teeth themselves are mostly hidden behind the crank bracket and green axle housing."
+    },
+    {
+      "feature": "cone_gear_center",
+      "color": "magenta",
+      "x": 1230,
+      "y": 3382,
+      "confidence": "medium",
+      "note": "Cone gear's narrow (small) end - a short exposed shaft stub visible entering its black bearing bracket. Used the SPEC's 'exposed shaft/hub point' fallback because the wide (base) end's own circular face is obscured face-on by a separate small steel mesh/drive gear (confirmed against ch12/page002_img02.png, which shows this exact drive gear meshing with the cone's wide end) - that mesh gear's own hub is NOT the cone gear's axis and was not used."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "color": "yellow",
+      "x": 736,
+      "y": 2850,
+      "confidence": "low",
+      "note": "Left edge of the widest point of one arm's bent pivot-attachment hook (numbered ID tag visible just above), in the reed bank sitting directly above the cone/cylinder-gear housing - positionally matches ch14's rocker-arm fan location. From this side angle the fan's true tapered face (clearly visible in the back view, page006) is foreshortened; this hook is the best resolvable proxy for the wide/pivot end. Structural correspondence to the smooth tapered blade in ch14 is uncertain."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "color": "yellow",
+      "x": 748,
+      "y": 2850,
+      "confidence": "low",
+      "note": "Right edge of the same arm's hook, paired with rocker_arm_corner_butt_left."
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 495,
+      "y": 340,
+      "confidence": "high",
+      "note": "Outer corner of the rounded boss at the left (front, per orientation_note) end of the green top frame casting - the near/left-side corner as seen directly from the machine's left."
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 1409,
+      "y": 338,
+      "confidence": "high",
+      "note": "Outer corner of the rounded boss at the right (back) end of the green top frame casting."
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 508,
+      "y": 3820,
+      "confidence": "high",
+      "note": "Bottom-left rounded corner of the green base slab at its front (photo-left) end."
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 1418,
+      "y": 3815,
+      "confidence": "high",
+      "note": "Bottom-left rounded corner of the green base slab at its back (photo-right) end."
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cylinder_gear_center_1",
+      "reason": "No distinct straight cylindrical helical gear body (matching ch13's reference) is resolvable from this left-side angle. The only candidate small gear found next to the cone gear's wide end is a separate steel mesh/drive gear for the cone gear (confirmed against ch12/page002_img02.png), not the cylinder gear. The cylinder gear, if present, is hidden behind the cone gear and the reed-bank frame."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "Same as cylinder_gear_center_1 - no second cylindrical gear body is visible from this angle."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "reason": "The rocker arm's narrow tip end points away into the image depth from this side angle (the fan's true taper is only clearly visible in the back view, page006_img01). The reed narrows to ~3px and disappears into the cone-gear tooth mesh; left/right tip corners are not distinguishably resolvable at this width."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "reason": "Same as rocker_arm_corner_tip_left."
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "reason": "This is a direct left-side elevation; the machine's right wall is on the far side of the frame from the camera and is occluded behind the near (left) wall at this corner."
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "reason": "Same as analyzer_corner_top_front_right, at the back (photo-right) end of the casting."
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "reason": "Same left/right occlusion as the top-frame corners, applied to the base slab's front (photo-left) end."
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "reason": "Same left/right occlusion as the top-frame corners, applied to the base slab's back (photo-right) end."
+    }
+  ],
+  "orientation_note": "This is a direct left-side elevation (camera at the machine's left, facing its right). The crank handle, chain, and pinion assembly are mounted at the machine's FRONT (platen side per spec) and appear on the photo-LEFT (x<700); the reed bank / cone-gear housing sit more centrally/right. So photo-left = machine front, photo-right = machine back, and the machine's own left wall (nearest the camera in this shot) is what's visible at each end; the corresponding right-wall corners are occluded behind it."
+}

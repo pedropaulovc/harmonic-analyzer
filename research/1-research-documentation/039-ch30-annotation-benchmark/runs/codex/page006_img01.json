@@ -1,0 +1,120 @@
+{
+  "image": "page006_img01.png",
+  "view": "back",
+  "model": "codex",
+  "width": 1732,
+  "height": 4104,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 490,
+      "y": 3145,
+      "confidence": "medium",
+      "note": "small chain sprocket on green bearing block at the upper chain wrap; distinct from lower crank-axle sprocket"
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 693,
+      "y": 3365,
+      "confidence": "high",
+      "note": "large visible brass cylindrical helical gear, back-side shaft/hub center"
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "color": "orange",
+      "x": 820,
+      "y": 3365,
+      "confidence": "medium",
+      "note": "smaller visible cylindrical helical gear on the right side of the base cluster; marked at its visible hub center"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 194,
+      "y": 258,
+      "confidence": "medium",
+      "note": "top frame far/front corner; image left is machine right in back view"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 1548,
+      "y": 254,
+      "confidence": "medium",
+      "note": "top frame far/front corner; image right is machine left in back view"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 191,
+      "y": 397,
+      "confidence": "high",
+      "note": "top frame near/back corner; image left is machine right in back view"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 1544,
+      "y": 396,
+      "confidence": "high",
+      "note": "top frame near/back corner; image right is machine left in back view"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 71,
+      "y": 3528,
+      "confidence": "medium",
+      "note": "far/front upper base-slab corner; image left is machine right in back view"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 1610,
+      "y": 3533,
+      "confidence": "medium",
+      "note": "far/front upper base-slab corner; image right is machine left in back view"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 70,
+      "y": 3705,
+      "confidence": "high",
+      "note": "near/back lower base-slab corner; image left is machine right in back view"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 1647,
+      "y": 3708,
+      "confidence": "high",
+      "note": "near/back lower base-slab corner; image right is machine left in back view"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cone_gear_center",
+      "reason": "conical gear stack body is visible, but no circular end face, hub, or exposed axle point is resolvable from the back view"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "reason": "individual corner of a single rocker arm is not separable in the overlapping back-view stack"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "reason": "individual corner of a single rocker arm is not separable in the overlapping back-view stack"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "butt end is hidden by the side post and overlapping arm stack"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "butt end is hidden by the side post and overlapping arm stack"
+    }
+  ],
+  "orientation_note": "Camera faces the back of the machine; the platen/paper front is away from the camera. Therefore image left corresponds to machine right and image right corresponds to machine left."
+}

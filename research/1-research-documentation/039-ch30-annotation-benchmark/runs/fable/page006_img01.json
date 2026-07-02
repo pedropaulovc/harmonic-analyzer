@@ -1,0 +1,120 @@
+{
+  "image": "page006_img01.png",
+  "view": "back",
+  "model": "fable",
+  "width": 1732,
+  "height": 4104,
+  "points": [
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 695,
+      "y": 3372,
+      "confidence": "high",
+      "note": "exposed silver axle pin in the black 'back side' pillow-block bearing at the brass end disc of the cylinder gear set (ch13 pp.24-25). This machine has a single cylinder gear drum."
+    },
+    {
+      "feature": "cone_gear_center",
+      "color": "magenta",
+      "x": 491,
+      "y": 3246,
+      "confidence": "medium",
+      "note": "projected rotation-axis point at the small (back) end of the cone gear stack, seen end-on as concentric gear rings; center of ring convergence. Motion blur in this region: +/-8 px."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "color": "yellow",
+      "x": 1476,
+      "y": 2729,
+      "confidence": "medium",
+      "note": "UPPER corner of the wide (16 mm) butt end face at image right. Chosen arm = the one forming the fan's top silhouette right of the pivot; by the seesaw inversion across the central pivot it is also the bottom-most arm at the tip fan, so both of its end faces lie on the fan envelope. End-face corner pairs are upper/lower in this face-on back view; named left/right by image x per spec (face slants down-right, upper corner has smaller x)."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "color": "yellow",
+      "x": 1489,
+      "y": 2749,
+      "confidence": "medium",
+      "note": "LOWER corner of the same butt end face (larger x: the face slants down-right toward the seam with the next arm)."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 644,
+      "y": 2777,
+      "confidence": "medium",
+      "note": "UPPER corner of the narrow tip end face at image left (bottom-most tip face of the fan; the black connecting rod for this arm pins onto the stepped underside just right of it). Upper corner has the smaller x here."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 647,
+      "y": 2807,
+      "confidence": "medium",
+      "note": "LOWER corner of the same tip end face, where the near-vertical end face meets the stepped underside (steps make this corner +/-4 px)."
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 129,
+      "y": 264,
+      "confidence": "medium",
+      "note": "outer top corner of the green top-frame clamp block at image LEFT (= machine back-right; image left is the machine's right/crank side in this back view)."
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 1612,
+      "y": 271,
+      "confidence": "medium",
+      "note": "outer top corner of the green top-frame clamp block at image RIGHT (= machine back-left)."
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 137,
+      "y": 3724,
+      "confidence": "medium",
+      "note": "rounded bottom corner of the green base slab at image LEFT (= machine back-right); apex of the corner radius."
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 1605,
+      "y": 3726,
+      "confidence": "medium",
+      "note": "rounded bottom corner of the green base slab at image RIGHT (= machine back-left); side moulding flares above, corner taken at the apex where it meets the bottom edge."
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "pinion_center",
+      "reason": "the pinion chain sprocket and the large brass crank drive gear sit at platen level on the FRONT side of the machine; in this dead-back view they are hidden behind the platen and rocker-arm assembly (only a sliver of the platen rack teeth shows through the gap). Axis point not visible."
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "reason": "the sprocket on the back end of the crank axle IS partly visible (chain wrap over the green crank post at ~(515,3040)), but its hub/axle point is buried behind the post top edge, the wrapping chain and motion blur - axis point not visible/resolvable."
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "no second cylinder gear exists - the machine has a single cylinder gear drum (20 co-axial gears, ch13); its other (front-side) end face is on the far side of the machine and not visible from the back."
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "reason": "directly behind the back clamp block in this dead-back view."
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "reason": "directly behind the back clamp block in this dead-back view."
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "reason": "hidden behind the base slab (front bottom edge is on the far side)."
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "reason": "hidden behind the base slab (front bottom edge is on the far side)."
+    }
+  ],
+  "orientation_note": "Back of the machine faces the camera (the FRONT = platen/paper side is the far side). Image-left = machine's RIGHT side: the green crank post with its chain sprocket and the cone/cylinder gear cluster appear at lower image-left. Corner names are machine-relative."
+}

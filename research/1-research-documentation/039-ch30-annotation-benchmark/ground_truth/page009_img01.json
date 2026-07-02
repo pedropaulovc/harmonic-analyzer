@@ -1,0 +1,87 @@
+{
+  "image": "page009_img01.png",
+  "points": [
+    {
+      "feature": "pinion_center",
+      "x": 743.9,
+      "y": 2367.2
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "x": 995.4,
+      "y": 2281.4
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "x": 769.4,
+      "y": 2335.9
+    },
+    {
+      "feature": "cone_gear_center",
+      "x": 935.8,
+      "y": 2334.5
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "x": 238.2,
+      "y": 2028.5
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "x": 287.2,
+      "y": 348.1
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "x": 1119.2,
+      "y": 346.8
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "x": 60.5,
+      "y": 352.2
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "x": 297.4,
+      "y": 2642
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "x": 1128.5,
+      "y": 2522.1
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "x": 62.4,
+      "y": 2497.5
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "Second cylinder gear lies behind the drum / crank cluster; its center cannot be located."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "Rocker/amplitude-bar fan is near edge-on and interleaved from this front-right angle; pivot (butt) ends recede behind the platen assembly."
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "Same fan; butt/pivot ends occluded behind the platen frame."
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "reason": "Same fan; single-arm tip corners not resolvable in this view."
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "reason": "occluded"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "reason": "occluded"
+    }
+  ],
+  "source": "human_ground_truth"
+}

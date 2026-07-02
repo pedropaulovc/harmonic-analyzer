@@ -1,0 +1,131 @@
+{
+  "image": "page005_img01.jpeg",
+  "view": "back-left three-quarter",
+  "model": "haiku",
+  "width": 1204,
+  "height": 2854,
+  "points": [
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 50,
+      "y": 2800,
+      "confidence": "low",
+      "note": "base slab back-left corner"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 1150,
+      "y": 2800,
+      "confidence": "low",
+      "note": "base slab back-right corner"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 150,
+      "y": 2800,
+      "confidence": "low",
+      "note": "base slab front-left corner"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1050,
+      "y": 2800,
+      "confidence": "low",
+      "note": "base slab front-right corner"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 80,
+      "y": 130,
+      "confidence": "low",
+      "note": "top frame back-left corner"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 1120,
+      "y": 130,
+      "confidence": "low",
+      "note": "top frame back-right corner"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 180,
+      "y": 130,
+      "confidence": "low",
+      "note": "top frame front-left corner"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1020,
+      "y": 130,
+      "confidence": "low",
+      "note": "top frame front-right corner"
+    },
+    {
+      "feature": "cone_gear_center",
+      "color": "magenta",
+      "x": 540,
+      "y": 2340,
+      "confidence": "medium",
+      "note": "conical brass gears, center of base"
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 400,
+      "y": 2330,
+      "confidence": "medium",
+      "note": "brass helical cylinder gear, left side"
+    },
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 620,
+      "y": 120,
+      "confidence": "medium",
+      "note": "small chain sprocket at platen level"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "color": "yellow",
+      "x": 490,
+      "y": 1480,
+      "confidence": "low",
+      "note": "rocker arm butt end, left side"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "color": "yellow",
+      "x": 530,
+      "y": 1480,
+      "confidence": "low",
+      "note": "rocker arm butt end, right side"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 470,
+      "y": 1330,
+      "confidence": "low",
+      "note": "rocker arm tip end, left side"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 550,
+      "y": 1330,
+      "confidence": "low",
+      "note": "rocker arm tip end, right side"
+    }
+  ],
+  "occluded": [],
+  "orientation_note": "Front (platen/paper side) faces right and forward; back faces left and back; left side of machine visible on left side of image"
+}

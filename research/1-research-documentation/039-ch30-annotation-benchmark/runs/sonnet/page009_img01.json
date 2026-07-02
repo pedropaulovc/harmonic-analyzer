@@ -1,0 +1,120 @@
+{
+  "image": "page009_img01.png",
+  "view": "front-right three-quarter",
+  "model": "sonnet",
+  "width": 1204,
+  "height": 2854,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 839,
+      "y": 2054,
+      "confidence": "high",
+      "note": "chain sprocket next to the large brass drive-gear disc, mounted on the cylinder-gear shaft"
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 762,
+      "y": 2318,
+      "confidence": "high",
+      "note": "brass end-disc of the cylinder gear shaft (matches ch13 'cylinder gear set' front-disc pattern); more visible of the two"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 143,
+      "y": 2016,
+      "confidence": "medium",
+      "note": "tip vertex of the front-most/most-isolated rocker arm; the paired tip_right corner is not separately resolvable at this resolution"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 298,
+      "y": 2636,
+      "confidence": "high",
+      "note": "nearest base corner; x aligns with the front-left post"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 68,
+      "y": 2485,
+      "confidence": "medium",
+      "note": "x aligns with the back-left post, visible past the front-left corner at this shallow rotation"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 1116,
+      "y": 2509,
+      "confidence": "high",
+      "note": "x aligns with the back-right post"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 302,
+      "y": 332,
+      "confidence": "high",
+      "note": "top casting corner at the front-left post"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 61,
+      "y": 350,
+      "confidence": "high",
+      "note": "top casting corner at the back-left post"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 850,
+      "y": 350,
+      "confidence": "high",
+      "note": "top casting corner at the front-right post"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 1080,
+      "y": 342,
+      "confidence": "high",
+      "note": "top casting corner at the back-right post"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "crank_axle_sprocket_center",
+      "reason": "second sprocket at the crank axle is almost entirely covered by the crank arm itself; its hub/axis point is not resolvable"
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "a second cylinder-gear shaft is visible behind the brass-disc gear but its end face recedes into deep shadow behind the crank-axle housing; no hub/axis point is resolvable"
+    },
+    {
+      "feature": "cone_gear_center",
+      "reason": "the conical gear stack is hidden behind the green triangular support brace and the platen carriage in this and the plain-front view; no cone-shaped stack or end face is visible"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "reason": "far edge of the tip merges with / is occluded by the next arm in the stacked fan at this resolution"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "butt/pivot end of the arm is hidden inside the black platen-carriage housing"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "butt/pivot end of the arm is hidden inside the black platen-carriage housing"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "reason": "hidden behind the crank/chain drive mechanism at the base; no corner vertex visible"
+    }
+  ],
+  "orientation_note": "The platen/paper carriage faces the camera almost directly; the camera is shifted slightly toward the machine's right side, so the crank/chain/pinion assembly (right side of the machine) is visible on the image-right, and a sliver of the right face is visible at the base and top-frame corners on the image-right. FRONT = platen/paper side (per SPEC). Left-side rod pair x-positions (~90 back, ~300 front) and right-side rod pair (~825 front, ~1085 back) were used to disambiguate front vs back at both the base and the top frame."
+}

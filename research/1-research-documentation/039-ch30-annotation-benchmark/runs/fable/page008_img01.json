@@ -1,0 +1,104 @@
+{
+  "image": "page008_img01.png",
+  "view": "right side",
+  "model": "fable",
+  "width": 1789,
+  "height": 4239,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 1400,
+      "y": 2813,
+      "confidence": "high",
+      "note": "brass front hub cap of the pinion sprocket (chain wraps it, runs down to crank; large drive gear edge-on directly behind), seen in profile; dot = axis point on visible hub end"
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "color": "red",
+      "x": 1415,
+      "y": 3112,
+      "confidence": "medium",
+      "note": "sprocket disc itself hidden behind crank-arm boss; dot = crank axle's visible front end-face center, same rotation axis"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 420,
+      "y": 299,
+      "confidence": "high",
+      "note": "outer corner of green top frame casting, image-left (machine back) end"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "color": "cyan",
+      "x": 1330,
+      "y": 299,
+      "confidence": "medium",
+      "note": "outer corner partially shaded by chrome post cap above it"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 404,
+      "y": 3838,
+      "confidence": "high",
+      "note": "bottom corner of green base slab, image-left (machine back) end"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "color": "cyan",
+      "x": 1343,
+      "y": 3833,
+      "confidence": "high",
+      "note": "bottom corner of green base slab, image-right (machine front) end"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cylinder_gear_center_1",
+      "reason": "axis point not visible: cylinder gear set (spaced helical brass gears) seen side-on through A-frame window; axis runs front-back, end faces face front/back and front end is hidden behind green frame post"
+    },
+    {
+      "feature": "cylinder_gear_center_2",
+      "reason": "axis point not visible: second brass roller (long fine-toothed pinion-gear cylinder below the gear row) also side-on; no end face or shaft tip resolvable"
+    },
+    {
+      "feature": "cone_gear_center",
+      "reason": "axis point not visible: cone gear stack axis runs front-back with its base circle facing the machine back; from the right side only occluding rods/gears are seen"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "reason": "rocker arm fan viewed end-on from the right: arms are edge-on thin slats overlapping each other; no single arm's outline corners resolvable"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "reason": "same: fan edge-on, corners unresolvable"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "reason": "same: fan edge-on, arm length axis points along the view direction"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "reason": "same: fan edge-on, corners unresolvable"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "reason": "directly behind top_front_right corner in this pure right-side view"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "reason": "directly behind top_back_right corner"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "reason": "directly behind base_front_right corner"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "reason": "directly behind base_back_right corner"
+    }
+  ],
+  "orientation_note": "Camera views the machine's RIGHT face. The machine FRONT (platen/paper side, with pen arm, drive gear + pinion sprocket, chain and hand crank) is at image RIGHT; machine BACK is at image LEFT. Left/right in corner names are machine-relative (right face toward camera)."
+}

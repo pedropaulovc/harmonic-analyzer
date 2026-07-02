@@ -1,0 +1,126 @@
+{
+  "image": "page005_img01.jpeg",
+  "view": "back-left three-quarter",
+  "model": "opus",
+  "width": 1204,
+  "height": 2854,
+  "points": [
+    {
+      "feature": "pinion_center",
+      "color": "red",
+      "x": 577,
+      "y": 1876,
+      "confidence": "low",
+      "note": "large brass crank drive gear + coaxial chain sprocket at platen level, seen nearly edge-on; axis projects onto the toothed rim band; center estimated"
+    },
+    {
+      "feature": "crank_axle_sprocket_center",
+      "color": "red",
+      "x": 256,
+      "y": 2163,
+      "confidence": "low",
+      "note": "lower chain sprocket at the crank axle (green hub the chain wraps); bonus per spec"
+    },
+    {
+      "feature": "cylinder_gear_center_1",
+      "color": "orange",
+      "x": 600,
+      "y": 2314,
+      "confidence": "medium",
+      "note": "brass cylindrical helical gear; dead center = center of the tilted brass end-face disc; axle/hub partly occluded by the black pillow-block bracket (its silver cap bolt sits just below-left of true center)"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_left",
+      "color": "yellow",
+      "x": 450,
+      "y": 1912,
+      "confidence": "low",
+      "note": "frontmost arm wide/butt end (near pivot); upper-back corner; overlapped by adjacent arms"
+    },
+    {
+      "feature": "rocker_arm_corner_butt_right",
+      "color": "yellow",
+      "x": 462,
+      "y": 1980,
+      "confidence": "low",
+      "note": "frontmost arm wide/butt end; lower-front corner"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_left",
+      "color": "yellow",
+      "x": 800,
+      "y": 1958,
+      "confidence": "medium",
+      "note": "frontmost arm narrow tip end; upper-back corner"
+    },
+    {
+      "feature": "rocker_arm_corner_tip_right",
+      "color": "yellow",
+      "x": 804,
+      "y": 1988,
+      "confidence": "medium",
+      "note": "frontmost arm narrow tip end; lower-front corner"
+    },
+    {
+      "feature": "analyzer_corner_base_back_left",
+      "color": "cyan",
+      "x": 300,
+      "y": 2602,
+      "confidence": "high",
+      "note": "nearest bottom corner"
+    },
+    {
+      "feature": "analyzer_corner_base_back_right",
+      "color": "cyan",
+      "x": 1128,
+      "y": 2482,
+      "confidence": "high",
+      "note": "rounded far back-right corner of the green slab (rightmost green)"
+    },
+    {
+      "feature": "analyzer_corner_base_front_left",
+      "color": "cyan",
+      "x": 72,
+      "y": 2463,
+      "confidence": "medium",
+      "note": "far end of visible left face"
+    },
+    {
+      "feature": "analyzer_corner_top_front_left",
+      "color": "cyan",
+      "x": 103,
+      "y": 284,
+      "confidence": "medium"
+    },
+    {
+      "feature": "analyzer_corner_top_back_left",
+      "color": "cyan",
+      "x": 330,
+      "y": 298,
+      "confidence": "medium"
+    },
+    {
+      "feature": "analyzer_corner_top_back_right",
+      "color": "cyan",
+      "x": 1147,
+      "y": 283,
+      "confidence": "medium",
+      "note": "top-right outer corner of the green back-right frame post (silver-capped)"
+    }
+  ],
+  "occluded": [
+    {
+      "feature": "cone_gear_center",
+      "reason": "cone base circle end-face/hub occluded by front silver support post and green bearing pillar; only the tapered side of the cone is visible"
+    },
+    {
+      "feature": "analyzer_corner_base_front_right",
+      "reason": "far diagonal corner, occluded by the base slab body"
+    },
+    {
+      "feature": "analyzer_corner_top_front_right",
+      "reason": "far corner, occluded by the central summing/pinion mechanism and the near frame rail"
+    }
+  ],
+  "orientation_note": "Assumed back-left three-quarter (per view hint, verified against pixels): camera behind-and-left of the machine, so the BACK face and machine-LEFT face are seen. FRONT = platen/paper side, which recedes away (up-right) and is occluded, supported by the diagonal green buttress strut. The nearest/lowest base corner is BACK-LEFT; image-right along the back edge = machine-right; the foreshortened side face on the image-left is the machine LEFT side (front-left corner at far image-left). Front-right corners of both slab and top frame are the far diagonal corners and are occluded."
+}
