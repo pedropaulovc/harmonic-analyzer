@@ -89,6 +89,7 @@ from _buildgraph import (  # noqa: E402
     all_config_files,
     artefact_for,
     config_files_of,
+    data_deps_of,
     machine_family_files,
     module_deps_of,
     part_row_files,
@@ -657,7 +658,8 @@ def _assembly_cache_outputs(stem: str) -> list[Path]:
 
 def _part_file_deps(script: Path, stem: str) -> list[str]:
     return [str(script.resolve()), *_helper_deps(script),
-            *_config_deps(script, stem, "part"), _submodule_dep()]
+            *_config_deps(script, stem, "part"), *data_deps_of(script),
+            _submodule_dep()]
 
 
 def _assembly_file_deps(stem: str) -> list[str]:
@@ -1111,8 +1113,12 @@ def task_check():
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_buildgraph.py")],
         },
         "nameplate": {
-            "file_dep": [str((SCRIPTS_DIR / "_nameplate_geometry.py").resolve()),
-                         str((SCRIPTS_DIR / "test_nameplate_geometry.py").resolve())],
+            # Guards the vendored engraving DXF the nameplate build imports; the
+            # DXF is now the source of truth (the re-traced coordinate loops are
+            # retired), so the gate depends on the file + its integrity test.
+            "file_dep": [str((SCRIPTS_DIR / "test_nameplate_geometry.py").resolve()),
+                         str((REPO_ROOT / "cad" / "references"
+                              / "nameplate-engraving.dxf").resolve())],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_nameplate_geometry.py")],
         },
         "recipe": {
