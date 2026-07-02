@@ -291,6 +291,16 @@ scripts that `from _common import log, check` are instrumented unchanged.
   OTel log record at the matching `SeverityNumber`. `_common.log`/`check` are thin
   aliases (`log`→`debug`, a passing `check`→`success`). New code must not add bare
   `print()` for status — reserve `print` for machine-readable stdout a caller pipes.
+- **Log vs event — a moment IN a span is a span event.** A fact that belongs to a
+  span's timeline (a cache hit/miss, a mate flip-recovery, a park driver
+  re-engagement) is recorded with `_telemetry.event("name", **attrs)` — an OTel
+  **span event** on the current span — not (only) a standalone log record. It shows
+  *when within the span* it happened and carries structured attrs, and is a no-op
+  when no span is recording (so a caller never guards). Keep a `warn`/`error` LOG
+  for anything a human scanning the console must see (a cache miss is BOTH: a `warn`
+  log so it stands out, and a `cache.miss` event so the trace shows it right before
+  the build it triggered). Use a plain log for narration that isn't tied to one
+  span's lifetime.
 - **Spans, no gaps.** Wrap work in `with _telemetry.span("name", **attrs):` — it
   sets status OK on clean exit and, on an exception, records it + sets ERROR before
   re-raising, so a failure is never a silent hole. The build is a TREE of operation
@@ -312,15 +322,51 @@ scripts that `from _common import log, check` are instrumented unchanged.
   trace with hundreds of near-instant "OK" leaves (335 + 343 in one soundness
   pass) that drown the signal. Do NOT span per item: keep ONE span around the loop
   and record the aggregate (counts) as attributes; per-item lines stay `debug`
-  logs, and offenders are named in the raised error the gate span records.
-- **One span per build, no duplicate layer.** `dodo._run` opens a span NAMED for
-  the doit task (`part:cone_gear`, `verify:soundness`). `run_build` uses
-  `_telemetry.build_session`, which *continues* that span when the spine injected a
-  parent context (operation spans attach straight to the task span — no second
-  `build.<target>` layer) and opens a local `build.<target>` root only
-  when a build script is run standalone. So a build is one tree, never two
-  stacked roots for the same part.
-- **Cross-process trace continuity.** `dodo._run` injects W3C trace context
+  logs, and offenders are named in the raised error the gate span records. Applied
+  to the free-DOF gate: `gate.dof_expected_free` cycles every `PARK_*` driver
+  (suppress → re-engage → re-suppress, a COM round-trip each — ~60 for `channel`)
+  plus three `ForceRebuild3`s, so it splits into `park.discover` / `park.necessity`
+  / `park.engage` / `park.restore` child spans, otherwise it is one multi-minute
+  black box.
+- **Descriptive span names, not generic ones.** A waterfall of 40 identical
+  `mate distance` rows is unreadable. The single mate chokepoint (`_assembly._mate`)
+  names its span for the caller's descriptive `label` (`mate top@crank_pin <-> …`),
+  keeping the mate `kind` as an attribute. Prefer a name that says WHICH thing over
+  one that says only the operation TYPE.
+- **The build body is one `<kind>.build` phase span.** `dodo._exec` opens a span
+  NAMED for the doit task (`task part:cone_gear`, `task assembly:drive_train`) — the
+  build subprocess CONTINUES it via the injected `TRACEPARENT`. Inside the
+  subprocess `run_build` opens ONE inner `part.build` / `assembly.build` phase span
+  around the `build()` body (a sibling of `sw.connect` / `sw.disconnect`), so the
+  ~40 mates + gates read as children of `assembly.build drive-train` instead of a
+  flat run under the task span. This is a PHASE, not the removed `build.<target>`
+  ROOT layer that mirrored the task span 1:1 — connect/teardown stay OUTSIDE it.
+  `build_session` still *continues* the task span under the spine (no second root)
+  and opens a local `build.<target>` root only when a build script runs standalone.
+  Non-build entries (`verify.py`, `export_models.py`, the `diagnostics/` probes) get
+  no phase wrapper (`kind is None`) — their gates already self-group.
+- **Resource = pipeline stage.** The OTel resource `service.name` (the Aspire
+  "resource" column) is set PER PROCESS to its stage — `part-build` /
+  `assembly-build` / `verify-<suite>` / `check-<gate>` / `export` / `release` —
+  under the shared `service.namespace = harmonic-analyzer`, so a trace groups by
+  subsystem instead of every span reading one umbrella name. `dodo._exec` injects
+  `OTEL_SERVICE_NAME` (the standard OTel var, from `_stage_name`) into each
+  subprocess env, so the child is labelled the moment it imports `_telemetry`; a
+  standalone script self-labels via `_telemetry.set_service(...)` (fallback-only —
+  it never clobbers an inherited label; `force=True` overrides; it rebuilds the
+  providers, resetting OTel's one-shot provider guard, since the resource is fixed
+  at provider creation). Add a new stage to `_stage_name` when a new task family
+  appears.
+- **Cache decisions live on the task trace.** The remote-cache restore/store run
+  INSIDE the `task part:`/`assembly:` span `dodo` opens (the cached actions open it
+  themselves, not `_run`), so a HIT/MISS/STORE is a `cache.*` **span event** + a
+  `cache` span attribute — a miss (and the build it triggered) is backtraceable from
+  ONE trace, and a HIT still shows a fast task span instead of the task vanishing. A
+  miss/drift/soft-error is a `warn` (`!!`), not routine `info` — it is the signal for
+  "why did this rebuild?". (`_artifact_cache.py`; still also appended to
+  `cache.jsonl`.)
+- **Cross-process trace continuity.** `dodo._exec` (the span-less core `_run` and
+  the cached part/assembly actions both call) injects W3C trace context
   (`TRACEPARENT`) into each subprocess env via `_telemetry.inject_env`; the build
   script's `build_session` extracts it, so the doit task and the process it
   spawns are **one** end-to-end trace. Preserve `env=_telemetry.inject_env()` on any

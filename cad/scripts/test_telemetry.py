@@ -223,5 +223,50 @@ def test_cross_process_trace_propagation(tmp_path):
     assert out.stdout.strip() == parent_trace
 
 
+def test_event_records_span_event_on_current_span(capture):
+    """``event()`` attaches a point-in-time event (with attrs) to the active span --
+    the idiomatic home for a cache hit/miss or a mate flip, vs a standalone log."""
+    spans, _ = capture
+    with _telemetry.span("op"):
+        _telemetry.event("cache.miss", label="part:cone_gear", key="deadbeef")
+    (sp,) = [s for s in spans.get_finished_spans() if s.name == "op"]
+    hit = [e for e in sp.events if e.name == "cache.miss"]
+    assert hit and hit[0].attributes["label"] == "part:cone_gear"
+    assert hit[0].attributes["key"] == "deadbeef"
+
+
+def test_event_without_active_span_is_noop():
+    """A bare ``event()`` with no span in scope must be a silent no-op, so callers
+    never have to guard (telemetry must never break the caller)."""
+    _telemetry.event("orphan", foo="bar")  # must not raise
+
+
+def test_set_service_relabels_resource_fallback_only():
+    """``set_service`` swaps this process's resource ``service.name`` (the Aspire
+    "resource" column) -- fallback-only by default (won't clobber a non-default
+    label), overridable with force -- and stamps the shared namespace."""
+    original = _telemetry._service_name
+    try:
+        # default -> stage: fallback takes effect and the LIVE resource swaps.
+        _telemetry.set_service("assembly-build")
+        exp = InMemorySpanExporter()
+        cast(SdkTracerProvider, _telemetry.trace.get_tracer_provider()).add_span_processor(
+            SimpleSpanProcessor(exp)
+        )
+        with _telemetry.span("op"):
+            pass
+        (sp,) = [s for s in exp.get_finished_spans() if s.name == "op"]
+        assert sp.resource.attributes["service.name"] == "assembly-build"
+        assert sp.resource.attributes["service.namespace"] == _telemetry._SERVICE_NAMESPACE
+        # fallback-only: a non-forced call does NOT override an already-set label.
+        _telemetry.set_service("part-build")
+        assert _telemetry._service_name == "assembly-build"
+        # force overrides regardless.
+        _telemetry.set_service("verify-kinematics", force=True)
+        assert _telemetry._service_name == "verify-kinematics"
+    finally:
+        _telemetry.set_service(original, force=True)
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))

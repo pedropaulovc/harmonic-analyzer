@@ -292,9 +292,36 @@ def _sldasm(stem: str) -> str:
     return str(artefact_for(SCRIPTS_DIR / f"build_{stem}_assembly.py").resolve())
 
 
-def _run(cmd: list[str], label: str, log_stem: str | None = None) -> None:
-    """Run a build/refresh subprocess from the repo root; raise on non-zero so
-    doit marks the task failed and stops (fail-loud -- no stale artefact).
+def _stage_name(label: str) -> str:
+    """The telemetry ``service.name`` (Aspire "resource" column) a subprocess with
+    this doit task ``label`` should advertise, so a trace groups by PIPELINE STAGE
+    -- part-build / assembly-build / verify-<suite> / check-<gate> / export / release
+    -- instead of every process reading the same umbrella name. Injected into the
+    child env as ``OTEL_SERVICE_NAME`` (the standard OTel var) by :func:`_exec`, so
+    the child is labelled the moment it imports ``_telemetry``."""
+    if label.startswith("part:"):
+        return "part-build"
+    if label.startswith(("assembly:", "FULL build", "REFRESH", "hook ")):
+        return "assembly-build"
+    if label.startswith("verify "):
+        return "verify-" + label.split(None, 2)[1]
+    if label.startswith("check "):
+        return "check-" + label.split(None, 2)[1]
+    if label.startswith("cut release") or label == "release":
+        return "release"
+    if label.startswith("export"):
+        return "export"
+    return "harmonic-analyzer"
+
+
+def _exec(cmd: list[str], label: str, log_stem: str | None = None) -> None:
+    """Run a subprocess from the repo root; raise on non-zero (fail-loud). The
+    subprocess CONTINUES the active span via the injected ``TRACEPARENT`` and is
+    labelled with its pipeline stage via ``OTEL_SERVICE_NAME`` (:func:`_stage_name`).
+
+    This is the span-less core of :func:`_run`. The cached part/assembly actions open
+    their OWN ``task`` span (so the cache decision + build share one trace) and call
+    ``_exec`` directly; every other task goes through ``_run``.
 
     With ``log_stem`` the subprocess output is teed to ``cad/out/logs/<stem>.log``
     AND echoed live to the console, so a release can ship the part/assembly/gate
@@ -302,33 +329,39 @@ def _run(cmd: list[str], label: str, log_stem: str | None = None) -> None:
     it, output is inherited straight to the terminal -- the cheap path for the
     non-release happy path. Decode the pipe as UTF-8 (errors=replace) so the gate
     labels' non-ASCII glyphs survive on a cp1252 Windows console."""
-    # One span per task action, NAMED for the doit task (``task part:cone_gear``)
-    # so the trace reads as the task itself; the build subprocess CONTINUES this
-    # span (via the injected TRACEPARENT) instead of adding a duplicate
-    # ``build.<target>`` layer under it.
-    with _telemetry.span(f"task {label}", label=label, cmd=" ".join(cmd)):
-        _telemetry.info(f">> {label}: {' '.join(cmd)}")
-        env = _telemetry.inject_env()
-        if log_stem is None:
-            rc = subprocess.run(cmd, cwd=str(REPO_ROOT), env=env).returncode
-        else:
-            LOGS.mkdir(parents=True, exist_ok=True)
-            with (LOGS / f"{log_stem}.log").open("w", encoding="utf-8") as fh:
-                fh.write(f">>  {label}: {' '.join(cmd)}\n")
+    _telemetry.info(f">> {label}: {' '.join(cmd)}")
+    env = _telemetry.inject_env()
+    env["OTEL_SERVICE_NAME"] = _stage_name(label)
+    if log_stem is None:
+        rc = subprocess.run(cmd, cwd=str(REPO_ROOT), env=env).returncode
+    else:
+        LOGS.mkdir(parents=True, exist_ok=True)
+        with (LOGS / f"{log_stem}.log").open("w", encoding="utf-8") as fh:
+            fh.write(f">>  {label}: {' '.join(cmd)}\n")
+            fh.flush()
+            proc = subprocess.Popen(
+                cmd, cwd=str(REPO_ROOT), env=env, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+                errors="replace", bufsize=1)
+            assert proc.stdout is not None
+            for line in proc.stdout:
+                sys.stdout.write(line)
+                sys.stdout.flush()
+                fh.write(line)
                 fh.flush()
-                proc = subprocess.Popen(
-                    cmd, cwd=str(REPO_ROOT), env=env, stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT, text=True, encoding="utf-8",
-                    errors="replace", bufsize=1)
-                assert proc.stdout is not None
-                for line in proc.stdout:
-                    sys.stdout.write(line)
-                    sys.stdout.flush()
-                    fh.write(line)
-                    fh.flush()
-                rc = proc.wait()
-        if rc:
-            raise RuntimeError(f"{label} failed (exit {rc})")
+            rc = proc.wait()
+    if rc:
+        raise RuntimeError(f"{label} failed (exit {rc})")
+
+
+def _run(cmd: list[str], label: str, log_stem: str | None = None) -> None:
+    """Open a ``task <label>`` span and run the subprocess inside it (see
+    :func:`_exec`). One span per task action, NAMED for the doit task
+    (``task part:cone_gear``) so the trace reads as the task itself; the build
+    subprocess CONTINUES this span (via the injected TRACEPARENT) instead of adding a
+    duplicate root layer under it."""
+    with _telemetry.span(f"task {label}", label=label, cmd=" ".join(cmd)):
+        _exec(cmd, label, log_stem)
 
 
 # --- Per-script helper dependencies, computed from each build script's REAL
@@ -553,13 +586,24 @@ def _cache_key(file_deps: list[str], label: str | None = None) -> str:
 def _cached_part_action(stem: str, script: Path) -> None:
     """Part action with a remote-cache shortcut: on a HIT the .SLDPRT (+ renders)
     are downloaded and the SolidWorks build is skipped; otherwise build, then push.
-    Falls through to a normal build whenever the cache is off or errors."""
-    key = _cache_key(_part_file_deps(script, stem), f"part:{stem}")
-    outputs = _part_cache_outputs(stem)
-    if _cache.restore(key, outputs, f"part:{stem}"):
-        return
-    _run([sys.executable, str(script)], f"part:{stem}", log_stem=f"part-{stem}")
-    _cache.store(key, outputs, f"part:{stem}")
+    Falls through to a normal build whenever the cache is off or errors.
+
+    Opens the ``task part:<stem>`` span HERE (rather than in _run) so the cache
+    decision and the build it gates share ONE trace: the restore/store record
+    ``cache.hit``/``cache.miss``/``cache.store`` events on this span and a ``cache``
+    attribute, so a miss (and why the build ran) is backtraceable from the trace,
+    not just the console -- and a HIT still shows a (fast) task span instead of the
+    task vanishing from the trace entirely."""
+    label = f"part:{stem}"
+    with _telemetry.span(f"task {label}", label=label) as sp:
+        key = _cache_key(_part_file_deps(script, stem), label)
+        outputs = _part_cache_outputs(stem)
+        if _cache.restore(key, outputs, label):
+            sp.set_attribute("cache", "hit")
+            return
+        sp.set_attribute("cache", "miss")
+        _exec([sys.executable, str(script)], label, log_stem=f"part-{stem}")
+        _cache.store(key, outputs, label)
 
 
 def _recipe_files(stem: str) -> list[str]:
@@ -747,49 +791,59 @@ def build_or_refresh(stem, dependencies, changed, targets):
     ``changed`` arg is likewise avoided -- it is corrupted by a prior failed
     task (D2).
     """
-    sidecar = _recipe_sidecar(stem)
-    digest = _digest_files(_recipe_files(stem))
+    label = f"assembly:{stem}"
+    # Open the task span HERE (not in _run) so the cache decision + the FULL/REFRESH
+    # build + any hooks share ONE trace rooted at this task: the cache events, the
+    # FULL-vs-REFRESH ``mode`` attribute, and every subprocess span nest under it, so
+    # a cache miss and the work it triggered are backtraceable from one trace.
+    with _telemetry.span(f"task {label}", label=label) as sp:
+        sidecar = _recipe_sidecar(stem)
+        digest = _digest_files(_recipe_files(stem))
 
-    # Remote-cache shortcut: a HIT downloads the .SLDASM (+ renders), skipping the
-    # COM build/refresh entirely. The recipe sidecar is NOT cached -- its digest
-    # tags by absolute path (machine-local) -- so recompute it here, exactly as the
-    # success tail does, to keep the next run's FULL/REFRESH decision correct.
-    cache_key = _cache_key(_assembly_file_deps(stem), f"assembly:{stem}")
-    cache_outputs = _assembly_cache_outputs(stem)
-    if _cache.restore(cache_key, cache_outputs, f"assembly:{stem}"):
+        # Remote-cache shortcut: a HIT downloads the .SLDASM (+ renders), skipping the
+        # COM build/refresh entirely. The recipe sidecar is NOT cached -- its digest
+        # tags by absolute path (machine-local) -- so recompute it here, exactly as the
+        # success tail does, to keep the next run's FULL/REFRESH decision correct.
+        cache_key = _cache_key(_assembly_file_deps(stem), label)
+        cache_outputs = _assembly_cache_outputs(stem)
+        if _cache.restore(cache_key, cache_outputs, label):
+            sp.set_attribute("cache", "hit")
+            sidecar.parent.mkdir(parents=True, exist_ok=True)
+            sidecar.write_text(digest + "\n", encoding="utf-8")
+            return
+        sp.set_attribute("cache", "miss")
+
+        target_missing = not Path(targets[0]).exists()
+        try:
+            last = sidecar.read_text(encoding="utf-8").strip()
+        except OSError:
+            last = None
+        recipe_changed = (last is None or last != digest)  # missing sidecar = FULL
+
+        asm_script = SCRIPTS_DIR / f"build_{stem}_assembly.py"
+        hooks = [SCRIPTS_DIR / h for h in POST_ASSEMBLY.get(stem, ())]
+        if target_missing or recipe_changed:
+            why = "target missing" if target_missing else "recipe changed"
+            sp.set_attribute("mode", "full")
+            _exec([sys.executable, str(asm_script)], f"FULL build {stem} ({why})",
+                  log_stem=f"assembly-{stem}")
+            for hook in hooks:
+                _exec([sys.executable, str(hook)], f"hook {hook.name}",
+                      log_stem=f"hook-{stem}-{hook.stem}")
+        else:
+            sp.set_attribute("mode", "refresh")
+            _exec([sys.executable, str(SCRIPTS_DIR / "refresh_assembly.py"), stem],
+                  f"REFRESH {stem}", log_stem=f"assembly-{stem}")
+        # _exec raised if the build failed, so we only get here on success: record this
+        # build's recipe digest for the next run's FULL/REFRESH decision.
         sidecar.parent.mkdir(parents=True, exist_ok=True)
         sidecar.write_text(digest + "\n", encoding="utf-8")
-        return
-
-    target_missing = not Path(targets[0]).exists()
-    try:
-        last = sidecar.read_text(encoding="utf-8").strip()
-    except OSError:
-        last = None
-    recipe_changed = (last is None or last != digest)  # missing sidecar = FULL
-
-    asm_script = SCRIPTS_DIR / f"build_{stem}_assembly.py"
-    hooks = [SCRIPTS_DIR / h for h in POST_ASSEMBLY.get(stem, ())]
-    if target_missing or recipe_changed:
-        why = "target missing" if target_missing else "recipe changed"
-        _run([sys.executable, str(asm_script)], f"FULL build {stem} ({why})",
-             log_stem=f"assembly-{stem}")
-        for hook in hooks:
-            _run([sys.executable, str(hook)], f"hook {hook.name}",
-                 log_stem=f"hook-{stem}-{hook.stem}")
-    else:
-        _run([sys.executable, str(SCRIPTS_DIR / "refresh_assembly.py"), stem],
-             f"REFRESH {stem}", log_stem=f"assembly-{stem}")
-    # _run raised if the build failed, so we only get here on success: record this
-    # build's recipe digest for the next run's FULL/REFRESH decision.
-    sidecar.parent.mkdir(parents=True, exist_ok=True)
-    sidecar.write_text(digest + "\n", encoding="utf-8")
-    # Publish the fresh artefacts for other machines (no-op unless mode=rw).
-    # RECOMPUTE the output set here, not reuse the one from the top: the channel
-    # stretch parts and the top-level gallery PNGs are glob-discovered and DID NOT
-    # EXIST yet on a clean builder when cache_outputs was first computed, so the
-    # early list would publish an incomplete archive (codex review). They exist now.
-    _cache.store(cache_key, _assembly_cache_outputs(stem), f"assembly:{stem}")
+        # Publish the fresh artefacts for other machines (no-op unless mode=rw).
+        # RECOMPUTE the output set here, not reuse the one from the top: the channel
+        # stretch parts and the top-level gallery PNGs are glob-discovered and DID NOT
+        # EXIST yet on a clean builder when cache_outputs was first computed, so the
+        # early list would publish an incomplete archive (codex review). They exist now.
+        _cache.store(cache_key, _assembly_cache_outputs(stem), label)
 
 
 def _close_sw_documents() -> None:
