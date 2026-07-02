@@ -228,10 +228,14 @@ def data_deps_of(script: Path) -> list[str]:
     ``adapter.import_dxf_dwg``) has no import edge to it, so an edit to the DXF
     would otherwise not rebuild the part. This scans the script's transitive
     module closure source for quoted ``*.dxf``/``*.dwg`` literals and resolves
-    each basename under ``cad/references``. It is CONSERVATIVE by construction --
-    it only lists files that actually exist there (an unresolved name is skipped,
-    never guessed) and, like the config read-set, can over- but never
-    under-invalidate.
+    each basename under ``cad/references``.
+
+    A named artefact is listed **whether or not it currently exists on disk**: a
+    referenced input that is accidentally deleted or renamed after a build is a
+    MISSING runtime dependency, and keeping it in ``file_dep`` makes doit/the
+    build fail loud on it rather than silently report the stale ``.SLDPRT`` up to
+    date. It is CONSERVATIVE (can over- but never under-invalidate): only files
+    named by a literal in the script's own import closure are ever listed.
     """
     sources = [script.resolve(), *(Path(p) for p in module_deps_of(script))]
     found: set[str] = set()
@@ -242,8 +246,7 @@ def data_deps_of(script: Path) -> list[str]:
             continue
         for literal in _DATA_LITERAL_RE.findall(text):
             candidate = REFERENCES_DIR / Path(literal).name
-            if candidate.is_file():
-                found.add(str(candidate.resolve()))
+            found.add(str(candidate.resolve()))
     return sorted(found)
 
 
