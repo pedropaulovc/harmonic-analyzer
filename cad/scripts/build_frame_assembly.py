@@ -39,7 +39,7 @@ depth):
   bar (z +74.1) and stays inside the wall's north edge (88.9) -- no cantilever.
   Seat Y = base-top 50.8 + 88.9 (half-height) = 139.7. The pivot x = 72.9, the
   rocker seesaw's mid-span (ch30 GT arm-end triangulation midpoint +72.5; the
-  rod-pin hole 127.49 out reaches the cam drum at -54.7, rods plumb; the old
+  rod-pin hole 127.37 out reaches the cam drum at -54.7, rods plumb; the old
   "arbor 47.5 + 25.4 rod lever" chain died with the ch30 re-anchor).
   Constrained (not grounded) by three orthogonal plane-plane mates against the
   base's principal planes, like the columns/top-frame.

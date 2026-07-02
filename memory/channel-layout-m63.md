@@ -39,7 +39,9 @@ layout" tables):
   lever-free (M6.4 clearance checks relied on this).
 - **Top frame** (new part): green ring clamping the 4 columns at
   y ≈ 1000–1040.7; columns continue above it.
-- **Default state (exact solve, build_channel_assembly.solve_default_state)**:
+- **Default state (exact solve, build_channel_assembly.solve_default_state)**
+  *(SUPERSEDED 2026-07-02 by [[ch14-rom-rederive]]: ecc 8.64 lobe-UP, arms rest
+  LEVEL, rod pin low at +127.37 — the numbers below are the M6.3-era record)*:
   drive-train locks cylinder gears at Rz(+1.5°) (half T120 tooth pitch —
   tooth faces the cone mesh), so the cam centres sit at (−47.367, 121.721)
   = arbor + 5.08·(sin1.5°, −cos1.5°) — M6.5: assuming the unrotated centre

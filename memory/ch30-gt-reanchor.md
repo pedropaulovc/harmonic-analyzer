@@ -65,7 +65,10 @@ preserved bit-exact, downstream chain untouched).
   instruction). Latent at HEAD since the taper commit; masked because no
   from-scratch top rebuild ran since (same gate-rot as the YAML apostrophe).
 
-- **Vertical rods (same-day follow-up, second PR):** the ch30 photos show every
+- **Vertical rods (same-day follow-up, second PR):** *(numbers below superseded
+  same day by the ch14 ROM re-derive — ROD_HOLE_X 127.37, ROD_C2C 147.67, level
+  rest pose, ecc 8.64 lobe-up; the plumb topology stands. See
+  [[ch14-rom-rederive]].)* the ch30 photos show every
   connecting rod hanging PLUMB from the rocker arm's rod-side tip onto its cam;
   the GT rocker-corner triangulation (solved cameras from
   `triangulate_ch30_gt.py`, ray-intersected `rocker_arm_corner_*` clusters) lands
