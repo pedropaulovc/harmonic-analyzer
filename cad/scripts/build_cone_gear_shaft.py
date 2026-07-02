@@ -12,11 +12,14 @@ shows solder blobs at the small gears) -- no keyseat, the shaft steps are
 plain; the four yellow tip gears (T006..T024) are a harder high-zinc
 yellow metal soldered on.
 
-Sections, large (pivot) end at z = 0. M6.7 (true-cone mesh, see the
-assembly docstring): gear seats at the exact-tracking stack pitch
-6.8889 mm (= drum z-pitch 7.0565 x cos 12.52 deg), seat centres at
-28.25 + 6.8889 j, gear faces 6.5 -- each step lands in the ~0.39 mm air
-gap between adjacent gear faces:
+Sections, FRONT STUB end at z = 0 (ch30 GT: the big end runs 35.8 past
+the old pivot-end origin, through the swing post journal, ending in the
+boss the photos show at machine z -123 -- see FRONT_STUB). M6.7
+(true-cone mesh, see the assembly docstring): gear seats at the
+exact-tracking stack pitch 6.8889 mm (= drum z-pitch 7.0565 x
+cos 12.52 deg), seat centres at FRONT_STUB + 28.25 + 6.8889 j, gear
+faces 6.5 -- each step lands in the ~0.39 mm air gap between adjacent
+gear faces (stations below quoted from the legacy pivot end):
 
 * 3/8 in x 141.9 -- pivot journal 25 (64T at stations 14.9..24.9) +
   seats T120..T024
@@ -77,21 +80,30 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 PIVOT_JOURNAL = 25.0  # mm, large-end journal into the pivot block (low)
 
-# (diameter in inches, section end station in mm from the pivot end).
-# M6.7 exact-tracking seat pitch 6.8889 (= 7.0565 drum z-pitch x
-# cos 12.5188 deg, the shallower incline at DP 49.82): seat j spans
-# 28.25 + 6.8889 j +- 3.25; each step station sits in the ~0.39 air gap
-# between faces (T024 north 141.72 | 141.9 | T018 south 142.11, and so
-# on). Diameters mirror build_cone_gear.bore_dia_in (snug perpendicular
-# seats), stepping much finer than the old DP 30 shaft because the tip
-# gears shrank: T006 OD is now 4.08 mm. WARNING the 1/32" (0.79 mm) tip
-# journal is mechanically marginal -- it follows from the 62.2 OD anchor
-# (ch13, low confidence) and is flagged for Phase 3 rebuild validation.
+FRONT_STUB = 35.8  # ch30 GT (2026-07-02): the 3/8" big end runs ON past the old
+# pivot-end origin, through the swing post's journal bore, ending in the boss
+# the photos show proud between the post and the crank-pedestal slab (GT
+# cone_front world (-127, 101, -123); the stub end lands at machine z -123.0).
+# The part origin is now this FRONT END; the old pivot-end stations below are
+# all shifted by FRONT_STUB, and the assembly places the shaft at
+# cone_station(-35.8) (build_drive_train_assembly SHAFT_FRONT_STATION).
+
+# (diameter in inches, section end station in mm from the FRONT STUB end;
+# comments quote the legacy pivot-end stations). M6.7 exact-tracking seat
+# pitch 6.8889 (= 7.0565 drum z-pitch x cos 12.5188 deg, the shallower
+# incline at DP 49.82): seat j spans 28.25 + 6.8889 j +- 3.25 from the pivot
+# end; each step station sits in the ~0.39 air gap between faces (T024 north
+# 141.72 | 141.9 | T018 south 142.11, and so on). Diameters mirror
+# build_cone_gear.bore_dia_in (snug perpendicular seats), stepping much finer
+# than the old DP 30 shaft because the tip gears shrank: T006 OD is now
+# 4.08 mm. WARNING the 1/32" (0.79 mm) tip journal is mechanically marginal --
+# it follows from the 62.2 OD anchor (ch13, low confidence) and is flagged
+# for Phase 3 rebuild validation.
 SECTIONS = [
-    (0.375, 141.9),  # pivot journal + 64T seat + T120..T024
-    (0.25, 148.8),  # T018 seat
-    (0.125, 155.7),  # T012 seat
-    (0.03125, 190.0),  # T006 seat + thin-tip journal (knob post at 177)
+    (0.375, FRONT_STUB + 141.9),  # front stub + pivot journal + 64T + T120..T024
+    (0.25, FRONT_STUB + 148.8),  # T018 seat
+    (0.125, FRONT_STUB + 155.7),  # T012 seat
+    (0.03125, FRONT_STUB + 190.0),  # T006 seat + thin-tip journal
 ]
 
 

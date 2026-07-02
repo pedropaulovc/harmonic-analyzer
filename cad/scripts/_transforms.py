@@ -214,6 +214,16 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     # rocker-arm-support (the unified support casting) is authored machine-handed
     # and lives in the non-mirroring frame.SLDASM -> NO mirror entry (it replaced
     # the old split rocker-arm-support + a-frame "x0" pair, 2026-06-19).
+    # ch25 alignment-pinion set (restored 2026-07-02): every part exactly
+    # symmetric about its local x = 0 plane (gear/rod axes, strap/block
+    # mid-planes); explicit c, no STLs yet at first build
+    "alignment-pinion": ("x", 0.0),
+    "pinion-bracket": ("x", 0.0),
+    "pinion-pivot-block": ("x", 0.0),
+    "pinion-pivot-shaft": ("x", 0.0),
+    "pinion-lever": ("x", 0.0),
+    "pinion-lift-rod": ("x", 0.0),
+    "pinion-handle": ("x", 0.0),
     # M6.10 fasteners: authored in final orientation (axis along Y or Z),
     # exactly symmetric about local x = 0; explicit c, no STL at first build
     "hex-bolt": ("x", 0.0),

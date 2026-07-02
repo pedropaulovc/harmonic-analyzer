@@ -1,0 +1,5 @@
+pinion-lever:
+  number: MHA-059
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  process: "machined (steel)"

@@ -1,0 +1,5 @@
+pinion-pivot-block:
+  number: MHA-061
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  process: "machined (steel)"

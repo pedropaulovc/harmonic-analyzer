@@ -9,7 +9,14 @@ metadata:
 `drive-train-unlock`; extended to channel 2026-06).** The default build now saves a
 WORKING kinematic model: the predetermined operational DOF are left FREE.
 - **drive-train** frees the **crank spin** (1 DOF — drag the crank, the whole geared
-  train turns). Cone-post swing stays park-driven.
+  train turns). Cone-post swing stays park-driven. The alignment-pinion swing
+  (`PARK_pinion_swing`, restored 2026-07-02 with the ch30 GT re-anchor) is likewise a
+  park-driven SETUP DOF: the angle driver pins the FRONT strap (`pinion-bracket`
+  family — the drum itself is tied to the strap by two-real mates), stays ENGAGED in
+  `free` builds, and the free-DOF closure count stays 1 (crank only). p2 probe/motion
+  stages target family `pinion-bracket`, `only_type=ANGLE` (the straps also carry
+  single-real axial DISTANCE locators that must NOT be suppressed — the p1 cone-post
+  pattern).
 - **channel** frees, per active channel, **3 DOF** — rocker swing + connecting-rod
   follow + amplitude-bar slide — so a 20-channel build saves 60 free DOF. Validated
   full-scale 2026-06: `park_drivers=60 expected_free_dof=60 free_dof=60`, interference
