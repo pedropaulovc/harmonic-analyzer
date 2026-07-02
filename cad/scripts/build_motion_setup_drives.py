@@ -230,8 +230,16 @@ async def _drive_p0(adapter: Any) -> dict[str, str]:
     bar, bar_name = _find_one(adapter, "amplitude-bar")
     if bar is None:
         raise RuntimeError("p0: amplitude-bar not found")
-    await _suppress(adapter, _part_driver_names(adapter, "channel", bar_name),
-                    f"p0 amplitude park ({bar_name})")
+    # In a default-`free` build the amplitude park driver is DEFERRED (recorded, not
+    # authored -- see AGENTS.md "Default-free DOF"), so the bar's amplitude slide is
+    # ALREADY free: there is nothing to suppress. Suppress only if the driver exists
+    # (a `locked` build, where it is authored + engaged).
+    driver_names = _part_driver_names(adapter, "channel", bar_name)
+    if driver_names:
+        await _suppress(adapter, driver_names, f"p0 amplitude park ({bar_name})")
+    else:
+        log(f"  p0: {bar_name} amplitude DOF already free "
+            "(deferred park driver -- not authored in the free build)")
     motor_axis = _entity_ref(bar_name, "Axis1", "AXIS")
     return await _run_swing_study(
         adapter, motor_axis, bar_name,
