@@ -24,12 +24,13 @@ Mid-pivot SEESAW, symmetric about the pivot. The 11.5" top span was measured
 manually from the ch.30 back view (supersedes the p.29 broadside photo-scaled
 4.5"/9" read and the indirect M6.3 "80 mm bar travel + 8 mm margin" = 88); the
 10.5" bottom arc + 0.22" perpendicular tip face come from the same ch.30 sketch.
-The connecting rod pins at +127.49 on the +X side, just inboard of the rod-side
-tip -- directly above the cam drum, so the rod hangs PLUMB (ch30 photos + GT
-rocker-corner triangulation; supersedes M6.3's "1 inch from the pivot", which
-was tied to the pre-ch30 arbor-47.5 layout). The amplitude bar rides the top
-edge either side of the pivot (ch. 15: the bar "can slide completely off the
-rocker").
+The connecting rod pins at +127.37 on the +X side, just inboard of the rod-side
+tip and LOW in the strap (5.3 above the bottom edge, ch14 fan photo) -- directly
+above the phased cam lobe, so the rod hangs PLUMB with the arm LEVEL (ch30
+photos + GT rocker-corner triangulation + the ch14 end views' flat 0-crank tip
+row; supersedes M6.3's "1 inch from the pivot", which was tied to the pre-ch30
+arbor-47.5 layout). The amplitude bar rides the top edge either side of the
+pivot (ch. 15: the bar "can slide completely off the rocker").
 
 This supersedes the legacy `oscilating-arms` part (no surviving source). M2's
 rod-at-tip reading is thus partially vindicated; its asymmetric 100/70 profile
@@ -83,14 +84,21 @@ BOT_ARC_LEN = 266.7  # bottom edge arc length = 10.5" (ch.30 back-view sketch)
 TIP_FACE = 5.588  # 0.22" tip face, PERPENDICULAR to the top edge (ch.30 sketch)
 PIVOT_HOLE_DIA = 6.5  # rides the 6.35 pivot shaft (DIMENSIONS.md ch14, derived)
 ROD_HOLE_DIA = 2.0  # connecting-rod pin (photo-scaled, low)
-ROD_HOLE_X = 127.49  # rod pin near the +X (rod-side) tip, 5.3 inboard of the
-# bottom-arc end (132.76): solved so the pin sits DIRECTLY ABOVE the cam drum
-# (machine -54.78) with the pivot at the seesaw mid-span (+72.9) -- the ch30
-# photos show every connecting rod hanging PLUMB from the arm tip onto its cam,
-# and the GT rocker-corner triangulation puts the rod-side arm end at machine
-# x -60 (bottom-arc end predicts -58.6). Supersedes M6.3's 25.4 ("1 inch from
-# the pivot"), which was derived from the pre-ch30 arbor-47.5 layout where the
-# drum sat 25.4 inboard of the pivot itself.
+ROD_HOLE_X = 127.3738  # rod pin near the +X (rod-side) tip, 5.4 inboard of the
+# bottom-arc end (132.76): solved so the pin sits DIRECTLY ABOVE the phased cam
+# lobe (machine -54.474 = drum -54.7 + ECC 8.64 x sin 1.5 deg, lobe UP at the
+# cos-mode home pose) with the pivot at the seesaw mid-span (+72.9) and the arm
+# LEVEL -- the ch30 photos show every connecting rod hanging PLUMB from the arm
+# tip onto its cam, the ch14 end views show the 0-crank tip row dead level, and
+# the GT rocker-corner triangulation puts the rod-side arm end at machine x -60
+# (bottom-arc end predicts -59.9 at the level pose). Supersedes 127.49, the
+# same plumb solve at the pre-ROM-fit lobe-down phase (ring x 54.78), and
+# M6.3's 25.4 ("1 inch from the pivot", pre-ch30 arbor-47.5 layout).
+ROD_HOLE_ABOVE_BOTTOM = 5.3  # rod-pin hole centre above the arm's BOTTOM edge:
+# the ch14 fan photo (p.26, 16 mm callout scale) puts the pin in the arm's lower
+# third -- 10.7 below the top edge = 5.3 above the bottom -- with the rod's
+# tombstone head lapping the face below the top edge. Supersedes the mid-depth
+# (8.0-equivalent) placement.
 THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > thickness
 
 # Arc centre sits ARM_DEPTH above the pivot's bottom edge: bottom edge is an
@@ -127,6 +135,11 @@ def _mid_y(x: float) -> float:
     by = _bottom_point(x)[1]
     ty = CENTER_Y - math.sqrt(R_TOP**2 - x * x)
     return (by + ty) / 2.0
+
+
+# Rod-pin hole centre: LOW in the strap (ch14 fan photo), not mid-depth like
+# the pivot. Assembly scripts import this (imported-not-copied, like _mid_y).
+ROD_HOLE_Y = _bottom_point(ROD_HOLE_X)[1] + ROD_HOLE_ABOVE_BOTTOM  # 15.303
 
 
 def _strap_area() -> float:
@@ -357,15 +370,17 @@ async def build(adapter) -> dict[str, str]:
         adapter, "Right Plane", 0.0, "Top Plane", _mid_y(0.0), "pivot bore"
     )
 
-    # Connecting-rod pin hole near the rod-side tip, mid-depth. Off-axis centre:
-    # define_circle emits centre-X, centre-Z, then diameter -- THREE dims. X is at
-    # +RodHoleX (positive, drives "RodHoleX"); the centre-Z is the trig-derived
-    # mid-height on the radial ray (no clean global knob) -> name/drive left None.
+    # Connecting-rod pin hole near the rod-side tip, LOW in the strap (5.3 above
+    # the bottom edge, ch14 fan photo -- the pivot hole stays mid-depth).
+    # Off-axis centre: define_circle emits centre-X, centre-Z, then diameter --
+    # THREE dims. X is at +RodHoleX (positive, drives "RodHoleX"); the centre-Z
+    # is the bottom-arc height + the photo offset (trig-derived, no clean global
+    # knob) -> name/drive left None.
     rod_x = ROD_HOLE_X
     rod = SketchDims()
     check("create_sketch rod hole", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, rod_x, _mid_y(rod_x), ROD_HOLE_DIA / 2.0, "rod hole",
+        adapter, rod_x, ROD_HOLE_Y, ROD_HOLE_DIA / 2.0, "rod hole",
         dims=rod,
         names=("RodPinX", None, "RodHoleDia"),
         drives=('"RodHoleX"', None, '"RodHoleDia"'),
@@ -381,9 +396,9 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "RodHole")
-    # Named axis through the rod-pin bore (Axis2 = (Right+rod_x) ∩ (Top+mid_y)).
+    # Named axis through the rod-pin bore (Axis2 = (Right+rod_x) ∩ (Top+hole_y)).
     await name_bore_axis(
-        adapter, "Right Plane", rod_x, "Top Plane", _mid_y(rod_x), "rod bore"
+        adapter, "Right Plane", rod_x, "Top Plane", ROD_HOLE_Y, "rod bore"
     )
 
     # Both bores are full-thickness through the 2.5 strap, entirely inside the

@@ -25,14 +25,16 @@ the lever tips, each caught at the plate by a little open hook fastener.
   eye in the plate bore -- the spring no longer threads the plate itself)
 
 Default mechanism state (DIMENSIONS.md "Channel & top-frame layout"):
-cylinder-gear notches +Y (cosine alignment), integral cam lobes -Y, rod
-rings concentric on the cams at (54.780, 101.741, z_j + 3.3) - the cam
-centre carries the gears' +1.5 deg tooth-phase rotation. Everything
-downstream is SOLVED here, not hard-coded: the rod-pin point is the
-intersection of the r 127.89 lever circle about the pivot with the
-r ROD_C2C circle about the ring centre (arm tilt ~ -7.82 deg including
-the -4.54 tapered-strap lever angle; rod tilt ~ 0 -- the rod hangs PLUMB
-from the arm's rod-side tip onto its cam, ch30 photos);
+cylinder-gear notches +Y (cosine alignment), integral cam lobes +Y (UP,
+the top of the stroke -- the ch14 end views show the 0-crank tip row
+dead level at the stroke top), rod rings concentric on the cams at
+(54.474, 113.437, z_j + 3.3) - the cam centre carries the gears'
++1.5 deg tooth-phase rotation. Everything downstream is SOLVED here, not
+hard-coded: the rod-pin point is the intersection of the r 127.58 lever
+circle about the pivot with the r ROD_C2C circle about the ring centre
+(arm tilt 0 -- the arms rest LEVEL, the 3.28 deg pin azimuth equals the
+tapered-strap lever angle; rod tilt 0 -- the rod hangs PLUMB from the
+arm's rod-side tip onto its cam, ch30 photos + ch14 end views);
 the bar rests its foot-notch roof on the tilted arm's top-edge arc
 (contact at the bar's -X edge); the bar's top pin height tilts the levers
 (~ +0.36 deg); the spring's top eye hangs 3.37 below the lever spring
@@ -123,15 +125,21 @@ from build_cylinder_gear import ECCENTRICITY as CAM_ECC  # cam lobe throw (mm):
 # throw is rescaled. A stale 5.08 hardcode (the pre-re-anchor throw) survived the
 # OD-62.2 re-anchor that moved ECCENTRICITY to 3.06, mislocating the ring 2.02 mm
 # south of the lobe -> the Ø30.8 bore dug into the Ø30.6 cam (20 x 171.67 mm^3).
+from build_connecting_rod import CENTER_DISTANCE as ROD_C2C  # ring centre ->
+# rocker pin (imported, NOT copied -- the part and the assembly must agree on
+# the link length or the J2 revolute drags the ring off the cam). Solved in
+# build_connecting_rod for the LEVEL rest pose: plumb rod from the level arm's
+# pin down to the lobe-up phased cam centre.
 from build_rocker_arm import ROD_HOLE_X as ARM_ROD_HOLE_X  # rod pin x in the arm
+from build_rocker_arm import ROD_HOLE_Y as ARM_ROD_PIN_LOCAL_Y  # rod pin y: LOW
+# in the strap (bottom-arc y + 5.3, ch14 fan photo), NOT mid-depth like the pivot
 from build_rocker_arm import _mid_y as _arm_mid_y  # tapered-strap mid-depth y(x)
 # Same imported-not-copied rule as CAM_ECC, and for the same reason: the rocker's
-# holes sit at the CURVED strap's mid-depth, so the rod-pin bore is NOT level
-# with the pivot bore (_mid_y(127.49) = 18.12 vs _mid_y(0) = 8.0). _arc_geometry
-# must model that intrinsic 4.54 deg lever angle or the placed pin lands 10 mm
-# off the solved point and the J2 revolute drags the ring off the cam (the 0.9
-# deg/0.4 mm version of this slip already cost 20 x 20.27 mm^3 of cylinder-gear
-# interference at the top level, ch30 rebuild).
+# rod-pin bore is NOT level with the pivot bore (ROD_HOLE_Y = 15.30 vs
+# _mid_y(0) = 8.0). _arc_geometry must model that intrinsic 3.28 deg lever angle
+# or the placed pin lands 7 mm off the solved point and the J2 revolute drags
+# the ring off the cam (the 0.9 deg/0.4 mm version of this slip already cost
+# 20 x 20.27 mm^3 of cylinder-gear interference at the top level, ch30 rebuild).
 
 ASM_NAME = "channel"
 
@@ -159,40 +167,40 @@ CAM_DZ = 3.3  # cam / rod-ring mid-plane at z_j + 3.3
 # --- rocker bank ------------------------------------------------------------
 PIVOT = (-72.9, 253.8)  # rocker pivot shaft axis (x, y)
 ARM_PIVOT_LOCAL_Y = _arm_mid_y(0.0)  # 8.0: pivot hole at local (0, 8) in the arm
-ARM_ROD_PIN_LOCAL_Y = _arm_mid_y(ARM_ROD_HOLE_X)  # 18.12: rod pin at mid-depth(127.49)
-# True pivot->rod-pin lever: 127.49 along the arm (near the rod-side tip) PLUS
-# the curved strap's mid-depth rise. Length 127.8912; the intrinsic lever angle
-# beta (4.5396 deg above the arm's +X) must come OFF the solved pin azimuth to
-# get the arm tilt (see _arc_geometry) -- at this lever the rise is 10.12 mm,
-# so ignoring beta is no longer a 0.4 mm nudge but a 10 mm catastrophe.
-_LEVER_DX = ARM_ROD_HOLE_X  # 127.49
-_LEVER_DY = ARM_ROD_PIN_LOCAL_Y - ARM_PIVOT_LOCAL_Y  # 10.1221
-ARM_ROD_LEVER = math.hypot(_LEVER_DX, _LEVER_DY)  # 127.8912
-ARM_LEVER_BETA_DEG = math.degrees(math.atan2(_LEVER_DY, _LEVER_DX))  # 4.5396
+# True pivot->rod-pin lever: 127.37 along the arm (near the rod-side tip) PLUS
+# the low pin's rise above the pivot bore (ROD_HOLE_Y 15.30 - 8.0 = 7.30).
+# Length 127.583; the intrinsic lever angle beta (3.2813 deg above the arm's
+# +X) must come OFF the solved pin azimuth to get the arm tilt (see
+# _arc_geometry) -- at this lever the rise is 7.30 mm, so ignoring beta is no
+# longer a 0.4 mm nudge but a 7 mm catastrophe.
+_LEVER_DX = ARM_ROD_HOLE_X  # 127.3738
+_LEVER_DY = ARM_ROD_PIN_LOCAL_Y - ARM_PIVOT_LOCAL_Y  # 7.3025
+ARM_ROD_LEVER = math.hypot(_LEVER_DX, _LEVER_DY)  # 127.5830
+ARM_LEVER_BETA_DEG = math.degrees(math.atan2(_LEVER_DY, _LEVER_DX))  # 3.2813
 ARM_ARC_CENTER_LOCAL_Y = 816.0  # arm local arc centre above the bottom edge
 ARM_TOP_RADIUS = 800.0
 
 # --- drive interface (default state) ----------------------------------------
 GEAR_PHASE_DEG = 1.5  # drive-train locks each cylinder gear at Rz(+1.5):
 # half the T120 tooth pitch, so a TOOTH faces the cone mesh (see
-# build_drive_train_assembly.py). The integral cam (local (0, -CAM_ECC))
-# swings with the gear by GEAR_PHASE_DEG, so the rod ring rides the PHASED cam
-# centre, not a point straight south of the arbor. CAM_ECC is imported above.
+# build_drive_train_assembly.py). The integral cam (local (0, +CAM_ECC) -- lobe
+# UP at notch-up, the cos-mode top of stroke per the ch14 end views) swings
+# with the gear by GEAR_PHASE_DEG, so the rod ring rides the PHASED cam
+# centre, not a point straight north of the arbor. CAM_ECC is imported above.
 RING_CENTER = (
-    54.7 + CAM_ECC * math.sin(math.radians(GEAR_PHASE_DEG)),
-    104.8 - CAM_ECC * math.cos(math.radians(GEAR_PHASE_DEG)),
-)  # phased cam centre at ECC 3.06: (54.780, 101.741). Authored x +54.7 = machine
+    54.7 - CAM_ECC * math.sin(math.radians(GEAR_PHASE_DEG)),
+    104.8 + CAM_ECC * math.cos(math.radians(GEAR_PHASE_DEG)),
+)  # phased cam centre at ECC 8.64: (54.474, 113.437). Authored x +54.7 = machine
 # -54.7, matching the drum's book placement (build_drive_train X_DRUM); y off the
 # ch30 GT drive height 104.8 (was 126.8). MUST stay in sync with X_DRUM/Y_DRIVE.
-ROD_C2C = 144.75  # VERTICAL rod (ch30): every rod hangs PLUMB from the arm's
-# rod-side tip onto its cam -- the pin (ROD_HOLE_X 127.49 out from the
-# mid-seesaw pivot) sits directly above the phased cam centre, refuting the
-# oblique 163.18/180.83 era (whose "line-2 photogrammetry" put the drum on the
-# far side of the rocker support; the GT rocker-corner triangulation lands the
-# arm's rod-side end at machine x -60, over the drum). 144.75 is solved to
-# preserve the arm rest tilt -7.8158 deg (pin azimuth -3.28 = tilt + beta
-# 4.54, pin (54.78, 246.49), rod tilt -0.001), so the whole downstream
-# bar/lever/spring chain is untouched. See build_connecting_rod.CENTER_DISTANCE.
+# ROD_C2C (imported above from build_connecting_rod.CENTER_DISTANCE, 147.6655):
+# VERTICAL rod (ch30): every rod hangs PLUMB from the arm's rod-side tip onto
+# its cam -- the pin (ROD_HOLE_X 127.3738 out from the mid-seesaw pivot) sits
+# directly above the phased cam centre WITH THE ARM LEVEL (arm tilt 0: the ch14
+# end views show the 0-crank tip row flat, and the GT rocker-corner
+# triangulation lands the arm's rod-side end at machine x -60 -- the level-pose
+# bottom-arc end predicts -59.9). Supersedes the 144.75 lobe-down closure at
+# rest tilt -7.8158 deg, and the oblique 163.18/180.83 era before it.
 
 # --- amplitude bars ---------------------------------------------------------
 BAR_WIDTH = 6.35
@@ -235,7 +243,7 @@ LEVER_MOUNT_Z = 85.0  # clears the top-frame boss bores (DIMENSIONS.md)
 from _spring import COIL_BODY_LENGTH, build_spring  # noqa: E402
 from build_channel_spring_installed import (  # noqa: E402
     BOTTOM_LEAD as SPRING_BOTTOM_LEAD,  # 2.0: normal hook lead (no longer spans plate)
-    INSTALLED_BODY_LENGTH as SPRING_BASE_BODY,  # 62.61: the neutral installed body
+    INSTALLED_BODY_LENGTH as SPRING_BASE_BODY,  # 61.98: the neutral installed body
     PLATE_EYE_Y,  # 996.54: bottom-eye y, ABOVE the plate on the hook arm
     TOP_LEAD as SPRING_TOP_LEAD,  # 2.0
 )
@@ -472,7 +480,7 @@ _CONTACT_OFF_Y = BAR_FOOT_NOTCH - BAR_CONTACT_GAP
 def _arc_geometry() -> dict[str, float]:
     """Amplitude-independent rocker/rod kinematics + the top-edge arc centre.
 
-    Rod-pin point P: |P - pivot| = ARM_ROD_LEVER (127.89) and
+    Rod-pin point P: |P - pivot| = ARM_ROD_LEVER (127.583) and
     |P - ring centre| = ROD_C2C, +X branch (rod side). The R800 arc the bar
     foot rides has its centre 808 mm out along the tilted arm's +Y, about the
     pivot hole at local (0, 8).
@@ -490,12 +498,12 @@ def _arc_geometry() -> dict[str, float]:
     px = ox + a * ux - h * uy
     py = oy + a * uy + h * ux
     # The pin azimuth is the LEVER's direction, and the lever leans beta above
-    # the arm's local +X (curved strap: the rod-pin bore at mid-depth(127.49)
-    # sits 10.12 above the pivot bore) -- so the ARM tilt is the azimuth MINUS
-    # beta. Beta was first missed when it was only 0.90 deg (25.4 lever): the
-    # placed pin landed 0.4 mm high and the ring dug 0.26 into the cam
-    # (live-measured, 20 x 20.27 mm^3); at today's 4.54 deg the same slip
-    # would be a 10 mm catastrophe, so the subtraction is load-bearing.
+    # the arm's local +X (the low rod-pin bore at ROD_HOLE_Y 15.30 sits 7.30
+    # above the pivot bore) -- so the ARM tilt is the azimuth MINUS beta. Beta
+    # was first missed when it was only 0.90 deg (25.4 lever): the placed pin
+    # landed 0.4 mm high and the ring dug 0.26 into the cam (live-measured,
+    # 20 x 20.27 mm^3); at today's 3.28 deg the same slip would be a 7 mm
+    # catastrophe, so the subtraction is load-bearing.
     arm_tilt = math.degrees(math.atan2(py - oy, px - ox)) - ARM_LEVER_BETA_DEG
     rod_tilt = -math.degrees(math.atan2(px - cx, py - cy))  # Rz is CCW from +X
 
@@ -508,6 +516,16 @@ def _arc_geometry() -> dict[str, float]:
 
 
 _ARC = _arc_geometry()
+# LEVEL rest pose is authored, not incidental: ROD_HOLE_X / ROD_C2C /
+# RING_CENTER are co-solved so the neutral arm sits flat (ch14 end views,
+# 0-crank tip row). Any drift here means one of those constants moved without
+# re-solving the closure -- fail before SolidWorks bakes the wrong pose in.
+if abs(_ARC["arm_tilt"]) > 0.02 or abs(_ARC["rod_tilt"]) > 0.02:
+    raise RuntimeError(
+        "neutral pose no longer level: arm_tilt=%.4f deg, rod_tilt=%.4f deg "
+        "-- re-solve ROD_HOLE_X (build_rocker_arm) and CENTER_DISTANCE "
+        "(build_connecting_rod) against RING_CENTER" % (_ARC["arm_tilt"], _ARC["rod_tilt"])
+    )
 
 
 def solve_state(amplitude: float = 0.0) -> dict[str, float]:

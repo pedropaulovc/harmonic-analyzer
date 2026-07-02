@@ -7,11 +7,12 @@ the 2.5 arm thickness (7.0565 - 2.5 = 4.5565); 19 fill the gaps between
 
 The OD has a hard geometric ceiling the M2 photo read (Ø25.4) violates:
 at d = 0 the amplitude-bar foot passes directly over the shaft, its
-cheek bottoms 6.45 above the axis (contact 262.63 - notch 2.381 - axis
-253.8), so the spacer radius must stay under ~6.4 or the bar can never
-reach zero coefficient (ch. 15 says it slides through the pivot to the
-opposite side). The p. 27 "large barrels" are therefore not these
-spacers; Ø10 keeps 1.45 clearance under the bar.
+cheek bottoms 5.63 above the axis (contact 261.81 - notch 2.381 - axis
+253.8; level rest pose, ch14 ROM re-derive), so the spacer radius must
+stay under ~5.6 or the bar can never reach zero coefficient (ch. 15 says
+it slides through the pivot to the opposite side). The p. 27 "large
+barrels" are therefore not these spacers; Ø10 keeps 0.63 clearance under
+the bar.
 
 Dimensions: cad/DIMENSIONS.md ch. 14 layout "Pivot spacer bushings" row
 (derived, med; OD bounded by bar clearance, low).
@@ -48,7 +49,7 @@ from _common import (
 PART_NAME = "pivot-bushing"
 MATERIAL = "Brass"
 
-OUTER_DIA = 10.0  # DIMENSIONS.md ch14 layout: bar-clearance ceiling ~12.9 (low)
+OUTER_DIA = 10.0  # DIMENSIONS.md ch14 layout: bar-clearance ceiling ~11.25 (low)
 BORE_DIA = 6.5  # rides the 6.35 pivot shaft (derived)
 LENGTH = 4.5565  # channel pitch 7.0565 - arm 2.5 (derived)
 

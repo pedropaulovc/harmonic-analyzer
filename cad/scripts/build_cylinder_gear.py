@@ -25,15 +25,19 @@ Features, in order:
    convert each gear's rotation into the near-sinusoidal reciprocation of its
    connecting rod (displacement = ECCENTRICITY x sin(theta)). Disc OD 30.6 mm,
    thickness 3.5 mm (the 4.5 mm inter-face gap minus 0.5 mm air per side; the
-   axial budget rides the unchanged 7.0565 channel pitch), centre offset -Y by
-   the 3.06 mm eccentricity (OD and offset both scaled 0.6022 with the gear so
-   the lobe clears the finer tooth-root circle), boss-extruded z = 3..6.5 from
-   an offset reference plane (cam disc centred on the bore, offset -Y by the
-   eccentricity -- the lobe points -Y). The cam dimensions are legacy
-   parameters.kcl values, uncontradicted by the book; the cam outline printed
-   on p. 25 is still flagged for a photo-scaling cross-check. (This is the
-   former standalone ``build_eccentric_cam.py`` / ``eccentric-cam`` part,
-   MHA-029, now folded into the gear -- the cam was always integral.)
+   axial budget rides the unchanged 7.0565 channel pitch), centre offset +Y by
+   the 8.64 mm eccentricity, boss-extruded z = 3..6.5 from an offset reference
+   plane (cam disc centred on the bore, offset +Y by the eccentricity -- the
+   lobe points +Y, the NOTCH side: the ch14 end views prove the rocker tips sit
+   at the TOP of their stroke at notch-up/0-cranks, so lobe-up is the cos-mode
+   home pose; the pre-ROM-fit build authored it -Y, 180 deg off). The throw is
+   MEASURED from the ch14 end-view ROM fit (tip half-amplitude 9.458 mm x
+   127.37/139.5); the real machine drives the rod with a CUT TEMPLATE cam (the
+   p.25 teardrop outline; Michelson 1898 closing note), modeled here as the
+   kinematically-equivalent circular eccentric-and-strap -- the ring centre
+   follows the same simple-harmonic orbit the template was cut to produce.
+   (This is the former standalone ``build_eccentric_cam.py`` / ``eccentric-cam``
+   part, MHA-029, now folded into the gear -- the cam was always integral.)
 4. Alignment notch: 3 mm deep saw KERF cut between two teeth (the p.23
    "notch" photo shows a thin kerf -- the real gears keep all 120 teeth, NOT
    a missing tooth). +Y (90 deg = 30*gamma) is a tooth crest at 120 T, so the
@@ -56,7 +60,7 @@ tooth-fraction fill).
 Dimensions: cad/DIMENSIONS.md "Chapter 13".
 
 Layout: gear axis = Z through the origin, gear z = 0..3 mm, cam z = 3..6.5,
-cam lobe -Y, notch +Y.
+cam lobe +Y, notch +Y (lobe on the notch side).
 
 Run (SolidWorks already open)::
 
@@ -99,11 +103,13 @@ MATERIAL = "Brass"  # ch. 13 text p.22: polished brass
 
 TEETH = 120  # DIMENSIONS.md ch13: derived from gear law k/80 (high)
 FACE_WIDTH = 3.0  # DIMENSIONS.md ch13: 0.38 face/pitch x 7.5 axial pitch (scaled, med)
-CAM_DIAMETER = 30.6  # DIMENSIONS.md ch13: integral cam diameter, scaled 0.6022 with the
-# gear OD (50.8 -> 30.6) so the eccentric lobe clears the new tooth-root circle (low)
+CAM_DIAMETER = 30.6  # DIMENSIONS.md ch13: integral cam bearing diameter; the rod ring
+# bore Ø30.8 measured on the p.25 overlay (Ø29.83 at the gear-OD scale) confirms it (med)
 CAM_THICKNESS = 3.5  # DIMENSIONS.md ch13: axial-budget (7.0565 channel pitch, unchanged) (med)
-ECCENTRICITY = 3.06  # DIMENSIONS.md ch13: cam eccentricity, scaled 0.6022 (5.08 -> 3.06);
-# rocker stroke shrinks proportionally (user-directed 2026-06-18) (low)
+ECCENTRICITY = 8.64  # DIMENSIONS.md ch13: cam throw MEASURED from the ch14 end-view ROM
+# fit (2026-07-02): tip half-amplitude 9.458 mm over the 20-tip least-squares cos fit at
+# the channel-pitch scale, x r_pin/r_tipface = 127.37/139.5. Supersedes the scaled-0.6022
+# legacy 3.06 (the lobe also flips to +Y -- see the module docstring). (med)
 BORE_DIAMETER = 0.375 * IN  # 9.525 DIMENSIONS.md ch13: cam bore (legacy, med)
 NOTCH_DEPTH = 3.0  # DIMENSIONS.md ch13: alignment notch depth, text p.22 (high)
 # The notch is "just a slit" cut with a SAW between two teeth -- the p.23 photo
@@ -199,7 +205,7 @@ def _ref_axis_start_mm(adapter, axis_name: str) -> list[float] | None:
 
 async def _name_lobe_axis(adapter) -> str:
     """Named reference axis through the eccentric cam-lobe centre (part-local
-    x 0, y -ECCENTRICITY), along Z, for the motion study's cam->rod coupling.
+    x 0, y +ECCENTRICITY), along Z, for the motion study's cam->rod coupling.
 
     The Henrici cam coupling (artifact B) makes each connecting-rod ring
     (Axis1@connecting-rod) coaxial with its drive-train cylinder-gear lobe. A
@@ -207,20 +213,20 @@ async def _name_lobe_axis(adapter) -> str:
     of tooth faces) and the lobe face will not select through the nested,
     flexible sub. A *named* axis is fast, mirror-agnostic and selects by name --
     the same pattern the bore axis already uses. The offset-plane sign for
-    "Top Plane - ECC" is verified against GetRefAxisParams (Y must land at the
-    lobe side, -ECC), so a flipped SW offset convention fails loudly here rather
+    "Top Plane + ECC" is verified against GetRefAxisParams (Y must land at the
+    lobe side, +ECC), so a flipped SW offset convention fails loudly here rather
     than silently building a wrong-side cam axis.
     """
     axis_name = await name_bore_axis(
-        adapter, "Right Plane", 0.0, "Top Plane", -ECCENTRICITY, "cam lobe axis"
+        adapter, "Right Plane", 0.0, "Top Plane", ECCENTRICITY, "cam lobe axis"
     )
     start = _ref_axis_start_mm(adapter, axis_name)
     if start is None:
         raise RuntimeError(f"could not read lobe axis {axis_name} params")
-    if abs(start[0]) > 0.1 or abs(start[1] - (-ECCENTRICITY)) > 0.1:
+    if abs(start[0]) > 0.1 or abs(start[1] - ECCENTRICITY) > 0.1:
         raise RuntimeError(
             f"lobe axis misplaced at (x={start[0]:.3f}, y={start[1]:.3f}); "
-            f"expected (0, {-ECCENTRICITY:.3f}) -- Top Plane offset sign flipped"
+            f"expected (0, {ECCENTRICITY:.3f}) -- Top Plane offset sign flipped"
         )
     _telemetry.success(f"lobe axis {axis_name} at (x {start[0]:.3f}, y {start[1]:.3f})")
     return axis_name
@@ -262,7 +268,7 @@ async def build(adapter) -> dict[str, str]:
     volume = v_teeth
 
     # ------------------------------------------------------------------
-    # Integral cam on the far gear face (z = 7..17.16), lobe -Y.
+    # Integral cam on the far gear face (z = 3..6.5), lobe +Y (notch side).
     # ------------------------------------------------------------------
     plane = check(
         "create_plane cam (Front + face width)",
@@ -272,15 +278,15 @@ async def build(adapter) -> dict[str, str]:
             )
         ),
     )
-    # Cam disc: ordinary auxiliary circle, centre offset -Y by the eccentricity.
-    # On-axis in X (x 0 -> no X dim); the -Y offset is one centre dim (displayed
+    # Cam disc: ordinary auxiliary circle, centre offset +Y by the eccentricity.
+    # On-axis in X (x 0 -> no X dim); the +Y offset is one centre dim (displayed
     # as the unsigned magnitude, so it drives to +"Eccentricity") plus diameter.
     check(f"create_sketch cam on {plane.name}", await adapter.create_sketch(plane.name))
     # On a custom offset plane the x=0 anchor still emits an X dim (3 dims, not
     # the 2 a Front/Top origin circle would), so the helper's recorded count
     # can't be predicted here -- name the feature but record no dims (like the
     # gooseneck sweep profile). CamDiameter/Eccentricity stay declared as knobs.
-    await define_circle(adapter, 0.0, -ECCENTRICITY, CAM_DIAMETER / 2.0, "cam disc")
+    await define_circle(adapter, 0.0, ECCENTRICITY, CAM_DIAMETER / 2.0, "cam disc")
     await ensure_fully_defined(adapter, "cam sketch")
     check("exit_sketch cam", await adapter.exit_sketch())
     name_last_feature(adapter, "CamProfile")
@@ -293,13 +299,13 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(adapter, "cam boss", volume + v_cam, 0.005 * v_cam)
 
     # The offset plane and the extrude direction both have ambiguous signs:
-    # assert the cam actually landed at z > FACE_WIDTH, on -Y.
+    # assert the cam actually landed at z > FACE_WIDTH, on +Y.
     mass = await adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"cam COM check failed: {mass.error}")
     com = [float(c) for c in mass.data.center_of_mass]
     com_z = (v_teeth * FACE_WIDTH / 2.0 + v_cam * (FACE_WIDTH + CAM_THICKNESS / 2.0)) / volume
-    com_y = v_cam * -ECCENTRICITY / volume
+    com_y = v_cam * ECCENTRICITY / volume
     if abs(com[2] - com_z) > 0.1 or abs(com[1] - com_y) > 0.1:
         raise RuntimeError(
             f"cam misplaced: COM {com}, expected y {com_y:.3f} z {com_z:.3f} "
@@ -383,7 +389,8 @@ async def build(adapter) -> dict[str, str]:
 
     # ------------------------------------------------------------------
     # Shaft bore through gear + cam (the bore circle is fully inside the
-    # eccentric cam disc: ecc 3.06 + bore_r 4.76 = 7.82 < cam_r 15.3).
+    # eccentric cam disc: ecc 8.64 + bore_r 4.76 = 13.40 < cam_r 15.3,
+    # a 1.90 mm wall at the thin side).
     # ------------------------------------------------------------------
     # Shaft bore: ordinary on-axis circle (origin centre -> no centre dims, just
     # the diameter), driven by the BoreDiameter knob.
