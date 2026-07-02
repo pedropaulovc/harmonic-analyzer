@@ -1174,6 +1174,11 @@ def _parse_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     _ARGS = _parse_args()
+    # Advertise the verify SUITE as this process's telemetry resource so the Aspire
+    # "resource" column reads e.g. "verify-kinematics" instead of the umbrella name.
+    # Fallback-only: under the spine dodo already set the matching OTEL_SERVICE_NAME
+    # (see _stage_name), so this is a no-op that keeps it; standalone it self-labels.
+    _telemetry.set_service(f"verify-{_ARGS.suite}")
     if _ARGS.suite in ("math", "config"):
         # No SolidWorks needed -- run directly without connecting.
         _report = Report()

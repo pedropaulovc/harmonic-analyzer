@@ -322,8 +322,11 @@ async def _mate(
 
     # Span every mate (the single chokepoint all mate helpers funnel through),
     # including flip-recovery, so the full-build waterfall stays contiguous
-    # between part spans instead of leaving the mate time as a gap.
-    async with _telemetry.aspan(f"mate {kind}", kind=kind, label=label) as msp:
+    # between part spans instead of leaving the mate time as a gap. NAME the span
+    # for the caller's descriptive ``label`` (e.g. "mate top@crank_pin <-> ...")
+    # rather than the generic mate ``kind`` -- a waterfall of 40 identical
+    # "mate distance" rows is unreadable; the mate TYPE stays as an attribute.
+    async with _telemetry.aspan(label, kind=kind, label=label) as msp:
         res = check(label, await _add_mate(adapter, kind, entities, flip=flip, **kw))
         if verify is None:
             return res
@@ -333,6 +336,10 @@ async def _mate(
         if moved <= _MATE_TOL_MM:
             return res
         msp.set_attribute("flipped", True)
+        # A flip-recovery is a moment in this mate's span timeline, not a
+        # standalone status line -- record it as a span event so the trace shows
+        # WHEN in the mate the re-solve happened and by how far it was off.
+        _telemetry.event("mate.flip_recovery", label=label, moved_mm=round(moved, 3))
         log(f"{label}: moved {moved:.2f} mm -> re-adding flipped")
         check(
             f"{label} (delete wrong side)",
@@ -1078,8 +1085,16 @@ async def assert_expected_free_dof(adapter: Any, expected_count: int) -> None:
     from solidworks_mcp.adapters.base import SuppressMateParameters
 
     asm = adapter.currentModel
+    # This gate cycles EVERY park driver (suppress -> re-engage -> re-suppress),
+    # each a COM round-trip, plus three ForceRebuild3s -- for `channel` that is
+    # ~60 drivers, so the gate is minutes of wall-clock. Segment the phases into
+    # named child spans (mirroring gate.dof/gate.health) so the waterfall shows
+    # WHERE the time goes -- discovery vs the necessity read vs the two
+    # suppress/re-suppress loops -- instead of one opaque multi-minute span.
     with _telemetry.span("gate.dof_expected_free") as gsp:
-        parked = await find_park_drivers(adapter)
+        with _telemetry.span("park.discover") as dsp:
+            parked = await find_park_drivers(adapter)
+            dsp.set_attribute("park_drivers", len(parked))
         free = [name for name, suppressed in parked if suppressed]
         gsp.set_attribute("park_drivers", len(parked))
         gsp.set_attribute("expected_free_dof", expected_count)
@@ -1092,7 +1107,9 @@ async def assert_expected_free_dof(adapter: Any, expected_count: int) -> None:
         # NECESSITY: the as-built (suppressed) pose must actually carry the freedom.
         # One spin DOF frees a whole chain, so >= expected_count under-constrained.
         if expected_count:
-            free_under = _under_constrained_components(adapter)
+            with _telemetry.span("park.necessity") as nsp:
+                free_under = _under_constrained_components(adapter)
+                nsp.set_attribute("free_under_constrained", len(free_under))
             gsp.set_attribute("free_under_constrained", len(free_under))
             if len(free_under) < expected_count:
                 raise RuntimeError(
@@ -1104,20 +1121,24 @@ async def assert_expected_free_dof(adapter: Any, expected_count: int) -> None:
         # SUFFICIENCY: re-engage the park drivers and prove the model is then rigid,
         # ALWAYS restoring the as-built free pose (suppress moves no part).
         try:
-            for name in free:
-                check(
-                    f"unsuppress {name}",
-                    await adapter.suppress_mate(SuppressMateParameters(name=name, suppress=False)),
-                )
-            adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
+            with _telemetry.span("park.engage") as esp:
+                esp.set_attribute("drivers", len(free))
+                for name in free:
+                    check(
+                        f"unsuppress {name}",
+                        await adapter.suppress_mate(SuppressMateParameters(name=name, suppress=False)),
+                    )
+                adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
             assert_components_fully_defined(adapter)  # 0 under-constrained, drivers engaged
         finally:
-            for name in free:
-                check(
-                    f"re-suppress {name}",
-                    await adapter.suppress_mate(SuppressMateParameters(name=name, suppress=True)),
-                )
-            adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
+            with _telemetry.span("park.restore") as rsp:
+                rsp.set_attribute("drivers", len(free))
+                for name in free:
+                    check(
+                        f"re-suppress {name}",
+                        await adapter.suppress_mate(SuppressMateParameters(name=name, suppress=True)),
+                    )
+                adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
         _telemetry.success(
             f"{len(free)} free DOF confirmed (necessity: free pose under-constrained; "
             f"sufficiency: re-engaged {len(free)} park driver(s) -> 0 under-constrained); "

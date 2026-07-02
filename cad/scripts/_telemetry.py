@@ -84,6 +84,27 @@ _GLYPH = {
 _SERVICE_NAME = "harmonic-analyzer"
 _LOGGER_NAME = "harmonic"
 
+# The OTLP/Aspire "resource" column groups spans by SERVICE. A whole pipeline run
+# spans several distinct roles -- building a part, mating an assembly, running the
+# kinematic gates, exporting, cutting a release -- so labelling every process the
+# same "harmonic-analyzer" wastes that column. Instead each process advertises its
+# PIPELINE STAGE as ``service.name`` (part-build / assembly-build / verify-* /
+# export / release), under the shared ``service.namespace`` umbrella, so the
+# resource column reads as the subsystem doing the work. The stage is taken from
+# ``OTEL_SERVICE_NAME`` (the standard OTel env var) -- dodo sets it per subprocess
+# (see ``_stage_name`` in dodo.py) so a child is labelled the moment it imports;
+# a standalone script self-labels via :func:`set_service`. Absent either, it falls
+# back to the umbrella name.
+_SERVICE_NAMESPACE = "harmonic-analyzer"
+_DEFAULT_SERVICE_NAME = "harmonic-analyzer"
+
+
+def _resolve_service_name() -> str:
+    return os.environ.get("OTEL_SERVICE_NAME") or _DEFAULT_SERVICE_NAME
+
+
+_service_name = _resolve_service_name()
+
 # Project default: ship OTLP to a local **.NET Aspire dashboard** (standalone
 # image's OTLP/HTTP port) with zero env. So `doit ...` / a build script lights up
 # the dashboard's traces+logs the moment it's running -- no OTEL_* exports needed.
@@ -216,6 +237,24 @@ def configure(*, console: bool = True, force: bool = False) -> None:
         return
     _configured = True
 
+    if force:
+        # OTel installs the global trace/log providers behind a one-shot ``Once``
+        # guard: a second ``set_*_provider`` merely warns ("Overriding ... not
+        # allowed") and keeps the FIRST provider. A forced reconfigure exists to
+        # SWAP the resource (``set_service`` relabelling this process's stage after
+        # import), so reset those guards or the rebuilt providers would be installed
+        # nowhere and the relabel would silently no-op. Private-API + best-effort: if
+        # OTel's internals move we simply keep the existing resource (telemetry must
+        # never break a build), and the primary path -- dodo setting OTEL_SERVICE_NAME
+        # in the child env BEFORE import, so the FIRST configure is already correct --
+        # never needs this at all.
+        with contextlib.suppress(Exception):
+            trace._TRACER_PROVIDER_SET_ONCE._done = False  # type: ignore[attr-defined]
+        with contextlib.suppress(Exception):
+            from opentelemetry._logs import _internal as _logs_internal
+
+            _logs_internal._LOGGER_PROVIDER_SET_ONCE._done = False  # type: ignore[attr-defined]
+
     want_console = console
 
     # Resolve the OTLP target ONCE (probes the Aspire default if no env is set)
@@ -228,7 +267,8 @@ def configure(*, console: bool = True, force: bool = False) -> None:
 
     resource = Resource.create(
         {
-            "service.name": _SERVICE_NAME,
+            "service.name": _service_name,
+            "service.namespace": _SERVICE_NAMESPACE,
             "service.version": os.environ.get("HARMONIC_VERSION", "dev"),
         }
     )
@@ -316,6 +356,30 @@ def get_tracer(name: str = _SERVICE_NAME):
     return trace.get_tracer(name)
 
 
+def set_service(name: str, *, force: bool = False) -> None:
+    """Relabel this process's telemetry resource (``service.name``) to ``name``.
+
+    The OTel ``Resource`` is fixed when the providers are created, so changing the
+    service name REBUILDS them (``configure(force=True)``). Call it BEFORE the first
+    span so every span in the process carries the new resource.
+
+    FALLBACK-ONLY by default: it does nothing once the process already carries a
+    NON-default label -- so a child that inherited a precise ``OTEL_SERVICE_NAME``
+    from dodo (``_stage_name``) keeps it, and a coarse self-derived fallback from
+    ``run_build`` never clobbers it. Pass ``force=True`` to relabel unconditionally.
+    No-op when ``name`` is empty or already active. Best-effort: a reconfigure
+    failure never propagates (telemetry must not break a build)."""
+    global _service_name
+    if not name or name == _service_name:
+        return
+    if not force and _service_name != _DEFAULT_SERVICE_NAME:
+        return
+    _service_name = name
+    os.environ["OTEL_SERVICE_NAME"] = name
+    with contextlib.suppress(Exception):
+        configure(force=True)
+
+
 # --------------------------------------------------------------------------- #
 # Severity-levelled log helpers. Each emits one structured record (bridged to  #
 # OTel + printed to the console) at its level. ``progress`` and ``success``    #
@@ -357,6 +421,21 @@ def error(message: str, *, exc_info: bool = False, **fields: Any) -> None:
 # drop-in: ``progress`` == the old ``log()``, ``ok`` == a passing ``  OK  ``.
 progress = debug
 ok = success
+
+
+def event(name: str, **attributes: Any) -> None:
+    """Record a point-in-time OTel span EVENT on the CURRENT span (best-effort).
+
+    Prefer this over a standalone log record for a moment that belongs to a span's
+    timeline -- a cache hit/miss, a mate flip-recovery, a driver re-engagement --
+    so the trace timeline shows *when within the span* it happened and carries its
+    structured attributes, instead of the fact living only in a correlated but
+    separate log stream. No-op when no span is recording, so a caller never has to
+    guard; and swallows any error, since telemetry must never break a build."""
+    with contextlib.suppress(Exception):
+        span = trace.get_current_span()
+        if span is not None and span.get_span_context().is_valid:
+            span.add_event(name, attributes=_extra(attributes) or {})
 
 
 def _enter_span(name: str, attributes: Mapping[str, Any] | None) -> tuple[Span, Any, int]:

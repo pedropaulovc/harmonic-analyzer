@@ -417,10 +417,33 @@ def test_trace_is_one_tree_with_far_fewer_spans(monkeypatch, tmp_path):
     spans, _ = _run_soundness(["drive-train"], monkeypatch, tmp_path)
     assert len({s.context.trace_id for s in spans}) == 1  # no gaps
     # Pre-fix: ~51 dof.check + ~52 health.whats_wrong + the gate/op spans = 110+.
-    # Post-fix the per-item leaves are gone; the whole drive-train pass is small.
-    assert len(spans) < 30, f"{len(spans)} spans -- per-item flood not removed?"
+    # Post-fix the per-item leaves are gone; the whole drive-train pass is small
+    # (~27 spans -- the free-DOF gate's park.* phase spans are a handful of named
+    # nodes, not a per-item flood). The bound guards against the 110+ regression,
+    # not exact count, so keep generous headroom above the real total.
+    assert len(spans) < 45, f"{len(spans)} spans -- per-item flood not removed?"
     assert len(_by_name(spans, "dof.check")) == 0
     assert len(_by_name(spans, "health.whats_wrong")) == 1
+
+
+def test_free_dof_gate_segmented_into_phase_spans(monkeypatch, tmp_path):
+    """The free-DOF gate (drive-train, built free) is not one opaque multi-minute
+    span: it splits into named phase children (discover / necessity / engage /
+    restore) so the suppress/re-engage/re-suppress cost is attributable, and the
+    sufficiency re-engage still nests the real ``gate.dof`` closure check."""
+    spans, report = _run_soundness(["drive-train"], monkeypatch, tmp_path)
+    assert report.failed == [], report.failed
+    (gate,) = _by_name(spans, "gate.dof_expected_free")
+    assert gate.status.status_code.name == "OK"
+    child_names = {
+        s.name for s in spans
+        if s.parent and s.parent.span_id == gate.context.span_id
+    }
+    # every expensive phase is its own span, so none of the gate's wall-clock is
+    # hidden in an unspanned region.
+    assert {"park.discover", "park.necessity", "park.engage", "park.restore"} <= child_names
+    # the sufficiency assert (drivers engaged) still runs the shared 0-DOF closure.
+    assert _by_name(spans, "gate.dof")
 
 
 # --------------------------------------------------------------------------- #

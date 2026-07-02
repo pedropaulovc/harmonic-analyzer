@@ -425,4 +425,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    # Advertise "export" as this process's telemetry resource (Aspire "resource"
+    # column). Fallback-only: dodo already set OTEL_SERVICE_NAME=export under the
+    # spine, so this keeps it; standalone it self-labels.
+    _telemetry.set_service("export")
     raise SystemExit(main())
