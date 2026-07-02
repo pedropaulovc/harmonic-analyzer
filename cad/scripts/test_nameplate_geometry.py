@@ -1,32 +1,22 @@
-"""Regression proof for the nameplate's native sketch-primitive engraving.
+"""Integrity guard for the nameplate's vendored engraving DXF.
 
-``build_nameplate`` draws the engraving with SolidWorks sketch primitives: line
-chains for the glyph/cartouche contours (vendored in
-``_nameplate_geometry.LETTERING_LOOPS``, re-imported from the source DXF
-``cad/references/nameplate-engraving.dxf``) and two rounded-rectangle arcs for the
-pinstripe frame (``BORDER_OUTER``/``BORDER_INNER``) -- no DXF import at build time.
+``build_nameplate`` no longer draws the engraving from hard-coded coordinate
+loops -- it **imports** the vendored DXF (``cad/references/nameplate-engraving.dxf``)
+onto the decorated face and cuts the whole artwork (lettering + scroll cartouche
++ pinstripe frame) as one feature (``adapter.import_dxf_dwg`` ->
+``IFeatureManager::InsertDwgOrDxfFile2``). The DXF is now the source of truth.
 
-The golden targets below are the analytic areas/volume of that vendored geometry,
-captured when the loops were re-imported from the DXF. This test guards them
-against regression by recomputing the three targets from the vendored primitives
-alone -- no CAD kernel required.
+This test is the kernel-free, dependency-free guard on that file: it confirms the
+DXF is present, is a millimetre-unit DXF (``$INSUNITS = 4`` -- the build imports it
+as mm), carries the expected traced-outline entity population (splines / ellipses
+/ polylines, not an empty or wrong export), and that its resolved artwork extent
+matches what the build's import scale (``ENGRAVING_RAW_WIDTH``) assumes. A DXF that
+is swapped, re-exported at a different unit, or truncated fails here rather than
+silently producing a mis-scaled or empty engraving on the live SolidWorks seat
+(where ``build_nameplate`` itself bounds-checks the removed volume).
 
-The maths mirrors ``build_nameplate`` exactly:
-  * engraving area = ``abs`` of the signed-area (shoelace) sum over the loops --
-    outer glyph/ornament contours wind CCW (+), the 9 enclosed counters wind CW
-    (-), so the sum is the even-odd filled region the single cut removes. This
-    also guards the winding parity the live cut depends on.
-  * pinstripe band area = outer minus inner rounded-rectangle area.
-  * plate volume = rounded plate slab, minus the field recess, minus the
-    engraving and pinstripe cuts (area x incise depth), minus the four screw
-    holes. The screws sit in the outer border clear of the pinstripe band, and
-    the engraving sits inside the already-sunk field, so the contributions don't
-    overlap and the closed form is exact.
-
-Solid validity and the boolean overlap resolution are proven on the live
-SolidWorks seat by ``build_nameplate`` itself (each cut asserts its removed
-volume against these same analytic areas); this test is the kernel-free guard on
-the vendored numbers.
+Parsed with a tiny regex reader over the ASCII DXF group-code pairs -- no ezdxf,
+no CAD kernel -- so it runs in the SolidWorks-free ``check:nameplate`` gate.
 
 Run directly for a full report::
 
@@ -35,98 +25,94 @@ Run directly for a full report::
 
 from __future__ import annotations
 
-import math
-
-from _nameplate_geometry import BORDER_INNER, BORDER_OUTER, LETTERING_LOOPS
+import re
+from collections import Counter
+from pathlib import Path
 
 import _telemetry
 
-# Golden analytic targets, captured when the loops were re-imported from
-# cad/references/nameplate-engraving.dxf (engraving even-odd region, pinstripe
-# band, finished volume) -- the regression guard recomputes them >= the 99% bar.
-GOLDEN_ENGRAVING_AREA = 533.252  # mm^2, even-odd filled glyph + cartouche region
-GOLDEN_BAND_AREA = 177.654  # mm^2, rounded-rectangle pinstripe frame
-GOLDEN_VOLUME = 6682.88  # mm^3, finished plate
+ENGRAVING_DXF = Path(__file__).resolve().parents[1] / "references" / "nameplate-engraving.dxf"
 
-# Plate / feature dimensions -- mirror build_nameplate.py exactly.
-PLATE_W, PLATE_H, PLATE_T, CORNER_R = 100.0, 55.0, 1.5, 3.0
-BORDER_W, RECESS_DEPTH, ENGRAVE_DEPTH = 8.0, 0.4, 0.3
-SCREW_DIA, SCREW_INSET = 2.6, 4.5
-
-Loop = list[tuple[float, float]]
-
-
-def _shoelace(loop: Loop) -> float:
-    """Signed polygon area (CCW positive) -- build_nameplate._shoelace."""
-    a = 0.0
-    n = len(loop)
-    for i in range(n):
-        x1, y1 = loop[i]
-        x2, y2 = loop[(i + 1) % n]
-        a += x1 * y2 - x2 * y1
-    return a / 2.0
+# Golden facts about the traced artwork, captured from the vendored DXF. The build
+# imports it as millimetres and uniform-scales its resolved outer frame
+# (ENGRAVING_RAW_WIDTH in build_nameplate) to the plate footprint, so both the unit
+# and the extent are load-bearing for a correctly-placed engraving.
+GOLDEN_INSUNITS = 4  # 4 = millimetres (build imports as mm)
+# Raw block-coordinate extent of the artwork as it literally appears in the file
+# (before the nested-INSERT transforms SolidWorks resolves on import -- the resolved
+# WCS footprint the build scales against is ~278.57 mm, build_nameplate's
+# ENGRAVING_RAW_WIDTH). Guards the file against truncation / a wrong-unit re-export.
+GOLDEN_COORD_WIDTH = 478.041  # raw block-coordinate bbox width (+/- 1%)
+GOLDEN_COORD_HEIGHT = 253.384  # raw block-coordinate bbox height (+/- 1%)
+# Curved traced outlines (splines/ellipses) + polylines must be present -- an empty
+# or all-straight export would not be the engraving.
+MIN_CURVE_ENTITIES = 40  # SPLINE + ELLIPSE contours in the artwork blocks
 
 
-def _engraving_area() -> float:
-    """Even-odd filled area of the traced engraving (mm^2).
-
-    Outer contours run CCW (+) and the enclosed counters CW (-), so the signed
-    sum is exactly the even-odd region the single cut removes -- the property
-    the live cut relies on, so a flipped loop would fail this test.
-    """
-    return abs(sum(_shoelace(loop) for loop in LETTERING_LOOPS))
+def _read() -> str:
+    return ENGRAVING_DXF.read_text(encoding="utf-8", errors="replace")
 
 
-def _rrect_area(spec: tuple[float, float, float, float, float]) -> float:
-    """Area of a rounded rectangle ``(cx, cy, w, h, r)``."""
-    _cx, _cy, w, h, r = spec
-    return w * h - (4.0 - math.pi) * r * r
+def _header_int(txt: str, var: str) -> int | None:
+    """Read an integer ``$VAR`` from the DXF HEADER section (group code 70)."""
+    m = re.search(rf"\${var}\n\s*70\n\s*(-?\d+)", txt)
+    return int(m.group(1)) if m else None
 
 
-def _band_area() -> float:
-    return _rrect_area(BORDER_OUTER) - _rrect_area(BORDER_INNER)
+def _blocks_section(txt: str) -> str:
+    start = txt.find("\nBLOCKS\n")
+    end = txt.find("\nENDSEC\n", start)
+    return txt[start:end] if start >= 0 and end > start else ""
 
 
-def _plate_volume() -> float:
-    """Finished plate volume from the closed forms (no CAD kernel).
+def _entity_counts(seg: str) -> Counter:
+    return Counter(re.findall(r"\n  0\n(\w+)\n", seg))
 
-    Slab - field recess - engraving cut - pinstripe cut - 4 screw holes. The
-    engraving cut's reach (RECESS+ENGRAVE) overlaps the already-sunk recess, so
-    only its ENGRAVE_DEPTH below the field floor is new material -- matching
-    build_nameplate's ``expected_removed = area * ENGRAVE_DEPTH``.
-    """
-    slab = (PLATE_W * PLATE_H - (4.0 - math.pi) * CORNER_R**2) * PLATE_T
-    field = (PLATE_W - 2.0 * BORDER_W) * (PLATE_H - 2.0 * BORDER_W) * RECESS_DEPTH
-    engraving = _engraving_area() * ENGRAVE_DEPTH
-    pinstripe = _band_area() * ENGRAVE_DEPTH
-    screws = 4.0 * math.pi * (SCREW_DIA / 2.0) ** 2 * PLATE_T
-    return slab - field - engraving - pinstripe - screws
+
+def _artwork_bbox(seg: str) -> tuple[float, float]:
+    """Width/height of the block geometry from its (10, 20) vertex coordinates."""
+    xs = [float(v) for v in re.findall(r"\n 10\n([-0-9.eE+]+)\n", seg)]
+    ys = [float(v) for v in re.findall(r"\n 20\n([-0-9.eE+]+)\n", seg)]
+    return (max(xs) - min(xs), max(ys) - min(ys))
 
 
 def _pct(got: float, ref: float) -> float:
     return 100.0 * (1.0 - abs(got - ref) / abs(ref))
 
 
-def test_engraving_region_area():
-    """The line-chain glyph/cartouche loops fill the golden engraving region."""
-    assert _pct(_engraving_area(), GOLDEN_ENGRAVING_AREA) >= 99.0
+def test_engraving_dxf_present():
+    """The vendored engraving DXF the build imports exists and is non-trivial."""
+    assert ENGRAVING_DXF.is_file(), ENGRAVING_DXF
+    assert ENGRAVING_DXF.stat().st_size > 10_000, ENGRAVING_DXF.stat().st_size
 
 
-def test_pinstripe_band_area():
-    """The two rounded rectangles enclose the golden pinstripe band area."""
-    assert _pct(_band_area(), GOLDEN_BAND_AREA) >= 99.0
+def test_engraving_dxf_is_millimetre_unit():
+    """$INSUNITS = 4 -- the build imports the DXF as millimetres."""
+    assert _header_int(_read(), "INSUNITS") == GOLDEN_INSUNITS
 
 
-def test_full_plate_volume():
-    """End-to-end: the primitive plate reaches the golden finished volume."""
-    assert _pct(_plate_volume(), GOLDEN_VOLUME) >= 99.0
+def test_engraving_dxf_has_traced_outline_entities():
+    """The artwork blocks carry the traced spline/ellipse/polyline contours."""
+    counts = _entity_counts(_blocks_section(_read()))
+    curves = counts.get("SPLINE", 0) + counts.get("ELLIPSE", 0)
+    assert curves >= MIN_CURVE_ENTITIES, counts
+    assert counts.get("LWPOLYLINE", 0) >= 1, counts
+
+
+def test_engraving_dxf_coordinate_extent():
+    """The artwork's raw block-coordinate extent is intact (not truncated/rescaled)."""
+    w, h = _artwork_bbox(_blocks_section(_read()))
+    assert _pct(w, GOLDEN_COORD_WIDTH) >= 99.0, w
+    assert _pct(h, GOLDEN_COORD_HEIGHT) >= 99.0, h
 
 
 if __name__ == "__main__":
-    eng = _engraving_area()
-    band = _band_area()
-    vol = _plate_volume()
-    _telemetry.info("nameplate primitive geometry vs golden analytic targets")
-    _telemetry.info(f"engraving area : {eng:9.4f}  golden {GOLDEN_ENGRAVING_AREA:9.4f}  -> {_pct(eng, GOLDEN_ENGRAVING_AREA):7.3f}%")
-    _telemetry.info(f"pinstripe band : {band:9.4f}  golden {GOLDEN_BAND_AREA:9.4f}  -> {_pct(band, GOLDEN_BAND_AREA):7.3f}%")
-    _telemetry.info(f"plate volume   : {vol:9.3f}  golden {GOLDEN_VOLUME:9.3f}  -> {_pct(vol, GOLDEN_VOLUME):7.3f}%")
+    txt = _read()
+    counts = _entity_counts(_blocks_section(txt))
+    w, h = _artwork_bbox(_blocks_section(txt))
+    _telemetry.info("nameplate engraving DXF integrity")
+    _telemetry.info(f"file           : {ENGRAVING_DXF}")
+    _telemetry.info(f"$INSUNITS      : {_header_int(txt, 'INSUNITS')}  golden {GOLDEN_INSUNITS}")
+    _telemetry.info(f"entities       : {dict(counts)}")
+    _telemetry.info(f"coord width    : {w:9.3f}  golden {GOLDEN_COORD_WIDTH:9.3f}  -> {_pct(w, GOLDEN_COORD_WIDTH):7.3f}%")
+    _telemetry.info(f"coord height   : {h:9.3f}  golden {GOLDEN_COORD_HEIGHT:9.3f}  -> {_pct(h, GOLDEN_COORD_HEIGHT):7.3f}%")

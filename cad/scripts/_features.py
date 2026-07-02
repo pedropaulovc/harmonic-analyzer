@@ -7,7 +7,6 @@ _common.
 from __future__ import annotations
 
 import math
-from collections.abc import Iterable
 from typing import Any
 
 from _common import (
@@ -52,51 +51,6 @@ async def sketch_rounded_rect(
     finally:
         sketch_mgr.AddToDB = prev
     _telemetry.success(f"rounded_rect {w:g}x{h:g} r{r:g} @ ({cx:g}, {cy:g})")
-
-async def sketch_polyline_loops(
-    adapter: Any, loops: Iterable[Iterable[tuple[float, float]]], *, label: str = "loops"
-) -> int:
-    """Draw closed line-segment loops into the OPEN sketch; return the loop count.
-
-    Each loop is a sequence of (x, y) plate-millimetre vertices, drawn as a chain
-    of straight :func:`add_line` segments and closed back to its first vertex --
-    the native sketch-primitive equivalent of importing a polyline DXF. Used for
-    the nameplate's traced engraving (glyph + scroll-cartouche contours): a
-    cosmetic profile, so callers skip :func:`ensure_fully_defined` and let the
-    single cut's even-odd fill turn each enclosed counter loop into a hole, just
-    as the DXF import + cut did.
-
-    Inference is suppressed via ``AddToDB`` (like the other raw draws here): the
-    traced contours have many near-collinear short segments that the inference
-    engine would otherwise snap to spurious horizontal/vertical relations.
-    Exactly-coincident endpoints still merge in the sketch DB, so every loop
-    closes. Zero-length segments (coincident consecutive vertices) are skipped so
-    a degenerate ``add_line`` cannot fail the draw.
-    """
-    sketch_mgr = adapter.currentSketchManager
-    prev = bool(sketch_mgr.AddToDB)
-    sketch_mgr.AddToDB = True
-    count = 0
-    segments = 0
-    try:
-        for loop in loops:
-            pts = list(loop)
-            if len(pts) < 3:
-                raise ValueError(f"{label}: loop {count} has < 3 vertices")
-            verts = pts + [pts[0]]  # close the loop
-            for (x1, y1), (x2, y2) in zip(verts, verts[1:], strict=False):
-                if abs(x2 - x1) < 1e-9 and abs(y2 - y1) < 1e-9:
-                    continue  # skip a zero-length segment
-                check(
-                    f"{label}[{count}] seg ({x1:g},{y1:g})->({x2:g},{y2:g})",
-                    await adapter.add_line(x1, y1, x2, y2),
-                )
-                segments += 1
-            count += 1
-    finally:
-        sketch_mgr.AddToDB = prev
-    _telemetry.success(f"sketch_polyline_loops {label}: {count} loops, {segments} segments")
-    return count
 
 def insert_helix(
     adapter: Any, height: float, pitch: float, clockwise: bool = True

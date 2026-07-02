@@ -113,12 +113,10 @@ def test_closure_follows_reused_build_scripts():
 
 
 def test_specialized_helper_blast_radius_is_narrow():
-    """_gear / _nameplate_geometry reach only their real importers, not the fleet."""
+    """_gear reaches only its real importers, not the fleet."""
     gear_users = [s for s in part_stems() if "_gear" in _helper_names(f"build_{s}.py")]
-    np_users = [s for s in part_stems() if "_nameplate_geometry" in _helper_names(f"build_{s}.py")]
     feat_users = [s for s in part_stems() if "_features" in _helper_names(f"build_{s}.py")]
     assert 0 < len(gear_users) < len(part_stems()), gear_users
-    assert np_users == ["nameplate"], np_users
     # spring/screw/nameplate feature builders reach only their handful of parts
     # (their direct importers + any part that reuses one of those build scripts)
     assert 0 < len(feat_users) <= 8, feat_users
