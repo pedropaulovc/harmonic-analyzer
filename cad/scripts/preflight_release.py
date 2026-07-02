@@ -25,11 +25,39 @@ from __future__ import annotations
 import sys
 from typing import Any
 
-from _common import OUT_SLDASM, check, log, run_build
+from _common import OUT_SLDASM, _read_member, check, log, run_build
 from _assembly import assert_park_closure, load_park_specs
 from verify import REST, _expected_free_dof
 
 import _telemetry
+
+
+def _discard_open_documents(adapter: Any) -> None:
+    """Close every open document WITHOUT a "Save Modified Documents" prompt.
+
+    ``assert_park_closure`` authors real mates, so the reopened assembly (and its
+    referenced children) are DIRTY. ``CloseAllDocuments(True)`` still pops the save
+    modal for a dirty referenced child in 3DX R2026x -- headless, that hangs
+    ``doit release`` forever. This mirrors ``cut_release._discard_open_documents``:
+    close the active doc by TITLE first (``CloseDoc`` discards a dirty doc without
+    saving, and closing the assembly title drops its hidden components too), then
+    ``CloseAllDocuments(True)`` as a backstop with nothing dirty left to prompt
+    about. Bounded so a misbehaving session can't spin; an empty title is refused
+    (``CloseDoc("")`` silently no-ops on assemblies and would leave the doc
+    resident)."""
+    for _ in range(500):
+        doc = adapter._attempt(lambda: _read_member(adapter.swApp, "IActiveDoc2"),
+                               default=None)
+        if doc is None:
+            break
+        title = str(_read_member(doc, "GetTitle") or "")
+        if not title:
+            raise RuntimeError(
+                "active document has an empty title -- refusing CloseDoc(''), which "
+                "silently no-ops on assemblies and would leave the document resident"
+            )
+        adapter._attempt(lambda t=title: adapter.swApp.CloseDoc(t), default=None)
+    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
 # The default-free assemblies that carry deferred park drivers (dashed stems, the
 # same set verify.py's `_expected_free_dof` gives a non-zero count). A `locked`
@@ -57,19 +85,22 @@ async def _preflight_one(adapter: Any, name: str) -> str:
         )
 
     # Fresh session per assembly (mirrors verify.py): stale open docs degrade COM.
-    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    async with _telemetry.aspan("preflight.open", name=name):
-        check(f"open {name}", await adapter.open_model(str(sldasm)))
-        configs = check("list configurations", await adapter.list_configurations())
-        if REST in (configs or []):
-            check(f"activate {REST}", await adapter.set_active_configuration(REST))
-    log(f"--- preflight {name} ({REST} pose): {expected} deferred park driver(s) ---")
-
-    # Authors the recorded drivers engaged and asserts 0 under-constrained. The doc
-    # is mutated in memory only -- discarded below WITHOUT saving, so the shipped
-    # .SLDASM stays the free model.
-    await assert_park_closure(adapter, specs, expected)
-    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+    # Use the discard-by-title path, not CloseAllDocuments(True): a dirty doc left
+    # by a prior iteration (or an aborted run) would otherwise pop the save modal.
+    _discard_open_documents(adapter)
+    try:
+        async with _telemetry.aspan("preflight.open", name=name):
+            check(f"open {name}", await adapter.open_model(str(sldasm)))
+            configs = check("list configurations", await adapter.list_configurations())
+            if REST in (configs or []):
+                check(f"activate {REST}", await adapter.set_active_configuration(REST))
+        log(f"--- preflight {name} ({REST} pose): {expected} deferred park driver(s) ---")
+        # Authors the recorded drivers engaged and asserts 0 under-constrained. The
+        # doc is mutated in memory only -- discarded in `finally` WITHOUT saving
+        # (whether the closure passes or raises), so the shipped .SLDASM stays free.
+        await assert_park_closure(adapter, specs, expected)
+    finally:
+        _discard_open_documents(adapter)
     return f"{expected} DOF closed"
 
 
