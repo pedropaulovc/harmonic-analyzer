@@ -247,6 +247,13 @@ def test_set_service_relabels_resource_fallback_only():
     label), overridable with force -- and stamps the shared namespace."""
     original = _telemetry._service_name
     try:
+        # Hermetic precondition: force back to the default label first, so the
+        # fallback path below is actually exercised regardless of any
+        # OTEL_SERVICE_NAME the invoking process already set. Under
+        # `doit check:telemetry`, dodo sets the per-stage name ('check-telemetry'),
+        # which is non-default and would otherwise make the fallback-only
+        # set_service("assembly-build") a no-op and fail this test.
+        _telemetry.set_service(_telemetry._DEFAULT_SERVICE_NAME, force=True)
         # default -> stage: fallback takes effect and the LIVE resource swaps.
         _telemetry.set_service("assembly-build")
         exp = InMemorySpanExporter()
