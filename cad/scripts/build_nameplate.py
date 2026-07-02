@@ -89,15 +89,29 @@ ENGRAVE_DEPTH = 0.3  # incise depth of the imported artwork below the field floo
 # cartouche and pinstripe frame) is drawn in the vendored DXF; the build imports
 # and cuts it as one feature (see module docstring).
 ENGRAVING_DXF = REFERENCES_DIR / "nameplate-engraving.dxf"
-# The DXF is millimetre-unit ($INSUNITS=4); its resolved artwork outer frame spans
-# ~278.57 mm. Scale it so that frame fits the plate's border as ENGRAVING_TARGET_WIDTH
-# (matching the historic 88 mm pinstripe-outer footprint), then centre on the plate.
-# NOTE: the exact scale/position is calibrated against the live import on a
-# SolidWorks seat -- these are the analytic starting values from the DXF extent.
-ENGRAVING_RAW_WIDTH = 278.57  # mm, resolved WCS bbox width of the traced artwork
+# The DXF is millimetre-unit ($INSUNITS=4); its resolved artwork spans the WCS bbox
+# below (NOT drawn around its own origin). Scale it so its outer frame fits the
+# plate's border as ENGRAVING_TARGET_WIDTH (the historic 88 mm pinstripe-outer
+# footprint). Placement uses swDwgEntitiesSpecifyPosition -- the position we pass is
+# where the DXF's ORIGIN lands, so to centre the ARTWORK on the plate we offset by
+# the scaled bbox centre: position = plate_centre - scale * bbox_centre. (A bare
+# plate-centre would drop the far-from-origin bbox off the 100x55 plate.)
+# NOTE: exact scale/position is calibrated against the live import on a SolidWorks
+# seat -- these are the analytic values from the DXF's resolved extent.
+ENGRAVING_RAW_BBOX = (199.469, 127.793, 478.041, 253.384)  # resolved WCS x0,y0,x1,y1 (mm)
+ENGRAVING_RAW_WIDTH = ENGRAVING_RAW_BBOX[2] - ENGRAVING_RAW_BBOX[0]  # ~278.57 mm
+ENGRAVING_RAW_CENTER = (
+    (ENGRAVING_RAW_BBOX[0] + ENGRAVING_RAW_BBOX[2]) / 2.0,
+    (ENGRAVING_RAW_BBOX[1] + ENGRAVING_RAW_BBOX[3]) / 2.0,
+)
 ENGRAVING_TARGET_WIDTH = 88.0  # mm, artwork outer frame footprint on the plate
 ENGRAVING_SCALE = ENGRAVING_TARGET_WIDTH / ENGRAVING_RAW_WIDTH
 ENGRAVING_CENTER = (PLATE_WIDTH / 2.0, PLATE_HEIGHT / 2.0)  # plate-mm
+# Where the DXF origin must land so the scaled artwork bbox centres on the plate.
+ENGRAVING_POSITION = (
+    ENGRAVING_CENTER[0] - ENGRAVING_SCALE * ENGRAVING_RAW_CENTER[0],
+    ENGRAVING_CENTER[1] - ENGRAVING_SCALE * ENGRAVING_RAW_CENTER[1],
+)
 
 # Four corner mounting screws (the shared brass fillister part), in the border band.
 SCREW_DIA = 2.6
@@ -237,7 +251,9 @@ async def build(adapter) -> dict[str, str]:
                 file_path=str(ENGRAVING_DXF),
                 plane="Front",
                 scale=ENGRAVING_SCALE,
-                position=[ENGRAVING_CENTER[0], ENGRAVING_CENTER[1]],
+                # DXF origin placement (SpecifyPosition) that centres the scaled
+                # artwork on the plate -- see ENGRAVING_POSITION.
+                position=[ENGRAVING_POSITION[0], ENGRAVING_POSITION[1]],
                 merge_points=True,   # close the traced contours so they cut
                 import_hatch=False,  # hatch fills are not cuttable profiles
                 import_dimensions=False,
