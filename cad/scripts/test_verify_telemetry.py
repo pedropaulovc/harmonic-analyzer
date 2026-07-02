@@ -373,14 +373,20 @@ def test_no_per_component_dof_check_spans(monkeypatch, tmp_path):
     spans, report = _run_soundness(["frame", "drive-train"], monkeypatch, tmp_path)
     assert report.failed == [], report.failed
     assert _by_name(spans, "dof.check") == []  # the flood is gone
-    # ...but the gate span survives and carries the aggregate verdict.
-    dt_count = COMPONENT_COUNTS["drive-train"]
+    # frame is fully defined (strict 0-DOF), so its gate is the aggregate gate.dof.
     dof_gates = _by_name(spans, "gate.dof")
-    assert len(dof_gates) == 2
-    dt = [g for g in dof_gates if g.attributes.get("components") == dt_count][0]
-    assert dt.attributes["fixed"] >= 1
-    assert dt.attributes["not_fully_defined"] == 0
-    assert dt.status.status_code.name == "OK"
+    assert len(dof_gates) == 1
+    frame_gate = dof_gates[0]
+    assert frame_gate.attributes["not_fully_defined"] == 0
+    assert frame_gate.status.status_code.name == "OK"
+    # drive-train is default-`free` (crank DOF deferred, not authored), so its DOF
+    # gate is the NECESSITY gate -- one span carrying the free-DOF aggregate, still
+    # no per-component flood. The exact-count closure runs in the release preflight.
+    nec = _by_name(spans, "gate.dof_free_necessity")
+    assert len(nec) == 1
+    assert nec[0].attributes["expected_free_dof"] == 1
+    assert nec[0].attributes["free_under_constrained"] >= 1
+    assert nec[0].status.status_code.name == "OK"
 
 
 def test_whats_wrong_collapses_to_one_span_per_health_gate(monkeypatch, tmp_path):
