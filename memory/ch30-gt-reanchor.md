@@ -22,11 +22,15 @@ preserved bit-exact, downstream chain untouched).
   comment claimed +0.275 and propagating it gave a wrong mesh c2c (39.90 vs the true
   40.446) that tripped the module's own assert. Recompute from live `_config`, never
   from comments.
-- `build_channel_assembly.py` authors the ring at **+54.78** and the rocker pivot at
-  **−72.9 in the SAME frame** — the rod is genuinely oblique ACROSS the machine
-  (dx 102.5). A "both on the drive side" planar sketch gives a wrong-sign x and a
-  bogus rod length (149.17); the old-value consistency check (does the code's own
-  d=182.3 comment reproduce?) is what caught it.
+- ~~the rod is genuinely oblique ACROSS the machine~~ **REFUTED same day** (see
+  the vertical-rod bullet below): the rods hang PLUMB. The "old-value consistency
+  check" that anchored the oblique reading (does the code's own d=182.3 comment
+  reproduce?) was **circular** — the d=182.3 comment was WRITTEN BY the same
+  "line-2 photogrammetry" commit that introduced the oblique read, so reproducing
+  it only proved self-consistency, not truth. A consistency check against a value
+  is worthless if the value and the hypothesis share an author-commit; check
+  against evidence from a DIFFERENT provenance (here: the ch30 photos + GT
+  rocker-corner triangulation).
 - Commit e2062b5 (PR #132) shipped an unescaped apostrophe in a single-quoted
   dimensions.yaml scalar — `check:config` was broken at HEAD and nobody noticed
   because the doit stamp was already green. Fixed on this branch (`sketch''s`).
@@ -60,6 +64,23 @@ preserved bit-exact, downstream chain untouched).
   neutral gap → `LEVER_EYE_Y` 1063.15→1063.25, per the math gate's own
   instruction). Latent at HEAD since the taper commit; masked because no
   from-scratch top rebuild ran since (same gate-rot as the YAML apostrophe).
+
+- **Vertical rods (same-day follow-up, second PR):** the ch30 photos show every
+  connecting rod hanging PLUMB from the rocker arm's rod-side tip onto its cam;
+  the GT rocker-corner triangulation (solved cameras from
+  `triangulate_ch30_gt.py`, ray-intersected `rocker_arm_corner_*` clusters) lands
+  the arm's rod-side end at machine (−60.0, 252.8) — directly over the drum —
+  and the far end at (+216.1, 246.8), midpoint +72.5 ≈ the frame's +72.9 pivot
+  (seesaw confirmed). Fix: `ROD_HOLE_X` 25.4 → **127.49** (hole solved so the pin
+  sits exactly above the phased cam centre at the PRESERVED −7.8158° rest tilt;
+  5.3 inboard of the bottom-arc end, which predicts the GT corner at −58.6),
+  `ROD_C2C`/`CENTER_DISTANCE` 180.83 → **144.75**, rod tilt +34.51° → −0.001°.
+  Downstream chain untouched (lever_tilt 0.23077, spring gate delta −0.004,
+  `LEVER_EYE_Y` 1063.25 stays). M6.3's "1-inch lever" closed the same
+  vertical-rod argument against the OLD arbor x 47.5; the GT drum move broke
+  that closure silently — the lesson is that a **derived** value's derivation
+  chain must be re-run when any anchor moves, or the value quietly becomes a
+  fossil (grep the codebase for the anchor when adopting a GT move).
 
 **How to apply (deferred follow-ups, all GT-located but blocked on the
 portal/back-frame re-layout):** arbor north bearing at z +91.5 (arbor north end held

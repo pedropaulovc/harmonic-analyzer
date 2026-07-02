@@ -37,8 +37,10 @@ depth):
   now seats FULLY on the support: it was moved south to z +81.5 and its ball/base
   narrowed to O13 so its z-footprint [75.0, 88.0] clears the channel-19 amplitude
   bar (z +74.1) and stays inside the wall's north edge (88.9) -- no cantilever.
-  Seat Y = base-top 50.8 + 88.9 (half-height) = 139.7. The pivot x =
-  arbor 47.5 + 25.4 rod lever = 72.9 (DIMENSIONS.md ch. 14 layout, M6.8-mirrored).
+  Seat Y = base-top 50.8 + 88.9 (half-height) = 139.7. The pivot x = 72.9, the
+  rocker seesaw's mid-span (ch30 GT arm-end triangulation midpoint +72.5; the
+  rod-pin hole 127.49 out reaches the cam drum at -54.7, rods plumb; the old
+  "arbor 47.5 + 25.4 rod lever" chain died with the ch30 re-anchor).
   Constrained (not grounded) by three orthogonal plane-plane mates against the
   base's principal planes, like the columns/top-frame.
 * top-frame x1: the green ring at ring mid-plane Y = 1020.2 (rails 22 x
@@ -106,7 +108,8 @@ ASM_NAME = "frame"
 BASE_TOP_Y = 50.8  # harmonic-base: 0.5 in bottom + 1.5 in top plate
 COLUMN_X = 197.0  # column centres, from the ch. 6 / ch. 30 corner placement
 COLUMN_Z = 112.0
-SUPPORT_X = 72.9  # rocker pivot x: arbor 47.5 + 25.4 rod lever (M6.3, M6.8 mirror)
+SUPPORT_X = 72.9  # rocker pivot x: the seesaw mid-span (ch30 GT arm-end
+# triangulation midpoint +72.5; M6.8 mirror). Rod-side tip reaches the drum.
 # The support's z position is NOT a constant: it is CENTRED on the base z-axis by
 # a coincident mate of symmetry planes (see build()), so the window reads centred
 # in the +/-X side views with no tuned offset. The north pivot ball mount
