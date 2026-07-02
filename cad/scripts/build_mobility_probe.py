@@ -123,6 +123,19 @@ async def _probe_sub(adapter: Any, sub: str, probes: list[tuple]) -> list[str]:
 
     path = str(OUT_SLDASM / f"{sub}.SLDASM")
     check(f"open {sub}", await adapter.open_model(path))
+
+    # Default-`free` builds DEFER the freed-DOF park drivers (they are recorded, not
+    # authored -- see AGENTS.md "Default-free DOF"), so the saved model has none to
+    # probe. Replay the recorded specs (author them engaged, renamed PARK_*) so the
+    # baseline/suppress argument below has real drivers to work on. The doc is NEVER
+    # saved (this probe only reads status), so the on-disk free model is untouched.
+    from _assembly import load_park_specs, replay_park_specs
+
+    specs = load_park_specs(sub)
+    if specs:
+        log(f"{sub}: replaying {len(specs)} deferred park driver(s) for the probe")
+        await replay_park_specs(adapter, specs)
+
     log(f"{sub}: classifying single-real DISTANCE/ANGLE park drivers ...")
     drivers = _drivers_by_family(adapter, adapter.currentModel, sub)
     log(f"{sub}: driver families {[(f, len(n)) for f, n in sorted(drivers.items())]}")

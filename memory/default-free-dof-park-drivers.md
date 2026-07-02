@@ -5,6 +5,24 @@ metadata:
   type: project
 ---
 
+> **UPDATE 2026-07 — defer-and-replay (park mates added by release, not build).**
+> The freed-DOF park drivers are no longer *authored-then-suppressed* by the build.
+> They are NOT authored at all in a `free` build (skipping ~61 mate solves — 1
+> crank + 3×20 channel — is the build-time win); each is RECORDED as a resolved
+> spec (`free_dof_key=` on the `*_driver` helpers → `_assembly._record_park_spec`)
+> into a `.<stem>.park.json` sidecar beside the `.SLDASM` (a cached assembly
+> output). The opt-in **release preflight** (`preflight_release.py`, doit task
+> `preflight`, COM-spine, gates `release`, NOT in `build`) replays them
+> (`replay_park_specs`), runs the exact-DOF closure (`assert_park_closure`), then
+> DISCARDS the model unsaved — shipped `.SLDASM` stays free. Build-time `soundness`
+> now proves only necessity (`assert_free_dof_necessity`, ≥ N under-constrained);
+> the closure moved to preflight. ENGAGED setup drivers (`PARK_pinion_swing`, cone
+> swing) are unchanged — still authored inline, never deferred. Diagnostics:
+> `build_mobility_probe.py` replays specs before its baseline;
+> `build_motion_setup_drives.py` treats an absent (deferred) driver as already-free;
+> `build_motion_study.py` (full-device, geometry-classifier) needs a seat re-check.
+> The prose below describes the ORIGINAL author-but-suppress mechanism.
+
 **Inverted the always-0-DOF design (2026-06, drive-train first, PR stacked on #110
 `drive-train-unlock`; extended to channel 2026-06).** The default build now saves a
 WORKING kinematic model: the predetermined operational DOF are left FREE.

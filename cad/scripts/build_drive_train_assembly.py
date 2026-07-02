@@ -145,6 +145,7 @@ from _assembly import (
     angle_driver,
     apply_component_color,
     assert_expected_free_dof,
+    assert_free_dof_necessity,
     check_no_interference,
     coincident_mate,
     component_transform,
@@ -156,6 +157,8 @@ from _assembly import (
     parallel_mate,
     place_component,
     save_assembly_and_images,
+    set_park_defer,
+    write_park_specs,
 )
 
 ASM_NAME = "drive-train"
@@ -577,6 +580,9 @@ async def _place_on_shaft(
 
 
 async def build(adapter) -> dict[str, str]:
+    # `free` (default) DEFERS the freed-DOF park drivers (records, does not author);
+    # `locked` authors them engaged. Set before any *_driver(free_dof_key=...) call.
+    set_park_defer(not LOCK)
     check("create_assembly", await adapter.create_assembly())
 
     # =================== structure (located, not fixed) ====================
@@ -1066,7 +1072,14 @@ async def build(adapter) -> dict[str, str]:
     handle_o = _org(adapter, handle)
     a_arm = component_transform(adapter, arm)
     crank_angle = math.degrees(math.acos(max(-1.0, min(1.0, a_arm[0]))))
-    crank_park = await angle_driver(
+    # The crank angle is a FREED operational-DOF park driver (``free_dof_key``). In
+    # the default `free` build it is NOT authored -- its resolved spec is recorded
+    # and re-authored transiently by the release preflight -- leaving the crank (and
+    # the whole keyed/geared train it pins) free to spin: ONE operational DOF, the
+    # working kinematic model. A `locked` build authors it engaged and renames it
+    # PARK_crank_angle for a fully-defined reproducible snapshot. Compute the BDC
+    # dihedral + handle verify target either way (they feed the recorded spec).
+    await angle_driver(
         adapter,
         named_ref(f"Right Plane@{arm}", "PLANE"),
         named_ref("Right Plane", "PLANE"),
@@ -1074,26 +1087,18 @@ async def build(adapter) -> dict[str, str]:
         label=f"crank angle PARK driver (reproducibility lock; freed in default "
               f"build; BDC a={crank_angle:.2f})",
         verify=(handle, handle_o),
+        free_dof_key="crank_angle",
     )
-    # Rename the feature to PARK_crank_angle so the tree documents its role and the
-    # DOF gate can discover it. In the default `free` build, suppress it -- leaving
-    # the crank (and the whole keyed/geared train it pins) free to spin: ONE
-    # operational DOF, the working kinematic model. `locked` leaves it engaged for a
-    # fully-defined reproducible snapshot, byte-compatible with the old grounding.
-    park_name = await mark_park_driver(adapter, crank_park, "crank_angle")
-    if not LOCK:
-        from solidworks_mcp.adapters.base import SuppressMateParameters
-        check(
-            f"suppress {park_name} (free the crank spin)",
-            await adapter.suppress_mate(SuppressMateParameters(name=park_name, suppress=True)),
-        )
-        adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
 
-    # Certify the AS-BUILT model. The DOF gate adapts to the mode: free -> closure
-    # proves exactly 1 free DOF (re-engages the park driver -> 0 under-constrained,
-    # then restores the free pose); locked -> strict 0-DOF. Every other check runs on
-    # the as-built model unchanged.
-    await assert_expected_free_dof(adapter, 0 if LOCK else 1)
+    # Certify the AS-BUILT model. free -> necessity only (the freed crank DOF is
+    # genuinely free; the exact-count closure runs in the release preflight, where
+    # the recorded spec is replayed); locked -> strict 0-DOF. All other checks run
+    # on the as-built model unchanged.
+    if LOCK:
+        await assert_expected_free_dof(adapter, 0)
+    else:
+        assert_free_dof_necessity(adapter, 1)
+        write_park_specs(ASM_NAME)
     check_no_interference(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)
 

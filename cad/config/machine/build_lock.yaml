@@ -4,11 +4,13 @@ build_lock:
   #
   #   free   = leave the predetermined operational DOF UNLOCKED (default). The saved
   #            model is a working kinematic model -- e.g. the crank spins and the whole
-  #            geared train turns with it. The reproducibility "park driver" mates are
-  #            authored but SUPPRESSED, so they pin nothing.
-  #   locked = engage the park drivers (today's behaviour): every operational DOF is
-  #            pinned, the model is fully defined (0 DOF), the saved pose is a hard,
-  #            reproducible snapshot. An explicit opt-in for a pinned export/snapshot.
+  #            geared train turns with it. The freed-DOF "park driver" mates are NOT
+  #            authored at all (skipping the mate solve saves build time); each is
+  #            RECORDED to a .<stem>.park.json sidecar and re-authored transiently by
+  #            the release preflight, which proves the closure then discards unsaved.
+  #   locked = author + engage the park drivers: every operational DOF is pinned, the
+  #            model is fully defined (0 DOF), the saved pose is a hard, reproducible
+  #            snapshot. An explicit opt-in for a pinned export/snapshot.
   #
   # Read by the per-assembly build script as `_config.machine("build_lock", "<stem>")`
   # with a STRING-LITERAL stem, so it tokenises to machine/build_lock.yaml in the doit
@@ -21,8 +23,9 @@ build_lock:
   notes: >-
     drive-train frees the crank spin (1 DOF). channel frees, per active channel, the
     rocker swing + connecting-rod follow + amplitude-bar slide (3 DOF/channel), so the
-    saved model is a working kinematic channel bank. Both author the locking mates as
-    suppressible PARK_* drivers. Other assemblies do not read build_lock and stay fully
-    defined. The verify DOF gate adapts: free -> assert exactly the expected free DOF
-    via the park-driver closure check; locked / unread -> strict 0-DOF. See AGENTS.md
-    "Verify suites".
+    saved model is a working kinematic channel bank. In a free build these freed-DOF
+    drivers are DEFERRED (recorded to a park-spec sidecar, not authored); a locked build
+    authors them engaged. Other assemblies do not read build_lock and stay fully defined.
+    The verify DOF gate adapts: free -> necessity only (>= N under-constrained); the
+    exact-count closure runs in the opt-in release preflight (assert_park_closure);
+    locked / unread -> strict 0-DOF. See AGENTS.md "Default-free DOF".
