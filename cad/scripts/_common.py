@@ -61,6 +61,10 @@ OUT_SLDPRT = CAD_ROOT / "out" / "sldprt"
 OUT_SLDASM = CAD_ROOT / "out" / "sldasm"
 OUT_PNG = CAD_ROOT / "out" / "png"
 OUT_STL = CAD_ROOT / "out" / "stl"
+# Vendored input artefacts a build imports at run time (e.g. the nameplate
+# engraving DXF). A build script that reads one of these must resolve it under
+# this dir so dodo's data_deps_of picks it up as a file_dep + cache-key input.
+REFERENCES_DIR = CAD_ROOT / "references"
 
 IN = 25.4  # inch -> mm
 
