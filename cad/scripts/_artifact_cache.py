@@ -144,6 +144,28 @@ def _log(msg: str) -> None:
     _telemetry.info(f"[cache] {msg}")
 
 
+def _warn(msg: str) -> None:
+    """A cache MISS / drift / soft error is a WARNING, not routine info: it is the
+    signal a debugger looks for when asking 'why did this rebuild?' -- it should
+    stand out at ``!!`` severity (and in the OTel logs at WARNING) rather than blend
+    into the ``--`` progress stream."""
+    import _telemetry
+
+    _telemetry.warn(f"[cache] {msg}")
+
+
+def _event(name: str, label: str, key: str, **extra) -> None:
+    """Record the cache outcome as a span EVENT on the active task span (best-effort).
+
+    The restore/store run INSIDE the ``task part:``/``assembly:`` span dodo opens, so
+    a hit/miss/store shows up ON the trace timeline (with the key + label) -- making a
+    cache miss backtraceable from the trace, not only from cache.jsonl / the console.
+    No-op when no span is recording (e.g. cache_status), so callers never guard."""
+    import _telemetry
+
+    _telemetry.event(name, label=label, key=key[:12], **extra)
+
+
 def _debug() -> bool:
     """HARMONIC_CACHE_DEBUG=1 (or any non-empty/non-``0`` value) -> log key inputs."""
     return os.environ.get("HARMONIC_CACHE_DEBUG", "").strip().lower() not in ("", "0", "false")
@@ -441,22 +463,29 @@ def restore(key: str, outputs: list[Path], label: str) -> bool:
             return False
         blob = backend.get(key)
         if blob is None:
-            _log(f"miss  {label} ({key[:12]})")
+            # A MISS is why a COM build is about to run -- surface it at WARNING so
+            # it stands out when backtracing an unexpected rebuild, and drop a span
+            # event so the trace shows the miss right before the build it triggered.
+            _warn(f"miss  {label} ({key[:12]}) -> building locally")
+            _event("cache.miss", label, key)
             _record("restore_miss", label, key)
             return False
         _unpack(blob)
         _log(f"HIT   {label} ({key[:12]}) -> skipped COM build")
+        _event("cache.hit", label, key)
         prev = last_stored_key(label)
         if prev and prev != key:
-            _log(f"WARN  {label}: HIT under {key[:12]} but this seat last published "
-                 f"{prev[:12]} -- store-skip-on-hit drift; {key[:12]} is NOT being "
-                 f"re-published from here")
+            _warn(f"{label}: HIT under {key[:12]} but this seat last published "
+                  f"{prev[:12]} -- store-skip-on-hit drift; {key[:12]} is NOT being "
+                  f"re-published from here")
+            _event("cache.hit_drift", label, key, prev_key=prev[:12])
             _record("restore_hit_drift", label, key)
         else:
             _record("restore_hit", label, key)
         return True
     except Exception as exc:  # noqa: BLE001 -- cache must never break a build
-        _log(f"restore error for {label}: {exc!r} -- building locally")
+        _warn(f"restore error for {label}: {exc!r} -- building locally")
+        _event("cache.restore_error", label, key)
         _record("restore_error", label, key)
         return False
 
@@ -476,13 +505,16 @@ def store(key: str, outputs: list[Path], label: str) -> None:
             return
         present = [o for o in outputs if o.exists()]
         if not present:
-            _log(f"nothing to store for {label} (no outputs on disk)")
+            _warn(f"nothing to store for {label} (no outputs on disk)")
+            _event("cache.store_empty", label, key)
             _record("store_empty", label, key)
             return
         backend.put(key, _pack(present))
         _log(f"store {label} ({key[:12]})")
+        _event("cache.store", label, key)
         _save_stored_key(label, key)
         _record("store", label, key)
     except Exception as exc:  # noqa: BLE001
-        _log(f"store error for {label}: {exc!r} -- continuing")
+        _warn(f"store error for {label}: {exc!r} -- continuing")
+        _event("cache.store_error", label, key)
         _record("store_error", label, key)

@@ -1613,6 +1613,25 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
     else:
         target = script.removeprefix("build_").removesuffix("_assembly")
 
+    # Which pipeline stage this process is. ``run_build`` is also the entry for
+    # non-BUILD tools (verify.py, export_models.py, the diagnostics/ probes); only a
+    # build_<stem>.py / build_<stem>_assembly.py / refresh_assembly.py is a genuine
+    # part/assembly build. ``kind`` (None for the others) drives BOTH the build-body
+    # grouping span below and the fallback resource label -- the non-build entries
+    # set their own richer label (verify: verify-<suite>) or inherit dodo's.
+    if script == "refresh_assembly":
+        kind: str | None = "assembly"
+    elif script.startswith("build_"):
+        kind = "assembly" if script.endswith("_assembly") else "part"
+    else:
+        kind = None
+    # Resource label (Aspire "resource" column): dodo sets OTEL_SERVICE_NAME per
+    # subprocess, so under the spine this is a fallback-only no-op that KEEPS dodo's
+    # precise stage name; run standalone it self-labels as part-build / assembly-build
+    # so the column is still meaningful.
+    if kind is not None:
+        _telemetry.set_service(f"{kind}-build")
+
     async def _run() -> dict[str, str]:
         adapter = PyWin32Adapter({})
         async with _telemetry.aspan("sw.connect"):
@@ -1624,10 +1643,18 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
             adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
             _telemetry.success("CloseAllDocuments (clean session)")
         try:
-            # No wrapper span here: the build's own operations (the @traced
-            # _common helpers it calls) are the children, so the trace is a tree
-            # of real steps instead of one opaque "build <target>" monolith.
-            return await build(adapter)
+            # Group the build's own operations (inserts, the mate chokepoint, the
+            # per-config gates) under ONE ``<kind>.build`` phase span, a sibling of
+            # sw.connect/sw.disconnect. This is deliberately NOT the removed
+            # ``build.<target>`` ROOT layer (which mirrored the doit task span 1:1):
+            # it is an inner PHASE that separates the build proper from
+            # connect/teardown, so e.g. the ~40 mate spans read as children of
+            # "assembly.build drive-train" instead of a flat run under the task span.
+            # Non-build entries (verify/export/probes) keep their operations flat.
+            if kind is None:
+                return await build(adapter)
+            async with _telemetry.aspan(f"{kind}.build", target=target):
+                return await build(adapter)
         finally:
             # Teardown is its own span so a disconnect failure is attributable
             # and never a silent gap before process exit.
