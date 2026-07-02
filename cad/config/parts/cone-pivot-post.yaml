@@ -1,5 +1,5 @@
 cone-pivot-post:
   number: MHA-016
-  material: Plain Carbon Steel
+  material: Gray Cast Iron
   tolerance_class: machined_block
-  process: "machined (steel)"
+  process: "cast + machined"
