@@ -248,7 +248,7 @@ async def build(adapter) -> dict[str, str]:
             "create_plane bend profile (flipped)",
             await adapter.create_plane(
                 CreatePlaneParameters(
-                    mode="offset", base_plane="Top Plane", offset=LEG_TOP, flip=True
+                    mode="offset", base_plane="Top Plane", offset=-LEG_TOP
                 )
             ),
         )

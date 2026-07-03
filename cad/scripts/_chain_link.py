@@ -128,13 +128,13 @@ async def build_link(
 
     check("create_part", await adapter.create_part())
 
-    # Offset plane at the x=P pin station (Right Plane normal is +X, so
-    # flip=False steps +P); created first so the axes name as Axis1/Axis2.
+    # Offset plane at the x=P pin station (Right Plane normal is +X, so a
+    # positive offset steps +P); created first so the axes name as Axis1/Axis2.
     station_plane = check(
         "create_plane @ x=P",
         await adapter.create_plane(
             CreatePlaneParameters(
-                mode="offset", base_plane="Right Plane", offset=LINK_PITCH, flip=False
+                mode="offset", base_plane="Right Plane", offset=LINK_PITCH
             )
         ),
     )
