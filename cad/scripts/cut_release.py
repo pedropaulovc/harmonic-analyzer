@@ -92,11 +92,17 @@ SCENE_JSON = CAD_ROOT / "out" / "boxes" / f"{TOP_ASSEMBLY}.json"
 COMPARISONS_DIR = REPO_ROOT / "comparisons"
 RENDER_OFFLINE = COMPARISONS_DIR / "tools" / "render_offline.py"
 GALLERY_PY = COMPARISONS_DIR / "tools" / "gallery.py"
-# The gallery artefacts staged into the bundle's ``comparisons/``: the geometry-
-# derived renders/composites/scores/index are gitignored + regenerated here; the
-# fixed reference photos and the manifest ride along so the bundle is standalone.
+# The gallery artefacts staged into the bundle's ``comparisons/``: the DERIVED
+# refs/renders/composites/scores/index are gitignored + regenerated here (none is
+# tracked, so the refresh never dirties the worktree the tag pins); the manifest
+# (pose/align source of truth) and ATTRIBUTION.md (CC BY credits for the shipped
+# reference imagery) ride along so the downloaded bundle is standalone + compliant.
 _GALLERY_STAGE = ("ref", "render", "composite", "scores.json", "index.html",
-                  "manifest.json")
+                  "manifest.json", "ATTRIBUTION.md")
+# Regenerated-in-place gallery outputs wiped before each refresh so a removed or
+# renamed pair leaves no stale render/composite/score/ref behind to be staged.
+_GALLERY_OUTPUT_DIRS = ("ref", "render", "composite")
+_GALLERY_OUTPUT_FILES = ("scores.json", "index.html")
 _VERSION_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 
 # SolidWorks COM type library (SldWorks); the version pins the same revision the
@@ -297,10 +303,16 @@ def refresh_comparisons(stage: Path) -> dict[str, Any] | None:
     renderer (``render_offline.py`` -> Blender) reads the settled
     ``cad/out/stl`` + ``cad/out/boxes`` cache and regenerates each pair's CAD
     render, the pixel-registered composite and the RMS score, then ``gallery.py``
-    rebuilds the static index. Those artefacts are gitignored, regenerable (they
-    drift as geometry changes), so a release is the place a fresh snapshot is
-    published -- shipped inside the bundle so a consumer sees THIS model scored
-    against Michelson's ch30 photos.
+    rebuilds the static index. Every gallery output is gitignored + regenerable --
+    including the reference crops (``prepare_reference`` re-derives them from the
+    pinned ``references`` submodule) -- so nothing TRACKED is rewritten and the
+    refresh can never dirty the worktree the tag pins. A release is the place a
+    fresh snapshot is published -- shipped inside the bundle so a consumer sees
+    THIS model scored against Michelson's ch30 photos.
+
+    The generated outputs are wiped first so a removed/renamed pair leaves no
+    stale render/composite/score/ref behind to be staged, and the ``len(scores)``
+    summary reflects only the pairs actually (re)scored this run.
 
     BEST-EFFORT by design: the offline renderer needs Blender, which lives on a
     separate GPU seat, so a release cut on the SolidWorks seat (no Blender) logs
@@ -311,6 +323,12 @@ def refresh_comparisons(stage: Path) -> dict[str, Any] | None:
     with _telemetry.span("release.comparisons") as sp:
         try:
             log("refreshing comparison gallery from stable STLs (render_offline) ...")
+            # Regenerate-don't-repair: clear the (gitignored) gallery outputs so
+            # leftovers from a removed/renamed pair are never staged into the zip.
+            for d in _GALLERY_OUTPUT_DIRS:
+                shutil.rmtree(COMPARISONS_DIR / d, ignore_errors=True)
+            for f in _GALLERY_OUTPUT_FILES:
+                (COMPARISONS_DIR / f).unlink(missing_ok=True)
             _stream_cmd(["uv", "run", str(RENDER_OFFLINE)], "cmp")
             _stream_cmd(["uv", "run", str(GALLERY_PY)], "gallery")
         except Exception as exc:  # noqa: BLE001 -- best-effort; never block a release
