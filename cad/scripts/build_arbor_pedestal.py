@@ -1,17 +1,22 @@
-r"""Reproduction script: cylinder-arbor pedestal (book ch. 13 / eight-views).
+r"""Reproduction script: cylinder-arbor pedestal (book ch. 13 / video 4).
 
-Rectangular bearing post that clamps one end of the stationary cylinder
-arbor (two used, front and back, at z = +/-92). The gears spin freely on
-the arbor (DIMENSIONS.md ch. 13 "M6.2 keyway refutation"), so the post
-only has to hold the arbor still: a plain block with a clamp bore at the
-drive height. The posts are barely visible behind the gate legs in the
-eight views (8/8 shows the drum-end hardware) -- proportions are
-estimated, function-driven (low confidence).
+Black tapered bearing post that clamps the south end of the stationary
+cylinder arbor. The gears spin freely on the arbor (dimensions.yaml
+ch. 13 "M6.2 keyway refutation"), so the post only holds the arbor
+still. Still `t00393` / keyframe `v4_pinion_008` (engineerguy video 4)
+show its true shape -- NOT the old plain green block: a black japanned
+casting, a low rectangular foot flange carrying a thin strap that
+tapers up to a semicircular dome around the arbor clamp bore
+(base:top width ~1.2 in the frame, scaled off the 120T gear OD 62.2).
 
-Dimensions: cad/DIMENSIONS.md ch. 13 "Drive supports" (estimated, low).
+Layout: foot flange standing on the Top plane, centred at the origin
+in plan (X width x Z depth); tapered strap up +Y, mid-plane in Z; dome
++ bore along Z at y = BORE_HEIGHT. The strap profile is a trapezoid +
+a full circle boss (its upper half proud of the trapezoid = the dome)
+-- no arcs, only proven primitives (see build_connecting_rod's head
+for the anchored-polygon pattern).
 
-Layout: block standing on the Top plane, centred at the origin in plan
-(X width x Z depth), bore along Z at y = BORE_HEIGHT.
+Dimensions: cad/config/dimensions.yaml ch. 13 "Drive supports".
 
 Run (SolidWorks already open)::
 
@@ -24,9 +29,10 @@ import math
 import sys
 
 from _common import (
-    CASTING_GREEN,
     IN,
+    PANEL_BLACK,
     SketchDims,
+    anchor_point_to_origin,
     apply_color,
     apply_material,
     check,
@@ -40,15 +46,18 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
+    set_sketch_direct_db,
     volume_check,
 )
 
 PART_NAME = "arbor-pedestal"
-MATERIAL = "Gray Cast Iron"  # green-painted casting like the base
+MATERIAL = "Gray Cast Iron"  # black japanned casting (t00393)
 
-BLOCK_WIDTH = 24.0  # X; estimated, function-driven (low)
-BLOCK_DEPTH = 16.0  # Z; estimated, function-driven (low)
-BLOCK_HEIGHT = 63.0  # bore at 54 + 9 of material above (low)
+FOOT_WIDTH = 24.0  # X; the rocker-support foot rail sits 0.25 east -- keep
+FOOT_DEPTH = 16.0  # Z; front face -98.5 clears the portal south plate by 0.5
+FOOT_HEIGHT = 5.0  # the low flange under the strap (photo-scaled, low)
+STRAP_T = 10.0  # Z; thin strap centred on the foot (photo-scaled, low)
+TOP_RADIUS = 10.0  # dome radius = strap half-width at the top (24 -> 20 taper)
 BORE_DIA = 0.375 * IN  # 9.525: arbor diameter (ch. 13, legacy, med)
 BORE_HEIGHT = 54.0  # ch30 GT: drive height above base top (was 76)
 
@@ -60,46 +69,149 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations): the block's three extents, plus the
-    # bore diameter and its drive-height station. The mm suffix is load-bearing --
-    # this is an INCH document and the equation manager reads BARE numbers in
-    # document units (an unsuffixed 85 = 85 in). BlockHeight feeds the extrude
-    # DEPTH (a feature parameter, not a sketch dim), so it carries no drive job;
-    # it stays a declared knob like the exemplars.
-    await set_global(adapter, "BlockWidth", f"{BLOCK_WIDTH}mm")
-    await set_global(adapter, "BlockDepth", f"{BLOCK_DEPTH}mm")
-    await set_global(adapter, "BlockHeight", f"{BLOCK_HEIGHT}mm")
+    # Editable knobs (Tools > Equations): foot extents, strap thickness, dome
+    # radius, bore diameter + drive-height station. The mm suffix is
+    # load-bearing -- this is an INCH document and the equation manager reads
+    # BARE numbers in document units (an unsuffixed 54 = 54 in). FootHeight and
+    # StrapThickness feed extrude DEPTHS (feature parameters, not sketch dims),
+    # so they carry no drive job; they stay declared knobs like the exemplars.
+    await set_global(adapter, "FootWidth", f"{FOOT_WIDTH}mm")
+    await set_global(adapter, "FootDepth", f"{FOOT_DEPTH}mm")
+    await set_global(adapter, "FootHeight", f"{FOOT_HEIGHT}mm")
+    await set_global(adapter, "StrapThickness", f"{STRAP_T}mm")
+    await set_global(adapter, "TopRadius", f"{TOP_RADIUS}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
     await set_global(adapter, "BoreHeight", f"{BORE_HEIGHT}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Block footprint on the Top plane (sketch y = global -Z): an origin-centred
-    # rectangle, width along X x depth along Z.
-    block = SketchDims()
-    check("create_sketch block", await adapter.create_sketch("Top"))
+    # Foot flange on the Top plane (sketch y = global -Z): an origin-centred
+    # rectangle, width along X x depth along Z, extruded up.
+    foot = SketchDims()
+    check("create_sketch foot", await adapter.create_sketch("Top"))
     await define_centered_rectangle(
-        adapter, BLOCK_WIDTH / 2.0, BLOCK_DEPTH / 2.0, "block", dims=block,
-        name_width="Width", drive_width='"BlockWidth"',
-        name_depth="Depth", drive_depth='"BlockDepth"',
+        adapter, FOOT_WIDTH / 2.0, FOOT_DEPTH / 2.0, "foot", dims=foot,
+        name_width="Width", drive_width='"FootWidth"',
+        name_depth="Depth", drive_depth='"FootDepth"',
         name_corner=("CornerX", "CornerZ"),
-        drive_corner=('"BlockWidth" / 2', '"BlockDepth" / 2'),
+        drive_corner=('"FootWidth" / 2', '"FootDepth" / 2'),
     )
-    await ensure_fully_defined(adapter, "block sketch")
-    check("exit_sketch block", await adapter.exit_sketch())
-    name_last_feature(adapter, "BlockProfile")
-    drive_jobs += block.apply(adapter, "BlockProfile")
+    await ensure_fully_defined(adapter, "foot sketch")
+    check("exit_sketch foot", await adapter.exit_sketch())
+    name_last_feature(adapter, "FootProfile")
+    drive_jobs += foot.apply(adapter, "FootProfile")
     check(
-        "extrude block",
-        await adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_HEIGHT)),
+        "extrude foot",
+        await adapter.create_extrusion(ExtrusionParameters(depth=FOOT_HEIGHT)),
     )
-    name_last_feature(adapter, "Block")
-    v_block = BLOCK_WIDTH * BLOCK_DEPTH * BLOCK_HEIGHT
-    volume = await volume_check(adapter, "block", v_block, 0.005 * v_block)
+    name_last_feature(adapter, "Foot")
+    v_foot = FOOT_WIDTH * FOOT_DEPTH * FOOT_HEIGHT
+    volume = await volume_check(adapter, "foot", v_foot, 0.005 * v_foot)
 
-    # Arbor clamp bore along Z at the drive height. On-axis in X (x 0): only the
-    # bore-height centre dim + the diameter are display dims, so the "X" slot is
-    # ignored.
+    # Tapered strap: an isosceles trapezoid on the Front plane, root buried in
+    # the foot (bottom edge on the Top plane, y 0), flanks narrowing FootWidth
+    # -> 2 x TopRadius at the bore height, mid-plane extruded StrapThickness.
+    # Fully defined by: both horizontals, both width dims, the root corner
+    # anchored to the origin (on-axis y 0 -> one h-dist dim), the rise dim and
+    # the top corner's h-dist -- 8 coordinate constraints for 4 free vertices,
+    # no redundancy (the flanks' endpoints merged at creation carry none).
+    half_root = FOOT_WIDTH / 2.0
+    strap = SketchDims()
+    check("create_sketch strap", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    bottom = check(
+        "strap bottom",
+        await adapter.add_line(-half_root, 0.0, half_root, 0.0),
+    )
+    check(
+        "strap flank right",
+        await adapter.add_line(half_root, 0.0, TOP_RADIUS, BORE_HEIGHT),
+    )
+    top = check(
+        "strap top",
+        await adapter.add_line(TOP_RADIUS, BORE_HEIGHT, -TOP_RADIUS, BORE_HEIGHT),
+    )
+    check(
+        "strap flank left",
+        await adapter.add_line(-TOP_RADIUS, BORE_HEIGHT, -half_root, 0.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    for ent in (bottom, top):
+        check("strap horizontal", await adapter.add_sketch_constraint(ent, None, "horizontal"))
+    check(
+        "dimension strap root width",
+        await adapter.add_sketch_dimension(bottom, None, "linear", FOOT_WIDTH),
+    )
+    strap.record("StrapRootWidth", '"FootWidth"')
+    await anchor_point_to_origin(
+        adapter, f"{bottom}.start", -half_root, 0.0, "strap root corner"
+    )
+    strap.record("RootCornerX", '"FootWidth" / 2')
+    check(
+        "dimension strap top width",
+        await adapter.add_sketch_dimension(top, None, "linear", 2.0 * TOP_RADIUS),
+    )
+    strap.record("StrapTopWidth", '"TopRadius" * 2')
+    check(
+        "dimension strap rise",
+        await adapter.add_sketch_dimension(
+            f"{top}.start", f"{bottom}.end", "vertical_distance", BORE_HEIGHT
+        ),
+    )
+    strap.record("StrapRise", '"BoreHeight"')
+    check(
+        "dimension top corner x",
+        await adapter.add_sketch_dimension(
+            f"{top}.start", "origin", "horizontal_distance", TOP_RADIUS
+        ),
+    )
+    strap.record("TopCornerX", '"TopRadius"')
+    await ensure_fully_defined(adapter, "strap sketch")
+    check("exit_sketch strap", await adapter.exit_sketch())
+    name_last_feature(adapter, "StrapProfile")
+    drive_jobs += strap.apply(adapter, "StrapProfile")
+    check(
+        "extrude strap",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=STRAP_T, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "Strap")
+    a_trap = (FOOT_WIDTH + 2.0 * TOP_RADIUS) / 2.0 * BORE_HEIGHT
+    w_at_foot_top = FOOT_WIDTH - (FOOT_WIDTH - 2.0 * TOP_RADIUS) * FOOT_HEIGHT / BORE_HEIGHT
+    a_overlap = (FOOT_WIDTH + w_at_foot_top) / 2.0 * FOOT_HEIGHT
+    v_strap = (a_trap - a_overlap) * STRAP_T
+    volume = await volume_check(adapter, "strap", volume + v_strap, 0.005 * v_strap)
+
+    # Dome: a full circle boss centred on the bore station; its upper half
+    # stands proud of the trapezoid top (the round head in t00393), its lower
+    # half is contained by the flanks (half-width sqrt(R^2 - dy^2) <= R <=
+    # trapezoid half-width below the top edge), so the union adds exactly a
+    # half disc. On-axis in X (x 0): centre-height dim + diameter only.
+    dome = SketchDims()
+    check("create_sketch dome", await adapter.create_sketch("Front"))
+    await define_circle(
+        adapter, 0.0, BORE_HEIGHT, TOP_RADIUS, "dome", dims=dome,
+        names=("DomeX", "DomeCy", "DomeDia"),
+        drives=(None, '"BoreHeight"', '"TopRadius" * 2'),
+    )
+    await ensure_fully_defined(adapter, "dome sketch")
+    check("exit_sketch dome", await adapter.exit_sketch())
+    name_last_feature(adapter, "DomeProfile")
+    drive_jobs += dome.apply(adapter, "DomeProfile")
+    check(
+        "extrude dome",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=STRAP_T, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "Dome")
+    v_dome = math.pi * TOP_RADIUS**2 / 2.0 * STRAP_T
+    volume = await volume_check(adapter, "dome", volume + v_dome, 0.005 * v_dome)
+
+    # Arbor clamp bore along Z at the drive height, through the strap. On-axis
+    # in X (x 0): only the bore-height centre dim + the diameter are display
+    # dims, so the "X" slot is ignored.
     bore = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Front"))
     await define_circle(
@@ -114,11 +226,11 @@ async def build(adapter) -> dict[str, str]:
     check(
         "cut bore",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=BLOCK_DEPTH + 4.0, both_directions=True)
+            ExtrusionParameters(depth=STRAP_T + 4.0, both_directions=True)
         ),
     )
     name_last_feature(adapter, "Bore")
-    v_bore = math.pi * BORE_RADIUS**2 * BLOCK_DEPTH
+    v_bore = math.pi * BORE_RADIUS**2 * STRAP_T
     volume = await volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
     v_final = volume
 
@@ -131,7 +243,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "driven pedestal (equations neutral)", v_final, 0.01 * v_bore)
 
     await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, CASTING_GREEN)
+    await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

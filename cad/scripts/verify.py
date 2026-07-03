@@ -867,7 +867,7 @@ def verify_base_footprint(report: Report) -> None:
         # drive-train import, not base-swept here.)
         mounts = (
             ("arbor-pedestal", train.X_DRUM, -train.ARBOR_PEDESTAL_Z,
-             arbor_post.BLOCK_WIDTH / 2.0, arbor_post.BLOCK_DEPTH / 2.0),
+             arbor_post.FOOT_WIDTH / 2.0, arbor_post.FOOT_DEPTH / 2.0),
             # base-bolted statics; head/washer is each one's widest plan extent
             ("cone-lock-knob", train.KNOB_X, train.KNOB_Z,
              train.KNOB_WASHER_DIA / 2.0, train.KNOB_WASHER_DIA / 2.0),
