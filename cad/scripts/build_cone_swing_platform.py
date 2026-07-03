@@ -19,9 +19,12 @@ point); local +Z runs along increasing cone station, so the wide south
 edge sits at local z = NORTH_OVERHANG - PLATE_LEN and the narrow north
 edge overhangs the pivot by NORTH_OVERHANG. A O6.35 pivot hole marks the
 pivot screw. A LOCK LOBE on the wide end's machine-west flank carries
-the stadium LOCK SLOT the cone-lock-knob's stud rides (v4_t00411 "knob";
-see the constants block) -- tightening the knob clamps the plate locked
-engaged or locked disengaged. The lobe makes the part CHIRAL, so the
+the OPEN-ENDED LOCK NOTCH the cone-lock-knob's stud rides (v4_t00411
+"knob"; see the constants block) -- the notch's mouth opens through the
+lobe's outer edge, so disengaging swings the plate clear of the stud
+entirely (v4_t00417) and the screwed-down knob then fences the mouth,
+locking the plate engaged OR disengaged. The lobe makes the part CHIRAL,
+so the
 script is AUTHORED MIRRORED under MIRROR_PLANE "x0" (constants block has
 the details). Named refs for the assembly: "swing pivot"
 (vertical axis through the origin) and "PlateTop" (datum plane on the
@@ -65,25 +68,30 @@ MATERIAL = "Plain Carbon Steel"  # black-finished steel plate (p.18 dark wedge)
 PLATE_T = 6.35  # 1/4" plate (low)
 HALF_WIDTH_S = 20.0  # south (big-end) half-width -- wide end of the wedge
 HALF_WIDTH_N = 12.0  # north (pivot/tip) half-width -- narrow end
-PLATE_LEN = 215.0  # north edge -> south edge along the cone axis: covers the
-# pivot post's south flank by 1.5 while keeping ~1.9 true (corner) air to the
-# crank pedestal -- the south edge is slanted in machine z, so the assembly
-# asserts the gap in the plate's own frame
+PLATE_LEN = 214.0  # north edge -> south edge along the cone axis: covers the
+# pivot post's south flank by 0.5 while keeping ~3.9 air to the crank pedestal
+# engaged and ~1.9 at the disengaged swing -- the south edge is slanted in
+# machine z, so the assembly asserts the gap in the plate's own frame at BOTH
+# poses
 NORTH_OVERHANG = 7.0  # pivot -> north edge (plate continues past the pivot)
 PIVOT_HOLE_DIA = 6.35  # pivot screw clearance hole at the origin
 
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total (both_directions splits it half per
 # side of the sketch plane); must exceed 2x any extent crossed
 
-# --- lock lobe + slot (the v4_t00411 clamp knob rides this) ------------------
-# A lobe on the wide end's machine-WEST flank carries an arc slot centred on
-# the swing pivot; the cone-lock-knob's stud (fixed to the base, between the
-# pivot post and the arbor pedestal -- the video's "between bracket and green
-# column" gap) passes through it. Tightening clamps the plate at either slot
-# end: locked ENGAGED (the as-built pose) or locked DISENGAGED (plate swung
-# +SLOT_STOP_DEG). The arc is modeled as its CHORD (a straight stadium slot):
-# at R~192 over 5 deg the sagitta is 0.18, absorbed by the
-# O6.35-stud-in-8.0-slot clearance.
+# --- lock lobe + notch (the v4_t00411 clamp knob rides this) -----------------
+# A lobe on the wide end's machine-WEST flank carries an OPEN-ENDED lock
+# notch: a slot-width channel from the engaged stud seat out THROUGH the
+# lobe's outer edge (the mouth). The cone-lock-knob's stud (fixed to the
+# base, between the pivot post and the arbor pedestal) sits at the notch's
+# closed end when engaged; on disengage the plate swings until its edge
+# passes the stud entirely -- v4_t00417 shows the bolt standing PAST the
+# plate edge. That open mouth is what makes the DISENGAGED lock work:
+# screwed down with no plate under it, the knob's washer drops past
+# plate-top level and fences the mouth, so the plate cannot swing back in
+# until the knob is raised (and tightened ON the plate it clamps ENGAGED).
+# The notch runs along the swing arc's CHORD: at R~192 over ~3 deg to the
+# mouth the sagitta is ~0.07, absorbed by the O6.35-stud-in-8.0 clearance.
 #
 # AUTHORED MIRRORED (the crank-pedestal precedent): the lobe made this part
 # CHIRAL, so it carries MIRROR_PLANE "x0" in _transforms.py and every local-x
@@ -91,22 +99,29 @@ THROUGH_CUT_DEPTH = 40.0  # mid-plane total (both_directions splits it half per
 # realises the insertion as this part reflected about its own x = 0, landing
 # the lobe machine-west. The assembly negates x at its transform boundary.
 LOBE_X_IN = 15.0  # lobe rectangle's inner edge x -- overlaps the taper
-LOBE_REACH = 32.5  # inner edge -> outer extent (x 15 -> 47.5): machine-west,
-# keeping >3.5 plan air to the arbor-pedestal block (asserted in the assembly)
+LOBE_REACH = 19.5  # inner edge -> outer extent (x 15 -> 34.5): machine-west,
+# clear of the arbor-pedestal block (asserted in the assembly). Sized with the
+# notch: the mouth sits washer-radius past the engaged seat (the knob's O18
+# washer still beds fully across the notch line when clamped), and the short
+# exit keeps the disengage swing small enough that the plate's south edge
+# stays off the crank pedestal (asserted in the assembly at both poses).
 LOBE_Z_N = -179.5  # lobe north edge (local z)
 LOBE_Z_S = -197.0  # lobe south edge
-SLOT_W = 8.0  # slot width: O6.35 stud + chord-vs-arc slack (see above)
-SLOT_STOP_DEG = 5.0  # disengaged stop: 167.75*sin(5deg) ~ 14.6 tooth
-# separation at the T120 -- visibly and mechanically out of mesh
+SLOT_W = 8.0  # notch width: O6.35 stud + chord-vs-arc slack (see above)
 SLOT_E_X, SLOT_E_Z = 24.5, -190.1  # engaged stud centre (authored frame)
-_SLOT_R = math.hypot(SLOT_E_X, SLOT_E_Z)  # 191.67 about the swing pivot
-SLOT_TRAVEL = _SLOT_R * math.radians(SLOT_STOP_DEG)  # 16.73 chord length
-# The plate swings +stop (big end away from the drum), so in PLATE coords the
+SLOT_R = math.hypot(SLOT_E_X, SLOT_E_Z)  # 191.67 about the swing pivot
+# The plate swings + (big end away from the drum), so in PLATE coords the
 # fixed stud sweeps the INVERSE rotation; in the AUTHORED (mirrored) frame
 # that is unit direction (-z, x)/R at E -- outward (+x), slightly north (+z).
-_SLOT_TX, _SLOT_TZ = -SLOT_E_Z / _SLOT_R, SLOT_E_X / _SLOT_R
-SLOT_W_X = SLOT_E_X + SLOT_TRAVEL * _SLOT_TX  # 41.09: disengaged stud centre
-SLOT_W_Z = SLOT_E_Z + SLOT_TRAVEL * _SLOT_TZ  # -187.96
+_SLOT_TX, _SLOT_TZ = -SLOT_E_Z / SLOT_R, SLOT_E_X / SLOT_R
+# Stud travel (in plate coords) from the engaged seat to the mouth: where the
+# chord crosses the lobe's outer edge. Past this the stud is OUT of the plate;
+# the assembly derives the disengaged pose (edge clear of the knob washer,
+# DISENGAGE_DEG) from it.
+NOTCH_EXIT_TRAVEL = (LOBE_X_IN + LOBE_REACH - SLOT_E_X) / _SLOT_TX  # 10.08
+_MOUTH_OVERSHOOT = 4.0  # cut ends past the edge so the mouth opens clean
+_SLOT_OUT_X = SLOT_E_X + (NOTCH_EXIT_TRAVEL + _MOUTH_OVERSHOOT) * _SLOT_TX
+_SLOT_OUT_Z = SLOT_E_Z + (NOTCH_EXIT_TRAVEL + _MOUTH_OVERSHOOT) * _SLOT_TZ
 
 
 async def build(adapter) -> dict[str, str]:
@@ -230,66 +245,67 @@ async def build(adapter) -> dict[str, str]:
     v_lobe = (LOBE_REACH * _span - _overlap) * PLATE_T
     volume = await volume_check(adapter, "lock lobe", volume + v_lobe, 0.005 * v_lobe)
 
-    # Lock slot: stadium = rotated rectangle cut + two end-cap circle cuts,
-    # every delta analytic. Sketch-frame direction/normal of the chord:
+    # Lock notch: open-ended channel = rotated rectangle cut (engaged seat ->
+    # past the lobe's outer edge, opening the mouth) + ONE end-cap circle cut
+    # at the closed engaged end. The mouth crossing is symmetric about the
+    # chord centreline, so the in-material rectangle volume is exactly
+    # width x NOTCH_EXIT_TRAVEL. Sketch-frame direction/normal of the chord:
     _dx, _dy = _SLOT_TX, -_SLOT_TZ
     _nx, _ny = (-_dy * SLOT_W / 2.0, _dx * SLOT_W / 2.0)
     _e = (SLOT_E_X, -SLOT_E_Z)
-    _w = (SLOT_W_X, -SLOT_W_Z)
+    _out = (_SLOT_OUT_X, -_SLOT_OUT_Z)
     slot = SketchDims()
-    check("create_sketch lock slot", await adapter.create_sketch("Top"))
+    check("create_sketch lock notch", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     slot_pts = [
         (_e[0] + _nx, _e[1] + _ny),
-        (_w[0] + _nx, _w[1] + _ny),
-        (_w[0] - _nx, _w[1] - _ny),
+        (_out[0] + _nx, _out[1] + _ny),
+        (_out[0] - _nx, _out[1] - _ny),
         (_e[0] - _nx, _e[1] - _ny),
     ]
     slot_lines = await add_line_chain(adapter, slot_pts)
     set_sketch_direct_db(adapter, False)
     await define_polygon_chain(
-        adapter, slot_lines, slot_pts, label="lock slot", dims=slot,
+        adapter, slot_lines, slot_pts, label="lock notch", dims=slot,
         names=["SlotAnchorX", "SlotAnchorZ", "SlotRunDx", "SlotRunDy",
                "SlotEndDx", "SlotEndDy", "SlotBackDx", "SlotBackDy"],
         drives=[None] * 8,
     )
-    await ensure_fully_defined(adapter, "lock slot sketch")
-    check("exit_sketch lock slot", await adapter.exit_sketch())
-    name_last_feature(adapter, "LockSlotProfile")
-    drive_jobs += slot.apply(adapter, "LockSlotProfile")
+    await ensure_fully_defined(adapter, "lock notch sketch")
+    check("exit_sketch lock notch", await adapter.exit_sketch())
+    name_last_feature(adapter, "LockNotchProfile")
+    drive_jobs += slot.apply(adapter, "LockNotchProfile")
     check(
-        "cut lock slot",
+        "cut lock notch",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
-    name_last_feature(adapter, "LockSlot")
-    v_slot = SLOT_TRAVEL * SLOT_W * PLATE_T
-    volume = await volume_check(adapter, "lock slot", volume - v_slot, 0.01 * v_slot)
+    name_last_feature(adapter, "LockNotch")
+    v_slot = NOTCH_EXIT_TRAVEL * SLOT_W * PLATE_T
+    volume = await volume_check(adapter, "lock notch", volume - v_slot, 0.01 * v_slot)
 
+    # Closed-end cap at the engaged seat (the mouth end is open -- no W cap).
     v_cap = math.pi * (SLOT_W / 2.0) ** 2 / 2.0 * PLATE_T
-    for tag, (cx, cy) in (("E", _e), ("W", _w)):
-        cap = SketchDims()
-        check(f"create_sketch slot cap {tag}", await adapter.create_sketch("Top"))
-        await define_circle(
-            adapter, cx, cy, SLOT_W / 2.0, f"slot cap {tag}", dims=cap,
-            names=(f"Cap{tag}Cx", f"Cap{tag}Cz", f"Cap{tag}Dia"),
-            drives=(None, None, '"SlotW"'),
-        )
-        await ensure_fully_defined(adapter, f"slot cap {tag} sketch")
-        check(f"exit_sketch slot cap {tag}", await adapter.exit_sketch())
-        name_last_feature(adapter, f"LockSlotCap{tag}Profile")
-        drive_jobs += cap.apply(adapter, f"LockSlotCap{tag}Profile")
-        check(
-            f"cut slot cap {tag}",
-            await adapter.create_cut_extrude(
-                ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
-            ),
-        )
-        name_last_feature(adapter, f"LockSlotCap{tag}")
-        volume = await volume_check(
-            adapter, f"slot cap {tag}", volume - v_cap, 0.02 * v_cap
-        )
+    cap = SketchDims()
+    check("create_sketch notch cap E", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter, _e[0], _e[1], SLOT_W / 2.0, "notch cap E", dims=cap,
+        names=("CapECx", "CapECz", "CapEDia"),
+        drives=(None, None, '"SlotW"'),
+    )
+    await ensure_fully_defined(adapter, "notch cap E sketch")
+    check("exit_sketch notch cap E", await adapter.exit_sketch())
+    name_last_feature(adapter, "LockNotchCapEProfile")
+    drive_jobs += cap.apply(adapter, "LockNotchCapEProfile")
+    check(
+        "cut notch cap E",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "LockNotchCapE")
+    volume = await volume_check(adapter, "notch cap E", volume - v_cap, 0.02 * v_cap)
 
     # Apply the deferred drive equations after the model + a rebuild exist, then
     # re-check: every equation evaluates to the value just built, so geometry

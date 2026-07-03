@@ -877,12 +877,12 @@ def verify_base_footprint(report: Report) -> None:
         # incline about its pivot: sweep its trapezoid corners AND the lock
         # lobe's rectangle corners (the platform is authored MIRRORED under
         # MIRROR_PLANE "x0", so the lobe's authored +x constants negate into
-        # this pre-mirror frame). The lock knob clamps the plate at either
-        # slot end, so sweep every corner at BOTH poses: engaged (the cone
-        # incline) and disengaged (incline + the slot's stop angle -- the
-        # same rotation sense the slot's stud-sweep tangent encodes). (The
-        # pivot post and tip block ride the PLATE, not the base -- their
-        # plate containment is asserted at drive-train import.)
+        # this pre-mirror frame). The lock notch is open-ended, so the
+        # disengaged pose is the plate swung until its edge clears the knob
+        # washer (train.DISENGAGE_DEG, derived from the notch geometry) --
+        # sweep every corner at BOTH poses. (The pivot post and tip block
+        # ride the PLATE, not the base -- their plate containment is
+        # asserted at drive-train import.)
         pv = train.cone_station(train.PIVOT_STATION)
         lobe_out = platform.LOBE_X_IN + platform.LOBE_REACH
         corners_local = (
@@ -900,7 +900,7 @@ def verify_base_footprint(report: Report) -> None:
         poses = (
             ("engaged", math.radians(train.INCLINE_DEG)),
             ("disengaged",
-             math.radians(train.INCLINE_DEG + platform.SLOT_STOP_DEG)),
+             math.radians(train.INCLINE_DEG + train.DISENGAGE_DEG)),
         )
         for pose, ang in poses:
             cos_a, sin_a = math.cos(ang), math.sin(ang)
