@@ -230,13 +230,17 @@ motion/truth and the `all` aggregate are gone.
 battery on each (DOF / over-constrained / model-healthy-deep / interference /
 gear-ratios / component-count). The **DOF gate adapts to how the model was built**
 (see "Default-free DOF" below): an assembly with an expected free operational DOF
-(today only drive-train, when built `free`) is checked by the **park-driver closure**
-— assert exactly the expected number of `PARK_*` mates are suppressed, re-engage them,
-confirm the model goes fully defined (0 under-constrained), then restore the free pose
-— instead of the strict "every component fully defined". Every assembly with nothing
-parked-free (the default for all others, and drive-train built `locked`) gets the
-strict 0-DOF check, unchanged. All NON-DOF gates always run on the as-built model.
-`subsystems` runs ONLY the subsystem-SPECIFIC gate
+(drive-train + channel, when built `free`) is checked by the **necessity gate**
+(`assert_free_dof_necessity`) — assert at least the expected number of top-level
+components read under-constrained, i.e. the operational DOF are genuinely free —
+instead of the strict "every component fully defined". Because the freed-DOF park
+drivers are now DEFERRED (not authored in the saved model, see below), soundness has
+nothing to re-engage, so the exact-count **SUFFICIENCY** proof (author the drivers →
+0 DOF) moves to the opt-in **release preflight** (`preflight_release.py` /
+`assert_park_closure`), which replays the recorded specs then discards the model
+unsaved. Every assembly with nothing parked-free (the default for all others, and
+either built `locked`) gets the strict 0-DOF check, unchanged. All NON-DOF gates
+always run on the as-built model. `subsystems` runs ONLY the subsystem-SPECIFIC gate
 soundness doesn't — currently just the `channel` assembly's 20-way moving-stem
 instance independence — so it opens only `channel`. (It used to re-open all 8 and
 repeat the whole battery, ~95% duplicate COM work and the biggest spine time sink;
@@ -246,31 +250,46 @@ the shared battery is always proven before subsystems.
 ## Default-free DOF (operational kinematics)
 
 The default build saves a **working kinematic model**, NOT a frozen one: the
-predetermined operational DOF are left FREE. Today that is drive-train's **crank
-spin** — drag the crank in the saved `.SLDASM` and the whole geared train turns
-(1 DOF). The cone-post swing and channel amplitude bars stay park-driven at their
+predetermined operational DOF are left FREE. That is drive-train's **crank spin**
+(1 DOF — drag the crank in the saved `.SLDASM` and the whole geared train turns)
+plus channel's **3 DOF per active channel** (rocker swing + connecting-rod follow +
+amplitude-bar slide). The cone-post swing and pinion swing stay park-driven at their
 engaged pose (setup/disengage motions, exercised by the motion/mobility suites).
 
-The mechanism is **author-but-suppress**. Every reproducibility-locking mate is
-still authored exactly as before, its feature renamed to `PARK_<key>` (e.g.
-`PARK_crank_angle`) so the tree documents the role and the DOF gate can find it
-(`_assembly.PARK_PREFIX`, `mark_park_driver`, `find_park_drivers`). In the default
-build the `PARK_*` mate is **suppressed** (pins nothing → the DOF is free); a
-`locked` build leaves it **engaged** (today's fully-defined, byte-reproducible
-snapshot — an explicit opt-in for a pinned export).
+The mechanism is **defer-and-replay** (was author-but-suppress). A freed-DOF park
+driver is NOT authored by the build at all — authoring each is an expensive mate
+solve that a `free` build only suppressed away again, so skipping it saves build
+time and leaves the DOF genuinely free. Instead the build RECORDS each driver's
+resolved spec (`free_dof_key=…` on the `*_driver` helpers → `_assembly` records
+`entities`/scalars/verify target) into a sidecar `.<stem>.park.json` beside the
+`.SLDASM` (a cached assembly output, so it rides the remote cache). The **release
+preflight** (`preflight_release.py`, a COM-spine task gating `release`, opt-in and
+NOT in `build`) replays those specs on a reopened free model, authors each engaged
++ `PARK_<key>`, proves the model then goes fully defined (0 DOF = the drivers are
+the sole freedom), and DISCARDS the model **without saving** — so the shipped
+`.SLDASM` stays the free kinematic model. "Gates re-evaluated as preflight, then
+release continues as before."
 
-Per-assembly mode lives in `cad/config/machine/build_lock.yaml`, read as a literal
-`_config.machine("build_lock", "<stem>")` so it tokenises into that assembly's doit
-`file_dep` + remote-cache digest: flipping `free`↔`locked` rebuilds ONLY that
-assembly and keys the cache to a distinct artefact. The flag is the CONFIG value
-(in the digest), never an env var (which would collide free/locked under one key).
-Release/export inherit the configured mode — no force-lock.
+Distinct from a freed-DOF driver is an ENGAGED park/setup driver (e.g.
+`PARK_pinion_swing`) held at a pose in the free model: it does real work in the
+saved model, so it is authored as usual (`mark_park_driver`), never deferred.
 
-There is **no scalar DOF API** in SolidWorks COM. "Exactly N free DOF" is proven by
-the park-driver closure check (`assert_expected_free_dof`) and, end-to-end, by
-`build_mobility_probe.py`, which re-engages all `PARK_*` for its 0-DOF baseline then
-suppresses each driver to show it frees its own part family. See
-`memory/default-free-dof-park-drivers.md`.
+A `locked` build authors every park driver engaged and renames it `PARK_<key>` —
+today's fully-defined, byte-reproducible snapshot, an explicit opt-in for a pinned
+export. Per-assembly mode lives in `cad/config/machine/build_lock.yaml`, read as a
+literal `_config.machine("build_lock", "<stem>")` so it tokenises into that
+assembly's doit `file_dep` + remote-cache digest: flipping `free`↔`locked` rebuilds
+ONLY that assembly and keys the cache to a distinct artefact. The flag is the CONFIG
+value (in the digest), never an env var. Release/export inherit the configured mode.
+
+There is **no scalar DOF API** in SolidWorks COM. At build time `soundness` proves
+only **necessity** (`assert_free_dof_necessity`: ≥ N components under-constrained).
+The exact **sufficiency** count is proven at release by `assert_park_closure`
+(replay every recorded driver → 0 DOF) and, as a hand-run diagnostic, by
+`build_mobility_probe.py` — which now REPLAYS the deferred specs (`replay_park_specs`)
+to reconstitute the drivers before its 0-DOF baseline, then suppresses each to show
+it frees its own part family. `build_motion_setup_drives.py` treats a deferred
+(absent) driver as already-free. See `memory/default-free-dof-park-drivers.md`.
 
 ## Stamps & incrementality
 

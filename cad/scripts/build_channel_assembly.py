@@ -101,23 +101,26 @@ from _common import (
 )
 from _assembly import (
     assert_expected_free_dof,
+    assert_free_dof_necessity,
     bore_axis_ref,
     check_no_interference,
     coincident_mate,
+    collected_park_specs,
     component_names,
     component_transform,
     concentric_mate,
     distance_driver,
     is_locked_build,
-    mark_park_driver,
     named_ref,
     PARK_PREFIX,
     parallel_mate,
     place_component,
     place_components_batch,
     save_assembly_and_images,
+    set_park_defer,
     spin_driver,
     world_point,
+    write_park_specs,
 )
 from _transforms import MIRROR_PLANE, rows_from_euler
 from build_cylinder_gear import ECCENTRICITY as CAM_ECC  # cam lobe throw (mm):
@@ -663,6 +666,9 @@ async def _revolute(
         )
     else:
         raise RuntimeError(f"_revolute: unknown axial spec {axial!r}")
+    # ``park_spin`` (a key) makes the spin a FREED operational-DOF park driver:
+    # deferred+recorded in a `free` build (the rocker swing stays free), authored
+    # engaged + PARK_<key> in a `locked` build. ``None`` keeps it a hard pin.
     spin = await spin_driver(
         adapter,
         named_ref(f"{off_axis_name}@{comp}", "AXIS"),
@@ -670,9 +676,8 @@ async def _revolute(
         (off_design[0], off_design[1]),
         label=f"{label} spin -> {off_design[0]:.1f},{off_design[1]:.1f}",
         verify=(comp, tgt),
+        free_dof_key=park_spin,
     )
-    if park_spin is not None:
-        await mark_park_driver(adapter, spin, park_spin)
     return spin
 
 
@@ -897,6 +902,9 @@ async def build(adapter) -> dict[str, str]:
             leads=(SPRING_BOTTOM_LEAD, SPRING_TOP_LEAD), views=[], eye_axes=True)
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
+    # `free` (default) DEFERS the freed-DOF park drivers (records, does not author);
+    # `locked` authors them engaged. Set before any *_driver(free_dof_key=...) call.
+    set_park_defer(not LOCK)
     check("create_assembly", await adapter.create_assembly())
 
     # Shafts. The pivot-shaft is inserted FIRST, so SolidWorks auto-fixes it as
@@ -1081,13 +1089,13 @@ async def build(adapter) -> dict[str, str]:
             label=f"J2 rod ch{j:02d} axial d={abs(rod_tgt[2] - z_mid):.2f} <- {rocker}",
             verify=(rod, rod_tgt),
         )
-        rod_spin = await spin_driver(
+        await spin_driver(
             adapter, named_ref(f"Axis1@{rod}", "AXIS"),
             (rod_pin[0], rod_pin[1]), (rod_ring[0], rod_ring[1]),
             label=f"J2 rod ch{j:02d} swing -> ring {rod_ring[0]:.1f},{rod_ring[1]:.1f}",
             verify=(rod, rod_tgt),
+            free_dof_key=f"rod_swing_{j:02d}",
         )
-        await mark_park_driver(adapter, rod_spin, f"rod_swing_{j:02d}")
         park_names.append(f"{PARK_PREFIX}rod_swing_{j:02d}")
         # J4 lever revolute (fulcrum OD ↔ fulcrum bore; spin via the bar pin).
         # The lever shares the channel mid-plane with the rocker (both mid-plane
@@ -1133,19 +1141,20 @@ async def build(adapter) -> dict[str, str]:
             label=f"J3 bar ch{j:02d} axial coincident mid-plane <- {rocker}",
             verify=(bar, bar_tgt),
         )
-        bar_park = await distance_driver(
+        # The foot-X driver is a FREED operational-DOF park driver (``free_dof_key``)
+        # so a `free` build defers it -> the bar swings about its top pin = slides
+        # the foot along the rocker arc, the amplitude DOF (request #1). It stays a
+        # part<->root-plane distance (the motion study's driver classifier only
+        # recognises one real part + the sub root), so it is NOT chained off a
+        # neighbour like the rocker axial.
+        await distance_driver(
             adapter,
             named_ref(f"Axis2@{bar}", "AXIS"), named_ref("Right Plane", "PLANE"),
             abs(foot[0]),
             label=f"J3 bar ch{j:02d} AMPLITUDE park foot-X={foot[0]:.2f} (amp {amplitude:+.1f})",
             verify=(bar, bar_tgt),
+            free_dof_key=f"bar_amplitude_{j:02d}",
         )
-        # Mark the foot-X driver PARK so the free build suppresses it -> the bar
-        # swings about its top pin = slides the foot along the rocker arc, the
-        # amplitude DOF (request #1). It stays a part<->root-plane distance (the
-        # motion study's driver classifier only recognises one real part + the
-        # sub root), so it is NOT chained off a neighbour like the rocker axial.
-        await mark_park_driver(adapter, bar_park, f"bar_amplitude_{j:02d}")
         park_names.append(f"{PARK_PREFIX}bar_amplitude_{j:02d}")
 
         # Return spring (ground; cosmetic) -- placed PER CHANNEL spanning this
@@ -1235,20 +1244,24 @@ async def build(adapter) -> dict[str, str]:
         _verify_pattern_z(adapter, "pivot-bushing", z_gap_planes, "pivot-bushing bank")
         _verify_pattern_z(adapter, "lever-bushing", z_gap_planes, "lever-bushing bank")
 
-    # Default-free kinematic model: suppress the PARK_* drivers so the per-channel
-    # operational DOF (rocker swing + rod follow + bar amplitude) are FREE; `locked`
-    # leaves them engaged for a fully-defined reproducible snapshot. The DOF gate
-    # then adapts -- the park-driver closure proves EXACTLY the freed count (re-engage
-    # -> 0 under-constrained, then restore the free pose); locked -> strict 0-DOF.
-    if not LOCK:
-        from solidworks_mcp.adapters.base import SuppressMateParameters
-        for name in park_names:
-            check(
-                f"suppress {name} (free the operational DOF)",
-                await adapter.suppress_mate(SuppressMateParameters(name=name, suppress=True)),
+    # Default-free kinematic model: the per-channel operational DOF (rocker swing +
+    # rod follow + bar amplitude) are FREE because their park drivers were DEFERRED
+    # (recorded, not authored) -- nothing to suppress. `locked` authored them
+    # engaged for a fully-defined reproducible snapshot. free -> necessity only (the
+    # freed DOF are genuinely free; the exact-count closure runs in the release
+    # preflight against the recorded specs); locked -> strict 0-DOF.
+    if LOCK:
+        await assert_expected_free_dof(adapter, 0)
+    else:
+        n_deferred = len(collected_park_specs())
+        if n_deferred != len(park_names):
+            raise RuntimeError(
+                f"recorded {n_deferred} deferred park spec(s) but expected "
+                f"{len(park_names)} ({sorted(park_names)}) -- a free_dof_key was "
+                "dropped or double-counted"
             )
-        adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
-    await assert_expected_free_dof(adapter, 0 if LOCK else len(park_names))
+        assert_free_dof_necessity(adapter, len(park_names))
+        write_park_specs(ASM_NAME)
     check_no_interference(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)
 
