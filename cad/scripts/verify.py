@@ -862,6 +862,9 @@ def verify_base_footprint(report: Report) -> None:
              pedestal.PEDESTAL_DIA / 2.0, pedestal.PEDESTAL_DIA / 2.0),
             ("arbor-pedestal", train.X_DRUM, -train.ARBOR_PEDESTAL_Z,
              arbor_post.BLOCK_WIDTH / 2.0, arbor_post.BLOCK_DEPTH / 2.0),
+            # base-bolted static; the washer flange is its widest plan extent
+            ("cone-lock-knob", train.KNOB_X, train.KNOB_Z,
+             train.KNOB_WASHER_DIA / 2.0, train.KNOB_WASHER_DIA / 2.0),
         )
         for label, cx, cz, hx, hz in mounts:
             _expect(
@@ -871,24 +874,45 @@ def verify_base_footprint(report: Report) -> None:
                 f"plate (+-{half_len:.2f}, +-{half_wid:.2f})",
             )
         # The cone swing platform lies flat on the base rotated by the cone
-        # incline about its pivot: sweep its trapezoid corners. (The pivot
-        # post and tip block ride the PLATE, not the base -- their plate
-        # containment is asserted at drive-train import.)
+        # incline about its pivot: sweep its trapezoid corners AND the lock
+        # lobe's rectangle corners (the platform is authored MIRRORED under
+        # MIRROR_PLANE "x0", so the lobe's authored +x constants negate into
+        # this pre-mirror frame). The lock knob clamps the plate at either
+        # slot end, so sweep every corner at BOTH poses: engaged (the cone
+        # incline) and disengaged (incline + the slot's stop angle -- the
+        # same rotation sense the slot's stud-sweep tangent encodes). (The
+        # pivot post and tip block ride the PLATE, not the base -- their
+        # plate containment is asserted at drive-train import.)
         pv = train.cone_station(train.PIVOT_STATION)
+        lobe_out = platform.LOBE_X_IN + platform.LOBE_REACH
         corners_local = (
-            (-platform.HALF_WIDTH_N, platform.NORTH_OVERHANG),
-            (platform.HALF_WIDTH_N, platform.NORTH_OVERHANG),
-            (platform.HALF_WIDTH_S, platform.NORTH_OVERHANG - platform.PLATE_LEN),
-            (-platform.HALF_WIDTH_S, platform.NORTH_OVERHANG - platform.PLATE_LEN),
+            ("trapezoid", -platform.HALF_WIDTH_N, platform.NORTH_OVERHANG),
+            ("trapezoid", platform.HALF_WIDTH_N, platform.NORTH_OVERHANG),
+            ("trapezoid", platform.HALF_WIDTH_S,
+             platform.NORTH_OVERHANG - platform.PLATE_LEN),
+            ("trapezoid", -platform.HALF_WIDTH_S,
+             platform.NORTH_OVERHANG - platform.PLATE_LEN),
+            ("lock lobe", -platform.LOBE_X_IN, platform.LOBE_Z_N),
+            ("lock lobe", -lobe_out, platform.LOBE_Z_N),
+            ("lock lobe", -lobe_out, platform.LOBE_Z_S),
+            ("lock lobe", -platform.LOBE_X_IN, platform.LOBE_Z_S),
         )
-        for lx, lz in corners_local:
-            cx = pv[0] + lx * train.COS_I - lz * train.SIN_I
-            cz = pv[2] + lx * train.SIN_I + lz * train.COS_I
-            _expect(
-                abs(cx) <= half_len + 1e-9 and abs(cz) <= half_wid + 1e-9,
-                f"cone-swing-platform corner ({cx:.2f}, {cz:.2f}) hangs off "
-                f"the base top plate (+-{half_len:.2f}, +-{half_wid:.2f})",
-            )
+        poses = (
+            ("engaged", math.radians(train.INCLINE_DEG)),
+            ("disengaged",
+             math.radians(train.INCLINE_DEG + platform.SLOT_STOP_DEG)),
+        )
+        for pose, ang in poses:
+            cos_a, sin_a = math.cos(ang), math.sin(ang)
+            for part, lx, lz in corners_local:
+                cx = pv[0] + lx * cos_a - lz * sin_a
+                cz = pv[2] + lx * sin_a + lz * cos_a
+                _expect(
+                    abs(cx) <= half_len + 1e-9 and abs(cz) <= half_wid + 1e-9,
+                    f"cone-swing-platform {part} corner ({cx:.2f}, {cz:.2f}) "
+                    f"hangs off the base top plate (+-{half_len:.2f}, "
+                    f"+-{half_wid:.2f}) at the {pose} pose",
+                )
 
     report.gate("footprint:drive-train-mounts-on-base", _mounts_on_plate)
 
