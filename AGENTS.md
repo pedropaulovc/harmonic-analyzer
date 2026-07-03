@@ -532,17 +532,25 @@ forces serial (debugging / a fallback if the spawn-mode pool misbehaves).
 ## Comparison gallery — refreshed during release, shipped in the bundle
 
 The reference-photo comparison gallery (this model overlaid on Michelson's ch30
-photos) is **geometry-derived**: its CAD renders, composites, RMS scores and
-`index.html` drift every time a part changes. Tracking them dirtied the tree on
-every rebuild and shipped a stale showcase, so they are now **gitignored and
-regenerated** — `comparisons/{render,composite}/`, `comparisons/scores.json`,
-`comparisons/index.html`. Only the **fixed benchmark** stays tracked:
-`comparisons/manifest.json` (the pose/align source of truth) and
-`comparisons/ref/` (the prepared reference photos).
+photos) is **derived**: its CAD renders, composites, RMS scores, `index.html` and
+even the prepared reference crops drift as the model (or a crop param) changes.
+Tracking them dirtied the tree on every rebuild and shipped a stale showcase, so
+the whole gallery is now **gitignored and regenerated** —
+`comparisons/{ref,render,composite}/`, `comparisons/scores.json`,
+`comparisons/index.html`. Only the **source** stays tracked:
+`comparisons/manifest.json` (the pose/align source of truth), `ATTRIBUTION.md`
+(CC BY credits) and `tools/`; the reference *photos* live in the pinned
+`references` submodule and their crops are re-derived by `prepare_reference`.
+Because nothing tracked is rewritten, the refresh can never dirty the worktree
+the release tag pins (an earlier version kept `ref/` tracked and could publish a
+dirty tree — Codex P2).
 
 `cut_release.py:refresh_comparisons` refreshes them **once the STLs are stable**
 — it runs inside `bundle()` *after* the neutral STL export, so the offline
-renderer reads settled geometry — then stages the whole gallery under the
+renderer reads settled geometry. It **wipes the generated outputs first** (so a
+removed/renamed pair leaves no stale render/composite/score/ref to be staged, and
+the shipped pair count is honest), then stages the whole gallery — plus
+`ATTRIBUTION.md`, so the redistributed CC BY imagery stays credited — under the
 bundle's `comparisons/`. Each release therefore publishes a fresh, self-contained
 snapshot (`open comparisons/index.html`) instead of relying on a tracked one.
 
