@@ -22,6 +22,14 @@ from pathlib import Path
 SCRIPTS_DIR = Path(__file__).resolve().parent
 CAD_OUT = SCRIPTS_DIR.parent / "out"
 CONFIG_DIR = SCRIPTS_DIR.parent / "config"
+REFERENCES_DIR = SCRIPTS_DIR.parent / "references"
+
+# Vendored input artefacts (DXF/DWG) a build imports at run time. A build that
+# imports one (e.g. build_nameplate -> nameplate-engraving.dxf) must depend on the
+# FILE so an edit rebuilds the part and busts its remote-cache key -- see
+# data_deps_of, honored by dodo._part_file_deps.
+_DATA_EXTENSIONS = (".dxf", ".dwg")
+_DATA_LITERAL_RE = re.compile(r"""["']([^"']+\.(?:dxf|dwg))["']""", re.IGNORECASE)
 
 # Sub-assemblies in build order; the top-level harmonic-analyzer references the
 # six subs, so it is last. doit derives ordering from file_dep, but this tuple
@@ -208,6 +216,38 @@ def module_deps_of(script: Path) -> list[str]:
         result.add(mod)
         frontier |= set(_direct_local_imports(mods[mod].resolve())) - result
     return sorted(str(mods[m].resolve()) for m in result)
+
+
+def data_deps_of(script: Path) -> list[str]:
+    """Resolved paths of every vendored DXF/DWG artefact ``script`` (or a helper
+    it imports) references by filename -- the run-time-imported input edges doit
+    must treat as ``file_dep`` (and fold into the remote-cache key).
+
+    ``module_deps_of`` only follows Python imports; a build that imports a data
+    file (``build_nameplate`` -> ``cad/references/nameplate-engraving.dxf`` via
+    ``adapter.import_dxf_dwg``) has no import edge to it, so an edit to the DXF
+    would otherwise not rebuild the part. This scans the script's transitive
+    module closure source for quoted ``*.dxf``/``*.dwg`` literals and resolves
+    each basename under ``cad/references``.
+
+    A named artefact is listed **whether or not it currently exists on disk**: a
+    referenced input that is accidentally deleted or renamed after a build is a
+    MISSING runtime dependency, and keeping it in ``file_dep`` makes doit/the
+    build fail loud on it rather than silently report the stale ``.SLDPRT`` up to
+    date. It is CONSERVATIVE (can over- but never under-invalidate): only files
+    named by a literal in the script's own import closure are ever listed.
+    """
+    sources = [script.resolve(), *(Path(p) for p in module_deps_of(script))]
+    found: set[str] = set()
+    for src in sources:
+        try:
+            text = src.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        for literal in _DATA_LITERAL_RE.findall(text):
+            candidate = REFERENCES_DIR / Path(literal).name
+            found.add(str(candidate.resolve()))
+    return sorted(found)
 
 
 # --- Per-script CONFIG read-set: which cad/config FILES a build script actually
