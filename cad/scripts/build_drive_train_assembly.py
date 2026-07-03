@@ -367,8 +367,9 @@ REMOVABLE_Z0 = -157.5  # mounted T12 (face 5.0): band -157.5..-152.5, mid -155 =
 # (ch. 23 -- bead chain on its m2 teeth; v2_gears_010).
 ARBOR_PEDESTAL_Z = 90.5  # SOUTH end only (at z -90.5): the rocker support no
 # longer clamps the arbor, but the solid portal north upright leaves no room for
-# a north pedestal where the arbor's north end was (GT NOTE above). South block
-# front face -98.5 clears the portal south-plate back face -99 by 0.5.
+# a north pedestal where the arbor's north end was (GT NOTE above). South foot
+# flange front face -98.5 clears the portal south-plate back face -99 by 0.5
+# (the tapered strap above the foot is thinner, z -95.5..-85.5).
 
 # The pinion must sit fully on the crankshaft.
 if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
@@ -710,6 +711,7 @@ APINION_Z_FRONT = -75.0  # drum front end face (station coverage asserted below)
 APINION_Z_BACK = APINION_Z_FRONT + APINION_DRUM_LEN  # +68.2
 PIVOT_Y = Y_BASE_TOP + 12.0  # 62.8: pivot block bore height
 STRAP_T = 5.0  # build_pinion_bracket THICKNESS
+STRAP_R_END = 9.0  # build_pinion_bracket WIDTH / 2 (must match): end-cap radius
 STRAP_C2C = 43.0  # build_pinion_bracket C2C (was 31: the drive axis now sits
 # 42.0 above the pivot bore, so the strap grew with the level-pinion layout)
 STRAP_AIR = 0.25  # axial air each side of each strap
@@ -755,8 +757,8 @@ if STRAP_C2C < TIP_APINION + 3.175 + 0.25:
     raise AssertionError("pivot shaft fouls the pinion drum tips")
 if math.hypot(LIFT_X - APINION_X, APINION_Y - PIVOT_Y) < TIP_APINION + 3.175 + 0.25:
     raise AssertionError("lift rod fouls the pinion drum tips")
-if LIFT_X - PIVOT_X < 11.0 + 3.175 + 0.25:
-    raise AssertionError("pivot block bores overlap")
+if LIFT_X - PIVOT_X < STRAP_R_END + 3.175 + 0.25:
+    raise AssertionError("lift rod fouls the strap's swinging pivot end cap")
 if LEVER_Z + 7.0 > BLOCK_FRONT_Z0 - 0.25:
     raise AssertionError("lever root reaches the front pivot block")
 
