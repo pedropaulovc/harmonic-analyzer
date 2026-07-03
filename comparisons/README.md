@@ -7,12 +7,14 @@ to iteratively tune the models toward the physical device. See
 ## Layout
 
 Tracked = source; **regen** = derived, gitignored and rebuilt by the tools below
-(they drift as the model or the reference crops change). Each release **publishes
-a fresh regen snapshot inside its bundle** under `comparisons/` — see
-`cad/scripts/cut_release.py:refresh_comparisons` (best-effort: needs Blender). The
-only tracked inputs are `manifest.json`, `ATTRIBUTION.md`, this README and `tools/`;
-everything else regenerates (the reference *source* photos live in the pinned
-`references` submodule).
+(they drift as the model or the reference crops change). The `export` stage
+produces the gallery from the freshly-exported STLs
+(`cad/scripts/export_models.py:refresh_comparison_gallery`, best-effort: needs
+Blender), and each release then **ships that snapshot inside its bundle** under
+`comparisons/` (`cad/scripts/cut_release.py:stage_comparisons`). The only tracked
+inputs are `manifest.json`, `ATTRIBUTION.md`, this README and `tools/`; everything
+else regenerates (the reference *source* photos live in the pinned `references`
+submodule).
 
 | path | tracked? | content |
 |---|---|---|
