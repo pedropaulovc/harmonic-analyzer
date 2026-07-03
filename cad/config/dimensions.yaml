@@ -231,7 +231,7 @@ sections:
       - - Crankshaft length
         - 145 mm
         - '5.7'
-        - 'derived, lengthened with the ch30 GT re-read (2026-07-02): the crank plane moved south (arm hub z −175..−167, T12 chain wheel −157.5, pedestal slab −145..−125) while the inboard 16T station stayed — the shaft spans z −175..−30 (`build_crankshaft.py`)'
+        - 'derived, lengthened with the ch30 GT re-read (2026-07-02): the crank plane moved south (arm hub z −175..−167, T12 chain wheel −157.5, pedestal cylinder front face −121.4) while the inboard 16T station stayed — the shaft spans z −175..−30 (`build_crankshaft.py`)'
         - derived
         - med
   - prose: |2
@@ -540,7 +540,7 @@ sections:
         - high (GT)
       - - Chain run
         - crank T12 sprocket (+122.8, 144.96, z −155 chain plane) up to the transgear knob-shaft T24 at post-mirror (−65, 241.78)
-        - ch30 GT crank re-anchor; the chain plane moved south to z −155 (T12 band −157.5..−152.5, in front of the pedestal slab front face −145)
+        - ch30 GT crank re-anchor; the chain plane moved south to z −155 (T12 band −157.5..−152.5, well in front of the pedestal cylinder front face −121.4)
         - med
       - - Cone pivot
         - at the big end, front (black bracket, p.18 "pivot" label); small end carried by the green knob post — swing is horizontal (out of mesh)
@@ -557,19 +557,19 @@ sections:
       - source
       - confidence
       rows:
-      - - '`crank-pedestal` (ch30 GT re-anchor 2026-07-02)'
-        - green cast slab 46.2 wide × 20 deep × 110 tall, Ø9.5 bore along Z at height 94.16 (bore abs y 144.96 = Y_CRANK)
-        - '(+122.8, −135): slab z −145..−125, crank shaft stations in front (T12 −157.5, arm hub −175..−167)'
-        - 'front view: centre +123 ± 3 (now matched EXACTLY — crankshaft row RESOLVED), Ø 278 px / 6.02 px/mm, top ~110 above base top; the crank axis rides near the slab top because the crank sits 40.16 above the drive line'
-        - high (GT)
+      - - '`crank-pedestal` (cylinder restore 2026-07-02; ch30 GT position)'
+        - green cast CYLINDER Ø46.2 × 110 tall, Ø9.5 crank bore along Z at height 94.16 (bore abs y 144.96 = Y_CRANK); Ø26 bottom-entry swing-journal cavity + two wall windows for the cone shaft (Ø13.5 front / Ø14 rear)
+        - '(+122.8, −98.3): band z −121.4..−75.2 — fills the stub-boss → 64T corridor (boss −123 proud of the flank, 64T tip rim 1.9 clear), foot fully on the base top plate (edge −133.35)'
+        - 'front view: centre +123 ± 3, Ø 278 px / 6.02 px/mm, top ~110 above base top; ch30 quarter views (page003/009): ONE round green column, split bearing cap on top, cone-stub boss on the flank. The 2026-07-02 “slab −145..−125” was a side-view mis-read (column occluded there) and overhung the base'
+        - high (GT + quarter views)
       - - '`arbor-pedestal` ×1 (M6.5, M6.9 trim, M6.12 south-only; ch30 GT height)'
         - green block 24 × 16 × 63 tall, Ø9.5 clamp bore along Z at height 54.0 (bore abs y 104.8)
         - 'SOUTH end only, at (−54.7, −90.5); arbor south end z −90.0 inside the bore (GT cyl_front boss −89.66). Block height dropped 85 → 63 with the drive plane (126.8 → 104.8). North end still unsupported — the GT north bearing (cyl_back z +91.5) is DEFERRED to the portal/back-frame re-layout'
         - ch30 GT (cyl_front); function-driven
         - med (GT height)
-      - - '`cone-pivot-post` (p1 swing bracket; ch30 GT re-anchor)'
-        - green cast block 32 × 26 × 63 tall, Ø9.5 journal bore at height 54.0 (bore abs y 104.8 = drive line), CASTING_GREEN (was black steel)
-        - 'centre (+124.83, −100.01) = cone shaft station −12.25, between the 64T (north) and the crank-pedestal slab (south); the cone shaft''s front stub threads the bore and ends proud at z −123.0 = the GT cone_front boss (−123.07 ± 1.6)'
+      - - '`cone-pivot-post` (p1 swing bracket; nested 2026-07-02)'
+        - green cast cylinder Ø24 × 63 tall, Ø9.5 journal bore at height 54.0 (bore abs y 104.8 = drive line); NESTS inside the crank pedestal Ø26 cavity (1 radial air — circular so every swing angle fits)
+        - 'centre (+124.83, −100.01) = cone shaft station −12.25, mid-pedestal; the cone shaft''s front stub threads the journal + the pedestal''s wall windows and ends proud at z −123.0 = the GT cone_front boss (−123.07 ± 1.6)'
         - ch30 GT (cone_front); p.18 "pivot" bracket — the ch30 photos read it green cast like the pedestals
         - high (GT)
       - - cone small-end support — DEFERRED (M6.12; GT locates it)
