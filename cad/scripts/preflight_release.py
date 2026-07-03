@@ -27,7 +27,7 @@ from typing import Any
 
 from _common import OUT_SLDASM, _read_member, check, log, run_build
 from _assembly import assert_park_closure, load_park_specs
-from verify import REST, _expected_free_dof
+from verify import REST, _expected_free_dof, assert_gear_ratios
 
 import _telemetry
 
@@ -95,6 +95,14 @@ async def _preflight_one(adapter: Any, name: str) -> str:
             if REST in (configs or []):
                 check(f"activate {REST}", await adapter.set_active_configuration(REST))
         log(f"--- preflight {name} ({REST} pose): {expected} deferred park driver(s) ---")
+        # gear-ratios is verified HERE at release, DEMOTED from the every-build
+        # soundness battery (it was 50% of a soundness run and re-proved a property
+        # fixed by the tooth-count config that check:math already validates). Run it
+        # on the clean reopened model BEFORE park_closure authors any mates.
+        # drive-train + channel (== FREE_ASSEMBLIES) carry the only real gear meshes
+        # (the crank drive + the 20 channel meshes); every other assembly's gate was
+        # a 0-mesh no-op, so this preserves the shipped-artefact guarantee.
+        assert_gear_ratios(adapter, name)
         # Authors the recorded drivers engaged and asserts 0 under-constrained. The
         # doc is mutated in memory only -- discarded in `finally` WITHOUT saving
         # (whether the closure passes or raises), so the shipped .SLDASM stays free.
