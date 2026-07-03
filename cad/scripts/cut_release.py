@@ -83,26 +83,17 @@ RENDER_DIFF = REPO_ROOT / "comparisons" / "tools" / "render_diff.py"
 # comparisons/tools/render_offline.py without SolidWorks.
 SCENE_JSON = CAD_ROOT / "out" / "boxes" / f"{TOP_ASSEMBLY}.json"
 
-# Comparison gallery (reference-photo overlays) refreshed from the STABLE STL/boxes
-# render cache and shipped in the bundle. render_offline.py drives Blender offline
-# (no SolidWorks); gallery.py rebuilds the static index. Both are PEP-723 scripts,
-# run via `uv run`. The refresh is BEST-EFFORT: Blender lives on a separate GPU
-# seat, so a release cut on the SolidWorks seat (no Blender) ships without the
-# refreshed gallery rather than failing (see refresh_comparisons).
+# Comparison gallery (reference-photo overlays). PRODUCED BY THE EXPORT STAGE
+# (export_models.refresh_comparison_gallery renders it from the STLs once they're
+# written, on the COM spine right before release); this module only STAGES the
+# result into the bundle's ``comparisons/`` so each release ships an up-to-date
+# showcase. The DERIVED refs/renders/composites/scores/index are gitignored +
+# regenerable (nothing tracked is touched); the manifest (pose/align source of
+# truth) and ATTRIBUTION.md (CC BY credits for the shipped reference imagery) ride
+# along so the downloaded bundle is standalone + compliant.
 COMPARISONS_DIR = REPO_ROOT / "comparisons"
-RENDER_OFFLINE = COMPARISONS_DIR / "tools" / "render_offline.py"
-GALLERY_PY = COMPARISONS_DIR / "tools" / "gallery.py"
-# The gallery artefacts staged into the bundle's ``comparisons/``: the DERIVED
-# refs/renders/composites/scores/index are gitignored + regenerated here (none is
-# tracked, so the refresh never dirties the worktree the tag pins); the manifest
-# (pose/align source of truth) and ATTRIBUTION.md (CC BY credits for the shipped
-# reference imagery) ride along so the downloaded bundle is standalone + compliant.
 _GALLERY_STAGE = ("ref", "render", "composite", "scores.json", "index.html",
                   "manifest.json", "ATTRIBUTION.md")
-# Regenerated-in-place gallery outputs wiped before each refresh so a removed or
-# renamed pair leaves no stale render/composite/score/ref behind to be staged.
-_GALLERY_OUTPUT_DIRS = ("ref", "render", "composite")
-_GALLERY_OUTPUT_FILES = ("scores.json", "index.html")
 _VERSION_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 
 # SolidWorks COM type library (SldWorks); the version pins the same revision the
@@ -274,71 +265,48 @@ def render_diff(stage: Path, prev_tag: str) -> dict[str, Any]:
     return data
 
 
-def _stream_cmd(cmd: list[str], tag: str) -> list[str]:
-    """Run ``cmd`` from the repo root, streaming its output line-by-line (so a
-    minutes-long render never looks hung), and raise on non-zero exit. Returns
-    the last ~50 lines for error context. Mirrors render_diff's streaming."""
-    proc = subprocess.Popen(
-        cmd, cwd=str(REPO_ROOT), stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT, text=True, bufsize=1,
-    )
-    tail: list[str] = []
-    assert proc.stdout is not None
-    for raw in proc.stdout:
-        line = raw.rstrip()
-        log(f"    {tag}| {line}")
-        tail.append(line)
-        if len(tail) > 50:
-            del tail[0]
-    if proc.wait() != 0:
-        raise RuntimeError(f"{cmd[0]} {tag} exited non-zero: {' / '.join(tail)[-400:]}")
-    return tail
+def stage_comparisons(stage: Path) -> dict[str, Any] | None:
+    """Stage the comparison gallery -- PRODUCED BY THE EXPORT STAGE -- into the
+    bundle (``stage/comparisons``), so each release ships an up-to-date "this
+    model vs Michelson's ch30 photos" showcase.
 
+    The gallery is refreshed upstream by
+    ``export_models.refresh_comparison_gallery`` (offline Blender render off the
+    stable STLs), which runs on the COM spine right before release; here we only
+    COPY the result in. Every gallery output is gitignored + regenerable
+    (reference crops included -- re-derived from the pinned ``references``
+    submodule), so nothing TRACKED is staged and the tagged tree stays clean.
 
-def refresh_comparisons(stage: Path) -> dict[str, Any] | None:
-    """Refresh the reference-photo comparison gallery from the STABLE STL/boxes
-    render cache and stage it into the bundle (``stage/comparisons``).
-
-    Runs AFTER the neutral STL export ("once STLs are stable"): the offline
-    renderer (``render_offline.py`` -> Blender) reads the settled
-    ``cad/out/stl`` + ``cad/out/boxes`` cache and regenerates each pair's CAD
-    render, the pixel-registered composite and the RMS score, then ``gallery.py``
-    rebuilds the static index. Every gallery output is gitignored + regenerable --
-    including the reference crops (``prepare_reference`` re-derives them from the
-    pinned ``references`` submodule) -- so nothing TRACKED is rewritten and the
-    refresh can never dirty the worktree the tag pins. A release is the place a
-    fresh snapshot is published -- shipped inside the bundle so a consumer sees
-    THIS model scored against Michelson's ch30 photos.
-
-    The generated outputs are wiped first so a removed/renamed pair leaves no
-    stale render/composite/score/ref behind to be staged, and the ``len(scores)``
-    summary reflects only the pairs actually (re)scored this run.
-
-    BEST-EFFORT by design: the offline renderer needs Blender, which lives on a
-    separate GPU seat, so a release cut on the SolidWorks seat (no Blender) logs
-    a warning and returns None -- the release still publishes, just without the
-    refreshed gallery. The standalone refresh is unchanged: run
-    ``uv run comparisons/tools/render_offline.py`` on a Blender-equipped seat.
+    Best-effort: if the export stage could not produce the gallery (the offline
+    renderer needs Blender, which lives on a separate GPU seat), it is absent --
+    warn and ship the bundle without it rather than failing the release. If a
+    gallery exists but predates this export's geometry, ship it but warn loudly.
     """
     with _telemetry.span("release.comparisons") as sp:
-        try:
-            log("refreshing comparison gallery from stable STLs (render_offline) ...")
-            # Regenerate-don't-repair: clear the (gitignored) gallery outputs so
-            # leftovers from a removed/renamed pair are never staged into the zip.
-            for d in _GALLERY_OUTPUT_DIRS:
-                shutil.rmtree(COMPARISONS_DIR / d, ignore_errors=True)
-            for f in _GALLERY_OUTPUT_FILES:
-                (COMPARISONS_DIR / f).unlink(missing_ok=True)
-            _stream_cmd(["uv", "run", str(RENDER_OFFLINE)], "cmp")
-            _stream_cmd(["uv", "run", str(GALLERY_PY)], "gallery")
-        except Exception as exc:  # noqa: BLE001 -- best-effort; never block a release
+        scores_file = COMPARISONS_DIR / "scores.json"
+        render_dir = COMPARISONS_DIR / "render"
+        produced = (scores_file.exists() and render_dir.is_dir()
+                    and any(render_dir.glob("*.jpg")))
+        if not produced:
             _telemetry.warn(
-                f"comparison gallery not refreshed ({exc}); shipping bundle "
-                "without it -- refresh on a Blender-equipped seat with "
+                "comparison gallery absent -- the export stage did not produce it "
+                "(needs Blender on the export seat); shipping bundle without it. "
+                "Produce it with `doit export` on a Blender seat, or "
                 "`uv run comparisons/tools/render_offline.py`.")
-            _telemetry.event("comparisons.skipped", reason=str(exc)[:200])
-            sp.set_attribute("refreshed", False)
+            _telemetry.event("comparisons.skipped", reason="not produced by export")
+            sp.set_attribute("staged", False)
             return None
+
+        # Honesty guard: a gallery older than the exported scene graph does not
+        # reflect this release's geometry (export ran without Blender, so an old
+        # render is lingering). Ship it, but make the staleness loud.
+        stale = scores_file.stat().st_mtime < SCENE_JSON.stat().st_mtime
+        if stale:
+            _telemetry.warn(
+                "comparison gallery is OLDER than the exported scene graph -- it "
+                "may not reflect this release's geometry (export ran without "
+                "Blender?). Shipping the existing gallery.")
+            sp.set_attribute("stale", True)
 
         dst = stage / "comparisons"
         dst.mkdir(exist_ok=True)
@@ -354,20 +322,20 @@ def refresh_comparisons(stage: Path) -> dict[str, Any] | None:
                 shutil.copy2(src, dst / name)
                 staged += 1
 
-        scores_file = COMPARISONS_DIR / "scores.json"
-        scores = (json.loads(scores_file.read_text(encoding="utf-8"))
-                  if scores_file.exists() else {})
+        scores = json.loads(scores_file.read_text(encoding="utf-8"))
         vals = [v for v in scores.values() if isinstance(v, (int, float))]
         facts = {
             "pairs": len(scores),
             "mean_score": round(sum(vals) / len(vals), 1) if vals else None,
             "files": staged,
+            "stale": stale,
         }
-        sp.set_attribute("refreshed", True)
+        sp.set_attribute("staged", True)
         sp.set_attribute("pairs", facts["pairs"])
-        log(f"comparison gallery: {facts['pairs']} pairs"
+        log(f"comparison gallery: staged {facts['pairs']} pairs"
             + (f" (mean RMS score {facts['mean_score']})" if vals else "")
-            + f", {staged} files staged")
+            + f", {staged} files"
+            + (" [STALE vs geometry]" if stale else ""))
         return facts
 
 
@@ -967,11 +935,11 @@ def bundle(sw: Any, revision: str, version: str,
     #    a previous release that predates the neutral bundle.
     facts["diff"] = render_diff(stage, prev_tag) if prev_tag else None
 
-    # 4b. Comparison gallery: refresh the reference-photo overlays from the STABLE
-    #     STLs exported above and ship them under stage/comparisons. Best-effort --
-    #     needs Blender (separate GPU seat), so a no-Blender release warns + ships
-    #     without it rather than failing. See refresh_comparisons.
-    facts["comparisons"] = refresh_comparisons(stage)
+    # 4b. Comparison gallery: ship the gallery the EXPORT stage produced (offline
+    #     Blender render off the stable STLs) under stage/comparisons. Best-effort
+    #     -- if export had no Blender the gallery is absent, so warn + ship without
+    #     it rather than failing. See stage_comparisons.
+    facts["comparisons"] = stage_comparisons(stage)
 
     # 5. Provenance manifest LAST -- it hashes everything staged above, so it must
     #    run after the diff is written and before the zip is sealed. (Build logs

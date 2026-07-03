@@ -529,7 +529,7 @@ parallelizes its per-mesh Hausdorff classification across a process pool
 (`--jobs`, default auto). `cut_release` benefits with no change. `--jobs 1`
 forces serial (debugging / a fallback if the spawn-mode pool misbehaves).
 
-## Comparison gallery — refreshed during release, shipped in the bundle
+## Comparison gallery — produced on export, shipped in the release bundle
 
 The reference-photo comparison gallery (this model overlaid on Michelson's ch30
 photos) is **derived**: its CAD renders, composites, RMS scores, `index.html` and
@@ -545,20 +545,25 @@ Because nothing tracked is rewritten, the refresh can never dirty the worktree
 the release tag pins (an earlier version kept `ref/` tracked and could publish a
 dirty tree — Codex P2).
 
-`cut_release.py:refresh_comparisons` refreshes them **once the STLs are stable**
-— it runs inside `bundle()` *after* the neutral STL export, so the offline
-renderer reads settled geometry. It **wipes the generated outputs first** (so a
-removed/renamed pair leaves no stale render/composite/score/ref to be staged, and
-the shipped pair count is honest), then stages the whole gallery — plus
-`ATTRIBUTION.md`, so the redistributed CC BY imagery stays credited — under the
-bundle's `comparisons/`. Each release therefore publishes a fresh, self-contained
-snapshot (`open comparisons/index.html`) instead of relying on a tracked one.
+**Produced by the `export` stage, shipped by `release`.** The gallery is refreshed
+inside the export task, not the release: `export_models.refresh_comparison_gallery`
+runs **once the STLs are written** (the tail of `export_models.main`, so the
+offline renderer reads settled geometry), `--stale-only` so only pairs whose
+geometry changed re-render. It first **prunes** any render/composite/score/ref
+whose pair id left the manifest (targeted, so it does *not* force a full
+re-render) — so a removed/renamed pair leaves nothing stale and the pair count
+stays honest. `cut_release.py:stage_comparisons` then simply **copies** that
+gallery — plus `ATTRIBUTION.md`, so the redistributed CC BY imagery stays credited
+— under the bundle's `comparisons/`. Each release therefore publishes a fresh,
+self-contained snapshot (`open comparisons/index.html`).
 
-It is **best-effort**: the offline renderer needs Blender, which lives on a
-separate GPU seat, so a release cut on the SolidWorks seat (no Blender) logs a
-`warn` (`release.comparisons` span, `refreshed=false`, a `comparisons.skipped`
-event) and ships the bundle **without** the gallery rather than failing the
-release. Refresh it standalone anytime — unchanged — with
+Both steps are **best-effort** on the Blender front: the renderer lives on a
+separate GPU seat, so an `export` run on the SolidWorks seat logs a `warn`
+(`export.comparisons` span, `refreshed=false`) and skips; `stage_comparisons` then
+finds no gallery and ships the bundle without it (`release.comparisons`,
+`staged=false`) — or, if an *old* gallery lingers, ships it with a loud
+`STALE vs geometry` warning rather than silently publishing stale renders. Refresh
+it standalone anytime — unchanged — with
 `uv run comparisons/tools/render_offline.py` (Blender) or
 `cad/scripts/render_compare.py` (SolidWorks), then `gallery.py`.
 
