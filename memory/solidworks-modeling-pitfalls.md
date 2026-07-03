@@ -1,6 +1,6 @@
 ---
 name: solidworks-modeling-pitfalls
-description: "SolidWorks COM modeling pitfalls learned live (SW 2026 via PyWin32Adapter): revolve axis edge breaks booleans, FeatureCut4 27 params + -Y default, direct-db circles, helix tessellation slack, cone-on-drum incline from drum pitch (sin i = step/drum-pitch), arc-centre locating dims reject equations"
+description: "SolidWorks COM modeling pitfalls learned live (SW 2026 via PyWin32Adapter): revolve axis edge breaks booleans, FeatureCut4 27 params + -Y default, direct-db circles, cut both_directions depth = TOTAL (half per side), helix tessellation slack, cone-on-drum incline from drum pitch (sin i = step/drum-pitch), arc-centre locating dims reject equations"
 metadata:
   node_type: memory
   type: reference
@@ -51,6 +51,14 @@ discovered during harmonic-analyzer M6.4:
   it gives "Parameter not optional". The default cut direction from a
   Top-plane sketch is **−Y**; pass Dir=True to cut +Y (verified live in
   `build_column_clamp.py`: the un-flipped cut removed the wrong band).
+- **`ExtrusionParameters(depth=D, both_directions=True)` on a cut = D TOTAL,
+  split D/2 per side of the sketch plane** — NOT D each way. A through-cut of a
+  plate extruded +Y from its own Top-plane sketch (plate spans y 0..T) with
+  `depth=T+4` reaches only (T+4)/2 up and leaves the top uncut (cone-swing-
+  platform pivot hole: removed exactly π r²·5.175 of a 6.35 plate; caught by the
+  ±1% volume gate). The pen-v-block exemplar's `THROUGH_CUT_DEPTH = 80.0 #
+  mid-plane total; > any extent crossed` states the convention — size the total
+  generously (≥ 2× any extent crossed), never `extent + small margin`.
 - **Helix/spring volume gates need slack ∝ base volume**: helix-body
   tessellation noise in mass-property diffs is ~0.02–0.03% of the WHOLE
   part, which can dwarf a small added feature. `_common.add_spring_end_hooks`
