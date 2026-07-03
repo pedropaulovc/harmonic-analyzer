@@ -18,9 +18,14 @@ Origin at the SWING PIVOT (the assembly rotates the plate about this
 point); local +Z runs along increasing cone station, so the wide south
 edge sits at local z = NORTH_OVERHANG - PLATE_LEN and the narrow north
 edge overhangs the pivot by NORTH_OVERHANG. A O6.35 pivot hole marks the
-pivot screw. Named refs for the assembly: "swing pivot" (vertical axis
-through the origin) and "PlateTop" (datum plane on the top face -- the
-riders' seat mate, FootSeat/DeckTop pattern).
+pivot screw. A LOCK LOBE on the wide end's machine-west flank carries
+the stadium LOCK SLOT the cone-lock-knob's stud rides (v4_t00411 "knob";
+see the constants block) -- tightening the knob clamps the plate locked
+engaged or locked disengaged. The lobe makes the part CHIRAL, so the
+script is AUTHORED MIRRORED under MIRROR_PLANE "x0" (constants block has
+the details). Named refs for the assembly: "swing pivot"
+(vertical axis through the origin) and "PlateTop" (datum plane on the
+top face -- the riders' seat mate, FootSeat/DeckTop pattern).
 
 Run (SolidWorks already open)::
 
@@ -69,6 +74,39 @@ PIVOT_HOLE_DIA = 6.35  # pivot screw clearance hole at the origin
 
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total (both_directions splits it half per
 # side of the sketch plane); must exceed 2x any extent crossed
+
+# --- lock lobe + slot (the v4_t00411 clamp knob rides this) ------------------
+# A lobe on the wide end's machine-WEST flank carries an arc slot centred on
+# the swing pivot; the cone-lock-knob's stud (fixed to the base, between the
+# pivot post and the arbor pedestal -- the video's "between bracket and green
+# column" gap) passes through it. Tightening clamps the plate at either slot
+# end: locked ENGAGED (the as-built pose) or locked DISENGAGED (plate swung
+# +SLOT_STOP_DEG). The arc is modeled as its CHORD (a straight stadium slot):
+# at R~192 over 5 deg the sagitta is 0.18, absorbed by the
+# O6.35-stud-in-8.0-slot clearance.
+#
+# AUTHORED MIRRORED (the crank-pedestal precedent): the lobe made this part
+# CHIRAL, so it carries MIRROR_PLANE "x0" in _transforms.py and every local-x
+# below is the NEGATION of the machine-effective value -- mirror_placement
+# realises the insertion as this part reflected about its own x = 0, landing
+# the lobe machine-west. The assembly negates x at its transform boundary.
+LOBE_X_IN = 15.0  # lobe rectangle's inner edge x -- overlaps the taper
+LOBE_REACH = 32.5  # inner edge -> outer extent (x 15 -> 47.5): machine-west,
+# keeping >3.5 plan air to the arbor-pedestal block (asserted in the assembly)
+LOBE_Z_N = -179.5  # lobe north edge (local z)
+LOBE_Z_S = -197.0  # lobe south edge
+SLOT_W = 8.0  # slot width: O6.35 stud + chord-vs-arc slack (see above)
+SLOT_STOP_DEG = 5.0  # disengaged stop: 167.75*sin(5deg) ~ 14.6 tooth
+# separation at the T120 -- visibly and mechanically out of mesh
+SLOT_E_X, SLOT_E_Z = 24.5, -190.1  # engaged stud centre (authored frame)
+_SLOT_R = math.hypot(SLOT_E_X, SLOT_E_Z)  # 191.67 about the swing pivot
+SLOT_TRAVEL = _SLOT_R * math.radians(SLOT_STOP_DEG)  # 16.73 chord length
+# The plate swings +stop (big end away from the drum), so in PLATE coords the
+# fixed stud sweeps the INVERSE rotation; in the AUTHORED (mirrored) frame
+# that is unit direction (-z, x)/R at E -- outward (+x), slightly north (+z).
+_SLOT_TX, _SLOT_TZ = -SLOT_E_Z / _SLOT_R, SLOT_E_X / _SLOT_R
+SLOT_W_X = SLOT_E_X + SLOT_TRAVEL * _SLOT_TX  # 41.09: disengaged stud centre
+SLOT_W_Z = SLOT_E_Z + SLOT_TRAVEL * _SLOT_TZ  # -187.96
 
 
 async def build(adapter) -> dict[str, str]:
@@ -150,6 +188,108 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "PivotHole")
     v_hole = math.pi * (PIVOT_HOLE_DIA / 2.0) ** 2 * PLATE_T
     volume = await volume_check(adapter, "pivot hole", volume - v_hole, 0.01 * v_hole)
+
+    # Lock lobe: axis-aligned rectangle overlapping the taper edge (authored
+    # local +x = machine-west, see the AUTHORED MIRRORED note above), merged
+    # into the plate (sketch y = -local z).
+    await set_global(adapter, "LobeReach", f"{LOBE_REACH}mm")
+    await set_global(adapter, "LobeSpan", f"{LOBE_Z_N - LOBE_Z_S}mm")
+    await set_global(adapter, "SlotW", f"{SLOT_W}mm")
+    lobe = SketchDims()
+    check("create_sketch lock lobe", await adapter.create_sketch("Top"))
+    lobe_pts = [
+        (LOBE_X_IN, -LOBE_Z_N),  # inner-north (anchor, inside the plate)
+        (LOBE_X_IN + LOBE_REACH, -LOBE_Z_N),  # outer-north
+        (LOBE_X_IN + LOBE_REACH, -LOBE_Z_S),  # outer-south
+        (LOBE_X_IN, -LOBE_Z_S),  # inner-south
+    ]
+    lobe_lines = await add_line_chain(adapter, lobe_pts)
+    await define_polygon_chain(
+        adapter, lobe_lines, lobe_pts, label="lock lobe", dims=lobe,
+        names=["LobeAnchorX", "LobeAnchorZ", "LobeNorth", "LobeWest",
+               "LobeSouth"],
+        drives=[None, None, '"LobeReach"', '"LobeSpan"', '"LobeReach"'],
+    )
+    await ensure_fully_defined(adapter, "lock lobe sketch")
+    check("exit_sketch lock lobe", await adapter.exit_sketch())
+    name_last_feature(adapter, "LockLobeProfile")
+    drive_jobs += lobe.apply(adapter, "LockLobeProfile")
+    check(
+        "extrude lock lobe",
+        await adapter.create_extrusion(ExtrusionParameters(depth=PLATE_T)),
+    )
+    name_last_feature(adapter, "LockLobe")
+    # Merged delta = rectangle minus its overlap with the trapezoid (the
+    # taper edge is linear in y, so the trapezoid rule is exact).
+    def _taper_x(y: float) -> float:
+        return (HALF_WIDTH_N
+                + (HALF_WIDTH_S - HALF_WIDTH_N) * (y + NORTH_OVERHANG) / PLATE_LEN)
+    _span = LOBE_Z_N - LOBE_Z_S
+    _overlap = ((_taper_x(-LOBE_Z_N) - LOBE_X_IN)
+                + (_taper_x(-LOBE_Z_S) - LOBE_X_IN)) / 2.0 * _span
+    v_lobe = (LOBE_REACH * _span - _overlap) * PLATE_T
+    volume = await volume_check(adapter, "lock lobe", volume + v_lobe, 0.005 * v_lobe)
+
+    # Lock slot: stadium = rotated rectangle cut + two end-cap circle cuts,
+    # every delta analytic. Sketch-frame direction/normal of the chord:
+    _dx, _dy = _SLOT_TX, -_SLOT_TZ
+    _nx, _ny = (-_dy * SLOT_W / 2.0, _dx * SLOT_W / 2.0)
+    _e = (SLOT_E_X, -SLOT_E_Z)
+    _w = (SLOT_W_X, -SLOT_W_Z)
+    slot = SketchDims()
+    check("create_sketch lock slot", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    slot_pts = [
+        (_e[0] + _nx, _e[1] + _ny),
+        (_w[0] + _nx, _w[1] + _ny),
+        (_w[0] - _nx, _w[1] - _ny),
+        (_e[0] - _nx, _e[1] - _ny),
+    ]
+    slot_lines = await add_line_chain(adapter, slot_pts)
+    set_sketch_direct_db(adapter, False)
+    await define_polygon_chain(
+        adapter, slot_lines, slot_pts, label="lock slot", dims=slot,
+        names=["SlotAnchorX", "SlotAnchorZ", "SlotRunDx", "SlotRunDy",
+               "SlotEndDx", "SlotEndDy", "SlotBackDx", "SlotBackDy"],
+        drives=[None] * 8,
+    )
+    await ensure_fully_defined(adapter, "lock slot sketch")
+    check("exit_sketch lock slot", await adapter.exit_sketch())
+    name_last_feature(adapter, "LockSlotProfile")
+    drive_jobs += slot.apply(adapter, "LockSlotProfile")
+    check(
+        "cut lock slot",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "LockSlot")
+    v_slot = SLOT_TRAVEL * SLOT_W * PLATE_T
+    volume = await volume_check(adapter, "lock slot", volume - v_slot, 0.01 * v_slot)
+
+    v_cap = math.pi * (SLOT_W / 2.0) ** 2 / 2.0 * PLATE_T
+    for tag, (cx, cy) in (("E", _e), ("W", _w)):
+        cap = SketchDims()
+        check(f"create_sketch slot cap {tag}", await adapter.create_sketch("Top"))
+        await define_circle(
+            adapter, cx, cy, SLOT_W / 2.0, f"slot cap {tag}", dims=cap,
+            names=(f"Cap{tag}Cx", f"Cap{tag}Cz", f"Cap{tag}Dia"),
+            drives=(None, None, '"SlotW"'),
+        )
+        await ensure_fully_defined(adapter, f"slot cap {tag} sketch")
+        check(f"exit_sketch slot cap {tag}", await adapter.exit_sketch())
+        name_last_feature(adapter, f"LockSlotCap{tag}Profile")
+        drive_jobs += cap.apply(adapter, f"LockSlotCap{tag}Profile")
+        check(
+            f"cut slot cap {tag}",
+            await adapter.create_cut_extrude(
+                ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+            ),
+        )
+        name_last_feature(adapter, f"LockSlotCap{tag}")
+        volume = await volume_check(
+            adapter, f"slot cap {tag}", volume - v_cap, 0.02 * v_cap
+        )
 
     # Apply the deferred drive equations after the model + a rebuild exist, then
     # re-check: every equation evaluates to the value just built, so geometry
