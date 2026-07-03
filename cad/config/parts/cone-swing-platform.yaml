@@ -1,0 +1,5 @@
+cone-swing-platform:
+  number: MHA-091
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  process: "machined (steel plate)"
