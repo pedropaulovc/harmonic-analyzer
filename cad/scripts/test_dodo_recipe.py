@@ -338,3 +338,97 @@ def test_recipe_digest_ignores_yaml_comments(tmp_path):
     assert dodo._digest_files(files) == base
     script.write_text("v1\n")
     assert dodo._digest_files(files) != base, "assembly-script change must FULL-rebuild"
+
+
+# --- Issue #144: the SolidworksMCP-python submodule is a runtime build input of every
+# COM task, so its source content must fold into every part/assembly recipe + cache
+# key (a submodule bump busts the key) -- while the SolidWorks-free check:* tasks,
+# which never touch COM, must stay off it.
+def _redirect_submodule(dodo, root: Path):
+    """Point dodo's submodule source + synthetic sidecar into a temp sandbox and
+    reset the per-process memoization, so a test controls the tree content and never
+    writes into the real cad/out."""
+    src = root / "src" / "solidworks_mcp"
+    src.mkdir(parents=True, exist_ok=True)
+    dodo.SUBMODULE_SRC = src
+    dodo._SUBMODULE_DIGEST_FILE = root / ".submodule.digest"
+    dodo._SUBMODULE_DIGEST = None
+    dodo._SUBMODULE_DEP_PATH = None
+    return src
+
+
+def test_com_deps_include_submodule_and_checks_do_not(tmp_path):
+    """The synthetic submodule dep is present in EVERY COM task's dep set (part
+    file_dep, assembly recipe + file_dep) and absent from EVERY check:* file_dep."""
+    dodo = _load_dodo()
+    src = _redirect_submodule(dodo, tmp_path)
+    (src / "adapters.py").write_text("def mate(): return 1\n")
+    dep = dodo._submodule_dep()
+    assert Path(dep) == (tmp_path / ".submodule.digest").resolve()
+
+    stem = dodo.part_stems()[0]
+    assert dep in dodo._part_file_deps(dodo.SCRIPTS_DIR / f"build_{stem}.py", stem), \
+        "every part must depend on the submodule digest"
+
+    asm = dodo.ASSEMBLY_ORDER[0]
+    assert dep in dodo._recipe_files(asm), "assembly recipe must fold the submodule"
+    assert dep in dodo._assembly_file_deps(asm), "assembly file_dep must include it"
+
+    # check:* tasks never touch COM -> the submodule must NOT enter their dep set,
+    # or an offline gate would spuriously re-run on a submodule bump.
+    for task in dodo.task_check():
+        assert dep not in task["file_dep"], \
+            f"check:{task['name']} must not depend on the submodule"
+
+
+def test_submodule_content_flips_com_cache_key(tmp_path):
+    """A submodule source change -- a committed pin bump OR a dirty local edit --
+    flips every COM cache key; a no-op recompute leaves it stable (idempotent).
+    Exercised through the REAL cache_key path (_cache_key -> _artifact_cache), so it
+    proves the fix reaches the cross-machine key, not just the dep list."""
+    dodo = _load_dodo()
+    src = _redirect_submodule(dodo, tmp_path)
+    (src / "adapters.py").write_text("def mate(): return 1\n")
+
+    stem = dodo.part_stems()[0]
+    script = dodo.SCRIPTS_DIR / f"build_{stem}.py"
+
+    def key():
+        dodo._SUBMODULE_DIGEST = None      # re-read the tree on each call
+        dodo._SUBMODULE_DEP_PATH = None
+        return dodo._cache_key(dodo._part_file_deps(script, stem), f"part:{stem}")
+
+    k1 = key()
+    assert key() == k1, "recompute with no change must be stable (idempotent)"
+
+    (src / "adapters.py").write_text("def mate(): return 2\n")   # dirty edit
+    k2 = key()
+    assert k2 != k1, "a submodule source edit must bust the COM cache key"
+
+    (src / "planes.py").write_text("PLANE = 3\n")               # new source file
+    k3 = key()
+    assert k3 != k2, "an added submodule source file must bust the key too"
+
+
+def test_submodule_digest_is_location_independent(tmp_path):
+    """The submodule digest folds each file by its REPO-RELATIVE tag, so identical
+    submodule content under different checkout roots hashes the same -- required for
+    cross-machine cache hits (mirrors test_digest_files_is_location_independent)."""
+    dodo = _load_dodo()
+
+    def digest_under(root: Path) -> str:
+        sub = root / "SolidworksMCP-python" / "src" / "solidworks_mcp"
+        sub.mkdir(parents=True)
+        (sub / "adapters.py").write_text("def mate(): return 1\n")
+        orig_repo, orig_src = dodo.REPO_ROOT, dodo.SUBMODULE_SRC
+        try:
+            dodo.REPO_ROOT = root
+            dodo.SUBMODULE_SRC = sub
+            dodo._SUBMODULE_DIGEST = None
+            return dodo._submodule_digest()
+        finally:
+            dodo.REPO_ROOT, dodo.SUBMODULE_SRC = orig_repo, orig_src
+            dodo._SUBMODULE_DIGEST = None
+
+    assert digest_under(tmp_path / "A") == digest_under(tmp_path / "B"), \
+        "identical submodule content must hash equally across checkout roots"
