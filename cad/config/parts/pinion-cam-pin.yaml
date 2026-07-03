@@ -1,0 +1,5 @@
+pinion-cam-pin:
+  number: MHA-094
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  process: "machined (steel)"
