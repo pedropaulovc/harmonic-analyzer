@@ -216,7 +216,13 @@ async def build(adapter) -> dict[str, str]:
     v_bore = _cam_bore_removed()
     res = await adapter.get_mass_properties()
     vol_before = res.data.volume
-    for u_mid in (THICKNESS / 2.0, -THICKNESS / 2.0):
+    for idx, u_mid in enumerate((THICKNESS / 2.0, -THICKNESS / 2.0)):
+        # Per-attempt profile name (the amplitude-bar idiom): a failed first
+        # attempt leaves its BLANKED sketch behind under its own name, so a
+        # shared name would make the retry's dim lookup (cam.apply) bind the
+        # deferred CamBore* equations to the orphan instead of the profile
+        # that actually cut (review catch on #163).
+        prof_name = f"CamBoreProfile{idx}"
         cam = SketchDims()
         check("create_sketch cam bore", await adapter.create_sketch("Right"))
         await define_circle(
@@ -226,8 +232,8 @@ async def build(adapter) -> dict[str, str]:
         )
         await ensure_fully_defined(adapter, "cam bore sketch")
         check("exit_sketch cam bore", await adapter.exit_sketch())
-        name_last_feature(adapter, "CamBoreProfile")
-        cam_jobs = cam.apply(adapter, "CamBoreProfile")
+        name_last_feature(adapter, prof_name)
+        cam_jobs = cam.apply(adapter, prof_name)
         cut = await adapter.create_cut_extrude(
             ExtrusionParameters(depth=4.0 * R_END, both_directions=True)
         )
