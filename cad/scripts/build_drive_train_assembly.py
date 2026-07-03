@@ -427,8 +427,8 @@ from build_harmonic_base import (  # noqa: E402
     STOP_SCREW_XZ as BASE_STOP_XZ,
 )
 from build_arbor_pedestal import (  # noqa: E402
-    BLOCK_DEPTH as ARBOR_PED_DEPTH,
-    BLOCK_WIDTH as ARBOR_PED_WIDTH,
+    FOOT_DEPTH as ARBOR_PED_DEPTH,  # PR3 reshaped the pedestal; its foot
+    FOOT_WIDTH as ARBOR_PED_WIDTH,  # flange keeps the old block's 24x16 plan
 )
 from build_cone_pivot_post import (  # noqa: E402
     BLOCK_DIA as POST_BLOCK_DIA,
