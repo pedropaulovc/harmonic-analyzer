@@ -3,11 +3,14 @@ r"""Reproduction script: pinion lift rod with cam pins (book ch. 25).
 The second Ø6.35 rod of the swing rig, running through the pivot
 blocks' west bores parallel to the strap torque shaft. Turning it by
 the engage lever (build_pinion_lever.py, rooted on its front end)
-rotates two short cam pins against the swing straps, lifting the
-alignment pinion into mesh (p. 68 close-ups + engineerguy 4/4 7:15).
-The real pins are longer and bear obliquely on the strap flanks; here
-they are shortened and parked pointing straight DOWN (the disengaged
-rest state) -- documented simplification, DIMENSIONS.md Appendix C.
+sweeps two short radial cam pins up beneath the straps' cam-follower
+pins (build_pinion_cam_pin.py, pressed through the strap tails),
+lifting the followers and swinging the alignment pinion east into mesh
+(p. 68-69 close-ups + engineerguy 4/4 7:15). Parked the pins point
+straight DOWN, clear of the followers (the disengaged rest state); the
+cam contact band and clearances are asserted in build_drive_train's
+cam block (PR5 -- supersedes the old "shortened, non-working pins"
+simplification, DIMENSIONS.md Appendix C).
 
 Layout: rod axis Z, z 0..210; pins along -Y at z 42.5 and 190.5, axis
 to tip 11.175 (8 proud of the rod surface).
@@ -53,7 +56,9 @@ ROD_DIA = 6.35  # rides the block bores, same stock as the torque shaft (derived
 ROD_LEN = 210.0  # machine z -120..+90: front end proud for the lever root
 # (ahead of the forward front block), back end 2 proud of the back pivot
 # block face (derived)
-PIN_DIA = 4.0  # cam pin, photo-scaled vs the rod (low)
+PIN_DIA = 3.0  # cam pin, photo-scaled vs the rod (low). Thinned 4.0 -> 3.0
+# with the PR5 working cam: at Ø4 the parked shaft sat 0.05 off the strap's
+# follower pin (build_drive_train's cam scan), under every design margin.
 PIN_TIP = 11.175  # rod axis to pin tip -- tip at machine y 51.625 (derived)
 PIN_STATIONS = (42.5, 190.5)  # machine z -77.5 / +70.5: inside each strap's
 # z band (straps at -80.25..-75.25 and +68.45..+73.45)

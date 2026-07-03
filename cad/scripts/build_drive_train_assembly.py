@@ -147,6 +147,7 @@ from _common import (
     check,
     run_build,
 )
+from _transforms import euler_from_rows
 from _assembly import (
     angle_driver,
     apply_component_color,
@@ -722,13 +723,30 @@ PIVOT_X = APINION_X - math.sqrt(
 STRAP_LEAN_DEG = math.degrees(
     math.atan2(PIVOT_X - APINION_X, APINION_Y - PIVOT_Y)
 )  # -12.38: strap leans west of vertical
-LIFT_X = PIVOT_X + 15.0  # lift rod in the block's far bore
+LIFT_X = PIVOT_X - 15.0  # lift rod in the blocks' WEST bores (PR5). It sat
+# east (+15) since the DP40 cram (issue #7 dodged the cone-pivot-post column);
+# the p.68-69 photos put the lever WEST of the tee handle and the cam pins
+# lifting the strap tails' follower pins from the WEST -- an east lift would
+# swing the drum OUT of mesh. The column (x ~47) is far east of the new spot,
+# and the M6.9 portal south upright that once blocked the west band was
+# replaced by the lone NORTH rocker-arm-support (x 41..105) -- nothing lives
+# at x -21..-7 in the rod's z run (cam asserts below re-prove the neighbours).
 PIVOT_SHAFT_Z0 = -106.0  # plain Ø6.35 x 196: 2 proud past each block face
 LIFT_ROD_Z0 = -120.0  # Ø6.35 x 210: front end proud for the lever root
 BLOCK_X = (PIVOT_X + LIFT_X) / 2.0  # block local origin midway the bores
 BLOCK_FRONT_Z0 = -104.0
 BLOCK_BACK_Z0 = 76.0
-LEVER_TILT_DEG = 32.0  # from vertical (p002)
+LEVER_TILT_DEG = 40.0  # from vertical, leaning east (p.68). The p002-fitted
+# 32 was measured with the lever rooted EAST of the pivot (pre-PR5); from the
+# west root that tilt swept the shaft through the pinion's front arbor stub
+# (117.9 mm^3), and 36 still grazed it (10.3 mm^3): the binding quantity is
+# the PERPENDICULAR distance from the stub's (x, y) to the rod line -- the
+# stub runs along z, so the 3D minimum is the 2D point-to-line distance, NOT
+# the vertical gap at the x-crossing (that mistake cost a build). 40 gives
+# 8.44 vs the 6.425 required, asserted below. PR6 re-derives the pose (and
+# both handles' sizes) against the photos; this is the interference-free
+# interim.
+LEVER_LEN = 72.0  # build_pinion_lever ROD_LEN, ball centre -> tip (must match)
 LEVER_Z = -113.0  # clamp ball flush on the lift rod's front end
 HANDLE_TILT_DEG = 65.0  # cross rod from vertical
 HANDLE_Z = -144.0  # tee-handle hub on the LONG front arbor stub (GT
@@ -757,10 +775,26 @@ if STRAP_C2C < TIP_APINION + 3.175 + 0.25:
     raise AssertionError("pivot shaft fouls the pinion drum tips")
 if math.hypot(LIFT_X - APINION_X, APINION_Y - PIVOT_Y) < TIP_APINION + 3.175 + 0.25:
     raise AssertionError("lift rod fouls the pinion drum tips")
-if LIFT_X - PIVOT_X < STRAP_R_END + 3.175 + 0.25:
+if abs(LIFT_X - PIVOT_X) < STRAP_R_END + 3.175 + 0.25:
     raise AssertionError("lift rod fouls the strap's swinging pivot end cap")
 if LEVER_Z + 7.0 > BLOCK_FRONT_Z0 - 0.25:
     raise AssertionError("lever root reaches the front pivot block")
+# The east-leaning lever shaft passes under the pinion's front arbor stub
+# (the Ø6.35 stub spans the lever's z band, so the 3D clearance is the 2D
+# distance from the stub's (x, y) to the Ø6 rod's axis line). Perpendicular
+# form when the foot lands on the rod segment, endpoint distance otherwise.
+_LEV_T = math.radians(LEVER_TILT_DEG)
+_LEV_U = (math.sin(_LEV_T), math.cos(_LEV_T))  # up the rod, east lean
+_LEV_REL = (APINION_X - LIFT_X, APINION_Y - PIVOT_Y)  # root -> stub
+_LEV_FOOT = _LEV_REL[0] * _LEV_U[0] + _LEV_REL[1] * _LEV_U[1]
+if 0.0 <= _LEV_FOOT <= LEVER_LEN:
+    _LEV_STUB_D = abs(_LEV_REL[0] * _LEV_U[1] - _LEV_REL[1] * _LEV_U[0])
+else:
+    _end = min(max(_LEV_FOOT, 0.0), LEVER_LEN)
+    _LEV_STUB_D = math.hypot(_LEV_REL[0] - _end * _LEV_U[0],
+                             _LEV_REL[1] - _end * _LEV_U[1])
+if _LEV_STUB_D < (6.35 + 6.0) / 2.0 + 0.25:
+    raise AssertionError("lever shaft crowds the pinion front stub")
 
 # --- pinion return spring (ch. 25, p.68-69): keeps the drum disengaged -------
 # Brass leaf east of the BACK strap only (t00393 shows the front strap clean):
@@ -770,7 +804,9 @@ if LEVER_Z + 7.0 > BLOCK_FRONT_Z0 - 0.25:
 # machine the leaf flexes and pushes the swing back west (the default-
 # disengaged behaviour); in rigid CAD the engaged pose overlaps the unflexed
 # blade, a documented simplification: only the PARKED pose is interference-
-# gated, and the engage-path rework (cam, PR5) owns the engaged contact.
+# gated. The cam engage path (PR5, below) defines the engaged pose; flexed
+# spring geometry for it stays deferred -- issue #158 (the channel springs'
+# stretchNN precedent is the eventual shape of the fix).
 # The thin-wall extrude is ONE-sided with an orientation-dependent side, so
 # every clearance below books the full wall thickness on whichever side hurts.
 SPRING_T = 0.8  # build_pinion_spring THICK (must match)
@@ -803,9 +839,10 @@ if SPRING_AXIS_OFF - STRAP_R_END - SPRING_T < 0.25 - 1e-9:
     raise AssertionError("spring blade touches the parked strap flank")
 if SPRING_W / 2.0 > STRAP_T / 2.0:
     raise AssertionError("spring blade overhangs the strap flank axially")
-if (LIFT_X - PIVOT_X) * _SPR_N[0] - (SPRING_AXIS_OFF + SPRING_T) - 3.175 < 0.25:
+if abs((LIFT_X - PIVOT_X) * _SPR_N[0] - SPRING_AXIS_OFF) - SPRING_T - 3.175 < 0.25:
     raise AssertionError("spring blade fouls the lift rod")  # perpendicular
     # foot of the rod axis lands mid-blade, so the segment bound is the line's
+    # (west rod: the blade sits 10.1 EAST of the strap axis, the rod ~14.7 WEST)
 if (math.hypot(X_DRUM - SPRING_CURL_C[0], Y_DRIVE - SPRING_CURL_C[1])
         - (SPRING_R_CURL + SPRING_T) < TIP_DRUM120 + 0.25):
     raise AssertionError("spring curl crowds the cylinder-gear tips")
@@ -821,10 +858,199 @@ if (math.hypot(SPRING_CURL_C[0] - APINION_X, SPRING_CURL_C[1] - APINION_Y)
 if SPRING_Z + SPRING_W / 2.0 > BLOCK_BACK_Z0 - 0.25:
     raise AssertionError("spring reaches the back pivot block")
 
+# --- cam engage path (ch. 25, p.68-69; PR5) ----------------------------------
+# Each strap tail carries a CAM-FOLLOWER PIN (build_pinion_cam_pin.py) pressed
+# through the bracket's tail cross-bore, protruding WEST over the lift rod.
+# Turning the lever rotates the lift rod; its radial cam pin sweeps up beneath
+# the follower and lifts it -- a west-of-pivot, below-pivot point RISES under
+# the CW engage swing -- pushing the drum east into mesh against the return
+# spring. Parked (pins straight down) nothing touches; the engaged contact is
+# proven REACHABLE analytically below (segment-segment scan), and the probe /
+# motion articulation owns driving it.
+CAM_DROP = 6.25  # pivot bore -> follower bore, down the strap centreline
+# (build_pinion_bracket CAM_DROP, must match)
+CAM_PIN_DIA = 3.0  # build_pinion_bracket CAM_BORE / build_pinion_cam_pin
+# PIN_DIA (must match)
+CAM_PIN_LEN = 17.5  # build_pinion_cam_pin PIN_LEN (must match)
+CAM_T_EAST = 7.5  # axial split: follower east end ~1.0 proud of the cap's
+# east exit (photo: a short stub), the rest is the west working reach. The
+# pin mid-plane therefore sits CAM_PIN_LEN/2 - CAM_T_EAST = 1.25 west of the
+# bracket's Right plane -- the axial mate below. (7.25 left the west end just
+# 0.15 off the rod flank, under the 0.25 design margin.)
+ROD_PIN_DIA = 3.0  # build_pinion_lift_rod PIN_DIA (must match; thinned with
+# PR5 -- see the part's comment)
+ROD_PIN_TIP = 11.175  # build_pinion_lift_rod PIN_TIP (must match)
+_CAM_R_SUM = (CAM_PIN_DIA + ROD_PIN_DIA) / 2.0  # 3.5 contact centre distance
+_CAM_T_WEST = CAM_PIN_LEN - CAM_T_EAST  # 10.25 west of the bore centre
+_CAM_C = (
+    PIVOT_X - CAM_DROP * _SPR_U[0],
+    PIVOT_Y - CAM_DROP * _SPR_U[1],
+)  # follower bore centre, machine frame (-0.18, 56.70)
+_CAM_HALF_CHORD = math.sqrt(STRAP_R_END**2 - CAM_DROP**2)  # 6.48 through the cap
+
+# Rod-pin z stations (rod z0 -120, pins at +42.5/+190.5) vs the strap
+# mid-planes the followers live in: the crossed cylinders meet 0.25/0.45 off
+# crown -- well under the 3.5 contact sum, checked here so a z-shuffle of the
+# rig cannot silently split the cam from its follower.
+_ROD_PIN_Z = (LIFT_ROD_Z0 + 42.5, LIFT_ROD_Z0 + 190.5)  # -77.5 / +70.5
+_STRAP_MID_Z = (
+    APINION_Z_FRONT - STRAP_AIR - STRAP_T / 2.0,  # -77.75
+    APINION_Z_BACK + STRAP_AIR + STRAP_T / 2.0,  # +70.95
+)
+for _pz, _sz in zip(_ROD_PIN_Z, _STRAP_MID_Z, strict=True):
+    if abs(_pz - _sz) > 1.0:
+        raise AssertionError("lift-rod cam pin misses its strap's z plane")
+
+# Bore integrity in the tail cap (web to the pivot bore, rim to the cap edge).
+if CAM_DROP - CAM_PIN_DIA / 2.0 - 3.175 < 1.5:
+    raise AssertionError("cam bore web to the pivot bore too thin")
+if STRAP_R_END - CAM_DROP - CAM_PIN_DIA / 2.0 < 1.2:
+    raise AssertionError("cam bore rim to the tail cap edge too thin")
+if CAM_PIN_LEN - CAM_T_EAST - _CAM_HALF_CHORD < 3.0:
+    raise AssertionError("follower's west working protrusion too short")
+
+# Follower east end vs the return spring's blade (same z plane, back strap).
+if SPRING_AXIS_OFF - SPRING_T - CAM_T_EAST < 0.25:
+    raise AssertionError("follower's east stub reaches the spring blade")
+
+# Parked clearances: follower fully east of the down-pin plane and of the
+# rod's own flank band; underside off the base.
+
+
+def _cam_end(t: float, c=_CAM_C) -> tuple[float, float]:
+    """Point at axial parameter t along the follower axis (east positive)."""
+    return (c[0] + t * _SPR_N[0], c[1] + t * _SPR_N[1])
+
+
+_CAM_WEST_END = _cam_end(-_CAM_T_WEST)
+# End-disc x reach: the face tilts with the lean, so its westmost material is
+# r * |in-plane normal x| west of the end centre.
+_CAM_WESTMOST = _CAM_WEST_END[0] - CAM_PIN_DIA / 2.0 * abs(_SPR_U[0])
+if _CAM_WESTMOST - (LIFT_X + ROD_PIN_DIA / 2.0) < 1.0:
+    raise AssertionError("follower's west end crowds the parked down-pin plane")
+if _CAM_WESTMOST - (LIFT_X + 3.175) < 0.25:
+    raise AssertionError("follower's west end reaches over the lift rod")
+if _CAM_WEST_END[1] - CAM_PIN_DIA / 2.0 - Y_BASE_TOP < 0.25:
+    raise AssertionError("follower's west end grazes the base top")
+
+# Engage swing angle from the c2c triangle (pivot, drum axis, pinion axis):
+# parked ray angle minus engaged ray angle about the pivot, both from +x.
+_PD = math.hypot(X_DRUM - PIVOT_X, Y_DRIVE - PIVOT_Y)  # 68.05 pivot -> drum
+_ANG_PARKED = math.atan2(APINION_Y - PIVOT_Y, APINION_X - PIVOT_X)
+_ANG_ENGAGED = math.atan2(Y_DRIVE - PIVOT_Y, X_DRUM - PIVOT_X) + math.acos(
+    max(-1.0, min(1.0, (STRAP_C2C**2 + _PD**2 - ENGAGED_C2C**2)
+                  / (2.0 * STRAP_C2C * _PD)))
+)
+_PHI_ENG = _ANG_PARKED - _ANG_ENGAGED  # ~4.1 deg CW, radians
+if not 0.01 < _PHI_ENG < math.radians(10.0):
+    raise AssertionError("engage swing angle out of the expected band")
+
+
+def _seg_seg_dist(p0, p1, q0, q1) -> float:
+    """Min distance between 3D segments p0-p1 and q0-q1 (standard clamp)."""
+    u = [p1[i] - p0[i] for i in range(3)]
+    v = [q1[i] - q0[i] for i in range(3)]
+    w = [p0[i] - q0[i] for i in range(3)]
+    a = sum(x * x for x in u)
+    b = sum(x * y for x, y in zip(u, v, strict=True))
+    c = sum(x * x for x in v)
+    d = sum(x * y for x, y in zip(u, w, strict=True))
+    e = sum(x * y for x, y in zip(v, w, strict=True))
+    den = a * c - b * b
+    sc, sn, sd = 0.0, 0.0, den
+    tc, tn, td = 0.0, 0.0, den
+    if den < 1e-12:
+        sn, sd, tn, td = 0.0, 1.0, e, c
+    else:
+        sn, tn = b * e - c * d, a * e - b * d
+        if sn < 0.0:
+            sn, tn, td = 0.0, e, c
+        elif sn > sd:
+            sn, tn, td = sd, e + b, c
+    if tn < 0.0:
+        tn = 0.0
+        sn = min(max(-d, 0.0), sd) if a > 1e-12 else 0.0
+        sd = a if a > 1e-12 else 1.0
+    elif tn > td:
+        tn = td
+        sn = min(max(-d + b, 0.0), sd) if a > 1e-12 else 0.0
+        sd = a if a > 1e-12 else 1.0
+    sc = sn / sd if sd > 1e-12 else 0.0
+    tc = tn / td if td > 1e-12 else 0.0
+    dp = [w[i] + sc * u[i] - tc * v[i] for i in range(3)]
+    return math.sqrt(sum(x * x for x in dp))
+
+
+def _cam_contact_azimuth(phi: float, dz: float) -> float | None:
+    """Rod-pin azimuth (rad, east-of-down) where the sweeping pin first
+    CONTACTS the follower (segment-segment distance = the radii sum), with the
+    follower swung CW by ``phi`` about the pivot. ``dz`` = rod-pin plane minus
+    strap mid-plane. Returns None if no contact by 60 deg."""
+    cphi, sphi = math.cos(phi), math.sin(phi)
+
+    def rot(p):  # CW by phi about the pivot
+        x, y = p[0] - PIVOT_X, p[1] - PIVOT_Y
+        return (PIVOT_X + x * cphi + y * sphi, PIVOT_Y - x * sphi + y * cphi)
+
+    e = rot(_cam_end(CAM_T_EAST))
+    w = rot(_cam_end(-_CAM_T_WEST))
+    q0 = (w[0], w[1], 0.0)
+    q1 = (e[0], e[1], 0.0)
+    for step in range(0, 1201):
+        th = math.radians(step * 0.05)
+        tip = (
+            LIFT_X + ROD_PIN_TIP * math.sin(th),
+            PIVOT_Y - ROD_PIN_TIP * math.cos(th),
+            dz,
+        )
+        root = (LIFT_X, PIVOT_Y, dz)
+        if _seg_seg_dist(root, tip, q0, q1) <= _CAM_R_SUM:
+            return th
+    return None
+
+
+def _cam_park_gap(dz: float) -> float:
+    """Surface-to-surface gap between the parked (straight-down) rod pin and
+    the parked follower."""
+    q0 = (*_CAM_WEST_END, 0.0)
+    q1 = (*_cam_end(CAM_T_EAST), 0.0)
+    root, tip = (LIFT_X, PIVOT_Y, dz), (LIFT_X, PIVOT_Y - ROD_PIN_TIP, dz)
+    return _seg_seg_dist(root, tip, q0, q1) - _CAM_R_SUM
+
+
+_TH_PARK_TOUCH = _TH_ENG = None
+for _dz in (abs(_pz - _sz) for _pz, _sz in zip(_ROD_PIN_Z, _STRAP_MID_Z, strict=True)):
+    if _cam_park_gap(_dz) < 0.4:
+        raise AssertionError("parked cam pin sits under 0.4 off the follower")
+    _TH_PARK_TOUCH = _cam_contact_azimuth(0.0, _dz)
+    _TH_ENG = _cam_contact_azimuth(_PHI_ENG, _dz)
+    if _TH_PARK_TOUCH is None or _TH_PARK_TOUCH < math.radians(5.0):
+        raise AssertionError("cam pin touches the follower at (or too near) park")
+    if _TH_ENG is None:
+        raise AssertionError("cam pin cannot reach the engaged follower")
+# Tip stays clear of the tail cap (R9 about the pivot, which does not move)
+# through the whole working sweep, with margin.
+for _step in range(0, int(math.degrees(_TH_ENG) * 4) + 1):
+    _th = math.radians(_step * 0.25)
+    _tip = (LIFT_X + ROD_PIN_TIP * math.sin(_th), PIVOT_Y - ROD_PIN_TIP * math.cos(_th))
+    if math.hypot(_tip[0] - PIVOT_X, _tip[1] - PIVOT_Y) < STRAP_R_END + 0.25:
+        raise AssertionError("cam pin tip gouges the strap tail cap mid-sweep")
+
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 ROT_X_POS90 = [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0]]
 ROT_Y_POS90 = [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]
+# Cam-follower pin pose: part +Z (the pin axis) -> the strap's leaned bore
+# direction d = _SPR_N, part +Y -> up the strap line (_SPR_U), part +X -> -z.
+# Right-handed: X x Y = (u1, -u0, 0) = _SPR_N. The pin's mid-plane origin
+# sits CAM_PIN_LEN/2 - CAM_T_EAST west of the bore centre along d.
+CAM_ROWS = [
+    [0.0, 0.0, -1.0],
+    [_SPR_U[0], _SPR_U[1], 0.0],
+    [_SPR_N[0], _SPR_N[1], 0.0],
+]
+CAM_EULER = euler_from_rows(CAM_ROWS)
+_CAM_PIN_ORG = _cam_end((CAM_T_EAST - _CAM_T_WEST) / 2.0)
 ROT_Y_INCLINE = [
     [COS_I, 0.0, SIN_I],
     [0.0, 1.0, 0.0],
@@ -1128,6 +1354,13 @@ async def build(adapter) -> dict[str, str]:
         [SPRING_X, Y_BASE_TOP, SPRING_Z], [0.0, 0.0, 0.0], IDENTITY,
         ground=False, label="pinion-spring (holds the swing disengaged)",
     )
+    cam_pins: dict[str, str] = {}
+    for tag, z_mid in (("front", _STRAP_MID_Z[0]), ("back", _STRAP_MID_Z[1])):
+        cam_pins[tag] = await place_component(
+            adapter, "pinion-cam-pin",
+            [_CAM_PIN_ORG[0], _CAM_PIN_ORG[1], z_mid], CAM_EULER, CAM_ROWS,
+            ground=False, label=f"pinion-cam-pin {tag} (strap tail follower)",
+        )
     await place_component(
         adapter, "pinion-lever",
         [LIFT_X, PIVOT_Y, LEVER_Z],
@@ -1635,6 +1868,49 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Right Plane@{bb}", "PLANE"), named_ref(f"Right Plane@{fb}", "PLANE"),
         label="pinion back strap anti-spin (rigid with front)", verify=(bb, bb_o),
     )
+    # Cam-follower pins: pressed in each strap's tail cross-bore (Axis3), so
+    # they RIDE the swing group -- coaxial + the CAM_T_EAST axial split off the
+    # strap's Right plane (which contains the bore centre) + a spin pin at the
+    # inserted dihedral (the pin is axisymmetric, so the angle is cosmetic, but
+    # the DOF must close for the release 0-DOF closure proof).
+    for tag in ("front", "back"):
+        cpin = cam_pins[tag]
+        br = pinion_brackets[tag]
+        cp_o = _org(adapter, cpin)
+        await coincident_mate(
+            adapter,
+            named_ref(f"Axis1@{cpin}", "AXIS"), named_ref(f"Axis3@{br}", "AXIS"),
+            label=f"cam follower {tag} pressed in the tail bore",
+            verify=(cpin, cp_o),
+        )
+        _split = abs(CAM_PIN_LEN / 2.0 - CAM_T_EAST)
+        await distance_driver(
+            adapter,
+            named_ref(f"Front Plane@{cpin}", "PLANE"),
+            named_ref(f"Right Plane@{br}", "PLANE"),
+            _split,
+            label=f"cam follower {tag} axial split d={_split:.2f}",
+            verify=(cpin, cp_o),
+        )
+        # Anti-spin plane pair: pin TOP (normal = pin local Y, rotates with the
+        # spin) vs bracket FRONT (normal = machine z). Pin RIGHT vs bracket
+        # RIGHT is DEGENERATE here -- the bracket's Right normal lies ALONG the
+        # pin axis, so that dihedral reads 90 for every spin angle; SolidWorks
+        # flags the no-op mate as redundant on BOTH parties (caught by the
+        # over-constrained gate). This pair reads 90 at insert (mid-range, no
+        # flip singularity) and genuinely pins the spin.
+        a_cp = component_transform(adapter, cpin)
+        a_br = component_transform(adapter, br)
+        cp_phase = math.degrees(
+            math.acos(max(-1.0, min(1.0, sum(a_cp[3 + k] * a_br[6 + k] for k in range(3)))))
+        )
+        await angle_driver(
+            adapter,
+            named_ref(f"Top Plane@{cpin}", "PLANE"),
+            named_ref(f"Front Plane@{br}", "PLANE"), cp_phase,
+            label=f"cam follower {tag} anti-spin (a={cp_phase:.2f})",
+            verify=(cpin, cp_o),
+        )
     # Pinion drum: journaled in the straps' top bores -- coaxial on the front
     # strap's Axis2 + an axial seat. Its free spin (real: the zeroing input) is
     # pinned by an angle anti-spin at the inserted dihedral vs the leaning strap
