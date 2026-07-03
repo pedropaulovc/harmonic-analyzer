@@ -1132,6 +1132,7 @@ def task_check():
                          str((SCRIPTS_DIR / "build_crank_pedestal.py").resolve()),
                          str((SCRIPTS_DIR / "build_cone_pivot_post.py").resolve()),
                          str((SCRIPTS_DIR / "build_cone_swing_platform.py").resolve()),
+                         str((SCRIPTS_DIR / "build_cone_lock_knob.py").resolve()),
                          str((SCRIPTS_DIR / "build_cone_tip_block.py").resolve()),
                          str((SCRIPTS_DIR / "build_arbor_pedestal.py").resolve()),
                          str((SCRIPTS_DIR / "build_harmonic_base.py").resolve()),
