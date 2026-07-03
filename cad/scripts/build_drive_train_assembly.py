@@ -363,11 +363,12 @@ REMOVABLE_Z0 = -157.5  # mounted T12 (face 5.0): band -157.5..-152.5, mid -155 =
 # arm/handle never crosses it. The small removable gear is the chain wheel
 # (ch. 23 -- bead chain on its m2 teeth; v2_gears_010).
 PEDESTAL_Z = -117.5  # crank pedestal CYLINDER centre: band -132.5..-102.5.
-# The slender O30 column stands SOUTH of the swing platform's south edge
-# (~1.9 true corner air -- the plate must swing free; asserted below in the
-# plate's inclined frame), its foot fully on the base top plate (edge
-# -133.35, 0.85 margin); the T12 chain-wheel plane (-157.5..-152.5) stays 20
-# clear and the paper-drive stub disc (-134.5..-137.5) clears the foot by 2.
+# The slender O28 column stands SOUTH of the swing platform's south edge
+# (~3.9 engaged, ~1.9 at the DISENGAGED swing -- the plate must swing free;
+# both asserted below in the plate's inclined frame), its foot fully on the
+# base top plate (edge -133.35, 1.85 margin); the T12 chain-wheel plane
+# (-157.5..-152.5) stays 21 clear and the paper-drive stub disc
+# (-134.5..-137.5) clears the foot by 3.
 ARBOR_PEDESTAL_Z = 90.5  # SOUTH end only (at z -90.5): the rocker support no
 # longer clamps the arbor, but the solid portal north upright leaves no room for
 # a north pedestal where the arbor's north end was (GT NOTE above). South block
@@ -403,10 +404,12 @@ from build_cone_swing_platform import (  # noqa: E402
     LOBE_Z_N as PLAT_LOBE_Z_N,
     LOBE_Z_S as PLAT_LOBE_Z_S,
     NORTH_OVERHANG as PLAT_OVERHANG,
+    NOTCH_EXIT_TRAVEL as PLAT_NOTCH_EXIT,
     PLATE_LEN as PLAT_LEN,
     PLATE_T as PLAT_T,
     SLOT_E_X as PLAT_SLOT_E_X,
     SLOT_E_Z as PLAT_SLOT_E_Z,
+    SLOT_R as PLAT_SLOT_R,
     SLOT_W as PLAT_SLOT_W,
 )
 from build_cone_lock_knob import (  # noqa: E402
@@ -495,11 +498,13 @@ if _PED_EDGE_GAP < 1.0:
         f"edge (needs >= 1.0)")
 
 
-# --- cone lock knob (v4_t00411; clamps the swing plate through its slot) -----
+# --- cone lock knob (v4_t00411; clamps the swing plate through its notch) ----
 # The knob is a base-bolted STATIC (pedestal pattern: located to the machine
-# datums); the plate's lock slot sweeps around its stationary stud. Its machine
-# position is DERIVED from the platform's engaged slot-end in the plate's local
-# frame, so the two scripts cannot drift apart.
+# datums); the plate's open lock notch sweeps around its stationary stud and,
+# past the mouth, clear of it (t00417: the bolt stands past the plate edge
+# when disengaged). Its machine position is DERIVED from the platform's
+# engaged notch-seat in the plate's local frame, so the two scripts cannot
+# drift apart.
 def _plate_local_to_machine(x_l: float, z_l: float) -> tuple[float, float]:
     """Plan point of the ENGAGED plate's local (x, z) in machine coords."""
     return (
@@ -514,7 +519,31 @@ def _plate_local_to_machine(x_l: float, z_l: float) -> tuple[float, float]:
 KNOB_X, KNOB_Z = _plate_local_to_machine(-PLAT_SLOT_E_X, PLAT_SLOT_E_Z)  # 96.98,
 # -87.60: the video's gap between the pivot post and the arbor pedestal
 if PLAT_SLOT_W - KNOB_STUD_DIA < 0.5:
-    raise AssertionError("lock stud has <0.5 clearance in the platform slot")
+    raise AssertionError("lock stud has <0.5 clearance in the platform notch")
+
+# Disengaged pose: the plate swings (same sense as the incline) until its
+# lobe edge clears the knob's WASHER, so the screwed-down washer fences the
+# notch mouth -- the DISENGAGED lock (see the platform's constants block).
+# Angle = (stud travel to the mouth + washer radius + margin) / notch radius.
+DISENGAGE_DEG = math.degrees(
+    (PLAT_NOTCH_EXIT + KNOB_WASHER_DIA / 2.0 + 2.0) / PLAT_SLOT_R
+)  # 6.30
+# At that swing the big end separates ~18.4 at the T120 -- visibly and
+# mechanically out of mesh (the v4_t00417 pose, bolt past the plate edge).
+_DISENGAGE_RAD = math.radians(DISENGAGE_DEG)
+# The crank pedestal must stay clear of the plate's south edge in the
+# DISENGAGED pose too: rotate its plate-frame plan point by -swing (a fixed
+# machine point sweeps the inverse rotation in plate coords) and re-run the
+# engaged edge-gap check at the swung pose.
+_PED_LOCAL_X = ((X_CRANK - _PPIVOT[0]) * COS_I
+                + (PEDESTAL_Z - _PPIVOT[2]) * SIN_I)
+_PED_SWUNG_Z = (-_PED_LOCAL_X * math.sin(_DISENGAGE_RAD)
+                + _PED_LOCAL_Z * math.cos(_DISENGAGE_RAD))
+_PED_EDGE_GAP_SWUNG = (PLAT_OVERHANG - PLAT_LEN) - _PED_SWUNG_Z - _PED_R
+if _PED_EDGE_GAP_SWUNG < 1.0:
+    raise AssertionError(
+        f"crank pedestal within {_PED_EDGE_GAP_SWUNG:.2f} of the swing plate's "
+        f"south edge at the DISENGAGED pose (needs >= 1.0)")
 _POST_LOCAL_Z = POST_STATION - PIVOT_STATION  # -194.5
 _WASHER_POST_GAP = (
     math.hypot(PLAT_SLOT_E_X, PLAT_SLOT_E_Z - _POST_LOCAL_Z)

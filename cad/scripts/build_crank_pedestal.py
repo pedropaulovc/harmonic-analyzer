@@ -52,7 +52,9 @@ from _common import (
 PART_NAME = "crank-pedestal"
 MATERIAL = "Gray Cast Iron"  # green-painted casting like the base
 
-PEDESTAL_DIA = 30.0  # ch30 quarter views: slender round column (photo-scaled, low)
+PEDESTAL_DIA = 28.0  # ch30 quarter views: slender round column (photo-scaled;
+# slimmed 30 -> 28 within photo tolerance so the swing plate's DISENGAGED pose
+# clears the column -- asserted in the drive-train assembly)
 PEDESTAL_HEIGHT = 110.0  # ch13 layout: front view top at ~110 above base top
 BORE_DIA = 0.375 * IN  # 9.525: crankshaft diameter (ch. 11, legacy, med)
 BORE_HEIGHT = 94.16  # ch30 GT: crank axle 144.96 machine = 94.16 above base top
