@@ -6,13 +6,20 @@ onto the decorated face and cuts the whole artwork (lettering + scroll cartouche
 + pinstripe frame) as one feature (``adapter.import_dxf_dwg`` ->
 ``IFeatureManager::InsertDwgOrDxfFile2``). The DXF is now the source of truth.
 
+That vendored DXF is a CLOSED-REGION rendering of the traced artwork: the raw
+photo trace is outline line-art (open strokes, hollow letters) that a cut-extrude
+cannot turn into a feature, so each stroke was buffered into a thin closed ribbon
+and the ribbons unioned into closed modelspace polylines that cut as grooves (see
+``build_nameplate`` docstring). So the file is a flat set of **closed LWPOLYLINEs**
+in the ENTITIES section -- no blocks, no open contours.
+
 This test is the kernel-free, dependency-free guard on that file: it confirms the
 DXF is present, is a millimetre-unit DXF (``$INSUNITS = 4`` -- the build imports it
-as mm), carries the expected traced-outline entity population (splines / ellipses
-/ polylines, not an empty or wrong export), and that its resolved artwork extent
-matches what the build's import scale (``ENGRAVING_RAW_WIDTH``) assumes. A DXF that
-is swapped, re-exported at a different unit, or truncated fails here rather than
-silently producing a mis-scaled or empty engraving on the live SolidWorks seat
+as mm), carries the expected population of CLOSED polyline regions (not an empty,
+open, or wrong export), and that its artwork extent matches what the build's import
+scale (``ENGRAVING_RAW_WIDTH``) assumes. A DXF that is swapped, re-exported at a
+different unit, truncated, or left with open contours fails here rather than
+silently producing a mis-scaled or uncuttable engraving on the live SolidWorks seat
 (where ``build_nameplate`` itself bounds-checks the removed volume).
 
 Parsed with a tiny regex reader over the ASCII DXF group-code pairs -- no ezdxf,
@@ -33,20 +40,19 @@ import _telemetry
 
 ENGRAVING_DXF = Path(__file__).resolve().parents[1] / "references" / "nameplate-engraving.dxf"
 
-# Golden facts about the traced artwork, captured from the vendored DXF. The build
-# imports it as millimetres and uniform-scales its resolved outer frame
+# Golden facts about the closed-region artwork, captured from the vendored DXF. The
+# build imports it as millimetres and uniform-scales its outer frame
 # (ENGRAVING_RAW_WIDTH in build_nameplate) to the plate footprint, so both the unit
 # and the extent are load-bearing for a correctly-placed engraving.
 GOLDEN_INSUNITS = 4  # 4 = millimetres (build imports as mm)
-# Raw block-coordinate extent of the artwork as it literally appears in the file
-# (before the nested-INSERT transforms SolidWorks resolves on import -- the resolved
-# WCS footprint the build scales against is ~278.57 mm, build_nameplate's
-# ENGRAVING_RAW_WIDTH). Guards the file against truncation / a wrong-unit re-export.
-GOLDEN_COORD_WIDTH = 478.041  # raw block-coordinate bbox width (+/- 1%)
-GOLDEN_COORD_HEIGHT = 253.384  # raw block-coordinate bbox height (+/- 1%)
-# Curved traced outlines (splines/ellipses) + polylines must be present -- an empty
-# or all-straight export would not be the engraving.
-MIN_CURVE_ENTITIES = 40  # SPLINE + ELLIPSE contours in the artwork blocks
+# Artwork bounding box in the modelspace ENTITIES. The file is authored at FINAL
+# plate-mm (the Makers seat ignores the import scale), so the outer frame spans the
+# 88 mm plate footprint exactly. Guards against truncation / a wrong-unit re-export.
+GOLDEN_COORD_WIDTH = 88.000  # artwork bbox width (mm, +/- 1%)
+GOLDEN_COORD_HEIGHT = 39.892  # artwork bbox height (mm, +/- 1%)
+# The buffered-ribbon union yields many closed polyline regions (letter strokes,
+# frame, scroll, screws). An empty or under-populated export is not the engraving.
+MIN_CLOSED_REGIONS = 90  # closed LWPOLYLINE rings (112 as vendored)
 
 
 def _read() -> str:
@@ -59,8 +65,8 @@ def _header_int(txt: str, var: str) -> int | None:
     return int(m.group(1)) if m else None
 
 
-def _blocks_section(txt: str) -> str:
-    start = txt.find("\nBLOCKS\n")
+def _entities_section(txt: str) -> str:
+    start = txt.find("\nENTITIES\n")
     end = txt.find("\nENDSEC\n", start)
     return txt[start:end] if start >= 0 and end > start else ""
 
@@ -69,8 +75,13 @@ def _entity_counts(seg: str) -> Counter:
     return Counter(re.findall(r"\n  0\n(\w+)\n", seg))
 
 
+def _closed_flags(seg: str) -> list[int]:
+    """Per-LWPOLYLINE closed flag (group 70 after the AcDbPolyline vertex count 90)."""
+    return [int(f) for f in re.findall(r"AcDbPolyline\n\s*90\n\s*\d+\n\s*70\n\s*(\d+)", seg)]
+
+
 def _artwork_bbox(seg: str) -> tuple[float, float]:
-    """Width/height of the block geometry from its (10, 20) vertex coordinates."""
+    """Width/height of the modelspace geometry from its (10, 20) vertex coordinates."""
     xs = [float(v) for v in re.findall(r"\n 10\n([-0-9.eE+]+)\n", seg)]
     ys = [float(v) for v in re.findall(r"\n 20\n([-0-9.eE+]+)\n", seg)]
     return (max(xs) - min(xs), max(ys) - min(ys))
@@ -91,28 +102,34 @@ def test_engraving_dxf_is_millimetre_unit():
     assert _header_int(_read(), "INSUNITS") == GOLDEN_INSUNITS
 
 
-def test_engraving_dxf_has_traced_outline_entities():
-    """The artwork blocks carry the traced spline/ellipse/polyline contours."""
-    counts = _entity_counts(_blocks_section(_read()))
-    curves = counts.get("SPLINE", 0) + counts.get("ELLIPSE", 0)
-    assert curves >= MIN_CURVE_ENTITIES, counts
-    assert counts.get("LWPOLYLINE", 0) >= 1, counts
+def test_engraving_dxf_has_closed_regions():
+    """The artwork is a population of CLOSED polyline regions (cuttable profiles)."""
+    seg = _entities_section(_read())
+    counts = _entity_counts(seg)
+    assert counts.get("LWPOLYLINE", 0) >= MIN_CLOSED_REGIONS, counts
+    flags = _closed_flags(seg)
+    assert len(flags) >= MIN_CLOSED_REGIONS, len(flags)
+    # Every ribbon must be closed -- an open contour would not cut as a region.
+    assert all(f & 1 for f in flags), flags
 
 
 def test_engraving_dxf_coordinate_extent():
-    """The artwork's raw block-coordinate extent is intact (not truncated/rescaled)."""
-    w, h = _artwork_bbox(_blocks_section(_read()))
+    """The artwork's coordinate extent is intact (not truncated/rescaled)."""
+    w, h = _artwork_bbox(_entities_section(_read()))
     assert _pct(w, GOLDEN_COORD_WIDTH) >= 99.0, w
     assert _pct(h, GOLDEN_COORD_HEIGHT) >= 99.0, h
 
 
 if __name__ == "__main__":
     txt = _read()
-    counts = _entity_counts(_blocks_section(txt))
-    w, h = _artwork_bbox(_blocks_section(txt))
+    seg = _entities_section(txt)
+    counts = _entity_counts(seg)
+    flags = _closed_flags(seg)
+    w, h = _artwork_bbox(seg)
     _telemetry.info("nameplate engraving DXF integrity")
     _telemetry.info(f"file           : {ENGRAVING_DXF}")
     _telemetry.info(f"$INSUNITS      : {_header_int(txt, 'INSUNITS')}  golden {GOLDEN_INSUNITS}")
     _telemetry.info(f"entities       : {dict(counts)}")
+    _telemetry.info(f"closed regions : {sum(f & 1 for f in flags)} / {len(flags)}  (min {MIN_CLOSED_REGIONS})")
     _telemetry.info(f"coord width    : {w:9.3f}  golden {GOLDEN_COORD_WIDTH:9.3f}  -> {_pct(w, GOLDEN_COORD_WIDTH):7.3f}%")
     _telemetry.info(f"coord height   : {h:9.3f}  golden {GOLDEN_COORD_HEIGHT:9.3f}  -> {_pct(h, GOLDEN_COORD_HEIGHT):7.3f}%")

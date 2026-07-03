@@ -17,6 +17,17 @@ revision re-traced the DXF into native ``LETTERING_LOOPS`` sketch primitives; th
 is now retired in favour of importing the file at build time via
 ``IFeatureManager::InsertDwgOrDxfFile2`` -- see ``adapter.import_dxf_dwg``).
 
+The vendored DXF is a CLOSED-REGION rendering of the traced artwork: the raw trace
+is outline line-art (open/closed strokes, hollow letters) that a cut-extrude cannot
+turn into a feature (no closed profile), so each stroke was buffered into a thin
+~0.4 mm closed ribbon and the ribbons unioned -- 112 closed LWPOLYLINEs that trace
+every stroke edge and cut as grooves, reproducing the artwork faithfully. This was
+a one-time offline transform (scratchpad ``generate_cut_dxf.py``: ezdxf resolve +
+shapely buffer/union, then scaled+centred to final plate-mm so the artwork is 88 mm
+wide on the plate centre -- the Makers seat ignores the import's scale/position, so
+both are baked into the file); git history keeps the original spline trace, the p.71
+macro is the provenance.
+
 The import is placed on the Front plane, uniform-scaled so the traced artwork's
 outer frame spans ``ENGRAVING_TARGET_WIDTH`` and centred on the plate centre, then
 cut both-directions to reach the field floor (so the lettering incises the sunk
@@ -89,17 +100,22 @@ ENGRAVE_DEPTH = 0.3  # incise depth of the imported artwork below the field floo
 # cartouche and pinstripe frame) is drawn in the vendored DXF; the build imports
 # and cuts it as one feature (see module docstring).
 ENGRAVING_DXF = REFERENCES_DIR / "nameplate-engraving.dxf"
-# The DXF is millimetre-unit ($INSUNITS=4); its resolved artwork spans the WCS bbox
-# below (NOT drawn around its own origin). Scale it so its outer frame fits the
-# plate's border as ENGRAVING_TARGET_WIDTH (the historic 88 mm pinstripe-outer
-# footprint). Placement uses swDwgEntitiesSpecifyPosition -- the position we pass is
-# where the DXF's ORIGIN lands, so to centre the ARTWORK on the plate we offset by
-# the scaled bbox centre: position = plate_centre - scale * bbox_centre. (A bare
-# plate-centre would drop the far-from-origin bbox off the 100x55 plate.)
-# NOTE: exact scale/position is calibrated against the live import on a SolidWorks
-# seat -- these are the analytic values from the DXF's resolved extent.
-ENGRAVING_RAW_BBOX = (199.469, 127.793, 478.041, 253.384)  # resolved WCS x0,y0,x1,y1 (mm)
-ENGRAVING_RAW_WIDTH = ENGRAVING_RAW_BBOX[2] - ENGRAVING_RAW_BBOX[0]  # ~278.57 mm
+# The DXF is millimetre-unit ($INSUNITS=4) and is authored at FINAL plate-mm: its
+# closed-region artwork already spans ENGRAVING_TARGET_WIDTH (88 mm, the historic
+# pinstripe-outer footprint) and is centred on the plate centre. So the bbox below
+# has width 88 and centre (50, 27.5).
+#
+# Why pre-baked: on the SOLIDWORKS 3DEXPERIENCE "for Makers" seat the import ignores
+# BOTH placement controls for a flat modelspace DXF -- IImportDxfDwgData::SetPosition
+# AND SetSheetScale are no-ops (verified live: the artwork lands at 1:1 raw coords
+# regardless of the scale/position passed). Rather than depend on a control that
+# silently does nothing, the one-time generate_cut_dxf.py bakes the final scale and
+# centring straight into the file, and the build imports at scale=1.0, position=(0,0).
+# ENGRAVING_SCALE below computes to 1.0 and ENGRAVING_POSITION to (0, 0) as guards: a
+# swapped or wrong-size DXF makes width != 88 (scale != 1) or the centre shift nonzero,
+# and build_nameplate's removed-volume bounds check then fails loud on the live seat.
+ENGRAVING_RAW_BBOX = (6.0000, 7.5538, 94.0000, 47.4462)  # artwork bbox x0,y0,x1,y1 (mm, final)
+ENGRAVING_RAW_WIDTH = ENGRAVING_RAW_BBOX[2] - ENGRAVING_RAW_BBOX[0]  # 88.0 mm (pre-scaled)
 ENGRAVING_RAW_CENTER = (
     (ENGRAVING_RAW_BBOX[0] + ENGRAVING_RAW_BBOX[2]) / 2.0,
     (ENGRAVING_RAW_BBOX[1] + ENGRAVING_RAW_BBOX[3]) / 2.0,
@@ -107,7 +123,8 @@ ENGRAVING_RAW_CENTER = (
 ENGRAVING_TARGET_WIDTH = 88.0  # mm, artwork outer frame footprint on the plate
 ENGRAVING_SCALE = ENGRAVING_TARGET_WIDTH / ENGRAVING_RAW_WIDTH
 ENGRAVING_CENTER = (PLATE_WIDTH / 2.0, PLATE_HEIGHT / 2.0)  # plate-mm
-# Where the DXF origin must land so the scaled artwork bbox centres on the plate.
+# The scaled resolved artwork centre already sits on the plate centre (baked into the
+# DXF), so this offset is ~(0, 0); it is passed straight through and ignored by SW.
 ENGRAVING_POSITION = (
     ENGRAVING_CENTER[0] - ENGRAVING_SCALE * ENGRAVING_RAW_CENTER[0],
     ENGRAVING_CENTER[1] - ENGRAVING_SCALE * ENGRAVING_RAW_CENTER[1],
@@ -230,17 +247,18 @@ async def build(adapter) -> dict[str, str]:
 
     # Traced-photo engraving, IMPORTED from the vendored DXF (was native line-loops).
     # The whole artwork -- lettering, scroll cartouche AND pinstripe frame -- comes
-    # from cad/references/nameplate-engraving.dxf, inserted on the Front plane as one
-    # sketch and cut as one feature. The artwork is traced to read from +Z; because
-    # the body extrudes -Z the decorated z=0 face is the exposed front (outward
-    # normal +Z), so the import reads correctly with no mirror.
+    # from cad/references/nameplate-engraving.dxf as 112 closed-region ribbons (see
+    # the module docstring), inserted on the Front plane as one sketch and cut as one
+    # feature. The artwork is traced to read from +Z; because the body extrudes -Z the
+    # decorated z=0 face is the exposed front (outward normal +Z), so the import reads
+    # correctly with no mirror.
     #
     # The cut reaches RECESS+ENGRAVE both-directions about z=0: over the sunk field
     # the lettering incises ENGRAVE_DEPTH into the floor (the recess already cleared
     # the first RECESS_DEPTH), while over the raised border the pinstripe/frame
-    # incise the full RECESS+ENGRAVE. No analytic area exists for the imported
-    # splines, so the removed volume is bounded-checked (something engraved, well
-    # short of cutting through the slab) rather than matched to a closed form.
+    # incise the full RECESS+ENGRAVE. No analytic area exists for the traced ribbons,
+    # so the removed volume is bounded-checked (something engraved, well short of
+    # cutting through the slab) rather than matched to a closed form.
     if not ENGRAVING_DXF.is_file():
         raise RuntimeError(f"engraving DXF not found: {ENGRAVING_DXF}")
     pre = await adapter.get_mass_properties()
@@ -254,8 +272,8 @@ async def build(adapter) -> dict[str, str]:
                 # DXF origin placement (SpecifyPosition) that centres the scaled
                 # artwork on the plate -- see ENGRAVING_POSITION.
                 position=[ENGRAVING_POSITION[0], ENGRAVING_POSITION[1]],
-                merge_points=True,   # close the traced contours so they cut
-                import_hatch=False,  # hatch fills are not cuttable profiles
+                merge_points=True,   # weld coincident ribbon endpoints into regions
+                import_hatch=False,  # file carries no hatches (closed ribbons only)
                 import_dimensions=False,
                 add_constraints=False,
             )
