@@ -18,6 +18,42 @@ z −146 → −155; connecting rod re-solved 163.18 → 180.83 (rocker rest til
 preserved bit-exact, downstream chain untouched).
 
 **Why (traps worth remembering):**
+- ~~"in the side views the green casting is a SLAB, not a round column"~~ **REFUTED
+  same day** (user caught it visually): the crank pedestal is a **cylinder**. The
+  slab read came from the true side views (page004/008), where the column hides
+  behind a frame column and the crank arm; the **quarter views** (page003/009) show
+  one round green column — elliptical top with a two-screw split bearing cap, domed
+  boss (the cone-shaft front stub end) on the flank. Worse, the slab band −145..−125
+  hung past the base bottom-plate corner (−139.7) — the very anchors the GT
+  triangulation was pinned to — and NO gate checked "a base-bolted mount stands on
+  the base" (added: `footprint:drive-train-mounts-on-base` in the math suite).
+  Corridor math then forced the real anatomy: stub boss (−123) → 64T south face is
+  ~49 deep and a Ø46.2 column fills it with ~2 air each side, with the swing journal
+  **nested inside** (Ø26 bottom-entry cavity + Ø24 cylindrical block + straight wall
+  windows for the 12.52° shaft — a slab + side-by-side block never fit, which is
+  what pushed the slab off the base). Lessons: (1) a shape read from an occluded
+  view must be cross-checked against the views that actually see the part; (2) when
+  a placement only "fits" by leaving the base, treat that as a wrong-anatomy signal,
+  not a coordinate.
+- **Adding an off-axis feature to a previously symmetric part breaks the M6.8
+  mirror silently.** The whole assembly is x-mirrored at placement
+  (`mirror_placement`, machine crank at −X while the scripts derive at +X);
+  the default `MIRROR_PLANE "x"` is only valid while the part IS x-symmetric.
+  Nesting the swing journal made the crank pedestal chiral, its cavity/windows
+  landed un-mirrored (+2.03 where −2.03 was needed) and only the assembly
+  interference gate caught it (3975 + 675 + 173 mm³, pedestal vs post/shaft).
+  Diagnosis that worked: attach to the live failed Assem via COM and dump
+  `Transform2` of the clashing components (`diagnostics/probe_pedestal_clash.py`)
+  — the −x translations exposed the frame flip in one read. Fix idiom = the
+  existing `x0` pattern (summing-lever): author the part script itself
+  mirrored (negate its x literals), declare `"crank-pedestal": "x0"`, and
+  negate the part-frame x in the assembly's import-time asserts. Lesson: any
+  new x-asymmetric feature on a mirror-placed part must switch the part to
+  the authored-mirrored idiom — grep `MIRROR_PLANE` before hardcoding
+  part-frame x offsets. Also same-day: cut-extrudes default to the −sketch-
+  normal side (bosses default +normal — the nameplate exemplar misleads);
+  the front/rear window cuts needed swapped `reverse_direction`, caught by
+  the part volume gate missing by exactly the cavity-overlap delta.
 - `PEN16_MID` in `build_drive_train_assembly.py` is **NEGATIVE** (−0.272); a stale
   comment claimed +0.275 and propagating it gave a wrong mesh c2c (39.90 vs the true
   40.446) that tripped the module's own assert. Recompute from live `_config`, never

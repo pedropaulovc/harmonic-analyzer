@@ -211,6 +211,11 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     "summing-lever": "x0",
     "magnifying-bracket": "x0",
     "pen-hanger": "x0",
+    # crank-pedestal went chiral with the nested swing journal (2026-07-02
+    # cylinder restore: cavity + wall windows off-axis in x), so its script is
+    # authored mirrored like the three above ("x0" keeps the placement off the
+    # STL bbox, whose centre now drifts with the cavity)
+    "crank-pedestal": "x0",
     # rocker-arm-support (the unified support casting) is authored machine-handed
     # and lives in the non-mirroring frame.SLDASM -> NO mirror entry (it replaced
     # the old split rocker-arm-support + a-frame "x0" pair, 2026-06-19).

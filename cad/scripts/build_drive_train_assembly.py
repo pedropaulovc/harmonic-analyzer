@@ -347,15 +347,22 @@ ARM_C2C = 66.0  # handle pivot from the shaft axis (rederived from the ch30
 # the handle below the table)
 REMOVABLE_Z0 = -157.5  # mounted T12 (face 5.0): band -157.5..-152.5, mid -155 =
 # the front chain plane (ch30 GT: solved-camera z-ticks bracket the physical
-# chain run at -153 +- 3), between the pedestal slab (front face -145) and the
-# crank arm (-175..-167). The plane clears the paper-drive stub disc
+# chain run at -153 +- 3), between the pedestal cylinder (front face -121.4)
+# and the crank arm (-175..-167). The plane clears the paper-drive stub disc
 # (-134.5..-137.5) by 15; the arm sits 9.5 SOUTH of the wheel so the rotating
 # arm/handle never crosses it. The small removable gear is the chain wheel
 # (ch. 23 -- bead chain on its m2 teeth; v2_gears_010).
-PEDESTAL_Z = -135.0  # crank pedestal slab centre: band -145..-125 (ch30 GT:
-# the green casting's front edge reads ~ -143; the slab's back face stops 2.0
-# clear of the cone-shaft front stub end at -123, so the stub's boss shows
-# between the pedestal and the swing post -- the GT cone_front feature)
+PEDESTAL_Z = -98.3  # crank pedestal CYLINDER centre: band -121.4..-75.2. The
+# O46.2 column fills the stub-boss -> 64T corridor: front face 1.6 behind the
+# cone-shaft front stub end (-123.0), whose boss emerges through the front
+# window and stands ~2.5 proud of the curved flank at the drive height -- the
+# GT cone_front feature; rear face clears the 64T tip rim by 1.9 and the 16T
+# pinion front by 1.4; the foot sits fully on the base top plate (edge
+# -133.35). The 2026-07-02 "slab band -145..-125" was a side-view mis-read
+# (the column hides behind a frame column + the crank arm there) and hung the
+# part past even the base bottom corner (-139.7); the ch30 quarter views
+# (page003/page009) show ONE round green column with the swing journal nested
+# inside -- cavity/block/window fit asserted below.
 ARBOR_PEDESTAL_Z = 90.5  # SOUTH end only (at z -90.5): the rocker support no
 # longer clamps the arbor, but the solid portal north upright leaves no room for
 # a north pedestal where the arbor's north end was (GT NOTE above). South block
@@ -365,14 +372,104 @@ ARBOR_PEDESTAL_Z = 90.5  # SOUTH end only (at z -90.5): the rocker support no
 if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
     raise AssertionError("crankshaft too short for the M6.7 pinion station")
 
-# Posts: the rotated 32x26 pivot block reaches (26/2)*cos+(32/2)*sin = 16.16
-# in machine z from its centre. Moved from station -1 to -12.25 (ch30 GT): the
-# block now sits BETWEEN the 64T and the pedestal slab, journaling the cone
-# shaft's new FRONT STUB -- the shaft runs on through the bore and its end
-# boss stands proud at z -123 (the GT cone_front feature at (-127, 101, -123)).
-# Painted green like the pedestal: the photos show one continuous green
-# casting complex at the machine front-right.
+# Posts: the O24 swing-journal block NESTS inside the crank pedestal's O26
+# cavity (2026-07-02 cylinder restore -- the ch30 photos show ONE round green
+# casting at the front-right, not a pedestal-plus-block pair). Station -12.25
+# (ch30 GT) centres the journal mid-pedestal; the cone shaft runs on through
+# the pedestal's wall windows and its front stub end boss stands proud of the
+# curved flank at z -123 (the GT cone_front feature at (-127, 101, -123)).
 PIVOT_POST_STATION = -12.25
+
+# --- pedestal <-> nested swing journal fit (SolidWorks-free, import-time) ----
+# The pedestal part hardcodes its cavity/window literals in ITS part frame;
+# they must land on the live cone-shaft line + swing axis placed here. Imported,
+# not copied (the CAM_ECC precedent), and asserted at import so a drifted
+# anchor fails before any COM work.
+from build_crank_pedestal import (  # noqa: E402
+    CAVITY_DIA as PED_CAVITY_DIA,
+    CAVITY_HEIGHT as PED_CAVITY_HEIGHT,
+    CAVITY_X as PED_CAVITY_X,
+    CAVITY_Z as PED_CAVITY_Z,
+    JOURNAL_Y as PED_JOURNAL_Y,
+    PEDESTAL_DIA as PED_DIA,
+    WINDOW_F_DIA as PED_WINDOW_F_DIA,
+    WINDOW_F_X as PED_WINDOW_F_X,
+    WINDOW_R_DIA as PED_WINDOW_R_DIA,
+    WINDOW_R_X as PED_WINDOW_R_X,
+)
+from build_cone_pivot_post import (  # noqa: E402
+    BLOCK_DIA as POST_BLOCK_DIA,
+    BLOCK_HEIGHT as POST_BLOCK_HEIGHT,
+    BORE_HEIGHT as POST_BORE_HEIGHT,
+)
+
+_PPOST = cone_station(PIVOT_POST_STATION)  # swing axis / journal plan point
+_PED_R = PED_DIA / 2.0
+# One journal drive height across pedestal, post and assembly.
+if (abs((Y_DRIVE - Y_BASE_TOP) - POST_BORE_HEIGHT) > 1e-9
+        or abs(PED_JOURNAL_Y - POST_BORE_HEIGHT) > 1e-9):
+    raise AssertionError("cone journal height drifted between pedestal/post/assembly")
+# Cavity centred on the swing axis: part-frame literals vs the live station.
+# The pedestal is CHIRAL and authored MIRRORED (M6.8 "x0", like summing-lever):
+# its part-frame x = MINUS this script's machine-frame offset (z unmirrored).
+if (abs(-(_PPOST[0] - X_CRANK) - PED_CAVITY_X) > 0.02
+        or abs((_PPOST[2] - PEDESTAL_Z) - PED_CAVITY_Z) > 0.02):
+    raise AssertionError(
+        f"pedestal cavity offset ({PED_CAVITY_X}, {PED_CAVITY_Z}) is off the swing "
+        f"axis ({-(_PPOST[0] - X_CRANK):.3f}, {_PPOST[2] - PEDESTAL_Z:.3f})")
+# Block nests with radial air and under the cavity ceiling.
+if (PED_CAVITY_DIA - POST_BLOCK_DIA < 1.5
+        or PED_CAVITY_HEIGHT - POST_BLOCK_HEIGHT < 1.5):
+    raise AssertionError("cone-pivot-post block does not nest in the pedestal cavity")
+# Foot fully on the base top plate (17.5 x 10.5 in centred: +-222.25, +-133.35).
+if abs(PEDESTAL_Z) + _PED_R > 133.35 or abs(X_CRANK) + _PED_R > 222.25:
+    raise AssertionError("crank pedestal foot hangs off the base top plate")
+# The shaft's front stub end boss must stand proud of the pedestal's curved
+# flank (GT cone_front), and the inclined shaft must thread the wall windows
+# with air. Walk the shaft line in part-frame plan coordinates.
+_STUB_END_Z = cone_station(SHAFT_FRONT_STATION)[2]  # -123.0
+
+
+def _shaft_part_xz(s: float) -> tuple[float, float]:
+    """Shaft-axis point at station s in the pedestal's authored-mirrored part
+    frame (x negated -- the M6.8 note at the cavity assert)."""
+    p = cone_station(s)
+    return -(p[0] - X_CRANK), p[2] - PEDESTAL_Z
+
+
+_HALF_SHAFT_X = (0.375 * 25.4 / 2.0) / COS_I  # inclined section's x half-width
+for _s in [SHAFT_FRONT_STATION + _k * 0.25 for _k in range(280)]:
+    _xp, _zp = _shaft_part_xz(_s)
+    if _xp * _xp + _zp * _zp >= _PED_R * _PED_R:
+        continue  # outside the column
+    if math.hypot(_xp - PED_CAVITY_X, _zp - PED_CAVITY_Z) < PED_CAVITY_DIA / 2.0:
+        continue  # inside the cavity void
+    _wx, _wd = ((PED_WINDOW_F_X, PED_WINDOW_F_DIA) if _zp < 0.0
+                else (PED_WINDOW_R_X, PED_WINDOW_R_DIA))
+    if abs(_xp - _wx) + _HALF_SHAFT_X > _wd / 2.0 - 0.4:
+        raise AssertionError(
+            f"cone shaft clips a pedestal wall window at station {_s:.2f} "
+            f"(part x {_xp:.2f}, z {_zp:.2f})")
+_FRONT_EXIT_Z = PEDESTAL_Z + next(
+    _zp for _s in [SHAFT_FRONT_STATION + _k * 0.05 for _k in range(4000)]
+    for _xp, _zp in [_shaft_part_xz(_s)]
+    if _xp * _xp + _zp * _zp < _PED_R * _PED_R)
+if _STUB_END_Z > _FRONT_EXIT_Z - 1.0:
+    raise AssertionError(
+        f"cone-shaft stub end {_STUB_END_Z:.1f} not proud of the pedestal flank "
+        f"(surface exit z {_FRONT_EXIT_Z:.2f})")
+# 64T tip rim must clear the column in plan.
+_TIP64 = R64 + 25.4 / DP_CRANK
+_G64_SOUTH = (GEAR64_SEAT[0] + (GEAR64_FACE / 2.0) * SIN_I,
+              GEAR64_SEAT[2] - (GEAR64_FACE / 2.0) * COS_I)
+_RIM_MIN = min(
+    math.hypot(_G64_SOUTH[0] + _TIP64 * COS_I * math.cos(_t) - X_CRANK,
+               _G64_SOUTH[1] + _TIP64 * SIN_I * math.cos(_t) - PEDESTAL_Z)
+    for _t in [_k * math.pi / 360.0 for _k in range(720)])
+if _RIM_MIN - _PED_R < 1.5:
+    raise AssertionError(
+        f"64T tip rim comes within {_RIM_MIN - _PED_R:.2f} of the pedestal column")
+
 # --- cone small-end support: DEFERRED to the portal/back-frame re-layout -----
 # The ch30 GT CONFIRMS a real tip post (black, slotted) at the cone's back end,
 # world (-81, 104.6, +101.8) -- but that point sits inside the model's portal

@@ -869,6 +869,51 @@ def verify_spring_base(report: Report) -> None:
     report.gate("spring:neutral-body-canonical", _matches_neutral_gap)
 
 
+def verify_base_footprint(report: Report) -> None:
+    """Every base-mounted drive-train component's plan footprint must sit fully
+    on the base TOP plate (SolidWorks-free; pure module constants).
+
+    This is the gate class the 2026-07-02 slab regression slipped through: the
+    crank pedestal was re-placed with over half its foot past the base edge and
+    all 48 gates stayed green -- nothing asserted "a mount bolted to the base
+    stands ON the base". Interference can't see it (air interferes with
+    nothing) and the DOF/health gates don't know where the base ends. Extend
+    the mount list when a new base-standing component joins the drive train
+    (frame components live in build_frame_assembly and centre themselves on the
+    base datums, so they are not swept here).
+    """
+
+    def _mounts_on_plate() -> None:
+        import build_arbor_pedestal as arbor_post
+        import build_cone_pivot_post as pivot_post
+        import build_crank_pedestal as pedestal
+        import build_drive_train_assembly as train
+        import build_harmonic_base as base
+
+        half_len, half_wid = base.TOP_LENGTH / 2.0, base.TOP_WIDTH / 2.0
+        ppost = train.cone_station(train.PIVOT_POST_STATION)
+        # (label, centre x, centre z, plan half-x, plan half-z); circular feet
+        # use the radius both ways, the rotated pivot post is circular so its
+        # incline never changes the footprint.
+        mounts = (
+            ("crank-pedestal", train.X_CRANK, train.PEDESTAL_Z,
+             pedestal.PEDESTAL_DIA / 2.0, pedestal.PEDESTAL_DIA / 2.0),
+            ("cone-pivot-post", ppost[0], ppost[2],
+             pivot_post.BLOCK_DIA / 2.0, pivot_post.BLOCK_DIA / 2.0),
+            ("arbor-pedestal", train.X_DRUM, -train.ARBOR_PEDESTAL_Z,
+             arbor_post.BLOCK_WIDTH / 2.0, arbor_post.BLOCK_DEPTH / 2.0),
+        )
+        for label, cx, cz, hx, hz in mounts:
+            _expect(
+                abs(cx) + hx <= half_len + 1e-9 and abs(cz) + hz <= half_wid + 1e-9,
+                f"{label} foot hangs off the base top plate: plan centre "
+                f"({cx:.2f}, {cz:.2f}) half-extents ({hx:.2f}, {hz:.2f}) vs "
+                f"plate (+-{half_len:.2f}, +-{half_wid:.2f})",
+            )
+
+    report.gate("footprint:drive-train-mounts-on-base", _mounts_on_plate)
+
+
 def _expect(condition: bool, message: str) -> None:
     if not condition:
         raise RuntimeError(message)
@@ -1128,6 +1173,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if suite == "math":
         verify_truth(report)
         verify_spring_base(report)
+        verify_base_footprint(report)
     if suite == "config":
         verify_config_vs_dimensions(report)
         verify_tolerance_audit(report)
@@ -1185,6 +1231,7 @@ if __name__ == "__main__":
         if _ARGS.suite == "math":
             verify_truth(_report)
             verify_spring_base(_report)
+            verify_base_footprint(_report)
         else:
             verify_config_vs_dimensions(_report)
             verify_tolerance_audit(_report)
