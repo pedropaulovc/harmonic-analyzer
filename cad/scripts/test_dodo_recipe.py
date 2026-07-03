@@ -187,6 +187,54 @@ def test_artefact_digest_immune_to_byte_churn():
     assert checker.check_modified(art, _FakeStat(stale[0] + 1234), stale) is True
 
 
+# --- Per-seat part order (cold-build divergence so two machines split the work).
+
+def test_seat_part_order_is_a_permutation(monkeypatch):
+    """_seat_part_order reorders but never drops/duplicates a part -- the spine must
+    still cover exactly part_stems(), or a part would silently never build."""
+    dodo = _load_dodo()
+    monkeypatch.setenv("HARMONIC_BUILD_ORDER_SEED", "seat-A")
+    order = dodo._seat_part_order()
+    assert sorted(order) == sorted(dodo.part_stems())
+    assert len(order) == len(set(order))
+
+
+def test_seat_part_order_deterministic_per_seed(monkeypatch):
+    """Same seed -> identical order on every call. This is the LOAD-BEARING property:
+    every process of one ``doit -n`` invocation (parent + workers) must compute the
+    SAME spine, or two COM tasks go ready at once and deadlock the single STA seat."""
+    dodo = _load_dodo()
+    monkeypatch.setenv("HARMONIC_BUILD_ORDER_SEED", "seat-A")
+    first = dodo._seat_part_order()
+    second = dodo._seat_part_order()
+    assert first == second
+
+
+def test_seat_part_order_diverges_across_seats(monkeypatch):
+    """Different seats -> different order (the whole point: cold builders don't march
+    in lock-step). With dozens of parts a fixed permutation makes a collision
+    astronomically unlikely, so any two distinct seeds must reorder."""
+    dodo = _load_dodo()
+    monkeypatch.setenv("HARMONIC_BUILD_ORDER_SEED", "seat-A")
+    a = dodo._seat_part_order()
+    monkeypatch.setenv("HARMONIC_BUILD_ORDER_SEED", "seat-B")
+    b = dodo._seat_part_order()
+    assert a != b, "distinct seats must not build parts in the same order"
+
+
+def test_spine_parts_precede_all_assemblies(monkeypatch):
+    """Whatever the per-seat part order, EVERY part must still come before EVERY
+    assembly on the spine (parts are the assemblies' file_dep prerequisites), and the
+    spine stays duplicate-free (the _assert_spine_complete invariant)."""
+    dodo = _load_dodo()
+    monkeypatch.setenv("HARMONIC_BUILD_ORDER_SEED", "seat-A")
+    spine = dodo._com_spine_order()
+    assert len(spine) == len(set(spine))
+    last_part = max(i for i, n in enumerate(spine) if n.startswith("part:"))
+    first_asm = min(i for i, n in enumerate(spine) if n.startswith("assembly:"))
+    assert last_part < first_asm
+
+
 def test_assembly_artefact_digest_folds_in_refs():
     """An assembly's stable digest folds its own recipe together with each referenced
     artefact's digest, recursively -- so a leaf-part input change propagates up to
