@@ -392,8 +392,8 @@ comparisons/.parity_sw/
 .solidworks_mcp/
 .generated/docs-index/
 
-# verify.py run logs
-.logs/.render-venv/
+# verify.py / shell run logs (covers the old .logs/.render-venv/ too)
+.logs/
 .render-mesa*
 .render-osmesa/
 .render_diff_v020/
