@@ -752,7 +752,8 @@ LEVER_TILT_DEG = 40.0  # from vertical, leaning east (p.68). The p002-fitted
 # 8.44 vs the 6.425 required, asserted below. PR6 re-derives the pose (and
 # both handles' sizes) against the photos; this is the interference-free
 # interim.
-LEVER_LEN = 72.0  # build_pinion_lever ROD_LEN, ball centre -> tip (must match)
+LEVER_LEN = 98.0  # build_pinion_lever ROD_LEN, ball centre -> tip (must
+# match; PR6 resize -- both ch25 close-ups read ~99 against the 6 mm rod)
 LEVER_Z = -113.0  # clamp ball flush on the lift rod's front end
 HANDLE_TILT_DEG = 65.0  # cross rod from vertical
 HANDLE_Z = -144.0  # tee-handle hub on the LONG front arbor stub (GT
@@ -1044,6 +1045,69 @@ for _step in range(0, int(math.degrees(_TH_ENG) * 4) + 1):
     _tip = (LIFT_X + ROD_PIN_TIP * math.sin(_th), PIVOT_Y - ROD_PIN_TIP * math.cos(_th))
     if math.hypot(_tip[0] - PIVOT_X, _tip[1] - PIVOT_Y) < STRAP_R_END + 0.25:
         raise AssertionError("cam pin tip gouges the strap tail cap mid-sweep")
+
+# --- full-rotation clearance proofs (PR6) -------------------------------------
+# The interference gate sees only the PARKED pose; the tee handle spins full
+# circle during zeroing and the lift rod (pins + lever) sweeps the cam throw.
+# Prove every angle clears the in-assembly neighbours: each sweep is a solid
+# of revolution, so a neighbour is cleared by z-band disjointness or, where
+# bands overlap, by radial clearance from the sweep axis. (Cross-assembly
+# neighbours are parked-gated at the top level; the platen/pen hardware sits
+# at y ~390+, far above both sweeps.)
+HANDLE_ARM = 35.0  # build_pinion_handle ROD_DOWN/ROD_UP (must match, PR6)
+HANDLE_BALL_R = 12.0  # build_pinion_handle BALL_DIA / 2 (must match)
+_TEE_R = HANDLE_ARM + 3.0  # swept disc radius: arm + rod end cap
+# The SWEPT geometry splits in two: the Ø6 cross rod sweeps the R38 disc in
+# its own thin band; the grip ball stays ON AXIS (R12, no sweep), only its
+# z reach is wider.
+_TEE_DISC_Z = (HANDLE_Z - 3.0, HANDLE_Z + 3.0)
+_TEE_BALL_Z = (HANDLE_Z - HANDLE_BALL_R, HANDLE_Z + HANDLE_BALL_R)
+# In-assembly bodies near the tee: everything of the swing rig ends well
+# north of the disc band; the crank cluster lives south/east of it.
+for _lo, _hi, _what in (
+    (LEVER_Z - 3.0, LEVER_Z + 7.0, "lever root"),
+    (BLOCK_FRONT_Z0, BLOCK_FRONT_Z0 + 12.0, "front pivot block"),
+    (LIFT_ROD_Z0, LIFT_ROD_Z0 + 210.0, "lift rod"),
+    (PIVOT_SHAFT_Z0, PIVOT_SHAFT_Z0 + 196.0, "pivot shaft"),
+    (APINION_Z_FRONT - STRAP_T - STRAP_AIR, APINION_Z_FRONT, "front strap"),
+    (REMOVABLE_Z0, REMOVABLE_Z0 + 5.0, "T12 chain wheel"),
+    (CRANK_ARM_Z0, CRANK_ARM_Z0 + 8.0, "crank arm hub"),
+):
+    if _TEE_DISC_Z[1] > _lo - 0.25 and _TEE_DISC_Z[0] < _hi + 0.25:
+        raise AssertionError(f"tee-handle sweep disc band reaches the {_what}")
+# The ball's wider z band DOES clip the T12 plane: radial clearance instead
+# (the ball is on-axis, the wheel is on the crank axis). The crank arm+handle
+# sweep entirely south of the arm hub (-175..) -- z-disjoint from the ball.
+if (math.hypot(X_CRANK - APINION_X, Y_CRANK - APINION_Y)
+        < HANDLE_BALL_R + 16.0 + 0.25):  # T12 OD/2 ~14 + margin
+    raise AssertionError("tee-handle ball reaches the T12 chain wheel")
+if _TEE_BALL_Z[0] < CRANK_ARM_Z0 + 8.0 + 0.25:
+    raise AssertionError("tee-handle ball band reaches the crank arm sweep")
+
+# Lever full throw (parked 40 deg -> engaged ~51 deg, checked to 60): the
+# stub distance grows monotonically past 37.6 deg, but prove it numerically,
+# and prove the swept tip annulus shares no z band with anything it could hit.
+for _step in range(0, 81):
+    _t = math.radians(LEVER_TILT_DEG + _step * 0.25)
+    _d = abs(_LEV_REL[0] * math.cos(_t) - _LEV_REL[1] * math.sin(_t))
+    if _d < (6.35 + 6.0) / 2.0 + 0.25:
+        raise AssertionError("lever shaft crowds the stub mid-throw")
+_LEV_Z = (LEVER_Z - 3.0, LEVER_Z + 3.0)  # rod plane through the throw
+if _LEV_Z[0] < BLOCK_FRONT_Z0 + 12.0 + 0.25 and _LEV_Z[1] > BLOCK_FRONT_Z0 - 0.25:
+    raise AssertionError("lever throw plane reaches the front pivot block")
+if _LEV_Z[1] > PIVOT_SHAFT_Z0 - 0.25:
+    raise AssertionError("lever throw plane reaches the pivot shaft front end")
+if _LEV_Z[0] < _TEE_BALL_Z[1] + 0.25:
+    raise AssertionError("lever throw plane reaches the tee-handle sweep")
+
+# Lift-rod cam pins through the throw (0 -> 60 deg): tip circle vs the pivot
+# shaft, the base top, and (back station, spring plane) the blade line.
+if 15.0 - ROD_PIN_TIP - 3.175 < 0.25:  # rod->pivot-shaft spacing is 15
+    raise AssertionError("cam pin sweep reaches the pivot shaft")
+if (PIVOT_Y - ROD_PIN_TIP) - Y_BASE_TOP < 0.25:
+    raise AssertionError("cam pin sweep reaches the base top")
+if (LIFT_X + ROD_PIN_TIP) > SPRING_X - 3.5 - 0.25:
+    raise AssertionError("cam pin sweep reaches the spring foot region")
 
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
