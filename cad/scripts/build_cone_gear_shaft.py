@@ -1,9 +1,10 @@
 r"""Reproduction script: cone gear shaft (book ch. 12, pp. 16-21) -- stepped.
 
 Steel shaft carrying the 20-gear cone set (all gears fixed to and
-rotating with the shaft), with bearing journals into the pivot block
-(large end -- the cone set pivots out of engagement, ch. 25) and the
-green post (thin end). At the finer module DP 49.82 (ch13 OD 62.2) the
+rotating with the shaft), with bearing journals into the green pivot
+post (large end) and the tip clamp block (thin end) -- both standing on
+the swing platform, so the whole set pivots out of engagement as one
+unit (ch. 25; p. 18 "pivot"). At the finer module DP 49.82 (ch13 OD 62.2) the
 tip gears are tiny -- T006 OD is 4.08 mm -- so the shaft steps down far
 more at the thin end to match the configured gear bores AND stay inside
 each gear's root circle (`build_cone_gear.py` ``BoreDia``, DIMENSIONS.md
@@ -12,9 +13,9 @@ shows solder blobs at the small gears) -- no keyseat, the shaft steps are
 plain; the four yellow tip gears (T006..T024) are a harder high-zinc
 yellow metal soldered on.
 
-Sections, FRONT STUB end at z = 0 (ch30 GT: the big end runs 35.8 past
-the old pivot-end origin, through the swing post journal, ending in the
-boss the photos show at machine z -123 -- see FRONT_STUB). M6.7
+Sections, FRONT STUB end at z = 0 (the big end runs 12.3 past the old
+pivot-end origin, through the pivot post's journal, ending just proud
+of the post's south flank -- see FRONT_STUB). M6.7
 (true-cone mesh, see the assembly docstring): gear seats at the
 exact-tracking stack pitch 6.8889 mm (= drum z-pitch 7.0565 x
 cos 12.52 deg), seat centres at FRONT_STUB + 28.25 + 6.8889 j, gear
@@ -25,15 +26,15 @@ gear faces (stations below quoted from the legacy pivot end):
   seats T120..T024
 * 1/4 in x 148.8 -- T018 seat
 * 1/8 in x 155.7 -- T012 seat
-* 1/32 in x 190.0 -- T006 seat + thin-tip journal into the green post.
+* 1/32 in x 190.0 -- T006 seat + thin-tip journal into the tip block.
   WARNING: a 0.79 mm x ~34 mm steel tip journal is mechanically
   marginal (it follows from the 62.2 OD anchor, low confidence) --
   flagged for Phase 3 rebuild validation; a real builder would more
   likely keep the tip gears larger (i.e. the 62.2 reading may be low).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 12" -- base dia legacy (med),
-length 190 = pivot journal + stack + thin-tip journal through the knob
-post at station 177 (derived, low), step diameters = gear bores
+length 190 = pivot journal + stack + thin-tip journal through the tip
+block at station 185 (derived, low), step diameters = gear bores
 (Appendix C #7).
 
 Build: four coaxial Front-plane circles extruded +Z to each section's end
@@ -80,14 +81,16 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 PIVOT_JOURNAL = 25.0  # mm, large-end journal into the pivot block (low)
 
-FRONT_STUB = 35.8  # ch30 GT (2026-07-02): the 3/8" big end runs ON past the old
-# pivot-end origin, through the nested swing-journal block and out the crank
-# pedestal's front wall window, ending in the boss the photos show proud of
-# the pedestal's curved flank (GT cone_front world (-127, 101, -123); the stub
-# end lands at machine z -123.0).
-# The part origin is now this FRONT END; the old pivot-end stations below are
+FRONT_STUB = 12.3  # the 3/8" big end runs ON past the old pivot-end origin,
+# through the pivot post's journal (post plan flank at station -10.85), ending
+# ~1.5 proud of the post's south flank. NOTE the GT cone_front point (world
+# (-127, 101, -123)) is a DOCUMENTED DEVIATION now: the old nested-pedestal
+# story ran the stub out to machine z -123, but the platform architecture
+# (p.18 top-down) ends it at the post -- the boss the photos show belongs to
+# the crank pedestal region, not this shaft.
+# The part origin is this FRONT END; the old pivot-end stations below are
 # all shifted by FRONT_STUB, and the assembly places the shaft at
-# cone_station(-35.8) (build_drive_train_assembly SHAFT_FRONT_STATION).
+# cone_station(-12.3) (build_drive_train_assembly SHAFT_FRONT_STATION).
 
 # (diameter in inches, section end station in mm from the FRONT STUB end;
 # comments quote the legacy pivot-end stations). M6.7 exact-tracking seat

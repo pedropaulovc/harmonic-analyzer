@@ -5,8 +5,9 @@ The crank is the device's ONE operating DOF and the full-device study
 opened are quasi-static SETUP DOFs -- the operator poses them by hand before a
 run, then they hold:
 
-    p1  cone disengage  -- the cone set swings horizontally out of mesh about the
-                           cone-pivot-post's vertical pivot (ch.12, p.18).
+    p1  cone disengage  -- the cone set swings horizontally out of mesh about
+                           the cone-swing-platform's tip-end vertical pivot
+                           (ch.12, p.18; post/shaft/gears/tip block ride the plate).
     p2  pinion engage   -- the strap+alignment-pinion group swings on the torque
                            shaft to mesh the cylinder train (ch.25, p.66).
     p0  amplitude adjust -- each amplitude bar swings about its top pin; the swing
@@ -74,9 +75,9 @@ def _family_driver_names(adapter: Any, root: str, family: str,
     A park driver references exactly one real part plus a root plane, so
     ``_real_parts`` leaving a single name marks it. ``only_type`` narrows to the
     swing driver when a family also carries positional locators of the other
-    type: the cone-pivot-post is LOCATED by three DISTANCE mates (height + plan
-    X/Z) and its swing is held by the lone ANGLE driver, so p1 must suppress
-    ANGLE only -- suppressing the distances too would unmoor the post in space.
+    type: the cone-swing-platform is LOCATED by three DISTANCE mates (height +
+    plan X/Z) and its swing is held by the lone ANGLE driver, so p1 must suppress
+    ANGLE only -- suppressing the distances too would unmoor the plate in space.
     """
     names: list[str] = []
     for _f, _m, name, mtype, parts, _v in _iter_mates(
@@ -183,19 +184,21 @@ async def _run_swing_study(adapter: Any, motor_axis, driven_needle: str,
 async def _drive_p1(adapter: Any) -> dict[str, str]:
     """p1: cone set swings out of mesh. Decouple the 21 gear meshes (the cone
     cluster cannot stay velocity-coupled to the cylinders while leaving mesh, so
-    suppress every gear mesh) and free the post's swing (its lone ANGLE park
-    driver), then motor the post about its vertical pivot."""
+    suppress every gear mesh) and free the platform's swing (its lone ANGLE park
+    driver), then motor the plate about its tip-end vertical pivot (Axis1,
+    "swing pivot"). The driven needle is the pivot POST: it rides the plate
+    194.5 from the pivot, so its arc proves the riders follow the swing."""
     path = str(OUT_SLDASM / "drive-train.SLDASM")
     check("open drive-train", await adapter.open_model(path))
     mates = check("list mates", await adapter.list_mates())
     await _suppress(adapter, _gear_mate_names(mates), "p1 gear meshes")
     await _suppress(adapter, _family_driver_names(
-        adapter, "drive-train", "cone-pivot-post", only_type=ANGLE),
-        "p1 cone-post swing park")
-    post, post_name = _find_one(adapter, "cone-pivot-post")
-    if post is None:
-        raise RuntimeError("p1: cone-pivot-post not found")
-    motor_axis = _entity_ref(post_name, "Axis2", "AXIS")
+        adapter, "drive-train", "cone-swing-platform", only_type=ANGLE),
+        "p1 cone-platform swing park")
+    plate, plate_name = _find_one(adapter, "cone-swing-platform")
+    if plate is None:
+        raise RuntimeError("p1: cone-swing-platform not found")
+    motor_axis = _entity_ref(plate_name, "Axis1", "AXIS")
     return await _run_swing_study(
         adapter, motor_axis, "cone-pivot-post",
         "p1 cone disengage", "drive-train-p1-cone-swing")
