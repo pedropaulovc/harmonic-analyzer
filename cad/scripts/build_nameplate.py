@@ -8,27 +8,42 @@ scroll cartouche. The book states the plate is 100 mm x 55 mm (ch.26 p.70) --
 the only hard provenance fact on the machine; the '2' stamped a few centimetres
 away in the baseplate corner is a separate base feature, not modelled here.
 
-The lettering, ornament and pinstripe are reproduced from the actual photo, not a
-font: the polished engraving was traced off the p.71 macro (originally into DXFs,
-since retired) and is now drawn with native SolidWorks **sketch primitives**:
+The lettering, ornament AND pinstripe frame are reproduced from the actual photo,
+not a font: the polished engraving was traced off the p.71 macro into a vector
+DXF (``cad/references/nameplate-engraving.dxf``). This build **imports that DXF**
+directly onto the decorated face and cuts the whole artwork as one feature --
+lettering, scroll cartouche and pinstripe frame all come from the DXF (an earlier
+revision re-traced the DXF into native ``LETTERING_LOOPS`` sketch primitives; that
+is now retired in favour of importing the file at build time via
+``IFeatureManager::InsertDwgOrDxfFile2`` -- see ``adapter.import_dxf_dwg``).
 
-* the glyph + scroll-cartouche contours are drawn as closed line chains from the
-  vendored ``_nameplate_geometry.LETTERING_LOOPS`` and cut into the field floor;
-* the pinstripe frame is two concentric rounded rectangles (true corner arcs via
-  :func:`sketch_rounded_rect`), cut shallow on the raised border.
+The vendored DXF is a CLOSED-REGION rendering of the traced artwork: the raw trace
+is outline line-art (open/closed strokes, hollow letters) that a cut-extrude cannot
+turn into a feature (no closed profile), so each stroke was buffered into a thin
+~0.4 mm closed ribbon and the ribbons unioned -- 112 closed LWPOLYLINEs that trace
+every stroke edge and cut as grooves, reproducing the artwork faithfully. This was
+a one-time offline transform (scratchpad ``generate_cut_dxf.py``: ezdxf resolve +
+shapely buffer/union, then scaled+centred to final plate-mm so the artwork is 88 mm
+wide on the plate centre -- the Makers seat ignores the import's scale/position, so
+both are baked into the file); git history keeps the original spline trace, the p.71
+macro is the provenance.
 
-``test_nameplate_geometry`` guards the vendored geometry against the golden analytic
-targets the primitives were validated to (engraving 100%, pinstripe band 99.99%,
-finished volume 100%).
+The import is placed on the Front plane, uniform-scaled so the traced artwork's
+outer frame spans ``ENGRAVING_TARGET_WIDTH`` and centred on the plate centre, then
+cut both-directions to reach the field floor (so the lettering incises the sunk
+field and the pinstripe/frame incise the raised border).
+
+``test_nameplate_geometry`` guards the vendored DXF's integrity (header units,
+entity population and artwork extent) -- the source of truth is now the file.
 
 Dimensions: cad/DIMENSIONS.md ch.26 -- 100 x 55 stated (high); thickness, corner
-radius, border, recess, pinstripe and screw inset are photo-plausible reads off
-the p.71 macro (low). The engraving geometry IS the traced photo.
+radius, border, recess and screw inset are photo-plausible reads off the p.71
+macro (low). The engraving geometry IS the traced photo (the DXF).
 
 Layout: width along +X, height along +Y from the origin corner, decorated face on
 the Front plane at z = 0. The body extrudes in -Z (``reverse_direction``) so the
 decorated z=0 face is the EXPOSED FRONT face (outward normal +Z): the traced
-lettering, drawn to read from +Z, then reads correctly on the face you actually
+artwork, drawn to read from +Z, then reads correctly on the face you actually
 see, with no mirror. (build_platen is untextured and extrudes +Z; only this
 engraved plate needs the decorated face frontmost.)
 
@@ -43,6 +58,7 @@ import math
 import sys
 
 from _common import (
+    REFERENCES_DIR,
     SketchDims,
     add_line_chain,
     apply_material,
@@ -62,12 +78,10 @@ from _common import (
     volume_check,
 )
 from _features import (
-    sketch_polyline_loops,
     sketch_rounded_rect,
 )
 
 import _telemetry
-from _nameplate_geometry import BORDER_INNER, BORDER_OUTER, LETTERING_LOOPS
 
 PART_NAME = "nameplate"
 MATERIAL = "Brass"  # bright cast/engraved brass plate (see _common.apply_material)
@@ -77,10 +91,44 @@ PLATE_HEIGHT = 55.0  # DIMENSIONS.md ch26: stated 55 mm (p.70, high)
 PLATE_THICKNESS = 1.5  # thin brass plate; p.71 edge read (low)
 CORNER_R = 3.0  # rounded plate corners (p.71, low)
 
-# Raised border framing the recessed field; pinstripe frame rides the border.
+# Raised border framing the recessed field; the imported pinstripe rides the border.
 BORDER_W = 8.0
 RECESS_DEPTH = 0.4
-ENGRAVE_DEPTH = 0.3  # incise depth of letters / ornament / pinstripe
+ENGRAVE_DEPTH = 0.3  # incise depth of the imported artwork below the field floor
+
+# Traced engraving, imported at build time. The whole artwork (lettering, scroll
+# cartouche and pinstripe frame) is drawn in the vendored DXF; the build imports
+# and cuts it as one feature (see module docstring).
+ENGRAVING_DXF = REFERENCES_DIR / "nameplate-engraving.dxf"
+# The DXF is millimetre-unit ($INSUNITS=4) and is authored at FINAL plate-mm: its
+# closed-region artwork already spans ENGRAVING_TARGET_WIDTH (88 mm, the historic
+# pinstripe-outer footprint) and is centred on the plate centre. So the bbox below
+# has width 88 and centre (50, 27.5).
+#
+# Why pre-baked: on the SOLIDWORKS 3DEXPERIENCE "for Makers" seat the import ignores
+# BOTH placement controls for a flat modelspace DXF -- IImportDxfDwgData::SetPosition
+# AND SetSheetScale are no-ops (verified live: the artwork lands at 1:1 raw coords
+# regardless of the scale/position passed). Rather than depend on a control that
+# silently does nothing, the one-time generate_cut_dxf.py bakes the final scale and
+# centring straight into the file, and the build imports at scale=1.0, position=(0,0).
+# ENGRAVING_SCALE below computes to 1.0 and ENGRAVING_POSITION to (0, 0) as guards: a
+# swapped or wrong-size DXF makes width != 88 (scale != 1) or the centre shift nonzero,
+# and build_nameplate's removed-volume bounds check then fails loud on the live seat.
+ENGRAVING_RAW_BBOX = (6.0000, 7.5538, 94.0000, 47.4462)  # artwork bbox x0,y0,x1,y1 (mm, final)
+ENGRAVING_RAW_WIDTH = ENGRAVING_RAW_BBOX[2] - ENGRAVING_RAW_BBOX[0]  # 88.0 mm (pre-scaled)
+ENGRAVING_RAW_CENTER = (
+    (ENGRAVING_RAW_BBOX[0] + ENGRAVING_RAW_BBOX[2]) / 2.0,
+    (ENGRAVING_RAW_BBOX[1] + ENGRAVING_RAW_BBOX[3]) / 2.0,
+)
+ENGRAVING_TARGET_WIDTH = 88.0  # mm, artwork outer frame footprint on the plate
+ENGRAVING_SCALE = ENGRAVING_TARGET_WIDTH / ENGRAVING_RAW_WIDTH
+ENGRAVING_CENTER = (PLATE_WIDTH / 2.0, PLATE_HEIGHT / 2.0)  # plate-mm
+# The scaled resolved artwork centre already sits on the plate centre (baked into the
+# DXF), so this offset is ~(0, 0); it is passed straight through and ignored by SW.
+ENGRAVING_POSITION = (
+    ENGRAVING_CENTER[0] - ENGRAVING_SCALE * ENGRAVING_RAW_CENTER[0],
+    ENGRAVING_CENTER[1] - ENGRAVING_SCALE * ENGRAVING_RAW_CENTER[1],
+)
 
 # Four corner mounting screws (the shared brass fillister part), in the border band.
 SCREW_DIA = 2.6
@@ -93,71 +141,11 @@ SCREW_XY = (
 )
 
 
-def _shoelace(loop: list[tuple[float, float]]) -> float:
-    """Signed polygon area (CCW positive)."""
-    a = 0.0
-    n = len(loop)
-    for i in range(n):
-        x1, y1 = loop[i]
-        x2, y2 = loop[(i + 1) % n]
-        a += x1 * y2 - x2 * y1
-    return a / 2.0
-
-
-def _engraving_area() -> float:
-    """Even-odd filled area of the traced engraving (mm^2).
-
-    The loops follow nesting parity -- outer glyph/ornament contours run CCW
-    (positive), the 9 enclosed counters run CW (negative) -- so the signed-area
-    sum is exactly the even-odd filled region the single cut removes.
-    """
-    return abs(sum(_shoelace(loop) for loop in LETTERING_LOOPS))
-
-
-def _rrect_area(spec: tuple[float, float, float, float, float]) -> float:
-    """Area of a rounded rectangle ``(cx, cy, w, h, r)``."""
-    _cx, _cy, w, h, r = spec
-    return w * h - (4.0 - math.pi) * r * r
-
-
-def _rrect_to_args(spec: tuple[float, float, float, float, float]):
-    """Reorder a ``(cx, cy, w, h, r)`` spec to sketch_rounded_rect's (w, h, r, cx, cy)."""
-    cx, cy, w, h, r = spec
-    return (w, h, r, cx, cy)
-
-
-async def _cut_region(adapter, depth, *, label, expected_removed):
-    """Exit the OPEN engraving/border sketch and both-directions cut it `depth`
-    into the front face, asserting the analytically expected removed volume.
-
-    ``depth`` is the half-reach; the cut runs 2*depth both ways about the z=0
-    Front plane, landing depth into the -z body (the +z half is air), same scheme
-    as the field recess. ``expected_removed`` is the NEW volume this cut removes
-    (overlap with the already-sunk recess excluded by the caller).
-    """
-    from solidworks_mcp.adapters.base import ExtrusionParameters
-
-    pre = await adapter.get_mass_properties()
-    check(f"exit_sketch {label}", await adapter.exit_sketch())
-    check(
-        f"cut {label}",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=2.0 * depth, both_directions=True)
-        ),
-    )
-    removed = float(pre.data.volume) - float((await adapter.get_mass_properties()).data.volume)
-    _telemetry.info(f"{label} removed {removed:.1f} mm^3 (analytic {expected_removed:.1f})")
-    if removed <= 0.0:
-        raise RuntimeError(f"cut {label}: nothing removed (sketch/cut/plane -> live)")
-    if abs(removed - expected_removed) > 0.02 * expected_removed:
-        raise RuntimeError(
-            f"cut {label}: removed {removed:.1f} mm^3, expected {expected_removed:.1f}"
-        )
-    return removed
-
-
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import (
+        ExtrusionParameters,
+        ImportDxfDwgParameters,
+    )
 
     check("create_part", await adapter.create_part())
 
@@ -257,43 +245,60 @@ async def build(adapter) -> dict[str, str]:
     if abs(removed - v_field) > 0.02 * v_field:
         raise RuntimeError(f"field recess removed {removed:.1f}, expected {v_field:.1f}")
 
-    # Traced-photo engraving, drawn as native sketch line-loops (was a DXF import).
-    # Lettering + cartouche incise the recessed field floor: the cut reaches
-    # RECESS+ENGRAVE but the recess already cleared the first RECESS_DEPTH over the
-    # field, so the NEW material removed is the engraving area x ENGRAVE_DEPTH.
-    # The loops are traced to read from +Z; because the body extrudes -Z the
-    # decorated z=0 face is the exposed front (outward normal +Z), so the loops
-    # incise and read correctly drawn exactly as traced -- no mirror.
-    # Engraving sketch = traced glyph/cartouche line-loops (sketch_polyline_loops):
-    # an UNTOUCHED text/engraving feature -- no SketchDims, no recorded/driven dims
-    # (the loops are the traced photo, not parametric geometry). Name only the cut.
-    eng_area = _engraving_area()
-    check("create_sketch lettering", await adapter.create_sketch("Front"))
-    await sketch_polyline_loops(adapter, LETTERING_LOOPS, label="lettering")
-    await _cut_region(
-        adapter,
-        RECESS_DEPTH + ENGRAVE_DEPTH,
-        label="lettering",
-        expected_removed=eng_area * ENGRAVE_DEPTH,
+    # Traced-photo engraving, IMPORTED from the vendored DXF (was native line-loops).
+    # The whole artwork -- lettering, scroll cartouche AND pinstripe frame -- comes
+    # from cad/references/nameplate-engraving.dxf as 112 closed-region ribbons (see
+    # the module docstring), inserted on the Front plane as one sketch and cut as one
+    # feature. The artwork is traced to read from +Z; because the body extrudes -Z the
+    # decorated z=0 face is the exposed front (outward normal +Z), so the import reads
+    # correctly with no mirror.
+    #
+    # The cut reaches RECESS+ENGRAVE both-directions about z=0: over the sunk field
+    # the lettering incises ENGRAVE_DEPTH into the floor (the recess already cleared
+    # the first RECESS_DEPTH), while over the raised border the pinstripe/frame
+    # incise the full RECESS+ENGRAVE. No analytic area exists for the traced ribbons,
+    # so the removed volume is bounded-checked (something engraved, well short of
+    # cutting through the slab) rather than matched to a closed form.
+    if not ENGRAVING_DXF.is_file():
+        raise RuntimeError(f"engraving DXF not found: {ENGRAVING_DXF}")
+    pre = await adapter.get_mass_properties()
+    check(
+        "import engraving DXF",
+        await adapter.import_dxf_dwg(
+            ImportDxfDwgParameters(
+                file_path=str(ENGRAVING_DXF),
+                plane="Front",
+                scale=ENGRAVING_SCALE,
+                # DXF origin placement (SpecifyPosition) that centres the scaled
+                # artwork on the plate -- see ENGRAVING_POSITION.
+                position=[ENGRAVING_POSITION[0], ENGRAVING_POSITION[1]],
+                merge_points=True,   # weld coincident ribbon endpoints into regions
+                import_hatch=False,  # file carries no hatches (closed ribbons only)
+                import_dimensions=False,
+                add_constraints=False,
+            )
+        ),
     )
-    name_last_feature(adapter, "LetteringCut")
-
-    # Pinstripe frame: two concentric rounded rectangles (even-odd -> thin band),
-    # incised ENGRAVE_DEPTH on the raised border (front face).
-    # Pinstripe = two concentric rounded rects drawn via sketch_rounded_rect (raw
-    # lines + corner arcs, not a define_* helper): cosmetic, under-defined, no
-    # recordable display dims -- like the plate outline, name only the cut.
-    band_area = _rrect_area(BORDER_OUTER) - _rrect_area(BORDER_INNER)
-    check("create_sketch pinstripe", await adapter.create_sketch("Front"))
-    await sketch_rounded_rect(adapter, *_rrect_to_args(BORDER_OUTER))
-    await sketch_rounded_rect(adapter, *_rrect_to_args(BORDER_INNER))
-    await _cut_region(
-        adapter,
-        ENGRAVE_DEPTH,
-        label="pinstripe",
-        expected_removed=band_area * ENGRAVE_DEPTH,
+    name_last_feature(adapter, "EngravingImport")
+    check(
+        "cut engraving",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(
+                depth=2.0 * (RECESS_DEPTH + ENGRAVE_DEPTH), both_directions=True
+            )
+        ),
     )
-    name_last_feature(adapter, "PinstripeCut")
+    name_last_feature(adapter, "EngravingCut")
+    removed = float(pre.data.volume) - float((await adapter.get_mass_properties()).data.volume)
+    slab_volume = (PLATE_WIDTH * PLATE_HEIGHT - (4.0 - math.pi) * CORNER_R**2) * PLATE_THICKNESS
+    _telemetry.info(f"engraving cut removed {removed:.1f} mm^3 (imported DXF artwork)")
+    if removed <= 0.0:
+        raise RuntimeError("cut engraving: nothing removed (import/cut/plane -> live)")
+    if removed > 0.5 * slab_volume:
+        raise RuntimeError(
+            f"cut engraving: removed {removed:.1f} mm^3 -- implausibly deep "
+            f"(> half the {slab_volume:.1f} mm^3 slab); check import scale/position"
+        )
 
     # Four corner screw through-holes (both-directions 2x thickness clears the slab).
     # Every centre is off-axis (both coords non-zero), so define_circle emits three
