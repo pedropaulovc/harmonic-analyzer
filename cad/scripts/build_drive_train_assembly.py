@@ -7,11 +7,14 @@ drive plane at y 104.8, not the old 126.8):
 
 * cone set: a TRUE CONE -- all 20 gears AND the 64T crank-drive gear
   seated perpendicular to the stepped shaft (p.18/p.20 photos), the
-  shaft inclined in PLAN, front stub journaled through the (green) swing
-  post with its end boss standing proud at z -123 (the GT cone_front
-  feature), thin 1/8" tip UNSUPPORTED for now (the real tip post the GT
-  found at z +102 sits inside the model's portal frustum -- deferred to
-  the back-frame re-layout).
+  shaft inclined in PLAN and carried at BOTH ends ON the cone swing
+  platform (p.18: the wedge plate labelled "pivot" at its tip): big end
+  journaled in the green pivot post, thin 1/32" tip in the black tip
+  block (the GT tip post at world (-81, 105, +102), realized at station
+  185). The plate pivots about a vertical axis at its TIP end, so the
+  whole set swings horizontally out of mesh as one unit -- the p1
+  disengage DOF; pivoting at the tip gives the big gears (which need
+  the most working-depth separation) the largest throw.
 * cylinder drum: 20 identical 120T gears spinning freely on the
   stationary arbor along Z at (-54.7, 104.8) (M6.2 keyway refutation),
   carried by the SOUTH arbor pedestal; the arbor's north end clears the
@@ -89,7 +92,8 @@ the crank pinion seeds PINION_SEED_DEG -- the generalization of the old
 the horizontal mesh; see the derivation at the constant).
 
 Mated-DOF strategy (M6 operation simulation): the structure -- the
-stationary arbor and the pedestals/posts -- is grounded; the crank
+stationary arbor and the pedestals -- is grounded; the swing platform
+is floated (its riders seat on it and follow the p1 swing); the crank
 chain, the cone cluster and the 20 cylinder
 gears are inserted on their exact mirrored transforms (so mate
 flip-recovery has a clean reference and the tuned tooth phases are
@@ -252,9 +256,12 @@ CONE_ORIGIN = [
     Y_DRIVE,
     cone_seat(0)[1] - SHAFT_T120_STATION * COS_I,
 ]
-SHAFT_FRONT_STATION = -35.8  # build_cone_gear_shaft FRONT_STUB: the stub runs
-# through the swing post's journal, its end boss proud at machine z -123.0
-# (the GT cone_front feature)
+SHAFT_FRONT_STATION = -12.3  # -build_cone_gear_shaft FRONT_STUB (asserted
+# below): the stub runs through the pivot post's journal, ending ~1.5 proud of
+# the post's south flank (z -100.06). DOCUMENTED DEVIATION: the GT cone_front
+# boss at z -123 belonged to the retired nested-pedestal story (stub through
+# the pedestal's wall windows); the platform architecture ends the shaft at
+# the post.
 
 
 def cone_station(s: float) -> list[float]:
@@ -355,17 +362,12 @@ REMOVABLE_Z0 = -157.5  # mounted T12 (face 5.0): band -157.5..-152.5, mid -155 =
 # (-134.5..-137.5) by 15; the arm sits 9.5 SOUTH of the wheel so the rotating
 # arm/handle never crosses it. The small removable gear is the chain wheel
 # (ch. 23 -- bead chain on its m2 teeth; v2_gears_010).
-PEDESTAL_Z = -98.3  # crank pedestal CYLINDER centre: band -121.4..-75.2. The
-# O46.2 column fills the stub-boss -> 64T corridor: front face 1.6 behind the
-# cone-shaft front stub end (-123.0), whose boss emerges through the front
-# window and stands ~2.5 proud of the curved flank at the drive height -- the
-# GT cone_front feature; rear face clears the 64T tip rim by 1.9 and the 16T
-# pinion front by 1.4; the foot sits fully on the base top plate (edge
-# -133.35). The 2026-07-02 "slab band -145..-125" was a side-view mis-read
-# (the column hides behind a frame column + the crank arm there) and hung the
-# part past even the base bottom corner (-139.7); the ch30 quarter views
-# (page003/page009) show ONE round green column with the swing journal nested
-# inside -- cavity/block/window fit asserted below.
+PEDESTAL_Z = -117.5  # crank pedestal CYLINDER centre: band -132.5..-102.5.
+# The slender O30 column stands SOUTH of the swing platform's south edge
+# (~1.9 true corner air -- the plate must swing free; asserted below in the
+# plate's inclined frame), its foot fully on the base top plate (edge
+# -133.35, 0.85 margin); the T12 chain-wheel plane (-157.5..-152.5) stays 20
+# clear and the paper-drive stub disc (-134.5..-137.5) clears the foot by 2.
 ARBOR_PEDESTAL_Z = 90.5  # SOUTH end only (at z -90.5): the rocker support no
 # longer clamps the arbor, but the solid portal north upright leaves no room for
 # a north pedestal where the arbor's north end was (GT NOTE above). South block
@@ -375,110 +377,107 @@ ARBOR_PEDESTAL_Z = 90.5  # SOUTH end only (at z -90.5): the rocker support no
 if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
     raise AssertionError("crankshaft too short for the M6.7 pinion station")
 
-# Posts: the O24 swing-journal block NESTS inside the crank pedestal's O26
-# cavity (2026-07-02 cylinder restore -- the ch30 photos show ONE round green
-# casting at the front-right, not a pedestal-plus-block pair). Station -12.25
-# (ch30 GT) centres the journal mid-pedestal; the cone shaft runs on through
-# the pedestal's wall windows and its front stub end boss stands proud of the
-# curved flank at z -123 (the GT cone_front feature at (-127, 101, -123)).
-PIVOT_POST_STATION = -12.25
+# The whole cone set rides the SWING PLATFORM (ch.12 p.18: the dark wedge
+# plate labelled "pivot" at its tip end). The green pivot post (big-end
+# journal) and the black tip block (1/32" tip journal) stand ON the plate;
+# the plate pivots about a vertical axis at cone station PIVOT_STATION, just
+# north of the shaft's rear end, so on disengage the BIG end -- where the
+# gears need the most working-depth separation -- swings the farthest
+# (throw ~ distance from pivot).
+POST_STATION = 1.5  # pivot post plan centre: south flank z -98.59, 1.1 air
+# to the 64T south face (-73.5) at the NORTH flank (-74.59)
+TIP_BLOCK_STATION = 185.0  # tip block plan centre; the shaft's tip end
+# (station 190) journals INSIDE its bore -- the GT tip post (-81, 104.6, +102)
+PIVOT_STATION = 196.0  # platform swing pivot (plan), north of the shaft end
 
-# --- pedestal <-> nested swing journal fit (SolidWorks-free, import-time) ----
-# The pedestal part hardcodes its cavity/window literals in ITS part frame;
-# they must land on the live cone-shaft line + swing axis placed here. Imported,
-# not copied (the CAM_ECC precedent), and asserted at import so a drifted
-# anchor fails before any COM work.
-from build_crank_pedestal import (  # noqa: E402
-    CAVITY_DIA as PED_CAVITY_DIA,
-    CAVITY_HEIGHT as PED_CAVITY_HEIGHT,
-    CAVITY_X as PED_CAVITY_X,
-    CAVITY_Z as PED_CAVITY_Z,
-    JOURNAL_Y as PED_JOURNAL_Y,
-    PEDESTAL_DIA as PED_DIA,
-    WINDOW_F_DIA as PED_WINDOW_F_DIA,
-    WINDOW_F_X as PED_WINDOW_F_X,
-    WINDOW_R_DIA as PED_WINDOW_R_DIA,
-    WINDOW_R_X as PED_WINDOW_R_X,
+# --- platform <-> riders fit (SolidWorks-free, import-time) ------------------
+# The platform/post/block parts hardcode their envelopes in THEIR part frames;
+# they must agree with the live cone-shaft line placed here. Imported, not
+# copied (the CAM_ECC precedent), and asserted at import so a drifted anchor
+# fails before any COM work.
+from build_cone_swing_platform import (  # noqa: E402
+    HALF_WIDTH_N as PLAT_HALF_N,
+    HALF_WIDTH_S as PLAT_HALF_S,
+    NORTH_OVERHANG as PLAT_OVERHANG,
+    PLATE_LEN as PLAT_LEN,
+    PLATE_T as PLAT_T,
 )
 from build_cone_pivot_post import (  # noqa: E402
     BLOCK_DIA as POST_BLOCK_DIA,
-    BLOCK_HEIGHT as POST_BLOCK_HEIGHT,
     BORE_HEIGHT as POST_BORE_HEIGHT,
 )
+from build_cone_tip_block import (  # noqa: E402
+    BLOCK_X as TIP_BLOCK_X,
+    BLOCK_Z as TIP_BLOCK_Z,
+    BORE_HEIGHT as TIP_BORE_HEIGHT,
+)
+from build_cone_gear_shaft import (  # noqa: E402
+    FRONT_STUB as SHAFT_FRONT_STUB,
+    SECTIONS as SHAFT_SECTIONS,
+)
+from build_crank_pedestal import PEDESTAL_DIA as PED_DIA  # noqa: E402
 
-_PPOST = cone_station(PIVOT_POST_STATION)  # swing axis / journal plan point
-_PED_R = PED_DIA / 2.0
-# One journal drive height across pedestal, post and assembly.
-if (abs((Y_DRIVE - Y_BASE_TOP) - POST_BORE_HEIGHT) > 1e-9
-        or abs(PED_JOURNAL_Y - POST_BORE_HEIGHT) > 1e-9):
-    raise AssertionError("cone journal height drifted between pedestal/post/assembly")
-# Cavity centred on the swing axis: part-frame literals vs the live station.
-# The pedestal is CHIRAL and authored MIRRORED (M6.8 "x0", like summing-lever):
-# its part-frame x = MINUS this script's machine-frame offset (z unmirrored).
-if (abs(-(_PPOST[0] - X_CRANK) - PED_CAVITY_X) > 0.02
-        or abs((_PPOST[2] - PEDESTAL_Z) - PED_CAVITY_Z) > 0.02):
+# One journal drive height across the platform and both riders: plate
+# thickness under each foot + bore height = 54 above the base top.
+if (abs((Y_DRIVE - Y_BASE_TOP) - (PLAT_T + POST_BORE_HEIGHT)) > 1e-9
+        or abs((Y_DRIVE - Y_BASE_TOP) - (PLAT_T + TIP_BORE_HEIGHT)) > 1e-9):
+    raise AssertionError("cone journal height drifted between platform/post/block")
+# The shaft is placed by its front stub end; keep the station in lockstep with
+# the part's FRONT_STUB.
+if abs(SHAFT_FRONT_STATION + SHAFT_FRONT_STUB) > 1e-9:
+    raise AssertionError("SHAFT_FRONT_STATION out of sync with the shaft FRONT_STUB")
+
+
+def _plat_half_width(s: float) -> float:
+    """Platform half-width at cone station s (linear taper, wide south end);
+    negative if s is off the plate."""
+    z_local = s - PIVOT_STATION  # platform local z (+ along increasing station)
+    if not (PLAT_OVERHANG - PLAT_LEN - 1e-9 <= z_local <= PLAT_OVERHANG + 1e-9):
+        return -1.0
+    return PLAT_HALF_N + (PLAT_HALF_S - PLAT_HALF_N) * (PLAT_OVERHANG - z_local) / PLAT_LEN
+
+
+# Both riders stand fully ON the plate (plan, in the platform's own inclined
+# frame: both are centred on the shaft-axis plan line, so only the along-axis
+# span and the half-width at each end matter).
+for _lbl, _s0, _hx, _hz in (
+    ("pivot post", POST_STATION, POST_BLOCK_DIA / 2.0, POST_BLOCK_DIA / 2.0),
+    ("tip block", TIP_BLOCK_STATION, TIP_BLOCK_X / 2.0, TIP_BLOCK_Z / 2.0),
+):
+    for _end in (_s0 - _hz, _s0 + _hz):
+        if _plat_half_width(_end) < _hx + 0.25:
+            raise AssertionError(
+                f"{_lbl} overhangs the swing platform at station {_end:g}")
+# The shaft's tip end journals INSIDE the tip block (>= 5 engaged, end short
+# of the north face).
+_TIP_END_STATION = SHAFT_FRONT_STATION + SHAFT_SECTIONS[-1][1]  # 190.0
+if not (TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0 + 5.0
+        <= _TIP_END_STATION
+        <= TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0 - 0.5):
+    raise AssertionError("shaft tip end does not journal inside the tip block")
+# The stub end stands proud of the post's south flank (nothing hides it).
+_STUB_END_Z = cone_station(SHAFT_FRONT_STATION)[2]  # -100.06
+_POST_SOUTH_Z = cone_station(POST_STATION)[2] - POST_BLOCK_DIA / 2.0  # -98.59
+if _STUB_END_Z > _POST_SOUTH_Z - 1.0:
     raise AssertionError(
-        f"pedestal cavity offset ({PED_CAVITY_X}, {PED_CAVITY_Z}) is off the swing "
-        f"axis ({-(_PPOST[0] - X_CRANK):.3f}, {_PPOST[2] - PEDESTAL_Z:.3f})")
-# Block nests with radial air and under the cavity ceiling.
-if (PED_CAVITY_DIA - POST_BLOCK_DIA < 1.5
-        or PED_CAVITY_HEIGHT - POST_BLOCK_HEIGHT < 1.5):
-    raise AssertionError("cone-pivot-post block does not nest in the pedestal cavity")
-# Foot fully on the base top plate (17.5 x 10.5 in centred: +-222.25, +-133.35).
+        f"cone-shaft stub end {_STUB_END_Z:.2f} not proud of the post's south "
+        f"flank {_POST_SOUTH_Z:.2f}")
+# Crank pedestal: foot fully on the base top plate (17.5 x 10.5 in centred:
+# +-222.25, +-133.35) and clear of the swing plate's south edge. The edge is
+# perpendicular to the INCLINED axis (slanted in machine z), so measure the
+# gap in the plate's own frame -- a machine-z midline check overstates it by
+# ~1 (the plate corner is the near point).
+_PED_R = PED_DIA / 2.0
 if abs(PEDESTAL_Z) + _PED_R > 133.35 or abs(X_CRANK) + _PED_R > 222.25:
     raise AssertionError("crank pedestal foot hangs off the base top plate")
-# The shaft's front stub end boss must stand proud of the pedestal's curved
-# flank (GT cone_front), and the inclined shaft must thread the wall windows
-# with air. Walk the shaft line in part-frame plan coordinates.
-_STUB_END_Z = cone_station(SHAFT_FRONT_STATION)[2]  # -123.0
-
-
-def _shaft_part_xz(s: float) -> tuple[float, float]:
-    """Shaft-axis point at station s in the pedestal's authored-mirrored part
-    frame (x negated -- the M6.8 note at the cavity assert)."""
-    p = cone_station(s)
-    return -(p[0] - X_CRANK), p[2] - PEDESTAL_Z
-
-
-_HALF_SHAFT_X = (0.375 * 25.4 / 2.0) / COS_I  # inclined section's x half-width
-for _s in [SHAFT_FRONT_STATION + _k * 0.25 for _k in range(280)]:
-    _xp, _zp = _shaft_part_xz(_s)
-    if _xp * _xp + _zp * _zp >= _PED_R * _PED_R:
-        continue  # outside the column
-    if math.hypot(_xp - PED_CAVITY_X, _zp - PED_CAVITY_Z) < PED_CAVITY_DIA / 2.0:
-        continue  # inside the cavity void
-    _wx, _wd = ((PED_WINDOW_F_X, PED_WINDOW_F_DIA) if _zp < 0.0
-                else (PED_WINDOW_R_X, PED_WINDOW_R_DIA))
-    if abs(_xp - _wx) + _HALF_SHAFT_X > _wd / 2.0 - 0.4:
-        raise AssertionError(
-            f"cone shaft clips a pedestal wall window at station {_s:.2f} "
-            f"(part x {_xp:.2f}, z {_zp:.2f})")
-_FRONT_EXIT_Z = PEDESTAL_Z + next(
-    _zp for _s in [SHAFT_FRONT_STATION + _k * 0.05 for _k in range(4000)]
-    for _xp, _zp in [_shaft_part_xz(_s)]
-    if _xp * _xp + _zp * _zp < _PED_R * _PED_R)
-if _STUB_END_Z > _FRONT_EXIT_Z - 1.0:
+_PPIVOT = cone_station(PIVOT_STATION)
+_PED_LOCAL_Z = (-(X_CRANK - _PPIVOT[0]) * SIN_I
+                + (PEDESTAL_Z - _PPIVOT[2]) * COS_I)  # -224.9: south of the edge
+_PED_EDGE_GAP = (PLAT_OVERHANG - PLAT_LEN) - _PED_LOCAL_Z - _PED_R  # 1.88
+if _PED_EDGE_GAP < 1.0:
     raise AssertionError(
-        f"cone-shaft stub end {_STUB_END_Z:.1f} not proud of the pedestal flank "
-        f"(surface exit z {_FRONT_EXIT_Z:.2f})")
-# 64T tip rim must clear the column in plan.
-_TIP64 = R64 + 25.4 / DP_CRANK
-_G64_SOUTH = (GEAR64_SEAT[0] + (GEAR64_FACE / 2.0) * SIN_I,
-              GEAR64_SEAT[2] - (GEAR64_FACE / 2.0) * COS_I)
-_RIM_MIN = min(
-    math.hypot(_G64_SOUTH[0] + _TIP64 * COS_I * math.cos(_t) - X_CRANK,
-               _G64_SOUTH[1] + _TIP64 * SIN_I * math.cos(_t) - PEDESTAL_Z)
-    for _t in [_k * math.pi / 360.0 for _k in range(720)])
-if _RIM_MIN - _PED_R < 1.5:
-    raise AssertionError(
-        f"64T tip rim comes within {_RIM_MIN - _PED_R:.2f} of the pedestal column")
-
-# --- cone small-end support: DEFERRED to the portal/back-frame re-layout -----
-# The ch30 GT CONFIRMS a real tip post (black, slotted) at the cone's back end,
-# world (-81, 104.6, +101.8) -- but that point sits inside the model's portal
-# frustum envelope, so placing it waits for the same back-frame re-layout as
-# the arbor's north bearing (GT NOTE at ARBOR_LENGTH). The cone tip stays
-# unsupported until then.
+        f"crank pedestal within {_PED_EDGE_GAP:.2f} of the swing plate's south "
+        f"edge (needs >= 1.0)")
 
 # --- alignment pinion (ch. 25): RESTORED 2026-07-02, carried DISENGAGED ------
 # The ch30 GT proves the zeroing rig is on the machine (tee handle triangulates
@@ -714,18 +713,32 @@ async def build(adapter) -> dict[str, str]:
         label=f"arbor-pedestal z={-ARBOR_PEDESTAL_Z:g}",
     )
     await _locate_to_datum(adapter, arbor_pedestal)
-    ppost = cone_station(PIVOT_POST_STATION)
-    # The cone-pivot-post is the SWING BRACKET (ch.12, p.18 "pivot"): floated so
-    # the whole cone set can swing horizontally out of mesh about its vertical
-    # axis (p1). Pinned at the engaged rest pose by a suppressible angle driver
-    # in the joints section.
+    # The cone SWING PLATFORM is the swing bracket (ch.12, p.18 "pivot"):
+    # floated so the whole cone set can swing horizontally out of mesh about
+    # its tip-end vertical pivot (p1). Pinned at the engaged rest pose by a
+    # suppressible angle driver in the joints section. The pivot post and tip
+    # block are seated ON its PlateTop below, so they -- and the shaft they
+    # journal -- ride the swing as one unit.
+    ppivot = cone_station(PIVOT_STATION)
+    platform = await place_component(
+        adapter, "cone-swing-platform",
+        [ppivot[0], Y_BASE_TOP, ppivot[2]], [0.0, -INCLINE_DEG, 0.0], ROT_Y_INCLINE,
+        ground=False, label="cone-swing-platform (swing bracket, engaged rest)",
+    )
+    ppost = cone_station(POST_STATION)
     pivot_post = await place_component(
         adapter, "cone-pivot-post",
-        [ppost[0], Y_BASE_TOP, ppost[2]], [0.0, -INCLINE_DEG, 0.0], ROT_Y_INCLINE,
-        ground=False, label="cone-pivot-post (swing bracket, engaged rest)",
+        [ppost[0], Y_BASE_TOP + PLAT_T, ppost[2]], [0.0, -INCLINE_DEG, 0.0],
+        ROT_Y_INCLINE, ground=False,
+        label="cone-pivot-post (big-end journal, on the plate)",
     )
-    # (cone small-end support deferred to the back-frame re-layout -- see the
-    # note above PIVOT_POST_STATION; the cone tip is unsupported for now.)
+    ptip = cone_station(TIP_BLOCK_STATION)
+    tip_block = await place_component(
+        adapter, "cone-tip-block",
+        [ptip[0], Y_BASE_TOP + PLAT_T, ptip[2]], [0.0, -INCLINE_DEG, 0.0],
+        ROT_Y_INCLINE, ground=False,
+        label="cone-tip-block (tip journal, on the plate)",
+    )
 
     # ============ alignment pinion swing group (ch.25, p.66; p2) ============
     # Floated straps + drum, joined and parked DISENGAGED in the joints
@@ -938,40 +951,71 @@ async def build(adapter) -> dict[str, str]:
         label="handle anti-spin (grip rest)", verify=(handle, hd_o),
     )
 
-    # =============== cone pivot post swing (p1 disengage DOF) ==============
-    # The post is the swing bracket: the whole cone set swings horizontally out
-    # of mesh about its vertical pivot (ch.12, p.18). Pin the floated post with
-    # three locating drivers that leave ONLY the rotation about the vertical
-    # axis (Axis2): a Top-plane distance (upright + height) and the vertical
-    # axis's distance to the Right/Front planes (plan X/Z). Then a suppressible
-    # ANGLE PARK DRIVER holds today's ENGAGED orientation (the incline dihedral).
-    # The cone shaft stays journaled to the post (below) and rides the swing, so
-    # the validated 20-gear mesh is untouched in `rest`; suppress the angle
-    # driver to articulate the disengage.
-    post_o = _org(adapter, pivot_post)
+    # =============== cone platform swing (p1 disengage DOF) ==============
+    # The platform is the swing bracket: the whole cone set -- post, shaft,
+    # gears, tip block -- swings horizontally out of mesh about the plate's
+    # tip-end vertical pivot (ch.12, p.18). Pin the floated plate with three
+    # locating drivers that leave ONLY the rotation about the pivot axis
+    # ("swing pivot", Axis1): a Top-plane distance (upright + height) and the
+    # pivot axis's distance to the Right/Front planes (plan X/Z). Then a
+    # suppressible ANGLE PARK DRIVER holds today's ENGAGED orientation (the
+    # incline dihedral). The riders seat on the plate below and follow the
+    # swing, so the validated 20-gear mesh is untouched in `rest`; suppress
+    # the angle driver to articulate the disengage.
+    plat_o = _org(adapter, platform)
     await distance_driver(
         adapter,
-        named_ref(f"Top Plane@{pivot_post}", "PLANE"), named_ref("Top Plane", "PLANE"),
-        abs(post_o[1]),
-        label=f"cone-post height d={abs(post_o[1]):.2f}", verify=(pivot_post, post_o),
+        named_ref(f"Top Plane@{platform}", "PLANE"), named_ref("Top Plane", "PLANE"),
+        abs(plat_o[1]),
+        label=f"cone-platform height d={abs(plat_o[1]):.2f}", verify=(platform, plat_o),
     )
     await distance_driver(
         adapter,
-        named_ref(f"Axis2@{pivot_post}", "AXIS"), named_ref("Right Plane", "PLANE"),
-        abs(post_o[0]),
-        label=f"cone-post pivot-X d={abs(post_o[0]):.2f}", verify=(pivot_post, post_o),
+        named_ref(f"Axis1@{platform}", "AXIS"), named_ref("Right Plane", "PLANE"),
+        abs(plat_o[0]),
+        label=f"cone-platform pivot-X d={abs(plat_o[0]):.2f}", verify=(platform, plat_o),
     )
     await distance_driver(
         adapter,
-        named_ref(f"Axis2@{pivot_post}", "AXIS"), named_ref("Front Plane", "PLANE"),
-        abs(post_o[2]),
-        label=f"cone-post pivot-Z d={abs(post_o[2]):.2f}", verify=(pivot_post, post_o),
+        named_ref(f"Axis1@{platform}", "AXIS"), named_ref("Front Plane", "PLANE"),
+        abs(plat_o[2]),
+        label=f"cone-platform pivot-Z d={abs(plat_o[2]):.2f}", verify=(platform, plat_o),
     )
     await angle_driver(
         adapter,
-        named_ref(f"Right Plane@{pivot_post}", "PLANE"), named_ref("Right Plane", "PLANE"),
+        named_ref(f"Right Plane@{platform}", "PLANE"), named_ref("Right Plane", "PLANE"),
         INCLINE_DEG,
-        label=f"cone-post swing park (p1, engaged a={INCLINE_DEG:.2f})",
+        label=f"cone-platform swing park (p1, engaged a={INCLINE_DEG:.2f})",
+        verify=(platform, plat_o),
+    )
+
+    # Pivot post rides the plate -- the frame rocker-support idiom (two
+    # flip-free coincidents between named/symmetry planes + one distance):
+    # its Top plane seats on the plate's PlateTop datum, its Right plane (the
+    # plane through its axis, parallel to the plate's at rest) coincides with
+    # the plate's Right plane (the shaft-axis plan line), and a Front-plane
+    # distance sets the along-plate station. 6 DOF, no fix/lock; the post
+    # follows the p1 swing.
+    post_o = _org(adapter, pivot_post)
+    await coincident_mate(
+        adapter,
+        named_ref(f"Top Plane@{pivot_post}", "PLANE"),
+        named_ref(f"PlateTop@{platform}", "PLANE"),
+        label="cone-post seats on the plate (Top <-> PlateTop)",
+        verify=(pivot_post, post_o),
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"Right Plane@{pivot_post}", "PLANE"),
+        named_ref(f"Right Plane@{platform}", "PLANE"),
+        label="cone-post on the plate centreline", verify=(pivot_post, post_o),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Front Plane@{pivot_post}", "PLANE"),
+        named_ref(f"Front Plane@{platform}", "PLANE"),
+        PIVOT_STATION - POST_STATION,
+        label=f"cone-post station d={PIVOT_STATION - POST_STATION:.2f}",
         verify=(pivot_post, post_o),
     )
 
@@ -995,6 +1039,33 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{pivot_post}", "PLANE"),
         d_axial,
         label=f"cone-shaft axial d={d_axial:.2f}", verify=(cone_shaft, cone_o),
+    )
+    # Tip block: positioned BY the shaft it journals -- coaxial on the shaft's
+    # axis (which the post + platform already carry) + an axial seat + a
+    # parallel anti-spin against the PLATFORM (not the spinning shaft). Its
+    # height falls out of the coaxial (bore height + plate = drive height,
+    # asserted at import), so its foot lands ON PlateTop with no seat mate --
+    # contact, not constraint. It follows the p1 swing through the shaft.
+    tb_o = _org(adapter, tip_block)
+    tb_axial = abs(sum((tb_o[k] - cone_o[k]) * cone_axis_dir[k] for k in range(3)))
+    await coincident_mate(
+        adapter,
+        named_ref(f"Axis1@{tip_block}", "AXIS"),
+        named_ref(f"Axis1@{cone_shaft}", "AXIS"),
+        label="tip-block journals the shaft tip", verify=(tip_block, tb_o),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Front Plane@{tip_block}", "PLANE"),
+        named_ref(f"Front Plane@{cone_shaft}", "PLANE"),
+        tb_axial,
+        label=f"tip-block axial seat d={tb_axial:.2f}", verify=(tip_block, tb_o),
+    )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Right Plane@{tip_block}", "PLANE"),
+        named_ref(f"Right Plane@{platform}", "PLANE"),
+        label="tip-block anti-spin (rides the plate)", verify=(tip_block, tb_o),
     )
     # The 64T crank-drive gear and the 20 cone gears are one rigid stepped
     # cluster KEYED to the cone shaft -- each via coaxial + axial seat + parallel
