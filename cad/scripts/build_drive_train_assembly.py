@@ -398,9 +398,24 @@ PIVOT_STATION = 196.0  # platform swing pivot (plan), north of the shaft end
 from build_cone_swing_platform import (  # noqa: E402
     HALF_WIDTH_N as PLAT_HALF_N,
     HALF_WIDTH_S as PLAT_HALF_S,
+    LOBE_REACH as PLAT_LOBE_REACH,
+    LOBE_X_IN as PLAT_LOBE_X_IN,
+    LOBE_Z_N as PLAT_LOBE_Z_N,
+    LOBE_Z_S as PLAT_LOBE_Z_S,
     NORTH_OVERHANG as PLAT_OVERHANG,
     PLATE_LEN as PLAT_LEN,
     PLATE_T as PLAT_T,
+    SLOT_E_X as PLAT_SLOT_E_X,
+    SLOT_E_Z as PLAT_SLOT_E_Z,
+    SLOT_W as PLAT_SLOT_W,
+)
+from build_cone_lock_knob import (  # noqa: E402
+    STUD_DIA as KNOB_STUD_DIA,
+    WASHER_DIA as KNOB_WASHER_DIA,
+)
+from build_arbor_pedestal import (  # noqa: E402
+    BLOCK_DEPTH as ARBOR_PED_DEPTH,
+    BLOCK_WIDTH as ARBOR_PED_WIDTH,
 )
 from build_cone_pivot_post import (  # noqa: E402
     BLOCK_DIA as POST_BLOCK_DIA,
@@ -478,6 +493,52 @@ if _PED_EDGE_GAP < 1.0:
     raise AssertionError(
         f"crank pedestal within {_PED_EDGE_GAP:.2f} of the swing plate's south "
         f"edge (needs >= 1.0)")
+
+
+# --- cone lock knob (v4_t00411; clamps the swing plate through its slot) -----
+# The knob is a base-bolted STATIC (pedestal pattern: located to the machine
+# datums); the plate's lock slot sweeps around its stationary stud. Its machine
+# position is DERIVED from the platform's engaged slot-end in the plate's local
+# frame, so the two scripts cannot drift apart.
+def _plate_local_to_machine(x_l: float, z_l: float) -> tuple[float, float]:
+    """Plan point of the ENGAGED plate's local (x, z) in machine coords."""
+    return (
+        _PPIVOT[0] + x_l * COS_I - z_l * SIN_I,
+        _PPIVOT[2] + x_l * SIN_I + z_l * COS_I,
+    )
+
+
+# The platform is AUTHORED MIRRORED (MIRROR_PLANE "x0" -- the lock lobe made
+# it chiral), so its exported local-x constants NEGATE into this pre-mirror
+# frame; z is untouched.
+KNOB_X, KNOB_Z = _plate_local_to_machine(-PLAT_SLOT_E_X, PLAT_SLOT_E_Z)  # 96.98,
+# -87.60: the video's gap between the pivot post and the arbor pedestal
+if PLAT_SLOT_W - KNOB_STUD_DIA < 0.5:
+    raise AssertionError("lock stud has <0.5 clearance in the platform slot")
+_POST_LOCAL_Z = POST_STATION - PIVOT_STATION  # -194.5
+_WASHER_POST_GAP = (
+    math.hypot(PLAT_SLOT_E_X, PLAT_SLOT_E_Z - _POST_LOCAL_Z)
+    - KNOB_WASHER_DIA / 2.0 - POST_BLOCK_DIA / 2.0
+)
+if _WASHER_POST_GAP < 2.0:
+    raise AssertionError(
+        f"lock knob washer within {_WASHER_POST_GAP:.2f} of the pivot post "
+        f"foot (needs >= 2.0)")
+# Lobe west edge vs the arbor-pedestal block, both plan rectangles: check the
+# lobe's two west corners against the block's east flank band.
+_ARB_E_X = X_DRUM + ARBOR_PED_WIDTH / 2.0  # 66.7
+_ARB_Z = (-ARBOR_PEDESTAL_Z - ARBOR_PED_DEPTH / 2.0,
+          -ARBOR_PEDESTAL_Z + ARBOR_PED_DEPTH / 2.0)  # -98.5..-82.5
+for _zl in (PLAT_LOBE_Z_N, PLAT_LOBE_Z_S):
+    # authored lobe outer edge +(X_IN+REACH) -> pre-mirror effective -(...)
+    _cx, _cz = _plate_local_to_machine(-(PLAT_LOBE_X_IN + PLAT_LOBE_REACH), _zl)
+    _gap = _cx - _ARB_E_X if _ARB_Z[0] - 2.0 <= _cz <= _ARB_Z[1] + 2.0 \
+        else math.hypot(max(0.0, _ARB_E_X - _cx),
+                        min(abs(_cz - _ARB_Z[0]), abs(_cz - _ARB_Z[1])))
+    if _gap < 2.0:
+        raise AssertionError(
+            f"swing-plate lock lobe corner (z_l {_zl}) within {_gap:.2f} of "
+            f"the arbor-pedestal block (needs >= 2.0)")
 
 # --- alignment pinion (ch. 25): RESTORED 2026-07-02, carried DISENGAGED ------
 # The ch30 GT proves the zeroing rig is on the machine (tee handle triangulates
@@ -739,6 +800,17 @@ async def build(adapter) -> dict[str, str]:
         ROT_Y_INCLINE, ground=False,
         label="cone-tip-block (tip journal, on the plate)",
     )
+    # The lock knob (v4_t00411) is a base-bolted static like the pedestals: its
+    # washer seat lands on the plate top, its stud drops through the plate's
+    # lock slot (engaged end -- the as-built pose). The plate is the mover: on
+    # disengage its slot sweeps around this stationary stud. No rotation: the
+    # knob is axisymmetric and belongs to the BASE, not the inclined plate.
+    lock_knob = await place_component(
+        adapter, "cone-lock-knob",
+        [KNOB_X, Y_BASE_TOP + PLAT_T, KNOB_Z], [0.0, 0.0, 0.0], IDENTITY,
+        ground=False, label="cone-lock-knob (platform clamp, engaged end)",
+    )
+    await _locate_to_datum(adapter, lock_knob)
 
     # ============ alignment pinion swing group (ch.25, p.66; p2) ============
     # Floated straps + drum, joined and parked DISENGAGED in the joints

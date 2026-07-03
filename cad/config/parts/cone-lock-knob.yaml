@@ -1,0 +1,6 @@
+cone-lock-knob:
+  number: MHA-093
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: "machined (steel, chrome plated)"
