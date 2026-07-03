@@ -81,9 +81,10 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 PIVOT_JOURNAL = 25.0  # mm, large-end journal into the pivot block (low)
 
 FRONT_STUB = 35.8  # ch30 GT (2026-07-02): the 3/8" big end runs ON past the old
-# pivot-end origin, through the swing post's journal bore, ending in the boss
-# the photos show proud between the post and the crank-pedestal slab (GT
-# cone_front world (-127, 101, -123); the stub end lands at machine z -123.0).
+# pivot-end origin, through the nested swing-journal block and out the crank
+# pedestal's front wall window, ending in the boss the photos show proud of
+# the pedestal's curved flank (GT cone_front world (-127, 101, -123); the stub
+# end lands at machine z -123.0).
 # The part origin is now this FRONT END; the old pivot-end stations below are
 # all shifted by FRONT_STUB, and the assembly places the shaft at
 # cone_station(-35.8) (build_drive_train_assembly SHAFT_FRONT_STATION).
