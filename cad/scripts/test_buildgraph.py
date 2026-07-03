@@ -17,8 +17,10 @@ import _telemetry  # noqa: E402
 import _buildgraph as bg  # noqa: E402
 from _buildgraph import (  # noqa: E402
     ASSEMBLY_ORDER,
+    REFERENCES_DIR,
     SCRIPTS_DIR,
     config_files_of,
+    data_deps_of,
     dependents_of,
     module_deps_of,
     part_stems,
@@ -113,15 +115,38 @@ def test_closure_follows_reused_build_scripts():
 
 
 def test_specialized_helper_blast_radius_is_narrow():
-    """_gear / _nameplate_geometry reach only their real importers, not the fleet."""
+    """_gear reaches only its real importers, not the fleet."""
     gear_users = [s for s in part_stems() if "_gear" in _helper_names(f"build_{s}.py")]
-    np_users = [s for s in part_stems() if "_nameplate_geometry" in _helper_names(f"build_{s}.py")]
     feat_users = [s for s in part_stems() if "_features" in _helper_names(f"build_{s}.py")]
     assert 0 < len(gear_users) < len(part_stems()), gear_users
-    assert np_users == ["nameplate"], np_users
     # spring/screw/nameplate feature builders reach only their handful of parts
     # (their direct importers + any part that reuses one of those build scripts)
     assert 0 < len(feat_users) <= 8, feat_users
+
+
+def test_data_deps_of_nameplate_lists_engraving_dxf():
+    """The nameplate build's imported DXF is a data dependency of the part."""
+    deps = data_deps_of(SCRIPTS_DIR / "build_nameplate.py")
+    assert any(d.endswith("nameplate-engraving.dxf") for d in deps), deps
+    # A build that imports no DXF/DWG has no data deps.
+    assert data_deps_of(SCRIPTS_DIR / "build_platen.py") == []
+
+
+def test_data_deps_of_keeps_missing_referenced_artefact():
+    """A referenced DXF is listed even when absent, so doit fails loud on it
+    (a deleted runtime input must not read as up-to-date)."""
+    missing_name = "does-not-exist-xyz.dxf"
+    assert not (REFERENCES_DIR / missing_name).exists()
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".py", dir=SCRIPTS_DIR, delete=False
+    ) as fh:
+        fh.write(f'PATH = REFERENCES_DIR / "{missing_name}"\n')
+        script = Path(fh.name)
+    try:
+        deps = data_deps_of(script)
+        assert [Path(d).name for d in deps] == [missing_name], deps
+    finally:
+        script.unlink()
 
 
 def _tokens(text: str) -> frozenset[str]:
