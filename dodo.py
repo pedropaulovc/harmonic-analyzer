@@ -115,7 +115,7 @@ CONFIG_DIR = REPO_ROOT / "cad" / "config"
 #
 #   part:a -> ... -> part:z -> assembly:frame -> ... -> assembly:harmonic_analyzer
 #          -> verify:soundness -> verify:subsystems -> verify:kinematics
-#          -> export -> release
+#          -> export -> preflight -> release
 #
 # Because each COM task waits on its predecessor, at most ONE COM task is ever
 # "ready", so the seat is never contended even under ``doit -n N`` -- identical
@@ -129,6 +129,7 @@ _COM_TAIL = [
     "verify:subsystems",
     "verify:kinematics",
     "export",
+    "preflight",
     "release",
 ]
 
@@ -458,6 +459,7 @@ LOGS = CAD_OUT / "logs"
 VERIFY_PY = (SCRIPTS_DIR / "verify.py").resolve()
 EXPORT_PY = (SCRIPTS_DIR / "export_models.py").resolve()
 RELEASE_PY = (SCRIPTS_DIR / "cut_release.py").resolve()
+PREFLIGHT_PY = (SCRIPTS_DIR / "preflight_release.py").resolve()
 
 # The gate suites, by SolidWorks-dependence -- the single source of truth for the
 # verify:/check: task names (reused by build + release so a new gate is wired in
@@ -559,7 +561,12 @@ def _assembly_cache_outputs(stem: str) -> list[Path]:
     cascade this whole mechanism exists to kill (codex review on #83)."""
     sldasm = Path(_sldasm(stem))
     massprops = sldasm.parent / f".{sldasm.stem}.massprops.sha"
-    outs = [sldasm, _png_dir(stem), massprops]
+    # The deferred park-driver specs sidecar (default-`free` builds of drive-train/
+    # channel; absent otherwise, skipped at pack time). It MUST ride the cache: a
+    # clean cache consumer restores the .SLDASM without it and the release preflight
+    # (preflight_release.py) would then find no specs to replay and fail loud.
+    park = sldasm.parent / f".{sldasm.stem}.park.json"
+    outs = [sldasm, _png_dir(stem), massprops, park]
     if stem == "channel":
         outs += _channel_spring_variants()
     if stem == "harmonic_analyzer":
@@ -1111,6 +1118,39 @@ def task_export():
         "task_dep": _spine_dep("export"),
         "uptodate": [False],
         "actions": [(_run, [[sys.executable, str(EXPORT_PY)], "export", "export"])],
+        "verbosity": 2,
+    }
+
+
+def task_preflight():
+    """Release preflight (OPT-IN, COM spine): replay each default-`free` assembly's
+    DEFERRED park drivers and re-run the exact-DOF closure, WITHOUT saving. Gates
+    `release` (its spine predecessor), so a release cannot publish a free model
+    whose operational DOF fail the sufficiency proof.
+
+    NOT in `build`/`default_tasks` -- the default build proves only DOF necessity
+    (fast); this strict closure runs at release time. On the spine after `export`
+    so it stays serial on the STA seat. Stamps `cad/out/reports/preflight.ok`.
+    """
+    stamp = str(REPORTS / "preflight.ok")
+    deps = [str(PREFLIGHT_PY), str(VERIFY_PY),
+            str((SCRIPTS_DIR / "_assembly.py").resolve()),
+            _sldasm("drive_train"), _sldasm("channel")]
+    return {
+        "file_dep": deps,
+        "targets": [stamp],
+        "task_dep": _spine_dep("preflight"),
+        # Always run (like export/release): the closure reads the per-assembly
+        # `.<stem>.park.json` sidecars, which are NOT declared file_dep (they are
+        # absent for a `locked` build, so a declared dep would error). Were this
+        # gated on the stamp + .SLDASM digest, a deleted/incompletely-restored
+        # sidecar (recipe digest unchanged) would leave preflight.ok "fresh" and
+        # release would SKIP the only sufficiency check. Running unconditionally,
+        # preflight_release.py fails loud when specs are missing (codex review).
+        "uptodate": [False],
+        "actions": [(_run_stamped, [[sys.executable, str(PREFLIGHT_PY)],
+                                    "release preflight", stamp])],
+        "clean": True,
         "verbosity": 2,
     }
 

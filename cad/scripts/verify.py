@@ -81,7 +81,7 @@ from _common import (
 )
 from _assembly import (
     assert_components_fully_defined,
-    assert_expected_free_dof,
+    assert_free_dof_necessity,
     assert_model_healthy,
     check_no_interference,
     component_names,
@@ -579,8 +579,9 @@ def _expected_free_dof(name: str) -> int:
 
     drive-train frees the crank spin (1 DOF); channel frees 3 DOF per active
     channel (rocker swing + connecting-rod follow + amplitude-bar slide), each a
-    suppressed PARK_* park driver, when built `free` (the default); a `locked`
-    build re-engages them -> 0. Read straight from cad/config/machine/
+    DEFERRED PARK_* park driver (recorded, not authored) when built `free` (the
+    default); a `locked` build authors them engaged -> 0. Read straight from
+    cad/config/machine/
     build_lock.yaml -- the same source of truth the build used, and the freshness
     guard (`_assert_fresh`) guarantees the saved model matches that config. Every
     other assembly stays fully defined (0). The literal accessor tokenises
@@ -623,12 +624,14 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
 
     free_dof = _expected_free_dof(name)
     if free_dof:
-        # Default-free build: assert EXACTLY the expected operational DOF are free
-        # via the park-driver closure check (it re-engages then restores the free
-        # pose, leaving the model as-shipped for the gates below).
-        await report.agate(
-            f"{name}:dof-expected-free",
-            lambda: assert_expected_free_dof(adapter, free_dof),
+        # Default-free build: the freed-DOF park drivers are DEFERRED (not authored
+        # in the saved model -- see AGENTS.md "Default-free DOF"), so there is
+        # nothing to re-engage here. Prove NECESSITY only -- the operational DOF are
+        # genuinely free. The exact-count SUFFICIENCY closure runs in the release
+        # preflight (`preflight_release.py`), which replays the recorded specs.
+        report.gate(
+            f"{name}:dof-free-necessity",
+            lambda: assert_free_dof_necessity(adapter, free_dof),
         )
     else:
         report.gate(f"{name}:dof-fully-defined", lambda: assert_components_fully_defined(adapter))

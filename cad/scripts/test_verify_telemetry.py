@@ -373,14 +373,20 @@ def test_no_per_component_dof_check_spans(monkeypatch, tmp_path):
     spans, report = _run_soundness(["frame", "drive-train"], monkeypatch, tmp_path)
     assert report.failed == [], report.failed
     assert _by_name(spans, "dof.check") == []  # the flood is gone
-    # ...but the gate span survives and carries the aggregate verdict.
-    dt_count = COMPONENT_COUNTS["drive-train"]
+    # frame is fully defined (strict 0-DOF), so its gate is the aggregate gate.dof.
     dof_gates = _by_name(spans, "gate.dof")
-    assert len(dof_gates) == 2
-    dt = [g for g in dof_gates if g.attributes.get("components") == dt_count][0]
-    assert dt.attributes["fixed"] >= 1
-    assert dt.attributes["not_fully_defined"] == 0
-    assert dt.status.status_code.name == "OK"
+    assert len(dof_gates) == 1
+    frame_gate = dof_gates[0]
+    assert frame_gate.attributes["not_fully_defined"] == 0
+    assert frame_gate.status.status_code.name == "OK"
+    # drive-train is default-`free` (crank DOF deferred, not authored), so its DOF
+    # gate is the NECESSITY gate -- one span carrying the free-DOF aggregate, still
+    # no per-component flood. The exact-count closure runs in the release preflight.
+    nec = _by_name(spans, "gate.dof_free_necessity")
+    assert len(nec) == 1
+    assert nec[0].attributes["expected_free_dof"] == 1
+    assert nec[0].attributes["free_under_constrained"] >= 1
+    assert nec[0].status.status_code.name == "OK"
 
 
 def test_whats_wrong_collapses_to_one_span_per_health_gate(monkeypatch, tmp_path):
@@ -426,24 +432,28 @@ def test_trace_is_one_tree_with_far_fewer_spans(monkeypatch, tmp_path):
     assert len(_by_name(spans, "health.whats_wrong")) == 1
 
 
-def test_free_dof_gate_segmented_into_phase_spans(monkeypatch, tmp_path):
-    """The free-DOF gate (drive-train, built free) is not one opaque multi-minute
-    span: it splits into named phase children (discover / necessity / engage /
-    restore) so the suppress/re-engage/re-suppress cost is attributable, and the
-    sufficiency re-engage still nests the real ``gate.dof`` closure check."""
+def test_free_dof_build_gate_is_single_necessity_span_not_park_phases(monkeypatch, tmp_path):
+    """The default-``free`` drive-train build/soundness DOF gate is now the
+    lightweight NECESSITY gate -- a single ``gate.dof_free_necessity`` span with no
+    per-item flood -- NOT the old author->suppress->re-engage park cycling. That
+    expensive segmentation (``gate.dof_expected_free`` with ``park.discover /
+    necessity / engage / restore`` children nesting the ``gate.dof`` sufficiency
+    closure) moved to the release preflight (``gate.park_closure``), so it must NOT
+    appear in a soundness pass -- this pins the PR's "fast build, no park solves at
+    build time" guarantee."""
     spans, report = _run_soundness(["drive-train"], monkeypatch, tmp_path)
     assert report.failed == [], report.failed
-    (gate,) = _by_name(spans, "gate.dof_expected_free")
+    (gate,) = _by_name(spans, "gate.dof_free_necessity")
     assert gate.status.status_code.name == "OK"
-    child_names = {
-        s.name for s in spans
-        if s.parent and s.parent.span_id == gate.context.span_id
-    }
-    # every expensive phase is its own span, so none of the gate's wall-clock is
-    # hidden in an unspanned region.
-    assert {"park.discover", "park.necessity", "park.engage", "park.restore"} <= child_names
-    # the sufficiency assert (drivers engaged) still runs the shared 0-DOF closure.
-    assert _by_name(spans, "gate.dof")
+    assert gate.attributes["expected_free_dof"] == 1
+    assert gate.attributes["free_under_constrained"] >= 1
+    # the old build-time park cycling / sufficiency closure is gone (preflight-only).
+    assert _by_name(spans, "gate.dof_expected_free") == []
+    assert _by_name(spans, "gate.park_closure") == []
+    for phase in ("park.discover", "park.necessity", "park.engage", "park.restore"):
+        assert _by_name(spans, phase) == [], f"{phase} should be preflight-only now"
+    # drive-train being free, there is no nested strict 0-DOF closure at build.
+    assert _by_name(spans, "gate.dof") == []
 
 
 # --------------------------------------------------------------------------- #
