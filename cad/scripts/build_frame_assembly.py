@@ -58,17 +58,19 @@ build_harmonic_base.py HOLE_XZ) with O23 head counterbores on its underside, and
 the lag screws (build_lag_screw.py, resized to the 9/16-12 foot tap) are
 CONSTRAINED coaxial with each (concentric to the hole axis + a head-seat
 coincident + a spin pin). The screws do NOT constrain the support -- three
-orthogonal mates already fully constrain it (one pivot-x distance mate + two
-flip-free coincident mates: the z-centring symmetry planes and the
+orthogonal mates already fully constrain it (one pivot-x offset-plane placement +
+two flip-free coincident mates: the z-centring symmetry planes and the
 FootSeat<->DeckTop datum seat) -- they are structure, constrained by their own
 contacts like the columns.
 
 Every component is fixed (base) or fully defined by three orthogonal mates
-against the base part; distance-mate flips are caught by reading back
-``Transform2`` after each mate and re-adding the mate flipped (and a mate whose
-correct side is known seeds ``flip`` to land in one solve). Final asserts: every
-component fixed or ``swFullyConstrained``, and zero interferences
-(tangent/coincident contact allowed).
+against the base part. Free-space placements (the corner/pivot offsets) go
+through ``plane_distance_mate``: a SIGNED offset builds a reference plane on the
+correct side of the base datum and the part is mated coincident to it, so it
+lands in ONE solve with no flip and no delete-and-re-add recovery. The readback
+of ``Transform2`` against each part's insertion pose stays as a fail-loud
+tripwire. Final asserts: every component fixed or ``swFullyConstrained``, and
+zero interferences (tangent/coincident contact allowed).
 
 The 20-channel pitch stations live in the channel subassembly.
 
@@ -205,16 +207,18 @@ async def build(adapter) -> dict[str, str]:
         name = res.data["name"]
         column_names.append(name)
         await plane_distance_mate(
-            adapter, name, "Right Plane", "Right Plane", base_name, COLUMN_X, target
+            adapter, name, "Right Plane", "Right Plane", base_name, sx * COLUMN_X, target
         )
         await plane_distance_mate(
-            adapter, name, "Front Plane", "Front Plane", base_name, COLUMN_Z, target
+            adapter, name, "Front Plane", "Front Plane", base_name, sz * COLUMN_Z, target
         )
         # Foot seat: the column stands ON the base top -- a physical contact, so
         # coincident its foot (the column's Top Plane: it extrudes UPWARD from there,
         # so that default plane sits at the foot) to the base DeckTop datum, not a
         # measured distance. The Right/Front mates above are genuine free-space
-        # corner offsets (the column touches nothing laterally), so they stay distance.
+        # corner offsets (the column touches nothing laterally); each is a SIGNED
+        # offset plane (sx/sz carry the corner's side) with a coincident, so the
+        # negative-side columns land in one solve with no flip recovery.
         await coincident_mate(
             adapter,
             named_ref(f"Top Plane@{name}", "PLANE"),
@@ -264,19 +268,17 @@ async def build(adapter) -> dict[str, str]:
         mirror=False,
         label="rocker-arm-support",
     )
-    # Pivot-x DISTANCE mate. flip=True: the +90 turn leaves the support's Front-
-    # plane normal such that the default side resolves this distance mate to the
-    # FAR side (x -72.9), which would force the verify-and-flip recovery to delete
-    # + re-add it and make the part visibly jump there and back. Seeding the
-    # correct side lands it on-target in ONE solve -- no jump. flip, not an
-    # "anti_aligned" swMateAlign, is the right knob: anti_aligned also picks the
-    # near side but inverts the part's orientation 180deg; flip keeps the inserted
-    # +90 orientation and only chooses the distance side. A free-space offset like
-    # this has no physical contact, so a distance mate (with its side selector) is
-    # unavoidable -- unlike the foot seat below, which IS a physical contact.
+    # Pivot-x placement (x +72.9). A free-space offset with no physical contact,
+    # so it needs an explicit side selector -- but the SIGNED offset plane is that
+    # selector: +SUPPORT_X builds the datum on the near (+X) side and the support's
+    # Front Plane is mated COINCIDENT to it, landing at x +72.9 in ONE solve. The
+    # old distance mate resolved to the FAR side (x -72.9) because the +90 turn
+    # inverts the support's Front-plane normal, so it leaned on the delete-and-re-add
+    # flip recovery (a visible there-and-back jump); coincident-to-a-signed-plane
+    # is immune -- the plane's position, not the part's plane normal, fixes the side.
     await plane_distance_mate(
         adapter, support_name, "Front Plane", "Right Plane", base_name,
-        SUPPORT_X, support_target, flip=True,
+        SUPPORT_X, support_target,
     )
     # Foot seat (y): a PHYSICAL coincident between two NAMED datum planes on the
     # contact -- the support's FootSeat (on its foot bottom face) and the base's
@@ -412,8 +414,10 @@ async def build(adapter) -> dict[str, str]:
     #                                                    so a distance mate IS the
     #                                                    strictly-necessary knob here
     # Same shape as the rocker-arm-support: two coincident datum seats + one
-    # unavoidable distance. The plate's Top plane normal (local Y) maps to machine
-    # -X, so seed flip=True to land the offset on the near side in one solve.
+    # signed free-space offset. The offset (+NAMEPLATE_POS[0]) builds the datum on
+    # the +X side and the plate's Top Plane is mated coincident to it -- landing at
+    # x 214.25 in one solve regardless of which way the plate's Top-plane normal
+    # (local Y -> machine -X) points, so no flip and no recovery.
     await coincident_mate(
         adapter,
         named_ref(f"Underside@{nameplate_name}", "PLANE"),
@@ -430,7 +434,7 @@ async def build(adapter) -> dict[str, str]:
     )
     await plane_distance_mate(
         adapter, nameplate_name, "Top Plane", "Right Plane", base_name,
-        NAMEPLATE_POS[0], NAMEPLATE_POS, flip=True,
+        NAMEPLATE_POS[0], NAMEPLATE_POS,
     )
     assert_component_placed(adapter, nameplate_name, NAMEPLATE_POS, NAMEPLATE_ROWS)
 
