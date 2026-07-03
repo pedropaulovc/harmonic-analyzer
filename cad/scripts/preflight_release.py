@@ -72,12 +72,7 @@ async def _preflight_one(adapter: Any, name: str) -> str:
 
     expected = _expected_free_dof(name)
     specs = load_park_specs(name)
-    if expected == 0:
-        # `locked` build (or an assembly with no parked DOF): the saved model is
-        # already fully defined, so there is no deferred closure to re-run.
-        log(f"{name}: locked/0-free-DOF build -- no park closure to preflight")
-        return "locked"
-    if not specs:
+    if expected != 0 and not specs:
         raise RuntimeError(
             f"{name}: config expects {expected} free DOF but no deferred park specs "
             f"were found ({name}.park.json missing beside the .SLDASM) -- the "
@@ -94,15 +89,22 @@ async def _preflight_one(adapter: Any, name: str) -> str:
             configs = check("list configurations", await adapter.list_configurations())
             if REST in (configs or []):
                 check(f"activate {REST}", await adapter.set_active_configuration(REST))
-        log(f"--- preflight {name} ({REST} pose): {expected} deferred park driver(s) ---")
         # gear-ratios is verified HERE at release, DEMOTED from the every-build
         # soundness battery (it was 50% of a soundness run and re-proved a property
         # fixed by the tooth-count config that check:math already validates). Run it
-        # on the clean reopened model BEFORE park_closure authors any mates.
-        # drive-train + channel (== FREE_ASSEMBLIES) carry the only real gear meshes
-        # (the crank drive + the 20 channel meshes); every other assembly's gate was
-        # a 0-mesh no-op, so this preserves the shipped-artefact guarantee.
+        # on the clean reopened model BEFORE park_closure authors any mates, for BOTH
+        # `free` AND `locked` builds -- a locked release skips the park closure below,
+        # so this is the ONLY live gear-mate ratio validation it gets now that
+        # soundness no longer runs the gate. drive-train + channel (== FREE_ASSEMBLIES)
+        # carry the only real gear meshes (the crank drive + 20 channel meshes).
         assert_gear_ratios(adapter, name)
+        if expected == 0:
+            # `locked` build (or an assembly with no parked DOF): the saved model is
+            # already fully defined, so there is no deferred closure to re-run --
+            # gear-ratios above is the whole preflight for it.
+            log(f"{name}: locked/0-free-DOF build -- gear-ratios checked, no park closure")
+            return "locked (gear-ratios ok)"
+        log(f"--- preflight {name} ({REST} pose): {expected} deferred park driver(s) ---")
         # Authors the recorded drivers engaged and asserts 0 under-constrained. The
         # doc is mutated in memory only -- discarded in `finally` WITHOUT saving
         # (whether the closure passes or raises), so the shipped .SLDASM stays free.
