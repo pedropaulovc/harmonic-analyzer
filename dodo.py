@@ -1081,9 +1081,16 @@ def task_check():
         "math": {
             # truth_model reads harmonics/phases/amplitudes/magnification from
             # _config + the YAML layer, so those must invalidate the math stamp
-            # too (codex review).
+            # too (codex review). The base-footprint gate reads placement +
+            # footprint constants straight off these build modules, so they
+            # must invalidate it too.
             "file_dep": [str(VERIFY_PY),
                          str((SCRIPTS_DIR / "truth_model.py").resolve()),
+                         str((SCRIPTS_DIR / "build_drive_train_assembly.py").resolve()),
+                         str((SCRIPTS_DIR / "build_crank_pedestal.py").resolve()),
+                         str((SCRIPTS_DIR / "build_cone_pivot_post.py").resolve()),
+                         str((SCRIPTS_DIR / "build_arbor_pedestal.py").resolve()),
+                         str((SCRIPTS_DIR / "build_harmonic_base.py").resolve()),
                          config_py, *_CONFIG_YAMLS],
             "cmd": [sys.executable, str(VERIFY_PY), "--suite", "math"],
         },
