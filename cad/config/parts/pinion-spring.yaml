@@ -1,5 +1,5 @@
 pinion-spring:
-  number: MHA-093
+  number: MHA-095
   material: Brass
   tolerance_class: machined_block
   process: "bent strip (brass)"
