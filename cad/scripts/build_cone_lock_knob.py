@@ -4,21 +4,23 @@ The chrome thumb knob that clamps the cone SWING PLATFORM to the base:
 "Unscrewing this knob allows the cone gear set to swing away from the
 cylinder" (v4 6:48). It stands in the gap between the big-end pivot post
 and the arbor pedestal (t00411/t00417); its stud drops through the
-platform's lock SLOT (build_cone_swing_platform) into the base, so
-tightening it clamps the plate at either slot end -- locked ENGAGED or
-locked DISENGAGED -- and loosening frees the p1 swing.
+platform's open lock NOTCH (build_cone_swing_platform) into the base.
+Tightened ON the plate it clamps the swing locked ENGAGED; with the plate
+swung clear (the notch mouth is open at the lobe edge -- t00417 shows the
+bolt standing past the plate end) screwing the washer down past plate-top
+level fences the mouth and locks the plate DISENGAGED.
 
-Stacked coaxial extrudes (thumb-screw recipe -- stepped REVOLVES fail to
-pattern/boolean, stacked extrusions are the proven blank): washer flange,
-body, and a stepped cap standing in for the domed top. Origin at the
-WASHER BOTTOM (the face that seats on the plate top), stud extruded
-DOWNWARD ending flush with the base top. DOCUMENTED DEVIATION: the thread
-engagement into the base is not modeled -- the drive-train has no base
-component (the crank/arbor pedestals' hold-down bolts set the precedent),
-and a longer stud would interfere with harmonic-base in the top-level
-assembly's gate.
+Shape per t00411: a thin washer flange under one straight-walled body
+crowned by a dome -- washer + body stacked coaxial extrudes (the proven
+blank; stepped REVOLVES fail to pattern/boolean), then a large top-edge
+fillet forms the domed crown. Origin at the WASHER BOTTOM (the face that
+seats on the plate top), stud extruded DOWNWARD ending flush with the
+base top. DOCUMENTED DEVIATION: the thread engagement into the base is
+not modeled -- the drive-train has no base component (the crank/arbor
+pedestals' hold-down bolts set the precedent), and a longer stud would
+interfere with harmonic-base in the top-level assembly's gate.
 
-Dimensions photo-scaled vs the O24 post foot in v4_t00411 (low).
+Dimensions photo-scaled vs the O24 post foot in v4_t00411.
 
 Run (SolidWorks already open)::
 
@@ -51,15 +53,27 @@ PART_NAME = "cone-lock-knob"
 MATERIAL = "Plain Carbon Steel"  # bright/chromed steel (the pinion-handle
 # precedent for chrome-look hardware; v4_t00411 shows worn chrome plate)
 
-WASHER_DIA = 20.0  # clamp washer flange, seats on the plate top (low)
+WASHER_DIA = 18.0  # clamp washer flange, seats on the plate top
 WASHER_T = 1.5
-BODY_DIA = 16.0  # knob body (low)
-BODY_TOP = 11.5  # body top above the washer seat
-CAP_DIA = 12.0  # stepped cap standing in for the domed top (low)
-CAP_TOP = 13.5
-STUD_DIA = 6.35  # 1/4" clamp stud -- rides the platform's SLOT_W slot
+BODY_DIA = 13.0  # knob body -- ONE straight wall (t00411: no mid step)
+BODY_TOP = 13.5  # body top above the washer seat; height ~ diameter
+DOME_R = 5.0  # top-edge fillet radius: the domed crown (leaves a O3 flat
+# at the apex, the still's slightly-flattened dome)
+STUD_DIA = 6.35  # 1/4" clamp stud -- rides the platform's SLOT_W notch
 STUD_LEN = 6.35  # plate thickness exactly: stud ends FLUSH with the base
 # top (thread engagement into the absent base unmodeled, see docstring)
+
+def _dome_fillet_volume(body_r: float, r: float) -> float:
+    """Removed volume of a radius-r fillet on a body_r cylinder's top rim.
+
+    Pappus over the corner cross-section (square r^2 minus the quarter
+    disc), centroid measured inward from the wall.
+    """
+    area = r * r * (1.0 - math.pi / 4.0)
+    sq = r * r * (r / 2.0)
+    disc = (math.pi * r * r / 4.0) * (r - 4.0 * r / (3.0 * math.pi))
+    x_bar = (sq - disc) / area
+    return 2.0 * math.pi * (body_r - x_bar) * area
 
 
 async def build(adapter) -> dict[str, str]:
@@ -69,22 +83,20 @@ async def build(adapter) -> dict[str, str]:
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
-    # document units (an unsuffixed 20 = 20 in).
+    # document units (an unsuffixed 18 = 18 in).
     await set_global(adapter, "WasherDia", f"{WASHER_DIA}mm")
     await set_global(adapter, "WasherT", f"{WASHER_T}mm")
     await set_global(adapter, "BodyDia", f"{BODY_DIA}mm")
     await set_global(adapter, "BodyTop", f"{BODY_TOP}mm")
-    await set_global(adapter, "CapDia", f"{CAP_DIA}mm")
-    await set_global(adapter, "CapTop", f"{CAP_TOP}mm")
     await set_global(adapter, "StudDia", f"{STUD_DIA}mm")
     await set_global(adapter, "StudLen", f"{STUD_LEN}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Coaxial stack UP from the washer seat (origin, Top plane). Every disc is
+    # Coaxial stack UP from the washer seat (origin, Top plane). Both discs are
     # sketched at the origin and extruded from the same plane with a growing
-    # extent (the thumb-screw blank trick): a smaller-diameter disc adds volume
-    # only past the taller neighbour it merges into, so each delta is analytic.
+    # extent (the thumb-screw blank trick): the smaller-diameter body adds
+    # volume only past the washer it merges into, so each delta is analytic.
     v_expect = 0.0
     for label, dia, extent, delta, dia_name, dia_drive in (
         ("washer", WASHER_DIA, WASHER_T,
@@ -93,9 +105,6 @@ async def build(adapter) -> dict[str, str]:
         ("body", BODY_DIA, BODY_TOP,
          math.pi * (BODY_DIA / 2.0) ** 2 * (BODY_TOP - WASHER_T),
          "BodyDia", '"BodyDia"'),
-        ("cap", CAP_DIA, CAP_TOP,
-         math.pi * (CAP_DIA / 2.0) ** 2 * (CAP_TOP - BODY_TOP),
-         "CapDia", '"CapDia"'),
     ):
         sd = SketchDims()
         check(f"create_sketch {label}", await adapter.create_sketch("Top"))
@@ -116,7 +125,16 @@ async def build(adapter) -> dict[str, str]:
         v_expect += delta
         await volume_check(adapter, label, v_expect, 0.005 * v_expect)
 
-    # Clamp stud DOWNWARD from the washer seat: through the platform's slot,
+    # Domed crown: one large fillet on the body's top rim (t00411's dome).
+    check(
+        "fillet dome",
+        await adapter.add_fillet(DOME_R, [[BODY_DIA / 2.0, BODY_TOP, 0.0]]),
+    )
+    name_last_feature(adapter, "DomeCrown")
+    v_expect -= _dome_fillet_volume(BODY_DIA / 2.0, DOME_R)
+    await volume_check(adapter, "dome crown", v_expect, 0.005 * v_expect)
+
+    # Clamp stud DOWNWARD from the washer seat: through the platform's notch,
     # ending flush with the base top.
     stud = SketchDims()
     check("create_sketch stud", await adapter.create_sketch("Top"))
