@@ -762,6 +762,65 @@ if LIFT_X - PIVOT_X < STRAP_R_END + 3.175 + 0.25:
 if LEVER_Z + 7.0 > BLOCK_FRONT_Z0 - 0.25:
     raise AssertionError("lever root reaches the front pivot block")
 
+# --- pinion return spring (ch. 25, p.68-69): keeps the drum disengaged -------
+# Brass leaf east of the BACK strap only (t00393 shows the front strap clean):
+# foot flat on the base, blade rising parallel to the parked strap's east
+# flank, tip curled east so the flank always meets a smooth tangent face.
+# Engaging the drum swings the strap east INTO the blade -- in the real
+# machine the leaf flexes and pushes the swing back west (the default-
+# disengaged behaviour); in rigid CAD the engaged pose overlaps the unflexed
+# blade, a documented simplification: only the PARKED pose is interference-
+# gated, and the engage-path rework (cam, PR5) owns the engaged contact.
+# The thin-wall extrude is ONE-sided with an orientation-dependent side, so
+# every clearance below books the full wall thickness on whichever side hurts.
+SPRING_T = 0.8  # build_pinion_spring THICK (must match)
+SPRING_W = 4.0  # build_pinion_spring WIDTH (must match)
+SPRING_R_CURL = 2.0  # build_pinion_spring R_CURL (must match)
+SPRING_TOP_T = 36.0  # build_pinion_spring BLADE_TOP_T (must match)
+SPRING_AXIS_OFF = 10.1  # strap axis -> blade centreline east (build_pinion_
+# spring AXIS_OFFSET, must match) = R_END 9 + 0.25 min air + the 0.8 wall
+SPRING_X = 9.04  # part-frame anchor (pre-mirror, like every constant here):
+# build_pinion_spring bakes the strap pivot at (SPRING_X - 7.88,
+# Y_BASE_TOP + 12.0) -- asserted below. The chirality mirror needs the
+# part's ("z", 0.0) MIRROR_PLANE entry (planar leaf, chiral in x).
+SPRING_Z = APINION_Z_BACK + STRAP_AIR + STRAP_T / 2.0  # 70.95: back-strap mid
+_SPR_TH = math.radians(-STRAP_LEAN_DEG)  # blade leans east of vertical
+_SPR_U = (math.sin(_SPR_TH), math.cos(_SPR_TH))  # up the blade
+_SPR_N = (math.cos(_SPR_TH), -math.sin(_SPR_TH))  # east normal of the axis
+_SPR_PIVOT = (SPRING_X - 7.88, Y_BASE_TOP + 12.0)
+SPRING_TOP = (
+    _SPR_PIVOT[0] + SPRING_TOP_T * _SPR_U[0] + SPRING_AXIS_OFF * _SPR_N[0],
+    _SPR_PIVOT[1] + SPRING_TOP_T * _SPR_U[1] + SPRING_AXIS_OFF * _SPR_N[1],
+)  # blade top, machine frame (18.74, 95.79)
+SPRING_CURL_C = (
+    SPRING_TOP[0] + SPRING_R_CURL * _SPR_N[0],
+    SPRING_TOP[1] + SPRING_R_CURL * _SPR_N[1],
+)
+
+if math.hypot(_SPR_PIVOT[0] - PIVOT_X, _SPR_PIVOT[1] - PIVOT_Y) > 0.01:
+    raise AssertionError("spring part frame disagrees with the strap pivot")
+if SPRING_AXIS_OFF - STRAP_R_END - SPRING_T < 0.25 - 1e-9:
+    raise AssertionError("spring blade touches the parked strap flank")
+if SPRING_W / 2.0 > STRAP_T / 2.0:
+    raise AssertionError("spring blade overhangs the strap flank axially")
+if (LIFT_X - PIVOT_X) * _SPR_N[0] - (SPRING_AXIS_OFF + SPRING_T) - 3.175 < 0.25:
+    raise AssertionError("spring blade fouls the lift rod")  # perpendicular
+    # foot of the rod axis lands mid-blade, so the segment bound is the line's
+if (math.hypot(X_DRUM - SPRING_CURL_C[0], Y_DRIVE - SPRING_CURL_C[1])
+        - (SPRING_R_CURL + SPRING_T) < TIP_DRUM120 + 0.25):
+    raise AssertionError("spring curl crowds the cylinder-gear tips")
+if (math.hypot(X_DRUM - SPRING_TOP[0], Y_DRIVE - SPRING_TOP[1])
+        - SPRING_T < TIP_DRUM120 + 0.25):
+    raise AssertionError("spring blade top crowds the cylinder-gear tips")
+if (math.hypot(SPRING_TOP[0] - APINION_X, SPRING_TOP[1] - APINION_Y)
+        < STRAP_R_END + SPRING_T + 0.25):
+    raise AssertionError("spring blade top reaches the strap's arbor end cap")
+if (math.hypot(SPRING_CURL_C[0] - APINION_X, SPRING_CURL_C[1] - APINION_Y)
+        - (SPRING_R_CURL + SPRING_T) < STRAP_R_END + 0.25):
+    raise AssertionError("spring curl reaches the strap's arbor end cap")
+if SPRING_Z + SPRING_W / 2.0 > BLOCK_BACK_Z0 - 0.25:
+    raise AssertionError("spring reaches the back pivot block")
+
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 ROT_X_POS90 = [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0]]
@@ -1063,6 +1122,11 @@ async def build(adapter) -> dict[str, str]:
         adapter, "pinion-lift-rod",
         [LIFT_X, PIVOT_Y, LIFT_ROD_Z0], [0.0, 0.0, 0.0], IDENTITY,
         ground=False, label="pinion-lift-rod (cam pins parked down)",
+    )
+    spring = await place_component(
+        adapter, "pinion-spring",
+        [SPRING_X, Y_BASE_TOP, SPRING_Z], [0.0, 0.0, 0.0], IDENTITY,
+        ground=False, label="pinion-spring (holds the swing disengaged)",
     )
     await place_component(
         adapter, "pinion-lever",
@@ -1524,6 +1588,7 @@ async def build(adapter) -> dict[str, str]:
         await _locate_to_datum(adapter, blk)
     await _locate_to_datum(adapter, pivot_shaft)
     await _locate_to_datum(adapter, lift_rod)
+    await _locate_to_datum(adapter, spring)
     # Front strap: revolute on the torque shaft (coincident pivot bore + axial
     # seat) -- the swing DOF -- then a suppressible ANGLE PARK DRIVER at the
     # parked lean pins it. Unlike the crank park it stays ENGAGED in `free`

@@ -234,6 +234,12 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     "pinion-lever": ("x", 0.0),
     "pinion-lift-rod": ("x", 0.0),
     "pinion-handle": ("x", 0.0),
+    # pinion-spring (PR4): planar-XY leaf, CHIRAL in x (foot east of the bend,
+    # blade at the strap lean) but an exact mid-plane z-extrude -- the
+    # counter-spring/chain-link z-idiom. The default 'x' mis-poses it (49 mm^3
+    # spring-vs-strap interference, caught by the gate). Explicit c, no STL
+    # dependency at first build.
+    "pinion-spring": ("z", 0.0),
     # M6.10 fasteners: authored in final orientation (axis along Y or Z),
     # exactly symmetric about local x = 0; explicit c, no STL at first build
     "hex-bolt": ("x", 0.0),
