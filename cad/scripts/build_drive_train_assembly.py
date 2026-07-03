@@ -967,13 +967,16 @@ def _seg_seg_dist(p0, p1, q0, q1) -> float:
             sn, tn, td = 0.0, e, c
         elif sn > sd:
             sn, tn, td = sd, e + b, c
+    # Endpoint branches: clamp sn against the NEW denominator a (clamping
+    # against the interior-case sd = den let sc exceed 1, measuring to a
+    # phantom point beyond p1 -- caught in review on #163).
     if tn < 0.0:
         tn = 0.0
-        sn = min(max(-d, 0.0), sd) if a > 1e-12 else 0.0
+        sn = min(max(-d, 0.0), a) if a > 1e-12 else 0.0
         sd = a if a > 1e-12 else 1.0
     elif tn > td:
         tn = td
-        sn = min(max(-d + b, 0.0), sd) if a > 1e-12 else 0.0
+        sn = min(max(-d + b, 0.0), a) if a > 1e-12 else 0.0
         sd = a if a > 1e-12 else 1.0
     sc = sn / sd if sd > 1e-12 else 0.0
     tc = tn / td if td > 1e-12 else 0.0
