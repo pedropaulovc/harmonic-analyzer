@@ -27,6 +27,21 @@ parsed-YAML for configs), so a cache hit and "doit up-to-date" always agree and 
 comment-only YAML edit busts neither. Paths are tagged **repo-relative**, so the
 key is identical across machines and worktrees.
 
+The `file_dep` set for a COM task also folds the **`SolidworksMCP-python`
+submodule** — the vendored COM adapter (`solidworks_mcp`) is imported at runtime
+by `_common`/`_assembly` (mate/plane/feature creation), so its source is a genuine
+build input, yet it is an installed package, not a repo-local `_*.py` helper, so
+`module_deps_of` never walked it (issue #144). `dodo._submodule_dep()` folds a
+content-hash of the submodule's `src/solidworks_mcp` tree (repo-relative-tagged,
+so cross-machine-stable) in as **one synthetic dep** — a small gitignored
+`cad/out/reports/.solidworks-mcp-submodule.digest` sidecar whose content is that
+hash — added only in the COM dep builders (`_part_file_deps` / `_recipe_files`), so
+a submodule bump (committed pin **or** a dirty local edit) busts every COM key and
+forces a rebuild, while the SolidWorks-free `check:*` tasks stay off it. Guarded by
+`check:recipe` (`test_dodo_recipe.py`). *Migration:* this shifts every COM cache
+key once — the build self-heals over one run (a rebuild re-stamps the ledger and
+republishes), or run `doit reset-dep`.
+
 Private/experimental work is cached too, with no namespacing: a unique input set
 yields a unique key, so an experiment is stored under its own key and never
 collides with the canonical artefacts. Two seats share a blob only when their

@@ -105,6 +105,14 @@ import _telemetry  # noqa: E402  (observability spine: console logging + tracing
 
 REPO_ROOT = Path(__file__).resolve().parent
 CONFIG_DIR = REPO_ROOT / "cad" / "config"
+# The vendored COM adapter (``solidworks_mcp``) lives in this submodule and is
+# imported AT RUNTIME by _common/_assembly (e.g. the mate/plane creation glue), so
+# its source is a genuine build input of every COM task -- yet it is an installed
+# package, not a repo-local ``_*.py`` helper, so ``module_deps_of`` never walks it.
+# Its tracked source content is folded into every COM task's recipe (see
+# ``_submodule_dep``) so a submodule bump -- committed pin OR a dirty local edit --
+# busts the cache key and forces a rebuild (issue #144).
+SUBMODULE_SRC = REPO_ROOT / "SolidworksMCP-python" / "src" / "solidworks_mcp"
 
 # --- COM spine: keep SolidWorks serial WITHOUT changing how COM work runs.
 #
@@ -512,6 +520,78 @@ def _digest_files(files: list[str]) -> str:
     return h.hexdigest()
 
 
+# --- SolidworksMCP-python submodule: a runtime build input of EVERY COM task.
+#
+# ``_common``/``_assembly`` import ``solidworks_mcp`` (the vendored COM adapter) at
+# runtime for the mate/plane/feature creation glue, so its source is as much a part
+# of a .SLDPRT/.SLDASM's recipe as ``_common.py`` -- but it is an INSTALLED package,
+# not a repo-local ``_*.py`` helper, so ``module_deps_of`` (which walks only local
+# ``_*.py`` imports) never included it. That left BOTH the local staleness digest
+# AND the remote cache key blind to a submodule bump: bumping it left every COM
+# task "up-to-date" and served stale cross-machine cache hits (issue #144).
+#
+# Fix: fold the submodule's tracked SOURCE content into every COM task's recipe via a
+# single synthetic file_dep whose CONTENT is a content-hash of the src tree. Hashing
+# the tree (not just ``git rev-parse HEAD``) also catches a dirty/uncommitted
+# submodule edit. One synthetic dep -- instead of the ~100 source files -- keeps the
+# per-task dep set (and thus every cache-key / _digest_files fold) O(1), not a
+# hundred md5s per COM task. The dep is added ONLY in the COM dep builders
+# (``_part_file_deps`` / ``_recipe_files``), so the SolidWorks-free ``check:*`` tasks
+# -- which never touch COM -- stay off it.
+_SUBMODULE_DIGEST_FILE = REPORTS / ".solidworks-mcp-submodule.digest"
+_SUBMODULE_DIGEST: str | None = None
+_SUBMODULE_DEP_PATH: str | None = None
+
+
+def _submodule_src_files() -> list[Path]:
+    """Every ``.py`` under the submodule's ``src/solidworks_mcp`` tree (sorted).
+    Empty when the submodule isn't checked out -- the digest degrades to a stable
+    empty-tree hash rather than crashing the build graph."""
+    if not SUBMODULE_SRC.is_dir():
+        return []
+    return sorted(SUBMODULE_SRC.rglob("*.py"))
+
+
+def _submodule_digest() -> str:
+    """Content fingerprint of the submodule source tree, memoized (the tree is static
+    within a run). Each file is folded by its REPO-RELATIVE tag (``_rel_tag``) + raw
+    content md5, so the digest is identical across checkout roots -- required for the
+    cross-machine cache key, exactly like ``_digest_files``."""
+    global _SUBMODULE_DIGEST
+    if _SUBMODULE_DIGEST is None:
+        h = hashlib.md5()
+        for f in _submodule_src_files():
+            h.update(_rel_tag(str(f)).encode())
+            h.update(get_file_md5(str(f)).encode())
+        _SUBMODULE_DIGEST = h.hexdigest()
+    return _SUBMODULE_DIGEST
+
+
+def _submodule_dep() -> str:
+    """Path to the single synthetic file_dep that tracks the submodule for the COM
+    tasks: a small generated sidecar whose CONTENT is ``_submodule_digest()``.
+
+    Written write-only-if-changed, so its mtime -- and doit's stat fast-path -- stays
+    stable across no-op runs (a submodule bump flips the content, hence the mtime,
+    hence every dependent COM task). Its repo-relative path tag + machine-independent
+    content (the tree hash) make the resulting cache key identical across machines.
+    Memoized to one write-check per process (called on every staleness probe via
+    ``_stable_artefact_digest``)."""
+    global _SUBMODULE_DEP_PATH
+    if _SUBMODULE_DEP_PATH is not None:
+        return _SUBMODULE_DEP_PATH
+    digest = _submodule_digest()
+    _SUBMODULE_DIGEST_FILE.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        current = _SUBMODULE_DIGEST_FILE.read_text(encoding="utf-8").strip()
+    except OSError:
+        current = None
+    if current != digest:
+        _SUBMODULE_DIGEST_FILE.write_text(digest + "\n", encoding="utf-8")
+    _SUBMODULE_DEP_PATH = str(_SUBMODULE_DIGEST_FILE.resolve())
+    return _SUBMODULE_DEP_PATH
+
+
 # --- Remote artefact cache (opt-in, off by default; see _artifact_cache.py).
 #
 # A COM task's outputs are a pure function of its ``file_dep`` content, so we key a
@@ -577,7 +657,7 @@ def _assembly_cache_outputs(stem: str) -> list[Path]:
 
 def _part_file_deps(script: Path, stem: str) -> list[str]:
     return [str(script.resolve()), *_helper_deps(script),
-            *_config_deps(script, stem, "part")]
+            *_config_deps(script, stem, "part"), _submodule_dep()]
 
 
 def _assembly_file_deps(stem: str) -> list[str]:
@@ -625,7 +705,7 @@ def _recipe_files(stem: str) -> list[str]:
     asm_script = script_for(stem)
     hooks = [str((SCRIPTS_DIR / h).resolve()) for h in POST_ASSEMBLY.get(stem, ())]
     return [str(asm_script.resolve()), *hooks, *_helper_deps(asm_script),
-            *_config_deps(asm_script, stem, "assembly")]
+            *_config_deps(asm_script, stem, "assembly"), _submodule_dep()]
 
 
 def _recipe_sidecar(stem: str) -> Path:
