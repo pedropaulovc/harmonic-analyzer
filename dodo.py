@@ -59,6 +59,7 @@ from __future__ import annotations
 import hashlib
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -122,9 +123,13 @@ SUBMODULE_SRC = REPO_ROOT / "SolidworksMCP-python" / "src" / "solidworks_mcp"
 # work), every COM task is chained into a single linear ``task_dep`` spine -- a
 # topological linearization of the COM sub-DAG:
 #
-#   part:a -> ... -> part:z -> assembly:frame -> ... -> assembly:harmonic_analyzer
+#   part:... -> part:... -> assembly:frame -> ... -> assembly:harmonic_analyzer
 #          -> verify:soundness -> verify:subsystems -> verify:kinematics
 #          -> export -> preflight -> release
+#
+# The parts fill the head of the spine in a PER-SEAT order (``_seat_part_order``),
+# not sorted, so two machines cold-building at once diverge and split the work via
+# the shared cache instead of duplicating it -- see that block for the seed rules.
 #
 # Because each COM task waits on its predecessor, at most ONE COM task is ever
 # "ready", so the seat is never contended even under ``doit -n N`` -- identical
@@ -143,9 +148,42 @@ _COM_TAIL = [
 ]
 
 
+# --- Per-seat part order: diverge two cold builders so they SPLIT the work.
+#
+# Parts have NO inter-part deps (``_part_file_deps`` never lists another part's
+# .SLDPRT), so the order parts occupy on the spine is free -- any permutation with
+# every part before every assembly is a valid COM linearization. We exploit that:
+# two machines doing the same cold build in the SAME order (the old sorted order)
+# march in lock-step, each MISSING the shared remote cache on the same next part
+# and building it in parallel -- N machines do N x the COM work. Permuting the part
+# order per SEAT breaks the lock-step: seat A climbs one way, seat B another, so by
+# the time the slower seat reaches a part the faster one has usually published it
+# (a cache HIT), and the fleet builds each part ~once instead of once-per-seat.
+#
+# The seed MUST be stable across every process of ONE ``doit`` invocation (the
+# parent AND every ``-n`` worker), or two workers would compute DIFFERENT spines,
+# disagree on a part's predecessor, and let two COM tasks go ready at once --
+# deadlocking the single STA seat (the whole point of the spine). So it is keyed on
+# the HOSTNAME (identical for every process on a seat, different across seats), via
+# hashlib -- NOT the builtin ``hash()``, whose str hashing is PYTHONHASHSEED-salted
+# and so differs between the parent and a spawned worker. ``HARMONIC_BUILD_ORDER_SEED``
+# overrides it (reproducible order in tests / a pinned build). Order never feeds a
+# cache key or a digest -- it is purely scheduling -- so permuting is always safe.
+def _build_order_seed() -> str:
+    return os.environ.get("HARMONIC_BUILD_ORDER_SEED") or socket.gethostname()
+
+
+def _seat_part_order() -> list[str]:
+    """``part_stems()`` permuted deterministically per seat (see the block above)."""
+    seed = _build_order_seed()
+    return sorted(part_stems(),
+                  key=lambda s: hashlib.md5(f"{seed}\0{s}".encode()).hexdigest())
+
+
 def _com_spine_order() -> list[str]:
-    """The full COM task order: parts, then assemblies, then the SW tail."""
-    parts = [f"part:{stem}" for stem in part_stems()]
+    """The full COM task order: parts (in per-seat order), then assemblies, then
+    the SW tail."""
+    parts = [f"part:{stem}" for stem in _seat_part_order()]
     asms = [f"assembly:{stem}" for stem in ASSEMBLY_ORDER]
     return parts + asms + _COM_TAIL
 

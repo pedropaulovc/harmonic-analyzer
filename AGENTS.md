@@ -183,6 +183,19 @@ gitignored `.harmonic-cache-mode` file at the repo root (`off`/`ro`/`rw`). Full
 details — roles, auth, salt-busting, provisioning, caveats — in
 [`DEVELOPING.md`](DEVELOPING.md).
 
+**Per-seat part order — two cold builders split the work, not duplicate it.**
+Parts have no inter-part deps, so their order on the COM spine is free. Two seats
+cold-building in the *same* order march in lock-step, each MISS the shared cache on
+the same next part and build it in parallel (N seats ⇒ N× the COM work). So the
+parts fill the spine head in a **per-seat permutation** (`_seat_part_order` in
+`dodo.py`): seat A climbs one way, seat B another, so by the time the slower seat
+reaches a part the faster one has usually published it (a HIT) — the fleet builds
+each part ~once. The seed is the **hostname** (via `hashlib`, *not* the
+PYTHONHASHSEED-salted builtin `hash()`, so it is identical across the parent and
+every `-n` worker — a per-process seed would let two workers disagree on the spine
+and deadlock the seat). `HARMONIC_BUILD_ORDER_SEED` overrides it. Order never feeds
+a cache key or digest — it is purely scheduling, so permuting is always safe.
+
 **Debugging a miss.** A cache key is `sha256(epoch + salt + Σ(relpath, digest))`,
 so a key that shifts unexpectedly is usually one dep digest moving. Three tools
 make that visible without scrollback archaeology (all best-effort, never able to
