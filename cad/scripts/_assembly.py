@@ -935,7 +935,7 @@ async def place_components_batch(
     return out_names
 
 
-def assert_components_fully_defined(adapter: Any) -> None:
+def assert_components_fully_defined(adapter: Any, *, resolve: bool = True) -> None:
     """Raise when any top-level component is neither fixed, fully defined,
     nor a pattern instance.
 
@@ -959,8 +959,12 @@ def assert_components_fully_defined(adapter: Any) -> None:
         # Re-solve the mate solver before reading the gate (stale-status reason
         # above) -- the ForceRebuild3 is the bulk of the gate's wall-clock, so it
         # gets its own child span rather than sitting in an unspanned gap.
+        # ``resolve=False``: the soundness suite already re-solved ONCE after open
+        # (verify._verify_static_one) and does not mutate the model between gates,
+        # so the rebuild here would be redundant -- skip it and just read status.
         with _telemetry.span("dof.resolve"):
-            adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
+            if resolve:
+                adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
             components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
         gsp.set_attribute("components", len(components))
         log(f"checking {len(components)} components for free DOF ...")
@@ -1200,12 +1204,16 @@ def is_locked_build(mode: str) -> bool:
     return mode == "locked"
 
 
-def _under_constrained_components(adapter: Any) -> list[str]:
+def _under_constrained_components(adapter: Any, *, resolve: bool = True) -> list[str]:
     """Re-solve and return the non-fixed, non-pattern top-level components that read
     UNDER-constrained (status 2) -- i.e. carry a real free DOF. Mirrors the status
-    read in :func:`assert_components_fully_defined` but collects the free ones."""
+    read in :func:`assert_components_fully_defined` but collects the free ones.
+
+    ``resolve=False`` skips the rebuild when the caller already re-solved (the
+    soundness suite's single shared rebuild)."""
     asm = adapter.currentModel
-    adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
+    if resolve:
+        adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
     components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
     under = []
     for component in components:
@@ -1311,7 +1319,7 @@ async def assert_expected_free_dof(adapter: Any, expected_count: int) -> None:
         )
 
 
-def assert_free_dof_necessity(adapter: Any, expected_count: int) -> None:
+def assert_free_dof_necessity(adapter: Any, expected_count: int, *, resolve: bool = True) -> None:
     """Build/soundness DOF gate for a default-``free`` model whose freed park
     drivers are DEFERRED (not authored -- see the Park drivers section).
 
@@ -1324,12 +1332,13 @@ def assert_free_dof_necessity(adapter: Any, expected_count: int) -> None:
     the deliberate build-time/release-time split: a fast build stays fast (no park
     solves on every run), the strict closure runs at release (opt-in, infrequent).
 
-    ``expected_count == 0`` reduces to :func:`assert_components_fully_defined`."""
+    ``expected_count == 0`` reduces to :func:`assert_components_fully_defined`.
+    ``resolve=False`` skips the rebuild (soundness re-solved once after open)."""
     if expected_count == 0:
-        assert_components_fully_defined(adapter)
+        assert_components_fully_defined(adapter, resolve=resolve)
         return
     with _telemetry.span("gate.dof_free_necessity") as gsp:
-        under = _under_constrained_components(adapter)
+        under = _under_constrained_components(adapter, resolve=resolve)
         gsp.set_attribute("expected_free_dof", expected_count)
         gsp.set_attribute("free_under_constrained", len(under))
         if len(under) < expected_count:
@@ -1503,8 +1512,12 @@ def whats_wrong(adapter: Any, model: Any) -> list[tuple[str, int, bool]]:
         out.append((name, code, warn))
     return out
 
+_REBUILD_UNSET: Any = object()
+
+
 def assert_model_healthy(
-    adapter: Any, *, label: str = "", model: Any = None, deep: bool = True
+    adapter: Any, *, label: str = "", model: Any = None, deep: bool = True,
+    rebuilt: Any = _REBUILD_UNSET,
 ) -> None:
     """Force-rebuild and raise on any ERROR-state feature/mate -- fail fast.
 
@@ -1527,7 +1540,12 @@ def assert_model_healthy(
         # gate's wall-clock; span it so it is not an unspanned leading gap before
         # the per-target whats_wrong checks.
         with _telemetry.span("health.rebuild"):
-            rebuilt = adapter._attempt(lambda: model.ForceRebuild3(False), default=None)
+            # ``rebuilt`` may be supplied by a caller that already re-solved this
+            # model (the soundness suite's single shared rebuild); only
+            # ForceRebuild3 here when it was NOT (standalone/build/motion callers).
+            # A False result -- from either path -- is still a hard health fault.
+            if rebuilt is _REBUILD_UNSET:
+                rebuilt = adapter._attempt(lambda: model.ForceRebuild3(False), default=None)
 
             targets = [(label or "top", model)]
             if deep:

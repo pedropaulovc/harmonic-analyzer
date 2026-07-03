@@ -68,6 +68,7 @@ sizing are done **analytically** (external spring calculations), not read off a 
 ## Where contact *is* tested
 
 Local cam/follower and spring/lever contact is exercised only in **small isolated
-subassemblies** (see `verify.py --suite subsystems`, doit: `verify:subsystems`). The full
-21-spring equilibrium is never
-solved in the top-level assembly.
+subassemblies** — the interference/health gates of `verify:soundness` open every
+(sub)assembly standalone (the former `verify:subsystems` suite is retired; its one
+unique gate, channel-independence, is folded into soundness). The full 21-spring
+equilibrium is never solved in the top-level assembly.

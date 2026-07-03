@@ -124,7 +124,7 @@ SUBMODULE_SRC = REPO_ROOT / "SolidworksMCP-python" / "src" / "solidworks_mcp"
 # topological linearization of the COM sub-DAG:
 #
 #   part:... -> part:... -> assembly:frame -> ... -> assembly:harmonic_analyzer
-#          -> verify:soundness -> verify:subsystems -> verify:kinematics
+#          -> verify:soundness -> verify:kinematics
 #          -> export -> preflight -> release
 #
 # The parts fill the head of the spine in a PER-SEAT order (``_seat_part_order``),
@@ -140,7 +140,6 @@ SUBMODULE_SRC = REPO_ROOT / "SolidworksMCP-python" / "src" / "solidworks_mcp"
 # run; fix-and-rerun recovers (doit skips up-to-date tasks).
 _COM_TAIL = [
     "verify:soundness",
-    "verify:subsystems",
     "verify:kinematics",
     "export",
     "preflight",
@@ -511,9 +510,16 @@ PREFLIGHT_PY = (SCRIPTS_DIR / "preflight_release.py").resolve()
 # The gate suites, by SolidWorks-dependence -- the single source of truth for the
 # verify:/check: task names (reused by build + release so a new gate is wired in
 # one place).
-_VERIFY_NAMES = ("soundness", "subsystems", "kinematics")   # need SW (spine)
+_VERIFY_NAMES = ("soundness", "kinematics")   # need SW (spine); subsystems retired
+# Offline checks REQUIRED on every build/release (fast, high-value):
 _CHECK_NAMES = ("math", "config", "graph", "nameplate", "recipe", "cache", "telemetry",
-                "verify_telemetry", "freshness", "flagonly")  # offline; MUST match task_check's specs keys
+                "freshness", "flagonly")
+# Offline checks that are OPT-IN only (runnable via `doit check:<name>` but NOT
+# depended on by `build`/`release`). ``verify_telemetry`` drives the real gates
+# through a mock SolidWorks to pin span SHAPE (~20-30 s, ~20x the other offline
+# checks) and has never caught a product defect -- so it is off the every-build
+# required path. Union of both MUST match task_check's specs keys.
+_OPTIONAL_CHECK_NAMES = ("verify_telemetry",)
 
 
 def _run_stamped(cmd: list[str], label: str, stamp: str) -> None:
@@ -1069,11 +1075,8 @@ def task_verify():
     asm_targets = [_sldasm(s) for s in ASSEMBLY_ORDER]
     suite_deps = {
         "soundness": asm_targets,
-        # subsystems now runs ONLY the channel assembly's instance-independence
-        # gate (soundness already runs the shared health battery on every
-        # assembly), so it depends on and targets the channel sub alone -- no
-        # reason to re-run when an unrelated assembly changes.
-        "subsystems": [_sldasm("channel")],
+        # subsystems retired: its one unique gate (channel-independence) is folded
+        # into soundness, which already opens `channel` (see verify._verify_static_one).
         "kinematics": [
             _sldasm("pen"),
             str((SCRIPTS_DIR / "pen_driver.py").resolve()),
@@ -1083,10 +1086,9 @@ def task_verify():
     # Pass the graph's assemblies EXPLICITLY (dashed names) rather than letting
     # verify.py glob every *.SLDASM under cad/out/sldasm -- a stray/scratch
     # assembly left in a worktree must not be verified (codex review). kinematics
-    # targets only the pen sub (verify.py's own default), so it needs no names;
-    # subsystems targets only the channel sub.
+    # targets only the pen sub (verify.py's own default), so it needs no names.
     asm_names = [s.replace("_", "-") for s in ASSEMBLY_ORDER]
-    suite_names = {"soundness": asm_names, "subsystems": ["channel"]}
+    suite_names = {"soundness": asm_names}
     for suite, deps in suite_deps.items():
         stamp = str(REPORTS / f"verify-{suite}.ok")
         cmd = [sys.executable, str(VERIFY_PY)]
@@ -1217,8 +1219,9 @@ def task_check():
     # spec added here without the matching name (or vice versa) would silently never run
     # in the default paths -- exactly the gap Codex caught on freshness/flagonly. Keep
     # the two in lockstep.
-    assert set(specs) == set(_CHECK_NAMES), \
-        f"check specs vs _CHECK_NAMES drift: {set(specs) ^ set(_CHECK_NAMES)}"
+    _all_check_names = set(_CHECK_NAMES) | set(_OPTIONAL_CHECK_NAMES)
+    assert set(specs) == _all_check_names, \
+        f"check specs vs check-names drift: {set(specs) ^ _all_check_names}"
     for name, spec in specs.items():
         stamp = str(REPORTS / f"check-{name}.ok")
         yield {
