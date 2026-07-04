@@ -563,7 +563,7 @@ sections:
         - ch30 GT (cyl_front); function-driven
         - med (GT height)
       - - '`cone-swing-platform` (p1 swing bracket; the p.18 wedge plate)'
-        - 'black steel wedge plate 6.35 thick, ASYMMETRIC trapezoid — half-width 12 (north, pivot) → east 20 / west 37 (south, big end) over 214 along the cone axis; the west flare makes the pivot → lock-knob line SOLID plate (the old bolt-on lock lobe is gone); plan corners rounded to the neighbouring hardware (NE/NW/SW R10 ≈ the pivot-screw head + lock washer, SE R12 = the crank column''s radius); Ø6.5 pivot hole riding the pivot screw''s Ø6.35 shoulder; 8-wide OPEN lock notch (chord of the R191.7 swing arc from the engaged seat out through the west taper edge, 10.46 stud travel to the mouth); carries the "crank axis" reference + CrankAxisSeat datum (vertical, 43.11 from the pivot along the plate frame, crank height 94.16 above the plate bottom) the whole crank rig mates to; plate top y 57.15 — the post/block bores sit 47.65 above it = drive line 104.8 (chiral plate: authored MIRRORED under MIRROR_PLANE "x0")'
+        - 'black steel wedge plate 6.35 thick, ASYMMETRIC trapezoid — half-width 12 (north, pivot) → east 20 / west 37 (south, big end) over 214 along the cone axis; the west flare makes the pivot → lock-knob line SOLID plate (the old bolt-on lock lobe is gone); plan corners rounded to the neighbouring hardware (NE/NW/SW R10 ≈ the lock washer, SE R12 = the crank column''s radius); Ø6.5 pivot hole riding the pivot screw''s Ø6.35 shoulder; 8-wide OPEN lock notch (chord of the R191.7 swing arc from the engaged seat out through the west taper edge, 10.46 stud travel to the mouth); carries the "crank axis" reference + CrankAxisSeat datum (vertical, 43.11 from the pivot along the plate frame, crank height 94.16 above the plate bottom) the whole crank rig mates to; plate top y 57.15 — the post/block bores sit 47.65 above it = drive line 104.8 (chiral plate: authored MIRRORED under MIRROR_PLANE "x0")'
         - 'FLOATED, pivot at cone station 196 = (+79.69, 103.29) with the plate rotated to the cone incline, swinging ON the cone-pivot-screw; the merged crank column, cone shaft (via both journals), tip block AND the crank rig all ride it — the p1 disengage DOF is the plate''s swing about its tip-end vertical axis, FREE by default (deferred PARK_cone_swing driver): 6.41° to clear the knob washer, the west edge then meeting the swing-stop screw'
         - p.18 top-down (the "pivot" label at the TIP; dark wedge under the whole cone set) + v4 stills; dims photo-scaled vs the 64T
         - med (role high, dims low)
@@ -583,13 +583,13 @@ sections:
         - v4_t00411 ("knob" label) + v4_t00417 top view; ch12 p.16 text; dims photo-scaled vs the Ø24 post foot
         - med (role high, dims low)
       - - '`cone-pivot-screw` (the physical p1 pivot pin)'
-        - slotted shoulder screw — head Ø12 × 3 (1.6 × 1.2 driver slot), Ø6.35 shoulder × 12.35 (plate 6.35 + 6 engaged into the base's Ø6.5 pivot hole)
+        - slotted shoulder screw — head Ø9.5 × 3 (1.6 × 1.2 driver slot; sized to clear the tip block's north face 0.25, assembly-asserted), Ø6.35 shoulder × 12.35 (plate 6.35 + 6 engaged into the base's Ø6.5 pivot hole)
         - 'base-threaded STATIC at the swing pivot (+79.69, 103.29), head seated on the plate top (y 57.15); the plate''s Ø6.5 hole rotates ON the shoulder — the harmonic base carries the matching blind hole (agreement asserted in the drive-train assembly)'
         - v4 top stills (slotted head at the plate tip); dims sized to the plate/pivot geometry
         - med (role high, dims low)
       - - '`swing-stop-screw` (p1 travel limit)'
         - slotted screw — Ø4 shank, 6 embedded into the base + 8 proud (covering the 6.35 plate band), head Ø8 × 2.5 on top
-        - 'base-threaded STATIC at (+105.19, −83.30), derived so the plate''s WEST edge just touches the shank flank at the 6.41° disengaged swing (knob-washer-clear) — the plate bumps it, limiting the swing to exactly what disengagement needs; ~2+ clear of the plate when engaged (asserted at import against the base''s hardcoded hole)'
+        - 'base-threaded STATIC at (+130.93, +9.94), derived so the plate''s EAST taper edge just touches the shank flank at the 6.41° disengaged swing — the disengage swing sweeps the plate EAST (the sense that walks the knob stud out the notch mouth), so the east edge is the one that advances onto the stop; 11.7 signed clearance to the ENGAGED edge (asserted at import against the base''s hardcoded hole; the first WEST-side derivation sat 19 inside the engaged plate — interference-gate caught)'
         - user review (v4: small screw the platform bumps against); position derived from the notch/knob geometry
         - med (role high, dims low)
       - - '`cone-tip-bushing` (T006 spacer on the tip stub)'

@@ -75,9 +75,10 @@ BORE_DIA = 0.375 * IN  # 9.525: cone shaft big-end diameter (ch. 12, legacy, med
 BORE_HEIGHT = 47.65  # + platform PLATE_T 6.35 = drive height 54 above base top
 # (asserted in the assembly)
 
-# Crank bore: same 3/8" as the crankshaft (ch. 11), machine-z direction =
-# local plan (+sin I, +cos I) (the column rides the plate, rotated -INCLINE),
-# passing CRANK_BORE_DX east of the column axis (X_CRANK - ppost.x, asserted
+# Crank bore: same 3/8" as the crankshaft (ch. 11), running along MACHINE z
+# once placed. The placement x-mirror conjugates directions, so the AUTHORED
+# plan direction is (-sin I, +cos I) (see the bore feature's comment); it
+# passes CRANK_BORE_DX east of the column axis (X_CRANK - ppost.x, asserted
 # in the assembly).
 INCLINE_DEG = 12.5182
 CRANK_BORE_Y = 87.81  # Y_CRANK 144.96 - Y_BASE_TOP 50.8 - PLATE_T 6.35
@@ -169,11 +170,16 @@ async def build(adapter) -> dict[str, str]:
 
     # Oblique crank bore: 360-degree revolved CUT about an in-sketch
     # centreline on a Top-offset plane at the crank height (proven live:
-    # sketch (x, y) -> part (X, -Z); direction (sin I, -cos I) in sketch =
-    # plan +INCLINE from local z = machine z once the column rides the
-    # inclined plate). The removed volume equals the straight-bore integral:
-    # the column is rotationally symmetric, and the two bores are 40 apart
-    # (no boolean interaction).
+    # sketch (x, y) -> part (X, -Z)). The column is placed through the
+    # x-MIRROR (bbox-"x", c=0), which CONJUGATES directions (R' = M R M):
+    # an authored plan direction (sin I, cos I) lands 2*INCLINE off machine
+    # z -- the exact two-lobe crankshaft interference signature the first
+    # build produced. The MIRROR-COMPENSATED authoring is plan (-sin I,
+    # +cos I) (sketch (-sin I, -cos I)) with the anchor at (DX*cos I,
+    # -DX*sin I) sketch coords, which the conjugated placement maps to
+    # machine z at DX east of the column axis. The removed volume equals
+    # the straight-bore integral: the column is rotationally symmetric, and
+    # the two bores are 40 apart (no boolean interaction).
     from solidworks_mcp.adapters.base import CreatePlaneParameters, RevolveParameters
     check(
         "create_plane CrankBorePlane",
@@ -183,9 +189,9 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "CrankBorePlane")
     check("create_sketch crank bore", await adapter.create_sketch("CrankBorePlane"))
-    _dx, _dy = _SIN_I, -_COS_I  # sketch direction of the crank axis
-    _nx, _ny = _COS_I, _SIN_I  # in-sketch normal
-    _cx, _cy = CRANK_BORE_DX * _COS_I, CRANK_BORE_DX * _SIN_I  # axis plan point
+    _dx, _dy = -_SIN_I, -_COS_I  # sketch direction (mirror-compensated, above)
+    _nx, _ny = _COS_I, -_SIN_I  # in-sketch normal
+    _cx, _cy = CRANK_BORE_DX * _COS_I, -CRANK_BORE_DX * _SIN_I  # axis plan point
     cbore = SketchDims()
     set_sketch_direct_db(adapter, True)
     _rect = [
