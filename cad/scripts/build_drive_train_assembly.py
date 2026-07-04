@@ -1325,6 +1325,38 @@ def _org(adapter, name: str) -> list[float]:
     return [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
 
 
+async def _seat_signed(adapter, moving_ref, base_plane, signed, *, label, verify=None):
+    """Flip-free distance seat: coincident ``moving_ref`` to a SIGNED offset plane
+    off the assembly datum ``base_plane`` (a bare datum name, e.g. "Front Plane").
+
+    The drive-train analogue of the frame's ``plane_distance_mate``: the sign of
+    ``signed`` alone selects the side -- ``create_plane`` builds the offset plane on
+    the +normal side for a positive offset and the far side for a negative one -- so
+    the part lands on-target in ONE solve, with no distance-mate delete-and-re-add
+    flip recovery. Offsets off the bare ASSEMBLY datum (never a rotated seed's
+    plane), so it is orientation-safe where ``plane_distance_mate``'s ``d==0``
+    seed-plane branch would not be. ``moving_ref`` may be a PLANE or an AXIS -- an
+    axis lands coincident lying IN the offset plane, pinning the same one coordinate
+    the distance mate did. For ``|signed| ~ 0`` the datum itself is the target. The
+    ``verify`` readback guard is preserved, now a pure tripwire: a correct signed
+    offset lands on-target in one solve, so it confirms rather than recovers."""
+    from solidworks_mcp.adapters.base import CreatePlaneParameters
+
+    if abs(signed) <= 1e-9:
+        target = named_ref(base_plane, "PLANE")
+    else:
+        plane = check(
+            f"{label}: offset {base_plane}{signed:+.2f}",
+            await adapter.create_plane(
+                CreatePlaneParameters(
+                    mode="offset", base_plane=base_plane, offset=signed
+                )
+            ),
+        )
+        target = named_ref(getattr(plane, "name", plane), "PLANE")
+    return await coincident_mate(adapter, moving_ref, target, label=label, verify=verify)
+
+
 async def _locate_to_datum(adapter, name: str) -> None:
     """Locate a static mount to the machine datum planes (three orthogonal plane
     distances), replacing an explicit fix for a part with no in-subassembly
@@ -1338,12 +1370,12 @@ async def _locate_to_datum(adapter, name: str) -> None:
         ("X", "Right Plane", o[0]),
         ("Z", "Front Plane", o[2]),
     ):
-        await distance_driver(
+        await _seat_signed(
             adapter,
             named_ref(f"{plane}@{name}", "PLANE"),
-            named_ref(plane, "PLANE"),
-            abs(coord),
-            label=f"{name} datum {axis} d={abs(coord):.2f}",
+            plane,
+            coord,
+            label=f"{name} datum {axis} d={coord:+.2f}",
             verify=(name, o),
         )
 
@@ -1835,23 +1867,23 @@ async def build(adapter) -> dict[str, str]:
     # swing, so the validated 20-gear mesh is untouched in `rest`; suppress
     # the angle driver to articulate the disengage.
     plat_o = _org(adapter, platform)
-    await distance_driver(
+    await _seat_signed(
         adapter,
-        named_ref(f"Top Plane@{platform}", "PLANE"), named_ref("Top Plane", "PLANE"),
-        abs(plat_o[1]),
-        label=f"cone-platform height d={abs(plat_o[1]):.2f}", verify=(platform, plat_o),
+        named_ref(f"Top Plane@{platform}", "PLANE"), "Top Plane",
+        plat_o[1],
+        label=f"cone-platform height d={plat_o[1]:+.2f}", verify=(platform, plat_o),
     )
-    await distance_driver(
+    await _seat_signed(
         adapter,
-        named_ref(f"Axis1@{platform}", "AXIS"), named_ref("Right Plane", "PLANE"),
-        abs(plat_o[0]),
-        label=f"cone-platform pivot-X d={abs(plat_o[0]):.2f}", verify=(platform, plat_o),
+        named_ref(f"Axis1@{platform}", "AXIS"), "Right Plane",
+        plat_o[0],
+        label=f"cone-platform pivot-X d={plat_o[0]:+.2f}", verify=(platform, plat_o),
     )
-    await distance_driver(
+    await _seat_signed(
         adapter,
-        named_ref(f"Axis1@{platform}", "AXIS"), named_ref("Front Plane", "PLANE"),
-        abs(plat_o[2]),
-        label=f"cone-platform pivot-Z d={abs(plat_o[2]):.2f}", verify=(platform, plat_o),
+        named_ref(f"Axis1@{platform}", "AXIS"), "Front Plane",
+        plat_o[2],
+        label=f"cone-platform pivot-Z d={plat_o[2]:+.2f}", verify=(platform, plat_o),
     )
     # The swing is a FREED operational DOF (user item 1): the park driver is
     # DEFERRED in the default `free` build (recorded, not authored -- the
@@ -2064,12 +2096,12 @@ async def build(adapter) -> dict[str, str]:
             label=f"cylinder-gear {j} radial", verify=(cyl, cyl_o),
         )
         if prev_cyl is None:
-            await distance_driver(  # anchor the stack's reference end once
+            await _seat_signed(  # anchor the stack's reference end once
                 adapter,
                 named_ref(f"Front Plane@{cyl}", "PLANE"),
-                named_ref("Front Plane", "PLANE"),
-                abs(cyl_o[2]),
-                label=f"cylinder-gear {j} axial anchor d={abs(cyl_o[2]):.2f}",
+                "Front Plane",
+                cyl_o[2],
+                label=f"cylinder-gear {j} axial anchor d={cyl_o[2]:+.2f}",
                 verify=(cyl, cyl_o),
             )
         else:
@@ -2115,11 +2147,11 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Axis1@{fb}", "AXIS"), named_ref(f"Axis1@{pivot_shaft}", "AXIS"),
         label="pinion swing radial", verify=(fb, fb_o),
     )
-    await distance_driver(
+    await _seat_signed(
         adapter,
-        named_ref(f"Front Plane@{fb}", "PLANE"), named_ref("Front Plane", "PLANE"),
-        abs(fb_o[2]),
-        label=f"pinion swing axial d={abs(fb_o[2]):.2f}", verify=(fb, fb_o),
+        named_ref(f"Front Plane@{fb}", "PLANE"), "Front Plane",
+        fb_o[2],
+        label=f"pinion swing axial d={fb_o[2]:+.2f}", verify=(fb, fb_o),
     )
     swing_park = await angle_driver(
         adapter,
@@ -2138,11 +2170,11 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Axis1@{bb}", "AXIS"), named_ref(f"Axis1@{pivot_shaft}", "AXIS"),
         label="pinion back strap radial", verify=(bb, bb_o),
     )
-    await distance_driver(
+    await _seat_signed(
         adapter,
-        named_ref(f"Front Plane@{bb}", "PLANE"), named_ref("Front Plane", "PLANE"),
-        abs(bb_o[2]),
-        label=f"pinion back strap axial d={abs(bb_o[2]):.2f}", verify=(bb, bb_o),
+        named_ref(f"Front Plane@{bb}", "PLANE"), "Front Plane",
+        bb_o[2],
+        label=f"pinion back strap axial d={bb_o[2]:+.2f}", verify=(bb, bb_o),
     )
     await parallel_mate(
         adapter,
@@ -2203,12 +2235,12 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Axis1@{align_pinion}", "AXIS"), named_ref(f"Axis2@{fb}", "AXIS"),
         label="alignment-pinion journaled in the straps", verify=(align_pinion, ap_o),
     )
-    await distance_driver(
+    await _seat_signed(
         adapter,
         named_ref(f"Front Plane@{align_pinion}", "PLANE"),
-        named_ref("Front Plane", "PLANE"),
-        abs(ap_o[2]),
-        label=f"alignment-pinion axial d={abs(ap_o[2]):.2f}",
+        "Front Plane",
+        ap_o[2],
+        label=f"alignment-pinion axial d={ap_o[2]:+.2f}",
         verify=(align_pinion, ap_o),
     )
     a_ap = component_transform(adapter, align_pinion)
