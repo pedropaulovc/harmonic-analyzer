@@ -32,7 +32,7 @@ cone_tip_gear_configs: [T006, T012, T018, T024]
 casting_green_parts:
   - arbor-pedestal
   - column-clamp
-  - crank-pedestal
+  - cone-pivot-post  # absorbed the old crank-pedestal (merged column, 2026-07-03)
   - gooseneck-clamp
   - harmonic-base
   - rocker-arm-support

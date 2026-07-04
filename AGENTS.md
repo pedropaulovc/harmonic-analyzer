@@ -276,10 +276,12 @@ folded into soundness entirely; see `memory/release-perf-incremental.md` and
 
 The default build saves a **working kinematic model**, NOT a frozen one: the
 predetermined operational DOF are left FREE. That is drive-train's **crank spin**
-(1 DOF — drag the crank in the saved `.SLDASM` and the whole geared train turns)
-plus channel's **3 DOF per active channel** (rocker swing + connecting-rod follow +
-amplitude-bar slide). The cone-post swing and pinion swing stay park-driven at their
-engaged pose (setup/disengage motions, exercised by the motion/mobility suites).
+(drag the crank in the saved `.SLDASM` and the whole geared train turns) **and
+cone-platform swing** (the p1 disengage: the plate — carrying the cone set AND the
+crank rig on the merged column — swings on its pivot screw; 2 DOF total for
+drive-train), plus channel's **3 DOF per active channel** (rocker swing +
+connecting-rod follow + amplitude-bar slide). The pinion swing stays park-driven at
+its engaged pose (a setup/disengage motion, exercised by the motion/mobility suites).
 
 The mechanism is **defer-and-replay** (was author-but-suppress). A freed-DOF park
 driver is NOT authored by the build at all — authoring each is an expensive mate

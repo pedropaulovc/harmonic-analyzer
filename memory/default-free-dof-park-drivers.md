@@ -5,6 +5,15 @@ metadata:
   type: project
 ---
 
+> **UPDATE 2026-07-03 — cone-platform swing is now a FREED DOF (PR2 round 3).**
+> The p1 swing angle driver gained `free_dof_key="cone_swing"`, so drive-train's
+> free count is **2** (crank spin + platform swing) — `verify._expected_free_dof`
+> returns 2 when free, and `assert_free_dof_necessity(adapter, 2)` runs in the
+> assembly build. The plate swings on the physical `cone-pivot-screw`; the merged
+> `cone-pivot-post` column carries the crank rig WITH the swing (16T↔64T mesh
+> survives disengage), travel limited by the `swing-stop-screw` at 6.41°. The
+> "cone swing stays park-driven" statements below are STALE for drive-train.
+>
 > **UPDATE 2026-07 — defer-and-replay (park mates added by release, not build).**
 > The freed-DOF park drivers are no longer *authored-then-suppressed* by the build.
 > They are NOT authored at all in a `free` build (skipping ~61 mate solves — 1
