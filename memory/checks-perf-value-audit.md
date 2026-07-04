@@ -44,5 +44,16 @@ Codex/human review, not the gate. Wiring the ~10 cheap offline checks into a <40
 parallel CI job on every push is the highest-value addition.
 
 Full write-up: artifact published this session (favicon 📊, "Check & verify-gate
-performance assessment"). **Perf changes above are OFFLINE-derived — rec 1&2 touch
-COM gates and need a live seat run before merge** (see [[no-untested-failure-assumptions]]).
+performance assessment").
+
+**Shipped as PR #165 (branch `perf-verify-gate-pruning`) and SEAT-VALIDATED**
+(2026-07-03): `doit build` on a live seat → `verify:soundness` 33 passed / 0 failed
+(each assembly re-solved ONCE via the new `verify.rebuild` span; top = 48 s), and
+**soundness ran ~262 s vs the ~989 s baseline — a ~73% cut** (gear-ratios + the two
+dropped rebuilds dominated even more than estimated). `verify:kinematics` 3/0.
+Free-path release preflight passed: gear-ratios reads drive-train (`gear_mates=21` =
+crank 1:4 + all 20 channel meshes of its cone stack; channel reads 0 at its own
+level) then park closure 47→1→0 / 60→60→0. The **locked-build** preflight branch
+(`build_lock.yaml`→`locked`) stays UNEXERCISED — dormant opt-in, shares the validated
+open+gear-ratios code, differs only by an early return. Component-count was dropped
+outright (not warn-only); `_COMPONENT_BAND` kept as reference/mock-sizing data.
