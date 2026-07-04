@@ -531,27 +531,52 @@ def _dump_sub_mates(adapter, sub_name):
             f"lone={lone} parts={_real_parts(parts, root)}{vstr}")
 
 
+# The ONLY deferred park drivers the operation study replays: the SETUP poses
+# it must hold engaged while the mechanism runs. Everything else a default-
+# `free` build records -- the crank spin, each channel's rocker/rod/amplitude
+# family -- is a DOF the study itself drives or lets recur, and deferred =
+# absent = already free, which is exactly the end state the suppression rules
+# below produce on a legacy authored model. Blanket-replaying those and then
+# relying on the classifiers to re-suppress them fails both ways: the crank
+# spec records `Right Plane@crank-arm` (the crank-handle name rule misses it)
+# and per-channel amplitude values are unique (the recurring-value rule reads
+# them as axial holds) -- codex review 2026-07-04, two P2s.
+_REPLAY_PARK_KEYS = {"drive-train": ("cone_swing",)}
+
+
 async def _replay_deferred_parks(adapter):
-    """Re-author the DEFERRED freed-DOF park drivers ENGAGED before the study.
+    """Re-author the deferred SETUP-pose park drivers ENGAGED before the study.
 
     Default-`free` builds RECORD the freed-DOF park drivers instead of
     authoring them (AGENTS.md "Default-free DOF"), so the flexed subs arrive
     with those DOF genuinely free -- including the cone-platform SWING, which
     the operation study must keep PARKED (only the crank turns; codex review
-    2026-07-04). Replay each moving sub's recorded specs in ITS OWN doc (the
-    ActivateDoc3 round-trip -- API selection needs the active doc; the docs
-    are NEVER saved), re-pinning every freed DOF engaged. The suppression
-    rules below then free exactly the DOF the study drives or lets recur --
-    the same end state the old author-but-suppress models arrived in.
+    2026-07-04). Replay exactly the `_REPLAY_PARK_KEYS` allowlist in each
+    sub's OWN doc (the ActivateDoc3 round-trip -- API selection needs the
+    active doc; the docs are NEVER saved), leaving every other recorded
+    driver deferred (= free, what the study needs).
     """
-    from _assembly import load_park_specs, replay_park_specs
+    from _assembly import is_locked_build, load_park_specs, replay_park_specs
 
     top = adapter.currentModel
     top_title = str(_read_member(top, "GetTitle"))
     for sub in MOVING_SUBS:
-        specs = load_park_specs(sub[:-2])  # component "-1" -> doc stem
-        if not specs:
+        stem = sub[:-2]  # component "-1" -> doc stem
+        keys = _REPLAY_PARK_KEYS.get(stem, ())
+        if not keys:
             continue
+        if is_locked_build(_config.machine("build_lock", stem.replace("-", "_"))):
+            # A `locked` build authored every park driver engaged -- the setup
+            # pose is already held; nothing was deferred, nothing to replay.
+            log(f"{sub}: built `locked`, setup parks already authored")
+            continue
+        specs = [s for s in load_park_specs(stem) if s["key"] in keys]
+        if len(specs) != len(keys):
+            found = [s["key"] for s in specs]
+            raise RuntimeError(
+                f"{stem}: replay allowlist {keys} not fully recorded in the "
+                f"park sidecar (found {found}) -- stale artefact or renamed "
+                f"free_dof_key; rebuild the assembly")
         _, model = _sub_model(adapter, sub)
         sub_title = str(_read_member(model, "GetTitle"))
         adapter._attempt(
@@ -559,7 +584,8 @@ async def _replay_deferred_parks(adapter):
             default=None)
         adapter.currentModel = adapter._attempt(
             lambda: adapter.swApp.ActiveDoc, default=model)
-        log(f"{sub}: replaying {len(specs)} deferred park driver(s) (engaged)")
+        log(f"{sub}: replaying {len(specs)} deferred setup park driver(s) "
+            f"(engaged): {[s['key'] for s in specs]}")
         await replay_park_specs(adapter, specs)
     adapter._attempt(
         lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()),
