@@ -112,8 +112,9 @@ BLOCK_SCREW_XZ = (
 BLOCK_SCREW_HOLE_DIA = 4.2  # slotted-screw O4 shank clearance
 BLOCK_SCREW_HOLE_DEPTH = 3.5  # 18 shank - 16 block = 2 buried + 1.5 air
 FOOT_SCREW_XZ = (
-    (2.633, 70.95),  # spring foot (build_pinion_spring hole, machine frame)
-    (54.7, -95.5),   # arbor-pedestal flange (build_arbor_pedestal SCREW_Z)
+    (-20.467, 70.95),  # spring foot (build_pinion_spring hole: the west foot
+    # crosses under the lift rod so its screw lands west of the moving rig)
+    (54.7, -95.5),     # arbor-pedestal flange (build_arbor_pedestal SCREW_Z)
 )
 FOOT_SCREW_HOLE_DIA = 3.2  # foot-screw O2.9 shank clearance
 FOOT_SCREW_HOLE_DEPTH = 7.7  # 8.0 shank under the 0.8 spring strip + air

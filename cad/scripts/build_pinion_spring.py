@@ -20,10 +20,10 @@ the open west side -- reads ~100 deg (leg at the strap's 12.38 lean =
 Layout (local frame = PRE-MIRROR machine frame - (9.04, base top 50.8),
 sketch on the Front plane; the assembly's M6.8 chirality mirror maps it to
 world via the ("z", 0.0) MIRROR_PLANE entry -- the part is an exact
-mid-plane z-extrude): strip centreline path = 7.0 foot at y 0.8 pointing
+mid-plane z-extrude): strip centreline path = 31.0 foot at y 0.8 pointing
 WEST of the bend, r 2.0 bend (77.62 deg sweep), blade up-east at the
 strap's parked 12.38 deg lean to t 32 along the strap axis, r 1.5 x
-20 deg WEST kink, 6.0 flat to the free tip.
+20 deg WEST kink, 2.0 flat to the free tip.
 Thin mid-plane extrude, width 4.0 symmetric about z 0. The thin side is
 ONE-sided and orientation-dependent (RevThinDir 0 -- see the SolidworksMCP
 u-bracket tutorial); every assembly clearance is designed worst-case with
@@ -65,12 +65,20 @@ MATERIAL = "Brass"  # p.68: the leaf reads brass against the steel strap
 
 THICK = 0.8  # strip thickness (photo-scaled vs the 5.0 strap)
 WIDTH = 4.0  # strip width = extrude depth, inside the strap's z band
-FOOT_LEN = 7.0  # flat screw-down foot on the base
+FOOT_LEN = 31.0  # flat screw-down foot on the base, pointing WEST: it
+# crosses UNDER the lift rod (rod bottom 59.6 vs foot top 51.6) and the
+# parked cam pin so its screw lands west of the whole moving rig -- in
+# page002_img01 the dark foot screw sits at frame left, past the block's
+# bright pair (the rig z-bands differ, so only the rod/pin cross above)
 R_BEND = 2.0  # foot-to-blade bend
 R_KINK = 1.5  # the subtle bend-back near the top (PR7)
 KINK_DEG = 20.0  # turn back west; the crest at the kink start is the
 # parked contact edge, the flat above it the engaged contact face
-FLAT_LEN = 6.0  # free flat above the kink
+FLAT_LEN = 2.0  # free flat above the kink. Short on purpose: the flat
+# angles 20 deg WEST of the flank it faces, so every mm of length dives
+# 0.342 toward the parked strap's n=9 flank line -- at 6.0 the last 3 mm
+# sat INSIDE the flank (a 6.28 mm^3 interference-gate hit); 2.0 leaves the
+# tip 0.32 east of it (build_drive_train asserts the tip's n-coordinate)
 BLADE_TILT_DEG = 12.38  # must match build_drive_train STRAP_LEAN_DEG magnitude
 
 # Machine-frame derivation (build_drive_train_assembly owns placement + the
@@ -88,7 +96,9 @@ FOOT_Y = 0.8  # foot centreline above the base top (= THICK: flush if the
 HOLE_DIA = 3.2  # foot screw hole (PR7 item 11): the black foot screw
 # (build_foot_screw, O2.9 shank) bolts the foot down -- 0.4 rims in the
 # 4-wide strip (the O4 slotted-screw shank cannot fit this strip)
-HOLE_FROM_END = 2.2  # hole centre east of the foot's free (west) end
+HOLE_FROM_END = 3.1  # hole centre east of the foot's free (west) end: the
+# O5.5 head sits fully on the strip (0.35 rim to the end) yet 0.46 clear
+# of the lift rod's west flank crossing above (build_drive_train asserts)
 
 _TH = math.radians(BLADE_TILT_DEG)
 _U = (math.sin(_TH), math.cos(_TH))  # up the blade, leaning east
