@@ -357,6 +357,23 @@ async def _mate(
             raise RuntimeError(f"{label}: component still off target by {moved:.2f} mm")
         return res
 
+def seat_plane_name(descriptor: str) -> str:
+    """A stable PascalCase feature name for a signed-offset seat reference plane.
+
+    ``create_plane`` auto-names its planes ``Plane1``/``Plane2`` … ; the signed-
+    offset seat helpers (:func:`plane_distance_mate`, drive-train's ``_seat_signed``)
+    rename theirs to this so the saved model reads semantically instead of carrying
+    a run of anonymous ``PlaneN`` features. Derived from a mate ``descriptor``: the
+    volatile ``d=…`` distance is dropped and every alphanumeric run is PascalCased,
+    then a ``Seat`` suffix marks it as a placement seat (e.g. ``"tube-frame-1 Right"``
+    -> ``TubeFrame1RightSeat``, ``"cone-platform height"`` -> ``ConePlatformHeightSeat``).
+    The descriptor is unique per seat (component + axis, or the mate label), so the
+    name is too."""
+    trimmed = re.sub(r"\bd=\S+", "", descriptor)
+    tokens = re.findall(r"[0-9A-Za-z]+", trimmed)
+    return "".join(t[:1].upper() + t[1:] for t in tokens) + "Seat"
+
+
 async def plane_distance_mate(
     adapter: Any,
     comp_name: str,
@@ -393,7 +410,10 @@ async def plane_distance_mate(
     if abs(distance) <= 1e-9:
         target_ref = named_ref(f"{base_plane}@{base_name}", "PLANE")
     else:
-        from solidworks_mcp.adapters.base import CreatePlaneParameters
+        from solidworks_mcp.adapters.base import (
+            CreatePlaneParameters,
+            RenameFeatureParameters,
+        )
 
         plane = check(
             f"create_plane {base_plane}{distance:+g} for {comp_name}",
@@ -403,7 +423,16 @@ async def plane_distance_mate(
                 )
             ),
         )
-        target_ref = named_ref(getattr(plane, "name", plane), "PLANE")
+        seat = seat_plane_name(f"{comp_name} {base_plane.split()[0]}")
+        check(
+            f"name seat plane {seat}",
+            await adapter.rename_feature(
+                RenameFeatureParameters(
+                    old_name=getattr(plane, "name", plane), new_name=seat
+                )
+            ),
+        )
+        target_ref = named_ref(seat, "PLANE")
     return await coincident_mate(
         adapter,
         named_ref(f"{comp_plane}@{comp_name}", "PLANE"),

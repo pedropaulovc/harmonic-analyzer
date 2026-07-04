@@ -872,7 +872,11 @@ async def _make_rocker_foot_axis(adapter, rk_comp, coeff):
     geometry is in PART-local coords, so it is mirror-independent (the rocker
     instances' handedness doesn't matter). Returns the new axis name.
     """
-    from solidworks_mcp.adapters.base import CreateAxisParameters, CreatePlaneParameters
+    from solidworks_mcp.adapters.base import (
+        CreateAxisParameters,
+        CreatePlaneParameters,
+        RenameFeatureParameters,
+    )
     top = adapter.currentModel
     top_title = str(_read_member(top, "GetTitle"))
     part = adapter._attempt(lambda: rk_comp.GetModelDoc2(), default=None)
@@ -883,14 +887,23 @@ async def _make_rocker_foot_axis(adapter, rk_comp, coeff):
     adapter._attempt(
         lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, _byref_i4()), default=None)
     adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
+    # Coeff-unique suffix: this runs once PER coefficient in the SAME rocker-arm
+    # part doc, so a static plane name would collide on the second call.
+    tok = f"{coeff:+.4f}".replace("+", "P").replace("-", "N").replace(".", "")
     try:
-        px = ("Right Plane" if abs(coeff) <= 1e-9 else
-              check("foot-pin plane x", await adapter.create_plane(CreatePlaneParameters(
-                  mode="offset", base_plane="Right Plane",
-                  offset=coeff))).name)
-        py = check("foot-pin plane y", await adapter.create_plane(CreatePlaneParameters(
-            mode="offset", base_plane="Top Plane",
-            offset=y_off))).name
+        if abs(coeff) <= 1e-9:
+            px = "Right Plane"
+        else:
+            px_auto = check("foot-pin plane x", await adapter.create_plane(CreatePlaneParameters(
+                mode="offset", base_plane="Right Plane", offset=coeff))).name
+            px = f"FootPinX{tok}"
+            check(f"name foot-pin plane x {px}", await adapter.rename_feature(
+                RenameFeatureParameters(old_name=px_auto, new_name=px)))
+        py_auto = check("foot-pin plane y", await adapter.create_plane(CreatePlaneParameters(
+            mode="offset", base_plane="Top Plane", offset=y_off))).name
+        py = f"FootPinY{tok}"
+        check(f"name foot-pin plane y {py}", await adapter.rename_feature(
+            RenameFeatureParameters(old_name=py_auto, new_name=py)))
         ax = check("foot-pin axis", await adapter.create_axis(CreateAxisParameters(
             mode="two_planes", planes=[px, py]))).name
     finally:

@@ -164,6 +164,7 @@ from _assembly import (
     parallel_mate,
     place_component,
     save_assembly_and_images,
+    seat_plane_name,
     set_park_defer,
     write_park_specs,
 )
@@ -1340,7 +1341,10 @@ async def _seat_signed(adapter, moving_ref, base_plane, signed, *, label, verify
     the distance mate did. For ``|signed| ~ 0`` the datum itself is the target. The
     ``verify`` readback guard is preserved, now a pure tripwire: a correct signed
     offset lands on-target in one solve, so it confirms rather than recovers."""
-    from solidworks_mcp.adapters.base import CreatePlaneParameters
+    from solidworks_mcp.adapters.base import (
+        CreatePlaneParameters,
+        RenameFeatureParameters,
+    )
 
     if abs(signed) <= 1e-9:
         target = named_ref(base_plane, "PLANE")
@@ -1353,7 +1357,16 @@ async def _seat_signed(adapter, moving_ref, base_plane, signed, *, label, verify
                 )
             ),
         )
-        target = named_ref(getattr(plane, "name", plane), "PLANE")
+        seat = seat_plane_name(label)
+        check(
+            f"{label}: name seat plane {seat}",
+            await adapter.rename_feature(
+                RenameFeatureParameters(
+                    old_name=getattr(plane, "name", plane), new_name=seat
+                )
+            ),
+        )
+        target = named_ref(seat, "PLANE")
     return await coincident_mate(adapter, moving_ref, target, label=label, verify=verify)
 
 

@@ -105,6 +105,7 @@ async def _volume(adapter) -> float:
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreatePlaneParameters,
+        RenameFeatureParameters,
         RevolveParameters,
         SweepParameters,
     )
@@ -230,8 +231,17 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     check(
+        "name bend profile plane BendProfilePlane",
+        await adapter.rename_feature(
+            RenameFeatureParameters(
+                old_name=getattr(profile_plane, "name", profile_plane),
+                new_name="BendProfilePlane",
+            )
+        ),
+    )
+    check(
         "create_sketch bend profile",
-        await adapter.create_sketch(getattr(profile_plane, "name", profile_plane)),
+        await adapter.create_sketch("BendProfilePlane"),
     )
     # The sweep profile rides a custom reference plane and is pierced onto the
     # path; its dim structure isn't a plain origin circle, and its diameter is
@@ -253,8 +263,17 @@ async def build(adapter) -> dict[str, str]:
             ),
         )
         check(
+            "name bend profile plane BendProfileFlippedPlane",
+            await adapter.rename_feature(
+                RenameFeatureParameters(
+                    old_name=getattr(profile_plane, "name", profile_plane),
+                    new_name="BendProfileFlippedPlane",
+                )
+            ),
+        )
+        check(
             "create_sketch bend profile (flipped)",
-            await adapter.create_sketch(getattr(profile_plane, "name", profile_plane)),
+            await adapter.create_sketch("BendProfileFlippedPlane"),
         )
         await define_circle(adapter, 0.0, 0.0, TUBE_R, "bend profile (flipped)")
         await ensure_fully_defined(adapter, "bend profile sketch (flipped)")

@@ -236,6 +236,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreatePlaneParameters,
         ExtrusionParameters,
+        RenameFeatureParameters,
     )
 
     check("create_part", await adapter.create_part())
@@ -278,10 +279,16 @@ async def build(adapter) -> dict[str, str]:
             )
         ),
     )
+    check(
+        "name cam plane CamProfilePlane",
+        await adapter.rename_feature(
+            RenameFeatureParameters(old_name=plane.name, new_name="CamProfilePlane")
+        ),
+    )
     # Cam disc: ordinary auxiliary circle, centre offset +Y by the eccentricity.
     # On-axis in X (x 0 -> no X dim); the +Y offset is one centre dim (displayed
     # as the unsigned magnitude, so it drives to +"Eccentricity") plus diameter.
-    check(f"create_sketch cam on {plane.name}", await adapter.create_sketch(plane.name))
+    check("create_sketch cam on CamProfilePlane", await adapter.create_sketch("CamProfilePlane"))
     # On a custom offset plane the x=0 anchor still emits an X dim (3 dims, not
     # the 2 a Front/Top origin circle would), so the helper's recorded count
     # can't be predicted here -- name the feature but record no dims (like the
