@@ -12,18 +12,14 @@ the SW suites are ``verify:<suite>`` tasks (on the COM spine); the no-SW ones ar
 ``check:<suite>`` tasks (parallel). There is no aggregate "all" -- ``doit build``
 is the single fully-safe entry point that runs every gate.
 
-  soundness (default) NEEDS SOLIDWORKS. Open the Default pose and run, collecting
-                      ALL failures: DOF fully-defined, no over-constrained
-                      component, model healthy (deep), interference-free, gear
-                      ratios == config, BOM/part-count envelope.
-  subsystems          NEEDS SOLIDWORKS. Subsystem-SPECIFIC structural gates (plan
-                      F1) NOT already covered by soundness -- currently just the
-                      channel assembly's 20-way moving-stem instance independence.
-                      soundness already opens every (sub)assembly standalone and
-                      runs the shared health battery (DOF / over-constrained /
-                      model-healthy / interference / gear-ratios / component-count)
-                      on each, so this pass no longer repeats it (that duplication
-                      was the biggest COM-spine time sink; see release-perf memory).
+  soundness (default) NEEDS SOLIDWORKS. Open the Default pose on every built
+                      (sub)assembly and run, collecting ALL failures: one shared
+                      re-solve, then DOF fully-defined / no over-constrained
+                      component / model healthy (deep) / interference-free, plus
+                      the channel assembly's 20-way moving-stem instance
+                      independence (folded in from the retired `subsystems` suite).
+                      gear ratios == config is verified at the RELEASE preflight,
+                      not on every build.
   kinematics          NEEDS SOLIDWORKS. Kinematic pen-driver fidelity (plan F5):
                       open pen.SLDASM, sweep the CrankDeg global, and assert
                       the pen-marker tip traces truth_model.pen_y (mapped to the
@@ -37,9 +33,8 @@ is the single fully-safe entry point that runs every gate.
                       the tolerance/metadata audit (parts.yaml <-> build scripts;
                       emits cad/out/reports/tolerance_audit.csv).
 
-Unlike the build gates (fail-fast), ``soundness``/``subsystems`` run every gate
-and report the full set of failures at the end, so one run tells you everything
-wrong.
+Unlike the build gates (fail-fast), ``soundness`` runs every gate and reports the
+full set of failures at the end, so one run tells you everything wrong.
 
 Run (SolidWorks already open for any suite touching geometry)::
 
@@ -134,13 +129,14 @@ _MOVING_CHANNEL_STEMS = ("rocker-arm", "connecting-rod", "amplitude-bar", "chann
 _INSTANCE_SUFFIX = re.compile(r"-\d+$")
 # Crank-drive gear mate: either side carries one of these in its component name.
 _CRANK_GEAR_TOKENS = ("crank-pinion", "crank-drive-gear")
-# Expected TOP-LEVEL component-count band per assembly: a tripwire for "a build
-# dropped/duplicated a channel (or a whole subassembly)", not a tight count.
+# Expected TOP-LEVEL component-count band per assembly. REFERENCE DATA ONLY -- the
+# live component-count gate was removed (every failure it ever raised was a stale
+# band or a gate bug, never a real regression). Kept because the counts document
+# each assembly's structure and size the mock in test_verify_telemetry.
 # component_names counts top-level components only (GetComponents(TopLevelOnly)),
 # so harmonic-analyzer's count is its 7 child subassemblies + 1 loose part (the
 # measuring-stick; the spare gear rides inside paper-drive) -- NOT the ~340
-# flattened parts. Bands measured live (verify.py --suite subsystems)
-# with margin.
+# flattened parts. Bands measured live on a green build, with margin.
 # The channel + drive-train bands scale with the built channel count N (the
 # TEMPORARY active_count): channel = 7N + 4 (N×{rocker,rod,bar,lever,spring} + 2
 # shafts + 4 ball-mounts + 2 bushings per inter-channel gap), drive-train = 40 + N
@@ -353,42 +349,6 @@ def assert_gear_ratios(adapter: Any, name: str) -> None:
         f"gear ratios == config (crank {crank_expected}, "
         f"{len(channel_links)} channel meshes)"
     )
-
-
-def assert_component_count(adapter: Any, name: str) -> None:
-    """Assert the top-level instance count is within the expected band.
-
-    The "N instances -> 1 part" property (no component patterns inflating the
-    BOM into N part lines) is structural here -- channels are independent
-    *instances of one part file*. This gate is the tripwire that a rebuild did
-    not drop or duplicate a channel; the exact count band is in ``_COMPONENT_BAND``.
-    """
-    # Span the gate; component_names() re-marshals the whole top-level component
-    # list over the COM bridge (~85 s for `channel`) and was a single unspanned
-    # gap. Give that read its own child span, mirroring gate.dof/gate.health.
-    with _telemetry.span("gate.component_count") as gsp:
-        band = _COMPONENT_BAND.get(name)
-        with _telemetry.span("count.read"):
-            count = len(component_names(adapter))
-        gsp.set_attribute("count", count)
-        if band is None:
-            _telemetry.debug(f"{name}: {count} components (no band configured)")
-            return
-        lo, hi = band
-        if not (lo <= count <= hi):
-            # WARN-only (was a hard gate). Every historical failure of this gate was
-            # a stale band or a gate bug -- never a real regression -- so a drift no
-            # longer blocks the build; it surfaces as a warning. The count stays a
-            # span attribute for observability. Update ``_COMPONENT_BAND`` when the
-            # count legitimately changes.
-            gsp.set_attribute("in_band", False)
-            _telemetry.warn(
-                f"{name}: {count} components outside expected band [{lo}, {hi}] "
-                "(warn-only -- update _COMPONENT_BAND if this is the intended count)"
-            )
-            return
-        gsp.set_attribute("in_band", True)
-    _telemetry.success(f"{name}: {count} components within [{lo}, {hi}]")
 
 
 def assert_channel_independence(adapter: Any) -> None:
@@ -625,7 +585,9 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
         lambda: assert_model_healthy(adapter, label=name, deep=True, rebuilt=rebuilt),
     )
     report.gate(f"{name}:interference-free", lambda: check_no_interference(adapter))
-    report.gate(f"{name}:component-count", lambda: assert_component_count(adapter, name))
+    # component-count REMOVED: every historical failure of that gate was a stale band
+    # or a gate bug (never a real regression), so it cost more in false alarms than it
+    # ever caught. The expected counts survive as reference data in `_COMPONENT_BAND`.
     # gear-ratios is DEMOTED to the release preflight (preflight_release.py): it is the
     # single most expensive gate and re-proves a property fixed by the tooth-count
     # config that check:math already validates analytically -- so it no longer runs on
