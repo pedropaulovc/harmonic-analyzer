@@ -147,8 +147,22 @@ discovered during harmonic-analyzer M6.4:
   assembly-component meshes, and running it before the part is in an
   assembly exports nothing useful (it re-exported unrelated stale models
   for ~4 min). Fix: give every new x-symmetric part an explicit
-  `MIRROR_PLANE["<part>"] = ("x", 0.0)` entry in `_common.py` (precedent:
-  wheel-bar, drive-chain; ch25 added all five pinion parts this way).
+  `MIRROR_PLANE["<part>"] = ("x", 0.0)` entry in `_transforms.py` (it
+  moved off `_common.py` so placement edits don't re-key all parts;
+  precedent: wheel-bar, drive-chain; ch25 added all five pinion parts).
+- **Every NEW part in a mirrored assembly MUST get a MIRROR_PLANE entry whose
+  declared symmetry the part ACTUALLY has** — the placement algebra is
+  M∘T∘S, valid only when S(part) == part. A part CHIRAL about local x that
+  falls through to the default `'x'` (STL-bbox centre) gets silently
+  MIS-POSED: org lands at −(x + 2·bbox_centre) with an un-flipped hand, no
+  placement error raised, caught only by the interference gate
+  (pinion-spring, PR4: 49 mm³ into the back strap; every earlier pinion
+  static was exactly x-symmetric so the default never bit). For a planar-XY
+  chiral leaf/wire that is an exact mid-plane z-extrude, declare
+  `("z", 0.0)` (the counter-spring/chain-link idiom); a part chiral in BOTH
+  needs its script authored pre-mirrored + `"x0"` (summing-lever idiom).
+  Also note: touching `_transforms.py` re-keys EVERY assembly (documented
+  tradeoff), so the whole assembly set rebuilds on the next doit.
 - **Shaded-WITH-edges captures paint fine geometry black**: the fluted
   columns (16 grooves × 2 sharp edges over 1070 mm) rendered as solid
   black bars at ~10 px width — the part colour was never wrong. The
