@@ -1019,9 +1019,22 @@ for _z0 in CAM_Z0:
     if _z0 < LIFT_ROD_Z0 + 1.0 or _z0 + CAM_LEN > LIFT_ROD_Z0 + 202.0 - 1.0:
         raise AssertionError("cam collar overhangs the lift rod")
 
-# PARK: collar top (ecc down) under the pin's underside, by design 0.10..0.25.
-_CAM_PARK_TOP = LIFT_Y - CAM_ECC + CAM_OD / 2.0
-_PARK_GAP = (_FPIN_Y_AT_CAM - FPIN_DIA / 2.0) - _CAM_PARK_TOP
+# PARK: collar (ecc down) under the pin, by design 0.10..0.25 of air. The
+# binding quantity is the SKEW-perpendicular distance from the collar axis's
+# in-plane point to the LEANING pin line, minus the radii sum -- NOT the
+# vertical gap at the crossing x (that mistake put the first build 0.009
+# into the collar: the pin's closest approach is downhill-west of the
+# crossing). The collar axis pierces the pin's z-plane at (LIFT_X, LIFT_Y -
+# ECC) parked; the pin line runs from _FPIN_C along -N.
+def _pin_line_dist(centre_y: float, c=None, n=None) -> float:
+    """Perpendicular distance from (LIFT_X, centre_y) to the pin axis line."""
+    c = c if c is not None else _FPIN_C
+    n = n if n is not None else _SPR_N
+    dx, dy = LIFT_X - c[0], centre_y - c[1]
+    return abs(dx * (-n[1]) - dy * (-n[0]))
+
+
+_PARK_GAP = _pin_line_dist(LIFT_Y - CAM_ECC) - (FPIN_DIA + CAM_OD) / 2.0
 if not 0.10 <= _PARK_GAP <= 0.25:
     raise AssertionError(
         f"park gap {_PARK_GAP:.3f} outside the 0.10..0.25 design band")
@@ -1054,9 +1067,12 @@ _FPIN_Y_AT_CAM_ENG = _FPIN_C_ENG[1] - _S_CAM_ENG * _N_ENG[1]
 _NEED_LIFT = _FPIN_Y_AT_CAM_ENG - _FPIN_Y_AT_CAM  # ~1.07 up
 if _NEED_LIFT <= 0.2:
     raise AssertionError("engage swing does not RAISE the follower over the cam")
-_CAM_MAX_TOP = LIFT_Y + CAM_ECC + CAM_OD / 2.0
-if _CAM_MAX_TOP - (_FPIN_Y_AT_CAM_ENG - FPIN_DIA / 2.0) < 0.25:
-    raise AssertionError("cam lift cannot reach the engaged follower height")
+# Drive authority: with the collar rotated ecc-UP, its surface must reach at
+# least 0.25 PAST first touch on the engaged pin line (the same skew metric
+# as the park gap, engaged pose).
+_D_ENG = _pin_line_dist(LIFT_Y + CAM_ECC, c=_FPIN_C_ENG, n=_N_ENG)
+if (FPIN_DIA + CAM_OD) / 2.0 - _D_ENG < 0.25:
+    raise AssertionError("cam lift cannot reach the engaged follower")
 if _FPIN_TIP_S - _S_CAM_ENG < 1.0:
     raise AssertionError("engaged pin slides off the cam axis")
 
