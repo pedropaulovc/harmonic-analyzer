@@ -26,5 +26,14 @@ every label looks unique). Confounds when comparing across releases: cache-hit b
 flips (not "flip=False was correct"), pre-mechanism releases predate the logging, and labels
 embed volatile coords/dims. Filter to releases where the assembly was actually rebuilt (≥1 flip).
 
+**Naming convention (user directive):** every signed-offset seat plane MUST get a semantic
+name — `create_plane` auto-names `Plane1/Plane2/…`, which ship as anonymous features. Use
+`_assembly.seat_plane_name(descriptor)` → PascalCase + `Seat` suffix (e.g. `ConePlatformHeightSeat`,
+`TubeFrame1RightSeat`) and `adapter.rename_feature(...)` right after `create_plane`, then mate on
+the new name. `plane_distance_mate` (frame) and drive-train's `_seat_signed` already do this — any
+future conversion (channel) inherits it via those helpers. Part-build scripts name their planes via
+`name_last_feature` (watch the trap: it renames the SKETCH, not the plane, if called after
+`create_sketch`+`exit_sketch`). Landed in PR #176.
+
 Full writeup posted to issue #64 (comment 4883506231). Related: [[drive-chain-front-plane]],
 [[default-free-dof-park-drivers]], [[verify-assumptions-live-sw]].
