@@ -86,14 +86,24 @@ CRANK_BORE_DX = 0.95  # machine X_CRANK 122.8 - ppost.x 121.85
 
 BLOCK_RADIUS = BLOCK_DIA / 2.0
 BORE_RADIUS = BORE_DIA / 2.0
+# The crank bore gets a REAL running clearance over the O9.525 crankshaft
+# (0.25 per side): the crank spins in this cast journal, and the crankshaft
+# is mated to the PLATFORM's crank axis (not this bore), so a line-to-line
+# bore turns micron-level chain mismatch into an interference sliver (0.29
+# mm^3 measured; the M6.8 sliver class -- design 0.25 margins, see memory).
+# The cone journal bore stays line-to-line: its shaft is mated EXACTLY
+# coaxial to this part's own named axis.
+CRANK_BORE_DIA = BORE_DIA + 0.5
+CRANK_BORE_RADIUS = CRANK_BORE_DIA / 2.0
 _SIN_I = math.sin(math.radians(INCLINE_DEG))
 _COS_I = math.cos(math.radians(INCLINE_DEG))
 
 
-def _bore_removed() -> float:
-    """Material removed by the journal bore: a z-cylinder r=BORE_RADIUS crossing
-    the O24 column -- z-chord 2*sqrt(R^2-x^2) integrated over the bore disc."""
-    R, r = BLOCK_RADIUS, BORE_RADIUS
+def _bore_removed(r: float = BORE_RADIUS) -> float:
+    """Material removed by a horizontal r-cylinder crossing the O24 column --
+    z-chord 2*sqrt(R^2-x^2) integrated over the bore disc (through-axis; the
+    crank bore's 0.95 offset shortens its crossing ~0.3%, inside the 1% gate)."""
+    R = BLOCK_RADIUS
     n = 4000
     h = 2.0 * r / n
 
@@ -202,8 +212,10 @@ async def build(adapter) -> dict[str, str]:
     _rect = [
         (_cx - 20.0 * _dx, _cy - 20.0 * _dy),
         (_cx + 20.0 * _dx, _cy + 20.0 * _dy),
-        (_cx + 20.0 * _dx + BORE_RADIUS * _nx, _cy + 20.0 * _dy + BORE_RADIUS * _ny),
-        (_cx - 20.0 * _dx + BORE_RADIUS * _nx, _cy - 20.0 * _dy + BORE_RADIUS * _ny),
+        (_cx + 20.0 * _dx + CRANK_BORE_RADIUS * _nx,
+         _cy + 20.0 * _dy + CRANK_BORE_RADIUS * _ny),
+        (_cx - 20.0 * _dx + CRANK_BORE_RADIUS * _nx,
+         _cy - 20.0 * _dy + CRANK_BORE_RADIUS * _ny),
     ]
     _rect_lines = await add_line_chain(adapter, _rect)
     set_sketch_direct_db(adapter, False)
@@ -226,7 +238,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
     )
     name_last_feature(adapter, "CrankBore")
-    volume = await volume_check(adapter, "crank bore", volume - v_bore, 0.01 * v_bore)
+    v_crank = _bore_removed(CRANK_BORE_RADIUS)
+    volume = await volume_check(adapter, "crank bore", volume - v_crank, 0.01 * v_crank)
 
     # Apply the deferred drive equations after the model + a rebuild exist, then
     # re-check: every equation evaluates to the value just built, so geometry
