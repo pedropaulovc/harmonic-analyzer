@@ -51,8 +51,12 @@ PART_NAME = "pinion-lever"
 MATERIAL = "Plain Carbon Steel"  # bright steel (p.68)
 
 ROD_DIA = 6.0  # p.68 "6 mm" annotation (high)
-ROD_LEN = 72.0  # ball centre to tip, p002 photogrammetry (med)
-BALL_DIA = 14.0  # root clamp ball, p002 photogrammetry vs the rod (low)
+ROD_LEN = 98.0  # ball centre to tip (PR6): both ch25 close-ups scaled
+# against the annotated 6 mm rod read ~99 (p.68 disengaged, 855 px @
+# 8.67 px/mm) and ~84 foreshortened (p.69 engaged) -- the old p002
+# photogrammetry 72 undershot by a third (med)
+BALL_DIA = 16.0  # root clamp ball (PR6): 150 px / 8.67 (p.68) and
+# 145 px / 9.17 (p.69) both read ~16-17 vs the old 14 (med)
 BORE = 6.35  # grips the Ø6.35 lift rod (derived)
 ROD_Y0 = 3.5  # rod base above the ball centre: 0.32 radial clearance to
 # the bore surface, buried 2.8 under the ball surface (derived)
