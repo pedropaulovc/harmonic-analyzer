@@ -51,6 +51,21 @@ discovered during harmonic-analyzer M6.4:
   it gives "Parameter not optional". The default cut direction from a
   Top-plane sketch is **−Y**; pass Dir=True to cut +Y (verified live in
   `build_column_clamp.py`: the un-flipped cut removed the wrong band).
+  Corollary (bit again 2026-07-03, cone-pivot-screw slot): a cut's default is
+  OPPOSITE the sketch normal for ANY plane, so a blind cut from a top/far-FACE
+  offset plane down into the body needs **NO** `reverse_direction` —
+  reversing sends it into air, the no-intersection cut falls through the
+  adapter's FeatureCut4→Cut3 overload chain, and a mis-mapped arg can land as
+  a FLIPPED-SIDE cut (removed the head-top ANNULUS around the slot: caught by
+  the volume gate, removal = (disc − strip)·depth exactly). Only a cut running
+  ALONG the normal (material above the sketch plane, e.g. a slot cut from an
+  origin head-face with the body extruded +Y) takes `reverse_direction=True`.
+- **A sketch on a REFERENCE plane enumerates the plane's own offset dim
+  first** in the `GetFirstDisplayDimension` walk (`D1@<plane>` before the
+  sketch's own `D1@<sketch>`), shifting positional renaming and tripping the
+  `SketchDims.apply` recorded-count guard. `_common._display_dimensions`
+  now takes an `owner` filter (FullName middle segment) and `apply`/
+  `name_dimensions` pass it — sketches on principal planes are unaffected.
 - **`ExtrusionParameters(depth=D, both_directions=True)` on a cut = D TOTAL,
   split D/2 per side of the sketch plane** — NOT D each way. A through-cut of a
   plate extruded +Y from its own Top-plane sketch (plate spans y 0..T) with
@@ -334,5 +349,23 @@ discovered during harmonic-analyzer M6.4:
   bore, so a point-point `coincident` (arc.center ↔ circle.center) replaced the
   `anchor_point_to_origin` + equation entirely. Same bug class as the
   magnifying-lever dome radius (don't drive an already-forced dim).
+
+- **A plane-to-plane DISTANCE mate to a WORLD datum also forces PARALLELISM —
+  seating a swing-family part against an assembly plane silently pins the whole
+  family's rotation** (2026-07-04, drive-train p1 swing): `_seat_on_crank`
+  axially seated the T12 chain wheel / 16T pinion / crank arm — all coaxial on
+  the platform-carried crank axis — with `distance(Front@part, Front Plane)`.
+  The distance forces `Front@part ∥` world Front; those planes are normal to
+  the crank axis, so the crank axis direction is locked to machine z and the
+  platform's freed swing DOF reads FULLY DEFINED (status 3) even though its
+  angle driver is deferred. Every part with a leftover spin still reads
+  under-constrained, so the old aggregate `assert_free_dof_necessity(n)` count
+  passed on the 47 spinners — only the per-family `required_stems` check caught
+  it. Fix: axial seats of parts riding a movable family must reference the
+  FAMILY's own axial datum (`Top Plane@crankshaft`, `CrankAxisSeat@platform`),
+  never an assembly datum. Diagnosis tool: `diagnostics/probe_platform_pin.py`
+  (dump per-component GetConstrainedStatus + every mate with its two
+  ReferenceComponents; a `parts=[..., 'drive-train']` row on a family member is
+  the smoking gun).
 
 See [[solidworks-3dx-launch]] for session/launch rules.

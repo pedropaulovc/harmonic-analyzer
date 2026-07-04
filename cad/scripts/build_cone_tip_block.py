@@ -54,15 +54,50 @@ MATERIAL = "Plain Carbon Steel"  # black-finished steel, like the platform it ri
 
 BLOCK_X = 14.0  # plan width across the shaft (low)
 BLOCK_Z = 12.0  # plan depth along the shaft (low)
-BLOCK_HEIGHT = 53.65  # bore at 47.65 + 6 of material above (low)
+BLOCK_HEIGHT = 55.0  # bore at 47.65 + headroom for the pinch cross-bore (low)
 BORE_DIA = 0.03125 * IN  # 0.79375: the shaft's 1/32" tip stub (ch. 12 SECTIONS)
 BORE_HEIGHT = 47.65  # + platform PLATE_T 6.35 = drive height 54 above base top
 
 BORE_RADIUS = BORE_DIA / 2.0
 
+# --- adjuster + pinch lock (item 5, v4_t00471 / 7:49) ------------------------
+ADJUSTER_BORE_DIA = 7.9  # threads the cone-tip-adjuster (line-to-line)
+ADJUSTER_BORE_DEPTH = 8.0  # from the NORTH face; 1/32" journal lip stays south
+SLIT_W = 1.2  # top slit width (the clamp flexure)
+SLIT_DEPTH = 8.0  # top face down past the bore line (55.0 -> 47.0)
+PINCH_BORE_DIA = 2.4  # pinch screw cross-bore, along local X
+PINCH_BORE_Y = 53.2  # between the counterbore top (51.6) and the block top
+
+# The pinch cross-bore must land wholly in the material band between the
+# adjuster counterbore's top and the block top, and the slit must cross it.
+if PINCH_BORE_Y - PINCH_BORE_DIA / 2.0 < BORE_HEIGHT + ADJUSTER_BORE_DIA / 2.0 + 0.25:
+    raise AssertionError("pinch bore clips the adjuster counterbore")
+if PINCH_BORE_Y + PINCH_BORE_DIA / 2.0 > BLOCK_HEIGHT - 0.25:
+    raise AssertionError("pinch bore breaches the block top")
+if BLOCK_HEIGHT - SLIT_DEPTH > PINCH_BORE_Y - PINCH_BORE_DIA / 2.0:
+    raise AssertionError("top slit does not cross the pinch bore")
+
+
+def _slit_removed() -> float:
+    """Slit volume net of the bores it crosses (counterbore band + journal)."""
+    r_cb, y_cb, y_bot = ADJUSTER_BORE_DIA / 2.0, BORE_HEIGHT, BLOCK_HEIGHT - SLIT_DEPTH
+    h = SLIT_W / 400.0
+    xs = [-SLIT_W / 2.0 + k * h for k in range(401)]
+
+    def f(x: float) -> float:
+        return (y_cb + math.sqrt(max(r_cb * r_cb - x * x, 0.0))) - y_bot
+
+    simpson = f(xs[0]) + f(xs[-1]) + 4.0 * sum(f(x) for x in xs[1:-1:2]) \
+        + 2.0 * sum(f(x) for x in xs[2:-1:2])
+    a_cb = simpson * h / 3.0
+    v = SLIT_W * BLOCK_Z * SLIT_DEPTH
+    v -= a_cb * ADJUSTER_BORE_DEPTH  # counterbore band already void
+    v -= math.pi * BORE_RADIUS**2 * (BLOCK_Z - ADJUSTER_BORE_DEPTH)  # journal band
+    return v
+
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
@@ -75,6 +110,10 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BlockHeight", f"{BLOCK_HEIGHT}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
     await set_global(adapter, "BoreHeight", f"{BORE_HEIGHT}mm")
+    await set_global(adapter, "AdjusterBoreDia", f"{ADJUSTER_BORE_DIA}mm")
+    await set_global(adapter, "SlitW", f"{SLIT_W}mm")
+    await set_global(adapter, "PinchBoreY", f"{PINCH_BORE_Y}mm")
+    await set_global(adapter, "PinchBoreDia", f"{PINCH_BORE_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -123,6 +162,78 @@ async def build(adapter) -> dict[str, str]:
     v_bore = math.pi * BORE_RADIUS**2 * BLOCK_Z
     volume = await volume_check(adapter, "bore", volume - v_bore, 0.5 * v_bore)
 
+    # Adjuster counterbore (v4_t00471 / 7:49): O7.9 from the NORTH face, 8
+    # deep -- the partially hollow slotted adjuster screw threads in here and
+    # the shaft tip rests in its cup (axial end-play takeup). The 1/32"
+    # journal lip survives at the south 4.
+    check("create_plane NorthFace", await adapter.create_plane(
+        CreatePlaneParameters(mode="offset", base_plane="Front Plane",
+                              offset=BLOCK_Z / 2.0)))
+    name_last_feature(adapter, "NorthFace")
+    cbore = SketchDims()
+    check("create_sketch counterbore", await adapter.create_sketch("NorthFace"))
+    await define_circle(
+        adapter, 0.0, BORE_HEIGHT, ADJUSTER_BORE_DIA / 2.0, "counterbore",
+        dims=cbore, names=("CbX", "CbZ", "CbDia"),
+        drives=(None, '"BoreHeight"', '"AdjusterBoreDia"'),
+    )
+    await ensure_fully_defined(adapter, "counterbore sketch")
+    check("exit_sketch counterbore", await adapter.exit_sketch())
+    name_last_feature(adapter, "CounterboreProfile")
+    drive_jobs += cbore.apply(adapter, "CounterboreProfile")
+    # A CUT's default direction is OPPOSITE the sketch normal (FeatureCut4
+    # remarks), so from the north-face plane it already bores SOUTH into the block.
+    check("cut counterbore", await adapter.create_cut_extrude(
+        ExtrusionParameters(depth=ADJUSTER_BORE_DEPTH)))
+    name_last_feature(adapter, "AdjusterBore")
+    v_cb = (math.pi * (ADJUSTER_BORE_DIA / 2.0) ** 2 - math.pi * BORE_RADIUS**2) \
+        * ADJUSTER_BORE_DEPTH
+    volume = await volume_check(adapter, "counterbore", volume - v_cb, 0.02 * v_cb)
+
+    # Top slit + perpendicular pinch screw (the McMaster 61815K41 pattern,
+    # locking the ADJUSTER's threads): 1.2-wide slit from the top down past
+    # the bore line, and an O2.4 cross-bore above the counterbore for the
+    # pinch screw that squeezes it closed.
+    check("create_plane BlockTop", await adapter.create_plane(
+        CreatePlaneParameters(mode="offset", base_plane="Top Plane",
+                              offset=BLOCK_HEIGHT)))
+    name_last_feature(adapter, "BlockTop")
+    slit = SketchDims()
+    check("create_sketch slit", await adapter.create_sketch("BlockTop"))
+    await define_centered_rectangle(
+        adapter, SLIT_W / 2.0, BLOCK_Z / 2.0 + 1.0, "slit", dims=slit,
+        name_width="SlitW", drive_width='"SlitW"',
+        name_depth="SlitSpan", drive_depth=None,
+        name_corner=("SlitCx", "SlitCz"), drive_corner=(None, None),
+    )
+    await ensure_fully_defined(adapter, "slit sketch")
+    check("exit_sketch slit", await adapter.exit_sketch())
+    name_last_feature(adapter, "SlitProfile")
+    drive_jobs += slit.apply(adapter, "SlitProfile")
+    check("cut slit", await adapter.create_cut_extrude(
+        ExtrusionParameters(depth=SLIT_DEPTH)))  # default cut dir = down into the block
+    name_last_feature(adapter, "TopSlit")
+    volume = await volume_check(
+        adapter, "top slit", volume - _slit_removed(), 0.02 * _slit_removed()
+    )
+
+    pinch = SketchDims()
+    check("create_sketch pinch bore", await adapter.create_sketch("Right"))
+    await define_circle(
+        adapter, 0.0, PINCH_BORE_Y, PINCH_BORE_DIA / 2.0, "pinch bore",
+        dims=pinch, names=("PinchX", "PinchZ", "PinchDia"),
+        drives=(None, '"PinchBoreY"', '"PinchBoreDia"'),
+    )
+    await ensure_fully_defined(adapter, "pinch bore sketch")
+    check("exit_sketch pinch bore", await adapter.exit_sketch())
+    name_last_feature(adapter, "PinchBoreProfile")
+    drive_jobs += pinch.apply(adapter, "PinchBoreProfile")
+    check("cut pinch bore", await adapter.create_cut_extrude(
+        ExtrusionParameters(depth=BLOCK_X + 4.0, both_directions=True)))
+    name_last_feature(adapter, "PinchBore")
+    v_pinch = math.pi * (PINCH_BORE_DIA / 2.0) ** 2 * (BLOCK_X - SLIT_W)
+    volume = await volume_check(adapter, "pinch bore", volume - v_pinch, 0.05 * v_pinch)
+
     # Apply the deferred drive equations after the model + a rebuild exist, then
     # re-check: every equation evaluates to the value just built, so geometry
     # must not move.
@@ -135,6 +246,9 @@ async def build(adapter) -> dict[str, str]:
     # Named bore axis for the view-independent coaxial mate: the shaft tip
     # positions this block (coaxial + axial distance), no face picks.
     await name_bore_axis(adapter, "Top Plane", BORE_HEIGHT, "Right Plane", 0.0, "journal axis")
+    # Second named axis (Axis2): the pinch-screw cross-bore, along local X at
+    # the slit -- the assembly journals the pinch screw on it.
+    await name_bore_axis(adapter, "Top Plane", PINCH_BORE_Y, "Front Plane", 0.0, "pinch axis")
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
