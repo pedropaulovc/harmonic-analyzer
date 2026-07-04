@@ -246,6 +246,10 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     # apply is not a symmetry of the placed pose; the z mid-plane is. Explicit
     # entry per the PR4 rule: every new part declares a symmetry it HAS.
     "pinion-cam-pin": ("z", 0.0),
+    # pinion-cam (PR8): the eccentric collar's bore, collar circle and set-pin
+    # boss are all centred on local x = 0 (the eccentricity and boss point
+    # down -Y); exactly x0-symmetric, explicit c, no STL at first build.
+    "pinion-cam": ("x", 0.0),
     # M6.10 fasteners: authored in final orientation (axis along Y or Z),
     # exactly symmetric about local x = 0; explicit c, no STL at first build
     "hex-bolt": ("x", 0.0),
