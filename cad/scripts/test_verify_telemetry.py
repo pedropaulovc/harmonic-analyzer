@@ -202,6 +202,14 @@ class MockModel:
     def __init__(self, name: str, n_components: int) -> None:
         self._name = name
         self._comps = [MockComponent(f"{name}-{i + 1}", self) for i in range(n_components)]
+        # The real necessity gate names one component family per freed DOF that
+        # must itself read under-constrained (required_stems -- taken from the
+        # SAME map verify passes, so the mock can't drift). Rename a few
+        # components to those families, from index 1 so the grounded "-1" seed
+        # stays fixed.
+        for j, stem in enumerate(verify._REQUIRED_FREE_STEMS.get(name, ()), start=1):
+            if j < len(self._comps):
+                self._comps[j]._name = f"{stem}-{j + 1}"
         self.InterferenceDetectionManager = MockIDM()
         # Whether the crank PARK mate is currently suppressed (free pose). Set by
         # open_model for the default-free drive-train; toggled by suppress_mate.
