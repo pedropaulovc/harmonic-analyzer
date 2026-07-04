@@ -30,6 +30,21 @@ git submodule update --init --recursive
 1. Invoke `/developing-solidworks` first (see the note at the top of this file).
 2. Python tooling: always use `uv`.
 
+## Minimum merge gate (every PR)
+
+A PR is not mergeable until ALL THREE hold — no exceptions, no partial
+credit:
+
+1. **Build green** — the full `uv run python -m doit -n 4` pipeline (every
+   part, assembly and gate) passes on the PR's head.
+2. **Codex happy** — the Codex auto-review of the latest push found nothing
+   (👍 reaction, or its findings were addressed and re-reviewed clean).
+3. **Visual inspection of renders** — an eye pass over the rendered PNGs of
+   every part/assembly the PR touched (regenerate them if stale or hard to
+   read; move the camera off the standard axes when needed). The CAD gates
+   prove volumes and mates, not that the geometry LOOKS like the machine —
+   a shape can pass every check and still be visibly wrong.
+
 ## Initialize the project (uv)
 
 This repo is a **uv project** (`pyproject.toml` + `uv.lock` at the root). One

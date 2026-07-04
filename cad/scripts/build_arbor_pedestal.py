@@ -10,11 +10,15 @@ tapers up to a semicircular dome around the arbor clamp bore
 (base:top width ~1.2 in the frame, scaled off the 120T gear OD 62.2).
 
 Layout: foot flange standing on the Top plane, centred at the origin
-in plan (X width x Z depth); tapered strap up +Y, mid-plane in Z; dome
-+ bore along Z at y = BORE_HEIGHT. The strap profile is a trapezoid +
-a full circle boss (its upper half proud of the trapezoid = the dome)
--- no arcs, only proven primitives (see build_connecting_rod's head
-for the anchored-polygon pattern).
+in plan (X width x Z depth); tapered strap up +Y, FLUSH with the
+foot's +Z (machine-north) face so the flange extends -Z only -- the
+casting is an L in side view, not an upside-down T (PR7 review item;
+v4_pinion_008 shows the strap rising from one end of the foot with the
+hold-down screw on the exposed flange). Dome + bore along Z at
+y = BORE_HEIGHT; a O3.2 fillister-screw hole drops through the flange.
+The strap profile is a trapezoid + a full circle boss (its upper half
+proud of the trapezoid = the dome) -- no arcs, only proven primitives
+(see build_connecting_rod's head for the anchored-polygon pattern).
 
 Dimensions: cad/config/dimensions.yaml ch. 13 "Drive supports".
 
@@ -40,6 +44,7 @@ from _common import (
     define_circle,
     drive_dimension,
     ensure_fully_defined,
+    extrude_at_offset,
     force_rebuild,
     name_last_feature,
     report_mass_properties,
@@ -56,7 +61,12 @@ MATERIAL = "Gray Cast Iron"  # black japanned casting (t00393)
 FOOT_WIDTH = 24.0  # X; the rocker-support foot rail sits 0.25 east -- keep
 FOOT_DEPTH = 16.0  # Z; front face -98.5 clears the portal south plate by 0.5
 FOOT_HEIGHT = 5.0  # the low flange under the strap (photo-scaled, low)
-STRAP_T = 10.0  # Z; thin strap centred on the foot (photo-scaled, low)
+STRAP_T = 10.0  # Z; thin strap FLUSH with the foot's +Z face (L, not T):
+# band local z (FOOT_DEPTH/2 - STRAP_T)..(FOOT_DEPTH/2) = -2..+8. Keeps the
+# arbor's 7.5 engagement from the north face; the -Z flange carries the screw
+SCREW_HOLE_DIA = 3.2  # foot-screw shank O2.9 (build_foot_screw, the flange
+# hold-down; its 8.0 shank reaches 3.0 into the base past this 5.0 flange)
+SCREW_Z = -5.0  # hole centre on the exposed flange, local z (machine -95.5)
 TOP_RADIUS = 10.0  # dome radius = strap half-width at the top (24 -> 20 taper)
 BORE_DIA = 0.375 * IN  # 9.525: arbor diameter (ch. 13, legacy, med)
 BORE_HEIGHT = 54.0  # ch30 GT: drive height above base top (was 76)
@@ -82,6 +92,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "TopRadius", f"{TOP_RADIUS}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
     await set_global(adapter, "BoreHeight", f"{BORE_HEIGHT}mm")
+    await set_global(adapter, "ScrewHoleDia", f"{SCREW_HOLE_DIA}mm")
+    await set_global(adapter, "ScrewZ", f"{-SCREW_Z}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -170,12 +182,9 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch strap", await adapter.exit_sketch())
     name_last_feature(adapter, "StrapProfile")
     drive_jobs += strap.apply(adapter, "StrapProfile")
-    check(
-        "extrude strap",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=STRAP_T, both_directions=True)
-        ),
-    )
+    # L, not T: the strap band hugs the foot's +Z face (local z -2..+8), so
+    # the extrude starts at an offset instead of straddling the mid-plane.
+    extrude_at_offset(adapter, STRAP_T, FOOT_DEPTH / 2.0 - STRAP_T)
     name_last_feature(adapter, "Strap")
     a_trap = (FOOT_WIDTH + 2.0 * TOP_RADIUS) / 2.0 * BORE_HEIGHT
     w_at_foot_top = FOOT_WIDTH - (FOOT_WIDTH - 2.0 * TOP_RADIUS) * FOOT_HEIGHT / BORE_HEIGHT
@@ -199,12 +208,7 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch dome", await adapter.exit_sketch())
     name_last_feature(adapter, "DomeProfile")
     drive_jobs += dome.apply(adapter, "DomeProfile")
-    check(
-        "extrude dome",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=STRAP_T, both_directions=True)
-        ),
-    )
+    extrude_at_offset(adapter, STRAP_T, FOOT_DEPTH / 2.0 - STRAP_T)
     name_last_feature(adapter, "Dome")
     v_dome = math.pi * TOP_RADIUS**2 / 2.0 * STRAP_T
     volume = await volume_check(adapter, "dome", volume + v_dome, 0.005 * v_dome)
@@ -226,12 +230,38 @@ async def build(adapter) -> dict[str, str]:
     check(
         "cut bore",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=STRAP_T + 4.0, both_directions=True)
+            # Mid-plane TOTAL about the Front sketch plane: the strap band now
+            # sits offset (-2..+8), so the cut spans generously past it.
+            ExtrusionParameters(depth=2.0 * FOOT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "Bore")
     v_bore = math.pi * BORE_RADIUS**2 * STRAP_T
     volume = await volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
+
+    # Flange hold-down screw hole (PR7): O3.2 through the exposed -Z flange at
+    # (x 0, z SCREW_Z) -- the fillister screw bolts the casting to the base.
+    # Top sketch (u, v) -> (X, -Z); mid-plane cut spans the 5-tall foot.
+    hole = SketchDims()
+    check("create_sketch screw hole", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter, 0.0, -SCREW_Z, SCREW_HOLE_DIA / 2.0, "screw hole", dims=hole,
+        names=("ScrewHoleX", "ScrewZ", "ScrewHoleDia"),
+        drives=(None, '"ScrewZ"', '"ScrewHoleDia"'),
+    )
+    await ensure_fully_defined(adapter, "screw hole sketch")
+    check("exit_sketch screw hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "ScrewHoleProfile")
+    drive_jobs += hole.apply(adapter, "ScrewHoleProfile")
+    check(
+        "cut screw hole",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=4.0 * FOOT_HEIGHT, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "ScrewHole")
+    v_hole = math.pi * (SCREW_HOLE_DIA / 2.0) ** 2 * FOOT_HEIGHT
+    volume = await volume_check(adapter, "screw hole", volume - v_hole, 0.02 * v_hole)
     v_final = volume
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
