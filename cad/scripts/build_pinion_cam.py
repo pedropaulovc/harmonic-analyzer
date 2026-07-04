@@ -52,7 +52,11 @@ from _common import (
 PART_NAME = "pinion-cam"
 MATERIAL = "Plain Carbon Steel"  # bright steel collar (img01)
 
-CAM_OD = 9.5  # collar OD, photo-scaled vs the Ø6.35 rod (med)
+CAM_OD = 9.2  # collar OD -- the photo reads ~9.5 vs the Ø6.35 rod (med);
+# trimmed 0.3 because the PARK clearance is the SKEW-perpendicular distance
+# from the collar axis to the LEANING pin line, not the vertical gap at the
+# crossing x (9.5 left the pair 0.009 interpenetrating: two 0.00 mm^3
+# interference-gate hits on the first PR8 assembly build)
 CAM_LEN = 9.0  # along the rod (med)
 ECC = 1.0  # bore offset -> 2.0 full lift; 0.575 min wall over the bore
 BORE = 6.35  # rides the lift rod (derived)
@@ -61,7 +65,10 @@ BOSS_PROUD = 0.5  # proud of the OD at the thick (down/park) side; capped
 # by the SPRING FOOT crossing under the back cam at the same z band:
 # the boss sweep circle (ecc + R + proud about LIFT_Y 58.14) bottoms at
 # 51.89 vs the 51.6 strip top (0.29 air; 1.2 dug 0.41 into the strip)
-BOSS_Z = 2.5  # boss axis station from the front face
+BOSS_Z = 1.7  # boss axis station from the front face: near the FRONT so
+# the boss z band (+-1.6) stays clear of the follower pin band -- the cam
+# is placed with the pin near its BACK end (build_drive_train CAM_Z0_OFF);
+# a mid-collar boss would sweep through the pin in 3D mid-rotation
 
 CAM_R = CAM_OD / 2.0
 BORE_R = BORE / 2.0
