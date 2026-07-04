@@ -3,8 +3,9 @@ r"""Reproduction script: pen subassembly (book ch. 24).
 The machine's output transducer: the pen carriage that writes the Fourier sum
 onto the recording paper, in machine coordinates (assembly origin = base
 origin; the output side is -Z). The pen rod + marker slide vertically through
-the fixed v-block bores; the magnifying wheel's wire (flexible, not modeled)
-raises and lowers them to trace the curve.
+the fixed v-block bores; the magnifying wheel's wire (pen-wire, WIRE 2 --
+modeled as its straight rest-pose run only) raises and lowers them to trace
+the curve.
 
 * pen-hanger (ground) on the wheel-bar + pen-v-block (ground) -- the fixed
   guide.
@@ -12,6 +13,10 @@ raises and lowers them to trace the curve.
   (reproduces truth_model.pen_y from a CrankDeg global, no force solver).
 * pen-marker (locked to the rod), pen-frame (over the marker + rod on the
   v-block top), pen-set-screw.
+* pen-wire -- WIRE 2's straight rest-pose run from the wheel-rim tangent down
+  to the rod's wire hole, locked to the rod so it rides the pen travel. The
+  rim wrap and tie-off are not modeled; the kinematic coupling stays a
+  Motion-study mate (docs/motion-policy.md).
 * hanger-screw -- fastens the pen-hanger from behind the wheel bar.
 
 Cross-subassembly fits (checked at the top level): the pen-hanger clamps the
@@ -37,6 +42,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
 
 from _common import (
@@ -87,6 +93,22 @@ FRAME_ROWS = [[0.0, 0.0, -1.0], [1.0, 0.0, 0.0], [0.0, -1.0, 0.0]]
 # x -18, 1 short of the marker barrel's west face (-17).
 SET_SCREW_POS = (-38.0, 413.0, -154.0)
 
+# --- amplification wire 2 (rim -> pen rod) -----------------------------------
+# Endpoints + length live in build_pen_wire.py (the part's length IS the run);
+# assert them against THIS script's anchors so a layout move fails loud.
+from build_pen_wire import (  # noqa: E402
+    WIRE_BOTTOM as PEN_WIRE_BOTTOM,
+    WIRE_LEN as PEN_WIRE_LEN,
+)
+from build_pen_rod import WIRE_HOLE_Y as ROD_WIRE_HOLE_Y  # noqa: E402
+
+assert math.isclose(
+    PEN_WIRE_BOTTOM[1], PEN_ROD_POS[1] + ROD_WIRE_HOLE_Y, abs_tol=1e-9
+), "pen-wire bottom drifted from the pen-rod wire hole"
+assert math.isclose(
+    PEN_WIRE_BOTTOM[1] + PEN_WIRE_LEN, WHEEL_BAR_Y, abs_tol=1e-9
+), "pen-wire top drifted from the wheel-axis tangent height"
+
 # --- M6.10 fastener ----------------------------------------------------------
 # Pen-hanger screw from BEHIND the bar (the wheel rim passes 1.0 in front
 # of the strap, so no front-side head fits): AF-7 head on the bar back
@@ -134,6 +156,16 @@ async def build(adapter) -> dict[str, str]:
     await lock_mate(adapter, named_ref(f"Front Plane@{pen_marker}", "PLANE"),
                     named_ref(f"Front Plane@{pen_rod}", "PLANE"),
                     label="pen-marker locked to rod")
+
+    # Amplification wire 2: the straight rest-pose run hanging off the wheel
+    # rim's 3 o'clock tangent down to the rod's wire hole level, 1.7 in front
+    # of the rod face (the tie-off is implied -- module docstring). Locked to
+    # the rod so it rides the pen travel with the marker.
+    pen_wire = await place_component(adapter, "pen-wire", list(PEN_WIRE_BOTTOM),
+                                     [0.0, 0.0, 0.0], IDENTITY, ground=False)
+    await lock_mate(adapter, named_ref(f"Front Plane@{pen_wire}", "PLANE"),
+                    named_ref(f"Front Plane@{pen_rod}", "PLANE"),
+                    label="pen-wire locked to rod")
 
     # Kinematic pen driver (plan F5): re-drive the Y-travel mate from a CrankDeg
     # global through the chained Fourier sum, so the pose reproduces

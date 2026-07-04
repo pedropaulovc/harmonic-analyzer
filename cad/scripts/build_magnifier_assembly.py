@@ -4,15 +4,30 @@ The amplification stage: the magnifying lever takes the summing lever's tiny
 motion and the magnifying wheel multiplies it again (via the wire to the pen),
 in machine coordinates (assembly origin = base origin; the output side is -Z).
 
-* magnifying-bracket (ground, bolted under the coefficients plate) carrying the
-  magnifying-lever on its collar bore (revolute about X); the clamp + thumb
-  screw + vertical rod + output-fixture ride the lever as one rigid body at the
-  set magnification radius (the output fixture is where WIRE 1 to the wheel hub
-  hooks).
+* magnifying-bracket (ground, bolted under the coefficients plate) whose collar
+  loosely guides the magnifying-lever rod (Ø6.2 over Ø6 -- NOT a mate). The
+  lever EXTENDS FROM the pivoted summing bar and pivots WITH it about the
+  knife-edge ridge line (engineerguy video 2/4 + 4/4; tip arc ~6 mm), so its
+  one DOF is the rock about that Z line; the clamp + thumb screw + vertical rod
+  + output-fixture ride the lever as one rigid body at the set magnification
+  radius -- the radius from the KNIFE EDGE is what the sliding clamp adjusts
+  (<=4x) -- and the output fixture is where WIRE 1 to the wheel hub hooks.
 * wheel-bar (HALF-width, clamped at ONE column with a free end past the pen
   hanger) + its column-clamp + pinch screw.
 * wheel-axle (structure) carrying the magnifying-wheel, which spins on its stud
-  (revolute); the wheel rim drives the pen rod via WIRE 2.
+  (revolute); the wheel rim drives the pen rod via WIRE 2 (pen.SLDASM).
+* lever-wire -- WIRE 1's straight rest-pose run from the output fixture's cross
+  hole down to the hub-groove tangent. It ARTICULATES like the real wire: a
+  ball joint at the hook (HookPoint on the wire coincident to the fixture's
+  HookAnchorPoint) plus a 0.25 face-face stand-off tangency to the hub drum,
+  so the hook end follows the lever while the hub end hugs the groove (its two
+  residual DOF, swing + spin, are freed park-driver DOF). Its YokePlane
+  carries the WIRE-1 COUPLING mate: the wheel's WireYokePoint held coincident
+  to it ties the wheel's spin to the wire's travel along its own axis (the
+  linearized inextensible-wire constraint), so in the default `free` build --
+  all park drivers DEFERRED, see ``LOCK`` -- dragging the lever swings the
+  clamp/rod/fixture group, the wire pivots at the hook staying on the hub, and
+  the wheel turns: a working kinematic chain, pivoted where the book pivots it.
 
 Cross-subassembly fits (checked at the top level): the column-clamp rides the
 O25.4 column (frame.SLDASM); the pen-hanger (pen.SLDASM) clamps the wheel-bar,
@@ -21,7 +36,10 @@ and the wheel rim -> pen-rod wire couples this sub to the pen.
 Documented simplifications (Appendix C): the magnifying clamp's thumb screw is
 modeled backed-out (the tip is tangent to the lever rod -- a seated screw would
 overlap it); the output fixture's clamp screw is omitted (its cross hole doubles
-as the wire hook); the wires are flexible elements, not modeled.
+as the wire hook); the wires are modeled as straight rest-pose rods only
+(lever-wire here, pen-wire in pen.SLDASM) -- hub/rim wraps, hooks and compliance
+are not, and the kinematic couplings stay Motion-study mates
+(docs/motion-policy.md), so each run stands 0.25 off its wheel surface.
 
 Fix-all strategy (M6.2): every structural component inserted at its exact final
 transform and fixed; the lever + wheel are left free and constrained by mates;
@@ -36,27 +54,52 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
 
+import _config
 from _common import (
     check,
     run_build,
 )
 from _assembly import (
     angle_driver,
-    assert_components_fully_defined,
+    assert_component_placed,
+    assert_expected_free_dof,
+    assert_free_dof_necessity,
     check_no_interference,
     coincident_mate,
+    component_named_ref,
     component_origin,
     distance_driver,
+    is_locked_build,
     lock_mate,
     named_ref,
     place_component,
     save_assembly_and_images,
+    set_park_defer,
+    write_park_specs,
 )
-from _transforms import IDENTITY, ROT_X_NEG90, ROT_Y_POS90, rot_z_rows
+from _transforms import (
+    IDENTITY,
+    ROT_X_NEG90,
+    ROT_Y_POS90,
+    euler_from_rows,
+    mirror_placement,
+    rot_z_rows,
+)
 
 ASM_NAME = "magnifier"
+
+# Build mode (cad/config/machine/build_lock.yaml). `free` (default) leaves the
+# lever rock -- the sub's single operational DOF -- UNLOCKED: its park driver is
+# DEFERRED (recorded, not authored), so the saved model is a working kinematic
+# chain: drag the lever and the clamp/rod/fixture/lever-wire group swings while
+# the WIRE-1 yoke mate turns the magnifying wheel with it. `locked` authors the
+# park driver engaged (the yoke then pins the wheel off the pinned lever) for a
+# fully-defined reproducible snapshot. The literal accessor tokenises to
+# machine/build_lock.yaml in the doit/cache digest.
+LOCK = is_locked_build(_config.machine("build_lock", "magnifier"))
 
 # --- machine anchors ---------------------------------------------------------
 BAR_Z = -133.9  # support-bar centres: column line -112 - clamp offset 21.9
@@ -70,7 +113,31 @@ COLUMN_Z = -112.0
 # (raised from 985); the bracket flange butts the plate front face. The clamp +
 # vertical rod ride up with it (CLAMP_POS and VROD_TOP_Y derive from LEVER_ROD_Y).
 LEVER_ROD_Y = 990.0
-LEVER_ROD_Z = -85.0
+# DEPTH RE-ANCHOR (2026-07-04): the ch30 p.4 side view shows the whole output
+# line (fixture wire, wheel, rim wire, pen rod) as ONE plumb vertical at the
+# machine front -- the old z -85 (M6.4, low) hung the wire hook 50 behind the
+# wheel plane, an ~8 deg lean the photo refutes. -128.3 is the ONLY window:
+# the thumb-screw head (top y 1010, pokes above the top-frame ring bottom
+# 999.7) must clear the ring's front rail z -101..-123 (=> <= -128.25), the
+# lever rod must clear the front column surface -124.7 (=> <= -127.95), and
+# the lever-wire's rim-duck route caps the hook at ~-137.96 (=> >= -128.31).
+# VROD_Z = -134.8 (clamp's 6.5 skew bore); wire hook -137.95; the bracket arm
+# reaches back to the unchanged plate flange (build_magnifying_bracket).
+LEVER_ROD_Z = -128.3
+LEVER_X0 = -200.0  # lever part origin (rod west dome tip; rod spans -200..-35)
+
+# Knife-edge pivot (engineerguy video 2/4 + 4/4): the lever rod EXTENDS FROM
+# the pivoted summing bar and pivots WITH it about the knife-edge ridge line
+# (along Z) -- it does NOT spin in the bracket collar (a loose Ø6.2/Ø6 guide).
+# The ridge is the summing sub's knife line; assert the lever part's local
+# KnifeAxis lands exactly on it, so a knife move fails loud here.
+from build_magnifying_lever import KNIFE_LOCAL_X, KNIFE_LOCAL_Y  # noqa: E402
+from build_summing_assembly import KNIFE, KNIFE_CONTACT_Y  # noqa: E402
+
+assert math.isclose(LEVER_X0 + KNIFE_LOCAL_X, KNIFE[0], abs_tol=1e-9), \
+    "magnifying-lever KnifeAxis x drifted from the summing knife line"
+assert math.isclose(LEVER_ROD_Y + KNIFE_LOCAL_Y, KNIFE_CONTACT_Y, abs_tol=1e-9), \
+    "magnifying-lever KnifeAxis y drifted from the knife-edge contact ridge"
 CLAMP_X = -150.0  # sliding clamp default position (p.46/48 insets)
 from build_magnifying_clamp import (  # noqa: E402
     BLOCK_DEPTH as CLAMP_DEPTH,
@@ -83,7 +150,7 @@ CLAMP_POS = (
     LEVER_ROD_Y - CLAMP_BORE_Y,
     LEVER_ROD_Z,
 )
-VROD_Z = LEVER_ROD_Z - CLAMP_ROD_DX  # -91.5 (local +x -> machine -z)
+VROD_Z = LEVER_ROD_Z - CLAMP_ROD_DX  # -134.8 (local +x -> machine -z)
 VROD_TOP_Y = LEVER_ROD_Y + 5.0  # dome inside the clamp's rod bore (rides the rod)
 FIXTURE_Y0 = 926.0  # collar y 926..934 on the vertical rod
 
@@ -95,6 +162,76 @@ from build_wheel_axle import FLANGE_LEN, STUD_LEN  # noqa: E402
 WHEEL_MID_Z = BAR_FRONT_Z - FLANGE_LEN - (STUD_LEN - 4.0) / 2.0  # -146.9:
 # the 10-wide hub sits flush between the flange face and the tip collar
 
+# --- amplification wire 1 (fixture -> hub) -----------------------------------
+# Endpoints + length live in build_lever_wire.py (the part's length IS the run);
+# re-derive the anchors from THIS script's layout and fail loud on drift, so a
+# layout move can never leave a floating wire.
+from build_lever_wire import (  # noqa: E402
+    CLEARANCE as WIRE_CLEARANCE,
+    WIRE_DIA as HUB_WIRE_DIA,
+    WIRE_END as HUB_WIRE_END,
+    WIRE_START as HUB_WIRE_START,
+)
+from build_magnifying_wheel import HUB_DIA, SPOKE_AXIAL  # noqa: E402
+
+# Hook = tied through the cross hole, hanging under the collar's bottom face
+# (wire r + 0.25) on the front face of the vertical rod (Ø5 rod r 2.5 +
+# wire r + 0.25).
+_HOOK_EXPECTED = (
+    CLAMP_X,
+    FIXTURE_Y0 - (HUB_WIRE_DIA / 2.0 + WIRE_CLEARANCE),
+    VROD_Z - (2.5 + HUB_WIRE_DIA / 2.0 + WIRE_CLEARANCE),
+)
+assert all(
+    math.isclose(a, b, abs_tol=1e-9)
+    for a, b in zip(HUB_WIRE_START, _HOOK_EXPECTED, strict=True)
+), f"lever-wire hook {HUB_WIRE_START} drifted from the fixture anchor {_HOOK_EXPECTED}"
+# The run grazes the hub groove at the 0.25 stand-off tangent ...
+assert math.isclose(
+    math.hypot(HUB_WIRE_END[0] - WHEEL_X, HUB_WIRE_END[1] - WHEEL_BAR_Y),
+    HUB_DIA / 2.0 + HUB_WIRE_DIA / 2.0 + WIRE_CLEARANCE,
+    abs_tol=1e-9,
+), "lever-wire end is not tangent to the hub groove"
+# ... inside the clear axial lane between the axle flange back face and the
+# spoke front faces (else the slanted run clips the flange or a spoke).
+assert (
+    BAR_FRONT_Z - FLANGE_LEN
+    > HUB_WIRE_END[2]
+    > WHEEL_MID_Z + SPOKE_AXIAL / 2.0 + HUB_WIRE_DIA / 2.0
+), "lever-wire end z outside the flange..spoke clear lane"
+
+
+def _lever_wire_rows() -> list[list[float]]:
+    """Rotation rows turning the part's +Y (wire axis) onto the HUB->HOOK
+    direction (the part origin is the hub end -- its Top/YokePlane sit at the
+    tangency); X' is the horizontal perpendicular, Z' = X' x Y' (proper)."""
+    delta = [s - e for s, e in zip(HUB_WIRE_START, HUB_WIRE_END, strict=True)]
+    length = math.hypot(*delta)
+    d = [v / length for v in delta]
+    n = math.hypot(d[0], d[1])
+    x = [d[1] / n, -d[0] / n, 0.0]
+    z = [
+        x[1] * d[2] - x[2] * d[1],
+        x[2] * d[0] - x[0] * d[2],
+        x[0] * d[1] - x[1] * d[0],
+    ]
+    return [x, d, z]
+
+
+# Wire articulation geometry (ball joint + hub stand-off, see build()). The
+# stand-off is an AXIS-AXIS distance (wire centreline Axis1 <-> wheel Axis1 at
+# the offset-tangency radius): skew lines have ONE minimal distance, so there
+# is no far-side flip, and name selection survives solver motion -- a
+# point-picked FACE self-destructs the moment flip-recovery moves the wire
+# (caught live: "Failed to select mate entity 1 (FACE at ...)" on re-add).
+# The two rest angles feed the wire's swing/spin park drivers (plane-plane
+# angles from the placed rows; mirror flips only x-components, |.| absorbs).
+_HW_ROWS = _lever_wire_rows()
+_STANDOFF_R = HUB_DIA / 2.0 + HUB_WIRE_DIA / 2.0 + WIRE_CLEARANCE  # 10.65
+_WIRE_FRONT_ANGLE = math.degrees(math.acos(min(1.0, abs(_HW_ROWS[2][2]))))
+_WIRE_RIGHT_ANGLE = math.degrees(math.acos(min(1.0, abs(_HW_ROWS[0][0]))))
+
+
 # --- M6.10 fasteners ---------------------------------------------------------
 # Column-clamp pinch screw on the wheel-bar clamp's back face (z -88), backed
 # out: the shank tip (-94.2) stays 0.2 inside the back-wall hole and 0.3 off
@@ -104,31 +241,47 @@ PINCH_SCREW_Z = -88.0
 
 
 async def build(adapter) -> dict[str, str]:
+    # `free` (default) DEFERS the freed-DOF park driver (records, does not
+    # author); `locked` authors it engaged. Set before the *_driver call below.
+    set_park_defer(not LOCK)
     check("create_assembly", await adapter.create_assembly())
 
     # --- magnifying group ----------------------------------------------------
-    # Bracket = ground (bolted under the plate). The lever rides its collar bore
-    # as a revolute about X; the rock (Rx, driven by the summing lever in the M6
-    # Motion study) is a suppressible angle snapshot. Both rod axis and collar
-    # axis are local X (Front∩Top), collinear at machine (985, -85). Axial slide
-    # pinned on the Right plane (x~200, non-degenerate); rock via Top-plane angle
-    # (Y-normal, mirror-invariant -> no flip, unlike the dy=0 off-axis spin).
-    mb = await place_component(adapter, "magnifying-bracket",
-                               [-40.0, LEVER_ROD_Y, LEVER_ROD_Z],
-                               [0.0, 0.0, 0.0], IDENTITY)
+    # Bracket = ground (bolted under the plate); its collar is a LOOSE GUIDE
+    # around the lever rod (Ø6.2 over Ø6, 0.1 radial slack -- enough for the
+    # ~1.6 deg knife rock), not a mate. The lever pivots about the summing
+    # bar's knife-edge ridge (see the knife-pivot block above); the rock park
+    # driver uses the Top-plane angle (Y-normal, mirror-invariant -> no flip).
+    await place_component(adapter, "magnifying-bracket",
+                          [-40.0, LEVER_ROD_Y, LEVER_ROD_Z],
+                          [0.0, 0.0, 0.0], IDENTITY)
     ml = await place_component(adapter, "magnifying-lever",
-                               [-200.0, LEVER_ROD_Y, LEVER_ROD_Z],
+                               [LEVER_X0, LEVER_ROD_Y, LEVER_ROD_Z],
                                [0.0, 0.0, 0.0], IDENTITY, ground=False)
     ml_o = component_origin(adapter, ml)
-    await coincident_mate(adapter, named_ref(f"Axis1@{ml}", "AXIS"),
-                          named_ref(f"Axis1@{mb}", "AXIS"),
-                          label="mag-lever collar pivot", verify=(ml, ml_o))
-    await distance_driver(adapter, named_ref(f"Right Plane@{ml}", "PLANE"),
-                          named_ref("Right Plane", "PLANE"), abs(ml_o[0]),
-                          label="mag-lever axial", verify=(ml, ml_o))
+    # Knife-edge pivot: the lever's KnifeAxis (Axis2, local Z through the
+    # summing knife-edge ridge) held by two axis-to-plane distances (the
+    # pen-rod idiom -- parallelism + position, no rotational overlap), depth
+    # pinned on the Front plane. The one remaining DOF -- the rock about the
+    # knife line, the ~6 mm tip arc of video 2/4|4/4 -- is the sub's FREED
+    # operational DOF: its park driver is DEFERRED in the default `free` build
+    # (recorded, not authored -- the lever and everything clamped to it swings
+    # about the knife line, and the WIRE-1 yoke below turns the wheel with
+    # it), authored engaged in a `locked` build. Same mechanism as
+    # drive-train's crank spin. The bracket collar stays a loose visual guide.
+    await distance_driver(adapter, named_ref(f"Axis2@{ml}", "AXIS"),
+                          named_ref("Right Plane", "PLANE"), abs(KNIFE[0]),
+                          label="mag-lever knife line across", verify=(ml, ml_o))
+    await distance_driver(adapter, named_ref(f"Axis2@{ml}", "AXIS"),
+                          named_ref("Top Plane", "PLANE"), KNIFE_CONTACT_Y,
+                          label="mag-lever knife line height", verify=(ml, ml_o))
+    await distance_driver(adapter, named_ref(f"Front Plane@{ml}", "PLANE"),
+                          named_ref("Front Plane", "PLANE"), abs(LEVER_ROD_Z),
+                          label="mag-lever depth", verify=(ml, ml_o))
     await angle_driver(adapter, named_ref(f"Top Plane@{ml}", "PLANE"),
                        named_ref("Top Plane", "PLANE"), 0.0,
-                       label="mag-lever rock snapshot", verify=(ml, ml_o))
+                       label="mag-lever rock PARK driver (freed in default build)",
+                       verify=(ml, ml_o), free_dof_key="lever_rock")
     # The clamp + vertical rod + output fixture + thumb screw are clamped to the
     # lever at the set magnification radius (the thumb screw locks the clamp on
     # the rod): they ride the lever as one rigid body. The output fixture is
@@ -185,17 +338,69 @@ async def build(adapter) -> dict[str, str]:
                                IDENTITY, ground=False)
     wh_o = component_origin(adapter, wh)
     # Revolute: radial coincident (wheel axis Z || axle stud Z) + axial
-    # distance(Front, |z|) + angle(Right, 0) rock snapshot. Probed FULLY(3),
-    # no flip (probe_wheel.py).
+    # distance(Front, |z|); the spin -- the old angle(Right, 0) rock snapshot --
+    # is now pinned by the WIRE-1 yoke below, coupling it to the lever.
     await coincident_mate(adapter, named_ref(f"Axis1@{wh}", "AXIS"),
                           named_ref(f"Axis1@{ax}", "AXIS"),
                           label="magnifying-wheel pivot", verify=(wh, wh_o))
     await distance_driver(adapter, named_ref(f"Front Plane@{wh}", "PLANE"),
                           named_ref("Front Plane", "PLANE"), abs(wh_o[2]),
                           label="magnifying-wheel axial", verify=(wh, wh_o))
-    await angle_driver(adapter, named_ref(f"Right Plane@{wh}", "PLANE"),
-                       named_ref("Right Plane", "PLANE"), 0.0,
-                       label="magnifying-wheel rock snapshot", verify=(wh, wh_o))
+    # --- amplification wire 1 (fixture -> hub) -------------------------------
+    # The straight rest-pose run: it hangs from the fixture's cross hole and
+    # grazes the hub-groove tangent (the wrap is implied -- module docstring).
+    # Locked to the output fixture so it rides the lever group, like the rest
+    # of the clamped chain. Part origin = the HUB end, +Y toward the hook.
+    hw = await place_component(adapter, "lever-wire", list(HUB_WIRE_END),
+                               euler_from_rows(_HW_ROWS), _HW_ROWS, ground=False)
+    hw_o = component_origin(adapter, hw)
+    # The wire ARTICULATES instead of riding the lever group rigidly (a locked
+    # wire's hub tip would sweep a ~10 mm lateral arc off the hub even over
+    # the real ~1.6 deg knife rock -- user-flagged): a BALL JOINT at the hook
+    # (the wire's HookPoint coincident to the fixture's HookAnchorPoint) plus
+    # the 0.25 face-face stand-off to the hub drum (the offset tangency the
+    # rest geometry is built at), so the hook end follows the lever while the
+    # hub end hugs the groove; the tip only creeps along its own axis (the
+    # unmodeled wrap's pay-in/pay-out). Ref POINTs select via GetCorresponding
+    # -- they do not resolve through name@comp strings.
+    await coincident_mate(adapter, component_named_ref(hw, "HookPoint", "POINT"),
+                          component_named_ref(fixture, "HookAnchorPoint", "POINT"),
+                          label="lever-wire hook ball joint", verify=(hw, hw_o))
+    await distance_driver(
+        adapter, component_named_ref(hw, "Axis1", "AXIS"),
+        component_named_ref(wh, "Axis1", "AXIS"), _STANDOFF_R,
+        label="lever-wire hub stand-off tangency", verify=(hw, hw_o))
+    # The wire's two residual DOF (swing across the tangency family + spin
+    # about its own axis) are freed operational DOF: park drivers DEFERRED in
+    # `free` builds, authored engaged in `locked`/preflight for the closure.
+    await angle_driver(adapter, named_ref(f"Front Plane@{hw}", "PLANE"),
+                       named_ref("Front Plane", "PLANE"), _WIRE_FRONT_ANGLE,
+                       label="lever-wire swing PARK driver (freed in default build)",
+                       verify=(hw, hw_o), free_dof_key="wire_swing")
+    await angle_driver(adapter, named_ref(f"Right Plane@{hw}", "PLANE"),
+                       named_ref("Right Plane", "PLANE"), _WIRE_RIGHT_ANGLE,
+                       label="lever-wire spin PARK driver (freed in default build)",
+                       verify=(hw, hw_o), free_dof_key="wire_spin")
+
+    # WIRE-1 coupling (replaces the old wheel rock snapshot): the wheel's
+    # WireYokePoint (hub pitch circle @ the wire tangency) held coincident to
+    # the lever-wire's YokePlane (perpendicular to the wire axis). The wheel's
+    # spin -- its one remaining DOF -- is thereby tied to the lever group's
+    # travel along the wire: the linearized inextensible-wire constraint, sign
+    # and ratio from geometry (build_lever_wire docstring). In the free build,
+    # dragging the lever turns the wheel; in a locked build the engaged lever
+    # park pins the whole chain. The mate is residual-free at the rest pose, so
+    # the wheel must NOT move when it solves -- asserted right after.
+    # component_named_ref, not a name@comp string: a reference POINT does not
+    # resolve through SelectByID2 string selection -- the GetCorresponding path
+    # is how the Motion study selects its rim RefPoint too.
+    await coincident_mate(adapter, component_named_ref(wh, "WireYokePoint", "POINT"),
+                          named_ref(f"YokePlane@{hw}", "PLANE"),
+                          label="WIRE1 yoke fixture->wheel", verify=(wh, wh_o))
+    wh_pos, _, wh_rows = mirror_placement(
+        "magnifying-wheel", [WHEEL_X, WHEEL_BAR_Y, WHEEL_MID_Z], [0.0, 0.0, 0.0],
+        IDENTITY)
+    assert_component_placed(adapter, wh, wh_pos, wh_rows)
 
     # --- fastener (M6.10) ----------------------------------------------------
     await place_component(adapter, "pinch-screw",
@@ -203,7 +408,19 @@ async def build(adapter) -> dict[str, str]:
                           [0.0, 0.0, 0.0], IDENTITY,
                           label=f"pinch-screw (wheel clamp x{-COLUMN_X:.0f})")
 
-    assert_components_fully_defined(adapter)
+    # Certify the AS-BUILT model. free -> necessity only (the freed lever DOF is
+    # genuinely free, and the yoke-coupled wheel must read under-constrained WITH
+    # it -- a frozen wheel would mean the coupling died); locked -> strict 0-DOF.
+    if LOCK:
+        await assert_expected_free_dof(adapter, 0)
+    else:
+        # THREE freed operational DOF: the lever's knife rock + the wire's
+        # swing/spin (all deferred PARK drivers above); the yoke-coupled wheel
+        # must also read under-constrained WITH them, else the coupling died.
+        assert_free_dof_necessity(
+            adapter, 3,
+            required_stems=("magnifying-lever", "magnifying-wheel", "lever-wire"))
+    write_park_specs(ASM_NAME)
     check_no_interference(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)
 

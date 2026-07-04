@@ -25,9 +25,11 @@ import sys
 
 from _common import (
     SketchDims,
+    _read_member,
     add_line_chain,
     anchor_point_to_origin,
     apply_material,
+    blank_sketch,
     check,
     define_circle,
     drive_dimension,
@@ -40,6 +42,7 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
+    set_sketch_direct_db,
     volume_check,
 )
 
@@ -61,6 +64,30 @@ BORE_DIA = 5.0  # axle bore, photo-scaled (low)
 
 RIM_INNER_DIA = RIM_OUTER_DIA - 2 * RIM_RING_RADIAL
 SPOKE_OVERLAP = 1.0  # spokes bite into hub and rim so the bodies merge
+
+# --- WIRE-1 yoke point (the coupling mate's wheel-side geometry) --------------
+# ``WireYokePoint``: a reference point on the hub PITCH circle (groove radius +
+# wire radius) at the lever-wire's tangency azimuth, in the wheel mid-plane. The
+# magnifier assembly holds it COINCIDENT to the lever-wire's YokePlane, tying the
+# wheel's spin to the lever group's travel along the wire (the linearized
+# inextensible-wire constraint -- see build_lever_wire's docstring). The azimuth
+# is layout-derived, so it is imported from build_lever_wire: a layout move
+# re-tangents the wire AND re-stamps this point in one rebuild.
+from build_lever_wire import (  # noqa: E402
+    WHEEL_BAR_Y as _YOKE_WHEEL_Y,
+    WHEEL_X as _YOKE_WHEEL_X,
+    YOKE_POINT as _YOKE_POINT,
+)
+
+# AUTHORED MIRRORED (x negated): the machine-chirality mirror realizes the
+# x-symmetric wheel as M(T(S(part))) -- the solid is S-invariant, but a CHIRAL
+# ref point gets double-flipped (S then M) and lands back at its PRE-mirror
+# azimuth, 2x13.26 deg off the mirrored-world tangency (caught live: the yoke
+# mate solved by spinning the wheel 26.5 deg to the wrong plane/circle
+# intersection). Authoring the point x-negated makes the double flip land it
+# on the true tangency -- the same idiom as the "x0" authored-mirrored parts.
+YOKE_LOCAL_X = -(_YOKE_POINT[0] - _YOKE_WHEEL_X)  # +10.1225 (pitch r 10.4 @ tangency)
+YOKE_LOCAL_Y = _YOKE_POINT[1] - _YOKE_WHEEL_Y  # -2.3866
 
 
 async def build(adapter) -> dict[str, str]:
@@ -242,6 +269,25 @@ async def build(adapter) -> dict[str, str]:
     # (circular_pattern's axis_point does NOT create a persistent ref axis).
     await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "wheel axis")
 
+    # WIRE-1 yoke point (see the module-level YOKE_LOCAL_* block): one raw
+    # sketch point on the Front plane (mid-plane, exact coords, inference OFF)
+    # promoted to a named REFERENCE POINT feature the assembly's coupling mate
+    # selects. The carrier sketch is blanked (unabsorbed sketches render SHOWN
+    # in every assembly instance); the point's coords are re-read and asserted
+    # after the final rebuild -- it is undimensioned, so drift must fail loud.
+    check("create_sketch yoke", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    model = adapter.currentModel
+    sk_point = model.SketchManager.CreatePoint(
+        YOKE_LOCAL_X / 1000.0, YOKE_LOCAL_Y / 1000.0, 0.0)
+    if sk_point is None:
+        raise RuntimeError("yoke sketch point creation failed")
+    set_sketch_direct_db(adapter, False)
+    check("exit_sketch yoke", await adapter.exit_sketch())
+    name_last_feature(adapter, "WireYokeSketch")
+    blank_sketch(adapter, "WireYokeSketch")
+    _make_yoke_ref_point(adapter)
+
     # Apply the deferred drive equations after the whole model + a rebuild exists,
     # so every target resolves. Each equation evaluates to the as-built value (the
     # spoked wheel's volume has no tidy closed form, so the neutrality gate asserts
@@ -255,8 +301,70 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven magnifying wheel (equations neutral)", v_built, 0.001 * v_built
     )
 
+    _assert_yoke_point(adapter)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
+
+
+def _yoke_sketch_points(adapter):
+    """The ISketchPoint list of WireYokeSketch (exactly one expected).
+
+    COM members read via ``_read_member`` -- pywin32 late binding exposes
+    FirstFeature/Name/GetNextFeature as methods on some builds and properties
+    on others (the fix_shown_sketches walk idiom)."""
+    model = adapter.currentModel
+    feat = _read_member(model, "FirstFeature")
+    for _ in range(5000):
+        if not feat:
+            break
+        if str(_read_member(feat, "Name")) == "WireYokeSketch":
+            sketch = _read_member(feat, "GetSpecificFeature2")
+            return list(_read_member(sketch, "GetSketchPoints2") or [])
+        feat = _read_member(feat, "GetNextFeature")
+    raise RuntimeError("WireYokeSketch not found")
+
+
+def _make_yoke_ref_point(adapter) -> None:
+    """Promote the yoke sketch point to a named reference-point FEATURE
+    (``WireYokePoint``) via raw COM -- the adapter's reference-point modes are
+    edge/face-based only; ``InsertReferencePoint(swRefPointSketchPoint=7)``
+    works from a selected sketch point (the adapter has no writer, same
+    raw-COM precedent as the Part D custom properties)."""
+    model = adapter.currentModel
+    pts = _yoke_sketch_points(adapter)
+    if len(pts) != 1:
+        raise RuntimeError(f"WireYokeSketch: expected 1 point, found {len(pts)}")
+    model.ClearSelection2(True)
+    # Select2(Append, Mark): the late-binding-safe select -- Select4's
+    # ISelectData arg raises "Type mismatch" under the adapter's forced late
+    # binding (the _assembly batch-fix comment documents the same trap).
+    if not pts[0].Select2(False, 0):
+        raise RuntimeError("cannot select the yoke sketch point")
+    feat = model.FeatureManager.InsertReferencePoint(7, 0, 0.0, 1)  # 7 = sketch point
+    model.ClearSelection2(True)
+    if isinstance(feat, tuple):  # late binding marshals the object return boxed
+        feat = next((f for f in feat if f is not None), None)
+    if feat is None:
+        raise RuntimeError("InsertReferencePoint(sketch point) returned null")
+    feat.Name = "WireYokePoint"
+    if str(_read_member(feat, "Name")) != "WireYokePoint":
+        raise RuntimeError("reference point rename failed")
+    _telemetry.success("WireYokePoint reference point created")
+
+
+def _assert_yoke_point(adapter) -> None:
+    """Fail loud if the (undimensioned, hidden) yoke sketch point drifted from
+    its authored coords across the rebuilds -- the coupling mate's geometry
+    must stay exact."""
+    pts = _yoke_sketch_points(adapter)
+    x_mm = float(_read_member(pts[0], "X")) * 1000.0
+    y_mm = float(_read_member(pts[0], "Y")) * 1000.0
+    if abs(x_mm - YOKE_LOCAL_X) > 1e-3 or abs(y_mm - YOKE_LOCAL_Y) > 1e-3:
+        raise RuntimeError(
+            f"yoke point drifted: ({x_mm:.4f}, {y_mm:.4f}) != "
+            f"({YOKE_LOCAL_X:.4f}, {YOKE_LOCAL_Y:.4f})"
+        )
+    _telemetry.success(f"yoke point holds at ({x_mm:.4f}, {y_mm:.4f})")
 
 
 if __name__ == "__main__":
