@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Iterable
 from typing import Any
 
@@ -1319,7 +1320,13 @@ async def assert_expected_free_dof(adapter: Any, expected_count: int) -> None:
         )
 
 
-def assert_free_dof_necessity(adapter: Any, expected_count: int, *, resolve: bool = True) -> None:
+def assert_free_dof_necessity(
+    adapter: Any,
+    expected_count: int,
+    *,
+    resolve: bool = True,
+    required_stems: tuple[str, ...] = (),
+) -> None:
     """Build/soundness DOF gate for a default-``free`` model whose freed park
     drivers are DEFERRED (not authored -- see the Park drivers section).
 
@@ -1331,6 +1338,12 @@ def assert_free_dof_necessity(adapter: Any, expected_count: int, *, resolve: boo
     (:func:`assert_park_closure`), which is where the recorded specs exist. This is
     the deliberate build-time/release-time split: a fast build stays fast (no park
     solves on every run), the strict closure runs at release (opt-in, infrequent).
+
+    The aggregate count alone cannot tell WHICH DOF is free -- the crank spin
+    alone under-constrains several crank-chain components, so a count check
+    passes even with a second freed DOF accidentally pinned (codex review
+    2026-07-04). ``required_stems`` therefore names one component family per
+    freed DOF (instance suffixes stripped) that MUST read under-constrained.
 
     ``expected_count == 0`` reduces to :func:`assert_components_fully_defined`.
     ``resolve=False`` skips the rebuild (soundness re-solved once after open)."""
@@ -1348,6 +1361,16 @@ def assert_free_dof_necessity(adapter: Any, expected_count: int, *, resolve: boo
                 "-- a deferred park driver's DOF is pinned by another mate, or the "
                 "model is over-constrained (the 'free' model is actually frozen)"
             )
+        if required_stems:
+            present = {re.sub(r"-\d+$", "", n) for n in under}
+            missing = [s for s in required_stems if s not in present]
+            gsp.set_attribute("required_stems", ",".join(required_stems))
+            if missing:
+                raise RuntimeError(
+                    f"free-DOF necessity: required famil(ies) {missing} read fully "
+                    f"defined -- that freed DOF is pinned. Under-constrained: "
+                    f"{sorted(under)}"
+                )
         _telemetry.success(
             f"{len(under)} under-constrained component(s) >= {expected_count} expected "
             "free DOF (necessity; sufficiency proven in the release preflight)"

@@ -1,0 +1,6 @@
+cone-pivot-screw:
+  number: MHA-094
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: "machined (steel, bright)"

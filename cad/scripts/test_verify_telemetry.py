@@ -202,6 +202,14 @@ class MockModel:
     def __init__(self, name: str, n_components: int) -> None:
         self._name = name
         self._comps = [MockComponent(f"{name}-{i + 1}", self) for i in range(n_components)]
+        # The real necessity gate names one component family per freed DOF that
+        # must itself read under-constrained (required_stems -- taken from the
+        # SAME map verify passes, so the mock can't drift). Rename a few
+        # components to those families, from index 1 so the grounded "-1" seed
+        # stays fixed.
+        for j, stem in enumerate(verify._REQUIRED_FREE_STEMS.get(name, ()), start=1):
+            if j < len(self._comps):
+                self._comps[j]._name = f"{stem}-{j + 1}"
         self.InterferenceDetectionManager = MockIDM()
         # Whether the crank PARK mate is currently suppressed (free pose). Set by
         # open_model for the default-free drive-train; toggled by suppress_mate.
@@ -394,8 +402,9 @@ def test_no_per_component_dof_check_spans(monkeypatch, tmp_path):
     # no per-component flood. The exact-count closure runs in the release preflight.
     nec = _by_name(spans, "gate.dof_free_necessity")
     assert len(nec) == 1
-    assert nec[0].attributes["expected_free_dof"] == 1
-    assert nec[0].attributes["free_under_constrained"] >= 1
+    # drive-train frees the crank spin + the cone-platform swing (PR2 round 3)
+    assert nec[0].attributes["expected_free_dof"] == 2
+    assert nec[0].attributes["free_under_constrained"] >= 2
     assert nec[0].status.status_code.name == "OK"
 
 
@@ -455,8 +464,9 @@ def test_free_dof_build_gate_is_single_necessity_span_not_park_phases(monkeypatc
     assert report.failed == [], report.failed
     (gate,) = _by_name(spans, "gate.dof_free_necessity")
     assert gate.status.status_code.name == "OK"
-    assert gate.attributes["expected_free_dof"] == 1
-    assert gate.attributes["free_under_constrained"] >= 1
+    # crank spin + cone-platform swing (PR2 round 3)
+    assert gate.attributes["expected_free_dof"] == 2
+    assert gate.attributes["free_under_constrained"] >= 2
     # the old build-time park cycling / sufficiency closure is gone (preflight-only).
     assert _by_name(spans, "gate.dof_expected_free") == []
     assert _by_name(spans, "gate.park_closure") == []

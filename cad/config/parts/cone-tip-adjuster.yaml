@@ -1,0 +1,6 @@
+cone-tip-adjuster:
+  number: MHA-097
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: "machined (steel, blued)"
