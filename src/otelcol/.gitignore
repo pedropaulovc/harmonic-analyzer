@@ -1,0 +1,3 @@
+# Downloaded tool binaries + runtime logs - recreate with bootstrap.ps1.
+# Everything tracked in this folder (the *.ps1 scripts + config.yaml) is the source.
+/bin/
