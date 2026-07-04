@@ -109,10 +109,11 @@ GEAR_OWNER = "drive-train"
 # channels articulating at independent harmonics (only grounded spring/bushing
 # structure is LocalLinearPattern'd; see build_channel_assembly.py).
 CHANNEL_OWNER = "channel"
-# Physically-built channels. TEMPORARY: machine.yaml channels.active_count caps
-# the per-channel mechanism to the first N (3) for build performance; the gates
-# below (instance independence, channel gear meshes, component bands) track that N
-# so the reduced build stays fully verified. Recover by setting it back to 20.
+# Physically-built channels. machine.yaml channels.active_count is a
+# BUILD-SPEED KNOB: it caps the per-channel mechanism to the first N during
+# debugging iterations (20 = the full machine, the default); the gates below
+# (instance independence, channel gear meshes, component bands) track that N
+# so a reduced build stays fully verified at its own scale.
 CHANNELS = _config.active_count()
 # The kinematic pen driver (plan F5) lives in this sub: its pen-rod travel mate
 # is equation-linked to a CrankDeg global through the chained Fourier sum
@@ -140,7 +141,7 @@ _CRANK_GEAR_TOKENS = ("crank-pinion", "crank-drive-gear")
 # measuring-stick; the spare gear rides inside paper-drive) -- NOT the ~340
 # flattened parts. Bands measured live on a green build, with margin.
 # The channel + drive-train bands scale with the built channel count N (the
-# TEMPORARY active_count): channel = 7N + 4 (N×{rocker,rod,bar,lever,spring} + 2
+# active_count build-speed knob): channel = 7N + 4 (N×{rocker,rod,bar,lever,spring} + 2
 # shafts + 4 ball-mounts + 2 bushings per inter-channel gap), drive-train = 59 + N
 # (full 20-gear cone stack + crank/structure ≈ 33 -- including the cone swing
 # platform + tip block that joined the pivot post in the p1 swing rework -- +
@@ -250,9 +251,10 @@ def _expected_channel_ratios() -> list[tuple[int, int]]:
 
     Only the first ``active_count`` channels get a cylinder gear (hence a
     cone↔cylinder gear mate), so the live model carries that many channel meshes —
-    use the active rows, not the full 20-row table (TEMPORARY; recover at
-    active_count=20). Cone gears active_count..19 stay keyed to the shaft and mesh
-    nothing, so they contribute no gear mate to compare against.
+    use the active rows, not the full 20-row table (active_count is the
+    build-speed knob; 20 = the full machine). Cone gears active_count..19 stay
+    keyed to the shaft and mesh nothing, so they contribute no gear mate to
+    compare against.
     """
     cyl = int(_config.machine("gear_train", "fundamental_cone_teeth"))
     return sorted(_canon_ratio(ch["cone_teeth"], cyl) for ch in _config.active_channels())
