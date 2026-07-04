@@ -206,8 +206,12 @@ class MockModel:
         # Whether the crank PARK mate is currently suppressed (free pose). Set by
         # open_model for the default-free drive-train; toggled by suppress_mate.
         self._park_suppressed = False
+        # Count ForceRebuild3 calls so a test can prove the soundness suite shares
+        # ONE re-solve across the dof/over/health gates instead of rebuilding 3x.
+        self.rebuild_calls = 0
 
     def ForceRebuild3(self, _quiet: bool) -> bool:
+        self.rebuild_calls += 1
         _sleep(T_REBUILD_PER_COMP * len(self._comps))
         return True
 
@@ -354,7 +358,13 @@ def _run_soundness(names: list[str], monkeypatch, tmp_path: Path):
                 await verify._verify_static_one(adapter, name, report)
 
     asyncio.run(drive())
+    # Expose the adapter so a test can inspect the last-opened model's rebuild count.
+    global _LAST_RUN_ADAPTER
+    _LAST_RUN_ADAPTER = adapter
     return spans.get_finished_spans(), report
+
+
+_LAST_RUN_ADAPTER: "MockAdapter | None" = None
 
 
 def _by_name(spans, name: str) -> list:
@@ -454,6 +464,27 @@ def test_free_dof_build_gate_is_single_necessity_span_not_park_phases(monkeypatc
         assert _by_name(spans, phase) == [], f"{phase} should be preflight-only now"
     # drive-train being free, there is no nested strict 0-DOF closure at build.
     assert _by_name(spans, "gate.dof") == []
+
+
+def test_soundness_shares_one_rebuild_across_dof_over_health(monkeypatch, tmp_path):
+    """The dof / over-constrained / model-healthy gates share ONE ForceRebuild3 (the
+    perf fix): a fully-defined assembly's model is re-solved exactly once -- the
+    single ``verify.rebuild`` -- not three times (was ~50 s x3 on the top assembly).
+    """
+    spans, report = _run_soundness(["frame"], monkeypatch, tmp_path)  # frame => fully-defined
+    assert report.failed == [], report.failed
+    # The single shared re-solve span is emitted once for the one assembly.
+    assert len(_by_name(spans, "verify.rebuild")) == 1
+    # ... and the model itself saw exactly ONE ForceRebuild3 (dof + over + health
+    # used to each re-solve it => 3). This is the assertion that pins the fix.
+    assert _LAST_RUN_ADAPTER is not None
+    assert _LAST_RUN_ADAPTER.currentModel.rebuild_calls == 1, (
+        f"{_LAST_RUN_ADAPTER.currentModel.rebuild_calls} rebuilds -- "
+        "the gates are still re-solving redundantly"
+    )
+    # gear-ratios is DEMOTED to the release preflight, so it must NOT run in soundness.
+    assert _by_name(spans, "gate.gear_ratios") == []
+    assert _by_name(spans, "gear.read_links") == []
 
 
 # --------------------------------------------------------------------------- #

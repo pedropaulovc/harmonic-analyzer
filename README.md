@@ -63,7 +63,7 @@ Tasks are grouped by whether they need SolidWorks — the prefix tells you at a 
 | group | needs SW? | what it does |
 |-------|:---:|--------------|
 | `part:<stem>` / `assembly:<stem>` | yes | build/refresh a part or assembly |
-| `verify:soundness` / `verify:subsystems` / `verify:kinematics` | yes | DOF/interference/ratio gates · per-sub-assembly · motion-study pen sweep |
+| `verify:soundness` / `verify:kinematics` | yes | DOF/interference/health gates per (sub)assembly · motion-study pen sweep (gear-ratios verified at release preflight) |
 | `check:math` / `check:config` / `check:graph` / `check:nameplate` / `check:recipe` | **no** | Fourier math · config audit · pure-python unit tests |
 | `export` | yes | neutral STEP/STL + scene-graph export |
 | `release` | yes | Pack-and-Go + exports + diff + GitHub release (opt-in) |

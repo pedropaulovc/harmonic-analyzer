@@ -85,9 +85,10 @@ The SolidWorks-free `check:*` gates and the comparison/diff tooling run from thi
 | group | needs SolidWorks | on the COM spine |
 |-------|:---:|:---:|
 | `part:<stem>`, `assembly:<stem>` | yes | yes |
-| `verify:soundness`, `verify:subsystems`, `verify:kinematics` | yes | yes |
+| `verify:soundness`, `verify:kinematics` | yes | yes |
 | `export`, `release` | yes | yes |
 | `check:math`, `check:config`, `check:graph`, `check:nameplate`, `check:recipe`, `check:cache` | **no** | no (parallel) |
+| `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) |
 | `cache_status` | **no** | no (diagnostic) |
 | `build` (default), `build_bare` | meta | — |
 
@@ -104,8 +105,8 @@ forbidding `-n`, `dodo.py` chains every COM task into a single linear `task_dep`
 of the COM sub-DAG:
 
 ```
-part:a → … → assembly:harmonic_analyzer → verify:soundness → verify:subsystems
-        → verify:kinematics → export → release
+part:a → … → assembly:harmonic_analyzer → verify:soundness
+        → verify:kinematics → export → preflight → release
 ```
 
 So at most one COM task is ever *ready* — the seat is never contended **even
@@ -234,14 +235,24 @@ coverage test fails loud otherwise).
 
 ## Verify suites (renamed)
 
-`verify.py --suite <x>` where `<x>` ∈ {`soundness`, `subsystems`, `kinematics`,
-`math`, `config`}. `math`/`config` need no SolidWorks (wrapped as `check:*`); the
-other three open the model (wrapped as `verify:*`). Old names static/isolation/
-motion/truth and the `all` aggregate are gone.
+`verify.py --suite <x>` where `<x>` ∈ {`soundness`, `kinematics`, `math`,
+`config`}. `math`/`config` need no SolidWorks (wrapped as `check:*`); the other two
+open the model (wrapped as `verify:*`). Old names static/isolation/motion/truth,
+the `all` aggregate, and the separate `subsystems` suite are gone.
 
 `soundness` opens EVERY built (sub)assembly standalone and runs the shared health
-battery on each (DOF / over-constrained / model-healthy-deep / interference /
-gear-ratios / component-count). The **DOF gate adapts to how the model was built**
+battery on each: **one shared re-solve** (`verify.rebuild`) after open, then DOF /
+over-constrained / model-healthy-deep / interference reading that resolved model
+(the three gates that each used to `ForceRebuild3` now share one — `resolve=False`;
+model-healthy gets the shared rebuild's result). Three former members left the
+every-build battery: **gear-ratios** is DEMOTED to the release preflight (it was ~50%
+of a run and re-proves a property the tooth-count config already fixes, which
+`check:math` validates analytically); **channel-independence** (the retired
+`subsystems` suite's one unique gate) is FOLDED IN — soundness already opens
+`channel`, so it runs there; and **component-count is REMOVED** (every failure it
+ever raised was a stale band or a gate bug, never a real regression — `_COMPONENT_BAND`
+stays as reference data). The **DOF gate adapts
+to how the model was built**
 (see "Default-free DOF" below): an assembly with an expected free operational DOF
 (drive-train + channel, when built `free`) is checked by the **necessity gate**
 (`assert_free_dof_necessity`) — assert at least the expected number of top-level
@@ -253,12 +264,13 @@ nothing to re-engage, so the exact-count **SUFFICIENCY** proof (author the drive
 `assert_park_closure`), which replays the recorded specs then discards the model
 unsaved. Every assembly with nothing parked-free (the default for all others, and
 either built `locked`) gets the strict 0-DOF check, unchanged. All NON-DOF gates
-always run on the as-built model. `subsystems` runs ONLY the subsystem-SPECIFIC gate
-soundness doesn't — currently just the `channel` assembly's 20-way moving-stem
-instance independence — so it opens only `channel`. (It used to re-open all 8 and
-repeat the whole battery, ~95% duplicate COM work and the biggest spine time sink;
-see `memory/release-perf-incremental.md`.) soundness runs first on the COM spine, so
-the shared battery is always proven before subsystems.
+always run on the as-built model. gear-ratios runs at release only, in
+`preflight_release.py`, on the reopened `drive-train` + `channel` (the only
+assemblies carrying real gear meshes) BEFORE `assert_park_closure` mutates the model.
+(History: `subsystems` used to re-open all 8 and repeat the whole battery — ~95%
+duplicate COM work — then was trimmed to only `channel`-independence, and is now
+folded into soundness entirely; see `memory/release-perf-incremental.md` and
+`memory/checks-perf-value-audit.md`.)
 
 ## Default-free DOF (operational kinematics)
 
