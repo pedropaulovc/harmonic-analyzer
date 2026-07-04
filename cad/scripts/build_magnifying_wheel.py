@@ -67,13 +67,13 @@ SPOKE_OVERLAP = 1.0  # spokes bite into hub and rim so the bodies merge
 
 # --- WIRE-1 yoke point (the coupling mate's wheel-side geometry) --------------
 # ``WireYokePoint``: a reference point on the hub PITCH circle (groove radius +
-# wire radius) at the hub-wire's tangency azimuth, in the wheel mid-plane. The
-# magnifier assembly holds it COINCIDENT to the hub-wire's YokePlane, tying the
+# wire radius) at the lever-wire's tangency azimuth, in the wheel mid-plane. The
+# magnifier assembly holds it COINCIDENT to the lever-wire's YokePlane, tying the
 # wheel's spin to the lever group's travel along the wire (the linearized
-# inextensible-wire constraint -- see build_hub_wire's docstring). The azimuth
-# is layout-derived, so it is imported from build_hub_wire: a layout move
+# inextensible-wire constraint -- see build_lever_wire's docstring). The azimuth
+# is layout-derived, so it is imported from build_lever_wire: a layout move
 # re-tangents the wire AND re-stamps this point in one rebuild.
-from build_hub_wire import (  # noqa: E402
+from build_lever_wire import (  # noqa: E402
     WHEEL_BAR_Y as _YOKE_WHEEL_Y,
     WHEEL_X as _YOKE_WHEEL_X,
     YOKE_POINT as _YOKE_POINT,

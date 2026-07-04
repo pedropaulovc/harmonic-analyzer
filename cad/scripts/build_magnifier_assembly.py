@@ -16,7 +16,7 @@ in machine coordinates (assembly origin = base origin; the output side is -Z).
   hanger) + its column-clamp + pinch screw.
 * wheel-axle (structure) carrying the magnifying-wheel, which spins on its stud
   (revolute); the wheel rim drives the pen rod via WIRE 2 (pen.SLDASM).
-* hub-wire -- WIRE 1's straight rest-pose run from the output fixture's cross
+* lever-wire -- WIRE 1's straight rest-pose run from the output fixture's cross
   hole down to the hub-groove tangent. It ARTICULATES like the real wire: a
   ball joint at the hook (HookPoint on the wire coincident to the fixture's
   HookAnchorPoint) plus a 0.25 face-face stand-off tangency to the hub drum,
@@ -37,7 +37,7 @@ Documented simplifications (Appendix C): the magnifying clamp's thumb screw is
 modeled backed-out (the tip is tangent to the lever rod -- a seated screw would
 overlap it); the output fixture's clamp screw is omitted (its cross hole doubles
 as the wire hook); the wires are modeled as straight rest-pose rods only
-(hub-wire here, pen-wire in pen.SLDASM) -- hub/rim wraps, hooks and compliance
+(lever-wire here, pen-wire in pen.SLDASM) -- hub/rim wraps, hooks and compliance
 are not, and the kinematic couplings stay Motion-study mates
 (docs/motion-policy.md), so each run stands 0.25 off its wheel surface.
 
@@ -94,7 +94,7 @@ ASM_NAME = "magnifier"
 # Build mode (cad/config/machine/build_lock.yaml). `free` (default) leaves the
 # lever rock -- the sub's single operational DOF -- UNLOCKED: its park driver is
 # DEFERRED (recorded, not authored), so the saved model is a working kinematic
-# chain: drag the lever and the clamp/rod/fixture/hub-wire group swings while
+# chain: drag the lever and the clamp/rod/fixture/lever-wire group swings while
 # the WIRE-1 yoke mate turns the magnifying wheel with it. `locked` authors the
 # park driver engaged (the yoke then pins the wheel off the pinned lever) for a
 # fully-defined reproducible snapshot. The literal accessor tokenises to
@@ -120,7 +120,7 @@ LEVER_ROD_Y = 990.0
 # the thumb-screw head (top y 1010, pokes above the top-frame ring bottom
 # 999.7) must clear the ring's front rail z -101..-123 (=> <= -128.25), the
 # lever rod must clear the front column surface -124.7 (=> <= -127.95), and
-# the hub-wire's rim-duck route caps the hook at ~-137.96 (=> >= -128.31).
+# the lever-wire's rim-duck route caps the hook at ~-137.96 (=> >= -128.31).
 # VROD_Z = -134.8 (clamp's 6.5 skew bore); wire hook -137.95; the bracket arm
 # reaches back to the unchanged plate flange (build_magnifying_bracket).
 LEVER_ROD_Z = -128.3
@@ -150,7 +150,7 @@ CLAMP_POS = (
     LEVER_ROD_Y - CLAMP_BORE_Y,
     LEVER_ROD_Z,
 )
-VROD_Z = LEVER_ROD_Z - CLAMP_ROD_DX  # -91.5 (local +x -> machine -z)
+VROD_Z = LEVER_ROD_Z - CLAMP_ROD_DX  # -134.8 (local +x -> machine -z)
 VROD_TOP_Y = LEVER_ROD_Y + 5.0  # dome inside the clamp's rod bore (rides the rod)
 FIXTURE_Y0 = 926.0  # collar y 926..934 on the vertical rod
 
@@ -163,10 +163,10 @@ WHEEL_MID_Z = BAR_FRONT_Z - FLANGE_LEN - (STUD_LEN - 4.0) / 2.0  # -146.9:
 # the 10-wide hub sits flush between the flange face and the tip collar
 
 # --- amplification wire 1 (fixture -> hub) -----------------------------------
-# Endpoints + length live in build_hub_wire.py (the part's length IS the run);
+# Endpoints + length live in build_lever_wire.py (the part's length IS the run);
 # re-derive the anchors from THIS script's layout and fail loud on drift, so a
 # layout move can never leave a floating wire.
-from build_hub_wire import (  # noqa: E402
+from build_lever_wire import (  # noqa: E402
     CLEARANCE as WIRE_CLEARANCE,
     WIRE_DIA as HUB_WIRE_DIA,
     WIRE_END as HUB_WIRE_END,
@@ -185,23 +185,23 @@ _HOOK_EXPECTED = (
 assert all(
     math.isclose(a, b, abs_tol=1e-9)
     for a, b in zip(HUB_WIRE_START, _HOOK_EXPECTED, strict=True)
-), f"hub-wire hook {HUB_WIRE_START} drifted from the fixture anchor {_HOOK_EXPECTED}"
+), f"lever-wire hook {HUB_WIRE_START} drifted from the fixture anchor {_HOOK_EXPECTED}"
 # The run grazes the hub groove at the 0.25 stand-off tangent ...
 assert math.isclose(
     math.hypot(HUB_WIRE_END[0] - WHEEL_X, HUB_WIRE_END[1] - WHEEL_BAR_Y),
     HUB_DIA / 2.0 + HUB_WIRE_DIA / 2.0 + WIRE_CLEARANCE,
     abs_tol=1e-9,
-), "hub-wire end is not tangent to the hub groove"
+), "lever-wire end is not tangent to the hub groove"
 # ... inside the clear axial lane between the axle flange back face and the
 # spoke front faces (else the slanted run clips the flange or a spoke).
 assert (
     BAR_FRONT_Z - FLANGE_LEN
     > HUB_WIRE_END[2]
     > WHEEL_MID_Z + SPOKE_AXIAL / 2.0 + HUB_WIRE_DIA / 2.0
-), "hub-wire end z outside the flange..spoke clear lane"
+), "lever-wire end z outside the flange..spoke clear lane"
 
 
-def _hub_wire_rows() -> list[list[float]]:
+def _lever_wire_rows() -> list[list[float]]:
     """Rotation rows turning the part's +Y (wire axis) onto the HUB->HOOK
     direction (the part origin is the hub end -- its Top/YokePlane sit at the
     tangency); X' is the horizontal perpendicular, Z' = X' x Y' (proper)."""
@@ -226,7 +226,7 @@ def _hub_wire_rows() -> list[list[float]]:
 # (caught live: "Failed to select mate entity 1 (FACE at ...)" on re-add).
 # The two rest angles feed the wire's swing/spin park drivers (plane-plane
 # angles from the placed rows; mirror flips only x-components, |.| absorbs).
-_HW_ROWS = _hub_wire_rows()
+_HW_ROWS = _lever_wire_rows()
 _STANDOFF_R = HUB_DIA / 2.0 + HUB_WIRE_DIA / 2.0 + WIRE_CLEARANCE  # 10.65
 _WIRE_FRONT_ANGLE = math.degrees(math.acos(min(1.0, abs(_HW_ROWS[2][2]))))
 _WIRE_RIGHT_ANGLE = math.degrees(math.acos(min(1.0, abs(_HW_ROWS[0][0]))))
@@ -351,7 +351,7 @@ async def build(adapter) -> dict[str, str]:
     # grazes the hub-groove tangent (the wrap is implied -- module docstring).
     # Locked to the output fixture so it rides the lever group, like the rest
     # of the clamped chain. Part origin = the HUB end, +Y toward the hook.
-    hw = await place_component(adapter, "hub-wire", list(HUB_WIRE_END),
+    hw = await place_component(adapter, "lever-wire", list(HUB_WIRE_END),
                                euler_from_rows(_HW_ROWS), _HW_ROWS, ground=False)
     hw_o = component_origin(adapter, hw)
     # The wire ARTICULATES instead of riding the lever group rigidly (a locked
@@ -365,29 +365,29 @@ async def build(adapter) -> dict[str, str]:
     # -- they do not resolve through name@comp strings.
     await coincident_mate(adapter, component_named_ref(hw, "HookPoint", "POINT"),
                           component_named_ref(fixture, "HookAnchorPoint", "POINT"),
-                          label="hub-wire hook ball joint", verify=(hw, hw_o))
+                          label="lever-wire hook ball joint", verify=(hw, hw_o))
     await distance_driver(
         adapter, component_named_ref(hw, "Axis1", "AXIS"),
         component_named_ref(wh, "Axis1", "AXIS"), _STANDOFF_R,
-        label="hub-wire hub stand-off tangency", verify=(hw, hw_o))
+        label="lever-wire hub stand-off tangency", verify=(hw, hw_o))
     # The wire's two residual DOF (swing across the tangency family + spin
     # about its own axis) are freed operational DOF: park drivers DEFERRED in
     # `free` builds, authored engaged in `locked`/preflight for the closure.
     await angle_driver(adapter, named_ref(f"Front Plane@{hw}", "PLANE"),
                        named_ref("Front Plane", "PLANE"), _WIRE_FRONT_ANGLE,
-                       label="hub-wire swing PARK driver (freed in default build)",
+                       label="lever-wire swing PARK driver (freed in default build)",
                        verify=(hw, hw_o), free_dof_key="wire_swing")
     await angle_driver(adapter, named_ref(f"Right Plane@{hw}", "PLANE"),
                        named_ref("Right Plane", "PLANE"), _WIRE_RIGHT_ANGLE,
-                       label="hub-wire spin PARK driver (freed in default build)",
+                       label="lever-wire spin PARK driver (freed in default build)",
                        verify=(hw, hw_o), free_dof_key="wire_spin")
 
     # WIRE-1 coupling (replaces the old wheel rock snapshot): the wheel's
     # WireYokePoint (hub pitch circle @ the wire tangency) held coincident to
-    # the hub-wire's YokePlane (perpendicular to the wire axis). The wheel's
+    # the lever-wire's YokePlane (perpendicular to the wire axis). The wheel's
     # spin -- its one remaining DOF -- is thereby tied to the lever group's
     # travel along the wire: the linearized inextensible-wire constraint, sign
-    # and ratio from geometry (build_hub_wire docstring). In the free build,
+    # and ratio from geometry (build_lever_wire docstring). In the free build,
     # dragging the lever turns the wheel; in a locked build the engaged lever
     # park pins the whole chain. The mate is residual-free at the rest pose, so
     # the wheel must NOT move when it solves -- asserted right after.
@@ -419,7 +419,7 @@ async def build(adapter) -> dict[str, str]:
         # must also read under-constrained WITH them, else the coupling died.
         assert_free_dof_necessity(
             adapter, 3,
-            required_stems=("magnifying-lever", "magnifying-wheel", "hub-wire"))
+            required_stems=("magnifying-lever", "magnifying-wheel", "lever-wire"))
     write_park_specs(ASM_NAME)
     check_no_interference(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)

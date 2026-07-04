@@ -51,12 +51,12 @@ ROD_BORE_DIA = 5.2  # Ø5 vertical rod + clearance
 CROSS_HOLE_DIA = 3.0  # clamp screw / wire hook
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > any extent crossed
 
-# HookAnchorPoint: where the hub-wire's hook BALL JOINT grabs the fixture.
+# HookAnchorPoint: where the lever-wire's hook BALL JOINT grabs the fixture.
 # The wire ties through the cross hole and hangs just UNDER the collar's
 # bottom face (wire r 0.4 + 0.25 clearance = 0.65 below it) on the front face
 # of the vertical rod (rod r 2.5 + wire r 0.4 + 0.25 = 3.15 off the rod axis
 # in local -z).
-# build_hub_wire.HOOK_Y/HOOK_Z anchor the same spot in machine coords;
+# build_lever_wire.HOOK_Y/HOOK_Z anchor the same spot in machine coords;
 # build_magnifier_assembly asserts the two agree. Local x = 0, so the point
 # is invariant under the machine-chirality mirror (no double-flip trap).
 HOOK_ANCHOR_LOCAL = (0.0, -0.65, -3.15)
@@ -166,7 +166,7 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven output fixture (equations neutral)", v_final, 30.0)
 
-    # HookAnchorPoint: the hub-wire ball joint's fixture-side anchor (see
+    # HookAnchorPoint: the lever-wire ball joint's fixture-side anchor (see
     # HOOK_ANCHOR_LOCAL). No adapter writer exists for a free-XYZ reference
     # point, so: blanked offset plane -> hidden sketch point (inference off,
     # exact coords) -> InsertReferencePoint(swRefPointSketchPoint = 7) ->

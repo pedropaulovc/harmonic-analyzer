@@ -1,6 +1,6 @@
 ---
 name: amplification-wires
-description: The two magnifying-wheel wires — now modeled as straight rest-pose rods (hub-wire/pen-wire) — and how the Motion study (Phase F) models their couplings
+description: The two magnifying-wheel wires — now modeled as straight rest-pose rods (lever-wire/pen-wire) — and how the Motion study (Phase F) models their couplings
 metadata: 
   node_type: memory
   type: project
@@ -31,7 +31,7 @@ bug):** LEVER_ROD_Z −128.3 — the ONLY depth window (thumb-screw head vs
 top-frame ring rail z −101..−123 needs ≤ −128.25; lever rod vs front column
 surface −124.7 needs ≤ −127.95; the wire's rim-duck feasibility caps the hook
 at ~−137.96 → ≥ −128.31); VROD_Z −134.8; bracket arm lengthened to machine
-−124.3..−70 (plate flange band unchanged). `hub-wire` (MHA-099) runs from the
+−124.3..−70 (plate flange band unchanged). `lever-wire` (MHA-099) runs from the
 hook (−150, 925.35, −137.95 — tied under the fixture collar bottom, beside
 the rod's front face at rod r + wire r + 0.25) to the hub-pitch tangency at
 z −142.77, a 0.74° lean: a PERFECTLY planar wire is IMPOSSIBLE (the rim ring
@@ -46,14 +46,14 @@ travel) is the vertical drop off the rim's 3-o'clock tangent (x −2.35 = wheel
 in FRONT of the rod face (z −146.9 vs −149). Hub/rim WRAPS, hooks/tie-offs and
 compliance are still NOT modeled; every run stands ≥0.25 off its neighbours
 (offline clearance probe covers hub/flange/stud/rim/spokes/collar/rod/bar).
-Endpoint math lives in the part scripts (build_hub_wire/build_pen_wire); the
+Endpoint math lives in the part scripts (build_lever_wire/build_pen_wire); the
 assemblies import + assert it against their layout anchors (fail loud on
 drift). No MIRROR_PLANE entry needed — a straight Y-cylinder rides the
 default "x" bbox path (avoids re-keying all 8 assemblies via _transforms).
 
 **WIRE 1 IS NOW A LIVE, BOOK-TRUE COUPLING in the saved magnifier (2026-07-04).**
 magnifier joined build_lock `free` with THREE freed DOF (necessity gate stems
-magnifying-lever + magnifying-wheel + hub-wire; 7 chain components read free;
+magnifying-lever + magnifying-wheel + lever-wire; 7 chain components read free;
 closure in preflight — `FREE_ASSEMBLIES` includes magnifier):
 
 1. **Lever knife-rock** (deferred `free_dof_key="lever_rock"`): the lever does
@@ -78,7 +78,7 @@ closure in preflight — `FREE_ASSEMBLIES` includes magnifier):
 The wheel is COUPLED (no DOF of its own) by the **WIRE-1 yoke**: `WireYokePoint`
 (hub pitch r10.4 at the tangency azimuth, from a hidden sketch point via
 raw-COM `InsertReferencePoint(swRefPointSketchPoint=7)`, drift-asserted)
-COINCIDENT to the hub-wire's `YokePlane` (offset ref plane ⊥ wire axis; part
+COINCIDENT to the lever-wire's `YokePlane` (offset ref plane ⊥ wire axis; part
 origin at the HUB end). VALIDATED by the new `verify:kinematics` live-chain
 gates (chain:magnifier:{wire-rides-hub, hook-ball-holds, coupling-alive,
 restores-to-rest} — replay ONLY lever_rock, sweep 0..1°, close unsaved):
