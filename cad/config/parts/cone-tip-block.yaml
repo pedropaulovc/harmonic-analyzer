@@ -1,0 +1,5 @@
+cone-tip-block:
+  number: MHA-092
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  process: "machined (steel)"

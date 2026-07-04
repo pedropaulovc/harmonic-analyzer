@@ -351,6 +351,10 @@ cad/out/*.mp4
 # doit build-graph hash database (DOIT_CONFIG dep_file, json backend)
 cad/out/.doit.db*
 
+# Per-PR pre-merge inspection snapshots (self-contained SLDPRT/SLDASM copies
+# saved per stacked PR so the model can be eyeballed in SolidWorks before merge)
+cad/out/inspection/
+
 # Downloaded release bundles (gh release download); large binaries, never
 # committed — the release on GitHub is the snapshot.
 download/
