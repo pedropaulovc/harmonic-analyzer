@@ -1,0 +1,5 @@
+pinion-cam:
+  number: MHA-104
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  process: "machined (steel)"
