@@ -858,20 +858,28 @@ async def _key_to_shaft(
     )
 
 
-async def _seat_on_crank(adapter, part, part_axis, crank_axis) -> list[float]:
+async def _seat_on_crank(
+        adapter, part, part_axis, crank_axis, crankshaft, cs_z) -> list[float]:
     """Journal a crank-chain part on the crankshaft via SEMANTIC mates: coaxial
     on the crank axis + an axial seat (the part's Z-normal Front plane to the
-    assembly Front plane, distance read live). Leaves ONLY spin -- the caller
-    pins it with a per-part anti-spin. Returns the part's live origin."""
+    CRANKSHAFT's Top plane -- its axial datum -- distance read live). The seat
+    must reference the crankshaft, NOT a world datum: a plane-plane distance
+    forces the planes parallel, so seating against the assembly Front plane
+    pins the crank axis to machine z and through it the whole p1 swing (the
+    platform reads fully defined -- caught by drive-train:dof-free-necessity).
+    Leaves ONLY spin -- the caller pins it with a per-part anti-spin. Returns
+    the part's live origin."""
     o = _org(adapter, part)
     await coincident_mate(
         adapter, named_ref(f"{part_axis}@{part}", "AXIS"), crank_axis,
         label=f"{part} coaxial on crank", verify=(part, o),
     )
+    d_seat = abs(o[2] - cs_z)
     await distance_driver(
         adapter, named_ref(f"Front Plane@{part}", "PLANE"),
-        named_ref("Front Plane", "PLANE"), abs(o[2]),
-        label=f"{part} axial seat d={abs(o[2]):.2f}", verify=(part, o),
+        named_ref(f"Top Plane@{crankshaft}", "PLANE"), d_seat,
+        label=f"{part} axial seat d={d_seat:.2f} (on the crankshaft)",
+        verify=(part, o),
     )
     return o
 
@@ -1196,7 +1204,8 @@ async def build(adapter) -> dict[str, str]:
 
     # T12 chain wheel (IDENTITY): its Right plane is parallel to the crankshaft's
     # at the keyed phase, so a parallel pins the spin (no tuned angle).
-    rm_o = await _seat_on_crank(adapter, removable, "Axis1", crank_axis)
+    rm_o = await _seat_on_crank(
+        adapter, removable, "Axis1", crank_axis, crankshaft, cs_o[2])
     await parallel_mate(
         adapter, named_ref(f"Right Plane@{removable}", "PLANE"), cs_right,
         label="T12 wheel anti-spin (keyed phase)", verify=(removable, rm_o),
@@ -1207,7 +1216,8 @@ async def build(adapter) -> dict[str, str]:
     # live dihedral between its Right plane and the crankshaft's (~11.25 deg). The
     # pinion origin sits ON the spin axis (flip-recovery can't read it), so a
     # wrong side surfaces as tooth interference, not a silent miss.
-    pn_o = await _seat_on_crank(adapter, pinion, "Axis2", crank_axis)
+    pn_o = await _seat_on_crank(
+        adapter, pinion, "Axis2", crank_axis, crankshaft, cs_o[2])
     a_pn = component_transform(adapter, pinion)
     a_cs = component_transform(adapter, crankshaft)
     pin_phase = math.degrees(
@@ -1222,7 +1232,8 @@ async def build(adapter) -> dict[str, str]:
     # Crank arm (rest pose -Y, rot_z -90): its Top plane is parallel to the
     # crankshaft's Right at the keyed phase. The crank angle driver below pins the
     # arm -- hence the whole keyed chain -- to the assembly.
-    arm_o = await _seat_on_crank(adapter, arm, "Axis1", crank_axis)
+    arm_o = await _seat_on_crank(
+        adapter, arm, "Axis1", crank_axis, crankshaft, cs_o[2])
     await parallel_mate(
         adapter, named_ref(f"Top Plane@{arm}", "PLANE"), cs_right,
         label="crank-arm anti-spin (keyed phase)", verify=(arm, arm_o),
