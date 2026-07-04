@@ -374,7 +374,7 @@ class SketchDims:
         helper's emission ever drifts from what it recorded, instead of silently
         mis-naming."""
         feat = _feature_by_name(adapter, feature_name)
-        actual = len(list(_display_dimensions(feat)))
+        actual = len(list(_display_dimensions(feat, feature_name)))
         if actual != len(self._rows):
             raise RuntimeError(
                 f"{feature_name}: recorded {len(self._rows)} dims but the feature "
@@ -1296,9 +1296,16 @@ def name_last_feature(adapter: Any, name: str) -> str:
     return name
 
 
-def _display_dimensions(feat: Any):
-    """Yield the IDimension of each display dimension owned by ``feat``, in
+def _display_dimensions(feat: Any, owner: str | None = None):
+    """Yield the IDimension of each display dimension of ``feat``, in
     creation order.
+
+    ``owner`` filters to dims whose ``FullName`` names that feature as the
+    owning one (the middle ``@`` segment). A sketch created on a REFERENCE
+    PLANE also enumerates the plane's own offset dim FIRST
+    (``D1@<plane>@...``), which would shift positional renaming and trip the
+    recorded-count guard -- proven live on cone-pivot-screw's HeadTop driver
+    slot. Pass the feature's (post-rename) name to see only its own dims.
 
     NO method flagging -- ``_FlagAsMethod`` mutates the gen_py type-shared
     dispatch repr, so flagging one ``IFeature`` instance flips ``GetTypeName2``
@@ -1314,8 +1321,15 @@ def _display_dimensions(feat: Any):
         if not disp:
             return
         idim = disp.GetDimension2(0)
-        yield idim
+        if owner is None or _dim_owner_feature(idim) == owner:
+            yield idim
         disp = feat.GetNextDisplayDimension(disp)
+
+
+def _dim_owner_feature(idim: Any) -> str:
+    """The owning feature's name from a dim's ``FullName`` (``D1@Sketch1@Part``)."""
+    parts = str(_read_member(idim, "FullName")).split("@")
+    return parts[1] if len(parts) > 1 else ""
 
 
 def _dim_value_mm(idim: Any) -> float:
@@ -1350,7 +1364,7 @@ def name_dimensions(adapter: Any, feature_name: str, names: list[str | None]) ->
     sketch's dimensioning ever changes, cross-check against
     :func:`dump_dimensions`. Returns the new ``leaf@feature`` names."""
     feat = _feature_by_name(adapter, feature_name)
-    dims = list(_display_dimensions(feat))
+    dims = list(_display_dimensions(feat, feature_name))
     if len(names) > len(dims):
         raise RuntimeError(
             f"name_dimensions {feature_name}: {len(names)} names for "
