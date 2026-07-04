@@ -139,16 +139,19 @@ _CRANK_GEAR_TOKENS = ("crank-pinion", "crank-drive-gear")
 # flattened parts. Bands measured live on a green build, with margin.
 # The channel + drive-train bands scale with the built channel count N (the
 # TEMPORARY active_count): channel = 7N + 4 (N×{rocker,rod,bar,lever,spring} + 2
-# shafts + 4 ball-mounts + 2 bushings per inter-channel gap), drive-train = 42 + N
+# shafts + 4 ball-mounts + 2 bushings per inter-channel gap), drive-train = 47 + N
 # (full 20-gear cone stack + crank/structure ≈ 34 -- including the cone swing
 # platform + tip block that joined the pivot post in the p1 swing rework -- +
 # the restored ch25 pinion swing rig's 8: alignment-pinion, 2 brackets, 2
-# pivot blocks, pivot shaft, lift rod, handle, plus N cylinder gears). Both
-# reproduce the measured N=20 bands (164, 62) and stay correct at N=3.
+# pivot blocks, pivot shaft, lift rod, handle, + the PR2 cone-swing hardware
+# 6: lock knob, pivot screw, swing-stop screw, tip bushing/adjuster/pinch
+# screw, MINUS the crank-pedestal the merged column absorbed, plus N cylinder
+# gears). Both reproduce the measured N=20 bands (164, 62 pre-PR2 -> 67) and
+# stay correct at N=3.
 _N_CH = _config.active_count()
 _COMPONENT_BAND = {
     "frame": (11, 16),          # measured 13 (9 structure + 4 lag-screw hold-downs)
-    "drive-train": (42 + _N_CH - 4, 42 + _N_CH + 4),  # N=20 -> (58,66), measured 62
+    "drive-train": (47 + _N_CH - 4, 47 + _N_CH + 4),  # N=20 -> (63,71), expected 67
     "channel": (8 * _N_CH + 4 - 6, 8 * _N_CH + 4 + 6),  # N=20 -> (158,170), measured 164
     # The former monolithic output split by function (no per-channel parts here);
     # bands tightened to the measured green-build counts (verify:subsystems).
