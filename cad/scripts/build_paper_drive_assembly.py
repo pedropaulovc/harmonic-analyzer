@@ -93,11 +93,11 @@ from _assembly import (
     assert_component_placed,
     assert_components_fully_defined,
     check_no_interference,
+    coincident_mate,
     component_names,
     component_origin,
     component_transform,
     distance_driver,
-    lock_mate,
     named_ref,
     part_path,
     place_component,
@@ -320,8 +320,16 @@ async def _insert_roller_chain(adapter) -> None:
         part = "chain-inner-link" if station % 2 == 0 else "chain-outer-link"
         name, _rows = await _place_chain_link(adapter, part, station)
         placed.append(name)
-    # Fix every link (explicitly placed, so fully constrained). The first
-    # assembly component is auto-fixed; fixing again is idempotent.
+    # Fix every link. Unlike the rest of the assembly (datum-located now, not
+    # fixed -- the #110 cleanup), the chain stays fixed: it is a closed loop of
+    # LINK_COUNT links at arbitrary loop-tangent rotations (link0 ~34 deg off
+    # axis, 9 links >40 deg), and a plane-distance datum-locate forces the part
+    # parallel to the datum -- which would snap each link to an axis and destroy
+    # the chain's per-link articulation. A per-link angle+axis scheme is 280
+    # mates plus a closed-loop over-constraint, so an explicit fix is the
+    # documented last resort here (the chain also breaks the kinematic path, so
+    # it is never driven). The first assembly component is auto-fixed; fixing
+    # again is idempotent.
     for name in placed:
         check(f"fix {name}", await adapter.fix_component(ComponentRefParameters(name=name)))
 
@@ -368,6 +376,63 @@ async def _insert_roller_chain(adapter) -> None:
     )
 
 
+def _plane_normals_and_origin(adapter, name: str):
+    """World normals of a component's (Right, Top, Front) planes + its origin
+    (mm). Transform2 is row-major (`world = local.R`), so the world normal of
+    the plane whose local normal is local axis i is row i."""
+    a = component_transform(adapter, name)
+    rows = [(a[0], a[1], a[2]), (a[3], a[4], a[5]), (a[6], a[7], a[8])]
+    org = [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
+    return rows, org
+
+
+async def _locate_to_datum(adapter, name: str, *, base: str | None = None) -> None:
+    """Locate a part by three orthogonal plane-distance mates -- the semantic
+    replacement for a fix (#110 idiom) or a rigid-ride lock. Orientation-
+    agnostic: each principal plane is paired to the base plane whose world normal
+    is most parallel, and the perpendicular distance is the origin offset
+    projected onto that normal.
+
+    Valid only for parts whose planes are (near-)parallel to the base planes --
+    i.e. rotations that are multiples of 90 deg. A part at an arbitrary angle
+    (the -10.22 deg latch, the 70 chain links at loop tangents) cannot be
+    plane-located: the parallelism a plane-distance mate forces would re-orient
+    it, so those stay fixed (documented last resort).
+
+    ``base=None`` -> machine datum planes (free-space grounded part).
+    ``base=<component>`` -> that component's planes, rigidly tying this part to
+    the base's (possibly moving) frame -- a lock replacement; part-to-part
+    references keep the mates hard, not suppressible drivers.
+    """
+    planes = ("Right Plane", "Top Plane", "Front Plane")
+    part_n, o = _plane_normals_and_origin(adapter, name)
+    if base is not None:
+        base_n, ref0 = _plane_normals_and_origin(adapter, base)
+    else:
+        base_n = [(1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)]
+        ref0 = [0.0, 0.0, 0.0]
+    delta = [o[i] - ref0[i] for i in range(3)]
+    suffix = f"@{base}" if base is not None else ""
+    used: set[int] = set()
+    for li, part_plane in enumerate(planes):
+        n = part_n[li]
+        bi = max((j for j in range(3) if j not in used),
+                 key=lambda j: abs(sum(n[k] * base_n[j][k] for k in range(3))))
+        used.add(bi)
+        bn = base_n[bi]
+        coord = sum(delta[k] * bn[k] for k in range(3))
+        part_ref = named_ref(f"{part_plane}@{name}", "PLANE")
+        base_ref = named_ref(f"{planes[bi]}{suffix}", "PLANE")
+        tag = f"{part_plane.split()[0]}->{planes[bi].split()[0]}{suffix}"
+        if abs(coord) < 1e-6:
+            await coincident_mate(adapter, part_ref, base_ref,
+                                  label=f"{name} datum {tag}=0", verify=(name, o))
+            continue
+        await distance_driver(adapter, part_ref, base_ref, abs(coord),
+                              label=f"{name} datum {tag} d={abs(coord):.2f}",
+                              verify=(name, o))
+
+
 async def build(adapter) -> dict[str, str]:
     _assert_rack_mesh()
     _assert_knob_shaft_clearance()
@@ -378,14 +443,25 @@ async def build(adapter) -> dict[str, str]:
     # --- support rails + clamps ----------------------------------------------
     # The top-rail support-bar is FIRST so the auto-fixed seed is structure,
     # not the mated platen.
+    # support-bar (top-rail) is FIRST -> auto-fixed seed; everything else is
+    # datum-located, not fixed (the #110 cleanup).
+    seed_done = False
     for label, bar_y in (("top-rail", TOP_RAIL_Y), ("bot-rail", BOT_RAIL_Y)):
-        await place_component(adapter, "support-bar", [0.0, bar_y, BAR_Z],
-                              [0.0, 0.0, 0.0], IDENTITY, label=f"support-bar ({label})")
+        bar = await place_component(
+            adapter, "support-bar", [0.0, bar_y, BAR_Z], [0.0, 0.0, 0.0], IDENTITY,
+            ground=False,
+            label=f"support-bar ({label}{', seed' if not seed_done else ''})")
+        if not seed_done:
+            seed_done = True  # first insert auto-fixes; leave it as the seed
+        else:
+            await _locate_to_datum(adapter, bar)
         for sx in (-1.0, 1.0):
             # Ry(+90): the clamp's front channel (local +X) faces -Z.
-            await place_component(adapter, "column-clamp", [sx * COLUMN_X, bar_y, COLUMN_Z],
-                                  [0.0, 90.0, 0.0], ROT_Y_POS90,
-                                  label=f"column-clamp ({label} x{sx * COLUMN_X:+.0f})")
+            clamp = await place_component(adapter, "column-clamp",
+                                          [sx * COLUMN_X, bar_y, COLUMN_Z],
+                                          [0.0, 90.0, 0.0], ROT_Y_POS90, ground=False,
+                                          label=f"column-clamp ({label} x{sx * COLUMN_X:+.0f})")
+            await _locate_to_datum(adapter, clamp)
 
     # --- platen group ---------------------------------------------------------
     # The platen runs as a prismatic slider along X (the paper feed): its local
@@ -417,40 +493,46 @@ async def build(adapter) -> dict[str, str]:
     rack = await place_component(adapter, "platen-rack",
                                  [RACK_X0, RACK_Y0, BAR_FRONT_Z],
                                  [0.0, 0.0, 180.0], rot_z_rows(180.0), ground=False)
-    await lock_mate(adapter, named_ref(f"Front Plane@{rack}", "PLANE"),
-                    named_ref(f"Front Plane@{platen}", "PLANE"),
-                    label="platen-rack locked to platen")
+    await _locate_to_datum(adapter, rack, base=platen)
     for dx in CLIP_FRONT_DX:
         # Rz(+90): the clip strip stands vertical on the paper face.
         clip = await place_component(adapter, "platen-clip",
                                      [PLATE_X0 + dx, CLIP_Y0, PLATE_FRONT_Z - 1.2],
                                      [0.0, 0.0, 90.0], rot_z_rows(90.0), ground=False,
                                      label=f"platen-clip x{PLATE_X0 + dx:+.0f}")
-        await lock_mate(adapter, named_ref(f"Front Plane@{clip}", "PLANE"),
-                        named_ref(f"Front Plane@{platen}", "PLANE"),
-                        label=f"platen-clip x{PLATE_X0 + dx:+.0f} locked to platen")
+        await _locate_to_datum(adapter, clip, base=platen)
     # Recording paper on the platen front face (ch30 p002/p003/p009): 0.5
     # proud of the platen, 2.25 clear of each clip band, 6 top/bottom margin.
     paper = await place_component(adapter, "platen-paper",
                                   [PLATE_X0 + 20.25, PLATE_Y0 + 6.0, PLATE_FRONT_Z - 0.5],
                                   [0.0, 0.0, 0.0], IDENTITY, ground=False)
-    await lock_mate(adapter, named_ref(f"Front Plane@{paper}", "PLANE"),
-                    named_ref(f"Front Plane@{platen}", "PLANE"),
-                    label="platen-paper locked to platen")
+    await _locate_to_datum(adapter, paper, base=platen)
 
     # --- transgear group ------------------------------------------------------
     # (The rocker-support A-frame that used to stand here is now part of the
     # single rocker-arm-support casting in frame.SLDASM; the pinion-bar west end
     # floats and was never mated to it, so it is simply gone from this assembly.)
-    await place_component(adapter, "pinion-bar", [PINION_AXIS[0], PINION_AXIS[1], -111.0],
-                          [0.0, 0.0, 0.0], IDENTITY)
+    pinion_bar = await place_component(adapter, "pinion-bar",
+                                       [PINION_AXIS[0], PINION_AXIS[1], -111.0],
+                                       [0.0, 0.0, 0.0], IDENTITY, ground=False)
+    await _locate_to_datum(adapter, pinion_bar)
     # Rx(-90): stud +Y -> -Z; shaft z -101.5..-137.5, collar to -141.5.
-    await place_component(adapter, "transgear-stub", [PINION_AXIS[0], PINION_AXIS[1], -101.5],
-                          [-90.0, 0.0, 0.0], ROT_X_NEG90)
-    await place_component(adapter, "rack-pinion", [PINION_AXIS[0], PINION_AXIS[1], -137.5],
-                          [0.0, 0.0, 0.0], IDENTITY)
+    stub = await place_component(adapter, "transgear-stub",
+                                 [PINION_AXIS[0], PINION_AXIS[1], -101.5],
+                                 [-90.0, 0.0, 0.0], ROT_X_NEG90, ground=False)
+    await _locate_to_datum(adapter, stub)
+    rack_pinion = await place_component(adapter, "rack-pinion",
+                                        [PINION_AXIS[0], PINION_AXIS[1], -137.5],
+                                        [0.0, 0.0, 0.0], IDENTITY, ground=False)
+    await _locate_to_datum(adapter, rack_pinion)
+    # The latch sits at LATCH_ANGLE_DEG (-10.22 deg, an arbitrary swing toward
+    # the crank) and carries no named axis, so it cannot be plane-located (the
+    # parallelism a plane mate forces would snap it to 0 deg) -- it stays fixed,
+    # the documented last resort for an arbitrarily-rotated part with no mating
+    # partner.
     await place_component(adapter, "transgear-latch", [PINION_AXIS[0], PINION_AXIS[1], -122.5],
-                          [0.0, 0.0, LATCH_ANGLE_DEG], rot_z_rows(LATCH_ANGLE_DEG))
+                          [0.0, 0.0, LATCH_ANGLE_DEG], rot_z_rows(LATCH_ANGLE_DEG),
+                          label="transgear-latch (fixed: arbitrary angle, no axis)")
     # Reversed (Rx +90, origin at the south end z -158.0): the plain shaft now
     # runs -158.0..-100.0 with the grab-knob tucked NORTH (-100.0..-93.5),
     # freeing the south of the shaft for the chain wheel on the front -155
@@ -459,41 +541,48 @@ async def build(adapter) -> dict[str, str]:
     # knob sits north of the T24/chain band and clear of the pinion bar's
     # z band (-105..-117) by 5 in z (and the shaft passes under the bar in y
     # anyway, see _assert_knob_shaft_clearance).
-    await place_component(adapter, "transgear-knob-shaft",
-                          [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], -158.0],
-                          [90.0, 0.0, 0.0], ROT_X_POS90)
+    knob_shaft = await place_component(adapter, "transgear-knob-shaft",
+                                       [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], -158.0],
+                                       [90.0, 0.0, 0.0], ROT_X_POS90, ground=False)
+    await _locate_to_datum(adapter, knob_shaft)
     # Fine 24T DP30 pinion on the knob shaft, just behind the knob face
     # (z -134..-128): engageable on the disc, parked clear in the rest state.
-    await place_component(adapter, "transgear-pinion",
-                          [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], -134.0],
-                          [0.0, 0.0, 0.0], IDENTITY)
+    knob_pinion = await place_component(adapter, "transgear-pinion",
+                                        [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], -134.0],
+                                        [0.0, 0.0, 0.0], IDENTITY, ground=False)
+    await _locate_to_datum(adapter, knob_pinion)
     # Mounted T24 removable = the knob-end chain wheel (ch. 23: the roller
     # chain rides the removable's teeth; swapping removables changes the
     # platen ratio). Band -157.5..-152.5 on the front -155 plane, south of the
     # stub disc and fine pinion, coplanar with the crank-end T12.
-    await place_component(adapter, "transgear-removable",
-                          [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], REMOVABLE_Z0],
-                          [0.0, 0.0, 0.0], IDENTITY, configuration="T24",
-                          label="transgear-removable (mounted T24)")
+    removable_t24 = await place_component(
+        adapter, "transgear-removable",
+        [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], REMOVABLE_Z0],
+        [0.0, 0.0, 0.0], IDENTITY, configuration="T24", ground=False,
+        label="transgear-removable (mounted T24)")
+    await _locate_to_datum(adapter, removable_t24)
     # The roller chain looping both removables (_assert_chain_layout pins the
     # _chain.py anchors to KNOB_SHAFT_XY / the drive-train crank).
     await _insert_roller_chain(adapter)
 
     # --- fasteners (M6.10) ----------------------------------------------------
     for x, y in CLIP_SCREW_XY:
-        await place_component(adapter, "fillister-screw", [x, y, PLATE_FRONT_Z - 1.2],
-                              [0.0, 0.0, 0.0], IDENTITY,
-                              label=f"fillister-screw (clip x{x:+.0f} y{y:.0f})")
+        screw = await place_component(adapter, "fillister-screw", [x, y, PLATE_FRONT_Z - 1.2],
+                                      [0.0, 0.0, 0.0], IDENTITY, ground=False,
+                                      label=f"fillister-screw (clip x{x:+.0f} y{y:.0f})")
+        await _locate_to_datum(adapter, screw)
     for x, y in PINCH_SCREW_XY:
-        await place_component(adapter, "pinch-screw", [x, y, PINCH_SCREW_Z],
-                              [0.0, 0.0, 0.0], IDENTITY,
-                              label=f"pinch-screw (clamp x{x:+.0f} y{y:.0f})")
+        screw = await place_component(adapter, "pinch-screw", [x, y, PINCH_SCREW_Z],
+                                      [0.0, 0.0, 0.0], IDENTITY, ground=False,
+                                      label=f"pinch-screw (clamp x{x:+.0f} y{y:.0f})")
+        await _locate_to_datum(adapter, screw)
 
     # Spare T18 removable: the swap chain wheel resting loose on the base, west
     # of the platen (a flat sibling of the mounted T24 above).
-    await place_component(adapter, "transgear-removable", list(SPARE_GEAR_POS),
-                          [-90.0, 0.0, 0.0], ROT_X_NEG90, configuration="T18",
-                          label="transgear-removable (spare T18)")
+    spare_t18 = await place_component(adapter, "transgear-removable", list(SPARE_GEAR_POS),
+                                      [-90.0, 0.0, 0.0], ROT_X_NEG90, configuration="T18",
+                                      ground=False, label="transgear-removable (spare T18)")
+    await _locate_to_datum(adapter, spare_t18)
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)
