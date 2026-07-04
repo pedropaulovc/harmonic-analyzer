@@ -1280,12 +1280,33 @@ sections:
       Notes: round brass rod lever; magnification set by a reeded (knurled) screw
       adjustment that moves the effective fulcrum/attachment point. Geometry
       constraint used in M2: output/input arm ratio = 4 at maximum setting (rod
-      ends domed; both rods revolves with hemispherical caps). M6.4 placement:
-      lever rod axis machine y 985 / z −85; clamp block at x −150; vertical rod
-      at z −91.5 (the clamp's skew bore, 6.5 off the lever axis), top y 990,
-      fixture at y 926; clamp thumb screw modeled BACKED OUT (head tangent above
-      the rod it pinches — seated it would overlap); the fixture's screw is
-      omitted at assembly level.
+      ends domed; both rods revolves with hemispherical caps).
+
+      KINEMATICS (2026-07-04, engineerguy video 2/4 + 4/4): the rod does NOT
+      spin in the bracket collar — it "extends from the pivoted summing bar"
+      and pivots WITH it about the knife-edge ridge line (pre-mirror (15,
+      995.134), along Z; the ~6 mm tip arc ≈ 1.6° of knife rock); the clamp
+      position along the rod is the radius from THAT pivot, which is what the
+      ≤4× adjustment really is. The bracket collar is a loose Ø6.2/Ø6 guide.
+
+      DEPTH RE-ANCHOR (2026-07-04, ch30 p.4): the side view shows the whole
+      output line (fixture wire → wheel → rim wire → pen rod) as one PLUMB
+      vertical at the machine front — the old z −85 (M6.4 low) hung the wire
+      hook 50 behind the wheel plane (~8° lean, photo-refuted). Re-derived:
+      lever rod z −128.3 — the ONLY depth window: the thumb-screw head (pokes
+      above the top-frame ring bottom 999.7) must clear the ring's front rail
+      z −101..−123, the rod must clear the front column surface −124.7, and
+      the wire's rim-duck route caps the hook at ~−137.96. Vertical rod z
+      −134.8 (skew bore 6.5), wire hook at (−150, 925.35, −137.95) tied under
+      the fixture collar beside the rod; the bracket arm lengthens to machine
+      −124.3..−70 (flange band on the plate front unchanged at −81..−76.45).
+      Derived from the plumb-line photo + wire clearance solve (≥0.25
+      everywhere; a perfectly planar wire is impossible — the rim ring blocks
+      it — so the wire leans ~0.8°, ducking behind the rim into the hub's
+      back groove band). Confidence med.
+      Clamp block at x −150; fixture at y 926; clamp thumb screw modeled
+      BACKED OUT (head tangent above the rod it pinches — seated it would
+      overlap); the fixture's screw is omitted at assembly level.
 - heading: Chapter 21 — Magnifying Wheel (pp. 50–53)
   elements:
   - prose: ''
@@ -1356,6 +1377,17 @@ sections:
       the stated magnification — strongest-sourced part in chapters 18–21.
       M6.4 placement: wheel at machine x −53 on the y-565 bar, wheel mid-plane
       z −146.9 (axle flange on the bar front −138.9).
+
+      Wires modeled (2026-07-04): the two amplification wires are now geometry —
+      straight rest-pose Ø0.8 steel rods (`hub-wire` MHA-099: fixture hook
+      (−150, 925.35, −137.95) → hub-groove tangent at z −142.77, a ~0.8° lean
+      ducking behind the rim ring into the hub's back groove band — see the
+      ch20 depth re-anchor; `pen-wire` MHA-100: rim 3-o'clock tangent →
+      pen-rod wire hole at y 513). The hub-wire ARTICULATES (ball joint at the
+      hook + axis-axis stand-off tangency to the hub) and carries the WIRE-1
+      yoke coupling to the wheel; wraps/tie-offs and compliance stay unmodeled;
+      every run stands ≥0.25 off its neighbours. Wire Ø photo-scaled
+      (hair-thin in the book; 0.8 keeps it renderable — low confidence).
 
       ---
 - heading: Chapter 22 — Platen (pp. 54–55)

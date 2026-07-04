@@ -1,0 +1,5 @@
+hub-wire:
+  number: MHA-099
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  process: "drawn steel wire"
