@@ -175,9 +175,10 @@ async def build(adapter) -> dict[str, str]:
     # an authored plan direction (sin I, cos I) lands 2*INCLINE off machine
     # z -- the exact two-lobe crankshaft interference signature the first
     # build produced. The MIRROR-COMPENSATED authoring is plan (-sin I,
-    # +cos I) (sketch (-sin I, -cos I)) with the anchor at (DX*cos I,
-    # -DX*sin I) sketch coords, which the conjugated placement maps to
-    # machine z at DX east of the column axis. The removed volume equals
+    # +cos I) (sketch (-sin I, -cos I)) with the anchor at (-DX*cos I,
+    # +DX*sin I) sketch coords (both signs interference-gate pinned), which
+    # the conjugated placement maps to machine z at DX east of the column
+    # axis. The removed volume equals
     # the straight-bore integral: the column is rotationally symmetric, and
     # the two bores are 40 apart (no boolean interaction).
     from solidworks_mcp.adapters.base import CreatePlaneParameters, RevolveParameters
@@ -191,7 +192,11 @@ async def build(adapter) -> dict[str, str]:
     check("create_sketch crank bore", await adapter.create_sketch("CrankBorePlane"))
     _dx, _dy = -_SIN_I, -_COS_I  # sketch direction (mirror-compensated, above)
     _nx, _ny = _COS_I, -_SIN_I  # in-sketch normal
-    _cx, _cy = CRANK_BORE_DX * _COS_I, -CRANK_BORE_DX * _SIN_I  # axis plan point
+    # Anchor sign pinned EMPIRICALLY: with (+DX*C, -DX*S) the built bore ran
+    # PARALLEL to the crankshaft but displaced 2*DX -- a single 408 mm^3
+    # crescent (two O9.525 cylinders offset 1.9 over the ~24 crossing), the
+    # exact wrong-side signature. The mirrored frame wants the anchor NEGATED.
+    _cx, _cy = -CRANK_BORE_DX * _COS_I, CRANK_BORE_DX * _SIN_I  # axis plan point
     cbore = SketchDims()
     set_sketch_direct_db(adapter, True)
     _rect = [
