@@ -557,11 +557,11 @@ sections:
       - source
       - confidence
       rows:
-      - - '`arbor-pedestal` ×1 (M6.5, M6.9 trim, M6.12 south-only; ch30 GT height)'
-        - green block 24 × 16 × 63 tall, Ø9.5 clamp bore along Z at height 54.0 (bore abs y 104.8)
-        - 'SOUTH end only, at (−54.7, −90.5); arbor south end z −90.0 inside the bore (GT cyl_front boss −89.66). Block height dropped 85 → 63 with the drive plane (126.8 → 104.8). North end still unsupported — the GT north bearing (cyl_back z +91.5) is DEFERRED to the portal/back-frame re-layout'
-        - ch30 GT (cyl_front); function-driven
-        - med (GT height)
+      - - '`arbor-pedestal` ×1 (M6.5, M6.9 trim, M6.12 south-only; ch30 GT height; PR3 reshape)'
+        - 'black japanned casting: foot flange 24 × 16 × 5 + tapered strap 10 thick (Z) narrowing 24 → 20 wide up to a R10 semicircular dome, 64 tall total; Ø9.5 clamp bore along Z at height 54.0 (bore abs y 104.8)'
+        - 'SOUTH end only, at (−54.7, −90.5); arbor south end z −90.0 inside the strap bore (z −95.5..−85.5, 4.5 engagement; GT cyl_front boss −89.66). Foot footprint keeps the old block''s clearances: front face −98.5 (portal south plate 0.5), rail 0.25 east. North end still unsupported — the GT north bearing (cyl_back z +91.5) is DEFERRED to the portal/back-frame re-layout'
+        - ch30 GT (cyl_front); shape from still t00393 / v4_pinion_008 (base:top taper ~1.2, scaled off the 120T OD 62.2)
+        - med (GT height; shape photo-scaled)
       - - '`cone-swing-platform` (p1 swing bracket; the p.18 wedge plate)'
         - 'black steel wedge plate 6.35 thick, ASYMMETRIC trapezoid — half-width 12 (north, pivot) → east 20 / west 37 (south, big end) over 214 along the cone axis; the west flare makes the pivot → lock-knob line SOLID plate (the old bolt-on lock lobe is gone); plan corners rounded to the neighbouring hardware (NE/NW/SW R10 ≈ the lock washer, SE R12 = the crank column''s radius); Ø6.5 pivot hole riding the pivot screw''s Ø6.35 shoulder; 8-wide OPEN lock notch (chord of the R191.7 swing arc from the engaged seat out through the west taper edge, 10.46 stud travel to the mouth); carries the "crank axis" reference + CrankAxisSeat datum (vertical, 43.11 from the pivot along the plate frame, crank height 94.16 above the plate bottom) the whole crank rig mates to; plate top y 57.15 — the post/block bores sit 47.65 above it = drive line 104.8 (chiral plate: authored MIRRORED under MIRROR_PLANE "x0")'
         - 'FLOATED, pivot at cone station 196 = (+79.69, 103.29) with the plate rotated to the cone incline, swinging ON the cone-pivot-screw; the merged crank column, cone shaft (via both journals), tip block AND the crank rig all ride it — the p1 disengage DOF is the plate''s swing about its tip-end vertical axis, FREE by default (deferred PARK_cone_swing driver): 6.41° to clear the knob washer, the west edge then meeting the swing-stop screw'
@@ -1727,8 +1727,9 @@ sections:
       0.2σ with the config gap untouched; drum z −75.0..+68.2 (face 143.2,
       spans all 20 stations); front stub runs south to z −132 carrying the tee
       handle (hub at z −144.0 = the GT handle ball −144.07); back stub free end
-      z +91.25 = GT pinion_back exactly. Straps: pivot y 62.8, bore-to-bore c2c
-      43.0, parked at a −12.38° west lean; the swing rides the torque shaft as
+      z +91.25 = GT pinion_back exactly. Straps: 18 wide (0.8× the 42T tip
+      Ø22.4, `v4_pinion_018` — the teeth stand proud of both flanks), pivot
+      y 62.8, bore-to-bore c2c 43.0, parked at a −12.38° west lean; the swing rides the torque shaft as
       the p2 setup DOF (PARK_pinion_swing angle driver, engaged in `free`
       builds, articulated by the mobility probe / motion drives). At DP 49.82
       the drum is 42T Ø22.4 (same DP as the cylinder train it must mesh); the
