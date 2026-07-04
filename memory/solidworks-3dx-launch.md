@@ -26,3 +26,24 @@ SolidWorks on this machine is **SOLIDWORKS Design Professional for Makers 2026**
    The crash that triggered this followed a heavy Basic Motion dynamic solve (21 springs + full gear train), not a build batch — the dynamic solve can take SW down (it died mid-`set_motion_time` sampling, surfacing as `Transform2`/`ArrayData` returning None). See [[motion-study-pipeline]].
 
 **2026-07-04 — killing SW is FINE; the only rule is how you RESTART it (corrects the 2026-06-14 "leave the running SW alone" note, retracted by Pedro).** `Stop-Process -Force SLDWORKS` is an acceptable way to get rid of a wedged/slow instance. What does NOT work after the kill is letting COM `connect()` cold-start `sldworks.exe` — the Makers licence rejects that with the "must be launched from the 3DEXPERIENCE Platform or from the desktop shortcut" Yes/No dialog and connect fails with `Server execution failed`. Recovery after ANY kill (or crash) is the same single path: launch the Platform shortcut — `Start-Process "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Dassault Systemes SOLIDWORKS 3DEXPERIENCE R2026x\SOLIDWORKS Design.lnk"` — splash clears in ~25 s with the cached session (no interactive re-login), THEN `adapter.connect()` attaches to the licensed instance.
+
+**2026-07-03 — "critically low on committed memory" modal mid-build.** After a
+day of repeated full-spine builds (~6 FULL drive-train rebuilds + verifies in
+one SW session) SolidWorks popped "Warning! Your system is running critically
+low on committed memory... Do you want to continue?" — a MODAL that blocks all
+COM, hanging the doit task. Remedy that worked: answer **No** (never Yes —
+"executing this command might cause SOLIDWORKS to fail"), stop the doit run,
+then a graceful COM `CloseAllDocuments(True)` + `ExitApp()` — which itself HUNG
+(process alive, Responding False, several minutes) — so `Stop-Process -Force`
+the hung instance and relaunch via the Platform shortcut (above), ~30 s splash,
+COM attaches, `doit` resumes from staleness. Proactive detection (poll
+committed memory / SW Resource Monitor between COM tasks, preemptively
+restart) is tracked in the repo issue "preemptive SW restart on resource
+exhaustion" (#164).
+   Post-restart wrinkle (same day): the relaunched session showed 3DEXPERIENCE
+licence errors that affected INTERACTIVE usage only -- COM builds kept
+passing (full part build green). One earlier relaunch attempt died outright
+(process exited, only `sldworks_fs` left, COM connect timeout after 60 s), so
+the auth failure can be either fatal-at-launch or interactive-only. If COM
+work starts failing after such a relaunch, suspect the licence state first,
+not the geometry.

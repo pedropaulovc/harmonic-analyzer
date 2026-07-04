@@ -13,8 +13,8 @@ recipe as the old pivot-shaft tee).
 
 Layout: drum axis Z, ball centred at the ORIGIN; hub z 7..14 (the ball
 solid reaches z 11.57 inside the bore, so the arbor stub seats z 12..14);
-cross rod along Y, asymmetric arms -35..+68 (the short arm stops above
-the machine base when the handle leans over).
+cross rod along Y, symmetric arms -35..+35 (PR6: both ch25 close-ups
+read near-equal arms; the old +68 long arm was a p002 misread).
 
 Volume gate (exact union, mm^3): hub annulus + ball + rod
 - ball/rod full pass - ball/hub cap integral (analytic, see V_TOTAL).
@@ -61,8 +61,11 @@ HUB_BORE = 6.35  # rides the drum's front arbor stub (derived)
 HUB_Z = (7.0, 14.0)  # clear of the ball bulge, 1 clear of the strap face
 BALL_DIA = 24.0  # grip ball, p002 photogrammetry (med)
 ROD_DIA = 6.0  # cross rod, same stock as the lever (high)
-ROD_DOWN = 35.0  # short arm -- stops above the base when leaned (derived)
-ROD_UP = 68.0  # long arm, p002 photogrammetry (med)
+ROD_DOWN = 35.0  # arm, ch25 close-ups (see ROD_UP) (med)
+ROD_UP = 35.0  # arm (PR6): BOTH p.68/p.69 close-ups, scaled against the
+# tee's own Ø6 cross rod, read near-symmetric arms (35.5/38 and 33.5/35 mm)
+# -- the old p002-photogrammetry 68 long arm matches neither and is retired
+# as a misread; tip-to-tip 70 fits both frames (med)
 
 HUB_R = HUB_DIA / 2.0
 BORE_R = HUB_BORE / 2.0
