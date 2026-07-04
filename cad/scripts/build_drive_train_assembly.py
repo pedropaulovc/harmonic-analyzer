@@ -1594,8 +1594,8 @@ async def build(adapter) -> dict[str, str]:
     )
     # The full 20-gear cone stack is ALWAYS built (it is one rigid keyed cluster
     # derived from the full channel table); only the cylinder drum + its cam
-    # followers downstream follow the TEMPORARY active_count (see machine.yaml
-    # channels.active_count / _config.active_count).
+    # followers downstream follow active_count -- the build-speed knob (see
+    # machine.yaml channels.active_count / _config.active_count; 20 = full).
     cone_gears: list[tuple[int, str]] = []
     for j in range(20):
         teeth = _config.cone_teeth(j)
@@ -1609,10 +1609,11 @@ async def build(adapter) -> dict[str, str]:
         cone_gears.append((teeth, cg))
 
     # =================== cylinder drum (driven, free on the arbor) =============
-    # TEMPORARY: only the first active_count cylinder gears (and, via the channel
-    # assembly, their cam followers) are built — the build-performance reduction.
-    # Cone gears 0..19 above stay; cone gears active_count..19 simply mesh nothing
-    # (they remain keyed to the cone shaft, fully defined, harmless).
+    # Only the first active_count cylinder gears (and, via the channel assembly,
+    # their cam followers) are built -- active_count is the build-speed knob for
+    # debugging iterations (20 = the full machine, the default). Cone gears
+    # 0..19 above stay; cone gears active_count..19 simply mesh nothing (they
+    # remain keyed to the cone shaft, fully defined, harmless).
     cyl_gears: list[str] = []
     for j in range(_config.active_count()):
         z_j = Z_DRUM0 + Z_PITCH * j
