@@ -79,6 +79,17 @@ CBORE_DIA = 23.0  # lag head O22, recessed
 CBORE_DEPTH = 6.5  # lag head 22 x 6 recessed 0.5
 CBORE_XZ = HOLE_XZ  # all four heads counterbored
 
+# Cone swing hardware, blind from the TOP face (machine = part-local):
+# the platform pivot screw's shank hole (build_cone_pivot_screw; the position
+# equals cone_station(PIVOT_STATION), asserted at drive-train import) and the
+# swing-stop screw's hole (build_swing_stop_screw; the disengaged plate edge +
+# shank radius, ditto asserted).
+PIVOT_SCREW_XZ = (79.69, 103.29)
+PIVOT_SCREW_HOLE_DIA = 6.5  # O6.35 shoulder clearance
+STOP_SCREW_XZ = (105.19, -83.30)
+STOP_SCREW_HOLE_DIA = 4.1  # O4 shank clearance
+SWING_HOLE_DEPTH = 6.0
+
 MM3_PER_IN3 = IN**3
 
 
@@ -249,6 +260,49 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(
             f"counterbores removed {before - after:.1f}, expected {v_cbore:.1f}"
         )
+
+    # Cone swing hardware holes, blind from the TOP face (see the constants
+    # block): pivot screw + swing-stop screw.
+    from solidworks_mcp.adapters.base import CreatePlaneParameters as _CPP
+
+    check(
+        "create_plane TopFace (swing holes)",
+        await adapter.create_plane(_CPP(
+            mode="offset", base_plane="Top Plane", offset=total,
+        )),
+    )
+    name_last_feature(adapter, "TopFace")
+    swing = SketchDims()
+    check("create_sketch swing holes", await adapter.create_sketch("TopFace"))
+    for tag, (sx, sz), dia in (
+        ("Pivot", PIVOT_SCREW_XZ, PIVOT_SCREW_HOLE_DIA),
+        ("Stop", STOP_SCREW_XZ, STOP_SCREW_HOLE_DIA),
+    ):
+        await define_circle(
+            adapter, sx, -sz, dia / 2.0, f"{tag.lower()} screw hole", dims=swing,
+            names=(f"{tag}HoleCx", f"{tag}HoleCz", f"{tag}HoleDia"),
+            drives=(None, None, None),
+        )
+    await ensure_fully_defined(adapter, "swing holes sketch")
+    check("exit_sketch swing holes", await adapter.exit_sketch())
+    name_last_feature(adapter, "SwingHoleProfile")
+    drive_jobs += swing.apply(adapter, "SwingHoleProfile")
+    # A CUT's default direction is OPPOSITE the sketch normal (FeatureCut4
+    # remarks), so from the top-face plane it already drills DOWN into the slab.
+    check(
+        "cut swing holes (blind)",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=SWING_HOLE_DEPTH)
+        ),
+    )
+    name_last_feature(adapter, "SwingHardwareHoles")
+    after_swing = await _volume(adapter)
+    v_swing = math.pi * ((PIVOT_SCREW_HOLE_DIA / 2.0) ** 2
+                         + (STOP_SCREW_HOLE_DIA / 2.0) ** 2) * SWING_HOLE_DEPTH
+    if abs((after - after_swing) - v_swing) > 0.02 * v_swing:
+        raise RuntimeError(
+            f"swing holes removed {after - after_swing:.1f}, expected {v_swing:.1f}")
+    after = after_swing
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves -- then re-check neutrality against the

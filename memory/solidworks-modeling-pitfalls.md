@@ -51,6 +51,21 @@ discovered during harmonic-analyzer M6.4:
   it gives "Parameter not optional". The default cut direction from a
   Top-plane sketch is **−Y**; pass Dir=True to cut +Y (verified live in
   `build_column_clamp.py`: the un-flipped cut removed the wrong band).
+  Corollary (bit again 2026-07-03, cone-pivot-screw slot): a cut's default is
+  OPPOSITE the sketch normal for ANY plane, so a blind cut from a top/far-FACE
+  offset plane down into the body needs **NO** `reverse_direction` —
+  reversing sends it into air, the no-intersection cut falls through the
+  adapter's FeatureCut4→Cut3 overload chain, and a mis-mapped arg can land as
+  a FLIPPED-SIDE cut (removed the head-top ANNULUS around the slot: caught by
+  the volume gate, removal = (disc − strip)·depth exactly). Only a cut running
+  ALONG the normal (material above the sketch plane, e.g. a slot cut from an
+  origin head-face with the body extruded +Y) takes `reverse_direction=True`.
+- **A sketch on a REFERENCE plane enumerates the plane's own offset dim
+  first** in the `GetFirstDisplayDimension` walk (`D1@<plane>` before the
+  sketch's own `D1@<sketch>`), shifting positional renaming and tripping the
+  `SketchDims.apply` recorded-count guard. `_common._display_dimensions`
+  now takes an `owner` filter (FullName middle segment) and `apply`/
+  `name_dimensions` pass it — sketches on principal planes are unaffected.
 - **`ExtrusionParameters(depth=D, both_directions=True)` on a cut = D TOTAL,
   split D/2 per side of the sketch plane** — NOT D each way. A through-cut of a
   plate extruded +Y from its own Top-plane sketch (plate spans y 0..T) with

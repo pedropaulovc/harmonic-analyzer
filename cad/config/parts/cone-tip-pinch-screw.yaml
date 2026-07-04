@@ -1,0 +1,6 @@
+cone-tip-pinch-screw:
+  number: MHA-098
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: "machined (steel, bright)"

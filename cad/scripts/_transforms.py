@@ -211,11 +211,11 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     "summing-lever": "x0",
     "magnifying-bracket": "x0",
     "pen-hanger": "x0",
-    # crank-pedestal went chiral with the nested swing journal (2026-07-02
-    # cylinder restore: cavity + wall windows off-axis in x), so its script is
-    # authored mirrored like the three above ("x0" keeps the placement off the
-    # STL bbox, whose centre now drifts with the cavity)
-    "crank-pedestal": "x0",
+    # (crank-pedestal's "x0" entry died with the part: the merged
+    # cone-pivot-post column absorbed it, 2026-07-03. The column's oblique
+    # crank bore makes it chiral, but it stays on the default bbox-"x" path --
+    # the bore's authored side is pinned empirically by the assembly's
+    # crank-axis agreement asserts, not by the mirror entry.)
     # cone-swing-platform went chiral with the one-sided lock lobe + slot
     # (PR2, 2026-07-03), so its script is authored mirrored like the above
     # ("x0" keeps the placement off the STL bbox, whose centre the lobe
@@ -241,6 +241,14 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     "fillister-screw": ("x", 0.0),
     "pinch-screw": ("x", 0.0),
     "hanger-screw": ("x", 0.0),
+    # PR2 round-3 cone-swing hardware (2026-07-03): all axisymmetric about the
+    # local Y axis (bodies are origin-centred circles), so exactly x0-symmetric;
+    # explicit c, no STL at first build (the memory's belt-and-braces rule)
+    "cone-pivot-screw": ("x", 0.0),
+    "swing-stop-screw": ("x", 0.0),
+    "cone-tip-bushing": ("x", 0.0),
+    "cone-tip-adjuster": ("x", 0.0),
+    "cone-tip-pinch-screw": ("x", 0.0),
 }
 
 def mirror_placement(

@@ -1,5 +1,0 @@
-crank-pedestal:
-  number: MHA-023
-  material: Gray Cast Iron
-  tolerance_class: machined_block
-  process: "cast + machined"
