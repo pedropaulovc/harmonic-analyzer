@@ -10,7 +10,7 @@ arbor stub (build_alignment_pinion.py). The lift rod's cam pin
 Layout: pivot bore at the origin, arbor bore at (0, C2C), strap up +Y,
 thickness z 0..5.
 
-Dimensions: cad/DIMENSIONS.md "Chapter 25".
+Dimensions: cad/config/dimensions.yaml "Chapter 25".
 
 Run (SolidWorks already open)::
 
@@ -45,7 +45,10 @@ from _common import (
 PART_NAME = "pinion-bracket"
 MATERIAL = "Plain Carbon Steel"  # p.68: bright steel strap
 
-WIDTH = 22.0  # DIMENSIONS.md ch25: strap width, photo-scaled vs the drum (low)
+WIDTH = 18.0  # ch25 strap width, photo-scaled vs the 42T drum tip Ø22.4 in
+# v4_pinion_018 (strap ~0.8x the tip OD; the teeth stand proud of BOTH flanks
+# -- the old 22 sat flush with the tips). Assembly guard: build_drive_train's
+# STRAP_R_END must match WIDTH / 2.
 C2C = 43.0  # pivot bore to arbor bore (ch30 GT 2026-07-02, was 31): the pinion
 # now parks LEVEL with the drive axis, 42.0 above the pivot bore, so the strap
 # spans sqrt(42^2 + 9.22^2) at a 12.4 deg west lean in the disengaged rest
