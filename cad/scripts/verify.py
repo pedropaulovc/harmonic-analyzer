@@ -527,6 +527,15 @@ def _expected_free_dof(name: str) -> int:
     return 0
 
 
+# One component family per freed DOF that must ITSELF read under-constrained
+# (assert_free_dof_necessity required_stems): the aggregate count check alone
+# cannot distinguish which DOF is free.
+_REQUIRED_FREE_STEMS = {
+    "drive-train": ("crankshaft", "cone-swing-platform"),
+    "channel": ("rocker-arm", "connecting-rod", "amplitude-bar"),
+}
+
+
 async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
     if not sldasm.exists():
@@ -570,11 +579,16 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
         # Default-free build: the freed-DOF park drivers are DEFERRED (not authored
         # in the saved model -- see AGENTS.md "Default-free DOF"), so there is
         # nothing to re-engage here. Prove NECESSITY only -- the operational DOF are
-        # genuinely free. The exact-count SUFFICIENCY closure runs in the release
-        # preflight (`preflight_release.py`), which replays the recorded specs.
+        # genuinely free, and each freed DOF's component family must itself read
+        # under-constrained (the aggregate count alone passes on the crank chain
+        # even with the swing pinned -- codex 2026-07-04). The exact-count
+        # SUFFICIENCY closure runs in the release preflight
+        # (`preflight_release.py`), which replays the recorded specs.
+        stems = _REQUIRED_FREE_STEMS.get(name, ())
         report.gate(
             f"{name}:dof-free-necessity",
-            lambda: assert_free_dof_necessity(adapter, free_dof, resolve=False),
+            lambda: assert_free_dof_necessity(
+                adapter, free_dof, resolve=False, required_stems=stems),
         )
     else:
         report.gate(

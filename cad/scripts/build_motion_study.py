@@ -531,7 +531,44 @@ def _dump_sub_mates(adapter, sub_name):
             f"lone={lone} parts={_real_parts(parts, root)}{vstr}")
 
 
+async def _replay_deferred_parks(adapter):
+    """Re-author the DEFERRED freed-DOF park drivers ENGAGED before the study.
+
+    Default-`free` builds RECORD the freed-DOF park drivers instead of
+    authoring them (AGENTS.md "Default-free DOF"), so the flexed subs arrive
+    with those DOF genuinely free -- including the cone-platform SWING, which
+    the operation study must keep PARKED (only the crank turns; codex review
+    2026-07-04). Replay each moving sub's recorded specs in ITS OWN doc (the
+    ActivateDoc3 round-trip -- API selection needs the active doc; the docs
+    are NEVER saved), re-pinning every freed DOF engaged. The suppression
+    rules below then free exactly the DOF the study drives or lets recur --
+    the same end state the old author-but-suppress models arrived in.
+    """
+    from _assembly import load_park_specs, replay_park_specs
+
+    top = adapter.currentModel
+    top_title = str(_read_member(top, "GetTitle"))
+    for sub in MOVING_SUBS:
+        specs = load_park_specs(sub[:-2])  # component "-1" -> doc stem
+        if not specs:
+            continue
+        _, model = _sub_model(adapter, sub)
+        sub_title = str(_read_member(model, "GetTitle"))
+        adapter._attempt(
+            lambda t=sub_title: adapter.swApp.ActivateDoc3(t, False, 2, _byref_i4()),
+            default=None)
+        adapter.currentModel = adapter._attempt(
+            lambda: adapter.swApp.ActiveDoc, default=model)
+        log(f"{sub}: replaying {len(specs)} deferred park driver(s) (engaged)")
+        await replay_park_specs(adapter, specs)
+    adapter._attempt(
+        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()),
+        default=None)
+    adapter.currentModel = top
+
+
 async def _suppress_drivers(adapter, level, dump=False):
+    await _replay_deferred_parks(adapter)
     if dump:
         for sub in MOVING_SUBS:
             _dump_sub_mates(adapter, sub)
