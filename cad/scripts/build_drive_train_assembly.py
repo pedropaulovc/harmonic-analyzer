@@ -1243,11 +1243,13 @@ _BLOCK_SCREW_XZ = tuple(
     for z0 in (BLOCK_FRONT_Z0, BLOCK_BACK_Z0)
     for sx in (BLOCK_SCREW_HALF, -BLOCK_SCREW_HALF)
 )
+# Machine-handed base part vs this pre-mirror derivation: x negates (the
+# pivot-hole assert convention above).
 for _want, _have in zip(_BLOCK_SCREW_XZ, BASE_BLOCK_XZ, strict=True):
-    if abs(_want[0] - _have[0]) > 0.05 or abs(_want[1] - _have[1]) > 0.05:
+    if abs(_want[0] + _have[0]) > 0.05 or abs(_want[1] - _have[1]) > 0.05:
         raise AssertionError(
-            f"harmonic-base block-screw hole {_have} != derived "
-            f"({_want[0]:.3f}, {_want[1]:.3f})")
+            f"harmonic-base block-screw hole {_have} != machine derived "
+            f"({-_want[0]:.3f}, {_want[1]:.3f})")
 # Foot screws (items 2 + 11): the black O2.9 hold-down at the spring foot
 # and on the pedestal's exposed flange.
 if FSCREW_SHANK_DIA > min(SPR_HOLE_DIA, ARBOR_PED_HOLE_DIA,
@@ -1266,11 +1268,12 @@ _FOOT_SCREW_XZ = (
     (SPRING_HOLE_X, SPRING_Z),
     (X_DRUM, -ARBOR_PEDESTAL_Z + ARBOR_PED_SCREW_Z),
 )
+# Same machine-handed x negation as the block screws above.
 for _want, _have in zip(_FOOT_SCREW_XZ, BASE_FOOT_XZ, strict=True):
-    if abs(_want[0] - _have[0]) > 0.05 or abs(_want[1] - _have[1]) > 0.05:
+    if abs(_want[0] + _have[0]) > 0.05 or abs(_want[1] - _have[1]) > 0.05:
         raise AssertionError(
-            f"harmonic-base foot-screw hole {_have} != derived "
-            f"({_want[0]:.3f}, {_want[1]:.3f})")
+            f"harmonic-base foot-screw hole {_have} != machine derived "
+            f"({-_want[0]:.3f}, {_want[1]:.3f})")
 
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
