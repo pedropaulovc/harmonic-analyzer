@@ -97,6 +97,29 @@ STOP_SCREW_XZ = (-130.93, 9.94)  # past the DISENGAGED east taper edge (the
 STOP_SCREW_HOLE_DIA = 4.1  # O4 shank clearance
 SWING_HOLE_DEPTH = 6.0
 
+# Alignment-pinion rig hold-downs (PR7 items 2/11/12), blind from the TOP face
+# like the swing hardware and in the SAME signed machine-handed convention
+# (x = -pre-mirror x): four Ø4.2 holes under the two pivot blocks' bright
+# slotted screws (build_pinion_pivot_block SCREW_* stations: pre-mirror block
+# x -6.336 +/- 13.5, hole z = block z0 + depth/2 -- asserted at drive-train
+# import with the sign flip) and two Ø3.2 holes under the black foot screws
+# (build_foot_screw): the spring foot and the arbor-pedestal flange.
+BLOCK_SCREW_XZ = (
+    (-7.164, -98.0),   # front block, east screw
+    (19.836, -98.0),   # front block, west screw
+    (-7.164, 82.0),    # back block, east screw
+    (19.836, 82.0),    # back block, west screw
+)
+BLOCK_SCREW_HOLE_DIA = 4.2  # slotted-screw O4 shank clearance
+BLOCK_SCREW_HOLE_DEPTH = 3.5  # 18 shank - 16 block = 2 buried + 1.5 air
+FOOT_SCREW_XZ = (
+    (20.467, 70.95),  # spring foot (build_pinion_spring hole: the west foot
+    # crosses under the lift rod so its screw lands west of the moving rig)
+    (-54.7, -95.5),   # arbor-pedestal flange (build_arbor_pedestal SCREW_Z)
+)
+FOOT_SCREW_HOLE_DIA = 3.2  # foot-screw O2.9 shank clearance
+FOOT_SCREW_HOLE_DEPTH = 7.7  # 8.0 shank under the 0.8 spring strip + air
+
 MM3_PER_IN3 = IN**3
 
 
@@ -310,6 +333,38 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(
             f"swing holes removed {after - after_swing:.1f}, expected {v_swing:.1f}")
     after = after_swing
+
+    # Alignment-pinion rig hold-down holes (PR7), blind from the same top
+    # face (see the constants block): 4 block-screw + 2 foot-screw stations,
+    # one sketch + cut per diameter/depth group.
+    for tag, xz, dia, depth in (
+        ("BlockScrew", BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DIA, BLOCK_SCREW_HOLE_DEPTH),
+        ("FootScrew", FOOT_SCREW_XZ, FOOT_SCREW_HOLE_DIA, FOOT_SCREW_HOLE_DEPTH),
+    ):
+        rig = SketchDims()
+        check(f"create_sketch {tag} holes", await adapter.create_sketch("TopFace"))
+        for k, (sx, sz) in enumerate(xz):
+            await define_circle(
+                adapter, sx, -sz, dia / 2.0, f"{tag} hole ({sx:.2f}, {sz:.1f})",
+                dims=rig,
+                names=(f"{tag}{k}Cx", f"{tag}{k}Cz", f"{tag}{k}Dia"),
+                drives=(None, None, None),
+            )
+        await ensure_fully_defined(adapter, f"{tag} holes sketch")
+        check(f"exit_sketch {tag} holes", await adapter.exit_sketch())
+        name_last_feature(adapter, f"{tag}HoleProfile")
+        drive_jobs += rig.apply(adapter, f"{tag}HoleProfile")
+        check(
+            f"cut {tag} holes (blind)",
+            await adapter.create_cut_extrude(ExtrusionParameters(depth=depth)),
+        )
+        name_last_feature(adapter, f"{tag}Holes")
+        after_rig = await _volume(adapter)
+        v_rig = len(xz) * math.pi * (dia / 2.0) ** 2 * depth
+        if abs((after - after_rig) - v_rig) > 0.02 * v_rig:
+            raise RuntimeError(
+                f"{tag} holes removed {after - after_rig:.1f}, expected {v_rig:.1f}")
+        after = after_rig
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves -- then re-check neutrality against the

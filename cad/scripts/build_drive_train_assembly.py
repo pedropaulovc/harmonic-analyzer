@@ -422,6 +422,12 @@ from build_swing_stop_screw import (  # noqa: E402
     SHANK_DIA as STOP_SHANK_DIA,
 )
 from build_harmonic_base import (  # noqa: E402
+    BLOCK_SCREW_HOLE_DEPTH as BASE_BLOCK_HOLE_DEPTH,
+    BLOCK_SCREW_HOLE_DIA as BASE_BLOCK_HOLE_DIA,
+    BLOCK_SCREW_XZ as BASE_BLOCK_XZ,
+    FOOT_SCREW_HOLE_DEPTH as BASE_FOOT_HOLE_DEPTH,
+    FOOT_SCREW_HOLE_DIA as BASE_FOOT_HOLE_DIA,
+    FOOT_SCREW_XZ as BASE_FOOT_XZ,
     PIVOT_SCREW_HOLE_DIA as BASE_PIVOT_HOLE_DIA,
     PIVOT_SCREW_XZ as BASE_PIVOT_XZ,
     STOP_SCREW_HOLE_DIA as BASE_STOP_HOLE_DIA,
@@ -429,7 +435,74 @@ from build_harmonic_base import (  # noqa: E402
 )
 from build_arbor_pedestal import (  # noqa: E402
     FOOT_DEPTH as ARBOR_PED_DEPTH,  # PR3 reshaped the pedestal; its foot
+    FOOT_HEIGHT as ARBOR_PED_FLANGE_T,  # the exposed flange the foot screw clamps
     FOOT_WIDTH as ARBOR_PED_WIDTH,  # flange keeps the old block's 24x16 plan
+    SCREW_HOLE_DIA as ARBOR_PED_HOLE_DIA,
+    SCREW_Z as ARBOR_PED_SCREW_Z,
+    STRAP_T as ARBOR_PED_STRAP_T,
+)
+# --- ch25 pinion swing rig part constants (PR7: imported, not hardcoded) ----
+from build_alignment_pinion import (  # noqa: E402
+    BORE_DIA as DRUM_BORE_DIA,
+)
+from build_pinion_arbor import (  # noqa: E402
+    SHAFT_DIA as ARBOR_DIA,
+    SHAFT_LEN as ARBOR_LEN,
+)
+from build_pinion_bracket import (  # noqa: E402
+    ARBOR_BORE as STRAP_ARBOR_BORE,
+    PIVOT_BORE as STRAP_PIVOT_BORE,
+)
+from build_pinion_pivot_block import (  # noqa: E402
+    BORE_UP as BLOCK_BORE_UP,
+    DEPTH as BLOCK_DEPTH,
+    HEIGHT as BLOCK_HEIGHT,
+    SCREW_HALF_SPACING as BLOCK_SCREW_HALF,
+    SCREW_HOLE_DIA as BLOCK_SCREW_HOLE_DIA,
+    WIDTH as BLOCK_WIDTH,
+)
+from build_pinion_lift_rod import (  # noqa: E402
+    PIN_STATIONS as ROD_PIN_STATIONS,
+    PIN_TIP as ROD_PIN_TIP,
+)
+from build_pinion_lever import (  # noqa: E402
+    CAP_SAG as LEVER_CAP_SAG,
+    HUB_LEN as LEVER_HUB_LEN,
+    ROD_LEN as LEVER_ROD_LEN,
+    ROD_ROOT_DIA as LEVER_ROD_DIA,
+    WALL_T as LEVER_WALL_T,
+)
+from build_pinion_handle import (  # noqa: E402
+    GRIP_DIA as HANDLE_GRIP_DIA,
+    GRIP_LEN as HANDLE_GRIP_LEN,
+    CAP_SAG as HANDLE_CAP_SAG,
+    ROD_DOWN as HANDLE_ARM_DOWN,
+    ROD_UP as HANDLE_ARM_UP,
+    TUBE_ID as HANDLE_TUBE_ID,
+    TUBE_LEN as HANDLE_TUBE_LEN,
+    WALL_T as HANDLE_WALL_T,
+)
+from build_pinion_spring import (  # noqa: E402
+    AXIS_OFFSET as SPRING_AXIS_OFF,
+    FLAT_TIP as SPR_FLAT_TIP_L,
+    FOOT_END as SPR_FOOT_END_L,
+    HOLE_DIA as SPR_HOLE_DIA,
+    HOLE_FROM_END as SPR_HOLE_FROM_END,
+    KINK_START as SPR_CREST_L,
+    PIVOT_LX as SPR_PIVOT_LX,
+    PIVOT_LY as SPR_PIVOT_LY,
+    THICK as SPRING_T,
+    WIDTH as SPRING_W,
+)
+from build_slotted_screw import (  # noqa: E402
+    HEAD_DIA as BSCREW_HEAD_DIA,
+    SHANK_DIA as BSCREW_SHANK_DIA,
+    SHANK_LEN as BSCREW_SHANK_LEN,
+)
+from build_foot_screw import (  # noqa: E402
+    HEAD_DIA as FSCREW_HEAD_DIA,
+    SHANK_DIA as FSCREW_SHANK_DIA,
+    SHANK_LEN as FSCREW_SHANK_LEN,
 )
 from build_cone_pivot_post import (  # noqa: E402
     BLOCK_DIA as POST_BLOCK_DIA,
@@ -737,8 +810,10 @@ LIFT_X = PIVOT_X - 15.0  # lift rod in the blocks' WEST bores (PR5). It sat
 # and the M6.9 portal south upright that once blocked the west band was
 # replaced by the lone NORTH rocker-arm-support (x 41..105) -- nothing lives
 # at x -21..-7 in the rod's z run (cam asserts below re-prove the neighbours).
-PIVOT_SHAFT_Z0 = -106.0  # plain Ø6.35 x 196: 2 proud past each block face
-LIFT_ROD_Z0 = -120.0  # Ø6.35 x 210: front end proud for the lever root
+PIVOT_SHAFT_Z0 = -104.0  # Ø6.35 x 192 (PR7 item 13): both crowned ends
+# FLUSH with the block outer faces (-104 / +88)
+LIFT_ROD_Z0 = -114.0  # Ø6.35 x 202 (PR7 item 13): back end flush at +88,
+# front end proud 10 south of the front block -- exactly the lever hub
 BLOCK_X = (PIVOT_X + LIFT_X) / 2.0  # block local origin midway the bores
 BLOCK_FRONT_Z0 = -104.0
 BLOCK_BACK_Z0 = 76.0
@@ -749,16 +824,18 @@ LEVER_TILT_DEG = 40.0  # from vertical, leaning east (p.68). The p002-fitted
 # the PERPENDICULAR distance from the stub's (x, y) to the rod line -- the
 # stub runs along z, so the 3D minimum is the 2D point-to-line distance, NOT
 # the vertical gap at the x-crossing (that mistake cost a build). 40 gives
-# 8.44 vs the 6.425 required, asserted below. PR6 re-derives the pose (and
-# both handles' sizes) against the photos; this is the interference-free
-# interim.
-LEVER_LEN = 98.0  # build_pinion_lever ROD_LEN, ball centre -> tip (must
-# match; PR6 resize -- both ch25 close-ups read ~99 against the 6 mm rod)
-LEVER_Z = -113.0  # clamp ball flush on the lift rod's front end
+# 8.44 vs the 7.25 the Ø8 arbor requires, asserted below (PR7 replaced the
+# Ø6.35 stub with the arbor on the same axis).
+LEVER_LEN = LEVER_ROD_LEN  # 86: hub centre -> tip (img07 @9.37 px/mm,
+# PR7 -- the PR6 98 was img08's perspective-inflated read)
+LEVER_Z = -111.0  # hub centre: the clamp hub's blind bore floor (local
+# z -3) seats on the lift rod's front end at -114; the hub's north face
+# (-106) stands 2 off the front block (item 13)
 HANDLE_TILT_DEG = 65.0  # cross rod from vertical
-HANDLE_Z = -144.0  # tee-handle hub on the LONG front arbor stub (GT
-# pinion_front z -144.07 +- 2.7: the stub reaches well south of the drum so
-# the handle clears the platen front -- build_alignment_pinion STUB_FRONT)
+HANDLE_Z = -144.0  # tee-handle CROSS-ROD plane (part origin; GT
+# pinion_front z -144.07 +- 2.7). The hub is now a blind tubular cap
+# (PR7 item 14): its bore floor at local +9 lands on -135, where the
+# steel arbor's flat front tip seats flush (build_pinion_arbor)
 
 if abs(math.hypot(PIVOT_X - APINION_X, APINION_Y - PIVOT_Y) - STRAP_C2C) > 0.001:
     raise AssertionError("strap c2c does not span pivot -> pinion axis")
@@ -784,15 +861,19 @@ if math.hypot(LIFT_X - APINION_X, APINION_Y - PIVOT_Y) < TIP_APINION + 3.175 + 0
     raise AssertionError("lift rod fouls the pinion drum tips")
 if abs(LIFT_X - PIVOT_X) < STRAP_R_END + 3.175 + 0.25:
     raise AssertionError("lift rod fouls the strap's swinging pivot end cap")
-if LEVER_Z + 7.0 > BLOCK_FRONT_Z0 - 0.25:
-    raise AssertionError("lever root reaches the front pivot block")
-# The east-leaning lever shaft passes under the pinion's front arbor stub
-# (the Ø6.35 stub spans the lever's z band, so the 3D clearance is the 2D
-# distance from the stub's (x, y) to the Ø6 rod's axis line). Perpendicular
-# form when the foot lands on the rod segment, endpoint distance otherwise.
+if LEVER_Z + LEVER_HUB_LEN / 2.0 > BLOCK_FRONT_Z0 - 0.25:
+    raise AssertionError("lever hub reaches the front pivot block")
+if abs((LEVER_Z - (LEVER_HUB_LEN / 2.0 - LEVER_WALL_T)) - LIFT_ROD_Z0) > 1e-9:
+    raise AssertionError("lever hub bore floor off the lift rod's front end")
+# The east-leaning lever shaft passes under the pinion ARBOR (PR7: the Ø8
+# steel arbor replaced the drum's Ø6.35 stubs; it spans the lever's z band,
+# so the 3D clearance is the 2D distance from the arbor's (x, y) to the Ø6
+# rod-root axis line). Perpendicular form when the foot lands on the rod
+# segment, endpoint distance otherwise. Rod ROOT dia books the worst case
+# (the PR7 taper only thins toward the tip).
 _LEV_T = math.radians(LEVER_TILT_DEG)
 _LEV_U = (math.sin(_LEV_T), math.cos(_LEV_T))  # up the rod, east lean
-_LEV_REL = (APINION_X - LIFT_X, APINION_Y - PIVOT_Y)  # root -> stub
+_LEV_REL = (APINION_X - LIFT_X, APINION_Y - PIVOT_Y)  # root -> arbor axis
 _LEV_FOOT = _LEV_REL[0] * _LEV_U[0] + _LEV_REL[1] * _LEV_U[1]
 if 0.0 <= _LEV_FOOT <= LEVER_LEN:
     _LEV_STUB_D = abs(_LEV_REL[0] * _LEV_U[1] - _LEV_REL[1] * _LEV_U[0])
@@ -800,45 +881,41 @@ else:
     _end = min(max(_LEV_FOOT, 0.0), LEVER_LEN)
     _LEV_STUB_D = math.hypot(_LEV_REL[0] - _end * _LEV_U[0],
                              _LEV_REL[1] - _end * _LEV_U[1])
-if _LEV_STUB_D < (6.35 + 6.0) / 2.0 + 0.25:
-    raise AssertionError("lever shaft crowds the pinion front stub")
+if _LEV_STUB_D < (ARBOR_DIA + LEVER_ROD_DIA) / 2.0 + 0.25:
+    raise AssertionError("lever shaft crowds the pinion arbor")
 
 # --- pinion return spring (ch. 25, p.68-69): keeps the drum disengaged -------
 # Brass leaf east of the BACK strap only (t00393 shows the front strap clean):
-# foot flat on the base, blade rising parallel to the parked strap's east
-# flank, tip curled east so the flank always meets a smooth tangent face.
-# Engaging the drum swings the strap east INTO the blade -- in the real
-# machine the leaf flexes and pushes the swing back west (the default-
+# foot flat on the base pointing WEST (crossing under the lift rod so its
+# black hold-down screw lands west of the whole moving rig -- img01's
+# far-left dark head), blade rising parallel to the parked strap's east
+# flank; near the top a SUBTLE BEND BACK (PR7 item 10): the kink's convex
+# crest is the parked contact edge, the flat above it the engaged contact
+# face. Engaging the drum swings the strap east INTO the blade -- in the
+# real machine the leaf flexes and pushes the swing back west (the default-
 # disengaged behaviour); in rigid CAD the engaged pose overlaps the unflexed
 # blade, a documented simplification: only the PARKED pose is interference-
 # gated. The cam engage path (PR5, below) defines the engaged pose; flexed
 # spring geometry for it stays deferred -- issue #158 (the channel springs'
 # stretchNN precedent is the eventual shape of the fix).
-# The thin-wall extrude is ONE-sided with an orientation-dependent side, so
-# every clearance below books the full wall thickness on whichever side hurts.
-SPRING_T = 0.8  # build_pinion_spring THICK (must match)
-SPRING_W = 4.0  # build_pinion_spring WIDTH (must match)
-SPRING_R_CURL = 2.0  # build_pinion_spring R_CURL (must match)
-SPRING_TOP_T = 36.0  # build_pinion_spring BLADE_TOP_T (must match)
-SPRING_AXIS_OFF = 10.1  # strap axis -> blade centreline east (build_pinion_
-# spring AXIS_OFFSET, must match) = R_END 9 + 0.25 min air + the 0.8 wall
-SPRING_X = 9.04  # part-frame anchor (pre-mirror, like every constant here):
-# build_pinion_spring bakes the strap pivot at (SPRING_X - 7.88,
-# Y_BASE_TOP + 12.0) -- asserted below. The chirality mirror needs the
-# part's ("z", 0.0) MIRROR_PLANE entry (planar leaf, chiral in x).
+# Geometry is IMPORTED from build_pinion_spring (machine = part local +
+# (SPRING_X, Y_BASE_TOP)). The thin wall is ONE-sided; the part's 1%-tol
+# volume gate pins the probed side (right-of-travel: under the foot, EAST
+# of the blade/flat centreline), but every clearance that can afford it
+# still books the full 0.8 on whichever side hurts. The flat-tip-vs-cap
+# check below is the one exception -- it relies on the gated east side.
+SPRING_X = 9.04  # part-frame anchor (pre-mirror, like every constant here);
+# the chirality mirror needs the part's ("z", 0.0) MIRROR_PLANE entry.
 SPRING_Z = APINION_Z_BACK + STRAP_AIR + STRAP_T / 2.0  # 70.95: back-strap mid
 _SPR_TH = math.radians(-STRAP_LEAN_DEG)  # blade leans east of vertical
 _SPR_U = (math.sin(_SPR_TH), math.cos(_SPR_TH))  # up the blade
 _SPR_N = (math.cos(_SPR_TH), -math.sin(_SPR_TH))  # east normal of the axis
-_SPR_PIVOT = (SPRING_X - 7.88, Y_BASE_TOP + 12.0)
-SPRING_TOP = (
-    _SPR_PIVOT[0] + SPRING_TOP_T * _SPR_U[0] + SPRING_AXIS_OFF * _SPR_N[0],
-    _SPR_PIVOT[1] + SPRING_TOP_T * _SPR_U[1] + SPRING_AXIS_OFF * _SPR_N[1],
-)  # blade top, machine frame (18.74, 95.79)
-SPRING_CURL_C = (
-    SPRING_TOP[0] + SPRING_R_CURL * _SPR_N[0],
-    SPRING_TOP[1] + SPRING_R_CURL * _SPR_N[1],
-)
+_SPR_PIVOT = (SPRING_X + SPR_PIVOT_LX, Y_BASE_TOP + SPR_PIVOT_LY)
+SPRING_CREST = (SPRING_X + SPR_CREST_L[0], Y_BASE_TOP + SPR_CREST_L[1])
+# the parked contact edge (kink start, tangent parallel to the strap axis)
+SPRING_FLAT_TIP = (SPRING_X + SPR_FLAT_TIP_L[0], Y_BASE_TOP + SPR_FLAT_TIP_L[1])
+SPRING_FOOT_TOP = Y_BASE_TOP + SPRING_T  # wall under the foot centreline
+SPRING_HOLE_X = SPRING_X + SPR_FOOT_END_L[0] + SPR_HOLE_FROM_END  # -20.37
 
 if math.hypot(_SPR_PIVOT[0] - PIVOT_X, _SPR_PIVOT[1] - PIVOT_Y) > 0.01:
     raise AssertionError("spring part frame disagrees with the strap pivot")
@@ -850,20 +927,37 @@ if abs((LIFT_X - PIVOT_X) * _SPR_N[0] - SPRING_AXIS_OFF) - SPRING_T - 3.175 < 0.
     raise AssertionError("spring blade fouls the lift rod")  # perpendicular
     # foot of the rod axis lands mid-blade, so the segment bound is the line's
     # (west rod: the blade sits 10.1 EAST of the strap axis, the rod ~14.7 WEST)
-if (math.hypot(X_DRUM - SPRING_CURL_C[0], Y_DRIVE - SPRING_CURL_C[1])
-        - (SPRING_R_CURL + SPRING_T) < TIP_DRUM120 + 0.25):
-    raise AssertionError("spring curl crowds the cylinder-gear tips")
-if (math.hypot(X_DRUM - SPRING_TOP[0], Y_DRIVE - SPRING_TOP[1])
+if (math.hypot(X_DRUM - SPRING_CREST[0], Y_DRIVE - SPRING_CREST[1])
         - SPRING_T < TIP_DRUM120 + 0.25):
-    raise AssertionError("spring blade top crowds the cylinder-gear tips")
-if (math.hypot(SPRING_TOP[0] - APINION_X, SPRING_TOP[1] - APINION_Y)
+    raise AssertionError("spring contact crest crowds the cylinder-gear tips")
+if (math.hypot(X_DRUM - SPRING_FLAT_TIP[0], Y_DRIVE - SPRING_FLAT_TIP[1])
+        - SPRING_T < TIP_DRUM120 + 0.25):
+    raise AssertionError("spring flat tip crowds the cylinder-gear tips")
+if (math.hypot(SPRING_CREST[0] - APINION_X, SPRING_CREST[1] - APINION_Y)
         < STRAP_R_END + SPRING_T + 0.25):
-    raise AssertionError("spring blade top reaches the strap's arbor end cap")
-if (math.hypot(SPRING_CURL_C[0] - APINION_X, SPRING_CURL_C[1] - APINION_Y)
-        - (SPRING_R_CURL + SPRING_T) < STRAP_R_END + 0.25):
-    raise AssertionError("spring curl reaches the strap's arbor end cap")
+    raise AssertionError("spring contact crest reaches the strap's arbor end cap")
+# The flat tips back WEST toward the strap; its wall is on the gated EAST
+# side, so the governing surface is the centreline itself. Two constraints,
+# tip-governed (n falls monotonically along kink + flat): the parked FLANK
+# line (n = R_END, the 6.28 mm^3 interference the first PR7 build hit at
+# FLAT_LEN 6) and the arbor-end cap circle.
+_FLAT_TIP_N = ((SPRING_FLAT_TIP[0] - PIVOT_X) * _SPR_N[0]
+               + (SPRING_FLAT_TIP[1] - PIVOT_Y) * _SPR_N[1])
+if _FLAT_TIP_N < STRAP_R_END + 0.25:
+    raise AssertionError("spring flat tip re-enters the parked strap flank")
+if (math.hypot(SPRING_FLAT_TIP[0] - APINION_X, SPRING_FLAT_TIP[1] - APINION_Y)
+        < STRAP_R_END + 0.25):
+    raise AssertionError("spring flat tip reaches the strap's arbor end cap")
 if SPRING_Z + SPRING_W / 2.0 > BLOCK_BACK_Z0 - 0.25:
     raise AssertionError("spring reaches the back pivot block")
+# West foot corridor (PR7 item 11): the strip crosses UNDER the lift rod and
+# the parked/sweeping back cam pin; its screw head must clear the rod flank.
+if (PIVOT_Y - 3.175) - SPRING_FOOT_TOP < 0.25:
+    raise AssertionError("spring foot reaches the lift rod above it")
+if (LIFT_X - 3.175) - (SPRING_HOLE_X + FSCREW_HEAD_DIA / 2.0) < 0.25:
+    raise AssertionError("spring foot screw head crowds the lift rod")
+if SPRING_HOLE_X - FSCREW_HEAD_DIA / 2.0 - 0.25 < SPRING_X + SPR_FOOT_END_L[0]:
+    raise AssertionError("spring foot screw head overhangs the foot's free end")
 
 # --- cam engage path (ch. 25, p.68-69; PR5) ----------------------------------
 # Each strap tail carries a CAM-FOLLOWER PIN (build_pinion_cam_pin.py) pressed
@@ -885,8 +979,8 @@ CAM_T_EAST = 7.5  # axial split: follower east end ~1.0 proud of the cap's
 # bracket's Right plane -- the axial mate below. (7.25 left the west end just
 # 0.15 off the rod flank, under the 0.25 design margin.)
 ROD_PIN_DIA = 3.0  # build_pinion_lift_rod PIN_DIA (must match; thinned with
-# PR5 -- see the part's comment)
-ROD_PIN_TIP = 11.175  # build_pinion_lift_rod PIN_TIP (must match)
+# PR5 -- see the part's comment). ROD_PIN_TIP is imported (10.8 after the
+# PR7 shortening for the spring's west foot crossing beneath).
 _CAM_R_SUM = (CAM_PIN_DIA + ROD_PIN_DIA) / 2.0  # 3.5 contact centre distance
 _CAM_T_WEST = CAM_PIN_LEN - CAM_T_EAST  # 10.25 west of the bore centre
 _CAM_C = (
@@ -895,11 +989,11 @@ _CAM_C = (
 )  # follower bore centre, machine frame (-0.18, 56.70)
 _CAM_HALF_CHORD = math.sqrt(STRAP_R_END**2 - CAM_DROP**2)  # 6.48 through the cap
 
-# Rod-pin z stations (rod z0 -120, pins at +42.5/+190.5) vs the strap
+# Rod-pin z stations (rod z0 -114, pins at +36.5/+184.5) vs the strap
 # mid-planes the followers live in: the crossed cylinders meet 0.25/0.45 off
 # crown -- well under the 3.5 contact sum, checked here so a z-shuffle of the
 # rig cannot silently split the cam from its follower.
-_ROD_PIN_Z = (LIFT_ROD_Z0 + 42.5, LIFT_ROD_Z0 + 190.5)  # -77.5 / +70.5
+_ROD_PIN_Z = tuple(LIFT_ROD_Z0 + s for s in ROD_PIN_STATIONS)  # -77.5 / +70.5
 _STRAP_MID_Z = (
     APINION_Z_FRONT - STRAP_AIR - STRAP_T / 2.0,  # -77.75
     APINION_Z_BACK + STRAP_AIR + STRAP_T / 2.0,  # +70.95
@@ -919,6 +1013,10 @@ if CAM_PIN_LEN - CAM_T_EAST - _CAM_HALF_CHORD < 3.0:
 # Follower east end vs the return spring's blade (same z plane, back strap).
 if SPRING_AXIS_OFF - SPRING_T - CAM_T_EAST < 0.25:
     raise AssertionError("follower's east stub reaches the spring blade")
+# The spring's west foot (PR7) crosses UNDER the back rod pin: the sweeping
+# pin's tip CORNER (radius hypot(tip, r)) must clear the strip top.
+if PIVOT_Y - math.hypot(ROD_PIN_TIP, ROD_PIN_DIA / 2.0) - SPRING_FOOT_TOP < 0.25:
+    raise AssertionError("sweeping cam-pin corner dips into the spring foot")
 
 # Parked clearances: follower fully east of the down-pin plane and of the
 # rod's own flank band; underside off the base.
@@ -1054,50 +1152,55 @@ for _step in range(0, int(math.degrees(_TH_ENG) * 4) + 1):
 # bands overlap, by radial clearance from the sweep axis. (Cross-assembly
 # neighbours are parked-gated at the top level; the platen/pen hardware sits
 # at y ~390+, far above both sweeps.)
-HANDLE_ARM = 35.0  # build_pinion_handle ROD_DOWN/ROD_UP (must match, PR6)
-HANDLE_BALL_R = 12.0  # build_pinion_handle BALL_DIA / 2 (must match)
-_TEE_R = HANDLE_ARM + 3.0  # swept disc radius: arm + rod end cap
-# The SWEPT geometry splits in two: the Ø6 cross rod sweeps the R38 disc in
-# its own thin band; the grip ball stays ON AXIS (R12, no sweep), only its
-# z reach is wider.
+# Handle geometry is imported (PR7 img07 re-derivation: arms 42/43, the
+# grip a Ø23 cylinder + domed cap, the hub a blind tube over the arbor).
+_TEE_R = max(HANDLE_ARM_DOWN, HANDLE_ARM_UP) + 0.5  # swept disc radius:
+# the long arm's flat-end corner reaches hypot(43, 3) = 43.1
+# The SWEPT geometry splits in two: the Ø6 cross rod sweeps the R43.5 disc
+# in its own thin band; the grip + cap + tube hub stay ON AXIS (R11.5 worst),
+# only their z reach is wider.
 _TEE_DISC_Z = (HANDLE_Z - 3.0, HANDLE_Z + 3.0)
-_TEE_BALL_Z = (HANDLE_Z - HANDLE_BALL_R, HANDLE_Z + HANDLE_BALL_R)
+_TEE_HUB_Z = (
+    HANDLE_Z - HANDLE_GRIP_LEN / 2.0 - HANDLE_CAP_SAG,
+    HANDLE_Z + HANDLE_GRIP_LEN / 2.0 + HANDLE_WALL_T + HANDLE_TUBE_LEN,
+)  # -153 .. -125: cap, grip, blind wall, tube seat
 # In-assembly bodies near the tee: everything of the swing rig ends well
 # north of the disc band; the crank cluster lives south/east of it.
 for _lo, _hi, _what in (
-    (LEVER_Z - 3.0, LEVER_Z + 7.0, "lever root"),
-    (BLOCK_FRONT_Z0, BLOCK_FRONT_Z0 + 12.0, "front pivot block"),
-    (LIFT_ROD_Z0, LIFT_ROD_Z0 + 210.0, "lift rod"),
-    (PIVOT_SHAFT_Z0, PIVOT_SHAFT_Z0 + 196.0, "pivot shaft"),
+    (LEVER_Z - LEVER_HUB_LEN / 2.0 - LEVER_CAP_SAG, LEVER_Z + LEVER_HUB_LEN / 2.0,
+     "lever hub"),
+    (BLOCK_FRONT_Z0, BLOCK_FRONT_Z0 + BLOCK_DEPTH, "front pivot block"),
+    (LIFT_ROD_Z0, LIFT_ROD_Z0 + 202.0, "lift rod"),
+    (PIVOT_SHAFT_Z0, PIVOT_SHAFT_Z0 + 192.0, "pivot shaft"),
     (APINION_Z_FRONT - STRAP_T - STRAP_AIR, APINION_Z_FRONT, "front strap"),
     (REMOVABLE_Z0, REMOVABLE_Z0 + 5.0, "T12 chain wheel"),
     (CRANK_ARM_Z0, CRANK_ARM_Z0 + 8.0, "crank arm hub"),
 ):
     if _TEE_DISC_Z[1] > _lo - 0.25 and _TEE_DISC_Z[0] < _hi + 0.25:
         raise AssertionError(f"tee-handle sweep disc band reaches the {_what}")
-# The ball's wider z band DOES clip the T12 plane: radial clearance instead
-# (the ball is on-axis, the wheel is on the crank axis). The crank arm+handle
-# sweep entirely south of the arm hub (-175..) -- z-disjoint from the ball.
+# The hub's wider z band DOES clip the T12 plane: radial clearance instead
+# (the grip is on-axis, the wheel is on the crank axis). The crank arm+handle
+# sweep entirely south of the arm hub (-175..) -- z-disjoint from the grip.
 if (math.hypot(X_CRANK - APINION_X, Y_CRANK - APINION_Y)
-        < HANDLE_BALL_R + 16.0 + 0.25):  # T12 OD/2 ~14 + margin
-    raise AssertionError("tee-handle ball reaches the T12 chain wheel")
-if _TEE_BALL_Z[0] < CRANK_ARM_Z0 + 8.0 + 0.25:
-    raise AssertionError("tee-handle ball band reaches the crank arm sweep")
+        < HANDLE_GRIP_DIA / 2.0 + 16.0 + 0.25):  # T12 OD/2 ~14 + margin
+    raise AssertionError("tee-handle grip reaches the T12 chain wheel")
+if _TEE_HUB_Z[0] < CRANK_ARM_Z0 + 8.0 + 0.25:
+    raise AssertionError("tee-handle grip band reaches the crank arm sweep")
 
 # Lever full throw (parked 40 deg -> engaged ~51 deg, checked to 60): the
-# stub distance grows monotonically past 37.6 deg, but prove it numerically,
+# arbor distance grows monotonically past 37.6 deg, but prove it numerically,
 # and prove the swept tip annulus shares no z band with anything it could hit.
 for _step in range(0, 81):
     _t = math.radians(LEVER_TILT_DEG + _step * 0.25)
     _d = abs(_LEV_REL[0] * math.cos(_t) - _LEV_REL[1] * math.sin(_t))
-    if _d < (6.35 + 6.0) / 2.0 + 0.25:
-        raise AssertionError("lever shaft crowds the stub mid-throw")
+    if _d < (ARBOR_DIA + LEVER_ROD_DIA) / 2.0 + 0.25:
+        raise AssertionError("lever shaft crowds the arbor mid-throw")
 _LEV_Z = (LEVER_Z - 3.0, LEVER_Z + 3.0)  # rod plane through the throw
-if _LEV_Z[0] < BLOCK_FRONT_Z0 + 12.0 + 0.25 and _LEV_Z[1] > BLOCK_FRONT_Z0 - 0.25:
+if _LEV_Z[0] < BLOCK_FRONT_Z0 + BLOCK_DEPTH + 0.25 and _LEV_Z[1] > BLOCK_FRONT_Z0 - 0.25:
     raise AssertionError("lever throw plane reaches the front pivot block")
 if _LEV_Z[1] > PIVOT_SHAFT_Z0 - 0.25:
     raise AssertionError("lever throw plane reaches the pivot shaft front end")
-if _LEV_Z[0] < _TEE_BALL_Z[1] + 0.25:
+if _LEV_Z[0] < _TEE_HUB_Z[1] + 0.25:
     raise AssertionError("lever throw plane reaches the tee-handle sweep")
 
 # Lift-rod cam pins through the throw (0 -> 60 deg): tip circle vs the pivot
@@ -1108,6 +1211,69 @@ if (PIVOT_Y - ROD_PIN_TIP) - Y_BASE_TOP < 0.25:
     raise AssertionError("cam pin sweep reaches the base top")
 if (LIFT_X + ROD_PIN_TIP) > SPRING_X - 3.5 - 0.25:
     raise AssertionError("cam pin sweep reaches the spring foot region")
+
+# --- pinion arbor + rig fasteners (PR7 items 2/11/12/14) ---------------------
+# The steel Ø8 arbor replaced the drum's integral stubs: it presses through
+# the drum, journals in both straps' top bores, and its flat front tip seats
+# flush on the tee handle's blind-cap bore floor.
+ARBOR_Z0 = -135.0  # front tip station (crowned back end at +91.25)
+if abs((HANDLE_Z + HANDLE_GRIP_LEN / 2.0 + HANDLE_WALL_T) - ARBOR_Z0) > 1e-9:
+    raise AssertionError("arbor front tip off the handle cap's bore floor")
+if abs(ARBOR_Z0 + ARBOR_LEN - 91.25) > 0.01:  # GT pinion_back free end
+    raise AssertionError("arbor back end off the GT pinion_back station")
+if not (ARBOR_DIA == DRUM_BORE_DIA == HANDLE_TUBE_ID == STRAP_ARBOR_BORE):
+    raise AssertionError("arbor dia disagrees with drum bore/handle tube/strap bore")
+if abs(STRAP_PIVOT_BORE - 6.35) > 1e-9:
+    raise AssertionError("strap pivot bore no longer rides the O6.35 shaft")
+# Block screws (item 12): two bright slotted heads per block, seated on the
+# block top, shanks dropping through the O4.2 block holes into the base.
+BLOCK_TOP_Y = PIVOT_Y + (BLOCK_HEIGHT - BLOCK_BORE_UP)  # 66.8
+if BSCREW_SHANK_DIA > BLOCK_SCREW_HOLE_DIA - 0.1:
+    raise AssertionError("block screw shank binds in the block hole")
+if BSCREW_SHANK_DIA > BASE_BLOCK_HOLE_DIA - 0.1:
+    raise AssertionError("block screw shank binds in the base hole")
+if BSCREW_SHANK_LEN - BLOCK_HEIGHT < 1.0:
+    raise AssertionError("block screw barely engages the base")
+if BSCREW_SHANK_LEN - BLOCK_HEIGHT > BASE_BLOCK_HOLE_DEPTH - 0.25:
+    raise AssertionError("block screw bottoms out in the base hole")
+if BLOCK_SCREW_HALF + BSCREW_HEAD_DIA / 2.0 > BLOCK_WIDTH / 2.0 - 0.25:
+    raise AssertionError("block screw head overhangs the block end")
+_BLOCK_SCREW_XZ = tuple(
+    (BLOCK_X + sx, z0 + BLOCK_DEPTH / 2.0)
+    for z0 in (BLOCK_FRONT_Z0, BLOCK_BACK_Z0)
+    for sx in (BLOCK_SCREW_HALF, -BLOCK_SCREW_HALF)
+)
+# Machine-handed base part vs this pre-mirror derivation: x negates (the
+# pivot-hole assert convention above).
+for _want, _have in zip(_BLOCK_SCREW_XZ, BASE_BLOCK_XZ, strict=True):
+    if abs(_want[0] + _have[0]) > 0.05 or abs(_want[1] - _have[1]) > 0.05:
+        raise AssertionError(
+            f"harmonic-base block-screw hole {_have} != machine derived "
+            f"({-_want[0]:.3f}, {_want[1]:.3f})")
+# Foot screws (items 2 + 11): the black O2.9 hold-down at the spring foot
+# and on the pedestal's exposed flange.
+if FSCREW_SHANK_DIA > min(SPR_HOLE_DIA, ARBOR_PED_HOLE_DIA,
+                          BASE_FOOT_HOLE_DIA) - 0.1:
+    raise AssertionError("foot screw shank binds in a foot hole")
+if FSCREW_SHANK_LEN - ARBOR_PED_FLANGE_T < 2.0:
+    raise AssertionError("foot screw barely engages the base at the pedestal")
+if FSCREW_SHANK_LEN - SPRING_T > BASE_FOOT_HOLE_DEPTH - 0.25:
+    raise AssertionError("foot screw bottoms out in the base hole (spring seat)")
+# Head fits the pedestal's exposed flange strip (local z -8..-2, centre -5).
+if FSCREW_HEAD_DIA / 2.0 > min(
+        abs(ARBOR_PED_SCREW_Z + ARBOR_PED_DEPTH / 2.0),
+        abs(ARBOR_PED_DEPTH / 2.0 - ARBOR_PED_STRAP_T - ARBOR_PED_SCREW_Z)):
+    raise AssertionError("foot screw head overhangs the pedestal flange")
+_FOOT_SCREW_XZ = (
+    (SPRING_HOLE_X, SPRING_Z),
+    (X_DRUM, -ARBOR_PEDESTAL_Z + ARBOR_PED_SCREW_Z),
+)
+# Same machine-handed x negation as the block screws above.
+for _want, _have in zip(_FOOT_SCREW_XZ, BASE_FOOT_XZ, strict=True):
+    if abs(_want[0] + _have[0]) > 0.05 or abs(_want[1] - _have[1]) > 0.05:
+        raise AssertionError(
+            f"harmonic-base foot-screw hole {_have} != machine derived "
+            f"({-_want[0]:.3f}, {_want[1]:.3f})")
 
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
@@ -1410,7 +1576,7 @@ async def build(adapter) -> dict[str, str]:
             adapter, "pinion-bracket",
             [PIVOT_X, PIVOT_Y, z0],
             [0.0, 0.0, STRAP_LEAN_DEG], rot_z_rows(STRAP_LEAN_DEG),
-            ground=False, label=f"pinion-bracket {tag} (leaning onto the arbor stub)",
+            ground=False, label=f"pinion-bracket {tag} (leaning, arbor bore up top)",
         )
     pinion_blocks: list[str] = []
     for tag, z0 in (("front", BLOCK_FRONT_Z0), ("back", BLOCK_BACK_Z0)):
@@ -1446,14 +1612,43 @@ async def build(adapter) -> dict[str, str]:
         adapter, "pinion-lever",
         [LIFT_X, PIVOT_Y, LEVER_Z],
         [0.0, 0.0, -LEVER_TILT_DEG], rot_z_rows(-LEVER_TILT_DEG),
-        label="pinion-lever (clamp on the lift rod front end)",
+        label="pinion-lever (clamp hub on the lift rod front end)",
     )
     await place_component(
         adapter, "pinion-handle",
         [APINION_X, APINION_Y, HANDLE_Z],
         [0.0, 0.0, -HANDLE_TILT_DEG], rot_z_rows(-HANDLE_TILT_DEG),
-        label="pinion-handle (on the long front arbor stub)",
+        label="pinion-handle (blind cap over the arbor front end)",
     )
+    # The steel arbor (PR7 item 14): pressed through the brass drum, journaled
+    # in both straps' Ø8 top bores -- it RIDES the swing group (mated in the
+    # joints section, not located: the engage swing carries it).
+    pinion_arbor = await place_component(
+        adapter, "pinion-arbor",
+        [APINION_X, APINION_Y, ARBOR_Z0], [0.0, 0.0, 0.0], IDENTITY,
+        ground=False, label="pinion-arbor (steel, through the drum)",
+    )
+    # Rig hold-downs (PR7 items 2/11/12): 4 bright block screws + 2 black foot
+    # screws, all base-bolted statics located to the machine datums below.
+    block_screws: list[str] = []
+    for k, (sx, sz) in enumerate(_BLOCK_SCREW_XZ):
+        scr = await place_component(
+            adapter, "slotted-screw",
+            [sx, BLOCK_TOP_Y, sz], [0.0, 0.0, 0.0], IDENTITY,
+            ground=False, label=f"slotted-screw block hold-down {k}",
+        )
+        block_screws.append(scr)
+    foot_screws: list[str] = []
+    for tag, (sx, sz), seat_y in (
+        ("spring foot", _FOOT_SCREW_XZ[0], Y_BASE_TOP + SPRING_T),
+        ("pedestal flange", _FOOT_SCREW_XZ[1], Y_BASE_TOP + ARBOR_PED_FLANGE_T),
+    ):
+        scr = await place_component(
+            adapter, "foot-screw",
+            [sx, seat_y, sz], [0.0, 0.0, 0.0], IDENTITY,
+            ground=False, label=f"foot-screw ({tag})",
+        )
+        foot_screws.append(scr)
 
     # =================== cone cluster (driven, on-solution) ====================
     cone_shaft = await place_component(
@@ -1906,6 +2101,8 @@ async def build(adapter) -> dict[str, str]:
     await _locate_to_datum(adapter, pivot_shaft)
     await _locate_to_datum(adapter, lift_rod)
     await _locate_to_datum(adapter, spring)
+    for scr in block_screws + foot_screws:
+        await _locate_to_datum(adapter, scr)
     # Front strap: revolute on the torque shaft (coincident pivot bore + axial
     # seat) -- the swing DOF -- then a suppressible ANGLE PARK DRIVER at the
     # parked lean pins it. Unlike the crank park it stays ENGAGED in `free`
@@ -2025,6 +2222,32 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Right Plane@{fb}", "PLANE"), ap_phase,
         label=f"alignment-pinion anti-spin (parked a={ap_phase:.2f})",
         verify=(align_pinion, ap_o),
+    )
+    # Steel arbor (PR7 item 14): pressed through the drum on the same strap
+    # bore axis -- coaxial + an axial seat (Front-plane distance, invariant
+    # under the z-parallel engage swing) + a parallel anti-spin to the drum
+    # it is pressed into (both inserted at IDENTITY, so their Right planes
+    # are parallel; riding the same swing group keeps the pair parallel).
+    arb_o = _org(adapter, pinion_arbor)
+    await coincident_mate(
+        adapter,
+        named_ref(f"Axis1@{pinion_arbor}", "AXIS"), named_ref(f"Axis2@{fb}", "AXIS"),
+        label="pinion arbor journaled in the straps", verify=(pinion_arbor, arb_o),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Front Plane@{pinion_arbor}", "PLANE"),
+        named_ref("Front Plane", "PLANE"),
+        abs(arb_o[2]),
+        label=f"pinion arbor axial d={abs(arb_o[2]):.2f}",
+        verify=(pinion_arbor, arb_o),
+    )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Right Plane@{pinion_arbor}", "PLANE"),
+        named_ref(f"Right Plane@{align_pinion}", "PLANE"),
+        label="pinion arbor anti-spin (pressed in the drum)",
+        verify=(pinion_arbor, arb_o),
     )
 
     # DRIVER #1 (the single machine input): the crank angle. The arm hangs at
