@@ -53,6 +53,20 @@ ROD_DIA = 6.0  # DIMENSIONS.md ch20: round brass rod (low)
 
 R = ROD_DIA / 2.0
 
+# --- knife-edge pivot axis (KnifeAxis = Axis2) --------------------------------
+# The lever does NOT spin in the bracket collar: it EXTENDS FROM the pivoted
+# summing bar and pivots WITH it about the knife-edge ridge (engineerguy video
+# 2/4 "at the pivoted bar we see that it sweeps out a small arc" + 4/4 "this
+# cylindrical rod extends from the pivoted summing bar"; the tip draws a ~6 mm
+# arc, and the clamp's position along the rod -- the radius from this pivot --
+# is what sets the <=4x magnification). The ridge line runs along Z at machine
+# (pre-mirror) (15, 995.134) = build_summing_assembly.KNIFE_CONTACT_Y; in
+# lever-local coords (assembly placement (-200, 990, -85), rod along +X) that
+# is (215, 5.134). Duplicated literals -- build_magnifier_assembly asserts them
+# against build_summing_assembly's KNIFE/KNIFE_CONTACT_Y and its own placement.
+KNIFE_LOCAL_X = 215.0
+KNIFE_LOCAL_Y = 5.134
+
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import RevolveParameters
@@ -163,9 +177,17 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven rod (equations neutral)", v_rod, 0.005 * v_rod)
 
-    # Named rod axis (local X through the origin = the revolve axis) so the rod
-    # rides the bracket collar as a revolute in the M6 mated-DOF assembly.
+    # Named rod axis (local X through the origin = the revolve axis); the
+    # bracket collar is a loose guide around it (Ø6.2 over Ø6), not a mate.
     await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "rod axis")
+
+    # KnifeAxis (Axis2): the knife-edge pivot line, local Z through
+    # (KNIFE_LOCAL_X, KNIFE_LOCAL_Y) -- see the module-level block. The line is
+    # outside the rod body (the physical rod attaches to the summing bar 50 mm
+    # past its own domed end; the attachment is not modeled), which is fine for
+    # a reference axis: the assembly pivots the lever about it.
+    await name_bore_axis(adapter, "Right Plane", KNIFE_LOCAL_X,
+                         "Top Plane", KNIFE_LOCAL_Y, "knife axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
