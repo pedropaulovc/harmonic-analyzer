@@ -45,7 +45,8 @@ from _common import (
 PART_NAME = "pinion-pivot-block"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel block (p.68)
 
-WIDTH = 33.0  # spans both bores +9 margin each side (derived)
+WIDTH = 36.0  # spans both bores + margin; widened 33 -> 36 (PR7) so the
+# Ø8 screw heads at x +-13.5 seat fully on the block (edge 17.5 + 0.5 rim)
 HEIGHT = 16.0  # photo-scaled (low); keeps the strap's r 11 bottom cap
 # (PIVOT_Y - 11 = 51.8) swinging clear of the base top 50.8
 DEPTH = 12.0  # photo-scaled (low)
