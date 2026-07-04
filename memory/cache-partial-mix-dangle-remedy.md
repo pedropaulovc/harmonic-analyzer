@@ -15,11 +15,15 @@ metadata:
 persistent IDs) while assemblies containing them HIT stale entries another
 seat published (whose mates bind that seat's part PIDs). `summing` ⊃
 summing-lever, `magnifier` ⊃ thumb-screw — exactly the hit assemblies holding
-locally rebuilt parts dangled; `pen` (no rebuilt parts) stayed healthy. The
-transitive recipe folding *should* make a part miss imply its assembly misses;
-a hit+miss mix means the other seat published the assembly but its part store
-was lost (store is best-effort) — `doit cache_status` shows the mix plus
-`DRIFT(last published …)` on the stale entries.
+locally rebuilt parts dangled; `pen` (no rebuilt parts) stayed healthy.
+Root cause (pinned in issue #149, 2026-07-03): a TWO-SEAT PUBLISH RACE, not a
+lost store — the keys never disagreed; the blob's contents moved underneath a
+multi-hour build. Seat A's parts phase missed (nothing published yet) and
+rebuilt locally; seat B then published the same recipe state's parts AND
+assemblies mid-window; seat A's assembly phase hit the just-published entries,
+PID-incompatible with its own parts. Any two seats building overlapping recipe
+states concurrently reproduce this. `doit cache_status` shows the mix plus
+`DRIFT(last published …)` on the foreign entries.
 
 **Why:** the obvious fix (delete the `.SLDASM`, re-run doit) silently
 RE-RESTORES the same broken artifact — the cache key still hits; restore
