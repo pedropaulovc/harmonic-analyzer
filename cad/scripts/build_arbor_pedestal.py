@@ -64,7 +64,8 @@ FOOT_HEIGHT = 5.0  # the low flange under the strap (photo-scaled, low)
 STRAP_T = 10.0  # Z; thin strap FLUSH with the foot's +Z face (L, not T):
 # band local z (FOOT_DEPTH/2 - STRAP_T)..(FOOT_DEPTH/2) = -2..+8. Keeps the
 # arbor's 7.5 engagement from the north face; the -Z flange carries the screw
-SCREW_HOLE_DIA = 3.2  # fillister-screw shank O2.9 (the flange hold-down)
+SCREW_HOLE_DIA = 3.2  # foot-screw shank O2.9 (build_foot_screw, the flange
+# hold-down; its 8.0 shank reaches 3.0 into the base past this 5.0 flange)
 SCREW_Z = -5.0  # hole centre on the exposed flange, local z (machine -95.5)
 TOP_RADIUS = 10.0  # dome radius = strap half-width at the top (24 -> 20 taper)
 BORE_DIA = 0.375 * IN  # 9.525: arbor diameter (ch. 13, legacy, med)
