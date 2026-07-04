@@ -228,8 +228,14 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     # symmetric about its local x = 0 plane (gear/rod axes, strap/block
     # mid-planes); explicit c, no STLs yet at first build
     "alignment-pinion": ("x", 0.0),
-    "pinion-bracket": ("x", 0.0),
-    "pinion-pivot-block": ("x", 0.0),
+    # pinion-bracket went x-ASYMMETRIC with the PR8 blind pin seat in its -X
+    # edge; every feature is a through/mid-plane form about the exact z
+    # mid-plane instead (extrude z 0..5).
+    "pinion-bracket": ("z", 2.5),
+    # pinion-pivot-block went x-ASYMMETRIC with the PR8 dropped lift bore;
+    # every feature is a through/mid-depth form about the exact z mid-plane
+    # instead (extrude z 0..12, screw holes at mid-depth).
+    "pinion-pivot-block": ("z", 6.0),
     "pinion-pivot-shaft": ("x", 0.0),
     "pinion-lever": ("x", 0.0),
     "pinion-lift-rod": ("x", 0.0),
