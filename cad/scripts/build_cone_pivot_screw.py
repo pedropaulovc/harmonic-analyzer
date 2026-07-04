@@ -41,7 +41,9 @@ from _common import (
 PART_NAME = "cone-pivot-screw"
 MATERIAL = "Plain Carbon Steel"  # bright steel screw (v4 stills)
 
-HEAD_DIA = 12.0
+HEAD_DIA = 9.5  # covers the plate's O6.5 hole; r 4.75 clears the tip block's
+# north face 0.25 (pivot station 196 - block north 191 -- assembly-asserted;
+# the first O12 cut clipped the block corner 13.5 mm^3)
 HEAD_T = 3.0
 SLOT_W = 1.6  # driver slot width
 SLOT_D = 1.2  # driver slot depth into the head top

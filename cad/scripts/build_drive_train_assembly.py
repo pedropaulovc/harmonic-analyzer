@@ -413,6 +413,7 @@ from build_cone_lock_knob import (  # noqa: E402
     WASHER_DIA as KNOB_WASHER_DIA,
 )
 from build_cone_pivot_screw import (  # noqa: E402
+    HEAD_DIA as PSCREW_HEAD_DIA,
     SHANK_DIA as PSCREW_SHANK_DIA,
 )
 from build_swing_stop_screw import (  # noqa: E402
@@ -558,6 +559,12 @@ if (abs(BASE_PIVOT_XZ[0] - _PPIVOT[0]) > 0.05
         f"({_PPIVOT[0]:.3f}, {_PPIVOT[2]:.3f})")
 if BASE_PIVOT_HOLE_DIA < PSCREW_SHANK_DIA:
     raise AssertionError("base pivot hole under the pivot-screw shoulder dia")
+# The pivot-screw head sits on the plate top at station PIVOT_STATION; the
+# tip block (also on the plate) ends at station 191 -- the head radius must
+# clear its north face (the first O12 head clipped the corner 13.5 mm^3).
+if PSCREW_HEAD_DIA / 2.0 > (
+        PIVOT_STATION - (TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0)) - 0.25:
+    raise AssertionError("pivot-screw head reaches the tip block's north face")
 
 
 # --- cone lock knob (v4_t00411; clamps the swing plate through its notch) ----
@@ -603,18 +610,22 @@ DISENGAGE_DEG = math.degrees(
 _DISENGAGE_RAD = math.radians(DISENGAGE_DEG)
 
 # --- swing-stop screw (item 6): bounds the free swing at the disengaged pose.
-# The plate's west edge bumps the screw's proud shank exactly when the notch
-# mouth has cleared the knob washer. Contact point taken on the west edge at
-# plate-local z -185 (just north of the notch); the screw centre sits one
-# shank radius outside the swung edge. The base part hardcodes the hole
-# (CAM_ECC pattern) -- assert agreement, and that the ENGAGED pose clears it.
-_K_W = (PLAT_WEST_S - PLAT_HALF_N) / PLAT_LEN
-_STOP_ZL = -185.0
-_STOP_PL = (-(PLAT_HALF_N + _K_W * (PLAT_OVERHANG - _STOP_ZL)), _STOP_ZL)
-_EDGE_D = (-_K_W, -1.0)
-_EDGE_N = math.hypot(*_EDGE_D)
-_EDGE_D = (_EDGE_D[0] / _EDGE_N, _EDGE_D[1] / _EDGE_N)
-_EDGE_OUT = (_EDGE_D[1], -_EDGE_D[0])  # outward (west) normal, plate frame
+# The DISENGAGE swing is + (the notch region sweeps machine EAST -- the same
+# sense that walks the knob stud out the notch mouth), so the plate VACATES
+# its west side and it is the EAST taper edge that advances onto a base
+# screw. Contact point taken on the east edge at plate-local z -105 (mid
+# plate, on the base with margin); the screw centre sits one shank radius
+# outside the swung edge. The base part hardcodes the hole (CAM_ECC
+# pattern) -- assert agreement, and that the ENGAGED pose clears it on the
+# CORRECT side (signed, not |distance|: the first cut of this derivation
+# used the west edge + an abs() gap and buried the screw 19 mm INSIDE the
+# engaged plate -- caught by the interference gate).
+_K_E = (PLAT_EAST_S - PLAT_HALF_N) / PLAT_LEN
+_STOP_ZL = -105.0
+_STOP_PL = (PLAT_HALF_N + _K_E * (PLAT_OVERHANG - _STOP_ZL), _STOP_ZL)
+_EDGE_OUT = (1.0, _K_E)  # outward (east) normal, plate frame
+_EDGE_N = math.hypot(*_EDGE_OUT)
+_EDGE_OUT = (_EDGE_OUT[0] / _EDGE_N, _EDGE_OUT[1] / _EDGE_N)
 
 
 def _swung_to_machine(x_l: float, z_l: float, ang: float) -> tuple[float, float]:
@@ -634,17 +645,21 @@ if abs(BASE_STOP_XZ[0] - STOP_X) > 0.05 or abs(BASE_STOP_XZ[1] - STOP_Z) > 0.05:
         f"({STOP_X:.3f}, {STOP_Z:.3f})")
 if BASE_STOP_HOLE_DIA < STOP_SHANK_DIA:
     raise AssertionError("base stop hole under the stop-screw shank dia")
-# Engaged pose clears the stop screw: distance from the screw centre to the
-# ENGAGED west edge line, minus the shank radius, must leave real air.
+# Engaged pose clears the stop screw on the OUTSIDE (signed distance along
+# the engaged east edge's outward normal, minus the shank radius).
 _EP = _swung_to_machine(_STOP_PL[0], _STOP_PL[1], math.radians(INCLINE_DEG))
-_ED = (_EDGE_D[0] * COS_I - _EDGE_D[1] * SIN_I,
-       _EDGE_D[0] * SIN_I + _EDGE_D[1] * COS_I)
+_N_ENG = (_EDGE_OUT[0] * COS_I - _EDGE_OUT[1] * SIN_I,
+          _EDGE_OUT[0] * SIN_I + _EDGE_OUT[1] * COS_I)
 _W = (STOP_X - _EP[0], STOP_Z - _EP[1])
-_STOP_ENGAGED_GAP = abs(_W[0] * _ED[1] - _W[1] * _ED[0]) - STOP_SHANK_DIA / 2.0
+_STOP_ENGAGED_GAP = (_W[0] * _N_ENG[0] + _W[1] * _N_ENG[1]) - STOP_SHANK_DIA / 2.0
 if _STOP_ENGAGED_GAP < 2.0:
     raise AssertionError(
         f"stop screw within {_STOP_ENGAGED_GAP:.2f} of the ENGAGED plate edge "
-        f"(needs >= 2.0)")
+        f"(needs >= 2.0, signed: negative = inside the plate)")
+# ... and it must stand clear of the OTHER swing hardware and on the base.
+if math.hypot(STOP_X - KNOB_X, STOP_Z - KNOB_Z) < (
+        KNOB_WASHER_DIA + STOP_SHANK_DIA) / 2.0 + 0.25:
+    raise AssertionError("stop screw fouls the lock-knob washer")
 _POST_LOCAL_Z = POST_STATION - PIVOT_STATION  # -194.5
 _WASHER_POST_GAP = (
     math.hypot(PLAT_SLOT_E_X, PLAT_SLOT_E_Z - _POST_LOCAL_Z)
@@ -657,6 +672,7 @@ if _WASHER_POST_GAP < 2.0:
 # Plate WEST edge (the flare) vs the arbor-pedestal block: sample the edge
 # along its run and check each machine point against the block's east flank
 # band (the old lobe-corner check generalised to the flared edge).
+_K_W = (PLAT_WEST_S - PLAT_HALF_N) / PLAT_LEN
 _ARB_E_X = X_DRUM + ARBOR_PED_WIDTH / 2.0  # 66.7
 _ARB_Z = (-ARBOR_PEDESTAL_Z - ARBOR_PED_DEPTH / 2.0,
           -ARBOR_PEDESTAL_Z + ARBOR_PED_DEPTH / 2.0)  # -98.5..-82.5
