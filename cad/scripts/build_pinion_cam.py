@@ -57,9 +57,10 @@ CAM_LEN = 9.0  # along the rod (med)
 ECC = 1.0  # bore offset -> 2.0 full lift; 0.575 min wall over the bore
 BORE = 6.35  # rides the lift rod (derived)
 BOSS_DIA = 3.2  # set-pin dome, photo ~3.2 (low)
-BOSS_PROUD = 1.2  # proud of the OD at the thick (down/park) side; capped
-# by the base top under the dropped rod: park boss-down reach 58.29 -
-# 5.75 - 1.2 = 51.34 vs base 50.8 (0.54 air; 2.0 dug 0.77 in)
+BOSS_PROUD = 0.5  # proud of the OD at the thick (down/park) side; capped
+# by the SPRING FOOT crossing under the back cam at the same z band:
+# the boss sweep circle (ecc + R + proud about LIFT_Y 58.14) bottoms at
+# 51.89 vs the 51.6 strip top (0.29 air; 1.2 dug 0.41 into the strip)
 BOSS_Z = 2.5  # boss axis station from the front face
 
 CAM_R = CAM_OD / 2.0

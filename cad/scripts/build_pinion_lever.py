@@ -43,6 +43,7 @@ from _common import (
     ensure_fully_defined,
     extrude_at_offset,
     force_rebuild,
+    name_bore_axis,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -287,6 +288,10 @@ async def build(adapter) -> dict[str, str]:
     check("revolve rod", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Rod")
     await volume_check(adapter, "lever", V_TOTAL, 0.01 * V_FRUSTUM)
+
+    # Named hub-bore axis (Axis1): the assembly clamps the lever coaxial on
+    # the lift rod (PR8 -- it spins with the rod to drive the cams).
+    await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "hub bore")
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).

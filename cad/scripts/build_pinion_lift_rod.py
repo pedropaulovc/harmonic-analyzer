@@ -34,6 +34,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_bore_axis,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -176,6 +177,10 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "BackCap")
     expected += V_CAP
     await volume_check(adapter, "back cap", expected, 0.03 * V_CAP)
+
+    # Named centreline axis (Axis1): the assembly's revolute (coaxial to the
+    # block's lift-bore axis) and the cam/lever clamps all key off it (PR8).
+    await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "rod axis")
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
