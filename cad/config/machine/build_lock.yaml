@@ -25,7 +25,7 @@ build_lock:
     drive-train frees the crank spin (1 DOF). channel frees, per active channel, the
     rocker swing + connecting-rod follow + amplitude-bar slide (3 DOF/channel), so the
     saved model is a working kinematic channel bank. magnifier frees the lever's
-    knife-edge rock + the articulated hub-wire's swing/spin (3 DOF, 2026-07-04): the
+    knife-edge rock + the articulated lever-wire's swing/spin (3 DOF, 2026-07-04): the
     lever pivots about the summing bar's knife-edge ridge (video 2/4+4/4, ~6 mm tip
     arc), the clamp/vertical-rod/fixture group swings with it, the wire ball-joints
     at the hook + rides the hub at the 0.25 stand-off tangency, and the WIRE-1 yoke

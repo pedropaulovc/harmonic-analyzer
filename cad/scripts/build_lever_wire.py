@@ -1,4 +1,4 @@
-r"""Reproduction script: hub wire -- WIRE 1 of the amplification chain (book
+r"""Reproduction script: lever wire -- WIRE 1 of the amplification chain (book
 ch. 20-21, pp. 46-53).
 
 The steel wire that hangs from the output fixture on the magnifying lever's
@@ -39,7 +39,7 @@ its YokePlane offset sit at the hub-end tangency), length ``WIRE_LEN``.
 
 Run (SolidWorks already open)::
 
-    uv run python cad\scripts\build_hub_wire.py
+    uv run python cad\scripts\build_lever_wire.py
 """
 
 from __future__ import annotations
@@ -64,7 +64,7 @@ from _common import (
     volume_check,
 )
 
-PART_NAME = "hub-wire"
+PART_NAME = "lever-wire"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 WIRE_DIA = 0.8  # hair-thin in the photos; renderable stand-in (low)
@@ -183,7 +183,7 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven hub wire (equations neutral)", v_wire, 0.005 * v_wire)
+    await volume_check(adapter, "driven lever wire (equations neutral)", v_wire, 0.005 * v_wire)
 
     # YokePlane: the WIRE-1 coupling plane, parallel to Top (perpendicular to
     # the wire axis) through the wheel's hub-pitch yoke point -- see module
