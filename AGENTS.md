@@ -242,15 +242,16 @@ the `all` aggregate, and the separate `subsystems` suite are gone.
 
 `soundness` opens EVERY built (sub)assembly standalone and runs the shared health
 battery on each: **one shared re-solve** (`verify.rebuild`) after open, then DOF /
-over-constrained / model-healthy-deep / interference / component-count reading that
-resolved model (the three gates that each used to `ForceRebuild3` now share one —
-`resolve=False`; model-healthy gets the shared rebuild's result). Two former members
-moved OUT of the every-build battery: **gear-ratios** is DEMOTED to the release
-preflight (it was ~50% of a run and re-proves a property the tooth-count config
-already fixes, which `check:math` validates analytically), and **channel-independence**
-(the retired `subsystems` suite's one unique gate) is FOLDED IN — soundness already
-opens `channel`, so it runs there. **component-count is now WARN-only** (every
-historical failure was a stale band, never a real regression). The **DOF gate adapts
+over-constrained / model-healthy-deep / interference reading that resolved model
+(the three gates that each used to `ForceRebuild3` now share one — `resolve=False`;
+model-healthy gets the shared rebuild's result). Three former members left the
+every-build battery: **gear-ratios** is DEMOTED to the release preflight (it was ~50%
+of a run and re-proves a property the tooth-count config already fixes, which
+`check:math` validates analytically); **channel-independence** (the retired
+`subsystems` suite's one unique gate) is FOLDED IN — soundness already opens
+`channel`, so it runs there; and **component-count is REMOVED** (every failure it
+ever raised was a stale band or a gate bug, never a real regression — `_COMPONENT_BAND`
+stays as reference data). The **DOF gate adapts
 to how the model was built**
 (see "Default-free DOF" below): an assembly with an expected free operational DOF
 (drive-train + channel, when built `free`) is checked by the **necessity gate**
