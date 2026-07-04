@@ -1131,6 +1131,8 @@ def task_check():
                          str((SCRIPTS_DIR / "build_drive_train_assembly.py").resolve()),
                          str((SCRIPTS_DIR / "build_crank_pedestal.py").resolve()),
                          str((SCRIPTS_DIR / "build_cone_pivot_post.py").resolve()),
+                         str((SCRIPTS_DIR / "build_cone_swing_platform.py").resolve()),
+                         str((SCRIPTS_DIR / "build_cone_tip_block.py").resolve()),
                          str((SCRIPTS_DIR / "build_arbor_pedestal.py").resolve()),
                          str((SCRIPTS_DIR / "build_harmonic_base.py").resolve()),
                          config_py, *_CONFIG_YAMLS],

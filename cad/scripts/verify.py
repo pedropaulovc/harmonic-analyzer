@@ -139,15 +139,16 @@ _CRANK_GEAR_TOKENS = ("crank-pinion", "crank-drive-gear")
 # flattened parts. Bands measured live on a green build, with margin.
 # The channel + drive-train bands scale with the built channel count N (the
 # TEMPORARY active_count): channel = 7N + 4 (N×{rocker,rod,bar,lever,spring} + 2
-# shafts + 4 ball-mounts + 2 bushings per inter-channel gap), drive-train = 40 + N
-# (full 20-gear cone stack + crank/structure ≈ 32 + the restored ch25 pinion
-# swing rig's 8: alignment-pinion, 2 brackets, 2 pivot blocks, pivot shaft,
-# lift rod, handle -- ch30 GT re-anchor, plus N cylinder gears). Both
-# reproduce the measured N=20 bands (164, 60) and stay correct at N=3.
+# shafts + 4 ball-mounts + 2 bushings per inter-channel gap), drive-train = 42 + N
+# (full 20-gear cone stack + crank/structure ≈ 34 -- including the cone swing
+# platform + tip block that joined the pivot post in the p1 swing rework -- +
+# the restored ch25 pinion swing rig's 8: alignment-pinion, 2 brackets, 2
+# pivot blocks, pivot shaft, lift rod, handle, plus N cylinder gears). Both
+# reproduce the measured N=20 bands (164, 62) and stay correct at N=3.
 _N_CH = _config.active_count()
 _COMPONENT_BAND = {
     "frame": (11, 16),          # measured 13 (9 structure + 4 lag-screw hold-downs)
-    "drive-train": (40 + _N_CH - 4, 40 + _N_CH + 4),  # N=20 -> (56,64), measured 60
+    "drive-train": (42 + _N_CH - 4, 42 + _N_CH + 4),  # N=20 -> (58,66), measured 62
     "channel": (8 * _N_CH + 4 - 6, 8 * _N_CH + 4 + 6),  # N=20 -> (158,170), measured 164
     # The former monolithic output split by function (no per-channel parts here);
     # bands tightened to the measured green-build counts (verify:subsystems).
@@ -848,21 +849,17 @@ def verify_base_footprint(report: Report) -> None:
 
     def _mounts_on_plate() -> None:
         import build_arbor_pedestal as arbor_post
-        import build_cone_pivot_post as pivot_post
+        import build_cone_swing_platform as platform
         import build_crank_pedestal as pedestal
         import build_drive_train_assembly as train
         import build_harmonic_base as base
 
         half_len, half_wid = base.TOP_LENGTH / 2.0, base.TOP_WIDTH / 2.0
-        ppost = train.cone_station(train.PIVOT_POST_STATION)
         # (label, centre x, centre z, plan half-x, plan half-z); circular feet
-        # use the radius both ways, the rotated pivot post is circular so its
-        # incline never changes the footprint.
+        # use the radius both ways.
         mounts = (
             ("crank-pedestal", train.X_CRANK, train.PEDESTAL_Z,
              pedestal.PEDESTAL_DIA / 2.0, pedestal.PEDESTAL_DIA / 2.0),
-            ("cone-pivot-post", ppost[0], ppost[2],
-             pivot_post.BLOCK_DIA / 2.0, pivot_post.BLOCK_DIA / 2.0),
             ("arbor-pedestal", train.X_DRUM, -train.ARBOR_PEDESTAL_Z,
              arbor_post.BLOCK_WIDTH / 2.0, arbor_post.BLOCK_DEPTH / 2.0),
         )
@@ -872,6 +869,25 @@ def verify_base_footprint(report: Report) -> None:
                 f"{label} foot hangs off the base top plate: plan centre "
                 f"({cx:.2f}, {cz:.2f}) half-extents ({hx:.2f}, {hz:.2f}) vs "
                 f"plate (+-{half_len:.2f}, +-{half_wid:.2f})",
+            )
+        # The cone swing platform lies flat on the base rotated by the cone
+        # incline about its pivot: sweep its trapezoid corners. (The pivot
+        # post and tip block ride the PLATE, not the base -- their plate
+        # containment is asserted at drive-train import.)
+        pv = train.cone_station(train.PIVOT_STATION)
+        corners_local = (
+            (-platform.HALF_WIDTH_N, platform.NORTH_OVERHANG),
+            (platform.HALF_WIDTH_N, platform.NORTH_OVERHANG),
+            (platform.HALF_WIDTH_S, platform.NORTH_OVERHANG - platform.PLATE_LEN),
+            (-platform.HALF_WIDTH_S, platform.NORTH_OVERHANG - platform.PLATE_LEN),
+        )
+        for lx, lz in corners_local:
+            cx = pv[0] + lx * train.COS_I - lz * train.SIN_I
+            cz = pv[2] + lx * train.SIN_I + lz * train.COS_I
+            _expect(
+                abs(cx) <= half_len + 1e-9 and abs(cz) <= half_wid + 1e-9,
+                f"cone-swing-platform corner ({cx:.2f}, {cz:.2f}) hangs off "
+                f"the base top plate (+-{half_len:.2f}, +-{half_wid:.2f})",
             )
 
     report.gate("footprint:drive-train-mounts-on-base", _mounts_on_plate)

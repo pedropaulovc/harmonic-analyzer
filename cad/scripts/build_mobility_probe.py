@@ -60,7 +60,9 @@ import _telemetry
 # that family, and checks the family goes free. (subassembly, family, label.)
 PROBES = [
     ("drive-train", "crank-handle", "crank input (the 1 operating DOF)"),
-    ("drive-train", "cone-pivot-post", "p1 cone swing-to-disengage"),
+    # p1: the swing park pins the PLATFORM (the post/tip block/shaft ride it by
+    # seat mates, so no rider family carries a swing driver of its own).
+    ("drive-train", "cone-swing-platform", "p1 cone swing-to-disengage"),
     # p2: the swing park pins the FRONT STRAP (the pinion itself is tied to the
     # strap by two-real mates, so its family carries no swing driver of its own).
     ("drive-train", "pinion-bracket", "p2 pinion swing-to-engage"),
