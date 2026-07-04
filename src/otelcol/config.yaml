@@ -1,0 +1,33 @@
+# OpenTelemetry Collector - fan-out for local OTel viewing (no Docker).
+# The Collector OWNS the spine's default OTLP port (:18890), so a plain build with
+# NO env var exports here, and the Collector duplicates every trace to BOTH the
+# Aspire dashboard and Jaeger. (Aspire itself was moved to :4319/:4320.)
+#
+# Receiver ports = the spine default (18890 HTTP / 18889 gRPC).
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 127.0.0.1:18890
+      grpc:
+        endpoint: 127.0.0.1:18889
+
+exporters:
+  otlphttp/aspire:
+    endpoint: http://localhost:4319
+    compression: none   # Aspire's OTLP/HTTP receiver can't decode gzip -> 500 invalid-wire-type
+  otlphttp/jaeger:
+    endpoint: http://localhost:4318
+
+service:
+  # No collector self-telemetry server (would grab a port and add noise).
+  telemetry:
+    metrics:
+      level: none
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [otlphttp/aspire, otlphttp/jaeger]
+    logs:
+      receivers: [otlp]
+      exporters: [otlphttp/aspire]   # Jaeger 404s on /v1/logs - logs to Aspire only
