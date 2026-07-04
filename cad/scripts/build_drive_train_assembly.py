@@ -1649,8 +1649,11 @@ async def build(adapter) -> dict[str, str]:
         await assert_expected_free_dof(adapter, 0)
     else:
         # TWO freed operational DOF: the crank spin and the platform swing
-        # (both deferred PARK drivers above).
-        assert_free_dof_necessity(adapter, 2)
+        # (both deferred PARK drivers above). Each names its family: the
+        # aggregate count alone passes on the crank chain even with the
+        # swing pinned (codex review 2026-07-04).
+        assert_free_dof_necessity(
+            adapter, 2, required_stems=("crankshaft", "cone-swing-platform"))
         write_park_specs(ASM_NAME)
     check_no_interference(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)

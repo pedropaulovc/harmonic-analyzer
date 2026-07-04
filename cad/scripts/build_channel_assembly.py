@@ -1260,7 +1260,11 @@ async def build(adapter) -> dict[str, str]:
                 f"{len(park_names)} ({sorted(park_names)}) -- a free_dof_key was "
                 "dropped or double-counted"
             )
-        assert_free_dof_necessity(adapter, len(park_names))
+        # Three freed DOF per channel, one family each: the aggregate count
+        # alone cannot tell a pinned family from a free one (codex 2026-07-04).
+        assert_free_dof_necessity(
+            adapter, len(park_names),
+            required_stems=("rocker-arm", "connecting-rod", "amplitude-bar"))
         write_park_specs(ASM_NAME)
     check_no_interference(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)
