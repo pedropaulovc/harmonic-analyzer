@@ -350,4 +350,22 @@ discovered during harmonic-analyzer M6.4:
   `anchor_point_to_origin` + equation entirely. Same bug class as the
   magnifying-lever dome radius (don't drive an already-forced dim).
 
+- **A plane-to-plane DISTANCE mate to a WORLD datum also forces PARALLELISM —
+  seating a swing-family part against an assembly plane silently pins the whole
+  family's rotation** (2026-07-04, drive-train p1 swing): `_seat_on_crank`
+  axially seated the T12 chain wheel / 16T pinion / crank arm — all coaxial on
+  the platform-carried crank axis — with `distance(Front@part, Front Plane)`.
+  The distance forces `Front@part ∥` world Front; those planes are normal to
+  the crank axis, so the crank axis direction is locked to machine z and the
+  platform's freed swing DOF reads FULLY DEFINED (status 3) even though its
+  angle driver is deferred. Every part with a leftover spin still reads
+  under-constrained, so the old aggregate `assert_free_dof_necessity(n)` count
+  passed on the 47 spinners — only the per-family `required_stems` check caught
+  it. Fix: axial seats of parts riding a movable family must reference the
+  FAMILY's own axial datum (`Top Plane@crankshaft`, `CrankAxisSeat@platform`),
+  never an assembly datum. Diagnosis tool: `diagnostics/probe_platform_pin.py`
+  (dump per-component GetConstrainedStatus + every mate with its two
+  ReferenceComponents; a `parts=[..., 'drive-train']` row on a family member is
+  the smoking gun).
+
 See [[solidworks-3dx-launch]] for session/launch rules.
