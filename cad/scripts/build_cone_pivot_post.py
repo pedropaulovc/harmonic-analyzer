@@ -1,22 +1,22 @@
-r"""Reproduction script: cone pivot post (book ch. 12, p. 18 "pivot").
+r"""Reproduction script: cone pivot post (book ch. 12, p. 18).
 
-Swing-journal block for the cone shaft's big end -- the whole cone set
-swings horizontally out of mesh about this block's vertical axis (ch. 12
-notes; p. 18 top-down labels the bracket "pivot"). Since the 2026-07-02
-cylinder restore it NESTS inside the crank pedestal's O26 vertical cavity
-(the ch30 photos show ONE round green casting at the front-right, not a
-pedestal-plus-block pair): a O24 cylinder standing on the base through the
-cavity's bottom opening, with the big-end journal bore at the drive
-height. Cylindrical on purpose -- the assembly rotates it about Y (the
-shaft incline, 12.52 deg) and the p1 swing articulates about the same
-vertical axis, and a circular plan section fits the round cavity at every
-swing angle. The block is fully hidden inside the pedestal; the shaft
-passes through the pedestal's wall windows and its front stub ends proud
-at machine z -123.0 (the GT cone_front boss).
+Big-end journal post for the cone shaft. It STANDS ON the cone swing
+platform (build_cone_swing_platform) near the wide south end: the p.18
+top-down shows the round green post carrying the shaft's big end on the
+dark wedge plate, and the whole plate -- post, shaft, cone set, tip
+block -- swings horizontally about the platform's TIP-end pivot to
+dis/engage the 16T from the 64T (video 4/4 stills). The post itself no
+longer supplies the swing axis; it just rides the plate.
+
+Cylindrical on purpose -- the assembly rotates it about Y (the shaft
+incline, 12.52 deg) and a circular plan section reads the same at every
+angle. "swing pivot" (Axis2) survives as the post's own centreline,
+used by the platform seat mates.
 
 Dimensions: cad/DIMENSIONS.md ch. 13 "Drive supports" (estimated, low;
-heights re-read from the ch30 GT). Fit against the pedestal cavity is
-asserted module-level in build_drive_train_assembly.
+heights re-read from the ch30 GT). BORE_HEIGHT + the platform's PLATE_T
+must equal the drive height above the base top (54) -- asserted
+module-level in build_drive_train_assembly.
 
 Layout: cylinder standing on the Top plane, axis through the origin,
 journal bore along Z at y = BORE_HEIGHT (the assembly rotates the post
@@ -55,11 +55,11 @@ from _common import (
 PART_NAME = "cone-pivot-post"
 MATERIAL = "Gray Cast Iron"  # one green casting complex with the crank pedestal
 
-BLOCK_DIA = 24.0  # pedestal cavity O26 - 1 radial air (was 32 x 26 standing free)
-BLOCK_HEIGHT = 63.0  # journal at 54 + 9 of material above (low)
+BLOCK_DIA = 24.0  # round green post, p.18 top-down (low)
+BLOCK_HEIGHT = 56.65  # journal at 47.65 + 9 of material above (low)
 BORE_DIA = 0.375 * IN  # 9.525: cone shaft big-end diameter (ch. 12, legacy, med)
-BORE_HEIGHT = 54.0  # ch30 GT: drive height above base top
-# (must equal build_crank_pedestal JOURNAL_Y -- asserted in the assembly)
+BORE_HEIGHT = 47.65  # + platform PLATE_T 6.35 = drive height 54 above base top
+# (asserted in the assembly)
 
 BLOCK_RADIUS = BLOCK_DIA / 2.0
 BORE_RADIUS = BORE_DIA / 2.0
@@ -155,12 +155,10 @@ async def build(adapter) -> dict[str, str]:
     # Named bore/central axis for view-independent assembly mate
     # selection (M6 mated-DOF drive train).
     await name_bore_axis(adapter, "Top Plane", BORE_HEIGHT, "Right Plane", 0.0, "journal axis")
-    # Vertical swing pivot (Axis2): the local Y centreline through the plan
-    # centre. The whole cone set swings HORIZONTALLY out of mesh about this post
-    # (ch.12, p.18 "pivot"); the drive-train floats the post and rotates it about
-    # this axis -- the p1 disengage DOF. The post is inserted with a pure Ry
-    # incline, which leaves this axis vertical, so a rotation about it is the
-    # horizontal swing the book describes.
+    # Vertical centreline (Axis2), historically named "swing pivot". The p1
+    # swing DOF now lives on the PLATFORM's own pivot axis (the post just rides
+    # the plate); this axis remains the post's plan centreline, used by the
+    # platform seat mates to locate the post on the plate.
     await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "swing pivot")
 
     await apply_material(adapter, MATERIAL)
