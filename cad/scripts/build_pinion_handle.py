@@ -1,25 +1,25 @@
 r"""Reproduction script: pinion turning handle (book ch. 25).
 
-The bright ball-and-cross-rod tee on the alignment pinion's front arbor
-(p. 67/68; the ch25 close-ups are shot from the BACK, so it appears at
-viewer-left there but front-centre in ch30 p002): the operator turns it
-to rotate all 20 engaged cylinder gears as one. A short hub journals on
-the drum's front arbor stub (build_alignment_pinion.py); the big ball
-with its through-rod forms the grip. Modeled as ONE part: bored hub
-extrusion plus a single ball+rod solid of revolution about the rod
-axis (revolve LAST -- an on-axis revolve breaks later booleans, see
-solidworks pitfalls; the merge inside the revolve itself is fine, same
-recipe as the old pivot-shaft tee).
+The bright tee on the alignment pinion's front arbor (p. 67/68): the
+operator turns it to rotate all 20 engaged cylinder gears as one. PR7
+re-derivation from ``page002_img07`` (its own Ø6 cross rod = 10 px/mm):
+the grip is NOT a ball but a short fat CYLINDER (Ø23) with a slightly
+domed south cap; the cross-rod arms are near-symmetric 42/43 (the old
++68 long arm was a p002 misread); and the hub is a BLIND TUBULAR CAP
+(OD 10.5, ID 8) swallowed over the arbor stub -- the stub is thicker
+steel now (Ø8, build_alignment_pinion), and the cap's dome-less north
+rim rides it.
 
-Layout: drum axis Z, ball centred at the ORIGIN; hub z 7..14 (the ball
-solid reaches z 11.57 inside the bore, so the arbor stub seats z 12..14);
-cross rod along Y, symmetric arms -35..+35 (PR6: both ch25 close-ups
-read near-equal arms; the old +68 long arm was a p002 misread).
+Layout: arbor axis Z; the CROSS ROD plane is the part origin (z 0 --
+what the assembly's HANDLE_Z positions). Grip cylinder z -7..+7, domed
+cap (sagitta 2) proud of z -7; blind wall z +7..+9; tube annulus z
++9..+19 (the Ø8 stub seats inside); cross rod along Y, arms -42..+43,
+built LAST so nothing crosses an axis.
 
-Volume gate (exact union, mm^3): hub annulus + ball + rod
-- ball/rod full pass - ball/hub cap integral (analytic, see V_TOTAL).
+Volume gate (mm^3): grip + cap (spherical-cap formula) + wall + annulus
++ rod - rod/grip overlap (Simpson over circular segments).
 
-Dimensions: cad/DIMENSIONS.md "Chapter 25".
+Dimensions: cad/config/dimensions.yaml "Chapter 25".
 
 Run (SolidWorks already open)::
 
@@ -34,8 +34,6 @@ import sys
 from _common import (
     POLISHED_STEEL,
     SketchDims,
-    add_line_chain,
-    anchor_point_to_origin,
     apply_color,
     apply_material,
     check,
@@ -56,179 +54,205 @@ from _common import (
 PART_NAME = "pinion-handle"
 MATERIAL = "Plain Carbon Steel"  # bright steel (p.67)
 
-HUB_DIA = 12.0  # journal hub, photo-scaled vs the rod (low)
-HUB_BORE = 6.35  # rides the drum's front arbor stub (derived)
-HUB_Z = (7.0, 14.0)  # clear of the ball bulge, 1 clear of the strap face
-BALL_DIA = 24.0  # grip ball, p002 photogrammetry (med)
-ROD_DIA = 6.0  # cross rod, same stock as the lever (high)
-ROD_DOWN = 35.0  # arm, ch25 close-ups (see ROD_UP) (med)
-ROD_UP = 35.0  # arm (PR6): BOTH p.68/p.69 close-ups, scaled against the
-# tee's own Ø6 cross rod, read near-symmetric arms (35.5/38 and 33.5/35 mm)
-# -- the old p002-photogrammetry 68 long arm matches neither and is retired
-# as a misread; tip-to-tip 70 fits both frames (med)
+GRIP_DIA = 23.0  # grip cylinder, img07 (was the Ø24 ball) (med)
+GRIP_LEN = 14.0  # along the arbor, z -7..+7 (med)
+CAP_SAG = 2.0  # domed south face (img07's rounded cap)
+ROD_DIA = 6.0  # cross rod, same stock as the lever root (high)
+ROD_DOWN = 42.0  # arm, img07 centre-to-tip (was 35) (med)
+ROD_UP = 43.0  # arm, img07 (the old p002 68 is retired) (med)
+TUBE_OD = 10.5  # blind cap hub over the arbor stub, img07 (med)
+TUBE_ID = 8.0  # = the arbor stub Ø8 (build_alignment_pinion STUB_DIA, must match)
+TUBE_LEN = 10.0  # stub seat depth (z +9..+19)
+WALL_T = 2.0  # blind wall between grip and tube (z +7..+9)
 
-HUB_R = HUB_DIA / 2.0
-BORE_R = HUB_BORE / 2.0
-BALL_R = BALL_DIA / 2.0
+GRIP_R = GRIP_DIA / 2.0
 ROD_R = ROD_DIA / 2.0
-JUNCTION = math.sqrt(BALL_R**2 - ROD_R**2)  # 11.6190
+CAP_R = (GRIP_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 34.06 crown sphere radius
 
-V_HUB = math.pi * (HUB_R**2 - BORE_R**2) * (HUB_Z[1] - HUB_Z[0])
-V_BALL = (4.0 * math.pi / 3.0) * BALL_R**3
+V_GRIP = math.pi * GRIP_R**2 * GRIP_LEN
+V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # 419.6
+V_WALL = math.pi * (TUBE_OD / 2.0) ** 2 * WALL_T
+V_TUBE = math.pi * ((TUBE_OD / 2.0) ** 2 - (TUBE_ID / 2.0) ** 2) * TUBE_LEN
 V_ROD = math.pi * ROD_R**2 * (ROD_DOWN + ROD_UP)
-# Rod through the ball centre: full-pass cylinder/sphere intersection.
-V_BALL_ROD = (4.0 * math.pi / 3.0) * (
-    BALL_R**3 - (BALL_R**2 - ROD_R**2) ** 1.5
-)
-# Ball cap inside the hub annulus (the ball surface z = sqrt(R^2 - r^2)
-# crosses the annulus between HUB_Z[0] and HUB_Z[1] for all r in it):
-# integral over r in [BORE_R, HUB_R] of 2*pi*r*(sqrt(R^2-r^2) - HUB_Z[0]).
-V_BALL_HUB = (2.0 * math.pi / 3.0) * (
-    (BALL_R**2 - BORE_R**2) ** 1.5 - (BALL_R**2 - HUB_R**2) ** 1.5
-) - math.pi * (HUB_R**2 - BORE_R**2) * HUB_Z[0]
-V_TOTAL = V_HUB + V_BALL + V_ROD - V_BALL_ROD - V_BALL_HUB
+
+
+def _grip_overlap() -> float:
+    """Rod volume already inside the grip cylinder: Simpson over the rod's
+    y-span inside the grip radius of the disc-segment area |x| <= c(y)
+    (the rod's z-extent +-3 stays inside the grip's z -7..+7)."""
+    n = 2000
+    y0, y1 = -GRIP_R, GRIP_R
+    h = (y1 - y0) / n
+
+    def area(y: float) -> float:
+        c = math.sqrt(max(GRIP_R**2 - y * y, 0.0))
+        if c >= ROD_R:
+            return math.pi * ROD_R**2
+        return 2.0 * (
+            c * math.sqrt(ROD_R**2 - c * c) + ROD_R**2 * math.asin(c / ROD_R)
+        )
+
+    total = area(y0) + area(y1)
+    for i in range(1, n):
+        total += (4.0 if i % 2 else 2.0) * area(y0 + i * h)
+    return total * h / 3.0
+
+
+V_TOTAL = V_GRIP + V_CAP + V_WALL + V_TUBE + V_ROD - _grip_overlap()
 
 
 async def build(adapter) -> dict[str, str]:
+    from solidworks_mcp.adapters.base import RevolveParameters
+
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations): the hub OD/bore, the grip ball and the
-    # cross-rod diameter + two arm lengths. The mm suffix is load-bearing -- this
-    # is an INCH document and the equation manager reads BARE numbers in document
-    # units (an unsuffixed 24 = 24 in). HubOffset/HubLength feed the feature-
-    # parameter hub extrude (built with the literals); declared so a GUI edit sees
-    # the knobs.
-    await set_global(adapter, "HubDia", f"{HUB_DIA}mm")
-    await set_global(adapter, "HubBore", f"{HUB_BORE}mm")
-    await set_global(adapter, "HubOffset", f"{HUB_Z[0]}mm")
-    await set_global(adapter, "HubLength", f"{HUB_Z[1] - HUB_Z[0]}mm")
-    await set_global(adapter, "BallDia", f"{BALL_DIA}mm")
+    # Editable knobs (Tools > Equations). The mm suffix is load-bearing (INCH
+    # document). GripLen/WallT/TubeLen feed extrude DEPTHS (feature params).
+    await set_global(adapter, "GripDia", f"{GRIP_DIA}mm")
+    await set_global(adapter, "GripLen", f"{GRIP_LEN}mm")
+    await set_global(adapter, "CapSag", f"{CAP_SAG}mm")
     await set_global(adapter, "RodDia", f"{ROD_DIA}mm")
     await set_global(adapter, "RodDown", f"{ROD_DOWN}mm")
     await set_global(adapter, "RodUp", f"{ROD_UP}mm")
+    await set_global(adapter, "TubeOd", f"{TUBE_OD}mm")
+    await set_global(adapter, "TubeId", f"{TUBE_ID}mm")
+    await set_global(adapter, "TubeLen", f"{TUBE_LEN}mm")
+    await set_global(adapter, "WallT", f"{WALL_T}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Bored hub first (annulus sketch -> offset extrude along +Z). Both circles
-    # are on the origin, so define_circle records only each diameter; its
-    # inference suppression keeps the concentric bore from snapping to the OD.
-    hub = SketchDims()
-    check("create_sketch hub", await adapter.create_sketch("Front"))
+    # Grip cylinder z -7..+7 (on-axis circle: only the diameter is a dim).
+    grip = SketchDims()
+    check("create_sketch grip", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, 0.0, HUB_R, "hub OD", dims=hub,
-        names=("HubOdCx", "HubOdCz", "HubDia"),
-        drives=(None, None, '"HubDia"'),
+        adapter, 0.0, 0.0, GRIP_R, "grip", dims=grip,
+        names=("GripCx", "GripCz", "GripDia"),
+        drives=(None, None, '"GripDia"'),
     )
-    await define_circle(
-        adapter, 0.0, 0.0, BORE_R, "hub bore", dims=hub,
-        names=("HubBoreCx", "HubBoreCz", "HubBore"),
-        drives=(None, None, '"HubBore"'),
-    )
-    await ensure_fully_defined(adapter, "hub sketch")
-    check("exit_sketch hub", await adapter.exit_sketch())
-    name_last_feature(adapter, "HubProfile")
-    drive_jobs += hub.apply(adapter, "HubProfile")
-    extrude_at_offset(adapter, HUB_Z[1] - HUB_Z[0], HUB_Z[0])
-    name_last_feature(adapter, "Hub")
-    await volume_check(adapter, "hub", V_HUB, 0.005 * V_HUB)
+    await ensure_fully_defined(adapter, "grip sketch")
+    check("exit_sketch grip", await adapter.exit_sketch())
+    name_last_feature(adapter, "GripProfile")
+    drive_jobs += grip.apply(adapter, "GripProfile")
+    extrude_at_offset(adapter, GRIP_LEN, -GRIP_LEN / 2.0)
+    name_last_feature(adapter, "Grip")
+    expected = V_GRIP
+    await volume_check(adapter, "grip", expected, 0.005 * V_GRIP)
 
-    # Ball + cross rod as one revolved profile about +Y (revolve LAST).
-    from solidworks_mcp.adapters.base import RevolveParameters
-
-    profile = SketchDims()
-    check("create_sketch ball+rod", await adapter.create_sketch("Front"))
+    # Domed south cap (sagitta CAP_SAG proud of z -7): Top-plane rim->apex arc
+    # revolved about Z -- the crowned-cap idiom (apex at more-positive sketch
+    # v for a -Z end; rim -> apex is the minor CCW lobe).
+    v_base = GRIP_LEN / 2.0
+    v_apex = GRIP_LEN / 2.0 + CAP_SAG
+    v_centre = GRIP_LEN / 2.0 + CAP_SAG - CAP_R
+    cap = SketchDims()
+    check("create_sketch cap", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
-    check(
-        "add_centerline rod axis",
-        await adapter.add_centerline(0.0, -ROD_DOWN, 0.0, ROD_UP),
-    )
-    lines = await add_line_chain(
-        adapter,
-        [
-            (0.0, -ROD_DOWN),
-            (ROD_R, -ROD_DOWN),
-            (ROD_R, -JUNCTION),
-        ],
-        close=False,
-    )
+    check("cap centerline", await adapter.add_centerline(0.0, v_base, 0.0, v_apex))
+    base = check("cap base", await adapter.add_line(0.0, v_base, GRIP_R, v_base))
     arc = check(
-        "add_arc ball",
-        await adapter.add_arc(
-            0.0, 0.0, ROD_R, -JUNCTION, ROD_R, JUNCTION
-        ),
+        "cap arc",
+        await adapter.add_arc(0.0, v_centre, GRIP_R, v_base, 0.0, v_apex),
     )
-    tail = await add_line_chain(
-        adapter,
-        [
-            (ROD_R, JUNCTION),
-            (ROD_R, ROD_UP),
-            (0.0, ROD_UP),
-            (0.0, -ROD_DOWN),
-        ],
-        close=False,
-    )
+    close = check("cap close", await adapter.add_line(0.0, v_apex, 0.0, v_base))
     set_sketch_direct_db(adapter, False)
-    rod_base, rod_wall = lines
-    upper_wall, rod_top, axis_edge = tail
-    # 13-DOF profile: ball arc centre on the origin + radius; h/v on the
-    # five chain edges; the arc chord vertical ties the upper endpoint's
-    # angle; rod radius + the two arm lengths as dims. The centerline
-    # merged into the (0, -ROD_DOWN) / (0, ROD_UP) profile corners at
-    # creation, so it carries no constraints of its own.
+    check("cap base horizontal", await adapter.add_sketch_constraint(base, None, "horizontal"))
+    check("cap close vertical", await adapter.add_sketch_constraint(close, None, "vertical"))
     check(
-        "anchor ball centre",
-        await adapter.add_sketch_constraint(f"{arc}.center", "origin", "coincident"),
-    )
-    check(
-        "ball radius",
-        await adapter.add_sketch_dimension(arc, None, "radial", BALL_R),
-    )
-    profile.record("BallRadius", '"BallDia" / 2')
-    for label, ent, relation in (
-        ("rod base", rod_base, "horizontal"),
-        ("rod wall", rod_wall, "vertical"),
-        ("upper wall", upper_wall, "vertical"),
-        ("rod top", rod_top, "horizontal"),
-        ("axis edge", axis_edge, "vertical"),
-    ):
-        check(
-            f"{label} {relation}",
-            await adapter.add_sketch_constraint(ent, None, relation),
-        )
-    check(
-        "arc chord vertical",
-        await adapter.add_sketch_constraint(
-            f"{arc}.end", f"{arc}.start", "vertical_points"
-        ),
-    )
-    await anchor_point_to_origin(
-        adapter, f"{rod_base}.start", 0.0, -ROD_DOWN, "rod base corner"
-    )
-    profile.record("RodDownArm", '"RodDown"')
-    check(
-        "long arm length",
+        "cap rim reach",
         await adapter.add_sketch_dimension(
-            f"{axis_edge}.start", "origin", "vertical_distance", ROD_UP
+            f"{base}.end", "origin", "horizontal_distance", GRIP_R
         ),
     )
-    profile.record("RodUpArm", '"RodUp"')
+    cap.record("CapRim", '"GripDia" / 2')
     check(
-        "rod radius",
-        await adapter.add_sketch_dimension(rod_base, None, "linear", ROD_R),
+        "cap sagitta",
+        await adapter.add_sketch_dimension(
+            f"{close}.start", f"{close}.end", "vertical_distance", CAP_SAG
+        ),
     )
-    profile.record("RodRadius", '"RodDia" / 2')
-    await ensure_fully_defined(adapter, "ball+rod profile")
-    check("exit_sketch ball+rod", await adapter.exit_sketch())
-    name_last_feature(adapter, "BallRodProfile")
-    drive_jobs += profile.apply(adapter, "BallRodProfile")
+    cap.record("CapSagDim", '"CapSag"')
     check(
-        "revolve ball+rod",
-        await adapter.create_revolve(RevolveParameters(angle=360.0)),
+        "cap on axis",
+        await adapter.add_sketch_constraint(f"{base}.start", "origin", "vertical_points"),
     )
-    name_last_feature(adapter, "BallRod")
-    await volume_check(
-        adapter, "ball+rod union", V_TOTAL, 0.01 * (V_TOTAL - V_HUB)
+    check(
+        "cap station",
+        await adapter.add_sketch_dimension(
+            f"{base}.start", "origin", "vertical_distance", v_base
+        ),
     )
+    cap.record("CapZ", '"GripLen" / 2')
+    check(
+        "cap radius",
+        await adapter.add_sketch_dimension(arc, None, "radial", CAP_R),
+    )
+    cap.record(
+        "CapR",
+        '("GripDia" / 2 * "GripDia" / 2 + "CapSag" * "CapSag") / (2 * "CapSag")',
+    )
+    await ensure_fully_defined(adapter, "cap sketch")
+    check("exit_sketch cap", await adapter.exit_sketch())
+    name_last_feature(adapter, "CapProfile")
+    drive_jobs += cap.apply(adapter, "CapProfile")
+    check("revolve cap", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    name_last_feature(adapter, "Cap")
+    expected += V_CAP
+    await volume_check(adapter, "cap", expected, 0.03 * V_CAP)
+
+    # Blind wall disc (z +7..+9) then the tube annulus (z +9..+19): the cap
+    # hub the Ø8 arbor stub seats into.
+    wall = SketchDims()
+    check("create_sketch wall", await adapter.create_sketch("Front"))
+    await define_circle(
+        adapter, 0.0, 0.0, TUBE_OD / 2.0, "wall", dims=wall,
+        names=("WallCx", "WallCz", "WallDia"),
+        drives=(None, None, '"TubeOd"'),
+    )
+    await ensure_fully_defined(adapter, "wall sketch")
+    check("exit_sketch wall", await adapter.exit_sketch())
+    name_last_feature(adapter, "WallProfile")
+    drive_jobs += wall.apply(adapter, "WallProfile")
+    extrude_at_offset(adapter, WALL_T, GRIP_LEN / 2.0)
+    name_last_feature(adapter, "Wall")
+    expected += V_WALL
+    await volume_check(adapter, "wall", expected, 0.01 * V_WALL)
+
+    tube = SketchDims()
+    check("create_sketch tube", await adapter.create_sketch("Front"))
+    await define_circle(
+        adapter, 0.0, 0.0, TUBE_OD / 2.0, "tube OD", dims=tube,
+        names=("TubeOdCx", "TubeOdCz", "TubeOd"),
+        drives=(None, None, '"TubeOd"'),
+    )
+    await define_circle(
+        adapter, 0.0, 0.0, TUBE_ID / 2.0, "tube ID", dims=tube,
+        names=("TubeIdCx", "TubeIdCz", "TubeId"),
+        drives=(None, None, '"TubeId"'),
+    )
+    await ensure_fully_defined(adapter, "tube sketch")
+    check("exit_sketch tube", await adapter.exit_sketch())
+    name_last_feature(adapter, "TubeProfile")
+    drive_jobs += tube.apply(adapter, "TubeProfile")
+    extrude_at_offset(adapter, TUBE_LEN, GRIP_LEN / 2.0 + WALL_T)
+    name_last_feature(adapter, "Tube")
+    expected += V_TUBE
+    await volume_check(adapter, "tube", expected, 0.01 * V_TUBE)
+
+    # Cross rod LAST: Top-plane on-axis circle extruded +Y across both arms.
+    rod = SketchDims()
+    check("create_sketch rod", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter, 0.0, 0.0, ROD_R, "rod", dims=rod,
+        names=("RodCx", "RodCz", "RodDia"),
+        drives=(None, None, '"RodDia"'),
+    )
+    await ensure_fully_defined(adapter, "rod sketch")
+    check("exit_sketch rod", await adapter.exit_sketch())
+    name_last_feature(adapter, "RodProfile")
+    drive_jobs += rod.apply(adapter, "RodProfile")
+    extrude_at_offset(adapter, ROD_DOWN + ROD_UP, -ROD_DOWN)
+    name_last_feature(adapter, "Rod")
+    await volume_check(adapter, "handle", V_TOTAL, 0.01 * V_ROD)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
@@ -236,9 +260,7 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(
-        adapter, "driven handle (equations neutral)", V_TOTAL, 0.01 * (V_TOTAL - V_HUB)
-    )
+    await volume_check(adapter, "driven handle (equations neutral)", V_TOTAL, 0.01 * V_ROD)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)

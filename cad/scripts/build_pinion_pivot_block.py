@@ -45,7 +45,8 @@ from _common import (
 PART_NAME = "pinion-pivot-block"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel block (p.68)
 
-WIDTH = 33.0  # spans both bores +9 margin each side (derived)
+WIDTH = 36.0  # spans both bores + margin; widened 33 -> 36 (PR7) so the
+# Ø8 screw heads at x +-13.5 seat fully on the block (edge 17.5 + 0.5 rim)
 HEIGHT = 16.0  # photo-scaled (low); keeps the strap's r 11 bottom cap
 # (PIVOT_Y - 11 = 51.8) swinging clear of the base top 50.8
 DEPTH = 12.0  # photo-scaled (low)
@@ -54,6 +55,10 @@ BORE = 6.35  # rides the Ø6.35 torque shaft / lift rod (derived)
 BORE_HALF_SPACING = 7.5  # half the pivot-to-lift rod spacing 15.0 -- the
 # lift rod must clear BOTH the cone-pivot-post column (machine x -47.1)
 # and the strap's swinging r 11 bottom cap (build_drive_train_assembly)
+SCREW_HOLE_DIA = 4.2  # slotted-screw shank O4 (PR7: the p.69 close-up's two
+# bright hold-down heads per block)
+SCREW_HALF_SPACING = 13.5  # hole centres out past the bores: 0.6 web to the
+# bore wall, 0.9 rim to the block end
 
 
 async def build(adapter) -> dict[str, str]:
@@ -72,6 +77,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BoreUp", f"{BORE_UP}mm")
     await set_global(adapter, "Bore", f"{BORE}mm")
     await set_global(adapter, "BoreHalfSpacing", f"{BORE_HALF_SPACING}mm")
+    await set_global(adapter, "ScrewHoleDia", f"{SCREW_HOLE_DIA}mm")
+    await set_global(adapter, "ScrewHalfSpacing", f"{SCREW_HALF_SPACING}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -119,6 +126,39 @@ async def build(adapter) -> dict[str, str]:
     area = WIDTH * HEIGHT - 2.0 * math.pi * (BORE / 2.0) ** 2
     expected = area * DEPTH
     await volume_check(adapter, "block", expected, 0.005 * expected)
+
+    # Two vertical slotted-screw holes (PR7): O4.2 along Y through the block at
+    # (x +-SCREW_HALF_SPACING, z mid-depth) -- the p.69 close-up's bright
+    # hold-down pair. Top sketch (u, v) -> (X, -Z); mid-plane cut spans the
+    # 16-tall block about the bore plane.
+    holes = SketchDims()
+    check("create_sketch screw holes", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter, SCREW_HALF_SPACING, -DEPTH / 2.0, SCREW_HOLE_DIA / 2.0,
+        "screw hole east", dims=holes,
+        names=("ScrewEastX", "ScrewEastZ", "ScrewEastDia"),
+        drives=('"ScrewHalfSpacing"', '"BlockDepth" / 2', '"ScrewHoleDia"'),
+    )
+    await define_circle(
+        adapter, -SCREW_HALF_SPACING, -DEPTH / 2.0, SCREW_HOLE_DIA / 2.0,
+        "screw hole west", dims=holes,
+        names=("ScrewWestX", "ScrewWestZ", "ScrewWestDia"),
+        drives=('"ScrewHalfSpacing"', '"BlockDepth" / 2', '"ScrewHoleDia"'),
+    )
+    await ensure_fully_defined(adapter, "screw holes sketch")
+    check("exit_sketch screw holes", await adapter.exit_sketch())
+    name_last_feature(adapter, "ScrewHolesProfile")
+    drive_jobs += holes.apply(adapter, "ScrewHolesProfile")
+    check(
+        "cut screw holes",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=4.0 * HEIGHT, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "ScrewHoles")
+    v_holes = 2.0 * math.pi * (SCREW_HOLE_DIA / 2.0) ** 2 * HEIGHT
+    expected -= v_holes
+    await volume_check(adapter, "screw holes", expected, 0.02 * v_holes)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).

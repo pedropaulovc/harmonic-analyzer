@@ -253,6 +253,12 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     "fillister-screw": ("x", 0.0),
     "pinch-screw": ("x", 0.0),
     "hanger-screw": ("x", 0.0),
+    # slotted-screw / foot-screw (PR7): same fastener convention (axis -Y,
+    # x0-symmetric)
+    "slotted-screw": ("x", 0.0),
+    "foot-screw": ("x", 0.0),
+    # pinion-arbor (PR7): plain crowned cylinder along Z, x0-symmetric
+    "pinion-arbor": ("x", 0.0),
     # PR2 round-3 cone-swing hardware (2026-07-03): all axisymmetric about the
     # local Y axis (bodies are origin-centred circles), so exactly x0-symmetric;
     # explicit c, no STL at first build (the memory's belt-and-braces rule)
