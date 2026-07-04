@@ -551,12 +551,16 @@ if abs(POST_CRANK_DX - (X_CRANK - _PPOST[0])) > 0.05:
         f"{X_CRANK - _PPOST[0]:.3f}")
 if abs(POST_CRANK_Y - (Y_CRANK - Y_BASE_TOP - PLAT_T)) > 1e-6:
     raise AssertionError("column CRANK_BORE_Y != Y_CRANK - Y_BASE_TOP - PLAT_T")
-# The base's pivot-screw hole sits exactly under the swing pivot.
-if (abs(BASE_PIVOT_XZ[0] - _PPIVOT[0]) > 0.05
+# The base's pivot-screw hole sits exactly under the swing pivot. The base
+# is MACHINE-handed (frame.SLDASM places it unmirrored) while this module
+# derives in the PRE-MIRROR frame, so the hole's x is the NEGATED pivot x
+# (the top-level interference gate proved raw +x wrong: both screws landed
+# in solid base, exactly their embedded shank volumes).
+if (abs(BASE_PIVOT_XZ[0] + _PPIVOT[0]) > 0.05
         or abs(BASE_PIVOT_XZ[1] - _PPIVOT[2]) > 0.05):
     raise AssertionError(
-        f"harmonic-base pivot-screw hole {BASE_PIVOT_XZ} != swing pivot "
-        f"({_PPIVOT[0]:.3f}, {_PPIVOT[2]:.3f})")
+        f"harmonic-base pivot-screw hole {BASE_PIVOT_XZ} != machine swing pivot "
+        f"({-_PPIVOT[0]:.3f}, {_PPIVOT[2]:.3f})")
 if BASE_PIVOT_HOLE_DIA < PSCREW_SHANK_DIA:
     raise AssertionError("base pivot hole under the pivot-screw shoulder dia")
 # The pivot-screw head sits on the plate top at station PIVOT_STATION; the
@@ -639,10 +643,12 @@ _N_M = (_EDGE_OUT[0] * math.cos(_A_DIS) - _EDGE_OUT[1] * math.sin(_A_DIS),
         _EDGE_OUT[0] * math.sin(_A_DIS) + _EDGE_OUT[1] * math.cos(_A_DIS))
 STOP_X = _CONTACT[0] + _N_M[0] * STOP_SHANK_DIA / 2.0
 STOP_Z = _CONTACT[1] + _N_M[1] * STOP_SHANK_DIA / 2.0
-if abs(BASE_STOP_XZ[0] - STOP_X) > 0.05 or abs(BASE_STOP_XZ[1] - STOP_Z) > 0.05:
+# Machine-handed base part vs this pre-mirror derivation: x negates (see the
+# pivot-hole assert above).
+if abs(BASE_STOP_XZ[0] + STOP_X) > 0.05 or abs(BASE_STOP_XZ[1] - STOP_Z) > 0.05:
     raise AssertionError(
-        f"harmonic-base stop-screw hole {BASE_STOP_XZ} != derived stop "
-        f"({STOP_X:.3f}, {STOP_Z:.3f})")
+        f"harmonic-base stop-screw hole {BASE_STOP_XZ} != machine derived stop "
+        f"({-STOP_X:.3f}, {STOP_Z:.3f})")
 if BASE_STOP_HOLE_DIA < STOP_SHANK_DIA:
     raise AssertionError("base stop hole under the stop-screw shank dia")
 # Engaged pose clears the stop screw on the OUTSIDE (signed distance along

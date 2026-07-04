@@ -79,16 +79,21 @@ CBORE_DIA = 23.0  # lag head O22, recessed
 CBORE_DEPTH = 6.5  # lag head 22 x 6 recessed 0.5
 CBORE_XZ = HOLE_XZ  # all four heads counterbored
 
-# Cone swing hardware, blind from the TOP face (machine = part-local):
-# the platform pivot screw's shank hole (build_cone_pivot_screw; the position
-# equals cone_station(PIVOT_STATION), asserted at drive-train import) and the
-# swing-stop screw's hole (build_swing_stop_screw; the disengaged plate edge +
-# shank radius, ditto asserted).
-PIVOT_SCREW_XZ = (79.69, 103.29)
+# Cone swing hardware, blind from the TOP face. MACHINE-handed part coords:
+# frame.SLDASM places the base unmirrored (like the rocker-arm-support and
+# the four hold-down holes above), but the drive-train screws that drop into
+# these holes are placed through mirror_placement, so their PRE-MIRROR x
+# NEGATES here (proven at the top-level interference gate: holes authored at
+# pre-mirror +x left both screws in solid base -- 190.0 + 75.4 mm^3, exactly
+# the two embedded shank volumes). The drive-train assembly asserts agreement
+# WITH the sign flip: pivot = -cone_station(PIVOT_STATION).x
+# (build_cone_pivot_screw), stop = -(disengaged east plate edge + shank
+# radius) (build_swing_stop_screw).
+PIVOT_SCREW_XZ = (-79.69, 103.29)
 PIVOT_SCREW_HOLE_DIA = 6.5  # O6.35 shoulder clearance
-STOP_SCREW_XZ = (130.93, 9.94)  # past the DISENGAGED east taper edge (the
-# disengage swing sweeps the plate EAST; the first west-side value sat 19
-# inside the engaged plate -- interference-gate proven)
+STOP_SCREW_XZ = (-130.93, 9.94)  # past the DISENGAGED east taper edge (the
+# disengage swing sweeps the plate EAST pre-mirror = machine -x; the first
+# derivation sat 19 inside the engaged plate -- interference-gate proven)
 STOP_SCREW_HOLE_DIA = 4.1  # O4 shank clearance
 SWING_HOLE_DEPTH = 6.0
 
