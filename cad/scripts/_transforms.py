@@ -240,6 +240,12 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     # spring-vs-strap interference, caught by the gate). Explicit c, no STL
     # dependency at first build.
     "pinion-spring": ("z", 0.0),
+    # pinion-cam-pin (PR5): plain cylinder authored along Z, exact mid-plane
+    # both-directions extrude about z = 0. Placed ROTATED (axis -> the strap's
+    # leaned cam-bore axis), so the local-x reflection the default 'x' would
+    # apply is not a symmetry of the placed pose; the z mid-plane is. Explicit
+    # entry per the PR4 rule: every new part declares a symmetry it HAS.
+    "pinion-cam-pin": ("z", 0.0),
     # M6.10 fasteners: authored in final orientation (axis along Y or Z),
     # exactly symmetric about local x = 0; explicit c, no STL at first build
     "hex-bolt": ("x", 0.0),
