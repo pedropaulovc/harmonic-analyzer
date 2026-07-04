@@ -34,6 +34,13 @@ discovered during harmonic-analyzer M6.4:
   later crosses the axis (e.g. `build_pen_marker.py`).
 - **add_circle on a Right-plane sketch** fails unless wrapped in
   `set_sketch_direct_db(True)` … `(False)`.
+- **Right-plane sketch u maps to part −Z** (probed live in the PR5
+  pinion-bracket cam bore: the u=+2.5 circle landed at z −2.5 outside the
+  0..5 plate and the cut errored "FeatureCut3 legacy: Parameter not
+  optional" — SolidWorks rejecting a nothing-to-cut feature surfaces as that
+  COM error, not as a clean no-op). Don't hardcode the sign: use the
+  amplitude-bar probe pattern (try +u, read volume back, flip on failure)
+  and hold the sketch's drive jobs back until the winning side is proven.
 - **On-axis revolve's SEAM EDGE poisons inference-ON circles on it**: a
   360° revolve of a Top-plane profile leaves its seam edge along +X on
   the z=0 face; an inference-ON `add_circle` whose CENTRE lies on that

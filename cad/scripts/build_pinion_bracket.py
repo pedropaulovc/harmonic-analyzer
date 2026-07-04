@@ -4,11 +4,14 @@ The polished-steel strap that carries one end of the alignment-pinion
 drum (p. 68 close-ups, shot from the BACK side): a short rounded-end
 flat bar with TWO Ø6.35 bores -- the bottom one pivots on the torque
 shaft (build_pinion_pivot_shaft.py), the top one journals the drum's
-arbor stub (build_alignment_pinion.py). The lift rod's cam pin
-(build_pinion_lift_rod.py) bears on the strap flank to swing it.
+arbor stub (build_alignment_pinion.py) -- plus a small Ø3 CROSS-BORE
+through the tail cap below the pivot. That bore presses the cam-follower
+pin (build_pinion_cam_pin.py, PR5): the lift rod's radial cam pin
+(build_pinion_lift_rod.py) sweeps up beneath the follower and lifts it,
+swinging the drum into mesh (p. 69 close-up with the rotation arrows).
 
 Layout: pivot bore at the origin, arbor bore at (0, C2C), strap up +Y,
-thickness z 0..5.
+thickness z 0..5; cam-pin bore along X at (y -CAM_DROP, z mid).
 
 Dimensions: cad/config/dimensions.yaml "Chapter 25".
 
@@ -27,10 +30,12 @@ from _common import (
     SketchDims,
     apply_color,
     apply_material,
+    blank_sketch,
     check,
     define_circle,
     drive_dimension,
     ensure_fully_defined,
+    feature_name_by_type,
     force_rebuild,
     name_bore_axis,
     name_last_feature,
@@ -41,6 +46,8 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+
+import _telemetry
 
 PART_NAME = "pinion-bracket"
 MATERIAL = "Plain Carbon Steel"  # p.68: bright steel strap
@@ -55,8 +62,38 @@ C2C = 43.0  # pivot bore to arbor bore (ch30 GT 2026-07-02, was 31): the pinion
 # (build_drive_train_assembly STRAP_C2C / STRAP_LEAN_DEG -- must match)
 THICKNESS = 5.0  # photo-scaled (low)
 BORE = 6.35  # both bores: torque shaft below, drum arbor stub above (derived)
+CAM_BORE = 3.0  # cam-follower pin press bore (photo-scaled vs the 6.35 shafts
+# in the p.69 close-up, low). Assembly guard: build_drive_train's
+# SPRING-style cam asserts and build_pinion_cam_pin PIN_DIA must match.
+CAM_DROP = 6.25  # pivot bore centre -> cam bore centre, down the strap
+# centreline. Bounded on both sides: web to the pivot bore
+# 6.25 - 1.5 - 3.175 = 1.575, rim to the cap edge 9 - 6.25 - 1.5 = 1.25.
+# build_drive_train's cam geometry (and build_pinion_cam_pin's span) key off
+# this drop -- must match.
 
 R_END = WIDTH / 2.0
+
+
+def _cam_bore_removed() -> float:
+    """Material removed by the cam cross-bore: integral over the bore's y-band
+    of (cap chord length at y) x (bore z-width at y), Simpson with 2000
+    panels. The bore is fully inside the thickness (z 1..4 of 0..5) and clear
+    of the pivot bore (y -4.75..-7.75 vs pivot r 3.175), so the cap's outer
+    circle is the only boundary that matters."""
+    r = CAM_BORE / 2.0
+    n = 2000
+    h = 2.0 * r / n
+
+    def f(dy: float) -> float:
+        y = -CAM_DROP + dy  # dy in [-r, r]
+        return 2.0 * math.sqrt(max(R_END**2 - y * y, 0.0)) * 2.0 * math.sqrt(
+            max(r * r - dy * dy, 0.0)
+        )
+
+    total = f(-r) + f(r)
+    for i in range(1, n):
+        total += (4.0 if i % 2 else 2.0) * f(-r + i * h)
+    return total * h / 3.0
 
 
 async def build(adapter) -> dict[str, str]:
@@ -74,6 +111,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "C2C", f"{C2C}mm")
     await set_global(adapter, "StrapThickness", f"{THICKNESS}mm")
     await set_global(adapter, "Bore", f"{BORE}mm")
+    await set_global(adapter, "CamBore", f"{CAM_BORE}mm")
+    await set_global(adapter, "CamDrop", f"{CAM_DROP}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -168,11 +207,78 @@ async def build(adapter) -> dict[str, str]:
     expected = area * THICKNESS
     await volume_check(adapter, "strap", expected, 0.005 * expected)
 
+    # Cam-follower pin cross-bore (PR5): a Ø3 hole ALONG X through the tail
+    # cap, CAM_DROP below the pivot, at mid-thickness. Sketched on the Right
+    # plane and cut mid-plane both directions -- symmetric about x 0, so the
+    # cut itself has no handedness; only the sketch-u -> part-Z sign is
+    # ambiguous, probed by volume read-back exactly like the amplitude bar's
+    # top-pin hole (drive jobs held back until the winning side is proven).
+    v_bore = _cam_bore_removed()
+    res = await adapter.get_mass_properties()
+    vol_before = res.data.volume
+    for idx, u_mid in enumerate((THICKNESS / 2.0, -THICKNESS / 2.0)):
+        # Per-attempt profile name (the amplitude-bar idiom): a failed first
+        # attempt leaves its BLANKED sketch behind under its own name, so a
+        # shared name would make the retry's dim lookup (cam.apply) bind the
+        # deferred CamBore* equations to the orphan instead of the profile
+        # that actually cut (review catch on #163).
+        prof_name = f"CamBoreProfile{idx}"
+        cam = SketchDims()
+        check("create_sketch cam bore", await adapter.create_sketch("Right"))
+        await define_circle(
+            adapter, u_mid, -CAM_DROP, CAM_BORE / 2.0, "cam bore", dims=cam,
+            names=("CamBoreCz", "CamBoreCy", "CamBoreDia"),
+            drives=('"StrapThickness" / 2', '"CamDrop"', '"CamBore"'),
+        )
+        await ensure_fully_defined(adapter, "cam bore sketch")
+        check("exit_sketch cam bore", await adapter.exit_sketch())
+        name_last_feature(adapter, prof_name)
+        cam_jobs = cam.apply(adapter, prof_name)
+        cut = await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=4.0 * R_END, both_directions=True)
+        )
+        if not cut.is_success:
+            _telemetry.debug(
+                f"cam bore cut at sketch u={u_mid:+g} failed ({cut.error}); flipping"
+            )
+            orphan = feature_name_by_type(adapter, "ProfileFeature")
+            if orphan:
+                blank_sketch(adapter, orphan)
+            continue
+        res = await adapter.get_mass_properties()
+        removed = vol_before - res.data.volume
+        if abs(removed - v_bore) < 0.02 * v_bore + 0.5:
+            _telemetry.success(
+                f"cam bore at sketch u={u_mid:+g} removed {removed:.1f} mm^3"
+                f" (analytic {v_bore:.1f})"
+            )
+            name_last_feature(adapter, "CamBore")
+            drive_jobs += cam_jobs
+            expected -= v_bore
+            break
+        if removed < 0.5:
+            _telemetry.debug(
+                f"cam bore cut at sketch u={u_mid:+g} removed nothing; flipping"
+            )
+            continue
+        raise RuntimeError(
+            f"cam bore cut removed {removed:.1f} mm^3, expected {v_bore:.1f}"
+            " -- circle misplaced/resized"
+        )
+    else:
+        raise RuntimeError("cam bore cut removed no material on either u sign")
+    await volume_check(adapter, "strap with cam bore", expected, 0.005 * expected)
+
     # Named bore axes for the assembly: the pivot bore (Axis1) rides the torque
     # shaft, the arbor bore (Axis2) journals the pinion. The p2 swing group keys
     # off these (concentric to the shaft + lock the pinion in -- build_drive_train).
     await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "pivot bore")
     await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", C2C, "arbor bore")
+    # Cam-pin bore axis (along X): Front @ mid-thickness x Top @ -CAM_DROP. The
+    # follower pin mates coaxial to this in the assembly, riding the swing.
+    await name_bore_axis(
+        adapter, "Front Plane", THICKNESS / 2.0, "Top Plane", -CAM_DROP, "cam pin bore"
+    )
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
