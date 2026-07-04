@@ -61,7 +61,9 @@ C2C = 43.0  # pivot bore to arbor bore (ch30 GT 2026-07-02, was 31): the pinion
 # spans sqrt(42^2 + 9.22^2) at a 12.4 deg west lean in the disengaged rest
 # (build_drive_train_assembly STRAP_C2C / STRAP_LEAN_DEG -- must match)
 THICKNESS = 5.0  # photo-scaled (low)
-BORE = 6.35  # both bores: torque shaft below, drum arbor stub above (derived)
+PIVOT_BORE = 6.35  # torque shaft below (derived)
+ARBOR_BORE = 8.0  # drum arbor above (PR7: the separate steel arbor is O8
+# -- build_pinion_arbor SHAFT_DIA must match)
 CAM_BORE = 3.0  # cam-follower pin press bore (photo-scaled vs the 6.35 shafts
 # in the p.69 close-up, low). Assembly guard: build_drive_train's
 # SPRING-style cam asserts and build_pinion_cam_pin PIN_DIA must match.
@@ -110,7 +112,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "StrapWidth", f"{WIDTH}mm")
     await set_global(adapter, "C2C", f"{C2C}mm")
     await set_global(adapter, "StrapThickness", f"{THICKNESS}mm")
-    await set_global(adapter, "Bore", f"{BORE}mm")
+    await set_global(adapter, "PivotBore", f"{PIVOT_BORE}mm")
+    await set_global(adapter, "ArborBore", f"{ARBOR_BORE}mm")
     await set_global(adapter, "CamBore", f"{CAM_BORE}mm")
     await set_global(adapter, "CamDrop", f"{CAM_DROP}mm")
 
@@ -134,14 +137,14 @@ async def build(adapter) -> dict[str, str]:
     # Pivot bore on the origin (only its diameter recorded); arbor bore on the +Y
     # axis (x 0): one centre dim (the rise, driven by the positive C2C) + diameter.
     await define_circle(
-        adapter, 0.0, 0.0, BORE / 2.0, "pivot bore", dims=strap,
+        adapter, 0.0, 0.0, PIVOT_BORE / 2.0, "pivot bore", dims=strap,
         names=("PivotBoreCx", "PivotBoreCz", "PivotBoreDia"),
-        drives=(None, None, '"Bore"'),
+        drives=(None, None, '"PivotBore"'),
     )
     arbor_bore = await define_circle(
-        adapter, 0.0, C2C, BORE / 2.0, "arbor bore", dims=strap,
+        adapter, 0.0, C2C, ARBOR_BORE / 2.0, "arbor bore", dims=strap,
         names=("ArborBoreCx", "ArborBoreCz", "ArborBoreDia"),
-        drives=(None, '"C2C"', '"Bore"'),
+        drives=(None, '"C2C"', '"ArborBore"'),
     )
     set_sketch_direct_db(adapter, False)
     # Cap arcs: centre + radius + endpoint alignment (one angle constraint
@@ -202,7 +205,8 @@ async def build(adapter) -> dict[str, str]:
     area = (
         WIDTH * C2C
         + math.pi * R_END**2
-        - 2.0 * math.pi * (BORE / 2.0) ** 2
+        - math.pi * (PIVOT_BORE / 2.0) ** 2
+        - math.pi * (ARBOR_BORE / 2.0) ** 2
     )
     expected = area * THICKNESS
     await volume_check(adapter, "strap", expected, 0.005 * expected)
