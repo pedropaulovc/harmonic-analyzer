@@ -368,4 +368,30 @@ discovered during harmonic-analyzer M6.4:
   ReferenceComponents; a `parts=[..., 'drive-train']` row on a family member is
   the smoking gun).
 
+Reference-point / mirror traps (WIRE-1 yoke, 2026-07-04):
+
+- **Chiral REF GEOMETRY on an S-mirrored part gets DOUBLE-FLIPPED.** The
+  machine-chirality mirror realizes an x-symmetric part as M∘T∘S — the solid is
+  S-invariant, but a ref point/plane at a chiral location lands back at its
+  PRE-mirror azimuth in the mirrored world (S flips it, M flips it back).
+  Author such features PRE-FLIPPED (x negated), same idiom as the "x0"
+  authored-mirrored parts. Caught live: the yoke mate solved by spinning the
+  wheel 26.5° to the wrong plane∩circle intersection.
+- **Creating a ref point at arbitrary XYZ**: adapter has no writer — raw COM:
+  hidden sketch point via `SketchManager.CreatePoint` (AddToDB on, then
+  `blank_sketch`), select it with `ISketchPoint::Select2(False, 0)` (Select4's
+  ISelectData arg = "Type mismatch" under forced late binding, the _assembly
+  batch-fix trap), then `FeatureManager.InsertReferencePoint(7, 0, 0, 1)`
+  (7 = swRefPointSketchPoint); the return marshals as a 1-TUPLE of the IFeature
+  — unwrap before `.Name = ...`. Assert the point's coords after the final
+  rebuild (it is undimensioned).
+- **Mating to a ref point inside a component**: `named_ref("Pt@comp", "POINT")`
+  string selection FAILS — use `component_named_ref(comp, "Pt", "POINT")` (the
+  GetCorresponding path, how the motion study selects its rim RefPoint).
+- **Point-on-plane yokes**: SW enforces the EXACT constraint surface (validated
+  0.02° vs analytic) — but a plane fixed to a ROTATING group has its normal-
+  displacement rate taken at the mate point, not where the physical cable
+  attaches, and the response curve is strongly asymmetric: measure rest ratios
+  by CENTRAL difference, never a one-sided secant.
+
 See [[solidworks-3dx-launch]] for session/launch rules.
