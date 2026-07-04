@@ -5,7 +5,10 @@ parallel under the alignment-pinion drum through both pivot blocks'
 east bores (p. 68 close-ups; the engage lever and its cam pins live on
 the SEPARATE lift rod in the west bores -- build_pinion_lift_rod.py).
 
-Layout: shaft axis Z, z 0..196.
+Layout: shaft axis Z, z 0..192 (PR7: ends FLUSH with the pivot blocks'
+outer faces, machine -104/+88, instead of 2 proud), each end crowned by
+a shallow spherical cap (sagitta 1.2 -- the p.69 close-up's domed end
+visible inside the strap bore).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 25".
 
@@ -35,6 +38,7 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
+    set_sketch_direct_db,
     volume_check,
 )
 
@@ -42,11 +46,13 @@ PART_NAME = "pinion-pivot-shaft"
 MATERIAL = "Plain Carbon Steel"  # bright steel (p.67)
 
 SHAFT_DIA = 6.35  # rides the strap and block bores (derived)
-SHAFT_LEN = 196.0  # machine z -106..+90: through both straps and blocks
-# with 2 proud past each block face (the front block sits forward at
-# z -104..-92, dodging the cone-pivot-post column) (derived)
+SHAFT_LEN = 192.0  # machine z -104..+88: ends FLUSH with the block outer
+# faces (PR7 review item; was 196 with 2 proud each side)
+CAP_SAG = 1.2  # crown height of each end's spherical cap (p.69, low)
 
 SHAFT_R = SHAFT_DIA / 2.0
+CAP_R = (SHAFT_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 4.80 sphere radius
+V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # 19.85 each
 V_SHAFT = math.pi * SHAFT_R**2 * SHAFT_LEN
 
 
@@ -62,6 +68,7 @@ async def build(adapter) -> dict[str, str]:
     # ShaftLen is declared so a GUI edit sees the knob.
     await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
     await set_global(adapter, "ShaftLen", f"{SHAFT_LEN}mm")
+    await set_global(adapter, "CapSag", f"{CAP_SAG}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -83,7 +90,111 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=SHAFT_LEN)),
     )
     name_last_feature(adapter, "Shaft")
-    await volume_check(adapter, "shaft", V_SHAFT, 0.005 * V_SHAFT)
+    volume = await volume_check(adapter, "shaft", V_SHAFT, 0.005 * V_SHAFT)
+
+    # Crowned end caps (PR7): a shallow spherical cap proud of each flat end
+    # (sagitta CAP_SAG), revolved about the shaft axis from a Top-plane
+    # profile (u, v) -> (X, -Z): radial base line at the end face, arc from
+    # the rim to the on-axis apex, on-axis close line doubling as the revolve
+    # axis edge (the handle-ball idiom: centerline overlapping the axis edge).
+    # Constraint accounting per cap (4 free points after merges): base
+    # horizontal + close vertical (directions), rim h-dist (radius), sagitta
+    # v-dist (apex), one station anchor (origin-coincident at the front end,
+    # a driven v-dist at the back end), arc radius (centre resolved to the
+    # outward-bulge solution as drawn; the volume gate arbitrates the lobe).
+    from solidworks_mcp.adapters.base import RevolveParameters
+
+    for tag, z_end, sign in (("front", 0.0, -1.0), ("back", SHAFT_LEN, 1.0)):
+        v_base = -z_end
+        v_apex = -(z_end + sign * CAP_SAG)
+        v_centre = -(z_end + sign * (CAP_SAG - CAP_R))
+        cap = SketchDims()
+        check(f"create_sketch cap {tag}", await adapter.create_sketch("Top"))
+        set_sketch_direct_db(adapter, True)
+        check(
+            f"cap {tag} centerline",
+            await adapter.add_centerline(0.0, v_base, 0.0, v_apex),
+        )
+        base = check(
+            f"cap {tag} base",
+            await adapter.add_line(0.0, v_base, SHAFT_R, v_base),
+        )
+        # add_arc sweeps CCW p1 -> p2: the minor (outward-bulge) lobe is
+        # rim -> apex at the front end, apex -> rim at the back end.
+        p1, p2 = (((0.0, v_apex), (SHAFT_R, v_base)) if sign > 0
+                  else ((SHAFT_R, v_base), (0.0, v_apex)))
+        arc = check(
+            f"cap {tag} arc",
+            await adapter.add_arc(0.0, v_centre, p1[0], p1[1], p2[0], p2[1]),
+        )
+        close = check(
+            f"cap {tag} close",
+            await adapter.add_line(0.0, v_apex, 0.0, v_base),
+        )
+        set_sketch_direct_db(adapter, False)
+        check(
+            f"cap {tag} base horizontal",
+            await adapter.add_sketch_constraint(base, None, "horizontal"),
+        )
+        check(
+            f"cap {tag} close vertical",
+            await adapter.add_sketch_constraint(close, None, "vertical"),
+        )
+        check(
+            f"cap {tag} rim reach",
+            await adapter.add_sketch_dimension(
+                f"{base}.end", "origin", "horizontal_distance", SHAFT_R
+            ),
+        )
+        cap.record(f"Cap{tag.capitalize()}Rim", '"ShaftDia" / 2')
+        check(
+            f"cap {tag} sagitta",
+            await adapter.add_sketch_dimension(
+                f"{close}.start", f"{close}.end", "vertical_distance", CAP_SAG
+            ),
+        )
+        cap.record(f"Cap{tag.capitalize()}Sag", '"CapSag"')
+        if z_end:
+            check(
+                f"cap {tag} on axis",
+                await adapter.add_sketch_constraint(
+                    f"{base}.start", "origin", "vertical_points"
+                ),
+            )
+            check(
+                f"cap {tag} station",
+                await adapter.add_sketch_dimension(
+                    f"{base}.start", "origin", "vertical_distance", z_end
+                ),
+            )
+            cap.record(f"Cap{tag.capitalize()}Z", '"ShaftLen"')
+        else:
+            check(
+                f"cap {tag} station",
+                await adapter.add_sketch_constraint(
+                    f"{base}.start", "origin", "coincident"
+                ),
+            )
+        check(
+            f"cap {tag} radius",
+            await adapter.add_sketch_dimension(arc, None, "radial", CAP_R),
+        )
+        cap.record(
+            f"Cap{tag.capitalize()}R",
+            '("ShaftDia" / 2 * "ShaftDia" / 2 + "CapSag" * "CapSag") / (2 * "CapSag")',
+        )
+        await ensure_fully_defined(adapter, f"cap {tag} sketch")
+        check(f"exit_sketch cap {tag}", await adapter.exit_sketch())
+        name_last_feature(adapter, f"Cap{tag.capitalize()}Profile")
+        drive_jobs += cap.apply(adapter, f"Cap{tag.capitalize()}Profile")
+        check(
+            f"revolve cap {tag}",
+            await adapter.create_revolve(RevolveParameters(angle=360.0)),
+        )
+        name_last_feature(adapter, f"Cap{tag.capitalize()}")
+        volume = await volume_check(
+            adapter, f"cap {tag}", volume + V_CAP, 0.03 * V_CAP
+        )
 
     # Named central axis (Axis1) for the assembly swing revolute: the pinion
     # swing group pivots on this shaft (p2 engage DOF, build_drive_train).
@@ -95,7 +206,7 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven shaft (equations neutral)", V_SHAFT, 0.005 * V_SHAFT)
+    await volume_check(adapter, "driven shaft (equations neutral)", volume, 0.005 * V_SHAFT)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
