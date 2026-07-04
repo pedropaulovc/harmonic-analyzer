@@ -98,23 +98,24 @@ STOP_SCREW_HOLE_DIA = 4.1  # O4 shank clearance
 SWING_HOLE_DEPTH = 6.0
 
 # Alignment-pinion rig hold-downs (PR7 items 2/11/12), blind from the TOP face
-# like the swing hardware: four Ø4.2 holes under the two pivot blocks' bright
-# slotted screws (build_pinion_pivot_block SCREW_* stations: block x -6.336
-# +/- 13.5, hole z = block z0 + depth/2 -- asserted at drive-train import) and
-# two Ø3.2 holes under the black foot screws (build_foot_screw): the spring
-# foot and the arbor-pedestal flange.
+# like the swing hardware and in the SAME signed machine-handed convention
+# (x = -pre-mirror x): four Ø4.2 holes under the two pivot blocks' bright
+# slotted screws (build_pinion_pivot_block SCREW_* stations: pre-mirror block
+# x -6.336 +/- 13.5, hole z = block z0 + depth/2 -- asserted at drive-train
+# import with the sign flip) and two Ø3.2 holes under the black foot screws
+# (build_foot_screw): the spring foot and the arbor-pedestal flange.
 BLOCK_SCREW_XZ = (
-    (7.164, -98.0),    # front block, east screw
-    (-19.836, -98.0),  # front block, west screw
-    (7.164, 82.0),     # back block, east screw
-    (-19.836, 82.0),   # back block, west screw
+    (-7.164, -98.0),   # front block, east screw
+    (19.836, -98.0),   # front block, west screw
+    (-7.164, 82.0),    # back block, east screw
+    (19.836, 82.0),    # back block, west screw
 )
 BLOCK_SCREW_HOLE_DIA = 4.2  # slotted-screw O4 shank clearance
 BLOCK_SCREW_HOLE_DEPTH = 3.5  # 18 shank - 16 block = 2 buried + 1.5 air
 FOOT_SCREW_XZ = (
-    (-20.467, 70.95),  # spring foot (build_pinion_spring hole: the west foot
+    (20.467, 70.95),  # spring foot (build_pinion_spring hole: the west foot
     # crosses under the lift rod so its screw lands west of the moving rig)
-    (54.7, -95.5),     # arbor-pedestal flange (build_arbor_pedestal SCREW_Z)
+    (-54.7, -95.5),   # arbor-pedestal flange (build_arbor_pedestal SCREW_Z)
 )
 FOOT_SCREW_HOLE_DIA = 3.2  # foot-screw O2.9 shank clearance
 FOOT_SCREW_HOLE_DEPTH = 7.7  # 8.0 shank under the 0.8 spring strip + air
