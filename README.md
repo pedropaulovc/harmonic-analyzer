@@ -3,7 +3,7 @@
 This repository documents the full reconstruction of Albert A. Michelson’s 20-element harmonic analyzer—an analog mechanical computer that performs Fourier synthesis and analysis via a system of gears, springs, levers, and cams.
 
 <p align="center">
-  <img src="docs/images/hero.png" width="420" alt="Top-level SolidWorks assembly, isometric view">
+  <img src="docs/images/hero.png" alt="Top-level SolidWorks assembly, isometric view">
 </p>
 
 ## 📐 Project Scope
