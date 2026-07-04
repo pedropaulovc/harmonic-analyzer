@@ -12,18 +12,14 @@ the SW suites are ``verify:<suite>`` tasks (on the COM spine); the no-SW ones ar
 ``check:<suite>`` tasks (parallel). There is no aggregate "all" -- ``doit build``
 is the single fully-safe entry point that runs every gate.
 
-  soundness (default) NEEDS SOLIDWORKS. Open the Default pose and run, collecting
-                      ALL failures: DOF fully-defined, no over-constrained
-                      component, model healthy (deep), interference-free, gear
-                      ratios == config, BOM/part-count envelope.
-  subsystems          NEEDS SOLIDWORKS. Subsystem-SPECIFIC structural gates (plan
-                      F1) NOT already covered by soundness -- currently just the
-                      channel assembly's 20-way moving-stem instance independence.
-                      soundness already opens every (sub)assembly standalone and
-                      runs the shared health battery (DOF / over-constrained /
-                      model-healthy / interference / gear-ratios / component-count)
-                      on each, so this pass no longer repeats it (that duplication
-                      was the biggest COM-spine time sink; see release-perf memory).
+  soundness (default) NEEDS SOLIDWORKS. Open the Default pose on every built
+                      (sub)assembly and run, collecting ALL failures: one shared
+                      re-solve, then DOF fully-defined / no over-constrained
+                      component / model healthy (deep) / interference-free, plus
+                      the channel assembly's 20-way moving-stem instance
+                      independence (folded in from the retired `subsystems` suite).
+                      gear ratios == config is verified at the RELEASE preflight,
+                      not on every build.
   kinematics          NEEDS SOLIDWORKS. Kinematic pen-driver fidelity (plan F5):
                       open pen.SLDASM, sweep the CrankDeg global, and assert
                       the pen-marker tip traces truth_model.pen_y (mapped to the
@@ -37,9 +33,8 @@ is the single fully-safe entry point that runs every gate.
                       the tolerance/metadata audit (parts.yaml <-> build scripts;
                       emits cad/out/reports/tolerance_audit.csv).
 
-Unlike the build gates (fail-fast), ``soundness``/``subsystems`` run every gate
-and report the full set of failures at the end, so one run tells you everything
-wrong.
+Unlike the build gates (fail-fast), ``soundness`` runs every gate and reports the
+full set of failures at the end, so one run tells you everything wrong.
 
 Run (SolidWorks already open for any suite touching geometry)::
 
@@ -134,13 +129,14 @@ _MOVING_CHANNEL_STEMS = ("rocker-arm", "connecting-rod", "amplitude-bar", "chann
 _INSTANCE_SUFFIX = re.compile(r"-\d+$")
 # Crank-drive gear mate: either side carries one of these in its component name.
 _CRANK_GEAR_TOKENS = ("crank-pinion", "crank-drive-gear")
-# Expected TOP-LEVEL component-count band per assembly: a tripwire for "a build
-# dropped/duplicated a channel (or a whole subassembly)", not a tight count.
+# Expected TOP-LEVEL component-count band per assembly. REFERENCE DATA ONLY -- the
+# live component-count gate was removed (every failure it ever raised was a stale
+# band or a gate bug, never a real regression). Kept because the counts document
+# each assembly's structure and size the mock in test_verify_telemetry.
 # component_names counts top-level components only (GetComponents(TopLevelOnly)),
 # so harmonic-analyzer's count is its 7 child subassemblies + 1 loose part (the
 # measuring-stick; the spare gear rides inside paper-drive) -- NOT the ~340
-# flattened parts. Bands measured live (verify.py --suite subsystems)
-# with margin.
+# flattened parts. Bands measured live on a green build, with margin.
 # The channel + drive-train bands scale with the built channel count N (the
 # TEMPORARY active_count): channel = 7N + 4 (N×{rocker,rod,bar,lever,spring} + 2
 # shafts + 4 ball-mounts + 2 bushings per inter-channel gap), drive-train = 40 + N
@@ -254,7 +250,7 @@ def _expected_channel_ratios() -> list[tuple[int, int]]:
     return sorted(_canon_ratio(ch["cone_teeth"], cyl) for ch in _config.active_channels())
 
 
-def assert_no_over_constrained(adapter: Any) -> None:
+def assert_no_over_constrained(adapter: Any, *, resolve: bool = True) -> None:
     """Raise if any top-level component is over-constrained (redundant mates).
 
     ``assert_components_fully_defined`` already rejects status != 3, but lumps
@@ -269,8 +265,11 @@ def assert_no_over_constrained(adapter: Any) -> None:
     # and the per-component status scan are the two costs -- give each its own
     # child span so the wall-clock is attributable, mirroring gate.dof/gate.health.
     with _telemetry.span("gate.over_constrained") as gsp:
+        # ``resolve=False``: soundness already re-solved once after open and does
+        # not mutate the model between gates, so this rebuild would be redundant.
         with _telemetry.span("over.rebuild"):
-            adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
+            if resolve:
+                adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
         with _telemetry.span("over.scan") as ssp:
             components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
             over = []
@@ -350,31 +349,6 @@ def assert_gear_ratios(adapter: Any, name: str) -> None:
         f"gear ratios == config (crank {crank_expected}, "
         f"{len(channel_links)} channel meshes)"
     )
-
-
-def assert_component_count(adapter: Any, name: str) -> None:
-    """Assert the top-level instance count is within the expected band.
-
-    The "N instances -> 1 part" property (no component patterns inflating the
-    BOM into N part lines) is structural here -- channels are independent
-    *instances of one part file*. This gate is the tripwire that a rebuild did
-    not drop or duplicate a channel; the exact count band is in ``_COMPONENT_BAND``.
-    """
-    # Span the gate; component_names() re-marshals the whole top-level component
-    # list over the COM bridge (~85 s for `channel`) and was a single unspanned
-    # gap. Give that read its own child span, mirroring gate.dof/gate.health.
-    with _telemetry.span("gate.component_count") as gsp:
-        band = _COMPONENT_BAND.get(name)
-        with _telemetry.span("count.read"):
-            count = len(component_names(adapter))
-        gsp.set_attribute("count", count)
-        if band is None:
-            _telemetry.debug(f"{name}: {count} components (no band configured)")
-            return
-        lo, hi = band
-        if not (lo <= count <= hi):
-            raise RuntimeError(f"{name}: {count} components outside expected band [{lo}, {hi}]")
-    _telemetry.success(f"{name}: {count} components within [{lo}, {hi}]")
 
 
 def assert_channel_independence(adapter: Any) -> None:
@@ -525,55 +499,6 @@ def _assert_fresh(name: str, report: Report) -> bool:
     return False
 
 
-async def _verify_isolation_one(adapter: Any, name: str, report: Report) -> None:
-    """Subsystem-SPECIFIC structural gates for one built (sub)assembly (plan F1).
-
-    The ``soundness`` pass already opens EVERY built (sub)assembly standalone (a
-    fresh session per assembly) and runs the shared health battery on each --
-    DOF fully-defined, no redundant mates, model-healthy (deep), interference-free,
-    gear-ratios, component-count. Re-running that whole battery here (the historical
-    "isolation" suite) re-opened all eight assemblies and repeated the single most
-    expensive COM work in the pipeline -- the deep model-healthy rebuild alone is
-    ~140 s for the top assembly -- for ZERO added coverage (see the release-perf
-    memory note). This pass now runs ONLY the gate ``soundness`` does not: the
-    channel assembly's 20-way moving-stem instance independence (the "no component
-    pattern for moving parts" invariant). ``soundness`` runs first on the COM spine,
-    so the shared battery is always proven before this pass.
-
-    The motion-dependent rows of the F1 table (gear decoherence, cam-follower
-    travel vs truth_model) need the Basic Motion solver and stay tracked in the
-    module docstring, not silently skipped.
-    """
-    if name != CHANNEL_OWNER:
-        return  # soundness owns the shared battery; only `channel` has a unique gate
-
-    sldasm = OUT_SLDASM / f"{name}.SLDASM"
-    if not sldasm.exists():
-        report.failed.append((f"iso:{name}:open", f"not built: {sldasm}"))
-        _telemetry.error(f"{sldasm.name} not built -- run doit")
-        return
-
-    if not _assert_fresh(name, report):
-        return  # stale on-disk artefact: fail loud rather than verify old geometry
-
-    # Fresh session: close any prior assembly before opening this one (accumulating
-    # open docs degrades the COM session -- the InterferenceDetectionManager came
-    # back null on the 5th open).
-    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    # Span the open+activate (see _verify_static_one): the per-assembly load is
-    # COM work that otherwise sits in an unspanned gap before the gates.
-    async with _telemetry.aspan("verify.open", name=name):
-        check(f"open {name}", await adapter.open_model(str(sldasm)))
-        configs = check("list configurations", await adapter.list_configurations())
-        if REST in (configs or []):
-            check(f"activate {REST}", await adapter.set_active_configuration(REST))
-    log(f"--- isolation: {name} ({REST} pose) ---")
-
-    # Instance independence is read straight off the component tree (GetComponents),
-    # populated on open -- no rebuild needed (soundness already rebuilt this assembly).
-    report.gate(f"iso:{name}:channel-independence", lambda: assert_channel_independence(adapter))
-
-
 def _expected_free_dof(name: str) -> int:
     """Free operational DOF expected in ``name``'s AS-SAVED model.
 
@@ -622,6 +547,19 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
             check(f"activate {REST}", await adapter.set_active_configuration(REST))
     log(f"--- verifying {name} ({REST} pose) ---")
 
+    # Single shared re-solve for the whole static battery. The DOF, over-constrained
+    # and model-healthy gates below EACH used to ForceRebuild3 this same model (three
+    # deep rebuilds where one suffices -- ~50 s x3 on the top assembly). The static
+    # suite never mutates the model between gates (they only READ GetComponents /
+    # GetConstrainedStatus / GetWhatsWrong / interferences), so re-solve ONCE here and
+    # let each gate read the resolved status (``resolve=False``). The rebuild result
+    # (False => a hard health fault) is handed to model-healthy so its
+    # ForceRebuild3-returned-False check is preserved.
+    with _telemetry.span("verify.rebuild", name=name):
+        rebuilt = adapter._attempt(
+            lambda: adapter.currentModel.ForceRebuild3(False), default=None
+        )
+
     free_dof = _expected_free_dof(name)
     if free_dof:
         # Default-free build: the freed-DOF park drivers are DEFERRED (not authored
@@ -631,15 +569,37 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
         # preflight (`preflight_release.py`), which replays the recorded specs.
         report.gate(
             f"{name}:dof-free-necessity",
-            lambda: assert_free_dof_necessity(adapter, free_dof),
+            lambda: assert_free_dof_necessity(adapter, free_dof, resolve=False),
         )
     else:
-        report.gate(f"{name}:dof-fully-defined", lambda: assert_components_fully_defined(adapter))
-    report.gate(f"{name}:no-over-constrained", lambda: assert_no_over_constrained(adapter))
-    report.gate(f"{name}:model-healthy", lambda: assert_model_healthy(adapter, label=name, deep=True))
+        report.gate(
+            f"{name}:dof-fully-defined",
+            lambda: assert_components_fully_defined(adapter, resolve=False),
+        )
+    report.gate(
+        f"{name}:no-over-constrained",
+        lambda: assert_no_over_constrained(adapter, resolve=False),
+    )
+    report.gate(
+        f"{name}:model-healthy",
+        lambda: assert_model_healthy(adapter, label=name, deep=True, rebuilt=rebuilt),
+    )
     report.gate(f"{name}:interference-free", lambda: check_no_interference(adapter))
-    report.gate(f"{name}:gear-ratios", lambda: assert_gear_ratios(adapter, name))
-    report.gate(f"{name}:component-count", lambda: assert_component_count(adapter, name))
+    # component-count REMOVED: every historical failure of that gate was a stale band
+    # or a gate bug (never a real regression), so it cost more in false alarms than it
+    # ever caught. The expected counts survive as reference data in `_COMPONENT_BAND`.
+    # gear-ratios is DEMOTED to the release preflight (preflight_release.py): it is the
+    # single most expensive gate and re-proves a property fixed by the tooth-count
+    # config that check:math already validates analytically -- so it no longer runs on
+    # every build, only against the shipped artefact at release.
+    # channel-independence (the "no component pattern for moving parts" invariant) is
+    # folded in here: soundness already opens `channel`, so the retired
+    # verify:subsystems suite's one unique gate runs on this same open model.
+    if name == CHANNEL_OWNER:
+        report.gate(
+            f"{name}:channel-independence",
+            lambda: assert_channel_independence(adapter),
+        )
 
 
 def _rebuild(adapter: Any) -> None:
@@ -1168,9 +1128,6 @@ async def build(adapter: Any) -> dict[str, str]:
     if suite == "soundness":
         for name in names:
             await _verify_static_one(adapter, name, report)
-    if suite == "subsystems":
-        for name in names:
-            await _verify_isolation_one(adapter, name, report)
     if suite == "kinematics":
         await _verify_motion_one(adapter, report)
     if suite == "math":
@@ -1205,13 +1162,13 @@ def _parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("names", nargs="*", help="assembly stem(s); default = all built")
     ap.add_argument("--suite", default="soundness",
-                    choices=["soundness", "subsystems", "kinematics", "math",
-                             "config"])
+                    choices=["soundness", "kinematics", "math", "config"])
     args = ap.parse_args()
     if not args.names:
         # math/config need no model; kinematics targets MOTION_OWNER (pen);
-        # soundness/subsystems default to all built. (There is no aggregate
-        # "all" suite -- `doit build` is the one fully-safe entry point.)
+        # soundness defaults to all built. (There is no aggregate "all" suite --
+        # `doit build` is the one fully-safe entry point. The channel-independence
+        # gate that used to be `subsystems` now runs inside soundness on `channel`.)
         if args.suite in ("math", "config"):
             args.names = []
         elif args.suite == "kinematics":
