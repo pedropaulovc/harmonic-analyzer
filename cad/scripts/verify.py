@@ -158,7 +158,7 @@ _COMPONENT_BAND = {
     # The former monolithic output split by function (no per-channel parts here);
     # bands tightened to the measured green-build counts (verify:subsystems).
     "summing": (7, 9),          # ch 18-19, measured 8 (knife-stay removed: never in the real device)
-    "magnifier": (11, 13),      # ch 20-21, measured 12 (+hub-wire, 2026-07-04)
+    "magnifier": (11, 13),      # ch 20-21, measured 12 (+lever-wire, 2026-07-04)
     "pen": (7, 9),              # ch 24, measured 8 (+pen-wire, 2026-07-04)
     "paper-drive": (85, 89),    # ch 22-23-25, measured 87 (27 placed + 60-link chain;
     # the ch30 GT re-anchor moved the crank to (122.8, 144.96) and the chain plane
@@ -527,7 +527,7 @@ def _expected_free_dof(name: str) -> int:
             return 0
         return 3 * _config.active_count()
     if name == "magnifier":
-        # The freed lever knife-rock + the articulated hub-wire's swing/spin;
+        # The freed lever knife-rock + the articulated lever-wire's swing/spin;
         # the wheel is COUPLED by the WIRE-1 yoke (no DOF of its own).
         return 0 if is_locked_build(_config.machine("build_lock", "magnifier")) else 3
     return 0
@@ -541,7 +541,7 @@ _REQUIRED_FREE_STEMS = {
     "channel": ("rocker-arm", "connecting-rod", "amplitude-bar"),
     # Three freed DOF (lever knife-rock + wire swing/spin); the yoke-coupled
     # wheel must read under-constrained WITH them, else the coupling died.
-    "magnifier": ("magnifying-lever", "magnifying-wheel", "hub-wire"),
+    "magnifier": ("magnifying-lever", "magnifying-wheel", "lever-wire"),
 }
 
 
@@ -765,7 +765,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     The transient park mate is discarded by closing the doc UNSAVED (the
     release-preflight convention), so the shipped free model is untouched.
     """
-    import build_hub_wire as _hw
+    import build_lever_wire as _hw
     import build_magnifier_assembly as _mag
     from build_output_fixture import HOOK_ANCHOR_LOCAL
 
@@ -808,7 +808,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
 
     def _wire_state() -> tuple[float, float, list[float]]:
         """(centreline-to-axis distance, hook ball residual, hub-end pos)."""
-        rows, pos = _xform("hub-wire-1")
+        rows, pos = _xform("lever-wire-1")
         u = rows[1]  # wire axis (+Y local = hub -> hook)
         # line-line distance to the wheel axis (direction Z at axis_xy)
         n = [u[1], -u[0], 0.0]  # u x z-hat
