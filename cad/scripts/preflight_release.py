@@ -95,8 +95,11 @@ async def _preflight_one(adapter: Any, name: str) -> str:
         # on the clean reopened model BEFORE park_closure authors any mates, for BOTH
         # `free` AND `locked` builds -- a locked release skips the park closure below,
         # so this is the ONLY live gear-mate ratio validation it gets now that
-        # soundness no longer runs the gate. drive-train + channel (== FREE_ASSEMBLIES)
-        # carry the only real gear meshes (the crank drive + 20 channel meshes).
+        # soundness no longer runs the gate. drive-train carries ALL 21 real meshes
+        # (the crank 1:4 drive + the 20 cone<->cylinder channel meshes of its gear
+        # stack); channel reads 0 gear mates at its own level (they live in the
+        # flexible drive-train sub, verified there), so its check is a cheap no-op --
+        # running it on both is harmless and keeps the shipped-artefact guarantee.
         assert_gear_ratios(adapter, name)
         if expected == 0:
             # `locked` build (or an assembly with no parked DOF): the saved model is
