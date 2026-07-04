@@ -1,22 +1,16 @@
-r"""Reproduction script: pinion lift rod with cam pins (book ch. 25).
+r"""Reproduction script: pinion lift rod (book ch. 25).
 
 The second Ø6.35 rod of the swing rig, running through the pivot
-blocks' west bores parallel to the strap torque shaft. Turning it by
-the engage lever (build_pinion_lever.py, rooted on its front end)
-sweeps two short radial cam pins up beneath the straps' cam-follower
-pins (build_pinion_cam_pin.py, pressed through the strap tails),
-lifting the followers and swinging the alignment pinion east into mesh
-(p. 68-69 close-ups + engineerguy 4/4 7:15). Parked the pins point
-straight DOWN, clear of the followers (the disengaged rest state); the
-cam contact band and clearances are asserted in build_drive_train's
-cam block (PR5 -- supersedes the old "shortened, non-working pins"
-simplification, DIMENSIONS.md Appendix C).
+blocks' LOW west bores, parallel to (and 4.51 below) the strap torque
+shaft. Turning it by the engage lever (build_pinion_lever.py, clamped
+on its front end) spins the two eccentric cam collars pinned to it
+(build_pinion_cam.py, PR8); their rising ODs lift the straps' follower
+pins resting on them from above and swing the drum east into mesh
+(page001_img01). PR5's integral radial cam pins are RETIRED -- the
+photo shows plain rod + separate set-pinned collars, and the collar
+mechanism replaced the crossed-pin lift.
 
-Layout: rod axis Z, z 0..210; pins along -Y at z 42.5 and 190.5, axis
-to tip 11.175 (8 proud of the rod surface).
-
-Volume gate: rod exact; each pin adds pi*r^2*L minus the numerically
-integrated rod/pin overlap wedge (Simpson, deterministic).
+Layout: rod axis Z, z 0..202, plain cylinder; crowned back end.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 25".
 
@@ -39,7 +33,6 @@ from _common import (
     define_circle,
     drive_dimension,
     ensure_fully_defined,
-    extrude_at_offset,
     force_rebuild,
     name_last_feature,
     report_mass_properties,
@@ -57,49 +50,14 @@ ROD_DIA = 6.35  # rides the block bores, same stock as the torque shaft (derived
 ROD_LEN = 202.0  # machine z -114..+88 (PR7): back end FLUSH with the back
 # block's outer face (+88, crowned below); the front end reaches just far
 # enough south of the front block (-104) for the lever's clamp hub
-PIN_DIA = 3.0  # cam pin, photo-scaled vs the rod (low). Thinned 4.0 -> 3.0
-# with the PR5 working cam: at Ø4 the parked shaft sat 0.05 off the strap's
-# follower pin (build_drive_train's cam scan), under every design margin.
-PIN_TIP = 10.8  # rod axis to pin tip -- tip at machine y 52.0 (derived).
-# Shortened from 11.175 when the spring's west foot (PR7) started crossing
-# under the back pin: the swept tip CORNER (radius sqrt(TIP^2 + 1.5^2))
-# dips to machine y 62.8 - 10.904 = 51.90, clearing the 51.6 strip top by
-# 0.30; at 11.175 the corner cut 0.075 INTO the strip mid-sweep
-PIN_STATIONS = (36.5, 184.5)  # machine z -77.5 / +70.5: inside each strap's
-# z band (straps at -80.25..-75.25 and +68.45..+73.45)
-PIN_END_INSIDE = 2.0  # pin extrusion ends 2.0 up inside the rod: above the
-# deepest rod-surface sag across the pin's width (2.466 at x +-2), so the
-# merge is a clean overlap, not a point tangency
 CAP_SAG = 1.2  # back-end crown sagitta (the p.69 dome; the front end hides
 # under the lever hub's own domed cap)
 
 ROD_R = ROD_DIA / 2.0
-PIN_R = PIN_DIA / 2.0
-PIN_LEN = PIN_TIP - PIN_END_INSIDE  # 9.175 extrusion length
 CAP_R = (ROD_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 4.80 crown sphere radius
 V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # 19.85
 
 V_ROD = math.pi * ROD_R**2 * ROD_LEN
-
-
-def _pin_overlap() -> float:
-    """Pin volume already inside the rod: integral over the pin cross-section
-    of (rod surface depth - PIN_END_INSIDE), Simpson with 2000 panels."""
-    n = 2000
-    h = 2.0 * PIN_R / n
-
-    def f(x: float) -> float:
-        return (math.sqrt(ROD_R**2 - x**2) - PIN_END_INSIDE) * 2.0 * math.sqrt(
-            max(PIN_R**2 - x**2, 0.0)
-        )
-
-    total = f(-PIN_R) + f(PIN_R)
-    for i in range(1, n):
-        total += (4.0 if i % 2 else 2.0) * f(-PIN_R + i * h)
-    return total * h / 3.0
-
-
-V_PIN_ADDED = math.pi * PIN_R**2 * PIN_LEN - _pin_overlap()
 
 
 async def build(adapter) -> dict[str, str]:
@@ -107,19 +65,13 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations): the rod + pin diameters, the two pin
-    # stations along the rod, and the pin reach. The mm suffix is load-bearing --
+    # Editable knobs (Tools > Equations): the rod diameter; RodLen feeds the
+    # feature-parameter extrude length (built with the literal below) --
+    # declared so a GUI edit sees the knob. The mm suffix is load-bearing --
     # this is an INCH document and the equation manager reads BARE numbers in
-    # document units (an unsuffixed 6.35 = 6.35 in). RodLen, PinTip and
-    # PinEndInside feed feature-parameter extrude lengths (built with the literals
-    # below) -- declared so a GUI edit sees the knobs.
+    # document units (an unsuffixed 6.35 = 6.35 in).
     await set_global(adapter, "RodDia", f"{ROD_DIA}mm")
     await set_global(adapter, "RodLen", f"{ROD_LEN}mm")
-    await set_global(adapter, "PinDia", f"{PIN_DIA}mm")
-    await set_global(adapter, "PinTip", f"{PIN_TIP}mm")
-    await set_global(adapter, "PinStationFront", f"{PIN_STATIONS[0]}mm")
-    await set_global(adapter, "PinStationBack", f"{PIN_STATIONS[1]}mm")
-    await set_global(adapter, "PinEndInside", f"{PIN_END_INSIDE}mm")
     await set_global(adapter, "CapSag", f"{CAP_SAG}mm")
 
     drive_jobs: list[tuple[str, str]] = []
@@ -143,30 +95,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Rod")
     volume = await volume_check(adapter, "rod", V_ROD, 0.005 * V_ROD)
 
-    # Both cam pins from one Top sketch (sketch (u, v) -> global (X, -Z),
-    # probe-verified), extruded +Y from y -PIN_TIP up into the rod. Each pin
-    # circle sits on the sketch v axis (x 0): one centre dim (the station, an
-    # unsigned distance driven by the positive station global) + diameter.
-    pins = SketchDims()
-    check("create_sketch pins", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter, 0.0, -PIN_STATIONS[0], PIN_R, "pin front", dims=pins,
-        names=("PinFrontCx", "PinFrontZ", "PinFrontDia"),
-        drives=(None, '"PinStationFront"', '"PinDia"'),
-    )
-    await define_circle(
-        adapter, 0.0, -PIN_STATIONS[1], PIN_R, "pin back", dims=pins,
-        names=("PinBackCx", "PinBackZ", "PinBackDia"),
-        drives=(None, '"PinStationBack"', '"PinDia"'),
-    )
-    await ensure_fully_defined(adapter, "pins sketch")
-    check("exit_sketch pins", await adapter.exit_sketch())
-    name_last_feature(adapter, "PinsProfile")
-    drive_jobs += pins.apply(adapter, "PinsProfile")
-    extrude_at_offset(adapter, PIN_LEN, -PIN_TIP)
-    name_last_feature(adapter, "CamPins")
-    expected = volume + 2.0 * V_PIN_ADDED
-    await volume_check(adapter, "cam pins", expected, 0.02 * 2.0 * V_PIN_ADDED)
+    expected = volume
 
     # Back-end crown (PR7, item 13): shallow spherical cap proud of the flush
     # back end -- Top-plane rim->apex profile revolved about the axis, the
@@ -255,7 +184,7 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(
-        adapter, "driven lift rod (equations neutral)", expected, 0.02 * 2.0 * V_PIN_ADDED
+        adapter, "driven lift rod (equations neutral)", expected, 0.03 * V_CAP
     )
 
     await apply_material(adapter, MATERIAL)

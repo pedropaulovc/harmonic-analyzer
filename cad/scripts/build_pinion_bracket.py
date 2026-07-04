@@ -2,16 +2,24 @@ r"""Reproduction script: pinion swing bracket (book ch. 25; 2 used).
 
 The polished-steel strap that carries one end of the alignment-pinion
 drum (p. 68 close-ups, shot from the BACK side): a short rounded-end
-flat bar with TWO Ø6.35 bores -- the bottom one pivots on the torque
-shaft (build_pinion_pivot_shaft.py), the top one journals the drum's
-arbor stub (build_alignment_pinion.py) -- plus a small Ø3 CROSS-BORE
-through the tail cap below the pivot. That bore presses the cam-follower
-pin (build_pinion_cam_pin.py, PR5): the lift rod's radial cam pin
-(build_pinion_lift_rod.py) sweeps up beneath the follower and lifts it,
-swinging the drum into mesh (p. 69 close-up with the rotation arrows).
+flat bar with a O6.35 pivot bore below (the torque shaft,
+build_pinion_pivot_shaft.py) and a O8 arbor bore above (the steel
+arbor, build_pinion_arbor.py) -- plus a BLIND O4 bore in the WEST EDGE
+just below the pivot (PR8, page001_img01): it seats the cam-follower
+pin (build_pinion_cam_pin.py) that rests ON the lift rod's eccentric
+cam collar (build_pinion_cam.py) from above, so turning the lever
+raises the collar under the pin and swings the drum east into mesh.
+(PR5's O3 tail CROSS-bore at drop 6.25 is retired: the photo puts the
+fatter pin near pivot height, and only a blind edge seat clears the
+pivot bore there -- a through bore at drop 2 would cut into it.)
 
 Layout: pivot bore at the origin, arbor bore at (0, C2C), strap up +Y,
-thickness z 0..5; cam-pin bore along X at (y -CAM_DROP, z mid).
+thickness z 0..5; pin bore along X into the -X edge at (y -PIN_DROP,
+z mid), PIN_SEAT deep from the x -9 tangent plane -- its mouth is
+already on the r9 cap arc (the edge at y -2 sits at x -8.775). The
+bore is the strap's FIRST x-asymmetric feature: MIRROR_PLANE moves to
+the exact z mid-plane ("z", THICKNESS/2 -- every feature is a through-
+or mid-plane form about it).
 
 Dimensions: cad/config/dimensions.yaml "Chapter 25".
 
@@ -52,7 +60,7 @@ import _telemetry
 PART_NAME = "pinion-bracket"
 MATERIAL = "Plain Carbon Steel"  # p.68: bright steel strap
 
-WIDTH = 18.0  # ch25 strap width, photo-scaled vs the 42T drum tip Ø22.4 in
+WIDTH = 18.0  # ch25 strap width, photo-scaled vs the 42T drum tip O22.4 in
 # v4_pinion_018 (strap ~0.8x the tip OD; the teeth stand proud of BOTH flanks
 # -- the old 22 sat flush with the tips). Assembly guard: build_drive_train's
 # STRAP_R_END must match WIDTH / 2.
@@ -64,33 +72,33 @@ THICKNESS = 5.0  # photo-scaled (low)
 PIVOT_BORE = 6.35  # torque shaft below (derived)
 ARBOR_BORE = 8.0  # drum arbor above (PR7: the separate steel arbor is O8
 # -- build_pinion_arbor SHAFT_DIA must match)
-CAM_BORE = 3.0  # cam-follower pin press bore (photo-scaled vs the 6.35 shafts
-# in the p.69 close-up, low). Assembly guard: build_drive_train's
-# SPRING-style cam asserts and build_pinion_cam_pin PIN_DIA must match.
-CAM_DROP = 6.25  # pivot bore centre -> cam bore centre, down the strap
-# centreline. Bounded on both sides: web to the pivot bore
-# 6.25 - 1.5 - 3.175 = 1.575, rim to the cap edge 9 - 6.25 - 1.5 = 1.25.
-# build_drive_train's cam geometry (and build_pinion_cam_pin's span) key off
-# this drop -- must match.
+PIN_BORE = 4.0  # cam-follower pin press seat (PR8) -- build_pinion_cam_pin
+# PIN_DIA must match; 0.5 walls in the 5-thick edge
+PIN_DROP = 2.0  # pivot bore centre -> pin bore axis, down the strap
+# centreline (img01: the pin rides at the pivot's height band). The blind
+# seat stops 5 short of the centreline, so the O6.35 pivot bore (which a
+# through bore at this drop would cut into) is untouched.
+PIN_SEAT = 4.0  # blind depth from the x -9 tangent plane (must match
+# build_pinion_cam_pin SEAT_LEN)
 
 R_END = WIDTH / 2.0
 
 
-def _cam_bore_removed() -> float:
-    """Material removed by the cam cross-bore: integral over the bore's y-band
-    of (cap chord length at y) x (bore z-width at y), Simpson with 2000
-    panels. The bore is fully inside the thickness (z 1..4 of 0..5) and clear
-    of the pivot bore (y -4.75..-7.75 vs pivot r 3.175), so the cap's outer
-    circle is the only boundary that matters."""
-    r = CAM_BORE / 2.0
+def _pin_bore_removed() -> float:
+    """Material removed by the blind edge bore: for each (dy, dz) point of
+    the bore disc the removed length runs from the cap arc surface
+    x = -sqrt(R_END^2 - y^2) east to the bore bottom x = -(R_END - PIN_SEAT).
+    z drops out (the disc's z-chord scales it); Simpson over dy."""
+    r = PIN_BORE / 2.0
+    bottom = -(R_END - PIN_SEAT)  # -5
     n = 2000
     h = 2.0 * r / n
 
     def f(dy: float) -> float:
-        y = -CAM_DROP + dy  # dy in [-r, r]
-        return 2.0 * math.sqrt(max(R_END**2 - y * y, 0.0)) * 2.0 * math.sqrt(
-            max(r * r - dy * dy, 0.0)
-        )
+        y = -PIN_DROP + dy
+        chord = 2.0 * math.sqrt(max(r * r - dy * dy, 0.0))
+        surface = -math.sqrt(max(R_END**2 - y * y, 0.0))
+        return chord * max(bottom - surface, 0.0)
 
     total = f(-r) + f(r)
     for i in range(1, n):
@@ -99,12 +107,12 @@ def _cam_bore_removed() -> float:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
     # Editable knobs (Tools > Equations): the strap width (= cap radius x 2), the
-    # bore-to-bore centre distance and the bore diameter. The mm suffix is
+    # bore-to-bore centre distance and the bore diameters. The mm suffix is
     # load-bearing -- this is an INCH document and the equation manager reads BARE
     # numbers in document units (an unsuffixed 22 = 22 in). Thickness is the
     # extrude feature parameter (built with the literal); StrapThickness is
@@ -114,8 +122,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "StrapThickness", f"{THICKNESS}mm")
     await set_global(adapter, "PivotBore", f"{PIVOT_BORE}mm")
     await set_global(adapter, "ArborBore", f"{ARBOR_BORE}mm")
-    await set_global(adapter, "CamBore", f"{CAM_BORE}mm")
-    await set_global(adapter, "CamDrop", f"{CAM_DROP}mm")
+    await set_global(adapter, "PinBore", f"{PIN_BORE}mm")
+    await set_global(adapter, "PinDrop", f"{PIN_DROP}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -211,77 +219,102 @@ async def build(adapter) -> dict[str, str]:
     expected = area * THICKNESS
     await volume_check(adapter, "strap", expected, 0.005 * expected)
 
-    # Cam-follower pin cross-bore (PR5): a Ø3 hole ALONG X through the tail
-    # cap, CAM_DROP below the pivot, at mid-thickness. Sketched on the Right
-    # plane and cut mid-plane both directions -- symmetric about x 0, so the
-    # cut itself has no handedness; only the sketch-u -> part-Z sign is
-    # ambiguous, probed by volume read-back exactly like the amplitude bar's
-    # top-pin hole (drive jobs held back until the winning side is proven).
-    v_bore = _cam_bore_removed()
+    # Blind cam-pin seat (PR8): O4 along X into the -X edge at (y -PIN_DROP,
+    # z mid), PIN_SEAT deep from a tangent plane at x -R_END. Two sign
+    # ambiguities are probed by volume read-back (the amplitude-bar idiom):
+    # the offset-plane side and the sketch-u -> part sign. The strap is still
+    # x-symmetric BEFORE this cut, so a volumetric pass alone cannot tell the
+    # -x seat from its +x mirror image -- the centre-of-mass x sign
+    # disambiguates (material removed at -x pushes the COM to +x).
+    v_bore = _pin_bore_removed()
     res = await adapter.get_mass_properties()
     vol_before = res.data.volume
-    for idx, u_mid in enumerate((THICKNESS / 2.0, -THICKNESS / 2.0)):
-        # Per-attempt profile name (the amplitude-bar idiom): a failed first
-        # attempt leaves its BLANKED sketch behind under its own name, so a
-        # shared name would make the retry's dim lookup (cam.apply) bind the
-        # deferred CamBore* equations to the orphan instead of the profile
-        # that actually cut (review catch on #163).
-        prof_name = f"CamBoreProfile{idx}"
-        cam = SketchDims()
-        check("create_sketch cam bore", await adapter.create_sketch("Right"))
-        await define_circle(
-            adapter, u_mid, -CAM_DROP, CAM_BORE / 2.0, "cam bore", dims=cam,
-            names=("CamBoreCz", "CamBoreCy", "CamBoreDia"),
-            drives=('"StrapThickness" / 2', '"CamDrop"', '"CamBore"'),
+    seated = False
+    for p_idx, plane_off in enumerate((-R_END, R_END)):
+        check(
+            f"create_plane PinSeatPlane{p_idx} (Right, {plane_off:+g})",
+            await adapter.create_plane(CreatePlaneParameters(
+                mode="offset", base_plane="Right Plane", offset=plane_off,
+            )),
         )
-        await ensure_fully_defined(adapter, "cam bore sketch")
-        check("exit_sketch cam bore", await adapter.exit_sketch())
-        name_last_feature(adapter, prof_name)
-        cam_jobs = cam.apply(adapter, prof_name)
-        cut = await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=4.0 * R_END, both_directions=True)
-        )
-        if not cut.is_success:
-            _telemetry.debug(
-                f"cam bore cut at sketch u={u_mid:+g} failed ({cut.error}); flipping"
+        name_last_feature(adapter, f"PinSeatPlane{p_idx}")
+        for u_idx, u_mid in enumerate((THICKNESS / 2.0, -THICKNESS / 2.0)):
+            prof_name = f"PinSeatProfile{p_idx}{u_idx}"
+            seat = SketchDims()
+            check(
+                "create_sketch pin seat",
+                await adapter.create_sketch(f"PinSeatPlane{p_idx}"),
             )
-            orphan = feature_name_by_type(adapter, "ProfileFeature")
-            if orphan:
-                blank_sketch(adapter, orphan)
-            continue
-        res = await adapter.get_mass_properties()
-        removed = vol_before - res.data.volume
-        if abs(removed - v_bore) < 0.02 * v_bore + 0.5:
+            await define_circle(
+                adapter, u_mid, -PIN_DROP, PIN_BORE / 2.0, "pin seat", dims=seat,
+                names=("PinSeatCz", "PinSeatCy", "PinSeatDia"),
+                drives=('"StrapThickness" / 2', '"PinDrop"', '"PinBore"'),
+            )
+            await ensure_fully_defined(adapter, "pin seat sketch")
+            check("exit_sketch pin seat", await adapter.exit_sketch())
+            name_last_feature(adapter, prof_name)
+            seat_jobs = seat.apply(adapter, prof_name)
+            cut = await adapter.create_cut_extrude(
+                ExtrusionParameters(depth=PIN_SEAT)
+            )
+            if not cut.is_success:
+                _telemetry.debug(
+                    f"pin seat cut (plane {plane_off:+g}, u {u_mid:+g}) failed "
+                    f"({cut.error}); flipping"
+                )
+                orphan = feature_name_by_type(adapter, "ProfileFeature")
+                if orphan:
+                    blank_sketch(adapter, orphan)
+                continue
+            res = await adapter.get_mass_properties()
+            removed = vol_before - res.data.volume
+            if removed < 0.5:
+                _telemetry.debug(
+                    f"pin seat cut (plane {plane_off:+g}, u {u_mid:+g}) removed "
+                    "nothing; flipping"
+                )
+                # A no-op cut feature would poison later attempts -- but a cut
+                # that removed nothing FAILS in SolidWorks, so is_success above
+                # already caught it; reaching here means a sliver. Fail loud.
+                raise RuntimeError(
+                    f"pin seat cut removed a sliver ({removed:.2f} mm^3)"
+                )
+            if abs(removed - v_bore) > 0.02 * v_bore + 0.5:
+                raise RuntimeError(
+                    f"pin seat cut removed {removed:.1f} mm^3, expected "
+                    f"{v_bore:.1f} -- circle misplaced/resized"
+                )
+            com = res.data.center_of_mass
+            com_x = com[0] * 1000.0 if com is not None else None
+            if com_x is None or com_x <= 0.02:
+                raise RuntimeError(
+                    f"pin seat landed on the wrong edge (COM x {com_x}) -- "
+                    "the -x seat must push the COM to +x"
+                )
             _telemetry.success(
-                f"cam bore at sketch u={u_mid:+g} removed {removed:.1f} mm^3"
-                f" (analytic {v_bore:.1f})"
+                f"pin seat (plane {plane_off:+g}, u {u_mid:+g}) removed "
+                f"{removed:.1f} mm^3 (analytic {v_bore:.1f}), COM x {com_x:+.3f}"
             )
-            name_last_feature(adapter, "CamBore")
-            drive_jobs += cam_jobs
+            name_last_feature(adapter, "PinSeat")
+            drive_jobs += seat_jobs
             expected -= v_bore
+            seated = True
             break
-        if removed < 0.5:
-            _telemetry.debug(
-                f"cam bore cut at sketch u={u_mid:+g} removed nothing; flipping"
-            )
-            continue
-        raise RuntimeError(
-            f"cam bore cut removed {removed:.1f} mm^3, expected {v_bore:.1f}"
-            " -- circle misplaced/resized"
-        )
-    else:
-        raise RuntimeError("cam bore cut removed no material on either u sign")
-    await volume_check(adapter, "strap with cam bore", expected, 0.005 * expected)
+        if seated:
+            break
+    if not seated:
+        raise RuntimeError("pin seat cut removed no material on any sign combo")
+    await volume_check(adapter, "strap with pin seat", expected, 0.005 * expected)
 
     # Named bore axes for the assembly: the pivot bore (Axis1) rides the torque
     # shaft, the arbor bore (Axis2) journals the pinion. The p2 swing group keys
     # off these (concentric to the shaft + lock the pinion in -- build_drive_train).
     await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "pivot bore")
     await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", C2C, "arbor bore")
-    # Cam-pin bore axis (along X): Front @ mid-thickness x Top @ -CAM_DROP. The
+    # Pin seat axis (along X): Front @ mid-thickness x Top @ -PIN_DROP. The
     # follower pin mates coaxial to this in the assembly, riding the swing.
     await name_bore_axis(
-        adapter, "Front Plane", THICKNESS / 2.0, "Top Plane", -CAM_DROP, "cam pin bore"
+        adapter, "Front Plane", THICKNESS / 2.0, "Top Plane", -PIN_DROP, "pin seat"
     )
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
