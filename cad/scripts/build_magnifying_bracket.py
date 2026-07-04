@@ -10,10 +10,11 @@ holes bored +Z through the flange (into the plate front face, engagement
 not modeled), placed at local x -9.5/-6.5 -- west of the collar/arm
 (|x|>5) so the bore touches only the flange band z 6..14.75.
 
-Layout: origin at the collar centre (machine (+40, 990, -85)); collar
-axis along X (the rod direction), arm runs +Z beside the plate's east
-edge (machine -85 -> -70), flange at local z 4..8.55 (machine -81..-76.45)
-butting the plate's real front face at -76.2 with a 0.25 gap. M6.8: the
+Layout: origin at the collar centre (machine (+40, 990, -128.3) after the
+2026-07-04 depth re-anchor); collar axis along X (the rod direction), arm
+runs +Z from the collar back beside the plate's east edge (machine
+-124.3 -> -70), flange at local z 47.3..51.85 (machine -81..-76.45,
+unchanged) butting the plate's real front face at -76.2 with a 0.25 gap. M6.8: the
 flange is the part's only x-asymmetric feature, so the machine mirror is
 authored here (FLANGE_X negated) and the assembly places the part with
 MIRROR_PLANE 'x0'. Dimensions: cad/DIMENSIONS.md ch. 20 (M6.4, low).
@@ -57,9 +58,17 @@ MATERIAL = "Plain Carbon Steel"  # black hardware
 COLLAR_OD = 12.0  # rod collar (low)
 COLLAR_BORE = 6.2  # the O6 magnifying rod clamps in (derived)
 COLLAR_HALF_LEN = 5.0  # along X
-ARM_HALF_X = 5.0  # arm 10 wide (x), y -3..+4.5, z 4..15 (low)
+ARM_HALF_X = 5.0  # arm 10 wide (x), y -3..+4.5 (low)
 ARM_Y = (-3.0, 4.5)
-ARM_Z = (4.0, 15.0)
+# DEPTH RE-ANCHOR (2026-07-04): the collar (part origin) moved forward with
+# the lever rod (machine z -85 -> -128.3, ch30 p.4 plumb-wire re-anchor in
+# build_magnifier_assembly), while the flange stays butted on the summing
+# plate's UNCHANGED front face (machine -81..-76.45, north face 0.25 off the
+# plate's -76.2). The arm therefore lengthens: local z 4 .. 58.3 = machine
+# -124.3..-70 (same -70 end as before). The real black bracket cantilevers
+# the rod well forward of the plate -- video 4/4 shows the rod extending from
+# the pivoted summing bar over the wheel line.
+ARM_Z = (4.0, 58.3)
 FLANGE_X = (-20.0, 5.0)  # mounting flange, machine x +20..+45. The collar sits
 # at machine x +40, EAST of the plate's east edge (+29.45), so the flange reaches
 # WEST onto the plate front face: x +20..+29.45 (9.45 wide) butts it, the rest
@@ -70,11 +79,12 @@ FLANGE_Y = (-2.54, 2.54)  # spans the plate's FULL height: with the collar/rod n
 # at the plate centreline (machine 990, see build_magnifier_assembly LEVER_ROD_Y), the
 # flange butts the plate FRONT FACE rather than tucking under it -- machine
 # 987.46..992.54 = the coplanar .cs plate band
-FLANGE_Z = (4.0, 8.55)  # north face at machine -76.45 = 0.25 south of the plate's
-# real FRONT (-Z) face at -76.2 (the plate is the Top-rect z +-76.2, centred on the
-# pivot -- NOT -70, an earlier mis-read); the flange butts that face. South face
-# flush with the arm (z 4). Reaching to z 14.75 punched 0.45 mm into the plate's
-# east edge inside its z-span -> a 13.6 mm^3 clash; stopping south of -76.2 clears it.
+FLANGE_Z = (47.3, 51.85)  # SAME machine band as ever (-81..-76.45): north face
+# at machine -76.45 = 0.25 south of the plate's real FRONT (-Z) face at -76.2
+# (the plate is the Top-rect z +-76.2, centred on the pivot -- NOT -70, an
+# earlier mis-read); the flange butts that face. Local values shifted by the
+# 2026-07-04 depth re-anchor (collar/origin at machine -123.5, was -85); only
+# the ARM between them lengthened.
 SCREW_HOLE_DIA = 3.2  # M6.10 mounting-screw holes (O2.9 fillister shanks)
 SCREW_HOLE_X = (-9.5, -6.5)  # machine x +30.5 / +33.5: west of the collar/arm
 # (|x|>5), in the flange-only band, so the +Z bore hits ONLY the flange

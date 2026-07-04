@@ -1079,6 +1079,14 @@ def task_verify():
         # into soundness, which already opens `channel` (see verify._verify_static_one).
         "kinematics": [
             _sldasm("pen"),
+            # The magnifier live-chain sweep (verify._verify_live_chain_one)
+            # opens magnifier.SLDASM and replays its recorded lever park spec;
+            # without this dep a magnifier rebuild would leave a fresh
+            # verify-kinematics.ok stamp valid and SKIP the WIRE-1 gates
+            # (codex review, PR #177). The park sidecar needs no separate dep:
+            # it is written by the same assembly task from the same recipe the
+            # .SLDASM's content digest is keyed on.
+            _sldasm("magnifier"),
             str((SCRIPTS_DIR / "pen_driver.py").resolve()),
             str((SCRIPTS_DIR / "truth_model.py").resolve()),
         ],
@@ -1086,7 +1094,7 @@ def task_verify():
     # Pass the graph's assemblies EXPLICITLY (dashed names) rather than letting
     # verify.py glob every *.SLDASM under cad/out/sldasm -- a stray/scratch
     # assembly left in a worktree must not be verified (codex review). kinematics
-    # targets only the pen sub (verify.py's own default), so it needs no names.
+    # targets the pen + magnifier subs (verify.py's own defaults), no names.
     asm_names = [s.replace("_", "-") for s in ASSEMBLY_ORDER]
     suite_names = {"soundness": asm_names}
     for suite, deps in suite_deps.items():

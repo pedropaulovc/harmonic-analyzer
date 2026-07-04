@@ -22,9 +22,12 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
 from _common import (
     SketchDims,
+    _read_member,
     apply_material,
+    blank_sketch,
     check,
     define_circle,
     drive_dimension,
@@ -35,6 +38,7 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
+    set_sketch_direct_db,
     volume_check,
 )
 
@@ -47,9 +51,22 @@ ROD_BORE_DIA = 5.2  # Ø5 vertical rod + clearance
 CROSS_HOLE_DIA = 3.0  # clamp screw / wire hook
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > any extent crossed
 
+# HookAnchorPoint: where the lever-wire's hook BALL JOINT grabs the fixture.
+# The wire ties through the cross hole and hangs just UNDER the collar's
+# bottom face (wire r 0.4 + 0.25 clearance = 0.65 below it) on the front face
+# of the vertical rod (rod r 2.5 + wire r 0.4 + 0.25 = 3.15 off the rod axis
+# in local -z).
+# build_lever_wire.HOOK_Y/HOOK_Z anchor the same spot in machine coords;
+# build_magnifier_assembly asserts the two agree. Local x = 0, so the point
+# is invariant under the machine-chirality mirror (no double-flip trap).
+HOOK_ANCHOR_LOCAL = (0.0, -0.65, -3.15)
+
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import (
+        CreatePlaneParameters,
+        ExtrusionParameters,
+    )
 
     check("create_part", await adapter.create_part())
 
@@ -149,9 +166,101 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven output fixture (equations neutral)", v_final, 30.0)
 
+    # HookAnchorPoint: the lever-wire ball joint's fixture-side anchor (see
+    # HOOK_ANCHOR_LOCAL). No adapter writer exists for a free-XYZ reference
+    # point, so: blanked offset plane -> hidden sketch point (inference off,
+    # exact coords) -> InsertReferencePoint(swRefPointSketchPoint = 7) ->
+    # rename -- the build_magnifying_wheel WireYokePoint recipe (late-binding
+    # traps documented there and in memory/solidworks-modeling-pitfalls.md).
+    check(
+        "create_plane HookAnchorPlane",
+        await adapter.create_plane(CreatePlaneParameters(
+            mode="offset", base_plane="Top Plane", offset=HOOK_ANCHOR_LOCAL[1])),
+    )
+    name_last_feature(adapter, "HookAnchorPlane")
+    _blank_ref_plane(adapter, "HookAnchorPlane")
+    check("create_sketch hook anchor", await adapter.create_sketch("HookAnchorPlane"))
+    set_sketch_direct_db(adapter, True)
+    model = adapter.currentModel
+    # Top-plane sketch mapping (x, y) -> (X, -Z); the offset plane inherits it.
+    sk_point = model.SketchManager.CreatePoint(
+        HOOK_ANCHOR_LOCAL[0] / 1000.0, -HOOK_ANCHOR_LOCAL[2] / 1000.0, 0.0)
+    if sk_point is None:
+        raise RuntimeError("hook anchor sketch point creation failed")
+    set_sketch_direct_db(adapter, False)
+    check("exit_sketch hook anchor", await adapter.exit_sketch())
+    name_last_feature(adapter, "HookAnchorSketch")
+    blank_sketch(adapter, "HookAnchorSketch")
+    _make_hook_ref_point(adapter)
+    _assert_hook_point(adapter)
+
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
+
+
+def _blank_ref_plane(adapter, name: str) -> None:
+    """Hide a reference plane (shown ref geometry renders in every assembly
+    instance -- the fix_shown_sketches BlankRefGeom idiom, applied at build)."""
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(name, "PLANE", 0, 0, 0, False, 0, null_callout(), 0):
+        raise RuntimeError(f"blank ref plane: cannot select {name!r}")
+    model.BlankRefGeom()
+    model.ClearSelection2(True)
+
+
+def _hook_sketch_points(adapter):
+    """The ISketchPoint list of HookAnchorSketch (exactly one expected);
+    members via ``_read_member`` (the pywin32 late-binding walk idiom)."""
+    model = adapter.currentModel
+    feat = _read_member(model, "FirstFeature")
+    for _ in range(5000):
+        if not feat:
+            break
+        if str(_read_member(feat, "Name")) == "HookAnchorSketch":
+            sketch = _read_member(feat, "GetSpecificFeature2")
+            return list(_read_member(sketch, "GetSketchPoints2") or [])
+        feat = _read_member(feat, "GetNextFeature")
+    raise RuntimeError("HookAnchorSketch not found")
+
+
+def _make_hook_ref_point(adapter) -> None:
+    """Promote the anchor sketch point to the named ``HookAnchorPoint``
+    reference-point feature (raw COM -- see the build() comment)."""
+    model = adapter.currentModel
+    pts = _hook_sketch_points(adapter)
+    if len(pts) != 1:
+        raise RuntimeError(f"HookAnchorSketch: expected 1 point, found {len(pts)}")
+    model.ClearSelection2(True)
+    if not pts[0].Select2(False, 0):  # Select4's ISelectData arg = Type mismatch
+        raise RuntimeError("cannot select the hook anchor sketch point")
+    feat = model.FeatureManager.InsertReferencePoint(7, 0, 0.0, 1)
+    model.ClearSelection2(True)
+    if isinstance(feat, tuple):  # late binding marshals the object return boxed
+        feat = next((f for f in feat if f is not None), None)
+    if feat is None:
+        raise RuntimeError("InsertReferencePoint(sketch point) returned null")
+    feat.Name = "HookAnchorPoint"
+    if str(_read_member(feat, "Name")) != "HookAnchorPoint":
+        raise RuntimeError("reference point rename failed")
+    _telemetry.success("HookAnchorPoint reference point created")
+
+
+def _assert_hook_point(adapter) -> None:
+    """Fail loud if the (undimensioned, hidden) anchor point drifted from its
+    authored sketch coords -- the ball joint's geometry must stay exact."""
+    pts = _hook_sketch_points(adapter)
+    x_mm = float(_read_member(pts[0], "X")) * 1000.0
+    y_mm = float(_read_member(pts[0], "Y")) * 1000.0
+    exp_x, exp_y = HOOK_ANCHOR_LOCAL[0], -HOOK_ANCHOR_LOCAL[2]
+    if abs(x_mm - exp_x) > 1e-3 or abs(y_mm - exp_y) > 1e-3:
+        raise RuntimeError(
+            f"hook anchor drifted: ({x_mm:.4f}, {y_mm:.4f}) != ({exp_x:.4f}, {exp_y:.4f})"
+        )
+    _telemetry.success(f"hook anchor holds at ({x_mm:.4f}, {y_mm:.4f})")
 
 
 if __name__ == "__main__":

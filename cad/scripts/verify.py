@@ -82,6 +82,8 @@ from _assembly import (
     component_names,
     component_transform,
     is_locked_build,
+    load_park_specs,
+    replay_park_specs,
 )
 from _common import (  # component iteration helpers (read-only)
     _flag_only,
@@ -157,8 +159,8 @@ _COMPONENT_BAND = {
     # The former monolithic output split by function (no per-channel parts here);
     # bands tightened to the measured green-build counts (verify:subsystems).
     "summing": (7, 9),          # ch 18-19, measured 8 (knife-stay removed: never in the real device)
-    "magnifier": (10, 12),      # ch 20-21, measured 11
-    "pen": (6, 8),              # ch 24, measured 7
+    "magnifier": (11, 13),      # ch 20-21, measured 12 (+lever-wire, 2026-07-04)
+    "pen": (7, 9),              # ch 24, measured 8 (+pen-wire, 2026-07-04)
     "paper-drive": (85, 89),    # ch 22-23-25, measured 87 (27 placed + 60-link chain;
     # the ch30 GT re-anchor moved the crank to (122.8, 144.96) and the chain plane
     # to z -155 -- the shorter drop shrank the loop 70 -> 60 links at pitch 6.2559;
@@ -525,6 +527,10 @@ def _expected_free_dof(name: str) -> int:
         if is_locked_build(_config.machine("build_lock", "channel")):
             return 0
         return 3 * _config.active_count()
+    if name == "magnifier":
+        # The freed lever knife-rock + the articulated lever-wire's swing/spin;
+        # the wheel is COUPLED by the WIRE-1 yoke (no DOF of its own).
+        return 0 if is_locked_build(_config.machine("build_lock", "magnifier")) else 3
     return 0
 
 
@@ -534,6 +540,9 @@ def _expected_free_dof(name: str) -> int:
 _REQUIRED_FREE_STEMS = {
     "drive-train": ("crankshaft", "cone-swing-platform"),
     "channel": ("rocker-arm", "connecting-rod", "amplitude-bar"),
+    # Three freed DOF (lever knife-rock + wire swing/spin); the yoke-coupled
+    # wheel must read under-constrained WITH them, else the coupling died.
+    "magnifier": ("magnifying-lever", "magnifying-wheel", "lever-wire"),
 }
 
 
@@ -722,6 +731,173 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
     report.gate(
         f"motion:{name}:dof-fully-defined",
         lambda: assert_components_fully_defined(adapter),
+    )
+
+
+# Magnifier live-chain sweep (WIRE 1). Small angles: the real machine's lever
+# tip arc is ~6 mm at r~215 (~1.6 deg of knife rock, engineerguy video 4/4).
+# POSITIVE offsets only: the rock park sits at exactly 0 deg, and an angle
+# dimension cannot go negative -- a signed sweep would flip branches at 0.
+_CHAIN_SWEEP_DEG = (0.25, 0.5, 1.0)
+_CHAIN_AXIS_TOL_MM = 0.05  # wire centreline must hold the tangency radius
+_CHAIN_HOOK_TOL_MM = 0.02  # ball joint residual
+_CHAIN_MIN_WHEEL_SPAN_DEG = 5.0  # coupling-alive floor over the 0..1 deg sweep
+_CHAIN_REST_TOL = 0.02  # mm / deg drift allowed after restoring the rest pose
+
+
+async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
+    """Magnifier live-chain physics sweep (WIRE 1 articulation).
+
+    Catches the regression class the 2026-07-04 side-view screenshot exposed
+    (a rigidly locked wire's hub tip swept laterally ~10 mm off the hub as the
+    chain moved): replay ONLY the lever's ``lever_rock`` park spec (the wire's
+    swing/spin parks stay free -- that freedom IS the articulation), sweep the
+    knife rock over a realistic 0..1 deg, and at every pose assert the wire
+    still behaves like a wire:
+
+    * wire-rides-hub: the wire's centreline stays at the stand-off tangency
+      radius of the wheel axis (hub r + wire r + clearance);
+    * hook-ball-holds: the wire's hook end stays on the fixture's anchor;
+    * coupling-alive: the wheel angle actually spans with the lever (the yoke
+      transmits);
+    * restores-to-rest: driving back to the recorded rest angle returns the
+      wheel and wire to the authored pose.
+
+    The transient park mate is discarded by closing the doc UNSAVED (the
+    release-preflight convention), so the shipped free model is untouched.
+    """
+    import build_lever_wire as _hw
+    import build_magnifier_assembly as _mag
+    from build_output_fixture import HOOK_ANCHOR_LOCAL
+
+    name = "magnifier"
+    sldasm = OUT_SLDASM / f"{name}.SLDASM"
+    if not sldasm.exists():
+        report.failed.append((f"chain:{name}:open", f"not built: {sldasm}"))
+        _telemetry.error(f"{sldasm.name} not built -- run doit")
+        return
+    if _expected_free_dof(name) == 0:
+        log("magnifier built `locked` -- live-chain sweep skipped (no free DOF)")
+        return
+    if not _assert_fresh(name, report):
+        return
+
+    specs = [s for s in load_park_specs(name) if s.get("key") == "lever_rock"]
+    if len(specs) != 1:
+        report.failed.append(
+            (f"chain:{name}:park-spec", f"expected 1 lever_rock park spec, got {len(specs)}"))
+        return
+
+    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+    check(f"open {name}", await adapter.open_model(str(sldasm)))
+    model = adapter.currentModel
+    log("--- live chain: magnifier lever sweep (knife rock, WIRE 1) ---")
+
+    # Final (mirrored) machine anchors for the invariants.
+    axis_xy = (-_mag.WHEEL_X, _mag.WHEEL_BAR_Y)  # wheel axis, along Z
+    r_expect = _hw.HUB_DIA / 2.0 + _hw.WIRE_DIA / 2.0 + _hw.CLEARANCE
+
+    def _xform(comp: str) -> tuple[list[list[float]], list[float]]:
+        a = component_transform(adapter, comp)
+        rows = [list(a[0:3]), list(a[3:6]), list(a[6:9])]
+        pos = [v * 1000.0 for v in a[9:12]]
+        return rows, pos
+
+    def _wheel_deg() -> float:
+        rows, _ = _xform("magnifying-wheel-1")
+        return math.degrees(math.atan2(rows[0][1], rows[0][0]))
+
+    def _wire_state() -> tuple[float, float, list[float]]:
+        """(centreline-to-axis distance, hook ball residual, hub-end pos)."""
+        rows, pos = _xform("lever-wire-1")
+        u = rows[1]  # wire axis (+Y local = hub -> hook)
+        # line-line distance to the wheel axis (direction Z at axis_xy)
+        n = [u[1], -u[0], 0.0]  # u x z-hat
+        n_len = math.hypot(n[0], n[1])
+        w = [pos[0] - axis_xy[0], pos[1] - axis_xy[1]]
+        d_axis = abs(w[0] * n[0] + w[1] * n[1]) / n_len
+        hook = [p + _hw.WIRE_LEN * ui for p, ui in zip(pos, u)]
+        frows, fpos = _xform("output-fixture-1")
+        anchor = [
+            fpos[k]
+            + HOOK_ANCHOR_LOCAL[0] * frows[0][k]
+            + HOOK_ANCHOR_LOCAL[1] * frows[1][k]
+            + HOOK_ANCHOR_LOCAL[2] * frows[2][k]
+            for k in range(3)
+        ]
+        d_hook = math.dist(hook, anchor)
+        return d_axis, d_hook, pos
+
+    replayed = await replay_park_specs(adapter, specs)
+    mate = replayed[0]
+    param = adapter._attempt(lambda: model.Parameter(f"D1@{mate}"), default=None)
+    if param is None:
+        report.failed.append((f"chain:{name}:driver", f"cannot read D1@{mate}"))
+        return
+    rest_rad = float(_read_member(param, "SystemValue"))
+
+    def _set_lever(rad: float) -> None:
+        param.SystemValue = rad
+        _rebuild(adapter)
+
+    _rebuild(adapter)
+    wheel0, (axis0, hook0, wire_pos0) = _wheel_deg(), _wire_state()
+    worst_axis = abs(axis0 - r_expect)
+    worst_hook = hook0
+    wheel_angles: list[float] = []
+    for delta in _CHAIN_SWEEP_DEG:
+        _set_lever(rest_rad + math.radians(delta))
+        d_axis, d_hook, _ = _wire_state()
+        w = _wheel_deg()
+        wheel_angles.append(w)
+        worst_axis = max(worst_axis, abs(d_axis - r_expect))
+        worst_hook = max(worst_hook, d_hook)
+        emit = (_telemetry.success
+                if abs(d_axis - r_expect) <= _CHAIN_AXIS_TOL_MM and d_hook <= _CHAIN_HOOK_TOL_MM
+                else _telemetry.error)
+        emit(f"lever {delta:+5.2f} deg  wheel {w - wheel0:+8.3f} deg  "
+             f"wire-axis d={d_axis:7.4f} (want {r_expect:g})  hook res={d_hook:.4f}")
+    wheel_span = max(wheel_angles) - min(wheel_angles)
+
+    # Restore the recorded rest pose, measure the drift, then discard UNSAVED.
+    _set_lever(rest_rad)
+    wheel_back = abs(_wheel_deg() - wheel0)
+    _, _, wire_back_pos = _wire_state()
+    wire_back = math.dist(wire_back_pos, wire_pos0)
+    title = str(_read_member(model, "GetTitle"))
+    adapter._attempt(lambda: adapter.swApp.CloseDoc(title), default=None)
+    adapter.currentModel = None
+
+    report.gate(
+        f"chain:{name}:wire-rides-hub",
+        lambda: _expect(
+            worst_axis <= _CHAIN_AXIS_TOL_MM,
+            f"wire centreline strays {worst_axis:.3f} mm off the {r_expect:g} mm "
+            f"hub tangency radius over the sweep (> {_CHAIN_AXIS_TOL_MM})",
+        ),
+    )
+    report.gate(
+        f"chain:{name}:hook-ball-holds",
+        lambda: _expect(
+            worst_hook <= _CHAIN_HOOK_TOL_MM,
+            f"hook ball residual {worst_hook:.3f} mm (> {_CHAIN_HOOK_TOL_MM})",
+        ),
+    )
+    report.gate(
+        f"chain:{name}:coupling-alive",
+        lambda: _expect(
+            wheel_span >= _CHAIN_MIN_WHEEL_SPAN_DEG,
+            f"wheel spans only {wheel_span:.2f} deg over the 0..1 deg lever sweep "
+            f"(< {_CHAIN_MIN_WHEEL_SPAN_DEG}) -- WIRE-1 coupling dead?",
+        ),
+    )
+    report.gate(
+        f"chain:{name}:restores-to-rest",
+        lambda: _expect(
+            wheel_back <= _CHAIN_REST_TOL and wire_back <= _CHAIN_REST_TOL,
+            f"rest pose drift after sweep: wheel {wheel_back:.4f} deg, "
+            f"wire {wire_back:.4f} mm (> {_CHAIN_REST_TOL})",
+        ),
     )
 
 
@@ -1191,6 +1367,7 @@ async def build(adapter: Any) -> dict[str, str]:
             await _verify_static_one(adapter, name, report)
     if suite == "kinematics":
         await _verify_motion_one(adapter, report)
+        await _verify_live_chain_one(adapter, report)
     if suite == "math":
         verify_truth(report)
         verify_spring_base(report)

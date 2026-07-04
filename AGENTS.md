@@ -269,7 +269,7 @@ ever raised was a stale band or a gate bug, never a real regression — `_COMPON
 stays as reference data). The **DOF gate adapts
 to how the model was built**
 (see "Default-free DOF" below): an assembly with an expected free operational DOF
-(drive-train + channel, when built `free`) is checked by the **necessity gate**
+(drive-train + channel + magnifier, when built `free`) is checked by the **necessity gate**
 (`assert_free_dof_necessity`) — assert at least the expected number of top-level
 components read under-constrained, i.e. the operational DOF are genuinely free —
 instead of the strict "every component fully defined". Because the freed-DOF park
@@ -295,7 +295,15 @@ predetermined operational DOF are left FREE. That is drive-train's **crank spin*
 cone-platform swing** (the p1 disengage: the plate — carrying the cone set AND the
 crank rig on the merged column — swings on its pivot screw; 2 DOF total for
 drive-train), plus channel's **3 DOF per active channel** (rocker swing +
-connecting-rod follow + amplitude-bar slide). The pinion swing stays park-driven at
+connecting-rod follow + amplitude-bar slide), plus magnifier's **lever
+knife-rock + lever-wire swing/spin** (3 DOF, 2026-07-04: the lever pivots about
+the summing bar's knife-edge ridge — engineerguy video 2/4+4/4, ~6 mm tip arc,
+the bracket collar is only a loose guide — carrying the clamp/vertical-rod/
+fixture group; the lever-wire ball-joints at the fixture hook and rides the hub
+drum at its 0.25 stand-off tangency; and the **WIRE-1 yoke mate** — the
+wheel's `WireYokePoint` held coincident to the lever-wire's `YokePlane`, the
+linearized inextensible-wire constraint — turns the magnifying wheel with it;
+the wheel is COUPLED, not separately freed). The pinion swing stays park-driven at
 its engaged pose (a setup/disengage motion, exercised by the motion/mobility suites).
 
 The mechanism is **defer-and-replay** (was author-but-suppress). A freed-DOF park
