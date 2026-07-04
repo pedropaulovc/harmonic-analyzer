@@ -441,6 +441,64 @@ async def plane_distance_mate(
         verify=(comp_name, target_origin),
     )
 
+
+async def seat_signed(
+    adapter: Any,
+    moving_ref: Any,
+    base_plane: str,
+    signed: float,
+    *,
+    label: str,
+    verify: tuple[str, list[float]] | None = None,
+) -> Any:
+    """Flip-free distance seat: coincident ``moving_ref`` to a SIGNED offset plane
+    off the assembly datum ``base_plane`` (a bare datum name, e.g. "Front Plane").
+
+    The bare-datum sibling of :func:`plane_distance_mate` (which offsets off a base
+    *component*'s plane): the sign of ``signed`` alone selects the side --
+    ``create_plane`` builds the offset plane on the +normal side for a positive
+    offset and the far side for a negative one -- so the part lands on-target in ONE
+    solve, with no distance-mate delete-and-re-add flip recovery. Offsets off the
+    bare ASSEMBLY datum (never a rotated seed's plane), so it is orientation-safe
+    where ``plane_distance_mate``'s ``d==0`` seed-plane branch would not be.
+    ``moving_ref`` may be a PLANE or an AXIS -- an axis lands coincident lying IN the
+    offset plane, pinning the same one coordinate the distance mate did. For
+    ``|signed| ~ 0`` the datum itself is the target. The ``verify`` readback guard is
+    preserved, now a pure tripwire: a correct signed offset lands on-target in one
+    solve, so it confirms rather than recovers.
+
+    Shared by drive-train and channel (both seat parts off bare assembly datums);
+    the offset plane is renamed via :func:`seat_plane_name` so it ships semantically
+    instead of as an anonymous ``PlaneN``."""
+    from solidworks_mcp.adapters.base import (
+        CreatePlaneParameters,
+        RenameFeatureParameters,
+    )
+
+    if abs(signed) <= 1e-9:
+        target = named_ref(base_plane, "PLANE")
+    else:
+        plane = check(
+            f"{label}: offset {base_plane}{signed:+.2f}",
+            await adapter.create_plane(
+                CreatePlaneParameters(
+                    mode="offset", base_plane=base_plane, offset=signed
+                )
+            ),
+        )
+        seat = seat_plane_name(label)
+        check(
+            f"{label}: name seat plane {seat}",
+            await adapter.rename_feature(
+                RenameFeatureParameters(
+                    old_name=getattr(plane, "name", plane), new_name=seat
+                )
+            ),
+        )
+        target = named_ref(seat, "PLANE")
+    return await coincident_mate(adapter, moving_ref, target, label=label, verify=verify)
+
+
 async def concentric_mate(
     adapter: Any,
     ref_a: Any,

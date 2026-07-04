@@ -117,6 +117,7 @@ from _assembly import (
     place_component,
     place_components_batch,
     save_assembly_and_images,
+    seat_signed,
     set_park_defer,
     spin_driver,
     world_point,
@@ -366,17 +367,9 @@ async def _locate_to_datum(adapter, name: str) -> None:
              ("Front Plane", "Front Plane", o[2], "z"))
     for part_plane, asm_plane, coord, axis in pairs:
         part_ref = named_ref(f"{part_plane}@{name}", "PLANE")
-        asm_ref = named_ref(asm_plane, "PLANE")
-        if abs(coord) < 1e-6:
-            await coincident_mate(
-                adapter, part_ref, asm_ref,
-                label=f"{name} datum {axis}=0 ({part_plane}<->{asm_plane})",
-                verify=(name, o),
-            )
-            continue
-        await distance_driver(
-            adapter, part_ref, asm_ref, abs(coord),
-            label=f"{name} datum {axis} d={abs(coord):.2f}",
+        await seat_signed(
+            adapter, part_ref, asm_plane, coord,
+            label=f"{name} datum {axis} d={coord:+.2f}",
             verify=(name, o),
         )
 
@@ -408,10 +401,10 @@ async def _seat_bushing_on_shaft(
         bore_axis_ref([shaft_xy[0] + od_r, shaft_xy[1], o[2]]),
         label=f"{name} concentric on shaft", verify=(name, o),
     )
-    await distance_driver(
+    await seat_signed(
         adapter,
-        named_ref(f"Front Plane@{name}", "PLANE"), named_ref("Front Plane", "PLANE"),
-        abs(o[2]), label=f"{name} axial z d={abs(o[2]):.2f}", verify=(name, o),
+        named_ref(f"Front Plane@{name}", "PLANE"), "Front Plane",
+        o[2], label=f"{name} axial z d={o[2]:+.2f}", verify=(name, o),
     )
     await parallel_mate(
         adapter,
@@ -444,29 +437,21 @@ async def _locate_spring(adapter, name: str, axis2_local_y: float) -> None:
     """
     o = _org(adapter, name)
     rp = named_ref(f"Right Plane@{name}", "PLANE")
-    front = named_ref("Front Plane", "PLANE")
-    if abs(o[2]) < 1e-6:
-        await coincident_mate(
-            adapter, rp, front,
-            label=f"{name} spring z=0 + planarity", verify=(name, o))
-    else:
-        await distance_driver(
-            adapter, rp, front, abs(o[2]),
-            label=f"{name} spring z d={abs(o[2]):.2f} + planarity", verify=(name, o))
+    await seat_signed(
+        adapter, rp, "Front Plane", o[2],
+        label=f"{name} spring z d={o[2]:+.2f} + planarity", verify=(name, o))
     a1 = named_ref(f"Axis1@{name}", "AXIS")
     a2 = named_ref(f"Axis2@{name}", "AXIS")
-    right = named_ref("Right Plane", "PLANE")
-    top = named_ref("Top Plane", "PLANE")
-    await distance_driver(
-        adapter, a1, right, abs(o[0]),
-        label=f"{name} spring low x d={abs(o[0]):.2f}", verify=(name, o))
-    await distance_driver(
-        adapter, a1, top, abs(o[1]),
-        label=f"{name} spring low y d={abs(o[1]):.2f}", verify=(name, o))
+    await seat_signed(
+        adapter, a1, "Right Plane", o[0],
+        label=f"{name} spring low x d={o[0]:+.2f}", verify=(name, o))
+    await seat_signed(
+        adapter, a1, "Top Plane", o[1],
+        label=f"{name} spring low y d={o[1]:+.2f}", verify=(name, o))
     p_high = world_point(adapter, name, [0.0, axis2_local_y, 0.0])
-    await distance_driver(
-        adapter, a2, right, abs(p_high[0]),
-        label=f"{name} spring high x d={abs(p_high[0]):.2f} (yaw)", verify=(name, o))
+    await seat_signed(
+        adapter, a2, "Right Plane", p_high[0],
+        label=f"{name} spring high x d={p_high[0]:+.2f} (yaw)", verify=(name, o))
 
 
 # Top-pin-to-foot span of the rigid bar (Axis1 local y - Axis2 local y); the
@@ -649,9 +634,9 @@ async def _revolute(
     part_plane = named_ref(f"Front Plane@{comp}", "PLANE")
     kind = axial[0]
     if kind == "datum":
-        await distance_driver(
-            adapter, part_plane, named_ref("Front Plane", "PLANE"), abs(tgt[2]),
-            label=f"{label} axial d={abs(tgt[2]):.2f}", verify=(comp, tgt),
+        await seat_signed(
+            adapter, part_plane, "Front Plane", tgt[2],
+            label=f"{label} axial d={tgt[2]:+.2f}", verify=(comp, tgt),
         )
     elif kind == "coincident":
         await coincident_mate(
