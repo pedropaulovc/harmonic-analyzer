@@ -85,9 +85,9 @@ AXIS_OFFSET = 10.1  # strap axis -> blade centreline, east
 KINK_T = 32.0  # pivot -> kink start (the contact crest), along the strap axis
 FOOT_Y = 0.8  # foot centreline above the base top (= THICK: flush if the
 # thin side falls down, 0.8 float if up -- either passes the gates)
-HOLE_DIA = 3.2  # foot screw hole (PR7 item 11): a black-tinted fillister
-# screw (O2.9 shank) bolts the foot down -- 0.4 rims in the 4-wide strip
-# (the O4 slotted-screw shank cannot fit this strip)
+HOLE_DIA = 3.2  # foot screw hole (PR7 item 11): the black foot screw
+# (build_foot_screw, O2.9 shank) bolts the foot down -- 0.4 rims in the
+# 4-wide strip (the O4 slotted-screw shank cannot fit this strip)
 HOLE_FROM_END = 2.2  # hole centre east of the foot's free (west) end
 
 _TH = math.radians(BLADE_TILT_DEG)
