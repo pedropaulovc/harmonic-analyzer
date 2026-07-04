@@ -60,7 +60,11 @@ ROD_LEN = 202.0  # machine z -114..+88 (PR7): back end FLUSH with the back
 PIN_DIA = 3.0  # cam pin, photo-scaled vs the rod (low). Thinned 4.0 -> 3.0
 # with the PR5 working cam: at Ø4 the parked shaft sat 0.05 off the strap's
 # follower pin (build_drive_train's cam scan), under every design margin.
-PIN_TIP = 11.175  # rod axis to pin tip -- tip at machine y 51.625 (derived)
+PIN_TIP = 10.8  # rod axis to pin tip -- tip at machine y 52.0 (derived).
+# Shortened from 11.175 when the spring's west foot (PR7) started crossing
+# under the back pin: the swept tip CORNER (radius sqrt(TIP^2 + 1.5^2))
+# dips to machine y 62.8 - 10.904 = 51.90, clearing the 51.6 strip top by
+# 0.30; at 11.175 the corner cut 0.075 INTO the strip mid-sweep
 PIN_STATIONS = (36.5, 184.5)  # machine z -77.5 / +70.5: inside each strap's
 # z band (straps at -80.25..-75.25 and +68.45..+73.45)
 PIN_END_INSIDE = 2.0  # pin extrusion ends 2.0 up inside the rod: above the

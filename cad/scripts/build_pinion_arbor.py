@@ -51,8 +51,9 @@ MATERIAL = "Plain Carbon Steel"  # bright steel (p.67; item 14)
 SHAFT_DIA = 8.0  # thicker than the retired Ø6.35 stubs -- the handle's cap
 # hub (OD 10.5) implies ~8 (img07); build_alignment_pinion BORE_DIA,
 # build_pinion_handle TUBE_ID and the strap ArborBore must match
-SHAFT_LEN = 226.25  # machine -135 (2 inside the handle cap's blind wall
-# face at -133) .. +91.25 (GT pinion_back free end)
+SHAFT_LEN = 226.25  # machine -135 (the flat front tip seats flush ON the
+# handle cap's bore floor: HANDLE_Z -144 + 9 = -135) .. +91.25 (GT
+# pinion_back free end)
 CAP_SAG = 1.2  # back-end crown (item 13)
 
 SHAFT_R = SHAFT_DIA / 2.0
