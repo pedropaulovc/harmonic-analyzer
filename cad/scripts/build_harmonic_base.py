@@ -86,7 +86,9 @@ CBORE_XZ = HOLE_XZ  # all four heads counterbored
 # shank radius, ditto asserted).
 PIVOT_SCREW_XZ = (79.69, 103.29)
 PIVOT_SCREW_HOLE_DIA = 6.5  # O6.35 shoulder clearance
-STOP_SCREW_XZ = (105.19, -83.30)
+STOP_SCREW_XZ = (130.93, 9.94)  # past the DISENGAGED east taper edge (the
+# disengage swing sweeps the plate EAST; the first west-side value sat 19
+# inside the engaged plate -- interference-gate proven)
 STOP_SCREW_HOLE_DIA = 4.1  # O4 shank clearance
 SWING_HOLE_DEPTH = 6.0
 
