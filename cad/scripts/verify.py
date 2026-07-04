@@ -503,10 +503,11 @@ def _assert_fresh(name: str, report: Report) -> bool:
 def _expected_free_dof(name: str) -> int:
     """Free operational DOF expected in ``name``'s AS-SAVED model.
 
-    drive-train frees the crank spin (1 DOF); channel frees 3 DOF per active
-    channel (rocker swing + connecting-rod follow + amplitude-bar slide), each a
-    DEFERRED PARK_* park driver (recorded, not authored) when built `free` (the
-    default); a `locked` build authors them engaged -> 0. Read straight from
+    drive-train frees the crank spin AND the cone-platform swing (2 DOF);
+    channel frees 3 DOF per active channel (rocker swing + connecting-rod
+    follow + amplitude-bar slide), each a DEFERRED PARK_* park driver
+    (recorded, not authored) when built `free` (the default); a `locked`
+    build authors them engaged -> 0. Read straight from
     cad/config/machine/
     build_lock.yaml -- the same source of truth the build used, and the freshness
     guard (`_assert_fresh`) guarantees the saved model matches that config. Every
@@ -515,7 +516,7 @@ def _expected_free_dof(name: str) -> int:
     verify too.
     """
     if name == "drive-train":
-        return 0 if is_locked_build(_config.machine("build_lock", "drive_train")) else 1
+        return 0 if is_locked_build(_config.machine("build_lock", "drive_train")) else 2
     if name == "channel":
         if is_locked_build(_config.machine("build_lock", "channel")):
             return 0
@@ -849,22 +850,28 @@ def verify_base_footprint(report: Report) -> None:
 
     def _mounts_on_plate() -> None:
         import build_arbor_pedestal as arbor_post
+        import build_cone_pivot_screw as pscrew
         import build_cone_swing_platform as platform
-        import build_crank_pedestal as pedestal
         import build_drive_train_assembly as train
         import build_harmonic_base as base
+        import build_swing_stop_screw as sscrew
 
         half_len, half_wid = base.TOP_LENGTH / 2.0, base.TOP_WIDTH / 2.0
+        pv = train.cone_station(train.PIVOT_STATION)
         # (label, centre x, centre z, plan half-x, plan half-z); circular feet
-        # use the radius both ways.
+        # use the radius both ways. (The old crank-pedestal is GONE: the merged
+        # cone-pivot-post rides the PLATE, so it is plate-contained at
+        # drive-train import, not base-swept here.)
         mounts = (
-            ("crank-pedestal", train.X_CRANK, train.PEDESTAL_Z,
-             pedestal.PEDESTAL_DIA / 2.0, pedestal.PEDESTAL_DIA / 2.0),
             ("arbor-pedestal", train.X_DRUM, -train.ARBOR_PEDESTAL_Z,
              arbor_post.BLOCK_WIDTH / 2.0, arbor_post.BLOCK_DEPTH / 2.0),
-            # base-bolted static; the washer flange is its widest plan extent
+            # base-bolted statics; head/washer is each one's widest plan extent
             ("cone-lock-knob", train.KNOB_X, train.KNOB_Z,
              train.KNOB_WASHER_DIA / 2.0, train.KNOB_WASHER_DIA / 2.0),
+            ("cone-pivot-screw", pv[0], pv[2],
+             pscrew.HEAD_DIA / 2.0, pscrew.HEAD_DIA / 2.0),
+            ("swing-stop-screw", train.STOP_X, train.STOP_Z,
+             sscrew.HEAD_DIA / 2.0, sscrew.HEAD_DIA / 2.0),
         )
         for label, cx, cz, hx, hz in mounts:
             _expect(
@@ -874,28 +881,24 @@ def verify_base_footprint(report: Report) -> None:
                 f"plate (+-{half_len:.2f}, +-{half_wid:.2f})",
             )
         # The cone swing platform lies flat on the base rotated by the cone
-        # incline about its pivot: sweep its trapezoid corners AND the lock
-        # lobe's rectangle corners (the platform is authored MIRRORED under
-        # MIRROR_PLANE "x0", so the lobe's authored +x constants negate into
-        # this pre-mirror frame). The lock notch is open-ended, so the
-        # disengaged pose is the plate swung until its edge clears the knob
-        # washer (train.DISENGAGE_DEG, derived from the notch geometry) --
-        # sweep every corner at BOTH poses. (The pivot post and tip block
+        # incline about its pivot: sweep its (asymmetric) trapezoid corners
+        # (the platform is authored MIRRORED under MIRROR_PLANE "x0", so the
+        # authored WEST +x constants negate into this pre-mirror frame; the
+        # old lock lobe is gone -- the solid west flare carries the notch).
+        # Corner fillets only pull the true extents INSIDE this sharp-corner
+        # sweep, so it stays conservative. The lock notch is open-ended, so
+        # the disengaged pose is the plate swung until its edge clears the
+        # knob washer (train.DISENGAGE_DEG, derived from the notch geometry)
+        # -- sweep every corner at BOTH poses. (The pivot post and tip block
         # ride the PLATE, not the base -- their plate containment is
         # asserted at drive-train import.)
-        pv = train.cone_station(train.PIVOT_STATION)
-        lobe_out = platform.LOBE_X_IN + platform.LOBE_REACH
         corners_local = (
-            ("trapezoid", -platform.HALF_WIDTH_N, platform.NORTH_OVERHANG),
-            ("trapezoid", platform.HALF_WIDTH_N, platform.NORTH_OVERHANG),
-            ("trapezoid", platform.HALF_WIDTH_S,
+            ("plate", -platform.HALF_WIDTH_N, platform.NORTH_OVERHANG),
+            ("plate", platform.HALF_WIDTH_N, platform.NORTH_OVERHANG),
+            ("plate", platform.EAST_HALF_S,
              platform.NORTH_OVERHANG - platform.PLATE_LEN),
-            ("trapezoid", -platform.HALF_WIDTH_S,
+            ("plate", -platform.WEST_HALF_S,
              platform.NORTH_OVERHANG - platform.PLATE_LEN),
-            ("lock lobe", -platform.LOBE_X_IN, platform.LOBE_Z_N),
-            ("lock lobe", -lobe_out, platform.LOBE_Z_N),
-            ("lock lobe", -lobe_out, platform.LOBE_Z_S),
-            ("lock lobe", -platform.LOBE_X_IN, platform.LOBE_Z_S),
         )
         poses = (
             ("engaged", math.radians(train.INCLINE_DEG)),

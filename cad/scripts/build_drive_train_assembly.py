@@ -21,7 +21,9 @@ drive plane at y 104.8, not the old 126.8):
   now-solid rocker-arm-support, the north-end support deferred to the
   back-frame re-layout (the GT shows a real north bearing at z +91.5);
   notches up = cosine setup (pp. 66-67).
-* crankshaft along Z in the green crank pedestal, ABOVE the 64T (ch30 GT:
+* crankshaft along Z in the merged green column (cone-pivot-post: big-end
+  journal + crank pedestal, ONE casting riding the swing plate), ABOVE the
+  64T (ch30 GT:
   the crank axle triangulates to y 144.8 -- a near-vertical 16T:64T mesh):
   crank arm + handle at the front, the T12 removable chain wheel (ch. 23:
   the bead chain rides the removable's m2 teeth -- swapping removables
@@ -357,18 +359,12 @@ ARM_C2C = 66.0  # handle pivot from the shaft axis (rederived from the ch30
 # the handle below the table)
 REMOVABLE_Z0 = -157.5  # mounted T12 (face 5.0): band -157.5..-152.5, mid -155 =
 # the front chain plane (ch30 GT: solved-camera z-ticks bracket the physical
-# chain run at -153 +- 3), between the pedestal cylinder (front face -121.4)
-# and the crank arm (-175..-167). The plane clears the paper-drive stub disc
+# chain run at -153 +- 3), between the merged crank column (south flank -98.6,
+# even at the disengaged swing) and the crank arm (-175..-167). The plane
+# clears the paper-drive stub disc
 # (-134.5..-137.5) by 15; the arm sits 9.5 SOUTH of the wheel so the rotating
 # arm/handle never crosses it. The small removable gear is the chain wheel
 # (ch. 23 -- bead chain on its m2 teeth; v2_gears_010).
-PEDESTAL_Z = -117.5  # crank pedestal CYLINDER centre: band -132.5..-102.5.
-# The slender O28 column stands SOUTH of the swing platform's south edge
-# (~3.9 engaged, ~1.9 at the DISENGAGED swing -- the plate must swing free;
-# both asserted below in the plate's inclined frame), its foot fully on the
-# base top plate (edge -133.35, 1.85 margin); the T12 chain-wheel plane
-# (-157.5..-152.5) stays 21 clear and the paper-drive stub disc
-# (-134.5..-137.5) clears the foot by 3.
 ARBOR_PEDESTAL_Z = 90.5  # SOUTH end only (at z -90.5): the rocker support no
 # longer clamps the arbor, but the solid portal north upright leaves no room for
 # a north pedestal where the arbor's north end was (GT NOTE above). South block
@@ -397,13 +393,12 @@ PIVOT_STATION = 196.0  # platform swing pivot (plan), north of the shaft end
 # copied (the CAM_ECC precedent), and asserted at import so a drifted anchor
 # fails before any COM work.
 from build_cone_swing_platform import (  # noqa: E402
+    CRANK_AXIS_OFF as PLAT_CRANK_OFF,
+    CRANK_AXIS_Y as PLAT_CRANK_Y,
+    EAST_HALF_S as PLAT_EAST_S,
     HALF_WIDTH_N as PLAT_HALF_N,
-    HALF_WIDTH_S as PLAT_HALF_S,
-    LOBE_REACH as PLAT_LOBE_REACH,
-    LOBE_X_IN as PLAT_LOBE_X_IN,
-    LOBE_Z_N as PLAT_LOBE_Z_N,
-    LOBE_Z_S as PLAT_LOBE_Z_S,
     NORTH_OVERHANG as PLAT_OVERHANG,
+    CRANK_SEAT_ANCHOR as PLAT_SEAT_ANCHOR,
     NOTCH_EXIT_TRAVEL as PLAT_NOTCH_EXIT,
     PLATE_LEN as PLAT_LEN,
     PLATE_T as PLAT_T,
@@ -411,10 +406,23 @@ from build_cone_swing_platform import (  # noqa: E402
     SLOT_E_Z as PLAT_SLOT_E_Z,
     SLOT_R as PLAT_SLOT_R,
     SLOT_W as PLAT_SLOT_W,
+    WEST_HALF_S as PLAT_WEST_S,
 )
 from build_cone_lock_knob import (  # noqa: E402
     STUD_DIA as KNOB_STUD_DIA,
     WASHER_DIA as KNOB_WASHER_DIA,
+)
+from build_cone_pivot_screw import (  # noqa: E402
+    SHANK_DIA as PSCREW_SHANK_DIA,
+)
+from build_swing_stop_screw import (  # noqa: E402
+    SHANK_DIA as STOP_SHANK_DIA,
+)
+from build_harmonic_base import (  # noqa: E402
+    PIVOT_SCREW_HOLE_DIA as BASE_PIVOT_HOLE_DIA,
+    PIVOT_SCREW_XZ as BASE_PIVOT_XZ,
+    STOP_SCREW_HOLE_DIA as BASE_STOP_HOLE_DIA,
+    STOP_SCREW_XZ as BASE_STOP_XZ,
 )
 from build_arbor_pedestal import (  # noqa: E402
     BLOCK_DEPTH as ARBOR_PED_DEPTH,
@@ -423,18 +431,34 @@ from build_arbor_pedestal import (  # noqa: E402
 from build_cone_pivot_post import (  # noqa: E402
     BLOCK_DIA as POST_BLOCK_DIA,
     BORE_HEIGHT as POST_BORE_HEIGHT,
+    CRANK_BORE_DX as POST_CRANK_DX,
+    CRANK_BORE_Y as POST_CRANK_Y,
 )
 from build_cone_tip_block import (  # noqa: E402
+    ADJUSTER_BORE_DEPTH as TIP_ADJ_BORE_DEPTH,
     BLOCK_X as TIP_BLOCK_X,
     BLOCK_Z as TIP_BLOCK_Z,
     BORE_HEIGHT as TIP_BORE_HEIGHT,
+    PINCH_BORE_DIA as TIP_PINCH_BORE_DIA,
+    PINCH_BORE_Y as TIP_PINCH_Y,
+)
+from build_cone_tip_bushing import (  # noqa: E402
+    BORE_DIA as BUSH_BORE_DIA,
+    LENGTH as BUSH_LEN,
+)
+from build_cone_tip_adjuster import (  # noqa: E402
+    BODY_LEN as ADJ_LEN,
+    CUP_DEPTH as ADJ_CUP_DEPTH,
+    CUP_DIA as ADJ_CUP_DIA,
+)
+from build_cone_tip_pinch_screw import (  # noqa: E402
+    SHANK_DIA as PINCH_SHANK_DIA,
+    SHANK_LEN as PINCH_SHANK_LEN,
 )
 from build_cone_gear_shaft import (  # noqa: E402
     FRONT_STUB as SHAFT_FRONT_STUB,
     SECTIONS as SHAFT_SECTIONS,
 )
-from build_crank_pedestal import PEDESTAL_DIA as PED_DIA  # noqa: E402
-
 # One journal drive height across the platform and both riders: plate
 # thickness under each foot + bore height = 54 above the base top.
 if (abs((Y_DRIVE - Y_BASE_TOP) - (PLAT_T + POST_BORE_HEIGHT)) > 1e-9
@@ -447,12 +471,14 @@ if abs(SHAFT_FRONT_STATION + SHAFT_FRONT_STUB) > 1e-9:
 
 
 def _plat_half_width(s: float) -> float:
-    """Platform half-width at cone station s (linear taper, wide south end);
-    negative if s is off the plate."""
+    """Platform MIN half-width at cone station s (the asymmetric plate's
+    narrower side -- east; the west flare is always wider); negative if s is
+    off the plate. Riders are centred on the shaft plan line (local x 0), so
+    the narrow side bounds their containment."""
     z_local = s - PIVOT_STATION  # platform local z (+ along increasing station)
     if not (PLAT_OVERHANG - PLAT_LEN - 1e-9 <= z_local <= PLAT_OVERHANG + 1e-9):
         return -1.0
-    return PLAT_HALF_N + (PLAT_HALF_S - PLAT_HALF_N) * (PLAT_OVERHANG - z_local) / PLAT_LEN
+    return PLAT_HALF_N + (PLAT_EAST_S - PLAT_HALF_N) * (PLAT_OVERHANG - z_local) / PLAT_LEN
 
 
 # Both riders stand fully ON the plate (plan, in the platform's own inclined
@@ -480,22 +506,58 @@ if _STUB_END_Z > _POST_SOUTH_Z - 1.0:
     raise AssertionError(
         f"cone-shaft stub end {_STUB_END_Z:.2f} not proud of the post's south "
         f"flank {_POST_SOUTH_Z:.2f}")
-# Crank pedestal: foot fully on the base top plate (17.5 x 10.5 in centred:
-# +-222.25, +-133.35) and clear of the swing plate's south edge. The edge is
-# perpendicular to the INCLINED axis (slanted in machine z), so measure the
-# gap in the plate's own frame -- a machine-z midline check overstates it by
-# ~1 (the plate corner is the near point).
-_PED_R = PED_DIA / 2.0
-if abs(PEDESTAL_Z) + _PED_R > 133.35 or abs(X_CRANK) + _PED_R > 222.25:
-    raise AssertionError("crank pedestal foot hangs off the base top plate")
+# --- tip end-play stack (item 5, v4_t00471 / 7:49) ---------------------------
+# Along the axis, south to north: T006 gear | brass bushing (spacer) | block
+# south face | 1/32" journal | adjuster screw in the counterbore, its blind cup
+# holding the shaft's tip end; the block's top slit + pinch screw lock it.
+TIP_SOUTH_STATION = TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0  # 179: block south face
+BUSH_STATION = TIP_SOUTH_STATION - BUSH_LEN  # 175: bushing south end
+ADJ_EMBED = 6.0  # adjuster thread engagement into the counterbore (8 deep)
+ADJ_HEAD_STATION = TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0 + (ADJ_LEN - ADJ_EMBED)  # 199
+_ADJ_MOUTH = ADJ_HEAD_STATION - ADJ_LEN  # 185: the blind cup's mouth
+_STUB_DIA = SHAFT_SECTIONS[-1][0] * 25.4  # 0.794: the 1/32" tip stub
+_STUB_START = SHAFT_FRONT_STATION + SHAFT_SECTIONS[-2][1]  # 155.7
+if BUSH_STATION < _STUB_START + 1.0:
+    raise AssertionError("tip bushing rides off the 1/32in stub section")
+if abs(BUSH_BORE_DIA - _STUB_DIA) > 0.05:
+    raise AssertionError("tip-bushing bore does not match the tip stub dia")
+if ADJ_EMBED > TIP_ADJ_BORE_DEPTH - 0.5:
+    raise AssertionError("adjuster bottoms out in the block counterbore")
+if not (_ADJ_MOUTH + 0.5 <= _TIP_END_STATION <= _ADJ_MOUTH + ADJ_CUP_DEPTH - 0.5):
+    raise AssertionError("shaft tip end does not rest inside the adjuster cup")
+if ADJ_CUP_DIA < _STUB_DIA + 0.25:
+    raise AssertionError("adjuster cup too tight around the tip stub")
+if abs(PINCH_SHANK_DIA - TIP_PINCH_BORE_DIA) > 0.05:
+    raise AssertionError("pinch-screw shank does not match the block cross-bore")
+if PINCH_SHANK_LEN < TIP_BLOCK_X / 2.0 + 0.5:
+    raise AssertionError("pinch screw too short to cross the top slit")
+# The crank pedestal is GONE as a separate base-mounted part: the cone pivot
+# post and the crank pedestal are ONE green column riding the swing platform
+# (user-confirmed vs v4_t00411/t00417), so the crank rig swings with the cone
+# set and the 16T<->64T mesh survives the disengage. Cross-script agreement
+# for the merged column's crank bore and the platform's "crank axis":
 _PPIVOT = cone_station(PIVOT_STATION)
-_PED_LOCAL_Z = (-(X_CRANK - _PPIVOT[0]) * SIN_I
-                + (PEDESTAL_Z - _PPIVOT[2]) * COS_I)  # -224.9: south of the edge
-_PED_EDGE_GAP = (PLAT_OVERHANG - PLAT_LEN) - _PED_LOCAL_Z - _PED_R  # 1.88
-if _PED_EDGE_GAP < 1.0:
+_PPOST = cone_station(POST_STATION)
+if abs(PLAT_CRANK_OFF - (X_CRANK - _PPIVOT[0])) > 0.05:
     raise AssertionError(
-        f"crank pedestal within {_PED_EDGE_GAP:.2f} of the swing plate's south "
-        f"edge (needs >= 1.0)")
+        f"platform CRANK_AXIS_OFF {PLAT_CRANK_OFF} != X_CRANK - pivot.x "
+        f"{X_CRANK - _PPIVOT[0]:.3f}")
+if abs(PLAT_CRANK_Y - (Y_CRANK - Y_BASE_TOP)) > 1e-6:
+    raise AssertionError("platform CRANK_AXIS_Y != Y_CRANK - Y_BASE_TOP")
+if abs(POST_CRANK_DX - (X_CRANK - _PPOST[0])) > 0.05:
+    raise AssertionError(
+        f"column CRANK_BORE_DX {POST_CRANK_DX} != X_CRANK - post.x "
+        f"{X_CRANK - _PPOST[0]:.3f}")
+if abs(POST_CRANK_Y - (Y_CRANK - Y_BASE_TOP - PLAT_T)) > 1e-6:
+    raise AssertionError("column CRANK_BORE_Y != Y_CRANK - Y_BASE_TOP - PLAT_T")
+# The base's pivot-screw hole sits exactly under the swing pivot.
+if (abs(BASE_PIVOT_XZ[0] - _PPIVOT[0]) > 0.05
+        or abs(BASE_PIVOT_XZ[1] - _PPIVOT[2]) > 0.05):
+    raise AssertionError(
+        f"harmonic-base pivot-screw hole {BASE_PIVOT_XZ} != swing pivot "
+        f"({_PPIVOT[0]:.3f}, {_PPIVOT[2]:.3f})")
+if BASE_PIVOT_HOLE_DIA < PSCREW_SHANK_DIA:
+    raise AssertionError("base pivot hole under the pivot-screw shoulder dia")
 
 
 # --- cone lock knob (v4_t00411; clamps the swing plate through its notch) ----
@@ -520,6 +582,14 @@ KNOB_X, KNOB_Z = _plate_local_to_machine(-PLAT_SLOT_E_X, PLAT_SLOT_E_Z)  # 96.98
 # -87.60: the video's gap between the pivot post and the arbor pedestal
 if PLAT_SLOT_W - KNOB_STUD_DIA < 0.5:
     raise AssertionError("lock stud has <0.5 clearance in the platform notch")
+# The plate's crank-anchor point (CrankAxisSeat's anchor, on the plate's
+# "crank axis") must land ON the machine crank axis at the engaged pose --
+# the SolidWorks-free proof of the platform's CRANK_SEAT_ANCHOR signs.
+_SEAT_ANCHOR_M = _plate_local_to_machine(-PLAT_SEAT_ANCHOR[0], PLAT_SEAT_ANCHOR[1])
+if abs(_SEAT_ANCHOR_M[0] - X_CRANK) > 0.05:
+    raise AssertionError(
+        f"platform CRANK_SEAT_ANCHOR maps to machine x {_SEAT_ANCHOR_M[0]:.3f}"
+        f" != X_CRANK {X_CRANK} -- anchor sign convention broke")
 
 # Disengaged pose: the plate swings (same sense as the incline) until its
 # lobe edge clears the knob's WASHER, so the screwed-down washer fences the
@@ -531,19 +601,50 @@ DISENGAGE_DEG = math.degrees(
 # At that swing the big end separates ~18.4 at the T120 -- visibly and
 # mechanically out of mesh (the v4_t00417 pose, bolt past the plate edge).
 _DISENGAGE_RAD = math.radians(DISENGAGE_DEG)
-# The crank pedestal must stay clear of the plate's south edge in the
-# DISENGAGED pose too: rotate its plate-frame plan point by -swing (a fixed
-# machine point sweeps the inverse rotation in plate coords) and re-run the
-# engaged edge-gap check at the swung pose.
-_PED_LOCAL_X = ((X_CRANK - _PPIVOT[0]) * COS_I
-                + (PEDESTAL_Z - _PPIVOT[2]) * SIN_I)
-_PED_SWUNG_Z = (-_PED_LOCAL_X * math.sin(_DISENGAGE_RAD)
-                + _PED_LOCAL_Z * math.cos(_DISENGAGE_RAD))
-_PED_EDGE_GAP_SWUNG = (PLAT_OVERHANG - PLAT_LEN) - _PED_SWUNG_Z - _PED_R
-if _PED_EDGE_GAP_SWUNG < 1.0:
+
+# --- swing-stop screw (item 6): bounds the free swing at the disengaged pose.
+# The plate's west edge bumps the screw's proud shank exactly when the notch
+# mouth has cleared the knob washer. Contact point taken on the west edge at
+# plate-local z -185 (just north of the notch); the screw centre sits one
+# shank radius outside the swung edge. The base part hardcodes the hole
+# (CAM_ECC pattern) -- assert agreement, and that the ENGAGED pose clears it.
+_K_W = (PLAT_WEST_S - PLAT_HALF_N) / PLAT_LEN
+_STOP_ZL = -185.0
+_STOP_PL = (-(PLAT_HALF_N + _K_W * (PLAT_OVERHANG - _STOP_ZL)), _STOP_ZL)
+_EDGE_D = (-_K_W, -1.0)
+_EDGE_N = math.hypot(*_EDGE_D)
+_EDGE_D = (_EDGE_D[0] / _EDGE_N, _EDGE_D[1] / _EDGE_N)
+_EDGE_OUT = (_EDGE_D[1], -_EDGE_D[0])  # outward (west) normal, plate frame
+
+
+def _swung_to_machine(x_l: float, z_l: float, ang: float) -> tuple[float, float]:
+    c, s = math.cos(ang), math.sin(ang)
+    return (_PPIVOT[0] + x_l * c - z_l * s, _PPIVOT[2] + x_l * s + z_l * c)
+
+
+_A_DIS = math.radians(INCLINE_DEG) + _DISENGAGE_RAD
+_CONTACT = _swung_to_machine(_STOP_PL[0], _STOP_PL[1], _A_DIS)
+_N_M = (_EDGE_OUT[0] * math.cos(_A_DIS) - _EDGE_OUT[1] * math.sin(_A_DIS),
+        _EDGE_OUT[0] * math.sin(_A_DIS) + _EDGE_OUT[1] * math.cos(_A_DIS))
+STOP_X = _CONTACT[0] + _N_M[0] * STOP_SHANK_DIA / 2.0
+STOP_Z = _CONTACT[1] + _N_M[1] * STOP_SHANK_DIA / 2.0
+if abs(BASE_STOP_XZ[0] - STOP_X) > 0.05 or abs(BASE_STOP_XZ[1] - STOP_Z) > 0.05:
     raise AssertionError(
-        f"crank pedestal within {_PED_EDGE_GAP_SWUNG:.2f} of the swing plate's "
-        f"south edge at the DISENGAGED pose (needs >= 1.0)")
+        f"harmonic-base stop-screw hole {BASE_STOP_XZ} != derived stop "
+        f"({STOP_X:.3f}, {STOP_Z:.3f})")
+if BASE_STOP_HOLE_DIA < STOP_SHANK_DIA:
+    raise AssertionError("base stop hole under the stop-screw shank dia")
+# Engaged pose clears the stop screw: distance from the screw centre to the
+# ENGAGED west edge line, minus the shank radius, must leave real air.
+_EP = _swung_to_machine(_STOP_PL[0], _STOP_PL[1], math.radians(INCLINE_DEG))
+_ED = (_EDGE_D[0] * COS_I - _EDGE_D[1] * SIN_I,
+       _EDGE_D[0] * SIN_I + _EDGE_D[1] * COS_I)
+_W = (STOP_X - _EP[0], STOP_Z - _EP[1])
+_STOP_ENGAGED_GAP = abs(_W[0] * _ED[1] - _W[1] * _ED[0]) - STOP_SHANK_DIA / 2.0
+if _STOP_ENGAGED_GAP < 2.0:
+    raise AssertionError(
+        f"stop screw within {_STOP_ENGAGED_GAP:.2f} of the ENGAGED plate edge "
+        f"(needs >= 2.0)")
 _POST_LOCAL_Z = POST_STATION - PIVOT_STATION  # -194.5
 _WASHER_POST_GAP = (
     math.hypot(PLAT_SLOT_E_X, PLAT_SLOT_E_Z - _POST_LOCAL_Z)
@@ -553,20 +654,22 @@ if _WASHER_POST_GAP < 2.0:
     raise AssertionError(
         f"lock knob washer within {_WASHER_POST_GAP:.2f} of the pivot post "
         f"foot (needs >= 2.0)")
-# Lobe west edge vs the arbor-pedestal block, both plan rectangles: check the
-# lobe's two west corners against the block's east flank band.
+# Plate WEST edge (the flare) vs the arbor-pedestal block: sample the edge
+# along its run and check each machine point against the block's east flank
+# band (the old lobe-corner check generalised to the flared edge).
 _ARB_E_X = X_DRUM + ARBOR_PED_WIDTH / 2.0  # 66.7
 _ARB_Z = (-ARBOR_PEDESTAL_Z - ARBOR_PED_DEPTH / 2.0,
           -ARBOR_PEDESTAL_Z + ARBOR_PED_DEPTH / 2.0)  # -98.5..-82.5
-for _zl in (PLAT_LOBE_Z_N, PLAT_LOBE_Z_S):
-    # authored lobe outer edge +(X_IN+REACH) -> pre-mirror effective -(...)
-    _cx, _cz = _plate_local_to_machine(-(PLAT_LOBE_X_IN + PLAT_LOBE_REACH), _zl)
+for _step in range(0, 43):
+    _zl = PLAT_OVERHANG - PLAT_LEN + 5.0 * _step  # south edge -> north
+    _xw = PLAT_HALF_N + _K_W * (PLAT_OVERHANG - _zl)  # authored west x
+    _cx, _cz = _plate_local_to_machine(-_xw, _zl)
     _gap = _cx - _ARB_E_X if _ARB_Z[0] - 2.0 <= _cz <= _ARB_Z[1] + 2.0 \
         else math.hypot(max(0.0, _ARB_E_X - _cx),
                         min(abs(_cz - _ARB_Z[0]), abs(_cz - _ARB_Z[1])))
     if _gap < 2.0:
         raise AssertionError(
-            f"swing-plate lock lobe corner (z_l {_zl}) within {_gap:.2f} of "
+            f"swing-plate west edge (z_l {_zl:.0f}) within {_gap:.2f} of "
             f"the arbor-pedestal block (needs >= 2.0)")
 
 # --- alignment pinion (ch. 25): RESTORED 2026-07-02, carried DISENGAGED ------
@@ -649,7 +752,24 @@ ROT_Y_INCLINE = [
     [COS_I, 0.0, SIN_I],
     [0.0, 1.0, 0.0],
     [-SIN_I, 0.0, COS_I],
-]  # Ry(-21.1), row-vector convention (matches the frame script's Ry rows)
+]  # Ry(-INCLINE), row-vector convention (matches the frame script's Ry rows)
+# The tip-stack riders are authored along +Y (Top-plane extrusions); these lay
+# that +Y axis along the inclined plate frame (same row-vector convention).
+ROT_SHAFT_NORTH = [  # +Y -> the increasing-station shaft direction (bushing)
+    [COS_I, 0.0, SIN_I],
+    [-SIN_I, 0.0, COS_I],
+    [0.0, -1.0, 0.0],
+]
+ROT_SHAFT_SOUTH = [  # +Y -> the decreasing-station direction (adjuster: head north)
+    [COS_I, 0.0, SIN_I],
+    [SIN_I, 0.0, -COS_I],
+    [0.0, 1.0, 0.0],
+]
+ROT_PINCH_WEST = [  # +Y -> plate-frame +X: the head seats east, the shank runs west
+    [0.0, 1.0, 0.0],
+    [COS_I, 0.0, SIN_I],
+    [SIN_I, 0.0, -COS_I],
+]
 
 
 def rot_z_rows(deg: float) -> list[list[float]]:
@@ -780,16 +900,12 @@ async def build(adapter) -> dict[str, str]:
         [X_DRUM, Y_DRIVE, ARBOR_SOUTH_Z],
         [90.0, 0.0, 0.0], ROT_X_POS90, ground=False, label="cylinder arbor (seed)",
     )
-    # The crank pedestal and arbor-pedestal are static mounts bolted to the
-    # (absent) base. With no in-subassembly contact partner, each is LOCATED to
-    # the machine datum planes by three orthogonal plane distances (a free-space
-    # machine-frame position, strictly necessary) -- the frame-column pattern,
-    # replacing the explicit fix.
-    pedestal = await place_component(
-        adapter, "crank-pedestal",
-        [X_CRANK, Y_BASE_TOP, PEDESTAL_Z], [0.0, 0.0, 0.0], IDENTITY, ground=False,
-    )
-    await _locate_to_datum(adapter, pedestal)
+    # The arbor-pedestal is a static mount bolted to the (absent) base. With
+    # no in-subassembly contact partner, it is LOCATED to the machine datum
+    # planes by three orthogonal plane distances (a free-space machine-frame
+    # position, strictly necessary) -- the frame-column pattern, replacing the
+    # explicit fix. (The old separate crank-pedestal is GONE: the merged green
+    # column below rides the swing platform.)
     # South arbor pedestal only (2026-06-19): the rocker support's arbor-clamp
     # boss is gone with the portal unification, AND the now-solid portal north
     # upright occupies the space the arbor's north end used to pass through. The
@@ -829,6 +945,34 @@ async def build(adapter) -> dict[str, str]:
         ROT_Y_INCLINE, ground=False,
         label="cone-tip-block (tip journal, on the plate)",
     )
+    # Tip end-play stack (item 5, v4_t00471): the brass spacer bushing on the
+    # tip stub, the axial adjuster screw in the block's counterbore, and the
+    # pinch screw across the block's top slit. Stations derived at import
+    # (BUSH_STATION / ADJ_HEAD_STATION); all three ride the swing family.
+    pbush = cone_station(BUSH_STATION)
+    tip_bushing = await place_component(
+        adapter, "cone-tip-bushing",
+        [pbush[0], Y_DRIVE, pbush[2]], [90.0, -INCLINE_DEG, 0.0],
+        ROT_SHAFT_NORTH, ground=False,
+        label="cone-tip-bushing (T006 spacer, on the tip stub)",
+    )
+    padj = cone_station(ADJ_HEAD_STATION)
+    tip_adjuster = await place_component(
+        adapter, "cone-tip-adjuster",
+        [padj[0], Y_DRIVE, padj[2]], [-90.0, -INCLINE_DEG, 0.0],
+        ROT_SHAFT_SOUTH, ground=False,
+        label="cone-tip-adjuster (axial end-play screw, head north)",
+    )
+    pinch_screw = await place_component(
+        adapter, "cone-tip-pinch-screw",
+        [
+            ptip[0] + (TIP_BLOCK_X / 2.0) * COS_I,
+            Y_BASE_TOP + PLAT_T + TIP_PINCH_Y,
+            ptip[2] + (TIP_BLOCK_X / 2.0) * SIN_I,
+        ],
+        [0.0, -INCLINE_DEG, -90.0], ROT_PINCH_WEST, ground=False,
+        label="cone-tip-pinch-screw (slit clamp, head east)",
+    )
     # The lock knob (v4_t00411) is a base-bolted static like the pedestals: its
     # washer seat lands on the plate top, its stud drops through the plate's
     # lock slot (engaged end -- the as-built pose). The plate is the mover: on
@@ -840,6 +984,26 @@ async def build(adapter) -> dict[str, str]:
         ground=False, label="cone-lock-knob (platform clamp, engaged end)",
     )
     await _locate_to_datum(adapter, lock_knob)
+    # The platform pivot screw (item 2, p.18 "pivot"): a base-threaded STATIC
+    # like the knob -- head seated on the plate top at the swing pivot, its
+    # shoulder dropping through the plate's clearance hole into the base's
+    # pivot hole. The plate rotates ABOUT it; the screw never moves.
+    pivot_screw = await place_component(
+        adapter, "cone-pivot-screw",
+        [ppivot[0], Y_BASE_TOP + PLAT_T, ppivot[2]], [0.0, 0.0, 0.0], IDENTITY,
+        ground=False, label="cone-pivot-screw (p1 pivot pin)",
+    )
+    await _locate_to_datum(adapter, pivot_screw)
+    # The swing-stop screw (item 6): a base-threaded STATIC just past the
+    # DISENGAGED pose -- the plate's west edge bumps its proud shank, limiting
+    # the p1 swing to exactly the knob-clear travel (STOP_X/STOP_Z derived at
+    # import and asserted against the base's hardcoded hole).
+    stop_screw = await place_component(
+        adapter, "swing-stop-screw",
+        [STOP_X, Y_BASE_TOP, STOP_Z], [0.0, 0.0, 0.0], IDENTITY,
+        ground=False, label="swing-stop-screw (p1 travel limit)",
+    )
+    await _locate_to_datum(adapter, stop_screw)
 
     # ============ alignment pinion swing group (ch.25, p.66; p2) ============
     # Floated straps + drum, joined and parked DISENGAGED in the joints
@@ -971,23 +1135,34 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # =================== joints ================================================
-    # Crankshaft revolute in the green pedestal: coincident axis-to-axis
-    # (4 DOF) + an axial plane distance (1 DOF). Its spin is the single crank
-    # driver, pinned via the handle below. The crankshaft axis is local +Y ->
-    # assembly Z (ROT_X_POS90), so its Top Plane is the axial reference.
+    # Crankshaft revolute on the PLATFORM's "crank axis" (the machine-z crank
+    # line the plate carries -- the merged column's bore is geometry only):
+    # coincident axis-to-axis (4 DOF) + an axial plane distance (1 DOF),
+    # BOTH relative to the swinging plate so the whole crank rig follows the
+    # p1 swing. The crankshaft axis is local +Y -> assembly Z (ROT_X_POS90),
+    # so its Top Plane is the axial reference; the plate's Front plane is the
+    # swing-following axial datum (distance read live from the rest pose).
     cs_o = _org(adapter, crankshaft)
     await coincident_mate(
         adapter,
         named_ref(f"Axis1@{crankshaft}", "AXIS"),
-        named_ref(f"Axis1@{pedestal}", "AXIS"),
-        label="crankshaft radial", verify=(crankshaft, cs_o),
+        named_ref(f"crank axis@{platform}", "AXIS"),
+        label="crankshaft radial (plate crank axis)", verify=(crankshaft, cs_o),
     )
+    # Axial seat vs the plate's CrankAxisSeat plane (perpendicular to the
+    # crank axis, anchored at the plate's crank-anchor point -- ON the crank
+    # axis, so its machine x is X_CRANK, asserted at import): distance =
+    # |Delta z| at the engaged rest pose (both are machine-z-normal planes
+    # there).
+    _SEAT_M = _plate_local_to_machine(-PLAT_SEAT_ANCHOR[0], PLAT_SEAT_ANCHOR[1])
+    _cs_axial = abs(cs_o[2] - _SEAT_M[1])
     await distance_driver(
         adapter,
         named_ref(f"Top Plane@{crankshaft}", "PLANE"),
-        named_ref("Front Plane", "PLANE"),
-        abs(cs_o[2]),
-        label=f"crankshaft axial d={abs(cs_o[2]):.2f}", verify=(crankshaft, cs_o),
+        named_ref(f"CrankAxisSeat@{platform}", "PLANE"),
+        _cs_axial,
+        label=f"crankshaft axial d={_cs_axial:.2f} (on the plate)",
+        verify=(crankshaft, cs_o),
     )
     # Keyed crank chain: the T12 chain wheel, the 16T pinion and the arm turn
     # rigidly WITH the crankshaft; the handle rides the arm's pivot pin. Each lock
@@ -1041,10 +1216,12 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Axis2@{arm}", "AXIS"),
         label="handle coaxial on arm pivot", verify=(handle, hd_o),
     )
+    _hd_axial = abs(hd_o[2] - _SEAT_M[1])
     await distance_driver(
         adapter, named_ref(f"Right Plane@{handle}", "PLANE"),
-        named_ref("Front Plane", "PLANE"), abs(hd_o[2]),
-        label=f"handle axial seat d={abs(hd_o[2]):.2f}", verify=(handle, hd_o),
+        named_ref(f"CrankAxisSeat@{platform}", "PLANE"), _hd_axial,
+        label=f"handle axial seat d={_hd_axial:.2f} (on the plate)",
+        verify=(handle, hd_o),
     )
     await parallel_mate(
         adapter, named_ref(f"Top Plane@{handle}", "PLANE"),
@@ -1082,12 +1259,18 @@ async def build(adapter) -> dict[str, str]:
         abs(plat_o[2]),
         label=f"cone-platform pivot-Z d={abs(plat_o[2]):.2f}", verify=(platform, plat_o),
     )
+    # The swing is a FREED operational DOF (user item 1): the park driver is
+    # DEFERRED in the default `free` build (recorded, not authored -- the
+    # plate swings freely between the gear mesh and the stop screw), authored
+    # engaged in a `locked` build. Same mechanism as the crank spin below.
     await angle_driver(
         adapter,
         named_ref(f"Right Plane@{platform}", "PLANE"), named_ref("Right Plane", "PLANE"),
         INCLINE_DEG,
-        label=f"cone-platform swing park (p1, engaged a={INCLINE_DEG:.2f})",
+        label=f"cone-platform swing PARK driver (p1, engaged a={INCLINE_DEG:.2f}; "
+              f"freed in default build)",
         verify=(platform, plat_o),
+        free_dof_key="cone_swing",
     )
 
     # Pivot post rides the plate -- the frame rocker-support idiom (two
@@ -1167,6 +1350,83 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Right Plane@{tip_block}", "PLANE"),
         named_ref(f"Right Plane@{platform}", "PLANE"),
         label="tip-block anti-spin (rides the plate)", verify=(tip_block, tb_o),
+    )
+    # --- tip end-play stack (item 5): bushing | adjuster | pinch screw --------
+    # The bushing spaces the T006 gear off the block's south face: coaxial on
+    # the tip stub + an axial seat off the shaft. Free-spinning in reality; its
+    # spin is pinned to the PLATFORM (immaterial, the lag-screw idiom) so the
+    # 0-DOF closure proof stays exact. Its Top plane is the axial reference
+    # (the part is authored along +Y).
+    bush_o = _org(adapter, tip_bushing)
+    bush_axial = abs(sum((bush_o[k] - cone_o[k]) * cone_axis_dir[k] for k in range(3)))
+    await coincident_mate(
+        adapter,
+        named_ref(f"Axis1@{tip_bushing}", "AXIS"),
+        named_ref(f"Axis1@{cone_shaft}", "AXIS"),
+        label="tip-bushing on the tip stub", verify=(tip_bushing, bush_o),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Top Plane@{tip_bushing}", "PLANE"),
+        named_ref(f"Front Plane@{cone_shaft}", "PLANE"),
+        bush_axial,
+        label=f"tip-bushing axial seat d={bush_axial:.2f}",
+        verify=(tip_bushing, bush_o),
+    )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Right Plane@{tip_bushing}", "PLANE"),
+        named_ref(f"Right Plane@{platform}", "PLANE"),
+        label="tip-bushing anti-spin (spin immaterial)",
+        verify=(tip_bushing, bush_o),
+    )
+    # The adjuster screws into the BLOCK's counterbore: coaxial on the block's
+    # journal axis + an axial seat off the block's Front plane + an anti-spin
+    # (the pinch screw locks its turn in reality).
+    adj_o = _org(adapter, tip_adjuster)
+    adj_axial = abs(sum((adj_o[k] - tb_o[k]) * cone_axis_dir[k] for k in range(3)))
+    await coincident_mate(
+        adapter,
+        named_ref(f"Axis1@{tip_adjuster}", "AXIS"),
+        named_ref(f"Axis1@{tip_block}", "AXIS"),
+        label="adjuster in the block counterbore", verify=(tip_adjuster, adj_o),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Top Plane@{tip_adjuster}", "PLANE"),
+        named_ref(f"Front Plane@{tip_block}", "PLANE"),
+        adj_axial,
+        label=f"adjuster axial set d={adj_axial:.2f}", verify=(tip_adjuster, adj_o),
+    )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Right Plane@{tip_adjuster}", "PLANE"),
+        named_ref(f"Right Plane@{tip_block}", "PLANE"),
+        label="adjuster anti-spin (pinch-locked)", verify=(tip_adjuster, adj_o),
+    )
+    # The pinch screw journals in the block's cross-bore (Axis2, the named
+    # "pinch axis"): coaxial + its head seat a half-block off the block's Right
+    # plane + an anti-spin.
+    pin_o = _org(adapter, pinch_screw)
+    await coincident_mate(
+        adapter,
+        named_ref(f"Axis1@{pinch_screw}", "AXIS"),
+        named_ref(f"Axis2@{tip_block}", "AXIS"),
+        label="pinch screw in the cross-bore", verify=(pinch_screw, pin_o),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Top Plane@{pinch_screw}", "PLANE"),
+        named_ref(f"Right Plane@{tip_block}", "PLANE"),
+        TIP_BLOCK_X / 2.0,
+        label=f"pinch head seat d={TIP_BLOCK_X / 2.0:.2f}",
+        verify=(pinch_screw, pin_o),
+    )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Front Plane@{pinch_screw}", "PLANE"),
+        named_ref(f"Front Plane@{tip_block}", "PLANE"),
+        label="pinch-screw anti-spin (slot upright)", verify=(pinch_screw, pin_o),
     )
     # The 64T crank-drive gear and the 20 cone gears are one rigid stepped
     # cluster KEYED to the cone shaft -- each via coaxial + axial seat + parallel
@@ -1366,7 +1626,9 @@ async def build(adapter) -> dict[str, str]:
     if LOCK:
         await assert_expected_free_dof(adapter, 0)
     else:
-        assert_free_dof_necessity(adapter, 1)
+        # TWO freed operational DOF: the crank spin and the platform swing
+        # (both deferred PARK drivers above).
+        assert_free_dof_necessity(adapter, 2)
         write_park_specs(ASM_NAME)
     check_no_interference(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)
