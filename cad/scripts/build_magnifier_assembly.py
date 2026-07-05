@@ -224,12 +224,22 @@ def _lever_wire_rows() -> list[list[float]]:
 # is no far-side flip, and name selection survives solver motion -- a
 # point-picked FACE self-destructs the moment flip-recovery moves the wire
 # (caught live: "Failed to select mate entity 1 (FACE at ...)" on re-add).
-# The two rest angles feed the wire's swing/spin park drivers (plane-plane
-# angles from the placed rows; mirror flips only x-components, |.| absorbs).
+# Park-driver formulations, re-derived after BOTH original plane-plane angle
+# drivers turned out Jacobian-singular (park-closure catch, 2026-07-05):
+# the SWING angle parked at 0.74 deg -- an angle to a fixed plane is a CONE
+# of orientations, and that close to the apex it pins nothing -- and the SPIN
+# angle (Right@wire vs Right, 13.4 deg) had its gradient PERPENDICULAR to the
+# spin DOF: the wire's Right normal is built horizontal, so spinning about
+# the near-vertical wire axis tips it out-of-plane first-order and the
+# in-plane angle is stationary. Both authored satisfied; neither pinned.
+# Now: SWING pins the hub-end point's depth (distance -- lever arm = the
+# whole wire); SPIN pins angle(Front@wire, RIGHT plane): that normal is
+# ~vertical, so the spin gradient is ~parallel to the wire axis
+# (sensitivity ~0.97, exactly the direction the other rows leave free) and
+# the rest value ~89.8 deg is far from the 0/180 cone apex.
 _HW_ROWS = _lever_wire_rows()
 _STANDOFF_R = HUB_DIA / 2.0 + HUB_WIRE_DIA / 2.0 + WIRE_CLEARANCE  # 10.65
-_WIRE_FRONT_ANGLE = math.degrees(math.acos(min(1.0, abs(_HW_ROWS[2][2]))))
-_WIRE_RIGHT_ANGLE = math.degrees(math.acos(min(1.0, abs(_HW_ROWS[0][0]))))
+_WIRE_SPIN_ANGLE = math.degrees(math.acos(min(1.0, abs(_HW_ROWS[2][0]))))
 
 
 # --- M6.10 fasteners ---------------------------------------------------------
@@ -373,12 +383,18 @@ async def build(adapter) -> dict[str, str]:
     # The wire's two residual DOF (swing across the tangency family + spin
     # about its own axis) are freed operational DOF: park drivers DEFERRED in
     # `free` builds, authored engaged in `locked`/preflight for the closure.
+    # SWING pins the HUB-end point's depth (the swing sweeps the hub end
+    # front-back on the tangency family; the lever arm is the whole wire, so
+    # the driver has first-order authority everywhere -- unlike the rest
+    # plane-plane angle, 0.74 deg = a Jacobian extremum that authored
+    # satisfied but pinned NOTHING; park-closure catch 2026-07-05).
+    await distance_driver(
+        adapter, component_named_ref(hw, "HubPoint", "POINT"),
+        named_ref("Front Plane", "PLANE"), abs(HUB_WIRE_END[2]),
+        label="lever-wire swing PARK driver (hub depth, freed in default build)",
+        verify=(hw, hw_o), free_dof_key="wire_swing")
     await angle_driver(adapter, named_ref(f"Front Plane@{hw}", "PLANE"),
-                       named_ref("Front Plane", "PLANE"), _WIRE_FRONT_ANGLE,
-                       label="lever-wire swing PARK driver (freed in default build)",
-                       verify=(hw, hw_o), free_dof_key="wire_swing")
-    await angle_driver(adapter, named_ref(f"Right Plane@{hw}", "PLANE"),
-                       named_ref("Right Plane", "PLANE"), _WIRE_RIGHT_ANGLE,
+                       named_ref("Right Plane", "PLANE"), _WIRE_SPIN_ANGLE,
                        label="lever-wire spin PARK driver (freed in default build)",
                        verify=(hw, hw_o), free_dof_key="wire_spin")
 
