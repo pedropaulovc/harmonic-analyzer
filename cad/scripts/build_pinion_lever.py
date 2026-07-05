@@ -56,8 +56,9 @@ from _common import (
 PART_NAME = "pinion-lever"
 MATERIAL = "Plain Carbon Steel"  # bright steel (p.68)
 
-ROD_ROOT_DIA = 6.0  # p.68 "6 mm" annotation, at the root (high)
-ROD_TIP_DIA = 4.0  # img07: the rod visibly thins toward the tip (med)
+ROD_ROOT_DIA = 4.0  # the rod is THINNER at the clamp hub (img07 re-read,
+# user review 2026-07-05: the first PR7 taper ran the wrong way)
+ROD_TIP_DIA = 6.0  # p.68 "6 mm" annotation reads at the fat grip end (high)
 ROD_LEN = 86.0  # hub centre to tip -- img07 @ 9.37 px/mm (med; the old 98
 # came from img08's perspective-inflated read, the old 72 from p002)
 HUB_OD = 13.0  # clamp hub cylinder, img07 (med)
