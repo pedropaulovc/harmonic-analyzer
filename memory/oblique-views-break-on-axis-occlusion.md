@@ -17,9 +17,11 @@ off the member's silhouette, exposing its true endpoint against the
 background.
 
 **How to apply:**
-- Look through the reference imagery for oblique full-machine shots
-  (`ch07-p001-img17/18` ≈ az −150, el 10 was the winner). (The curation catalog
-  `references/curation/batches/*.json` referenced here is not present in the repo.)
+- The curation catalog (`references/curation/batches/*.json`, inside the `references`
+  submodule — run `git submodule update --init references` to grep it; a working-tree
+  search shows nothing while the submodule is uninitialized) tags frames with
+  `view_guess: {az_deg, el_deg}`, `components`, `notes` — search it for oblique
+  full-machine shots (`ch07-p001-img17/18` ≈ az −150, el 10 was the winner).
 - **Vertical scale** at low elevation (~10°) is near-true: calibrate on the
   top-frame ring height (41 mm = plate top 1040.7 → underside 999.7).
 - **Cross-check scale** with a vertical cylinder's silhouette width — it equals
