@@ -7,7 +7,7 @@ metadata:
   originSessionId: 1f309627-0ce3-4562-b4bc-935d4f44247a
 ---
 
-`build_output_assembly.py` inserts ~123 component instances and pushes SolidWorks'
+`build_output_assembly.py` (the 123-component output monolith, since SPLIT into 4 flat subassembly builders — summing/magnifier/pen/paper-drive — 2026-06-20) inserts ~123 component instances and pushes SolidWorks'
 per-process GDI handle count up. The Windows default `GDIProcessHandleQuota` is **10000**
 (HKLM\...\Windows NT\CurrentVersion\Windows). A **fresh** SW process baselines ~1780 and
 the full build peaks **~8871** — comfortably under the ceiling, and it completes (123
@@ -29,6 +29,6 @@ relaunch — see [[solidworks-3dx-launch]], then clear the recovery dialog [[sw-
 
 Diagnostics: GDI is cheap per repeated INSTANCE (chain links, fasteners cost ~20/comp —
 graphics reused) but ~140-180 per distinct new part doc. Measure live with
-`GetGuiResources(proc.Handle, 0)` via a P/Invoke (see `.logs/gdi_probe.ps1`). The quota
+`GetGuiResources(proc.Handle, 0)` via a P/Invoke. The quota
 *can* be raised to 65536 (HKLM, needs admin + SW restart) as a belt-and-suspenders fix, but
 a fresh restart alone was sufficient — no registry change was needed. Confirmed 2026-06-17.

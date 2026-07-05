@@ -39,7 +39,7 @@ layout" tables):
   lever-free (M6.4 clearance checks relied on this).
 - **Top frame** (new part): green ring clamping the 4 columns at
   y ≈ 1000–1040.7; columns continue above it.
-- **Default state (exact solve, build_channel_assembly.solve_default_state)**
+- **Default state (exact solve, build_channel_assembly.solve_state)**
   *(SUPERSEDED 2026-07-02 by [[ch14-rom-rederive]]: ecc 8.64 lobe-UP, arms rest
   LEVEL, rod pin low at +127.37 — the numbers below are the M6.3-era record)*:
   drive-train locks cylinder gears at Rz(+1.5°) (half T120 tooth pitch —
@@ -72,7 +72,7 @@ layout" tables):
 - **Channel-spring chain (RESOLVED in M6.4)**: the installed-spring part
   spans lever tab (spring hole ~1067.5) down through the summing plate
   (top 998, Ø4.5 holes at x −22.10, z z_j−1.95);
-  `build_channel_assembly._assert_plate_threading` gates the fit. The
+  `build_channel_assembly._assert_spring_threading` gates the fit. The
   earlier "plate level y 1027.6" claim was wrong (see
   [[output-layout-m64]]).
 

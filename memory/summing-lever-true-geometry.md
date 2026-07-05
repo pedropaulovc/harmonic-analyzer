@@ -33,6 +33,12 @@ photos) — tune against the knife-mount fit + ch30 parity. Plan:
 `~/.claude/plans/serialized-wobbling-lerdorf.md`. See [[harmonic-analyzer-project]],
 dof-refactor (dropped memory), [[parametric-springs]].
 
+> **NOTE (later drift):** `build_output_assembly.py` referenced throughout was SPLIT
+> 2026-06-20 into 4 flat subassembly builders — the summing-lever now lives in
+> `build_summing_assembly.py`. The ch30 parity scores below (mean ≈ 76.7) are the
+> 2026-06-17 snapshot; the gallery has been re-tuned since (current mean ≈ 69). The
+> geometry constants and fix narratives remain accurate.
+
 **Knife mount = BORED bearing support (2026-06-17, user-confirmed):** the hex trunnion
 (vertex-up, on the lever) rides inside an OVERSIZED circular bore on the fixed support so
 only the hex's TOP vertex line nears the bore's upper inner wall → true knife-edge line

@@ -75,5 +75,5 @@ Repo already has working probes for this exact pattern:
 motion-study scripts handle pose/alignment-dependent gear over-defines.
 
 Related: [[channel-amplitude-state]], [[build-gdi-session-accumulation]],
-[[sw-document-recovery-dialog]], [[solidworks-modeling-pitfalls]],
+[[sw-recovery-dialog]], [[solidworks-modeling-pitfalls]],
 [[fix-relations-last-resort]].

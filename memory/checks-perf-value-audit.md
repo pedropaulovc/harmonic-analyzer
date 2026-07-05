@@ -9,6 +9,11 @@ Audit (2026-07-03) of every verify gate + offline `check:*`, from 113 h of OTel
 capture (`cad/out/reports/telemetry/traces.jsonl`, 24 k spans) cross-referenced
 with conversation history + git log. Extends [[release-perf-incremental]].
 
+> **NOTE:** the `_assembly.py`/`verify.py` line numbers below (`:1530`, `:963`, `:275`)
+> drift with every edit — treat them as approximate; grep the symbol name
+> (`assert_model_healthy`, `assert_components_fully_defined`, `assert_no_over_constrained`)
+> for the current location.
+
 **Where soundness time goes** (median real run ≈ **989 s**, ~99% of all verify cost;
 offline `check:*` total ≈34 s, parallel/off-spine, negligible):
 - **gear-ratios ≈ 493 s = 50%** of a run — one COM MateGroup walk (`gear.read_links`);

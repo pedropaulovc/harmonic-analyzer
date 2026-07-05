@@ -21,4 +21,4 @@ Verifying the PR #76 telemetry spine (`cad/scripts/_telemetry.py`) end-to-end on
 
 **Gotcha — orphans mean you killed it, not a real gap.** The spine uses `SimpleSpanProcessor` (exports each span on its *end*). A build killed mid-run (e.g. `timeout`) flushes finished children but never their still-open `task`/`pipeline`/`build` parents → Jaeger shows children as orphan roots. Let builds COMPLETE before auditing. A clean summing+knife_stay run = 73 spans, 1 root, 0 orphans; per-part component-insert + mate spans, `gate.dof`/`gate.interference`/`gate.health` with per-component children. Note Jaeger merges driver+subprocess into one `processID` (identical resource attrs), so a processID-based cross-process detector reads 0 — the bridge is proven instead by 1-root/0-orphan across the process boundary.
 
-Relates to [[harmonic-analyzer-project-decisions]].
+Relates to [[harmonic-analyzer-project]].
