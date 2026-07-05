@@ -1062,7 +1062,9 @@ def verify_base_footprint(report: Report) -> None:
         # cone-pivot-post rides the PLATE, so it is plate-contained at
         # drive-train import, not base-swept here.)
         mounts = (
-            ("arbor-pedestal", train.X_DRUM, -train.ARBOR_PEDESTAL_Z,
+            ("arbor-pedestal south", train.X_DRUM, -train.ARBOR_PEDESTAL_Z,
+             arbor_post.FOOT_WIDTH / 2.0, arbor_post.FOOT_DEPTH / 2.0),
+            ("arbor-pedestal north", train.X_DRUM, train.ARBOR_PEDESTAL_NORTH_Z,
              arbor_post.FOOT_WIDTH / 2.0, arbor_post.FOOT_DEPTH / 2.0),
             # base-bolted statics; head/washer is each one's widest plan extent
             ("cone-lock-knob", train.KNOB_X, train.KNOB_Z,
@@ -1092,7 +1094,9 @@ def verify_base_footprint(report: Report) -> None:
         # ride the PLATE, not the base -- their plate containment is
         # asserted at drive-train import.)
         corners_local = (
-            ("plate", -platform.HALF_WIDTH_N, platform.NORTH_OVERHANG),
+            # WEST negates into this pre-mirror frame; the NW corner carries
+            # the PR8 trim (WEST_HALF_N 9.5), the NE keeps HALF_WIDTH_N 12.
+            ("plate", -platform.WEST_HALF_N, platform.NORTH_OVERHANG),
             ("plate", platform.HALF_WIDTH_N, platform.NORTH_OVERHANG),
             ("plate", platform.EAST_HALF_S,
              platform.NORTH_OVERHANG - platform.PLATE_LEN),
