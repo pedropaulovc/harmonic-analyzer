@@ -54,6 +54,16 @@ SHAFT_LENGTH = 145.0  # ch11: derived (crank seat + pedestal bearing + seats);
 PIN_HOLE_DIA = 5.0  # ch11: tapered-pin cross-hole, pin small end (photo)
 PIN_HOLE_HEIGHT = 12.0  # crank hub centre above the outboard end
 THROUGH_CUT_DEPTH = 30.0  # mid-plane total; > shaft dia
+# Keyed-chain seat stations (local +Y from the outboard origin): named datum
+# planes the T12 chain wheel and the 16T pinion mate COINCIDENT to in the
+# assembly (the frame CboreSeat idiom). Coincident replaces the old unsigned
+# plane-plane DISTANCE seats, whose two solution branches let the free-
+# spinning crank family reflect about the shaft origin on a re-solve (the
+# 16T rendered floating 200 mm south -- render-gate catch, 2026-07-04). The
+# arm seats directly on the Top Plane (station 0). build_drive_train asserts
+# these match its REMOVABLE_Z0 / PINION_TOOTH_Z derivations.
+SEAT_T12 = 17.5
+SEAT_PINION = 101.16972071095871  # |PINION_TOOTH_Z - FACE/2 - CRANKSHAFT_Z0|
 
 
 async def build(adapter) -> dict[str, str]:
@@ -133,6 +143,21 @@ async def build(adapter) -> dict[str, str]:
     # crankshaft mates concentric in the pedestal and the crank parts /
     # pinion / chain wheel lock to it (M6 mated-DOF drive train).
     await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "shaft axis")
+
+    # Keyed-chain SEAT DATUMS (see the constants block): the T12 wheel and the
+    # 16T pinion mate their Front planes COINCIDENT to these in the assembly --
+    # flip-free, unlike an unsigned plane-plane distance. The arm (station 0)
+    # seats on the Top Plane itself.
+    from solidworks_mcp.adapters.base import CreatePlaneParameters
+
+    for seat_name, station in (("SeatT12", SEAT_T12), ("SeatPinion", SEAT_PINION)):
+        check(
+            f"create_plane {seat_name} (Top Plane, +{station:.3f})",
+            await adapter.create_plane(CreatePlaneParameters(
+                mode="offset", base_plane="Top Plane", offset=station,
+            )),
+        )
+        name_last_feature(adapter, seat_name)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
