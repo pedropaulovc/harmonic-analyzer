@@ -1,6 +1,6 @@
 ---
 name: od-62mm-reanchor
-description: gear train re-anchored OD 103.3->62.2mm (low conf); alignment pinion removed; SW rebuild DONE+green & landed on main (PR#12 Fix#8 reverted to land it, then RE-LANDED clean in PR#13 e0bb8d7)
+description: gear train re-anchored OD 103.3->62.2mm (low conf); alignment pinion removed (later RESTORED 2026-07-02, see ch30-gt-reanchor); SW rebuild DONE+green & landed on main (PR#12 Fix#8 reverted to land it, then RE-LANDED clean in PR#13 e0bb8d7)
 metadata: 
   node_type: memory
   type: project
@@ -32,13 +32,16 @@ chose **"remove pinion completely will be reworked after."**
 
 So the **alignment pinion is REMOVED** from build_drive_train_assembly.py (drum, 2
 straps, 2 blocks, torque shaft, lift rod, lever, handle + all its self-checks +
-p2 swing joints). Module imports clean; verify --suite config 14/14. Part scripts
+p2 swing joints). Module imports clean; verify --suite config 14/14.
+**(SUPERSEDED 2026-07-02: the alignment pinion was RESTORED level-inboard at
+x ±10.38 with the ch30 GT re-anchor, commit f5ad9428 — see [[ch30-gt-reanchor]].)** Part scripts
 (build_alignment_pinion/pinion_bracket/etc.) stay on disk for the rework.
 
 2026-06-19: **Phase 3 DONE + GREEN + LANDED on main** (HEAD fde40f2). Full doit
 rebuild of all 20 cone configs + cylinder gear + cam/rod + drive-train (no pinion)
-+ output/frame/top; muntz_yellow applied; verify all suites pass (static/truth/
-config + isolation/motion/engagement live, 88 gates). Render diff vs v0.2.0 shown
++ output/frame/top; muntz_yellow applied; verify all suites pass (the then-current
+suites static/truth/config + isolation/motion/engagement, 88 gates; suites were
+renamed 2026-06-20 to soundness/kinematics/math/config, engagement dropped). Render diff vs v0.2.0 shown
 (9 changed parts, all drive-train + dependents: cone-gear stack, cylinder-gear,
 connecting-rod, crank-drive-gear, crank-pinion, cone-gear-shaft, transgear-removable,
 channel-spring-installed, measuring-stick; frame/platen/pen/summing UNCHANGED).

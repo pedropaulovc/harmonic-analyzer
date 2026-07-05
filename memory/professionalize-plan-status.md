@@ -9,6 +9,13 @@ metadata:
 
 Executing `C:\Users\pedro\.claude\plans\i-want-to-professionalize-stateful-star.md` on branch `professionalize-cad`. Each commit fast-forward-pushed to `origin/main` (user wants main to track the work; `git push origin professionalize-cad:main` + `git branch -f main professionalize-cad`).
 
+> **NOTE (later drift):** this is a ~2026-06-16 status snapshot. The verify SUITE NAMES
+> below are all OLD — renamed 2026-06-20 (commit 0c39d8c1): static→(folded into `soundness`),
+> truth→`math`, isolation→`subsystems` (later RETIRED, folded into soundness), motion→`kinematics`,
+> engagement→removed 2026-06-19 (see [[assembly-single-config]]). Gate COUNTS quoted were last
+> validated 2026-06-16 and have drifted; `build_all.py` (step 1) was removed 2026-06-18. The plan
+> is long past this point — check git log for current status.
+
 **DONE (pushed to main):**
 - A (prune comparisons to ch30 8-views), B1 (retire C#/KCL), B2 (README + docs/), C (YAML config layer + `_config.py` + generated DIMENSIONS.md from dimensions.yaml), E (gitignore binaries).
 - B3/B4: `verify.py` + `truth_model.py`.

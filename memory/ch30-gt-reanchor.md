@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-**2026-07-02 (branch `drive-train/ch30-gt-reposition`):** the whole drive train was
+**2026-07-02 (merged to main; work branch `drive-train/ch30-gt-reposition`, since deleted):** the whole drive train was
 re-anchored on the bundle-adjusted ch30 GT
 (`cad/scripts/diagnostics/triangulate_ch30_gt.py`, ground truth in
 `research/1-research-documentation/039-ch30-annotation-benchmark/ground_truth/`).
@@ -14,8 +14,8 @@ Headlines: drive plane y 126.8 → **104.8**; crank at **(122.8, 144.96)** — A
 anchor" contradiction: the wrong assumption was the HORIZONTAL mesh azimuth, not
 either measurement); alignment pinion RESTORED level-inboard at x ±10.38 (the
 2026-06-18 "impossible channel" argument located it in the wrong place); chain plane
-z −146 → −155; connecting rod re-solved 163.18 → 180.83 (rocker rest tilt −6.92°
-preserved bit-exact, downstream chain untouched).
+z −146 → −155; connecting rod re-solved 163.18 → 180.83 (rocker rest pose preserved
+bit-exact — the −6.92° is the pin AZIMUTH, arm tilt is −7.82°; downstream chain untouched).
 
 **Why (traps worth remembering):**
 - ~~"in the side views the green casting is a SLAB, not a round column"~~ **REFUTED
@@ -43,7 +43,7 @@ preserved bit-exact, downstream chain untouched).
   landed un-mirrored (+2.03 where −2.03 was needed) and only the assembly
   interference gate caught it (3975 + 675 + 173 mm³, pedestal vs post/shaft).
   Diagnosis that worked: attach to the live failed Assem via COM and dump
-  `Transform2` of the clashing components (`diagnostics/probe_pedestal_clash.py`)
+  `Transform2` of the clashing components (`diagnostics/probe_pedestal_clash.py`, since deleted 2026-07-03)
   — the −x translations exposed the frame flip in one read. Fix idiom = the
   existing `x0` pattern (summing-lever): author the part script itself
   mirrored (negate its x literals), declare `"crank-pedestal": "x0"`, and

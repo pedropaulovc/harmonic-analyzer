@@ -13,6 +13,13 @@ the static fully-defined harmonic-analyzer.SLDASM, never re-saving it. See
 [[motion-study-pipeline]] (gate PROVEN: top motor drives a flexible sub's gear
 train) and [[amplification-wires]].
 
+> **NOTE (later drift):** the spring-eye world coordinates quoted below (lever eye
+> 1063.65, plate eye 989.5) are the 2026-06-13 Phase-F values; they were superseded by
+> the OD-62.2 and ch14-ROM re-anchors — current `LEVER_EYE_Y` ≈ 1062.52, `PLATE_EYE_Y`
+> ≈ 996.54, gooseneck tip ≈ 1370.6. The PR/branch labels (`#64`, `#63`, `demo_motion.py`)
+> are historical and not all resolvable in git today. The METHOD (named-axis depth-2
+> selection, cam Z-rank pairing, suppression classifier) is unchanged.
+
 **Scope decision 2026-06-13: user chose "Incremental, push for full"** — validate
 the per-sub suppression recipe in isolation first (fast), then assemble the full
 crank-driven device with the 21 real springs + the two wires. (Options offered:

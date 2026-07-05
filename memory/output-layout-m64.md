@@ -8,9 +8,15 @@ metadata:
 ---
 
 M6.4 output.SLDASM FINAL placements (2026-06-10, after the 17→8→0
-interference campaign). Authoritative source: `cad/scripts/build_output_assembly.py`
-constants + `cad/DIMENSIONS.md` ch. 18–24 M6.4 rows. Machine coords: Y up
+interference campaign). Authoritative source (HISTORICAL): the then-`build_output_assembly.py`
+constants (SPLIT 2026-06-20 into summing/magnifier/pen/paper-drive builders — see
+[[output-split-and-loose-part-collision]]) + `cad/config/dimensions.yaml` ch. 18–24 M6.4
+rows (the generated `DIMENSIONS.md` was retired 2026-06-20). Machine coords: Y up
 (base top 50.8), channels along Z, output side −Z. Knife line (15, 990).
+
+> **NOTE:** these are the M6.4 (2026-06-10) placements; many have moved since (e.g.
+> `STICK_POS` is now ≈ (−212, 53.8, −100), the drive re-layout shifted the front-edge
+> parks). Treat the table as the M6.4 snapshot, not current coordinates.
 
 - **Summing group (z≈0)**: summing-lever + knife-mount at (15, 990, 0) ID;
   top-crossbar (15, **1010**, 0) — band 1010..1051, 0.5 above the tube top
