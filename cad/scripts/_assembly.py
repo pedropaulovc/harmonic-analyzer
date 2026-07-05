@@ -350,6 +350,31 @@ async def _add_mate(
         )
     )
 
+def _mate_hard_error(adapter: Any, name: str) -> int:
+    """The named mate feature's HARD ``swFeatureError_e`` code (0 if clean or
+    only a warning). SW can create a mate in an ERROR state (e.g. 47 "cannot
+    be solved -- dimension flipped") WITHOUT moving anything, so a motion-based
+    readback alone misses a wrong-side add -- the magnifier wire-swing park
+    replay authored "OK", left the wire at pose, and the closure gate found the
+    corpse (2026-07-05). One FeatureByName + GetErrorCode2 per mate; warnings
+    (e.g. legitimate over-define co-flags) stay tolerated."""
+    import pythoncom
+    from win32com.client import VARIANT
+
+    if not name:
+        return 0
+    model = adapter.currentModel
+    feat = adapter._attempt(lambda: model.FeatureByName(name), default=None)
+    if feat is None:
+        return 0
+    _flag_only(feat, "GetErrorCode2")
+    warn = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_BOOL, False)
+    code = int(adapter._attempt(lambda: feat.GetErrorCode2(warn), default=0) or 0)
+    if code and bool(warn.value):
+        return 0
+    return code
+
+
 async def _mate(
     adapter: Any,
     label: str,
@@ -365,8 +390,10 @@ async def _mate(
     ``verify=(comp_name, target_origin_mm)`` enables readback-and-flip: after
     the mate solves, the component origin must stay within ``_MATE_TOL_MM`` of
     ``target_origin_mm`` (it was inserted there); otherwise the mate is deleted
-    and re-added with the OPPOSITE flip, then re-checked. Returns the (final)
-    mate result data.
+    and re-added with the OPPOSITE flip, then re-checked. A mate created in a
+    HARD error state (``_mate_hard_error``) triggers the same recovery even
+    when nothing moved -- SW's wrong-side add can fail IN PLACE. Returns the
+    (final) mate result data.
 
     ``flip`` seeds the FIRST solve's side. Default ``False`` keeps the historic
     behaviour (lean on the recovery). A caller that already knows the correct
@@ -384,19 +411,25 @@ async def _mate(
     # "mate distance" rows is unreadable; the mate TYPE stays as an attribute.
     async with _telemetry.aspan(label, kind=kind, label=label) as msp:
         res = check(label, await _add_mate(adapter, kind, entities, flip=flip, **kw))
-        if verify is None:
+        err = _mate_hard_error(adapter, res.get("name", ""))
+        if verify is None and not err:
             return res
-        comp_name, target_origin = verify
-        array = component_transform(adapter, comp_name)
-        moved = max(abs(array[9 + i] * 1000.0 - target_origin[i]) for i in range(3))
-        if moved <= _MATE_TOL_MM:
+        moved = 0.0
+        comp_name: str | None = None
+        target_origin: list[float] = []
+        if verify is not None:
+            comp_name, target_origin = verify
+            array = component_transform(adapter, comp_name)
+            moved = max(abs(array[9 + i] * 1000.0 - target_origin[i]) for i in range(3))
+        if moved <= _MATE_TOL_MM and not err:
             return res
         msp.set_attribute("flipped", True)
         # A flip-recovery is a moment in this mate's span timeline, not a
         # standalone status line -- record it as a span event so the trace shows
         # WHEN in the mate the re-solve happened and by how far it was off.
-        _telemetry.event("mate.flip_recovery", label=label, moved_mm=round(moved, 3))
-        log(f"{label}: moved {moved:.2f} mm -> re-adding flipped")
+        _telemetry.event(
+            "mate.flip_recovery", label=label, moved_mm=round(moved, 3), error=err)
+        log(f"{label}: moved {moved:.2f} mm, error={err} -> re-adding flipped")
         check(
             f"{label} (delete wrong side)",
             await adapter.delete_mate(MateRefParameters(name=res.get("name", ""))),
@@ -405,10 +438,17 @@ async def _mate(
             f"{label} (flipped)",
             await _add_mate(adapter, kind, entities, flip=not flip, **kw),
         )
-        array = component_transform(adapter, comp_name)
-        moved = max(abs(array[9 + i] * 1000.0 - target_origin[i]) for i in range(3))
-        if moved > _MATE_TOL_MM:
-            raise RuntimeError(f"{label}: component still off target by {moved:.2f} mm")
+        err = _mate_hard_error(adapter, res.get("name", ""))
+        if err:
+            raise RuntimeError(
+                f"{label}: mate in hard error state {err} after flip recovery")
+        if comp_name is not None:
+            array = component_transform(adapter, comp_name)
+            moved = max(
+                abs(array[9 + i] * 1000.0 - target_origin[i]) for i in range(3))
+            if moved > _MATE_TOL_MM:
+                raise RuntimeError(
+                    f"{label}: component still off target by {moved:.2f} mm")
         return res
 
 async def plane_distance_mate(
