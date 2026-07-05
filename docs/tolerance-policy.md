@@ -52,9 +52,11 @@ left "deferred":
 - **CAM (STEP→CAM→G-code) — IN SCOPE, deferred until the nominal model is frozen and validated.**
   The build is manual-primary for fidelity, with the PM-30MV **CNC** cutting the repetitive high-count
   parts (20 cams, 19 spacer bushings, cone/cylinder gear train). The primary feed is the **3D solid
-  via STEP** (already emitted by `SaveAs3` in `export_models.py`/`cut_release.py`) into **Fusion 360**
-  (Makers SKU) → G-code; CAM cuts nominal, so the toleranced print carries fits/finish. Authored after
-  the §4 Findings close. Manual mill + lathe still make every one-off part.
+  via STEP** (emitted by `SaveAs3` in `export_models.py`/`cut_release.py`) into **Fusion 360**
+  (Makers SKU) → G-code; CAM cuts nominal, so the toleranced print carries fits/finish. **Caveat:** the
+  neutral export writes one STEP per SLDPRT (active config), so a multi-config part like the 20-config
+  `cone-gear` needs a **per-config STEP export path added** before all 20 can be fed to CAM (see the
+  assessment §11). Authored after the §4 Findings close. Manual mill + lathe still make every one-off part.
 - **DXF — narrow role, NOT the primary CAM feed.** 2D only; used only for genuinely flat parts, 2.5D
   contour/indexed profiles (cam/gear-tooth flanks), and inspection-reference overlays — subordinate to
   the STEP→CAM path (which handles the real 3D solids). Carries geometry, not tolerances.
