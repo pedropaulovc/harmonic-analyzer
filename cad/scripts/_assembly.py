@@ -389,12 +389,12 @@ def _mate_hard_error(adapter: Any, name: str) -> int:
 # readback guard in `_mate` stays as the safety net AND regression alarm: a flip
 # in a normal build means this heuristic broke for that mate -- re-learn its side.
 _FLIP_INVERT: frozenset[str] = frozenset({
-    # Learned from the channel discovery build (empty-set pass): these references
-    # seat on the side OPPOSITE the coordinate's + normal, so the plain sign rule
-    # is backwards for them. Every one flipped on ALL its instances (all-or-none
-    # per signature -> a clean polarity flip, not a sign-split), so XOR-ing the
-    # rule zeroes them. (Sign-split z-seats like `spring z`/`datum z` are NOT here
-    # -- the plain sign rule already handled both sides.)
+    # Learned once, per assembly, from the empty-set discovery build: these
+    # references seat on the side OPPOSITE the sign rule, so XOR-ing zeroes them.
+    # Each flipped on ALL its instances (a clean polarity flip, not a partial
+    # sign-split), and each was surfaced by a `flip-seed MISS` warn naming the sig.
+    # Re-derive after a mate/geometry change: build, read the warns, update here.
+    # --- channel ---
     "spring hook datum y",
     "pivot bushing axial z",
     "lever bushing axial z",
@@ -403,6 +403,57 @@ _FLIP_INVERT: frozenset[str] = frozenset({
     "pivot ball mount datum z",
     "fulcrum shaft datum x",
     "fulcrum shaft datum y",
+    # --- drive-train (its datum/axial convention is largely inverted vs channel) ---
+    "alignment pinion axial",
+    "arbor pedestal datum X",
+    "arbor pedestal datum Y",
+    "arbor pedestal datum Z",
+    "axial seat",
+    "cam follower back axial split",
+    "cam follower front axial split",
+    "cone gear axial seat",
+    "cone lock knob datum X",
+    "cone lock knob datum Y",
+    "cone lock knob datum Z",
+    "cone pivot screw datum X",
+    "cone pivot screw datum Y",
+    "cone pivot screw datum Z",
+    "cone platform height",
+    "cone shaft axial",
+    "crankshaft axial (on the plate)",
+    "cylinder gear axial anchor",
+    "cylinder gear axial pitch",
+    "foot screw datum X",
+    "foot screw datum Y",
+    "foot screw datum Z",
+    "pinch head seat",
+    "pinion arbor axial",
+    "pinion back strap axial",
+    "pinion lift rod datum X",
+    "pinion lift rod datum Y",
+    "pinion lift rod datum Z",
+    "pinion pivot block datum X",
+    "pinion pivot block datum Y",
+    "pinion pivot block datum Z",
+    "pinion pivot shaft datum X",
+    "pinion pivot shaft datum Y",
+    "pinion pivot shaft datum Z",
+    "pinion spring datum Y",
+    "pinion swing axial",
+    "slotted screw datum X",
+    "slotted screw datum Y",
+    "slotted screw datum Z",
+    "swing stop screw datum X",
+    "swing stop screw datum Y",
+    "swing stop screw datum Z",
+    "tip block axial seat",
+    "tip bushing axial seat",
+    # --- magnifier (lever mates are abs-distance, always the flipped side) ---
+    "mag lever depth",
+    "mag lever knife line across",
+    # --- pen / paper-drive ---
+    "pen rod travel snapshot",
+    "platen feed snapshot",
 })
 
 
