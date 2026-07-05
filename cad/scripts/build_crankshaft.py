@@ -60,10 +60,17 @@ THROUGH_CUT_DEPTH = 30.0  # mid-plane total; > shaft dia
 # plane-plane DISTANCE seats, whose two solution branches let the free-
 # spinning crank family reflect about the shaft origin on a re-solve (the
 # 16T rendered floating 200 mm south -- render-gate catch, 2026-07-04). The
-# arm seats directly on the Top Plane (station 0). build_drive_train asserts
-# these match its REMOVABLE_Z0 / PINION_TOOTH_Z derivations.
+# arm seats at SEAT_ARM. build_drive_train asserts these match its
+# REMOVABLE_Z0 / PINION_TOOTH_Z / arm-placement derivations.
 SEAT_T12 = 17.5
 SEAT_PINION = 101.16972071095871  # |PINION_TOOTH_Z - FACE/2 - CRANKSHAFT_Z0|
+SEAT_ARM = 8.0  # the arm's ORIGIN plane. The arm's "z" MIRROR_PLANE entry
+# (bbox mid-plane reflection) keeps its 8-thick plate at station 0..8 but
+# lands the AS-BUILT origin at the plate's NORTH face (station 8, machine
+# -167): the mirrored plate extrudes machine -z from the origin. Seating the
+# origin at station 0 instead hung the plate at -183..-175 and buried the
+# handle collar in the arm's square end (502 mm^3 -- interference-gate catch
+# 2026-07-05).
 
 
 async def build(adapter) -> dict[str, str]:
@@ -144,13 +151,17 @@ async def build(adapter) -> dict[str, str]:
     # pinion / chain wheel lock to it (M6 mated-DOF drive train).
     await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "shaft axis")
 
-    # Keyed-chain SEAT DATUMS (see the constants block): the T12 wheel and the
-    # 16T pinion mate their Front planes COINCIDENT to these in the assembly --
-    # flip-free, unlike an unsigned plane-plane distance. The arm (station 0)
-    # seats on the Top Plane itself.
+    # Keyed-chain SEAT DATUMS (see the constants block): the T12 wheel, the
+    # 16T pinion and the crank arm mate their origin planes COINCIDENT to
+    # these in the assembly -- flip-free, unlike an unsigned plane-plane
+    # distance.
     from solidworks_mcp.adapters.base import CreatePlaneParameters
 
-    for seat_name, station in (("SeatT12", SEAT_T12), ("SeatPinion", SEAT_PINION)):
+    for seat_name, station in (
+        ("SeatT12", SEAT_T12),
+        ("SeatPinion", SEAT_PINION),
+        ("SeatArm", SEAT_ARM),
+    ):
         check(
             f"create_plane {seat_name} (Top Plane, +{station:.3f})",
             await adapter.create_plane(CreatePlaneParameters(
