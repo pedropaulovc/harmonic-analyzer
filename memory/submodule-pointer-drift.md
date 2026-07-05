@@ -10,7 +10,7 @@ metadata:
 `SolidworksMCP-python` submodule working tree sat on a local `personal`
 branch two commits BEHIND `origin/personal` (left there by the DXF-import
 session, see [[dxf-import-makers-seat]]), predating
-`f3a83ca "RevolveParameters.is_cut"`. The build script's
+`d84537a "RevolveParameters.is_cut"`. The build script's
 `RevolveParameters(angle=360.0, is_cut=True)` lost the kwarg SILENTLY —
 pydantic BaseModel ignores unknown fields by default — so the only symptom
 was a wrong volume downstream.

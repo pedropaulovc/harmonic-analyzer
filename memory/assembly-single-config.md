@@ -20,7 +20,9 @@ What was removed (branch `remove-assembly-configs`):
   post-assembly hooks; `dodo.py` docstrings de-referenced.
 - `verify.py`: the whole `engagement` suite removed (`_verify_engagement`,
   `_open_isolated`, `Report.agate`, `TOP_OWNER`, the CLI `engagement` choice).
-  Surviving suites: static / truth / config / isolation / motion / all.
+  Surviving suites: static / truth / config / isolation / motion / all. (NOTE: those
+  suite names were RENAMED 2026-06-20, commit 0c39d8c1 — now soundness/kinematics/math/config;
+  `isolation`→`subsystems` was later retired entirely, folded into soundness.)
 - `cut_release.py`: discard-guard comments generalized (no longer cites the
   operating/pinion_engaged dirty-child case).
 - `_gear_mate_names` (was imported from build_engagement_configs by

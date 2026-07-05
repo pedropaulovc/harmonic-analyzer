@@ -81,4 +81,4 @@ portal pattern to the support FOOT pattern (FootTappedHoles, local X ±60.32 Z
   structure + 4 bolts).
 
 The rocker-pivot SHAFT runs along Z; the wall sits at the north end with the
-shaft's north end carried at its apex. Related: [[harmonic-analyzer-project-decisions]].
+shaft's north end carried at its apex. Related: [[harmonic-analyzer-project]].

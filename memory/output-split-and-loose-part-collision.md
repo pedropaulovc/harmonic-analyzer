@@ -35,5 +35,10 @@ exactly as the book's single output group held both removables). Rule of thumb: 
 loose top-level part is only safe if its part-type appears nowhere nested.
 
 Supersedes the output-band details in [[output-layout-m64]]. Phase 2 (deterministic
-`fix`→interface mates, per [[fix-relations-last-resort]]) is the next phase, not yet
-started.
+`fix`→interface mates, per [[fix-relations-last-resort]]) followed.
+
+> **UPDATE (later):** this Phase-1 branch MERGED as PR #41 (2026-06-20) — no longer
+> "no PR yet"; Phase 2 (semantic/datum-locate mates) began 2026-06-27. The component
+> bands have since drifted (measured ≈ summing 8 / magnifier 12 / pen 8 / paper-drive 87 /
+> top 8 — magnifier +lever-wire, pen +pen-wire, chain 64→60 links). The leaf-name
+> collision LESSON is unchanged.

@@ -14,7 +14,8 @@ the SOLIDWORKS process was occupying the single STA COM seat.
 **Why it presents as a silent open failure.** With a modal dialog up,
 `ISldWorks::OpenDoc6` can't service the request and returns **null with
 `error_code=0, warning_code=0` and `GetDocumentCount()==0`** (a documented SW
-"S_OK with null return" mode). `adapters/solidworks/io.py` open_model treats
+"S_OK with null return" mode). The external `solidworks_mcp` adapter's `open_model`
+(`adapters/solidworks/io.py` in that submodule, NOT this repo) treats
 null as `raise "Failed to open model"`, so `refresh_assembly.py` fails the task
 and the release aborts. The generic message hides that the real blocker is a
 dialog, not the file.
