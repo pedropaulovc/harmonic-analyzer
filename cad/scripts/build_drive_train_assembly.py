@@ -1362,7 +1362,7 @@ async def _locate_to_datum(adapter, name: str) -> None:
             adapter,
             named_ref(f"{plane}@{name}", "PLANE"),
             named_ref(plane, "PLANE"),
-            abs(coord),
+            coord,
             label=f"{name} datum {axis} d={abs(coord):.2f}",
             verify=(name, o),
         )
@@ -1378,7 +1378,7 @@ async def _key_to_shaft(
     the keyed phase -- the parallel pins the spin with no tuned angle (the
     lag-screw idiom). Removes the same 6 DOF the lock did; no fix/lock."""
     p_o = _org(adapter, part)
-    d_axial = abs(sum((p_o[k] - shaft_o[k]) * axis_dir[k] for k in range(3)))
+    d_axial = sum((p_o[k] - shaft_o[k]) * axis_dir[k] for k in range(3))
     await coincident_mate(
         adapter, named_ref(f"{part_axis}@{part}", "AXIS"), shaft_axis_ref,
         label=f"{label} coaxial", verify=(part, p_o),
@@ -1798,7 +1798,7 @@ async def build(adapter) -> dict[str, str]:
     # |Delta z| at the engaged rest pose (both are machine-z-normal planes
     # there).
     _SEAT_M = _plate_local_to_machine(-PLAT_SEAT_ANCHOR[0], PLAT_SEAT_ANCHOR[1])
-    _cs_axial = abs(cs_o[2] - _SEAT_M[1])
+    _cs_axial = cs_o[2] - _SEAT_M[1]
     await distance_driver(
         adapter,
         named_ref(f"Top Plane@{crankshaft}", "PLANE"),
@@ -1905,19 +1905,19 @@ async def build(adapter) -> dict[str, str]:
     await distance_driver(
         adapter,
         named_ref(f"Top Plane@{platform}", "PLANE"), named_ref("Top Plane", "PLANE"),
-        abs(plat_o[1]),
+        plat_o[1],
         label=f"cone-platform height d={abs(plat_o[1]):.2f}", verify=(platform, plat_o),
     )
     await distance_driver(
         adapter,
         named_ref(f"Axis1@{platform}", "AXIS"), named_ref("Right Plane", "PLANE"),
-        abs(plat_o[0]),
+        plat_o[0],
         label=f"cone-platform pivot-X d={abs(plat_o[0]):.2f}", verify=(platform, plat_o),
     )
     await distance_driver(
         adapter,
         named_ref(f"Axis1@{platform}", "AXIS"), named_ref("Front Plane", "PLANE"),
-        abs(plat_o[2]),
+        plat_o[2],
         label=f"cone-platform pivot-Z d={abs(plat_o[2]):.2f}", verify=(platform, plat_o),
     )
     # The swing is a FREED operational DOF (user item 1): the park driver is
@@ -1971,7 +1971,7 @@ async def build(adapter) -> dict[str, str]:
     cone_o = [a_s[9] * 1000.0, a_s[10] * 1000.0, a_s[11] * 1000.0]
     cone_axis_dir = [a_s[6], a_s[7], a_s[8]]  # image of local Z = inclined shaft axis
     post_o = _org(adapter, pivot_post)
-    d_axial = abs(sum((cone_o[k] - post_o[k]) * cone_axis_dir[k] for k in range(3)))
+    d_axial = sum((cone_o[k] - post_o[k]) * cone_axis_dir[k] for k in range(3))
     await coincident_mate(
         adapter,
         named_ref(f"Axis1@{cone_shaft}", "AXIS"),
@@ -1992,7 +1992,7 @@ async def build(adapter) -> dict[str, str]:
     # asserted at import), so its foot lands ON PlateTop with no seat mate --
     # contact, not constraint. It follows the p1 swing through the shaft.
     tb_o = _org(adapter, tip_block)
-    tb_axial = abs(sum((tb_o[k] - cone_o[k]) * cone_axis_dir[k] for k in range(3)))
+    tb_axial = sum((tb_o[k] - cone_o[k]) * cone_axis_dir[k] for k in range(3))
     await coincident_mate(
         adapter,
         named_ref(f"Axis1@{tip_block}", "AXIS"),
@@ -2019,7 +2019,7 @@ async def build(adapter) -> dict[str, str]:
     # 0-DOF closure proof stays exact. Its Top plane is the axial reference
     # (the part is authored along +Y).
     bush_o = _org(adapter, tip_bushing)
-    bush_axial = abs(sum((bush_o[k] - cone_o[k]) * cone_axis_dir[k] for k in range(3)))
+    bush_axial = sum((bush_o[k] - cone_o[k]) * cone_axis_dir[k] for k in range(3))
     await coincident_mate(
         adapter,
         named_ref(f"Axis1@{tip_bushing}", "AXIS"),
@@ -2045,7 +2045,7 @@ async def build(adapter) -> dict[str, str]:
     # journal axis + an axial seat off the block's Front plane + an anti-spin
     # (the pinch screw locks its turn in reality).
     adj_o = _org(adapter, tip_adjuster)
-    adj_axial = abs(sum((adj_o[k] - tb_o[k]) * cone_axis_dir[k] for k in range(3)))
+    adj_axial = sum((adj_o[k] - tb_o[k]) * cone_axis_dir[k] for k in range(3))
     await coincident_mate(
         adapter,
         named_ref(f"Axis1@{tip_adjuster}", "AXIS"),
@@ -2135,7 +2135,7 @@ async def build(adapter) -> dict[str, str]:
                 adapter,
                 named_ref(f"Front Plane@{cyl}", "PLANE"),
                 named_ref("Front Plane", "PLANE"),
-                abs(cyl_o[2]),
+                cyl_o[2],
                 label=f"cylinder-gear {j} axial anchor d={abs(cyl_o[2]):.2f}",
                 verify=(cyl, cyl_o),
             )
@@ -2186,7 +2186,7 @@ async def build(adapter) -> dict[str, str]:
     await distance_driver(
         adapter,
         named_ref(f"Front Plane@{fb}", "PLANE"), named_ref("Front Plane", "PLANE"),
-        abs(fb_o[2]),
+        fb_o[2],
         label=f"pinion swing axial d={abs(fb_o[2]):.2f}", verify=(fb, fb_o),
     )
     await angle_driver(
@@ -2209,7 +2209,7 @@ async def build(adapter) -> dict[str, str]:
     await distance_driver(
         adapter,
         named_ref(f"Front Plane@{bb}", "PLANE"), named_ref("Front Plane", "PLANE"),
-        abs(bb_o[2]),
+        bb_o[2],
         label=f"pinion back strap axial d={abs(bb_o[2]):.2f}", verify=(bb, bb_o),
     )
     await parallel_mate(
@@ -2275,7 +2275,7 @@ async def build(adapter) -> dict[str, str]:
     await distance_driver(
         adapter,
         named_ref(f"Front Plane@{lift_rod}", "PLANE"), named_ref("Front Plane", "PLANE"),
-        abs(lr_o[2]),
+        lr_o[2],
         label=f"lift rod axial d={abs(lr_o[2]):.2f}", verify=(lift_rod, lr_o),
     )
     await angle_driver(
@@ -2297,7 +2297,7 @@ async def build(adapter) -> dict[str, str]:
             named_ref(f"Axis1@{cam}", "AXIS"), named_ref(f"Axis1@{lift_rod}", "AXIS"),
             label=f"pinion cam {tag} on the lift rod", verify=(cam, cam_o),
         )
-        _cam_ax = abs(cam_o[2] - lr_o[2])
+        _cam_ax = cam_o[2] - lr_o[2]
         await distance_driver(
             adapter,
             named_ref(f"Front Plane@{cam}", "PLANE"),
@@ -2325,7 +2325,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         named_ref(f"Front Plane@{lever}", "PLANE"),
         named_ref(f"Front Plane@{lift_rod}", "PLANE"),
-        abs(lev_o[2] - lr_o[2]),
+        lev_o[2] - lr_o[2],
         label=f"lever axial seat d={abs(lev_o[2] - lr_o[2]):.2f}",
         verify=(lever, lev_o),
     )
@@ -2352,7 +2352,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         named_ref(f"Front Plane@{align_pinion}", "PLANE"),
         named_ref("Front Plane", "PLANE"),
-        abs(ap_o[2]),
+        ap_o[2],
         label=f"alignment-pinion axial d={abs(ap_o[2]):.2f}",
         verify=(align_pinion, ap_o),
     )
@@ -2383,7 +2383,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         named_ref(f"Front Plane@{pinion_arbor}", "PLANE"),
         named_ref("Front Plane", "PLANE"),
-        abs(arb_o[2]),
+        arb_o[2],
         label=f"pinion arbor axial d={abs(arb_o[2]):.2f}",
         verify=(pinion_arbor, arb_o),
     )
