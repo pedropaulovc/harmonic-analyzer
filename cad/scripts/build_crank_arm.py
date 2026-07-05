@@ -263,6 +263,22 @@ async def build(adapter) -> dict[str, str]:
     )
     _telemetry.info(f"handle pivot bore axis -> {pivot_axis} (expect Axis2)")
 
+    # HandleSeat datum: the plate face OPPOSITE the origin plane (z =
+    # ARM_THICKNESS). The chirality-mirrored drive-train maps part +z to
+    # machine -z, so this is the arm's SOUTH face -- the crank handle's brass
+    # collar butts flush against it (its Right/origin plane mates COINCIDENT
+    # here, the flip-free seat idiom; seating on Front@arm instead buried the
+    # collar inside the plate, 502 mm^3, 2026-07-05).
+    from solidworks_mcp.adapters.base import CreatePlaneParameters
+
+    check(
+        f"create_plane HandleSeat (Front Plane, +{ARM_THICKNESS})",
+        await adapter.create_plane(CreatePlaneParameters(
+            mode="offset", base_plane="Front Plane", offset=ARM_THICKNESS,
+        )),
+    )
+    name_last_feature(adapter, "HandleSeat")
+
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)

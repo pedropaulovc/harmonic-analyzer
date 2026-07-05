@@ -347,10 +347,14 @@ ARBOR_LENGTH = 187.0  # north end at z +97: 7.5 seated in the NORTH
 CRANKSHAFT_Z0 = -175.0  # outboard (crank) end (was -160: the crank plane moved
 # south with the ch30 GT re-read -- arm hub -175..-167, GT axle bolt -189 +- 2.7)
 CRANKSHAFT_LENGTH = 145.0  # build_crankshaft.py SHAFT_LENGTH (-175..-30)
-CRANK_ARM_Z0 = CRANKSHAFT_Z0  # arm hub at the shaft's south end (-175..-167), in
-# FRONT of (south of) the T12 chain wheel (-157.5..-152.5): the arm + the handle
-# (its grip extends -Z, further south) then sweep entirely south of the chain
-# plane (-155) and cannot foul the chain when the crank turns (user, book p005).
+CRANK_ARM_Z0 = CRANKSHAFT_Z0  # arm PLATE south face: the hub band is
+# -175..-167 at the shaft's south end, in FRONT of (south of) the T12 chain
+# wheel (-157.5..-152.5): the arm + the handle (its grip extends -Z, further
+# south) then sweep entirely south of the chain plane (-155) and cannot foul
+# the chain when the crank turns (user, book p005). NB: this is the PRE-mirror
+# authored z (plate extrudes +z, 0..8 above it); the arm's "z" MIRROR_PLANE
+# entry (bbox mid-plane reflection) keeps the plate band -175..-167 but lands
+# the AS-BUILT origin at the north face -- see CRANK_ARM_ORIGIN_Z.
 ARM_C2C = 66.0  # handle pivot from the shaft axis (rederived from the ch30
 # eight-views, see build_crank_arm.py; was 150 -- a down-pointing 150 arm put
 # the handle below the table)
@@ -389,15 +393,25 @@ if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
 # The crankshaft's named seat datums (the flip-free coincident seats for the
 # keyed chain -- see _seat_on_crank) must sit exactly at this module's
 # authored stations.
+from build_crank_arm import ARM_THICKNESS  # noqa: E402
 from build_crankshaft import (  # noqa: E402
+    SEAT_ARM as CS_SEAT_ARM,
     SEAT_PINION as CS_SEAT_PINION,
     SEAT_T12 as CS_SEAT_T12,
 )
+
+CRANK_ARM_ORIGIN_Z = CRANK_ARM_Z0 + ARM_THICKNESS  # the arm origin's AS-BUILT
+# (post-mirror) world z = the plate's NORTH face (-167): the arm's "z"
+# MIRROR_PLANE reflection preserves the plate band but relocates the origin.
+# This is where the crankshaft's SeatArm datum must hold the origin plane --
+# NOT a placement input (place_component takes the PRE-mirror z, CRANK_ARM_Z0).
 
 if abs((CRANKSHAFT_Z0 + CS_SEAT_T12) - REMOVABLE_Z0) > 1e-6:
     raise AssertionError("crankshaft SeatT12 datum off the REMOVABLE_Z0 station")
 if abs((CRANKSHAFT_Z0 + CS_SEAT_PINION) - (PINION_TOOTH_Z - PINION_FACE / 2.0)) > 1e-6:
     raise AssertionError("crankshaft SeatPinion datum off the 16T station")
+if abs((CRANKSHAFT_Z0 + CS_SEAT_ARM) - CRANK_ARM_ORIGIN_Z) > 1e-6:
+    raise AssertionError("crankshaft SeatArm datum off the arm origin station")
 
 # The whole cone set rides the SWING PLATFORM (ch.12 p.18: the dark wedge
 # plate labelled "pivot" at its tip end). The green pivot post (big-end
@@ -515,8 +529,6 @@ from build_pinion_handle import (  # noqa: E402
     GRIP_DIA as HANDLE_GRIP_DIA,
     GRIP_LEN as HANDLE_GRIP_LEN,
     CAP_SAG as HANDLE_CAP_SAG,
-    ROD_DOWN as HANDLE_ARM_DOWN,
-    ROD_UP as HANDLE_ARM_UP,
     TUBE_ID as HANDLE_TUBE_ID,
     TUBE_LEN as HANDLE_TUBE_LEN,
     WALL_T as HANDLE_WALL_T,
@@ -1157,9 +1169,9 @@ if math.hypot(PIVOT_X - LIFT_X, PIVOT_Y - LIFT_Y) - _CAM_SWEEP_R - 3.175 < 0.25:
 # at y ~390+, far above both sweeps.)
 # Handle geometry is imported (PR7 img07 re-derivation: arms 42/43, the
 # grip a Ø23 cylinder + domed cap, the hub a blind tube over the arbor).
-_TEE_R = max(HANDLE_ARM_DOWN, HANDLE_ARM_UP) + 0.5  # swept disc radius:
-# the long arm's flat-end corner reaches hypot(43, 3) = 43.1
-# The SWEPT geometry splits in two: the Ø6 cross rod sweeps the R43.5 disc
+# The SWEPT geometry splits in two: the Ø6 cross rod sweeps a R43.5 disc
+# (max(HANDLE_ARM_DOWN, HANDLE_ARM_UP) + 0.5; the long arm's flat-end corner
+# reaches hypot(43, 3) = 43.1)
 # in its own thin band; the grip + cap + tube hub stay ON AXIS (R11.5 worst),
 # only their z reach is wider.
 _TEE_DISC_Z = (HANDLE_Z - 3.0, HANDLE_Z + 3.0)
@@ -1177,7 +1189,7 @@ for _lo, _hi, _what in (
     (PIVOT_SHAFT_Z0, PIVOT_SHAFT_Z0 + 192.0, "pivot shaft"),
     (APINION_Z_FRONT - STRAP_T - STRAP_AIR, APINION_Z_FRONT, "front strap"),
     (REMOVABLE_Z0, REMOVABLE_Z0 + 5.0, "T12 chain wheel"),
-    (CRANK_ARM_Z0, CRANK_ARM_Z0 + 8.0, "crank arm hub"),
+    (CRANK_ARM_Z0, CRANK_ARM_Z0 + ARM_THICKNESS, "crank arm hub"),
 ):
     if _TEE_DISC_Z[1] > _lo - 0.25 and _TEE_DISC_Z[0] < _hi + 0.25:
         raise AssertionError(f"tee-handle sweep disc band reaches the {_what}")
@@ -1187,7 +1199,7 @@ for _lo, _hi, _what in (
 if (math.hypot(X_CRANK - APINION_X, Y_CRANK - APINION_Y)
         < HANDLE_GRIP_DIA / 2.0 + 16.0 + 0.25):  # T12 OD/2 ~14 + margin
     raise AssertionError("tee-handle grip reaches the T12 chain wheel")
-if _TEE_HUB_Z[0] < CRANK_ARM_Z0 + 8.0 + 0.25:
+if _TEE_HUB_Z[0] < CRANK_ARM_Z0 + ARM_THICKNESS + 0.25:
     raise AssertionError("tee-handle grip band reaches the crank arm sweep")
 
 # Lever full throw (parked 40 deg -> engaged ~51 deg, checked to 60): the
@@ -1378,11 +1390,12 @@ async def _key_to_shaft(
 
 
 async def _seat_on_crank(
-        adapter, part, part_axis, crank_axis, crankshaft, seat_plane) -> list[float]:
+        adapter, part, part_axis, crank_axis, crankshaft, seat_plane,
+        alignment: str = "closest") -> list[float]:
     """Journal a crank-chain part on the crankshaft via SEMANTIC mates: coaxial
     on the crank axis + an axial seat -- the part's Z-normal Front plane
-    COINCIDENT to the crankshaft's named seat datum ('Top Plane' for the arm's
-    station 0, 'SeatT12'/'SeatPinion' otherwise). Coincident replaces the old
+    COINCIDENT to the crankshaft's named seat datum ('SeatT12'/'SeatPinion'/
+    'SeatArm'). Coincident replaces the old
     UNSIGNED plane-plane distance, whose two solution branches let the free-
     spinning crank family reflect about the shaft origin on a re-solve: the
     16T rendered floating ~200 south of its seat with every gate green
@@ -1399,7 +1412,7 @@ async def _seat_on_crank(
         adapter, named_ref(f"Front Plane@{part}", "PLANE"),
         named_ref(f"{seat_plane}@{crankshaft}", "PLANE"),
         label=f"{part} axial seat on {seat_plane} (coincident, flip-free)",
-        verify=(part, o),
+        alignment=alignment, verify=(part, o),
     )
     return o
 
@@ -1735,6 +1748,10 @@ async def build(adapter) -> dict[str, str]:
     # handle reads "down" in all eight roll angles, which only a -Y arm does,
     # since a downward vector lies on the views' vertical rotation axis). The
     # arm part extrudes along its local +X; rot_z(-90) maps that to assembly -Y.
+    # AUTHORED PRE-MIRROR at the plate's south face: the arm's "z" MIRROR_PLANE
+    # (bbox mid-plane) maps the 0..8 plate onto itself and lands the MIRRORED
+    # origin at the NORTH face, CRANK_ARM_ORIGIN_Z (authoring the north face
+    # here double-applies the +8 -- caught 2026-07-05).
     arm = await place_component(
         adapter, "crank-arm",
         [X_CRANK, Y_CRANK, CRANK_ARM_Z0], [0.0, 0.0, -90.0], rot_z_rows(-90.0),
@@ -1816,8 +1833,12 @@ async def build(adapter) -> dict[str, str]:
     # Crank arm (rest pose -Y, rot_z -90): its Top plane is parallel to the
     # crankshaft's Right at the keyed phase. The crank angle driver below pins the
     # arm -- hence the whole keyed chain -- to the assembly.
+    # The mirrored arm's Front normal reads machine -z against SeatArm's +z:
+    # the seat holds at the as-built pose only ANTI-aligned. Pin it explicitly
+    # rather than trust CLOSEST on a mirrored part.
     arm_o = await _seat_on_crank(
-        adapter, arm, "Axis1", crank_axis, crankshaft, "Top Plane")
+        adapter, arm, "Axis1", crank_axis, crankshaft, "SeatArm",
+        alignment="anti_aligned")
     await parallel_mate(
         adapter, named_ref(f"Top Plane@{arm}", "PLANE"), cs_right,
         label="crank-arm anti-spin (keyed phase)", verify=(arm, arm_o),
@@ -1825,19 +1846,30 @@ async def build(adapter) -> dict[str, str]:
 
     # Crank handle: rides the arm's PIVOT pin (Axis2@arm), NOT the crankshaft --
     # a real pin joint. Coaxial to the arm pivot bore + an axial seat (its
-    # Z-normal Right plane to the assembly Front) + a parallel holding the grip's
-    # rest orientation (the grip spin is immaterial, like a lag screw).
+    # Z-normal Right/origin plane -- the brass collar face -- COINCIDENT to
+    # the arm's HandleSeat datum, the plate's SOUTH face at CRANK_ARM_Z0, so
+    # the collar butts flush where it physically rides) + a parallel holding
+    # the grip's rest orientation (the grip spin is immaterial, like a lag
+    # screw). The seat WAS the last unsigned axial distance on the crank chain
+    # (278.29 to the plate's CrankAxisSeat): adding it teleported the handle
+    # to the far branch, and the flip recovery re-solved by wrenching the
+    # FREE-swinging plate +8 in z, dragging the whole crank family off pose
+    # (caught live 2026-07-05; the pose ledger would have refused the save).
+    # Coincident has one branch -- and referencing the ARM keeps the seat
+    # internal to the swinging rig.
     hd_o = _org(adapter, handle)
     await coincident_mate(
         adapter, named_ref(f"Axis1@{handle}", "AXIS"),
         named_ref(f"Axis2@{arm}", "AXIS"),
         label="handle coaxial on arm pivot", verify=(handle, hd_o),
     )
-    _hd_axial = abs(hd_o[2] - _SEAT_M[1])
-    await distance_driver(
+    await coincident_mate(
         adapter, named_ref(f"Right Plane@{handle}", "PLANE"),
-        named_ref(f"CrankAxisSeat@{platform}", "PLANE"), _hd_axial,
-        label=f"handle axial seat d={_hd_axial:.2f} (on the plate)",
+        named_ref(f"HandleSeat@{arm}", "PLANE"),
+        label="handle axial seat on arm south face (coincident, flip-free)",
+        # Both normals read machine -z (mirrored parts): pin the alignment
+        # rather than trust CLOSEST (see the SeatArm note above).
+        alignment="aligned",
         verify=(handle, hd_o),
     )
     await parallel_mate(
