@@ -375,6 +375,129 @@ def _mate_hard_error(adapter: Any, name: str) -> int:
     return code
 
 
+# --- Deterministic flip seeding for distance drivers ------------------------
+# A distance mate is two-sided: abs(d) fixes the gap, `flip` picks the side. The
+# correct side is a function of the SIGN of the (signed) target coordinate the
+# build already computed -- a part at z=-40 sits on the far side of the datum
+# from one at z=+40 -- so `flip = (signed < 0)` lands the great majority on-
+# target in ONE solve, no delete-and-re-add. A minority of references have their
+# default side inverted relative to the coordinate's + direction (the part
+# plane's normal opposes the datum's); those signatures live in `_FLIP_INVERT`
+# and XOR the rule. The set is DETERMINED ONCE during development: build with it
+# empty, and every mate that still needs a recovery WARNS with its signature
+# (see `_mate`); add those signatures here and rebuild -> zero flips. The
+# readback guard in `_mate` stays as the safety net AND regression alarm: a flip
+# in a normal build means this heuristic broke for that mate -- re-learn its side.
+_FLIP_INVERT: frozenset[str] = frozenset({
+    # Per-signature flip polarity, learned once from the discovery build (see
+    # `_seed_flip`/`_orient_suffix`): a signature here seats on the side
+    # OPPOSITE the plain sign rule. Rotation/mirror twins carry an ` @<diag>`
+    # orientation suffix so each is seeded independently of its sibling.
+    # Re-derive after a mate/geometry change: build with this empty, read the
+    # `flip-seed MISS` warns, paste their sigs here, rebuild -> zero flips.
+    "alignment pinion axial",
+    "arbor pedestal datum X",
+    "arbor pedestal datum Y",
+    "arbor pedestal datum Y @npn",
+    "arbor pedestal datum Z",
+    "axial seat",
+    "cam follower back seat depth",
+    "cam follower front seat depth",
+    "cone gear axial seat",
+    "cone lock knob datum X",
+    "cone lock knob datum Y",
+    "cone lock knob datum Z",
+    "cone pivot screw datum X",
+    "cone pivot screw datum Y",
+    "cone pivot screw datum Z",
+    "cone platform height",
+    "cone shaft axial",
+    "crankshaft axial (on the plate)",
+    "cylinder gear axial anchor",
+    "cylinder gear axial pitch",
+    "foot screw datum X",
+    "foot screw datum Y",
+    "foot screw datum Z",
+    "fulcrum shaft datum x",
+    "fulcrum shaft datum y",
+    "lever axial seat",
+    "lever bushing axial z",
+    "lift rod axial",
+    "mag lever depth @npn",
+    "mag lever knife line across @npn",
+    "pen rod travel snapshot",
+    "pinch head seat @ppn",
+    "pinion arbor axial",
+    "pinion cam back set pin axial",
+    "pinion cam front set pin axial",
+    "pinion pivot block datum Y @npn",
+    "pinion pivot shaft datum X",
+    "pinion pivot shaft datum Y",
+    "pinion pivot shaft datum Z",
+    "pinion spring datum Y @npn",
+    "pivot ball mount datum x",
+    "pivot ball mount datum y",
+    "pivot ball mount datum z",
+    "pivot bushing axial z",
+    "platen feed snapshot",
+    "slotted screw datum X",
+    "slotted screw datum Y",
+    "slotted screw datum Z",
+    "spring hook datum y @npn",
+    "swing stop screw datum X",
+    "swing stop screw datum Y",
+    "swing stop screw datum Z",
+    "tip block axial seat",
+    "tip bushing axial seat",
+})
+
+
+def _flip_sig(label: str) -> str:
+    """Canonical, index/coordinate-free signature of a driver ``label``.
+
+    Strips the volatile per-instance parts -- the ``-> x,y`` target, the
+    ``d=<dist>`` distance, and every digit-bearing token (channel/tooth indices
+    like ``-7``, ``ch16``, ``T120``, ``J4``) -- leaving the structural descriptor
+    (``"spring hook datum y"``). Mates that share a signature are the same seat
+    stamped across a pattern, so they share one flip polarity. Keys
+    :data:`_FLIP_INVERT`; generated with the SAME transform over the mined flip
+    logs, so seeds and runtime signatures match by construction."""
+    s = re.sub(r"\s*->.*$", "", label)
+    s = re.sub(r"\bd=[+-]?[0-9.]+", "", s)
+    s = re.sub(r"\b\w*\d\w*\b", " ", s)
+    s = re.sub(r"[-\s]+", " ", s).strip()
+    return s
+
+
+def _orient_suffix(adapter: Any, comp_name: str) -> str:
+    """Orientation fingerprint of a component, disambiguating a flip signature.
+
+    A datum-plane distance mate's correct side depends on which way the part's
+    same-name plane normal points, and a FIXED rotation of the part flips it: the
+    NORTH arbor pedestal is the SOUTH casting rotated 180 deg about Y, so its Right
+    (X) and Front (Z) plane normals invert while Top (Y) is unchanged -- the two
+    pedestals need OPPOSITE flip on X/Z. They share one :func:`_flip_sig` (the
+    instance index is stripped so a 20-channel pattern collapses to one entry), so
+    without this they collide on a single polarity. Tag the signature with the sign
+    of the component's rotation-matrix diagonal (``ppp`` = identity, dropped; the
+    ry180 twin is ``npn``): same-oriented instances still share one entry, while a
+    rotation/mirror twin gets its own -- learned independently. Empty for a missing
+    name (a driver without a ``verify`` component)."""
+    if not comp_name:
+        return ""
+    xf = component_transform(adapter, comp_name)
+    signs = "".join("n" if xf[i] < -1e-6 else "p" for i in (0, 4, 8))
+    return "" if signs == "ppp" else " @" + signs
+
+
+def _seed_flip(label: str, signed: float, suffix: str = "") -> bool:
+    """The deterministic first-solve side for a distance driver: the sign of the
+    signed target coordinate, XOR the reference's learned polarity. ``suffix`` is
+    the caller's orientation fingerprint (:func:`_orient_suffix`), appended to the
+    signature so a rotation/mirror twin is disambiguated from its sibling."""
+    return (signed < 0.0) ^ ((_flip_sig(label) + suffix) in _FLIP_INVERT)
+
+
 async def _mate(
     adapter: Any,
     label: str,
@@ -429,7 +552,12 @@ async def _mate(
         # WHEN in the mate the re-solve happened and by how far it was off.
         _telemetry.event(
             "mate.flip_recovery", label=label, moved_mm=round(moved, 3), error=err)
-        log(f"{label}: moved {moved:.2f} mm, error={err} -> re-adding flipped")
+        _seed_sig = _flip_sig(label) + (
+            _orient_suffix(adapter, comp_name) if comp_name else "")
+        _telemetry.warn(
+            f"flip-seed MISS: {label!r} off by {moved:.2f} mm, error={err}"
+            f" -> re-adding flipped  (learn: add sig {_seed_sig!r} to _FLIP_INVERT)"
+        )
         check(
             f"{label} (delete wrong side)",
             await adapter.delete_mate(MateRefParameters(name=res.get("name", ""))),
@@ -579,8 +707,16 @@ async def distance_driver(
     label: str = "",
     verify: tuple[str, list[float]] | None = None,
     free_dof_key: str | None = None,
+    flip: bool | None = None,
 ) -> Any:
     """A distance mate used as a driving dimension pinning one slide DOF.
+
+    ``distance`` is SIGNED: its magnitude is the gap, and its SIGN selects the
+    mate side deterministically -- ``flip`` defaults to :func:`_seed_flip` (the
+    sign of ``distance`` XOR the reference's learned polarity), so the part lands
+    on-target in ONE solve with no delete-and-re-add flip recovery. Pass an
+    explicit ``flip`` to override the sign rule. (Callers that pass a bare
+    magnitude get ``flip=False``, the historic behaviour.)
 
     ``free_dof_key`` marks this as a *freed operational-DOF* park driver (see the
     Park drivers section): in a deferred (default-``free``) build it is RECORDED
@@ -589,9 +725,12 @@ async def distance_driver(
     ``PARK_<key>``. ``None`` is a hard pin, authored as before.
     """
     label = label or f"distance driver d={distance:g}"
+    if flip is None:
+        comp = verify[0] if verify else ""
+        flip = _seed_flip(label, distance, _orient_suffix(adapter, comp))
     return await _driver_or_defer(
         adapter, "distance", ref_a, ref_b,
-        label=label, verify=verify, free_dof_key=free_dof_key,
+        label=label, verify=verify, free_dof_key=free_dof_key, flip=flip,
         distance=abs(distance),
     )
 
@@ -1177,18 +1316,22 @@ def _record_park_spec(
 async def _driver_or_defer(
     adapter: Any, kind: str, ref_a: Any, ref_b: Any,
     *, label: str, verify: tuple[str, list[float]] | None,
-    free_dof_key: str | None, **params: Any,
+    free_dof_key: str | None, flip: bool = False, **params: Any,
 ) -> Any:
     """Author a driver mate, OR (freed-DOF key + deferral on) record it and skip.
 
     Returns the mate result dict when authored; a ``{"deferred_park": key}``
     sentinel when deferred. When a ``free_dof_key`` is authored (``locked`` build
     or a normal non-deferred run) the feature is renamed ``PARK_<key>`` so the
-    tree documents it and the DOF gate can find it."""
+    tree documents it and the DOF gate can find it. ``flip`` seeds the authored
+    mate's side (see :func:`_mate`); it is NOT part of the recorded park spec (a
+    deferred driver is not authored, so its side is chosen at replay)."""
     if free_dof_key is not None and _PARK_DEFER:
         _record_park_spec(free_dof_key, kind, [ref_a, ref_b], verify=verify, **params)
         return {"deferred_park": free_dof_key, "name": ""}
-    res = await _mate(adapter, label, kind, [ref_a, ref_b], verify=verify, **params)
+    res = await _mate(
+        adapter, label, kind, [ref_a, ref_b], verify=verify, flip=flip, **params
+    )
     if free_dof_key is not None:
         await mark_park_driver(adapter, res, free_dof_key)
     return res
