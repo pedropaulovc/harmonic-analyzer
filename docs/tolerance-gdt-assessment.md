@@ -217,6 +217,10 @@ State a one-line reference per part class, as *"machine off this,"* not a formal
 Tier: **T1** = spend the budget here · **T2** = moderate · **T3** = leave loose / cosmetic.
 "Add" lists only what is *new* beyond the existing `material/tolerance_class/process/fit_class`.
 
+> This section tiers the parts by **tolerance/fit** effort. The **machinability** pass for the same
+> T1 parts — stock, setups, thin walls, internal corners, CNC-vs-manual routing, per feature — lives
+> in the companion [`machining-dfm.md`](./machining-dfm.md).
+
 | Subsystem · part(s) | Tier | Add |
 |---|---|---|
 | **Summing lever** `summing-lever`, `knife-mount` | **T1** | knife-edge **straightness + ⟂ to motion plane**; **parallelism/equal height** of the two mounts; `precision` on the seat; `bearing` finish on edge + seat. **Material:** the lever is gray cast iron and the mount brass — neither hardens to a durable edge, so the hardness callout needs a **hardened tool-steel knife-edge insert** (e.g. O1/W1, pinned/screwed into the lever) riding a **hardened-steel seat** set into the mount; spec the insert + seat as separate hardened parts (add to `materials.yaml`), *not* "harden the casting." *Least forgiving interface in the machine.* |
