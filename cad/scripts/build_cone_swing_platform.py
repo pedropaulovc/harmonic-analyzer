@@ -65,7 +65,12 @@ PART_NAME = "cone-swing-platform"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel plate (p.18 dark wedge)
 
 PLATE_T = 6.35  # 1/4" plate
-HALF_WIDTH_N = 12.0  # north (pivot/tip) half-width, both sides
+HALF_WIDTH_N = 12.0  # north (pivot/tip) half-width, EAST side (the lock-slot
+# region keeps its full seat)
+WEST_HALF_N = 9.5  # north half-width, WEST side (PR8: trimmed 12 -> 9.5 so
+# the flared west edge clears the NORTH arbor pedestal at z 89.5..105.5 --
+# 12 put the plate corner-touching the clamp's east flank; ch12 img09 shows
+# the real plate narrow at the tip with the clamp hugging its edge)
 EAST_HALF_S = 20.0  # east half-width at the south (big) end -- unchanged taper
 WEST_HALF_S = 37.0  # west half-width at the south end: the flare that makes
 # the pivot -> lock-knob line solid plate (covers the notch seat + washer)
@@ -110,16 +115,16 @@ _SLOT_TX, _SLOT_TZ = -SLOT_E_Z / SLOT_R, SLOT_E_X / SLOT_R
 
 
 def _west_edge_x(z_local: float) -> float:
-    """Authored x of the west taper edge at local z (linear 12 -> 37)."""
-    return HALF_WIDTH_N + (WEST_HALF_S - HALF_WIDTH_N) * (
+    """Authored x of the west taper edge at local z (linear 9.5 -> 37)."""
+    return WEST_HALF_N + (WEST_HALF_S - WEST_HALF_N) * (
         NORTH_OVERHANG - z_local) / PLATE_LEN
 
 
 def _chord_exit_travel(x0: float, z0: float) -> float:
     """Stud travel from (x0, z0) along the chord to the west taper edge."""
     # solve x0 + t*TX = _west_edge_x(z0 + t*TZ) for t (both sides linear)
-    k = (WEST_HALF_S - HALF_WIDTH_N) / PLATE_LEN
-    return (HALF_WIDTH_N + k * (NORTH_OVERHANG - z0) - x0) / (_SLOT_TX + k * _SLOT_TZ)
+    k = (WEST_HALF_S - WEST_HALF_N) / PLATE_LEN
+    return (WEST_HALF_N + k * (NORTH_OVERHANG - z0) - x0) / (_SLOT_TX + k * _SLOT_TZ)
 
 
 # Stud travel (in plate coords) from the engaged seat to the mouth. Past this
@@ -136,7 +141,7 @@ _SLOT_OUT_Z = SLOT_E_Z + (NOTCH_EXIT_TRAVEL + _MOUTH_OVERSHOOT) * _SLOT_TZ
 # points; the fillets are cut on the vertical edges after all through-cuts.
 _CORNERS = (
     ("NE", -HALF_WIDTH_N, NORTH_OVERHANG, 10.0),
-    ("NW", HALF_WIDTH_N, NORTH_OVERHANG, 10.0),
+    ("NW", WEST_HALF_N, NORTH_OVERHANG, 8.0),
     ("SW", WEST_HALF_S, NORTH_OVERHANG - PLATE_LEN, 10.0),
     ("SE", -EAST_HALF_S, NORTH_OVERHANG - PLATE_LEN, 12.0),
 )
@@ -199,6 +204,7 @@ async def build(adapter) -> dict[str, str]:
     # document units (an unsuffixed 214 = 214 in).
     await set_global(adapter, "PlateT", f"{PLATE_T}mm")
     await set_global(adapter, "HalfWidthN", f"{HALF_WIDTH_N}mm")
+    await set_global(adapter, "WestHalfN", f"{WEST_HALF_N}mm")
     await set_global(adapter, "EastHalfS", f"{EAST_HALF_S}mm")
     await set_global(adapter, "WestHalfS", f"{WEST_HALF_S}mm")
     await set_global(adapter, "PlateLen", f"{PLATE_LEN}mm")
@@ -216,7 +222,8 @@ async def build(adapter) -> dict[str, str]:
     set_sketch_direct_db(adapter, True)
     plan_pts = [
         (-HALF_WIDTH_N, -NORTH_OVERHANG),  # north-east (anchor)
-        (HALF_WIDTH_N, -NORTH_OVERHANG),  # north-west (authored +x = west)
+        (WEST_HALF_N, -NORTH_OVERHANG),  # north-west (authored +x = west;
+        # trimmed to clear the north arbor pedestal, PR8)
         (WEST_HALF_S, PLATE_LEN - NORTH_OVERHANG),  # south-west (flare)
         (-EAST_HALF_S, PLATE_LEN - NORTH_OVERHANG),  # south-east
     ]
@@ -226,8 +233,9 @@ async def build(adapter) -> dict[str, str]:
         adapter, lines, plan_pts, label="plate plan", dims=plate,
         names=["NorthHalfW", "NorthOverhangDim", "NorthEdge",
                "WestTaperDx", "PlateLenDim", "SouthEdge"],
-        drives=['"HalfWidthN"', '"NorthOverhang"', '2 * "HalfWidthN"',
-                '"WestHalfS" - "HalfWidthN"', '"PlateLen"',
+        drives=['"HalfWidthN"', '"NorthOverhang"',
+                '"HalfWidthN" + "WestHalfN"',
+                '"WestHalfS" - "WestHalfN"', '"PlateLen"',
                 '"WestHalfS" + "EastHalfS"'],
     )
     await ensure_fully_defined(adapter, "plate plan")
@@ -239,7 +247,7 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=PLATE_T)),
     )
     name_last_feature(adapter, "Plate")
-    v_plate = ((2.0 * HALF_WIDTH_N) + (WEST_HALF_S + EAST_HALF_S)) / 2.0 \
+    v_plate = ((HALF_WIDTH_N + WEST_HALF_N) + (WEST_HALF_S + EAST_HALF_S)) / 2.0 \
         * PLATE_LEN * PLATE_T
     volume = await volume_check(adapter, "plate", v_plate, 0.005 * v_plate)
 
