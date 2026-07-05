@@ -91,11 +91,13 @@ CBORE_XZ = HOLE_XZ  # all four heads counterbored
 # radius) (build_swing_stop_screw).
 PIVOT_SCREW_XZ = (-79.69, 103.29)
 PIVOT_SCREW_HOLE_DIA = 6.5  # O6.35 shoulder clearance
-STOP_SCREW_XZ = (-129.694, 9.523)  # past the DISENGAGED east taper edge (the
-# stop point moved with the PR8 west-tip trim of the swing plate: the notch
-# mouth line changed, shortening the disengage travel --
-# disengage swing sweeps the plate EAST pre-mirror = machine -x; the first
-# derivation sat 19 inside the engaged plate -- interference-gate proven)
+STOP_SCREW_XZ = (-130.830, 9.887)  # past the DISENGAGED east taper edge. The
+# PR8 west-tip trim moved this only via the DISENGAGE angle (the notch mouth
+# is on the WEST edge, so the exit travel shortened); the contact edge itself
+# is the EAST taper line, unchanged at HALF_WIDTH_N 12. (An earlier PR8 pass
+# wrongly fed the west width into the east-edge derivation -- Codex catch.)
+# Disengage swing sweeps the plate EAST pre-mirror = machine -x; the first
+# derivation sat 19 inside the engaged plate -- interference-gate proven.
 STOP_SCREW_HOLE_DIA = 4.1  # O4 shank clearance
 SWING_HOLE_DEPTH = 6.0
 
