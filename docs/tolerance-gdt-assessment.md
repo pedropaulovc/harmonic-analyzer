@@ -466,9 +466,16 @@ faces & pockets, define stock + tools + operations → post G-code`. For a **3-a
 solid**, STEP is the mainstream, robust path — it preserves the true form (bores, hubs, varying
 depth) a 2D profile cannot. DXF is a **narrow special case**, handled in its own subsection below.
 
-- **The STEP feed already exists.** The repo drives `SaveAs3` for STEP/STL today
-  (`export_models.py`, `cut_release.py`), so the CAM input is a **byproduct of the existing neutral
-  export** — no new export path is needed to feed CAM, only a validated model.
+- **The STEP feed mostly exists — with one gap for multi-config parts.** The repo drives `SaveAs3`
+  for STEP/STL today (`export_models.py`, `cut_release.py`), so for a **single-config** part the CAM
+  input is a free byproduct of the existing neutral export. **But** the neutral exporters write only
+  **one `<stem>.STEP` per SLDPRT** (the active config) while emitting the per-config geometry as
+  **STL only** (`export_part_stls` iterates configs for STL; STEP is one-per-stem). So the 20-config
+  **`cone-gear`** (and any other multi-config part) currently exports just **one** cone-gear config as
+  STEP — Fusion would see a single gear, not all 20. **A per-config STEP export path must be added**
+  (iterate configs like the STL path does) before CAM can be fed from STEP for the whole cone train;
+  until then the per-config STLs are the only complete neutral geometry, and STL is a poor CAM input
+  (mesh, not solid). Tracked as a gap, not "already done."
 - **Sequencing.** Author toolpaths only **after the nominal geometry is frozen and validated** —
   there is no point cutting paths against moving geometry, and the §4 Findings (fit/grade/geometry
   reconciliation) must close first so the CNC parts are cut to fits that actually hold.
