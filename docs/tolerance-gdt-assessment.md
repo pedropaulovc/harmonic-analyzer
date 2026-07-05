@@ -421,7 +421,8 @@ against the actual audience and the toolchain, each is now a decision, not a def
 
 **Toolchain (corrected).** The build is **manual-primary by deliberate choice** — manual mill +
 lathe with DROs, chosen for fidelity to a hand-built 1898 machine — **with a PM-30MV CNC available
-for the repetitive, high-count parts**: the **20 cams**, the **19 spacer bushings**, and the
+for the repetitive, high-count parts**: the **20 cams**, the **19+19 spacer bushings** (the
+`pivot-bushing` and `lever-bushing` banks — different OD and length, both 19-off), and the
 **cone/cylinder gear train**. That is exactly where channel-to-channel *consistency* (§2's expensive
 error mode) is hardest to hold by hand, so CNC is the right tool there even though manual remains the
 main path for one-off parts. An earlier draft of this section wrongly called the toolchain
@@ -460,7 +461,7 @@ so supplying them is the single highest-value contribution this supplement makes
 ### CAM (STEP → CAM → G-code) — IN SCOPE, deferred until the nominal model is validated
 
 **Corrected from a prior "OUT."** With the **PM-30MV CNC** in the toolchain for the repetitive parts
-(20 cams, 19 spacer bushings, cone/cylinder gear train), CAM has a real consumer. The **primary feed
+(20 cams, 19+19 spacer bushings, cone/cylinder gear train), CAM has a real consumer. The **primary feed
 is the 3D solid via STEP**, not DXF: `SW → STEP → CAM (SOLIDWORKS CAM / HSMWorks / external) → select
 faces & pockets, define stock + tools + operations → post G-code`. For a **3-axis mill cutting a real
 solid**, STEP is the mainstream, robust path — it preserves the true form (bores, hubs, varying
