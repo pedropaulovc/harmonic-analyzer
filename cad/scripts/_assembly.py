@@ -389,34 +389,20 @@ def _mate_hard_error(adapter: Any, name: str) -> int:
 # readback guard in `_mate` stays as the safety net AND regression alarm: a flip
 # in a normal build means this heuristic broke for that mate -- re-learn its side.
 _FLIP_INVERT: frozenset[str] = frozenset({
-    # Learned once, per assembly, from the empty-set discovery build: these
-    # references seat on the side OPPOSITE the sign rule, so XOR-ing zeroes them.
-    # Each flipped on ALL its instances (a clean polarity flip, not a partial
-    # sign-split), and each was surfaced by a `flip-seed MISS` warn naming the sig.
-    # Re-derive after a mate/geometry change: build, read the warns, update here.
-    # --- channel ---
-    "spring hook datum y",
-    "pivot bushing axial z",
-    "lever bushing axial z",
-    "pivot ball mount datum x",
-    "pivot ball mount datum y",
-    "pivot ball mount datum z",
-    "fulcrum shaft datum x",
-    "fulcrum shaft datum y",
-    # --- drive-train (its datum/axial convention is largely inverted vs channel) ---
-    # #182's crank/cam rewrite: its new seats + a few whose sign it flipped
-    # (re-learned from the post-#182 discovery build).
-    "pinion cam front set pin axial",
-    "pinion cam back set pin axial",
-    "lift rod axial",
-    "lever axial seat",
-    "cam follower front seat depth",
-    "cam follower back seat depth",
+    # Per-signature flip polarity, learned once from the discovery build (see
+    # `_seed_flip`/`_orient_suffix`): a signature here seats on the side
+    # OPPOSITE the plain sign rule. Rotation/mirror twins carry an ` @<diag>`
+    # orientation suffix so each is seeded independently of its sibling.
+    # Re-derive after a mate/geometry change: build with this empty, read the
+    # `flip-seed MISS` warns, paste their sigs here, rebuild -> zero flips.
     "alignment pinion axial",
+    "arbor pedestal datum X",
     "arbor pedestal datum Y",
+    "arbor pedestal datum Y @npn",
+    "arbor pedestal datum Z",
     "axial seat",
-    "cam follower back axial split",
-    "cam follower front axial split",
+    "cam follower back seat depth",
+    "cam follower front seat depth",
     "cone gear axial seat",
     "cone lock knob datum X",
     "cone lock knob datum Y",
@@ -432,28 +418,37 @@ _FLIP_INVERT: frozenset[str] = frozenset({
     "foot screw datum X",
     "foot screw datum Y",
     "foot screw datum Z",
-    "pinch head seat",
-    "pinion arbor axial",    "pinion lift rod datum X",
-    "pinion lift rod datum Y",
-    "pinion lift rod datum Z",
-    "pinion pivot block datum Y",
+    "fulcrum shaft datum x",
+    "fulcrum shaft datum y",
+    "lever axial seat",
+    "lever bushing axial z",
+    "lift rod axial",
+    "mag lever depth @npn",
+    "mag lever knife line across @npn",
+    "pen rod travel snapshot",
+    "pinch head seat @ppn",
+    "pinion arbor axial",
+    "pinion cam back set pin axial",
+    "pinion cam front set pin axial",
+    "pinion pivot block datum Y @npn",
     "pinion pivot shaft datum X",
     "pinion pivot shaft datum Y",
     "pinion pivot shaft datum Z",
-    "pinion spring datum Y",    "slotted screw datum X",
+    "pinion spring datum Y @npn",
+    "pivot ball mount datum x",
+    "pivot ball mount datum y",
+    "pivot ball mount datum z",
+    "pivot bushing axial z",
+    "platen feed snapshot",
+    "slotted screw datum X",
     "slotted screw datum Y",
     "slotted screw datum Z",
+    "spring hook datum y @npn",
     "swing stop screw datum X",
     "swing stop screw datum Y",
     "swing stop screw datum Z",
     "tip block axial seat",
     "tip bushing axial seat",
-    # --- magnifier (lever mates are abs-distance, always the flipped side) ---
-    "mag lever depth",
-    "mag lever knife line across",
-    # --- pen / paper-drive ---
-    "pen rod travel snapshot",
-    "platen feed snapshot",
 })
 
 
@@ -474,10 +469,33 @@ def _flip_sig(label: str) -> str:
     return s
 
 
-def _seed_flip(label: str, signed: float) -> bool:
+def _orient_suffix(adapter: Any, comp_name: str) -> str:
+    """Orientation fingerprint of a component, disambiguating a flip signature.
+
+    A datum-plane distance mate's correct side depends on which way the part's
+    same-name plane normal points, and a FIXED rotation of the part flips it: the
+    NORTH arbor pedestal is the SOUTH casting rotated 180 deg about Y, so its Right
+    (X) and Front (Z) plane normals invert while Top (Y) is unchanged -- the two
+    pedestals need OPPOSITE flip on X/Z. They share one :func:`_flip_sig` (the
+    instance index is stripped so a 20-channel pattern collapses to one entry), so
+    without this they collide on a single polarity. Tag the signature with the sign
+    of the component's rotation-matrix diagonal (``ppp`` = identity, dropped; the
+    ry180 twin is ``npn``): same-oriented instances still share one entry, while a
+    rotation/mirror twin gets its own -- learned independently. Empty for a missing
+    name (a driver without a ``verify`` component)."""
+    if not comp_name:
+        return ""
+    xf = component_transform(adapter, comp_name)
+    signs = "".join("n" if xf[i] < -1e-6 else "p" for i in (0, 4, 8))
+    return "" if signs == "ppp" else " @" + signs
+
+
+def _seed_flip(label: str, signed: float, suffix: str = "") -> bool:
     """The deterministic first-solve side for a distance driver: the sign of the
-    signed target coordinate, XOR the reference's learned polarity."""
-    return (signed < 0.0) ^ (_flip_sig(label) in _FLIP_INVERT)
+    signed target coordinate, XOR the reference's learned polarity. ``suffix`` is
+    the caller's orientation fingerprint (:func:`_orient_suffix`), appended to the
+    signature so a rotation/mirror twin is disambiguated from its sibling."""
+    return (signed < 0.0) ^ ((_flip_sig(label) + suffix) in _FLIP_INVERT)
 
 
 async def _mate(
@@ -534,9 +552,11 @@ async def _mate(
         # WHEN in the mate the re-solve happened and by how far it was off.
         _telemetry.event(
             "mate.flip_recovery", label=label, moved_mm=round(moved, 3), error=err)
+        _seed_sig = _flip_sig(label) + (
+            _orient_suffix(adapter, comp_name) if comp_name else "")
         _telemetry.warn(
             f"flip-seed MISS: {label!r} off by {moved:.2f} mm, error={err}"
-            f" -> re-adding flipped  (learn: add sig {_flip_sig(label)!r} to _FLIP_INVERT)"
+            f" -> re-adding flipped  (learn: add sig {_seed_sig!r} to _FLIP_INVERT)"
         )
         check(
             f"{label} (delete wrong side)",
@@ -706,7 +726,8 @@ async def distance_driver(
     """
     label = label or f"distance driver d={distance:g}"
     if flip is None:
-        flip = _seed_flip(label, distance)
+        comp = verify[0] if verify else ""
+        flip = _seed_flip(label, distance, _orient_suffix(adapter, comp))
     return await _driver_or_defer(
         adapter, "distance", ref_a, ref_b,
         label=label, verify=verify, free_dof_key=free_dof_key, flip=flip,
