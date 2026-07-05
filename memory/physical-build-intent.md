@@ -34,3 +34,16 @@ metal gate and must close before CAM authoring.
 `docs/tolerance-policy.md`), not render metadata; when scoping drawings/DXF/CAM, remember CNC exists
 for repeat parts. Fidelity-to-original constrains DFA part-count reduction (don't consolidate away
 period brackets/screws).
+
+**Real-build findings (2026-07-04, from `docs/machining-dfm.md` "How to get this reviewed"):**
+- **Automated DFM false-greens on this machine.** DFMPro (SW add-in) AND Xometry's auto-DFM both
+  passed every SLDPRT — but miss the real hazards (sharp internal corners at every gear-tooth root +
+  the cam notch; sub-mm walls like T006 0.49mm). Don't trust an automated-DFM green here.
+- **Fusion 360 CAM verify is the primary automated check the user banks on.** It simulates the real
+  tool vs the real solid, so it DOES surface sharp internal corners (as un-cut stock) + reach/gouge/
+  collision — the class DFMPro misses. Blind spot: rigid geometry + held stock, so it will NOT catch
+  thin-wall breakage / slender-shaft whip / tiny-part workholding (T006 0.49mm wall, Ø0.79×34mm shaft,
+  1.90mm cam wall) → those need a first-article cut, not a clean sim.
+- **Gear cutters for DP 49.82 don't exist commercially** (searched). Plan: **self-made form cutters
+  via the Eureka method** (`references/gears-and-gear-cutting/` ch. 12), teeth cut indexed on a
+  dividing head. Wire-EDM/hobbing are outsource alternates only (the shop has no 2D cutters).
