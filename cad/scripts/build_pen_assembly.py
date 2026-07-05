@@ -138,17 +138,17 @@ async def build(adapter) -> dict[str, str]:
                                     [0.0, 0.0, 0.0], IDENTITY, ground=False)
     rod_o = component_origin(adapter, pen_rod)
     await distance_driver(adapter, named_ref(f"Axis1@{pen_rod}", "AXIS"),
-                          named_ref("Front Plane", "PLANE"), abs(rod_o[2]),
+                          named_ref("Front Plane", "PLANE"), rod_o[2],
                           label="pen-rod slide depth", verify=(pen_rod, rod_o))
     await distance_driver(adapter, named_ref(f"Axis1@{pen_rod}", "AXIS"),
-                          named_ref("Right Plane", "PLANE"), abs(rod_o[0]),
+                          named_ref("Right Plane", "PLANE"), rod_o[0],
                           label="pen-rod slide across", verify=(pen_rod, rod_o))
     await angle_driver(adapter, named_ref(f"Front Plane@{pen_rod}", "PLANE"),
                        named_ref("Front Plane", "PLANE"), 0.0,
                        label="pen-rod spin snapshot", verify=(pen_rod, rod_o))
     pen_travel = await distance_driver(
         adapter, named_ref(f"Top Plane@{pen_rod}", "PLANE"),
-        named_ref("Top Plane", "PLANE"), abs(rod_o[1]),
+        named_ref("Top Plane", "PLANE"), rod_o[1],
         label="pen-rod travel snapshot", verify=(pen_rod, rod_o))
     pen_marker = await place_component(adapter, "pen-marker",
                                        [MARKER_X, MARKER_TIP_Y, PEN_Z_MID],
