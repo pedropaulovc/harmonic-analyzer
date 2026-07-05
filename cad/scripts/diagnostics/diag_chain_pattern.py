@@ -15,8 +15,10 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from _common import OUT_PNG, check, run_build
-from build_paper_drive_assembly import _insert_roller_chain
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # cad/scripts
+
+from _common import OUT_PNG, check, run_build  # noqa: E402
+from build_paper_drive_assembly import _insert_roller_chain  # noqa: E402
 
 
 async def build(adapter) -> dict[str, str]:

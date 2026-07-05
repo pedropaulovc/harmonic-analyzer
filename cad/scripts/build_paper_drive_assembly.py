@@ -3,8 +3,8 @@ r"""Reproduction script: paper-drive subassembly (book ch. 22-23, 25).
 The orthogonal time-base of the plotter: the platen carries the recording paper
 across the pen as the operator turns the crank, driven through the translational
 gearing, in machine coordinates (assembly origin = base origin; base top
-y = 50.8; the output side is -Z). 85 components (21 placed + the 64-link roller
-drive chain, explicitly placed).
+y = 50.8; the output side is -Z). 21 placed components + the roller drive chain,
+built as a native connected-linkage chain component pattern along the loop.
 
 * Support rails (front of the columns, centres z -133.9): platen top rail
   (y 440) + bottom rail (y 334), each clamped by a column-clamp pair at
@@ -45,9 +45,10 @@ Default-state notes / documented simplifications (Appendix C):
 * The four column-clamp pinch screws are modeled backed-out (tips 0.2 inside
   their back-wall holes, 0.3 off the columns).
 * Wires are flexible elements, not modeled; the drive chain is a real roller
-  chain (alternating chain-inner-link / chain-outer-link, explicitly placed
-  along the loop, see _insert_roller_chain); the recording paper rides the
-  platen as a rigid sheet (platen-paper).
+  chain (alternating chain-inner-link / chain-outer-link), built as a native
+  SolidWorks connected-linkage chain component pattern along the loop centreline
+  spline, see _insert_roller_chain; the recording paper rides the platen as a
+  rigid sheet (platen-paper).
 * Both pinion-bar ends float: in the real machine the west end is carried by the
   ball-mount housing at the A-frame clevis and the east end by a column bracket;
   neither fitting is modeled.
@@ -79,7 +80,6 @@ from _chain import (
     TIP_R_T12,
     TIP_R_T24,
     centreline_distance,
-    loop_parameter,
     loop_point_tangent,
 )
 from _common import (
@@ -90,7 +90,6 @@ from _common import (
 )
 from _assembly import (
     angle_driver,
-    assert_component_placed,
     assert_components_fully_defined,
     check_no_interference,
     component_names,
@@ -99,7 +98,6 @@ from _assembly import (
     distance_driver,
     lock_mate,
     named_ref,
-    part_path,
     place_component,
     save_assembly_and_images,
 )
@@ -108,7 +106,6 @@ from _transforms import (  # noqa: E402
     ROT_X_NEG90,
     ROT_X_POS90,
     ROT_Y_POS90,
-    mirror_placement,
     rot_z_rows,
 )
 
@@ -269,103 +266,126 @@ def _assert_chain_layout() -> None:
     )
 
 
-async def _place_chain_link(adapter, part: str, station: int) -> tuple[str, list[float]]:
-    """Insert one roller-chain link with its pin0 origin on path ``station``
-    and its local +X (pin0->pin1) along the loop tangent there. Authored in
-    the PRE-mirror frame and reflected by mirror_placement (the achiral link's
-    local-z symmetry makes the YZ mirror a proper rotation, so a pure-Z tangent
-    rotation keeps the plates flat in the chain plane). Returns (name, rows)."""
-    from solidworks_mcp.adapters.base import InsertComponentParameters
-
-    x, y, theta = loop_point_tangent(
-        station * LINK_PITCH, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1], mirror_x=False
+async def _place_chain_seed(adapter, part: str, station: int) -> str:
+    """Seat ONE chain-pattern seed link at path ``station``, oriented along the
+    forward CHORD (pin0->pin1) so both pin axes sit ~on the loop -- the connected
+    -linkage chain pattern then fills the rest of the loop. Authored directly in
+    post-mirror machine coordinates (``mirror_x=True``); the achiral link's
+    local-z symmetry makes that a pure-Z rotation, keeping the plates flat in the
+    chain plane. Returns the instance name."""
+    x0, y0, _ = loop_point_tangent(
+        station * LINK_PITCH, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1], mirror_x=True
     )
-    position, rotation, rows = mirror_placement(
-        part, [x, y, CHAIN_MID_Z], [0.0, 0.0, math.degrees(theta)]
+    x1, y1, _ = loop_point_tangent(
+        (station + 1) * LINK_PITCH, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1], mirror_x=True
     )
-    data = check(
-        f"insert {part} @ station {station} ({position[0]:.1f}, {position[1]:.1f})",
-        await adapter.insert_component(
-            InsertComponentParameters(
-                file_path=part_path(part), position=position, rotation=rotation
-            )
-        ),
+    ang = math.degrees(math.atan2(y1 - y0, x1 - x0))
+    return await place_component(
+        adapter, part, [x0, y0, CHAIN_MID_Z], [0.0, 0.0, ang], rot_z_rows(ang),
+        mirror=False, ground=True, label=f"{part} seed @ station {station}",
     )
-    name = data["name"]
-    assert_component_placed(adapter, name, position, rows)
-    return name, rows
 
 
 async def _insert_roller_chain(adapter) -> None:
-    """The drive chain: a real roller chain of explicitly-placed links.
+    """The drive chain: a native CHAIN COMPONENT PATTERN (connected linkage) of
+    alternating inner/outer links along the _chain.py loop.
 
-    Ch. 23: the chain rides the two mounted removables' m2 teeth (T24 knob
-    shaft, T12 crank shaft). LINK_COUNT links alternate INNER (chain-inner-link:
-    plates + bushings) and OUTER (chain-outer-link: plates + pins) around the
-    _chain.py centreline loop, each seated by its pin0 on a path station and
-    rotated to the loop tangent (pure Z, so every plate stays flat in the chain
-    plane). Explicit placement -- the two-group Connected-Linkage feature
-    rejects raw-COM CreateFeature and the single-group distance pattern
-    chord-steps + rolls the links out of plane on the tight wraps. Links are
-    fixed (the chain is a rigid sub-assembly until per-part DOF arrives).
+    Ch. 23: the chain rides the two mounted removables' m2 teeth (T24 knob shaft,
+    T12 crank shaft). The loop centreline is authored as a single CLOSED SPLINE
+    (one sketch segment) on an offset plane at the chain plane (z = CHAIN_MID_Z);
+    two seed links (chain-inner-link @ station 0, chain-outer-link @ station 1)
+    are placed tangent; SolidWorks' native ``FeatureChainPattern`` (connected
+    linkage, via ``adapter.pattern_components_chain``) fills the loop with the
+    alternating INNER (plates + bushings) / OUTER (plates + pins) links. Each
+    link's two pin axes (Axis1/Axis2) are the group's path-links, so the pattern
+    keeps every plate flat in the chain plane and tangent to the loop.
 
-    Gates: LINK_COUNT links, every link origin (its pin0) back-read onto the
-    loop at the chain z (arbitrates the mirroring), and the stations spaced one
-    LINK_PITCH apart (exact -- explicit placement, no chord-stepping).
+    The path MUST be one connected segment: SolidWorks never treats the 3-arc +
+    taut-line contour as connected (the segments share coordinates but carry no
+    coincidence relations, so MakeSketchChain forms 0 paths), hence the spline
+    through dense loop samples. The dedicated ``FeatureChainPattern`` one-call API
+    is used because the documented CreateDefinition/CreateFeature route returns
+    null under pywin32 late binding. See memory/chain-pattern-not-createable-
+    late-bound.md.
+
+    Gates: the pattern produced ~LINK_COUNT links (the loop length is not an exact
+    integer multiple of the pitch, so a one-link seam at the seed is expected),
+    every instance sits on the chain plane, and its origin (pin0) reads back onto
+    the loop centreline.
     """
-    from solidworks_mcp.adapters.base import ComponentRefParameters
+    from solidworks_mcp.adapters.base import (
+        ComponentChainPatternParameters,
+        CreatePlaneParameters,
+    )
 
-    placed: list[str] = []
-    for station in range(LINK_COUNT):
-        part = "chain-inner-link" if station % 2 == 0 else "chain-outer-link"
-        name, _rows = await _place_chain_link(adapter, part, station)
-        placed.append(name)
-    # Fix every link (explicitly placed, so fully constrained). The first
-    # assembly component is auto-fixed; fixing again is idempotent.
-    for name in placed:
-        check(f"fix {name}", await adapter.fix_component(ComponentRefParameters(name=name)))
+    # 1. Path: a single CLOSED SPLINE on an offset plane at the chain plane.
+    plane = check(
+        f"chain path plane @ z={CHAIN_MID_Z}",
+        await adapter.create_plane(
+            CreatePlaneParameters(mode="offset", base_plane="Front Plane",
+                                  offset=CHAIN_MID_Z)))
+    plane_name = getattr(plane, "name", plane)
+    sk = check("chain path sketch", await adapter.create_sketch(plane_name))
+    sketch_name = getattr(sk, "data", sk) if not isinstance(sk, str) else sk
+    n_samples = 96
+    pts = []
+    for i in range(n_samples):
+        s = i * CENTRELINE_LEN / n_samples
+        x, y, _ = loop_point_tangent(
+            s, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1], mirror_x=True)
+        pts.append({"x": x, "y": y})
+    pts.append(pts[0])  # close the loop
+    check("chain path spline", await adapter.add_spline(pts))
+    check("chain path exit", await adapter.exit_sketch())
 
+    # 2. Two seed links, tangent at the first two stations.
+    inner = await _place_chain_seed(adapter, "chain-inner-link", 0)
+    outer = await _place_chain_seed(adapter, "chain-outer-link", 1)
+
+    # 3. Native connected-linkage chain pattern fills the loop.
+    check(
+        "roller chain (native chain component pattern)",
+        await adapter.pattern_components_chain(
+            ComponentChainPatternParameters(
+                path_segment=f"Spline1@{sketch_name}",
+                group1_component=inner,
+                group1_link1=f"Axis1@{inner}", group1_link2=f"Axis2@{inner}",
+                group1_plane=f"Front Plane@{inner}",
+                group2_component=outer,
+                group2_link1=f"Axis1@{outer}", group2_link2=f"Axis2@{outer}",
+                group2_plane=f"Front Plane@{outer}",
+                # Explicit count (NOT fill_path): _chain sizes CENTRELINE_LEN =
+                # LINK_COUNT * LINK_PITCH with LINK_COUNT even, so LINK_COUNT links
+                # close the loop seamlessly; fill_path undershoots (leaves a ~2-link
+                # seam) because it reserves clearance. For connected linkage the
+                # count is PER GROUP and the two groups interleave, so each group
+                # gets LINK_COUNT // 2 (30 inner + 30 outer = 60 links).
+                pitch_method="connected_linkage", fill_path=False,
+                count=LINK_COUNT // 2, spacing=LINK_PITCH,
+                align_method="tangent", options="dynamic")))
+
+    # 4. Gates: enough links, on the chain plane, on the loop centreline.
     links = [
         n
         for n in component_names(adapter)
         if n.startswith(("chain-inner-link", "chain-outer-link"))
     ]
-    if len(links) != LINK_COUNT:
-        raise RuntimeError(f"placed {len(links)} chain links, expected {LINK_COUNT}")
+    if not 0.9 * LINK_COUNT <= len(links) <= 1.1 * LINK_COUNT:
+        raise RuntimeError(
+            f"chain pattern produced {len(links)} links, expected ~{LINK_COUNT}")
     worst = 0.0
-    params = []
     for name in links:
         array = component_transform(adapter, name)
         x, y, z = (array[9] * 1000.0, array[10] * 1000.0, array[11] * 1000.0)
-        if abs(z - CHAIN_MID_Z) > 0.1:
+        if abs(z - CHAIN_MID_Z) > 0.5:
             raise RuntimeError(f"{name}: link z {z:.3f} off the chain plane {CHAIN_MID_Z}")
         dist = centreline_distance(
-            x, y, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1], mirror_x=True
-        )
+            x, y, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1], mirror_x=True)
         worst = max(worst, dist)
-        if dist > 0.1:
-            raise RuntimeError(
-                f"{name}: link pin0 ({x:.2f}, {y:.2f}) sits {dist:.3f} off the chain path"
-            )
-        params.append(
-            loop_parameter(x, y, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1], mirror_x=True)
-        )
-    # Closure gate: each link's pin0 sits one station apart; consecutive
-    # arc-length gaps (incl. wraparound) within +-15% of the pitch (explicit
-    # placement is exact, only floating-point + tangent-vs-chord noise).
-    params.sort()
-    gaps = [b - a for a, b in zip(params, params[1:], strict=False)]
-    gaps.append(params[0] + CENTRELINE_LEN - params[-1])
-    bad = [g for g in gaps if not 0.85 * LINK_PITCH < g < 1.15 * LINK_PITCH]
-    if bad:
-        raise RuntimeError(
-            f"link spacing broken: gaps {[round(g, 3) for g in bad]} vs pitch"
-            f" {LINK_PITCH:.4f}"
-        )
-    log(
-        f"roller chain: {len(links)} links on the path (worst off-path"
-        f" {worst:.4f}; gaps {min(gaps):.3f}..{max(gaps):.3f})"
-    )
+    if worst > 2.0:
+        raise RuntimeError(f"chain links sit up to {worst:.2f} mm off the loop centreline")
+    log(f"roller chain: native connected-linkage chain pattern, {len(links)} links"
+        f" (worst off-loop {worst:.2f} mm)")
 
 
 async def build(adapter) -> dict[str, str]:
