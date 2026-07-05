@@ -410,11 +410,19 @@ lockstep with the config.
 
 ---
 
-## 11. Manufacturing outputs (drawings / DXF / CAM) — decided, not deferred
+## 11. Manufacturing outputs (drawings / STEP→CAM / DXF) — decided, not deferred
 
 The original policy deferred "2D drawings with tolerance callouts, DXF/CAM outputs." Reassessed
-against the actual audience and the stated **manual**-machining toolchain, each is now a decision,
-not a defer.
+against the actual audience and the toolchain, each is now a decision, not a defer.
+
+**Toolchain (corrected).** The build is **manual-primary by deliberate choice** — manual mill +
+lathe with DROs, chosen for fidelity to a hand-built 1898 machine — **with a PM-30MV CNC available
+for the repetitive, high-count parts**: the **20 cams**, the **19 spacer bushings**, and the
+**cone/cylinder gear train**. That is exactly where channel-to-channel *consistency* (§2's expensive
+error mode) is hardest to hold by hand, so CNC is the right tool there even though manual remains the
+main path for one-off parts. An earlier draft of this section wrongly called the toolchain
+manual-only (and the PM-30MV a "manual mill") and scoped CAM/DXF out on that basis; the DXF and CAM
+decisions below are re-derived from the corrected toolchain.
 
 ### 2D shop drawings — IN SCOPE (the vehicle that makes everything above real)
 
@@ -445,24 +453,60 @@ so supplying them is the single highest-value contribution this supplement makes
   routing on the first pass and capture the working recipe — the repo already hand-tunes render
   cameras the same way.
 
-### DXF — optional reference exhibit only (not a build deliverable)
+### CAM (STEP → CAM → G-code) — IN SCOPE, deferred until the nominal model is validated
 
-DXF feeds flat-profile cutting (laser / waterjet / plasma / wire-EDM) and 2D CAM. This machine is
-almost entirely turned/milled solid parts and the toolchain has **none** of those cutters — so DXF
-has no consumer on the build path. The only genuinely useful 2D profiles are **inspection/reference
-exhibits**: the cone/cylinder gear tooth flanks, the rack tooth profile, and the few truly flat
-parts (nameplate, clips, platen outline). Export those on request via `IPartDoc.ExportToDWG2`
-(a dedicated face/sketch→DXF call, verified in the bundle; or a drawing `SaveAs` to `.dxf`) as
-comparison aids; they carry no tolerance info a drawing wouldn't carry better. The decision is
-"optional exhibit," not "pending."
+**Corrected from a prior "OUT."** With the **PM-30MV CNC** in the toolchain for the repetitive parts
+(20 cams, 19 spacer bushings, cone/cylinder gear train), CAM has a real consumer. The **primary feed
+is the 3D solid via STEP**, not DXF: `SW → STEP → CAM (SOLIDWORKS CAM / HSMWorks / external) → select
+faces & pockets, define stock + tools + operations → post G-code`. For a **3-axis mill cutting a real
+solid**, STEP is the mainstream, robust path — it preserves the true form (bores, hubs, varying
+depth) a 2D profile cannot. DXF is a **narrow special case**, handled in its own subsection below.
 
-### CAM — OUT (not applicable to the build path)
+- **The STEP feed already exists.** The repo drives `SaveAs3` for STEP/STL today
+  (`export_models.py`, `cut_release.py`), so the CAM input is a **byproduct of the existing neutral
+  export** — no new export path is needed to feed CAM, only a validated model.
+- **Sequencing.** Author toolpaths only **after the nominal geometry is frozen and validated** —
+  there is no point cutting paths against moving geometry, and the §4 Findings (fit/grade/geometry
+  reconciliation) must close first so the CNC parts are cut to fits that actually hold.
+- **CAM cuts NOMINAL — tolerances do not travel in the STEP.** A plain STEP (normal SaveAs) carries
+  *geometry only*; the CAM tool generates paths to nominal, and the tolerance/fit/finish is held by
+  **machining process + inspection against the 2D print (§8)**, not by anything in the STEP. (STEP
+  **AP242-with-PMI** *can* carry the tolerances into a PMI-aware CAM tool, but that publish path is
+  **MBD-add-in-gated** on this seat — see below — so the 2D drawing stays the guaranteed carrier.)
+- **Scope boundary — CNC does the repeats, manual does the rest.** CAM is *not* a whole-machine
+  deliverable: one-off frame/pedestal/linkage parts stay on the manual mill + lathe (fidelity, and
+  not worth CNC fixturing). CAM targets only the high-count families where CNC repeatability buys the
+  consistency the error model rewards.
+- **CAM tool = Fusion 360** (Autodesk **Makers / personal SKU**, which bundles CAM). CAM therefore
+  lives in an **external** tool fed the neutral **STEP** the repo already exports — which makes it
+  **moot** whether SOLIDWORKS CAM is enabled on this seat (the earlier "probe SOLIDWORKS CAM
+  Standard" caveat is dropped). Fusion imports STEP for the 3-axis solids and also takes a **DXF
+  sketch** for the 2.5D/flat parts (§DXF), covering both routes. Watch the Makers-SKU limits (e.g.
+  rapids/positioning moves, available posts) at CAM-planning time — not a blocker for the repeat-part
+  contour/pocket work here.
+- **Not a doit task — CAM stays in Fusion.** Because CAM is external and each part needs
+  fixture/stock/tool decisions plus hand-verification (Fusion simulation, a first-article cut), CAM
+  is a **semi-manual downstream step keyed off the frozen STEP exports**, not a scripted spine task.
+  The repo's job ends at emitting a validated STEP per repeat part; toolpaths + G-code are authored
+  and owned in Fusion.
 
-The stated manufacturing method is **manual** milling and turning with DROs (PM-30MV manual mill,
-JET BD-920N manual lathe) — there is **no CNC** in the toolchain. CAM produces toolpaths/G-code for
-CNC, which has no consumer here. This is a definitive scope exclusion tied to the manufacturing
-method, not a deferral. Revisit only if a CNC machine enters the toolchain (e.g., a CNC conversion
-of the mill).
+### DXF — narrow role: flat parts, 2.5D profiles, inspection reference (NOT the primary CAM feed)
+
+DXF is **2D** (a flat set of curves, no solid), so it is *not* the general CNC feed — STEP is
+(above). DXF earns its keep only where a part **is** essentially a 2D profile at a single depth:
+
+- **Genuinely flat parts** — nameplate, clips, platen outline — trivially cut from a DXF profile.
+- **2.5D contour/engrave or indexed profiles** — cam eccentric profiles and gear/rack **tooth
+  flanks**, *if* cut via a 2.5D contour flow or a rotary indexed from the flank curve rather than
+  3-axis milled from the solid. Which route per part is a CAM-planning call (§CAM), not fixed here.
+- **Inspection reference** — overlay a cut gear on its nominal flank.
+
+DXF would also be the feed for a purely-2D cutter (laser / waterjet / plasma / wire-EDM) — but the
+toolchain has **none** of those, so that path is moot. Export via `IPartDoc.ExportToDWG2` (a
+dedicated face/sketch→DXF call, verified in the bundle; or a drawing `SaveAs` to `.dxf`). Like a
+plain STEP, DXF carries **geometry, not tolerances** — the toleranced print (§8) stays the authority
+for size/fit/finish. Net: DXF is a **convenience for the flat/2.5D subset and an inspection aid**,
+subordinate to the STEP→CAM path, not a build deliverable of its own.
 
 ### DimXpert / MBD — DimXpert IS available on the Makers seat (the backbone); 3D-PDF + STEP242-PMI publish are optional
 
