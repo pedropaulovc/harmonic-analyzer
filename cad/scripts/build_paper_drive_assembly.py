@@ -402,16 +402,16 @@ async def build(adapter) -> dict[str, str]:
                                    [0.0, 0.0, 0.0], IDENTITY, ground=False)
     pl_o = component_origin(adapter, platen)
     await distance_driver(adapter, named_ref(f"Axis1@{platen}", "AXIS"),
-                          named_ref("Top Plane", "PLANE"), abs(pl_o[1]),
+                          named_ref("Top Plane", "PLANE"), pl_o[1],
                           label="platen slide height", verify=(platen, pl_o))
     await distance_driver(adapter, named_ref(f"Axis1@{platen}", "AXIS"),
-                          named_ref("Front Plane", "PLANE"), abs(pl_o[2]),
+                          named_ref("Front Plane", "PLANE"), pl_o[2],
                           label="platen slide depth", verify=(platen, pl_o))
     await angle_driver(adapter, named_ref(f"Top Plane@{platen}", "PLANE"),
                        named_ref("Top Plane", "PLANE"), 0.0,
                        label="platen spin snapshot", verify=(platen, pl_o))
     await distance_driver(adapter, named_ref(f"Right Plane@{platen}", "PLANE"),
-                          named_ref("Right Plane", "PLANE"), abs(pl_o[0]),
+                          named_ref("Right Plane", "PLANE"), pl_o[0],
                           label="platen feed snapshot", verify=(platen, pl_o))
     # Rz(180): teeth point down at the rack pinion below.
     rack = await place_component(adapter, "platen-rack",

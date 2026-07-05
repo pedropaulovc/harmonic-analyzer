@@ -375,6 +375,60 @@ def _mate_hard_error(adapter: Any, name: str) -> int:
     return code
 
 
+# --- Deterministic flip seeding for distance drivers ------------------------
+# A distance mate is two-sided: abs(d) fixes the gap, `flip` picks the side. The
+# correct side is a function of the SIGN of the (signed) target coordinate the
+# build already computed -- a part at z=-40 sits on the far side of the datum
+# from one at z=+40 -- so `flip = (signed < 0)` lands the great majority on-
+# target in ONE solve, no delete-and-re-add. A minority of references have their
+# default side inverted relative to the coordinate's + direction (the part
+# plane's normal opposes the datum's); those signatures live in `_FLIP_INVERT`
+# and XOR the rule. The set is DETERMINED ONCE during development: build with it
+# empty, and every mate that still needs a recovery WARNS with its signature
+# (see `_mate`); add those signatures here and rebuild -> zero flips. The
+# readback guard in `_mate` stays as the safety net AND regression alarm: a flip
+# in a normal build means this heuristic broke for that mate -- re-learn its side.
+_FLIP_INVERT: frozenset[str] = frozenset({
+    # Learned from the channel discovery build (empty-set pass): these references
+    # seat on the side OPPOSITE the coordinate's + normal, so the plain sign rule
+    # is backwards for them. Every one flipped on ALL its instances (all-or-none
+    # per signature -> a clean polarity flip, not a sign-split), so XOR-ing the
+    # rule zeroes them. (Sign-split z-seats like `spring z`/`datum z` are NOT here
+    # -- the plain sign rule already handled both sides.)
+    "spring hook datum y",
+    "pivot bushing axial z",
+    "lever bushing axial z",
+    "pivot ball mount datum x",
+    "pivot ball mount datum y",
+    "pivot ball mount datum z",
+    "fulcrum shaft datum x",
+    "fulcrum shaft datum y",
+})
+
+
+def _flip_sig(label: str) -> str:
+    """Canonical, index/coordinate-free signature of a driver ``label``.
+
+    Strips the volatile per-instance parts -- the ``-> x,y`` target, the
+    ``d=<dist>`` distance, and every digit-bearing token (channel/tooth indices
+    like ``-7``, ``ch16``, ``T120``, ``J4``) -- leaving the structural descriptor
+    (``"spring hook datum y"``). Mates that share a signature are the same seat
+    stamped across a pattern, so they share one flip polarity. Keys
+    :data:`_FLIP_INVERT`; generated with the SAME transform over the mined flip
+    logs, so seeds and runtime signatures match by construction."""
+    s = re.sub(r"\s*->.*$", "", label)
+    s = re.sub(r"\bd=[+-]?[0-9.]+", "", s)
+    s = re.sub(r"\b\w*\d\w*\b", " ", s)
+    s = re.sub(r"[-\s]+", " ", s).strip()
+    return s
+
+
+def _seed_flip(label: str, signed: float) -> bool:
+    """The deterministic first-solve side for a distance driver: the sign of the
+    signed target coordinate, XOR the reference's learned polarity."""
+    return (signed < 0.0) ^ (_flip_sig(label) in _FLIP_INVERT)
+
+
 async def _mate(
     adapter: Any,
     label: str,
@@ -429,7 +483,10 @@ async def _mate(
         # WHEN in the mate the re-solve happened and by how far it was off.
         _telemetry.event(
             "mate.flip_recovery", label=label, moved_mm=round(moved, 3), error=err)
-        log(f"{label}: moved {moved:.2f} mm, error={err} -> re-adding flipped")
+        _telemetry.warn(
+            f"flip-seed MISS: {label!r} off by {moved:.2f} mm, error={err}"
+            f" -> re-adding flipped  (learn: add sig {_flip_sig(label)!r} to _FLIP_INVERT)"
+        )
         check(
             f"{label} (delete wrong side)",
             await adapter.delete_mate(MateRefParameters(name=res.get("name", ""))),
@@ -579,8 +636,16 @@ async def distance_driver(
     label: str = "",
     verify: tuple[str, list[float]] | None = None,
     free_dof_key: str | None = None,
+    flip: bool | None = None,
 ) -> Any:
     """A distance mate used as a driving dimension pinning one slide DOF.
+
+    ``distance`` is SIGNED: its magnitude is the gap, and its SIGN selects the
+    mate side deterministically -- ``flip`` defaults to :func:`_seed_flip` (the
+    sign of ``distance`` XOR the reference's learned polarity), so the part lands
+    on-target in ONE solve with no delete-and-re-add flip recovery. Pass an
+    explicit ``flip`` to override the sign rule. (Callers that pass a bare
+    magnitude get ``flip=False``, the historic behaviour.)
 
     ``free_dof_key`` marks this as a *freed operational-DOF* park driver (see the
     Park drivers section): in a deferred (default-``free``) build it is RECORDED
@@ -589,9 +654,11 @@ async def distance_driver(
     ``PARK_<key>``. ``None`` is a hard pin, authored as before.
     """
     label = label or f"distance driver d={distance:g}"
+    if flip is None:
+        flip = _seed_flip(label, distance)
     return await _driver_or_defer(
         adapter, "distance", ref_a, ref_b,
-        label=label, verify=verify, free_dof_key=free_dof_key,
+        label=label, verify=verify, free_dof_key=free_dof_key, flip=flip,
         distance=abs(distance),
     )
 
@@ -1177,18 +1244,22 @@ def _record_park_spec(
 async def _driver_or_defer(
     adapter: Any, kind: str, ref_a: Any, ref_b: Any,
     *, label: str, verify: tuple[str, list[float]] | None,
-    free_dof_key: str | None, **params: Any,
+    free_dof_key: str | None, flip: bool = False, **params: Any,
 ) -> Any:
     """Author a driver mate, OR (freed-DOF key + deferral on) record it and skip.
 
     Returns the mate result dict when authored; a ``{"deferred_park": key}``
     sentinel when deferred. When a ``free_dof_key`` is authored (``locked`` build
     or a normal non-deferred run) the feature is renamed ``PARK_<key>`` so the
-    tree documents it and the DOF gate can find it."""
+    tree documents it and the DOF gate can find it. ``flip`` seeds the authored
+    mate's side (see :func:`_mate`); it is NOT part of the recorded park spec (a
+    deferred driver is not authored, so its side is chosen at replay)."""
     if free_dof_key is not None and _PARK_DEFER:
         _record_park_spec(free_dof_key, kind, [ref_a, ref_b], verify=verify, **params)
         return {"deferred_park": free_dof_key, "name": ""}
-    res = await _mate(adapter, label, kind, [ref_a, ref_b], verify=verify, **params)
+    res = await _mate(
+        adapter, label, kind, [ref_a, ref_b], verify=verify, flip=flip, **params
+    )
     if free_dof_key is not None:
         await mark_park_driver(adapter, res, free_dof_key)
     return res
