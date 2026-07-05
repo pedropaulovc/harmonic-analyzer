@@ -798,7 +798,10 @@ async def spin_driver(
         adapter,
         off_axis_ref,
         named_ref(plane, "PLANE"),
-        abs(target),
+        target,  # SIGNED: distance_driver abs()es the mate value but needs the
+        # sign to seed the seat side (which side of the plane the off-axis bore
+        # is on). Passing abs() defeated the seeding -> every deferred rod_swing
+        # replay flipped (108.95 mm each) in the preflight (2026-07-05).
         label=label,
         verify=verify,
         free_dof_key=free_dof_key,
@@ -1296,21 +1299,31 @@ def collected_park_specs() -> list[dict[str, Any]]:
 
 def _record_park_spec(
     key: str, kind: str, entities: list[Any],
-    *, verify: tuple[str, list[float]] | None = None, **params: Any,
+    *, verify: tuple[str, list[float]] | None = None, flip: bool = False,
+    **params: Any,
 ) -> None:
     """Record one deferred freed-DOF park driver as a machine-independent spec
-    (entity refs by name + geometry-derived scalars), for replay in the preflight."""
+    (entity refs by name + geometry-derived scalars + the resolved mate SIDE),
+    for replay in the preflight.
+
+    ``flip`` is the sign-derived seat side the driver helper already resolved
+    (:func:`_seed_flip` for distance/spin drivers; ``False`` for angle drivers).
+    Recording it lets :func:`replay_park_specs` re-author on the SAME side in one
+    solve -- extending #185's flip-free seeding into the replay path, so the
+    preflight park closure no longer leans on the flip-recovery net (the wire-
+    swing replay hit a hard error-47 far-side add before this, 2026-07-05)."""
     _PARK_SPECS.append({
         "key": key,
         "kind": kind,
         "entities": [e.model_dump() for e in entities],
         "verify": [verify[0], [float(v) for v in verify[1]]] if verify else None,
+        "flip": bool(flip),
         "params": {
             k: (float(v) if isinstance(v, (int, float)) else v)
             for k, v in params.items()
         },
     })
-    _telemetry.debug(f"deferred PARK_{key}: {kind} recorded (not authored)")
+    _telemetry.debug(f"deferred PARK_{key}: {kind} recorded (not authored, flip={flip})")
 
 
 async def _driver_or_defer(
@@ -1324,10 +1337,11 @@ async def _driver_or_defer(
     sentinel when deferred. When a ``free_dof_key`` is authored (``locked`` build
     or a normal non-deferred run) the feature is renamed ``PARK_<key>`` so the
     tree documents it and the DOF gate can find it. ``flip`` seeds the authored
-    mate's side (see :func:`_mate`); it is NOT part of the recorded park spec (a
-    deferred driver is not authored, so its side is chosen at replay)."""
+    mate's side (see :func:`_mate`) AND is recorded in the deferred spec, so the
+    replay re-authors on the same resolved side (flip-free, like the build)."""
     if free_dof_key is not None and _PARK_DEFER:
-        _record_park_spec(free_dof_key, kind, [ref_a, ref_b], verify=verify, **params)
+        _record_park_spec(
+            free_dof_key, kind, [ref_a, ref_b], verify=verify, flip=flip, **params)
         return {"deferred_park": free_dof_key, "name": ""}
     res = await _mate(
         adapter, label, kind, [ref_a, ref_b], verify=verify, flip=flip, **params
@@ -1374,7 +1388,9 @@ async def replay_park_specs(adapter: Any, specs: list[dict[str, Any]]) -> list[s
     Used by the release preflight (and the mobility/motion diagnostics) to
     reconstitute the freed operational DOF on a reopened default-``free`` model.
     Reconstructs each :class:`MateEntityRef` from the recorded fields, replays the
-    exact mate (with the original flip-recovery ``verify`` target), then re-solves."""
+    exact mate on the RECORDED side (``spec["flip"]`` -- the build's sign-derived
+    seat, #185), with the original flip-recovery ``verify`` target as the safety
+    net, then re-solves."""
     from solidworks_mcp.adapters.base import MateEntityRef
 
     names: list[str] = []
@@ -1389,6 +1405,7 @@ async def replay_park_specs(adapter: Any, specs: list[dict[str, Any]]) -> list[s
             spec["kind"],
             entities,
             verify=verify,
+            flip=bool(spec.get("flip", False)),
             **spec.get("params", {}),
         )
         names.append(await mark_park_driver(adapter, res, spec["key"]))

@@ -1150,7 +1150,9 @@ async def build(adapter) -> dict[str, str]:
         await distance_driver(
             adapter,
             named_ref(f"Axis2@{bar}", "AXIS"), named_ref("Right Plane", "PLANE"),
-            abs(foot[0]),
+            foot[0],  # SIGNED: distance_driver abs()es the mate value but needs
+            # the sign to seed the seat side (which side of Right Plane the foot
+            # is on) so the deferred spec records the correct flip for replay
             label=f"J3 bar ch{j:02d} AMPLITUDE park foot-X={foot[0]:.2f} (amp {amplitude:+.1f})",
             verify=(bar, bar_tgt),
             free_dof_key=f"bar_amplitude_{j:02d}",
