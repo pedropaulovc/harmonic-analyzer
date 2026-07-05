@@ -390,7 +390,10 @@ async def build(adapter) -> dict[str, str]:
     # satisfied but pinned NOTHING; park-closure catch 2026-07-05).
     await distance_driver(
         adapter, component_named_ref(hw, "HubPoint", "POINT"),
-        named_ref("Front Plane", "PLANE"), abs(HUB_WIRE_END[2]),
+        named_ref("Front Plane", "PLANE"), HUB_WIRE_END[2],  # SIGNED (hub z<0):
+        # distance_driver abs()es the mate value but needs the sign to seed the
+        # side; the deferred spec then records the right flip so the preflight
+        # replay is flip-free (was abs() -> far-side error-47 add + recovery)
         label="lever-wire swing PARK driver (hub depth, freed in default build)",
         verify=(hw, hw_o), free_dof_key="wire_swing")
     await angle_driver(adapter, named_ref(f"Front Plane@{hw}", "PLANE"),
