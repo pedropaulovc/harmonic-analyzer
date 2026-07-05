@@ -24,7 +24,7 @@ asm.CompConfigProperties5(2, 1, True, False, "", False, False)  # Suppression=Fu
 TWO bugs caused earlier false negatives (both burned a full probe each):
 1. `SelectByID2(..., None, 0)` — bare `None` for the Callout is a documented
    failure mode; pass `null_callout()` (a typed-null dispatch). The adapter's
-   `_select_component` (assembly.py:345) already does this, so just call it.
+   `_select_component` (assembly.py:397) already does this, so just call it.
 2. `swComponentFullyResolved` is **2**, not 3 (3 = swComponentResolved). An
    invalid suppression state makes CompConfigProperties5 return False.
 

@@ -25,8 +25,9 @@ metadata:
 > (`replay_park_specs`), runs the exact-DOF closure (`assert_park_closure`), then
 > DISCARDS the model unsaved — shipped `.SLDASM` stays free. Build-time `soundness`
 > now proves only necessity (`assert_free_dof_necessity`, ≥ N under-constrained);
-> the closure moved to preflight. ENGAGED setup drivers (`PARK_pinion_swing`, cone
-> swing) are unchanged — still authored inline, never deferred. Diagnostics:
+> the closure moved to preflight. ENGAGED setup drivers (`PARK_pinion_swing`) are
+> unchanged — still authored inline, never deferred (cone swing is now a DEFERRED
+> freed-DOF driver, per the 2026-07-03 update above). Diagnostics:
 > `build_mobility_probe.py` replays specs before its baseline;
 > `build_motion_setup_drives.py` treats an absent (deferred) driver as already-free;
 > `build_motion_study.py` (full-device, geometry-classifier) needs a seat re-check.
@@ -100,5 +101,5 @@ and watch the gears turn, and the artefact didn't represent the device's kinemat
 
 No defensive locked-pose fallbacks were added — per [[no-untested-failure-assumptions]],
 all checks run on whatever mode is actually built. Full design in AGENTS.md
-"Default-free DOF (operational kinematics)". Related: [[fix-relations-are-a-last-resort]],
-[[channel-count-amplitude-state]].
+"Default-free DOF (operational kinematics)". Related: [[fix-relations-last-resort]],
+[[channel-amplitude-state]].

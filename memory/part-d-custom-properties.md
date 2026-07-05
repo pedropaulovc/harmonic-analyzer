@@ -9,6 +9,12 @@ metadata:
 
 Part D of the professionalize-cad plan is COMPLETE (committed fd3431c on branch `professionalize-cad`).
 
+> **NOTE (later drift):** the registry is now the per-subsystem/per-part split under
+> `cad/config/parts/` (not a single `cad/config/parts.yaml`); the part-count arithmetic
+> below is a 2026-06-15 snapshot (fd3431c→post-deletion was actually ~87→79) and the
+> config-suite gate count has since changed (≈13). The custom-property MECHANISM
+> (raw-COM Add3 + readback, Generator = git-sha, tolerance audit) is unchanged.
+
 - **Source of truth:** `cad/config/parts.yaml` — 77-part registry (was 85 at validation; 8 alignment-pinion parts deleted 2026-06-18, commit c1ebca3 — see [[od-62mm-reanchor]]) (number MHA-###, material, tolerance_class, fit_class, process, confidence), merged over a `defaults:` block. `_config.parts(stem)` returns the merged record.
 - **Writer:** `_common.apply_custom_properties(adapter, props)` drives raw COM `IModelDocExtension.CustomPropertyManager("").Add3(name, 30, value, 2)` (swCustomInfoText, swCustomPropertyReplaceValue) — the PyWin32 adapter has NO property writer — then reads back via `model.GetCustomInfoValue("", name)` and raises on mismatch. `part_properties(part_name)` builds the dict (Title + Generator + registry fields); Generator = `harmonic-analyzer @ {git short sha}{-dirty}` (NO wall-clock — determinism decision). Wired into `save_part_and_images` (re-save after writing).
 - **VALIDATED LIVE** 2026-06-15: opened cone-gear.SLDPRT, wrote 9 props, saved, reopened from disk, all 9 read back identical. The raw-COM Add3 path persists correctly.

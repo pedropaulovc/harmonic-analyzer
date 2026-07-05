@@ -30,6 +30,13 @@ battery and runs first on the spine). `dodo.py task_verify`: `verify:subsystems`
 deps on / passes only `channel` (`suite_names`/`suite_deps`). Saves ~16 min/run.
 No coverage lost — soundness is a strict superset of the dropped gates.
 
+> **UPDATE (superseded — this §1 describes an intermediate state).** The `subsystems`
+> suite was later RETIRED ENTIRELY (commit `ca38b0b8`), not merely limited to `channel`:
+> channel-independence was folded into `soundness`, so `verify:subsystems` and its `dodo`
+> task no longer exist. Current SW-spine verify suites are `soundness` + `kinematics` (with
+> `math`/`config` off-spine). The redundancy finding stands; only the mechanism changed.
+> §2 (the PNG render cache) below is unchanged and current.
+
 ## 2. release re-rendered/re-exported all 81 docs every time (even on a no-change release)
 
 `cut_release.export_neutral` had NO staleness check: it opened all 81 docs, SaveAs3'd

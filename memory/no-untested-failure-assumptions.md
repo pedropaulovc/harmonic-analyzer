@@ -16,5 +16,5 @@ occur, and obscures the clean design. The user rejected a plan that ran soundnes
 
 **How to apply:** enforce all gates on the as-built artifact in its actual mode. If a failure
 mode is real, *reproduce it empirically first*, then fix it with evidence — don't pre-engineer
-around it. See [[fix-relations-are-a-last-resort]] (same spirit: don't reach for heavy
+around it. See [[fix-relations-last-resort]] (same spirit: don't reach for heavy
 mitigations before they're justified).

@@ -11,7 +11,7 @@ The harmonic analyzer's output amplification runs through TWO inextensible
 steel WIRES at the magnifying wheel — both crucial for the Motion study, both
 kinematic couplings (NOT springs). User flagged this explicitly 2026-06-13.
 
-Topology (DIMENSIONS.md ch20 pp.46-49, ch21 pp.50-53, strongest-sourced):
+Topology (cad/config/dimensions.yaml; book ch20 pp.46-49, ch21 pp.50-53, strongest-sourced):
 `20 channels → summing-lever → magnifying-lever (rotates; adjustable ≤4× set by
 the CLAMP position on the Ø-rod) → clamp+vertical-rod+OUTPUT-FIXTURE ride the
 lever → WIRE 1 hooks the output-fixture (its mostly-vertical travel) and wraps
