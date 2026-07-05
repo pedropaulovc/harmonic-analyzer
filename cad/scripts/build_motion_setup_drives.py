@@ -116,6 +116,25 @@ async def _suppress(adapter: Any, names: list[str], label: str) -> None:
     for name in names:
         check(f"suppress {name}", await adapter.suppress_mate(
             SuppressMateParameters(name=name, suppress=True)))
+
+
+async def _suppress_park_or_note_free(
+        adapter: Any, names: list[str], label: str) -> None:
+    """Suppress a freed-DOF family's park driver(s), or note the deferred case.
+
+    Under defer-and-replay (AGENTS.md "Default-free DOF") a freed family's
+    park driver is NOT authored in the default ``free`` build -- the DOF is
+    already free and there is nothing to suppress. Raising there (the p0 bug,
+    repeated for p2's pinion swing when PR8 deferred it -- Codex catch,
+    2026-07-05) breaks the diagnostic on exactly the builds it targets. A
+    ``locked`` build still authors the drivers, so a non-empty list keeps the
+    strict suppress path.
+    """
+    if not names:
+        log(f"  {label}: DOF already free "
+            "(deferred park driver -- not authored in the free build)")
+        return
+    await _suppress(adapter, names, label)
     log(f"  {label}: suppressed {len(names)} mate(s): {names}")
 
 
@@ -192,7 +211,7 @@ async def _drive_p1(adapter: Any) -> dict[str, str]:
     check("open drive-train", await adapter.open_model(path))
     mates = check("list mates", await adapter.list_mates())
     await _suppress(adapter, _gear_mate_names(mates), "p1 gear meshes")
-    await _suppress(adapter, _family_driver_names(
+    await _suppress_park_or_note_free(adapter, _family_driver_names(
         adapter, "drive-train", "cone-swing-platform", only_type=ANGLE),
         "p1 cone-platform swing park")
     plate, plate_name = _find_one(adapter, "cone-swing-platform")
@@ -212,7 +231,7 @@ async def _drive_p2(adapter: Any) -> dict[str, str]:
     the torque shaft); the journaled pinion must ride the arc."""
     path = str(OUT_SLDASM / "drive-train.SLDASM")
     check("open drive-train", await adapter.open_model(path))
-    await _suppress(adapter, _family_driver_names(
+    await _suppress_park_or_note_free(adapter, _family_driver_names(
         adapter, "drive-train", "pinion-bracket", only_type=ANGLE),
         "p2 pinion swing park")
     bracket, bracket_name = _find_one(adapter, "pinion-bracket")

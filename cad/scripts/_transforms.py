@@ -228,8 +228,14 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     # symmetric about its local x = 0 plane (gear/rod axes, strap/block
     # mid-planes); explicit c, no STLs yet at first build
     "alignment-pinion": ("x", 0.0),
-    "pinion-bracket": ("x", 0.0),
-    "pinion-pivot-block": ("x", 0.0),
+    # pinion-bracket went x-ASYMMETRIC with the PR8 blind pin seat in its -X
+    # edge; every feature is a through/mid-plane form about the exact z
+    # mid-plane instead (extrude z 0..5).
+    "pinion-bracket": ("z", 2.5),
+    # pinion-pivot-block went x-ASYMMETRIC with the PR8 dropped lift bore;
+    # every feature is a through/mid-depth form about the exact z mid-plane
+    # instead (extrude z 0..12, screw holes at mid-depth).
+    "pinion-pivot-block": ("z", 6.0),
     "pinion-pivot-shaft": ("x", 0.0),
     "pinion-lever": ("x", 0.0),
     "pinion-lift-rod": ("x", 0.0),
@@ -240,12 +246,15 @@ MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
     # spring-vs-strap interference, caught by the gate). Explicit c, no STL
     # dependency at first build.
     "pinion-spring": ("z", 0.0),
-    # pinion-cam-pin (PR5): plain cylinder authored along Z, exact mid-plane
-    # both-directions extrude about z = 0. Placed ROTATED (axis -> the strap's
-    # leaned cam-bore axis), so the local-x reflection the default 'x' would
-    # apply is not a symmetry of the placed pose; the z mid-plane is. Explicit
-    # entry per the PR4 rule: every new part declares a symmetry it HAS.
-    "pinion-cam-pin": ("z", 0.0),
+    # pinion-cam-pin (PR8 rework): axisymmetric stud along local Z (cylinder
+    # + domed end), so the local x = 0 plane is an exact symmetry regardless
+    # of the rotated placement. Explicit c, no STL at first build. (The PR5
+    # mid-plane cylinder used ("z", 0.0); the dome killed that plane.)
+    "pinion-cam-pin": ("x", 0.0),
+    # pinion-cam (PR8): the eccentric collar's bore, collar circle and set-pin
+    # boss are all centred on local x = 0 (the eccentricity and boss point
+    # down -Y); exactly x0-symmetric, explicit c, no STL at first build.
+    "pinion-cam": ("x", 0.0),
     # M6.10 fasteners: authored in final orientation (axis along Y or Z),
     # exactly symmetric about local x = 0; explicit c, no STL at first build
     "hex-bolt": ("x", 0.0),

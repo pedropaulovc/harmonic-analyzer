@@ -109,10 +109,11 @@ GEAR_OWNER = "drive-train"
 # channels articulating at independent harmonics (only grounded spring/bushing
 # structure is LocalLinearPattern'd; see build_channel_assembly.py).
 CHANNEL_OWNER = "channel"
-# Physically-built channels. TEMPORARY: machine.yaml channels.active_count caps
-# the per-channel mechanism to the first N (3) for build performance; the gates
-# below (instance independence, channel gear meshes, component bands) track that N
-# so the reduced build stays fully verified. Recover by setting it back to 20.
+# Physically-built channels. machine.yaml channels.active_count is a
+# BUILD-SPEED KNOB: it caps the per-channel mechanism to the first N during
+# debugging iterations (20 = the full machine, the default); the gates below
+# (instance independence, channel gear meshes, component bands) track that N
+# so a reduced build stays fully verified at its own scale.
 CHANNELS = _config.active_count()
 # The kinematic pen driver (plan F5) lives in this sub: its pen-rod travel mate
 # is equation-linked to a CrankDeg global through the chained Fourier sum
@@ -140,21 +141,23 @@ _CRANK_GEAR_TOKENS = ("crank-pinion", "crank-drive-gear")
 # measuring-stick; the spare gear rides inside paper-drive) -- NOT the ~340
 # flattened parts. Bands measured live on a green build, with margin.
 # The channel + drive-train bands scale with the built channel count N (the
-# TEMPORARY active_count): channel = 7N + 4 (N×{rocker,rod,bar,lever,spring} + 2
-# shafts + 4 ball-mounts + 2 bushings per inter-channel gap), drive-train = 57 + N
+# active_count build-speed knob): channel = 7N + 4 (N×{rocker,rod,bar,lever,spring} + 2
+# shafts + 4 ball-mounts + 2 bushings per inter-channel gap), drive-train = 61 + N
 # (full 20-gear cone stack + crank/structure ≈ 33 -- including the cone swing
-# platform + tip block that joined the pivot post in the p1 swing rework -- +
-# the ch25 pinion swing rig's 19: alignment-pinion, 2 brackets, 2 pivot
+# platform + tip block that joined the pivot post in the p1 swing rework, and
+# the NORTH arbor pedestal + its foot screw (PR8, ch12 img09) -- + the ch25
+# pinion swing rig's 21: alignment-pinion, 2 brackets, 2 pivot
 # blocks, pivot shaft, lift rod, lever, handle, return spring (PR4), 2
-# cam-follower pins (PR5), steel arbor, 4 block screws + 2 foot screws (PR7),
-# + the PR2 cone-swing hardware 6: lock knob, pivot screw, swing-stop screw,
-# tip bushing/adjuster/pinch screw, MINUS the crank-pedestal the merged
-# column absorbed, plus N cylinder gears). Both reproduce the measured N=20
-# bands (164, 70 pre-PR7 -> 77) and stay correct at N=3.
+# cam-follower pins (PR5, edge studs since PR8), steel arbor, 4 block screws
+# + 2 foot screws (PR7), 2 eccentric cam collars (PR8), + the PR2 cone-swing
+# hardware 6: lock knob, pivot screw, swing-stop screw, tip
+# bushing/adjuster/pinch screw, MINUS the crank-pedestal the merged column
+# absorbed, plus N cylinder gears). Both reproduce the measured N=20 bands
+# (164, 77 pre-PR8 -> 81) and stay correct at N=3.
 _N_CH = _config.active_count()
 _COMPONENT_BAND = {
     "frame": (11, 16),          # measured 13 (9 structure + 4 lag-screw hold-downs)
-    "drive-train": (57 + _N_CH - 4, 57 + _N_CH + 4),  # N=20 -> (73,81), expected 77
+    "drive-train": (61 + _N_CH - 4, 61 + _N_CH + 4),  # N=20 -> (77,85), expected 81
     "channel": (8 * _N_CH + 4 - 6, 8 * _N_CH + 4 + 6),  # N=20 -> (158,170), measured 164
     # The former monolithic output split by function (no per-channel parts here);
     # bands tightened to the measured green-build counts (verify:subsystems).
@@ -249,9 +252,10 @@ def _expected_channel_ratios() -> list[tuple[int, int]]:
 
     Only the first ``active_count`` channels get a cylinder gear (hence a
     cone↔cylinder gear mate), so the live model carries that many channel meshes —
-    use the active rows, not the full 20-row table (TEMPORARY; recover at
-    active_count=20). Cone gears active_count..19 stay keyed to the shaft and mesh
-    nothing, so they contribute no gear mate to compare against.
+    use the active rows, not the full 20-row table (active_count is the
+    build-speed knob; 20 = the full machine). Cone gears active_count..19 stay
+    keyed to the shaft and mesh nothing, so they contribute no gear mate to
+    compare against.
     """
     cyl = int(_config.machine("gear_train", "fundamental_cone_teeth"))
     return sorted(_canon_ratio(ch["cone_teeth"], cyl) for ch in _config.active_channels())
@@ -509,12 +513,12 @@ def _assert_fresh(name: str, report: Report) -> bool:
 def _expected_free_dof(name: str) -> int:
     """Free operational DOF expected in ``name``'s AS-SAVED model.
 
-    drive-train frees the crank spin AND the cone-platform swing (2 DOF);
-    channel frees 3 DOF per active channel (rocker swing + connecting-rod
-    follow + amplitude-bar slide), each a DEFERRED PARK_* park driver
-    (recorded, not authored) when built `free` (the default); a `locked`
-    build authors them engaged -> 0. Read straight from
-    cad/config/machine/
+    drive-train frees the crank spin, the cone-platform swing, the pinion
+    engage swing and the lift-rod/cam spin (4 DOF, PR8); channel frees 3 DOF
+    per active channel (rocker swing + connecting-rod follow + amplitude-bar
+    slide), each a DEFERRED PARK_* park driver (recorded, not authored) when
+    built `free` (the default); a `locked` build authors them engaged -> 0.
+    Read straight from cad/config/machine/
     build_lock.yaml -- the same source of truth the build used, and the freshness
     guard (`_assert_fresh`) guarantees the saved model matches that config. Every
     other assembly stays fully defined (0). The literal accessor tokenises
@@ -522,7 +526,7 @@ def _expected_free_dof(name: str) -> int:
     verify too.
     """
     if name == "drive-train":
-        return 0 if is_locked_build(_config.machine("build_lock", "drive_train")) else 2
+        return 0 if is_locked_build(_config.machine("build_lock", "drive_train")) else 4
     if name == "channel":
         if is_locked_build(_config.machine("build_lock", "channel")):
             return 0
@@ -538,7 +542,8 @@ def _expected_free_dof(name: str) -> int:
 # (assert_free_dof_necessity required_stems): the aggregate count check alone
 # cannot distinguish which DOF is free.
 _REQUIRED_FREE_STEMS = {
-    "drive-train": ("crankshaft", "cone-swing-platform"),
+    "drive-train": ("crankshaft", "cone-swing-platform",
+                    "pinion-bracket", "pinion-lift-rod"),
     "channel": ("rocker-arm", "connecting-rod", "amplitude-bar"),
     # Three freed DOF (lever knife-rock + wire swing/spin); the yoke-coupled
     # wheel must read under-constrained WITH them, else the coupling died.
@@ -1057,7 +1062,9 @@ def verify_base_footprint(report: Report) -> None:
         # cone-pivot-post rides the PLATE, so it is plate-contained at
         # drive-train import, not base-swept here.)
         mounts = (
-            ("arbor-pedestal", train.X_DRUM, -train.ARBOR_PEDESTAL_Z,
+            ("arbor-pedestal south", train.X_DRUM, -train.ARBOR_PEDESTAL_Z,
+             arbor_post.FOOT_WIDTH / 2.0, arbor_post.FOOT_DEPTH / 2.0),
+            ("arbor-pedestal north", train.X_DRUM, train.ARBOR_PEDESTAL_NORTH_Z,
              arbor_post.FOOT_WIDTH / 2.0, arbor_post.FOOT_DEPTH / 2.0),
             # base-bolted statics; head/washer is each one's widest plan extent
             ("cone-lock-knob", train.KNOB_X, train.KNOB_Z,
@@ -1087,7 +1094,9 @@ def verify_base_footprint(report: Report) -> None:
         # ride the PLATE, not the base -- their plate containment is
         # asserted at drive-train import.)
         corners_local = (
-            ("plate", -platform.HALF_WIDTH_N, platform.NORTH_OVERHANG),
+            # WEST negates into this pre-mirror frame; the NW corner carries
+            # the PR8 trim (WEST_HALF_N 9.5), the NE keeps HALF_WIDTH_N 12.
+            ("plate", -platform.WEST_HALF_N, platform.NORTH_OVERHANG),
             ("plate", platform.HALF_WIDTH_N, platform.NORTH_OVERHANG),
             ("plate", platform.EAST_HALF_S,
              platform.NORTH_OVERHANG - platform.PLATE_LEN),

@@ -34,6 +34,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_bore_axis,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -50,11 +51,17 @@ WIDTH = 36.0  # spans both bores + margin; widened 33 -> 36 (PR7) so the
 HEIGHT = 16.0  # photo-scaled (low); keeps the strap's r 11 bottom cap
 # (PIVOT_Y - 11 = 51.8) swinging clear of the base top 50.8
 DEPTH = 12.0  # photo-scaled (low)
-BORE_UP = 12.0  # bore height above the base seat -- sets PIVOT_Y (derived)
+BORE_UP = 12.0  # pivot bore height above the base seat -- sets PIVOT_Y (derived)
 BORE = 6.35  # rides the Ø6.35 torque shaft / lift rod (derived)
 BORE_HALF_SPACING = 7.5  # half the pivot-to-lift rod spacing 15.0 -- the
 # lift rod must clear BOTH the cone-pivot-post column (machine x -47.1)
 # and the strap's swinging r 11 bottom cap (build_drive_train_assembly)
+LIFT_BORE_DROP = 4.66  # the WEST (lift) bore sits this far BELOW the pivot
+# bore (PR8, page001_img01: the rods ride at different heights so the
+# eccentric cam collar's top meets the follower pin from below). Bore
+# bottom at local -7.84 keeps a 4.2 web to the block bottom (-12). The
+# 4.66 (not the photo-first 4.51) buys the 0.15 park AIR between pin and
+# collar -- exact tangency tips the interference gate on FP noise.
 SCREW_HOLE_DIA = 4.2  # slotted-screw shank O4 (PR7: the p.69 close-up's two
 # bright hold-down heads per block)
 SCREW_HALF_SPACING = 13.5  # hole centres out past the bores: 0.6 web to the
@@ -77,6 +84,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BoreUp", f"{BORE_UP}mm")
     await set_global(adapter, "Bore", f"{BORE}mm")
     await set_global(adapter, "BoreHalfSpacing", f"{BORE_HALF_SPACING}mm")
+    await set_global(adapter, "LiftBoreDrop", f"{LIFT_BORE_DROP}mm")
     await set_global(adapter, "ScrewHoleDia", f"{SCREW_HOLE_DIA}mm")
     await set_global(adapter, "ScrewHalfSpacing", f"{SCREW_HALF_SPACING}mm")
 
@@ -94,17 +102,20 @@ async def build(adapter) -> dict[str, str]:
         (-WIDTH / 2.0, HEIGHT - BORE_UP),
     ]
     entities = await add_line_chain(adapter, block_rect)
-    # Bores on the sketch x axis (y 0): x != 0 records ONE centre dim (an unsigned
-    # distance to the origin, driven by the positive spacing global) + diameter.
+    # Pivot bore on the sketch x axis (y 0): x != 0 records ONE centre dim (an
+    # unsigned distance to the origin, driven by the positive spacing global) +
+    # diameter. The lift bore drops LIFT_BORE_DROP below it (PR8), adding its
+    # own unsigned y dim.
     await define_circle(
         adapter, BORE_HALF_SPACING, 0.0, BORE / 2.0, "pivot bore", dims=block,
         names=("PivotBoreX", "PivotBoreCz", "PivotBoreDia"),
         drives=('"BoreHalfSpacing"', None, '"Bore"'),
     )
     await define_circle(
-        adapter, -BORE_HALF_SPACING, 0.0, BORE / 2.0, "lift bore", dims=block,
+        adapter, -BORE_HALF_SPACING, -LIFT_BORE_DROP, BORE / 2.0, "lift bore",
+        dims=block,
         names=("LiftBoreX", "LiftBoreCz", "LiftBoreDia"),
-        drives=('"BoreHalfSpacing"', None, '"Bore"'),
+        drives=('"BoreHalfSpacing"', '"LiftBoreDrop"', '"Bore"'),
     )
     # Rectangle anchored at vertex 0 (-WIDTH/2, -BORE_UP): the width (X span) and
     # height (Y span) segment dims, then the two anchor dims (absolute distances
@@ -159,6 +170,13 @@ async def build(adapter) -> dict[str, str]:
     v_holes = 2.0 * math.pi * (SCREW_HOLE_DIA / 2.0) ** 2 * HEIGHT
     expected -= v_holes
     await volume_check(adapter, "screw holes", expected, 0.02 * v_holes)
+
+    # Named lift-bore axis (Axis1): the lift rod's revolute mates coaxial to
+    # this in the assembly (PR8 -- the rod spins to drive the cams).
+    await name_bore_axis(
+        adapter, "Right Plane", -BORE_HALF_SPACING, "Top Plane", -LIFT_BORE_DROP,
+        "lift bore",
+    )
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
