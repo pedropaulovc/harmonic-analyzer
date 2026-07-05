@@ -435,8 +435,12 @@ from build_cone_swing_platform import (  # noqa: E402
     CRANK_AXIS_OFF as PLAT_CRANK_OFF,
     CRANK_AXIS_Y as PLAT_CRANK_Y,
     EAST_HALF_S as PLAT_EAST_S,
-    WEST_HALF_N as PLAT_HALF_N,  # the WEST taper line's north endpoint (the
-    # scan below models that line; the east tip keeps HALF_WIDTH_N 12)
+    HALF_WIDTH_N as PLAT_EAST_N,  # EAST taper line's north endpoint (12 --
+    # the lock-slot side keeps its full seat; feeds the stop-screw/containment
+    # east-edge math)
+    WEST_HALF_N as PLAT_WEST_N,  # WEST line's north endpoint (9.5, the PR8
+    # trim; feeds ONLY the west-edge pedestal scan. Aliasing it into the east
+    # math shifted the derived stop point -- Codex catch, 2026-07-05)
     NORTH_OVERHANG as PLAT_OVERHANG,
     CRANK_SEAT_ANCHOR as PLAT_SEAT_ANCHOR,
     NOTCH_EXIT_TRAVEL as PLAT_NOTCH_EXIT,
@@ -605,7 +609,7 @@ def _plat_half_width(s: float) -> float:
     z_local = s - PIVOT_STATION  # platform local z (+ along increasing station)
     if not (PLAT_OVERHANG - PLAT_LEN - 1e-9 <= z_local <= PLAT_OVERHANG + 1e-9):
         return -1.0
-    return PLAT_HALF_N + (PLAT_EAST_S - PLAT_HALF_N) * (PLAT_OVERHANG - z_local) / PLAT_LEN
+    return PLAT_EAST_N + (PLAT_EAST_S - PLAT_EAST_N) * (PLAT_OVERHANG - z_local) / PLAT_LEN
 
 
 # Both riders stand fully ON the plate (plan, in the platform's own inclined
@@ -750,9 +754,9 @@ _DISENGAGE_RAD = math.radians(DISENGAGE_DEG)
 # CORRECT side (signed, not |distance|: the first cut of this derivation
 # used the west edge + an abs() gap and buried the screw 19 mm INSIDE the
 # engaged plate -- caught by the interference gate).
-_K_E = (PLAT_EAST_S - PLAT_HALF_N) / PLAT_LEN
+_K_E = (PLAT_EAST_S - PLAT_EAST_N) / PLAT_LEN
 _STOP_ZL = -105.0
-_STOP_PL = (PLAT_HALF_N + _K_E * (PLAT_OVERHANG - _STOP_ZL), _STOP_ZL)
+_STOP_PL = (PLAT_EAST_N + _K_E * (PLAT_OVERHANG - _STOP_ZL), _STOP_ZL)
 _EDGE_OUT = (1.0, _K_E)  # outward (east) normal, plate frame
 _EDGE_N = math.hypot(*_EDGE_OUT)
 _EDGE_OUT = (_EDGE_OUT[0] / _EDGE_N, _EDGE_OUT[1] / _EDGE_N)
@@ -805,7 +809,7 @@ if _WASHER_POST_GAP < 2.0:
 # along its run and check each machine point against each block's east flank
 # band (the old lobe-corner check generalised to the flared edge; the north
 # pedestal joined in PR8).
-_K_W = (PLAT_WEST_S - PLAT_HALF_N) / PLAT_LEN
+_K_W = (PLAT_WEST_S - PLAT_WEST_N) / PLAT_LEN
 _ARB_E_X = X_DRUM + ARBOR_PED_WIDTH / 2.0  # 66.7
 _ARB_Z_BANDS = (
     # (band, min gap): the SOUTH pedestal keeps the 2.0 design margin; the
@@ -821,7 +825,7 @@ _ARB_Z_BANDS = (
 )
 for _step in range(0, 43):
     _zl = PLAT_OVERHANG - PLAT_LEN + 5.0 * _step  # south edge -> north
-    _xw = PLAT_HALF_N + _K_W * (PLAT_OVERHANG - _zl)  # authored west x
+    _xw = PLAT_WEST_N + _K_W * (PLAT_OVERHANG - _zl)  # authored west x
     _cx, _cz = _plate_local_to_machine(-_xw, _zl)
     for _ARB_Z, _min_gap in _ARB_Z_BANDS:
         _gap = _cx - _ARB_E_X if _ARB_Z[0] - 2.0 <= _cz <= _ARB_Z[1] + 2.0 \

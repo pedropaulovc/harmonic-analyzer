@@ -199,21 +199,31 @@ def part_path(part: str) -> str:
     return str(path)
 
 # As-authored pose ledger (the foundational placement gate, 2026-07-05).
-# ``place_component`` records every inserted component's final (mirrored)
-# world position; ``save_assembly_and_images`` re-verifies ALL of them after
-# the LAST solve, just before saving. Rationale: the per-mate ``verify=``
-# reads run mid-build -- a later re-solve can still hop an unsigned
-# distance-mate branch (the 16T crank pinion rendered floating ~200 mm off
-# its seat with every gate green: mates satisfied, nothing interfering).
+# ``place_component`` and ``place_components_batch`` record every inserted
+# component's final (mirrored) world position AND rotation rows;
+# ``save_assembly_and_images`` re-verifies ALL of them after the LAST solve,
+# just before saving. Rationale: the per-mate ``verify=`` reads run
+# mid-build -- a later re-solve can still hop an unsigned distance-mate
+# branch (the 16T crank pinion rendered floating ~200 mm off its seat with
+# every gate green: mates satisfied, nothing interfering). Rotation is
+# checked too (Codex, 2026-07-05): a component can spin about its placed
+# origin -- e.g. the lift rod / cam collars on the freed pinion_cam DOF --
+# leaving the translation clean while the parked pose is visibly wrong.
 # Builds never actuate the freed operational DOF, so the as-saved pose must
 # equal the authored rest pose for every component -- drift IS a defect.
-_POSE_LEDGER: dict[str, list[float]] = {}
+_POSE_LEDGER: dict[str, tuple[list[float], list[float]]] = {}
 
 
-def assert_pose_ledger(adapter: Any, tol_mm: float = 0.5) -> None:
-    """Verify every ledger component still sits at its authored world origin."""
+def _ledger_record(name: str, position: list[float], rows: list[list[float]]) -> None:
+    _POSE_LEDGER[name] = (list(position), [c for row in rows for c in row])
+
+
+def assert_pose_ledger(
+    adapter: Any, tol_mm: float = 0.5, rot_tol: float = 1e-3,
+) -> None:
+    """Verify every ledger component still sits at its authored world pose."""
     offenders: list[str] = []
-    for name, expected in _POSE_LEDGER.items():
+    for name, (expected, exp_rows) in _POSE_LEDGER.items():
         array = component_transform(adapter, name)
         actual = [array[9] * 1000.0, array[10] * 1000.0, array[11] * 1000.0]
         delta = max(abs(a - e) for a, e in zip(actual, expected, strict=True))
@@ -221,6 +231,16 @@ def assert_pose_ledger(adapter: Any, tol_mm: float = 0.5) -> None:
             offenders.append(
                 f"{name}: {[round(v, 2) for v in actual]} != authored "
                 f"{[round(v, 2) for v in expected]} (drift {delta:.2f})"
+            )
+            continue
+        rot_drift = max(
+            abs(a - e) for a, e in zip(array[0:9], exp_rows, strict=True)
+        )
+        if rot_drift > rot_tol:
+            offenders.append(
+                f"{name}: rotation {[round(v, 4) for v in array[0:9]]} != "
+                f"authored {[round(v, 4) for v in exp_rows]} "
+                f"(drift {rot_drift:.4f})"
             )
     n = len(_POSE_LEDGER)
     _POSE_LEDGER.clear()
@@ -752,7 +772,7 @@ async def place_component(
                 await adapter.fix_component(ComponentRefParameters(name=name)),
             )
         assert_component_placed(adapter, name, position, rows)
-        _POSE_LEDGER[name] = list(position)
+        _ledger_record(name, position, rows)
         return name
 
 def _placement_transform(rows: list[list[float]], position_mm: list[float]) -> list[float]:
@@ -935,6 +955,12 @@ async def place_components_batch(
                     )
                 used[best_i] = True
                 out_names[best_i] = str(_read_member(comp, "Name2"))
+                # Same save-time pose guarantee as the per-part path: batched
+                # components (grounded or not) enter the ledger too (Codex,
+                # 2026-07-05 -- the channel build batches ground=False banks).
+                _POSE_LEDGER[out_names[best_i]] = (
+                    list(finals[best_i]), list(expected_rows[best_i]),
+                )
                 if grounds[best_i]:
                     grounded_comps.append(comp)
 
