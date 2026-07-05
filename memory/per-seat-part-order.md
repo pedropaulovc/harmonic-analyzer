@@ -8,7 +8,7 @@ metadata:
 Two machines cold-building at once used to both walk parts in the SAME (sorted)
 order, so they marched in lock-step: each MISSED the shared remote cache on the
 same next part and built it in parallel — N seats did N× the COM work. Fixed
-(2026-07-03, branch `pr4-pinion-spring`) by permuting the parts at the head of the
+(2026-07-03, PR #150) by permuting the parts at the head of the
 COM spine per seat: `_seat_part_order()` in `dodo.py` sorts `part_stems()` by
 `md5(seed\0stem)`, seed = `socket.gethostname()` (override `HARMONIC_BUILD_ORDER_SEED`).
 Seat A climbs one way, seat B another, so the slower seat usually HITs the cache on
