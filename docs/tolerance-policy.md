@@ -51,7 +51,7 @@ left "deferred":
   `drawing:<stem>` doit task on the COM spine.
 - **CAM (STEP→CAM→G-code) — IN SCOPE, deferred until the nominal model is frozen and validated.**
   The build is manual-primary for fidelity, with the PM-30MV **CNC** cutting the repetitive high-count
-  parts (20 cams, 19 spacer bushings, cone/cylinder gear train). The primary feed is the **3D solid
+  parts (20 cams, 19+19 spacer bushings, cone/cylinder gear train). The primary feed is the **3D solid
   via STEP** (emitted by `SaveAs3` in `export_models.py`/`cut_release.py`) into **Fusion 360**
   (Makers SKU) → G-code; CAM cuts nominal, so the toleranced print carries fits/finish. **Caveat:** the
   neutral export writes one STEP per SLDPRT (active config), so a multi-config part like the 20-config
