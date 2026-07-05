@@ -35,7 +35,7 @@ pen trace is flat, so the motion gate passes trivially.
 
 **verify.py wiring:** `CHANNELS = _config.active_count()`, `_expected_channel_ratios()`
 uses `active_channels()`; channel/drive-train `_COMPONENT_BAND` are formulas
-(channel = 7N+4±6, drive-train = 32+N±4) reproducing the measured N=20 bands (144, 52).
+(channel = 8N+4±6, drive-train = 57+N±4) reproducing the measured N=20 bands (channel 158–170, drive-train 73–81).
 `verify_amplitude_preset._law` handles `neutral` (asserts all zeros); gate is
 `amplitude:preset-law`. `output`/`frame` bands unchanged (the 20-hole summing plate just
 leaves holes empty at reduced counts).

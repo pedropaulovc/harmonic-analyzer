@@ -41,5 +41,5 @@ configs; **zero** added to part/assembly builds or any `verify:*` gate (single-c
 parts never enter the loop). The ~3 s is the gear gap-pattern rebuild itself —
 skipping it *is* the bug.
 
-v0.5.1 stays published (user: keep, fix forward). See [[mm-normalization-render-ready-release]],
+v0.5.1 stays published (user: keep, fix forward). See [[mm-normalization-render-bundle]],
 [[headless-render-no-gl]] (the render-diff that surfaced this).

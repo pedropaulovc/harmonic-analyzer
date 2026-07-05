@@ -39,4 +39,4 @@ raises an explanatory error). `MotionExportParameters`/`ExportMotionVideoInput` 
 added `sw_type_info.early_bound()` (wrap late-bound dispatch in its early-bound
 interface class so dispid-only members like `IModelDocExtension.GetMotionStudyManager`
 resolve). PR-M3 on branch `motion-video-export` → `personal`. See
-[[harmonic-analyzer-project]]; adapter PRs target `personal` per fix-migration-status (dropped memory).
+[[harmonic-analyzer-project]]; adapter PRs target `personal`.

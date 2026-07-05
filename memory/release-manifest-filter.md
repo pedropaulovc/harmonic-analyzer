@@ -22,11 +22,11 @@ canonical **build manifest** — `part_stems()` for parts, `ASSEMBLY_ORDER` for
 assemblies, both `_`→`-` to match dashed filenames (`_buildgraph.artefact_for`
 confirms that mapping). It **logs every stray dropped** (no silent truncation)
 and **fails loud if a manifest doc is missing** from cad/out (a partial/stale
-build refuses to ship a hole). Current full build → 73 parts + 8 assemblies kept.
+build refuses to ship a hole). Current full build → 73 parts + 8 assemblies kept (the part count has since grown — ~94 as of 2026-07-04; the filter mechanism is unchanged).
 
 Implication: the didiff vs prior-release in render_diff is now also clean of
 strays. If a NEW part's filename ever diverges from `<dashed build-script stem>`
 (e.g. PART_NAME set independent of the stem), the manifest filter would drop it —
 the fail-loud `missing` guard catches that as a hard error, not a silent omit.
-Related: [[mm-normalization-and-render-ready-release]],
+Related: [[mm-normalization-render-bundle]],
 [[release-perf-incremental]].
