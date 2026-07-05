@@ -291,10 +291,13 @@ folded into soundness entirely; see `memory/release-perf-incremental.md` and
 
 The default build saves a **working kinematic model**, NOT a frozen one: the
 predetermined operational DOF are left FREE. That is drive-train's **crank spin**
-(drag the crank in the saved `.SLDASM` and the whole geared train turns) **and
-cone-platform swing** (the p1 disengage: the plate — carrying the cone set AND the
-crank rig on the merged column — swings on its pivot screw; 2 DOF total for
-drive-train), plus channel's **3 DOF per active channel** (rocker swing +
+(drag the crank in the saved `.SLDASM` and the whole geared train turns),
+**cone-platform swing** (the p1 disengage: the plate — carrying the cone set AND
+the crank rig on the merged column — swings on its pivot screw), **pinion engage
+swing** (PR8: the strap+pinion rigid group swings on the torque shaft — the p2
+setup motion, formerly park-driven at the engaged pose) **and lift-rod/cam spin**
+(PR8: the eccentric-cam engage path; 4 DOF total for drive-train), plus channel's
+**3 DOF per active channel** (rocker swing +
 connecting-rod follow + amplitude-bar slide), plus magnifier's **lever
 knife-rock + lever-wire swing/spin** (3 DOF, 2026-07-04: the lever pivots about
 the summing bar's knife-edge ridge — engineerguy video 2/4+4/4, ~6 mm tip arc,
@@ -303,8 +306,9 @@ fixture group; the lever-wire ball-joints at the fixture hook and rides the hub
 drum at its 0.25 stand-off tangency; and the **WIRE-1 yoke mate** — the
 wheel's `WireYokePoint` held coincident to the lever-wire's `YokePlane`, the
 linearized inextensible-wire constraint — turns the magnifying wheel with it;
-the wheel is COUPLED, not separately freed). The pinion swing stays park-driven at
-its engaged pose (a setup/disengage motion, exercised by the motion/mobility suites).
+the wheel is COUPLED, not separately freed). The motion/mobility diagnostics
+treat every deferred (absent) park driver as already-free
+(`_suppress_park_or_note_free` in `build_motion_setup_drives.py`).
 
 The mechanism is **defer-and-replay** (was author-but-suppress). A freed-DOF park
 driver is NOT authored by the build at all — authoring each is an expensive mate
