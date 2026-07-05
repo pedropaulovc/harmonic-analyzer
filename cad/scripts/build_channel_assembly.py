@@ -375,7 +375,7 @@ async def _locate_to_datum(adapter, name: str) -> None:
             )
             continue
         await distance_driver(
-            adapter, part_ref, asm_ref, abs(coord),
+            adapter, part_ref, asm_ref, coord,
             label=f"{name} datum {axis} d={abs(coord):.2f}",
             verify=(name, o),
         )
@@ -411,7 +411,7 @@ async def _seat_bushing_on_shaft(
     await distance_driver(
         adapter,
         named_ref(f"Front Plane@{name}", "PLANE"), named_ref("Front Plane", "PLANE"),
-        abs(o[2]), label=f"{name} axial z d={abs(o[2]):.2f}", verify=(name, o),
+        o[2], label=f"{name} axial z d={abs(o[2]):.2f}", verify=(name, o),
     )
     await parallel_mate(
         adapter,
@@ -451,21 +451,21 @@ async def _locate_spring(adapter, name: str, axis2_local_y: float) -> None:
             label=f"{name} spring z=0 + planarity", verify=(name, o))
     else:
         await distance_driver(
-            adapter, rp, front, abs(o[2]),
+            adapter, rp, front, o[2],
             label=f"{name} spring z d={abs(o[2]):.2f} + planarity", verify=(name, o))
     a1 = named_ref(f"Axis1@{name}", "AXIS")
     a2 = named_ref(f"Axis2@{name}", "AXIS")
     right = named_ref("Right Plane", "PLANE")
     top = named_ref("Top Plane", "PLANE")
     await distance_driver(
-        adapter, a1, right, abs(o[0]),
+        adapter, a1, right, o[0],
         label=f"{name} spring low x d={abs(o[0]):.2f}", verify=(name, o))
     await distance_driver(
-        adapter, a1, top, abs(o[1]),
+        adapter, a1, top, o[1],
         label=f"{name} spring low y d={abs(o[1]):.2f}", verify=(name, o))
     p_high = world_point(adapter, name, [0.0, axis2_local_y, 0.0])
     await distance_driver(
-        adapter, a2, right, abs(p_high[0]),
+        adapter, a2, right, p_high[0],
         label=f"{name} spring high x d={abs(p_high[0]):.2f} (yaw)", verify=(name, o))
 
 
@@ -650,7 +650,7 @@ async def _revolute(
     kind = axial[0]
     if kind == "datum":
         await distance_driver(
-            adapter, part_plane, named_ref("Front Plane", "PLANE"), abs(tgt[2]),
+            adapter, part_plane, named_ref("Front Plane", "PLANE"), tgt[2],
             label=f"{label} axial d={abs(tgt[2]):.2f}", verify=(comp, tgt),
         )
     elif kind == "coincident":
@@ -660,7 +660,7 @@ async def _revolute(
         )
     elif kind == "distance":
         await distance_driver(
-            adapter, part_plane, named_ref(f"Front Plane@{axial[1]}", "PLANE"), abs(axial[2]),
+            adapter, part_plane, named_ref(f"Front Plane@{axial[1]}", "PLANE"), axial[2],
             label=f"{label} axial d={abs(axial[2]):.2f} <- neighbor {axial[1]}",
             verify=(comp, tgt),
         )
@@ -1085,7 +1085,7 @@ async def build(adapter) -> dict[str, str]:
         )
         await distance_driver(
             adapter, named_ref(f"Front Plane@{rod}", "PLANE"), named_ref(f"Front Plane@{rocker}", "PLANE"),
-            abs(rod_tgt[2] - z_mid),
+            rod_tgt[2] - z_mid,
             label=f"J2 rod ch{j:02d} axial d={abs(rod_tgt[2] - z_mid):.2f} <- {rocker}",
             verify=(rod, rod_tgt),
         )
