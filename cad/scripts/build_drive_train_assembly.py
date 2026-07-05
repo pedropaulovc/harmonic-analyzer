@@ -159,6 +159,7 @@ from _assembly import (
     distance_driver,
     gear_mate,
     is_locked_build,
+    lock_mate,
     named_ref,
     parallel_mate,
     place_component,
@@ -602,14 +603,18 @@ if abs(SHAFT_FRONT_STATION + SHAFT_FRONT_STUB) > 1e-9:
 
 
 def _plat_half_width(s: float) -> float:
-    """Platform MIN half-width at cone station s (the asymmetric plate's
-    narrower side -- east; the west flare is always wider); negative if s is
-    off the plate. Riders are centred on the shaft plan line (local x 0), so
-    the narrow side bounds their containment."""
+    """Platform MIN half-width at cone station s: the narrower of the east
+    taper and the west flare (the PR8 west-tip trim makes the WEST side the
+    narrow one near the north end -- 9.5 vs 12); negative if s is off the
+    plate. Riders are centred on the shaft plan line (local x 0), so the
+    narrower side at each station bounds their containment."""
     z_local = s - PIVOT_STATION  # platform local z (+ along increasing station)
     if not (PLAT_OVERHANG - PLAT_LEN - 1e-9 <= z_local <= PLAT_OVERHANG + 1e-9):
         return -1.0
-    return PLAT_EAST_N + (PLAT_EAST_S - PLAT_EAST_N) * (PLAT_OVERHANG - z_local) / PLAT_LEN
+    frac = (PLAT_OVERHANG - z_local) / PLAT_LEN
+    east = PLAT_EAST_N + (PLAT_EAST_S - PLAT_EAST_N) * frac
+    west = PLAT_WEST_N + (PLAT_WEST_S - PLAT_WEST_N) * frac
+    return min(east, west)
 
 
 # Both riders stand fully ON the plate (plan, in the platform's own inclined
@@ -1588,9 +1593,11 @@ async def build(adapter) -> dict[str, str]:
     # (located to the machine datums below); the lift rod is a REVOLUTE in
     # the blocks' dropped west bores carrying the two eccentric cams and the
     # lever (PR8 -- all semantically mated, spinning as one family on the
-    # deferred pinion_cam park). Only the tee handle stays FIXED (its
-    # z-rotation breaks the plane-distance locate; it rides the static arbor
-    # axis anyway).
+    # deferred pinion_cam park). The tee handle is LOCKED to the arbor in
+    # the joints section (cross-pinned in the real machine) so the freed p2
+    # swing carries it with the rig -- it was base-FIXED while the swing was
+    # park-driven, which PR8's freed swing would have left hanging in space
+    # (Codex catch, 2026-07-05).
     align_pinion = await place_component(
         adapter, "alignment-pinion",
         [APINION_X, APINION_Y, APINION_Z_FRONT], [0.0, 0.0, 0.0], IDENTITY,
@@ -1652,10 +1659,11 @@ async def build(adapter) -> dict[str, str]:
         [0.0, 0.0, -LEVER_TILT_DEG], rot_z_rows(-LEVER_TILT_DEG),
         ground=False, label="pinion-lever (clamp hub on the lift rod front end)",
     )
-    await place_component(
+    tee_handle = await place_component(
         adapter, "pinion-handle",
         [APINION_X, APINION_Y, HANDLE_Z],
         [0.0, 0.0, -HANDLE_TILT_DEG], rot_z_rows(-HANDLE_TILT_DEG),
+        ground=False,
         label="pinion-handle (blind cap over the arbor front end)",
     )
     # The steel arbor (PR7 item 14): pressed through the brass drum, journaled
@@ -2385,6 +2393,15 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Right Plane@{align_pinion}", "PLANE"),
         label="pinion arbor anti-spin (pressed in the drum)",
         verify=(pinion_arbor, arb_o),
+    )
+    # Tee handle: cross-pinned on the arbor front end (the zeroing crank), so
+    # it is RIGID to the arbor -- a LOCK records the authored relative pose
+    # with no branches and no DOF change, and the freed p2 swing carries the
+    # handle with the rig instead of leaving it base-fixed in space.
+    await lock_mate(
+        adapter, named_ref(f"Front Plane@{tee_handle}", "PLANE"),
+        named_ref(f"Front Plane@{pinion_arbor}", "PLANE"),
+        label="tee handle cross-pinned on the arbor",
     )
 
     # DRIVER #1 (the single machine input): the crank angle. The arm hangs at
