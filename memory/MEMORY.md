@@ -1,5 +1,6 @@
 # Memory index
 
+- [Physical build intent](physical-build-intent.md) — model is destined for a REAL machined build (period brass+steel) once validated; manual mill+lathe primary for fidelity, PM-30MV **CNC** for repetitive parts (cams/spacers/gears); `tolerance-gdt-assessment.md` §11 + `tolerance-policy.md` revised to CAM/DXF **IN SCOPE** (CAM deferred until nominal model frozen)
 - [Codex Windows sandbox broken](codex-windows-sandbox.md) — codex plugin `--write` (workspace-write) blocks ALL commands on this seat; bypass with direct `codex exec --sandbox danger-full-access`
 
 - [Default-free DOF + park drivers](default-free-dof-park-drivers.md) — the default build saves a WORKING kinematic model (operational DOF FREE; drive-train = crank spin + cone-platform swing = 2 DOF, channel = 3/active-channel, magnifier = 3); freed-DOF park drivers are DEFER-AND-REPLAY — recorded to a `.<stem>.park.json` sidecar, NOT authored in the free build, then replayed by the release preflight (`replay_park_specs` + `assert_park_closure`); build-time `soundness` proves only necessity (`assert_free_dof_necessity`); a `locked` build (`machine/build_lock.yaml`) authors every `PARK_<key>` engaged; every other gate unchanged
