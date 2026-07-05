@@ -207,6 +207,20 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "HookPoint")
 
+    # HubPoint: the HUB-end face centre (= the part origin), same arc-centre
+    # idiom on the bottom edge. The assembly's wire-SWING park driver pins this
+    # point's distance to a machine plane: the swing lever arm is the whole
+    # wire length, so the driver is well-conditioned where the old
+    # plane-plane ANGLE (parked at 0.74 deg, a Jacobian extremum) authored
+    # satisfied but pinned nothing -- caught by the release-preflight park
+    # closure, 2026-07-05.
+    check(
+        "ref point HubPoint",
+        await adapter.create_reference_point(CreateReferencePointParameters(
+            mode="arc_center", edge_point=[WIRE_DIA / 2.0, 0.0, 0.0])),
+    )
+    name_last_feature(adapter, "HubPoint")
+
     # Named centreline axis (local Y): the hub STAND-OFF mate holds this axis
     # at the offset-tangency distance from the wheel's Axis1 (axis-axis
     # distance -- skew lines have ONE minimal distance, so no far-side flip,
