@@ -198,6 +198,40 @@ def part_path(part: str) -> str:
         )
     return str(path)
 
+# As-authored pose ledger (the foundational placement gate, 2026-07-05).
+# ``place_component`` records every inserted component's final (mirrored)
+# world position; ``save_assembly_and_images`` re-verifies ALL of them after
+# the LAST solve, just before saving. Rationale: the per-mate ``verify=``
+# reads run mid-build -- a later re-solve can still hop an unsigned
+# distance-mate branch (the 16T crank pinion rendered floating ~200 mm off
+# its seat with every gate green: mates satisfied, nothing interfering).
+# Builds never actuate the freed operational DOF, so the as-saved pose must
+# equal the authored rest pose for every component -- drift IS a defect.
+_POSE_LEDGER: dict[str, list[float]] = {}
+
+
+def assert_pose_ledger(adapter: Any, tol_mm: float = 0.5) -> None:
+    """Verify every ledger component still sits at its authored world origin."""
+    offenders: list[str] = []
+    for name, expected in _POSE_LEDGER.items():
+        array = component_transform(adapter, name)
+        actual = [array[9] * 1000.0, array[10] * 1000.0, array[11] * 1000.0]
+        delta = max(abs(a - e) for a, e in zip(actual, expected, strict=True))
+        if delta > tol_mm:
+            offenders.append(
+                f"{name}: {[round(v, 2) for v in actual]} != authored "
+                f"{[round(v, 2) for v in expected]} (drift {delta:.2f})"
+            )
+    n = len(_POSE_LEDGER)
+    _POSE_LEDGER.clear()
+    if offenders:
+        raise RuntimeError(
+            f"pose ledger: {len(offenders)} component(s) drifted from the "
+            "authored pose after the final solve:\n  " + "\n  ".join(offenders)
+        )
+    _telemetry.success(f"pose ledger: all {n} placed components at authored pose")
+
+
 def assert_component_placed(
     adapter: Any,
     name: str,
@@ -718,6 +752,7 @@ async def place_component(
                 await adapter.fix_component(ComponentRefParameters(name=name)),
             )
         assert_component_placed(adapter, name, position, rows)
+        _POSE_LEDGER[name] = list(position)
         return name
 
 def _placement_transform(rows: list[list[float]], position_mm: list[float]) -> list[float]:
@@ -1716,6 +1751,9 @@ async def save_assembly_and_images(
     # the DOF gate even with broken mates. deep=True also inspects each
     # subassembly's own document, where a sub's internal mate errors live.
     assert_model_healthy(adapter, label=asm_name, deep=True)
+    # ... and never save a solver-drifted one: every placed component must
+    # still sit at its authored pose after the FINAL solve (see _POSE_LEDGER).
+    assert_pose_ledger(adapter)
     OUT_SLDASM.mkdir(parents=True, exist_ok=True)
     asm_path = (OUT_SLDASM / f"{asm_name}.SLDASM").resolve()
     # Save on isometric so the .SLDASM opens isometric; runs AFTER any
