@@ -38,11 +38,14 @@ geometry is casting-shaped, not milling-shaped.
   | `connecting-rod` | 20 | flat 2D outline → DXF/2.5D |
   | `knife-mount` | 2 | trivial prismatic block, 2 identical |
 
-- **Casting-vs-bar substitution (3 parts modeled as castings):** `summing-lever`,
-  `rocker-arm-support`, and (nominally) `knife-mount` are `Gray Cast Iron` in the model. The support
-  and mount cut fine from bar; the **lever does not** — its ribbed/leaf organic form is casting-native
-  and hogging it from solid means 4–5 setups around cantilevered plates. Decide **cast, fabricate
-  (weld/silver-solder up from simple stock), or accept the multi-setup hog** before you start.
+- **Casting-vs-bar substitution (4 T1 parts modeled as castings):** `summing-lever`,
+  `rocker-arm-support`, `connecting-rod`, and (nominally) `knife-mount` are `Gray Cast Iron` in the
+  model. Three are **benign** substitutions — the mount and support cut fine from bar, and the rod is a
+  flat 2D profile that cuts trivially from plate (book: "rough-finished", so cosmetically forgiving).
+  The **lever does not** — its ribbed/leaf organic form is casting-native and hogging it from solid
+  means 4–5 setups around cantilevered plates. Decide **cast, fabricate (weld/silver-solder up from
+  simple stock), or accept the multi-setup hog** before you start; the other three are just a stock
+  choice, the lever is a real decision.
 
 - **Almost every hole is 2.5D and almost nothing is threaded.** Only `rocker-arm-support` has real
   threads (4× 9/16-12 tapped foot holes). No keyways anywhere — gears are **soldered** to their
