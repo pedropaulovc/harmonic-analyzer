@@ -74,10 +74,10 @@ Offline-validated only (this dev box has no SolidWorks; uv even picked py3.14 by
 default — pin `--python 3.11`): `py_compile`, `ruff` clean on the diff,
 `test_dodo_recipe`/`test_buildgraph`/`test_artifact_cache`/`test_telemetry`/
 `test_nameplate_geometry` = 48 passed, verify `--suite math` 9/9 + `config` 13/13,
-`doit list`/`doit info verify:subsystems` correct.
+`doit list`/`doit info verify:soundness` correct. *(This validation predates the subsystems retirement — `verify:subsystems` no longer exists; use `verify:soundness`/`verify:kinematics`.)*
 
 **The COM paths (verify on the seat, the release neutral export + PNG cache) MUST be
 run once on the SolidWorks seat before the next real release.** Best first run:
-`doit verify:subsystems` after `verify:soundness`, then a `doit release -- vX --no-publish`
+`doit verify:kinematics` after `verify:soundness` (`verify:subsystems` has since been retired), then a `doit release -- vX --no-publish`
 (dry run — builds the bundle + logs, nothing leaves the machine) to confirm the
 copy/cache flow ships the same step/stl/png set.
