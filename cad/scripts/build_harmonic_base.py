@@ -91,9 +91,13 @@ CBORE_XZ = HOLE_XZ  # all four heads counterbored
 # radius) (build_swing_stop_screw).
 PIVOT_SCREW_XZ = (-79.69, 103.29)
 PIVOT_SCREW_HOLE_DIA = 6.5  # O6.35 shoulder clearance
-STOP_SCREW_XZ = (-130.93, 9.94)  # past the DISENGAGED east taper edge (the
-# disengage swing sweeps the plate EAST pre-mirror = machine -x; the first
-# derivation sat 19 inside the engaged plate -- interference-gate proven)
+STOP_SCREW_XZ = (-130.830, 9.887)  # past the DISENGAGED east taper edge. The
+# PR8 west-tip trim moved this only via the DISENGAGE angle (the notch mouth
+# is on the WEST edge, so the exit travel shortened); the contact edge itself
+# is the EAST taper line, unchanged at HALF_WIDTH_N 12. (An earlier PR8 pass
+# wrongly fed the west width into the east-edge derivation -- Codex catch.)
+# Disengage swing sweeps the plate EAST pre-mirror = machine -x; the first
+# derivation sat 19 inside the engaged plate -- interference-gate proven.
 STOP_SCREW_HOLE_DIA = 4.1  # O4 shank clearance
 SWING_HOLE_DEPTH = 6.0
 
@@ -115,7 +119,9 @@ BLOCK_SCREW_HOLE_DEPTH = 3.5  # 18 shank - 16 block = 2 buried + 1.5 air
 FOOT_SCREW_XZ = (
     (20.467, 70.95),  # spring foot (build_pinion_spring hole: the west foot
     # crosses under the lift rod so its screw lands west of the moving rig)
-    (-54.7, -95.5),   # arbor-pedestal flange (build_arbor_pedestal SCREW_Z)
+    (-54.7, -95.5),   # south arbor-pedestal flange (build_arbor_pedestal SCREW_Z)
+    (-54.7, 102.5),   # NORTH arbor-pedestal flange (PR8, ch12 img09: the
+    # mirrored base-standing clamp at z 97.5; ry180 flips its flange to +z)
 )
 FOOT_SCREW_HOLE_DIA = 3.2  # foot-screw O2.9 shank clearance
 FOOT_SCREW_HOLE_DEPTH = 7.7  # 8.0 shank under the 0.8 spring strip + air

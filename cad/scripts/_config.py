@@ -65,13 +65,14 @@ def channels() -> list[dict[str, Any]]:
 def active_count() -> int:
     """How many channels the build PHYSICALLY instantiates (machine.yaml).
 
-    TEMPORARY (2026-06-19): reduced from the full 20 to cut build/refresh time
-    while the remaining parts are certified. Caps the per-channel mechanism — the
-    cylinder gear + cam-follower in drive-train and the rocker/amplitude-bar/
-    top-lever/spring in channel — to the FIRST ``active_count`` channels. The 20
-    cone gears and all 20 channels.yaml rows (gear law, ratios, synthesis truth
-    model) are KEPT. Recover by setting machine.yaml channels.active_count back to
-    20. See the channels.active_count note in machine.yaml.
+    A BUILD-SPEED KNOB: drop it below 20 to cut build/refresh time during
+    debugging iterations (each channel adds a cylinder gear + cam-follower to
+    drive-train and a rocker/amplitude-bar/top-lever/spring to channel); set
+    it back to 20 — the full machine, the default — for validation and
+    release. Caps the per-channel mechanism to the FIRST ``active_count``
+    channels; the 20 cone gears and all 20 channels.yaml rows (gear law,
+    ratios, synthesis truth model) are ALWAYS kept. See the
+    channels.active_count note in machine/channels.yaml.
     """
     return int(machine("channels", "active_count"))
 

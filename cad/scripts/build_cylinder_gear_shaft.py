@@ -46,7 +46,10 @@ PART_NAME = "cylinder-gear-shaft"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 SHAFT_DIA = 0.375 * IN  # ch13: = cam bore (legacy parameters.kcl)
-SHAFT_LENGTH = 168.0  # ch13 stack + journals; north end clears the now-solid
+SHAFT_LENGTH = 187.0  # ch13 stack + journals; north end at machine +97: 7.0
+# seated in the NORTH arbor-pedestal bore band (PR8, ch12 img09 -- the base-
+# standing north clamp restored; the pedestal foot sits just clear of the
+# rocker-arm-support footprint). Was 168, clear of the old solid
 # rocker-arm-support north upright (shortened from 200, 2026-06-19); south end
 # pulled back to machine z -90 (ch30 GT cyl_front, 2026-07-02: the end stops
 # INSIDE the arbor-pedestal bore, blind-bearing look). See

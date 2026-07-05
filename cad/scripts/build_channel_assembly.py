@@ -149,9 +149,9 @@ ASM_NAME = "channel"
 # --- machine stations -------------------------------------------------------
 import os  # noqa: E402
 
-# Channels physically built. Default = machine.yaml channels.active_count (the
-# TEMPORARY 3-channel build-performance reduction; recover by setting it back to
-# 20 — see _config.active_count). CHANNEL_COUNT env still overrides for tests.
+# Channels physically built. Default = machine.yaml channels.active_count, the
+# BUILD-SPEED KNOB: drop it below 20 for debugging iterations, 20 = the full
+# machine (see _config.active_count). CHANNEL_COUNT env still overrides for tests.
 CHANNELS = int(os.environ.get("CHANNEL_COUNT", str(_config.active_count())))
 
 # Build mode (cad/config/machine/build_lock.yaml). `free` (default) leaves the
