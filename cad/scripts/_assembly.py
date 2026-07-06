@@ -30,6 +30,15 @@ from _common import (
 )
 from _transforms import mirror_placement
 
+# The sprockets the chain seats on (the mounted T24 + crank T12 removables).
+# A chain link touching one of these is intended MESH, not a fault: the chain
+# rides the pitch circle so the links overlap the teeth in the shared z-plane
+# (a coplanar single-plane stand-in). Whitelisted like link<->link contact in
+# check_no_interference. Defined here (not in _common) so it stays off every
+# part's recipe digest -- only the assemblies that read it rebuild on a change.
+_CHAIN_SPROCKET_PREFIXES = ("transgear-removable",)
+
+
 def insert_sketch_text(
     adapter: Any,
     text: str,
@@ -216,6 +225,25 @@ _POSE_LEDGER: dict[str, tuple[list[float], list[float]]] = {}
 
 def _ledger_record(name: str, position: list[float], rows: list[list[float]]) -> None:
     _POSE_LEDGER[name] = (list(position), [c for row in rows for c in row])
+
+
+def reledger_to_solved(adapter: Any, name: str) -> None:
+    """Re-anchor a placed component's pose-ledger entry to its CURRENT solved pose.
+
+    For a component whose final orientation is DELEGATED to a feature solved
+    AFTER it is placed -- a chain-component-pattern seed, whose tangent alignment
+    the pattern owns and re-solves off the provisional authored chord angle (the
+    pin-spacing chord is shorter than the wrap arc, so the two pin axes pull the
+    seed straight) -- the place-time pose is not the invariant; the post-feature
+    solved pose is. Call after the owning feature is built so assert_pose_ledger
+    checks the pose that is actually intended to persist, not the placeholder.
+    """
+    array = component_transform(adapter, name)
+    _ledger_record(
+        name,
+        [array[9] * 1000.0, array[10] * 1000.0, array[11] * 1000.0],
+        [list(array[0:3]), list(array[3:6]), list(array[6:9])],
+    )
 
 
 def assert_pose_ledger(
@@ -1648,6 +1676,7 @@ def check_no_interference(adapter: Any) -> None:
             interferences = adapter._attempt(lambda: mgr.GetInterferences(), default=None)
         details = []
         chain_contacts = []
+        chain_mesh_contacts = []
         for interference in list(interferences or []):
             _flag(interference, "IInterference")
             names = []
@@ -1658,14 +1687,30 @@ def check_no_interference(adapter: Any) -> None:
             if all(n.startswith(_CHAIN_LINK_PREFIXES) for n in names) and len(names) == 2:
                 chain_contacts.append(volume_mm3)
                 continue
+            # Chain link <-> sprocket: intended mesh. The chain seats on the
+            # pitch circle so its links overlap the removables' teeth in the
+            # shared z-plane (a coplanar single-plane stand-in). Whitelisted
+            # like the link<->link contact above.
+            links = [n for n in names if n.startswith(_CHAIN_LINK_PREFIXES)]
+            sprockets = [n for n in names if n.startswith(_CHAIN_SPROCKET_PREFIXES)]
+            if len(names) == 2 and len(links) == 1 and len(sprockets) == 1:
+                chain_mesh_contacts.append(volume_mm3)
+                continue
             details.append(f"{' & '.join(names)}: {volume_mm3:.2f} mm^3")
         adapter._attempt(lambda: mgr.Done(), default=None)
         isp.set_attribute("hits", len(details))
         isp.set_attribute("chain_contacts", len(chain_contacts))
+        isp.set_attribute("chain_mesh_contacts", len(chain_mesh_contacts))
         if chain_contacts:
             _telemetry.debug(
                 f"{len(chain_contacts)} chain-internal link contacts"
                 f" (<= {max(chain_contacts):.2f} mm^3) allowed -- articulating chain"
+            )
+        if chain_mesh_contacts:
+            _telemetry.debug(
+                f"{len(chain_mesh_contacts)} chain<->sprocket mesh contacts"
+                f" (<= {max(chain_mesh_contacts):.2f} mm^3) allowed -- chain seated"
+                f" on the pitch circle"
             )
         if details:
             raise RuntimeError(

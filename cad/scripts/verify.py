@@ -534,6 +534,10 @@ def _expected_free_dof(name: str) -> int:
         # The freed lever knife-rock + the articulated lever-wire's swing/spin;
         # the wheel is COUPLED by the WIRE-1 yoke (no DOF of its own).
         return 0 if is_locked_build(_config.machine("build_lock", "magnifier")) else 3
+    if name == "paper-drive":
+        # The freed crank (T12) spin; the knob T24 is belt-coupled and the platen
+        # is rack-coupled (no DOF of their own).
+        return 0 if is_locked_build(_config.machine("build_lock", "paper_drive")) else 1
     return 0
 
 
@@ -547,6 +551,9 @@ _REQUIRED_FREE_STEMS = {
     # Three freed DOF (lever knife-rock + wire swing/spin); the yoke-coupled
     # wheel must read under-constrained WITH them, else the coupling died.
     "magnifier": ("magnifying-lever", "magnifying-wheel", "lever-wire"),
+    # One freed DOF (the crank T12 spin); the belt-coupled knob + rack-fed platen
+    # read under-constrained with it.
+    "paper-drive": ("transgear-removable",),
 }
 
 
