@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -41,11 +42,25 @@ def main() -> int:
     sw = comtypes.client.GetActiveObject("SldWorks.Application", interface=mod.ISldWorks)
     _telemetry.info(f"attached to SW; revision {sw.RevisionNumber()}")
 
-    sw.CloseAllDocuments(True)
     sw.OpenDoc6(ASSEMBLY, SW_DOC_ASSEMBLY, SW_OPEN_SILENT, "", 0, 0)
     doc = sw.IActiveDoc2
-    _telemetry.info(f"opened {Path(ASSEMBLY).name}: {doc.GetTitle()}")
+    title = doc.GetTitle()
+    _telemetry.info(f"opened {Path(ASSEMBLY).name}: {title}")
+    try:
+        return _probe(mod, sw, doc)
+    finally:
+        # Discard the probe's doc BY TITLE -- never CloseAllDocuments, which would
+        # nuke any OTHER model open on this interactive seat. CloseDoc drops the
+        # unsaved belt edit silently, so the shipped .SLDASM is untouched and a
+        # headless run never hangs on a save modal, even if the probe raises
+        # mid-way (codex #189 round-5, matching the pywin32 probe's finally).
+        try:
+            sw.CloseDoc(title)
+        except Exception as exc:  # noqa: BLE001
+            _telemetry.warn(f"CloseDoc({title!r}) failed: {exc}")
 
+
+def _probe(mod: Any, sw: Any, doc: Any) -> int:
     # comtypes chokes on GetComponents' SAFEARRAY(VT_DISPATCH) return
     # (KeyError 9). Sidestep it: select each sprocket by name (names known from
     # the pywin32 dump -- transgear-removable-1=T24 knob, -2=T12 crank) and pull
@@ -64,7 +79,6 @@ def main() -> int:
     doc.ClearSelection2(True)
     if "T12" not in sprockets or "T24" not in sprockets:
         _telemetry.error(f"could not select both sprockets (got {sorted(sprockets)})")
-        sw.CloseAllDocuments(True)
         return 2
 
     # FeatureByName lives on IAssemblyDoc (not the IModelDoc2 comtypes typed
@@ -83,7 +97,6 @@ def main() -> int:
     _telemetry.info(f"CreateDefinition({SW_FM_BELT_AND_CHAIN}) -> "
                     f"{type(raw).__name__} (null={raw is None})")
     if raw is None:
-        sw.CloseAllDocuments(True)
         return 3
     data = raw.QueryInterface(mod.IBeltChainFeatureData)
 
@@ -121,16 +134,12 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001
             errs = f"<{exc}>"
         _telemetry.error(f"CreateFeature -> None (comtypes ALSO nulls); errors={errs}")
-        sw.CloseAllDocuments(True)
         return 4
 
     name = feat.Name
     _telemetry.success(f"BELT FEATURE CREATED via comtypes: {name!r} -- "
                        f"belt/chain feasible early-bound")
-
-    # Discard -- never persist the probe into the shipped .SLDASM.
-    sw.CloseAllDocuments(True)
-    return 0
+    return 0  # the probe's doc is discarded by title in main()'s finally
 
 
 if __name__ == "__main__":
