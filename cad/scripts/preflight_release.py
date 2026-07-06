@@ -26,7 +26,7 @@ import sys
 from typing import Any
 
 from _common import OUT_SLDASM, _read_member, check, log, run_build
-from _assembly import assert_park_closure, load_park_specs
+from _assembly_postbuild import assert_park_closure, load_park_specs
 from verify import REST, _expected_free_dof, assert_gear_ratios
 
 import _telemetry

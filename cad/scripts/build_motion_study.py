@@ -556,7 +556,8 @@ async def _replay_deferred_parks(adapter):
     active doc; the docs are NEVER saved), leaving every other recorded
     driver deferred (= free, what the study needs).
     """
-    from _assembly import is_locked_build, load_park_specs, replay_park_specs
+    from _assembly import is_locked_build
+    from _assembly_postbuild import load_park_specs, replay_park_specs
 
     top = adapter.currentModel
     top_title = str(_read_member(top, "GetTitle"))
