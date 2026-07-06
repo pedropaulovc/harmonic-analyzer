@@ -907,8 +907,8 @@ async def place_component(
     and the read-back assert holds.
 
     ``mirror=True`` (default) routes the placement through ``mirror_placement``,
-    which reflects it about the machine YZ plane using the part's ``MIRROR_PLANE``
-    symmetry (default ``"x"``). Pass ``mirror=False`` for a SINGLE machine-handed
+    which reflects it about the machine YZ plane using the part's declared symmetry
+    (``cad/config/placement/<part>.yaml``, default ``"x"``). Pass ``mirror=False`` for a SINGLE machine-handed
     part with no mirror twin -- e.g. the maker's nameplate -- whose ``position``/
     ``rows`` are already the exact machine transform; the default ``"x"`` reflection
     would otherwise flip it across X (onto the wrong side, text reversed).

@@ -122,7 +122,7 @@ from _assembly import (
     world_point,
     write_park_specs,
 )
-from _transforms import MIRROR_PLANE, rows_from_euler
+from _transforms import rows_from_euler, set_runtime_placement
 from build_cylinder_gear import ECCENTRICITY as CAM_ECC  # cam lobe throw (mm):
 # imported, NOT copied, so the rod ring stays concentric with the cam when the
 # throw is rescaled. A stale 5.08 hardcode (the pre-re-anchor throw) survived the
@@ -886,7 +886,7 @@ async def build(adapter) -> dict[str, str]:
         if name is None:
             name = f"channel-spring-installed-stretch{len(variant_by_body):02d}"
             variant_by_body[key] = name
-            MIRROR_PLANE[name] = ("z", 0.0)  # z-symmetric like the base spring
+            set_runtime_placement(name, ("z", 0.0))  # z-symmetric like the base spring
         spec["part"] = name
     log(f"spring variants: base {SPRING_BASE_BODY:.2f} + {len(variant_by_body)} "
         f"stretched bodies {sorted(variant_by_body)}")
