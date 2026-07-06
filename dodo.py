@@ -513,7 +513,7 @@ PREFLIGHT_PY = (SCRIPTS_DIR / "preflight_release.py").resolve()
 _VERIFY_NAMES = ("soundness", "kinematics")   # need SW (spine); subsystems retired
 # Offline checks REQUIRED on every build/release (fast, high-value):
 _CHECK_NAMES = ("math", "config", "graph", "nameplate", "recipe", "cache", "telemetry",
-                "freshness", "flagonly")
+                "freshness", "flagonly", "partiso")
 # Offline checks that are OPT-IN only (runnable via `doit check:<name>` but NOT
 # depended on by `build`/`release`). ``verify_telemetry`` drives the real gates
 # through a mock SolidWorks to pin span SHAPE (~20-30 s, ~20x the other offline
@@ -576,16 +576,54 @@ def _digest_files(files: list[str]) -> str:
 # task "up-to-date" and served stale cross-machine cache hits (issue #144).
 #
 # Fix: fold the submodule's tracked SOURCE content into every COM task's recipe via a
-# single synthetic file_dep whose CONTENT is a content-hash of the src tree. Hashing
-# the tree (not just ``git rev-parse HEAD``) also catches a dirty/uncommitted
-# submodule edit. One synthetic dep -- instead of the ~100 source files -- keeps the
-# per-task dep set (and thus every cache-key / _digest_files fold) O(1), not a
-# hundred md5s per COM task. The dep is added ONLY in the COM dep builders
-# (``_part_file_deps`` / ``_recipe_files``), so the SolidWorks-free ``check:*`` tasks
-# -- which never touch COM -- stay off it.
+# synthetic file_dep whose CONTENT is a content-hash of the src tree. Hashing the tree
+# (not just ``git rev-parse HEAD``) also catches a dirty/uncommitted submodule edit.
+# One synthetic dep -- instead of the ~100 source files -- keeps the per-task dep set
+# (and thus every cache-key / _digest_files fold) O(1), not a hundred md5s per COM
+# task. The dep is added ONLY in the COM dep builders (``_part_file_deps`` /
+# ``_recipe_files``), so the SolidWorks-free ``check:*`` tasks -- which never touch
+# COM -- stay off it.
+#
+# TWO tiers (the over-rebuild fix): the ASSEMBLY recipe folds the WHOLE tree
+# (``_submodule_dep`` -> ``_submodule_digest``), but the PART recipe folds only the
+# PART-RELEVANT slice (``_submodule_part_dep`` -> ``_submodule_part_digest``), which
+# drops the assembly/motion + MCP-server modules no part can reach. So a bump that
+# touches only assembly.py (or the MCP tooling) rebuilds the 8 assemblies but leaves
+# all ~100 parts cached, instead of a whole-fleet rebuild on an assembly-only change.
+# The exclusion is SAFE because parts never import those modules -- enforced loud by
+# ``check:partiso`` (test_part_isolation.py); see ``_PART_DIGEST_EXCLUDE_*`` below.
 _SUBMODULE_DIGEST_FILE = REPORTS / ".solidworks-mcp-submodule.digest"
+_SUBMODULE_PART_DIGEST_FILE = REPORTS / ".solidworks-mcp-submodule-part.digest"
 _SUBMODULE_DIGEST: str | None = None
+_SUBMODULE_PART_DIGEST: str | None = None
 _SUBMODULE_DEP_PATH: str | None = None
+_SUBMODULE_PART_DEP_PATH: str | None = None
+
+# Submodule source files that NO part build can reach, so a change to them cannot
+# alter a part's geometry -- excluded from the PART recipe digest so an
+# assembly-only (or MCP-tooling-only) submodule bump stops rebuilding every part.
+# Two tiers, both proven part-irrelevant and ENFORCED by test_part_isolation.py
+# (``check:partiso``), which fails loud if a part ever imports one:
+#   * assembly.py / motion.py -- the assembly+motion COM path. They ARE loaded
+#     transitively (PyWin32Adapter mixes them in), but a part only ever calls
+#     sketch/feature/export methods; those modules import base/com_variant (never
+#     the reverse), so a change to an assembly/motion method body or module-level
+#     constant can't propagate into the sketch/feature calls a part actually makes.
+#   * tools/ agents/ ui/ server*.py -- the MCP server surface; no build code (part
+#     OR assembly) imports it at all.
+# CONSERVATIVE: everything else (base, com_variant, sketch, feature, sw_type_info,
+# pywin32_adapter, factory, ...) stays in the part digest, so a real shared-helper
+# change still rebuilds parts. The ASSEMBLY (full) digest keeps the WHOLE tree.
+# Tags are PACKAGE-relative (relative to ``solidworks_mcp/``), the natural import
+# structure, so the module name is just ``solidworks_mcp.`` + the dotted tag -- and
+# ``test_part_isolation.py`` derives its forbidden-import set straight from these.
+_PART_DIGEST_EXCLUDE_FILES = frozenset({
+    "adapters/solidworks/assembly.py",
+    "adapters/solidworks/motion.py",
+    "server.py",
+    "server_cli_fixed.py",
+})
+_PART_DIGEST_EXCLUDE_DIRS = ("tools/", "agents/", "ui/")
 
 
 def _submodule_src_files() -> list[Path]:
@@ -597,44 +635,90 @@ def _submodule_src_files() -> list[Path]:
     return sorted(SUBMODULE_SRC.rglob("*.py"))
 
 
+def _is_part_relevant_submodule_file(f: Path) -> bool:
+    """False for a submodule source file no part build can reach (the two exclude
+    tiers above), so it is dropped from the PART recipe digest. Matched on the
+    PACKAGE-relative path (relative to ``solidworks_mcp/``), so the classification is
+    identical across checkout roots and independent of REPO_ROOT."""
+    try:
+        rel = f.resolve().relative_to(SUBMODULE_SRC.resolve()).as_posix()
+    except ValueError:
+        return True  # outside the package tree (defensive) -> keep it in the digest
+    if rel in _PART_DIGEST_EXCLUDE_FILES:
+        return False
+    return not any(rel.startswith(d) for d in _PART_DIGEST_EXCLUDE_DIRS)
+
+
+def _digest_submodule_files(files: list[Path]) -> str:
+    """Fold a list of submodule files into one md5, each keyed by its REPO-RELATIVE
+    tag (``_rel_tag``) + raw content md5 -- identical across checkout roots, exactly
+    like ``_digest_files``, so the derived cache key is cross-machine stable."""
+    h = hashlib.md5()
+    for f in files:
+        h.update(_rel_tag(str(f)).encode())
+        h.update(get_file_md5(str(f)).encode())
+    return h.hexdigest()
+
+
 def _submodule_digest() -> str:
-    """Content fingerprint of the submodule source tree, memoized (the tree is static
-    within a run). Each file is folded by its REPO-RELATIVE tag (``_rel_tag``) + raw
-    content md5, so the digest is identical across checkout roots -- required for the
-    cross-machine cache key, exactly like ``_digest_files``."""
+    """Content fingerprint of the WHOLE submodule source tree (assembly digest),
+    memoized (the tree is static within a run)."""
     global _SUBMODULE_DIGEST
     if _SUBMODULE_DIGEST is None:
-        h = hashlib.md5()
-        for f in _submodule_src_files():
-            h.update(_rel_tag(str(f)).encode())
-            h.update(get_file_md5(str(f)).encode())
-        _SUBMODULE_DIGEST = h.hexdigest()
+        _SUBMODULE_DIGEST = _digest_submodule_files(_submodule_src_files())
     return _SUBMODULE_DIGEST
 
 
-def _submodule_dep() -> str:
-    """Path to the single synthetic file_dep that tracks the submodule for the COM
-    tasks: a small generated sidecar whose CONTENT is ``_submodule_digest()``.
+def _submodule_part_digest() -> str:
+    """Content fingerprint of the PART-RELEVANT submodule files only (drops the
+    assembly/motion + MCP-server modules parts never reach), memoized. So an
+    assembly-only submodule bump leaves this digest -- and thus every part's recipe
+    -- unchanged, instead of rebuilding all ~100 parts."""
+    global _SUBMODULE_PART_DIGEST
+    if _SUBMODULE_PART_DIGEST is None:
+        files = [f for f in _submodule_src_files() if _is_part_relevant_submodule_file(f)]
+        _SUBMODULE_PART_DIGEST = _digest_submodule_files(files)
+    return _SUBMODULE_PART_DIGEST
 
-    Written write-only-if-changed, so its mtime -- and doit's stat fast-path -- stays
-    stable across no-op runs (a submodule bump flips the content, hence the mtime,
-    hence every dependent COM task). Its repo-relative path tag + machine-independent
-    content (the tree hash) make the resulting cache key identical across machines.
-    Memoized to one write-check per process (called on every staleness probe via
-    ``_stable_artefact_digest``)."""
-    global _SUBMODULE_DEP_PATH
-    if _SUBMODULE_DEP_PATH is not None:
-        return _SUBMODULE_DEP_PATH
-    digest = _submodule_digest()
-    _SUBMODULE_DIGEST_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+def _write_digest_sidecar(path: Path, digest: str) -> str:
+    """Write ``digest`` to ``path`` write-only-if-changed (so its mtime -- and doit's
+    stat fast-path -- stays stable across no-op runs; a bump flips the content, hence
+    the mtime, hence every dependent COM task). Returns the resolved path string."""
+    path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        current = _SUBMODULE_DIGEST_FILE.read_text(encoding="utf-8").strip()
+        current = path.read_text(encoding="utf-8").strip()
     except OSError:
         current = None
     if current != digest:
-        _SUBMODULE_DIGEST_FILE.write_text(digest + "\n", encoding="utf-8")
-    _SUBMODULE_DEP_PATH = str(_SUBMODULE_DIGEST_FILE.resolve())
+        path.write_text(digest + "\n", encoding="utf-8")
+    return str(path.resolve())
+
+
+def _submodule_dep() -> str:
+    """Path to the synthetic file_dep tracking the WHOLE submodule for ASSEMBLY
+    recipes (``_recipe_files``): a generated sidecar whose CONTENT is
+    ``_submodule_digest()``. Its repo-relative path tag + machine-independent content
+    make the resulting cache key identical across machines. Memoized to one
+    write-check per process (called on every staleness probe)."""
+    global _SUBMODULE_DEP_PATH
+    if _SUBMODULE_DEP_PATH is None:
+        _SUBMODULE_DEP_PATH = _write_digest_sidecar(
+            _SUBMODULE_DIGEST_FILE, _submodule_digest())
     return _SUBMODULE_DEP_PATH
+
+
+def _submodule_part_dep() -> str:
+    """Path to the synthetic file_dep tracking the PART-RELEVANT submodule slice for
+    PART recipes (``_part_file_deps``): a separate sidecar whose CONTENT is
+    ``_submodule_part_digest()``. Distinct from ``_submodule_dep`` so an assembly-only
+    submodule change flips the assembly sidecar (rebuilds assemblies) but leaves this
+    one untouched (parts stay cached). Memoized to one write-check per process."""
+    global _SUBMODULE_PART_DEP_PATH
+    if _SUBMODULE_PART_DEP_PATH is None:
+        _SUBMODULE_PART_DEP_PATH = _write_digest_sidecar(
+            _SUBMODULE_PART_DIGEST_FILE, _submodule_part_digest())
+    return _SUBMODULE_PART_DEP_PATH
 
 
 # --- Remote artefact cache (opt-in, off by default; see _artifact_cache.py).
@@ -703,7 +787,7 @@ def _assembly_cache_outputs(stem: str) -> list[Path]:
 def _part_file_deps(script: Path, stem: str) -> list[str]:
     return [str(script.resolve()), *_helper_deps(script),
             *_config_deps(script, stem, "part"), *data_deps_of(script),
-            _submodule_dep()]
+            _submodule_part_dep()]
 
 
 def _assembly_file_deps(stem: str) -> list[str]:
@@ -1228,6 +1312,20 @@ def task_check():
             "file_dep": [str((SCRIPTS_DIR / "_common.py").resolve()),
                          str((SCRIPTS_DIR / "test_flag_only.py").resolve())],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_flag_only.py")],
+        },
+        "partiso": {
+            # Guards the two-tier submodule digest: parts must never import the
+            # assembly/motion + MCP-server modules the PART recipe excludes
+            # (_submodule_part_digest), else that exclusion could silently skip a
+            # real part rebuild. Derives its forbidden set from dodo's exclude lists,
+            # so it depends on dodo.py + every part script (a new part or a helper's
+            # import edge must re-run it). Pure python -> offline gate.
+            "file_dep": [str((REPO_ROOT / "dodo.py").resolve()),
+                         str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
+                         str((SCRIPTS_DIR / "_common.py").resolve()),
+                         str((SCRIPTS_DIR / "test_part_isolation.py").resolve()),
+                         *part_script_deps],
+            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_part_isolation.py")],
         },
     }
     # Tripwire: `build` and `release` depend on f"check:{c}" for c in _CHECK_NAMES, so a

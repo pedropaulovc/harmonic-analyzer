@@ -102,7 +102,7 @@ The SolidWorks-free `check:*` gates and the comparison/diff tooling run from thi
 | `part:<stem>`, `assembly:<stem>` | yes | yes |
 | `verify:soundness`, `verify:kinematics` | yes | yes |
 | `export`, `release` | yes | yes |
-| `check:math`, `check:config`, `check:graph`, `check:nameplate`, `check:recipe`, `check:cache` | **no** | no (parallel) |
+| `check:math`, `check:config`, `check:graph`, `check:nameplate`, `check:recipe`, `check:cache`, `check:partiso` | **no** | no (parallel) |
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) |
 | `cache_status` | **no** | no (diagnostic) |
 | `build` (default), `build_bare` | meta | — |
@@ -247,6 +247,30 @@ CONSERVATIVE — any `_config` use the analyzer can't classify falls back to the
 whole config — so it can only over-rebuild, never skip a real change. Don't add a
 new `_config` accessor without mapping it in `_buildgraph` (`check:graph`'s
 coverage test fails loud otherwise).
+
+## Two-tier submodule digest (part vs assembly)
+
+The vendored `SolidworksMCP-python` submodule is a runtime input of every COM task,
+so its source content is folded into each task's recipe/cache key (issue #144 —
+`_submodule_digest` in `dodo.py`). But it is NOT one blob: **parts fold only the
+part-relevant slice** (`_submodule_part_digest` — the whole tree MINUS the
+assembly/motion COM modules and the MCP-server surface: `adapters/solidworks/
+assembly.py`, `.../motion.py`, `tools/`, `agents/`, `ui/`, `server*.py`), while
+**assemblies fold the whole tree** (`_submodule_digest`). Net: an assembly-only (or
+MCP-tooling-only) submodule bump rebuilds the ~8 assemblies but leaves all ~100 parts
+cached, instead of a whole-fleet rebuild. The two sidecars are distinct files
+(`.solidworks-mcp-submodule.digest` vs `-part.digest`).
+
+The exclusion is SAFE only because **no part build ever imports an assembly-level
+module** — `assembly.py`/`motion.py` are loaded transitively (PyWin32Adapter mixes
+them in) but a part only ever CALLS sketch/feature/export methods, and those modules
+import `base`/`com_variant` never the reverse, so their bodies can't leak into a
+part's geometry. `check:partiso` (`test_part_isolation.py`) ENFORCES this loud: it
+derives its forbidden-import set straight from `dodo._PART_DIGEST_EXCLUDE_*` and fails
+if any part script (or a repo-local helper it transitively imports) directly imports
+one of the excluded modules or the main-repo `_assembly` helper. So the exclusion
+can never silently go stale — add a module to the exclude list only if `check:partiso`
+still passes.
 
 ## Verify suites (renamed)
 
