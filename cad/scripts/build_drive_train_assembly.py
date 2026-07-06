@@ -143,6 +143,7 @@ import math
 import sys
 
 import _config
+import _config_asm
 from _common import (
     check,
     run_build,
@@ -1461,7 +1462,7 @@ async def _place_on_shaft(
 async def build(adapter) -> dict[str, str]:
     # `free` (default) DEFERS the freed-DOF park drivers (records, does not author);
     # `locked` authors them engaged. Set before any *_driver(free_dof_key=...) call.
-    set_flip_seeds(_config.flip_seeds("drive_train"))  # per-assembly learned flip polarity
+    set_flip_seeds(_config_asm.flip_seeds("drive_train"))  # per-assembly learned flip polarity
     set_park_defer(not LOCK)
     check("create_assembly", await adapter.create_assembly())
 

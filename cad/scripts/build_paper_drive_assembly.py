@@ -69,6 +69,7 @@ import math
 import sys
 
 import _config
+import _config_asm
 from _chain import (
     CENTRELINE_LEN,
     CRANK_CENTRE as CHAIN_CRANK_CENTRE,
@@ -370,7 +371,7 @@ async def _insert_roller_chain(adapter) -> None:
 
 
 async def build(adapter) -> dict[str, str]:
-    set_flip_seeds(_config.flip_seeds("paper_drive"))  # per-assembly learned flip polarity
+    set_flip_seeds(_config_asm.flip_seeds("paper_drive"))  # per-assembly learned flip polarity
     _assert_rack_mesh()
     _assert_knob_shaft_clearance()
     _assert_chain_layout()
