@@ -1,81 +1,89 @@
 ---
 name: belt-chain-feature-com-binding
-description: SW Belt/Chain assembly feature IS creatable in pywin32 (swFmBeltAndChain=119) — the pulley members must be cylindrical FACES, not component objects; passing components makes CreateFeature silently null
+description: SW Belt/Chain feature via pywin32 — pulley members are cylindrical FACES; PulleyDiameters getters return [] until AccessSelections; pre-create diameter sets no-op (SW re-derives from faces) — enforce post-create via early-bound ModifyDefinition + read-back
 metadata:
   type: reference
 ---
 
-## Belt/Chain assembly feature — WORKS in pywin32 (2026-07-05)
+## Belt/Chain assembly feature — the full pywin32 recipe (2026-07-05/06)
 
 For the paper-drive operational-DOF rework (couple the T12 crank sprocket ↔ T24
-knob sprocket so the crank drives the paper feed). Probe:
-`cad/scripts/diagnostics/probe_belt_feature.py` (WORKING). Extends
-[[chain-component-pattern]].
+knob sprocket so the crank drives the paper feed). Working probes:
+`cad/scripts/diagnostics/probe_belt_feature.py` (creation),
+`probe_belt_diameter.py` (diameter enforcement + measured coupling ratio/sense).
+Extends [[chain-component-pattern]].
 
-> **Lesson repeated from the chain pattern (same morning mistake): do NOT conclude
-> "the API can't do this from Python."** I first passed the wrong INPUT and wrongly
-> declared it infeasible in both pywin32 and comtypes. The fix was the pulley member
-> TYPE, per [[verify-assumptions-live-sw]] / the C#/VB.NET examples. Everything C#
-> can do here, pywin32 does.
+> **Lesson, three times now: do NOT conclude "the API can't do this" from a
+> null/empty/False return.** (1) Passing the wrong pulley member TYPE made
+> CreateFeature null → "infeasible in pywin32" (wrong). (2) Reading
+> `PulleyDiameters` without `AccessSelections` returns EMPTY and the pre-create
+> setter no-ops → "EngageBelt silently ignores PulleyDiameters, use a gear mate"
+> (codex #189 round-5 — wrong, and the gear mate also REVERSES the rotation
+> sense a chain preserves). (3) Late-bound `ModifyDefinition` returns False →
+> looks like "modification unsupported" (wrong — early-bind the IFeature).
+> Per [[verify-assumptions-live-sw]]: everything the C# examples do, pywin32 does.
 
-**Enum:** `swFeatureNameID_e.swFmBeltAndChain = 119` (verified via .NET reflection on
-`SolidWorks.Interop.swconst.dll`; `swFmLocalChainPattern=112` cross-checked). The
-offline docs list names but no ints. **NOT 92** (a wrong value → CreateDefinition null).
+**Enum:** `swFeatureNameID_e.swFmBeltAndChain = 119` (verified via .NET reflection;
+NOT 92 — a wrong value → CreateDefinition null).
 
-**The one thing that mattered — PulleyComponents must be cylindrical FACES, not the
-component objects.** The C#/VB.NET help examples select pulley faces (`SelectByRay`
-→ `GetSelectedObject6`). Passing the `IComponent2` objects makes the definition
-INVALID, so `CreateFeature` returns null **silently** — and the property setters
-still return "success" (the getters/setters lie pre-commit, so "all 7 props set =
-True" proves nothing). Switching to a Z-axis cylindrical face per sprocket made
-`CreateFeature` return the feature (`Belt1`) on the very first (simplest) strategy.
+**Creation (unchanged, proven):**
+1. **Pulley members = cylindrical FACES** (each pulley's largest cylinder about
+   the rotation axis — on a gear/sprocket that is the tooth-TIP face ring), NOT
+   the IComponent2 objects (components → CreateFeature silently null, and the
+   pre-commit setters still report success).
+2. `data = fm.CreateDefinition(119)` → `typed = sw_type_info.early_bound(data,
+   "IBeltChainFeatureData")` → set `PulleyComponents` (dispatch_array of faces),
+   `FlipSides`, `BeltLocationPlane` (IRefPlane normal to the axes),
+   `EngageBelt=True` (the coupling mates — a `BeltMates1` folder holding a
+   `BeltMate1` of type `MateBeltDim`), `CreateBeltPart=False` (the roller-chain
+   pattern stays the visual) → `feat = fm.CreateFeature(data)` (raw data,
+   late-bound fm). ~2–5 min solve on the real assembly.
 
-**Working pywin32 recipe (verified — `created=True name='Belt1'`):**
-1. **Get each pulley's cylindrical FACE** (its rotation axis). Per component:
-   `comp.GetBody()` → `body.GetFaces()`; for each face `face.GetSurface()`, keep the
-   ones where `surf.IsCylinder()` and `surf.CylinderParams` axis ≈ Z (`abs(az)>0.9`);
-   pick the largest radius. (Flag each dispatch: IComponent2 / IBody2 / IFace2 /
-   ISurface — `GetBody`/`GetFaces`/`GetSurface`/`IsCylinder` are methods;
-   `CylinderParams` is a property = 7 doubles `[ox,oy,oz, ax,ay,az, r]`, metres.)
-   The tip-cylinder is fine (T12 r=0.014, T24 r=0.026); `PulleyDiameters` sets the
-   effective belt diameter separately.
-2. `data = fm.CreateDefinition(119)` → non-null.
-3. `typed = sw_type_info.early_bound(data, "IBeltChainFeatureData")`; set on `typed`:
-   `PulleyComponents = com_variant.dispatch_array([face_a, face_b])`,
-   `PulleyDiameters = double_array([d_a, d_b])` (metres, pitch dia),
-   `FlipSides = VARIANT(VT_ARRAY|VT_BOOL, [False, False])`,
-   `BeltLocationPlane = <IRefPlane>` (from `model.FeatureByName("Front Plane")` →
-   `.GetSpecificFeature2()`; plane is normal to the pulley axes = Z here),
-   `UseBeltThickness=False`, `CreateBeltPart=False` (we keep the
-   [[chain-component-pattern]] link chain for the visual), `EngageBelt=True`
-   (creates the belt MATES that couple pulley rotation — the operational point).
-4. `feat = fm.CreateFeature(data)` — pass the RAW `data` (typed shares its oleobj),
-   late-bound `fm`. Returns the belt feature. (early_bound `fm` / passing `typed`
-   also fine; the raw/late combo is simplest.)
+**Diameters — the part round-5 got wrong.** SW derives each pulley's belt
+diameter from the picked FACE when the definition commits (tip ring 28:52 =
+0.538 on the m2 sprockets), and the `PulleyDiameters` you set pre-create does
+NOT survive the commit. Enforce POST-create (the official
+`Create_Belt_Chain_Feature_Example` route), with two COM traps:
 
-**comtypes NOT needed** (it also nulled — but that was still the component-input bug;
-it has its own friction anyway: object-typed returns come back as generic `_Dispatch`
-needing per-call `QueryInterface`, and it can't unmarshal `GetComponents`'
-`SAFEARRAY(VT_DISPATCH)` return, `KeyError 9`). See `probe_belt_comtypes.py` for that
-dead end.
+- **Getters are AccessSelections-gated**: `GetDefinition()` →
+  `typed.PulleyDiameters` reads **[]** until `typed.AccessSelections(model,
+  None)` — an un-accessed read looks exactly like "the property doesn't work".
+- **`ModifyDefinition` must be called on an EARLY-bound IFeature**
+  (`sw_type_info.early_bound(feat, "IFeature")`) — the late-bound flagged call
+  mismarshals and returns False. (Same family as the chain-pattern
+  CreateFeature null.)
 
-**SHIPPED in the real build (2026-07-05).** Wrapped as an adapter method
-`insert_belt_chain` (submodule `SolidworksMCP-python`, branch `pedro/belt-chain-feature`)
-+ used in `build_paper_drive_assembly.py`: T12/T24 sprockets freed (`ground=False` +
-axis-to-plane revolute via `_sprocket_revolute`, spin free), then the belt feature
-couples them (EngageBelt, CreateBeltPart=False — the roller-chain pattern is the
-visual). The crank T12 spin is the freed operational DOF (deferred park driver,
-`build_lock.yaml` `paper_drive: free`); a rack-pinion mate feeds the platen off the
-knob axis at the NET through-train travel (documented kinematic cheat across the
-Appendix C #8 engage gap — geometry unchanged). Build GREEN: belt OK (~124s),
-necessity gate `7 under-constrained >= 1 free DOF`, interference 0. See
-[[default-free-dof-park-drivers]].
+Recipe (now inside the adapter's `insert_belt_chain`, fail-loud):
+`GetDefinition` → `AccessSelections` → read (skip if already right, then
+`ReleaseSelectionAccess`) → set `PulleyDiameters = double_array(metres)` →
+`feat_eb.ModifyDefinition(data, model, None)` → fresh `GetDefinition` +
+`AccessSelections` → read-back must equal the request (raise otherwise) →
+`ReleaseSelectionAccess`. ModifyDefinition re-solves the belt from the new
+diameters; the enforcement read-back is PROVEN live (scratch probe, 2026-07-06:
+requested [0.024, 0.048] m confirmed post-ModifyDefinition, feature solved
+green). The resulting coupling ratio + same-sense rotation are asserted on the
+REAL paper-drive by `verify:kinematics` (`paper-drive:crank-feed`).
 
-**Gotcha found doing this — the rack-pinion mate needs DISTINCT entity marks**
-(rack=64, pinion=128; SW *Create Rack and Pinion Mate* example). The adapter's
-`_MATE_DEFAULT_MARKS` had NO `rack_pinion` entry, so both entities got mark 1 and
-`CreateMate` returned null ("CreateMate failed for rack_pinion mate"). Fixed in the
-adapter (per-index marks by entity order). This path had no prior use — latent bug.
+**Driving a coupled sprocket in a SCRATCH probe fails (unresolved):** a temp
+plane-plane ANGLE driver in the minimal two-sprocket assembly is created in
+hard error 1 IN PLACE, both flip sides — from parallel AND 15°-off-apex rest
+poses. The same `angle_driver` drives the FULL paper-drive model fine (twice),
+so measure coupling ratios on the real model via `verify:kinematics`
+([[park-driver-singularities]]). The scratch probe's durable result is the
+diameter enforcement itself: `insert_belt_chain` completed with the fail-loud
+read-back green (requested [0.024, 0.048] m confirmed post-ModifyDefinition).
 
-**blank_sketch:** exposed `IModelDoc2::BlankSketch` as an adapter method to hide
+**comtypes NOT needed** (its nulls were the same input bugs; it also can't
+unmarshal `GetComponents`' SAFEARRAY — see `probe_belt_comtypes.py`).
+
+**Rack-pinion gotcha (shipped with this work):** the rack-pinion mate needs
+DISTINCT entity marks (rack=64, pinion=128); the adapter's `_MATE_DEFAULT_MARKS`
+had no `rack_pinion` entry so both got mark 1 and `CreateMate` returned null.
+Fixed in the adapter (submodule #78); diameters enforce is submodule #79.
+
+**blank_sketch:** `IModelDoc2::BlankSketch` exposed as an adapter method to hide
 construction sketches (the chain-path spline + the belt's own generated sketch).
+
+See [[paper-drive-kinematic-probe]] for the ratio/sense verification wired into
+`verify:kinematics`, and [[default-free-dof-park-drivers]] for the freed crank
+spin.
