@@ -62,7 +62,7 @@ def _discard_open_documents(adapter: Any) -> None:
 # The default-free assemblies that carry deferred park drivers (dashed stems, the
 # same set verify.py's `_expected_free_dof` gives a non-zero count). A `locked`
 # build of either yields 0 expected free DOF and is skipped (nothing to close).
-FREE_ASSEMBLIES = ["drive-train", "channel", "magnifier"]
+FREE_ASSEMBLIES = ["drive-train", "channel", "magnifier", "paper-drive"]
 
 
 async def _preflight_one(adapter: Any, name: str) -> str:

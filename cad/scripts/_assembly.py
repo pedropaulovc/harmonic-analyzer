@@ -1578,6 +1578,7 @@ def assert_free_dof_necessity(
     *,
     resolve: bool = True,
     required_stems: tuple[str, ...] = (),
+    required_instances: tuple[str, ...] = (),
 ) -> None:
     """Build/soundness DOF gate for a default-``free`` model whose freed park
     drivers are DEFERRED (not authored -- see the Park drivers section).
@@ -1596,6 +1597,13 @@ def assert_free_dof_necessity(
     passes even with a second freed DOF accidentally pinned (codex review
     2026-07-04). ``required_stems`` therefore names one component family per
     freed DOF (instance suffixes stripped) that MUST read under-constrained.
+
+    ``required_instances`` names EXACT component instances (no stem-collapse) that
+    must read under-constrained -- use it when several instances share a stem and
+    only a SPECIFIC one carries the freed DOF (e.g. paper-drive has three
+    ``transgear-removable`` instances -- T12 crank, T24 knob, T18 spare -- but only
+    the T12 crank spin is the operational DOF; a stem check would pass if the T24
+    were free and the T12 pinned, codex #189). Pass the runtime instance name.
 
     ``expected_count == 0`` reduces to :func:`assert_components_fully_defined`.
     ``resolve=False`` skips the rebuild (soundness re-solved once after open)."""
@@ -1622,6 +1630,15 @@ def assert_free_dof_necessity(
                     f"free-DOF necessity: required famil(ies) {missing} read fully "
                     f"defined -- that freed DOF is pinned. Under-constrained: "
                     f"{sorted(under)}"
+                )
+        if required_instances:
+            missing_inst = [n for n in required_instances if n not in under]
+            gsp.set_attribute("required_instances", ",".join(required_instances))
+            if missing_inst:
+                raise RuntimeError(
+                    f"free-DOF necessity: required instance(s) {missing_inst} read "
+                    f"fully defined -- that freed DOF is pinned (a sibling instance "
+                    f"may be free instead). Under-constrained: {sorted(under)}"
                 )
         _telemetry.success(
             f"{len(under)} under-constrained component(s) >= {expected_count} expected "

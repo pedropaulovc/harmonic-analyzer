@@ -573,14 +573,20 @@ async def build(adapter) -> dict[str, str]:
     # knob sits north of the T24/chain band and clear of the pinion bar's
     # z band (-105..-117) by 5 in z (and the shaft passes under the bar in y
     # anyway, see _assert_knob_shaft_clearance).
-    await place_component(adapter, "transgear-knob-shaft",
+    # FREE (ground=False): rigidly LOCK-mated to the T24 knob wheel below so the
+    # whole knob cluster (shaft + fine pinion + T24) turns as ONE keyed body when
+    # the crank drives the belt -- the visible knob shaft + fine pinion follow the
+    # feed, not just the T24 surrogate (codex #189). Neither part carries a
+    # construction axis (only the removable does), so the cluster's single spin DOF
+    # is T24's revolute; the Lock mate preserves each part's as-placed pose.
+    knob_shaft = await place_component(adapter, "transgear-knob-shaft",
                           [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], -158.0],
-                          [90.0, 0.0, 0.0], ROT_X_POS90)
+                          [90.0, 0.0, 0.0], ROT_X_POS90, ground=False)
     # Fine 24T DP30 pinion on the knob shaft, just behind the knob face
-    # (z -134..-128): engageable on the disc, parked clear in the rest state.
-    await place_component(adapter, "transgear-pinion",
+    # (z -134..-128): the "translation gear" of the feed train.
+    fine_pinion = await place_component(adapter, "transgear-pinion",
                           [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], -134.0],
-                          [0.0, 0.0, 0.0], IDENTITY)
+                          [0.0, 0.0, 0.0], IDENTITY, ground=False)
     # Mounted T24 removable = the knob-end chain wheel (ch. 23: the roller
     # chain rides the removable's teeth; swapping removables changes the
     # platen ratio). Band -157.5..-152.5 on the front -155 plane, south of the
@@ -591,6 +597,18 @@ async def build(adapter) -> dict[str, str]:
                           [0.0, 0.0, 0.0], IDENTITY, configuration="T24", ground=False,
                           label="transgear-removable (mounted T24)")
     await _sprocket_revolute(adapter, t24, "T24 knob wheel")
+    # Key the knob cluster to spin as ONE rigid body: LOCK the knob shaft and the
+    # fine pinion to the (free-spinning) T24 wheel -- all three ride the same
+    # physical knob shaft. Dragging the crank -> belt -> T24 now turns the shaft
+    # AND the fine pinion together, so the whole feed train visibly follows (codex
+    # #189 :592). Net DOF unchanged: freeing shaft + pinion (+12 DOF) is removed by
+    # the two 6-DOF Lock mates; the cluster keeps T24's single free spin.
+    await lock_mate(adapter, named_ref(f"Front Plane@{knob_shaft}", "PLANE"),
+                    named_ref(f"Front Plane@{t24}", "PLANE"),
+                    label="knob cluster: knob shaft locked to T24")
+    await lock_mate(adapter, named_ref(f"Front Plane@{fine_pinion}", "PLANE"),
+                    named_ref(f"Front Plane@{t24}", "PLANE"),
+                    label="knob cluster: fine pinion locked to T24")
     # Crank-end T12 removable = the crank-shaft chain wheel, brought over from
     # drive-train so the chain seats on BOTH sprockets locally. Placed at the
     # PRE-mirror crank centre (_chain CRANK_CENTRE == drive-train X_CRANK,Y_CRANK,
@@ -675,8 +693,12 @@ async def build(adapter) -> dict[str, str]:
     else:
         # ONE freed operational DOF: the crank spin (the deferred PARK driver
         # above), which drives the belt-coupled knob + the rack-fed platen.
+        # Target the SPECIFIC T12 crank instance (not the shared
+        # ``transgear-removable`` stem: the T24 knob + T18 spare share it, so a
+        # stem check would pass even if T24 were free and the crank T12 pinned --
+        # codex #189 :679).
         assert_free_dof_necessity(
-            adapter, 1, required_stems=("transgear-removable",))
+            adapter, 1, required_instances=(t12,))
         write_park_specs(ASM_NAME)
     check_no_interference(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)
