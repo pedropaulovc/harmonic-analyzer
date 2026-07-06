@@ -71,6 +71,8 @@ def _launch() -> None:
         ),
         help="path to blender.exe ($HARMONIC_BLENDER)",
     )
+    ap.add_argument("--shots", default="", help="verify: relaunch headed, capture "
+                    "the camera<->free toggle screenshots to this dir, then quit")
     args = ap.parse_args()
 
     blender = Path(args.blender)
@@ -83,6 +85,8 @@ def _launch() -> None:
         str(blender), "--python", str(here), "--",
         "--pair", args.pair, "--repo", str(Path(args.repo).resolve()),
     ]
+    if args.shots:
+        cmd += ["--shots", str(Path(args.shots).resolve())]
     print("launching:", " ".join(cmd), flush=True)
     raise SystemExit(subprocess.call(cmd))
 
@@ -533,8 +537,11 @@ class HAC_OT_reset_target(bpy.types.Operator):
             return {"CANCELLED"}
         props = context.scene.hac_pose
         cx, cy, cz = _bbox_center()
-        props.free_target = False
+        # Set the coords FIRST (each assignment trips _on_target_update, which
+        # re-frees the target), then clear free_target LAST so the pose saves as a
+        # null target_mm and stays auto-centred after a later bbox change.
         props.target_x, props.target_y, props.target_z = cx, cy, cz
+        props.free_target = False
         _aim(props)
         return {"FINISHED"}
 
@@ -612,8 +619,14 @@ class HAC_OT_save_manifest(bpy.types.Operator):
         c["target_mm"] = ([round(props.target_x, 2), round(props.target_y, 2),
                            round(props.target_z, 2)] if props.free_target else None)
         c["perspective"] = {"focal_length_mm": round(props.focal_mm, 2)} if props.perspective else None
+        # The studio previews an EXPLICIT euler target/zoom (it never applies
+        # frame_components). Drop that seed-time auto-frame hint so the offline
+        # render reproduces what was posed here, instead of silently re-deriving
+        # target/zoom from the components and discarding these edits.
+        dropped = c.pop("frame_components", None)
         path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-        self.report({"INFO"}, f"saved pose -> {path.name} ({props.pair_id})")
+        note = "  (cleared frame_components)" if dropped else ""
+        self.report({"INFO"}, f"saved pose -> {path.name} ({props.pair_id}){note}")
         return {"FINISHED"}
 
 
@@ -744,7 +757,21 @@ _CLASSES = (
 _KEYMAPS: list = []
 
 
+def _disable_retired_addon():
+    """The retired blender_camera_addon.py registered the SAME `hac.*` operator
+    ids and `Harmonic` panel category. On a seat that still has it enabled it
+    loads first and collides with our register() (and keeps forcing camera-view
+    lock). Disable it defensively before we register. No-op if it's absent."""
+    try:
+        import addon_utils
+        addon_utils.disable("blender_camera_addon", default_set=False,
+                            handle_error=lambda _e: None)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def register():
+    _disable_retired_addon()
     for cls in _CLASSES:
         bpy.utils.register_class(cls)
     bpy.types.Scene.hac_pose = bpy.props.PointerProperty(type=HACPoseProps)
