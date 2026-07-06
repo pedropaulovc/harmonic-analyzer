@@ -640,25 +640,27 @@ async def build(adapter) -> dict[str, str]:
     # T24 exactly as the roller chain physically does: SAME rotation sense (both
     # sprockets turn the same way -- a gear mate models an external mesh and
     # REVERSES) at the pitch-diameter ratio 24:48 = 12:24 teeth = 0.500 (each
-    # link engages one tooth, so rev_T12 * 12 == rev_T24 * 24). SW seeds each
-    # pulley's belt diameter from the picked face -- on these sprockets the
-    # tooth-TIP cylinder (28:52 = 0.538, a ~7.7% feed error) -- and the
-    # pre-create PulleyDiameters put silently no-ops, so the adapter FORCES the
-    # pitch values post-create (GetDefinition -> AccessSelections ->
-    # PulleyDiameters -> ModifyDefinition, the official example's route) and
-    # fails loud unless the read-back confirms (probed live 2026-07-06; see
-    # memory/belt-chain-feature-com-binding.md). EngageBelt authors the coupling
-    # mates; CreateBeltPart stays off -- the roller-chain component pattern above
-    # is the visual. Both sprockets stay FREE (Axis1 pinned, spin-only via
-    # _sprocket_revolute), so the belt constrains only their relative rotation --
-    # 0 net free DOF added. The verify:kinematics probe asserts the 0.500 ratio
-    # AND the same-sense rotation tightly.
+    # link engages one tooth, so rev_T12 * 12 == rev_T24 * 24). The pulley
+    # members are each sprocket's Axis1 DATUM AXIS, not a face: with a face
+    # member SW bakes the picked face's diameter -- on these sprockets the
+    # tooth-TIP cylinder (28:52 = 0.538, a ~7.7% feed error) -- into the
+    # EngageBelt coupling mate and no definition-level route rewrites it; an
+    # axis has no diameter to steal, so the typed pitch diameters drive the
+    # mate exactly (probed live 2026-07-06, ratio +0.5000; see
+    # memory/belt-chain-feature-com-binding.md). The adapter reads the mate's
+    # own D1/D2 back and fails loud on a mismatch. EngageBelt authors the
+    # coupling mates; CreateBeltPart stays off -- the roller-chain component
+    # pattern above is the visual. Both sprockets stay FREE (Axis1 pinned,
+    # spin-only via _sprocket_revolute), so the belt constrains only their
+    # relative rotation -- 0 net free DOF added. The verify:kinematics probe
+    # asserts the 0.500 ratio AND the same-sense rotation tightly.
     from solidworks_mcp.adapters.base import BeltChainParameters
     check(
         "chain coupling T12<->T24 (belt/chain feature, pitch 24:48)",
         await adapter.insert_belt_chain(BeltChainParameters(
             pulley_components=[t12, t24],
             pulley_diameters=[2.0 * PITCH_R_T12, 2.0 * PITCH_R_T24],  # mm
+            pulley_member_axes=[f"Axis1@{t12}", f"Axis1@{t24}"],
             location_plane="Front Plane",
             engage_belt=True, create_belt_part=False, blank_sketch=True)))
     # (2) Rack-pinion mate feeds the platen off the knob (T24) axis at the NET
