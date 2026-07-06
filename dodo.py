@@ -91,12 +91,15 @@ from _buildgraph import (  # noqa: E402
     artefact_for,
     config_files_of,
     data_deps_of,
+    flipseed_family_files,
     machine_family_files,
     module_deps_of,
     part_row_files,
     part_scripts,
     part_stems,
     parts_registry_files,
+    placement_family_files,
+    placement_row_file,
     references_of,
     script_for,
     stamps_part_properties,
@@ -472,6 +475,31 @@ def _expand_parts_token(stem: str | None, kind: str | None, script: Path) -> lis
     return parts_registry_files()
 
 
+def _expand_placement_token(stem: str | None, kind: str | None) -> list[str]:
+    """Per-task expansion of the ``"placement/*"`` token (the dynamic part name in
+    ``_transforms.mirror_placement``, read by every assembly that imports
+    ``_transforms``):
+
+      * an ASSEMBLY depends on the placement rows of the parts it REFERENCES -- so a
+        ``placement/<part>.yaml`` edit lands in exactly the recipes of the assemblies
+        that PLACE that part (a FULL re-insert, which the mirror change needs), and
+        NOWHERE else (issue #156). A referenced sub-assembly has no placement file, so
+        it contributes nothing; its own leaf-part placement edits re-key the SUB, which
+        then propagates up as a REFRESH -- correct, the top never re-places a leaf.
+      * a PART reads no placement (placement is assembly-time only) -> no dep, so a
+        placement edit never rebuilds the part.
+      * any other caller -> the whole family (conservative).
+    """
+    if kind == "assembly" and stem is not None:
+        files: set[str] = set()
+        for ref in references_of(stem):
+            files.update(placement_row_file(ref.replace("_", "-")))
+        return sorted(files)
+    if kind == "part":
+        return []
+    return placement_family_files()
+
+
 def _config_deps(script, stem: str | None = None, kind: str | None = None) -> list[str]:
     """The cad/config FILES this build script actually reads (fine-grained;
     conservative whole-config fallback on any unclassifiable ``_config`` use).
@@ -489,6 +517,10 @@ def _config_deps(script, stem: str | None = None, kind: str | None = None) -> li
             out.update(machine_family_files())
         elif tok == "parts/*":
             out.update(_expand_parts_token(stem, kind, script))
+        elif tok == "placement/*":
+            out.update(_expand_placement_token(stem, kind))
+        elif tok == "flip_seeds/*":
+            out.update(flipseed_family_files())
         else:
             out.add(str((CONFIG_DIR / tok).resolve()))
     return sorted(out)

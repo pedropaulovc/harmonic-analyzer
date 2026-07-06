@@ -301,8 +301,11 @@ _FIXED_ACCESSOR_TOKENS: dict[str, frozenset[str]] = {
 # Accessors whose file(s) are named by their FIRST positional argument:
 #   machine(<subsystem>, ...) -> machine/<subsystem>.yaml   (dynamic -> machine/*)
 #   parts(<dashed-name>)      -> parts/<name>.yaml+_defaults (dynamic -> parts/*)
+#   placement(<dashed-name>)  -> placement/<name>.yaml       (dynamic -> placement/*)
+#   flip_seeds(<stem>)        -> flip_seeds/<stem>.yaml       (dynamic -> flip_seeds/*)
 #   provenance/_doc(<doc>)    -> that doc's file family      (dynamic -> "**")
-_FAMILY_ACCESSORS: frozenset[str] = frozenset({"machine", "parts", "provenance", "_doc"})
+_FAMILY_ACCESSORS: frozenset[str] = frozenset(
+    {"machine", "parts", "placement", "flip_seeds", "provenance", "_doc"})
 
 
 class _UnknownConfigUse(Exception):
@@ -328,6 +331,20 @@ def _part_registry_names() -> frozenset[str]:
     """Per-part registry stems (``parts/<dashed-name>.yaml`` minus _defaults)."""
     d = CONFIG_DIR / "parts"
     return frozenset(p.stem for p in d.glob("*.yaml") if p.stem != "_defaults") if d.is_dir() else frozenset()
+
+
+@functools.lru_cache(maxsize=1)
+def _placement_names() -> frozenset[str]:
+    """Per-part placement stems (``placement/<dashed-name>.yaml``)."""
+    d = CONFIG_DIR / "placement"
+    return frozenset(p.stem for p in d.glob("*.yaml")) if d.is_dir() else frozenset()
+
+
+@functools.lru_cache(maxsize=1)
+def _flipseed_stems() -> frozenset[str]:
+    """Per-assembly flip-seed stems (``flip_seeds/<stem>.yaml``)."""
+    d = CONFIG_DIR / "flip_seeds"
+    return frozenset(p.stem for p in d.glob("*.yaml")) if d.is_dir() else frozenset()
 
 
 def _doc_family_tokens(doc: str) -> frozenset[str] | None:
@@ -358,6 +375,18 @@ def _family_tokens(accessor: str, arg: str | None) -> frozenset[str]:
         if arg in _part_registry_names():
             return frozenset({f"parts/{arg}.yaml", "parts/_defaults.yaml"})
         raise _UnknownConfigUse                        # unknown registry row
+    if accessor == "placement":
+        if arg is None:
+            return frozenset({"placement/*"})         # dynamic part name (mirror_placement)
+        if arg in _placement_names():
+            return frozenset({f"placement/{arg}.yaml"})
+        raise _UnknownConfigUse                        # unknown placement row
+    if accessor == "flip_seeds":
+        if arg is None:
+            return frozenset({"flip_seeds/*"})        # dynamic stem (no caller does this)
+        if arg in _flipseed_stems():
+            return frozenset({f"flip_seeds/{arg}.yaml"})
+        raise _UnknownConfigUse                        # unknown flip-seed stem
     # provenance / _doc: a non-literal doc name is unresolvable -> whole config.
     if arg is None:
         raise _UnknownConfigUse
@@ -473,6 +502,26 @@ def parts_registry_files() -> list[str]:
     """Every parts/*.yaml (incl _defaults) -- the conservative ``"parts/*"``
     expansion (dodo.py narrows this per task)."""
     d = CONFIG_DIR / "parts"
+    return sorted(str(p.resolve()) for p in d.glob("*.yaml")) if d.is_dir() else []
+
+
+def placement_family_files() -> list[str]:
+    """Every placement/*.yaml -- the conservative ``"placement/*"`` expansion
+    (dodo.py narrows this per assembly to its referenced-part rows)."""
+    d = CONFIG_DIR / "placement"
+    return sorted(str(p.resolve()) for p in d.glob("*.yaml")) if d.is_dir() else []
+
+
+def placement_row_file(dashed_name: str) -> list[str]:
+    """The placement file a single part contributes, if it exists (a part with no
+    placement file takes the default bbox-``x`` mirror, so has no dep)."""
+    row = CONFIG_DIR / "placement" / f"{dashed_name}.yaml"
+    return [str(row.resolve())] if row.exists() else []
+
+
+def flipseed_family_files() -> list[str]:
+    """Every flip_seeds/*.yaml -- the conservative ``"flip_seeds/*"`` expansion."""
+    d = CONFIG_DIR / "flip_seeds"
     return sorted(str(p.resolve()) for p in d.glob("*.yaml")) if d.is_dir() else []
 
 
