@@ -5,6 +5,17 @@ metadata:
   type: project
 ---
 
+> **UPDATE 2026-07-05 — paper-drive joins the free regime (1 DOF: crank spin).**
+> The crank-end T12 sprocket spins free (deferred `crank_spin` park driver,
+> `build_lock.yaml` `paper_drive: free`, `verify._expected_free_dof("paper-drive")`
+> → 1, `required_stems=("transgear-removable",)`). A native **Belt/Chain feature**
+> ([[belt-chain-feature-com-binding]], `adapter.insert_belt_chain`, EngageBelt)
+> couples T12↔T24; a **rack-pinion mate** feeds the platen off the knob axis at the
+> NET through-train travel. The engage is a documented KINEMATIC coupling at the
+> faithful ch30 rest geometry (the transgear keeps its 13.1 mm gap — Appendix C #8's
+> open riddle; the single latch arm can't serve both 66.05 rest and 51.0 engaged).
+> Build GREEN: necessity `7 under-constrained >= 1`, interference 0.
+>
 > **UPDATE 2026-07-03 — cone-platform swing is now a FREED DOF (PR2 round 3).**
 > The p1 swing angle driver gained `free_dof_key="cone_swing"`, so drive-train's
 > free count is **2** (crank spin + platform swing) — `verify._expected_free_dof`

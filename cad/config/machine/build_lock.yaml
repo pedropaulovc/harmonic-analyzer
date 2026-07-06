@@ -19,6 +19,7 @@ build_lock:
   drive_train: free
   channel: free
   magnifier: free
+  paper_drive: free
   source: "design decision 2026-06 (default-free kinematic model + opt-in lock)"
   confidence: high
   notes: >-
@@ -29,7 +30,11 @@ build_lock:
     lever pivots about the summing bar's knife-edge ridge (video 2/4+4/4, ~6 mm tip
     arc), the clamp/vertical-rod/fixture group swings with it, the wire ball-joints
     at the hook + rides the hub at the 0.25 stand-off tangency, and the WIRE-1 yoke
-    mate turns the magnifying wheel (coupled, not separately freed). In a free build these freed-DOF
+    mate turns the magnifying wheel (coupled, not separately freed). paper_drive frees the
+    crank (T12) sprocket spin (1 DOF): a Belt/Chain feature couples it to the knob T24, and a
+    rack-pinion mate feeds the platen off the knob axis at the net through-train ratio (the
+    intermediate transgear stays in its faithful ch30 rest pose; the engage is coupled
+    kinematically across the documented gap, Appendix C #8). In a free build these freed-DOF
     drivers are DEFERRED (recorded to a park-spec sidecar, not authored); a locked build
     authors them engaged. Other assemblies do not read build_lock and stay fully defined.
     The verify DOF gate adapts: free -> necessity only (>= N under-constrained); the

@@ -14,8 +14,10 @@ stand-in are both retired.
 Geometry (local frame: knob wrap centre at the origin, machine xy
 pre-mirror; crank centre from build_drive_train_assembly X_CRANK / Y_CRANK
 minus build_paper_drive_assembly KNOB_SHAFT_XY): two UNEQUAL wrap arcs whose
-centreline floats clear OUTSIDE the gear tooth tips (a real chain wraps at
-the teeth; rigid model beads there would intersect them), the common
+centreline rides each gear's PITCH circle (where a real chain seats -- the
+rollers rest in the tooth valleys and the tips poke out past the chain; the
+links overlap the teeth in the shared z-plane, intended mesh whitelisted in
+build_paper_drive_assembly.check_no_interference), the common
 external tangent taut line on the +n side (the pinion-bar side), and a
 slack arc sagging SAG below the straight external tangent on the -n side,
 tangent-continuous at all four junctions (internal tangency:
@@ -45,13 +47,19 @@ CRANK_CENTRE = (122.8, 144.96)  # drive-train X_CRANK, Y_CRANK
 
 TIP_R_T24 = 26.0  # mounted removables, module 2: tip r = (T + 2) * 2 / 2
 TIP_R_T12 = 14.0
-TIP_AIR = 0.41  # chain inner reach floats this clear of the tooth tips
-REACH = 2.5  # centreline-to-tip budget past TIP_AIR: the retired flat band
-# was 5 wide (centreline +- 2.5) and every M6.8/M6.9 checker-arbitrated
-# clearance was tuned against that reach; the bead radius (2.4) stays
-# inside it, so the tuning transfers with margin
-WRAP_R_A = TIP_R_T24 + TIP_AIR + REACH  # 28.91 (knob T24)
-WRAP_R_B = TIP_R_T12 + TIP_AIR + REACH  # 16.91 (crank T12)
+PITCH_R_T24 = 24.0  # module 2 pitch r = T * 2 / 2 -- the chain pin centreline
+PITCH_R_T12 = 12.0  # rides here (rollers seat in the tooth valleys)
+# The roller chain SEATS on each sprocket: its pin centreline rides the gear
+# PITCH circle (the pitch polygon a real chain wraps), so the rollers rest in
+# the tooth valleys and the tips poke out past the chain -- "on the base, not
+# the teeth". Because the chain and the removables share one z-plane (a
+# coplanar single-plane stand-in for a chain that really straddles the
+# sprocket), the links necessarily overlap the teeth in that plane; that
+# contact is intended mesh, whitelisted in
+# build_paper_drive_assembly.check_no_interference (chain-link <->
+# transgear-removable), exactly as link<->link contact already is.
+WRAP_R_A = PITCH_R_T24  # 24.0 (knob T24 pitch circle)
+WRAP_R_B = PITCH_R_T12  # 16.91 -> 12.0 (crank T12 pitch circle)
 SAG = 14.0  # slack-run droop below the straight tangent (p006 crop read 18;
 # was trimmed from 18 to clear the cone-pivot-post top, but the ch30 GT
 # re-anchor retired that constraint: the post (now the p1 swing bracket at
