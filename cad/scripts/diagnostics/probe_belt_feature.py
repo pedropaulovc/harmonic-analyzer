@@ -163,6 +163,7 @@ async def build(adapter) -> dict[str, str]:
             return d, t
 
         def preselect():
+            ext = model.Extension  # the selection extension used by SelectByID2 below
             adapter._attempt(lambda: model.ClearSelection2(True), default=None)
             for i, cfg in enumerate(("T12", "T24")):
                 nm = adapter._attempt(lambda c=sprockets[cfg]: c.Name2, default=None)
