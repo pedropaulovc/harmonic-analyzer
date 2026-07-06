@@ -393,47 +393,64 @@ def test_recipe_digest_ignores_yaml_comments(tmp_path):
 # key (a submodule bump busts the key) -- while the SolidWorks-free check:* tasks,
 # which never touch COM, must stay off it.
 def _redirect_submodule(dodo, root: Path):
-    """Point dodo's submodule source + synthetic sidecar into a temp sandbox and
-    reset the per-process memoization, so a test controls the tree content and never
-    writes into the real cad/out."""
+    """Point dodo's submodule source + BOTH synthetic sidecars (full + part-relevant)
+    into a temp sandbox and reset the per-process memoization, so a test controls the
+    tree content and never writes into the real cad/out."""
     src = root / "src" / "solidworks_mcp"
     src.mkdir(parents=True, exist_ok=True)
     dodo.SUBMODULE_SRC = src
     dodo._SUBMODULE_DIGEST_FILE = root / ".submodule.digest"
+    dodo._SUBMODULE_PART_DIGEST_FILE = root / ".submodule-part.digest"
     dodo._SUBMODULE_DIGEST = None
+    dodo._SUBMODULE_PART_DIGEST = None
     dodo._SUBMODULE_DEP_PATH = None
+    dodo._SUBMODULE_PART_DEP_PATH = None
     return src
 
 
+def _reset_submodule_memo(dodo):
+    """Force both digests to re-read the (redirected) tree on the next call."""
+    dodo._SUBMODULE_DIGEST = None
+    dodo._SUBMODULE_PART_DIGEST = None
+    dodo._SUBMODULE_DEP_PATH = None
+    dodo._SUBMODULE_PART_DEP_PATH = None
+
+
 def test_com_deps_include_submodule_and_checks_do_not(tmp_path):
-    """The synthetic submodule dep is present in EVERY COM task's dep set (part
-    file_dep, assembly recipe + file_dep) and absent from EVERY check:* file_dep."""
+    """The synthetic submodule dep is present in EVERY COM task's dep set and absent
+    from EVERY check:* file_dep. Two-tier since #144-followup: PARTS fold the
+    part-relevant slice (``_submodule_part_dep``), ASSEMBLIES fold the whole tree
+    (``_submodule_dep``); the two sidecars are distinct files."""
     dodo = _load_dodo()
     src = _redirect_submodule(dodo, tmp_path)
     (src / "adapters.py").write_text("def mate(): return 1\n")
-    dep = dodo._submodule_dep()
-    assert Path(dep) == (tmp_path / ".submodule.digest").resolve()
+    full_dep = dodo._submodule_dep()
+    part_dep = dodo._submodule_part_dep()
+    assert Path(full_dep) == (tmp_path / ".submodule.digest").resolve()
+    assert Path(part_dep) == (tmp_path / ".submodule-part.digest").resolve()
+    assert full_dep != part_dep, "part + assembly must track SEPARATE sidecars"
 
     stem = dodo.part_stems()[0]
-    assert dep in dodo._part_file_deps(dodo.SCRIPTS_DIR / f"build_{stem}.py", stem), \
-        "every part must depend on the submodule digest"
+    part_deps = dodo._part_file_deps(dodo.SCRIPTS_DIR / f"build_{stem}.py", stem)
+    assert part_dep in part_deps, "every part must depend on the part-slice digest"
+    assert full_dep not in part_deps, "a part must NOT fold the whole-tree digest"
 
     asm = dodo.ASSEMBLY_ORDER[0]
-    assert dep in dodo._recipe_files(asm), "assembly recipe must fold the submodule"
-    assert dep in dodo._assembly_file_deps(asm), "assembly file_dep must include it"
+    assert full_dep in dodo._recipe_files(asm), "assembly recipe must fold the submodule"
+    assert full_dep in dodo._assembly_file_deps(asm), "assembly file_dep must include it"
 
-    # check:* tasks never touch COM -> the submodule must NOT enter their dep set,
-    # or an offline gate would spuriously re-run on a submodule bump.
+    # check:* tasks never touch COM -> neither submodule sidecar may enter their dep
+    # set, or an offline gate would spuriously re-run on a submodule bump.
     for task in dodo.task_check():
-        assert dep not in task["file_dep"], \
+        assert full_dep not in task["file_dep"] and part_dep not in task["file_dep"], \
             f"check:{task['name']} must not depend on the submodule"
 
 
-def test_submodule_content_flips_com_cache_key(tmp_path):
-    """A submodule source change -- a committed pin bump OR a dirty local edit --
-    flips every COM cache key; a no-op recompute leaves it stable (idempotent).
-    Exercised through the REAL cache_key path (_cache_key -> _artifact_cache), so it
-    proves the fix reaches the cross-machine key, not just the dep list."""
+def test_part_relevant_submodule_change_flips_part_cache_key(tmp_path):
+    """A PART-RELEVANT submodule source change -- a committed pin bump OR a dirty
+    local edit -- flips every part's COM cache key; a no-op recompute leaves it stable
+    (idempotent). Exercised through the REAL cache_key path (_cache_key ->
+    _artifact_cache), so it proves the fix reaches the cross-machine key."""
     dodo = _load_dodo()
     src = _redirect_submodule(dodo, tmp_path)
     (src / "adapters.py").write_text("def mate(): return 1\n")
@@ -442,8 +459,7 @@ def test_submodule_content_flips_com_cache_key(tmp_path):
     script = dodo.SCRIPTS_DIR / f"build_{stem}.py"
 
     def key():
-        dodo._SUBMODULE_DIGEST = None      # re-read the tree on each call
-        dodo._SUBMODULE_DEP_PATH = None
+        _reset_submodule_memo(dodo)        # re-read the tree on each call
         return dodo._cache_key(dodo._part_file_deps(script, stem), f"part:{stem}")
 
     k1 = key()
@@ -451,11 +467,61 @@ def test_submodule_content_flips_com_cache_key(tmp_path):
 
     (src / "adapters.py").write_text("def mate(): return 2\n")   # dirty edit
     k2 = key()
-    assert k2 != k1, "a submodule source edit must bust the COM cache key"
+    assert k2 != k1, "a part-relevant submodule edit must bust the part cache key"
 
     (src / "planes.py").write_text("PLANE = 3\n")               # new source file
     k3 = key()
-    assert k3 != k2, "an added submodule source file must bust the key too"
+    assert k3 != k2, "an added part-relevant submodule source file must bust it too"
+
+
+def test_assembly_only_submodule_change_spares_parts(tmp_path):
+    """The #144-followup guarantee: editing an EXCLUDED (assembly/motion/MCP-server)
+    submodule module flips the ASSEMBLY cache key but leaves the PART key untouched,
+    so an assembly-only submodule bump no longer rebuilds the ~100 parts."""
+    dodo = _load_dodo()
+    src = _redirect_submodule(dodo, tmp_path)
+    (src / "adapters.py").write_text("def mate(): return 1\n")  # a part-relevant file
+    excluded = src / "adapters" / "solidworks" / "assembly.py"
+    excluded.parent.mkdir(parents=True, exist_ok=True)
+    excluded.write_text("def add_mate(): return 1\n")
+
+    stem = dodo.part_stems()[0]
+    part_script = dodo.SCRIPTS_DIR / f"build_{stem}.py"
+    asm = dodo.ASSEMBLY_ORDER[0]
+
+    def part_key():
+        _reset_submodule_memo(dodo)
+        return dodo._cache_key(dodo._part_file_deps(part_script, stem), f"part:{stem}")
+
+    def asm_key():
+        _reset_submodule_memo(dodo)
+        return dodo._cache_key(dodo._assembly_file_deps(asm), f"assembly:{asm}")
+
+    p1, a1 = part_key(), asm_key()
+    excluded.write_text("def add_mate(): return 2\n")            # assembly-only edit
+    p2, a2 = part_key(), asm_key()
+
+    assert p2 == p1, "an assembly-only submodule edit must NOT bust the part key"
+    assert a2 != a1, "an assembly-only submodule edit MUST bust the assembly key"
+
+
+def test_part_digest_excludes_assembly_level_modules():
+    """Unit-level: the classifier drops ONLY the assembly/motion COM modules from the
+    part slice while keeping the shared helpers AND the MCP-server surface (codex #191:
+    tools/server stay in the part digest), and the two digests of the REAL tree
+    genuinely differ (so the exclusion isn't a no-op)."""
+    dodo = _load_dodo()
+    src = dodo.SUBMODULE_SRC
+    excl = dodo._is_part_relevant_submodule_file
+    assert excl(src / "adapters" / "solidworks" / "assembly.py") is False
+    assert excl(src / "adapters" / "solidworks" / "motion.py") is False
+    # MCP-server surface stays IN the part digest (kept, not excluded):
+    assert excl(src / "server.py") is True
+    assert excl(src / "tools" / "modeling.py") is True
+    assert excl(src / "adapters" / "base.py") is True
+    assert excl(src / "adapters" / "com_variant.py") is True
+    assert dodo._submodule_part_digest() != dodo._submodule_digest(), \
+        "part slice must exclude real content, else the split is a no-op"
 
 
 def test_submodule_digest_is_location_independent(tmp_path):
