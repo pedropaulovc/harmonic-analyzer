@@ -2,7 +2,7 @@ r"""Kinematic probe: prove the crank drives the paper feed (codex #189 kinematic
 
 Turning the crank T12 sprocket must propagate through the WHOLE feed train:
 
-    T12 (crank) --belt 12:24--> T24 (knob wheel) --Lock--> knob shaft + fine pinion
+    T12 (crank) --gear mate 12:24--> T24 (knob wheel) --Lock--> knob shaft + fine pinion
     T24 --rack-pinion--> platen (the paper feed)
 
 and the roller chain rides both sprockets. This probe opens the saved default-`free`
@@ -13,20 +13,21 @@ angle), never by projection onto a shared axis: the knob shaft is modeled on a s
 axis PERPENDICULAR to the sprockets' (verified live -- it turns about global Y while
 T24 turns about Z), so a shared-axis projection would read a false zero for it.
 
-  * the belt drives T24 at a ~1:2 reduction off the crank (nominal 12:24 = 0.50; the
-    live SW Belt/Chain feature measures ~0.54 -- reported, band-checked, not exact),
+  * the gear mate drives T24 at the EXACT 12:24 = 0.500 reduction off the crank
+    (asserted tightly; the rejected SW Belt/Chain feature coupled at 28:52 = 0.538),
   * knob shaft and fine 24T pinion turn by the SAME magnitude as T24 (Lock-mated
     cluster -- the whole feed train follows; codex #189 :592),
   * the platen translates by ``NET_RACK_TRAVEL_PER_KNOB_REV * (dTheta_T24 / 360)``,
     checked against the MEASURED T24 rotation (exact downstream of T24).
 
 The roller-chain COMPONENT PATTERN has NO native coupling to sprocket rotation --
-SolidWorks chain-pattern instances cannot be mated to other components, and the
-Belt/Chain feature couples only the two sprockets' rotation (researched 2026-07-05:
-help.solidworks.com Distance-Chain-Parameters, Hawk Ridge chain-pattern tips). So
-link travel is not automatic; the probe ATTEMPTS it by advancing the Dynamic
-pattern's seed link along the loop by the matching arc and reports whether the links
-moved -- a best-effort demonstration, not a hard gate.
+SolidWorks chain-pattern instances cannot be mated to other components. The sprocket
+rotation coupling is a plain gear mate on the two Axis1 spin axes (the Belt/Chain
+feature was rejected -- it couples off the wrapped tip cylinders at 28:52 = 0.538,
+not the 12:24 tooth ratio a chain enforces). So link travel is not automatic; the
+probe ATTEMPTS it by advancing the Dynamic pattern's seed link along the loop by the
+matching arc and reports whether the links moved -- a best-effort demonstration, not
+a hard gate.
 
 The doc is NEVER saved (this probe only drives + reads), so the on-disk free model is
 untouched.
@@ -55,8 +56,8 @@ from _assembly import (
 import _telemetry
 from preflight_release import _discard_open_documents
 
-# Coupled ratios (from the paper-drive build): belt T12:T24 = 12:24, so the knob
-# side turns at half the crank; the platen feeds NET mm per knob revolution.
+# Coupled ratios (from the paper-drive build): gear mate T12:T24 = 12:24, so the
+# knob side turns at half the crank; the platen feeds NET mm per knob revolution.
 from build_paper_drive_assembly import (
     CHAIN_CRANK_CENTRE,
     KNOB_SHAFT_XY,
@@ -66,8 +67,13 @@ from build_paper_drive_assembly import (
 )
 
 DRIVE_DEG = 30.0    # crank test rotation
-# Nominal belt ratio is 12:24 = 0.50; the live SW Belt/Chain feature couples at ~0.54
-# (measured), so the probe checks a ~1:2 band and reports the actual ratio (not exact).
+CRANK_TOL = 2.0     # deg: the temporary driver must hit DRIVE_DEG on BOTH sides
+# The crank T12 -> knob T24 tie is a GEAR MATE at the exact 12:24 tooth/pitch
+# ratio (= 0.5), the ratio a roller chain enforces. (The SW Belt/Chain feature
+# was rejected -- EngageBelt couples off the wrapped tip cylinders at 28:52 =
+# 0.538, a ~7.7% feed error.) So the probe asserts the true 0.500 TIGHTLY.
+CHAIN_RATIO = 0.5   # T12:T24 = 12:24 exact (gear-mate coupling)
+RATIO_TOL = 0.03    # measured T24/crank vs CHAIN_RATIO (pose/numeric slack)
 ANG_TOL = 1.2       # deg: locked cluster parts turn by equal magnitude (near-exact)
 LIN_TOL = 0.35      # mm: platen feed vs NET * measured-T24 / 360
 
@@ -157,7 +163,7 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
     # --- drive the crank ----------------------------------------------------
     # Author a temporary angle mate on the T12 Right-plane dihedral at rest + DRIVE_DEG
     # (the freed crank_spin driver is deferred/absent in the free model, so this is the
-    # sole spin constraint); the belt + rack relations propagate it to the whole train.
+    # sole spin constraint); the gear + rack relations propagate it to the whole train.
     a = component_transform(adapter, t12)
     rest_dihedral = math.degrees(math.acos(max(-1.0, min(1.0, a[0]))))
     target = rest_dihedral + DRIVE_DEG
@@ -172,7 +178,7 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
 
     # --- read the driven state ---------------------------------------------
     # Rotation MAGNITUDE of each part (axis-agnostic -- see _rot_angle_deg). All
-    # locked cluster parts turn by the same angle; the belt gives T24 a fraction of
+    # locked cluster parts turn by the same angle; the gear mate gives T24 a fraction of
     # the crank; the platen translates in X.
     d_crank = _rot_angle_deg(_rot(adapter, t12), base_R[t12])
     d_t24 = _rot_angle_deg(_rot(adapter, t24), base_R[t24])
@@ -180,22 +186,29 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
     d_pinion = _rot_angle_deg(_rot(adapter, fine_pinion), base_R[fine_pinion])
     d_disc = _rot_angle_deg(_rot(adapter, disc), base_R[disc])
     d_platen = component_origin(adapter, platen)[0] - base_platen_x
-    belt_ratio = d_t24 / d_crank if d_crank else 0.0
-    log(f"crank spun {d_crank:.2f} deg -> T24 {d_t24:.2f} (ratio {belt_ratio:.3f}), "
+    chain_ratio = d_t24 / d_crank if d_crank else 0.0
+    log(f"crank spun {d_crank:.2f} deg -> T24 {d_t24:.2f} (ratio {chain_ratio:.3f}), "
         f"shaft {d_shaft:.2f}, pinion {d_pinion:.2f}, disc {d_disc:.2f} deg; "
         f"platen {d_platen:+.3f} mm")
 
     # --- assert the coupled motion (magnitudes) ----------------------------
-    if d_crank < DRIVE_DEG - 2.0:
+    # (0) The temporary driver must actually hit DRIVE_DEG -- bound it on BOTH
+    # sides, so an OVER-driven crank (a runaway/mis-solved mate) fails too, not
+    # just an under-driven one (codex #189 round-5).
+    if abs(d_crank - DRIVE_DEG) > CRANK_TOL:
         raise RuntimeError(
-            f"crank moved only {d_crank:.2f} deg (drove +{DRIVE_DEG:.0f}) -- drive failed")
-    # (1) Belt couples crank T12 -> knob T24. Nominal chain ratio is 12:24 = 0.50; the
-    # live SW Belt/Chain feature couples them at ~0.54 here (reported honestly, not
-    # asserted-exact). Require a ~1:2 reduction band, which proves the belt drives T24.
-    if not (0.40 < belt_ratio < 0.65):
+            f"crank moved {d_crank:.2f} deg, expected {DRIVE_DEG:.0f} "
+            f"(+/-{CRANK_TOL:.0f}) -- drive did not seat at the target angle")
+    # (1) Gear mate couples crank T12 -> knob T24 at the EXACT 12:24 = 0.500
+    # tooth/pitch ratio (a roller chain enforces one link per tooth). Assert it
+    # TIGHTLY -- a wrong ratio (e.g. the belt feature's 0.538 tip-cylinder
+    # coupling, or a flipped/dropped mate) now FAILS instead of passing a broad
+    # band (codex #189 round-5).
+    if abs(chain_ratio - CHAIN_RATIO) > RATIO_TOL:
         raise RuntimeError(
-            f"T24 turned {d_t24:.2f} deg for crank {d_crank:.2f} (ratio {belt_ratio:.3f}); "
-            "expected a ~1:2 belt reduction (0.40-0.65) -- belt coupling broken")
+            f"T24 turned {d_t24:.2f} deg for crank {d_crank:.2f} (ratio {chain_ratio:.3f}); "
+            f"expected the 12:24 chain ratio {CHAIN_RATIO:.3f} +/-{RATIO_TOL:.2f} "
+            "-- gear coupling wrong (belt-feature 0.538 or flipped/dropped mate?)")
     # (2) CORE :592 check -- the Lock-mated knob cluster (knob shaft + fine 24T pinion)
     # turns by the SAME angle as the driven T24, i.e. the whole feed train follows.
     for nm, dv in (("knob shaft", d_shaft), ("fine pinion", d_pinion)):
@@ -221,7 +234,7 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
             "disc did not follow the feed (codex #189)")
     _telemetry.success(
         f"crank->feed coupling OK: crank {d_crank:.1f} deg -> T24/shaft/pinion "
-        f"{d_t24:.1f} deg (belt ratio {belt_ratio:.3f}) -> platen {d_platen:+.3f} mm, "
+        f"{d_t24:.1f} deg (chain ratio {chain_ratio:.3f} = 12:24) -> platen {d_platen:+.3f} mm, "
         f"disc {d_disc:.2f} deg")
 
     # --- chain-link travel (best-effort attempt; no native coupling) -------
@@ -230,7 +243,7 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
     _telemetry.info(
         "KINEMATIC PROBE -- crank drives the paper feed (rotation magnitudes):\n"
         f"  crank T12   {d_crank:6.2f} deg  (driver)\n"
-        f"  knob  T24   {d_t24:6.2f} deg  (belt, ratio {belt_ratio:.3f} vs nominal 0.50)\n"
+        f"  knob  T24   {d_t24:6.2f} deg  (gear mate, ratio {chain_ratio:.3f} = 12:24)\n"
         f"  knob shaft  {d_shaft:6.2f} deg  (Lock to T24)\n"
         f"  fine pinion {d_pinion:6.2f} deg  (Lock to T24)\n"
         f"  96T disc    {d_disc:6.2f} deg  (rack-pinion, rolls on the platen rack)\n"

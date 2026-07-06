@@ -37,6 +37,12 @@ from _transforms import mirror_placement
 # check_no_interference. Defined here (not in _common) so it stays off every
 # part's recipe digest -- only the assemblies that read it rebuild on a change.
 _CHAIN_SPROCKET_PREFIXES = ("transgear-removable",)
+# Only the sprockets the roller chain actually WRAPS mesh it: the T12 crank wheel
+# and the T24 knob wheel. The loose T18 spare (same "transgear-removable" stem, a
+# different config) rests off the loop, so a chain-link overlap with IT is a real
+# collision, NOT intended mesh -- discriminate by referenced configuration so the
+# mesh whitelist below never masks a spare-part clash (codex #189 round-5).
+_CHAIN_SPROCKET_CONFIGS = ("T12", "T24")
 
 
 def insert_sketch_text(
@@ -1697,9 +1703,11 @@ def check_no_interference(adapter: Any) -> None:
         for interference in list(interferences or []):
             _flag(interference, "IInterference")
             names = []
+            configs = []
             for comp in list(_read_member(interference, "Components") or []):
-                # No flag: Name2 is a property read (issue #87).
+                # No flag: Name2 / ReferencedConfiguration are property reads (issue #87).
                 names.append(str(_read_member(comp, "Name2")))
+                configs.append(str(_read_member(comp, "ReferencedConfiguration") or ""))
             volume_mm3 = float(_read_member(interference, "Volume") or 0.0) * 1e9
             if all(n.startswith(_CHAIN_LINK_PREFIXES) for n in names) and len(names) == 2:
                 chain_contacts.append(volume_mm3)
@@ -1707,9 +1715,14 @@ def check_no_interference(adapter: Any) -> None:
             # Chain link <-> sprocket: intended mesh. The chain seats on the
             # pitch circle so its links overlap the removables' teeth in the
             # shared z-plane (a coplanar single-plane stand-in). Whitelisted
-            # like the link<->link contact above.
+            # like the link<->link contact above -- but ONLY for a sprocket the
+            # chain actually wraps (config T12/T24); a link overlapping the loose
+            # T18 spare is a real clash and must NOT be whitelisted (codex #189).
             links = [n for n in names if n.startswith(_CHAIN_LINK_PREFIXES)]
-            sprockets = [n for n in names if n.startswith(_CHAIN_SPROCKET_PREFIXES)]
+            sprockets = [
+                n for n, cfg in zip(names, configs)
+                if n.startswith(_CHAIN_SPROCKET_PREFIXES) and cfg in _CHAIN_SPROCKET_CONFIGS
+            ]
             if len(names) == 2 and len(links) == 1 and len(sprockets) == 1:
                 chain_mesh_contacts.append(volume_mm3)
                 continue
