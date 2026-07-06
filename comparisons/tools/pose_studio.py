@@ -477,17 +477,23 @@ class HAC_OT_build_scene(bpy.types.Operator):
         # Seed sliders from the pair's stored pose (fires _aim via callbacks).
         c = pair.get("camera", {})
         cx, cy, cz = _bbox_center()
-        tm = c.get("target_mm")
-        # Seed the target sliders first — each assignment trips _on_target_update
-        # (which frees the target) — then set free_target LAST so a null-target
-        # pose stays auto-centred (and re-saves as null, not an explicit centre).
-        props.target_x, props.target_y, props.target_z = (
-            (float(tm[0]), float(tm[1]), float(tm[2])) if tm is not None else (cx, cy, cz))
-        props.free_target = tm is not None
         props.az_deg = float(c.get("az_deg", 0.0))
         props.el_deg = float(c.get("el_deg", 0.0))
         props.roll_deg = float(c.get("roll_deg", 0.0))
-        props.zoom = float(c.get("zoom") or 1.0)
+        # Resolve framing exactly as render_offline will (needs az/el/roll set
+        # first): a frame_components close-up — or an explicit target_mm — yields a
+        # concrete target+zoom, a bare pose falls back to the bbox centre. Seeding
+        # the RESOLVED values means the preview matches the render AND Save Pose
+        # (which drops frame_components) re-writes an explicit target_mm/zoom that
+        # reproduces the same close-up, instead of collapsing it to the full bbox.
+        explicit = bool(c.get("frame_components")) or c.get("target_mm") is not None
+        target, zoom = bw.resolve_framing(c, boxes, mesh_lo, mesh_hi)
+        # Seed the target sliders first — each assignment trips _on_target_update
+        # (which frees the target) — then set free_target LAST so a bbox-centred
+        # pose stays auto-centred (and re-saves as null, not an explicit centre).
+        props.target_x, props.target_y, props.target_z = tuple(float(v) for v in target)
+        props.free_target = explicit
+        props.zoom = float(zoom)
         persp = c.get("perspective")
         props.perspective = bool(persp)
         if persp and persp.get("focal_length_mm"):
