@@ -60,13 +60,14 @@ PITCH_R_T12 = 12.0  # rides here (rollers seat in the tooth valleys)
 # transgear-removable), exactly as link<->link contact already is.
 WRAP_R_A = PITCH_R_T24  # 24.0 (knob T24 pitch circle)
 WRAP_R_B = PITCH_R_T12  # 16.91 -> 12.0 (crank T12 pitch circle)
-SAG = 14.0  # slack-run droop below the straight tangent (p006 crop read 18;
-# was trimmed from 18 to clear the cone-pivot-post top, but the ch30 GT
-# re-anchor retired that constraint: the post (now the p1 swing bracket at
-# machine z -113..-87) no longer shares a z corridor with the chain plane
-# (z -155). 14 kept conservatively -- the chain's OUTER reach (radius
-# SLACK_R + REACH about C) still dips ~3.7 below the centreline near the
-# window edge, and every M6.8/M6.9 clearance was tuned at this droop
+SAG_NOMINAL = 14.0  # slack-run droop seed (p006 crop read 18; was trimmed
+# from 18 to clear the cone-pivot-post top, but the ch30 GT re-anchor retired
+# that constraint: the post (now the p1 swing bracket at machine z -113..-87)
+# no longer shares a z corridor with the chain plane (z -155). 14 kept
+# conservatively -- every M6.8/M6.9 clearance was tuned near this droop.
+# The BUILT droop is SAG below: solved off this seed so the loop closes on an
+# integer number of standard-pitch links (a real chain's length is quantised;
+# the sag is the underdefined member that absorbs the slack).
 
 # --- centreline geometry (A = knob = origin, B = crank) ----------------------
 BX = CRANK_CENTRE[0] - KNOB_CENTRE[0]
@@ -112,19 +113,77 @@ def _droop(rs: float) -> float:
     return cx * _SNX + cy * _SNY + rs - _SC0
 
 
-# Solve droop(SLACK_R) = SAG (droop decreases monotonically with rs).
-_LO = max(WRAP_R_A, WRAP_R_B) + D / 2.0  # safely past the q2 > 0 floor
-while _droop(_LO) < SAG:  # pragma: no cover - geometry sanity
-    _LO *= 0.9
-_HI = 10000.0
-assert _droop(_LO) > SAG > _droop(_HI)
+def _ccw(a_from: float, a_to: float) -> float:
+    return (a_to - a_from) % (2.0 * math.pi)
+
+
+def _solve_slack_radius(sag: float) -> float:
+    """Slack-arc radius whose droop equals ``sag`` (droop falls with rs)."""
+    lo = max(WRAP_R_A, WRAP_R_B) + D / 2.0  # safely past the q2 > 0 floor
+    while _droop(lo) < sag:  # pragma: no cover - geometry sanity
+        lo *= 0.9
+    hi = 10000.0
+    assert _droop(lo) > sag > _droop(hi)
+    for _ in range(80):
+        mid = 0.5 * (lo + hi)
+        if _droop(mid) > sag:
+            lo = mid
+        else:
+            hi = mid
+    return 0.5 * (lo + hi)
+
+
+def _loop_length(sag: float) -> float:
+    """Total centreline loop length at slack droop ``sag`` (monotonically
+    increasing: more droop = a longer slack run)."""
+    rs = _solve_slack_radius(sag)
+    cx, cy = _slack_centre(rs)
+    gax, gay = _unit(-cx, -cy)
+    gbx, gby = _unit(BX - cx, BY - cy)
+    ang_n = math.atan2(TNY, TNX)
+    ang_ga = math.atan2(gay, gax)
+    ang_gb = math.atan2(gby, gbx)
+    span_a = _ccw(ang_n, ang_ga)
+    span_slack = _ccw(ang_ga, ang_gb)
+    span_b = _ccw(ang_gb, ang_n)
+    return WRAP_R_A * span_a + WRAP_R_B * span_b + rs * span_slack + TAUT_LEN
+
+
+# --- integer-link closure -----------------------------------------------------
+# A roller chain has a FIXED standard pitch and closes only on an EVEN link
+# count (inner/outer must alternate back to the seam), so the loop length is
+# QUANTISED: pick the even count nearest the nominal-droop loop, then solve the
+# SAG so the centreline lands EXACTLY on count * pitch. The sag -- not the
+# pitch -- absorbs the slack, exactly like a real chain (move an axle and the
+# droop responds).
+LINK_PITCH = 6.35  # ANSI #25 pitch (1/4 in), EXACT: the link parts and the
+# chain-pattern spacing carry this standard pitch; closure comes from the sag.
+LINK_COUNT = 2 * round(_loop_length(SAG_NOMINAL) / (2.0 * LINK_PITCH))
+CENTRELINE_LEN = LINK_COUNT * LINK_PITCH
+
+# Quantisation moves the target length by at most LINK_PITCH / 2 (~3.2 mm), so
+# the solved sag stays within a few mm of the seed -- a tight bracket keeps the
+# solve inside the internal-tangency feasibility window (very large droops make
+# the slack arc infeasible: _slack_centre's q2 < 0).
+_LO_SAG, _HI_SAG = SAG_NOMINAL - 8.0, SAG_NOMINAL + 8.0
+assert _loop_length(_LO_SAG) < CENTRELINE_LEN < _loop_length(_HI_SAG)
 for _ in range(80):
-    _MID = 0.5 * (_LO + _HI)
-    if _droop(_MID) > SAG:
-        _LO = _MID
+    _MID = 0.5 * (_LO_SAG + _HI_SAG)
+    if _loop_length(_MID) < CENTRELINE_LEN:
+        _LO_SAG = _MID
     else:
-        _HI = _MID
-SLACK_R = 0.5 * (_LO + _HI)
+        _HI_SAG = _MID
+SAG = 0.5 * (_LO_SAG + _HI_SAG)  # the BUILT droop: 11.28 for the 54-link loop.
+# The count quantisation moves the target length by at most LINK_PITCH / 2
+# (~3.2 mm); the slack run's length-vs-droop sensitivity is ~0.85 mm/mm here,
+# so the solved sag lands within ~4 mm of the seed -- INSIDE the +-8 bracket
+# and under the 14-tuned clearance envelope (a tauter chain sits higher in the
+# corridor every M6.8/M6.9 clearance was tuned against; the next-larger count,
+# 56 links, would need SAG 26 -- outside both the p006 photo read (18) and the
+# tuned envelope, so the tauter side is the right quantisation).
+assert abs(_loop_length(SAG) - CENTRELINE_LEN) < 1e-6
+
+SLACK_R = _solve_slack_radius(SAG)
 CX, CY = _slack_centre(SLACK_R)
 
 GAX, GAY = _unit(-CX, -CY)  # C -> A radial (slack tangent at knob)
@@ -138,32 +197,23 @@ _ANG_N = math.atan2(TNY, TNX)
 _ANG_GA = math.atan2(GAY, GAX)
 _ANG_GB = math.atan2(GBY, GBX)
 
-
-def _ccw(a_from: float, a_to: float) -> float:
-    return (a_to - a_from) % (2.0 * math.pi)
-
-
 SPAN_A = _ccw(_ANG_N, _ANG_GA)
 SPAN_SLACK = _ccw(_ANG_GA, _ANG_GB)
 SPAN_B = _ccw(_ANG_GB, _ANG_N)
 assert abs(SPAN_A + SPAN_SLACK + SPAN_B - 2.0 * math.pi) < 1e-9
-
-CENTRELINE_LEN = (
+assert abs(
     WRAP_R_A * SPAN_A + WRAP_R_B * SPAN_B + SLACK_R * SPAN_SLACK + TAUT_LEN
-)
+    - CENTRELINE_LEN
+) < 1e-6
 
 # --- roller chain ------------------------------------------------------------
-# A real ANSI-#25-proportioned roller chain (pitch ~1/4 in): alternating INNER
-# links (2 inner plates + 2 rollers) and OUTER links (2 outer plates + 2 pins),
-# explicitly placed along the centreline loop (build_paper_drive_assembly
-# ._insert_roller_chain). A roller chain closes a loop only with an EVEN number
-# of pitches (inner/outer must alternate back to the seam), so the link count is
-# forced even. Every dimension stays inside a +-2.4 in-plane / +-2.1 z envelope
-# (the retired #13 ball chain's 4.8 bead) so the band-tuned M6.8/M6.9 clearances
-# transfer untouched.
-PITCH_NOMINAL = 6.35  # #25 chain / #13 ball-chain pitch (1/4 in), the seed
-LINK_COUNT = 2 * round(CENTRELINE_LEN / (2.0 * PITCH_NOMINAL))  # 64 (even)
-LINK_PITCH = CENTRELINE_LEN / LINK_COUNT  # exact closure: count * pitch = loop
+# A real ANSI-#25-proportioned roller chain (pitch 1/4 in EXACT, see
+# LINK_PITCH/LINK_COUNT above): alternating INNER links (2 inner plates + 2
+# rollers) and OUTER links (2 outer plates + 2 pins), filled along the
+# centreline loop by the connected-linkage chain pattern
+# (build_paper_drive_assembly._insert_roller_chain). Every dimension stays
+# inside a +-2.4 in-plane / +-2.1 z envelope (the retired #13 ball chain's 4.8
+# bead) so the band-tuned M6.8/M6.9 clearances transfer untouched.
 
 # Every clearance is >= 0.3 mm and nothing relies on exact tangency: the
 # M6.x interference checker flags ~0.00 mm^3 slivers, so the links FLOAT as a
