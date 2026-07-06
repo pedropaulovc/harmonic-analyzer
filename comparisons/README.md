@@ -50,6 +50,39 @@ uv run comparisons/tools/composite.py [--only id1,id2]
 C:\src\SolidworksMCP-python\.venv\Scripts\python.exe -m doit part:cone_gear
 ```
 
+## Interactive posing — Blender pose studio
+
+`pose_studio.py` opens a pair's model **and** its book reference in Blender and
+lets you dial the manifest camera live against the overlay, instead of
+hand-editing `az/el/roll/zoom/target` and re-rendering. No SolidWorks needed —
+just `uv` + Blender.
+
+```powershell
+# export the STL cache once after any rebuild (same prerequisite as render_offline)
+C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\export_models.py
+# launch — the script relaunches itself inside Blender's GUI
+uv run comparisons/tools/pose_studio.py --pair ch30-p003
+```
+
+`--pair` matches a manifest pair id or any substring. Point at a different
+Blender with `--blender <path>` or `$HARMONIC_BLENDER` (default `Blender 5.1`).
+
+In Blender, open the **Harmonic** tab of the N-panel (press `N`):
+
+- **Build / Reload Scene** — loads the pair and seeds every slider from its saved pose.
+- **Orientation / Target / Framing** — az/el/roll, the framing centre (the other 3 axes), zoom + lens (mm).
+- **Reference** — book overlay opacity / scale / shift (shown in camera view only).
+- **Navigate** — MMB orbit · Shift+MMB pan · scroll zoom. `Numpad 0` toggles camera view and drops you onto the camera's *exact* vantage — no jump. **Capture From View** bakes a free-orbit angle back into the pose; **Frame Model** recovers the orbit if it greys out.
+- **Save Pose To Manifest** — writes az/el/roll/target/zoom/lens onto the pair.
+
+The pose round-trips 1:1 with `render_offline.py`, so after saving,
+`render_offline.py --only <id>` reproduces it exactly. **Create Pair** adds a
+new id + model + reference to the manifest in place.
+
+> Verify the camera behaviour after touching the studio: `pose_studio.py --pair
+> <id> --shots <dir>` drives the real UI (build → toggle camera view → capture
+> each state → quit) and drops before/after PNGs in `<dir>`.
+
 Pair ids are `<model>--<source-id>`; `model` maps to
 `cad/out/{sldprt,sldasm}/<dashed>.{SLDPRT,SLDASM}`. Camera convention:
 az 0 / el 0 = SolidWorks Front, +az = camera toward the model's +X (right)
