@@ -81,8 +81,12 @@ def _launch() -> None:
             f"blender not found: {blender}\n"
             f"pass --blender <path> or set HARMONIC_BLENDER"
         )
+    # --factory-startup: skip the user's startup.blend AND addons, so the studio
+    # opens the same pristine factory scene render_offline.py renders (it also
+    # passes --factory-startup) — no stray user-startup objects to pose against,
+    # and the retired blender_camera_addon can't load and collide.
     cmd = [
-        str(blender), "--python", str(here), "--",
+        str(blender), "--factory-startup", "--python", str(here), "--",
         "--pair", args.pair, "--repo", str(Path(args.repo).resolve()),
     ]
     if args.shots:
@@ -922,6 +926,13 @@ def _auto_build():
 
 
 if __name__ == "__main__":
+    # --factory-startup restores the factory pref that shows the splash on launch;
+    # suppress it so the studio (and the --shots window grabs) open straight to the
+    # scene. Best-effort — never block startup on it.
+    try:
+        bpy.context.preferences.view.show_splash = False
+    except Exception:  # noqa: BLE001
+        pass
     register()
     # Build after Blender's UI is ready (context.screen valid) — a one-shot timer.
     bpy.app.timers.register(_auto_build, first_interval=0.25)
