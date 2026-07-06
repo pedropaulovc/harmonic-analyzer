@@ -82,9 +82,8 @@ from _assembly import (
     component_names,
     component_transform,
     is_locked_build,
-    load_park_specs,
-    replay_park_specs,
 )
+from _assembly_postbuild import load_park_specs, replay_park_specs
 from _common import (  # component iteration helpers (read-only)
     _flag_only,
     _read_member,
