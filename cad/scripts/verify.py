@@ -802,13 +802,21 @@ _CHAIN_REST_TOL = 0.02  # mm / deg drift allowed after restoring the rest pose
 async def _verify_paper_feed_one(adapter: Any, report: Report) -> None:
     """Kinematic proof that the crank drives the WHOLE paper feed (codex #189).
 
-    The Belt/Chain (T12->T24) and rack-pinion ratios are otherwise exercised only by
+    The gear-mate (T12->T24) and rack-pinion ratios are otherwise exercised only by
     the hand-run ``build_kinematic_probe.py``, so a paper-feed regression could ship
     with the standard gates green. This wires that proof into ``verify:kinematics``:
     open paper-drive, drive the crank, and assert T24 / knob shaft / fine pinion / the
     96T disc all turn and the platen feeds (the probe's own assertions). The driven
-    (dirty) model is discarded without saving."""
+    (dirty) model is discarded without saving.
+
+    Skipped for a `locked` build: there the crank_spin park driver is authored
+    engaged (PARK_crank_spin) and the crank is fully defined, so there is no free
+    DOF to drive -- the probe would fail on an immovable crank. The 0-DOF closure is
+    proven instead by the release preflight (assert_park_closure)."""
     name = "paper-drive"
+    if _expected_free_dof(name) == 0:
+        log(f"{name}: locked build (0 free DOF) -- crank-feed drive probe skipped")
+        return
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
     if not sldasm.exists():
         report.failed.append((f"motion:{name}:open", f"not built: {sldasm}"))

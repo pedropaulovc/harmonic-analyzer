@@ -9,9 +9,11 @@ built as a native connected-linkage chain component pattern along the loop.
 Operational kinematics (default `free` build): the crank-end T12 sprocket spin is
 a FREE operational DOF -- drag it and the whole feed train follows. The coupling
 is authored as SolidWorks mates, NOT re-posed geometry (the ch30 rest pose below
-is preserved exactly, faithful to the plates): a native **Belt/Chain feature**
-(``adapter.insert_belt_chain``, EngageBelt) couples T12 <-> T24 at the 12:24 chain
-ratio, and a single **rack-pinion mate** feeds the platen off the knob (T24) axis
+is preserved exactly, faithful to the plates): a **gear mate** couples
+T12 <-> T24 at the exact 12:24 tooth/pitch ratio (the ratio a roller chain
+enforces -- the SW Belt/Chain feature was rejected here because EngageBelt couples
+off the wrapped tip cylinders at 28:52 = 0.538, a ~7.7% feed error; see the
+coupling block), and a single **rack-pinion mate** feeds the platen off the knob (T24) axis
 at the NET through-train travel (fine-pinion 24T -> disc 96T -> rack, see
 ``NET_RACK_TRAVEL_PER_KNOB_REV``). The intermediate transgear gears stay in their
 faithful rest pose; the fine-pinion/disc coupling is the modeled ENGAGED operation
@@ -113,6 +115,7 @@ from _assembly import (
     component_origin,
     component_transform,
     distance_driver,
+    gear_mate,
     is_locked_build,
     lock_mate,
     named_ref,
@@ -134,7 +137,7 @@ from _transforms import (  # noqa: E402
 ASM_NAME = "paper-drive"
 
 # Build mode (cad/config/machine/build_lock.yaml). `free` (default) leaves the
-# crank spin a FREE operational DOF (drag the crank sprocket and the belt-coupled
+# crank spin a FREE operational DOF (drag the crank sprocket and the gear-coupled
 # knob + the platen feed follow); `locked` authors the spin-park engaged for a
 # byte-reproducible 0-DOF snapshot. Read as a STRING-LITERAL so the accessor
 # tokenises to machine/build_lock.yaml in the doit/cache digest (flipping the
@@ -579,7 +582,7 @@ async def build(adapter) -> dict[str, str]:
     # anyway, see _assert_knob_shaft_clearance).
     # FREE (ground=False): rigidly LOCK-mated to the T24 knob wheel below so the
     # whole knob cluster (shaft + fine pinion + T24) turns as ONE keyed body when
-    # the crank drives the belt -- the visible knob shaft + fine pinion follow the
+    # the crank drives the gear mate -- the visible knob shaft + fine pinion follow the
     # feed, not just the T24 surrogate (codex #189). Neither part carries a
     # construction axis (only the removable does), so the cluster's single spin DOF
     # is T24's revolute; the Lock mate preserves each part's as-placed pose.
@@ -595,7 +598,7 @@ async def build(adapter) -> dict[str, str]:
     # chain rides the removable's teeth; swapping removables changes the
     # platen ratio). Band -157.5..-152.5 on the front -155 plane, south of the
     # stub disc and fine pinion, coplanar with the crank-end T12. FREE to spin
-    # (ground=False): the belt feature below couples it to the crank T12.
+    # (ground=False): the gear mate below couples it to the crank T12.
     t24 = await place_component(adapter, "transgear-removable",
                           [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], REMOVABLE_Z0],
                           [0.0, 0.0, 0.0], IDENTITY, configuration="T24", ground=False,
@@ -603,7 +606,7 @@ async def build(adapter) -> dict[str, str]:
     await _sprocket_revolute(adapter, t24, "T24 knob wheel")
     # Key the knob cluster to spin as ONE rigid body: LOCK the knob shaft and the
     # fine pinion to the (free-spinning) T24 wheel -- all three ride the same
-    # physical knob shaft. Dragging the crank -> belt -> T24 now turns the shaft
+    # physical knob shaft. Dragging the crank -> gear mate -> T24 now turns the shaft
     # AND the fine pinion together, so the whole feed train visibly follows (codex
     # #189 :592). Net DOF unchanged: freeing shaft + pinion (+12 DOF) is removed by
     # the two 6-DOF Lock mates; the cluster keeps T24's single free spin.
@@ -631,19 +634,26 @@ async def build(adapter) -> dict[str, str]:
     await _insert_roller_chain(adapter)
 
     # --- operational coupling -------------------------------------------------
-    # (1) Belt/Chain feature couples the crank T12 <-> knob T24 at the 12:24
-    # chain ratio (the roller-chain visual is the physical realization; this is
-    # the kinematic tie). Both pulleys are FREE, so EngageBelt's belt mates
-    # actually constrain rotation. Diameters = pitch diameters (module 2).
-    from solidworks_mcp.adapters.base import BeltChainParameters  # noqa: E402
-    check(
-        "belt/chain coupling T12<->T24",
-        await adapter.insert_belt_chain(
-            BeltChainParameters(
-                pulley_components=[t12, t24],
-                pulley_diameters=[2.0 * PITCH_R_T12, 2.0 * PITCH_R_T24],  # 24, 48 mm
-                location_plane="Front Plane", pulley_axis="z",
-                engage_belt=True, create_belt_part=False, blank_sketch=True)))
+    # (1) Gear mate couples the crank T12 <-> knob T24 at the EXACT 12:24
+    # tooth/pitch ratio -- the ratio a roller chain physically enforces (each
+    # link engages one tooth, so rev_T12 * 12 == rev_T24 * 24 -> omega_T24 =
+    # 0.5 * omega_T12). The roller-chain component pattern is the visual
+    # realization; this gear mate is the kinematic tie. The SW Belt/Chain
+    # feature was tried here first, but EngageBelt derives its coupling ratio
+    # from the wrapped OUTSIDE-cylinder faces (tip dia 28:52 = 0.538) and
+    # silently IGNORES PulleyDiameters -- a ~7.7% feed error vs the true 0.500
+    # chain ratio (the kinematic probe measured exactly that 0.538). A gear mate
+    # on the two sprocket spin axes couples at 12:24 exactly. Both axes stay FREE
+    # (Axis1 pinned, spin-only via _sprocket_revolute), so the mate constrains
+    # only their relative rotation -- 0 net free DOF added. ratio = pitch radii
+    # (== tooth counts at module 2), driver T12 : driven T24; the probe's tight
+    # 0.500 band validates the sense (flip to [T24, T12] if it reads ~2.0).
+    await gear_mate(
+        adapter,
+        named_ref(f"Axis1@{t12}", "AXIS"),
+        named_ref(f"Axis1@{t24}", "AXIS"),
+        ratio=[PITCH_R_T12, PITCH_R_T24],  # 12:24 = 0.500
+        label="chain coupling T12<->T24 (12:24 tooth ratio)")
     # (2) Rack-pinion mate feeds the platen off the knob (T24) axis at the NET
     # through-train travel (fine-pinion 24T -> disc 96T -> rack). The intermediate
     # transgear gears stay in their faithful rest pose; this is the engaged
@@ -673,7 +683,7 @@ async def build(adapter) -> dict[str, str]:
         label="rack-pinion disc follows the platen feed")
     # (3) The crank spin is the FREED operational-DOF park driver. Deferred in the
     # default `free` build (recorded, not authored) -> T12 spins free and drives
-    # the whole belt+rack train; authored + PARK_crank_spin in a `locked` build.
+    # the whole gear+rack train; authored + PARK_crank_spin in a `locked` build.
     # A spur sprocket is symmetric so the spin pose is cosmetic; pin the local
     # Right-plane dihedral (read live) like drive-train's crank_angle.
     t12_o = component_origin(adapter, t12)
@@ -710,7 +720,7 @@ async def build(adapter) -> dict[str, str]:
         await assert_expected_free_dof(adapter, 0)
     else:
         # ONE freed operational DOF: the crank spin (the deferred PARK driver
-        # above), which drives the belt-coupled knob + the rack-fed platen.
+        # above), which drives the gear-coupled knob + the rack-fed platen.
         # Target the SPECIFIC T12 crank instance (not the shared
         # ``transgear-removable`` stem: the T24 knob + T18 spare share it, so a
         # stem check would pass even if T24 were free and the crank T12 pinned --
