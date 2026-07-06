@@ -1318,13 +1318,20 @@ def task_check():
             # assembly/motion + MCP-server modules the PART recipe excludes
             # (_submodule_part_digest), else that exclusion could silently skip a
             # real part rebuild. Derives its forbidden set from dodo's exclude lists,
-            # so it depends on dodo.py + every part script (a new part or a helper's
-            # import edge must re-run it). Pure python -> offline gate.
-            "file_dep": [str((REPO_ROOT / "dodo.py").resolve()),
-                         str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
-                         str((SCRIPTS_DIR / "_common.py").resolve()),
-                         str((SCRIPTS_DIR / "test_part_isolation.py").resolve()),
-                         *part_script_deps],
+            # so it depends on dodo.py + every part script AND the transitive
+            # repo-local helper closure the test actually scans (module_deps_of):
+            # a helper like _gear.py gaining a forbidden import while no part script
+            # changes must still re-run this gate, else the invariant goes stale
+            # unnoticed (codex #191). The entry point of any new forbidden import is
+            # always in this set -- a part script (caught) or a helper already in a
+            # part's closure (caught) -- so it is self-healing. Pure python -> offline.
+            "file_dep": sorted({
+                str((REPO_ROOT / "dodo.py").resolve()),
+                str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
+                str((SCRIPTS_DIR / "test_part_isolation.py").resolve()),
+                *part_script_deps,
+                *(dep for p in part_scripts() for dep in module_deps_of(p)),
+            }),
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_part_isolation.py")],
         },
     }
