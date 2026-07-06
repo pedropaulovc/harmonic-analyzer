@@ -550,6 +550,9 @@ REPORTS = CAD_OUT / "reports"
 # release ships the logs that produced it. Gitignored (cad/out/logs/).
 LOGS = CAD_OUT / "logs"
 VERIFY_PY = (SCRIPTS_DIR / "verify.py").resolve()
+# Verify/preflight gate logic that is NOT on any assembly's build closure (so it
+# does not ride a .SLDASM digest) -> a direct file_dep of verify:/preflight tasks.
+POSTBUILD_PY = (SCRIPTS_DIR / "_assembly_postbuild.py").resolve()
 EXPORT_PY = (SCRIPTS_DIR / "export_models.py").resolve()
 RELEASE_PY = (SCRIPTS_DIR / "cut_release.py").resolve()
 PREFLIGHT_PY = (SCRIPTS_DIR / "preflight_release.py").resolve()
@@ -1243,7 +1246,16 @@ def task_verify():
         cmd += ["--suite", suite]
         yield {
             "name": suite,
-            "file_dep": [str(VERIFY_PY), *deps],
+            # verify.py's gate LOGIC lives partly in _assembly_postbuild.py
+            # (load/replay_park_specs -- the kinematics WIRE-1 live-chain replay).
+            # Unlike verify's other helper imports (_assembly/_common/build_*),
+            # that module is deliberately OUTSIDE every assembly recipe (it is on
+            # NO build script's closure), so a change to the replay logic does NOT
+            # bump any .SLDASM digest -- and the .SLDASM file_deps below would then
+            # leave a fresh verify-*.ok stamp valid, SKIPPING the gate (codex PR
+            # #193). Depend on it directly. The build_* helpers verify imports for
+            # constants need no such dep: they ride their .SLDPRT -> .SLDASM digest.
+            "file_dep": [str(VERIFY_PY), str(POSTBUILD_PY), *deps],
             "targets": [stamp],
             "task_dep": _spine_dep(f"verify:{suite}"),
             "actions": [(_run_stamped, [cmd, f"verify {suite}", stamp])],
@@ -1443,7 +1455,7 @@ def task_preflight():
     """
     stamp = str(REPORTS / "preflight.ok")
     deps = [str(PREFLIGHT_PY), str(VERIFY_PY),
-            str((SCRIPTS_DIR / "_assembly.py").resolve()),
+            str((SCRIPTS_DIR / "_assembly.py").resolve()), str(POSTBUILD_PY),
             _sldasm("drive_train"), _sldasm("channel")]
     return {
         "file_dep": deps,
