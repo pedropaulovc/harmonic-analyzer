@@ -24,7 +24,10 @@ Z rotations are also compared -- ratio AND sense:
   * knob shaft and fine 24T pinion turn by the SAME magnitude as T24 (Lock-mated
     cluster -- the whole feed train follows; codex #189 :592),
   * the platen translates by ``NET_RACK_TRAVEL_PER_KNOB_REV * (dTheta_T24 / 360)``,
-    checked against the MEASURED T24 rotation (exact downstream of T24).
+    checked SIGNED against the MEASURED T24 signed-Z rotation (exact downstream of
+    T24; a reversed rack alignment feeding the paper backward now fails), and the
+    96T disc's signed-Z roll must match the platen travel (``FEED_SIGN`` /
+    ``DISC_ROLL_SIGN`` pin the authored mate alignments).
 
 The roller-chain COMPONENT PATTERN has NO native coupling to sprocket rotation --
 SolidWorks chain-pattern instances cannot be mated to other components. So link
@@ -79,6 +82,15 @@ CHAIN_RATIO = 0.5   # T12:T24 = 12:24 exact (belt/chain coupling, pitch diams)
 RATIO_TOL = 0.03    # measured T24/crank vs CHAIN_RATIO (pose/numeric slack)
 ANG_TOL = 1.2       # deg: locked cluster parts turn by equal magnitude (near-exact)
 LIN_TOL = 0.35      # mm: platen feed vs NET * measured-T24 / 360
+# SIGNED feed senses (codex #189: magnitude-only platen/disc checks would pass a
+# mate that solved to the reversed alignment and fed the paper BACKWARD). Both
+# rack-pinion mates store their alignment in the authored model, so the sense is
+# deterministic per build script; these constants pin it. Calibrated live on the
+# built paper-drive -- a flipped mate now fails the gate instead of hiding in
+# abs(). They live HERE (not in the build script) so a calibration flip re-runs
+# only verify:kinematics, not the assembly build.
+FEED_SIGN = 1.0      # sign of (platen dX) / (T24 signed-Z deg): the platen mate
+DISC_ROLL_SIGN = 1.0  # sign of (disc signed-Z deg) / (platen dX): the disc mate
 
 
 def _rot(adapter: Any, name: str) -> list[float]:
@@ -207,12 +219,14 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
     z_t24 = _rel_z_angle_deg(_rot(adapter, t24), base_R[t24])
     d_shaft = _rot_angle_deg(_rot(adapter, knob_shaft), base_R[knob_shaft])
     d_pinion = _rot_angle_deg(_rot(adapter, fine_pinion), base_R[fine_pinion])
-    d_disc = _rot_angle_deg(_rot(adapter, disc), base_R[disc])
+    # The 96T disc also spins about global Z -> its SIGNED rotation is meaningful
+    # (the sense the rack-roll mate enforces), like the sprockets'.
+    z_disc = _rel_z_angle_deg(_rot(adapter, disc), base_R[disc])
     d_platen = component_origin(adapter, platen)[0] - base_platen_x
     chain_ratio = d_t24 / d_crank if d_crank else 0.0
     log(f"crank spun {d_crank:.2f} deg (Z {z_crank:+.2f}) -> T24 {d_t24:.2f} "
         f"(Z {z_t24:+.2f}, ratio {chain_ratio:.3f}), "
-        f"shaft {d_shaft:.2f}, pinion {d_pinion:.2f}, disc {d_disc:.2f} deg; "
+        f"shaft {d_shaft:.2f}, pinion {d_pinion:.2f}, disc Z {z_disc:+.2f} deg; "
         f"platen {d_platen:+.3f} mm")
 
     # --- assert the coupled motion (magnitudes) ----------------------------
@@ -250,25 +264,29 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
                 f"{nm} turned {dv:.2f} deg, expected {d_t24:.2f} (Lock-mated to T24) "
                 "-- the knob cluster did not follow the feed (codex #189 :592)")
     # (3) Rack-pinion feeds the platen off the knob axis at the NET through-train
-    # travel; check against the MEASURED T24 rotation (exact downstream of T24).
-    exp_platen = NET_RACK_TRAVEL_PER_KNOB_REV * d_t24 / 360.0
-    if abs(abs(d_platen) - abs(exp_platen)) > LIN_TOL:
+    # travel; check SIGNED against the MEASURED T24 signed-Z rotation (exact
+    # downstream of T24). A reversed mate alignment feeds the paper BACKWARD at
+    # the right magnitude -- abs() would pass it (codex #189).
+    exp_platen = FEED_SIGN * NET_RACK_TRAVEL_PER_KNOB_REV * z_t24 / 360.0
+    if abs(d_platen - exp_platen) > LIN_TOL:
         raise RuntimeError(
-            f"platen fed {d_platen:+.3f} mm, expected |{exp_platen:.3f}| "
-            f"(NET {NET_RACK_TRAVEL_PER_KNOB_REV:.2f} x {d_t24:.2f}/360) -- rack broken")
+            f"platen fed {d_platen:+.3f} mm, expected {exp_platen:+.3f} "
+            f"(FEED_SIGN {FEED_SIGN:+.0f} x NET {NET_RACK_TRAVEL_PER_KNOB_REV:.2f} "
+            f"x Z {z_t24:+.2f}/360) -- rack broken or feed direction REVERSED")
     # (4) The visible 96T rack-pinion disc rolls on the platen rack: it turns
-    # |platen| / (2*pi*PINION_PD_R) revolutions (codex #189). Proves it is no longer
-    # a static gear while the rack slides past it.
-    exp_disc = abs(d_platen) / (2.0 * math.pi * PINION_PD_R) * 360.0
-    if abs(d_disc - exp_disc) > ANG_TOL:
+    # platen / (2*pi*PINION_PD_R) revolutions, SIGNED (codex #189). Proves it is
+    # no longer a static gear while the rack slides past it, in the right sense.
+    exp_disc = DISC_ROLL_SIGN * d_platen / (2.0 * math.pi * PINION_PD_R) * 360.0
+    if abs(z_disc - exp_disc) > ANG_TOL:
         raise RuntimeError(
-            f"rack-pinion disc turned {d_disc:.2f} deg, expected {exp_disc:.2f} "
-            f"(|platen| {abs(d_platen):.3f} / 2*pi*{PINION_PD_R:.2f}) -- the visible "
-            "disc did not follow the feed (codex #189)")
+            f"rack-pinion disc turned Z {z_disc:+.2f} deg, expected {exp_disc:+.2f} "
+            f"(DISC_ROLL_SIGN {DISC_ROLL_SIGN:+.0f} x platen {d_platen:+.3f} / "
+            f"2*pi*{PINION_PD_R:.2f}) -- the visible disc did not follow the feed "
+            "(or rolls the wrong way)")
     _telemetry.success(
         f"crank->feed coupling OK: crank {d_crank:.1f} deg -> T24/shaft/pinion "
         f"{d_t24:.1f} deg (chain ratio {chain_ratio:.3f} = 12:24, same-sense) "
-        f"-> platen {d_platen:+.3f} mm, disc {d_disc:.2f} deg")
+        f"-> platen {d_platen:+.3f} mm, disc Z {z_disc:+.2f} deg (signed senses ok)")
 
     # --- chain-link travel (best-effort attempt; no native coupling) -------
     chain_moved = await _attempt_chain_advance(adapter, d_crank)
@@ -279,7 +297,7 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
         f"  knob  T24   {d_t24:6.2f} deg  (belt/chain, ratio {chain_ratio:.3f} = 12:24, same-sense)\n"
         f"  knob shaft  {d_shaft:6.2f} deg  (Lock to T24)\n"
         f"  fine pinion {d_pinion:6.2f} deg  (Lock to T24)\n"
-        f"  96T disc    {d_disc:6.2f} deg  (rack-pinion, rolls on the platen rack)\n"
+        f"  96T disc    {z_disc:+6.2f} deg  (rack-pinion, rolls on the platen rack, signed)\n"
         f"  platen      {d_platen:+7.3f} mm  (rack, NET {NET_RACK_TRAVEL_PER_KNOB_REV:.2f}/rev)\n"
         f"  roller chain {'links advanced (Dynamic seed drive)' if chain_moved else 'static visual -- SW has no sprocket->link coupling'}")
     return {"crank_deg": f"{d_crank:.2f}", "platen_mm": f"{d_platen:.3f}",
