@@ -215,6 +215,11 @@ def _apply_camera_to_free(space) -> None:
         sensor_long = (cam_data.sensor_height if cam_data.sensor_fit == "VERTICAL"
                        else cam_data.sensor_width)
         space.lens = cam_data.lens * 36.0 / max(sensor_long, 1e-6)
+    # Match the PROJECTION too: a fallback exit (View menu / gizmo, or if the
+    # keymap loses) can restore an ORTHO free view, which would render a
+    # perspective camera orthographically — a visible scale jump. Force the
+    # viewport's projection to the camera's regardless of what was restored.
+    rv3d.view_perspective = "ORTHO" if cam_data.type == "ORTHO" else "PERSP"
 
 
 def _invert_pose(cam_matrix):
@@ -363,17 +368,33 @@ class HACPoseProps(bpy.types.PropertyGroup):
 # --------------------------------------------------------------------------- #
 # scene building
 # --------------------------------------------------------------------------- #
+_FACTORY_DEFAULT_NAMES = {"Cube", "Camera", "Light", "Lamp"}
+
+
 def _clean_scene():
-    """Remove any prior built objects + the factory default cube/camera/light."""
+    """Remove our own built objects, plus the factory default cube/camera/light
+    the launcher's fresh Blender opens with.
+
+    We do NOT blind-delete every mesh/camera/light: if this is ever run inside a
+    populated session (e.g. `blender --python` in the user's own file), that would
+    silently wipe their unsaved scene. So the broad sweep runs ONLY when the
+    leftover scene is the pristine factory default (all objects named
+    Cube/Camera/Light); any foreign content is left untouched (with a warning)."""
     for obj in _STATE.get("objs", []) + ([_STATE["cam"]] if _STATE.get("cam") else []):
         try:
             bpy.data.objects.remove(obj, do_unlink=True)
         except (ReferenceError, RuntimeError):
             pass
     _STATE.clear()
-    for obj in list(bpy.data.objects):
-        if obj.type in {"MESH", "CAMERA", "LIGHT"}:
-            bpy.data.objects.remove(obj, do_unlink=True)
+    leftover = list(bpy.data.objects)
+    pristine = all(o.name.split(".")[0] in _FACTORY_DEFAULT_NAMES for o in leftover)
+    if pristine:
+        for obj in leftover:
+            if obj.type in {"MESH", "CAMERA", "LIGHT"}:
+                bpy.data.objects.remove(obj, do_unlink=True)
+    elif leftover:
+        print(f"!! pose_studio: {len(leftover)} pre-existing object(s) in scene — "
+              f"leaving them untouched (run via the launcher for a clean scene)", flush=True)
     for mesh in list(bpy.data.meshes):
         if mesh.users == 0:
             bpy.data.meshes.remove(mesh)
