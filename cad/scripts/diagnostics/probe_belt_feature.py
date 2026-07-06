@@ -65,7 +65,18 @@ async def build(adapter) -> dict[str, str]:
     from _common import check  # noqa: E402
 
     check("open paper-drive", await adapter.open_model(str(asm)))
+    try:
+        return await _explore(adapter)
+    finally:
+        # Close the driven (possibly belt-dirtied) model WITHOUT a save prompt, even
+        # on an exception -- a headless run must not hang on the save modal or leave
+        # the modified session resident (codex #189). _discard closes the active
+        # title first, then CloseAllDocuments as a backstop with nothing left dirty.
+        from preflight_release import _discard_open_documents  # noqa: E402
+        _discard_open_documents(adapter)
 
+
+async def _explore(adapter) -> dict[str, str]:
     # --- topology dump (before) ---------------------------------------------
     mates_before = await adapter.list_mates()
     n_mates_before = len(mates_before.data or []) if mates_before else 0
@@ -214,9 +225,7 @@ async def build(adapter) -> dict[str, str]:
     else:
         error(f"belt feature NOT created: {payload.get('reason', payload)}")
 
-    # Discard -- never persist the spike into the shipped .SLDASM.
-    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    return {}
+    return {}  # the driven model is discarded in build()'s finally (never persisted)
 
 
 if __name__ == "__main__":
