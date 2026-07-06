@@ -1,6 +1,6 @@
 ---
 name: paper-drive-kinematic-probe
-description: Paper-drive crank→feed kinematic probe — coupling is the Belt/Chain feature at ENFORCED pitch diameters (0.500, same-sense); knob-shaft spin axis ⊥ sprockets (magnitude-compare only)
+description: Paper-drive crank→feed kinematic probe — coupling is the Belt/Chain feature with AXIS pulley members (0.500, same-sense; face members bake the tip ratio 0.538); knob-shaft spin axis ⊥ sprockets (magnitude-compare only)
 metadata:
   type: project
 ---
@@ -10,17 +10,20 @@ metadata:
 its `_drive_and_measure` as the `paper-drive:crank-feed` gate. Findings that will
 trip up anyone reasoning about this model:
 
-1. **The crank→T24 coupling is the SW Belt/Chain feature with PulleyDiameters
-   ENFORCED to the pitch values (24/48 → ratio 12:24 = 0.500), same-sense.** Round-5
-   briefly replaced it with a gear mate after concluding "EngageBelt ignores
-   pulley_diameters" — that conclusion was WRONG (the getters read [] until
-   `AccessSelections`, and only the PRE-create set no-ops; post-create
-   `ModifyDefinition` re-solves the coupling — see
-   [[belt-chain-feature-com-binding]]). The gear mate also had a real fidelity bug
-   the magnitude-only probe couldn't see: an external gear mesh REVERSES rotation,
-   a chain turns both sprockets the SAME way. The probe now asserts BOTH: ratio
-   0.500 ± 0.03 (tip-face 0.538 fails it) AND same sign of the two sprockets'
-   SIGNED Z rotations.
+1. **The crank→T24 coupling is the SW Belt/Chain feature with DATUM-AXIS pulley
+   members and typed pitch diameters (24/48 → ratio 12:24 = 0.500), same-sense.**
+   Two wrong turns are baked into this: round-5 replaced the belt with a gear
+   mate after concluding "EngageBelt ignores pulley_diameters" (wrong — the
+   getters read [] until `AccessSelections`; and a gear mate REVERSES rotation
+   while a chain turns both sprockets the SAME way — a fidelity bug the
+   magnitude-only probe couldn't see). The follow-up "enforce PulleyDiameters
+   post-create via ModifyDefinition" ALSO turned out wrong: the definition read
+   back green while the coupling mate kept the picked faces' tip diameters
+   (0.538) — with FACE members no definition-level route touches the mate. AXIS
+   members give the mate no face to steal from, so the typed diameters drive it
+   exactly (measured +0.5000 live; see [[belt-chain-feature-com-binding]]). The
+   probe asserts BOTH: ratio 0.500 ± 0.03 (tip-face 0.538 fails it) AND same
+   sign of the two sprockets' SIGNED Z rotations.
 
 2. **The knob shaft's modeled spin axis is PERPENDICULAR to the sprockets'.** T24
    and the fine pinion spin about global Z; the `transgear-knob-shaft` (placed
