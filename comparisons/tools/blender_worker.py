@@ -178,7 +178,13 @@ def resolve_framing(cam, boxes, mesh_lo, mesh_hi):
             zoom = max(1.0, min(0.75 * z, 15.0))
             target = tuple((lo[i] + hi[i]) / 2 for i in range(3))
     if target is None:
-        target = tuple((mesh_lo[i] + mesh_hi[i]) / 2 for i in range(3))
+        # An explicit target_mm trucks/pedestals the framing centre off the
+        # bbox midpoint (the interactive pose_studio.py exposes it as the camera
+        # target xyz); null keeps the historical auto-centre, so every existing
+        # pose renders byte-identically.
+        tm = cam.get("target_mm")
+        target = (tuple(float(v) for v in tm) if tm is not None
+                  else tuple((mesh_lo[i] + mesh_hi[i]) / 2 for i in range(3)))
     return target, zoom
 
 
@@ -186,9 +192,9 @@ def aim_camera(cam, cam_data, c, boxes, mesh_lo, mesh_hi, ext, w, h):
     """Position cam/cam_data for camera spec ``c`` (manifest euler camera dict).
 
     Single source of truth for the camera placement, shared with the
-    interactive blender_camera_addon.py so a pose adjusted in the viewport
-    reproduces 1:1 on the next render_offline.py run. Returns (target, zoom,
-    cam_dist) for callers that want to invert/inspect the framing.
+    interactive pose_studio.py so a pose adjusted in the viewport reproduces
+    1:1 on the next render_offline.py run. Returns (target, zoom, cam_dist)
+    for callers that want to invert/inspect the framing.
     """
     r, u, o = camera_axes(c.get("az_deg", 0.0), c.get("el_deg", 0.0), c.get("roll_deg", 0.0))
     target, zoom = resolve_framing(c, boxes, mesh_lo, mesh_hi)
