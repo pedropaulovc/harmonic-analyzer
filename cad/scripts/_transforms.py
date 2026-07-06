@@ -7,7 +7,7 @@ from __future__ import annotations
 import math
 import struct
 
-import _config
+import _config_asm
 from _common import OUT_STL
 
 _STL_BBOX_CACHE: dict[str, tuple[tuple[float, float], ...]] = {}
@@ -153,7 +153,7 @@ def _mirror_xform(
 #
 # The per-part mirror-plane symmetry declaration S now lives in its OWN config
 # family -- ``cad/config/placement/<dashed-name>.yaml`` (``mirror_plane:``) --
-# read via ``_config.placement`` in ``mirror_placement`` below (issue #156).
+# read via ``_config_asm.placement`` in ``mirror_placement`` below (issue #156).
 # It was a module-level dict here, which put it in EVERY assembly's helper
 # closure: adding one new part's entry re-keyed all 8 assemblies -> a full
 # spine of FULL rebuilds. Per-file, a placement edit now re-keys only the
@@ -193,7 +193,7 @@ def mirror_placement(
     # Per-part symmetry S: a runtime override (dynamically-built parts) wins, else
     # cad/config/placement/<part>.yaml (default 'x'). A tuple/list [axis, c] carries
     # an explicit plane coordinate (YAML yields a list).
-    plane = _RUNTIME_PLACEMENT.get(part) or _config.placement(part).get("mirror_plane", "x")
+    plane = _RUNTIME_PLACEMENT.get(part) or _config_asm.placement(part).get("mirror_plane", "x")
     explicit_c = None
     if isinstance(plane, (list, tuple)):
         plane, explicit_c = plane[0], float(plane[1])

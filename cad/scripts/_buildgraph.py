@@ -397,18 +397,27 @@ def _family_tokens(accessor: str, arg: str | None) -> frozenset[str]:
     return fam
 
 
-def _config_aliases(tree: ast.AST) -> set[str]:
-    """Local names bound to the ``_config`` module in this source.
+# The config-accessor modules the read-set analysis tracks. ``_config`` is the
+# part+assembly loader; ``_config_asm`` holds the assembly-ONLY accessors
+# (placement/flip_seeds) kept out of ``_config`` so they stay off every part's
+# closure (a part never imports ``_config_asm``). Both expose the same family
+# accessors, so the token machinery treats them identically.
+_CONFIG_MODULES: frozenset[str] = frozenset({"_config", "_config_asm"})
 
-    Always includes the canonical ``_config``; adds any ``import _config as X``
-    alias so ``X.machine(...)`` is still tracked. A ``from _config import name``
-    binds a BARE name we don't follow -- handled separately as a hard fallback.
+
+def _config_aliases(tree: ast.AST) -> set[str]:
+    """Local names bound to a config-accessor module (:data:`_CONFIG_MODULES`).
+
+    Always includes the canonical names; adds any ``import _config as X`` /
+    ``import _config_asm as Y`` alias so ``X.machine(...)`` is still tracked. A
+    ``from _config import name`` binds a BARE name we don't follow -- handled
+    separately as a hard fallback.
     """
-    names = {"_config"}
+    names = set(_CONFIG_MODULES)
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for a in node.names:
-                if a.name == "_config" and a.asname:
+                if a.name in _CONFIG_MODULES and a.asname:
                     names.add(a.asname)
     return names
 
@@ -434,7 +443,7 @@ def _config_tokens_in_source(path: Path) -> frozenset[str]:
     # A bare-name import (`from _config import channels`) would need whole-program
     # name tracking; none exists in this codebase, so treat it as unknown.
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module == "_config":
+        if isinstance(node, ast.ImportFrom) and node.module in _CONFIG_MODULES:
             raise _UnknownConfigUse
 
     tokens: set[str] = set()

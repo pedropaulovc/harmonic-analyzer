@@ -41,7 +41,7 @@ Run (SolidWorks already open)::
 """
 
 from __future__ import annotations
-import _config
+import _config_asm
 
 import math
 import sys
@@ -120,7 +120,7 @@ HANGER_SCREW_POS = (5.5, WHEEL_BAR_Y, -128.9)  # machine x -5.5
 
 
 async def build(adapter) -> dict[str, str]:
-    set_flip_seeds(_config.flip_seeds("pen"))  # per-assembly learned flip polarity
+    set_flip_seeds(_config_asm.flip_seeds("pen"))  # per-assembly learned flip polarity
     check("create_assembly", await adapter.create_assembly())
 
     # The pen carriage (rod + marker) slides vertically through the fixed
