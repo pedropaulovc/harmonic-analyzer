@@ -86,11 +86,12 @@ LIN_TOL = 0.35      # mm: platen feed vs NET * measured-T24 / 360
 # mate that solved to the reversed alignment and fed the paper BACKWARD). Both
 # rack-pinion mates store their alignment in the authored model, so the sense is
 # deterministic per build script; these constants pin it. Calibrated live on the
-# built paper-drive -- a flipped mate now fails the gate instead of hiding in
-# abs(). They live HERE (not in the build script) so a calibration flip re-runs
-# only verify:kinematics, not the assembly build.
-FEED_SIGN = 1.0      # sign of (platen dX) / (T24 signed-Z deg): the platen mate
-DISC_ROLL_SIGN = 1.0  # sign of (disc signed-Z deg) / (platen dX): the disc mate
+# built paper-drive (2026-07-06: crank Z +30.00 -> T24 Z +15.00 -> platen
+# -2.660 mm -> disc Z +3.75 deg) -- a flipped mate now fails the gate instead
+# of hiding in abs(). They live HERE (not in the build script) so a calibration
+# flip re-runs only verify:kinematics, not the assembly build.
+FEED_SIGN = -1.0      # sign of (platen dX) / (T24 signed-Z deg): the platen mate
+DISC_ROLL_SIGN = -1.0  # sign of (disc signed-Z deg) / (platen dX): the disc mate
 
 
 def _rot(adapter: Any, name: str) -> list[float]:
@@ -308,7 +309,21 @@ async def build(adapter: Any) -> dict[str, str]:
     check("open paper-drive",
           await adapter.open_model(str(OUT_SLDASM / "paper-drive.SLDASM")))
     try:
-        return await _drive_and_measure(adapter)
+        result = await _drive_and_measure(adapter)
+        # Standalone-only (the verify:kinematics gate calls _drive_and_measure
+        # directly): render the DRIVEN pose for a visual proof of the moved
+        # train -- crank +30 deg, everything downstream displaced. The model
+        # still discards unsaved below; only PNGs are written.
+        from _common import OUT_PNG
+        png_dir = OUT_PNG / "paper-drive"
+        png_dir.mkdir(parents=True, exist_ok=True)
+        for view in ("front", "isometric"):
+            img = (png_dir / f"paper-drive_driven_{view}.png").resolve()
+            check(f"export driven {view}", await adapter.export_image({
+                "file_path": str(img), "format_type": "png",
+                "width": 1600, "height": 1000, "view_orientation": view}))
+            result[f"driven_{view}"] = str(img)
+        return result
     finally:
         # Discard the driven (dirty) model WITHOUT a save prompt, even if a motion
         # assertion raised -- a failed probe must not leave paper-drive.SLDASM open,
