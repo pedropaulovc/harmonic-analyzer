@@ -25,7 +25,7 @@ from __future__ import annotations
 import sys
 
 from _common import run_build
-from _assembly_postbuild import refresh_assembly
+from _assembly import refresh_assembly
 
 USAGE = "usage: refresh_assembly.py <assembly-stem>  (e.g. paper-drive, drive-train)"
 
