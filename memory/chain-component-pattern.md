@@ -61,8 +61,11 @@ Verified end-to-end in pywin32 on the real loop (58 alternating links, connected
    `Axis1`(256)/`Axis2`(512) + `Front Plane`(16384); group2 outer comp(2048) + pins
    `Axis1`(4096)/`Axis2`(8192) + `Front Plane`(32768). Seeds placed tangent (chord) so
    both pins sit ~on the path.
-4. Non-integer fit leaves a one-link seam at the seed (58 vs 60) — size the spline
-   length / count to close, or accept the slack-run seam.
+4. Non-integer fit leaves a one-link seam at the seed — RESOLVED by quantising the
+   LOOP, not the pitch: `_chain.py` keeps `LINK_PITCH` at the exact #25 standard
+   (6.35) and solves the slack-run SAG so `CENTRELINE_LEN == LINK_COUNT * pitch`
+   with an even count (54) — the sag absorbs the residual, like a real chain
+   (2026-07-06; was 58 stretched-pitch links with a seam risk).
 
 **How to apply:** the native chain pattern is viable for the paper-drive roller chain
 (`_insert_roller_chain` can be replaced). Author the loop path sketch, select the loop

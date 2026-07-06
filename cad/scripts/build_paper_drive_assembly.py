@@ -9,10 +9,12 @@ built as a native connected-linkage chain component pattern along the loop.
 Operational kinematics (default `free` build): the crank-end T12 sprocket spin is
 a FREE operational DOF -- drag it and the whole feed train follows. The coupling
 is authored as SolidWorks mates, NOT re-posed geometry (the ch30 rest pose below
-is preserved exactly, faithful to the plates): a **gear mate** couples
-T12 <-> T24 at the exact 12:24 tooth/pitch ratio (the ratio a roller chain
-enforces -- the SW Belt/Chain feature was rejected here because EngageBelt couples
-off the wrapped tip cylinders at 28:52 = 0.538, a ~7.7% feed error; see the
+is preserved exactly, faithful to the plates): a native **Belt/Chain assembly
+feature** (EngageBelt) couples T12 <-> T24 exactly as the roller chain physically
+does -- SAME rotation sense (a gear mate would reverse it) at the pitch-diameter
+24:48 = 12:24-tooth = 0.500 ratio (SW seeds each pulley's belt diameter from the
+picked tooth-tip face, 28:52 = 0.538, so the adapter FORCES PulleyDiameters to
+the pitch values post-create and fails loud on read-back mismatch; see the
 coupling block), and a single **rack-pinion mate** feeds the platen off the knob (T24) axis
 at the NET through-train travel (fine-pinion 24T -> disc 96T -> rack, see
 ``NET_RACK_TRAVEL_PER_KNOB_REV``). The intermediate transgear gears stay in their
@@ -115,13 +117,13 @@ from _assembly import (
     component_origin,
     component_transform,
     distance_driver,
-    gear_mate,
     is_locked_build,
     lock_mate,
     named_ref,
     place_component,
     rack_pinion_mate,
     reledger_to_solved,
+    remap_front_to_machine_front,
     save_assembly_and_images,
     set_park_defer,
     write_park_specs,
@@ -634,26 +636,31 @@ async def build(adapter) -> dict[str, str]:
     await _insert_roller_chain(adapter)
 
     # --- operational coupling -------------------------------------------------
-    # (1) Gear mate couples the crank T12 <-> knob T24 at the EXACT 12:24
-    # tooth/pitch ratio -- the ratio a roller chain physically enforces (each
-    # link engages one tooth, so rev_T12 * 12 == rev_T24 * 24 -> omega_T24 =
-    # 0.5 * omega_T12). The roller-chain component pattern is the visual
-    # realization; this gear mate is the kinematic tie. The SW Belt/Chain
-    # feature was tried here first, but EngageBelt derives its coupling ratio
-    # from the wrapped OUTSIDE-cylinder faces (tip dia 28:52 = 0.538) and
-    # silently IGNORES PulleyDiameters -- a ~7.7% feed error vs the true 0.500
-    # chain ratio (the kinematic probe measured exactly that 0.538). A gear mate
-    # on the two sprocket spin axes couples at 12:24 exactly. Both axes stay FREE
-    # (Axis1 pinned, spin-only via _sprocket_revolute), so the mate constrains
-    # only their relative rotation -- 0 net free DOF added. ratio = pitch radii
-    # (== tooth counts at module 2), driver T12 : driven T24; the probe's tight
-    # 0.500 band validates the sense (flip to [T24, T12] if it reads ~2.0).
-    await gear_mate(
-        adapter,
-        named_ref(f"Axis1@{t12}", "AXIS"),
-        named_ref(f"Axis1@{t24}", "AXIS"),
-        ratio=[PITCH_R_T12, PITCH_R_T24],  # 12:24 = 0.500
-        label="chain coupling T12<->T24 (12:24 tooth ratio)")
+    # (1) The native Belt/Chain assembly feature couples the crank T12 <-> knob
+    # T24 exactly as the roller chain physically does: SAME rotation sense (both
+    # sprockets turn the same way -- a gear mate models an external mesh and
+    # REVERSES) at the pitch-diameter ratio 24:48 = 12:24 teeth = 0.500 (each
+    # link engages one tooth, so rev_T12 * 12 == rev_T24 * 24). SW seeds each
+    # pulley's belt diameter from the picked face -- on these sprockets the
+    # tooth-TIP cylinder (28:52 = 0.538, a ~7.7% feed error) -- and the
+    # pre-create PulleyDiameters put silently no-ops, so the adapter FORCES the
+    # pitch values post-create (GetDefinition -> AccessSelections ->
+    # PulleyDiameters -> ModifyDefinition, the official example's route) and
+    # fails loud unless the read-back confirms (probed live 2026-07-06; see
+    # memory/belt-chain-feature-com-binding.md). EngageBelt authors the coupling
+    # mates; CreateBeltPart stays off -- the roller-chain component pattern above
+    # is the visual. Both sprockets stay FREE (Axis1 pinned, spin-only via
+    # _sprocket_revolute), so the belt constrains only their relative rotation --
+    # 0 net free DOF added. The verify:kinematics probe asserts the 0.500 ratio
+    # AND the same-sense rotation tightly.
+    from solidworks_mcp.adapters.base import BeltChainParameters
+    check(
+        "chain coupling T12<->T24 (belt/chain feature, pitch 24:48)",
+        await adapter.insert_belt_chain(BeltChainParameters(
+            pulley_components=[t12, t24],
+            pulley_diameters=[2.0 * PITCH_R_T12, 2.0 * PITCH_R_T24],  # mm
+            location_plane="Front Plane",
+            engage_belt=True, create_belt_part=False, blank_sketch=True)))
     # (2) Rack-pinion mate feeds the platen off the knob (T24) axis at the NET
     # through-train travel (fine-pinion 24T -> disc 96T -> rack). The intermediate
     # transgear gears stay in their faithful rest pose; this is the engaged
@@ -729,6 +736,11 @@ async def build(adapter) -> dict[str, str]:
             adapter, 1, required_instances=(t12,))
         write_park_specs(ASM_NAME)
     check_no_interference(adapter)
+    # Machine coords put the output/paper side at -Z, so SolidWorks' native Front
+    # renders the machine BACK (chain and transgear cluster mirrored). Re-base the
+    # standard views (same as the top assembly) so the saved doc and the _front
+    # render show the true machine front. Geometry untouched.
+    remap_front_to_machine_front(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)
 
 
