@@ -48,6 +48,7 @@ NON_PART_SCRIPTS = frozenset(
         "build_motion_study_springs.py",
         "build_motion_setup_drives.py",
         "build_mobility_probe.py",
+        "build_kinematic_probe.py",
     }
 )
 
