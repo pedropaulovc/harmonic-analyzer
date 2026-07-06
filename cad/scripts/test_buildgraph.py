@@ -207,7 +207,7 @@ def test_config_files_conservative_on_unknown_use():
         "import _config\nf = _config._doc\n",                    # family accessor, not a literal call
         "import _config\nx = _config._doc('nope')\n",            # literal but unknown doc
         "import _config\nx = _config.machine('no_such_sub')\n",  # unknown machine subsystem
-        "import _config\nx = _config.placement('no-such-part')\n",  # unknown placement row
+        "import _config_asm\nx = _config_asm.placement('no-such-part')\n",  # unknown placement row
         "from _config import machine\nx = machine()\n",          # bare-name import (untracked)
     ]
     for src in raise_cases:
@@ -228,13 +228,17 @@ def test_config_files_resolve_known_forms():
     # a dynamic machine/parts arg widens to the whole family (conservative, not an error).
     assert _tokens("import _config\nx = _config.machine(sub, 'k')\n") == frozenset({"machine/*"})
     assert _tokens("import _config\nx = _config.parts(name)\n") == frozenset({"parts/*"})
+    # placement/flip_seeds are assembly-only accessors on the SEPARATE _config_asm
+    # module (kept off every part's closure); the analyzer tracks it identically.
     # placement: a literal known part -> its own file; a dynamic part -> the family
     # (mirror_placement's real use); flip_seeds is ALWAYS the family (narrowed per
     # task to the assembly's own stem in dodo, never resolved from the literal).
-    assert _tokens("import _config\nx = _config.placement('pinion-spring')\n") == frozenset({"placement/pinion-spring.yaml"})
-    assert _tokens("import _config\nx = _config.placement(part)\n") == frozenset({"placement/*"})
-    assert _tokens("import _config\nx = _config.flip_seeds('drive_train')\n") == frozenset({"flip_seeds/*"})
-    assert _tokens("import _config\nx = _config.flip_seeds(stem)\n") == frozenset({"flip_seeds/*"})
+    assert _tokens("import _config_asm\nx = _config_asm.placement('pinion-spring')\n") == frozenset({"placement/pinion-spring.yaml"})
+    assert _tokens("import _config_asm\nx = _config_asm.placement(part)\n") == frozenset({"placement/*"})
+    assert _tokens("import _config_asm\nx = _config_asm.flip_seeds('drive_train')\n") == frozenset({"flip_seeds/*"})
+    assert _tokens("import _config_asm\nx = _config_asm.flip_seeds(stem)\n") == frozenset({"flip_seeds/*"})
+    # an aliased _config_asm import is tracked too.
+    assert _tokens("import _config_asm as ca\nx = ca.placement(p)\n") == frozenset({"placement/*"})
     # an aliased module import is still tracked.
     assert _tokens("import _config as cfg\nx = cfg.machine('output')\n") == frozenset({"machine/output.yaml"})
     # no _config use at all -> empty read-set (no config dependency).
@@ -250,13 +254,16 @@ def test_config_accessor_coverage():
 
     import _config
 
+    import _config_asm
+
     accessors = {
-        name for name, fn in inspect.getmembers(_config, inspect.isfunction)
-        if fn.__module__ == "_config" and not name.startswith("__") and name != "_load"
+        name for mod in (_config, _config_asm)
+        for name, fn in inspect.getmembers(mod, inspect.isfunction)
+        if fn.__module__ == mod.__name__ and not name.startswith("__") and name != "_load"
     }
     classified = set(bg._FIXED_ACCESSOR_TOKENS) | set(bg._FAMILY_ACCESSORS)
     missing = accessors - classified
-    assert not missing, f"unclassified _config accessors (map them in _buildgraph): {missing}"
+    assert not missing, f"unclassified config accessors (map them in _buildgraph): {missing}"
 
 
 def test_pen_assembly_tracks_pen_driver_config():
