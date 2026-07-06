@@ -1,0 +1,7 @@
+# Learned flip-polarity seeds for the magnifier assembly (issue: per-assembly
+# flip seeds). Rebuild with these empty + read the `_mate` `learn: add sig`
+# warns to re-derive. Seeds are an optimisation; a miss self-heals via the
+# readback guard.
+seeds:
+  - "mag lever depth @npn"
+  - "mag lever knife line across @npn"
