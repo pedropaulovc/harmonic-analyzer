@@ -585,13 +585,13 @@ def _digest_files(files: list[str]) -> str:
 # COM -- stay off it.
 #
 # TWO tiers (the over-rebuild fix): the ASSEMBLY recipe folds the WHOLE tree
-# (``_submodule_dep`` -> ``_submodule_digest``), but the PART recipe folds only the
-# PART-RELEVANT slice (``_submodule_part_dep`` -> ``_submodule_part_digest``), which
-# drops the assembly/motion + MCP-server modules no part can reach. So a bump that
-# touches only assembly.py (or the MCP tooling) rebuilds the 8 assemblies but leaves
-# all ~100 parts cached, instead of a whole-fleet rebuild on an assembly-only change.
-# The exclusion is SAFE because parts never import those modules -- enforced loud by
-# ``check:partiso`` (test_part_isolation.py); see ``_PART_DIGEST_EXCLUDE_*`` below.
+# (``_submodule_dep`` -> ``_submodule_digest``), but the PART recipe folds the tree
+# MINUS the assembly/motion COM modules (``_submodule_part_dep`` ->
+# ``_submodule_part_digest``). So a bump that touches only assembly.py/motion.py
+# rebuilds the 8 assemblies but leaves all ~100 parts cached, instead of a whole-fleet
+# rebuild. The exclusion is SAFE because a part only ever CALLS sketch/feature/export
+# methods, never an assembly/motion method -- enforced loud by ``check:partiso``
+# (test_part_isolation.py); see ``_PART_DIGEST_EXCLUDE_FILES`` below.
 _SUBMODULE_DIGEST_FILE = REPORTS / ".solidworks-mcp-submodule.digest"
 _SUBMODULE_PART_DIGEST_FILE = REPORTS / ".solidworks-mcp-submodule-part.digest"
 _SUBMODULE_DIGEST: str | None = None
@@ -614,16 +614,26 @@ _SUBMODULE_PART_DEP_PATH: str | None = None
 # CONSERVATIVE: everything else (base, com_variant, sketch, feature, sw_type_info,
 # pywin32_adapter, factory, ...) stays in the part digest, so a real shared-helper
 # change still rebuilds parts. The ASSEMBLY (full) digest keeps the WHOLE tree.
-# Tags are PACKAGE-relative (relative to ``solidworks_mcp/``), the natural import
-# structure, so the module name is just ``solidworks_mcp.`` + the dotted tag -- and
-# ``test_part_isolation.py`` derives its forbidden-import set straight from these.
+# Tags are PACKAGE-relative (relative to ``solidworks_mcp/``), so the module name is
+# just ``solidworks_mcp.`` + the dotted tag -- ``test_part_isolation.py`` derives its
+# forbidden-import set straight from this.
+#
+# ONLY the two assembly/motion COM modules are excluded. They ARE loaded transitively
+# (PyWin32Adapter mixes them in), but a part only ever CALLS sketch/feature/export
+# methods -- never an assembly/motion method -- so their content cannot change a
+# part's geometry. That "not-CALLED" basis is fully checkable from repo-local code
+# (``test_part_isolation.py``: no part imports/calls them). Everything ELSE in the
+# submodule stays in the part digest -- including the MCP-server surface
+# (``tools/``/``agents/``/``ui/``/``server*.py``). Excluding those would rest on a
+# "not-REACHED" claim (no part-relevant submodule module imports them through the
+# package's own import graph), which the repo-local guard CANNOT see -- a part-relevant
+# file like ``base.py`` could start importing ``solidworks_mcp.tools`` and the
+# exclusion would silently go stale (codex #191). So we conservatively keep them: an
+# over-rebuild on a rare MCP-tooling bump, never a stale part.
 _PART_DIGEST_EXCLUDE_FILES = frozenset({
     "adapters/solidworks/assembly.py",
     "adapters/solidworks/motion.py",
-    "server.py",
-    "server_cli_fixed.py",
 })
-_PART_DIGEST_EXCLUDE_DIRS = ("tools/", "agents/", "ui/")
 
 
 def _submodule_src_files() -> list[Path]:
@@ -636,17 +646,15 @@ def _submodule_src_files() -> list[Path]:
 
 
 def _is_part_relevant_submodule_file(f: Path) -> bool:
-    """False for a submodule source file no part build can reach (the two exclude
-    tiers above), so it is dropped from the PART recipe digest. Matched on the
-    PACKAGE-relative path (relative to ``solidworks_mcp/``), so the classification is
-    identical across checkout roots and independent of REPO_ROOT."""
+    """False only for the assembly/motion COM modules (dropped from the PART recipe
+    digest); every other submodule file stays in. Matched on the PACKAGE-relative path
+    (relative to ``solidworks_mcp/``), so the classification is identical across
+    checkout roots and independent of REPO_ROOT."""
     try:
         rel = f.resolve().relative_to(SUBMODULE_SRC.resolve()).as_posix()
     except ValueError:
         return True  # outside the package tree (defensive) -> keep it in the digest
-    if rel in _PART_DIGEST_EXCLUDE_FILES:
-        return False
-    return not any(rel.startswith(d) for d in _PART_DIGEST_EXCLUDE_DIRS)
+    return rel not in _PART_DIGEST_EXCLUDE_FILES
 
 
 def _digest_submodule_files(files: list[Path]) -> str:

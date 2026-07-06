@@ -506,16 +506,18 @@ def test_assembly_only_submodule_change_spares_parts(tmp_path):
 
 
 def test_part_digest_excludes_assembly_level_modules():
-    """Unit-level: the classifier drops exactly the assembly/motion + MCP-server
-    modules from the part slice while keeping the shared helpers, and the two digests
-    of the REAL tree genuinely differ (so the exclusion isn't a no-op)."""
+    """Unit-level: the classifier drops ONLY the assembly/motion COM modules from the
+    part slice while keeping the shared helpers AND the MCP-server surface (codex #191:
+    tools/server stay in the part digest), and the two digests of the REAL tree
+    genuinely differ (so the exclusion isn't a no-op)."""
     dodo = _load_dodo()
     src = dodo.SUBMODULE_SRC
     excl = dodo._is_part_relevant_submodule_file
     assert excl(src / "adapters" / "solidworks" / "assembly.py") is False
     assert excl(src / "adapters" / "solidworks" / "motion.py") is False
-    assert excl(src / "server.py") is False
-    assert excl(src / "tools" / "modeling.py") is False
+    # MCP-server surface stays IN the part digest (kept, not excluded):
+    assert excl(src / "server.py") is True
+    assert excl(src / "tools" / "modeling.py") is True
     assert excl(src / "adapters" / "base.py") is True
     assert excl(src / "adapters" / "com_variant.py") is True
     assert dodo._submodule_part_digest() != dodo._submodule_digest(), \

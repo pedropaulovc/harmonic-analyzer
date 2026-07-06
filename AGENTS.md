@@ -252,25 +252,30 @@ coverage test fails loud otherwise).
 
 The vendored `SolidworksMCP-python` submodule is a runtime input of every COM task,
 so its source content is folded into each task's recipe/cache key (issue #144 —
-`_submodule_digest` in `dodo.py`). But it is NOT one blob: **parts fold only the
-part-relevant slice** (`_submodule_part_digest` — the whole tree MINUS the
-assembly/motion COM modules and the MCP-server surface: `adapters/solidworks/
-assembly.py`, `.../motion.py`, `tools/`, `agents/`, `ui/`, `server*.py`), while
-**assemblies fold the whole tree** (`_submodule_digest`). Net: an assembly-only (or
-MCP-tooling-only) submodule bump rebuilds the ~8 assemblies but leaves all ~100 parts
-cached, instead of a whole-fleet rebuild. The two sidecars are distinct files
-(`.solidworks-mcp-submodule.digest` vs `-part.digest`).
+`_submodule_digest` in `dodo.py`). But it is NOT one blob: **parts fold the tree MINUS
+the two assembly/motion COM modules** (`_submodule_part_digest` — drops
+`adapters/solidworks/assembly.py` + `.../motion.py`), while **assemblies fold the whole
+tree** (`_submodule_digest`). Net: a bump touching only `assembly.py`/`motion.py`
+rebuilds the ~8 assemblies but leaves all ~100 parts cached, instead of a whole-fleet
+rebuild. The two sidecars are distinct files (`.solidworks-mcp-submodule.digest` vs
+`-part.digest`).
 
-The exclusion is SAFE only because **no part build ever imports an assembly-level
-module** — `assembly.py`/`motion.py` are loaded transitively (PyWin32Adapter mixes
-them in) but a part only ever CALLS sketch/feature/export methods, and those modules
-import `base`/`com_variant` never the reverse, so their bodies can't leak into a
-part's geometry. `check:partiso` (`test_part_isolation.py`) ENFORCES this loud: it
-derives its forbidden-import set straight from `dodo._PART_DIGEST_EXCLUDE_*` and fails
-if any part script (or a repo-local helper it transitively imports) directly imports
-one of the excluded modules or the main-repo `_assembly` helper. So the exclusion
-can never silently go stale — add a module to the exclude list only if `check:partiso`
-still passes.
+The exclusion is SAFE because a part only ever **CALLS** sketch/feature/export methods
+— never an assembly/motion method — so `assembly.py`/`motion.py` content can't change
+a part's geometry (they ARE loaded, via the PyWin32Adapter mixin, but loading ≠
+calling; those modules import `base`/`com_variant`, never the reverse). That
+"not-CALLED" basis is fully checkable from repo-local code, and `check:partiso`
+(`test_part_isolation.py`) ENFORCES it loud: it derives its forbidden set straight from
+`dodo._PART_DIGEST_EXCLUDE_FILES` and fails if any part script (or a repo-local helper
+it transitively imports — the full `module_deps_of` closure) directly imports an
+excluded module or the main-repo `_assembly` helper.
+
+Only assembly/motion are excluded — **the MCP-server surface (`tools/`/`agents/`/`ui/`/
+`server*.py`) deliberately stays IN the part digest** (codex #191). Excluding it would
+rest on a "not-REACHED through the submodule's own import graph" claim (a part-relevant
+module like `base.py` could start importing `solidworks_mcp.tools`), which the
+repo-local guard cannot see — so those modules are kept, accepting an over-rebuild on a
+rare MCP-tooling bump rather than risking a stale part.
 
 ## Verify suites (renamed)
 
