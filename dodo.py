@@ -1309,13 +1309,13 @@ def task_check():
             "cmd": [sys.executable, str(VERIFY_PY), "--suite", "config"],
         },
         "graph": {
-            # test_config_accessor_coverage reads _config.py, so a new accessor
-            # added there (without an entry in _buildgraph) must invalidate this
-            # stamp -- else the "fails loud" coverage test silently never re-runs
-            # and the perf benefit is lost (codex review).
+            # test_config_accessor_coverage reads _config.py AND _config_asm.py, so
+            # a new accessor added to EITHER (without an entry in _buildgraph) must
+            # invalidate this stamp -- else the "fails loud" coverage test silently
+            # never re-runs and the perf benefit is lost (codex review #193).
             "file_dep": [str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
                          str((SCRIPTS_DIR / "test_buildgraph.py").resolve()),
-                         config_py],
+                         config_py, str((SCRIPTS_DIR / "_config_asm.py").resolve())],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_buildgraph.py")],
         },
         "nameplate": {
