@@ -1,6 +1,6 @@
 ---
 name: belt-chain-feature-com-binding
-description: SW Belt/Chain feature via pywin32 — pulley members are cylindrical FACES; PulleyDiameters getters return [] until AccessSelections; pre-create diameter sets no-op (SW re-derives from faces) — enforce post-create via early-bound ModifyDefinition + read-back
+description: SW Belt/Chain feature via pywin32 — for a correct EngageBelt coupling ratio on toothed wheels the pulley members MUST be datum AXES, not faces; with FACE members the MateBeltDim bakes the picked faces' TIP diameters and NO definition-level route (PulleyDiameters+ModifyDefinition, ModifyMemberParameters, EngageBelt re-author, direct mate-dim writes) changes the coupling — all verified inert live
 metadata:
   type: reference
 ---
@@ -10,68 +10,75 @@ metadata:
 For the paper-drive operational-DOF rework (couple the T12 crank sprocket ↔ T24
 knob sprocket so the crank drives the paper feed). Working probes:
 `cad/scripts/diagnostics/probe_belt_feature.py` (creation),
-`probe_belt_diameter.py` (diameter enforcement + measured coupling ratio/sense).
-Extends [[chain-component-pattern]].
+`probe_belt_mate_dims.py` (found where the ratio lives),
+`probe_belt_ratio_fix.py` + `probe_belt_mate_dim_write.py` (proved every
+definition-level route inert), `probe_belt_axis_members.py` (the fix, measured
+ratio +0.5000). Extends [[chain-component-pattern]].
 
-> **Lesson, three times now: do NOT conclude "the API can't do this" from a
-> null/empty/False return.** (1) Passing the wrong pulley member TYPE made
-> CreateFeature null → "infeasible in pywin32" (wrong). (2) Reading
-> `PulleyDiameters` without `AccessSelections` returns EMPTY and the pre-create
-> setter no-ops → "EngageBelt silently ignores PulleyDiameters, use a gear mate"
-> (codex #189 round-5 — wrong, and the gear mate also REVERSES the rotation
-> sense a chain preserves). (3) Late-bound `ModifyDefinition` returns False →
-> looks like "modification unsupported" (wrong — early-bind the IFeature).
-> Per [[verify-assumptions-live-sw]]: everything the C# examples do, pywin32 does.
+> **Lesson, FOUR times now: do NOT conclude "the API can't do this" from a
+> null/empty/False return — and do NOT conclude "it worked" from a green
+> read-back.** (1) Wrong pulley member TYPE made CreateFeature null →
+> "infeasible in pywin32" (wrong). (2) Reading `PulleyDiameters` without
+> `AccessSelections` returns EMPTY → "EngageBelt ignores PulleyDiameters, use a
+> gear mate" (codex #189 round-5 — wrong, and a gear mate also REVERSES the
+> rotation sense a chain preserves). (3) Late-bound `ModifyDefinition` returns
+> False → looks like "unsupported" (wrong — early-bind the IFeature). (4) The
+> post-create PulleyDiameters enforcement read back GREEN while the measured
+> coupling stayed at the face-derived 0.538 — the definition and the mate are
+> DISJOINT stores. Verify the behaviour (drive it and measure), not the
+> property. Per [[verify-assumptions-live-sw]].
 
 **Enum:** `swFeatureNameID_e.swFmBeltAndChain = 119` (verified via .NET reflection;
 NOT 92 — a wrong value → CreateDefinition null).
 
-**Creation (unchanged, proven):**
-1. **Pulley members = cylindrical FACES** (each pulley's largest cylinder about
-   the rotation axis — on a gear/sprocket that is the tooth-TIP face ring), NOT
-   the IComponent2 objects (components → CreateFeature silently null, and the
-   pre-commit setters still report success).
+**Creation (proven):**
+1. **Pulley members: datum AXES for a correct coupling** (see below). The
+   face route (each pulley's largest cylinder about the rotation axis) also
+   creates fine but poisons the coupling ratio on toothed wheels. Passing
+   IComponent2 objects → CreateFeature silently null.
 2. `data = fm.CreateDefinition(119)` → `typed = sw_type_info.early_bound(data,
-   "IBeltChainFeatureData")` → set `PulleyComponents` (dispatch_array of faces),
-   `FlipSides`, `BeltLocationPlane` (IRefPlane normal to the axes),
-   `EngageBelt=True` (the coupling mates — a `BeltMates1` folder holding a
-   `BeltMate1` of type `MateBeltDim`), `CreateBeltPart=False` (the roller-chain
-   pattern stays the visual) → `feat = fm.CreateFeature(data)` (raw data,
-   late-bound fm). ~2–5 min solve on the real assembly.
+   "IBeltChainFeatureData")` → set `PulleyComponents` (dispatch_array of the
+   member entities), `PulleyDiameters` (double_array, METRES), `FlipSides`,
+   `BeltLocationPlane` (IRefPlane normal to the axes), `EngageBelt=True` (the
+   coupling mates — a `BeltMates1` folder holding a `BeltMate1` of type
+   `MateBeltDim`), `CreateBeltPart=False` (the roller-chain pattern stays the
+   visual) → `feat = fm.CreateFeature(data)` (raw data, late-bound fm).
 
-**Diameters — the part round-5 got wrong.** SW derives each pulley's belt
-diameter from the picked FACE when the definition commits (tip ring 28:52 =
-0.538 on the m2 sprockets), and the `PulleyDiameters` you set pre-create does
-NOT survive the commit. Enforce POST-create (the official
-`Create_Belt_Chain_Feature_Example` route), with two COM traps:
+**The coupling ratio lives in the MATE, not the definition.** `BeltMate1`
+(`MateBeltDim`) carries plain dimensions `D1`/`D2` — the per-pulley diameters
+whose quotient IS the coupling. With FACE members SW bakes the picked faces'
+diameters into them at creation (tooth-TIP ring 28:52 = 0.538 on the m2
+sprockets, a ~7.7% feed error) and **never re-derives them**. Measured live,
+ALL of these commit green and leave the coupling at 0.5385:
 
-- **Getters are AccessSelections-gated**: `GetDefinition()` →
-  `typed.PulleyDiameters` reads **[]** until `typed.AccessSelections(model,
-  None)` — an un-accessed read looks exactly like "the property doesn't work".
-- **`ModifyDefinition` must be called on an EARLY-bound IFeature**
-  (`sw_type_info.early_bound(feat, "IFeature")`) — the late-bound flagged call
-  mismarshals and returns False. (Same family as the chain-pattern
-  CreateFeature null.)
+- `PulleyDiameters` post-create + early-bound `ModifyDefinition` (the official
+  C# example's route — the definition reads back the new values; the belt PATH
+  sketch even honours them, radii at pitch 0.012/0.024 m; the mate does not).
+- `ModifyMemberParameters` (returns True, inert).
+- Deleting + re-authoring with `EngageBelt` toggled (re-bakes from faces).
+- Writing the mate's own `D1`/`D2` `IDimension.SystemValue` directly (write
+  verified by read-back, rebuild forced — coupling unchanged; the mate solves
+  from cached internals, not its display dims).
 
-Recipe (now inside the adapter's `insert_belt_chain`, fail-loud):
-`GetDefinition` → `AccessSelections` → read (skip if already right, then
-`ReleaseSelectionAccess`) → set `PulleyDiameters = double_array(metres)` →
-`feat_eb.ModifyDefinition(data, model, None)` → fresh `GetDefinition` +
-`AccessSelections` → read-back must equal the request (raise otherwise) →
-`ReleaseSelectionAccess`. ModifyDefinition re-solves the belt from the new
-diameters; the enforcement read-back is PROVEN live (scratch probe, 2026-07-06:
-requested [0.024, 0.048] m confirmed post-ModifyDefinition, feature solved
-green). The resulting coupling ratio + same-sense rotation are asserted on the
-REAL paper-drive by `verify:kinematics` (`paper-drive:crank-feed`).
+**The fix: DATUM-AXIS pulley members.** Select each sprocket's `Axis1` via
+`SelectByID2("Axis1@<comp>@<asm>", "AXIS", …)` → `GetSelectedObject6(1, -1)` →
+pass those entities as `PulleyComponents`. An axis has no diameter to steal, so
+the typed `PulleyDiameters` drive the mate exactly. Measured on the real
+paper-drive: T12 +30.00° → T24 +15.00°, **ratio +0.5000, same sense**
+(`probe_belt_axis_members.py`). Productised in the adapter as
+`BeltChainParameters.pulley_member_axes` (submodule #79); post-create the
+adapter walks the MateGroup for the `MateBeltDim` and fails loud unless its
+D1/D2 multiset equals the request — the only meaningful verification.
+
+**COM traps (still real):** `PulleyDiameters` getters return **[]** until
+`typed.AccessSelections(model, None)`; `ModifyDefinition` must be called on an
+EARLY-bound IFeature (late-bound mismarshals → False).
 
 **Driving a coupled sprocket in a SCRATCH probe fails (unresolved):** a temp
 plane-plane ANGLE driver in the minimal two-sprocket assembly is created in
 hard error 1 IN PLACE, both flip sides — from parallel AND 15°-off-apex rest
-poses. The same `angle_driver` drives the FULL paper-drive model fine (twice),
-so measure coupling ratios on the real model via `verify:kinematics`
-([[park-driver-singularities]]). The scratch probe's durable result is the
-diameter enforcement itself: `insert_belt_chain` completed with the fail-loud
-read-back green (requested [0.024, 0.048] m confirmed post-ModifyDefinition).
+poses. The same `angle_driver` drives the FULL paper-drive model fine, so
+measure coupling ratios on the real model ([[park-driver-singularities]]).
 
 **comtypes NOT needed** (its nulls were the same input bugs; it also can't
 unmarshal `GetComponents`' SAFEARRAY — see `probe_belt_comtypes.py`).
@@ -79,7 +86,7 @@ unmarshal `GetComponents`' SAFEARRAY — see `probe_belt_comtypes.py`).
 **Rack-pinion gotcha (shipped with this work):** the rack-pinion mate needs
 DISTINCT entity marks (rack=64, pinion=128); the adapter's `_MATE_DEFAULT_MARKS`
 had no `rack_pinion` entry so both got mark 1 and `CreateMate` returned null.
-Fixed in the adapter (submodule #78); diameters enforce is submodule #79.
+Fixed in the adapter (submodule #78).
 
 **blank_sketch:** `IModelDoc2::BlankSketch` exposed as an adapter method to hide
 construction sketches (the chain-path spline + the belt's own generated sketch).
