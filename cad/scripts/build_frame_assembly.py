@@ -84,6 +84,7 @@ Run (SolidWorks already open)::
 """
 
 from __future__ import annotations
+import _config
 
 import sys
 
@@ -93,6 +94,7 @@ from _common import (
     run_build,
 )
 from _assembly import (
+    set_flip_seeds,
     assert_component_placed,
     assert_components_fully_defined,
     check_no_interference,
@@ -177,6 +179,7 @@ def _part(name: str) -> str:
 
 
 async def build(adapter) -> dict[str, str]:
+    set_flip_seeds(_config.flip_seeds("frame"))  # per-assembly learned flip polarity
     from solidworks_mcp.adapters.base import InsertComponentParameters
 
     base_path = _part("harmonic-base")

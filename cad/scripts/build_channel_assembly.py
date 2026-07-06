@@ -100,6 +100,7 @@ from _common import (
     run_build,
 )
 from _assembly import (
+    set_flip_seeds,
     assert_expected_free_dof,
     assert_free_dof_necessity,
     bore_axis_ref,
@@ -819,6 +820,7 @@ async def build(adapter) -> dict[str, str]:
     # repositions that channel's bar + lever; a_j = 0 is the neutral pose. The
     # neutral state still anchors the amplitude-independent rocker/rod and the
     # cosmetic spring/threading seed.
+    set_flip_seeds(_config.flip_seeds("channel"))  # per-assembly learned flip polarity
     amplitudes = _config.amplitudes()
     if any(a < 0.0 for a in amplitudes):
         raise RuntimeError(
