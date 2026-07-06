@@ -149,6 +149,7 @@ from _common import (
 )
 from _transforms import euler_from_rows
 from _assembly import (
+    set_flip_seeds,
     angle_driver,
     apply_component_color,
     assert_expected_free_dof,
@@ -1460,6 +1461,7 @@ async def _place_on_shaft(
 async def build(adapter) -> dict[str, str]:
     # `free` (default) DEFERS the freed-DOF park drivers (records, does not author);
     # `locked` authors them engaged. Set before any *_driver(free_dof_key=...) call.
+    set_flip_seeds(_config.flip_seeds("drive_train"))  # per-assembly learned flip polarity
     set_park_defer(not LOCK)
     check("create_assembly", await adapter.create_assembly())
 

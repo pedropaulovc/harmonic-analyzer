@@ -382,11 +382,12 @@ def _family_tokens(accessor: str, arg: str | None) -> frozenset[str]:
             return frozenset({f"placement/{arg}.yaml"})
         raise _UnknownConfigUse                        # unknown placement row
     if accessor == "flip_seeds":
-        if arg is None:
-            return frozenset({"flip_seeds/*"})        # dynamic stem (no caller does this)
-        if arg in _flipseed_stems():
-            return frozenset({f"flip_seeds/{arg}.yaml"})
-        raise _UnknownConfigUse                        # unknown flip-seed stem
+        # Always the family glob, narrowed per-task to the task's OWN stem in dodo
+        # (_expand_flipseeds_token) -- NOT resolved from the literal arg. Each
+        # assembly loads only its own seeds at build time, so the authoritative dep
+        # is the task stem; resolving the literal would leak a sibling's seed file
+        # into any script that imports that sibling's module (magnifier <- summing).
+        return frozenset({"flip_seeds/*"})
     # provenance / _doc: a non-literal doc name is unresolvable -> whole config.
     if arg is None:
         raise _UnknownConfigUse
