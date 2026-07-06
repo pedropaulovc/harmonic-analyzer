@@ -53,6 +53,7 @@ from _assembly import (
 )
 
 import _telemetry
+from preflight_release import _discard_open_documents
 
 # Coupled ratios (from the paper-drive build): belt T12:T24 = 12:24, so the knob
 # side turns at half the crank; the platen feeds NET mm per knob revolution.
@@ -60,6 +61,7 @@ from build_paper_drive_assembly import (
     CHAIN_CRANK_CENTRE,
     KNOB_SHAFT_XY,
     NET_RACK_TRAVEL_PER_KNOB_REV,
+    PINION_PD_R,
     SPARE_GEAR_POS,
 )
 
@@ -133,20 +135,22 @@ def _one(adapter: Any, stem: str) -> str:
     return hits[0]
 
 
-async def build(adapter: Any) -> dict[str, str]:
-    path = str(OUT_SLDASM / "paper-drive.SLDASM")
-    check("open paper-drive", await adapter.open_model(path))
-
+async def _drive_and_measure(adapter: Any) -> dict[str, str]:
     roles = _removables_by_role(adapter)
     t12, t24 = roles["T12"], roles["T24"]
     knob_shaft = _one(adapter, "transgear-knob-shaft")
     fine_pinion = _one(adapter, "transgear-pinion")
-    platen = _one(adapter, "platen-")
+    disc = _one(adapter, "rack-pinion")
+    # The platen BODY exactly (platen-<n>), not a "platen-rack"/"platen-clip" sibling.
+    platen = next((n for n in component_names(adapter)
+                   if n.rsplit("-", 1)[0] == "platen"), "")
+    if not platen:
+        raise RuntimeError("no platen-<n> body component found")
     log(f"parts: crank T12={t12}, knob T24={t24}, shaft={knob_shaft}, "
-        f"pinion={fine_pinion}, platen={platen}")
+        f"pinion={fine_pinion}, disc={disc}, platen={platen}")
 
     # --- baseline -----------------------------------------------------------
-    parts = (t12, t24, knob_shaft, fine_pinion)
+    parts = (t12, t24, knob_shaft, fine_pinion, disc)
     base_R = {n: _rot(adapter, n) for n in parts}
     base_platen_x = component_origin(adapter, platen)[0]
 
@@ -174,10 +178,12 @@ async def build(adapter: Any) -> dict[str, str]:
     d_t24 = _rot_angle_deg(_rot(adapter, t24), base_R[t24])
     d_shaft = _rot_angle_deg(_rot(adapter, knob_shaft), base_R[knob_shaft])
     d_pinion = _rot_angle_deg(_rot(adapter, fine_pinion), base_R[fine_pinion])
+    d_disc = _rot_angle_deg(_rot(adapter, disc), base_R[disc])
     d_platen = component_origin(adapter, platen)[0] - base_platen_x
     belt_ratio = d_t24 / d_crank if d_crank else 0.0
     log(f"crank spun {d_crank:.2f} deg -> T24 {d_t24:.2f} (ratio {belt_ratio:.3f}), "
-        f"shaft {d_shaft:.2f}, pinion {d_pinion:.2f} deg; platen {d_platen:+.3f} mm")
+        f"shaft {d_shaft:.2f}, pinion {d_pinion:.2f}, disc {d_disc:.2f} deg; "
+        f"platen {d_platen:+.3f} mm")
 
     # --- assert the coupled motion (magnitudes) ----------------------------
     if d_crank < DRIVE_DEG - 2.0:
@@ -204,9 +210,19 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError(
             f"platen fed {d_platen:+.3f} mm, expected |{exp_platen:.3f}| "
             f"(NET {NET_RACK_TRAVEL_PER_KNOB_REV:.2f} x {d_t24:.2f}/360) -- rack broken")
+    # (4) The visible 96T rack-pinion disc rolls on the platen rack: it turns
+    # |platen| / (2*pi*PINION_PD_R) revolutions (codex #189). Proves it is no longer
+    # a static gear while the rack slides past it.
+    exp_disc = abs(d_platen) / (2.0 * math.pi * PINION_PD_R) * 360.0
+    if abs(d_disc - exp_disc) > ANG_TOL:
+        raise RuntimeError(
+            f"rack-pinion disc turned {d_disc:.2f} deg, expected {exp_disc:.2f} "
+            f"(|platen| {abs(d_platen):.3f} / 2*pi*{PINION_PD_R:.2f}) -- the visible "
+            "disc did not follow the feed (codex #189)")
     _telemetry.success(
         f"crank->feed coupling OK: crank {d_crank:.1f} deg -> T24/shaft/pinion "
-        f"{d_t24:.1f} deg (belt ratio {belt_ratio:.3f}) -> platen {d_platen:+.3f} mm")
+        f"{d_t24:.1f} deg (belt ratio {belt_ratio:.3f}) -> platen {d_platen:+.3f} mm, "
+        f"disc {d_disc:.2f} deg")
 
     # --- chain-link travel (best-effort attempt; no native coupling) -------
     chain_moved = await _attempt_chain_advance(adapter, d_crank)
@@ -217,12 +233,23 @@ async def build(adapter: Any) -> dict[str, str]:
         f"  knob  T24   {d_t24:6.2f} deg  (belt, ratio {belt_ratio:.3f} vs nominal 0.50)\n"
         f"  knob shaft  {d_shaft:6.2f} deg  (Lock to T24)\n"
         f"  fine pinion {d_pinion:6.2f} deg  (Lock to T24)\n"
+        f"  96T disc    {d_disc:6.2f} deg  (rack-pinion, rolls on the platen rack)\n"
         f"  platen      {d_platen:+7.3f} mm  (rack, NET {NET_RACK_TRAVEL_PER_KNOB_REV:.2f}/rev)\n"
         f"  roller chain {'links advanced (Dynamic seed drive)' if chain_moved else 'static visual -- SW has no sprocket->link coupling'}")
-    # NEVER save -- restore the free on-disk model.
-    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     return {"crank_deg": f"{d_crank:.2f}", "platen_mm": f"{d_platen:.3f}",
             "chain_moved": str(chain_moved)}
+
+
+async def build(adapter: Any) -> dict[str, str]:
+    check("open paper-drive",
+          await adapter.open_model(str(OUT_SLDASM / "paper-drive.SLDASM")))
+    try:
+        return await _drive_and_measure(adapter)
+    finally:
+        # Discard the driven (dirty) model WITHOUT a save prompt, even if a motion
+        # assertion raised -- a failed probe must not leave paper-drive.SLDASM open,
+        # dirty, or hang the COM session on a save modal (codex #189). Never saves.
+        _discard_open_documents(adapter)
 
 
 async def _attempt_chain_advance(adapter: Any, d_crank_deg: float) -> bool:

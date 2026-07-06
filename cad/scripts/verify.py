@@ -551,10 +551,29 @@ _REQUIRED_FREE_STEMS = {
     # Three freed DOF (lever knife-rock + wire swing/spin); the yoke-coupled
     # wheel must read under-constrained WITH them, else the coupling died.
     "magnifier": ("magnifying-lever", "magnifying-wheel", "lever-wire"),
-    # One freed DOF (the crank T12 spin); the belt-coupled knob + rack-fed platen
-    # read under-constrained with it.
+    # One freed DOF (the crank T12 spin). paper-drive is handled by INSTANCE, not
+    # this stem (see _required_free_instances) -- three transgear-removable siblings
+    # share the stem, so a stem check passes even if T12 is pinned and T24/T18 is
+    # loose (codex #189 :679). Kept as reference data only.
     "paper-drive": ("transgear-removable",),
 }
+
+
+def _required_free_instances(name: str) -> tuple[str, ...]:
+    """Exact component instances that must read under-constrained, sourced from the
+    recorded park specs (each freed-DOF driver's ``verify`` target). Used where a
+    stem is shared by several instances and only a SPECIFIC one carries the freed
+    DOF -- paper-drive's three ``transgear-removable`` siblings, of which only the
+    T12 crank is the operational input (codex #189 :679). Empty when there is no
+    park sidecar (a ``locked`` build, where free_dof is 0 and this is unused)."""
+    from _assembly import load_park_specs
+
+    out: list[str] = []
+    for spec in load_park_specs(name):
+        target = spec.get("verify") or []
+        if target and isinstance(target[0], str):
+            out.append(target[0])
+    return tuple(out)
 
 
 async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
@@ -605,11 +624,17 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
         # even with the swing pinned -- codex 2026-07-04). The exact-count
         # SUFFICIENCY closure runs in the release preflight
         # (`preflight_release.py`), which replays the recorded specs.
-        stems = _REQUIRED_FREE_STEMS.get(name, ())
+        # paper-drive alone has a SHARED stem (three transgear-removable siblings),
+        # so target the EXACT T12 crank instance from the recorded park spec
+        # (codex #189 :679); every other assembly keeps its unique stem families
+        # (unchanged -- their DOF map to distinct part names).
+        insts = _required_free_instances(name) if name == "paper-drive" else ()
+        stems = () if insts else _REQUIRED_FREE_STEMS.get(name, ())
         report.gate(
             f"{name}:dof-free-necessity",
             lambda: assert_free_dof_necessity(
-                adapter, free_dof, resolve=False, required_stems=stems),
+                adapter, free_dof, resolve=False,
+                required_stems=stems, required_instances=insts),
         )
     else:
         report.gate(

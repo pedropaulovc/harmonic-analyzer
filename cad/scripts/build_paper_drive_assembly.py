@@ -561,8 +561,12 @@ async def build(adapter) -> dict[str, str]:
     # Rx(-90): stud +Y -> -Z; shaft z -101.5..-137.5, collar to -141.5.
     await place_component(adapter, "transgear-stub", [PINION_AXIS[0], PINION_AXIS[1], -101.5],
                           [-90.0, 0.0, 0.0], ROT_X_NEG90)
-    await place_component(adapter, "rack-pinion", [PINION_AXIS[0], PINION_AXIS[1], -137.5],
-                          [0.0, 0.0, 0.0], IDENTITY)
+    # FREE (ground=False): rack-pinion-mated to the platen below so the visible 96T
+    # disc turns WITH the paper feed instead of sitting static while the rack slides
+    # past it (codex #189). Its axis is pinned + spin coupled -> 0 free DOF.
+    disc = await place_component(adapter, "rack-pinion",
+                          [PINION_AXIS[0], PINION_AXIS[1], -137.5],
+                          [0.0, 0.0, 0.0], IDENTITY, ground=False)
     await place_component(adapter, "transgear-latch", [PINION_AXIS[0], PINION_AXIS[1], -122.5],
                           [0.0, 0.0, LATCH_ANGLE_DEG], rot_z_rows(LATCH_ANGLE_DEG))
     # Reversed (Rx +90, origin at the south end z -158.0): the plain shaft now
@@ -653,6 +657,20 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Axis1@{t24}", "AXIS"),
         rack_travel_per_revolution=NET_RACK_TRAVEL_PER_KNOB_REV,
         label="platen feed (crank->knob->rack, net)")
+    # (2b) Couple the VISIBLE 96T rack-pinion disc to the platen so it turns WITH the
+    # feed instead of sitting static while the rack slides past it (codex #189). The
+    # disc rolls on the platen rack at its own pitch circumference (2*pi*PINION_PD_R).
+    # This is the SAME platen<->rotation law as the NET T24 mate above -- the disc
+    # turns 24/96 per knob rev, and 0.25 * 2*pi*PINION_PD_R = NET -- so it only
+    # DETERMINES the disc from the already-fed platen: 0 new free DOF, no conflict.
+    # Pin the disc axis first (spin free), like the sprockets.
+    await _sprocket_revolute(adapter, disc, "rack-pinion disc")
+    await rack_pinion_mate(
+        adapter,
+        named_ref(f"Axis1@{platen}", "AXIS"),
+        named_ref(f"Axis1@{disc}", "AXIS"),
+        rack_travel_per_revolution=2.0 * math.pi * PINION_PD_R,
+        label="rack-pinion disc follows the platen feed")
     # (3) The crank spin is the FREED operational-DOF park driver. Deferred in the
     # default `free` build (recorded, not authored) -> T12 spins free and drives
     # the whole belt+rack train; authored + PARK_crank_spin in a `locked` build.
