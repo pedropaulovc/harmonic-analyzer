@@ -802,7 +802,7 @@ _CHAIN_REST_TOL = 0.02  # mm / deg drift allowed after restoring the rest pose
 async def _verify_paper_feed_one(adapter: Any, report: Report) -> None:
     """Kinematic proof that the crank drives the WHOLE paper feed (codex #189).
 
-    The gear-mate (T12->T24) and rack-pinion ratios are otherwise exercised only by
+    The belt/chain (T12->T24) and rack-pinion ratios are otherwise exercised only by
     the hand-run ``build_kinematic_probe.py``, so a paper-feed regression could ship
     with the standard gates green. This wires that proof into ``verify:kinematics``:
     open paper-drive, drive the crank, and assert T24 / knob shaft / fine pinion / the

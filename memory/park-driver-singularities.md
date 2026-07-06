@@ -11,7 +11,15 @@ release preflight park closure (2026-07-05) and fixed in PR #186.
 **1. Singular drivers — satisfied, pinning nothing.** A plane-plane ANGLE to a
 fixed plane defines a CONE of orientations: parked near the 0/180 apex
 (magnifier wire swing, 0.74 deg) the constraint has no first-order authority
-and the body can precess with the mate green. Subtler: the angle can sit far
+and the body can precess with the mate green. Related UNRESOLVED authoring
+failure: in a SCRATCH two-sprocket assembly (probe_belt_diameter.py,
+2026-07-06) a temp plane-plane angle DRIVER fails IN PLACE with hard error 1
+on BOTH flip sides -- from an exactly-parallel rest pose AND from a 15-deg
+off-apex seed, belt mate engaged or not-yet-driven. The SAME angle_driver
+drives the full paper-drive model fine (twice, both coupling variants), so
+the trigger is something about the minimal model, not the helper; root cause
+not yet isolated (error 1 = unknown). Measure coupling ratios on the REAL
+assembly via verify:kinematics instead of scratch drives. Subtler: the angle can sit far
 from the apex (wire spin, 13.4 deg) yet its GRADIENT be perpendicular to the
 DOF it's meant to pin (the wire's Right normal was built horizontal; spin about
 the near-vertical axis tips it out-of-plane first-order, in-plane angle
