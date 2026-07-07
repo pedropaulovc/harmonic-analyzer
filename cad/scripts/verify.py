@@ -534,6 +534,10 @@ def _expected_free_dof(name: str) -> int:
         # The freed lever knife-rock + the articulated lever-wire's swing/spin;
         # the wheel is COUPLED by the WIRE-1 yoke (no DOF of its own).
         return 0 if is_locked_build(_config.machine("build_lock", "magnifier")) else 3
+    if name == "paper-drive":
+        # The freed crank (T12) spin; the knob T24 is belt-coupled and the platen
+        # is rack-coupled (no DOF of their own).
+        return 0 if is_locked_build(_config.machine("build_lock", "paper_drive")) else 1
     return 0
 
 
@@ -547,7 +551,34 @@ _REQUIRED_FREE_STEMS = {
     # Three freed DOF (lever knife-rock + wire swing/spin); the yoke-coupled
     # wheel must read under-constrained WITH them, else the coupling died.
     "magnifier": ("magnifying-lever", "magnifying-wheel", "lever-wire"),
+    # One freed DOF (the crank T12 spin). paper-drive is handled by INSTANCE, not
+    # this stem (see _required_free_instances) -- three transgear-removable siblings
+    # share the stem, so a stem check passes even if T12 is pinned and T24/T18 is
+    # loose (codex #189 :679). Kept as reference data only.
+    "paper-drive": ("transgear-removable",),
 }
+
+
+def _required_free_instances(name: str) -> tuple[str, ...]:
+    """Exact component instances that must read under-constrained, sourced from the
+    recorded park specs (each freed-DOF driver's ``verify`` target). Used where a
+    stem is shared by several instances and only a SPECIFIC one carries the freed
+    DOF -- paper-drive's three ``transgear-removable`` siblings, of which only the
+    T12 crank is the operational input (codex #189 :679). Empty when there is no
+    park sidecar (a ``locked`` build, where free_dof is 0 and this is unused)."""
+    from _assembly import load_park_specs
+
+    out: list[str] = []
+    for spec in load_park_specs(name):
+        target = spec.get("verify") or []
+        if target and isinstance(target[0], str):
+            out.append(target[0])
+    return tuple(out)
+
+
+def _fail(msg: str) -> None:
+    """Raise inside a ``report.gate`` lambda (which cannot contain a statement)."""
+    raise RuntimeError(msg)
 
 
 async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
@@ -598,12 +629,31 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
         # even with the swing pinned -- codex 2026-07-04). The exact-count
         # SUFFICIENCY closure runs in the release preflight
         # (`preflight_release.py`), which replays the recorded specs.
-        stems = _REQUIRED_FREE_STEMS.get(name, ())
-        report.gate(
-            f"{name}:dof-free-necessity",
-            lambda: assert_free_dof_necessity(
-                adapter, free_dof, resolve=False, required_stems=stems),
-        )
+        # paper-drive alone has a SHARED stem (three transgear-removable siblings),
+        # so target the EXACT T12 crank instance from the recorded park spec
+        # (codex #189 :679); every other assembly keeps its unique stem families
+        # (unchanged -- their DOF map to distinct part names).
+        insts = _required_free_instances(name) if name == "paper-drive" else ()
+        if name == "paper-drive" and not insts:
+            # A free paper-drive MUST have recorded its crank_spin instance in
+            # .paper-drive.park.json. A missing/stale sidecar would silently fall
+            # back to the weak shared-stem check (which :679 showed passes even with
+            # T12 pinned and a T24/T18 sibling loose). Fail loud instead (codex #189).
+            report.gate(
+                f"{name}:dof-free-necessity",
+                lambda: _fail(
+                    "free paper-drive but .paper-drive.park.json records no crank_spin "
+                    "instance -- stale/missing park sidecar; refusing the weak stem "
+                    "fallback. Rebuild paper-drive to regenerate it."),
+            )
+        else:
+            stems = () if insts else _REQUIRED_FREE_STEMS.get(name, ())
+            report.gate(
+                f"{name}:dof-free-necessity",
+                lambda: assert_free_dof_necessity(
+                    adapter, free_dof, resolve=False,
+                    required_stems=stems, required_instances=insts),
+            )
     else:
         report.gate(
             f"{name}:dof-fully-defined",
@@ -747,6 +797,58 @@ _CHAIN_AXIS_TOL_MM = 0.05  # wire centreline must hold the tangency radius
 _CHAIN_HOOK_TOL_MM = 0.02  # ball joint residual
 _CHAIN_MIN_WHEEL_SPAN_DEG = 5.0  # coupling-alive floor over the 0..1 deg sweep
 _CHAIN_REST_TOL = 0.02  # mm / deg drift allowed after restoring the rest pose
+
+
+async def _verify_paper_feed_one(adapter: Any, report: Report) -> None:
+    """Kinematic proof that the crank drives the WHOLE paper feed (codex #189).
+
+    The belt/chain (T12->T24) and rack-pinion ratios are otherwise exercised only by
+    the hand-run ``build_kinematic_probe.py``, so a paper-feed regression could ship
+    with the standard gates green. This wires that proof into ``verify:kinematics``:
+    open paper-drive, drive the crank, and assert T24 / knob shaft / fine pinion / the
+    96T disc all turn and the platen feeds (the probe's own assertions). The driven
+    (dirty) model is discarded without saving.
+
+    A `locked` build gets the SAME proof, not a skip: there the crank_spin park
+    driver is authored engaged (``PARK_crank_spin``) and the crank is fully
+    defined, so the probe first SUPPRESSES that driver in-session -- freeing
+    exactly the crank spin -- then drives as usual. The model is discarded
+    unsaved either way, so the shipped locked artefact keeps its 0-DOF closure
+    (proven by the release preflight). Without this, a locked release could
+    ship a wrong rack travel with every gate green: soundness only proves
+    0 DOF, the belt mate ratio is build-time-checked but the rack coefficient
+    and the end-to-end train are only proven by driving (codex #189)."""
+    name = "paper-drive"
+    sldasm = OUT_SLDASM / f"{name}.SLDASM"
+    if not sldasm.exists():
+        report.failed.append((f"motion:{name}:open", f"not built: {sldasm}"))
+        _telemetry.error(f"{sldasm.name} not built -- run doit")
+        return
+    if not _assert_fresh(name, report):
+        return  # stale on-disk artefact: fail loud rather than verify old geometry
+
+    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+    check(f"open {name}", await adapter.open_model(str(sldasm)))
+    log(f"--- motion: {name} crank->feed kinematic proof (codex #189) ---")
+    # _drive_and_measure authors a temporary crank driver, rebuilds, and asserts the
+    # whole train follows -- raising on any broken coupling (belt / lock / rack-pinion).
+    from build_kinematic_probe import _drive_and_measure  # noqa: E402
+    try:
+        if _expected_free_dof(name) == 0:
+            # Locked build: free the crank spin for the drive by suppressing its
+            # engaged park driver (session-only -- the doc is discarded unsaved).
+            from solidworks_mcp.adapters.base import SuppressMateParameters  # noqa: E402
+            check(
+                f"{name}: suppress PARK_crank_spin (locked build -- free the "
+                "crank for the drive probe)",
+                await adapter.suppress_mate(
+                    SuppressMateParameters(name="PARK_crank_spin", suppress=True)
+                ),
+            )
+        await report.agate(f"{name}:crank-feed", lambda: _drive_and_measure(adapter))
+    finally:
+        from preflight_release import _discard_open_documents  # noqa: E402
+        _discard_open_documents(adapter)
 
 
 async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
@@ -1376,6 +1478,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if suite == "kinematics":
         await _verify_motion_one(adapter, report)
         await _verify_live_chain_one(adapter, report)
+        await _verify_paper_feed_one(adapter, report)
     if suite == "math":
         verify_truth(report)
         verify_spring_base(report)

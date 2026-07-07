@@ -335,7 +335,17 @@ fixture group; the lever-wire ball-joints at the fixture hook and rides the hub
 drum at its 0.25 stand-off tangency; and the **WIRE-1 yoke mate** — the
 wheel's `WireYokePoint` held coincident to the lever-wire's `YokePlane`, the
 linearized inextensible-wire constraint — turns the magnifying wheel with it;
-the wheel is COUPLED, not separately freed). The motion/mobility diagnostics
+the wheel is COUPLED, not separately freed), plus paper-drive's **crank spin**
+(1 DOF, 2026-07-05: the crank-end T12 sprocket spins free; a native **Belt/Chain
+feature** (`adapter.insert_belt_chain`, EngageBelt) couples it to the knob T24 at
+the 12:24 chain ratio, and a **rack-pinion mate** feeds the platen off the knob
+axis at the NET through-train travel `NET_RACK_TRAVEL_PER_KNOB_REV` — knob T24 and
+knob are COUPLED, the platen feed is COUPLED, not separately freed). paper-drive's
+engaged path is a documented KINEMATIC coupling at the faithful ch30 rest geometry:
+the intermediate transgear (fine-pinion → 96T disc) keeps its 13.1 mm rest gap and
+the coupling spans it — the single latch arm cannot serve both the 66.05 rest and
+51.0 engaged centre distances (DIMENSIONS.md Appendix C #8's open kinematic riddle),
+so the engage is coupled, not geometrically meshed. The motion/mobility diagnostics
 treat every deferred (absent) park driver as already-free
 (`_suppress_park_or_note_free` in `build_motion_setup_drives.py`).
 
