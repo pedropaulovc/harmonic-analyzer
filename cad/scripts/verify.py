@@ -320,19 +320,32 @@ def assert_gear_ratios(adapter: Any, name: str) -> None:
     with _telemetry.span("gate.gear_ratios") as gsp:
         with _telemetry.span("gear.read_links"):
             links = _gear_mate_links(adapter)
-        gsp.set_attribute("gear_mates", len(links))
-        if not links:
+        # A rack-pinion mate comes back from _gear_mate_links as a gear-type mate
+        # (SolidWorks stores it as one), but it couples LINEAR<->rotary motion, so
+        # it carries no integer tooth ratio -- its stored GearRatio is a small
+        # pitch fraction that rounds to 0/0. paper-drive has exactly one (the
+        # platen rack-pinion, #189). Keep only true ROTATIONAL meshes (both tooth
+        # counts round to > 0); those are the crank + channel gear meshes this
+        # gate validates. Without this, paper-drive's lone rack-pinion is neither
+        # crank nor channel and trips the comparison as a spurious (0,0) mesh.
+        rotational = [
+            link for link in links
+            if round(link["numerator"]) > 0 and round(link["denominator"]) > 0
+        ]
+        gsp.set_attribute("gear_mates", len(rotational))
+        if not rotational:
             if name == GEAR_OWNER:
                 raise RuntimeError(f"{GEAR_OWNER} has no gear mates -- the drive train is broken")
             _telemetry.debug(
-                f"{name}: no gear mates at this level "
-                f"(they live in the flexible {GEAR_OWNER} sub; verified there)"
+                f"{name}: no rotational gear meshes at this level "
+                f"(rack-pinion/none; the crank + channel meshes live in the "
+                f"flexible {GEAR_OWNER} sub, verified there)"
             )
             return
 
         crank_links: list[tuple[int, int]] = []
         channel_links: list[tuple[int, int]] = []
-        for link in links:
+        for link in rotational:
             ratio = _canon_ratio(round(link["numerator"]), round(link["denominator"]))
             names = " ".join(side["component"] for side in link["sides"])
             bucket = crank_links if any(t in names for t in _CRANK_GEAR_TOKENS) else channel_links
