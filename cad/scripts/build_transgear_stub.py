@@ -10,7 +10,7 @@ photo's end hardware collapsed to a collar -- simplification).
 
 Layout: axis +Y from the bracket-back end at the origin; the assembly
 rotates +Y to -Z (machine front). Base y 0..9.1 (bracket + arm hub), seat
-y 9.1..22 (feed pinion + disc), collar 22..26.
+y 9.1..22.9 (feed pinion + disc), collar 22.9..26.9.
 Dimensions: docs/paper-drive-rework.md E7/E8.
 
 Run (SolidWorks already open)::
@@ -48,7 +48,7 @@ MATERIAL = "Plain Carbon Steel"
 BASE_DIA = 0.375 * IN  # 9.525 machine-standard stock (low)
 BASE_LEN = 9.1  # bracket plate (4) + gap + latch big hub (z -125.9..-135)
 SEAT_DIA = 5.0  # turned-down gear seat (feed pinion + disc bores)
-SEAT_LEN = 12.9  # feed pinion 9.5 + disc 3 + 0.4 (z -135..-147.9)
+SEAT_LEN = 13.8  # feed pinion 9.5 + disc 3 + 0.9 slack (z -135..-148.8)
 COLLAR_DIA = 14.0
 COLLAR_LEN = 4.0
 

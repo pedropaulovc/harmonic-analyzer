@@ -11,8 +11,8 @@ build_platen_guide.py). Fastener holes:
   y 15..140 from the TOP edge down (ch22 front photo; holes at the
   clips' 8-inset end holes -> local y 23/132);
 * ten O3 guide-screw through-holes in two rows of 5 (ch22 front photo)
-  at the guide bands: bottom rail row y 13.25, top rail row y 47
-  (machine bands 315.5..321 / 349.5..354.5 with the plate at y 305).
+  at the guide rail centrelines: bottom row y 13, top row y 47 (machine
+  318 / 352 with the plate at y 305).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 22" — 140 mm height annotated
 (p.55 callout, high); width ~300 from the front-photo aspect (~2.15:1)
@@ -73,7 +73,7 @@ SOCKET_XY = ((6.0, 23.0), (6.0, 132.0), (294.0, 23.0), (294.0, 132.0))
 # into the guide rails on the back).
 GUIDE_HOLE_DIA = 3.0
 GUIDE_HOLE_X = (30.0, 90.0, 150.0, 210.0, 270.0)
-GUIDE_HOLE_Y = (13.25, 47.0)  # bottom / top rail centrelines
+GUIDE_HOLE_Y = (13.0, 47.0)  # bottom / top rail centrelines (machine 318 / 352)
 GUIDE_HOLE_XY = tuple((x, y) for y in GUIDE_HOLE_Y for x in GUIDE_HOLE_X)
 
 

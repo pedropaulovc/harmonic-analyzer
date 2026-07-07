@@ -9,7 +9,7 @@ below the bar carrying the fixed stud (build_transgear_stub.py) on which the
 Layout: plate in the Front plane, thickness extruded +Z (the assembly seats
 local z 0 on the bar's back face, plate spanning machine z -129.9..-125.9).
 Origin at the STUD BORE centre; the two O4.4 screw holes sit at x +-10 on
-the bar's mid-height line (local y 40.53), plate top edge flush with the
+the bar's mid-height line (local y 40.533), plate top edge flush with the
 bar top.
 
 Run (SolidWorks already open)::
@@ -51,7 +51,7 @@ PLATE_Y = (-12.0, 51.53)  # 12 below the stud .. flush with the bar top
 PLATE_THICK = 4.0
 STUD_BORE_DIA = 9.6  # the O9.525 stud plugs in
 SCREW_HOLE_DX = 10.0  # bar sockets at stud x +-10 (support-bar BRACKET_HOLE_X)
-SCREW_HOLE_Y = 40.53  # bar mid-height above the stud (338.5 - 297.97)
+SCREW_HOLE_Y = 40.533  # bar mid-height above the stud (338.5 - 297.967)
 SCREW_HOLE_DIA = 4.4  # clearance for the O3.9 bracket screws
 
 
