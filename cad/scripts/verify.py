@@ -566,8 +566,6 @@ def _required_free_instances(name: str) -> tuple[str, ...]:
     DOF -- paper-drive's three ``transgear-removable`` siblings, of which only the
     T12 crank is the operational input (codex #189 :679). Empty when there is no
     park sidecar (a ``locked`` build, where free_dof is 0 and this is unused)."""
-    from _assembly import load_park_specs
-
     out: list[str] = []
     for spec in load_park_specs(name):
         target = spec.get("verify") or []
