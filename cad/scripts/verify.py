@@ -329,6 +329,12 @@ def assert_gear_ratios(adapter: Any, name: str) -> None:
         if not links:
             if name == GEAR_OWNER:
                 raise RuntimeError(f"{GEAR_OWNER} has no gear mates -- the drive train is broken")
+            if name == "paper-drive":
+                # A missing/suppressed 12T:120T feed mesh must fail loud, not
+                # take the harmless no-gears path below (codex #196).
+                raise RuntimeError(
+                    "paper-drive has no gear mates -- the paper-feed train is broken"
+                )
             _telemetry.debug(
                 f"{name}: no gear mates at this level "
                 f"(they live in the flexible {GEAR_OWNER} sub; verified there)"
