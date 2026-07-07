@@ -106,7 +106,8 @@ the 12T base circles), riding turned-down seats on the stud / knob shaft.
   z −155 unchanged (68-link loop, sag ≈ 21). (Photo cross-check ch30 p002:
   stud ≈ (+12, ~292-299), knob ≈ (+55..58, ~279-287) ✓ within parallax.)
 - z stack on the stud (front → back): collar −152.8..−148.8 | disc
-  −148.4..−145.4 (0.3 in front of the guide-screw heads at −145.1) | feed
+  −148.4..−145.4 (the guide-screw heads are counterbored sub-flush, so the
+  deepest platen furniture nearby is the paper plane −143.4) | feed
   pinion −145.4..−135.9 (3.0 into the rack band −138.9..−132.9) | latch arm
   −132.75..−130.15 (2.6 thick — it fits the 3.0 slot between the rack back
   and the bar front; its Ø22 big hub rises past the rack's tooth band in y)
@@ -129,7 +130,7 @@ park unchanged). Net feed: 1 crank rev (T12/T24 mounted) = 0.5 knob rev →
 | column-clamp-back (NEW) | BACK semi-arc 14 deep, 2 Ø4.0 threaded ear holes |
 | clamp-screw (NEW) | Ø8×2.5 head, Ø3.9×28 shank — ×4, heads on the bar front |
 | pinion-bar | RETIRED (deleted; bar + bracket replace it) |
-| transgear-bracket (NEW) | 30×63.5×4 black plate on the bar back, Ø9.6 stud bore, 2 Ø4.4 holes |
+| transgear-bracket (NEW) | 30×63.5×4 black plate on the bar back, Ø9.6 stud bore, 2 Ø4.4 holes; 1.5-deep front groove (local y 16..24) clears the sliding bottom guide rail |
 | bracket-screw (NEW) | Ø8×2.5 head, Ø3.9×12 shank — ×2, heads on the bracket back |
 | rack-pinion | 96T DP30 → 120T **DP38** disc, bore Ø5 (role: fixed reducer) |
 | transgear-pinion | 24T DP30 → 12T DP38, face 4, bore Ø5 (third gear) |
@@ -139,9 +140,9 @@ park unchanged). Net feed: 1 crank rev (T12/T24 mounted) = 0.5 knob rev →
 | transgear-knob-shaft | stepped: Ø9.525×9.1 + Ø5×5.5 seat + Ø9.525×12.9 + knob (z −157.5..−123.5) |
 | transgear-removable | face width 5.0 → 2.4 |
 | chain links (_chain) | inner plates ±1.45..±2.25, bushings ±1.45, outer ±2.55..±3.35, pins ±3.35 |
-| platen | +10 Ø3 guide thru-holes (rows y 13/47); clip sockets → (6/294, 23/132) |
+| platen | +10 Ø3 guide thru-holes (rows y 13/47) with Ø6.5×2.4 head counterbores (paper lies flat, crowns 0.2 sub-flush); clip sockets → (6/294, 23/132) |
 | platen-clip | natural brass (was PANEL_BLACK); edge positions y [320,445] |
-| platen-guide (NEW) | 300×5×10 rail (10 deep so the locks clear the 9-deep bar), 4 lock holes — ×2 |
+| platen-guide (NEW) | 300×5×10 rail (10 deep so the locks clear the 9-deep bar), 4 lock holes + 5 blind Ø3 screw holes on the front face — ×2 |
 | guide-lock (NEW) | 22×12×2 plate, 2 Ø3 holes — ×4 |
 | platen-rack | 30 → 12 tall; teeth-down band y [303,315], crests 2 below the platen edge |
 

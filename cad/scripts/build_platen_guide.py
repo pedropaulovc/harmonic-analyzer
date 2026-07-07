@@ -3,7 +3,8 @@ r"""Reproduction script: platen guide rail (book ch. 22, pp. 54-55; 2 used).
 One of the two black guide rails screwed across the FULL width of the platen
 back, above and below the bright wear band where the support bar slides --
 the platen HANGS on the bar by these. Each is fastened by a row of 5 screws
-whose heads show on the platen front (ch22 front photo) and carries 2 lock
+whose heads show on the platen front (ch22 front photo; counterbored flush so
+the paper lies flat, shanks threading into the rail) and carries 2 lock
 plates (build_guide_lock.py) that bridge behind the bar so the platen cannot
 fall off. 10 deep so the lock plates clear the 9-deep bar.
 
@@ -53,6 +54,13 @@ LOCK_SCREW_DX = 7.0  # 2 screws per lock flank its centre
 HOLE_DIA = 3.0  # the fillister screws' O2.9 shanks thread in
 
 HOLE_X = tuple(s + d for s in LOCK_STATION_X for d in (-LOCK_SCREW_DX, LOCK_SCREW_DX))
+
+# Blind holes on the FRONT face (mid-height) where the row of 5 fastening
+# screws threads in: the platen counterbores its heads (build_platen), so the
+# O2.9 shanks reach 2.4 past the platen back into the rail. Stations = the
+# platen's GUIDE_HOLE_X (pinned by an assert in the assembly module).
+SCREW_STATION_X = (30.0, 90.0, 150.0, 210.0, 270.0)
+SCREW_HOLE_DEPTH = 3.0
 
 
 async def build(adapter) -> dict[str, str]:
@@ -121,8 +129,37 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "LockHoles")
     v_holes = len(HOLE_X) * math.pi * (HOLE_DIA / 2.0) ** 2 * GUIDE_DEPTH
-    v_final = v_rail - v_holes
-    await volume_check(adapter, "guide with holes", v_final, 0.02 * v_holes)
+    await volume_check(adapter, "guide with holes", v_rail - v_holes, 0.02 * v_holes)
+
+    # Blind screw holes on the front face (both-directions trick: 2x depth
+    # about the z=0 sketch plane lands 0..SCREW_HOLE_DEPTH in material).
+    screws = SketchDims()
+    check("create_sketch screw holes", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    for n, x in enumerate(SCREW_STATION_X):
+        await define_circle(
+            adapter, x, GUIDE_HEIGHT / 2.0, HOLE_DIA / 2.0, f"screw hole x{x:.0f}",
+            dims=screws,
+            names=(f"F{n}X", f"F{n}Z", f"F{n}Dia"),
+            drives=(None, None, '"HoleDia"'),
+        )
+    set_sketch_direct_db(adapter, False)
+    await ensure_fully_defined(adapter, "screw holes sketch")
+    check("exit_sketch screw holes", await adapter.exit_sketch())
+    name_last_feature(adapter, "ScrewHoleProfile")
+    drive_jobs += screws.apply(adapter, "ScrewHoleProfile")
+    check(
+        "cut screw holes",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=2.0 * SCREW_HOLE_DEPTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "ScrewHoles")
+    v_screws = (
+        len(SCREW_STATION_X) * math.pi * (HOLE_DIA / 2.0) ** 2 * SCREW_HOLE_DEPTH
+    )
+    v_final = v_rail - v_holes - v_screws
+    await volume_check(adapter, "guide with screw holes", v_final, 0.02 * v_screws)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
