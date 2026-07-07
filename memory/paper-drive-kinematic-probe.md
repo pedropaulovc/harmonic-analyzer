@@ -39,6 +39,16 @@ trip up anyone reasoning about this model:
    drives the FULL paper-drive model fine. Root cause unisolated
    ([[park-driver-singularities]]); measure coupling ratios on the real model.
 
+4. **`FEED_SIGN` is PINNED physics (+1), not a calibration knob** (2026-07-07,
+   PR #196). The original rack-pinion mate passed every magnitude check while
+   feeding the paper BACKWARD (user drag test). Since then: the mate rides the
+   RACK's own pitch-line `Axis1` (not the platen's slide axis) with
+   `flip=True` — calibrated live (flip=False measured platen +0.133 mm for feed
+   Z −1.50°; physics demands −0.133). If the `paper-drive:crank-feed` gate ever
+   fails on sign, flip the MATE in `build_paper_drive_assembly.py`; never
+   re-sign the probe constants. The end-to-end NET assert is signed through the
+   whole train, so a reversal can't hide behind a retuned pairwise constant.
+
 The probe never saves (drives + reads, then discards via
 `preflight_release._discard_open_documents` in a `finally`). NON_PART_SCRIPT,
 run by hand or via `verify:kinematics` (skipped for a `locked` build — no free
