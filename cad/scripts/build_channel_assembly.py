@@ -67,13 +67,19 @@ share a channel slice:
   * free-space structure with no in-subassembly contact partner (fulcrum-
     shaft, ball mounts, springs, spring-hooks) is datum-located by three
     orthogonal plane distances (the #110 frame-column idiom).
-Each joint is pinned to its on-solution pose by an off-pivot spin driver;
-the spin (+ the anchor's axial) dims are the per-channel suppressible
-drivers, so the saved state stays fully defined (0 DOF) for the gate while
-the joints stay free for a Motion study to drive. Far-side mate flips are
-caught by reading back the origin and re-adding flipped. Saved state:
-every component fixed or fully defined, zero interference (face-flush and
-tangent contacts allowed).
+Each of the rocker/rod/bar joints is pinned to its on-solution pose by a
+per-channel FREED park driver (rocker swing + rod follow + bar amplitude,
+DEFERRED in the default `free` build -- 3 live DOF per channel). The
+channel LEVER carries no pin of its own: the J5 foot-on-arc coupling (the
+bar's foot axis held at its as-solved radius from the rocker's arc-centre
+axis) closes the rocker -> bar -> lever chain, so dragging the rocker
+articulates the whole channel and the lever reads under-constrained WITH
+it (coupled, magnifier-wheel style, not separately freed). A `locked`
+build authors the three park drivers engaged; with the coupling that
+fully defines the lever too (0 DOF). Far-side mate flips are caught by
+reading back the origin and re-adding flipped. Saved state: every
+component fixed, fully defined (locked) or coupled-free (free), zero
+interference (face-flush and tangent contacts allowed).
 
 The cams themselves live in drive-train.SLDASM (integral with the
 cylinder gears); the frame, supports and top-frame ring in frame.SLDASM.
@@ -614,6 +620,7 @@ async def _revolute(
     label: str,
     axial: tuple = ("datum",),
     park_spin: str | None = None,
+    pin_spin: bool = True,
 ) -> Any:
     """Build one revolute joint pinned to its on-solution pose.
 
@@ -636,7 +643,10 @@ async def _revolute(
 
     ``park_spin`` (a key) renames the spin driver ``PARK_<key>`` so it becomes a
     suppressible operational DOF (the rocker swing); ``None`` keeps it a hard pin.
-    Returns the spin mate dict (so the caller can collect the park name).
+    ``pin_spin=False`` skips the spin driver entirely -- the caller couples the
+    residual spin through another mate (the channel lever's spin is closed by
+    the J5 foot-on-arc coupling, not a pin). Returns the spin mate dict (so the
+    caller can collect the park name), or ``None`` when the spin was skipped.
     """
     tgt = _org(adapter, comp)
     # Capture the off-axis (spin) target at the PLACED design pose, BEFORE the
@@ -666,6 +676,8 @@ async def _revolute(
         )
     else:
         raise RuntimeError(f"_revolute: unknown axial spec {axial!r}")
+    if not pin_spin:
+        return None
     # ``park_spin`` (a key) makes the spin a FREED operational-DOF park driver:
     # deferred+recorded in a `free` build (the rocker swing stays free), authored
     # engaged + PARK_<key> in a `locked` build. ``None`` keeps it a hard pin.
@@ -1097,16 +1109,20 @@ async def build(adapter) -> dict[str, str]:
             free_dof_key=f"rod_swing_{j:02d}",
         )
         park_names.append(f"{PARK_PREFIX}rod_swing_{j:02d}")
-        # J4 lever revolute (fulcrum OD ↔ fulcrum bore; spin via the bar pin).
-        # The lever shares the channel mid-plane with the rocker (both mid-plane
-        # extruded, both at z_mid), so its axial seat is a COINCIDENT mid-plane
-        # mate to the rocker's Front plane -- not a bare distance to the datum.
+        # J4 lever revolute (fulcrum OD ↔ fulcrum bore). The lever shares the
+        # channel mid-plane with the rocker (both mid-plane extruded, both at
+        # z_mid), so its axial seat is a COINCIDENT mid-plane mate to the
+        # rocker's Front plane -- not a bare distance to the datum. NO spin pin
+        # (pin_spin=False): the lever's rotation is CLOSED by the J5 foot-on-arc
+        # coupling below (like the magnifier wheel's yoke -- coupled, not
+        # separately freed): swing the rocker and the bar + lever follow.
         await _revolute(
             adapter, lever,
             bore_axis_ref(fulc_od), named_ref(f"Axis1@{lever}", "AXIS"),
             concentric=True, off_axis_name="Axis2",
             off_axis_local=LEVER_BAR_PIN_BORE_LOCAL, pivot_xy=fulc_w,
             label=f"J4 lever ch{j:02d}", axial=("coincident", rocker),
+            pin_spin=False,
         )
         # J3 bar — the amplitude-setting joint (p0). A real revolute hinges the
         # bar at its top pin (Axis1@bar) coaxial with the lever's bar pin
@@ -1158,6 +1174,34 @@ async def build(adapter) -> dict[str, str]:
             free_dof_key=f"bar_amplitude_{j:02d}",
         )
         park_names.append(f"{PARK_PREFIX}bar_amplitude_{j:02d}")
+        # J5 foot-on-arc COUPLING: the bar's foot axis (Axis2@bar) is held at
+        # its as-solved radius from the rocker's R800 arc-centre axis
+        # (Axis3@rocker) -- two Z-parallel axes, ONE unambiguous distance (the
+        # lever-wire stand-off idiom, no far-side flip). This is the slot
+        # contact that closes the rocker -> bar -> lever chain: swinging the
+        # rocker moves the arc centre, the foot follows at its radius, and the
+        # top-pin hinge turns the lever -- so the lever is COUPLED (magnifier-
+        # wheel style), not separately freed, and the free count stays 3 per
+        # channel. The radius is the design pose's own measure (per channel:
+        # the foot-notch contact offset rotates with the amplitude tilt), so
+        # the mate authors residual-free; it tracks the true roof-on-arc
+        # contact to first order (offset ~5 mm over R800 -- sub-visible).
+        arc_c = world_point(adapter, rocker, [0.0, ARM_ARC_CENTER_LOCAL_Y, 0.0])
+        foot_r = math.hypot(foot[0] - arc_c[0], foot[1] - arc_c[1])
+        want_r = math.hypot(
+            (PIVOT[0] - amplitudes[j]) - _ARC["acx"], st["bar_bottom"] - _ARC["acy"])
+        if abs(foot_r - want_r) > 1e-3:
+            raise RuntimeError(
+                f"ch{j:02d}: measured foot->arc-centre radius {foot_r:.4f} != "
+                f"analytic {want_r:.4f} -- the placed pose drifted off solve_state"
+            )
+        await distance_driver(
+            adapter,
+            named_ref(f"Axis2@{bar}", "AXIS"), named_ref(f"Axis3@{rocker}", "AXIS"),
+            foot_r,
+            label=f"J5 bar-foot on rocker arc ch{j:02d} r={foot_r:.2f}",
+            verify=(bar, bar_tgt),
+        )
 
         # Return spring (ground; cosmetic) -- placed PER CHANNEL spanning this
         # channel's (moving) lever eye to the FIXED summing-plate hole, at the
@@ -1262,11 +1306,15 @@ async def build(adapter) -> dict[str, str]:
                 f"{len(park_names)} ({sorted(park_names)}) -- a free_dof_key was "
                 "dropped or double-counted"
             )
-        # Three freed DOF per channel, one family each: the aggregate count
-        # alone cannot tell a pinned family from a free one (codex 2026-07-04).
+        # Three freed DOF per channel, one family each -- plus the channel
+        # lever, which must read under-constrained WITH the chain (the J5
+        # coupling closes it off the rocker; a frozen lever means the coupling
+        # died). The aggregate count alone cannot tell a pinned family from a
+        # free one (codex 2026-07-04).
         assert_free_dof_necessity(
             adapter, len(park_names),
-            required_stems=("rocker-arm", "connecting-rod", "amplitude-bar"))
+            required_stems=("rocker-arm", "connecting-rod", "amplitude-bar",
+                            "channel-lever"))
         write_park_specs(ASM_NAME)
     check_no_interference(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)

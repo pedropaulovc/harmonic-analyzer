@@ -400,6 +400,16 @@ async def build(adapter) -> dict[str, str]:
     await name_bore_axis(
         adapter, "Right Plane", rod_x, "Top Plane", ROD_HOLE_Y, "rod bore"
     )
+    # Named axis on the R800 top-edge arc CENTRE (Axis3 = Right ∩ Top+816, a
+    # free-space datum 808 above the pivot bore, along Z like the bores). The
+    # channel assembly holds the amplitude bar's foot axis at its as-solved
+    # radius from this line (the J5 foot-on-arc coupling), so swinging the
+    # rocker drives the bar + channel lever. Tied to "CenterY" so a GUI edit
+    # of the arc radius/depth moves the coupling with it.
+    await name_bore_axis(
+        adapter, "Right Plane", 0.0, "Top Plane", CENTER_Y, "arc centre",
+        drive_b='"CenterY"', drive_jobs=drive_jobs,
+    )
 
     # Both bores are full-thickness through the 2.5 strap, entirely inside the
     # material, so each removes pi*r^2*thickness.
