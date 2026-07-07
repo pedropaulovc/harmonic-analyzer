@@ -8,7 +8,7 @@ metadata:
 # Paper-drive real train (2026-07-07, PR #196)
 
 The paper-drive was rebuilt against the primary references
-(docs/paper-drive-rework.md is the evidence doc). Durable facts:
+([[paper-drive-rework]] is the evidence dossier). Durable facts:
 
 - **Topology (final):** crank T12 —chain→ knob T24 —lock→ 12T DP38 third gear
   —gear 12:120→ 120T DP38 reducer disc —lock→ 12T DP30 feed pinion
