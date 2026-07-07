@@ -311,6 +311,23 @@ def save_src_digests(digests: dict[str, str]) -> None:
         json.dumps(dict(sorted(out.items())), indent=1), encoding="utf-8")
 
 
+def exporter_invalidated() -> bool:
+    """True when ``export-src.json`` exists but carries a DIFFERENT exporter sentinel.
+    ``load_src_digests`` already empties the digest map on a mismatch, which re-exports
+    every DECLARED target (its recipe digest no longer matches ``{}``) -- but an
+    UNDECLARED target (a generated stretch-spring mesh, ``src_digest`` -> None) is
+    mtime-gated and ignores the map, so an old STL newer than its ``.SLDPRT`` would still
+    read fresh after an exporter/format change. main() folds this into ``force`` so the
+    exporter bump regenerates EVERY mesh through the new logic (codex review)."""
+    if not SRC_DIGESTS.exists():
+        return False
+    try:
+        stored = json.loads(SRC_DIGESTS.read_text(encoding="utf-8")).get(_EXPORTER_KEY)
+    except Exception:
+        return False
+    return stored != _exporter_digest()
+
+
 def _import_dodo() -> Any:
     """dodo.py (repo root, off cad/scripts' path) is doit's build graph plus the
     exact recipe digest its ContentChecker + remote-cache key use. Reusing it makes
@@ -452,7 +469,10 @@ def assert_configs_distinct(stem: str, crc_by_mesh: dict[str, int]) -> None:
 
 
 def main() -> int:
-    force = "--force" in sys.argv[1:]
+    # An exporter/helper-closure change (sentinel mismatch) forces a FULL export so even
+    # mtime-gated undeclared targets regenerate through the new logic, not just the
+    # digest-gated declared ones (codex review).
+    force = "--force" in sys.argv[1:] or exporter_invalidated()
     # Only RECORD source digests when the caller vouches the natives are current --
     # i.e. the doit ``export`` task, which runs on the COM spine AFTER every part /
     # assembly is (re)built (dodo passes ``--record-digests``). A bare standalone run
@@ -593,12 +613,20 @@ def main() -> int:
                     digests[dashed] = d
                 adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
-                by_stem: dict[str, list[tuple[str, str]]] = {}
+                # Group ALL configs per stem, and re-export the WHOLE group whenever
+                # ANY of its configs is stale: export_part_stls' assert_configs_distinct
+                # (the stale-tessellation guard) needs >=2 sibling CRCs to catch a
+                # config that failed to rebuild, so a single-config partial refresh
+                # (one deleted --tNN.STL / missing colour) must still bring its siblings
+                # along (codex review). Single-config parts are unaffected (one entry).
+                all_by_stem: dict[str, list[tuple[str, str]]] = {}
+                stale_stems: set[str] = set()
                 for stem, cfg, mesh in sorted(stems):
+                    all_by_stem.setdefault(stem, []).append((cfg, mesh))
                     if force or part_stl_stale(stem, mesh, colors, digests):
-                        by_stem.setdefault(stem, []).append((cfg, mesh))
-                for stem, cfg_meshes in sorted(by_stem.items()):
-                    await export_part_stls(stem, cfg_meshes)
+                        stale_stems.add(stem)
+                for stem in sorted(stale_stems):
+                    await export_part_stls(stem, all_by_stem[stem])
                 done[m] = "exported"
             return done
         finally:
