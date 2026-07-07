@@ -1,5 +1,0 @@
-column-clamp:
-  number: MHA-012
-  material: Gray Cast Iron
-  tolerance_class: machined_block
-  process: "cast + machined"
