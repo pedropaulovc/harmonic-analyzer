@@ -36,6 +36,13 @@ The paper-drive was rebuilt against the primary references
   protrude in front of the bar, so the old x −258..+42 offset would collide.
 - **All platen-riding fasteners must be lock-mated to the platen** (grounded
   screws float in space when the platen feeds — the original issue-5 bug).
+- **Two interference-gate fixes are load-bearing geometry, not whitelists:**
+  the platen counterbores its 10 guide-screw stations Ø6.5×2.4 (heads 0.2
+  sub-flush so the 0.5-thick paper lies flat; shanks thread 2.4 into blind Ø3
+  holes on the rails), and the transgear bracket carries a 1.5-deep full-width
+  front groove at stud-local y 16..24 (the bottom guide rail slides 1.0 past
+  the bar-back plane and would otherwise sweep the plate). Don't "simplify"
+  either away.
 - Chain z-stack straddles the 2.4-wide sprockets (inner plate inner faces
   ±1.45); knob centre (54.575, 284.1332) pre-mirror is duplicated as a
   literal in `_chain.KNOB_CENTRE` (leaf-safety) and pinned by
