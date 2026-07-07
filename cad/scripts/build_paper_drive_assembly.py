@@ -147,6 +147,7 @@ BAR_Z = (BAR_FRONT_Z + BAR_BACK_Z) / 2.0  # -134.4 bar centre
 
 # --- platen (hangs on the bar) ----------------------------------------------
 from build_platen import (  # noqa: E402
+    CBORE_DEPTH as PLATEN_CBORE_DEPTH,
     GUIDE_HOLE_X as PLATEN_GUIDE_HOLE_X,
     GUIDE_HOLE_Y as PLATEN_GUIDE_HOLE_Y,
     PLATE_HEIGHT,
@@ -159,6 +160,7 @@ from build_platen_guide import (  # noqa: E402
     GUIDE_HEIGHT,
     HOLE_X as GUIDE_LOCK_HOLE_X,
     LOCK_STATION_X,
+    SCREW_STATION_X as GUIDE_SCREW_STATION_X,
 )
 from build_guide_lock import LOCK_WIDTH  # noqa: E402
 from build_platen_clip import (  # noqa: E402
@@ -223,8 +225,9 @@ KNOB_SHAFT_XY = (
 )  # (54.575, 284.133)
 
 # z stack on the stud (front -> back): collar | disc | feed pinion | latch arm
-# | bracket. The disc window sits 0.3 in front of the platen furniture's
-# deepest reach (the guide-screw heads at -145.1).
+# | bracket. The disc window clears the platen furniture: the guide-screw
+# heads are counterbored sub-flush (crowns -142.7), so the deepest reach near
+# the cluster is the paper plane at -143.4 -- 2.0 in front of the disc back.
 DISC_Z0 = -148.4  # disc -148.4..-145.4
 THIRD_Z0 = DISC_Z0  # third gear -148.4..-144.4 (full mesh overlap 3.0)
 FEED_Z0 = DISC_Z0 + DISC_FACE  # -145.4; face 9.5 reaches the rack band 3.0 deep
@@ -282,7 +285,10 @@ CLIP_SCREW_XY = tuple(
 _CLIP_Y0_LOCAL = PLATE_HEIGHT - CLIP_LENGTH  # 15
 assert PLATEN_SOCKET_XY[0][1] == _CLIP_Y0_LOCAL + CLIP_HOLE_INSET
 assert PLATEN_SOCKET_XY[1][1] == PLATE_HEIGHT - CLIP_HOLE_INSET
-# Guide screws: 2 rows of 5, heads on the platen front (ch22 front photo).
+# Guide screws: 2 rows of 5, heads counterbored 0.2 sub-flush of the platen
+# front (ch22 front photo shows the slotted heads; the paper lies flat over
+# them), shanks threading 2.4 into the rails' blind holes.
+assert GUIDE_SCREW_STATION_X == PLATEN_GUIDE_HOLE_X
 GUIDE_SCREW_XY = tuple(
     (PLATE_X0 + x, PLATE_Y0 + y)
     for y in PLATEN_GUIDE_HOLE_Y
@@ -709,8 +715,10 @@ async def build(adapter) -> dict[str, str]:
             ground=False, label=f"fillister-screw (clip x{x:+.0f} y{y:.0f})")
         await _lock_to_platen(screw, f"clip screw x{x:+.0f} y{y:.0f}")
     for x, y in GUIDE_SCREW_XY:
+        # Seated on the counterbore floor: crown 0.2 sub-flush so the paper
+        # lies flat; shank threads 2.4 into the rail's blind hole.
         screw = await place_component(
-            adapter, "fillister-screw", [x, y, PLATE_FRONT_Z],
+            adapter, "fillister-screw", [x, y, PLATE_FRONT_Z + PLATEN_CBORE_DEPTH],
             [0.0, 0.0, 0.0], IDENTITY,
             ground=False, label=f"fillister-screw (guide x{x:+.0f} y{y:.0f})")
         await _lock_to_platen(screw, f"guide screw x{x:+.0f} y{y:.0f}")
