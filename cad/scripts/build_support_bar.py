@@ -20,7 +20,7 @@ handed and placed with ``mirror=False`` (a bbox-x mirror would flip the
 holes to +2/+22, off the stud line).
 
 Layout: bar axis along X, origin at the bar centre; height along Y,
-depth along Z (front face local z -4.5). Dimensions: docs/
+depth along Z (front face local z -4.5). Dimensions: memory/
 paper-drive-rework.md E1/E2.
 
 Run (SolidWorks already open)::

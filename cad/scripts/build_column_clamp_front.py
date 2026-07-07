@@ -5,7 +5,7 @@ bar to each front column (ch30 p005 quarter view): its front face carries the
 bar's back face, its relief wraps the column's front half, and the two O4.4
 ear holes pass the clamp screws whose heads show on the bar front (ch30
 p002). Depth 17.9 spans bar back (machine z -129.9) to the column-axis plane
-(z -112). Geometry: _clamp_arc.py; layout: docs/paper-drive-rework.md E2.
+(z -112). Geometry: _clamp_arc.py; layout: memory/paper-drive-rework.md E2.
 
 Run (SolidWorks already open)::
 

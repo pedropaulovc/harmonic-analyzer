@@ -4,7 +4,7 @@ The orthogonal time-base of the plotter: the platen carries the recording paper
 across the pen as the operator turns the crank, driven through the translational
 gearing, in machine coordinates (assembly origin = base origin; base top
 y = 50.8; the output side is -Z). Rebuilt against the primary references
-(docs/paper-drive-rework.md): ONE support bar, two-piece column clamps, the
+(memory/paper-drive-rework.md): ONE support bar, two-piece column clamps, the
 hanging platen (guides + locks), and the REAL six-gear power train:
 
     crank T12 --(belt/chain feature, pitch O 24:48)--> knob T24
@@ -50,7 +50,7 @@ Fix-all strategy (M6.2): every structural component inserted at its exact final
 transform and fixed; the platen group and the gear train are left free and
 constrained by mates; transforms asserted by read-back; zero interference.
 
-Dimensions: docs/paper-drive-rework.md; cad/DIMENSIONS.md ch. 22-23, 25.
+Dimensions: memory/paper-drive-rework.md; cad/DIMENSIONS.md ch. 22-23, 25.
 
 Run (SolidWorks already open)::
 
@@ -860,13 +860,16 @@ async def build(adapter) -> dict[str, str]:
     # reference is the stud axis. The engagement SENSE is calibrated from the
     # verify:kinematics signed feed assert (2026-07-07 field report: the
     # platen-axis-referenced default fed the paper backward vs the tooth
-    # contact) -- flip here if the probe's FEED_SIGN assert fails on sign.
+    # contact; the pitch-axis re-reference still solved reversed at flip=False
+    # -- the live gate measured +0.133 mm for feed Z -1.50 deg). flip=True
+    # lands the physical sense; recalibrate HERE (never the probe's FEED_SIGN)
+    # if the gate ever fails on sign again.
     await rack_pinion_mate(
         adapter,
         named_ref(f"Axis1@{rack}", "AXIS"),
         named_ref(f"Axis1@{feed}", "AXIS"),
         rack_travel_per_revolution=math.pi * FEED_PD,
-        flip=False,
+        flip=True,
         label="platen feed (feed pinion on the rack)")
     # (4) The crank spin is the FREED operational-DOF park driver. Deferred in
     # the default `free` build (recorded, not authored) -> T12 spins free and

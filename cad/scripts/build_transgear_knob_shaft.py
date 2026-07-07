@@ -14,7 +14,7 @@ Layout: axis +Y from the chain-side (machine-front) end at the origin;
 the assembly rotates +Y to +Z (machine back). Front section y 0..9.1
 (removable seat, machine z -157.5..-148.4), O5 pinion seat y 9.1..14.6,
 rear section y 14.6..27.5 (latch small hub near the knob), knob y 27.5..34.
-Dimensions: docs/paper-drive-rework.md E7/E8.
+Dimensions: memory/paper-drive-rework.md E7/E8.
 
 Run (SolidWorks already open)::
 
