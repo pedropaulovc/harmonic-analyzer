@@ -31,7 +31,6 @@ cone_tip_gear_configs: [T006, T012, T018, T024]
 # Parts that take the cast-iron green frame appearance (memory: M6.x green castings).
 casting_green_parts:
   - arbor-pedestal
-  - column-clamp
   - cone-pivot-post  # absorbed the old crank-pedestal (merged column, 2026-07-03)
   - gooseneck-clamp
   - harmonic-base

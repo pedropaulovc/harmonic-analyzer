@@ -584,6 +584,9 @@ def _expected_free_dof(name: str) -> int:
         # The freed crank (T12) spin; the knob T24 is belt-coupled and the platen
         # is rack-coupled (no DOF of their own).
         return 0 if is_locked_build(_config.machine("build_lock", "paper_drive")) else 1
+    if name == "summing":
+        # The freed lever knife-edge rock; the boss-hook is lock-mated and rides it.
+        return 0 if is_locked_build(_config.machine("build_lock", "summing")) else 1
     return 0
 
 
@@ -602,6 +605,8 @@ _REQUIRED_FREE_STEMS = {
     # share the stem, so a stem check passes even if T12 is pinned and T24/T18 is
     # loose (codex #189 :679). Kept as reference data only.
     "paper-drive": ("transgear-removable",),
+    # One freed DOF (the lever knife-edge rock); the lock-mated boss-hook rides it.
+    "summing": ("summing-lever",),
 }
 
 
