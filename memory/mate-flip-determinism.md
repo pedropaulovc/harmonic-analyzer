@@ -58,6 +58,19 @@ get a semantic name via `_assembly.seat_plane_name(descriptor)` (frame's
 `plane_distance_mate`). Part-build planes use `name_last_feature` (trap: renames
 the SKETCH, not the plane, after `create_sketch`+`exit_sketch`).
 
+**`_FLIP_INVERT` is GLOBAL — do NOT split it per-assembly (tried, reverted PR #193).**
+A seed is keyed by `_flip_sig(label)[+orient]`, and the SAME sig recurs across
+assemblies — e.g. `"lever axial seat"` is exercised by mates in BOTH `channel` and
+`drive_train`. A disjoint per-assembly `cad/config/flip_seeds/<stem>.yaml` split
+under-populated `drive_train` (the sig sat only in `channel.yaml`) → a `flip-seed
+MISS` every build (self-healed, but broke the 0-flip invariant). A CORRECT scheme
+would give every assembly the full set — which is just the module-global
+`_FLIP_INVERT`. Since the table is a universal dep of every assembly either way,
+externalizing it to config buys NO cache-narrowing over keeping it in `_assembly.py`
+next to the `_seed_flip`/`_flip_sig`/`_orient_suffix` logic it keys. Keep it there.
+(Contrast: placement/`mirror_plane` IS genuinely per-part disjoint data — that split,
+`_config_asm.placement` #156, is correct.)
+
 **History:** frame #138 (5→0, planes, kept). drive #176 + channel #179 = planes,
 CLOSED. **#185 = distance + sign-derived flip + orientation-aware sigs, MERGED**
 (rebased through #182 drive rewrite, #186 hard-error `_mate`, main→v0.15.0).
