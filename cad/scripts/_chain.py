@@ -15,10 +15,11 @@ Geometry (local frame: knob wrap centre at the origin, machine xy
 pre-mirror; crank centre from build_drive_train_assembly X_CRANK / Y_CRANK
 minus build_paper_drive_assembly KNOB_SHAFT_XY): two UNEQUAL wrap arcs whose
 centreline rides each gear's PITCH circle (where a real chain seats -- the
-rollers rest in the tooth valleys and the tips poke out past the chain; the
-links overlap the teeth in the shared z-plane, intended mesh whitelisted in
+rollers rest in the tooth valleys, the plates STRADDLE the 2.4-wide
+sprocket, and the tips pass between them; only the roller<->tooth seating
+remains as intended contact, whitelisted in
 build_paper_drive_assembly.check_no_interference), the common
-external tangent taut line on the +n side (the pinion-bar side), and a
+external tangent taut line on the +n side (the support-bar side), and a
 slack arc sagging SAG below the straight external tangent on the -n side,
 tangent-continuous at all four junctions (internal tangency:
 |C - A| = R_slack - WRAP_R_A, |C - B| = R_slack - WRAP_R_B; R_slack is
@@ -30,8 +31,9 @@ from __future__ import annotations
 import math
 
 # Chain-wheel centres, machine xy pre-mirror.
-KNOB_CENTRE = (65.0, 241.78)  # build_paper_drive_assembly KNOB_SHAFT_XY (ch30
-# rest state: latch C2C 66.05 from the stud, y clamped under the pinion bar)
+KNOB_CENTRE = (54.575, 284.1332)  # build_paper_drive_assembly KNOB_SHAFT_XY:
+# stud (12, 297.9667) + latch C2C 44.766 at -18 deg (the permanent 12T:120T
+# mesh -- paper-drive rework E8; ch30 p002 cross-check knob ~(55-58, 279-287))
 # The crank chain-wheel rides the crankshaft, so its centre IS (X_CRANK, Y_CRANK)
 # (the ch30 GT crank axis, ABOVE the drive line since the 2026-07-02 re-anchor).
 # Hardcoded as a literal (like KNOB_CENTRE above) -- NOT imported from
@@ -173,7 +175,7 @@ for _ in range(80):
         _LO_SAG = _MID
     else:
         _HI_SAG = _MID
-SAG = 0.5 * (_LO_SAG + _HI_SAG)  # the BUILT droop: 11.28 for the 54-link loop.
+SAG = 0.5 * (_LO_SAG + _HI_SAG)  # the BUILT droop (solved for LINK_COUNT).
 # The count quantisation moves the target length by at most LINK_PITCH / 2
 # (~3.2 mm); the slack run's length-vs-droop sensitivity is ~0.85 mm/mm here,
 # so the solved sag lands within ~4 mm of the seed -- INSIDE the +-8 bracket
@@ -215,29 +217,31 @@ assert abs(
 # inside a +-2.4 in-plane / +-2.1 z envelope (the retired #13 ball chain's 4.8
 # bead) so the band-tuned M6.8/M6.9 clearances transfer untouched.
 
-# Every clearance is >= 0.3 mm and nothing relies on exact tangency: the
+# Every clearance is >= 0.25 mm and nothing relies on exact tangency: the
 # M6.x interference checker flags ~0.00 mm^3 slivers, so the links FLOAT as a
-# multibody (disconnected bodies in a part are allowed). The whole envelope
-# stays inside the retired bead's +-2.4 (in-plane half-height 2.4; |z| <= 2.1
-# < 2.4), so the band-tuned M6.8/M6.9 clearances transfer with margin.
-PLATE_HEIGHT = 4.8  # obround plate height == retired bead diameter (envelope)
+# multibody (disconnected bodies in a part are allowed). The z stack is sized
+# so the chain STRADDLES the 2.4-wide removable sprockets (ch23 p.58-59:
+# chain wider than the wheel -- paper-drive rework E6): sprocket faces +-1.2,
+# inner-plate INNER faces at +-1.45 (0.25 clear per side), so the tooth tips
+# pass BETWEEN the plates instead of through them.
+PLATE_HEIGHT = 4.8  # obround plate height (in-plane envelope, unchanged)
 PLATE_HALF_H = PLATE_HEIGHT / 2.0  # 2.4, the obround end-arc radius
 PLATE_THICK = 0.8  # side-plate thickness (z)
 
 ROLLER_DIA = 2.5  # roller/bushing outer diameter (~0.52 of plate height, #25)
 ROLLER_R = ROLLER_DIA / 2.0  # 1.25
 BUSH_BORE_R = 1.0  # bushing through-bore; pin floats inside (0.35 clearance)
-BUSH_HALF_LEN = 1.0  # bushing reach along the pin axis (z -1.0..1.0)
+BUSH_HALF_LEN = 1.45  # bushing spans the inner plates (z -1.45..1.45)
 INNER_PLATE_HOLE_R = 1.55  # bushing OD floats inside (0.30); web 0.85
 
 PIN_DIA = 1.3  # outer-link pin (floats in the bushing bore and plate holes)
 PIN_R = PIN_DIA / 2.0  # 0.65
-PIN_HALF_LEN = 2.1  # pin reach along the pin axis (z -2.1..2.1)
+PIN_HALF_LEN = 3.35  # pin reach along the pin axis (flush with the outer plates)
 OUTER_PLATE_HOLE_R = 0.95  # pin floats inside (0.30); web 1.45
 
 # z stack (pin axis), symmetric about the chain mid-plane:
-INNER_PLATE_Z = 0.6  # inner-plate centre (faces 0.2..1.0)
-OUTER_PLATE_Z = 1.7  # outer-plate centre (faces 1.3..2.1, 0.3 gap to inner)
+INNER_PLATE_Z = 1.85  # inner-plate centre (faces 1.45..2.25, sprocket 0.25 clear)
+OUTER_PLATE_Z = 2.95  # outer-plate centre (faces 2.55..3.35, 0.3 gap to inner)
 
 
 def loop_point_tangent(

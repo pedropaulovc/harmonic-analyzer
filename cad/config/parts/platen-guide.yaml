@@ -1,5 +1,5 @@
-pinion-bar:
-  number: MHA-055
+platen-guide:
+  number: MHA-111
   material: Plain Carbon Steel
   tolerance_class: machined_block
   process: "machined (steel)"
