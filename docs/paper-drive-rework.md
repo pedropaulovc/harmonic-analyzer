@@ -116,8 +116,9 @@ the 12T base circles), riding turned-down seats on the stud / knob shaft.
 ## Mate chain (issue 8, AS BUILT)
 crank T12 —(belt/chain feature, pitch Ø 24:48)→ knob T24 —(LOCK: keyed
 shaft)→ 12T third gear —(GEAR mate 12:120, external, reversing)→ 120T disc
-—(LOCK: drive pins)→ 12T DP30 feed pinion —(RACK-PINION mate, π·10.160 per
-rev)→ rack —(LOCK)→ platen. One free operational DOF: crank spin (deferred
+—(LOCK: drive pins)→ 12T DP30 feed pinion —(RACK-PINION mate on the rack's
+own pitch-line Axis1, π·10.160 per rev, sense pinned by the kinematics
+probe's signed feed asserts)→ rack —(LOCK)→ platen. One free operational DOF: crank spin (deferred
 park unchanged). Net feed: 1 crank rev (T12/T24 mounted) = 0.5 knob rev →
 0.5·(12/120)·π·10.160 = 1.596 mm platen travel
 (`NET_RACK_TRAVEL_PER_CRANK_REV`; verified by the kinematics probe).
@@ -143,7 +144,7 @@ park unchanged). Net feed: 1 crank rev (T12/T24 mounted) = 0.5 knob rev →
 | platen | +10 Ø3 guide thru-holes (rows y 13/47) with Ø6.5×2.4 head counterbores (paper lies flat, crowns 0.2 sub-flush); clip sockets → (6/294, 23/132) |
 | platen-clip | natural brass (was PANEL_BLACK); edge positions y [320,445] |
 | platen-guide (NEW) | 300×5×10 rail (10 deep so the locks clear the 9-deep bar), 4 lock holes + 5 blind Ø3 screw holes on the front face — ×2 |
-| guide-lock (NEW) | 22×12×2 plate, 2 Ø3 holes — ×4 |
+| guide-lock (NEW) | 22×19×2 plate, 2 Ø3 holes — ×4 (19 tall so the BOTTOM-rail pair, whose rail sits 7 below the bar, still overlaps the bar band by 7; top pair overlaps 14) |
 | platen-rack | 30 → 12 tall; teeth-down band y [303,315], crests 2 below the platen edge |
 
 Assembly: single bar y-centre 338.5 (top edge 349.5 carries the hanging
