@@ -112,9 +112,10 @@ assert math.isclose(
 # --- M6.10 fastener ----------------------------------------------------------
 # Pen-hanger screw from BEHIND the bar (the wheel rim passes 1.0 in front
 # of the strap, so no front-side head fits): AF-7 head on the bar back
-# face (-128.9), O3.5 shank through the bar + strap holes, tip 0.5 behind
-# the strap front face (-141.9).
-HANGER_SCREW_POS = (5.5, WHEEL_BAR_Y, -128.9)  # machine x -5.5
+# face (-129.9 -- the 9-deep support-bar stock seated on the clamp arc,
+# build_magnifier_assembly BAR_BACK_Z), O3.5 shank through the bar + strap
+# holes, tip 0.5 behind the strap front face (-141.9).
+HANGER_SCREW_POS = (5.5, WHEEL_BAR_Y, -129.9)  # machine x -5.5
 
 
 async def build(adapter) -> dict[str, str]:

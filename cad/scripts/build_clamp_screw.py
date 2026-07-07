@@ -1,8 +1,9 @@
-r"""Reproduction script: column-clamp screw (book ch. 21/22, ch30; 4 used).
+r"""Reproduction script: column-clamp screw (book ch. 21/22, ch30; 6 used:
+4 on the platen support bar, 2 on the magnifying wheel-bar).
 
 The long slotted machine screw closing each two-piece column clamp: 2 per
-clamp, heads on the support bar's FRONT face flanking the column (ch30
-p002), shank through the bar (9) and the front arc (17.9), threading into
+clamp, heads on the bar's FRONT face flanking the column (ch30 p002),
+shank through the bar (9) and the front arc (17.9), threading into
 the back arc (O4.0 ear holes). Plain cylindrical head; slot and thread not
 modeled (documented simplification, same as fillister-screw).
 
