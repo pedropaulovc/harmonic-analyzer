@@ -1,9 +1,16 @@
+---
+name: paper-drive-rework
+description: Full evidence dossier (E1-E8) + part-change table behind the PR #196 paper-drive rework — backs [[paper-drive-real-train]]
+metadata:
+  type: project
+---
+
 # Paper-drive rework — reference findings + design (2026-07-07)
 
 User-reported issues (8) audited against book ch22/ch23, videos 2/4 + 4/4, ch30
-8-views, and the v4 transgear keyframes. This file is the working design doc for
-the rework branch; the durable rows land in `cad/config/dimensions.yaml` when
-implemented.
+8-views, and the v4 transgear keyframes. This is the evidence dossier for the
+PR #196 rework branch (durable rows live in `cad/config/dimensions.yaml`; the
+distilled rules in [[paper-drive-real-train]]).
 
 ## Evidence summary
 
