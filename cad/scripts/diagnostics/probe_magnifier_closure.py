@@ -17,7 +17,7 @@ from win32com.client import VARIANT
 
 import _telemetry
 from _common import OUT_SLDASM, _flag, _flag_only, _read_member, log
-from _assembly import load_park_specs, replay_park_specs
+from _assembly_postbuild import load_park_specs, replay_park_specs
 
 _ERR = {
     0: "None", 1: "Warning", 2: "RebuildError",
