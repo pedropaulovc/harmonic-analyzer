@@ -362,15 +362,18 @@ def src_digest(src: Path) -> str | None:
 
 
 def _save_as(doc: Any, out: Path) -> int:
-    """SaveAs3 to ``out``, guaranteeing THIS call produced the file: remove any prior
-    output first, so a SaveAs3 that fails (a locked / read-only path) leaves NO file
-    and raises -- instead of silently leaving a stale export that the existence check
-    would pass and a fresh digest would then stamp current (codex review). Returns the
-    SaveAs3 status for logging."""
+    """SaveAs3 to ``out``, guaranteeing THIS call produced a REAL file: remove any prior
+    output first, so a SaveAs3 that fails (a locked / read-only path) leaves NO file and
+    raises -- instead of silently leaving a stale export that the existence check would
+    pass and a fresh digest would then stamp current. Also reject a zero-byte placeholder
+    (SolidWorks can drop one before an export failure) -- the release exporter already
+    treats size 0 as a failed save; the digest-cached path must too, or the empty output
+    gets recorded fresh (codex review). Returns the SaveAs3 status for logging."""
     out.unlink(missing_ok=True)
     ok = doc.SaveAs3(str(out), 0, 0)
-    if not out.exists():
-        raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={ok})")
+    if not out.exists() or out.stat().st_size == 0:
+        out.unlink(missing_ok=True)  # never leave a zero-byte placeholder behind
+        raise RuntimeError(f"SaveAs3 produced no/empty file: {out} (rc={ok})")
     return ok
 
 
