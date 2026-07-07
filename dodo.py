@@ -1414,9 +1414,13 @@ def task_export():
 
     Always runs ``export_models.py`` (``uptodate: False``) -- it self-checks every
     output's per-file staleness cheaply and prints "all exports fresh" when there
-    is nothing to do. We do NOT gate on a single declared target: a deleted
-    STEP/STL/colors output (with the boxes JSON + CAD inputs unchanged) must still
-    be regenerated, which doit would otherwise skip (codex review).
+    is nothing to do. That self-check keys on the SAME churn-immune recipe digest
+    (``_stable_artefact_digest``) doit/the remote cache use, NOT the .SLDPRT/.SLDASM
+    mtime -- SolidWorks' save-cascade + cache-restore bump those mtimes on every
+    build, which used to make the script re-export every part each release. We do
+    NOT gate on a single declared target: a deleted STEP/STL/colors output (with the
+    boxes JSON + CAD inputs unchanged) must still be regenerated, which doit would
+    otherwise skip (codex review).
     """
     target = str((CAD_OUT / "boxes" / "harmonic-analyzer.json").resolve())
     deps = ([_sldprt(s) for s in part_stems()]
