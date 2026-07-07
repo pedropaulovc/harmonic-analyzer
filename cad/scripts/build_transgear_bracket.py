@@ -10,7 +10,8 @@ Layout: plate in the Front plane, thickness extruded +Z (the assembly seats
 local z 0 on the bar's back face, plate spanning machine z -129.9..-125.9).
 Origin at the STUD BORE centre; the two O4.4 screw holes sit at x +-10 on
 the bar's mid-height line (local y 40.533), plate top edge flush with the
-bar top.
+bar top. A shallow full-width groove on the front face clears the platen's
+bottom guide rail sliding past (local y 16..24, 1.5 deep).
 
 Run (SolidWorks already open)::
 
@@ -54,6 +55,15 @@ SCREW_HOLE_DX = 10.0  # bar sockets at stud x +-10 (support-bar BRACKET_HOLE_X)
 SCREW_HOLE_Y = 40.533  # bar mid-height above the stud (338.5 - 297.967)
 SCREW_HOLE_DIA = 4.4  # clearance for the O3.9 bracket screws
 
+# Front-face clearance groove: the platen's BOTTOM guide rail slides past the
+# bar-back plane (machine z -129.9..-128.9 = local z 0..1.0) across the
+# plate's local y band 17.53..22.53 on its way to the stud. A full-width
+# 1.5-deep relief keeps the sliding rail 0.5 clear of the plate (the
+# interference gate caught the 30x5x1.0 overlap).
+GROOVE_Y = (16.0, 24.0)
+GROOVE_DEPTH = 1.5
+GROOVE_HALF_W = PLATE_HALF_W + 1.0  # overshoot past both plate edges
+
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
@@ -68,6 +78,9 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PlateThick", f"{PLATE_THICK}mm")
     await set_global(adapter, "StudBoreDia", f"{STUD_BORE_DIA}mm")
     await set_global(adapter, "ScrewHoleDia", f"{SCREW_HOLE_DIA}mm")
+    await set_global(adapter, "GrooveHalfW", f"{GROOVE_HALF_W}mm")
+    await set_global(adapter, "GrooveY0", f"{GROOVE_Y[0]}mm")
+    await set_global(adapter, "GrooveY1", f"{GROOVE_Y[1]}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -142,6 +155,45 @@ async def build(adapter) -> dict[str, str]:
     ) * PLATE_THICK
     expected -= v_holes
     await volume_check(adapter, "holes", expected, 0.02 * v_holes)
+
+    # Guide-rail clearance groove across the front face (both-directions
+    # trick: 2x depth about the z=0 sketch plane lands 0..GROOVE_DEPTH in
+    # material; the -z half is air). Anchor vertex 0 at (-W, y0), both coords
+    # non-zero: seg0 width, seg1 height, then anchor x/z (unsigned).
+    groove = SketchDims()
+    check("create_sketch groove", await adapter.create_sketch("Front"))
+    g_rect = [
+        (-GROOVE_HALF_W, GROOVE_Y[0]),
+        (GROOVE_HALF_W, GROOVE_Y[0]),
+        (GROOVE_HALF_W, GROOVE_Y[1]),
+        (-GROOVE_HALF_W, GROOVE_Y[1]),
+    ]
+    g_lines = await add_line_chain(adapter, g_rect)
+    await define_rectilinear_chain(
+        adapter, g_lines, g_rect, label="groove", dims=groove,
+        names=["GrooveW", "GrooveH", "GrooveAnchorX", "GrooveAnchorZ"],
+        drives=[
+            '2 * "GrooveHalfW"',
+            '"GrooveY1" - "GrooveY0"',
+            '"GrooveHalfW"',
+            '"GrooveY0"',
+        ],
+    )
+    await ensure_fully_defined(adapter, "groove sketch")
+    check("exit_sketch groove", await adapter.exit_sketch())
+    name_last_feature(adapter, "GrooveProfile")
+    drive_jobs += groove.apply(adapter, "GrooveProfile")
+    check(
+        "cut groove",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=2.0 * GROOVE_DEPTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "GuideGroove")
+    # The groove overshoots in x, so only the plate's own width contributes.
+    v_groove = 2.0 * PLATE_HALF_W * (GROOVE_Y[1] - GROOVE_Y[0]) * GROOVE_DEPTH
+    expected -= v_groove
+    await volume_check(adapter, "groove", expected, 0.02 * v_groove)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).

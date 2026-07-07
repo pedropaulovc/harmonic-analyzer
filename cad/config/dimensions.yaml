@@ -1433,7 +1433,7 @@ sections:
         - scaled + derived
         - med
       - - Platen guides + locks (rework E3, NEW)
-        - 'two black rails 300 × 5 × 10 screwed across the FULL platen back (bottom y 315.5..320.5, top 349.5..354.5 — the platen HANGS by the top rail''s underside on the bar''s top edge 349.5), each by 5 fillister screws whose heads show on the platen front (rows y 318/352, x −120..+120 step 60); 4 black lock plates 22 × 12 × 2 (2 per rail, stations ±90, 2 fillister screws each) on the rail backs (z −128.9..−126.9), bridging 1.0 behind the bar so the platen cannot fall off'
+        - 'two black rails 300 × 5 × 10 screwed across the FULL platen back (bottom y 315.5..320.5, top 349.5..354.5 — the platen HANGS by the top rail''s underside on the bar''s top edge 349.5), each by 5 fillister screws whose heads show on the platen front (rows y 318/352, x −120..+120 step 60), seated in Ø6.5 × 2.4 counterbores (crowns 0.2 sub-flush so the paper lies flat) with shanks threading 2.4 into blind Ø3 holes on the rail fronts; 4 black lock plates 22 × 12 × 2 (2 per rail, stations ±90, 2 fillister screws each) on the rail backs (z −128.9..−126.9), bridging 1.0 behind the bar so the platen cannot fall off'
         - —
         - 'ch22 p.54-55 back photo (rails + bright wear band + lock plates) + front photo (two rows of 5 screw heads)'
         - scaled + derived
@@ -1571,7 +1571,7 @@ sections:
         - counted + derived
         - med
       - - Pinion bar — RETIRED (paper-drive rework 2026-07-07)
-        - 'the transgear cluster does NOT hang from a dedicated bar: book p.62/63 shows the cluster''s bracket screwed to the BACK of the single platen support bar (2 large slotted screws). `pinion-bar.SLDPRT` deleted; replaced by `transgear-bracket` (30 × 63.5 × 4 black plate, Ø9.6 stud bore at machine (−12, 297.97), 2 × Ø4.4 screw holes at stud ± 10 on the bar mid-height 338.5)'
+        - 'the transgear cluster does NOT hang from a dedicated bar: book p.62/63 shows the cluster''s bracket screwed to the BACK of the single platen support bar (2 large slotted screws). `pinion-bar.SLDPRT` deleted; replaced by `transgear-bracket` (30 × 63.5 × 4 black plate, Ø9.6 stud bore at machine (−12, 297.97), 2 × Ø4.4 screw holes at stud ± 10 on the bar mid-height 338.5; 1.5-deep full-width front groove at stud-local y 16..24 clears the platen''s bottom guide rail sliding past the bar-back plane)'
         - —
         - book p.62 top-down + p.63 back view; docs/paper-drive-rework.md E1
         - scaled + derived

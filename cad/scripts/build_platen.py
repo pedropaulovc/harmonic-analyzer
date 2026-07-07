@@ -76,6 +76,13 @@ GUIDE_HOLE_X = (30.0, 90.0, 150.0, 210.0, 270.0)
 GUIDE_HOLE_Y = (13.0, 47.0)  # bottom / top rail centrelines (machine 318 / 352)
 GUIDE_HOLE_XY = tuple((x, y) for y in GUIDE_HOLE_Y for x in GUIDE_HOLE_X)
 
+# Front-face counterbores recess the guide-screw heads (O5.5 x 2.2 fillister)
+# 0.2 below the front face so the recording paper lies FLAT on the platen --
+# a proud head would pierce the rigid paper sheet (the interference gate
+# caught exactly that, 11.9 mm^3 per head).
+CBORE_DIA = 6.5  # 0.5 radial clearance around the O5.5 heads
+CBORE_DEPTH = 2.4  # head 2.2 -> crown 0.2 sub-flush
+
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
@@ -94,6 +101,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "SocketDia", f"{SOCKET_DIA}mm")
     await set_global(adapter, "SocketDepth", f"{SOCKET_DEPTH}mm")
     await set_global(adapter, "GuideHoleDia", f"{GUIDE_HOLE_DIA}mm")
+    await set_global(adapter, "CboreDia", f"{CBORE_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -209,10 +217,48 @@ async def build(adapter) -> dict[str, str]:
         0.02 * v_guide_holes,
     )
 
+    # Head counterbores from the front face (same both-directions trick as the
+    # sockets: 2x depth about the z=0 sketch plane lands 0..CBORE_DEPTH in
+    # material). Positions repeat the guide-hole stations (named, undriven);
+    # only the diameter rides the global.
+    cbores = SketchDims()
+    check("create_sketch counterbores", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    for n, (x, y) in enumerate(GUIDE_HOLE_XY):
+        await define_circle(
+            adapter, x, y, CBORE_DIA / 2.0, f"counterbore ({x:.0f}, {y:.2f})",
+            dims=cbores,
+            names=(f"Cb{n}X", f"Cb{n}Z", f"Cb{n}Dia"),
+            drives=(None, None, '"CboreDia"'),
+        )
+    set_sketch_direct_db(adapter, False)
+    await ensure_fully_defined(adapter, "counterbores sketch")
+    check("exit_sketch counterbores", await adapter.exit_sketch())
+    name_last_feature(adapter, "CboreProfile")
+    drive_jobs += cbores.apply(adapter, "CboreProfile")
+    check(
+        "cut counterbores",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=2.0 * CBORE_DEPTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "Counterbores")
+    # The O3 through-holes already removed their share of each counterbore.
+    v_cbores = (
+        len(GUIDE_HOLE_XY) * math.pi
+        * ((CBORE_DIA / 2.0) ** 2 - (GUIDE_HOLE_DIA / 2.0) ** 2) * CBORE_DEPTH
+    )
+    await volume_check(
+        adapter,
+        "counterbores",
+        v_plate - v_sockets - v_guide_holes - v_cbores,
+        0.02 * v_cbores,
+    )
+
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built
     # value, so the geometry must not move).
-    v_final = v_plate - v_sockets - v_guide_holes
+    v_final = v_plate - v_sockets - v_guide_holes - v_cbores
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
