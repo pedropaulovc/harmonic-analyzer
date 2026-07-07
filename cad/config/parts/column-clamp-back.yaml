@@ -1,0 +1,5 @@
+column-clamp-back:
+  number: MHA-106
+  material: Gray Cast Iron
+  tolerance_class: machined_block
+  process: "cast + machined"

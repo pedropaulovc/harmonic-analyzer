@@ -1,20 +1,20 @@
 r"""Reproduction script: transgear latch arm (book ch. 23, pp. 56-59).
 
-The tapered link that carries the knob shaft and swings its fine 24T
-pinion into mesh with the rack-pinion disc (engineerguy v4_transgear_008:
-latch arm with a hole, pivoting on the rack-pinion stud): a big hub
-riding the stud, a small hub carrying the knob shaft, joined by a
-tapered web. C2C 66.05 is the ch30 REST (disengaged) state -- the plates
-show the knob shaft parked at post-mirror (-65, ~242), its mounted
-removable's tips overlapping the disc rim only in XY projection (the
-chain plane sits ~56 north of the disc). The ENGAGED state (24T DP30
-pinion on the disc, c2c (81.28 + 20.32 + 0.4)/2 = 51.0) is NOT modeled;
-how the original single arm serves both centre distances is the open
-kinematic riddle of DIMENSIONS.md Appendix C #8.
+The tapered link joining the stud to the knob shaft (engineerguy
+v4_transgear_008: latch arm with a hole, pivoting ON the stud): a big hub
+riding the stud, a small hub carrying the knob shaft, joined by a tapered
+web. Its C2C is the PERMANENT 12T:120T DP38 mesh distance -- 44.116
+nominal + 0.65 centre extension = 44.766 (the extension clears the
+_gear-recipe gap floor at the 12T base circle, the same checker-arbitrated
+slack the drive-train meshes use). The arm pivoting on the stud is what
+DISSOLVED the old Appendix C #8 riddle: unlatching tilts the whole cluster
+away from the rack (v4_transgear 001 vs 011-013) while this c2c never
+changes; the old 66.05 was a rest-state fit against the refuted
+disc-meshes-rack topology.
 
 Layout: big hub on the origin (stud axis along Z), small hub at
-(+66.05, 0) -- the assembly rotates the c2c line to the photo direction.
-4.5 thick along Z. Dimensions: cad/DIMENSIONS.md ch. 23 (M6.8, derived).
+(+44.766, 0) -- the assembly rotates the c2c line to the photo direction.
+4.5 thick along Z. Dimensions: memory/paper-drive-rework.md E7/E8.
 
 Run (SolidWorks already open)::
 
@@ -53,9 +53,12 @@ MATERIAL = "Plain Carbon Steel"
 BIG_HUB_DIA = 22.0  # rides the rack-pinion stud (low)
 SMALL_HUB_DIA = 16.0  # carries the knob shaft (low)
 BORE_DIA = 9.6  # both bores ride O9.5 shafts (derived)
-C2C = 66.0482  # ch30 rest-state centre distance: stud (0, 253.5) to the
-# parked knob shaft (pre-mirror +65.0, 241.78) = hypot(65, 11.72) (scaled)
-THICKNESS = 4.5  # along Z (low)
+C2C = 44.766  # the permanent 12T:120T DP38 mesh: (12 + 120) / (2 * 38) in
+# = 44.116 + 0.65 centre extension (gap-floor clearance, see docstring)
+THICKNESS = 2.6  # along Z: the arm lives in the 3.0 slot between the rack's
+# back face (-132.9) and the bar front / bracket plane (-129.9) -- its big
+# hub (r 11) rises past the rack's tooth band in y, so it cannot share the
+# rack's z band (derived)
 WEB_HALF_AT_BIG = 9.0  # tapered web half-widths (derived: inside hub ODs)
 WEB_HALF_AT_SMALL = 6.5
 

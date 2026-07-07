@@ -3,80 +3,54 @@ r"""Reproduction script: paper-drive subassembly (book ch. 22-23, 25).
 The orthogonal time-base of the plotter: the platen carries the recording paper
 across the pen as the operator turns the crank, driven through the translational
 gearing, in machine coordinates (assembly origin = base origin; base top
-y = 50.8; the output side is -Z). 21 placed components + the roller drive chain,
-built as a native connected-linkage chain component pattern along the loop.
+y = 50.8; the output side is -Z). Rebuilt against the primary references
+(memory/paper-drive-rework.md): ONE support bar, two-piece column clamps, the
+hanging platen (guides + locks), and the REAL six-gear power train:
 
-Operational kinematics (default `free` build): the crank-end T12 sprocket spin is
-a FREE operational DOF -- drag it and the whole feed train follows. The coupling
-is authored as SolidWorks mates, NOT re-posed geometry (the ch30 rest pose below
-is preserved exactly, faithful to the plates): a native **Belt/Chain assembly
-feature** (EngageBelt) couples T12 <-> T24 exactly as the roller chain physically
-does -- SAME rotation sense (a gear mate would reverse it) at the pitch-diameter
-24:48 = 12:24-tooth = 0.500 ratio (SW seeds each pulley's belt diameter from the
-picked tooth-tip face, 28:52 = 0.538, so the adapter FORCES PulleyDiameters to
-the pitch values post-create and fails loud on read-back mismatch; see the
-coupling block), and a single **rack-pinion mate** feeds the platen off the knob (T24) axis
-at the NET through-train travel (fine-pinion 24T -> disc 96T -> rack, see
-``NET_RACK_TRAVEL_PER_KNOB_REV``). The intermediate transgear gears stay in their
-faithful rest pose; the fine-pinion/disc coupling is the modeled ENGAGED operation
-expressed kinematically ACROSS the documented 13.1 rest gap (the single latch arm
-cannot serve both the 66.05 rest and 51.0 engaged centre distances -- DIMENSIONS.md
-Appendix C #8's open kinematic riddle -- so the engage is coupled, not geometrically
-meshed). `locked` authors the crank-spin park engaged for a 0-DOF snapshot. Mode:
-cad/config/machine/build_lock.yaml (``paper_drive``).
+    crank T12 --(belt/chain feature, pitch O 24:48)--> knob T24
+      --(LOCK: keyed shaft)--> 12T DP38 third gear
+      --(GEAR mate 12:120)--> 120T DP38 reducer disc
+      --(LOCK: stud stack)--> 12T DP30 feed pinion
+      --(RACK-PINION mate, pi*10.16/rev)--> rack --(LOCK)--> platen
 
-* Support rails (front of the columns, centres z -133.9): platen top rail
-  (y 440) + bottom rail (y 334), each clamped by a column-clamp pair at
-  x +-197.
-* Platen group: platen (prismatic slider along X, the paper feed) face-flush on
-  the rails, platen-rack on its back (teeth down, meshing the rack pinion with
-  0.3 backlash and tooth-on-gap phasing), two platen-clips on the paper face,
-  platen-paper riding as a rigid sheet.
-* Transgear group (ch. 23 topology, M6.8): pinion-bar, transgear-stub carrying
-  rack-pinion (96T disc) + latch big hub; the latch (c2c 66.05, ch30 rest
-  state) carries the knob shaft with the mounted T24 removable CHAIN-WRAPPED at
-  the drive-train chain plane (the roller chain rides the removable's m2 teeth --
-  that is how gear swaps change the platen ratio), the fine 24T DP30
-  transgear-pinion near the front, and the roller chain looping both removables.
-* Fasteners (M6.10): four fillister screws holding the platen clips (into the
-  platen's blind sockets), four pinch screws in the platen-rail column clamps
-  (backed out).
-* Spare transgear-removable (T18 chain wheel) stored loose on the base top
-  (y 50.8): the swap gear for changing the platen ratio (ch. 23). A spare for
-  THIS subsystem -- so it lives here (flat sibling of the mounted T24, exactly as
-  the book's single output group held both) rather than floating at the top level
-  where its leaf name would collide with the T12/T24 instances nested in the
-  drive-train / this sub.
+Operational kinematics (default `free` build): the crank-end T12 sprocket spin
+is the ONE free operational DOF -- drag it and the whole feed train follows at
+1.596 mm of paper per crank revolution (T12/T24 mounted). Every stage is a real
+SolidWorks mate on real, geometrically meshed gears (the old NET rack-pinion
+shortcut across the fictitious rest gap is gone -- the latch arm pivots ON the
+stud, so the 12T:120T mesh is permanent and the old Appendix C #8 riddle
+dissolves). `locked` authors the crank-spin park engaged for a 0-DOF snapshot.
+Mode: cad/config/machine/build_lock.yaml (``paper_drive``).
 
-Cross-subassembly fits (checked at the top level): the column-clamps ride the
-O25.4 columns (frame.SLDASM); the roller chain spans this sub's knob shaft and
-the drive-train crankshaft (drive-train.SLDASM) -- both share the z -155 chain
-plane.
+* ONE support bar (22 x 9 x 452, book p.62 "the bar that the platen rides on"),
+  front face on the platen back, clamped to each column by a FRONT + BACK
+  semi-arc pair closed by two long screws whose heads show on the bar front
+  (ch30 p002).
+* Platen group (HANGS on the bar): platen + two full-width back guide rails
+  (above/below the bar band) + 4 lock plates bridging behind the bar + the
+  teeth-down rack at the bottom edge (crests 2 below the platen edge) + two
+  bright-brass edge clips + the paper sheet + ALL its screws -- everything
+  lock-mated to the platen so the whole group feeds together (the old
+  grounded-screw float is fixed).
+* Transgear group: bracket on the bar's back face (2 slotted screws) carrying
+  the stepped stud; on the stud the 120T disc + 12T feed pinion (locked pair,
+  O5 seat) and the latch arm's big hub; the arm carries the knob shaft with
+  the mounted T24 removable CHAIN-WRAPPED at the z -155 chain plane, the 12T
+  DP38 third gear on the shaft's O5 seat, and the thumb knob.
+* The roller chain loops both removables (native connected-linkage chain
+  component pattern); the sprocket face (2.4) now fits BETWEEN the chain's
+  inner plates, so only the roller<->tooth seating is intended contact.
+* Spare transgear-removable (T18 chain wheel) stored loose on the base top.
 
-Default-state notes / documented simplifications (Appendix C):
-* The transgear is modeled in the ch30 REST (disengaged) state: the latch parks
-  the knob shaft at c2c 66.05 from the stud, so the fine 24T pinion sits 13.1
-  clear of the disc tips. The mounted removables are CHAIN wheels (m2 teeth carry
-  the roller chain, ch. 23), so they never mesh another gear; the T24's tips
-  overlap the disc rim in XY projection only (chain plane z -157.5..-152.5 vs disc
-  -137.5..-134.5, 15.0 clear in z), exactly as the ch30 plates show. The ENGAGED pose and the
-  swing path between the two are not modeled.
-* The four column-clamp pinch screws are modeled backed-out (tips 0.2 inside
-  their back-wall holes, 0.3 off the columns).
-* Wires are flexible elements, not modeled; the drive chain is a real roller
-  chain (alternating chain-inner-link / chain-outer-link), built as a native
-  SolidWorks connected-linkage chain component pattern along the loop centreline
-  spline, see _insert_roller_chain; the recording paper rides the platen as a
-  rigid sheet (platen-paper).
-* Both pinion-bar ends float: in the real machine the west end is carried by the
-  ball-mount housing at the A-frame clevis and the east end by a column bracket;
-  neither fitting is modeled.
+Cross-subassembly fits (checked at the top level): the column-clamp arcs ride
+the O25.4 columns (frame.SLDASM); the roller chain spans this sub's knob shaft
+and the drive-train crankshaft -- both share the z -155 chain plane.
 
 Fix-all strategy (M6.2): every structural component inserted at its exact final
-transform and fixed; the platen + rack + clips + paper are left free and
+transform and fixed; the platen group and the gear train are left free and
 constrained by mates; transforms asserted by read-back; zero interference.
 
-Dimensions: cad/DIMENSIONS.md ch. 22-23, 25.
+Dimensions: memory/paper-drive-rework.md; cad/DIMENSIONS.md ch. 22-23, 25.
 
 Run (SolidWorks already open)::
 
@@ -117,6 +91,7 @@ from _assembly import (
     component_origin,
     component_transform,
     distance_driver,
+    gear_mate,
     is_locked_build,
     lock_mate,
     named_ref,
@@ -139,166 +114,303 @@ from _transforms import (  # noqa: E402
 ASM_NAME = "paper-drive"
 
 # Build mode (cad/config/machine/build_lock.yaml). `free` (default) leaves the
-# crank spin a FREE operational DOF (drag the crank sprocket and the gear-coupled
-# knob + the platen feed follow); `locked` authors the spin-park engaged for a
+# crank spin a FREE operational DOF (drag the crank sprocket and the whole
+# geared feed train follows); `locked` authors the spin-park engaged for a
 # byte-reproducible 0-DOF snapshot. Read as a STRING-LITERAL so the accessor
 # tokenises to machine/build_lock.yaml in the doit/cache digest (flipping the
-# mode rebuilds ONLY paper-drive). `is_locked_build` rejects any value other than
-# `free`/`locked`.
+# mode rebuilds ONLY paper-drive). `is_locked_build` rejects any value other
+# than `free`/`locked`.
 LOCK = is_locked_build(_config.machine("build_lock", "paper_drive"))
 
+ROT_Y_180 = [[-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -1.0]]
+
 # --- machine anchors ---------------------------------------------------------
-BAR_Z = -133.9  # support-bar centres: column line -112 - clamp offset 21.9
-BAR_FRONT_Z = BAR_Z - 5.0  # -138.9: bar front face = platen back face
-TOP_RAIL_Y = 440.0  # touches the platen back near its top edge (445)
-BOT_RAIL_Y = 334.0  # above the rack band (top 323.6); clamp bottom 326
+from build_support_bar import (  # noqa: E402
+    BAR_DEPTH,
+    BAR_HEIGHT,
+    BRACKET_HOLE_X as BAR_BRACKET_HOLE_X,  # MACHINE-handed (bar mirror=False)
+    CLAMP_HOLE_X,
+)
+from build_column_clamp_front import DEPTH as ARC_FRONT_DEPTH  # noqa: E402
+from build_transgear_bracket import (  # noqa: E402
+    PLATE_THICK as BRACKET_THICK,
+    SCREW_HOLE_DX as BRACKET_SCREW_DX,
+)
+
 COLUMN_X = 197.0
 COLUMN_Z = -112.0
+# Depth chain: the front arc's front face (-129.9) carries the bar's back
+# face; the bar's front face (-138.9) carries the platen's back face.
+BAR_BACK_Z = COLUMN_Z - ARC_FRONT_DEPTH  # -129.9
+BAR_FRONT_Z = BAR_BACK_Z - BAR_DEPTH  # -138.9
+BAR_Z = (BAR_FRONT_Z + BAR_BACK_Z) / 2.0  # -134.4 bar centre
 
-# --- platen ------------------------------------------------------------------
-from build_platen import PLATE_THICKNESS  # noqa: E402
-from build_platen_rack import (  # noqa: E402
-    PITCH as RACK_PITCH,
-    PITCH_LINE_Y as RACK_PITCH_LINE_Y,
+# --- platen (hangs on the bar) ----------------------------------------------
+from build_platen import (  # noqa: E402
+    CBORE_DEPTH as PLATEN_CBORE_DEPTH,
+    GUIDE_HOLE_X as PLATEN_GUIDE_HOLE_X,
+    GUIDE_HOLE_Y as PLATEN_GUIDE_HOLE_Y,
+    PLATE_HEIGHT,
+    PLATE_THICKNESS,
+    PLATE_WIDTH,
+    SOCKET_XY as PLATEN_SOCKET_XY,
 )
-from build_rack_pinion import TEETH as RACK_PINION_TEETH  # noqa: E402
-from build_transgear_pinion import TEETH as FINE_PINION_TEETH  # noqa: E402  # 24T
+from build_platen_guide import (  # noqa: E402
+    GUIDE_DEPTH,
+    GUIDE_HEIGHT,
+    HOLE_X as GUIDE_LOCK_HOLE_X,
+    LOCK_STATION_X,
+    SCREW_STATION_X as GUIDE_SCREW_STATION_X,
+)
+from build_guide_lock import LOCK_WIDTH  # noqa: E402
+from build_platen_clip import (  # noqa: E402
+    CLIP_LENGTH,
+    CLIP_THICKNESS,
+    CLIP_WIDTH,
+    HOLE_INSET as CLIP_HOLE_INSET,
+)
+from build_platen_rack import (  # noqa: E402
+    ADDENDUM as RACK_ADDENDUM,
+    BAR_HEIGHT as RACK_BAR_HEIGHT,
+    FIRST_GAP_X as RACK_FIRST_GAP_X,
+    PITCH as RACK_PITCH,
+)
 
-PLATE_X0 = -258.0  # right edge +42 (photo position)
+PLATE_X0 = -150.0  # centred between the columns (ch30 rest pose)
 PLATE_Y0 = 305.0
 PLATE_FRONT_Z = BAR_FRONT_Z - PLATE_THICKNESS  # -142.9
-PINION_AXIS = (0.0, 253.5)  # transgear stud on the pinion bar
-PINION_PD_R = RACK_PINION_TEETH / 30.0 * IN / 2.0  # 40.64 (DP 30)
-# Net platen feed per knob (T24) revolution through the engaged train: the knob
-# and the fine 24T pinion are coaxial (one spin), the fine pinion reduces
-# 24/96 into the 96T rack-pinion disc, and the disc feeds the rack pi*PD per
-# rev. So one knob turn advances the platen 2*pi*PINION_PD_R * (24/96).
-# Authored as a single rack-pinion mate onto the knob axis at this NET travel:
-# a documented KINEMATIC coupling that leaves the intermediate transgear gears
-# in their faithful ch30 rest pose (the fine-pinion/disc gap is preserved --
-# the coupling is the engaged operation, the geometry stays as photographed).
-NET_RACK_TRAVEL_PER_KNOB_REV = (
-    2.0 * math.pi * PINION_PD_R * FINE_PINION_TEETH / RACK_PINION_TEETH
-)  # 63.84 mm
-RACK_BACKLASH = _config.fit("gear_mesh", "rack_backlash_mm")  # cad/config/tolerances.yaml
-# Rz(180) placement: machine x = RACK_X0 - x_local, y = RACK_Y0 - y_local.
-# Tooth centres sit at x_local = k * PITCH. The gear's seed gap is centred
-# at +gamma/2 (the _gear.py flanks cross the pitch circle at +pi/(2N) and
-# gamma - pi/(2N)), so a TOOTH -- not a gap -- sits at bottom dead centre
-# and the gaps flank it at x = +-PITCH/2. RACK_X0 = 15.5 * PITCH puts rack
-# teeth onto those gaps (the original 15 * PITCH was tip-to-tip: one max
-# overlap dead centre decaying by the tip-circle sagitta at +-1..3 teeth).
-RACK_X0 = 15.5 * RACK_PITCH  # 41.23 (right edge 0.77 west of the plate's)
-RACK_Y0 = PINION_AXIS[1] + PINION_PD_R + RACK_BACKLASH + RACK_PITCH_LINE_Y
 
-CLIP_Y0 = 312.0
-CLIP_FRONT_DX = (18.0, 290.0)  # clip x bands (p - 10 .. p) inside the plate;
-# the right clip sits east of the pen v-block's x band (-24..8)
+# The platen hangs: the bar's top edge carries the top guide's underside.
+GUIDE_Y = (315.5, 349.5)  # bottom / top rail seats (machine y)
+BAR_TOP_Y = GUIDE_Y[1]  # 349.5
+BAR_CY = BAR_TOP_Y - BAR_HEIGHT / 2.0  # 338.5
+LOCK_Z0 = BAR_FRONT_Z + GUIDE_DEPTH  # -128.9: lock plates on the guide backs,
+# 1.0 behind the bar's back face -- they bridge the bar so the platen cannot
+# fall off it.
 
-# --- transgear ---------------------------------------------------------------
-from build_transgear_latch import C2C as LATCH_C2C  # noqa: E402
+# Rack: teeth-down at the platen's bottom edge, crests protruding 2 below it.
+RACK_TIP_Y = PLATE_Y0 - 2.0  # 303
+RACK_PITCH_Y = RACK_TIP_Y + RACK_ADDENDUM  # 303.8467
+RACK_Y0 = RACK_TIP_Y + RACK_BAR_HEIGHT  # 315 (Rz180: local y 0..12 maps down)
 
-# Ch30 rest state (M6.8): the plates show the knob-shaft cluster parked at
-# post-mirror (-65, ~248 +- 3, chain-plane parallax); y is clamped to 241.78
-# so the shaft top (246.5) keeps clearing the pinion bar's underside (247.5).
-KNOB_SHAFT_XY = (65.0, 241.78)
-LATCH_ANGLE_DEG = math.degrees(
-    math.atan2(KNOB_SHAFT_XY[1] - PINION_AXIS[1], KNOB_SHAFT_XY[0] - PINION_AXIS[0])
-)  # -10.22: small hub swung low toward the crank
-REMOVABLE_Z0 = -157.5  # mounted T24 band -157.5..-152.5, mid -155 = the FRONT
-# chain plane (book ch30 p005/p002: chain a flat loop on the front face, cone
-# behind; plane moved -146 -> -155 with the ch30 GT crank re-anchor). South of
-# the stub disc (-134.5..-137.5) by 15.0 and of the fine pinion (-134..-128):
-# the knob shaft is reversed (knob to the north, see its placement) so its
-# plain south length hosts the wheel clear of the disc. The crank-end T12
-# is COPLANAR at -155 (drive-train REMOVABLE_Z0 -157.5) -- the chain runs flat.
-T24_MID_Z = REMOVABLE_Z0 + 2.5  # -155.0 (face 5.0)
-T12_MID_Z = -155.0  # drive-train REMOVABLE_Z0 -157.5 + face 5.0 / 2
-CHAIN_MID_Z = (T24_MID_Z + T12_MID_Z) / 2.0  # -155.0: both wheels coplanar now,
-# so the link pin0 stations ride a single flat front plane (was -81.05, north of
-# the pedestal in the cone-post Z-band -- that collided); the chain floats
-# radially outside the tooth tips so the z overlap with either wheel cannot interfere
+# --- transgear (the real six-gear train) -------------------------------------
+from build_rack_pinion import (  # noqa: E402
+    DP as DISC_DP,
+    FACE_WIDTH as DISC_FACE,
+    TEETH as DISC_TEETH,
+)
+from build_transgear_feed_pinion import (  # noqa: E402
+    DP as FEED_DP,
+    FACE_WIDTH as FEED_FACE,
+    TEETH as FEED_TEETH,
+)
+from build_transgear_latch import C2C as LATCH_C2C, THICKNESS as LATCH_THICK  # noqa: E402
+from build_transgear_pinion import (  # noqa: E402
+    DP as THIRD_DP,
+    FACE_WIDTH as THIRD_FACE,
+    TEETH as THIRD_TEETH,
+)
+
+FEED_PD = FEED_TEETH / FEED_DP * IN  # 10.16 -- meshes the DP30 rack
+# Centre extension of the feed-pinion/rack mesh: the _gear recipe cuts tooth
+# gaps down to the BASE circle (rb = 4.918 for 12T DP30), which sits above the
+# rack crests' reach at nominal centres -- extend like the drive-train's
+# checker-arbitrated mesh slacks (rb - (PD/2 - addendum) = 0.685, +0.115).
+RACK_MESH_EXT = 0.8
+STUD_XY = (12.0, RACK_PITCH_Y - FEED_PD / 2.0 - RACK_MESH_EXT)  # (12, 297.9667)
+LATCH_ANGLE_DEG = -18.0  # knob swung low toward the crank (ch30 p002)
+KNOB_SHAFT_XY = (
+    STUD_XY[0] + LATCH_C2C * math.cos(math.radians(LATCH_ANGLE_DEG)),
+    STUD_XY[1] + LATCH_C2C * math.sin(math.radians(LATCH_ANGLE_DEG)),
+)  # (54.575, 284.133)
+
+# z stack on the stud (front -> back): collar | disc | feed pinion | latch arm
+# | bracket. The disc window clears the platen furniture: the guide-screw
+# heads are counterbored sub-flush (crowns -142.7), so the deepest reach near
+# the cluster is the paper plane at -143.4 -- 2.0 in front of the disc back.
+DISC_Z0 = -148.4  # disc -148.4..-145.4
+THIRD_Z0 = DISC_Z0  # third gear -148.4..-144.4 (full mesh overlap 3.0)
+FEED_Z0 = DISC_Z0 + DISC_FACE  # -145.4; face 9.5 reaches the rack band 3.0 deep
+RACK_BACK_Z = BAR_FRONT_Z + 6.0  # -132.9 (rack thickness 6 on the platen back)
+ARM_Z = (RACK_BACK_Z + BAR_BACK_Z) / 2.0  # -131.4: the arm's 2.6 band fits the
+# 3.0 slot between the rack's back face and the bar-front/bracket plane
+BRACKET_Z0 = BAR_BACK_Z  # plate -129.9..-125.9 on the bar's back face
+STUB_Z0 = BRACKET_Z0 + BRACKET_THICK  # -125.9 (Rx-90: local +Y -> -Z)
+KNOB_SHAFT_Z0 = -157.5  # Rx+90: local +Y -> +Z (stack runs to the knob at the back)
+
+REMOVABLE_Z0 = -156.2  # mounted removables: face 2.4 about the -155 chain plane
+T24_MID_Z = REMOVABLE_Z0 + 1.2  # -155.0
+CHAIN_MID_Z = -155.0  # both wheels coplanar; the crank T12 matches (drive-train)
 REMOVABLE_TIP_R = {"T12": 14.0, "T18": 20.0, "T24": 26.0}  # m2: OD (T+2)*2
 
-# Spare T18 removable: the swap chain wheel, stored flat on the base top
-# (y 50.8 + the part's 5.0 half-thickness about the z -15 mid-plane), well west
-# of the platen, axis +Z laid flat -> Rx(-90). A spare for this subsystem, so it
-# rides here as a flat sibling of the mounted T24 (the book's single output group
-# held both); placing it loose at the TOP level would clash on leaf name with the
-# T12/T24 instances nested in drive-train / this sub.
-SPARE_GEAR_POS = (-160.0, 55.8, -15.0)
+# Mesh phasing. build_fixed_gear seeds every gear with a TOOTH centred on
+# local +X (the seed gap spans +pi/(2N)..gamma-pi/(2N)), and teeth repeat
+# every gamma = 360/N. The disc keeps identity spin (LATCH_ANGLE is a
+# multiple of its 3-deg pitch, so a disc TOOTH points along the c2c line);
+# the third gear is spun so a GAP faces back along that line.
+THIRD_GAMMA = 360.0 / THIRD_TEETH  # 30
+_MESH_AZ = 180.0 + LATCH_ANGLE_DEG  # 162: from the knob axis toward the stud
+THIRD_PHASE_DEG = (_MESH_AZ - THIRD_GAMMA / 2.0) % THIRD_GAMMA  # 27
+if THIRD_PHASE_DEG > THIRD_GAMMA / 2.0:
+    THIRD_PHASE_DEG -= THIRD_GAMMA  # -3: nearest representative
+# The feed pinion keeps identity spin: its mesh line points straight up
+# (+90 deg is a tooth azimuth for 12T -- 90 = 3 * 30), and the rack is
+# phased so a GAP centre sits exactly on the stud's x (see RACK_X0).
+_k = math.floor((PLATE_X0 + PLATE_WIDTH - STUD_XY[0] - RACK_FIRST_GAP_X) / RACK_PITCH)
+RACK_X0 = STUD_XY[0] + RACK_FIRST_GAP_X + _k * RACK_PITCH  # 148.985: gap on the stud,
+# right edge ~1 west of the platen's
 
-# --- M6.10 fasteners ---------------------------------------------------------
-# Platen-clip screws: each clip's own O3.0 end holes land at pre-mirror
-# (clip_pos_x - 5, 320/429) after its Rz(+90); under-head face on the clip
-# front (-144.1), O2.9 shank through the 1.2 strip and 2.8 into the
-# platen's 3.5-deep sockets.
-CLIP_SCREW_XY = ((-245.0, 320.0), (-245.0, 429.0), (27.0, 320.0), (27.0, 429.0))
-# Column-clamp pinch screws on each platen-rail clamp's back face (z -88),
-# backed out: the shank tip (-94.2) stays 0.2 inside the back-wall hole (inner
-# end -94.4) and 0.3 off the column surface (-94.5). The wheel-bar clamp's
-# pinch screw lives in magnifier.SLDASM.
-PINCH_SCREW_Z = -88.0
-PINCH_SCREW_XY = (
-    (COLUMN_X, TOP_RAIL_Y),
-    (-COLUMN_X, TOP_RAIL_Y),
-    (COLUMN_X, BOT_RAIL_Y),
-    (-COLUMN_X, BOT_RAIL_Y),
+# Net platen feed per CRANK revolution through the real train (T12/T24
+# mounted): 0.5 chain * (12/120) gear * pi*PD rack = 1.596 mm. Every stage is
+# a real mate; this constant only documents the law for the kinematics probe.
+NET_RACK_TRAVEL_PER_CRANK_REV = (
+    0.5 * (THIRD_TEETH / DISC_TEETH) * math.pi * FEED_PD
+)  # 1.596 mm
+
+# Spare T18 removable: the swap chain wheel, stored flat on the base top
+# (y 50.8 + the 2.4 face), well west of the platen, axis +Z laid flat ->
+# Rx(-90). A spare for this subsystem, so it rides here as a flat sibling of
+# the mounted T24; placing it loose at the TOP level would clash on leaf name
+# with the T12/T24 instances nested in drive-train / this sub.
+SPARE_GEAR_POS = (-160.0, 53.2, -15.0)
+
+# --- fasteners ----------------------------------------------------------------
+# Platen-clip screws: through the clips' O3 end holes into the platen's edge
+# sockets (pre-mirror machine coords = platen-local + plate origin).
+CLIP_SCREW_XY = tuple(
+    (PLATE_X0 + sx, PLATE_Y0 + sy) for sx, sy in PLATEN_SOCKET_XY
+)
+# The clips run from the platen's top edge down; their end holes (inset
+# CLIP_HOLE_INSET) must land exactly on the platen's edge sockets.
+_CLIP_Y0_LOCAL = PLATE_HEIGHT - CLIP_LENGTH  # 15
+assert PLATEN_SOCKET_XY[0][1] == _CLIP_Y0_LOCAL + CLIP_HOLE_INSET
+assert PLATEN_SOCKET_XY[1][1] == PLATE_HEIGHT - CLIP_HOLE_INSET
+# Guide screws: 2 rows of 5, heads counterbored 0.2 sub-flush of the platen
+# front (ch22 front photo shows the slotted heads; the paper lies flat over
+# them), shanks threading 2.4 into the rails' blind holes.
+assert GUIDE_SCREW_STATION_X == PLATEN_GUIDE_HOLE_X
+GUIDE_SCREW_XY = tuple(
+    (PLATE_X0 + x, PLATE_Y0 + y)
+    for y in PLATEN_GUIDE_HOLE_Y
+    for x in PLATEN_GUIDE_HOLE_X
+)
+# Lock screws: 2 per lock plate, heads on the lock backs, into the guides.
+LOCK_SCREW_XY = tuple(
+    (PLATE_X0 + x, gy + GUIDE_HEIGHT / 2.0)
+    for gy in GUIDE_Y
+    for x in GUIDE_LOCK_HOLE_X
 )
 
 
 def _assert_rack_mesh() -> None:
-    """Pitch-line backlash and tooth-on-gap phasing at x = 0."""
-    rack_pitch_y = RACK_Y0 - RACK_PITCH_LINE_Y
-    backlash = rack_pitch_y - (PINION_AXIS[1] + PINION_PD_R)
-    if abs(backlash - RACK_BACKLASH) > 1e-9:
-        raise RuntimeError(f"rack backlash {backlash:.3f} != {RACK_BACKLASH}")
-    phase = math.remainder(RACK_X0, RACK_PITCH)  # tooth centres at +-p/2
-    if abs(abs(phase) - RACK_PITCH / 2.0) > 1e-9:
+    """Feed-pinion/rack law: centre extension and tooth-on-gap phasing."""
+    ext = RACK_PITCH_Y - (STUD_XY[1] + FEED_PD / 2.0)
+    if abs(ext - RACK_MESH_EXT) > 1e-9:
+        raise RuntimeError(f"rack mesh extension {ext:.3f} != {RACK_MESH_EXT}")
+    # A rack GAP centre must sit exactly over the stud (the pinion's +90-deg
+    # tooth): gap centres sit at RACK_X0 - FIRST_GAP_X - k*PITCH (Rz180).
+    phase = math.remainder(RACK_X0 - RACK_FIRST_GAP_X - STUD_XY[0], RACK_PITCH)
+    if abs(phase) > 1e-9:
+        raise RuntimeError(f"rack gap phase {phase:.4f} != 0 over the stud")
+    if FEED_TEETH % 4:
+        raise RuntimeError("feed-pinion top-tooth alignment needs teeth % 4 == 0")
+    z_overlap = (FEED_Z0 + FEED_FACE) - BAR_FRONT_Z  # pinion face into the rack band
+    if z_overlap < 2.5:
+        raise RuntimeError(f"feed pinion reaches only {z_overlap:.2f} into the rack band")
+    # Radial safety: the rack crests must clear the pinion's base-circle gap
+    # floor, and the pinion tips the rack's root line.
+    rb = FEED_PD / 2.0 * math.cos(math.radians(14.5))
+    crest_reach = FEED_PD / 2.0 + RACK_MESH_EXT - RACK_ADDENDUM
+    if crest_reach <= rb + 0.05:
+        raise RuntimeError(f"rack crests reach {crest_reach:.3f} into the pinion"
+                           f" gap floor at rb {rb:.3f}")
+    log(f"rack mesh: pitch line y {RACK_PITCH_Y:.2f}, extension {ext:.2f},"
+        f" rack gap centred over the stud, crest/floor margin"
+        f" {crest_reach - rb:.3f}")
+
+
+def _assert_gear_mesh() -> None:
+    """Third-gear/disc mesh: same DP, c2c on the latch, phased tooth-on-gap."""
+    if THIRD_DP != DISC_DP:
+        raise RuntimeError(f"third gear DP {THIRD_DP} != disc DP {DISC_DP}")
+    c2c_nominal = (THIRD_TEETH + DISC_TEETH) / (2.0 * DISC_DP) * IN  # 44.116
+    ext = LATCH_C2C - c2c_nominal
+    if not (0.5 <= ext <= 0.8):
         raise RuntimeError(
-            f"rack tooth phase {phase:.4f} != +-p/2: the gear gaps sit at"
-            f" +-PITCH/2 about bottom dead centre (tooth at the bottom)"
+            f"gear mesh extension {ext:.3f} outside the 0.5..0.8 gap-floor window"
         )
-    if RACK_PINION_TEETH % 4:
-        raise RuntimeError("96T bottom-tooth alignment needs a multiple of 4")
-    log(f"rack mesh: pitch line y {rack_pitch_y:.2f}, backlash {backlash:.2f},"
-        f" rack teeth on the gaps flanking the gear's bottom tooth")
+    # The disc's teeth repeat every 3 deg, so a tooth must point along the c2c
+    # line at the latch angle for the third gear's phased gap to receive it.
+    disc_gamma = 360.0 / DISC_TEETH
+    if abs(math.remainder(LATCH_ANGLE_DEG, disc_gamma)) > 1e-9:
+        raise RuntimeError(
+            f"latch angle {LATCH_ANGLE_DEG} is not a multiple of the disc pitch"
+            f" {disc_gamma}"
+        )
+    # Radial: the disc tooth tips must clear the third gear's base-circle gap
+    # floor (the same law the latch C2C extension exists for).
+    rb3 = THIRD_TEETH / THIRD_DP * IN / 2.0 * math.cos(math.radians(14.5))
+    disc_ra = (DISC_TEETH + 2.0) / DISC_DP * IN / 2.0
+    tip_reach = LATCH_C2C - disc_ra
+    if tip_reach <= rb3 + 0.05:
+        raise RuntimeError(
+            f"disc tips reach {tip_reach:.3f}, third-gear gap floor {rb3:.3f}"
+        )
+    z_overlap = min(THIRD_Z0 + THIRD_FACE, DISC_Z0 + DISC_FACE) - max(THIRD_Z0, DISC_Z0)
+    if z_overlap < 2.5:
+        raise RuntimeError(f"third gear/disc z overlap {z_overlap:.2f} < 2.5")
+    # The latch arm must fit its slot between the rack back and the bar front.
+    slot = BAR_BACK_Z - RACK_BACK_Z
+    if LATCH_THICK > slot - 0.3:
+        raise RuntimeError(f"latch arm {LATCH_THICK} too thick for the {slot:.1f} slot")
+    # The bar's MACHINE-handed bracket sockets must land under the (mirrored)
+    # bracket screw line: pre-mirror stud +-dx reflects to -(STUD_X +- dx).
+    expected = {round(-(STUD_XY[0] + dx), 6) for dx in (-BRACKET_SCREW_DX, BRACKET_SCREW_DX)}
+    if expected != {round(x, 6) for x in BAR_BRACKET_HOLE_X}:
+        raise RuntimeError(
+            f"support-bar bracket holes {BAR_BRACKET_HOLE_X} != mirrored screw"
+            f" line {sorted(expected)}"
+        )
+    log(f"gear mesh 12:120 DP38: c2c {LATCH_C2C} (ext {ext:.2f}), third gear"
+        f" phased {THIRD_PHASE_DEG:+.1f} deg, tip/floor margin {tip_reach - rb3:.3f}")
 
 
 def _assert_knob_shaft_clearance() -> None:
-    """The knob shaft must run under the pinion bar (z -105..-117 band),
-    on the latch arm's exact c2c, with the rest-state air gaps intact."""
+    """The knob cluster must ride the latch's exact c2c with its air gaps."""
     arm = math.hypot(
-        KNOB_SHAFT_XY[0] - PINION_AXIS[0], KNOB_SHAFT_XY[1] - PINION_AXIS[1]
+        KNOB_SHAFT_XY[0] - STUD_XY[0], KNOB_SHAFT_XY[1] - STUD_XY[1]
     )
-    if abs(arm - LATCH_C2C) > 1e-3:
+    if abs(arm - LATCH_C2C) > 1e-6:
         raise RuntimeError(f"knob shaft sits {arm:.4f} from the stud, latch c2c"
                            f" is {LATCH_C2C}")
     shaft_top = KNOB_SHAFT_XY[1] + 0.375 * IN / 2.0
-    bar_bottom = PINION_AXIS[1] - 6.0
-    if shaft_top >= bar_bottom - 0.5:
+    if shaft_top >= PLATE_Y0 - 0.5:
         raise RuntimeError(
-            f"knob shaft top {shaft_top:.2f} too close to the pinion bar"
-            f" underside {bar_bottom:.2f}"
+            f"knob shaft top {shaft_top:.2f} too close to the platen bottom"
+            f" edge {PLATE_Y0}"
         )
-    # Rest state: the fine pinion (tip r 11) stays clear of the disc tips,
-    # and the chain-plane T24 clears the STUB shaft (O14) it floats past.
-    pinion_gap = arm - (41.49 + 11.0)  # disc tip r + pinion tip r
-    if pinion_gap < 5.0:
-        raise RuntimeError(f"rest-state pinion/disc tip gap {pinion_gap:.2f} < 5")
-    t24_stub_gap = arm - (26.0 + 7.0)  # T24 tip r + stub shaft r
-    if t24_stub_gap < 0.5:
-        raise RuntimeError(f"mounted T24 to stub-shaft gap {t24_stub_gap:.2f} < 0.5")
-    log(f"knob shaft at ({KNOB_SHAFT_XY[0]:.2f}, {KNOB_SHAFT_XY[1]:.2f}),"
-        f" {bar_bottom - shaft_top:.2f} under the bar; rest-state gaps:"
-        f" pinion/disc {pinion_gap:.1f}, T24/stub {t24_stub_gap:.1f}")
+    t24_collar_gap = arm - (REMOVABLE_TIP_R["T24"] + 7.0)  # T24 tip r + collar r
+    if t24_collar_gap < 0.5:
+        raise RuntimeError(f"mounted T24 to stub-collar gap {t24_collar_gap:.2f} < 0.5")
+    # The T24 overlaps the disc rim in XY -- they must stay z-separated.
+    t24_front = REMOVABLE_Z0 + 2.4
+    z_gap = DISC_Z0 - t24_front  # -148.4 - (-153.8) = 5.4
+    if z_gap < 2.0:
+        raise RuntimeError(f"T24/disc z gap {z_gap:.2f} < 2.0")
+    log(f"knob shaft at ({KNOB_SHAFT_XY[0]:.3f}, {KNOB_SHAFT_XY[1]:.3f}),"
+        f" {PLATE_Y0 - shaft_top:.2f} under the platen edge; gaps:"
+        f" T24/collar {t24_collar_gap:.1f}, T24/disc z {z_gap:.1f}")
 
 
 def _assert_chain_layout() -> None:
     """_chain.py derives the loop from OUR anchors -- pin them together."""
-    if CHAIN_KNOB_CENTRE != KNOB_SHAFT_XY:
+    knob_err = max(
+        abs(a - b) for a, b in zip(CHAIN_KNOB_CENTRE, KNOB_SHAFT_XY)
+    )
+    if knob_err > 1e-3:
         raise RuntimeError(
-            f"_chain KNOB_CENTRE {CHAIN_KNOB_CENTRE} != KNOB_SHAFT_XY {KNOB_SHAFT_XY}"
+            f"_chain KNOB_CENTRE {CHAIN_KNOB_CENTRE} != KNOB_SHAFT_XY"
+            f" ({KNOB_SHAFT_XY[0]:.4f}, {KNOB_SHAFT_XY[1]:.4f})"
         )
     from build_drive_train_assembly import X_CRANK, Y_CRANK
     if CHAIN_CRANK_CENTRE != (X_CRANK, Y_CRANK):
@@ -415,7 +527,7 @@ async def _insert_roller_chain(adapter) -> None:
                 # close the loop seamlessly; fill_path undershoots (leaves a ~2-link
                 # seam) because it reserves clearance. For connected linkage the
                 # count is PER GROUP and the two groups interleave, so each group
-                # gets LINK_COUNT // 2 (30 inner + 30 outer = 60 links).
+                # gets LINK_COUNT // 2.
                 pitch_method="connected_linkage", fill_path=False,
                 count=LINK_COUNT // 2, spacing=LINK_PITCH,
                 align_method="tangent", options="dynamic")))
@@ -467,13 +579,13 @@ async def _insert_roller_chain(adapter) -> None:
 
 
 async def _sprocket_revolute(adapter, name: str, label: str) -> None:
-    """Constrain a free-spinning sprocket to a fixed Z spin-axis, leaving the
+    """Constrain a free-spinning wheel to a fixed Z spin-axis, leaving the
     spin free (the operational/coupled DOF).
 
     Two axis-to-plane distances pin the central Axis1 (a Z line) in XY -- height
     (Top plane = y) and lateral (Right plane = x) -- and keep it parallel to Z;
-    a Front-plane distance pins the axial z. The sprocket is a symmetric spur
-    wheel, so its origin is spin-invariant and the origin ``verify`` passes at
+    a Front-plane distance pins the axial z. The wheel is a symmetric spur
+    gear, so its origin is spin-invariant and the origin ``verify`` passes at
     any spin angle (the spin is pinned separately, or left free + coupled)."""
     o = component_origin(adapter, name)
     await distance_driver(adapter, named_ref(f"Axis1@{name}", "AXIS"),
@@ -489,6 +601,7 @@ async def _sprocket_revolute(adapter, name: str, label: str) -> None:
 
 async def build(adapter) -> dict[str, str]:
     _assert_rack_mesh()
+    _assert_gear_mesh()
     _assert_knob_shaft_clearance()
     _assert_chain_layout()
 
@@ -497,28 +610,34 @@ async def build(adapter) -> dict[str, str]:
     set_park_defer(not LOCK)
     check("create_assembly", await adapter.create_assembly())
 
-    # --- support rails + clamps ----------------------------------------------
-    # The top-rail support-bar is FIRST so the auto-fixed seed is structure,
-    # not the mated platen.
-    for label, bar_y in (("top-rail", TOP_RAIL_Y), ("bot-rail", BOT_RAIL_Y)):
-        await place_component(adapter, "support-bar", [0.0, bar_y, BAR_Z],
-                              [0.0, 0.0, 0.0], IDENTITY, label=f"support-bar ({label})")
-        for sx in (-1.0, 1.0):
-            # Ry(+90): the clamp's front channel (local +X) faces -Z.
-            await place_component(adapter, "column-clamp", [sx * COLUMN_X, bar_y, COLUMN_Z],
+    # --- support bar + two-piece clamps ---------------------------------------
+    # The bar is FIRST so the auto-fixed seed is structure, not the mated platen.
+    # MACHINE-handed (mirror=False): its bracket-screw holes flank the stud at
+    # machine -12, which a bbox mirror would flip (see build_support_bar.py).
+    await place_component(adapter, "support-bar", [0.0, BAR_CY, BAR_Z],
+                          [0.0, 0.0, 0.0], IDENTITY, mirror=False,
+                          label="support-bar (the platen bar)")
+    for sx in (-1.0, 1.0):
+        # Ry(+90): the arcs' local +X (their depth axis) faces machine -Z.
+        for arc in ("column-clamp-front", "column-clamp-back"):
+            await place_component(adapter, arc, [sx * COLUMN_X, BAR_CY, COLUMN_Z],
                                   [0.0, 90.0, 0.0], ROT_Y_POS90,
-                                  label=f"column-clamp ({label} x{sx * COLUMN_X:+.0f})")
+                                  label=f"{arc} (x{sx * COLUMN_X:+.0f})")
+    # Clamp screws: heads on the bar's FRONT face flanking each column (ch30
+    # p002), shanks through bar + front arc, threading into the back arc.
+    for x in CLAMP_HOLE_X:
+        await place_component(adapter, "clamp-screw", [x, BAR_CY, BAR_FRONT_Z],
+                              [0.0, 0.0, 0.0], IDENTITY,
+                              label=f"clamp-screw (x{x:+.1f})")
 
-    # --- platen group ---------------------------------------------------------
+    # --- platen group (hangs on the bar) ---------------------------------------
     # The platen runs as a prismatic slider along X (the paper feed): its local
     # slide axis is held parallel to the Top + Front planes at the slide-line
     # offsets (axis-to-plane distance, no rotational redundancy) and an angle
-    # snapshot kills the residual spin. Probed FULLY(3), probe_platen.py. The
-    # rack, clips and paper ride it via Lock mates. The feed position (its X
-    # slide) is NOT snapshot-pinned any more: it is COUPLED to the knob (T24)
-    # rotation by the rack-pinion mate below, so in the default `free` build the
-    # platen feed follows the free crank spin (one operational DOF); a `locked`
-    # build pins it through the authored crank-spin park + the coupling chain.
+    # snapshot kills the residual spin. The rack, guides, locks, clips, paper
+    # and EVERY platen-riding screw ride it via Lock mates (the old grounded
+    # clip screws floated in space while the platen fed -- rework E5). The feed
+    # position is COUPLED to the crank through the real gear train below.
     platen = await place_component(adapter, "platen",
                                    [PLATE_X0, PLATE_Y0, PLATE_FRONT_Z],
                                    [0.0, 0.0, 0.0], IDENTITY, ground=False)
@@ -532,110 +651,174 @@ async def build(adapter) -> dict[str, str]:
     await angle_driver(adapter, named_ref(f"Top Plane@{platen}", "PLANE"),
                        named_ref("Top Plane", "PLANE"), 0.0,
                        label="platen spin snapshot", verify=(platen, pl_o))
-    # Rz(180): teeth point down at the rack pinion below.
+
+    async def _lock_to_platen(name: str, label: str) -> None:
+        await lock_mate(adapter, named_ref(f"Front Plane@{name}", "PLANE"),
+                        named_ref(f"Front Plane@{platen}", "PLANE"),
+                        label=f"{label} locked to platen")
+
+    # Rack: Rz(180) -> teeth point down, crests 2 below the platen edge.
     rack = await place_component(adapter, "platen-rack",
                                  [RACK_X0, RACK_Y0, BAR_FRONT_Z],
                                  [0.0, 0.0, 180.0], rot_z_rows(180.0), ground=False)
-    await lock_mate(adapter, named_ref(f"Front Plane@{rack}", "PLANE"),
-                    named_ref(f"Front Plane@{platen}", "PLANE"),
-                    label="platen-rack locked to platen")
-    for dx in CLIP_FRONT_DX:
-        # Rz(+90): the clip strip stands vertical on the paper face.
-        clip = await place_component(adapter, "platen-clip",
-                                     [PLATE_X0 + dx, CLIP_Y0, PLATE_FRONT_Z - 1.2],
-                                     [0.0, 0.0, 90.0], rot_z_rows(90.0), ground=False,
-                                     label=f"platen-clip x{PLATE_X0 + dx:+.0f}")
-        await lock_mate(adapter, named_ref(f"Front Plane@{clip}", "PLANE"),
-                        named_ref(f"Front Plane@{platen}", "PLANE"),
-                        label=f"platen-clip x{PLATE_X0 + dx:+.0f} locked to platen")
-    # Recording paper on the platen front face (ch30 p002/p003/p009): 0.5
-    # proud of the platen, 2.25 clear of each clip band, 6 top/bottom margin.
+    await _lock_to_platen(rack, "platen-rack")
+    # Guide rails on the platen back, above/below the bar band -- the platen
+    # HANGS by the top rail's underside on the bar's top edge.
+    guides = []
+    for gy in GUIDE_Y:
+        guide = await place_component(adapter, "platen-guide",
+                                      [PLATE_X0, gy, BAR_FRONT_Z],
+                                      [0.0, 0.0, 0.0], IDENTITY, ground=False,
+                                      label=f"platen-guide (y{gy:.1f})")
+        await _lock_to_platen(guide, f"platen-guide y{gy:.1f}")
+        guides.append(guide)
+    # Lock plates on the guide backs, bridging BEHIND the bar (1.0 clear of its
+    # back face): top-rail locks hang DOWN over the bar (Rz180, 14 overlap),
+    # bottom-rail locks bridge UP across the 7 open channel onto the bar band
+    # (identity, 7 overlap -- the 19-tall plate is sized by this station); the
+    # two rows clear each other by 1.0 in y.
+    for x_c in LOCK_STATION_X:
+        top = await place_component(
+            adapter, "guide-lock",
+            [PLATE_X0 + x_c + LOCK_WIDTH / 2.0, GUIDE_Y[1] + GUIDE_HEIGHT, LOCK_Z0],
+            [0.0, 0.0, 180.0], rot_z_rows(180.0), ground=False,
+            label=f"guide-lock (top x{x_c:.0f})")
+        await _lock_to_platen(top, f"guide-lock top x{x_c:.0f}")
+        bot = await place_component(
+            adapter, "guide-lock",
+            [PLATE_X0 + x_c - LOCK_WIDTH / 2.0, GUIDE_Y[0], LOCK_Z0],
+            [0.0, 0.0, 0.0], IDENTITY, ground=False,
+            label=f"guide-lock (bottom x{x_c:.0f})")
+        await _lock_to_platen(bot, f"guide-lock bottom x{x_c:.0f}")
+    # Paper clips: bright brass strips hugging the platen's left/right edges
+    # from the top edge down (ch22 front photo). Rz(+90) stands the +X-authored
+    # strip vertical; each lands 1 inside its edge with its holes on the
+    # platen's edge sockets.
+    for sx in (PLATEN_SOCKET_XY[0][0], PLATEN_SOCKET_XY[2][0]):
+        clip_x = PLATE_X0 + sx + CLIP_WIDTH / 2.0  # hole line -> strip east edge
+        clip = await place_component(
+            adapter, "platen-clip",
+            [clip_x, PLATE_Y0 + PLATE_HEIGHT - CLIP_LENGTH, PLATE_FRONT_Z - CLIP_THICKNESS],
+            [0.0, 0.0, 90.0], rot_z_rows(90.0), ground=False,
+            label=f"platen-clip (x{clip_x:+.0f})")
+        await _lock_to_platen(clip, f"platen-clip x{clip_x:+.0f}")
+    # Recording paper on the platen front face: 0.5 proud, clear of the edge
+    # clips, 6 top/bottom margin.
     paper = await place_component(adapter, "platen-paper",
                                   [PLATE_X0 + 20.25, PLATE_Y0 + 6.0, PLATE_FRONT_Z - 0.5],
                                   [0.0, 0.0, 0.0], IDENTITY, ground=False)
-    await lock_mate(adapter, named_ref(f"Front Plane@{paper}", "PLANE"),
-                    named_ref(f"Front Plane@{platen}", "PLANE"),
-                    label="platen-paper locked to platen")
+    await _lock_to_platen(paper, "platen-paper")
 
-    # --- transgear group ------------------------------------------------------
-    # (The rocker-support A-frame that used to stand here is now part of the
-    # single rocker-arm-support casting in frame.SLDASM; the pinion-bar west end
-    # floats and was never mated to it, so it is simply gone from this assembly.)
-    await place_component(adapter, "pinion-bar", [PINION_AXIS[0], PINION_AXIS[1], -111.0],
+    # --- platen-riding fasteners (ALL lock-mated -- rework E5) -----------------
+    for x, y in CLIP_SCREW_XY:
+        screw = await place_component(
+            adapter, "fillister-screw", [x, y, PLATE_FRONT_Z - CLIP_THICKNESS],
+            [0.0, 0.0, 0.0], IDENTITY,
+            ground=False, label=f"fillister-screw (clip x{x:+.0f} y{y:.0f})")
+        await _lock_to_platen(screw, f"clip screw x{x:+.0f} y{y:.0f}")
+    for x, y in GUIDE_SCREW_XY:
+        # Seated on the counterbore floor: crown 0.2 sub-flush so the paper
+        # lies flat; shank threads 2.4 into the rail's blind hole.
+        screw = await place_component(
+            adapter, "fillister-screw", [x, y, PLATE_FRONT_Z + PLATEN_CBORE_DEPTH],
+            [0.0, 0.0, 0.0], IDENTITY,
+            ground=False, label=f"fillister-screw (guide x{x:+.0f} y{y:.0f})")
+        await _lock_to_platen(screw, f"guide screw x{x:+.0f} y{y:.0f}")
+    for x, y in LOCK_SCREW_XY:
+        # Ry(180): shank points machine -Z, head on the lock plate's back.
+        screw = await place_component(
+            adapter, "fillister-screw", [x, y, LOCK_Z0 + 2.0],
+            [0.0, 180.0, 0.0], ROT_Y_180,
+            ground=False, label=f"fillister-screw (lock x{x:+.0f} y{y:.0f})")
+        await _lock_to_platen(screw, f"lock screw x{x:+.0f} y{y:.0f}")
+
+    # --- transgear group (the real train) --------------------------------------
+    # Bracket on the bar's back face, stud bore below the bar.
+    await place_component(adapter, "transgear-bracket",
+                          [STUD_XY[0], STUD_XY[1], BRACKET_Z0],
                           [0.0, 0.0, 0.0], IDENTITY)
-    # Rx(-90): stud +Y -> -Z; shaft z -101.5..-137.5, collar to -141.5.
-    await place_component(adapter, "transgear-stub", [PINION_AXIS[0], PINION_AXIS[1], -101.5],
+    for dx in (-BRACKET_SCREW_DX, BRACKET_SCREW_DX):
+        # Ry(180): shank forward into the bar, head on the bracket back.
+        await place_component(adapter, "bracket-screw",
+                              [STUD_XY[0] + dx, BAR_CY, STUB_Z0],
+                              [0.0, 180.0, 0.0], ROT_Y_180,
+                              label=f"bracket-screw (x{STUD_XY[0] + dx:+.0f})")
+    # Rx(-90): stud +Y -> -Z; base z -125.9..-135, O5 seat to -148.8, collar
+    # to -152.8.
+    await place_component(adapter, "transgear-stub", [STUD_XY[0], STUD_XY[1], STUB_Z0],
                           [-90.0, 0.0, 0.0], ROT_X_NEG90)
-    # FREE (ground=False): rack-pinion-mated to the platen below so the visible 96T
-    # disc turns WITH the paper feed instead of sitting static while the rack slides
-    # past it (codex #189). Its axis is pinned + spin coupled -> 0 free DOF.
-    disc = await place_component(adapter, "rack-pinion",
-                          [PINION_AXIS[0], PINION_AXIS[1], -137.5],
-                          [0.0, 0.0, 0.0], IDENTITY, ground=False)
-    await place_component(adapter, "transgear-latch", [PINION_AXIS[0], PINION_AXIS[1], -122.5],
+    # Latch arm in the slot between the rack's back face and the bar front,
+    # swung to the knob at LATCH_ANGLE (thickness centred about ARM_Z).
+    await place_component(adapter, "transgear-latch", [STUD_XY[0], STUD_XY[1], ARM_Z],
                           [0.0, 0.0, LATCH_ANGLE_DEG], rot_z_rows(LATCH_ANGLE_DEG))
-    # Reversed (Rx +90, origin at the south end z -158.0): the plain shaft now
-    # runs -158.0..-100.0 with the grab-knob tucked NORTH (-100.0..-93.5),
-    # freeing the south of the shaft for the chain wheel on the front -155
-    # plane (shaft followed the chain plane -146 -> -155). The fine pinion
-    # below stays at -134..-128 (parked clear of the disc, unchanged); the
-    # knob sits north of the T24/chain band and clear of the pinion bar's
-    # z band (-105..-117) by 5 in z (and the shaft passes under the bar in y
-    # anyway, see _assert_knob_shaft_clearance).
-    # FREE (ground=False): rigidly LOCK-mated to the T24 knob wheel below so the
-    # whole knob cluster (shaft + fine pinion + T24) turns as ONE keyed body when
-    # the crank drives the gear mate -- the visible knob shaft + fine pinion follow the
-    # feed, not just the T24 surrogate (codex #189). Neither part carries a
-    # construction axis (only the removable does), so the cluster's single spin DOF
-    # is T24's revolute; the Lock mate preserves each part's as-placed pose.
+    # 120T DP38 reducer disc on the stud's O5 seat, FREE (revolute below) --
+    # gear-mated to the third gear. Identity spin: a tooth points along the
+    # c2c line (LATCH_ANGLE is a multiple of its 3-deg pitch).
+    disc = await place_component(adapter, "rack-pinion",
+                                 [STUD_XY[0], STUD_XY[1], DISC_Z0],
+                                 [0.0, 0.0, 0.0], IDENTITY, ground=False,
+                                 label="rack-pinion (120T reducer disc)")
+    await _sprocket_revolute(adapter, disc, "reducer disc")
+    # 12T DP30 feed pinion locked coaxially behind the disc ("behind and
+    # attached to the fourth gear is the fifth gear" -- 4/4 video); its long
+    # face bridges back to the rack band and meshes the teeth-down rack.
+    feed = await place_component(adapter, "transgear-feed-pinion",
+                                 [STUD_XY[0], STUD_XY[1], FEED_Z0],
+                                 [0.0, 0.0, 0.0], IDENTITY, ground=False)
+    await lock_mate(adapter, named_ref(f"Front Plane@{feed}", "PLANE"),
+                    named_ref(f"Front Plane@{disc}", "PLANE"),
+                    label="feed pinion locked to the disc")
+    # Knob shaft on the latch's small hub: Rx(+90) runs local +Y to machine +Z
+    # (removable seat at the chain plane, O5 third-gear seat, hub ride, knob).
     knob_shaft = await place_component(adapter, "transgear-knob-shaft",
-                          [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], -158.0],
-                          [90.0, 0.0, 0.0], ROT_X_POS90, ground=False)
-    # Fine 24T DP30 pinion on the knob shaft, just behind the knob face
-    # (z -134..-128): the "translation gear" of the feed train.
-    fine_pinion = await place_component(adapter, "transgear-pinion",
-                          [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], -134.0],
-                          [0.0, 0.0, 0.0], IDENTITY, ground=False)
+                                       [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], KNOB_SHAFT_Z0],
+                                       [90.0, 0.0, 0.0], ROT_X_POS90, ground=False)
+    # 12T DP38 third gear on the O5 seat, phased so a GAP faces the disc's
+    # tooth along the c2c line.
+    third = await place_component(adapter, "transgear-pinion",
+                                  [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], THIRD_Z0],
+                                  [0.0, 0.0, THIRD_PHASE_DEG],
+                                  rot_z_rows(THIRD_PHASE_DEG), ground=False,
+                                  label="transgear-pinion (12T third gear)")
     # Mounted T24 removable = the knob-end chain wheel (ch. 23: the roller
     # chain rides the removable's teeth; swapping removables changes the
-    # platen ratio). Band -157.5..-152.5 on the front -155 plane, south of the
-    # stub disc and fine pinion, coplanar with the crank-end T12. FREE to spin
-    # (ground=False): the gear mate below couples it to the crank T12.
+    # platen ratio). FREE to spin: the belt/chain feature couples it to the
+    # crank T12.
     t24 = await place_component(adapter, "transgear-removable",
-                          [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], REMOVABLE_Z0],
-                          [0.0, 0.0, 0.0], IDENTITY, configuration="T24", ground=False,
-                          label="transgear-removable (mounted T24)")
+                                [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], REMOVABLE_Z0],
+                                [0.0, 0.0, 0.0], IDENTITY, configuration="T24",
+                                ground=False,
+                                label="transgear-removable (mounted T24)")
     await _sprocket_revolute(adapter, t24, "T24 knob wheel")
-    # Key the knob cluster to spin as ONE rigid body: LOCK the knob shaft and the
-    # fine pinion to the (free-spinning) T24 wheel -- all three ride the same
-    # physical knob shaft. Dragging the crank -> gear mate -> T24 now turns the shaft
-    # AND the fine pinion together, so the whole feed train visibly follows (codex
-    # #189 :592). Net DOF unchanged: freeing shaft + pinion (+12 DOF) is removed by
-    # the two 6-DOF Lock mates; the cluster keeps T24's single free spin.
+    # Key the knob cluster to spin as ONE rigid body: LOCK the knob shaft and
+    # the third gear to the (free-spinning) T24 wheel -- all three ride the
+    # same physical knob shaft. Net DOF unchanged: freeing shaft + third
+    # (+12 DOF) is removed by the two 6-DOF Lock mates; the cluster keeps
+    # T24's single free spin.
     await lock_mate(adapter, named_ref(f"Front Plane@{knob_shaft}", "PLANE"),
                     named_ref(f"Front Plane@{t24}", "PLANE"),
                     label="knob cluster: knob shaft locked to T24")
-    await lock_mate(adapter, named_ref(f"Front Plane@{fine_pinion}", "PLANE"),
+    await lock_mate(adapter, named_ref(f"Front Plane@{third}", "PLANE"),
                     named_ref(f"Front Plane@{t24}", "PLANE"),
-                    label="knob cluster: fine pinion locked to T24")
+                    label="knob cluster: third gear locked to T24")
     # Crank-end T12 removable = the crank-shaft chain wheel, brought over from
     # drive-train so the chain seats on BOTH sprockets locally. Placed at the
     # PRE-mirror crank centre (_chain CRANK_CENTRE == drive-train X_CRANK,Y_CRANK,
     # the same anchor _assert_chain_layout pins) and reflected by the default
-    # mirror path, exactly like the T24 above -- so it lands on the crank wrap
-    # centre the chain loops. Coplanar with the T24 on the -155 front plane; a
-    # spur gear is symmetric so identity rotation. FREE to spin -- this is the
-    # crank input, the single operational DOF.
+    # mirror path. Coplanar with the T24 on the -155 chain plane; a spur gear is
+    # symmetric so identity rotation. FREE to spin -- this is the crank input,
+    # the single operational DOF.
     t12 = await place_component(adapter, "transgear-removable",
-                          [CHAIN_CRANK_CENTRE[0], CHAIN_CRANK_CENTRE[1], REMOVABLE_Z0],
-                          [0.0, 0.0, 0.0], IDENTITY, configuration="T12", ground=False,
-                          label="transgear-removable (crank chain wheel T12)")
+                                [CHAIN_CRANK_CENTRE[0], CHAIN_CRANK_CENTRE[1], REMOVABLE_Z0],
+                                [0.0, 0.0, 0.0], IDENTITY, configuration="T12",
+                                ground=False,
+                                label="transgear-removable (crank chain wheel T12)")
     await _sprocket_revolute(adapter, t12, "T12 crank wheel")
     # The roller chain looping both removables (_assert_chain_layout pins the
     # _chain.py anchors to KNOB_SHAFT_XY / the drive-train crank).
     await _insert_roller_chain(adapter)
 
-    # --- operational coupling -------------------------------------------------
+    # --- operational coupling (every stage a real mate) ------------------------
     # (1) The native Belt/Chain assembly feature couples the crank T12 <-> knob
     # T24 exactly as the roller chain physically does: SAME rotation sense (both
     # sprockets turn the same way -- a gear mate models an external mesh and
@@ -652,8 +835,7 @@ async def build(adapter) -> dict[str, str]:
     # coupling mates; CreateBeltPart stays off -- the roller-chain component
     # pattern above is the visual. Both sprockets stay FREE (Axis1 pinned,
     # spin-only via _sprocket_revolute), so the belt constrains only their
-    # relative rotation -- 0 net free DOF added. The verify:kinematics probe
-    # asserts the 0.500 ratio AND the same-sense rotation tightly.
+    # relative rotation -- 0 net free DOF added.
     from solidworks_mcp.adapters.base import BeltChainParameters
     check(
         "chain coupling T12<->T24 (belt/chain feature, pitch 24:48)",
@@ -663,38 +845,38 @@ async def build(adapter) -> dict[str, str]:
             pulley_member_axes=[f"Axis1@{t12}", f"Axis1@{t24}"],
             location_plane="Front Plane",
             engage_belt=True, create_belt_part=False, blank_sketch=True)))
-    # (2) Rack-pinion mate feeds the platen off the knob (T24) axis at the NET
-    # through-train travel (fine-pinion 24T -> disc 96T -> rack). The intermediate
-    # transgear gears stay in their faithful rest pose; this is the engaged
-    # operation expressed kinematically across the documented 13.1 rest gap
-    # (Appendix C #8). The rack linear reference is the platen's own slide Axis1
-    # (along the feed X -- the rack is locked to the platen); the pinion reference
-    # is the knob axis.
-    await rack_pinion_mate(
+    # (2) GEAR mate 12:120: the third gear (in the knob cluster) drives the
+    # reducer disc -- the permanent DP38 mesh the latch arm exists to hold.
+    await gear_mate(
         adapter,
-        named_ref(f"Axis1@{platen}", "AXIS"),
-        named_ref(f"Axis1@{t24}", "AXIS"),
-        rack_travel_per_revolution=NET_RACK_TRAVEL_PER_KNOB_REV,
-        label="platen feed (crank->knob->rack, net)")
-    # (2b) Couple the VISIBLE 96T rack-pinion disc to the platen so it turns WITH the
-    # feed instead of sitting static while the rack slides past it (codex #189). The
-    # disc rolls on the platen rack at its own pitch circumference (2*pi*PINION_PD_R).
-    # This is the SAME platen<->rotation law as the NET T24 mate above -- the disc
-    # turns 24/96 per knob rev, and 0.25 * 2*pi*PINION_PD_R = NET -- so it only
-    # DETERMINES the disc from the already-fed platen: 0 new free DOF, no conflict.
-    # Pin the disc axis first (spin free), like the sprockets.
-    await _sprocket_revolute(adapter, disc, "rack-pinion disc")
-    await rack_pinion_mate(
-        adapter,
-        named_ref(f"Axis1@{platen}", "AXIS"),
+        named_ref(f"Axis1@{third}", "AXIS"),
         named_ref(f"Axis1@{disc}", "AXIS"),
-        rack_travel_per_revolution=2.0 * math.pi * PINION_PD_R,
-        label="rack-pinion disc follows the platen feed")
-    # (3) The crank spin is the FREED operational-DOF park driver. Deferred in the
-    # default `free` build (recorded, not authored) -> T12 spins free and drives
-    # the whole gear+rack train; authored + PARK_crank_spin in a `locked` build.
-    # A spur sprocket is symmetric so the spin pose is cosmetic; pin the local
-    # Right-plane dihedral (read live) like drive-train's crank_angle.
+        [THIRD_TEETH, DISC_TEETH],
+        label="third gear 12T : disc 120T (DP38)")
+    # (3) RACK-PINION mate: the feed pinion (locked to the disc) feeds the
+    # platen at its own pitch circumference -- pi * 10.16 per rev. The rack
+    # linear reference is the RACK's own pitch-line Axis1 (the physical
+    # engagement line; the platen follows through its lock mate), the pinion
+    # reference is the stud axis. The engagement SENSE is calibrated from the
+    # verify:kinematics signed feed assert (2026-07-07 field report: the
+    # platen-axis-referenced default fed the paper backward vs the tooth
+    # contact; the pitch-axis re-reference still solved reversed at flip=False
+    # -- the live gate measured +0.133 mm for feed Z -1.50 deg). flip=True
+    # lands the physical sense; recalibrate HERE (never the probe's FEED_SIGN)
+    # if the gate ever fails on sign again.
+    await rack_pinion_mate(
+        adapter,
+        named_ref(f"Axis1@{rack}", "AXIS"),
+        named_ref(f"Axis1@{feed}", "AXIS"),
+        rack_travel_per_revolution=math.pi * FEED_PD,
+        flip=True,
+        label="platen feed (feed pinion on the rack)")
+    # (4) The crank spin is the FREED operational-DOF park driver. Deferred in
+    # the default `free` build (recorded, not authored) -> T12 spins free and
+    # drives the whole gear+rack train; authored + PARK_crank_spin in a
+    # `locked` build. A spur sprocket is symmetric so the spin pose is
+    # cosmetic; pin the local Right-plane dihedral (read live) like
+    # drive-train's crank_angle.
     t12_o = component_origin(adapter, t12)
     a_t12 = component_transform(adapter, t12)
     crank_dihedral = math.degrees(math.acos(max(-1.0, min(1.0, a_t12[0]))))
@@ -704,16 +886,6 @@ async def build(adapter) -> dict[str, str]:
         crank_dihedral,
         label=f"crank spin PARK driver (freed in default build; a={crank_dihedral:.2f})",
         verify=(t12, t12_o), free_dof_key="crank_spin")
-
-    # --- fasteners (M6.10) ----------------------------------------------------
-    for x, y in CLIP_SCREW_XY:
-        await place_component(adapter, "fillister-screw", [x, y, PLATE_FRONT_Z - 1.2],
-                              [0.0, 0.0, 0.0], IDENTITY,
-                              label=f"fillister-screw (clip x{x:+.0f} y{y:.0f})")
-    for x, y in PINCH_SCREW_XY:
-        await place_component(adapter, "pinch-screw", [x, y, PINCH_SCREW_Z],
-                              [0.0, 0.0, 0.0], IDENTITY,
-                              label=f"pinch-screw (clamp x{x:+.0f} y{y:.0f})")
 
     # Spare T18 removable: the swap chain wheel resting loose on the base, west
     # of the platen (a flat sibling of the mounted T24 above).
@@ -729,11 +901,11 @@ async def build(adapter) -> dict[str, str]:
         await assert_expected_free_dof(adapter, 0)
     else:
         # ONE freed operational DOF: the crank spin (the deferred PARK driver
-        # above), which drives the gear-coupled knob + the rack-fed platen.
-        # Target the SPECIFIC T12 crank instance (not the shared
-        # ``transgear-removable`` stem: the T24 knob + T18 spare share it, so a
-        # stem check would pass even if T24 were free and the crank T12 pinned --
-        # codex #189 :679).
+        # above), which drives the chain-coupled knob cluster, the gear-mated
+        # disc + feed pinion, and the rack-fed platen. Target the SPECIFIC T12
+        # crank instance (not the shared ``transgear-removable`` stem: the T24
+        # knob + T18 spare share it, so a stem check would pass even if T24
+        # were free and the crank T12 pinned -- codex #189).
         assert_free_dof_necessity(
             adapter, 1, required_instances=(t12,))
         write_park_specs(ASM_NAME)
