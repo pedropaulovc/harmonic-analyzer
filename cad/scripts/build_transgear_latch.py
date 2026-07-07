@@ -14,7 +14,7 @@ disc-meshes-rack topology.
 
 Layout: big hub on the origin (stud axis along Z), small hub at
 (+44.766, 0) -- the assembly rotates the c2c line to the photo direction.
-4.5 thick along Z. Dimensions: docs/paper-drive-rework.md E7/E8.
+4.5 thick along Z. Dimensions: memory/paper-drive-rework.md E7/E8.
 
 Run (SolidWorks already open)::
 

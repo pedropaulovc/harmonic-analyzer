@@ -5,7 +5,7 @@ to each front column (ch30 p005 quarter view): its relief wraps the column's
 back half and its two O4.0 ear holes take the clamp-screw threads (the screw
 stack is bar -> front arc -> this shell). Depth 14 spans the column-axis
 plane (machine z -112) to z -98, a 1.2 solid back wall past the Ø25.4
-column. Geometry: _clamp_arc.py; layout: docs/paper-drive-rework.md E2.
+column. Geometry: _clamp_arc.py; layout: memory/paper-drive-rework.md E2.
 
 Run (SolidWorks already open)::
 
