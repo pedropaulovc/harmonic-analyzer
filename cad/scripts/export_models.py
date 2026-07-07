@@ -298,7 +298,13 @@ def load_src_digests() -> dict[str, str]:
     the whole cache, so every output regenerates through the new format logic."""
     if not SRC_DIGESTS.exists():
         return {}
-    data = dict(json.loads(SRC_DIGESTS.read_text(encoding="utf-8")))
+    try:
+        data = dict(json.loads(SRC_DIGESTS.read_text(encoding="utf-8")))
+    except (OSError, ValueError):
+        # Truncated/corrupt sidecar (interrupted save_src_digests, partial cache
+        # copy): don't abort the export -- return {} so the untrusted/force path
+        # regenerates and rewrites a valid file (matches exporter_untrusted's guard).
+        return {}
     if data.pop(_EXPORTER_KEY, None) != _exporter_digest():
         return {}
     return data
