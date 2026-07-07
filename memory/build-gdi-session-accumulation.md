@@ -1,6 +1,6 @@
 ---
 name: build-gdi-session-accumulation
-description: "Two distinct SW session-age failure modes: (1) GDI handle exhaustion (rm_gdi modal, hang) — act only on the actual error; (2) progressive per-op slowdown (mates 4.7s→35s over an all-day session, GDI fine) — diagnose by comparing identical mate durations against release logs, remedy = clean COM exit + relaunch"
+description: "Two distinct SW seat slowdowns: (1) GDI handle exhaustion (rm_gdi modal, hang) — act only on the actual error; (2) runaway TextInputHost starving SW's STA message pump (mates 4.7s→35s, GDI fine, SW restart does NOT help) — diagnose via release-log span diffs + per-process CPU rate, remedy = kill TextInputHost"
 metadata: 
   node_type: memory
   type: project
@@ -33,17 +33,22 @@ graphics reused) but ~140-180 per distinct new part doc. Measure live with
 *can* be raised to 65536 (HKLM, needs admin + SW restart) as a belt-and-suspenders fix, but
 a fresh restart alone was sufficient — no registry change was needed. Confirmed 2026-06-17.
 
-**Second failure mode (2026-07-06): progressive per-operation SLOWDOWN, GDI fine.** After
-an all-day seat (dozens of probes, 95 part builds, two killed builds; SW at 2.4 h CPU /
-1.6 GB WS / 18.5k kernel handles but GDI only ~1500), identical drive-train gear mates ran
-**7.5× slower** than the v0.15.1 release run (4.7 s → 35.5 s each), and a full `frame`
-build 2.5× slower (148 s → 372 s) — degradation was PROGRESSIVE across the day (2.5× at
-mid-afternoon, 7.5× by evening). No modal, no hang, no GDI pressure — just latency.
-**Diagnose** by downloading the latest release's `-logs.zip` (per-task logs attached to the
-GitHub release) and comparing the SAME labelled mate spans; per-task totals mislead (doit
-task lines include cache-store upload). **Remedy:** stop doit, exit SW CLEANLY via COM —
-attach → `CloseAllDocuments(True)` → `ExitApp()` — which avoids the Document Recovery
-dialog a kill would cause ([[sw-recovery-dialog]]), then relaunch doit (the adapter
-cold-starts SW itself). doit resumes from its ledger; only the interrupted task re-runs.
-User-approved restart on measured-slowdown evidence; the "don't pre-emptively restart" rule
-above still holds when there's no measurement.
+**Second failure mode (2026-07-06): progressive per-operation SLOWDOWN — a runaway
+`TextInputHost`, NOT SW session age and NOT GDI.** Identical drive-train gear mates ran
+**7.5× slower** than the v0.15.1 release logs (4.7 s → 35.5 s each), full `frame` build
+2.5× slower (148 s → 372 s), worsening across the day (2.5× mid-afternoon → 7.5× by
+evening). GDI was fine (~1500) and a CLEAN SW RESTART DID NOT FIX IT (fresh instance still
+placed 5× slow). Culprit: Windows' `TextInputHost.exe` runaway (a known Windows bug) — 9.3
+CPU-hours accumulated, burning 66% of a core continuously while SW got only 36%. Mechanism:
+SW is an STA COM server — every call serializes on the UI thread's message pump, exactly
+where a churning input host injects load, so op LATENCY inflates while CPU looks idle.
+**Kill it** (`Stop-Process -Name TextInputHost -Force`; it respawns clean on demand) →
+placement cadence back to baseline (8.3 s → 1.2–2.2 s) immediately, no SW restart needed.
+
+**Diagnosis recipe:** (1) download the latest release's `-logs.zip` (per-task logs attached
+to the GitHub release) and diff the SAME-labelled mate/placement spans — per-task totals
+mislead (doit task lines include cache-store upload); (2) `GetGuiResources` for GDI; (3)
+per-process CPU RATE (sample `Get-Process` CPU twice over 5 s — cumulative totals flag the
+runaway: TextInputHost had 33,605 s); (4) only then consider an SW restart (clean exit:
+attach → `CloseAllDocuments(True)` → `ExitApp()`, avoids the recovery dialog
+[[sw-recovery-dialog]]; doit resumes from its ledger).
