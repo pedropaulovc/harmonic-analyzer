@@ -4,8 +4,9 @@ The amplification stage: the magnifying lever takes the summing lever's tiny
 motion and the magnifying wheel multiplies it again (via the wire to the pen),
 in machine coordinates (assembly origin = base origin; the output side is -Z).
 
-* magnifying-bracket (ground, bolted under the coefficients plate) whose collar
-  loosely guides the magnifying-lever rod (Ø6.2 over Ø6 -- NOT a mate). The
+* magnifying-bracket -- the fitting that AFFIXES the lever rod to the pivoted
+  summing bar, so it RIDES the lever (locked, like the clamp chain), its collar
+  carrying the rod (Ø6.2 over Ø6) concentrically at every rock angle. The
   lever EXTENDS FROM the pivoted summing bar and pivots WITH it about the
   knife-edge ridge line (engineerguy video 2/4 + 4/4; tip arc ~6 mm), so its
   one DOF is the rock about that Z line; the clamp + thumb screw + vertical rod
@@ -13,7 +14,8 @@ in machine coordinates (assembly origin = base origin; the output side is -Z).
   radius -- the radius from the KNIFE EDGE is what the sliding clamp adjusts
   (<=4x) -- and the output fixture is where WIRE 1 to the wheel hub hooks.
 * wheel-bar (HALF-width, clamped at ONE column with a free end past the pen
-  hanger) + its column-clamp + pinch screw.
+  hanger) + its two-piece column clamp (front/back arcs + two clamp screws --
+  the platen support bar's clamp, ch30 p005).
 * wheel-axle (structure) carrying the magnifying-wheel, which spins on its stud
   (revolute); the wheel rim drives the pen rod via WIRE 2 (pen.SLDASM).
 * lever-wire -- WIRE 1's straight rest-pose run from the output fixture's cross
@@ -29,9 +31,9 @@ in machine coordinates (assembly origin = base origin; the output side is -Z).
   clamp/rod/fixture group, the wire pivots at the hook staying on the hub, and
   the wheel turns: a working kinematic chain, pivoted where the book pivots it.
 
-Cross-subassembly fits (checked at the top level): the column-clamp rides the
-O25.4 column (frame.SLDASM); the pen-hanger (pen.SLDASM) clamps the wheel-bar,
-and the wheel rim -> pen-rod wire couples this sub to the pen.
+Cross-subassembly fits (checked at the top level): the column-clamp arcs ride
+the O25.4 column (frame.SLDASM); the pen-hanger (pen.SLDASM) clamps the
+wheel-bar, and the wheel rim -> pen-rod wire couples this sub to the pen.
 
 Documented simplifications (Appendix C): the magnifying clamp's thumb screw is
 modeled backed-out (the tip is tangent to the lever rod -- a seated screw would
@@ -42,8 +44,8 @@ are not, and the kinematic couplings stay Motion-study mates
 (docs/motion-policy.md), so each run stands 0.25 off its wheel surface.
 
 Fix-all strategy (M6.2): every structural component inserted at its exact final
-transform and fixed; the lever + wheel are left free and constrained by mates;
-transforms asserted by read-back; zero interference.
+transform and fixed; the lever + bracket + wheel + wire are left free and
+constrained by mates; transforms asserted by read-back; zero interference.
 
 Dimensions: cad/DIMENSIONS.md ch. 20-21.
 
@@ -102,11 +104,23 @@ ASM_NAME = "magnifier"
 LOCK = is_locked_build(_config.machine("build_lock", "magnifier"))
 
 # --- machine anchors ---------------------------------------------------------
-BAR_Z = -133.9  # support-bar centres: column line -112 - clamp offset 21.9
-BAR_FRONT_Z = BAR_Z - 5.0  # -138.9: bar front face = platen back face
 WHEEL_BAR_Y = 565.0
 COLUMN_X = 197.0
 COLUMN_Z = -112.0
+# Depth chain -- the SAME two-piece clamp seat as the platen support bar
+# (paper-drive PR #196 E2): the front arc's front face (-129.9) carries the
+# bar's back face; the bar's front face lands on the shared -138.9 plane, so
+# the wheel/axle/wire/pen line is untouched by the clamp swap.
+from _clamp_arc import EAR_HOLE_Z as CLAMP_EAR_DX  # noqa: E402
+from build_column_clamp_front import DEPTH as ARC_FRONT_DEPTH  # noqa: E402
+from build_wheel_bar import (  # noqa: E402
+    BAR_DEPTH as WHEEL_BAR_DEPTH,
+    CLAMP_HOLE_X as BAR_CLAMP_HOLE_LOCAL_X,
+)
+
+BAR_BACK_Z = COLUMN_Z - ARC_FRONT_DEPTH  # -129.9
+BAR_FRONT_Z = BAR_BACK_Z - WHEEL_BAR_DEPTH  # -138.9: bar front = platen-back plane
+BAR_Z = (BAR_FRONT_Z + BAR_BACK_Z) / 2.0  # -134.4 bar centre
 
 # --- magnifying group --------------------------------------------------------
 # Rod at the plate centreline (990) so it is coplanar with the coefficients plate
@@ -156,7 +170,16 @@ FIXTURE_Y0 = 926.0  # collar y 926..934 on the vertical rod
 
 # --- wheel -------------------------------------------------------------------
 WHEEL_X = -53.0
-WHEEL_BAR_X0 = -92.0  # wheel-bar centre: span -192 (west clamp) .. +8
+WHEEL_BAR_X0 = -109.0  # wheel-bar centre: span -226 (29 past the west column) .. +8
+# Clamp screws flank the column line, closing the stack bar -> front arc ->
+# back arc with heads on the bar's front face (ch30 p002 / support-bar idiom).
+CLAMP_SCREW_X = (-COLUMN_X - CLAMP_EAR_DX, -COLUMN_X + CLAMP_EAR_DX)
+# The bar's clamp holes must land on those screw lines: the ("x", 0) mirror
+# flips the part's local stations, so book hole x = centre - local.
+assert sorted(
+    round(WHEEL_BAR_X0 - lx, 6) for lx in BAR_CLAMP_HOLE_LOCAL_X
+) == sorted(round(x, 6) for x in CLAMP_SCREW_X), \
+    "wheel-bar clamp holes drifted off the column clamp-screw lines"
 from build_wheel_axle import FLANGE_LEN, STUD_LEN  # noqa: E402
 
 WHEEL_MID_Z = BAR_FRONT_Z - FLANGE_LEN - (STUD_LEN - 4.0) / 2.0  # -146.9:
@@ -242,29 +265,39 @@ _STANDOFF_R = HUB_DIA / 2.0 + HUB_WIRE_DIA / 2.0 + WIRE_CLEARANCE  # 10.65
 _WIRE_SPIN_ANGLE = math.degrees(math.acos(min(1.0, abs(_HW_ROWS[2][0]))))
 
 
-# --- M6.10 fasteners ---------------------------------------------------------
-# Column-clamp pinch screw on the wheel-bar clamp's back face (z -88), backed
-# out: the shank tip (-94.2) stays 0.2 inside the back-wall hole and 0.3 off
-# the column surface (the four platen-rail-clamp pinch screws live in
-# paper-drive.SLDASM).
-PINCH_SCREW_Z = -88.0
-
-
 async def build(adapter) -> dict[str, str]:
     # `free` (default) DEFERS the freed-DOF park driver (records, does not
     # author); `locked` authors it engaged. Set before the *_driver call below.
     set_park_defer(not LOCK)
     check("create_assembly", await adapter.create_assembly())
 
-    # --- magnifying group ----------------------------------------------------
-    # Bracket = ground (bolted under the plate); its collar is a LOOSE GUIDE
-    # around the lever rod (Ø6.2 over Ø6, 0.1 radial slack -- enough for the
-    # ~1.6 deg knife rock), not a mate. The lever pivots about the summing
-    # bar's knife-edge ridge (see the knife-pivot block above); the rock park
-    # driver uses the Top-plane angle (Y-normal, mirror-invariant -> no flip).
-    await place_component(adapter, "magnifying-bracket",
-                          [-40.0, LEVER_ROD_Y, LEVER_ROD_Z],
+    # --- wheel bar + clamp ---------------------------------------------------
+    # FIRST so the auto-fixed assembly seed is structure, not the mated lever
+    # (the bracket -- the old first insert -- now RIDES the lever, see below).
+    # Magnifying-wheel bar: HALF-width (every ch30 plate shows it clamped
+    # at ONE column with a free end just past the pen hanger -- M6.8
+    # 8-view pass). Span -192..+8 covers the axle (-53) and the hanger
+    # strap top (-19..-3).
+    await place_component(adapter, "wheel-bar", [WHEEL_BAR_X0, WHEEL_BAR_Y, BAR_Z],
                           [0.0, 0.0, 0.0], IDENTITY)
+    # Two-piece clamp at the west column -- the SAME black arcs as the platen
+    # support bar (ch30 p005 / paper-drive PR #196 E2): the front arc's face
+    # carries the bar's back face, the back arc closes on the column, and two
+    # clamp screws (heads on the bar's front face, ch30 p002) close the stack
+    # bar -> front arc -> back arc. Ry(+90): the arcs' local +X faces machine -Z.
+    for arc in ("column-clamp-front", "column-clamp-back"):
+        await place_component(adapter, arc, [-COLUMN_X, WHEEL_BAR_Y, COLUMN_Z],
+                              [0.0, 90.0, 0.0], ROT_Y_POS90,
+                              label=f"{arc} (wheel x{-COLUMN_X:.0f})")
+    for x in CLAMP_SCREW_X:
+        await place_component(adapter, "clamp-screw", [x, WHEEL_BAR_Y, BAR_FRONT_Z],
+                              [0.0, 0.0, 0.0], IDENTITY,
+                              label=f"clamp-screw (wheel x{x:+.1f})")
+
+    # --- magnifying group ----------------------------------------------------
+    # The lever pivots about the summing bar's knife-edge ridge (see the
+    # knife-pivot block above); the rock park driver uses the Top-plane angle
+    # (Y-normal, mirror-invariant -> no flip).
     ml = await place_component(adapter, "magnifying-lever",
                                [LEVER_X0, LEVER_ROD_Y, LEVER_ROD_Z],
                                [0.0, 0.0, 0.0], IDENTITY, ground=False)
@@ -292,6 +325,18 @@ async def build(adapter) -> dict[str, str]:
                        named_ref("Top Plane", "PLANE"), 0.0,
                        label="mag-lever rock PARK driver (freed in default build)",
                        verify=(ml, ml_o), free_dof_key="lever_rock")
+    # Bracket: the fitting that AFFIXES the lever rod to the (rocking) summing
+    # bar -- it rides the lever, not the frame, so it is LOCKED to the lever
+    # like the clamp chain below (grounding it made the free lever rock clip
+    # the collar: the rod sweeps ~0.7 mm at the collar over the ~1.6 deg rock,
+    # far past the 0.1 radial slack). Its collar stays the rod's snug carrier
+    # (Ø6.2 over Ø6), now exactly concentric at every rock angle.
+    bracket = await place_component(adapter, "magnifying-bracket",
+                                    [-40.0, LEVER_ROD_Y, LEVER_ROD_Z],
+                                    [0.0, 0.0, 0.0], IDENTITY, ground=False)
+    await lock_mate(adapter, named_ref(f"Front Plane@{bracket}", "PLANE"),
+                    named_ref(f"Front Plane@{ml}", "PLANE"),
+                    label="mag-bracket locked to lever")
     # The clamp + vertical rod + output fixture + thumb screw are clamped to the
     # lever at the set magnification radius (the thumb screw locks the clamp on
     # the rod): they ride the lever as one rigid body. The output fixture is
@@ -325,17 +370,6 @@ async def build(adapter) -> dict[str, str]:
     await lock_mate(adapter, named_ref(f"Front Plane@{fixture}", "PLANE"),
                     named_ref(f"Front Plane@{vrod}", "PLANE"),
                     label="output-fixture locked to vertical-rod")
-
-    # --- wheel bar + clamp ---------------------------------------------------
-    # Magnifying-wheel bar: HALF-width (every ch30 plate shows it clamped
-    # at ONE column with a free end just past the pen hanger -- M6.8
-    # 8-view pass). Span -192..+8 covers the axle (-53) and the hanger
-    # strap top (-19..-3).
-    await place_component(adapter, "wheel-bar", [WHEEL_BAR_X0, WHEEL_BAR_Y, BAR_Z],
-                          [0.0, 0.0, 0.0], IDENTITY)
-    await place_component(adapter, "column-clamp", [-COLUMN_X, WHEEL_BAR_Y, COLUMN_Z],
-                          [0.0, 90.0, 0.0], ROT_Y_POS90,
-                          label=f"column-clamp (wheel x{-COLUMN_X:.0f})")
 
     # --- magnifying wheel ----------------------------------------------------
     # Rx(-90): the axle's +Y axis points -Z (flange on the bar front face).
@@ -421,12 +455,6 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY)
     assert_component_placed(adapter, wh, wh_pos, wh_rows)
 
-    # --- fastener (M6.10) ----------------------------------------------------
-    await place_component(adapter, "pinch-screw",
-                          [-COLUMN_X, WHEEL_BAR_Y, PINCH_SCREW_Z],
-                          [0.0, 0.0, 0.0], IDENTITY,
-                          label=f"pinch-screw (wheel clamp x{-COLUMN_X:.0f})")
-
     # Certify the AS-BUILT model. free -> necessity only (the freed lever DOF is
     # genuinely free, and the yoke-coupled wheel must read under-constrained WITH
     # it -- a frozen wheel would mean the coupling died); locked -> strict 0-DOF.
@@ -435,10 +463,13 @@ async def build(adapter) -> dict[str, str]:
     else:
         # THREE freed operational DOF: the lever's knife rock + the wire's
         # swing/spin (all deferred PARK drivers above); the yoke-coupled wheel
-        # must also read under-constrained WITH them, else the coupling died.
+        # must also read under-constrained WITH them, else the coupling died --
+        # and so must the lock-mated bracket (a regression to grounded would
+        # re-create the collar clipping this rework fixed).
         assert_free_dof_necessity(
             adapter, 3,
-            required_stems=("magnifying-lever", "magnifying-wheel", "lever-wire"))
+            required_stems=("magnifying-lever", "magnifying-wheel", "lever-wire",
+                            "magnifying-bracket"))
     write_park_specs(ASM_NAME)
     check_no_interference(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)

@@ -13,7 +13,7 @@ strap/bar overlap at the bar's free end (walls >= 0.4, low).
 
 Layout: axis along Z, AUTHORED IN FINAL ORIENTATION (pointing -Z =
 machine south, into the bar's back face): under-head face on the Front
-plane at z = 0, hex head 0..+2.5, shank -12.5..0 (bar 10 + strap 2.5).
+plane at z = 0, hex head 0..+2.5, shank -11.5..0 (bar 9 + strap 2.5).
 Symmetric about local x = 0 (MIRROR_PLANE ("x", 0.0)).
 
 Run (SolidWorks already open)::
@@ -52,7 +52,7 @@ MATERIAL = "Plain Carbon Steel"  # black hardware
 HEAD_AF = 7.0  # hex across-flats (low)
 HEAD_H = 2.5
 SHANK_DIA = 3.5  # rides the bar's O3.8 through-hole / strap's O3.6 hole
-SHANK_LEN = 12.5  # bar 10 + 2.5 into the 3-thick strap (tip 0.5 recessed)
+SHANK_LEN = 11.5  # bar 9 + 2.5 into the 3-thick strap (tip 0.5 recessed)
 
 # Every hex offset dim is linear in the across-flats (radius = AF/sqrt 3), so a
 # single HeadAF global drives them all via dimensionless coefficients -- unit-safe
