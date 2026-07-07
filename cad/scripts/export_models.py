@@ -269,14 +269,27 @@ def save_colors(colors: dict) -> None:
 
 
 def _exporter_digest() -> str:
-    """Digest of the exporter itself (this module's source), stamped into the cache so
-    a change to the export/format/scene logic invalidates every recorded output even
-    when no CAD recipe changed. Best-effort: an unreadable source yields '' (a stable
-    value that still round-trips), never blocking an export."""
+    """Digest of the exporter's own source CLOSURE -- this module plus every repo-local
+    helper it transitively imports (render_compare's scene extraction, _common's STL
+    preference constants, ...) -- stamped into the cache so a change to ANY export /
+    format / scene / colour logic invalidates every recorded output even when no CAD
+    recipe changed (codex review). Best-effort: if the closure can't be resolved, fall
+    back to this module alone; if even that can't be read, '' (a stable, round-tripping
+    value) -- never blocking an export."""
+    self_path = Path(__file__).resolve()
     try:
-        return hashlib.md5(Path(__file__).resolve().read_bytes()).hexdigest()
+        from _buildgraph import module_deps_of
+        files = sorted({self_path, *(Path(p).resolve()
+                                     for p in module_deps_of(self_path))})
+        h = hashlib.md5()
+        for f in files:
+            h.update(f.read_bytes())
+        return h.hexdigest()
     except Exception:
-        return ""
+        try:
+            return hashlib.md5(self_path.read_bytes()).hexdigest()
+        except Exception:
+            return ""
 
 
 def load_src_digests() -> dict[str, str]:
@@ -381,8 +394,13 @@ def asm_source_changed(dashed: str, src: Path, digests: dict[str, str]) -> bool:
         return True
     cur = src_digest(src)
     if cur is None:
-        bj = OUT_BOXES / f"{dashed}.json"
-        return not bj.exists() or bj.stat().st_mtime < src.stat().st_mtime
+        # Digest-unavailable fallback: check EVERY assembly output's mtime vs the
+        # source, not just the boxes JSON -- a fresh scene JSON alongside a stale mono
+        # STL/STEP must still read stale (codex review).
+        outs = (OUT_BOXES / f"{dashed}.json", OUT_STL / f"{dashed}.STL",
+                OUT_STEP / f"{dashed}.STEP")
+        return any(not o.exists() or o.stat().st_mtime < src.stat().st_mtime
+                   for o in outs)
     return digests.get(dashed) != cur
 
 
