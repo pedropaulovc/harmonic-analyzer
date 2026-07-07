@@ -302,10 +302,9 @@ _FIXED_ACCESSOR_TOKENS: dict[str, frozenset[str]] = {
 #   machine(<subsystem>, ...) -> machine/<subsystem>.yaml   (dynamic -> machine/*)
 #   parts(<dashed-name>)      -> parts/<name>.yaml+_defaults (dynamic -> parts/*)
 #   placement(<dashed-name>)  -> placement/<name>.yaml       (dynamic -> placement/*)
-#   flip_seeds(<stem>)        -> flip_seeds/<stem>.yaml       (dynamic -> flip_seeds/*)
 #   provenance/_doc(<doc>)    -> that doc's file family      (dynamic -> "**")
 _FAMILY_ACCESSORS: frozenset[str] = frozenset(
-    {"machine", "parts", "placement", "flip_seeds", "provenance", "_doc"})
+    {"machine", "parts", "placement", "provenance", "_doc"})
 
 
 class _UnknownConfigUse(Exception):
@@ -337,13 +336,6 @@ def _part_registry_names() -> frozenset[str]:
 def _placement_names() -> frozenset[str]:
     """Per-part placement stems (``placement/<dashed-name>.yaml``)."""
     d = CONFIG_DIR / "placement"
-    return frozenset(p.stem for p in d.glob("*.yaml")) if d.is_dir() else frozenset()
-
-
-@functools.lru_cache(maxsize=1)
-def _flipseed_stems() -> frozenset[str]:
-    """Per-assembly flip-seed stems (``flip_seeds/<stem>.yaml``)."""
-    d = CONFIG_DIR / "flip_seeds"
     return frozenset(p.stem for p in d.glob("*.yaml")) if d.is_dir() else frozenset()
 
 
@@ -381,13 +373,6 @@ def _family_tokens(accessor: str, arg: str | None) -> frozenset[str]:
         if arg in _placement_names():
             return frozenset({f"placement/{arg}.yaml"})
         raise _UnknownConfigUse                        # unknown placement row
-    if accessor == "flip_seeds":
-        # Always the family glob, narrowed per-task to the task's OWN stem in dodo
-        # (_expand_flipseeds_token) -- NOT resolved from the literal arg. Each
-        # assembly loads only its own seeds at build time, so the authoritative dep
-        # is the task stem; resolving the literal would leak a sibling's seed file
-        # into any script that imports that sibling's module (magnifier <- summing).
-        return frozenset({"flip_seeds/*"})
     # provenance / _doc: a non-literal doc name is unresolvable -> whole config.
     if arg is None:
         raise _UnknownConfigUse
@@ -398,10 +383,10 @@ def _family_tokens(accessor: str, arg: str | None) -> frozenset[str]:
 
 
 # The config-accessor modules the read-set analysis tracks. ``_config`` is the
-# part+assembly loader; ``_config_asm`` holds the assembly-ONLY accessors
-# (placement/flip_seeds) kept out of ``_config`` so they stay off every part's
-# closure (a part never imports ``_config_asm``). Both expose the same family
-# accessors, so the token machinery treats them identically.
+# part+assembly loader; ``_config_asm`` holds the assembly-ONLY ``placement``
+# accessor kept out of ``_config`` so it stays off every part's closure (a part
+# never imports ``_config_asm``). Both expose the same family accessors, so the
+# token machinery treats them identically.
 _CONFIG_MODULES: frozenset[str] = frozenset({"_config", "_config_asm"})
 
 
@@ -527,12 +512,6 @@ def placement_row_file(dashed_name: str) -> list[str]:
     placement file takes the default bbox-``x`` mirror, so has no dep)."""
     row = CONFIG_DIR / "placement" / f"{dashed_name}.yaml"
     return [str(row.resolve())] if row.exists() else []
-
-
-def flipseed_family_files() -> list[str]:
-    """Every flip_seeds/*.yaml -- the conservative ``"flip_seeds/*"`` expansion."""
-    d = CONFIG_DIR / "flip_seeds"
-    return sorted(str(p.resolve()) for p in d.glob("*.yaml")) if d.is_dir() else []
 
 
 def part_row_files(dashed_name: str) -> list[str]:

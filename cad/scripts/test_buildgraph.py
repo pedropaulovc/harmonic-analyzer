@@ -188,7 +188,7 @@ def test_config_files_subset_of_known_tokens():
     """Every real script resolves to known tokens (concrete files that exist, or
     the machine/* | parts/* | ** globs). The set can only NARROW the old whole-
     config dep, never invent a missing-file dependency."""
-    globs = {"machine/*", "parts/*", "placement/*", "flip_seeds/*", "**"}
+    globs = {"machine/*", "parts/*", "placement/*", "**"}
     for stem in part_stems():
         for tok in config_files_of(SCRIPTS_DIR / f"build_{stem}.py"):
             assert tok in globs or (bg.CONFIG_DIR / tok).is_file(), f"{stem}: {tok}"
@@ -228,15 +228,12 @@ def test_config_files_resolve_known_forms():
     # a dynamic machine/parts arg widens to the whole family (conservative, not an error).
     assert _tokens("import _config\nx = _config.machine(sub, 'k')\n") == frozenset({"machine/*"})
     assert _tokens("import _config\nx = _config.parts(name)\n") == frozenset({"parts/*"})
-    # placement/flip_seeds are assembly-only accessors on the SEPARATE _config_asm
-    # module (kept off every part's closure); the analyzer tracks it identically.
-    # placement: a literal known part -> its own file; a dynamic part -> the family
-    # (mirror_placement's real use); flip_seeds is ALWAYS the family (narrowed per
-    # task to the assembly's own stem in dodo, never resolved from the literal).
+    # placement is an assembly-only accessor on the SEPARATE _config_asm module
+    # (kept off every part's closure); the analyzer tracks it identically. A literal
+    # known part -> its own file; a dynamic part -> the family (mirror_placement's
+    # real use).
     assert _tokens("import _config_asm\nx = _config_asm.placement('pinion-spring')\n") == frozenset({"placement/pinion-spring.yaml"})
     assert _tokens("import _config_asm\nx = _config_asm.placement(part)\n") == frozenset({"placement/*"})
-    assert _tokens("import _config_asm\nx = _config_asm.flip_seeds('drive_train')\n") == frozenset({"flip_seeds/*"})
-    assert _tokens("import _config_asm\nx = _config_asm.flip_seeds(stem)\n") == frozenset({"flip_seeds/*"})
     # an aliased _config_asm import is tracked too.
     assert _tokens("import _config_asm as ca\nx = ca.placement(p)\n") == frozenset({"placement/*"})
     # an aliased module import is still tracked.

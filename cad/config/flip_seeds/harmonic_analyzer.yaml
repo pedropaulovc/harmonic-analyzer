@@ -1,5 +1,0 @@
-# Learned flip-polarity seeds for the harmonic_analyzer assembly (issue: per-assembly flip
-# seeds). None needed today; the file exists so _config.flip_seeds("harmonic_analyzer")
-# resolves to a concrete per-file token (an absent file would fall back to the
-# whole config). Add sigs here from the `_mate` `learn: add sig` warns.
-seeds: []
