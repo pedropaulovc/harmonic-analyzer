@@ -5,6 +5,29 @@ metadata:
   type: project
 ---
 
+> **UPDATE 2026-07-07 — round 2 (PR #201): summing + pen join; channel lever COUPLED.**
+> `summing: free` (1 DOF, lever knife-edge rock — the old rock-snapshot angle
+> driver re-keyed `free_dof_key="lever_rock"`; boss-hook rides via its lock
+> mate) and `pen: free` (1 DOF, carriage travel — `PARK_pen_travel`; the F5
+> pen-driver equation is NOT in the shipped free model: `verify:kinematics`
+> replays the deferred spec, installs the equation transiently on the replayed
+> mate — `base_mm` from the spec's `params.distance` — sweeps, discards
+> unsaved; a `locked` build installs at build time against the renamed
+> `PARK_pen_travel`). channel's LEVER is now COUPLED, not freed: J4 lost its
+> hard spin pin (`_revolute(pin_spin=False)`) and the new **J5 foot-on-arc
+> mate** (bar `Axis2` ↔ rocker `Axis3` arc-centre axis, per-channel as-solved
+> radius ≈806, cross-checked vs `solve_state` at 1e-3) closes rocker → bar →
+> lever, so the park count stays 3/channel while `channel-lever` joins the
+> necessity `required_stems`; in a locked build footX + J5 fully define
+> lever + bar (Jacobian non-singular at rest: coupling ⊥ the amplitude slide
+> but first-order in lever↔rocker). `preflight_release.FREE_ASSEMBLIES` +=
+> summing, pen. Also 2026-07-07: the magnifying-bracket is lock-mated to the
+> magnifying lever (it affixes the rod to the ROCKING summing bar — grounded
+> it clipped the rod over the knife rock), and the magnifier wheel-bar adopted
+> the paper-drive two-piece clamp (green one-piece `column-clamp` +
+> `pinch-screw` parts RETIRED; wheel-bar 10×9×234, back face −129.9, front
+> unchanged −138.9).
+>
 > **UPDATE 2026-07-05 — paper-drive joins the free regime (1 DOF: crank spin).**
 > The crank-end T12 sprocket spins free (deferred `crank_spin` park driver,
 > `build_lock.yaml` `paper_drive: free`, `verify._expected_free_dof("paper-drive")`

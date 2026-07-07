@@ -1349,22 +1349,16 @@ sections:
         - p.50–51
         - scaled
         - low
-      - - Wheel bar (M6.4/M6.8; paper-drive rework note)
-        - '10-square steel HALF-width bar (`wheel-bar`, x −192..+8) at y 565, on the clamp axis z −133.9 (front face −138.9) — the magnifying wheel''s own bar. The paper-drive rework retired the other two 10-square rails: the platen rides ONE 22 × 9 × 452 `support-bar` at y 338.5 (see ch. 22)'
+      - - Wheel bar (M6.4/M6.8; clamp unified with the platen bar 2026-07)
+        - '10 tall × 9 deep steel HALF-width bar (`wheel-bar`, x −226..+8, the clamped end 29 past the west column like the support-bar) at y 565, back face −129.9 on the front clamp arc, front face −138.9 (the shared platen-back plane) — the magnifying wheel''s own bar, same 22 × 9-family stock depth as the ONE 22 × 9 × 452 `support-bar` at y 338.5 (see ch. 22)'
         - —
         - 'M6.4 layout; p3 90° view: bars run tangent IN FRONT of the columns (z −112)'
         - derived
         - low
-      - - Column clamp (×1, wheel bar only since the paper-drive rework)
-        - green cast collar Ø48 × 16, bore Ø25.6 sliding on the Ø25.4 column (OD rederived from the 8-views M6.11); open channel across the front face (10.2 wide, floor 5.1 below bar centre) at column-to-bar offset 21.9; Ø3.2 radial pinch-screw hole through the back wall (M6.10). The platen bar''s 4 clamps are now the two-piece semi-arc pairs (`column-clamp-front`/`-back`, ch. 22 row) — the one-piece channel collar remains only on the wheel bar (magnifier.SLDASM)
+      - - Column clamp (two-piece, wheel bar — unified with the platen-bar clamps 2026-07)
+        - 'the same black two-piece semi-arc pair as the platen bar''s (`column-clamp-front`/`-back`, ch. 22 row): front arc face at −129.9 carries the bar back face, back arc closes on the Ø25.4 column, two clamp screws through the bar flanking the column (heads on the bar front face). The green one-piece channel collar (and its backed-out pinch screw) is RETIRED — no consumer left'
         - —
-        - p.50–55
-        - scaled + derived
-        - low
-      - - Pinch screw ×1 (M6.10; wheel-bar clamp only)
-        - 'Ø6 × 2.5 head + Ø2.9 × 6.2 shank in the clamp''s back-wall hole, BACKED OUT (a seated screw would overlap the column it pinches): head bears on the clamp back face; the back wall is 11.2 thick, so the 6.2 shank seats mid-wall, tip ~5 off the column. The paper-drive rail clamps'' 4 pinch screws are retired with the one-piece collars'
-        - —
-        - p.50–55 (screw heads on the clamp backs)
+        - p.50–55 (ch30 p005 two-piece arcs)
         - scaled + derived
         - low
   - prose: |2
