@@ -195,12 +195,14 @@ async def build(adapter) -> dict[str, str]:
                           [0.0, 0.0, 0.0], IDENTITY)
 
     # Certify the AS-BUILT model. free -> necessity only (the freed lever rock
-    # is genuinely free; the lock-mated boss-hook reads under-constrained WITH
-    # it); locked -> strict 0-DOF.
+    # is genuinely free; the lock-mated boss-hook MUST read under-constrained
+    # WITH it -- a grounded/fixed regression would freeze the counter-spring
+    # anchor while the lever still swings); locked -> strict 0-DOF.
     if LOCK:
         await assert_expected_free_dof(adapter, 0)
     else:
-        assert_free_dof_necessity(adapter, 1, required_stems=("summing-lever",))
+        assert_free_dof_necessity(
+            adapter, 1, required_stems=("summing-lever", "boss-hook"))
     write_park_specs(ASM_NAME)
     check_no_interference(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)

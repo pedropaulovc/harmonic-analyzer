@@ -235,13 +235,15 @@ async def build(adapter) -> dict[str, str]:
                           [0.0, 0.0, 0.0], IDENTITY)
 
     # Certify the AS-BUILT model. free -> necessity only (the freed pen travel
-    # is genuinely free; the lock-mated marker + pen-wire read under-constrained
-    # WITH the rod); locked -> strict 0-DOF (the equation-driven mate still
-    # fully defines).
+    # is genuinely free; the lock-mated marker + pen-wire MUST read
+    # under-constrained WITH the rod -- with the neutral preset the motion
+    # sweep reads got == want == 0 even if a rider were disconnected); locked
+    # -> strict 0-DOF (the equation-driven mate still fully defines).
     if LOCK:
         await assert_expected_free_dof(adapter, 0)
     else:
-        assert_free_dof_necessity(adapter, 1, required_stems=("pen-rod",))
+        assert_free_dof_necessity(
+            adapter, 1, required_stems=("pen-rod", "pen-marker", "pen-wire"))
     write_park_specs(ASM_NAME)
     check_no_interference(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)
