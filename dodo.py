@@ -1430,7 +1430,12 @@ def task_export():
         "targets": [target],
         "task_dep": _spine_dep("export"),
         "uptodate": [False],
-        "actions": [(_run, [[sys.executable, str(EXPORT_PY)], "export", "export"])],
+        # --record-digests: this task runs on the COM spine AFTER every part/assembly
+        # is (re)built, so the natives are current and their recipe digests are safe to
+        # RECORD as the export-freshness cache (a bare standalone run must not -- see
+        # export_models.main).
+        "actions": [(_run, [[sys.executable, str(EXPORT_PY), "--record-digests"],
+                            "export", "export"])],
         "verbosity": 2,
     }
 

@@ -30,6 +30,7 @@ Run after any --rebuild so the render cache tracks geometry:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
@@ -65,6 +66,12 @@ COLORS = OUT_STL / "colors.json"
 # which SolidWorks bumps on every save-cascade / cache-restore and made every export
 # look stale each release.
 SRC_DIGESTS = OUT_STL / "export-src.json"
+# Sentinel key in that file recording the EXPORTER's own version (this module's
+# source). The per-source recipe digest is blind to the export/format/scene/colour
+# logic here, so without this a change to the exporter would leave every output
+# looking fresh and ship stale STEP/STL/scene JSON (codex review). A sentinel
+# mismatch invalidates the whole cache -> full regeneration through the new logic.
+_EXPORTER_KEY = "__exporter__"
 
 # swconst ids (extracted from the installed swconst.tlb, R2026x). The STL ids
 # live in _common (shared with the part-build STL export); STEP is export-only.
@@ -261,15 +268,34 @@ def save_colors(colors: dict) -> None:
         {k: list(v) for k, v in sorted(colors.items())}, indent=1), encoding="utf-8")
 
 
+def _exporter_digest() -> str:
+    """Digest of the exporter itself (this module's source), stamped into the cache so
+    a change to the export/format/scene logic invalidates every recorded output even
+    when no CAD recipe changed. Best-effort: an unreadable source yields '' (a stable
+    value that still round-trips), never blocking an export."""
+    try:
+        return hashlib.md5(Path(__file__).resolve().read_bytes()).hexdigest()
+    except Exception:
+        return ""
+
+
 def load_src_digests() -> dict[str, str]:
-    if SRC_DIGESTS.exists():
-        return dict(json.loads(SRC_DIGESTS.read_text(encoding="utf-8")))
-    return {}
+    """Recorded source digests -- but ONLY if written by this same exporter version.
+    A changed exporter (its ``__exporter__`` sentinel no longer matches) invalidates
+    the whole cache, so every output regenerates through the new format logic."""
+    if not SRC_DIGESTS.exists():
+        return {}
+    data = dict(json.loads(SRC_DIGESTS.read_text(encoding="utf-8")))
+    if data.pop(_EXPORTER_KEY, None) != _exporter_digest():
+        return {}
+    return data
 
 
 def save_src_digests(digests: dict[str, str]) -> None:
+    out = {k: v for k, v in digests.items() if k != _EXPORTER_KEY}
+    out[_EXPORTER_KEY] = _exporter_digest()
     SRC_DIGESTS.write_text(
-        json.dumps(dict(sorted(digests.items())), indent=1), encoding="utf-8")
+        json.dumps(dict(sorted(out.items())), indent=1), encoding="utf-8")
 
 
 def _import_dodo() -> Any:
@@ -294,6 +320,19 @@ def src_digest(src: Path) -> str | None:
         return _import_dodo()._stable_artefact_digest(str(src.resolve()))
     except Exception:
         return None
+
+
+def _save_as(doc: Any, out: Path) -> int:
+    """SaveAs3 to ``out``, guaranteeing THIS call produced the file: remove any prior
+    output first, so a SaveAs3 that fails (a locked / read-only path) leaves NO file
+    and raises -- instead of silently leaving a stale export that the existence check
+    would pass and a fresh digest would then stamp current (codex review). Returns the
+    SaveAs3 status for logging."""
+    out.unlink(missing_ok=True)
+    ok = doc.SaveAs3(str(out), 0, 0)
+    if not out.exists():
+        raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={ok})")
+    return ok
 
 
 def stamp_render_cache_current() -> None:
@@ -378,6 +417,14 @@ def assert_configs_distinct(stem: str, crc_by_mesh: dict[str, int]) -> None:
 
 def main() -> int:
     force = "--force" in sys.argv[1:]
+    # Only RECORD source digests when the caller vouches the natives are current --
+    # i.e. the doit ``export`` task, which runs on the COM spine AFTER every part /
+    # assembly is (re)built (dodo passes ``--record-digests``). A bare standalone run
+    # may export a not-yet-rebuilt native, so stamping its recipe digest would make a
+    # later same-recipe build's fresh geometry look already-exported and get skipped
+    # (codex review). Standalone still READS the cache (fast "all fresh"); it just
+    # never writes, so it can never poison it.
+    record = "--record-digests" in sys.argv[1:]
     models = manifest_models()
     colors = load_colors()
     digests = load_src_digests()
@@ -451,9 +498,7 @@ def main() -> int:
                 adapter._attempt(lambda: doc.ForceRebuild3(False), default=None)
                 adapter._attempt(lambda: doc.EditRebuild3(), default=None)
                 out = OUT_STL / f"{mesh}.STL"
-                ok = doc.SaveAs3(str(out), 0, 0)
-                if not out.exists():
-                    raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={ok})")
+                _save_as(doc, out)
                 crc_by_mesh[mesh] = zlib.crc32(out.read_bytes()) & 0xFFFFFFFF
                 colors[mesh] = doc_rgb(doc)
                 log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB) rgb={colors[mesh]}")
@@ -461,7 +506,7 @@ def main() -> int:
             # Stamp the source recipe digest AFTER the distinctness proof passes, so a
             # bad (stale-config) export is never recorded fresh. All configs share one
             # source part, hence one digest.
-            d = src_digest(src)
+            d = src_digest(src) if record else None
             if d is not None:
                 for _cfg, mesh in cfg_meshes:
                     digests[mesh] = d
@@ -474,13 +519,11 @@ def main() -> int:
                 check(f"open {src.name}", await adapter.open_model(str(src)))
                 doc = adapter.currentModel
                 for out in (OUT_STL / f"{dashed}.STL", OUT_STEP / f"{dashed}.STEP"):
-                    ok = doc.SaveAs3(str(out), 0, 0)
-                    if not out.exists():
-                        raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={ok})")
+                    _save_as(doc, out)
                     log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB)")
                 colors[dashed] = doc_rgb(doc)
                 log(f"colour {dashed}: {colors[dashed]}")
-                d = src_digest(src)
+                d = src_digest(src) if record else None
                 if d is not None:
                     digests[dashed] = d
                 adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
@@ -492,14 +535,10 @@ def main() -> int:
                 check(f"open {src.name}", await adapter.open_model(str(src)))
                 doc = adapter.currentModel
                 out = OUT_STEP / f"{dashed}.STEP"
-                ok = doc.SaveAs3(str(out), 0, 0)
-                if not out.exists():
-                    raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={ok})")
+                _save_as(doc, out)
                 log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB)")
                 mono = OUT_STL / f"{dashed}.STL"  # mm, like every other STL
-                ok = doc.SaveAs3(str(mono), 0, 0)
-                if not mono.exists():
-                    raise RuntimeError(f"SaveAs3 produced no file: {mono} (rc={ok})")
+                _save_as(doc, mono)
                 log(f"saved {mono.name} ({mono.stat().st_size / 1e6:.1f} MB, mm)")
                 # fresh cache: preloaded colors.json entries would mask
                 # colour changes made to part docs since the last export
@@ -513,7 +552,7 @@ def main() -> int:
                 }), encoding="utf-8")
                 log(f"saved boxes+scene {dashed}.json "
                     f"({len(boxes)} boxes, {len(scene)} instances, {len(stems)} meshes)")
-                d = src_digest(src)
+                d = src_digest(src) if record else None
                 if d is not None:
                     digests[dashed] = d
                 adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
@@ -528,7 +567,8 @@ def main() -> int:
             return done
         finally:
             save_colors(colors)
-            save_src_digests(digests)
+            if record:
+                save_src_digests(digests)
             restore_export_prefs(adapter, old)
 
     rc = run_build(build)
