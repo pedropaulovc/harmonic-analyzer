@@ -358,6 +358,13 @@ def _source_changed(stem: str, mesh: str, digests: dict[str, str]) -> bool:
     at. Falls back to STL-vs-SLDPRT mtime only when the part is not a declared target
     (digest unavailable) -- churn-immune otherwise."""
     src = OUT_SLDPRT / f"{stem}.SLDPRT"
+    # A vanished native is STALE, never fresh: the recipe digest is content-free (it
+    # would still resolve for a declared target whose .SLDPRT was deleted), so without
+    # this a matching recorded digest reports fresh and the old STL gets stamped
+    # current -- then render_offline fails on the missing part source. Stale -> the
+    # export tries to open it and fails loud instead (codex review).
+    if not src.exists():
+        return True
     cur = src_digest(src)
     if cur is None:
         stl = OUT_STL / f"{mesh}.STL"
@@ -370,6 +377,8 @@ def asm_source_changed(dashed: str, src: Path, digests: dict[str, str]) -> bool:
     exported at. Falls back to boxes-JSON-vs-SLDASM mtime only when the digest is
     unavailable (dodo import failed) -- so a broken import degrades to the old behaviour,
     never a silent skip."""
+    if not src.exists():  # vanished native -> stale, never a silent fresh (see above)
+        return True
     cur = src_digest(src)
     if cur is None:
         bj = OUT_BOXES / f"{dashed}.json"
@@ -391,9 +400,18 @@ def manifest_part_stale(stem: str, colors: dict, digests: dict[str, str]) -> boo
     """Manifest-part freshness: additionally requires the archival ``<stem>.STEP`` (the
     STL and STEP are written together in the top-level parts loop). The recipe-digest
     check already re-exports a rebuilt part -- refreshing STL AND STEP AND colour -- so
-    the old STL-vs-STEP mtime race (codex review #11) no longer needs a mtime clause."""
-    return (not (OUT_STEP / f"{stem}.STEP").exists()
-            or part_stl_stale(stem, stem, colors, digests))
+    the old STL-vs-STEP mtime race (codex review #11) no longer needs a mtime clause --
+    EXCEPT on the digest-unavailable fallback (``src_digest`` is None, e.g. a standalone
+    run that cannot import dodo), where ``_source_changed`` compares only the STL mtime;
+    there the STEP-vs-source mtime guard is re-added so a rebuilt part with a fresh STL
+    but a stale STEP is not treated as fresh (codex review)."""
+    step = OUT_STEP / f"{stem}.STEP"
+    if not step.exists() or part_stl_stale(stem, stem, colors, digests):
+        return True
+    src = OUT_SLDPRT / f"{stem}.SLDPRT"
+    if src.exists() and src_digest(src) is None:
+        return step.stat().st_mtime < src.stat().st_mtime
+    return False
 
 
 def assert_configs_distinct(stem: str, crc_by_mesh: dict[str, int]) -> None:
