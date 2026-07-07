@@ -1,17 +1,18 @@
 r"""Reproduction script: platen plate (book ch. 22, pp. 54-55).
 
 The heavy darkened-brass plate that carries the recording paper. The
-toothed rack bar screwed to its back bottom edge and the two paper-clip
-strips are separate parts (build_platen_rack.py / build_platen_clip.py).
-M6.10 fasteners pass: four O3 x 3.5 sockets in the front face take the
-clip fillister screws (through the clips' existing O3 end holes). The
-sockets are authored MACHINE-handed: the platen's default "x" mirror
-realizes as a pure translation (machine x = local - 42, machine y =
-local + 305, machine front face z -142.9 = local z 0), so machine
-socket targets (245/-27, y 320/429) pass straight through as local
-(287/15, 15/124). The sockets are NOT symmetric about the plate centre
-(the clips sit asymmetrically), which is fine precisely because the
-realized transform never flips the part.
+toothed rack bar screwed to its back bottom edge, the two paper-clip
+strips, and the two back-side guide rails the platen hangs on are
+separate parts (build_platen_rack.py / build_platen_clip.py /
+build_platen_guide.py). Fastener holes:
+
+* four O3 x 3.5 clip-screw sockets in the front face at the plate's
+  extreme left/right edges (x 6/294), the clips spanning local
+  y 15..140 from the TOP edge down (ch22 front photo; holes at the
+  clips' 8-inset end holes -> local y 23/132);
+* ten O3 guide-screw through-holes in two rows of 5 (ch22 front photo)
+  at the guide bands: bottom rail row y 13.25, top rail row y 47
+  (machine bands 315.5..321 / 349.5..354.5 with the plate at y 305).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 22" — 140 mm height annotated
 (p.55 callout, high); width ~300 from the front-photo aspect (~2.15:1)
@@ -63,10 +64,17 @@ PLATE_WIDTH = 300.0  # DIMENSIONS.md ch22: photo aspect vs 140 mm (low)
 PLATE_HEIGHT = 140.0  # DIMENSIONS.md ch22: p.55 callout (high)
 PLATE_THICKNESS = 4.0  # DIMENSIONS.md ch22: p.55 edge-on photo (low)
 
-# M6.10 clip-screw sockets (machine-handed locals, see docstring).
+# Clip-screw sockets (machine-handed locals, see docstring).
 SOCKET_DIA = 3.0  # the fillister screws' O2.9 shanks thread in (low)
 SOCKET_DEPTH = 3.5  # 0.5 web to the back face
-SOCKET_XY = ((15.0, 15.0), (15.0, 124.0), (287.0, 15.0), (287.0, 124.0))
+SOCKET_XY = ((6.0, 23.0), (6.0, 132.0), (294.0, 23.0), (294.0, 132.0))
+
+# Guide-screw through-holes: 2 rows of 5 (heads on the front face, shanks
+# into the guide rails on the back).
+GUIDE_HOLE_DIA = 3.0
+GUIDE_HOLE_X = (30.0, 90.0, 150.0, 210.0, 270.0)
+GUIDE_HOLE_Y = (13.25, 47.0)  # bottom / top rail centrelines
+GUIDE_HOLE_XY = tuple((x, y) for y in GUIDE_HOLE_Y for x in GUIDE_HOLE_X)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -85,6 +93,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PlateThickness", f"{PLATE_THICKNESS}mm")
     await set_global(adapter, "SocketDia", f"{SOCKET_DIA}mm")
     await set_global(adapter, "SocketDepth", f"{SOCKET_DEPTH}mm")
+    await set_global(adapter, "GuideHoleDia", f"{GUIDE_HOLE_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -165,10 +174,45 @@ async def build(adapter) -> dict[str, str]:
     if abs(removed - v_sockets) > 0.02 * v_sockets:
         raise RuntimeError(f"sockets removed {removed:.1f}, expected {v_sockets:.1f}")
 
+    # Guide-screw through-holes (2 rows of 5). Same direct-db rationale as the
+    # sockets; positions are the guide layout (named, undriven), only the
+    # diameter rides the global.
+    guide_holes = SketchDims()
+    check("create_sketch guide holes", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    for n, (x, y) in enumerate(GUIDE_HOLE_XY):
+        await define_circle(
+            adapter, x, y, GUIDE_HOLE_DIA / 2.0, f"guide hole ({x:.0f}, {y:.2f})",
+            dims=guide_holes,
+            names=(f"G{n}X", f"G{n}Z", f"G{n}Dia"),
+            drives=(None, None, '"GuideHoleDia"'),
+        )
+    set_sketch_direct_db(adapter, False)
+    await ensure_fully_defined(adapter, "guide holes sketch")
+    check("exit_sketch guide holes", await adapter.exit_sketch())
+    name_last_feature(adapter, "GuideHoleProfile")
+    drive_jobs += guide_holes.apply(adapter, "GuideHoleProfile")
+    check(
+        "cut guide holes",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=2.0 * PLATE_THICKNESS, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "GuideHoles")
+    v_guide_holes = (
+        len(GUIDE_HOLE_XY) * math.pi * (GUIDE_HOLE_DIA / 2.0) ** 2 * PLATE_THICKNESS
+    )
+    await volume_check(
+        adapter,
+        "guide holes",
+        v_plate - v_sockets - v_guide_holes,
+        0.02 * v_guide_holes,
+    )
+
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built
     # value, so the geometry must not move).
-    v_final = v_plate - v_sockets
+    v_final = v_plate - v_sockets - v_guide_holes
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)

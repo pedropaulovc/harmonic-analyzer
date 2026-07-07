@@ -1,13 +1,17 @@
-r"""Reproduction script: transgear stud (book ch. 23, pp. 56-59).
+r"""Reproduction script: transgear stud (book ch. 23, pp. 56-59, 62-63).
 
-The plain 3/8" steel stud that plugs into the pinion bar's hole and
-carries the rack pinion, the fixed transgear pinion and the latch arm's
-big hub. A retaining collar at the outboard end keeps the stack on (the
+The stepped steel stud that plugs into the transgear bracket's bore
+(build_transgear_bracket.py, on the support bar's back) and carries the
+whole fixed-reduction stack: a 3/8" base section through the bracket and
+the latch arm's big hub, then a turned-down O5 front seat for the 12T DP30
+feed pinion + 120T disc (their bores cannot take 3/8" -- the 12T base
+circle r 4.92 sits under the wall), ending in a retaining collar (the
 photo's end hardware collapsed to a collar -- simplification).
 
-Layout: axis +Y from the bar-side end at the origin; the assembly
-rotates +Y to -Z (machine front). Shaft y 0..36, collar 36..40.
-Dimensions: cad/DIMENSIONS.md ch. 23 (M6.4, low/derived).
+Layout: axis +Y from the bracket-back end at the origin; the assembly
+rotates +Y to -Z (machine front). Base y 0..9.1 (bracket + arm hub), seat
+y 9.1..22 (feed pinion + disc), collar 22..26.
+Dimensions: docs/paper-drive-rework.md E7/E8.
 
 Run (SolidWorks already open)::
 
@@ -41,8 +45,10 @@ from _common import (
 PART_NAME = "transgear-stub"
 MATERIAL = "Plain Carbon Steel"
 
-SHAFT_DIA = 0.375 * IN  # 9.525 machine-standard stock (low)
-SHAFT_LEN = 36.0  # bar (z -105..-117) through rack pinion (-137.5) (derived)
+BASE_DIA = 0.375 * IN  # 9.525 machine-standard stock (low)
+BASE_LEN = 9.1  # bracket plate (4) + gap + latch big hub (z -125.9..-135)
+SEAT_DIA = 5.0  # turned-down gear seat (feed pinion + disc bores)
+SEAT_LEN = 12.9  # feed pinion 9.5 + disc 3 + 0.4 (z -135..-147.9)
 COLLAR_DIA = 14.0
 COLLAR_LEN = 4.0
 
@@ -52,18 +58,21 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations): the shaft + collar diameters and
-    # lengths. The mm suffix is load-bearing -- this is an INCH document and the
-    # equation manager reads BARE numbers in document units (so the 3/8" shaft is
-    # carried as its 9.525 mm value, not an unsuffixed 9.525 read as inches).
-    await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
-    await set_global(adapter, "ShaftLen", f"{SHAFT_LEN}mm")
+    # Editable knobs (Tools > Equations): the section diameters and lengths.
+    # The mm suffix is load-bearing -- this is an INCH document and the
+    # equation manager reads BARE numbers in document units (so the 3/8" base
+    # is carried as its 9.525 mm value, not an unsuffixed 9.525 read as inches).
+    await set_global(adapter, "BaseDia", f"{BASE_DIA}mm")
+    await set_global(adapter, "BaseLen", f"{BASE_LEN}mm")
+    await set_global(adapter, "SeatDia", f"{SEAT_DIA}mm")
+    await set_global(adapter, "SeatLen", f"{SEAT_LEN}mm")
     await set_global(adapter, "CollarDia", f"{COLLAR_DIA}mm")
     await set_global(adapter, "CollarLen", f"{COLLAR_LEN}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
-    y_tip = SHAFT_LEN + COLLAR_LEN
+    y_seat = BASE_LEN + SEAT_LEN
+    y_tip = y_seat + COLLAR_LEN
     profile = SketchDims()
     check("create_sketch profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -73,9 +82,11 @@ async def build(adapter) -> dict[str, str]:
     )
     profile_pts = [
         (0.0, 0.0),
-        (SHAFT_DIA / 2.0, 0.0),
-        (SHAFT_DIA / 2.0, SHAFT_LEN),
-        (COLLAR_DIA / 2.0, SHAFT_LEN),
+        (BASE_DIA / 2.0, 0.0),
+        (BASE_DIA / 2.0, BASE_LEN),
+        (SEAT_DIA / 2.0, BASE_LEN),
+        (SEAT_DIA / 2.0, y_seat),
+        (COLLAR_DIA / 2.0, y_seat),
         (COLLAR_DIA / 2.0, y_tip),
         (0.0, y_tip),
     ]
@@ -84,16 +95,21 @@ async def build(adapter) -> dict[str, str]:
     # The centerline merged into the (0, 0)/(0, y_tip) profile corners at
     # creation, so the closed chain's own constraints define it too. Emission
     # order = the kept per-segment distance dims in line order (each direction's
-    # last segment is closure-supplied and skipped): seg0 shaft radius, seg1
-    # shaft length, seg2 collar step (radius rise to the collar), seg3 collar
-    # length; the origin anchor at (0, 0) adds no dim (both coords zero).
+    # last segment is closure-supplied and skipped): seg0 base radius, seg1 base
+    # length, seg2 seat step (radius drop), seg3 seat length, seg4 collar step
+    # (radius rise), seg5 collar length; the origin anchor at (0, 0) adds no dim.
     await define_rectilinear_chain(
         adapter, profile_lines, profile_pts, label="stub", dims=profile,
-        names=["ShaftRadius", "ShaftLength", "CollarStep", "CollarLength"],
+        names=[
+            "BaseRadius", "BaseLength", "SeatStep",
+            "SeatLength", "CollarStep", "CollarLength",
+        ],
         drives=[
-            '"ShaftDia" / 2',
-            '"ShaftLen"',
-            '"CollarDia" / 2 - "ShaftDia" / 2',
+            '"BaseDia" / 2',
+            '"BaseLen"',
+            '"BaseDia" / 2 - "SeatDia" / 2',
+            '"SeatLen"',
+            '"CollarDia" / 2 - "SeatDia" / 2',
             '"CollarLen"',
         ],
     )
@@ -105,7 +121,9 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Stub")
 
     expected = math.pi * (
-        (SHAFT_DIA / 2.0) ** 2 * SHAFT_LEN + (COLLAR_DIA / 2.0) ** 2 * COLLAR_LEN
+        (BASE_DIA / 2.0) ** 2 * BASE_LEN
+        + (SEAT_DIA / 2.0) ** 2 * SEAT_LEN
+        + (COLLAR_DIA / 2.0) ** 2 * COLLAR_LEN
     )
     await volume_check(adapter, "stub", expected, 0.005 * expected)
 
