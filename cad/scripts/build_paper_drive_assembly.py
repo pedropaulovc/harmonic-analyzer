@@ -3,8 +3,27 @@ r"""Reproduction script: paper-drive subassembly (book ch. 22-23, 25).
 The orthogonal time-base of the plotter: the platen carries the recording paper
 across the pen as the operator turns the crank, driven through the translational
 gearing, in machine coordinates (assembly origin = base origin; base top
-y = 50.8; the output side is -Z). 85 components (21 placed + the 64-link roller
-drive chain, explicitly placed).
+y = 50.8; the output side is -Z). 21 placed components + the roller drive chain,
+built as a native connected-linkage chain component pattern along the loop.
+
+Operational kinematics (default `free` build): the crank-end T12 sprocket spin is
+a FREE operational DOF -- drag it and the whole feed train follows. The coupling
+is authored as SolidWorks mates, NOT re-posed geometry (the ch30 rest pose below
+is preserved exactly, faithful to the plates): a native **Belt/Chain assembly
+feature** (EngageBelt) couples T12 <-> T24 exactly as the roller chain physically
+does -- SAME rotation sense (a gear mate would reverse it) at the pitch-diameter
+24:48 = 12:24-tooth = 0.500 ratio (SW seeds each pulley's belt diameter from the
+picked tooth-tip face, 28:52 = 0.538, so the adapter FORCES PulleyDiameters to
+the pitch values post-create and fails loud on read-back mismatch; see the
+coupling block), and a single **rack-pinion mate** feeds the platen off the knob (T24) axis
+at the NET through-train travel (fine-pinion 24T -> disc 96T -> rack, see
+``NET_RACK_TRAVEL_PER_KNOB_REV``). The intermediate transgear gears stay in their
+faithful rest pose; the fine-pinion/disc coupling is the modeled ENGAGED operation
+expressed kinematically ACROSS the documented 13.1 rest gap (the single latch arm
+cannot serve both the 66.05 rest and 51.0 engaged centre distances -- DIMENSIONS.md
+Appendix C #8's open kinematic riddle -- so the engage is coupled, not geometrically
+meshed). `locked` authors the crank-spin park engaged for a 0-DOF snapshot. Mode:
+cad/config/machine/build_lock.yaml (``paper_drive``).
 
 * Support rails (front of the columns, centres z -133.9): platen top rail
   (y 440) + bottom rail (y 334), each clamped by a column-clamp pair at
@@ -45,9 +64,10 @@ Default-state notes / documented simplifications (Appendix C):
 * The four column-clamp pinch screws are modeled backed-out (tips 0.2 inside
   their back-wall holes, 0.3 off the columns).
 * Wires are flexible elements, not modeled; the drive chain is a real roller
-  chain (alternating chain-inner-link / chain-outer-link, explicitly placed
-  along the loop, see _insert_roller_chain); the recording paper rides the
-  platen as a rigid sheet (platen-paper).
+  chain (alternating chain-inner-link / chain-outer-link), built as a native
+  SolidWorks connected-linkage chain component pattern along the loop centreline
+  spline, see _insert_roller_chain; the recording paper rides the platen as a
+  rigid sheet (platen-paper).
 * Both pinion-bar ends float: in the real machine the west end is carried by the
   ball-mount housing at the A-frame clevis and the east end by a column bracket;
   neither fitting is modeled.
@@ -75,11 +95,11 @@ from _chain import (
     KNOB_CENTRE as CHAIN_KNOB_CENTRE,
     LINK_COUNT,
     LINK_PITCH,
-    TIP_AIR,
+    PITCH_R_T12,
+    PITCH_R_T24,
     TIP_R_T12,
     TIP_R_T24,
     centreline_distance,
-    loop_parameter,
     loop_point_tangent,
 )
 from _common import (
@@ -90,29 +110,42 @@ from _common import (
 )
 from _assembly import (
     angle_driver,
-    assert_component_placed,
-    assert_components_fully_defined,
+    assert_expected_free_dof,
+    assert_free_dof_necessity,
     check_no_interference,
     component_names,
     component_origin,
     component_transform,
     distance_driver,
+    is_locked_build,
     lock_mate,
     named_ref,
-    part_path,
     place_component,
+    rack_pinion_mate,
+    reledger_to_solved,
+    remap_front_to_machine_front,
     save_assembly_and_images,
+    set_park_defer,
+    write_park_specs,
 )
 from _transforms import (  # noqa: E402
     IDENTITY,
     ROT_X_NEG90,
     ROT_X_POS90,
     ROT_Y_POS90,
-    mirror_placement,
     rot_z_rows,
 )
 
 ASM_NAME = "paper-drive"
+
+# Build mode (cad/config/machine/build_lock.yaml). `free` (default) leaves the
+# crank spin a FREE operational DOF (drag the crank sprocket and the gear-coupled
+# knob + the platen feed follow); `locked` authors the spin-park engaged for a
+# byte-reproducible 0-DOF snapshot. Read as a STRING-LITERAL so the accessor
+# tokenises to machine/build_lock.yaml in the doit/cache digest (flipping the
+# mode rebuilds ONLY paper-drive). `is_locked_build` rejects any value other than
+# `free`/`locked`.
+LOCK = is_locked_build(_config.machine("build_lock", "paper_drive"))
 
 # --- machine anchors ---------------------------------------------------------
 BAR_Z = -133.9  # support-bar centres: column line -112 - clamp offset 21.9
@@ -129,12 +162,24 @@ from build_platen_rack import (  # noqa: E402
     PITCH_LINE_Y as RACK_PITCH_LINE_Y,
 )
 from build_rack_pinion import TEETH as RACK_PINION_TEETH  # noqa: E402
+from build_transgear_pinion import TEETH as FINE_PINION_TEETH  # noqa: E402  # 24T
 
 PLATE_X0 = -258.0  # right edge +42 (photo position)
 PLATE_Y0 = 305.0
 PLATE_FRONT_Z = BAR_FRONT_Z - PLATE_THICKNESS  # -142.9
 PINION_AXIS = (0.0, 253.5)  # transgear stud on the pinion bar
 PINION_PD_R = RACK_PINION_TEETH / 30.0 * IN / 2.0  # 40.64 (DP 30)
+# Net platen feed per knob (T24) revolution through the engaged train: the knob
+# and the fine 24T pinion are coaxial (one spin), the fine pinion reduces
+# 24/96 into the 96T rack-pinion disc, and the disc feeds the rack pi*PD per
+# rev. So one knob turn advances the platen 2*pi*PINION_PD_R * (24/96).
+# Authored as a single rack-pinion mate onto the knob axis at this NET travel:
+# a documented KINEMATIC coupling that leaves the intermediate transgear gears
+# in their faithful ch30 rest pose (the fine-pinion/disc gap is preserved --
+# the coupling is the engaged operation, the geometry stays as photographed).
+NET_RACK_TRAVEL_PER_KNOB_REV = (
+    2.0 * math.pi * PINION_PD_R * FINE_PINION_TEETH / RACK_PINION_TEETH
+)  # 63.84 mm
 RACK_BACKLASH = _config.fit("gear_mesh", "rack_backlash_mm")  # cad/config/tolerances.yaml
 # Rz(180) placement: machine x = RACK_X0 - x_local, y = RACK_Y0 - y_local.
 # Tooth centres sit at x_local = k * PITCH. The gear's seed gap is centred
@@ -265,107 +310,181 @@ def _assert_chain_layout() -> None:
         raise RuntimeError("_chain tip radii diverged from REMOVABLE_TIP_R")
     log(
         f"roller chain layout: loop {CENTRELINE_LEN:.2f}, {LINK_COUNT} links at"
-        f" {LINK_PITCH:.4f}, wrap air {TIP_AIR}, plane z {CHAIN_MID_Z}"
+        f" {LINK_PITCH:.4f}, seated on pitch circles ({PITCH_R_T24}/{PITCH_R_T12}),"
+        f" plane z {CHAIN_MID_Z}"
     )
 
 
-async def _place_chain_link(adapter, part: str, station: int) -> tuple[str, list[float]]:
-    """Insert one roller-chain link with its pin0 origin on path ``station``
-    and its local +X (pin0->pin1) along the loop tangent there. Authored in
-    the PRE-mirror frame and reflected by mirror_placement (the achiral link's
-    local-z symmetry makes the YZ mirror a proper rotation, so a pure-Z tangent
-    rotation keeps the plates flat in the chain plane). Returns (name, rows)."""
-    from solidworks_mcp.adapters.base import InsertComponentParameters
-
-    x, y, theta = loop_point_tangent(
-        station * LINK_PITCH, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1], mirror_x=False
+async def _place_chain_seed(adapter, part: str, station: int) -> str:
+    """Seat ONE chain-pattern seed link at path ``station``, oriented along the
+    forward CHORD (pin0->pin1) so both pin axes sit ~on the loop -- the connected
+    -linkage chain pattern then fills the rest of the loop. Authored directly in
+    post-mirror machine coordinates (``mirror_x=True``); the achiral link's
+    local-z symmetry makes that a pure-Z rotation, keeping the plates flat in the
+    chain plane. Returns the instance name."""
+    x0, y0, _ = loop_point_tangent(
+        station * LINK_PITCH, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1], mirror_x=True
     )
-    position, rotation, rows = mirror_placement(
-        part, [x, y, CHAIN_MID_Z], [0.0, 0.0, math.degrees(theta)]
+    x1, y1, _ = loop_point_tangent(
+        (station + 1) * LINK_PITCH, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1], mirror_x=True
     )
-    data = check(
-        f"insert {part} @ station {station} ({position[0]:.1f}, {position[1]:.1f})",
-        await adapter.insert_component(
-            InsertComponentParameters(
-                file_path=part_path(part), position=position, rotation=rotation
-            )
-        ),
+    ang = math.degrees(math.atan2(y1 - y0, x1 - x0))
+    return await place_component(
+        adapter, part, [x0, y0, CHAIN_MID_Z], [0.0, 0.0, ang], rot_z_rows(ang),
+        mirror=False, ground=True, label=f"{part} seed @ station {station}",
     )
-    name = data["name"]
-    assert_component_placed(adapter, name, position, rows)
-    return name, rows
 
 
 async def _insert_roller_chain(adapter) -> None:
-    """The drive chain: a real roller chain of explicitly-placed links.
+    """The drive chain: a native CHAIN COMPONENT PATTERN (connected linkage) of
+    alternating inner/outer links along the _chain.py loop.
 
-    Ch. 23: the chain rides the two mounted removables' m2 teeth (T24 knob
-    shaft, T12 crank shaft). LINK_COUNT links alternate INNER (chain-inner-link:
-    plates + bushings) and OUTER (chain-outer-link: plates + pins) around the
-    _chain.py centreline loop, each seated by its pin0 on a path station and
-    rotated to the loop tangent (pure Z, so every plate stays flat in the chain
-    plane). Explicit placement -- the two-group Connected-Linkage feature
-    rejects raw-COM CreateFeature and the single-group distance pattern
-    chord-steps + rolls the links out of plane on the tight wraps. Links are
-    fixed (the chain is a rigid sub-assembly until per-part DOF arrives).
+    Ch. 23: the chain rides the two mounted removables' m2 teeth (T24 knob shaft,
+    T12 crank shaft). The loop centreline is authored as a single CLOSED SPLINE
+    (one sketch segment) on an offset plane at the chain plane (z = CHAIN_MID_Z);
+    two seed links (chain-inner-link @ station 0, chain-outer-link @ station 1)
+    are placed tangent; SolidWorks' native ``FeatureChainPattern`` (connected
+    linkage, via ``adapter.pattern_components_chain``) fills the loop with the
+    alternating INNER (plates + bushings) / OUTER (plates + pins) links. Each
+    link's two pin axes (Axis1/Axis2) are the group's path-links, so the pattern
+    keeps every plate flat in the chain plane and tangent to the loop.
 
-    Gates: LINK_COUNT links, every link origin (its pin0) back-read onto the
-    loop at the chain z (arbitrates the mirroring), and the stations spaced one
-    LINK_PITCH apart (exact -- explicit placement, no chord-stepping).
+    The path MUST be one connected segment: SolidWorks never treats the 3-arc +
+    taut-line contour as connected (the segments share coordinates but carry no
+    coincidence relations, so MakeSketchChain forms 0 paths), hence the spline
+    through dense loop samples. The dedicated ``FeatureChainPattern`` one-call API
+    is used because the documented CreateDefinition/CreateFeature route returns
+    null under pywin32 late binding. See memory/chain-pattern-not-createable-
+    late-bound.md.
+
+    Gates: the pattern produced EXACTLY LINK_COUNT links (the loop is sized
+    CENTRELINE_LEN = LINK_COUNT * LINK_PITCH with LINK_COUNT even, so the two
+    interleaved groups close it seamlessly), every instance sits on the chain
+    plane, and its origin (pin0) reads back onto the loop centreline.
     """
-    from solidworks_mcp.adapters.base import ComponentRefParameters
+    from solidworks_mcp.adapters.base import (
+        ComponentChainPatternParameters,
+        CreatePlaneParameters,
+        RenameFeatureParameters,
+    )
 
-    placed: list[str] = []
-    for station in range(LINK_COUNT):
-        part = "chain-inner-link" if station % 2 == 0 else "chain-outer-link"
-        name, _rows = await _place_chain_link(adapter, part, station)
-        placed.append(name)
-    # Fix every link (explicitly placed, so fully constrained). The first
-    # assembly component is auto-fixed; fixing again is idempotent.
-    for name in placed:
-        check(f"fix {name}", await adapter.fix_component(ComponentRefParameters(name=name)))
+    # 1. Path: a single CLOSED SPLINE on an offset plane at the chain plane.
+    plane = check(
+        f"chain path plane @ z={CHAIN_MID_Z}",
+        await adapter.create_plane(
+            CreatePlaneParameters(mode="offset", base_plane="Front Plane",
+                                  offset=CHAIN_MID_Z)))
+    plane_name = getattr(plane, "name", plane)
+    sk = check("chain path sketch", await adapter.create_sketch(plane_name))
+    sketch_name = getattr(sk, "data", sk) if not isinstance(sk, str) else sk
+    n_samples = 96
+    pts = []
+    for i in range(n_samples):
+        s = i * CENTRELINE_LEN / n_samples
+        x, y, _ = loop_point_tangent(
+            s, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1], mirror_x=True)
+        pts.append({"x": x, "y": y})
+    pts.append(pts[0])  # close the loop
+    check("chain path spline", await adapter.add_spline(pts))
+    check("chain path exit", await adapter.exit_sketch())
+    # Give the auto-named path sketch a stable, human-readable name so the
+    # pattern selects "Spline1@chain-path" independent of feature order.
+    check("rename chain path sketch",
+          await adapter.rename_feature(
+              RenameFeatureParameters(old_name=sketch_name, new_name="chain-path")))
+    sketch_name = "chain-path"
 
+    # 2. Two seed links, tangent at the first two stations.
+    inner = await _place_chain_seed(adapter, "chain-inner-link", 0)
+    outer = await _place_chain_seed(adapter, "chain-outer-link", 1)
+
+    # 3. Native connected-linkage chain pattern fills the loop.
+    pattern = check(
+        "roller chain (native chain component pattern)",
+        await adapter.pattern_components_chain(
+            ComponentChainPatternParameters(
+                path_segment=f"Spline1@{sketch_name}",
+                group1_component=inner,
+                group1_link1=f"Axis1@{inner}", group1_link2=f"Axis2@{inner}",
+                group1_plane=f"Front Plane@{inner}",
+                group2_component=outer,
+                group2_link1=f"Axis1@{outer}", group2_link2=f"Axis2@{outer}",
+                group2_plane=f"Front Plane@{outer}",
+                # Explicit count (NOT fill_path): _chain sizes CENTRELINE_LEN =
+                # LINK_COUNT * LINK_PITCH with LINK_COUNT even, so LINK_COUNT links
+                # close the loop seamlessly; fill_path undershoots (leaves a ~2-link
+                # seam) because it reserves clearance. For connected linkage the
+                # count is PER GROUP and the two groups interleave, so each group
+                # gets LINK_COUNT // 2 (30 inner + 30 outer = 60 links).
+                pitch_method="connected_linkage", fill_path=False,
+                count=LINK_COUNT // 2, spacing=LINK_PITCH,
+                align_method="tangent", options="dynamic")))
+    # Rename the auto-named pattern feature (e.g. "LocalChainPattern1") to a
+    # stable, human-readable name in the tree.
+    pat_name = getattr(pattern, "name", None)
+    if pat_name:
+        check("rename chain pattern",
+              await adapter.rename_feature(
+                  RenameFeatureParameters(old_name=pat_name, new_name="roller-chain")))
+
+    # The pattern OWNS the seed links' tangent alignment: it re-solves each off
+    # the provisional authored chord angle (chord < arc on the wrap, so the two
+    # pin axes pull the seed straight -- a fraction of a degree on the tight
+    # pitch-circle wrap). Re-anchor the two seeds' pose-ledger entries to that
+    # solved pose so the save-time gate checks the intended persistent pose.
+    reledger_to_solved(adapter, inner)
+    reledger_to_solved(adapter, outer)
+
+    # Hide the path spline: it is construction scaffolding for the pattern, not a
+    # rendered feature.
+    check("blank chain path sketch", await adapter.blank_sketch("chain-path"))
+
+    # 4. Gates: enough links, on the chain plane, on the loop centreline.
     links = [
         n
         for n in component_names(adapter)
         if n.startswith(("chain-inner-link", "chain-outer-link"))
     ]
+    # EXACT closure: _chain sizes CENTRELINE_LEN = LINK_COUNT * LINK_PITCH with
+    # LINK_COUNT even, so the connected-linkage pattern (LINK_COUNT // 2 per group)
+    # fills the loop with EXACTLY LINK_COUNT links -- no seam, no band.
     if len(links) != LINK_COUNT:
-        raise RuntimeError(f"placed {len(links)} chain links, expected {LINK_COUNT}")
+        raise RuntimeError(
+            f"chain pattern produced {len(links)} links, expected exactly {LINK_COUNT}")
     worst = 0.0
-    params = []
     for name in links:
         array = component_transform(adapter, name)
         x, y, z = (array[9] * 1000.0, array[10] * 1000.0, array[11] * 1000.0)
-        if abs(z - CHAIN_MID_Z) > 0.1:
+        if abs(z - CHAIN_MID_Z) > 0.5:
             raise RuntimeError(f"{name}: link z {z:.3f} off the chain plane {CHAIN_MID_Z}")
         dist = centreline_distance(
-            x, y, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1], mirror_x=True
-        )
+            x, y, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1], mirror_x=True)
         worst = max(worst, dist)
-        if dist > 0.1:
-            raise RuntimeError(
-                f"{name}: link pin0 ({x:.2f}, {y:.2f}) sits {dist:.3f} off the chain path"
-            )
-        params.append(
-            loop_parameter(x, y, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1], mirror_x=True)
-        )
-    # Closure gate: each link's pin0 sits one station apart; consecutive
-    # arc-length gaps (incl. wraparound) within +-15% of the pitch (explicit
-    # placement is exact, only floating-point + tangent-vs-chord noise).
-    params.sort()
-    gaps = [b - a for a, b in zip(params, params[1:], strict=False)]
-    gaps.append(params[0] + CENTRELINE_LEN - params[-1])
-    bad = [g for g in gaps if not 0.85 * LINK_PITCH < g < 1.15 * LINK_PITCH]
-    if bad:
-        raise RuntimeError(
-            f"link spacing broken: gaps {[round(g, 3) for g in bad]} vs pitch"
-            f" {LINK_PITCH:.4f}"
-        )
-    log(
-        f"roller chain: {len(links)} links on the path (worst off-path"
-        f" {worst:.4f}; gaps {min(gaps):.3f}..{max(gaps):.3f})"
-    )
+    if worst > 2.0:
+        raise RuntimeError(f"chain links sit up to {worst:.2f} mm off the loop centreline")
+    log(f"roller chain: native connected-linkage chain pattern, {len(links)} links"
+        f" (worst off-loop {worst:.2f} mm)")
+
+
+async def _sprocket_revolute(adapter, name: str, label: str) -> None:
+    """Constrain a free-spinning sprocket to a fixed Z spin-axis, leaving the
+    spin free (the operational/coupled DOF).
+
+    Two axis-to-plane distances pin the central Axis1 (a Z line) in XY -- height
+    (Top plane = y) and lateral (Right plane = x) -- and keep it parallel to Z;
+    a Front-plane distance pins the axial z. The sprocket is a symmetric spur
+    wheel, so its origin is spin-invariant and the origin ``verify`` passes at
+    any spin angle (the spin is pinned separately, or left free + coupled)."""
+    o = component_origin(adapter, name)
+    await distance_driver(adapter, named_ref(f"Axis1@{name}", "AXIS"),
+                          named_ref("Top Plane", "PLANE"), o[1],
+                          label=f"{label} axis height", verify=(name, o))
+    await distance_driver(adapter, named_ref(f"Axis1@{name}", "AXIS"),
+                          named_ref("Right Plane", "PLANE"), o[0],
+                          label=f"{label} axis lateral", verify=(name, o))
+    await distance_driver(adapter, named_ref(f"Front Plane@{name}", "PLANE"),
+                          named_ref("Front Plane", "PLANE"), o[2],
+                          label=f"{label} axial", verify=(name, o))
 
 
 async def build(adapter) -> dict[str, str]:
@@ -373,6 +492,9 @@ async def build(adapter) -> dict[str, str]:
     _assert_knob_shaft_clearance()
     _assert_chain_layout()
 
+    # `free` (default) DEFERS the freed crank-spin park driver (records, does not
+    # author); `locked` authors it engaged. Set before any *_driver(free_dof_key=).
+    set_park_defer(not LOCK)
     check("create_assembly", await adapter.create_assembly())
 
     # --- support rails + clamps ----------------------------------------------
@@ -390,13 +512,13 @@ async def build(adapter) -> dict[str, str]:
     # --- platen group ---------------------------------------------------------
     # The platen runs as a prismatic slider along X (the paper feed): its local
     # slide axis is held parallel to the Top + Front planes at the slide-line
-    # offsets (axis-to-plane distance, no rotational redundancy), an angle
-    # snapshot kills the residual spin, and an X distance snapshot pins the
-    # feed position (suppressed in the Motion study). Probed FULLY(3),
-    # probe_platen.py. The rack, clips and paper ride it via Lock mates; the
-    # transgear cluster stays fixed (parked/disengaged in the ch30 rest state,
-    # and the roller chain breaks the kinematic path -- the crank->platen feed
-    # is driven directly in artifact B's Motion study).
+    # offsets (axis-to-plane distance, no rotational redundancy) and an angle
+    # snapshot kills the residual spin. Probed FULLY(3), probe_platen.py. The
+    # rack, clips and paper ride it via Lock mates. The feed position (its X
+    # slide) is NOT snapshot-pinned any more: it is COUPLED to the knob (T24)
+    # rotation by the rack-pinion mate below, so in the default `free` build the
+    # platen feed follows the free crank spin (one operational DOF); a `locked`
+    # build pins it through the authored crank-spin park + the coupling chain.
     platen = await place_component(adapter, "platen",
                                    [PLATE_X0, PLATE_Y0, PLATE_FRONT_Z],
                                    [0.0, 0.0, 0.0], IDENTITY, ground=False)
@@ -410,9 +532,6 @@ async def build(adapter) -> dict[str, str]:
     await angle_driver(adapter, named_ref(f"Top Plane@{platen}", "PLANE"),
                        named_ref("Top Plane", "PLANE"), 0.0,
                        label="platen spin snapshot", verify=(platen, pl_o))
-    await distance_driver(adapter, named_ref(f"Right Plane@{platen}", "PLANE"),
-                          named_ref("Right Plane", "PLANE"), pl_o[0],
-                          label="platen feed snapshot", verify=(platen, pl_o))
     # Rz(180): teeth point down at the rack pinion below.
     rack = await place_component(adapter, "platen-rack",
                                  [RACK_X0, RACK_Y0, BAR_FRONT_Z],
@@ -447,8 +566,12 @@ async def build(adapter) -> dict[str, str]:
     # Rx(-90): stud +Y -> -Z; shaft z -101.5..-137.5, collar to -141.5.
     await place_component(adapter, "transgear-stub", [PINION_AXIS[0], PINION_AXIS[1], -101.5],
                           [-90.0, 0.0, 0.0], ROT_X_NEG90)
-    await place_component(adapter, "rack-pinion", [PINION_AXIS[0], PINION_AXIS[1], -137.5],
-                          [0.0, 0.0, 0.0], IDENTITY)
+    # FREE (ground=False): rack-pinion-mated to the platen below so the visible 96T
+    # disc turns WITH the paper feed instead of sitting static while the rack slides
+    # past it (codex #189). Its axis is pinned + spin coupled -> 0 free DOF.
+    disc = await place_component(adapter, "rack-pinion",
+                          [PINION_AXIS[0], PINION_AXIS[1], -137.5],
+                          [0.0, 0.0, 0.0], IDENTITY, ground=False)
     await place_component(adapter, "transgear-latch", [PINION_AXIS[0], PINION_AXIS[1], -122.5],
                           [0.0, 0.0, LATCH_ANGLE_DEG], rot_z_rows(LATCH_ANGLE_DEG))
     # Reversed (Rx +90, origin at the south end z -158.0): the plain shaft now
@@ -459,25 +582,128 @@ async def build(adapter) -> dict[str, str]:
     # knob sits north of the T24/chain band and clear of the pinion bar's
     # z band (-105..-117) by 5 in z (and the shaft passes under the bar in y
     # anyway, see _assert_knob_shaft_clearance).
-    await place_component(adapter, "transgear-knob-shaft",
+    # FREE (ground=False): rigidly LOCK-mated to the T24 knob wheel below so the
+    # whole knob cluster (shaft + fine pinion + T24) turns as ONE keyed body when
+    # the crank drives the gear mate -- the visible knob shaft + fine pinion follow the
+    # feed, not just the T24 surrogate (codex #189). Neither part carries a
+    # construction axis (only the removable does), so the cluster's single spin DOF
+    # is T24's revolute; the Lock mate preserves each part's as-placed pose.
+    knob_shaft = await place_component(adapter, "transgear-knob-shaft",
                           [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], -158.0],
-                          [90.0, 0.0, 0.0], ROT_X_POS90)
+                          [90.0, 0.0, 0.0], ROT_X_POS90, ground=False)
     # Fine 24T DP30 pinion on the knob shaft, just behind the knob face
-    # (z -134..-128): engageable on the disc, parked clear in the rest state.
-    await place_component(adapter, "transgear-pinion",
+    # (z -134..-128): the "translation gear" of the feed train.
+    fine_pinion = await place_component(adapter, "transgear-pinion",
                           [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], -134.0],
-                          [0.0, 0.0, 0.0], IDENTITY)
+                          [0.0, 0.0, 0.0], IDENTITY, ground=False)
     # Mounted T24 removable = the knob-end chain wheel (ch. 23: the roller
     # chain rides the removable's teeth; swapping removables changes the
     # platen ratio). Band -157.5..-152.5 on the front -155 plane, south of the
-    # stub disc and fine pinion, coplanar with the crank-end T12.
-    await place_component(adapter, "transgear-removable",
+    # stub disc and fine pinion, coplanar with the crank-end T12. FREE to spin
+    # (ground=False): the gear mate below couples it to the crank T12.
+    t24 = await place_component(adapter, "transgear-removable",
                           [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], REMOVABLE_Z0],
-                          [0.0, 0.0, 0.0], IDENTITY, configuration="T24",
+                          [0.0, 0.0, 0.0], IDENTITY, configuration="T24", ground=False,
                           label="transgear-removable (mounted T24)")
+    await _sprocket_revolute(adapter, t24, "T24 knob wheel")
+    # Key the knob cluster to spin as ONE rigid body: LOCK the knob shaft and the
+    # fine pinion to the (free-spinning) T24 wheel -- all three ride the same
+    # physical knob shaft. Dragging the crank -> gear mate -> T24 now turns the shaft
+    # AND the fine pinion together, so the whole feed train visibly follows (codex
+    # #189 :592). Net DOF unchanged: freeing shaft + pinion (+12 DOF) is removed by
+    # the two 6-DOF Lock mates; the cluster keeps T24's single free spin.
+    await lock_mate(adapter, named_ref(f"Front Plane@{knob_shaft}", "PLANE"),
+                    named_ref(f"Front Plane@{t24}", "PLANE"),
+                    label="knob cluster: knob shaft locked to T24")
+    await lock_mate(adapter, named_ref(f"Front Plane@{fine_pinion}", "PLANE"),
+                    named_ref(f"Front Plane@{t24}", "PLANE"),
+                    label="knob cluster: fine pinion locked to T24")
+    # Crank-end T12 removable = the crank-shaft chain wheel, brought over from
+    # drive-train so the chain seats on BOTH sprockets locally. Placed at the
+    # PRE-mirror crank centre (_chain CRANK_CENTRE == drive-train X_CRANK,Y_CRANK,
+    # the same anchor _assert_chain_layout pins) and reflected by the default
+    # mirror path, exactly like the T24 above -- so it lands on the crank wrap
+    # centre the chain loops. Coplanar with the T24 on the -155 front plane; a
+    # spur gear is symmetric so identity rotation. FREE to spin -- this is the
+    # crank input, the single operational DOF.
+    t12 = await place_component(adapter, "transgear-removable",
+                          [CHAIN_CRANK_CENTRE[0], CHAIN_CRANK_CENTRE[1], REMOVABLE_Z0],
+                          [0.0, 0.0, 0.0], IDENTITY, configuration="T12", ground=False,
+                          label="transgear-removable (crank chain wheel T12)")
+    await _sprocket_revolute(adapter, t12, "T12 crank wheel")
     # The roller chain looping both removables (_assert_chain_layout pins the
     # _chain.py anchors to KNOB_SHAFT_XY / the drive-train crank).
     await _insert_roller_chain(adapter)
+
+    # --- operational coupling -------------------------------------------------
+    # (1) The native Belt/Chain assembly feature couples the crank T12 <-> knob
+    # T24 exactly as the roller chain physically does: SAME rotation sense (both
+    # sprockets turn the same way -- a gear mate models an external mesh and
+    # REVERSES) at the pitch-diameter ratio 24:48 = 12:24 teeth = 0.500 (each
+    # link engages one tooth, so rev_T12 * 12 == rev_T24 * 24). The pulley
+    # members are each sprocket's Axis1 DATUM AXIS, not a face: with a face
+    # member SW bakes the picked face's diameter -- on these sprockets the
+    # tooth-TIP cylinder (28:52 = 0.538, a ~7.7% feed error) -- into the
+    # EngageBelt coupling mate and no definition-level route rewrites it; an
+    # axis has no diameter to steal, so the typed pitch diameters drive the
+    # mate exactly (probed live 2026-07-06, ratio +0.5000; see
+    # memory/belt-chain-feature-com-binding.md). The adapter reads the mate's
+    # own D1/D2 back and fails loud on a mismatch. EngageBelt authors the
+    # coupling mates; CreateBeltPart stays off -- the roller-chain component
+    # pattern above is the visual. Both sprockets stay FREE (Axis1 pinned,
+    # spin-only via _sprocket_revolute), so the belt constrains only their
+    # relative rotation -- 0 net free DOF added. The verify:kinematics probe
+    # asserts the 0.500 ratio AND the same-sense rotation tightly.
+    from solidworks_mcp.adapters.base import BeltChainParameters
+    check(
+        "chain coupling T12<->T24 (belt/chain feature, pitch 24:48)",
+        await adapter.insert_belt_chain(BeltChainParameters(
+            pulley_components=[t12, t24],
+            pulley_diameters=[2.0 * PITCH_R_T12, 2.0 * PITCH_R_T24],  # mm
+            pulley_member_axes=[f"Axis1@{t12}", f"Axis1@{t24}"],
+            location_plane="Front Plane",
+            engage_belt=True, create_belt_part=False, blank_sketch=True)))
+    # (2) Rack-pinion mate feeds the platen off the knob (T24) axis at the NET
+    # through-train travel (fine-pinion 24T -> disc 96T -> rack). The intermediate
+    # transgear gears stay in their faithful rest pose; this is the engaged
+    # operation expressed kinematically across the documented 13.1 rest gap
+    # (Appendix C #8). The rack linear reference is the platen's own slide Axis1
+    # (along the feed X -- the rack is locked to the platen); the pinion reference
+    # is the knob axis.
+    await rack_pinion_mate(
+        adapter,
+        named_ref(f"Axis1@{platen}", "AXIS"),
+        named_ref(f"Axis1@{t24}", "AXIS"),
+        rack_travel_per_revolution=NET_RACK_TRAVEL_PER_KNOB_REV,
+        label="platen feed (crank->knob->rack, net)")
+    # (2b) Couple the VISIBLE 96T rack-pinion disc to the platen so it turns WITH the
+    # feed instead of sitting static while the rack slides past it (codex #189). The
+    # disc rolls on the platen rack at its own pitch circumference (2*pi*PINION_PD_R).
+    # This is the SAME platen<->rotation law as the NET T24 mate above -- the disc
+    # turns 24/96 per knob rev, and 0.25 * 2*pi*PINION_PD_R = NET -- so it only
+    # DETERMINES the disc from the already-fed platen: 0 new free DOF, no conflict.
+    # Pin the disc axis first (spin free), like the sprockets.
+    await _sprocket_revolute(adapter, disc, "rack-pinion disc")
+    await rack_pinion_mate(
+        adapter,
+        named_ref(f"Axis1@{platen}", "AXIS"),
+        named_ref(f"Axis1@{disc}", "AXIS"),
+        rack_travel_per_revolution=2.0 * math.pi * PINION_PD_R,
+        label="rack-pinion disc follows the platen feed")
+    # (3) The crank spin is the FREED operational-DOF park driver. Deferred in the
+    # default `free` build (recorded, not authored) -> T12 spins free and drives
+    # the whole gear+rack train; authored + PARK_crank_spin in a `locked` build.
+    # A spur sprocket is symmetric so the spin pose is cosmetic; pin the local
+    # Right-plane dihedral (read live) like drive-train's crank_angle.
+    t12_o = component_origin(adapter, t12)
+    a_t12 = component_transform(adapter, t12)
+    crank_dihedral = math.degrees(math.acos(max(-1.0, min(1.0, a_t12[0]))))
+    await angle_driver(
+        adapter,
+        named_ref(f"Right Plane@{t12}", "PLANE"), named_ref("Right Plane", "PLANE"),
+        crank_dihedral,
+        label=f"crank spin PARK driver (freed in default build; a={crank_dihedral:.2f})",
+        verify=(t12, t12_o), free_dof_key="crank_spin")
 
     # --- fasteners (M6.10) ----------------------------------------------------
     for x, y in CLIP_SCREW_XY:
@@ -495,8 +721,28 @@ async def build(adapter) -> dict[str, str]:
                           [-90.0, 0.0, 0.0], ROT_X_NEG90, configuration="T18",
                           label="transgear-removable (spare T18)")
 
-    assert_components_fully_defined(adapter)
+    # Certify the AS-BUILT model. `free` -> necessity only (the crank spin is
+    # genuinely free; the exact-count 0-DOF closure runs in the release preflight,
+    # where the recorded spec is replayed). `locked` -> strict 0-DOF. All other
+    # checks run on the as-built model unchanged.
+    if LOCK:
+        await assert_expected_free_dof(adapter, 0)
+    else:
+        # ONE freed operational DOF: the crank spin (the deferred PARK driver
+        # above), which drives the gear-coupled knob + the rack-fed platen.
+        # Target the SPECIFIC T12 crank instance (not the shared
+        # ``transgear-removable`` stem: the T24 knob + T18 spare share it, so a
+        # stem check would pass even if T24 were free and the crank T12 pinned --
+        # codex #189 :679).
+        assert_free_dof_necessity(
+            adapter, 1, required_instances=(t12,))
+        write_park_specs(ASM_NAME)
     check_no_interference(adapter)
+    # Machine coords put the output/paper side at -Z, so SolidWorks' native Front
+    # renders the machine BACK (chain and transgear cluster mirrored). Re-base the
+    # standard views (same as the top assembly) so the saved doc and the _front
+    # render show the true machine front. Geometry untouched.
+    remap_front_to_machine_front(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)
 
 

@@ -25,11 +25,13 @@ drive plane at y 104.8, not the old 126.8):
   journal + crank pedestal, ONE casting riding the swing plate), ABOVE the
   64T (ch30 GT:
   the crank axle triangulates to y 144.8 -- a near-vertical 16T:64T mesh):
-  crank arm + handle at the front, the T12 removable chain wheel (ch. 23:
-  the bead chain rides the removable's m2 teeth -- swapping removables
-  changes the platen ratio) and the 16T pinion inboard (the removable
-  tapered pin is OMITTED: a tapered pin cannot sit in the straight
-  5 mm cross-holes without solid interference).
+  crank arm + handle at the front and the 16T pinion inboard. (The T12
+  removable crank chain wheel -- ch. 23, the roller chain rides its m2 teeth
+  -- is NOT placed here: paper-drive now owns the whole crank->paper chain
+  drive, so the single crank wheel lives there, avoiding a duplicate at the
+  top level -- codex #189 :605. The removable's tapered pin is OMITTED
+  regardless: a tapered pin cannot sit in the straight 5 mm cross-holes
+  without solid interference.)
 * alignment pinion (ch. 25): the 42T zeroing drum + its swing rig, parked
   DISENGAGED, inboard of the drum and level with the drive axis (GT).
 
@@ -1750,12 +1752,13 @@ async def build(adapter) -> dict[str, str]:
         [0.0, 0.0, PINION_SEED_DEG], rot_z_rows(PINION_SEED_DEG),  # tooth-in-gap
         ground=False, label="crank-pinion (centred on the 64T contact tooth)",
     )
-    removable = await place_component(
-        adapter, "transgear-removable",
-        [X_CRANK, Y_CRANK, REMOVABLE_Z0], [0.0, 0.0, 0.0], IDENTITY,
-        ground=False, configuration="T12",
-        label="transgear-removable (crank chain wheel T12)",
-    )
+    # The crank-end T12 chain wheel is NOT placed here: paper-drive now OWNS the
+    # whole crank->paper chain drive (both sprockets + roller chain + belt), so the
+    # single crank chain wheel lives in paper-drive (codex #189 :605). Placing it
+    # here too made two coincident T12 wheels at the crank centre once both
+    # subassemblies are inserted at the top level -> interference. drive-train keeps
+    # only the crankshaft, arm, handle and 16T pinion; the crank spin DOF is
+    # unchanged (crankshaft/arm, free_dof_key="crank_angle").
     # Crank rest pose: the arm hangs straight DOWN (ch30 eight-views -- the
     # handle reads "down" in all eight roll angles, which only a -Y arm does,
     # since a downward vector lies on the views' vertical rotation axis). The
@@ -1807,22 +1810,14 @@ async def build(adapter) -> dict[str, str]:
         label=f"crankshaft axial d={_cs_axial:.2f} (on the plate)",
         verify=(crankshaft, cs_o),
     )
-    # Keyed crank chain: the T12 chain wheel, the 16T pinion and the arm turn
-    # rigidly WITH the crankshaft; the handle rides the arm's pivot pin. Each lock
-    # is replaced by a SEMANTIC keyed joint -- coaxial + axial seat + an anti-spin
-    # -- so the chain shares the crankshaft's single spin DOF with no lock/fix.
-    # The suppressible crank ANGLE DRIVER below pins that spin (via the arm).
+    # Keyed crank rig: the 16T pinion and the arm turn rigidly WITH the crankshaft;
+    # the handle rides the arm's pivot pin. Each lock is replaced by a SEMANTIC
+    # keyed joint -- coaxial + axial seat + an anti-spin -- so they share the
+    # crankshaft's single spin DOF with no lock/fix. The suppressible crank ANGLE
+    # DRIVER below pins that spin (via the arm). (The T12 chain wheel that used to
+    # be keyed here now lives in paper-drive -- codex #189 :605.)
     crank_axis = named_ref(f"Axis1@{crankshaft}", "AXIS")
     cs_right = named_ref(f"Right Plane@{crankshaft}", "PLANE")
-
-    # T12 chain wheel (IDENTITY): its Right plane is parallel to the crankshaft's
-    # at the keyed phase, so a parallel pins the spin (no tuned angle).
-    rm_o = await _seat_on_crank(
-        adapter, removable, "Axis1", crank_axis, crankshaft, "SeatT12")
-    await parallel_mate(
-        adapter, named_ref(f"Right Plane@{removable}", "PLANE"), cs_right,
-        label="T12 wheel anti-spin (keyed phase)", verify=(removable, rm_o),
-    )
 
     # 16T pinion (placed +half-pitch, tooth-in-gap on the 64T): no plane pair is
     # parallel at that phase, so pin the spin with an ANGLE anti-spin holding the

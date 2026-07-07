@@ -30,6 +30,21 @@ from _common import (
 )
 from _transforms import mirror_placement
 
+# The sprockets the chain seats on (the mounted T24 + crank T12 removables).
+# A chain link touching one of these is intended MESH, not a fault: the chain
+# rides the pitch circle so the links overlap the teeth in the shared z-plane
+# (a coplanar single-plane stand-in). Whitelisted like link<->link contact in
+# check_no_interference. Defined here (not in _common) so it stays off every
+# part's recipe digest -- only the assemblies that read it rebuild on a change.
+_CHAIN_SPROCKET_PREFIXES = ("transgear-removable",)
+# Only the sprockets the roller chain actually WRAPS mesh it: the T12 crank wheel
+# and the T24 knob wheel. The loose T18 spare (same "transgear-removable" stem, a
+# different config) rests off the loop, so a chain-link overlap with IT is a real
+# collision, NOT intended mesh -- discriminate by referenced configuration so the
+# mesh whitelist below never masks a spare-part clash (codex #189 round-5).
+_CHAIN_SPROCKET_CONFIGS = ("T12", "T24")
+
+
 def insert_sketch_text(
     adapter: Any,
     text: str,
@@ -216,6 +231,25 @@ _POSE_LEDGER: dict[str, tuple[list[float], list[float]]] = {}
 
 def _ledger_record(name: str, position: list[float], rows: list[list[float]]) -> None:
     _POSE_LEDGER[name] = (list(position), [c for row in rows for c in row])
+
+
+def reledger_to_solved(adapter: Any, name: str) -> None:
+    """Re-anchor a placed component's pose-ledger entry to its CURRENT solved pose.
+
+    For a component whose final orientation is DELEGATED to a feature solved
+    AFTER it is placed -- a chain-component-pattern seed, whose tangent alignment
+    the pattern owns and re-solves off the provisional authored chord angle (the
+    pin-spacing chord is shorter than the wrap arc, so the two pin axes pull the
+    seed straight) -- the place-time pose is not the invariant; the post-feature
+    solved pose is. Call after the owning feature is built so assert_pose_ledger
+    checks the pose that is actually intended to persist, not the placeholder.
+    """
+    array = component_transform(adapter, name)
+    _ledger_record(
+        name,
+        [array[9] * 1000.0, array[10] * 1000.0, array[11] * 1000.0],
+        [list(array[0:3]), list(array[3:6]), list(array[6:9])],
+    )
 
 
 def assert_pose_ledger(
@@ -412,6 +446,7 @@ _FLIP_INVERT: frozenset[str] = frozenset({
     "cone pivot screw datum Z",
     "cone platform height",
     "cone shaft axial",
+    "crank wheel axial",
     "crankshaft axial (on the plate)",
     "cylinder gear axial anchor",
     "cylinder gear axial pitch",
@@ -420,6 +455,7 @@ _FLIP_INVERT: frozenset[str] = frozenset({
     "foot screw datum Z",
     "fulcrum shaft datum x",
     "fulcrum shaft datum y",
+    "knob wheel axial",
     "lever axial seat",
     "lever bushing axial z",
     "lift rod axial",
@@ -440,6 +476,7 @@ _FLIP_INVERT: frozenset[str] = frozenset({
     "pivot ball mount datum z",
     "pivot bushing axial z",
     "platen feed snapshot",
+    "rack pinion disc axial",
     "slotted screw datum X",
     "slotted screw datum Y",
     "slotted screw datum Z",
@@ -1550,6 +1587,7 @@ def assert_free_dof_necessity(
     *,
     resolve: bool = True,
     required_stems: tuple[str, ...] = (),
+    required_instances: tuple[str, ...] = (),
 ) -> None:
     """Build/soundness DOF gate for a default-``free`` model whose freed park
     drivers are DEFERRED (not authored -- see the Park drivers section).
@@ -1568,6 +1606,13 @@ def assert_free_dof_necessity(
     passes even with a second freed DOF accidentally pinned (codex review
     2026-07-04). ``required_stems`` therefore names one component family per
     freed DOF (instance suffixes stripped) that MUST read under-constrained.
+
+    ``required_instances`` names EXACT component instances (no stem-collapse) that
+    must read under-constrained -- use it when several instances share a stem and
+    only a SPECIFIC one carries the freed DOF (e.g. paper-drive has three
+    ``transgear-removable`` instances -- T12 crank, T24 knob, T18 spare -- but only
+    the T12 crank spin is the operational DOF; a stem check would pass if the T24
+    were free and the T12 pinned, codex #189). Pass the runtime instance name.
 
     ``expected_count == 0`` reduces to :func:`assert_components_fully_defined`.
     ``resolve=False`` skips the rebuild (soundness re-solved once after open)."""
@@ -1594,6 +1639,15 @@ def assert_free_dof_necessity(
                     f"free-DOF necessity: required famil(ies) {missing} read fully "
                     f"defined -- that freed DOF is pinned. Under-constrained: "
                     f"{sorted(under)}"
+                )
+        if required_instances:
+            missing_inst = [n for n in required_instances if n not in under]
+            gsp.set_attribute("required_instances", ",".join(required_instances))
+            if missing_inst:
+                raise RuntimeError(
+                    f"free-DOF necessity: required instance(s) {missing_inst} read "
+                    f"fully defined -- that freed DOF is pinned (a sibling instance "
+                    f"may be free instead). Under-constrained: {sorted(under)}"
                 )
         _telemetry.success(
             f"{len(under)} under-constrained component(s) >= {expected_count} expected "
@@ -1648,24 +1702,48 @@ def check_no_interference(adapter: Any) -> None:
             interferences = adapter._attempt(lambda: mgr.GetInterferences(), default=None)
         details = []
         chain_contacts = []
+        chain_mesh_contacts = []
         for interference in list(interferences or []):
             _flag(interference, "IInterference")
             names = []
+            configs = []
             for comp in list(_read_member(interference, "Components") or []):
-                # No flag: Name2 is a property read (issue #87).
+                # No flag: Name2 / ReferencedConfiguration are property reads (issue #87).
                 names.append(str(_read_member(comp, "Name2")))
+                configs.append(str(_read_member(comp, "ReferencedConfiguration") or ""))
             volume_mm3 = float(_read_member(interference, "Volume") or 0.0) * 1e9
             if all(n.startswith(_CHAIN_LINK_PREFIXES) for n in names) and len(names) == 2:
                 chain_contacts.append(volume_mm3)
+                continue
+            # Chain link <-> sprocket: intended mesh. The chain seats on the
+            # pitch circle so its links overlap the removables' teeth in the
+            # shared z-plane (a coplanar single-plane stand-in). Whitelisted
+            # like the link<->link contact above -- but ONLY for a sprocket the
+            # chain actually wraps (config T12/T24); a link overlapping the loose
+            # T18 spare is a real clash and must NOT be whitelisted (codex #189).
+            links = [n for n in names if n.startswith(_CHAIN_LINK_PREFIXES)]
+            sprockets = [
+                n for n, cfg in zip(names, configs)
+                if n.startswith(_CHAIN_SPROCKET_PREFIXES) and cfg in _CHAIN_SPROCKET_CONFIGS
+            ]
+            if len(names) == 2 and len(links) == 1 and len(sprockets) == 1:
+                chain_mesh_contacts.append(volume_mm3)
                 continue
             details.append(f"{' & '.join(names)}: {volume_mm3:.2f} mm^3")
         adapter._attempt(lambda: mgr.Done(), default=None)
         isp.set_attribute("hits", len(details))
         isp.set_attribute("chain_contacts", len(chain_contacts))
+        isp.set_attribute("chain_mesh_contacts", len(chain_mesh_contacts))
         if chain_contacts:
             _telemetry.debug(
                 f"{len(chain_contacts)} chain-internal link contacts"
                 f" (<= {max(chain_contacts):.2f} mm^3) allowed -- articulating chain"
+            )
+        if chain_mesh_contacts:
+            _telemetry.debug(
+                f"{len(chain_mesh_contacts)} chain<->sprocket mesh contacts"
+                f" (<= {max(chain_mesh_contacts):.2f} mm^3) allowed -- chain seated"
+                f" on the pitch circle"
             )
         if details:
             raise RuntimeError(
