@@ -45,6 +45,15 @@ credit:
    prove volumes and mates, not that the geometry LOOKS like the machine —
    a shape can pass every check and still be visibly wrong.
 
+**Rebase on `main` proactively, not reactively.** Check the branch against
+`origin/main` (`git fetch origin main && git status`/`git log HEAD..origin/main`)
+before starting new work on it, and always before kicking off a full
+`uv run python -m doit -n 4` build — a stale branch risks a green build that
+still conflicts or drifts (config/digest/cache-key changes on `main` invalidate
+what you just built). Rebase (`git pull --rebase origin main`) as soon as you
+find `main` has moved, rather than waiting for a merge conflict or a failed
+gate to force it.
+
 ## Initialize the project (uv)
 
 This repo is a **uv project** (`pyproject.toml` + `uv.lock` at the root). One
