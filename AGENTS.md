@@ -307,7 +307,8 @@ ever raised was a stale band or a gate bug, never a real regression — `_COMPON
 stays as reference data). The **DOF gate adapts
 to how the model was built**
 (see "Default-free DOF" below): an assembly with an expected free operational DOF
-(drive-train + channel + magnifier, when built `free`) is checked by the **necessity gate**
+(drive-train + channel + magnifier + paper-drive + summing + pen, when built
+`free`) is checked by the **necessity gate**
 (`assert_free_dof_necessity`) — assert at least the expected number of top-level
 components read under-constrained, i.e. the operational DOF are genuinely free —
 instead of the strict "every component fully defined". Because the freed-DOF park
@@ -336,15 +337,30 @@ swing** (PR8: the strap+pinion rigid group swings on the torque shaft — the p2
 setup motion, formerly park-driven at the engaged pose) **and lift-rod/cam spin**
 (PR8: the eccentric-cam engage path; 4 DOF total for drive-train), plus channel's
 **3 DOF per active channel** (rocker swing +
-connecting-rod follow + amplitude-bar slide), plus magnifier's **lever
+connecting-rod follow + amplitude-bar slide; 2026-07-07 the **channel lever is
+COUPLED**, not separately freed: the J5 foot-on-arc mate — the amplitude bar's
+foot axis held at its as-solved radius from the rocker's arc-centre axis
+`Axis3@rocker` — closes the rocker → bar → lever chain, so dragging the rocker
+articulates the whole channel and the lever reads under-constrained WITH it;
+the old J4 hard spin pin is gone), plus magnifier's **lever
 knife-rock + lever-wire swing/spin** (3 DOF, 2026-07-04: the lever pivots about
-the summing bar's knife-edge ridge — engineerguy video 2/4+4/4, ~6 mm tip arc,
-the bracket collar is only a loose guide — carrying the clamp/vertical-rod/
-fixture group; the lever-wire ball-joints at the fixture hook and rides the hub
-drum at its 0.25 stand-off tangency; and the **WIRE-1 yoke mate** — the
+the summing bar's knife-edge ridge — engineerguy video 2/4+4/4, ~6 mm tip arc —
+carrying the clamp/vertical-rod/fixture group AND the magnifying-bracket
+(2026-07-07: the bracket AFFIXES the rod to the rocking summing bar, so it is
+lock-mated to the lever, not grounded — its collar carries the rod concentric
+at every rock angle); the lever-wire ball-joints at the fixture hook and rides
+the hub drum at its 0.25 stand-off tangency; and the **WIRE-1 yoke mate** — the
 wheel's `WireYokePoint` held coincident to the lever-wire's `YokePlane`, the
 linearized inextensible-wire constraint — turns the magnifying wheel with it;
-the wheel is COUPLED, not separately freed), plus paper-drive's **crank spin**
+the wheel is COUPLED, not separately freed), plus summing's **lever knife-edge
+rock** (1 DOF, 2026-07-07: the summing lever rocks live on the knife-mount
+ridge, the lock-mated boss-hook riding it), plus pen's **carriage travel**
+(1 DOF, 2026-07-07: the rod + lock-mated marker/pen-wire slide vertically in
+the v-block; the shipped free model carries NO F5 pen-driver equation —
+`verify:kinematics` replays the deferred travel spec transiently, installs the
+chained-Fourier equation on the replayed mate, sweeps `CrankDeg`, and discards
+unsaved; a `locked` build authors mate + equation at build time, the equation
+targeting `PARK_pen_travel`), plus paper-drive's **crank spin**
 (1 DOF, 2026-07-05: the crank-end T12 sprocket spins free; a native **Belt/Chain
 feature** (`adapter.insert_belt_chain`, EngageBelt) couples it to the knob T24 at
 the 12:24 chain ratio, and a **rack-pinion mate** feeds the platen off the knob
