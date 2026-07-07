@@ -1,8 +1,11 @@
 r"""Reproduction script: platen paper clip strip (book ch. 22, p. 55).
 
-One of the two thin brass strips (left/right on the platen front) the
-recording paper slides under; each is held by a screw at either end.
-Used twice in the assembly.
+One of the two thin BRIGHT BRASS strips hugging the platen front's extreme
+left/right edges, running from the TOP edge down ~125 (ch22 front photo);
+the recording paper slides under them and a screw holds each end. Used
+twice in the assembly (vertical, so the assembly rotates the +X-authored
+strip 90 about Z). Natural brass -- no paint (they read bright against the
+blackened platen; the old PANEL_BLACK made them invisible).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 22" — scaled from the p.55 front
 photo vs the 140 mm height callout (low).
@@ -21,10 +24,8 @@ import math
 import sys
 
 from _common import (
-    PANEL_BLACK,
     SketchDims,
     add_line_chain,
-    apply_color,
     apply_material,
     check,
     define_circle,
@@ -146,7 +147,6 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "driven clip (equations neutral)", v_final, 0.005 * v_strip)
 
     await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, PANEL_BLACK)  # ch30 plates: see _common palette
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

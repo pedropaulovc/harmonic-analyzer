@@ -1,19 +1,20 @@
-r"""Reproduction script: translational-gearing third gear (book ch. 23).
+r"""Reproduction script: translational-gearing feed pinion (book ch. 23).
 
-The tiny steel pinion pinned on the knob shaft just behind the mounted
-removable -- the "third gear" of the 4/4 video narration: 12 teeth, meshing
-the 120T reducer disc (build_rack_pinion.py) at the same DP 38, the
-permanent 1:10 reduction of the paper feed (paper-drive rework E7/E8; the
-old 24T DP30 estimate belonged to the refuted disc-meshes-rack topology).
-At DP 38 the 12T gear's root sits BELOW a 3/8" bore's wall, so it rides a
-turned-down O5 pinion seat on the knob shaft
-(build_transgear_knob_shaft.py) -- base circle r 3.88 leaves a 1.38 wall.
+The "fifth gear" of the 4/4 video narration: "Behind and attached to the
+fourth gear is the fifth gear. This gear has twelve teeth and engages the
+rack." 12T at DP 30 (it MUST match the rack -- the scale anchor of ch. 23),
+PD 10.160. Locked coaxially behind the 120T reducer disc on the stud, its
+long face bridges from the disc plane back to the rack plane (the wide
+long-toothed pinion of p.58/p.62), passing under the platen's bottom edge
+to mesh the teeth-down rack. At DP 30 the 12T base circle (r 4.92) sits almost ON a 3/8" bore's
+wall, so pinion + disc ride the stud's turned-down O5 front section
+(build_transgear_stub.py) -- the O5 bore leaves a 2.4 wall.
 
-Layout: gear axis = Z through the origin, disc z = 0..4 mm.
+Layout: gear axis = Z through the origin, disc z = 0..9.5 mm.
 
 Run (SolidWorks already open)::
 
-    uv run python cad\scripts\build_transgear_pinion.py
+    uv run python cad\scripts\build_transgear_feed_pinion.py
 """
 
 from __future__ import annotations
@@ -37,13 +38,13 @@ from _common import (
 )
 from _gear import build_fixed_gear, volume_check
 
-PART_NAME = "transgear-pinion"
-MATERIAL = "Plain Carbon Steel"  # ch. 23 photos: steel (unlike the brass wheels)
+PART_NAME = "transgear-feed-pinion"
+MATERIAL = "Brass"  # ch. 23 photos: brass like the disc it is pinned to
 
-TEETH = 12  # 4/4 video narration: the third gear has 12 teeth (med)
-DP = 38.0  # meshes the 120T reducer disc at its DP (med)
-FACE_WIDTH = 4.0  # mm, thin pinion behind the removable (low)
-BORE_DIAMETER = 5.0  # rides the knob shaft's turned-down pinion seat (derived)
+TEETH = 12  # 4/4 video narration: "this gear has twelve teeth" (med)
+DP = 30.0  # meshes the DP30 rack (the ch23 scale anchor)
+FACE_WIDTH = 9.5  # bridges the disc plane back to the rack plane (derived)
+BORE_DIAMETER = 5.0  # rides the stud's turned-down front seat (derived)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -53,10 +54,9 @@ async def build(adapter) -> dict[str, str]:
 
     # Editable knobs (Tools > Equations): face width and bore diameter carry the
     # load-bearing mm suffix (INCH document; the equation manager reads bare
-    # numbers in document units, so an unsuffixed length blows the part up 25.4x).
-    # FaceWidth is the cut-bore depth knob (a feature parameter, not a driven
-    # sketch dim). TEETH stays a module constant -- the gear blank/gap/pattern is
-    # built by build_fixed_gear with literal numerics, off this self-naming path.
+    # numbers in document units). FaceWidth is the cut-bore depth knob (a feature
+    # parameter, not a driven sketch dim). TEETH/DP stay module constants -- the
+    # gear blank/gap/pattern is built by build_fixed_gear with literal numerics.
     await set_global(adapter, "FaceWidth", f"{FACE_WIDTH}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIAMETER}mm")
 
@@ -64,8 +64,7 @@ async def build(adapter) -> dict[str, str]:
 
     volume = await build_fixed_gear(adapter, TEETH, FACE_WIDTH, dp=DP)
 
-    # On-axis bore (centre 0,0): define_circle emits only the diameter dim, so
-    # only the "Dia" slot is recorded -- the X/Z names are ignored.
+    # On-axis bore (centre 0,0): define_circle emits only the diameter dim.
     bore = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Front"))
     await define_circle(
@@ -92,7 +91,7 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(
-        adapter, "driven transgear pinion (equations neutral)", volume - v_bore, 0.01 * v_bore
+        adapter, "driven feed pinion (equations neutral)", volume - v_bore, 0.01 * v_bore
     )
 
     await apply_material(adapter, MATERIAL)

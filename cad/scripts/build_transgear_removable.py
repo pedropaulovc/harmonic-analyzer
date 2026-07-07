@@ -18,7 +18,7 @@ holes stay in solid material in every configuration.
 The 12T gear comes out stub/undercut at standard proportions, like the 6T
 cone gear -- the real hand-cut gear is similarly approximate.
 
-Layout: gear axis = Z through the origin, disc z = 0..5 mm.
+Layout: gear axis = Z through the origin, disc z = 0..2.4 mm.
 
 Run (SolidWorks already open)::
 
@@ -71,7 +71,9 @@ MATERIAL = "Plain Carbon Steel"  # ch. 23 photos: steel, unlike the brass wheels
 
 DP_GEAR = 12.7  # module 2.0 mm, DIMENSIONS.md ch23 keyframe measurement (med)
 PA_DEG = 14.5  # period-typical, same assumption as the rest of the machine
-FACE_WIDTH = 5.0  # mm, catalog shot v4_transgear_015 (low)
+FACE_WIDTH = 2.4  # mm: the chain plates STRADDLE the thin sprocket (ch23
+# p.58-59 -- chain wider than the wheel); the inner-link clear gap is 2.9
+# (_chain.py), so 2.4 leaves 0.25 per side (paper-drive rework E6)
 BORE_DIAMETER = 12.0  # mm, common to all three gears (low)
 PIN_HOLE_DIAMETER = 3.5  # mm, 2x drive-pin holes (low)
 PIN_CIRCLE_RADIUS = 9.5  # mm, bolt-circle radius (low)

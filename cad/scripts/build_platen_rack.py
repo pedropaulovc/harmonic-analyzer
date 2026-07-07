@@ -1,23 +1,26 @@
 r"""Reproduction script: platen rack bar (book ch. 22 pp. 54-55, teeth ch. 23).
 
-The brass rack screwed along the platen's back bottom edge, driven by the
-120T DP 30 rack pinion. The bar section comes from the ch. 22 photos; the
-tooth pitch was resolved during M4 gear prep (DIMENSIONS.md ch. 23: rack
-pitch measured as DP 30 on `v4_transgear_028/030` -- it is the scale anchor
-for the whole chapter), superseding this script's M2 smooth-bar version.
-Mounting holes stay deferred to the M6 drive-train work (Appendix C #8).
+The brass rack screwed along the platen's back bottom edge, teeth-down with
+the crests protruding ~2 below the platen's bottom edge (ch22 back photo),
+driven by the 12T DP 30 feed pinion (build_transgear_feed_pinion.py, the
+"fifth gear" of the 4/4 video). The tooth pitch was resolved during M4 gear
+prep (DIMENSIONS.md ch. 23: rack pitch measured as DP 30 on
+`v4_transgear_028/030` -- it is the scale anchor for the whole chapter). The
+12-tall band fits below the platen's bottom guide rail (paper-drive rework
+E3); the assembly mounts it rotated 180 about Z so the +Y-authored teeth
+point down.
 
 Rack tooth form: straight-flanked trapezoid (the involute rack profile is
 exactly straight at the 14.5 deg pressure angle). With the pitch line at
 PITCH_LINE_Y, gap half-width is p/4 at the pitch line and flares at 14.5 deg:
-root (dedendum 1.157/DP below) half-width 0.412, cut overshoot to y = 31
-(past the bar top at 30, so the cut opens cleanly) half-width 1.143. The
+root (dedendum 1.157/DP below) half-width 0.412, cut overshoot to y = 13
+(past the bar top at 12, so the cut opens cleanly) half-width 1.143. The
 teeth crest at the bar top = pitch line + addendum (1/DP).
 
 112 gaps at p = pi/30 in = 2.660 mm fill the 300 mm bar (first gap centre
 at 1.33 mm; last opening ends at 297.5 mm).
 
-Layout: bar x = 0..300, y = 0..30, z = 0..6; teeth cut into the top edge.
+Layout: bar x = 0..300, y = 0..12, z = 0..6; teeth cut into the top edge.
 
 Run (SolidWorks already open)::
 
@@ -40,6 +43,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_bore_axis,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -63,14 +67,14 @@ MATERIAL = "Brass"  # ch. 22/23 photos: brass
 DP = 30.0  # 1/in, DIMENSIONS.md ch23 (med — scale anchor of the chapter)
 PA_DEG = 14.5  # period-typical, same as the gear train
 BAR_LENGTH = 300.0  # DIMENSIONS.md ch22: = platen width (low)
-BAR_HEIGHT = 30.0  # DIMENSIONS.md ch22: back-side brass strip (low)
+BAR_HEIGHT = 12.0  # exposed band below the bottom guide rail (rework E3, low)
 BAR_THICKNESS = 6.0  # DIMENSIONS.md ch22: edge-on photo (low)
 
 PITCH = math.pi / DP * IN  # 2.660 mm
 ADDENDUM = 1.0 / DP * IN  # 0.847 mm
 DEDENDUM = 1.157 / DP * IN  # 0.980 mm -- 14.5 deg full-depth standard
 
-PITCH_LINE_Y = BAR_HEIGHT - ADDENDUM  # 29.153 -- teeth crest at the bar top
+PITCH_LINE_Y = BAR_HEIGHT - ADDENDUM  # 11.153 -- teeth crest at the bar top
 ROOT_Y = PITCH_LINE_Y - DEDENDUM  # 28.174
 CUT_TOP_Y = BAR_HEIGHT + 1.0  # opens past the top edge
 TAN_PA = math.tan(math.radians(PA_DEG))
@@ -198,6 +202,15 @@ async def build(adapter) -> dict[str, str]:
     )
 
     await apply_material(adapter, MATERIAL)
+
+    # Named pitch-line axis (local X at y = pitch line, mid-thickness) so the
+    # assembly's rack-pinion mate references the RACK's own engagement line --
+    # not the platen it happens to be locked to (2026-07-07 field report).
+    await name_bore_axis(
+        adapter, "Front Plane", BAR_THICKNESS / 2.0,
+        "Top Plane", PITCH_LINE_Y, "pitch axis",
+    )
+
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 
