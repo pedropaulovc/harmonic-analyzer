@@ -608,7 +608,10 @@ def _expected_free_dof(name: str) -> int:
 _REQUIRED_FREE_STEMS = {
     "drive-train": ("crankshaft", "cone-swing-platform",
                     "pinion-bracket", "pinion-lift-rod"),
-    "channel": ("rocker-arm", "connecting-rod", "amplitude-bar"),
+    # Rocker swing + rod follow + bar amplitude, plus the channel lever which
+    # must read under-constrained WITH the chain (closed by the J5 foot-on-arc
+    # coupling off the rocker -- a frozen lever means the coupling died).
+    "channel": ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever"),
     # Three freed DOF (lever knife-rock + wire swing/spin); the yoke-coupled
     # wheel must read under-constrained WITH them, else the coupling died.
     "magnifier": ("magnifying-lever", "magnifying-wheel", "lever-wire"),
