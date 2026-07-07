@@ -809,14 +809,16 @@ async def _verify_paper_feed_one(adapter: Any, report: Report) -> None:
     96T disc all turn and the platen feeds (the probe's own assertions). The driven
     (dirty) model is discarded without saving.
 
-    Skipped for a `locked` build: there the crank_spin park driver is authored
-    engaged (PARK_crank_spin) and the crank is fully defined, so there is no free
-    DOF to drive -- the probe would fail on an immovable crank. The 0-DOF closure is
-    proven instead by the release preflight (assert_park_closure)."""
+    A `locked` build gets the SAME proof, not a skip: there the crank_spin park
+    driver is authored engaged (``PARK_crank_spin``) and the crank is fully
+    defined, so the probe first SUPPRESSES that driver in-session -- freeing
+    exactly the crank spin -- then drives as usual. The model is discarded
+    unsaved either way, so the shipped locked artefact keeps its 0-DOF closure
+    (proven by the release preflight). Without this, a locked release could
+    ship a wrong rack travel with every gate green: soundness only proves
+    0 DOF, the belt mate ratio is build-time-checked but the rack coefficient
+    and the end-to-end train are only proven by driving (codex #189)."""
     name = "paper-drive"
-    if _expected_free_dof(name) == 0:
-        log(f"{name}: locked build (0 free DOF) -- crank-feed drive probe skipped")
-        return
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
     if not sldasm.exists():
         report.failed.append((f"motion:{name}:open", f"not built: {sldasm}"))
@@ -832,6 +834,17 @@ async def _verify_paper_feed_one(adapter: Any, report: Report) -> None:
     # whole train follows -- raising on any broken coupling (belt / lock / rack-pinion).
     from build_kinematic_probe import _drive_and_measure  # noqa: E402
     try:
+        if _expected_free_dof(name) == 0:
+            # Locked build: free the crank spin for the drive by suppressing its
+            # engaged park driver (session-only -- the doc is discarded unsaved).
+            from solidworks_mcp.adapters.base import SuppressMateParameters  # noqa: E402
+            check(
+                f"{name}: suppress PARK_crank_spin (locked build -- free the "
+                "crank for the drive probe)",
+                await adapter.suppress_mate(
+                    SuppressMateParameters(name="PARK_crank_spin", suppress=True)
+                ),
+            )
         await report.agate(f"{name}:crank-feed", lambda: _drive_and_measure(adapter))
     finally:
         from preflight_release import _discard_open_documents  # noqa: E402
