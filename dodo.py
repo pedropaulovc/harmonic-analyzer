@@ -97,6 +97,8 @@ from _buildgraph import (  # noqa: E402
     part_scripts,
     part_stems,
     parts_registry_files,
+    placement_family_files,
+    placement_row_file,
     references_of,
     script_for,
     stamps_part_properties,
@@ -472,6 +474,31 @@ def _expand_parts_token(stem: str | None, kind: str | None, script: Path) -> lis
     return parts_registry_files()
 
 
+def _expand_placement_token(stem: str | None, kind: str | None) -> list[str]:
+    """Per-task expansion of the ``"placement/*"`` token (the dynamic part name in
+    ``_transforms.mirror_placement``, read by every assembly that imports
+    ``_transforms``):
+
+      * an ASSEMBLY depends on the placement rows of the parts it REFERENCES -- so a
+        ``placement/<part>.yaml`` edit lands in exactly the recipes of the assemblies
+        that PLACE that part (a FULL re-insert, which the mirror change needs), and
+        NOWHERE else (issue #156). A referenced sub-assembly has no placement file, so
+        it contributes nothing; its own leaf-part placement edits re-key the SUB, which
+        then propagates up as a REFRESH -- correct, the top never re-places a leaf.
+      * a PART reads no placement (placement is assembly-time only) -> no dep, so a
+        placement edit never rebuilds the part.
+      * any other caller -> the whole family (conservative).
+    """
+    if kind == "assembly" and stem is not None:
+        files: set[str] = set()
+        for ref in references_of(stem):
+            files.update(placement_row_file(ref.replace("_", "-")))
+        return sorted(files)
+    if kind == "part":
+        return []
+    return placement_family_files()
+
+
 def _config_deps(script, stem: str | None = None, kind: str | None = None) -> list[str]:
     """The cad/config FILES this build script actually reads (fine-grained;
     conservative whole-config fallback on any unclassifiable ``_config`` use).
@@ -489,6 +516,8 @@ def _config_deps(script, stem: str | None = None, kind: str | None = None) -> li
             out.update(machine_family_files())
         elif tok == "parts/*":
             out.update(_expand_parts_token(stem, kind, script))
+        elif tok == "placement/*":
+            out.update(_expand_placement_token(stem, kind))
         else:
             out.add(str((CONFIG_DIR / tok).resolve()))
     return sorted(out)
@@ -503,6 +532,9 @@ REPORTS = CAD_OUT / "reports"
 # release ships the logs that produced it. Gitignored (cad/out/logs/).
 LOGS = CAD_OUT / "logs"
 VERIFY_PY = (SCRIPTS_DIR / "verify.py").resolve()
+# Verify/preflight gate logic that is NOT on any assembly's build closure (so it
+# does not ride a .SLDASM digest) -> a direct file_dep of verify:/preflight tasks.
+POSTBUILD_PY = (SCRIPTS_DIR / "_assembly_postbuild.py").resolve()
 EXPORT_PY = (SCRIPTS_DIR / "export_models.py").resolve()
 RELEASE_PY = (SCRIPTS_DIR / "cut_release.py").resolve()
 PREFLIGHT_PY = (SCRIPTS_DIR / "preflight_release.py").resolve()
@@ -1196,7 +1228,16 @@ def task_verify():
         cmd += ["--suite", suite]
         yield {
             "name": suite,
-            "file_dep": [str(VERIFY_PY), *deps],
+            # verify.py's gate LOGIC lives partly in _assembly_postbuild.py
+            # (load/replay_park_specs -- the kinematics WIRE-1 live-chain replay).
+            # Unlike verify's other helper imports (_assembly/_common/build_*),
+            # that module is deliberately OUTSIDE every assembly recipe (it is on
+            # NO build script's closure), so a change to the replay logic does NOT
+            # bump any .SLDASM digest -- and the .SLDASM file_deps below would then
+            # leave a fresh verify-*.ok stamp valid, SKIPPING the gate (codex PR
+            # #193). Depend on it directly. The build_* helpers verify imports for
+            # constants need no such dep: they ride their .SLDPRT -> .SLDASM digest.
+            "file_dep": [str(VERIFY_PY), str(POSTBUILD_PY), *deps],
             "targets": [stamp],
             "task_dep": _spine_dep(f"verify:{suite}"),
             "actions": [(_run_stamped, [cmd, f"verify {suite}", stamp])],
@@ -1250,13 +1291,13 @@ def task_check():
             "cmd": [sys.executable, str(VERIFY_PY), "--suite", "config"],
         },
         "graph": {
-            # test_config_accessor_coverage reads _config.py, so a new accessor
-            # added there (without an entry in _buildgraph) must invalidate this
-            # stamp -- else the "fails loud" coverage test silently never re-runs
-            # and the perf benefit is lost (codex review).
+            # test_config_accessor_coverage reads _config.py AND _config_asm.py, so
+            # a new accessor added to EITHER (without an entry in _buildgraph) must
+            # invalidate this stamp -- else the "fails loud" coverage test silently
+            # never re-runs and the perf benefit is lost (codex review #193).
             "file_dep": [str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
                          str((SCRIPTS_DIR / "test_buildgraph.py").resolve()),
-                         config_py],
+                         config_py, str((SCRIPTS_DIR / "_config_asm.py").resolve())],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_buildgraph.py")],
         },
         "nameplate": {
@@ -1396,7 +1437,7 @@ def task_preflight():
     """
     stamp = str(REPORTS / "preflight.ok")
     deps = [str(PREFLIGHT_PY), str(VERIFY_PY),
-            str((SCRIPTS_DIR / "_assembly.py").resolve()),
+            str((SCRIPTS_DIR / "_assembly.py").resolve()), str(POSTBUILD_PY),
             _sldasm("drive_train"), _sldasm("channel")]
     return {
         "file_dep": deps,

@@ -164,6 +164,37 @@ def test_artefact_digest_is_recipe_not_bytes():
     assert not os.path.exists(art) or dodo.ContentChecker._digest(art) == recipe
 
 
+def test_verify_gate_logic_off_build_closure_is_a_file_dep():
+    """A verify/preflight gate whose LOGIC lives in a module on NO assembly's build
+    closure (so it rides no .SLDASM digest) MUST list that module as a direct
+    file_dep -- else a change to the gate logic leaves the verify-*.ok stamp
+    stale-fresh and SKIPS the gate (codex PR #193: replay_park_specs moved to
+    _assembly_postbuild.py, off every build closure). General guard: computes the
+    verify/preflight ``_*.py`` helpers that are on no assembly closure and asserts
+    each task depends on them."""
+    dodo = _load_dodo()
+    import _buildgraph as bg
+
+    asm_closure = set()
+    for a in bg.ASSEMBLY_ORDER:
+        asm_closure |= {os.path.basename(m) for m in bg.module_deps_of(bg.script_for(a))}
+
+    def _orphan_helpers(script):
+        helpers = {os.path.basename(m) for m in bg.module_deps_of(script)
+                   if os.path.basename(m).startswith("_")}
+        return helpers - asm_closure  # gate-logic helpers riding no .SLDASM digest
+
+    verify_orphans = _orphan_helpers(bg.SCRIPTS_DIR / "verify.py")
+    assert "_assembly_postbuild.py" in verify_orphans, verify_orphans  # the known case
+    for t in dodo.task_verify():
+        deps = {os.path.basename(d) for d in t["file_dep"]}
+        assert verify_orphans <= deps, f"verify:{t['name']} missing gate-logic deps: {verify_orphans - deps}"
+
+    pf_orphans = _orphan_helpers(bg.SCRIPTS_DIR / "preflight_release.py")
+    pf_deps = {os.path.basename(d) for d in dodo.task_preflight()["file_dep"]}
+    assert pf_orphans <= pf_deps, f"preflight missing gate-logic deps: {pf_orphans - pf_deps}"
+
+
 def test_artefact_digest_immune_to_byte_churn():
     """THE idempotency fix: a SolidWorks save rewrites a part's bytes (new mtime +
     size) without changing its geometry inputs. check_modified must report

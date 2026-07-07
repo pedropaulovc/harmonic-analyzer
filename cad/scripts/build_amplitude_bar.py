@@ -15,9 +15,9 @@ Profile (on the Front plane, bar length along +Y, origin at bottom-left
 corner) is a single 12-segment chain; both notches are centred slots in the
 end faces. Extruded by the bar depth (+Z, 0..6.35). The top pin hole runs
 along global X through the top-slot cheeks at 6.35 below the bar top,
-mid-depth (Z = 3.175): a Right-plane sketch maps (x, y) -> global (±Z, Y)
-with ambiguous handedness, so the cut is probed by volume read-back and the
-sketch-x sign flipped on a miss (crank-arm cross-hole pattern).
+mid-depth (Z = 3.175): a Right-plane sketch maps local +X -> global -Z, so
+the circle centre sits at sketch_x = -BarDepth/2 to land inside the body, and
+the removed volume is asserted against analytic so a wrong side fails loud.
 
 Run (SolidWorks already open)::
 
@@ -36,12 +36,10 @@ from _common import (
     apply_material,
     apply_color,
     BAR_STEEL,
-    blank_sketch,
     check,
     define_circle,
     drive_dimension,
     ensure_fully_defined,
-    feature_name_by_type,
     force_rebuild,
     bbox_extent_check,
     measure_check,
@@ -203,69 +201,50 @@ async def build(adapter) -> dict[str, str]:
     expected_removed = (
         math.pi * (TOP_PIN_HOLE_DIA / 2.0) ** 2 * (BAR_WIDTH - TOP_NOTCH_WIDTH)
     )
-    # The probe tries each handedness in turn; only the winning iteration's
-    # dims feed drive_jobs. Each iteration names its profile uniquely
-    # (TopPinProfile0/1) so a blanked miss never collides with the retry's
-    # name, and records the centre + diameter dims inline. The centre-X dim is
-    # an UNSIGNED distance from the origin -- sketch_x is negative on the
-    # flipped side, so it displays as its magnitude; the drive '"BarDepth" / 2'
-    # is positive on both sides (unit-safe, never lands negative). pin_y is the
-    # positive drop below the bar top.
-    for idx, sketch_x in enumerate((BAR_DEPTH / 2.0, -BAR_DEPTH / 2.0)):
-        pin = SketchDims()
-        prof_name = f"TopPinProfile{idx}"
-        check("create_sketch top pin hole", await adapter.create_sketch("Right"))
-        set_sketch_direct_db(adapter, True)  # inference snaps to the top corner
-        await define_circle(
-            adapter, sketch_x, pin_y, TOP_PIN_HOLE_DIA / 2.0, "top pin hole",
-            dims=pin,
-            names=("TopPinX", "TopPinY", "TopPinDia"),
-            drives=('"BarDepth" / 2', '"BarLength" - "TopPinDrop"', '"TopPinHoleDia"'),
-        )
-        set_sketch_direct_db(adapter, False)
-        await ensure_fully_defined(adapter, "top pin hole sketch")
-        check("exit_sketch top pin hole", await adapter.exit_sketch())
-        # Name + record-rename the profile before the cut absorbs it; the drive
-        # jobs are held back until this handedness is proven to be the winner.
-        name_last_feature(adapter, prof_name)
-        pin_jobs = pin.apply(adapter, prof_name)
-        cut = await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
-        )
-        if not cut.is_success:
-            _telemetry.debug(
-                f"top pin cut at sketch x={sketch_x:+g} failed"
-                f" ({cut.error}); flipping sign"
-            )
-            # The unconsumed sketch would stay SHOWN and render in all 20
-            # assembly instances (floating circles above the top frame).
-            orphan = feature_name_by_type(adapter, "ProfileFeature")
-            if orphan:
-                blank_sketch(adapter, orphan)
-            continue
-        res = await adapter.get_mass_properties()
-        removed = vol_before - res.data.volume
-        if abs(removed - expected_removed) < 2.0:
-            _telemetry.success(
-                f"top pin hole at sketch x={sketch_x:+g}"
-                f" removed {removed:.1f} mm^3 (analytic {expected_removed:.1f})"
-            )
-            name_last_feature(adapter, "TopPinHole")
-            drive_jobs += pin_jobs
-            vol_final = res.data.volume
-            break
-        if removed < 1.0:
-            _telemetry.debug(
-                f"top pin cut at sketch x={sketch_x:+g} removed nothing;"
-                " flipping"
-            )
-            continue
+    # The bore runs along global X at mid-depth. This is a Right-plane sketch,
+    # whose local +X maps to global -Z (SolidWorks' standard Right-plane
+    # orientation), so the centre sits at sketch_x = -BarDepth/2 to land INSIDE
+    # the 0..BarDepth body -- a +BarDepth/2 centre lands at Z = -3.175, outside
+    # the body, and the cut removes nothing (or FeatureCut3 rejects the empty
+    # profile). The centre-X dim is an UNSIGNED distance from the origin, so it
+    # displays as its magnitude and the drive '"BarDepth" / 2' is positive.
+    # pin_y is the positive drop below the bar top. The removed volume is
+    # asserted against analytic (±2), so a wrong plane handedness or a
+    # mislocated/resized circle fails LOUD instead of boring the wrong place.
+    pin = SketchDims()
+    sketch_x = -BAR_DEPTH / 2.0
+    check("create_sketch top pin hole", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)  # inference snaps to the top corner
+    await define_circle(
+        adapter, sketch_x, pin_y, TOP_PIN_HOLE_DIA / 2.0, "top pin hole",
+        dims=pin,
+        names=("TopPinX", "TopPinY", "TopPinDia"),
+        drives=('"BarDepth" / 2', '"BarLength" - "TopPinDrop"', '"TopPinHoleDia"'),
+    )
+    set_sketch_direct_db(adapter, False)
+    await ensure_fully_defined(adapter, "top pin hole sketch")
+    check("exit_sketch top pin hole", await adapter.exit_sketch())
+    # Name + record-rename the profile before the cut absorbs it.
+    name_last_feature(adapter, "TopPinProfile")
+    drive_jobs += pin.apply(adapter, "TopPinProfile")
+    cut = await adapter.create_cut_extrude(
+        ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+    )
+    if not cut.is_success:
+        raise RuntimeError(f"top pin hole cut failed: {cut.error}")
+    res = await adapter.get_mass_properties()
+    removed = vol_before - res.data.volume
+    if abs(removed - expected_removed) >= 2.0:
         raise RuntimeError(
             f"top pin cut removed {removed:.1f} mm^3, expected"
-            f" {expected_removed:.1f} — circle misplaced/resized"
+            f" {expected_removed:.1f} — circle misplaced/resized or wrong side"
         )
-    else:
-        raise RuntimeError("top pin hole cut removed no material on either side")
+    _telemetry.success(
+        f"top pin hole at sketch x={sketch_x:+g}"
+        f" removed {removed:.1f} mm^3 (analytic {expected_removed:.1f})"
+    )
+    name_last_feature(adapter, "TopPinHole")
+    vol_final = res.data.volume
 
     # Named axes (parallel to the top-pin bore, view-independent selection):
     # Axis1 = top-pin bore at (y = pin_y, z = mid-depth) -- the hole runs along
@@ -317,10 +296,10 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs.append(('D1@MidWidth', '"BarWidth" / 2'))
 
     # Apply the deferred drive equations now -- after the whole model + a
-    # rebuild exists, so every target (BarProfile + the winning TopPinProfile)
-    # resolves. Each equation evaluates to the value just built, so the
-    # geometry must not move; the volume re-check is the neutrality proof
-    # (vol_final is the post-cut volume read back from the winning handedness).
+    # rebuild exists, so every target (BarProfile + TopPinProfile) resolves.
+    # Each equation evaluates to the value just built, so the geometry must not
+    # move; the volume re-check is the neutrality proof (vol_final is the
+    # post-cut volume read back above).
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)

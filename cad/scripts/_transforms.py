@@ -7,6 +7,7 @@ from __future__ import annotations
 import math
 import struct
 
+import _config_asm
 from _common import OUT_STL
 
 _STL_BBOX_CACHE: dict[str, tuple[tuple[float, float], ...]] = {}
@@ -150,133 +151,31 @@ def _mirror_xform(
 # the photo comparison renders.
 # ---------------------------------------------------------------------------
 #
-# Lives here (not _common): MIRROR_PLANE is read only by mirror_placement below
-# and the channel-assembly stretched-spring loop -- never by a part build. Keep
-# it off _common so it stays off every part's input hash; a placement-only edit
-# then re-keys the assemblies (which import _transforms), not all ~70 parts.
-MIRROR_PLANE: dict[str, str | tuple[str, float]] = {
-    # channel
-    "amplitude-bar": ("x", 3.175),
-    "rocker-arm": "z",
-    "connecting-rod": "z",
-    "channel-lever": "z",
-    "channel-spring-installed": "z",
-    # drive train
-    "crank-arm": "z",
-    "crank-handle": "z",
-    "transgear-latch": "z",
-    # odd sprocket teeth break the 'x' tooth-pattern closure; the hub is
-    # z-symmetric about the bbox centre (mesh resid 0.000)
-    "chain-sprocket": "z",
-    # output
-    "boss-hook": "z",
-    # spring-hook: the little channel plate hook, the boss-hook idiom one size
-    # down. A planar wire in its local X-Y plane (achiral about local z=0), so
-    # like the channel spring it engages it must take the SAME z-mirror -- the
-    # default "x" would X-flip the chiral hook to the wrong side of the eye with
-    # its arm reversed (it must mirror identically to channel-spring-installed).
-    "spring-hook": ("z", 0.0),
-    "counter-spring": "z",
-    "gooseneck": "z",
-    # gooseneck-clamp: default 'x' (block/bore/screw-head all x-centred);
-    # 'z' was invalid -- the screw head sits one-sided at local z 12..18
-    # (M6.8 rebuild: 2280 mm^3 clamp-vs-gooseneck interference)
-    # pinion-bar / platen-rack: stub bore and tooth grid are NOT centred
-    # in the bbox x-span, but both parts are exact z-extrusions
-    "pinion-bar": "z",
-    "platen-rack": "z",
-    "magnifying-lever": "z",
-    "magnifying-clamp": "z",
-    "thumb-screw": "z",
-    "magnifying-vertical-rod": "z",
-    "pen-v-block": "z",
-    "pen-frame": "z",
-    "pen-set-screw": "z",
-    "column-clamp": "z",
-    # plain x-symmetric slab cornered at origin; explicit c avoids the
-    # STL-bbox dependency for a part newer than the legacy export set
-    "platen-paper": ("x", 129.75),
-    # roller-chain links: flat XY parts, exactly symmetric about local z=0
-    # (plates at +-plate_z, round bodies centred on z=0); achiral, so the
-    # YZ-mirror is a proper rotation. Explicit c, no STL at first build.
-    "chain-inner-link": ("z", 0.0),
-    "chain-outer-link": ("z", 0.0),
-    # centred symmetric bar; explicit c, no STL yet at first build
-    "wheel-bar": ("x", 0.0),
-    # knife bearing support: X-symmetric (bore + block centred on x0); explicit
-    # so placement never depends on a stale/absent STL bbox (it mirrors with the
-    # summing lever so the bore stays around the hex trunnion).
-    "knife-mount": ("x", 0.0),
-    # parts whose build scripts are themselves mirrored (M6.8)
-    "summing-lever": "x0",
-    "magnifying-bracket": "x0",
-    "pen-hanger": "x0",
-    # (crank-pedestal's "x0" entry died with the part: the merged
-    # cone-pivot-post column absorbed it, 2026-07-03. The column's oblique
-    # crank bore makes it chiral, but it stays on the default bbox-"x" path --
-    # the bore's authored side is pinned empirically by the assembly's
-    # crank-axis agreement asserts, not by the mirror entry.)
-    # cone-swing-platform went chiral with the one-sided lock lobe + slot
-    # (PR2, 2026-07-03), so its script is authored mirrored like the above
-    # ("x0" keeps the placement off the STL bbox, whose centre the lobe
-    # shifted 13.75 mm -- the default 'x' landed the plate 26.85 mm off)
-    "cone-swing-platform": "x0",
-    # rocker-arm-support (the unified support casting) is authored machine-handed
-    # and lives in the non-mirroring frame.SLDASM -> NO mirror entry (it replaced
-    # the old split rocker-arm-support + a-frame "x0" pair, 2026-06-19).
-    # ch25 alignment-pinion set (restored 2026-07-02): every part exactly
-    # symmetric about its local x = 0 plane (gear/rod axes, strap/block
-    # mid-planes); explicit c, no STLs yet at first build
-    "alignment-pinion": ("x", 0.0),
-    # pinion-bracket went x-ASYMMETRIC with the PR8 blind pin seat in its -X
-    # edge; every feature is a through/mid-plane form about the exact z
-    # mid-plane instead (extrude z 0..5).
-    "pinion-bracket": ("z", 2.5),
-    # pinion-pivot-block went x-ASYMMETRIC with the PR8 dropped lift bore;
-    # every feature is a through/mid-depth form about the exact z mid-plane
-    # instead (extrude z 0..12, screw holes at mid-depth).
-    "pinion-pivot-block": ("z", 6.0),
-    "pinion-pivot-shaft": ("x", 0.0),
-    "pinion-lever": ("x", 0.0),
-    "pinion-lift-rod": ("x", 0.0),
-    "pinion-handle": ("x", 0.0),
-    # pinion-spring (PR4): planar-XY leaf, CHIRAL in x (foot east of the bend,
-    # blade at the strap lean) but an exact mid-plane z-extrude -- the
-    # counter-spring/chain-link z-idiom. The default 'x' mis-poses it (49 mm^3
-    # spring-vs-strap interference, caught by the gate). Explicit c, no STL
-    # dependency at first build.
-    "pinion-spring": ("z", 0.0),
-    # pinion-cam-pin (PR8 rework): axisymmetric stud along local Z (cylinder
-    # + domed end), so the local x = 0 plane is an exact symmetry regardless
-    # of the rotated placement. Explicit c, no STL at first build. (The PR5
-    # mid-plane cylinder used ("z", 0.0); the dome killed that plane.)
-    "pinion-cam-pin": ("x", 0.0),
-    # pinion-cam (PR8): the eccentric collar's bore, collar circle and set-pin
-    # boss are all centred on local x = 0 (the eccentricity and boss point
-    # down -Y); exactly x0-symmetric, explicit c, no STL at first build.
-    "pinion-cam": ("x", 0.0),
-    # M6.10 fasteners: authored in final orientation (axis along Y or Z),
-    # exactly symmetric about local x = 0; explicit c, no STL at first build
-    "hex-bolt": ("x", 0.0),
-    "lag-screw": ("x", 0.0),
-    "fillister-screw": ("x", 0.0),
-    "pinch-screw": ("x", 0.0),
-    "hanger-screw": ("x", 0.0),
-    # slotted-screw / foot-screw (PR7): same fastener convention (axis -Y,
-    # x0-symmetric)
-    "slotted-screw": ("x", 0.0),
-    "foot-screw": ("x", 0.0),
-    # pinion-arbor (PR7): plain crowned cylinder along Z, x0-symmetric
-    "pinion-arbor": ("x", 0.0),
-    # PR2 round-3 cone-swing hardware (2026-07-03): all axisymmetric about the
-    # local Y axis (bodies are origin-centred circles), so exactly x0-symmetric;
-    # explicit c, no STL at first build (the memory's belt-and-braces rule)
-    "cone-pivot-screw": ("x", 0.0),
-    "swing-stop-screw": ("x", 0.0),
-    "cone-tip-bushing": ("x", 0.0),
-    "cone-tip-adjuster": ("x", 0.0),
-    "cone-tip-pinch-screw": ("x", 0.0),
-}
+# The per-part mirror-plane symmetry declaration S now lives in its OWN config
+# family -- ``cad/config/placement/<dashed-name>.yaml`` (``mirror_plane:``) --
+# read via ``_config_asm.placement`` in ``mirror_placement`` below (issue #156).
+# It was a module-level dict here, which put it in EVERY assembly's helper
+# closure: adding one new part's entry re-keyed all 8 assemblies -> a full
+# spine of FULL rebuilds. Per-file, a placement edit now re-keys only the
+# assemblies that PLACE that part (``placement/*`` -> referenced-part rows in
+# dodo/_buildgraph), and never the part itself (placement is assembly-time).
+# A part with NO file takes the default bbox-``x`` plane, exactly as before.
+
+# In-process placement override for parts GENERATED at assembly-build time (no
+# config file, no STL yet) -- e.g. build_channel_assembly's per-channel stretched
+# springs (channel-spring-installed-stretchNN). Replaces the old mutate-the-shared-
+# MIRROR_PLANE-dict hack; keyed the same, read first by mirror_placement. Not a
+# config input, so it never touches the recipe/cache digest (these ephemeral parts
+# are rebuilt fresh each run anyway).
+_RUNTIME_PLACEMENT: dict[str, str | tuple[str, float]] = {}
+
+
+def set_runtime_placement(part: str, mirror_plane: str | tuple[str, float]) -> None:
+    """Register a mirror-plane symmetry for a dynamically-generated part (see
+    ``_RUNTIME_PLACEMENT``). ``mirror_plane`` uses the same vocabulary as the
+    ``placement/*.yaml`` ``mirror_plane`` field."""
+    _RUNTIME_PLACEMENT[part] = mirror_plane
+
 
 def mirror_placement(
     part: str,
@@ -291,10 +190,13 @@ def mirror_placement(
     insert_component + assert_component_placed."""
     if rows is None:
         rows = rows_from_euler(rotation)
-    plane = MIRROR_PLANE.get(part, "x")
+    # Per-part symmetry S: a runtime override (dynamically-built parts) wins, else
+    # cad/config/placement/<part>.yaml (default 'x'). A tuple/list [axis, c] carries
+    # an explicit plane coordinate (YAML yields a list).
+    plane = _RUNTIME_PLACEMENT.get(part) or _config_asm.placement(part).get("mirror_plane", "x")
     explicit_c = None
-    if isinstance(plane, tuple):
-        plane, explicit_c = plane
+    if isinstance(plane, (list, tuple)):
+        plane, explicit_c = plane[0], float(plane[1])
     axis = 2 if plane == "z" else 0
     if explicit_c is not None:
         c = explicit_c
