@@ -463,10 +463,13 @@ async def build(adapter) -> dict[str, str]:
     else:
         # THREE freed operational DOF: the lever's knife rock + the wire's
         # swing/spin (all deferred PARK drivers above); the yoke-coupled wheel
-        # must also read under-constrained WITH them, else the coupling died.
+        # must also read under-constrained WITH them, else the coupling died --
+        # and so must the lock-mated bracket (a regression to grounded would
+        # re-create the collar clipping this rework fixed).
         assert_free_dof_necessity(
             adapter, 3,
-            required_stems=("magnifying-lever", "magnifying-wheel", "lever-wire"))
+            required_stems=("magnifying-lever", "magnifying-wheel", "lever-wire",
+                            "magnifying-bracket"))
     write_park_specs(ASM_NAME)
     check_no_interference(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)

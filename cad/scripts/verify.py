@@ -87,7 +87,11 @@ from _assembly import (
     component_transform,
     is_locked_build,
 )
-from _assembly_postbuild import load_park_specs, replay_park_specs
+from _assembly_postbuild import (
+    discard_open_documents,
+    load_park_specs,
+    replay_park_specs,
+)
 from _common import (  # component iteration helpers (read-only)
     _flag_only,
     _read_member,
@@ -613,17 +617,25 @@ _REQUIRED_FREE_STEMS = {
     # coupling off the rocker -- a frozen lever means the coupling died).
     "channel": ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever"),
     # Three freed DOF (lever knife-rock + wire swing/spin); the yoke-coupled
-    # wheel must read under-constrained WITH them, else the coupling died.
-    "magnifier": ("magnifying-lever", "magnifying-wheel", "lever-wire"),
+    # wheel must read under-constrained WITH them, else the coupling died --
+    # and so must the lock-mated bracket (it AFFIXES the rod to the rocking
+    # summing bar; a regression to grounded re-creates the collar clipping,
+    # codex #201).
+    "magnifier": ("magnifying-lever", "magnifying-wheel", "lever-wire",
+                  "magnifying-bracket"),
     # One freed DOF (the crank T12 spin). paper-drive is handled by INSTANCE, not
     # this stem (see _required_free_instances) -- three transgear-removable siblings
     # share the stem, so a stem check passes even if T12 is pinned and T24/T18 is
     # loose (codex #189 :679). Kept as reference data only.
     "paper-drive": ("transgear-removable",),
-    # One freed DOF (the lever knife-edge rock); the lock-mated boss-hook rides it.
-    "summing": ("summing-lever",),
-    # One freed DOF (the carriage travel); the lock-mated marker + wire ride it.
-    "pen": ("pen-rod",),
+    # One freed DOF (the lever knife-edge rock); the lock-mated boss-hook must
+    # read under-constrained WITH it (a grounded/fixed regression would freeze
+    # the counter-spring anchor while the lever still swings, codex #201).
+    "summing": ("summing-lever", "boss-hook"),
+    # One freed DOF (the carriage travel); the lock-mated marker + pen-wire
+    # must ride it -- with the neutral preset the motion sweep reads
+    # got == want == 0 even if the marker were disconnected (codex #201).
+    "pen": ("pen-rod", "pen-marker", "pen-wire"),
 }
 
 
@@ -795,97 +807,106 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
 
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     check(f"open {name}", await adapter.open_model(str(sldasm)))
-    if _expected_free_dof(name):
-        # Default-`free` build: the travel park driver is DEFERRED, so the
-        # shipped pen.SLDASM has neither the mate nor the F5 equation (the
-        # carriage is a live free DOF). Replay the recorded spec transiently
-        # (authors + renames PARK_pen_travel), install the equation on the
-        # replayed mate, then sweep as usual. The doc is mutated in memory only
-        # -- verify never saves, and the next CloseAllDocuments discards it.
-        travel = [s for s in load_park_specs(name) if s.get("key") == "pen_travel"]
-        if len(travel) != 1:
-            report.failed.append((
-                f"motion:{name}:park-spec",
-                f"expected exactly 1 recorded pen_travel park spec, found "
-                f"{len(travel)} -- rebuild pen",
-            ))
-            _telemetry.error(f"{name}: pen_travel park spec missing/ambiguous")
-            return
-        (travel_mate,) = await replay_park_specs(adapter, travel)
-        base_mm = abs(float(travel[0]["params"]["distance"]))
-        param = adapter._attempt(
-            lambda: adapter.currentModel.Parameter(f"D1@{travel_mate}"), default=None)
-        if param is None:
-            report.failed.append((
-                f"motion:{name}:pen-driver-install",
-                f"cannot read D1@{travel_mate} on the replayed travel mate",
-            ))
-            _telemetry.error(f"{name}: cannot read D1@{travel_mate}")
-            return
-        base_doc = float(_read_member(param, "Value"))  # IPS doc -> inches
-        info = await pen_driver.install(
-            adapter, travel_mate, base_doc, base_doc / base_mm)
-        log(f"pen driver (transient replay): {info['links']}-link chain, scale "
-            f"{info['scale_mm_per_unit']:.4g} mm/unit, rest {info['rest_deg']:g} deg")
-    log(f"--- motion: {name} pen-driver sweep (rest {pen_driver.rest_crank_deg():g} deg, "
-        f"stroke +-{pen_driver.stroke_half_mm():g} mm) ---")
-    marker = _pen_marker_name(adapter)
+    try:
+        if _expected_free_dof(name):
+            # Default-`free` build: the travel park driver is DEFERRED, so the
+            # shipped pen.SLDASM has neither the mate nor the F5 equation (the
+            # carriage is a live free DOF). Replay the recorded spec transiently
+            # (authors + renames PARK_pen_travel), install the equation on the
+            # replayed mate, then sweep as usual. The doc is mutated in memory
+            # only -- verify never saves, and the ``finally`` below discards it.
+            travel = [s for s in load_park_specs(name) if s.get("key") == "pen_travel"]
+            if len(travel) != 1:
+                report.failed.append((
+                    f"motion:{name}:park-spec",
+                    f"expected exactly 1 recorded pen_travel park spec, found "
+                    f"{len(travel)} -- rebuild pen",
+                ))
+                _telemetry.error(f"{name}: pen_travel park spec missing/ambiguous")
+                return
+            (travel_mate,) = await replay_park_specs(adapter, travel)
+            base_mm = abs(float(travel[0]["params"]["distance"]))
+            param = adapter._attempt(
+                lambda: adapter.currentModel.Parameter(f"D1@{travel_mate}"), default=None)
+            if param is None:
+                report.failed.append((
+                    f"motion:{name}:pen-driver-install",
+                    f"cannot read D1@{travel_mate} on the replayed travel mate",
+                ))
+                _telemetry.error(f"{name}: cannot read D1@{travel_mate}")
+                return
+            base_doc = float(_read_member(param, "Value"))  # IPS doc -> inches
+            info = await pen_driver.install(
+                adapter, travel_mate, base_doc, base_doc / base_mm)
+            log(f"pen driver (transient replay): {info['links']}-link chain, scale "
+                f"{info['scale_mm_per_unit']:.4g} mm/unit, rest {info['rest_deg']:g} deg")
+        log(f"--- motion: {name} pen-driver sweep (rest {pen_driver.rest_crank_deg():g} deg, "
+            f"stroke +-{pen_driver.stroke_half_mm():g} mm) ---")
+        marker = _pen_marker_name(adapter)
 
-    # Rest pose: at pen_rest_crank_deg the driver equation subtracts pen_y(rest),
-    # so the mate sits at its build datum -- tip0 is the saved render pose.
-    await pen_driver.set_crank_deg(adapter, pen_driver.rest_crank_deg())
-    _rebuild(adapter)
-    tip0 = _tip_y_mm(adapter, marker)
-
-    sweep: list[tuple[float, float, float]] = []  # (theta_deg, got_mm, want_mm)
-    for theta in _MOTION_SWEEP_DEG:
-        await pen_driver.set_crank_deg(adapter, theta)
+        # Rest pose: at pen_rest_crank_deg the driver equation subtracts pen_y(rest),
+        # so the mate sits at its build datum -- tip0 is the saved render pose.
+        await pen_driver.set_crank_deg(adapter, pen_driver.rest_crank_deg())
         _rebuild(adapter)
-        got = _tip_y_mm(adapter, marker) - tip0
-        want = pen_driver.expected_tip_disp_mm(math.radians(theta))
-        sweep.append((theta, got, want))
-        err = abs(got - want)
-        emit = _telemetry.success if err <= _MOTION_TOL_MM else _telemetry.error
-        emit(f"CrankDeg={theta:6.1f}  tipDisp={got:+8.4f}  "
-             f"want={want:+8.4f}  |err|={err:.2e}")
-    worst = max((abs(g - w) for _, g, w in sweep), default=0.0)
+        tip0 = _tip_y_mm(adapter, marker)
 
-    # Interference at the two poses furthest from the rest datum (the stroke
-    # extremes the pen carriage is most likely to bind at).
-    far = sorted(_MOTION_SWEEP_DEG,
-                 key=lambda t: abs(pen_driver.expected_tip_disp_mm(math.radians(t))))[-2:]
-    interference: list[tuple[float, str]] = []
-    for theta in far:
-        await pen_driver.set_crank_deg(adapter, theta)
+        sweep: list[tuple[float, float, float]] = []  # (theta_deg, got_mm, want_mm)
+        for theta in _MOTION_SWEEP_DEG:
+            await pen_driver.set_crank_deg(adapter, theta)
+            _rebuild(adapter)
+            got = _tip_y_mm(adapter, marker) - tip0
+            want = pen_driver.expected_tip_disp_mm(math.radians(theta))
+            sweep.append((theta, got, want))
+            err = abs(got - want)
+            emit = _telemetry.success if err <= _MOTION_TOL_MM else _telemetry.error
+            emit(f"CrankDeg={theta:6.1f}  tipDisp={got:+8.4f}  "
+                 f"want={want:+8.4f}  |err|={err:.2e}")
+        worst = max((abs(g - w) for _, g, w in sweep), default=0.0)
+
+        # Interference at the two poses furthest from the rest datum (the stroke
+        # extremes the pen carriage is most likely to bind at).
+        far = sorted(_MOTION_SWEEP_DEG,
+                     key=lambda t: abs(pen_driver.expected_tip_disp_mm(math.radians(t))))[-2:]
+        interference: list[tuple[float, str]] = []
+        for theta in far:
+            await pen_driver.set_crank_deg(adapter, theta)
+            _rebuild(adapter)
+            try:
+                check_no_interference(adapter)
+            except Exception as exc:  # noqa: BLE001 -- collect, gate below
+                interference.append((theta, str(exc)))
+
+        # Leave the doc at its deterministic rest datum (matches the saved pose).
+        await pen_driver.set_crank_deg(adapter, pen_driver.rest_crank_deg())
         _rebuild(adapter)
-        try:
-            check_no_interference(adapter)
-        except Exception as exc:  # noqa: BLE001 -- collect, gate below
-            interference.append((theta, str(exc)))
 
-    # Leave the doc at its deterministic rest datum (matches the saved pose).
-    await pen_driver.set_crank_deg(adapter, pen_driver.rest_crank_deg())
-    _rebuild(adapter)
-
-    report.gate(
-        f"motion:{name}:tip-traces-truth",
-        lambda: _expect(
-            worst <= _MOTION_TOL_MM,
-            f"pen tip deviates from truth_model by {worst:.3e} mm "
-            f"(> {_MOTION_TOL_MM} mm) over the CrankDeg sweep",
-        ),
-    )
-    report.gate(
-        f"motion:{name}:stroke-interference-free",
-        lambda: _expect(
-            not interference,
-            f"interference at stroke extremes (CrankDeg deg): {interference}",
-        ),
-    )
-    report.gate(
-        f"motion:{name}:dof-fully-defined",
-        lambda: assert_components_fully_defined(adapter),
-    )
+        report.gate(
+            f"motion:{name}:tip-traces-truth",
+            lambda: _expect(
+                worst <= _MOTION_TOL_MM,
+                f"pen tip deviates from truth_model by {worst:.3e} mm "
+                f"(> {_MOTION_TOL_MM} mm) over the CrankDeg sweep",
+            ),
+        )
+        report.gate(
+            f"motion:{name}:stroke-interference-free",
+            lambda: _expect(
+                not interference,
+                f"interference at stroke extremes (CrankDeg deg): {interference}",
+            ),
+        )
+        report.gate(
+            f"motion:{name}:dof-fully-defined",
+            lambda: assert_components_fully_defined(adapter),
+        )
+    finally:
+        # The sweep leaves the doc DIRTY (CrankDeg edits + rebuilds; on a free
+        # build also the replayed PARK_pen_travel mate + the F5 equations), and
+        # a bare CloseAllDocuments(True) can still pop the save modal for a
+        # dirty referenced child (the preflight/cut_release discard rationale).
+        # Discard by title on EVERY exit -- including the early returns above --
+        # so no later open/close hits the modal (codex #201). verify never saves.
+        discard_open_documents(adapter)
 
 
 # Magnifier live-chain sweep (WIRE 1). Small angles: the real machine's lever
