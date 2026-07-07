@@ -5,12 +5,20 @@ metadata:
   type: reference
 ---
 
-The `_mate` readback-and-reflip recovery (add mate → readback → if the component
-moved past `_MATE_TOL_MM`, or SW created it in a HARD error state (`GetErrorCode2`,
-e.g. 47 "dimension flipped" that fails IN PLACE with no motion — added by #186),
-delete + re-add flipped) fires 100–170× per full cold build. The correct side is
-**deterministic per mate** — apparent randomness is always a part-lifecycle event
-or a signature collision (see below), never a coin flip.
+The `_mate` readback GUARD (add mate → readback → is the component past
+`_MATE_TOL_MM`, or did SW create it in a HARD error state (`GetErrorCode2`,
+e.g. 47 "dimension flipped" that fails IN PLACE with no motion — added by #186)?)
+detects a wrong-side flip. The correct side is **deterministic per mate** —
+apparent randomness is always a part-lifecycle event or a signature collision
+(see below), never a coin flip — so a detected flip is a SEEDING BUG.
+
+**#195: a flip is now a HARD ERROR, not a self-healed recovery.** `_mate` used
+to delete + re-add flipped (self-heal) and emit a `flip-seed MISS` **warn**; that
+inefficient reflip fired every build for any unseeded reference — the exact cost
+the seeding system exists to kill. The recovery is REMOVED: detection stays, but a
+miss now **raises** a `RuntimeError` naming the exact sig to toggle in
+`_FLIP_INVERT`. Zero flips is thus ENFORCED — the build fails loud on the first
+un/mis-seeded mate instead of silently paying for a per-build reflip.
 
 **Winner = distance mate + SIGN-DERIVED flip, NOT signed-offset planes (#185).**
 Two ways to kill a flip: (a) convert the distance mate to a COINCIDENT to a signed
@@ -26,13 +34,18 @@ SIGNED coordinate (call sites pass `coord`, not `abs(coord)`) and seeds
 `flip = (signed < 0) XOR (_flip_sig(label)+_orient_suffix(...) in _FLIP_INVERT)`.
 The sign handles the great majority; `_FLIP_INVERT` is the per-signature learned
 polarity for references whose default side is inverted. `_mate`'s readback +
-#186's hard-error check stay as the safety net AND regression alarm: any real
-recovery emits a loud `flip-seed MISS` **warn** naming the exact sig to add — a
-flip in a normal build means the heuristic broke for that mate.
+#186's hard-error check stay as the regression alarm, but now FATAL (#195): a
+wrong side **raises** `flip-seed MISS: … landed on the WRONG side … toggle sig
+{sig!r} in _FLIP_INVERT`, naming the exact sig — a flip in a normal build means
+the heuristic broke for that mate and the build stops until it is re-seeded.
 
-**Learn once, from the build's own warns.** Build with `_FLIP_INVERT` empty →
-every inverted seat warns its sig → paste them in → rebuild = 0 flips. Re-derive
-after any mate/geometry change. Final set: **54 sigs, 7 orientation-tagged.**
+**Learn from the build's own output.** Post-#195 a miss ERRORS, so a hard-error
+build surfaces only the FIRST missing sig then halts — fix-one-rebuild-repeat, or
+to bulk-learn temporarily restore the warn+self-heal path, collect every
+`flip-seed MISS` in one pass, paste them in, then re-arm the raise. Re-derive
+after any mate/geometry change. Set as of #195: **57 sigs** (add crank wheel /
+knob wheel / rack pinion disc axial from the belt/chain drive), 7
+orientation-tagged. A full cold `doit build` over all 8 assemblies is 0-flip.
 
 **Signature collision = the real "non-determinism" (orientation fix, #185).**
 `_flip_sig` strips the instance index so a 20-channel pattern collapses to ONE
@@ -49,7 +62,8 @@ pinch head, pinion spring. Diagnose a collision by comparing which instance flip
 across two builds with opposite membership (`-1` in one, `-2` in the other).
 
 **Technique — release logs / build output are mineable telemetry.** The
-`LABEL: … -> re-adding flipped` / `flip-seed MISS` lines carry the sig to seed.
+`flip-seed MISS: … toggle sig …` error (pre-#195: `-> re-adding flipped` warn)
+carries the sig to seed.
 Strip the `.. [ Ns + Ns]` timing prefix. Confounds: cache-hit builds log no flips;
 labels embed volatile coords (use `_flip_sig` to canonicalise).
 
@@ -74,5 +88,7 @@ next to the `_seed_flip`/`_flip_sig`/`_orient_suffix` logic it keys. Keep it the
 **History:** frame #138 (5→0, planes, kept). drive #176 + channel #179 = planes,
 CLOSED. **#185 = distance + sign-derived flip + orientation-aware sigs, MERGED**
 (rebased through #182 drive rewrite, #186 hard-error `_mate`, main→v0.15.0).
+**#195 = flip-seed MISS promoted warn→ERROR (recovery removed, zero flips
+enforced), + #194 pinion_bracket deterministic pin-seat cut, main→v0.16.0.**
 Related: [[default-free-dof-park-drivers]],
 [[verify-assumptions-live-sw]], [[park-driver-singularities]].
