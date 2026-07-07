@@ -545,27 +545,27 @@ async def _mate(
     flip: bool = False,
     **kw: Any,
 ) -> Any:
-    """Add a mate and ``check`` it; recover a far-side flip when ``verify`` set.
+    """Add a mate and ``check`` it; FAIL LOUD on a far-side flip when ``verify`` set.
 
-    ``verify=(comp_name, target_origin_mm)`` enables readback-and-flip: after
+    ``verify=(comp_name, target_origin_mm)`` enables the readback GUARD: after
     the mate solves, the component origin must stay within ``_MATE_TOL_MM`` of
-    ``target_origin_mm`` (it was inserted there); otherwise the mate is deleted
-    and re-added with the OPPOSITE flip, then re-checked. A mate created in a
-    HARD error state (``_mate_hard_error``) triggers the same recovery even
-    when nothing moved -- SW's wrong-side add can fail IN PLACE. Returns the
-    (final) mate result data.
+    ``target_origin_mm`` (it was inserted there); otherwise the mate landed on
+    the WRONG side. A mate created in a HARD error state (``_mate_hard_error``)
+    is the same failure even when nothing moved -- SW's wrong-side add can fail
+    IN PLACE. Returns the mate result data.
 
-    ``flip`` seeds the FIRST solve's side. Default ``False`` keeps the historic
-    behaviour (lean on the recovery). A caller that already knows the correct
-    side passes the right ``flip`` so the part lands on-target in ONE solve --
-    no delete-and-re-add, so the part never visibly jumps. The recovery stays as
-    a safety net (re-adds with ``not flip``), so a wrong guess still self-heals.
+    ``flip`` seeds the solve's side. The correct side is DETERMINISTIC per mate
+    (the sign rule XOR the reference's :data:`_FLIP_INVERT` polarity -- see
+    ``_seed_flip``), so a caller that seeds it right lands on-target in ONE solve.
+    A wrong seed does NOT self-heal: this used to delete + re-add flipped, but
+    that inefficient reflip fired every build for an unseeded reference and is
+    exactly what the seeding system exists to kill. Detection stays, but a miss
+    now RAISES, naming the exact signature to toggle in ``_FLIP_INVERT`` so the
+    fix is a one-line seed change, not a silent per-build reflip.
     """
-    from solidworks_mcp.adapters.base import MateRefParameters
-
     # Span every mate (the single chokepoint all mate helpers funnel through),
-    # including flip-recovery, so the full-build waterfall stays contiguous
-    # between part spans instead of leaving the mate time as a gap. NAME the span
+    # so the full-build waterfall stays contiguous between part spans instead of
+    # leaving the mate time as a gap. NAME the span
     # for the caller's descriptive ``label`` (e.g. "mate top@crank_pin <-> ...")
     # rather than the generic mate ``kind`` -- a waterfall of 40 identical
     # "mate distance" rows is unreadable; the mate TYPE stays as an attribute.
@@ -583,38 +583,25 @@ async def _mate(
             moved = max(abs(array[9 + i] * 1000.0 - target_origin[i]) for i in range(3))
         if moved <= _MATE_TOL_MM and not err:
             return res
-        msp.set_attribute("flipped", True)
-        # A flip-recovery is a moment in this mate's span timeline, not a
-        # standalone status line -- record it as a span event so the trace shows
-        # WHEN in the mate the re-solve happened and by how far it was off.
+        msp.set_attribute("flip_miss", True)
+        # The mate landed on the WRONG side. This is a deterministic seeding
+        # bug, not a coin flip -- record the moment on the span, then FAIL LOUD
+        # naming the exact signature to toggle. We do NOT self-heal by re-adding
+        # flipped: that reflip fired every build for an unseeded reference and is
+        # precisely the inefficiency the seeding system exists to eliminate.
         _telemetry.event(
-            "mate.flip_recovery", label=label, moved_mm=round(moved, 3), error=err)
+            "mate.flip_miss", label=label, moved_mm=round(moved, 3), error=err)
         _seed_sig = _flip_sig(label) + (
             _orient_suffix(adapter, comp_name) if comp_name else "")
-        _telemetry.warn(
-            f"flip-seed MISS: {label!r} off by {moved:.2f} mm, error={err}"
-            f" -> re-adding flipped  (learn: add sig {_seed_sig!r} to _FLIP_INVERT)"
+        raise RuntimeError(
+            f"flip-seed MISS: {label!r} landed on the WRONG side"
+            f" (off by {moved:.2f} mm, error={err}). The correct side is"
+            f" DETERMINISTIC -- seed it: toggle sig {_seed_sig!r} in"
+            f" _FLIP_INVERT (add it if absent, remove it if present) in"
+            f" cad/scripts/_assembly.py, then rebuild. It XORs the sign rule for"
+            f" this reference so the mate lands on-target in ONE solve. Do NOT"
+            f" rely on a runtime reflip -- there is none any more."
         )
-        check(
-            f"{label} (delete wrong side)",
-            await adapter.delete_mate(MateRefParameters(name=res.get("name", ""))),
-        )
-        res = check(
-            f"{label} (flipped)",
-            await _add_mate(adapter, kind, entities, flip=not flip, **kw),
-        )
-        err = _mate_hard_error(adapter, res.get("name", ""))
-        if err:
-            raise RuntimeError(
-                f"{label}: mate in hard error state {err} after flip recovery")
-        if comp_name is not None:
-            array = component_transform(adapter, comp_name)
-            moved = max(
-                abs(array[9 + i] * 1000.0 - target_origin[i]) for i in range(3))
-            if moved > _MATE_TOL_MM:
-                raise RuntimeError(
-                    f"{label}: component still off target by {moved:.2f} mm")
-        return res
 
 async def plane_distance_mate(
     adapter: Any,
