@@ -1211,6 +1211,12 @@ def task_verify():
             # it is written by the same assembly task from the same recipe the
             # .SLDASM's content digest is keyed on.
             _sldasm("magnifier"),
+            # The paper-feed kinematic proof (verify._verify_paper_feed_one) opens
+            # paper-drive.SLDASM and drives the crank; without these deps a paper-drive
+            # or probe change would leave a fresh verify-kinematics.ok stamp valid and
+            # SKIP the crank->feed gate (codex #189).
+            _sldasm("paper-drive"),
+            str((SCRIPTS_DIR / "build_kinematic_probe.py").resolve()),
             str((SCRIPTS_DIR / "pen_driver.py").resolve()),
             str((SCRIPTS_DIR / "truth_model.py").resolve()),
         ],

@@ -96,6 +96,17 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven rack pinion (equations neutral)", expected, 0.01 * v_bore)
 
+    # Construction axis (Top x Right = the Z gear axis through the origin): gives the
+    # disc an Axis1 the paper-drive assembly can rack-pinion-mate to the platen, so
+    # the visible 96T disc turns WITH the paper feed instead of sitting static
+    # (codex #189). A reference feature -- no volume, geometry unchanged.
+    from solidworks_mcp.adapters.base import CreateAxisParameters  # noqa: E402
+    check(
+        "create_axis Z (Top x Right)",
+        await adapter.create_axis(
+            CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])),
+    )
+
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
