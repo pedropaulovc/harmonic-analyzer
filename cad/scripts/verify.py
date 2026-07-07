@@ -131,6 +131,10 @@ _MOVING_CHANNEL_STEMS = ("rocker-arm", "connecting-rod", "amplitude-bar", "chann
 _INSTANCE_SUFFIX = re.compile(r"-\d+$")
 # Crank-drive gear mate: either side carries one of these in its component name.
 _CRANK_GEAR_TOKENS = ("crank-pinion", "crank-drive-gear")
+# Paper-feed reduction gear mate (paper-drive): the 12T third gear driving the
+# 120T reducer disc (the disc part is named rack-pinion for historical reasons).
+_FEED_GEAR_TOKENS = ("rack-pinion",)
+_FEED_GEAR_RATIO = (1, 10)  # 12T third gear : 120T reducer disc
 # Expected TOP-LEVEL component-count band per assembly. REFERENCE DATA ONLY -- the
 # live component-count gate was removed (every failure it ever raised was a stale
 # band or a gate bug, never a real regression). Kept because the counts document
@@ -163,10 +167,11 @@ _COMPONENT_BAND = {
     "summing": (7, 9),          # ch 18-19, measured 8 (knife-stay removed: never in the real device)
     "magnifier": (11, 13),      # ch 20-21, measured 12 (+lever-wire, 2026-07-04)
     "pen": (7, 9),              # ch 24, measured 8 (+pen-wire, 2026-07-04)
-    "paper-drive": (85, 89),    # ch 22-23-25, measured 87 (27 placed + 60-link chain;
-    # the ch30 GT re-anchor moved the crank to (122.8, 144.96) and the chain plane
-    # to z -155 -- the shorter drop shrank the loop 70 -> 60 links at pitch 6.2559;
-    # placed count unchanged, all moves were repositions)
+    "paper-drive": (118, 126),  # ch 22-23-25, expected 122 (54 placed + 68-link
+    # chain; the paper-drive rework replaced the two rails + pinion-bar topology
+    # with one bar + two-piece clamps + the hanging-platen furniture and its
+    # 22 lock-mated fillister screws, and the lower knob centre lengthened the
+    # loop 60 -> 68 links)
     "harmonic-analyzer": (7, 9),  # measured 8: 7 subassemblies + 1 loose part (measuring-stick)
 }
 
@@ -331,33 +336,55 @@ def assert_gear_ratios(adapter: Any, name: str) -> None:
             return
 
         crank_links: list[tuple[int, int]] = []
+        feed_links: list[tuple[int, int]] = []
         channel_links: list[tuple[int, int]] = []
         for link in links:
             ratio = _canon_ratio(round(link["numerator"]), round(link["denominator"]))
             names = " ".join(side["component"] for side in link["sides"])
-            bucket = crank_links if any(t in names for t in _CRANK_GEAR_TOKENS) else channel_links
-            bucket.append(ratio)
+            if any(t in names for t in _CRANK_GEAR_TOKENS):
+                crank_links.append(ratio)
+            elif any(t in names for t in _FEED_GEAR_TOKENS):
+                feed_links.append(ratio)
+            else:
+                channel_links.append(ratio)
 
         problems = []
         crank_num, crank_den = (int(v) for v in _config.machine("gear_train", "crank_drive_ratio"))
         crank_expected = _canon_ratio(crank_num, crank_den)
-        if crank_links != [crank_expected]:
-            problems.append(
-                f"crank drive: live {crank_links} != expected [{crank_expected}]"
-            )
-
-        expected = _expected_channel_ratios()
-        if sorted(channel_links) != expected:
-            problems.append(
-                f"channel meshes: live {sorted(channel_links)} != config {expected}"
-            )
+        if name == "paper-drive":
+            # The single paper-feed reduction mesh (12T third gear : 120T disc);
+            # paper-drive carries no crank/channel gear mates.
+            if feed_links != [_FEED_GEAR_RATIO]:
+                problems.append(
+                    f"paper feed mesh: live {feed_links} != expected [{_FEED_GEAR_RATIO}]"
+                )
+            if crank_links or channel_links:
+                problems.append(
+                    f"unexpected non-feed gear mates in paper-drive: "
+                    f"crank {crank_links}, channel {channel_links}"
+                )
+        else:
+            if crank_links != [crank_expected]:
+                problems.append(
+                    f"crank drive: live {crank_links} != expected [{crank_expected}]"
+                )
+            expected = _expected_channel_ratios()
+            if sorted(channel_links) != expected:
+                problems.append(
+                    f"channel meshes: live {sorted(channel_links)} != config {expected}"
+                )
+            if feed_links:
+                problems.append(
+                    f"unexpected paper-feed gear mates in {name}: {feed_links}"
+                )
         gsp.set_attribute("crank_meshes", len(crank_links))
+        gsp.set_attribute("feed_meshes", len(feed_links))
         gsp.set_attribute("channel_meshes", len(channel_links))
         if problems:
             raise RuntimeError("; ".join(problems))
     _telemetry.success(
-        f"gear ratios == config (crank {crank_expected}, "
-        f"{len(channel_links)} channel meshes)"
+        f"gear ratios == config ({len(crank_links)} crank, {len(feed_links)} feed,"
+        f" {len(channel_links)} channel meshes)"
     )
 
 
@@ -805,9 +832,9 @@ async def _verify_paper_feed_one(adapter: Any, report: Report) -> None:
     The belt/chain (T12->T24) and rack-pinion ratios are otherwise exercised only by
     the hand-run ``build_kinematic_probe.py``, so a paper-feed regression could ship
     with the standard gates green. This wires that proof into ``verify:kinematics``:
-    open paper-drive, drive the crank, and assert T24 / knob shaft / fine pinion / the
-    96T disc all turn and the platen feeds (the probe's own assertions). The driven
-    (dirty) model is discarded without saving.
+    open paper-drive, drive the crank, and assert T24 / knob shaft / third gear /
+    the 120T disc / the feed pinion all turn and the platen feeds (the probe's own
+    assertions). The driven (dirty) model is discarded without saving.
 
     A `locked` build gets the SAME proof, not a skip: there the crank_spin park
     driver is authored engaged (``PARK_crank_spin``) and the crank is fully

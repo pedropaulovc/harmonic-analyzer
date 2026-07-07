@@ -76,12 +76,17 @@ implemented.
 6. the rack (DP 30 — unchanged, pitch 2.660 verified).
 
 Modules: disc OD measures ≈82 (±2.5) @120T → fixed-reduction mesh 12T:120T at
-**DP 38** (m 0.6684): PD 8.021 / 80.211, OD 9.36 / 81.55, c2c 44.116 (+0.3
-backlash = 44.42). Pitch-ratio cross-check on ch30 p002: rack pitch / disc
-pitch ≈ 1.27 measured vs 2.660/2.101 = 1.266 for DP38 ✓ (DP30 disc would give
-1.0 — refuted). The 5th pinion is DP 30 (must match the rack): PD 10.160,
-face ~9.5 long (it bridges from behind the disc plane to the rack plane —
-p.62/p.58 show the long-toothed wide pinion).
+**DP 38** (m 0.6684): PD 8.021 / 80.211, OD 9.36 / 81.55, c2c 44.116 + 0.65
+centre extension = **44.766** (the extension clears the `_gear`-recipe gap
+floor at the 12T base circle — the recipe cuts gaps only down to rb, so any
+<63T pinion needs drive-train-style checker-arbitrated slack). Pitch-ratio
+cross-check on ch30 p002: rack pitch / disc pitch ≈ 1.27 measured vs
+2.660/2.101 = 1.266 for DP38 ✓ (DP30 disc would give 1.0 — refuted). The 5th
+pinion is DP 30 (must match the rack): PD 10.160, face 9.5 (it bridges from
+behind the disc plane to the rack plane — p.62/p.58 show the long-toothed
+wide pinion); its rack mesh gets the same treatment (axis 0.8 below the
+nominal pitch-line offset). Both 12T gears bore Ø5 (a 3/8" bore would breach
+the 12T base circles), riding turned-down seats on the stud / knob shaft.
 
 ### E8 — topology: the disc does NOT mesh the rack; the cluster tilts to unlatch
 - The 120T disc rides IN FRONT of the platen face (z south of the platen
@@ -94,44 +99,56 @@ p.62/p.58 show the long-toothed wide pinion).
   (66.05 rest vs 51.0 engaged) dissolves: the measured latch c2c was fitted
   against the wrong (disc-meshes-rack, 24T/96T) topology; the engaged c2c is
   44.42 and never changes.
-- Anchors (pre-mirror machine coords): rack teeth-down at the platen bottom
-  edge, pitch line y ≈ 304.25 → stud (12.0, 304.25 − 5.080 − 0.3 = 298.87);
-  knob shaft = stud + 44.42 @ ≈ −18° → ≈ (54.2, 285.1); crank T12 unchanged
-  (122.8, 144.96); chain plane z −155 unchanged. (Photo cross-check ch30 p002:
+- Anchors AS IMPLEMENTED (pre-mirror machine coords): rack teeth-down with
+  crests at y 303 (2 below the platen bottom edge), pitch line 303.847 →
+  stud (12.0, 303.847 − 5.080 − 0.8 = 297.967); knob shaft = stud + 44.766 @
+  −18° = (54.575, 284.133); crank T12 unchanged (122.8, 144.96); chain plane
+  z −155 unchanged (68-link loop, sag ≈ 21). (Photo cross-check ch30 p002:
   stud ≈ (+12, ~292-299), knob ≈ (+55..58, ~279-287) ✓ within parallax.)
+- z stack on the stud (front → back): collar −152.8..−148.8 | disc
+  −148.4..−145.4 (0.3 in front of the guide-screw heads at −145.1) | feed
+  pinion −145.4..−135.9 (3.0 into the rack band −138.9..−132.9) | latch arm
+  −132.75..−130.15 (2.6 thick — it fits the 3.0 slot between the rack back
+  and the bar front; its Ø22 big hub rises past the rack's tooth band in y)
+  | bracket plate −129.9..−125.9 on the bar back.
 
-## Mate chain (issue 8, target state)
+## Mate chain (issue 8, AS BUILT)
 crank T12 —(belt/chain feature, pitch Ø 24:48)→ knob T24 —(LOCK: keyed
 shaft)→ 12T third gear —(GEAR mate 12:120, external, reversing)→ 120T disc
 —(LOCK: drive pins)→ 12T DP30 feed pinion —(RACK-PINION mate, π·10.160 per
 rev)→ rack —(LOCK)→ platen. One free operational DOF: crank spin (deferred
 park unchanged). Net feed: 1 crank rev (T12/T24 mounted) = 0.5 knob rev →
-0.5·(12/120)·π·10.160 = 1.596 mm platen travel.
+0.5·(12/120)·π·10.160 = 1.596 mm platen travel
+(`NET_RACK_TRAVEL_PER_CRANK_REV`; verified by the kinematics probe).
 
 ## Part changes
-| part | change |
+| part | change (as implemented) |
 |---|---|
-| support-bar | 10×10×384 → 22 tall × 9 deep × 452 (ends x ±226) |
-| column-clamp | one-piece collar+channel → FRONT semi-arc w/ 2 ear thru-holes |
-| column-clamp-back (NEW) | BACK semi-arc, 2 threaded ear sockets |
-| pinion-bar | RETIRED (bar + bracket replace it) |
-| transgear-bracket (NEW) | plate on bar back, 2 screws, stud bore below bar |
-| rack-pinion | 96T DP30 → 120T **DP38** disc (renamed role: fixed reducer) |
-| transgear-pinion | 24T DP30 → 12T DP38 (third gear) |
-| transgear-feed-pinion (NEW) | 12T DP30, face 9.5 (fifth gear, meshes rack) |
-| transgear-latch | c2c 66.05 → 44.42 (swing arm, engaged) |
-| transgear-stub | shaft shortened/re-banded for bracket→disc reach |
-| transgear-knob-shaft | shortened (≈ z −158..−123 span) |
+| support-bar | 10×10×384 → 22 tall × 9 deep × 452 (ends x ±226); 4 Ø4.4 clamp thru-holes + 2 Ø4.0 bracket holes (MACHINE-handed, placed mirror=False) |
+| column-clamp-front (NEW) | FRONT semi-arc 17.9 deep, 2 Ø4.4 ear thru-holes (mirror_plane z) |
+| column-clamp-back (NEW) | BACK semi-arc 14 deep, 2 Ø4.0 threaded ear holes |
+| clamp-screw (NEW) | Ø8×2.5 head, Ø3.9×28 shank — ×4, heads on the bar front |
+| pinion-bar | RETIRED (deleted; bar + bracket replace it) |
+| transgear-bracket (NEW) | 30×63.5×4 black plate on the bar back, Ø9.6 stud bore, 2 Ø4.4 holes |
+| bracket-screw (NEW) | Ø8×2.5 head, Ø3.9×12 shank — ×2, heads on the bracket back |
+| rack-pinion | 96T DP30 → 120T **DP38** disc, bore Ø5 (role: fixed reducer) |
+| transgear-pinion | 24T DP30 → 12T DP38, face 4, bore Ø5 (third gear) |
+| transgear-feed-pinion (NEW) | 12T DP30, face 9.5, bore Ø5 (fifth gear, meshes rack) |
+| transgear-latch | c2c 66.05 → 44.766; thickness 4.5 → 2.6 (rack-back/bar-front slot) |
+| transgear-stub | stepped: Ø9.525×9.1 + Ø5×13.8 seat + Ø14×4 collar |
+| transgear-knob-shaft | stepped: Ø9.525×9.1 + Ø5×5.5 seat + Ø9.525×12.9 + knob (z −157.5..−123.5) |
 | transgear-removable | face width 5.0 → 2.4 |
-| chain links (_chain_link/_chain) | widths per E6 |
-| platen | +10 Ø3 guide thru-holes; clip sockets moved to edge/top positions |
-| platen-clip | brass color (was PANEL_BLACK); edge positions y [320,445] |
-| platen-guide (NEW) | 300×5×4 strip, 5 holes — ×2 (top/bottom) |
-| guide-lock (NEW) | ~22×12×2 plate, 2 holes — ×4 |
-| platen-rack | re-anchored: band [305,~316], teeth at platen bottom edge |
+| chain links (_chain) | inner plates ±1.45..±2.25, bushings ±1.45, outer ±2.55..±3.35, pins ±3.35 |
+| platen | +10 Ø3 guide thru-holes (rows y 13/47); clip sockets → (6/294, 23/132) |
+| platen-clip | natural brass (was PANEL_BLACK); edge positions y [320,445] |
+| platen-guide (NEW) | 300×5×10 rail (10 deep so the locks clear the 9-deep bar), 4 lock holes — ×2 |
+| guide-lock (NEW) | 22×12×2 plate, 2 Ø3 holes — ×4 |
+| platen-rack | 30 → 12 tall; teeth-down band y [303,315], crests 2 below the platen edge |
 
-Assembly: single bar y-centre ≈ 345.4 (front face −138.9), clamps ±197,
-platen hangs via guides/locks (slide DOF unchanged), all platen-riding
-fasteners lock-mated, transgear cluster per E8, chain loop re-solved for the
-new knob centre, verify:kinematics probe re-targeted to the real gear-mate
-train (1.596 mm/crank-rev).
+Assembly: single bar y-centre 338.5 (top edge 349.5 carries the hanging
+platen's top guide; front face −138.9), clamps ±197, platen CENTRED x ±150
+(between the columns — the clamp screw heads protrude past the bar front),
+all 22 platen-riding fillisters + rack + clips + guides + locks + paper
+lock-mated to the platen, transgear cluster per E8, chain loop re-solved for
+the new knob centre (68 links), verify:kinematics probe re-targeted to the
+real per-stage mate train (1.596 mm/crank-rev net).
