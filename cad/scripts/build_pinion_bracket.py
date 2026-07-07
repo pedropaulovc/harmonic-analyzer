@@ -38,12 +38,10 @@ from _common import (
     SketchDims,
     apply_color,
     apply_material,
-    blank_sketch,
     check,
     define_circle,
     drive_dimension,
     ensure_fully_defined,
-    feature_name_by_type,
     force_rebuild,
     name_bore_axis,
     name_last_feature,
@@ -220,90 +218,67 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "strap", expected, 0.005 * expected)
 
     # Blind cam-pin seat (PR8): O4 along X into the -X edge at (y -PIN_DROP,
-    # z mid), PIN_SEAT deep from a tangent plane at x -R_END. Two sign
-    # ambiguities are probed by volume read-back (the amplitude-bar idiom):
-    # the offset-plane side and the sketch-u -> part sign. The strap is still
-    # x-symmetric BEFORE this cut, so a volumetric pass alone cannot tell the
-    # -x seat from its +x mirror image -- the centre-of-mass x sign
-    # disambiguates (material removed at -x pushes the COM to +x).
+    # z mid), PIN_SEAT deep from a tangent plane at x -R_END. Both signs are
+    # computed UP FRONT, not probed by exception-retry (#194): the seat is on
+    # the -X edge, so the offset plane sits at Right - R_END (global x = -9);
+    # and the sketch rides that Right-parallel plane, whose local +u maps to
+    # global -Z (SolidWorks' standard Right-plane orientation), so the circle
+    # centre sits at u = -THICKNESS/2 to land at global z = +THICKNESS/2 --
+    # mid-thickness, INSIDE the 0..THICKNESS body. The mirror combo
+    # (u = +THICKNESS/2 -> z = -2.5) lands outside the body, so FeatureCut3
+    # rejects the empty profile ("Parameter not optional") -- exactly the
+    # self-correcting retry #194 removed. The centre-u dim is an UNSIGNED
+    # distance from the origin, so it displays as its magnitude and the drive
+    # '"StrapThickness" / 2' is positive on the flipped side (unit-safe). Two
+    # assertions keep a wrong plane handedness or a mislocated circle LOUD: the
+    # removed volume vs analytic (the strap is x-symmetric BEFORE this cut, so
+    # a volumetric pass alone cannot tell the -x seat from its +x mirror) and
+    # the centre-of-mass x sign (material removed at -x pushes the COM to +x).
     v_bore = _pin_bore_removed()
     res = await adapter.get_mass_properties()
     vol_before = res.data.volume
-    seated = False
-    for p_idx, plane_off in enumerate((-R_END, R_END)):
-        check(
-            f"create_plane PinSeatPlane{p_idx} (Right, {plane_off:+g})",
-            await adapter.create_plane(CreatePlaneParameters(
-                mode="offset", base_plane="Right Plane", offset=plane_off,
-            )),
+    check(
+        f"create_plane PinSeatPlane (Right, {-R_END:+g})",
+        await adapter.create_plane(CreatePlaneParameters(
+            mode="offset", base_plane="Right Plane", offset=-R_END,
+        )),
+    )
+    name_last_feature(adapter, "PinSeatPlane")
+    seat = SketchDims()
+    u_mid = -THICKNESS / 2.0
+    check("create_sketch pin seat", await adapter.create_sketch("PinSeatPlane"))
+    await define_circle(
+        adapter, u_mid, -PIN_DROP, PIN_BORE / 2.0, "pin seat", dims=seat,
+        names=("PinSeatCz", "PinSeatCy", "PinSeatDia"),
+        drives=('"StrapThickness" / 2', '"PinDrop"', '"PinBore"'),
+    )
+    await ensure_fully_defined(adapter, "pin seat sketch")
+    check("exit_sketch pin seat", await adapter.exit_sketch())
+    name_last_feature(adapter, "PinSeatProfile")
+    drive_jobs += seat.apply(adapter, "PinSeatProfile")
+    cut = await adapter.create_cut_extrude(ExtrusionParameters(depth=PIN_SEAT))
+    if not cut.is_success:
+        raise RuntimeError(f"pin seat cut failed: {cut.error}")
+    res = await adapter.get_mass_properties()
+    removed = vol_before - res.data.volume
+    if abs(removed - v_bore) > 0.02 * v_bore + 0.5:
+        raise RuntimeError(
+            f"pin seat cut removed {removed:.1f} mm^3, expected {v_bore:.1f} "
+            "-- circle misplaced/resized or wrong side"
         )
-        name_last_feature(adapter, f"PinSeatPlane{p_idx}")
-        for u_idx, u_mid in enumerate((THICKNESS / 2.0, -THICKNESS / 2.0)):
-            prof_name = f"PinSeatProfile{p_idx}{u_idx}"
-            seat = SketchDims()
-            check(
-                "create_sketch pin seat",
-                await adapter.create_sketch(f"PinSeatPlane{p_idx}"),
-            )
-            await define_circle(
-                adapter, u_mid, -PIN_DROP, PIN_BORE / 2.0, "pin seat", dims=seat,
-                names=("PinSeatCz", "PinSeatCy", "PinSeatDia"),
-                drives=('"StrapThickness" / 2', '"PinDrop"', '"PinBore"'),
-            )
-            await ensure_fully_defined(adapter, "pin seat sketch")
-            check("exit_sketch pin seat", await adapter.exit_sketch())
-            name_last_feature(adapter, prof_name)
-            seat_jobs = seat.apply(adapter, prof_name)
-            cut = await adapter.create_cut_extrude(
-                ExtrusionParameters(depth=PIN_SEAT)
-            )
-            if not cut.is_success:
-                _telemetry.debug(
-                    f"pin seat cut (plane {plane_off:+g}, u {u_mid:+g}) failed "
-                    f"({cut.error}); flipping"
-                )
-                orphan = feature_name_by_type(adapter, "ProfileFeature")
-                if orphan:
-                    blank_sketch(adapter, orphan)
-                continue
-            res = await adapter.get_mass_properties()
-            removed = vol_before - res.data.volume
-            if removed < 0.5:
-                _telemetry.debug(
-                    f"pin seat cut (plane {plane_off:+g}, u {u_mid:+g}) removed "
-                    "nothing; flipping"
-                )
-                # A no-op cut feature would poison later attempts -- but a cut
-                # that removed nothing FAILS in SolidWorks, so is_success above
-                # already caught it; reaching here means a sliver. Fail loud.
-                raise RuntimeError(
-                    f"pin seat cut removed a sliver ({removed:.2f} mm^3)"
-                )
-            if abs(removed - v_bore) > 0.02 * v_bore + 0.5:
-                raise RuntimeError(
-                    f"pin seat cut removed {removed:.1f} mm^3, expected "
-                    f"{v_bore:.1f} -- circle misplaced/resized"
-                )
-            com = res.data.center_of_mass
-            com_x = com[0] * 1000.0 if com is not None else None
-            if com_x is None or com_x <= 0.02:
-                raise RuntimeError(
-                    f"pin seat landed on the wrong edge (COM x {com_x}) -- "
-                    "the -x seat must push the COM to +x"
-                )
-            _telemetry.success(
-                f"pin seat (plane {plane_off:+g}, u {u_mid:+g}) removed "
-                f"{removed:.1f} mm^3 (analytic {v_bore:.1f}), COM x {com_x:+.3f}"
-            )
-            name_last_feature(adapter, "PinSeat")
-            drive_jobs += seat_jobs
-            expected -= v_bore
-            seated = True
-            break
-        if seated:
-            break
-    if not seated:
-        raise RuntimeError("pin seat cut removed no material on any sign combo")
+    com = res.data.center_of_mass
+    com_x = com[0] * 1000.0 if com is not None else None
+    if com_x is None or com_x <= 0.02:
+        raise RuntimeError(
+            f"pin seat landed on the wrong edge (COM x {com_x}) -- "
+            "the -x seat must push the COM to +x"
+        )
+    _telemetry.success(
+        f"pin seat (plane {-R_END:+g}, u {u_mid:+g}) removed "
+        f"{removed:.1f} mm^3 (analytic {v_bore:.1f}), COM x {com_x:+.3f}"
+    )
+    name_last_feature(adapter, "PinSeat")
+    expected -= v_bore
     await volume_check(adapter, "strap with pin seat", expected, 0.005 * expected)
 
     # Named bore axes for the assembly: the pivot bore (Axis1) rides the torque
