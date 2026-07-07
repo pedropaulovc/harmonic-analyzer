@@ -11,9 +11,9 @@ the reeding recipe needs an X-axis layout and this part's stack is sized
 along its axis).
 
 Layout: axis +Y from the chain-side (machine-front) end at the origin;
-the assembly rotates +Y to +Z (machine back). Front section y 0..10
-(removable seat, machine z -157.5..-147.5), O5 pinion seat y 10..15,
-rear section y 15..27.5 (latch small hub at y 23..27.5), knob y 27.5..34.
+the assembly rotates +Y to +Z (machine back). Front section y 0..9.1
+(removable seat, machine z -157.5..-148.4), O5 pinion seat y 9.1..14.6,
+rear section y 14.6..27.5 (latch small hub near the knob), knob y 27.5..34.
 Dimensions: docs/paper-drive-rework.md E7/E8.
 
 Run (SolidWorks already open)::
@@ -49,10 +49,10 @@ PART_NAME = "transgear-knob-shaft"
 MATERIAL = "Brass"
 
 SHAFT_DIA = 0.375 * IN  # 9.525 (low)
-FRONT_LEN = 10.0  # removable seat (machine z -157.5..-147.5)
+FRONT_LEN = 9.1  # removable seat (machine z -157.5..-148.4)
 SEAT_DIA = 5.0  # turned-down third-gear seat (12T DP38 root < 3/8" surface)
-SEAT_LEN = 5.0  # third gear face 4 + 1 clearance (z -147.5..-142.5)
-REAR_LEN = 12.5  # to the knob face; latch small hub rides z -134.5..-130
+SEAT_LEN = 5.5  # third gear face 4 + 1.5 clearance (z -148.4..-142.9)
+REAR_LEN = 12.9  # to the knob face; latch small hub rides z -132.75..-130.15
 KNOB_DIA = 20.0  # large brass thumb knob (low)
 KNOB_LEN = 6.5
 

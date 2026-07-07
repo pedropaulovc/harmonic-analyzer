@@ -55,7 +55,10 @@ SMALL_HUB_DIA = 16.0  # carries the knob shaft (low)
 BORE_DIA = 9.6  # both bores ride O9.5 shafts (derived)
 C2C = 44.766  # the permanent 12T:120T DP38 mesh: (12 + 120) / (2 * 38) in
 # = 44.116 + 0.65 centre extension (gap-floor clearance, see docstring)
-THICKNESS = 4.5  # along Z (low)
+THICKNESS = 2.6  # along Z: the arm lives in the 3.0 slot between the rack's
+# back face (-132.9) and the bar front / bracket plane (-129.9) -- its big
+# hub (r 11) rises past the rack's tooth band in y, so it cannot share the
+# rack's z band (derived)
 WEB_HALF_AT_BIG = 9.0  # tapered web half-widths (derived: inside hub ODs)
 WEB_HALF_AT_SMALL = 6.5
 
