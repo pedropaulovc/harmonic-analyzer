@@ -907,8 +907,8 @@ async def place_component(
     and the read-back assert holds.
 
     ``mirror=True`` (default) routes the placement through ``mirror_placement``,
-    which reflects it about the machine YZ plane using the part's ``MIRROR_PLANE``
-    symmetry (default ``"x"``). Pass ``mirror=False`` for a SINGLE machine-handed
+    which reflects it about the machine YZ plane using the part's declared symmetry
+    (``cad/config/placement/<part>.yaml``, default ``"x"``). Pass ``mirror=False`` for a SINGLE machine-handed
     part with no mirror twin -- e.g. the maker's nameplate -- whose ``position``/
     ``rows`` are already the exact machine transform; the default ``"x"`` reflection
     would otherwise flip it across X (onto the wrong side, text reversed).
@@ -1373,45 +1373,8 @@ def write_park_specs(name: str) -> Any:
     return path
 
 
-def load_park_specs(name: str) -> list[dict[str, Any]]:
-    """Read the deferred park specs for ``<name>.SLDASM`` (``[]`` if none)."""
-    path = park_spec_path(name)
-    if not path.exists():
-        return []
-    return json.loads(path.read_text()).get("specs", [])
 
 
-async def replay_park_specs(adapter: Any, specs: list[dict[str, Any]]) -> list[str]:
-    """Author every recorded deferred park driver ENGAGED on the ACTIVE assembly
-    and rename it ``PARK_<key>``; return the new names.
-
-    Used by the release preflight (and the mobility/motion diagnostics) to
-    reconstitute the freed operational DOF on a reopened default-``free`` model.
-    Reconstructs each :class:`MateEntityRef` from the recorded fields, replays the
-    exact mate on the RECORDED side (``spec["flip"]`` -- the build's sign-derived
-    seat, #185), with the original flip-recovery ``verify`` target as the safety
-    net, then re-solves."""
-    from solidworks_mcp.adapters.base import MateEntityRef
-
-    names: list[str] = []
-    for spec in specs:
-        entities = [MateEntityRef(**e) for e in spec["entities"]]
-        verify = None
-        if spec.get("verify"):
-            verify = (spec["verify"][0], list(spec["verify"][1]))
-        res = await _mate(
-            adapter,
-            f"replay PARK_{spec['key']}",
-            spec["kind"],
-            entities,
-            verify=verify,
-            flip=bool(spec.get("flip", False)),
-            **spec.get("params", {}),
-        )
-        names.append(await mark_park_driver(adapter, res, spec["key"]))
-    if names:
-        adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
-    return names
 
 
 async def mark_park_driver(adapter: Any, mate: Any, key: str) -> str:
@@ -1638,47 +1601,6 @@ def assert_free_dof_necessity(
         )
 
 
-async def assert_park_closure(
-    adapter: Any, specs: list[dict[str, Any]], expected_count: int
-) -> None:
-    """Release-preflight SUFFICIENCY gate: on a reopened default-``free`` model,
-    prove the deferred park drivers are the SOLE freedom.
-
-    * NECESSITY: the spec count equals ``expected_count`` and, before authoring,
-      at least ``expected_count`` top-level components read under-constrained (the
-      freedom really is present in the shipped free model).
-    * SUFFICIENCY: :func:`replay_park_specs` authors every recorded driver engaged
-      and re-solves; the model must then be fully defined (0 under-constrained), so
-      the true free-DOF count equals the number of drivers.
-
-    The caller MUST discard the document WITHOUT saving -- this mutates the
-    in-memory model (authoring real mates), and the shipped ``.SLDASM`` must stay
-    the free kinematic model."""
-    with _telemetry.span("gate.park_closure") as gsp:
-        gsp.set_attribute("expected_free_dof", expected_count)
-        gsp.set_attribute("specs", len(specs))
-        if len(specs) != expected_count:
-            raise RuntimeError(
-                f"park spec count {len(specs)} != expected free DOF {expected_count} "
-                "-- the recorded specs disagree with the configured free-DOF count "
-                "(rebuild the assembly)"
-            )
-        under = _under_constrained_components(adapter)
-        gsp.set_attribute("free_under_constrained", len(under))
-        if len(under) < expected_count:
-            raise RuntimeError(
-                f"expected >= {expected_count} under-constrained component(s) in the "
-                f"free pose but found {len(under)}: {sorted(under)} -- the shipped "
-                "model is already frozen (the deferred park drivers freed nothing)"
-            )
-        names = await replay_park_specs(adapter, specs)
-        gsp.set_attribute("authored", len(names))
-        # SUFFICIENCY: with every driver engaged the model must be rigid.
-        assert_components_fully_defined(adapter)
-        _telemetry.success(
-            f"park closure OK: {len(under)} free -> authored {len(names)} PARK_* "
-            "driver(s) -> 0 under-constrained (sufficiency); model NOT saved"
-        )
 
 
 def component_names(adapter: Any) -> list[str]:
@@ -2073,6 +1995,59 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
     return hashlib.sha256(repr(rows).encode("utf-8")).hexdigest()
 
 
+def select_mates_folder(adapter: Any) -> bool:
+    """Select the active assembly's Mates folder -- the precondition for
+    ``IAssemblyDoc.AutoMateRepair``. The folder is a ``MateGroup`` feature that sits
+    at/near the END of the top-level tree, so scan from the back (a couple of COM
+    round-trips) instead of walking all ~150 component features forward (~50 s).
+    Falls back to a full forward walk if an in-context feature pushed it off the
+    tail."""
+    model = adapter.currentModel
+    count = int(adapter._attempt(lambda: model.GetFeatureCount(), default=0) or 0)
+    for i in range(min(count, 8)):  # MateGroup is the last top-level feature (i=0)
+        feat = adapter._attempt(lambda i=i: model.FeatureByPositionReverse(i), default=None)
+        if feat is None:
+            continue
+        _flag(feat, "IFeature")
+        if str(adapter._attempt(lambda f=feat: f.GetTypeName2(), default="")) == "MateGroup":
+            return bool(adapter._attempt(lambda f=feat: f.Select2(False, 0), default=False))
+    feat = adapter._attempt(lambda: model.FirstFeature(), default=None)
+    while feat is not None:
+        _flag(feat, "IFeature")
+        if str(adapter._attempt(lambda f=feat: f.GetTypeName2(), default="")) == "MateGroup":
+            return bool(adapter._attempt(lambda f=feat: f.Select2(False, 0), default=False))
+        feat = adapter._attempt(lambda f=feat: f.GetNextFeature(), default=None)
+    return False
+def _rebuild_faults(adapter: Any) -> list[str]:
+    """Non-warning What's Wrong entries for the active model, formatted for a log."""
+    return [
+        f"{name} [{_FEATURE_ERROR.get(code, code)}]"
+        for name, code, warn in whats_wrong(adapter, adapter.currentModel)
+        if not warn
+    ]
+def repair_dangling_mates(adapter: Any) -> int:
+    """Auto-heal mates whose referenced topology was re-IDed by a from-scratch part
+    rebuild (the "sharp edge"): ``IAssemblyDoc.AutoMateRepair`` re-binds the broken
+    mates in place (~5 s) instead of a ~500 s full re-insert/re-mate.
+
+    Returns the count AutoMateRepair reports as repaired. Its own return code is
+    ADVISORY ONLY -- it returns PartialSuccess with a large FailedMates array (the
+    assembly's already-valid mates, which it cannot "re-repair") even on a fully
+    successful heal -- so the CALLER must judge success from a fresh ``whats_wrong``
+    + the standard DOF/interference/health gates, never from this code.
+    """
+    asm = adapter.currentModel
+    _flag(asm, "IAssemblyDoc")
+    if not select_mates_folder(adapter):
+        log("AutoMateRepair: could not select the Mates folder -- skipping repair")
+        return 0
+    processed, failed = _byref_variant(), _byref_variant()
+    ret = adapter._attempt(lambda: asm.AutoMateRepair(processed, failed), default=-1)
+    n_proc = len(list(processed.value or [])) if processed.value is not None else 0
+    n_fail = len(list(failed.value or [])) if failed.value is not None else 0
+    log(f"AutoMateRepair: ret={ret} (1=PartialSuccess is normal) "
+        f"re-bound {n_proc} mate(s), {n_fail} already-valid skipped")
+    return n_proc
 def save_assembly_in_place(adapter: Any, asm_name: str, geometry_changed: bool) -> None:
     """Save ``<asm_name>.SLDASM`` in place with a silent ``ModelDoc2.Save3``.
 
@@ -2148,66 +2123,6 @@ def save_assembly_in_place(adapter: Any, asm_name: str, geometry_changed: bool) 
             f"(ret={ret}, err={err.value}, warn={warn.value})")
     log(f"saved {sldasm.name} via Save3(Silent) (ret={ret}, err={err.value}, "
         f"warn={warn.value})")
-
-def _rebuild_faults(adapter: Any) -> list[str]:
-    """Non-warning What's Wrong entries for the active model, formatted for a log."""
-    return [
-        f"{name} [{_FEATURE_ERROR.get(code, code)}]"
-        for name, code, warn in whats_wrong(adapter, adapter.currentModel)
-        if not warn
-    ]
-
-
-def select_mates_folder(adapter: Any) -> bool:
-    """Select the active assembly's Mates folder -- the precondition for
-    ``IAssemblyDoc.AutoMateRepair``. The folder is a ``MateGroup`` feature that sits
-    at/near the END of the top-level tree, so scan from the back (a couple of COM
-    round-trips) instead of walking all ~150 component features forward (~50 s).
-    Falls back to a full forward walk if an in-context feature pushed it off the
-    tail."""
-    model = adapter.currentModel
-    count = int(adapter._attempt(lambda: model.GetFeatureCount(), default=0) or 0)
-    for i in range(min(count, 8)):  # MateGroup is the last top-level feature (i=0)
-        feat = adapter._attempt(lambda i=i: model.FeatureByPositionReverse(i), default=None)
-        if feat is None:
-            continue
-        _flag(feat, "IFeature")
-        if str(adapter._attempt(lambda f=feat: f.GetTypeName2(), default="")) == "MateGroup":
-            return bool(adapter._attempt(lambda f=feat: f.Select2(False, 0), default=False))
-    feat = adapter._attempt(lambda: model.FirstFeature(), default=None)
-    while feat is not None:
-        _flag(feat, "IFeature")
-        if str(adapter._attempt(lambda f=feat: f.GetTypeName2(), default="")) == "MateGroup":
-            return bool(adapter._attempt(lambda f=feat: f.Select2(False, 0), default=False))
-        feat = adapter._attempt(lambda f=feat: f.GetNextFeature(), default=None)
-    return False
-
-
-def repair_dangling_mates(adapter: Any) -> int:
-    """Auto-heal mates whose referenced topology was re-IDed by a from-scratch part
-    rebuild (the "sharp edge"): ``IAssemblyDoc.AutoMateRepair`` re-binds the broken
-    mates in place (~5 s) instead of a ~500 s full re-insert/re-mate.
-
-    Returns the count AutoMateRepair reports as repaired. Its own return code is
-    ADVISORY ONLY -- it returns PartialSuccess with a large FailedMates array (the
-    assembly's already-valid mates, which it cannot "re-repair") even on a fully
-    successful heal -- so the CALLER must judge success from a fresh ``whats_wrong``
-    + the standard DOF/interference/health gates, never from this code.
-    """
-    asm = adapter.currentModel
-    _flag(asm, "IAssemblyDoc")
-    if not select_mates_folder(adapter):
-        log("AutoMateRepair: could not select the Mates folder -- skipping repair")
-        return 0
-    processed, failed = _byref_variant(), _byref_variant()
-    ret = adapter._attempt(lambda: asm.AutoMateRepair(processed, failed), default=-1)
-    n_proc = len(list(processed.value or [])) if processed.value is not None else 0
-    n_fail = len(list(failed.value or [])) if failed.value is not None else 0
-    log(f"AutoMateRepair: ret={ret} (1=PartialSuccess is normal) "
-        f"re-bound {n_proc} mate(s), {n_fail} already-valid skipped")
-    return n_proc
-
-
 async def refresh_assembly(
     adapter: Any, asm_name: str, views: Iterable[str] = DEFAULT_VIEWS
 ) -> dict[str, str]:

@@ -131,7 +131,7 @@ async def _probe_sub(adapter: Any, sub: str, probes: list[tuple]) -> list[str]:
     # probe. Replay the recorded specs (author them engaged, renamed PARK_*) so the
     # baseline/suppress argument below has real drivers to work on. The doc is NEVER
     # saved (this probe only reads status), so the on-disk free model is untouched.
-    from _assembly import load_park_specs, replay_park_specs
+    from _assembly_postbuild import load_park_specs, replay_park_specs
 
     specs = load_park_specs(sub)
     if specs:
