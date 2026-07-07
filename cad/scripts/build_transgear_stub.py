@@ -11,7 +11,7 @@ photo's end hardware collapsed to a collar -- simplification).
 Layout: axis +Y from the bracket-back end at the origin; the assembly
 rotates +Y to -Z (machine front). Base y 0..9.1 (bracket + arm hub), seat
 y 9.1..22.9 (feed pinion + disc), collar 22.9..26.9.
-Dimensions: docs/paper-drive-rework.md E7/E8.
+Dimensions: memory/paper-drive-rework.md E7/E8.
 
 Run (SolidWorks already open)::
 
