@@ -6,8 +6,10 @@ platen cannot fall off it: the plate overlaps the guide on one long edge
 (the 2 screw holes) and cantilevers past the bar's back face on the other.
 
 Layout: width along +X, height along +Y from the origin corner, thickness
-extruded +Z; the y = 0 edge is the guide-side edge (the assembly flips the
-bottom-rail copies 180 about X so they bridge upward).
+extruded +Z; the y = 0 edge is the guide-side edge (screw holes 2.5 above
+it). Bottom-rail copies mount as authored and bridge UP across the open
+channel onto the bar band; top-rail copies are flipped Rz180 by the assembly
+and hang DOWN over the bar.
 
 Run (SolidWorks already open)::
 
@@ -44,7 +46,13 @@ PART_NAME = "guide-lock"
 MATERIAL = "Plain Carbon Steel"
 
 LOCK_WIDTH = 22.0
-LOCK_HEIGHT = 12.0  # 5 on the guide + 7 bridging over the bar band
+# Sized by the BOTTOM station: its rail sits 7 below the bar (open channel), so
+# reaching a 7 overlap behind the bar band takes 5 (rail) + 7 (channel) + 7
+# (bar) = 19. The top rail sits ON the bar, so the same plate overlaps the bar
+# by 14 there -- and the two rows still clear each other by 1.0 in y
+# (2026-07-07 field report: a 12-tall plate topped out AT the bar's bottom
+# edge and retained nothing at the bottom stations).
+LOCK_HEIGHT = 19.0
 LOCK_THICK = 2.0
 HOLE_DIA = 3.0  # the fillister screws' O2.9 shanks pass through
 HOLE_XY = ((4.0, 2.5), (18.0, 2.5))  # on the guide band (guide holes x +-7)

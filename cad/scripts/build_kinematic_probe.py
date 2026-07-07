@@ -29,9 +29,10 @@ the global Z axis, so their SIGNED Z rotations are also compared -- ratio AND se
     mesh; ``GEAR_SENSE`` pins the authored alignment),
   * the feed pinion turns WITH the disc (Lock, same axis -- signed compare),
   * the platen translates by ``pi * FEED_PD * (dTheta_feed / 360)``, checked
-    SIGNED against the MEASURED feed-pinion rotation (``FEED_SIGN`` pins the
-    authored rack-pinion alignment), and end-to-end the feed must equal
-    ``NET_RACK_TRAVEL_PER_CRANK_REV`` per crank revolution.
+    SIGNED against the MEASURED feed-pinion rotation (``FEED_SIGN`` states the
+    physical tooth-contact sense -- flip the MATE, not the constant), and
+    end-to-end the feed must equal ``NET_RACK_TRAVEL_PER_CRANK_REV`` per crank
+    revolution, SIGNED through the whole train.
 
 The roller-chain COMPONENT PATTERN has NO native coupling to sprocket rotation --
 SolidWorks chain-pattern instances cannot be mated to other components. So link
@@ -94,14 +95,17 @@ LIN_TOL = 0.05      # mm: the 30-deg drive feeds only ~0.133 mm through the 1:20
 # SIGNED senses (codex #189: magnitude-only checks would pass a mate that
 # solved to the reversed alignment and fed the paper BACKWARD). The gear and
 # rack-pinion mates store their alignment in the authored model, so the sense
-# is deterministic per build script; these constants pin it. Initialised to
-# the physical expectation (external mesh reverses; the pinion ABOVE-mesh
-# feeds +x for +spin) -- calibrate from the first live gate run if the
-# authored alignments solve the other way (precedent: 29f1282). They live
-# HERE (not in the build script) so a calibration flip re-runs only
-# verify:kinematics, not the assembly build.
+# is deterministic per build script; these constants pin it (precedent:
+# 29f1282). They live HERE (not in the build script) so a calibration flip
+# re-runs only verify:kinematics, not the assembly build.
 GEAR_SENSE = -1.0   # sign of (disc Z) / (T24/third Z): external 12:120 mesh
-FEED_SIGN = -1.0    # sign of (platen dX) / (feed-pinion signed-Z deg)
+# FEED_SIGN is PINNED by the physical tooth contact observed in live SW
+# (2026-07-07 drag test: the original platen-axis-referenced mate fed the
+# paper BACKWARD at this constant's old -1 value, every magnitude passing).
+# Do NOT re-calibrate this constant to whatever the model does -- it states
+# the physics; flip the MATE (build_paper_drive_assembly, rack_pinion_mate
+# flip=) until this assert holds.
+FEED_SIGN = +1.0    # sign of (platen dX) / (feed-pinion signed-Z deg)
 
 
 def _rot(adapter: Any, name: str) -> list[float]:
@@ -304,12 +308,19 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
             f"(FEED_SIGN {FEED_SIGN:+.0f} x pi*{FEED_PD:.2f} x feed Z "
             f"{z_feed:+.2f}/360) -- rack broken or feed direction REVERSED")
     # (6) End-to-end cross-check: the whole train must feed at the documented
-    # NET law (1.596 mm per crank rev with T12/T24 mounted), magnitude.
-    exp_net = NET_RACK_TRAVEL_PER_CRANK_REV * d_crank / 360.0
-    if abs(abs(d_platen) - exp_net) > LIN_TOL:
+    # NET law (1.596 mm per crank rev with T12/T24 mounted), SIGNED through the
+    # full chain (same-sense chain -> reversing 12:120 mesh -> pinned rack
+    # sense): d_platen = FEED_SIGN * GEAR_SENSE * NET * z_crank / 360. Any
+    # single reversal anywhere in the train flips the sign and fails HERE even
+    # if a pairwise constant above were miscalibrated to match it (2026-07-07
+    # field report: the rack mate fed backward while every magnitude passed).
+    exp_net = (FEED_SIGN * GEAR_SENSE
+               * NET_RACK_TRAVEL_PER_CRANK_REV * z_crank / 360.0)
+    if abs(d_platen - exp_net) > LIN_TOL:
         raise RuntimeError(
-            f"net feed |{d_platen:+.3f}| mm != {exp_net:.3f} "
-            f"(NET {NET_RACK_TRAVEL_PER_CRANK_REV:.3f}/crank-rev x {d_crank:.1f}/360)")
+            f"net feed {d_platen:+.3f} mm != {exp_net:+.3f} "
+            f"(FEED_SIGN {FEED_SIGN:+.0f} x GEAR_SENSE {GEAR_SENSE:+.0f} x NET "
+            f"{NET_RACK_TRAVEL_PER_CRANK_REV:.3f}/crank-rev x crank Z {z_crank:+.1f}/360)")
     _telemetry.success(
         f"crank->feed coupling OK: crank {d_crank:.1f} deg -> T24/shaft/third "
         f"{d_t24:.1f} deg (chain ratio {chain_ratio:.3f} = 12:24, same-sense) "
