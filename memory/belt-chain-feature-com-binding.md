@@ -65,10 +65,15 @@ ALL of these commit green and leave the coupling at 0.5385:
 pass those entities as `PulleyComponents`. An axis has no diameter to steal, so
 the typed `PulleyDiameters` drive the mate exactly. Measured on the real
 paper-drive: T12 +30.00° → T24 +15.00°, **ratio +0.5000, same sense**
-(`probe_belt_axis_members.py`). Productised in the adapter as
-`BeltChainParameters.pulley_member_axes` (submodule #79); post-create the
-adapter walks the MateGroup for the `MateBeltDim` and fails loud unless its
-D1/D2 multiset equals the request — the only meaningful verification.
+(`probe_belt_axis_members.py`; re-proven by the `verify:kinematics` gate 8/0).
+Productised in the adapter as `BeltChainParameters.pulley_member_axes`
+(submodule #79); post-create the adapter walks the MateGroup for the
+`MateBeltDim` and fails loud unless its D1/D2 carry the requested RATIO — the
+compare is SCALE-invariant because the recorded scale varies by member kind:
+an axis-member mate stores the typed diameters at HALF scale (radii — measured
+0.012/0.024 for typed 0.024/0.048, coupling still exact) while a face-member
+mate stores diameters (0.028/0.052 for 0.014/0.026 tip radii). Only the ratio
+is the coupling; absolutes live in other mates.
 
 **COM traps (still real):** `PulleyDiameters` getters return **[]** until
 `typed.AccessSelections(model, None)`; `ModifyDefinition` must be called on an
