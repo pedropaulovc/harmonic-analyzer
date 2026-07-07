@@ -91,7 +91,6 @@ from _buildgraph import (  # noqa: E402
     artefact_for,
     config_files_of,
     data_deps_of,
-    flipseed_family_files,
     machine_family_files,
     module_deps_of,
     part_row_files,
@@ -500,21 +499,6 @@ def _expand_placement_token(stem: str | None, kind: str | None) -> list[str]:
     return placement_family_files()
 
 
-def _expand_flipseeds_token(stem: str | None, kind: str | None) -> list[str]:
-    """Per-task expansion of the ``"flip_seeds/*"`` token: an ASSEMBLY depends on
-    ONLY its own ``flip_seeds/<stem>.yaml`` (it loads only its own seeds at build
-    time via ``set_flip_seeds(_config.flip_seeds("<stem>"))``); a PART loads none;
-    any other caller gets the whole family. Narrowing to the task stem -- rather
-    than the literal arg -- keeps a sibling's seed edit from re-keying an assembly
-    that merely imports the sibling's build module."""
-    if kind == "assembly" and stem is not None:
-        f = CONFIG_DIR / "flip_seeds" / f"{stem}.yaml"
-        return [str(f.resolve())] if f.exists() else []
-    if kind == "part":
-        return []
-    return flipseed_family_files()
-
-
 def _config_deps(script, stem: str | None = None, kind: str | None = None) -> list[str]:
     """The cad/config FILES this build script actually reads (fine-grained;
     conservative whole-config fallback on any unclassifiable ``_config`` use).
@@ -534,8 +518,6 @@ def _config_deps(script, stem: str | None = None, kind: str | None = None) -> li
             out.update(_expand_parts_token(stem, kind, script))
         elif tok == "placement/*":
             out.update(_expand_placement_token(stem, kind))
-        elif tok == "flip_seeds/*":
-            out.update(_expand_flipseeds_token(stem, kind))
         else:
             out.add(str((CONFIG_DIR / tok).resolve()))
     return sorted(out)

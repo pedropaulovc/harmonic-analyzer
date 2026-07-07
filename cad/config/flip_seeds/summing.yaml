@@ -1,5 +1,0 @@
-# Learned flip-polarity seeds for the summing assembly (issue: per-assembly flip
-# seeds). None needed today; the file exists so _config.flip_seeds("summing")
-# resolves to a concrete per-file token (an absent file would fall back to the
-# whole config). Add sigs here from the `_mate` `learn: add sig` warns.
-seeds: []

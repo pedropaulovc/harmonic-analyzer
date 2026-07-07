@@ -382,31 +382,74 @@ def _mate_hard_error(adapter: Any, name: str) -> int:
 # from one at z=+40 -- so `flip = (signed < 0)` lands the great majority on-
 # target in ONE solve, no delete-and-re-add. A minority of references have their
 # default side inverted relative to the coordinate's + direction (the part
-# plane's normal opposes the datum's); those signatures live in the assembly's
-# `cad/config/flip_seeds/<stem>.yaml` and XOR the rule. The set is DETERMINED ONCE
-# during development: build with it empty, and every mate that still needs a
-# recovery WARNS with its signature (see `_mate`); add those signatures to that
-# assembly's seed file and rebuild -> zero flips. The readback guard in `_mate`
-# stays as the safety net AND regression alarm: a flip in a normal build means this
-# heuristic broke for that mate -- re-learn its side.
-# Active flip-polarity seed set for the CURRENT assembly build, loaded from
-# cad/config/flip_seeds/<stem>.yaml by set_flip_seeds() (issue: per-assembly flip
-# seeds). Was a single global frozenset here spanning every assembly, so
-# re-learning one assembly's polarity re-keyed all 8; now each build script loads
-# only its own. Empty by default -- a build that never calls set_flip_seeds (or an
-# assembly with no seeds) just falls back to the plain sign rule, and any needed
-# flip is still recovered by the _mate readback guard (seeds are an optimisation,
-# not a correctness input).
-_ACTIVE_FLIP_SEEDS: frozenset[str] = frozenset()
-
-
-def set_flip_seeds(seeds) -> None:
-    """Install the flip-polarity seeds for the assembly about to be built. Called
-    once at the top of each build_<stem>_assembly.build() with
-    ``_config.flip_seeds("<stem>")`` -- the literal stem keeps the config dep
-    scoped to that one flip_seeds/<stem>.yaml file."""
-    global _ACTIVE_FLIP_SEEDS
-    _ACTIVE_FLIP_SEEDS = frozenset(seeds)
+# plane's normal opposes the datum's); those signatures live in `_FLIP_INVERT`
+# and XOR the rule. The set is DETERMINED ONCE during development: build with it
+# empty, and every mate that still needs a recovery WARNS with its signature
+# (see `_mate`); add those signatures here and rebuild -> zero flips. The
+# readback guard in `_mate` stays as the safety net AND regression alarm: a flip
+# in a normal build means this heuristic broke for that mate -- re-learn its side.
+_FLIP_INVERT: frozenset[str] = frozenset({
+    # Per-signature flip polarity, learned once from the discovery build (see
+    # `_seed_flip`/`_orient_suffix`): a signature here seats on the side
+    # OPPOSITE the plain sign rule. Rotation/mirror twins carry an ` @<diag>`
+    # orientation suffix so each is seeded independently of its sibling.
+    # Re-derive after a mate/geometry change: build with this empty, read the
+    # `flip-seed MISS` warns, paste their sigs here, rebuild -> zero flips.
+    "alignment pinion axial",
+    "arbor pedestal datum X",
+    "arbor pedestal datum Y",
+    "arbor pedestal datum Y @npn",
+    "arbor pedestal datum Z",
+    "axial seat",
+    "cam follower back seat depth",
+    "cam follower front seat depth",
+    "cone gear axial seat",
+    "cone lock knob datum X",
+    "cone lock knob datum Y",
+    "cone lock knob datum Z",
+    "cone pivot screw datum X",
+    "cone pivot screw datum Y",
+    "cone pivot screw datum Z",
+    "cone platform height",
+    "cone shaft axial",
+    "crankshaft axial (on the plate)",
+    "cylinder gear axial anchor",
+    "cylinder gear axial pitch",
+    "foot screw datum X",
+    "foot screw datum Y",
+    "foot screw datum Z",
+    "fulcrum shaft datum x",
+    "fulcrum shaft datum y",
+    "lever axial seat",
+    "lever bushing axial z",
+    "lift rod axial",
+    "mag lever depth @npn",
+    "mag lever knife line across @npn",
+    "pen rod travel snapshot",
+    "pinch head seat @ppn",
+    "pinion arbor axial",
+    "pinion cam back set pin axial",
+    "pinion cam front set pin axial",
+    "pinion pivot block datum Y @npn",
+    "pinion pivot shaft datum X",
+    "pinion pivot shaft datum Y",
+    "pinion pivot shaft datum Z",
+    "pinion spring datum Y @npn",
+    "pivot ball mount datum x",
+    "pivot ball mount datum y",
+    "pivot ball mount datum z",
+    "pivot bushing axial z",
+    "platen feed snapshot",
+    "slotted screw datum X",
+    "slotted screw datum Y",
+    "slotted screw datum Z",
+    "spring hook datum y @npn",
+    "swing stop screw datum X",
+    "swing stop screw datum Y",
+    "swing stop screw datum Z",
+    "tip block axial seat",
+    "tip bushing axial seat",
+})
 
 
 def _flip_sig(label: str) -> str:
@@ -416,10 +459,9 @@ def _flip_sig(label: str) -> str:
     ``d=<dist>`` distance, and every digit-bearing token (channel/tooth indices
     like ``-7``, ``ch16``, ``T120``, ``J4``) -- leaving the structural descriptor
     (``"spring hook datum y"``). Mates that share a signature are the same seat
-    stamped across a pattern, so they share one flip polarity. Keys the active
-    seed set (:data:`_ACTIVE_FLIP_SEEDS`, loaded per assembly from
-    cad/config/flip_seeds/<stem>.yaml); generated with the SAME transform over the
-    mined flip logs, so seeds and runtime signatures match by construction."""
+    stamped across a pattern, so they share one flip polarity. Keys
+    :data:`_FLIP_INVERT`; generated with the SAME transform over the mined flip
+    logs, so seeds and runtime signatures match by construction."""
     s = re.sub(r"\s*->.*$", "", label)
     s = re.sub(r"\bd=[+-]?[0-9.]+", "", s)
     s = re.sub(r"\b\w*\d\w*\b", " ", s)
@@ -453,7 +495,7 @@ def _seed_flip(label: str, signed: float, suffix: str = "") -> bool:
     signed target coordinate, XOR the reference's learned polarity. ``suffix`` is
     the caller's orientation fingerprint (:func:`_orient_suffix`), appended to the
     signature so a rotation/mirror twin is disambiguated from its sibling."""
-    return (signed < 0.0) ^ ((_flip_sig(label) + suffix) in _ACTIVE_FLIP_SEEDS)
+    return (signed < 0.0) ^ ((_flip_sig(label) + suffix) in _FLIP_INVERT)
 
 
 async def _mate(
@@ -514,8 +556,7 @@ async def _mate(
             _orient_suffix(adapter, comp_name) if comp_name else "")
         _telemetry.warn(
             f"flip-seed MISS: {label!r} off by {moved:.2f} mm, error={err}"
-            f" -> re-adding flipped  (learn: add sig {_seed_sig!r} to this "
-            f"assembly's cad/config/flip_seeds/<stem>.yaml)"
+            f" -> re-adding flipped  (learn: add sig {_seed_sig!r} to _FLIP_INVERT)"
         )
         check(
             f"{label} (delete wrong side)",

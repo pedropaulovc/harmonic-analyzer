@@ -33,7 +33,6 @@ Run (SolidWorks already open)::
 """
 
 from __future__ import annotations
-import _config_asm
 
 import sys
 
@@ -43,7 +42,6 @@ from _common import (
     run_build,
 )
 from _assembly import (
-    set_flip_seeds,
     angle_driver,
     assert_components_fully_defined,
     check_no_interference,
@@ -100,7 +98,6 @@ def _assert_counter_spring_hang() -> None:
 
 
 async def build(adapter) -> dict[str, str]:
-    set_flip_seeds(_config_asm.flip_seeds("summing"))  # per-assembly learned flip polarity
     _assert_counter_spring_hang()
 
     check("create_assembly", await adapter.create_assembly())

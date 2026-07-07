@@ -58,13 +58,11 @@ import math
 import sys
 
 import _config
-import _config_asm
 from _common import (
     check,
     run_build,
 )
 from _assembly import (
-    set_flip_seeds,
     angle_driver,
     assert_component_placed,
     assert_expected_free_dof,
@@ -255,7 +253,6 @@ PINCH_SCREW_Z = -88.0
 async def build(adapter) -> dict[str, str]:
     # `free` (default) DEFERS the freed-DOF park driver (records, does not
     # author); `locked` authors it engaged. Set before the *_driver call below.
-    set_flip_seeds(_config_asm.flip_seeds("magnifier"))  # per-assembly learned flip polarity
     set_park_defer(not LOCK)
     check("create_assembly", await adapter.create_assembly())
 
