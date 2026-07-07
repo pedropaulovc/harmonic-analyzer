@@ -21,11 +21,15 @@ is the single fully-safe entry point that runs every gate.
                       gear ratios == config is verified at the RELEASE preflight,
                       not on every build.
   kinematics          NEEDS SOLIDWORKS. Kinematic pen-driver fidelity (plan F5):
-                      open pen.SLDASM, sweep the CrankDeg global, and assert
-                      the pen-marker tip traces truth_model.pen_y (mapped to the
-                      physical half-stroke) with NO force solver -- the computed-
-                      not-simulated summation realised through the equation-driven
-                      pen-rod mate (pen_driver.py / docs/motion-policy.md).
+                      open pen.SLDASM (on a default-`free` build, first replay
+                      the deferred travel park spec and install the F5 equation
+                      transiently -- the shipped model has neither, its travel
+                      is a live free DOF; discarded unsaved), sweep the CrankDeg
+                      global, and assert the pen-marker tip traces
+                      truth_model.pen_y (mapped to the physical half-stroke)
+                      with NO force solver -- the computed-not-simulated
+                      summation realised through the equation-driven pen-rod
+                      mate (pen_driver.py / docs/motion-policy.md).
   math                no-SolidWorks analytic self-check of ``truth_model``: the
                       synthesis math is symmetric / band-limited / correct.
   config              no-SolidWorks cross-checks: build config (machine/channels)
@@ -115,10 +119,13 @@ CHANNEL_OWNER = "channel"
 # so a reduced build stays fully verified at its own scale.
 CHANNELS = _config.active_count()
 # The kinematic pen driver (plan F5) lives in this sub: its pen-rod travel mate
-# is equation-linked to a CrankDeg global through the chained Fourier sum
-# (pen_driver.install, run at build time). The motion suite sweeps CrankDeg here
-# and proves the pen tip traces truth_model.pen_y -- the computed-not-simulated
-# summation, with no force solver (docs/motion-policy.md).
+# is equation-linked to a CrankDeg global through the chained Fourier sum. On a
+# `locked` build pen_driver.install ran at build time; on the default `free`
+# build the travel mate is a DEFERRED park driver, so the motion suite replays
+# it and installs the equation transiently before the sweep (discarded
+# unsaved). Either way it sweeps CrankDeg and proves the pen tip traces
+# truth_model.pen_y -- the computed-not-simulated summation, with no force
+# solver (docs/motion-policy.md).
 MOTION_OWNER = "pen"
 PEN_MARKER_STEM = "pen-marker"  # the carriage tip whose Y traces the curve
 # CrankDeg angles to sample; spans a full fundamental period (0..360) so both
@@ -587,6 +594,11 @@ def _expected_free_dof(name: str) -> int:
     if name == "summing":
         # The freed lever knife-edge rock; the boss-hook is lock-mated and rides it.
         return 0 if is_locked_build(_config.machine("build_lock", "summing")) else 1
+    if name == "pen":
+        # The freed carriage travel; the marker + pen-wire are lock-mated and ride
+        # it. The F5 pen-driver equation exists only in a `locked` build --
+        # verify:kinematics replays the deferred mate and installs it transiently.
+        return 0 if is_locked_build(_config.machine("build_lock", "pen")) else 1
     return 0
 
 
@@ -607,6 +619,8 @@ _REQUIRED_FREE_STEMS = {
     "paper-drive": ("transgear-removable",),
     # One freed DOF (the lever knife-edge rock); the lock-mated boss-hook rides it.
     "summing": ("summing-lever",),
+    # One freed DOF (the carriage travel); the lock-mated marker + wire ride it.
+    "pen": ("pen-rod",),
 }
 
 
@@ -757,7 +771,9 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
     """Kinematic pen-driver fidelity (plan F5): sweep CrankDeg, prove the tip traces truth_model.
 
     pen.SLDASM's pen-rod travel mate is equation-linked to a CrankDeg global
-    through the chained Fourier sum (installed by pen_driver.install at build).
+    through the chained Fourier sum (installed at build on a `locked` build;
+    replayed + installed transiently here on the default `free` build, whose
+    shipped model leaves the travel a live free DOF).
     Setting CrankDeg and rebuilding must displace the pen-marker tip by exactly
     ``pen_driver.expected_tip_disp_mm(theta)`` from the rest pose -- the computed
     (not force-simulated) summation, mapped onto the physical half-stroke. The
@@ -776,6 +792,38 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
 
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     check(f"open {name}", await adapter.open_model(str(sldasm)))
+    if _expected_free_dof(name):
+        # Default-`free` build: the travel park driver is DEFERRED, so the
+        # shipped pen.SLDASM has neither the mate nor the F5 equation (the
+        # carriage is a live free DOF). Replay the recorded spec transiently
+        # (authors + renames PARK_pen_travel), install the equation on the
+        # replayed mate, then sweep as usual. The doc is mutated in memory only
+        # -- verify never saves, and the next CloseAllDocuments discards it.
+        travel = [s for s in load_park_specs(name) if s.get("key") == "pen_travel"]
+        if len(travel) != 1:
+            report.failed.append((
+                f"motion:{name}:park-spec",
+                f"expected exactly 1 recorded pen_travel park spec, found "
+                f"{len(travel)} -- rebuild pen",
+            ))
+            _telemetry.error(f"{name}: pen_travel park spec missing/ambiguous")
+            return
+        (travel_mate,) = await replay_park_specs(adapter, travel)
+        base_mm = abs(float(travel[0]["params"]["distance"]))
+        param = adapter._attempt(
+            lambda: adapter.currentModel.Parameter(f"D1@{travel_mate}"), default=None)
+        if param is None:
+            report.failed.append((
+                f"motion:{name}:pen-driver-install",
+                f"cannot read D1@{travel_mate} on the replayed travel mate",
+            ))
+            _telemetry.error(f"{name}: cannot read D1@{travel_mate}")
+            return
+        base_doc = float(_read_member(param, "Value"))  # IPS doc -> inches
+        info = await pen_driver.install(
+            adapter, travel_mate, base_doc, base_doc / base_mm)
+        log(f"pen driver (transient replay): {info['links']}-link chain, scale "
+            f"{info['scale_mm_per_unit']:.4g} mm/unit, rest {info['rest_deg']:g} deg")
     log(f"--- motion: {name} pen-driver sweep (rest {pen_driver.rest_crank_deg():g} deg, "
         f"stroke +-{pen_driver.stroke_half_mm():g} mm) ---")
     marker = _pen_marker_name(adapter)
