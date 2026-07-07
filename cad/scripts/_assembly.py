@@ -900,6 +900,7 @@ async def rack_pinion_mate(
     *,
     pinion_pitch_diameter: float = 0.0,
     rack_travel_per_revolution: float = 0.0,
+    flip: bool = False,
     label: str = "rack_pinion",
     verify: tuple[str, list[float]] | None = None,
 ) -> Any:
@@ -908,8 +909,11 @@ async def rack_pinion_mate(
     ``rack_ref`` selects a linear rack edge/axis, ``pinion_ref`` the pinion's
     cylindrical face/axis. Set EITHER ``pinion_pitch_diameter`` (mm) OR
     ``rack_travel_per_revolution`` (mm) -- the adapter writes it into the mate
-    definition (AddMate5 has no parameter for it). Verify the feed direction
-    with a kinematic rotate, per the plan's gear-ratio risk.
+    definition (AddMate5 has no parameter for it). ``flip`` sets the mate's
+    ``Reverse`` member when the solver's derived engagement sense runs the rack
+    backward vs the physical tooth contact -- calibrate it from the
+    verify:kinematics gate (the probe's signed feed assert), per the
+    GEAR_SENSE/FEED_SIGN precedent.
     """
     return await _mate(
         adapter,
@@ -918,6 +922,7 @@ async def rack_pinion_mate(
         [rack_ref, pinion_ref],
         pinion_pitch_diameter=pinion_pitch_diameter,
         rack_travel_per_revolution=rack_travel_per_revolution,
+        flip=flip,
         verify=verify,
     )
 

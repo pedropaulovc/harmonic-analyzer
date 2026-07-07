@@ -43,6 +43,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_bore_axis,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -73,7 +74,7 @@ PITCH = math.pi / DP * IN  # 2.660 mm
 ADDENDUM = 1.0 / DP * IN  # 0.847 mm
 DEDENDUM = 1.157 / DP * IN  # 0.980 mm -- 14.5 deg full-depth standard
 
-PITCH_LINE_Y = BAR_HEIGHT - ADDENDUM  # 29.153 -- teeth crest at the bar top
+PITCH_LINE_Y = BAR_HEIGHT - ADDENDUM  # 11.153 -- teeth crest at the bar top
 ROOT_Y = PITCH_LINE_Y - DEDENDUM  # 28.174
 CUT_TOP_Y = BAR_HEIGHT + 1.0  # opens past the top edge
 TAN_PA = math.tan(math.radians(PA_DEG))
@@ -201,6 +202,15 @@ async def build(adapter) -> dict[str, str]:
     )
 
     await apply_material(adapter, MATERIAL)
+
+    # Named pitch-line axis (local X at y = pitch line, mid-thickness) so the
+    # assembly's rack-pinion mate references the RACK's own engagement line --
+    # not the platen it happens to be locked to (2026-07-07 field report).
+    await name_bore_axis(
+        adapter, "Front Plane", BAR_THICKNESS / 2.0,
+        "Top Plane", PITCH_LINE_Y, "pitch axis",
+    )
+
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

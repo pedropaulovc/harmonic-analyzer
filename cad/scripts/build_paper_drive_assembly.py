@@ -673,8 +673,10 @@ async def build(adapter) -> dict[str, str]:
         await _lock_to_platen(guide, f"platen-guide y{gy:.1f}")
         guides.append(guide)
     # Lock plates on the guide backs, bridging BEHIND the bar (1.0 clear of its
-    # back face): top-rail locks hang DOWN over the bar (Rz180), bottom-rail
-    # locks bridge UP (identity).
+    # back face): top-rail locks hang DOWN over the bar (Rz180, 14 overlap),
+    # bottom-rail locks bridge UP across the 7 open channel onto the bar band
+    # (identity, 7 overlap -- the 19-tall plate is sized by this station); the
+    # two rows clear each other by 1.0 in y.
     for x_c in LOCK_STATION_X:
         top = await place_component(
             adapter, "guide-lock",
@@ -853,13 +855,18 @@ async def build(adapter) -> dict[str, str]:
         label="third gear 12T : disc 120T (DP38)")
     # (3) RACK-PINION mate: the feed pinion (locked to the disc) feeds the
     # platen at its own pitch circumference -- pi * 10.16 per rev. The rack
-    # linear reference is the platen's own slide Axis1 (the rack is locked to
-    # the platen); the pinion reference is the stud axis.
+    # linear reference is the RACK's own pitch-line Axis1 (the physical
+    # engagement line; the platen follows through its lock mate), the pinion
+    # reference is the stud axis. The engagement SENSE is calibrated from the
+    # verify:kinematics signed feed assert (2026-07-07 field report: the
+    # platen-axis-referenced default fed the paper backward vs the tooth
+    # contact) -- flip here if the probe's FEED_SIGN assert fails on sign.
     await rack_pinion_mate(
         adapter,
-        named_ref(f"Axis1@{platen}", "AXIS"),
+        named_ref(f"Axis1@{rack}", "AXIS"),
         named_ref(f"Axis1@{feed}", "AXIS"),
         rack_travel_per_revolution=math.pi * FEED_PD,
+        flip=False,
         label="platen feed (feed pinion on the rack)")
     # (4) The crank spin is the FREED operational-DOF park driver. Deferred in
     # the default `free` build (recorded, not authored) -> T12 spins free and
