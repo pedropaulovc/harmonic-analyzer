@@ -10,7 +10,7 @@ the clamp axis -- only the block depth, which side the relief opens, and the
 ear-hole diameter (clearance vs thread) differ, so one builder takes the
 deltas.
 
-Local frame (matches build_column_clamp.py): clamp axis (screw line) along
+Local frame (inherited from the retired one-piece collar): clamp axis (screw line) along
 +X, column axis along Y through the origin, ears flanking at local z +-17.5;
 the assembly rotates local +X to machine -Z. The FRONT arc spans local
 x 0..DEPTH (relief opening -X, back face on the column-axis plane), the BACK

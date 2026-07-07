@@ -461,7 +461,9 @@ _FLIP_INVERT: frozenset[str] = frozenset({
     "lift rod axial",
     "mag lever depth @npn",
     "mag lever knife line across @npn",
-    "pen rod travel snapshot",
+    # (was "pen rod travel snapshot" -- the label gained the PARK-driver tag
+    # 2026-07-07; same mate, same learned side)
+    "pen rod travel PARK driver (freed in default build)",
     "pinch head seat @ppn",
     "pinion arbor axial",
     "pinion cam back set pin axial",
@@ -476,7 +478,10 @@ _FLIP_INVERT: frozenset[str] = frozenset({
     "pivot ball mount datum z",
     "pivot bushing axial z",
     "platen feed snapshot",
-    "rack pinion disc axial",
+    # (was "rack pinion disc axial" -- the 120T disc's label became "reducer
+    # disc" in the PR #196 real-train rework; same mate, same learned side.
+    # Latent until 2026-07-07's full paper-drive rebuild re-keyed it.)
+    "reducer disc axial",
     "slotted screw datum X",
     "slotted screw datum Y",
     "slotted screw datum Z",

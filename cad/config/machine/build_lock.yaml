@@ -20,6 +20,8 @@ build_lock:
   channel: free
   magnifier: free
   paper_drive: free
+  summing: free
+  pen: free
   source: "design decision 2026-06 (default-free kinematic model + opt-in lock)"
   confidence: high
   notes: >-
@@ -34,7 +36,11 @@ build_lock:
     crank (T12) sprocket spin (1 DOF): a Belt/Chain feature couples it to the knob T24, and a
     rack-pinion mate feeds the platen off the knob axis at the net through-train ratio (the
     intermediate transgear stays in its faithful ch30 rest pose; the engage is coupled
-    kinematically across the documented gap, Appendix C #8). In a free build these freed-DOF
+    kinematically across the documented gap, Appendix C #8). summing frees the lever's
+    knife-edge rock (1 DOF; the boss-hook rides it via its lock mate). pen frees the pen
+    carriage's vertical travel (1 DOF; marker + pen-wire ride via lock mates; the F5
+    pen-driver equation is installed on the transiently replayed travel mate by
+    verify:kinematics, or at build time in a locked build). In a free build these freed-DOF
     drivers are DEFERRED (recorded to a park-spec sidecar, not authored); a locked build
     authors them engaged. Other assemblies do not read build_lock and stay fully defined.
     The verify DOF gate adapts: free -> necessity only (>= N under-constrained); the
