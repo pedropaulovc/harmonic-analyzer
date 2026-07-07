@@ -1,11 +1,15 @@
-r"""Reproduction script: translational-gearing rack pinion (book ch. 23).
+r"""Reproduction script: translational-gearing reducer disc (book ch. 23).
 
-The large thin brass gear that drives the platen rack: 96 teeth DP 30.
-The M4c "120 teeth / OD 103.3" keyframe read is REFUTED by the calibrated
-ch. 30 front view (p1, 6.02 px/mm): the gear OD spans ~83 mm centred on
-the pinion-bar stud at (0, 253.5) -- 96T DP 30 gives PD 81.28 / OD 82.97.
-~3 mm disc, plain 3/8" shaft bore (the latch/stud hardware is modeled in
-build_paper_drive_assembly.py; Appendix C #8).
+The large thin brass disc gear -- the "fourth gear" of the 4/4 video: 120
+teeth (narrated count, CONFIRMED by an FFT ring count on the ch30 p002
+front view, ~115-119 peak) at DP 38 (disc OD measures ~82 +-2.5; 120T DP38
+gives PD 80.21 / OD 81.55, and the measured rack/disc pitch ratio ~1.27
+matches 2.660/2.101). It does NOT touch the rack (the old 96T DP30
+"rack-pinion" role is REFUTED -- paper-drive rework E7/E8): it is the fixed
+reduction wheel, driven 12:120 by the third gear on the knob shaft
+(build_transgear_pinion.py) and locked coaxially to the 12T DP30 feed
+pinion (build_transgear_feed_pinion.py) that meshes the rack. ~3 mm disc,
+plain 3/8" stud bore.
 
 Layout: gear axis = Z through the origin, disc z = 0..3 mm.
 
@@ -20,7 +24,6 @@ import math
 import sys
 
 from _common import (
-    IN,
     SketchDims,
     apply_material,
     check,
@@ -39,10 +42,12 @@ from _gear import build_fixed_gear, volume_check
 PART_NAME = "rack-pinion"
 MATERIAL = "Brass"  # ch. 23 photos: brass
 
-TEETH = 96  # DIMENSIONS.md ch23: calibrated p1 OD ~83 -> 96T DP30 (med,
-# supersedes the 120T keyframe count -- see docstring)
+TEETH = 120  # 4/4 video narration, FFT-confirmed on ch30 p002 (med)
+DP = 38.0  # OD ~82 at 120T; pitch-ratio cross-check vs the DP30 rack (med)
 FACE_WIDTH = 3.0  # mm, edge-on view v4_transgear_002 (low)
-BORE_DIAMETER = 0.375 * IN  # 9.525 -- machine-standard shaft stock (low)
+BORE_DIAMETER = 5.0  # shares the stud's O5 front seat with the feed pinion
+# (whose 12T DP30 base circle cannot take the 3/8" stud -- see
+# build_transgear_feed_pinion.py)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -63,7 +68,7 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    volume = await build_fixed_gear(adapter, TEETH, FACE_WIDTH)
+    volume = await build_fixed_gear(adapter, TEETH, FACE_WIDTH, dp=DP)
 
     # Shaft bore (on-axis circle at the origin: only the diameter is a dim, so
     # define_circle records just that -- the centre X/Z slots are ignored).
@@ -96,10 +101,9 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven rack pinion (equations neutral)", expected, 0.01 * v_bore)
 
-    # Construction axis (Top x Right = the Z gear axis through the origin): gives the
-    # disc an Axis1 the paper-drive assembly can rack-pinion-mate to the platen, so
-    # the visible 96T disc turns WITH the paper feed instead of sitting static
-    # (codex #189). A reference feature -- no volume, geometry unchanged.
+    # Construction axis (Top x Right = the Z gear axis through the origin): the
+    # paper-drive assembly gear-mates the disc to the third gear and revolute-
+    # mates it on the stud. A reference feature -- no volume, geometry unchanged.
     from solidworks_mcp.adapters.base import CreateAxisParameters  # noqa: E402
     check(
         "create_axis Z (Top x Right)",
