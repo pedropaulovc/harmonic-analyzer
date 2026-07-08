@@ -1013,7 +1013,8 @@ async def apply_material(adapter: Any, material: str) -> None:
     )
 
 
-CASTING_GREEN = (0.13, 0.45, 0.42)  # sampled from the ch30 studio photos
+CASTING_GREEN = (0.03, 0.45, 0.38)  # re-sampled from the ch30/ch17/ch18 plates
+# (2026-07-08): R≈0.05·G, B≈0.85·G — the previous 0.13 red channel rendered teal
 # M6.8 photo-tuning palette, all sampled from the ch30 plates:
 POLISHED_STEEL = (0.65, 0.64, 0.63)  # frame columns (p006 column average)
 PANEL_BLACK = (0.08, 0.08, 0.09)  # platen board / clips / knife hardware
