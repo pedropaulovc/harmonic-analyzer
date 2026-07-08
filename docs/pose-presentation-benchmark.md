@@ -142,13 +142,16 @@ so the control sits registered and perturbations move relative to it.
 | P10 | **flicker pair** | the two registered full-frame images sent as two consecutive images in one message (blink-comparator analogue); each frame downscaled so the two together fit the shared ~1.4 MP budget (~0.7 MP each) — P10 must not win by carrying twice the pixels |
 | P11 | **dashboard** | one sheet: small sbs pair + P7 fusion + P9 edges (does combining views beat any single view?) |
 
-Secondary factor (crossed only with the 3 best arms in a second phase):
-**coordinate grid on/off** — SoM suggests the grid may contribute more than
-the blend mode; measuring it separately avoids attributing its gain to an arm.
-If a grid variant displaces the plain arm as T1 winner, that exact `arm+grid`
-variant enters T2 as an additional arm (budgeted like one) — the decision
-rule must check convergence on the presentation actually being adopted, not
-its grid-less sibling.
+Secondary factor: **coordinate grid on/off** — SoM suggests the grid may
+contribute more than the blend mode; measuring it separately avoids
+attributing its gain to an arm. The grid phase is scheduled **inside the
+first pass, after T1 and before T2** (T2's arm set depends on its outcome):
+grid-ON variants of the T1 top-3 rerun the same 6-pair × 27-case sub-grid at
+N = 3 (the grid-OFF numbers are T1's own) ≈ 1.5k calls ≈ 2.2M tokens per
+model. If a grid variant displaces the plain arm as T1 winner, that exact
+`arm+grid` variant enters T2 as an additional arm (budgeted like one) — the
+decision rule must check convergence on the presentation actually being
+adopted, not its grid-less sibling.
 
 ## Tasks
 
@@ -186,7 +189,9 @@ its grid-less sibling.
   "d₁ first" (that would make "first" always correct): which delta is shown
   first follows the same deterministic parity schedule as the other
   position-bias controls — `zlib.crc32(f"{case_id}:{arm}:{repeat}:t3")` —
-  balanced, identical across executions and models, recorded per row.
+  balanced, identical across executions and models, recorded per row. T3
+  cells run the same N = 3 repeats as T1 (the schedule's `repeat` term is
+  live): 144 trials per arm-model curve instead of a thin 48.
 
 ## Metrics
 
@@ -234,19 +239,21 @@ stratified pairs × a 27-case sub-grid** (rotations ±3°/±15° = 12, targets
 ±15/±40 mm × 2 axes = 8, both zooms, the first 4 mixed, 1 control) × 11 arms
 ≈ 1.8k cells; with N = 3 repeats ≈ **5.3k calls ≈ 8.0M tokens per subject
 model** at ~1.5k tokens/cell, ≈ 10.7k calls / 16M tokens across both.
-T3: 6 pairs × 8 delta-pairs × 11 arms ≈ 0.5k cells per model. T2: ≤5 arms
+T3: 6 pairs × 8 delta-pairs × 11 arms × N = 3 ≈ 1.6k calls per model. Grid
+phase: ≈ 1.5k calls per model (see "Presentation arms"). T2: ≤5 arms
 (top-3 + P1 + a winning grid variant, selected per subject model) × 6 pairs
 × 6 starts × ≤6 rounds ≈ 1.1k renders + calls per model worst case. First
-pass all-in (T1 sub-grid + T3 + T2): ≈ **7k calls ≈ 10.5M tokens per
-model**, ~21M across both. Generation: 18 pairs × 45 ≈ 800 Blender renders once (shared by all
+pass all-in (T1 sub-grid + grid phase + T3 + T2): ≈ **9.5k calls ≈ 14M
+tokens per model**, ~28M across both. Generation: 18 pairs × 45 ≈ 800 Blender renders once (shared by all
 arms **and both models**), minutes on the GPU seat.
 
 **Full-grid confirmation is a separately approved phase, not part of the
-first-pass budget.** It covers the **top 3 arms plus P1 whenever it is not
-among them** (the retirement comparison must be full-grid vs full-grid, not
-challenger full-grid vs incumbent subset) on the cells the first pass did
-not run: ≤4 arms × (18×45 − 6×27) × N = 3 ≈ **7.8k calls ≈ 11.7M tokens per
-model** — larger than the first pass itself. Project it, report it, and get
+first-pass budget.** It covers the **top 3 arms, plus P1 whenever it is not
+among them, plus the winning `arm+grid` variant if one displaced a plain
+arm** (the retirement comparison must be full-grid vs full-grid — no
+adoptable presentation may carry only subset numbers) on the cells the
+first pass did not run: ≤5 arms × (18×45 − 6×27) × N = 3 ≈ **9.7k calls ≈
+14.6M tokens per model** — larger than the first pass itself. Project it, report it, and get
 an explicit go before starting it; the first-pass budget gate does not
 authorize it.
 
@@ -266,10 +273,13 @@ authorize it.
   ends with `composite.regenerate()` — all three must be bypassable):
   `--manifest <path>`, `--no-trim --canvas WxH` (fixed framing, see
   "Presentation arms"), `--out-root <dir>` (renders + sidecars under
-  `<dir>/render/` instead of `comparisons/render/`), and
+  `<dir>/render/` **and prepared references under `<dir>/ref/`** —
+  `prepare_reference` also writes through `pair_paths()` into
+  `comparisons/ref/`, which `cut_release.stage_comparisons` ships wholesale,
+  so bench refs must be redirected too, not just renders), and
   `--skip-composites` (no gallery/scores regeneration — bench stimuli are
   built by `presentations.py`). Together these guarantee bench cases never
-  touch the shipping gallery cache, whatever their ids.
+  touch the shipping gallery cache or release bundle, whatever their ids.
 - `comparisons/bench/run.py` — fans out one fresh-context call per cell ×
   subject model: Opus via the Agent tool with the explicit `model: "opus"`
   override, Codex via `codex exec` (see "Subject models"); structured-output
@@ -331,11 +341,12 @@ sufficient given this section. All decisions are pinned; do not re-ask them.
    JSON, eyeball the stimuli sheets and the parsed outputs, THEN fan out. Do
    not launch 5k cells on an unsmoked harness.
 6. **Budget gate — per phase, not per benchmark**: the first pass all-in
-   (T1 sub-grid ≈ 5.3k + T3 ≈ 0.5k + T2 ≤ 1.1k calls) ≈ **7k calls / ~10.5M
-   tokens per subject model** (~21M across both); abort and report if its
-   projected total exceeds 12M tokens per model. T2 arms per the Tasks
-   section (top-3 + P1 + grid variant, per model). The **full-grid
-   confirmation (≈ 11.7M tokens per model, see the cost envelope) is NOT
+   (T1 sub-grid ≈ 5.3k + grid phase ≈ 1.5k + T3 ≈ 1.6k + T2 ≤ 1.1k calls)
+   ≈ **9.5k calls / ~14M tokens per subject model** (~28M across both);
+   abort and report if its projected total exceeds 16M tokens per model.
+   Phase order within the first pass: T1 → grid phase → T3 ∥ T2 (T2's arm
+   set needs T1 + grid results; T3 needs only T1 stimuli). The **full-grid
+   confirmation (≈ 14.6M tokens per model, see the cost envelope) is NOT
    covered by this gate** — project it after the first-pass report and get
    an explicit go before launching it.
 7. **Deliverables**: `results.jsonl` + the report tables per subject model
