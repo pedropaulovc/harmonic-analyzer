@@ -360,14 +360,37 @@ def exec_t3(cases, cell, model):
 
 
 # --- T2 closed loop ----------------------------------------------------------
+# A model-proposed correction is untrusted input: an extreme, NaN, or negative
+# value (e.g. zoom_factor=0 or 1e9) can degenerate the camera (zero/huge
+# ortho_scale, near-infinite target) and pathologically stall Blender's
+# rasterizer -- which then wedges the ONE shared render server every other T2
+# loop queues behind. Clamp every field to a generous-but-finite range instead
+# of trusting the schema alone (a JSON Schema "number" has no magnitude bound).
+_CORR_BOUNDS = {"az_deg": 90.0, "el_deg": 90.0, "roll_deg": 90.0,
+               "target_x_mm": 500.0, "target_y_mm": 500.0}
+
+
+def _safe_num(v, bound: float, default: float = 0.0) -> float:
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return default
+    if not math.isfinite(v):
+        return default
+    return max(-bound, min(bound, v))
+
+
 def _apply_correction(cur: dict, corr: dict, r0, u0) -> dict:
     nc = json.loads(json.dumps(cur))
-    nc["az_deg"] = cur["az_deg"] + (corr.get("az_deg") or 0.0)
-    nc["el_deg"] = cur["el_deg"] + (corr.get("el_deg") or 0.0)
-    nc["roll_deg"] = cur["roll_deg"] + (corr.get("roll_deg") or 0.0)
-    tx, ty = corr.get("target_x_mm") or 0.0, corr.get("target_y_mm") or 0.0
+    nc["az_deg"] = cur["az_deg"] + _safe_num(corr.get("az_deg"), _CORR_BOUNDS["az_deg"])
+    nc["el_deg"] = cur["el_deg"] + _safe_num(corr.get("el_deg"), _CORR_BOUNDS["el_deg"])
+    nc["roll_deg"] = cur["roll_deg"] + _safe_num(corr.get("roll_deg"), _CORR_BOUNDS["roll_deg"])
+    tx = _safe_num(corr.get("target_x_mm"), _CORR_BOUNDS["target_x_mm"])
+    ty = _safe_num(corr.get("target_y_mm"), _CORR_BOUNDS["target_y_mm"])
     nc["target_mm"] = [cur["target_mm"][i] + tx * r0[i] + ty * u0[i] for i in range(3)]
-    nc["zoom"] = cur["zoom"] * (corr.get("zoom_factor") or 1.0)
+    zf = _safe_num(corr.get("zoom_factor"), 8.0, default=1.0)
+    zf = zf if 0.1 <= zf <= 8.0 else 1.0   # non-finite/absurd/degenerate -> no-op
+    nc["zoom"] = max(0.05, min(50.0, cur["zoom"] * zf))
     return nc
 
 
