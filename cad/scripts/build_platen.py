@@ -286,22 +286,23 @@ async def build(adapter) -> dict[str, str]:
     # would remove nothing -> the volume_check below fails loud.
     from solidworks_mcp.adapters.base import CreatePlaneParameters
 
-    check(
-        "create_plane back face",
+    back_plane = check(
+        "create_plane back face (Front + thickness)",
         await adapter.create_plane(CreatePlaneParameters(
-            mode="offset", base_plane="Front", offset=PLATE_THICKNESS,
+            mode="offset", base_plane="Front Plane", offset=PLATE_THICKNESS,
         )),
     )
-    back_plane = name_last_feature(adapter, "BackFace")
-    reliefs = SketchDims()
-    check("create_sketch clamp reliefs", await adapter.create_sketch(back_plane))
+    check(
+        f"create_sketch clamp reliefs on {back_plane.name}",
+        await adapter.create_sketch(back_plane.name),
+    )
     set_sketch_direct_db(adapter, True)
     for n, (x, y) in enumerate(CLAMP_RELIEF_XY):
+        # On a custom offset plane the x anchor emits an X dim too (3 dims); the
+        # reliefs are mesh-agnostic clearance, so name the feature only and record
+        # no driving dims (same as the cylinder-gear cam profile).
         await define_circle(
             adapter, x, y, CLAMP_RELIEF_DIA / 2.0, f"clamp relief ({x:.1f}, {y:.1f})",
-            dims=reliefs,
-            names=(f"Cr{n}X", f"Cr{n}Z", f"Cr{n}Dia"),
-            drives=(None, None, None),
         )
     set_sketch_direct_db(adapter, False)
     await ensure_fully_defined(adapter, "clamp reliefs sketch")
