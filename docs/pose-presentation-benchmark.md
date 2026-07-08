@@ -120,7 +120,14 @@ measures (a shifted or zoomed render re-centres back onto the ref). Benchmark
 renders are therefore produced **untrimmed on a fixed canvas** (skip
 `trim_render_file`; the unperturbed camera defines the canvas framing for the
 whole case family) and every arm pastes ref and render into that same fixed
-frame with no per-image re-fitting. Only rotation reads survive content
+frame with no per-image re-fitting. Fixing the canvas is necessary but NOT
+sufficient: `blender_worker.aim_camera` **auto-fits the world framing per
+camera** (`need_w`/`ortho_scale`/`cam_dist` from the camera's own projected
+bbox), so an az/el/roll-perturbed view would quietly re-fit to a different
+world scale. The fixed-framing mode must therefore also **freeze the
+resolved framing** — target, zoom, frame width and camera distance computed
+ONCE from the unperturbed camera and reused verbatim for every case in the
+family, with only the pose delta applied on top. Only rotation reads survive content
 fitting; translation/zoom reads require this.
 
 **The pair's baseline 2-D align is frozen into the frame, not re-fit.** Some
@@ -181,7 +188,12 @@ adopted, not its grid-less sibling.
   class thresholds.
 - **T2 — closed loop.** The subagent iterates: read stimulus → propose a
   camera correction → harness re-renders → new stimulus, ≤ 6 rounds. Measures
-  what actually matters in production. Run for the **top-3 arms from T1 plus
+  what actually matters in production. Target corrections
+  (`recommended_correction` on target-x/y) are applied along the **original
+  unperturbed camera's right/up axes on every round** — the same basis
+  generation and scoring use — never the current perturbed camera's axes
+  (with rotation error present the two bases disagree and convergence paths
+  diverge between harnesses). Run for the **top-3 arms from T1 plus
   P1 whenever it is not already among them** — the decision rule needs the
   incumbent's T2 baseline, so P1 is never skipped — plus the grid phase's
   winning `arm+grid` variant if one displaced a plain arm (≤ 5 arms; T2 is
@@ -214,7 +226,7 @@ adopted, not its grid-less sibling.
 
 | task | metrics |
 |---|---|
-| T1 | per-parameter sign accuracy; magnitude bucket accuracy; false-positive rate on controls; per-arm confusion between parameters (e.g. az error read as target-x — the classic degeneracy) |
+| T1 | per-parameter sign accuracy — the headline number is **macro-averaged over {−, 0, +} per parameter class** (≈80% of ground-truth labels are `0`, so a plain average lets an arm that always answers "no error" score ~80% while reading nothing; the macro average makes the active signs carry the score); magnitude bucket accuracy; false-positive rate on controls; per-arm confusion between parameters (e.g. az error read as target-x — the classic degeneracy) |
 | T2 | final pose error (rotation geodesic ° + target mm + zoom %); rounds to reach az/el ≤ 1°, roll ≤ 1°, target ≤ 5 mm, zoom ±3% (all must hold); % diverged |
 | T3 | psychometric threshold (delta ratio at 75% correct); AUC |
 | all | tokens + images per decision; latency |
@@ -292,8 +304,10 @@ authorize it.
   currently hardcodes `composite.load_manifest()`, writes through
   `composite.pair_paths()` into the shipping `comparisons/render/` tree, and
   ends with `composite.regenerate()` — all three must be bypassable):
-  `--manifest <path>`, `--no-trim --canvas WxH` (fixed framing, see
-  "Presentation arms"), `--out-root <dir>` (renders + sidecars under
+  `--manifest <path>`, `--no-trim --canvas WxH` (fixed framing — including
+  the frozen `aim_camera` framing solve, see "Presentation arms": the
+  perturbed cameras must inherit the unperturbed camera's resolved
+  target/zoom/frame-width/distance, not re-fit their own), `--out-root <dir>` (renders + sidecars under
   `<dir>/render/` **and prepared references under `<dir>/ref/`** —
   `prepare_reference` also writes through `pair_paths()` into
   `comparisons/ref/`, which `cut_release.stage_comparisons` ships wholesale,
@@ -305,13 +319,24 @@ authorize it.
   subject model: Opus via the Agent tool with the explicit `model: "opus"`
   override, Codex via `codex exec` (see "Subject models"); structured-output
   schema per task, appends `results.jsonl` tagged with the model; resumable
-  (skip answered cells).
+  (skip answered cells). **Ground truth is hidden from subjects**: the
+  delta-tagged case ids (`…+az+7`) exist only on the generation/scorer side —
+  stimuli served to a subject get **opaque ids/filenames** (a salted hash;
+  the id→delta map stays private to the scorer), and each call runs in a
+  clean workspace containing only the stimulus images and the prompt. This
+  binds hardest on the Codex arm: `codex exec` must run with its cwd in that
+  sandbox dir, NOT the repo, or it can simply read `cases.jsonl` (or the
+  filename) and answer without looking at the pixels.
 - `comparisons/bench/report.py` — tables above + per-arm exemplar sheets.
 
 ## Decision rule
 
-Adopt the arm (or arm+grid combo) that wins T1 sign accuracy with ≥5-point
-margin AND does not lose T2 convergence; retire `_blend.jpg` generation from
+Adopt the arm (or arm+grid combo) that wins T1 macro sign accuracy with a
+≥5-point margin AND does not lose T2, where "does not lose" is pinned as
+**non-inferiority on two T2 metrics simultaneously**: its convergence rate
+is within 5 points of the best T2 arm's, and its median rounds-to-converge
+is at most 1 round more; ties beyond that break on cost per decision.
+Retire `_blend.jpg` generation from
 the pipeline if the incumbent P1 is beaten on both, keeping the winner as the
 artefact `composite.py` emits. If P2/P3 win, the gallery keeps `_cad` (the
 slider) and the pipeline simply stops paying for blends.
