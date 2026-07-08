@@ -197,12 +197,12 @@ def _fmt_pct(x) -> str:
 
 
 def markdown(model: str, t1: dict, t3: dict) -> str:
-    L = [f"## Subject model: `{model}`\n", "### T1 — single-shot pose read\n",
+    L = [f"## Subject model: `{model}`\n", "### T1 - single-shot pose read\n",
          "| arm | n | macro sign % | 95% CI | magnitude % | control FP % | median tok | lat s |",
          "|---|--:|--:|--:|--:|--:|--:|--:|"]
     for arm in t1["ranking"]:
         t = t1["table"][arm]
-        ci = f"{_fmt_pct(t['ci'][0])}–{_fmt_pct(t['ci'][1])}"
+        ci = f"{_fmt_pct(t['ci'][0])} to {_fmt_pct(t['ci'][1])}"
         L.append(f"| {arm} | {t['n']} | **{_fmt_pct(t['macro_sign'])}** | {ci} | "
                  f"{_fmt_pct(t['magnitude'])} | {_fmt_pct(t['control_fp'])} | "
                  f"{t['median_tokens'] or '-'} | {t['mean_latency_s']} |")
@@ -213,7 +213,7 @@ def markdown(model: str, t1: dict, t3: dict) -> str:
         pp = t1["table"][arm]["per_param"]
         L.append(f"| {arm} | " + " | ".join(_fmt_pct(pp[p]) for p in PARAMS) + " |")
     if t3["table"]:
-        L.append("\n### T3 — 2AFC discrimination (fraction correct)\n")
+        L.append("\n### T3 - 2AFC discrimination (fraction correct)\n")
         L.append("| arm | n | frac correct | by class |")
         L.append("|---|--:|--:|---|")
         for arm in t3["ranking"]:
@@ -229,7 +229,7 @@ def main() -> int:
     ap.add_argument("--model", help="codex|opus (default: both if present)")
     args = ap.parse_args()
     models = [args.model] if args.model else ["codex", "opus"]
-    summary, md = {}, ["# Pose-presentation benchmark — results\n"]
+    summary, md = {}, ["# Pose-presentation benchmark - results\n"]
     for model in models:
         t1 = t1_report(model)
         t3 = t3_report(model)
