@@ -405,7 +405,11 @@ def is_stale(pair: dict, mpath: Path) -> bool:
 def write_sidecar(pair: dict, mpath: Path, size: tuple[int, int]) -> None:
     _sidecar(pair["id"]).write_text(
         json.dumps({"camera": pair["camera"], "reference": pair["reference"],
-                    "size": list(size), "model_mtime": mpath.stat().st_mtime}),
+                    "size": list(size), "model_mtime": mpath.stat().st_mtime,
+                    "engine": "solidworks",
+                    # captures run under force_plain_white_background --
+                    # composite._content_mask seeds its knockout flood from it
+                    "render_bg": "white"}),
         encoding="utf-8",
     )
 
@@ -547,7 +551,9 @@ def main() -> int:
                     + f" {w}x{h}")
                 set_camera(adapter, cam)
                 await capture(adapter, composite.pair_paths(pid)["render"], w, h)
-                composite.trim_render_file(composite.pair_paths(pid)["render"])
+                # captures run under force_plain_white_background
+                composite.trim_render_file(composite.pair_paths(pid)["render"],
+                                           background="white")
                 write_sidecar(pair, mpath, (w, h))
                 done[pid] = "rendered"
             adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
