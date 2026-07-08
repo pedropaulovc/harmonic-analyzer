@@ -54,7 +54,8 @@ No published work was found evaluating which composite lets a VLM estimate a
 ## Question under test
 
 Given a reference photo and a render from a perturbed camera, which
-presentation maximises an Opus subagent's ability to:
+presentation maximises a vision agent's ability (two subject models — see
+"Subject models") to:
 
 1. **Detect** that the pose is off (vs an unperturbed control),
 2. **Read the direction and rough magnitude** of the error in camera terms
@@ -77,8 +78,25 @@ Perturbation grid, applied one parameter at a time plus a mixed tier:
 | az, el, roll | ±1°, ±3°, ±7°, ±15° |
 | target (image-plane x and y separately) | ±5, ±15, ±40 mm |
 | zoom | ×0.85, ×1.18 |
-| mixed | 6 random 2–3-parameter combos per pair, components drawn from the above |
+| mixed | 6 seeded 2–3-parameter combos per pair (see below) |
 | control | unperturbed (for false-positive rate) |
+
+**Target deltas are image-plane, converted at generation.** The renderer's
+camera input is a 3-D world-space `target_mm`; a "target-x +15 mm" case is
+produced by offsetting the pair's base target along the **unperturbed
+camera's right (x) or up (y) axis** — the same r/u basis `blender_worker.py`
+derives from az/el/roll — never along world X/Y (a world-axis move changes
+projected sign/magnitude with azimuth and roll, corrupting the scores).
+`gen_cases.py` does this conversion once and records the resulting world
+target in `cases.jsonl`.
+
+**The mixed tier is seeded, drawn once, and committed.** `gen_cases.py`
+draws each pair's 6 mixed cases with `random.Random(f"{pair_id}:mixed")`
+(2 or 3 distinct parameters, components sampled uniformly from the
+single-parameter levels above) and records them in `cases.jsonl` — the
+ground-truth artefact every run shares. Re-generating with the same seed
+reproduces the identical cases; the first-pass sub-grid uses the first 4 of
+each pair's 6.
 
 Renders come from the existing `render_offline.py` path (Blender, exact
 manifest camera model), so generation is pure pipeline reuse. Stratify pairs:
@@ -102,9 +120,17 @@ whole case family) and every arm pastes ref and render into that same fixed
 frame with no per-image re-fitting. Only rotation reads survive content
 fitting; translation/zoom reads require this.
 
+**The pair's baseline 2-D align is frozen into the frame, not re-fit.** Some
+approved anchors are only registered *after* the manifest `align` (e.g.
+`ch30-p002` carries scale 1.13 / dy −233); pasting raw renders would make
+even the zero-error control start misregistered, inflating false positives.
+`gen_cases.py` applies each pair's manifest align **once**, as a constant of
+the whole case family (same scale/offset for the control and every delta),
+so the control sits registered and perturbations move relative to it.
+
 | id | arm | build recipe |
 |---|---|---|
-| P1 | **blend-red (incumbent)** | grayscale ref + red-tinted render at α 230/255 (`composite.blend_overlay`) |
+| P1 | **blend-red (incumbent)** | grayscale ref + red-tinted render at α 230/255, rebuilt fixed-frame in `presentations.py` — do NOT call `composite.blend_overlay`/`_fitted_render` (their content re-fit would cancel the very target/zoom deltas under test; only the `_render_rgba` tint math is reused) |
 | P2 | **side-by-side** | ref \| render, thin neutral gap (the pose-round sheets) |
 | P3 | **side-by-side + labelled grid** | P2 with a 10×10 grid, row/column labels on both halves (SoM-style speakable coordinates) |
 | P4 | **onion ladder** | 5-tile strip: ref/render opacity 100/0, 75/25, 50/50, 25/75, 0/100 |
@@ -134,27 +160,49 @@ the blend mode; measuring it separately avoids attributing its gain to an arm.
   class thresholds.
 - **T2 — closed loop.** The subagent iterates: read stimulus → propose a
   camera correction → harness re-renders → new stimulus, ≤ 6 rounds. Measures
-  what actually matters in production. Run only for the top-3 arms from T1
-  (it is ~10× the cost).
+  what actually matters in production. Run for the **top-3 arms from T1 plus
+  P1 whenever it is not already among them** — the decision rule needs the
+  incumbent's T2 baseline, so P1 is never skipped (≤ 4 arms; it is ~10× the
+  per-cell cost). Start deltas are pinned, 4 per pair: `az +7°`, `el −7°`,
+  `target-x +25 mm`, and the pair's first recorded mixed case (M1 from
+  `cases.jsonl`). Convergence covers **every** perturbed parameter: az/el
+  ≤ 1°, roll ≤ 1°, target ≤ 5 mm, zoom within ±3% — a roll- or zoom-carrying
+  start cannot count as converged on az/el alone.
 - **T3 — 2AFC discrimination.** Two stimuli of the same pair (deltas d₁ < d₂),
   "which is better aligned?" Sweeping d₂/d₁ yields a psychometric curve per
   arm — the arm's *detection threshold*, cheap to run and robust to prompt
-  wording.
+  wording. The 8 delta-pairs (d₁, d₂) are pinned: az (1°, 3°), az (3°, 7°),
+  az (7°, 15°), el (3°, 7°), roll (3°, 7°), target-y (5, 15 mm),
+  target-y (15, 40 mm), target-x (15, 40 mm).
 
 ## Metrics
 
 | task | metrics |
 |---|---|
 | T1 | per-parameter sign accuracy; magnitude bucket accuracy; false-positive rate on controls; per-arm confusion between parameters (e.g. az error read as target-x — the classic degeneracy) |
-| T2 | final pose error (rotation geodesic ° + target mm + zoom %); rounds to reach az/el ≤ 1°, target ≤ 5 mm; % diverged |
+| T2 | final pose error (rotation geodesic ° + target mm + zoom %); rounds to reach az/el ≤ 1°, roll ≤ 1°, target ≤ 5 mm, zoom ±3% (all must hold); % diverged |
 | T3 | psychometric threshold (delta ratio at 75% correct); AUC |
 | all | tokens + images per decision; latency |
 
+## Subject models (crossed factor — every cell runs on both)
+
+| model | invocation | pinning |
+|---|---|---|
+| **Claude Opus** (the production pose agent) | Agent tool, one fresh subagent per cell | the runner passes `model: "opus"` **explicitly on every spawn** — never rely on inheritance (a subagent inherits the orchestrating session's model by default, which may not be Opus). `run.py` hard-codes the override; a smoke assertion checks the spawned model id before fan-out. |
+| **Codex CLI, gpt-5.5, high reasoning** | `codex exec` non-interactive, one invocation per cell | `--model gpt-5.5` + reasoning effort `high` (config flag, e.g. `-c model_reasoning_effort="high"`), stimulus images attached per cell (`-i`), same prompt template and the same JSON output schema (the runner parses the JSON from stdout). Exact flag spellings are verified against the installed `codex` version during harness build and committed in `run.py`. |
+
+Model is fully crossed with arm × case × task: same stimuli, same prompts,
+same N. Report every table per model. The **decision rule applies to the
+Opus numbers** (Opus is what runs pose feedback in production); the Codex
+column is a generalization check — if the winning arm flips between models,
+report that prominently instead of averaging it away.
+
 ## Controls
 
-- Fixed model (Opus), temperature 0, fresh subagent per cell (no context
-  bleed), one fixed prompt template per arm (prompt text published with the
-  benchmark; no per-arm tuning beyond describing the encoding).
+- Two fixed subject models (see above), temperature 0 where the backend
+  exposes it, fresh context per cell (no bleed), one fixed prompt template
+  per arm (prompt text published with the benchmark; no per-arm or per-model
+  tuning beyond describing the encoding).
 - Randomise ref/render side in P2/P3 and order in P10 (position bias is
   documented — report it as its own number).
 - Equal pixel budget per stimulus; JPEG q90 everywhere.
@@ -164,28 +212,42 @@ the blend mode; measuring it separately avoids attributing its gain to an arm.
 
 The grid is 45 cases/pair (3 rotation params × 8 levels = 24, 2 target axes ×
 6 levels = 12, 2 zoom levels, 6 mixed, 1 control). Full T1 would be 18 pairs
-× 45 × 11 arms ≈ 8.9k cells — so the first pass subsamples: **6 stratified
-pairs × a 21-case sub-grid** (levels ±3°/±15°, ±15/±40 mm, both zooms, 4
-mixed, 1 control) × 11 arms ≈ 1.4k cells; with N = 3 repeats ≈ 4.2k calls, at
-~1.5k tokens/cell ≈ 6.3M tokens. Full-grid confirmation runs only for the top
-3 arms. T3: 6 pairs × 8 delta-pairs × 11 arms ≈ 0.5k cells. T2: 3 arms × 6
-pairs × 4 deltas × ≤6 rounds ≈ 0.4k renders + calls. Generation: 18 pairs ×
-45 ≈ 800 Blender renders once (shared by all arms), minutes on the GPU seat.
+× 45 × 11 arms ≈ 8.9k cells *per model* — so the first pass subsamples: **6
+stratified pairs × a 27-case sub-grid** (rotations ±3°/±15° = 12, targets
+±15/±40 mm × 2 axes = 8, both zooms, the first 4 mixed, 1 control) × 11 arms
+≈ 1.8k cells; with N = 3 repeats ≈ **5.3k calls ≈ 8.0M tokens per subject
+model** at ~1.5k tokens/cell, ≈ 10.7k calls / 16M tokens across both.
+Full-grid confirmation runs only for the top 3 arms. T3: 6 pairs × 8
+delta-pairs × 11 arms ≈ 0.5k cells per model. T2: ≤4 arms (top-3 + P1) × 6
+pairs × 4 starts × ≤6 rounds ≈ 0.6k renders + calls per model. Generation:
+18 pairs × 45 ≈ 800 Blender renders once (shared by all arms **and both
+models**), minutes on the GPU seat.
 
 ## Harness sketch (all new code lives outside the shipping pipeline)
 
-- `comparisons/bench/presentations.py` — the 11 builders (P1/P2 wrap existing
-  `composite.py` code; the rest are ~10 lines of Pillow each).
-- `comparisons/bench/gen_cases.py` — perturb manifest cameras → temp manifest
-  → `render_offline.py` → stimuli + `cases.jsonl` (pair, delta, arm, paths).
-  **Prerequisite:** `render_offline.py` currently hardcodes
-  `composite.load_manifest()` on `comparisons/manifest.json` — it needs a
-  `--manifest <path>` override (and a `--no-trim --canvas WxH` fixed-framing
-  mode, see "Presentation arms") before the harness can feed it perturbed
-  cameras. Both are small, benchmark-motivated flags on the shipping tool.
-- `comparisons/bench/run.py` — fans out one subagent per cell (Agent tool /
-  Workflow), structured-output schema per task, appends `results.jsonl`;
-  resumable (skip answered cells).
+- `comparisons/bench/presentations.py` — the 11 builders, **all** operating
+  on the same fixed-frame ref/render pair (~10 lines of Pillow each; P1
+  reuses only `composite._render_rgba`'s tint math — never `_fitted_render`,
+  see the P1 row).
+- `comparisons/bench/gen_cases.py` — perturb manifest cameras (image-plane →
+  world target conversion, seeded mixed draws, frozen baseline align — see
+  "Ground truth") → temp manifest with synthetic case ids
+  (`<pair_id>+<delta_tag>`, e.g. `…-img01+az+7`) → `render_offline.py` →
+  stimuli + `cases.jsonl`. **Prerequisite flags on `render_offline.py`** (it
+  currently hardcodes `composite.load_manifest()`, writes through
+  `composite.pair_paths()` into the shipping `comparisons/render/` tree, and
+  ends with `composite.regenerate()` — all three must be bypassable):
+  `--manifest <path>`, `--no-trim --canvas WxH` (fixed framing, see
+  "Presentation arms"), `--out-root <dir>` (renders + sidecars under
+  `<dir>/render/` instead of `comparisons/render/`), and
+  `--skip-composites` (no gallery/scores regeneration — bench stimuli are
+  built by `presentations.py`). Together these guarantee bench cases never
+  touch the shipping gallery cache, whatever their ids.
+- `comparisons/bench/run.py` — fans out one fresh-context call per cell ×
+  subject model: Opus via the Agent tool with the explicit `model: "opus"`
+  override, Codex via `codex exec` (see "Subject models"); structured-output
+  schema per task, appends `results.jsonl` tagged with the model; resumable
+  (skip answered cells).
 - `comparisons/bench/report.py` — tables above + per-arm exemplar sheets.
 
 ## Decision rule
@@ -209,25 +271,43 @@ The instruction "run the benchmark in docs/pose-presentation-benchmark.md" is
 sufficient given this section. All decisions are pinned; do not re-ask them.
 
 1. **Seat preconditions**: Blender seat (the render_offline path must work),
-   `cad/out` STL/boxes cache current (`doit export` or a fresh pull of a
-   built tree), `uv sync` done. No SolidWorks needed.
+   `uv sync` done, and a **current `cad/out` STL/boxes cache**. The benchmark
+   run itself needs no SolidWorks — but *producing* that cache does
+   (`doit export` is a COM-spine task on a SolidWorks seat). On a
+   Blender-only seat, pull an already-built tree (remote cache / a seat that
+   ran the export); do not attempt `doit export` locally. Also: `codex` CLI
+   installed and authenticated, with `gpt-5.5` available.
 2. **Build the harness first** (nothing exists yet): the four
-   `comparisons/bench/` files from the harness sketch, plus the two
-   `render_offline.py` flags (`--manifest <path>`, `--no-trim --canvas WxH`).
-   Bench outputs live in `comparisons/bench/out/` — add it to `.gitignore`;
-   the bench *code* is tracked.
-3. **First-pass pairs** (stratified, pinned): `ch30-p002` (wide, dark),
-   `ch30-p007` (wide, dark, oblique), `ch12-p002` (macro, dark),
-   `ch12-p001` (macro, white bg), `ch17-p002` (macro, occlusion-heavy),
-   `ch23-p004` (down-look macro).
-4. **Runner config** (pinned): Opus subagents, temperature 0, fresh subagent
-   per cell, structured output, N = 3 repeats, prompt templates committed
-   beside the runner before the first full pass.
+   `comparisons/bench/` files from the harness sketch, plus the four
+   `render_offline.py` flags (`--manifest <path>`, `--no-trim --canvas WxH`,
+   `--out-root <dir>`, `--skip-composites`). Bench outputs live in
+   `comparisons/bench/out/` — add it to `.gitignore`; the bench *code* is
+   tracked. Nothing the bench renders may land under `comparisons/render/`
+   or `comparisons/composite/`.
+3. **First-pass pairs** (stratified, pinned — manifest-exact ids, the
+   renderer's `--only` matches `pair["id"]` verbatim):
+   `harmonic_analyzer--ch30-p002-img01` (wide, dark),
+   `harmonic_analyzer--ch30-p007-img01` (wide, dark, oblique),
+   `harmonic_analyzer--ch12-p002-img09` (macro, dark),
+   `harmonic_analyzer--ch12-p001-img02` (macro, white bg),
+   `harmonic_analyzer--ch17-p002-img06` (macro, occlusion-heavy),
+   `harmonic_analyzer--ch23-p004-img02` (down-look macro).
+4. **Runner config** (pinned): both subject models per "Subject models" —
+   Opus subagents spawned with the **explicit `model: "opus"` override**
+   (never inherited), and `codex exec --model gpt-5.5` at high reasoning
+   effort; temperature 0 where exposed, fresh context per cell, structured
+   output, N = 3 repeats, prompt templates committed beside the runner
+   before the first full pass.
 5. **Smoke before fan-out**: run ~10 hand-picked cells (one easy + one hard
-   delta on two arms), eyeball the stimuli sheets and the parsed outputs,
-   THEN fan out. Do not launch 4k cells on an unsmoked harness.
-6. **Budget gate**: first pass ≈ 4.2k calls / ~6.3M tokens. Abort and report
-   if the projected total exceeds 8M tokens; T2 runs only for the T1 top-3.
-7. **Deliverables**: `results.jsonl` + the report tables (per-arm T1 sign
-   accuracy with CIs, T3 thresholds, cost per decision), per-arm exemplar
-   stimulus sheets, and a recommendation applying the decision rule above.
+   delta on two arms) **on each subject model**, verify the Opus spawn
+   reports the Opus model id and the codex invocation returns parseable
+   JSON, eyeball the stimuli sheets and the parsed outputs, THEN fan out. Do
+   not launch 5k cells on an unsmoked harness.
+6. **Budget gate**: first pass ≈ 5.3k calls / ~8.0M tokens **per subject
+   model** (~16M across both). Abort and report if the projected total
+   exceeds 10M tokens per model; T2 runs only for the T1 top-3 plus P1.
+7. **Deliverables**: `results.jsonl` + the report tables per subject model
+   (per-arm T1 sign accuracy with CIs, T3 thresholds, cost per decision),
+   per-arm exemplar stimulus sheets, and a recommendation applying the
+   decision rule above to the Opus numbers, with the Codex column as the
+   generalization check.
