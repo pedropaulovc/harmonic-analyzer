@@ -46,13 +46,40 @@ def _content_mask_solid(render: Image.Image, bg: str, tol: int = 24) -> Image.Im
     return diff.point(lambda v: 255 if v > tol else 0)
 
 
-def _registered(row: dict, out_size: tuple[int, int] | None = None):
-    """Render placed into the ref frame at the pair's frozen align.
+_FIT_CACHE: dict[str, dict] = {}
 
-    Returns (ref RGB, render RGB, content mask L) all at a common size — the ref
-    size (or ``out_size`` if given). The render (fixed-frame canvas) is scaled to
-    the ref frame, then the manifest align (scale about centre + px offset) is
-    applied; uncovered frame stays the reference background colour.
+
+def _family_fit(pid: str, align: dict, ref_size: tuple[int, int], bg: str) -> dict:
+    """Freeze the CONTROL render's content-fit transform for the whole family.
+
+    The shipping composite path fits the CONTENT-TRIMMED render to the ref, so the
+    manifest align was tuned against that. Reproduce it ONCE from the pair's
+    control render (its content bbox -> the min-fit scale + centred paste + align
+    offset), then apply the SAME (scale, origin) to every case's UNTRIMMED canvas.
+    The control therefore registers exactly as the gallery does, while a perturbed
+    render's content — shifted/zoomed within the fixed canvas — moves relative to
+    it (a per-case content re-fit would cancel that translation/zoom signal).
+    """
+    if pid in _FIT_CACHE:
+        return _FIT_CACHE[pid]
+    ctrl = Image.open(BENCH / "out" / "render" / f"{pid}+ctrl.jpg").convert("RGB")
+    bb = _content_mask_solid(ctrl, bg).getbbox() or (0, 0, ctrl.width, ctrl.height)
+    cx0, cy0, cx1, cy1 = bb
+    cw, ch = cx1 - cx0, cy1 - cy0
+    rw, rh = ref_size
+    s = min(rw / cw, rh / ch) * align.get("scale", 1.0)
+    px0 = align.get("dx_px", 0) + (rw - cw * s) / 2   # where the control content's
+    py0 = align.get("dy_px", 0) + (rh - ch * s) / 2   # top-left lands in the ref frame
+    fit = {"s": s, "cx0": cx0, "cy0": cy0, "px0": px0, "py0": py0}
+    _FIT_CACHE[pid] = fit
+    return fit
+
+
+def _registered(row: dict, out_size: tuple[int, int] | None = None):
+    """Render placed into the ref frame at the family's frozen content-fit.
+
+    Returns (ref RGB, render RGB, content mask L) at a common size (the ref size,
+    or ``out_size``). Uncovered frame stays the reference background colour.
     """
     pid = row["pair_id"]
     bg = row.get("background", "black")
@@ -61,20 +88,17 @@ def _registered(row: dict, out_size: tuple[int, int] | None = None):
     size = out_size or ref.size
     if ref.size != size:
         ref = ref.resize(size, Image.Resampling.LANCZOS)
-    rw, rh = size
-    align = row.get("align") or {}
-    # fixed-frame render -> ref frame: fit by long edge, then apply align scale.
-    base_s = min(rw / ren_src.width, rh / ren_src.height)
-    s = base_s * align.get("scale", 1.0)
-    w, h = max(1, round(ren_src.width * s)), max(1, round(ren_src.height * s))
-    ren = ren_src.resize((w, h), Image.Resampling.LANCZOS)
+    fit = _family_fit(pid, row.get("align") or {}, size, bg)
+    s = fit["s"]
+    ren = ren_src.resize((max(1, round(ren_src.width * s)), max(1, round(ren_src.height * s))),
+                         Image.Resampling.LANCZOS)
     mask = _content_mask_solid(ren, bg)
-    dx = align.get("dx_px", 0) + (rw - w) // 2
-    dy = align.get("dy_px", 0) + (rh - h) // 2
-    canvas = Image.new("RGB", size, _bg_rgb(bg))
+    ox = round(fit["px0"] - fit["cx0"] * s)   # frozen transform: control content
+    oy = round(fit["py0"] - fit["cy0"] * s)   # lands at the align position; a case's
+    canvas = Image.new("RGB", size, _bg_rgb(bg))  # shifted content moves with it
     mcanvas = Image.new("L", size, 0)
-    canvas.paste(ren, (dx, dy), mask)
-    mcanvas.paste(mask, (dx, dy))
+    canvas.paste(ren, (ox, oy), mask)
+    mcanvas.paste(mask, (ox, oy))
     return ref, canvas, mcanvas
 
 
