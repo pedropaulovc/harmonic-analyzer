@@ -188,7 +188,7 @@ def test_config_files_subset_of_known_tokens():
     """Every real script resolves to known tokens (concrete files that exist, or
     the machine/* | parts/* | ** globs). The set can only NARROW the old whole-
     config dep, never invent a missing-file dependency."""
-    globs = {"machine/*", "parts/*", "placement/*", "**"}
+    globs = {"machine/*", "parts/*", "**"}
     for stem in part_stems():
         for tok in config_files_of(SCRIPTS_DIR / f"build_{stem}.py"):
             assert tok in globs or (bg.CONFIG_DIR / tok).is_file(), f"{stem}: {tok}"
@@ -207,7 +207,6 @@ def test_config_files_conservative_on_unknown_use():
         "import _config\nf = _config._doc\n",                    # family accessor, not a literal call
         "import _config\nx = _config._doc('nope')\n",            # literal but unknown doc
         "import _config\nx = _config.machine('no_such_sub')\n",  # unknown machine subsystem
-        "import _config_asm\nx = _config_asm.placement('no-such-part')\n",  # unknown placement row
         "from _config import machine\nx = machine()\n",          # bare-name import (untracked)
     ]
     for src in raise_cases:
@@ -228,14 +227,6 @@ def test_config_files_resolve_known_forms():
     # a dynamic machine/parts arg widens to the whole family (conservative, not an error).
     assert _tokens("import _config\nx = _config.machine(sub, 'k')\n") == frozenset({"machine/*"})
     assert _tokens("import _config\nx = _config.parts(name)\n") == frozenset({"parts/*"})
-    # placement is an assembly-only accessor on the SEPARATE _config_asm module
-    # (kept off every part's closure); the analyzer tracks it identically. A literal
-    # known part -> its own file; a dynamic part -> the family (mirror_placement's
-    # real use).
-    assert _tokens("import _config_asm\nx = _config_asm.placement('pinion-spring')\n") == frozenset({"placement/pinion-spring.yaml"})
-    assert _tokens("import _config_asm\nx = _config_asm.placement(part)\n") == frozenset({"placement/*"})
-    # an aliased _config_asm import is tracked too.
-    assert _tokens("import _config_asm as ca\nx = ca.placement(p)\n") == frozenset({"placement/*"})
     # an aliased module import is still tracked.
     assert _tokens("import _config as cfg\nx = cfg.machine('output')\n") == frozenset({"machine/output.yaml"})
     # no _config use at all -> empty read-set (no config dependency).
@@ -251,10 +242,8 @@ def test_config_accessor_coverage():
 
     import _config
 
-    import _config_asm
-
     accessors = {
-        name for mod in (_config, _config_asm)
+        name for mod in (_config,)
         for name, fn in inspect.getmembers(mod, inspect.isfunction)
         if fn.__module__ == mod.__name__ and not name.startswith("__") and name != "_load"
     }
