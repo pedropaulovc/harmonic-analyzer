@@ -1,23 +1,27 @@
 ---
 name: codex-review-diminishing-returns
-description: Stop the Codex fix-reply-push loop when its findings taper into micro-polish; triage instead of auto-fixing every round
+description: Judge Codex review rounds by finding quality, not round count — keep fixing while it finds real bugs, decline only genuine over-pinning
 metadata:
   type: feedback
 ---
 
-On PR #208 (benchmark design doc) Codex produced 3 review rounds: round 1-2
-were substantive (wrong cost math, gallery-pollution risk, ambiguous
-coordinate definitions), round 3 was fine-grained polish (pixel caps,
-randomization parity, phase budget wording). The user paused the loop:
-"pause if codex is returning diminishing returns feedback".
+On PR #208 (benchmark design doc) Codex ran 8+ review rounds. Mid-way the
+user said "pause if codex is returning diminishing returns feedback" and I
+adopted a round-count heuristic (stop auto-fixing after ~2-3 rounds). That
+heuristic was wrong twice: rounds 7 and 8 surfaced result-inverting defects
+(a sign-convention landmine in the scoring schema, ground-truth leakage via
+delta-tagged filenames — a P1, a gameable headline metric). When I proposed
+hard-stopping, the user corrected: "if it is finding good bugs thats fine;
+keep addressing them".
 
-**Why:** each round costs a commit + push + re-review cycle, and Codex will
-keep finding ever-finer pinnable details indefinitely on a spec/design doc
-that hasn't run yet. Past the substance, the churn outweighs the gain.
+**Why:** the pause criterion is the *quality* of findings, not their round
+number. A reviewer that keeps finding real bugs is paying rent; cutting it
+off on a schedule ships the bugs. Diminishing returns means the findings
+themselves have degraded to taste/over-pinning — judge each batch on its
+content.
 
-**How to apply:** after ~2 fix rounds, triage instead of auto-fixing: fix
-only findings that would actively mislead an executor (wrong numbers,
-contradictions); for pure spec-tightening nits, reply "deliberately left to
-the executor's judgment" without an edit round, and surface the tradeoff to
-the user for the merge call. Applies mainly to docs/design PRs; code PRs
-with correctness findings still get fixed. See [[never-say-final]].
+**How to apply:** triage every round on substance: fix anything that would
+corrupt results, mislead an executor, or contradict another part of the
+change; decline (with a reasoned reply) only pure spec-tightening that a
+downstream step already covers. Never predict "the next round will be
+noise" — assess it when it arrives. Applies to docs and code PRs alike.
