@@ -178,11 +178,11 @@ async def build(adapter: Any) -> dict[str, str]:
         # with hard error 1, both flips -- seen live twice. 15 deg puts the rest
         # dihedral safely off the apex (a spur sprocket's spin pose is cosmetic).
         t12 = await place_component(adapter, "transgear-removable", [T12_POS, 0.0, 0.0],
-                                    [0.0, 0.0, 15.0], rot_z_rows(15.0), mirror=False,
+                                    [0.0, 0.0, 15.0], rot_z_rows(15.0),
                                     ground=False, configuration="T12",
                                     label="probe T12")
         t24 = await place_component(adapter, "transgear-removable", [T24_POS, 0.0, 0.0],
-                                    [0.0, 0.0, 0.0], IDENTITY, mirror=False,
+                                    [0.0, 0.0, 0.0], IDENTITY,
                                     ground=False, configuration="T24",
                                     label="probe T24")
         await _revolute(adapter, t12, T12_POS, "T12")

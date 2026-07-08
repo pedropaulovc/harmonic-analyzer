@@ -204,3 +204,8 @@ as a ring with the hook arm end-on as a stub — stub inside ring ⇒ threaded.
    `build_channel_assembly.PLATE_HOLE_DIA`. summing-lever volume rose 134359→135655 (less material removed).
 Re-validated: channel/summing/top interference-NONE, render confirms each eye threads its hook arm and the
 shank fills the snug bore. LESSON for chiral grounded parts: ALWAYS give them a MIRROR_PLANE entry.
+
+> **Superseded 2026-07-08 (#151):** the M6.8 mirror layer (`mirror_placement`,
+> `MIRROR_PLANE`, the batch-spec default-mirror trap described above) is RETIRED.
+> Every placement — including batch grounded specs — now inserts its exact
+> machine transform verbatim. See [[mirror-retirement-sweep]].
