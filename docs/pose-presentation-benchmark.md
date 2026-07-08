@@ -124,10 +124,15 @@ frame with no per-image re-fitting. Fixing the canvas is necessary but NOT
 sufficient: `blender_worker.aim_camera` **auto-fits the world framing per
 camera** (`need_w`/`ortho_scale`/`cam_dist` from the camera's own projected
 bbox), so an az/el/roll-perturbed view would quietly re-fit to a different
-world scale. The fixed-framing mode must therefore also **freeze the
-resolved framing** — target, zoom, frame width and camera distance computed
-ONCE from the unperturbed camera and reused verbatim for every case in the
-family, with only the pose delta applied on top. Only rotation reads survive content
+world scale. The fixed-framing mode must therefore also **freeze the fit
+basis** — target, base zoom, projected frame width and camera distance
+computed ONCE from the unperturbed camera — and reuse it for every case in
+the family with only the pose delta applied on top. One carve-out so the
+freeze doesn't cancel the very signal it protects: **zoom cases still apply
+their zoom factor to the frozen base** (frame width =
+`frozen_need_w × 1.05 / (zoom₀ × factor)`) — reusing the control zoom
+verbatim would render ×0.85/×1.18 cases at control scale and score a zoom
+error the subject never sees. Only rotation reads survive content
 fitting; translation/zoom reads require this.
 
 **The pair's baseline 2-D align is frozen into the frame, not re-fit.** Some
@@ -162,8 +167,10 @@ N = 3 (the grid-OFF numbers are that model's T1) ≈ 1.5k calls ≈ 2.2M tokens
 per model — the per-model figure already assumes this. **P3 is exempt** — it already carries the grid, and its grid-OFF
 baseline is P2's own T1 numbers; if P3 makes the top-3 it enters the grid
 comparison as-is (there is no "P3+grid" variant to invent), and its
-grid-phase slot is **backfilled by the 4th-ranked arm** (pinned — never
-skipped, so every execution measures exactly three grid-ON variants). If a grid variant displaces the plain arm as T1 winner, that exact
+grid-phase slot is **backfilled by the highest-ranked arm with a distinct
+grid variant** — that also skips P2, whose grid-ON variant IS P3 and is
+already measured (pinned — never skipped, so every execution measures
+exactly three DISTINCT grid-ON variants). If a grid variant displaces the plain arm as T1 winner, that exact
 `arm+grid` variant enters T2 as an additional arm (budgeted like one) — the
 decision rule must check convergence on the presentation actually being
 adopted, not its grid-less sibling.
@@ -199,11 +206,14 @@ adopted, not its grid-less sibling.
   target are additive deltas), and the ±3% zoom gate is
   `|log(zoom/zoom_true)| ≤ log 1.03`. Both subject models run T2
   **stateless per round**: every round is a fresh call (fresh Opus
-  subagent / fresh `codex exec`) whose prompt carries the full round
-  history (prior stimuli + corrections) — this keeps the two backends
-  informationally identical (`codex exec` is one-shot by design, and Opus
-  must not get a persistent-conversation advantage) and means the budget's
-  one-call-per-round arithmetic holds for both. Run for the **top-3 arms from T1 plus
+  subagent / fresh `codex exec`) whose prompt carries the **current
+  stimulus image plus a text-only history of prior rounds' corrections** —
+  never the prior images (a six-round cell would otherwise carry a
+  triangular 1+2+…+6 image history and blow the flat per-call budget; the
+  production pose loop also never re-reads old renders). This keeps the two
+  backends informationally identical (`codex exec` is one-shot by design,
+  and Opus must not get a persistent-conversation advantage) and means the
+  budget's one-flat-call-per-round arithmetic holds for both. Run for the **top-3 arms from T1 plus
   P1 whenever it is not already among them** — the decision rule needs the
   incumbent's T2 baseline, so P1 is never skipped — plus the grid phase's
   winning `arm+grid` variant if one displaced a plain arm (≤ 5 arms; T2 is
@@ -350,11 +360,17 @@ Adopt the arm (or arm+grid combo) that wins T1 macro sign accuracy with a
 ≥5-point margin AND does not lose T2, where "does not lose" is pinned as
 **non-inferiority on two T2 metrics simultaneously**: its convergence rate
 is within 5 points of the best T2 arm's, and its median rounds-to-converge
-is at most 1 round more; ties beyond that break on cost per decision.
+is at most 1 round more (non-converged cells enter that median as round 7 —
+censored at max+1 — so divergence can never shrink an arm's median); ties
+beyond that break on cost per decision.
 Retire `_blend.jpg` generation from
-the pipeline if the incumbent P1 is beaten on both, keeping the winner as the
-artefact `composite.py` emits. If P2/P3 win, the gallery keeps `_cad` (the
-slider) and the pipeline simply stops paying for blends.
+the pipeline if the incumbent P1 is beaten on both, **keeping the exact
+winning presentation as the artefact `composite.py` emits** — if the winner
+is an `arm+grid` combo, the pipeline must generate that gridded sheet, not
+fall back to the ungridded `_cad` (shipping a different presentation than
+the one that won would void the benchmark's evidence). If plain P2/P3 win,
+the gallery keeps `_cad` (the slider) and the pipeline simply stops paying
+for blends.
 
 Retiring the blend is a coordinated change, not a deletion: current consumers
 hard-require it — `cut_release.stage_comparisons` lists
