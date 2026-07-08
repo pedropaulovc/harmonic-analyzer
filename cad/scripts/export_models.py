@@ -300,10 +300,11 @@ def load_src_digests() -> dict[str, str]:
         return {}
     try:
         data = dict(json.loads(SRC_DIGESTS.read_text(encoding="utf-8")))
-    except (OSError, ValueError):
-        # Truncated/corrupt sidecar (interrupted save_src_digests, partial cache
-        # copy): don't abort the export -- return {} so the untrusted/force path
-        # regenerates and rewrites a valid file (matches exporter_untrusted's guard).
+    except Exception:
+        # ANY unusable sidecar -- unreadable, invalid JSON, or valid-but-not-an-object
+        # (`null`/`0` -> dict() TypeError) from an interrupted save / partial copy --
+        # must not abort the export. Return {} so the untrusted/force path regenerates
+        # and rewrites a valid file (mirrors exporter_untrusted's broad guard).
         return {}
     if data.pop(_EXPORTER_KEY, None) != _exporter_digest():
         return {}
