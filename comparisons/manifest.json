@@ -254,7 +254,7 @@
    },
    "camera": {
     "mode": "euler",
-    "roll_deg": 20.0,
+    "roll_deg": 30.0,
     "zoom": 5.2,
     "target_mm": [
      -108.0,
@@ -268,9 +268,9 @@
     "el_deg": 76.0
    },
    "align": {
-    "scale": 1.37,
-    "dx_px": 125,
-    "dy_px": 216
+    "scale": 1.2,
+    "dx_px": 40,
+    "dy_px": -40
    },
    "component_focus": [
     "cone_gear",
@@ -302,8 +302,8 @@
     "perspective": {
      "focal_length_mm": 100.0
     },
-    "az_deg": 3.0,
-    "el_deg": 8.0
+    "az_deg": -4.0,
+    "el_deg": 3.0
    },
    "align": {
     "scale": 1.0,
@@ -339,13 +339,13 @@
     "perspective": {
      "focal_length_mm": 100.0
     },
-    "az_deg": 190.0,
-    "el_deg": 6.0
+    "az_deg": 197.0,
+    "el_deg": 1.0
    },
    "align": {
-    "scale": 1.64,
-    "dx_px": 64,
-    "dy_px": 46
+    "scale": 1.75,
+    "dx_px": 68,
+    "dy_px": -104
    },
    "component_focus": [
     "crank_arm",
@@ -367,22 +367,22 @@
    "camera": {
     "mode": "euler",
     "roll_deg": 0.0,
-    "zoom": 6.2,
+    "zoom": 4.8,
     "target_mm": [
-     -55.0,
-     120.0,
-     -35.0
+     50.0,
+     100.0,
+     -20.0
     ],
     "perspective": {
      "focal_length_mm": 100.0
     },
-    "az_deg": 162.0,
-    "el_deg": 2.0
+    "az_deg": 92.0,
+    "el_deg": 18.0
    },
    "align": {
-    "scale": 1.22,
-    "dx_px": -73,
-    "dy_px": 36
+    "scale": 1.38,
+    "dx_px": 47,
+    "dy_px": -60
    },
    "component_focus": [
     "rocker_arm",
@@ -404,22 +404,22 @@
    "camera": {
     "mode": "euler",
     "roll_deg": 0.0,
-    "zoom": 14.5,
+    "zoom": 13.5,
     "target_mm": [
      -12.0,
      116.0,
      -32.0
     ],
     "perspective": {
-     "focal_length_mm": 100.0
+     "focal_length_mm": 150.0
     },
     "az_deg": 83.0,
     "el_deg": 4.0
    },
    "align": {
-    "scale": 1.13,
-    "dx_px": 97,
-    "dy_px": -54
+    "scale": 1.25,
+    "dx_px": 155,
+    "dy_px": 61
    },
    "component_focus": [
     "pinion_drum",
@@ -441,22 +441,22 @@
    "camera": {
     "mode": "euler",
     "roll_deg": 0.0,
-    "zoom": 11.5,
+    "zoom": 12.0,
     "target_mm": [
      -35.0,
-     278.0,
-     -145.0
+     285.0,
+     -150.0
     ],
     "perspective": {
      "focal_length_mm": 100.0
     },
-    "az_deg": 204.0,
-    "el_deg": -24.0
+    "az_deg": 203.0,
+    "el_deg": 35.0
    },
    "align": {
-    "scale": 1.8,
-    "dx_px": -223,
-    "dy_px": 37
+    "scale": 1.75,
+    "dx_px": 195,
+    "dy_px": -195
    },
    "component_focus": [
     "crank_drive_gear",
@@ -480,20 +480,20 @@
     "roll_deg": 0.0,
     "zoom": 8.8,
     "target_mm": [
-     70.0,
+     95.0,
      395.0,
      -146.0
     ],
     "perspective": {
      "focal_length_mm": 100.0
     },
-    "az_deg": 184.0,
+    "az_deg": 191.0,
     "el_deg": 0.0
    },
    "align": {
-    "scale": 1.11,
-    "dx_px": -72,
-    "dy_px": 24
+    "scale": 1.19,
+    "dx_px": -98,
+    "dy_px": -11
    },
    "component_focus": [
     "pen_marker",
@@ -519,7 +519,7 @@
     "zoom": 2.2,
     "target_mm": [
      10.0,
-     400.0,
+     345.0,
      0.0
     ],
     "perspective": {
@@ -552,23 +552,23 @@
    },
    "camera": {
     "mode": "euler",
-    "roll_deg": 22.0,
-    "zoom": 10.0,
+    "roll_deg": 12.0,
+    "zoom": 9.0,
     "target_mm": [
-     18.0,
-     1015.0,
-     5.0
+     -10.0,
+     1002.0,
+     10.0
     ],
     "perspective": {
      "focal_length_mm": 100.0
     },
-    "az_deg": 196.0,
-    "el_deg": 30.0
+    "az_deg": 193.0,
+    "el_deg": -24.0
    },
    "align": {
-    "scale": 1.84,
-    "dx_px": 161,
-    "dy_px": -216
+    "scale": 1.73,
+    "dx_px": -67,
+    "dy_px": 67
    },
    "component_focus": [
     "channel_spring_installed",
@@ -593,19 +593,19 @@
     "zoom": 17.0,
     "target_mm": [
      -50.0,
-     992.0,
+     1000.0,
      -20.0
     ],
     "perspective": {
      "focal_length_mm": 100.0
     },
     "az_deg": 207.0,
-    "el_deg": -2.0
+    "el_deg": -12.0
    },
    "align": {
-    "scale": 1.84,
-    "dx_px": -198,
-    "dy_px": -47
+    "scale": 1.45,
+    "dx_px": -140,
+    "dy_px": -147
    },
    "component_focus": [
     "summing_lever",
