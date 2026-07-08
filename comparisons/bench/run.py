@@ -386,7 +386,9 @@ def main() -> int:
                 print(f"  xx cell failed: {e}", flush=True)
                 continue
             append_result(row)
-            spent += row.get("tokens", 0) or 0
+            # codex suppresses its "tokens used" summary under --output-schema, so
+            # fall back to a measured ~18k/cell estimate to keep the budget gate live.
+            spent += (row.get("tokens") or 0) or 18000
             completed += 1
             ok = row.get("response") is not None
             if completed % 10 == 0 or not ok:

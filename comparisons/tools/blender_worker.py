@@ -288,6 +288,26 @@ def main():
     scene.collection.objects.link(cam)
     scene.camera = cam
 
+    # Serve mode (bench T2 closed loop): keep the assembly loaded and render one
+    # camera per stdin JSON line {id,camera,width,height,frozen,out} — avoids the
+    # ~40 s reload per round. Prints "SERVED <id>" per frame; blank line exits.
+    if job.get("serve"):
+        import sys as _sys
+        for raw in _sys.stdin:
+            raw = raw.strip()
+            if not raw:
+                break
+            req = json.loads(raw)
+            w, h = req["width"], req["height"]
+            scene.render.resolution_x = w
+            scene.render.resolution_y = h
+            aim_camera(cam, cam_data, req["camera"], boxes, mesh_lo, mesh_hi, ext, w, h,
+                       frozen=req.get("frozen"))
+            scene.render.filepath = req["out"]
+            bpy.ops.render.render(write_still=True)
+            print(f"SERVED {req['id']}", flush=True)
+        return
+
     scene.render.engine = "BLENDER_WORKBENCH"
     scene.display.shading.light = "STUDIO"
     scene.display.shading.color_type = "OBJECT"
