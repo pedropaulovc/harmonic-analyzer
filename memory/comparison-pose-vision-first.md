@@ -22,3 +22,15 @@ score cannot.
 (framing) → re-render `--only <id>`; repeat. Then `tune_align.py --only <id>
 --write` for scale/dx/dy, then freeze. See [[comparison-camera-refinement]],
 [[oblique-views-break-on-axis-occlusion]].
+
+**tune_align output is UNVERIFIED until you eyeball the blend it produced.**
+On dense macro refs (bright close-up content on a dark background — the ch11/
+ch12/ch17-style book close-ups) silhouette IoU rewards zooming the render into
+the ref's content mass: the optimizer rails toward its scale bound (1.85) and
+reports an *improved* IoU (0.35→0.75) for a visually absurd fit. The 2026-07
+book-pairs round shipped scales 1.6–1.84 on 9 pairs this way — caught only by
+a human opening the gallery. Red flags: fitted scale near the search bound, or
+any scale ≫1.2 when the render was already framed to match the ref. After
+`--write`, ALWAYS re-view `composite/<id>_blend.jpg` (the sbs sheets do NOT use
+the align, so they can't catch this); when the render framing was eye-matched
+to the ref, neutral `{scale 1, dx 0, dy 0}` beats a railed optimizer fit.
