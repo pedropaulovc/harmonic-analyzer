@@ -293,6 +293,12 @@ def main():
     # ~40 s reload per round. Prints "SERVED <id>" per frame; blank line exits.
     if job.get("serve"):
         import sys as _sys
+        # Cold-load (importing all N part STLs + building the scene graph) can run
+        # well past a request's own render timeout under CPU contention (no GPU on
+        # this seat -- WORKBENCH falls back to software rasterization). Emit a
+        # readiness sentinel the CLIENT waits on BEFORE issuing any request, so a
+        # request's timeout measures only the render step, never the reload.
+        print("READY", flush=True)
         for raw in _sys.stdin:
             raw = raw.strip()
             if not raw:
