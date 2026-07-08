@@ -111,12 +111,20 @@ def _content_mask(img: Image.Image, thresh: int = 30,
     return ImageChops.difference(rgb, bg).convert("L").point(lambda v: 255 if v else 0)
 
 
-def trim_render_file(path: Path, margin_frac: float = 0.01) -> None:
+def trim_render_file(path: Path, margin_frac: float = 0.01,
+                     background: str | None = None) -> None:
     """Crop a captured render to its content + a small margin, in place.
 
     ViewZoomToFit2 fits the SolidWorks window aspect, not the capture canvas,
     so raw captures carry large background margins. render_compare captures
     on an oversized canvas and calls this to store a content-tight image.
+
+    ``background``: the capture's uniform backdrop colour, forwarded to
+    ``_content_mask`` so a model region touching a corner is not flood-eaten
+    out of the trim bbox (and thereby permanently cropped from the stored
+    render). Both callers know their backdrop — render_offline composites onto
+    the pair's reference colour, render_compare forces plain white — so pass
+    it; ``None`` keeps the legacy unconditional corner flood.
     """
     # Load + close the source handle BEFORE writing back to the same path:
     # Image.open is lazy and keeps `path` open for reading, so saving to the same
@@ -125,7 +133,7 @@ def trim_render_file(path: Path, margin_frac: float = 0.01) -> None:
     # JPEG makes it intermittent (random EINVAL/EACCES across a 400-file batch).
     with Image.open(path) as src:
         src.load()
-        bbox = _content_mask(src).getbbox()
+        bbox = _content_mask(src, background=background).getbbox()
         if not bbox:
             return
         m = round(max(src.size) * margin_frac)
@@ -143,9 +151,13 @@ def trim_render_file(path: Path, margin_frac: float = 0.01) -> None:
 
 def render_bg(pair_id: str) -> str | None:
     """The uniform colour behind the render's pixels, recorded by the renderer
-    in its sidecar (``render_bg``). Fallback for pre-key Blender sidecars: the
-    engine tag proves the render used the pair's reference background. None
-    (unknown/legacy SolidWorks sidecar) keeps the unconditional corner flood."""
+    in its sidecar (``render_bg``). Fallbacks for pre-key sidecars: an
+    ``engine: blender`` tag proves the render used the pair's reference
+    background, and a sidecar with NO engine key is provably a legacy
+    SolidWorks capture (only render_compare ever wrote engine-less sidecars,
+    always under force_plain_white_background) — so it reads as white rather
+    than degrading to the model-corner-eating unconditional flood. Only a
+    missing/unreadable sidecar returns None (unconditional flood)."""
     sc = pair_paths(pair_id)["render"].with_name(f"{pair_id}.meta.json")
     try:
         meta = json.loads(sc.read_text(encoding="utf-8"))
@@ -155,7 +167,7 @@ def render_bg(pair_id: str) -> str | None:
         return meta["render_bg"]
     if meta.get("engine") == "blender":
         return meta.get("reference", {}).get("background", "black")
-    return None
+    return "white"
 
 
 def _fitted_render(pair_id: str, ref_size: tuple[int, int], align: dict | None):

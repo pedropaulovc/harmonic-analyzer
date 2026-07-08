@@ -166,7 +166,8 @@ def main() -> int:
                 out = composite.pair_paths(pair["id"])["render"]
                 out.parent.mkdir(parents=True, exist_ok=True)
                 bg.save(out, **composite.JPEG_OPTS)
-                composite.trim_render_file(out)
+                composite.trim_render_file(
+                    out, background=pair["reference"].get("background", "black"))
                 _sidecar(pair["id"]).write_text(json.dumps({
                     "camera": pair["camera"], "reference": pair["reference"],
                     "size": list(j["_size"]), "model_mtime": src.stat().st_mtime,
