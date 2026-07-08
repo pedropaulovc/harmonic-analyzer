@@ -162,7 +162,8 @@ N = 3 (the grid-OFF numbers are that model's T1) ≈ 1.5k calls ≈ 2.2M tokens
 per model — the per-model figure already assumes this. **P3 is exempt** — it already carries the grid, and its grid-OFF
 baseline is P2's own T1 numbers; if P3 makes the top-3 it enters the grid
 comparison as-is (there is no "P3+grid" variant to invent), and its
-grid-phase slot is skipped or given to the 4th-ranked arm. If a grid variant displaces the plain arm as T1 winner, that exact
+grid-phase slot is **backfilled by the 4th-ranked arm** (pinned — never
+skipped, so every execution measures exactly three grid-ON variants). If a grid variant displaces the plain arm as T1 winner, that exact
 `arm+grid` variant enters T2 as an additional arm (budgeted like one) — the
 decision rule must check convergence on the presentation actually being
 adopted, not its grid-less sibling.
@@ -193,7 +194,16 @@ adopted, not its grid-less sibling.
   unperturbed camera's right/up axes on every round** — the same basis
   generation and scoring use — never the current perturbed camera's axes
   (with rotation error present the two bases disagree and convergence paths
-  diverge between harnesses). Run for the **top-3 arms from T1 plus
+  diverge between harnesses). Zoom corrections are a **multiplicative
+  factor** on the current zoom (`new_zoom = zoom × factor`; az/el/roll and
+  target are additive deltas), and the ±3% zoom gate is
+  `|log(zoom/zoom_true)| ≤ log 1.03`. Both subject models run T2
+  **stateless per round**: every round is a fresh call (fresh Opus
+  subagent / fresh `codex exec`) whose prompt carries the full round
+  history (prior stimuli + corrections) — this keeps the two backends
+  informationally identical (`codex exec` is one-shot by design, and Opus
+  must not get a persistent-conversation advantage) and means the budget's
+  one-call-per-round arithmetic holds for both. Run for the **top-3 arms from T1 plus
   P1 whenever it is not already among them** — the decision rule needs the
   incumbent's T2 baseline, so P1 is never skipped — plus the grid phase's
   winning `arm+grid` variant if one displaced a plain arm (≤ 5 arms; T2 is
@@ -216,8 +226,9 @@ adopted, not its grid-less sibling.
   az (7°, 15°), el (3°, 7°), roll (3°, 7°), target-y (5, 15 mm),
   target-y (15, 40 mm), target-x (15, 40 mm). Presentation order is NOT
   "d₁ first" (that would make "first" always correct): which delta is shown
-  first follows the same deterministic parity schedule as the other
-  position-bias controls — `zlib.crc32(f"{case_id}:{arm}:{repeat}:t3".encode())` —
+  first follows the same deterministic schedule as the other position-bias
+  controls — `(zlib.crc32(f"{case_id}:{arm}:t3".encode()) + repeat) % 2`,
+  with `+ repeat` outside the hash for the same CRC-linearity reason —
   balanced, identical across executions and models, recorded per row. T3
   cells run the same N = 3 repeats as T1 (the schedule's `repeat` term is
   live): 144 trials per arm-model curve instead of a thin 48.
@@ -236,7 +247,7 @@ adopted, not its grid-less sibling.
 | model | invocation | pinning |
 |---|---|---|
 | **Claude Opus** (the production pose agent) | Agent tool, one fresh subagent per cell | the runner passes `model: "opus"` **explicitly on every spawn** — never rely on inheritance (a subagent inherits the orchestrating session's model by default, which may not be Opus). `run.py` hard-codes the override; a smoke assertion checks the spawned model id before fan-out. |
-| **Codex CLI, gpt-5.5, high reasoning** | `codex exec` non-interactive, one invocation per cell | `--model gpt-5.5` + reasoning effort `high` (config flag, e.g. `-c model_reasoning_effort="high"`), stimulus images attached per cell (`-i`), same prompt template and the same JSON output schema (the runner parses the JSON from stdout). Exact flag spellings are verified against the installed `codex` version during harness build and committed in `run.py`. |
+| **Codex CLI, gpt-5.5, high reasoning** | `codex exec` non-interactive, one invocation per cell (per **round** for T2 — see Tasks; both models run T2 stateless-per-round) | `--model gpt-5.5` + reasoning effort `high` (config flag, e.g. `-c model_reasoning_effort="high"`), stimulus images attached per cell (`-i`), same prompt template and the same JSON output schema (the runner parses the JSON from stdout). Exact flag spellings are verified against the installed `codex` version during harness build and committed in `run.py`. |
 
 Model is fully crossed with arm × case × task: same stimuli, same prompts,
 same N. Report every table per model. The **decision rule applies to the
@@ -252,9 +263,13 @@ report that prominently instead of averaging it away.
   tuning beyond describing the encoding).
 - Balance ref/render side in P2/P3 and order in P10 (position bias is
   documented — report it as its own number). The assignment is
-  deterministic, not sampled at run time: side/order = parity of
-  `zlib.crc32(f"{case_id}:{arm}:{repeat}".encode())` (balanced across cells,
-  identical across executions and both subject models), and each
+  deterministic, not sampled at run time: side/order =
+  `(zlib.crc32(f"{case_id}:{arm}".encode()) + repeat) % 2` — the `+ repeat`
+  is OUTSIDE the hash so the assignment provably flips on every repeat
+  (hashing the repeat digit does not work: CRC32 is linear, so changing the
+  final digit XORs the hash by a constant whose parity is even — empirically
+  the parity never flips across repeats 0/1/2 for ANY cell). Balanced across
+  cells, identical across executions and both subject models; each
   `results.jsonl` row records the assignment it used.
 - Equal pixel budget per stimulus; JPEG q90 everywhere.
 - N ≥ 3 repeats per cell — but at temperature 0 an identical-stimulus repeat
