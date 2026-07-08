@@ -551,7 +551,9 @@ def main() -> int:
                     + f" {w}x{h}")
                 set_camera(adapter, cam)
                 await capture(adapter, composite.pair_paths(pid)["render"], w, h)
-                composite.trim_render_file(composite.pair_paths(pid)["render"])
+                # captures run under force_plain_white_background
+                composite.trim_render_file(composite.pair_paths(pid)["render"],
+                                           background="white")
                 write_sidecar(pair, mpath, (w, h))
                 done[pid] = "rendered"
             adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
