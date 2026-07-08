@@ -40,7 +40,9 @@ ASSEMBLY_ORDER = ("frame", "drive_train", "channel", "summing", "magnifier", "pe
 
 # Scripts that match build_*.py but produce no .SLDPRT part in the SolidWorks
 # queue -- excluded from the part list: motion/diagnostic deliverables that
-# consume/probe the saved assemblies (Basic Motion sweeps, mobility probes).
+# consume/probe the saved assemblies (Basic Motion sweeps, mobility probes), and
+# the engineering-drawing builds (which consume a built .SLDPRT and emit a
+# .SLDDRW/.PDF, driven by the opt-in ``drawing`` task, not the part queue).
 # None builds the machine.
 NON_PART_SCRIPTS = frozenset(
     {
@@ -49,6 +51,7 @@ NON_PART_SCRIPTS = frozenset(
         "build_motion_setup_drives.py",
         "build_mobility_probe.py",
         "build_kinematic_probe.py",
+        "build_drawing_pen_v_block.py",
     }
 )
 

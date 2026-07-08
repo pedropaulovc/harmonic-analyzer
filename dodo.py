@@ -142,6 +142,7 @@ _COM_TAIL = [
     "verify:soundness",
     "verify:kinematics",
     "export",
+    "drawing",
     "preflight",
     "release",
 ]
@@ -358,6 +359,8 @@ def _stage_name(label: str) -> str:
         return "release"
     if label.startswith("export"):
         return "export"
+    if label.startswith("drawing"):
+        return "drawing"
     return "harmonic-analyzer"
 
 
@@ -509,6 +512,10 @@ POSTBUILD_PY = (SCRIPTS_DIR / "_assembly_postbuild.py").resolve()
 EXPORT_PY = (SCRIPTS_DIR / "export_models.py").resolve()
 RELEASE_PY = (SCRIPTS_DIR / "cut_release.py").resolve()
 PREFLIGHT_PY = (SCRIPTS_DIR / "preflight_release.py").resolve()
+# The opt-in ASME engineering-drawing build (pilot: pen-v-block). Drives IDrawingDoc
+# COM via the submodule's drawing helpers; produces a .SLDDRW + .PDF under
+# cad/out/slddrw/. On the COM spine (after export), NOT in default `build`.
+DRAWING_PY = (SCRIPTS_DIR / "build_drawing_pen_v_block.py").resolve()
 
 # The gate suites, by SolidWorks-dependence -- the single source of truth for the
 # verify:/check: task names (reused by build + release so a new gate is wired in
@@ -587,20 +594,35 @@ def _digest_files(files: list[str]) -> str:
 # ``_recipe_files``), so the SolidWorks-free ``check:*`` tasks -- which never touch
 # COM -- stay off it.
 #
-# TWO tiers (the over-rebuild fix): the ASSEMBLY recipe folds the WHOLE tree
-# (``_submodule_dep`` -> ``_submodule_digest``), but the PART recipe folds the tree
-# MINUS the assembly/motion COM modules (``_submodule_part_dep`` ->
-# ``_submodule_part_digest``). So a bump that touches only assembly.py/motion.py
-# rebuilds the 8 assemblies but leaves all ~100 parts cached, instead of a whole-fleet
-# rebuild. The exclusion is SAFE because a part only ever CALLS sketch/feature/export
-# methods, never an assembly/motion method -- enforced loud by ``check:partiso``
-# (test_part_isolation.py); see ``_PART_DIGEST_EXCLUDE_FILES`` below.
+# THREE tiers (the over-rebuild fix), each folding a different slice of the tree:
+#   * PART recipe (``_submodule_part_dep`` -> ``_submodule_part_digest``) folds the
+#     tree MINUS the assembly/motion COM modules AND the drawing module
+#     (``_PART_DIGEST_EXCLUDE_FILES``).
+#   * ASSEMBLY recipe (``_submodule_assembly_dep`` -> ``_submodule_assembly_digest``)
+#     folds the tree MINUS the drawing module (``_ASSEMBLY_DIGEST_EXCLUDE_FILES``) --
+#     assemblies DO call assembly/motion, so those stay in, but never the drawing
+#     module.
+#   * the opt-in ``drawing`` TASK (``_submodule_dep`` -> ``_submodule_digest``) folds
+#     the WHOLE tree (incl. drawing.py), so any submodule change rebuilds the single
+#     cheap drawing -- conservative on purpose.
+# So a bump touching only assembly.py/motion.py rebuilds the 8 assemblies but leaves
+# all ~100 parts cached; a bump touching only the drawing module rebuilds NEITHER the
+# parts NOR the assemblies (only the drawing), instead of a whole-fleet rebuild. The
+# exclusions are SAFE because a part only ever CALLS sketch/feature/export methods
+# (never assembly/motion/drawing), and neither part nor assembly build IMPORTS the
+# drawing module (it holds module-level functions imported ONLY by the main-repo
+# drawing build script) -- both enforced loud by ``check:partiso``
+# (test_part_isolation.py); see ``_PART_DIGEST_EXCLUDE_FILES`` /
+# ``_ASSEMBLY_DIGEST_EXCLUDE_FILES`` below.
 _SUBMODULE_DIGEST_FILE = REPORTS / ".solidworks-mcp-submodule.digest"
 _SUBMODULE_PART_DIGEST_FILE = REPORTS / ".solidworks-mcp-submodule-part.digest"
+_SUBMODULE_ASSEMBLY_DIGEST_FILE = REPORTS / ".solidworks-mcp-submodule-assembly.digest"
 _SUBMODULE_DIGEST: str | None = None
 _SUBMODULE_PART_DIGEST: str | None = None
+_SUBMODULE_ASSEMBLY_DIGEST: str | None = None
 _SUBMODULE_DEP_PATH: str | None = None
 _SUBMODULE_PART_DEP_PATH: str | None = None
+_SUBMODULE_ASSEMBLY_DEP_PATH: str | None = None
 
 # Submodule source files that NO part build can reach, so a change to them cannot
 # alter a part's geometry -- excluded from the PART recipe digest so an
@@ -636,6 +658,22 @@ _SUBMODULE_PART_DEP_PATH: str | None = None
 _PART_DIGEST_EXCLUDE_FILES = frozenset({
     "adapters/solidworks/assembly.py",
     "adapters/solidworks/motion.py",
+    # The drawing COM module: module-level IDrawingDoc helpers imported ONLY by the
+    # main-repo drawing build script -- no part (or assembly) build ever imports or
+    # calls it, so its content cannot change a part's geometry. Excluded from the
+    # PART tier here and from the ASSEMBLY tier via _ASSEMBLY_DIGEST_EXCLUDE_FILES
+    # below; check:partiso enforces the "no part/assembly imports it" basis.
+    "adapters/solidworks/drawing.py",
+})
+
+# Submodule files excluded from the ASSEMBLY recipe digest. Assemblies DO call the
+# assembly/motion COM path, so those stay IN their digest -- only the drawing module
+# is dropped (no assembly build imports or calls it). So a drawing-module bump leaves
+# the assembly digest -- and thus every assembly's recipe -- unchanged, rebuilding
+# neither parts nor assemblies. Same PACKAGE-relative tagging as the part set;
+# test_part_isolation.py derives its assembly forbidden-import set straight from this.
+_ASSEMBLY_DIGEST_EXCLUDE_FILES = frozenset({
+    "adapters/solidworks/drawing.py",
 })
 
 
@@ -658,6 +696,17 @@ def _is_part_relevant_submodule_file(f: Path) -> bool:
     except ValueError:
         return True  # outside the package tree (defensive) -> keep it in the digest
     return rel not in _PART_DIGEST_EXCLUDE_FILES
+
+
+def _is_assembly_relevant_submodule_file(f: Path) -> bool:
+    """False only for the drawing COM module (dropped from the ASSEMBLY recipe
+    digest); every other submodule file -- assembly/motion included -- stays in.
+    Same PACKAGE-relative matching as the part predicate."""
+    try:
+        rel = f.resolve().relative_to(SUBMODULE_SRC.resolve()).as_posix()
+    except ValueError:
+        return True  # outside the package tree (defensive) -> keep it in the digest
+    return rel not in _ASSEMBLY_DIGEST_EXCLUDE_FILES
 
 
 def _digest_submodule_files(files: list[Path]) -> str:
@@ -690,6 +739,19 @@ def _submodule_part_digest() -> str:
         files = [f for f in _submodule_src_files() if _is_part_relevant_submodule_file(f)]
         _SUBMODULE_PART_DIGEST = _digest_submodule_files(files)
     return _SUBMODULE_PART_DIGEST
+
+
+def _submodule_assembly_digest() -> str:
+    """Content fingerprint of the ASSEMBLY-RELEVANT submodule files only (drops the
+    drawing module assemblies never reach), memoized. So a drawing-module bump leaves
+    this digest -- and thus every assembly's recipe -- unchanged, instead of
+    rebuilding all ~8 assemblies."""
+    global _SUBMODULE_ASSEMBLY_DIGEST
+    if _SUBMODULE_ASSEMBLY_DIGEST is None:
+        files = [f for f in _submodule_src_files()
+                 if _is_assembly_relevant_submodule_file(f)]
+        _SUBMODULE_ASSEMBLY_DIGEST = _digest_submodule_files(files)
+    return _SUBMODULE_ASSEMBLY_DIGEST
 
 
 def _write_digest_sidecar(path: Path, digest: str) -> str:
@@ -730,6 +792,19 @@ def _submodule_part_dep() -> str:
         _SUBMODULE_PART_DEP_PATH = _write_digest_sidecar(
             _SUBMODULE_PART_DIGEST_FILE, _submodule_part_digest())
     return _SUBMODULE_PART_DEP_PATH
+
+
+def _submodule_assembly_dep() -> str:
+    """Path to the synthetic file_dep tracking the ASSEMBLY-RELEVANT submodule slice
+    for ASSEMBLY recipes (``_recipe_files``): a separate sidecar whose CONTENT is
+    ``_submodule_assembly_digest()``. Distinct from ``_submodule_dep`` (whole tree,
+    used by the drawing task) so a drawing-module change flips only the drawing task's
+    dep, leaving assemblies cached. Memoized to one write-check per process."""
+    global _SUBMODULE_ASSEMBLY_DEP_PATH
+    if _SUBMODULE_ASSEMBLY_DEP_PATH is None:
+        _SUBMODULE_ASSEMBLY_DEP_PATH = _write_digest_sidecar(
+            _SUBMODULE_ASSEMBLY_DIGEST_FILE, _submodule_assembly_digest())
+    return _SUBMODULE_ASSEMBLY_DEP_PATH
 
 
 # --- Remote artefact cache (opt-in, off by default; see _artifact_cache.py).
@@ -846,7 +921,7 @@ def _recipe_files(stem: str) -> list[str]:
     asm_script = script_for(stem)
     hooks = [str((SCRIPTS_DIR / h).resolve()) for h in POST_ASSEMBLY.get(stem, ())]
     return [str(asm_script.resolve()), *hooks, *_helper_deps(asm_script),
-            *_config_deps(asm_script, stem, "assembly"), _submodule_dep()]
+            *_config_deps(asm_script, stem, "assembly"), _submodule_assembly_dep()]
 
 
 def _recipe_sidecar(stem: str) -> Path:
@@ -1407,6 +1482,31 @@ def task_export():
         # export_models.main).
         "actions": [(_run, [[sys.executable, str(EXPORT_PY), "--record-digests"],
                             "export", "export"])],
+        "verbosity": 2,
+    }
+
+
+def task_drawing():
+    """ASME Y14.5-2018 engineering drawing for the pilot part (OPT-IN, COM spine).
+
+    Turns the built ``pen-v-block.SLDPRT`` into a machinist-complete ``.SLDDRW`` +
+    ``.PDF`` (third-angle views, model dims, tolerances, center marks, notes, title
+    block) via the submodule's drawing COM helpers. On the spine AFTER ``export`` so
+    it stays serial on the STA seat (every part is built by then). NOT in
+    ``build``/``default_tasks`` -- run with ``doit drawing``.
+
+    ``_submodule_dep()`` (WHOLE tree) is the submodule dep here, so ANY submodule
+    change re-runs this single cheap drawing; a drawing-module edit does NOT touch the
+    part/assembly digests (separate tiers), so it rebuilds nothing else.
+    """
+    slddrw = str((CAD_OUT / "slddrw" / "pen-v-block.SLDDRW").resolve())
+    pdf = str((CAD_OUT / "slddrw" / "pen-v-block.PDF").resolve())
+    return {
+        "file_dep": [str(DRAWING_PY), _sldprt("pen_v_block"), _submodule_dep()],
+        "targets": [slddrw, pdf],
+        "task_dep": _spine_dep("drawing"),
+        "uptodate": [False],
+        "actions": [(_run, [[sys.executable, str(DRAWING_PY)], "drawing", "drawing"])],
         "verbosity": 2,
     }
 
