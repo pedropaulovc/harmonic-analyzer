@@ -126,6 +126,16 @@ SUBMODULE_SRC = REPO_ROOT / "SolidworksMCP-python" / "src" / "solidworks_mcp"
 #   part:... -> part:... -> assembly:frame -> ... -> assembly:harmonic_analyzer
 #          -> verify:soundness -> verify:kinematics
 #          -> export -> preflight -> release
+#                 \-> drawing              (opt-in leaf, off `export`)
+#
+# ``drawing`` is a LEAF hanging off ``export``, NOT a link in the preflight/release
+# chain: an in-line position would either drag the opt-in drawing into every
+# ``release`` (a flaky drawing/PDF build could block a real model release, and the
+# bundle excludes drawings anyway -- codex #213) or drag ``release`` into a bare
+# ``doit drawing``. So it depends on ``export`` directly (serial on the seat, every
+# part built by then) and nothing depends on it. The sole non-linear case is the
+# nonsensical ``doit drawing release`` under ``-n`` (both ready after ``export``);
+# no real invocation combines them.
 #
 # The parts fill the head of the spine in a PER-SEAT order (``_seat_part_order``),
 # not sorted, so two machines cold-building at once diverge and split the work via
@@ -142,10 +152,13 @@ _COM_TAIL = [
     "verify:soundness",
     "verify:kinematics",
     "export",
-    "drawing",
     "preflight",
     "release",
 ]
+# ``drawing`` is deliberately NOT in the linear spine above -- it is an opt-in leaf
+# off ``export`` (see the spine comment). It gets an explicit ``task_dep=["export"]``
+# in ``task_drawing`` instead of a positional ``_spine_dep`` edge, so it never joins
+# the preflight/release chain in either direction.
 
 
 # --- Per-seat part order: diverge two cold builders so they SPLIT the work.
@@ -1415,23 +1428,32 @@ def task_check():
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_flag_only.py")],
         },
         "partiso": {
-            # Guards the two-tier submodule digest: parts must never import the
+            # Guards the THREE-tier submodule digest: parts must never import the
             # assembly/motion + MCP-server modules the PART recipe excludes
-            # (_submodule_part_digest), else that exclusion could silently skip a
-            # real part rebuild. Derives its forbidden set from dodo's exclude lists,
-            # so it depends on dodo.py + every part script AND the transitive
-            # repo-local helper closure the test actually scans (module_deps_of):
-            # a helper like _gear.py gaining a forbidden import while no part script
-            # changes must still re-run this gate, else the invariant goes stale
-            # unnoticed (codex #191). The entry point of any new forbidden import is
-            # always in this set -- a part script (caught) or a helper already in a
-            # part's closure (caught) -- so it is self-healing. Pure python -> offline.
+            # (_submodule_part_digest), AND assemblies must never import the drawing
+            # module the ASSEMBLY recipe excludes (_submodule_assembly_digest), else
+            # either exclusion could silently skip a real rebuild. Derives its
+            # forbidden sets from dodo's exclude lists, so it depends on dodo.py +
+            # every part AND assembly script AND the transitive repo-local helper
+            # closure the test actually scans (module_deps_of): a helper gaining a
+            # forbidden import while no script changes must still re-run this gate,
+            # else the invariant goes stale unnoticed (codex #191, #213). The entry
+            # point of any new forbidden import is always in this set -- a part/
+            # assembly script (caught) or a helper already in one's closure (caught)
+            # -- so it is self-healing. Pure python -> offline.
             "file_dep": sorted({
                 str((REPO_ROOT / "dodo.py").resolve()),
                 str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
                 str((SCRIPTS_DIR / "test_part_isolation.py").resolve()),
                 *part_script_deps,
                 *(dep for p in part_scripts() for dep in module_deps_of(p)),
+                # Assembly tier (codex #213): the new assembly-isolation guard scans
+                # every assembly script + its closure, so those files must gate the
+                # stamp too -- else an assembly script/helper starting to import the
+                # drawing module leaves check-partiso.ok fresh and skips the check.
+                *(str(script_for(stem).resolve()) for stem in ASSEMBLY_ORDER),
+                *(dep for stem in ASSEMBLY_ORDER
+                  for dep in module_deps_of(script_for(stem))),
             }),
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_part_isolation.py")],
         },
@@ -1491,8 +1513,10 @@ def task_drawing():
 
     Turns the built ``pen-v-block.SLDPRT`` into a machinist-complete ``.SLDDRW`` +
     ``.PDF`` (third-angle views, model dims, tolerances, center marks, notes, title
-    block) via the submodule's drawing COM helpers. On the spine AFTER ``export`` so
-    it stays serial on the STA seat (every part is built by then). NOT in
+    block) via the submodule's drawing COM helpers. An opt-in LEAF off ``export``
+    (explicit ``task_dep=["export"]``, NOT a link in the preflight/release chain):
+    serial on the STA seat (every part built by then), yet nothing depends on it, so
+    a drawing/PDF failure never blocks a ``release`` (codex #213). NOT in
     ``build``/``default_tasks`` -- run with ``doit drawing``.
 
     ``_submodule_dep()`` (WHOLE tree) is the submodule dep here, so ANY submodule
@@ -1504,7 +1528,9 @@ def task_drawing():
     return {
         "file_dep": [str(DRAWING_PY), _sldprt("pen_v_block"), _submodule_dep()],
         "targets": [slddrw, pdf],
-        "task_dep": _spine_dep("drawing"),
+        # Explicit leaf off `export` (see _COM_TAIL note) -- keeps drawing serial on
+        # the seat without joining the preflight/release chain in either direction.
+        "task_dep": ["export"],
         "uptodate": [False],
         "actions": [(_run, [[sys.executable, str(DRAWING_PY)], "drawing", "drawing"])],
         "verbosity": 2,
