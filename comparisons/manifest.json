@@ -503,7 +503,7 @@
     "platen_rack"
    ],
    "status": "aligned",
-   "notes": "pen mechanism on platen, near-frontal (az~184): pen v-block right-of-center on paper, rack + rack-pinion below. Model: pen v-block authored brass vs green on real machine; paper has no trace.",
+   "notes": "pen mechanism on platen, near-frontal (az~184): pen v-block right-of-center on paper, rack + rack-pinion below. Model: v-block painted green + marker nickel/blunt-nose 2026-07-08; paper has no trace; marker still vertical (Appendix C simplification).",
    "tier": 1
   },
   {
@@ -577,7 +577,7 @@
     "amplitude_bar"
    ],
    "status": "aligned",
-   "notes": "oblique into the spring bank (az~196 el~30 roll~22): springs recede to top-right, channel levers top-left, summing lever lower-right. Model: summing lever authored dark-gray vs green.",
+   "notes": "oblique into the spring bank (az~196 el~30 roll~22): springs recede to top-right, channel levers top-left, summing lever lower-right. Model: summing lever painted casting green 2026-07-08.",
    "tier": 1
   },
   {
@@ -614,7 +614,7 @@
     "knife_mount"
    ],
    "status": "aligned",
-   "notes": "summing lever under top frame, macro from front-right (az~207): pivot tube + tapered arm to counter-spring eye. Model: lever is a simplified tube+taper vs the real webbed casting, and dark-gray vs green.",
+   "notes": "summing lever under top frame, macro from front-right (az~207): pivot tube + tapered arm to counter-spring eye. Model: lever is a simplified tube+taper vs the real webbed casting; painted casting green 2026-07-08.",
    "tier": 1
   }
  ]
