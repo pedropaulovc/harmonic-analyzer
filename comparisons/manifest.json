@@ -552,23 +552,23 @@
    },
    "camera": {
     "mode": "euler",
-    "roll_deg": -15.0,
+    "roll_deg": 15.0,
     "zoom": 13.0,
     "target_mm": [
      24.0,
-     1035.0,
-     10.0
+     1030.0,
+     -10.0
     ],
     "perspective": {
      "focal_length_mm": 24.0
     },
-    "az_deg": 17.0,
+    "az_deg": 163.0,
     "el_deg": -35.0
    },
    "align": {
-    "scale": 1.73,
-    "dx_px": -67,
-    "dy_px": 67
+    "scale": 1.64,
+    "dx_px": 208,
+    "dy_px": -145
    },
    "component_focus": [
     "channel_spring_installed",
