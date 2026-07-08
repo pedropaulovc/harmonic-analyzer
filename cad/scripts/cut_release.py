@@ -321,15 +321,19 @@ def stage_comparisons(stage: Path) -> dict[str, Any] | None:
             sp.set_attribute("staged", False)
             return None
 
-        # Honesty guard: a gallery older than the exported scene graph does not
-        # reflect this release's geometry (export ran without Blender, so an old
-        # render is lingering). Ship it, but make the staleness loud.
-        stale = scores_file.stat().st_mtime < SCENE_JSON.stat().st_mtime
+        # Honesty guard: a gallery older than the exported scene graph OR the
+        # manifest does not reflect this release (export ran without Blender, so
+        # an old render lingers -- or a pose/align/crop edit landed after the
+        # last refresh). Ship it, but make the staleness loud (also disclosed in
+        # the release notes, see release_notes).
+        stale = scores_file.stat().st_mtime < max(
+            SCENE_JSON.stat().st_mtime,
+            (COMPARISONS_DIR / "manifest.json").stat().st_mtime)
         if stale:
             _telemetry.warn(
-                "comparison gallery is OLDER than the exported scene graph -- it "
-                "may not reflect this release's geometry (export ran without "
-                "Blender?). Shipping the existing gallery.")
+                "comparison gallery is OLDER than the exported scene graph or the "
+                "manifest -- it may not reflect this release's geometry/poses "
+                "(export ran without Blender?). Shipping the existing gallery.")
             sp.set_attribute("stale", True)
 
         dst = stage / "comparisons"
@@ -1042,7 +1046,11 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
            f"({facts['comparisons']['pairs']} pairs"
            + (f", mean RMS score {facts['comparisons']['mean_score']}"
               if facts['comparisons'].get('mean_score') is not None else "")
-           + "; open `comparisons/index.html`)\n"
+           + "; open `comparisons/index.html`)"
+           + (" **[STALE -- rendered from an OLDER geometry export/manifest; "
+              "do not treat the visual fit as authoritative for this release]**"
+              if facts['comparisons'].get('stale') else "")
+           + "\n"
            if facts.get("comparisons") else "")
         + (f"- `diff/` -- changed-parts diff renders vs "
            f"{facts['diff']['prev']} (see below)\n" if facts.get("diff") else "")
