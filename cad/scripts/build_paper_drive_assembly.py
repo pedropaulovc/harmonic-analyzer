@@ -702,8 +702,9 @@ async def build(adapter) -> dict[str, str]:
             [0.0, 0.0, 90.0], rot_z_rows(90.0), ground=False,
             label=f"platen-clip (x{clip_x:+.0f})")
         await _lock_to_platen(clip, f"platen-clip x{clip_x:+.0f}")
-    # Recording paper on the platen front face: 0.5 proud, clear of the edge
-    # clips, 6 top/bottom margin.
+    # Recording paper over the platen front face: front 0.5 proud, clear of the
+    # edge clips, 6 top/bottom margin. The 0.25-thick sheet leaves 0.25 air
+    # behind it (build_platen_paper) so no face lands coplanar on the platen.
     paper = await place_component(adapter, "platen-paper",
                                   [PLATE_X0 + 20.25, PLATE_Y0 + 6.0, PLATE_FRONT_Z - 0.5],
                                   [0.0, 0.0, 0.0], IDENTITY, ground=False)
