@@ -8,19 +8,29 @@
 
 Sources mined for this assessment: the book chapters 10–19
 (`references/albert-michelsons-harmonic-analyzer/`), every `build_*.py` interface in
-`cad/scripts/`, and the hobby-machining + gear-cutting references
+`cad/scripts/`, the hobby-machining + gear-cutting references
 (`references/machining-for-hobbyists-getting-started/`, `references/gears-and-gear-cutting/`,
-`references/machinerys-handbook/`).
+`references/machinerys-handbook/`), and three GD&T / engineering-drawing primers:
+[*Understanding GD&T*](https://www.youtube.com/watch?v=G7wnGeR_69k) and
+[*Understanding Engineering Drawings*](https://www.youtube.com/watch?v=ht9GwXQMgpo) (The Efficient
+Engineer), and [*Tolerances Didn't Make Sense Until I Learned This*](https://www.youtube.com/watch?v=zhW1RXr-Wgk)
+(Engineering Gone Wild). Those three establish that the **full** GD&T vocabulary — feature-control
+frames, datum reference frames, true position, profile, runout, and the MMC/LMC modifiers with bonus
+tolerance — is fair game here, applied functionally (see the §1 verdict).
 
 ---
 
-## 1. The audience is the binding constraint
+## 1. The audience calibrates the values, not the vocabulary
 
 The two reference books this supplement sits beside teach **`±` limits and fits only — zero
 GD&T.** No feature-control frames, datums, true position, flatness/perpendicularity symbols, or
 MMC modifiers appear anywhere in the measuring, lathe, mill, or drill chapters; the one
 engineering drawing shown is dimensioned nominal-only. The gear book's governing maxim is
-literally *"if it looks right it most likely is all right."*
+literally *"if it looks right it most likely is all right."* That the *books* omit GD&T is a fact
+about the books — **not** a reason to omit it from the supplement. The supplement's job is to add
+what the books lack; the three video primers in the sources above are exactly the "how to read a
+feature-control frame" education a reader needs, so the deliverable **supplies** GD&T rather than
+ducking it.
 
 What the audience already owns and reads:
 
@@ -41,13 +51,28 @@ Achievable **on the part**, careful work with a DRO:
 
 In this audience's own words: **±.001″ is "tight," ±.005″ is "comfortable," ±1/16″ is "loose."**
 
-**Verdict (drives everything below): stay in `±` limits + named fits. Introduce exactly one
-geometric idea — runout/TIR read on a dial indicator — because that workflow is already taught
-and it is the property that actually matters for bores and gears. Translate the handful of real
-geometric requirements (squareness, knife-edge straightness, the rocker radius) into shop
-*procedures* the books already teach (indicate in a 4-jaw, bore don't drill, single-setup
-machining), not into feature-control frames.** A one-page "how to read a runout callout" sidebar
-in the supplement covers the entire GD&T vocabulary a reader needs.
+**Verdict (drives everything below): use the full GD&T vocabulary (governing standard
+ASME Y14.5-2018 — see §5.5), applied *functionally* — a geometric control appears only where the
+part's function demands it, exactly as the error model in §2 allocates the budget.** This
+**supersedes** an earlier "lite" verdict that capped the drawings at dial-indicator runout on the
+theory that the audience couldn't parse feature-control frames. That cap is now retired: the
+supplement ships a GD&T primer (the video sources are that primer), so the vocabulary is no longer
+the constraint — *function* is. The audience data above is not a ceiling on the vocabulary, it
+calibrates two things:
+
+- **The tolerance *values*.** Stay near the routine **±0.05–0.13 mm** band and reserve the
+  best-case **±0.013–0.025 mm** for genuinely fitted features; a callout the shop can't hold to is
+  worse than none. The video's rule is this machine's rule: *"as accurate as necessary, not as
+  accurate as possible."*
+- **What the primer must teach.** How to read a feature-control frame, datums and datum
+  precedence, true position with basic dimensions, the MMC bonus, and TIR on a dial indicator —
+  so a reader who has only ever seen `±` prints can still build to the drawing.
+
+So GD&T is used where it buys function — the summing **knife edge**, the 20 **cams**, and
+**channel-to-channel consistency** (§2) — a **general tolerance block governs everything
+unspecified** (an ASME decimal-place title-block table; ISO 2768 if drawing to ISO — §5.1/§11), and
+the geometric controls stay few *because the error
+model says so*, not because the reader is assumed unable to read them.
 
 ---
 
@@ -94,8 +119,10 @@ counter-spring post is gouged by its own set screw. None of these need a tight n
 "thou" features.
 
 **Gap 2 — no geometric controls.** Runout, the rocker form radius, knife-edge straightness/
-squareness, and the channel-stack coplanarity are entirely unexpressed. These are the few places
-geometry — not size — is the functional requirement.
+squareness, and the channel-stack coplanarity are entirely unexpressed. These are the places
+geometry — not size — is the functional requirement; §5.2 now expresses them as proper
+feature-control frames (runout, profile, perpendicularity, position) over the full GD&T vocabulary,
+not as prose.
 
 **Gap 3 — no surface finish.** Sliding/running surfaces (journals, bores, the knife edge and its
 seat, the rocker slide) have no finish spec; a rough bore runs untrue and wears.
@@ -167,25 +194,80 @@ fit gets `precision`; the rest of the part stays at its block grade.** A part ca
 default `tolerance_class` *and* a tighter grade on its critical feature (encode as
 `critical_features`, §8).
 
-### 5.2 GD&T-lite — the only geometric controls to add
+### 5.2 The GD&T controls to add — full vocabulary, applied by function
 
-Introduce a small `geometric:` vocabulary, every entry expressed as a **dial-indicator number or a
-shop procedure**, never a feature-control frame the reader can't parse:
+Each control below is a real **feature-control frame** authored onto the model (§8) and imported
+onto the drawing — *and* paired with the shop procedure that holds and inspects it, so a reader who
+builds by feel still knows what the frame demands. Organised by the five GD&T categories; a row
+appears only where the error model (§2) says geometry matters. A **feature of size** (bore,
+journal, opposed faces) takes a Ø tolerance zone on its axis / median plane; a **surface feature**
+takes a zone between two offsets of the surface — the distinction changes what the same symbol
+means, so it is called out per row.
 
-| Control | How the reader holds it | Where it applies | Target |
+**Form** (single feature, no datum)
+
+| Control | Where it applies | Target | Hold / inspect |
 |---|---|---|---|
-| **Runout / TIR** (the one real GD&T idea) | indicate the OD/face while the bore is on a mandrel, or bore-and-cut in one setup | cone gears, cylinder gears + integral cam, both pinions, magnifying wheel, all shaft journals | **≤0.025–0.05 mm TIR** (.001–.002″) |
-| **Bore-to-pitch concentricity** (folds into runout) | 4-jaw indicate the blank true before cutting teeth | every cut gear | *"imperative … no eccentricity"* (gear book) |
-| **Pivot-axis squareness** | bore the pivot hole **in the same setup** that faces the mount; don't drill free-hand | rocker, lever, knife mounts, pedestals | as-machined single-setup |
-| **Knife-edge straightness + sharpness + hardness** | grind/stone a straight edge on a **hardened tool-steel insert** (not the cast/brass parent); seat in a matching **hardened-steel** flat/vee | summing-lever knife edge + knife-mount seat | edge straight & ⟂ to the motion plane; insert + seat hardened (Finding-style material note in §6) |
-| **Knife-support parallelism** | set the two knife mounts coplanar/parallel at assembly (shim to a common height) | the two `knife-mount` blocks | parallel, equal height |
-| **Form: rocker concave radius** (book's one stated geometric req) | turn/mill to the radius | `rocker-arm` top surface | **R = 800 mm nominal**, ±0.5 mm (book says = bar length 812.8; model uses 800 — reconcile, Finding 5) |
-| **Channel-stack consistency** | machine all 19 spacer bushings to **one length in one setup**; keep the pivot shaft straight | pivot/fulcrum bushing stacks | spacer length scatter ≤0.05 mm |
+| **Flatness** | knife-mount seat face; pedestal + base mating faces; top-crossbar seat | ≤0.02–0.05 mm | surface-grind or single-setup face; dial-indicator sweep on 3 jacks, or CMM |
+| **Straightness** (axis, Ø zone) | `pivot-shaft`, `fulcrum-shaft`, `cone-gear-shaft` tip, `crank-pin` axes | ≤0.02–0.05 mm over length | between-centres turn + steady; indicate on Vee-blocks. Rule #1 (below) already bounds it at MMC |
+| **Circularity / Cylindricity** | gear + cam blanks, running journals, bearing bores | folds into runout, below | 4-jaw indicate true; rotate-and-probe, polar plot |
 
-**Deliberately excluded, with reasons:** true position + datum reference frames, profile-of-surface
-FCFs, composite frames, MMC/LMC modifiers. The audience doesn't read them, the references don't
-teach them, and every requirement above is reachable by single-setup machining + indicating. Adding
-them would make the supplement *less* usable.
+**Orientation** (feature to datum)
+
+| Control | Where it applies | Target | Hold / inspect |
+|---|---|---|---|
+| **Perpendicularity** | pivot-bore axis ⟂ mount face (`rocker-arm`, `summing-lever`, `knife-mount`, pedestals); **knife edge ⟂ motion plane** | ≤0.02–0.05 mm | bore the hole **in the setup that faces the mount**; indicate off a square |
+| **Parallelism** | the two `knife-mount` seats coplanar / equal-height; amplitude-bar slide face to base | parallel, ≤0.05 mm | shim to a common height at assembly; indicate |
+| **Angularity** | *available* for the oblique cone↔cylinder mesh seat, but that mesh is adjustable / loose (§2) — **not required** | — | sine bar, if ever toleranced |
+
+**Location** (feature-of-size position from a datum reference frame)
+
+| Control | Where it applies | Target | Hold / inspect |
+|---|---|---|---|
+| **Position (true position)** — cylindrical zone about a **basic-dimension** location; **M** where a clearance hole benefits from bonus | `rocker-arm-support` 4× foot holes; `summing-lever` 20 spring holes at 7.0565 pitch; channel pivot / lever bores; `knife-mount` fastener holes (once modeled); crank + frame bolt patterns | Ø0.1–0.2 mm at MMC, loosening with bonus | drill from a common fixture / jig; CMM the hole centres against the basic grid |
+
+Position replaces a `±`-boxed hole location with a **round** zone evenly distributed about the true
+position (a square `±` zone is both too tight on the diagonal and too loose on the axes), and it
+names the datum precedence explicitly — for a hole the primary datum is normally the face the axis
+must be ⟂ to.
+
+**Profile** (form + orientation + location of a shaped feature at once)
+
+| Control | Where it applies | Target | Hold / inspect |
+|---|---|---|---|
+| **Profile of a surface** | `rocker-arm` **R800 concave** form (the book's one stated geometric req — profile is its natural control); `cylinder-gear` cam eccentric profile; involute **gear-tooth flanks** | 0.05–0.1 mm zone following the true profile | form-cut / CNC profile; CMM scan against the nominal curve. Profile-without-datum on a nominally flat face ≡ flatness |
+
+**Runout** (rotating features about a datum axis)
+
+| Control | Where it applies | Target | Hold / inspect |
+|---|---|---|---|
+| **Circular runout** | gear OD / pitch to bore axis; cam OD to bore; all journals; magnifying wheel | ≤0.025–0.05 mm TIR (.001–.002″) | mandrel or bore-and-cut one setup; rotate + dial gauge per cross-section |
+| **Total runout** | full-length control where a whole cylindrical face must run true (long journals, gear bodies, wheel rim) | ≤0.05 mm TIR | dial gauge traversed **along** the axis |
+
+Bore-to-pitch concentricity on a cut gear (the gear book's *"imperative … no eccentricity"*) is now
+just runout to the bore-axis datum — no separate control. Datums for every framed feature follow the
+per-class rule in §5.4, listed in **precedence order**: the sequence is load-bearing because it
+fixes how the part is immobilised (3-2-1: primary datum ≥3 contacts, secondary ≥2, tertiary ≥1), so
+inspection is repeatable.
+
+**Modifiers & Rule #1 (why the fits actually close).**
+
+- **MMC / LMC / RFS + bonus tolerance.** A position tolerance defaults to **RFS** (the zone is
+  fixed). Adding **M (MMC)** grows the zone by the actual feature's departure from maximum material
+  — a clearance hole cut oversize may sit less accurately and still assemble, exactly the bonus a
+  hand-built machine wants on its bolt / foot / pin patterns. **L (LMC)** is the mirror, for a hole
+  near an edge where minimum material (thin wall) is the risk. The modifier is encoded on the frame
+  (§8); the worked bonus arithmetic is in the *Understanding GD&T* / *Tolerances* primers.
+- **Rule #1 / the Envelope Principle** (ASME default, §5.5): the MMC size of a feature of size is a
+  perfect-form envelope its surface may not cross, so **size limits already bound form** — a pin at
+  Ø-max must be straight; a smaller pin may bow within the envelope. This is why a size-only pin
+  still drops into its mating hole, and it is the right default for this machine's slip fits. Add a
+  separate straightness/flatness only where a feature must stay straight *below* MMC.
+
+**Still omitted — by function, not by audience:** composite position frames, symmetry, MMC applied
+to *datums*, and profile on the frame castings. Each is dropped because **no feature here needs it**
+(no pattern-to-pattern datum shift, no symmetric slot that must be centred, no cast face carrying a
+fit), not because a reader can't parse it — add any of them the moment a part earns it.
 
 ### 5.3 Add a `surface_finish:` block
 
@@ -199,16 +281,34 @@ Most surfaces get **no callout** — that matches the books' silence and the boo
 connecting rods. Spec finish only where a surface bears or slides. (Handbook rule of thumb if a
 reader wants one: roughness ≤ 1/8 of the dimensional tolerance.)
 
-### 5.4 Datum philosophy (lightweight, per part class)
+### 5.4 Datum reference frames (per part class)
 
-State a one-line reference per part class, as *"machine off this,"* not a formal DRF:
+A datum reference frame is stated per part class in **precedence order** (primary → secondary →
+tertiary) — the order fixes how the part is immobilised (3-2-1) and therefore how every framed
+tolerance in §5.2 is inspected, so it must be identical across the run to stay repeatable:
 
-- **Rotating parts** (gears, wheels, pinions, shafts): datum = the **bore/journal axis**, secondary
-  = a **faced end**. Cut features off the bore in one setup → runout falls out for free.
-- **Pivoting parts** (rockers, levers, knife mounts): datum = the **mounting face**, locate the
-  **pivot bore** square to it in the same setup.
-- **Frame / mounting parts** (base, pedestals, crossbars, portals): datum = the **mating face +
-  bolt pattern**; everything else is reference.
+- **Rotating parts** (gears, wheels, pinions, shafts): primary = the **bore / journal axis**,
+  secondary = a **faced end**. Cut features off the bore in one setup → runout falls out for free.
+- **Pivoting parts** (rockers, levers, knife mounts): primary = the **mounting face**, secondary =
+  the **pivot bore** located square to it in the same setup; tertiary = an edge or second hole.
+- **Frame / mounting parts** (base, pedestals, crossbars, portals): primary = the **mating face**,
+  secondary/tertiary = the **bolt pattern**; everything else is reference.
+
+### 5.5 Governing standard — ASME Y14.5-2018 (Rule #1); ISO noted
+
+Pick **ASME Y14.5-2018** as the drawing standard, for two reasons the primers make explicit: its
+default **Rule #1 (Envelope Principle)** ties form to the MMC size limit, so a size-only feature is
+still guaranteed to assemble — the right default for a hand-built machine full of slip fits — and
+it drops the fragile concentricity/symmetry controls (removed in the 2018 edition) that this machine
+never needed anyway (runout and position cover their intent). Note the alternative for a reader
+working to **ISO**: ISO defaults to the **Independency Principle** (size and form independent, so a
+within-size part may still be bent), and needs an explicit **Ⓔ** to invoke the envelope — the mirror
+of ASME's **Ⓘ** for independency. State the chosen standard in the drawing title block (§11) so the
+default rule is unambiguous.
+
+Y14.5-2018 governs the **dimensioning & tolerancing** (GD&T, the FCFs, Rule #1); the multiview
+**projection** and sheet **format** follow its companion ASME standards (Y14.3 and Y14.100), so
+"draw to ASME Y14.5" below is shorthand for the Y14 family with Y14.5-2018 as the tolerancing rule.
 
 ---
 
@@ -282,8 +382,9 @@ v3.3.0; **DimXpert is included with every SOLIDWORKS license — confirmed for t
    exactly the dimensions a drawing pulls via
    `IDrawingDoc.InsertModelDimensions` / `InsertModelAnnotations3` — the print inherits every ± with
    no re-authoring, fully associative.
-2. **Geometric tolerances + datums as DimXpert PMI.** For the `geometric:` controls (runout,
-   concentricity, perpendicularity) and datums, author them during the build via
+2. **Geometric tolerances + datums as DimXpert PMI.** For the full `geometric:` set (§5.2) —
+   flatness, straightness, perpendicularity, parallelism, **position**, **profile**, circular/total
+   **runout** — plus datums and their precedence, author them during the build via
    `IDimXpertManager.DimXpertPart` → `IDimXpertPart.InsertDatum` / `InsertSizeDimension` /
    `InsertLocationDimension` / `InsertGtol` (+ typed interfaces `IDimXpertConcentricityTolerance`,
    `IDimXpertOrientationTolerance` for perp/parallel, `IDimXpertFlatnessTolerance`…). **DimXpert
@@ -295,7 +396,14 @@ v3.3.0; **DimXpert is included with every SOLIDWORKS license — confirmed for t
    no dedicated named *subclass*, which is what misled an earlier draft.) Note: this enum is **absent
    from offline bundle v3.3.0**; the values above are from help.solidworks.com/2026. Classic
    `IModelDoc2.InsertGtol` + `swGcsCIRCRUNOUT` / `swGcsTOTALRUNOUT` (`swGtolGeomCharSymbol_e`) remains
-   a fallback.
+   a fallback. (Concentricity/symmetry are available in the enum but unused — ASME Y14.5-2018 dropped
+   them and §5.2 covers their intent with runout/position.)
+   - **True position needs basic dimensions.** The located dimensions a position frame references
+     must be stamped **basic** (boxed, no ± ) — `IDimension.SetToleranceType(swTolBASIC)` on the
+     driving locating dims — otherwise the general `±` block also applies and double-tolerances the
+     hole. **Material-condition modifiers** (MMC/LMC) ride the GTol, set on the DimXpert position
+     tolerance (`IDimXpert*Tolerance` material-condition property) / passed to the classic
+     `InsertGtol` frame; RFS is the default when omitted.
 3. **Surface-finish symbols** from `surface_finish:` → `IModelDoc2.InsertSurfaceFinishSymbol2` on the
    bearing/sliding faces.
 
@@ -331,11 +439,17 @@ surface_finish:
   finish:  { ra_um: 3.2,        applies_to: "general machined (default)" }
   none:    { applies_to: "non-contacting, gear flanks, cosmetic/rough" }
 
-geometric:
-  runout:        { tir_mm: [0.025, 0.05], applies_to: "gear bore->pitch, cam->bore, journals, wheel", how: "indicate / bore-and-cut one setup" }
-  pivot_square:  { applies_to: "rocker/lever/mount pivot bores", how: "bore in the setup that faces the mount" }
-  knife_edge:    { applies_to: "summing-lever edge + seat", how: "straight, sharp; hardened tool-steel insert + hardened-steel seat (separate parts, not the cast/brass parent); seat parallel/equal-height" }
-  rocker_radius: { value: 800, tol_mm: 0.5, applies_to: "rocker-arm top", note: "nominal; book says = bar length 812.8 — reconcile (Finding 5)" }
+geometric:            # keyed by GD&T characteristic (§5.2); each = tolerance zone + how to hold it
+  flatness:         { tol_mm: 0.05, applies_to: "knife-mount seat, pedestal/base mating faces", how: "single-setup face/grind; indicate on 3 jacks or CMM" }
+  straightness:     { tol_mm: 0.05, applies_to: "pivot/fulcrum/cone-gear-shaft + crank-pin axes", how: "between-centres + steady; Rule #1 already bounds it at MMC" }
+  perpendicularity: { tol_mm: 0.05, applies_to: "pivot-bore axis to mount face; knife edge to motion plane", how: "bore in the setup that faces the mount" }
+  parallelism:      { tol_mm: 0.05, applies_to: "the two knife-mount seats; amplitude-bar slide", how: "shim coplanar/equal-height at assembly" }
+  position:         { tol_mm: 0.15, modifier: MMC, applies_to: "support foot holes, 20 spring holes @7.0565, channel bores, bolt patterns", how: "drill from a common jig; basic dims locate the true position" }
+  profile_surface:  { tol_mm: 0.1, applies_to: "rocker R800 concave form, cam eccentric profile, gear-tooth flanks", how: "form-cut/CNC; CMM scan vs the nominal curve" }
+  runout:           { tir_mm: [0.025, 0.05], types: [circular, total], applies_to: "gear bore->pitch, cam->bore, journals, wheel", how: "mandrel / bore-and-cut one setup; dial gauge" }
+  # feature notes that resolve to the characteristics above:
+  knife_edge:       { chars: [straightness, perpendicularity, parallelism], applies_to: "summing-lever edge + seat", how: "straight, sharp; hardened tool-steel insert + hardened-steel seat (separate parts, not the cast/brass parent); seat parallel/equal-height" }
+  rocker_radius:    { char: profile_surface, value: 800, tol_mm: 0.5, applies_to: "rocker-arm top", note: "book says = bar length 812.8 — reconcile (Finding 5)" }
 ```
 
 **`parts/*.yaml`** — add optional fields, required only for the ~10 T1 parts. **Each
@@ -353,7 +467,10 @@ summing-lever:
   surface_finish: bearing
   critical_features:
     # select: API-stable model item (named dim / feature) the build script creates and PMI attaches to.
-    - { select: "knife_seat_dia@Sketch3", feature: "knife edge", grade: precision, geometric: knife_edge, finish: bearing }
+    # A row is a feature-control frame: characteristic + tolerance + datum precedence (+ modifier).
+    - { select: "knife_seat_dia@Sketch3", feature: "knife edge", grade: precision, geometric: knife_edge, datums: [A, B], finish: bearing }
+    # position example — the 4 support foot holes, MMC bonus, located by basic dims off datums A|B|C:
+    - { select: "foot_hole_pattern@Sketch2", feature: "4x foot holes", geometric: position, modifier: MMC, datums: [A, B, C] }
 ```
 
 The build script owns the contract: it must **name** that dimension/feature (not rely on
@@ -401,16 +518,20 @@ lockstep with the config.
 ## 10. What the supplement actually ships
 
 - **Generated 2D PDF shop drawings (Tier-1 first) that auto-consume the PMI embedded in each
-  SLDPRT** (§8) — the tolerance/fit/finish/runout data is authored onto the model from the YAML at
-  build time, so the drawing imports it rather than re-typing it. Pair with a **one-page primer
-  sidebar**: how to read a runout (TIR) callout, what "slip fit / press fit" mean in thou, and
-  "bore don't drill, single setup, indicate true." The GD&T stays **lite** — runout plus the
-  rocker/knife controls — nothing the reader can't parse.
+  SLDPRT** (§8) — the tolerance/fit/finish/GD&T data is authored onto the model from the YAML at
+  build time, so the drawing imports it rather than re-typing it. Draw to **ASME Y14.5-2018** (§5.5)
+  and stamp the standard + projection-angle symbol in the title block (§11). Pair with a **GD&T
+  primer sidebar** (the video sources are that primer): how to read a feature-control frame, datums
+  and datum precedence, **true position + basic dimensions**, the **MMC bonus**, circular/total
+  **runout (TIR)**, what "slip / transition / press fit" mean in thou, and "bore don't drill, single
+  setup, indicate true." The GD&T is **full** — the vocabulary is not the limit, *function* is: a
+  frame appears only where the error model (§2) rewards it, and a general tolerance block governs
+  the rest.
 - **The single authoritative gear table** (DP/module, 14.5° PA, the 20 cone tooth counts 6→120, the
   120-tooth cylinders, the rack/pinion) — the one place precision *and* internal consistency both
   matter.
-- Update `tolerance-policy.md` §"Out of scope": GD&T (lite), surface finish, and critical-feature
-  callouts move **in scope**; the drawings/DXF/CAM question is decided in §11 (not deferred).
+- Update `tolerance-policy.md` §"Scope": GD&T (full ASME Y14.5), surface finish, and critical-feature
+  callouts are **in scope**; the drawings/DXF/CAM question is decided in §11 (not deferred).
 
 ---
 
@@ -457,6 +578,32 @@ so supplying them is the single highest-value contribution this supplement makes
 - **Caveat.** Programmatic drawing layout is brittle; expect to hand-finish view placement / leader
   routing on the first pass and capture the working recipe — the repo already hand-tunes render
   cameras the same way.
+- **Drawing conventions the generator must honour** (from the *Understanding Engineering Drawings*
+  primer, so the print is standard-legible):
+  - **Title block** (bottom-right): part name/number, scale, material + finish, author, and — because
+    it fixes how the views read — the **projection-angle symbol** and the governing **standard
+    (ASME Y14.5-2018)**. Use **third-angle** projection (North-American default); note the choice
+    explicitly since first- vs third-angle swaps left/right and top/bottom view placement.
+  - **View set:** one front view carrying the most information, only as many orthographic views as
+    fully define the part (drop redundant ones), plus an **isometric** for clarity; a **section view**
+    (hatched cut) wherever internal geometry (bores, the knife-mount bearing bore) would otherwise be
+    dimensioned off hidden lines; a **detail view** at larger scale for small features (the cam notch,
+    a sub-mm gear root); **centre-lines** on every circular feature.
+  - **Dimensioning:** prefer **datum (baseline) dimensioning** off the part's primary datum over
+    **chain** dimensioning, so tolerances don't accumulate down a chain — chain only where the
+    *relative* spacing of a hole group matters (e.g. the 20 spring holes). Dimensions outside the
+    part, never off hidden lines, don't dimension 90° corners, reference-only dims in **( )**.
+    Hole callouts carry Ø + depth (⌴ counterbore / ⌵ countersink symbols where used). Thread callouts
+    match each thread's **own** standard, not a blanket one: **Unified inch** as *size–TPI–series–
+    class* — the `rocker-arm-support` **9⁄16-12 UNC-2B** tapped feet (the machine's one real threaded
+    feature) are inch, so they take the Unified form, **not** metric — and **ISO metric** as
+    **M d×pitch** (class 6H/6g) for any metric fastener. Don't force the M form onto an inch thread.
+  - **General tolerance block** governs every unspecified dimension. On an ASME print this is the
+    native **decimal-place title-block table** (e.g. `.X ±0.5`, `.XX ±0.1`, `.XXX ±0.025` — each
+    place *defines* its tolerance, so it is specified, not assumed); an **ISO 2768** table is the
+    equivalent when drawing to ISO. Map the repo's `machined_block`/`plate_profile`/
+    `visual_noncritical` grades into whichever block the chosen standard uses, so only
+    critical-to-function features carry an explicit `±` or a feature-control frame.
 
 ### CAM (STEP → CAM → G-code) — IN SCOPE, deferred until the nominal model is validated
 
