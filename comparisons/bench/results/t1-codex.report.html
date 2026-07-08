@@ -161,6 +161,37 @@ on the side-by-side pair (P2/P3) — the classic azimuth↔target-x degeneracy.<
 <tr><td><b>P2</b> Side-by-side</td><td class="h" style="background:#c2892c">59</td><td class="h" style="background:#c2892c">55</td><td class="h" style="background:#2f8f5b">74</td><td class="h" style="background:#c0473f">48</td><td class="h" style="background:#c0473f">52</td><td class="h" style="background:#2f8f5b">69</td></tr>
 <tr><td><b>P3</b> Side-by-side + grid</td><td class="h" style="background:#c2892c">61</td><td class="h" style="background:#c2892c">58</td><td class="h" style="background:#2f8f5b">73</td><td class="h" style="background:#c0473f">43</td><td class="h" style="background:#c0473f">54</td><td class="h" style="background:#c2892c">62</td></tr></tbody></table></div>
 
+<h2>T3 — can it tell two errors apart?</h2>
+<p class="note">A different question: shown two stimuli of the same pair with different error
+magnitudes, pick the better-aligned one (2AFC, chance = 50%). This is <b>discrimination</b>, not
+absolute reading — and the ranking nearly <b>inverts</b> T1. The two-image arms (side-by-side,
+flicker) that were worst at reading a single stimulus are best at telling two apart; the overlay
+arms that won T1 sit near chance here. The winner depends on the task.</p>
+<div class="scroll"><table>
+<thead><tr><th>arm</th><th>discrimination %</th><th>vs chance</th><th>strongest axis</th></tr></thead>
+<tbody><tr><td><span class="armname">P3</span> Side-by-side + grid</td><td class="num" style="color:var(--bad)">66.7</td><td class="num">+16.7</td><td class="num">tx 94%</td></tr>
+<tr><td><span class="armname">P10</span> Flicker pair</td><td class="num" style="color:var(--bad)">65.3</td><td class="num">+15.3</td><td class="num">roll 78%</td></tr>
+<tr><td><span class="armname">P2</span> Side-by-side</td><td class="num" style="color:var(--bad)">62.5</td><td class="num">+12.5</td><td class="num">roll 72%</td></tr>
+<tr><td><span class="armname">P5</span> Blend (subtle)</td><td class="num" style="color:var(--bad)">60.4</td><td class="num">+10.4</td><td class="num">tx 78%</td></tr>
+<tr><td><span class="armname">P7</span> Green–magenta fusion</td><td class="num" style="color:var(--bad)">59.7</td><td class="num">+9.7</td><td class="num">tx 83%</td></tr>
+<tr><td><span class="armname">P4</span> Onion ladder</td><td class="num" style="color:var(--bad)">59.0</td><td class="num">+9.0</td><td class="num">roll 72%</td></tr>
+<tr><td><span class="armname">P8</span> Difference heatmap</td><td class="num" style="color:var(--bad)">59.0</td><td class="num">+9.0</td><td class="num">tx 83%</td></tr>
+<tr><td><span class="armname">P6</span> Checkerboard</td><td class="num" style="color:var(--bad)">56.2</td><td class="num">+6.2</td><td class="num">roll 78%</td></tr>
+<tr><td><span class="armname">P11</span> Dashboard</td><td class="num" style="color:var(--bad)">56.2</td><td class="num">+6.2</td><td class="num">tx 89%</td></tr>
+<tr><td><span class="armname">P9</span> Edge overlay</td><td class="num" style="color:var(--bad)">54.9</td><td class="num">+4.9</td><td class="num">tx 78%</td></tr>
+<tr><td><span class="armname">P1</span> Blend (red overlay)</td><td class="num" style="color:var(--bad)">52.8</td><td class="num">+2.8</td><td class="num">el 56%</td></tr></tbody></table></div>
+
+<h2>T2 — closing the loop <span class="tag" style="font-size:.6em">preliminary · 14/144</span></h2>
+<p class="note">The production question: iterate — read stimulus, propose a camera correction, re-render,
+repeat (≤6 rounds). Convergence = az/el/roll ≤ 1°, target ≤ 5 mm, zoom ± 3%. This run is still in
+progress, so read it as an early signal, not a verdict. Non-converged cells enter the median as round 7.</p>
+<div class="scroll"><table>
+<thead><tr><th>arm</th><th>n</th><th>converged</th><th>median rounds</th></tr></thead>
+<tbody><tr><td><span class="armname">P5</span> Blend (subtle)</td><td class="num">4</td><td class="num">3/4 (75%)</td><td class="num">2</td></tr>
+<tr><td><span class="armname">P1</span> Blend (red overlay)</td><td class="num">4</td><td class="num">3/4 (75%)</td><td class="num">4</td></tr>
+<tr><td><span class="armname">P6</span> Checkerboard</td><td class="num">3</td><td class="num">2/3 (67%)</td><td class="num">1</td></tr>
+<tr><td><span class="armname">P7</span> Green–magenta fusion</td><td class="num">3</td><td class="num">2/3 (67%)</td><td class="num">1</td></tr></tbody></table></div>
+
 <h2>Reading the result</h2>
 
 <div class="finding"><b>Checkerboard (P6) leads — and is the only arm that separates from the pack.</b>
@@ -179,6 +210,11 @@ A coordinate grid (P3) did not rescue side-by-side here.</div>
 <div class="finding"><b>Everyone struggles with translation and zoom.</b> Rotations read at 65–82%;
 target-x, target-y and zoom sit at 45–68%. Any presentation adopted for production pose feedback will
 need to lean on the reads it is good at and treat translation as low-confidence.</div>
+<div class="finding"><b>The task changes the winner.</b> On T3's two-image discrimination the ranking
+nearly inverts — side-by-side and flicker (T1's losers) come out on top, the overlays near chance.
+Absolute pose reading (T1) and fine A-vs-B discrimination (T3) reward different presentations, so the
+right choice depends on how the production loop actually uses the composite. T2 (the closed loop that
+mirrors production) is the tiebreaker — and it is still running.</div>
 
 
 <h2>Method &amp; caveats</h2>

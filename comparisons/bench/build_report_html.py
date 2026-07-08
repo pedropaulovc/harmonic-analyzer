@@ -216,6 +216,24 @@ on the side-by-side pair (P2/P3) — the classic azimuth↔target-x degeneracy.<
 <thead><tr><th>arm</th><th>az</th><th>el</th><th>roll</th><th>target-x</th><th>target-y</th><th>zoom</th></tr></thead>
 <tbody>{heat}</tbody></table></div>
 
+<h2>T3 — can it tell two errors apart?</h2>
+<p class="note">A different question: shown two stimuli of the same pair with different error
+magnitudes, pick the better-aligned one (2AFC, chance = 50%). This is <b>discrimination</b>, not
+absolute reading — and the ranking nearly <b>inverts</b> T1. The two-image arms (side-by-side,
+flicker) that were worst at reading a single stimulus are best at telling two apart; the overlay
+arms that won T1 sit near chance here. The winner depends on the task.</p>
+<div class="scroll"><table>
+<thead><tr><th>arm</th><th>discrimination %</th><th>vs chance</th><th>strongest axis</th></tr></thead>
+<tbody>{t3rows}</tbody></table></div>
+
+<h2>T2 — closing the loop <span class="tag" style="font-size:.6em">preliminary · {t2n}/144</span></h2>
+<p class="note">The production question: iterate — read stimulus, propose a camera correction, re-render,
+repeat (≤6 rounds). Convergence = az/el/roll ≤ 1°, target ≤ 5 mm, zoom ± 3%. This run is still in
+progress, so read it as an early signal, not a verdict. Non-converged cells enter the median as round 7.</p>
+<div class="scroll"><table>
+<thead><tr><th>arm</th><th>n</th><th>converged</th><th>median rounds</th></tr></thead>
+<tbody>{t2rows}</tbody></table></div>
+
 <h2>Reading the result</h2>
 {findings}
 
@@ -298,6 +316,30 @@ def main() -> int:
             f'<td class="h" style="background:{_heat_color(pp[p])}">{100*pp[p]:.0f}</td>' for p in params)
         heat.append(f'<tr><td><b>{arm}</b> {ARM_NAME[arm]}</td>{cells}</tr>')
 
+    # T3 discrimination
+    t3 = summary[args.model].get("t3", {"table": {}, "ranking": []})
+    t3rows = []
+    for arm in t3["ranking"]:
+        t = t3["table"][arm]
+        fc = t["frac_correct"]
+        best = max(t["by_class"].items(), key=lambda kv: kv[1]) if t["by_class"] else ("-", 0)
+        t3rows.append(
+            f'<tr><td><span class="armname">{arm}</span> {ARM_NAME[arm]}</td>'
+            f'<td class="num" style="color:{_score_color((fc-0.5)*2)}">{100*fc:.1f}</td>'
+            f'<td class="num">+{100*(fc-0.5):.1f}</td>'
+            f'<td class="num">{best[0]} {100*best[1]:.0f}%</td></tr>')
+
+    # T2 convergence (preliminary)
+    t2 = summary[args.model].get("t2", {"table": {}, "ranking": [], "n_total": 0})
+    t2rows = []
+    for arm in t2["ranking"]:
+        t = t2["table"][arm]
+        t2rows.append(
+            f'<tr><td><span class="armname">{arm}</span> {ARM_NAME[arm]}</td>'
+            f'<td class="num">{t["n"]}</td>'
+            f'<td class="num">{t["converged"]}/{t["n"]} ({100*t["conv_rate"]:.0f}%)</td>'
+            f'<td class="num">{t["median_rounds"]:g}</td></tr>')
+
     top = ranking[0]
     p1_rank = ranking.index("P1") + 1
     findings = f"""
@@ -317,12 +359,19 @@ A coordinate grid (P3) did not rescue side-by-side here.</div>
 <div class="finding"><b>Everyone struggles with translation and zoom.</b> Rotations read at 65–82%;
 target-x, target-y and zoom sit at 45–68%. Any presentation adopted for production pose feedback will
 need to lean on the reads it is good at and treat translation as low-confidence.</div>
+<div class="finding"><b>The task changes the winner.</b> On T3's two-image discrimination the ranking
+nearly inverts — side-by-side and flicker (T1's losers) come out on top, the overlays near chance.
+Absolute pose reading (T1) and fine A-vs-B discrimination (T3) reward different presentations, so the
+right choice depends on how the production loop actually uses the composite. T2 (the closed loop that
+mirrors production) is the tiebreaker — and it is still running.</div>
 """
 
     html = HTML.format(
         ncells=ncells, narms=len(ranking), tokM=tokM,
         ref=imgs["ref"], ctrl=imgs["ctrl"], pert=imgs["pert"],
-        rows="\n".join(rows), cards="\n".join(cards), heat="\n".join(heat), findings=findings)
+        rows="\n".join(rows), cards="\n".join(cards), heat="\n".join(heat),
+        t3rows="\n".join(t3rows), t2rows="\n".join(t2rows) or '<tr><td colspan="4">no data yet</td></tr>',
+        t2n=t2.get("n_total", 0), findings=findings)
     out = OUT / f"report_{args.model}.html"
     out.write_text(html, encoding="utf-8")
     print(f"wrote {out} ({len(html)//1024} KB)")
