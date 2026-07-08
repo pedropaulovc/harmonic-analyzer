@@ -145,15 +145,16 @@ def _fitted_render(pair_id: str, ref_size: tuple[int, int], align: dict | None):
     return ren, mask, (dx, dy)
 
 
-def aligned_render(pair_id: str, align: dict | None) -> Path:
+def aligned_render(pair_id: str, align: dict | None,
+                   background: str = "black") -> Path:
     """The render placed in the reference frame — identical scale/offset to
-    the blend's red layer — on black, so the gallery's reveal slider swaps
-    between two pixel-registered images."""
+    the blend's red layer — on the reference's background colour, so the
+    gallery's reveal slider swaps between two pixel-registered images."""
     p = pair_paths(pair_id)
     with Image.open(p["ref"]) as ref:
         ref_size = ref.size
     ren, mask, offset = _fitted_render(pair_id, ref_size, align)
-    canvas = Image.new("RGB", ref_size, "black")
+    canvas = Image.new("RGB", ref_size, background)
     canvas.paste(ren.convert("RGB"), offset, mask)
     p["cad"].parent.mkdir(parents=True, exist_ok=True)
     canvas.save(p["cad"], **JPEG_OPTS)
@@ -217,7 +218,7 @@ def regenerate(only: set[str] | None = None) -> dict[str, float]:
             print(f"  --  [{i}/{len(todo)}] {pid}: no render yet, skipping", flush=True)
             continue
         align = pair.get("align")
-        aligned_render(pid, align)
+        aligned_render(pid, align, pair["reference"].get("background", "black"))
         blend_overlay(pid, align)
         scores[pid] = score_pair(pid, align)
         print(f"  OK  [{i}/{len(todo)}] {pid}: score {scores[pid]}"
