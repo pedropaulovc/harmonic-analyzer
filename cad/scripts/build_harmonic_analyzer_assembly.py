@@ -66,8 +66,8 @@ SUBASSEMBLIES = ("frame", "drive-train", "channel", "summing", "magnifier", "pen
 # Parked in the FAR-WEST margin lane running along Z (machine x -220..-212,
 # z -100..100, y 50.8..53.8), the ~12.5 mm clear lane between the west columns
 # (west face x -209.7) and the west top-plate edge (x -222.25); well clear of the
-# rocker-arm-support foot (x 41..105). Authored as the EXACT machine transform
-# (mirror=False): flat, long axis along Z, GRADUATIONS UP. build_measuring_stick
+# rocker-arm-support foot (x 41..105). Authored as the EXACT machine transform:
+# flat, long axis along Z, GRADUATIONS UP. build_measuring_stick
 # cuts the ticks into the local z=0 face (outward normal -Z), so graduations-up
 # requires local -Z -> machine +Y, i.e. local +Z -> -Y. The rows therefore map
 # part X(length 200)->machine +Z, part Y(width 8)->machine -X, part Z(3 thick)->
@@ -132,9 +132,9 @@ async def build(adapter) -> dict[str, str]:
         assert_component_placed(adapter, comp, [0.0, 0.0, 0.0], IDENTITY)
 
     # Loose hardware on the base top (not part of any mechanism). Exact machine
-    # transform (mirror=False): flat, graduated face up, long axis along Z.
+    # transform: flat, graduated face up, long axis along Z.
     await place_component(adapter, "measuring-stick", list(STICK_POS),
-                          STICK_EULER, STICK_ROWS, mirror=False)
+                          STICK_EULER, STICK_ROWS)
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)

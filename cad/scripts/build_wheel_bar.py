@@ -3,7 +3,7 @@ r"""Reproduction script: magnifying-wheel bar (book ch. 21, pp. 50-51).
 The short bar carrying the magnifying-wheel axle and the pen-hanger
 strap. M6.8 ch30 8-view pass (user-confirmed): unlike the two full-width
 platen rails, this bar spans only ~HALF the frame width -- every plate
-shows it clamped at ONE column (post-mirror the right/+X one) with a
+shows it clamped at ONE column (the machine +x / west one) with a
 free end just past the pen hanger; there is no second clamp on the far
 column at this height.
 
@@ -13,18 +13,18 @@ face on the front clamp arc's face at -129.9, the same two-piece clamp
 seat as build_support_bar.py). 234 long: the clamped end runs 29 past
 the west column line (the support-bar idiom -- the clamp-screw stack
 bar -> front arc -> back arc needs bar over BOTH ear holes), the free
-end just past the hanger. Placed in build_magnifier_assembly at centre
-x -109 (pre-mirror): span -226..+8, covering the wheel axle (-53) and
-the pen-hanger strap top (-19..-3) with margin.
+end just past the hanger. Placed IDENTITY in build_magnifier_assembly at
+centre x +109 (machine = local + 109): span -8..+226, covering the wheel
+axle (+53) and the pen-hanger strap top with margin.
 
 Holes (all along local Z, the machine front-back axis):
 * 2x O4.4 clamp-screw through-holes flanking the column at local
-  x 70.5 / 105.5 (the column line crosses the bar at local +88 = centre
-  -109 minus book -197 under the ("x", 0) mirror; ears at +-17.5,
+  x 70.5 / 105.5 (the column line crosses the bar at local +88 =
+  column +197 - centre +109; ears at +-17.5,
   _clamp_arc.EAR_HOLE_Z): heads on the bar's front face, threading into
   the back arc -- exactly the support-bar stack.
 * 1x O3.8 pen-hanger screw hole at local (-114.5, 0) (machine
-  (-5.5, 565) -- the realized ("x", 0) mirror is machine = local + 109)
+  (-5.5, 565) = local + 109)
   taking the pen-hanger screw from behind the bar. The hole sits in the
   5-wide strap/bar overlap at the free end (0.6 edge wall to the end
   face -- thin but photo-consistent: the bar end runs "just past" the

@@ -7,17 +7,17 @@ into. The collar/rod sit at the plate centreline (machine y 990) so the
 rod is coplanar with the plate; the flange spans the plate's full height
 (987.46..992.54) and bolts to its front face. M6.10 fasteners: two O3.2
 holes bored +Z through the flange (into the plate front face, engagement
-not modeled), placed at local x -9.5/-6.5 -- west of the collar/arm
+not modeled), placed at local x -9.5/-6.5 -- east of the collar/arm
 (|x|>5) so the bore touches only the flange band z 6..14.75.
 
 Layout: origin at the collar centre (machine (+40, 990, -128.3) after the
 2026-07-04 depth re-anchor); collar axis along X (the rod direction), arm
 runs +Z from the collar back beside the plate's east edge (machine
 -124.3 -> -70), flange at local z 47.3..51.85 (machine -81..-76.45,
-unchanged) butting the plate's real front face at -76.2 with a 0.25 gap. M6.8: the
-flange is the part's only x-asymmetric feature, so the machine mirror is
-authored here (FLANGE_X negated) and the assembly places the part with
-MIRROR_PLANE 'x0'. Dimensions: cad/DIMENSIONS.md ch. 20 (M6.4, low).
+unchanged) butting the plate's real front face at -76.2 with a 0.25 gap. The
+part is authored MACHINE-handed and placed IDENTITY, so local axes are
+machine axes (the flange, its only x-asymmetric feature, sits at the
+machine-east local -x). Dimensions: cad/DIMENSIONS.md ch. 20 (M6.4, low).
 
 Run (SolidWorks already open)::
 

@@ -15,8 +15,7 @@ pass) -- 5/16" shank matching the legacy hold-down size, head photo-plausible
 
 Layout: axis along Y, AUTHORED IN FINAL ORIENTATION (head up): under-head
 face on the Top plane at y = 0, hex head rising to +5.5, shank descending
-to -32. Inserted with IDENTITY rotation; symmetric about local x = 0
-(MIRROR_PLANE ("x", 0.0)).
+to -32. Inserted with IDENTITY rotation; symmetric about local x = 0.
 
 Run (SolidWorks already open)::
 
