@@ -1,1 +1,0 @@
-{"camera": {"mode": "euler", "roll_deg": 0.0, "zoom": 17.0, "target_mm": [-45.0, 270.0, -152.0], "perspective": {"focal_length_mm": 100.0}, "az_deg": 203.0, "el_deg": 58.0}, "reference": {"path": "references/albert-michelsons-harmonic-analyzer/ch23_images/page004_img02.jpeg", "source": "book ch23"}, "size": [2240, 1538], "model_mtime": 1783468128.6325846, "engine": "blender"}
