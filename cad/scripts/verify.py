@@ -1020,8 +1020,9 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     model = adapter.currentModel
     log("--- live chain: magnifier lever sweep (knife rock, WIRE 1) ---")
 
-    # Final (mirrored) machine anchors for the invariants.
-    axis_xy = (-_mag.WHEEL_X, _mag.WHEEL_BAR_Y)  # wheel axis, along Z
+    # Machine anchors for the invariants (the magnifier is authored
+    # machine-handed, #151 -- constants feed straight through).
+    axis_xy = (_mag.WHEEL_X, _mag.WHEEL_BAR_Y)  # wheel axis, along Z
     r_expect = _hw.HUB_DIA / 2.0 + _hw.WIRE_DIA / 2.0 + _hw.CLEARANCE
 
     def _xform(comp: str) -> tuple[list[list[float]], list[float]]:
@@ -1241,7 +1242,8 @@ def verify_spring_base(report: Report) -> None:
 
         st = channel.solve_state(0.0)
         phi0 = math.radians(st["lever_tilt"])
-        hole_x_0 = channel.FULCRUM[0] + channel.LEVER_SPRING_X * math.cos(phi0)
+        # The lever reaches machine -X from the fulcrum (#151 machine frame).
+        hole_x_0 = channel.FULCRUM[0] - channel.LEVER_SPRING_X * math.cos(phi0)
         neutral_body = channel._spring_spec(0.0, hole_x_0)["body"]
         base = channel.SPRING_BASE_BODY
         _expect(
@@ -1304,10 +1306,11 @@ def verify_base_footprint(report: Report) -> None:
                 f"plate (+-{half_len:.2f}, +-{half_wid:.2f})",
             )
         # The cone swing platform lies flat on the base rotated by the cone
-        # incline about its pivot: sweep its (asymmetric) trapezoid corners
-        # (the platform is authored MIRRORED under MIRROR_PLANE "x0", so the
-        # authored WEST +x constants negate into this pre-mirror frame; the
-        # old lock lobe is gone -- the solid west flare carries the notch).
+        # incline about its pivot: sweep its (asymmetric) trapezoid corners.
+        # The machine-handed platform's local +x tips machine WEST at the
+        # engaged pose (train._plate_local_to_machine), so the WEST half-
+        # widths sit at local +x and the EAST ones at local -x; the solid
+        # west flare carries the notch (the old lock lobe is gone).
         # Corner fillets only pull the true extents INSIDE this sharp-corner
         # sweep, so it stays conservative. The lock notch is open-ended, so
         # the disengaged pose is the plate swung until its edge clears the
@@ -1316,13 +1319,13 @@ def verify_base_footprint(report: Report) -> None:
         # ride the PLATE, not the base -- their plate containment is
         # asserted at drive-train import.)
         corners_local = (
-            # WEST negates into this pre-mirror frame; the NW corner carries
-            # the PR8 trim (WEST_HALF_N 9.5), the NE keeps HALF_WIDTH_N 12.
-            ("plate", -platform.WEST_HALF_N, platform.NORTH_OVERHANG),
-            ("plate", platform.HALF_WIDTH_N, platform.NORTH_OVERHANG),
-            ("plate", platform.EAST_HALF_S,
+            # The NW corner carries the PR8 trim (WEST_HALF_N 9.5), the NE
+            # keeps HALF_WIDTH_N 12.
+            ("plate", platform.WEST_HALF_N, platform.NORTH_OVERHANG),
+            ("plate", -platform.HALF_WIDTH_N, platform.NORTH_OVERHANG),
+            ("plate", -platform.EAST_HALF_S,
              platform.NORTH_OVERHANG - platform.PLATE_LEN),
-            ("plate", -platform.WEST_HALF_S,
+            ("plate", platform.WEST_HALF_S,
              platform.NORTH_OVERHANG - platform.PLATE_LEN),
         )
         poses = (
@@ -1332,9 +1335,11 @@ def verify_base_footprint(report: Report) -> None:
         )
         for pose, ang in poses:
             cos_a, sin_a = math.cos(ang), math.sin(ang)
+            # Ry(+ang) plate->machine plan map (the engaged-pose case is
+            # train._plate_local_to_machine): local +x -> (+cos, -sin).
             for part, lx, lz in corners_local:
-                cx = pv[0] + lx * cos_a - lz * sin_a
-                cz = pv[2] + lx * sin_a + lz * cos_a
+                cx = pv[0] + lx * cos_a + lz * sin_a
+                cz = pv[2] - lx * sin_a + lz * cos_a
                 _expect(
                     abs(cx) <= half_len + 1e-9 and abs(cz) <= half_wid + 1e-9,
                     f"cone-swing-platform {part} corner ({cx:.2f}, {cz:.2f}) "

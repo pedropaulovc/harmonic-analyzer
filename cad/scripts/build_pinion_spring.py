@@ -17,10 +17,11 @@ engage. The FOOT points WEST, the SAME side the top bends back toward
 the open west side -- reads ~100 deg (leg at the strap's 12.38 lean =
 102.4, within the photo's tolerance).
 
-Layout (local frame = PRE-MIRROR machine frame - (9.04, base top 50.8),
-sketch on the Front plane; the assembly's M6.8 chirality mirror maps it to
-world via the ("z", 0.0) MIRROR_PLANE entry -- the part is an exact
-mid-plane z-extrude): strip centreline path = 31.0 foot at y 0.8 pointing
+Layout (sketch on the Front plane; the assembly seats the part at machine
+(-9.04, base top 50.8) with a composed Ry(180), so part-local -x reads
+machine WEST -- direction words below are MACHINE directions; the part is
+an exact mid-plane z-extrude, so the Ry(180)'s z-flip is immaterial):
+strip centreline path = 31.0 foot at y 0.8 pointing
 WEST of the bend, r 2.0 bend (77.62 deg sweep), blade up-east at the
 strap's parked 12.38 deg lean to t 32 along the strap axis, r 1.5 x
 20 deg WEST kink, 2.0 flat to the free tip.

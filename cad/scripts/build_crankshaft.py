@@ -64,10 +64,10 @@ THROUGH_CUT_DEPTH = 30.0  # mid-plane total; > shaft dia
 # REMOVABLE_Z0 / PINION_TOOTH_Z / arm-placement derivations.
 SEAT_T12 = 17.5
 SEAT_PINION = 101.16972071095871  # |PINION_TOOTH_Z - FACE/2 - CRANKSHAFT_Z0|
-SEAT_ARM = 8.0  # the arm's ORIGIN plane. The arm's "z" MIRROR_PLANE entry
-# (bbox mid-plane reflection) keeps its 8-thick plate at station 0..8 but
-# lands the AS-BUILT origin at the plate's NORTH face (station 8, machine
-# -167): the mirrored plate extrudes machine -z from the origin. Seating the
+SEAT_ARM = 8.0  # the arm's ORIGIN plane. The arm's placed pose composes a
+# Ry(180), which keeps its 8-thick plate at station 0..8 but puts the
+# AS-BUILT origin at the plate's NORTH face (station 8, machine -167): the
+# plate extrudes machine -z from the origin. Seating the
 # origin at station 0 instead hung the plate at -183..-175 and buried the
 # handle collar in the arm's square end (502 mm^3 -- interference-gate catch
 # 2026-07-05).

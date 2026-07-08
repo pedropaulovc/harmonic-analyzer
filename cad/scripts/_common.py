@@ -1186,9 +1186,9 @@ async def report_mass_properties(adapter: Any) -> None:
 # Assembly helpers (M6)
 # ---------------------------------------------------------------------------
 
-# MIRROR_PLANE (the per-part machine-chirality table) moved to _transforms.py,
-# next to its only consumer mirror_placement -- it is assembly-placement data, no
-# part reads it, so keeping it off _common keeps it off every part's input hash.
+# The MIRROR_PLANE per-part chirality table and its consumer mirror_placement
+# are GONE (#151): every assembly is authored machine-handed and components
+# insert on their exact machine transforms (see _transforms.py).
 
 # swConstrainedStatus_e
 UNDER_CONSTRAINED = 2
