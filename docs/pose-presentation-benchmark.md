@@ -139,12 +139,16 @@ so the control sits registered and perturbations move relative to it.
 | P7 | **green-magenta fusion** | ref → green channel, render → magenta (R+B); registered = gray, misregistration = complementary fringes |
 | P8 | **difference heatmap** | \|ref−render\| grayscale → viridis/inferno colormap, plus the raw pair as thumbnails |
 | P9 | **edge overlay** | render's silhouette/Canny edges drawn 2 px in a saturated colour over the untouched colour ref (photo texture fully visible) |
-| P10 | **flicker pair** | the two registered full-frame images sent as two consecutive images in one message (blink-comparator analogue) |
+| P10 | **flicker pair** | the two registered full-frame images sent as two consecutive images in one message (blink-comparator analogue); each frame downscaled so the two together fit the shared ~1.4 MP budget (~0.7 MP each) — P10 must not win by carrying twice the pixels |
 | P11 | **dashboard** | one sheet: small sbs pair + P7 fusion + P9 edges (does combining views beat any single view?) |
 
 Secondary factor (crossed only with the 3 best arms in a second phase):
 **coordinate grid on/off** — SoM suggests the grid may contribute more than
 the blend mode; measuring it separately avoids attributing its gain to an arm.
+If a grid variant displaces the plain arm as T1 winner, that exact `arm+grid`
+variant enters T2 as an additional arm (budgeted like one) — the decision
+rule must check convergence on the presentation actually being adopted, not
+its grid-less sibling.
 
 ## Tasks
 
@@ -163,9 +167,11 @@ the blend mode; measuring it separately avoids attributing its gain to an arm.
   what actually matters in production. Run for the **top-3 arms from T1 plus
   P1 whenever it is not already among them** — the decision rule needs the
   incumbent's T2 baseline, so P1 is never skipped (≤ 4 arms; it is ~10× the
-  per-cell cost). Start deltas are pinned, 4 per pair: `az +7°`, `el −7°`,
-  `target-x +25 mm`, and the pair's first recorded mixed case (M1 from
-  `cases.jsonl`). Convergence covers **every** perturbed parameter: az/el
+  per-cell cost). Start deltas are pinned, 6 per pair — one per parameter
+  class so T2 is direct evidence for every parameter the decision rule
+  leans on: `az +7°`, `el −7°`, `roll +7°`, `zoom ×0.85`, `target-x +25 mm`,
+  and the pair's first recorded mixed case (M1 from `cases.jsonl`).
+  Convergence covers **every** perturbed parameter: az/el
   ≤ 1°, roll ≤ 1°, target ≤ 5 mm, zoom within ±3% — a roll- or zoom-carrying
   start cannot count as converged on az/el alone.
 - **T3 — 2AFC discrimination.** Two stimuli of the same pair (deltas d₁ < d₂),
@@ -203,8 +209,12 @@ report that prominently instead of averaging it away.
   exposes it, fresh context per cell (no bleed), one fixed prompt template
   per arm (prompt text published with the benchmark; no per-arm or per-model
   tuning beyond describing the encoding).
-- Randomise ref/render side in P2/P3 and order in P10 (position bias is
-  documented — report it as its own number).
+- Balance ref/render side in P2/P3 and order in P10 (position bias is
+  documented — report it as its own number). The assignment is
+  deterministic, not sampled at run time: side/order = parity of
+  `zlib.crc32(f"{case_id}:{arm}:{repeat}")` (balanced across cells,
+  identical across executions and both subject models), and each
+  `results.jsonl` row records the assignment it used.
 - Equal pixel budget per stimulus; JPEG q90 everywhere.
 - N ≥ 3 repeats per cell for CIs on the T1 headline numbers.
 
@@ -217,11 +227,19 @@ stratified pairs × a 27-case sub-grid** (rotations ±3°/±15° = 12, targets
 ±15/±40 mm × 2 axes = 8, both zooms, the first 4 mixed, 1 control) × 11 arms
 ≈ 1.8k cells; with N = 3 repeats ≈ **5.3k calls ≈ 8.0M tokens per subject
 model** at ~1.5k tokens/cell, ≈ 10.7k calls / 16M tokens across both.
-Full-grid confirmation runs only for the top 3 arms. T3: 6 pairs × 8
-delta-pairs × 11 arms ≈ 0.5k cells per model. T2: ≤4 arms (top-3 + P1) × 6
-pairs × 4 starts × ≤6 rounds ≈ 0.6k renders + calls per model. Generation:
-18 pairs × 45 ≈ 800 Blender renders once (shared by all arms **and both
-models**), minutes on the GPU seat.
+T3: 6 pairs × 8 delta-pairs × 11 arms ≈ 0.5k cells per model. T2: ≤4 arms
+(top-3 + P1) × 6 pairs × 6 starts × ≤6 rounds ≈ 0.9k renders + calls per
+model. Generation: 18 pairs × 45 ≈ 800 Blender renders once (shared by all
+arms **and both models**), minutes on the GPU seat.
+
+**Full-grid confirmation is a separately approved phase, not part of the
+first-pass budget.** It covers the **top 3 arms plus P1 whenever it is not
+among them** (the retirement comparison must be full-grid vs full-grid, not
+challenger full-grid vs incumbent subset) on the cells the first pass did
+not run: ≤4 arms × (18×45 − 6×27) × N = 3 ≈ **7.8k calls ≈ 11.7M tokens per
+model** — larger than the first pass itself. Project it, report it, and get
+an explicit go before starting it; the first-pass budget gate does not
+authorize it.
 
 ## Harness sketch (all new code lives outside the shipping pipeline)
 
@@ -303,9 +321,13 @@ sufficient given this section. All decisions are pinned; do not re-ask them.
    reports the Opus model id and the codex invocation returns parseable
    JSON, eyeball the stimuli sheets and the parsed outputs, THEN fan out. Do
    not launch 5k cells on an unsmoked harness.
-6. **Budget gate**: first pass ≈ 5.3k calls / ~8.0M tokens **per subject
-   model** (~16M across both). Abort and report if the projected total
-   exceeds 10M tokens per model; T2 runs only for the T1 top-3 plus P1.
+6. **Budget gate — per phase, not per benchmark**: the first pass (T1
+   sub-grid + T3 + T2) ≈ 5.3k calls / ~8.0M tokens **per subject model**
+   (~16M across both); abort and report if its projected total exceeds 10M
+   tokens per model. T2 runs only for the T1 top-3 plus P1. The **full-grid
+   confirmation (≈ 11.7M tokens per model, see the cost envelope) is NOT
+   covered by this gate** — project it after the first-pass report and get
+   an explicit go before launching it.
 7. **Deliverables**: `results.jsonl` + the report tables per subject model
    (per-arm T1 sign accuracy with CIs, T3 thresholds, cost per decision),
    per-arm exemplar stimulus sheets, and a recommendation applying the
