@@ -168,8 +168,10 @@ footer{{margin-top:3em;padding-top:1.4em;border-top:1px solid var(--line);color:
 <div class="eyebrow">Pose-feedback presentation benchmark · first-pass screening</div>
 <h1>Which composite lets a vision model read camera-pose error?</h1>
 <p class="lede">Eleven ways to show a reference photo against a mis-posed CAD render, scored by how
-well <b>Codex gpt-5.5</b> reads the applied camera error from a single glance. Deterministic
-grading — no LLM judge. This is the N=1 screening pass; it ranks the field, it does not yet crown a winner.</p>
+well <b>Codex gpt-5.5</b> reads the applied camera error, discriminates two errors apart, and closes
+a correction loop. Deterministic grading — no LLM judge. T1 (below) is an N=1 screening pass over Codex;
+T3 and T2 are complete too, giving a full decision-rule preview — but the rule governs on Opus, whose
+run is paused (see "Reading the result").</p>
 <div class="chips">
  <span class="chip">subject · <b>Codex gpt-5.5</b>, high reasoning</span>
  <span class="chip">task · <b>T1</b> single-shot direction read</span>
@@ -257,13 +259,14 @@ zoom error moves the model in the frame instead of silently re-fitting; the mani
 frozen from each pair's control so the zero-error case sits registered. Perturbations are applied one
 parameter at a time (plus a mixed tier and a control) with exactly known deltas, and stimulus ids
 served to the model are opaque salted hashes so it can't read the answer.</p>
-<div class="finding note"><b>This is a screening pass (N=1).</b> The field is tight (58.7–70.8%) and
-the confidence intervals overlap; the control false-positive rate rests on only six control cells per
-arm. The benchmark's decision rule also requires <b>T2</b> (closed-loop convergence over ≤6 rounds),
-which is not yet run. So this pass narrows the field to a top cluster and rank-orders it — it does not
-yet name the arm that replaces the incumbent. And these are the <b>Codex</b> numbers; the production
-pose agent is <b>Opus</b>, whose run is in progress — if the winning arm flips between models, that is
-reported, not averaged away.</p>
+<div class="finding note"><b>T1 itself is still N=1</b> (the original design's first pass calls for
+N=3 on this sub-grid); the field is tight (58.7–70.8%) and the confidence intervals overlap, and the
+control false-positive rate rests on only six control cells per arm. T1, T3, and T2 are all now
+complete on Codex, and the decision rule above gives a clean preview verdict on that data — but it is
+a <b>generalization check, not the adoption decision</b>: the rule governs on the <b>Opus</b> numbers
+(Opus runs pose feedback in production), and that run is currently <b>paused</b> (rate-limit quota) at
+1,091/1,782 T1 cells, resumable. The actual call waits on Opus, not on more Codex data — and if the
+winning arm flips between models, that gets reported prominently, not averaged away.</p>
 
 <footer>Deterministic scoring · {ncells} Codex cells · pose-presentation-benchmark · harmonic-analyzer</footer>
 </div>
