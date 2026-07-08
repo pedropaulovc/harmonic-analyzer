@@ -73,21 +73,38 @@ def prepare_reference(pair: dict, max_px: int = 1600) -> Path:
     return out
 
 
-def _content_mask(img: Image.Image, thresh: int = 30) -> Image.Image:
+def _content_mask(img: Image.Image, thresh: int = 30,
+                  background: str | None = None) -> Image.Image:
     """255 where render content, 0 where viewport background.
 
     SolidWorks captures sit on a vertical-gradient background, so a plain
     corner-colour test fails; flood-filling from the corners follows the
     gradient and stops at content edges.
+
+    ``background`` (colour name/hex, offline renders only): only corners
+    actually SHOWING that colour seed the flood. Blender renders composite the
+    model onto an exact uniform background, and a macro framing can put model
+    at a corner (ch12-p001: the teal base plate spans the bottom edge) — an
+    unconditional corner flood then starts inside the model and eats every
+    connected region within thresh of it (the base plate AND the rocker-arm
+    support). A corner showing model is simply skipped; if no corner matches,
+    the mask is all-content, which composites identically anyway — the canvas
+    is that same background colour.
     """
-    from PIL import ImageChops, ImageDraw
+    from PIL import ImageChops, ImageColor, ImageDraw
 
     rgb = img.convert("RGB")
     sentinel = (255, 0, 255)
+    bg_rgb = ImageColor.getrgb(background) if background else None
     w, h = rgb.size
     for xy in ((0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)):
-        if rgb.getpixel(xy) != sentinel:
-            ImageDraw.floodfill(rgb, xy, sentinel, thresh=thresh)
+        px = rgb.getpixel(xy)
+        if px == sentinel:
+            continue
+        if bg_rgb is not None and max(
+                abs(a - b) for a, b in zip(px, bg_rgb)) > thresh:
+            continue  # corner shows model, not background -- don't seed here
+        ImageDraw.floodfill(rgb, xy, sentinel, thresh=thresh)
     bg = Image.new("RGB", rgb.size, sentinel)
     return ImageChops.difference(rgb, bg).convert("L").point(lambda v: 255 if v else 0)
 
@@ -122,7 +139,8 @@ def trim_render_file(path: Path, margin_frac: float = 0.01) -> None:
             time.sleep(0.25)
 
 
-def _fitted_render(pair_id: str, ref_size: tuple[int, int], align: dict | None):
+def _fitted_render(pair_id: str, ref_size: tuple[int, int], align: dict | None,
+                   background: str | None = None):
     """Content-trimmed render scaled to fit the ref frame.
 
     Returns (render RGB, content mask, paste offset). The capture fills only
@@ -132,7 +150,7 @@ def _fitted_render(pair_id: str, ref_size: tuple[int, int], align: dict | None):
     """
     align = align or {}
     ren = Image.open(pair_paths(pair_id)["render"])
-    mask = _content_mask(ren)
+    mask = _content_mask(ren, background=background)
     bbox = mask.getbbox() or (0, 0, ren.width, ren.height)
     ren, mask = ren.crop(bbox), mask.crop(bbox)
     rw, rh = ref_size
@@ -153,7 +171,7 @@ def aligned_render(pair_id: str, align: dict | None,
     p = pair_paths(pair_id)
     with Image.open(p["ref"]) as ref:
         ref_size = ref.size
-    ren, mask, offset = _fitted_render(pair_id, ref_size, align)
+    ren, mask, offset = _fitted_render(pair_id, ref_size, align, background)
     canvas = Image.new("RGB", ref_size, background)
     canvas.paste(ren.convert("RGB"), offset, mask)
     p["cad"].parent.mkdir(parents=True, exist_ok=True)
@@ -170,10 +188,11 @@ def _render_rgba(render: Image.Image, mask: Image.Image) -> Image.Image:
     )
 
 
-def blend_overlay(pair_id: str, align: dict | None) -> Path:
+def blend_overlay(pair_id: str, align: dict | None,
+                  background: str | None = None) -> Path:
     p = pair_paths(pair_id)
     ref = Image.open(p["ref"]).convert("L").convert("RGB")
-    ren, mask, offset = _fitted_render(pair_id, ref.size, align)
+    ren, mask, offset = _fitted_render(pair_id, ref.size, align, background)
     layer = Image.new("RGBA", ref.size, (0, 0, 0, 0))
     layer.paste(_render_rgba(ren, mask), offset)
     out = Image.alpha_composite(ref.convert("RGBA"), layer).convert("RGB")
@@ -182,12 +201,13 @@ def blend_overlay(pair_id: str, align: dict | None) -> Path:
     return p["blend"]
 
 
-def score_pair(pair_id: str, align: dict | None) -> float:
+def score_pair(pair_id: str, align: dict | None,
+               background: str | None = None) -> float:
     """RMS grayscale mismatch where the render has content. Relative metric:
     only meaningful as a trend per pair across iterations."""
     p = pair_paths(pair_id)
     ref = Image.open(p["ref"]).convert("L")
-    ren, mask, offset = _fitted_render(pair_id, ref.size, align)
+    ren, mask, offset = _fitted_render(pair_id, ref.size, align, background)
     canvas = Image.new("L", ref.size, 0)
     canvas.paste(ren.convert("L"), offset)
     mcanvas = Image.new("L", ref.size, 0)
@@ -218,9 +238,10 @@ def regenerate(only: set[str] | None = None) -> dict[str, float]:
             print(f"  --  [{i}/{len(todo)}] {pid}: no render yet, skipping", flush=True)
             continue
         align = pair.get("align")
-        aligned_render(pid, align, pair["reference"].get("background", "black"))
-        blend_overlay(pid, align)
-        scores[pid] = score_pair(pid, align)
+        bg = pair["reference"].get("background", "black")
+        aligned_render(pid, align, bg)
+        blend_overlay(pid, align, bg)
+        scores[pid] = score_pair(pid, align, bg)
         print(f"  OK  [{i}/{len(todo)}] {pid}: score {scores[pid]}"
               f"  ({time.monotonic() - t0:.0f}s)", flush=True)
     SCORES.write_text(json.dumps(dict(sorted(scores.items())), indent=1), encoding="utf-8")
