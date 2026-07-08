@@ -566,7 +566,16 @@ def _prune_stale_gallery() -> None:
                 log(f"pruned stale gallery file {sub}/{f.name}")
     scores_f = COMPARISONS_DIR / "scores.json"
     if scores_f.exists():
-        scores = json.loads(scores_f.read_text(encoding="utf-8"))
+        try:
+            scores = json.loads(scores_f.read_text(encoding="utf-8"))
+        except ValueError:
+            # An interrupted run can leave the (ignored, regenerable) file
+            # malformed; raising here would ride refresh_comparison_gallery's
+            # best-effort catch and block regeneration forever. Delete it —
+            # the composite pass rewrites it from scratch.
+            scores_f.unlink()
+            log("deleted corrupt scores.json (composite pass regenerates it)")
+            return
         kept = {k: v for k, v in scores.items() if k in ids}
         if len(kept) != len(scores):
             scores_f.write_text(json.dumps(dict(sorted(kept.items())), indent=1),
