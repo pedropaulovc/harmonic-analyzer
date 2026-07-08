@@ -192,6 +192,46 @@ def t3_report(model: str) -> dict:
     return {"table": table, "ranking": ranking}
 
 
+def _median(xs: list[float]) -> float:
+    s = sorted(xs)
+    return s[len(s) // 2] if s else float("nan")
+
+
+def t2_report(model: str) -> dict:
+    """Closed-loop convergence per arm. Non-converged rounds censored at 7
+    (max+1) so divergence can only lengthen a median, never shrink it."""
+    rows = [r for r in load_raw("t2", model) if r.get("response") is not None]
+    arms = sorted({r["arm"] for r in rows}, key=lambda a: int(a[1:]))
+    table = {}
+    for arm in arms:
+        ar = [r for r in rows if r["arm"] == arm]
+        conv = [r for r in ar if r["converged"]]
+        rounds = [r["n_rounds"] if r["converged"] else 7 for r in ar]
+        table[arm] = {
+            "n": len(ar), "converged": len(conv),
+            "conv_rate": len(conv) / len(ar) if ar else float("nan"),
+            "median_rounds": _median(rounds),
+            "median_final_rot": _median([max(r["final_err"]["az"], r["final_err"]["el"],
+                                             r["final_err"]["roll"]) for r in ar]),
+        }
+    ranking = sorted(table, key=lambda a: (table[a]["conv_rate"], -table[a]["median_rounds"]),
+                     reverse=True)
+    return {"table": table, "ranking": ranking, "n_total": len(rows)}
+
+
+def load_raw(task: str, model: str) -> list[dict]:
+    if not RESULTS.exists():
+        return []
+    out = []
+    for line in RESULTS.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        r = json.loads(line)
+        if r["task"] == task and r["model"] == model:
+            out.append(r)
+    return out
+
+
 def _fmt_pct(x) -> str:
     return f"{100*x:.1f}" if isinstance(x, float) and x == x else "-"
 
@@ -233,9 +273,10 @@ def main() -> int:
     for model in models:
         t1 = t1_report(model)
         t3 = t3_report(model)
-        if not t1["table"] and not t3["table"]:
+        t2 = t2_report(model)
+        if not t1["table"] and not t3["table"] and not t2["table"]:
             continue
-        summary[model] = {"t1": t1, "t3": t3}
+        summary[model] = {"t1": t1, "t3": t3, "t2": t2}
         md.append(markdown(model, t1, t3))
     (OUT / "summary.json").write_text(json.dumps(summary, indent=1), encoding="utf-8")
     report_md = OUT / "report.md"
