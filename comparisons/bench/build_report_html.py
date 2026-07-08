@@ -226,13 +226,27 @@ arms that won T1 sit near chance here. The winner depends on the task.</p>
 <thead><tr><th>arm</th><th>discrimination %</th><th>vs chance</th><th>strongest axis</th></tr></thead>
 <tbody>{t3rows}</tbody></table></div>
 
-<h2>T2 — closing the loop <span class="tag" style="font-size:.6em">preliminary · {t2n}/144</span></h2>
+<h2>T2 — closing the loop <span class="tag" style="font-size:.6em">complete · {t2n}/144</span></h2>
 <p class="note">The production question: iterate — read stimulus, propose a camera correction, re-render,
-repeat (≤6 rounds). Convergence = az/el/roll ≤ 1°, target ≤ 5 mm, zoom ± 3%. This run is still in
-progress, so read it as an early signal, not a verdict. Non-converged cells enter the median as round 7.</p>
+repeat (≤6 rounds). Convergence = az/el/roll ≤ 1°, target ≤ 5 mm, zoom ± 3%. Run on the top-3 T1 arms
+plus the incumbent P1, 6 pairs × 6 pinned starts (one per parameter class). Non-converged cells enter
+the median as round 7 (censored at max+1).</p>
 <div class="scroll"><table>
 <thead><tr><th>arm</th><th>n</th><th>converged</th><th>median rounds</th></tr></thead>
 <tbody>{t2rows}</tbody></table></div>
+
+<h2>Decision rule — applied to Codex (generalization check)</h2>
+<p class="note">The benchmark's rule: adopt the arm that wins T1 macro sign accuracy over the
+incumbent (P1) by <b>&ge;5 points</b> <i>and</i> is non-inferior on T2 — convergence rate within
+5 points of the best arm, median rounds-to-converge at most 1 round more. <b>The rule governs on
+the Opus numbers</b> (Opus runs pose feedback in production); this section applies it to Codex as
+the generalization check, since the Opus run is currently paused (quota). Treat this as a preview,
+not the adoption decision.</p>
+<div class="scroll"><table>
+<thead><tr><th>arm</th><th>T1 macro sign %</th><th>margin vs P1</th><th>T2 converged %</th>
+<th>vs best conv</th><th>median rounds</th><th>vs best rounds</th><th>passes?</th></tr></thead>
+<tbody>{decrows}</tbody></table></div>
+<div class="finding"><b>{dec_verdict}</b> {dec_detail}</div>
 
 <h2>Reading the result</h2>
 {findings}
@@ -342,6 +356,49 @@ def main() -> int:
 
     top = ranking[0]
     p1_rank = ranking.index("P1") + 1
+
+    # Decision rule (T1 margin vs incumbent + T2 non-inferiority vs best T2 arm)
+    decrows, dec_verdict, dec_detail = "", "", ""
+    if t2["table"]:
+        p1_sign = table["P1"]["macro_sign"]
+        best_conv_arm = max(t2["table"], key=lambda a: t2["table"][a]["conv_rate"])
+        best_conv, best_rounds = t2["table"][best_conv_arm]["conv_rate"], t2["table"][best_conv_arm]["median_rounds"]
+        rows_out = []
+        winner = None
+        for arm in t2["ranking"]:
+            if arm not in table:
+                continue
+            t1m, t2t = table[arm]["macro_sign"], t2["table"][arm]
+            margin = (t1m - p1_sign) * 100
+            conv_gap = (best_conv - t2t["conv_rate"]) * 100
+            rounds_gap = t2t["median_rounds"] - best_rounds
+            passes = margin >= 5 and conv_gap <= 5 and rounds_gap <= 1
+            if passes and winner is None and arm != "P1":
+                winner = arm
+            rows_out.append(
+                f'<tr><td><span class="armname">{arm}</span> {ARM_NAME[arm]}</td>'
+                f'<td class="num">{100*t1m:.1f}</td>'
+                f'<td class="num" style="color:{_score_color(0.5+margin/20)}">{margin:+.1f}</td>'
+                f'<td class="num">{100*t2t["conv_rate"]:.0f}</td>'
+                f'<td class="num">{"best" if arm==best_conv_arm else f"-{conv_gap:.0f}"}</td>'
+                f'<td class="num">{t2t["median_rounds"]:g}</td>'
+                f'<td class="num">{"best" if arm==best_conv_arm else f"+{rounds_gap:g}"}</td>'
+                f'<td class="num" style="color:{"var(--good)" if passes else "var(--faint)"}">'
+                f'{"YES" if passes else "no"}</td></tr>')
+        decrows = "\n".join(rows_out)
+        if winner:
+            dec_verdict = f"On Codex, {winner} ({ARM_NAME[winner]}) clears both bars."
+            dec_detail = (f"It beats the incumbent P1 by {(table[winner]['macro_sign']-p1_sign)*100:.1f} "
+                          f"points on T1 and is non-inferior to the best T2 arm on both convergence "
+                          f"rate and median rounds. P1 itself fails T2 non-inferiority decisively "
+                          f"(conv rate {100*(best_conv-t2['table']['P1']['conv_rate']):.0f} points below "
+                          f"best, median rounds +{t2['table']['P1']['median_rounds']-best_rounds:g}) -- "
+                          "the retirement condition (\"beaten on both\") is met on the Codex side. "
+                          "This is a generalization-check result, not the production decision, which "
+                          "governs on Opus.")
+        else:
+            dec_verdict = "No arm clears both bars on Codex yet."
+            dec_detail = "The incumbent P1 is not displaced under this rule on the current data."
     findings = f"""
 <div class="finding"><b>Checkerboard (P6) leads — and is the only arm that separates from the pack.</b>
 It tops macro sign accuracy at {100*table['P6']['macro_sign']:.1f}% and, tellingly, has by far the
@@ -371,7 +428,9 @@ mirrors production) is the tiebreaker — and it is still running.</div>
         ref=imgs["ref"], ctrl=imgs["ctrl"], pert=imgs["pert"],
         rows="\n".join(rows), cards="\n".join(cards), heat="\n".join(heat),
         t3rows="\n".join(t3rows), t2rows="\n".join(t2rows) or '<tr><td colspan="4">no data yet</td></tr>',
-        t2n=t2.get("n_total", 0), findings=findings)
+        t2n=t2.get("n_total", 0), findings=findings,
+        decrows=decrows or '<tr><td colspan="8">T2 not yet run</td></tr>',
+        dec_verdict=dec_verdict, dec_detail=dec_detail)
     out = OUT / f"report_{args.model}.html"
     out.write_text(html, encoding="utf-8")
     print(f"wrote {out} ({len(html)//1024} KB)")

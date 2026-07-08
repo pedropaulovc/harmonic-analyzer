@@ -181,16 +181,33 @@ arms that won T1 sit near chance here. The winner depends on the task.</p>
 <tr><td><span class="armname">P9</span> Edge overlay</td><td class="num" style="color:var(--bad)">54.9</td><td class="num">+4.9</td><td class="num">tx 78%</td></tr>
 <tr><td><span class="armname">P1</span> Blend (red overlay)</td><td class="num" style="color:var(--bad)">52.8</td><td class="num">+2.8</td><td class="num">el 56%</td></tr></tbody></table></div>
 
-<h2>T2 — closing the loop <span class="tag" style="font-size:.6em">preliminary · 14/144</span></h2>
+<h2>T2 — closing the loop <span class="tag" style="font-size:.6em">complete · 144/144</span></h2>
 <p class="note">The production question: iterate — read stimulus, propose a camera correction, re-render,
-repeat (≤6 rounds). Convergence = az/el/roll ≤ 1°, target ≤ 5 mm, zoom ± 3%. This run is still in
-progress, so read it as an early signal, not a verdict. Non-converged cells enter the median as round 7.</p>
+repeat (≤6 rounds). Convergence = az/el/roll ≤ 1°, target ≤ 5 mm, zoom ± 3%. Run on the top-3 T1 arms
+plus the incumbent P1, 6 pairs × 6 pinned starts (one per parameter class). Non-converged cells enter
+the median as round 7 (censored at max+1).</p>
 <div class="scroll"><table>
 <thead><tr><th>arm</th><th>n</th><th>converged</th><th>median rounds</th></tr></thead>
-<tbody><tr><td><span class="armname">P5</span> Blend (subtle)</td><td class="num">4</td><td class="num">3/4 (75%)</td><td class="num">2</td></tr>
-<tr><td><span class="armname">P1</span> Blend (red overlay)</td><td class="num">4</td><td class="num">3/4 (75%)</td><td class="num">4</td></tr>
-<tr><td><span class="armname">P6</span> Checkerboard</td><td class="num">3</td><td class="num">2/3 (67%)</td><td class="num">1</td></tr>
-<tr><td><span class="armname">P7</span> Green–magenta fusion</td><td class="num">3</td><td class="num">2/3 (67%)</td><td class="num">1</td></tr></tbody></table></div>
+<tbody><tr><td><span class="armname">P5</span> Blend (subtle)</td><td class="num">36</td><td class="num">24/36 (67%)</td><td class="num">2</td></tr>
+<tr><td><span class="armname">P6</span> Checkerboard</td><td class="num">36</td><td class="num">23/36 (64%)</td><td class="num">2</td></tr>
+<tr><td><span class="armname">P7</span> Green–magenta fusion</td><td class="num">36</td><td class="num">21/36 (58%)</td><td class="num">4</td></tr>
+<tr><td><span class="armname">P1</span> Blend (red overlay)</td><td class="num">36</td><td class="num">18/36 (50%)</td><td class="num">7</td></tr></tbody></table></div>
+
+<h2>Decision rule — applied to Codex (generalization check)</h2>
+<p class="note">The benchmark's rule: adopt the arm that wins T1 macro sign accuracy over the
+incumbent (P1) by <b>&ge;5 points</b> <i>and</i> is non-inferior on T2 — convergence rate within
+5 points of the best arm, median rounds-to-converge at most 1 round more. <b>The rule governs on
+the Opus numbers</b> (Opus runs pose feedback in production); this section applies it to Codex as
+the generalization check, since the Opus run is currently paused (quota). Treat this as a preview,
+not the adoption decision.</p>
+<div class="scroll"><table>
+<thead><tr><th>arm</th><th>T1 macro sign %</th><th>margin vs P1</th><th>T2 converged %</th>
+<th>vs best conv</th><th>median rounds</th><th>vs best rounds</th><th>passes?</th></tr></thead>
+<tbody><tr><td><span class="armname">P5</span> Blend (subtle)</td><td class="num">67.0</td><td class="num" style="color:var(--mid)">+1.3</td><td class="num">67</td><td class="num">best</td><td class="num">2</td><td class="num">best</td><td class="num" style="color:var(--faint)">no</td></tr>
+<tr><td><span class="armname">P6</span> Checkerboard</td><td class="num">70.8</td><td class="num" style="color:var(--good)">+5.1</td><td class="num">64</td><td class="num">-3</td><td class="num">2</td><td class="num">+0</td><td class="num" style="color:var(--good)">YES</td></tr>
+<tr><td><span class="armname">P7</span> Green–magenta fusion</td><td class="num">65.7</td><td class="num" style="color:var(--bad)">-0.0</td><td class="num">58</td><td class="num">-8</td><td class="num">4</td><td class="num">+2</td><td class="num" style="color:var(--faint)">no</td></tr>
+<tr><td><span class="armname">P1</span> Blend (red overlay)</td><td class="num">65.7</td><td class="num" style="color:var(--bad)">+0.0</td><td class="num">50</td><td class="num">-17</td><td class="num">7</td><td class="num">+5</td><td class="num" style="color:var(--faint)">no</td></tr></tbody></table></div>
+<div class="finding"><b>On Codex, P6 (Checkerboard) clears both bars.</b> It beats the incumbent P1 by 5.1 points on T1 and is non-inferior to the best T2 arm on both convergence rate and median rounds. P1 itself fails T2 non-inferiority decisively (conv rate 17 points below best, median rounds +5) -- the retirement condition ("beaten on both") is met on the Codex side. This is a generalization-check result, not the production decision, which governs on Opus.</div>
 
 <h2>Reading the result</h2>
 
