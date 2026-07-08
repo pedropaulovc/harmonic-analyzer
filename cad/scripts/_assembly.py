@@ -28,7 +28,6 @@ from _common import (
     log,
     set_isometric_view,
 )
-from _transforms import mirror_placement
 
 # The sprockets the chain seats on (the mounted T24 + crank T12 removables).
 # A chain link touching one of these is intended MESH, not a fault: the chain
@@ -1001,11 +1000,14 @@ async def place_component(
     rows: list[list[float]],
     *,
     ground: bool = True,
-    mirror: bool = True,
     configuration: str = "",
     label: str = "",
 ) -> str:
-    """Insert a part at its exact final (mirrored) transform and assert it.
+    """Insert a part at its exact final machine transform and assert it.
+
+    ``position``/``rotation``/``rows`` ARE the machine-frame pose -- the crank
+    at machine -X, the output side -Z (#151 re-authored the derivation
+    machine-handed; the M6.8 ``mirror_placement`` reflection layer is gone).
 
     ``ground=True`` fixes the component (structure: shafts, mounts, bushings,
     supports, frame, fasteners, cosmetic springs). ``ground=False`` leaves it
@@ -1014,13 +1016,6 @@ async def place_component(
     cone-gear tooth counts, the transgear-removable wheels). Either way the
     part is inserted on-solution so mate flip-recovery has a clean reference
     and the read-back assert holds.
-
-    ``mirror=True`` (default) routes the placement through ``mirror_placement``,
-    which reflects it about the machine YZ plane using the part's declared symmetry
-    (``cad/config/placement/<part>.yaml``, default ``"x"``). Pass ``mirror=False`` for a SINGLE machine-handed
-    part with no mirror twin -- e.g. the maker's nameplate -- whose ``position``/
-    ``rows`` are already the exact machine transform; the default ``"x"`` reflection
-    would otherwise flip it across X (onto the wrong side, text reversed).
     """
     from solidworks_mcp.adapters.base import (
         ComponentRefParameters,
@@ -1035,10 +1030,6 @@ async def place_component(
         f"part {label}", part=part, ground=ground,
         configuration=configuration or "default",
     ) as psp:
-        if mirror:
-            position, rotation, rows = mirror_placement(
-                part, position, rotation, rows, configuration
-            )
         path = (OUT_SLDPRT / f"{part}.SLDPRT").resolve()
         if not path.exists():
             raise RuntimeError(
@@ -1100,12 +1091,11 @@ async def place_components_batch(
     Each ``spec`` is a dict:
 
       * ``part`` -- part stem (``<part>.SLDPRT`` under the part-output dir),
-      * ``position`` -- origin (mm) in the pre-mirror machine frame,
-      * ``rows`` -- rotation rows (images of the part X/Y/Z axes), pre-mirror,
+      * ``position`` -- origin (mm) in the machine frame,
+      * ``rows`` -- rotation rows (images of the part X/Y/Z axes), machine frame,
       * ``rotation`` -- Euler angles (optional; carried only for parity with
         :func:`place_component`, the transform is built from ``rows``),
       * ``ground`` -- fix the component (default ``True``),
-      * ``mirror`` -- route through ``mirror_placement`` (default ``True``),
       * ``label`` -- log label (optional).
 
     Why this is safe to batch where :func:`place_component` is not: these parts
@@ -1120,8 +1110,8 @@ async def place_components_batch(
     component to its spec by ORIGIN (bijective, so it tolerates ``AddComponents3``
     returning the array in a different order than ``Names`` rather than
     false-failing on identical repeated parts -- the 19 bushings), then asserts
-    BOTH the translation and the rotation (``array[0:9]`` vs the spec's mirrored
-    rows -- the same check the per-part ``assert_component_placed`` runs) so a
+    BOTH the translation and the rotation (``array[0:9]`` vs the spec's rows --
+    the same check the per-part ``assert_component_placed`` runs) so a
     misoriented or mislanded part fails loud immediately. The SAME origin match
     drives the per-spec ``ground`` flag and the returned ``Name2`` order, so a
     reorder can never fix/return the wrong component. Returns the component
@@ -1141,8 +1131,8 @@ async def place_components_batch(
 
     names: list[str] = []
     transforms: list[float] = []
-    finals: list[list[float]] = []  # final (mirrored) origin per spec, mm
-    expected_rows: list[list[float]] = []  # final (mirrored) rotation, flat 9, per spec
+    finals: list[list[float]] = []  # final machine-frame origin per spec, mm
+    expected_rows: list[list[float]] = []  # final rotation, flat 9, per spec
     grounds: list[bool] = []
     for spec in specs:
         part = spec["part"]
@@ -1153,10 +1143,7 @@ async def place_components_batch(
                 f"default config); use place_component for {part!r}"
             )
         position = list(spec["position"])
-        rotation = list(spec.get("rotation", [0.0, 0.0, 0.0]))
         rows = [list(r) for r in spec["rows"]]
-        if spec.get("mirror", True):
-            position, rotation, rows = mirror_placement(part, position, rotation, rows, "")
         names.append(str(part_path(part)))  # raises if the .SLDPRT is missing
         transforms.extend(_placement_transform(rows, position))
         finals.append(position)

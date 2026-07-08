@@ -85,9 +85,10 @@ from _assembly import (
 from _transforms import (
     IDENTITY,
     ROT_X_NEG90,
+    ROT_Y_180,
     ROT_Y_POS90,
+    compose_rows,
     euler_from_rows,
-    mirror_placement,
     rot_z_rows,
 )
 
@@ -105,7 +106,7 @@ LOCK = is_locked_build(_config.machine("build_lock", "magnifier"))
 
 # --- machine anchors ---------------------------------------------------------
 WHEEL_BAR_Y = 565.0
-COLUMN_X = 197.0
+COLUMN_X = 197.0  # the WEST column (machine +x is west; the crank side -x is east)
 COLUMN_Z = -112.0
 # Depth chain -- the SAME two-piece clamp seat as the platen support bar
 # (paper-drive PR #196 E2): the front arc's front face (-129.9) carries the
@@ -138,7 +139,8 @@ LEVER_ROD_Y = 990.0
 # VROD_Z = -134.8 (clamp's 6.5 skew bore); wire hook -137.95; the bracket arm
 # reaches back to the unchanged plate flange (build_magnifying_bracket).
 LEVER_ROD_Z = -128.3
-LEVER_X0 = -200.0  # lever part origin (rod west dome tip; rod spans -200..-35)
+LEVER_X0 = 200.0  # lever part origin (rod west dome tip; rod spans +35..+200,
+# placed Ry(180) so the part's local +x runs east toward the summing knife)
 
 # Knife-edge pivot (engineerguy video 2/4 + 4/4): the lever rod EXTENDS FROM
 # the pivoted summing bar and pivots WITH it about the knife-edge ridge line
@@ -148,11 +150,13 @@ LEVER_X0 = -200.0  # lever part origin (rod west dome tip; rod spans -200..-35)
 from build_magnifying_lever import KNIFE_LOCAL_X, KNIFE_LOCAL_Y  # noqa: E402
 from build_summing_assembly import KNIFE, KNIFE_CONTACT_Y  # noqa: E402
 
-assert math.isclose(LEVER_X0 + KNIFE_LOCAL_X, KNIFE[0], abs_tol=1e-9), \
+# The lever is placed Ry(180) (local +x -> machine -x), so the knife lands at
+# LEVER_X0 - KNIFE_LOCAL_X.
+assert math.isclose(LEVER_X0 - KNIFE_LOCAL_X, KNIFE[0], abs_tol=1e-9), \
     "magnifying-lever KnifeAxis x drifted from the summing knife line"
 assert math.isclose(LEVER_ROD_Y + KNIFE_LOCAL_Y, KNIFE_CONTACT_Y, abs_tol=1e-9), \
     "magnifying-lever KnifeAxis y drifted from the knife-edge contact ridge"
-CLAMP_X = -150.0  # sliding clamp default position (p.46/48 insets)
+CLAMP_X = 150.0  # sliding clamp default position (p.46/48 insets)
 from build_magnifying_clamp import (  # noqa: E402
     BLOCK_DEPTH as CLAMP_DEPTH,
     LEVER_BORE_Y as CLAMP_BORE_Y,
@@ -169,15 +173,17 @@ VROD_TOP_Y = LEVER_ROD_Y + 5.0  # dome inside the clamp's rod bore (rides the ro
 FIXTURE_Y0 = 926.0  # collar y 926..934 on the vertical rod
 
 # --- wheel -------------------------------------------------------------------
-WHEEL_X = -53.0
-WHEEL_BAR_X0 = -109.0  # wheel-bar centre: span -226 (29 past the west column) .. +8
+WHEEL_X = 53.0
+WHEEL_BAR_X0 = 109.0  # wheel-bar centre: span -8 .. +226 (29 past the west column)
 # Clamp screws flank the column line, closing the stack bar -> front arc ->
 # back arc with heads on the bar's front face (ch30 p002 / support-bar idiom).
-CLAMP_SCREW_X = (-COLUMN_X - CLAMP_EAR_DX, -COLUMN_X + CLAMP_EAR_DX)
-# The bar's clamp holes must land on those screw lines: the ("x", 0) mirror
-# flips the part's local stations, so book hole x = centre - local.
+# (west screw first -- keeps the component instance order of the mirrored-era
+# build, so the pose-equivalence diff matches instances by name)
+CLAMP_SCREW_X = (COLUMN_X + CLAMP_EAR_DX, COLUMN_X - CLAMP_EAR_DX)
+# The bar's clamp holes must land on those screw lines: the bar is placed at
+# IDENTITY, so book hole x = centre + local station.
 assert sorted(
-    round(WHEEL_BAR_X0 - lx, 6) for lx in BAR_CLAMP_HOLE_LOCAL_X
+    round(WHEEL_BAR_X0 + lx, 6) for lx in BAR_CLAMP_HOLE_LOCAL_X
 ) == sorted(round(x, 6) for x in CLAMP_SCREW_X), \
     "wheel-bar clamp holes drifted off the column clamp-screw lines"
 from build_wheel_axle import FLANGE_LEN, STUD_LEN  # noqa: E402
@@ -276,8 +282,8 @@ async def build(adapter) -> dict[str, str]:
     # (the bracket -- the old first insert -- now RIDES the lever, see below).
     # Magnifying-wheel bar: HALF-width (every ch30 plate shows it clamped
     # at ONE column with a free end just past the pen hanger -- M6.8
-    # 8-view pass). Span -192..+8 covers the axle (-53) and the hanger
-    # strap top (-19..-3).
+    # 8-view pass). Span -8..+192 covers the axle (+53) and the hanger
+    # strap top (+3..+19).
     await place_component(adapter, "wheel-bar", [WHEEL_BAR_X0, WHEEL_BAR_Y, BAR_Z],
                           [0.0, 0.0, 0.0], IDENTITY)
     # Two-piece clamp at the west column -- the SAME black arcs as the platen
@@ -286,9 +292,9 @@ async def build(adapter) -> dict[str, str]:
     # clamp screws (heads on the bar's front face, ch30 p002) close the stack
     # bar -> front arc -> back arc. Ry(+90): the arcs' local +X faces machine -Z.
     for arc in ("column-clamp-front", "column-clamp-back"):
-        await place_component(adapter, arc, [-COLUMN_X, WHEEL_BAR_Y, COLUMN_Z],
+        await place_component(adapter, arc, [COLUMN_X, WHEEL_BAR_Y, COLUMN_Z],
                               [0.0, 90.0, 0.0], ROT_Y_POS90,
-                              label=f"{arc} (wheel x{-COLUMN_X:.0f})")
+                              label=f"{arc} (wheel x{COLUMN_X:.0f})")
     for x in CLAMP_SCREW_X:
         await place_component(adapter, "clamp-screw", [x, WHEEL_BAR_Y, BAR_FRONT_Z],
                               [0.0, 0.0, 0.0], IDENTITY,
@@ -300,7 +306,7 @@ async def build(adapter) -> dict[str, str]:
     # (Y-normal, mirror-invariant -> no flip).
     ml = await place_component(adapter, "magnifying-lever",
                                [LEVER_X0, LEVER_ROD_Y, LEVER_ROD_Z],
-                               [0.0, 0.0, 0.0], IDENTITY, ground=False)
+                               [0.0, 180.0, 0.0], ROT_Y_180, ground=False)
     ml_o = component_origin(adapter, ml)
     # Knife-edge pivot: the lever's KnifeAxis (Axis2, local Z through the
     # summing knife-edge ridge) held by two axis-to-plane distances (the
@@ -332,7 +338,7 @@ async def build(adapter) -> dict[str, str]:
     # far past the 0.1 radial slack). Its collar stays the rod's snug carrier
     # (Ø6.2 over Ø6), now exactly concentric at every rock angle.
     bracket = await place_component(adapter, "magnifying-bracket",
-                                    [-40.0, LEVER_ROD_Y, LEVER_ROD_Z],
+                                    [40.0, LEVER_ROD_Y, LEVER_ROD_Z],
                                     [0.0, 0.0, 0.0], IDENTITY, ground=False)
     await lock_mate(adapter, named_ref(f"Front Plane@{bracket}", "PLANE"),
                     named_ref(f"Front Plane@{ml}", "PLANE"),
@@ -350,23 +356,28 @@ async def build(adapter) -> dict[str, str]:
                     named_ref(f"Front Plane@{ml}", "PLANE"),
                     label="mag-clamp locked to lever")
     # Backed-out thumb screw: shank tip tangent to the rod top (a seated
-    # screw would overlap the rod it pinches -- see module docstring).
+    # screw would overlap the rod it pinches -- see module docstring). Rz(-90)
+    # points the shank down the clamp bore; the extra Ry(180) turns its head
+    # features to the machine hand ([180, 0, -90] is the same rotation's Euler
+    # form).
+    _rz90_ry180 = compose_rows(rot_z_rows(-90.0), ROT_Y_180)
     tscrew = await place_component(adapter, "thumb-screw",
                                    [CLAMP_X, LEVER_ROD_Y + 3.0 + 12.0 + 5.0, LEVER_ROD_Z],
-                                   [0.0, 0.0, -90.0], rot_z_rows(-90.0), ground=False,
+                                   [180.0, 0.0, -90.0], _rz90_ry180, ground=False,
                                    label="thumb-screw (clamp)")
     await lock_mate(adapter, named_ref(f"Front Plane@{tscrew}", "PLANE"),
                     named_ref(f"Front Plane@{clamp}", "PLANE"),
                     label="thumb-screw locked to clamp")
     vrod = await place_component(adapter, "magnifying-vertical-rod",
                                  [CLAMP_X, VROD_TOP_Y, VROD_Z],
-                                 [0.0, 0.0, -90.0], rot_z_rows(-90.0), ground=False)
+                                 [180.0, 0.0, -90.0], _rz90_ry180, ground=False)
     await lock_mate(adapter, named_ref(f"Front Plane@{vrod}", "PLANE"),
                     named_ref(f"Front Plane@{clamp}", "PLANE"),
                     label="vertical-rod locked to clamp")
     fixture = await place_component(adapter, "output-fixture",
                                     [CLAMP_X, FIXTURE_Y0, VROD_Z],
                                     [0.0, 0.0, 0.0], IDENTITY, ground=False)
+    # (the fixture is x-symmetric about its origin, so it stays at IDENTITY)
     await lock_mate(adapter, named_ref(f"Front Plane@{fixture}", "PLANE"),
                     named_ref(f"Front Plane@{vrod}", "PLANE"),
                     label="output-fixture locked to vertical-rod")
@@ -450,10 +461,8 @@ async def build(adapter) -> dict[str, str]:
     await coincident_mate(adapter, component_named_ref(wh, "WireYokePoint", "POINT"),
                           named_ref(f"YokePlane@{hw}", "PLANE"),
                           label="WIRE1 yoke fixture->wheel", verify=(wh, wh_o))
-    wh_pos, _, wh_rows = mirror_placement(
-        "magnifying-wheel", [WHEEL_X, WHEEL_BAR_Y, WHEEL_MID_Z], [0.0, 0.0, 0.0],
-        IDENTITY)
-    assert_component_placed(adapter, wh, wh_pos, wh_rows)
+    assert_component_placed(
+        adapter, wh, [WHEEL_X, WHEEL_BAR_Y, WHEEL_MID_Z], IDENTITY)
 
     # Certify the AS-BUILT model. free -> necessity only (the freed lever DOF is
     # genuinely free, and the yoke-coupled wheel must read under-constrained WITH
