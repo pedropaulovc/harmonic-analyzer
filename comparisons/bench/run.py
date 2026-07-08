@@ -134,7 +134,7 @@ T2_SCHEMA = {
 }
 T2_CONVENTIONS = """You are closing a camera-pose loop. The REFERENCE shows the
 correct pose; the CAD RENDER is from a perturbed camera. Propose the CORRECTION
-to APPLY to the render's camera to make it match the reference (not the error —
+to APPLY to the render's camera to make it match the reference (not the error -
 the corrective move):
 - az_deg/el_deg/roll_deg: additive degrees (if the render is rotated +5deg az
   vs the reference, propose az_deg = -5).
@@ -225,7 +225,7 @@ def run_codex(prompt: str, images: list[Path], schema_path: Path, sandbox: Path,
         cmd += ["-i", str(im)]
     try:
         proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True,
-                              timeout=timeout)
+                              encoding="utf-8", errors="replace", timeout=timeout)
     except subprocess.TimeoutExpired:
         return None, 0, "timeout"
     tokens = 0
@@ -412,7 +412,7 @@ def exec_t2(cases, cell, model, server):
     cur = gc._apply(base, target0, r0, u0, sd, zoom0)
     row_syn = {"pair_id": pid, "case_id": f"{pid}+ctrl", "align": align, "background": bg}
     side = crc(pid, arm) % 2
-    rounds, history, converged, mid = [], [], False, ""
+    rounds, history, converged, mid, err_break = [], [], False, "", ""
     for rnd in range(6):
         ren = server.render_jpg(cur, w, h, frozen, bg, sb / f"round{rnd}.jpg")
         oid = opaque("t2", pid, start_key, arm, rnd)
@@ -427,6 +427,7 @@ def exec_t2(cases, cell, model, server):
         e_before = _pose_err(cur, base, target0, zoom0)
         if data is None:
             rounds.append({"round": rnd, "error": err, "err_before": e_before})
+            err_break = err or "round-error"
             break
         rounds.append({"round": rnd, "correction": data, "err_before": e_before,
                        "tokens": tokens})
@@ -435,9 +436,12 @@ def exec_t2(cases, cell, model, server):
         if _converged(_pose_err(cur, base, target0, zoom0)):
             converged = True
             break
+    # response=None on an error-break so done_keys retries the cell (a genuine
+    # non-converged loop that ran its rounds keeps response=rounds and counts done).
     return {
         "task": "t2", "cell_key": cell_key, "model": model, "model_id": mid,
-        "pair_id": pid, "start": start_key, "arm": arm, "response": rounds or None,
+        "pair_id": pid, "start": start_key, "arm": arm,
+        "response": None if err_break else rounds, "error": err_break,
         "rounds": rounds, "n_rounds": len(rounds), "converged": converged,
         "final_err": _pose_err(cur, base, target0, zoom0),
         "tokens": sum(r.get("tokens", 0) or 0 for r in rounds),
