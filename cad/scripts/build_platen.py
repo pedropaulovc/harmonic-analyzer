@@ -92,6 +92,21 @@ GUIDE_HOLE_XY = tuple((x, y) for y in GUIDE_HOLE_Y for x in GUIDE_HOLE_X)
 CBORE_DIA = 6.5  # 0.5 radial clearance around the O5.5 heads
 CBORE_DEPTH = 2.4  # head 2.2 -> crown 0.2 sub-flush
 
+# BACK-face relief where the sliding carriage rides over the four column-clamp
+# screw heads (O8 x 2.5 proud of the support-bar front, build_paper_drive_
+# assembly): flush against the bar front the heads would bury 2.5 into this
+# board (interference gate: 125.66 mm^3 each at the ch30 park, which advances the
+# carriage in front of the east column). A shallow blind pocket from the BACK
+# lets the heads nest so the board slides clear. Stations are SYMMETRIC about the
+# width centre (141) so the set is invariant under the assembly's part-centre
+# mirror (see build_platen_guide.LOCK_STATION_X for the same trap) -- 55.5/226.5
+# sit over the +-179.5 clamps, 20.5/261.5 over the +-214.5 clamps, whichever pair
+# the carriage parks across. On the wear-band centreline (machine y 338.5 = local
+# 33.5), clear of the guide-rail band and its screw rows (y 13/47).
+CLAMP_RELIEF_DIA = 10.0  # 1.0 radial clearance around the O8 heads
+CLAMP_RELIEF_DEPTH = 3.0  # 0.5 past the 2.5 head; leaves a 1.0 front web
+CLAMP_RELIEF_XY = ((20.5, 33.5), (55.5, 33.5), (226.5, 33.5), (261.5, 33.5))
+
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
@@ -264,10 +279,56 @@ async def build(adapter) -> dict[str, str]:
         0.02 * v_cbores,
     )
 
+    # Column-clamp head reliefs on the BACK face (blind pockets). Sketch on a
+    # plane offset the full thickness off the front (= the back face), then the
+    # same both-directions trick (2x depth) lands CLAMP_RELIEF_DEPTH into
+    # material from the back, leaving a front web. A wrong-signed offset plane
+    # would remove nothing -> the volume_check below fails loud.
+    from solidworks_mcp.adapters.base import CreatePlaneParameters
+
+    check(
+        "create_plane back face",
+        await adapter.create_plane(CreatePlaneParameters(
+            mode="offset", base_plane="Front", offset=PLATE_THICKNESS,
+        )),
+    )
+    back_plane = name_last_feature(adapter, "BackFace")
+    reliefs = SketchDims()
+    check("create_sketch clamp reliefs", await adapter.create_sketch(back_plane))
+    set_sketch_direct_db(adapter, True)
+    for n, (x, y) in enumerate(CLAMP_RELIEF_XY):
+        await define_circle(
+            adapter, x, y, CLAMP_RELIEF_DIA / 2.0, f"clamp relief ({x:.1f}, {y:.1f})",
+            dims=reliefs,
+            names=(f"Cr{n}X", f"Cr{n}Z", f"Cr{n}Dia"),
+            drives=(None, None, None),
+        )
+    set_sketch_direct_db(adapter, False)
+    await ensure_fully_defined(adapter, "clamp reliefs sketch")
+    check("exit_sketch clamp reliefs", await adapter.exit_sketch())
+    name_last_feature(adapter, "ClampReliefProfile")
+    check(
+        "cut clamp reliefs",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=2.0 * CLAMP_RELIEF_DEPTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "ClampReliefs")
+    v_relief = (
+        len(CLAMP_RELIEF_XY) * math.pi * (CLAMP_RELIEF_DIA / 2.0) ** 2
+        * CLAMP_RELIEF_DEPTH
+    )
+    await volume_check(
+        adapter,
+        "clamp reliefs",
+        v_plate - v_sockets - v_guide_holes - v_cbores - v_relief,
+        0.02 * v_relief,
+    )
+
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built
     # value, so the geometry must not move).
-    v_final = v_plate - v_sockets - v_guide_holes - v_cbores
+    v_final = v_plate - v_sockets - v_guide_holes - v_cbores - v_relief
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
