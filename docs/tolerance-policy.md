@@ -42,9 +42,16 @@ are the concrete realizations of the classes above, being lifted into `tolerance
 Reassessed in [`tolerance-gdt-assessment.md`](./tolerance-gdt-assessment.md) §11 — nothing here is
 left "deferred":
 
-- **GD&T (lite), surface-finish specs, critical-feature callouts — IN SCOPE.** Held in config,
-  stamped into custom properties, audited; geometric intent limited to dial-indicator runout plus
-  the rocker form radius and knife-edge controls (see the assessment §5).
+- **GD&T (full, ASME Y14.5-2018), surface-finish specs, critical-feature callouts — IN SCOPE.**
+  Held in config, stamped into the model as PMI, imported onto the drawings, audited. The full
+  vocabulary is available — form, orientation, location (true position + MMC/LMC bonus), profile,
+  and runout, over explicit datum reference frames — applied **functionally**: a feature-control
+  frame appears only where the error model rewards it (the knife edge, the cams, channel
+  consistency), and a general tolerance block (an ASME decimal-place title-block table; ISO 2768 if
+  drawing to ISO) governs everything unspecified. This
+  **retires the earlier "lite" cap** that limited geometry to dial-indicator runout on the theory the
+  audience couldn't parse frames — the supplement now ships a GD&T primer instead (see assessment
+  §1/§5).
 - **2D shop drawings — IN SCOPE (planned).** A hobby machinist builds from a dimensioned, toleranced
   print, so generated PDF drawings (Tier-1 precision-critical parts first) are the vehicle that
   carries the tolerances to the bench. Same `SaveAs3` path the STEP/STL export already uses; a new
