@@ -237,9 +237,15 @@ adopted, not its grid-less sibling.
   target-y (15, 40 mm), target-x (15, 40 mm). Presentation order is NOT
   "d₁ first" (that would make "first" always correct): which delta is shown
   first follows the same deterministic schedule as the other position-bias
-  controls — `(zlib.crc32(f"{case_id}:{arm}:t3".encode()) + repeat) % 2`,
+  controls — `(zlib.crc32(f"{pair_id}:{arm}:t3:{delta_class}".encode()) + repeat) % 2`,
   with `+ repeat` outside the hash for the same CRC-linearity reason —
-  balanced, identical across executions and models, recorded per row. T3
+  balanced, identical across executions and models, recorded per row.
+  Within a T3 trial the two stimuli share **identical layout**: any
+  arm-internal side/order (P2/P3's ref side, P10's frame order) is keyed
+  from the **base pair id**, not the delta-tagged case id, so d₁ and d₂
+  cannot land on different layouts and the only within-trial difference is
+  the delta magnitude — d₁/d₂ presentation order is the ONE thing the T3
+  schedule varies. T3
   cells run the same N = 3 repeats as T1 (the schedule's `repeat` term is
   live): 144 trials per arm-model curve instead of a thin 48.
 
@@ -257,7 +263,7 @@ adopted, not its grid-less sibling.
 | model | invocation | pinning |
 |---|---|---|
 | **Claude Opus** (the production pose agent) | Agent tool, one fresh subagent per cell | the runner passes `model: "opus"` **explicitly on every spawn** — never rely on inheritance (a subagent inherits the orchestrating session's model by default, which may not be Opus). `run.py` hard-codes the override; a smoke assertion checks the spawned model id before fan-out. |
-| **Codex CLI, gpt-5.5, high reasoning** | `codex exec` non-interactive, one invocation per cell (per **round** for T2 — see Tasks; both models run T2 stateless-per-round) | `--model gpt-5.5` + reasoning effort `high` (config flag, e.g. `-c model_reasoning_effort="high"`), stimulus images attached per cell (`-i`), same prompt template and the same JSON output schema (the runner parses the JSON from stdout). Exact flag spellings are verified against the installed `codex` version during harness build and committed in `run.py`. |
+| **Codex CLI, gpt-5.5, high reasoning** | `codex exec` non-interactive, one invocation per cell (per **round** for T2 — see Tasks; both models run T2 stateless-per-round) | `--model gpt-5.5` + reasoning effort `high` (config flag, e.g. `-c model_reasoning_effort="high"`), stimulus images attached per cell (`-i`), same prompt template and the same JSON output schema (the runner parses the JSON from stdout). Two more pinned flags: `--skip-git-repo-check` (the sandbox workspace is deliberately NOT a git repo, and `codex exec` refuses to run outside one), and `--ignore-user-config --ignore-rules` (a seat's `$CODEX_HOME/config.toml` — MCP servers, web search, persistent instructions — must not silently vary the subject between seats); `run.py` also records the effective Codex config fingerprint per run. Exact flag spellings are verified against the installed `codex` version during harness build and committed in `run.py`. |
 
 Model is fully crossed with arm × case × task: same stimuli, same prompts,
 same N. Report every table per model. The **decision rule applies to the
