@@ -49,6 +49,10 @@ from _assembly import (
     assert_component_placed,
     assert_components_fully_defined,
     check_no_interference,
+    coincident_mate,
+    component_transform,
+    distance_driver,
+    named_ref,
     place_component,
     remap_front_to_machine_front,
     save_assembly_and_images,
@@ -104,14 +108,59 @@ def _subassembly(name: str) -> str:
     return str(path)
 
 
+def _plane_normals_and_origin(adapter, name: str):
+    """World normals of a component's (Right, Top, Front) planes + its origin
+    (mm). Transform2 is row-major (`world = local.R`), so the world normal of
+    the plane whose local normal is local axis i is row i."""
+    a = component_transform(adapter, name)
+    rows = [(a[0], a[1], a[2]), (a[3], a[4], a[5]), (a[6], a[7], a[8])]
+    org = [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
+    return rows, org
+
+
+async def _locate_to_datum(adapter, name: str) -> None:
+    """Locate a component by three orthogonal plane-distance mates to the
+    machine datum planes -- the semantic replacement for a fix (#110 idiom).
+    Orientation-agnostic: each principal plane is paired to the datum plane
+    whose world normal is most parallel, and the perpendicular distance is the
+    origin offset projected onto that normal. Valid for parts whose planes are
+    (near-)parallel to the datum -- here every subassembly is authored in
+    machine coordinates at the identity transform (origin coincident), so each
+    pairs to its own datum plane at distance 0 (a coincident mate)."""
+    planes = ("Right Plane", "Top Plane", "Front Plane")
+    datum_n = [(1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)]
+    part_n, o = _plane_normals_and_origin(adapter, name)
+    used: set[int] = set()
+    for li, part_plane in enumerate(planes):
+        n = part_n[li]
+        bi = max((j for j in range(3) if j not in used),
+                 key=lambda j: abs(sum(n[k] * datum_n[j][k] for k in range(3))))
+        used.add(bi)
+        coord = o[bi]  # datum normals are the axes, so the projection is the axis coord
+        part_ref = named_ref(f"{part_plane}@{name}", "PLANE")
+        base_ref = named_ref(planes[bi], "PLANE")
+        tag = f"{part_plane.split()[0]}->{planes[bi].split()[0]}"
+        if abs(coord) < 1e-6:
+            await coincident_mate(adapter, part_ref, base_ref,
+                                  label=f"{name} datum {tag}=0", verify=(name, o))
+            continue
+        await distance_driver(adapter, part_ref, base_ref, abs(coord),
+                              label=f"{name} datum {tag} d={abs(coord):.2f}",
+                              verify=(name, o))
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
-        ComponentRefParameters,
         InsertComponentParameters,
     )
 
     check("create_assembly", await adapter.create_assembly())
 
+    # Each subassembly is authored in machine coordinates, so it is inserted at
+    # the identity transform. frame is FIRST -> the auto-fixed assembly seed;
+    # every other subassembly is datum-located (three plane mates to the
+    # coincident machine datum planes), not fixed -- the #110 cleanup lifted one
+    # level. Each sub rides through the seat as one rigid body either way.
     for name in SUBASSEMBLIES:
         data = check(
             f"insert {name}.SLDASM",
@@ -124,17 +173,18 @@ async def build(adapter) -> dict[str, str]:
             ),
         )
         comp = data["name"]
-        if not data.get("fixed"):
-            check(
-                f"fix {name}",
-                await adapter.fix_component(ComponentRefParameters(name=comp)),
-            )
         assert_component_placed(adapter, comp, [0.0, 0.0, 0.0], IDENTITY)
+        if data.get("fixed"):
+            continue  # frame = auto-fixed seed
+        await _locate_to_datum(adapter, comp)
 
     # Loose hardware on the base top (not part of any mechanism). Exact machine
-    # transform (mirror=False): flat, graduated face up, long axis along Z.
-    await place_component(adapter, "measuring-stick", list(STICK_POS),
-                          STICK_EULER, STICK_ROWS, mirror=False)
+    # transform (mirror=False): flat, graduated face up, long axis along Z. Its
+    # rows are an axis-aligned permutation, so it datum-locates instead of being
+    # fixed (the #110 cleanup) -- not the seed (frame is).
+    stick = await place_component(adapter, "measuring-stick", list(STICK_POS),
+                                  STICK_EULER, STICK_ROWS, mirror=False, ground=False)
+    await _locate_to_datum(adapter, stick)
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)
