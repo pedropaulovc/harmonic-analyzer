@@ -188,19 +188,48 @@ def resolve_framing(cam, boxes, mesh_lo, mesh_hi):
     return target, zoom
 
 
-def aim_camera(cam, cam_data, c, boxes, mesh_lo, mesh_hi, ext, w, h):
+def compute_framing(c, boxes, mesh_lo, mesh_hi, ext, w, h, frozen=None):
+    """Framing scalars for camera spec ``c`` — bpy-free, so probe + render share it.
+
+    ``frozen`` (bench fixed-frame mode, comparisons/bench) pins ``need_w`` — the
+    projected world width the fit is derived from — to a value computed ONCE from
+    the family's unperturbed camera, so an az/el/roll perturbation reuses the base
+    framing instead of silently re-fitting to its own projected bbox. ``target``
+    still comes from ``c`` (a target-perturbation case moves the aim point) and
+    ``zoom`` from ``c.zoom`` (the zoom carve-out: a zoom case shrinks frame_w),
+    so only rotation-invariant re-fitting is suppressed. Default (frozen=None) is
+    the historical per-camera fit, byte-identical for the shipping pipeline.
+    """
+    r, u, o = camera_axes(c.get("az_deg", 0.0), c.get("el_deg", 0.0), c.get("roll_deg", 0.0))
+    target, zoom = resolve_framing(c, boxes, mesh_lo, mesh_hi)
+    if frozen and frozen.get("need_w") is not None:
+        need_w = float(frozen["need_w"])
+    else:
+        need_w = max(_proj_extent(mesh_lo, mesh_hi, r),
+                     _proj_extent(mesh_lo, mesh_hi, u) * w / h)
+    frame_w = need_w * 1.05 / zoom  # world width that fills the frame at target
+    lp = lens_params(c)
+    if lp is None:
+        cam_dist = ext * 3
+    else:
+        lens_mm, sensor_long = lp
+        fit_span = frame_w * h / w if h >= w else frame_w
+        cam_dist = fit_span * lens_mm / sensor_long
+    return {"r": r, "u": u, "o": o, "target": target, "zoom": zoom,
+            "need_w": need_w, "frame_w": frame_w, "cam_dist": cam_dist, "lens": lp}
+
+
+def aim_camera(cam, cam_data, c, boxes, mesh_lo, mesh_hi, ext, w, h, frozen=None):
     """Position cam/cam_data for camera spec ``c`` (manifest euler camera dict).
 
     Single source of truth for the camera placement, shared with the
     interactive pose_studio.py so a pose adjusted in the viewport reproduces
     1:1 on the next render_offline.py run. Returns (target, zoom, cam_dist)
-    for callers that want to invert/inspect the framing.
+    for callers that want to invert/inspect the framing. ``frozen`` (bench)
+    pins the fit basis — see compute_framing.
     """
-    r, u, o = camera_axes(c.get("az_deg", 0.0), c.get("el_deg", 0.0), c.get("roll_deg", 0.0))
-    target, zoom = resolve_framing(c, boxes, mesh_lo, mesh_hi)
-    need_w = max(_proj_extent(mesh_lo, mesh_hi, r),
-                 _proj_extent(mesh_lo, mesh_hi, u) * w / h)
-    frame_w = need_w * 1.05 / zoom  # world width that fills the frame at target
+    f = compute_framing(c, boxes, mesh_lo, mesh_hi, ext, w, h, frozen)
+    r, u, o = f["r"], f["u"], f["o"]
 
     # Orthographic unless the pair requests a lens. For perspective, orient the
     # DX long edge (sensor_long) to the canvas long edge so a portrait canvas
@@ -209,31 +238,26 @@ def aim_camera(cam, cam_data, c, boxes, mesh_lo, mesh_hi, ext, w, h):
     # sensor_long. That keeps the same silhouette fit as ortho at the target
     # plane (near parts enlarged) while the long-axis angle of view matches the
     # real f-mm lens (~13.5 deg at 100 mm on 23.6 mm).
-    lp = lens_params(c)
-    if lp is None:
+    if f["lens"] is None:
         cam_data.type = "ORTHO"
         cam_data.sensor_fit = "HORIZONTAL"
-        cam_data.ortho_scale = frame_w
-        cam_dist = ext * 3
+        cam_data.ortho_scale = f["frame_w"]
     else:
-        lens_mm, sensor_long = lp
+        lens_mm, sensor_long = f["lens"]
         cam_data.type = "PERSP"
         cam_data.lens = lens_mm
         if h >= w:  # portrait: long edge runs vertically
             cam_data.sensor_fit = "VERTICAL"
             cam_data.sensor_height = sensor_long
-            fit_span = frame_w * h / w  # world height that fills the frame
         else:       # landscape: long edge runs horizontally
             cam_data.sensor_fit = "HORIZONTAL"
             cam_data.sensor_width = sensor_long
-            fit_span = frame_w          # world width that fills the frame
-        cam_dist = fit_span * lens_mm / sensor_long
 
     rot = Matrix(((r[0], u[0], o[0]), (r[1], u[1], o[1]), (r[2], u[2], o[2])))
     m = rot.to_4x4()
-    m.translation = Vector(target) + Vector(o) * cam_dist
+    m.translation = Vector(f["target"]) + Vector(o) * f["cam_dist"]
     cam.matrix_world = m
-    return target, zoom, cam_dist
+    return f["target"], f["zoom"], f["cam_dist"]
 
 
 def main():
@@ -244,6 +268,18 @@ def main():
     scene = bpy.context.scene
     mesh_lo, mesh_hi = scene_bounds(objs)
     ext = max(hi - lo for hi, lo in zip(mesh_hi, mesh_lo))
+
+    # Probe mode (bench gen_cases): compute + emit the base framing for each
+    # pair's camera and render nothing. gen_cases reads PROBE lines to resolve
+    # target0/need_w0 for the fixed-frame family (see comparisons/bench).
+    if job.get("probe"):
+        for pair in job["pairs"]:
+            f = compute_framing(pair["camera"], boxes, mesh_lo, mesh_hi, ext,
+                                pair["width"], pair["height"])
+            print("PROBE " + json.dumps({
+                "id": pair["id"], "target": list(f["target"]), "zoom": f["zoom"],
+                "need_w": f["need_w"], "cam_dist": f["cam_dist"], "ext": ext}))
+        return
 
     cam_data = bpy.data.cameras.new("cam")
     cam_data.clip_start = ext * 0.001
@@ -267,7 +303,8 @@ def main():
         w, h = pair["width"], pair["height"]
         scene.render.resolution_x = w
         scene.render.resolution_y = h
-        aim_camera(cam, cam_data, pair["camera"], boxes, mesh_lo, mesh_hi, ext, w, h)
+        aim_camera(cam, cam_data, pair["camera"], boxes, mesh_lo, mesh_hi, ext, w, h,
+                   frozen=pair.get("frozen"))
         scene.render.filepath = pair["out"]
         bpy.ops.render.render(write_still=True)
         print(f"RENDERED {pair['id']}")

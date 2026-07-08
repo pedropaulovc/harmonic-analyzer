@@ -1,0 +1,405 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["pillow"]
+# ///
+"""Dual-model runner for the pose-presentation benchmark (docs/pose-presentation-benchmark.md).
+
+Fans out one fresh-context call per cell x subject model. Codex (gpt-5.5, high
+reasoning) via `codex exec` with `--output-schema` structured output in a
+sandbox cwd; Claude Opus via `claude -p --model opus` (explicit override) in the
+same sandbox. Deterministic side/order schedules, opaque stimulus ids (the
+id->delta map stays here, never served), N repeats, resumable (answered cells
+skipped), results appended to results.jsonl tagged by model. Ground truth is
+recorded on each row for the scorer but NEVER shown to a subject.
+
+    uv run comparisons/bench/run.py --task t1 --model codex          # T1 sub-grid, all arms
+    uv run comparisons/bench/run.py --task t1 --model codex --limit 10 --arms P1,P2   # smoke
+    uv run comparisons/bench/run.py --task t3 --model codex
+    uv run comparisons/bench/run.py --task t1 --model opus            # after codex
+
+Resume is automatic: rerun the same command; done cells are skipped.
+"""
+
+import argparse
+import json
+import re
+import subprocess
+import sys
+import threading
+import time
+import zlib
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from hashlib import sha256
+from pathlib import Path
+
+BENCH = Path(__file__).resolve().parent
+sys.path.insert(0, str(BENCH))
+import presentations as P  # noqa: E402
+
+OUT = BENCH / "out"
+CASES = BENCH / "cases.jsonl"
+RESULTS = OUT / "results.jsonl"
+SANDBOX_ROOT = OUT / "sandbox"
+SCHEMA_DIR = OUT / "schemas"
+SALT = "pose-bench-v1"
+ARMS = P.ARMS
+
+# T1 sub-grid tags (27/pair): rotations +-3/+-15, targets +-15/+-40, both zooms,
+# first 4 mixed, control. Generation renders the FULL 45; the sub-grid is a view.
+SUBGRID_TAGS = (
+    [f"{p}{s}{v}" for p in ("az", "el", "roll") for s in ("+", "-") for v in (3, 15)]
+    + [f"{p}{s}{v}" for p in ("tx", "ty") for s in ("+", "-") for v in (15, 40)]
+    + ["zoom085", "zoom118", "mix1", "mix2", "mix3", "mix4", "ctrl"]
+)
+
+# T3 delta-pairs (8), all positive-signed, one direction per class.
+T3_PAIRS = [
+    ("az", "az+1", "az+3"), ("az", "az+3", "az+7"), ("az", "az+7", "az+15"),
+    ("el", "el+3", "el+7"), ("roll", "roll+3", "roll+7"),
+    ("ty", "ty+5", "ty+15"), ("ty", "ty+15", "ty+40"), ("tx", "tx+15", "tx+40"),
+]
+
+FIRST_PASS_PAIRS = [
+    "harmonic_analyzer--ch30-p002-img01", "harmonic_analyzer--ch30-p007-img01",
+    "harmonic_analyzer--ch12-p002-img09", "harmonic_analyzer--ch12-p001-img02",
+    "harmonic_analyzer--ch17-p002-img06", "harmonic_analyzer--ch23-p004-img02",
+]
+
+# --- arm encodings (shared prompt fragment; describes the encoding only) ------
+ARM_ENCODING = {
+    "P1": "a single overlay: the reference photo in grayscale with the CAD render tinted RED on top. Where red edges sit off the grayscale photo edges, the pose is misaligned there.",
+    "P2": "two images side by side: one is the reference photo, the other the CAD render (their left/right order is randomised).",
+    "P3": "two images side by side (reference photo and CAD render, order randomised) with a labelled coordinate grid (columns 0-9, rows A-J) drawn over both to help you name where things sit.",
+    "P4": "a 5-tile strip that cross-fades reference->render (opacity 100/0, 75/25, 50/50, 25/75, 0/100); drift between the ends shows the pose error.",
+    "P5": "a subtle overlay: the reference photo (full colour texture visible) with the CAD render faintly superimposed.",
+    "P6": "an 8x8 checkerboard alternating tiles of the reference photo and the CAD render; a registered pose reads continuous across tile seams, a misaligned one shows breaks at the seams.",
+    "P7": "a colour fusion: the reference photo drives the GREEN channel and the CAD render drives MAGENTA (red+blue). Registered structure reads gray; misregistration shows green/magenta colour fringes on the side it drifted toward.",
+    "P8": "a difference heatmap (bright = large photo-vs-render mismatch) with small reference and render thumbnails below.",
+    "P9": "the reference photo (full colour) with the CAD render's edges drawn as thin RED lines on top; red edges away from the matching photo edge show the pose error there.",
+    "P10": "two full-frame images shown in sequence: one reference photo and one CAD render (order randomised); compare them like a blink comparator.",
+    "P11": "a dashboard: a small reference|render pair on top, and below it a green/magenta colour fusion and a red-edge overlay of the same pair.",
+}
+
+T1_CONVENTIONS = """You are estimating the CAMERA POSE ERROR of a CAD render.
+The REFERENCE shows the correct pose of a mechanical model. The CAD RENDER was
+produced from a camera perturbed from that correct pose. Estimate the
+perturbation APPLIED TO THE RENDER (not the correction) for each of six
+independent parameters, using this convention:
+- az (azimuth/yaw, deg): + = camera orbited toward the object's RIGHT (you see
+  more of its right side than the reference); - = toward its left.
+- el (elevation/pitch, deg): + = camera moved UP (looking down more); - = down.
+- roll (deg): + = render rotated CLOCKWISE vs the reference; - = anticlockwise.
+- target_x (mm, image-plane): + = camera aim shifted right, so the MODEL appears
+  shifted LEFT in the render vs the reference; - = model shifted right.
+- target_y (mm): + = aim shifted up, so the MODEL appears shifted DOWN; - = up.
+- zoom (factor): + = render zoomed IN (model larger than reference); - = out.
+Magnitude buckets: rotations small<=2deg / medium 3-8 / large>8; targets
+small<=8mm / medium 9-25 / large>25; zoom is always large. Use direction "0"
+and magnitude "small" for a parameter with no detectable error."""
+
+T3_CONVENTIONS = """You will judge which of two stimuli shows the CAD render in
+BETTER alignment with the reference pose (smaller pose error). Answer with the
+label of the better-aligned stimulus."""
+
+# --- JSON schemas (codex --output-schema; opus parses the same shape) ---------
+_PARAM = {
+    "type": "object", "additionalProperties": False,
+    "properties": {
+        "direction": {"type": "string", "enum": ["-", "0", "+"]},
+        "magnitude": {"type": "string", "enum": ["small", "medium", "large"]},
+    }, "required": ["direction", "magnitude"],
+}
+T1_SCHEMA = {
+    "type": "object", "additionalProperties": False,
+    "properties": {p: _PARAM for p in ("az", "el", "roll", "target_x", "target_y", "zoom")},
+    "required": ["az", "el", "roll", "target_x", "target_y", "zoom"],
+}
+T3_SCHEMA = {
+    "type": "object", "additionalProperties": False,
+    "properties": {"choice": {"type": "string", "enum": ["1", "2"]}},
+    "required": ["choice"],
+}
+
+_LOCK = threading.Lock()
+
+
+def load_cases() -> dict:
+    rows = [json.loads(l) for l in CASES.read_text(encoding="utf-8").splitlines() if l.strip()]
+    return {r["case_id"]: r for r in rows}
+
+
+def crc(*parts) -> int:
+    return zlib.crc32(":".join(str(p) for p in parts).encode())
+
+
+def opaque(*parts) -> str:
+    return sha256((SALT + ":" + ":".join(str(p) for p in parts)).encode()).hexdigest()[:16]
+
+
+def done_keys() -> set:
+    if not RESULTS.exists():
+        return set()
+    keys = set()
+    for line in RESULTS.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        r = json.loads(line)
+        if r.get("response") is not None:   # only successful cells count as done;
+            keys.add(r["cell_key"])         # errored cells retry on rerun
+    return keys
+
+
+def append_result(row: dict) -> None:
+    with _LOCK:
+        with RESULTS.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(row) + "\n")
+
+
+def _extract_json(text: str) -> dict | None:
+    text = text.strip()
+    m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if m:
+        text = m.group(1)
+    # first balanced object
+    start = text.find("{")
+    if start < 0:
+        return None
+    depth = 0
+    for i in range(start, len(text)):
+        if text[i] == "{":
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+            if depth == 0:
+                try:
+                    return json.loads(text[start:i + 1])
+                except ValueError:
+                    return None
+    return None
+
+
+def write_schema(name: str, schema: dict) -> Path:
+    SCHEMA_DIR.mkdir(parents=True, exist_ok=True)
+    p = SCHEMA_DIR / f"{name}.json"
+    p.write_text(json.dumps(schema), encoding="utf-8")
+    return p
+
+
+def run_codex(prompt: str, images: list[Path], schema_path: Path, sandbox: Path,
+              timeout: int = 240) -> tuple[dict | None, int, str]:
+    out_file = sandbox / "codex_out.json"
+    # Prompt goes via STDIN, never as a positional: `-i FILE...` is variadic and
+    # would otherwise swallow a trailing prompt arg as another image path.
+    cmd = ["codex", "exec", "--model", "gpt-5.5",
+           "-c", "model_reasoning_effort=high",
+           "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules",
+           "-C", str(sandbox), "-s", "read-only",
+           "--output-schema", str(schema_path), "-o", str(out_file)]
+    for im in images:
+        cmd += ["-i", str(im)]
+    try:
+        proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True,
+                              timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return None, 0, "timeout"
+    tokens = 0
+    m = re.search(r"tokens used[:\s]+([\d,]+)", proc.stdout + "\n" + proc.stderr)
+    if m:
+        tokens = int(m.group(1).replace(",", ""))
+    data = None
+    if out_file.exists():
+        data = _extract_json(out_file.read_text(encoding="utf-8"))
+    if data is None:
+        data = _extract_json(proc.stdout)
+    err = "" if data is not None else (proc.stderr[-400:] or "no-json")
+    return data, tokens, err
+
+
+def run_opus(prompt: str, images: list[Path], sandbox: Path,
+             timeout: int = 240) -> tuple[dict | None, int, str, str]:
+    imgs = ", ".join(f"./{im.name}" for im in images)
+    full = (prompt + f"\n\nThe stimulus image(s) are in this directory: {imgs}. "
+            "Use the Read tool to view each, then respond with ONLY the JSON object.")
+    cmd = ["claude", "-p", "--model", "opus", "--output-format", "json",
+           "--permission-mode", "bypassPermissions", full]
+    try:
+        proc = subprocess.run(cmd, cwd=str(sandbox), capture_output=True, text=True,
+                              timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return None, 0, "timeout", ""
+    model_id, text, tokens = "", "", 0
+    try:
+        obj = json.loads(proc.stdout)
+        events = obj if isinstance(obj, list) else [obj]
+        for e in events:
+            if e.get("type") == "system" and e.get("model"):
+                model_id = e["model"]
+            if e.get("type") == "result":
+                text = e.get("result", "")
+                u = e.get("usage", {})
+                tokens = u.get("input_tokens", 0) + u.get("output_tokens", 0)
+            if not model_id and e.get("message", {}).get("model"):
+                model_id = e["message"]["model"]
+    except ValueError:
+        text = proc.stdout
+    data = _extract_json(text)
+    err = "" if data is not None else "no-json"
+    return data, tokens, err, model_id
+
+
+def invoke(model: str, prompt: str, images: list[Path], schema: dict, sandbox: Path):
+    if model == "codex":
+        sp = write_schema("t_" + opaque(prompt)[:8], schema)
+        data, tokens, err = run_codex(prompt, images, sp, sandbox)
+        return data, tokens, err, "gpt-5.5"
+    data, tokens, err, mid = run_opus(prompt, images, sandbox)
+    return data, tokens, err, mid
+
+
+# --- cell builders -----------------------------------------------------------
+def t1_cells(cases, pairs, arms, n, grid):
+    for pid in pairs:
+        for tag in SUBGRID_TAGS:
+            cid = f"{pid}+{tag}"
+            if cid not in cases:
+                continue
+            for arm in arms:
+                for rep in range(n):
+                    yield ("t1", cid, arm, rep, grid)
+
+
+def t3_cells(cases, pairs, arms, n):
+    for pid in pairs:
+        for dclass, t1, t2 in T3_PAIRS:
+            c1, c2 = f"{pid}+{t1}", f"{pid}+{t2}"
+            if c1 not in cases or c2 not in cases:
+                continue
+            for arm in arms:
+                for rep in range(n):
+                    yield ("t3", pid, dclass, (c1, c2), arm, rep)
+
+
+def exec_t1(cases, cell, model):
+    _t, cid, arm, rep, grid = cell
+    row = cases[cid]
+    cell_key = f"t1:{model}:{cid}:{arm}:{rep}:{int(grid)}"
+    sb = SANDBOX_ROOT / cell_key.replace(":", "_")
+    sb.mkdir(parents=True, exist_ok=True)
+    side = crc(cid, arm) + rep
+    oid = opaque("t1", cid, arm, rep, grid)
+    imgs = P.build_stimulus(row, arm, sb, oid, grid=grid, side=side % 2, order=side % 2)
+    prompt = (T1_CONVENTIONS + f"\n\nThe stimulus is {ARM_ENCODING[arm]}\n\n"
+              "Return a JSON object with keys az, el, roll, target_x, target_y, zoom, "
+              "each an object {\"direction\": \"-\"|\"0\"|\"+\", \"magnitude\": "
+              "\"small\"|\"medium\"|\"large\"}.")
+    t0 = time.monotonic()
+    data, tokens, err, mid = invoke(model, prompt, imgs, T1_SCHEMA, sb)
+    return {
+        "task": "t1", "cell_key": cell_key, "model": model, "model_id": mid,
+        "case_id": cid, "pair_id": row["pair_id"], "arm": arm, "repeat": rep,
+        "grid": grid, "side": side % 2, "tier": row["tier"], "delta": row["delta"],
+        "response": data, "tokens": tokens, "error": err,
+        "latency_s": round(time.monotonic() - t0, 1),
+    }
+
+
+def exec_t3(cases, cell, model):
+    _t, pid, dclass, (c1, c2), arm, rep = cell
+    cell_key = f"t3:{model}:{pid}:{dclass}:{arm}:{rep}"
+    sb = SANDBOX_ROOT / cell_key.replace(":", "_")
+    sb.mkdir(parents=True, exist_ok=True)
+    order = (crc(pid, arm, "t3", dclass) + rep) % 2   # which delta is shown first
+    side = crc(pid, arm) % 2                          # arm-internal layout (base-pair keyed)
+    first_cid, second_cid = (c1, c2) if order == 0 else (c2, c1)
+    imgs = []
+    for slot, cid in (("1", first_cid), ("2", second_cid)):
+        oid = opaque("t3", pid, dclass, arm, rep, slot)
+        for im in P.build_stimulus(cases[cid], arm, sb, oid, grid=False, side=side, order=side):
+            imgs.append(im)
+    # correct answer: the smaller-delta case (c1) = better aligned
+    correct = "1" if first_cid == c1 else "2"
+    prompt = (T3_CONVENTIONS + f"\n\nEach stimulus is {ARM_ENCODING[arm]}\n\n"
+              f"Stimulus 1 = {imgs[0].name if len(imgs)<=2 else 'the first image(s)'}, "
+              f"Stimulus 2 = the remaining image(s). Which stimulus shows BETTER "
+              "alignment (smaller pose error)? Return JSON {\"choice\": \"1\"|\"2\"}.")
+    t0 = time.monotonic()
+    data, tokens, err, mid = invoke(model, prompt, imgs, T3_SCHEMA, sb)
+    return {
+        "task": "t3", "cell_key": cell_key, "model": model, "model_id": mid,
+        "pair_id": pid, "delta_class": dclass, "arm": arm, "repeat": rep,
+        "order": order, "side": side, "correct": correct,
+        "response": data, "tokens": tokens, "error": err,
+        "latency_s": round(time.monotonic() - t0, 1),
+    }
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--task", required=True, choices=["t1", "t3"])
+    ap.add_argument("--model", required=True, choices=["codex", "opus"])
+    ap.add_argument("--arms", help="comma list, default all 11")
+    ap.add_argument("--pairs", help="comma list, default 6 first-pass")
+    ap.add_argument("--n", type=int, default=3)
+    ap.add_argument("--grid", action="store_true", help="grid-ON variant (T1)")
+    ap.add_argument("--concurrency", type=int, default=6)
+    ap.add_argument("--limit", type=int, help="cap cells (smoke)")
+    ap.add_argument("--budget-tokens", type=int, default=16_000_000)
+    args = ap.parse_args()
+
+    cases = load_cases()
+    arms = args.arms.split(",") if args.arms else ARMS
+    pairs = args.pairs.split(",") if args.pairs else FIRST_PASS_PAIRS
+    SANDBOX_ROOT.mkdir(parents=True, exist_ok=True)
+    RESULTS.parent.mkdir(parents=True, exist_ok=True)
+
+    if args.task == "t1":
+        cells = list(t1_cells(cases, pairs, arms, args.n, args.grid))
+        runner = exec_t1
+    else:
+        cells = list(t3_cells(cases, pairs, arms, args.n))
+        runner = exec_t3
+
+    done = done_keys()
+    todo = []
+    for c in cells:
+        if args.task == "t1":
+            key = f"t1:{args.model}:{c[1]}:{c[2]}:{c[3]}:{int(c[4])}"
+        else:
+            key = f"t3:{args.model}:{c[1]}:{c[2]}:{c[4]}:{c[5]}"
+        if key not in done:
+            todo.append(c)
+    n_done = len(cells) - len(todo)
+    if args.limit:
+        todo = todo[:args.limit]
+    print(f"{args.task}/{args.model}: {len(cells)} cells, {n_done} already done, "
+          f"{len(todo)} to run now (concurrency {args.concurrency})", flush=True)
+
+    spent = 0
+    completed = 0
+    t0 = time.monotonic()
+    with ThreadPoolExecutor(max_workers=args.concurrency) as ex:
+        futs = {ex.submit(runner, cases, c, args.model): c for c in todo}
+        for fut in as_completed(futs):
+            try:
+                row = fut.result()
+            except Exception as e:  # noqa: BLE001
+                print(f"  xx cell failed: {e}", flush=True)
+                continue
+            append_result(row)
+            spent += row.get("tokens", 0) or 0
+            completed += 1
+            ok = row.get("response") is not None
+            if completed % 10 == 0 or not ok:
+                rate = completed / max(1e-9, time.monotonic() - t0)
+                print(f"  [{completed}/{len(todo)}] {row['cell_key']} "
+                      f"{'OK' if ok else 'ERR:' + row.get('error','')} "
+                      f"tok~{spent} {rate:.2f}/s", flush=True)
+            if spent > args.budget_tokens:
+                print(f"!! budget gate hit ({spent} > {args.budget_tokens}); stopping", flush=True)
+                break
+    print(f"done: {completed} cells, ~{spent} tokens, {time.monotonic()-t0:.0f}s", flush=True)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
