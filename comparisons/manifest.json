@@ -268,9 +268,9 @@
     "el_deg": 76.0
    },
    "align": {
-    "scale": 1.75,
-    "dx_px": -241,
-    "dy_px": -201
+    "scale": 1.0,
+    "dx_px": 0,
+    "dy_px": 0
    },
    "component_focus": [
     "cone_gear",
@@ -343,9 +343,9 @@
     "el_deg": -4.0
    },
    "align": {
-    "scale": 1.84,
-    "dx_px": 99,
-    "dy_px": -121
+    "scale": 1.0,
+    "dx_px": 0,
+    "dy_px": 0
    },
    "component_focus": [
     "crank_arm",
@@ -380,9 +380,9 @@
     "el_deg": 18.0
    },
    "align": {
-    "scale": 1.38,
-    "dx_px": 47,
-    "dy_px": -60
+    "scale": 1.0,
+    "dx_px": 0,
+    "dy_px": 0
    },
    "component_focus": [
     "rocker_arm",
@@ -417,9 +417,9 @@
     "el_deg": 4.0
    },
    "align": {
-    "scale": 1.25,
-    "dx_px": 155,
-    "dy_px": 61
+    "scale": 1.0,
+    "dx_px": 0,
+    "dy_px": 0
    },
    "component_focus": [
     "pinion_drum",
@@ -454,9 +454,9 @@
     "el_deg": 58.0
    },
    "align": {
-    "scale": 1.75,
-    "dx_px": 195,
-    "dy_px": -195
+    "scale": 1.0,
+    "dx_px": 0,
+    "dy_px": 0
    },
    "component_focus": [
     "crank_drive_gear",
@@ -491,9 +491,9 @@
     "el_deg": 12.0
    },
    "align": {
-    "scale": 1.19,
-    "dx_px": -98,
-    "dy_px": -11
+    "scale": 1.0,
+    "dx_px": 0,
+    "dy_px": 0
    },
    "component_focus": [
     "pen_marker",
@@ -529,9 +529,9 @@
     "el_deg": 25.0
    },
    "align": {
-    "scale": 1.27,
-    "dx_px": -74,
-    "dy_px": 77
+    "scale": 1.0,
+    "dx_px": 0,
+    "dy_px": 0
    },
    "component_focus": [
     "magnifying_wheel",
@@ -566,9 +566,9 @@
     "el_deg": -35.0
    },
    "align": {
-    "scale": 1.64,
-    "dx_px": 208,
-    "dy_px": -145
+    "scale": 1.0,
+    "dx_px": 0,
+    "dy_px": 0
    },
    "component_focus": [
     "channel_spring_installed",
@@ -603,9 +603,9 @@
     "el_deg": -12.0
    },
    "align": {
-    "scale": 1.45,
-    "dx_px": -140,
-    "dy_px": -147
+    "scale": 1.0,
+    "dx_px": 0,
+    "dy_px": 0
    },
    "component_focus": [
     "summing_lever",
