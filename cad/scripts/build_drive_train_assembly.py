@@ -2191,6 +2191,13 @@ async def build(adapter) -> dict[str, str]:
         label=f"pinion swing PARK driver (p2, disengaged a={abs(STRAP_LEAN_DEG):.2f})",
         verify=(fb, fb_o),
         free_dof_key="pinion_swing",
+        # The strap's origin IS the pivot bore, ON the torque-shaft axis: the
+        # |lean| angle is satisfied at EITHER lean and the origin readback is
+        # blind to the branch (#154). The arbor bore at the strap top is the
+        # off-axis witness -- the two leans separate it by ~2*C2C*sin(12.38 deg)
+        # ~ 18 mm. Recorded into the deferred park spec, so the preflight
+        # replay is guarded identically.
+        witness_local=[0.0, STRAP_C2C, 0.0],
     )
     # Back strap: the same revolute on the shaft + a parallel anti-spin to the
     # front strap (both inserted at the same lean, so their Right planes are
@@ -2211,6 +2218,9 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         named_ref(f"Right Plane@{bb}", "PLANE"), named_ref(f"Right Plane@{fb}", "PLANE"),
         label="pinion back strap anti-spin (rigid with front)", verify=(bb, bb_o),
+        # Same on-axis-origin blindness as the front strap (#154): parallel is
+        # satisfied at either lean, so witness the arbor bore at the strap top.
+        witness_local=[0.0, STRAP_C2C, 0.0],
     )
     # Cam-follower pins (PR8): pressed in each strap's blind WEST-EDGE seat
     # (Axis3), so they RIDE the swing group -- coaxial + the seat-bottom axial
