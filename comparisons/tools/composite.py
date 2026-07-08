@@ -81,15 +81,17 @@ def _content_mask(img: Image.Image, thresh: int = 30,
     corner-colour test fails; flood-filling from the corners follows the
     gradient and stops at content edges.
 
-    ``background`` (colour name/hex, offline renders only): only corners
-    actually SHOWING that colour seed the flood. Blender renders composite the
-    model onto an exact uniform background, and a macro framing can put model
-    at a corner (ch12-p001: the teal base plate spans the bottom edge) — an
-    unconditional corner flood then starts inside the model and eats every
-    connected region within thresh of it (the base plate AND the rocker-arm
-    support). A corner showing model is simply skipped; if no corner matches,
-    the mask is all-content, which composites identically anyway — the canvas
-    is that same background colour.
+    ``background`` (colour name/hex — the RENDER's own uniform backdrop, from
+    the renderer's sidecar ``render_bg``, NOT the manifest's presentation
+    colour): only corners actually SHOWING that colour seed the flood. Both
+    engines lay the model over an exact uniform colour (Blender: the pair's
+    reference background; SolidWorks: forced plain white), and a macro framing
+    can put model at a corner (ch12-p001: the teal base plate spans the bottom
+    edge) — an unconditional corner flood then starts inside the model and
+    eats every connected region within thresh of it (the base plate AND the
+    rocker-arm support). A corner showing model is simply skipped; if no
+    corner matches, the mask is all-content. ``None`` (pre-``render_bg``
+    sidecar) keeps the unconditional flood.
     """
     from PIL import ImageChops, ImageColor, ImageDraw
 
@@ -139,8 +141,24 @@ def trim_render_file(path: Path, margin_frac: float = 0.01) -> None:
             time.sleep(0.25)
 
 
-def _fitted_render(pair_id: str, ref_size: tuple[int, int], align: dict | None,
-                   background: str | None = None):
+def render_bg(pair_id: str) -> str | None:
+    """The uniform colour behind the render's pixels, recorded by the renderer
+    in its sidecar (``render_bg``). Fallback for pre-key Blender sidecars: the
+    engine tag proves the render used the pair's reference background. None
+    (unknown/legacy SolidWorks sidecar) keeps the unconditional corner flood."""
+    sc = pair_paths(pair_id)["render"].with_name(f"{pair_id}.meta.json")
+    try:
+        meta = json.loads(sc.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if "render_bg" in meta:
+        return meta["render_bg"]
+    if meta.get("engine") == "blender":
+        return meta.get("reference", {}).get("background", "black")
+    return None
+
+
+def _fitted_render(pair_id: str, ref_size: tuple[int, int], align: dict | None):
     """Content-trimmed render scaled to fit the ref frame.
 
     Returns (render RGB, content mask, paste offset). The capture fills only
@@ -150,7 +168,7 @@ def _fitted_render(pair_id: str, ref_size: tuple[int, int], align: dict | None,
     """
     align = align or {}
     ren = Image.open(pair_paths(pair_id)["render"])
-    mask = _content_mask(ren, background=background)
+    mask = _content_mask(ren, background=render_bg(pair_id))
     bbox = mask.getbbox() or (0, 0, ren.width, ren.height)
     ren, mask = ren.crop(bbox), mask.crop(bbox)
     rw, rh = ref_size
@@ -171,7 +189,7 @@ def aligned_render(pair_id: str, align: dict | None,
     p = pair_paths(pair_id)
     with Image.open(p["ref"]) as ref:
         ref_size = ref.size
-    ren, mask, offset = _fitted_render(pair_id, ref_size, align, background)
+    ren, mask, offset = _fitted_render(pair_id, ref_size, align)
     canvas = Image.new("RGB", ref_size, background)
     canvas.paste(ren.convert("RGB"), offset, mask)
     p["cad"].parent.mkdir(parents=True, exist_ok=True)
@@ -188,11 +206,10 @@ def _render_rgba(render: Image.Image, mask: Image.Image) -> Image.Image:
     )
 
 
-def blend_overlay(pair_id: str, align: dict | None,
-                  background: str | None = None) -> Path:
+def blend_overlay(pair_id: str, align: dict | None) -> Path:
     p = pair_paths(pair_id)
     ref = Image.open(p["ref"]).convert("L").convert("RGB")
-    ren, mask, offset = _fitted_render(pair_id, ref.size, align, background)
+    ren, mask, offset = _fitted_render(pair_id, ref.size, align)
     layer = Image.new("RGBA", ref.size, (0, 0, 0, 0))
     layer.paste(_render_rgba(ren, mask), offset)
     out = Image.alpha_composite(ref.convert("RGBA"), layer).convert("RGB")
@@ -201,13 +218,12 @@ def blend_overlay(pair_id: str, align: dict | None,
     return p["blend"]
 
 
-def score_pair(pair_id: str, align: dict | None,
-               background: str | None = None) -> float:
+def score_pair(pair_id: str, align: dict | None) -> float:
     """RMS grayscale mismatch where the render has content. Relative metric:
     only meaningful as a trend per pair across iterations."""
     p = pair_paths(pair_id)
     ref = Image.open(p["ref"]).convert("L")
-    ren, mask, offset = _fitted_render(pair_id, ref.size, align, background)
+    ren, mask, offset = _fitted_render(pair_id, ref.size, align)
     canvas = Image.new("L", ref.size, 0)
     canvas.paste(ren.convert("L"), offset)
     mcanvas = Image.new("L", ref.size, 0)
@@ -238,10 +254,9 @@ def regenerate(only: set[str] | None = None) -> dict[str, float]:
             print(f"  --  [{i}/{len(todo)}] {pid}: no render yet, skipping", flush=True)
             continue
         align = pair.get("align")
-        bg = pair["reference"].get("background", "black")
-        aligned_render(pid, align, bg)
-        blend_overlay(pid, align, bg)
-        scores[pid] = score_pair(pid, align, bg)
+        aligned_render(pid, align, pair["reference"].get("background", "black"))
+        blend_overlay(pid, align)
+        scores[pid] = score_pair(pid, align)
         print(f"  OK  [{i}/{len(todo)}] {pid}: score {scores[pid]}"
               f"  ({time.monotonic() - t0:.0f}s)", flush=True)
     SCORES.write_text(json.dumps(dict(sorted(scores.items())), indent=1), encoding="utf-8")
