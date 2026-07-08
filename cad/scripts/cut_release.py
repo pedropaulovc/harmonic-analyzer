@@ -278,22 +278,46 @@ def stage_comparisons(stage: Path) -> dict[str, Any] | None:
     submodule), so nothing TRACKED is staged and the tagged tree stays clean.
 
     Best-effort: if the export stage could not produce the gallery (the offline
-    renderer needs Blender, which lives on a separate GPU seat), it is absent --
-    warn and ship the bundle without it rather than failing the release. If a
-    gallery exists but predates this export's geometry, ship it but warn loudly.
+    renderer needs Blender, which lives on a separate GPU seat), it is absent or
+    incomplete -- warn and ship the bundle without it rather than failing the
+    release. If a gallery exists but predates this export's geometry, ship it
+    but warn loudly.
     """
     with _telemetry.span("release.comparisons") as sp:
         scores_file = COMPARISONS_DIR / "scores.json"
-        render_dir = COMPARISONS_DIR / "render"
-        produced = (scores_file.exists() and render_dir.is_dir()
-                    and any(render_dir.glob("*.jpg")))
-        if not produced:
+        # COMPLETE or absent -- a partial gallery (render_offline succeeded but
+        # gallery.py/composite died, or an interrupted run left renders without
+        # index.html) must not ship: the notes point users at index.html and the
+        # reveal slider needs every overlay. Validate the full per-manifest file
+        # set + a parseable scores.json covering every pair; anything short is
+        # treated exactly like "not produced" (all regenerable, never fatal).
+        manifest = json.loads(
+            (COMPARISONS_DIR / "manifest.json").read_text(encoding="utf-8"))
+        ids = [p["id"] for p in manifest["pairs"]]
+        required = [COMPARISONS_DIR / "index.html", scores_file]
+        for pid in ids:
+            required += [COMPARISONS_DIR / "render" / f"{pid}.jpg",
+                         COMPARISONS_DIR / "composite" / f"{pid}_cad.jpg",
+                         COMPARISONS_DIR / "composite" / f"{pid}_blend.jpg",
+                         COMPARISONS_DIR / "ref" / f"{pid}.jpg"]
+        missing = [str(p.relative_to(COMPARISONS_DIR)) for p in required
+                   if not p.exists()]
+        scores: dict[str, Any] = {}
+        if scores_file.exists():
+            try:
+                scores = json.loads(scores_file.read_text(encoding="utf-8"))
+            except ValueError:
+                missing.append("scores.json (unparseable)")
+        missing += [f"scores.json[{pid}]" for pid in ids if pid not in scores]
+        if missing:
             _telemetry.warn(
-                "comparison gallery absent -- the export stage did not produce it "
-                "(needs Blender on the export seat); shipping bundle without it. "
-                "Produce it with `doit export` on a Blender seat, or "
+                "comparison gallery absent/incomplete -- the export stage did not "
+                f"produce it (needs Blender on the export seat); {len(missing)} "
+                f"missing, e.g. {', '.join(missing[:4])}. Shipping bundle without "
+                "it. Produce it with `doit export` on a Blender seat, or "
                 "`uv run comparisons/tools/render_offline.py`.")
-            _telemetry.event("comparisons.skipped", reason="not produced by export")
+            _telemetry.event("comparisons.skipped",
+                             reason=f"incomplete: {', '.join(missing[:8])}"[:200])
             sp.set_attribute("staged", False)
             return None
 
@@ -322,7 +346,6 @@ def stage_comparisons(stage: Path) -> dict[str, Any] | None:
                 shutil.copy2(src, dst / name)
                 staged += 1
 
-        scores = json.loads(scores_file.read_text(encoding="utf-8"))
         vals = [v for v in scores.values() if isinstance(v, (int, float))]
         facts = {
             "pairs": len(scores),
