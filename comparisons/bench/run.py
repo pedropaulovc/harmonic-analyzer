@@ -22,6 +22,7 @@ Resume is automatic: rerun the same command; done cells are skipped.
 
 import argparse
 import json
+import math
 import re
 import subprocess
 import sys
@@ -35,6 +36,7 @@ from pathlib import Path
 BENCH = Path(__file__).resolve().parent
 sys.path.insert(0, str(BENCH))
 import presentations as P  # noqa: E402
+import gen_cases as gc  # noqa: E402  (bpy-free camera math: _apply, camera_axes)
 
 OUT = BENCH / "out"
 CASES = BENCH / "cases.jsonl"
@@ -119,6 +121,30 @@ T3_SCHEMA = {
     "properties": {"choice": {"type": "string", "enum": ["1", "2"]}},
     "required": ["choice"],
 }
+
+# T2 pinned starts (6/pair, one per parameter class). "M1" = the pair's mix1 delta.
+T2_STARTS = [
+    ("az7", {"az_deg": 7.0}), ("elm7", {"el_deg": -7.0}), ("roll7", {"roll_deg": 7.0}),
+    ("zoom085", {"zoom": 0.85}), ("txp25", {"tx_mm": 25.0}), ("mix1", "M1"),
+]
+_T2P = ("az_deg", "el_deg", "roll_deg", "target_x_mm", "target_y_mm", "zoom_factor")
+T2_SCHEMA = {
+    "type": "object", "additionalProperties": False,
+    "properties": {k: {"type": "number"} for k in _T2P}, "required": list(_T2P),
+}
+T2_CONVENTIONS = """You are closing a camera-pose loop. The REFERENCE shows the
+correct pose; the CAD RENDER is from a perturbed camera. Propose the CORRECTION
+to APPLY to the render's camera to make it match the reference (not the error —
+the corrective move):
+- az_deg/el_deg/roll_deg: additive degrees (if the render is rotated +5deg az
+  vs the reference, propose az_deg = -5).
+- target_x_mm/target_y_mm: additive mm along the image right/up. target_x_mm +
+  shifts the camera aim right, moving the MODEL LEFT in the frame; so if the
+  model sits too far RIGHT, propose a POSITIVE target_x_mm.
+- zoom_factor: multiplicative (>1 zooms in / enlarges the model, <1 zooms out);
+  1.0 = no zoom change.
+Use 0 for a parameter that needs no change. Aim to converge in as few rounds as
+possible (az/el/roll within 1deg, target within 5mm, zoom within 3%)."""
 
 _LOCK = threading.Lock()
 
@@ -333,9 +359,94 @@ def exec_t3(cases, cell, model):
     }
 
 
+# --- T2 closed loop ----------------------------------------------------------
+def _apply_correction(cur: dict, corr: dict, r0, u0) -> dict:
+    nc = json.loads(json.dumps(cur))
+    nc["az_deg"] = cur["az_deg"] + (corr.get("az_deg") or 0.0)
+    nc["el_deg"] = cur["el_deg"] + (corr.get("el_deg") or 0.0)
+    nc["roll_deg"] = cur["roll_deg"] + (corr.get("roll_deg") or 0.0)
+    tx, ty = corr.get("target_x_mm") or 0.0, corr.get("target_y_mm") or 0.0
+    nc["target_mm"] = [cur["target_mm"][i] + tx * r0[i] + ty * u0[i] for i in range(3)]
+    nc["zoom"] = cur["zoom"] * (corr.get("zoom_factor") or 1.0)
+    return nc
+
+
+def _pose_err(cur: dict, base: dict, target0, zoom0: float) -> dict:
+    return {
+        "az": abs(cur["az_deg"] - base["az_deg"]),
+        "el": abs(cur["el_deg"] - base["el_deg"]),
+        "roll": abs(cur["roll_deg"] - base["roll_deg"]),
+        "target": math.dist(cur["target_mm"], target0),
+        "zoom": abs(math.log(cur["zoom"] / zoom0)),
+    }
+
+
+def _converged(e: dict) -> bool:
+    return (e["az"] <= 1 and e["el"] <= 1 and e["roll"] <= 1
+            and e["target"] <= 5 and e["zoom"] <= math.log(1.03))
+
+
+def t2_cells(cases, pairs, arms):
+    for pid in pairs:
+        if f"{pid}+ctrl" not in cases:
+            continue
+        for start_key, start_delta in T2_STARTS:
+            for arm in arms:
+                yield ("t2", pid, start_key, start_delta, arm)
+
+
+def exec_t2(cases, cell, model, server):
+    _t, pid, start_key, start_delta, arm = cell
+    meta = cases[f"{pid}+ctrl"]
+    base = meta["base_camera"]
+    target0 = tuple(meta["target0"])
+    zoom0 = float(meta.get("zoom0") or base.get("zoom") or 1.0)
+    r0, u0 = tuple(meta["basis"]["r"]), tuple(meta["basis"]["u"])
+    frozen = {"need_w": meta["frozen"]["need_w"]}
+    w, h = meta["frozen"]["canvas"]
+    bg, align = meta.get("background", "black"), meta.get("align") or {}
+    cell_key = f"t2:{model}:{pid}:{start_key}:{arm}"
+    sb = SANDBOX_ROOT / cell_key.replace(":", "_")
+    sb.mkdir(parents=True, exist_ok=True)
+    sd = cases[f"{pid}+mix1"]["delta"] if start_delta == "M1" else start_delta
+    cur = gc._apply(base, target0, r0, u0, sd, zoom0)
+    row_syn = {"pair_id": pid, "case_id": f"{pid}+ctrl", "align": align, "background": bg}
+    side = crc(pid, arm) % 2
+    rounds, history, converged, mid = [], [], False, ""
+    for rnd in range(6):
+        ren = server.render_jpg(cur, w, h, frozen, bg, sb / f"round{rnd}.jpg")
+        oid = opaque("t2", pid, start_key, arm, rnd)
+        imgs = P.build_stimulus(row_syn, arm, sb, oid, grid=False, side=side, order=side,
+                                render_path=ren)
+        hist = ("\n\nPrior rounds (text only, images not reshown):\n" + "\n".join(history)) \
+            if history else ""
+        prompt = (T2_CONVENTIONS + f"\n\nThe stimulus is {ARM_ENCODING[arm]}" + hist +
+                  "\n\nReturn a JSON object with numeric keys az_deg, el_deg, roll_deg, "
+                  "target_x_mm, target_y_mm, zoom_factor.")
+        data, tokens, err, mid = invoke(model, prompt, imgs, T2_SCHEMA, sb)
+        e_before = _pose_err(cur, base, target0, zoom0)
+        if data is None:
+            rounds.append({"round": rnd, "error": err, "err_before": e_before})
+            break
+        rounds.append({"round": rnd, "correction": data, "err_before": e_before,
+                       "tokens": tokens})
+        history.append(f"Round {rnd + 1}: applied {json.dumps(data)}")
+        cur = _apply_correction(cur, data, r0, u0)
+        if _converged(_pose_err(cur, base, target0, zoom0)):
+            converged = True
+            break
+    return {
+        "task": "t2", "cell_key": cell_key, "model": model, "model_id": mid,
+        "pair_id": pid, "start": start_key, "arm": arm, "response": rounds or None,
+        "rounds": rounds, "n_rounds": len(rounds), "converged": converged,
+        "final_err": _pose_err(cur, base, target0, zoom0),
+        "tokens": sum(r.get("tokens", 0) or 0 for r in rounds),
+    }
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--task", required=True, choices=["t1", "t3"])
+    ap.add_argument("--task", required=True, choices=["t1", "t3", "t2"])
     ap.add_argument("--model", required=True, choices=["codex", "opus"])
     ap.add_argument("--arms", help="comma list, default all 11")
     ap.add_argument("--pairs", help="comma list, default 6 first-pass")
@@ -352,20 +463,29 @@ def main() -> int:
     SANDBOX_ROOT.mkdir(parents=True, exist_ok=True)
     RESULTS.parent.mkdir(parents=True, exist_ok=True)
 
+    server = None
     if args.task == "t1":
         cells = list(t1_cells(cases, pairs, arms, args.n, args.grid))
         runner = exec_t1
-    else:
+    elif args.task == "t3":
         cells = list(t3_cells(cases, pairs, arms, args.n))
         runner = exec_t3
+    else:  # t2 needs a persistent blender render server (one per run)
+        cells = list(t2_cells(cases, pairs, arms))
+        from render_server import RenderServer
+        print("t2: starting persistent blender render server ...", flush=True)
+        server = RenderServer()
+        runner = lambda cs, c, m: exec_t2(cs, c, m, server)  # noqa: E731
 
     done = done_keys()
     todo = []
     for c in cells:
         if args.task == "t1":
             key = f"t1:{args.model}:{c[1]}:{c[2]}:{c[3]}:{int(c[4])}"
-        else:
+        elif args.task == "t3":
             key = f"t3:{args.model}:{c[1]}:{c[2]}:{c[4]}:{c[5]}"
+        else:
+            key = f"t2:{args.model}:{c[1]}:{c[2]}:{c[4]}"
         if key not in done:
             todo.append(c)
     n_done = len(cells) - len(todo)
@@ -399,6 +519,8 @@ def main() -> int:
             if spent > args.budget_tokens:
                 print(f"!! budget gate hit ({spent} > {args.budget_tokens}); stopping", flush=True)
                 break
+    if server is not None:
+        server.close()
     print(f"done: {completed} cells, ~{spent} tokens, {time.monotonic()-t0:.0f}s", flush=True)
     return 0
 

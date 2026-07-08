@@ -75,16 +75,19 @@ def _family_fit(pid: str, align: dict, ref_size: tuple[int, int], bg: str) -> di
     return fit
 
 
-def _registered(row: dict, out_size: tuple[int, int] | None = None):
+def _registered(row: dict, out_size: tuple[int, int] | None = None,
+                render_path: Path | None = None):
     """Render placed into the ref frame at the family's frozen content-fit.
 
     Returns (ref RGB, render RGB, content mask L) at a common size (the ref size,
-    or ``out_size``). Uncovered frame stays the reference background colour.
+    or ``out_size``). ``render_path`` overrides the case render (T2 feeds a fresh
+    per-round render); the family fit still keys on the pair's control render.
+    Uncovered frame stays the reference background colour.
     """
     pid = row["pair_id"]
     bg = row.get("background", "black")
     ref = Image.open(BENCH / "out" / "ref" / f"{pid}.jpg").convert("RGB")
-    ren_src = Image.open(BENCH / "out" / "render" / f"{row['case_id']}.jpg").convert("RGB")
+    ren_src = Image.open(render_path or (BENCH / "out" / "render" / f"{row['case_id']}.jpg")).convert("RGB")
     size = out_size or ref.size
     if ref.size != size:
         ref = ref.resize(size, Image.Resampling.LANCZOS)
@@ -228,10 +231,11 @@ def _onion(ref, ren):
 
 
 def build_stimulus(row, arm, out_dir: Path, opaque_id: str,
-                   grid: bool = False, side: int = 0, order: int = 0) -> list[Path]:
+                   grid: bool = False, side: int = 0, order: int = 0,
+                   render_path: Path | None = None) -> list[Path]:
     """Build one arm's stimulus for a case row. Returns served image path(s)."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    ref, ren, mask = _registered(row)
+    ref, ren, mask = _registered(row, render_path=render_path)
 
     if arm in ("P2", "P3"):
         # side 0: ref left / render right; side 1: swapped
