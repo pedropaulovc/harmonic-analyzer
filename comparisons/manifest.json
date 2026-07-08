@@ -254,23 +254,23 @@
    },
    "camera": {
     "mode": "euler",
-    "roll_deg": 0.0,
-    "zoom": 3.2,
+    "roll_deg": 20.0,
+    "zoom": 5.2,
     "target_mm": [
-     -85.0,
+     -108.0,
      105.0,
      0.0
     ],
     "perspective": {
      "focal_length_mm": 100.0
     },
-    "az_deg": 180.0,
-    "el_deg": 62.0
+    "az_deg": 5.0,
+    "el_deg": 76.0
    },
    "align": {
-    "scale": 1.0,
-    "dx_px": 0,
-    "dy_px": 0
+    "scale": 1.37,
+    "dx_px": 125,
+    "dy_px": 216
    },
    "component_focus": [
     "cone_gear",
@@ -278,8 +278,8 @@
     "rocker_arm",
     "connecting_rod"
    ],
-   "status": "draft",
-   "notes": "drive-train plan: top-down oblique over cone+cylinder gear sets, amplitude-bar curtain upper right, pivot at bottom",
+   "status": "aligned",
+   "notes": "drive-train plan from above-back (az~5 el~76): cone base top-left w/ crank pinion, apex bottom, cylinder set right, amplitude bars top-right. Model: swing platform reads teal vs black-ish in photo.",
    "tier": 1
   },
   {
@@ -287,21 +287,22 @@
    "model": "harmonic_analyzer",
    "reference": {
     "path": "references/albert-michelsons-harmonic-analyzer/ch12_images/page001_img02.jpeg",
-    "source": "book ch12"
+    "source": "book ch12",
+    "background": "white"
    },
    "camera": {
     "mode": "euler",
     "roll_deg": 0.0,
-    "zoom": 2.6,
+    "zoom": 4.1,
     "target_mm": [
-     -60.0,
-     115.0,
+     -45.0,
+     190.0,
      -40.0
     ],
     "perspective": {
      "focal_length_mm": 100.0
     },
-    "az_deg": 268.0,
+    "az_deg": 3.0,
     "el_deg": 8.0
    },
    "align": {
@@ -315,8 +316,8 @@
     "crank_arm",
     "rocker_arm_support"
    ],
-   "status": "draft",
-   "notes": "lower drive train from machine right (-X): crank arm image-left, chain rising, cone gear set labeled, green pedestals",
+   "status": "aligned",
+   "notes": "lower drive train from machine BACK (az~3, white bg): chain+sprockets top-left, connecting-rod bank, cone gears bottom-left, pinion drum, rocker-support frustum right. tune_align skipped (white bg unsupported); content-fit align.",
    "tier": 1
   },
   {
@@ -329,22 +330,22 @@
    "camera": {
     "mode": "euler",
     "roll_deg": 0.0,
-    "zoom": 4.0,
+    "zoom": 14.0,
     "target_mm": [
      -122.0,
-     110.0,
-     -168.0
+     108.0,
+     -145.0
     ],
     "perspective": {
      "focal_length_mm": 100.0
     },
-    "az_deg": 215.0,
-    "el_deg": 4.0
+    "az_deg": 190.0,
+    "el_deg": 6.0
    },
    "align": {
-    "scale": 1.0,
-    "dx_px": 0,
-    "dy_px": 0
+    "scale": 1.64,
+    "dx_px": 64,
+    "dy_px": 46
    },
    "component_focus": [
     "crank_arm",
@@ -352,8 +353,8 @@
     "chain_sprocket",
     "crank_pedestal"
    ],
-   "status": "draft",
-   "notes": "crank installed, front-right oblique: arm + wooden handle on sprocket, green pedestal, cone gear behind",
+   "status": "aligned",
+   "notes": "crank close-up from front (az~190): pedestal right, t120 cone end behind, chain up. Model crank parked with arm at 6 o'clock/handle toward viewer vs photo ~7:30 \u2014 free-DOF rest pose, not a geometry error.",
    "tier": 1
   },
   {
@@ -366,22 +367,22 @@
    "camera": {
     "mode": "euler",
     "roll_deg": 0.0,
-    "zoom": 2.2,
+    "zoom": 6.2,
     "target_mm": [
-     70.0,
-     140.0,
-     -10.0
+     -55.0,
+     120.0,
+     -35.0
     ],
     "perspective": {
      "focal_length_mm": 100.0
     },
-    "az_deg": 158.0,
-    "el_deg": 8.0
+    "az_deg": 162.0,
+    "el_deg": 2.0
    },
    "align": {
-    "scale": 1.0,
-    "dx_px": 0,
-    "dy_px": 0
+    "scale": 1.22,
+    "dx_px": -73,
+    "dy_px": 36
    },
    "component_focus": [
     "rocker_arm",
@@ -389,8 +390,8 @@
     "harmonic_base",
     "nameplate"
    ],
-   "status": "draft",
-   "notes": "front-low base region: rocker-arm fan over cylinder gear row, crank handle right, nameplate on base",
+   "status": "aligned",
+   "notes": "front-low base region (az~162 el~2): cylinder drums + rocker fan center, crank pedestal right, nameplate center-left, both columns. Turntable disc in photo is staging, not machine.",
    "tier": 1
   },
   {
@@ -403,22 +404,22 @@
    "camera": {
     "mode": "euler",
     "roll_deg": 0.0,
-    "zoom": 2.4,
+    "zoom": 14.5,
     "target_mm": [
-     -40.0,
-     140.0,
-     -20.0
+     -12.0,
+     116.0,
+     -32.0
     ],
     "perspective": {
      "focal_length_mm": 100.0
     },
-    "az_deg": 92.0,
-    "el_deg": 6.0
+    "az_deg": 83.0,
+    "el_deg": 4.0
    },
    "align": {
-    "scale": 1.0,
-    "dx_px": 0,
-    "dy_px": 0
+    "scale": 1.13,
+    "dx_px": 97,
+    "dy_px": -54
    },
    "component_focus": [
     "pinion_drum",
@@ -426,8 +427,8 @@
     "connecting_rod",
     "crank_arm"
    ],
-   "status": "draft",
-   "notes": "pinion drum meshing cylinder gear set through base window from machine left (+X); back side image-left, front side image-right",
+   "status": "aligned",
+   "notes": "pinion drum through the base window from machine left (az~83): drum fills window, connecting rods above, front-side T-handle right. Strong registration.",
    "tier": 1
   },
   {
@@ -440,22 +441,22 @@
    "camera": {
     "mode": "euler",
     "roll_deg": 0.0,
-    "zoom": 3.2,
+    "zoom": 11.5,
     "target_mm": [
-     -60.0,
-     180.0,
-     -100.0
+     -35.0,
+     278.0,
+     -145.0
     ],
     "perspective": {
      "focal_length_mm": 100.0
     },
-    "az_deg": 205.0,
-    "el_deg": -22.0
+    "az_deg": 204.0,
+    "el_deg": -24.0
    },
    "align": {
-    "scale": 1.0,
-    "dx_px": 0,
-    "dy_px": 0
+    "scale": 1.8,
+    "dx_px": -223,
+    "dy_px": 37
    },
    "component_focus": [
     "crank_drive_gear",
@@ -463,8 +464,8 @@
     "platen_rack",
     "chain_sprocket"
    ],
-   "status": "draft",
-   "notes": "below-front oblique of translational gearing: crank drive gear disk meshing pinion under platen rack, knob + chain in front",
+   "status": "aligned",
+   "notes": "translational gearing from below-front (az~204 el~-24): knob-shaft T24 disc + chain sprocket + chain, rack-pinion at stub, platen rack above.",
    "tier": 1
   },
   {
@@ -477,22 +478,22 @@
    "camera": {
     "mode": "euler",
     "roll_deg": 0.0,
-    "zoom": 4.2,
+    "zoom": 8.8,
     "target_mm": [
-     13.0,
-     408.0,
-     -148.0
+     70.0,
+     395.0,
+     -146.0
     ],
     "perspective": {
      "focal_length_mm": 100.0
     },
-    "az_deg": 197.0,
-    "el_deg": 2.0
+    "az_deg": 184.0,
+    "el_deg": 0.0
    },
    "align": {
-    "scale": 1.0,
-    "dx_px": 0,
-    "dy_px": 0
+    "scale": 1.11,
+    "dx_px": -72,
+    "dy_px": 24
    },
    "component_focus": [
     "pen_marker",
@@ -501,8 +502,8 @@
     "platen",
     "platen_rack"
    ],
-   "status": "draft",
-   "notes": "pen mechanism in situ on platen, slight left oblique; rack teeth at bottom, rack pinion lower right",
+   "status": "aligned",
+   "notes": "pen mechanism on platen, near-frontal (az~184): pen v-block right-of-center on paper, rack + rack-pinion below. Model: pen v-block authored brass vs green on real machine; paper has no trace.",
    "tier": 1
   },
   {
@@ -515,22 +516,22 @@
    "camera": {
     "mode": "euler",
     "roll_deg": 0.0,
-    "zoom": 1.5,
+    "zoom": 2.2,
     "target_mm": [
-     60.0,
-     480.0,
-     -30.0
+     10.0,
+     400.0,
+     0.0
     ],
     "perspective": {
-     "focal_length_mm": 100.0
+     "focal_length_mm": 45.0
     },
-    "az_deg": 318.0,
-    "el_deg": 8.0
+    "az_deg": 328.0,
+    "el_deg": 10.0
    },
    "align": {
-    "scale": 1.0,
-    "dx_px": 0,
-    "dy_px": 0
+    "scale": 1.27,
+    "dx_px": -74,
+    "dy_px": 77
    },
    "component_focus": [
     "magnifying_wheel",
@@ -538,8 +539,8 @@
     "rocker_arm",
     "channel_lever"
    ],
-   "status": "draft",
-   "notes": "mid-machine from back-right (color slide): wheel top, amplitude-bar bank, lever fan, rocker stack bottom",
+   "status": "aligned",
+   "notes": "mid-machine from back-right (color slide, ~45mm lens not the book 100mm): wheel top-left, amplitude-bar curtain, rocker fan, drums bottom-left.",
    "tier": 1
   },
   {
@@ -551,23 +552,23 @@
    },
    "camera": {
     "mode": "euler",
-    "roll_deg": 0.0,
-    "zoom": 4.5,
+    "roll_deg": 22.0,
+    "zoom": 10.0,
     "target_mm": [
-     0.0,
+     18.0,
      1015.0,
-     0.0
+     5.0
     ],
     "perspective": {
      "focal_length_mm": 100.0
     },
-    "az_deg": 230.0,
-    "el_deg": 42.0
+    "az_deg": 196.0,
+    "el_deg": 30.0
    },
    "align": {
-    "scale": 1.0,
-    "dx_px": 0,
-    "dy_px": 0
+    "scale": 1.84,
+    "dx_px": 161,
+    "dy_px": -216
    },
    "component_focus": [
     "channel_spring_installed",
@@ -575,8 +576,8 @@
     "channel_lever",
     "amplitude_bar"
    ],
-   "status": "draft",
-   "notes": "oblique macro down the spring bank: amplitude bar top-left, springs receding diagonal, summing lever lower right",
+   "status": "aligned",
+   "notes": "oblique into the spring bank (az~196 el~30 roll~22): springs recede to top-right, channel levers top-left, summing lever lower-right. Model: summing lever authored dark-gray vs green.",
    "tier": 1
   },
   {
@@ -589,22 +590,22 @@
    "camera": {
     "mode": "euler",
     "roll_deg": 0.0,
-    "zoom": 4.5,
+    "zoom": 17.0,
     "target_mm": [
-     -40.0,
-     995.0,
-     0.0
+     -50.0,
+     992.0,
+     -20.0
     ],
     "perspective": {
      "focal_length_mm": 100.0
     },
-    "az_deg": 195.0,
-    "el_deg": 12.0
+    "az_deg": 207.0,
+    "el_deg": -2.0
    },
    "align": {
-    "scale": 1.0,
-    "dx_px": 0,
-    "dy_px": 0
+    "scale": 1.84,
+    "dx_px": -198,
+    "dy_px": -47
    },
    "component_focus": [
     "summing_lever",
@@ -612,8 +613,8 @@
     "counter_spring",
     "knife_mount"
    ],
-   "status": "draft",
-   "notes": "summing lever casting under top frame, front-left oblique; counter spring hook upper right, amplitude bars left",
+   "status": "aligned",
+   "notes": "summing lever under top frame, macro from front-right (az~207): pivot tube + tapered arm to counter-spring eye. Model: lever is a simplified tube+taper vs the real webbed casting, and dark-gray vs green.",
    "tier": 1
   }
  ]

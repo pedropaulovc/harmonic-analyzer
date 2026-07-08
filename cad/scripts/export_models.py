@@ -150,15 +150,16 @@ def doc_rgb(doc: Any) -> tuple[float, float, float]:
     return MATERIAL_RGB.get(name.strip().lower(), DEFAULT_RGB)
 
 
-def comp_rgb(comp: Any, part_colors: dict[str, tuple[float, float, float]],
-             stem: str) -> tuple[float, float, float]:
+def comp_rgb(comp: Any) -> tuple[float, float, float] | None:
+    """Component-level appearance override, or None when unset.
+
+    Most components carry NO override (SolidWorks displays the part-doc
+    colour cascade), so None is the common case — the scene writer fills it
+    from the part-doc colours after the part exports refresh them."""
     try:
-        rgb = _valid_rgb(comp.GetMaterialPropertyValues2(1, None) or ())
-        if rgb:
-            return rgb
+        return _valid_rgb(comp.GetMaterialPropertyValues2(1, None) or ())
     except Exception:
-        pass
-    return part_colors.get(stem, DEFAULT_RGB)
+        return None
 
 
 def _safe_cfg(name: str) -> str:
@@ -239,19 +240,25 @@ def scan_assembly(adapter: Any, part_colors: dict) -> tuple[list, list, set[tupl
         cfg = str(_read_member(comp, "ReferencedConfiguration") or "")
         mesh = mesh_key(stem, cfg)
         if mesh not in part_colors:
+            # Opportunistic part-doc read: GetModelDoc2 returns None for a
+            # LIGHTWEIGHT component — seed nothing then, so a lightweight scan
+            # can't pollute colors.json with defaults; the scene writer fills
+            # missing colours from the part exports' authoritative doc reads.
             try:
                 doc = comp.GetModelDoc2()
-                part_colors[mesh] = doc_rgb(doc) if doc else DEFAULT_RGB
+                if doc:
+                    part_colors[mesh] = doc_rgb(doc)
             except Exception:
-                part_colors[mesh] = DEFAULT_RGB
+                pass
         stems.add((stem, cfg, mesh))
+        override = comp_rgb(comp)
         scene.append({
             "name": short,
             "part": stem,
             "cfg": cfg,
             "mesh": mesh,
             "xform": xform,
-            "rgb": list(comp_rgb(comp, part_colors, mesh)),
+            "rgb": list(override) if override else None,
         })
     return boxes, scene, stems
 
@@ -633,21 +640,12 @@ def main() -> int:
                 mono = OUT_STL / f"{dashed}.STL"  # mm, like every other STL
                 _save_as(doc, mono)
                 log(f"saved {mono.name} ({mono.stat().st_size / 1e6:.1f} MB, mm)")
-                # fresh cache: preloaded colors.json entries would mask
-                # colour changes made to part docs since the last export
+                # fresh cache: only resolved-component doc reads land in
+                # scan_colors (a lightweight scan seeds nothing), so stale
+                # colors.json entries are refreshed, never masked
                 scan_colors: dict = {}
                 boxes, scene, stems = scan_assembly(adapter, scan_colors)
                 colors.update(scan_colors)
-                (OUT_BOXES / f"{dashed}.json").write_text(json.dumps({
-                    "unit": "mm",
-                    "boxes": [{"name": n, "box": list(b)} for n, b in boxes],
-                    "components": scene,
-                }), encoding="utf-8")
-                log(f"saved boxes+scene {dashed}.json "
-                    f"({len(boxes)} boxes, {len(scene)} instances, {len(stems)} meshes)")
-                d = src_digest(src) if record else None
-                if d is not None:
-                    digests[dashed] = d
                 adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
                 # Group ALL configs per stem, and re-export the WHOLE group whenever
@@ -664,6 +662,26 @@ def main() -> int:
                         stale_stems.add(stem)
                 for stem in sorted(stale_stems):
                     await export_part_stls(stem, all_by_stem[stem])
+
+                # Scene colours are written AFTER the part exports so a
+                # component without an appearance override gets the part-doc
+                # colour those exports just (re-)read — the cascade SolidWorks
+                # actually displays. A lightweight scan (GetModelDoc2 = None,
+                # appearance reads unset) therefore no longer greys the scene.
+                for c in scene:
+                    c["rgb"] = c["rgb"] or list(colors.get(c["mesh"], DEFAULT_RGB))
+                (OUT_BOXES / f"{dashed}.json").write_text(json.dumps({
+                    "unit": "mm",
+                    "boxes": [{"name": n, "box": list(b)} for n, b in boxes],
+                    "components": scene,
+                }), encoding="utf-8")
+                log(f"saved boxes+scene {dashed}.json "
+                    f"({len(boxes)} boxes, {len(scene)} instances, {len(stems)} meshes)")
+                # Stamp the assembly digest only after its scene JSON is actually
+                # on disk with final colours.
+                d = src_digest(src) if record else None
+                if d is not None:
+                    digests[dashed] = d
                 done[m] = "exported"
             # Persist the digest cache + exporter sentinel ONLY on a fully successful
             # export -- inside the `finally` a partial failure would stamp the current
