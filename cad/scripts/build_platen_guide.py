@@ -46,10 +46,15 @@ from _common import (
 PART_NAME = "platen-guide"
 MATERIAL = "Plain Carbon Steel"
 
-GUIDE_LENGTH = 300.0  # = platen width (ch22 back photo: full-width rails)
+GUIDE_LENGTH = 282.0  # = platen width (ch22 back photo: full-width rails;
+# width re-measured 2026-07-08, see build_platen.PLATE_WIDTH)
 GUIDE_HEIGHT = 5.0
 GUIDE_DEPTH = 10.0  # 1.0 past the 9-deep bar so the lock plates clear it
-LOCK_STATION_X = (60.0, 240.0)  # lock-plate centres (2 per guide)
+LOCK_STATION_X = (60.0, 190.0)  # lock-plate centres (2 per guide). The east
+# station is NOT the mirrored 222: at the measured ch30 park (carriage at
+# PLATE_X0 -47, build_paper_drive_assembly) a lock there would ride into the
+# east column clamp (machine x 173..221, same y/z bands) -- 190 keeps the
+# 22-wide plates clear by ~8 while still bracing the rail's east half
 LOCK_SCREW_DX = 7.0  # 2 screws per lock flank its centre
 HOLE_DIA = 3.0  # the fillister screws' O2.9 shanks thread in
 
@@ -59,7 +64,8 @@ HOLE_X = tuple(s + d for s in LOCK_STATION_X for d in (-LOCK_SCREW_DX, LOCK_SCRE
 # screws threads in: the platen counterbores its heads (build_platen), so the
 # O2.9 shanks reach 2.4 past the platen back into the rail. Stations = the
 # platen's GUIDE_HOLE_X (pinned by an assert in the assembly module).
-SCREW_STATION_X = (30.0, 90.0, 150.0, 210.0, 270.0)
+SCREW_STATION_X = (21.0, 81.0, 141.0, 201.0, 261.0)  # 60 pitch symmetric
+# about the 282 length's centre (= platen GUIDE_HOLE_X)
 SCREW_HOLE_DEPTH = 3.0
 
 

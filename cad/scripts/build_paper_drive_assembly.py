@@ -176,7 +176,12 @@ from build_platen_rack import (  # noqa: E402
     PITCH as RACK_PITCH,
 )
 
-PLATE_X0 = -150.0  # centred between the columns (ch30 rest pose)
+PLATE_X0 = -47.0  # ch30 park pose, re-measured 2026-07-08 on the p002 front
+# plate: the record carriage sits ADVANCED, board centre at machine x ~ +94
+# (board centre 221 px vs machine centre 340 px at 1.27 px/mm, image mirrored;
+# the p006 back view agrees in direction). The former -150 centred the platen
+# between the columns, which no ch30 plate shows. -47 + 282/2 = +94; the board
+# east edge (+235) passes in front of the east column exactly as photographed.
 PLATE_Y0 = 305.0
 PLATE_FRONT_Z = BAR_FRONT_Z - PLATE_THICKNESS  # -142.9
 
@@ -705,8 +710,11 @@ async def build(adapter) -> dict[str, str]:
     # Recording paper over the platen front face: front 0.5 proud, clear of the
     # edge clips, 6 top/bottom margin. The 0.25-thick sheet leaves 0.25 air
     # behind it (build_platen_paper) so no face lands coplanar on the platen.
+    # Centred on the 282 board: margins (282 - 259.5)/2 = 11.25, which puts the
+    # paper 0.25 clear of each clip band (1..11 / 271..281) -- the ch30 p002
+    # margins measure ~11 beyond the paper, clips hugging the sheet edges.
     paper = await place_component(adapter, "platen-paper",
-                                  [PLATE_X0 + 20.25, PLATE_Y0 + 6.0, PLATE_FRONT_Z - 0.5],
+                                  [PLATE_X0 + 11.25, PLATE_Y0 + 6.0, PLATE_FRONT_Z - 0.5],
                                   [0.0, 0.0, 0.0], IDENTITY, ground=False)
     await _lock_to_platen(paper, "platen-paper")
 

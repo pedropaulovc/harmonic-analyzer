@@ -7,7 +7,7 @@ separate parts (build_platen_rack.py / build_platen_clip.py /
 build_platen_guide.py). Fastener holes:
 
 * four O3 x 3.5 clip-screw sockets in the front face at the plate's
-  extreme left/right edges (x 6/294), the clips spanning local
+  extreme left/right edges (x 6/276), the clips spanning local
   y 15..140 from the TOP edge down (ch22 front photo; holes at the
   clips' 8-inset end holes -> local y 23/132);
 * ten O3 guide-screw through-holes in two rows of 5 (ch22 front photo)
@@ -15,9 +15,11 @@ build_platen_guide.py). Fastener holes:
   318 / 352 with the plate at y 305).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 22" — 140 mm height annotated
-(p.55 callout, high); width ~300 from the front-photo aspect (~2.15:1)
-and the p.54 inset vs the 460 mm frame (low; supersedes an earlier ~200
-estimate); thickness ~4 from the p.55 top edge-on photo (low).
+(p.55 callout, high); width 282 re-measured 2026-07-08 on the ch30 p002
+front plate with a dual-anchored pixel scale (column span + paper width
+agree on 1.27 px/mm; supersedes the aspect-derived ~300, whose vertical
+reference mixed in the guide rails); thickness ~4 from the p.55 top
+edge-on photo (low).
 
 Layout: width along +X, height along +Y from the origin corner, thickness
 extruded +Z.
@@ -60,19 +62,26 @@ import _telemetry
 PART_NAME = "platen"
 MATERIAL = "Brass"  # see _common.apply_material docstring
 
-PLATE_WIDTH = 300.0  # DIMENSIONS.md ch22: photo aspect vs 140 mm (low)
+PLATE_WIDTH = 282.0  # re-measured 2026-07-08 on ch30 p002 (dual-anchored px
+# scale: column span 394 AND paper 259.5 agree on 1.27 px/mm; board reads
+# 358 px = 282, exposed margin beyond the paper ~11 mm/side). The former 300
+# came from the front-photo aspect vs the 140 height (low) -- the vertical
+# extent mixes in the guide rails, which is exactly what inflated it (med)
 PLATE_HEIGHT = 140.0  # DIMENSIONS.md ch22: p.55 callout (high)
 PLATE_THICKNESS = 4.0  # DIMENSIONS.md ch22: p.55 edge-on photo (low)
 
 # Clip-screw sockets (machine-handed locals, see docstring).
 SOCKET_DIA = 3.0  # the fillister screws' O2.9 shanks thread in (low)
 SOCKET_DEPTH = 3.5  # 0.5 web to the back face
-SOCKET_XY = ((6.0, 23.0), (6.0, 132.0), (294.0, 23.0), (294.0, 132.0))
+SOCKET_XY = ((6.0, 23.0), (6.0, 132.0), (276.0, 23.0), (276.0, 132.0))  # 6 in
+# from each edge (mirrors with the width)
 
 # Guide-screw through-holes: 2 rows of 5 (heads on the front face, shanks
 # into the guide rails on the back).
 GUIDE_HOLE_DIA = 3.0
-GUIDE_HOLE_X = (30.0, 90.0, 150.0, 210.0, 270.0)
+GUIDE_HOLE_X = (21.0, 81.0, 141.0, 201.0, 261.0)  # 5 stations, 60 pitch,
+# symmetric about the 282 width's centre (must match the rail's
+# SCREW_STATION_X -- pinned by an assert in the assembly module)
 GUIDE_HOLE_Y = (13.0, 47.0)  # bottom / top rail centrelines (machine 318 / 352)
 GUIDE_HOLE_XY = tuple((x, y) for y in GUIDE_HOLE_Y for x in GUIDE_HOLE_X)
 

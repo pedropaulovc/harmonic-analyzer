@@ -1,9 +1,10 @@
 r"""Reproduction script: crank arm (book ch. 11, pp. 12-15).
 
-The metal crank arm that drives the machine: full-radius boss at the
+The metal crank arm that drives the machine: round O14 boss at the
 crankshaft end (bored for the shaft and cross-drilled for the removable
-tapered pin), straight arm, square end carrying the handle pivot, and a
-fiducial dimple for alignment. The wooden handle and the tapered pin are
+tapered pin; the bar's own full-radius end would leave 0.24 mm walls around
+the 9.525 bore), straight 10-wide bar, square end carrying the handle pivot,
+and a fiducial dimple for alignment. The wooden handle and the tapered pin are
 separate parts (build_crank_handle.py / build_crank_pin.py); the chain
 eyelet (chain lost) is omitted.
 
@@ -11,9 +12,10 @@ Dimensions: cad/DIMENSIONS.md "Chapter 11" — all photo-scaled (low) except
 the legacy 3/8" crankshaft bore (med).
 
 Layout: arm length along +X from the origin (shaft bore axis = global Z
-through the origin), thickness extruded +Z (0..8). The cross-pin hole runs
+through the origin), thickness extruded +Z (0..ARM_THICKNESS). The cross-pin hole runs
 along global Y at mid-thickness: probed live, a Top-plane sketch maps
-(x, y) -> global (X, -Z), so the hole circle sits at sketch (0, -4).
+(x, y) -> global (X, -Z), so the hole circle sits at sketch
+(0, -ARM_THICKNESS/2).
 Through-cuts use mid-plane blind cuts (depth > extent) because the
 ThroughAll+both_directions combination fails live on SW 2026 (MCP issue
 #38); the dimple uses a mid-plane cut of twice its depth so the cut
@@ -58,13 +60,19 @@ ARM_C2C = 66.0  # DIMENSIONS.md ch11: shaft-to-handle-pivot centres -- REDERIVED
 # landing the handle ~10 mm above the base top. The former 150 (cone-axial scaled,
 # low) was >2x too long -- a down-pointing 150 arm would drive the handle below
 # the table (med).
-ARM_WIDTH = 16.0  # DIMENSIONS.md ch11: arm width (low)
-ARM_THICKNESS = 8.0  # DIMENSIONS.md ch11: ~half the arm width, p.12 photo (low)
+ARM_WIDTH = 10.0  # re-measured 2026-07-08 on the ch11 macro + ch30 p008 (both
+# anchored on the handle collar O11 / handle O22): the bar reads 9-10 wide;
+# the former 16 was ~60% over (med)
+ARM_THICKNESS = 5.0  # same re-measure: the ch11 edge-on face reads 4-5 (was 8)
+BOSS_DIA = 14.0  # round boss at the shaft end: the 9.525 bore through a
+# full-radius 10 bar would leave 0.24 walls, so the end flares to a O14 disc
+# (2.24 walls) -- reads as the slightly-flared rounded end in the ch11 macro
 SQUARE_END_OVERHANG = 10.0  # DIMENSIONS.md ch11: square end past the pivot (low)
 SHAFT_BORE_DIA = 0.375 * IN  # 9.525: 3/8" crankshaft (med); the legacy 9.5
 # rounding left the bore 0.025 smaller than the shaft (caught in M6.2)
 PIVOT_BORE_DIA = 6.0  # DIMENSIONS.md ch11: handle pivot screw (low)
-DIMPLE_DIA = 8.0  # DIMENSIONS.md ch11: fiducial indentation (low)
+DIMPLE_DIA = 5.0  # fiducial indentation, rescaled with the slimmer bar (an 8
+# dimple on a 10 bar would leave 1 mm edge webs)
 DIMPLE_DEPTH = 0.5  # DIMENSIONS.md ch11: fiducial indentation (low)
 DIMPLE_X = 30.0  # DIMENSIONS.md ch11: on the arm near the boss (low)
 PIN_HOLE_DIA = 5.0  # DIMENSIONS.md ch11: tapered-pin cross-hole, small end (low)
@@ -92,6 +100,7 @@ async def build(adapter) -> dict[str, str]:
     # square end stays SQUARE_END_OVERHANG past the pivot when either changes.
     await set_global(adapter, "ArmC2C", f"{ARM_C2C}mm")
     await set_global(adapter, "ArmWidth", f"{ARM_WIDTH}mm")
+    await set_global(adapter, "BossDia", f"{BOSS_DIA}mm")
     await set_global(adapter, "ArmThickness", f"{ARM_THICKNESS}mm")
     await set_global(adapter, "SquareEndOverhang", f"{SQUARE_END_OVERHANG}mm")
     await set_global(adapter, "ShaftBoreDia", f"{SHAFT_BORE_DIA}mm")
@@ -159,6 +168,28 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Arm")
     vol = await _volume(adapter)
     _telemetry.info(f"volume after extrude: {vol:.1f} mm^3")
+
+    # Shaft boss: O14 disc at the origin, same thickness as the bar, merged.
+    # The 9.525 shaft bore through the 10-wide bar alone would leave 0.24 mm
+    # walls; the flared round end is visible in the ch11 macro.
+    boss = SketchDims()
+    check("create_sketch boss", await adapter.create_sketch("Front"))
+    await define_circle(
+        adapter, 0.0, 0.0, BOSS_DIA / 2.0, "shaft boss", dims=boss,
+        names=("BossX", "BossZ", "BossDiaDim"),
+        drives=(None, None, '"BossDia"'),
+    )
+    await ensure_fully_defined(adapter, "boss sketch")
+    check("exit_sketch boss", await adapter.exit_sketch())
+    name_last_feature(adapter, "BossProfile")
+    drive_jobs += boss.apply(adapter, "BossProfile")
+    check(
+        "extrude boss",
+        await adapter.create_extrusion(ExtrusionParameters(depth=ARM_THICKNESS)),
+    )
+    name_last_feature(adapter, "Boss")
+    vol = await _volume(adapter)
+    _telemetry.info(f"volume after boss: {vol:.1f} mm^3")
 
     # Shaft bore + handle pivot bore, one through-cut. The shaft bore sits on the
     # origin (only its diameter is a dim); the pivot bore is off-axis at +X

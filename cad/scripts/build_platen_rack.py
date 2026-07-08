@@ -66,7 +66,8 @@ MATERIAL = "Brass"  # ch. 22/23 photos: brass
 # (2.66 mm) so the mesh interfered (output interference gate, 8 hits ≤ 1.93 mm³).
 DP = 30.0  # 1/in, DIMENSIONS.md ch23 (med — scale anchor of the chapter)
 PA_DEG = 14.5  # period-typical, same as the gear train
-BAR_LENGTH = 300.0  # DIMENSIONS.md ch22: = platen width (low)
+BAR_LENGTH = 282.0  # = platen width (re-measured 2026-07-08, see
+# build_platen.PLATE_WIDTH)
 BAR_HEIGHT = 12.0  # exposed band below the bottom guide rail (rework E3, low)
 BAR_THICKNESS = 6.0  # DIMENSIONS.md ch22: edge-on photo (low)
 
@@ -79,7 +80,7 @@ ROOT_Y = PITCH_LINE_Y - DEDENDUM  # 28.174
 CUT_TOP_Y = BAR_HEIGHT + 1.0  # opens past the top edge
 TAN_PA = math.tan(math.radians(PA_DEG))
 
-GAP_COUNT = 112
+GAP_COUNT = 106  # fills the 282 bar: 1.33 + 105 * 2.660 = 280.6 (was 112 / 300)
 FIRST_GAP_X = PITCH / 2.0  # 1.33 -- first gap centred half a pitch in
 
 
