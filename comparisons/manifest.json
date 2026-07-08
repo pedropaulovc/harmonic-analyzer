@@ -303,7 +303,7 @@
      "focal_length_mm": 100.0
     },
     "az_deg": -4.0,
-    "el_deg": 3.0
+    "el_deg": -6.0
    },
    "align": {
     "scale": 1.0,
@@ -340,12 +340,12 @@
      "focal_length_mm": 100.0
     },
     "az_deg": 197.0,
-    "el_deg": 1.0
+    "el_deg": -10.0
    },
    "align": {
-    "scale": 1.75,
-    "dx_px": 68,
-    "dy_px": -104
+    "scale": 1.84,
+    "dx_px": 15,
+    "dy_px": -68
    },
    "component_focus": [
     "crank_arm",
@@ -451,7 +451,7 @@
      "focal_length_mm": 100.0
     },
     "az_deg": 203.0,
-    "el_deg": 35.0
+    "el_deg": 48.0
    },
    "align": {
     "scale": 1.75,
@@ -478,17 +478,17 @@
    "camera": {
     "mode": "euler",
     "roll_deg": 0.0,
-    "zoom": 8.8,
+    "zoom": 6.5,
     "target_mm": [
-     95.0,
-     395.0,
-     -146.0
+     85.0,
+     380.0,
+     -143.0
     ],
     "perspective": {
      "focal_length_mm": 100.0
     },
-    "az_deg": 191.0,
-    "el_deg": 0.0
+    "az_deg": 210.0,
+    "el_deg": 3.0
    },
    "align": {
     "scale": 1.19,
@@ -526,7 +526,7 @@
      "focal_length_mm": 45.0
     },
     "az_deg": 328.0,
-    "el_deg": 10.0
+    "el_deg": 25.0
    },
    "align": {
     "scale": 1.27,
@@ -552,18 +552,18 @@
    },
    "camera": {
     "mode": "euler",
-    "roll_deg": 18.0,
-    "zoom": 8.0,
+    "roll_deg": 15.0,
+    "zoom": 13.0,
     "target_mm": [
-     22.0,
-     980.0,
-     0.0
+     24.0,
+     1030.0,
+     -10.0
     ],
     "perspective": {
-     "focal_length_mm": 100.0
+     "focal_length_mm": 24.0
     },
-    "az_deg": 155.0,
-    "el_deg": 32.0
+    "az_deg": 163.0,
+    "el_deg": -35.0
    },
    "align": {
     "scale": 1.73,
