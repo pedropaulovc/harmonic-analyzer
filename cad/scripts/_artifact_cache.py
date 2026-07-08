@@ -269,9 +269,12 @@ def _unpack(blob: bytes) -> None:
         tar.extractall(REPO_ROOT)
         # tar.add recorded the BUILDER's mtimes; refresh restored files to now so a
         # pulled native part/assembly is never OLDER than a developer's pre-existing
-        # derived export -- export_models.part_stl_stale compares mtimes, and a stale-
-        # looking native would wrongly skip regeneration and ship old geometry (codex
-        # review). Best-effort: a utime failure must not fail a restore.
+        # derived export -- the mtime-based downstream freshness guards (render_offline
+        # and cut_release's SCENE_JSON check) would otherwise see a stale-looking native
+        # and wrongly skip regeneration / ship old geometry (codex review). (export
+        # itself now keys staleness on the churn-immune recipe digest, not mtime, and
+        # re-stamps its outputs current after a successful run so those guards stay
+        # truthful.) Best-effort: a utime failure must not fail a restore.
         now = time.time()
         for member in members:
             if not member.isreg():

@@ -30,8 +30,11 @@ Run after any --rebuild so the render cache tracks geometry:
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import sys
+import time
 import zlib
 from pathlib import Path
 from typing import Any
@@ -57,6 +60,18 @@ OUT_STEP = CAD_ROOT / "out" / "step"
 OUT_BOXES = CAD_ROOT / "out" / "boxes"
 OUT_SLDPRT = CAD_ROOT / "out" / "sldprt"
 COLORS = OUT_STL / "colors.json"
+# Per-output source-recipe digests: ``mesh|dashed-assembly -> digest`` recorded at
+# export time so a re-export fires iff the SOURCE's recipe changed. Keyed on doit's
+# churn-immune ``_stable_artefact_digest`` (below), NOT the .SLDPRT/.SLDASM mtime,
+# which SolidWorks bumps on every save-cascade / cache-restore and made every export
+# look stale each release.
+SRC_DIGESTS = OUT_STL / "export-src.json"
+# Sentinel key in that file recording the EXPORTER's own version (this module's
+# source). The per-source recipe digest is blind to the export/format/scene/colour
+# logic here, so without this a change to the exporter would leave every output
+# looking fresh and ship stale STEP/STL/scene JSON (codex review). A sentinel
+# mismatch invalidates the whole cache -> full regeneration through the new logic.
+_EXPORTER_KEY = "__exporter__"
 
 # swconst ids (extracted from the installed swconst.tlb, R2026x). The STL ids
 # live in _common (shared with the part-build STL export); STEP is export-only.
@@ -253,18 +268,222 @@ def save_colors(colors: dict) -> None:
         {k: list(v) for k, v in sorted(colors.items())}, indent=1), encoding="utf-8")
 
 
-def part_stl_stale(stem: str, mesh: str, colors: dict) -> bool:
+def _exporter_digest() -> str:
+    """Digest of the exporter's own source CLOSURE -- this module plus every repo-local
+    helper it transitively imports (render_compare's scene extraction, _common's STL
+    preference constants, ...) -- stamped into the cache so a change to ANY export /
+    format / scene / colour logic invalidates every recorded output even when no CAD
+    recipe changed (codex review). Best-effort: if the closure can't be resolved, fall
+    back to this module alone; if even that can't be read, '' (a stable, round-tripping
+    value) -- never blocking an export."""
+    self_path = Path(__file__).resolve()
+    try:
+        from _buildgraph import module_deps_of
+        files = sorted({self_path, *(Path(p).resolve()
+                                     for p in module_deps_of(self_path))})
+        h = hashlib.md5()
+        for f in files:
+            h.update(f.read_bytes())
+        return h.hexdigest()
+    except Exception:
+        try:
+            return hashlib.md5(self_path.read_bytes()).hexdigest()
+        except Exception:
+            return ""
+
+
+def load_src_digests() -> dict[str, str]:
+    """Recorded source digests -- but ONLY if written by this same exporter version.
+    A changed exporter (its ``__exporter__`` sentinel no longer matches) invalidates
+    the whole cache, so every output regenerates through the new format logic."""
+    if not SRC_DIGESTS.exists():
+        return {}
+    try:
+        data = dict(json.loads(SRC_DIGESTS.read_text(encoding="utf-8")))
+    except Exception:
+        # ANY unusable sidecar -- unreadable, invalid JSON, or valid-but-not-an-object
+        # (`null`/`0` -> dict() TypeError) from an interrupted save / partial copy --
+        # must not abort the export. Return {} so the untrusted/force path regenerates
+        # and rewrites a valid file (mirrors exporter_untrusted's broad guard).
+        return {}
+    if data.pop(_EXPORTER_KEY, None) != _exporter_digest():
+        return {}
+    return data
+
+
+def save_src_digests(digests: dict[str, str]) -> None:
+    out = {k: v for k, v in digests.items() if k != _EXPORTER_KEY}
+    out[_EXPORTER_KEY] = _exporter_digest()
+    SRC_DIGESTS.write_text(
+        json.dumps(dict(sorted(out.items())), indent=1), encoding="utf-8")
+
+
+def exporter_untrusted() -> bool:
+    """True when the existing outputs are NOT known to have been produced by THIS
+    exporter version -- the ``export-src.json`` sentinel is absent (first run, or the
+    cache was deleted) OR does not match the current exporter/helper closure.
+    ``load_src_digests`` already empties the digest map on a mismatch, which re-exports
+    every DECLARED target (its recipe digest no longer matches ``{}``) -- but an
+    UNDECLARED target (a generated stretch-spring mesh, ``src_digest`` -> None) is
+    mtime-gated and ignores the map, so an old STL newer than its ``.SLDPRT`` would still
+    read fresh. main() folds this into ``force`` so an untrusted cache regenerates EVERY
+    mesh through the current logic (codex review). A missing sentinel counts as untrusted
+    because pre-sentinel outputs carry no proof of which exporter made them."""
+    if not SRC_DIGESTS.exists():
+        return True
+    try:
+        stored = json.loads(SRC_DIGESTS.read_text(encoding="utf-8")).get(_EXPORTER_KEY)
+    except Exception:
+        return True
+    return stored != _exporter_digest()
+
+
+def _import_dodo() -> Any:
+    """dodo.py (repo root, off cad/scripts' path) is doit's build graph plus the
+    exact recipe digest its ContentChecker + remote-cache key use. Reusing it makes
+    export's staleness immune to SolidWorks' save-metadata byte churn and cache-restore
+    mtime churn -- the same reason verify.py's freshness guard imports dodo -- so a
+    part/assembly re-exports iff doit itself would consider it rebuilt. export_models.py
+    always runs as its own process, so this never races the orchestrator."""
+    repo_root = str(CAD_ROOT.parent)
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+    import dodo  # noqa: PLC0415
+
+    return dodo
+
+
+def src_digest(src: Path) -> str | None:
+    """Churn-immune recipe digest of a built ``.SLDPRT``/``.SLDASM`` (``None`` when it
+    is not a declared build target -- the caller then falls back to mtime)."""
+    try:
+        return _import_dodo()._stable_artefact_digest(str(src.resolve()))
+    except Exception:
+        return None
+
+
+def _save_as(doc: Any, out: Path) -> int:
+    """SaveAs3 to ``out``, guaranteeing THIS call produced a REAL file: remove any prior
+    output first, so a SaveAs3 that fails (a locked / read-only path) leaves NO file and
+    raises -- instead of silently leaving a stale export that the existence check would
+    pass and a fresh digest would then stamp current. Also reject a zero-byte placeholder
+    (SolidWorks can drop one before an export failure) -- the release exporter already
+    treats size 0 as a failed save; the digest-cached path must too, or the empty output
+    gets recorded fresh (codex review). Returns the SaveAs3 status for logging."""
+    out.unlink(missing_ok=True)
+    ok = doc.SaveAs3(str(out), 0, 0)
+    if not out.exists() or out.stat().st_size == 0:
+        out.unlink(missing_ok=True)  # never leave a zero-byte placeholder behind
+        raise RuntimeError(f"SaveAs3 produced no/empty file: {out} (rc={ok})")
+    return ok
+
+
+def validated_outputs(parts: list[str], assemblies: list[str]) -> set[Path]:
+    """Every render-cache output whose freshness THIS run establishes for the current
+    manifest: each manifest part's STL + STEP; each manifest assembly's boxes JSON +
+    mono STL + STEP and every part-mesh STL its scene references; plus the colours /
+    digests sidecars. Only existing files are returned. Used to SCOPE the stamp so it
+    can't refresh a non-manifest leftover (a stale subassembly scene) it never checked."""
+    out: set[Path] = {COLORS, SRC_DIGESTS}
+    for m in parts:
+        d = m.replace("_", "-")
+        out |= {OUT_STL / f"{d}.STL", OUT_STEP / f"{d}.STEP"}
+    for m in assemblies:
+        d = m.replace("_", "-")
+        bj = OUT_BOXES / f"{d}.json"
+        out |= {bj, OUT_STL / f"{d}.STL", OUT_STEP / f"{d}.STEP"}
+        if bj.exists():
+            try:
+                comps = json.loads(bj.read_text(encoding="utf-8")).get("components") or []
+                out |= {OUT_STL / f"{c['mesh']}.STL" for c in comps if c.get("mesh")}
+            except Exception:
+                pass
+    return {p for p in out if p.is_file()}
+
+
+def stamp_render_cache_current(outputs: set[Path]) -> None:
+    """Downstream freshness guards (``render_offline``, ``cut_release``) assert each
+    render-cache output is no OLDER than its SolidWorks source BY MTIME. But the remote
+    cache restore bumps a restored native's mtime to now (safety), so a legitimately
+    fresh, digest-unchanged output we (correctly) did NOT rewrite can look older and
+    trip those guards. A SUCCESSFUL export means the render cache is current, so re-stamp
+    the outputs THIS run proved fresh / regenerated to now -- a truthful post-condition,
+    not a rebuild. Scoped to ``outputs`` (see :func:`validated_outputs`), NOT a blanket
+    glob, so a non-manifest leftover this run never checked is never falsely refreshed
+    (codex review). Best-effort: a utime failure never fails the export."""
+    now = time.time()
+    for f in outputs:
+        try:
+            if f.is_file():
+                os.utime(f, (now, now))
+        except OSError:
+            pass
+
+
+def _source_changed(stem: str, mesh: str, digests: dict[str, str]) -> bool:
+    """True when ``<stem>``'s recipe digest differs from the one ``mesh`` was exported
+    at. Falls back to STL-vs-SLDPRT mtime only when the part is not a declared target
+    (digest unavailable) -- churn-immune otherwise."""
     src = OUT_SLDPRT / f"{stem}.SLDPRT"
+    # A vanished native is STALE, never fresh: the recipe digest is content-free (it
+    # would still resolve for a declared target whose .SLDPRT was deleted), so without
+    # this a matching recorded digest reports fresh and the old STL gets stamped
+    # current -- then render_offline fails on the missing part source. Stale -> the
+    # export tries to open it and fails loud instead (codex review).
+    if not src.exists():
+        return True
+    cur = src_digest(src)
+    if cur is None:
+        stl = OUT_STL / f"{mesh}.STL"
+        return not stl.exists() or stl.stat().st_mtime < src.stat().st_mtime
+    return digests.get(mesh) != cur
+
+
+def asm_source_changed(dashed: str, src: Path, digests: dict[str, str]) -> bool:
+    """True when the assembly's recipe digest differs from the one its boxes/scene were
+    exported at. Falls back to boxes-JSON-vs-SLDASM mtime only when the digest is
+    unavailable (dodo import failed) -- so a broken import degrades to the old behaviour,
+    never a silent skip."""
+    if not src.exists():  # vanished native -> stale, never a silent fresh (see above)
+        return True
+    cur = src_digest(src)
+    if cur is None:
+        # Digest-unavailable fallback: check EVERY assembly output's mtime vs the
+        # source, not just the boxes JSON -- a fresh scene JSON alongside a stale mono
+        # STL/STEP must still read stale (codex review).
+        outs = (OUT_BOXES / f"{dashed}.json", OUT_STL / f"{dashed}.STL",
+                OUT_STEP / f"{dashed}.STEP")
+        return any(not o.exists() or o.stat().st_mtime < src.stat().st_mtime
+                   for o in outs)
+    return digests.get(dashed) != cur
+
+
+def part_stl_stale(stem: str, mesh: str, colors: dict, digests: dict[str, str]) -> bool:
+    """Referenced-part STL freshness: the STL is present, its colour is cached, and the
+    source part's recipe is unchanged. Referenced-only parts get NO per-part STEP (only
+    manifest parts + assemblies do), so a STEP is NOT required here -- requiring one made
+    every referenced part re-export forever once the manifest held only the assembly."""
     stl = OUT_STL / f"{mesh}.STL"
+    return (not stl.exists() or mesh not in colors
+            or _source_changed(stem, mesh, digests))
+
+
+def manifest_part_stale(stem: str, colors: dict, digests: dict[str, str]) -> bool:
+    """Manifest-part freshness: additionally requires the archival ``<stem>.STEP`` (the
+    STL and STEP are written together in the top-level parts loop). The recipe-digest
+    check already re-exports a rebuilt part -- refreshing STL AND STEP AND colour -- so
+    the old STL-vs-STEP mtime race (codex review #11) no longer needs a mtime clause --
+    EXCEPT on the digest-unavailable fallback (``src_digest`` is None, e.g. a standalone
+    run that cannot import dodo), where ``_source_changed`` compares only the STL mtime;
+    there the STEP-vs-source mtime guard is re-added so a rebuilt part with a fresh STL
+    but a stale STEP is not treated as fresh (codex review)."""
     step = OUT_STEP / f"{stem}.STEP"
-    # STEP staleness matters even when the STL looks fresh: a part build now writes
-    # a build-time STL (newer than the SLDPRT) but does NOT refresh the STEP or the
-    # cached colour, so a rebuilt part would otherwise be skipped here with a stale
-    # STEP/colour (codex review #11). A missing/older STEP -> re-export, which also
-    # re-reads the appearance colour.
-    return (not stl.exists() or stl.stat().st_mtime < src.stat().st_mtime
-            or not step.exists() or step.stat().st_mtime < src.stat().st_mtime
-            or mesh not in colors)
+    if not step.exists() or part_stl_stale(stem, stem, colors, digests):
+        return True
+    src = OUT_SLDPRT / f"{stem}.SLDPRT"
+    if src.exists() and src_digest(src) is None:
+        return step.stat().st_mtime < src.stat().st_mtime
+    return False
 
 
 def assert_configs_distinct(stem: str, crc_by_mesh: dict[str, int]) -> None:
@@ -287,31 +506,48 @@ def assert_configs_distinct(stem: str, crc_by_mesh: dict[str, int]) -> None:
 
 
 def main() -> int:
-    force = "--force" in sys.argv[1:]
+    # An untrusted cache (sentinel absent or mismatched) forces a FULL export so even
+    # mtime-gated undeclared targets regenerate through the current logic, not just the
+    # digest-gated declared ones (codex review).
+    force = "--force" in sys.argv[1:] or exporter_untrusted()
+    # Only RECORD source digests when the caller vouches the natives are current --
+    # i.e. the doit ``export`` task, which runs on the COM spine AFTER every part /
+    # assembly is (re)built (dodo passes ``--record-digests``). A bare standalone run
+    # may export a not-yet-rebuilt native, so stamping its recipe digest would make a
+    # later same-recipe build's fresh geometry look already-exported and get skipped
+    # (codex review). Standalone still READS the cache (fast "all fresh"); it just
+    # never writes, so it can never poison it.
+    record = "--record-digests" in sys.argv[1:]
     models = manifest_models()
     colors = load_colors()
+    digests = load_src_digests()
 
     parts = [m for m in models if model_path(m).suffix.lower() == ".sldprt"]
     assemblies = [m for m in models if m not in parts]
 
     stale_parts = [m for m in parts if force
-                   or part_stl_stale(m.replace("_", "-"), m.replace("_", "-"), colors)]
+                   or manifest_part_stale(m.replace("_", "-"), colors, digests)]
     stale_asms = []
     for m in assemblies:
-        src, bj = model_path(m), OUT_BOXES / f"{m.replace('_', '-')}.json"
-        mono = OUT_STL / f"{m.replace('_', '-')}.STL"
-        if (force or not bj.exists() or bj.stat().st_mtime < src.stat().st_mtime
-                or not mono.exists() or mono.stat().st_mtime < src.stat().st_mtime):
+        src, dashed = model_path(m), m.replace("_", "-")
+        bj = OUT_BOXES / f"{dashed}.json"
+        mono, step = OUT_STL / f"{dashed}.STL", OUT_STEP / f"{dashed}.STEP"
+        # Assembly source (its .SLDASM digest folds every referenced part, recursively),
+        # so any leaf-part recipe change flips it -> re-export. Missing outputs re-export
+        # regardless (why the export task runs `uptodate: False`).
+        if (force or not bj.exists() or not mono.exists() or not step.exists()
+                or asm_source_changed(dashed, src, digests)):
             stale_asms.append(m)
             continue
         data = json.loads(bj.read_text(encoding="utf-8"))
         comps = data.get("components") or []
         if (not comps or any("mesh" not in c for c in comps) or any(
-                part_stl_stale(c["part"], c["mesh"], colors) for c in comps)):
+                part_stl_stale(c["part"], c["mesh"], colors, digests) for c in comps)):
             stale_asms.append(m)
 
     if not stale_parts and not stale_asms:
         _telemetry.info("all exports fresh")
+        stamp_render_cache_current(validated_outputs(parts, assemblies))
         return 0
     _telemetry.info(f"exporting parts={stale_parts or '[]'} assemblies={stale_asms or '[]'}")
     for d in (OUT_STL, OUT_STEP, OUT_BOXES):
@@ -355,13 +591,18 @@ def main() -> int:
                 adapter._attempt(lambda: doc.ForceRebuild3(False), default=None)
                 adapter._attempt(lambda: doc.EditRebuild3(), default=None)
                 out = OUT_STL / f"{mesh}.STL"
-                ok = doc.SaveAs3(str(out), 0, 0)
-                if not out.exists():
-                    raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={ok})")
+                _save_as(doc, out)
                 crc_by_mesh[mesh] = zlib.crc32(out.read_bytes()) & 0xFFFFFFFF
                 colors[mesh] = doc_rgb(doc)
                 log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB) rgb={colors[mesh]}")
             assert_configs_distinct(stem, crc_by_mesh)
+            # Stamp the source recipe digest AFTER the distinctness proof passes, so a
+            # bad (stale-config) export is never recorded fresh. All configs share one
+            # source part, hence one digest.
+            d = src_digest(src) if record else None
+            if d is not None:
+                for _cfg, mesh in cfg_meshes:
+                    digests[mesh] = d
             adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
         try:
@@ -371,12 +612,13 @@ def main() -> int:
                 check(f"open {src.name}", await adapter.open_model(str(src)))
                 doc = adapter.currentModel
                 for out in (OUT_STL / f"{dashed}.STL", OUT_STEP / f"{dashed}.STEP"):
-                    ok = doc.SaveAs3(str(out), 0, 0)
-                    if not out.exists():
-                        raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={ok})")
+                    _save_as(doc, out)
                     log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB)")
                 colors[dashed] = doc_rgb(doc)
                 log(f"colour {dashed}: {colors[dashed]}")
+                d = src_digest(src) if record else None
+                if d is not None:
+                    digests[dashed] = d
                 adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
                 done[m] = "exported"
 
@@ -386,14 +628,10 @@ def main() -> int:
                 check(f"open {src.name}", await adapter.open_model(str(src)))
                 doc = adapter.currentModel
                 out = OUT_STEP / f"{dashed}.STEP"
-                ok = doc.SaveAs3(str(out), 0, 0)
-                if not out.exists():
-                    raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={ok})")
+                _save_as(doc, out)
                 log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB)")
                 mono = OUT_STL / f"{dashed}.STL"  # mm, like every other STL
-                ok = doc.SaveAs3(str(mono), 0, 0)
-                if not mono.exists():
-                    raise RuntimeError(f"SaveAs3 produced no file: {mono} (rc={ok})")
+                _save_as(doc, mono)
                 log(f"saved {mono.name} ({mono.stat().st_size / 1e6:.1f} MB, mm)")
                 # fresh cache: preloaded colors.json entries would mask
                 # colour changes made to part docs since the last export
@@ -407,21 +645,41 @@ def main() -> int:
                 }), encoding="utf-8")
                 log(f"saved boxes+scene {dashed}.json "
                     f"({len(boxes)} boxes, {len(scene)} instances, {len(stems)} meshes)")
+                d = src_digest(src) if record else None
+                if d is not None:
+                    digests[dashed] = d
                 adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
-                by_stem: dict[str, list[tuple[str, str]]] = {}
+                # Group ALL configs per stem, and re-export the WHOLE group whenever
+                # ANY of its configs is stale: export_part_stls' assert_configs_distinct
+                # (the stale-tessellation guard) needs >=2 sibling CRCs to catch a
+                # config that failed to rebuild, so a single-config partial refresh
+                # (one deleted --tNN.STL / missing colour) must still bring its siblings
+                # along (codex review). Single-config parts are unaffected (one entry).
+                all_by_stem: dict[str, list[tuple[str, str]]] = {}
+                stale_stems: set[str] = set()
                 for stem, cfg, mesh in sorted(stems):
-                    if force or part_stl_stale(stem, mesh, colors):
-                        by_stem.setdefault(stem, []).append((cfg, mesh))
-                for stem, cfg_meshes in sorted(by_stem.items()):
-                    await export_part_stls(stem, cfg_meshes)
+                    all_by_stem.setdefault(stem, []).append((cfg, mesh))
+                    if force or part_stl_stale(stem, mesh, colors, digests):
+                        stale_stems.add(stem)
+                for stem in sorted(stale_stems):
+                    await export_part_stls(stem, all_by_stem[stem])
                 done[m] = "exported"
+            # Persist the digest cache + exporter sentinel ONLY on a fully successful
+            # export -- inside the `finally` a partial failure would stamp the current
+            # sentinel, so the next run's exporter_untrusted() goes false and skips the
+            # not-yet-regenerated fallback meshes (codex review).
+            if record:
+                save_src_digests(digests)
             return done
         finally:
             save_colors(colors)
             restore_export_prefs(adapter, old)
 
-    return run_build(build)
+    rc = run_build(build)
+    if rc == 0:  # cache is current -> keep mtime-based downstream guards satisfied
+        stamp_render_cache_current(validated_outputs(parts, assemblies))
+    return rc
 
 
 if __name__ == "__main__":
