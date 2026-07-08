@@ -254,7 +254,7 @@
    },
    "camera": {
     "mode": "euler",
-    "roll_deg": 30.0,
+    "roll_deg": 10.0,
     "zoom": 5.2,
     "target_mm": [
      -108.0,
@@ -268,9 +268,9 @@
     "el_deg": 76.0
    },
    "align": {
-    "scale": 1.2,
-    "dx_px": 40,
-    "dy_px": -40
+    "scale": 1.75,
+    "dx_px": -241,
+    "dy_px": -201
    },
    "component_focus": [
     "cone_gear",
@@ -293,7 +293,7 @@
    "camera": {
     "mode": "euler",
     "roll_deg": 0.0,
-    "zoom": 4.1,
+    "zoom": 4.7,
     "target_mm": [
      -45.0,
      190.0,
@@ -367,7 +367,7 @@
    "camera": {
     "mode": "euler",
     "roll_deg": 0.0,
-    "zoom": 4.8,
+    "zoom": 5.6,
     "target_mm": [
      50.0,
      100.0,
@@ -376,7 +376,7 @@
     "perspective": {
      "focal_length_mm": 100.0
     },
-    "az_deg": 92.0,
+    "az_deg": 97.0,
     "el_deg": 18.0
    },
    "align": {
@@ -441,10 +441,10 @@
    "camera": {
     "mode": "euler",
     "roll_deg": 0.0,
-    "zoom": 12.0,
+    "zoom": 15.0,
     "target_mm": [
      -35.0,
-     285.0,
+     260.0,
      -150.0
     ],
     "perspective": {
@@ -516,10 +516,10 @@
    "camera": {
     "mode": "euler",
     "roll_deg": 0.0,
-    "zoom": 2.2,
+    "zoom": 2.7,
     "target_mm": [
      10.0,
-     345.0,
+     290.0,
      0.0
     ],
     "perspective": {
@@ -552,18 +552,18 @@
    },
    "camera": {
     "mode": "euler",
-    "roll_deg": 12.0,
-    "zoom": 9.0,
+    "roll_deg": 18.0,
+    "zoom": 8.0,
     "target_mm": [
-     -10.0,
-     1002.0,
-     10.0
+     22.0,
+     980.0,
+     0.0
     ],
     "perspective": {
      "focal_length_mm": 100.0
     },
-    "az_deg": 193.0,
-    "el_deg": -24.0
+    "az_deg": 155.0,
+    "el_deg": 32.0
    },
    "align": {
     "scale": 1.73,
