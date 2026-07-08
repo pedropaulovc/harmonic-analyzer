@@ -34,7 +34,8 @@ sys.path.insert(0, str(TOOLS))
 import render_offline as ro  # noqa: E402  (BLENDER, WORKER, model_paths)
 
 JPEG = {"quality": 90, "optimize": True}
-DEFAULT_TIMEOUT = 60.0   # normal render is 1-2s; this only trips on a stall
+DEFAULT_TIMEOUT = 60.0    # normal render is 1-2s; this only trips on a genuine stall
+STARTUP_TIMEOUT = 240.0   # cold-load of the full assembly under CPU contention (no GPU)
 
 
 class RenderServer:
@@ -50,6 +51,18 @@ class RenderServer:
         self._start_proc()
 
     def _start_proc(self) -> None:
+        """(Re)spawn the worker and BLOCK until it signals READY.
+
+        Called from __init__ (no concurrent callers yet) and from
+        _restart_locked (caller already holds self._lock) -- either way,
+        blocking here means no render() request can reach the fresh process
+        before its cold-load (importing every part STL, building the scene
+        graph -- can run well past a request timeout under CPU contention with
+        no GPU) has actually finished. Skipping this handshake was the earlier
+        bug: a restart's replacement got hit with the next queued request
+        immediately, timed out again before finishing its own reload, and
+        restarted again -- a livelock that never completed a single render.
+        """
         _src, geom = ro.model_paths(self.model)
         jobf = self.tmp / "serve_job.json"
         jobf.write_text(json.dumps(geom | {"serve": True, "pairs": []}), encoding="utf-8")
@@ -68,6 +81,22 @@ class RenderServer:
                 pass
             self._q.put(None)  # EOF/death sentinel
         threading.Thread(target=_read_loop, daemon=True).start()
+
+        deadline = time.monotonic() + STARTUP_TIMEOUT
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                proc.kill()
+                raise RuntimeError(f"blender serve did not become READY within "
+                                   f"{STARTUP_TIMEOUT}s")
+            try:
+                line = self._q.get(timeout=remaining)
+            except queue.Empty:
+                continue
+            if line is None:
+                raise RuntimeError("blender serve process died during startup")
+            if line.strip() == "READY":
+                return
 
     def _restart_locked(self) -> None:
         """Caller must hold self._lock. Kills the wedged process and reloads fresh."""
