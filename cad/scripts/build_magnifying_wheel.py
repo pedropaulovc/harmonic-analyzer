@@ -24,10 +24,12 @@ from __future__ import annotations
 import sys
 
 from _common import (
+    PANEL_BLACK,
     SketchDims,
     _read_member,
     add_line_chain,
     anchor_point_to_origin,
+    apply_color,
     apply_material,
     blank_sketch,
     check,
@@ -246,6 +248,11 @@ async def build(adapter) -> dict[str, str]:
     _telemetry.info(f"volume after pattern: {v_built:.1f} mm^3")
 
     await apply_material(adapter, MATERIAL)
+    # Black-painted casting (module docstring / p.51 photo: black spokes and
+    # rim ring, only the machined rim edge and hub reading bright) — the bare
+    # Gray Cast Iron appearance rendered the whole wheel mid-gray in the
+    # comparison gallery.
+    await apply_color(adapter, PANEL_BLACK)
 
     # Verify the two annotated diameters (ch. 21: 100 mm rim, 20 mm hub
     # — they self-validate against the stated 5x magnification).
