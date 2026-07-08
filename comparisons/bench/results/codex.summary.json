@@ -598,41 +598,41 @@
   "t2": {
    "table": {
     "P1": {
-     "n": 4,
-     "converged": 3,
-     "conv_rate": 0.75,
-     "median_rounds": 4,
-     "median_final_rot": 3.3306690738754696e-16
+     "n": 36,
+     "converged": 18,
+     "conv_rate": 0.5,
+     "median_rounds": 7,
+     "median_final_rot": 0.0
     },
     "P5": {
-     "n": 4,
-     "converged": 3,
-     "conv_rate": 0.75,
+     "n": 36,
+     "converged": 24,
+     "conv_rate": 0.6666666666666666,
      "median_rounds": 2,
-     "median_final_rot": 3.3306690738754696e-16
+     "median_final_rot": 0.0
     },
     "P6": {
-     "n": 3,
-     "converged": 2,
-     "conv_rate": 0.6666666666666666,
-     "median_rounds": 1,
-     "median_final_rot": 3.3306690738754696e-16
+     "n": 36,
+     "converged": 23,
+     "conv_rate": 0.6388888888888888,
+     "median_rounds": 2,
+     "median_final_rot": 0.0
     },
     "P7": {
-     "n": 3,
-     "converged": 2,
-     "conv_rate": 0.6666666666666666,
-     "median_rounds": 1,
-     "median_final_rot": 3.3306690738754696e-16
+     "n": 36,
+     "converged": 21,
+     "conv_rate": 0.5833333333333334,
+     "median_rounds": 4,
+     "median_final_rot": 0.0
     }
    },
    "ranking": [
     "P5",
-    "P1",
     "P6",
-    "P7"
+    "P7",
+    "P1"
    ],
-   "n_total": 14
+   "n_total": 144
   }
  }
 }
