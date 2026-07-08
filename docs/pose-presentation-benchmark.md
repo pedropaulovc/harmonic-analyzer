@@ -83,7 +83,10 @@ Perturbation grid, applied one parameter at a time plus a mixed tier:
 
 **Target deltas are image-plane, converted at generation.** The renderer's
 camera input is a 3-D world-space `target_mm`; a "target-x +15 mm" case is
-produced by offsetting the pair's base target along the **unperturbed
+produced by offsetting the pair's **resolved** base target — several anchors
+(the ch30 pairs) leave `target_mm` null in the manifest and
+`blender_worker.resolve_framing` substitutes the model bbox centre at render
+time, so `gen_cases.py` resolves that base first — along the **unperturbed
 camera's right (x) or up (y) axis** — the same r/u basis `blender_worker.py`
 derives from az/el/roll — never along world X/Y (a world-axis move changes
 projected sign/magnitude with azimuth and roll, corrupting the scores).
@@ -148,7 +151,10 @@ attributing its gain to an arm. The grid phase is scheduled **inside the
 first pass, after T1 and before T2** (T2's arm set depends on its outcome):
 grid-ON variants of the T1 top-3 rerun the same 6-pair × 27-case sub-grid at
 N = 3 (the grid-OFF numbers are T1's own) ≈ 1.5k calls ≈ 2.2M tokens per
-model. If a grid variant displaces the plain arm as T1 winner, that exact
+model. **P3 is exempt** — it already carries the grid, and its grid-OFF
+baseline is P2's own T1 numbers; if P3 makes the top-3 it enters the grid
+comparison as-is (there is no "P3+grid" variant to invent), and its
+grid-phase slot is skipped or given to the 4th-ranked arm. If a grid variant displaces the plain arm as T1 winner, that exact
 `arm+grid` variant enters T2 as an additional arm (budgeted like one) — the
 decision rule must check convergence on the presentation actually being
 adopted, not its grid-less sibling.
@@ -188,7 +194,7 @@ adopted, not its grid-less sibling.
   target-y (15, 40 mm), target-x (15, 40 mm). Presentation order is NOT
   "d₁ first" (that would make "first" always correct): which delta is shown
   first follows the same deterministic parity schedule as the other
-  position-bias controls — `zlib.crc32(f"{case_id}:{arm}:{repeat}:t3")` —
+  position-bias controls — `zlib.crc32(f"{case_id}:{arm}:{repeat}:t3".encode())` —
   balanced, identical across executions and models, recorded per row. T3
   cells run the same N = 3 repeats as T1 (the schedule's `repeat` term is
   live): 144 trials per arm-model curve instead of a thin 48.
@@ -224,11 +230,15 @@ report that prominently instead of averaging it away.
 - Balance ref/render side in P2/P3 and order in P10 (position bias is
   documented — report it as its own number). The assignment is
   deterministic, not sampled at run time: side/order = parity of
-  `zlib.crc32(f"{case_id}:{arm}:{repeat}")` (balanced across cells,
+  `zlib.crc32(f"{case_id}:{arm}:{repeat}".encode())` (balanced across cells,
   identical across executions and both subject models), and each
   `results.jsonl` row records the assignment it used.
 - Equal pixel budget per stimulus; JPEG q90 everywhere.
-- N ≥ 3 repeats per cell for CIs on the T1 headline numbers.
+- N ≥ 3 repeats per cell — but at temperature 0 an identical-stimulus repeat
+  is a near-deterministic duplicate, so **CIs are bootstrapped over
+  cases/pairs, never computed from repeats**. Repeats exist to cover the
+  side/order schedule (P2/P3/P10/T3, where `repeat` changes the stimulus)
+  and to absorb residual backend nondeterminism, not as independent draws.
 
 ## Size & cost envelope
 
@@ -345,7 +355,10 @@ sufficient given this section. All decisions are pinned; do not re-ask them.
    ≈ **9.5k calls / ~14M tokens per subject model** (~28M across both);
    abort and report if its projected total exceeds 16M tokens per model.
    Phase order within the first pass: T1 → grid phase → T3 ∥ T2 (T2's arm
-   set needs T1 + grid results; T3 needs only T1 stimuli). The **full-grid
+   set needs T1 + grid results). T3's ladder includes ±1°/±7°/±5 mm levels
+   OUTSIDE the T1 sub-grid — they exist because the generation step renders
+   the **full** 45-case grid once (≈800 renders); do not "optimize"
+   generation down to the 27-case sub-grid or T3's pairs go missing. The **full-grid
    confirmation (≈ 14.6M tokens per model, see the cost envelope) is NOT
    covered by this gate** — project it after the first-pass report and get
    an explicit go before launching it.
