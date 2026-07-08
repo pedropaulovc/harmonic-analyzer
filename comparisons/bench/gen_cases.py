@@ -106,15 +106,23 @@ def _delta_tag(delta: dict) -> str:
     return "_".join(parts)
 
 
-def _apply(base_cam: dict, target0, r0, u0, delta: dict) -> dict:
-    """Build the rendered camera for a delta dict (image-plane target -> world)."""
+def _apply(base_cam: dict, target0, r0, u0, delta: dict, zoom0: float) -> dict:
+    """Build the rendered camera for a delta dict (image-plane target -> world).
+
+    Bakes the probe-RESOLVED zoom0/target0 into the camera and DROPS
+    frame_components, so the frozen-frame renderer uses these explicit values
+    instead of re-resolving the subsystem framing per case (which would reset a
+    macro pair's zoom to the manifest 1.0 and snap target back to the subsystem
+    centre, cancelling the target/zoom perturbations under test).
+    """
     cam = json.loads(json.dumps(base_cam))  # deep copy
+    cam.pop("frame_components", None)
     cam["az_deg"] = base_cam.get("az_deg", 0.0) + delta.get("az_deg", 0.0)
     cam["el_deg"] = base_cam.get("el_deg", 0.0) + delta.get("el_deg", 0.0)
     cam["roll_deg"] = base_cam.get("roll_deg", 0.0) + delta.get("roll_deg", 0.0)
     tx, ty = delta.get("tx_mm", 0.0), delta.get("ty_mm", 0.0)
     cam["target_mm"] = [target0[i] + tx * r0[i] + ty * u0[i] for i in range(3)]
-    cam["zoom"] = float(base_cam.get("zoom") or 1.0) * delta.get("zoom", 1.0)
+    cam["zoom"] = zoom0 * delta.get("zoom", 1.0)
     return cam
 
 
@@ -194,9 +202,11 @@ def main() -> int:
         fr = framing[pid]
         target0 = tuple(fr["target"])
         need_w0, canvas = fr["need_w"], fr["canvas"]
+        zoom0 = float(fr["zoom"])                 # probe-resolved (frame_components aware)
         base_cam = pair["camera"]
         r0, u0, _o0 = camera_axes(base_cam.get("az_deg", 0.0), base_cam.get("el_deg", 0.0),
                                   base_cam.get("roll_deg", 0.0))
+        control_cam = _apply(base_cam, target0, r0, u0, {}, zoom0)  # effective base pose
         singles = _single_deltas()
         mixed = _mixed_deltas(pid)
         for delta in singles + mixed:
@@ -205,12 +215,12 @@ def main() -> int:
             tag = "ctrl" if tier == "control" else \
                 (f"mix{mixed.index(delta) + 1}" if is_mixed else _delta_tag(delta))
             case_id = f"{pid}+{tag}"
-            cam = _apply(base_cam, target0, r0, u0, delta)
+            cam = _apply(base_cam, target0, r0, u0, delta, zoom0)
             frozen = {"need_w": need_w0, "canvas": canvas}
             rows.append({
                 "case_id": case_id, "pair_id": pid, "tier": tier,
-                "delta": delta, "camera": cam, "base_camera": base_cam,
-                "frozen": frozen, "target0": list(target0),
+                "delta": delta, "camera": cam, "base_camera": control_cam,
+                "frozen": frozen, "target0": list(target0), "zoom0": zoom0,
                 "basis": {"r": list(r0), "u": list(u0)},
                 "align": pair.get("align") or {},
                 "background": pair["reference"].get("background", "black"),
