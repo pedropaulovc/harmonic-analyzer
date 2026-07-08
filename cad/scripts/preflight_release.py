@@ -22,6 +22,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import os
 import sys
 from typing import Any
 
@@ -39,6 +40,18 @@ import _telemetry
 # same set verify.py's `_expected_free_dof` gives a non-zero count). A `locked`
 # build of either yields 0 expected free DOF and is skipped (nothing to close).
 FREE_ASSEMBLIES = ["drive-train", "channel", "magnifier", "paper-drive", "summing", "pen"]
+
+# Off-by-default operator escape hatch: skip a named assembly's park-closure
+# SUFFICIENCY proof (gear-ratios still runs) when a KNOWN, tracked gate
+# limitation blocks it -- never a silent bypass. Set
+# ``HARMONIC_PREFLIGHT_SKIP_PARK=<dashed-stem>[,<stem>...]``. Currently the only
+# intended use is ``paper-drive`` per issue #205: its gear-mate/belt-chain-coupled
+# transgear pair reads under-defined in SolidWorks' mate-DOF accounting even though
+# the train is kinematically driven, so ``assert_park_closure``'s "every component
+# fully defined" can't be satisfied. Remove the need for this when #205 lands.
+_PARK_SKIP = {
+    s for s in os.environ.get("HARMONIC_PREFLIGHT_SKIP_PARK", "").replace(",", " ").split()
+}
 
 
 async def _preflight_one(adapter: Any, name: str) -> str:
@@ -83,6 +96,14 @@ async def _preflight_one(adapter: Any, name: str) -> str:
             # gear-ratios above is the whole preflight for it.
             log(f"{name}: locked/0-free-DOF build -- gear-ratios checked, no park closure")
             return "locked (gear-ratios ok)"
+        if name in _PARK_SKIP:
+            _telemetry.warn(
+                f"{name}: park-closure SUFFICIENCY SKIPPED via "
+                "HARMONIC_PREFLIGHT_SKIP_PARK (known gate limitation, issue #205 -- "
+                "gear/belt-chain-coupled DOF read under-defined); gear-ratios "
+                "checked, sufficiency NOT proven this release"
+            )
+            return f"{expected} DOF -- park closure SKIPPED (issue #205)"
         log(f"--- preflight {name} ({REST} pose): {expected} deferred park driver(s) ---")
         # Authors the recorded drivers engaged and asserts 0 under-constrained. The
         # doc is mutated in memory only -- discarded in `finally` WITHOUT saving
