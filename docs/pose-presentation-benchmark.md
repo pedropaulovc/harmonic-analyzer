@@ -87,10 +87,20 @@ open (ch30 standards).
 
 ## Presentation arms
 
-All arms consume the same two inputs — prepared ref and content-fitted render
-at identical registration (the `_fitted_render` transform, neutral align) —
-and are normalised to the **same total pixel budget** (~1.4 MP per stimulus,
-whether one fused image or a sheet), so no arm wins by resolution.
+All arms consume the same two inputs — the prepared ref and the perturbed
+render — and are normalised to the **same total pixel budget** (~1.4 MP per
+stimulus, whether one fused image or a sheet), so no arm wins by resolution.
+
+**Fixed framing, NOT the pipeline's content fit.** The shipping composite path
+(`trim_render_file` + `composite._fitted_render`) crops the render to its
+content and rescales/centres it into the ref frame — which would *silently
+cancel* exactly the target- and zoom-perturbation signal this benchmark
+measures (a shifted or zoomed render re-centres back onto the ref). Benchmark
+renders are therefore produced **untrimmed on a fixed canvas** (skip
+`trim_render_file`; the unperturbed camera defines the canvas framing for the
+whole case family) and every arm pastes ref and render into that same fixed
+frame with no per-image re-fitting. Only rotation reads survive content
+fitting; translation/zoom reads require this.
 
 | id | arm | build recipe |
 |---|---|---|
@@ -115,6 +125,13 @@ the blend mode; measuring it separately avoids attributing its gain to an arm.
 - **T1 — single-shot direction read.** One stimulus, one response. The
   subagent outputs, per parameter, `direction ∈ {-, 0, +}` and a magnitude
   bucket (`small / medium / large`), as structured output. Primary metric.
+  Bucket ground truth is fixed per parameter class up front: rotations —
+  small ≤ 2°, medium 3–8°, large > 8° (so levels 1/3·7/15 map to
+  small/medium·medium/large); target — small ≤ 8 mm, medium 9–25 mm, large
+  > 25 mm (5/15/40 → small/medium/large); zoom — ×0.85 and ×1.18 both score
+  as `large` (only two levels; zoom magnitude is reported but excluded from
+  the headline bucket-accuracy number). Mixed-tier components inherit their
+  class thresholds.
 - **T2 — closed loop.** The subagent iterates: read stimulus → propose a
   camera correction → harness re-renders → new stimulus, ≤ 6 rounds. Measures
   what actually matters in production. Run only for the top-3 arms from T1
@@ -145,11 +162,15 @@ the blend mode; measuring it separately avoids attributing its gain to an arm.
 
 ## Size & cost envelope
 
-T1: 18 pairs × ~26 cases × 11 arms ≈ 5.1k cells — subsample to 6 stratified
-pairs for the first pass (≈1.7k cells; at ~1.5k tokens/cell ≈ 2.6M tokens).
-T3: 6 pairs × 8 delta-pairs × 11 arms ≈ 0.5k cells. T2: 3 arms × 6 pairs × 4
-deltas × ≤6 rounds ≈ 0.4k renders + calls. Generation: ~500 Blender renders,
-minutes on the GPU seat.
+The grid is 45 cases/pair (3 rotation params × 8 levels = 24, 2 target axes ×
+6 levels = 12, 2 zoom levels, 6 mixed, 1 control). Full T1 would be 18 pairs
+× 45 × 11 arms ≈ 8.9k cells — so the first pass subsamples: **6 stratified
+pairs × a 21-case sub-grid** (levels ±3°/±15°, ±15/±40 mm, both zooms, 4
+mixed, 1 control) × 11 arms ≈ 1.4k cells; with N = 3 repeats ≈ 4.2k calls, at
+~1.5k tokens/cell ≈ 6.3M tokens. Full-grid confirmation runs only for the top
+3 arms. T3: 6 pairs × 8 delta-pairs × 11 arms ≈ 0.5k cells. T2: 3 arms × 6
+pairs × 4 deltas × ≤6 rounds ≈ 0.4k renders + calls. Generation: 18 pairs ×
+45 ≈ 800 Blender renders once (shared by all arms), minutes on the GPU seat.
 
 ## Harness sketch (all new code lives outside the shipping pipeline)
 
@@ -157,6 +178,11 @@ minutes on the GPU seat.
   `composite.py` code; the rest are ~10 lines of Pillow each).
 - `comparisons/bench/gen_cases.py` — perturb manifest cameras → temp manifest
   → `render_offline.py` → stimuli + `cases.jsonl` (pair, delta, arm, paths).
+  **Prerequisite:** `render_offline.py` currently hardcodes
+  `composite.load_manifest()` on `comparisons/manifest.json` — it needs a
+  `--manifest <path>` override (and a `--no-trim --canvas WxH` fixed-framing
+  mode, see "Presentation arms") before the harness can feed it perturbed
+  cameras. Both are small, benchmark-motivated flags on the shipping tool.
 - `comparisons/bench/run.py` — fans out one subagent per cell (Agent tool /
   Workflow), structured-output schema per task, appends `results.jsonl`;
   resumable (skip answered cells).
@@ -169,3 +195,10 @@ margin AND does not lose T2 convergence; retire `_blend.jpg` generation from
 the pipeline if the incumbent P1 is beaten on both, keeping the winner as the
 artefact `composite.py` emits. If P2/P3 win, the gallery keeps `_cad` (the
 slider) and the pipeline simply stops paying for blends.
+
+Retiring the blend is a coordinated change, not a deletion: current consumers
+hard-require it — `cut_release.stage_comparisons` lists
+`composite/<id>_blend.jpg` in its complete-or-absent gallery validation, and
+`gallery.py` renders a blend cell per pair. The retirement PR must swap both
+to the winning artefact (or drop the cell) in the same change, or every
+release would ship galleryless with a "gallery incomplete" warning.
