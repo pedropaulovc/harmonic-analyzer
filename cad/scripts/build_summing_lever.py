@@ -64,10 +64,12 @@ import math
 import sys
 
 from _common import (
+    CASTING_GREEN,
     IN,
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
+    apply_color,
     apply_material,
     check,
     define_circle,
@@ -690,6 +692,9 @@ async def build(adapter) -> dict[str, str]:
     await name_bore_axis(adapter, "Top Plane", HEX_H / 2.0, "Right Plane", 0.0, "knife axis")
 
     await apply_material(adapter, MATERIAL)
+    # Green-painted casting on the machine (ch17/ch18 macros show the same
+    # paint as the frame), not bare cast iron.
+    await apply_color(adapter, CASTING_GREEN)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

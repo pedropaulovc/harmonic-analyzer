@@ -8,7 +8,10 @@
 units: mm
 
 palette:                              # name: [r, g, b]
-  casting_green:  [0.13, 0.45, 0.42]  # cast-iron frame parts (studio green)
+  casting_green:  [0.03, 0.45, 0.38]  # cast-iron frame parts (studio green;
+  # re-sampled 2026-07-08 from ch30 p002/p009 + ch17/ch18 medians — the old
+  # 0.13 red channel washed the paint into pastel teal; the plates read
+  # R≈0.05·G, B≈0.85·G)
   polished_steel: [0.65, 0.64, 0.63]  # frame columns
   panel_black:    [0.08, 0.08, 0.09]  # platen board / clips / knife hardware
   spring_black:   [0.12, 0.12, 0.13]  # blued spring wire
@@ -37,6 +40,8 @@ casting_green_parts:
   - rocker-arm-support
   - top-crossbar
   - top-frame
+  - summing-lever  # ch17/ch18 macros: same green paint as the frame (2026-07-08)
+  - pen-v-block    # ch24 macro: green-painted cradle over the brass mass model
 
 # Default SolidWorks materials by part class (per-part override lives in parts.yaml).
 materials:
