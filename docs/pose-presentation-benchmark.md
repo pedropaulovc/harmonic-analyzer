@@ -166,8 +166,11 @@ its grid-less sibling.
   camera correction → harness re-renders → new stimulus, ≤ 6 rounds. Measures
   what actually matters in production. Run for the **top-3 arms from T1 plus
   P1 whenever it is not already among them** — the decision rule needs the
-  incumbent's T2 baseline, so P1 is never skipped (≤ 4 arms; it is ~10× the
-  per-cell cost). Start deltas are pinned, 6 per pair — one per parameter
+  incumbent's T2 baseline, so P1 is never skipped — plus the grid phase's
+  winning `arm+grid` variant if one displaced a plain arm (≤ 5 arms; T2 is
+  ~10× the per-cell cost). Arm selection is **per subject model**: each
+  model runs its own T1 ranking's top-3 (+P1 +grid variant), so the Codex
+  generalization check has closed-loop data for its own winner, not Opus's. Start deltas are pinned, 6 per pair — one per parameter
   class so T2 is direct evidence for every parameter the decision rule
   leans on: `az +7°`, `el −7°`, `roll +7°`, `zoom ×0.85`, `target-x +25 mm`,
   and the pair's first recorded mixed case (M1 from `cases.jsonl`).
@@ -179,7 +182,11 @@ its grid-less sibling.
   arm — the arm's *detection threshold*, cheap to run and robust to prompt
   wording. The 8 delta-pairs (d₁, d₂) are pinned: az (1°, 3°), az (3°, 7°),
   az (7°, 15°), el (3°, 7°), roll (3°, 7°), target-y (5, 15 mm),
-  target-y (15, 40 mm), target-x (15, 40 mm).
+  target-y (15, 40 mm), target-x (15, 40 mm). Presentation order is NOT
+  "d₁ first" (that would make "first" always correct): which delta is shown
+  first follows the same deterministic parity schedule as the other
+  position-bias controls — `zlib.crc32(f"{case_id}:{arm}:{repeat}:t3")` —
+  balanced, identical across executions and models, recorded per row.
 
 ## Metrics
 
@@ -227,9 +234,11 @@ stratified pairs × a 27-case sub-grid** (rotations ±3°/±15° = 12, targets
 ±15/±40 mm × 2 axes = 8, both zooms, the first 4 mixed, 1 control) × 11 arms
 ≈ 1.8k cells; with N = 3 repeats ≈ **5.3k calls ≈ 8.0M tokens per subject
 model** at ~1.5k tokens/cell, ≈ 10.7k calls / 16M tokens across both.
-T3: 6 pairs × 8 delta-pairs × 11 arms ≈ 0.5k cells per model. T2: ≤4 arms
-(top-3 + P1) × 6 pairs × 6 starts × ≤6 rounds ≈ 0.9k renders + calls per
-model. Generation: 18 pairs × 45 ≈ 800 Blender renders once (shared by all
+T3: 6 pairs × 8 delta-pairs × 11 arms ≈ 0.5k cells per model. T2: ≤5 arms
+(top-3 + P1 + a winning grid variant, selected per subject model) × 6 pairs
+× 6 starts × ≤6 rounds ≈ 1.1k renders + calls per model worst case. First
+pass all-in (T1 sub-grid + T3 + T2): ≈ **7k calls ≈ 10.5M tokens per
+model**, ~21M across both. Generation: 18 pairs × 45 ≈ 800 Blender renders once (shared by all
 arms **and both models**), minutes on the GPU seat.
 
 **Full-grid confirmation is a separately approved phase, not part of the
@@ -321,10 +330,11 @@ sufficient given this section. All decisions are pinned; do not re-ask them.
    reports the Opus model id and the codex invocation returns parseable
    JSON, eyeball the stimuli sheets and the parsed outputs, THEN fan out. Do
    not launch 5k cells on an unsmoked harness.
-6. **Budget gate — per phase, not per benchmark**: the first pass (T1
-   sub-grid + T3 + T2) ≈ 5.3k calls / ~8.0M tokens **per subject model**
-   (~16M across both); abort and report if its projected total exceeds 10M
-   tokens per model. T2 runs only for the T1 top-3 plus P1. The **full-grid
+6. **Budget gate — per phase, not per benchmark**: the first pass all-in
+   (T1 sub-grid ≈ 5.3k + T3 ≈ 0.5k + T2 ≤ 1.1k calls) ≈ **7k calls / ~10.5M
+   tokens per subject model** (~21M across both); abort and report if its
+   projected total exceeds 12M tokens per model. T2 arms per the Tasks
+   section (top-3 + P1 + grid variant, per model). The **full-grid
    confirmation (≈ 11.7M tokens per model, see the cost envelope) is NOT
    covered by this gate** — project it after the first-pass report and get
    an explicit go before launching it.
