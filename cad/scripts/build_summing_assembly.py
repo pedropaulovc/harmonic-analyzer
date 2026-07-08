@@ -61,7 +61,7 @@ from _assembly import (
     set_park_defer,
     write_park_specs,
 )
-from _transforms import IDENTITY, ROT_Y_POS90
+from _transforms import IDENTITY, ROT_Y_180, ROT_Y_POS90
 
 ASM_NAME = "summing"
 
@@ -75,8 +75,8 @@ ASM_NAME = "summing"
 LOCK = is_locked_build(_config.machine("build_lock", "summing"))
 
 # --- machine anchors ---------------------------------------------------------
-KNIFE = (15.0, 990.0)  # summing-lever knife-edge line (x, y), along Z
-COLUMN_X = 197.0
+KNIFE = (-15.0, 990.0)  # summing-lever knife-edge line (x, y), along Z
+COLUMN_X = -197.0  # east column (the crank side is machine -X)
 
 # --- knife bearing supports (build_knife_mount) -----------------------------
 from build_summing_lever import HEX_H, HEX_Z_INNER, HEX_Z_OUTER  # noqa: E402
@@ -92,9 +92,9 @@ from build_counter_spring import (  # noqa: E402
     WIRE_DIA as CS_WIRE_DIA,
 )
 
-BOSS_HOOK_POS = (90.5, 1000.0, 0.0)
-SPRING_POS = (95.0, 1052.1, 0.0)  # coil-bottom origin; ring at y 1012.1
-# (1052.0 left the hook rod poking 0.05 past the ring inner top)
+BOSS_HOOK_POS = (-90.5, 1000.0, 0.0)
+SPRING_POS = (-95.0, 1052.1, 0.0)  # coil-bottom origin; ring at y 1012.1
+# (y 1052.0 left the hook rod poking 0.05 past the ring inner top)
 
 
 def _assert_counter_spring_hang() -> None:
@@ -181,16 +181,21 @@ async def build(adapter) -> dict[str, str]:
     # counter spring hangs from at machine ~(-91, 990)) rather than the pivot
     # axis -- the lock just freezes the current pose, so the handle is chosen for
     # physical meaning (the eye), not the rock centre.
+    # Ry(180): the boss-hook is a planar-XY wire form modeled with its open jaw
+    # toward local +X; turned about Y it faces the machine crank side (-X),
+    # hanging the counter-spring over the lever's anchor eye at ~(-91, 990).
     bh = await place_component(adapter, "boss-hook", list(BOSS_HOOK_POS),
-                               [0.0, 0.0, 0.0], IDENTITY, ground=False)
+                               [0.0, 180.0, 0.0], ROT_Y_180, ground=False)
     await lock_mate(adapter, named_ref(f"Axis1@{bh}", "AXIS"),
                     named_ref(f"Axis2@{sl}", "AXIS"), label="boss-hook keyed")
     # Ry(+90): the end loops land in the YZ plane, encircling the hook arm
     # (bottom) and the gooseneck pin (top) nail-through-ring style.
     await place_component(adapter, "counter-spring", list(SPRING_POS),
                           [0.0, 90.0, 0.0], ROT_Y_POS90)
+    # Ry(180), like the boss-hook: the gooseneck's overhang arm reaches from
+    # the east column toward the machine centre.
     await place_component(adapter, "gooseneck", [COLUMN_X, 1210.0, 0.0],
-                          [0.0, 0.0, 0.0], IDENTITY)
+                          [0.0, 180.0, 0.0], ROT_Y_180)
     await place_component(adapter, "gooseneck-clamp", [COLUMN_X, 1040.7, 0.0],
                           [0.0, 0.0, 0.0], IDENTITY)
 
