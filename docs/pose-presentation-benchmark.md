@@ -149,9 +149,10 @@ Secondary factor: **coordinate grid on/off** — SoM suggests the grid may
 contribute more than the blend mode; measuring it separately avoids
 attributing its gain to an arm. The grid phase is scheduled **inside the
 first pass, after T1 and before T2** (T2's arm set depends on its outcome):
-grid-ON variants of the T1 top-3 rerun the same 6-pair × 27-case sub-grid at
-N = 3 (the grid-OFF numbers are T1's own) ≈ 1.5k calls ≈ 2.2M tokens per
-model. **P3 is exempt** — it already carries the grid, and its grid-OFF
+grid-ON variants of **each subject model's own T1 top-3** (per-model
+selection, exactly like T2's) rerun the same 6-pair × 27-case sub-grid at
+N = 3 (the grid-OFF numbers are that model's T1) ≈ 1.5k calls ≈ 2.2M tokens
+per model — the per-model figure already assumes this. **P3 is exempt** — it already carries the grid, and its grid-OFF
 baseline is P2's own T1 numbers; if P3 makes the top-3 it enters the grid
 comparison as-is (there is no "P3+grid" variant to invent), and its
 grid-phase slot is skipped or given to the 4th-ranked arm. If a grid variant displaces the plain arm as T1 winner, that exact
@@ -164,6 +165,13 @@ adopted, not its grid-less sibling.
 - **T1 — single-shot direction read.** One stimulus, one response. The
   subagent outputs, per parameter, `direction ∈ {-, 0, +}` and a magnitude
   bucket (`small / medium / large`), as structured output. Primary metric.
+  The schema names the quantity to kill a sign-inversion landmine: T1's
+  field is **`estimated_delta`** — the perturbation applied to the render as
+  read from the stimulus, NOT the corrective move (which is its negation;
+  T2's schema is the opposite, **`recommended_correction`**). The scorer
+  compares `estimated_delta` against the generated delta; a prompt/scorer
+  convention mismatch would invert sign accuracy while looking perfectly
+  deterministic.
   Bucket ground truth is fixed per parameter class up front: rotations —
   small ≤ 2°, medium 3–8°, large > 8° (so levels 1/3·7/15 map to
   small/medium·medium/large); target — small ≤ 8 mm, medium 9–25 mm, large
@@ -189,7 +197,10 @@ adopted, not its grid-less sibling.
 - **T3 — 2AFC discrimination.** Two stimuli of the same pair (deltas d₁ < d₂),
   "which is better aligned?" Sweeping d₂/d₁ yields a psychometric curve per
   arm — the arm's *detection threshold*, cheap to run and robust to prompt
-  wording. The 8 delta-pairs (d₁, d₂) are pinned: az (1°, 3°), az (3°, 7°),
+  wording. The 8 delta-pairs (d₁, d₂) are pinned, all **positive-signed**
+  (+az, +el, +roll, +target — one fixed direction per class, so thresholds
+  are reproducible even where discrimination is direction-dependent):
+  az (1°, 3°), az (3°, 7°),
   az (7°, 15°), el (3°, 7°), roll (3°, 7°), target-y (5, 15 mm),
   target-y (15, 40 mm), target-x (15, 40 mm). Presentation order is NOT
   "d₁ first" (that would make "first" always correct): which delta is shown
@@ -329,8 +340,12 @@ sufficient given this section. All decisions are pinned; do not re-ask them.
    `render_offline.py` flags (`--manifest <path>`, `--no-trim --canvas WxH`,
    `--out-root <dir>`, `--skip-composites`). Bench outputs live in
    `comparisons/bench/out/` — add it to `.gitignore`; the bench *code* is
-   tracked. Nothing the bench renders may land under `comparisons/render/`
-   or `comparisons/composite/`.
+   tracked, and so is **`comparisons/bench/cases.jsonl`** — the committed
+   ground truth (mixed draws, resolved world targets, schedules) must NOT
+   be written under the ignored `out/`, or later runs could silently
+   regenerate different cases while reports claim they were fixed. Nothing
+   the bench renders may land under `comparisons/render/` or
+   `comparisons/composite/`.
 3. **First-pass pairs** (stratified, pinned — manifest-exact ids, the
    renderer's `--only` matches `pair["id"]` verbatim):
    `harmonic_analyzer--ch30-p002-img01` (wide, dark),
