@@ -166,11 +166,16 @@ def main() -> int:
                 out = composite.pair_paths(pair["id"])["render"]
                 out.parent.mkdir(parents=True, exist_ok=True)
                 bg.save(out, **composite.JPEG_OPTS)
-                composite.trim_render_file(out)
+                composite.trim_render_file(
+                    out, background=pair["reference"].get("background", "black"))
                 _sidecar(pair["id"]).write_text(json.dumps({
                     "camera": pair["camera"], "reference": pair["reference"],
                     "size": list(j["_size"]), "model_mtime": src.stat().st_mtime,
-                    "engine": "blender"}), encoding="utf-8")
+                    "engine": "blender",
+                    # exact uniform colour behind the render's pixels --
+                    # composite._content_mask seeds its knockout flood from it
+                    "render_bg": pair["reference"].get("background", "black"),
+                }), encoding="utf-8")
                 rendered.add(pair["id"])
                 print(f"  OK  {pair['id']}", flush=True)
 

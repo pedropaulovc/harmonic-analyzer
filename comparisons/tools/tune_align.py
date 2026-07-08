@@ -60,7 +60,7 @@ def tune_pair(pair: dict, ref_thresh: int) -> tuple[dict, float, float]:
     refmask = ref.resize(small, Image.Resampling.BILINEAR).point(lambda v: 255 if v > ref_thresh else 0)  # type: ignore[operator]  # PIL stubs type ImagePointTransform too broadly
 
     ren = Image.open(composite.pair_paths(pid)["render"])
-    mask = composite._content_mask(ren)
+    mask = composite._content_mask(ren, background=composite.render_bg(pid))
     bbox = mask.getbbox() or (0, 0, ren.width, ren.height)
     mask = mask.crop(bbox)
     # base content-fit scale at work resolution
