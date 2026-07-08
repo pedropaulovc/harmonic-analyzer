@@ -244,6 +244,377 @@
    "status": "aligned",
    "notes": "8-views station 8: front-left quarter - platen face large at center, crank handle small at right edge, body receding left-back",
    "tier": 0
+  },
+  {
+   "id": "harmonic_analyzer--ch12-p002-img09",
+   "model": "harmonic_analyzer",
+   "reference": {
+    "path": "references/albert-michelsons-harmonic-analyzer/ch12_images/page002_img09.jpeg",
+    "source": "book ch12"
+   },
+   "camera": {
+    "mode": "euler",
+    "roll_deg": 0.0,
+    "zoom": 3.2,
+    "target_mm": [
+     -85.0,
+     105.0,
+     0.0
+    ],
+    "perspective": {
+     "focal_length_mm": 100.0
+    },
+    "az_deg": 180.0,
+    "el_deg": 62.0
+   },
+   "align": {
+    "scale": 1.0,
+    "dx_px": 0,
+    "dy_px": 0
+   },
+   "component_focus": [
+    "cone_gear",
+    "cylinder_gear",
+    "rocker_arm",
+    "connecting_rod"
+   ],
+   "status": "draft",
+   "notes": "drive-train plan: top-down oblique over cone+cylinder gear sets, amplitude-bar curtain upper right, pivot at bottom",
+   "tier": 1
+  },
+  {
+   "id": "harmonic_analyzer--ch12-p001-img02",
+   "model": "harmonic_analyzer",
+   "reference": {
+    "path": "references/albert-michelsons-harmonic-analyzer/ch12_images/page001_img02.jpeg",
+    "source": "book ch12"
+   },
+   "camera": {
+    "mode": "euler",
+    "roll_deg": 0.0,
+    "zoom": 2.6,
+    "target_mm": [
+     -60.0,
+     115.0,
+     -40.0
+    ],
+    "perspective": {
+     "focal_length_mm": 100.0
+    },
+    "az_deg": 268.0,
+    "el_deg": 8.0
+   },
+   "align": {
+    "scale": 1.0,
+    "dx_px": 0,
+    "dy_px": 0
+   },
+   "component_focus": [
+    "cone_gear",
+    "cylinder_gear",
+    "crank_arm",
+    "rocker_arm_support"
+   ],
+   "status": "draft",
+   "notes": "lower drive train from machine right (-X): crank arm image-left, chain rising, cone gear set labeled, green pedestals",
+   "tier": 1
+  },
+  {
+   "id": "harmonic_analyzer--ch11-p002-img05",
+   "model": "harmonic_analyzer",
+   "reference": {
+    "path": "references/albert-michelsons-harmonic-analyzer/ch11_images/page002_img05.jpeg",
+    "source": "book ch11"
+   },
+   "camera": {
+    "mode": "euler",
+    "roll_deg": 0.0,
+    "zoom": 4.0,
+    "target_mm": [
+     -122.0,
+     110.0,
+     -168.0
+    ],
+    "perspective": {
+     "focal_length_mm": 100.0
+    },
+    "az_deg": 215.0,
+    "el_deg": 4.0
+   },
+   "align": {
+    "scale": 1.0,
+    "dx_px": 0,
+    "dy_px": 0
+   },
+   "component_focus": [
+    "crank_arm",
+    "crank_handle",
+    "chain_sprocket",
+    "crank_pedestal"
+   ],
+   "status": "draft",
+   "notes": "crank installed, front-right oblique: arm + wooden handle on sprocket, green pedestal, cone gear behind",
+   "tier": 1
+  },
+  {
+   "id": "harmonic_analyzer--ch26-p001-img03",
+   "model": "harmonic_analyzer",
+   "reference": {
+    "path": "references/albert-michelsons-harmonic-analyzer/ch26_images/page001_img03.jpeg",
+    "source": "book ch26"
+   },
+   "camera": {
+    "mode": "euler",
+    "roll_deg": 0.0,
+    "zoom": 2.2,
+    "target_mm": [
+     70.0,
+     140.0,
+     -10.0
+    ],
+    "perspective": {
+     "focal_length_mm": 100.0
+    },
+    "az_deg": 158.0,
+    "el_deg": 8.0
+   },
+   "align": {
+    "scale": 1.0,
+    "dx_px": 0,
+    "dy_px": 0
+   },
+   "component_focus": [
+    "rocker_arm",
+    "cylinder_gear",
+    "harmonic_base",
+    "nameplate"
+   ],
+   "status": "draft",
+   "notes": "front-low base region: rocker-arm fan over cylinder gear row, crank handle right, nameplate on base",
+   "tier": 1
+  },
+  {
+   "id": "harmonic_analyzer--ch25-p001-img01",
+   "model": "harmonic_analyzer",
+   "reference": {
+    "path": "references/albert-michelsons-harmonic-analyzer/ch25_images/page001_img01.jpeg",
+    "source": "book ch25"
+   },
+   "camera": {
+    "mode": "euler",
+    "roll_deg": 0.0,
+    "zoom": 2.4,
+    "target_mm": [
+     -40.0,
+     140.0,
+     -20.0
+    ],
+    "perspective": {
+     "focal_length_mm": 100.0
+    },
+    "az_deg": 92.0,
+    "el_deg": 6.0
+   },
+   "align": {
+    "scale": 1.0,
+    "dx_px": 0,
+    "dy_px": 0
+   },
+   "component_focus": [
+    "pinion_drum",
+    "cylinder_gear",
+    "connecting_rod",
+    "crank_arm"
+   ],
+   "status": "draft",
+   "notes": "pinion drum meshing cylinder gear set through base window from machine left (+X); back side image-left, front side image-right",
+   "tier": 1
+  },
+  {
+   "id": "harmonic_analyzer--ch23-p004-img02",
+   "model": "harmonic_analyzer",
+   "reference": {
+    "path": "references/albert-michelsons-harmonic-analyzer/ch23_images/page004_img02.jpeg",
+    "source": "book ch23"
+   },
+   "camera": {
+    "mode": "euler",
+    "roll_deg": 0.0,
+    "zoom": 3.2,
+    "target_mm": [
+     -60.0,
+     180.0,
+     -100.0
+    ],
+    "perspective": {
+     "focal_length_mm": 100.0
+    },
+    "az_deg": 205.0,
+    "el_deg": -22.0
+   },
+   "align": {
+    "scale": 1.0,
+    "dx_px": 0,
+    "dy_px": 0
+   },
+   "component_focus": [
+    "crank_drive_gear",
+    "transgear_removable",
+    "platen_rack",
+    "chain_sprocket"
+   ],
+   "status": "draft",
+   "notes": "below-front oblique of translational gearing: crank drive gear disk meshing pinion under platen rack, knob + chain in front",
+   "tier": 1
+  },
+  {
+   "id": "harmonic_analyzer--ch24-p001-img02",
+   "model": "harmonic_analyzer",
+   "reference": {
+    "path": "references/albert-michelsons-harmonic-analyzer/ch24_images/page001_img02.jpeg",
+    "source": "book ch24"
+   },
+   "camera": {
+    "mode": "euler",
+    "roll_deg": 0.0,
+    "zoom": 4.2,
+    "target_mm": [
+     13.0,
+     408.0,
+     -148.0
+    ],
+    "perspective": {
+     "focal_length_mm": 100.0
+    },
+    "az_deg": 197.0,
+    "el_deg": 2.0
+   },
+   "align": {
+    "scale": 1.0,
+    "dx_px": 0,
+    "dy_px": 0
+   },
+   "component_focus": [
+    "pen_marker",
+    "pen_rod",
+    "pen_v_block",
+    "platen",
+    "platen_rack"
+   ],
+   "status": "draft",
+   "notes": "pen mechanism in situ on platen, slight left oblique; rack teeth at bottom, rack pinion lower right",
+   "tier": 1
+  },
+  {
+   "id": "harmonic_analyzer--ch31-p001-img04",
+   "model": "harmonic_analyzer",
+   "reference": {
+    "path": "references/albert-michelsons-harmonic-analyzer/ch31_images/page001_img04.jpeg",
+    "source": "book ch31"
+   },
+   "camera": {
+    "mode": "euler",
+    "roll_deg": 0.0,
+    "zoom": 1.5,
+    "target_mm": [
+     60.0,
+     480.0,
+     -30.0
+    ],
+    "perspective": {
+     "focal_length_mm": 100.0
+    },
+    "az_deg": 318.0,
+    "el_deg": 8.0
+   },
+   "align": {
+    "scale": 1.0,
+    "dx_px": 0,
+    "dy_px": 0
+   },
+   "component_focus": [
+    "magnifying_wheel",
+    "amplitude_bar",
+    "rocker_arm",
+    "channel_lever"
+   ],
+   "status": "draft",
+   "notes": "mid-machine from back-right (color slide): wheel top, amplitude-bar bank, lever fan, rocker stack bottom",
+   "tier": 1
+  },
+  {
+   "id": "harmonic_analyzer--ch17-p002-img06",
+   "model": "harmonic_analyzer",
+   "reference": {
+    "path": "references/albert-michelsons-harmonic-analyzer/ch17_images/page002_img06.jpeg",
+    "source": "book ch17"
+   },
+   "camera": {
+    "mode": "euler",
+    "roll_deg": 0.0,
+    "zoom": 4.5,
+    "target_mm": [
+     0.0,
+     1015.0,
+     0.0
+    ],
+    "perspective": {
+     "focal_length_mm": 100.0
+    },
+    "az_deg": 230.0,
+    "el_deg": 42.0
+   },
+   "align": {
+    "scale": 1.0,
+    "dx_px": 0,
+    "dy_px": 0
+   },
+   "component_focus": [
+    "channel_spring_installed",
+    "summing_lever",
+    "channel_lever",
+    "amplitude_bar"
+   ],
+   "status": "draft",
+   "notes": "oblique macro down the spring bank: amplitude bar top-left, springs receding diagonal, summing lever lower right",
+   "tier": 1
+  },
+  {
+   "id": "harmonic_analyzer--ch18-p001-img01",
+   "model": "harmonic_analyzer",
+   "reference": {
+    "path": "references/albert-michelsons-harmonic-analyzer/ch18_images/page001_img01.png",
+    "source": "book ch18"
+   },
+   "camera": {
+    "mode": "euler",
+    "roll_deg": 0.0,
+    "zoom": 4.5,
+    "target_mm": [
+     -40.0,
+     995.0,
+     0.0
+    ],
+    "perspective": {
+     "focal_length_mm": 100.0
+    },
+    "az_deg": 195.0,
+    "el_deg": 12.0
+   },
+   "align": {
+    "scale": 1.0,
+    "dx_px": 0,
+    "dy_px": 0
+   },
+   "component_focus": [
+    "summing_lever",
+    "boss_hook",
+    "counter_spring",
+    "knife_mount"
+   ],
+   "status": "draft",
+   "notes": "summing lever casting under top frame, front-left oblique; counter spring hook upper right, amplitude bars left",
+   "tier": 1
   }
  ]
 }
