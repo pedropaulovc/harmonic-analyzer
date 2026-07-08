@@ -82,6 +82,7 @@ _EXPORTER_KEY = "__exporter__"
 REPO = CAD_ROOT.parent
 COMPARISONS_DIR = REPO / "comparisons"
 RENDER_OFFLINE = COMPARISONS_DIR / "tools" / "render_offline.py"
+COMPOSITE_PY = COMPARISONS_DIR / "tools" / "composite.py"
 GALLERY_PY = COMPARISONS_DIR / "tools" / "gallery.py"
 
 # swconst ids (extracted from the installed swconst.tlb, R2026x). The STL ids
@@ -580,9 +581,12 @@ def refresh_comparison_gallery() -> bool:
     bundles (cut_release.stage_comparisons). Returns True if refreshed.
 
     Runs render_offline (Blender, no SolidWorks) ``--stale-only`` so only pairs
-    whose geometry changed re-render, then gallery.py rebuilds the static index.
-    The gallery outputs are gitignored + regenerable, so nothing tracked is
-    touched.
+    whose geometry changed re-render, then a FULL composite.py pass — its
+    staleness key is camera/reference/model only, so an align-only manifest edit
+    (scale/dx/dy) skips the render yet still must recompute the _cad/_blend
+    overlays + scores (cheap: Pillow over ~20 pairs) — then gallery.py rebuilds
+    the static index. The gallery outputs are gitignored + regenerable, so
+    nothing tracked is touched.
 
     BEST-EFFORT: the offline renderer needs Blender, which lives on a separate
     GPU seat, so on an export seat without it this warns + returns False rather
@@ -593,6 +597,7 @@ def refresh_comparison_gallery() -> bool:
         try:
             _prune_stale_gallery()
             _run_tool(["uv", "run", str(RENDER_OFFLINE), "--stale-only"], "cmp")
+            _run_tool(["uv", "run", str(COMPOSITE_PY)], "composite")
             _run_tool(["uv", "run", str(GALLERY_PY)], "gallery")
         except Exception as exc:  # noqa: BLE001 -- best-effort; never fail export
             _telemetry.warn(
