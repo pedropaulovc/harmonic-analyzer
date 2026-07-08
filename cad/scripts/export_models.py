@@ -33,6 +33,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import subprocess
 import sys
 import time
 import zlib
@@ -72,6 +73,17 @@ SRC_DIGESTS = OUT_STL / "export-src.json"
 # looking fresh and ship stale STEP/STL/scene JSON (codex review). A sentinel
 # mismatch invalidates the whole cache -> full regeneration through the new logic.
 _EXPORTER_KEY = "__exporter__"
+
+# Comparison gallery, produced by THIS export stage from the STLs written above
+# (so `doit export` yields an up-to-date gallery for the release to bundle). Both
+# are PEP-723 scripts run via `uv run`; render_offline drives Blender (no
+# SolidWorks). See refresh_comparison_gallery -- best-effort (Blender is on a
+# separate GPU seat), and cut_release.stage_comparisons ships the result.
+REPO = CAD_ROOT.parent
+COMPARISONS_DIR = REPO / "comparisons"
+RENDER_OFFLINE = COMPARISONS_DIR / "tools" / "render_offline.py"
+COMPOSITE_PY = COMPARISONS_DIR / "tools" / "composite.py"
+GALLERY_PY = COMPARISONS_DIR / "tools" / "gallery.py"
 
 # swconst ids (extracted from the installed swconst.tlb, R2026x). The STL ids
 # live in _common (shared with the part-build STL export); STEP is export-only.
@@ -512,6 +524,103 @@ def assert_configs_distinct(stem: str, crc_by_mesh: dict[str, int]) -> None:
         seen[crc] = mesh
 
 
+def _run_tool(cmd: list[str], tag: str) -> None:
+    """Run a PEP-723 comparison tool via ``uv run`` from the repo root, streaming
+    its output line-by-line (a Blender render takes minutes) and raising on a
+    non-zero exit (kept for the caller's best-effort catch)."""
+    proc = subprocess.Popen(cmd, cwd=str(REPO), stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, text=True, bufsize=1)
+    tail: list[str] = []
+    assert proc.stdout is not None
+    for raw in proc.stdout:
+        line = raw.rstrip()
+        log(f"    {tag}| {line}")
+        tail.append(line)
+        if len(tail) > 40:
+            del tail[0]
+    if proc.wait() != 0:
+        raise RuntimeError(f"{tag} exited non-zero: {' / '.join(tail)[-400:]}")
+
+
+def _prune_stale_gallery() -> None:
+    """Delete generated gallery artefacts (render/composite/ref files + scores
+    entries) whose pair id is no longer in the manifest, so a removed/renamed
+    pair leaves nothing stale for the release to stage and ``len(scores)`` stays
+    honest. TARGETED -- it keeps the current pairs, so it does NOT force a full
+    re-render; ``render_offline --stale-only`` then re-renders only the pairs
+    whose geometry actually changed."""
+    manifest = json.loads((COMPARISONS_DIR / "manifest.json").read_text(encoding="utf-8"))
+    ids = {p["id"] for p in manifest.get("pairs", [])}
+    expected: set[str] = set()
+    for pid in ids:
+        expected |= {f"render/{pid}.jpg", f"render/{pid}.meta.json",
+                     f"composite/{pid}_cad.jpg", f"composite/{pid}_blend.jpg",
+                     f"ref/{pid}.jpg"}
+    for sub in ("render", "composite", "ref"):
+        d = COMPARISONS_DIR / sub
+        if not d.exists():
+            continue
+        for f in d.iterdir():
+            if f.is_file() and f"{sub}/{f.name}" not in expected:
+                f.unlink()
+                log(f"pruned stale gallery file {sub}/{f.name}")
+    scores_f = COMPARISONS_DIR / "scores.json"
+    if scores_f.exists():
+        try:
+            scores = json.loads(scores_f.read_text(encoding="utf-8"))
+        except ValueError:
+            # An interrupted run can leave the (ignored, regenerable) file
+            # malformed; raising here would ride refresh_comparison_gallery's
+            # best-effort catch and block regeneration forever. Delete it —
+            # the composite pass rewrites it from scratch.
+            scores_f.unlink()
+            log("deleted corrupt scores.json (composite pass regenerates it)")
+            return
+        kept = {k: v for k, v in scores.items() if k in ids}
+        if len(kept) != len(scores):
+            scores_f.write_text(json.dumps(dict(sorted(kept.items())), indent=1),
+                                encoding="utf-8")
+            log(f"pruned {len(scores) - len(kept)} stale score entr"
+                f"{'y' if len(scores) - len(kept) == 1 else 'ies'}")
+
+
+def refresh_comparison_gallery() -> bool:
+    """Produce the offline comparison gallery from the STLs this export just
+    wrote, so ``doit export`` yields an up-to-date gallery that the release then
+    bundles (cut_release.stage_comparisons). Returns True if refreshed.
+
+    Runs render_offline (Blender, no SolidWorks) ``--stale-only`` so only pairs
+    whose geometry changed re-render, then a FULL composite.py pass — its
+    staleness key is camera/reference/model only, so an align-only manifest edit
+    (scale/dx/dy) skips the render yet still must recompute the _cad/_blend
+    overlays + scores (cheap: Pillow over ~20 pairs) — then gallery.py rebuilds
+    the static index. The gallery outputs are gitignored + regenerable, so
+    nothing tracked is touched.
+
+    BEST-EFFORT: the offline renderer needs Blender, which lives on a separate
+    GPU seat, so on an export seat without it this warns + returns False rather
+    than failing the export. The standalone refresh is unchanged: run
+    ``uv run comparisons/tools/render_offline.py`` on a Blender-equipped seat.
+    """
+    with _telemetry.span("export.comparisons") as sp:
+        try:
+            _prune_stale_gallery()
+            _run_tool(["uv", "run", str(RENDER_OFFLINE), "--stale-only"], "cmp")
+            _run_tool(["uv", "run", str(COMPOSITE_PY)], "composite")
+            _run_tool(["uv", "run", str(GALLERY_PY)], "gallery")
+        except Exception as exc:  # noqa: BLE001 -- best-effort; never fail export
+            _telemetry.warn(
+                f"comparison gallery not refreshed ({exc}); export continues -- "
+                "refresh on a Blender-equipped seat with "
+                "`uv run comparisons/tools/render_offline.py`.")
+            _telemetry.event("comparisons.skipped", reason=str(exc)[:200])
+            sp.set_attribute("refreshed", False)
+            return False
+        sp.set_attribute("refreshed", True)
+        _telemetry.info("comparison gallery refreshed from exported STLs")
+        return True
+
+
 def main() -> int:
     # An untrusted cache (sentinel absent or mismatched) forces a FULL export so even
     # mtime-gated undeclared targets regenerate through the current logic, not just the
@@ -555,6 +664,10 @@ def main() -> int:
     if not stale_parts and not stale_asms:
         _telemetry.info("all exports fresh")
         stamp_render_cache_current(validated_outputs(parts, assemblies))
+        # Geometry unchanged, but still reconcile the gallery (cheap: --stale-only
+        # is a no-op when nothing drifted) so `doit export` always leaves an
+        # up-to-date gallery for the release to bundle.
+        refresh_comparison_gallery()
         return 0
     _telemetry.info(f"exporting parts={stale_parts or '[]'} assemblies={stale_asms or '[]'}")
     for d in (OUT_STL, OUT_STEP, OUT_BOXES):
@@ -695,8 +808,12 @@ def main() -> int:
             restore_export_prefs(adapter, old)
 
     rc = run_build(build)
-    if rc == 0:  # cache is current -> keep mtime-based downstream guards satisfied
+    # Only produce the gallery once the STL/boxes export actually succeeded --
+    # a failed COM export leaves the render cache half-written (fail loud there);
+    # the stamp keeps mtime-based downstream guards satisfied.
+    if rc == 0:
         stamp_render_cache_current(validated_outputs(parts, assemblies))
+        refresh_comparison_gallery()
     return rc
 
 

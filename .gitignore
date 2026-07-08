@@ -380,6 +380,20 @@ cad/out/*.png
 # build and blocked doit release's clean-tree preflight)
 cad/out/harmonic-analyzer-bom.csv
 
+# Comparison gallery — DERIVED, regenerable artefacts (they drift as the model or
+# the reference crops change, so tracking them dirtied the tree on every rebuild
+# and shipped a stale showcase). Refreshed offline (comparisons/tools/
+# render_offline.py -> Blender + gallery.py) and published INSIDE each release
+# bundle (cut_release.py: refresh_comparisons). Only manifest.json (pose/align
+# source of truth) + ATTRIBUTION.md / README.md / tools stay tracked; the reference
+# CROPS regenerate from the pinned `references` submodule via prepare_reference,
+# so the release refresh rewrites nothing tracked (never dirties the tagged tree).
+comparisons/ref/
+comparisons/render/
+comparisons/composite/
+comparisons/scores.json
+comparisons/index.html
+
 # Mesa OSMesa software-GL DLL fetched on demand for headless VTK rendering
 # (comparisons/tools/osmesa_win.py; ~55 MB, regenerable from pal1000/mesa-dist-win)
 comparisons/tools/.osmesa-cache/

@@ -6,16 +6,27 @@ to iteratively tune the models toward the physical device. See
 
 ## Layout
 
-| path | content |
-|---|---|
-| `manifest.json` | source of truth: pair id → reference, model, camera pose, 2D align, tier, status |
-| `index.html` | inspection gallery (tier + text filters; drag the ref⇆cad reveal slider) — `uv run comparisons/tools/gallery.py` |
-| `ref/<id>.jpg` | prepared reference (cropped/rotated, ≤1600 px) |
-| `render/<id>.jpg` | raw CAD render, content-trimmed, black background (+ `.meta.json` staleness/engine sidecar) |
-| `composite/<id>_cad.jpg` | render fitted into the reference frame (same scale/offset as the blend layer) — the slider's top image |
-| `composite/<id>_blend.jpg` | red-tinted render over grayscale ref — misalignment is instantly visible |
-| `scores.json` | pair → RMS shape score (regression trend only; compare across commits, same engine) |
-| `findings/iter_NNN.json` | per-iteration vision findings |
+Tracked = source; **regen** = derived, gitignored and rebuilt by the tools below
+(they drift as the model or the reference crops change). The `export` stage
+produces the gallery from the freshly-exported STLs
+(`cad/scripts/export_models.py:refresh_comparison_gallery`, best-effort: needs
+Blender), and each release then **ships that snapshot inside its bundle** under
+`comparisons/` (`cad/scripts/cut_release.py:stage_comparisons`). The only tracked
+inputs are `manifest.json`, `ATTRIBUTION.md`, this README and `tools/`; everything
+else regenerates (the reference *source* photos live in the pinned `references`
+submodule).
+
+| path | tracked? | content |
+|---|---|---|
+| `manifest.json` | tracked | source of truth: pair id → reference, model, camera pose, 2D align, tier, status |
+| `ATTRIBUTION.md` | tracked | CC BY credits/licensing for the reference photos (ships in every release bundle) |
+| `ref/<id>.jpg` | regen | prepared reference (cropped/rotated, ≤1600 px) — re-derived from the `references` submodule by `prepare_reference` |
+| `index.html` | regen | inspection gallery (tier + text filters; drag the ref⇆cad reveal slider) — `uv run comparisons/tools/gallery.py` |
+| `render/<id>.jpg` | regen | raw CAD render, content-trimmed, black background (+ `.meta.json` staleness/engine sidecar) |
+| `composite/<id>_cad.jpg` | regen | render fitted into the reference frame (same scale/offset as the blend layer) — the slider's top image |
+| `composite/<id>_blend.jpg` | regen | red-tinted render over grayscale ref — misalignment is instantly visible |
+| `scores.json` | regen | pair → RMS shape score (regression trend only; compare across commits, same engine) |
+| `findings/iter_NNN.json` | — | per-iteration vision findings |
 
 ## Workflow
 

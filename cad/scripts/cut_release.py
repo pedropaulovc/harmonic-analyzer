@@ -82,6 +82,18 @@ RENDER_DIFF = REPO_ROOT / "comparisons" / "tools" / "render_diff.py"
 # + per-config mesh keys + colours) that lets a consumer render the bundle with
 # comparisons/tools/render_offline.py without SolidWorks.
 SCENE_JSON = CAD_ROOT / "out" / "boxes" / f"{TOP_ASSEMBLY}.json"
+
+# Comparison gallery (reference-photo overlays). PRODUCED BY THE EXPORT STAGE
+# (export_models.refresh_comparison_gallery renders it from the STLs once they're
+# written, on the COM spine right before release); this module only STAGES the
+# result into the bundle's ``comparisons/`` so each release ships an up-to-date
+# showcase. The DERIVED refs/renders/composites/scores/index are gitignored +
+# regenerable (nothing tracked is touched); the manifest (pose/align source of
+# truth) and ATTRIBUTION.md (CC BY credits for the shipped reference imagery) ride
+# along so the downloaded bundle is standalone + compliant.
+COMPARISONS_DIR = REPO_ROOT / "comparisons"
+_GALLERY_STAGE = ("ref", "render", "composite", "scores.json", "index.html",
+                  "manifest.json", "ATTRIBUTION.md")
 _VERSION_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 
 # SolidWorks COM type library (SldWorks); the version pins the same revision the
@@ -251,6 +263,107 @@ def render_diff(stage: Path, prev_tag: str) -> dict[str, Any]:
     log(f"diff render: {len(data.get('changed_parts', []))} changed parts, "
         f"{len(data['image_paths'])} views")
     return data
+
+
+def stage_comparisons(stage: Path) -> dict[str, Any] | None:
+    """Stage the comparison gallery -- PRODUCED BY THE EXPORT STAGE -- into the
+    bundle (``stage/comparisons``), so each release ships an up-to-date "this
+    model vs Michelson's ch30 photos" showcase.
+
+    The gallery is refreshed upstream by
+    ``export_models.refresh_comparison_gallery`` (offline Blender render off the
+    stable STLs), which runs on the COM spine right before release; here we only
+    COPY the result in. Every gallery output is gitignored + regenerable
+    (reference crops included -- re-derived from the pinned ``references``
+    submodule), so nothing TRACKED is staged and the tagged tree stays clean.
+
+    Best-effort: if the export stage could not produce the gallery (the offline
+    renderer needs Blender, which lives on a separate GPU seat), it is absent or
+    incomplete -- warn and ship the bundle without it rather than failing the
+    release. If a gallery exists but predates this export's geometry, ship it
+    but warn loudly.
+    """
+    with _telemetry.span("release.comparisons") as sp:
+        scores_file = COMPARISONS_DIR / "scores.json"
+        # COMPLETE or absent -- a partial gallery (render_offline succeeded but
+        # gallery.py/composite died, or an interrupted run left renders without
+        # index.html) must not ship: the notes point users at index.html and the
+        # reveal slider needs every overlay. Validate the full per-manifest file
+        # set + a parseable scores.json covering every pair; anything short is
+        # treated exactly like "not produced" (all regenerable, never fatal).
+        manifest = json.loads(
+            (COMPARISONS_DIR / "manifest.json").read_text(encoding="utf-8"))
+        ids = [p["id"] for p in manifest["pairs"]]
+        required = [COMPARISONS_DIR / "index.html", scores_file]
+        for pid in ids:
+            required += [COMPARISONS_DIR / "render" / f"{pid}.jpg",
+                         COMPARISONS_DIR / "composite" / f"{pid}_cad.jpg",
+                         COMPARISONS_DIR / "composite" / f"{pid}_blend.jpg",
+                         COMPARISONS_DIR / "ref" / f"{pid}.jpg"]
+        missing = [str(p.relative_to(COMPARISONS_DIR)) for p in required
+                   if not p.exists()]
+        scores: dict[str, Any] = {}
+        if scores_file.exists():
+            try:
+                scores = json.loads(scores_file.read_text(encoding="utf-8"))
+            except ValueError:
+                missing.append("scores.json (unparseable)")
+        missing += [f"scores.json[{pid}]" for pid in ids if pid not in scores]
+        if missing:
+            _telemetry.warn(
+                "comparison gallery absent/incomplete -- the export stage did not "
+                f"produce it (needs Blender on the export seat); {len(missing)} "
+                f"missing, e.g. {', '.join(missing[:4])}. Shipping bundle without "
+                "it. Produce it with `doit export` on a Blender seat, or "
+                "`uv run comparisons/tools/render_offline.py`.")
+            _telemetry.event("comparisons.skipped",
+                             reason=f"incomplete: {', '.join(missing[:8])}"[:200])
+            sp.set_attribute("staged", False)
+            return None
+
+        # Honesty guard: a gallery older than the exported scene graph OR the
+        # manifest does not reflect this release (export ran without Blender, so
+        # an old render lingers -- or a pose/align/crop edit landed after the
+        # last refresh). Ship it, but make the staleness loud (also disclosed in
+        # the release notes, see release_notes).
+        stale = scores_file.stat().st_mtime < max(
+            SCENE_JSON.stat().st_mtime,
+            (COMPARISONS_DIR / "manifest.json").stat().st_mtime)
+        if stale:
+            _telemetry.warn(
+                "comparison gallery is OLDER than the exported scene graph or the "
+                "manifest -- it may not reflect this release's geometry/poses "
+                "(export ran without Blender?). Shipping the existing gallery.")
+            sp.set_attribute("stale", True)
+
+        dst = stage / "comparisons"
+        dst.mkdir(exist_ok=True)
+        staged = 0
+        for name in _GALLERY_STAGE:
+            src = COMPARISONS_DIR / name
+            if not src.exists():
+                continue
+            if src.is_dir():
+                shutil.copytree(src, dst / name, dirs_exist_ok=True)
+                staged += sum(1 for p in (dst / name).rglob("*") if p.is_file())
+            else:
+                shutil.copy2(src, dst / name)
+                staged += 1
+
+        vals = [v for v in scores.values() if isinstance(v, (int, float))]
+        facts = {
+            "pairs": len(scores),
+            "mean_score": round(sum(vals) / len(vals), 1) if vals else None,
+            "files": staged,
+            "stale": stale,
+        }
+        sp.set_attribute("staged", True)
+        sp.set_attribute("pairs", facts["pairs"])
+        log(f"comparison gallery: staged {facts['pairs']} pairs"
+            + (f" (mean RMS score {facts['mean_score']})" if vals else "")
+            + f", {staged} files"
+            + (" [STALE vs geometry]" if stale else ""))
+        return facts
 
 
 def preflight(version: str, allow_dirty: bool) -> None:
@@ -849,6 +962,12 @@ def bundle(sw: Any, revision: str, version: str,
     #    a previous release that predates the neutral bundle.
     facts["diff"] = render_diff(stage, prev_tag) if prev_tag else None
 
+    # 4b. Comparison gallery: ship the gallery the EXPORT stage produced (offline
+    #     Blender render off the stable STLs) under stage/comparisons. Best-effort
+    #     -- if export had no Blender the gallery is absent, so warn + ship without
+    #     it rather than failing. See stage_comparisons.
+    facts["comparisons"] = stage_comparisons(stage)
+
     # 5. Provenance manifest LAST -- it hashes everything staged above, so it must
     #    run after the diff is written and before the zip is sealed. (Build logs
     #    are NOT staged here: they ship as a separate logs asset, see _logs_asset.)
@@ -923,6 +1042,16 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         f"this bundle with `comparisons/tools/render_offline.py` (no SolidWorks)\n"
         f"- `png/` -- {facts['views']}-angle preview renders "
         f"({facts['pngs']} images)\n"
+        + (f"- `comparisons/` -- this model overlaid on Michelson's ch30 photos "
+           f"({facts['comparisons']['pairs']} pairs"
+           + (f", mean RMS score {facts['comparisons']['mean_score']}"
+              if facts['comparisons'].get('mean_score') is not None else "")
+           + "; open `comparisons/index.html`)"
+           + (" **[STALE -- rendered from an OLDER geometry export/manifest; "
+              "do not treat the visual fit as authoritative for this release]**"
+              if facts['comparisons'].get('stale') else "")
+           + "\n"
+           if facts.get("comparisons") else "")
         + (f"- `diff/` -- changed-parts diff renders vs "
            f"{facts['diff']['prev']} (see below)\n" if facts.get("diff") else "")
         + f"- Size: {facts['size_mb']:.1f} MB\n"
