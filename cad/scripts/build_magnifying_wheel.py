@@ -24,10 +24,12 @@ from __future__ import annotations
 import sys
 
 from _common import (
+    PANEL_BLACK,
     SketchDims,
     _read_member,
     add_line_chain,
     anchor_point_to_origin,
+    apply_color,
     apply_material,
     blank_sketch,
     check,
@@ -246,6 +248,14 @@ async def build(adapter) -> dict[str, str]:
     _telemetry.info(f"volume after pattern: {v_built:.1f} mm^3")
 
     await apply_material(adapter, MATERIAL)
+    # Black-painted casting (p.51 photo). The photo's bright accents — the
+    # machined rim edge and the 20 mm brass hub drum — are deliberately NOT
+    # preserved: the comparison render pipeline carries ONE colour per part
+    # (export_models colors.json -> STL instancing -> Blender object colour),
+    # so a face-scoped highlight cannot reach the gallery, and the wheel reads
+    # black-dominant in every plate. Documented simplification; the honest fix
+    # would be splitting the brass hub into its own part.
+    await apply_color(adapter, PANEL_BLACK)
 
     # Verify the two annotated diameters (ch. 21: 100 mm rim, 20 mm hub
     # — they self-validate against the stated 5x magnification).
