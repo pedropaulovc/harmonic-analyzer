@@ -82,7 +82,10 @@ def is_stale(pair: dict, src: Path) -> bool:
     sc = _sidecar(pair["id"])
     if not img.exists() or not sc.exists():
         return True
-    meta = json.loads(sc.read_text(encoding="utf-8"))
+    try:
+        meta = json.loads(sc.read_text(encoding="utf-8"))
+    except ValueError:
+        return True  # truncated sidecar (interrupted run) -> re-render heals it
     return (
         meta.get("camera") != pair["camera"]
         or meta.get("reference") != pair["reference"]
