@@ -202,3 +202,32 @@ hard-require it — `cut_release.stage_comparisons` lists
 `gallery.py` renders a blend cell per pair. The retirement PR must swap both
 to the winning artefact (or drop the cell) in the same change, or every
 release would ship galleryless with a "gallery incomplete" warning.
+
+## Runbook — everything an executor needs
+
+The instruction "run the benchmark in docs/pose-presentation-benchmark.md" is
+sufficient given this section. All decisions are pinned; do not re-ask them.
+
+1. **Seat preconditions**: Blender seat (the render_offline path must work),
+   `cad/out` STL/boxes cache current (`doit export` or a fresh pull of a
+   built tree), `uv sync` done. No SolidWorks needed.
+2. **Build the harness first** (nothing exists yet): the four
+   `comparisons/bench/` files from the harness sketch, plus the two
+   `render_offline.py` flags (`--manifest <path>`, `--no-trim --canvas WxH`).
+   Bench outputs live in `comparisons/bench/out/` — add it to `.gitignore`;
+   the bench *code* is tracked.
+3. **First-pass pairs** (stratified, pinned): `ch30-p002` (wide, dark),
+   `ch30-p007` (wide, dark, oblique), `ch12-p002` (macro, dark),
+   `ch12-p001` (macro, white bg), `ch17-p002` (macro, occlusion-heavy),
+   `ch23-p004` (down-look macro).
+4. **Runner config** (pinned): Opus subagents, temperature 0, fresh subagent
+   per cell, structured output, N = 3 repeats, prompt templates committed
+   beside the runner before the first full pass.
+5. **Smoke before fan-out**: run ~10 hand-picked cells (one easy + one hard
+   delta on two arms), eyeball the stimuli sheets and the parsed outputs,
+   THEN fan out. Do not launch 4k cells on an unsmoked harness.
+6. **Budget gate**: first pass ≈ 4.2k calls / ~6.3M tokens. Abort and report
+   if the projected total exceeds 8M tokens; T2 runs only for the T1 top-3.
+7. **Deliverables**: `results.jsonl` + the report tables (per-arm T1 sign
+   accuracy with CIs, T3 thresholds, cost per decision), per-arm exemplar
+   stimulus sheets, and a recommendation applying the decision rule above.
