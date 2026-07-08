@@ -154,9 +154,11 @@ def main() -> int:
             for pair, j in zip(pairs, jobs, strict=True):
                 png = Path(j["out"])
                 img = Image.open(png).convert("RGBA")
-                # black background: matches the black-studio references in
-                # the gallery's reveal slider
-                bg = Image.new("RGB", img.size, "black")
+                # background matches the reference photography: black studio
+                # by default, reference.background overrides (e.g. "white"
+                # for the white-backdrop book shots)
+                bg = Image.new("RGB", img.size,
+                               pair["reference"].get("background", "black"))
                 bg.paste(img, mask=img.getchannel("A"))
                 out = composite.pair_paths(pair["id"])["render"]
                 out.parent.mkdir(parents=True, exist_ok=True)
