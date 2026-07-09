@@ -103,9 +103,14 @@ def _copy_with_mates(adapter, comp_name: str, new_z_mm: float,
         raise RuntimeError(f"seed component not found: {comp_name!r}")
     repeat = [True] * SEED_MATES
     new_refs = [None] * SEED_MATES
-    values = [new_z_mm / 1000.0]  # metres; maps to the ONE distance mate
+    # Values carry the POSITIVE magnitude (the seat authored abs(z), the
+    # production distance_driver idiom); the SIDE rides FlipDimension --
+    # "true for a positive distance dimension, false for a negative"
+    # (codex #219: signed negative metres here could fail the call or land
+    # wrong-side and mislabel the API unusable).
+    values = [abs(new_z_mm) / 1000.0]  # metres; maps to the ONE distance mate
     flip_align = [False] * SEED_MATES
-    flip_dim = [True]  # positive dimension, matches the seat's abs(z) authoring
+    flip_dim = [new_z_mm >= 0.0]
     lock_rot = [False] * SEED_MATES
     orient = [0]
 
