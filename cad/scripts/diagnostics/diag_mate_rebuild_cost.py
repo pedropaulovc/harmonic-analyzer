@@ -40,6 +40,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # cad/scripts
 
 from _common import check, log, run_build  # noqa: E402
 from _assembly import (  # noqa: E402
+    _seed_flip,
     component_transform,
     place_component,
     place_components_batch,
@@ -65,12 +66,19 @@ Z_FAR = 400.0         # keep fillers clear of the probe stations
 def _probe_params(comp: str, z_mm: float) -> AddMateParameters:
     """A distance axial mate: probe component's Front Plane at its Z station.
 
-    A DISTANCE mate (abs value + sign-seeded flip, the production
-    distance_driver idiom) so each probe bushing solves to its OWN station --
-    a coincident to the assembly Front Plane pulled every probe to z=0 and
+    A DISTANCE mate so each probe bushing solves to its OWN station -- a
+    coincident to the assembly Front Plane pulled every probe to z=0 and
     made the per-station/deferral checks vacuous (codex #219). The probe
     bushing stays otherwise unmated (never saved); one plane mate is enough
     to time the solve.
+
+    The flip seed is the PRODUCTION polarity, not the raw sign: the seat this
+    probe models (`_seat_bushing_on_shaft`'s axial distance, same
+    bushing-Front-Plane <-> assembly-Front-Plane references) goes through
+    `distance_driver`, whose signature "pivot bushing axial z" is in
+    `_FLIP_INVERT` -- so a negative station seeds flip=False (codex #219
+    round 2). Reusing `_seed_flip` over the same label keeps the probe in
+    lockstep with the polarity table instead of shadowing it.
     """
     return AddMateParameters(
         mate_type="distance",
@@ -80,7 +88,7 @@ def _probe_params(comp: str, z_mm: float) -> AddMateParameters:
         ],
         alignment="closest",
         distance=abs(z_mm),
-        flip=z_mm < 0.0,
+        flip=_seed_flip(f"{comp} axial z d={abs(z_mm):.2f}", z_mm),
     )
 
 
@@ -199,11 +207,21 @@ async def build(adapter) -> dict[str, str]:
     # exactly as the rebuild-each batch did.
     log("== deferral: same mates, NO per-mate rebuild, ONE closing rebuild ==")
     r4 = await _probe_batch(adapter, "defer", rebuild_each=False)
+    worst = 0.0
     for row in r4:
         z_final = component_transform(adapter, row["comp"])[11] * 1000.0
+        delta = z_final - row["z_target"]
+        worst = max(worst, abs(delta))
         log(f"  defer {row['comp']}: target={row['z_target']:.3f} "
             f"z_after_create={row['z_after_create']:.3f} z_final={z_final:.3f} "
-            f"(final delta {z_final - row['z_target']:+.3f})")
+            f"(final delta {delta:+.3f})")
+    # H4 is only evidence if the closing rebuild actually left every probe on
+    # its plane -- a best-effort log would let an off-target run pass silently
+    # (codex #219 round 2).
+    check(
+        f"deferral final poses on target (worst |delta| {worst:.3f}mm <= 0.05)",
+        worst <= 0.05,
+    )
 
     log("=" * 70)
     for tag, rows in (("base", r1), ("grounded", r2), ("seated", r3), ("defer", r4)):
