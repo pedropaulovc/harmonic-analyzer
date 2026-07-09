@@ -83,3 +83,4 @@
 - [Paper-drive real train](paper-drive-real-train.md) — PR #196 final six-gear topology; Appendix C #8 closed; <63T pinions need centre extension (gap floor at base circle) and 12T needs a Ø5 seat
 - [Paper-drive rework evidence](paper-drive-rework.md) — the full E1-E8 dossier + part-change table behind PR #196 (moved from docs/); anchors, z-stacks, mate chain, photo cross-checks
 - [Mirror retirement sweep](mirror-retirement-sweep.md) — #151 golden-pose gate, rulebook, accepted deltas
+- [Hole Wizard drawing locators](hole-wizard-drawing-locators.md) — dimension the wizard's OWN absorbed positioning sketch (edit_hole_position) AND set swInsertHoleWizardLocationDimensions (0x20000) in InsertModelAnnotations3 — both required for model-driven X/Y locators on a drawing
