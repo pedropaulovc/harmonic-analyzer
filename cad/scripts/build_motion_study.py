@@ -895,6 +895,11 @@ async def _reset_to_assembled(adapter):
 
 async def _export_video(adapter, stage):
     from solidworks_mcp.adapters.base import MotionExportParameters
+    # The export grabs the live viewport (screen renderer) -- frame the whole
+    # machine from the gallery's 3/4 view first.
+    model = adapter.currentModel
+    adapter._attempt(lambda: model.ShowNamedView2("*Trimetric", -1), default=None)
+    adapter._attempt(lambda: model.ViewZoomtofit2(), default=None)
     vid = (OUT_PNG.parent / f"{ASM}-operation-{stage}.mp4").resolve()
     res = await adapter.export_motion_video(MotionExportParameters(
         file_path=str(vid), study_name="", frames_per_second=25.0))
