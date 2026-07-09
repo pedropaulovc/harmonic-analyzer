@@ -56,6 +56,7 @@ build_or_refresh takes the FULL branch when the target is absent)::
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import os
 import shutil
@@ -551,6 +552,103 @@ def _run_stamped(cmd: list[str], label: str, stamp: str) -> None:
     _run(cmd, label, log_stem=Path(stamp).stem)
     Path(stamp).parent.mkdir(parents=True, exist_ok=True)
     Path(stamp).write_text(f"{label}\n", encoding="utf-8")
+
+
+# --- COM seat mutual-exclusion lock (belt-and-suspenders over the task_dep spine).
+#
+# The spine totally orders the MANDATORY COM tasks + the preflight->release chain, so
+# at most one is ready under ``-n N``. But the opt-in ``drawing`` leaf branches off
+# ``export`` in PARALLEL with preflight -- it deliberately does NOT depend on
+# release/preflight (so a drawing/PDF failure can't block a release, and ``doit
+# drawing`` doesn't cut one). No static task_dep edge closes the remaining hole (a
+# combined ``doit -n N drawing release`` unblocks both off ``export``): release must
+# not depend on drawing AND drawing must not depend on release, yet they'd need to be
+# ordered -- a contradiction. So the single-seat rule is enforced at RUNTIME here --
+# every OPT-IN COM action (drawing / preflight / release) grabs this advisory lock,
+# and the second to start fails loud instead of corrupting the shared STA seat
+# (codex #213). The mandatory chain keeps using the plain ``_run``/``_run_stamped``
+# (already serialized by task_dep), so a normal ``doit -n N`` build is unchanged.
+_COM_SEAT_LOCK = REPORTS / ".com-seat.lock"
+
+
+def _pid_alive(pid: int) -> bool:
+    """True if ``pid`` is a live process. Conservative: on any uncertainty returns
+    True, so a stale-lock reclaim never STEALS a lock from a running COM task."""
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        try:
+            import ctypes
+
+            k32 = ctypes.windll.kernel32
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            STILL_ACTIVE = 259
+            handle = k32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+            if not handle:
+                return False  # no such process (or access denied -> treat as gone)
+            code = ctypes.c_ulong()
+            ok = k32.GetExitCodeProcess(handle, ctypes.byref(code))
+            k32.CloseHandle(handle)
+            return (not ok) or code.value == STILL_ACTIVE
+        except Exception:
+            return True  # can't tell -> assume alive
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except OSError:
+        return True  # e.g. EPERM -> exists but not ours -> alive
+
+
+@contextlib.contextmanager
+def _com_seat(label: str):
+    """Advisory exclusive lock for the single SolidWorks COM seat (see the block
+    above). Fails loud on genuine contention; reclaims a lock whose holder has died
+    (a hard-killed prior run), never one still alive."""
+    REPORTS.mkdir(parents=True, exist_ok=True)
+    fd = None
+    for reclaim in (True, False):
+        try:
+            fd = os.open(str(_COM_SEAT_LOCK), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            break
+        except FileExistsError:
+            holder = ""
+            try:
+                holder = _COM_SEAT_LOCK.read_text(encoding="utf-8").strip()
+            except OSError:
+                pass
+            first = holder.splitlines()[0] if holder else ""
+            pid = int(first) if first.isdigit() else 0
+            if reclaim and pid and not _pid_alive(pid):
+                with contextlib.suppress(OSError):
+                    os.unlink(str(_COM_SEAT_LOCK))
+                continue  # stale -> retry the create once
+            raise SystemExit(
+                f"dodo: SolidWorks COM seat busy ({holder or 'unknown holder'}); "
+                f"`{label}` cannot run concurrently. Run the opt-in COM tasks "
+                f"(drawing / preflight / release) one at a time -- not combined "
+                f"under -n. (If no COM task is running, delete {_COM_SEAT_LOCK}.)"
+            )
+    os.write(fd, f"{os.getpid()}\n{label}\n".encode())
+    os.close(fd)
+    try:
+        yield
+    finally:
+        with contextlib.suppress(OSError):
+            os.unlink(str(_COM_SEAT_LOCK))
+
+
+def _run_locked(cmd: list[str], label: str, log_stem: str | None = None) -> None:
+    """``_run`` under the COM-seat lock -- for the opt-in ``drawing`` leaf."""
+    with _com_seat(label):
+        _run(cmd, label, log_stem)
+
+
+def _run_stamped_locked(cmd: list[str], label: str, stamp: str) -> None:
+    """``_run_stamped`` under the COM-seat lock -- for the opt-in ``preflight``."""
+    with _com_seat(label):
+        _run_stamped(cmd, label, stamp)
 
 
 def _rel_tag(f: str) -> str:
@@ -1530,9 +1628,11 @@ def task_drawing():
         "targets": [slddrw, pdf],
         # Explicit leaf off `export` (see _COM_TAIL note) -- keeps drawing serial on
         # the seat without joining the preflight/release chain in either direction.
+        # The COM-seat lock (_run_locked) enforces the remaining mutual exclusion vs
+        # a concurrently-run preflight/release (codex #213).
         "task_dep": ["export"],
         "uptodate": [False],
-        "actions": [(_run, [[sys.executable, str(DRAWING_PY)], "drawing", "drawing"])],
+        "actions": [(_run_locked, [[sys.executable, str(DRAWING_PY)], "drawing", "drawing"])],
         "verbosity": 2,
     }
 
@@ -1563,8 +1663,8 @@ def task_preflight():
         # release would SKIP the only sufficiency check. Running unconditionally,
         # preflight_release.py fails loud when specs are missing (codex review).
         "uptodate": [False],
-        "actions": [(_run_stamped, [[sys.executable, str(PREFLIGHT_PY)],
-                                    "release preflight", stamp])],
+        "actions": [(_run_stamped_locked, [[sys.executable, str(PREFLIGHT_PY)],
+                                           "release preflight", stamp])],
         "clean": True,
         "verbosity": 2,
     }
@@ -1573,6 +1673,12 @@ def task_preflight():
 def _run_release(relargs):
     """Run cut_release.py, forwarding any positional args (``doit release -- v0.2.0``)."""
     _run([sys.executable, str(RELEASE_PY), *relargs], "cut release")
+
+
+def _run_release_locked(relargs):
+    """``_run_release`` under the COM-seat lock -- for the opt-in ``release``."""
+    with _com_seat("cut release"):
+        _run_release(relargs)
 
 
 def task_release():
@@ -1589,7 +1695,7 @@ def task_release():
         "task_dep": [*_spine_dep("release"), *(f"check:{c}" for c in _CHECK_NAMES)],
         "uptodate": [False],
         "pos_arg": "relargs",
-        "actions": [(_run_release,)],
+        "actions": [(_run_release_locked,)],
         "verbosity": 2,
     }
 
