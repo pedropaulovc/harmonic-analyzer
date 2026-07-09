@@ -71,4 +71,31 @@ Local cam/follower and spring/lever contact is exercised only in **small isolate
 subassemblies** — the interference/health gates of `verify:soundness` open every
 (sub)assembly standalone (the former `verify:subsystems` suite is retired; its one
 unique gate, channel-independence, is folded into soundness). The full 21-spring
-equilibrium is never solved in the top-level assembly.
+equilibrium is never solved in the top-level assembly **gates**; the opt-in
+operation study below attempts it as a demonstration.
+
+## The full-machine operation study (demonstration, not a gate)
+
+`cad/scripts/build_motion_study.py` (stages `flex`/`kinematic`/`springs`/`full`;
+NOT in the doit graph) opens the saved default-`free` top assembly, makes the six
+moving subs FLEXIBLE, replays the setup poses + amplitude clamps engaged from the
+park sidecars (a `square` opt re-stations the bars transiently for a visible
+harmonic trace), authors the cross-sub couplings artifact A deliberately omits —
+20 cam ring↔lobe points, the crank↔T12 chain tie, the summing↔magnifying-lever
+1:1 hand-off, the WIRE-2 rim↔pen yoke — and runs one crank motor under Basic
+Motion, exporting an mp4 + sampled spans (`cad/out/reports/motion/`, rendered by
+`motion_report.py`). Nothing is ever saved.
+
+Two reliability classes, measured live (2026-07-09):
+
+- **`kinematic` (cams + chain tie + motor) is robust** — two crank revolutions
+  tracked, all 20 rockers at the cam-eccentricity amplitude, platen feeding
+  through the belt/chain → rack-pinion train. This is the full-functionality
+  smoke test beyond the per-sub kinematic gates.
+- **`full` (21 spring force elements + the output couplings) is MARGINAL** —
+  the whole coupled web sits at the fixed-step integrator's stability edge:
+  identical fresh solves vary between correct motion that dies partway and a
+  dead study, and repeated re-solves in one session degrade toward lockup
+  regardless of configuration. This is exactly the convergence-hostile case
+  the section above predicts; the pen's authoritative verification remains
+  `verify:kinematics` (computed, not simulated).
