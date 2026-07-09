@@ -691,6 +691,17 @@ async def build(adapter) -> dict[str, str]:
     await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", TIP_X, "anchor axis")
     await name_bore_axis(adapter, "Top Plane", HEX_H / 2.0, "Right Plane", 0.0, "knife axis")
 
+    # Summation-plate spring eye (``SpringEye``, hole 0): every plate hole
+    # shares the same X off the knife axis, so ONE point serves all 20 channel
+    # springs (identical torque arm about the Z knife line -- the summing
+    # torque is reproduced exactly). arc_center of the O2 hole's top-face edge.
+    from _refpoints import add_named_point
+
+    await add_named_point(adapter, "SpringEye", [
+        [HOLE_X + HOLE_DIA / 2.0, PLATE_T / 2.0, HOLE_Z[0]],
+        [HOLE_X, PLATE_T / 2.0, HOLE_Z[0] + HOLE_DIA / 2.0],
+    ])
+
     await apply_material(adapter, MATERIAL)
     # Green-painted casting on the machine (ch17/ch18 macros show the same
     # paint as the frame), not bare cast iron.

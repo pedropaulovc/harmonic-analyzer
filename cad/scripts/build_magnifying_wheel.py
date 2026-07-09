@@ -296,6 +296,20 @@ async def build(adapter) -> dict[str, str]:
     blank_sketch(adapter, "WireYokeSketch")
     _make_yoke_ref_point(adapter)
 
+    # WIRE-2 rim point (``RimPoint``): a radius-50 point on the rim OD edge.
+    # The full-machine assembly's scotch-yoke mate holds it on the pen-rod's
+    # horizontal plane, so the wheel's rock drags the pen in Y -- the
+    # linearized wire-2 constraint, sibling of WireYokePoint above (which is
+    # sketch-promoted because the pitch-circle tangency has no geometry;
+    # this one anchors to the real rim edge and moves with it).
+    from _refpoints import add_named_point
+
+    await add_named_point(adapter, "RimPoint", [
+        [RIM_OUTER_DIA / 2.0, 0.0, RIM_AXIAL / 2.0],
+        [RIM_OUTER_DIA / 2.0, 0.0, -RIM_AXIAL / 2.0],
+        [0.0, RIM_OUTER_DIA / 2.0, RIM_AXIAL / 2.0],
+    ], mode="along_curve")
+
     # Apply the deferred drive equations after the whole model + a rebuild exists,
     # so every target resolves. Each equation evaluates to the as-built value (the
     # spoked wheel's volume has no tidy closed form, so the neutrality gate asserts

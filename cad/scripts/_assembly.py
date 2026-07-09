@@ -1511,6 +1511,15 @@ async def mark_park_driver(adapter: Any, mate: Any, key: str) -> str:
     return new
 
 
+def deferred_park_count(name: str) -> int:
+    """Number of deferred park-driver specs recorded beside ``<name>.SLDASM``
+    (0 when the sidecar is absent -- a ``locked`` build, or nothing parked)."""
+    path = park_spec_path(name)
+    if not path.exists():
+        return 0
+    return len(json.loads(path.read_text()).get("specs", []))
+
+
 async def find_park_drivers(adapter: Any) -> list[tuple[str, bool]]:
     """``(name, suppressed)`` for every top-level ``PARK_*`` mate of the active
     assembly (via ``list_mates``, which returns ``name``/``type``/``suppressed``)."""
@@ -2275,8 +2284,27 @@ def save_assembly_in_place(adapter: Any, asm_name: str, geometry_changed: bool) 
             f"(ret={ret}, err={err.value}, warn={warn.value})")
     log(f"saved {sldasm.name} via Save3(Silent) (ret={ret}, err={err.value}, "
         f"warn={warn.value})")
+def _default_refresh_dof_gate(adapter: Any, asm_name: str) -> None:
+    """DOF gate for the refresh path, aware of default-``free`` assemblies.
+
+    A ``free`` build DEFERS its freed park drivers to the ``.<stem>.park.json``
+    sidecar, so the shipped model is legitimately under-constrained -- the
+    strict fully-defined check would fail every part-only refresh of such an
+    assembly (latent since the default-free split; the refresh path was never
+    adapted). The sidecar count is the refresh-time expectation (count-only
+    necessity -- the stricter per-family proof stays in ``verify:soundness``,
+    which runs downstream in the same build). No sidecar (a ``locked`` build,
+    or an assembly with nothing parked) keeps the strict gate."""
+    n = deferred_park_count(asm_name)
+    if n:
+        assert_free_dof_necessity(adapter, n)
+        return
+    assert_components_fully_defined(adapter)
+
+
 async def refresh_assembly(
-    adapter: Any, asm_name: str, views: Iterable[str] = DEFAULT_VIEWS
+    adapter: Any, asm_name: str, views: Iterable[str] = DEFAULT_VIEWS,
+    dof_gate: Any = None,
 ) -> dict[str, str]:
     """Reload an assembly's parts in place -- the cheap incremental rebuild.
 
@@ -2294,8 +2322,9 @@ async def refresh_assembly(
     ~500 s full re-insert/re-mate); only if the re-read is STILL faulted does the
     refresh raise, naming the config + the broken feature/mate. Then the
     rest/export pose is re-activated and the
-    standard gates run: ``assert_components_fully_defined`` (free DOF),
-    ``check_no_interference`` (overlaps), ``assert_model_healthy`` (deep mate
+    standard gates run: the build-mode-aware DOF gate (``dof_gate`` override,
+    else :func:`_default_refresh_dof_gate`), ``check_no_interference``
+    (overlaps), ``assert_model_healthy`` (deep mate
     health). Any gate raises a ``RuntimeError`` naming the culprit and the
     ``.SLDASM`` is left untouched (the in-place save never runs) -- so an
     UNHEALABLE dangling mate (AutoMateRepair could not re-bind it) or a geometry
@@ -2354,7 +2383,15 @@ async def refresh_assembly(
             check(f"re-activate {rest}", await adapter.set_active_configuration(rest))
 
     # Gates -- each already raises a RuntimeError naming the culprit. No fallback.
-    assert_components_fully_defined(adapter)
+    # The DOF gate adapts to how the model was built: sidecar-counted free-DOF
+    # necessity for a default-`free` assembly, strict fully-defined otherwise
+    # (see _default_refresh_dof_gate). ``dof_gate`` overrides it entirely -- the
+    # top assembly passes its operational gate from refresh_assembly.py (which
+    # imports _assembly_top OUTSIDE any build recipe).
+    if dof_gate is not None:
+        dof_gate(adapter)
+    else:
+        _default_refresh_dof_gate(adapter, asm_name)
     check_no_interference(adapter)
     assert_model_healthy(adapter, label=asm_name, deep=True)
 

@@ -31,8 +31,7 @@ from _common import (
 )
 from _assembly import coincident_mate
 from build_motion_study import (
-    _add_ring_centre_point, _by_z_rank, _comp_xform, _components, _entity_ref,
-    _iter_mates,
+    _by_z_rank, _comp_xform, _components, _entity_ref, _iter_mates,
 )
 
 
@@ -73,7 +72,10 @@ async def main():
             await adapter.suppress_mate(SuppressMateParameters(name=name, suppress=False))
             await adapter.delete_mate(MateRefParameters(name=name))
 
-    point_name = await _add_ring_centre_point(adapter)
+    # The connecting-rod carries a PERMANENT ring-centre point now
+    # (build_connecting_rod authors "RingCenter" via _refpoints.py); the old
+    # runtime _add_ring_centre_point round-trip is gone.
+    point_name = "RingCenter"
 
     comps = _components(adapter)
     gears = _by_z_rank(adapter, "cylinder-gear", comps=comps)

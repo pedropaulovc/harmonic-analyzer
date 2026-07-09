@@ -1,6 +1,6 @@
 ---
 name: motion-study-full-device-rework
-description: 2026-07-09 full-device operation study rework — the default-free architecture needs ZERO suppression; COM traps (unflagged IComponent2, currentModel overwrite, lightweight docs) and Basic Motion margin lessons (fresh-solve-only attribution, coaxial gear degeneracy)
+description: 2026-07-08/09 full-device operation rework — the top .SLDASM now SHIPS the operating machine (flexible movers, SETUP_ clamps, cam/chain/hand-off/WIRE2 couplings, two saved Basic Motion studies); SETUP_ vs PARK_ naming; runner-not-builder study; COM traps (unflagged IComponent2, currentModel overwrite, lightweight docs) and Basic Motion margin lessons
 metadata:
   type: project
 ---
@@ -15,7 +15,43 @@ authors. See [[motion-study-pipeline]] for the June recipe this supersedes.
 crank motor operating the whole machine with real spring force elements, plus
 video + pen-vs-truth assets.
 
-**How to apply (the new shape):**
+**How to apply (SUPERSEDED 2026-07-09 by the second rework — everything moved
+into the ARTIFACT):** the top build (`_assembly_top.py` +
+`build_harmonic_analyzer_assembly.py`) now ships the operating machine — six
+flexible movers (ONE batched CompConfigProperties5 on the whole selection),
+the 23 engaged `SETUP_<key>` clamps (sub park-sidecar specs RETARGETED into
+top context: prefix component paths with `<sub>-1/`, split one-level
+`Feat@comp` names into component= form, leave bare root-plane names/world
+points alone — subs sit at identity), the 20 `CAM_chNN` couplings (permanent
+`RingCenter` RefPoint on connecting-rod; 20° perturb first),
+`CHAIN_crank_paper`, `HANDOFF_levers`, `WIRE2_pen` (permanent `RimPoint`), and
+TWO saved Basic Motion studies (kinematic = motor; full = motor + 21 springs
+on permanent `SpringEye` RefPoints; names in `.harmonic-analyzer.studies.json`).
+Rules that fell out of the second rework:
+- `SETUP_` ≠ `PARK_`: the top clamps are ordinary operating mates; `PARK_` is
+  reserved for the park machinery (find_park_drivers / assert_park_closure /
+  the dof_expected_free cycle) — naming them PARK_ would entangle them with
+  defer/cycle/closure semantics (user call, 2026-07-09).
+- The study script is a RUNNER: it may add motion ELEMENTS (gravity) to a
+  saved study but NEVER a mate — its one mate mutation (J2 rod-axial
+  suppression for solver margin) happens on the STANDALONE channel doc before
+  the top opens. The artifact keeps the axials LIVE: Grübler over each cam
+  loop (bearing 5 + pivot 5 + J2 rev+axial 5 + cam 2 = 17 on 18) is exactly
+  constrained — the suppression is integrator tolerance, not statics.
+- The strip-and-recalc attribution loop was DROPPED (June + July both showed
+  repeated in-session recalcs degrade toward lockup regardless of what was
+  stripped; only a fresh run's first solve is evidence).
+- Top DOF gate = `assert_top_operational_dof` (full-tree walk, floor 3·N+12 +
+  required chain families + exact T12 instance; the CLAMPED amplitude-bar is
+  the calibration canary for whether nested GetConstrainedStatus reads the
+  parent or the sub-doc solve — unverified COM semantic).
+- `doit stamp_recipes -- all-subs` is the escape that let the `_assembly.py`
+  refresh-gate fix land WITHOUT a FULL 8-assembly rebuild (declares the
+  on-disk artefacts valid for the new recipe; the refresh gates still prove it).
+- The amplitude preset stays upstream (machine/amplitude.yaml → channels.yaml
+  → channel build → recorded specs); no study-time re-station exists any more.
+
+**The first rework's shape (2026-07-08, historical):**
 - ZERO suppression: deferred park drivers are ABSENT = free. Replay ENGAGED
   only the setup poses (drive-train cone_swing/pinion_swing/pinion_cam) + the
   20 bar_amplitude clamps — on each sub opened STANDALONE (the preflight

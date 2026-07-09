@@ -74,17 +74,28 @@ unique gate, channel-independence, is folded into soundness). The full 21-spring
 equilibrium is never solved in the top-level assembly **gates**; the opt-in
 operation study below attempts it as a demonstration.
 
-## The full-machine operation study (demonstration, not a gate)
+## The full-machine operation studies (demonstration, not a gate)
 
-`cad/scripts/build_motion_study.py` (stages `flex`/`kinematic`/`springs`/`full`;
-NOT in the doit graph) opens the saved default-`free` top assembly, makes the six
-moving subs FLEXIBLE, replays the setup poses + amplitude clamps engaged from the
-park sidecars (a `square` opt re-stations the bars transiently for a visible
-harmonic trace), authors the cross-sub couplings artifact A deliberately omits —
-20 cam ring↔lobe points, the crank↔T12 chain tie, the summing↔magnifying-lever
-1:1 hand-off, the WIRE-2 rim↔pen yoke — and runs one crank motor under Basic
-Motion, exporting an mp4 + sampled spans (`cad/out/reports/motion/`, rendered by
-`motion_report.py`). Nothing is ever saved.
+The top assembly build SHIPS the operating machine (see AGENTS.md "The top
+assembly is the OPERATING machine"): six flexible subs, the engaged `SETUP_*`
+clamps, every cross-sub coupling (20 cam ring↔lobe points, the crank↔T12 chain
+tie, the summing↔magnifying-lever 1:1 hand-off, the WIRE-2 rim↔pen yoke), and
+**two saved Basic Motion studies** — `kinematic` (crank motor only) and `full`
+(motor + the 21 spring force elements on the parts' permanent `SpringEye`
+points), names recorded in `.harmonic-analyzer.studies.json`.
+
+`cad/scripts/build_motion_study.py` (stages `kinematic`/`full`; NOT in the doit
+graph) is the RUNNER: it suppresses each channel's J2 rod-axial mate on the
+standalone channel doc (the cam point-on-axis makes each of the 20 loops
+redundant by 1, and Basic Motion is redundancy-intolerant — the artifact keeps
+the axials live because the static solve is Grübler-exact with them), opens the
+top, resolves the requested saved study, solves from the assembled pose,
+samples with fail-loud gates, and exports an mp4 + sampled spans
+(`cad/out/reports/motion/`, rendered by `motion_report.py`). It never saves and
+never authors a mate — a mate edit under a saved study risks the
+initial-animation-state corruption class. The amplitude preset is a config
+concern (machine/amplitude.yaml → channels.yaml → the channel build → the
+clamps), not a study option.
 
 Two reliability classes, measured live (2026-07-09):
 
@@ -92,10 +103,12 @@ Two reliability classes, measured live (2026-07-09):
   tracked, all 20 rockers at the cam-eccentricity amplitude, platen feeding
   through the belt/chain → rack-pinion train. This is the full-functionality
   smoke test beyond the per-sub kinematic gates.
-- **`full` (21 spring force elements + the output couplings) is MARGINAL** —
+- **`full` (the 21 spring force elements + the output couplings) is MARGINAL** —
   the whole coupled web sits at the fixed-step integrator's stability edge:
   identical fresh solves vary between correct motion that dies partway and a
   dead study, and repeated re-solves in one session degrade toward lockup
-  regardless of configuration. This is exactly the convergence-hostile case
-  the section above predicts; the pen's authoritative verification remains
-  `verify:kinematics` (computed, not simulated).
+  regardless of configuration (which is also why the old in-session
+  strip-and-recalc attribution loop was dropped: only a run's FIRST solve is
+  evidence). This is exactly the convergence-hostile case the section above
+  predicts; the pen's authoritative verification remains `verify:kinematics`
+  (computed, not simulated).
