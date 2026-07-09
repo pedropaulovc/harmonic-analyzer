@@ -67,6 +67,7 @@ from build_motion_study import (
     SPRING_KCH,
     SPRING_KCT,
     _by_z_rank,
+    _comp_model_doc,
     _components,
     _entity_ref,
     _find_one,
@@ -123,7 +124,7 @@ async def _eye_point(adapter, comp_needle, edge_point, label, comps=None):
     comp, _ = _find_one(adapter, comp_needle, comps=comps)
     if comp is None:
         raise RuntimeError(f"{comp_needle} not found for eye point {label}")
-    part = adapter._attempt(lambda: comp.GetModelDoc2(), default=None)
+    part = _comp_model_doc(adapter, comp)
     if part is None:
         raise RuntimeError(f"{comp_needle} part doc unresolved")
     part_title = str(_read_member(part, "GetTitle"))
@@ -251,7 +252,7 @@ async def _rim_point(adapter, comps=None):
     wh, _ = _find_one(adapter, "magnifying-wheel-1", comps=comps)
     if wh is None:
         raise RuntimeError("magnifying-wheel-1 not found for rim point")
-    part = adapter._attempt(lambda: wh.GetModelDoc2(), default=None)
+    part = _comp_model_doc(adapter, wh)
     if part is None:
         raise RuntimeError("magnifying-wheel part doc unresolved")
     part_title = str(_read_member(part, "GetTitle"))
