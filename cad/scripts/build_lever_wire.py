@@ -83,7 +83,7 @@ CLEARANCE = 0.25  # surface stand-off (interference-gate margin convention)
 # rim back-face bound at radius 43.35, axle-flange bound inside radius 17.9,
 # spoke fronts at -144.9) gives the hook/hub-end pair below: a 10 mm z drop
 # over the ~371 run = 1.5 deg, visually plumb.
-CLAMP_X = -150.0  # sliding clamp / vertical rod / fixture line
+CLAMP_X = 150.0  # sliding clamp / vertical rod / fixture line
 # The wire TIES through the fixture's cross hole and hangs beside the vertical
 # rod, just under the collar's bottom face: wire r + 0.25 below it in y, and
 # off the rod axis in -z by rod r 2.5 + wire r 0.4 + 0.25 = 3.15 (the front
@@ -94,7 +94,7 @@ CLAMP_X = -150.0  # sliding clamp / vertical rod / fixture line
 # wire's rim-duck feasibility caps the hook at ~-137.96).
 HOOK_Y = 925.35  # FIXTURE_Y0 926 - wire r 0.4 - 0.25 (under the collar bottom)
 HOOK_Z = -137.95
-WHEEL_X = -53.0  # magnifying-wheel centre
+WHEEL_X = 53.0  # magnifying-wheel centre
 WHEEL_BAR_Y = 565.0
 HUB_DIA = 20.0  # ch. 21 annotated (build_magnifying_wheel.HUB_DIA)
 # Hub-end Z: in the hub's back groove band, between the rim-duck bound
@@ -104,9 +104,11 @@ HUB_END_Z = -142.77
 
 # XY tangent from the hook to the hub circle inflated by wire r + clearance,
 # on the west (hook) side: the wire grazes the groove and the wrap is implied.
+# (-acos picks the tangent whose contact point faces the hook at machine +x;
+# the pre-#151 mirrored frame used +acos for the reflected tangent.)
 _R_EFF = HUB_DIA / 2.0 + WIRE_DIA / 2.0 + CLEARANCE
 _VX, _VY = CLAMP_X - WHEEL_X, HOOK_Y - WHEEL_BAR_Y  # hub centre -> hook (2D)
-_THETA = math.atan2(_VY, _VX) + math.acos(_R_EFF / math.hypot(_VX, _VY))
+_THETA = math.atan2(_VY, _VX) - math.acos(_R_EFF / math.hypot(_VX, _VY))
 
 WIRE_START = (CLAMP_X, HOOK_Y, HOOK_Z)  # hook end
 WIRE_END = (

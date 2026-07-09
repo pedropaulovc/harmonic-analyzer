@@ -9,9 +9,9 @@ top-lever fulcrum shaft (seat 1040.7 + ball rise 25.2 = axis 1065.9) and
 the summing lever hangs below it (M6.4). One rail carries a Ø17 clearance
 bore at mid-span (z 0) for the counter-spring gooseneck post, which slides
 through and drops below the plate (ch. 19; the real corner casting is bored
-for the post). The post is authored at +197 in summing but its SOLID mirrors
-to x -197 (MIRROR_PLANE 'z'); this part inserts un-mirrored, so the bore is
-cut at part x -197 to meet it (M6.12). Identified in M6.3 from the
+for the post). Summing places the post at machine x -197 (COLUMN_X, with a
+composed Ry(180)), so the bore is cut at part x -197 to meet it (M6.12).
+Identified in M6.3 from the
 eight views (green ring at y ~ 1010-1055 in every view, columns
 continuing above to their caps); no book chapter covers it directly.
 
@@ -70,14 +70,12 @@ GOOSENECK_BORE_DIA = 17.0  # clearance for the Ø16 counter-spring post sliding
 # through the rail mid-span (build_gooseneck); the post drops below the
 # plate, gripped by the gooseneck-clamp above -- ch. 19. Fully inside the rail
 # band (|x| 197 in 186..208), so a clean cylindrical cut.
-GOOSENECK_X = -COLUMN_X  # The counter-spring post is authored at +197 in
-# summing, but it has MIRROR_PLANE 'z', so mirror_placement reflects its SOLID
-# about the machine YZ plane and the post body actually sits at x -197. This
-# part inserts UN-mirrored (direct insert_component; its authored x IS its
-# solid x, proved by the part COM shifting -1.59 toward -x), so the clearance
-# bore must be cut at x -COLUMN_X to coincide with the post's mirrored body.
-# At +COLUMN_X it bored the opposite rail and the post drilled solid casting
-# (full Ø16x41 = 8243 mm^3 top-level interference, M6.12).
+GOOSENECK_X = -COLUMN_X  # The counter-spring post body sits at machine
+# x -197: summing places the gooseneck at its COLUMN_X = -197 (with a
+# composed Ry(180)), so the clearance bore is cut at x -COLUMN_X to coincide
+# with the post body. At +COLUMN_X it bored the opposite rail and the post
+# drilled solid casting (full Ø16x41 = 8243 mm^3 top-level interference,
+# M6.12).
 GOOSENECK_Z = 0.0  # rail mid-span (sketch y -> machine -Z; 0 is handedness-free)
 
 OUTER_X = COLUMN_X + RAIL_WIDTH / 2.0  # 208

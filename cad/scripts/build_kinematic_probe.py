@@ -157,7 +157,9 @@ def _removables_by_role(adapter: Any) -> dict[str, str]:
     The three ``transgear-removable`` instances share a stem, so identify them by
     position: T12 at the crank centre, T24 at the knob shaft, T18 the loose spare."""
     known = {
-        "T12": CHAIN_CRANK_CENTRE,
+        # Machine-handed anchors (#151): the T12 rides the crank at machine -X
+        # (_chain's CHAIN_CRANK_CENTRE is its own pre-mirror +X anchor).
+        "T12": (-CHAIN_CRANK_CENTRE[0], CHAIN_CRANK_CENTRE[1]),
         "T24": KNOB_SHAFT_XY,
         "T18": SPARE_GEAR_POS[:2],
     }
@@ -167,8 +169,7 @@ def _removables_by_role(adapter: Any) -> dict[str, str]:
         best, bestd = None, 1e9
         for n in insts:
             x, y = _origin_xy(adapter, n)
-            # match on |x| (the default mirror flips the X sign) and y.
-            d = math.hypot(abs(x) - abs(kx), y - ky)
+            d = math.hypot(x - kx, y - ky)
             if d < bestd:
                 best, bestd = n, d
         if bestd > 8.0:
