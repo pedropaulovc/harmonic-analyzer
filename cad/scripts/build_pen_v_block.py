@@ -28,6 +28,7 @@ from _common import (
     CASTING_GREEN,
     SketchDims,
     add_line_chain,
+    anchor_point_to_origin,
     apply_color,
     apply_material,
     check,
@@ -84,8 +85,9 @@ async def build(adapter) -> dict[str, str]:
     # INCH document and the equation manager reads BARE numbers in document units
     # (an unsuffixed 32 = 32 in, blowing the part up 25.4x in-plane). Bore/slit
     # stations are independent globals so a GUI edit nudges one feature without
-    # touching its neighbours. (The set-screw hole is a Hole Wizard feature placed
-    # by point, not an equation-driven sketch, so it has no globals here.)
+    # touching its neighbours. The set-screw hole is a Hole Wizard feature, but it
+    # is placed on a DRIVEN sketch point (ScrewHoleX/ScrewHoleY), so its location
+    # is equation-driven like every other feature -- not an un-dimensioned pick.
     await set_global(adapter, "BlockLength", f"{BLOCK_LENGTH}mm")
     await set_global(adapter, "BlockHeight", f"{BLOCK_HEIGHT}mm")
     await set_global(adapter, "BlockDepth", f"{BLOCK_DEPTH}mm")
@@ -96,6 +98,11 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "SlitLength", f"{SLIT_LENGTH}mm")
     await set_global(adapter, "SlitY0", f"{SLIT_Y[0]}mm")
     await set_global(adapter, "SlitY1", f"{SLIT_Y[1]}mm")
+    # Set-screw hole station: the Hole Wizard hole is placed ON a driven sketch
+    # point (below), so its X/Y ARE equation-driven dims -- a machinist reads the
+    # locators off the drawing, and a GUI edit moves the tapped hole.
+    await set_global(adapter, "ScrewHoleX", f"{SCREW_HOLE_XY[0]}mm")
+    await set_global(adapter, "ScrewHoleY", f"{SCREW_HOLE_XY[1]}mm")
 
     # Each sketch records its dim names + drive equations in the helper's
     # emission order; the equations are collected here and applied in one
@@ -202,12 +209,12 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     _telemetry.info(f"volume after slit: {vol:.1f} mm^3")
 
-    # Front-face set-screw hole: a real Hole Wizard #5-40 UNC tapped THROUGH hole,
-    # placed at the (ScrewHoleX, ScrewHoleY) point on the front face (z=0, a solid
-    # spot clear of the bores and the slit). Modeling it as a smart hole rather
-    # than a plain drill means the MODEL carries the thread designation, so the
-    # drawing reads a native "#5-40 UNC-2B THRU" callout with no hard-coded map;
-    # the tap-drill diameter comes from the #5-40 table.
+    # Front-face set-screw hole: a real Hole Wizard #5-40 UNC tapped THROUGH hole
+    # at (ScrewHoleX, ScrewHoleY) on the front face (z=0, a solid spot clear of the
+    # bores and the slit). Modeling it as a smart hole rather than a plain drill
+    # means the MODEL carries the thread designation, so the drawing reads a native
+    # "#5-40 UNC-2B THRU" callout with no hard-coded map; the tap-drill diameter
+    # comes from the #5-40 table.
     hole = check(
         "tapped set-screw hole (#5-40 UNC)",
         await adapter.insert_tapped_hole(
@@ -218,6 +225,29 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     _telemetry.info(f"set-screw hole feature: {hole}")
+
+    # The Hole Wizard drops its location point UN-dimensioned (an under-defined
+    # pick), so the hole has no X/Y locator on a drawing and its position is not
+    # parametric. Open the wizard's own positioning sketch and anchor that point to
+    # the origin: a horizontal + vertical distance dim (D1/D2), driven by the
+    # ScrewHoleX/ScrewHoleY globals. This fully defines the hole and gives the
+    # drawing real locator dimensions telling a machinist WHERE to drill/tap.
+    locator = check(
+        "open set-screw hole positioning sketch",
+        await adapter.edit_hole_position(hole["name"], "ScrewHoleLocator"),
+    )
+    await anchor_point_to_origin(
+        adapter, locator, SCREW_HOLE_XY[0], SCREW_HOLE_XY[1], "set-screw locator"
+    )
+    await ensure_fully_defined(adapter, "set-screw locator sketch")
+    check("exit_sketch set-screw locator", await adapter.exit_sketch())
+    # anchor_point_to_origin emits horizontal (D1) then vertical (D2) for a general
+    # off-axis point; drive each by its global (the positioning sketch is absorbed
+    # under the wizard, so it is addressed by these raw dim names, not SketchDims).
+    drive_jobs += [
+        ("D1@ScrewHoleLocator", '"ScrewHoleX"'),
+        ("D2@ScrewHoleLocator", '"ScrewHoleY"'),
+    ]
     v_final = await _volume(adapter)
     _telemetry.info(f"volume after set-screw hole: {v_final:.1f} mm^3")
 

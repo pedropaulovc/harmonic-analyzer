@@ -26,21 +26,23 @@ import _telemetry
 
 STANDARD = "ASME Y14.5-2018"
 
-# The project drawing template (ANSI A landscape, unused tables stripped), checked
+# The project drawing template (ANSI B landscape, unused tables stripped), checked
 # into the repo so the sheet/border/title block is reproducible across seats instead
 # of depending on each seat's default ``.drwdot``. Built by
 # ``make_drawing_template.py``; ``new_drawing`` falls back to the seat default (with
 # a warning) until it exists.
 TEMPLATE_DRWDOT = (CAD_ROOT / "templates" / "harmonic-analyzer.drwdot").resolve()
 
-# Third-angle projection symbol: the ONE project placement (sheet meters, just above
-# the title block) + size, referenced by every part drawing rather than re-specified.
+# Layout anchors in sheet METERS (origin bottom-left), placed within the rendered
+# region of the ANSI B landscape sheet (0.4318 x 0.2794 m): notes upper-left, title
+# block + third-angle symbol lower-right of the left-stacked views. (The PDF/PNG
+# export crops to the content region, so anchors sit near the drawn views rather than
+# at the extreme sheet corners.)
 _PROJECTION_XY = (0.186, 0.055)
 _PROJECTION_SIZE = 0.005
 
-# General-notes block (upper-left) and title-block (lower-right) anchor + line pitch,
-# sheet meters (origin bottom-left). The 5 mm notes pitch keeps a 7-line block clear
-# of the top view's upper dimension.
+# General-notes block (upper-left) and title-block (lower-right) anchor + line pitch.
+# The 5 mm notes pitch keeps a 7-line block clear of the top view's upper dimension.
 _NOTES_XY = (0.018, 0.205)
 _NOTES_PITCH = 0.005
 _TITLE_XY = (0.180, 0.032)

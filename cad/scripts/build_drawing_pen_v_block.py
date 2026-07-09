@@ -35,8 +35,14 @@ import _telemetry
 from solidworks_mcp.adapters.solidworks import drawing as dwg
 
 PART_NAME = "pen-v-block"
-MATERIAL = "Brass"
 SLDPRT = (OUT_SLDPRT / f"{PART_NAME}.SLDPRT").resolve()
+
+# Title-block / notes identity is READ FROM THE MODEL, never hard-coded: the part
+# stamps these as SolidWorks custom properties from its parts.yaml registry row
+# (_common.part_properties), so the print always agrees with the source-of-truth
+# BOM data. A missing make-critical field fails the build rather than shipping a
+# blank/stale title block. (Scale is separately read back from the actual view.)
+TITLE_PROPS = ("Title", "Number", "Revision", "Material")
 # Dedicated output homes: the native drawing under cad/out/slddrw, the PDF under
 # cad/out/pdf, and the render under cad/out/png as ``<part>_drawing.png`` (the
 # ``_drawing`` suffix keeps it distinct from the part-render PNGs in cad/out/png/<part>/).
@@ -44,10 +50,10 @@ OUT_SLDDRW = CAD_ROOT / "out" / "slddrw"
 OUT_PDF = CAD_ROOT / "out" / "pdf"
 OUT_PNG = CAD_ROOT / "out" / "png"
 
-# 1.5:1 keeps the 32 x 18 mm block readable (~48 x 27 mm) while leaving clear
-# vertical room on the A-size (279 x 216 mm) sheet for the stacked front/top
-# views, the notes band above them, and the baseline dimensions below. (Standard
-# views auto-fit to 2:1; the title block reads the ACTUAL scale back.)
+# On the ANSI B (431.8 x 279.4 mm) sheet the 32 x 18 mm block auto-fits to 2:1
+# (~64 x 36 mm), leaving room for the left-stacked front/top views, the notes band
+# upper-left and the title block lower-right. This scale is a floor request; the
+# standard views auto-fit larger and the title block reads the ACTUAL scale back.
 SHEET_SCALE = (1.5, 1.0)
 
 # Two hole-callout groups are expected: "2X Ø8.00 THRU" (the two consolidated bores)
@@ -69,11 +75,25 @@ REDUNDANT_DIMS = ("Bore1Z", "TopRun")
 
 
 async def build(adapter) -> dict[str, str]:
-    # 1. Open the part; capture its on-disk path for the view references.
+    # 1. Open the part; capture its on-disk path for the view references, and read
+    #    the title-block identity off its custom properties WHILE it is the active
+    #    doc (the drawing created next carries none of its own). Fail loud on a
+    #    missing make-critical field -- a blank part number/material/rev on a
+    #    machinist print is a real defect, not a cosmetic one.
     res = await adapter.open_model(str(SLDPRT))
     check("open pen-v-block.SLDPRT", res)
     model_path = res.data.path
     _telemetry.info(f"model path: {model_path}")
+    props = dwg.read_custom_properties(adapter, list(TITLE_PROPS))
+    missing_props = [p for p in TITLE_PROPS if not props.get(p)]
+    if missing_props:
+        raise RuntimeError(
+            f"pen-v-block.SLDPRT is missing title-block custom properties "
+            f"{missing_props}; the part must stamp them (see part_properties) "
+            "before a drawing can be drawn from the model"
+        )
+    material = props["Material"]
+    _telemetry.info(f"title identity from model: {props}")
 
     # 2. New drawing from the project template (falls back to the seat default).
     pd.new_drawing(adapter)
@@ -191,13 +211,15 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
 
     # 6. General notes (upper-left) + title-block identity (lower-right), from the
-    #    project shared conventions.
-    pd.add_notes_block(adapter, pd.standard_notes(material=MATERIAL))
+    #    project shared conventions. Name/number/rev/material all come from the
+    #    model's custom properties (read in step 1), so the print never disagrees
+    #    with the registry; the display name is the Title property, upper-cased.
+    pd.add_notes_block(adapter, pd.standard_notes(material=material))
     pd.add_title_block(
         adapter,
         pd.title_rows(
-            name="PEN V-BLOCK", number="MHA-053", rev="A",
-            material=MATERIAL, scale_str=scale_str,
+            name=props["Title"].upper(), number=props["Number"],
+            rev=props["Revision"], material=material, scale_str=scale_str,
         ),
     )
     await force_rebuild(adapter)

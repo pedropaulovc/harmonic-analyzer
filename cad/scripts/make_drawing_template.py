@@ -1,10 +1,11 @@
 r"""Create the project drawing template (``cad/templates/harmonic-analyzer.drwdot``).
 
-Derives a clean ANSI A-landscape drawing template from the seat's stock ANSI sheet
-format, strips the unused stock tables (revision / BOM / general) that clutter a
-single-part print, sets it born-ASME (third-angle, mm), and saves it into the repo
-so the drawing pipeline uses a PROJECT-owned, reproducible template instead of each
-seat's default ``.drwdot``.
+Derives a clean ANSI B-landscape (17x11 in / 431.8x279.4 mm) drawing template from
+the seat's stock ANSI sheet format, strips the unused stock tables (revision / BOM /
+general) that clutter a single-part print, sets it born-ASME (third-angle, mm), and
+saves it into the repo so the drawing pipeline uses a PROJECT-owned, reproducible
+template instead of each seat's default ``.drwdot``. The template is COMMITTED so the
+sheet/border/title-block bytes are pinned into release provenance.
 
 One-off / regenerate-on-demand — NOT on the build spine. Run with SolidWorks open::
 
@@ -22,22 +23,22 @@ import _telemetry
 
 from solidworks_mcp.adapters.solidworks import drawing as dwg
 
-# The stock ANSI A landscape sheet format (border + title block); resolved from the
+# The stock ANSI B landscape sheet format (border + title block); resolved from the
 # install's sheetformat dir so it works across seats.
-ANSI_A_FORMAT = "a - landscape.slddrt"
+ANSI_B_FORMAT = "b - landscape.slddrt"
 
 
 async def build(adapter) -> dict[str, str]:
     # 1. Blank drawing from the seat default template.
     dwg.new_drawing(adapter)
 
-    # 2. Apply the stock ANSI A landscape sheet format (border + zones + title block).
-    fmt = dwg.resolve_sheet_format(adapter, ANSI_A_FORMAT)
+    # 2. Apply the stock ANSI B landscape sheet format (border + zones + title block).
+    fmt = dwg.resolve_sheet_format(adapter, ANSI_B_FORMAT)
     if fmt:
         dwg.apply_sheet_format(adapter, fmt)
         _telemetry.info(f"applied ANSI sheet format: {fmt}")
     else:
-        _telemetry.warn(f"{ANSI_A_FORMAT!r} not found on this seat; keeping template default")
+        _telemetry.warn(f"{ANSI_B_FORMAT!r} not found on this seat; keeping template default")
 
     # 3. Born ASME: third-angle projection, mm.
     dwg.setup_sheet(adapter, scale=(1, 1), first_angle=False)
