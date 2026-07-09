@@ -782,7 +782,17 @@ async def author_operation_studies(adapter, comps) -> dict[str, str]:
     path = studies_sidecar_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(
-        {"studies": names, "rpm": CRANK_RPM, "duration_s": DURATION_S},
+        {"studies": names, "rpm": CRANK_RPM, "duration_s": DURATION_S,
+         # The amplitude state the SETUP_* clamps were built against (this
+         # same process replayed them), recorded HERE at build time so the
+         # study runner labels its samples with the truth curve that is
+         # actually baked into the clamps -- reading live config at solve
+         # time would mislabel the trace if config moved after the build
+         # (codex #217).
+         "amplitude": {
+             "preset": str(_config.machine("amplitude", "preset")),
+             "coefficients_mm": [float(a) for a in _config.amplitudes()],
+         }},
         indent=1))
     _telemetry.success(f"saved operation studies {names} -> {path.name}")
     return names

@@ -865,6 +865,17 @@ def _recipe_files(stem: str) -> list[str]:
         # configuration at the top build anyway).
         files += [str((CAD_OUT / "sldasm" / f".{sub}.park.json").resolve())
                   for sub in ("drive-train", "channel")]
+        # The SAVED motion studies bake element references into nested part
+        # geometry -- the crank motor's Axis1@crankshaft and the 21 springs'
+        # SpringEye points. AutoMateRepair heals dangling MATES on a top
+        # refresh, but nothing re-authors a dangling STUDY element, so a
+        # rebuild of one of these anchor parts must force a FULL top rebuild
+        # (which re-authors the studies). Their artefact digests are
+        # recipe-keyed, so this triggers exactly when the part actually
+        # rebuilds (codex #217 round 2).
+        files += [_sldprt(p) for p in ("crankshaft", "channel_lever",
+                                       "summing_lever", "gooseneck",
+                                       "boss_hook")]
     return files
 
 
@@ -1060,7 +1071,10 @@ def build_or_refresh(stem, dependencies, changed, targets):
             return
         sp.set_attribute("cache", "miss")
 
-        target_missing = not Path(targets[0]).exists()
+        # ANY missing target escalates to FULL: for the top that includes the
+        # studies sidecar, which only the full build path regenerates -- a
+        # refresh would leave it missing forever (codex #217 round 2).
+        target_missing = any(not Path(t).exists() for t in targets)
         try:
             last = sidecar.read_text(encoding="utf-8").strip()
         except OSError:
@@ -1142,6 +1156,8 @@ def _clean_assembly(stem):
     if stem == "channel":
         for variant in _channel_spring_variants():
             _force_remove(variant)
+    if stem == "harmonic_analyzer":
+        _force_remove(CAD_OUT / "sldasm" / ".harmonic-analyzer.studies.json")
 
 
 def task_assembly():
@@ -1165,10 +1181,19 @@ def task_assembly():
         # Factored into _recipe_files so build_or_refresh computes the identical
         # digest.
         recipe_files = _recipe_files(stem)
+        targets = [_sldasm(stem)]
+        if stem == "harmonic_analyzer":
+            # The saved-study names sidecar is REQUIRED output (the study
+            # runner resolves the studies from it), so it is a declared
+            # target: a deleted/unrestored sidecar makes the task re-run, and
+            # build_or_refresh escalates any missing target to FULL, which
+            # regenerates it (codex #217 round 2).
+            targets.append(str((CAD_OUT / "sldasm" /
+                                ".harmonic-analyzer.studies.json").resolve()))
         yield {
             "name": stem,
             "file_dep": [*recipe_files, *ref_targets],
-            "targets": [_sldasm(stem)],
+            "targets": targets,
             "uptodate": [_RecipeTracker(stem, recipe_files)],
             # COM spine: serialize assemblies after every part on the SW seat.
             "task_dep": _spine_dep(f"assembly:{stem}"),

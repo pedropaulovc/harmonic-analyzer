@@ -79,7 +79,10 @@ def _truth_fit(pen: list[tuple[float, float]], rpm: float, preset: str,
     deg_per_s = 360.0 * rpm / 60.0
     best = (0.0, 0.0, [0.0] * len(ts))
     for phase in range(0, 360):
-        cand = _norm([truth_model.pen_y(deg_per_s * t + phase, coeffs) for t in ts])
+        # pen_y takes RADIANS (every other caller converts); passing the raw
+        # degree angle fit against a ~57x-frequency waveform (codex #217).
+        cand = _norm([truth_model.pen_y(math.radians(deg_per_s * t + phase), coeffs)
+                      for t in ts])
         r = _pearson(ys, cand)
         if abs(r) > abs(best[0]):
             best = (r, float(phase), cand if r >= 0 else [-v for v in cand])

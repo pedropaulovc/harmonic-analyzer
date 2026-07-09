@@ -425,15 +425,18 @@ def _rows_json(rows):
     return {label: _rot_series(samples) for label, samples in rows.items()}
 
 
-async def _reset_to_assembled(adapter):
+async def _reset_to_assembled(adapter, study_name=""):
     """Return the model to its assembled pose before calculate_motion.
 
     calculate_motion is POSE-DEPENDENT: solving from a previous run's settled
     pose makes the closed-loop cam mechanism lock (proven), whereas solving
-    from the assembled pose reliably moves.
+    from the assembled pose reliably moves. ``study_name`` targets the named
+    saved study explicitly (empty = the active one; the runner passes the
+    resolved name so the reset can never land on a different study's timeline
+    -- codex #217 round 2).
     """
     from solidworks_mcp.adapters.base import MotionTimeParameters
-    await adapter.set_motion_time(MotionTimeParameters(time=0.0, study_name=""))
+    await adapter.set_motion_time(MotionTimeParameters(time=0.0, study_name=study_name))
     adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
     adapter._attempt(lambda: adapter.currentModel.EditRebuild3(), default=None)
     log("  reset to assembled pose (set_time 0 + rebuild) before solve")
@@ -522,23 +525,28 @@ async def build(adapter):
             axis="y", reverse=True, study_name=study))
         log(f"  gravity -Y: {'OK' if g.is_success else 'FAIL ' + str(g.error)}")
 
-    await _reset_to_assembled(adapter)
+    await _reset_to_assembled(adapter, study)
     log("  Calculate() -- blocking solve of the whole device ...")
     with _telemetry.span("motion.calculate", study=study):
         check("calculate_motion", await adapter.calculate_motion(
             MotionStudyRefParameters(name=study)))
 
+    # The amplitude state comes from the BUILD-time studies sidecar -- the
+    # vector the SETUP_* clamps were actually authored against -- not from
+    # live config, which can move between the build and this hand-run solve
+    # (codex #217 round 2). Older sidecars predate the record: fall back to
+    # live config with a loud warning (rebuild the top to bake it).
+    amplitude = sidecar.get("amplitude")
+    if amplitude is None:
+        _telemetry.warn(
+            "studies sidecar records no amplitude state (pre-record artifact) "
+            "-- labelling samples with LIVE config; rebuild harmonic-analyzer "
+            "to bake it")
+        amplitude = {"preset": str(_config.machine("amplitude", "preset")),
+                     "coefficients_mm": [float(a) for a in _config.amplitudes()]}
     payload = {"stage": stage, "study": study, "rpm": rpm,
                "duration_s": duration, "channels": N_CHANNELS,
-               # The amplitude state this solve actually ran under, persisted so
-               # motion_report overlays the SAME truth curve even if the config
-               # moves after solving (codex #217). check:config pins channels.yaml
-               # to the preset, and the doit freshness chain pins the artifact's
-               # bar clamps to channels.yaml, so config-at-solve == baked clamps.
-               "amplitude": {
-                   "preset": str(_config.machine("amplitude", "preset")),
-                   "coefficients_mm": [float(a) for a in _config.amplitudes()],
-               }}
+               "amplitude": amplitude}
     with _telemetry.span("motion.sample"):
         payload["kinematic"] = await _sample_kinematic(adapter, comps, duration, study)
         if stage == "full":
