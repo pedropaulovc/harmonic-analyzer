@@ -503,9 +503,11 @@ async def _replay_setup_parks(adapter, preset="config"):
         if stem == "channel":
             specs = [_patch_bar_spec(s, preset) for s in specs]
         sub_path = str((OUT_SLDASM / f"{stem}.SLDASM").resolve())
+        # open_model FLAGS the doc dispatch and sets adapter.currentModel
+        # itself -- never overwrite it with a raw swApp.ActiveDoc read (an
+        # unflagged dispatch silently breaks GetTitle() inside the adapter's
+        # mate-entity name qualification; cost one live run to find).
         check(f"open {stem} (setup parks)", await adapter.open_model(sub_path))
-        adapter.currentModel = adapter._attempt(
-            lambda: adapter.swApp.ActiveDoc, default=adapter.currentModel)
         log(f"{stem}: replaying {len(specs)} deferred setup park driver(s) "
             f"(engaged): {[s['key'] for s in specs]}")
         await replay_park_specs(adapter, specs)
@@ -883,8 +885,6 @@ async def build(adapter):
 
     asm_path = str((OUT_SLDASM / f"{ASM}.SLDASM").resolve())
     check("open harmonic-analyzer", await adapter.open_model(asm_path))
-    adapter.currentModel = adapter._attempt(
-        lambda: adapter.swApp.ActiveDoc, default=adapter.currentModel)
     log(f"opened {asm_path}")
 
     with _telemetry.span("motion.flex"):
