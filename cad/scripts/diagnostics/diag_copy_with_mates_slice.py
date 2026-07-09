@@ -12,12 +12,17 @@ CreateMate+EditRebuild3 at a time; if a slice copy carries the whole chain,
 channels 2..19 collapse to one call each.
 
 Contracts under test (all previously measured, see memory/v018-perf-review.md):
-  C1  arrays are sized to the DISTINCT mates of the slice in tree order
-      (F2: 2 comps / 4 mates); here 4 comps / 12 mates.
-  C2  ``Values`` entries map positionally per mate; entries under
+  C1  arrays are sized to the DISTINCT mates of the slice (F2: 2 comps /
+      4 mates); here 4 comps / 12 mates. The per-slot ORDER for a
+      multi-component slice is NOT plain tree order (measured 2026-07-09:
+      5 of 6 dims followed it, but foot-X consumed the J2-spin slot) and
+      no armchair rule fits all six -- so the probe DISCOVERS the mapping
+      with a sentinel-valued calibration copy, then deletes it.
+  C2  ``Values`` entries map positionally per slot; entries under
       dimension-less mates are dead; every dimension mate must carry its
       REAL value (a 0.0 re-values it to zero -- the Z=0 landing of the
-      first ladder run).
+      first ladder run and the rod-ring-on-Right-Plane landing of the
+      first slice run).
   C3  the ONE substituted entry is the rocker's axial distance to the
       anchor bushing's Front plane: PITCH/2 + k*PITCH, always positive =
       always the seed's side (Q5: FlipDimension is a NO-OP under
@@ -57,6 +62,11 @@ from _assembly import (  # noqa: E402
     world_point,
 )
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows, rows_from_euler  # noqa: E402
+from solidworks_mcp.adapters.base import ComponentRefParameters  # noqa: E402
+from solidworks_mcp.adapters.solidworks.assembly import (  # noqa: E402
+    _mate_group_subfeatures,
+    _read_member,
+)
 from build_channel_assembly import (  # noqa: E402
     ARM_ARC_CENTER_LOCAL_Y,
     ARM_MID_DZ,
@@ -88,10 +98,66 @@ from build_channel_assembly import (  # noqa: E402
 SEED_J = 1  # seed channel: its rocker anchors to the gap-1 bushing at PITCH/2
 N_COPY_STATIONS = 4  # copies land at channels SEED_J+1 .. SEED_J+N
 SLICE_MATES = 12  # J1(3) + J2(3) + J4(2) + J3(3) + J5(1), creation order
-AXIAL_IDX = 1  # the rocker axial distance's position in the slice mate order
 PIVOT_OD_PT = [PIVOT[0] + SHAFT_R, PIVOT[1], 0.0]
 FULC_OD_PT = [FULCRUM[0] + SHAFT_R, FULCRUM[1], 0.0]
 CHAIN_PARTS = ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever")
+
+
+# Semantic identity of each dimension mate in the slice, classified by the
+# part prefixes of its two mated components ("ROOT" = an assembly plane;
+# measured: the ReferenceComponent of a root plane is the assembly document
+# itself, e.g. "Assem50", so any prefix that is not a known part maps to
+# ROOT). Unique for this chain, so a copied dim is identifiable no matter
+# what order the copy created it in.
+_SEM_BY_OWNERS = {
+    frozenset({"rocker-arm", "pivot-bushing"}): "J1a",
+    frozenset({"rocker-arm", "ROOT"}): "J1s",
+    frozenset({"connecting-rod", "rocker-arm"}): "J2a",
+    frozenset({"connecting-rod", "ROOT"}): "J2s",
+    frozenset({"amplitude-bar", "ROOT"}): "footX",
+    frozenset({"amplitude-bar", "rocker-arm"}): "J5",
+}
+_KNOWN_PART_PREFIXES = set(CHAIN_PARTS) | {
+    "pivot-bushing", "pivot-shaft", "fulcrum-shaft"}
+# Position of each semantic dim in _seed_chain's creation-order dims list.
+_DIMS_IDX_BY_SEM = {"J1a": 1, "J1s": 2, "J2a": 4, "J2s": 5, "footX": 10, "J5": 11}
+# The dims whose slots MUST calibrate: the EXTERNAL ones (referencing an
+# entity outside the copied set). The 2026-07-09 calibration measured that
+# ONLY external mates get Values slots (tree-ordered among themselves:
+# J1c=0, J1a=1, J1s=2, J2s=3, J4c=4, footX=5) -- INTERNAL mates (J2a, J5)
+# are re-bound between the copies and INHERIT their dims (sentinels never
+# touched them), so they need no slot and no value.
+_EXTERNAL_SEMS = {"J1a", "J1s", "J2s", "footX"}
+
+
+def _dim_mates_with_owners(adapter) -> list[dict]:
+    """Every MateDistanceDim in tree order: name, D1 (mm), owner prefixes."""
+    model = adapter.currentModel
+    out: list[dict] = []
+    for feat in _mate_group_subfeatures(adapter):
+        if str(_read_member(feat, "GetTypeName2")) != "MateDistanceDim":
+            continue
+        name = str(_read_member(feat, "Name"))
+        param = adapter._attempt(
+            lambda n=name: model.Parameter(f"D1@{n}"), default=None)
+        val = _read_member(param, "SystemValue") if param is not None else None
+        mate = _read_member(feat, "GetSpecificFeature2")
+        owners = set()
+        instances = set()
+        for i in range(2):
+            ent = adapter._attempt(
+                lambda m=mate, k=i: m.MateEntity(k), default=None)
+            owner = _read_member(ent, "ReferenceComponent") if ent else None
+            nm = str(_read_member(owner, "Name2") or "") if owner else ""
+            part = nm.rsplit("-", 1)[0] if nm else ""
+            if part in _KNOWN_PART_PREFIXES:
+                owners.add(part)
+                instances.add(nm)
+            else:
+                owners.add("ROOT")
+        out.append({"name": name, "mm": (val or 0.0) * 1000.0,
+                    "owners": frozenset(owners), "instances": instances})
+    return out
 
 
 def _spin_dim_value(pivot_xy: tuple[float, float], target_xy: tuple[float, float]) -> float:
@@ -274,13 +340,15 @@ def _copy_slice(adapter, comps: dict[str, str], values_m: list[float]) -> None:
     adapter._attempt(lambda: model.CopyWithMates2(*args), default=None)
 
 
-def _slice_transforms(adapter, exclude: set[str]) -> dict[str, list[list[float]]]:
-    """Transforms of every chain-part instance NOT in ``exclude``, by part."""
-    out: dict[str, list[list[float]]] = {p: [] for p in CHAIN_PARTS}
+def _slice_transforms(
+    adapter, exclude: set[str],
+) -> dict[str, list[tuple[str, list[float]]]]:
+    """(name, transform) of every chain-part instance NOT in ``exclude``."""
+    out: dict[str, list[tuple[str, list[float]]]] = {p: [] for p in CHAIN_PARTS}
     for name in component_names(adapter):
         part = name.rsplit("-", 1)[0]
         if part in out and name not in exclude:
-            out[part].append(component_transform(adapter, name))
+            out[part].append((name, component_transform(adapter, name)))
     return out
 
 
@@ -317,18 +385,52 @@ async def build(adapter) -> dict[str, str]:
     seed_tf = {p: component_transform(adapter, comps[p]) for p in CHAIN_PARTS}
     seed_names = set(comps.values())
 
-    # Copies: station k = SEED_J + i, axial re-valued to PITCH/2 + i*PITCH
-    # (always positive = the seed's side; C3). NB the per-mate array order
-    # for a MULTI-component slice is assumed = assembly tree order (C1); the
-    # rival hypothesis (per-component GetMates concatenation, deduped) agrees
-    # on AXIAL_IDX=1 but would slide J5's 806 mm radius under a dead
-    # coincident entry and hand J5 a 0.0 -- yanking every copied bar to the
-    # arc centre. So a wrong order fails the pose check LOUD and the landing
-    # pattern says which order is real.
+    # CALIBRATION COPY -- discover the Values-slot mapping empirically.
+    # 2026-07-09 measured: with tree-order values, 5 of 6 dims landed right
+    # but the bar's foot-X consumed the J2-spin slot and the rod spin got a
+    # dead one (rod ring yanked onto the Right Plane, drift exactly 54.474;
+    # bar foot re-valued 72.9 -> 54.474, drift exactly 18.427). So the
+    # multi-component enumeration is NOT plain tree order, and the rival
+    # per-component-GetMates rule contradicts other slots (J5 landed at
+    # tree index 11). Rather than guess: copy once with a DISTINCT sentinel
+    # per slot, identify each copied dim by its mated components, read
+    # which sentinel it holds -> slot, then delete the calibration copy.
+    sentinels = [1000.0 + 10.0 * k for k in range(SLICE_MATES)]
+    dims_before = {d["name"] for d in _dim_mates_with_owners(adapter)}
+    comps_before = set(component_names(adapter))
+    _copy_slice(adapter, comps, [s / 1000.0 for s in sentinels])
+    slot_by_sem: dict[str, int] = {}
+    for dm in _dim_mates_with_owners(adapter):
+        if dm["name"] in dims_before:
+            continue
+        sem = _SEM_BY_OWNERS.get(dm["owners"])
+        k = round((dm["mm"] - 1000.0) / 10.0)
+        ok = 0 <= k < SLICE_MATES and abs(dm["mm"] - sentinels[k]) < 0.01
+        log(f"calibration: {dm['name']} owners={sorted(dm['owners'])} "
+            f"={dm['mm']:.2f}mm -> sem={sem} slot={k if ok else '??'}")
+        if sem is not None and ok:
+            slot_by_sem[sem] = k
+    for name in sorted(set(component_names(adapter)) - comps_before):
+        check(f"remove calibration copy {name}",
+              await adapter.remove_component(ComponentRefParameters(name=name)))
+    missing = _EXTERNAL_SEMS - set(slot_by_sem)
+    if missing:
+        log(f"VERDICT: calibration could not map slots for {sorted(missing)}"
+            f" -- mapped {slot_by_sem}; cannot value the real copies")
+        return {"verdict": "calibration-failed"}
+    log(f"discovered Values-slot mapping: {slot_by_sem} "
+        f"(internal dims {sorted(set(_DIMS_IDX_BY_SEM) - set(slot_by_sem))} "
+        f"inherit the seed's values -- no slot)")
+
+    # Real copies: station k = SEED_J + i; every dim gets its SEED value at
+    # its DISCOVERED slot, with only the rocker axial substituted to
+    # PITCH/2 + i*PITCH (always positive = the seed's side; C3).
     times = []
     for i in range(1, N_COPY_STATIONS + 1):
-        values = [d / 1000.0 for d in dims]
-        values[AXIAL_IDX] = (PITCH / 2.0 + i * PITCH) / 1000.0
+        values = [0.0] * SLICE_MATES
+        for sem, k in slot_by_sem.items():
+            values[k] = (PITCH / 2.0 + i * PITCH if sem == "J1a"
+                         else dims[_DIMS_IDX_BY_SEM[sem]]) / 1000.0
         t0 = time.perf_counter()
         _copy_slice(adapter, comps, values)
         times.append(time.perf_counter() - t0)
@@ -337,40 +439,132 @@ async def build(adapter) -> dict[str, str]:
     mates_after = await _mate_count(adapter)
     want_mates = mates_before + SLICE_MATES * N_COPY_STATIONS
 
-    # Judge poses: every copy must hold the seed's rotation + XY and sit at
-    # seed Z + i*PITCH, for ALL FOUR parts.
-    tfs = _slice_transforms(adapter, seed_names)
-    pose_fail: list[str] = []
-    for part in CHAIN_PARTS:
-        got = sorted(tfs[part], key=lambda m: m[11])
-        want_zs = sorted(seed_tf[part][11] * 1000.0 + i * PITCH
-                         for i in range(1, N_COPY_STATIONS + 1))
-        if len(got) != N_COPY_STATIONS:
-            pose_fail.append(f"{part}: {len(got)} copies != {N_COPY_STATIONS}")
-            continue
-        for m, want_z in zip(got, want_zs):
-            rot_xy_ok = all(
-                abs(m[k] - seed_tf[part][k]) < 1e-6 for k in range(9)
-            ) and all(
-                abs((m[9 + a] - seed_tf[part][9 + a]) * 1000.0) < 1e-3
-                for a in range(2)
-            )
-            z_ok = abs(m[11] * 1000.0 - want_z) < 0.05
-            if not (rot_xy_ok and z_ok):
-                pose_fail.append(
-                    f"{part}@{m[11] * 1000.0:.3f}: want z {want_z:.3f}, "
-                    f"rot/xy {'ok' if rot_xy_ok else 'DRIFTED'}"
-                )
+    # Evidence dump: every distance mate's ACTUAL dimension value + owners,
+    # in tree order -- the direct record of what each copied dim holds.
+    dist_dump = [
+        f"{d['name']}[{'+'.join(sorted(d['owners']))}]={d['mm']:.3f}mm"
+        for d in _dim_mates_with_owners(adapter)
+    ]
+    log(f"distance dims in tree order: {'; '.join(dist_dump)}")
+    log(f"seed dims for reference (mm): {[round(d, 3) for d in dims]} "
+        f"(per-copy axial -> {[round(PITCH / 2.0 + i * PITCH, 3) for i in range(1, N_COPY_STATIONS + 1)]})")
 
-    # Stability: one closing rebuild, then re-check a sentinel pose.
+    def _measure(tag: str) -> tuple[list[str], set[str]]:
+        """Judge poses: every copy must hold the seed's rotation + XY and
+        sit at seed Z + i*PITCH, for ALL FOUR parts. Returns (failure
+        descriptions, failing instance names)."""
+        tfs = _slice_transforms(adapter, seed_names)
+        fails: list[str] = []
+        bad: set[str] = set()
+        for part in CHAIN_PARTS:
+            got = sorted(tfs[part], key=lambda nm: nm[1][11])
+            want_zs = sorted(seed_tf[part][11] * 1000.0 + i * PITCH
+                             for i in range(1, N_COPY_STATIONS + 1))
+            if len(got) != N_COPY_STATIONS:
+                fails.append(f"{part}: {len(got)} copies != {N_COPY_STATIONS}")
+                continue
+            worst_rot = worst_xy = worst_z = 0.0
+            for (name, m), want_z in zip(got, want_zs):
+                rot_d = max(abs(m[k] - seed_tf[part][k]) for k in range(9))
+                xy_d = max(abs((m[9 + a] - seed_tf[part][9 + a]) * 1000.0)
+                           for a in range(2))
+                z_d = abs(m[11] * 1000.0 - want_z)
+                worst_rot = max(worst_rot, rot_d)
+                worst_xy = max(worst_xy, xy_d)
+                worst_z = max(worst_z, z_d)
+                # Copies re-run the mate SOLVE, so sub-visible solver
+                # residual vs the seed pose is expected; only real drift (a
+                # wrong branch, a mis-valued dim) fails. rot elements are
+                # unitless direction cosines: 1e-4 ~ 0.006 deg.
+                if rot_d > 1e-4 or xy_d > 0.05 or z_d > 0.05:
+                    bad.add(name)
+                    fails.append(
+                        f"{name}@{m[11] * 1000.0:.3f}: rot_d={rot_d:.2e} "
+                        f"xy_d={xy_d:.4f}mm z_d={z_d:.4f}mm (want z {want_z:.3f})"
+                    )
+            log(f"pose deltas {tag} {part}: rot {worst_rot:.2e}, "
+                f"xy {worst_xy:.5f}mm, z {worst_z:.5f}mm")
+        return fails, bad
+
+    pose_fail, bad_instances = _measure("raw")
+
+    # FLIP-REPAIR PASS. A copied distance dim can solve on the OTHER side
+    # of its reference (measured: the rod's spin dim landed the ring at
+    # +54.474 instead of -54.474 -- drift exactly 2x the dim, the same
+    # 108.95 mm flip the deferred rod_swing replays hit). The mate carries
+    # that side as ITS OWN FlipDimension state, which is why a
+    # SetTransformAndSolve3 to the correct pose just snaps back (measured
+    # twice). The fix edits the mate itself: IFeature::GetDefinition ->
+    # IDistanceMateFeatureData.FlipDimension = not current ->
+    # ModifyDefinition (the documented edit path). For each drifted copy,
+    # toggle its external dims one at a time and keep what heals.
+    t_fix = 0.0
     model = adapter.currentModel
+    if pose_fail:
+        log(f"raw poses off ({len(pose_fail)} checks; instances "
+            f"{sorted(bad_instances)}) -- running the FlipDimension repair")
+        t0 = time.perf_counter()
+        for inst in sorted(bad_instances):
+            cands = [
+                d for d in _dim_mates_with_owners(adapter)
+                if inst in d["instances"]
+                and ("ROOT" in d["owners"]
+                     or d["owners"] == frozenset({"rocker-arm", "pivot-bushing"}))
+            ]
+            for d in cands:
+                feat = next(
+                    (f for f in _mate_group_subfeatures(adapter)
+                     if str(_read_member(f, "Name")) == d["name"]), None)
+                if feat is None:
+                    continue
+                data = _read_member(feat, "GetDefinition")
+                if data is None:
+                    log(f"!! {d['name']}: GetDefinition returned None")
+                    continue
+                cur = bool(_read_member(data, "FlipDimension"))
+                adapter._attempt(
+                    lambda dd=data, c=cur: setattr(dd, "FlipDimension", not c))
+                # The Component arg must be a typed dispatch-null: a bare
+                # Python None marshals as VT_NULL and the call is rejected
+                # (the documented OpenDoc6/CopyWithMates2 trap; measured
+                # here as ModifyDefinition=False with no effect).
+                null_comp = VARIANT(pythoncom.VT_DISPATCH, None)
+                ok = adapter._attempt(
+                    lambda f=feat, dd=data, nc=null_comp:
+                        f.ModifyDefinition(dd, model, nc),
+                    default=False)
+                adapter._attempt(lambda: model.EditRebuild3(), default=None)
+                m = component_transform(adapter, inst)
+                p = inst.rsplit("-", 1)[0]
+                healed = (
+                    all(abs(m[k] - seed_tf[p][k]) < 1e-4 for k in range(9))
+                    and all(abs((m[9 + a] - seed_tf[p][9 + a]) * 1000.0) < 0.05
+                            for a in range(2))
+                )
+                log(f"flip-repair {inst}: {d['name']} FlipDimension "
+                    f"{cur} -> {not cur} (ModifyDefinition={ok}) -> "
+                    f"{'HEALED' if healed else 'no change'}")
+                if healed:
+                    break
+                # revert the unhelpful toggle
+                adapter._attempt(
+                    lambda dd=data, c=cur: setattr(dd, "FlipDimension", c))
+                adapter._attempt(
+                    lambda f=feat, dd=data, nc=null_comp:
+                        f.ModifyDefinition(dd, model, nc),
+                    default=False)
+        t_fix = time.perf_counter() - t0
+        pose_fail, bad_instances = _measure("repaired")
+
+    # Stability: one closing rebuild, then re-check.
+    tfs_pre = _slice_transforms(adapter, seed_names)
     adapter._attempt(lambda: model.EditRebuild3(), default=None)
-    tfs2 = _slice_transforms(adapter, seed_names)
+    tfs_post = _slice_transforms(adapter, seed_names)
     stable = all(
-        abs(a[11] - b[11]) * 1000.0 < 1e-3
+        abs(a[1][11] - b[1][11]) * 1000.0 < 1e-3
         for part in CHAIN_PARTS
-        for a, b in zip(sorted(tfs[part], key=lambda m: m[11]),
-                        sorted(tfs2[part], key=lambda m: m[11]))
+        for a, b in zip(sorted(tfs_pre[part], key=lambda nm: nm[1][11]),
+                        sorted(tfs_post[part], key=lambda nm: nm[1][11]))
     )
 
     log("=" * 70)
@@ -379,9 +573,10 @@ async def build(adapter) -> dict[str, str]:
     log(f"poses: {'ALL ON-STATION' if not pose_fail else 'FAIL -- ' + '; '.join(pose_fail)}")
     log(f"stable after rebuild: {stable}")
     log(f"timing: seed chain {t_seed:.1f}s vs slice copy avg "
-        f"{sum(times) / len(times):.2f}s (first {times[0]:.2f}s, last {times[-1]:.2f}s)")
+        f"{sum(times) / len(times):.2f}s (first {times[0]:.2f}s, last "
+        f"{times[-1]:.2f}s) + repair pass {t_fix:.1f}s total")
     ok = (mates_after == want_mates) and not pose_fail and stable
-    log(f"VERDICT: {'PASS -- one call replicates the whole chain' if ok else 'FAIL (see above)'}")
+    log(f"VERDICT: {'PASS -- one call + pose-seed repair replicates the whole chain' if ok else 'FAIL (see above)'}")
     return {"verdict": "pass" if ok else "fail"}
 
 
