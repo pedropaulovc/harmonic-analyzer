@@ -189,12 +189,21 @@ def _find_one(adapter, needle, model=None, comps=None, toplevel=False):
     return hits[0] if hits else (None, None)
 
 
+def _comp_model_doc(adapter, comp):
+    """A component's model doc. GetModelDoc2 is a METHOD -- the component
+    dispatches from :func:`_components` are deliberately UNFLAGGED (#87), so
+    an unflagged call raises ('str' object not callable) and _attempt reads
+    None; flag the single dispatch at the point of use (cost two live runs)."""
+    _flag(comp, "IComponent2")
+    return adapter._attempt(lambda: comp.GetModelDoc2(), default=None)
+
+
 def _sub_model(adapter, sub_name):
     log(f"  resolving {sub_name} model doc ...")
     comp, _ = _find_one(adapter, sub_name, toplevel=True)
     if comp is None:
         raise RuntimeError(f"sub component not found: {sub_name}")
-    model = adapter._attempt(lambda: comp.GetModelDoc2(), default=None)
+    model = _comp_model_doc(adapter, comp)
     if model is None:
         # After the flex-solve rebuilds a component dispatch can refuse
         # GetModelDoc2 (lightweight/stale COM read) even though the sub doc IS
@@ -533,7 +542,7 @@ async def _add_ring_centre_point(adapter):
     rod_comp, _ = _find_one(adapter, "connecting-rod-1")
     if rod_comp is None:
         raise RuntimeError("connecting-rod-1 not found for ring-centre point")
-    part = adapter._attempt(lambda: rod_comp.GetModelDoc2(), default=None)
+    part = _comp_model_doc(adapter, rod_comp)
     if part is None:
         raise RuntimeError("connecting-rod part doc unresolved")
     part_title = str(_read_member(part, "GetTitle"))
