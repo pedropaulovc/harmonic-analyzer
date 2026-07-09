@@ -849,8 +849,23 @@ def _recipe_files(stem: str) -> list[str]:
     no longer forces a spurious ~500 s FULL re-insert."""
     asm_script = script_for(stem)
     hooks = [str((SCRIPTS_DIR / h).resolve()) for h in POST_ASSEMBLY.get(stem, ())]
-    return [str(asm_script.resolve()), *hooks, *_helper_deps(asm_script),
-            *_config_deps(asm_script, stem, "assembly"), _submodule_dep()]
+    files = [str(asm_script.resolve()), *hooks, *_helper_deps(asm_script),
+             *_config_deps(asm_script, stem, "assembly"), _submodule_dep()]
+    if stem == "harmonic_analyzer":
+        # The top build CONSUMES the drive-train + channel park sidecars (the
+        # SETUP_* clamps replay their recorded specs -- _assembly_top._SETUP_PARKS),
+        # so a sub rebuild that re-records specs without moving the top's script/
+        # config (e.g. a channels.yaml amplitude edit) must force a FULL top
+        # rebuild -- a REFRESH would keep the stale clamps while the DOF gate
+        # still reads a live mechanism (codex #217 P1). _digest_files hashes a
+        # missing sidecar as "<missing>", so recipe digests stay computable on a
+        # clean checkout; as doit file_dep (via _assembly_file_deps) they exist
+        # by the time the top task runs -- the free sub builds write them (a
+        # `locked` mover has no sidecar, but require_free_movers rejects that
+        # configuration at the top build anyway).
+        files += [str((CAD_OUT / "sldasm" / f".{sub}.park.json").resolve())
+                  for sub in ("drive-train", "channel")]
+    return files
 
 
 def _recipe_sidecar(stem: str) -> Path:

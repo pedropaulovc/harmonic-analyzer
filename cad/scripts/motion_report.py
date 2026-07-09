@@ -56,16 +56,24 @@ def _pearson(a: list[float], b: list[float]) -> float:
     return cov / (va * vb) if va and vb else 0.0
 
 
-def _truth_fit(pen: list[tuple[float, float]], rpm: float, preset: str):
+def _truth_fit(pen: list[tuple[float, float]], rpm: float, preset: str,
+               coeffs=None):
     """Phase-fit the truth curve to the sampled pen trace.
 
     Returns (best_r, best_phase_deg, truth_series aligned to the samples).
     The crank rest angle (and the yoke's sign) are arbitrary vs truth theta=0,
     so sweep the phase over a full period at 1-degree steps and keep the
     magnitude-best r (sign folded into the returned series).
+
+    ``coeffs`` is the a_j vector the SOLVE actually ran under (persisted in the
+    samples JSON); when present it is used verbatim, so a config edit after
+    solving cannot swap the truth curve out from under the saved trace (codex
+    #217). ``None`` falls back to reading the preset from config at report time
+    (older samples files).
     """
     import truth_model
-    coeffs = truth_model.coefficients("square" if preset == "square" else "config")
+    if coeffs is None:
+        coeffs = truth_model.coefficients("square" if preset == "square" else "config")
     ts = [t for t, _y in pen]
     ys = _norm([y for _t, y in pen])
     deg_per_s = 360.0 * rpm / 60.0
@@ -81,7 +89,13 @@ def _truth_fit(pen: list[tuple[float, float]], rpm: float, preset: str):
 def main() -> int:
     stage = sys.argv[1] if len(sys.argv) > 1 else "full"
     data = _load(stage)
-    rpm, preset = float(data["rpm"]), data.get("preset", "config")
+    rpm = float(data["rpm"])
+    # The runner persists the amplitude state it solved under; older samples
+    # files carried only a top-level "preset" string (config read at report
+    # time -- the fallback path in _truth_fit).
+    amplitude = data.get("amplitude") or {}
+    preset = amplitude.get("preset", data.get("preset", "config"))
+    coeffs_solved = amplitude.get("coefficients_mm")
 
     import matplotlib
     matplotlib.use("Agg")
@@ -127,7 +141,7 @@ def main() -> int:
                 md.append(f"- platen feed: {data[kind]['platen_feed_mm']:.3f} mm")
         else:
             pen = [(t, y) for t, y in data["pen"]["series_t_y"]]
-            r, phase, truth = _truth_fit(pen, rpm, preset)
+            r, phase, truth = _truth_fit(pen, rpm, preset, coeffs=coeffs_solved)
             ts = [t for t, _y in pen]
             ax.plot(ts, _norm([y for _t, y in pen]), color=C_BLUE, linewidth=2,
                     label="pen tip (sampled)")

@@ -52,6 +52,7 @@ import math
 import os
 import sys
 
+import _config
 from _common import (
     OUT_PNG,
     OUT_SLDASM,
@@ -99,6 +100,8 @@ ASM = TOP_ASM
 ROCKER_MIN_DEG = 1.0      # dead-output gate: largest rocker swing must exceed
 PEN_MIN_MM = 0.5          # dead-output gate: pen-tip travel must exceed
 SUM_MIN_DEG = 0.05        # dead-output gate: summing-lever rock must exceed
+PLATEN_MIN_MM = 1.0       # dead-output gate: platen feed must exceed (the chain
+                          # tie is an artifact mate now -- measured ~19 mm/2 revs)
 
 # Motion samples land here (JSON per stage) for the SW-free plot/report step.
 OUT_MOTION = (OUT_PNG.parent / "reports" / "motion")
@@ -320,8 +323,8 @@ async def _sample_kinematic(adapter, comps, duration, study, n_probe=3):
 
     Gates: (1) solve-lock on the crank (constant-rate motor must track);
     (2) dead-output on the rockers (a decoupled cam chain solves cleanly with
-    a dead output). Platen feed is reported AND gated -- the chain tie is an
-    artefact mate now, so a dead platen is a real regression.
+    a dead output); (3) dead-output on the platen -- the chain tie is an
+    artefact mate now, so a missing or unfed platen is a real regression.
     """
     probes = []
     for comp, name in _by_z_rank(adapter, "rocker-arm", comps=comps)[:n_probe]:
@@ -336,8 +339,11 @@ async def _sample_kinematic(adapter, comps, duration, study, n_probe=3):
     if crank is not None:
         probes.append((crank, "crankshaft"))
     platen, _platen_n = _find_one(adapter, "platen-1", comps=comps)
-    if platen is not None:
-        probes.append((platen, "platen"))
+    if platen is None:
+        raise RuntimeError(
+            "platen-1 not found -- cannot prove the crank->chain->rack paper "
+            "feed (CHAIN_crank_paper is an artifact mate; the platen must exist)")
+    probes.append((platen, "platen"))
     rows = await _sample_transforms(adapter, probes, 12, duration, study)
 
     spans = {}
@@ -361,6 +367,12 @@ async def _sample_kinematic(adapter, comps, duration, study, n_probe=3):
                 f"DEAD OUTPUT: crank drove the full run but the largest rocker "
                 f"swing was only {rocker_max:.2f} deg (< {ROCKER_MIN_DEG}) -- "
                 f"the cam-follower chain is decoupled.")
+        feed = spans.get("platen", 0.0)
+        if feed < PLATEN_MIN_MM:
+            raise RuntimeError(
+                f"DEAD OUTPUT: platen fed only {feed:.2f} mm "
+                f"(< {PLATEN_MIN_MM}) -- the crank->chain->rack paper train is "
+                f"decoupled (CHAIN_crank_paper / belt / rack-pinion).")
     return {"spans_deg": {k: v for k, v in spans.items() if k != "platen"},
             "platen_feed_mm": spans.get("platen"),
             "rows": _rows_json(rows)}
@@ -517,7 +529,16 @@ async def build(adapter):
             MotionStudyRefParameters(name=study)))
 
     payload = {"stage": stage, "study": study, "rpm": rpm,
-               "duration_s": duration, "channels": N_CHANNELS}
+               "duration_s": duration, "channels": N_CHANNELS,
+               # The amplitude state this solve actually ran under, persisted so
+               # motion_report overlays the SAME truth curve even if the config
+               # moves after solving (codex #217). check:config pins channels.yaml
+               # to the preset, and the doit freshness chain pins the artifact's
+               # bar clamps to channels.yaml, so config-at-solve == baked clamps.
+               "amplitude": {
+                   "preset": str(_config.machine("amplitude", "preset")),
+                   "coefficients_mm": [float(a) for a in _config.amplitudes()],
+               }}
     with _telemetry.span("motion.sample"):
         payload["kinematic"] = await _sample_kinematic(adapter, comps, duration, study)
         if stage == "full":
