@@ -1,0 +1,389 @@
+r"""Empirical probe: can ONE ``CopyWithMates2`` call replicate a channel's
+whole 4-part moving chain (rocker + connecting-rod + amplitude-bar +
+channel-lever, 12 mates) to the next Z station?
+
+Follow-up to ``diag_copy_with_mates.py`` (single-part ladder, PASS
+2026-07-09: native-typed arrays, positional per-mate ``Values``, ~0.65s/copy
+vs ~4.4s production seat) and the prior session's F2 slice probe on toy
+geometry (2 parts / 4 mates: internal mates re-bound between the copies,
+external mates repeated). This is the production-shaped question: the
+channel build authors ~12 mates per channel x 20 channels one
+CreateMate+EditRebuild3 at a time; if a slice copy carries the whole chain,
+channels 2..19 collapse to one call each.
+
+Contracts under test (all previously measured, see memory/v018-perf-review.md):
+  C1  arrays are sized to the DISTINCT mates of the slice in tree order
+      (F2: 2 comps / 4 mates); here 4 comps / 12 mates.
+  C2  ``Values`` entries map positionally per mate; entries under
+      dimension-less mates are dead; every dimension mate must carry its
+      REAL value (a 0.0 re-values it to zero -- the Z=0 landing of the
+      first ladder run).
+  C3  the ONE substituted entry is the rocker's axial distance to the
+      anchor bushing's Front plane: PITCH/2 + k*PITCH, always positive =
+      always the seed's side (Q5: FlipDimension is a NO-OP under
+      Repeat=True; a copy inherits the seed's side, so the anchor must
+      keep every station on one side -- which the bushing anchor does,
+      unlike the Front-datum anchor whose stations cross zero).
+
+Judged from the model (transforms + mate count), never from the lying
+return value. Fresh throwaway assembly, NEVER saved.
+
+Run (SolidWorks open, seat free; ~2-4 min)::
+
+    uv run python cad\scripts\diagnostics\diag_copy_with_mates_slice.py
+"""
+
+from __future__ import annotations
+
+import math
+import sys
+import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # cad/scripts
+
+import pythoncom  # noqa: E402
+from win32com.client import VARIANT  # noqa: E402
+
+from _common import check, log, run_build  # noqa: E402
+from _assembly import (  # noqa: E402
+    coincident_mate,
+    component_names,
+    component_transform,
+    distance_driver,
+    named_ref,
+    place_component,
+    spin_driver,
+    world_point,
+)
+from _transforms import ROT_Y_180, compose_rows, euler_from_rows, rows_from_euler  # noqa: E402
+from build_channel_assembly import (  # noqa: E402
+    ARM_ARC_CENTER_LOCAL_Y,
+    ARM_MID_DZ,
+    ARM_PIVOT_LOCAL_Y,
+    BAR_FOOT_LOCAL,
+    BAR_WIDTH,
+    CAM_DZ,
+    FULCRUM,
+    IDENTITY,
+    LEVER_BAR_PIN_BORE_LOCAL,
+    PITCH,
+    PIVOT,
+    PIVOT_BUSHING_OD,
+    PIVOT_SHAFT_Z,
+    RING_CENTER,
+    ROCKER_ROD_BORE_LOCAL,
+    ROD_PIN_BORE_LOCAL,
+    ROD_STRAP_BORE_LOCAL,
+    SHAFT_R,
+    _org,
+    _revolute,
+    _seat_bushing_on_shaft,
+    bore_axis_ref,
+    rot_z_rows,
+    solve_state,
+    z_station,
+)
+
+SEED_J = 1  # seed channel: its rocker anchors to the gap-1 bushing at PITCH/2
+N_COPY_STATIONS = 4  # copies land at channels SEED_J+1 .. SEED_J+N
+SLICE_MATES = 12  # J1(3) + J2(3) + J4(2) + J3(3) + J5(1), creation order
+AXIAL_IDX = 1  # the rocker axial distance's position in the slice mate order
+PIVOT_OD_PT = [PIVOT[0] + SHAFT_R, PIVOT[1], 0.0]
+FULC_OD_PT = [FULCRUM[0] + SHAFT_R, FULCRUM[1], 0.0]
+CHAIN_PARTS = ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever")
+
+
+def _spin_dim_value(pivot_xy: tuple[float, float], target_xy: tuple[float, float]) -> float:
+    """The dimension value spin_driver authors: the better-conditioned
+    in-plane coordinate of the off-pivot bore (see _assembly.spin_driver)."""
+    dx = target_xy[0] - pivot_xy[0]
+    dy = target_xy[1] - pivot_xy[1]
+    return abs(target_xy[1]) if abs(dx) >= abs(dy) else abs(target_xy[0])
+
+
+async def _seed_chain(adapter, j: int, bushing: str) -> tuple[dict[str, str], list[float], float]:
+    """Author channel ``j``'s 4-part chain the production way, HARD-PINNED
+    (no park deferral: every spin/amplitude driver authored, so the slice is
+    fully defined and the copies replicate the full 12-mate battery).
+
+    Returns (component names by part, per-mate dimension values in creation
+    order, wall seconds). The values list is the probe's ground truth for
+    the ``Values`` array (C2): dimension-less mates carry 0.0 (dead entries).
+    """
+    t0 = time.perf_counter()
+    st = solve_state(0.0)  # neutral amplitude for every station
+    zj = z_station(j)
+    z_mid = zj + ARM_MID_DZ
+    arm_rows = compose_rows(rot_z_rows(st["arm_tilt"]), ROT_Y_180)
+    rod_rows = compose_rows(rot_z_rows(st["rod_tilt"]), ROT_Y_180)
+    t = math.radians(st["arm_tilt"])
+    arm_origin_dx = ARM_PIVOT_LOCAL_Y * math.sin(t)
+    arm_origin_dy = ARM_PIVOT_LOCAL_Y * math.cos(t)
+    bar_rows = rows_from_euler([st["bar_tilt"], -90.0, 0.0])
+    lever_rows = compose_rows(rot_z_rows(st["lever_tilt"]), ROT_Y_180)
+
+    rocker = await place_component(
+        adapter, "rocker-arm",
+        [PIVOT[0] - arm_origin_dx, PIVOT[1] - arm_origin_dy, z_mid],
+        euler_from_rows(arm_rows), arm_rows,
+        ground=False, label=f"rocker-arm ch{j:02d} (slice seed)",
+    )
+    rod = await place_component(
+        adapter, "connecting-rod",
+        [RING_CENTER[0], RING_CENTER[1], zj + CAM_DZ],
+        euler_from_rows(rod_rows), rod_rows,
+        ground=False, label=f"connecting-rod ch{j:02d} (slice seed)",
+    )
+    bar = await place_component(
+        adapter, "amplitude-bar",
+        [st["bar_origin_x"], st["bar_origin_y"], z_mid - BAR_WIDTH / 2.0],
+        [st["bar_tilt"], -90.0, 0.0], bar_rows,
+        ground=False, label=f"amplitude-bar ch{j:02d} (slice seed)",
+    )
+    lever = await place_component(
+        adapter, "channel-lever",
+        [FULCRUM[0], FULCRUM[1], z_mid],
+        euler_from_rows(lever_rows), lever_rows,
+        ground=False, label=f"channel-lever ch{j:02d} (slice seed)",
+    )
+
+    pivot_w = (PIVOT[0], PIVOT[1])
+    fulc_w = (FULCRUM[0], FULCRUM[1])
+    dims: list[float] = []
+
+    # J1 rocker revolute: concentric(dead) + axial distance(SUBSTITUTED) +
+    # spin pin. Same call as production but park_spin=None -> hard pin.
+    rocker_rod_pin = world_point(adapter, rocker, ROCKER_ROD_BORE_LOCAL)
+    await _revolute(
+        adapter, rocker,
+        bore_axis_ref(PIVOT_OD_PT), named_ref(f"Axis1@{rocker}", "AXIS"),
+        concentric=True, off_axis_name="Axis2",
+        off_axis_local=ROCKER_ROD_BORE_LOCAL, pivot_xy=pivot_w,
+        label=f"J1 rocker ch{j:02d}",
+        axial=("distance", bushing, PITCH / 2.0),
+        park_spin=None,
+    )
+    dims += [0.0, PITCH / 2.0,
+             _spin_dim_value(pivot_w, (rocker_rod_pin[0], rocker_rod_pin[1]))]
+
+    # J2 rod: coaxial(dead) + axial distance + spin pin (production body,
+    # free_dof_key omitted -> hard).
+    rod_tgt = _org(adapter, rod)
+    rod_ring = world_point(adapter, rod, ROD_STRAP_BORE_LOCAL)
+    rod_pin = world_point(adapter, rod, ROD_PIN_BORE_LOCAL)
+    await coincident_mate(
+        adapter, named_ref(f"Axis2@{rocker}", "AXIS"), named_ref(f"Axis2@{rod}", "AXIS"),
+        label=f"J2 rod ch{j:02d} coaxial pin <- {rocker}", verify=(rod, rod_tgt),
+    )
+    await distance_driver(
+        adapter, named_ref(f"Front Plane@{rod}", "PLANE"),
+        named_ref(f"Front Plane@{rocker}", "PLANE"),
+        rod_tgt[2] - z_mid,
+        label=f"J2 rod ch{j:02d} axial d={abs(rod_tgt[2] - z_mid):.2f} <- {rocker}",
+        verify=(rod, rod_tgt),
+    )
+    await spin_driver(
+        adapter, named_ref(f"Axis1@{rod}", "AXIS"),
+        (rod_pin[0], rod_pin[1]), (rod_ring[0], rod_ring[1]),
+        label=f"J2 rod ch{j:02d} swing -> ring {rod_ring[0]:.1f},{rod_ring[1]:.1f}",
+        verify=(rod, rod_tgt),
+    )
+    dims += [0.0, abs(rod_tgt[2] - z_mid),
+             _spin_dim_value((rod_pin[0], rod_pin[1]), (rod_ring[0], rod_ring[1]))]
+
+    # J4 lever revolute: concentric(dead) + coincident mid-plane(dead), no
+    # spin (closed by J5).
+    await _revolute(
+        adapter, lever,
+        bore_axis_ref(FULC_OD_PT), named_ref(f"Axis1@{lever}", "AXIS"),
+        concentric=True, off_axis_name="Axis2",
+        off_axis_local=LEVER_BAR_PIN_BORE_LOCAL, pivot_xy=fulc_w,
+        label=f"J4 lever ch{j:02d}", axial=("coincident", rocker),
+        pin_spin=False,
+    )
+    dims += [0.0, 0.0]
+
+    # J3 bar: top-pin hinge(dead) + mid-plane(dead) + foot-X distance (the
+    # amplitude driver, hard-pinned here).
+    bar_tgt = _org(adapter, bar)
+    foot = world_point(adapter, bar, BAR_FOOT_LOCAL)
+    await coincident_mate(
+        adapter,
+        named_ref(f"Axis2@{lever}", "AXIS"), named_ref(f"Axis1@{bar}", "AXIS"),
+        label=f"J3 bar ch{j:02d} radial (top-pin hinge)", verify=(bar, bar_tgt),
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"MidWidth@{bar}", "PLANE"), named_ref(f"Front Plane@{rocker}", "PLANE"),
+        label=f"J3 bar ch{j:02d} axial coincident mid-plane <- {rocker}",
+        verify=(bar, bar_tgt),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Axis2@{bar}", "AXIS"), named_ref("Right Plane", "PLANE"),
+        foot[0],
+        label=f"J3 bar ch{j:02d} foot-X={foot[0]:.2f} (hard pin)",
+        verify=(bar, bar_tgt),
+    )
+    dims += [0.0, 0.0, abs(foot[0])]
+
+    # J5 foot-on-arc coupling: axis-axis distance at the as-solved radius.
+    arc_c = world_point(adapter, rocker, [0.0, ARM_ARC_CENTER_LOCAL_Y, 0.0])
+    foot_r = math.hypot(foot[0] - arc_c[0], foot[1] - arc_c[1])
+    await distance_driver(
+        adapter,
+        named_ref(f"Axis2@{bar}", "AXIS"), named_ref(f"Axis3@{rocker}", "AXIS"),
+        foot_r,
+        label=f"J5 bar-foot on rocker arc ch{j:02d} r={foot_r:.2f}",
+        verify=(bar, bar_tgt),
+    )
+    dims += [foot_r]
+
+    comps = {"rocker-arm": rocker, "connecting-rod": rod,
+             "amplitude-bar": bar, "channel-lever": lever}
+    return comps, dims, time.perf_counter() - t0
+
+
+async def _mate_count(adapter) -> int:
+    res = await adapter.list_mates()
+    return len(res.data or []) if res.is_success else -1
+
+
+def _copy_slice(adapter, comps: dict[str, str], values_m: list[float]) -> None:
+    """One native-typed CopyWithMates2 of the whole 4-part slice."""
+    model = adapter.currentModel
+    raw = []
+    for part in CHAIN_PARTS:
+        c = model.GetComponentByName(comps[part])
+        if c is None:
+            raise RuntimeError(f"slice component not found: {comps[part]!r}")
+        raw.append(c._oleobj_)
+    n = SLICE_MATES
+    args = (
+        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, raw),
+        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, [True] * n),
+        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, [None] * n),
+        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, values_m),
+        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, [False] * n),
+        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, [False] * n),
+        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, [False] * n),
+        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_I4, [0] * n),
+    )
+    # Return value lies (False on success) -- caller judges from the model.
+    adapter._attempt(lambda: model.CopyWithMates2(*args), default=None)
+
+
+def _slice_transforms(adapter, exclude: set[str]) -> dict[str, list[list[float]]]:
+    """Transforms of every chain-part instance NOT in ``exclude``, by part."""
+    out: dict[str, list[list[float]]] = {p: [] for p in CHAIN_PARTS}
+    for name in component_names(adapter):
+        part = name.rsplit("-", 1)[0]
+        if part in out and name not in exclude:
+            out[part].append(component_transform(adapter, name))
+    return out
+
+
+async def build(adapter) -> dict[str, str]:
+    check("create_assembly", await adapter.create_assembly())
+    await place_component(
+        adapter, "pivot-shaft", [PIVOT[0], PIVOT[1], PIVOT_SHAFT_Z],
+        [0.0, 0.0, 0.0], IDENTITY, ground=True, label="pivot-shaft (grounded)",
+    )
+    await place_component(
+        adapter, "fulcrum-shaft", [FULCRUM[0], FULCRUM[1], 0.0],
+        [0.0, 0.0, 0.0], IDENTITY, ground=True, label="fulcrum-shaft (grounded)",
+    )
+    # The anchor bushing in the gap below the seed channel, seated the
+    # production way (concentric + Front-datum distance + anti-spin).
+    z_gap = z_station(SEED_J) + ARM_MID_DZ - PITCH / 2.0
+    bushing = await place_component(
+        adapter, "pivot-bushing", [PIVOT[0], PIVOT[1], z_gap],
+        [0.0, 0.0, 0.0], IDENTITY, ground=False,
+        label=f"pivot-bushing gap {SEED_J - 1:02d}/{SEED_J:02d} (anchor)",
+    )
+    await _seat_bushing_on_shaft(
+        adapter, bushing, PIVOT_OD_PT, (PIVOT[0], PIVOT[1]), PIVOT_BUSHING_OD / 2.0,
+    )
+
+    comps, dims, t_seed = await _seed_chain(adapter, SEED_J, bushing)
+    log(f"seed chain ch{SEED_J:02d}: {SLICE_MATES} mates in {t_seed:.1f}s; "
+        f"dims (mm) = {[round(d, 3) for d in dims]}")
+    mates_before = await _mate_count(adapter)
+    res = await adapter.list_mates()
+    order = [(m["name"], m["type"]) for m in (res.data or [])]
+    log(f"mate tree order ({len(order)}): {order}")
+
+    seed_tf = {p: component_transform(adapter, comps[p]) for p in CHAIN_PARTS}
+    seed_names = set(comps.values())
+
+    # Copies: station k = SEED_J + i, axial re-valued to PITCH/2 + i*PITCH
+    # (always positive = the seed's side; C3). NB the per-mate array order
+    # for a MULTI-component slice is assumed = assembly tree order (C1); the
+    # rival hypothesis (per-component GetMates concatenation, deduped) agrees
+    # on AXIAL_IDX=1 but would slide J5's 806 mm radius under a dead
+    # coincident entry and hand J5 a 0.0 -- yanking every copied bar to the
+    # arc centre. So a wrong order fails the pose check LOUD and the landing
+    # pattern says which order is real.
+    times = []
+    for i in range(1, N_COPY_STATIONS + 1):
+        values = [d / 1000.0 for d in dims]
+        values[AXIAL_IDX] = (PITCH / 2.0 + i * PITCH) / 1000.0
+        t0 = time.perf_counter()
+        _copy_slice(adapter, comps, values)
+        times.append(time.perf_counter() - t0)
+        log(f"slice copy -> ch{SEED_J + i:02d}: {times[-1]:.2f}s")
+
+    mates_after = await _mate_count(adapter)
+    want_mates = mates_before + SLICE_MATES * N_COPY_STATIONS
+
+    # Judge poses: every copy must hold the seed's rotation + XY and sit at
+    # seed Z + i*PITCH, for ALL FOUR parts.
+    tfs = _slice_transforms(adapter, seed_names)
+    pose_fail: list[str] = []
+    for part in CHAIN_PARTS:
+        got = sorted(tfs[part], key=lambda m: m[11])
+        want_zs = sorted(seed_tf[part][11] * 1000.0 + i * PITCH
+                         for i in range(1, N_COPY_STATIONS + 1))
+        if len(got) != N_COPY_STATIONS:
+            pose_fail.append(f"{part}: {len(got)} copies != {N_COPY_STATIONS}")
+            continue
+        for m, want_z in zip(got, want_zs):
+            rot_xy_ok = all(
+                abs(m[k] - seed_tf[part][k]) < 1e-6 for k in range(9)
+            ) and all(
+                abs((m[9 + a] - seed_tf[part][9 + a]) * 1000.0) < 1e-3
+                for a in range(2)
+            )
+            z_ok = abs(m[11] * 1000.0 - want_z) < 0.05
+            if not (rot_xy_ok and z_ok):
+                pose_fail.append(
+                    f"{part}@{m[11] * 1000.0:.3f}: want z {want_z:.3f}, "
+                    f"rot/xy {'ok' if rot_xy_ok else 'DRIFTED'}"
+                )
+
+    # Stability: one closing rebuild, then re-check a sentinel pose.
+    model = adapter.currentModel
+    adapter._attempt(lambda: model.EditRebuild3(), default=None)
+    tfs2 = _slice_transforms(adapter, seed_names)
+    stable = all(
+        abs(a[11] - b[11]) * 1000.0 < 1e-3
+        for part in CHAIN_PARTS
+        for a, b in zip(sorted(tfs[part], key=lambda m: m[11]),
+                        sorted(tfs2[part], key=lambda m: m[11]))
+    )
+
+    log("=" * 70)
+    log(f"mates: {mates_before} -> {mates_after} (want {want_mates}: "
+        f"+{SLICE_MATES}/copy x {N_COPY_STATIONS})")
+    log(f"poses: {'ALL ON-STATION' if not pose_fail else 'FAIL -- ' + '; '.join(pose_fail)}")
+    log(f"stable after rebuild: {stable}")
+    log(f"timing: seed chain {t_seed:.1f}s vs slice copy avg "
+        f"{sum(times) / len(times):.2f}s (first {times[0]:.2f}s, last {times[-1]:.2f}s)")
+    ok = (mates_after == want_mates) and not pose_fail and stable
+    log(f"VERDICT: {'PASS -- one call replicates the whole chain' if ok else 'FAIL (see above)'}")
+    return {"verdict": "pass" if ok else "fail"}
+
+
+if __name__ == "__main__":
+    sys.exit(run_build(build))
