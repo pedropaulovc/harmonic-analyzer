@@ -783,19 +783,33 @@ async def author_operation_studies(adapter, comps) -> dict[str, str]:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(
         {"studies": names, "rpm": CRANK_RPM, "duration_s": DURATION_S,
-         # The amplitude state the SETUP_* clamps were built against (this
-         # same process replayed them), recorded HERE at build time so the
-         # study runner labels its samples with the truth curve that is
-         # actually baked into the clamps -- reading live config at solve
-         # time would mislabel the trace if config moved after the build
+         # The truth state the SETUP_* clamps were built against (this same
+         # process replayed them), recorded HERE at build time so the study
+         # runner labels its samples with the curve that is actually baked
+         # into the machine -- reading live config at solve/report time
+         # would mislabel the trace if config moved after the build
          # (codex #217).
-         "amplitude": {
-             "preset": str(_config.machine("amplitude", "preset")),
-             "coefficients_mm": [float(a) for a in _config.amplitudes()],
-         }},
+         "amplitude": truth_state()},
         indent=1))
     _telemetry.success(f"saved operation studies {names} -> {path.name}")
     return names
+
+
+def truth_state() -> dict:
+    """The FULL truth-model input set the built machine embodies, sliced to
+    the ACTIVE channels (the only stations physically instantiated --
+    ``pen_y`` summed over all 20 rows would compare a debug build against
+    harmonics it doesn't have). Persisted in the studies sidecar so
+    ``motion_report`` reconstructs the identical curve without touching live
+    config (codex #217 round 3)."""
+    chans = _config.active_channels()
+    return {
+        "preset": str(_config.machine("amplitude", "preset")),
+        "coefficients_mm": [float(c["amplitude_mm"]) for c in chans],
+        "harmonics": [int(c["harmonic_n"]) for c in chans],
+        "phases_deg": [float(c["phase_deg"]) for c in chans],
+        "magnify": float(_config.machine("output", "magnify_factor")),
+    }
 
 
 # ---- the operational DOF gate --------------------------------------------------
@@ -882,7 +896,18 @@ def assert_top_operational_dof(adapter: Any, *, resolve: bool = True) -> None:
                 f"defined -- that chain is frozen (a coupling or clamp pinned "
                 f"it). Under-constrained families: {sorted(present)}")
         t12 = required_t12_instances()
-        if t12 and not any(inst in under for inst in t12):
+        if not t12:
+            # The top requires every mover built `free` (require_free_movers),
+            # and a free paper-drive always records its T12 crank spec -- an
+            # empty result means the sidecar is missing/unrestored, and
+            # skipping would silently drop the only paper-drive-specific
+            # live-DOF check (codex #217 round 3).
+            raise RuntimeError(
+                "top operational DOF: no T12 crank instance recorded in "
+                ".paper-drive.park.json -- sidecar missing or empty, so the "
+                "paper-crank liveness check cannot run; rebuild paper-drive "
+                "(`doit assembly:paper_drive`)")
+        if not any(inst in under for inst in t12):
             raise RuntimeError(
                 f"top operational DOF: paper-drive T12 crank {t12} reads fully "
                 "defined -- the chain-tied paper crank is frozen")

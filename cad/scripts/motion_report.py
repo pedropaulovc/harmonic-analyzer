@@ -57,7 +57,7 @@ def _pearson(a: list[float], b: list[float]) -> float:
 
 
 def _truth_fit(pen: list[tuple[float, float]], rpm: float, preset: str,
-               coeffs=None):
+               truth: dict | None = None):
     """Phase-fit the truth curve to the sampled pen trace.
 
     Returns (best_r, best_phase_deg, truth_series aligned to the samples).
@@ -65,15 +65,27 @@ def _truth_fit(pen: list[tuple[float, float]], rpm: float, preset: str,
     so sweep the phase over a full period at 1-degree steps and keep the
     magnitude-best r (sign folded into the returned series).
 
-    ``coeffs`` is the a_j vector the SOLVE actually ran under (persisted in the
-    samples JSON); when present it is used verbatim, so a config edit after
-    solving cannot swap the truth curve out from under the saved trace (codex
-    #217). ``None`` falls back to reading the preset from config at report time
-    (older samples files).
+    ``truth`` is the FULL truth-input record the SOLVE actually ran under
+    (coefficients + harmonics + phases + magnify, persisted in the samples
+    JSON via the build-time studies sidecar); when present it is used
+    verbatim, so a config edit after solving -- amplitudes, phases, harmonic
+    table or magnify alike -- cannot swap the curve out from under the saved
+    trace (codex #217). ``None``/partial falls back to reading config at
+    report time (older samples files).
     """
     import truth_model
+    truth = truth or {}
+    coeffs = truth.get("coefficients_mm")
+    kw = {}
     if coeffs is None:
         coeffs = truth_model.coefficients("square" if preset == "square" else "config")
+    else:
+        if truth.get("harmonics") is not None:
+            kw["js"] = [int(j) for j in truth["harmonics"]]
+        if truth.get("phases_deg") is not None:
+            kw["phases"] = [math.radians(p) for p in truth["phases_deg"]]
+        if truth.get("magnify") is not None:
+            kw["magnify_factor"] = float(truth["magnify"])
     ts = [t for t, _y in pen]
     ys = _norm([y for _t, y in pen])
     deg_per_s = 360.0 * rpm / 60.0
@@ -81,7 +93,8 @@ def _truth_fit(pen: list[tuple[float, float]], rpm: float, preset: str,
     for phase in range(0, 360):
         # pen_y takes RADIANS (every other caller converts); passing the raw
         # degree angle fit against a ~57x-frequency waveform (codex #217).
-        cand = _norm([truth_model.pen_y(math.radians(deg_per_s * t + phase), coeffs)
+        cand = _norm([truth_model.pen_y(math.radians(deg_per_s * t + phase),
+                                        coeffs, **kw)
                       for t in ts])
         r = _pearson(ys, cand)
         if abs(r) > abs(best[0]):
@@ -98,7 +111,6 @@ def main() -> int:
     # time -- the fallback path in _truth_fit).
     amplitude = data.get("amplitude") or {}
     preset = amplitude.get("preset", data.get("preset", "config"))
-    coeffs_solved = amplitude.get("coefficients_mm")
 
     import matplotlib
     matplotlib.use("Agg")
@@ -144,7 +156,7 @@ def main() -> int:
                 md.append(f"- platen feed: {data[kind]['platen_feed_mm']:.3f} mm")
         else:
             pen = [(t, y) for t, y in data["pen"]["series_t_y"]]
-            r, phase, truth = _truth_fit(pen, rpm, preset, coeffs=coeffs_solved)
+            r, phase, truth = _truth_fit(pen, rpm, preset, truth=amplitude)
             ts = [t for t, _y in pen]
             ax.plot(ts, _norm([y for _t, y in pen]), color=C_BLUE, linewidth=2,
                     label="pen tip (sampled)")

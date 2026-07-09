@@ -64,12 +64,21 @@ def coefficients(preset: str = "config") -> list[float]:
     raise ValueError(f"unknown preset: {preset}")
 
 
-def pen_y(x: float, coeffs: list[float] | None = None) -> float:
-    """Pen displacement at synthesis angle ``x`` (radians): magnify·Σ a_j cos(j x + φ_j)."""
+def pen_y(x: float, coeffs: list[float] | None = None, *,
+          js: list[int] | None = None, phases: list[float] | None = None,
+          magnify_factor: float | None = None) -> float:
+    """Pen displacement at synthesis angle ``x`` (radians): magnify·Σ a_j cos(j x + φ_j).
+
+    Every input defaults to live config; pass them explicitly (``phases`` in
+    RADIANS) to evaluate a PERSISTED truth state — e.g. the one a motion solve
+    recorded at build time — so a config edit after solving cannot swap the
+    curve out from under a saved trace (codex #217)."""
     a = coefficients() if coeffs is None else coeffs
-    js, ph = harmonics(), phases_rad()
+    js = harmonics() if js is None else js
+    ph = phases_rad() if phases is None else phases
+    m = magnify() if magnify_factor is None else magnify_factor
     total = sum(aj * math.cos(j * x + p) for aj, j, p in zip(a, js, ph))
-    return magnify() * total
+    return m * total
 
 
 def pen_curve(coeffs: list[float] | None = None, samples: int = 25) -> list[tuple[float, float]]:
