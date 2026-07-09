@@ -792,6 +792,10 @@ def _assembly_cache_outputs(stem: str) -> list[Path]:
     if stem == "harmonic_analyzer":
         outs += sorted((CAD_OUT / "png").glob("eight-views-*.png"))
         outs.append(CAD_OUT / "harmonic-analyzer-bom.csv")
+        # The saved operation studies' auto-assigned names (+ baked motor
+        # params) -- the study runner resolves them from here, so a cache
+        # consumer restoring the .SLDASM without it could not run the studies.
+        outs.append(sldasm.parent / f".{sldasm.stem}.studies.json")
     return outs
 
 
@@ -1551,6 +1555,59 @@ def _cache_status(statusargs):
             for rel, digest in inputs:
                 _telemetry.debug(f"         {digest}  {rel}")
     _telemetry.success(f"[cache_status] {hits} hit / {misses} miss / {unknown} unknown")
+
+
+def _stamp_recipes(stampargs):
+    """See :func:`task_stamp_recipes`."""
+    stems = [a.replace("-", "_") for a in (stampargs or [])]
+    if not stems:
+        _telemetry.error(
+            "stamp_recipes: name the assemblies explicitly, e.g. "
+            "`doit stamp_recipes -- channel summing` or `-- all-subs`")
+        raise SystemExit(2)
+    if stems == ["all_subs"]:
+        stems = [s for s in ASSEMBLY_ORDER if s != "harmonic_analyzer"]
+    unknown = [s for s in stems if s not in ASSEMBLY_ORDER]
+    if unknown:
+        raise SystemExit(
+            f"stamp_recipes: unknown assembly stem(s) {unknown}; "
+            f"known: {sorted(ASSEMBLY_ORDER)}")
+    for stem in stems:
+        if not Path(_sldasm(stem)).exists():
+            _telemetry.warn(
+                f"[stamp] {stem}: target missing -- the next build is FULL "
+                "regardless; skipped")
+            continue
+        digest = _digest_files(_recipe_files(stem))
+        sidecar = _recipe_sidecar(stem)
+        sidecar.parent.mkdir(parents=True, exist_ok=True)
+        sidecar.write_text(digest + "\n", encoding="utf-8")
+        _telemetry.success(f"[stamp] {stem}: recipe sidecar -> {digest[:12]}...")
+
+
+def task_stamp_recipes():
+    """OPERATOR ESCAPE: re-stamp named assemblies' recipe sidecars to the CURRENT
+    recipe digest WITHOUT rebuilding -- an explicit declaration that the on-disk
+    ``.SLDASM`` is still valid for a recipe change, so the next run REFRESHes
+    (reopen + rebuild + gates + save, seconds) instead of FULL re-insert/re-mating
+    (~500 s each).
+
+    For helper-module edits that provably do not change built geometry (the
+    motivating case: a refresh-gate fix in ``_assembly.py`` would otherwise FULL
+    rebuild all 8 assemblies). The refresh still runs every gate and
+    verify:soundness still follows in the same build, so a wrong claim fails
+    loud rather than shipping a stale artefact. NEVER stamp after a change that
+    moves inserts/mates (assembly script, placement config) -- let the FULL run.
+
+    Positional args (after ``--``): assembly stems (``channel summing``), or
+    ``all-subs`` = every assembly EXCEPT the top. SolidWorks-free, off the
+    spine, never in default_tasks."""
+    return {
+        "uptodate": [False],
+        "pos_arg": "stampargs",
+        "actions": [(_stamp_recipes,)],
+        "verbosity": 2,
+    }
 
 
 def task_cache_status():

@@ -37,7 +37,7 @@ from _assembly import (
     component_transform,
     concentric_mate,
 )
-from build_motion_study_springs import _eye_point
+from build_motion_study import _eye_point
 
 import _telemetry
 

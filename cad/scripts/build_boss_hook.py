@@ -181,6 +181,16 @@ async def build(adapter) -> dict[str, str]:
     # the M6 Motion study).
     await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "shank axis")
 
+    # Counter-spring bottom eye (``SpringEye``): the arm end face. Candidates
+    # walk the circle in case a neighbouring body consumes part of the edge.
+    from _refpoints import add_named_point
+
+    await add_named_point(adapter, "SpringEye", [
+        [ELBOW_R + ARM_RUN, SHANK_RISE + ELBOW_R + ROD_DIA / 2.0, 0.0],
+        [ELBOW_R + ARM_RUN, SHANK_RISE + ELBOW_R, ROD_DIA / 2.0],
+        [ELBOW_R + ARM_RUN, SHANK_RISE + ELBOW_R - ROD_DIA / 2.0, 0.0],
+    ])
+
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)

@@ -1,66 +1,48 @@
-r"""The OPERATION simulation (artifact B): a throwaway SOLIDWORKS Basic Motion
-study that opens the saved, default-`free` harmonic-analyzer.SLDASM and runs the
-whole device from a single crank motor, with the 20 channel springs + counter
-spring as real force elements and the two amplifying wires as motion couplings.
-It NEVER re-saves any artefact (the .SLDASM fleet on disk stays untouched; the
-study lives only in the dirtied in-memory doc + the exported video/samples).
+r"""The OPERATION runner: solve, sample and export the SAVED Basic Motion
+studies that build_harmonic_analyzer_assembly.py ships inside
+harmonic-analyzer.SLDASM. It NEVER re-saves any artefact.
 
-ARCHITECTURE (2026-07, default-free DOF -- this is a full rewrite of the
-2026-06-14 study, which targeted the retired `output-1` sub and re-derived by
-suppression what the free build now simply ships):
+ARCHITECTURE (2026-07, the default-free TOP -- this replaces the runtime study
+BUILDER, which assembled flexible subs + clamps + couplings + springs on every
+run): artifact A now authors the whole operating machine (see
+_assembly_top.py) -- six flexible subs, the 23 engaged ``SETUP_*`` clamps, the
+20 ``CAM_chNN`` couplings, ``CHAIN_crank_paper``, ``HANDOFF_levers``,
+``WIRE2_pen``, and TWO saved Basic Motion studies whose auto-assigned names
+ride the ``.harmonic-analyzer.studies.json`` sidecar:
 
-  * The top assembly inserts SEVEN subs rigid+fixed (frame, drive-train,
-    channel, summing, magnifier, pen, paper-drive). Six of them move; frame
-    stays fixed.
-  * Every moving sub is built `free`: its operational DOF carry NO park driver
-    (deferred to the `.<stem>.park.json` sidecar), so once the sub is FLEXIBLE
-    its internal kinematics are live with ZERO suppression -- the crank spins
-    the geared train, J2/J5 close each channel's rocker->rod and
-    rocker->bar->lever chains, the summing/magnifying levers rock on their
-    knife lines, the WIRE-1 yoke turns the wheel, the pen carriage slides, and
-    paper-drive's belt/chain + rack-pinion feed the platen. The old ~500 s
-    mate-classifier walk is GONE because the mates it suppressed no longer
-    exist.
-  * What artifact A deliberately does NOT author is every CROSS-sub coupling
-    (POST_ASSEMBLY == {}); those are exactly what this study adds:
-      - 20 cam couplings: connecting-rod ring-centre point ON
-        Axis3@cylinder-gear (the eccentric lobe axis), channel<->drive-train;
-      - the crank->paper chain: paper-drive's crank-end sprocket tied 1:1 to
-        the drive-train crankshaft it is coaxial with;
-      - the summing->magnifier hand-off: the magnifying lever knife-rocks ON
-        the summing bar's ridge, coaxial with the summing knife line ->
-        coupled 1:1 about that shared axis;
-      - WIRE 2: a point on the magnifying-wheel Ø100 rim held on the pen-rod's
-        horizontal plane (scotch yoke) -- the wheel's rock drags the pen in Y;
-      - 20 channel springs (channel-lever tab eye -> summing-lever plate) + 1
-        counter spring (gooseneck -> boss-hook): the analogue SUM as a real
-        force balance.
-  * The three drive-train SETUP poses (cone_swing p1, pinion_swing p2,
-    pinion_cam) are deferred-free in artifact A but must be HELD ENGAGED while
-    the machine runs -- replayed from the park sidecar. The crank_angle park
-    stays deferred (the motor owns that DOF). The per-channel bar_amplitude
-    parks are replayed too (the bars are coefficient SETTINGS, clamped during
-    operation); pass an amplitude preset to pin them at non-neutral stations
-    for a visible harmonic trace.
+    kinematic  -> crank motor only (the robust demonstration class)
+    full       -> motor + the 21 spring force elements (the analogue-sum
+                  demonstration; the coupled web sits at the fixed-step
+                  integrator's stability edge)
 
-Basic Motion (physical_simulation) is the licensed solver on this 3DEXPERIENCE
-Makers seat -- MotionAnalysis is NOT licensed here. Basic Motion solves motors,
-gears, springs and gravity, which is what this study needs.
+This script only prepares, solves and measures:
+
+  * suppress each channel's J2 rod-AXIAL mate on the STANDALONE channel doc
+    (Basic Motion solver margin: the axial + the cam point-on-axis leaves each
+    of the 20 loops redundant by exactly 1, and Basic Motion is
+    redundancy-intolerant. The ARTIFACT keeps the axials LIVE -- the static
+    solve is Gruebler-exact with them; this is an integrator tolerance, not a
+    statics problem). In-memory only; the top binds to the dirtied doc;
+  * open the top, resolve the requested SAVED study by its sidecar name
+    (re-applying the duration), add opt-in gravity (a motion ELEMENT --
+    allowed under a saved study, unlike a mate), solve from the assembled
+    pose, sample the kinematic / summing / pen signals with fail-loud gates,
+    and export the video + samples JSON (``cad/out/reports/motion/``,
+    rendered by motion_report.py).
+
+NOTHING here authors or edits a mate on the top doc: a mate edit under a
+saved motion study risks the initial-animation-state corruption class (June
+lesson). The old ``flex``/``springs`` stages are GONE -- their work is the
+artifact's now.
 
     uv run python cad\scripts\build_motion_study.py [stage] [opts...]
 
-``stage`` (default ``kinematic``) gates how far the build runs so the heavy
-solve can be brought up incrementally:
-    flex       -> flexible + engaged setup parks + bar clamps (no motor/solve)
-    kinematic  -> + cam couplings + chain tie + crank motor + Calculate +
-                  rocker/platen samples + video
-    springs    -> + 21 spring force elements + summing-chain samples
-    full       -> + lever hand-off + WIRE2 yoke + pen sample vs truth + video
-
-``opts``: ``square`` pins the amplitude bars at the square-wave preset stations
-(default: the as-built neutral, a_j = 0 -> a flat pen line); ``grav`` enables
-gravity (default off: on a ~1 m mechanism gravity dwarfs the solver-safe spring
-rates and destabilises the solve).
+``stage`` (default ``kinematic``): which SAVED study to solve -- ``kinematic``
+or ``full``. ``opts``: ``grav`` enables gravity (default off: on a ~1 m
+mechanism gravity dwarfs the solver-safe spring rates and destabilises the
+solve). The amplitude preset is a CONFIG concern now (machine/amplitude.yaml
+-> channels.yaml -> the channel build -> the top clamps); there is no
+study-time re-station.
 """
 
 from __future__ import annotations
@@ -70,311 +52,123 @@ import math
 import os
 import sys
 
-import _config
 from _common import (
     OUT_PNG,
     OUT_SLDASM,
-    _flag,
-    _read_member,
     check,
     log,
     run_build,
 )
-from _assembly import (
-    coincident_mate,
-    component_named_ref,
-    gear_mate,
-    named_ref,
+
+# The component/mate walk helpers live beside the top-build logic now; the
+# re-exports keep this module the stable import surface for the ~25
+# diagnostics probes (and build_motion_setup_drives / build_mobility_probe).
+from _assembly_top import (  # noqa: F401 -- re-exported for the probes
+    ANGLE,
+    COINCIDENT,
+    CONCENTRIC,
+    DISTANCE,
+    MOVING_SUBS,
+    N_CHANNELS,
+    TOP_ASM,
+    _by_z_rank,
+    _comp_model_doc,
+    _comp_xform,
+    _comp_z_mm,
+    _components,
+    _family,
+    _find_family,
+    _find_one,
+    _iter_mates,
+    _mate_parts,
+    _mate_value,
+    _part_family,
+    _real_parts,
+    _root_title,
+    _rot_angle,
+    _sub_model,
+    _world,
+    load_studies_sidecar,
 )
-from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
+from _assembly import component_named_ref
 
 import _telemetry
 
-# ---- study constants --------------------------------------------------------
-ASM = "harmonic-analyzer"
-# frame-1 stays fixed; everything else solves flexibly with the parent.
-MOVING_SUBS = ("drive-train-1", "channel-1", "summing-1", "magnifier-1",
-               "pen-1", "paper-drive-1")
-
-CRANK_RPM = float(os.environ.get("MOTION_CRANK_RPM", "20.0"))  # 1 rev / 3 s
-DURATION_S = float(os.environ.get("MOTION_DURATION_S", "6.0"))  # two crank revs
-N_CHANNELS = _config.active_count()
+# ---- runner constants ---------------------------------------------------------
+ASM = TOP_ASM
 ROCKER_MIN_DEG = 1.0      # dead-output gate: largest rocker swing must exceed
 PEN_MIN_MM = 0.5          # dead-output gate: pen-tip travel must exceed
 SUM_MIN_DEG = 0.05        # dead-output gate: summing-lever rock must exceed
-
-# A point on the connecting-rod's ring-bore circular edge (part-local mm); its
-# arc centre is the ring centre = the cam-pin point (point-on-axis cam
-# de-redundancy, see memory). RING_BORE_DIA 30.8 / RING_THICKNESS 3.0
-# (build_connecting_rod.py) -> edge at (r=15.4, z=+1.5).
-ROD_BORE_EDGE_MM = [15.4, 0.0, 1.5]
-
-# swMateType_e
-COINCIDENT, CONCENTRIC, DISTANCE, ANGLE = 0, 1, 5, 6
-_MATE_NAME = {0: "COINCIDENT", 1: "CONCENTRIC", 4: "TANGENT", 5: "DISTANCE",
-              6: "ANGLE", 9: "CAMFOLLOWER", 10: "GEAR", 13: "RACKPINION",
-              16: "LOCK"}
-
-RIGID, FLEXIBLE = "rigid", "flexible"
-
-# Spring stiffness k = G*d^4 / (8*D^3*n); steel shear modulus. The GEOMETRIC
-# steel rates (~2.1 kN/m channel, ~0.5 kN/m counter) are far too stiff for the
-# fixed-step Basic Motion integrator (poc_spring_adder: k~2000 N/m ABORTS the
-# solve; k in the low-N/m..tens band tracks the moving-anchor sum cleanly), so
-# the study defaults to a solver-safe band, env-sweepable. 0/negative => the
-# geometric helical rate.
-G_STEEL = 79.3e9  # Pa
-CH_SPRING = dict(d=1.0, D=5.5, n=28.0, free_mm=32.0)
-CT_SPRING = dict(d=1.8, D=10.7, n=165.0, free_mm=315.0)
-# Defaults sit at the soft end of the POC-proven band: the full web (20 stiff
-# loops + gear chains + yoke) is marginal for the fixed-step integrator, and
-# softer springs move the natural frequencies away from its stability edge.
-SPRING_KCH = float(os.environ.get("SPRING_KCH", "5.0"))    # N/m, channel
-SPRING_KCT = float(os.environ.get("SPRING_KCT", "2.5"))    # N/m, counter
 
 # Motion samples land here (JSON per stage) for the SW-free plot/report step.
 OUT_MOTION = (OUT_PNG.parent / "reports" / "motion")
 
 
-def _k_helical(d_mm: float, D_mm: float, n: float) -> float:
-    """Linear rate (N/m) of a helical compression/extension spring."""
-    d, D = d_mm / 1000.0, D_mm / 1000.0
-    return G_STEEL * d**4 / (8.0 * D**3 * n)
-
-
-# ---- component / mate walk helpers (shared with the probes) ------------------
-# GetComponents(False) returns the WHOLE nested tree -- hundreds of nodes once
-# the moving subs are flexible, each costing a Name2 COM round-trip. Every walk
-# is timed (logged); callers that need it more than once enumerate ONCE and
-# pass the (comp, name) list down. ``toplevel=True`` is the tiny fast list.
-def _components(adapter, model=None, toplevel=False):
-    """``[(comp, Name2), ...]`` for every component; logs the walk + its cost."""
-    import time as _t
-    model = model or adapter.currentModel
-    t0 = _t.perf_counter()
-    raw = adapter._attempt(lambda: model.GetComponents(bool(toplevel)), default=None) or []
-    out = []
-    for c in raw:
-        # No flag: Name2 is a property read (issue #87).
-        out.append((c, str(_read_member(c, "Name2"))))
-    scope = "top-level" if toplevel else "full-tree"
-    log(f"    [enumerated {len(out)} components, {scope}, {_t.perf_counter() - t0:.1f}s]")
-    return out
-
-
-def _find_comps(adapter, needle, model=None, comps=None):
-    """Components whose Name2 contains ``needle``; pass ``comps`` to reuse a walk."""
-    if comps is None:
-        comps = _components(adapter, model)
-    return [(c, nm) for c, nm in comps if needle in nm]
-
-
-def _part_family(name2):
-    """Component Name2 -> exact part family (never prefix-confused).
-
-    ``"drive-train-1/cylinder-gear-1"`` -> ``"cylinder-gear"``.
-    """
-    part = name2.split("/")[-1]
-    return part.rsplit("-", 1)[0]
-
-
-def _find_family(adapter, family, model=None, comps=None):
-    """Components whose part family equals ``family`` EXACTLY (dispatch, name)."""
-    if comps is None:
-        comps = _components(adapter, model)
-    return [(c, nm) for c, nm in comps if _part_family(nm) == family]
-
-
-def _find_one(adapter, needle, model=None, comps=None, toplevel=False):
-    if comps is None:
-        comps = _components(adapter, model, toplevel=toplevel)
-    hits = [(c, nm) for c, nm in comps if needle in nm]
-    return hits[0] if hits else (None, None)
-
-
-def _comp_model_doc(adapter, comp):
-    """A component's model doc. GetModelDoc2 is a METHOD -- the component
-    dispatches from :func:`_components` are deliberately UNFLAGGED (#87), so
-    an unflagged call raises ('str' object not callable) and _attempt reads
-    None; flag the single dispatch at the point of use (cost two live runs)."""
-    _flag(comp, "IComponent2")
-    return adapter._attempt(lambda: comp.GetModelDoc2(), default=None)
-
-
-def _sub_model(adapter, sub_name):
-    log(f"  resolving {sub_name} model doc ...")
-    comp, _ = _find_one(adapter, sub_name, toplevel=True)
-    if comp is None:
-        raise RuntimeError(f"sub component not found: {sub_name}")
-    model = _comp_model_doc(adapter, comp)
-    if model is None:
-        # After the flex-solve rebuilds a component dispatch can refuse
-        # GetModelDoc2 (lightweight/stale COM read) even though the sub doc IS
-        # open in the session as a reference -- resolve it by document path
-        # instead (observed live on drive-train-1 after flexing all 6 subs).
-        path = str((OUT_SLDASM / f"{sub_name.rsplit('-', 1)[0]}.SLDASM").resolve())
-        model = adapter._attempt(
-            lambda: adapter.swApp.GetOpenDocumentByName(path), default=None)
-        if model is not None:
-            log(f"  {sub_name}: GetModelDoc2 None; resolved by path instead")
-    if model is None:
-        raise RuntimeError(
-            f"model doc unresolved for {sub_name} (GetModelDoc2 None and "
-            f"no open document matches its path)")
-    return comp, model
-
-
-def _mate_parts(adapter, mate):
-    """Distinct PART names a mate references (planes/origins -> None, skipped)."""
-    parts = []
-    n = int(adapter._attempt(lambda: mate.GetMateEntityCount(), default=0))
-    for i in range(n):
-        me = adapter._attempt(lambda k=i: mate.MateEntity(k), default=None)
-        if me is None:
-            continue
-        _flag(me, "IMateEntity2")
-        rc = adapter._attempt(lambda e=me: e.ReferenceComponent2, default=None)
-        if rc is None:
-            rc = adapter._attempt(lambda e=me: e.ReferenceComponent, default=None)
-        if rc is not None:
-            # No flag: Name2 is a property read (issue #87).
-            parts.append(str(_read_member(rc, "Name2")))
-    return parts
-
-
-def _mate_value(adapter, mate, mtype):
-    if mtype not in (DISTANCE, ANGLE):
-        return None
-    dd = adapter._attempt(lambda: mate.DisplayDimension2(0), default=None)
-    if dd is None:
-        return None
-    _flag(dd, "IDisplayDimension")
-    dim = adapter._attempt(lambda: dd.GetDimension2(0), default=None)
-    if dim is None:
-        dim = adapter._attempt(lambda: dd.GetDimension(), default=None)
-    if dim is None:
-        return None
-    _flag(dim, "IDimension")
-    return adapter._attempt(lambda: dim.Value, default=None)
-
-
-def _iter_mates(adapter, model, read_values=True, progress_every=0):
-    """Yield (feature, mate, name, mtype, parts, value) for MODEL's mate group.
-
-    ``read_values=False`` skips the per-mate DisplayDimension2 round-trip (the
-    slow part) for callers that classify by family/type alone.
-    ``progress_every`` > 0 logs a heartbeat every N mates walked.
-    """
-    _flag(model, "IModelDoc2")
-    feat = _read_member(model, "FirstFeature")
-    seen = 0
-    for _ in range(50000):
-        if not feat:
-            break
-        _flag(feat, "IFeature")
-        if _read_member(feat, "GetTypeName2") == "MateGroup":
-            sub = _read_member(feat, "GetFirstSubFeature")
-            for _ in range(50000):
-                if not sub:
-                    break
-                _flag(sub, "IFeature")
-                name = str(_read_member(sub, "Name"))
-                mate = adapter._attempt(lambda s=sub: s.GetSpecificFeature2(), default=None)
-                if mate is not None:
-                    _flag(mate, "IMate2")
-                    mtype = int(adapter._attempt(lambda m=mate: m.Type, default=-1))
-                    parts = _mate_parts(adapter, mate)
-                    val = _mate_value(adapter, mate, mtype) if read_values else None
-                    seen += 1
-                    if progress_every and seen % progress_every == 0:
-                        log(f"    ... walked {seen} mates")
-                    yield sub, mate, name, mtype, parts, val
-                sub = _read_member(sub, "GetNextSubFeature")
-        feat = _read_member(feat, "GetNextFeature")
-
-
-def _root_title(sub_name):
-    """Sub instance name -> the doc-root pseudo-part name in its own mate group
-    ("drive-train-1" -> "drive-train")."""
-    return sub_name.rsplit("-", 1)[0]
-
-
-def _real_parts(parts, root):
-    """Distinct real part names, dropping the assembly-root pseudo-part."""
-    return sorted({p for p in parts if p != root})
-
-
-def _lone_real(parts, root):
-    rp = _real_parts(parts, root)
-    return rp[0] if len(rp) == 1 else None
-
-
-def _family(part_name):
-    """"rocker-arm-12" -> "rocker-arm" (strip the trailing instance suffix)."""
-    return part_name.rsplit("-", 1)[0]
-
-
 def _entity_ref(name2, prefix, etype):
-    """A depth-2-safe ``MateEntityRef`` for a named feature inside a nested part.
-
-    ``name2`` is the component path ("channel-1/connecting-rod-1"), ``prefix``
-    the part-local named feature ("Axis1"). Maps the base IFeature through
-    ``IComponent2.GetCorresponding`` (PR #64) -- the hand-built reversed
-    ``Axis1@part@sub@asm`` string resolves only one level deep.
-    """
+    """A depth-2-safe ``MateEntityRef`` for a named feature inside a nested part
+    (kept for the probes; see ``_assembly.component_named_ref``)."""
     return component_named_ref(name2, prefix, etype)
 
 
-def _comp_xform(adapter, comp):
-    """Component world transform as a 16-float array, or None if unreadable.
+# ---- runtime eye points (kept for the diagnostics probes/POCs) ----------------
+async def _eye_point(adapter, comp_needle, edge_points, label, comps=None):
+    """Create a mateable eye-centre RefPoint on a SHARED part doc (never saved).
 
-    After a heavy Basic Motion solve, Transform2 (or its ArrayData)
-    occasionally returns None on a set_motion_time sample -- a transient COM
-    read, not a real error; callers skip that sample."""
-    t = _read_member(comp, "Transform2")
-    data = _read_member(t, "ArrayData") if t is not None else None
-    if data is None:
-        return None
-    return [float(v) for v in data]
-
-
-def _comp_z_mm(adapter, comp):
-    a = _comp_xform(adapter, comp)
-    return a[11] * 1000.0 if a else 0.0
-
-
-def _by_z_rank(adapter, family, comps=None):
-    """Components of part FAMILY, sorted by world Z (station order).
-
-    The 20 instances of each moving part span the 20 channel stations
-    monotonically in Z, so the i-th entry of two such lists is the same
-    station -- robust pairing without trusting instance-suffix order."""
-    hits = _find_family(adapter, family, comps=comps)
-    return sorted(hits, key=lambda t: _comp_z_mm(adapter, t[0]))
-
-
-def _world(a, local_mm):
-    r, t = a[0:9], a[9:12]
-    return [sum(local_mm[i] * r[i * 3 + k] for i in range(3)) + t[k] * 1000.0
-            for k in range(3)]
-
-
-def _rot_angle(a0, a1):
-    """Relative rotation magnitude (deg) between two component transforms."""
-    def cols(a):
-        return ((a[0], a[1], a[2]), (a[3], a[4], a[5]), (a[6], a[7], a[8]))
-    c0, c1 = cols(a0), cols(a1)
-    tr = sum(c1[k][i] * c0[k][i] for k in range(3) for i in range(3))
-    return math.degrees(math.acos(max(-1.0, min(1.0, (tr - 1.0) / 2.0))))
+    The MACHINE parts carry permanent named points now (``_refpoints.py``:
+    RingCenter / SpringEye / RimPoint), so the operation runner never calls
+    this -- it survives for the hand-run POC rigs (poc_spring_adder /
+    poc_damper_check), whose throwaway parts have no named points.
+    arc_center on the eye hole's circular edge -> the ring centre;
+    ``edge_points`` is a candidate list tried in order (a union can consume
+    part of the circle). Selection in a component's part doc requires it be
+    the ACTIVE doc -> ActivateDoc3 round-trip.
+    """
+    from solidworks_mcp.adapters.base import CreateReferencePointParameters
+    from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
+    from _common import _read_member
+    top = adapter.currentModel
+    top_title = str(_read_member(top, "GetTitle"))
+    comp, _ = _find_one(adapter, comp_needle, comps=comps)
+    if comp is None:
+        raise RuntimeError(f"{comp_needle} not found for eye point {label}")
+    part = _comp_model_doc(adapter, comp)
+    if part is None:
+        raise RuntimeError(f"{comp_needle} part doc unresolved")
+    part_title = str(_read_member(part, "GetTitle"))
+    adapter._attempt(
+        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, _byref_i4()), default=None)
+    adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
+    name = None
+    try:
+        for ep in edge_points:
+            res = await adapter.create_reference_point(
+                CreateReferencePointParameters(mode="arc_center", edge_point=ep))
+            if res.is_success:
+                data = res.data
+                name = data.get("name") if isinstance(data, dict) else getattr(
+                    data, "name", None)
+                log(f"  eye point {label}: edge {ep} -> {name!r}")
+                break
+            log(f"    eye point {label}: edge {ep} rejected")
+    finally:
+        adapter._attempt(
+            lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()), default=None)
+        adapter.currentModel = top
+    if not name:
+        raise RuntimeError(
+            f"eye point {label}: no candidate edge selected on {part_title} "
+            f"({edge_points})")
+    log(f"  eye point {label} on {part_title} = {name!r}")
+    return name
 
 
 # ---- generic named-suppress (kept for the diagnostics probes) ----------------
 async def _suppress_named(adapter, sub_name, families, mtypes, label):
     """Suppress every single-real-part mate in SUB whose part family matches.
 
-    The free build defers its park drivers, so the operation study itself needs
-    no suppression -- this survives for the hand-run diagnostics probes that
-    still poke authored structural mates.
+    The free build defers its park drivers, so the operation runner itself
+    needs no classifier walk -- this survives for the hand-run diagnostics
+    probes that still poke authored structural mates.
     """
     _, model = _sub_model(adapter, sub_name)
     root = _root_title(sub_name)
@@ -384,8 +178,8 @@ async def _suppress_named(adapter, sub_name, families, mtypes, label):
             adapter, model, read_values=False, progress_every=20):
         if mtype not in mtypes:
             continue
-        lone = _lone_real(parts, root)
-        if lone is not None and _family(lone) in families:
+        real = _real_parts(parts, root)
+        if len(real) == 1 and _family(real[0]) in families:
             targets.append(name)
     await _do_suppress(adapter, sub_name, targets, label)
     return targets
@@ -403,143 +197,29 @@ async def _do_suppress(adapter, sub_name, targets, label):
     adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
 
 
-# ---- stage: float + ground + flex --------------------------------------------
-async def _flex_subs(adapter):
-    from solidworks_mcp.adapters.base import (
-        ComponentRefParameters, SetComponentSolvingParameters,
-    )
-    asm = adapter.currentModel
-    for sub in MOVING_SUBS:
-        check(f"float {sub}", await adapter.float_component(ComponentRefParameters(name=sub)))
-        for plane in ("Front Plane", "Top Plane", "Right Plane"):
-            await coincident_mate(
-                adapter, named_ref(f"{plane}@{sub}", "PLANE"),
-                named_ref(plane, "PLANE"), label=f"ground {sub} {plane}")
-        adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
-        log(f"  set {sub} FLEXIBLE -- blocking solve ...")
-        check(f"flexible {sub}", await adapter.set_component_solving(
-            SetComponentSolvingParameters(name=sub, solving=FLEXIBLE)))
-        comp, _ = _find_one(adapter, sub, toplevel=True)
-        solving = int(adapter._attempt(lambda c=comp: c.Solving, default=-1))
-        log(f"  {sub} Solving={solving} (1=flexible)")
-    adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
-
-
-# ---- stage: replay the ENGAGED setup parks -----------------------------------
-# Deferred park drivers = ABSENT = free. The operation study leaves the DOF the
-# machine RUNS on free (crank_angle, rocker/rod swings, lever rocks, pen travel,
-# paper crank) and re-authors ENGAGED only the SETUP poses that must be held
-# while it runs: the three drive-train setup swings, and the 20 bar_amplitude
-# clamps (the bars are coefficient SETTINGS -- in the real machine each bar is
-# clamped at its station while the crank turns). A trailing "_" is a prefix
-# match (the per-channel key families).
-_SETUP_PARKS = {
-    "drive-train": ("cone_swing", "pinion_swing", "pinion_cam"),
-    "channel": ("bar_amplitude_",),
-}
-
-
-def _key_matches(key, patterns):
-    return any(key == p or (p.endswith("_") and key.startswith(p))
-               for p in patterns)
-
-
-def _square_station(key):
-    """bar_amplitude_{j} -> the square-preset station a_j (mm from the pivot).
-
-    Row j synthesises harmonic n = 20 - j (channels.yaml); the square preset is
-    the textbook odd-harmonic partial sum a_j = fundamental / n (odd n), 0
-    (even n), fundamental = machine amplitude.fundamental_station_mm (80).
-    """
-    j = int(key.rsplit("_", 1)[1])
-    n = int(_config.channels()[j]["harmonic_n"])
-    fund = float(_config.machine("amplitude", "fundamental_station_mm"))
-    return fund / n if n % 2 else 0.0
-
-
-def _patch_bar_spec(spec, preset):
-    """Re-station a recorded bar_amplitude spec for a non-config preset.
-
-    The recorded spec pins the bar at its as-built station (foot X from the
-    assembly Right Plane = PIVOT.x + a_j). For a transient preset the study
-    replays the SAME mate at the preset's station: distance -> PIVOT.x + a_j',
-    verify dropped (the recorded world point is only valid at the recorded
-    station). J5 (foot radius from the rocker arc centre) is invariant along
-    the R800 arc, so re-stationing is always consistent with it.
-    """
-    if preset == "config":
-        return spec
-    from build_channel_assembly import PIVOT
-    a_j = _square_station(spec["key"])
-    spec = dict(spec, params=dict(spec["params"]), verify=None, witness=None)
-    spec["params"]["distance"] = PIVOT[0] + a_j
-    return spec
-
-
-async def _replay_setup_parks(adapter, preset="config"):
-    """Re-author the deferred SETUP-pose park drivers ENGAGED, BEFORE the top
-    assembly is opened.
-
-    Each sub is opened STANDALONE (the proven preflight/verify replay ground --
-    name-based mate-entity selection works reliably only in a doc opened as its
-    own top; replaying inside the referenced/flexed parent failed live: the
-    sub loads lightweight, GetModelDoc2 reads None and SelectByID2 misses
-    'Right Plane@cone-swing-platform-1'), the specs are replayed engaged, and
-    the doc is left OPEN + DIRTY -- when the top assembly opens next it binds
-    to the same in-memory doc, so the parked poses ride into the flexible
-    solve. NOTHING is saved. ``preset`` re-stations the channel amplitude
-    clamps (see :func:`_patch_bar_spec`).
-    """
-    from _assembly import is_locked_build
-    from _assembly_postbuild import load_park_specs, replay_park_specs
-
-    for sub in MOVING_SUBS:
-        stem = sub[:-2]  # component "-1" -> doc stem
-        patterns = _SETUP_PARKS.get(stem, ())
-        if not patterns:
-            continue
-        if is_locked_build(_config.machine("build_lock", stem.replace("-", "_"))):
-            if preset != "config" and stem == "channel":
-                raise RuntimeError(
-                    "channel is built `locked` -- its amplitude clamps are "
-                    "authored in the artefact and cannot be transiently "
-                    "re-stationed; rebuild `free` or use the config preset")
-            log(f"{stem}: built `locked`, setup parks already authored")
-            continue
-        specs = [s for s in load_park_specs(stem) if _key_matches(s["key"], patterns)]
-        if not specs:
-            raise RuntimeError(
-                f"{stem}: no setup park specs matching {patterns} in the park "
-                f"sidecar -- stale artefact or renamed free_dof_key; rebuild "
-                f"the assembly")
-        if stem == "channel":
-            specs = [_patch_bar_spec(s, preset) for s in specs]
-        sub_path = str((OUT_SLDASM / f"{stem}.SLDASM").resolve())
-        # open_model FLAGS the doc dispatch and sets adapter.currentModel
-        # itself -- never overwrite it with a raw swApp.ActiveDoc read (an
-        # unflagged dispatch silently breaks GetTitle() inside the adapter's
-        # mate-entity name qualification; cost one live run to find).
-        check(f"open {stem} (setup parks)", await adapter.open_model(sub_path))
-        log(f"{stem}: replaying {len(specs)} deferred setup park driver(s) "
-            f"(engaged): {[s['key'] for s in specs]}")
-        await replay_park_specs(adapter, specs)
-        if stem == "channel":
-            await _free_rod_axial(adapter)
-
-
-async def _free_rod_axial(adapter):
+# ---- Basic Motion margin: de-redundant the cam loops --------------------------
+async def _free_rod_axial_standalone(adapter):
     """Suppress each channel's J2 rod-axial mate (Front@rod <-> Front@rocker)
-    on the STANDALONE channel doc, so the cam loops are exactly constrained.
+    on the STANDALONE channel doc, BEFORE the top opens.
 
-    Per rod, artifact A authors J2 as coincident-axes (4 constraints) + this
-    axial distance (1), leaving 1 DOF (swing about the pin). The study's cam
-    point-on-axis adds 2 more -> 7 on 6 DOF = each of the 20 loops redundant
-    by exactly 1, and Basic Motion is redundancy-intolerant (the June lesson:
-    redundant parallel loops froze the solve; the exactly-constrained
-    point-on-axis recipe had NO rod axial mate -- the rod's Z-float is benign,
-    the loop forces are planar). Suppressed in-memory only, never saved.
+    Per rod, the channel authors J2 as coincident-axes (4 constraints) + this
+    axial distance (1); the top's cam point-on-axis adds 2 more -> 7 on 6 DOF
+    = each of the 20 loops redundant by exactly 1, and Basic Motion is
+    redundancy-intolerant (June: redundant parallel loops froze the solve; the
+    exactly-constrained recipe had NO rod axial -- the rod's Z-float is
+    benign, the loop forces are planar). Done on the standalone doc because
+    the top carries the SAVED studies: suppressing a mate in the open top
+    would be a mate edit under a study (the corruption class). The top then
+    binds to this dirtied in-memory doc. NOTHING is saved.
     """
     from solidworks_mcp.adapters.base import SuppressMateParameters
+    channel_path = str((OUT_SLDASM / "channel.SLDASM").resolve())
+    # open_model FLAGS the doc dispatch and sets adapter.currentModel itself --
+    # never overwrite it with a raw swApp.ActiveDoc read (an unflagged dispatch
+    # silently breaks GetTitle() inside the adapter's mate-entity name
+    # qualification; cost one live run to find).
+    check("open channel (rod-axial de-redundancy)",
+          await adapter.open_model(channel_path))
     model = adapter.currentModel
     targets = []
     for _f, _m, name, mtype, parts, _v in _iter_mates(
@@ -558,157 +238,6 @@ async def _free_rod_axial(adapter):
         raise RuntimeError(
             f"rod-axial de-redundancy found only {len(targets)} J2 axial "
             f"mates (expected {N_CHANNELS}) -- channel mate shape drifted")
-
-
-# ---- stage: cam couplings (channel <-> drive-train, cross-sub) ---------------
-async def _add_ring_centre_point(adapter):
-    """Create a mateable ring-centre RefPoint on the SHARED connecting-rod part.
-
-    The cam pin must be POSITION-ONLY (point-on-axis, 2 constraints) -- a
-    collinear-axes pin re-fixes the rod orientation the J2 rod<->rocker
-    revolute already fixes, over-constraining 20 parallel loops so Basic Motion
-    solves erratically (proven 2026-06-14). The rod's ORIGIN feature is NOT
-    mateable, so create a real RefPoint at the ring centre: the arc centre of
-    the ring-bore edge. All instances share connecting-rod.SLDPRT, so ONE point
-    is inherited by every instance via GetCorresponding; the part is NEVER
-    saved. Selection in a part doc requires it be ACTIVE -> ActivateDoc3
-    round-trip. Returns the point feature name.
-    """
-    from solidworks_mcp.adapters.base import CreateReferencePointParameters
-    top = adapter.currentModel
-    top_title = str(_read_member(top, "GetTitle"))
-    rod_comp, _ = _find_one(adapter, "connecting-rod-1")
-    if rod_comp is None:
-        raise RuntimeError("connecting-rod-1 not found for ring-centre point")
-    part = _comp_model_doc(adapter, rod_comp)
-    if part is None:
-        raise RuntimeError("connecting-rod part doc unresolved")
-    part_title = str(_read_member(part, "GetTitle"))
-    adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, _byref_i4()), default=None)
-    adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
-    pt = check("create ring-centre RefPoint", await adapter.create_reference_point(
-        CreateReferencePointParameters(mode="arc_center", edge_point=ROD_BORE_EDGE_MM)))
-    name = pt.get("name") if isinstance(pt, dict) else getattr(pt, "name", None)
-    adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()), default=None)
-    adapter.currentModel = top
-    if not name:
-        raise RuntimeError("ring-centre RefPoint creation returned no name")
-    log(f"  ring-centre point on {part_title} = {name!r} (shared by all rods)")
-    return name
-
-
-async def _add_cam_couplings(adapter, comps=None):
-    """Per channel, at TOP level: rod ring-centre POINT on cam lobe Axis3.
-
-    Cross-sub (drive-train<->channel), allowed at top level. The cam lobe
-    orbits as the gear turns -> the rod ring follows -> via the artifact-A J2
-    revolute the rod pin drives the rocker -> J5 closes rocker->bar->lever.
-    """
-    from solidworks_mcp.adapters.base import RotateComponentParameters
-    point_name = await _add_ring_centre_point(adapter)
-    if comps is None:
-        log("  enumerating components for cam pairing (single full-tree walk) ...")
-        comps = _components(adapter)
-    gears = _by_z_rank(adapter, "cylinder-gear", comps=comps)
-    rods = _by_z_rank(adapter, "connecting-rod", comps=comps)
-    n = min(len(gears), len(rods))
-    log(f"  cam couplings: {len(gears)} gears, {len(rods)} rods -> {n} channels")
-    cam_ok = 0
-    names = []
-    for i in range(n):
-        gear_comp, gear_n = gears[i]
-        rod_n = rods[i][1]
-        # PERTURB before mating: at the design pose the rod ring point lies ON
-        # the eccentric lobe Axis3 (degenerate zero-distance) and AddMate5
-        # rejects the point-on-axis as "over-defines". Spin the gear ~20 deg
-        # about its own axis so the lobe orbits OFF the stationary ring point;
-        # the closing ForceRebuild3 snaps the gear back to its mate pose and
-        # the added mate just holds (proven decisively, probe_perturb_cam).
-        a = _comp_xform(adapter, gear_comp)
-        await adapter.rotate_component(RotateComponentParameters(
-            name=gear_n, angle=20.0, axis_vector=[a[6], a[7], a[8]],
-            axis_point=[a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0], mode="exact"))
-        try:
-            cam = await coincident_mate(
-                adapter, _entity_ref(rod_n, point_name, "POINT"),
-                _entity_ref(gear_n, "Axis3", "AXIS"),
-                label=f"ch{i:02d} cam lobe <-> rod ring point")
-            if cam.get("name"):
-                cam_ok += 1
-                names.append(cam["name"])
-        except Exception as exc:  # noqa: BLE001 -- per-channel diagnostics
-            log(f"    ch{i:02d} cam coupling FAILED: {exc}")
-    adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
-    log(f"  cam couplings: {cam_ok}/{n}")
-    if cam_ok < n:
-        raise RuntimeError(f"cam couplings incomplete: {cam_ok}/{n}")
-    return names
-
-
-# ---- stage: crank->paper chain tie (drive-train <-> paper-drive) -------------
-async def _tie_paper_chain(adapter, comps=None):
-    """Tie paper-drive's crank-end T12 sprocket 1:1 to the drive-train
-    crankshaft it is coaxial with.
-
-    Paper-drive owns the whole crank->paper chain train, placing its crank-end
-    T12 (a transgear-removable in config T12) ON the crankshaft axis at world
-    (-122.8, 144.96), spin along Z -- in the real machine they are one keyed
-    shaft. Artifact A leaves the two subs independent; a 1:1 gear mate on the
-    coaxial Axis1s co-rotates them, so the belt/chain feature + rack-pinion
-    inside paper-drive feed the platen off the crank. Best-effort: the paper
-    feed is a demonstration nicety, so a failure warns and the study continues
-    without it.
-    """
-    if comps is None:
-        comps = _components(adapter)
-    crank_n = _find_one(adapter, "crankshaft-1", comps=comps)[1]
-    # The crank-end T12 = the transgear-removable instance in PAPER-DRIVE whose
-    # world XY sits on the crankshaft axis (the knob T24 + spare T18 are the
-    # other instances; XY separates them decisively).
-    t12_n = None
-    cands = []
-    for comp, nm in _find_family(adapter, "transgear-removable", comps=comps):
-        if not nm.startswith("paper-drive"):
-            continue
-        cfg = str(_read_member(comp, "ReferencedConfiguration"))
-        cands.append((nm, cfg))
-        if cfg == "T12":
-            t12_n = nm
-            break
-    if not crank_n or not t12_n:
-        _telemetry.warn(f"chain tie: components unresolved "
-                        f"(crank={crank_n!r}, t12={t12_n!r}; candidates "
-                        f"{cands}) -- skipping")
-        return None
-    for alignment in ("aligned", "anti_aligned"):
-        try:
-            res = await gear_mate(
-                adapter, _entity_ref(crank_n, "Axis1", "AXIS"),
-                _entity_ref(t12_n, "Axis1", "AXIS"),
-                [1.0, 1.0], alignment=alignment, label="chain crank->paper 1:1")
-            if res.get("name"):
-                log(f"  chain tie: {res['name']} ({t12_n}, alignment={alignment})")
-                return res
-        except Exception as exc:  # noqa: BLE001
-            log(f"    chain tie alignment={alignment} rejected: {exc}")
-    _telemetry.warn("chain tie failed both alignments -- continuing without "
-                    "platen feed")
-    return None
-
-
-# ---- stage: crank motor -------------------------------------------------------
-async def _add_crank_motor(adapter):
-    from solidworks_mcp.adapters.base import MotionMotorParameters
-    cs_comp, cs_name = _find_one(adapter, "crankshaft")
-    if cs_comp is None:
-        raise RuntimeError("crankshaft component not found")
-    axis = _entity_ref(cs_name, "Axis1", "AXIS")
-    log(f"  crank motor on Axis1@{cs_name} ({CRANK_RPM} RPM) ...")
-    res = check("add_motor crank", await adapter.add_motor(MotionMotorParameters(
-        motor_type="rotary", entity=axis, speed=CRANK_RPM, study_name="")))
-    return res
 
 
 # ---- sampling + fail-loud gates ----------------------------------------------
@@ -755,7 +284,7 @@ def assert_motion_progressed(samples, duration, label="driven",
         f"{duration:.2f}s (typical {typical:.3f} deg/step, OK)")
 
 
-async def _sample_transforms(adapter, probes, n_steps, study_name=""):
+async def _sample_transforms(adapter, probes, n_steps, duration, study_name=""):
     """Sample (t -> transform) rows for PROBES = [(comp, label), ...].
 
     Returns {label: [(t, xform_or_None), ...]}. One set_motion_time per step,
@@ -765,7 +294,7 @@ async def _sample_transforms(adapter, probes, n_steps, study_name=""):
     from solidworks_mcp.adapters.base import MotionTimeParameters
     rows = {label: [] for _c, label in probes}
     for s in range(n_steps + 1):
-        t = DURATION_S * s / n_steps
+        t = duration * s / n_steps
         check(f"set_time {t:.2f}", await adapter.set_motion_time(
             MotionTimeParameters(time=t, study_name=study_name)))
         for comp, label in probes:
@@ -786,12 +315,13 @@ def _span(series):
     return (max(vals) - min(vals)) if vals else 0.0
 
 
-async def _sample_kinematic(adapter, comps, n_probe=3):
+async def _sample_kinematic(adapter, comps, duration, study, n_probe=3):
     """Crank + rockers + platen over the run -- the kinematic-stage signal.
 
     Gates: (1) solve-lock on the crank (constant-rate motor must track);
     (2) dead-output on the rockers (a decoupled cam chain solves cleanly with
-    a dead output). Platen feed is reported, not gated (chain tie best-effort).
+    a dead output). Platen feed is reported AND gated -- the chain tie is an
+    artefact mate now, so a dead platen is a real regression.
     """
     probes = []
     for comp, name in _by_z_rank(adapter, "rocker-arm", comps=comps)[:n_probe]:
@@ -805,15 +335,15 @@ async def _sample_kinematic(adapter, comps, n_probe=3):
     crank, _ = _find_one(adapter, "crankshaft-1", comps=comps)
     if crank is not None:
         probes.append((crank, "crankshaft"))
-    platen, platen_n = _find_one(adapter, "platen-1", comps=comps)
+    platen, _platen_n = _find_one(adapter, "platen-1", comps=comps)
     if platen is not None:
         probes.append((platen, "platen"))
-    rows = await _sample_transforms(adapter, probes, n_steps=12)
+    rows = await _sample_transforms(adapter, probes, 12, duration, study)
 
     spans = {}
     for label, samples in rows.items():
         if label == "platen":
-            # linear feed: track world-Y/X translation magnitude
+            # linear feed: track world translation magnitude
             pts = [(t, _world(a, [0, 0, 0])) for t, a in samples if a is not None]
             if pts:
                 d = max(math.dist(pts[0][1], p) for _t, p in pts)
@@ -823,7 +353,7 @@ async def _sample_kinematic(adapter, comps, n_probe=3):
     log(f"  kinematic spans: { {k: round(v, 2) for k, v in spans.items()} }")
 
     if crank is not None:
-        assert_motion_progressed(rows["crankshaft"], DURATION_S, "crankshaft")
+        assert_motion_progressed(rows["crankshaft"], duration, "crankshaft")
         rocker_max = max((v for k, v in spans.items() if k.startswith("rocker")),
                          default=0.0)
         if rocker_max < ROCKER_MIN_DEG:
@@ -836,7 +366,7 @@ async def _sample_kinematic(adapter, comps, n_probe=3):
             "rows": _rows_json(rows)}
 
 
-async def _sample_summing_chain(adapter, comps):
+async def _sample_summing_chain(adapter, comps, duration, study):
     """channel-lever / summing-lever / magnifying-wheel rotation over the run --
     the spring-summing signal. Gate: the summing lever must actually rock."""
     probes = []
@@ -845,7 +375,7 @@ async def _sample_summing_chain(adapter, comps):
         comp, name = _find_one(adapter, needle, comps=comps)
         if comp is not None:
             probes.append((comp, needle.rsplit("-1", 1)[0]))
-    rows = await _sample_transforms(adapter, probes, n_steps=12)
+    rows = await _sample_transforms(adapter, probes, 12, duration, study)
     spans = {label: _span(_rot_series(samples)) for label, samples in rows.items()}
     log(f"  summing-chain spans(deg): { {k: round(v, 2) for k, v in spans.items()} }")
     if spans.get("summing-lever", 0.0) < SUM_MIN_DEG:
@@ -857,14 +387,15 @@ async def _sample_summing_chain(adapter, comps):
     return {"spans_deg": spans, "rows": _rows_json(rows)}
 
 
-async def _sample_pen(adapter, comps, n_steps=48):
+async def _sample_pen(adapter, comps, duration, study, n_steps=48):
     """Pen-marker tip world-Y over the run + the dead-output gate.
 
     Returns the (t, y_mm) series for the truth-curve comparison asset."""
     marker, _ = _find_one(adapter, "pen-marker", comps=comps)
     if marker is None:
         raise RuntimeError("pen-marker not found for the pen sample")
-    rows = await _sample_transforms(adapter, [(marker, "pen-marker")], n_steps)
+    rows = await _sample_transforms(
+        adapter, [(marker, "pen-marker")], n_steps, duration, study)
     series = [(t, _world(a, [0.0, 0.0, 0.0])[1])
               for t, a in rows["pen-marker"] if a is not None]
     ys = [y for _t, y in series]
@@ -896,7 +427,7 @@ async def _reset_to_assembled(adapter):
     log("  reset to assembled pose (set_time 0 + rebuild) before solve")
 
 
-async def _export_video(adapter, stage):
+async def _export_video(adapter, stage, study):
     from solidworks_mcp.adapters.base import MotionExportParameters
     # The export grabs the live viewport (screen renderer) -- frame the whole
     # machine from the gallery's 3/4 view first.
@@ -905,7 +436,7 @@ async def _export_video(adapter, stage):
     adapter._attempt(lambda: model.ViewZoomtofit2(), default=None)
     vid = (OUT_PNG.parent / f"{ASM}-operation-{stage}.mp4").resolve()
     res = await adapter.export_motion_video(MotionExportParameters(
-        file_path=str(vid), study_name="", frames_per_second=25.0))
+        file_path=str(vid), study_name=study, frames_per_second=25.0))
     if res.is_success:
         log(f"  video {res.data['bytes']} bytes -> {vid}")
         return str(vid)
@@ -924,147 +455,80 @@ def _write_samples(stage, payload):
 # ---- main --------------------------------------------------------------------
 async def build(adapter):
     stage = sys.argv[1] if len(sys.argv) > 1 else "kinematic"
-    order = {"flex": 0, "kinematic": 1, "springs": 2, "full": 3}
-    if stage not in order:
-        raise RuntimeError(f"unknown stage {stage!r}; pick {sorted(order)}")
-    level = order[stage]
+    if stage not in ("kinematic", "full"):
+        raise RuntimeError(f"unknown stage {stage!r}; pick kinematic|full")
     opts = set(sys.argv[2:])
-    preset = "square" if "square" in opts else "config"
-    log(f"stage = {stage} (level {level}) preset={preset} "
-        f"rpm={CRANK_RPM} dur={DURATION_S}s channels={N_CHANNELS}")
 
-    # A prior run's in-memory motion study triggers the blocking "Update
-    # Initial Animation State" modal on the next mate edit (proven); start from
-    # a clean session. CloseDoc discards dirty docs without the save prompt.
+    sidecar = load_studies_sidecar()
+    study = sidecar["studies"].get(stage)
+    if not study:
+        raise RuntimeError(
+            f"no saved {stage!r} study recorded in the sidecar "
+            f"({sidecar.get('studies')}) -- rebuild harmonic-analyzer")
+    rpm = float(sidecar.get("rpm", 0.0))
+    duration = float(os.environ.get("MOTION_DURATION_S",
+                                    sidecar.get("duration_s", 6.0)))
+    log(f"stage = {stage} -> saved study {study!r} (motor {rpm} RPM baked; "
+        f"duration {duration}s) channels={N_CHANNELS}")
+
+    # A prior run's in-memory state (and any dirty doc) must not leak into
+    # this solve; CloseDoc discards dirty docs without the save prompt.
     from _assembly_postbuild import discard_open_documents
     discard_open_documents(adapter)
 
-    # Setup parks replay FIRST, on each sub opened standalone; the top then
-    # binds to the dirtied in-memory sub docs (see _replay_setup_parks).
-    with _telemetry.span("motion.parks", preset=preset):
-        await _replay_setup_parks(adapter, preset)
+    # Solver-margin prep FIRST, on the standalone channel doc; the top then
+    # binds to the dirtied in-memory doc (see _free_rod_axial_standalone).
+    with _telemetry.span("motion.derigidify"):
+        await _free_rod_axial_standalone(adapter)
 
     asm_path = str((OUT_SLDASM / f"{ASM}.SLDASM").resolve())
     check("open harmonic-analyzer", await adapter.open_model(asm_path))
     log(f"opened {asm_path}")
     # The top opens with nested components LIGHTWEIGHT (seat default), and a
-    # lightweight component's GetModelDoc2 reads None -- which broke first the
-    # sub-doc resolution and then the connecting-rod part doc (both live).
-    # Resolve everything once; the study reaches into part docs everywhere
-    # (ring/eye/rim RefPoints, GetCorresponding mate refs).
+    # lightweight component's GetModelDoc2 reads None (broke sub-doc + part
+    # resolution live). Resolve everything once.
     n = adapter._attempt(
         lambda: adapter.currentModel.ResolveAllLightWeightComponents(False),
         default=None)
     log(f"  ResolveAllLightWeightComponents -> {n}")
 
-    with _telemetry.span("motion.flex"):
-        await _flex_subs(adapter)
-    if level < 1:
-        log("stage flex complete (no motor/solve)")
-        return {}
-
     log("  enumerating components (single full-tree walk, reused everywhere) ...")
     comps = _components(adapter)
 
-    # EVERY real mate is authored BEFORE the motion study exists -- adding a
-    # mate to a doc that carries a study corrupts the study's initial
-    # animation state (the June modal lesson; attempt 6's post-study gear +
-    # yoke mates preceded a dead zero-motion solve). Motion ELEMENTS (motor,
-    # springs, gravity) belong to the study and come after.
-    #
-    # strip_groups: every authored coupling, most-suspect first -- on a DEAD
-    # solve the sampler suppresses one group at a time and re-solves in the
-    # SAME session (attribution costs minutes, a fresh run costs ~40).
-    strip_groups = []
-    with _telemetry.span("motion.couplings"):
-        cam_names = await _add_cam_couplings(adapter, comps=comps)
-        tie = await _tie_paper_chain(adapter, comps=comps)
-    if level >= 3:
-        from build_motion_study_springs import add_output_mates
-        with _telemetry.span("motion.output"):
-            out = await add_output_mates(adapter, comps=comps)
-        if out.get("handoff"):
-            strip_groups.append(("lever hand-off gear", [out["handoff"]], None))
-        if out.get("wire2"):
-            strip_groups.append(("WIRE2 yoke", [out["wire2"]], None))
-    if tie and tie.get("name"):
-        strip_groups.append(("chain tie", [tie["name"]], None))
-    strip_groups.append(
-        ("bar clamps", [f"PARK_bar_amplitude_{j:02d}" for j in range(N_CHANNELS)],
-         "channel-1"))
-    strip_groups.append(("cam couplings", cam_names, None))
-
+    # Resolve the SAVED study by name (create_motion_study with a name is
+    # resolve-only: re-applies type + duration and activates). No mates are
+    # authored past this point -- only motion elements are legal additions.
     check("ensure_motion_addin", await adapter.ensure_motion_addin())
     from solidworks_mcp.adapters.base import (
         MotionGravityParameters, MotionStudyParameters, MotionStudyRefParameters,
     )
-    made = check("create_motion_study", await adapter.create_motion_study(
-        MotionStudyParameters(name="", study_type="physical_simulation",
-                              duration=DURATION_S, activate=True)))
-    log(f"  study {made['name']!r}")
-    await _add_crank_motor(adapter)
-
-    if level >= 2:
-        from build_motion_study_springs import add_springs
-        with _telemetry.span("motion.springs"):
-            await add_springs(adapter, comps=comps)
-    if level >= 3 and "grav" in opts:
+    check(f"resolve saved study {study!r}", await adapter.create_motion_study(
+        MotionStudyParameters(name=study, study_type="physical_simulation",
+                              duration=duration, activate=True)))
+    if "grav" in opts:
         g = await adapter.add_gravity(MotionGravityParameters(
-            axis="y", reverse=True, study_name=""))
+            axis="y", reverse=True, study_name=study))
         log(f"  gravity -Y: {'OK' if g.is_success else 'FAIL ' + str(g.error)}")
 
     await _reset_to_assembled(adapter)
     log("  Calculate() -- blocking solve of the whole device ...")
-    with _telemetry.span("motion.calculate"):
+    with _telemetry.span("motion.calculate", study=study):
         check("calculate_motion", await adapter.calculate_motion(
-            MotionStudyRefParameters(name="")))
+            MotionStudyRefParameters(name=study)))
 
-    payload = {"stage": stage, "preset": preset, "rpm": CRANK_RPM,
-               "duration_s": DURATION_S, "channels": N_CHANNELS}
-    # DEAD-solve attribution loop: a zero-motion solve strips the next suspect
-    # coupling group and re-solves in the same session. A run that only moves
-    # stripped still exports its video/samples, and the stripped list names
-    # the killer in the report + a hard failure at the end.
-    from solidworks_mcp.adapters.base import SuppressMateParameters
-    stripped = []
+    payload = {"stage": stage, "study": study, "rpm": rpm,
+               "duration_s": duration, "channels": N_CHANNELS}
     with _telemetry.span("motion.sample"):
-        for _round in range(len(strip_groups) + 1):
-            try:
-                payload["kinematic"] = await _sample_kinematic(adapter, comps)
-                break
-            except RuntimeError as exc:
-                is_dead = ("MOTION SOLVE LOCKED" in str(exc)
-                           or "DEAD OUTPUT" in str(exc))
-                if not is_dead or not strip_groups:
-                    raise
-                label, names, comp = strip_groups.pop(0)
-                _telemetry.warn(
-                    f"DEAD SOLVE ({str(exc).split(':')[0]}) -- stripping "
-                    f"{label} ({len(names)} mates) and re-solving for "
-                    f"attribution")
-                for nm in names:
-                    kw = {"component": comp} if comp else {}
-                    check(f"suppress {nm} ({label})", await adapter.suppress_mate(
-                        SuppressMateParameters(name=nm, suppress=True, **kw)))
-                stripped.append(label)
-                await _reset_to_assembled(adapter)
-                check("calculate_motion (retry)", await adapter.calculate_motion(
-                    MotionStudyRefParameters(name="")))
-        payload["stripped"] = stripped
-        if not stripped and level >= 2:
-            payload["summing"] = await _sample_summing_chain(adapter, comps)
-        if not stripped and level >= 3:
-            payload["pen"] = await _sample_pen(adapter, comps)
+        payload["kinematic"] = await _sample_kinematic(adapter, comps, duration, study)
+        if stage == "full":
+            payload["summing"] = await _sample_summing_chain(
+                adapter, comps, duration, study)
+            payload["pen"] = await _sample_pen(adapter, comps, duration, study)
 
     artefacts = {"samples": _write_samples(stage, payload)}
-    vid = await _export_video(adapter, stage)
+    vid = await _export_video(adapter, stage, study)
     if vid:
         artefacts["video"] = vid
-    if stripped:
-        raise RuntimeError(
-            f"solve moved only after stripping {stripped} -- those couplings "
-            f"kill the Basic Motion solve; samples/video exported for the "
-            f"stripped configuration (see {artefacts.get('samples')})")
     return artefacts
 
 

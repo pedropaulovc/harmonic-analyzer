@@ -92,6 +92,7 @@ from _assembly_postbuild import (
     load_park_specs,
     replay_park_specs,
 )
+from _assembly_top import TOP_ASM, assert_top_operational_dof
 from _common import (  # component iteration helpers (read-only)
     _flag_only,
     _read_member,
@@ -580,6 +581,11 @@ def _expected_free_dof(name: str) -> int:
     other assembly stays fully defined (0). The literal accessor tokenises
     build_lock.yaml into this gate's recipe deps, so flipping the flag re-runs
     verify too.
+
+    The TOP assembly (harmonic-analyzer) is dispatched separately in
+    ``_verify_static_one``: its six FLEXIBLE movers make a scalar count
+    meaningless, so it gets ``assert_top_operational_dof`` (floor + required
+    chain families) instead of this table.
     """
     if name == "drive-train":
         return 0 if is_locked_build(_config.machine("build_lock", "drive_train")) else 4
@@ -698,7 +704,17 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
         )
 
     free_dof = _expected_free_dof(name)
-    if free_dof:
+    if name == TOP_ASM:
+        # The full-machine assembly: six flexible movers whose live internals
+        # legitimately read under-constrained, clamped/coupled at top level.
+        # Neither the strict fully-defined gate nor the per-sub necessity table
+        # fits -- the operational gate (floor + required chain families + the
+        # T12 instance) lives beside the top build logic in _assembly_top.
+        report.gate(
+            f"{name}:dof-operational",
+            lambda: assert_top_operational_dof(adapter, resolve=False),
+        )
+    elif free_dof:
         # Default-free build: the freed-DOF park drivers are DEFERRED (not authored
         # in the saved model -- see AGENTS.md "Default-free DOF"), so there is
         # nothing to re-engage here. Prove NECESSITY only -- the operational DOF are

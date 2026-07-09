@@ -157,8 +157,21 @@ hooks) when the assembly script / `_common.py` / a hook changed, or the target i
 missing. Force a full rebuild of one assembly by deleting its `.SLDASM` target,
 then `doit assembly:<stem>`.
 
+**Operator escape — `doit stamp_recipes -- <stems…|all-subs>`.** Re-stamps the
+named assemblies' recipe sidecars to the CURRENT recipe digest without
+rebuilding — an explicit declaration that a recipe change (typically a
+helper-module edit in `_assembly.py` that provably doesn't alter built
+geometry) does not invalidate the on-disk `.SLDASM`, so the next run REFRESHes
+instead of FULL re-insert/re-mating all 8 assemblies. The refresh still runs
+every gate and `verify:soundness` still follows, so a wrong claim fails loud.
+NEVER stamp after a change that moves inserts/mates.
+
 **Fail loud.** A refresh that hits a dangling mate, free DOF, or interference
 exits non-zero and leaves the `.SLDASM` untouched — never a stale artefact.
+The refresh DOF gate adapts to how the model was built: a default-`free`
+assembly (its park sidecar has specs) gets the count-only free-DOF necessity
+gate; the top gets `assert_top_operational_dof` (passed in by
+`refresh_assembly.py`); everything else keeps strict fully-defined.
 
 **Idempotent — artefact bytes don't drive rebuilds.** Saving an assembly makes
 SolidWorks rewrite volatile save metadata into every nested `.SLDPRT`/`.SLDASM`
@@ -408,6 +421,44 @@ The exact **sufficiency** count is proven at release by `assert_park_closure`
 to reconstitute the drivers before its 0-DOF baseline, then suppresses each to show
 it frees its own part family. `build_motion_setup_drives.py` treats a deferred
 (absent) driver as already-free. See `memory/default-free-dof-park-drivers.md`.
+
+## The top assembly is the OPERATING machine (default-free, one level up)
+
+`harmonic-analyzer.SLDASM` is not seven fixed blocks: only frame stays fixed;
+the six movers are floated, 3-plane grounded at identity and set **FLEXIBLE**
+(one batched `CompConfigProperties5` on the whole selection), so their
+default-`free` internals stay live in the saved doc. On top of that the build
+authors (all in `_assembly_top.py`, the top's own helper module — iterating on
+it rebuilds ONLY the top):
+
+- the 23 engaged **`SETUP_<key>`** clamps — drive-train's cone_swing /
+  pinion_swing / pinion_cam + the 20 channel bar_amplitude stations, replayed
+  from the sub park sidecars retargeted into top context. NOT park drivers
+  (never deferred/cycled/closure-proven), hence NOT the `PARK_` prefix the
+  park machinery discovers;
+- the physical cross-sub couplings: 20 **`CAM_chNN`** rod-ring↔lobe
+  point-on-axis mates (the rod's permanent `RingCenter` RefPoint; 20° gear
+  perturb first — the zero-distance degenerate rejection), the
+  **`CHAIN_crank_paper`** 1:1 tie, the **`HANDOFF_levers`** summing↔magnifying
+  1:1 gear on the OFFSET axes, and the **`WIRE2_pen`** rim-point↔pen-plane
+  scotch yoke (the WIRE-1 precedent, one level up). Channel's J2 rod-axial
+  mates stay LIVE — Grübler over each cam loop is exactly constrained;
+- TWO saved Basic Motion studies (`kinematic` = crank motor only;
+  `full` = motor + 20 channel springs + counter spring on the parts' permanent
+  `SpringEye` RefPoints), names recorded in `.harmonic-analyzer.studies.json`.
+  `build_motion_study.py` is now a RUNNER: it suppresses the J2 axials on the
+  standalone channel doc (Basic Motion redundancy margin), opens the top,
+  resolves a saved study, solves, samples, exports — it never authors a mate
+  (a mate edit under a saved study risks initial-animation-state corruption).
+
+The top's DOF gate is **`assert_top_operational_dof`** (full-tree walk: floor
+of `3·N+12` under-constrained nested components + required chain families +
+the exact T12 instance) — used by `verify:soundness` and the refresh path. The
+top has NO deferred parks, so it stays OUT of the release preflight closure.
+The top build requires every mover built `free` (`require_free_movers`); a
+`locked` mover is a pinned-export configuration incompatible with the coupled
+machine. The amplitude preset stays upstream (machine/amplitude.yaml →
+channels.yaml → the channel build → the recorded specs the clamps replay).
 
 ## Stamps & incrementality
 

@@ -37,7 +37,15 @@ def main() -> int:
     asm_name = sys.argv[1].removesuffix(".SLDASM").replace("_", "-")
 
     async def build(adapter):
-        artefacts = await refresh_assembly(adapter, asm_name)
+        dof_gate = None
+        if asm_name == "harmonic-analyzer":
+            # The top's DOF gate is the OPERATIONAL one (six flexible movers,
+            # live chains) -- imported here, off every build recipe, and passed
+            # in so _assembly.py itself never depends on _assembly_top.
+            from _assembly_top import assert_top_operational_dof
+
+            dof_gate = assert_top_operational_dof
+        artefacts = await refresh_assembly(adapter, asm_name, dof_gate=dof_gate)
         if asm_name == "harmonic-analyzer":
             # The top assembly's eight-views gallery + parts-only BOM are not part
             # of the generic refresh tail; regenerate them on the still-open doc so
