@@ -86,12 +86,15 @@ Also corrected: drive-train's "export_image front 77.3s" log line is mislabeled 
   in place (pose lands pre-rebuild, so flip read-backs don't need the rebuild); batch-defer +
   ONE closing rebuild (0.52s) is pose-identical. ⇒ mate-COUNT elimination is the lever;
   rebuild-deferral is a minor (~100-200s) follow-up.
-- **CopyWithMates2 is DEAD on this stack** (4 iterations): returns instant False even in the
+- **CopyWithMates2 is DEAD on this stack** (5 iterations): returns instant False in the
   official example's exact shape (1 mate, all arrays len 1, typed-null `VT_DISPATCH` refs,
-  list AND VARIANT-array marshaling) — argument-stage rejection, same family as the
-  chain-pattern `CreateDefinition` null; early binding is the only untried path and is
-  forbidden in-process (wedges the seat). Standalone repro: scratchpad `cwm_standalone.py`
-  (session 8640c77b). COM traps re-confirmed en route: bare `None` → VT_NULL 'Type mismatch'
+  list AND VARIANT-array marshaling) AND with a component-to-component mate reference
+  (Phase C — bushing plane mated to the shaft component's plane, not the assembly datum) —
+  argument-stage rejection while OpenDoc6/AddComponent5/SelectByID2/AddMate5 all work in the
+  same session. Residual deltas to the official example: profile-center mate type (useless
+  for the channels regardless) and early binding (forbidden in-process — wedges the seat).
+  Same family as the chain-pattern `CreateDefinition` null. Standalone repro: scratchpad
+  `cwm_standalone.py` (session 8640c77b). COM traps re-confirmed en route: bare `None` → VT_NULL 'Type mismatch'
   (use `VARIANT(VT_DISPATCH, None)`); `OpenDoc6` byref outs = `VT_BYREF|VT_I4` VARIANTs;
   a part must be OPEN before `AddComponent5` inserts it by path.
 - Environment note: one SW crash during the first soundness attempt (wedged at
