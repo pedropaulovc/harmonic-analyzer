@@ -52,6 +52,7 @@ from win32com.client import VARIANT  # noqa: E402
 
 from _common import check, log, run_build  # noqa: E402
 from _assembly import (  # noqa: E402
+    _mate_hard_error,
     coincident_mate,
     component_names,
     component_transform,
@@ -529,6 +530,8 @@ async def build(adapter) -> dict[str, str]:
                 f"mapping: {cal} != {slot_by_sem}")
         log("sentinel calibration agrees with the rule-based mapping")
 
+    pre_copy_mates = {r["name"] for r in _mates_with_owners(adapter)}
+
     # Real copies: station k = SEED_J + i; every dim gets its SEED value at
     # its DISCOVERED slot, with only the rocker axial substituted to
     # PITCH/2 + i*PITCH (always positive = the seed's side; C3). Each slot
@@ -651,10 +654,19 @@ async def build(adapter) -> dict[str, str]:
                 adapter._attempt(lambda: model.EditRebuild3(), default=None)
                 m = component_transform(adapter, inst)
                 p = inst.rsplit("-", 1)[0]
+                # Healed = rotation + XY back at the seed's AND Z on one of
+                # the expected stations: an axial-only drift keeps rot/XY
+                # matching, so without the Z term the loop would accept the
+                # first (wrong) candidate and never try the axial mate
+                # (codex #220 round 3). Which station this instance owns is
+                # settled by the aggregate re-measure after the loop.
+                want_zs_inst = [seed_tf[p][11] * 1000.0 + i * PITCH
+                                for i in range(1, N_COPY_STATIONS + 1)]
                 healed = (
                     all(abs(m[k] - seed_tf[p][k]) < 1e-4 for k in range(9))
                     and all(abs((m[9 + a] - seed_tf[p][9 + a]) * 1000.0) < 0.05
                             for a in range(2))
+                    and min(abs(m[11] * 1000.0 - w) for w in want_zs_inst) < 0.05
                 )
                 log(f"flip-repair {inst}: {d['name']} FlipDimension "
                     f"{cur} -> {not cur} (ModifyDefinition={ok}) -> "
@@ -701,14 +713,33 @@ async def build(adapter) -> dict[str, str]:
     log(f"timing: seed chain {t_seed:.1f}s vs slice copy avg "
         f"{sum(times) / len(times):.2f}s (first {times[0]:.2f}s, last "
         f"{times[-1]:.2f}s) + repair pass {t_fix:.1f}s total")
-    ok = (mates_after == want_mates) and not pose_fail and stable
+    # Copied-mate HEALTH: the expected mate count and stable poses can hold
+    # while a copied mate sits suppressed or in a hard error state with its
+    # component parked at the inserted transform (codex #220 round 3 --
+    # the park-replay corpse mode _mate_hard_error documents). Scan every
+    # mate the real copies added.
+    res = await adapter.list_mates()
+    unhealthy = []
+    for m in (res.data or []):
+        if m["name"] in pre_copy_mates:
+            continue
+        code = _mate_hard_error(adapter, m["name"])
+        if m.get("suppressed") or code:
+            unhealthy.append(
+                f"{m['name']} (suppressed={m.get('suppressed')}, err={code})")
+    log(f"copied-mate health: "
+        f"{'all clean' if not unhealthy else 'UNHEALTHY -- ' + '; '.join(unhealthy)}")
+
+    ok = ((mates_after == want_mates) and not pose_fail and stable
+          and not unhealthy)
     if not ok:
         # Raise so the process exits non-zero -- a logged FAIL with exit 0
         # would let automation treat a failed validation as passing
         # (codex #220).
         raise RuntimeError(
             f"slice validation FAILED: mates {mates_after}/{want_mates}, "
-            f"{len(pose_fail)} pose failures, stable={stable} (see log)")
+            f"{len(pose_fail)} pose failures, stable={stable}, "
+            f"{len(unhealthy)} unhealthy copied mates (see log)")
     log("VERDICT: PASS -- one call + flip repair replicates the whole chain")
     return {"verdict": "pass"}
 
