@@ -861,6 +861,12 @@ async def build(adapter):
     log(f"stage = {stage} (level {level}) preset={preset} "
         f"rpm={CRANK_RPM} dur={DURATION_S}s channels={N_CHANNELS}")
 
+    # A prior run's in-memory motion study triggers the blocking "Update
+    # Initial Animation State" modal on the next mate edit (proven); start from
+    # a clean session. CloseDoc discards dirty docs without the save prompt.
+    from _assembly_postbuild import discard_open_documents
+    discard_open_documents(adapter)
+
     asm_path = str((OUT_SLDASM / f"{ASM}.SLDASM").resolve())
     check("open harmonic-analyzer", await adapter.open_model(asm_path))
     log(f"opened {asm_path}")
