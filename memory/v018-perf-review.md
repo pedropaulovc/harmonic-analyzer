@@ -86,17 +86,31 @@ Also corrected: drive-train's "export_image front 77.3s" log line is mislabeled 
   in place (pose lands pre-rebuild, so flip read-backs don't need the rebuild); batch-defer +
   ONE closing rebuild (0.52s) is pose-identical. ⇒ mate-COUNT elimination is the lever;
   rebuild-deferral is a minor (~100-200s) follow-up.
-- **CopyWithMates2 is DEAD on this stack** (5 iterations): returns instant False in the
-  official example's exact shape (1 mate, all arrays len 1, typed-null `VT_DISPATCH` refs,
-  list AND VARIANT-array marshaling) AND with a component-to-component mate reference
-  (Phase C — bushing plane mated to the shaft component's plane, not the assembly datum) —
-  argument-stage rejection while OpenDoc6/AddComponent5/SelectByID2/AddMate5 all work in the
-  same session. Residual deltas to the official example: profile-center mate type (useless
-  for the channels regardless) and early binding (forbidden in-process — wedges the seat).
-  Same family as the chain-pattern `CreateDefinition` null. Standalone repro: scratchpad
-  `cwm_standalone.py` (session 8640c77b). COM traps re-confirmed en route: bare `None` → VT_NULL 'Type mismatch'
-  (use `VARIANT(VT_DISPATCH, None)`); `OpenDoc6` byref outs = `VT_BYREF|VT_I4` VARIANTs;
-  a part must be OPEN before `AddComponent5` inserts it by path.
+- **CopyWithMates/CopyWithMates2 are DEAD via COM on this seat — but the UI command WORKS**
+  (definitive, ~20 variants over 6 probe phases, scratchpad `cwm_standalone.py` /
+  `cwm_early.py` / `cwm_phase_f.py`, session 8640c77b). Pedro manually ran Insert →
+  Component → Copy with Mates on `channel.SLDASM` (rocker-arm-1: Repeat concentric +
+  re-valued axial distance +1 pitch) and it placed a working copy — so the feature EXISTS
+  on the Makers edition. Every API form returns instant False with NO copy: late-bound
+  list + VARIANT-array marshaling; the official example's exact shape (1 mate, arrays
+  len 1, `VT_DISPATCH` typed-null refs); parallel per-mate arrays; component-to-component
+  mate references; selection-harvested component handle (`GetSelectedObject6`, the v1 VBA
+  example's way); the obsolete 5-arg v1; **early-bound dispid invoke** (gen_py
+  `IAssemblyDoc(model._oleobj_).CopyWithMates2` — `InvokeTypes(170, …)`, every param
+  declared plain `VT_VARIANT`, so marshaling cannot be the blocker); on a SAVED assembly;
+  with the component live-selected; with explicit `NewEntityToMateTo` dispatches (both the
+  plane `IFeature` and its `GetSpecificFeature2` RefPlane, Repeat=False). Timing tell:
+  VARIANT-array calls return in 0.00s (marshal-stage rejection) but list/typed calls take
+  0.10-0.26s — the method RUNS and declines. Only untried probe left: macro-RECORD the
+  manual UI action (needs Pedro at the seat) and string-dump the .swp to see whether the
+  UI even routes through this API. Verdict for perf work: mate-count elimination for the
+  MOVING channel parts stays closed; the landed pattern+grounding wins don't depend on it.
+  COM traps re-confirmed en route: bare `None` → VT_NULL 'Type mismatch' (use
+  `VARIANT(VT_DISPATCH, None)`); `OpenDoc6` byref outs = `VT_BYREF|VT_I4` VARIANTs; a part
+  must be OPEN before `AddComponent5` inserts it by path; `Extension.SaveAs3` Options: 1 =
+  Silent, **2 = Copy** (doc stays unsaved — silent no-op trap); gen_py wrapper loads via
+  `GetModuleForTypelib` (fast, no regen) — `sw_type_info.early_bound` is safe, in-process
+  `EnsureModule` remains forbidden.
 - Environment note: one SW crash during the first soundness attempt (wedged at
   `channel.SLDASM [Viewing]`, Responding=False); Pedro disabled ENHANCED GRAPHICS and the
   re-run passed — suspect that setting, not the model.
