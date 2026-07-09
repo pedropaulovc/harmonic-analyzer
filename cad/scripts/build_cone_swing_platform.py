@@ -20,8 +20,9 @@ the lock knob washer at the south-west). A O6.5 pivot hole takes the
 slotted pivot screw (clearance over its O6.35 shoulder -- the plate
 rotates ON the screw).
 
-The asymmetric flare keeps the part CHIRAL, so the script stays
-AUTHORED MIRRORED under MIRROR_PLANE "x0" (constants note below).
+The asymmetric flare keeps the part CHIRAL; the assembly places it at
+Ry(+INCLINE), under which part-local +x tips machine WEST at the engaged
+pose -- the west flare and notch are authored at +x (constants note below).
 
 Named refs for the assembly: "swing pivot" (Axis1, vertical through the
 origin), the CRANK AXIS (Axis2 -- the machine-z crank line the
@@ -100,17 +101,16 @@ _COS_I = math.cos(math.radians(INCLINE_DEG))
 # The notch runs along the swing arc's CHORD: at R~192 over ~3 deg to the
 # mouth the sagitta is ~0.07, absorbed by the O6.35-stud-in-8.0 clearance.
 #
-# AUTHORED MIRRORED (the crank-pedestal precedent, kept from the lobe era):
-# every local-x below is the NEGATION of the machine-effective value --
-# mirror_placement realises the insertion as this part reflected about its
-# own x = 0, landing the flare machine-west. The assembly negates x at its
-# transform boundary.
+# LOCAL-FRAME CONVENTION: the assembly places this part at Ry(+INCLINE)
+# (train._plate_local_to_machine), under which local +x maps to machine WEST
+# at the engaged pose -- every west-side feature below (the flare, the lock
+# notch) is authored at local +x, east-side features at local -x.
 SLOT_W = 8.0  # notch width: O6.35 stud + chord-vs-arc slack (see above)
-SLOT_E_X, SLOT_E_Z = 24.5, -190.1  # engaged stud centre (authored frame)
+SLOT_E_X, SLOT_E_Z = 24.5, -190.1  # engaged stud centre (part-local frame)
 SLOT_R = math.hypot(SLOT_E_X, SLOT_E_Z)  # 191.67 about the swing pivot
-# The plate swings + (big end away from the drum), so in PLATE coords the
-# fixed stud sweeps the INVERSE rotation; in the AUTHORED (mirrored) frame
-# that is unit direction (-z, x)/R at E -- outward (+x), slightly north (+z).
+# The plate swings toward disengage (big end away from the drum), so in PLATE
+# coords the fixed stud sweeps the INVERSE rotation: unit direction (-z, x)/R
+# at E -- outward toward the west edge (+x), slightly north (+z).
 _SLOT_TX, _SLOT_TZ = -SLOT_E_Z / SLOT_R, SLOT_E_X / SLOT_R
 
 
@@ -163,12 +163,14 @@ def _corner_fillet_area(label: str, r: float) -> float:
 # --- crank axis (the machine-z crank line, carried BY the plate) -------------
 # The merged column's crank bore is oblique geometry only; the KINEMATIC
 # reference the crankshaft mates to is this named axis, so the crank rig
-# swings with the plate. In the authored (mirrored) frame the axis runs
-# plan direction (-sin I, cos I) at height CRANK_AXIS_Y above the plate
-# BOTTOM, passing the plan point (-CRANK_AXIS_OFF * cos I, -CRANK_AXIS_OFF *
-# sin I) -- CRANK_AXIS_OFF is the machine X_CRANK - pivot.x = 43.11
-# (asserted against the live cone geometry in the assembly).
-CRANK_AXIS_OFF = 43.11  # X_CRANK 122.8 - ppivot.x 79.69
+# swings with the plate. In the part-local frame the axis runs plan
+# direction (-sin I, cos I) -- the direction the Ry(+INCLINE) placement maps
+# to machine z (cf. cone-pivot-post) -- at height CRANK_AXIS_Y above the
+# plate BOTTOM, passing the plan point (-CRANK_AXIS_OFF * cos I,
+# -CRANK_AXIS_OFF * sin I) -- CRANK_AXIS_OFF is the distance the crank axis
+# sits EAST of the pivot, pivot.x - X_CRANK = 43.11 (asserted against the
+# live cone geometry in the assembly).
+CRANK_AXIS_OFF = 43.11  # east offset: ppivot.x -79.69 - X_CRANK -122.8
 CRANK_AXIS_Y = 94.16  # Y_CRANK 144.96 - Y_BASE_TOP 50.8 (above plate BOTTOM)
 # Construction: a vertical REFERENCE AXIS through the crank axis's plan
 # point (the foot of the pivot's perpendicular onto the axis line), built
@@ -180,14 +182,14 @@ CRANK_AXIS_Y = 94.16  # Y_CRANK 144.96 - Y_BASE_TOP 50.8 (above plate BOTTOM)
 # crank axis = that plane (x) the Top-offset plane at CRANK_AXIS_Y.
 # CrankAxisSeat = "Front Plane" rotated the same way about the same axis,
 # so it passes through CRANK_SEAT_ANCHOR -- the anchor the assembly's
-# axial-distance mates reference (via _plate_local_to_machine, mirror-x
-# negated; its machine point lands ON the crank axis, x = X_CRANK,
-# asserted SolidWorks-free at assembly import). The angle's FLIP side is
+# axial-distance mates reference (via _plate_local_to_machine; its machine
+# point lands ON the crank axis, x = X_CRANK, asserted SolidWorks-free at
+# assembly import). The angle's FLIP side is
 # the one remaining EMPIRICAL sign -- flip on assembly crankshaft-mate
 # verify failure.
 CRANK_PLANE_ANGLE = INCLINE_DEG  # sign candidate (flip side)
 CRANK_SEAT_ANCHOR = (-CRANK_AXIS_OFF * _COS_I, -CRANK_AXIS_OFF * _SIN_I)
-# (authored plan x, z) = (-42.09, -9.34); machine (122.80, 103.29)
+# (part-local plan x, z) = (-42.09, -9.34); machine (-122.80, 103.29)
 
 
 async def build(adapter) -> dict[str, str]:

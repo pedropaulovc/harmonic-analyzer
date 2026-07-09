@@ -81,15 +81,13 @@ from build_lever_wire import (  # noqa: E402
     YOKE_POINT as _YOKE_POINT,
 )
 
-# AUTHORED MIRRORED (x negated): the machine-chirality mirror realizes the
-# x-symmetric wheel as M(T(S(part))) -- the solid is S-invariant, but a CHIRAL
-# ref point gets double-flipped (S then M) and lands back at its PRE-mirror
-# azimuth, 2x13.26 deg off the mirrored-world tangency (caught live: the yoke
-# mate solved by spinning the wheel 26.5 deg to the wrong plane/circle
-# intersection). Authoring the point x-negated makes the double flip land it
-# on the true tangency -- the same idiom as the "x0" authored-mirrored parts.
-YOKE_LOCAL_X = -(_YOKE_POINT[0] - _YOKE_WHEEL_X)  # +10.1225 (pitch r 10.4 @ tangency)
-YOKE_LOCAL_Y = _YOKE_POINT[1] - _YOKE_WHEEL_Y  # -2.3866
+# The wheel is placed at IDENTITY, so the yoke point's local offset IS the
+# machine offset from the wheel centre. (Pre-#151 this was authored x-NEGATED
+# to survive the chirality mirror's double flip -- the imported tangency
+# azimuth was itself in the mirrored frame, so the two negations cancelled to
+# the same +10.1225 the machine-handed layout gives directly.)
+YOKE_LOCAL_X = _YOKE_POINT[0] - _YOKE_WHEEL_X  # +10.1156 (pitch r 10.4 @ tangency)
+YOKE_LOCAL_Y = _YOKE_POINT[1] - _YOKE_WHEEL_Y  # -2.4156
 
 
 async def build(adapter) -> dict[str, str]:

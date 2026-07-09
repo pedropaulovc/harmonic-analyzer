@@ -28,7 +28,6 @@ from _common import (
     log,
     set_isometric_view,
 )
-from _transforms import mirror_placement
 
 # The sprockets the chain seats on (the mounted T24 + crank T12 removables).
 # A chain link touching one of these is intended MESH, not a fault: the chain
@@ -540,6 +539,24 @@ def _seed_flip(label: str, signed: float, suffix: str = "") -> bool:
     return (signed < 0.0) ^ ((_flip_sig(label) + suffix) in _FLIP_INVERT)
 
 
+def witness_from_ledger(comp_name: str, local_mm: list[float]) -> list[float]:
+    """The AUTHORED world position (mm) of a component-local point, from the pose
+    ledger -- the placed pose IS the design pose by construction (components are
+    inserted on-solution), so this is the ground-truth target for an off-origin
+    mate witness (issue #154). Raises for a component that was never placed
+    through :func:`place_component` / :func:`place_components_batch`."""
+    if comp_name not in _POSE_LEDGER:
+        raise RuntimeError(
+            f"witness_from_ledger: {comp_name!r} has no pose-ledger entry -- "
+            "witness points require a component placed on-solution"
+        )
+    pos, rows = _POSE_LEDGER[comp_name]
+    return [
+        sum(local_mm[i] * rows[i * 3 + k] for i in range(3)) + pos[k]
+        for k in range(3)
+    ]
+
+
 async def _mate(
     adapter: Any,
     label: str,
@@ -547,6 +564,7 @@ async def _mate(
     entities: list[Any],
     *,
     verify: tuple[str, list[float]] | None = None,
+    witness: tuple[list[float], list[float]] | None = None,
     flip: bool = False,
     **kw: Any,
 ) -> Any:
@@ -559,6 +577,15 @@ async def _mate(
     is the same failure even when nothing moved -- SW's wrong-side add can fail
     IN PLACE. Returns the mate result data.
 
+    ``witness=(local_mm, expected_world_mm)`` extends the guard with an
+    OFF-ORIGIN point of the ``verify`` component (issue #154): an angle/parallel
+    mate has two solutions, and for a component whose origin sits ON the mate's
+    rotation axis the origin does not move under a branch flip -- the origin
+    readback is structurally blind. The witness point (component-local, off the
+    axis) separates the branches; its authored world position comes from the
+    pose ledger (:func:`witness_from_ledger`) at build time and is persisted in
+    the deferred park spec for the preflight replay. Requires ``verify``.
+
     ``flip`` seeds the solve's side. The correct side is DETERMINISTIC per mate
     (the sign rule XOR the reference's :data:`_FLIP_INVERT` polarity -- see
     ``_seed_flip``), so a caller that seeds it right lands on-target in ONE solve.
@@ -568,6 +595,8 @@ async def _mate(
     now RAISES, naming the exact signature to toggle in ``_FLIP_INVERT`` so the
     fix is a one-line seed change, not a silent per-build reflip.
     """
+    if witness is not None and verify is None:
+        raise RuntimeError(f"{label!r}: witness requires verify (the component name)")
     # Span every mate (the single chokepoint all mate helpers funnel through),
     # so the full-build waterfall stays contiguous between part spans instead of
     # leaving the mate time as a gap. NAME the span
@@ -586,8 +615,27 @@ async def _mate(
             comp_name, target_origin = verify
             array = component_transform(adapter, comp_name)
             moved = max(abs(array[9 + i] * 1000.0 - target_origin[i]) for i in range(3))
-        if moved <= _MATE_TOL_MM and not err:
+        w_moved = 0.0
+        if witness is not None and comp_name:
+            w_local, w_expected = witness
+            w_actual = world_point(adapter, comp_name, list(w_local))
+            w_moved = max(abs(a - e) for a, e in zip(w_actual, w_expected, strict=True))
+        if moved <= _MATE_TOL_MM and w_moved <= _MATE_TOL_MM and not err:
             return res
+        if w_moved > _MATE_TOL_MM >= moved and not err:
+            # The origin held but the witness point moved: the mate solved the
+            # WRONG BRANCH about an axis through the component origin -- the
+            # failure mode the origin readback is structurally blind to (#154).
+            msp.set_attribute("witness_miss", True)
+            _telemetry.event(
+                "mate.witness_miss", label=label, moved_mm=round(w_moved, 3))
+            raise RuntimeError(
+                f"witness MISS: {label!r} solved the WRONG branch -- the witness"
+                f" point drifted {w_moved:.2f} mm from its authored pose while the"
+                f" component origin held (origin on the mate axis). The intended"
+                f" branch is no longer pinned by the mate graph: fix the mate's"
+                f" angle/alignment or restore the ordering that pinned it."
+            )
         msp.set_attribute("flip_miss", True)
         # The mate landed on the WRONG side. This is a deterministic seeding
         # bug, not a coin flip -- record the moment on the span, then FAIL LOUD
@@ -711,13 +759,24 @@ async def parallel_mate(
     alignment: str = "closest",
     label: str = "parallel",
     verify: tuple[str, list[float]] | None = None,
+    witness_local: list[float] | None = None,
 ) -> Any:
     """Parallel mate between two planes / faces; pins ONE rotational DOF.
 
     The distance-free way to pin a leftover rotation (e.g. the immaterial spin of
     a concentric-/collinear-mated solid of revolution) -- coincident would force
     the planes flush (an unwanted translation), parallel only kills the spin.
+
+    ``witness_local`` (issue #154): a component-local point OFF the pinned
+    rotation's axis, for a ``verify`` component whose origin sits ON it -- the
+    two parallel solutions leave the origin fixed, so only an off-origin point
+    separates them. Expected world position derives from the pose ledger.
     """
+    witness = None
+    if witness_local is not None:
+        if verify is None:
+            raise RuntimeError(f"{label!r}: witness_local requires verify")
+        witness = (list(witness_local), witness_from_ledger(verify[0], witness_local))
     return await _mate(
         adapter,
         label,
@@ -725,6 +784,7 @@ async def parallel_mate(
         [ref_a, ref_b],
         alignment=alignment,
         verify=verify,
+        witness=witness,
     )
 
 async def distance_driver(
@@ -772,6 +832,7 @@ async def angle_driver(
     label: str = "",
     verify: tuple[str, list[float]] | None = None,
     free_dof_key: str | None = None,
+    witness_local: list[float] | None = None,
 ) -> Any:
     """An angle mate used as a driving dimension pinning one rotational DOF.
 
@@ -779,11 +840,24 @@ async def angle_driver(
     deferred (default-``free``) build it is RECORDED and NOT authored (leaving the
     rotation free); a ``locked`` build authors it engaged and renames it
     ``PARK_<key>``. See :func:`distance_driver` and the Park drivers section.
+
+    ``witness_local`` (issue #154): an angle mate is satisfied at EITHER of two
+    leans, and for a ``verify`` component whose origin sits ON the rotation axis
+    the origin readback cannot tell them apart. Pass a component-local point off
+    the axis; its authored world position (pose ledger) becomes the branch
+    witness, checked when the driver is authored AND recorded into a deferred
+    park spec so the preflight replay is guarded the same way.
     """
     label = label or f"angle driver a={angle:g}"
+    witness = None
+    if witness_local is not None:
+        if verify is None:
+            raise RuntimeError(f"{label!r}: witness_local requires verify")
+        witness = (list(witness_local), witness_from_ledger(verify[0], witness_local))
     return await _driver_or_defer(
         adapter, "angle", ref_a, ref_b,
         label=label, verify=verify, free_dof_key=free_dof_key,
+        witness=witness,
         angle=angle,
     )
 
@@ -926,11 +1000,14 @@ async def place_component(
     rows: list[list[float]],
     *,
     ground: bool = True,
-    mirror: bool = True,
     configuration: str = "",
     label: str = "",
 ) -> str:
-    """Insert a part at its exact final (mirrored) transform and assert it.
+    """Insert a part at its exact final machine transform and assert it.
+
+    ``position``/``rotation``/``rows`` ARE the machine-frame pose -- the crank
+    at machine -X, the output side -Z (#151 re-authored the derivation
+    machine-handed; the M6.8 ``mirror_placement`` reflection layer is gone).
 
     ``ground=True`` fixes the component (structure: shafts, mounts, bushings,
     supports, frame, fasteners, cosmetic springs). ``ground=False`` leaves it
@@ -939,13 +1016,6 @@ async def place_component(
     cone-gear tooth counts, the transgear-removable wheels). Either way the
     part is inserted on-solution so mate flip-recovery has a clean reference
     and the read-back assert holds.
-
-    ``mirror=True`` (default) routes the placement through ``mirror_placement``,
-    which reflects it about the machine YZ plane using the part's declared symmetry
-    (``cad/config/placement/<part>.yaml``, default ``"x"``). Pass ``mirror=False`` for a SINGLE machine-handed
-    part with no mirror twin -- e.g. the maker's nameplate -- whose ``position``/
-    ``rows`` are already the exact machine transform; the default ``"x"`` reflection
-    would otherwise flip it across X (onto the wrong side, text reversed).
     """
     from solidworks_mcp.adapters.base import (
         ComponentRefParameters,
@@ -960,10 +1030,6 @@ async def place_component(
         f"part {label}", part=part, ground=ground,
         configuration=configuration or "default",
     ) as psp:
-        if mirror:
-            position, rotation, rows = mirror_placement(
-                part, position, rotation, rows, configuration
-            )
         path = (OUT_SLDPRT / f"{part}.SLDPRT").resolve()
         if not path.exists():
             raise RuntimeError(
@@ -1025,12 +1091,11 @@ async def place_components_batch(
     Each ``spec`` is a dict:
 
       * ``part`` -- part stem (``<part>.SLDPRT`` under the part-output dir),
-      * ``position`` -- origin (mm) in the pre-mirror machine frame,
-      * ``rows`` -- rotation rows (images of the part X/Y/Z axes), pre-mirror,
+      * ``position`` -- origin (mm) in the machine frame,
+      * ``rows`` -- rotation rows (images of the part X/Y/Z axes), machine frame,
       * ``rotation`` -- Euler angles (optional; carried only for parity with
         :func:`place_component`, the transform is built from ``rows``),
       * ``ground`` -- fix the component (default ``True``),
-      * ``mirror`` -- route through ``mirror_placement`` (default ``True``),
       * ``label`` -- log label (optional).
 
     Why this is safe to batch where :func:`place_component` is not: these parts
@@ -1045,8 +1110,8 @@ async def place_components_batch(
     component to its spec by ORIGIN (bijective, so it tolerates ``AddComponents3``
     returning the array in a different order than ``Names`` rather than
     false-failing on identical repeated parts -- the 19 bushings), then asserts
-    BOTH the translation and the rotation (``array[0:9]`` vs the spec's mirrored
-    rows -- the same check the per-part ``assert_component_placed`` runs) so a
+    BOTH the translation and the rotation (``array[0:9]`` vs the spec's rows --
+    the same check the per-part ``assert_component_placed`` runs) so a
     misoriented or mislanded part fails loud immediately. The SAME origin match
     drives the per-spec ``ground`` flag and the returned ``Name2`` order, so a
     reorder can never fix/return the wrong component. Returns the component
@@ -1066,8 +1131,8 @@ async def place_components_batch(
 
     names: list[str] = []
     transforms: list[float] = []
-    finals: list[list[float]] = []  # final (mirrored) origin per spec, mm
-    expected_rows: list[list[float]] = []  # final (mirrored) rotation, flat 9, per spec
+    finals: list[list[float]] = []  # final machine-frame origin per spec, mm
+    expected_rows: list[list[float]] = []  # final rotation, flat 9, per spec
     grounds: list[bool] = []
     for spec in specs:
         part = spec["part"]
@@ -1078,10 +1143,7 @@ async def place_components_batch(
                 f"default config); use place_component for {part!r}"
             )
         position = list(spec["position"])
-        rotation = list(spec.get("rotation", [0.0, 0.0, 0.0]))
         rows = [list(r) for r in spec["rows"]]
-        if spec.get("mirror", True):
-            position, rotation, rows = mirror_placement(part, position, rotation, rows, "")
         names.append(str(part_path(part)))  # raises if the .SLDPRT is missing
         transforms.extend(_placement_transform(rows, position))
         finals.append(position)
@@ -1333,7 +1395,8 @@ def collected_park_specs() -> list[dict[str, Any]]:
 
 def _record_park_spec(
     key: str, kind: str, entities: list[Any],
-    *, verify: tuple[str, list[float]] | None = None, flip: bool = False,
+    *, verify: tuple[str, list[float]] | None = None,
+    witness: tuple[list[float], list[float]] | None = None, flip: bool = False,
     **params: Any,
 ) -> None:
     """Record one deferred freed-DOF park driver as a machine-independent spec
@@ -1345,12 +1408,22 @@ def _record_park_spec(
     Recording it lets :func:`replay_park_specs` re-author on the SAME side in one
     solve -- extending #185's flip-free seeding into the replay path, so the
     preflight park closure no longer leans on the flip-recovery net (the wire-
-    swing replay hit a hard error-47 far-side add before this, 2026-07-05)."""
+    swing replay hit a hard error-47 far-side add before this, 2026-07-05).
+
+    ``witness`` (issue #154) is the resolved off-origin branch witness
+    ``(local_mm, expected_world_mm)`` -- persisted so the preflight replay of a
+    flip-ambiguous angle driver is guarded exactly like the build would be (the
+    replay runs in a fresh process with no pose ledger, so the expected world
+    position must ride the spec)."""
     _PARK_SPECS.append({
         "key": key,
         "kind": kind,
         "entities": [e.model_dump() for e in entities],
         "verify": [verify[0], [float(v) for v in verify[1]]] if verify else None,
+        "witness": (
+            [[float(v) for v in witness[0]], [float(v) for v in witness[1]]]
+            if witness else None
+        ),
         "flip": bool(flip),
         "params": {
             k: (float(v) if isinstance(v, (int, float)) else v)
@@ -1363,7 +1436,9 @@ def _record_park_spec(
 async def _driver_or_defer(
     adapter: Any, kind: str, ref_a: Any, ref_b: Any,
     *, label: str, verify: tuple[str, list[float]] | None,
-    free_dof_key: str | None, flip: bool = False, **params: Any,
+    free_dof_key: str | None,
+    witness: tuple[list[float], list[float]] | None = None,
+    flip: bool = False, **params: Any,
 ) -> Any:
     """Author a driver mate, OR (freed-DOF key + deferral on) record it and skip.
 
@@ -1375,10 +1450,12 @@ async def _driver_or_defer(
     replay re-authors on the same resolved side (flip-free, like the build)."""
     if free_dof_key is not None and _PARK_DEFER:
         _record_park_spec(
-            free_dof_key, kind, [ref_a, ref_b], verify=verify, flip=flip, **params)
+            free_dof_key, kind, [ref_a, ref_b],
+            verify=verify, witness=witness, flip=flip, **params)
         return {"deferred_park": free_dof_key, "name": ""}
     res = await _mate(
-        adapter, label, kind, [ref_a, ref_b], verify=verify, flip=flip, **params
+        adapter, label, kind, [ref_a, ref_b],
+        verify=verify, witness=witness, flip=flip, **params
     )
     if free_dof_key is not None:
         await mark_park_driver(adapter, res, free_dof_key)

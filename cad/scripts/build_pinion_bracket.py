@@ -17,9 +17,9 @@ Layout: pivot bore at the origin, arbor bore at (0, C2C), strap up +Y,
 thickness z 0..5; pin bore along X into the -X edge at (y -PIN_DROP,
 z mid), PIN_SEAT deep from the x -9 tangent plane -- its mouth is
 already on the r9 cap arc (the edge at y -2 sits at x -8.775). The
-bore is the strap's FIRST x-asymmetric feature: MIRROR_PLANE moves to
-the exact z mid-plane ("z", THICKNESS/2 -- every feature is a through-
-or mid-plane form about it).
+assembly composes a Ry(180) into the strap's lean pose, so local -x (the
+pin-bore edge) reads machine WEST and the origin lands at the strap's
+NORTH face.
 
 Dimensions: cad/config/dimensions.yaml "Chapter 25".
 
