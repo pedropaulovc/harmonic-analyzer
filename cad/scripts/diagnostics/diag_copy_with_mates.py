@@ -67,6 +67,7 @@ N_COPIES = 8
 GAP_Z = [z_station(j) + ARM_MID_DZ - PITCH / 2.0 for j in range(1, 12)]
 PIVOT_OD_PT = [PIVOT[0] + SHAFT_R, PIVOT[1], 0.0]
 SEED_MATES = 3  # concentric + Front-plane distance + Top-plane parallel
+DIST_IDX = 1  # the distance mate's position in the seed's mate order
 
 
 async def _mate_count(adapter) -> int:
@@ -89,16 +90,22 @@ async def _seat_baseline(adapter, gap: int) -> tuple[str, float]:
 
 
 def _copy_with_mates(adapter, comp_name: str, new_z_mm: float,
-                     variant: str) -> bool:
+                     variant: str, flip_override: bool | None = None) -> bool:
     """One CopyWithMates2 call: repeat every mate, substitute the distance.
 
-    ``Values`` maps to the seed's distance/angle mates; the seat triple has
-    exactly ONE (the Front-plane Z distance), so a single entry re-stations
-    the copy. ``variant`` picks the marshaling: 'native' = every array in its
-    native VT with raw ``_oleobj_`` component pointers (the PROVEN contract),
-    'list' / 'variant' = the two known-broken encodings kept as regression
-    probes. Returns the post-call bushing count -- the caller judges success
-    from growth, never from CopyWithMates2's return value (it lies).
+    Every array maps POSITIONALLY per seed mate, in the seed's mate order
+    (measured 2026-07-09: the value placed at index 0 -- the concentric --
+    was IGNORED and the distance mate copied with its index-1 entry 0.0,
+    landing every copy at Z=0 exactly; the API doc says ``Values`` is
+    "valid for distance, angle, and profile center mates only", i.e. the
+    entry under a dimension-less mate is dead). The seat triple is
+    concentric(0) / Front-plane distance(1) / Top-plane parallel(2), so the
+    Z substitution rides index ``DIST_IDX = 1``. ``variant`` picks the
+    marshaling: 'native' = every array in its native VT with raw
+    ``_oleobj_`` component pointers (the PROVEN contract), 'list' /
+    'variant' = the two known-broken encodings kept as regression probes.
+    Returns the post-call bushing count -- the caller judges success from
+    growth, never from CopyWithMates2's return value (it lies).
     """
     model = adapter.currentModel
     comp = model.GetComponentByName(comp_name)
@@ -106,13 +113,17 @@ def _copy_with_mates(adapter, comp_name: str, new_z_mm: float,
         raise RuntimeError(f"seed component not found: {comp_name!r}")
     repeat = [True] * SEED_MATES
     # Values carry the POSITIVE magnitude (the seat authored abs(z), the
-    # production distance_driver idiom); the SIDE rides FlipDimension --
-    # "true for a positive distance dimension, false for a negative"
-    # (codex #219: signed negative metres here could fail the call or land
-    # wrong-side and mislabel the API unusable).
-    values = [abs(new_z_mm) / 1000.0] + [0.0] * (SEED_MATES - 1)
+    # production distance_driver idiom). The SIDE is INHERITED from the
+    # seed: Q5 measured FlipDimension as a NO-OP under Repeat=True (both
+    # bits land a +20 target at -20, the seed's side), so the bit below is
+    # kept only as the knob Q5 exercises -- never rely on it for side
+    # selection.
+    values = [0.0] * SEED_MATES
+    values[DIST_IDX] = abs(new_z_mm) / 1000.0
     flip_align = [False] * SEED_MATES
-    flip_dim = [new_z_mm >= 0.0] + [False] * (SEED_MATES - 1)
+    flip_dim = [False] * SEED_MATES
+    flip_dim[DIST_IDX] = (new_z_mm >= 0.0 if flip_override is None
+                          else flip_override)
     lock_rot = [False] * SEED_MATES
     orient = [0] * SEED_MATES
 
@@ -215,10 +226,17 @@ async def build(adapter) -> dict[str, str]:
         times.append(dt)
         log(f"copy -> gap {k}: bushings={n_now} {dt:.2f}s")
 
-    # Q2: real mates + correct stations, judged from the model.
+    # Q2: real mates + correct stations, judged from the model. A copy
+    # inherits the SEED'S SIDE of the anchor plane (Q5: FlipDimension is a
+    # no-op under Repeat=True), so the expected station for a copy is
+    # -abs(target): the seed sits on the negative side, and the one ladder
+    # target crossing zero (+0.737) legitimately lands mirrored. Production
+    # must therefore anchor re-valued distances so every station shares the
+    # seed's side (e.g. the neighbour-bushing anchor, PITCH/2 + k*PITCH).
     mates_after = await _mate_count(adapter)
     zs = _bushing_zs(adapter)
-    expected = sorted(GAP_Z[k] for k in range(2 + N_COPIES))
+    expected = sorted([GAP_Z[0], GAP_Z[1]]
+                      + [-abs(GAP_Z[k]) for k in range(2, 2 + N_COPIES)])
     on_plane = (
         len(zs) == len(expected)
         and all(abs(g - w) < 0.05 for g, w in zip(zs, expected))
@@ -231,6 +249,21 @@ async def build(adapter) -> dict[str, str]:
         f"CopyWithMates2 avg {sum(times) / len(times):.2f}s "
         f"(first {times[0]:.2f}s, last {times[-1]:.2f}s -- growth says "
         f"whether the copy also pays the population tax)")
+
+    # Q5: FlipDimension semantics. The 2026-07-09 ladder landed 9/10 stations
+    # exactly; the one target CROSSING ZERO (+0.737) landed mirrored (-0.737)
+    # despite flip_dim=True -- so "true for a positive distance dimension"
+    # (the doc's wording) is NOT world-side-absolute. Pin it: copy the seed
+    # (at Z=-62.77) to an unambiguous +20 mm target under both flip bits and
+    # read where each lands. (Runs AFTER Q2 so the +/-20 landings don't
+    # pollute the station comparison.)
+    for flip in (False, True):
+        before = set(component_names(adapter))
+        _copy_with_mates(adapter, seed, 20.0, variant, flip_override=flip)
+        new = [n for n in component_names(adapter) if n not in before]
+        landed = [round(component_transform(adapter, n)[11] * 1000.0, 3)
+                  for n in new]
+        log(f"Q5 flip={flip}: target +20.0 -> landed {landed}")
     return {"verdict": "ran", "on_plane": str(on_plane)}
 
 
