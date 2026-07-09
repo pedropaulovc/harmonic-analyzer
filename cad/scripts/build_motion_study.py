@@ -465,18 +465,22 @@ def _patch_bar_spec(spec, preset):
 
 
 async def _replay_setup_parks(adapter, preset="config"):
-    """Re-author the deferred SETUP-pose park drivers ENGAGED before the study.
+    """Re-author the deferred SETUP-pose park drivers ENGAGED, BEFORE the top
+    assembly is opened.
 
-    Replayed in each sub's OWN doc (ActivateDoc3 round-trip -- API selection
-    needs the active doc; the docs are NEVER saved), leaving every other
-    recorded driver deferred (= free, what the study drives). ``preset``
-    re-stations the channel amplitude clamps (see :func:`_patch_bar_spec`).
+    Each sub is opened STANDALONE (the proven preflight/verify replay ground --
+    name-based mate-entity selection works reliably only in a doc opened as its
+    own top; replaying inside the referenced/flexed parent failed live: the
+    sub loads lightweight, GetModelDoc2 reads None and SelectByID2 misses
+    'Right Plane@cone-swing-platform-1'), the specs are replayed engaged, and
+    the doc is left OPEN + DIRTY -- when the top assembly opens next it binds
+    to the same in-memory doc, so the parked poses ride into the flexible
+    solve. NOTHING is saved. ``preset`` re-stations the channel amplitude
+    clamps (see :func:`_patch_bar_spec`).
     """
     from _assembly import is_locked_build
     from _assembly_postbuild import load_park_specs, replay_park_specs
 
-    top = adapter.currentModel
-    top_title = str(_read_member(top, "GetTitle"))
     for sub in MOVING_SUBS:
         stem = sub[:-2]  # component "-1" -> doc stem
         patterns = _SETUP_PARKS.get(stem, ())
@@ -488,7 +492,7 @@ async def _replay_setup_parks(adapter, preset="config"):
                     "channel is built `locked` -- its amplitude clamps are "
                     "authored in the artefact and cannot be transiently "
                     "re-stationed; rebuild `free` or use the config preset")
-            log(f"{sub}: built `locked`, setup parks already authored")
+            log(f"{stem}: built `locked`, setup parks already authored")
             continue
         specs = [s for s in load_park_specs(stem) if _key_matches(s["key"], patterns)]
         if not specs:
@@ -498,20 +502,13 @@ async def _replay_setup_parks(adapter, preset="config"):
                 f"the assembly")
         if stem == "channel":
             specs = [_patch_bar_spec(s, preset) for s in specs]
-        _, model = _sub_model(adapter, sub)
-        sub_title = str(_read_member(model, "GetTitle"))
-        adapter._attempt(
-            lambda t=sub_title: adapter.swApp.ActivateDoc3(t, False, 2, _byref_i4()),
-            default=None)
+        sub_path = str((OUT_SLDASM / f"{stem}.SLDASM").resolve())
+        check(f"open {stem} (setup parks)", await adapter.open_model(sub_path))
         adapter.currentModel = adapter._attempt(
-            lambda: adapter.swApp.ActiveDoc, default=model)
-        log(f"{sub}: replaying {len(specs)} deferred setup park driver(s) "
+            lambda: adapter.swApp.ActiveDoc, default=adapter.currentModel)
+        log(f"{stem}: replaying {len(specs)} deferred setup park driver(s) "
             f"(engaged): {[s['key'] for s in specs]}")
         await replay_park_specs(adapter, specs)
-    adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()),
-        default=None)
-    adapter.currentModel = top
 
 
 # ---- stage: cam couplings (channel <-> drive-train, cross-sub) ---------------
@@ -879,13 +876,19 @@ async def build(adapter):
     from _assembly_postbuild import discard_open_documents
     discard_open_documents(adapter)
 
+    # Setup parks replay FIRST, on each sub opened standalone; the top then
+    # binds to the dirtied in-memory sub docs (see _replay_setup_parks).
+    with _telemetry.span("motion.parks", preset=preset):
+        await _replay_setup_parks(adapter, preset)
+
     asm_path = str((OUT_SLDASM / f"{ASM}.SLDASM").resolve())
     check("open harmonic-analyzer", await adapter.open_model(asm_path))
+    adapter.currentModel = adapter._attempt(
+        lambda: adapter.swApp.ActiveDoc, default=adapter.currentModel)
     log(f"opened {asm_path}")
 
     with _telemetry.span("motion.flex"):
         await _flex_subs(adapter)
-        await _replay_setup_parks(adapter, preset)
     if level < 1:
         log("stage flex complete (no motor/solve)")
         return {}
