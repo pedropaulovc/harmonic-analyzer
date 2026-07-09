@@ -2206,16 +2206,21 @@ async def build(adapter) -> dict[str, str]:
     await angle_driver(
         adapter,
         named_ref(f"Right Plane@{fb}", "PLANE"), named_ref("Right Plane", "PLANE"),
-        abs(STRAP_LEAN_DEG),
+        180.0 - abs(STRAP_LEAN_DEG),
         label=f"pinion swing PARK driver (p2, disengaged a={abs(STRAP_LEAN_DEG):.2f})",
         verify=(fb, fb_o),
         free_dof_key="pinion_swing",
         # The strap's origin IS the pivot bore, ON the torque-shaft axis: the
-        # |lean| angle is satisfied at EITHER lean and the origin readback is
-        # blind to the branch (#154). The arbor bore at the strap top is the
-        # off-axis witness -- the two leans separate it by ~2*C2C*sin(12.38 deg)
-        # ~ 18 mm. Recorded into the deferred park spec, so the preflight
-        # replay is guarded identically.
+        # angle is satisfied at EITHER branch and the origin readback is blind to
+        # it (#154). The arbor bore at the strap top is the off-axis witness.
+        #
+        # The DIHEDRAL is 180 - |lean|, NOT |lean|: the strap is inserted
+        # machine-handed as Ry(180) . Rz(lean) (`_strap_rows` above), so its
+        # Right-plane normal is flipped to -X and its angle to the assembly Right
+        # plane is the SUPPLEMENT of the physical lean -- the same 180 - tilt rule
+        # spin_driver documents for parts whose normals flip. Targeting |lean|
+        # solved the far branch, 180 - 2*|lean| ~ 155 deg off (an 84 mm witness
+        # drift the deferred replay caught at release preflight -- #211 regression).
         witness_local=[0.0, STRAP_C2C, 0.0],
     )
     # Back strap: the same revolute on the shaft + a parallel anti-spin to the
