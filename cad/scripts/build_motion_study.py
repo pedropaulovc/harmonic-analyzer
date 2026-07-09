@@ -196,7 +196,19 @@ def _sub_model(adapter, sub_name):
         raise RuntimeError(f"sub component not found: {sub_name}")
     model = adapter._attempt(lambda: comp.GetModelDoc2(), default=None)
     if model is None:
-        raise RuntimeError(f"GetModelDoc2 returned None for {sub_name}")
+        # After the flex-solve rebuilds a component dispatch can refuse
+        # GetModelDoc2 (lightweight/stale COM read) even though the sub doc IS
+        # open in the session as a reference -- resolve it by document path
+        # instead (observed live on drive-train-1 after flexing all 6 subs).
+        path = str((OUT_SLDASM / f"{sub_name.rsplit('-', 1)[0]}.SLDASM").resolve())
+        model = adapter._attempt(
+            lambda: adapter.swApp.GetOpenDocumentByName(path), default=None)
+        if model is not None:
+            log(f"  {sub_name}: GetModelDoc2 None; resolved by path instead")
+    if model is None:
+        raise RuntimeError(
+            f"model doc unresolved for {sub_name} (GetModelDoc2 None and "
+            f"no open document matches its path)")
     return comp, model
 
 
