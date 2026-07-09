@@ -15,7 +15,7 @@ clip holes (O3, scaled low); head photo-plausible fillister (low).
 Layout: axis along Z, AUTHORED IN FINAL ORIENTATION (pointing +Z =
 machine north for the clips; the flange copies rotate Rx(-90) to point
 +Y): under-head face on the Front plane at z = 0, head -2.2..0, shank
-0..+4. Symmetric about local x = 0 (MIRROR_PLANE ("x", 0.0)).
+0..+4. Symmetric about local x = 0.
 
 Run (SolidWorks already open)::
 

@@ -7,15 +7,18 @@ top-lever bank on its fulcrum shaft with the channel springs hanging from
 the lever tips, each caught at the plate by a little open hook fastener.
 164 components:
 
-* pivot-shaft x1 (rocker bank at (-72.9, 253.8), along Z, centred z 0)
-  + fulcrum-shaft x1 (lever bank at (-199.9, 1065.9), 182 long - the
+Coordinates are machine frame (#151: crank at machine -X, output side -Z;
+the M6.8 mirror layer is gone).
+
+* pivot-shaft x1 (rocker bank at (72.9, 253.8), along Z, centred z 0)
+  + fulcrum-shaft x1 (lever bank at (199.9, 1065.9), 182 long - the
   228.6 shaft clipped the west columns at top level, M6.5)
 * pivot-ball-mount x4 (rocker pair: north on the rocker-support apex at
-  (-72.9, 228.6, +101.6), south on the A-FRAME clevis saddle at
-  (-72.9, 228.6, -111) - M6.5 photo audit: there is no south frustum,
+  (72.9, 228.6, +101.6), south on the A-FRAME clevis saddle at
+  (72.9, 228.6, -111) - M6.5 photo audit: there is no south frustum,
   the front stand is the rocker-arm-support's transgear-A-frame leg
   (frame.SLDASM) whose ears flank this mount's O16 base; lever pair on the top-frame west rail,
-  seats (-199.9, 1040.7, +/-85) - z 85 keeps the O16 base clear of the
+  seats (199.9, 1040.7, +/-85) - z 85 keeps the O16 base clear of the
   O35 corner-boss bores)
 * rocker-arm x20, pivot-bushing x19, connecting-rod x20,
   amplitude-bar x20, channel-lever x20, lever-bushing x19,
@@ -28,7 +31,7 @@ Default mechanism state (DIMENSIONS.md "Channel & top-frame layout"):
 cylinder-gear notches +Y (cosine alignment), integral cam lobes +Y (UP,
 the top of the stroke -- the ch14 end views show the 0-crank tip row
 dead level at the stroke top), rod rings concentric on the cams at
-(54.474, 113.437, z_j + 3.3) - the cam centre carries the gears'
+(-54.474, 113.437, z_j + 3.3) - the cam centre carries the gears'
 +1.5 deg tooth-phase rotation. Everything downstream is SOLVED here, not
 hard-coded: the rod-pin point is the intersection of the r 127.58 lever
 circle about the pivot with the r ROD_C2C circle about the ring centre
@@ -36,19 +39,19 @@ circle about the pivot with the r ROD_C2C circle about the ring centre
 tapered-strap lever angle; rod tilt 0 -- the rod hangs PLUMB from the
 arm's rod-side tip onto its cam, ch30 photos + ch14 end views);
 the bar rests its foot-notch roof on the tilted arm's top-edge arc
-(contact at the bar's -X edge); the bar's top pin height tilts the levers
-(~ +0.36 deg); the spring's top eye hangs 3.37 below the lever spring
-hole so its ring threads the O4 hole without touching (margins asserted
-> 0.1); the bottom eye now sits just ABOVE the plate (no longer threading
-it) on the arm of a spring-hook fastener whose shank seats in the plate's
-O2.0 bore (at z_j + 0.8, on the spring axis, one arm-offset -X of the eye)
+(contact at the bar's +X edge, machine frame); the bar's top pin height
+tilts the levers (~ +0.36 deg); the spring's top eye hangs 3.37 below the
+lever spring hole so its ring threads the O4 hole without touching (margins
+asserted > 0.1); the bottom eye now sits just ABOVE the plate (no longer
+threading it) on the arm of a spring-hook fastener whose shank seats in the
+plate's O2.0 bore (at z_j + 0.8, on the spring axis, one arm-offset +X of the eye)
 -- the plate itself (the summing-lever) lives in summing.SLDASM, checked at
 the top level.
 
 Orientation notes: the amplitude bar is rotated 90 deg about its long
-axis (Ry(90)) so its end slots and O2 top pin hole run across Z,
-straddling the 2.5 arm / 3.0 lever; the spring is rotated 90 deg about Y
-so its end-hook ring lies perpendicular to the lever face. Channel
+axis (Ry(-90), machine frame) so its end slots and O2 top pin hole run
+across Z, straddling the 2.5 arm / 3.0 lever; the spring's end-hook ring
+lies perpendicular to the lever face. Channel
 stations: z_j = -67.1 + 7.0565 j, arm/bar/lever mid-planes at z_j + 0.8,
 cam/rod plane z_j + 3.3 (rod tip strap face-flush against the arm).
 
@@ -128,7 +131,7 @@ from _assembly import (
     world_point,
     write_park_specs,
 )
-from _transforms import rows_from_euler, set_runtime_placement
+from _transforms import ROT_Y_180, compose_rows, euler_from_rows, rows_from_euler
 from build_cylinder_gear import ECCENTRICITY as CAM_ECC  # cam lobe throw (mm):
 # imported, NOT copied, so the rod ring stays concentric with the cam when the
 # throw is rescaled. A stale 5.08 hardcode (the pre-re-anchor throw) survived the
@@ -174,7 +177,7 @@ ARM_MID_DZ = 0.8  # arm/bar/lever mid-planes at z_j + 0.8
 CAM_DZ = 3.3  # cam / rod-ring mid-plane at z_j + 3.3
 
 # --- rocker bank ------------------------------------------------------------
-PIVOT = (-72.9, 253.8)  # rocker pivot shaft axis (x, y)
+PIVOT = (72.9, 253.8)  # rocker pivot shaft axis (x, y); machine frame (crank at -X)
 ARM_PIVOT_LOCAL_Y = _arm_mid_y(0.0)  # 8.0: pivot hole at local (0, 8) in the arm
 # True pivot->rod-pin lever: 127.37 along the arm (near the rod-side tip) PLUS
 # the low pin's rise above the pivot bore (ROD_HOLE_Y 15.30 - 8.0 = 7.30).
@@ -197,11 +200,11 @@ GEAR_PHASE_DEG = 1.5  # drive-train locks each cylinder gear at Rz(+1.5):
 # with the gear by GEAR_PHASE_DEG, so the rod ring rides the PHASED cam
 # centre, not a point straight north of the arbor. CAM_ECC is imported above.
 RING_CENTER = (
-    54.7 - CAM_ECC * math.sin(math.radians(GEAR_PHASE_DEG)),
+    -(54.7 - CAM_ECC * math.sin(math.radians(GEAR_PHASE_DEG))),
     104.8 + CAM_ECC * math.cos(math.radians(GEAR_PHASE_DEG)),
-)  # phased cam centre at ECC 8.64: (54.474, 113.437). Authored x +54.7 = machine
-# -54.7, matching the drum's book placement (build_drive_train X_DRUM); y off the
-# ch30 GT drive height 104.8 (was 126.8). MUST stay in sync with X_DRUM/Y_DRIVE.
+)  # phased cam centre at ECC 8.64: machine (-54.474, 113.437). The drum sits at
+# machine -54.7 (build_drive_train X_DRUM, crank side -X); y off the ch30 GT drive
+# height 104.8 (was 126.8). MUST stay in sync with X_DRUM/Y_DRIVE.
 # ROD_C2C (imported above from build_connecting_rod.CENTER_DISTANCE, 147.6655):
 # VERTICAL rod (ch30): every rod hangs PLUMB from the arm's rod-side tip onto
 # its cam -- the pin (ROD_HOLE_X 127.3738 out from the mid-seesaw pivot) sits
@@ -228,7 +231,7 @@ BAR_TOP_PIN_DROP = 6.35
 BAR_CONTACT_GAP = _config.fit("cam_follower_contact", "contact_gap_mm")  # cad/config/tolerances.yaml
 
 # --- lever bank -------------------------------------------------------------
-FULCRUM = (-199.9, 1065.9)  # lever fulcrum shaft axis (x, y)
+FULCRUM = (199.9, 1065.9)  # lever fulcrum shaft axis (x, y); machine frame
 LEVER_BAR_PIN_X = 127.0
 LEVER_SPRING_X = 177.8  # 7" c2c; the 254 "2:1" guess is photo-refuted (M6.4 -
 # the lever bank ends at x ~ -30 in the ch. 30 front view and the 32 mm
@@ -479,10 +482,12 @@ async def _locate_spring(adapter, name: str, axis2_local_y: float) -> None:
 # amplitude swing pivots the bar about its top pin over this lever arm.
 BAR_TOP_TO_FOOT = BAR_TOP_PIN_LOCAL[1] - BAR_FOOT_LOCAL[1]  # 806.45
 # Foot-axis -> notch-roof contact offset in the bar's UNtilted (vertical) XY
-# frame: the roof sits at the bar's -X edge (-BAR_WIDTH/2) and BAR_FOOT_NOTCH up,
-# lifted BAR_CONTACT_GAP off the arc. Rotating this by the bar tilt keeps the
-# contact-on-arc constraint exact as the bar swings.
-_CONTACT_OFF_X = -BAR_WIDTH / 2.0
+# frame: the roof sits at the bar's +X edge (+BAR_WIDTH/2) and BAR_FOOT_NOTCH up,
+# lifted BAR_CONTACT_GAP off the arc. (Machine frame: the amplitude foot slides
+# +X off the pivot, so the roof rides the +X edge -- the mirror of the pre-#151
+# -X edge.) Rotating this by the bar tilt keeps the contact-on-arc constraint
+# exact as the bar swings.
+_CONTACT_OFF_X = BAR_WIDTH / 2.0
 _CONTACT_OFF_Y = BAR_FOOT_NOTCH - BAR_CONTACT_GAP
 
 
@@ -501,24 +506,26 @@ def _arc_geometry() -> dict[str, float]:
     a = (ARM_ROD_LEVER**2 - ROD_C2C**2 + d * d) / (2.0 * d)
     h = math.sqrt(ARM_ROD_LEVER**2 - a * a)
     ux, uy = dx / d, dy / d
-    # +X branch (rod side): u points down-right (uy < 0), so the
-    # perpendicular (-uy, ux) has a positive x component; the (uy, -ux)
-    # branch lands at x ~ -88, behind the pivot.
-    px = ox + a * ux - h * uy
-    py = oy + a * uy + h * ux
+    # -X branch (rod side, machine frame): the ring sits at machine -X of the
+    # pivot, so the rod-side intersection is the perpendicular branch with the
+    # more-negative x -- (+h*uy, -h*ux) rather than the pre-#151 (-h*uy, +h*ux)
+    # that picked the +X (mirrored) side. This IS the h-term sign flip the
+    # machine-hand re-authoring demands: the rest of the loop is x-mirror-even.
+    px = ox + a * ux + h * uy
+    py = oy + a * uy - h * ux
     # The pin azimuth is the LEVER's direction, and the lever leans beta above
-    # the arm's local +X (the low rod-pin bore at ROD_HOLE_Y 15.30 sits 7.30
-    # above the pivot bore) -- so the ARM tilt is the azimuth MINUS beta. Beta
-    # was first missed when it was only 0.90 deg (25.4 lever): the placed pin
-    # landed 0.4 mm high and the ring dug 0.26 into the cam (live-measured,
-    # 20 x 20.27 mm^3); at today's 3.28 deg the same slip would be a 7 mm
-    # catastrophe, so the subtraction is load-bearing.
-    arm_tilt = math.degrees(math.atan2(py - oy, px - ox)) - ARM_LEVER_BETA_DEG
-    rod_tilt = -math.degrees(math.atan2(px - cx, py - cy))  # Rz is CCW from +X
+    # the arm's local +X. In the machine frame the arm's rod-side points -X, so
+    # the azimuth is measured from -X (atan2 with x = ox - px); the ARM tilt is
+    # that azimuth MINUS beta. Beta is load-bearing: the low rod-pin bore
+    # (ROD_HOLE_Y 15.30) sits 7.30 above the pivot bore, and ignoring the 3.28
+    # deg lever angle would land the pin 7 mm off and drag the ring off the cam.
+    arm_tilt = math.degrees(math.atan2(py - oy, ox - px)) - ARM_LEVER_BETA_DEG
+    rod_tilt = math.degrees(math.atan2(px - cx, py - cy))  # machine hand: mirror
+    # of the pre-#151 -atan2 (the ring is now at -X of the pin).
 
     t = math.radians(arm_tilt)
     rel = ARM_ARC_CENTER_LOCAL_Y - ARM_PIVOT_LOCAL_Y
-    acx = ox - rel * math.sin(t)
+    acx = ox + rel * math.sin(t)
     acy = oy + rel * math.cos(t)
     return {"arm_tilt": arm_tilt, "rod_tilt": rod_tilt,
             "pin_x": px, "pin_y": py, "acx": acx, "acy": acy}
@@ -545,13 +552,20 @@ def solve_state(amplitude: float = 0.0) -> dict[str, float]:
     neutral pose bit-exactly. The mechanism is a 4-bar loop: the bar top pin
     rides the lever's 127 mm crank, the rigid bar (806.45 mm) hangs to the foot,
     and the foot-notch roof rests on the rocker's R800 top-edge arc. Positive
-    amplitude slides the foot -X along the arc (the lifting side, clear of the
-    pivot shaft), tilting the bar by ``bar_tilt`` and the lever by ``lever_tilt``.
-    Solved by driving the lever-reach residual to zero over the bar tilt.
+    amplitude slides the foot +X along the arc (the machine-frame lifting side,
+    clear of the pivot shaft; the mirror of the pre-#151 -X side), tilting the
+    bar by ``bar_tilt`` and the lever by ``lever_tilt``. Solved by driving the
+    lever-reach residual to zero over the bar tilt.
+
+    The solver runs in the machine frame, so its swing root ``beta`` is the
+    PHYSICAL bar tilt (the mirror of the pre-#151 value). The reported
+    ``bar_tilt`` negates it: the bar is authored ``rows_from_euler([bar_tilt,
+    -90, 0])`` (Ry(-90), the mirror of the old Ry(+90)), and with that turn the
+    scalar that reproduces the physical pose is -degrees(beta).
     """
     ox, _oy = PIVOT
     acx, acy = _ARC["acx"], _ARC["acy"]
-    fx = ox - amplitude  # foot-axis X (-X = the lifting side)
+    fx = ox + amplitude  # foot-axis X (+X = the machine-frame lifting side)
 
     def foot_y(beta: float) -> float:
         s, c = math.sin(beta), math.cos(beta)
@@ -568,7 +582,7 @@ def solve_state(amplitude: float = 0.0) -> dict[str, float]:
         ty = fy + BAR_TOP_TO_FOOT * math.cos(beta)
         return math.hypot(tx - FULCRUM[0], ty - FULCRUM[1]) - LEVER_BAR_PIN_X
 
-    beta = _bisect(residual, -0.20, 0.30)
+    beta = _bisect(residual, -0.30, 0.20)
     fy = foot_y(beta)
     tx = fx + BAR_TOP_TO_FOOT * math.sin(beta)
     ty = fy + BAR_TOP_TO_FOOT * math.cos(beta)
@@ -578,13 +592,13 @@ def solve_state(amplitude: float = 0.0) -> dict[str, float]:
         "rod_tilt": _ARC["rod_tilt"],
         "pin_x": _ARC["pin_x"],
         "pin_y": _ARC["pin_y"],
-        "bar_tilt": math.degrees(beta),
+        "bar_tilt": -math.degrees(beta),
         "bar_bottom": fy,                # foot-axis Y
-        "bar_origin_x": fx - (BAR_WIDTH / 2.0) * math.cos(beta),
-        "bar_origin_y": fy + (BAR_WIDTH / 2.0) * math.sin(beta),
+        "bar_origin_x": fx + (BAR_WIDTH / 2.0) * math.cos(beta),
+        "bar_origin_y": fy - (BAR_WIDTH / 2.0) * math.sin(beta),
         "contact_y": contact_y,
         "bar_pin_y": ty,
-        "lever_tilt": math.degrees(math.atan2(ty - FULCRUM[1], tx - FULCRUM[0])),
+        "lever_tilt": math.degrees(math.atan2(ty - FULCRUM[1], FULCRUM[0] - tx)),
     }
 
 
@@ -811,7 +825,7 @@ def _spring_spec(amplitude: float, hole_x_0: float) -> dict[str, Any]:
     """
     st = solve_state(amplitude)
     phi = math.radians(st["lever_tilt"])
-    hole_x = FULCRUM[0] + LEVER_SPRING_X * math.cos(phi)
+    hole_x = FULCRUM[0] - LEVER_SPRING_X * math.cos(phi)  # lever reaches -X (machine)
     hole_y = FULCRUM[1] + LEVER_SPRING_X * math.sin(phi)
     eye_y = hole_y - SPRING_EYE_DROP
     dx = hole_x - hole_x_0
@@ -871,10 +885,11 @@ async def build(adapter) -> dict[str, str]:
     # the fixed plate hole at its measured gap length. Even (a_j=0) channels reuse
     # the base part; the rest get a distinct stretched variant, built ONCE here
     # (lean -- no PNG views; the canonical part renders its own). The variants are
-    # length variants of channel-spring-installed, so MIRROR_PLANE inherits its
-    # z-symmetry and part_properties inherits its registry row.
+    # length variants of channel-spring-installed, so part_properties inherits its
+    # registry row (their placement is authored machine-handed here, no per-part
+    # symmetry declaration -- the #151 mirror layer is gone).
     phi_0 = math.radians(state["lever_tilt"])  # state = solve_state(0.0)
-    hole_x_0 = FULCRUM[0] + LEVER_SPRING_X * math.cos(phi_0)
+    hole_x_0 = FULCRUM[0] - LEVER_SPRING_X * math.cos(phi_0)  # lever reaches -X
     spring_specs = [_spring_spec(a, hole_x_0) for a in amplitudes]
     # The canonical channel-spring-installed body MUST equal the neutral gap so
     # the neutral pose mates that ONE part x20 with no generated stretch variant.
@@ -898,7 +913,6 @@ async def build(adapter) -> dict[str, str]:
         if name is None:
             name = f"channel-spring-installed-stretch{len(variant_by_body):02d}"
             variant_by_body[key] = name
-            set_runtime_placement(name, ("z", 0.0))  # z-symmetric like the base spring
         spec["part"] = name
     log(f"spring variants: base {SPRING_BASE_BODY:.2f} + {len(variant_by_body)} "
         f"stretched bodies {sorted(variant_by_body)}")
@@ -923,7 +937,7 @@ async def build(adapter) -> dict[str, str]:
     # the assembly seed (ground=False -- the one allowed fixed component, the
     # #110 idiom). The fulcrum-shaft is free-space structure with no contact
     # partner, so it is datum-located (three orthogonal plane distances), not
-    # fixed. The shaft axes in the FINAL mirrored frame (x -> -x) anchor the
+    # fixed. The shaft axes (machine frame, crank at -X) anchor the
     # rocker/lever concentrics.
     await place_component(
         adapter, "pivot-shaft", [PIVOT[0], PIVOT[1], PIVOT_SHAFT_Z], [0.0, 0.0, 0.0],
@@ -934,8 +948,8 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY, ground=False, label="fulcrum-shaft (lever bank)",
     )
     await _locate_to_datum(adapter, fulcrum)
-    pivot_w = (-PIVOT[0], PIVOT[1])  # (72.9, 253.8)
-    fulc_w = (-FULCRUM[0], FULCRUM[1])  # (199.9, 1065.9)
+    pivot_w = (PIVOT[0], PIVOT[1])  # (72.9, 253.8) machine world
+    fulc_w = (FULCRUM[0], FULCRUM[1])  # (199.9, 1065.9) machine world
     pivot_od = [pivot_w[0] + SHAFT_R, pivot_w[1], 0.0]
     fulc_od = [fulc_w[0] + SHAFT_R, fulc_w[1], 0.0]
 
@@ -999,8 +1013,13 @@ async def build(adapter) -> dict[str, str]:
     # per-channel suppressible drivers (see _revolute).
     # Rocker + rod are amplitude-independent (same tilt every channel); the bar
     # and lever are placed per channel from solve_state(a_j).
-    arm_rows = rot_z_rows(state["arm_tilt"])
-    rod_rows = rot_z_rows(state["rod_tilt"])
+    # The rocker/rod/lever parts are modeled crank-side (+X); the machine puts
+    # the crank at -X, so each picks up a fixed Ry(180) on top of its in-plane
+    # Rz tilt -- the proper-rotation realisation of the pre-#151 z-plane mirror
+    # (mirror_placement is gone). compose_rows(Rz(tilt), Ry180) IS that pose; the
+    # matching Euler comes back via euler_from_rows for insert_component.
+    arm_rows = compose_rows(rot_z_rows(state["arm_tilt"]), ROT_Y_180)
+    rod_rows = compose_rows(rot_z_rows(state["rod_tilt"]), ROT_Y_180)
     t = math.radians(state["arm_tilt"])
     arm_origin_dx = ARM_PIVOT_LOCAL_Y * math.sin(t)  # -(0,8)*Rz offset
     arm_origin_dy = ARM_PIVOT_LOCAL_Y * math.cos(t)
@@ -1029,35 +1048,36 @@ async def build(adapter) -> dict[str, str]:
         zj = z_station(j)
         z_mid = zj + ARM_MID_DZ
         st = solve_state(amplitudes[j])  # this channel's bar/lever pose
-        bar_rows = rows_from_euler([st["bar_tilt"], 90.0, 0.0])
-        lever_rows = rot_z_rows(st["lever_tilt"])
+        # Bar rotated Ry(-90) (machine frame: local X slot -> +Z, local Z depth ->
+        # -X, the mirror of the pre-#151 Ry(+90)) then swung by st['bar_tilt']
+        # about Z. Lever gets the Ry(180) z-plane turn like the rocker/rod.
+        bar_rows = rows_from_euler([st["bar_tilt"], -90.0, 0.0])
+        lever_rows = compose_rows(rot_z_rows(st["lever_tilt"]), ROT_Y_180)
 
         rocker = await place_component(
             adapter, "rocker-arm",
-            [PIVOT[0] + arm_origin_dx, PIVOT[1] - arm_origin_dy, z_mid],
-            [0.0, 0.0, state["arm_tilt"]], arm_rows,
+            [PIVOT[0] - arm_origin_dx, PIVOT[1] - arm_origin_dy, z_mid],
+            euler_from_rows(arm_rows), arm_rows,
             ground=False, label=f"rocker-arm ch{j:02d}",
         )
         rod = await place_component(
             adapter, "connecting-rod",
             [RING_CENTER[0], RING_CENTER[1], zj + CAM_DZ],
-            [0.0, 0.0, state["rod_tilt"]], rod_rows,
+            euler_from_rows(rod_rows), rod_rows,
             ground=False, label=f"connecting-rod ch{j:02d}",
         )
-        # Bar rotated 90 about Y (local X slot -> -Z, local Z depth -> +X) then
-        # swung by st['bar_tilt'] about Z to set the foot station: rows_from_euler
-        # ([tilt, 90, 0]) is exactly that Ry90 . Rz(-tilt). Origin places the foot
-        # axis at (PIVOT[0] - a_j, bar_bottom); the swing keeps the foot on the arc.
+        # Origin places the foot axis at (PIVOT[0] + a_j, bar_bottom) on the
+        # machine +X lifting side; the swing keeps the foot on the arc.
         bar = await place_component(
             adapter, "amplitude-bar",
-            [st["bar_origin_x"], st["bar_origin_y"], z_mid + BAR_WIDTH / 2.0],
-            [st["bar_tilt"], 90.0, 0.0], bar_rows,
+            [st["bar_origin_x"], st["bar_origin_y"], z_mid - BAR_WIDTH / 2.0],
+            [st["bar_tilt"], -90.0, 0.0], bar_rows,
             ground=False, label=f"amplitude-bar ch{j:02d} a={amplitudes[j]:.2f}",
         )
         lever = await place_component(
             adapter, "channel-lever",
             [FULCRUM[0], FULCRUM[1], z_mid],
-            [0.0, 0.0, st["lever_tilt"]], lever_rows,
+            euler_from_rows(lever_rows), lever_rows,
             ground=False, label=f"channel-lever ch{j:02d}",
         )
 
@@ -1186,10 +1206,14 @@ async def build(adapter) -> dict[str, str]:
         # the foot-notch contact offset rotates with the amplitude tilt), so
         # the mate authors residual-free; it tracks the true roof-on-arc
         # contact to first order (offset ~5 mm over R800 -- sub-visible).
+        # Analytic radius, all in the machine frame: the foot X is the +X-side
+        # station PIVOT[0] + a_j (matching solve_state's fx), the arc centre and
+        # bar_bottom come straight from the machine-frame solver (#151: was a
+        # pre-mirror PIVOT[0] - a_j mixed against the post-mirror foot readback).
         arc_c = world_point(adapter, rocker, [0.0, ARM_ARC_CENTER_LOCAL_Y, 0.0])
         foot_r = math.hypot(foot[0] - arc_c[0], foot[1] - arc_c[1])
         want_r = math.hypot(
-            (PIVOT[0] - amplitudes[j]) - _ARC["acx"], st["bar_bottom"] - _ARC["acy"])
+            (PIVOT[0] + amplitudes[j]) - _ARC["acx"], st["bar_bottom"] - _ARC["acy"])
         if abs(foot_r - want_r) > 1e-3:
             raise RuntimeError(
                 f"ch{j:02d}: measured foot->arc-centre radius {foot_r:.4f} != "
@@ -1239,17 +1263,18 @@ async def build(adapter) -> dict[str, str]:
         # Spring-hook fastener (ground; cosmetic) -- the SEPARATE little open J-hook
         # that connects this channel's spring to the plate (the spring no longer
         # threads the plate itself). It seats shank-UP in the plate bore at
-        # (hole_x_0 - arm_offset, z_mid) and presents its +X arm just above the
+        # (hole_x_0 + arm_offset, z_mid) and presents its arm just above the
         # plate, threading the spring's bottom eye (fixed at (hole_x_0,
-        # PLATE_EYE_Y, z_mid) for every pose). The spring stays vertical; the hook
-        # reaches +X back to it. IDENTITY orientation: the eye-axis tilt (<=1.1 deg
-        # off +X even at full amplitude) is well inside the bore/ring clearance.
+        # PLATE_EYE_Y, z_mid) for every pose). The part is modeled with its arm to
+        # local +X; Ry(180) (the machine-frame z-plane turn) points that arm to
+        # machine -X, back toward the eye one arm-offset away. The eye-axis tilt
+        # (<=1.1 deg even at full amplitude) is well inside the bore/ring clearance.
         grounded_specs.append({
             "part": "spring-hook",
-            "position": [hole_x_0 - HOOK_ARM_OFFSET_X,
+            "position": [hole_x_0 + HOOK_ARM_OFFSET_X,
                          PLATE_EYE_Y - HOOK_ARM_HEIGHT, z_mid],
-            "rotation": [0.0, 0.0, 0.0],
-            "rows": IDENTITY,
+            "rotation": [0.0, 180.0, 0.0],
+            "rows": ROT_Y_180,
             "label": f"spring-hook ch{j:02d} bore-seat",
         })
 

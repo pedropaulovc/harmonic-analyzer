@@ -74,7 +74,7 @@ from _assembly import (
     set_park_defer,
     write_park_specs,
 )
-from _transforms import IDENTITY
+from _transforms import IDENTITY, ROT_Y_180
 import pen_driver  # noqa: E402  (kinematic pen driver, plan F5)
 
 ASM_NAME = "pen"
@@ -94,27 +94,31 @@ LOCK = is_locked_build(_config.machine("build_lock", "pen"))
 WHEEL_BAR_Y = 565.0  # the wheel-bar the pen-hanger clamps (magnifier.SLDASM)
 
 # --- pen ---------------------------------------------------------------------
-PEN_ROD_X = -3.0
+PEN_ROD_X = 3.0
 PEN_Z_MID = -151.5  # pen-rod / v-block bore plane (v-block back face -143.5
 # clears the plate front -142.9 by 0.6)
 HANGER_POS = (PEN_ROD_X, 505.0, PEN_Z_MID)
 PEN_ROD_POS = (PEN_ROD_X, 398.0, PEN_Z_MID - 2.5)  # rod z -154..-149
-VBLOCK_POS = (-24.0, 390.0, -159.5)  # rod bore (local x 21) at (-3, -151.5)
-MARKER_X = -13.0  # marker bore (local x 11)
+# Ry(180): the v-block is modeled bores-toward-local-+x/+z; turned about Y its
+# back face (the local z 0 wall, now at world z -143.5) clears the plate front
+# and the rod bore (local x 21, z 8) lands at (3, -151.5).
+VBLOCK_POS = (24.0, 390.0, -143.5)
+MARKER_X = 13.0  # marker bore (local x 11)
 MARKER_TIP_Y = 368.0
 # Frame flat on the v-block top (y 408), long axis along X so its window
-# (machine x -25..+7, z -161..-147) spans the marker barrel (-17..-9,
-# z -155.5..-147.5) and the pen rod (-5.5..-0.5, z -154..-149). Mapping:
-# machine x = -29 + local y, machine y = 418 - local z, machine z =
+# (machine x -7..+25, z -161..-147) spans the marker barrel (+9..+17,
+# z -155.5..-147.5) and the pen rod (+0.5..+5.5, z -154..-149). Mapping:
+# machine x = 29 - local y, machine y = 408 + local z, machine z =
 # -143 - local x; the ring's near rail is trimmed to local x 0.75
 # (build_pen_frame TRIM_NEAR) so its edge (z -143.75) clears the recording
 # paper's front face (-143.4) by 0.35. The screw hole (local x 11, z 5)
-# lands at machine (y 413, z -154), axis along X through the west end rail.
-FRAME_POS = (-29.0, 418.0, -143.0)
-FRAME_ROWS = [[0.0, 0.0, -1.0], [1.0, 0.0, 0.0], [0.0, -1.0, 0.0]]
-# Set screw along +X (the part's own axis): knob x -38..-33, shank tip at
-# x -18, 1 short of the marker barrel's west face (-17).
-SET_SCREW_POS = (-38.0, 413.0, -154.0)
+# lands at machine (y 413, z -154), axis along X through the east end rail.
+FRAME_POS = (29.0, 408.0, -143.0)
+FRAME_ROWS = [[0.0, 0.0, -1.0], [-1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
+# Set screw turned Ry(180) so its own axis presses east (-X) through the
+# frame's east end-rail hole: knob x +33..+38, shank tip at x +18, 1 short
+# of the marker barrel's east face (+17).
+SET_SCREW_POS = (38.0, 413.0, -154.0)
 
 # --- amplification wire 2 (rim -> pen rod) -----------------------------------
 # Endpoints + length live in build_pen_wire.py (the part's length IS the run);
@@ -138,7 +142,7 @@ assert math.isclose(
 # face (-129.9 -- the 9-deep support-bar stock seated on the clamp arc,
 # build_magnifier_assembly BAR_BACK_Z), O3.5 shank through the bar + strap
 # holes, tip 0.5 behind the strap front face (-141.9).
-HANGER_SCREW_POS = (5.5, WHEEL_BAR_Y, -129.9)  # machine x -5.5
+HANGER_SCREW_POS = (-5.5, WHEEL_BAR_Y, -129.9)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -160,7 +164,7 @@ async def build(adapter) -> dict[str, str]:
     await place_component(adapter, "pen-hanger", list(HANGER_POS),
                           [0.0, 0.0, 0.0], IDENTITY)
     await place_component(adapter, "pen-v-block", list(VBLOCK_POS),
-                          [0.0, 0.0, 0.0], IDENTITY)
+                          [0.0, 180.0, 0.0], ROT_Y_180)
     pen_rod = await place_component(adapter, "pen-rod", list(PEN_ROD_POS),
                                     [0.0, 0.0, 0.0], IDENTITY, ground=False)
     rod_o = component_origin(adapter, pen_rod)
@@ -223,14 +227,15 @@ async def build(adapter) -> dict[str, str]:
         log(f"pen driver: {info['links']}-link chain, scale "
             f"{info['scale_mm_per_unit']:.4g} mm/unit, rest {info['rest_deg']:g} deg")
         log(f"  equation: {info['equation']}")
-    # Ry(+90)*Rx(+90): the ring lies flat on the v-block top, long axis
-    # along X, window over the marker + pen rod (see FRAME_POS comment).
+    # Rx(-90)*Ry(+90) (gimbal representative [-90, 90, 0]): the ring lies flat
+    # on the v-block top, long axis along X, window over the marker + pen rod
+    # (see FRAME_POS comment).
     await place_component(adapter, "pen-frame", list(FRAME_POS),
-                          [90.0, 90.0, 0.0], FRAME_ROWS)
-    # No rotation: the screw's own +X axis presses east through the frame's
-    # west end-rail hole toward the marker barrel.
+                          [-90.0, 90.0, 0.0], FRAME_ROWS)
+    # Ry(180): the screw's own axis presses east (-X) through the frame's
+    # east end-rail hole toward the marker barrel.
     await place_component(adapter, "pen-set-screw", list(SET_SCREW_POS),
-                          [0.0, 0.0, 0.0], IDENTITY)
+                          [0.0, 180.0, 0.0], ROT_Y_180)
     await place_component(adapter, "hanger-screw", list(HANGER_SCREW_POS),
                           [0.0, 0.0, 0.0], IDENTITY)
 

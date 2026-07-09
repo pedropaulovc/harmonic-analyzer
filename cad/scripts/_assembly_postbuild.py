@@ -85,12 +85,19 @@ async def replay_park_specs(adapter: Any, specs: list[dict[str, Any]]) -> list[s
         verify = None
         if spec.get("verify"):
             verify = (spec["verify"][0], list(spec["verify"][1]))
+        witness = None
+        if spec.get("witness"):
+            # The recorded off-origin branch witness (#154): local point +
+            # authored world position, so a flip-ambiguous angle replay fails
+            # loud on the wrong lean exactly like the build would.
+            witness = (list(spec["witness"][0]), list(spec["witness"][1]))
         res = await _mate(
             adapter,
             f"replay PARK_{spec['key']}",
             spec["kind"],
             entities,
             verify=verify,
+            witness=witness,
             flip=bool(spec.get("flip", False)),
             **spec.get("params", {}),
         )

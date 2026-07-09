@@ -82,3 +82,4 @@
 - [Park-driver singularities](park-driver-singularities.md) — a park mate can author "OK" yet pin NOTHING (angle-to-plane cone apex, or gradient ⊥ the DOF — axisymmetric parts are point-constraint-blind to spin) or fail IN PLACE (far-side distance created in hard error 47 with zero motion, invisible to motion-based flip recovery; `_mate` now checks GetErrorCode2). Debug with diagnostics/probe_magnifier_closure.py; status 6 = swInvalidSolution
 - [Paper-drive real train](paper-drive-real-train.md) — PR #196 final six-gear topology; Appendix C #8 closed; <63T pinions need centre extension (gap floor at base circle) and 12T needs a Ø5 seat
 - [Paper-drive rework evidence](paper-drive-rework.md) — the full E1-E8 dossier + part-change table behind PR #196 (moved from docs/); anchors, z-stacks, mate chain, photo cross-checks
+- [Mirror retirement sweep](mirror-retirement-sweep.md) — #151 golden-pose gate, rulebook, accepted deltas

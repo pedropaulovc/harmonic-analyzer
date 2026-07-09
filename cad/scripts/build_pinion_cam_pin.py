@@ -13,7 +13,7 @@ that clears the Ø6.35 pivot bore there.
 
 Layout: axis Z, root (seated) end at the ORIGIN, z 0..15: 4.0 presses
 into the strap's blind edge bore, 11 proud; domed outer end (sagitta
-0.8, the rod-end crown idiom). Axisymmetric -> MIRROR_PLANE ("x", 0.0).
+0.8, the rod-end crown idiom). Axisymmetric about its local x = 0.
 
 Dimensions: cad/config/dimensions.yaml "Chapter 25".
 
