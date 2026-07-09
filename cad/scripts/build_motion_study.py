@@ -126,8 +126,11 @@ RIGID, FLEXIBLE = "rigid", "flexible"
 G_STEEL = 79.3e9  # Pa
 CH_SPRING = dict(d=1.0, D=5.5, n=28.0, free_mm=32.0)
 CT_SPRING = dict(d=1.8, D=10.7, n=165.0, free_mm=315.0)
-SPRING_KCH = float(os.environ.get("SPRING_KCH", "50.0"))   # N/m, channel
-SPRING_KCT = float(os.environ.get("SPRING_KCT", "25.0"))   # N/m, counter
+# Defaults sit at the soft end of the POC-proven band: the full web (20 stiff
+# loops + gear chains + yoke) is marginal for the fixed-step integrator, and
+# softer springs move the natural frequencies away from its stability edge.
+SPRING_KCH = float(os.environ.get("SPRING_KCH", "5.0"))    # N/m, channel
+SPRING_KCT = float(os.environ.get("SPRING_KCT", "2.5"))    # N/m, counter
 
 # Motion samples land here (JSON per stage) for the SW-free plot/report step.
 OUT_MOTION = (OUT_PNG.parent / "reports" / "motion")

@@ -252,8 +252,14 @@ async def _couple_levers(adapter, comps):
     last = None
     for alignment in ("aligned", "anti_aligned"):
         try:
+            # Axis1@summing-lever (the pivot-cylinder axis, 5.134 mm below the
+            # knife ridge) -- NOT the knife Axis3, which is COAXIAL with the
+            # magnifying lever's Axis2: a gear mate's coupling sense comes
+            # from the line between the two axes, degenerate at zero centre
+            # distance (a prime suspect in the marginal/dead solves). The
+            # offset pair co-rotates identically at 1:1.
             res = await gear_mate(
-                adapter, _entity_ref(sum_n, "Axis3", "AXIS"),
+                adapter, _entity_ref(sum_n, "Axis1", "AXIS"),
                 _entity_ref(mag_n, "Axis2", "AXIS"),
                 [1.0, 1.0], alignment=alignment,
                 label="hand-off summing->magnifying lever 1:1")
