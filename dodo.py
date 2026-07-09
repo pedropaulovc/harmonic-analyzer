@@ -1074,10 +1074,25 @@ def build_or_refresh(stem, dependencies, changed, targets):
         cache_key = _cache_key(_assembly_file_deps(stem), label)
         cache_outputs = _assembly_cache_outputs(stem)
         if _cache.restore(cache_key, cache_outputs, label):
-            sp.set_attribute("cache", "hit")
-            sidecar.parent.mkdir(parents=True, exist_ok=True)
-            sidecar.write_text(digest + "\n", encoding="utf-8")
-            return
+            # A blob packed before an output joined the required set (e.g. the
+            # studies sidecar) restores under the same deps-based key but lacks
+            # the new file -- accepting it would skip the missing-target FULL
+            # escalation below and leave the target absent forever. Validate
+            # every declared target and demote an incomplete hit to a MISS
+            # (the rebuild then re-publishes a complete blob under this key)
+            # rather than salt-busting the whole fleet (codex #217 round 4).
+            incomplete = [t for t in targets if not Path(t).exists()]
+            if not incomplete:
+                sp.set_attribute("cache", "hit")
+                sidecar.parent.mkdir(parents=True, exist_ok=True)
+                sidecar.write_text(digest + "\n", encoding="utf-8")
+                return
+            _telemetry.warn(
+                f"cache HIT for {label} lacks required target(s) "
+                f"{[Path(t).name for t in incomplete]} -- stale pre-sidecar "
+                f"blob, demoting to MISS")
+            _telemetry.event("cache.hit_incomplete", label=label,
+                             missing=",".join(Path(t).name for t in incomplete))
         sp.set_attribute("cache", "miss")
 
         # ANY missing target escalates to FULL: for the top that includes the

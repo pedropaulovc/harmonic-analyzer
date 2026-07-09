@@ -23,6 +23,8 @@ import math
 import sys
 from pathlib import Path
 
+import _telemetry
+
 # Categorical palette (fixed assignment order, CVD-safe spacing).
 C_BLUE, C_ORANGE, C_RED, C_TEAL = "#4269d0", "#efb118", "#ff725c", "#6cc5b0"
 INK, MUTED, GRID = "#1a1a2e", "#5c5c6e", "#e4e4ec"
@@ -171,7 +173,7 @@ def main() -> int:
     png = OUT_MOTION / f"{stage}-report.png"
     fig.savefig(png, dpi=160)
     (OUT_MOTION / f"{stage}-report.md").write_text("\n".join(md) + "\n")
-    print(f"report -> {png}")
+    _telemetry.success(f"report -> {png}")
     return 0
 
 
