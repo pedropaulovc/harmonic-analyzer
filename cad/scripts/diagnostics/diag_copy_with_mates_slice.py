@@ -131,7 +131,8 @@ _EXTERNAL_SEMS = {"J1a", "J1s", "J2s", "footX"}
 
 
 def _dim_mates_with_owners(adapter) -> list[dict]:
-    """Every MateDistanceDim in tree order: name, D1 (mm), owner prefixes."""
+    """Every MateDistanceDim in tree order: name, D1 (mm), owner prefixes,
+    and the mate's own FlipDimension state (its side of the reference)."""
     model = adapter.currentModel
     out: list[dict] = []
     for feat in _mate_group_subfeatures(adapter):
@@ -141,6 +142,8 @@ def _dim_mates_with_owners(adapter) -> list[dict]:
         param = adapter._attempt(
             lambda n=name: model.Parameter(f"D1@{n}"), default=None)
         val = _read_member(param, "SystemValue") if param is not None else None
+        data = _read_member(feat, "GetDefinition")
+        flip = bool(_read_member(data, "FlipDimension")) if data else None
         mate = _read_member(feat, "GetSpecificFeature2")
         owners = set()
         instances = set()
@@ -156,7 +159,8 @@ def _dim_mates_with_owners(adapter) -> list[dict]:
             else:
                 owners.add("ROOT")
         out.append({"name": name, "mm": (val or 0.0) * 1000.0,
-                    "owners": frozenset(owners), "instances": instances})
+                    "owners": frozenset(owners), "instances": instances,
+                    "flip": flip})
     return out
 
 
@@ -316,8 +320,17 @@ async def _mate_count(adapter) -> int:
     return len(res.data or []) if res.is_success else -1
 
 
-def _copy_slice(adapter, comps: dict[str, str], values_m: list[float]) -> None:
-    """One native-typed CopyWithMates2 of the whole 4-part slice."""
+def _copy_slice(adapter, comps: dict[str, str], values_m: list[float],
+                flip_dim: list[bool] | None = None) -> None:
+    """One native-typed CopyWithMates2 of the whole 4-part slice.
+
+    ``flip_dim`` carries the per-slot dimension SIDE. The UI doc ties the
+    flip controls to the mate list and the API doc says FlipDimension
+    "maps to the Values array" -- i.e. when a slot re-values a dim, the
+    side must ride along; all-False hands every re-valued dim the False
+    side regardless of what the seed authored (measured: the rod spin,
+    authored flip=True, copied mirrored under all-False).
+    """
     model = adapter.currentModel
     raw = []
     for part in CHAIN_PARTS:
@@ -332,7 +345,8 @@ def _copy_slice(adapter, comps: dict[str, str], values_m: list[float]) -> None:
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, [None] * n),
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, values_m),
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, [False] * n),
-        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, [False] * n),
+        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL,
+                list(flip_dim) if flip_dim is not None else [False] * n),
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, [False] * n),
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_I4, [0] * n),
     )
@@ -395,8 +409,17 @@ async def build(adapter) -> dict[str, str]:
     # tree index 11). Rather than guess: copy once with a DISTINCT sentinel
     # per slot, identify each copied dim by its mated components, read
     # which sentinel it holds -> slot, then delete the calibration copy.
+    seed_dim_rows = _dim_mates_with_owners(adapter)
+    # The seed's authored FlipDimension per semantic dim -- the side each
+    # re-valued slot must carry (distance_driver seeded it by sign).
+    seed_flip_by_sem = {
+        _SEM_BY_OWNERS[d["owners"]]: bool(d["flip"])
+        for d in seed_dim_rows if d["owners"] in _SEM_BY_OWNERS
+    }
+    log(f"seed FlipDimension by dim: {seed_flip_by_sem}")
+
     sentinels = [1000.0 + 10.0 * k for k in range(SLICE_MATES)]
-    dims_before = {d["name"] for d in _dim_mates_with_owners(adapter)}
+    dims_before = {d["name"] for d in seed_dim_rows}
     comps_before = set(component_names(adapter))
     _copy_slice(adapter, comps, [s / 1000.0 for s in sentinels])
     slot_by_sem: dict[str, int] = {}
@@ -415,16 +438,27 @@ async def build(adapter) -> dict[str, str]:
               await adapter.remove_component(ComponentRefParameters(name=name)))
     missing = _EXTERNAL_SEMS - set(slot_by_sem)
     if missing:
-        log(f"VERDICT: calibration could not map slots for {sorted(missing)}"
-            f" -- mapped {slot_by_sem}; cannot value the real copies")
-        return {"verdict": "calibration-failed"}
+        # Raise (not return): run_build only maps exceptions to a non-zero
+        # exit, and automation must not read a failed calibration as a
+        # passing run (codex #220).
+        raise RuntimeError(
+            f"calibration could not map slots for {sorted(missing)} -- "
+            f"mapped {slot_by_sem}; cannot value the real copies")
     log(f"discovered Values-slot mapping: {slot_by_sem} "
         f"(internal dims {sorted(set(_DIMS_IDX_BY_SEM) - set(slot_by_sem))} "
         f"inherit the seed's values -- no slot)")
 
     # Real copies: station k = SEED_J + i; every dim gets its SEED value at
     # its DISCOVERED slot, with only the rocker axial substituted to
-    # PITCH/2 + i*PITCH (always positive = the seed's side; C3).
+    # PITCH/2 + i*PITCH (always positive = the seed's side; C3). Each slot
+    # also carries the seed's authored FlipDimension -- value and side ride
+    # together (all-False mirrored the rod; if this lands clean, the
+    # ModifyDefinition repair below becomes a no-op fallback).
+    flips = [False] * SLICE_MATES
+    for sem, k in slot_by_sem.items():
+        flips[k] = seed_flip_by_sem.get(sem, False)
+    log(f"per-slot FlipDimension for copies: "
+        f"{ {k: flips[k] for _, k in slot_by_sem.items()} }")
     times = []
     for i in range(1, N_COPY_STATIONS + 1):
         values = [0.0] * SLICE_MATES
@@ -432,7 +466,7 @@ async def build(adapter) -> dict[str, str]:
             values[k] = (PITCH / 2.0 + i * PITCH if sem == "J1a"
                          else dims[_DIMS_IDX_BY_SEM[sem]]) / 1000.0
         t0 = time.perf_counter()
-        _copy_slice(adapter, comps, values)
+        _copy_slice(adapter, comps, values, flip_dim=flips)
         times.append(time.perf_counter() - t0)
         log(f"slice copy -> ch{SEED_J + i:02d}: {times[-1]:.2f}s")
 
@@ -556,15 +590,21 @@ async def build(adapter) -> dict[str, str]:
         t_fix = time.perf_counter() - t0
         pose_fail, bad_instances = _measure("repaired")
 
-    # Stability: one closing rebuild, then re-check.
+    # Stability: one closing rebuild, then re-check the FULL pose (rotation
+    # + XYZ, matched by instance name) -- a same-station flip snap-back
+    # changes XY/rotation while leaving Z untouched (codex #220), so a
+    # Z-only comparison would miss exactly the failure mode the flip
+    # repair guards against.
     tfs_pre = _slice_transforms(adapter, seed_names)
     adapter._attempt(lambda: model.EditRebuild3(), default=None)
     tfs_post = _slice_transforms(adapter, seed_names)
-    stable = all(
-        abs(a[1][11] - b[1][11]) * 1000.0 < 1e-3
-        for part in CHAIN_PARTS
-        for a, b in zip(sorted(tfs_pre[part], key=lambda nm: nm[1][11]),
-                        sorted(tfs_post[part], key=lambda nm: nm[1][11]))
+    pre_by_name = {n: m for part in CHAIN_PARTS for n, m in tfs_pre[part]}
+    post_by_name = {n: m for part in CHAIN_PARTS for n, m in tfs_post[part]}
+    stable = set(pre_by_name) == set(post_by_name) and all(
+        max(abs(a[k] - b[k]) for k in range(9)) < 1e-6
+        and max(abs((a[9 + t] - b[9 + t]) * 1000.0) for t in range(3)) < 1e-3
+        for n, a in pre_by_name.items()
+        for b in [post_by_name[n]]
     )
 
     log("=" * 70)
@@ -576,8 +616,15 @@ async def build(adapter) -> dict[str, str]:
         f"{sum(times) / len(times):.2f}s (first {times[0]:.2f}s, last "
         f"{times[-1]:.2f}s) + repair pass {t_fix:.1f}s total")
     ok = (mates_after == want_mates) and not pose_fail and stable
-    log(f"VERDICT: {'PASS -- one call + pose-seed repair replicates the whole chain' if ok else 'FAIL (see above)'}")
-    return {"verdict": "pass" if ok else "fail"}
+    if not ok:
+        # Raise so the process exits non-zero -- a logged FAIL with exit 0
+        # would let automation treat a failed validation as passing
+        # (codex #220).
+        raise RuntimeError(
+            f"slice validation FAILED: mates {mates_after}/{want_mates}, "
+            f"{len(pose_fail)} pose failures, stable={stable} (see log)")
+    log("VERDICT: PASS -- one call + flip repair replicates the whole chain")
+    return {"verdict": "pass"}
 
 
 if __name__ == "__main__":
