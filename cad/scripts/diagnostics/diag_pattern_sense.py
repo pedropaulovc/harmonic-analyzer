@@ -95,7 +95,11 @@ def _classify(zs: list[float], n: int) -> str:
 
 
 async def _fresh_rig(adapter) -> str:
-    """New throwaway assembly: grounded shaft + one bushing seed. Never saved."""
+    """New throwaway assembly: grounded shaft + one bushing seed. Never saved.
+
+    Closes every open document first -- ~15 trials would otherwise pile up
+    ~15 abandoned scratch assemblies in the session."""
+    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     check("create_assembly", await adapter.create_assembly())
     await place_component(
         adapter, "pivot-shaft", [PIVOT[0], PIVOT[1], PIVOT_SHAFT_Z],
