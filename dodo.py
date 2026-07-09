@@ -103,6 +103,7 @@ from _buildgraph import (  # noqa: E402
 )
 
 import _artifact_cache as _cache  # noqa: E402  (remote build-artefact cache)
+import _config  # noqa: E402  (build_lock mode -> park-sidecar target declaration)
 import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -1160,12 +1161,39 @@ def _clean_assembly(stem):
     the next build; codex review #4)."""
     _force_remove(Path(_sldasm(stem)))
     _force_remove(_recipe_sidecar(stem))
+    _force_remove(CAD_OUT / "sldasm" / f".{stem.replace('_', '-')}.park.json")
     _force_remove(CAD_OUT / "png" / stem.replace("_", "-"))
     if stem == "channel":
         for variant in _channel_spring_variants():
             _force_remove(variant)
     if stem == "harmonic_analyzer":
         _force_remove(CAD_OUT / "sldasm" / ".harmonic-analyzer.studies.json")
+
+
+# The six movers: built `free` (the default), each records its deferred park-
+# driver specs into `.{stem}.park.json` beside the .SLDASM. Those sidecars are
+# CONSUMED downstream -- the top build replays drive-train/channel clamps and
+# requires paper-drive's T12 spec, the release preflight replays all of them --
+# so a free mover's sidecar is a declared TARGET: deleting it re-runs the
+# producer (build_or_refresh escalates any missing target to FULL) instead of
+# doit reporting a missing dependency it refuses to heal (codex #217 round 3).
+# A `locked` mover authors its drivers engaged and writes no sidecar, so its
+# target set excludes it (mirrors _assembly.is_locked_build's mode whitelist).
+_PARK_SIDECAR_STEMS = ("drive_train", "channel", "magnifier", "paper_drive",
+                       "summing", "pen")
+
+
+def _park_sidecar_targets(stem: str) -> list[str]:
+    if stem not in _PARK_SIDECAR_STEMS:
+        return []
+    mode = str(_config.machine("build_lock", stem))
+    if mode not in ("free", "locked"):
+        raise RuntimeError(
+            f"invalid build_lock mode {mode!r} for {stem}; expected free|locked")
+    if mode == "locked":
+        return []
+    return [str((CAD_OUT / "sldasm" /
+                 f".{stem.replace('_', '-')}.park.json").resolve())]
 
 
 def task_assembly():
@@ -1189,7 +1217,7 @@ def task_assembly():
         # Factored into _recipe_files so build_or_refresh computes the identical
         # digest.
         recipe_files = _recipe_files(stem)
-        targets = [_sldasm(stem)]
+        targets = [_sldasm(stem), *_park_sidecar_targets(stem)]
         if stem == "harmonic_analyzer":
             # The saved-study names sidecar is REQUIRED output (the study
             # runner resolves the studies from it), so it is a declared

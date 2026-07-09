@@ -52,7 +52,6 @@ import math
 import os
 import sys
 
-import _config
 from _common import (
     OUT_PNG,
     OUT_SLDASM,
@@ -90,6 +89,7 @@ from _assembly_top import (  # noqa: F401 -- re-exported for the probes
     _sub_model,
     _world,
     load_studies_sidecar,
+    truth_state,
 )
 from _assembly import component_named_ref
 
@@ -97,7 +97,7 @@ import _telemetry
 
 # ---- runner constants ---------------------------------------------------------
 ASM = TOP_ASM
-ROCKER_MIN_DEG = 1.0      # dead-output gate: largest rocker swing must exceed
+ROCKER_MIN_DEG = 1.0      # dead-output gate: EVERY rocker swing must exceed
 PEN_MIN_MM = 0.5          # dead-output gate: pen-tip travel must exceed
 SUM_MIN_DEG = 0.05        # dead-output gate: summing-lever rock must exceed
 PLATEN_MIN_MM = 1.0       # dead-output gate: platen feed must exceed (the chain
@@ -318,16 +318,23 @@ def _span(series):
     return (max(vals) - min(vals)) if vals else 0.0
 
 
-async def _sample_kinematic(adapter, comps, duration, study, n_probe=3):
-    """Crank + rockers + platen over the run -- the kinematic-stage signal.
+async def _sample_kinematic(adapter, comps, duration, study):
+    """Crank + EVERY rocker + platen over the run -- the kinematic-stage signal.
 
     Gates: (1) solve-lock on the crank (constant-rate motor must track);
-    (2) dead-output on the rockers (a decoupled cam chain solves cleanly with
-    a dead output); (3) dead-output on the platen -- the chain tie is an
-    artefact mate now, so a missing or unfed platen is a real regression.
+    (2) dead-output on EACH of the N_CHANNELS rockers -- the top authors one
+    CAM_chNN coupling per channel, and a single dead cam/rod loop must fail
+    the proof, not hide behind a moving neighbour (codex #217 round 3);
+    (3) dead-output on the platen -- the chain tie is an artefact mate now,
+    so a missing or unfed platen is a real regression.
     """
     probes = []
-    for comp, name in _by_z_rank(adapter, "rocker-arm", comps=comps)[:n_probe]:
+    rockers = _by_z_rank(adapter, "rocker-arm", comps=comps)
+    if len(rockers) < N_CHANNELS:
+        raise RuntimeError(
+            f"only {len(rockers)} rocker-arm component(s) found -- expected "
+            f"{N_CHANNELS} (one per active channel); the cam bank is incomplete")
+    for comp, name in rockers:
         probes.append((comp, f"rocker@{name.split('/')[-1]}"))
     cyl = _by_z_rank(adapter, "cylinder-gear", comps=comps)
     if cyl:
@@ -360,13 +367,13 @@ async def _sample_kinematic(adapter, comps, duration, study, n_probe=3):
 
     if crank is not None:
         assert_motion_progressed(rows["crankshaft"], duration, "crankshaft")
-        rocker_max = max((v for k, v in spans.items() if k.startswith("rocker")),
-                         default=0.0)
-        if rocker_max < ROCKER_MIN_DEG:
+        dead = sorted(k for k, v in spans.items()
+                      if k.startswith("rocker") and v < ROCKER_MIN_DEG)
+        if dead:
             raise RuntimeError(
-                f"DEAD OUTPUT: crank drove the full run but the largest rocker "
-                f"swing was only {rocker_max:.2f} deg (< {ROCKER_MIN_DEG}) -- "
-                f"the cam-follower chain is decoupled.")
+                f"DEAD OUTPUT: crank drove the full run but {len(dead)}/"
+                f"{len(rockers)} rocker(s) swung < {ROCKER_MIN_DEG} deg: "
+                f"{dead} -- those cam-follower loops are decoupled.")
         feed = spans.get("platen", 0.0)
         if feed < PLATEN_MIN_MM:
             raise RuntimeError(
@@ -520,7 +527,12 @@ async def build(adapter):
     check(f"resolve saved study {study!r}", await adapter.create_motion_study(
         MotionStudyParameters(name=study, study_type="physical_simulation",
                               duration=duration, activate=True)))
-    if "grav" in opts:
+    # A gravity run materially changes the solve, so its artefacts are
+    # labelled `<stage>-grav` -- it can never overwrite (or be mistaken for)
+    # the default no-gravity run's samples/video (codex #217 round 3).
+    grav = "grav" in opts
+    run_label = f"{stage}-grav" if grav else stage
+    if grav:
         g = await adapter.add_gravity(MotionGravityParameters(
             axis="y", reverse=True, study_name=study))
         log(f"  gravity -Y: {'OK' if g.is_success else 'FAIL ' + str(g.error)}")
@@ -531,22 +543,21 @@ async def build(adapter):
         check("calculate_motion", await adapter.calculate_motion(
             MotionStudyRefParameters(name=study)))
 
-    # The amplitude state comes from the BUILD-time studies sidecar -- the
-    # vector the SETUP_* clamps were actually authored against -- not from
-    # live config, which can move between the build and this hand-run solve
+    # The truth state comes from the BUILD-time studies sidecar -- the inputs
+    # the SETUP_* clamps were actually authored against -- not from live
+    # config, which can move between the build and this hand-run solve
     # (codex #217 round 2). Older sidecars predate the record: fall back to
-    # live config with a loud warning (rebuild the top to bake it).
+    # the live truth state with a loud warning (rebuild the top to bake it).
     amplitude = sidecar.get("amplitude")
     if amplitude is None:
         _telemetry.warn(
-            "studies sidecar records no amplitude state (pre-record artifact) "
+            "studies sidecar records no truth state (pre-record artifact) "
             "-- labelling samples with LIVE config; rebuild harmonic-analyzer "
             "to bake it")
-        amplitude = {"preset": str(_config.machine("amplitude", "preset")),
-                     "coefficients_mm": [float(a) for a in _config.amplitudes()]}
+        amplitude = truth_state()
     payload = {"stage": stage, "study": study, "rpm": rpm,
                "duration_s": duration, "channels": N_CHANNELS,
-               "amplitude": amplitude}
+               "gravity": grav, "amplitude": amplitude}
     with _telemetry.span("motion.sample"):
         payload["kinematic"] = await _sample_kinematic(adapter, comps, duration, study)
         if stage == "full":
@@ -554,8 +565,8 @@ async def build(adapter):
                 adapter, comps, duration, study)
             payload["pen"] = await _sample_pen(adapter, comps, duration, study)
 
-    artefacts = {"samples": _write_samples(stage, payload)}
-    vid = await _export_video(adapter, stage, study)
+    artefacts = {"samples": _write_samples(run_label, payload)}
+    vid = await _export_video(adapter, run_label, study)
     if vid:
         artefacts["video"] = vid
     return artefacts
