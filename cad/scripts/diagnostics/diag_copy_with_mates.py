@@ -71,7 +71,7 @@ SEED_MATES = 3  # concentric + Front-plane distance + Top-plane parallel
 
 async def _mate_count(adapter) -> int:
     res = await adapter.list_mates()
-    return len(res.data or []) if res.success else -1
+    return len(res.data or []) if res.is_success else -1
 
 
 async def _seat_baseline(adapter, gap: int) -> tuple[str, float]:
@@ -94,42 +94,69 @@ def _copy_with_mates(adapter, comp_name: str, new_z_mm: float,
 
     ``Values`` maps to the seed's distance/angle mates; the seat triple has
     exactly ONE (the Front-plane Z distance), so a single entry re-stations
-    the copy. ``variant`` picks the marshaling: 'list' = plain Python lists
-    (pywin32 auto-marshal), 'variant' = explicit VARIANT arrays.
+    the copy. ``variant`` picks the marshaling: 'native' = every array in its
+    native VT with raw ``_oleobj_`` component pointers (the PROVEN contract),
+    'list' / 'variant' = the two known-broken encodings kept as regression
+    probes. Returns the post-call bushing count -- the caller judges success
+    from growth, never from CopyWithMates2's return value (it lies).
     """
     model = adapter.currentModel
     comp = model.GetComponentByName(comp_name)
     if comp is None:
         raise RuntimeError(f"seed component not found: {comp_name!r}")
     repeat = [True] * SEED_MATES
-    new_refs = [None] * SEED_MATES
     # Values carry the POSITIVE magnitude (the seat authored abs(z), the
     # production distance_driver idiom); the SIDE rides FlipDimension --
     # "true for a positive distance dimension, false for a negative"
     # (codex #219: signed negative metres here could fail the call or land
     # wrong-side and mislabel the API unusable).
-    values = [abs(new_z_mm) / 1000.0]  # metres; maps to the ONE distance mate
+    values = [abs(new_z_mm) / 1000.0] + [0.0] * (SEED_MATES - 1)
     flip_align = [False] * SEED_MATES
-    flip_dim = [new_z_mm >= 0.0]
+    flip_dim = [new_z_mm >= 0.0] + [False] * (SEED_MATES - 1)
     lock_rot = [False] * SEED_MATES
-    orient = [0]
+    orient = [0] * SEED_MATES
 
-    if variant == "list":
-        args = ([comp], repeat, new_refs, values, flip_align, flip_dim,
-                lock_rot, orient)
-    else:
+    if variant == "native":
+        # The PROVEN contract (session 8640c77b, phase W): EVERY array in its
+        # native VT with RAW `_oleobj_` component pointers -- VBA's exact wire
+        # shape. pywin32's plain lists marshal as VT_VARIANT arrays, which SW
+        # half-accepts: component copied, mates SILENTLY dropped.
         args = (
-            VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, [comp]),
+            VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH,
+                    [comp._oleobj_]),
             VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, repeat),
-            VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_VARIANT, new_refs),
+            VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH,
+                    [None] * SEED_MATES),
             VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, values),
             VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, flip_align),
             VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, flip_dim),
             VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, lock_rot),
             VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_I4, orient),
         )
-    ok = adapter._attempt(lambda: model.CopyWithMates2(*args), default=None)
-    return bool(ok)
+    elif variant == "list":
+        args = ([comp], repeat, [None] * SEED_MATES, values, flip_align,
+                flip_dim, lock_rot, orient)
+    else:
+        args = (
+            VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, [comp]),
+            VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, repeat),
+            VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_VARIANT,
+                    [None] * SEED_MATES),
+            VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, values),
+            VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, flip_align),
+            VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, flip_dim),
+            VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, lock_rot),
+            VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_I4, orient),
+        )
+    # The return value LIES (False even when the copy lands mated -- measured
+    # both ways on this seat), so success is judged by the caller from the
+    # component count/transforms, never from this bool.
+    adapter._attempt(lambda: model.CopyWithMates2(*args), default=None)
+    n_bushings = sum(
+        1 for n in component_names(adapter)
+        if n.rsplit("-", 1)[0] == "pivot-bushing"
+    )
+    return n_bushings
 
 
 def _bushing_zs(adapter) -> list[float]:
@@ -152,30 +179,41 @@ async def build(adapter) -> dict[str, str]:
     log(f"baseline production seat: {t_seed:.2f}s / {t_base2:.2f}s per bushing")
     mates_before = await _mate_count(adapter)
 
-    # Q1: marshaling. Try plain lists once; on failure retry VARIANT arrays.
-    variant = "list"
-    ok = False
-    try:
-        ok = _copy_with_mates(adapter, seed, GAP_Z[2], variant)
-    except Exception as exc:  # noqa: BLE001 -- probe reports, never hides
-        log(f"!! list marshaling raised: {exc}")
-    if not ok:
-        variant = "variant"
-        ok = _copy_with_mates(adapter, seed, GAP_Z[2], variant)
-    log(f"CopyWithMates2 first call: ok={ok} (marshaling={variant})")
-    if not ok:
-        log("Q1 verdict: CopyWithMates2 UNUSABLE under pywin32 -- both "
-            "marshaling variants failed; history's manual path stands")
-        return {"verdict": "unusable"}
+    # Q1: marshaling. The 'native' shape is the proven contract; 'list' and
+    # 'variant' stay as regression probes for the two known-broken encodings.
+    # Success = the bushing count GREW (the returned bool lies), and a failed
+    # shape only condemns THAT shape -- never the API (a working positive
+    # control exists: the UI command and the in-process VBA twin both copy;
+    # see memory/negative-result-positive-control.md).
+    n_before = len(_bushing_zs(adapter))
+    variant = None
+    for shape in ("native", "list", "variant"):
+        try:
+            n_now = _copy_with_mates(adapter, seed, GAP_Z[2], shape)
+        except Exception as exc:  # noqa: BLE001 -- probe reports, never hides
+            log(f"!! {shape} marshaling raised: {exc}")
+            continue
+        copied = n_now > n_before
+        log(f"CopyWithMates2 ({shape}): bushings {n_before} -> {n_now} "
+            f"({'copy created' if copied else 'no copy'})")
+        if copied:
+            variant = shape
+            break
+    if variant is None:
+        log("Q1 verdict: no copy under the shapes tried (native/list/"
+            "variant) -- a marshaling regression, NOT proof the API is "
+            "unusable; re-derive the wire shape against the VBA positive "
+            "control before concluding anything")
+        return {"verdict": "no-copy-under-tried-shapes"}
 
     # Q3: timed copies across gaps 3..N -- population grows each call.
     times = []
     for k in range(3, 3 + N_COPIES - 1):
         t0 = time.perf_counter()
-        okk = _copy_with_mates(adapter, seed, GAP_Z[k], variant)
+        n_now = _copy_with_mates(adapter, seed, GAP_Z[k], variant)
         dt = time.perf_counter() - t0
         times.append(dt)
-        log(f"copy -> gap {k}: ok={okk} {dt:.2f}s")
+        log(f"copy -> gap {k}: bushings={n_now} {dt:.2f}s")
 
     # Q2: real mates + correct stations, judged from the model.
     mates_after = await _mate_count(adapter)

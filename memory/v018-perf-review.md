@@ -86,36 +86,37 @@ Also corrected: drive-train's "export_image front 77.3s" log line is mislabeled 
   in place (pose lands pre-rebuild, so flip read-backs don't need the rebuild); batch-defer +
   ONE closing rebuild (0.52s) is pose-identical. ⇒ mate-COUNT elimination is the lever;
   rebuild-deferral is a minor (~100-200s) follow-up.
-- **CopyWithMates2 SOLVED (2026-07-09, 8 probe phases + web samples): it works from
-  pywin32 — the components array must carry RAW `_oleobj_` pointers.** The working call
-  (scratchpad `cwm_phase_h.py` H2, session 8640c77b):
-  `asm.CopyWithMates2(VARIANT(VT_ARRAY | VT_DISPATCH, [comp._oleobj_]), repeat_list,
-  refs_list, values_list, flipalign_list, flipdim_list, lockrot_list, orient_list)` —
-  every other array a plain Python list, `NewEntityToMateTo` entries
-  `VARIANT(VT_DISPATCH, None)` when Repeat=True. Passing the `CDispatch` wrapper (bare, in
-  a list, or inside `VT_ARRAY|VT_DISPATCH`) or `VT_VARIANT` arrays → instant False, NO
-  copy, no error — the method QIs the array elements and silently declines. Root cause
-  found by triangulating with in-process VBA via `RunMacro2` on a generated **.swb (text
-  VBA — compiles on the fly, no binary .swp needed; module name `""` works)**: VBA
-  `Dim comps(0) As Object` FAILED, `As SldWorks.Component2` WORKED — typed-pointer
-  SAFEARRAY is the contract. **The return value LIES: False even when the copy is created
-  and mated — judge by component count/transform, never the bool.** ~20 earlier variants
-  (official-example shape, per-mate arrays, comp-to-comp refs, selection-harvested handle,
-  obsolete v1, early-bound dispid `InvokeTypes(170)` typed wrapper, saved doc, live
-  selection, explicit entity refs) all False — none of that matters, only the raw-pointer
-  array does. Every published working sample is in-process VBA with typed arrays (The CAD
-  Coder has video proof); no out-of-process sample exists anywhere — this recipe is new
-  ground. Manual UI test (Pedro, `channel.SLDASM` rocker-arm-1: Repeat concentric +
-  re-valued axial distance) also works. ⇒ REOPENS the mate-count-elimination lever for the
-  moving channel parts (copy rocker/rod/bar/lever per station with re-valued distances);
-  prototype against the real channel before counting the win. COM traps confirmed en
-  route: bare `None` → VT_NULL 'Type mismatch' (`VARIANT(VT_DISPATCH, None)`); `OpenDoc6`
-  byref outs = `VT_BYREF|VT_I4` VARIANTs; a part must be OPEN before `AddComponent5`
-  inserts by path; `Extension.SaveAs3` Options: 1 = Silent, **2 = Copy** (doc stays
-  unsaved — silent no-op trap); gen_py wrapper loads via `GetModuleForTypelib` (fast, no
-  regen) — `sw_type_info.early_bound` is safe, in-process `EnsureModule` remains
-  forbidden; `RunMacro2(path.swb, "", "main", 0, byref_i4())` is a working in-process
-  escape hatch for any future API gated on typed pointers pywin32 can't build.
+- **CopyWithMates2 FULLY SOLVED from pywin32 (2026-07-09, 10 probe phases; Pedro pushed
+  back three times on premature "dead" verdicts — see [[negative-result-positive-control]]).
+  The contract: EVERY array must be its NATIVE-TYPED SAFEARRAY with raw pointers — VBA's
+  exact wire shape.** The working call (scratchpad `cwm_phase_w.py` W1, session 8640c77b):
+  `asm.CopyWithMates2(VARIANT(VT_ARRAY|VT_DISPATCH, [comp._oleobj_]),
+  VARIANT(VT_ARRAY|VT_BOOL, repeat), VARIANT(VT_ARRAY|VT_DISPATCH, [None]*n),
+  VARIANT(VT_ARRAY|VT_R8, values_m), VARIANT(VT_ARRAY|VT_BOOL, flip_align),
+  VARIANT(VT_ARRAY|VT_BOOL, flip_dim), VARIANT(VT_ARRAY|VT_BOOL, lock_rot),
+  VARIANT(VT_ARRAY|VT_I4, orient))` — full semantics: mates replicated as REAL features,
+  per-mate `Values` re-values applied, pose solved (verified vs an in-process VBA control,
+  byte-identical result). Failure ladder (all verified): `CDispatch` in the comps array →
+  instant False, nothing; raw `_oleobj_` comps + plain lists elsewhere (pywin32 marshals
+  lists as `VT_ARRAY|VT_VARIANT`) → component copied, mates SILENTLY DROPPED (multi-comp
+  copies kept internal mates only); all-native-typed → everything works. **The return
+  value LIES (False on success) — judge by mate dump + transforms.** Triangulation route:
+  in-process VBA via `RunMacro2` on generated text `.swb` (module name `""` works) —
+  `Dim x As Object` declarations fail EXACTLY like Python (so not a language/process gate);
+  VBA bisect (asm typed/Object × comps typed/Object) fingered the typed call; comtypes
+  (true `COMMETHOD` vtable call, gens sldworks TLB in ~4s) still failed with its default
+  list→`VT_VARIANT`-array conversion — which pinned the gate to the ARRAY VTs, closed by
+  Phase W. comtypes gotcha: cannot unpack `SAFEARRAY(VT_DISPATCH)` returns (GetComponents)
+  — fetch via `GetComponentByName`. ⇒ REOPENS mate-count elimination for the moving
+  channel parts AND drive-train's repeated stations (Pedro: consider both); next
+  validation = pair/slice copy + throughput ladder in the native-typed shape, concentric
+  mates, real channel parts. COM traps confirmed en route: bare `None` → VT_NULL 'Type
+  mismatch' (`VARIANT(VT_DISPATCH, None)`); `OpenDoc6` byref outs = `VT_BYREF|VT_I4`
+  VARIANTs; a part must be OPEN before `AddComponent5` inserts by path;
+  `Extension.SaveAs3` Options: 1 = Silent, **2 = Copy** (doc stays unsaved — silent no-op
+  trap); gen_py wrapper loads via `GetModuleForTypelib` (fast, no regen) —
+  `sw_type_info.early_bound` safe, in-process `EnsureModule` still forbidden;
+  `RunMacro2(path.swb, "", "main", 0, byref_i4())` = general in-process escape hatch.
 - Environment note: one SW crash during the first soundness attempt (wedged at
   `channel.SLDASM [Viewing]`, Responding=False); Pedro disabled ENHANCED GRAPHICS and the
   re-run passed — suspect that setting, not the model.
