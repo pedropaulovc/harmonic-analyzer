@@ -45,6 +45,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # cad/scripts
 import pythoncom  # noqa: E402
 from win32com.client import VARIANT  # noqa: E402
 
+import _telemetry  # noqa: E402
 from _common import check, log, run_build  # noqa: E402
 from _assembly import (  # noqa: E402
     component_names,
@@ -161,8 +162,11 @@ def _copy_with_mates(adapter, comp_name: str, new_z_mm: float,
         )
     # The return value LIES (False even when the copy lands mated -- measured
     # both ways on this seat), so success is judged by the caller from the
-    # component count/transforms, never from this bool.
-    adapter._attempt(lambda: model.CopyWithMates2(*args), default=None)
+    # component count/transforms, never from this bool. Span per the
+    # COM-operation invariant (AGENTS.md; codex #220).
+    with _telemetry.span("assembly.copy_with_mates", variant=variant,
+                         mates=SEED_MATES):
+        adapter._attempt(lambda: model.CopyWithMates2(*args), default=None)
     n_bushings = sum(
         1 for n in component_names(adapter)
         if n.rsplit("-", 1)[0] == "pivot-bushing"
@@ -211,11 +215,14 @@ async def build(adapter) -> dict[str, str]:
             variant = shape
             break
     if variant is None:
-        log("Q1 verdict: no copy under the shapes tried (native/list/"
-            "variant) -- a marshaling regression, NOT proof the API is "
-            "unusable; re-derive the wire shape against the VBA positive "
-            "control before concluding anything")
-        return {"verdict": "no-copy-under-tried-shapes"}
+        # Raise so automation cannot read a marshaling regression as a
+        # passing run (codex #220). It is NOT proof the API is unusable --
+        # re-derive the wire shape against the VBA positive control before
+        # concluding anything.
+        raise RuntimeError(
+            "no copy under the shapes tried (native/list/variant) -- a "
+            "marshaling regression; re-derive the wire shape against the "
+            "VBA positive control")
 
     # Q3: timed copies across gaps 3..N -- population grows each call.
     times = []
@@ -250,13 +257,16 @@ async def build(adapter) -> dict[str, str]:
         f"(first {times[0]:.2f}s, last {times[-1]:.2f}s -- growth says "
         f"whether the copy also pays the population tax)")
 
-    # Q5: FlipDimension semantics. The 2026-07-09 ladder landed 9/10 stations
-    # exactly; the one target CROSSING ZERO (+0.737) landed mirrored (-0.737)
-    # despite flip_dim=True -- so "true for a positive distance dimension"
-    # (the doc's wording) is NOT world-side-absolute. Pin it: copy the seed
-    # (at Z=-62.77) to an unambiguous +20 mm target under both flip bits and
-    # read where each lands. (Runs AFTER Q2 so the +/-20 landings don't
-    # pollute the station comparison.)
+    # Q5: FlipDimension semantics. Pinned 2026-07-09: on the Repeat path a
+    # re-valued dim's flip RESETS (the array is ignored -- both bits land a
+    # +20 target on the SEED's side, -20), and the copy inherits the seed's
+    # side of the anchor. Copy the seed (at Z=-62.77) to an unambiguous
+    # +20 mm target under both flip bits and ASSERT both land at -20 --
+    # a different landing means the CopyWithMates2 flip contract CHANGED
+    # (SW upgrade?) and everything built on the seed-side rule must be
+    # re-validated (codex #220: log-only here let a contract change exit
+    # 0). Runs AFTER Q2 so the +/-20 landings don't pollute the station
+    # comparison.
     for flip in (False, True):
         before = set(component_names(adapter))
         _copy_with_mates(adapter, seed, 20.0, variant, flip_override=flip)
@@ -264,7 +274,21 @@ async def build(adapter) -> dict[str, str]:
         landed = [round(component_transform(adapter, n)[11] * 1000.0, 3)
                   for n in new]
         log(f"Q5 flip={flip}: target +20.0 -> landed {landed}")
-    return {"verdict": "ran", "on_plane": str(on_plane)}
+        if len(landed) != 1 or abs(landed[0] - (-20.0)) > 0.05:
+            raise RuntimeError(
+                f"Q5 contract broke: flip={flip} target +20.0 landed "
+                f"{landed}, expected the seed side (-20.0) -- CopyWithMates2 "
+                f"flip semantics changed; re-validate the seed-side rule")
+
+    # Failures raise (not return) so automation can never read a failed
+    # ladder as passing (codex #220).
+    if mates_after - mates_before != SEED_MATES * N_COPIES:
+        raise RuntimeError(
+            f"ladder mates {mates_before} -> {mates_after}, expected "
+            f"+{SEED_MATES * N_COPIES} -- copies did not carry real mates")
+    if not on_plane:
+        raise RuntimeError(f"ladder stations off: {zs} != {expected}")
+    return {"verdict": "pass"}
 
 
 if __name__ == "__main__":
