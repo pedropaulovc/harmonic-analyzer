@@ -384,8 +384,18 @@ async def _pattern_bank(
     deterministic in at most two solves, never inference-trusting.
     """
     count = len(gap_planes)
-    for flip in (False, True):
-        tag = " (FlipDir1 retry)" if flip else ""
+    if count < 2:
+        # One gap (CHANNELS == 2): the seated seed IS the whole bank; a
+        # count=1 LocalLinearPattern is invalid/pointless (codex #219).
+        _verify_pattern_z(adapter, prefix, gap_planes, f"{prefix} bank (seed only)")
+        return
+    # Flip seed TRUE: diag_pattern_sense (2026-07-09, 5/5 reps) measured the
+    # Top∩Right axis pick resolving +Z deterministically, so FlipDir1=True
+    # lands the copies down-spine in ONE solve; the untried value stays as
+    # the verified retry (the same learn-the-seed philosophy as _FLIP_INVERT).
+    attempts = (True, False)
+    for attempt, flip in enumerate(attempts):
+        tag = " (flip retry)" if attempt else ""
         feature = check(
             f"linear-pattern {prefix} x{count}{tag}",
             await adapter.pattern_components_linear(
@@ -399,9 +409,9 @@ async def _pattern_bank(
             _verify_pattern_z(adapter, prefix, gap_planes, f"{prefix} pattern")
             return
         except RuntimeError as exc:
-            if flip:
+            if attempt == len(attempts) - 1:
                 raise
-            log(f"!! {prefix} pattern sense flipped -- deleting + FlipDir1 retry ({exc})")
+            log(f"!! {prefix} pattern sense flipped -- deleting + flip retry ({exc})")
             _delete_feature(adapter, feature.name)
 
 

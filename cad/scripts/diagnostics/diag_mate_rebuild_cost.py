@@ -63,20 +63,24 @@ Z_FAR = 400.0         # keep fillers clear of the probe stations
 
 
 def _probe_params(comp: str, z_mm: float) -> AddMateParameters:
-    """A coincident axial mate: probe component's Front Plane to a Z station.
+    """A distance axial mate: probe component's Front Plane at its Z station.
 
-    Distance mates carry flip/side semantics; a plain coincident keeps the
-    probe about SOLVE COST, not side selection. The bushing is already
-    concentric-free (grounded fillers never mate), so each probe bushing gets
-    ONE concentric first (un-instrumented) and then this instrumented mate.
+    A DISTANCE mate (abs value + sign-seeded flip, the production
+    distance_driver idiom) so each probe bushing solves to its OWN station --
+    a coincident to the assembly Front Plane pulled every probe to z=0 and
+    made the per-station/deferral checks vacuous (codex #219). The probe
+    bushing stays otherwise unmated (never saved); one plane mate is enough
+    to time the solve.
     """
     return AddMateParameters(
-        mate_type="coincident",
+        mate_type="distance",
         entities=[
             MateEntityRef(entity_type="PLANE", name=f"Front Plane@{comp}"),
             MateEntityRef(entity_type="PLANE", name="Front Plane"),
         ],
         alignment="closest",
+        distance=abs(z_mm),
+        flip=z_mm < 0.0,
     )
 
 
@@ -132,10 +136,12 @@ async def _probe_batch(adapter, tag: str, rebuild_each: bool) -> list[dict[str, 
         )
         t = _timed_mate(adapter, _probe_params(comp, z), comp, rebuild=rebuild_each)
         t["comp"] = comp
+        t["z_target"] = z
         rows.append(t)
         log(f"  {tag}[{i}] select={t['select']:.2f}s create={t['create']:.2f}s "
             f"name={t['name']:.2f}s rebuild={t.get('rebuild', 0.0):.2f}s "
-            f"z_after_create={t['z_after_create']:.2f}")
+            f"z_after_create={t['z_after_create']:.2f} (target {z:.2f}, "
+            f"delta {t['z_after_create'] - z:+.3f})")
     if not rebuild_each:
         t0 = time.perf_counter()
         adapter._attempt(lambda: adapter.currentModel.EditRebuild3())
@@ -195,8 +201,9 @@ async def build(adapter) -> dict[str, str]:
     r4 = await _probe_batch(adapter, "defer", rebuild_each=False)
     for row in r4:
         z_final = component_transform(adapter, row["comp"])[11] * 1000.0
-        log(f"  defer {row['comp']}: z_after_create={row['z_after_create']:.3f} "
-            f"z_final={z_final:.3f}")
+        log(f"  defer {row['comp']}: target={row['z_target']:.3f} "
+            f"z_after_create={row['z_after_create']:.3f} z_final={z_final:.3f} "
+            f"(final delta {z_final - row['z_target']:+.3f})")
 
     log("=" * 70)
     for tag, rows in (("base", r1), ("grounded", r2), ("seated", r3), ("defer", r4)):
