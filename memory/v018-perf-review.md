@@ -153,9 +153,17 @@ mates, one call per station) both PASS. The full multi-component contract, all m
    slice has NO spin dims at all — they are deferred park drivers — and its only external
    dim (rocker axial, flip=False, always-positive ladder) copies right natively, so the
    flip problem evaporates there; (b) where a pinned dim must be copied (`locked`),
-   formulate the seed dim so the WANTED side is the False side (pick reference/entity
-   order accordingly in distance_driver) — copies reset to False and land right by
-   construction; (c) ModifyDefinition-set-after-copy stays as the ~1s/copy fallback.
+   formulate the seed dim so the WANTED side is the False side — **VALIDATED: the
+   authored flip state follows the REFERENCE-PLANE choice, not entity order** (rod
+   spin: axis↔Right and Right↔axis both author upright as flip=True; axis↔Top authors
+   upright as flip=False → copies land upright natively, rod rot 2e-16, repair pass
+   0.0s). The probe's formulation search (author → read FlipDimension → delete + try
+   next candidate) finds the False-side form in one seed pass; (c)
+   ModifyDefinition-set-after-copy stays as the ~1s/copy fallback. Also: the slot
+   mapping needs NO calibration copy — it is computed rule-based from the seed's own
+   mate list (external mates in tree order); the sentinel calibration (which flashes
+   No-Solution states at 1000+mm dims — Pedro flagged the UI drama) is now the opt-in
+   `--calibrate` cross-check only.
 5. **Anchor one-sided** — a copy lands on the SEED's side of a re-valued distance, so
    stations must not cross the anchor (channel: anchor the rocker axial to the
    gap-1 bushing at PITCH/2 + k·PITCH, not the Front datum whose stations cross zero).
