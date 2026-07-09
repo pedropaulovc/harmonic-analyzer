@@ -1,0 +1,17 @@
+
+operation:                         # the saved Basic Motion operation studies (baked into the top .SLDASM)
+  crank_rpm: 20.0                  # rotary crank motor speed — 1 rev / 3 s
+  duration_s: 6.0                  # study duration — two crank revolutions
+  spring_k_channel: 5.0            # N/m per channel spring; solver-safe band (geometric helical ~2.1 kN/m ABORTS Basic Motion)
+  spring_k_counter: 2.5            # N/m counter spring; geometric ~0.5 kN/m
+  source: "poc_spring_adder / poc_damper_check solver-margin sweeps (2026-07)"
+  confidence: high
+  notes: >-
+    These values are BAKED into harmonic-analyzer.SLDASM at build time — the
+    crank motor and the 21 spring force elements of the two saved operation
+    studies. They are config (not env) so they ride the top assembly's doit
+    recipe + remote-cache key (the build_lock.yaml precedent): sweeping a
+    stiffness or the motor speed rebuilds ONLY the top and keys the cache to a
+    distinct artifact, and a stale-parameter artifact can never be reported
+    up-to-date. A zero/negative spring rate selects the geometric helical rate
+    (k = G·d⁴ / (8·D³·n) of the drawn spring geometry).

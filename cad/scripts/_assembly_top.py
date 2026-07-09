@@ -53,7 +53,6 @@ from __future__ import annotations
 
 import json
 import math
-import os
 from typing import Any
 
 import _config
@@ -89,22 +88,26 @@ _SETUP_PARKS = {
 }
 SETUP_PREFIX = "SETUP_"
 
-# Saved-study parameters (build-time; the study script can override duration on
-# the resolved study, but the motor speed is baked into the saved element).
-CRANK_RPM = float(os.environ.get("MOTION_CRANK_RPM", "20.0"))   # 1 rev / 3 s
-DURATION_S = float(os.environ.get("MOTION_DURATION_S", "6.0"))  # two crank revs
+# Saved-study parameters. CONFIG, not env (codex #217): they bake into the
+# saved artifact (motor speed + spring rates of the saved studies), so they
+# must ride the top's recipe/cache key -- the literal machine("operation", ...)
+# reads tokenise machine/operation.yaml into the top's file_dep, and a sweep
+# rebuilds only the top. (The runner may still override the DURATION of the
+# resolved study at solve time -- that never re-saves the artifact.)
+CRANK_RPM = float(_config.machine("operation", "crank_rpm"))
+DURATION_S = float(_config.machine("operation", "duration_s"))
 
 # Spring stiffness k = G*d^4 / (8*D^3*n); steel shear modulus. The GEOMETRIC
 # steel rates (~2.1 kN/m channel, ~0.5 kN/m counter) are far too stiff for the
 # fixed-step Basic Motion integrator (poc_spring_adder: k~2000 N/m ABORTS the
 # solve; low-N/m..tens tracks the moving-anchor sum cleanly), so the saved
-# study uses a solver-safe band, env-sweepable at BUILD time. 0/negative =>
-# the geometric helical rate.
+# study uses a solver-safe band from config. 0/negative => the geometric
+# helical rate.
 G_STEEL = 79.3e9  # Pa
 CH_SPRING = dict(d=1.0, D=5.5, n=28.0, free_mm=32.0)
 CT_SPRING = dict(d=1.8, D=10.7, n=165.0, free_mm=315.0)
-SPRING_KCH = float(os.environ.get("SPRING_KCH", "5.0"))    # N/m, channel
-SPRING_KCT = float(os.environ.get("SPRING_KCT", "2.5"))    # N/m, counter
+SPRING_KCH = float(_config.machine("operation", "spring_k_channel"))
+SPRING_KCT = float(_config.machine("operation", "spring_k_counter"))
 
 # swMateType_e values the walk helpers classify by.
 COINCIDENT, CONCENTRIC, DISTANCE, ANGLE = 0, 1, 5, 6
@@ -290,8 +293,21 @@ def _comp_xform(adapter, comp):
 
 
 def _comp_z_mm(adapter, comp):
+    """World Z (mm) of a component -- STRICT: raises on an unreadable transform.
+
+    This feeds :func:`_by_z_rank`, which pairs the 20 cam couplings and the 20
+    springs by Z station order at BUILD time -- one silently-zeroed transform
+    would mate a rod to the wrong gear while every count check still passes
+    (codex #217). A transient None here means the model needs a re-solve, not
+    a default."""
     a = _comp_xform(adapter, comp)
-    return a[11] * 1000.0 if a else 0.0
+    if a is None:
+        name = str(_read_member(comp, "Name2"))
+        raise RuntimeError(
+            f"unreadable Transform2 for {name!r} -- refusing to Z-rank with a "
+            "placeholder (would silently mis-pair cam/spring stations); "
+            "re-solve and retry")
+    return a[11] * 1000.0
 
 
 def _by_z_rank(adapter, family, comps=None):
