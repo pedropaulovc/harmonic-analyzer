@@ -520,6 +520,41 @@ async def _replay_setup_parks(adapter, preset="config"):
         log(f"{stem}: replaying {len(specs)} deferred setup park driver(s) "
             f"(engaged): {[s['key'] for s in specs]}")
         await replay_park_specs(adapter, specs)
+        if stem == "channel":
+            await _free_rod_axial(adapter)
+
+
+async def _free_rod_axial(adapter):
+    """Suppress each channel's J2 rod-axial mate (Front@rod <-> Front@rocker)
+    on the STANDALONE channel doc, so the cam loops are exactly constrained.
+
+    Per rod, artifact A authors J2 as coincident-axes (4 constraints) + this
+    axial distance (1), leaving 1 DOF (swing about the pin). The study's cam
+    point-on-axis adds 2 more -> 7 on 6 DOF = each of the 20 loops redundant
+    by exactly 1, and Basic Motion is redundancy-intolerant (the June lesson:
+    redundant parallel loops froze the solve; the exactly-constrained
+    point-on-axis recipe had NO rod axial mate -- the rod's Z-float is benign,
+    the loop forces are planar). Suppressed in-memory only, never saved.
+    """
+    from solidworks_mcp.adapters.base import SuppressMateParameters
+    model = adapter.currentModel
+    targets = []
+    for _f, _m, name, mtype, parts, _v in _iter_mates(
+            adapter, model, read_values=False, progress_every=40):
+        if mtype != DISTANCE:
+            continue
+        fams = {_family(p) for p in _real_parts(parts, "channel")}
+        if fams == {"connecting-rod", "rocker-arm"}:
+            targets.append(name)
+    log(f"  rod-axial de-redundancy: suppressing {len(targets)} J2 axial mates")
+    for name in targets:
+        check(f"suppress {name} (rod axial)", await adapter.suppress_mate(
+            SuppressMateParameters(name=name, suppress=True)))
+    adapter._attempt(lambda: model.ForceRebuild3(False), default=None)
+    if len(targets) < N_CHANNELS:
+        raise RuntimeError(
+            f"rod-axial de-redundancy found only {len(targets)} J2 axial "
+            f"mates (expected {N_CHANNELS}) -- channel mate shape drifted")
 
 
 # ---- stage: cam couplings (channel <-> drive-train, cross-sub) ---------------
@@ -626,24 +661,20 @@ async def _tie_paper_chain(adapter, comps=None):
     # The crank-end T12 = the transgear-removable instance in PAPER-DRIVE whose
     # world XY sits on the crankshaft axis (the knob T24 + spare T18 are the
     # other instances; XY separates them decisively).
-    cs_comp, _ = _find_one(adapter, "crankshaft-1", comps=comps)
-    cs_a = _comp_xform(adapter, cs_comp)
     t12_n = None
     cands = []
     for comp, nm in _find_family(adapter, "transgear-removable", comps=comps):
         if not nm.startswith("paper-drive"):
             continue
-        a = _comp_xform(adapter, comp)
-        d = (math.hypot((a[9] - cs_a[9]) * 1000.0, (a[10] - cs_a[10]) * 1000.0)
-             if a and cs_a else None)
-        cands.append((nm, None if d is None else round(d, 2)))
-        if d is not None and d < 5.0:
+        cfg = str(_read_member(comp, "ReferencedConfiguration"))
+        cands.append((nm, cfg))
+        if cfg == "T12":
             t12_n = nm
             break
     if not crank_n or not t12_n:
         _telemetry.warn(f"chain tie: components unresolved "
                         f"(crank={crank_n!r}, t12={t12_n!r}; candidates "
-                        f"xy-dist-mm={cands}) -- skipping")
+                        f"{cands}) -- skipping")
         return None
     for alignment in ("aligned", "anti_aligned"):
         try:
@@ -918,12 +949,23 @@ async def build(adapter):
     log("  enumerating components (single full-tree walk, reused everywhere) ...")
     comps = _components(adapter)
 
+    # EVERY real mate is authored BEFORE the motion study exists -- adding a
+    # mate to a doc that carries a study corrupts the study's initial
+    # animation state (the June modal lesson; attempt 6's post-study gear +
+    # yoke mates preceded a dead zero-motion solve). Motion ELEMENTS (motor,
+    # springs, gravity) belong to the study and come after.
     with _telemetry.span("motion.couplings"):
         await _add_cam_couplings(adapter, comps=comps)
         await _tie_paper_chain(adapter, comps=comps)
+    if level >= 3:
+        from build_motion_study_springs import add_output_mates
+        with _telemetry.span("motion.output"):
+            await add_output_mates(adapter, comps=comps)
 
     check("ensure_motion_addin", await adapter.ensure_motion_addin())
-    from solidworks_mcp.adapters.base import MotionStudyParameters, MotionStudyRefParameters
+    from solidworks_mcp.adapters.base import (
+        MotionGravityParameters, MotionStudyParameters, MotionStudyRefParameters,
+    )
     made = check("create_motion_study", await adapter.create_motion_study(
         MotionStudyParameters(name="", study_type="physical_simulation",
                               duration=DURATION_S, activate=True)))
@@ -934,11 +976,10 @@ async def build(adapter):
         from build_motion_study_springs import add_springs
         with _telemetry.span("motion.springs"):
             await add_springs(adapter, comps=comps)
-    if level >= 3:
-        from build_motion_study_springs import add_output_couplings
-        with _telemetry.span("motion.output"):
-            await add_output_couplings(adapter, comps=comps,
-                                       with_gravity="grav" in opts)
+    if level >= 3 and "grav" in opts:
+        g = await adapter.add_gravity(MotionGravityParameters(
+            axis="y", reverse=True, study_name=""))
+        log(f"  gravity -Y: {'OK' if g.is_success else 'FAIL ' + str(g.error)}")
 
     await _reset_to_assembled(adapter)
     log("  Calculate() -- blocking solve of the whole device ...")

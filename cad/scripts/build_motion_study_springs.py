@@ -308,15 +308,15 @@ async def _rim_point(adapter, comps=None):
     return name
 
 
-async def add_output_couplings(adapter, comps=None, with_gravity=False):
-    """Stage `full`: the summing->magnifier hand-off + WIRE 2 + opt-in gravity.
+async def add_output_mates(adapter, comps=None):
+    """Stage `full`: the summing->magnifier hand-off + the WIRE 2 yoke.
 
-    Everything cross-sub, authored at the top level; artifact A's live WIRE-1
-    chain inside magnifier already turns the wheel with the lever, so only the
-    hand-off INTO magnifier and the yoke OUT of it are added here.
+    Everything cross-sub, authored at the top level, and BEFORE the motion
+    study is created (a mate added under an existing study corrupts its
+    initial animation state). Artifact A's live WIRE-1 chain inside magnifier
+    already turns the wheel with the lever, so only the hand-off INTO
+    magnifier and the yoke OUT of it are added here.
     """
-    from solidworks_mcp.adapters.base import MotionGravityParameters
-
     if comps is None:
         comps = _components(adapter)
 
@@ -332,13 +332,4 @@ async def add_output_couplings(adapter, comps=None, with_gravity=False):
         _entity_ref(rod_n, "Top Plane", "PLANE"),
         label="WIRE2 yoke rim->pen")
     log(f"  WIRE2 yoke: {w2.get('name')}")
-
-    grav_ok = None
-    if with_gravity:
-        g = await adapter.add_gravity(MotionGravityParameters(
-            axis="y", reverse=True, study_name=""))
-        grav_ok = g.is_success
-        log(f"  gravity -Y: {'OK' if g.is_success else 'FAIL ' + str(g.error)}")
-    else:
-        log("  gravity: SKIPPED (pass `grav` to enable)")
-    return {"wire2": w2.get("name"), "gravity": grav_ok}
+    return {"wire2": w2.get("name")}
