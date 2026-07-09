@@ -320,7 +320,7 @@ async def add_output_mates(adapter, comps=None):
     if comps is None:
         comps = _components(adapter)
 
-    await _couple_levers(adapter, comps)
+    handoff = await _couple_levers(adapter, comps)
 
     rim_pt = await _rim_point(adapter, comps=comps)
     wheel_n = _find_one(adapter, "magnifying-wheel-1", comps=comps)[1]
@@ -332,4 +332,4 @@ async def add_output_mates(adapter, comps=None):
         _entity_ref(rod_n, "Top Plane", "PLANE"),
         label="WIRE2 yoke rim->pen")
     log(f"  WIRE2 yoke: {w2.get('name')}")
-    return {"wire2": w2.get("name")}
+    return {"handoff": handoff.get("name"), "wire2": w2.get("name")}
