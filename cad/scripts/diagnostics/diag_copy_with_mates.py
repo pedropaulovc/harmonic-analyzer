@@ -257,6 +257,33 @@ async def build(adapter) -> dict[str, str]:
         f"(first {times[0]:.2f}s, last {times[-1]:.2f}s -- growth says "
         f"whether the copy also pays the population tax)")
 
+    # Failures raise (not return) so automation can never read a failed
+    # ladder as passing (codex #220).
+    if mates_after - mates_before != SEED_MATES * N_COPIES:
+        raise RuntimeError(
+            f"ladder mates {mates_before} -> {mates_after}, expected "
+            f"+{SEED_MATES * N_COPIES} -- copies did not carry real mates")
+    if not on_plane:
+        raise RuntimeError(f"ladder stations off: {zs} != {expected}")
+
+    # Rebuild-stability: the pre-rebuild readings can hold while a later
+    # solve flips or dangles a copied mate (codex #220 round 3 -- the
+    # slice probe already guards this). One closing rebuild (asserted),
+    # then the mate count and stations must re-read unchanged.
+    model = adapter.currentModel
+    if not bool(adapter._attempt(lambda: model.EditRebuild3(), default=False)):
+        raise RuntimeError(
+            "closing EditRebuild3 failed -- ladder stability unproven")
+    mates_post = await _mate_count(adapter)
+    zs_post = _bushing_zs(adapter)
+    if mates_post != mates_after or any(
+            abs(a - b) > 0.05 for a, b in zip(zs_post, zs)) or (
+            len(zs_post) != len(zs)):
+        raise RuntimeError(
+            f"ladder unstable across rebuild: mates {mates_after} -> "
+            f"{mates_post}, stations {zs} -> {zs_post}")
+    log("ladder stable across closing rebuild")
+
     # Q5: FlipDimension semantics. Pinned 2026-07-09: on the Repeat path a
     # re-valued dim's flip RESETS (the array is ignored -- both bits land a
     # +20 target on the SEED's side, -20), and the copy inherits the seed's
@@ -279,15 +306,6 @@ async def build(adapter) -> dict[str, str]:
                 f"Q5 contract broke: flip={flip} target +20.0 landed "
                 f"{landed}, expected the seed side (-20.0) -- CopyWithMates2 "
                 f"flip semantics changed; re-validate the seed-side rule")
-
-    # Failures raise (not return) so automation can never read a failed
-    # ladder as passing (codex #220).
-    if mates_after - mates_before != SEED_MATES * N_COPIES:
-        raise RuntimeError(
-            f"ladder mates {mates_before} -> {mates_after}, expected "
-            f"+{SEED_MATES * N_COPIES} -- copies did not carry real mates")
-    if not on_plane:
-        raise RuntimeError(f"ladder stations off: {zs} != {expected}")
     return {"verdict": "pass"}
 
 
