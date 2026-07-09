@@ -22,7 +22,13 @@ REPO = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO / "cad" / "scripts"))
 GOLD = REPO / "cad" / "out" / "reports" / "pose-golden"
 
+import _telemetry  # status goes through telemetry, not bare print (AGENTS.md)
+
 fails = []
+
+
+def _status(ok: bool, line: str) -> None:
+    (_telemetry.debug if ok else _telemetry.error)(line)
 
 
 def expect(asm, comp, pos, rows, label, pos_tol=1e-3, row_tol=1e-6):
@@ -33,7 +39,7 @@ def expect(asm, comp, pos, rows, label, pos_tol=1e-3, row_tol=1e-6):
     dp = max(abs(a - b) for a, b in zip(gp, pos))
     dr = max(abs(a - b) for a, b in zip(gr, fr))
     ok = dp < pos_tol and dr < row_tol
-    print(f"{'OK ' if ok else 'FAIL'} {label:45s} dpos={dp:.6f} drow={dr:.2e}")
+    _status(ok, f"{'OK ' if ok else 'FAIL'} {label:45s} dpos={dp:.6f} drow={dr:.2e}")
     if not ok:
         fails.append((label, gp, pos, gr, fr))
 
@@ -68,7 +74,7 @@ expect("pen", "hanger-screw-1", list(p.HANGER_SCREW_POS), IDENTITY, "hanger-scre
 from _transforms import rows_from_euler
 fr = rows_from_euler([-90.0, 90.0, 0.0])
 d = max(abs(a - b) for ra, rb in zip(fr, p.FRAME_ROWS) for a, b in zip(ra, rb))
-print(f"{'OK ' if d < 1e-9 else 'FAIL'} pen-frame euler [-90,90,0] vs FRAME_ROWS      drow={d:.2e}")
+_status(d < 1e-9, f"{'OK ' if d < 1e-9 else 'FAIL'} pen-frame euler [-90,90,0] vs FRAME_ROWS      drow={d:.2e}")
 if d >= 1e-9:
     fails.append(("pen-frame euler", fr, p.FRAME_ROWS))
 
@@ -98,11 +104,13 @@ expect("magnifier", "lever-wire-1", list(m.HUB_WIRE_END), m._HW_ROWS, "lever-wir
 
 # euler/rows agreement for the composed placements
 d = max(abs(a - b) for ra, rb in zip(rows_from_euler([180.0, 0.0, -90.0]), _rz) for a, b in zip(ra, rb))
-print(f"{'OK ' if d < 1e-9 else 'FAIL'} thumb/vrod euler [180,0,-90] vs composed      drow={d:.2e}")
+_status(d < 1e-9, f"{'OK ' if d < 1e-9 else 'FAIL'} thumb/vrod euler [180,0,-90] vs composed      drow={d:.2e}")
 if d >= 1e-9:
     fails.append(("thumb euler", None, None))
 d = max(abs(a - b) for ra, rb in zip(rows_from_euler([0.0, 180.0, 0.0]), ROT_Y_180) for a, b in zip(ra, rb))
-print(f"{'OK ' if d < 1e-9 else 'FAIL'} ROT_Y_180 euler [0,180,0]                     drow={d:.2e}")
+_status(d < 1e-9, f"{'OK ' if d < 1e-9 else 'FAIL'} ROT_Y_180 euler [0,180,0]                     drow={d:.2e}")
+if d >= 1e-9:
+    fails.append(("ROT_Y_180 euler", None, None))
 
 # ---- drive-train ------------------------------------------------------------
 import build_drive_train_assembly as d
@@ -110,7 +118,7 @@ import build_drive_train_assembly as d
 def eul(euler, rows, label):
     fr = rows_from_euler(euler)
     dd = max(abs(a - b) for ra, rb in zip(fr, rows) for a, b in zip(ra, rb))
-    print(f"{'OK ' if dd < 1e-9 else 'FAIL'} euler {label:40s} drow={dd:.2e}")
+    _status(dd < 1e-9, f"{'OK ' if dd < 1e-9 else 'FAIL'} euler {label:40s} drow={dd:.2e}")
     if dd >= 1e-9:
         fails.append((f"euler {label}", euler, rows))
 
@@ -263,7 +271,7 @@ p._assert_rack_mesh()
 p._assert_gear_mesh()
 p._assert_knob_shaft_clearance()
 p._assert_chain_layout()
-print("OK  paper-drive module layout asserts")
+_telemetry.debug("OK  paper-drive module layout asserts")
 
 PD = "paper-drive"
 expect(PD, "support-bar-1", [0.0, p.BAR_CY, p.BAR_Z], IDENTITY, "support-bar")
@@ -347,16 +355,16 @@ try:
     _link_expect("chain-inner-link-1", 0, "chain seed inner @0")
     _link_expect("chain-outer-link-1", 1, "chain seed outer @1")
 except Exception as e:
-    print("chain seed check errored:", e)
+    _telemetry.error(f"chain seed check errored: {e}")
+    fails.append(("chain seed lookup", repr(e)))
     _link_ok = False
 if _link_ok and not fails:
     for k in range(1, 34):
         _link_expect(f"chain-inner-link-{k + 1}", 2 * k, f"chain inner @{2 * k}")
         _link_expect(f"chain-outer-link-{k + 1}", 2 * k + 1, f"chain outer @{2 * k + 1}")
 
-print()
 if fails:
     for f in fails:
-        print("FAIL DETAIL:", f)
+        _telemetry.error(f"FAIL DETAIL: {f}")
     sys.exit(1)
-print(f"ALL CHECKS PASSED")
+_telemetry.success("ALL CHECKS PASSED")

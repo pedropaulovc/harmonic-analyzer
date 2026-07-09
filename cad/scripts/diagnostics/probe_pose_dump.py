@@ -24,12 +24,12 @@ from __future__ import annotations
 
 import asyncio
 import json
-import math
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import _telemetry  # noqa: E402
 from _common import OUT_SLDASM, _flag, _read_member, log  # noqa: E402
 
 ASSEMBLIES = (
@@ -50,36 +50,41 @@ ROT_TOL = 1e-6
 async def dump(out_dir: Path) -> None:
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
-    adapter = PyWin32Adapter({})
-    await adapter.connect()
-    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True))
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    for stem in ASSEMBLIES:
-        path = (OUT_SLDASM / f"{stem}.SLDASM").resolve()
-        if not path.exists():
-            raise RuntimeError(f"{stem}: {path} missing -- build the fleet first")
-        await adapter.open_model(str(path))
-        doc = adapter.currentModel
-        _flag(doc, "IModelDoc2")
-        # NO ForceRebuild3: the as-SAVED pose is the invariant being pinned.
-        poses: dict[str, list[float]] = {}
-        comps = adapter._attempt(lambda: doc.GetComponents(False), default=None) or []
-        for c in comps:
-            _flag(c, "IComponent2")
-            name = str(_read_member(c, "Name2"))
-            xf = adapter._attempt(lambda cc=c: cc.Transform2, default=None)
-            if xf is None:  # a suppressed/lightweight component has no transform
-                poses[name] = []
-                continue
-            poses[name] = [float(v) for v in _read_member(xf, "ArrayData")][:12]
-        (out_dir / f"{stem}.json").write_text(
-            json.dumps(poses, indent=1, sort_keys=True), encoding="utf-8"
-        )
-        log(f"{stem}: dumped {len(poses)} top-level component poses")
+    # COM-touching entry point: one span per assembly (open + component walk),
+    # NOT per component -- the per-item floods drown the trace (AGENTS.md).
+    with _telemetry.span("pose.dump", out_dir=str(out_dir), fleet=len(ASSEMBLIES)):
+        adapter = PyWin32Adapter({})
+        await adapter.connect()
         adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True))
+        out_dir.mkdir(parents=True, exist_ok=True)
 
-    await adapter.disconnect()
+        for stem in ASSEMBLIES:
+            path = (OUT_SLDASM / f"{stem}.SLDASM").resolve()
+            if not path.exists():
+                raise RuntimeError(f"{stem}: {path} missing -- build the fleet first")
+            with _telemetry.span("pose.dump.assembly", assembly=stem) as span:
+                await adapter.open_model(str(path))
+                doc = adapter.currentModel
+                _flag(doc, "IModelDoc2")
+                # NO ForceRebuild3: the as-SAVED pose is the invariant being pinned.
+                poses: dict[str, list[float]] = {}
+                comps = adapter._attempt(lambda: doc.GetComponents(False), default=None) or []
+                for c in comps:
+                    _flag(c, "IComponent2")
+                    name = str(_read_member(c, "Name2"))
+                    xf = adapter._attempt(lambda cc=c: cc.Transform2, default=None)
+                    if xf is None:  # a suppressed/lightweight component has no transform
+                        poses[name] = []
+                        continue
+                    poses[name] = [float(v) for v in _read_member(xf, "ArrayData")][:12]
+                (out_dir / f"{stem}.json").write_text(
+                    json.dumps(poses, indent=1, sort_keys=True), encoding="utf-8"
+                )
+                span.set_attribute("components", len(poses))
+                log(f"{stem}: dumped {len(poses)} top-level component poses")
+                adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True))
+
+        await adapter.disconnect()
 
 
 def diff(golden_dir: Path, other_dir: Path) -> int:
