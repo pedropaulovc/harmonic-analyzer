@@ -132,6 +132,10 @@ from _assembly import (
     write_park_specs,
 )
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows, rows_from_euler
+from solidworks_mcp.adapters.base import (
+    ComponentLinearPatternParameters,
+    CreateAxisParameters,
+)
 from build_cylinder_gear import ECCENTRICITY as CAM_ECC  # cam lobe throw (mm):
 # imported, NOT copied, so the rod ring stays concentric with the cam when the
 # throw is rescaled. A stale 5.08 hardcode (the pre-re-anchor throw) survived the
@@ -336,6 +340,81 @@ def _verify_pattern_z(
     log(f"{label}: {len(got)} instances on-plane (z {got[0]:.1f}..{got[-1]:.1f})")
 
 
+def _delete_feature(adapter, name: str) -> None:
+    """Delete an assembly feature by name (Select2 + DeleteSelection2).
+
+    Used by the bank-pattern sense retry: a flipped pattern is removed whole
+    (instances go with the feature; the seed survives) before re-creating it
+    with ``FlipDir1``. Fails loud when the feature is still present after."""
+    model = adapter.currentModel
+    feat = adapter._attempt(lambda: model.FeatureByName(name), default=None)
+    if feat is None:
+        raise RuntimeError(f"feature to delete not found: {name!r}")
+    adapter._attempt(lambda: model.ClearSelection2(True), default=None)
+    if not adapter._attempt(lambda: feat.Select2(False, 0), default=False):
+        raise RuntimeError(f"failed to select feature for delete: {name!r}")
+    if not adapter._attempt(lambda: model.Extension.DeleteSelection2(0), default=False):
+        adapter._attempt(lambda: model.EditDelete(), default=None)
+    if adapter._attempt(lambda: model.FeatureByName(name), default=None) is not None:
+        raise RuntimeError(f"feature {name!r} still present after delete")
+
+
+def _instance_at_z(adapter, prefix: str, z_mm: float) -> str:
+    """Name of the ``prefix`` instance whose origin sits on the ``z_mm`` plane."""
+    for n in component_names(adapter):
+        if n.rsplit("-", 1)[0] != prefix:
+            continue
+        if abs(component_transform(adapter, n)[11] * 1000.0 - z_mm) < 0.05:
+            return n
+    raise RuntimeError(f"no {prefix} instance at z={z_mm:.2f}")
+
+
+async def _pattern_bank(
+    adapter, seed: str, prefix: str, axis_name: str, gap_planes: list[float],
+) -> None:
+    """Replicate a seated bank seed down the spine by a LocalLinearPattern.
+
+    The direction reference is EXPLICIT reference geometry (the BankZ datum
+    axis), not the shaft's cylindrical face -- the retired face pick left the
+    direction SENSE to SolidWorks' inference, which flipped the bank to +Z at
+    20 channels while resolving -Z at 3 (#8 era). An axis still fixes only
+    the LINE, so the sense is verified against the gap planes
+    (:func:`_verify_pattern_z`, fail loud) and, when flipped, the pattern is
+    deleted and re-created with ``FlipDir1`` (``flip_direction``) --
+    deterministic in at most two solves, never inference-trusting.
+    """
+    count = len(gap_planes)
+    if count < 2:
+        # One gap (CHANNELS == 2): the seated seed IS the whole bank; a
+        # count=1 LocalLinearPattern is invalid/pointless (codex #219).
+        _verify_pattern_z(adapter, prefix, gap_planes, f"{prefix} bank (seed only)")
+        return
+    # Flip seed TRUE: diag_pattern_sense (2026-07-09, 5/5 reps) measured the
+    # Top∩Right axis pick resolving +Z deterministically, so FlipDir1=True
+    # lands the copies down-spine in ONE solve; the untried value stays as
+    # the verified retry (the same learn-the-seed philosophy as _FLIP_INVERT).
+    attempts = (True, False)
+    for attempt, flip in enumerate(attempts):
+        tag = " (flip retry)" if attempt else ""
+        feature = check(
+            f"linear-pattern {prefix} x{count}{tag}",
+            await adapter.pattern_components_linear(
+                ComponentLinearPatternParameters(
+                    components=[seed], count=count, spacing=PITCH,
+                    direction_name=axis_name, flip_direction=flip,
+                )
+            ),
+        )
+        try:
+            _verify_pattern_z(adapter, prefix, gap_planes, f"{prefix} pattern")
+            return
+        except RuntimeError as exc:
+            if attempt == len(attempts) - 1:
+                raise
+            log(f"!! {prefix} pattern sense flipped -- deleting + flip retry ({exc})")
+            _delete_feature(adapter, feature.name)
+
+
 # --- mate scheme (validated single-channel probe) ---------------------------
 # Both rocker-pivot and lever-fulcrum shafts ride O6.35 bores.
 SHAFT_R = 6.35 / 2.0
@@ -361,13 +440,13 @@ async def _locate_to_datum(adapter, name: str) -> None:
     idiom). Three orthogonal plane pairs fully define the body: each pins one
     translation and, by forcing the planes parallel, the rotations.
 
-    The part is inserted axis-aligned (IDENTITY parts -- shafts, ball mounts,
-    spring-hooks, bushings), so its principal planes map same-name to the
-    assembly planes (Right->X, Top->Y, Front->Z). The live origin (read
-    post-mirror) gives the three distances, so it is mirror-agnostic; coord 0
-    degenerates to a coincident. (Tilted parts -- the amplitude springs -- can't
-    use plane-parallel locates, which force an axis-aligned pose; see
-    `_locate_spring`.)
+    The part is inserted axis-aligned (IDENTITY parts -- shafts, ball mounts),
+    so its principal planes map same-name to the assembly planes (Right->X,
+    Top->Y, Front->Z). The live origin (read post-mirror) gives the three
+    distances, so it is mirror-agnostic; coord 0 degenerates to a coincident.
+    (The cosmetic bank -- springs, spring-hooks -- is GROUNDED at its computed
+    insert transform instead, and the bushings are patterned; see the bank
+    blocks in build().)
     """
     o = _org(adapter, name)
     pairs = (("Right Plane", "Right Plane", o[0], "x"),
@@ -427,55 +506,6 @@ async def _seat_bushing_on_shaft(
         named_ref(f"Top Plane@{name}", "PLANE"), named_ref("Top Plane", "PLANE"),
         label=f"{name} anti-spin", verify=(name, o),
     )
-
-
-async def _locate_spring(adapter, name: str, axis2_local_y: float) -> None:
-    """Pin a cosmetic channel spring at its inserted pose -- holds at ANY tilt
-    (amplitude preset), unlike the neutral-only plane-locate it replaces.
-
-    The spring is inserted ROT_Y(+90).Rz(theta), so its LOCAL X always images to
-    world Z (the transform's first row is [0,0,-1] for EVERY theta). Its Right
-    Plane is therefore a horizontal plane (normal world Z) and its two named axes
-    (Axis1 low, Axis2 at the top eye, both along local X) stay world-Z-parallel
-    regardless of the preset. The spring-to-lever / spring-to-hook joints are
-    hook-through-ring linkages with PERPENDICULAR axes (no faithful concentric),
-    so the spring is a computed-pose cosmetic part -- pin it, don't follow:
-
-      * Z + planarity: Right Plane(spring) <-> Front Plane(asm) at z_mid pins the
-        Z station and the two out-of-plane tilts (keeps the spring in its
-        channel's vertical plane), leaving X, Y and yaw.
-      * X, Y of the low axis + X of the high axis: three axis-to-plane DISTANCE
-        mates (the spin_driver idiom -- mirror-safe, no plane-parallel forcing the
-        spring vertical, no fragile angle mate). The high/low X gap pins yaw.
-
-    Four mates = 6 DOF with NO fix, so the ungrounded `fixed=1` invariant holds
-    for any tilt. (#113 forced the spring vertical and raised on theta>0.05 deg.)
-    """
-    o = _org(adapter, name)
-    rp = named_ref(f"Right Plane@{name}", "PLANE")
-    front = named_ref("Front Plane", "PLANE")
-    if abs(o[2]) < 1e-6:
-        await coincident_mate(
-            adapter, rp, front,
-            label=f"{name} spring z=0 + planarity", verify=(name, o))
-    else:
-        await distance_driver(
-            adapter, rp, front, o[2],
-            label=f"{name} spring z d={abs(o[2]):.2f} + planarity", verify=(name, o))
-    a1 = named_ref(f"Axis1@{name}", "AXIS")
-    a2 = named_ref(f"Axis2@{name}", "AXIS")
-    right = named_ref("Right Plane", "PLANE")
-    top = named_ref("Top Plane", "PLANE")
-    await distance_driver(
-        adapter, a1, right, o[0],
-        label=f"{name} spring low x d={abs(o[0]):.2f}", verify=(name, o))
-    await distance_driver(
-        adapter, a1, top, o[1],
-        label=f"{name} spring low y d={abs(o[1]):.2f}", verify=(name, o))
-    p_high = world_point(adapter, name, [0.0, axis2_local_y, 0.0])
-    await distance_driver(
-        adapter, a2, right, p_high[0],
-        label=f"{name} spring high x d={abs(p_high[0]):.2f} (yaw)", verify=(name, o))
 
 
 # Top-pin-to-foot span of the rigid bar (Axis1 local y - Axis2 local y); the
@@ -980,33 +1010,43 @@ async def build(adapter) -> dict[str, str]:
     # it -- chaining Z part->part off a physical neighbour rather than every rocker
     # referencing the global Front datum (the #110 neighbour idiom, request #4).
     # One pivot + one lever bushing ride the shafts in each inter-channel gap
-    # j-1/j (j>=1) at z_gap = z_mid(j) - PITCH/2. They are inserted in ONE batch
-    # (ground=False) then seated concentric on their shaft (_seat_bushing_on_shaft,
-    # the pivot idiom). pivot_bushing_by_gap[j] is the bushing directly below
-    # channel j's rocker.
+    # j-1/j (j>=1) at z_gap = z_mid(j) - PITCH/2. REVIVED seed+pattern
+    # (2026-07-09): ONE semantically seated seed per bank at the TOP gap
+    # (_seat_bushing_on_shaft, the #110 pivot idiom, 3 mates), replicated down
+    # the spine by a LocalLinearPattern off the BankZ datum axis -- see
+    # _pattern_bank for the sense-verify + FlipDir1 retry that replaces the
+    # retired face-pick inference. Net: 2 patterns replace 36 seated copies
+    # (108 mates), each of which paid a full-assembly re-solve.
+    # pivot_bushing_by_gap[j] is the bushing directly below channel j's rocker
+    # (pattern instances are real components; their names map to gaps by
+    # transform Z).
     pivot_bushing_by_gap: dict[int, str] = {}
     if CHANNELS > 1:
-        bushing_specs: list[dict[str, Any]] = []
-        for j in range(1, CHANNELS):
-            z_gap = z_station(j) + ARM_MID_DZ - PITCH / 2.0
-            bushing_specs.append({
-                "part": "pivot-bushing", "position": [PIVOT[0], PIVOT[1], z_gap],
-                "rotation": [0.0, 0.0, 0.0], "rows": IDENTITY, "ground": False,
-                "label": f"pivot-bushing gap {j - 1:02d}/{j:02d}",
-            })
-            bushing_specs.append({
-                "part": "lever-bushing", "position": [FULCRUM[0], FULCRUM[1], z_gap],
-                "rotation": [0.0, 0.0, 0.0], "rows": IDENTITY, "ground": False,
-                "label": f"lever-bushing gap {j - 1:02d}/{j:02d}",
-            })
-        bushings = await place_components_batch(
-            adapter, bushing_specs, label="bushing banks (pivot + lever)")
-        for nm, spec in zip(bushings, bushing_specs):
-            if spec["part"] == "pivot-bushing":
-                await _seat_bushing_on_shaft(adapter, nm, pivot_od, pivot_w, PIVOT_BUSHING_OD / 2.0)
-                pivot_bushing_by_gap[int(spec["label"].split("/")[-1])] = nm
-            else:
-                await _seat_bushing_on_shaft(adapter, nm, fulc_od, fulc_w, LEVER_BUSHING_OD / 2.0)
+        gap_planes = [
+            z_station(j) + ARM_MID_DZ - PITCH / 2.0 for j in range(1, CHANNELS)
+        ]
+        z_top_gap = gap_planes[-1]
+        bank_axis = check(
+            "axis BankZ (Top ∩ Right)",
+            await adapter.create_axis(
+                CreateAxisParameters(
+                    mode="two_planes", planes=["Top Plane", "Right Plane"]
+                )
+            ),
+        ).name
+        for part, xy, od_pt, od_r in (
+            ("pivot-bushing", pivot_w, pivot_od, PIVOT_BUSHING_OD / 2.0),
+            ("lever-bushing", fulc_w, fulc_od, LEVER_BUSHING_OD / 2.0),
+        ):
+            seed = await place_component(
+                adapter, part, [xy[0], xy[1], z_top_gap],
+                [0.0, 0.0, 0.0], IDENTITY, ground=False,
+                label=f"{part} seed gap {CHANNELS - 2:02d}/{CHANNELS - 1:02d}",
+            )
+            await _seat_bushing_on_shaft(adapter, seed, od_pt, xy, od_r)
+            await _pattern_bank(adapter, seed, part, bank_axis, gap_planes)
+        for j, z_gap in enumerate(gap_planes, start=1):
+            pivot_bushing_by_gap[j] = _instance_at_z(adapter, "pivot-bushing", z_gap)
 
     # Per-channel chain: the four moving parts are inserted on-solution
     # (ground=False) and joined by revolutes whose spin/axial dims are the
@@ -1028,20 +1068,19 @@ async def build(adapter) -> dict[str, str]:
     # they are placed EXPLICITLY per channel (springs in the loop, bushings in
     # each inter-channel gap) rather than seeded once and replicated by a
     # LocalLinearPattern. The pattern's direction sense is read from the shaft's
-    # cylindrical face and SolidWorks resolves it unreliably at full scale -- it
-    # flipped the bushing bank to +Z at 20 channels (clean at 3), and the API
-    # exposes no sense override, so the seed+pattern is not deterministic. The
-    # moving parts stay individual mated instances so each channel articulates
-    # independently (a different harmonic frequency) for the Motion study.
-    #
-    # These grounded parts carry NO mates and are referenced by nobody downstream
-    # (only the _verify_pattern_z banks read the bushings back), so their exact
-    # transform IS their final pose. Instead of a per-part insert+fix (~116 COM
-    # round-trips, each fix re-solving the assembly) their (part, pose) specs are
-    # COLLECTED here and inserted in ONE AddComponents3 + fixed in ONE
-    # FixComponent (Select2 each, one solve) after the loop (place_components_batch). The
-    # moving parts keep the per-part place_component path -- their insertion pose
-    # seeds the mate flip-recovery, so they are not batchable.
+    # cosmetic repeated structure. The bushing banks are seed+pattern off the
+    # BankZ reference axis (see the block above the loop); the springs and
+    # spring-hooks are per-channel GROUNDED cosmetic parts (Pedro 2026-07-09,
+    # v018 perf review): no operational DOF, no in-subassembly contact partner,
+    # and a pose fully computed at insert time (the per-channel amplitude tilt
+    # is baked into spring_rows), so the placement transform IS the final pose
+    # and the old 7-mates-per-channel locate battery bought nothing but ~140
+    # late-assembly mate solves. Their specs are COLLECTED here and inserted in
+    # ONE AddComponents3 + fixed in ONE FixComponent (Select2 each, one solve)
+    # after the loop (place_components_batch). The MOVING parts stay individual
+    # mated instances so each channel articulates independently (a different
+    # harmonic frequency) for the Motion study; their insertion pose seeds the
+    # mate flip-recovery, so they are not batchable.
     grounded_specs: list[dict[str, Any]] = []
     park_names: list[str] = []  # PARK_* operational-DOF drivers (suppressed if free)
     for j in range(CHANNELS):
@@ -1241,9 +1280,9 @@ async def build(adapter) -> dict[str, str]:
         _assert_spring_threading(spec["hole_y"], spec["eye_y"])
         ux, uy = spec["ux"], spec["uy"]
         # rows = Rz(theta).Ry90: local +Y (coil axis) -> the span direction,
-        # local +Z (eye axis) -> the in-plane normal, local +X -> world -Z for ANY
-        # theta (first row tilt-independent) -- what makes the spring's mate axes
-        # world-Z-parallel so _locate_spring pins any tilt. theta=0 is vertical.
+        # local +Z (eye axis) -> the in-plane normal, local +X -> world -Z for
+        # ANY theta (first row tilt-independent). The tilt is baked in here, so
+        # the grounded pose holds for every amplitude preset. theta=0 vertical.
         spring_rows = [[0.0, 0.0, -1.0], [ux, uy, 0.0], [uy, -ux, 0.0]]
         grounded_specs.append({
             "part": spec["part"],
@@ -1252,10 +1291,6 @@ async def build(adapter) -> dict[str, str]:
             "rotation": [0.0, 0.0, 0.0],
             "rows": spring_rows,
             "kind": "spring", "theta": spec["theta"],
-            # Local Y of the spring's high mate axis (Axis2 = top-eye height), so
-            # _locate_spring can read its world X for the yaw pin. Matches the
-            # `body + top_lead` height build_spring places Axis2 at.
-            "axis2_local_y": spec["body"] + SPRING_TOP_LEAD,
             "label": (f"channel-spring ch{j:02d} {spec['part'].rsplit('-', 1)[-1]} "
                       f"body={spec['body']:.2f} tilt={spec['theta']:+.2f}"),
         })
@@ -1281,29 +1316,25 @@ async def build(adapter) -> dict[str, str]:
         # (Bushings are pre-placed + seated BEFORE this loop so the rocker can
         # reference its neighbour for the axial Z seat -- see that block above.)
 
-    # Insert the cosmetic bank (springs + spring-hooks; the bushings were placed
-    # and seated before the loop) in ONE AddComponents3 (ground=False -- no
-    # FixComponent pass), then seat each by its SEMANTIC mate (the "drop grounding
-    # for semantic mates" cleanup, #110):
-    #   * spring-hooks have no in-subassembly contact partner (they seat in the
-    #     summing plate, another subassembly) -> datum-located, IDENTITY-oriented;
-    #   * springs ride at the per-channel amplitude tilt (theta != 0 off neutral),
-    #     so they are pinned by their world-Z-parallel mate axes (_locate_spring),
-    #     which holds at ANY tilt -- not the plane-parallel locate, which would
-    #     force them vertical.
+    # Insert the cosmetic bank (springs + spring-hooks; the bushings were
+    # patterned before the loop) in ONE AddComponents3 + ONE FixComponent
+    # (ground=True). GROUNDED, not semantically mated -- PURELY a
+    # build-performance measure (Pedro 2026-07-09, reversing the #110
+    # treatment for THIS bank only; no kinematic or gate semantics change,
+    # the parts were pinned to global datums and never articulated): both are
+    # cosmetic with no operational DOF and no in-subassembly contact partner
+    # (hooks seat in the summing plate, ANOTHER subassembly; springs' hook/ring
+    # joints have perpendicular axes, no faithful concentric), so the old
+    # locate battery only re-pinned the already-computed insert pose at the
+    # price of ~140 late-assembly mate solves (~4-5 s each, v0.18.0). A fixed
+    # exact-transform part also cannot flip. The per-channel amplitude tilt is
+    # baked into spring_rows, so grounding holds for every preset -- the #113
+    # vertical-only trap does not apply (nothing is re-derived from a mate).
     for spec in grounded_specs:
-        spec["ground"] = False
-    bank = await place_components_batch(
-        adapter, grounded_specs, label="cosmetic bank (springs + hooks)"
+        spec["ground"] = True
+    await place_components_batch(
+        adapter, grounded_specs, label="cosmetic bank (springs + hooks, grounded)"
     )
-    for nm, spec in zip(bank, grounded_specs):
-        if spec.get("kind") != "spring":
-            await _locate_to_datum(adapter, nm)
-            continue
-        # Springs ride at the per-channel amplitude tilt (theta may be nonzero for
-        # any non-neutral preset). Pin them by their world-Z-parallel mate axes so
-        # the locate holds at ANY tilt -- no vertical-only assumption, no guard.
-        await _locate_spring(adapter, nm, float(spec["axis2_local_y"]))
 
     # Confirm both bushing banks landed on the inter-channel gap planes. The
     # explicit placements above are deterministic; this guards a future off-by-one

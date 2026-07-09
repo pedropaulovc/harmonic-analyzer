@@ -70,3 +70,53 @@ cannot batch (each CreateMate consumes its own selection); everything but the so
 
 Also corrected: drive-train's "export_image front 77.3s" log line is mislabeled — the cost is
 `assembly_geometry_digest`'s `get_mass_properties` (exact-BREP fingerprint), render itself ~1s.
+
+**2026-07-09 seat validation (PR #219) — measured results:**
+- **Channel rebuild 1016s vs 1736s = 720s saved (41%)**, all gates green + soundness 5/5 +
+  renders pixel-equivalent to v0.18.0. Bushing banks seed+pattern off the `BankZ` datum axis
+  (Top∩Right) with `flip_direction=True` seeded from the probe (landed first-solve, no retry);
+  springs+hooks grounded (40 comps, one AddComponents3 + one FixComponent, 16.2s vs ~679s of
+  mates).
+- **diag_pattern_sense**: the historic face-pick flip did NOT reproduce in isolation (10/10
+  correct at n=3 AND n=20, deterministic); the axis pick is deterministic-but-+Z (5/5) and
+  FlipDir1 reverses it 5/5; `D1ReverseDirection` dead late-bound (`GetDefinition` → None).
+  Keep verify+retry in production — the historic flip happened in full-assembly context.
+- **diag_mate_rebuild_cost**: per-mate growth attributed to **CreateMate itself** (0.43→1.32s
+  across population rungs), NOT the per-mate `EditRebuild3` (0.11→0.44s); CreateMate solves
+  in place (pose lands pre-rebuild, so flip read-backs don't need the rebuild); batch-defer +
+  ONE closing rebuild (0.52s) is pose-identical. ⇒ mate-COUNT elimination is the lever;
+  rebuild-deferral is a minor (~100-200s) follow-up.
+- **CopyWithMates2 FULLY SOLVED from pywin32 (2026-07-09, 10 probe phases; Pedro pushed
+  back three times on premature "dead" verdicts — see [[negative-result-positive-control]]).
+  The contract: EVERY array must be its NATIVE-TYPED SAFEARRAY with raw pointers — VBA's
+  exact wire shape.** The working call (scratchpad `cwm_phase_w.py` W1, session 8640c77b):
+  `asm.CopyWithMates2(VARIANT(VT_ARRAY|VT_DISPATCH, [comp._oleobj_]),
+  VARIANT(VT_ARRAY|VT_BOOL, repeat), VARIANT(VT_ARRAY|VT_DISPATCH, [None]*n),
+  VARIANT(VT_ARRAY|VT_R8, values_m), VARIANT(VT_ARRAY|VT_BOOL, flip_align),
+  VARIANT(VT_ARRAY|VT_BOOL, flip_dim), VARIANT(VT_ARRAY|VT_BOOL, lock_rot),
+  VARIANT(VT_ARRAY|VT_I4, orient))` — full semantics: mates replicated as REAL features,
+  per-mate `Values` re-values applied, pose solved (verified vs an in-process VBA control,
+  byte-identical result). Failure ladder (all verified): `CDispatch` in the comps array →
+  instant False, nothing; raw `_oleobj_` comps + plain lists elsewhere (pywin32 marshals
+  lists as `VT_ARRAY|VT_VARIANT`) → component copied, mates SILENTLY DROPPED (multi-comp
+  copies kept internal mates only); all-native-typed → everything works. **The return
+  value LIES (False on success) — judge by mate dump + transforms.** Triangulation route:
+  in-process VBA via `RunMacro2` on generated text `.swb` (module name `""` works) —
+  `Dim x As Object` declarations fail EXACTLY like Python (so not a language/process gate);
+  VBA bisect (asm typed/Object × comps typed/Object) fingered the typed call; comtypes
+  (true `COMMETHOD` vtable call, gens sldworks TLB in ~4s) still failed with its default
+  list→`VT_VARIANT`-array conversion — which pinned the gate to the ARRAY VTs, closed by
+  Phase W. comtypes gotcha: cannot unpack `SAFEARRAY(VT_DISPATCH)` returns (GetComponents)
+  — fetch via `GetComponentByName`. ⇒ REOPENS mate-count elimination for the moving
+  channel parts AND drive-train's repeated stations (Pedro: consider both); next
+  validation = pair/slice copy + throughput ladder in the native-typed shape, concentric
+  mates, real channel parts. COM traps confirmed en route: bare `None` → VT_NULL 'Type
+  mismatch' (`VARIANT(VT_DISPATCH, None)`); `OpenDoc6` byref outs = `VT_BYREF|VT_I4`
+  VARIANTs; a part must be OPEN before `AddComponent5` inserts by path;
+  `Extension.SaveAs3` Options: 1 = Silent, **2 = Copy** (doc stays unsaved — silent no-op
+  trap); gen_py wrapper loads via `GetModuleForTypelib` (fast, no regen) —
+  `sw_type_info.early_bound` safe, in-process `EnsureModule` still forbidden;
+  `RunMacro2(path.swb, "", "main", 0, byref_i4())` = general in-process escape hatch.
+- Environment note: one SW crash during the first soundness attempt (wedged at
+  `channel.SLDASM [Viewing]`, Responding=False); Pedro disabled ENHANCED GRAPHICS and the
+  re-run passed — suspect that setting, not the model.
