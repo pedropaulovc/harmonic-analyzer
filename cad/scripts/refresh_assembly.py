@@ -45,6 +45,19 @@ def main() -> int:
             from _assembly_top import assert_top_operational_dof
 
             dof_gate = assert_top_operational_dof
+        else:
+            # A `locked` assembly keeps the STRICT fully-defined gate even if a
+            # stale free-era park sidecar survived on disk (the locked FULL
+            # build unlinks it via write_park_specs, but the CONFIG is the
+            # authority, not a file's absence -- codex #217 round 4). Read here,
+            # off every build recipe, so _assembly.py stays _config-free.
+            import _config
+            from _assembly import assert_components_fully_defined, is_locked_build
+
+            mode = _config.machine("build_lock").get(
+                asm_name.replace("-", "_"))
+            if mode is not None and is_locked_build(str(mode)):
+                dof_gate = assert_components_fully_defined
         artefacts = await refresh_assembly(adapter, asm_name, dof_gate=dof_gate)
         if asm_name == "harmonic-analyzer":
             # The top assembly's eight-views gallery + parts-only BOM are not part

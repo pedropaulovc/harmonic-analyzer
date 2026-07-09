@@ -201,9 +201,10 @@ async def _do_suppress(adapter, sub_name, targets, label):
 
 
 # ---- Basic Motion margin: de-redundant the cam loops --------------------------
-async def _free_rod_axial_standalone(adapter):
+async def _free_rod_axial_standalone(adapter, n_channels):
     """Suppress each channel's J2 rod-axial mate (Front@rod <-> Front@rocker)
-    on the STANDALONE channel doc, BEFORE the top opens.
+    on the STANDALONE channel doc, BEFORE the top opens. ``n_channels`` is the
+    BUILT channel count (from the studies sidecar, not live config).
 
     Per rod, the channel authors J2 as coincident-axes (4 constraints) + this
     axial distance (1); the top's cam point-on-axis adds 2 more -> 7 on 6 DOF
@@ -237,10 +238,10 @@ async def _free_rod_axial_standalone(adapter):
         check(f"suppress {name} (rod axial)", await adapter.suppress_mate(
             SuppressMateParameters(name=name, suppress=True)))
     adapter._attempt(lambda: model.ForceRebuild3(False), default=None)
-    if len(targets) < N_CHANNELS:
+    if len(targets) < n_channels:
         raise RuntimeError(
             f"rod-axial de-redundancy found only {len(targets)} J2 axial "
-            f"mates (expected {N_CHANNELS}) -- channel mate shape drifted")
+            f"mates (expected {n_channels}) -- channel mate shape drifted")
 
 
 # ---- sampling + fail-loud gates ----------------------------------------------
@@ -318,22 +319,23 @@ def _span(series):
     return (max(vals) - min(vals)) if vals else 0.0
 
 
-async def _sample_kinematic(adapter, comps, duration, study):
+async def _sample_kinematic(adapter, comps, duration, study, n_channels):
     """Crank + EVERY rocker + platen over the run -- the kinematic-stage signal.
 
     Gates: (1) solve-lock on the crank (constant-rate motor must track);
-    (2) dead-output on EACH of the N_CHANNELS rockers -- the top authors one
-    CAM_chNN coupling per channel, and a single dead cam/rod loop must fail
-    the proof, not hide behind a moving neighbour (codex #217 round 3);
+    (2) dead-output on EACH of the ``n_channels`` BUILT rockers (count from
+    the studies sidecar, not live config) -- the top authors one CAM_chNN
+    coupling per channel, and a single dead cam/rod loop must fail the proof,
+    not hide behind a moving neighbour (codex #217 round 3);
     (3) dead-output on the platen -- the chain tie is an artefact mate now,
     so a missing or unfed platen is a real regression.
     """
     probes = []
     rockers = _by_z_rank(adapter, "rocker-arm", comps=comps)
-    if len(rockers) < N_CHANNELS:
+    if len(rockers) < n_channels:
         raise RuntimeError(
             f"only {len(rockers)} rocker-arm component(s) found -- expected "
-            f"{N_CHANNELS} (one per active channel); the cam bank is incomplete")
+            f"{n_channels} (one per built channel); the cam bank is incomplete")
     for comp, name in rockers:
         probes.append((comp, f"rocker@{name.split('/')[-1]}"))
     cyl = _by_z_rank(adapter, "cylinder-gear", comps=comps)
@@ -490,8 +492,25 @@ async def build(adapter):
     rpm = float(sidecar.get("rpm", 0.0))
     duration = float(os.environ.get("MOTION_DURATION_S",
                                     sidecar.get("duration_s", 6.0)))
+    # The truth state comes from the BUILD-time studies sidecar -- the inputs
+    # the SETUP_* clamps were actually authored against -- not from live
+    # config, which can move between the build and this hand-run solve
+    # (codex #217 round 2). Older sidecars predate the record: fall back to
+    # the live truth state with a loud warning (rebuild the top to bake it).
+    amplitude = sidecar.get("amplitude")
+    if amplitude is None:
+        _telemetry.warn(
+            "studies sidecar records no truth state (pre-record artifact) "
+            "-- labelling samples with LIVE config; rebuild harmonic-analyzer "
+            "to bake it")
+        amplitude = truth_state()
+    # The BUILT channel count: the coefficient vector is recorded sliced to
+    # the stations the build instantiated, so its length is authoritative --
+    # a live active_count edit after the build must move neither the prep nor
+    # the gates (codex #217 round 4).
+    n_channels = len(amplitude["coefficients_mm"])
     log(f"stage = {stage} -> saved study {study!r} (motor {rpm} RPM baked; "
-        f"duration {duration}s) channels={N_CHANNELS}")
+        f"duration {duration}s) channels={n_channels}")
 
     # A prior run's in-memory state (and any dirty doc) must not leak into
     # this solve; CloseDoc discards dirty docs without the save prompt.
@@ -501,7 +520,7 @@ async def build(adapter):
     # Solver-margin prep FIRST, on the standalone channel doc; the top then
     # binds to the dirtied in-memory doc (see _free_rod_axial_standalone).
     with _telemetry.span("motion.derigidify"):
-        await _free_rod_axial_standalone(adapter)
+        await _free_rod_axial_standalone(adapter, n_channels)
 
     asm_path = str((OUT_SLDASM / f"{ASM}.SLDASM").resolve())
     check("open harmonic-analyzer", await adapter.open_model(asm_path))
@@ -533,9 +552,11 @@ async def build(adapter):
     grav = "grav" in opts
     run_label = f"{stage}-grav" if grav else stage
     if grav:
-        g = await adapter.add_gravity(MotionGravityParameters(
-            axis="y", reverse=True, study_name=study))
-        log(f"  gravity -Y: {'OK' if g.is_success else 'FAIL ' + str(g.error)}")
+        # Fail loud: a rejected gravity element would otherwise record a
+        # plain no-gravity solve under the `-grav` label (codex #217 round 4).
+        check("add gravity -Y", await adapter.add_gravity(
+            MotionGravityParameters(axis="y", reverse=True, study_name=study)))
+        log("  gravity -Y: OK")
 
     await _reset_to_assembled(adapter, study)
     log("  Calculate() -- blocking solve of the whole device ...")
@@ -543,23 +564,12 @@ async def build(adapter):
         check("calculate_motion", await adapter.calculate_motion(
             MotionStudyRefParameters(name=study)))
 
-    # The truth state comes from the BUILD-time studies sidecar -- the inputs
-    # the SETUP_* clamps were actually authored against -- not from live
-    # config, which can move between the build and this hand-run solve
-    # (codex #217 round 2). Older sidecars predate the record: fall back to
-    # the live truth state with a loud warning (rebuild the top to bake it).
-    amplitude = sidecar.get("amplitude")
-    if amplitude is None:
-        _telemetry.warn(
-            "studies sidecar records no truth state (pre-record artifact) "
-            "-- labelling samples with LIVE config; rebuild harmonic-analyzer "
-            "to bake it")
-        amplitude = truth_state()
     payload = {"stage": stage, "study": study, "rpm": rpm,
-               "duration_s": duration, "channels": N_CHANNELS,
+               "duration_s": duration, "channels": n_channels,
                "gravity": grav, "amplitude": amplitude}
     with _telemetry.span("motion.sample"):
-        payload["kinematic"] = await _sample_kinematic(adapter, comps, duration, study)
+        payload["kinematic"] = await _sample_kinematic(
+            adapter, comps, duration, study, n_channels)
         if stage == "full":
             payload["summing"] = await _sample_summing_chain(
                 adapter, comps, duration, study)
