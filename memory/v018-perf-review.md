@@ -70,3 +70,30 @@ cannot batch (each CreateMate consumes its own selection); everything but the so
 
 Also corrected: drive-train's "export_image front 77.3s" log line is mislabeled — the cost is
 `assembly_geometry_digest`'s `get_mass_properties` (exact-BREP fingerprint), render itself ~1s.
+
+**2026-07-09 seat validation (PR #219) — measured results:**
+- **Channel rebuild 1016s vs 1736s = 720s saved (41%)**, all gates green + soundness 5/5 +
+  renders pixel-equivalent to v0.18.0. Bushing banks seed+pattern off the `BankZ` datum axis
+  (Top∩Right) with `flip_direction=True` seeded from the probe (landed first-solve, no retry);
+  springs+hooks grounded (40 comps, one AddComponents3 + one FixComponent, 16.2s vs ~679s of
+  mates).
+- **diag_pattern_sense**: the historic face-pick flip did NOT reproduce in isolation (10/10
+  correct at n=3 AND n=20, deterministic); the axis pick is deterministic-but-+Z (5/5) and
+  FlipDir1 reverses it 5/5; `D1ReverseDirection` dead late-bound (`GetDefinition` → None).
+  Keep verify+retry in production — the historic flip happened in full-assembly context.
+- **diag_mate_rebuild_cost**: per-mate growth attributed to **CreateMate itself** (0.43→1.32s
+  across population rungs), NOT the per-mate `EditRebuild3` (0.11→0.44s); CreateMate solves
+  in place (pose lands pre-rebuild, so flip read-backs don't need the rebuild); batch-defer +
+  ONE closing rebuild (0.52s) is pose-identical. ⇒ mate-COUNT elimination is the lever;
+  rebuild-deferral is a minor (~100-200s) follow-up.
+- **CopyWithMates2 is DEAD on this stack** (4 iterations): returns instant False even in the
+  official example's exact shape (1 mate, all arrays len 1, typed-null `VT_DISPATCH` refs,
+  list AND VARIANT-array marshaling) — argument-stage rejection, same family as the
+  chain-pattern `CreateDefinition` null; early binding is the only untried path and is
+  forbidden in-process (wedges the seat). Standalone repro: scratchpad `cwm_standalone.py`
+  (session 8640c77b). COM traps re-confirmed en route: bare `None` → VT_NULL 'Type mismatch'
+  (use `VARIANT(VT_DISPATCH, None)`); `OpenDoc6` byref outs = `VT_BYREF|VT_I4` VARIANTs;
+  a part must be OPEN before `AddComponent5` inserts it by path.
+- Environment note: one SW crash during the first soundness attempt (wedged at
+  `channel.SLDASM [Viewing]`, Responding=False); Pedro disabled ENHANCED GRAPHICS and the
+  re-run passed — suspect that setting, not the model.
