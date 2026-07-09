@@ -83,14 +83,19 @@ RENDER_DIFF = REPO_ROOT / "comparisons" / "tools" / "render_diff.py"
 # comparisons/tools/render_offline.py without SolidWorks.
 SCENE_JSON = CAD_ROOT / "out" / "boxes" / f"{TOP_ASSEMBLY}.json"
 
-# Engineering-drawing deliverables (SLDDRW + PDF + PNG). Produced by the ``drawing``
-# task (a release-spine predecessor), staged into the bundle's ``drawings/`` so each
-# release ships the machinist prints alongside the models. Globbed per kind so
-# additional part drawings ride along automatically.
-DRAWINGS_SRC = {
-    "slddrw": (CAD_ROOT / "out" / "slddrw", "*.SLDDRW"),
-    "pdf": (CAD_ROOT / "out" / "pdf", "*.PDF"),
-    "png": (CAD_ROOT / "out" / "png", "*_drawing.png"),
+# Parts that ship an engineering drawing -- the release MANIFEST for drawings. A
+# gitignored cad/out ACCUMULATES stray/retired prints a blanket glob would silently
+# ship (like ``_models`` filters native CAD), so staging is restricted to these stems
+# and every non-manifest print is logged + skipped. Grow this as the fleet gains prints.
+DRAWING_TARGETS = frozenset({"pen-v-block"})
+
+# The drawing PRINT deliverables (PDF + PNG) per target, named ``<stem>.PDF`` /
+# ``<stem>_drawing.png``. The native SLDDRW is NOT staged here -- it rides the
+# Pack-and-Go archive (``package`` sets ``IncludeDrawings``), which rewrites its model
+# references so it opens portably; a raw copy would dangle against the build-time path.
+DRAWING_PRINTS_SRC = {
+    "pdf": (CAD_ROOT / "out" / "pdf", "{stem}.PDF"),
+    "png": (CAD_ROOT / "out" / "png", "{stem}_drawing.png"),
 }
 
 # Comparison gallery (reference-photo overlays). PRODUCED BY THE EXPORT STAGE
@@ -528,9 +533,12 @@ def package(sw: Any, revision: str, zip_path: Path) -> dict[str, Any]:
     names_count = pg.GetDocumentNamesCount()
     log(f"pack-and-go: {names_count} referenced documents")
 
-    # Bundle exactly the CAD: no drawings/sim/toolbox, but DO include components
-    # suppressed in the active config so no part is dropped from the archive.
-    pg.IncludeDrawings = False
+    # Bundle the CAD + the engineering drawings that reference it: IncludeDrawings
+    # pulls the pen-v-block SLDDRW into the pack with its model references REWRITTEN to
+    # the flattened archive, so the released .SLDDRW opens portably instead of prompting
+    # for the build-time cad/out/sldprt path (codex #213). No sim/toolbox; include
+    # components suppressed in the active config so no part is dropped from the archive.
+    pg.IncludeDrawings = True
     pg.IncludeSimulationResults = False
     pg.IncludeToolboxComponents = False
     pg.IncludeSuppressed = True
@@ -932,26 +940,37 @@ def write_provenance(stage: Path, version: str, revision: str,
 # Bundle assembly (single zip)
 # --------------------------------------------------------------------------- #
 def stage_drawings(stage: Path) -> dict[str, list[str]]:
-    """Copy the engineering-drawing deliverables (SLDDRW + PDF + PNG) into the bundle
-    (``stage/drawings``). The ``drawing`` task is a release-spine predecessor, so the
-    artefacts exist by release time; a missing SLDDRW/PDF/PNG is a real gap and fails
-    the release (unlike the best-effort comparison gallery, these are required)."""
+    """Copy the drawing PRINT deliverables (PDF + PNG) for every manifest drawing target
+    into ``stage/drawings``.
+
+    Manifest-filtered exactly like :func:`_models`: only ``DRAWING_TARGETS`` are shipped,
+    every non-manifest print in the gitignored cad/out is LOGGED + skipped (never a
+    silent stray in the bundle), and a MISSING manifest print fails the release loud (the
+    ``drawing`` task is a release-spine predecessor, so the prints must exist by now). The
+    native SLDDRW is not copied here -- it rides the Pack-and-Go archive with portable
+    references."""
     dst = stage / "drawings"
     dst.mkdir(exist_ok=True)
     staged: dict[str, list[str]] = {}
-    for kind, (src_dir, pattern) in DRAWINGS_SRC.items():
-        files = sorted(src_dir.glob(pattern)) if src_dir.is_dir() else []
-        for f in files:
+    for kind, (src_dir, tmpl) in DRAWING_PRINTS_SRC.items():
+        kept: list[str] = []
+        for stem in sorted(DRAWING_TARGETS):
+            f = src_dir / tmpl.format(stem=stem)
+            if not f.is_file():
+                raise RuntimeError(
+                    f"release: drawing {kind} missing for {stem!r} ({f}) -- refusing to "
+                    "ship an incomplete release; the `drawing` task must run first")
             shutil.copy2(f, dst / f.name)
-        staged[kind] = [f.name for f in files]
-    if not (staged.get("slddrw") and staged.get("pdf") and staged.get("png")):
-        raise RuntimeError(
-            "release: engineering-drawing artefacts missing under cad/out "
-            f"(slddrw={staged.get('slddrw')}, pdf={staged.get('pdf')}, "
-            f"png={staged.get('png')}); the `drawing` task must run before release"
-        )
-    log(f"staged {sum(len(v) for v in staged.values())} drawing artefact(s): "
-        f"{len(staged['slddrw'])} SLDDRW + {len(staged['pdf'])} PDF + {len(staged['png'])} PNG")
+            kept.append(f.name)
+        strays = sorted(
+            p.name for p in src_dir.glob(tmpl.format(stem="*"))
+            if src_dir.is_dir() and p.name not in kept)
+        if strays:
+            log(f"release: skipping {len(strays)} non-manifest drawing {kind} in cad/out "
+                f"(stale/stray, NOT shipped): {', '.join(strays)}")
+        staged[kind] = kept
+    log(f"staged {sum(len(v) for v in staged.values())} drawing print(s) "
+        f"({len(staged['pdf'])} PDF + {len(staged['png'])} PNG) for {len(DRAWING_TARGETS)} target(s)")
     return staged
 
 
@@ -1002,8 +1021,9 @@ def bundle(sw: Any, revision: str, version: str,
     #     it rather than failing. See stage_comparisons.
     facts["comparisons"] = stage_comparisons(stage)
 
-    # 4c. Engineering drawings: ship the SLDDRW + PDF + PNG machinist prints under
-    #     stage/drawings (Pack-and-Go at step 1 deliberately omits drawings).
+    # 4c. Engineering drawings: ship the PDF + PNG machinist prints under
+    #     stage/drawings (manifest-filtered). The native SLDDRW rides the Pack-and-Go
+    #     archive at step 1 (IncludeDrawings) with its references rewritten portable.
     facts["drawings"] = stage_drawings(stage)
 
     # 5. Provenance manifest LAST -- it hashes everything staged above, so it must

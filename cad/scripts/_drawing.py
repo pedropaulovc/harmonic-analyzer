@@ -110,14 +110,24 @@ def add_projection_symbol(adapter: Any) -> None:
 
 
 def add_notes_block(adapter: Any, notes: list[str]) -> None:
-    """Place the general-notes block in the upper-left at the standard line pitch."""
+    """Place the general-notes block in the upper-left at the standard line pitch.
+
+    RAISES if any note fails to insert (``add_note`` returns ``None``) -- the
+    machinist notes are a required deliverable, so a silent miss must fail the build.
+    """
     x, y_top = _NOTES_XY
     for i, line in enumerate(notes):
-        dwg.add_note(adapter, line, x, y_top - i * _NOTES_PITCH)
+        if dwg.add_note(adapter, line, x, y_top - i * _NOTES_PITCH) is None:
+            raise RuntimeError(f"notes block: SolidWorks did not insert note {line!r}")
 
 
 def add_title_block(adapter: Any, rows: list[str]) -> None:
-    """Place the title-block rows in the lower-right at the standard line pitch."""
+    """Place the title-block rows in the lower-right at the standard line pitch.
+
+    RAISES if any row fails to insert -- the part number / material / standard rows
+    are make-critical, so a silent miss must fail rather than ship a blank title block.
+    """
     x, y_top = _TITLE_XY
     for i, row in enumerate(rows):
-        dwg.add_note(adapter, row, x, y_top - i * _TITLE_PITCH)
+        if dwg.add_note(adapter, row, x, y_top - i * _TITLE_PITCH) is None:
+            raise RuntimeError(f"title block: SolidWorks did not insert row {row!r}")

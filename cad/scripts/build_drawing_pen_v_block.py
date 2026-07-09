@@ -78,9 +78,14 @@ async def build(adapter) -> dict[str, str]:
     # 2. New drawing from the project template (falls back to the seat default).
     pd.new_drawing(adapter)
 
-    # 3. Sheet setup: ASME third-angle, A-size landscape; mm units (the part is an
-    #    inch document, so the drawing must be flipped to mm).
-    dwg.setup_sheet(adapter, scale=SHEET_SCALE, first_angle=False)
+    # 3. Sheet setup: ASME third-angle + mm units (the part is an inch document, so
+    #    the drawing is flipped to mm). Fail loud if the sheet cannot be configured --
+    #    placing views on an unconfigured sheet ships a print on the wrong sheet/scale.
+    if not dwg.setup_sheet(adapter, scale=SHEET_SCALE, first_angle=False):
+        raise RuntimeError(
+            "sheet setup (SetupSheet6) failed; refusing to place views on an "
+            "unconfigured sheet"
+        )
     dwg.set_units_mm(adapter, decimals=2)
 
     # ASME third-angle projection symbol, lower-right above the title block. Drawn
@@ -147,7 +152,14 @@ async def build(adapter) -> dict[str, str]:
         n_views += 1
         anns = dwg.insert_model_dims(adapter, view, marked_only=False)
         all_anns.extend(anns)
-        dwg.auto_center_marks(adapter, view, holes=True)
+        # Every orthographic view of this part carries circular features (the two Ø8
+        # bores in Top, the set-screw hole in Front) that ASME requires center-lined,
+        # so a failure to insert marks here is an incomplete print -- fail loud.
+        if not dwg.auto_center_marks(adapter, view, holes=True):
+            raise RuntimeError(
+                f"center marks not inserted on view {name!r}; refusing to ship a print "
+                "with un-centre-marked circular features"
+            )
         _telemetry.info(f"view {name}: {len(anns)} dims inserted")
 
     # Every hole is a through cut -> tag each diameter callout THRU; the two identical
