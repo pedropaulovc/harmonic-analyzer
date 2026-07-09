@@ -876,6 +876,14 @@ def _recipe_files(stem: str) -> list[str]:
         files += [_sldprt(p) for p in ("crankshaft", "channel_lever",
                                        "summing_lever", "gooseneck",
                                        "boss_hook")]
+        # Same reasoning one level up: a FULL rebuild of the SUB hosting an
+        # anchor re-inserts its components from scratch, reassigning the
+        # nested-component PIDs the study references chain through -- while
+        # the anchor PART's own digest holds. So the anchor-hosting subs'
+        # artefacts (also recipe-keyed) are FULL-triggers too. The other
+        # movers (magnifier/pen/paper-drive) host no study-baked reference
+        # (WIRE2_pen's RimPoint is a MATE -- AutoMateRepair heals those).
+        files += [_sldasm(s) for s in ("drive_train", "channel", "summing")]
     return files
 
 
