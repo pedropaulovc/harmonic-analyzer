@@ -629,17 +629,21 @@ async def _tie_paper_chain(adapter, comps=None):
     cs_comp, _ = _find_one(adapter, "crankshaft-1", comps=comps)
     cs_a = _comp_xform(adapter, cs_comp)
     t12_n = None
+    cands = []
     for comp, nm in _find_family(adapter, "transgear-removable", comps=comps):
         if not nm.startswith("paper-drive"):
             continue
         a = _comp_xform(adapter, comp)
-        if a and math.hypot((a[9] - cs_a[9]) * 1000.0,
-                            (a[10] - cs_a[10]) * 1000.0) < 5.0:
+        d = (math.hypot((a[9] - cs_a[9]) * 1000.0, (a[10] - cs_a[10]) * 1000.0)
+             if a and cs_a else None)
+        cands.append((nm, None if d is None else round(d, 2)))
+        if d is not None and d < 5.0:
             t12_n = nm
             break
     if not crank_n or not t12_n:
         _telemetry.warn(f"chain tie: components unresolved "
-                        f"(crank={crank_n!r}, t12={t12_n!r}) -- skipping")
+                        f"(crank={crank_n!r}, t12={t12_n!r}; candidates "
+                        f"xy-dist-mm={cands}) -- skipping")
         return None
     for alignment in ("aligned", "anti_aligned"):
         try:

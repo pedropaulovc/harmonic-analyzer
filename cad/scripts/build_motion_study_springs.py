@@ -89,15 +89,34 @@ from build_summing_lever import PLATE_T
 from build_boss_hook import ARM_RUN, ELBOW_R, ROD_DIA, SHANK_RISE
 from build_gooseneck import PIN_DIA, PIN_X, PIN_Y
 
+# Each eye is a CANDIDATE list -- a union (the gooseneck lug eats the pin
+# end-face's top arc; probed live) can consume part of a circular edge, so
+# several points on the same circle are tried in order.
 # channel-lever spring tab: Ø4 hole at (177.8, 0), faces z = +/-1.5.
-CH_LEVER_EYE = [LEVER_SPRING_X + SPRING_HOLE_DIA / 2.0, 0.0, LEVER_THICKNESS / 2.0]
+CH_LEVER_EYE = [
+    [LEVER_SPRING_X + SPRING_HOLE_DIA / 2.0, 0.0, LEVER_THICKNESS / 2.0],
+    [LEVER_SPRING_X, SPRING_HOLE_DIA / 2.0, LEVER_THICKNESS / 2.0],
+]
 # summing-lever plate hole 0 (all 20 share X, so one point serves all springs):
 # Ø2 at (39.85, top face y +2.54, z -66.3).
-SUM_PLATE_EYE = [PLATE_HOLE_X + PLATE_HOLE_DIA / 2.0, PLATE_T / 2.0, PLATE_HOLE_Z[0]]
-# gooseneck counter-spring pin: Ø4 revolved along X, tip end-face at x -98.
-GOOSENECK_EYE = [PIN_X[1], PIN_Y + PIN_DIA / 2.0, 0.0]
+SUM_PLATE_EYE = [
+    [PLATE_HOLE_X + PLATE_HOLE_DIA / 2.0, PLATE_T / 2.0, PLATE_HOLE_Z[0]],
+    [PLATE_HOLE_X, PLATE_T / 2.0, PLATE_HOLE_Z[0] + PLATE_HOLE_DIA / 2.0],
+]
+# gooseneck counter-spring pin: Ø4 revolved along X about y 163, tip end-face
+# at x -98. The lug union eats the top arc -- (x, 165, 0) FAILS, side/bottom
+# points select (probed live, probe_gooseneck_pin_edge).
+GOOSENECK_EYE = [
+    [PIN_X[1], PIN_Y, PIN_DIA / 2.0],
+    [PIN_X[1], PIN_Y - PIN_DIA / 2.0, 0.0],
+    [PIN_X[0], PIN_Y, PIN_DIA / 2.0],
+]
 # boss-hook arm: Ø3 rod along X at y 15, end face at x 6.5.
-BOSS_HOOK_EYE = [ELBOW_R + ARM_RUN, SHANK_RISE + ELBOW_R + ROD_DIA / 2.0, 0.0]
+BOSS_HOOK_EYE = [
+    [ELBOW_R + ARM_RUN, SHANK_RISE + ELBOW_R + ROD_DIA / 2.0, 0.0],
+    [ELBOW_R + ARM_RUN, SHANK_RISE + ELBOW_R, ROD_DIA / 2.0],
+    [ELBOW_R + ARM_RUN, SHANK_RISE + ELBOW_R - ROD_DIA / 2.0, 0.0],
+]
 
 # Free length: None = start at assembled length with zero force (no pretension
 # to calibrate; motion comes from cam-chain length changes).
@@ -110,13 +129,14 @@ CT_FREE_LEN = None
 RIM_EDGE_CANDIDATES = [[50.0, 0.0, 4.0], [50.0, 0.0, -4.0], [0.0, 50.0, 4.0]]
 
 
-async def _eye_point(adapter, comp_needle, edge_point, label, comps=None):
+async def _eye_point(adapter, comp_needle, edge_points, label, comps=None):
     """Create a mateable eye-centre RefPoint on a SHARED part doc (never saved).
 
-    arc_center on the eye hole's circular edge -> the ring centre. Selection in
-    a component's part doc requires it be the ACTIVE doc -> ActivateDoc3
-    round-trip. All instances of the part inherit the point via
-    GetCorresponding. Returns the point feature name (e.g. "Point2").
+    arc_center on the eye hole's circular edge -> the ring centre;
+    ``edge_points`` is a candidate list tried in order (a union can consume
+    part of the circle). Selection in a component's part doc requires it be
+    the ACTIVE doc -> ActivateDoc3 round-trip. All instances of the part
+    inherit the point via GetCorresponding. Returns the point feature name.
     """
     from solidworks_mcp.adapters.base import CreateReferencePointParameters
     top = adapter.currentModel
@@ -131,16 +151,26 @@ async def _eye_point(adapter, comp_needle, edge_point, label, comps=None):
     adapter._attempt(
         lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, _byref_i4()), default=None)
     adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
+    name = None
     try:
-        pt = check(f"eye point {label}", await adapter.create_reference_point(
-            CreateReferencePointParameters(mode="arc_center", edge_point=edge_point)))
-        name = pt.get("name") if isinstance(pt, dict) else getattr(pt, "name", None)
+        for ep in edge_points:
+            res = await adapter.create_reference_point(
+                CreateReferencePointParameters(mode="arc_center", edge_point=ep))
+            if res.is_success:
+                data = res.data
+                name = data.get("name") if isinstance(data, dict) else getattr(
+                    data, "name", None)
+                log(f"  eye point {label}: edge {ep} -> {name!r}")
+                break
+            log(f"    eye point {label}: edge {ep} rejected")
     finally:
         adapter._attempt(
             lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()), default=None)
         adapter.currentModel = top
     if not name:
-        raise RuntimeError(f"eye point {label} returned no name")
+        raise RuntimeError(
+            f"eye point {label}: no candidate edge selected on {part_title} "
+            f"({edge_points})")
     log(f"  eye point {label} on {part_title} = {name!r}")
     return name
 
