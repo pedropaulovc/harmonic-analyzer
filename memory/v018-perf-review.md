@@ -135,16 +135,27 @@ mates, one call per station) both PASS. The full multi-component contract, all m
 3. **Every external dim slot must carry its REAL value** — a 0.0 re-values the copied
    dim to zero (first ladder run: all copies at Z=0; first slice run: rod ring yanked
    onto the Right Plane, drift exactly the 54.474 dim).
-4. **A copy does NOT inherit the seed dim's FlipDimension** and the flip ARRAY is not a
-   reliable side selector (ladder Q5: both bits land a +20 target at −20). The rod spin
-   (seed flip=True) copied as flip=False → mirrored pose, drift exactly 2×54.474; a
+4. **On the Repeat=True path a re-valued dim's FlipDimension RESETS to False — the seed's
+   state is not inherited AND the FlipDimension array entry is IGNORED** (three encodings
+   tried: all-False, tree-order bits, the seed's authored flip at the discovered slot —
+   identical mirrored landing every time; ladder Q5: both bits land a +20 target at −20;
+   positive control: editing the same property on the copied mate post-hoc works). The
+   array's flip evidently serves only the Repeat=False/new-entity path — matches the UI
+   doc, where "Flip Mate Alignment" belongs to "New Entity to Mate to". The rod spin
+   (seed flip=True) therefore copies mirrored (drift exactly 2×54.474), and a
    SetTransformAndSolve3 to the right pose just snaps back (the mate pins the side).
    **Repair that works:** `IFeature.GetDefinition` → `IDistanceMateFeatureData
    .FlipDimension = not cur` → `ModifyDefinition(data, model, VARIANT(VT_DISPATCH,
    None))` → rebuild; heals to rot 1e-16. Bare `None` third arg = VT_NULL → the call
    returns False and silently does nothing (same trap family as OpenDoc6/CopyWithMates2
-   arrays). Production shape: set each copied external dim's flip to the seed's authored
-   flip (known from distance_driver) instead of measure-and-toggle.
+   arrays). **Avoidance (Pedro 2026-07-09: parts must land upright from the start, the
+   mirrored branch is the OLD drive-train side):** (a) the production `free` build's
+   slice has NO spin dims at all — they are deferred park drivers — and its only external
+   dim (rocker axial, flip=False, always-positive ladder) copies right natively, so the
+   flip problem evaporates there; (b) where a pinned dim must be copied (`locked`),
+   formulate the seed dim so the WANTED side is the False side (pick reference/entity
+   order accordingly in distance_driver) — copies reset to False and land right by
+   construction; (c) ModifyDefinition-set-after-copy stays as the ~1s/copy fallback.
 5. **Anchor one-sided** — a copy lands on the SEED's side of a re-valued distance, so
    stations must not cross the anchor (channel: anchor the rocker axial to the
    gap-1 bushing at PITCH/2 + k·PITCH, not the Front datum whose stations cross zero).
