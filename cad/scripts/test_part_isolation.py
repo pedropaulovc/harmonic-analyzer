@@ -100,6 +100,44 @@ def _assembly_scripts() -> list[Path]:
     return [script_for(stem) for stem in dodo.ASSEMBLY_ORDER]
 
 
+def _submodule_py_files() -> list[Path]:
+    """Every ``.py`` under the vendored submodule's ``solidworks_mcp`` package."""
+    root = dodo.SUBMODULE_SRC
+    return sorted(root.rglob("*.py")) if root.is_dir() else []
+
+
+def _package_of(path: Path) -> str:
+    """Dotted package CONTAINING a submodule file, e.g.
+    ``adapters/solidworks/base.py`` -> ``solidworks_mcp.adapters.solidworks`` (and an
+    ``__init__.py`` maps to its own package the same way)."""
+    rel = path.resolve().relative_to(dodo.SUBMODULE_SRC.parent.resolve())
+    return ".".join(rel.with_suffix("").parts[:-1])
+
+
+def _resolved_imports(path: Path) -> set[str]:
+    """Absolute module names imported by ``path``, RESOLVING relative imports against
+    the file's package. Submodule code uses relative imports (``from .drawing import
+    X``), which ``_imported_modules`` (absolute-only) would miss -- so this resolver is
+    what makes the submodule-reachability guard sound."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    pkg = _package_of(path)
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names.update(a.name for a in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            if node.level == 0:
+                base = node.module or ""
+            else:
+                parts = pkg.split(".")
+                kept = parts[: len(parts) - (node.level - 1)] if node.level - 1 <= len(parts) else []
+                base = ".".join([*kept, node.module] if node.module else kept)
+            if base:
+                names.add(base)
+                names.update(f"{base}.{a.name}" for a in node.names)
+    return names
+
+
 def test_forbidden_set_is_nonempty():
     """Sanity: the derivation actually produced module names (else the guard is a
     no-op and every part would 'pass' vacuously)."""
@@ -149,6 +187,34 @@ def test_no_assembly_imports_drawing_submodule():
         "assembly-build code imports the drawing submodule module the ASSEMBLY digest "
         f"excludes (dodo._ASSEMBLY_DIGEST_EXCLUDE_FILES): {offenders}. Either drop the "
         "import or move the module out of the exclusion.")
+
+
+def test_no_submodule_file_imports_drawing_module():
+    """The drawing module is dropped from BOTH the part and assembly submodule digests
+    on the basis that NOTHING inside the submodule imports it (only main-repo drawing
+    build scripts do). This guard proves that basis from the submodule's OWN import
+    graph -- which the repo-local part/assembly scan cannot see (codex #213): if an
+    INCLUDED submodule file (e.g. ``base.py`` / ``pywin32_adapter.py``) imported the
+    drawing module, a later drawing-ONLY edit would be invisible to those digests,
+    leaving cached parts/assemblies stale even though runtime behaviour changed.
+    Resolves relative imports (submodule code uses them), so it catches ``from .drawing
+    import X`` as well as the absolute path."""
+    drawing_mod = _tag_to_module("adapters/solidworks/drawing.py")
+    assert drawing_mod == "solidworks_mcp.adapters.solidworks.drawing"
+    drawing_file = (dodo.SUBMODULE_SRC / "adapters" / "solidworks" / "drawing.py").resolve()
+    files = _submodule_py_files()
+    assert files, "no submodule .py files found -- guard would pass vacuously"
+    offenders: dict[str, str] = {}
+    for f in files:
+        if f.resolve() == drawing_file:
+            continue  # the module itself
+        if drawing_mod in _resolved_imports(f):
+            offenders[str(f.relative_to(dodo.SUBMODULE_SRC))] = drawing_mod
+    assert not offenders, (
+        f"submodule file(s) import the drawing module {drawing_mod!r} that the part AND "
+        f"assembly digests EXCLUDE: {offenders}. Drawing-only edits would then be invisible "
+        "to those digests (stale cached parts/assemblies). Either stop importing it from "
+        "included submodule code, or drop drawing.py from the digest exclude sets.")
 
 
 def test_no_part_imports_main_assembly_helper():

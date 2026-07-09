@@ -1,9 +1,32 @@
 ---
 name: two-tier-submodule-digest
-description: Parts fold only the part-relevant SolidworksMCP submodule slice (excl. assembly/motion/MCP-server), assemblies fold the whole tree — check:partiso enforces parts never import asm-level code
+description: THREE-tier SolidworksMCP submodule digest — parts exclude {assembly,motion,drawing}, assemblies exclude {drawing}, the opt-in drawing task folds the whole tree; check:partiso enforces both exclusions
 metadata:
   type: project
 ---
+
+**Now THREE tiers (2026-07-08, drawing pipeline PR).** A third tier was added for the
+opt-in `drawing` task so drawing-code edits rebuild NEITHER parts NOR assemblies:
+- **Parts** fold `_submodule_part_digest()` = tree MINUS `_PART_DIGEST_EXCLUDE_FILES` =
+  {`assembly.py`, `motion.py`, `drawing.py`}.
+- **Assemblies** fold `_submodule_assembly_digest()` (`_submodule_assembly_dep()` sidecar
+  `-assembly.digest`) = tree MINUS `_ASSEMBLY_DIGEST_EXCLUDE_FILES` = {`drawing.py`}.
+  `_recipe_files` points assemblies at this, NOT the whole-tree `_submodule_dep()`.
+- **The `drawing` task** folds `_submodule_digest()` = the WHOLE tree (conservative; one
+  opt-in task).
+- SAFE because `drawing.py` is module-level functions (NOT a mixin) — no part/assembly
+  build imports it. `check:partiso` gained an ASSEMBLY-isolation test (derives from
+  `_ASSEMBLY_DIGEST_EXCLUDE_FILES`) mirroring the part guard.
+- Proven: editing `drawing.py` leaves part+assembly digests UNCHANGED, only the full
+  digest moves (call the uncached `_digest_submodule_files` primitive — the
+  `_submodule_*_digest()` wrappers memoize, so re-calling in one process is a no-op and
+  a naive isolation test falsely reads "unchanged" for all three).
+- MIGRATION: introducing the assembly-tier sidecar shifted every assembly's remote-cache
+  key once (8 assemblies read MISS in `cache_status`), but locally the recipe digest is
+  unchanged so doit keeps them up-to-date — the default build is unaffected; the cache
+  self-heals on the next clean build.
+
+**Original two-tier design (2026-07-05) below — still the load-bearing rationale.**
 
 **The bug (2026-07-05):** a submodule bump that touched only assembly-level code
 (`adapters/solidworks/assembly.py`) made ~84 UNCHANGED parts go cache-MISS and rebuild

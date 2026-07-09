@@ -481,10 +481,18 @@ def test_com_deps_include_submodule_and_checks_do_not(tmp_path):
     assert full_dep in dodo.task_drawing()["file_dep"], \
         "the drawing task must fold the whole-tree submodule digest"
 
-    # check:* tasks never touch COM -> none of the submodule sidecars may enter their
-    # dep set, or an offline gate would spuriously re-run on a submodule bump.
+    # check:* tasks never touch COM -> none may fold a submodule sidecar and spuriously
+    # re-run on a submodule bump -- EXCEPT check:partiso, whose drawing-reachability
+    # guard SCANS the submodule tree and so MUST re-run when it changes (codex #213); it
+    # deliberately folds the whole-tree sidecar (only that one, not the part/asm slices).
     for task in dodo.task_check():
         deps = task["file_dep"]
+        if task["name"] == "partiso":
+            assert full_dep in deps, \
+                "check:partiso must fold the submodule digest (its guard scans the tree)"
+            assert part_dep not in deps and asm_dep not in deps, \
+                "check:partiso needs only the whole-tree sidecar, not the part/asm slices"
+            continue
         assert full_dep not in deps and part_dep not in deps and asm_dep not in deps, \
             f"check:{task['name']} must not depend on the submodule"
 

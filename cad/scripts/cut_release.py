@@ -83,6 +83,16 @@ RENDER_DIFF = REPO_ROOT / "comparisons" / "tools" / "render_diff.py"
 # comparisons/tools/render_offline.py without SolidWorks.
 SCENE_JSON = CAD_ROOT / "out" / "boxes" / f"{TOP_ASSEMBLY}.json"
 
+# Engineering-drawing deliverables (SLDDRW + PDF + PNG). Produced by the ``drawing``
+# task (a release-spine predecessor), staged into the bundle's ``drawings/`` so each
+# release ships the machinist prints alongside the models. Globbed per kind so
+# additional part drawings ride along automatically.
+DRAWINGS_SRC = {
+    "slddrw": (CAD_ROOT / "out" / "slddrw", "*.SLDDRW"),
+    "pdf": (CAD_ROOT / "out" / "pdf", "*.PDF"),
+    "png": (CAD_ROOT / "out" / "png", "*_drawing.png"),
+}
+
 # Comparison gallery (reference-photo overlays). PRODUCED BY THE EXPORT STAGE
 # (export_models.refresh_comparison_gallery renders it from the STLs once they're
 # written, on the COM spine right before release); this module only STAGES the
@@ -921,6 +931,30 @@ def write_provenance(stage: Path, version: str, revision: str,
 # --------------------------------------------------------------------------- #
 # Bundle assembly (single zip)
 # --------------------------------------------------------------------------- #
+def stage_drawings(stage: Path) -> dict[str, list[str]]:
+    """Copy the engineering-drawing deliverables (SLDDRW + PDF + PNG) into the bundle
+    (``stage/drawings``). The ``drawing`` task is a release-spine predecessor, so the
+    artefacts exist by release time; a missing SLDDRW/PDF/PNG is a real gap and fails
+    the release (unlike the best-effort comparison gallery, these are required)."""
+    dst = stage / "drawings"
+    dst.mkdir(exist_ok=True)
+    staged: dict[str, list[str]] = {}
+    for kind, (src_dir, pattern) in DRAWINGS_SRC.items():
+        files = sorted(src_dir.glob(pattern)) if src_dir.is_dir() else []
+        for f in files:
+            shutil.copy2(f, dst / f.name)
+        staged[kind] = [f.name for f in files]
+    if not (staged.get("slddrw") and staged.get("pdf") and staged.get("png")):
+        raise RuntimeError(
+            "release: engineering-drawing artefacts missing under cad/out "
+            f"(slddrw={staged.get('slddrw')}, pdf={staged.get('pdf')}, "
+            f"png={staged.get('png')}); the `drawing` task must run before release"
+        )
+    log(f"staged {sum(len(v) for v in staged.values())} drawing artefact(s): "
+        f"{len(staged['slddrw'])} SLDDRW + {len(staged['pdf'])} PDF + {len(staged['png'])} PNG")
+    return staged
+
+
 def bundle(sw: Any, revision: str, version: str,
            prev_tag: str | None = None) -> tuple[Path, dict[str, Any]]:
     """Assemble the single release zip: Pack-and-Go + neutral STEP/STL/PNG.
@@ -967,6 +1001,10 @@ def bundle(sw: Any, revision: str, version: str,
     #     -- if export had no Blender the gallery is absent, so warn + ship without
     #     it rather than failing. See stage_comparisons.
     facts["comparisons"] = stage_comparisons(stage)
+
+    # 4c. Engineering drawings: ship the SLDDRW + PDF + PNG machinist prints under
+    #     stage/drawings (Pack-and-Go at step 1 deliberately omits drawings).
+    facts["drawings"] = stage_drawings(stage)
 
     # 5. Provenance manifest LAST -- it hashes everything staged above, so it must
     #    run after the diff is written and before the zip is sealed. (Build logs
