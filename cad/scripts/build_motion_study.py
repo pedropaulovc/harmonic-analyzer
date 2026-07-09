@@ -613,6 +613,7 @@ async def _add_cam_couplings(adapter, comps=None):
     n = min(len(gears), len(rods))
     log(f"  cam couplings: {len(gears)} gears, {len(rods)} rods -> {n} channels")
     cam_ok = 0
+    names = []
     for i in range(n):
         gear_comp, gear_n = gears[i]
         rod_n = rods[i][1]
@@ -631,14 +632,16 @@ async def _add_cam_couplings(adapter, comps=None):
                 adapter, _entity_ref(rod_n, point_name, "POINT"),
                 _entity_ref(gear_n, "Axis3", "AXIS"),
                 label=f"ch{i:02d} cam lobe <-> rod ring point")
-            cam_ok += 1 if cam.get("name") else 0
+            if cam.get("name"):
+                cam_ok += 1
+                names.append(cam["name"])
         except Exception as exc:  # noqa: BLE001 -- per-channel diagnostics
             log(f"    ch{i:02d} cam coupling FAILED: {exc}")
     adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
     log(f"  cam couplings: {cam_ok}/{n}")
     if cam_ok < n:
         raise RuntimeError(f"cam couplings incomplete: {cam_ok}/{n}")
-    return cam_ok
+    return names
 
 
 # ---- stage: crank->paper chain tie (drive-train <-> paper-drive) -------------
@@ -954,13 +957,24 @@ async def build(adapter):
     # animation state (the June modal lesson; attempt 6's post-study gear +
     # yoke mates preceded a dead zero-motion solve). Motion ELEMENTS (motor,
     # springs, gravity) belong to the study and come after.
+    #
+    # strip_groups: every authored coupling, most-suspect first -- on a DEAD
+    # solve the sampler suppresses one group at a time and re-solves in the
+    # SAME session (attribution costs minutes, a fresh run costs ~40).
+    strip_groups = []
     with _telemetry.span("motion.couplings"):
-        await _add_cam_couplings(adapter, comps=comps)
-        await _tie_paper_chain(adapter, comps=comps)
+        cam_names = await _add_cam_couplings(adapter, comps=comps)
+        tie = await _tie_paper_chain(adapter, comps=comps)
     if level >= 3:
         from build_motion_study_springs import add_output_mates
         with _telemetry.span("motion.output"):
-            await add_output_mates(adapter, comps=comps)
+            out = await add_output_mates(adapter, comps=comps)
+        strip_groups.append(
+            ("output gear+yoke",
+             [n for n in (out.get("handoff"), out.get("wire2")) if n]))
+    if tie and tie.get("name"):
+        strip_groups.append(("chain tie", [tie["name"]]))
+    strip_groups.append(("cam couplings", cam_names))
 
     check("ensure_motion_addin", await adapter.ensure_motion_addin())
     from solidworks_mcp.adapters.base import (
@@ -989,17 +1003,46 @@ async def build(adapter):
 
     payload = {"stage": stage, "preset": preset, "rpm": CRANK_RPM,
                "duration_s": DURATION_S, "channels": N_CHANNELS}
+    # DEAD-solve attribution loop: a zero-motion solve strips the next suspect
+    # coupling group and re-solves in the same session. A run that only moves
+    # stripped still exports its video/samples, and the stripped list names
+    # the killer in the report + a hard failure at the end.
+    from solidworks_mcp.adapters.base import SuppressMateParameters
+    stripped = []
     with _telemetry.span("motion.sample"):
-        payload["kinematic"] = await _sample_kinematic(adapter, comps)
-        if level >= 2:
+        for _round in range(len(strip_groups) + 1):
+            try:
+                payload["kinematic"] = await _sample_kinematic(adapter, comps)
+                break
+            except RuntimeError as exc:
+                if "MOTION SOLVE LOCKED" not in str(exc) or not strip_groups:
+                    raise
+                label, names = strip_groups.pop(0)
+                _telemetry.warn(
+                    f"DEAD SOLVE -- stripping {label} ({len(names)} mates) "
+                    f"and re-solving for attribution")
+                for nm in names:
+                    check(f"suppress {nm} ({label})", await adapter.suppress_mate(
+                        SuppressMateParameters(name=nm, suppress=True)))
+                stripped.append(label)
+                await _reset_to_assembled(adapter)
+                check("calculate_motion (retry)", await adapter.calculate_motion(
+                    MotionStudyRefParameters(name="")))
+        payload["stripped"] = stripped
+        if not stripped and level >= 2:
             payload["summing"] = await _sample_summing_chain(adapter, comps)
-        if level >= 3:
+        if not stripped and level >= 3:
             payload["pen"] = await _sample_pen(adapter, comps)
 
     artefacts = {"samples": _write_samples(stage, payload)}
     vid = await _export_video(adapter, stage)
     if vid:
         artefacts["video"] = vid
+    if stripped:
+        raise RuntimeError(
+            f"solve moved only after stripping {stripped} -- those couplings "
+            f"kill the Basic Motion solve; samples/video exported for the "
+            f"stripped configuration (see {artefacts.get('samples')})")
     return artefacts
 
 
