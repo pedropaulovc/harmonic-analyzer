@@ -132,6 +132,10 @@ from _assembly import (
     write_park_specs,
 )
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows, rows_from_euler
+from solidworks_mcp.adapters.base import (
+    ComponentLinearPatternParameters,
+    CreateAxisParameters,
+)
 from build_cylinder_gear import ECCENTRICITY as CAM_ECC  # cam lobe throw (mm):
 # imported, NOT copied, so the rod ring stays concentric with the cam when the
 # throw is rescaled. A stale 5.08 hardcode (the pre-re-anchor throw) survived the
@@ -334,6 +338,71 @@ def _verify_pattern_z(
                 " -- pattern direction sense flipped?"
             )
     log(f"{label}: {len(got)} instances on-plane (z {got[0]:.1f}..{got[-1]:.1f})")
+
+
+def _delete_feature(adapter, name: str) -> None:
+    """Delete an assembly feature by name (Select2 + DeleteSelection2).
+
+    Used by the bank-pattern sense retry: a flipped pattern is removed whole
+    (instances go with the feature; the seed survives) before re-creating it
+    with ``FlipDir1``. Fails loud when the feature is still present after."""
+    model = adapter.currentModel
+    feat = adapter._attempt(lambda: model.FeatureByName(name), default=None)
+    if feat is None:
+        raise RuntimeError(f"feature to delete not found: {name!r}")
+    adapter._attempt(lambda: model.ClearSelection2(True), default=None)
+    if not adapter._attempt(lambda: feat.Select2(False, 0), default=False):
+        raise RuntimeError(f"failed to select feature for delete: {name!r}")
+    if not adapter._attempt(lambda: model.Extension.DeleteSelection2(0), default=False):
+        adapter._attempt(lambda: model.EditDelete(), default=None)
+    if adapter._attempt(lambda: model.FeatureByName(name), default=None) is not None:
+        raise RuntimeError(f"feature {name!r} still present after delete")
+
+
+def _instance_at_z(adapter, prefix: str, z_mm: float) -> str:
+    """Name of the ``prefix`` instance whose origin sits on the ``z_mm`` plane."""
+    for n in component_names(adapter):
+        if n.rsplit("-", 1)[0] != prefix:
+            continue
+        if abs(component_transform(adapter, n)[11] * 1000.0 - z_mm) < 0.05:
+            return n
+    raise RuntimeError(f"no {prefix} instance at z={z_mm:.2f}")
+
+
+async def _pattern_bank(
+    adapter, seed: str, prefix: str, axis_name: str, gap_planes: list[float],
+) -> None:
+    """Replicate a seated bank seed down the spine by a LocalLinearPattern.
+
+    The direction reference is EXPLICIT reference geometry (the BankZ datum
+    axis), not the shaft's cylindrical face -- the retired face pick left the
+    direction SENSE to SolidWorks' inference, which flipped the bank to +Z at
+    20 channels while resolving -Z at 3 (#8 era). An axis still fixes only
+    the LINE, so the sense is verified against the gap planes
+    (:func:`_verify_pattern_z`, fail loud) and, when flipped, the pattern is
+    deleted and re-created with ``FlipDir1`` (``flip_direction``) --
+    deterministic in at most two solves, never inference-trusting.
+    """
+    count = len(gap_planes)
+    for flip in (False, True):
+        tag = " (FlipDir1 retry)" if flip else ""
+        feature = check(
+            f"linear-pattern {prefix} x{count}{tag}",
+            await adapter.pattern_components_linear(
+                ComponentLinearPatternParameters(
+                    components=[seed], count=count, spacing=PITCH,
+                    direction_name=axis_name, flip_direction=flip,
+                )
+            ),
+        )
+        try:
+            _verify_pattern_z(adapter, prefix, gap_planes, f"{prefix} pattern")
+            return
+        except RuntimeError as exc:
+            if flip:
+                raise
+            log(f"!! {prefix} pattern sense flipped -- deleting + FlipDir1 retry ({exc})")
+            _delete_feature(adapter, feature.name)
 
 
 # --- mate scheme (validated single-channel probe) ---------------------------
@@ -980,33 +1049,43 @@ async def build(adapter) -> dict[str, str]:
     # it -- chaining Z part->part off a physical neighbour rather than every rocker
     # referencing the global Front datum (the #110 neighbour idiom, request #4).
     # One pivot + one lever bushing ride the shafts in each inter-channel gap
-    # j-1/j (j>=1) at z_gap = z_mid(j) - PITCH/2. They are inserted in ONE batch
-    # (ground=False) then seated concentric on their shaft (_seat_bushing_on_shaft,
-    # the pivot idiom). pivot_bushing_by_gap[j] is the bushing directly below
-    # channel j's rocker.
+    # j-1/j (j>=1) at z_gap = z_mid(j) - PITCH/2. REVIVED seed+pattern
+    # (2026-07-09): ONE semantically seated seed per bank at the TOP gap
+    # (_seat_bushing_on_shaft, the #110 pivot idiom, 3 mates), replicated down
+    # the spine by a LocalLinearPattern off the BankZ datum axis -- see
+    # _pattern_bank for the sense-verify + FlipDir1 retry that replaces the
+    # retired face-pick inference. Net: 2 patterns replace 36 seated copies
+    # (108 mates), each of which paid a full-assembly re-solve.
+    # pivot_bushing_by_gap[j] is the bushing directly below channel j's rocker
+    # (pattern instances are real components; their names map to gaps by
+    # transform Z).
     pivot_bushing_by_gap: dict[int, str] = {}
     if CHANNELS > 1:
-        bushing_specs: list[dict[str, Any]] = []
-        for j in range(1, CHANNELS):
-            z_gap = z_station(j) + ARM_MID_DZ - PITCH / 2.0
-            bushing_specs.append({
-                "part": "pivot-bushing", "position": [PIVOT[0], PIVOT[1], z_gap],
-                "rotation": [0.0, 0.0, 0.0], "rows": IDENTITY, "ground": False,
-                "label": f"pivot-bushing gap {j - 1:02d}/{j:02d}",
-            })
-            bushing_specs.append({
-                "part": "lever-bushing", "position": [FULCRUM[0], FULCRUM[1], z_gap],
-                "rotation": [0.0, 0.0, 0.0], "rows": IDENTITY, "ground": False,
-                "label": f"lever-bushing gap {j - 1:02d}/{j:02d}",
-            })
-        bushings = await place_components_batch(
-            adapter, bushing_specs, label="bushing banks (pivot + lever)")
-        for nm, spec in zip(bushings, bushing_specs):
-            if spec["part"] == "pivot-bushing":
-                await _seat_bushing_on_shaft(adapter, nm, pivot_od, pivot_w, PIVOT_BUSHING_OD / 2.0)
-                pivot_bushing_by_gap[int(spec["label"].split("/")[-1])] = nm
-            else:
-                await _seat_bushing_on_shaft(adapter, nm, fulc_od, fulc_w, LEVER_BUSHING_OD / 2.0)
+        gap_planes = [
+            z_station(j) + ARM_MID_DZ - PITCH / 2.0 for j in range(1, CHANNELS)
+        ]
+        z_top_gap = gap_planes[-1]
+        bank_axis = check(
+            "axis BankZ (Top ∩ Right)",
+            await adapter.create_axis(
+                CreateAxisParameters(
+                    mode="two_planes", planes=["Top Plane", "Right Plane"]
+                )
+            ),
+        ).name
+        for part, xy, od_pt, od_r in (
+            ("pivot-bushing", pivot_w, pivot_od, PIVOT_BUSHING_OD / 2.0),
+            ("lever-bushing", fulc_w, fulc_od, LEVER_BUSHING_OD / 2.0),
+        ):
+            seed = await place_component(
+                adapter, part, [xy[0], xy[1], z_top_gap],
+                [0.0, 0.0, 0.0], IDENTITY, ground=False,
+                label=f"{part} seed gap {CHANNELS - 2:02d}/{CHANNELS - 1:02d}",
+            )
+            await _seat_bushing_on_shaft(adapter, seed, od_pt, xy, od_r)
+            await _pattern_bank(adapter, seed, part, bank_axis, gap_planes)
+        for j, z_gap in enumerate(gap_planes, start=1):
+            pivot_bushing_by_gap[j] = _instance_at_z(adapter, "pivot-bushing", z_gap)
 
     # Per-channel chain: the four moving parts are inserted on-solution
     # (ground=False) and joined by revolutes whose spin/axial dims are the

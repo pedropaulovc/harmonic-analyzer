@@ -54,6 +54,7 @@ from build_channel_assembly import (  # noqa: E402
 from solidworks_mcp.adapters.base import (  # noqa: E402
     AdapterResultStatus,
     ComponentLinearPatternParameters,
+    CreateAxisParameters,
 )
 from solidworks_mcp.adapters.solidworks import assembly as _sw_asm  # noqa: E402
 from solidworks_mcp.adapters.solidworks import features as _sw_feat  # noqa: E402
@@ -112,6 +113,22 @@ async def _pattern_adapter(adapter, seed: str, n: int):
         ComponentLinearPatternParameters(
             components=[seed], count=n, spacing=PITCH,
             direction_point=PIVOT_OD_PT,
+        )
+    )
+
+
+async def _pattern_axis(adapter, seed: str, n: int, flip: bool):
+    """The REVIVED production shape: explicit reference-axis direction
+    (BankZ = Top ∩ Right) + the plumbed flip_direction -- what
+    build_channel_assembly._pattern_bank now ships. Measures whether the
+    axis pick is sense-deterministic and which flip value lands 'down'."""
+    axis = (await adapter.create_axis(
+        CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
+    )).data.name
+    return await adapter.pattern_components_linear(
+        ComponentLinearPatternParameters(
+            components=[seed], count=n, spacing=PITCH,
+            direction_name=axis, flip_direction=flip,
         )
     )
 
@@ -180,6 +197,18 @@ async def build(adapter) -> dict[str, str]:
             results.append(("face", n, rep, sense))
             log(f"face n={n} rep={rep}: {sense}")
 
+    # --- Production shape: reference-axis direction (both flips) -------------
+    for flip in (False, True):
+        for rep in range(REPS):
+            seed = await _fresh_rig(adapter)
+            res = await _pattern_axis(adapter, seed, CHANNELS, flip)
+            if res.status != AdapterResultStatus.SUCCESS:
+                results.append((f"axis-flip{flip}", CHANNELS, rep, f"error({res.error})"))
+                continue
+            sense = _classify(_bushing_zs(adapter), CHANNELS)
+            results.append((f"axis-flip{flip}", CHANNELS, rep, sense))
+            log(f"axis flip={flip} rep={rep}: {sense}")
+
     # --- H3a: creation-time FlipDir1=True ------------------------------------
     for rep in range(REPS):
         seed = await _fresh_rig(adapter)
@@ -202,7 +231,8 @@ async def build(adapter) -> dict[str, str]:
 
     # --- summary --------------------------------------------------------------
     log("=" * 70)
-    for variant, n in (("face", 3), ("face", CHANNELS), ("flipdir1", CHANNELS)):
+    for variant, n in (("face", 3), ("face", CHANNELS), ("axis-flipFalse", CHANNELS),
+                       ("axis-flipTrue", CHANNELS), ("flipdir1", CHANNELS)):
         cell = [r[3] for r in results if r[0] == variant and r[1] == n]
         if not cell:
             continue
