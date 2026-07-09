@@ -3,8 +3,12 @@ r"""Reproduction script: pen set screw (book ch. 24, pp. 64-65).
 The small screw with the black knurled knob that threads up through the
 pen frame's bottom rail to set the pen-to-paper angle. M4 finishing pass:
 knob reeded with 22 axial Ø1 mm grooves (tube-frame fluting recipe,
-``_features.add_reeded_head_and_thread``) and a cosmetic M3 thread on the
-shank (annotation only -- keeps M6 interference checks clean).
+``_features.add_reeded_head_and_thread``) and a cosmetic #5-40 UNC thread
+on the shank (annotation only -- keeps M6 interference checks clean).
+Inch (Unified) to match the pen-v-block's #5-40 tapped set-screw hole and
+the machine's inch convention (docs/tolerance-gdt-assessment.md §5.5) --
+NOT metric. The shank OD stays Ø3 (≈#5 major); the cosmetic thread carries
+no geometry, so the designation is what makes it period-accurate.
 
 The stepped body is two coaxial merged extrusions, NOT a profile revolve:
 circular patterns of cuts on stepped REVOLVED bodies fail to create (see
@@ -108,7 +112,8 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "driven stepped blank (equations neutral)", v_blank, 0.005 * v_blank)
 
     await add_reeded_head_and_thread(
-        adapter, KNOB_DIA, KNOB_LENGTH, SHANK_DIA, SHANK_LENGTH, groove_count=22
+        adapter, KNOB_DIA, KNOB_LENGTH, SHANK_DIA, SHANK_LENGTH, groove_count=22,
+        thread_size="#5-40", thread_standard="ansi_inch",
     )
 
     await apply_material(adapter, MATERIAL)

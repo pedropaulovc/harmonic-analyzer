@@ -280,6 +280,7 @@ async def add_reeded_head_and_thread(
     groove_count: int,
     groove_dia: float = 1.0,
     thread_size: str = "M3x0.5",
+    thread_standard: str = "ansi_metric",
 ) -> None:
     """Reed a screw head and add a cosmetic thread to its shank.
 
@@ -363,7 +364,7 @@ async def add_reeded_head_and_thread(
         await adapter.add_thread(
             AddThreadParameters(
                 edge_point=[head_length + shank_length, shank_dia / 2.0, 0.0],
-                standard="ansi_metric",
+                standard=thread_standard,
                 size=thread_size,
                 end_type="blind",
                 depth=shank_length,

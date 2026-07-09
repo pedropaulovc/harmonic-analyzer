@@ -3,9 +3,10 @@ r"""Reproduction script: pen v-block (book ch. 24, pp. 64-65).
 The chunky brass block that seats the marker: chamfered top corners, two
 vertical bores, a stopped horizontal slit from one end (the flexing clamp
 jaw -- it must NOT run the full length or the block would fall apart) and
-a small front hole for the clamp/set screw. This is the modern
-replacement pen holder (Harland/Wilson) documented by the book photos;
-the marker itself is a consumable, not modelled.
+a front #5-40 UNC tapped hole (a real Hole Wizard smart hole) for the set
+screw. This is the modern replacement pen holder (Harland/Wilson)
+documented by the book photos; the marker itself is a consumable, not
+modelled.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 24" — all scaled from the p.65
 close-up vs the ~5 mm square rod (low).
@@ -58,7 +59,11 @@ BORE_DIA = 8.0  # two vertical bores
 BORE_X = (11.0, 21.0)
 SLIT_LENGTH = 26.0  # stopped cut from x=0; hinge remains 26..32
 SLIT_Y = (4.0, 8.0)  # slit band
-SCREW_HOLE_DIA = 2.5  # front-face clamp/set screw hole
+# Front-face set-screw hole: a Hole Wizard #5-40 UNC tapped THROUGH hole. Inch
+# (Unified) per docs/tolerance-gdt-assessment.md §5.5 -- the machine is an inch
+# machine, so NOT metric M3 ("don't force the M form onto an inch thread"). The
+# tap-drill diameter comes from the #5-40 table, so there is no ScrewHoleDia knob.
+SCREW_HOLE_SIZE = "#5-40"
 SCREW_HOLE_XY = (29.0, 11.0)
 
 THROUGH_CUT_DEPTH = 80.0  # mid-plane total; > any extent crossed
@@ -70,16 +75,17 @@ async def _volume(adapter) -> float:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import ExtrusionParameters, TappedHoleParameters
 
     check("create_part", await adapter.create_part())
 
     # Editable knobs (Tools > Equations): the block envelope, the chamfer, the
-    # two bores, the slit band and the front screw hole. The mm suffix is
-    # load-bearing -- this is an INCH document and the equation manager reads
-    # BARE numbers in document units (an unsuffixed 32 = 32 in, blowing the part
-    # up 25.4x in-plane). Bore/slit/screw stations are independent globals so a
-    # GUI edit nudges one feature without touching its neighbours.
+    # two bores and the slit band. The mm suffix is load-bearing -- this is an
+    # INCH document and the equation manager reads BARE numbers in document units
+    # (an unsuffixed 32 = 32 in, blowing the part up 25.4x in-plane). Bore/slit
+    # stations are independent globals so a GUI edit nudges one feature without
+    # touching its neighbours. (The set-screw hole is a Hole Wizard feature placed
+    # by point, not an equation-driven sketch, so it has no globals here.)
     await set_global(adapter, "BlockLength", f"{BLOCK_LENGTH}mm")
     await set_global(adapter, "BlockHeight", f"{BLOCK_HEIGHT}mm")
     await set_global(adapter, "BlockDepth", f"{BLOCK_DEPTH}mm")
@@ -90,9 +96,6 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "SlitLength", f"{SLIT_LENGTH}mm")
     await set_global(adapter, "SlitY0", f"{SLIT_Y[0]}mm")
     await set_global(adapter, "SlitY1", f"{SLIT_Y[1]}mm")
-    await set_global(adapter, "ScrewHoleDia", f"{SCREW_HOLE_DIA}mm")
-    await set_global(adapter, "ScrewHoleX", f"{SCREW_HOLE_XY[0]}mm")
-    await set_global(adapter, "ScrewHoleY", f"{SCREW_HOLE_XY[1]}mm")
 
     # Each sketch records its dim names + drive equations in the helper's
     # emission order; the equations are collected here and applied in one
@@ -199,29 +202,24 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     _telemetry.info(f"volume after slit: {vol:.1f} mm^3")
 
-    # Front-face screw hole along Z. Centre off both axes -> centre-X,
-    # centre-Z, diameter = 3 dims.
-    screw = SketchDims()
-    check("create_sketch screw hole", await adapter.create_sketch("Front"))
-    await define_circle(
-        adapter, SCREW_HOLE_XY[0], SCREW_HOLE_XY[1], SCREW_HOLE_DIA / 2.0, "screw hole",
-        dims=screw,
-        names=("ScrewHoleCx", "ScrewHoleCz", "ScrewHoleDiaDim"),
-        drives=('"ScrewHoleX"', '"ScrewHoleY"', '"ScrewHoleDia"'),
-    )
-    await ensure_fully_defined(adapter, "screw hole sketch")
-    check("exit_sketch screw hole", await adapter.exit_sketch())
-    name_last_feature(adapter, "ScrewHoleProfile")
-    drive_jobs += screw.apply(adapter, "ScrewHoleProfile")
-    check(
-        "cut screw hole",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+    # Front-face set-screw hole: a real Hole Wizard #5-40 UNC tapped THROUGH hole,
+    # placed at the (ScrewHoleX, ScrewHoleY) point on the front face (z=0, a solid
+    # spot clear of the bores and the slit). Modeling it as a smart hole rather
+    # than a plain drill means the MODEL carries the thread designation, so the
+    # drawing reads a native "#5-40 UNC-2B THRU" callout with no hard-coded map;
+    # the tap-drill diameter comes from the #5-40 table.
+    hole = check(
+        "tapped set-screw hole (#5-40 UNC)",
+        await adapter.insert_tapped_hole(
+            TappedHoleParameters(
+                face_point=[SCREW_HOLE_XY[0], SCREW_HOLE_XY[1], 0.0],
+                size=SCREW_HOLE_SIZE,
+            )
         ),
     )
-    name_last_feature(adapter, "ScrewHole")
+    _telemetry.info(f"set-screw hole feature: {hole}")
     v_final = await _volume(adapter)
-    _telemetry.info(f"volume after screw hole: {v_final:.1f} mm^3")
+    _telemetry.info(f"volume after set-screw hole: {v_final:.1f} mm^3")
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
