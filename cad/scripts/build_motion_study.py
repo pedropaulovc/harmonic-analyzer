@@ -1035,9 +1035,9 @@ async def build(adapter):
                     f"{label} ({len(names)} mates) and re-solving for "
                     f"attribution")
                 for nm in names:
+                    kw = {"component": comp} if comp else {}
                     check(f"suppress {nm} ({label})", await adapter.suppress_mate(
-                        SuppressMateParameters(name=nm, suppress=True,
-                                               component=comp)))
+                        SuppressMateParameters(name=nm, suppress=True, **kw)))
                 stripped.append(label)
                 await _reset_to_assembled(adapter)
                 check("calculate_motion (retry)", await adapter.calculate_motion(
