@@ -793,6 +793,12 @@ async def _sample_kinematic(adapter, comps, n_probe=3):
     probes = []
     for comp, name in _by_z_rank(adapter, "rocker-arm", comps=comps)[:n_probe]:
         probes.append((comp, f"rocker@{name.split('/')[-1]}"))
+    cyl = _by_z_rank(adapter, "cylinder-gear", comps=comps)
+    if cyl:
+        # Distinguishes "gear train turns but cams decoupled" (cylgear > 0,
+        # rockers 0) from "whole train jammed" (cylgear ~ 0 with the crank
+        # grinding) in one look.
+        probes.append((cyl[0][0], "cylgear"))
     crank, _ = _find_one(adapter, "crankshaft-1", comps=comps)
     if crank is not None:
         probes.append((crank, "crankshaft"))
@@ -969,12 +975,16 @@ async def build(adapter):
         from build_motion_study_springs import add_output_mates
         with _telemetry.span("motion.output"):
             out = await add_output_mates(adapter, comps=comps)
-        strip_groups.append(
-            ("output gear+yoke",
-             [n for n in (out.get("handoff"), out.get("wire2")) if n]))
+        if out.get("handoff"):
+            strip_groups.append(("lever hand-off gear", [out["handoff"]], None))
+        if out.get("wire2"):
+            strip_groups.append(("WIRE2 yoke", [out["wire2"]], None))
     if tie and tie.get("name"):
-        strip_groups.append(("chain tie", [tie["name"]]))
-    strip_groups.append(("cam couplings", cam_names))
+        strip_groups.append(("chain tie", [tie["name"]], None))
+    strip_groups.append(
+        ("bar clamps", [f"PARK_bar_amplitude_{j:02d}" for j in range(N_CHANNELS)],
+         "channel-1"))
+    strip_groups.append(("cam couplings", cam_names, None))
 
     check("ensure_motion_addin", await adapter.ensure_motion_addin())
     from solidworks_mcp.adapters.base import (
@@ -1015,15 +1025,19 @@ async def build(adapter):
                 payload["kinematic"] = await _sample_kinematic(adapter, comps)
                 break
             except RuntimeError as exc:
-                if "MOTION SOLVE LOCKED" not in str(exc) or not strip_groups:
+                is_dead = ("MOTION SOLVE LOCKED" in str(exc)
+                           or "DEAD OUTPUT" in str(exc))
+                if not is_dead or not strip_groups:
                     raise
-                label, names = strip_groups.pop(0)
+                label, names, comp = strip_groups.pop(0)
                 _telemetry.warn(
-                    f"DEAD SOLVE -- stripping {label} ({len(names)} mates) "
-                    f"and re-solving for attribution")
+                    f"DEAD SOLVE ({str(exc).split(':')[0]}) -- stripping "
+                    f"{label} ({len(names)} mates) and re-solving for "
+                    f"attribution")
                 for nm in names:
                     check(f"suppress {nm} ({label})", await adapter.suppress_mate(
-                        SuppressMateParameters(name=nm, suppress=True)))
+                        SuppressMateParameters(name=nm, suppress=True,
+                                               component=comp)))
                 stripped.append(label)
                 await _reset_to_assembled(adapter)
                 check("calculate_motion (retry)", await adapter.calculate_motion(
