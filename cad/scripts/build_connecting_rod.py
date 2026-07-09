@@ -364,6 +364,20 @@ async def build(adapter) -> dict[str, str]:
         adapter, "Right Plane", 0.0, "Top Plane", CENTER_DISTANCE, "rod pin bore"
     )
 
+    # Cam ring-centre point (``RingCenter``): the mateable stand-in for the
+    # unmateable part ORIGIN. The top assembly's cam coupling holds this point
+    # ON the cam lobe axis (point-on-axis, position-only -- a collinear pin
+    # would re-fix the orientation the J2 rod<->rocker revolute already fixes,
+    # over-constraining 20 parallel loops). arc_center of the ring-bore edge
+    # -> (0, 0, +RING_THICKNESS/2), on the strap-bore axis (Axis1).
+    from _refpoints import add_named_point
+
+    await add_named_point(adapter, "RingCenter", [
+        [RING_BORE_DIA / 2.0, 0.0, RING_THICKNESS / 2.0],
+        [0.0, RING_BORE_DIA / 2.0, RING_THICKNESS / 2.0],
+        [RING_BORE_DIA / 2.0, 0.0, -RING_THICKNESS / 2.0],
+    ])
+
     # Apply the deferred drive equations after the whole model + a rebuild exists,
     # so every target resolves. Each equation evaluates to the as-built value (the
     # rod's volume has no tidy closed form, so the neutrality gate asserts the

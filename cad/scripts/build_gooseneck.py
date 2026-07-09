@@ -372,6 +372,17 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven gooseneck (equations neutral)", final_vol, 0.001 * final_vol
     )
 
+    # Counter-spring top eye (``SpringEye``): the pin end. The lug union EATS
+    # the pin end-face's top arc (probed live, probe_gooseneck_pin_edge), so
+    # the candidates walk side/bottom points of the same circle.
+    from _refpoints import add_named_point
+
+    await add_named_point(adapter, "SpringEye", [
+        [PIN_X[1], PIN_Y, PIN_DIA / 2.0],
+        [PIN_X[1], PIN_Y - PIN_DIA / 2.0, 0.0],
+        [PIN_X[0], PIN_Y, PIN_DIA / 2.0],
+    ])
+
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)

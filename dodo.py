@@ -103,6 +103,7 @@ from _buildgraph import (  # noqa: E402
 )
 
 import _artifact_cache as _cache  # noqa: E402  (remote build-artefact cache)
+import _config  # noqa: E402  (build_lock mode -> park-sidecar target declaration)
 import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -792,6 +793,10 @@ def _assembly_cache_outputs(stem: str) -> list[Path]:
     if stem == "harmonic_analyzer":
         outs += sorted((CAD_OUT / "png").glob("eight-views-*.png"))
         outs.append(CAD_OUT / "harmonic-analyzer-bom.csv")
+        # The saved operation studies' auto-assigned names (+ baked motor
+        # params) -- the study runner resolves them from here, so a cache
+        # consumer restoring the .SLDASM without it could not run the studies.
+        outs.append(sldasm.parent / f".{sldasm.stem}.studies.json")
     return outs
 
 
@@ -845,8 +850,42 @@ def _recipe_files(stem: str) -> list[str]:
     no longer forces a spurious ~500 s FULL re-insert."""
     asm_script = script_for(stem)
     hooks = [str((SCRIPTS_DIR / h).resolve()) for h in POST_ASSEMBLY.get(stem, ())]
-    return [str(asm_script.resolve()), *hooks, *_helper_deps(asm_script),
-            *_config_deps(asm_script, stem, "assembly"), _submodule_dep()]
+    files = [str(asm_script.resolve()), *hooks, *_helper_deps(asm_script),
+             *_config_deps(asm_script, stem, "assembly"), _submodule_dep()]
+    if stem == "harmonic_analyzer":
+        # The top build CONSUMES the drive-train + channel park sidecars (the
+        # SETUP_* clamps replay their recorded specs -- _assembly_top._SETUP_PARKS),
+        # so a sub rebuild that re-records specs without moving the top's script/
+        # config (e.g. a channels.yaml amplitude edit) must force a FULL top
+        # rebuild -- a REFRESH would keep the stale clamps while the DOF gate
+        # still reads a live mechanism (codex #217 P1). _digest_files hashes a
+        # missing sidecar as "<missing>", so recipe digests stay computable on a
+        # clean checkout; as doit file_dep (via _assembly_file_deps) they exist
+        # by the time the top task runs -- the free sub builds write them (a
+        # `locked` mover has no sidecar, but require_free_movers rejects that
+        # configuration at the top build anyway).
+        files += [str((CAD_OUT / "sldasm" / f".{sub}.park.json").resolve())
+                  for sub in ("drive-train", "channel")]
+        # The SAVED motion studies bake element references into nested part
+        # geometry -- the crank motor's Axis1@crankshaft and the 21 springs'
+        # SpringEye points. AutoMateRepair heals dangling MATES on a top
+        # refresh, but nothing re-authors a dangling STUDY element, so a
+        # rebuild of one of these anchor parts must force a FULL top rebuild
+        # (which re-authors the studies). Their artefact digests are
+        # recipe-keyed, so this triggers exactly when the part actually
+        # rebuilds (codex #217 round 2).
+        files += [_sldprt(p) for p in ("crankshaft", "channel_lever",
+                                       "summing_lever", "gooseneck",
+                                       "boss_hook")]
+        # Same reasoning one level up: a FULL rebuild of the SUB hosting an
+        # anchor re-inserts its components from scratch, reassigning the
+        # nested-component PIDs the study references chain through -- while
+        # the anchor PART's own digest holds. So the anchor-hosting subs'
+        # artefacts (also recipe-keyed) are FULL-triggers too. The other
+        # movers (magnifier/pen/paper-drive) host no study-baked reference
+        # (WIRE2_pen's RimPoint is a MATE -- AutoMateRepair heals those).
+        files += [_sldasm(s) for s in ("drive_train", "channel", "summing")]
+    return files
 
 
 def _recipe_sidecar(stem: str) -> Path:
@@ -1035,13 +1074,31 @@ def build_or_refresh(stem, dependencies, changed, targets):
         cache_key = _cache_key(_assembly_file_deps(stem), label)
         cache_outputs = _assembly_cache_outputs(stem)
         if _cache.restore(cache_key, cache_outputs, label):
-            sp.set_attribute("cache", "hit")
-            sidecar.parent.mkdir(parents=True, exist_ok=True)
-            sidecar.write_text(digest + "\n", encoding="utf-8")
-            return
+            # A blob packed before an output joined the required set (e.g. the
+            # studies sidecar) restores under the same deps-based key but lacks
+            # the new file -- accepting it would skip the missing-target FULL
+            # escalation below and leave the target absent forever. Validate
+            # every declared target and demote an incomplete hit to a MISS
+            # (the rebuild then re-publishes a complete blob under this key)
+            # rather than salt-busting the whole fleet (codex #217 round 4).
+            incomplete = [t for t in targets if not Path(t).exists()]
+            if not incomplete:
+                sp.set_attribute("cache", "hit")
+                sidecar.parent.mkdir(parents=True, exist_ok=True)
+                sidecar.write_text(digest + "\n", encoding="utf-8")
+                return
+            _telemetry.warn(
+                f"cache HIT for {label} lacks required target(s) "
+                f"{[Path(t).name for t in incomplete]} -- stale pre-sidecar "
+                f"blob, demoting to MISS")
+            _telemetry.event("cache.hit_incomplete", label=label,
+                             missing=",".join(Path(t).name for t in incomplete))
         sp.set_attribute("cache", "miss")
 
-        target_missing = not Path(targets[0]).exists()
+        # ANY missing target escalates to FULL: for the top that includes the
+        # studies sidecar, which only the full build path regenerates -- a
+        # refresh would leave it missing forever (codex #217 round 2).
+        target_missing = any(not Path(t).exists() for t in targets)
         try:
             last = sidecar.read_text(encoding="utf-8").strip()
         except OSError:
@@ -1119,10 +1176,39 @@ def _clean_assembly(stem):
     the next build; codex review #4)."""
     _force_remove(Path(_sldasm(stem)))
     _force_remove(_recipe_sidecar(stem))
+    _force_remove(CAD_OUT / "sldasm" / f".{stem.replace('_', '-')}.park.json")
     _force_remove(CAD_OUT / "png" / stem.replace("_", "-"))
     if stem == "channel":
         for variant in _channel_spring_variants():
             _force_remove(variant)
+    if stem == "harmonic_analyzer":
+        _force_remove(CAD_OUT / "sldasm" / ".harmonic-analyzer.studies.json")
+
+
+# The six movers: built `free` (the default), each records its deferred park-
+# driver specs into `.{stem}.park.json` beside the .SLDASM. Those sidecars are
+# CONSUMED downstream -- the top build replays drive-train/channel clamps and
+# requires paper-drive's T12 spec, the release preflight replays all of them --
+# so a free mover's sidecar is a declared TARGET: deleting it re-runs the
+# producer (build_or_refresh escalates any missing target to FULL) instead of
+# doit reporting a missing dependency it refuses to heal (codex #217 round 3).
+# A `locked` mover authors its drivers engaged and writes no sidecar, so its
+# target set excludes it (mirrors _assembly.is_locked_build's mode whitelist).
+_PARK_SIDECAR_STEMS = ("drive_train", "channel", "magnifier", "paper_drive",
+                       "summing", "pen")
+
+
+def _park_sidecar_targets(stem: str) -> list[str]:
+    if stem not in _PARK_SIDECAR_STEMS:
+        return []
+    mode = str(_config.machine("build_lock", stem))
+    if mode not in ("free", "locked"):
+        raise RuntimeError(
+            f"invalid build_lock mode {mode!r} for {stem}; expected free|locked")
+    if mode == "locked":
+        return []
+    return [str((CAD_OUT / "sldasm" /
+                 f".{stem.replace('_', '-')}.park.json").resolve())]
 
 
 def task_assembly():
@@ -1146,10 +1232,19 @@ def task_assembly():
         # Factored into _recipe_files so build_or_refresh computes the identical
         # digest.
         recipe_files = _recipe_files(stem)
+        targets = [_sldasm(stem), *_park_sidecar_targets(stem)]
+        if stem == "harmonic_analyzer":
+            # The saved-study names sidecar is REQUIRED output (the study
+            # runner resolves the studies from it), so it is a declared
+            # target: a deleted/unrestored sidecar makes the task re-run, and
+            # build_or_refresh escalates any missing target to FULL, which
+            # regenerates it (codex #217 round 2).
+            targets.append(str((CAD_OUT / "sldasm" /
+                                ".harmonic-analyzer.studies.json").resolve()))
         yield {
             "name": stem,
             "file_dep": [*recipe_files, *ref_targets],
-            "targets": [_sldasm(stem)],
+            "targets": targets,
             "uptodate": [_RecipeTracker(stem, recipe_files)],
             # COM spine: serialize assemblies after every part on the SW seat.
             "task_dep": _spine_dep(f"assembly:{stem}"),
@@ -1551,6 +1646,59 @@ def _cache_status(statusargs):
             for rel, digest in inputs:
                 _telemetry.debug(f"         {digest}  {rel}")
     _telemetry.success(f"[cache_status] {hits} hit / {misses} miss / {unknown} unknown")
+
+
+def _stamp_recipes(stampargs):
+    """See :func:`task_stamp_recipes`."""
+    stems = [a.replace("-", "_") for a in (stampargs or [])]
+    if not stems:
+        _telemetry.error(
+            "stamp_recipes: name the assemblies explicitly, e.g. "
+            "`doit stamp_recipes -- channel summing` or `-- all-subs`")
+        raise SystemExit(2)
+    if stems == ["all_subs"]:
+        stems = [s for s in ASSEMBLY_ORDER if s != "harmonic_analyzer"]
+    unknown = [s for s in stems if s not in ASSEMBLY_ORDER]
+    if unknown:
+        raise SystemExit(
+            f"stamp_recipes: unknown assembly stem(s) {unknown}; "
+            f"known: {sorted(ASSEMBLY_ORDER)}")
+    for stem in stems:
+        if not Path(_sldasm(stem)).exists():
+            _telemetry.warn(
+                f"[stamp] {stem}: target missing -- the next build is FULL "
+                "regardless; skipped")
+            continue
+        digest = _digest_files(_recipe_files(stem))
+        sidecar = _recipe_sidecar(stem)
+        sidecar.parent.mkdir(parents=True, exist_ok=True)
+        sidecar.write_text(digest + "\n", encoding="utf-8")
+        _telemetry.success(f"[stamp] {stem}: recipe sidecar -> {digest[:12]}...")
+
+
+def task_stamp_recipes():
+    """OPERATOR ESCAPE: re-stamp named assemblies' recipe sidecars to the CURRENT
+    recipe digest WITHOUT rebuilding -- an explicit declaration that the on-disk
+    ``.SLDASM`` is still valid for a recipe change, so the next run REFRESHes
+    (reopen + rebuild + gates + save, seconds) instead of FULL re-insert/re-mating
+    (~500 s each).
+
+    For helper-module edits that provably do not change built geometry (the
+    motivating case: a refresh-gate fix in ``_assembly.py`` would otherwise FULL
+    rebuild all 8 assemblies). The refresh still runs every gate and
+    verify:soundness still follows in the same build, so a wrong claim fails
+    loud rather than shipping a stale artefact. NEVER stamp after a change that
+    moves inserts/mates (assembly script, placement config) -- let the FULL run.
+
+    Positional args (after ``--``): assembly stems (``channel summing``), or
+    ``all-subs`` = every assembly EXCEPT the top. SolidWorks-free, off the
+    spine, never in default_tasks."""
+    return {
+        "uptodate": [False],
+        "pos_arg": "stampargs",
+        "actions": [(_stamp_recipes,)],
+        "verbosity": 2,
+    }
 
 
 def task_cache_status():

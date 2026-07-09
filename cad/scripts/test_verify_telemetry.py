@@ -402,9 +402,10 @@ def test_no_per_component_dof_check_spans(monkeypatch, tmp_path):
     # no per-component flood. The exact-count closure runs in the release preflight.
     nec = _by_name(spans, "gate.dof_free_necessity")
     assert len(nec) == 1
-    # drive-train frees the crank spin + the cone-platform swing (PR2 round 3)
-    assert nec[0].attributes["expected_free_dof"] == 2
-    assert nec[0].attributes["free_under_constrained"] >= 2
+    # drive-train frees the crank spin + cone-platform swing + pinion engage
+    # swing + lift-rod/cam spin (4 DOF, PR8)
+    assert nec[0].attributes["expected_free_dof"] == 4
+    assert nec[0].attributes["free_under_constrained"] >= 4
     assert nec[0].status.status_code.name == "OK"
 
 
@@ -464,9 +465,9 @@ def test_free_dof_build_gate_is_single_necessity_span_not_park_phases(monkeypatc
     assert report.failed == [], report.failed
     (gate,) = _by_name(spans, "gate.dof_free_necessity")
     assert gate.status.status_code.name == "OK"
-    # crank spin + cone-platform swing (PR2 round 3)
-    assert gate.attributes["expected_free_dof"] == 2
-    assert gate.attributes["free_under_constrained"] >= 2
+    # crank spin + cone-platform swing + pinion swing + lift-rod/cam (PR8)
+    assert gate.attributes["expected_free_dof"] == 4
+    assert gate.attributes["free_under_constrained"] >= 4
     # the old build-time park cycling / sufficiency closure is gone (preflight-only).
     assert _by_name(spans, "gate.dof_expected_free") == []
     assert _by_name(spans, "gate.park_closure") == []

@@ -1,34 +1,42 @@
 r"""Reproduction script: harmonic-analyzer.SLDASM (top level, M6.5).
 
-The complete machine: the seven subassemblies plus the loose hardware, mated
-to the frame. Every subassembly is authored in MACHINE coordinates (assembly
-origin = base origin, Y up, base top y 50.8, channels along Z, output side -Z),
-so each one is inserted at the identity transform and fixed -- the fix-all
-strategy of M6.2-M6.4 lifted one level. The output is split by function into
-the signal-flow chain summing -> magnifier -> pen (the value) plus paper-drive
-(the orthogonal time-base).
+The complete OPERATING machine: the seven subassemblies plus the loose
+hardware, coupled into one working mechanism. Every subassembly is authored in
+MACHINE coordinates (assembly origin = base origin, Y up, base top y 50.8,
+channels along Z, output side -Z), so each one is inserted at the identity
+transform; frame stays FIXED, and the six moving subs are floated, 3-plane
+grounded at identity and set FLEXIBLE (one batched toggle), so their
+default-`free` internals stay live in the saved doc.
 
-Cross-subassembly fits proven by the top-level interference check:
+On top of the flexible subs the build authors (see _assembly_top.py):
 
-* channel spring-hook fasteners (channel.SLDASM) seat shank-up in the
-  summing-lever plate's O4.5 holes (summing.SLDASM), each presenting its arm
-  just above the plate where the spring's bottom eye links on -- gated
-  analytically by build_channel_assembly._assert_hook_fastener;
-* top-crossbar ends face-flush on the top-frame ring rail inner faces
-  (frame.SLDASM), gooseneck-clamp around the east column (all summing.SLDASM);
-* column-clamps (magnifier + paper-drive) ride the Ø25.4 columns (frame) with
-  a 25.6 bore;
-* the pen-hanger (pen.SLDASM) clamps the wheel-bar (magnifier.SLDASM), and the
-  wheel rim -> pen-rod wire couples the two;
-* chain sprockets (drive-train crankshaft + paper-drive knob shaft) share the
-  z -81 chain plane;
-* rocker-arm connecting-rod rings (channel) ride the cam lobes integral
-  to the drive-train's cylinder gears;
-* the loose measuring-stick sits on the base top (y 50.8). The spare T18
-  transgear-removable, a swap part for the platen drive, rides inside
-  paper-drive (a flat sibling of its mounted T24) rather than floating here --
-  at the top level its leaf name would collide with the T12/T24 instances
-  nested in drive-train / paper-drive.
+* the 23 engaged SETUP clamps (``SETUP_<key>``) -- drive-train's cone_swing /
+  pinion_swing / pinion_cam setup poses + the 20 channel bar_amplitude
+  stations, replayed from the sub park sidecars into top context (the bars
+  are Fourier coefficient SETTINGS, clamped while the crank turns; the
+  ``machine/amplitude.yaml preset`` config picks config vs square stations);
+* the physical cross-sub couplings: 20 cam ring<->lobe point-on-axis mates
+  (``CAM_chNN``), the crank->paper chain tie (``CHAIN_crank_paper``), the
+  summing->magnifying lever hand-off (``HANDOFF_levers``), and the WIRE-2
+  rim->pen scotch yoke (``WIRE2_pen``) -- dragging the crank in the saved
+  model articulates the whole machine down to the pen;
+* TWO saved Basic Motion studies: ``kinematic`` (crank motor only) and
+  ``full`` (motor + the 21 spring force elements) -- the shipped .SLDASM
+  opens ready to solve, no runtime study assembly required
+  (build_motion_study.py just resolves, solves and samples them).
+
+Cross-subassembly FITS remain proven by the top-level interference check
+(channel spring-hook fasteners in the summing plate holes, crossbar/clamp
+seats on the frame, chain sprockets on the z -81 plane, rod rings on the cam
+lobes, the pen-hanger on the wheel-bar); the DOF gate is the OPERATIONAL one
+-- the machine's kinematic chains must read genuinely live
+(``assert_top_operational_dof``), not frozen into a display model.
+
+The loose measuring-stick sits on the base top (y 50.8) in the far-west
+margin lane. The spare T18 transgear-removable rides inside paper-drive (a
+flat sibling of its mounted T24) rather than floating here -- at the top
+level its leaf name would collide with the T12/T24 instances nested in
+drive-train / paper-drive.
 
 Run (SolidWorks already open)::
 
@@ -47,11 +55,21 @@ from _common import (
 )
 from _assembly import (
     assert_component_placed,
-    assert_components_fully_defined,
     check_no_interference,
     place_component,
     remap_front_to_machine_front,
     save_assembly_and_images,
+)
+from _assembly_top import (
+    _components,
+    add_cam_couplings,
+    add_output_couplings,
+    assert_top_operational_dof,
+    author_operation_studies,
+    flex_moving_subs,
+    replay_setup_clamps,
+    require_free_movers,
+    tie_paper_chain,
 )
 from _transforms import IDENTITY
 
@@ -110,6 +128,9 @@ async def build(adapter) -> dict[str, str]:
         InsertComponentParameters,
     )
 
+    # Fail fast: the coupling web presupposes default-`free` movers.
+    require_free_movers()
+
     check("create_assembly", await adapter.create_assembly())
 
     for name in SUBASSEMBLIES:
@@ -124,7 +145,11 @@ async def build(adapter) -> dict[str, str]:
             ),
         )
         comp = data["name"]
-        if not data.get("fixed"):
+        # Only frame stays FIXED (usually auto-fixed as the first insert). The
+        # six movers must stay floatable: a fixed component silently refuses
+        # the flexible toggle, so they are 3-plane grounded instead
+        # (flex_moving_subs).
+        if name == "frame" and not data.get("fixed"):
             check(
                 f"fix {name}",
                 await adapter.fix_component(ComponentRefParameters(name=comp)),
@@ -136,7 +161,23 @@ async def build(adapter) -> dict[str, str]:
     await place_component(adapter, "measuring-stick", list(STICK_POS),
                           STICK_EULER, STICK_ROWS)
 
-    assert_components_fully_defined(adapter)
+    # Float + 3-plane ground the movers at identity, then ONE batched flexible
+    # toggle -- the subs' default-`free` internals are now live in this doc.
+    await flex_moving_subs(adapter)
+
+    # The 23 engaged setup clamps (SETUP_*), from the sub park sidecars.
+    await replay_setup_clamps(adapter)
+
+    # One full-tree component walk, reused by every coupling + the studies.
+    comps = _components(adapter)
+
+    # Physical cross-sub couplings: cams, chain, lever hand-off, WIRE2 yoke.
+    await add_cam_couplings(adapter, comps)
+    await tie_paper_chain(adapter, comps)
+    await add_output_couplings(adapter, comps)
+
+    # Gates: the machine must be kinematically LIVE (not frozen) and fit-clean.
+    assert_top_operational_dof(adapter)
     check_no_interference(adapter)
 
     # The machine is authored output-side -Z, so SolidWorks' native Front view
@@ -144,6 +185,12 @@ async def build(adapter) -> dict[str, str]:
     # eight-views gallery below, which goes through ShowNamedView2) shows the
     # machine front, and the file opens on it. Geometry is untouched.
     remap_front_to_machine_front(adapter)
+
+    # The saved operation studies (kinematic + full), AFTER every mate exists
+    # (a mate authored under an existing study risks initial-animation-state
+    # corruption) and BEFORE the save that ships them.
+    await author_operation_studies(adapter, comps)
+
     artefacts = await save_assembly_and_images(adapter, ASM_NAME)
     artefacts.update(await export_gallery_and_bom(adapter))
     return artefacts

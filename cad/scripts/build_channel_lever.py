@@ -268,6 +268,16 @@ async def build(adapter) -> dict[str, str]:
         adapter, "Right Plane", BAR_PIN_X, "Top Plane", 0.0, "bar pin bore"
     )
 
+    # Spring-tab eye centre (``SpringEye``): the channel spring's top endpoint
+    # in the full-machine assembly (one per lever instance). arc_center of the
+    # O4 spring hole's face edge.
+    from _refpoints import add_named_point
+
+    await add_named_point(adapter, "SpringEye", [
+        [LEVER_SPRING_X + SPRING_HOLE_DIA / 2.0, 0.0, LEVER_THICKNESS / 2.0],
+        [LEVER_SPRING_X, SPRING_HOLE_DIA / 2.0, LEVER_THICKNESS / 2.0],
+    ])
+
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
     # built, so the geometry must not move -- the re-check below is the proof.
