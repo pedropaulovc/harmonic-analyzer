@@ -886,6 +886,15 @@ async def build(adapter):
     asm_path = str((OUT_SLDASM / f"{ASM}.SLDASM").resolve())
     check("open harmonic-analyzer", await adapter.open_model(asm_path))
     log(f"opened {asm_path}")
+    # The top opens with nested components LIGHTWEIGHT (seat default), and a
+    # lightweight component's GetModelDoc2 reads None -- which broke first the
+    # sub-doc resolution and then the connecting-rod part doc (both live).
+    # Resolve everything once; the study reaches into part docs everywhere
+    # (ring/eye/rim RefPoints, GetCorresponding mate refs).
+    n = adapter._attempt(
+        lambda: adapter.currentModel.ResolveAllLightWeightComponents(False),
+        default=None)
+    log(f"  ResolveAllLightWeightComponents -> {n}")
 
     with _telemetry.span("motion.flex"):
         await _flex_subs(adapter)
