@@ -936,11 +936,11 @@ def _git_sha() -> str:
 def part_properties(part_name: str) -> dict[str, str]:
     """SolidWorks custom properties for ``part_name`` from the parts.yaml registry.
 
-    Pulls the manufacturing registry fields (including material specification,
-    finish, and quantity) from ``cad/config/parts.yaml`` and stamps a reproducible
-    Generator (git sha). Title is the part name. Parts absent from the registry
-    get the minimal set (Title + Generator) and are flagged by the verify.py
-    tolerance audit.
+    Pulls Number/Revision/Material/Tolerance Class/Fit Class/Process/Confidence
+    from ``cad/config/parts.yaml`` (merged over its defaults) and stamps a
+    reproducible Generator (git sha). Title is the part name. Parts absent from
+    the registry get the minimal set (Title + Generator) and are flagged by the
+    verify.py tolerance audit.
     """
     import _config
 
@@ -959,8 +959,6 @@ def part_properties(part_name: str) -> dict[str, str]:
         "Number": "number", "Revision": "revision", "Material": "material",
         "Tolerance Class": "tolerance_class", "Fit Class": "fit_class",
         "Process": "process", "Confidence": "confidence",
-        "Material Specification": "material_specification",
-        "Finish": "finish", "Quantity": "quantity",
     }
     for prop, key in field_map.items():
         if key in reg and reg[key] is not None:
@@ -1384,50 +1382,6 @@ def name_dimensions(adapter: Any, feature_name: str, names: list[str | None]) ->
         out.append(f"{new}@{feature_name}")
         _telemetry.success(f"dim {old} = {val:.4g} mm -> {new}@{feature_name}")
     return out
-
-
-def mark_dimensions_for_drawing(
-    adapter: Any, feature_name: str, dimension_names: set[str]
-) -> None:
-    """Mark an explicit model-dimension subset for drawing insertion."""
-    feature = _feature_by_name(adapter, feature_name)
-    marked: set[str] = set()
-    display = _read_member(feature, "GetFirstDisplayDimension")
-    for _ in range(1000):
-        if not display:
-            break
-        dimension = display.GetDimension2(0)
-        name = str(_read_member(dimension, "Name"))
-        if _dim_owner_feature(dimension) == feature_name and name in dimension_names:
-            display.MarkedForDrawing = True
-            if not bool(_read_member(display, "MarkedForDrawing")):
-                raise RuntimeError(f"{name}@{feature_name}: mark-for-drawing failed")
-            marked.add(name)
-        display = feature.GetNextDisplayDimension(display)
-    missing = dimension_names - marked
-    if missing:
-        raise RuntimeError(
-            f"{feature_name}: dimensions not marked for drawing: {sorted(missing)}"
-        )
-    _telemetry.success(
-        f"marked for drawing {feature_name}: {', '.join(sorted(marked))}"
-    )
-
-
-def clear_dimensions_for_drawing(adapter: Any) -> int:
-    """Clear every model display-dimension drawing mark; return the count."""
-    cleared = 0
-    for feature in _iter_features(adapter):
-        display = _read_member(feature, "GetFirstDisplayDimension")
-        for _ in range(1000):
-            if not display:
-                break
-            if bool(_read_member(display, "MarkedForDrawing")):
-                display.MarkedForDrawing = False
-                cleared += 1
-            display = feature.GetNextDisplayDimension(display)
-    _telemetry.success(f"cleared {cleared} model-dimension drawing marks")
-    return cleared
 
 
 @_telemetry.traced("param.global", label_param="name")

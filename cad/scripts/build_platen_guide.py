@@ -27,16 +27,15 @@ from _common import (
     SketchDims,
     add_line_chain,
     apply_color,
+    apply_custom_properties,
     apply_material,
     blank_sketch,
     check,
-    clear_dimensions_for_drawing,
     define_circle,
     define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
-    mark_dimensions_for_drawing,
     name_dimensions,
     name_last_feature,
     report_mass_properties,
@@ -45,7 +44,13 @@ from _common import (
     set_global,
     set_sketch_direct_db,
     volume_check,
+    _dim_owner_feature,
+    _feature_by_name,
+    _iter_features,
+    _read_member,
 )
+import _config
+import _telemetry
 from _hole_wizard import BA6, TapEnd, create_tapped_pattern
 
 PART_NAME = "platen-guide"
@@ -67,6 +72,60 @@ HOLE_X = tuple(s + d for s in LOCK_STATION_X for d in (-LOCK_SCREW_DX, LOCK_SCRE
 SCREW_STATION_X = (30.0, 90.0, 150.0, 210.0, 270.0)
 SCREW_HOLE_DEPTH = 3.0
 SCREW_THREAD_DEPTH = 2.4
+
+
+def _mark_dimensions_for_drawing(
+    adapter, feature_name: str, dimension_names: set[str]
+) -> None:
+    """Mark only this part's explicit manufacturing dimensions for insertion."""
+    feature = _feature_by_name(adapter, feature_name)
+    marked: set[str] = set()
+    display = _read_member(feature, "GetFirstDisplayDimension")
+    for _ in range(1000):
+        if not display:
+            break
+        dimension = display.GetDimension2(0)
+        name = str(_read_member(dimension, "Name"))
+        if _dim_owner_feature(dimension) == feature_name and name in dimension_names:
+            display.MarkedForDrawing = True
+            if not bool(_read_member(display, "MarkedForDrawing")):
+                raise RuntimeError(f"{name}@{feature_name}: mark-for-drawing failed")
+            marked.add(name)
+        display = feature.GetNextDisplayDimension(display)
+    missing = dimension_names - marked
+    if missing:
+        raise RuntimeError(
+            f"{feature_name}: dimensions not marked for drawing: {sorted(missing)}"
+        )
+    _telemetry.success(
+        f"marked for drawing {feature_name}: {', '.join(sorted(marked))}"
+    )
+
+
+def _clear_dimensions_for_drawing(adapter) -> None:
+    cleared = 0
+    for feature in _iter_features(adapter):
+        display = _read_member(feature, "GetFirstDisplayDimension")
+        for _ in range(1000):
+            if not display:
+                break
+            if bool(_read_member(display, "MarkedForDrawing")):
+                display.MarkedForDrawing = False
+                cleared += 1
+            display = feature.GetNextDisplayDimension(display)
+    _telemetry.success(f"cleared {cleared} model-dimension drawing marks")
+
+
+def _apply_drawing_properties(adapter) -> None:
+    spec = _config.parts(PART_NAME)
+    apply_custom_properties(
+        adapter,
+        {
+            "Material Specification": str(spec["material_specification"]),
+            "Finish": str(spec["finish"]),
+            "Quantity": str(spec["quantity"]),
+        },
+    )
 
 
 async def build(adapter) -> dict[str, str]:
@@ -228,13 +287,13 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven guide (equations neutral)", v_final, 0.02 * v_holes
     )
 
-    clear_dimensions_for_drawing(adapter)
-    mark_dimensions_for_drawing(adapter, "GuideProfile", {"Length", "Height"})
-    mark_dimensions_for_drawing(adapter, "Guide", {"Depth"})
-    mark_dimensions_for_drawing(
+    _clear_dimensions_for_drawing(adapter)
+    _mark_dimensions_for_drawing(adapter, "GuideProfile", {"Length", "Height"})
+    _mark_dimensions_for_drawing(adapter, "Guide", {"Depth"})
+    _mark_dimensions_for_drawing(
         adapter, "ThroughTapDrillProfile", {"T0X", "T1X", "T2X", "T3X", "T0Y"}
     )
-    mark_dimensions_for_drawing(
+    _mark_dimensions_for_drawing(
         adapter,
         "BlindDrawingLocatorProfile",
         {"B0X", "B1X", "B2X", "B3X", "B4X"},
@@ -243,6 +302,7 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)
+    _apply_drawing_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 
 
