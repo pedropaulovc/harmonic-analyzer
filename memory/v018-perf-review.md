@@ -283,3 +283,17 @@ ModifyDefinition's third arg need typed VT_DISPATCH nulls (bare None =
 VT_NULL 'Type mismatch'); IModelDoc2::SaveAs3 returns 0 ON SUCCESS (gate on
 file existence); a crashed run's open doc holds the .SLDPRT file lock
 (CloseDoc by basename before deleting).
+
+**2026-07-10 finding 2 SHIPPED (#237 + submodule #85):** _profile_feature_names
+(cut/sweep profile selector) and _common.feature_name_by_type (extrude_at_offset)
+now flag only GetTypeName2 + GetNextFeature (the c992057 pattern; GetTypeName2
+kept method-dispatched -- property resolution silently breaks the match and
+falls back to stale _last_sketch_name). Measured: full fleet parts total
+6,990s -> 6,369s (-621s, -9%), concentrated on the predicted paths --
+channel_spring_installed -48% (helix), counter_spring -26%, harmonic_base -26%,
+summing_lever -17%, platen -18%; cone_gear +8% = variance (its tooth pattern is
+not on the fixed path -- the review's 7.8s/tooth-gap attribution to finding 2
+was WRONG for the circular-pattern path; strike that sub-claim). All volume
+gates + verify suites green, top-assembly render eye-passed. Remaining queue:
+finding 1 (release neutral export ~1,700s), cylinder-gear ladder via
+NewEntityToMateTo (~156s, unblocked by #236), finding 4 (no-op refresh gates).
