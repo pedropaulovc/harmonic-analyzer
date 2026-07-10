@@ -74,6 +74,8 @@ from _assembly import (  # noqa: E402
 from _assembly_postbuild import discard_open_documents  # noqa: E402
 from _common import _flag_only, check, log, run_build  # noqa: E402
 from _cwm import (  # noqa: E402
+    component_constrained_status,
+    component_mate_count,
     copy_with_mates,
     external_mate_rows,
     mates_with_owners,
@@ -117,8 +119,13 @@ def _report(adapter, tag: str, name: str, target: list[float]) -> bool:
 
 
 def _rebuild(adapter) -> None:
+    """EditRebuild3, raising on a False return: the verdicts below are only
+    meaningful against a rebuild that actually solved -- a silent failure
+    would leave the pre-rebuild pose in place and fake a HOLD."""
     model = adapter.currentModel
-    adapter._attempt(lambda: model.EditRebuild3(), default=None)
+    if not adapter._attempt(lambda: model.EditRebuild3(), default=False):
+        raise RuntimeError(
+            "EditRebuild3 returned False -- no-solution/over-defined state")
 
 
 def _drag_to(adapter, name: str, array16: list[float]) -> bool:
@@ -231,10 +238,15 @@ def _copy(adapter, seed: dict[str, str], n: int, values_m: list[float],
     return comps
 
 
-def _targets(adapter, seed: dict[str, str], station: int) -> dict[str, list[float]]:
+def _targets(seed_arrays: dict[str, list[float]],
+             station: int) -> dict[str, list[float]]:
+    """Station targets off the SNAPSHOT of the seed's as-authored transforms
+    -- never a live read: the seed is under-constrained, so a prior copy or
+    rebuild could drift it, and live-derived targets would normalize that
+    drift away and fake a HOLD."""
     out = {}
-    for part, name in seed.items():
-        a = list(component_transform(adapter, name))
+    for part, a in seed_arrays.items():
+        a = list(a)
         a[11] -= station * PITCH / 1000.0
         out[part] = a
     return out
@@ -288,10 +300,22 @@ _PHASE_LABELS = {
 
 async def _phase(adapter, mode: str) -> dict[str, bool]:
     log(f"=== phase: {_PHASE_LABELS[mode]} ===")
-    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+    # Repo idiom for dropping a dirty transient model -- CloseAllDocuments
+    # on an unsaved assembly can raise the Save Modified Documents modal
+    # and hang a headless run.
+    discard_open_documents(adapter)
     seed = await _seed_slice(adapter, mode)
     n, slot_values, dim_slot = _slice_slots(adapter, seed)
     log(f"seed slice: {n} mates, ext dims {slot_values}, ladder slot {dim_slot}")
+    # Snapshot the seed BEFORE any copy: as-authored transforms (the target
+    # basis) and per-part mate count / constrained status (the copy-
+    # completeness reference, mirroring the production validation).
+    seed_arrays = {p: list(component_transform(adapter, c))
+                   for p, c in seed.items()}
+    seed_counts = {p: component_mate_count(adapter, c)
+                   for p, c in seed.items()}
+    seed_status = {p: component_constrained_status(adapter, c)
+                   for p, c in seed.items()}
     verdicts: dict[str, bool] = {}
     strategies = (
         ("A put-only", _land_put),
@@ -300,7 +324,7 @@ async def _phase(adapter, mode: str) -> dict[str, bool]:
     )
     for station, (tag, land) in enumerate(strategies, start=1):
         comps = _copy(adapter, seed, n, slot_values, dim_slot, station)
-        targets = _targets(adapter, seed, station)
+        targets = _targets(seed_arrays, station)
         log(f"--- copy {tag} at station {station} ---")
         for part, name in comps.items():
             _report(adapter, "post-copy (parked)", name, targets[part])
@@ -311,6 +335,22 @@ async def _phase(adapter, mode: str) -> dict[str, bool]:
         hold = all(
             _report(adapter, "post-EditRebuild3", name, targets[part])
             for part, name in comps.items())
+        # The copy must also CARRY the seed's constraints -- a copy that
+        # silently dropped mates could sit at target and fake a HOLD.
+        for part, name in comps.items():
+            mates = component_mate_count(adapter, name)
+            status = component_constrained_status(adapter, name)
+            if mates != seed_counts[part] or status != seed_status[part]:
+                log(f"  !! {name}: mates={mates} (seed {seed_counts[part]}),"
+                    f" status={status} (seed {seed_status[part]})"
+                    " -- copy incomplete, verdict forced WANDER")
+                hold = False
+        # The seed itself must not have drifted, or the snapshot targets no
+        # longer describe the design ladder.
+        for part, name in seed.items():
+            if not _report(adapter, "seed drift check", name,
+                           _targets(seed_arrays, 0)[part]):
+                raise RuntimeError(f"seed {name} drifted off its snapshot")
         verdicts[tag] = hold
         log(f"  VERDICT {tag}: {'HOLD' if hold else 'WANDER'}")
     return verdicts
