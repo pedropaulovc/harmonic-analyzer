@@ -333,6 +333,32 @@ def test_part_tasks_cover_every_stem_once(monkeypatch):
     assert len(names) == len(set(names))
 
 
+def test_drawing_spine_boundary_and_source_dependency(monkeypatch):
+    """Drawings stay out of build_bare, yet remain serialized after its final
+    assembly and before verification. Their only CAD input is the source SLDPRT."""
+    dodo = _load_dodo()
+    monkeypatch.setenv("HARMONIC_BUILD_ORDER_SEED", "seat-A")
+    spine = dodo._com_spine_order()
+    drawing = "drawing:platen_guide"
+    assert max(i for i, name in enumerate(spine) if name.startswith("assembly:")) \
+        < spine.index(drawing) < spine.index("verify:soundness")
+
+    task = next(task for task in dodo.task_drawing() if task["name"] == "platen_guide")
+    cad_deps = [path for path in task["file_dep"] if path.lower().endswith(".sldprt")]
+    assert cad_deps == [dodo._sldprt("platen_guide")]
+    assert not any(path.lower().endswith(".sldasm") for path in task["file_dep"])
+    assert {Path(path).name for path in task["targets"]} == {
+        "platen-guide.SLDDRW",
+        "platen-guide.pdf",
+        "platen-guide_drawing.png",
+    }
+
+    build_deps = set(dodo.task_build()["task_dep"])
+    bare_deps = set(dodo.task_build_bare()["task_dep"])
+    assert drawing in build_deps
+    assert drawing not in bare_deps
+
+
 def test_assembly_artefact_digest_folds_in_refs():
     """An assembly's stable digest folds its own recipe together with each referenced
     artefact's digest, recursively -- so a leaf-part input change propagates up to
