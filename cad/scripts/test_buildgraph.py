@@ -269,6 +269,20 @@ def test_pen_assembly_free_of_pen_driver_closure():
     assert "channels.yaml" not in pen_cfg, pen_cfg
 
 
+def test_module_deps_follow_non_helper_siblings():
+    """POSITIVE direction of the traversal the retired pen test used to exercise
+    (codex #224): ``module_deps_of`` must follow ORDINARY sibling modules, not just
+    the ``_*``/``build_*`` helpers, and ``config_files_of`` must see the config
+    reads behind them -- else a script importing a non-helper module would silently
+    drop its Python/config deps. Real chain: pen_driver imports truth_model (both
+    plain siblings), which reads machine/output + channels through _config."""
+    closure = {Path(p).stem for p in module_deps_of(SCRIPTS_DIR / "pen_driver.py")}
+    assert "truth_model" in closure, closure
+    cfg = config_files_of(SCRIPTS_DIR / "pen_driver.py")
+    assert "machine/output.yaml" in cfg, cfg
+    assert "channels.yaml" in cfg, cfg
+
+
 def test_stamps_part_properties_only_genuine_stampers():
     """Only assemblies that GENERATE+stamp an in-script part (no separate part task)
     are flagged, via the function-level call graph. channel calls
