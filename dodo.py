@@ -113,6 +113,7 @@ from _buildgraph import (  # noqa: E402
 
 import _artifact_cache as _cache  # noqa: E402  (remote build-artefact cache)
 import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
+from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent
 CONFIG_DIR = REPO_ROOT / "cad" / "config"
@@ -233,25 +234,11 @@ def _com_seat(label: str):
 # SolidWorks adapter submodule digest.
 # Their order is derived from the source part producer for stable scheduling;
 # the runtime COM-seat lock provides serialization without adding false DAG edges.
-_DRAWING_SPECS = {
-    "platen_guide": {
-        "part": "platen_guide",
-        "arg": "platen-guide",
-        "script": SCRIPTS_DIR / "export_part_drawing.py",
-        "targets": (
-            CAD_OUT / "slddrw" / "platen-guide.SLDDRW",
-            CAD_OUT / "pdf" / "platen-guide.pdf",
-            CAD_OUT / "png" / "platen-guide_drawing.png",
-        ),
-    },
-}
-
-
 def _drawing_order() -> list[str]:
     producer_order = {stem: i for i, stem in enumerate(_seat_part_order())}
     return sorted(
-        _DRAWING_SPECS,
-        key=lambda name: (producer_order[_DRAWING_SPECS[name]["part"]], name),
+        DRAWINGS_BY_NAME,
+        key=lambda name: (producer_order[DRAWINGS_BY_NAME[name].part], name),
     )
 
 
@@ -1272,7 +1259,7 @@ def task_assembly():
 
 
 def _clean_drawing(stem: str) -> None:
-    for target in _DRAWING_SPECS[stem]["targets"]:
+    for target in DRAWINGS_BY_NAME[stem].outputs.values():
         _force_remove(Path(target))
 
 
@@ -1284,19 +1271,21 @@ def task_drawing():
     ``drawing:<stem>`` and deliberately excluded from ``build_bare``.
     """
     for stem in _drawing_order():
-        spec = _DRAWING_SPECS[stem]
-        script = Path(spec["script"]).resolve()
-        source = _sldprt(spec["part"])
+        spec = DRAWINGS_BY_NAME[stem]
+        script = spec.script.resolve()
+        source = _sldprt(spec.part)
         runtime = [*_helper_deps(script), _submodule_dep()]
         yield {
             "name": stem,
-            "file_dep": sorted({str(script), source, *runtime}),
-            "targets": [str(Path(path).resolve()) for path in spec["targets"]],
+            "file_dep": sorted(
+                {str(script), source, *runtime, *(str(path.resolve()) for path in spec.assets)}
+            ),
+            "targets": [str(path.resolve()) for path in spec.outputs.values()],
             "actions": [
                 (
                     _run,
                     [
-                        [sys.executable, str(script), spec["arg"]],
+                        [sys.executable, str(script), spec.artifact_stem],
                         f"drawing {stem}",
                         None,
                         True,
