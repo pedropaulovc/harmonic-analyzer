@@ -3,9 +3,11 @@
 SolidWorks 2026 on this seat has no BA rows in its stock BSI Hole Wizard
 database.  A metric HoleWzd seed would leave contradictory M2.5 metadata in the
 authoritative model, so BA holes are explicit tapping-drill cuts with model-owned
-6 BA cosmetic threads.  The thread form remains the period form from the project
-research; the tapping drill is the practical shop drill, not the theoretical
-basic core diameter.
+6 BA cosmetic threads.  SolidWorks drops custom StandardType/Size strings on
+save when no database row exists; the durable native identity is therefore the
+BSI-standard feature name + ThreadCallout, backed by model custom properties.
+The thread form remains the period form from the project research; the tapping
+drill is the practical shop drill, not the theoretical basic core diameter.
 """
 
 from __future__ import annotations
@@ -77,10 +79,12 @@ async def add_cosmetic_ba_threads(
         _read_member,
         _select_edges_geometric,
     )
+    from solidworks_mcp.adapters import sw_type_info
     from solidworks_mcp.adapters.solidworks.manufacturing import (
         _THREAD_END_TYPES,
         _THREAD_STANDARDS,
     )
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
     if end is TapEnd.BOTTOMING and thread_depth_mm is None:
         raise ValueError("bottoming cosmetic threads require thread_depth_mm")
@@ -111,6 +115,71 @@ async def add_cosmetic_ba_threads(
                 f"{tap.designation} cosmetic thread {index + 1} creation failed"
             )
         _flag_feature_methods(feature, "IFeature")
+        data = feature.GetDefinition()
+        if data is None:
+            raise RuntimeError(
+                f"{tap.designation} cosmetic thread {index + 1} has no definition"
+            )
+        data = sw_type_info.flagged(data, "ICosmeticThreadFeatureData")
+        model = adapter.currentModel
+        accessed = bool(data.AccessSelections(model, null_callout()))
+        if not accessed:
+            raise RuntimeError(
+                f"{tap.designation} cosmetic thread {index + 1} selections unavailable"
+            )
+        try:
+            thread_callout = (
+                f"{tap.designation}, {tap.pitch_mm:.2f} PITCH, "
+                f"{tap.angle_deg:.1f} DEG INCLUDED ANGLE"
+            )
+            data.Standard = _THREAD_STANDARDS["bsi"]
+            data.StandardType = "British Association"
+            data.Size = tap.designation
+            data.ThreadCallout = thread_callout
+            data.Diameter = tap.major_diameter_mm / 1000.0
+            data.EndCondition = _THREAD_END_TYPES[
+                "through" if end is TapEnd.THROUGH else "blind"
+            ]
+            if end is TapEnd.BOTTOMING:
+                data.BlindDepth = float(thread_depth_mm) / 1000.0
+            if not feature.ModifyDefinition(data, model, null_callout()):
+                raise RuntimeError(
+                    f"{tap.designation} cosmetic thread {index + 1} metadata rejected"
+                )
+        finally:
+            data.ReleaseSelectionAccess()
+
+        feature.Name = f"{tap.designation} {end.value.title()} Thread {index + 1}"
+        reread = feature.GetDefinition()
+        if reread is None:
+            raise RuntimeError(
+                f"{tap.designation} cosmetic thread {index + 1} read-back unavailable"
+            )
+        reread = sw_type_info.flagged(reread, "ICosmeticThreadFeatureData")
+        expected_end = _THREAD_END_TYPES[
+            "through" if end is TapEnd.THROUGH else "blind"
+        ]
+        expected_depth = 0.0 if end is TapEnd.THROUGH else float(thread_depth_mm)
+        actual_depth = float(reread.BlindDepth) * 1000.0
+        fields_match = (
+            reread.Standard == _THREAD_STANDARDS["bsi"]
+            and reread.ThreadCallout == thread_callout
+            and abs(float(reread.Diameter) * 1000.0 - tap.major_diameter_mm) < 1e-6
+            and reread.EndCondition == expected_end
+            and (
+                end is TapEnd.THROUGH
+                or abs(actual_depth - expected_depth) < 1e-6
+            )
+        )
+        if not fields_match:
+            raise RuntimeError(
+                f"{tap.designation} cosmetic thread {index + 1} metadata read-back "
+                f"failed: standard={reread.Standard!r}, "
+                f"type={reread.StandardType!r}, size={reread.Size!r}, "
+                f"callout={reread.ThreadCallout!r}, "
+                f"diameter_mm={float(reread.Diameter) * 1000.0!r}, "
+                f"end={reread.EndCondition!r}, depth_mm={actual_depth!r}"
+            )
         feature_name = str(_read_member(feature, "Name") or "")
         if not feature_name:
             raise RuntimeError(
