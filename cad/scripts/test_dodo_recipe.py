@@ -555,6 +555,23 @@ def test_part_digest_excludes_assembly_level_modules():
         "part slice must exclude real content, else the split is a no-op"
 
 
+def test_kinematics_verify_depends_on_pen_driver_and_truth_model():
+    """Post-#221 (park-driver machinery removed): build_pen_assembly no longer
+    imports pen_driver/truth_model, so those modules ride no assembly's .SLDASM
+    digest. The F5 chained-Fourier equation they define is now authored
+    TRANSIENTLY by verify:kinematics instead, so the guard for "an edit to
+    pen_driver/truth_model must invalidate the stamp" moved from the pen build
+    recipe to dodo.task_verify's kinematics file_dep (see the comment block there).
+    Pin that it's actually still wired up -- a dropped file_dep would leave a fresh
+    verify-kinematics.ok stamp valid after a pen_driver/truth_model edit and SKIP
+    the re-authored equation entirely."""
+    dodo = _load_dodo()
+    kinematics = next(t for t in dodo.task_verify() if t["name"] == "kinematics")
+    deps = {Path(d).name for d in kinematics["file_dep"]}
+    assert "pen_driver.py" in deps, deps
+    assert "truth_model.py" in deps, deps
+
+
 def test_submodule_digest_is_location_independent(tmp_path):
     """The submodule digest folds each file by its REPO-RELATIVE tag, so identical
     submodule content under different checkout roots hashes the same -- required for
