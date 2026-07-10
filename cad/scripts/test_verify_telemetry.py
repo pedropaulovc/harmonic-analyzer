@@ -68,18 +68,19 @@ def _install_solidworks_stub() -> None:
         sti.flag_methods = lambda obj, iface: None  # type: ignore[attr-defined]
         sys.modules[sti_name] = sti
         sys.modules["solidworks_mcp.adapters"].sw_type_info = sti  # type: ignore[attr-defined]
-    # The free-DOF closure gate does `from solidworks_mcp.adapters.base import
-    # SuppressMateParameters` at runtime; the mock's suppress_mate ignores the
-    # params object, so a permissive kwargs holder is enough to satisfy the import.
+    # Some helpers import parameter classes from solidworks_mcp.adapters.base at
+    # runtime; a permissive kwargs holder is enough to satisfy those imports.
     base_name = "solidworks_mcp.adapters.base"
     if base_name not in sys.modules:
         base = types.ModuleType(base_name)
 
-        class _Params:  # accepts any kwargs (name=..., suppress=...)
+        class _Params:  # accepts any kwargs
             def __init__(self, **kw: Any) -> None:
                 self.__dict__.update(kw)
 
         base.SuppressMateParameters = _Params  # type: ignore[attr-defined]
+        base.MateEntityRef = _Params  # type: ignore[attr-defined]
+        base.RenameFeatureParameters = _Params  # type: ignore[attr-defined]
         sys.modules[base_name] = base
         sys.modules["solidworks_mcp.adapters"].base = base  # type: ignore[attr-defined]
 
@@ -113,8 +114,7 @@ T_GEAR_LINKS_OTHER = 0.15
 T_TOOLS_INTERFERENCE = 0.3
 T_GET_INTERFERENCES = 0.7
 T_WHATS_WRONG = 0.03           # per target, the leaf that used to flood the trace
-T_LIST_MATES = 0.2             # MateGroup walk for the PARK_* free-DOF closure
-T_SUPPRESS_MATE = 0.1          # one suppress/unsuppress toggle
+T_LIST_MATES = 0.2             # MateGroup walk (list_mates)
 
 
 def _sleep(seconds: float) -> None:
@@ -165,11 +165,10 @@ class MockComponent:
 
     def GetConstrainedStatus(self) -> int:
         _sleep(T_CONSTRAINED_STATUS)
-        # Faithful to the park-driver closure: while the crank PARK mate is
-        # SUPPRESSED (the as-built free pose) the train is under-constrained; when
-        # it is engaged the model is fully defined. Fixed (-1) comps never reach
-        # here (IsFixed short-circuits), so non-fixed status tracks the park state.
-        if getattr(self._model, "_park_suppressed", False):
+        # Faithful to a freed-DOF model: in the free pose the train reads
+        # under-constrained; a fully-defined assembly reads fully constrained.
+        # Fixed (-1) comps never reach here (IsFixed short-circuits).
+        if getattr(self._model, "_free_pose", False):
             return _assembly.UNDER_CONSTRAINED  # 2 -> the free DOF is real
         return _assembly.FULLY_CONSTRAINED  # 3 -> fully defined, gate passes
 
@@ -202,18 +201,23 @@ class MockModel:
     def __init__(self, name: str, n_components: int) -> None:
         self._name = name
         self._comps = [MockComponent(f"{name}-{i + 1}", self) for i in range(n_components)]
-        # The real necessity gate names one component family per freed DOF that
-        # must itself read under-constrained (required_stems -- taken from the
-        # SAME map verify passes, so the mock can't drift). Rename a few
-        # components to those families, from index 1 so the grounded "-1" seed
-        # stays fixed.
-        for j, stem in enumerate(verify._REQUIRED_FREE_STEMS.get(name, ()), start=1):
-            if j < len(self._comps):
-                self._comps[j]._name = f"{stem}-{j + 1}"
+        # The real free-DOF gate names required families (necessity) AND
+        # rejects any under-constrained component outside the allowed coupled
+        # families (exact-set) -- both taken from the SAME maps verify passes,
+        # so the mock can't drift. Rename every non-seed component into the
+        # allowed set (cycling), which also covers the required stems (they
+        # are a subset); index 0 stays the grounded "-1" seed (IsFixed).
+        allowed = (verify._ALLOWED_FREE_STEMS.get(name)
+                   or verify._REQUIRED_FREE_STEMS.get(name, ()))
+        required = verify._REQUIRED_FREE_STEMS.get(name, ())
+        stems = list(required) + [s for s in allowed if s not in required]
+        for j in range(1, len(self._comps)):
+            if stems:
+                self._comps[j]._name = f"{stems[(j - 1) % len(stems)]}-{j + 1}"
         self.InterferenceDetectionManager = MockIDM()
-        # Whether the crank PARK mate is currently suppressed (free pose). Set by
-        # open_model for the default-free drive-train; toggled by suppress_mate.
-        self._park_suppressed = False
+        # Whether this model is in its freed-DOF pose (non-fixed components read
+        # under-constrained). Set by open_model for the free drive-train.
+        self._free_pose = False
         # Count ForceRebuild3 calls so a test can prove the soundness suite shares
         # ONE re-solve across the dof/over/health gates instead of rebuilding 3x.
         self.rebuild_calls = 0
@@ -254,8 +258,8 @@ class MockAdapter:
         _sleep(T_OPEN)
         stem = Path(path).stem
         self._current = MockModel(stem, COMPONENT_COUNTS.get(stem, 8))
-        # The default-free drive-train ships with the crank PARK mate suppressed.
-        self._current._park_suppressed = stem == "drive-train"
+        # drive-train ships with its operational DOF genuinely free.
+        self._current._free_pose = stem == "drive-train"
         return _Result(True)
 
     async def list_configurations(self) -> _Result:
@@ -267,22 +271,9 @@ class MockAdapter:
         return _Result(True)
 
     async def list_mates(self) -> _Result:
-        # drive-train's default-free build leaves the crank PARK driver SUPPRESSED
-        # (1 free DOF); other assemblies have no PARK_* mates (strict 0-DOF path).
+        # No driver mates exist for the freed DOF in the saved models.
         _sleep(T_LIST_MATES)
-        if self.currentModel._name == "drive-train":
-            return _Result([
-                {"name": "PARK_crank_angle", "type": "MateAngleDim", "suppressed": True}
-            ])
         return _Result([])
-
-    async def suppress_mate(self, params: Any) -> _Result:
-        # Track the park state so GetConstrainedStatus reflects it: unsuppress
-        # (suppress=False) engages the driver -> fully defined; suppress=True frees
-        # the crank -> under-constrained. The closure cycles both and restores.
-        _sleep(T_SUPPRESS_MATE)
-        self.currentModel._park_suppressed = bool(getattr(params, "suppress", True))
-        return _Result(True)
 
 
 def _fake_gear_links(owner: str):
@@ -397,14 +388,14 @@ def test_no_per_component_dof_check_spans(monkeypatch, tmp_path):
     frame_gate = dof_gates[0]
     assert frame_gate.attributes["not_fully_defined"] == 0
     assert frame_gate.status.status_code.name == "OK"
-    # drive-train is default-`free` (crank DOF deferred, not authored), so its DOF
-    # gate is the NECESSITY gate -- one span carrying the free-DOF aggregate, still
-    # no per-component flood. The exact-count closure runs in the release preflight.
+    # drive-train keeps its operational DOF free (no driver mates), so its DOF
+    # gate is the NECESSITY gate -- one span carrying the free-DOF aggregate,
+    # still no per-component flood.
     nec = _by_name(spans, "gate.dof_free_necessity")
     assert len(nec) == 1
-    # drive-train frees the crank spin + the cone-platform swing (PR2 round 3)
-    assert nec[0].attributes["expected_free_dof"] == 2
-    assert nec[0].attributes["free_under_constrained"] >= 2
+    # crank spin + cone-platform swing + pinion swing + lift-rod/cam spin (PR8)
+    assert nec[0].attributes["expected_free_dof"] == 4
+    assert nec[0].attributes["free_under_constrained"] >= 4
     assert nec[0].status.status_code.name == "OK"
 
 
@@ -443,36 +434,32 @@ def test_trace_is_one_tree_with_far_fewer_spans(monkeypatch, tmp_path):
     assert len({s.context.trace_id for s in spans}) == 1  # no gaps
     # Pre-fix: ~51 dof.check + ~52 health.whats_wrong + the gate/op spans = 110+.
     # Post-fix the per-item leaves are gone; the whole drive-train pass is small
-    # (~27 spans -- the free-DOF gate's park.* phase spans are a handful of named
-    # nodes, not a per-item flood). The bound guards against the 110+ regression,
-    # not exact count, so keep generous headroom above the real total.
+    # (~27 spans). The bound guards against the 110+ regression, not exact
+    # count, so keep generous headroom above the real total.
     assert len(spans) < 45, f"{len(spans)} spans -- per-item flood not removed?"
     assert len(_by_name(spans, "dof.check")) == 0
     assert len(_by_name(spans, "health.whats_wrong")) == 1
 
 
-def test_free_dof_build_gate_is_single_necessity_span_not_park_phases(monkeypatch, tmp_path):
-    """The default-``free`` drive-train build/soundness DOF gate is now the
-    lightweight NECESSITY gate -- a single ``gate.dof_free_necessity`` span with no
-    per-item flood -- NOT the old author->suppress->re-engage park cycling. That
-    expensive segmentation (``gate.dof_expected_free`` with ``park.discover /
-    necessity / engage / restore`` children nesting the ``gate.dof`` sufficiency
-    closure) moved to the release preflight (``gate.park_closure``), so it must NOT
-    appear in a soundness pass -- this pins the PR's "fast build, no park solves at
-    build time" guarantee."""
+def test_free_dof_gate_is_single_necessity_span_not_park_phases(monkeypatch, tmp_path):
+    """The drive-train soundness DOF gate is the lightweight NECESSITY gate -- a
+    single ``gate.dof_free_necessity`` span with no per-item flood. The retired
+    park machinery's spans (``gate.dof_expected_free`` with ``park.*`` phase
+    children, the release ``gate.park_closure``) must not appear anywhere --
+    this pins the park-driver removal."""
     spans, report = _run_soundness(["drive-train"], monkeypatch, tmp_path)
     assert report.failed == [], report.failed
     (gate,) = _by_name(spans, "gate.dof_free_necessity")
     assert gate.status.status_code.name == "OK"
-    # crank spin + cone-platform swing (PR2 round 3)
-    assert gate.attributes["expected_free_dof"] == 2
-    assert gate.attributes["free_under_constrained"] >= 2
-    # the old build-time park cycling / sufficiency closure is gone (preflight-only).
+    # crank spin + cone-platform swing + pinion swing + lift-rod/cam spin (PR8)
+    assert gate.attributes["expected_free_dof"] == 4
+    assert gate.attributes["free_under_constrained"] >= 4
+    # the park machinery is gone -- none of its spans may reappear.
     assert _by_name(spans, "gate.dof_expected_free") == []
     assert _by_name(spans, "gate.park_closure") == []
     for phase in ("park.discover", "park.necessity", "park.engage", "park.restore"):
-        assert _by_name(spans, phase) == [], f"{phase} should be preflight-only now"
-    # drive-train being free, there is no nested strict 0-DOF closure at build.
+        assert _by_name(spans, phase) == [], f"{phase} is retired park machinery"
+    # drive-train being free, there is no nested strict 0-DOF gate.
     assert _by_name(spans, "gate.dof") == []
 
 
@@ -501,8 +488,6 @@ def test_soundness_shares_one_rebuild_across_dof_over_health(monkeypatch, tmp_pa
 # Standalone demo: print the REAL console span tree for a realistic pass.       #
 # --------------------------------------------------------------------------- #
 def _demo() -> None:
-    import contextlib
-
     class _Patch:
         """Minimal monkeypatch shim so _run_soundness works outside pytest."""
 
