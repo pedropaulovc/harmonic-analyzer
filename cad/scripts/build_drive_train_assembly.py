@@ -172,7 +172,7 @@ from _cwm import (  # noqa: E402
     copy_with_mates,
     external_mate_rows,
     mates_with_owners,
-    set_distance_flip,
+    resolve_entity,
 )
 
 ASM_NAME = "drive-train"
@@ -2148,9 +2148,15 @@ async def build(adapter) -> dict[str, str]:
             " plane (copies land on the seed's side)")
     # The seed authors flip=True on the inclined frame (measured: the first
     # epoch-3 build failed the old flip=False assert at d=37.30). The Repeat
-    # path RESETS a re-valued dim to flip=False, so each copy's dim must be
-    # healed back to the seed's side before the closing rebuild.
+    # path RESETS a re-valued dim to flip=False, but the CORRECT idiom re-points
+    # the axial-seat slot with Repeat=false + NewEntityToMateTo (the shared
+    # shaft's Front plane, the same reference the seed's seat uses) and honours
+    # FlipDimension=seed_flip on that slot directly -- so each copy lands on the
+    # seed's side in the copy call itself, no post-copy ModifyDefinition heal
+    # (measured 2026-07-10, MIXED Repeat array; _cwm.py module doc).
     seed_flip = bool(seed_dim["flip"])
+    shaft_front = resolve_entity(
+        adapter, named_ref(f"Front Plane@{cone_shaft}", "PLANE"))
     seed_mates = component_mate_count(adapter, seed_cg)
     # The status REFERENCE is the seed's own reading, NOT fully-defined: the
     # cone cluster deliberately rides freed DOF (crank spin, platform swing --
@@ -2166,8 +2172,19 @@ async def build(adapter) -> dict[str, str]:
             cfg = f"T{teeth:03d}"
             values = [0.0] * 3
             values[dim_slot] = (d_seed + j * SEAT_PITCH) / 1000.0
+            # Re-point ONLY the axial-seat slot to the shared shaft's Front
+            # plane (Repeat=false) so FlipDimension=seed_flip is honoured on it;
+            # the coaxial + anti-spin slots keep the seed's shaft references
+            # (Repeat=true) untouched -- the measured mixed-array idiom.
+            repeat = [True] * 3
+            repeat[dim_slot] = False
+            new_ents: list = [None] * 3
+            new_ents[dim_slot] = shaft_front
+            flips = [False] * 3
+            flips[dim_slot] = seed_flip
             before = set(component_names(adapter))
-            copy_with_mates(adapter, [seed_cg], 3, values)
+            copy_with_mates(adapter, [seed_cg], 3, values, flips=flips,
+                            repeat=repeat, new_entities=new_ents)
             new = sorted(set(component_names(adapter)) - before)
             if len(new) != 1:
                 raise RuntimeError(
@@ -2178,24 +2195,10 @@ async def build(adapter) -> dict[str, str]:
             if teeth in TIP_TEETH:  # the four hard yellow tip gears
                 await apply_component_color(adapter, cg, MUNTZ_YELLOW)
             cone_gears.append((teeth, cg))
-        if seed_flip:
-            # ONE tree walk for the whole batch (the walk is ~20 s -- never
-            # per-copy): find each copy's re-valued dim and set it back to
-            # the seed's flip side.
-            copies = {cg for _, cg in cone_gears[1:]}
-            healed = 0
-            for row in mates_with_owners(
-                    adapter, {"cone-gear", "cone-gear-shaft"}):
-                if row["type"] != "MateDistanceDim":
-                    continue
-                if not (row["instances"] & copies):
-                    continue
-                set_distance_flip(adapter, row["name"], True)
-                healed += 1
-            if healed != len(copies):
-                raise RuntimeError(
-                    f"flip heal covered {healed} copies, expected"
-                    f" {len(copies)} -- a copy's axial dim was not found")
+        # No post-copy flip heal: FlipDimension=seed_flip was honoured in each
+        # copy call (Repeat=false on the axial-seat slot), so the copied dims
+        # already sit on the seed's side. The end-state validation below (pose
+        # + status + mate count) is the tripwire if any copy landed wrong.
         model = adapter.currentModel
         if not bool(adapter._attempt(lambda: model.EditRebuild3(),
                                      default=False)):
