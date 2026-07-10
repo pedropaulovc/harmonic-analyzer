@@ -50,6 +50,56 @@ def read_required_properties(
     return properties
 
 
+def import_cosmetic_threads(adapter: Any, view: Any) -> tuple[int, int]:
+    """Import a view's cosmetic threads and count seed plus pattern instances.
+
+    ``IDrawingDoc.InsertModelAnnotations3`` with ``swInsertCThreads`` makes this
+    independent of each seat's drawing annotation preferences.
+    ``GetCThreadCount`` counts seed objects, while each
+    ``ICThread.GetPatternedTransformsCount`` supplies its repeated instances.
+    """
+    view = _sw_type_info.flagged(view, "IView")
+    draw = adapter.currentModel
+    name = view_name(adapter, view)
+    draw.ActivateView(name)
+    draw.ClearSelection2(True)
+    selected = draw.Extension.SelectByID2(
+        name, "DRAWINGVIEW", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+    )
+    if not selected:
+        raise RuntimeError(f"failed to select drawing view {name!r}")
+    adapter._attempt(
+        lambda: draw.InsertModelAnnotations3(
+            0,      # swImportModelItemsFromEntireModel
+            0x1,    # swInsertCThreads
+            False,
+            True,
+            True,
+            False,
+        )
+    )
+    adapter._attempt(lambda: adapter.currentModel.EditRebuild3())
+    seed_count = int(adapter._get_attr_or_call(view, "GetCThreadCount") or 0)
+    instance_count = 0
+    thread = adapter._get_attr_or_call(view, "GetFirstCThread")
+    visited = 0
+    while thread is not None:
+        visited += 1
+        if visited > 10_000:
+            raise RuntimeError("cosmetic-thread traversal exceeded 10,000 entries")
+        thread = _sw_type_info.flagged(thread, "ICThread")
+        patterns = int(
+            adapter._get_attr_or_call(thread, "GetPatternedTransformsCount") or 0
+        )
+        instance_count += 1 + patterns
+        thread = adapter._get_attr_or_call(thread, "GetNext")
+    if visited != seed_count:
+        raise RuntimeError(
+            f"cosmetic-thread count mismatch: API={seed_count}, traversed={visited}"
+        )
+    return seed_count, instance_count
+
+
 def new_project_drawing(adapter: Any, *, property_view: str) -> tuple[Any, Any]:
     for asset in (ASME_B_DRWDOT, ASME_B_SLDDRT):
         if not asset.is_file() or asset.stat().st_size == 0:

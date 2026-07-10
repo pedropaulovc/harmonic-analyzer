@@ -69,8 +69,15 @@ async def add_cosmetic_ba_threads(
     end: TapEnd,
     tap: TapSpec = BA6,
     thread_depth_mm: float | None = None,
+    expected_instances: int | None = None,
 ) -> None:
-    """Attach read-validated 6 BA cosmetic threads to drilled circular edges."""
+    """Attach and rebuild-validate 6 BA cosmetic threads.
+
+    Cosmetic threads are subfeatures of their owning cut/pattern.  SolidWorks
+    reports repeated instances through ``GetPatternedTransformsCount`` rather
+    than as additional top-level features, so validation must traverse both
+    levels and count the base annotation plus its transforms.
+    """
     from solidworks_mcp.adapters.solidworks.features import (
         _flag_feature_methods,
         _read_member,
@@ -184,6 +191,49 @@ async def add_cosmetic_ba_threads(
             )
         adapter.currentModel.ClearSelection2(True)
         _telemetry.success(f"added {tap.designation} cosmetic thread {index + 1}")
+
+    adapter._attempt(lambda: adapter.currentModel.EditRebuild3())
+    persisted: dict[str, int] = {}
+    feature = _read_member(adapter.currentModel, "FirstFeature")
+    for _ in range(10_000):
+        if feature is None:
+            break
+        subfeature = _read_member(feature, "GetFirstSubFeature")
+        for _ in range(10_000):
+            if subfeature is None:
+                break
+            if _read_member(subfeature, "GetTypeName2") == "CosmeticThread":
+                definition = _read_member(subfeature, "GetDefinition")
+                definition = sw_type_info.flagged(
+                    definition, "ICosmeticThreadFeatureData"
+                )
+                count = int(
+                    _read_member(definition, "GetPatternedTransformsCount") or 0
+                )
+                persisted[str(_read_member(subfeature, "Name") or "")] = count
+            subfeature = _read_member(subfeature, "GetNextSubFeature")
+        feature = _read_member(feature, "GetNextFeature")
+    expected = {
+        f"{tap.designation} {end.value.title()} Thread {index + 1}"
+        for index in range(len(points_xy))
+    }
+    missing = expected - persisted.keys()
+    if missing:
+        raise RuntimeError(
+            f"{tap.designation} cosmetic threads did not survive rebuild: "
+            f"{sorted(missing)}"
+        )
+    physical_instances = sum(1 + persisted[name] for name in expected)
+    required_instances = expected_instances or len(points_xy)
+    if physical_instances != required_instances:
+        raise RuntimeError(
+            f"{tap.designation} cosmetic thread instances: {physical_instances}, "
+            f"expected {required_instances}"
+        )
+    _telemetry.success(
+        f"{len(expected)} {tap.designation} cosmetic thread seed(s) survived "
+        f"rebuild as {physical_instances} instance(s)"
+    )
 
 
 async def create_tapped_pattern(

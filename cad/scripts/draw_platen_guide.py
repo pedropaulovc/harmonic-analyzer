@@ -22,6 +22,7 @@ from _drawing_common import (
     add_hole_group_tags,
     assert_asme_b_sheet,
     draw_note_table,
+    import_cosmetic_threads,
     new_project_drawing,
     read_required_properties,
     render_pdf_png,
@@ -267,13 +268,19 @@ async def build(adapter: Any) -> dict[str, str]:
         f"{BA6.designation}, {BA6.pitch_mm:.2f} PITCH, "
         f"{BA6.angle_deg:.1f} DEG INCLUDED ANGLE"
     )
-    removed_thread_notes = remove_notes_matching(adapter, thread_callout)
-    expected_thread_notes = len(THROUGH_X) + len(BLIND_X)
-    if removed_thread_notes != expected_thread_notes:
+    thread_seeds, thread_instances = import_cosmetic_threads(adapter, front)
+    expected_thread_instances = len(THROUGH_X) + len(BLIND_X)
+    if thread_instances != expected_thread_instances:
         raise RuntimeError(
-            f"removed {removed_thread_notes} native thread callouts; "
-            f"expected {expected_thread_notes}"
+            f"front view has {thread_seeds} cosmetic-thread seed(s) / "
+            f"{thread_instances} instance(s); expected {expected_thread_instances}"
         )
+    removed_thread_notes = remove_notes_matching(adapter, thread_callout)
+    _telemetry.info(
+        f"front view imported {thread_seeds} cosmetic-thread seed(s) as "
+        f"{thread_instances} instance(s); removed {removed_thread_notes} "
+        "automatic callout note(s)"
+    )
 
     front_annotations = _insert_marked_model_dimensions(adapter, front)
     _curate_front_dimensions(adapter, front_annotations)
