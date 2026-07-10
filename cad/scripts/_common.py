@@ -1386,6 +1386,50 @@ def name_dimensions(adapter: Any, feature_name: str, names: list[str | None]) ->
     return out
 
 
+def mark_dimensions_for_drawing(
+    adapter: Any, feature_name: str, dimension_names: set[str]
+) -> None:
+    """Mark an explicit model-dimension subset for drawing insertion."""
+    feature = _feature_by_name(adapter, feature_name)
+    marked: set[str] = set()
+    display = _read_member(feature, "GetFirstDisplayDimension")
+    for _ in range(1000):
+        if not display:
+            break
+        dimension = display.GetDimension2(0)
+        name = str(_read_member(dimension, "Name"))
+        if _dim_owner_feature(dimension) == feature_name and name in dimension_names:
+            display.MarkedForDrawing = True
+            if not bool(_read_member(display, "MarkedForDrawing")):
+                raise RuntimeError(f"{name}@{feature_name}: mark-for-drawing failed")
+            marked.add(name)
+        display = feature.GetNextDisplayDimension(display)
+    missing = dimension_names - marked
+    if missing:
+        raise RuntimeError(
+            f"{feature_name}: dimensions not marked for drawing: {sorted(missing)}"
+        )
+    _telemetry.success(
+        f"marked for drawing {feature_name}: {', '.join(sorted(marked))}"
+    )
+
+
+def clear_dimensions_for_drawing(adapter: Any) -> int:
+    """Clear every model display-dimension drawing mark; return the count."""
+    cleared = 0
+    for feature in _iter_features(adapter):
+        display = _read_member(feature, "GetFirstDisplayDimension")
+        for _ in range(1000):
+            if not display:
+                break
+            if bool(_read_member(display, "MarkedForDrawing")):
+                display.MarkedForDrawing = False
+                cleared += 1
+            display = feature.GetNextDisplayDimension(display)
+    _telemetry.success(f"cleared {cleared} model-dimension drawing marks")
+    return cleared
+
+
 @_telemetry.traced("param.global", label_param="name")
 async def set_global(adapter: Any, name: str, expr: str | float) -> float:
     """Add or update an equation-manager global variable; returns its value.
