@@ -60,7 +60,6 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import math
-import re
 import sys
 
 import _telemetry
@@ -85,9 +84,12 @@ from _common import (
     run_build,
 )
 from _assembly import (
+    _CHAIN_SPROCKET_CONFIGS,
+    _CHAIN_SPROCKET_PREFIXES,
+    _flag,
+    _read_member,
     angle_driver,
     assert_free_dof_necessity,
-    check_no_interference,
     component_names,
     component_origin,
     component_transform,
@@ -185,47 +187,108 @@ LOCK_Z0 = BAR_FRONT_Z + GUIDE_DEPTH  # -128.9: lock plates on the guide backs,
 
 
 def _validate_threaded_guide_contacts(
-    message: str, allowed_pairs: set[frozenset[str]]
+    contacts: dict[frozenset[str], float], allowed_pairs: set[frozenset[str]]
 ) -> None:
     """Accept only the bounded screw-major/thread-tap engagement volumes."""
-    prefix = re.match(r"^\d+ interference\(s\): (.+)$", message)
-    if prefix is None:
-        raise RuntimeError(message)
-    entries = prefix.group(1).split("; ")
     expected_volume = (
         math.pi
         * ((SHANK_DIA / 2.0) ** 2 - (THREAD.tap_diameter_mm / 2.0) ** 2)
         * (SHANK_LEN - LOCK_THICK)
     )
-    seen: set[frozenset[str]] = set()
-    for entry in entries:
-        match = re.match(r"^(.+) & (.+): ([0-9.]+) mm\^3$", entry)
-        if match is None:
-            raise RuntimeError(message)
-        pair = frozenset((match.group(1), match.group(2)))
-        volume = float(match.group(3))
-        if pair not in allowed_pairs:
-            raise RuntimeError(message)
+    if set(contacts) != allowed_pairs:
+        missing = sorted(
+            " & ".join(sorted(pair)) for pair in allowed_pairs - set(contacts)
+        )
+        extra = sorted(
+            " & ".join(sorted(pair)) for pair in set(contacts) - allowed_pairs
+        )
+        raise RuntimeError(
+            f"6 BA thread engagement set differs: missing={missing}, extra={extra}"
+        )
+    for pair, volume in contacts.items():
         if not 0.98 * expected_volume <= volume <= 1.02 * expected_volume:
             raise RuntimeError(
                 f"thread engagement {' & '.join(sorted(pair))} is {volume:.2f} mm^3; "
                 f"expected {expected_volume:.2f} mm^3"
             )
-        seen.add(pair)
-    if seen != allowed_pairs:
-        missing = sorted(" & ".join(sorted(pair)) for pair in allowed_pairs - seen)
-        raise RuntimeError(f"missing expected 6 BA thread engagements: {missing}")
 
 
 def _check_paper_drive_interference(
     adapter, allowed_thread_pairs: set[frozenset[str]]
 ) -> None:
-    try:
-        check_no_interference(adapter)
-    except RuntimeError as exc:
-        _validate_threaded_guide_contacts(str(exc), allowed_thread_pairs)
+    """Run the standard interference gate plus bounded threaded engagements."""
+    asm = adapter.currentModel
+    with _telemetry.span("gate.interference") as span:
+        _telemetry.debug("interference detection: starting ...")
+        _flag(asm, "IAssemblyDoc")
+        adapter._attempt(lambda: asm.ToolsCheckInterference(), default=None)
+        manager = _read_member(asm, "InterferenceDetectionManager")
+        if manager is None:
+            raise RuntimeError("InterferenceDetectionManager unavailable")
+        _flag(manager, "IInterferenceDetectionMgr")
+        manager.TreatCoincidenceAsInterference = False
+        manager.TreatSubAssembliesAsComponents = True
+        manager.IncludeMultibodyPartInterferences = True
+        manager.MakeInterferingPartsTransparent = False
+        manager.CreateFastenersFolder = False
+        manager.UseTransform = False
+        with _telemetry.span("interference.compute"):
+            interferences = adapter._attempt(
+                lambda: manager.GetInterferences(), default=None
+            )
+
+        details: list[str] = []
+        threaded: dict[frozenset[str], float] = {}
+        chain_contacts: list[float] = []
+        chain_mesh_contacts: list[float] = []
+        for interference in list(interferences or []):
+            _flag(interference, "IInterference")
+            components = list(_read_member(interference, "Components") or [])
+            names = [str(_read_member(component, "Name2")) for component in components]
+            configs = [
+                str(_read_member(component, "ReferencedConfiguration") or "")
+                for component in components
+            ]
+            volume = float(_read_member(interference, "Volume") or 0.0) * 1e9
+            pair = frozenset(names)
+            if pair in allowed_thread_pairs:
+                threaded[pair] = volume
+                continue
+            if len(names) == 2 and all(
+                name.startswith(("chain-inner-link", "chain-outer-link"))
+                for name in names
+            ):
+                chain_contacts.append(volume)
+                continue
+            links = [
+                name
+                for name in names
+                if name.startswith(("chain-inner-link", "chain-outer-link"))
+            ]
+            sprockets = [
+                name
+                for name, config in zip(names, configs)
+                if name.startswith(_CHAIN_SPROCKET_PREFIXES)
+                and config in _CHAIN_SPROCKET_CONFIGS
+            ]
+            if len(names) == 2 and len(links) == 1 and len(sprockets) == 1:
+                chain_mesh_contacts.append(volume)
+                continue
+            details.append(f"{' & '.join(names)}: {volume:.2f} mm^3")
+        adapter._attempt(lambda: manager.Done(), default=None)
+
+        _validate_threaded_guide_contacts(threaded, allowed_thread_pairs)
+        span.set_attribute("hits", len(details))
+        span.set_attribute("thread_engagements", len(threaded))
+        span.set_attribute("chain_contacts", len(chain_contacts))
+        span.set_attribute("chain_mesh_contacts", len(chain_mesh_contacts))
+        if details:
+            raise RuntimeError(
+                f"{len(details)} interference(s): " + "; ".join(details)
+            )
         _telemetry.success(
-            f"{len(allowed_thread_pairs)} bounded 6 BA screw/tap engagements"
+            f"interference check: no faults; {len(threaded)} bounded 6 BA "
+            "screw/tap engagements"
         )
 
 # Rack: teeth-down at the platen's bottom edge, crests protruding 2 below it.
