@@ -1,5 +1,5 @@
-r"""Standalone MINIMAL repro: CopyWithMates2 parks an under-constrained copy
-off its mates' pose.
+r"""Standalone MINIMAL repro: CopyWithMates2 does not preserve the seed's pose
+along an UNDER-CONSTRAINED copy's free DOF.
 
 The smallest slice that shows it (measured 2026-07-09, SW 2024 SP3; re-confirmed
 2026-07-10 on SW 2026 SP2 via an early-bound C# Interop port): ONE part with
@@ -7,41 +7,52 @@ ZERO features (an empty part -- just its default planes), TWO mates to the
 assembly root planes (coincident Top + distance Front, leaving in-plane slide +
 spin free), ONE CopyWithMates2 call with the distance slot re-valued one step
 over. The floating copy lands at the right distance but PARKED ~8.5-9.5 mm off
-along the free in-plane direction -- deterministically, where the seed sat
+along the FREE in-plane direction -- deterministically, where the seed sat
 exactly on pose. A raw Transform2 put to the intended pose then survives
 EditRebuild3 (no revert at this scale; reverts were only ever observed on a
 large multi-loop assembly).
-
-By default the SEED IS FLOATED (its auto-fix removed) -- see below -- so the
-run isolates the pure CopyWithMates2 free-DOF wander with NO mate errors.
 
     seed after mates           org=(   0.000,   0.000, -20.000)  ON-POSE
     copy post-CopyWithMates2   org=(   9.488,  -0.000, -45.000)  WANDER   <- parks off, free dir
     copy post-put+rebuild      org=(   0.000,   0.000, -45.000)  ON-POSE  <- put heals, holds
 
-WHY FLOAT THE SEED (the confound this isolates). The first component added to an
-assembly is AUTO-FIXED by SolidWorks. A DISTANCE mate on a fixed component
-conflicts with the fix (the part can't move to satisfy it), so SolidWorks flags
-that mate over-defined -- a spurious "mates are over-defined / corrupted" error
-that has nothing to do with CopyWithMates2. `--fixed-seed` keeps the auto-fix to
-demonstrate that artifact:
-  * seed reads FULLY-DEFINED (it is pinned, not mate-constrained) and never wanders;
-  * the seed's Distance mate reports an ERROR (fix vs. distance-mate conflict);
-  * the copy's mates come out `aligned` while the seed's stay `closest`
-    (CopyWithMates2 does NOT preserve the alignment mode), so the copy's distance
-    also resolves on the OTHER side (solved z -45 vs seed-derived -50).
-Floating the seed makes both instances floating + under-defined, removes every
-mate error, and leaves ONLY the wander -- which is also the realistic case (a
-copied part is never the fixed one).
+IT IS THE FREE DOF, not API usage. The copy's distance mate IS re-valued the
+documented way -- Repeat=false + NewEntityToMateTo set to the assembly's own root
+planes (the same planes the seed mates to). Its mates come out correct
+(coincident + distance, referencing the root, err=0). The wander is NOT a
+mate-authoring failure; CopyWithMates2 simply resolves the copy's UNCONSTRAINED
+in-plane slide to an arbitrary off-origin station instead of the seed's.
+
+    --pin is the NEGATIVE CONTROL. It adds a third mate (Right-plane coincident)
+    that removes the free slide, so the copy is FULLY defined. The very same
+    CopyWithMates2 call then lands the copy EXACTLY on pose (no wander). So the
+    wander is specific to an under-constrained copy; a fully-mated copy is placed
+    correctly.
+
+Do NOT read into the bool return. CopyWithMates2 returns False on this call --
+but it ALSO returns False on the --pin copy that lands perfectly on pose and is
+fully defined with clean mates. So its return value is not a reliable
+success/failure signal here; only the resulting Transform2 / DOF status is.
+
+The auto-fixed first component is a SEPARATE confound, off by default. The first
+component added to an assembly is AUTO-FIXED; a distance mate on a fixed
+component conflicts with the fix (the part can't move to satisfy it), so
+SolidWorks flags that mate over-defined -- spurious "mates over-defined /
+corrupted" errors unrelated to CopyWithMates2. This repro FLOATS the seed by
+default (UnfixComponent) to remove that noise; --fixed-seed keeps the auto-fix to
+demonstrate the artifact (seed reads fully-defined-because-pinned, its Distance
+mate errors, and the seed's mate stays `closest` while the copy's is `aligned`,
+so the copy's distance also resolves on the other side, z -45 vs -50).
 
 pywin32 only -- NO repo imports, suitable for a vendor ticket. SolidWorks must
 already be open; the script creates its own throwaway documents, closes only
 those, and saves nothing except the tiny part in %TEMP%.
 
-Run:  uv run python cad\scripts\diagnostics\diag_cwm_min.py [--visible] [--fixed-seed]
+Run:  uv run python cad\scripts\diagnostics\diag_cwm_min.py [--visible] [--pin] [--fixed-seed]
 
 --visible uses a one-extrude cylinder instead of the empty part, so the parked
 copy can be seen (and screenshotted) in the viewport.
+--pin adds the Right-plane mate (negative control: no free DOF => no wander).
 --fixed-seed keeps the first component auto-fixed (see the confound above).
 
 Reproduce by hand in the SolidWorks UI
@@ -67,15 +78,20 @@ The script mirrors these exact steps -- do them by hand to see the wander live
    The component is now UNDER-DEFINED -- a free slide along the plane
    intersection (it shows a "(-)" prefix in the tree).
 5. Copy with Mates: select the component, then Insert > Component > Copy with
-   Mates. In the PropertyManager, keep each mate's existing reference (the Repeat
-   option) and give the Distance mate a NEW value one step over, e.g. 45 mm. Place
-   one copy, then close the PropertyManager.
+   Mates. Step through each mate. For the DISTANCE mate you must RE-SELECT its
+   reference (the assembly Front plane -- the same plane the seed uses; picking it
+   again is required, editing the value alone is not enough) and set the NEW value
+   one step over, e.g. 45 mm. Keep the other mate's reference as-is. Place one
+   copy, then close the PropertyManager.
 6. RESULT: the copy sits at the right DISTANCE but is PARKED ~8-9 mm off to the
    SIDE of the seed along the free direction -- not where the seed sits. Switch to
    a Front view (look straight down the cylinder axis): seed and copy show as two
    offset circles instead of one concentric circle. That off-side park is the bug.
-7. (Optional heal) Drag the copy back onto the seed's axis, or use Move Component
-   to set the intended pose; it holds through a rebuild (Ctrl-Q / Ctrl-B).
+7. NEGATIVE CONTROL: redo it but first add a third mate pinning the slide
+   (Coincident: part Right plane <-> assembly Right plane) so the component is
+   fully defined. Now the Copy with Mates copy lands exactly on the seed's axis --
+   no wander. (Or heal the under-defined case: drag the copy back onto the axis /
+   Move Component to the intended pose; it holds through a rebuild, Ctrl-Q.)
 """
 
 from __future__ import annotations
@@ -143,6 +159,17 @@ def mate(asm, refs, mtype, d=0.0):
     asm.ClearSelection2(True)
 
 
+def plane_entity(asm, name):
+    """The assembly's own root plane, as an entity for NewEntityToMateTo."""
+    if not asm.Extension.SelectByID2(name, "PLANE", 0, 0, 0, False, 0, NULL, 0):
+        raise RuntimeError(f"select failed: {name}")
+    ent = flag(asm.SelectionManager, "GetSelectedObject6").GetSelectedObject6(1, -1)
+    asm.ClearSelection2(True)
+    if ent is None:
+        raise RuntimeError(f"no entity for {name}")
+    return ent
+
+
 def report(tag, comp, want) -> bool:
     a = comp.Transform2.ArrayData
     p = [a[9] * 1000, a[10] * 1000, a[11] * 1000]
@@ -192,6 +219,7 @@ def status(ext, when, seed, copy=None):
 def main() -> int:
     visible = "--visible" in sys.argv
     fixed_seed = "--fixed-seed" in sys.argv
+    pin = "--pin" in sys.argv
     sw = flag(dynamic.Dispatch("SldWorks.Application"),
               "NewPart", "NewAssembly", "CloseDoc", "GetMathUtility")
     path = os.path.join(tempfile.gettempdir(), "cwm_min.SLDPRT")
@@ -214,31 +242,45 @@ def main() -> int:
         print(f"  seed: fixed={comp.IsFixed()} "
               f"({'auto-fix kept (--fixed-seed)' if fixed_seed else 'floated'})")
         name = comp.Name2
+        # mates on the component: Top-coincident, Front-distance (+ Right-coincident
+        # with --pin, which removes the free slide => the negative control).
         mate(asm, [f"Top Plane@{name}@{title}", "Top Plane"], COIN)
         mate(asm, [f"Front Plane@{name}@{title}", "Front Plane"], DIST, Z0)
+        if pin:
+            mate(asm, [f"Right Plane@{name}@{title}", "Right Plane"], COIN)
         seed = comp.Transform2.ArrayData  # the reference: solved seed pose
         report("seed after mates", comp, [seed[9] * 1000, seed[10] * 1000,
                                           seed[11] * 1000])
         status(ext, "seed only, before CopyWithMates2", comp)
         before = {c.Name2 for c in asm.GetComponents(True)}
-        n = 2  # both mates are external (root-plane refs); slot 1 = the dim
-        asm.CopyWithMates2(
+        # Documented usage: Repeat=false + NewEntityToMateTo set to the assembly's
+        # own root planes (the same planes the seed mates to), so a re-valued
+        # distance mate is authored correctly on the copy.
+        plane_names = ["Top Plane", "Front Plane"] + (["Right Plane"] if pin else [])
+        values = [0.0, Z0 + STEP] + ([0.0] if pin else [])
+        n = len(plane_names)
+        ents = [plane_entity(asm, nm)._oleobj_ for nm in plane_names]
+        ok = asm.CopyWithMates2(
             VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH,
                     [comp._oleobj_]),
-            VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, [True] * n),
-            VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, [None] * n),
-            VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [0.0, Z0 + STEP]),
+            VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, [False] * n),
+            VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, ents),
+            VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, values),
             VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, [False] * n),
             VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, [False] * n),
             VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, [False] * n),
             VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_I4, [0] * n),
         )
+        # NOTE: `ok` is False here even in the --pin case that lands the copy
+        # perfectly on pose -- the bool return is NOT a reliable signal.
+        print(f"  CopyWithMates2 returned {ok}"
+              " (unreliable -- False even on a successful --pin copy)")
         comps = {c.Name2: c for c in asm.GetComponents(True)}
         copy = flag(comps[(set(comps) - before).pop()],
                     "IsFixed", "GetConstrainedStatus")
         # expected: the seed's solved pose, one STEP further on its side
         want = [seed[9] * 1000, seed[10] * 1000, (seed[11] - STEP) * 1000]
-        parked = report("copy post-CopyWithMates2", copy, want)
+        on_pose = report("copy post-CopyWithMates2", copy, want)
         status(ext, "after CopyWithMates2", comp, copy)
         z_parked = copy.Transform2.ArrayData[11] * 1000
         if abs(z_parked - want[2]) > 0.05:
@@ -259,8 +301,9 @@ def main() -> int:
             print("  !! EditRebuild3 returned False")
         held = report("copy post-put+rebuild", copy, want)
         status(ext, "after put + rebuild", comp, copy)
-        print(f"VERDICT: {'no wander' if parked else 'copy PARKS OFF-POSE'},"
-              f" {'put holds' if held else 'put REVERTED'}")
+        print(f"VERDICT: {'no wander (copy on pose)' if on_pose else 'copy PARKS OFF-POSE'},"
+              f" {'put holds' if held else 'put REVERTED'}"
+              f"{' [--pin control]' if pin else ''}")
         return 0
     finally:
         for t in titles:
