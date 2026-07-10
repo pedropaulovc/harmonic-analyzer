@@ -943,6 +943,14 @@ def stage_drawings(stage: Path) -> dict[str, str]:
             staged[f"{drawing_name}:{kind}"] = str(
                 destination.relative_to(stage)
             ).replace("\\", "/")
+            if kind == "slddrw":
+                native_dir = stage / "solidworks"
+                native_dir.mkdir(parents=True, exist_ok=True)
+                native_copy = native_dir / source.name
+                shutil.copy2(source, native_copy)
+                staged[f"{drawing_name}:solidworks_slddrw"] = str(
+                    native_copy.relative_to(stage)
+                ).replace("\\", "/")
     return staged
 
 

@@ -26,6 +26,7 @@ from _drawing_common import (
     read_required_properties,
     render_pdf_png,
     reopen_drawing,
+    sanitize_pdf_metadata,
     set_hidden_lines_removed,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -175,9 +176,10 @@ def _manufacturing_notes() -> str:
                 f"PITCH {BA6.pitch_mm:.2f}, CORE DIA {BA6.core_diameter_mm:.3f}, "
                 f"INCLUDED ANGLE {BA6.angle_deg:.1f} DEG."
             ),
-            "5. PLATEN-MATING FACE FLAT WITHIN 0.10; SURFACE FINISH Ra 3.2 OR BETTER.",
-            "6. OPPOSITE FACE PARALLEL TO PLATEN-MATING FACE WITHIN 0.10.",
-            "7. APPLY BLACK OXIDE AFTER MACHINING.",
+            "5. DATUM A IS THE PLATEN-MATING FACE (BLIND-HOLE ENTRY FACE).",
+            "6. DATUM A FACE: FLATNESS 0.10; SURFACE FINISH Ra 3.2 OR BETTER.",
+            "7. OPPOSITE FACE: PARALLELISM 0.10 TO DATUM A.",
+            "8. APPLY BLACK OXIDE AFTER MACHINING.",
         )
     )
 
@@ -195,7 +197,7 @@ def _add_hole_schedule(adapter: Any) -> None:
             (
                 "A",
                 "4",
-                "53, 67, 233, 247",
+                "53.00, 67.00, 233.00, 247.00",
                 (
                     f"6 BA THRU; CORE DIA {BA6.core_diameter_mm:.3f} THRU; "
                     "TAP FROM REAR"
@@ -204,7 +206,7 @@ def _add_hole_schedule(adapter: Any) -> None:
             (
                 "B",
                 "5",
-                "30, 90, 150, 210, 270",
+                "30.00, 90.00, 150.00, 210.00, 270.00",
                 (
                     f"6 BA x {BLIND_THREAD_DEPTH:g} FULL; CORE DIA "
                     f"{BA6.core_diameter_mm:.3f} x {BLIND_HOLE_DEPTH:g} DEEP; "
@@ -213,7 +215,7 @@ def _add_hole_schedule(adapter: Any) -> None:
             ),
         ),
         column_x=(0.014, 0.050, 0.071, 0.202),
-        row_y=(0.270, 0.260, 0.249),
+        row_y=(0.264, 0.254, 0.243),
     )
 
 
@@ -243,9 +245,21 @@ async def build(adapter: Any) -> dict[str, str]:
         required=("Number", "Material Specification", "Finish", "Quantity"),
     )
     drawing_model, sheet = new_project_drawing(adapter, property_view=PART_STEM)
+    summary = {
+        0: "Platen Guide Manufacturing Drawing",
+        1: "Harmonic Analyzer hobby-machinist book drawing",
+        2: "Harmonic Analyzer Project",
+        3: "platen guide; manufacturing drawing; 6 BA",
+        4: "Generated from the project-owned ASME B drawing standard",
+    }
+    model_doc = _sw_type_info.flagged(drawing_model, "IModelDoc2")
+    for field, value in summary.items():
+        model_doc.SummaryInfo(field, value)
+        if model_doc.SummaryInfo(field) != value:
+            raise RuntimeError(f"drawing summary field {field} did not persist")
     front = place_view(adapter, str(SOURCE), "*Back", 0.190, 0.190, scale=(1, 1))
     right = place_view(adapter, str(SOURCE), "*Right", 0.375, 0.190, scale=(3, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", 0.190, 0.055, scale=(1, 3))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", 0.205, 0.043, scale=(1, 4))
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
@@ -289,7 +303,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_note(adapter, _manufacturing_notes(), 0.014, 0.105)
     add_note(adapter, "SCALE 3:1", 0.352, 0.163)
-    add_note(adapter, "REFERENCE — SCALE 1:3", 0.145, 0.018)
+    add_note(adapter, "REFERENCE — SCALE 1:4", 0.170, 0.014)
 
     drawing_model.ClearSelection2(True)
     drawing_model.EditRebuild3()
@@ -308,6 +322,7 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, sheet = await reopen_drawing(adapter, OUTPUTS.slddrw)
     assert_asme_b_sheet(adapter, sheet, phase="post-save reopen")
     artifacts.update(save_drawing(adapter, "", pdf_path=str(OUTPUTS.pdf)))
+    sanitize_pdf_metadata(OUTPUTS.pdf, title="Platen Guide Manufacturing Drawing")
     render_pdf_png(OUTPUTS.pdf, OUTPUTS.png)
     artifacts["png"] = str(OUTPUTS.png.resolve())
     if set(artifacts) != {"drawing", "pdf", "png"}:

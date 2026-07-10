@@ -158,6 +158,36 @@ def render_pdf_png(pdf: Path, png: Path) -> None:
         )
 
 
+def sanitize_pdf_metadata(pdf: Path, *, title: str) -> None:
+    """Replace seat/user PDF metadata while preserving the vector page."""
+    from pypdf import PdfReader, PdfWriter
+
+    reader = PdfReader(pdf)
+    if len(reader.pages) != 1:
+        raise RuntimeError(f"drawing PDF has {len(reader.pages)} pages, expected 1")
+    writer = PdfWriter()
+    writer.clone_document_from_reader(reader)
+    metadata = {
+        "/Title": title,
+        "/Author": "Harmonic Analyzer Project",
+        "/Subject": "Hobby-machinist manufacturing drawing",
+        "/Keywords": "harmonic analyzer, manufacturing drawing, 6 BA",
+        "/Creator": "Harmonic Analyzer SolidWorks drawing pipeline",
+        "/Producer": "Harmonic Analyzer Project",
+    }
+    writer.add_metadata(metadata)
+    temporary = pdf.with_suffix(".sanitized.pdf")
+    try:
+        writer.write(temporary)
+        temporary.replace(pdf)
+    finally:
+        temporary.unlink(missing_ok=True)
+    reread = PdfReader(pdf).metadata or {}
+    for key, value in metadata.items():
+        if reread.get(key) != value:
+            raise RuntimeError(f"PDF metadata {key} did not sanitize")
+
+
 def _select_edge(adapter: Any, x: float, y: float, *, append: bool) -> Any:
     draw = adapter.currentModel
     selected = draw.Extension.SelectByID2(
