@@ -242,6 +242,7 @@ async def create_tapped_pattern(
             )
     if end is TapEnd.BOTTOMING:
         for key, actual, expected in (
+            ("tap drill diameter", readback["tap_drill_diameter_mm"], tap.tap_diameter_mm),
             ("hole depth", readback["hole_depth_mm"], float(hole_depth_mm)),
             ("thread depth", readback["thread_depth_mm"], float(thread_depth_mm)),
         ):
@@ -299,7 +300,7 @@ async def create_tapped_pattern(
         await dimension_between(
             adapter, ref, "origin", "vertical_distance", y_mm, f"{name} P{index} Y"
         )
-        locator_names.extend((f"P{index}X", f"P{index}Y"))
+        locator_names.extend((f"{name}P{index}X", f"{name}P{index}Y"))
     await ensure_fully_defined(adapter, f"{name} locations")
     check(f"exit {name} locations", await adapter.exit_sketch())
     _name_dimensions(position_feature, locator_names)
