@@ -554,7 +554,6 @@ async def build(adapter) -> dict[str, str]:
         times.append(time.perf_counter() - t0)
         log(f"slice copy -> ch{SEED_J + i:02d}: {times[-1]:.2f}s")
 
-    mates_after = await _mate_count(adapter)
     want_mates = mates_before + SLICE_MATES * N_COPY_STATIONS
 
     # Evidence dump: every distance mate's ACTUAL dimension value + owners,
@@ -683,40 +682,28 @@ async def build(adapter) -> dict[str, str]:
         t_fix = time.perf_counter() - t0
         pose_fail, bad_instances = _measure("repaired")
 
-    # Stability: one closing rebuild, then re-check the FULL pose (rotation
-    # + XYZ, matched by instance name) -- a same-station flip snap-back
-    # changes XY/rotation while leaving Z untouched (codex #220), so a
-    # Z-only comparison would miss exactly the failure mode the flip
-    # repair guards against. The rebuild itself must SUCCEED before the
-    # post-rebuild read means anything -- a swallowed False/COM error here
-    # would compare against a stale model and report stable=True without
-    # ever proving a rebuild (codex #220 round 2).
-    tfs_pre = _slice_transforms(adapter, seed_names)
+    # END-STATE VALIDATION (codex #220 rounds 2-5 converged here): every
+    # mutation -- the copies and any flip repair -- is done, ONE closing
+    # rebuild (asserted) solves the final assembly, and every invariant is
+    # proven on that post-rebuild end state. The absolute pose measure
+    # subsumes the earlier pre/post "stability" comparison (a snap-back or
+    # dropped mate lands the copy off its seed pose or station), and
+    # nothing mutates after these checks, so no invariant can be silently
+    # invalidated by a later step.
     if not bool(adapter._attempt(lambda: model.EditRebuild3(), default=False)):
         raise RuntimeError(
-            "closing EditRebuild3 failed -- rebuild-stability unproven")
-    tfs_post = _slice_transforms(adapter, seed_names)
-    pre_by_name = {n: m for part in CHAIN_PARTS for n, m in tfs_pre[part]}
-    post_by_name = {n: m for part in CHAIN_PARTS for n, m in tfs_post[part]}
-    stable = set(pre_by_name) == set(post_by_name) and all(
-        max(abs(a[k] - b[k]) for k in range(9)) < 1e-6
-        and max(abs((a[9 + t] - b[9 + t]) * 1000.0) for t in range(3)) < 1e-3
-        for n, a in pre_by_name.items()
-        for b in [post_by_name[n]]
-    )
-
-    log("=" * 70)
-    log(f"mates: {mates_before} -> {mates_after} (want {want_mates}: "
-        f"+{SLICE_MATES}/copy x {N_COPY_STATIONS})")
-    log(f"poses: {'ALL ON-STATION' if not pose_fail else 'FAIL -- ' + '; '.join(pose_fail)}")
-    log(f"stable after rebuild: {stable}")
-    log(f"timing: seed chain {t_seed:.1f}s vs slice copy avg "
-        f"{sum(times) / len(times):.2f}s (first {times[0]:.2f}s, last "
-        f"{times[-1]:.2f}s) + repair pass {t_fix:.1f}s total")
-    # Seed immutability: the production rework copies FROM a source
-    # channel, so nothing in the copy/repair workflow may perturb the seed
-    # slice itself (codex #220 round 4) -- every other check here excludes
-    # seed_names, so drift of the SOURCE would otherwise pass silently.
+            "closing EditRebuild3 failed -- end state unproven")
+    # (1) Mate count, re-read POST-rebuild: a copied mate that the closing
+    # solve dropped would keep the pre-rebuild count and evade the health
+    # scan (which only sees mates that still exist).
+    mates_final = await _mate_count(adapter)
+    # (2) Absolute poses post-rebuild: seed rotation/XY + exact station Z
+    # for every copy of all four parts.
+    pose_fail, _ = _measure("final")
+    # (3) Seed immutability: the production rework copies FROM a source
+    # channel, so nothing in the copy/repair/rebuild workflow may perturb
+    # the seed slice itself -- every other check excludes seed_names, so
+    # drift of the SOURCE would otherwise pass silently.
     seed_drift = []
     for part, name in comps.items():
         m = component_transform(adapter, name)
@@ -726,12 +713,9 @@ async def build(adapter) -> dict[str, str]:
         if rot_d > 1e-6 or xyz_d > 1e-3:
             seed_drift.append(f"{name}: rot_d={rot_d:.2e} xyz_d={xyz_d:.4f}mm")
     log(f"seed slice: {'unmoved' if not seed_drift else 'MOVED -- ' + '; '.join(seed_drift)}")
-
-    # Copied-mate HEALTH: the expected mate count and stable poses can hold
-    # while a copied mate sits suppressed or in a hard error state with its
-    # component parked at the inserted transform (codex #220 round 3 --
-    # the park-replay corpse mode _mate_hard_error documents). Scan every
-    # mate the real copies added.
+    # (4) Copied-mate HEALTH: count and poses can hold while a copied mate
+    # sits suppressed or in a hard error state (the park-replay corpse mode
+    # _mate_hard_error documents). Scan every mate the real copies added.
     res = await adapter.list_mates()
     unhealthy = []
     for m in (res.data or []):
@@ -744,15 +728,22 @@ async def build(adapter) -> dict[str, str]:
     log(f"copied-mate health: "
         f"{'all clean' if not unhealthy else 'UNHEALTHY -- ' + '; '.join(unhealthy)}")
 
-    ok = ((mates_after == want_mates) and not pose_fail and stable
+    log("=" * 70)
+    log(f"mates (post-rebuild): {mates_before} -> {mates_final} (want "
+        f"{want_mates}: +{SLICE_MATES}/copy x {N_COPY_STATIONS})")
+    log(f"poses: {'ALL ON-STATION' if not pose_fail else 'FAIL -- ' + '; '.join(pose_fail)}")
+    log(f"timing: seed chain {t_seed:.1f}s vs slice copy avg "
+        f"{sum(times) / len(times):.2f}s (first {times[0]:.2f}s, last "
+        f"{times[-1]:.2f}s) + repair pass {t_fix:.1f}s total")
+    ok = ((mates_final == want_mates) and not pose_fail
           and not unhealthy and not seed_drift)
     if not ok:
         # Raise so the process exits non-zero -- a logged FAIL with exit 0
         # would let automation treat a failed validation as passing
         # (codex #220).
         raise RuntimeError(
-            f"slice validation FAILED: mates {mates_after}/{want_mates}, "
-            f"{len(pose_fail)} pose failures, stable={stable}, "
+            f"slice validation FAILED: mates {mates_final}/{want_mates}, "
+            f"{len(pose_fail)} pose failures, "
             f"{len(unhealthy)} unhealthy copied mates, "
             f"{len(seed_drift)} seed drifts (see log)")
     log("VERDICT: PASS -- one call + flip repair replicates the whole chain")
