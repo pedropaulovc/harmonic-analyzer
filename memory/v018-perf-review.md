@@ -222,3 +222,27 @@ the FREE (no spin dims) slice forced, all measured on the seat:
    `reledger_to_solved` so the final pose-ledger sweep covers copies; DOF specs
    recorded on the copies via the same driver helpers (labels VERBATIM like the
    authored path so `_flip_sig` signatures match).
+
+**2026-07-09 round-3 addendum — the attractor resists minimal reproduction
+(`diagnostics/diag_cwm_attractor.py`, 3 seat runs):** a 3-phase isolated repro
+(rocker-on-shaft single; +rod open chain; +ring-X root-plane closer = CLOSED
+loop, the production J3 idiom) copied each slice 3x and landed one copy per
+strategy. All NINE cells HOLD through EditRebuild3 — including bare
+`Transform2` put-only on the closed loop. So fact 1's put-reversion is an
+EMERGENT property of the production channel slice (mirrored/rotated seed
+transforms, coincident-PLANE axial mates, the 4-part multi-loop, ~100-component
+context), not of CopyWithMates2 + free DOF per se; the put+driver landing
+stays justified by the production-scale measurements (runs 3-4), and any
+future ladder must validate on its REAL slice, not a toy. What DOES reproduce
+at every scale is the parked-pose wander: each copy parks spun ~9deg off the
+seed, deterministically. Two positive findings: (a) **IDragOperator**
+(`GetDragOperator` -> AddComponent/BeginDrag/Drag(absolute)/EndDrag,
+TransformType=2, DragMode=0, UseAbsoluteTransform=True — the UI Move
+Components solver path, "reuses the solver") lands copies in ~0.2s/part vs
+~0.8s per authored driver mate and survives the rebuild in all repro phases —
+the candidate cheap landing for the drive-train cone-gear ladder, pending
+real-slice validation. (b) The UI-vs-API mystery is WORKFLOW, not solver
+magic: every vendor demo (GoEngineer pT3GPqMmAWk, Visiativ ToiXLdm7ncs
+transcripts; thecadcoder prerequisite "both components fully constraint")
+copies a FULLY-DEFINED seed — the UI path never exercises under-constrained
+copies at all.
