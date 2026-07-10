@@ -82,6 +82,11 @@ RENDER_DIFF = REPO_ROOT / "comparisons" / "tools" / "render_diff.py"
 # + per-config mesh keys + colours) that lets a consumer render the bundle with
 # comparisons/tools/render_offline.py without SolidWorks.
 SCENE_JSON = CAD_ROOT / "out" / "boxes" / f"{TOP_ASSEMBLY}.json"
+DRAWING_OUTPUTS = {
+    "slddrw": CAD_ROOT / "out" / "slddrw" / "platen-guide.SLDDRW",
+    "pdf": CAD_ROOT / "out" / "pdf" / "platen-guide.pdf",
+    "png": CAD_ROOT / "out" / "png" / "platen-guide_drawing.png",
+}
 
 # Comparison gallery (reference-photo overlays). PRODUCED BY THE EXPORT STAGE
 # (export_models.refresh_comparison_gallery renders it from the STLs once they're
@@ -921,6 +926,20 @@ def write_provenance(stage: Path, version: str, revision: str,
 # --------------------------------------------------------------------------- #
 # Bundle assembly (single zip)
 # --------------------------------------------------------------------------- #
+def stage_drawings(stage: Path) -> dict[str, str]:
+    """Copy required manufacturing drawings into their release directories."""
+    staged: dict[str, str] = {}
+    for kind, source in DRAWING_OUTPUTS.items():
+        if not source.is_file() or source.stat().st_size == 0:
+            raise RuntimeError(f"required drawing output is missing: {source}")
+        destination_dir = stage / kind
+        destination_dir.mkdir(parents=True, exist_ok=True)
+        destination = destination_dir / source.name
+        shutil.copy2(source, destination)
+        staged[kind] = str(destination.relative_to(stage)).replace("\\", "/")
+    return staged
+
+
 def bundle(sw: Any, revision: str, version: str,
            prev_tag: str | None = None) -> tuple[Path, dict[str, Any]]:
     """Assemble the single release zip: Pack-and-Go + neutral STEP/STL/PNG.
@@ -949,6 +968,7 @@ def bundle(sw: Any, revision: str, version: str,
 
     # 2. Neutral exports (STEP / STL / PNG) into the same stage.
     facts.update(export_neutral(sw, stage))
+    facts["drawings"] = stage_drawings(stage)
 
     # 3. Scene graph (mm): per-component transforms + mesh keys + colours, so a
     #    consumer can render the bundle with render_offline.py (no SolidWorks).

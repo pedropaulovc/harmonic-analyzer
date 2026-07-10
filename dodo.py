@@ -16,6 +16,7 @@ Task groups (the prefix says whether SolidWorks is required):
 
   part:<stem>        build one part            (COM -- needs SolidWorks)
   assembly:<stem>    build/refresh one assembly (COM)
+  drawing:<stem>     build one manufacturing drawing (COM)
   verify:<suite>     soundness/subsystems/kinematics gates (COM)
   check:<name>       math/config/graph/nameplate/recipe gates (NO SolidWorks)
   export             neutral STEP/STL/scene export (COM)
@@ -146,6 +147,32 @@ _COM_TAIL = [
     "release",
 ]
 
+# Drawing tasks declare only their source model and drawing-specific inputs.
+# They sit at the first COM boundary after ``build_bare``: placing them directly
+# after their source part would make the later assembly spine pull them into
+# ``build_bare``.  Within that boundary their order is derived from the source
+# part producer, so adding another drawing needs no hand-edited spine-tail entry.
+_DRAWING_SPECS = {
+    "platen_guide": {
+        "part": "platen_guide",
+        "arg": "platen-guide",
+        "script": SCRIPTS_DIR / "export_part_drawing.py",
+        "targets": (
+            CAD_OUT / "slddrw" / "platen-guide.SLDDRW",
+            CAD_OUT / "pdf" / "platen-guide.pdf",
+            CAD_OUT / "png" / "platen-guide_drawing.png",
+        ),
+    },
+}
+
+
+def _drawing_order() -> list[str]:
+    producer_order = {stem: i for i, stem in enumerate(_seat_part_order())}
+    return sorted(
+        _DRAWING_SPECS,
+        key=lambda name: (producer_order[_DRAWING_SPECS[name]["part"]], name),
+    )
+
 
 # --- Per-seat part order: diverge two cold builders so they SPLIT the work.
 #
@@ -180,11 +207,11 @@ def _seat_part_order() -> list[str]:
 
 
 def _com_spine_order() -> list[str]:
-    """The full COM task order: parts (in per-seat order), then assemblies, then
-    the SW tail."""
+    """The COM order: bare build, dependency-ordered drawings, then SW tail."""
     parts = [f"part:{stem}" for stem in _seat_part_order()]
     asms = [f"assembly:{stem}" for stem in ASSEMBLY_ORDER]
-    return parts + asms + _COM_TAIL
+    drawings = [f"drawing:{stem}" for stem in _drawing_order()]
+    return parts + asms + drawings + _COM_TAIL
 
 
 _SPINE = _com_spine_order()
@@ -206,6 +233,11 @@ def _assert_spine_complete() -> None:
         raise SystemExit("dodo: duplicate task in COM spine")
     if not part_stems():
         raise SystemExit("dodo: no part scripts found -- COM spine is empty")
+    missing = {
+        spec["part"] for spec in _DRAWING_SPECS.values() if spec["part"] not in part_stems()
+    }
+    if missing:
+        raise SystemExit(f"dodo: drawing source part(s) missing: {sorted(missing)}")
 
 
 _assert_spine_complete()
@@ -350,6 +382,8 @@ def _stage_name(label: str) -> str:
         return "part-build"
     if label.startswith(("assembly:", "FULL build", "REFRESH", "hook ")):
         return "assembly-build"
+    if label.startswith(("drawing:", "drawing ")):
+        return "drawing-export"
     if label.startswith("verify "):
         return "verify-" + label.split(None, 2)[1]
     if label.startswith("check "):
@@ -1159,6 +1193,35 @@ def task_assembly():
         }
 
 
+def _clean_drawing(stem: str) -> None:
+    for target in _DRAWING_SPECS[stem]["targets"]:
+        _force_remove(Path(target))
+
+
+def task_drawing():
+    """Curated manufacturing drawings, serialized on the SolidWorks COM spine.
+
+    A drawing depends on its authoritative SLDPRT plus the drawing exporter and
+    its project-local helper closure.  It is independently selectable as
+    ``drawing:<stem>`` and deliberately excluded from ``build_bare``.
+    """
+    for stem in _drawing_order():
+        spec = _DRAWING_SPECS[stem]
+        script = Path(spec["script"]).resolve()
+        source = _sldprt(spec["part"])
+        yield {
+            "name": stem,
+            "file_dep": sorted({str(script), source, *module_deps_of(script)}),
+            "targets": [str(Path(path).resolve()) for path in spec["targets"]],
+            "task_dep": _spine_dep(f"drawing:{stem}"),
+            "actions": [
+                (_run, [[sys.executable, str(script), spec["arg"]], f"drawing {stem}"])
+            ],
+            "clean": [(_clean_drawing, [stem])],
+            "verbosity": 2,
+        }
+
+
 def task_verify():
     """SolidWorks verification suites -- need SW open, run on the COM spine.
 
@@ -1490,6 +1553,7 @@ def task_build():
         "task_dep": (
             [f"part:{s}" for s in part_stems()]
             + [f"assembly:{s}" for s in ASSEMBLY_ORDER]
+            + [f"drawing:{s}" for s in _drawing_order()]
             + [f"verify:{s}" for s in _VERIFY_NAMES]
             + [f"check:{s}" for s in _CHECK_NAMES]
         ),
