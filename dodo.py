@@ -1272,6 +1272,18 @@ def task_verify():
             str((SCRIPTS_DIR / "build_kinematic_probe.py").resolve()),
             str((SCRIPTS_DIR / "pen_driver.py").resolve()),
             str((SCRIPTS_DIR / "truth_model.py").resolve()),
+            # The transient pen equation reads _config VALUES through
+            # pen_driver/truth_model (machine/output.yaml pen_rest_crank_deg /
+            # pen_trace_half_mm / magnify_factor + channels.yaml harmonics/
+            # phases/amplitudes). Post-#221 those files are no longer on pen's
+            # build recipe (the saved model carries no equation), so without
+            # these deps an amplitude edit would leave a fresh
+            # verify-kinematics.ok stamp valid and SKIP the sweep (codex #224).
+            # Derived by the same static analyzer as the build recipes, so a
+            # new config read in pen_driver/truth_model is picked up
+            # automatically. (_config.py itself needs no direct dep: it is on
+            # pen's build closure, so it rides the pen.SLDASM recipe digest.)
+            *_config_deps(SCRIPTS_DIR / "pen_driver.py"),
         ],
     }
     # Pass the graph's assemblies EXPLICITLY (dashed names) rather than letting
