@@ -22,7 +22,8 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
-from contextlib import contextmanager
+import time
+from contextlib import closing, contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterator
@@ -106,6 +107,38 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _read_provision_manifest(root: Path) -> ProvisionManifest | None:
+    path = root / "harmonic-analyzer-standard.json"
+    if not path.is_file():
+        return None
+    try:
+        manifest = ProvisionManifest(**json.loads(path.read_text(encoding="utf-8")))
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"invalid provision manifest: {path}") from exc
+    if (
+        manifest.migration_version != MIGRATION_VERSION
+        or manifest.standard != CUSTOM_STANDARD
+        or manifest.designation != BA6.designation
+        or manifest.major_diameter_mm != BA6.major_diameter_mm
+        or manifest.pitch_mm != BA6.pitch_mm
+        or manifest.core_diameter_mm != BA6.core_diameter_mm
+        or manifest.included_angle_deg != BA6.angle_deg
+    ):
+        raise RuntimeError(f"provision manifest is incompatible with this project: {path}")
+    return manifest
+
+
+def _publish_staging(staging: Path, destination: Path) -> None:
+    for attempt in range(6):
+        try:
+            staging.rename(destination)
+            return
+        except PermissionError:
+            if attempt == 5:
+                raise
+            time.sleep(0.25 * (attempt + 1))
+
+
 def _solidworks_running() -> bool:
     result = subprocess.run(
         ["tasklist", "/FI", "IMAGENAME eq SLDWORKS.exe", "/FO", "CSV", "/NH"],
@@ -158,7 +191,9 @@ def _columns(connection: sqlite3.Connection, table: str) -> tuple[str, ...]:
 
 
 def validate_source_schema(database: Path) -> None:
-    with sqlite3.connect(f"file:{database.as_posix()}?mode=ro", uri=True) as connection:
+    with closing(
+        sqlite3.connect(f"file:{database.as_posix()}?mode=ro", uri=True)
+    ) as connection:
         for table, expected in EXPECTED_COLUMNS.items():
             actual = _columns(connection, table)
             if actual != expected:
@@ -322,7 +357,7 @@ def _trim_to_ba_holes(connection: sqlite3.Connection) -> None:
 
 def migrate_database(database: Path) -> None:
     validate_source_schema(database)
-    with sqlite3.connect(database) as connection:
+    with closing(sqlite3.connect(database)) as connection:
         connection.execute("PRAGMA busy_timeout=5000")
         existing = connection.execute(
             "SELECT COUNT(*) FROM Standards WHERE Name=?", (CUSTOM_STANDARD,)
@@ -342,7 +377,9 @@ def migrate_database(database: Path) -> None:
 
 
 def verify_database(database: Path) -> None:
-    with sqlite3.connect(f"file:{database.as_posix()}?mode=ro", uri=True) as connection:
+    with closing(
+        sqlite3.connect(f"file:{database.as_posix()}?mode=ro", uri=True)
+    ) as connection:
         standard = connection.execute(
             "SELECT TableNamePrefix, enabled, Protected FROM Standards WHERE Name=?",
             (CUSTOM_STANDARD,),
@@ -477,11 +514,20 @@ def provision(
     source_database = source_root / DATABASE_RELATIVE
     if not source_database.is_file():
         raise FileNotFoundError(f"source Hole Wizard database is missing: {source_database}")
+    template_dir = shared_root / "templates"
+    existing_manifest = _read_provision_manifest(source_root)
+    if existing_manifest is not None:
+        verify_database(source_database)
+        _copy_templates(template_dir)
+        if configure:
+            configure_registry(version, source_root, template_dir)
+        _telemetry.success(f"existing {CUSTOM_STANDARD} verified at {source_root}")
+        return source_root, template_dir
+
     validate_source_schema(source_database)
     source_hash = _sha256(source_database)
     release_name = f"solidworks-data-{source_hash[:12]}-ba6-v{MIGRATION_VERSION}"
     final_toolbox = shared_root / "toolbox" / release_name
-    template_dir = shared_root / "templates"
     manifest = ProvisionManifest(
         migration_version=MIGRATION_VERSION,
         source_database_sha256=source_hash,
@@ -514,7 +560,7 @@ def provision(
                     json.dumps(asdict(manifest), indent=2, sort_keys=True) + "\n",
                     encoding="utf-8",
                 )
-                staging.rename(final_toolbox)
+                _publish_staging(staging, final_toolbox)
             except Exception:
                 shutil.rmtree(staging, ignore_errors=True)
                 raise
@@ -544,11 +590,14 @@ def main() -> int:
     source = (args.source_toolbox_root or discovered_source).resolve()
     shared = args.shared_root.resolve()
     if args.check:
-        source_database = source / DATABASE_RELATIVE
-        source_hash = _sha256(source_database)
-        final = shared / "toolbox" / (
-            f"solidworks-data-{source_hash[:12]}-ba6-v{MIGRATION_VERSION}"
-        )
+        if _read_provision_manifest(source) is not None:
+            final = source
+        else:
+            source_database = source / DATABASE_RELATIVE
+            source_hash = _sha256(source_database)
+            final = shared / "toolbox" / (
+                f"solidworks-data-{source_hash[:12]}-ba6-v{MIGRATION_VERSION}"
+            )
         verify_database(final / DATABASE_RELATIVE)
         for template in (ASME_B_DRWDOT.name, ASME_B_SLDDRT.name):
             path = shared / "templates" / template

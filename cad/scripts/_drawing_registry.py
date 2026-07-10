@@ -15,7 +15,7 @@ from pathlib import Path
 SCRIPTS_DIR = Path(__file__).resolve().parent
 CAD_ROOT = SCRIPTS_DIR.parent
 DRAWING_STANDARDS_DIR = CAD_ROOT / "standards" / "drawings"
-ASME_B_DRWDOT = DRAWING_STANDARDS_DIR / "asme-b-book.drwdot"
+ASME_B_DRWDOT = DRAWING_STANDARDS_DIR / "asme-b-book.DRWDOT"
 ASME_B_SLDDRT = DRAWING_STANDARDS_DIR / "asme-b-book.slddrt"
 
 

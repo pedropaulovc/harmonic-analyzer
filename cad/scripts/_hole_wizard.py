@@ -58,6 +58,7 @@ class CreatedTapPattern:
     feature: Any
     core_diameter_mm: float
     thread_diameter_mm: float
+    drive_jobs: tuple[tuple[str, str], ...]
 
 
 async def add_cosmetic_ba_threads(
@@ -197,6 +198,7 @@ async def create_tapped_pattern(
     hole_depth_mm: float | None = None,
     thread_depth_mm: float | None = None,
     add_threads: bool = True,
+    diameter_drive: str | None = None,
 ) -> CreatedTapPattern:
     """Cut bottoming tap drills and apply model-owned BA cosmetic threads."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
@@ -222,13 +224,14 @@ async def create_tapped_pattern(
             f"{tap.designation} core ({x_mm:g}, {y_mm:g})",
             dims=dimensions,
             names=(f"{name}P{index}X", f"{name}P{index}Y", f"{name}P{index}Dia"),
+            drives=(None, None, diameter_drive),
         )
     set_sketch_direct_db(adapter, False)
     await ensure_fully_defined(adapter, f"{name} thread-core sketch")
     check(f"exit_sketch {name} thread cores", await adapter.exit_sketch())
     profile_name = f"{name}CoreProfile"
     name_last_feature(adapter, profile_name)
-    dimensions.apply(adapter, profile_name)
+    drive_jobs = tuple(dimensions.apply(adapter, profile_name))
     check(
         f"cut {name} thread cores",
         await adapter.create_cut_extrude(
@@ -255,4 +258,5 @@ async def create_tapped_pattern(
         feature=feature,
         core_diameter_mm=tap.core_diameter_mm,
         thread_diameter_mm=tap.major_diameter_mm,
+        drive_jobs=drive_jobs,
     )
