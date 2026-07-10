@@ -12,11 +12,10 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 from typing import Any
 
 import _telemetry
-from _common import check, run_build
+from _common import run_build
 from _drawing_common import ASME_B_HEIGHT_M, ASME_B_WIDTH_M, assert_asme_b_sheet
 from _drawing_registry import ASME_B_DRWDOT, ASME_B_SLDDRT
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
