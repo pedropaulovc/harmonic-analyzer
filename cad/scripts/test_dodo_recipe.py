@@ -709,3 +709,18 @@ def test_submodule_digest_is_location_independent(tmp_path):
 
     assert digest_under(tmp_path / "A") == digest_under(tmp_path / "B"), \
         "identical submodule content must hash equally across checkout roots"
+
+
+def test_recipe_gate_tracks_sources_imported_by_its_tests():
+    """Editing code exercised by the drawing/provision tests must stale the
+    ``check:recipe`` stamp even when the test files themselves are unchanged."""
+    dodo = _load_dodo()
+    recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
+    deps = {Path(path).name for path in recipe["file_dep"]}
+    assert {
+        "_hole_wizard.py",
+        "build_fillister_screw.py",
+        "build_platen.py",
+        "build_platen_guide.py",
+        "build_paper_drive_assembly.py",
+    } <= deps

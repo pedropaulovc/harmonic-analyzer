@@ -1407,6 +1407,15 @@ def task_check():
     # invalidate the stamp (codex review).
     part_script_deps = [str(p.resolve()) for p in part_scripts()]
     pytest_cmd = [sys.executable, "-m", "pytest", "-q"]
+    recipe_tests = [
+        SCRIPTS_DIR / "test_dodo_recipe.py",
+        SCRIPTS_DIR / "test_platen_guide_drawing.py",
+        SCRIPTS_DIR / "test_solidworks_seat_provision.py",
+    ]
+    recipe_test_deps = sorted({
+        *(str(path.resolve()) for path in recipe_tests),
+        *(dep for path in recipe_tests for dep in module_deps_of(path)),
+    })
     specs = {
         "math": {
             # truth_model reads harmonics/phases/amplitudes/magnification from
@@ -1458,20 +1467,10 @@ def task_check():
         },
         "recipe": {
             "file_dep": [str((REPO_ROOT / "dodo.py").resolve()),
-                         str((SCRIPTS_DIR / "test_dodo_recipe.py").resolve()),
-                         str((SCRIPTS_DIR / "test_platen_guide_drawing.py").resolve()),
-                         str((SCRIPTS_DIR / "test_solidworks_seat_provision.py").resolve()),
-                         str((SCRIPTS_DIR / "_drawing_common.py").resolve()),
-                         str((SCRIPTS_DIR / "_drawing_registry.py").resolve()),
-                         str((SCRIPTS_DIR / "draw_platen_guide.py").resolve()),
-                         str((SCRIPTS_DIR / "provision_solidworks_seat.py").resolve()),
-                         str((SCRIPTS_DIR / "cut_release.py").resolve()),
+                         *recipe_test_deps,
                          str(ASME_B_DRWDOT.resolve()),
                          str(ASME_B_SLDDRT.resolve())],
-            "cmd": [*pytest_cmd,
-                    str(SCRIPTS_DIR / "test_dodo_recipe.py"),
-                    str(SCRIPTS_DIR / "test_platen_guide_drawing.py"),
-                    str(SCRIPTS_DIR / "test_solidworks_seat_provision.py")],
+            "cmd": [*pytest_cmd, *(str(path) for path in recipe_tests)],
         },
         "cache": {
             # The artefact-cache provenance/observability unit tests (issue #73):
