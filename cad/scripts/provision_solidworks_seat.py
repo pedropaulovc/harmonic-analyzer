@@ -12,6 +12,7 @@ Run through ``scripts/solidworks/provision_seat.ps1`` with SolidWorks closed.
 from __future__ import annotations
 
 import argparse
+import ctypes
 import hashlib
 import json
 import os
@@ -114,6 +115,12 @@ def _solidworks_running() -> bool:
         timeout=5,
     )
     return "SLDWORKS.EXE" in result.stdout.upper()
+
+
+def _is_administrator() -> bool:
+    if sys.platform != "win32":
+        return False
+    return bool(ctypes.windll.shell32.IsUserAnAdmin())
 
 
 def _registry_context() -> tuple[str, Path]:
@@ -551,6 +558,12 @@ def main() -> int:
         return 0
     if _solidworks_running() and not args.what_if:
         raise RuntimeError("close SolidWorks before provisioning its Toolbox database")
+    if not args.no_configure and not args.what_if and not _is_administrator():
+        raise PermissionError(
+            "run the provisioning wrapper from an elevated PowerShell session to "
+            "configure the machine-wide SolidWorks Toolbox Data Location; use "
+            "--no-configure only for a staged-clone validation"
+        )
     provision(
         version=version,
         source_root=source,
