@@ -335,7 +335,8 @@ def test_part_tasks_cover_every_stem_once(monkeypatch):
 
 def test_drawing_spine_boundary_and_source_dependency(monkeypatch):
     """Drawings stay out of build_bare, yet remain serialized after its final
-    assembly and before verification. Their only CAD input is the source SLDPRT."""
+    assembly and before verification. Their only CAD input is the source SLDPRT,
+    while the full runtime recipe remains conservative."""
     dodo = _load_dodo()
     monkeypatch.setenv("HARMONIC_BUILD_ORDER_SEED", "seat-A")
     spine = dodo._com_spine_order()
@@ -347,12 +348,14 @@ def test_drawing_spine_boundary_and_source_dependency(monkeypatch):
     cad_deps = [path for path in task["file_dep"] if path.lower().endswith(".sldprt")]
     assert cad_deps == [dodo._sldprt("platen_guide")]
     assert not any(path.lower().endswith(".sldasm") for path in task["file_dep"])
-    assert {Path(path).name for path in task["file_dep"]} == {
+    dep_names = {Path(path).name for path in task["file_dep"]}
+    assert {
         "platen-guide.SLDPRT",
         "export_part_drawing.py",
         "_hole_wizard.py",
-        "drawing.py",
-    }
+        "_common.py",
+        ".solidworks-mcp-submodule.digest",
+    } <= dep_names
     assert {Path(path).name for path in task["targets"]} == {
         "platen-guide.SLDDRW",
         "platen-guide.pdf",

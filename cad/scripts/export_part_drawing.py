@@ -410,7 +410,8 @@ async def build(adapter: Any) -> dict[str, str]:
         ],
     )
     drawing_model.SetCurrentLayer("")
-    add_third_angle_symbol(adapter, 0.490, 0.078, size=0.008)
+    if not add_third_angle_symbol(adapter, 0.245, 0.035, size=0.008):
+        raise RuntimeError("failed to add the in-bounds third-angle projection symbol")
 
     front = place_view(adapter, str(SOURCE), "*Back", 0.190, 0.190, scale=(1, 1))
     right = place_view(adapter, str(SOURCE), "*Right", 0.375, 0.190, scale=(3, 1))
