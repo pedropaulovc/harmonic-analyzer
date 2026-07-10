@@ -252,17 +252,21 @@ def test_config_accessor_coverage():
     assert not missing, f"unclassified config accessors (map them in _buildgraph): {missing}"
 
 
-def test_pen_assembly_tracks_pen_driver_config():
-    """REGRESSION (codex P1): build_pen_assembly imports pen_driver -> truth_model,
-    which embed machine/output + channels values into the saved assembly equations.
-    module_deps_of must follow those non-_*/build_* modules so config_files_of sees
-    the files -- else a machine/output.yaml or channels.yaml edit leaves
-    assembly:pen up to date with a stale pen driver."""
+def test_pen_assembly_free_of_pen_driver_closure():
+    """Post-#221: the park-driver machinery is gone -- build_pen_assembly no longer
+    imports pen_driver/truth_model, since the F5 chained-Fourier equation is now
+    authored TRANSIENTLY by verify:kinematics (see dodo.task_verify's kinematics
+    file_dep) rather than baked into the saved assembly. The build recipe must NOT
+    drag pen_driver/truth_model (and their channels.yaml/machine/output.yaml reads)
+    back into module_deps_of/config_files_of -- that would rebuild assembly:pen on
+    every amplitude edit for an equation the saved model does not even contain. The
+    guard for the transient equation moved to dodo.task_verify's kinematics
+    file_dep (pinned in test_dodo_recipe.py)."""
     closure = {Path(p).stem for p in module_deps_of(script_for("pen"))}
-    assert {"pen_driver", "truth_model"} <= closure, closure
+    assert closure.isdisjoint({"pen_driver", "truth_model"}), closure
     pen_cfg = config_files_of(script_for("pen"))
-    assert "machine/output.yaml" in pen_cfg, pen_cfg
-    assert "channels.yaml" in pen_cfg, pen_cfg
+    assert "machine/output.yaml" not in pen_cfg, pen_cfg
+    assert "channels.yaml" not in pen_cfg, pen_cfg
 
 
 def test_stamps_part_properties_only_genuine_stampers():
