@@ -43,6 +43,8 @@ def test_platen_guide_hole_stations_are_native_linear_patterns() -> None:
     assert "ThroughTapPattern" in source
     assert "PlatenMountTapPattern" in source
     assert "BlindDrawingLocatorProfile" not in source
+    assert "for x in through_seed_x" in source
+    assert "points_xy=((SCREW_STATION_X[0], GUIDE_HEIGHT / 2.0),)" in source
 
 
 def test_threaded_interference_allowance_is_exact_by_engagement_length() -> None:
