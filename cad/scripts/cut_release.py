@@ -149,7 +149,7 @@ PNG_WIDTH, PNG_HEIGHT = 1600, 1000
 PNG_CACHE_DIR = RELEASE_DIR / "png-cache"
 # Bump when _export_pngs' rendering (views, pixel size, framing) changes so a code
 # change invalidates every cached render rather than shipping a stale-format image.
-PNG_RENDER_REV = "1"
+PNG_RENDER_REV = "2"  # rev 2: src term switched raw-bytes -> recipe digest
 
 
 # --------------------------------------------------------------------------- #
@@ -663,13 +663,19 @@ def _png_key(src: Path, stl_paths: list[Path], colors_digest: str) -> str:
 
     Folds the just-exported STL(s) for this document -- the RESOLVED geometry (for an
     assembly the monolithic STL bakes in every child, so a changed child re-renders
-    it) -- plus the source SLDPRT/SLDASM bytes (mates + stored appearance) and the
+    it) -- plus the document's RECIPE digest (script + config + referenced artefacts,
+    the same churn-immune chokepoint doit staleness and the remote cache key on; the
+    raw SLDPRT/SLDASM bytes it replaces churn on every save via the parent-md5
+    cascade, which held this cache to 9/648 hits across the v0.18.0 release) and the
     shared colors.json (any other appearance change), plus the render revision/params.
-    A miss can only ever re-render; it can never serve a wrong image."""
+    An UNDECLARED document (no recipe -- ``src_digest`` None) falls back to its raw
+    bytes. A miss can only ever re-render; it can never serve a wrong image."""
+    from export_models import src_digest
+
     h = hashlib.sha256()
     h.update(PNG_RENDER_REV.encode())
     h.update(repr((PNG_VIEWS, PNG_WIDTH, PNG_HEIGHT)).encode())
-    h.update(_sha256(src).encode())
+    h.update((src_digest(src) or _sha256(src)).encode())
     for p in stl_paths:
         h.update(_sha256(p).encode())
     h.update(colors_digest.encode())
