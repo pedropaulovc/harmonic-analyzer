@@ -936,11 +936,11 @@ def _git_sha() -> str:
 def part_properties(part_name: str) -> dict[str, str]:
     """SolidWorks custom properties for ``part_name`` from the parts.yaml registry.
 
-    Pulls Number/Revision/Material/Tolerance Class/Fit Class/Process/Confidence
-    from ``cad/config/parts.yaml`` (merged over its defaults) and stamps a
-    reproducible Generator (git sha). Title is the part name. Parts absent from
-    the registry get the minimal set (Title + Generator) and are flagged by the
-    verify.py tolerance audit.
+    Pulls the manufacturing registry fields (including material specification,
+    finish, and quantity) from ``cad/config/parts.yaml`` and stamps a reproducible
+    Generator (git sha). Title is the part name. Parts absent from the registry
+    get the minimal set (Title + Generator) and are flagged by the verify.py
+    tolerance audit.
     """
     import _config
 
@@ -959,6 +959,8 @@ def part_properties(part_name: str) -> dict[str, str]:
         "Number": "number", "Revision": "revision", "Material": "material",
         "Tolerance Class": "tolerance_class", "Fit Class": "fit_class",
         "Process": "process", "Confidence": "confidence",
+        "Material Specification": "material_specification",
+        "Finish": "finish", "Quantity": "quantity",
     }
     for prop, key in field_map.items():
         if key in reg and reg[key] is not None:
