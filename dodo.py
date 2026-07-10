@@ -228,7 +228,9 @@ def _com_seat(label: str):
         _clear_seat_holder(holder)
         _COM_LOCK.release()
 
-# Drawing tasks declare only their source model and drawing-specific inputs.
+# Drawing tasks declare only their source model as CAD input, while their code
+# recipe follows the exporter's complete repo-local import closure and the full
+# SolidWorks adapter submodule digest.
 # Their order is derived from the source part producer for stable scheduling;
 # the runtime COM-seat lock provides serialization without adding false DAG edges.
 _DRAWING_SPECS = {
@@ -236,10 +238,6 @@ _DRAWING_SPECS = {
         "part": "platen_guide",
         "arg": "platen-guide",
         "script": SCRIPTS_DIR / "export_part_drawing.py",
-        "inputs": (
-            SCRIPTS_DIR / "_hole_wizard.py",
-            SUBMODULE_SRC / "adapters" / "solidworks" / "drawing.py",
-        ),
         "targets": (
             CAD_OUT / "slddrw" / "platen-guide.SLDDRW",
             CAD_OUT / "pdf" / "platen-guide.pdf",
@@ -1289,10 +1287,10 @@ def task_drawing():
         spec = _DRAWING_SPECS[stem]
         script = Path(spec["script"]).resolve()
         source = _sldprt(spec["part"])
-        inputs = [str(Path(path).resolve()) for path in spec["inputs"]]
+        runtime = [*_helper_deps(script), _submodule_dep()]
         yield {
             "name": stem,
-            "file_dep": sorted({str(script), source, *inputs}),
+            "file_dep": sorted({str(script), source, *runtime}),
             "targets": [str(Path(path).resolve()) for path in spec["targets"]],
             "actions": [
                 (

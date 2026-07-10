@@ -70,6 +70,16 @@ def test_threaded_interference_allowance_is_exact_by_engagement_length() -> None
         paper_drive._validate_thread_contacts(wrong_volume, engagement_lengths)
 
 
+def test_paper_drive_tracks_every_intended_thread_contact() -> None:
+    contacts = paper_drive.paper_drive_thread_engagement_lengths()
+    assert len(contacts) == 22
+    assert sorted(contacts.values()) == (
+        [screw.SHANK_LEN - paper_drive.LOCK_THICK] * 8
+        + [paper_drive.GUIDE_SCREW_THREAD_DEPTH] * 10
+        + [screw.SHANK_LEN - paper_drive.CLIP_THICKNESS] * 4
+    )
+
+
 def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/platen-guide.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/platen-guide.pdf")

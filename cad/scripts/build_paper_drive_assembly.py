@@ -219,6 +219,27 @@ def _validate_thread_contacts(
             )
 
 
+def paper_drive_thread_engagement_lengths() -> dict[frozenset[str], float]:
+    """Expected top-level component pairs for all 22 intentional 6 BA contacts."""
+    contacts: dict[frozenset[str], float] = {}
+    for screw_index in range(1, 5):
+        pair = frozenset(("platen-1", f"fillister-screw-{screw_index}"))
+        contacts[pair] = SHANK_LEN - CLIP_THICKNESS
+    for screw_index in range(5, 15):
+        guide_index = 1 if screw_index <= 9 else 2
+        pair = frozenset(
+            (f"platen-guide-{guide_index}", f"fillister-screw-{screw_index}")
+        )
+        contacts[pair] = GUIDE_SCREW_THREAD_DEPTH
+    for screw_index in range(15, 23):
+        guide_index = 1 if screw_index <= 18 else 2
+        pair = frozenset(
+            (f"platen-guide-{guide_index}", f"fillister-screw-{screw_index}")
+        )
+        contacts[pair] = SHANK_LEN - LOCK_THICK
+    return contacts
+
+
 def _check_paper_drive_interference(
     adapter, thread_engagement_lengths: dict[frozenset[str], float]
 ) -> None:
@@ -872,6 +893,13 @@ async def build(adapter) -> dict[str, str]:
         guide = guides[0 if y < guide_mid_y else 1]
         thread_engagement_lengths[frozenset((guide, screw))] = (
             SHANK_LEN - LOCK_THICK
+        )
+
+    expected_thread_contacts = paper_drive_thread_engagement_lengths()
+    if thread_engagement_lengths != expected_thread_contacts:
+        raise RuntimeError(
+            "placed paper-drive thread-contact ledger differs from the shared "
+            "build/verify contract"
         )
 
     # --- transgear group (the real train) --------------------------------------
