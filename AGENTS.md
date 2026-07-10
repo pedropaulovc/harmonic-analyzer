@@ -304,23 +304,19 @@ of a run and re-proves a property the tooth-count config already fixes, which
 `subsystems` suite's one unique gate) is FOLDED IN — soundness already opens
 `channel`, so it runs there; and **component-count is REMOVED** (every failure it
 ever raised was a stale band or a gate bug, never a real regression — `_COMPONENT_BAND`
-stays as reference data). The **DOF gate adapts
-to how the model was built**
-(see "Default-free DOF" below): an assembly with an expected free operational DOF
-(drive-train + channel + magnifier + paper-drive + summing + pen, when built
-`free`) is checked by the **necessity gate**
-(`assert_free_dof_necessity`) — assert at least the expected number of top-level
-components read under-constrained, i.e. the operational DOF are genuinely free —
-instead of the strict "every component fully defined". Because the freed-DOF park
-drivers are now DEFERRED (not authored in the saved model, see below), soundness has
-nothing to re-engage, so the exact-count **SUFFICIENCY** proof (author the drivers →
-0 DOF) moves to the opt-in **release preflight** (`preflight_release.py` /
-`assert_park_closure`), which replays the recorded specs then discards the model
-unsaved. Every assembly with nothing parked-free (the default for all others, and
-either built `locked`) gets the strict 0-DOF check, unchanged. All NON-DOF gates
-always run on the as-built model. gear-ratios runs at release only, in
-`preflight_release.py`, on the reopened `drive-train` + `channel` (the only
-assemblies carrying real gear meshes) BEFORE `assert_park_closure` mutates the model.
+stays as reference data). The **DOF gate splits by whether the assembly has
+freed operational DOF** (see "Default-free DOF" below): an assembly with freed
+DOF (drive-train + channel + magnifier + paper-drive + summing + pen) is
+checked by the **free-DOF set gate** (`assert_free_dof_necessity`) — at least
+the expected number of top-level components read under-constrained, each freed
+DOF's own family among them (necessity), AND, where the assembly's allowed
+coupled-family list is pinned (`verify._ALLOWED_FREE_STEMS`), no component
+OUTSIDE that list reads under-constrained (the exact-set direction — an
+unintended freedom, e.g. a dropped mate on a structural part, fails soundness
+loud). Every assembly with nothing freed gets the strict 0-DOF check,
+unchanged. All NON-DOF gates always run on the as-built model. gear-ratios
+runs at release only, in `preflight_release.py`, on the reopened `drive-train`
++ `channel` (the only assemblies carrying real gear meshes).
 (History: `subsystems` used to re-open all 8 and repeat the whole battery — ~95%
 duplicate COM work — then was trimmed to only `channel`-independence, and is now
 folded into soundness entirely; see `memory/release-perf-incremental.md` and
@@ -356,11 +352,10 @@ the wheel is COUPLED, not separately freed), plus summing's **lever knife-edge
 rock** (1 DOF, 2026-07-07: the summing lever rocks live on the knife-mount
 ridge, the lock-mated boss-hook riding it), plus pen's **carriage travel**
 (1 DOF, 2026-07-07: the rod + lock-mated marker/pen-wire slide vertically in
-the v-block; the shipped free model carries NO F5 pen-driver equation —
-`verify:kinematics` replays the deferred travel spec transiently, installs the
-chained-Fourier equation on the replayed mate, sweeps `CrankDeg`, and discards
-unsaved; a `locked` build authors mate + equation at build time, the equation
-targeting `PARK_pen_travel`), plus paper-drive's **crank spin**
+the v-block; the shipped model carries NO F5 pen-driver equation —
+`verify:kinematics` authors the travel drive transiently from the DOF manifest
+(`DRIVE_pen_travel`), installs the chained-Fourier equation on it, sweeps
+`CrankDeg`, and discards unsaved), plus paper-drive's **crank spin**
 (1 DOF, 2026-07-05: the crank-end T12 sprocket spins free; a native **Belt/Chain
 feature** (`adapter.insert_belt_chain`, EngageBelt) couples it to the knob T24 at
 the 12:24 chain ratio, and a **rack-pinion mate** feeds the platen off the knob
@@ -370,44 +365,38 @@ engaged path is a documented KINEMATIC coupling at the faithful ch30 rest geomet
 the intermediate transgear (fine-pinion → 96T disc) keeps its 13.1 mm rest gap and
 the coupling spans it — the single latch arm cannot serve both the 66.05 rest and
 51.0 engaged centre distances (DIMENSIONS.md Appendix C #8's open kinematic riddle),
-so the engage is coupled, not geometrically meshed. The motion/mobility diagnostics
-treat every deferred (absent) park driver as already-free
-(`_suppress_park_or_note_free` in `build_motion_setup_drives.py`).
+so the engage is coupled, not geometrically meshed. The motion/mobility
+diagnostics treat every freed (absent-driver) DOF as already-free
+(`build_motion_setup_drives.py`).
 
-The mechanism is **defer-and-replay** (was author-but-suppress). A freed-DOF park
-driver is NOT authored by the build at all — authoring each is an expensive mate
-solve that a `free` build only suppressed away again, so skipping it saves build
-time and leaves the DOF genuinely free. Instead the build RECORDS each driver's
-resolved spec (`free_dof_key=…` on the `*_driver` helpers → `_assembly` records
-`entities`/scalars/verify target) into a sidecar `.<stem>.park.json` beside the
-`.SLDASM` (a cached assembly output, so it rides the remote cache). The **release
-preflight** (`preflight_release.py`, a COM-spine task gating `release`, opt-in and
-NOT in `build`) replays those specs on a reopened free model, authors each engaged
-+ `PARK_<key>`, proves the model then goes fully defined (0 DOF = the drivers are
-the sole freedom), and DISCARDS the model **without saving** — so the shipped
-`.SLDASM` stays the free kinematic model. "Gates re-evaluated as preflight, then
-release continues as before."
+The mechanism is the **kinematic DOF manifest**. A freed DOF gets NO driver
+mate at all — every part is inserted on its exact Python-solved transform and
+the real contact mates hold it, so the saved pose is deterministic without
+full definition. The build only RECORDS each freed DOF's drive spec
+(`free_dof_key=…` on the `*_driver` helpers → `_assembly` records
+`entities`/scalars/rest value/mate side) into a sidecar `.<stem>.dof.json`
+beside the `.SLDASM` (a cached assembly output, so it rides the remote cache).
+`verify:kinematics` (and the mobility/motion diagnostics) author those specs
+TRANSIENTLY (`_assembly_postbuild.author_dof_drives`, mates named
+`DRIVE_<key>`) to pin or sweep a DOF on a reopened model, then discard the
+model **without saving** — the shipped `.SLDASM` stays the free kinematic
+model.
 
-Distinct from a freed-DOF driver is an ENGAGED park/setup driver (e.g.
-`PARK_pinion_swing`) held at a pose in the free model: it does real work in the
-saved model, so it is authored as usual (`mark_park_driver`), never deferred.
+(History: this replaced the two-sided "park driver" machinery — deferred
+`PARK_*` mates, a `locked` build mode in `build_lock.yaml`, and a release
+0-DOF closure proof (`assert_park_closure`). Killed 2026-07-09: placement
+already made the build deterministic, the closure re-proved what insertion
+fixed, and the replay path was a recurring bug source. See
+`memory/default-free-dof-park-drivers.md`.)
 
-A `locked` build authors every park driver engaged and renames it `PARK_<key>` —
-today's fully-defined, byte-reproducible snapshot, an explicit opt-in for a pinned
-export. Per-assembly mode lives in `cad/config/machine/build_lock.yaml`, read as a
-literal `_config.machine("build_lock", "<stem>")` so it tokenises into that
-assembly's doit `file_dep` + remote-cache digest: flipping `free`↔`locked` rebuilds
-ONLY that assembly and keys the cache to a distinct artefact. The flag is the CONFIG
-value (in the digest), never an env var. Release/export inherit the configured mode.
-
-There is **no scalar DOF API** in SolidWorks COM. At build time `soundness` proves
-only **necessity** (`assert_free_dof_necessity`: ≥ N components under-constrained).
-The exact **sufficiency** count is proven at release by `assert_park_closure`
-(replay every recorded driver → 0 DOF) and, as a hand-run diagnostic, by
-`build_mobility_probe.py` — which now REPLAYS the deferred specs (`replay_park_specs`)
-to reconstitute the drivers before its 0-DOF baseline, then suppresses each to show
-it frees its own part family. `build_motion_setup_drives.py` treats a deferred
-(absent) driver as already-free. See `memory/default-free-dof-park-drivers.md`.
+There is **no scalar DOF API** in SolidWorks COM. `soundness` proves the free
+set from both directions with one status walk (`assert_free_dof_necessity`):
+≥ N components under-constrained with each freed DOF's family present
+(necessity), and — where `verify._ALLOWED_FREE_STEMS` pins the assembly's
+coupled families — no component outside that list under-constrained (exact
+set). As a hand-run diagnostic, `build_mobility_probe.py` authors the manifest
+drives to reconstitute a 0-DOF baseline, then suppresses each to show it frees
+its own part family.
 
 ## Stamps & incrementality
 
@@ -429,8 +418,8 @@ scripts that `from _common import log, check` are instrumented unchanged.
   aliases (`log`→`debug`, a passing `check`→`success`). New code must not add bare
   `print()` for status — reserve `print` for machine-readable stdout a caller pipes.
 - **Log vs event — a moment IN a span is a span event.** A fact that belongs to a
-  span's timeline (a cache hit/miss, a mate flip-recovery, a park driver
-  re-engagement) is recorded with `_telemetry.event("name", **attrs)` — an OTel
+  span's timeline (a cache hit/miss, a mate flip-recovery, a transient drive
+  authored) is recorded with `_telemetry.event("name", **attrs)` — an OTel
   **span event** on the current span — not (only) a standalone log record. It shows
   *when within the span* it happened and carries structured attrs, and is a no-op
   when no span is recording (so a caller never guards). Keep a `warn`/`error` LOG
@@ -459,12 +448,11 @@ scripts that `from _common import log, check` are instrumented unchanged.
   trace with hundreds of near-instant "OK" leaves (335 + 343 in one soundness
   pass) that drown the signal. Do NOT span per item: keep ONE span around the loop
   and record the aggregate (counts) as attributes; per-item lines stay `debug`
-  logs, and offenders are named in the raised error the gate span records. Applied
-  to the free-DOF gate: `gate.dof_expected_free` cycles every `PARK_*` driver
-  (suppress → re-engage → re-suppress, a COM round-trip each — ~60 for `channel`)
-  plus three `ForceRebuild3`s, so it splits into `park.discover` / `park.necessity`
-  / `park.engage` / `park.restore` child spans, otherwise it is one multi-minute
-  black box.
+  logs, and offenders are named in the raised error the gate span records. (The
+  retired park-closure gate was the canonical positive example: its per-driver
+  suppress/re-engage cycling split into `park.*` phase child spans instead of
+  one multi-minute black box — apply the same segmentation to any future
+  multi-phase COM gate.)
 - **Descriptive span names, not generic ones.** A waterfall of 40 identical
   `mate distance` rows is unreadable. The single mate chokepoint (`_assembly._mate`)
   names its span for the caller's descriptive `label` (`mate top@crank_pin <-> …`),

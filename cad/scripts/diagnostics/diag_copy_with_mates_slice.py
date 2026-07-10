@@ -188,8 +188,8 @@ def _spin_dim_value(pivot_xy: tuple[float, float], target_xy: tuple[float, float
 
 async def _seed_chain(adapter, j: int, bushing: str) -> tuple[dict[str, str], list[float], float]:
     """Author channel ``j``'s 4-part chain the production way, HARD-PINNED
-    (no park deferral: every spin/amplitude driver authored, so the slice is
-    fully defined and the copies replicate the full 12-mate battery).
+    (no free-DOF recording: every spin/amplitude driver authored, so the slice
+    is fully defined and the copies replicate the full 12-mate battery).
 
     Returns (component names by part, per-mate dimension values in creation
     order, wall seconds). The values list is the probe's ground truth for
@@ -237,7 +237,7 @@ async def _seed_chain(adapter, j: int, bushing: str) -> tuple[dict[str, str], li
     dims: list[float] = []
 
     # J1 rocker revolute: concentric(dead) + axial distance(SUBSTITUTED) +
-    # spin pin. Same call as production but park_spin=None -> hard pin.
+    # spin pin. Same call as production but free_spin=None -> hard pin.
     rocker_rod_pin = world_point(adapter, rocker, ROCKER_ROD_BORE_LOCAL)
     await _revolute(
         adapter, rocker,
@@ -246,7 +246,7 @@ async def _seed_chain(adapter, j: int, bushing: str) -> tuple[dict[str, str], li
         off_axis_local=ROCKER_ROD_BORE_LOCAL, pivot_xy=pivot_w,
         label=f"J1 rocker ch{j:02d}",
         axial=("distance", bushing, PITCH / 2.0),
-        park_spin=None,
+        free_spin=None,
     )
     dims += [0.0, PITCH / 2.0,
              _spin_dim_value(pivot_w, (rocker_rod_pin[0], rocker_rod_pin[1]))]

@@ -1,16 +1,18 @@
-"""Release-preflight DOF-sufficiency proof, split out of _assembly.py so its churn
-does not re-key the 8-assembly BUILD cache.
+"""Transient free-DOF drive replay, split out of _assembly.py so its churn does
+not re-key the 8-assembly BUILD cache.
 
-These functions run ONLY on the verify/preflight/diagnostics path -- NEVER on the
-assembly BUILD path (no build_<stem>_assembly.py imports them), so they are
-deliberately OUTSIDE the assembly recipe/helper closure: load/replay the recorded
-park specs and assert_park_closure (author every deferred driver -> assert 0 DOF).
-Consumed by preflight_release.py / verify.py and the motion/mobility diagnostics.
+These functions run ONLY on the verify/diagnostics path -- NEVER on the assembly
+BUILD path (no build_<stem>_assembly.py imports them), so they are deliberately
+OUTSIDE the assembly recipe/helper closure: load the recorded free-DOF manifest
+(``.<stem>.dof.json``, written by ``_assembly.write_dof_manifest``) and author
+its drive mates TRANSIENTLY on a reopened model, so verify:kinematics can sweep
+the mechanism (the pen Fourier sweep, the magnifier chain proof). Callers MUST
+discard the mutated document unsaved (:func:`discard_open_documents`).
 
 Because this module is on NO assembly build closure, a change to it does not bump
-any .SLDASM digest -- so verify:/preflight tasks depend on it DIRECTLY (see
-POSTBUILD_PY in dodo.py) to stay fresh. (The incremental-REFRESH helpers, which ARE
-build-path, live in _assembly.py where they ride the assembly recipe -- codex #193.)
+any .SLDASM digest -- so verify: tasks depend on it DIRECTLY (see POSTBUILD_PY in
+dodo.py) to stay fresh. (The incremental-REFRESH helpers, which ARE build-path,
+live in _assembly.py where they ride the assembly recipe -- codex #193.)
 
 Dependencies point ONE way: this module imports helpers from _assembly; _assembly
 never imports this module.
@@ -19,23 +21,24 @@ from __future__ import annotations
 
 import json
 
-import _telemetry
 from typing import Any
 
 from _assembly import (
     _mate,
-    _under_constrained_components,
-    assert_components_fully_defined,
-    mark_park_driver,
-    park_spec_path,
+    dof_manifest_path,
 )
-from _common import _read_member
+from _common import _read_member, check
+
+# Transiently authored drive mates are named ``DRIVE_<key>`` so the kinematics
+# sweeps can target them (e.g. the pen equation drives ``D1@DRIVE_pen_travel``).
+# They exist only in-memory: the caller discards the document unsaved.
+DRIVE_PREFIX = "DRIVE_"
 
 
 def discard_open_documents(adapter: Any) -> None:
     """Close every open document WITHOUT a "Save Modified Documents" prompt.
 
-    The replay/closure paths author real mates (and verify's pen sweep installs
+    The transient-drive paths author real mates (and verify's pen sweep installs
     equations), so the reopened assembly (and its referenced children) are
     DIRTY. ``CloseAllDocuments(True)`` still pops the save modal for a dirty
     referenced child in 3DX R2026x -- headless, that hangs the run forever.
@@ -61,22 +64,44 @@ def discard_open_documents(adapter: Any) -> None:
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
 
-def load_park_specs(name: str) -> list[dict[str, Any]]:
-    """Read the deferred park specs for ``<name>.SLDASM`` (``[]`` if none)."""
-    path = park_spec_path(name)
+def load_dof_manifest(name: str) -> list[dict[str, Any]]:
+    """Read the free-DOF drive specs for ``<name>.SLDASM`` (``[]`` if none)."""
+    path = dof_manifest_path(name)
     if not path.exists():
         return []
     return json.loads(path.read_text()).get("specs", [])
-async def replay_park_specs(adapter: Any, specs: list[dict[str, Any]]) -> list[str]:
-    """Author every recorded deferred park driver ENGAGED on the ACTIVE assembly
-    and rename it ``PARK_<key>``; return the new names.
 
-    Used by the release preflight (and the mobility/motion diagnostics) to
-    reconstitute the freed operational DOF on a reopened default-``free`` model.
-    Reconstructs each :class:`MateEntityRef` from the recorded fields, replays the
-    exact mate on the RECORDED side (``spec["flip"]`` -- the build's sign-derived
-    seat, #185), with the original flip-recovery ``verify`` target as the safety
-    net, then re-solves."""
+
+async def _rename_drive_mate(adapter: Any, mate: Any, key: str) -> str:
+    """Rename a just-authored transient drive mate to ``DRIVE_<key>``.
+
+    ``mate`` is the dict :func:`_assembly._mate` returns (it carries the SW
+    feature ``name``). Renaming uses ``IFeature::Name`` via the adapter's
+    ``rename_feature``. ``DRIVE_<key>`` must be unique in the tree (distinct
+    keys) and free of SW-reserved characters. Returns the new name."""
+    from solidworks_mcp.adapters.base import RenameFeatureParameters
+
+    old = mate.get("name") if isinstance(mate, dict) else str(mate)
+    if not old:
+        raise RuntimeError(f"_rename_drive_mate: mate has no resolvable name ({mate!r})")
+    new = f"{DRIVE_PREFIX}{key}"
+    check(
+        f"rename drive mate {old!r} -> {new!r}",
+        await adapter.rename_feature(RenameFeatureParameters(old_name=old, new_name=new)),
+    )
+    return new
+
+
+async def author_dof_drives(adapter: Any, specs: list[dict[str, Any]]) -> list[str]:
+    """Author the given free-DOF drive specs on the ACTIVE assembly and rename
+    each ``DRIVE_<key>``; return the new names.
+
+    Used by verify:kinematics (and the mobility/motion diagnostics) to pin or
+    sweep a freed operational DOF on a reopened model -- TRANSIENTLY, the caller
+    discards the document unsaved. Reconstructs each :class:`MateEntityRef` from
+    the recorded fields and authors the exact mate on the RECORDED side
+    (``spec["flip"]`` -- the build's sign-derived seat, #185), with the original
+    flip-recovery ``verify`` target as the safety net, then re-solves."""
     from solidworks_mcp.adapters.base import MateEntityRef
 
     names: list[str] = []
@@ -93,7 +118,7 @@ async def replay_park_specs(adapter: Any, specs: list[dict[str, Any]]) -> list[s
             witness = (list(spec["witness"][0]), list(spec["witness"][1]))
         res = await _mate(
             adapter,
-            f"replay PARK_{spec['key']}",
+            f"transient drive {spec['key']}",
             spec["kind"],
             entities,
             verify=verify,
@@ -101,48 +126,7 @@ async def replay_park_specs(adapter: Any, specs: list[dict[str, Any]]) -> list[s
             flip=bool(spec.get("flip", False)),
             **spec.get("params", {}),
         )
-        names.append(await mark_park_driver(adapter, res, spec["key"]))
+        names.append(await _rename_drive_mate(adapter, res, spec["key"]))
     if names:
         adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
     return names
-async def assert_park_closure(
-    adapter: Any, specs: list[dict[str, Any]], expected_count: int
-) -> None:
-    """Release-preflight SUFFICIENCY gate: on a reopened default-``free`` model,
-    prove the deferred park drivers are the SOLE freedom.
-
-    * NECESSITY: the spec count equals ``expected_count`` and, before authoring,
-      at least ``expected_count`` top-level components read under-constrained (the
-      freedom really is present in the shipped free model).
-    * SUFFICIENCY: :func:`replay_park_specs` authors every recorded driver engaged
-      and re-solves; the model must then be fully defined (0 under-constrained), so
-      the true free-DOF count equals the number of drivers.
-
-    The caller MUST discard the document WITHOUT saving -- this mutates the
-    in-memory model (authoring real mates), and the shipped ``.SLDASM`` must stay
-    the free kinematic model."""
-    with _telemetry.span("gate.park_closure") as gsp:
-        gsp.set_attribute("expected_free_dof", expected_count)
-        gsp.set_attribute("specs", len(specs))
-        if len(specs) != expected_count:
-            raise RuntimeError(
-                f"park spec count {len(specs)} != expected free DOF {expected_count} "
-                "-- the recorded specs disagree with the configured free-DOF count "
-                "(rebuild the assembly)"
-            )
-        under = _under_constrained_components(adapter)
-        gsp.set_attribute("free_under_constrained", len(under))
-        if len(under) < expected_count:
-            raise RuntimeError(
-                f"expected >= {expected_count} under-constrained component(s) in the "
-                f"free pose but found {len(under)}: {sorted(under)} -- the shipped "
-                "model is already frozen (the deferred park drivers freed nothing)"
-            )
-        names = await replay_park_specs(adapter, specs)
-        gsp.set_attribute("authored", len(names))
-        # SUFFICIENCY: with every driver engaged the model must be rigid.
-        assert_components_fully_defined(adapter)
-        _telemetry.success(
-            f"park closure OK: {len(under)} free -> authored {len(names)} PARK_* "
-            "driver(s) -> 0 under-constrained (sufficiency); model NOT saved"
-        )

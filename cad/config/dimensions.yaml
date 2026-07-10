@@ -1786,8 +1786,8 @@ sections:
       z +91.25 = GT pinion_back exactly. Straps: 18 wide (0.8× the 42T tip
       Ø22.4, `v4_pinion_018` — the teeth stand proud of both flanks), pivot
       y 62.8, bore-to-bore c2c 43.0, parked at a −12.38° west lean; the swing rides the torque shaft as
-      the p2 setup DOF (PARK_pinion_swing angle driver, engaged in `free`
-      builds, articulated by the mobility probe / motion drives). The brass
+      the p2 setup DOF (a freed operational DOF, its angle drive spec recorded
+      in the DOF manifest; articulated by the mobility probe / motion drives). The brass
       return spring (table row above) stands east of the back strap, foot on
       the base, and presses the swing west to the disengaged rest —
       parked-pose clearances asserted in `build_drive_train_assembly`

@@ -168,8 +168,8 @@ def test_verify_gate_logic_off_build_closure_is_a_file_dep():
     """A verify/preflight gate whose LOGIC lives in a module on NO assembly's build
     closure (so it rides no .SLDASM digest) MUST list that module as a direct
     file_dep -- else a change to the gate logic leaves the verify-*.ok stamp
-    stale-fresh and SKIPS the gate (codex PR #193: replay_park_specs moved to
-    _assembly_postbuild.py, off every build closure). General guard: computes the
+    stale-fresh and SKIPS the gate (codex PR #193: the transient-drive replay
+    lives in _assembly_postbuild.py, off every build closure). General guard: computes the
     verify/preflight ``_*.py`` helpers that are on no assembly closure and asserts
     each task depends on them."""
     dodo = _load_dodo()

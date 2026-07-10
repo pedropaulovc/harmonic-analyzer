@@ -1,7 +1,7 @@
-r"""Throwaway diagnostic: WHY does the magnifier park closure read status=6?
+r"""Throwaway diagnostic: WHY does the magnifier drive replay read status=6?
 
-Replays the recorded park specs on a fresh magnifier.SLDASM (exactly what the
-release preflight does), then dumps GetWhatsWrong (feature + swFeatureError_e
+Replays the recorded DOF manifest on a fresh magnifier.SLDASM (exactly what
+verify:kinematics does), then dumps GetWhatsWrong (feature + swFeatureError_e
 code + warning flag) and every component's GetConstrainedStatus -- ground truth
 for which replayed driver conflicts (code 46/47) instead of theorizing.
 
@@ -17,7 +17,7 @@ from win32com.client import VARIANT
 
 import _telemetry
 from _common import OUT_SLDASM, _flag, _flag_only, _read_member, log
-from _assembly_postbuild import load_park_specs, replay_park_specs
+from _assembly_postbuild import author_dof_drives, load_dof_manifest
 
 _ERR = {
     0: "None", 1: "Warning", 2: "RebuildError",
@@ -80,9 +80,9 @@ async def main():
         log(f"    [{'WARN' if wn else 'ERROR'}] {n!r} code={ec} ({_ERR.get(ec, ec)})")
     _statuses(adapter, model)
 
-    specs = load_park_specs("magnifier")
-    log(f"replaying {len(specs)} park spec(s) ...")
-    names = await replay_park_specs(adapter, specs)
+    specs = load_dof_manifest("magnifier")
+    log(f"replaying {len(specs)} DOF manifest spec(s) ...")
+    names = await author_dof_drives(adapter, specs)
     log(f"replayed: {names}")
 
     log("=== AFTER replay ===")
@@ -104,7 +104,7 @@ async def main():
 
     # Isolate: suppress each wire driver in turn and re-check.
     from solidworks_mcp.adapters.base import SuppressMateParameters
-    for suppress_name in ("PARK_wire_spin", "PARK_wire_swing"):
+    for suppress_name in ("DRIVE_wire_spin", "DRIVE_wire_swing"):
         await adapter.suppress_mate(
             SuppressMateParameters(name=suppress_name, suppress=True))
         adapter._attempt(lambda: model.ForceRebuild3(False))
@@ -115,7 +115,7 @@ async def main():
         await adapter.suppress_mate(
             SuppressMateParameters(name=suppress_name, suppress=False))
 
-    # Discard unsaved (the preflight idiom) so the artefact stays pristine.
+    # Discard unsaved (the transient-replay idiom) so the artefact stays pristine.
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     await adapter.disconnect()
 
