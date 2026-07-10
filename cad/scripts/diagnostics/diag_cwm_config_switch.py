@@ -120,6 +120,12 @@ async def build(adapter) -> dict[str, str]:
         assert len(rows) == 3 and len(dims) == 1, (rows, dims)
         dim_slot = dims[0]
         seed_status = component_constrained_status(adapter, seed)
+        if seed_status != FULLY_CONSTRAINED:
+            raise RuntimeError(
+                f"seed status {seed_status}, expected fully defined"
+                f" ({FULLY_CONSTRAINED}) -- this probe validates the"
+                " fully-defined copy path; an under-constrained seed"
+                " (unfixed shaft / ineffective mate) voids every verdict")
         seed_dia = _box_dia_mm(adapter, seed)
         log(f"seed: 3 mates, dim slot {dim_slot}, status={seed_status},"
             f" box dia {seed_dia:.2f}")
@@ -149,7 +155,7 @@ async def build(adapter) -> dict[str, str]:
             pose_ok = (abs(org[0]) < TOL_MM and abs(org[1]) < TOL_MM
                        and abs(org[2] + (Z0 + k * STEP)) < TOL_MM)
             ok = (got_cfg == cfg and pose_ok and mates == 3
-                  and status == seed_status and dia < seed_dia - 1.0)
+                  and status == FULLY_CONSTRAINED and dia < seed_dia - 1.0)
             log(f"  cfg={got_cfg} pose=({org[0]:.3f},{org[1]:.3f},{org[2]:.3f})"
                 f" mates={mates} status={status} dia={dia:.2f}"
                 f" -> {'PASS' if ok else 'FAIL'}")
@@ -157,6 +163,11 @@ async def build(adapter) -> dict[str, str]:
         log("=== SUMMARY ===")
         for cfg, verdict in results.items():
             log(f"  {cfg}: {verdict}")
+        failed = [cfg for cfg, v in results.items() if v != "PASS"]
+        if failed:
+            raise RuntimeError(
+                f"config-switch probe FAILED for {failed} -- see the"
+                " per-copy lines above")
         return results
     finally:
         discard_open_documents(adapter)
