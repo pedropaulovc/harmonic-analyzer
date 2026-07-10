@@ -88,10 +88,11 @@ Only the SEED channels are authored mate-by-mate: channel 0 (the global
 Z anchor) plus the first channel >= 1 of each distinct amplitude value.
 Every other channel is ONE CopyWithMates2 of its seed's 4-part slice
 (rocker + rod + bar + lever, 9 mates -- see _cwm.py for the pinned
-native-call contract), with the J1a axial dim re-valued along the
-ladder off the SEED's gap bushing (PITCH/2 + k*PITCH): a copied
-channel's Z chains to that one shared bushing, while authored channels
-keep the per-gap neighbour idiom. The copied mates pin a copy only up
+native-call contract). The J1a axial dim is re-pointed to THIS channel's
+OWN gap bushing (Repeat=false + NewEntityToMateTo) at the local PITCH/2
+seat -- the SAME per-gap neighbour idiom the authored channels use --
+so a copy is topologically identical to an authored channel, not chained
+to the seed's bushing on a cumulative ladder. The copied mates pin a copy only up
 to its 3 free operational DOF, so its design pose is PUT (no solve)
 right after the copy and one closing rebuild solves everything from
 that consistent state. The call's return value lies, so each copy is
@@ -156,6 +157,7 @@ from _cwm import (
     external_mate_rows,
     mates_with_owners,
     put_component_pose,
+    resolve_entity,
 )
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows, rows_from_euler
 from solidworks_mcp.adapters.base import (
@@ -1373,12 +1375,10 @@ async def build(adapter) -> dict[str, str]:
             raise RuntimeError(
                 f"J1a seed value {dim['mm']:.3f} mm != PITCH/2"
                 f" {PITCH / 2.0:.3f} -- the axial anchor moved")
-        if dim["flip"]:
-            raise RuntimeError(
-                f"J1a seed dim {dim['name']!r} authored flip=True --"
-                " CopyWithMates2's Repeat path RESETS re-valued dims to"
-                " flip=False, so every copy would land on the wrong side;"
-                " keep the ladder formulated with the wanted side as False")
+        # The seed's J1a side is CARRIED to each copy (flips[dim_slot]) via the
+        # Repeat=false + own-bushing idiom, so any seed side is honoured; the
+        # authored neighbour idiom (#110) produces flip=False. No always-positive
+        # ladder is needed anymore (see the copy site + _cwm.py module doc).
         arrays = {p: list(component_transform(adapter, n))
                   for p, n in seed_comps.items()}
         mate_counts = {p: component_mate_count(adapter, n)
@@ -1386,7 +1386,8 @@ async def build(adapter) -> dict[str, str]:
         # The seed's drive targets (all Z-independent), for the transient
         # drivers that land each copy on the design pose.
         return {
-            "n": len(rows), "dim_slot": slot, "arrays": arrays,
+            "n": len(rows), "dim_slot": slot, "dim_flip": bool(dim["flip"]),
+            "arrays": arrays,
             "mate_counts": mate_counts,
             "rocker_off": world_point(
                 adapter, seed_comps["rocker-arm"], ROCKER_ROD_BORE_LOCAL),
@@ -1400,14 +1401,14 @@ async def build(adapter) -> dict[str, str]:
 
     # Per-channel chain, seed-and-replicate (PR #220 -> production). Channel 0
     # is always authored (it is the single global Z anchor -- its J1a is a
-    # ROOT-datum distance at a negative station, flip=True, which the Repeat
-    # path cannot reproduce, so it never seeds). The first channel >= 1 of each
-    # amplitude value is authored as that group's SEED (its J1a anchors
-    # PITCH/2 off its own gap bushing, positive = flip False); every later
+    # ROOT-datum distance at a negative station, so it is never a copy seed).
+    # The first channel >= 1 of each amplitude value is authored as that group's
+    # SEED (its J1a anchors PITCH/2 off its own gap bushing); every later
     # same-amplitude channel is ONE CopyWithMates2 of the seed's 4-part slice
-    # with the J1a slot re-valued along the ladder. With the current all-
-    # neutral preset that is 2 authored + (CHANNELS-2) copies; a restored
-    # square preset degrades gracefully (each distinct a_j authors once).
+    # with the J1a slot re-pointed (Repeat=false) to ITS own gap bushing at the
+    # same local PITCH/2. With the current all-neutral preset that is 2 authored
+    # + (CHANNELS-2) copies; a restored square preset degrades gracefully (each
+    # distinct a_j authors once).
     seed_by_amp: dict[float, tuple[int, dict[str, str]]] = {}
     slots_by_seed: dict[int, tuple[int, int, dict[str, list[float]]]] = {}
     copied: list[dict[str, Any]] = []
@@ -1426,18 +1427,28 @@ async def build(adapter) -> dict[str, str]:
         slice_info = slots_by_seed[seed_j]
         n_slice, dim_slot = slice_info["n"], slice_info["dim_slot"]
         seed_arrays = slice_info["arrays"]
-        # The copy keeps the seed's EXTERNAL references, so its J1a measures
-        # to the SEED's gap bushing -- the ladder PITCH/2 + (j-seed_j)*PITCH --
-        # not to this channel's own gap bushing (the authored path's neighbour
-        # idiom). Always positive = the seed's False side, the only side the
-        # Repeat path can land on (see _cwm.py).
-        ladder = PITCH / 2.0 + (j - seed_j) * PITCH
+        # Re-point ONLY the J1a slot to THIS channel's OWN gap bushing
+        # (Repeat=false + NewEntityToMateTo) at the LOCAL PITCH/2 seat -- exactly
+        # the authored #110 neighbour idiom -- honouring the seed's side via
+        # flips[dim_slot]. The other two external slots (J1 radial on the shared
+        # pivot-shaft) keep the seed's references (Repeat=true), the measured
+        # mixed-array idiom. This drops the old cumulative always-positive ladder
+        # off the seed's bushing (see _cwm.py module doc).
+        own_bushing = pivot_bushing_by_gap[j]
         values = [0.0] * n_slice
-        values[dim_slot] = ladder / 1000.0
+        values[dim_slot] = (PITCH / 2.0) / 1000.0
+        repeat = [True] * n_slice
+        repeat[dim_slot] = False
+        new_ents: list = [None] * n_slice
+        new_ents[dim_slot] = resolve_entity(
+            adapter, named_ref(f"Front Plane@{own_bushing}", "PLANE"))
+        flips = [False] * n_slice
+        flips[dim_slot] = slice_info["dim_flip"]
         with _telemetry.span("cwm.comp_names", channel=j, phase="before"):
             before_comps = set(component_names(adapter))
         copy_with_mates(
-            adapter, [seed_comps[p] for p in CHAIN_PARTS], n_slice, values)
+            adapter, [seed_comps[p] for p in CHAIN_PARTS], n_slice, values,
+            flips=flips, repeat=repeat, new_entities=new_ents)
         with _telemetry.span("cwm.comp_names", channel=j, phase="after"):
             new_comps = sorted(set(component_names(adapter)) - before_comps)
         comps = {}
@@ -1530,7 +1541,8 @@ async def build(adapter) -> dict[str, str]:
                 await _debug_png(adapter, f"drive-fail-ch{j:02d}")
             raise
         log(f"ch{j:02d} <- CopyWithMates2 of ch{seed_j:02d}"
-            f" (J1a ladder {ladder:.2f} mm, driven to pose + freed)")
+            f" (J1a PITCH/2 {PITCH / 2.0:.2f} mm <- own bushing {own_bushing},"
+            f" driven to pose + freed)")
         copied.append({"j": j, "seed_j": seed_j, "comps": comps,
                        "targets": targets})
 
