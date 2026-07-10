@@ -236,6 +236,10 @@ _DRAWING_SPECS = {
         "part": "platen_guide",
         "arg": "platen-guide",
         "script": SCRIPTS_DIR / "export_part_drawing.py",
+        "inputs": (
+            SCRIPTS_DIR / "_hole_wizard.py",
+            SUBMODULE_SRC / "adapters" / "solidworks" / "drawing.py",
+        ),
         "targets": (
             CAD_OUT / "slddrw" / "platen-guide.SLDDRW",
             CAD_OUT / "pdf" / "platen-guide.pdf",
@@ -1277,17 +1281,18 @@ def _clean_drawing(stem: str) -> None:
 def task_drawing():
     """Curated manufacturing drawings, serialized by the runtime COM-seat lock.
 
-    A drawing depends on its authoritative SLDPRT plus the drawing exporter and
-    its project-local helper closure.  It is independently selectable as
+    A drawing depends on its authoritative SLDPRT plus explicitly declared
+    drawing inputs. It is independently selectable as
     ``drawing:<stem>`` and deliberately excluded from ``build_bare``.
     """
     for stem in _drawing_order():
         spec = _DRAWING_SPECS[stem]
         script = Path(spec["script"]).resolve()
         source = _sldprt(spec["part"])
+        inputs = [str(Path(path).resolve()) for path in spec["inputs"]]
         yield {
             "name": stem,
-            "file_dep": sorted({str(script), source, *module_deps_of(script)}),
+            "file_dep": sorted({str(script), source, *inputs}),
             "targets": [str(Path(path).resolve()) for path in spec["targets"]],
             "actions": [
                 (
