@@ -46,13 +46,15 @@ def test_threaded_guide_interference_allowance_is_exact() -> None:
         )
         * (screw.SHANK_LEN - paper_drive.LOCK_THICK)
     )
-    message = "4 interference(s): " + "; ".join(
-        f"{' & '.join(sorted(pair))}: {volume:.2f} mm^3" for pair in allowed
-    )
-    paper_drive._validate_threaded_guide_contacts(message, allowed)
+    contacts = {pair: volume for pair in allowed}
+    paper_drive._validate_threaded_guide_contacts(contacts, allowed)
     with pytest.raises(RuntimeError):
         paper_drive._validate_threaded_guide_contacts(
-            message + "; platen-guide-1 & platen-rack-1: 0.10 mm^3", allowed
+            {
+                **contacts,
+                frozenset(("platen-guide-1", "platen-rack-1")): 0.10,
+            },
+            allowed,
         )
 
 
