@@ -1,24 +1,48 @@
 r"""Standalone MINIMAL repro: CopyWithMates2 parks an under-constrained copy
 off its mates' pose.
 
-The smallest slice that shows it (measured 2026-07-09, SW 2024 SP3):
-ONE part with ZERO features (an empty part -- just its default planes),
-TWO mates to the assembly root planes (coincident Top + distance Front,
-leaving in-plane slide + spin free), ONE CopyWithMates2 call with the
-distance slot re-valued one step over. The copy lands at the right
-distance but PARKED ~8.5 mm off along the free in-plane direction --
-deterministically, where the seed sat exactly on pose. A raw Transform2
-put to the intended pose then survives EditRebuild3 (no revert at this
-scale; reverts were only ever observed on a large multi-loop assembly).
+The smallest slice that shows it (measured 2026-07-09, SW 2024 SP3; re-confirmed
+2026-07-10 on SW 2026 SP2 via an early-bound C# Interop port): ONE part with
+ZERO features (an empty part -- just its default planes), TWO mates to the
+assembly root planes (coincident Top + distance Front, leaving in-plane slide +
+spin free), ONE CopyWithMates2 call with the distance slot re-valued one step
+over. The floating copy lands at the right distance but PARKED ~8.5-9.5 mm off
+along the free in-plane direction -- deterministically, where the seed sat
+exactly on pose. A raw Transform2 put to the intended pose then survives
+EditRebuild3 (no revert at this scale; reverts were only ever observed on a
+large multi-loop assembly).
 
-pywin32 only -- NO repo imports, suitable for a vendor ticket. SolidWorks
-must already be open; the script creates its own throwaway documents,
-closes only those, and saves nothing except the tiny part in %TEMP%.
+By default the SEED IS FLOATED (its auto-fix removed) -- see below -- so the
+run isolates the pure CopyWithMates2 free-DOF wander with NO mate errors.
 
-Run:  uv run python cad\scripts\diagnostics\diag_cwm_min.py [--visible]
+    seed after mates           org=(   0.000,   0.000, -20.000)  ON-POSE
+    copy post-CopyWithMates2   org=(   9.488,  -0.000, -45.000)  WANDER   <- parks off, free dir
+    copy post-put+rebuild      org=(   0.000,   0.000, -45.000)  ON-POSE  <- put heals, holds
 
---visible uses a one-extrude cylinder instead of the empty part, so the
-parked copy can be seen (and screenshotted) in the viewport.
+WHY FLOAT THE SEED (the confound this isolates). The first component added to an
+assembly is AUTO-FIXED by SolidWorks. A DISTANCE mate on a fixed component
+conflicts with the fix (the part can't move to satisfy it), so SolidWorks flags
+that mate over-defined -- a spurious "mates are over-defined / corrupted" error
+that has nothing to do with CopyWithMates2. `--fixed-seed` keeps the auto-fix to
+demonstrate that artifact:
+  * seed reads FULLY-DEFINED (it is pinned, not mate-constrained) and never wanders;
+  * the seed's Distance mate reports an ERROR (fix vs. distance-mate conflict);
+  * the copy's mates come out `aligned` while the seed's stay `closest`
+    (CopyWithMates2 does NOT preserve the alignment mode), so the copy's distance
+    also resolves on the OTHER side (solved z -45 vs seed-derived -50).
+Floating the seed makes both instances floating + under-defined, removes every
+mate error, and leaves ONLY the wander -- which is also the realistic case (a
+copied part is never the fixed one).
+
+pywin32 only -- NO repo imports, suitable for a vendor ticket. SolidWorks must
+already be open; the script creates its own throwaway documents, closes only
+those, and saves nothing except the tiny part in %TEMP%.
+
+Run:  uv run python cad\scripts\diagnostics\diag_cwm_min.py [--visible] [--fixed-seed]
+
+--visible uses a one-extrude cylinder instead of the empty part, so the parked
+copy can be seen (and screenshotted) in the viewport.
+--fixed-seed keeps the first component auto-fixed (see the confound above).
 """
 
 from __future__ import annotations
@@ -34,6 +58,11 @@ COIN, DIST = 0, 5        # swMateType_e
 CLOSEST = 2              # swMateAlign_e
 Z0, STEP = 0.020, 0.025  # seed dim value / ladder step (m)
 NULL = VARIANT(pythoncom.VT_DISPATCH, None)  # bare None marshals VT_NULL
+
+# swConstrainedStatus_e -> label
+_CS = {1: "unknown-constraint", 2: "under-defined", 3: "fully-defined",
+       4: "OVER-DEFINED", 5: "NO-SOLUTION", 6: "INVALID-SOLUTION",
+       7: "autosolve-off"}
 
 
 def flag(obj, *names):
@@ -91,8 +120,45 @@ def report(tag, comp, want) -> bool:
     return ok
 
 
+def whats_wrong(ext) -> list[str]:
+    """Best-effort list of 'name(type) err=code warn=bool' for problem mates."""
+    feats = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_VARIANT, None)
+    codes = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_VARIANT, None)
+    warns = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_VARIANT, None)
+    try:
+        ext.GetWhatsWrong(feats, codes, warns)
+    except Exception as exc:  # noqa: BLE001 -- diagnostic, never fatal
+        return [f"<GetWhatsWrong n/a: {exc}>"]
+    fs = feats.value or []
+    cs = codes.value or []
+    ws = warns.value or []
+    out = []
+    for i, f in enumerate(fs):
+        try:
+            name = f.Name
+            typ = flag(f, "GetTypeName2").GetTypeName2()
+        except Exception:  # noqa: BLE001
+            name, typ = "?", "?"
+        code = cs[i] if i < len(cs) else "?"
+        warn = ws[i] if i < len(ws) else "?"
+        out.append(f"{name}({typ}) err={code} warn={warn}")
+    return out
+
+
+def status(ext, when, seed, copy=None):
+    print(f"  --- status: {when} ---")
+    for label, c in (("seed", seed), ("copy", copy)):
+        if c is None:
+            continue
+        print(f"    {label} component : {_CS.get(c.GetConstrainedStatus(), '?'):18s}"
+              f" fixed={c.IsFixed()}")
+    ww = whats_wrong(ext)
+    print(f"    WhatsWrong     : {', '.join(ww) if ww else '(none)'}")
+
+
 def main() -> int:
     visible = "--visible" in sys.argv
+    fixed_seed = "--fixed-seed" in sys.argv
     sw = flag(dynamic.Dispatch("SldWorks.Application"),
               "NewPart", "NewAssembly", "CloseDoc", "GetMathUtility")
     path = os.path.join(tempfile.gettempdir(), "cwm_min.SLDPRT")
@@ -100,17 +166,27 @@ def main() -> int:
     try:
         asm = flag(sw.NewAssembly(), "AddComponent5", "AddMate5",
                    "EditRebuild3", "ClearSelection2", "GetComponents",
-                   "GetTitle", "CopyWithMates2")
-        flag(asm.Extension, "SelectByID2")
+                   "GetTitle", "CopyWithMates2", "UnfixComponent")
+        ext = flag(asm.Extension, "SelectByID2", "GetWhatsWrong")
         title = asm.GetTitle()
         titles.insert(0, title)  # assembly closes first
-        comp = asm.AddComponent5(path, 0, "", False, "", 0.0, 0.0, -Z0)
+        comp = flag(asm.AddComponent5(path, 0, "", False, "", 0.0, 0.0, -Z0),
+                    "IsFixed", "GetConstrainedStatus", "Select2")
+        # The first component is auto-fixed. Float it (default) so its distance
+        # mate does not conflict with the fix -- see the module docstring.
+        if not fixed_seed:
+            comp.Select2(False, 0)
+            asm.UnfixComponent()
+            asm.ClearSelection2(True)
+        print(f"  seed: fixed={comp.IsFixed()} "
+              f"({'auto-fix kept (--fixed-seed)' if fixed_seed else 'floated'})")
         name = comp.Name2
         mate(asm, [f"Top Plane@{name}@{title}", "Top Plane"], COIN)
         mate(asm, [f"Front Plane@{name}@{title}", "Front Plane"], DIST, Z0)
         seed = comp.Transform2.ArrayData  # the reference: solved seed pose
         report("seed after mates", comp, [seed[9] * 1000, seed[10] * 1000,
                                           seed[11] * 1000])
+        status(ext, "seed only, before CopyWithMates2", comp)
         before = {c.Name2 for c in asm.GetComponents(True)}
         n = 2  # both mates are external (root-plane refs); slot 1 = the dim
         asm.CopyWithMates2(
@@ -125,16 +201,18 @@ def main() -> int:
             VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_I4, [0] * n),
         )
         comps = {c.Name2: c for c in asm.GetComponents(True)}
-        copy = comps[(set(comps) - before).pop()]
+        copy = flag(comps[(set(comps) - before).pop()],
+                    "IsFixed", "GetConstrainedStatus")
         # expected: the seed's solved pose, one STEP further on its side
         want = [seed[9] * 1000, seed[10] * 1000, (seed[11] - STEP) * 1000]
         parked = report("copy post-CopyWithMates2", copy, want)
+        status(ext, "after CopyWithMates2", comp, copy)
         z_parked = copy.Transform2.ArrayData[11] * 1000
         if abs(z_parked - want[2]) > 0.05:
-            # Second divergence flavor (shows on the --visible body): the
-            # COPIED dim solves with a different plane-side/offset than the
-            # seed's authored mate, so even its constrained direction lands
-            # off the seed-derived station.
+            # Second divergence flavor (seen with --fixed-seed): the COPIED dim
+            # solves with a different plane-side/offset than the seed's authored
+            # mate, so even its constrained direction lands off the seed-derived
+            # station.
             print(f"  NB copied dim solved z={z_parked:.3f} vs seed-derived"
                   f" {want[2]:.3f} -- the copy's distance resolves on a"
                   " different side than the seed's")
@@ -147,6 +225,7 @@ def main() -> int:
         if not asm.EditRebuild3():
             print("  !! EditRebuild3 returned False")
         held = report("copy post-put+rebuild", copy, want)
+        status(ext, "after put + rebuild", comp, copy)
         print(f"VERDICT: {'no wander' if parked else 'copy PARKS OFF-POSE'},"
               f" {'put holds' if held else 'put REVERTED'}")
         return 0
