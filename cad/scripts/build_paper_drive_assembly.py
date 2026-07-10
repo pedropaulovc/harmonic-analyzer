@@ -63,6 +63,8 @@ import math
 import re
 import sys
 
+import _telemetry
+
 from _chain import (
     CENTRELINE_LEN,
     CRANK_CENTRE as CHAIN_CRANK_CENTRE,
@@ -222,9 +224,8 @@ def _check_paper_drive_interference(
         check_no_interference(adapter)
     except RuntimeError as exc:
         _validate_threaded_guide_contacts(str(exc), allowed_thread_pairs)
-        check(
-            f"{len(allowed_thread_pairs)} bounded 6 BA screw/tap engagements",
-            True,
+        _telemetry.success(
+            f"{len(allowed_thread_pairs)} bounded 6 BA screw/tap engagements"
         )
 
 # Rack: teeth-down at the platen's bottom edge, crests protruding 2 below it.
