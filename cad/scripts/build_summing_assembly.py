@@ -11,10 +11,9 @@ spring / gooseneck chain.
 * top-crossbar -- hangs the lever from the top-frame ring.
 * summing-lever -- rocks on the knife edge (Axis3 coincident to the support
   contact ridge); the part the channel + counter springs drive in the M6
-  Motion study. The rock is the sub's single FREED operational DOF: in the
-  default `free` build (cad/config/machine/build_lock.yaml) its park driver
-  is DEFERRED (recorded, not authored), so the saved model rocks on the
-  knife edge; `locked` authors it engaged (see ``LOCK``).
+  Motion study. The rock is the sub's single FREED operational DOF: its
+  drive spec is recorded into the DOF manifest, never authored, so the
+  saved model rocks on the knife edge.
 * boss-hook (keyed to the lever's anchor eye) + counter-spring + gooseneck +
   gooseneck-clamp -- the counter-balance hung from the east column.
 
@@ -39,7 +38,6 @@ from __future__ import annotations
 
 import sys
 
-import _config
 from _common import (
     check,
     log,
@@ -47,32 +45,21 @@ from _common import (
 )
 from _assembly import (
     angle_driver,
-    assert_expected_free_dof,
     assert_free_dof_necessity,
     check_no_interference,
     coincident_mate,
     component_origin,
     distance_driver,
-    is_locked_build,
     lock_mate,
     named_ref,
     place_component,
+    reset_dof_manifest,
     save_assembly_and_images,
-    set_park_defer,
-    write_park_specs,
+    write_dof_manifest,
 )
 from _transforms import IDENTITY, ROT_Y_180, ROT_Y_POS90
 
 ASM_NAME = "summing"
-
-# Build mode (cad/config/machine/build_lock.yaml). `free` (default) leaves the
-# lever's knife-edge rock -- the sub's single operational DOF -- UNLOCKED: its
-# park driver is DEFERRED (recorded, not authored), so the saved model is a
-# working kinematic model: drag the lever and it rocks on the knife edge, the
-# boss-hook riding it. `locked` authors the park driver engaged for a
-# fully-defined reproducible snapshot. The literal accessor tokenises to
-# machine/build_lock.yaml in the doit/cache digest.
-LOCK = is_locked_build(_config.machine("build_lock", "summing"))
 
 # --- machine anchors ---------------------------------------------------------
 KNIFE = (-15.0, 990.0)  # summing-lever knife-edge line (x, y), along Z
@@ -117,9 +104,9 @@ def _assert_counter_spring_hang() -> None:
 async def build(adapter) -> dict[str, str]:
     _assert_counter_spring_hang()
 
-    # `free` (default) DEFERS the freed-DOF park driver (records, does not
-    # author); `locked` authors it engaged. Set before the *_driver call below.
-    set_park_defer(not LOCK)
+    # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
+    # call: each freed DOF is recorded (never authored) and persisted below.
+    reset_dof_manifest()
     check("create_assembly", await adapter.create_assembly())
 
     # Two knife bearing supports, one per hex trunnion (overhanging the lever
@@ -141,10 +128,9 @@ async def build(adapter) -> dict[str, str]:
                           [0.0, 0.0, 0.0], IDENTITY)
     # Summing lever: knife-edge revolute = coincident axis-to-axis on the knife
     # line (the bore-bottom rocking edge) + a Front-plane axial distance,
-    # leaving the rock DOF -- the sub's freed operational DOF (park driver
-    # deferred in the default `free` build, authored engaged in `locked`).
-    # This is the part the counter spring + channel springs drive in the M6
-    # Motion study.
+    # leaving the rock DOF -- the sub's freed operational DOF (its drive spec
+    # recorded into the DOF manifest, never authored). This is the part the
+    # counter spring + channel springs drive in the M6 Motion study.
     sl = await place_component(adapter, "summing-lever", [KNIFE[0], KNIFE[1], 0.0],
                                [0.0, 0.0, 0.0], IDENTITY, ground=False)
     sl_o = component_origin(adapter, sl)
@@ -167,11 +153,10 @@ async def build(adapter) -> dict[str, str]:
                           named_ref("Front Plane", "PLANE"), abs(sl_o[2]),
                           label="summing-lever axial", verify=(sl, sl_o))
     # The rock about the knife line is the sub's FREED operational DOF: its
-    # park driver (an ANGLE between Right planes -- the boss "spin ref"
-    # distance-to-Top is degenerate here, see above) is DEFERRED in the default
-    # `free` build (recorded, not authored -- drag the lever and it rocks on
-    # the knife edge, per the magnifier lever_rock idiom), authored engaged in
-    # a `locked` build.
+    # drive spec (an ANGLE between Right planes -- the boss "spin ref"
+    # distance-to-Top is degenerate here, see above) is recorded into the DOF
+    # manifest, never authored -- drag the lever and it rocks on the knife
+    # edge, per the magnifier lever_rock idiom.
     await angle_driver(adapter, named_ref(f"Right Plane@{sl}", "PLANE"),
                        named_ref("Right Plane", "PLANE"), 0.0,
                        label="summing-lever rock PARK driver (freed in default build)",
@@ -199,16 +184,13 @@ async def build(adapter) -> dict[str, str]:
     await place_component(adapter, "gooseneck-clamp", [COLUMN_X, 1040.7, 0.0],
                           [0.0, 0.0, 0.0], IDENTITY)
 
-    # Certify the AS-BUILT model. free -> necessity only (the freed lever rock
-    # is genuinely free; the lock-mated boss-hook MUST read under-constrained
+    # Certify the AS-BUILT model. Necessity only: the freed lever rock is
+    # genuinely free; the lock-mated boss-hook MUST read under-constrained
     # WITH it -- a grounded/fixed regression would freeze the counter-spring
-    # anchor while the lever still swings); locked -> strict 0-DOF.
-    if LOCK:
-        await assert_expected_free_dof(adapter, 0)
-    else:
-        assert_free_dof_necessity(
-            adapter, 1, required_stems=("summing-lever", "boss-hook"))
-    write_park_specs(ASM_NAME)
+    # anchor while the lever still swings.
+    assert_free_dof_necessity(
+        adapter, 1, required_stems=("summing-lever", "boss-hook"))
+    write_dof_manifest(ASM_NAME)
     check_no_interference(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)
 
