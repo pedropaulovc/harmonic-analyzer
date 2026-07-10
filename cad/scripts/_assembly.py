@@ -1595,6 +1595,64 @@ def assert_free_dof_necessity(
         )
 
 
+def assert_refresh_dof(adapter: Any, asm_name: str) -> None:
+    """Apply the saved assembly's DOF contract during an incremental refresh.
+
+    Assemblies with operational freedom persist one manifest entry per omitted
+    drive mate in ``.<stem>.dof.json``.  A refresh reopens that already-built
+    model, so the manifest -- not a hard-coded zero-DOF assumption -- is its
+    source of truth.  Every manifest entry must identify a component instance
+    through ``verify``; requiring those instances in the necessity gate prevents
+    an unrelated loose component from satisfying the aggregate count.
+
+    An assembly without a manifest has no declared operational freedom and keeps
+    the strict fully-defined gate.  A malformed manifest fails loud rather than
+    weakening the refresh validation.
+    """
+    path = dof_manifest_path(asm_name)
+    if not path.exists():
+        assert_components_fully_defined(adapter)
+        return
+
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"invalid DOF manifest {path.name}: {exc}") from exc
+
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"DOF manifest {path.name} must contain a JSON object")
+    if payload.get("stem") != asm_name:
+        raise RuntimeError(
+            f"DOF manifest {path.name} names stem {payload.get('stem')!r}, "
+            f"expected {asm_name!r}"
+        )
+    specs = payload.get("specs")
+    if not isinstance(specs, list) or not specs:
+        raise RuntimeError(
+            f"DOF manifest {path.name} must contain a non-empty specs list"
+        )
+
+    targets: list[str] = []
+    for index, spec in enumerate(specs):
+        verify = spec.get("verify") if isinstance(spec, dict) else None
+        target = verify[0] if isinstance(verify, list) and verify else None
+        if not isinstance(target, str) or not target:
+            raise RuntimeError(
+                f"DOF manifest {path.name} spec {index} has no verify component "
+                "instance; refresh cannot prove that declared DOF is free"
+            )
+        targets.append(target)
+
+    # Preserve first-seen order while collapsing cases where two independent
+    # drives are witnessed on the same component (for example wire swing/spin).
+    required_instances = tuple(dict.fromkeys(targets))
+    assert_free_dof_necessity(
+        adapter,
+        len(specs),
+        required_instances=required_instances,
+    )
+
+
 
 
 def component_names(adapter: Any) -> list[str]:
@@ -2160,7 +2218,8 @@ async def refresh_assembly(
     ~500 s full re-insert/re-mate); only if the re-read is STILL faulted does the
     refresh raise, naming the config + the broken feature/mate. Then the
     rest/export pose is re-activated and the
-    standard gates run: ``assert_components_fully_defined`` (free DOF),
+    standard gates run: :func:`assert_refresh_dof` (strict zero DOF for a model
+    without a manifest; manifest-backed free-DOF necessity otherwise),
     ``check_no_interference`` (overlaps), ``assert_model_healthy`` (deep mate
     health). Any gate raises a ``RuntimeError`` naming the culprit and the
     ``.SLDASM`` is left untouched (the in-place save never runs) -- so an
@@ -2220,7 +2279,7 @@ async def refresh_assembly(
             check(f"re-activate {rest}", await adapter.set_active_configuration(rest))
 
     # Gates -- each already raises a RuntimeError naming the culprit. No fallback.
-    assert_components_fully_defined(adapter)
+    assert_refresh_dof(adapter, asm_name)
     check_no_interference(adapter)
     assert_model_healthy(adapter, label=asm_name, deep=True)
 
