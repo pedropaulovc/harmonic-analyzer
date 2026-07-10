@@ -139,7 +139,6 @@ import sys
 import _config
 import _telemetry
 from _common import (
-    FULLY_CONSTRAINED,
     check,
     run_build,
 )
@@ -2148,6 +2147,14 @@ async def build(adapter) -> dict[str, str]:
             " Repeat path resets re-valued dims to flip=False and lands on"
             " the seed's side)")
     seed_mates = component_mate_count(adapter, seed_cg)
+    # The status REFERENCE is the seed's own reading, NOT fully-defined: the
+    # cone cluster deliberately rides freed DOF (crank spin, platform swing --
+    # cone-gear is in verify's drive-train allowed-under-constrained set), so
+    # at this build point a correctly keyed gear reads whatever the seed
+    # reads. A copy must merely MATCH it (an unsolvable copied mate flips a
+    # component to over/no-solution without moving it, which a pose read
+    # alone misses).
+    seed_status = component_constrained_status(adapter, seed_cg)
     with _telemetry.span("cone.replicate", copies=19):
         for j in range(1, 20):
             teeth = _config.cone_teeth(j)
@@ -2194,10 +2201,11 @@ async def build(adapter) -> dict[str, str]:
                 f"{cg}: {got} mates, seed has {seed_mates} -- the copy"
                 " dropped mates")
         status = component_constrained_status(adapter, cg)
-        if status != FULLY_CONSTRAINED:
+        if status != seed_status:
             raise RuntimeError(
-                f"{cg}: constrained status {status}, expected fully defined"
-                f" ({FULLY_CONSTRAINED}) -- a copied mate is unsolvable")
+                f"{cg}: constrained status {status}, seed reads"
+                f" {seed_status} -- a copied mate is unsolvable or"
+                " over-defining")
         reledger_to_solved(adapter, cg)
     # 16T pinion (keyed to the crank) drives the 64T -> the cone cluster turns.
     await gear_mate(
