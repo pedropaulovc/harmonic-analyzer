@@ -156,6 +156,7 @@ from build_platen_guide import (  # noqa: E402
     HOLE_X as GUIDE_LOCK_HOLE_X,
     LOCK_STATION_X,
     SCREW_STATION_X as GUIDE_SCREW_STATION_X,
+    SCREW_THREAD_DEPTH as GUIDE_SCREW_THREAD_DEPTH,
     THREAD,
 )
 from build_guide_lock import LOCK_THICK, LOCK_WIDTH  # noqa: E402
@@ -186,15 +187,12 @@ LOCK_Z0 = BAR_FRONT_Z + GUIDE_DEPTH  # -128.9: lock plates on the guide backs,
 # fall off it.
 
 
-def _validate_threaded_guide_contacts(
-    contacts: dict[frozenset[str], float], allowed_pairs: set[frozenset[str]]
+def _validate_thread_contacts(
+    contacts: dict[frozenset[str], float],
+    engagement_lengths: dict[frozenset[str], float],
 ) -> None:
     """Accept only the bounded screw-major/thread-tap engagement volumes."""
-    expected_volume = (
-        math.pi
-        * ((SHANK_DIA / 2.0) ** 2 - (THREAD.tap_diameter_mm / 2.0) ** 2)
-        * (SHANK_LEN - LOCK_THICK)
-    )
+    allowed_pairs = set(engagement_lengths)
     if set(contacts) != allowed_pairs:
         missing = sorted(
             " & ".join(sorted(pair)) for pair in allowed_pairs - set(contacts)
@@ -206,6 +204,14 @@ def _validate_threaded_guide_contacts(
             f"6 BA thread engagement set differs: missing={missing}, extra={extra}"
         )
     for pair, volume in contacts.items():
+        expected_volume = (
+            math.pi
+            * (
+                (SHANK_DIA / 2.0) ** 2
+                - (THREAD.tap_drill_diameter_mm / 2.0) ** 2
+            )
+            * engagement_lengths[pair]
+        )
         if not 0.98 * expected_volume <= volume <= 1.02 * expected_volume:
             raise RuntimeError(
                 f"thread engagement {' & '.join(sorted(pair))} is {volume:.2f} mm^3; "
@@ -214,7 +220,7 @@ def _validate_threaded_guide_contacts(
 
 
 def _check_paper_drive_interference(
-    adapter, allowed_thread_pairs: set[frozenset[str]]
+    adapter, thread_engagement_lengths: dict[frozenset[str], float]
 ) -> None:
     """Run the standard interference gate plus bounded threaded engagements."""
     asm = adapter.currentModel
@@ -251,7 +257,7 @@ def _check_paper_drive_interference(
             ]
             volume = float(_read_member(interference, "Volume") or 0.0) * 1e9
             pair = frozenset(names)
-            if pair in allowed_thread_pairs:
+            if pair in thread_engagement_lengths:
                 threaded[pair] = volume
                 continue
             if len(names) == 2 and all(
@@ -277,7 +283,7 @@ def _check_paper_drive_interference(
             details.append(f"{' & '.join(names)}: {volume:.2f} mm^3")
         adapter._attempt(lambda: manager.Done(), default=None)
 
-        _validate_threaded_guide_contacts(threaded, allowed_thread_pairs)
+        _validate_thread_contacts(threaded, thread_engagement_lengths)
         span.set_attribute("hits", len(details))
         span.set_attribute("thread_engagements", len(threaded))
         span.set_attribute("chain_contacts", len(chain_contacts))
@@ -833,12 +839,17 @@ async def build(adapter) -> dict[str, str]:
 
     # --- platen-riding fasteners (ALL lock-mated -- rework E5) -----------------
     # The socket lists are pre-mirror-ordered; negate x to the machine frame.
+    thread_engagement_lengths: dict[frozenset[str], float] = {}
+    guide_mid_y = sum(GUIDE_Y) / len(GUIDE_Y)
     for x, y in CLIP_SCREW_XY:
         screw = await place_component(
             adapter, "fillister-screw", [-x, y, PLATE_FRONT_Z - CLIP_THICKNESS],
             [0.0, 0.0, 0.0], IDENTITY,
             ground=False, label=f"fillister-screw (clip x{-x:+.0f} y{y:.0f})")
         await _lock_to_platen(screw, f"clip screw x{-x:+.0f} y{y:.0f}")
+        thread_engagement_lengths[frozenset((platen, screw))] = (
+            SHANK_LEN - CLIP_THICKNESS
+        )
     for x, y in GUIDE_SCREW_XY:
         # Seated on the counterbore floor: crown 0.2 sub-flush so the paper
         # lies flat; shank threads 2.4 into the rail's blind hole.
@@ -847,8 +858,10 @@ async def build(adapter) -> dict[str, str]:
             [0.0, 0.0, 0.0], IDENTITY,
             ground=False, label=f"fillister-screw (guide x{-x:+.0f} y{y:.0f})")
         await _lock_to_platen(screw, f"guide screw x{-x:+.0f} y{y:.0f}")
-    threaded_guide_pairs: set[frozenset[str]] = set()
-    guide_mid_y = sum(GUIDE_Y) / len(GUIDE_Y)
+        guide = guides[0 if y < guide_mid_y else 1]
+        thread_engagement_lengths[frozenset((guide, screw))] = (
+            GUIDE_SCREW_THREAD_DEPTH
+        )
     for x, y in LOCK_SCREW_XY:
         # Ry(180): shank points machine -Z, head on the lock plate's back.
         screw = await place_component(
@@ -857,7 +870,9 @@ async def build(adapter) -> dict[str, str]:
             ground=False, label=f"fillister-screw (lock x{-x:+.0f} y{y:.0f})")
         await _lock_to_platen(screw, f"lock screw x{-x:+.0f} y{y:.0f}")
         guide = guides[0 if y < guide_mid_y else 1]
-        threaded_guide_pairs.add(frozenset((guide, screw)))
+        thread_engagement_lengths[frozenset((guide, screw))] = (
+            SHANK_LEN - LOCK_THICK
+        )
 
     # --- transgear group (the real train) --------------------------------------
     # Bracket on the bar's back face, stud bore below the bar.
@@ -1033,7 +1048,7 @@ async def build(adapter) -> dict[str, str]:
     assert_free_dof_necessity(
         adapter, 1, required_instances=(t12,))
     write_dof_manifest(ASM_NAME)
-    _check_paper_drive_interference(adapter, threaded_guide_pairs)
+    _check_paper_drive_interference(adapter, thread_engagement_lengths)
     # Machine coords put the output/paper side at -Z, so SolidWorks' native Front
     # renders the machine BACK (chain and transgear cluster mirrored). Re-base the
     # standard views (same as the top assembly) so the saved doc and the _front
