@@ -28,12 +28,16 @@ from _common import (
     add_line_chain,
     apply_color,
     apply_material,
+    blank_sketch,
     check,
+    clear_dimensions_for_drawing,
     define_circle,
     define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    mark_dimensions_for_drawing,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -104,6 +108,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=GUIDE_DEPTH)),
     )
     name_last_feature(adapter, "Guide")
+    depth_dim = name_dimensions(adapter, "Guide", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"GuideDepth"')]
     v_rail = GUIDE_LENGTH * GUIDE_HEIGHT * GUIDE_DEPTH
     await volume_check(adapter, "guide rail", v_rail, 0.005 * v_rail)
 
@@ -155,6 +161,7 @@ async def build(adapter) -> dict[str, str]:
     # The five platen screws enter the front face and need 2.4 mm of full thread
     # in a 3.0 mm bottoming hole.  Keep this as a second Hole Wizard feature so
     # the drawing can distinguish its blind callout from the rear through taps.
+    blind_pre = await adapter.get_mass_properties()
     mount_taps = await create_tapped_pattern(
         adapter,
         name="PlatenMountTaps",
@@ -165,8 +172,34 @@ async def build(adapter) -> dict[str, str]:
         hole_depth_mm=SCREW_HOLE_DEPTH,
         thread_depth_mm=SCREW_THREAD_DEPTH,
     )
-    blind_tap_drill = SketchDims()
-    check("create_sketch 6 BA blind tap drills", await adapter.create_sketch("Front"))
+    cylinder_min = (
+        len(SCREW_STATION_X)
+        * math.pi
+        * (mount_taps.tap_diameter_mm / 2.0) ** 2
+        * SCREW_HOLE_DEPTH
+    )
+    cylinder_max = (
+        len(SCREW_STATION_X)
+        * math.pi
+        * (mount_taps.thread_diameter_mm / 2.0) ** 2
+        * SCREW_HOLE_DEPTH
+    )
+    blind_post = await adapter.get_mass_properties()
+    v_screws = blind_pre.data.volume - blind_post.data.volume
+    if not 0.98 * cylinder_min <= v_screws <= 1.02 * cylinder_max:
+        raise RuntimeError(
+            "6 BA blind taps removed "
+            f"{v_screws:.1f} mm^3, outside {cylinder_min:.1f}..{cylinder_max:.1f}"
+        )
+    v_final = v_rail - v_holes - v_screws
+    await volume_check(adapter, "guide with screw holes", v_final, 0.02 * v_screws)
+
+    # Hidden drawing-only locator sketch. Hole Wizard location dimensions are
+    # imported as an all-or-nothing group by SolidWorks, which also pulls every
+    # redundant 2.5 ordinate. This marked sketch carries only the five blind-hole
+    # baselines needed on the manufacturing drawing and changes no solid geometry.
+    blind_locators = SketchDims()
+    check("create_sketch blind drawing locators", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     for n, x in enumerate(SCREW_STATION_X):
         await define_circle(
@@ -174,31 +207,16 @@ async def build(adapter) -> dict[str, str]:
             x,
             GUIDE_HEIGHT / 2.0,
             THREAD.tap_diameter_mm / 2.0,
-            f"6 BA blind tap drill x{x:.0f}",
-            dims=blind_tap_drill,
+            f"blind drawing locator x{x:.0f}",
+            dims=blind_locators,
             names=(f"B{n}X", f"B{n}Y", f"B{n}Dia"),
-            drives=(None, None, '"TapDrillDia"'),
         )
     set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "6 BA blind tap drill sketch")
-    check("exit_sketch 6 BA blind tap drills", await adapter.exit_sketch())
-    name_last_feature(adapter, "BlindTapDrillProfile")
-    drive_jobs += blind_tap_drill.apply(adapter, "BlindTapDrillProfile")
-    check(
-        "calibrate 6 BA blind tap drills",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=2.0 * SCREW_HOLE_DEPTH, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "BlindTapDrillCalibration")
-    v_screws = (
-        len(SCREW_STATION_X)
-        * math.pi
-        * (mount_taps.tap_diameter_mm / 2.0) ** 2
-        * SCREW_HOLE_DEPTH
-    )
-    v_final = v_rail - v_holes - v_screws
-    await volume_check(adapter, "guide with screw holes", v_final, 0.02 * v_screws)
+    await ensure_fully_defined(adapter, "blind drawing locator sketch")
+    check("exit_sketch blind drawing locators", await adapter.exit_sketch())
+    name_last_feature(adapter, "BlindDrawingLocatorProfile")
+    blind_locators.apply(adapter, "BlindDrawingLocatorProfile")
+    blank_sketch(adapter, "BlindDrawingLocatorProfile")
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
@@ -208,6 +226,18 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(
         adapter, "driven guide (equations neutral)", v_final, 0.02 * v_holes
+    )
+
+    clear_dimensions_for_drawing(adapter)
+    mark_dimensions_for_drawing(adapter, "GuideProfile", {"Length", "Height"})
+    mark_dimensions_for_drawing(adapter, "Guide", {"Depth"})
+    mark_dimensions_for_drawing(
+        adapter, "ThroughTapDrillProfile", {"T0X", "T1X", "T2X", "T3X", "T0Y"}
+    )
+    mark_dimensions_for_drawing(
+        adapter,
+        "BlindDrawingLocatorProfile",
+        {"B0X", "B1X", "B2X", "B3X", "B4X"},
     )
 
     await apply_material(adapter, MATERIAL)

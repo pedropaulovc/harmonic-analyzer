@@ -20,19 +20,19 @@ from _common import CAD_ROOT, check, run_build
 from _hole_wizard import BA6
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
-    add_overall_dimension,
     add_third_angle_symbol,
     auto_center_marks,
     curate_dimensions,
     dimension_name,
-    draw_border_and_title_block,
-    insert_model_dims,
     new_drawing,
     place_view,
     save_drawing,
     set_units_mm,
     setup_sheet,
+    view_name,
 )
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
 import _telemetry
 
@@ -63,12 +63,96 @@ def _custom_properties(model: Any) -> dict[str, str]:
     return {name: str(model.GetCustomInfoValue("", name) or "") for name in names}
 
 
+def _set_source_sketch_visibility(model: Any, name: str, *, visible: bool) -> None:
+    model.ClearSelection2(True)
+    selected = model.Extension.SelectByID2(
+        name, "SKETCH", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+    )
+    if not selected:
+        raise RuntimeError(f"failed to select source sketch {name!r}")
+    if visible:
+        model.UnblankSketch()
+    else:
+        model.BlankSketch()
+    model.ClearSelection2(True)
+
+
 def _set_hlr(adapter: Any, view: Any) -> None:
     ok = adapter._attempt(
         lambda: view.SetDisplayMode4(False, 2, False, False, True), default=False
     )
     if not ok:
         raise RuntimeError("failed to set hidden-lines-removed drawing view")
+
+
+def _sheet_line(sm: Any, x0: float, y0: float, x1: float, y1: float) -> None:
+    # The Drawing.drwdot sheet sketch retains its original 1:2 transform even
+    # after ISheet reports 1:1. Double sketch coordinates to land at true sheet
+    # positions; annotation positions are already true sheet coordinates.
+    factor = 2.0
+    sm.CreateLine(
+        x0 * factor, y0 * factor, 0.0, x1 * factor, y1 * factor, 0.0
+    )
+
+
+def _draw_border_and_title_block(
+    adapter: Any, title_rows: list[str], *, margin: float = 0.006
+) -> None:
+    draw = adapter.currentModel
+    sm = draw.SketchManager
+    width = SHEET_WIDTH
+    height = SHEET_HEIGHT
+    block_w = 0.145
+    row_h = 0.008
+    x0 = width - margin - block_w
+    y0 = margin
+    x1 = width - margin
+    y1 = y0 + len(title_rows) * row_h
+    for ax, ay, bx, by in (
+        (margin, margin, width - margin, margin),
+        (width - margin, margin, width - margin, height - margin),
+        (width - margin, height - margin, margin, height - margin),
+        (margin, height - margin, margin, margin),
+        (x0, y0, x1, y0),
+        (x1, y0, x1, y1),
+        (x1, y1, x0, y1),
+        (x0, y1, x0, y0),
+    ):
+        _sheet_line(sm, ax, ay, bx, by)
+    for row in range(1, len(title_rows)):
+        y = y0 + row * row_h
+        _sheet_line(sm, x0, y, x1, y)
+    for index, text in enumerate(title_rows):
+        y = y1 - (index + 0.5) * row_h
+        add_note(adapter, text, x0 + 0.004, y)
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+
+
+def _insert_marked_model_dimensions(adapter: Any, view: Any) -> list[Any]:
+    """Import only model dimensions explicitly marked in the SLDPRT."""
+    draw = adapter.currentModel
+    name = view_name(adapter, view)
+    draw.ActivateView(name)
+    draw.ClearSelection2(True)
+    selected = draw.Extension.SelectByID2(
+        name, "DRAWINGVIEW", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+    )
+    if not selected:
+        raise RuntimeError(f"failed to select drawing view {name!r}")
+    result = adapter._attempt(
+        lambda: draw.InsertModelAnnotations3(
+            0,  # entire model
+            0x8000,  # dimensions marked for drawing
+            False,
+            True,   # eliminate duplicates
+            True,   # include absorbed/hidden feature dimensions
+            False,
+        )
+    )
+    if not result or isinstance(result, str):
+        return []
+    return list(result)
 
 
 def _curate_front_dimensions(adapter: Any, annotations: list[Any]) -> list[Any]:
@@ -86,8 +170,6 @@ def _curate_front_dimensions(adapter: Any, annotations: list[Any]) -> list[Any]:
         "B3X",
         "B4X",
     }
-    names = {dimension_name(adapter, ann) for ann in annotations}
-    delete = tuple(sorted(name for name in names if name and name not in keep))
     reposition = {
         "Length": (0.190, 0.145),
         "Height": (0.032, 0.185),
@@ -102,38 +184,110 @@ def _curate_front_dimensions(adapter: Any, annotations: list[Any]) -> list[Any]:
         "B3X": (0.268, 0.230),
         "B4X": (0.322, 0.221),
     }
+    names = {dimension_name(adapter, ann) for ann in annotations}
+    delete = tuple(sorted(name for name in names if name and name not in keep))
     curated = curate_dimensions(
         adapter, annotations, delete=delete, reposition=reposition
     )
     present = {dimension_name(adapter, ann) for ann in curated}
     missing = sorted(keep - present)
     if missing:
-        raise RuntimeError(f"drawing is missing model dimensions: {missing}")
+        raise RuntimeError(
+            f"drawing is missing model dimensions: {missing}; available={sorted(present)}"
+        )
+    curated = curate_dimensions(adapter, curated, reposition=reposition)
     return curated
 
 
+def _curate_right_dimensions(adapter: Any, annotations: list[Any]) -> None:
+    names = {dimension_name(adapter, ann) for ann in annotations}
+    delete = tuple(sorted(name for name in names if name and name != "Depth"))
+    curated = curate_dimensions(
+        adapter,
+        annotations,
+        delete=delete,
+        reposition={"Depth": (0.375, 0.151)},
+    )
+    if "Depth" not in {dimension_name(adapter, ann) for ann in curated}:
+        raise RuntimeError("drawing is missing the model-driven 10 mm depth")
+
+
 def _manufacturing_notes() -> str:
-    through = ", ".join(f"{x:g}" for x in THROUGH_X)
-    blind = ", ".join(f"{x:g}" for x in BLIND_X)
     return "\n".join(
         (
             "UNLESS OTHERWISE SPECIFIED:",
             "1. DIMENSIONS ARE IN MILLIMETRES. INTERPRET PER ASME Y14.5.",
             "2. REMOVE BURRS AND BREAK SHARP EDGES 0.2 MAX.",
-            "3. 4X 6 BA THRU, ENTER FROM REAR; X = " + through + ".",
             (
-                f"4. 5X 6 BA x {BLIND_THREAD_DEPTH:g} FULL THREAD; "
-                f"TAP DRILL DIA {BA6.tap_diameter_mm:.3f} x {BLIND_HOLE_DEPTH:g} DEEP; "
-                f"X = {blind}."
-            ),
-            (
-                f"5. 6 BA BASIC: MAJOR DIA {BA6.major_diameter_mm:.2f}, "
+                f"3. 6 BA BASIC: MAJOR DIA {BA6.major_diameter_mm:.2f}, "
                 f"PITCH {BA6.pitch_mm:.2f}, INCLUDED ANGLE {BA6.angle_deg:.1f} DEG."
             ),
-            "6. ALL HOLE CENTRES LIE 2.5 FROM THE LOWER EDGE.",
-            "7. APPLY BLACK OXIDE AFTER MACHINING.",
+            "4. ALL HOLE CENTRES LIE 2.5 FROM THE LOWER EDGE.",
+            "5. APPLY BLACK OXIDE AFTER MACHINING.",
         )
     )
+
+
+def _add_hole_callout(
+    adapter: Any,
+    view: Any,
+    text: str,
+    *,
+    edge_x: float,
+    edge_y: float,
+    note_x: float,
+    note_y: float,
+) -> Any:
+    """Attach a leadered group callout to a representative circular hole edge."""
+    draw = adapter.currentModel
+    name = view_name(adapter, view)
+    if not draw.ActivateView(name):
+        raise RuntimeError(f"failed to activate drawing view {name!r}")
+    draw.ClearSelection2(True)
+    selected = draw.Extension.SelectByID2(
+        "", "EDGE", edge_x, edge_y, 0.0, False, 0, null_callout(), 0
+    )
+    if not selected:
+        raise RuntimeError(
+            f"failed to select representative hole edge at ({edge_x}, {edge_y})"
+        )
+    selection = draw.SelectionManager
+    edge = selection.GetSelectedObject6(1, -1)
+    if edge is None:
+        raise RuntimeError("representative hole selection did not return an edge")
+
+    note = draw.InsertNote(text)
+    if note is None:
+        raise RuntimeError(f"failed to insert hole callout {text!r}")
+    note = _sw_type_info.flagged(note, "INote")
+    annotation = note.GetAnnotation()
+    if annotation is None:
+        raise RuntimeError(f"hole callout has no annotation: {text!r}")
+    annotation = _sw_type_info.flagged(annotation, "IAnnotation")
+    attached = list(annotation.GetAttachedEntities3() or [])
+    if not attached:
+        annotation.SetAttachedEntities([edge])
+        attached = list(annotation.GetAttachedEntities3() or [])
+    if not attached:
+        raise RuntimeError(f"failed to attach hole callout to its circular edge: {text!r}")
+    leader_status = annotation.SetLeader3(
+        1,  # swSTRAIGHT
+        0,  # swLS_SMART
+        True,
+        False,
+        False,
+        False,
+    )
+    if leader_status != 0:
+        raise RuntimeError(
+            f"failed to create callout arrow leader: status={leader_status}, text={text!r}"
+        )
+    if not annotation.SetPosition2(note_x, note_y, 0.0):
+        raise RuntimeError(f"failed to position hole callout: {text!r}")
+    if annotation.GetLeaderCount() < 1:
+        raise RuntimeError(f"hole callout has no arrow leader: {text!r}")
+    draw.ClearSelection2(True)
+    return note
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -147,6 +301,9 @@ async def build(adapter: Any) -> dict[str, str]:
     missing = [name for name in required if not props[name]]
     if missing:
         raise RuntimeError(f"source part properties are missing: {missing}")
+    _set_source_sketch_visibility(
+        source_model, "BlindDrawingLocatorProfile", visible=True
+    )
 
     new_drawing(adapter, width=SHEET_WIDTH, height=SHEET_HEIGHT)
     if not setup_sheet(
@@ -160,7 +317,20 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         raise RuntimeError("failed to configure ASME B-size drawing sheet")
     set_units_mm(adapter, decimals=2)
-    draw_border_and_title_block(
+    drawing_model = adapter.currentModel
+    sheet = adapter._get_attr_or_call(drawing_model, "GetCurrentSheet")
+    if sheet is None or not sheet.SetScale(1.0, 1.0, True, False):
+        raise RuntimeError("failed to force the B-size sheet to 1:1")
+    properties = list(adapter._get_attr_or_call(sheet, "GetProperties") or [])
+    if len(properties) < 4 or properties[2:4] != [1.0, 1.0]:
+        raise RuntimeError(f"drawing sheet scale read-back is not 1:1: {properties!r}")
+    drawing_model.ForceRebuild3(False)
+    drawing_model.EditRebuild3()
+    drawing_model.CreateLayer2(
+        "BORDER", "ASME border and title block", 0, 0, 0, True, True
+    )
+    drawing_model.SetCurrentLayer("BORDER")
+    _draw_border_and_title_block(
         adapter,
         [
             "PLATEN GUIDE",
@@ -171,32 +341,62 @@ async def build(adapter: Any) -> dict[str, str]:
             "SCALE 1:1  THIRD ANGLE",
             "SHEET 1 OF 1",
         ],
-        width=SHEET_WIDTH,
-        height=SHEET_HEIGHT,
-        block_w=0.145,
-        row_h=0.008,
     )
-    add_third_angle_symbol(adapter, 0.267, 0.039, size=0.004)
+    drawing_model.SetCurrentLayer("")
+    add_third_angle_symbol(adapter, 0.490, 0.078, size=0.008)
 
-    front = place_view(adapter, str(SOURCE), "*Front", 0.190, 0.190, scale=(1, 1))
+    front = place_view(adapter, str(SOURCE), "*Back", 0.190, 0.190, scale=(1, 1))
     right = place_view(adapter, str(SOURCE), "*Right", 0.375, 0.190, scale=(3, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", 0.085, 0.075, scale=(1, 2))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", 0.190, 0.055, scale=(1, 3))
     for view in (front, right, iso):
         _set_hlr(adapter, view)
 
-    annotations = insert_model_dims(
-        adapter, front, marked_only=False, hole_callouts=False, all_views=False
+    front_annotations = _insert_marked_model_dimensions(adapter, front)
+    _curate_front_dimensions(adapter, front_annotations)
+    _set_source_sketch_visibility(
+        source_model, "BlindDrawingLocatorProfile", visible=False
     )
-    _curate_front_dimensions(adapter, annotations)
+    right_annotations = _insert_marked_model_dimensions(adapter, right)
+    _curate_right_dimensions(adapter, right_annotations)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
-    if add_overall_dimension(adapter, right, vertical=False, offset=0.012) is None:
-        raise RuntimeError("failed to add the 10 mm thickness dimension")
+
+    _add_hole_callout(
+        adapter,
+        front,
+        (
+            "4X 6 BA THRU\n"
+            f"TAP DRILL DIA {BA6.tap_diameter_mm:.3f} THRU\n"
+            "ENTER FROM REAR"
+        ),
+        edge_x=0.287,
+        edge_y=0.1911,
+        note_x=0.260,
+        note_y=0.132,
+    )
+    _add_hole_callout(
+        adapter,
+        front,
+        (
+            f"5X 6 BA x {BLIND_THREAD_DEPTH:g} FULL THREAD\n"
+            f"TAP DRILL DIA {BA6.tap_diameter_mm:.3f} x {BLIND_HOLE_DEPTH:g} DEEP"
+        ),
+        edge_x=0.310,
+        edge_y=0.1911,
+        note_x=0.322,
+        note_y=0.096,
+    )
 
     add_note(adapter, _manufacturing_notes(), 0.014, 0.112)
-    add_note(adapter, "FRONT", 0.184, 0.174)
+    add_note(adapter, "PLATEN FACE", 0.176, 0.174)
     add_note(adapter, "RIGHT", 0.366, 0.163)
-    add_note(adapter, "ISOMETRIC (REFERENCE)", 0.040, 0.031)
+    add_note(adapter, "ISOMETRIC (REFERENCE)", 0.150, 0.018)
+
+    drawing_model.ClearSelection2(True)
+    drawing_model.EditRebuild3()
+    sheet_name = adapter._get_attr_or_call(sheet, "GetName")
+    if not sheet_name or not drawing_model.ActivateSheet(sheet_name):
+        raise RuntimeError("failed to activate the drawing sheet for export")
 
     artifacts = save_drawing(
         adapter, str(SLDDRW), pdf_path=str(PDF), png_path=str(PNG)
@@ -216,4 +416,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build, kind=None))
+    sys.exit(run_build(build))

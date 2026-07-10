@@ -6,7 +6,7 @@ strips, and the two back-side guide rails the platen hangs on are
 separate parts (build_platen_rack.py / build_platen_clip.py /
 build_platen_guide.py). Fastener holes:
 
-* four O3 x 3.5 clip-screw sockets in the front face at the plate's
+* four 6 BA x 3.5 clip-screw sockets in the front face at the plate's
   extreme left/right edges (x 6/294), the clips spanning local
   y 15..140 from the TOP edge down (ch22 front photo; holes at the
   clips' 8-inset end holes -> local y 23/132);
@@ -56,6 +56,7 @@ from _common import (
 )
 
 import _telemetry
+from _hole_wizard import BA6, TapEnd, create_tapped_pattern
 
 PART_NAME = "platen"
 MATERIAL = "Brass"  # see _common.apply_material docstring
@@ -65,8 +66,9 @@ PLATE_HEIGHT = 140.0  # DIMENSIONS.md ch22: p.55 callout (high)
 PLATE_THICKNESS = 4.0  # DIMENSIONS.md ch22: p.55 edge-on photo (low)
 
 # Clip-screw sockets (machine-handed locals, see docstring).
-SOCKET_DIA = 3.0  # the fillister screws' O2.9 shanks thread in (low)
+SOCKET_DIA = BA6.tap_diameter_mm
 SOCKET_DEPTH = 3.5  # 0.5 web to the back face
+SOCKET_THREAD_DEPTH = 3.0
 SOCKET_XY = ((6.0, 23.0), (6.0, 132.0), (294.0, 23.0), (294.0, 132.0))
 
 # Guide-screw through-holes: 2 rows of 5 (heads on the front face, shanks
@@ -84,6 +86,20 @@ CBORE_DIA = 6.5  # 0.5 radial clearance around the O5.5 heads
 CBORE_DEPTH = 2.4  # head 2.2 -> crown 0.2 sub-flush
 
 
+def _blank_reference_axis(adapter, name: str) -> None:
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    selected = model.Extension.SelectByID2(
+        name, "AXIS", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+    )
+    if not selected:
+        raise RuntimeError(f"cannot select AXIS {name!r} to hide")
+    model.BlankRefGeom()
+    model.ClearSelection2(True)
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -99,6 +115,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PlateHeight", f"{PLATE_HEIGHT}mm")
     await set_global(adapter, "PlateThickness", f"{PLATE_THICKNESS}mm")
     await set_global(adapter, "SocketDia", f"{SOCKET_DIA}mm")
+    await set_global(adapter, "SocketThreadMajorDia", f"{BA6.major_diameter_mm}mm")
     await set_global(adapter, "SocketDepth", f"{SOCKET_DEPTH}mm")
     await set_global(adapter, "GuideHoleDia", f"{GUIDE_HOLE_DIA}mm")
     await set_global(adapter, "CboreDia", f"{CBORE_DIA}mm")
@@ -145,42 +162,40 @@ async def build(adapter) -> dict[str, str]:
         adapter, "plate height (annotated 140)", "y", PLATE_HEIGHT
     )
 
-    # Direct-db: the sketch plane is coplanar with the plate's front face,
-    # and inference against the face broke the second add_circle live.
-    # Each socket is off-axis in both x and y, so define_circle emits THREE dims
-    # (centre-x, centre-z, diameter). The socket centres are an asymmetric,
-    # machine-handed layout with no single global knob (the clips sit
-    # asymmetrically -- see docstring), so the position dims are named (for the
-    # self-naming tree) but left undriven; only the diameter is driven by the
-    # SocketDia global.
-    sockets = SketchDims()
-    check("create_sketch sockets", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    for n, (x, y) in enumerate(SOCKET_XY):
-        await define_circle(
-            adapter, x, y, SOCKET_DIA / 2.0, f"socket ({x:.0f}, {y:.0f})",
-            dims=sockets,
-            names=(f"S{n}X", f"S{n}Z", f"S{n}Dia"),
-            drives=(None, None, '"SocketDia"'),
-        )
-    set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "sockets sketch")
-    check("exit_sketch sockets", await adapter.exit_sketch())
-    name_last_feature(adapter, "SocketProfile")
-    drive_jobs += sockets.apply(adapter, "SocketProfile")
-    check(
-        "cut sockets",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=2.0 * SOCKET_DEPTH, both_directions=True)
-        ),
+    socket_taps = await create_tapped_pattern(
+        adapter,
+        name="ClipScrewTaps",
+        points_xy=SOCKET_XY,
+        z_face_mm=0.0,
+        normal_sign=-1,
+        end=TapEnd.BOTTOMING,
+        hole_depth_mm=SOCKET_DEPTH,
+        thread_depth_mm=SOCKET_THREAD_DEPTH,
     )
-    name_last_feature(adapter, "Sockets")
     post = await adapter.get_mass_properties()
-    v_sockets = len(SOCKET_XY) * math.pi * (SOCKET_DIA / 2.0) ** 2 * SOCKET_DEPTH
     removed = pre.data.volume - post.data.volume
-    _telemetry.info(f"sockets removed {removed:.1f} mm^3 (analytic {v_sockets:.1f})")
-    if abs(removed - v_sockets) > 0.02 * v_sockets:
-        raise RuntimeError(f"sockets removed {removed:.1f}, expected {v_sockets:.1f}")
+    minimum = (
+        len(SOCKET_XY)
+        * math.pi
+        * (socket_taps.tap_diameter_mm / 2.0) ** 2
+        * SOCKET_DEPTH
+    )
+    maximum = (
+        len(SOCKET_XY)
+        * math.pi
+        * (socket_taps.thread_diameter_mm / 2.0) ** 2
+        * SOCKET_DEPTH
+    )
+    _telemetry.info(
+        f"sockets removed {removed:.1f} mm^3 "
+        f"(native threaded envelope {minimum:.1f}..{maximum:.1f})"
+    )
+    if removed < 0.98 * minimum or removed > 1.02 * maximum:
+        raise RuntimeError(
+            f"sockets removed {removed:.1f}, expected within "
+            f"{minimum:.1f}..{maximum:.1f} mm^3"
+        )
+    v_sockets = removed
 
     # Guide-screw through-holes (2 rows of 5). Same direct-db rationale as the
     # sockets; positions are the guide layout (named, undriven), only the
@@ -272,7 +287,10 @@ async def build(adapter) -> dict[str, str]:
     # the platen runs as a prismatic joint along the rails in the M6 mated-DOF
     # assembly: collinear with an assembly axis at the slide line, an angle snap
     # kills the residual spin, an X distance snapshot pins the feed position.
-    await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "slide axis")
+    slide_axis = await name_bore_axis(
+        adapter, "Front Plane", 0.0, "Top Plane", 0.0, "slide axis"
+    )
+    _blank_reference_axis(adapter, slide_axis)
 
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)

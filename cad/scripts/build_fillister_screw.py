@@ -6,8 +6,7 @@ sockets (ch. 22 p. 55 -- the platen's "fastener holes deferred to
 assembly" promise, resolved in the M6.10 fasteners pass), and 2x
 fastening the magnifying-lever bracket's flange up into the summing
 lever's coefficients plate (ch. 20 p. 47 "mounting screws omitted").
-Plain cylindrical head: the slot is ~0.8 mm, below comparison-render
-resolution (documented simplification); thread not modeled.
+Period slotted cheese head with a model-owned 6 BA cosmetic thread callout.
 
 Dimensions: cad/DIMENSIONS.md ch. 20/22 (M6.10) -- shank matches the
 clip holes (O3, scaled low); head photo-plausible fillister (low).
@@ -31,11 +30,13 @@ from _common import (
     SketchDims,
     apply_material,
     check,
+    define_centered_rectangle,
     define_circle,
     drive_dimension,
     ensure_fully_defined,
     extrude_at_offset,
     force_rebuild,
+    name_bore_axis,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -47,13 +48,35 @@ from _common import (
 PART_NAME = "fillister-screw"
 MATERIAL = "Brass"  # bright screws on the brass clips
 
-HEAD_DIA = 5.5  # fillister head (low)
-HEAD_H = 2.2
-SHANK_DIA = 2.9  # rides the clips' O3 holes / the flange's O3.2 holes
+HEAD_DIA = 4.2  # period 6 BA cheese-head proportion
+HEAD_H = 1.96
+SLOT_W = 0.448
+SLOT_D = 0.882
+SHANK_DIA = 2.8  # 6 BA major diameter
 SHANK_LEN = 4.0  # clip 1.2 + 2.8 platen socket; = flange thickness 4
 
 
+def _blank_reference(adapter, name: str, selection_type: str) -> None:
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    selected = model.Extension.SelectByID2(
+        name, selection_type, 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+    )
+    if not selected:
+        raise RuntimeError(f"cannot select {selection_type} {name!r} to hide")
+    model.BlankRefGeom()
+    model.ClearSelection2(True)
+
+
 async def build(adapter) -> dict[str, str]:
+    from solidworks_mcp.adapters.base import (
+        AddThreadParameters,
+        CreatePlaneParameters,
+        ExtrusionParameters,
+    )
+
     check("create_part", await adapter.create_part())
 
     # Editable knobs (Tools > Equations). mm suffix load-bearing (INCH document;
@@ -64,6 +87,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HeadH", f"{HEAD_H}mm")
     await set_global(adapter, "ShankDia", f"{SHANK_DIA}mm")
     await set_global(adapter, "ShankLen", f"{SHANK_LEN}mm")
+    await set_global(adapter, "SlotW", f"{SLOT_W}mm")
+    await set_global(adapter, "SlotD", f"{SLOT_D}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -104,14 +129,84 @@ async def build(adapter) -> dict[str, str]:
     expected += v_shank
     await volume_check(adapter, "shank", expected, 0.005 * v_shank)
 
+    # Cut the period driver slot from the outer head face toward the shank.
+    check(
+        "create_plane head outer face",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Front Plane", offset=-HEAD_H
+            )
+        ),
+    )
+    name_last_feature(adapter, "HeadOuterFace")
+    slot_dims = SketchDims()
+    check("create_sketch driver slot", await adapter.create_sketch("HeadOuterFace"))
+    await define_centered_rectangle(
+        adapter,
+        HEAD_DIA / 2.0 + 0.5,
+        SLOT_W / 2.0,
+        "driver slot",
+        dims=slot_dims,
+        name_width="SlotLength",
+        name_depth="SlotWidth",
+        name_corner=("SlotCx", "SlotCy"),
+        drive_corner=(None, None),
+    )
+    await ensure_fully_defined(adapter, "driver slot sketch")
+    check("exit_sketch driver slot", await adapter.exit_sketch())
+    name_last_feature(adapter, "DriverSlotProfile")
+    drive_jobs += slot_dims.apply(adapter, "DriverSlotProfile")
+    check(
+        "cut driver slot",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=SLOT_D, reverse_direction=True)
+        ),
+    )
+    name_last_feature(adapter, "DriverSlot")
+    half_slot = SLOT_W / 2.0
+    head_radius = HEAD_DIA / 2.0
+    slot_area = 2.0 * (
+        half_slot * math.sqrt(head_radius**2 - half_slot**2)
+        + head_radius**2 * math.asin(half_slot / head_radius)
+    )
+    v_slot = slot_area * SLOT_D
+    expected -= v_slot
+    await volume_check(adapter, "slotted head", expected, 0.02 * v_slot)
+
+    thread_result = await adapter.add_thread(
+            AddThreadParameters(
+                edge_point=[SHANK_DIA / 2.0, 0.0, SHANK_LEN],
+                standard="none",
+                standard_type="British Association",
+                size="6 BA",
+                diameter=SHANK_DIA,
+                end_type="blind",
+                depth=SHANK_LEN,
+                note="6 BA, 0.53 PITCH, 47.5 DEG INCLUDED ANGLE",
+            )
+        )
+    check("add model-owned 6 BA thread", thread_result)
+    if not thread_result.data or thread_result.data.get("size") != "6 BA":
+        raise RuntimeError(f"6 BA cosmetic thread read-back failed: {thread_result.data!r}")
+    _blank_reference(adapter, "HeadOuterFace", "PLANE")
+
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven fillister screw (equations neutral)", expected, 0.005 * v_shank)
+    await volume_check(
+        adapter,
+        "driven fillister screw (equations neutral)",
+        expected,
+        0.02 * v_slot,
+    )
 
+    axis_name = await name_bore_axis(
+        adapter, "Front Plane", 0.0, "Right Plane", 0.0, "screw axis"
+    )
+    _blank_reference(adapter, axis_name, "AXIS")
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
