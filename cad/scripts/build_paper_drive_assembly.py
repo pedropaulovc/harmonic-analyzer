@@ -60,6 +60,7 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import math
+import re
 import sys
 
 from _chain import (
@@ -151,8 +152,10 @@ from build_platen_guide import (  # noqa: E402
     HOLE_X as GUIDE_LOCK_HOLE_X,
     LOCK_STATION_X,
     SCREW_STATION_X as GUIDE_SCREW_STATION_X,
+    THREAD,
 )
-from build_guide_lock import LOCK_WIDTH  # noqa: E402
+from build_guide_lock import LOCK_THICK, LOCK_WIDTH  # noqa: E402
+from build_fillister_screw import SHANK_DIA, SHANK_LEN  # noqa: E402
 from build_platen_clip import (  # noqa: E402
     CLIP_LENGTH,
     CLIP_THICKNESS,
@@ -177,6 +180,52 @@ BAR_CY = BAR_TOP_Y - BAR_HEIGHT / 2.0  # 338.5
 LOCK_Z0 = BAR_FRONT_Z + GUIDE_DEPTH  # -128.9: lock plates on the guide backs,
 # 1.0 behind the bar's back face -- they bridge the bar so the platen cannot
 # fall off it.
+
+
+def _validate_threaded_guide_contacts(
+    message: str, allowed_pairs: set[frozenset[str]]
+) -> None:
+    """Accept only the bounded screw-major/thread-tap engagement volumes."""
+    prefix = re.match(r"^\d+ interference\(s\): (.+)$", message)
+    if prefix is None:
+        raise RuntimeError(message)
+    entries = prefix.group(1).split("; ")
+    expected_volume = (
+        math.pi
+        * ((SHANK_DIA / 2.0) ** 2 - (THREAD.tap_diameter_mm / 2.0) ** 2)
+        * (SHANK_LEN - LOCK_THICK)
+    )
+    seen: set[frozenset[str]] = set()
+    for entry in entries:
+        match = re.match(r"^(.+) & (.+): ([0-9.]+) mm\^3$", entry)
+        if match is None:
+            raise RuntimeError(message)
+        pair = frozenset((match.group(1), match.group(2)))
+        volume = float(match.group(3))
+        if pair not in allowed_pairs:
+            raise RuntimeError(message)
+        if not 0.98 * expected_volume <= volume <= 1.02 * expected_volume:
+            raise RuntimeError(
+                f"thread engagement {' & '.join(sorted(pair))} is {volume:.2f} mm^3; "
+                f"expected {expected_volume:.2f} mm^3"
+            )
+        seen.add(pair)
+    if seen != allowed_pairs:
+        missing = sorted(" & ".join(sorted(pair)) for pair in allowed_pairs - seen)
+        raise RuntimeError(f"missing expected 6 BA thread engagements: {missing}")
+
+
+def _check_paper_drive_interference(
+    adapter, allowed_thread_pairs: set[frozenset[str]]
+) -> None:
+    try:
+        check_no_interference(adapter)
+    except RuntimeError as exc:
+        _validate_threaded_guide_contacts(str(exc), allowed_thread_pairs)
+        check(
+            f"{len(allowed_thread_pairs)} bounded 6 BA screw/tap engagements",
+            True,
+        )
 
 # Rack: teeth-down at the platen's bottom edge, crests protruding 2 below it.
 RACK_TIP_Y = PLATE_Y0 - 2.0  # 303
@@ -734,6 +783,8 @@ async def build(adapter) -> dict[str, str]:
             [0.0, 0.0, 0.0], IDENTITY,
             ground=False, label=f"fillister-screw (guide x{-x:+.0f} y{y:.0f})")
         await _lock_to_platen(screw, f"guide screw x{-x:+.0f} y{y:.0f}")
+    threaded_guide_pairs: set[frozenset[str]] = set()
+    guide_mid_y = sum(GUIDE_Y) / len(GUIDE_Y)
     for x, y in LOCK_SCREW_XY:
         # Ry(180): shank points machine -Z, head on the lock plate's back.
         screw = await place_component(
@@ -741,6 +792,8 @@ async def build(adapter) -> dict[str, str]:
             [0.0, 180.0, 0.0], ROT_Y_180,
             ground=False, label=f"fillister-screw (lock x{-x:+.0f} y{y:.0f})")
         await _lock_to_platen(screw, f"lock screw x{-x:+.0f} y{y:.0f}")
+        guide = guides[0 if y < guide_mid_y else 1]
+        threaded_guide_pairs.add(frozenset((guide, screw)))
 
     # --- transgear group (the real train) --------------------------------------
     # Bracket on the bar's back face, stud bore below the bar.
@@ -916,7 +969,7 @@ async def build(adapter) -> dict[str, str]:
     assert_free_dof_necessity(
         adapter, 1, required_instances=(t12,))
     write_dof_manifest(ASM_NAME)
-    check_no_interference(adapter)
+    _check_paper_drive_interference(adapter, threaded_guide_pairs)
     # Machine coords put the output/paper side at -Z, so SolidWorks' native Front
     # renders the machine BACK (chain and transgear cluster mirrored). Re-base the
     # standard views (same as the top assembly) so the saved doc and the _front
