@@ -2336,7 +2336,17 @@ async def build(adapter) -> dict[str, str]:
     # per station -- rotation included, the put-held tooth phase -- full mate
     # set, and the seed's own constrained reading (the drum rides the freed
     # crank train, so a correctly mated copy reads whatever the seed reads).
+    # Mate-count expectation follows the CHAIN topology: every station carries
+    # its own 3 mates (radial + axial + mesh) and every station except the
+    # LAST is additionally referenced by the next station's chained axial --
+    # so the seed and interior copies read 4, the tail copy 3.
+    want_seed = 3 if len(cyl_gears) == 1 else 4
     seed_cyl_mates = component_mate_count(adapter, seed_cyl)
+    if seed_cyl_mates != want_seed:
+        raise RuntimeError(
+            f"{seed_cyl}: {seed_cyl_mates} mates, expected {want_seed}"
+            " (radial + axial anchor + fresh mesh, + station 1's chained"
+            " axial when replicated)")
     seed_cyl_status = component_constrained_status(adapter, seed_cyl)
     for j, cyl in enumerate(cyl_gears):
         if j == 0:
@@ -2348,11 +2358,13 @@ async def build(adapter) -> dict[str, str]:
             [list(seed_cyl_arr[0:3]), list(seed_cyl_arr[3:6]),
              list(seed_cyl_arr[6:9])],
         )
+        want = 3 if j == len(cyl_gears) - 1 else 4
         got = component_mate_count(adapter, cyl)
-        if got != seed_cyl_mates:
+        if got != want:
             raise RuntimeError(
-                f"{cyl}: {got} mates, seed has {seed_cyl_mates} -- the copy"
-                " dropped mates")
+                f"{cyl}: {got} mates, expected {want} -- the copy dropped"
+                " mates (3 own + 1 from the next station's chained axial,"
+                " tail station unchained)")
         status = component_constrained_status(adapter, cyl)
         if status != seed_cyl_status:
             raise RuntimeError(
