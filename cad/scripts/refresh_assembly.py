@@ -8,9 +8,10 @@ rebuild, health/DOF/interference gates, in-place ``Save3``, PNG export) lives in
 :func:`_assembly.refresh_assembly`; this is the thin entrypoint the build graph
 (``dodo.py``) shells out to for the cheap path.
 
-Fail loud: any dangling mate, free DOF, or interference halts the refresh with a
-non-zero exit and leaves the ``.SLDASM`` untouched -- recover with the full
-escape (delete the target + ``doit assembly:<stem>``).
+Fail loud: any dangling mate, DOF state that violates the saved kinematic
+manifest, or interference halts the refresh with a non-zero exit and leaves the
+``.SLDASM`` untouched -- recover with the full escape (delete the target +
+``doit assembly:<stem>``).
 
 Run (SolidWorks already open)::
 
