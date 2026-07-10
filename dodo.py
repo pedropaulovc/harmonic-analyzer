@@ -1168,8 +1168,19 @@ def task_verify():
     SolidWorks-free ``check:`` tasks).
     """
     asm_targets = [_sldasm(s) for s in ASSEMBLY_ORDER]
+
+    def _dof_json(stem: str) -> str:
+        sldasm = Path(_sldasm(stem))
+        return str(sldasm.parent / f".{sldasm.stem}.dof.json")
+
     suite_deps = {
-        "soundness": asm_targets,
+        # soundness reads paper-drive's DOF manifest directly (the exact crank
+        # instance for the necessity gate, codex #189). The manifest is NOT a
+        # declared target of any task (it is a cache-packed sidecar), so
+        # listing it as file_dep makes doit FAIL LOUD when it is missing/
+        # deleted while the .SLDASM digest is unchanged -- without it a fresh
+        # verify-soundness.ok stamp would silently skip the gate (codex #221).
+        "soundness": [*asm_targets, _dof_json("paper_drive")],
         # subsystems retired: its one unique gate (channel-independence) is folded
         # into soundness, which already opens `channel` (see verify._verify_static_one).
         "kinematics": [
@@ -1178,15 +1189,18 @@ def task_verify():
             # opens magnifier.SLDASM and authors its recorded lever drive spec
             # transiently; without this dep a magnifier rebuild would leave a
             # fresh verify-kinematics.ok stamp valid and SKIP the WIRE-1 gates
-            # (codex review, PR #177). The DOF-manifest sidecar needs no
-            # separate dep: it is written by the same assembly task from the
-            # same recipe the .SLDASM's content digest is keyed on.
+            # (codex review, PR #177).
             _sldasm("magnifier"),
             # The paper-feed kinematic proof (verify._verify_paper_feed_one) opens
             # paper-drive.SLDASM and drives the crank; without these deps a paper-drive
             # or probe change would leave a fresh verify-kinematics.ok stamp valid and
             # SKIP the crank->feed gate (codex #189).
             _sldasm("paper-drive"),
+            # The pen sweep + magnifier chain sweep read these manifests
+            # directly (the transient drive specs). Same rationale as
+            # soundness's paper-drive manifest dep above (codex #221).
+            _dof_json("pen"),
+            _dof_json("magnifier"),
             str((SCRIPTS_DIR / "build_kinematic_probe.py").resolve()),
             str((SCRIPTS_DIR / "pen_driver.py").resolve()),
             str((SCRIPTS_DIR / "truth_model.py").resolve()),

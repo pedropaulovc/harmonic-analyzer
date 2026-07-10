@@ -9,6 +9,10 @@ to re-pin an assembly's allowed list.
 Run (SolidWorks already open)::
 
     uv run python cad\scripts\diagnostics\dump_under_constrained.py [name ...]
+
+``--dir <path>`` points at an alternate ``sldasm`` directory (e.g. another
+checkout's built artefacts -- valid whenever that build's mate graph matches
+the code under review).
 """
 
 from __future__ import annotations
@@ -26,11 +30,23 @@ DEFAULT_NAMES = ("drive-train", "magnifier", "paper-drive", "channel",
                  "summing", "pen")
 
 
+def _sldasm_dir() -> Path:
+    argv = sys.argv[1:]
+    if "--dir" in argv:
+        return Path(argv[argv.index("--dir") + 1])
+    return OUT_SLDASM
+
+
 async def build(adapter) -> dict[str, str]:
-    names = [a for a in sys.argv[1:] if not a.startswith("-")] or list(DEFAULT_NAMES)
+    argv = sys.argv[1:]
+    if "--dir" in argv:
+        i = argv.index("--dir")
+        argv = argv[:i] + argv[i + 2:]
+    names = [a for a in argv if not a.startswith("-")] or list(DEFAULT_NAMES)
+    sldasm_dir = _sldasm_dir()
     out: dict[str, str] = {}
     for name in names:
-        sldasm = OUT_SLDASM / f"{name}.SLDASM"
+        sldasm = sldasm_dir / f"{name}.SLDASM"
         if not sldasm.exists():
             log(f"{name}: not built -- skipped")
             continue
