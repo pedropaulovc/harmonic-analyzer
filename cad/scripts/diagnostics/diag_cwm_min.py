@@ -43,6 +43,39 @@ Run:  uv run python cad\scripts\diagnostics\diag_cwm_min.py [--visible] [--fixed
 --visible uses a one-extrude cylinder instead of the empty part, so the parked
 copy can be seen (and screenshotted) in the viewport.
 --fixed-seed keeps the first component auto-fixed (see the confound above).
+
+Reproduce by hand in the SolidWorks UI
+--------------------------------------
+The script mirrors these exact steps -- do them by hand to see the wander live
+(menu paths are SW 2024-2026; they may vary slightly by version):
+
+1. New part. For a VISIBLE copy, sketch a circle (R 5 mm) on the Front plane and
+   extrude it ~10 mm into a small cylinder. (An empty part -- default planes only,
+   zero features -- reproduces it too, just nothing to look at.) Save it, e.g.
+   %TEMP%\cwm_min.SLDPRT.
+2. New assembly. Insert > Component, and drop that part in ONCE (position doesn't
+   matter).
+3. FLOAT it: right-click the component in the tree > Float. The first component is
+   FIXED by default, and a distance mate on a fixed part throws a spurious
+   "over-defined" error on that mate -- the confound this repro isolates. (Skip
+   this step to SEE that artifact: the distance mate goes red and the component
+   reads fully-defined because it is pinned, not mate-constrained.)
+4. Add two mates to the ASSEMBLY's own reference planes, leaving the in-plane
+   slide free:
+     a. Coincident: part Top plane  <-> assembly Top plane.
+     b. Distance:   part Front plane <-> assembly Front plane, value 20 mm.
+   The component is now UNDER-DEFINED -- a free slide along the plane
+   intersection (it shows a "(-)" prefix in the tree).
+5. Copy with Mates: select the component, then Insert > Component > Copy with
+   Mates. In the PropertyManager, keep each mate's existing reference (the Repeat
+   option) and give the Distance mate a NEW value one step over, e.g. 45 mm. Place
+   one copy, then close the PropertyManager.
+6. RESULT: the copy sits at the right DISTANCE but is PARKED ~8-9 mm off to the
+   SIDE of the seed along the free direction -- not where the seed sits. Switch to
+   a Front view (look straight down the cylinder axis): seed and copy show as two
+   offset circles instead of one concentric circle. That off-side park is the bug.
+7. (Optional heal) Drag the copy back onto the seed's axis, or use Move Component
+   to set the intended pose; it holds through a rebuild (Ctrl-Q / Ctrl-B).
 """
 
 from __future__ import annotations
