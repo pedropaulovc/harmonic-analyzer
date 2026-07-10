@@ -26,6 +26,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
     new_drawing,
     place_view,
+    remove_notes_matching,
     save_drawing,
     set_units_mm,
     setup_sheet,
@@ -418,6 +419,18 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", 0.190, 0.055, scale=(1, 3))
     for view in (front, right, iso):
         _set_hlr(adapter, view)
+
+    thread_callout = (
+        f"{BA6.designation}, {BA6.pitch_mm:.2f} PITCH, "
+        f"{BA6.angle_deg:.1f} DEG INCLUDED ANGLE"
+    )
+    removed_thread_notes = remove_notes_matching(adapter, thread_callout)
+    expected_thread_notes = len(THROUGH_X) + len(BLIND_X)
+    if removed_thread_notes != expected_thread_notes:
+        raise RuntimeError(
+            f"removed {removed_thread_notes} native thread callouts; "
+            f"expected {expected_thread_notes}"
+        )
 
     front_annotations = _insert_marked_model_dimensions(adapter, front)
     _curate_front_dimensions(adapter, front_annotations)
