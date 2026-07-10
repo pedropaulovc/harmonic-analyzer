@@ -7,6 +7,8 @@ from pathlib import Path
 
 import cut_release
 import export_part_drawing as drawing
+import build_fillister_screw as screw
+import build_platen as platen
 from _hole_wizard import BA6
 
 
@@ -18,6 +20,14 @@ def test_period_6ba_thread_form() -> None:
     assert math.isclose(BA6.radial_depth_mm, 0.318, abs_tol=1e-12)
     assert math.isclose(BA6.tap_diameter_mm, 2.164, abs_tol=1e-12)
     assert math.isclose(BA6.crest_root_radius_mm, 0.0958399, abs_tol=1e-12)
+
+
+def test_mating_hardware_uses_6ba() -> None:
+    assert screw.SHANK_DIA == BA6.major_diameter_mm
+    assert (screw.HEAD_DIA, screw.HEAD_H) == (4.2, 1.96)
+    assert (screw.SLOT_W, screw.SLOT_D) == (0.448, 0.882)
+    assert platen.SOCKET_DIA == BA6.tap_diameter_mm
+    assert platen.SOCKET_THREAD_DEPTH < platen.SOCKET_DEPTH
 
 
 def test_required_drawing_paths() -> None:
