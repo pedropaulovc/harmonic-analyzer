@@ -184,6 +184,7 @@ def _curate_front_dimensions(adapter: Any, annotations: list[Any]) -> list[Any]:
         "B3X": (0.268, 0.230),
         "B4X": (0.322, 0.221),
     }
+    annotations = _delete_unnamed_imports(adapter, annotations)
     names = {dimension_name(adapter, ann) for ann in annotations}
     delete = tuple(sorted(name for name in names if name and name not in keep))
     curated = curate_dimensions(
@@ -200,6 +201,7 @@ def _curate_front_dimensions(adapter: Any, annotations: list[Any]) -> list[Any]:
 
 
 def _curate_right_dimensions(adapter: Any, annotations: list[Any]) -> None:
+    annotations = _delete_unnamed_imports(adapter, annotations)
     names = {dimension_name(adapter, ann) for ann in annotations}
     delete = tuple(sorted(name for name in names if name and name != "Depth"))
     curated = curate_dimensions(
@@ -212,20 +214,87 @@ def _curate_right_dimensions(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError("drawing is missing the model-driven 10 mm depth")
 
 
+def _delete_unnamed_imports(adapter: Any, annotations: list[Any]) -> list[Any]:
+    """Remove automatic cosmetic-thread callouts from a marked-dimension import."""
+    draw = adapter.currentModel
+    survivors: list[Any] = []
+    for annotation in annotations:
+        annotation = _sw_type_info.flagged(annotation, "IAnnotation")
+        if dimension_name(adapter, annotation):
+            survivors.append(annotation)
+            continue
+        draw.ClearSelection2(True)
+        if not annotation.Select2(False, 0):
+            raise RuntimeError("failed to select an automatic model annotation")
+        draw.EditDelete()
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    return survivors
+
+
 def _manufacturing_notes() -> str:
+    through = ", ".join(f"{x:g}" for x in THROUGH_X)
+    blind = ", ".join(f"{x:g}" for x in BLIND_X)
     return "\n".join(
         (
             "UNLESS OTHERWISE SPECIFIED:",
             "1. DIMENSIONS ARE IN MILLIMETRES. INTERPRET PER ASME Y14.5.",
-            "2. REMOVE BURRS AND BREAK SHARP EDGES 0.2 MAX.",
+            "2. TOLERANCES: X +/-0.5; X.X +/-0.25; X.XX +/-0.10; ANGLES +/-0.5 DEG.",
+            "3. REMOVE BURRS AND BREAK SHARP EDGES 0.2 MAX.",
             (
-                f"3. 6 BA BASIC: MAJOR DIA {BA6.major_diameter_mm:.2f}, "
+                f"4. 6 BA BASIC: MAJOR DIA {BA6.major_diameter_mm:.2f}, "
                 f"PITCH {BA6.pitch_mm:.2f}, INCLUDED ANGLE {BA6.angle_deg:.1f} DEG."
             ),
-            "4. ALL HOLE CENTRES LIE 2.5 FROM THE LOWER EDGE.",
-            "5. APPLY BLACK OXIDE AFTER MACHINING.",
+            f"5. THRU TAPS AT X = {through}; BLIND TAPS AT X = {blind}.",
+            "6. PLATEN FACE FLAT WITHIN 0.10; SURFACE FINISH Ra 3.2 OR BETTER.",
+            "7. OPPOSITE FACE PARALLEL TO PLATEN FACE WITHIN 0.10.",
+            "8. APPLY BLACK OXIDE AFTER MACHINING.",
         )
     )
+
+
+def _assert_sheet(adapter: Any, sheet: Any, *, phase: str) -> None:
+    properties = list(adapter._get_attr_or_call(sheet, "GetProperties") or [])
+    if len(properties) < 7:
+        raise RuntimeError(f"{phase}: incomplete drawing sheet properties {properties!r}")
+    if properties[2:4] != [1.0, 1.0]:
+        raise RuntimeError(f"{phase}: drawing sheet scale is not 1:1: {properties!r}")
+    if abs(properties[5] - SHEET_WIDTH) > 1e-6 or abs(properties[6] - SHEET_HEIGHT) > 1e-6:
+        raise RuntimeError(f"{phase}: drawing sheet is not ASME B size: {properties!r}")
+
+
+async def _reopen_drawing(adapter: Any) -> tuple[Any, Any]:
+    model = adapter.currentModel
+    title = str(adapter._get_attr_or_call(model, "GetTitle") or "")
+    if not title:
+        raise RuntimeError("saved drawing has no document title")
+    adapter.swApp.CloseDoc(title)
+    check("reopen saved platen-guide drawing", await adapter.open_model(str(SLDDRW)))
+    reopened = adapter.currentModel
+    sheet = adapter._get_attr_or_call(reopened, "GetCurrentSheet")
+    if sheet is None:
+        raise RuntimeError("reopened drawing has no current sheet")
+    return reopened, sheet
+
+
+def _render_pdf_png() -> None:
+    import pypdfium2 as pdfium
+
+    document = pdfium.PdfDocument(str(PDF))
+    if len(document) != 1:
+        raise RuntimeError(f"drawing PDF has {len(document)} pages, expected 1")
+    page = document[0]
+    image = page.render(scale=300.0 / 72.0).to_pil()
+    page.close()
+    document.close()
+    if image.size == (5100, 3301):
+        image = image.crop((0, 0, 5100, 3300))
+    PNG.parent.mkdir(parents=True, exist_ok=True)
+    image.save(PNG, dpi=(300, 300))
+    if image.size != (5100, 3300):
+        raise RuntimeError(
+            f"ASME B PNG is {image.size}, expected 5100x3300 at 300 dpi"
+        )
 
 
 def _add_hole_callout(
@@ -321,9 +390,7 @@ async def build(adapter: Any) -> dict[str, str]:
     sheet = adapter._get_attr_or_call(drawing_model, "GetCurrentSheet")
     if sheet is None or not sheet.SetScale(1.0, 1.0, True, False):
         raise RuntimeError("failed to force the B-size sheet to 1:1")
-    properties = list(adapter._get_attr_or_call(sheet, "GetProperties") or [])
-    if len(properties) < 4 or properties[2:4] != [1.0, 1.0]:
-        raise RuntimeError(f"drawing sheet scale read-back is not 1:1: {properties!r}")
+    _assert_sheet(adapter, sheet, phase="initial setup")
     drawing_model.ForceRebuild3(False)
     drawing_model.EditRebuild3()
     drawing_model.CreateLayer2(
@@ -338,7 +405,7 @@ async def build(adapter: Any) -> dict[str, str]:
             f"MATERIAL: {props['Material Specification']}",
             f"FINISH: {props['Finish']}",
             f"QTY: {props['Quantity']}",
-            "SCALE 1:1  THIRD ANGLE",
+            "SCALE AS SHOWN  THIRD ANGLE",
             "SHEET 1 OF 1",
         ],
     )
@@ -366,8 +433,8 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         (
             "4X 6 BA THRU\n"
-            f"TAP DRILL DIA {BA6.tap_diameter_mm:.3f} THRU\n"
-            "ENTER FROM REAR"
+            f"DRILL DIA {BA6.tap_drill_diameter_mm:.2f} THRU\n"
+            "TAP FROM REAR; NO CHAMFER ON PLATEN FACE"
         ),
         edge_x=0.287,
         edge_y=0.1911,
@@ -379,7 +446,8 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         (
             f"5X 6 BA x {BLIND_THREAD_DEPTH:g} FULL THREAD\n"
-            f"TAP DRILL DIA {BA6.tap_diameter_mm:.3f} x {BLIND_HOLE_DEPTH:g} DEEP"
+            f"DRILL DIA {BA6.tap_drill_diameter_mm:.2f} x {BLIND_HOLE_DEPTH:g} DEEP\n"
+            "ENTER FROM PLATEN FACE"
         ),
         edge_x=0.310,
         edge_y=0.1911,
@@ -389,8 +457,8 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_note(adapter, _manufacturing_notes(), 0.014, 0.112)
     add_note(adapter, "PLATEN FACE", 0.176, 0.174)
-    add_note(adapter, "RIGHT", 0.366, 0.163)
-    add_note(adapter, "ISOMETRIC (REFERENCE)", 0.150, 0.018)
+    add_note(adapter, "RIGHT (SCALE 3:1)", 0.350, 0.163)
+    add_note(adapter, "ISOMETRIC (SCALE 1:3, REFERENCE)", 0.135, 0.018)
 
     drawing_model.ClearSelection2(True)
     drawing_model.EditRebuild3()
@@ -398,9 +466,19 @@ async def build(adapter: Any) -> dict[str, str]:
     if not sheet_name or not drawing_model.ActivateSheet(sheet_name):
         raise RuntimeError("failed to activate the drawing sheet for export")
 
-    artifacts = save_drawing(
-        adapter, str(SLDDRW), pdf_path=str(PDF), png_path=str(PNG)
-    )
+    if not sheet.SetScale(1.0, 1.0, False, False):
+        raise RuntimeError("failed to set final drawing sheet scale to 1:1")
+    _assert_sheet(adapter, sheet, phase="before save")
+    artifacts = save_drawing(adapter, str(SLDDRW))
+    drawing_model, sheet = await _reopen_drawing(adapter)
+    if not sheet.SetScale(1.0, 1.0, False, False):
+        raise RuntimeError("failed to persist reopened drawing sheet scale")
+    check("save final 1:1 drawing sheet", await adapter.save_file(str(SLDDRW)))
+    drawing_model, sheet = await _reopen_drawing(adapter)
+    _assert_sheet(adapter, sheet, phase="post-save reopen")
+    artifacts.update(save_drawing(adapter, "", pdf_path=str(PDF)))
+    _render_pdf_png()
+    artifacts["png"] = str(PNG.resolve())
     expected = {"drawing", "pdf", "png"}
     if set(artifacts) != expected:
         raise RuntimeError(f"drawing export incomplete: {artifacts!r}")
