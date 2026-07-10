@@ -95,6 +95,38 @@ def mates_with_owners(adapter: Any, known_prefixes: set[str]) -> list[dict]:
     return out
 
 
+def set_distance_flip(adapter: Any, mate_name: str, flip: bool) -> None:
+    """Set a distance mate's FlipDimension by feature name -- the measured
+    post-copy repair (2026-07-09 round 2): CopyWithMates2's Repeat path
+    RESETS a re-valued dim to flip=False regardless of the seed's state, so
+    a flip=True seed needs each copy healed back before the closing rebuild
+    (heals to rot 1e-16). The ModifyDefinition third arg must be a typed
+    VT_DISPATCH null -- a bare ``None`` marshals VT_NULL and the call
+    silently no-ops (same trap family as the CopyWithMates2 arrays)."""
+    import pythoncom
+    from win32com.client import VARIANT
+
+    from solidworks_mcp.adapters.solidworks.assembly import _read_member
+
+    model = adapter.currentModel
+    _flag_only(model, "FeatureByName")
+    feat = adapter._attempt(lambda: model.FeatureByName(mate_name), default=None)
+    if feat is None:
+        raise RuntimeError(f"set_distance_flip: no feature {mate_name!r}")
+    data = _read_member(feat, "GetDefinition")
+    if data is None:
+        raise RuntimeError(f"set_distance_flip: no definition on {mate_name!r}")
+    data.FlipDimension = flip
+    _flag_only(feat, "ModifyDefinition")
+    ok = adapter._attempt(
+        lambda: feat.ModifyDefinition(
+            data, model, VARIANT(pythoncom.VT_DISPATCH, None)),
+        default=False)
+    if not ok:
+        raise RuntimeError(f"set_distance_flip: ModifyDefinition failed on"
+                           f" {mate_name!r}")
+
+
 def _component(adapter: Any, name: str) -> Any:
     comp = adapter.currentModel.GetComponentByName(name)
     if comp is None:
