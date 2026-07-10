@@ -73,11 +73,36 @@ def _is_native_border_segment(points: list[tuple[float, float]]) -> bool:
     return short_tick and (near_left or near_right or near_top or near_bottom)
 
 
-def _strip_native_template(adapter: Any) -> tuple[int, int, int]:
-    """Retain only native border/zone segments; remove annotations and tables."""
+def _delete_native_sheet_annotations(adapter: Any) -> int:
+    """Delete stock notes before entering sheet-format edit mode."""
+    draw = adapter.currentModel
+    sheet_view = adapter._attempt(lambda: draw.GetFirstView())
+    if sheet_view is None:
+        raise RuntimeError("native drawing has no sheet view")
+    sheet_view = _sw_type_info.flagged(sheet_view, "IView")
+    annotations: list[Any] = []
+    annotation = adapter._attempt(lambda: sheet_view.GetFirstAnnotation3())
+    while annotation is not None:
+        annotation = _sw_type_info.flagged(annotation, "IAnnotation")
+        next_annotation = adapter._attempt(lambda item=annotation: item.GetNext3())
+        annotations.append(annotation)
+        annotation = next_annotation
+    for annotation in annotations:
+        draw.ClearSelection2(True)
+        if not annotation.Select2(False, 0):
+            raise RuntimeError("failed to select native sheet annotation")
+        draw.EditDelete()
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    return len(annotations)
+
+
+def _strip_native_template(adapter: Any) -> int:
+    """Retain only native border/zone sketch segments."""
     draw = adapter.currentModel
     sheet = adapter._get_attr_or_call(draw, "GetCurrentSheet")
     sheet = _sw_type_info.flagged(sheet, "ISheet")
+    sheet.SheetFormatVisible = True
     sketch = adapter._get_attr_or_call(sheet, "GetTemplateSketch")
     sketch = _sw_type_info.flagged(sketch, "ISketch")
     segments = list(adapter._get_attr_or_call(sketch, "GetSketchSegments") or [])
@@ -87,42 +112,67 @@ def _strip_native_template(adapter: Any) -> tuple[int, int, int]:
         if not _is_native_border_segment(_segment_points(adapter, segment)):
             delete_segments.append(segment)
 
-    draw.ClearSelection2(True)
     for segment in delete_segments:
+        draw.ClearSelection2(True)
         selected = adapter._attempt(
-            lambda item=segment: item.Select4(True, null_callout()), default=False
+            lambda item=segment: item.Select4(False, null_callout()), default=False
         )
         if not selected:
             raise RuntimeError("failed to select native title-block segment")
-    if delete_segments:
         draw.EditDelete()
 
-    sheet_view = adapter._attempt(lambda: draw.GetFirstView())
-    annotations: list[Any] = []
-    if sheet_view is not None:
-        annotation = adapter._attempt(lambda: sheet_view.GetFirstAnnotation3())
-        while annotation is not None:
-            annotation = _sw_type_info.flagged(annotation, "IAnnotation")
-            next_annotation = adapter._attempt(lambda item=annotation: item.GetNext3())
-            annotations.append(annotation)
-            annotation = next_annotation
-    removed_annotations = 0
-    for annotation in annotations:
-        draw.ClearSelection2(True)
-        if not annotation.Select2(False, 0):
-            raise RuntimeError("failed to select native sheet annotation")
-        draw.EditDelete()
-        removed_annotations += 1
-    removed_tables = delete_all_tables(adapter)
+    remaining_segments = list(
+        adapter._get_attr_or_call(sketch, "GetSketchSegments") or []
+    )
+    remaining_interior = []
+    for segment in remaining_segments:
+        segment = _sw_type_info.flagged(segment, "ISketchSegment")
+        if not _is_native_border_segment(_segment_points(adapter, segment)):
+            remaining_interior.append(segment)
+    if remaining_interior:
+        raise RuntimeError(
+            "native title-block cleanup left "
+            f"{len(remaining_interior)} interior sketch entities"
+        )
+
     draw.ClearSelection2(True)
     draw.EditRebuild3()
-    return len(delete_segments), removed_annotations, removed_tables
+    return len(delete_segments)
 
 
 def _line(adapter: Any, x0: float, y0: float, x1: float, y1: float) -> None:
     segment = adapter.currentModel.SketchManager.CreateLine(x0, y0, 0.0, x1, y1, 0.0)
     if segment is None:
         raise RuntimeError(f"failed to create title-block line ({x0}, {y0})-({x1}, {y1})")
+
+
+def _draw_project_border(adapter: Any) -> None:
+    margin = 0.006
+    x0, y0 = margin, margin
+    x1, y1 = ASME_B_WIDTH_M - margin, ASME_B_HEIGHT_M - margin
+    for line in (
+        (x0, y0, x1, y0),
+        (x1, y0, x1, y1),
+        (x1, y1, x0, y1),
+        (x0, y1, x0, y0),
+    ):
+        _line(adapter, *line)
+    for index in range(1, 4):
+        x = x0 + (x1 - x0) * index / 4.0
+        _line(adapter, x, y0, x, y0 + 0.004)
+        _line(adapter, x, y1, x, y1 - 0.004)
+    y_mid = (y0 + y1) / 2.0
+    _line(adapter, x0, y_mid, x0 + 0.004, y_mid)
+    _line(adapter, x1, y_mid, x1 - 0.004, y_mid)
+    for index, label in enumerate(("4", "3", "2", "1")):
+        x = x0 + (x1 - x0) * (index + 0.5) / 4.0
+        add_note(adapter, label, x, y1 + 0.001)
+    for y, label in (
+        (y0 + 0.75 * (y1 - y0), "B"),
+        (y0 + 0.25 * (y1 - y0), "A"),
+    ):
+        add_note(adapter, label, 0.001, y)
+        add_note(adapter, label, x1 + 0.001, y)
 
 
 def _draw_project_title_block(adapter: Any) -> None:
@@ -189,13 +239,19 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("native drawing has no current sheet")
     sheet = _sw_type_info.flagged(sheet, "ISheet")
     assert_asme_b_sheet(adapter, sheet, phase="native B template")
+    sheet.SheetFormatVisible = True
+    removed_annotations = _delete_native_sheet_annotations(adapter)
+    removed_tables = delete_all_tables(adapter)
     draw.EditTemplate()
     if draw.GetEditSheet():
         raise RuntimeError("failed to enter sheet-format edit mode")
-    removed = _strip_native_template(adapter)
+    removed_segments = _strip_native_template(adapter)
     _telemetry.info(
-        f"native B cleanup: segments={removed[0]}, notes={removed[1]}, tables={removed[2]}"
+        "native B cleanup: "
+        f"segments={removed_segments}, notes={removed_annotations}, "
+        f"tables={removed_tables}"
     )
+    _draw_project_border(adapter)
     _draw_project_title_block(adapter)
     _assert_no_banned_sheet_text(adapter)
     draw.EditSheet2()

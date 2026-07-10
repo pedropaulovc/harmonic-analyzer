@@ -14,6 +14,7 @@ import build_platen as platen
 import build_platen_guide as guide
 import build_paper_drive_assembly as paper_drive
 from _drawing_registry import DRAWINGS, ASME_B_DRWDOT, ASME_B_SLDDRT
+from _drawing_common import sanitize_pdf_metadata
 from _hole_wizard import BA6
 
 
@@ -99,6 +100,20 @@ def test_required_drawing_paths() -> None:
     assert drawing.PNG.as_posix().endswith("/png/platen-guide_drawing.png")
 
 
+def test_pdf_metadata_is_project_owned(tmp_path: Path) -> None:
+    from pypdf import PdfReader, PdfWriter
+
+    pdf = tmp_path / "drawing.pdf"
+    writer = PdfWriter()
+    writer.add_blank_page(width=1224, height=792)
+    writer.add_metadata({"/Author": "seat-user"})
+    writer.write(pdf)
+    sanitize_pdf_metadata(pdf, title="Drawing")
+    metadata = PdfReader(pdf).metadata
+    assert metadata.author == "Harmonic Analyzer Project"
+    assert metadata.title == "Drawing"
+
+
 def test_drawing_registry_is_unique_and_extensible() -> None:
     assert len({spec.name for spec in DRAWINGS}) == len(DRAWINGS)
     assert len({spec.part for spec in DRAWINGS}) == len(DRAWINGS)
@@ -126,6 +141,7 @@ def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None
     staged = cut_release.stage_drawings(stage)
     assert staged == {
         "platen_guide:slddrw": "slddrw/platen-guide.SLDDRW",
+        "platen_guide:solidworks_slddrw": "solidworks/platen-guide.SLDDRW",
         "platen_guide:pdf": "pdf/platen-guide.pdf",
         "platen_guide:png": "png/platen-guide_drawing.png",
     }

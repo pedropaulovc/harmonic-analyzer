@@ -50,6 +50,7 @@ dependencies = [
     # the whole pipeline runs from this one uv venv.
     "solidworks-mcp-python",
     "pypdfium2>=5.11.0",
+    "pypdf>=6.14.2",
 ]
 
 [dependency-groups]
