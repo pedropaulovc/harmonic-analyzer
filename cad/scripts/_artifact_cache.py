@@ -101,7 +101,13 @@ from pathlib import Path
 #   2 -- part entries gained the .STL sidecar; assembly entries gained the channel
 #        stretch parts + top-level gallery/BOM. Old epoch-1 blobs are incomplete
 #        for the current pipeline, so they MUST NOT be served (codex review).
-_CACHE_EPOCH = "2"
+#   3 -- assembly entries renamed the free-DOF sidecar .park.json -> .dof.json
+#        (park machinery removal). Epoch-2 assembly blobs carry the old sidecar
+#        name, so a hit would restore no manifest and verify:kinematics would
+#        fail on missing drive specs. (The recipe-digest shift from the same
+#        change already keys new lookups away from old blobs; the bump makes
+#        the archive-contract change explicit and unconditional -- codex #221.)
+_CACHE_EPOCH = "3"
 
 # Project-wide defaults, committed so a machine opts in by setting only a MODE --
 # never by rediscovering where the cache lives. Each is still overridable by the

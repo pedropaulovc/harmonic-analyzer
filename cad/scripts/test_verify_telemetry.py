@@ -201,14 +201,19 @@ class MockModel:
     def __init__(self, name: str, n_components: int) -> None:
         self._name = name
         self._comps = [MockComponent(f"{name}-{i + 1}", self) for i in range(n_components)]
-        # The real necessity gate names one component family per freed DOF that
-        # must itself read under-constrained (required_stems -- taken from the
-        # SAME map verify passes, so the mock can't drift). Rename a few
-        # components to those families, from index 1 so the grounded "-1" seed
-        # stays fixed.
-        for j, stem in enumerate(verify._REQUIRED_FREE_STEMS.get(name, ()), start=1):
-            if j < len(self._comps):
-                self._comps[j]._name = f"{stem}-{j + 1}"
+        # The real free-DOF gate names required families (necessity) AND
+        # rejects any under-constrained component outside the allowed coupled
+        # families (exact-set) -- both taken from the SAME maps verify passes,
+        # so the mock can't drift. Rename every non-seed component into the
+        # allowed set (cycling), which also covers the required stems (they
+        # are a subset); index 0 stays the grounded "-1" seed (IsFixed).
+        allowed = (verify._ALLOWED_FREE_STEMS.get(name)
+                   or verify._REQUIRED_FREE_STEMS.get(name, ()))
+        required = verify._REQUIRED_FREE_STEMS.get(name, ())
+        stems = list(required) + [s for s in allowed if s not in required]
+        for j in range(1, len(self._comps)):
+            if stems:
+                self._comps[j]._name = f"{stems[(j - 1) % len(stems)]}-{j + 1}"
         self.InterferenceDetectionManager = MockIDM()
         # Whether this model is in its freed-DOF pose (non-fixed components read
         # under-constrained). Set by open_model for the free drive-train.
