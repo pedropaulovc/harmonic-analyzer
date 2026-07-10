@@ -351,7 +351,9 @@ def test_drawing_spine_boundary_and_source_dependency(monkeypatch):
     dep_names = {Path(path).name for path in task["file_dep"]}
     assert {
         "platen-guide.SLDPRT",
-        "export_part_drawing.py",
+        "draw_platen_guide.py",
+        "_drawing_common.py",
+        "_drawing_registry.py",
         "_hole_wizard.py",
         "_common.py",
         ".solidworks-mcp-submodule.digest",
@@ -360,6 +362,9 @@ def test_drawing_spine_boundary_and_source_dependency(monkeypatch):
         "platen-guide.SLDDRW",
         "platen-guide.pdf",
         "platen-guide_drawing.png",
+    }
+    assert {"asme-b-book.drwdot", "asme-b-book.slddrt"} <= {
+        name.lower() for name in dep_names
     }
 
     build_deps = set(dodo.task_build()["task_dep"])
