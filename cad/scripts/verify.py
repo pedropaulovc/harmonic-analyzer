@@ -636,11 +636,15 @@ _REQUIRED_FREE_STEMS = {
 # the built assemblies (`gate.dof_free_necessity` names any stray explicitly,
 # so extending them after a deliberate coupling change is a one-line fix).
 _ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
+    # channel validated live: 80 under-constrained = exactly these 4 stems x 20
+    # channels (diagnostics/dump_under_constrained.py, 2026-07-09).
     "channel": ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever"),
     "summing": ("summing-lever", "boss-hook"),
     "pen": ("pen-rod", "pen-marker", "pen-wire"),
-    # drive-train / magnifier / paper-drive: pinned from the live dump in this
-    # PR's seat validation (the coupled trains span many families).
+    # drive-train / magnifier / paper-drive: their coupled trains span many
+    # families; pin from `diagnostics/dump_under_constrained.py` on the next
+    # full build (their artefacts are not present on this seat). Absent here =
+    # the exact-set direction is skipped, necessity still runs.
 }
 
 
