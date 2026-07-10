@@ -674,7 +674,13 @@ def feature_name_by_type(adapter: Any, type_name: str) -> str:
     for _ in range(5000):
         if not feat:
             break
-        _flag(feat, "IFeature")
+        # Flag only the two methods the walk calls (the c992057 pattern):
+        # full IFeature flagging is a GetIDsOfNames round-trip per method
+        # name per feature, uncached across walks (fresh CDispatch each
+        # GetNextFeature), which taxed every extrude_at_offset with an
+        # O(features) flag storm. GetTypeName2 must stay method-dispatched
+        # or the comparison below silently never matches.
+        _flag_only(feat, "GetTypeName2", "GetNextFeature")
         try:
             if _read_member(feat, "GetTypeName2") == type_name:
                 found = str(_read_member(feat, "Name"))
