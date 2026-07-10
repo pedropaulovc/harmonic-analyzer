@@ -84,6 +84,22 @@ reading back the origin and re-adding flipped. Saved state: every
 component fixed, fully defined or coupled-free, zero interference
 (face-flush and tangent contacts allowed).
 
+Only the SEED channels are authored mate-by-mate: channel 0 (the global
+Z anchor) plus the first channel >= 1 of each distinct amplitude value.
+Every other channel is ONE CopyWithMates2 of its seed's 4-part slice
+(rocker + rod + bar + lever, 9 mates -- see _cwm.py for the pinned
+native-call contract), with the J1a axial dim re-valued along the
+ladder off the SEED's gap bushing (PITCH/2 + k*PITCH): a copied
+channel's Z chains to that one shared bushing, while authored channels
+keep the per-gap neighbour idiom. The copied mates pin a copy only up
+to its 3 free operational DOF, so its design pose is PUT (no solve)
+right after the copy and one closing rebuild solves everything from
+that consistent state. The call's return value lies, so each copy is
+then proven from the model -- pose = seed pose translated down-spine,
+per-part mate count = the seed's, constrained status under-constrained
+-- and its 3 freed-DOF drive specs are recorded exactly like an
+authored channel's, its pose re-anchored into the ledger.
+
 The cams themselves live in drive-train.SLDASM (integral with the
 cylinder gears); the frame, supports and top-frame ring in frame.SLDASM.
 Cross-subassembly fits are checked at the top level (M6.5).
@@ -103,12 +119,15 @@ import sys
 from typing import Any
 
 import _config
+import _telemetry
 from _common import (
+    UNDER_CONSTRAINED,
     check,
     log,
     run_build,
 )
 from _assembly import (
+    assert_component_placed,
     assert_free_dof_necessity,
     bore_axis_ref,
     check_no_interference,
@@ -122,11 +141,21 @@ from _assembly import (
     parallel_mate,
     place_component,
     place_components_batch,
+    reledger_to_solved,
     reset_dof_manifest,
     save_assembly_and_images,
     spin_driver,
     world_point,
     write_dof_manifest,
+)
+from _cwm import (
+    component_constrained_status,
+    component_mate_count,
+    component_mate_dump,
+    copy_with_mates,
+    external_mate_rows,
+    mates_with_owners,
+    put_component_pose,
 )
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows, rows_from_euler
 from solidworks_mcp.adapters.base import (
@@ -414,6 +443,44 @@ ROD_PIN_BORE_LOCAL = [0.0, ROD_C2C, 0.0]  # rod Axis2 (rocker pin = swing pivot)
 LEVER_BAR_PIN_BORE_LOCAL = [127.0, 0.0, 0.0]  # lever Axis2 (bar pin)
 BAR_TOP_PIN_LOCAL = [3.175, 806.45, 3.175]  # bar Axis1 (swing pivot)
 BAR_FOOT_LOCAL = [3.175, 0.0, 3.175]  # bar Axis2 (foot, ~806 mm arm)
+
+# --- CopyWithMates2 slice replication (PR #220 probes -> production) ---------
+# A channel's 4 moving parts + their 9 mates are one repeatable SLICE: author
+# it once per amplitude value (the seed), then replicate every same-amplitude
+# channel with ONE native CopyWithMates2 call (~1-2 s) instead of re-authoring
+# (~12-20 s of per-mate solves). Contract + pinned rules live in _cwm.py.
+CHAIN_PARTS = ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever")
+# Every part a slice mate can reference, for owner classification (anything
+# else -- root planes -- maps to "ROOT" in mates_with_owners).
+_CWM_PREFIXES = set(CHAIN_PARTS) | {
+    "pivot-bushing", "pivot-shaft", "fulcrum-shaft", "lever-bushing"}
+# The free-build slice: J1 radial+axial, J2 coaxial+axial, J4 radial+axial,
+# J3 radial+axial, J5 = 9 mates, of which 3 are EXTERNAL (J1 radial on the
+# pivot-shaft, J1a axial dim to the gap bushing -- the ONLY external dim --
+# and J4 radial on the fulcrum-shaft). A mate-scheme change moves these:
+# update them consciously, the slot audit below fails loud.
+SLICE_MATES = 9
+SLICE_EXTERNAL = 3
+# Debug instrumentation for the copy path: per-part pose readbacks around the
+# pose landing + PNG snapshots of the model state (screenshot-first debugging).
+_CWM_DEBUG = bool(os.environ.get("HARMONIC_CWM_DEBUG"))
+
+
+async def _debug_png(adapter: Any, tag: str) -> None:
+    """Export front + isometric PNGs of the CURRENT model state under
+    ``cad/out/png/cwm-debug/`` (``HARMONIC_CWM_DEBUG=1`` only)."""
+    if not _CWM_DEBUG:
+        return
+    from _common import OUT_PNG
+    out = OUT_PNG / "cwm-debug"
+    out.mkdir(parents=True, exist_ok=True)
+    for view in ("front", "isometric"):
+        path = (out / f"{tag}_{view}.png").resolve()
+        await adapter.export_image({
+            "file_path": str(path), "format_type": "png",
+            "width": 1600, "height": 1000, "view_orientation": view,
+        })
+        log(f"  DEBUG png -> {path}")
 
 
 def _org(adapter, name: str) -> list[float]:
@@ -1063,18 +1130,29 @@ async def build(adapter) -> dict[str, str]:
     # and a pose fully computed at insert time (the per-channel amplitude tilt
     # is baked into spring_rows), so the placement transform IS the final pose
     # and the old 7-mates-per-channel locate battery bought nothing but ~140
-    # late-assembly mate solves. Their specs are COLLECTED here and inserted in
-    # ONE AddComponents3 + fixed in ONE FixComponent (Select2 each, one solve)
-    # after the loop (place_components_batch). The MOVING parts stay individual
-    # mated instances so each channel articulates independently (a different
-    # harmonic frequency) for the Motion study; their insertion pose seeds the
-    # mate flip-recovery, so they are not batchable.
+    # late-assembly mate solves. Their specs are COLLECTED per channel and
+    # inserted in ONE AddComponents3 + fixed in ONE FixComponent (Select2 each,
+    # one solve) after the chain loops (place_components_batch). The MOVING
+    # parts stay individual mated instances so each channel articulates
+    # independently (a different harmonic frequency) for the Motion study --
+    # but they are NOT all authored one by one: only the seeds are
+    # (_author_channel); same-amplitude channels are replicated from their
+    # seed's slice by CopyWithMates2 (the dispatch loop), each copy validated
+    # against the seed pose from the model.
     grounded_specs: list[dict[str, Any]] = []
     free_dof_keys: list[str] = []  # freed operational DOF recorded in the manifest
-    for j in range(CHANNELS):
+
+    async def _author_channel(j: int, st: dict[str, float]) -> dict[str, str]:
+        """Author one channel's chain from scratch: place the 4 moving parts
+        on-solution and join them with the 9-mate slice (J1/J2/J4/J3/J5).
+
+        The SEED path: run for channel 0 (the single global Z anchor) and once
+        per distinct amplitude value; every other channel is replicated from
+        its amplitude group's seed by one CopyWithMates2 call (the dispatch
+        loop below). Appends the channel's freed-DOF keys and returns the
+        part -> instance map (the copyable slice)."""
         zj = z_station(j)
         z_mid = zj + ARM_MID_DZ
-        st = solve_state(amplitudes[j])  # this channel's bar/lever pose
         # Bar rotated Ry(-90) (machine frame: local X slot -> +Z, local Z depth ->
         # -X, the mirror of the pre-#151 Ry(+90)) then swung by st['bar_tilt']
         # about Z. Lever gets the Ry(180) z-plane turn like the rocker/rod.
@@ -1253,7 +1331,299 @@ async def build(adapter) -> dict[str, str]:
             label=f"J5 bar-foot on rocker arc ch{j:02d} r={foot_r:.2f}",
             verify=(bar, bar_tgt),
         )
+        return {"rocker-arm": rocker, "connecting-rod": rod,
+                "amplitude-bar": bar, "channel-lever": lever}
 
+    def _slice_slots(seed_comps: dict[str, str]) -> dict[str, Any]:
+        """Measure the seed slice's CopyWithMates2 slot layout: the array
+        length, the J1a dim's Values slot index, the seed parts' as-authored
+        transform arrays (the pose targets every copy is landed on) and their
+        per-part mate counts (the copy-completeness reference).
+
+        One mates_with_owners read serves both the slice-mate count tripwire
+        and the external slot mapping. Every expectation is asserted LOUD: a
+        mate-scheme change that silently mis-slots the ladder value would
+        re-value a live copied dim to 0.0 (the _cwm contract), so drift here
+        must fail the build, not mis-place a channel."""
+        slice_instances = set(seed_comps.values())
+        rows = [r for r in mates_with_owners(adapter, _CWM_PREFIXES)
+                if r["instances"] & slice_instances]
+        if len(rows) != SLICE_MATES:
+            raise RuntimeError(
+                f"seed slice carries {len(rows)} mates, expected {SLICE_MATES}"
+                " -- the mate scheme changed; re-derive SLICE_MATES/"
+                f"SLICE_EXTERNAL: {[r['name'] for r in rows]}")
+        ext = external_mate_rows(rows, slice_instances)
+        if len(ext) != SLICE_EXTERNAL:
+            raise RuntimeError(
+                f"seed slice exposes {len(ext)} external mates, expected"
+                f" {SLICE_EXTERNAL}: {[r['name'] for r in ext]}")
+        dims = [(i, r) for i, r in enumerate(ext)
+                if r["type"] == "MateDistanceDim"]
+        if len(dims) != 1:
+            raise RuntimeError(
+                "seed slice must expose exactly ONE external dim (the J1a"
+                f" rocker axial); got {[(i, r['name']) for i, r in dims]}")
+        slot, dim = dims[0]
+        if dim["owners"] != frozenset({"rocker-arm", "pivot-bushing"}):
+            raise RuntimeError(
+                f"external dim {dim['name']!r} is not the J1a rocker->bushing"
+                f" axial (owners {sorted(dim['owners'])})")
+        if abs(dim["mm"] - PITCH / 2.0) > 0.01:
+            raise RuntimeError(
+                f"J1a seed value {dim['mm']:.3f} mm != PITCH/2"
+                f" {PITCH / 2.0:.3f} -- the axial anchor moved")
+        if dim["flip"]:
+            raise RuntimeError(
+                f"J1a seed dim {dim['name']!r} authored flip=True --"
+                " CopyWithMates2's Repeat path RESETS re-valued dims to"
+                " flip=False, so every copy would land on the wrong side;"
+                " keep the ladder formulated with the wanted side as False")
+        arrays = {p: list(component_transform(adapter, n))
+                  for p, n in seed_comps.items()}
+        mate_counts = {p: component_mate_count(adapter, n)
+                       for p, n in seed_comps.items()}
+        # The seed's drive targets (all Z-independent), for the transient
+        # drivers that land each copy on the design pose.
+        return {
+            "n": len(rows), "dim_slot": slot, "arrays": arrays,
+            "mate_counts": mate_counts,
+            "rocker_off": world_point(
+                adapter, seed_comps["rocker-arm"], ROCKER_ROD_BORE_LOCAL),
+            "rod_ring": world_point(
+                adapter, seed_comps["connecting-rod"], ROD_STRAP_BORE_LOCAL),
+            "rod_pin": world_point(
+                adapter, seed_comps["connecting-rod"], ROD_PIN_BORE_LOCAL),
+            "foot": world_point(
+                adapter, seed_comps["amplitude-bar"], BAR_FOOT_LOCAL),
+        }
+
+    # Per-channel chain, seed-and-replicate (PR #220 -> production). Channel 0
+    # is always authored (it is the single global Z anchor -- its J1a is a
+    # ROOT-datum distance at a negative station, flip=True, which the Repeat
+    # path cannot reproduce, so it never seeds). The first channel >= 1 of each
+    # amplitude value is authored as that group's SEED (its J1a anchors
+    # PITCH/2 off its own gap bushing, positive = flip False); every later
+    # same-amplitude channel is ONE CopyWithMates2 of the seed's 4-part slice
+    # with the J1a slot re-valued along the ladder. With the current all-
+    # neutral preset that is 2 authored + (CHANNELS-2) copies; a restored
+    # square preset degrades gracefully (each distinct a_j authors once).
+    seed_by_amp: dict[float, tuple[int, dict[str, str]]] = {}
+    slots_by_seed: dict[int, tuple[int, int, dict[str, list[float]]]] = {}
+    copied: list[dict[str, Any]] = []
+    for j in range(CHANNELS):
+        st = solve_state(amplitudes[j])  # this channel's bar/lever pose
+        amp_key = round(amplitudes[j], 6)
+        seed = seed_by_amp.get(amp_key) if j >= 2 else None
+        if seed is None:
+            comps = await _author_channel(j, st)
+            if j >= 1:
+                seed_by_amp[amp_key] = (j, comps)
+            continue
+        seed_j, seed_comps = seed
+        if seed_j not in slots_by_seed:
+            slots_by_seed[seed_j] = _slice_slots(seed_comps)
+        slice_info = slots_by_seed[seed_j]
+        n_slice, dim_slot = slice_info["n"], slice_info["dim_slot"]
+        seed_arrays = slice_info["arrays"]
+        # The copy keeps the seed's EXTERNAL references, so its J1a measures
+        # to the SEED's gap bushing -- the ladder PITCH/2 + (j-seed_j)*PITCH --
+        # not to this channel's own gap bushing (the authored path's neighbour
+        # idiom). Always positive = the seed's False side, the only side the
+        # Repeat path can land on (see _cwm.py).
+        ladder = PITCH / 2.0 + (j - seed_j) * PITCH
+        values = [0.0] * n_slice
+        values[dim_slot] = ladder / 1000.0
+        with _telemetry.span("cwm.comp_names", channel=j, phase="before"):
+            before_comps = set(component_names(adapter))
+        copy_with_mates(
+            adapter, [seed_comps[p] for p in CHAIN_PARTS], n_slice, values)
+        with _telemetry.span("cwm.comp_names", channel=j, phase="after"):
+            new_comps = sorted(set(component_names(adapter)) - before_comps)
+        comps = {}
+        for name in new_comps:
+            part = name.rsplit("-", 1)[0]
+            if part not in CHAIN_PARTS or part in comps:
+                raise RuntimeError(
+                    f"ch{j:02d} copy: unexpected new component {name!r}"
+                    f" (full new set {new_comps})")
+            comps[part] = name
+        if len(comps) != len(CHAIN_PARTS):
+            raise RuntimeError(
+                f"ch{j:02d} copy created {len(comps)}/{len(CHAIN_PARTS)} chain"
+                f" parts: {new_comps}")
+        # Land the copy on its DESIGN pose by pinning its 3 operational DOF
+        # with TRANSIENT drivers, then deleting them. The chain's DOF are
+        # genuinely free, so the copied mates pin the copy only up to the
+        # free manifold -- and the copy carries a solver-state ATTRACTOR: a
+        # deterministic wrong pose (first run: rocker ~17 deg swung; every
+        # rebuild: ~97 deg) that the solver returns to from ANY start.
+        # Measured dead ends (2026-07-09): raw Transform2 puts land every
+        # part exactly on target but the next solve reverts them, and
+        # SetTransformAndSolve3 with the whole chain already consistent at
+        # target STILL reverts -- only a real DRIVEN solve rewrites the
+        # copied mates' stored state. So drive the copy exactly like an
+        # authored channel (same helpers, same labels/flip seeding, readback-
+        # verified), which anchors the stored state at the design pose, then
+        # delete the drivers -- the DOF end up free, later rebuilds hold.
+        targets: dict[str, list[float]] = {}
+        dz_m = (j - seed_j) * PITCH / 1000.0
+        for part in CHAIN_PARTS:
+            target = list(seed_arrays[part])
+            target[11] += dz_m
+            targets[part] = target
+        rocker_c = comps["rocker-arm"]
+        rod_c = comps["connecting-rod"]
+        bar_c = comps["amplitude-bar"]
+        def _tgt_mm(part: str) -> list[float]:
+            a = targets[part]
+            return [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
+        off = slice_info["rocker_off"]
+        ring = slice_info["rod_ring"]
+        pin = slice_info["rod_pin"]
+        foot = slice_info["foot"]
+        def _put_chain() -> None:
+            for part in CHAIN_PARTS:
+                put_component_pose(adapter, comps[part], targets[part])
+
+        try:
+            with _telemetry.span("cwm.pose_drive", channel=j):
+                drives: list[str] = []
+                _put_chain()
+                mate = await spin_driver(
+                    adapter, named_ref(f"Axis2@{rocker_c}", "AXIS"),
+                    pivot_w, (off[0], off[1]),
+                    label=(f"J1 rocker ch{j:02d} spin ->"
+                           f" {off[0]:.1f},{off[1]:.1f}"),
+                    verify=(rocker_c, _tgt_mm("rocker-arm")))
+                drives.append(mate["name"])
+                _put_chain()  # each add re-seats the still-free siblings
+                mate = await distance_driver(
+                    adapter, named_ref(f"Axis2@{bar_c}", "AXIS"),
+                    named_ref("Right Plane", "PLANE"), foot[0],
+                    label=(f"J3 bar ch{j:02d} AMPLITUDE drive"
+                           f" foot-X={foot[0]:.2f} (amp"
+                           f" {amplitudes[j]:+.1f})"),
+                    verify=(bar_c, _tgt_mm("amplitude-bar")))
+                drives.append(mate["name"])
+                _put_chain()
+                mate = await spin_driver(
+                    adapter, named_ref(f"Axis1@{rod_c}", "AXIS"),
+                    (pin[0], pin[1]), (ring[0], ring[1]),
+                    label=(f"J2 rod ch{j:02d} swing -> ring"
+                           f" {ring[0]:.1f},{ring[1]:.1f}"),
+                    verify=(rod_c, _tgt_mm("connecting-rod")))
+                drives.append(mate["name"])
+                for name in reversed(drives):
+                    _delete_feature(adapter, name)
+        except Exception:
+            if _CWM_DEBUG:
+                for part in CHAIN_PARTS:
+                    a = component_transform(adapter, comps[part])
+                    t = targets[part]
+                    log(f"  DEBUG ch{j:02d} {comps[part]} at-drive-fail pose:"
+                        f" ({a[9] * 1000:.2f}, {a[10] * 1000:.2f},"
+                        f" {a[11] * 1000:.2f})"
+                        f" xrow ({a[0]:+.3f},{a[1]:+.3f},{a[2]:+.3f}) target"
+                        f" ({t[9] * 1000:.2f}, {t[10] * 1000:.2f},"
+                        f" {t[11] * 1000:.2f})")
+                await _debug_png(adapter, f"drive-fail-ch{j:02d}")
+            raise
+        log(f"ch{j:02d} <- CopyWithMates2 of ch{seed_j:02d}"
+            f" (J1a ladder {ladder:.2f} mm, driven to pose + freed)")
+        copied.append({"j": j, "seed_j": seed_j, "comps": comps,
+                       "targets": targets})
+
+    # End-state validation of the replicated channels: ONE closing solve, then
+    # prove each copy from the model (the CopyWithMates2 return value LIES):
+    # pose = the seed's pose translated down-spine; per-part mate count = the
+    # seed's (a native-typing slip silently DROPS mates); per-part
+    # constrained status = under-constrained like the seed's (an unsolvable
+    # copied mate drives its components to over/no-solution WITHOUT moving
+    # anything, so a pose read alone misses it). All three read the model via
+    # per-component calls -- never the MateGroup tree walk, which measured
+    # ~20 s per pass here. Then record each copy's freed-DOF drive specs and
+    # re-anchor the pose ledger to the validated solved poses (the copies
+    # were never place_component'd, so the ledger must learn them for the
+    # final assert_pose_ledger sweep in save_assembly_and_images).
+    if copied:
+        model = adapter.currentModel
+        if not bool(adapter._attempt(lambda: model.EditRebuild3(), default=False)):
+            raise RuntimeError("closing EditRebuild3 after slice replication failed")
+        await _debug_png(adapter, "post-rebuild")
+        if _CWM_DEBUG:
+            for rec in copied:
+                seed_comps = seed_by_amp[round(amplitudes[rec["j"]], 6)][1]
+                for part in CHAIN_PARTS:
+                    log(f"  DEBUG mates seed {seed_comps[part]}: "
+                        f"{component_mate_dump(adapter, seed_comps[part])}")
+                    log(f"  DEBUG mates copy {rec['comps'][part]}: "
+                        f"{component_mate_dump(adapter, rec['comps'][part])}")
+        for rec in copied:
+            seed_counts = slots_by_seed[rec["seed_j"]]["mate_counts"]
+            for part in CHAIN_PARTS:
+                name = rec["comps"][part]
+                a = rec["targets"][part]
+                assert_component_placed(
+                    adapter, name,
+                    [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0],
+                    [list(a[0:3]), list(a[3:6]), list(a[6:9])],
+                )
+                got = component_mate_count(adapter, name)
+                if got != seed_counts[part]:
+                    raise RuntimeError(
+                        f"ch{rec['j']:02d} {name}: {got} mates, seed has"
+                        f" {seed_counts[part]} -- the copy dropped mates")
+                status = component_constrained_status(adapter, name)
+                if status != UNDER_CONSTRAINED:
+                    raise RuntimeError(
+                        f"ch{rec['j']:02d} {name}: constrained status"
+                        f" {status}, expected under-constrained"
+                        f" ({UNDER_CONSTRAINED}) -- a copied mate is"
+                        " unsolvable or over-defining")
+        for rec in copied:
+            j = rec["j"]
+            rocker = rec["comps"]["rocker-arm"]
+            rod = rec["comps"]["connecting-rod"]
+            bar = rec["comps"]["amplitude-bar"]
+            for name in rec["comps"].values():
+                reledger_to_solved(adapter, name)
+            # Record the copy's 3 freed-DOF drive specs -- pure recording
+            # (free_dof_key never authors) + cheap COM transform reads on the
+            # validated copies. Labels mirror the authored path VERBATIM so
+            # the flip ledger (_flip_sig) resolves the same signatures.
+            tgt = _org(adapter, rocker)
+            off = world_point(adapter, rocker, ROCKER_ROD_BORE_LOCAL)
+            await spin_driver(
+                adapter, named_ref(f"Axis2@{rocker}", "AXIS"), pivot_w,
+                (off[0], off[1]),
+                label=f"J1 rocker ch{j:02d} spin -> {off[0]:.1f},{off[1]:.1f}",
+                verify=(rocker, tgt), free_dof_key=f"rocker_angle_{j:02d}")
+            free_dof_keys.append(f"rocker_angle_{j:02d}")
+            tgt = _org(adapter, rod)
+            ring = world_point(adapter, rod, ROD_STRAP_BORE_LOCAL)
+            pin = world_point(adapter, rod, ROD_PIN_BORE_LOCAL)
+            await spin_driver(
+                adapter, named_ref(f"Axis1@{rod}", "AXIS"),
+                (pin[0], pin[1]), (ring[0], ring[1]),
+                label=f"J2 rod ch{j:02d} swing -> ring {ring[0]:.1f},{ring[1]:.1f}",
+                verify=(rod, tgt), free_dof_key=f"rod_swing_{j:02d}")
+            free_dof_keys.append(f"rod_swing_{j:02d}")
+            tgt = _org(adapter, bar)
+            foot = world_point(adapter, bar, BAR_FOOT_LOCAL)
+            amplitude = foot[0] - pivot_w[0]
+            await distance_driver(
+                adapter,
+                named_ref(f"Axis2@{bar}", "AXIS"),
+                named_ref("Right Plane", "PLANE"),
+                foot[0],
+                label=(f"J3 bar ch{j:02d} AMPLITUDE drive foot-X={foot[0]:.2f}"
+                       f" (amp {amplitude:+.1f})"),
+                verify=(bar, tgt), free_dof_key=f"bar_amplitude_{j:02d}")
+            free_dof_keys.append(f"bar_amplitude_{j:02d}")
+
+    for j in range(CHANNELS):
+        z_mid = z_station(j) + ARM_MID_DZ
         # Return spring (ground; cosmetic) -- placed PER CHANNEL spanning this
         # channel's (moving) lever eye to the FIXED summing-plate hole, at the
         # measured gap length (parametric-springs memory / task #10). NOT a fixed
@@ -1300,9 +1670,6 @@ async def build(adapter) -> dict[str, str]:
             "rows": ROT_Y_180,
             "label": f"spring-hook ch{j:02d} bore-seat",
         })
-
-        # (Bushings are pre-placed + seated BEFORE this loop so the rocker can
-        # reference its neighbour for the axial Z seat -- see that block above.)
 
     # Insert the cosmetic bank (springs + spring-hooks; the bushings were
     # patterned before the loop) in ONE AddComponents3 + ONE FixComponent
