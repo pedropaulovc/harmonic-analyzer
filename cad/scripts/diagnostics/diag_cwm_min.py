@@ -1,38 +1,51 @@
-r"""Standalone MINIMAL repro: CopyWithMates2 does not preserve the seed's pose
-along an UNDER-CONSTRAINED copy's free DOF.
+r"""Diagnostic: CopyWithMates2 does not carry a copied component's FREE-DOF pose
+into the copy. This is EXPECTED SolidWorks behavior, NOT a bug -- it is kept as a
+documented gotcha and a control experiment.
 
-The smallest slice that shows it (measured 2026-07-09, SW 2024 SP3; re-confirmed
-2026-07-10 on SW 2026 SP2 via an early-bound C# Interop port): ONE part with
-ZERO features (an empty part -- just its default planes), TWO mates to the
-assembly root planes (coincident Top + distance Front, leaving in-plane slide +
-spin free), ONE CopyWithMates2 call with the distance slot re-valued one step
-over. The floating copy lands at the right distance but PARKED ~8.5-9.5 mm off
-along the FREE in-plane direction -- deterministically, where the seed sat
-exactly on pose. A raw Transform2 put to the intended pose then survives
-EditRebuild3 (no revert at this scale; reverts were only ever observed on a
-large multi-loop assembly).
+CONCLUSION (investigated 2026-07-09/10, SW 2024 SP3 + SW 2026 SP2 via a raw
+pywin32 run and an early-bound C# Interop port): when a copied component is
+UNDER-CONSTRAINED, the value of its free DOF is not defined by mates, so
+CopyWithMates2 has nothing to preserve there -- it re-solves and the free DOF
+lands wherever the solver puts it (deterministically, but NOT at the seed's
+value). Fully-constrain the copy and it lands exactly on pose. So there is no
+defect: an unconstrained position was never defined, and moving it is within
+spec. The practical lesson for the build: a component copied with a free DOF will
+NOT inherit the seed's pose along that DOF -- fully-mate it, or place it
+explicitly with a Transform2 put (which is what the pipeline does).
+
+The smallest slice that shows it: ONE part with ZERO features (an empty part --
+just its default planes), TWO mates to the assembly root planes (coincident Top
++ distance Front, which remove 5 of 6 DOF and leave exactly ONE free DOF -- the
+in-plane slide along the two planes' intersection line; all rotations, including
+spin about the axis, are constrained -- confirmed by --pin, where a single
+translational Right-plane mate fully defines the part), ONE CopyWithMates2 call
+with the distance slot re-valued one step over. The floating copy lands at the
+right distance but ~8.5-9.5 mm off along the FREE in-plane direction, where the
+seed sat exactly on its (arbitrary) value. A raw Transform2 put to the intended
+pose then survives EditRebuild3.
 
     seed after mates           org=(   0.000,   0.000, -20.000)  ON-POSE
-    copy post-CopyWithMates2   org=(   9.488,  -0.000, -45.000)  WANDER   <- parks off, free dir
-    copy post-put+rebuild      org=(   0.000,   0.000, -45.000)  ON-POSE  <- put heals, holds
+    copy post-CopyWithMates2   org=(   9.488,  -0.000, -45.000)  free DOF re-placed
+    copy post-put+rebuild      org=(   0.000,   0.000, -45.000)  ON-POSE (explicit put)
 
 IT IS THE FREE DOF, not API usage. The copy's distance mate IS re-valued the
 documented way -- Repeat=false + NewEntityToMateTo set to the assembly's own root
 planes (the same planes the seed mates to). Its mates come out correct
-(coincident + distance, referencing the root, err=0). The wander is NOT a
-mate-authoring failure; CopyWithMates2 simply resolves the copy's UNCONSTRAINED
-in-plane slide to an arbitrary off-origin station instead of the seed's.
+(coincident + distance, referencing the root, err=0). The off-pose landing is NOT
+a mate-authoring failure; CopyWithMates2 simply resolves the copy's UNCONSTRAINED
+in-plane slide to a station of its own choosing instead of the seed's.
 
     --pin is the NEGATIVE CONTROL. It adds a third mate (Right-plane coincident)
     that removes the free slide, so the copy is FULLY defined. The very same
-    CopyWithMates2 call then lands the copy EXACTLY on pose (no wander). So the
-    wander is specific to an under-constrained copy; a fully-mated copy is placed
-    correctly.
+    CopyWithMates2 call then lands the copy EXACTLY on pose. So the off-pose
+    landing is specific to an under-constrained copy; a fully-mated copy is placed
+    correctly -- the evidence it is expected behavior, not breakage.
 
 Do NOT read into the bool return. CopyWithMates2 returns False on this call --
-but it ALSO returns False on the --pin copy that lands perfectly on pose and is
-fully defined with clean mates. So its return value is not a reliable
-success/failure signal here; only the resulting Transform2 / DOF status is.
+but it ALSO returns False on the --pin copy that lands perfectly on pose, and on
+SolidWorks' OWN documented profile-center example (Copy_Component_With_Profile_
+Center_Mate) recreated on SW 2026 SP2. So on this build its return value is not a
+reliable success/failure signal; only the resulting Transform2 / DOF status is.
 
 The auto-fixed first component is a SEPARATE confound, off by default. The first
 component added to an assembly is AUTO-FIXED; a distance mate on a fixed
@@ -44,21 +57,27 @@ demonstrate the artifact (seed reads fully-defined-because-pinned, its Distance
 mate errors, and the seed's mate stays `closest` while the copy's is `aligned`,
 so the copy's distance also resolves on the other side, z -45 vs -50).
 
-pywin32 only -- NO repo imports, suitable for a vendor ticket. SolidWorks must
-already be open; the script creates its own throwaway documents, closes only
-those, and saves nothing except the tiny part in %TEMP%.
+NOT reproduced here (separate open question): the original symptom that started
+this investigation was a Transform2 put REVERTING after rebuild on a large
+multi-loop assembly. This minimal case shows the opposite (the put holds), so it
+does NOT capture that behavior -- if anything is still worth chasing, it is the
+revert at scale, not this expected free-DOF placement.
+
+pywin32 only -- NO repo imports. SolidWorks must already be open; the script
+creates its own throwaway documents, closes only those, and saves nothing except
+the tiny part in %TEMP%.
 
 Run:  uv run python cad\scripts\diagnostics\diag_cwm_min.py [--visible] [--pin] [--fixed-seed]
 
---visible uses a one-extrude cylinder instead of the empty part, so the parked
-copy can be seen (and screenshotted) in the viewport.
---pin adds the Right-plane mate (negative control: no free DOF => no wander).
+--visible uses a one-extrude cylinder instead of the empty part, so the copy can
+be seen (and screenshotted) in the viewport.
+--pin adds the Right-plane mate (negative control: no free DOF => copy on pose).
 --fixed-seed keeps the first component auto-fixed (see the confound above).
 
 Reproduce by hand in the SolidWorks UI
 --------------------------------------
-The script mirrors these exact steps -- do them by hand to see the wander live
-(menu paths are SW 2024-2026; they may vary slightly by version):
+The script mirrors these exact steps -- do them by hand to see it live (menu
+paths are SW 2024-2026; they may vary slightly by version):
 
 1. New part. For a VISIBLE copy, sketch a circle (R 5 mm) on the Front plane and
    extrude it ~10 mm into a small cylinder. (An empty part -- default planes only,
@@ -83,14 +102,14 @@ The script mirrors these exact steps -- do them by hand to see the wander live
    again is required, editing the value alone is not enough) and set the NEW value
    one step over, e.g. 45 mm. Keep the other mate's reference as-is. Place one
    copy, then close the PropertyManager.
-6. RESULT: the copy sits at the right DISTANCE but is PARKED ~8-9 mm off to the
-   SIDE of the seed along the free direction -- not where the seed sits. Switch to
-   a Front view (look straight down the cylinder axis): seed and copy show as two
-   offset circles instead of one concentric circle. That off-side park is the bug.
+6. RESULT: the copy sits at the right DISTANCE but is ~8-9 mm off to the SIDE of
+   the seed along the free direction -- because that direction is unconstrained.
+   Switch to a Front view (look straight down the cylinder axis): seed and copy
+   show as two offset circles instead of one concentric circle.
 7. NEGATIVE CONTROL: redo it but first add a third mate pinning the slide
    (Coincident: part Right plane <-> assembly Right plane) so the component is
-   fully defined. Now the Copy with Mates copy lands exactly on the seed's axis --
-   no wander. (Or heal the under-defined case: drag the copy back onto the axis /
+   fully defined. Now the Copy with Mates copy lands exactly on the seed's axis.
+   (Or place the under-defined case explicitly: drag the copy onto the axis /
    Move Component to the intended pose; it holds through a rebuild, Ctrl-Q.)
 """
 
