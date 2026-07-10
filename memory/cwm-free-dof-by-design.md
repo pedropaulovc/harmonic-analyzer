@@ -40,9 +40,30 @@ pose along that DOF — fully-mate it, or place it explicitly with a Transform2 
 (what the pipeline does). Relates to [[default-free-dof-park-drivers]] (the build
 deliberately ships free operational DOF, placed by insertion transform).
 
-**STILL OPEN — the actual symptom to chase:** the original report was a
-Transform2 put **REVERTING after EditRebuild3 on the large multi-loop assembly**.
-The minimal case shows the put HOLDS, so it does not capture that. If there is a
-real defect, it is the revert at scale, not this expected free-DOF placement.
+**The revert-at-scale is NOT an open bug — it is the documented "solver-state
+attractor," same free-DOF root, already characterized AND mitigated.** A copy of
+a slice with FREED operational DOF: the solver returns the copied chain to one
+deterministic wrong pose on the free manifold from ANY start, even though every
+copied mate is value/flip/alignment-identical to the seed's and satisfied at the
+design pose. A raw Transform2 put lands exactly and is REVERTED by the next
+solve; `SetTransformAndSolve3` reverts the same way. This is expected
+constraint-solver branch-selection on an under-determined system (the same free
+DOF as the wander); the minimal case shows the put HOLDS only because minimal
+scale can't summon a strong non-design attractor (mirrored/rotated transforms,
+coincident PLANE axial mates, 4-part multi-loop, ~100 components — proven by
+`diag_cwm_attractor.py` #227, put held in all nine minimal cells).
+
+MITIGATION (shipping in `build_channel_assembly` via `_cwm.copy_with_mates`,
+`_cwm.py` lines 22-30): put the chain at the design pose (makes the design branch
+the nearest) → author transient driver mates pinning each free DOF (a real DRIVEN
+solve rewrites the copied mates' stored state) → delete the drivers. Put-alone
+reverts; driver-alone solves to the wrong nearest branch; the two-step lands it.
+
+Only remaining question (perf, not correctness): whether IDragOperator absolute
+Drag (attractor repro measured ~0.2 s/part vs ~0.8 s/authored-driver, and it
+survived the rebuild at minimal scale) can replace the transient drivers on the
+REAL channel slice — pending validation there.
+
 Extends [[negative-result-positive-control]] and [[no-untested-failure-assumptions]];
-verify empirically per [[verify-assumptions-live-sw]].
+verify empirically per [[verify-assumptions-live-sw]]; relates to
+[[default-free-dof-park-drivers]].
