@@ -236,62 +236,73 @@ async def build(adapter) -> dict[str, str]:
         times.append(dt)
         log(f"copy -> gap {k}: bushings={n_now} {dt:.2f}s")
 
-    # Q2: real mates + correct stations, judged from the model. A copy
-    # inherits the SEED'S SIDE of the anchor plane (Q5: FlipDimension is a
-    # no-op under Repeat=True), so the expected station for a copy is
-    # -abs(target): the seed sits on the negative side, and the one ladder
-    # target crossing zero (+0.737) legitimately lands mirrored. Production
-    # must therefore anchor re-valued distances so every station shares the
-    # seed's side (e.g. the neighbour-bushing anchor, PITCH/2 + k*PITCH).
+    # Q2 (informational pre-rebuild read; the GATE is the end-state
+    # validation below). A copy inherits the SEED'S SIDE of the anchor
+    # plane (Q5: FlipDimension is a no-op under Repeat=True), so the
+    # expected station for a copy is -abs(target): the seed sits on the
+    # negative side, and the one ladder target crossing zero (+0.737)
+    # legitimately lands mirrored. Production must therefore anchor
+    # re-valued distances so every station shares the seed's side (e.g.
+    # the neighbour-bushing anchor, PITCH/2 + k*PITCH).
     mates_after = await _mate_count(adapter)
     zs = _bushing_zs(adapter)
     expected = sorted([GAP_Z[0], GAP_Z[1]]
                       + [-abs(GAP_Z[k]) for k in range(2, 2 + N_COPIES)])
-    on_plane = (
-        len(zs) == len(expected)
-        and all(abs(g - w) < 0.05 for g, w in zip(zs, expected))
-    )
     log("=" * 70)
     log(f"mate count: {mates_before} -> {mates_after} "
         f"(expected +{SEED_MATES * N_COPIES} if copies carry REAL mates)")
-    log(f"stations: {'ON-PLANE' if on_plane else 'OFF -- ' + str(zs)}")
+    log(f"stations (pre-rebuild): {zs}")
     log(f"timing: production seat ~{(t_seed + t_base2) / 2:.2f}s vs "
         f"CopyWithMates2 avg {sum(times) / len(times):.2f}s "
         f"(first {times[0]:.2f}s, last {times[-1]:.2f}s -- growth says "
         f"whether the copy also pays the population tax)")
 
-    # Failures raise (not return) so automation can never read a failed
-    # ladder as passing (codex #220).
-    if mates_after - mates_before != SEED_MATES * N_COPIES:
-        raise RuntimeError(
-            f"ladder mates {mates_before} -> {mates_after}, expected "
-            f"+{SEED_MATES * N_COPIES} -- copies did not carry real mates")
-    if not on_plane:
-        raise RuntimeError(f"ladder stations off: {zs} != {expected}")
+    # Q5: FlipDimension semantics. Pinned 2026-07-09: on the Repeat path a
+    # re-valued dim's flip RESETS (the array is ignored -- both bits land a
+    # +20 target on the SEED's side, -20), and the copy inherits the seed's
+    # side of the anchor. Copy the seed (at Z=-62.77) to an unambiguous
+    # +20 mm target under both flip bits; the landings are asserted at the
+    # end-state validation (a break means the CopyWithMates2 flip contract
+    # CHANGED -- SW upgrade? -- and the seed-side rule must be
+    # re-validated).
+    q5_names: list[str] = []
+    for flip in (False, True):
+        before = set(component_names(adapter))
+        _copy_with_mates(adapter, seed, 20.0, variant, flip_override=flip)
+        new = [n for n in component_names(adapter) if n not in before]
+        q5_names.extend(new)
+        log(f"Q5 flip={flip}: target +20.0 -> landed "
+            f"{[round(component_transform(adapter, n)[11] * 1000.0, 3) for n in new]}")
 
-    # Rebuild-stability: the pre-rebuild readings can hold while a later
-    # solve flips or dangles a copied mate (codex #220 round 3 -- the
-    # slice probe already guards this). One closing rebuild (asserted),
-    # then the mate count and stations must re-read unchanged.
+    # END-STATE VALIDATION (codex #220 rounds 3-5 converged here): every
+    # mutation -- ladder copies AND Q5 copies -- is done, ONE closing
+    # rebuild (asserted) solves the final assembly, and every invariant is
+    # proven on that post-rebuild end state. Nothing mutates after these
+    # checks, so no invariant can be silently invalidated by a later step.
     model = adapter.currentModel
     if not bool(adapter._attempt(lambda: model.EditRebuild3(), default=False)):
         raise RuntimeError(
-            "closing EditRebuild3 failed -- ladder stability unproven")
-    mates_post = await _mate_count(adapter)
-    zs_post = _bushing_zs(adapter)
-    if mates_post != mates_after or any(
-            abs(a - b) > 0.05 for a, b in zip(zs_post, zs)) or (
-            len(zs_post) != len(zs)):
+            "closing EditRebuild3 failed -- end state unproven")
+    # (1) Mate count: ladder copies + the two Q5 copies, all real.
+    mates_final = await _mate_count(adapter)
+    want_final = mates_before + SEED_MATES * (N_COPIES + 2)
+    if mates_final != want_final:
         raise RuntimeError(
-            f"ladder unstable across rebuild: mates {mates_after} -> "
-            f"{mates_post}, stations {zs} -> {zs_post}")
-    log("ladder stable across closing rebuild")
-
-    # Copied-mate HEALTH (mirrors the slice probe; codex #220 round 4):
-    # count and stations can hold while a copied mate sits suppressed or
-    # in a hard error state with its bushing parked at the inserted
-    # transform. Scan every mate the ladder copies added (runs BEFORE Q5
-    # so only ladder copies are scanned).
+            f"end-state mates {mates_final} != {want_final} "
+            f"(baselines {mates_before} + {SEED_MATES}x{N_COPIES} ladder "
+            f"+ {SEED_MATES}x2 Q5) -- a copied mate dropped or never landed")
+    # (2) Stations: the ladder AND both Q5 copies at the seed side (-20).
+    zs_final = _bushing_zs(adapter)
+    expected_final = sorted(expected + [-20.0, -20.0])
+    if (len(zs_final) != len(expected_final)
+            or any(abs(g - w) > 0.05
+                   for g, w in zip(zs_final, expected_final))):
+        raise RuntimeError(
+            f"end-state stations off: {zs_final} != {expected_final} "
+            f"(ladder drift, Q5 contract break, or rebuild snap-back)")
+    # (3) Health: every mate any copy added (ladder + Q5) unsuppressed and
+    # error-free -- count/stations can hold while a mate sits suppressed or
+    # hard-errored with its bushing parked at the inserted transform.
     unhealthy = []
     for m in ((await adapter.list_mates()).data or []):
         if m["name"] in pre_copy_names:
@@ -302,44 +313,9 @@ async def build(adapter) -> dict[str, str]:
                 f"{m['name']} (suppressed={m.get('suppressed')}, err={code})")
     if unhealthy:
         raise RuntimeError(
-            f"ladder copied mates unhealthy: {'; '.join(unhealthy)}")
-    log("ladder copied-mate health: all clean")
-
-    # Q5: FlipDimension semantics. Pinned 2026-07-09: on the Repeat path a
-    # re-valued dim's flip RESETS (the array is ignored -- both bits land a
-    # +20 target on the SEED's side, -20), and the copy inherits the seed's
-    # side of the anchor. Copy the seed (at Z=-62.77) to an unambiguous
-    # +20 mm target under both flip bits and ASSERT both land at -20 --
-    # a different landing means the CopyWithMates2 flip contract CHANGED
-    # (SW upgrade?) and everything built on the seed-side rule must be
-    # re-validated (codex #220: log-only here let a contract change exit
-    # 0). Runs AFTER Q2 so the +/-20 landings don't pollute the station
-    # comparison.
-    q5_names: list[str] = []
-    for flip in (False, True):
-        before = set(component_names(adapter))
-        _copy_with_mates(adapter, seed, 20.0, variant, flip_override=flip)
-        new = [n for n in component_names(adapter) if n not in before]
-        q5_names.extend(new)
-        landed = [round(component_transform(adapter, n)[11] * 1000.0, 3)
-                  for n in new]
-        log(f"Q5 flip={flip}: target +20.0 -> landed {landed}")
-        if len(landed) != 1 or abs(landed[0] - (-20.0)) > 0.05:
-            raise RuntimeError(
-                f"Q5 contract broke: flip={flip} target +20.0 landed "
-                f"{landed}, expected the seed side (-20.0) -- CopyWithMates2 "
-                f"flip semantics changed; re-validate the seed-side rule")
-    # The Q5 copies land after the ladder's closing rebuild, so their
-    # landings need their own rebuild-stability proof (codex #220 round 4):
-    # one asserted rebuild, then both must still read the seed side.
-    if not bool(adapter._attempt(lambda: model.EditRebuild3(), default=False)):
-        raise RuntimeError("post-Q5 EditRebuild3 failed -- Q5 stability unproven")
-    for n in q5_names:
-        z = component_transform(adapter, n)[11] * 1000.0
-        if abs(z - (-20.0)) > 0.05:
-            raise RuntimeError(
-                f"Q5 copy {n} moved on rebuild: z={z:.3f}, expected -20.0")
-    log("Q5 landings rebuild-stable")
+            f"end-state copied mates unhealthy: {'; '.join(unhealthy)}")
+    log(f"end-state validation: mates {mates_final} == {want_final}, "
+        f"stations on-plane incl. Q5 seed-side, copied-mate health clean")
     return {"verdict": "pass"}
 
 
