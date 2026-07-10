@@ -172,6 +172,7 @@ from _cwm import (  # noqa: E402
     copy_with_mates,
     external_mate_rows,
     mates_with_owners,
+    set_distance_flip,
 )
 
 ASM_NAME = "drive-train"
@@ -2140,12 +2141,16 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(
             f"cone seed axial dim {seed_dim['mm']:.3f} != measured"
             f" |d|={abs(d_seed):.3f} -- the seat formulation moved")
-    if d_seed <= 0 or seed_dim["flip"]:
+    if d_seed <= 0:
         raise RuntimeError(
-            f"cone seed axial seat d={d_seed:.2f} flip={seed_dim['flip']} --"
-            " the ladder needs a positive-station, flip=False seed (the"
-            " Repeat path resets re-valued dims to flip=False and lands on"
-            " the seed's side)")
+            f"cone seed axial seat d={d_seed:.2f} -- the ladder assumes"
+            " positive stations marching one way off the shaft's Front"
+            " plane (copies land on the seed's side)")
+    # The seed authors flip=True on the inclined frame (measured: the first
+    # epoch-3 build failed the old flip=False assert at d=37.30). The Repeat
+    # path RESETS a re-valued dim to flip=False, so each copy's dim must be
+    # healed back to the seed's side before the closing rebuild.
+    seed_flip = bool(seed_dim["flip"])
     seed_mates = component_mate_count(adapter, seed_cg)
     # The status REFERENCE is the seed's own reading, NOT fully-defined: the
     # cone cluster deliberately rides freed DOF (crank spin, platform swing --
@@ -2173,6 +2178,24 @@ async def build(adapter) -> dict[str, str]:
             if teeth in TIP_TEETH:  # the four hard yellow tip gears
                 await apply_component_color(adapter, cg, MUNTZ_YELLOW)
             cone_gears.append((teeth, cg))
+        if seed_flip:
+            # ONE tree walk for the whole batch (the walk is ~20 s -- never
+            # per-copy): find each copy's re-valued dim and set it back to
+            # the seed's flip side.
+            copies = {cg for _, cg in cone_gears[1:]}
+            healed = 0
+            for row in mates_with_owners(
+                    adapter, {"cone-gear", "cone-gear-shaft"}):
+                if row["type"] != "MateDistanceDim":
+                    continue
+                if not (row["instances"] & copies):
+                    continue
+                set_distance_flip(adapter, row["name"], True)
+                healed += 1
+            if healed != len(copies):
+                raise RuntimeError(
+                    f"flip heal covered {healed} copies, expected"
+                    f" {len(copies)} -- a copy's axial dim was not found")
         model = adapter.currentModel
         if not bool(adapter._attempt(lambda: model.EditRebuild3(),
                                      default=False)):
