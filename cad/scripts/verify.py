@@ -21,10 +21,10 @@ is the single fully-safe entry point that runs every gate.
                       gear ratios == config is verified at the RELEASE preflight,
                       not on every build.
   kinematics          NEEDS SOLIDWORKS. Kinematic pen-driver fidelity (plan F5):
-                      open pen.SLDASM (on a default-`free` build, first replay
-                      the deferred travel park spec and install the F5 equation
-                      transiently -- the shipped model has neither, its travel
-                      is a live free DOF; discarded unsaved), sweep the CrankDeg
+                      open pen.SLDASM (first author the travel drive mate
+                      transiently from the recorded DOF manifest and install
+                      the F5 equation -- the shipped model has neither, its
+                      travel is a live free DOF; discarded unsaved), sweep the CrankDeg
                       global, and assert the pen-marker tip traces
                       truth_model.pen_y (mapped to the physical half-stroke)
                       with NO force solver -- the computed-not-simulated
@@ -85,12 +85,11 @@ from _assembly import (
     check_no_interference,
     component_names,
     component_transform,
-    is_locked_build,
 )
 from _assembly_postbuild import (
+    author_dof_drives,
     discard_open_documents,
-    load_park_specs,
-    replay_park_specs,
+    load_dof_manifest,
 )
 from _common import (  # component iteration helpers (read-only)
     _flag_only,
@@ -123,13 +122,12 @@ CHANNEL_OWNER = "channel"
 # so a reduced build stays fully verified at its own scale.
 CHANNELS = _config.active_count()
 # The kinematic pen driver (plan F5) lives in this sub: its pen-rod travel mate
-# is equation-linked to a CrankDeg global through the chained Fourier sum. On a
-# `locked` build pen_driver.install ran at build time; on the default `free`
-# build the travel mate is a DEFERRED park driver, so the motion suite replays
-# it and installs the equation transiently before the sweep (discarded
-# unsaved). Either way it sweeps CrankDeg and proves the pen tip traces
-# truth_model.pen_y -- the computed-not-simulated summation, with no force
-# solver (docs/motion-policy.md).
+# is equation-linked to a CrankDeg global through the chained Fourier sum. The
+# shipped model leaves the travel a live free DOF, so the motion suite authors
+# the drive mate transiently from the recorded DOF manifest and installs the
+# equation before the sweep (discarded unsaved). It sweeps CrankDeg and proves
+# the pen tip traces truth_model.pen_y -- the computed-not-simulated summation,
+# with no force solver (docs/motion-policy.md).
 MOTION_OWNER = "pen"
 PEN_MARKER_STEM = "pen-marker"  # the carriage tip whose Y traces the curve
 # CrankDeg angles to sample; spans a full fundamental period (0..360) so both
@@ -572,37 +570,29 @@ def _expected_free_dof(name: str) -> int:
     drive-train frees the crank spin, the cone-platform swing, the pinion
     engage swing and the lift-rod/cam spin (4 DOF, PR8); channel frees 3 DOF
     per active channel (rocker swing + connecting-rod follow + amplitude-bar
-    slide), each a DEFERRED PARK_* park driver (recorded, not authored) when
-    built `free` (the default); a `locked` build authors them engaged -> 0.
-    Read straight from cad/config/machine/
-    build_lock.yaml -- the same source of truth the build used, and the freshness
-    guard (`_assert_fresh`) guarantees the saved model matches that config. Every
-    other assembly stays fully defined (0). The literal accessor tokenises
-    build_lock.yaml into this gate's recipe deps, so flipping the flag re-runs
-    verify too.
+    slide). Each freed DOF's drive spec is recorded in the assembly's DOF
+    manifest, never authored. Every other assembly stays fully defined (0).
     """
     if name == "drive-train":
-        return 0 if is_locked_build(_config.machine("build_lock", "drive_train")) else 4
+        return 4
     if name == "channel":
-        if is_locked_build(_config.machine("build_lock", "channel")):
-            return 0
         return 3 * _config.active_count()
     if name == "magnifier":
         # The freed lever knife-rock + the articulated lever-wire's swing/spin;
         # the wheel is COUPLED by the WIRE-1 yoke (no DOF of its own).
-        return 0 if is_locked_build(_config.machine("build_lock", "magnifier")) else 3
+        return 3
     if name == "paper-drive":
         # The freed crank (T12) spin; the knob T24 is belt-coupled and the platen
         # is rack-coupled (no DOF of their own).
-        return 0 if is_locked_build(_config.machine("build_lock", "paper_drive")) else 1
+        return 1
     if name == "summing":
         # The freed lever knife-edge rock; the boss-hook is lock-mated and rides it.
-        return 0 if is_locked_build(_config.machine("build_lock", "summing")) else 1
+        return 1
     if name == "pen":
-        # The freed carriage travel; the marker + pen-wire are lock-mated and ride
-        # it. The F5 pen-driver equation exists only in a `locked` build --
-        # verify:kinematics replays the deferred mate and installs it transiently.
-        return 0 if is_locked_build(_config.machine("build_lock", "pen")) else 1
+        # The freed carriage travel; the marker + pen-wire are lock-mated and
+        # ride it. The F5 pen-driver equation is installed transiently by
+        # verify:kinematics on the replayed drive mate.
+        return 1
     return 0
 
 
@@ -638,16 +628,61 @@ _REQUIRED_FREE_STEMS = {
     "pen": ("pen-rod", "pen-marker", "pen-wire"),
 }
 
+# EXACT-SET allowed lists (the sufficiency direction, replacing the retired
+# release park-closure): every under-constrained component's stem must be in
+# its assembly's list -- the freed DOF's own families PLUS everything coupled
+# to them. A stray (a forgotten mate on a structural part) fails soundness
+# loud instead of shipping. The lists are pinned from a live status dump of
+# the built assemblies (`gate.dof_free_necessity` names any stray explicitly,
+# so extending them after a deliberate coupling change is a one-line fix).
+_ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
+    # Every list pinned LIVE from built artefacts via
+    # diagnostics/dump_under_constrained.py (2026-07-09): channel read 80
+    # under-constrained = exactly these 4 stems x 20 channels; the other
+    # dumps are quoted per assembly below. Re-pin after a deliberate
+    # coupling change -- the gate names any stray.
+    "channel": ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever"),
+    "summing": ("summing-lever", "boss-hook"),
+    "pen": ("pen-rod", "pen-marker", "pen-wire"),
+    # 63 under-constrained, 22 families: the crank chain, the geared train,
+    # the platform + its riders (cone set, tip hardware) and the pinion
+    # engage rig -- all coupled to the 4 freed DOF.
+    "drive-train": (
+        "alignment-pinion", "cone-gear", "cone-gear-shaft", "cone-pivot-post",
+        "cone-swing-platform", "cone-tip-adjuster", "cone-tip-block",
+        "cone-tip-bushing", "cone-tip-pinch-screw", "crank-arm",
+        "crank-drive-gear", "crank-handle", "crank-pinion", "crankshaft",
+        "cylinder-gear", "pinion-arbor", "pinion-bracket", "pinion-cam",
+        "pinion-cam-pin", "pinion-handle", "pinion-lever", "pinion-lift-rod",
+    ),
+    # 8 under-constrained: the lever carries the clamp/vertical-rod/fixture
+    # group + the bracket; the wire and yoke-coupled wheel articulate with it.
+    "magnifier": (
+        "lever-wire", "magnifying-bracket", "magnifying-clamp",
+        "magnifying-lever", "magnifying-vertical-rod", "magnifying-wheel",
+        "output-fixture", "thumb-screw",
+    ),
+    # 39 under-constrained, 12 families: the crank T12 + belt-coupled knob
+    # cluster, the reduction train down to the feed pinion, and the
+    # rack-coupled platen group with its riders.
+    "paper-drive": (
+        "fillister-screw", "guide-lock", "platen", "platen-clip",
+        "platen-guide", "platen-paper", "platen-rack", "rack-pinion",
+        "transgear-feed-pinion", "transgear-knob-shaft", "transgear-pinion",
+        "transgear-removable",
+    ),
+}
+
 
 def _required_free_instances(name: str) -> tuple[str, ...]:
-    """Exact component instances that must read under-constrained, sourced from the
-    recorded park specs (each freed-DOF driver's ``verify`` target). Used where a
+    """Exact component instances that must read under-constrained, sourced from
+    the DOF manifest (each freed-DOF drive's ``verify`` target). Used where a
     stem is shared by several instances and only a SPECIFIC one carries the freed
     DOF -- paper-drive's three ``transgear-removable`` siblings, of which only the
     T12 crank is the operational input (codex #189 :679). Empty when there is no
-    park sidecar (a ``locked`` build, where free_dof is 0 and this is unused)."""
+    manifest sidecar."""
     out: list[str] = []
-    for spec in load_park_specs(name):
+    for spec in load_dof_manifest(name):
         target = spec.get("verify") or []
         if target and isinstance(target[0], str):
             out.append(target[0])
@@ -699,29 +734,29 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
 
     free_dof = _expected_free_dof(name)
     if free_dof:
-        # Default-free build: the freed-DOF park drivers are DEFERRED (not authored
-        # in the saved model -- see AGENTS.md "Default-free DOF"), so there is
-        # nothing to re-engage here. Prove NECESSITY only -- the operational DOF are
-        # genuinely free, and each freed DOF's component family must itself read
-        # under-constrained (the aggregate count alone passes on the crank chain
-        # even with the swing pinned -- codex 2026-07-04). The exact-count
-        # SUFFICIENCY closure runs in the release preflight
-        # (`preflight_release.py`), which replays the recorded specs.
+        # The freed operational DOF have no driver mates in the saved model
+        # (see AGENTS.md "Default-free DOF"). Prove NECESSITY -- the DOF are
+        # genuinely free, each freed DOF's component family itself reading
+        # under-constrained (the aggregate count alone passes on the crank
+        # chain even with the swing pinned -- codex 2026-07-04) -- and the
+        # EXACT SET: no component outside the allowed coupled families may
+        # read under-constrained (an unintended freedom fails here, the
+        # replacement for the retired release park-closure proof).
         # paper-drive alone has a SHARED stem (three transgear-removable siblings),
-        # so target the EXACT T12 crank instance from the recorded park spec
+        # so target the EXACT T12 crank instance from the recorded DOF manifest
         # (codex #189 :679); every other assembly keeps its unique stem families
         # (unchanged -- their DOF map to distinct part names).
         insts = _required_free_instances(name) if name == "paper-drive" else ()
         if name == "paper-drive" and not insts:
             # A free paper-drive MUST have recorded its crank_spin instance in
-            # .paper-drive.park.json. A missing/stale sidecar would silently fall
+            # .paper-drive.dof.json. A missing/stale sidecar would silently fall
             # back to the weak shared-stem check (which :679 showed passes even with
             # T12 pinned and a T24/T18 sibling loose). Fail loud instead (codex #189).
             report.gate(
                 f"{name}:dof-free-necessity",
                 lambda: _fail(
-                    "free paper-drive but .paper-drive.park.json records no crank_spin "
-                    "instance -- stale/missing park sidecar; refusing the weak stem "
+                    "free paper-drive but .paper-drive.dof.json records no crank_spin "
+                    "instance -- stale/missing DOF manifest; refusing the weak stem "
                     "fallback. Rebuild paper-drive to regenerate it."),
             )
         else:
@@ -730,7 +765,8 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
                 f"{name}:dof-free-necessity",
                 lambda: assert_free_dof_necessity(
                     adapter, free_dof, resolve=False,
-                    required_stems=stems, required_instances=insts),
+                    required_stems=stems, required_instances=insts,
+                    allowed_stems=_ALLOWED_FREE_STEMS.get(name, ())),
             )
     else:
         report.gate(
@@ -786,9 +822,9 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
     """Kinematic pen-driver fidelity (plan F5): sweep CrankDeg, prove the tip traces truth_model.
 
     pen.SLDASM's pen-rod travel mate is equation-linked to a CrankDeg global
-    through the chained Fourier sum (installed at build on a `locked` build;
-    replayed + installed transiently here on the default `free` build, whose
-    shipped model leaves the travel a live free DOF).
+    through the chained Fourier sum (authored + installed transiently here from
+    the recorded DOF manifest; the shipped model leaves the travel a live free
+    DOF).
     Setting CrankDeg and rebuilding must displace the pen-marker tip by exactly
     ``pen_driver.expected_tip_disp_mm(theta)`` from the rest pose -- the computed
     (not force-simulated) summation, mapped onto the physical half-stroke. The
@@ -808,38 +844,37 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     check(f"open {name}", await adapter.open_model(str(sldasm)))
     try:
-        if _expected_free_dof(name):
-            # Default-`free` build: the travel park driver is DEFERRED, so the
-            # shipped pen.SLDASM has neither the mate nor the F5 equation (the
-            # carriage is a live free DOF). Replay the recorded spec transiently
-            # (authors + renames PARK_pen_travel), install the equation on the
-            # replayed mate, then sweep as usual. The doc is mutated in memory
-            # only -- verify never saves, and the ``finally`` below discards it.
-            travel = [s for s in load_park_specs(name) if s.get("key") == "pen_travel"]
-            if len(travel) != 1:
-                report.failed.append((
-                    f"motion:{name}:park-spec",
-                    f"expected exactly 1 recorded pen_travel park spec, found "
-                    f"{len(travel)} -- rebuild pen",
-                ))
-                _telemetry.error(f"{name}: pen_travel park spec missing/ambiguous")
-                return
-            (travel_mate,) = await replay_park_specs(adapter, travel)
-            base_mm = abs(float(travel[0]["params"]["distance"]))
-            param = adapter._attempt(
-                lambda: adapter.currentModel.Parameter(f"D1@{travel_mate}"), default=None)
-            if param is None:
-                report.failed.append((
-                    f"motion:{name}:pen-driver-install",
-                    f"cannot read D1@{travel_mate} on the replayed travel mate",
-                ))
-                _telemetry.error(f"{name}: cannot read D1@{travel_mate}")
-                return
-            base_doc = float(_read_member(param, "Value"))  # IPS doc -> inches
-            info = await pen_driver.install(
-                adapter, travel_mate, base_doc, base_doc / base_mm)
-            log(f"pen driver (transient replay): {info['links']}-link chain, scale "
-                f"{info['scale_mm_per_unit']:.4g} mm/unit, rest {info['rest_deg']:g} deg")
+        # The shipped pen.SLDASM has neither the travel mate nor the F5
+        # equation (the carriage is a live free DOF). Author the drive mate
+        # transiently from the recorded DOF manifest (DRIVE_pen_travel),
+        # install the equation on it, then sweep as usual. The doc is mutated
+        # in memory only -- verify never saves, and the ``finally`` below
+        # discards it.
+        travel = [s for s in load_dof_manifest(name) if s.get("key") == "pen_travel"]
+        if len(travel) != 1:
+            report.failed.append((
+                f"motion:{name}:dof-manifest",
+                f"expected exactly 1 recorded pen_travel drive spec, found "
+                f"{len(travel)} -- rebuild pen",
+            ))
+            _telemetry.error(f"{name}: pen_travel drive spec missing/ambiguous")
+            return
+        (travel_mate,) = await author_dof_drives(adapter, travel)
+        base_mm = abs(float(travel[0]["params"]["distance"]))
+        param = adapter._attempt(
+            lambda: adapter.currentModel.Parameter(f"D1@{travel_mate}"), default=None)
+        if param is None:
+            report.failed.append((
+                f"motion:{name}:pen-driver-install",
+                f"cannot read D1@{travel_mate} on the transient travel mate",
+            ))
+            _telemetry.error(f"{name}: cannot read D1@{travel_mate}")
+            return
+        base_doc = float(_read_member(param, "Value"))  # IPS doc -> inches
+        info = await pen_driver.install(
+            adapter, travel_mate, base_doc, base_doc / base_mm)
+        log(f"pen driver (transient): {info['links']}-link chain, scale "
+            f"{info['scale_mm_per_unit']:.4g} mm/unit, rest {info['rest_deg']:g} deg")
         log(f"--- motion: {name} pen-driver sweep (rest {pen_driver.rest_crank_deg():g} deg, "
             f"stroke +-{pen_driver.stroke_half_mm():g} mm) ---")
         marker = _pen_marker_name(adapter)
@@ -900,8 +935,8 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
             lambda: assert_components_fully_defined(adapter),
         )
     finally:
-        # The sweep leaves the doc DIRTY (CrankDeg edits + rebuilds; on a free
-        # build also the replayed PARK_pen_travel mate + the F5 equations), and
+        # The sweep leaves the doc DIRTY (CrankDeg edits + rebuilds, plus the
+        # transient DRIVE_pen_travel mate + the F5 equations), and
         # a bare CloseAllDocuments(True) can still pop the save modal for a
         # dirty referenced child (the preflight/cut_release discard rationale).
         # Discard by title on EVERY exit -- including the early returns above --
@@ -911,7 +946,7 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
 
 # Magnifier live-chain sweep (WIRE 1). Small angles: the real machine's lever
 # tip arc is ~6 mm at r~215 (~1.6 deg of knife rock, engineerguy video 4/4).
-# POSITIVE offsets only: the rock park sits at exactly 0 deg, and an angle
+# POSITIVE offsets only: the rock rest angle sits at exactly 0 deg, and an angle
 # dimension cannot go negative -- a signed sweep would flip branches at 0.
 _CHAIN_SWEEP_DEG = (0.25, 0.5, 1.0)
 _CHAIN_AXIS_TOL_MM = 0.05  # wire centreline must hold the tangency radius
@@ -928,17 +963,9 @@ async def _verify_paper_feed_one(adapter: Any, report: Report) -> None:
     with the standard gates green. This wires that proof into ``verify:kinematics``:
     open paper-drive, drive the crank, and assert T24 / knob shaft / third gear /
     the 120T disc / the feed pinion all turn and the platen feeds (the probe's own
-    assertions). The driven (dirty) model is discarded without saving.
-
-    A `locked` build gets the SAME proof, not a skip: there the crank_spin park
-    driver is authored engaged (``PARK_crank_spin``) and the crank is fully
-    defined, so the probe first SUPPRESSES that driver in-session -- freeing
-    exactly the crank spin -- then drives as usual. The model is discarded
-    unsaved either way, so the shipped locked artefact keeps its 0-DOF closure
-    (proven by the release preflight). Without this, a locked release could
-    ship a wrong rack travel with every gate green: soundness only proves
-    0 DOF, the belt mate ratio is build-time-checked but the rack coefficient
-    and the end-to-end train are only proven by driving (codex #189)."""
+    assertions). The driven (dirty) model is discarded without saving. The belt
+    mate ratio is build-time-checked but the rack coefficient and the
+    end-to-end train are only proven by driving (codex #189)."""
     name = "paper-drive"
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
     if not sldasm.exists():
@@ -955,21 +982,9 @@ async def _verify_paper_feed_one(adapter: Any, report: Report) -> None:
     # whole train follows -- raising on any broken coupling (belt / lock / rack-pinion).
     from build_kinematic_probe import _drive_and_measure  # noqa: E402
     try:
-        if _expected_free_dof(name) == 0:
-            # Locked build: free the crank spin for the drive by suppressing its
-            # engaged park driver (session-only -- the doc is discarded unsaved).
-            from solidworks_mcp.adapters.base import SuppressMateParameters  # noqa: E402
-            check(
-                f"{name}: suppress PARK_crank_spin (locked build -- free the "
-                "crank for the drive probe)",
-                await adapter.suppress_mate(
-                    SuppressMateParameters(name="PARK_crank_spin", suppress=True)
-                ),
-            )
         await report.agate(f"{name}:crank-feed", lambda: _drive_and_measure(adapter))
     finally:
-        from preflight_release import _discard_open_documents  # noqa: E402
-        _discard_open_documents(adapter)
+        discard_open_documents(adapter)
 
 
 async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
@@ -977,10 +992,10 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
 
     Catches the regression class the 2026-07-04 side-view screenshot exposed
     (a rigidly locked wire's hub tip swept laterally ~10 mm off the hub as the
-    chain moved): replay ONLY the lever's ``lever_rock`` park spec (the wire's
-    swing/spin parks stay free -- that freedom IS the articulation), sweep the
-    knife rock over a realistic 0..1 deg, and at every pose assert the wire
-    still behaves like a wire:
+    chain moved): author ONLY the lever's ``lever_rock`` drive from the DOF
+    manifest (the wire's swing/spin stay free -- that freedom IS the
+    articulation), sweep the knife rock over a realistic 0..1 deg, and at every
+    pose assert the wire still behaves like a wire:
 
     * wire-rides-hub: the wire's centreline stays at the stand-off tangency
       radius of the wheel axis (hub r + wire r + clearance);
@@ -990,8 +1005,8 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     * restores-to-rest: driving back to the recorded rest angle returns the
       wheel and wire to the authored pose.
 
-    The transient park mate is discarded by closing the doc UNSAVED (the
-    release-preflight convention), so the shipped free model is untouched.
+    The transient drive mate is discarded by closing the doc UNSAVED, so the
+    shipped free model is untouched.
     """
     import build_lever_wire as _hw
     import build_magnifier_assembly as _mag
@@ -1003,16 +1018,14 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
         report.failed.append((f"chain:{name}:open", f"not built: {sldasm}"))
         _telemetry.error(f"{sldasm.name} not built -- run doit")
         return
-    if _expected_free_dof(name) == 0:
-        log("magnifier built `locked` -- live-chain sweep skipped (no free DOF)")
-        return
     if not _assert_fresh(name, report):
         return
 
-    specs = [s for s in load_park_specs(name) if s.get("key") == "lever_rock"]
+    specs = [s for s in load_dof_manifest(name) if s.get("key") == "lever_rock"]
     if len(specs) != 1:
         report.failed.append(
-            (f"chain:{name}:park-spec", f"expected 1 lever_rock park spec, got {len(specs)}"))
+            (f"chain:{name}:dof-manifest",
+             f"expected 1 lever_rock drive spec, got {len(specs)}"))
         return
 
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
@@ -1056,7 +1069,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
         d_hook = math.dist(hook, anchor)
         return d_axis, d_hook, pos
 
-    replayed = await replay_park_specs(adapter, specs)
+    replayed = await author_dof_drives(adapter, specs)
     mate = replayed[0]
     param = adapter._attempt(lambda: model.Parameter(f"D1@{mate}"), default=None)
     if param is None:

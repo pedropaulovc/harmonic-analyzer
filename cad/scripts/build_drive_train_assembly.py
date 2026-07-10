@@ -111,28 +111,20 @@ gear mate is each cylinder gear's sole rotational constraint, so it
 holds the cosine-setup phase without nudging the gear. The whole train
 is left with exactly ONE operational DOF -- the crank angle.
 
-Build mode (``machine/build_lock.yaml`` -> ``_config.machine("build_lock",
-"drive_train")``; default ``free``):
+The saved model is a WORKING kinematic model: the operational DOF (crank
+spin, cone-platform swing, pinion engage swing, lift-rod/cam spin) are left
+genuinely FREE -- no driver mates exist for them; each freed DOF's drive
+spec (entities + rest value + mate side) is recorded into the assembly's
+DOF manifest (``.drive-train.dof.json``) for the transient verify:kinematics
+replays. Every part is inserted on its exact solved transform, so the saved
+pose is deterministic without full definition.
 
-* ``free`` (DEFAULT) -- the saved model is a WORKING kinematic model: the
-  crank angle DOF is left UNLOCKED, so dragging the crank turns the whole
-  geared train (1 DOF). A single ``PARK_crank_angle`` angle mate (the
-  reproducibility "park driver") IS authored at the inserted rest pose but
-  SUPPRESSED, so it pins nothing.
-* ``locked`` -- an explicit opt-in pinned snapshot: the park driver stays
-  ENGAGED, the crank angle is fixed, every component is fully defined
-  (0 DOF), and the saved pose is byte-reproducible. This reproduces the
-  historical grounding exactly.
-
-The model is certified AS BUILT in whichever mode is configured:
-``assert_expected_free_dof(adapter, 1 if free else 0)`` runs the park-driver
-closure check (re-engage every ``PARK_*`` -> ForceRebuild -> assert 0
-under-constrained -> re-suppress -> restore), proving exactly the expected
-free DOF and nothing more; ``check_no_interference`` runs on the as-built
-pose. Zero interferences (tangent/coincident contact allowed -- bores ride
-their shafts). Gear-ratio sign is verified kinematically by a motion script.
-The verify ``soundness`` suite re-runs this same DOF gate plus every other
-gate on the as-built model; only the DOF gate adapts to the mode.
+The model is certified AS BUILT: ``assert_free_dof_necessity`` proves each
+freed DOF's component family genuinely reads under-constrained;
+``check_no_interference`` runs on the as-built pose. Zero interferences
+(tangent/coincident contact allowed -- bores ride their shafts). Gear-ratio
+sign is verified kinematically by a motion script. The verify ``soundness``
+suite re-runs this same DOF gate plus every other gate on the as-built model.
 
 Run (SolidWorks already open)::
 
@@ -153,34 +145,22 @@ from _transforms import ROT_Y_180, compose_rows, euler_from_rows
 from _assembly import (
     angle_driver,
     apply_component_color,
-    assert_expected_free_dof,
     assert_free_dof_necessity,
     check_no_interference,
     coincident_mate,
     component_transform,
     distance_driver,
     gear_mate,
-    is_locked_build,
     lock_mate,
     named_ref,
     parallel_mate,
     place_component,
+    reset_dof_manifest,
     save_assembly_and_images,
-    set_park_defer,
-    write_park_specs,
+    write_dof_manifest,
 )
 
 ASM_NAME = "drive-train"
-
-# Build mode (cad/config/machine/build_lock.yaml). `free` (default) leaves the
-# crank spin -- the single operational DOF -- UNLOCKED: its park driver is
-# authored but suppressed, so the saved model is a working kinematic model.
-# `locked` engages the park driver for a fully-defined reproducible snapshot.
-# The literal accessor tokenises to machine/build_lock.yaml in the doit/cache
-# digest, so flipping it rebuilds ONLY drive-train and keys the cache correctly.
-# `is_locked_build` rejects any value other than `free`/`locked` (a typo'd opt-in
-# must fail loud, not silently build free).
-LOCK = is_locked_build(_config.machine("build_lock", "drive_train"))
 
 Y_BASE_TOP = 50.8  # harmonic-base top face
 Y_DRIVE = Y_BASE_TOP + 54.0  # 104.8: cone big-end and arbor axes (ch30 GT
@@ -1474,9 +1454,9 @@ async def _place_on_shaft(
 
 
 async def build(adapter) -> dict[str, str]:
-    # `free` (default) DEFERS the freed-DOF park drivers (records, does not author);
-    # `locked` authors them engaged. Set before any *_driver(free_dof_key=...) call.
-    set_park_defer(not LOCK)
+    # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
+    # call: each freed DOF is recorded (never authored) and persisted below.
+    reset_dof_manifest()
     check("create_assembly", await adapter.create_assembly())
 
     # =================== structure (located, not fixed) ====================
@@ -1609,10 +1589,10 @@ async def build(adapter) -> dict[str, str]:
     # (located to the machine datums below); the lift rod is a REVOLUTE in
     # the blocks' dropped west bores carrying the two eccentric cams and the
     # lever (PR8 -- all semantically mated, spinning as one family on the
-    # deferred pinion_cam park). The tee handle is LOCKED to the arbor in
+    # freed pinion_cam DOF). The tee handle is LOCKED to the arbor in
     # the joints section (cross-pinned in the real machine) so the freed p2
     # swing carries it with the rig -- it was base-FIXED while the swing was
-    # park-driven, which PR8's freed swing would have left hanging in space
+    # pinned, which PR8's freed swing would have left hanging in space
     # (Codex catch, 2026-07-05).
     align_pinion = await place_component(
         adapter, "alignment-pinion",
@@ -1910,11 +1890,11 @@ async def build(adapter) -> dict[str, str]:
     # tip-end vertical pivot (ch.12, p.18). Pin the floated plate with three
     # locating drivers that leave ONLY the rotation about the pivot axis
     # ("swing pivot", Axis1): a Top-plane distance (upright + height) and the
-    # pivot axis's distance to the Right/Front planes (plan X/Z). Then a
-    # suppressible ANGLE PARK DRIVER holds today's ENGAGED orientation (the
-    # incline dihedral). The riders seat on the plate below and follow the
-    # swing, so the validated 20-gear mesh is untouched in `rest`; suppress
-    # the angle driver to articulate the disengage.
+    # pivot axis's distance to the Right/Front planes (plan X/Z). The swing
+    # angle itself stays FREE (its ANGLE drive spec -- today's ENGAGED incline
+    # dihedral -- is recorded into the DOF manifest). The riders seat on the
+    # plate below and follow the swing, so the validated 20-gear mesh is
+    # untouched in `rest`; drag the plate to articulate the disengage.
     plat_o = _org(adapter, platform)
     await distance_driver(
         adapter,
@@ -1934,10 +1914,9 @@ async def build(adapter) -> dict[str, str]:
         plat_o[2],
         label=f"cone-platform pivot-Z d={abs(plat_o[2]):.2f}", verify=(platform, plat_o),
     )
-    # The swing is a FREED operational DOF (user item 1): the park driver is
-    # DEFERRED in the default `free` build (recorded, not authored -- the
-    # plate swings freely between the gear mesh and the stop screw), authored
-    # engaged in a `locked` build. Same mechanism as the crank spin below.
+    # The swing is a FREED operational DOF (user item 1): its drive spec is
+    # recorded, not authored -- the plate swings freely between the gear mesh
+    # and the stop screw. Same mechanism as the crank spin below.
     await angle_driver(
         adapter,
         named_ref(f"Right Plane@{platform}", "PLANE"), named_ref("Right Plane", "PLANE"),
@@ -2186,10 +2165,9 @@ async def build(adapter) -> dict[str, str]:
         await _locate_to_datum(adapter, scr)
     # Front strap: revolute on the torque shaft (coincident pivot bore + axial
     # seat) -- the swing DOF. The parked-lean ANGLE driver is a FREED
-    # operational-DOF park driver now (PR8 item 3, ``free_dof_key``): the
-    # default `free` build records its spec instead of authoring it, so the
-    # saved model swings the drum in/out of mesh by hand; the release
-    # preflight replays it for the 0-DOF closure proof.
+    # operational DOF (PR8 item 3, ``free_dof_key``): its spec is recorded
+    # into the DOF manifest instead of authored, so the saved model swings
+    # the drum in/out of mesh by hand.
     fb, bb = pinion_brackets["front"], pinion_brackets["back"]
     fb_o = _org(adapter, fb)
     await coincident_mate(
@@ -2291,8 +2269,8 @@ async def build(adapter) -> dict[str, str]:
         )
     # Lift rod REVOLUTE (PR8): coaxial in the front block's dropped west bore
     # + an axial seat; its spin -- the lever/cam input -- is a FREED
-    # operational-DOF park driver (``free_dof_key``), recorded not authored in
-    # `free` builds. Top@rod vs the assembly RIGHT plane reads 90 at insert
+    # operational DOF (``free_dof_key``), recorded into the DOF manifest, not
+    # authored. Top@rod vs the assembly RIGHT plane reads 90 at insert
     # (mid-range, no flip singularity).
     lr_o = _org(adapter, lift_rod)
     await coincident_mate(
@@ -2450,13 +2428,11 @@ async def build(adapter) -> dict[str, str]:
     handle_o = _org(adapter, handle)
     a_arm = component_transform(adapter, arm)
     crank_angle = math.degrees(math.acos(max(-1.0, min(1.0, a_arm[0]))))
-    # The crank angle is a FREED operational-DOF park driver (``free_dof_key``). In
-    # the default `free` build it is NOT authored -- its resolved spec is recorded
-    # and re-authored transiently by the release preflight -- leaving the crank (and
-    # the whole keyed/geared train it pins) free to spin: ONE operational DOF, the
-    # working kinematic model. A `locked` build authors it engaged and renames it
-    # PARK_crank_angle for a fully-defined reproducible snapshot. Compute the BDC
-    # dihedral + handle verify target either way (they feed the recorded spec).
+    # The crank angle is a FREED operational DOF (``free_dof_key``): NOT
+    # authored -- its resolved spec is recorded into the DOF manifest for the
+    # transient kinematics replays -- leaving the crank (and the whole
+    # keyed/geared train it pins) free to spin: the working kinematic model.
+    # The BDC dihedral + handle verify target feed the recorded spec.
     await angle_driver(
         adapter,
         named_ref(f"Right Plane@{arm}", "PLANE"),
@@ -2468,23 +2444,16 @@ async def build(adapter) -> dict[str, str]:
         free_dof_key="crank_angle",
     )
 
-    # Certify the AS-BUILT model. free -> necessity only (the freed crank DOF is
-    # genuinely free; the exact-count closure runs in the release preflight, where
-    # the recorded spec is replayed); locked -> strict 0-DOF. All other checks run
-    # on the as-built model unchanged.
-    if LOCK:
-        await assert_expected_free_dof(adapter, 0)
-    else:
-        # FOUR freed operational DOF: the crank spin, the platform swing, the
-        # pinion engage swing and the lift-rod/cam spin (all deferred PARK
-        # drivers above). Each names its family: the aggregate count alone
-        # passes on the crank chain even with the others pinned (codex
-        # review 2026-07-04).
-        assert_free_dof_necessity(
-            adapter, 4,
-            required_stems=("crankshaft", "cone-swing-platform",
-                            "pinion-bracket", "pinion-lift-rod"))
-        write_park_specs(ASM_NAME)
+    # Certify the AS-BUILT model: FOUR freed operational DOF -- the crank
+    # spin, the platform swing, the pinion engage swing and the lift-rod/cam
+    # spin (all recorded above). Each names its family: the aggregate count
+    # alone passes on the crank chain even with the others pinned (codex
+    # review 2026-07-04). All other checks run on the as-built model.
+    assert_free_dof_necessity(
+        adapter, 4,
+        required_stems=("crankshaft", "cone-swing-platform",
+                        "pinion-bracket", "pinion-lift-rod"))
+    write_dof_manifest(ASM_NAME)
     check_no_interference(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)
 

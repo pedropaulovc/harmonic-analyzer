@@ -13,14 +13,14 @@ hanging platen (guides + locks), and the REAL six-gear power train:
       --(LOCK: stud stack)--> 12T DP30 feed pinion
       --(RACK-PINION mate, pi*10.16/rev)--> rack --(LOCK)--> platen
 
-Operational kinematics (default `free` build): the crank-end T12 sprocket spin
-is the ONE free operational DOF -- drag it and the whole feed train follows at
-1.596 mm of paper per crank revolution (T12/T24 mounted). Every stage is a real
-SolidWorks mate on real, geometrically meshed gears (the old NET rack-pinion
-shortcut across the fictitious rest gap is gone -- the latch arm pivots ON the
-stud, so the 12T:120T mesh is permanent and the old Appendix C #8 riddle
-dissolves). `locked` authors the crank-spin park engaged for a 0-DOF snapshot.
-Mode: cad/config/machine/build_lock.yaml (``paper_drive``).
+Operational kinematics: the crank-end T12 sprocket spin is the ONE free
+operational DOF -- drag it and the whole feed train follows at 1.596 mm of
+paper per crank revolution (T12/T24 mounted). Every stage is a real SolidWorks
+mate on real, geometrically meshed gears (the old NET rack-pinion shortcut
+across the fictitious rest gap is gone -- the latch arm pivots ON the stud, so
+the 12T:120T mesh is permanent and the old Appendix C #8 riddle dissolves).
+The crank-spin drive spec is recorded into the DOF manifest for the transient
+verify:kinematics replay, never authored.
 
 * ONE support bar (22 x 9 x 452, book p.62 "the bar that the platen rides on"),
   front face on the platen back, clamped to each column by a FRONT + BACK
@@ -62,7 +62,6 @@ from __future__ import annotations
 import math
 import sys
 
-import _config
 from _chain import (
     CENTRELINE_LEN,
     CRANK_CENTRE as CHAIN_CRANK_CENTRE,
@@ -84,7 +83,6 @@ from _common import (
 )
 from _assembly import (
     angle_driver,
-    assert_expected_free_dof,
     assert_free_dof_necessity,
     check_no_interference,
     component_names,
@@ -92,16 +90,15 @@ from _assembly import (
     component_transform,
     distance_driver,
     gear_mate,
-    is_locked_build,
     lock_mate,
     named_ref,
     place_component,
     rack_pinion_mate,
     reledger_to_solved,
     remap_front_to_machine_front,
+    reset_dof_manifest,
     save_assembly_and_images,
-    set_park_defer,
-    write_park_specs,
+    write_dof_manifest,
 )
 from _transforms import (  # noqa: E402
     IDENTITY,
@@ -113,15 +110,6 @@ from _transforms import (  # noqa: E402
 )
 
 ASM_NAME = "paper-drive"
-
-# Build mode (cad/config/machine/build_lock.yaml). `free` (default) leaves the
-# crank spin a FREE operational DOF (drag the crank sprocket and the whole
-# geared feed train follows); `locked` authors the spin-park engaged for a
-# byte-reproducible 0-DOF snapshot. Read as a STRING-LITERAL so the accessor
-# tokenises to machine/build_lock.yaml in the doit/cache digest (flipping the
-# mode rebuilds ONLY paper-drive). `is_locked_build` rejects any value other
-# than `free`/`locked`.
-LOCK = is_locked_build(_config.machine("build_lock", "paper_drive"))
 
 ROT_Y_180 = [[-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -1.0]]
 ROT_X_180 = [[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]]
@@ -616,9 +604,9 @@ async def build(adapter) -> dict[str, str]:
     _assert_knob_shaft_clearance()
     _assert_chain_layout()
 
-    # `free` (default) DEFERS the freed crank-spin park driver (records, does not
-    # author); `locked` authors it engaged. Set before any *_driver(free_dof_key=).
-    set_park_defer(not LOCK)
+    # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
+    # call: each freed DOF is recorded (never authored) and persisted below.
+    reset_dof_manifest()
     check("create_assembly", await adapter.create_assembly())
 
     # --- support bar + two-piece clamps ---------------------------------------
@@ -897,12 +885,11 @@ async def build(adapter) -> dict[str, str]:
         rack_travel_per_revolution=math.pi * FEED_PD,
         flip=True,
         label="platen feed (feed pinion on the rack)")
-    # (4) The crank spin is the FREED operational-DOF park driver. Deferred in
-    # the default `free` build (recorded, not authored) -> T12 spins free and
-    # drives the whole gear+rack train; authored + PARK_crank_spin in a
-    # `locked` build. A spur sprocket is symmetric so the spin pose is
-    # cosmetic; pin the local Right-plane dihedral (read live) like
-    # drive-train's crank_angle.
+    # (4) The crank spin is a FREED operational DOF: its drive spec is
+    # recorded into the DOF manifest, never authored -- T12 spins free and
+    # drives the whole gear+rack train. A spur sprocket is symmetric so the
+    # spin pose is cosmetic; pin the local Right-plane dihedral (read live)
+    # like drive-train's crank_angle.
     t12_o = component_origin(adapter, t12)
     a_t12 = component_transform(adapter, t12)
     crank_dihedral = math.degrees(math.acos(max(-1.0, min(1.0, a_t12[0]))))
@@ -919,22 +906,16 @@ async def build(adapter) -> dict[str, str]:
                           [-90.0, 0.0, 0.0], ROT_X_NEG90, configuration="T18",
                           label="transgear-removable (spare T18)")
 
-    # Certify the AS-BUILT model. `free` -> necessity only (the crank spin is
-    # genuinely free; the exact-count 0-DOF closure runs in the release preflight,
-    # where the recorded spec is replayed). `locked` -> strict 0-DOF. All other
-    # checks run on the as-built model unchanged.
-    if LOCK:
-        await assert_expected_free_dof(adapter, 0)
-    else:
-        # ONE freed operational DOF: the crank spin (the deferred PARK driver
-        # above), which drives the chain-coupled knob cluster, the gear-mated
-        # disc + feed pinion, and the rack-fed platen. Target the SPECIFIC T12
-        # crank instance (not the shared ``transgear-removable`` stem: the T24
-        # knob + T18 spare share it, so a stem check would pass even if T24
-        # were free and the crank T12 pinned -- codex #189).
-        assert_free_dof_necessity(
-            adapter, 1, required_instances=(t12,))
-        write_park_specs(ASM_NAME)
+    # Certify the AS-BUILT model. ONE freed operational DOF: the crank spin
+    # (its drive spec recorded above, never authored), which drives the
+    # chain-coupled knob cluster, the gear-mated disc + feed pinion, and the
+    # rack-fed platen. Target the SPECIFIC T12 crank instance (not the shared
+    # ``transgear-removable`` stem: the T24 knob + T18 spare share it, so a
+    # stem check would pass even if T24 were free and the crank T12 pinned --
+    # codex #189).
+    assert_free_dof_necessity(
+        adapter, 1, required_instances=(t12,))
+    write_dof_manifest(ASM_NAME)
     check_no_interference(adapter)
     # Machine coords put the output/paper side at -Z, so SolidWorks' native Front
     # renders the machine BACK (chain and transgear cluster mirrored). Re-base the
