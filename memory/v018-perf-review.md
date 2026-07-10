@@ -177,3 +177,48 @@ mates, one call per station) both PASS. The full multi-component contract, all m
    ⇒ channel rework: 18 stations × ~12 mates of CreateMate (~400–700s) collapse to
    ~1.2s/station + flip-set + ONE closing rebuild. Next: production rework of
    build_channel_assembly's moving loop + drive-train's cone-gear ladder on this recipe.
+
+**2026-07-09 round 3 — SHIPPED in build_channel_assembly (`_cwm.py`; channel 20ch
+standalone 418s vs ~1016s baseline, soundness 5/5, pose ledger 128/128).** New facts
+the FREE (no spin dims) slice forced, all measured on the seat:
+
+1. **Free-DOF copies carry a solver-state ATTRACTOR.** A copied chain whose operational
+   DOF are free lands parked at a solver-chosen pose, and EVERY later solve returns it
+   to one deterministic wrong pose from ANY start — even though the copied mates are
+   value/flip/alignment-identical to the seed's (IMate2 dump) and satisfied at the
+   design pose. Raw `Transform2` puts land all 4 parts exactly and the next
+   EditRebuild3 reverts them; `SetTransformAndSolve3` with the whole chain already
+   consistent at target reverts identically (the yank is NOT sibling inconsistency).
+   The solver re-solves copied chains from the mates' stored state, not from current
+   positions. Authored chains never show this: inserted at pose, solved at pose.
+2. **Driver-only landing picks the WRONG BRANCH.** Authoring the 3 transient drive
+   mates from the attractor pose solves each to the NEAREST solution branch: the
+   channel lever solved to the MIRROR intersection of its two J3 pin circles
+   (fulcrum-R127 x foot-R806.45; verified numerically — observed pin = design pin
+   reflected across the fulcrum->foot line), leaving ~1 mm residuals everywhere and a
+   false 'flip-seed MISS (off by 0.98 mm)'. A spin driver pins ONE coordinate, so it
+   cannot disambiguate the two branches by itself.
+3. **The landing recipe that works (production `_cwm` + build_channel_assembly):**
+   PUT the whole chain at the design pose (branch selection) -> author the 3 transient
+   drivers rocker-spin/bar-foot-X/rod-swing, RE-PUTTING the chain before each add
+   (every add re-seats the still-free siblings) -> delete the drivers -> ONE closing
+   EditRebuild3. The driven solves rewrite the stored state, so the freed DOF then
+   HOLD the design pose through ForceRebuild3/gates/save like an authored channel.
+   ~5s/copy + ~1.2s CopyWithMates2 vs 13-17s authored.
+4. **J3 amplitude flip: the sign rule is already correct** (flip=False for the
+   positive foot-X) — do NOT add 'bar AMPLITUDE drive foot X= . (amp + . )' to
+   `_FLIP_INVERT`; tried, lands the bar at -72.9 (146 mm off). The 0.98 mm 'MISS' was
+   fact 2, not a side flip. (Sub-mm 'flip MISS' reports = unconverged solve, not flip.)
+5. **The MateGroup tree walk is ~20 s per pass on the real channel assembly**
+   (`_mate_group_subfeatures` walks EVERY top-level feature with per-feature flagging;
+   per-copy snapshots are unaffordable). Cheap replacements: `IComponent2::GetMates`
+   (one call per component — the API docs' own remedy; counts + `IMate2`
+   Type/Flipped/DisplayDimension2 dims), `GetConstrainedStatus` (2=under, 4=over,
+   5/6=no/invalid solution) as the per-copy mate-health read, and `component_names`
+   (0.2 s). The tree walk survives ONLY in the once-per-seed slot audit.
+6. **Validation that sticks** (CopyWithMates2's return LIES): per-copy component-name
+   diff; post-rebuild `assert_component_placed` vs seed-pose-translated targets;
+   per-part GetMates count == seed's; per-part constrained status == under;
+   `reledger_to_solved` so the final pose-ledger sweep covers copies; DOF specs
+   recorded on the copies via the same driver helpers (labels VERBATIM like the
+   authored path so `_flip_sig` signatures match).
