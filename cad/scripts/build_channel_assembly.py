@@ -70,19 +70,19 @@ share a channel slice:
   * free-space structure with no in-subassembly contact partner (fulcrum-
     shaft, ball mounts, springs, spring-hooks) is datum-located by three
     orthogonal plane distances (the #110 frame-column idiom).
-Each of the rocker/rod/bar joints is pinned to its on-solution pose by a
-per-channel FREED park driver (rocker swing + rod follow + bar amplitude,
-DEFERRED in the default `free` build -- 3 live DOF per channel). The
-channel LEVER carries no pin of its own: the J5 foot-on-arc coupling (the
-bar's foot axis held at its as-solved radius from the rocker's arc-centre
-axis) closes the rocker -> bar -> lever chain, so dragging the rocker
-articulates the whole channel and the lever reads under-constrained WITH
-it (coupled, magnifier-wheel style, not separately freed). A `locked`
-build authors the three park drivers engaged; with the coupling that
-fully defines the lever too (0 DOF). Far-side mate flips are caught by
+Each of the rocker/rod/bar joints keeps its operational DOF genuinely
+FREE (rocker swing + rod follow + bar amplitude -- 3 live DOF per
+channel); each freed DOF's drive spec is recorded into the assembly's
+DOF manifest (`.channel.dof.json`) for the transient verify:kinematics
+replays, never authored. The channel LEVER carries no pin of its own:
+the J5 foot-on-arc coupling (the bar's foot axis held at its as-solved
+radius from the rocker's arc-centre axis) closes the rocker -> bar ->
+lever chain, so dragging the rocker articulates the whole channel and
+the lever reads under-constrained WITH it (coupled, magnifier-wheel
+style, not separately freed). Far-side mate flips are caught by
 reading back the origin and re-adding flipped. Saved state: every
-component fixed, fully defined (locked) or coupled-free (free), zero
-interference (face-flush and tangent contacts allowed).
+component fixed, fully defined or coupled-free, zero interference
+(face-flush and tangent contacts allowed).
 
 The cams themselves live in drive-train.SLDASM (integral with the
 cylinder gears); the frame, supports and top-frame ring in frame.SLDASM.
@@ -109,27 +109,24 @@ from _common import (
     run_build,
 )
 from _assembly import (
-    assert_expected_free_dof,
     assert_free_dof_necessity,
     bore_axis_ref,
     check_no_interference,
     coincident_mate,
-    collected_park_specs,
+    collected_dof_specs,
     component_names,
     component_transform,
     concentric_mate,
     distance_driver,
-    is_locked_build,
     named_ref,
-    PARK_PREFIX,
     parallel_mate,
     place_component,
     place_components_batch,
+    reset_dof_manifest,
     save_assembly_and_images,
-    set_park_defer,
     spin_driver,
     world_point,
-    write_park_specs,
+    write_dof_manifest,
 )
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows, rows_from_euler
 from solidworks_mcp.adapters.base import (
@@ -167,14 +164,6 @@ import os  # noqa: E402
 # machine (see _config.active_count). CHANNEL_COUNT env still overrides for tests.
 CHANNELS = int(os.environ.get("CHANNEL_COUNT", str(_config.active_count())))
 
-# Build mode (cad/config/machine/build_lock.yaml). `free` (default) leaves the
-# per-channel operational DOF UNLOCKED -- the rocker swings about its pivot, the
-# connecting rod follows on its pin, and the amplitude bar slides along the arc.
-# Each is authored as a suppressible PARK_* driver, suppressed in the free build
-# so the saved model articulates (the drive-train idiom, extended per channel).
-# `locked` engages every park driver for a fully-defined reproducible snapshot.
-# Literal stem -> tokenises build_lock.yaml into the doit/cache digest.
-LOCK = is_locked_build(_config.machine("build_lock", "channel"))
 Z0 = _config.machine("channels", "station_z0_mm")  # channel 0 gear plane (machine.yaml)
 PITCH = _config.machine("channels", "station_pitch_mm")
 ARM_MID_DZ = 0.8  # arm/bar/lever mid-planes at z_j + 0.8
@@ -663,7 +652,7 @@ async def _revolute(
     pivot_xy: tuple[float, float],
     label: str,
     axial: tuple = ("datum",),
-    park_spin: str | None = None,
+    free_spin: str | None = None,
     pin_spin: bool = True,
 ) -> Any:
     """Build one revolute joint pinned to its on-solution pose.
@@ -685,12 +674,12 @@ async def _revolute(
       a NEIGHBOR part's Front plane (each rocker j>=1 onto the pivot-bushing in
       the gap below it), so Z chains part->part instead of part->global datum.
 
-    ``park_spin`` (a key) renames the spin driver ``PARK_<key>`` so it becomes a
-    suppressible operational DOF (the rocker swing); ``None`` keeps it a hard pin.
-    ``pin_spin=False`` skips the spin driver entirely -- the caller couples the
-    residual spin through another mate (the channel lever's spin is closed by
-    the J5 foot-on-arc coupling, not a pin). Returns the spin mate dict (so the
-    caller can collect the park name), or ``None`` when the spin was skipped.
+    ``free_spin`` (a key) makes the spin a freed operational DOF (the rocker
+    swing): recorded into the DOF manifest, not authored. ``None`` keeps it a
+    hard pin. ``pin_spin=False`` skips the spin driver entirely -- the caller
+    couples the residual spin through another mate (the channel lever's spin is
+    closed by the J5 foot-on-arc coupling, not a pin). Returns the spin mate
+    dict, or ``None`` when the spin was skipped.
     """
     tgt = _org(adapter, comp)
     # Capture the off-axis (spin) target at the PLACED design pose, BEFORE the
@@ -722,9 +711,8 @@ async def _revolute(
         raise RuntimeError(f"_revolute: unknown axial spec {axial!r}")
     if not pin_spin:
         return None
-    # ``park_spin`` (a key) makes the spin a FREED operational-DOF park driver:
-    # deferred+recorded in a `free` build (the rocker swing stays free), authored
-    # engaged + PARK_<key> in a `locked` build. ``None`` keeps it a hard pin.
+    # ``free_spin`` (a key) records the spin into the DOF manifest instead of
+    # authoring it -- the rocker swing stays free. ``None`` keeps it a hard pin.
     spin = await spin_driver(
         adapter,
         named_ref(f"{off_axis_name}@{comp}", "AXIS"),
@@ -732,7 +720,7 @@ async def _revolute(
         (off_design[0], off_design[1]),
         label=f"{label} spin -> {off_design[0]:.1f},{off_design[1]:.1f}",
         verify=(comp, tgt),
-        free_dof_key=park_spin,
+        free_dof_key=free_spin,
     )
     return spin
 
@@ -958,9 +946,9 @@ async def build(adapter) -> dict[str, str]:
             leads=(SPRING_BOTTOM_LEAD, SPRING_TOP_LEAD), views=[], eye_axes=True)
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
-    # `free` (default) DEFERS the freed-DOF park drivers (records, does not author);
-    # `locked` authors them engaged. Set before any *_driver(free_dof_key=...) call.
-    set_park_defer(not LOCK)
+    # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
+    # call: each freed DOF is recorded (never authored) and persisted below.
+    reset_dof_manifest()
     check("create_assembly", await adapter.create_assembly())
 
     # Shafts. The pivot-shaft is inserted FIRST, so SolidWorks auto-fixes it as
@@ -1082,7 +1070,7 @@ async def build(adapter) -> dict[str, str]:
     # harmonic frequency) for the Motion study; their insertion pose seeds the
     # mate flip-recovery, so they are not batchable.
     grounded_specs: list[dict[str, Any]] = []
-    park_names: list[str] = []  # PARK_* operational-DOF drivers (suppressed if free)
+    free_dof_keys: list[str] = []  # freed operational DOF recorded in the manifest
     for j in range(CHANNELS):
         zj = z_station(j)
         z_mid = zj + ARM_MID_DZ
@@ -1123,8 +1111,8 @@ async def build(adapter) -> dict[str, str]:
         # J1 rocker revolute (shaft OD ↔ pivot bore). Axial Z chains off the
         # neighbour pivot-bushing in the gap below (distance = PITCH/2), except
         # channel 0 which is the single global Z anchor (#110 neighbour idiom,
-        # request #4). The spin is a PARK driver: suppressed in the free build so
-        # the rocker swings about its pivot (request #3).
+        # request #4). The spin is a freed DOF: recorded, not authored, so the
+        # rocker swings about its pivot (request #3).
         axial = (("distance", pivot_bushing_by_gap[j], PITCH / 2.0)
                  if j >= 1 else ("datum",))
         await _revolute(
@@ -1133,16 +1121,16 @@ async def build(adapter) -> dict[str, str]:
             concentric=True, off_axis_name="Axis2",
             off_axis_local=ROCKER_ROD_BORE_LOCAL, pivot_xy=pivot_w,
             label=f"J1 rocker ch{j:02d}", axial=axial,
-            park_spin=f"rocker_angle_{j:02d}",
+            free_spin=f"rocker_angle_{j:02d}",
         )
-        park_names.append(f"{PARK_PREFIX}rocker_angle_{j:02d}")
+        free_dof_keys.append(f"rocker_angle_{j:02d}")
         # J2 connecting-rod: a REAL revolute on the rocker's rod pin (request #2),
         # replacing the old design-pose pin to the global datums. The rod's pin
         # bore (Axis2@rod) is made coaxial with the rocker's rod bore (Axis2@rocker)
         # -- a coincident of two named axes (AddMate5 rejects concentric on axes);
-        # a distance to the rocker's Front plane pins Z; and a PARK spin driver on
-        # the rod's cam-ring bore (Axis1@rod) pins the swing about the pin, freed in
-        # the free build so the rod follows the rocker. NB the cam ring's external
+        # a distance to the rocker's Front plane pins Z; and the swing about the
+        # pin is a freed DOF (recorded on the rod's cam-ring bore Axis1@rod, not
+        # authored) so the rod follows the rocker. NB the cam ring's external
         # journal (the cylinder-gear lobe) lives at the TOP level only; this
         # channel-level revolute lets the ring float there -- validated channel-only
         # for now (the ~0.39 mm lobe slack the old _pin_design_pose guarded is a
@@ -1167,7 +1155,7 @@ async def build(adapter) -> dict[str, str]:
             verify=(rod, rod_tgt),
             free_dof_key=f"rod_swing_{j:02d}",
         )
-        park_names.append(f"{PARK_PREFIX}rod_swing_{j:02d}")
+        free_dof_keys.append(f"rod_swing_{j:02d}")
         # J4 lever revolute (fulcrum OD ↔ fulcrum bore). The lever shares the
         # channel mid-plane with the rocker (both mid-plane extruded, both at
         # z_mid), so its axial seat is a COINCIDENT mid-plane mate to the
@@ -1189,15 +1177,15 @@ async def build(adapter) -> dict[str, str]:
         # the top pin rides the arc CENTRE while the foot rides the R800 arc
         # itself (build_rocker_arm docstring): swinging the bar about the top pin
         # slides the foot ALONG the arc, and that swing IS the amplitude DOF
-        # (±88 mm seesaw, ch.15). The swing is pinned by ONE suppressible PARK
-        # DRIVER — a distance from the foot axis (Axis2@bar) to the assembly
-        # Right Plane, i.e. the foot's X = the amplitude position. Default =
-        # today's solved contact, so `rest` is bit-exact; suppressing it (the
-        # motion study / an amplitude config) frees the bar to swing = slide the
-        # foot along the arc. The driver MUST stay a part↔root-plane distance
-        # (NOT part↔part): the motion study's driver classifier only recognises
-        # dims that reference one real part + the sub root. This is the explicit
-        # form of the generic foot-X spin_driver the other revolutes use.
+        # (±88 mm seesaw, ch.15). The swing is a freed DOF whose drive spec —
+        # a distance from the foot axis (Axis2@bar) to the assembly Right
+        # Plane, i.e. the foot's X = the amplitude position — is recorded into
+        # the DOF manifest at today's solved contact, so a transient replay
+        # reproduces `rest` bit-exact. The spec MUST stay a part↔root-plane
+        # distance (NOT part↔part): the motion study's driver classifier only
+        # recognises dims that reference one real part + the sub root. This is
+        # the explicit form of the generic foot-X spin_driver the other
+        # revolutes use.
         bar_tgt = _org(adapter, bar)
         foot = world_point(adapter, bar, BAR_FOOT_LOCAL)
         amplitude = foot[0] - pivot_w[0]  # foot X relative to the rocker pivot
@@ -1216,23 +1204,23 @@ async def build(adapter) -> dict[str, str]:
             label=f"J3 bar ch{j:02d} axial coincident mid-plane <- {rocker}",
             verify=(bar, bar_tgt),
         )
-        # The foot-X driver is a FREED operational-DOF park driver (``free_dof_key``)
-        # so a `free` build defers it -> the bar swings about its top pin = slides
-        # the foot along the rocker arc, the amplitude DOF (request #1). It stays a
-        # part<->root-plane distance (the motion study's driver classifier only
-        # recognises one real part + the sub root), so it is NOT chained off a
-        # neighbour like the rocker axial.
+        # The foot-X driver is a freed operational DOF (``free_dof_key``): the
+        # bar swings about its top pin = slides the foot along the rocker arc,
+        # the amplitude DOF (request #1). It stays a part<->root-plane distance
+        # (the motion study's driver classifier only recognises one real part +
+        # the sub root), so it is NOT chained off a neighbour like the rocker
+        # axial.
         await distance_driver(
             adapter,
             named_ref(f"Axis2@{bar}", "AXIS"), named_ref("Right Plane", "PLANE"),
             foot[0],  # SIGNED: distance_driver abs()es the mate value but needs
             # the sign to seed the seat side (which side of Right Plane the foot
-            # is on) so the deferred spec records the correct flip for replay
-            label=f"J3 bar ch{j:02d} AMPLITUDE park foot-X={foot[0]:.2f} (amp {amplitude:+.1f})",
+            # is on) so the recorded spec carries the correct flip for replay
+            label=f"J3 bar ch{j:02d} AMPLITUDE drive foot-X={foot[0]:.2f} (amp {amplitude:+.1f})",
             verify=(bar, bar_tgt),
             free_dof_key=f"bar_amplitude_{j:02d}",
         )
-        park_names.append(f"{PARK_PREFIX}bar_amplitude_{j:02d}")
+        free_dof_keys.append(f"bar_amplitude_{j:02d}")
         # J5 foot-on-arc COUPLING: the bar's foot axis (Axis2@bar) is held at
         # its as-solved radius from the rocker's R800 arc-centre axis
         # (Axis3@rocker) -- two Z-parallel axes, ONE unambiguous distance (the
@@ -1346,32 +1334,25 @@ async def build(adapter) -> dict[str, str]:
         _verify_pattern_z(adapter, "pivot-bushing", z_gap_planes, "pivot-bushing bank")
         _verify_pattern_z(adapter, "lever-bushing", z_gap_planes, "lever-bushing bank")
 
-    # Default-free kinematic model: the per-channel operational DOF (rocker swing +
-    # rod follow + bar amplitude) are FREE because their park drivers were DEFERRED
-    # (recorded, not authored) -- nothing to suppress. `locked` authored them
-    # engaged for a fully-defined reproducible snapshot. free -> necessity only (the
-    # freed DOF are genuinely free; the exact-count closure runs in the release
-    # preflight against the recorded specs); locked -> strict 0-DOF.
-    if LOCK:
-        await assert_expected_free_dof(adapter, 0)
-    else:
-        n_deferred = len(collected_park_specs())
-        if n_deferred != len(park_names):
-            raise RuntimeError(
-                f"recorded {n_deferred} deferred park spec(s) but expected "
-                f"{len(park_names)} ({sorted(park_names)}) -- a free_dof_key was "
-                "dropped or double-counted"
-            )
-        # Three freed DOF per channel, one family each -- plus the channel
-        # lever, which must read under-constrained WITH the chain (the J5
-        # coupling closes it off the rocker; a frozen lever means the coupling
-        # died). The aggregate count alone cannot tell a pinned family from a
-        # free one (codex 2026-07-04).
-        assert_free_dof_necessity(
-            adapter, len(park_names),
-            required_stems=("rocker-arm", "connecting-rod", "amplitude-bar",
-                            "channel-lever"))
-        write_park_specs(ASM_NAME)
+    # Free kinematic model: the per-channel operational DOF (rocker swing +
+    # rod follow + bar amplitude) are FREE -- their drivers were recorded into
+    # the DOF manifest, never authored. Necessity gate: the freed DOF are
+    # genuinely free, one family per DOF (the aggregate count alone cannot
+    # tell a pinned family from a free one, codex 2026-07-04); the channel
+    # lever must read under-constrained WITH the chain (the J5 coupling closes
+    # it off the rocker; a frozen lever means the coupling died).
+    n_recorded = len(collected_dof_specs())
+    if n_recorded != len(free_dof_keys):
+        raise RuntimeError(
+            f"recorded {n_recorded} free-DOF spec(s) but expected "
+            f"{len(free_dof_keys)} ({sorted(free_dof_keys)}) -- a free_dof_key "
+            "was dropped or double-counted"
+        )
+    assert_free_dof_necessity(
+        adapter, len(free_dof_keys),
+        required_stems=("rocker-arm", "connecting-rod", "amplitude-bar",
+                        "channel-lever"))
+    write_dof_manifest(ASM_NAME)
     check_no_interference(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)
 

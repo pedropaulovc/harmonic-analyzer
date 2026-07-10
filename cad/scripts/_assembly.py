@@ -222,7 +222,7 @@ def part_path(part: str) -> str:
 # every gate green: mates satisfied, nothing interfering). Rotation is
 # checked too (Codex, 2026-07-05): a component can spin about its placed
 # origin -- e.g. the lift rod / cam collars on the freed pinion_cam DOF --
-# leaving the translation clean while the parked pose is visibly wrong.
+# leaving the translation clean while the rest pose is visibly wrong.
 # Builds never actuate the freed operational DOF, so the as-saved pose must
 # equal the authored rest pose for every component -- drift IS a defect.
 _POSE_LEDGER: dict[str, tuple[list[float], list[float]]] = {}
@@ -584,7 +584,8 @@ async def _mate(
     readback is structurally blind. The witness point (component-local, off the
     axis) separates the branches; its authored world position comes from the
     pose ledger (:func:`witness_from_ledger`) at build time and is persisted in
-    the deferred park spec for the preflight replay. Requires ``verify``.
+    the DOF-manifest spec for the transient kinematics replay. Requires
+    ``verify``.
 
     ``flip`` seeds the solve's side. The correct side is DETERMINISTIC per mate
     (the sign rule XOR the reference's :data:`_FLIP_INVERT` polarity -- see
@@ -807,17 +808,16 @@ async def distance_driver(
     explicit ``flip`` to override the sign rule. (Callers that pass a bare
     magnitude get ``flip=False``, the historic behaviour.)
 
-    ``free_dof_key`` marks this as a *freed operational-DOF* park driver (see the
-    Park drivers section): in a deferred (default-``free``) build it is RECORDED
-    as a spec and NOT authored -- leaving the slide free and saving the mate
-    solve -- while a ``locked`` build authors it engaged and renames it
-    ``PARK_<key>``. ``None`` is a hard pin, authored as before.
+    ``free_dof_key`` marks this as a *freed operational DOF* (see the Kinematic
+    DOF manifest section): the mate is NOT authored -- the slide stays free --
+    and its resolved spec is RECORDED into the DOF manifest for the transient
+    verify:kinematics replays. ``None`` is a hard pin, authored as before.
     """
     label = label or f"distance driver d={distance:g}"
     if flip is None:
         comp = verify[0] if verify else ""
         flip = _seed_flip(label, distance, _orient_suffix(adapter, comp))
-    return await _driver_or_defer(
+    return await _driver_or_record(
         adapter, "distance", ref_a, ref_b,
         label=label, verify=verify, free_dof_key=free_dof_key, flip=flip,
         distance=abs(distance),
@@ -836,17 +836,17 @@ async def angle_driver(
 ) -> Any:
     """An angle mate used as a driving dimension pinning one rotational DOF.
 
-    ``free_dof_key`` marks this as a *freed operational-DOF* park driver: in a
-    deferred (default-``free``) build it is RECORDED and NOT authored (leaving the
-    rotation free); a ``locked`` build authors it engaged and renames it
-    ``PARK_<key>``. See :func:`distance_driver` and the Park drivers section.
+    ``free_dof_key`` marks this as a *freed operational DOF*: the mate is NOT
+    authored (the rotation stays free) and its resolved spec is RECORDED into
+    the DOF manifest. See :func:`distance_driver` and the Kinematic DOF
+    manifest section.
 
     ``witness_local`` (issue #154): an angle mate is satisfied at EITHER of two
     leans, and for a ``verify`` component whose origin sits ON the rotation axis
     the origin readback cannot tell them apart. Pass a component-local point off
     the axis; its authored world position (pose ledger) becomes the branch
-    witness, checked when the driver is authored AND recorded into a deferred
-    park spec so the preflight replay is guarded the same way.
+    witness, checked when the driver is authored AND recorded into the DOF
+    manifest so the transient replay is guarded the same way.
     """
     label = label or f"angle driver a={angle:g}"
     witness = None
@@ -854,7 +854,7 @@ async def angle_driver(
         if verify is None:
             raise RuntimeError(f"{label!r}: witness_local requires verify")
         witness = (list(witness_local), witness_from_ledger(verify[0], witness_local))
-    return await _driver_or_defer(
+    return await _driver_or_record(
         adapter, "angle", ref_a, ref_b,
         label=label, verify=verify, free_dof_key=free_dof_key,
         witness=witness,
@@ -873,11 +873,11 @@ async def spin_driver(
 ) -> Any:
     """Pin a revolute's spin via a distance from an off-pivot bore to a plane.
 
-    ``free_dof_key`` (a park key) forwards to the underlying :func:`distance_driver`
-    so the spin becomes a *freed operational-DOF* park driver: recorded (not
-    authored) in a deferred ``free`` build, engaged + ``PARK_<key>`` in a ``locked``
-    build. The resolved plane + target distance ARE the recorded spec, so the
-    replay re-authors the same pin without re-deriving the sensitivity choice.
+    ``free_dof_key`` forwards to the underlying :func:`distance_driver` so the
+    spin becomes a *freed operational DOF*: recorded into the DOF manifest, not
+    authored. The resolved plane + target distance ARE the recorded spec, so a
+    transient replay re-authors the same pin without re-deriving the
+    sensitivity choice.
 
     A plane-plane *angle* mate is unreliable here: a mirrored part flips its
     plane normals, so the true dihedral is ``180 - tilt`` and both flip
@@ -1347,75 +1347,64 @@ def assert_components_fully_defined(adapter: Any, *, resolve: bool = True) -> No
 
 
 # ---------------------------------------------------------------------------
-# Park drivers -- freed-operational-DOF "reproducibility lock" mates
+# Kinematic DOF manifest -- freed operational DOF, recorded not authored
 # ---------------------------------------------------------------------------
-# A PARK driver pins one OPERATIONAL degree of freedom (e.g. the crank spin)
-# purely so a fully-defined snapshot has a deterministic pose. In the default
-# `free` build these freed-DOF drivers are NOT authored at all -- authoring each
-# is an expensive mate solve that is only suppressed away again -- so the build
-# is faster and the saved model leaves the DOF genuinely free (a working
-# kinematic model). Instead each driver is RECORDED as a resolved spec
-# (``free_dof_key`` on the ``*_driver`` helpers) and re-authored transiently by
-# the release preflight (``preflight_release.py`` -> :func:`assert_park_closure`),
-# which proves the drivers are the sole freedom then DISCARDS the model without
-# saving. A `locked` build authors them engaged and renames each to a
-# ``PARK_<key>`` feature (the fully-defined byte-reproducible snapshot).
+# The build leaves every OPERATIONAL degree of freedom (crank spin, rocker
+# swing, carriage travel, ...) genuinely FREE: no driver mate is authored for
+# it, because each part is inserted on its exact Python-solved transform and
+# the real contact mates hold it there -- the saved pose is deterministic
+# without full definition. What the build DOES record is a manifest entry per
+# freed DOF (``free_dof_key`` on the ``*_driver`` helpers): the driving entity
+# refs, rest value and resolved mate side, persisted as a ``.<stem>.dof.json``
+# sidecar. That manifest is the machine-readable answer to "which entity
+# drives this DOF at what rest value" -- ``verify:kinematics`` replays entries
+# TRANSIENTLY (``_assembly_postbuild.author_dof_drives``) to sweep the
+# mechanism (the pen Fourier sweep, the magnifier chain proof), always
+# discarding the model unsaved.
 #
-# NB "freed-DOF park driver" (deferred here) is distinct from an ENGAGED setup
-# driver held at a pose in the free model (e.g. the pinion-swing PARK on the
-# drive-train): those do real work in the saved model, so they are authored as
-# usual (plain ``mark_park_driver``), never deferred.
-PARK_PREFIX = "PARK_"
-
-# Deferral state (set once per build via :func:`set_park_defer`). When on, a
-# ``*_driver`` call carrying a ``free_dof_key`` records its resolved spec into
-# ``_PARK_SPECS`` instead of solving the mate.
-_PARK_DEFER = False
-_PARK_SPECS: list[dict[str, Any]] = []
+# (History: this used to be the two-sided "park driver" machinery -- deferred
+# PARK_* mates, a `locked` build mode authoring them engaged, and a release
+# 0-DOF closure proof. Killed 2026-07-09: placement already makes the build
+# deterministic, the closure re-proved what insertion fixed, and the replay
+# path was a recurring bug source. Soundness now proves the free-DOF SET
+# exactly instead -- see ``assert_free_dof_necessity``.)
+_DOF_SPECS: list[dict[str, Any]] = []
 
 
-def set_park_defer(defer: bool) -> None:
-    """Enable/disable deferral of freed-operational-DOF park drivers and reset the
-    recorded-spec buffer. Call once near the top of a build: ``set_park_defer(not
-    LOCK)`` -- a ``free`` build defers+records, a ``locked`` build authors inline."""
-    global _PARK_DEFER
-    _PARK_DEFER = bool(defer)
-    _PARK_SPECS.clear()
+def reset_dof_manifest() -> None:
+    """Clear the recorded free-DOF specs. Call once near the top of a build so a
+    multi-build process never leaks one assembly's manifest into the next."""
+    _DOF_SPECS.clear()
 
 
-def park_deferred() -> bool:
-    """True when freed-DOF park drivers are being deferred (a ``free`` build)."""
-    return _PARK_DEFER
+def collected_dof_specs() -> list[dict[str, Any]]:
+    """The free-DOF specs recorded so far this build (a shallow copy)."""
+    return list(_DOF_SPECS)
 
 
-def collected_park_specs() -> list[dict[str, Any]]:
-    """The park-driver specs recorded so far this build (a shallow copy)."""
-    return list(_PARK_SPECS)
-
-
-def _record_park_spec(
+def _record_dof_spec(
     key: str, kind: str, entities: list[Any],
     *, verify: tuple[str, list[float]] | None = None,
     witness: tuple[list[float], list[float]] | None = None, flip: bool = False,
     **params: Any,
 ) -> None:
-    """Record one deferred freed-DOF park driver as a machine-independent spec
+    """Record one freed operational DOF as a machine-independent drive spec
     (entity refs by name + geometry-derived scalars + the resolved mate SIDE),
-    for replay in the preflight.
+    for transient replay by the verify:kinematics sweeps.
 
     ``flip`` is the sign-derived seat side the driver helper already resolved
     (:func:`_seed_flip` for distance/spin drivers; ``False`` for angle drivers).
-    Recording it lets :func:`replay_park_specs` re-author on the SAME side in one
-    solve -- extending #185's flip-free seeding into the replay path, so the
-    preflight park closure no longer leans on the flip-recovery net (the wire-
-    swing replay hit a hard error-47 far-side add before this, 2026-07-05).
+    Recording it lets :func:`_assembly_postbuild.author_dof_drives` re-author on
+    the SAME side in one solve (#185's flip-free seeding, extended to the replay
+    path -- the wire-swing replay hit a hard error-47 far-side add before this,
+    2026-07-05).
 
     ``witness`` (issue #154) is the resolved off-origin branch witness
-    ``(local_mm, expected_world_mm)`` -- persisted so the preflight replay of a
+    ``(local_mm, expected_world_mm)`` -- persisted so the transient replay of a
     flip-ambiguous angle driver is guarded exactly like the build would be (the
     replay runs in a fresh process with no pose ledger, so the expected world
     position must ride the spec)."""
-    _PARK_SPECS.append({
+    _DOF_SPECS.append({
         "key": key,
         "kind": kind,
         "entities": [e.model_dump() for e in entities],
@@ -1430,114 +1419,58 @@ def _record_park_spec(
             for k, v in params.items()
         },
     })
-    _telemetry.debug(f"deferred PARK_{key}: {kind} recorded (not authored, flip={flip})")
+    _telemetry.debug(f"dof manifest {key}: {kind} drive recorded (not authored, flip={flip})")
 
 
-async def _driver_or_defer(
+async def _driver_or_record(
     adapter: Any, kind: str, ref_a: Any, ref_b: Any,
     *, label: str, verify: tuple[str, list[float]] | None,
     free_dof_key: str | None,
     witness: tuple[list[float], list[float]] | None = None,
     flip: bool = False, **params: Any,
 ) -> Any:
-    """Author a driver mate, OR (freed-DOF key + deferral on) record it and skip.
+    """Author a driver mate, OR (a ``free_dof_key``) record it into the DOF
+    manifest and skip -- the DOF stays free in the saved model.
 
-    Returns the mate result dict when authored; a ``{"deferred_park": key}``
-    sentinel when deferred. When a ``free_dof_key`` is authored (``locked`` build
-    or a normal non-deferred run) the feature is renamed ``PARK_<key>`` so the
-    tree documents it and the DOF gate can find it. ``flip`` seeds the authored
-    mate's side (see :func:`_mate`) AND is recorded in the deferred spec, so the
-    replay re-authors on the same resolved side (flip-free, like the build)."""
-    if free_dof_key is not None and _PARK_DEFER:
-        _record_park_spec(
+    Returns the mate result dict when authored; a ``{"free_dof": key}`` sentinel
+    when recorded. ``flip`` seeds the authored mate's side (see :func:`_mate`)
+    AND is recorded in the spec, so a transient replay re-authors on the same
+    resolved side (flip-free, like the build)."""
+    if free_dof_key is not None:
+        _record_dof_spec(
             free_dof_key, kind, [ref_a, ref_b],
             verify=verify, witness=witness, flip=flip, **params)
-        return {"deferred_park": free_dof_key, "name": ""}
-    res = await _mate(
+        return {"free_dof": free_dof_key, "name": ""}
+    return await _mate(
         adapter, label, kind, [ref_a, ref_b],
         verify=verify, witness=witness, flip=flip, **params
     )
-    if free_dof_key is not None:
-        await mark_park_driver(adapter, res, free_dof_key)
-    return res
 
 
-def park_spec_path(name: str) -> Any:
-    """Sidecar path (next to ``<name>.SLDASM``) holding the deferred park-driver
+def dof_manifest_path(name: str) -> Any:
+    """Sidecar path (next to ``<name>.SLDASM``) holding the free-DOF drive
     specs. ``name`` is the dashed assembly stem (``"drive-train"``)."""
-    return OUT_SLDASM / f".{name}.park.json"
+    return OUT_SLDASM / f".{name}.dof.json"
 
 
-def write_park_specs(name: str) -> Any:
-    """Persist this build's recorded park specs beside ``<name>.SLDASM`` (a doit
-    assembly output that rides the remote cache). With nothing deferred (a
-    ``locked`` build) any stale sidecar is removed and ``None`` returned."""
-    path = park_spec_path(name)
-    if not _PARK_SPECS:
+def write_dof_manifest(name: str) -> Any:
+    """Persist this build's recorded free-DOF specs beside ``<name>.SLDASM`` (a
+    doit assembly output that rides the remote cache). With nothing recorded any
+    stale sidecar is removed and ``None`` returned."""
+    path = dof_manifest_path(name)
+    if not _DOF_SPECS:
         path.unlink(missing_ok=True)
         return None
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"stem": name, "specs": _PARK_SPECS}, indent=2))
+    path.write_text(json.dumps({"stem": name, "specs": _DOF_SPECS}, indent=2))
     _telemetry.success(
-        f"wrote {len(_PARK_SPECS)} deferred park spec(s) -> {path.name}"
+        f"wrote {len(_DOF_SPECS)} free-DOF drive spec(s) -> {path.name}"
     )
     return path
 
 
 
 
-
-
-async def mark_park_driver(adapter: Any, mate: Any, key: str) -> str:
-    """Rename a just-created park-driver mate feature to ``PARK_<key>``.
-
-    ``mate`` is the dict a ``*_driver`` helper returns (it carries the SW
-    feature ``name``). Renaming uses ``IFeature::Name`` (a settable property)
-    via the adapter's ``rename_feature`` -- which resolves mates through
-    ``FeatureByName`` like ``delete_mate`` does. ``PARK_<key>`` must be unique
-    in the tree (distinct keys) and free of SW-reserved characters. Returns the
-    new name.
-    """
-    from solidworks_mcp.adapters.base import RenameFeatureParameters
-
-    old = mate.get("name") if isinstance(mate, dict) else str(mate)
-    if not old:
-        raise RuntimeError(f"mark_park_driver: mate has no resolvable name ({mate!r})")
-    new = f"{PARK_PREFIX}{key}"
-    check(
-        f"mark park driver {old!r} -> {new!r}",
-        await adapter.rename_feature(RenameFeatureParameters(old_name=old, new_name=new)),
-    )
-    return new
-
-
-async def find_park_drivers(adapter: Any) -> list[tuple[str, bool]]:
-    """``(name, suppressed)`` for every top-level ``PARK_*`` mate of the active
-    assembly (via ``list_mates``, which returns ``name``/``type``/``suppressed``)."""
-    mates = check("list mates", await adapter.list_mates())
-    return [
-        (str(m["name"]), bool(m["suppressed"]))
-        for m in mates
-        if str(m["name"]).startswith(PARK_PREFIX)
-    ]
-
-
-BUILD_LOCK_MODES = ("free", "locked")
-
-
-def is_locked_build(mode: str) -> bool:
-    """``True`` for ``locked``, ``False`` for ``free``; raise on anything else.
-
-    The ``build_lock`` flag is read in two places (the build script and verify);
-    routing both through here means a typo (``Locked``/``lock``) fails LOUD at the
-    point of use instead of silently degrading a pinned-snapshot request to a free
-    build.
-    """
-    if mode not in BUILD_LOCK_MODES:
-        raise RuntimeError(
-            f"invalid build_lock mode {mode!r}; expected one of {BUILD_LOCK_MODES}"
-        )
-    return mode == "locked"
 
 
 def _under_constrained_components(adapter: Any, *, resolve: bool = True) -> list[str]:
@@ -1565,96 +1498,6 @@ def _under_constrained_components(adapter: Any, *, resolve: bool = True) -> list
     return under
 
 
-async def assert_expected_free_dof(adapter: Any, expected_count: int) -> None:
-    """Assert the assembly has EXACTLY ``expected_count`` free operational DOF,
-    pinned only by suppressed ``PARK_*`` park-driver mates.
-
-    The currently-suppressed ``PARK_*`` mates ARE the intended free DOF (each
-    pins one). SolidWorks exposes no scalar DOF count, so the count is proven from
-    BOTH sides -- necessity and sufficiency -- so neither a dead nor a redundant
-    park driver can falsely certify a frozen model as kinematic:
-
-    * NECESSITY (the free pose is genuinely free): in the as-built (suppressed)
-      pose, at least ``expected_count`` top-level components read under-constrained.
-      Suppressing a park driver that another mate already pins would free nothing,
-      and this catches it -- the closure alone would not.
-    * SUFFICIENCY / count (the drivers are the SOLE freedom): re-engage every park
-      driver, re-solve, and assert the model is then fully defined (0
-      under-constrained), so the true DOF count equals the number suppressed.
-
-    The suppression state is ALWAYS restored (``finally``), leaving the model
-    exactly as found (the as-built free pose) even if the closure check raises --
-    so a caught failure never leaves later gates running against a locked/dirty
-    model.
-
-    ``expected_count == 0`` (a locked build, or an assembly with no parked DOF)
-    has nothing to cycle and reduces to a plain
-    :func:`assert_components_fully_defined`.
-    """
-    from solidworks_mcp.adapters.base import SuppressMateParameters
-
-    asm = adapter.currentModel
-    # This gate cycles EVERY park driver (suppress -> re-engage -> re-suppress),
-    # each a COM round-trip, plus three ForceRebuild3s -- for `channel` that is
-    # ~60 drivers, so the gate is minutes of wall-clock. Segment the phases into
-    # named child spans (mirroring gate.dof/gate.health) so the waterfall shows
-    # WHERE the time goes -- discovery vs the necessity read vs the two
-    # suppress/re-suppress loops -- instead of one opaque multi-minute span.
-    with _telemetry.span("gate.dof_expected_free") as gsp:
-        with _telemetry.span("park.discover") as dsp:
-            parked = await find_park_drivers(adapter)
-            dsp.set_attribute("park_drivers", len(parked))
-        free = [name for name, suppressed in parked if suppressed]
-        gsp.set_attribute("park_drivers", len(parked))
-        gsp.set_attribute("expected_free_dof", expected_count)
-        gsp.set_attribute("free_dof", len(free))
-        if len(free) != expected_count:
-            raise RuntimeError(
-                f"expected {expected_count} free DOF (suppressed {PARK_PREFIX}* mates) "
-                f"but found {len(free)}: {sorted(free)}"
-            )
-        # NECESSITY: the as-built (suppressed) pose must actually carry the freedom.
-        # One spin DOF frees a whole chain, so >= expected_count under-constrained.
-        if expected_count:
-            with _telemetry.span("park.necessity") as nsp:
-                free_under = _under_constrained_components(adapter)
-                nsp.set_attribute("free_under_constrained", len(free_under))
-            gsp.set_attribute("free_under_constrained", len(free_under))
-            if len(free_under) < expected_count:
-                raise RuntimeError(
-                    f"expected >= {expected_count} under-constrained component(s) in the "
-                    f"free pose after suppressing {sorted(free)} but found "
-                    f"{len(free_under)}: suppressing the park driver(s) freed nothing -- "
-                    "another mate still pins the DOF (the 'free' model is actually frozen)"
-                )
-        # SUFFICIENCY: re-engage the park drivers and prove the model is then rigid,
-        # ALWAYS restoring the as-built free pose (suppress moves no part).
-        try:
-            with _telemetry.span("park.engage") as esp:
-                esp.set_attribute("drivers", len(free))
-                for name in free:
-                    check(
-                        f"unsuppress {name}",
-                        await adapter.suppress_mate(SuppressMateParameters(name=name, suppress=False)),
-                    )
-                adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
-            assert_components_fully_defined(adapter)  # 0 under-constrained, drivers engaged
-        finally:
-            with _telemetry.span("park.restore") as rsp:
-                rsp.set_attribute("drivers", len(free))
-                for name in free:
-                    check(
-                        f"re-suppress {name}",
-                        await adapter.suppress_mate(SuppressMateParameters(name=name, suppress=True)),
-                    )
-                adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
-        _telemetry.success(
-            f"{len(free)} free DOF confirmed (necessity: free pose under-constrained; "
-            f"sufficiency: re-engaged {len(free)} park driver(s) -> 0 under-constrained); "
-            "restored free pose"
-        )
-
-
 def assert_free_dof_necessity(
     adapter: Any,
     expected_count: int,
@@ -1662,18 +1505,17 @@ def assert_free_dof_necessity(
     resolve: bool = True,
     required_stems: tuple[str, ...] = (),
     required_instances: tuple[str, ...] = (),
+    allowed_stems: tuple[str, ...] = (),
 ) -> None:
-    """Build/soundness DOF gate for a default-``free`` model whose freed park
-    drivers are DEFERRED (not authored -- see the Park drivers section).
+    """Build/soundness DOF gate for a model with freed operational DOF.
 
-    Because the park mates do not exist in the saved model there is nothing to
-    re-engage, so this proves only NECESSITY: at least ``expected_count`` top-level
-    components read under-constrained, i.e. the operational DOF genuinely ARE free
-    (a mate did not silently freeze one). The exact-count SUFFICIENCY proof --
-    author the drivers -> 0 DOF -- moves to the release preflight
-    (:func:`assert_park_closure`), which is where the recorded specs exist. This is
-    the deliberate build-time/release-time split: a fast build stays fast (no park
-    solves on every run), the strict closure runs at release (opt-in, infrequent).
+    The freed DOF have no driver mates in the saved model (see the Kinematic
+    DOF manifest section), so the gate reads the component constrained-status
+    walk and proves the free SET from both directions:
+
+    * NECESSITY: at least ``expected_count`` top-level components read
+      under-constrained, i.e. the operational DOF genuinely ARE free (a mate
+      did not silently freeze one).
 
     The aggregate count alone cannot tell WHICH DOF is free -- the crank spin
     alone under-constrains several crank-chain components, so a count check
@@ -1688,6 +1530,15 @@ def assert_free_dof_necessity(
     the T12 crank spin is the operational DOF; a stem check would pass if the T24
     were free and the T12 pinned, codex #189). Pass the runtime instance name.
 
+    * EXACT SET (``allowed_stems``): every under-constrained component's stem
+      must be in ``allowed_stems`` -- the exhaustive list of families expected
+      to move (the freed DOF's own parts PLUS everything coupled to them).
+      This is the sufficiency direction the retired release park-closure used
+      to prove by authoring drivers to 0 DOF: an UNINTENDED freedom (a
+      forgotten mate on a structural part) now fails here, in every soundness
+      pass, instead of only at release. Omit it to skip the exact-set check
+      (necessity only).
+
     ``expected_count == 0`` reduces to :func:`assert_components_fully_defined`.
     ``resolve=False`` skips the rebuild (soundness re-solved once after open)."""
     if expected_count == 0:
@@ -1701,8 +1552,8 @@ def assert_free_dof_necessity(
             raise RuntimeError(
                 f"expected >= {expected_count} free operational DOF but only "
                 f"{len(under)} component(s) read under-constrained: {sorted(under)} "
-                "-- a deferred park driver's DOF is pinned by another mate, or the "
-                "model is over-constrained (the 'free' model is actually frozen)"
+                "-- a freed DOF is pinned by another mate, or the model is "
+                "over-constrained (the 'free' model is actually frozen)"
             )
         if required_stems:
             present = {re.sub(r"-\d+$", "", n) for n in under}
@@ -1723,9 +1574,24 @@ def assert_free_dof_necessity(
                     f"fully defined -- that freed DOF is pinned (a sibling instance "
                     f"may be free instead). Under-constrained: {sorted(under)}"
                 )
+        if allowed_stems:
+            allowed = set(allowed_stems)
+            stray = sorted(
+                n for n in under if re.sub(r"-\d+$", "", n) not in allowed
+            )
+            gsp.set_attribute("stray_under_constrained", len(stray))
+            if stray:
+                raise RuntimeError(
+                    f"free-DOF exact-set: component(s) {stray} read under-"
+                    f"constrained but are NOT in the allowed free set "
+                    f"{sorted(allowed)} -- an unintended freedom (a missing/"
+                    "dropped mate on a structural part), or a newly coupled "
+                    "family that must be added to the allowed list"
+                )
         _telemetry.success(
             f"{len(under)} under-constrained component(s) >= {expected_count} expected "
-            "free DOF (necessity; sufficiency proven in the release preflight)"
+            "free DOF (necessity"
+            + ("; exact-set: no strays)" if allowed_stems else ")")
         )
 
 
