@@ -246,3 +246,21 @@ magic: every vendor demo (GoEngineer pT3GPqMmAWk, Visiativ ToiXLdm7ncs
 transcripts; thecadcoder prerequisite "both components fully constraint")
 copies a FULLY-DEFINED seed — the UI path never exercises under-constrained
 copies at all.
+
+**2026-07-09 minimal wander repro (`diagnostics/diag_cwm_min.py`, standalone
+pywin32, vendor-ticket grade):** the CopyWithMates2 parked-pose wander needs
+NOTHING: one part with ZERO features (default planes only), TWO root-plane
+mates (coincident Top + distance Front; in-plane slide + spin free), one
+Repeat copy with the dim slot re-valued -> the copy lands at the right
+distance but parked 8.5 mm off along the free in-plane direction (seed sat
+exact). The --visible one-extrude variant adds a SECOND divergence flavor:
+the copied dim resolves on a DIFFERENT side than the seed's authored mate
+(z -45 measured vs -50 seed-derived; the seed's dim carries a -5 body-side
+offset the copy loses) -- the flip/side family at minimal scale. A raw
+Transform2 put heals the free directions and HOLDS through EditRebuild3
+(the put-reversion attractor stays exclusive to the big multi-loop
+assembly). Standalone COM traps re-confirmed: SelectByID2's Callout and
+ModifyDefinition's third arg need typed VT_DISPATCH nulls (bare None =
+VT_NULL 'Type mismatch'); IModelDoc2::SaveAs3 returns 0 ON SUCCESS (gate on
+file existence); a crashed run's open doc holds the .SLDPRT file lock
+(CloseDoc by basename before deleting).
