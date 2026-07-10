@@ -280,6 +280,12 @@ def test_drawing_spine_boundary_and_source_dependency(monkeypatch):
     cad_deps = [path for path in task["file_dep"] if path.lower().endswith(".sldprt")]
     assert cad_deps == [dodo._sldprt("platen_guide")]
     assert not any(path.lower().endswith(".sldasm") for path in task["file_dep"])
+    assert {Path(path).name for path in task["file_dep"]} == {
+        "platen-guide.SLDPRT",
+        "export_part_drawing.py",
+        "_hole_wizard.py",
+        "drawing.py",
+    }
     assert {Path(path).name for path in task["targets"]} == {
         "platen-guide.SLDDRW",
         "platen-guide.pdf",
