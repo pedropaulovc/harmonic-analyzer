@@ -45,8 +45,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # cad/scripts
 import pythoncom  # noqa: E402
 from win32com.client import VARIANT  # noqa: E402
 
+import _telemetry  # noqa: E402
 from _common import check, log, run_build  # noqa: E402
 from _assembly import (  # noqa: E402
+    _mate_hard_error,
     component_names,
     component_transform,
     place_component,
@@ -67,6 +69,7 @@ N_COPIES = 8
 GAP_Z = [z_station(j) + ARM_MID_DZ - PITCH / 2.0 for j in range(1, 12)]
 PIVOT_OD_PT = [PIVOT[0] + SHAFT_R, PIVOT[1], 0.0]
 SEED_MATES = 3  # concentric + Front-plane distance + Top-plane parallel
+DIST_IDX = 1  # the distance mate's position in the seed's mate order
 
 
 async def _mate_count(adapter) -> int:
@@ -89,16 +92,22 @@ async def _seat_baseline(adapter, gap: int) -> tuple[str, float]:
 
 
 def _copy_with_mates(adapter, comp_name: str, new_z_mm: float,
-                     variant: str) -> bool:
+                     variant: str, flip_override: bool | None = None) -> bool:
     """One CopyWithMates2 call: repeat every mate, substitute the distance.
 
-    ``Values`` maps to the seed's distance/angle mates; the seat triple has
-    exactly ONE (the Front-plane Z distance), so a single entry re-stations
-    the copy. ``variant`` picks the marshaling: 'native' = every array in its
-    native VT with raw ``_oleobj_`` component pointers (the PROVEN contract),
-    'list' / 'variant' = the two known-broken encodings kept as regression
-    probes. Returns the post-call bushing count -- the caller judges success
-    from growth, never from CopyWithMates2's return value (it lies).
+    Every array maps POSITIONALLY per seed mate, in the seed's mate order
+    (measured 2026-07-09: the value placed at index 0 -- the concentric --
+    was IGNORED and the distance mate copied with its index-1 entry 0.0,
+    landing every copy at Z=0 exactly; the API doc says ``Values`` is
+    "valid for distance, angle, and profile center mates only", i.e. the
+    entry under a dimension-less mate is dead). The seat triple is
+    concentric(0) / Front-plane distance(1) / Top-plane parallel(2), so the
+    Z substitution rides index ``DIST_IDX = 1``. ``variant`` picks the
+    marshaling: 'native' = every array in its native VT with raw
+    ``_oleobj_`` component pointers (the PROVEN contract), 'list' /
+    'variant' = the two known-broken encodings kept as regression probes.
+    Returns the post-call bushing count -- the caller judges success from
+    growth, never from CopyWithMates2's return value (it lies).
     """
     model = adapter.currentModel
     comp = model.GetComponentByName(comp_name)
@@ -106,13 +115,17 @@ def _copy_with_mates(adapter, comp_name: str, new_z_mm: float,
         raise RuntimeError(f"seed component not found: {comp_name!r}")
     repeat = [True] * SEED_MATES
     # Values carry the POSITIVE magnitude (the seat authored abs(z), the
-    # production distance_driver idiom); the SIDE rides FlipDimension --
-    # "true for a positive distance dimension, false for a negative"
-    # (codex #219: signed negative metres here could fail the call or land
-    # wrong-side and mislabel the API unusable).
-    values = [abs(new_z_mm) / 1000.0] + [0.0] * (SEED_MATES - 1)
+    # production distance_driver idiom). The SIDE is INHERITED from the
+    # seed: Q5 measured FlipDimension as a NO-OP under Repeat=True (both
+    # bits land a +20 target at -20, the seed's side), so the bit below is
+    # kept only as the knob Q5 exercises -- never rely on it for side
+    # selection.
+    values = [0.0] * SEED_MATES
+    values[DIST_IDX] = abs(new_z_mm) / 1000.0
     flip_align = [False] * SEED_MATES
-    flip_dim = [new_z_mm >= 0.0] + [False] * (SEED_MATES - 1)
+    flip_dim = [False] * SEED_MATES
+    flip_dim[DIST_IDX] = (new_z_mm >= 0.0 if flip_override is None
+                          else flip_override)
     lock_rot = [False] * SEED_MATES
     orient = [0] * SEED_MATES
 
@@ -150,8 +163,11 @@ def _copy_with_mates(adapter, comp_name: str, new_z_mm: float,
         )
     # The return value LIES (False even when the copy lands mated -- measured
     # both ways on this seat), so success is judged by the caller from the
-    # component count/transforms, never from this bool.
-    adapter._attempt(lambda: model.CopyWithMates2(*args), default=None)
+    # component count/transforms, never from this bool. Span per the
+    # COM-operation invariant (AGENTS.md; codex #220).
+    with _telemetry.span("assembly.copy_with_mates", variant=variant,
+                         mates=SEED_MATES):
+        adapter._attempt(lambda: model.CopyWithMates2(*args), default=None)
     n_bushings = sum(
         1 for n in component_names(adapter)
         if n.rsplit("-", 1)[0] == "pivot-bushing"
@@ -178,6 +194,8 @@ async def build(adapter) -> dict[str, str]:
     _, t_base2 = await _seat_baseline(adapter, 1)
     log(f"baseline production seat: {t_seed:.2f}s / {t_base2:.2f}s per bushing")
     mates_before = await _mate_count(adapter)
+    pre_copy_names = {m["name"]
+                      for m in ((await adapter.list_mates()).data or [])}
 
     # Q1: marshaling. The 'native' shape is the proven contract; 'list' and
     # 'variant' stay as regression probes for the two known-broken encodings.
@@ -200,11 +218,14 @@ async def build(adapter) -> dict[str, str]:
             variant = shape
             break
     if variant is None:
-        log("Q1 verdict: no copy under the shapes tried (native/list/"
-            "variant) -- a marshaling regression, NOT proof the API is "
-            "unusable; re-derive the wire shape against the VBA positive "
-            "control before concluding anything")
-        return {"verdict": "no-copy-under-tried-shapes"}
+        # Raise so automation cannot read a marshaling regression as a
+        # passing run (codex #220). It is NOT proof the API is unusable --
+        # re-derive the wire shape against the VBA positive control before
+        # concluding anything.
+        raise RuntimeError(
+            "no copy under the shapes tried (native/list/variant) -- a "
+            "marshaling regression; re-derive the wire shape against the "
+            "VBA positive control")
 
     # Q3: timed copies across gaps 3..N -- population grows each call.
     times = []
@@ -215,23 +236,87 @@ async def build(adapter) -> dict[str, str]:
         times.append(dt)
         log(f"copy -> gap {k}: bushings={n_now} {dt:.2f}s")
 
-    # Q2: real mates + correct stations, judged from the model.
+    # Q2 (informational pre-rebuild read; the GATE is the end-state
+    # validation below). A copy inherits the SEED'S SIDE of the anchor
+    # plane (Q5: FlipDimension is a no-op under Repeat=True), so the
+    # expected station for a copy is -abs(target): the seed sits on the
+    # negative side, and the one ladder target crossing zero (+0.737)
+    # legitimately lands mirrored. Production must therefore anchor
+    # re-valued distances so every station shares the seed's side (e.g.
+    # the neighbour-bushing anchor, PITCH/2 + k*PITCH).
     mates_after = await _mate_count(adapter)
     zs = _bushing_zs(adapter)
-    expected = sorted(GAP_Z[k] for k in range(2 + N_COPIES))
-    on_plane = (
-        len(zs) == len(expected)
-        and all(abs(g - w) < 0.05 for g, w in zip(zs, expected))
-    )
+    expected = sorted([GAP_Z[0], GAP_Z[1]]
+                      + [-abs(GAP_Z[k]) for k in range(2, 2 + N_COPIES)])
     log("=" * 70)
     log(f"mate count: {mates_before} -> {mates_after} "
         f"(expected +{SEED_MATES * N_COPIES} if copies carry REAL mates)")
-    log(f"stations: {'ON-PLANE' if on_plane else 'OFF -- ' + str(zs)}")
+    log(f"stations (pre-rebuild): {zs}")
     log(f"timing: production seat ~{(t_seed + t_base2) / 2:.2f}s vs "
         f"CopyWithMates2 avg {sum(times) / len(times):.2f}s "
         f"(first {times[0]:.2f}s, last {times[-1]:.2f}s -- growth says "
         f"whether the copy also pays the population tax)")
-    return {"verdict": "ran", "on_plane": str(on_plane)}
+
+    # Q5: FlipDimension semantics. Pinned 2026-07-09: on the Repeat path a
+    # re-valued dim's flip RESETS (the array is ignored -- both bits land a
+    # +20 target on the SEED's side, -20), and the copy inherits the seed's
+    # side of the anchor. Copy the seed (at Z=-62.77) to an unambiguous
+    # +20 mm target under both flip bits; the landings are asserted at the
+    # end-state validation (a break means the CopyWithMates2 flip contract
+    # CHANGED -- SW upgrade? -- and the seed-side rule must be
+    # re-validated).
+    q5_names: list[str] = []
+    for flip in (False, True):
+        before = set(component_names(adapter))
+        _copy_with_mates(adapter, seed, 20.0, variant, flip_override=flip)
+        new = [n for n in component_names(adapter) if n not in before]
+        q5_names.extend(new)
+        log(f"Q5 flip={flip}: target +20.0 -> landed "
+            f"{[round(component_transform(adapter, n)[11] * 1000.0, 3) for n in new]}")
+
+    # END-STATE VALIDATION (codex #220 rounds 3-5 converged here): every
+    # mutation -- ladder copies AND Q5 copies -- is done, ONE closing
+    # rebuild (asserted) solves the final assembly, and every invariant is
+    # proven on that post-rebuild end state. Nothing mutates after these
+    # checks, so no invariant can be silently invalidated by a later step.
+    model = adapter.currentModel
+    if not bool(adapter._attempt(lambda: model.EditRebuild3(), default=False)):
+        raise RuntimeError(
+            "closing EditRebuild3 failed -- end state unproven")
+    # (1) Mate count: ladder copies + the two Q5 copies, all real.
+    mates_final = await _mate_count(adapter)
+    want_final = mates_before + SEED_MATES * (N_COPIES + 2)
+    if mates_final != want_final:
+        raise RuntimeError(
+            f"end-state mates {mates_final} != {want_final} "
+            f"(baselines {mates_before} + {SEED_MATES}x{N_COPIES} ladder "
+            f"+ {SEED_MATES}x2 Q5) -- a copied mate dropped or never landed")
+    # (2) Stations: the ladder AND both Q5 copies at the seed side (-20).
+    zs_final = _bushing_zs(adapter)
+    expected_final = sorted(expected + [-20.0, -20.0])
+    if (len(zs_final) != len(expected_final)
+            or any(abs(g - w) > 0.05
+                   for g, w in zip(zs_final, expected_final))):
+        raise RuntimeError(
+            f"end-state stations off: {zs_final} != {expected_final} "
+            f"(ladder drift, Q5 contract break, or rebuild snap-back)")
+    # (3) Health: every mate any copy added (ladder + Q5) unsuppressed and
+    # error-free -- count/stations can hold while a mate sits suppressed or
+    # hard-errored with its bushing parked at the inserted transform.
+    unhealthy = []
+    for m in ((await adapter.list_mates()).data or []):
+        if m["name"] in pre_copy_names:
+            continue
+        code = _mate_hard_error(adapter, m["name"])
+        if m.get("suppressed") or code:
+            unhealthy.append(
+                f"{m['name']} (suppressed={m.get('suppressed')}, err={code})")
+    if unhealthy:
+        raise RuntimeError(
+            f"end-state copied mates unhealthy: {'; '.join(unhealthy)}")
+    log(f"end-state validation: mates {mates_final} == {want_final}, "
+        f"stations on-plane incl. Q5 seed-side, copied-mate health clean")
+    return {"verdict": "pass"}
 
 
 if __name__ == "__main__":

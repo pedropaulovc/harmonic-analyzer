@@ -120,3 +120,60 @@ Also corrected: drive-train's "export_image front 77.3s" log line is mislabeled 
 - Environment note: one SW crash during the first soundness attempt (wedged at
   `channel.SLDASM [Viewing]`, Responding=False); Pedro disabled ENHANCED GRAPHICS and the
   re-run passed — suspect that setting, not the model.
+
+**2026-07-09 round 2 (PR #220) — CopyWithMates2 validated on the REAL channel chain.**
+`diag_copy_with_mates` (ladder, real pivot-bushing on pivot-shaft) and
+`diag_copy_with_mates_slice` (whole 4-part rocker+rod+bar+lever chain, 12 hard-pinned
+mates, one call per station) both PASS. The full multi-component contract, all measured:
+1. **`Values`/flip slots enumerate EXTERNAL mates ONLY** (mates referencing an entity
+   outside the copied set), tree-ordered among themselves (slice: J1c=0, J1a=1, J1s=2,
+   J2s=3, J4c=4, footX=5). Extra array entries are ignored (arrays may be sized to all
+   mates).
+2. **Internal mates inherit** — mates between copied components are re-bound to the
+   copies and KEEP their dims (sentinel calibration left J2a/J5 untouched). No slot, no
+   value, no flip for them.
+3. **Every external dim slot must carry its REAL value** — a 0.0 re-values the copied
+   dim to zero (first ladder run: all copies at Z=0; first slice run: rod ring yanked
+   onto the Right Plane, drift exactly the 54.474 dim).
+4. **On the Repeat=True path a re-valued dim's FlipDimension RESETS to False — the seed's
+   state is not inherited AND the FlipDimension array entry is IGNORED** (three encodings
+   tried: all-False, tree-order bits, the seed's authored flip at the discovered slot —
+   identical mirrored landing every time; ladder Q5: both bits land a +20 target at −20;
+   positive control: editing the same property on the copied mate post-hoc works). The
+   array's flip evidently serves only the Repeat=False/new-entity path — matches the UI
+   doc, where "Flip Mate Alignment" belongs to "New Entity to Mate to". The rod spin
+   (seed flip=True) therefore copies mirrored (drift exactly 2×54.474), and a
+   SetTransformAndSolve3 to the right pose just snaps back (the mate pins the side).
+   **Repair that works:** `IFeature.GetDefinition` → `IDistanceMateFeatureData
+   .FlipDimension = not cur` → `ModifyDefinition(data, model, VARIANT(VT_DISPATCH,
+   None))` → rebuild; heals to rot 1e-16. Bare `None` third arg = VT_NULL → the call
+   returns False and silently does nothing (same trap family as OpenDoc6/CopyWithMates2
+   arrays). **Avoidance (Pedro 2026-07-09: parts must land upright from the start, the
+   mirrored branch is the OLD drive-train side):** (a) the production `free` build's
+   slice has NO spin dims at all — they are deferred park drivers — and its only external
+   dim (rocker axial, flip=False, always-positive ladder) copies right natively, so the
+   flip problem evaporates there; (b) where a pinned dim must be copied (`locked`),
+   formulate the seed dim so the WANTED side is the False side — **VALIDATED: the
+   authored flip state follows the REFERENCE-PLANE choice, not entity order** (rod
+   spin: axis↔Right and Right↔axis both author upright as flip=True; axis↔Top authors
+   upright as flip=False → copies land upright natively, rod rot 2e-16, repair pass
+   0.0s). The probe's formulation search (author → read FlipDimension → delete + try
+   next candidate) finds the False-side form in one seed pass; (c)
+   ModifyDefinition-set-after-copy stays as the ~1s/copy fallback. Also: the slot
+   mapping needs NO calibration copy — it is computed rule-based from the seed's own
+   mate list (external mates in tree order); the sentinel calibration (which flashes
+   No-Solution states at 1000+mm dims — Pedro flagged the UI drama) is now the opt-in
+   `--calibrate` cross-check only.
+5. **Anchor one-sided** — a copy lands on the SEED's side of a re-valued distance, so
+   stations must not cross the anchor (channel: anchor the rocker axial to the
+   gap-1 bushing at PITCH/2 + k·PITCH, not the Front datum whose stations cross zero).
+6. **Calibration-copy technique** (how the slot mapping was discovered, reusable):
+   one copy with a distinct sentinel per slot, classify each copied dim by its mated
+   components (`IMate2.MateEntity(i).ReferenceComponent`; a root plane's owner is the
+   assembly DOC name, e.g. "Assem50" — not empty), read which sentinel it holds → slot;
+   delete the calibration copy. Robust against any enumeration rule.
+7. **Timing (throwaway assembly, population ~20 comps):** seed chain 12 mates =
+   12–20s; slice copy = 0.92–1.47s/station; ladder copy 0.65s vs 4.4s production seat.
+   ⇒ channel rework: 18 stations × ~12 mates of CreateMate (~400–700s) collapse to
+   ~1.2s/station + flip-set + ONE closing rebuild. Next: production rework of
+   build_channel_assembly's moving loop + drive-train's cone-gear ladder on this recipe.
