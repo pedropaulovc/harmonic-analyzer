@@ -1,25 +1,31 @@
-r"""Mobility probe (plan step 5 verification): prove each operational DOF's park
-driver removes exactly the freedom it is meant to, expressed through SolidWorks'
-per-component constraint status (the closest thing the API gives to a Kutzbach
-mobility count -- there is no scalar DOF readout).
+r"""Mobility probe (plan step 5 verification): prove each operational DOF's
+drive spec removes exactly the freedom it is meant to, expressed through
+SolidWorks' per-component constraint status (the closest thing the API gives
+to a Kutzbach mobility count -- there is no scalar DOF readout).
 
-The argument, per subassembly:
+The saved free model carries no driver mates at all: every operational DOF's
+spec is recorded into the assembly's DOF manifest instead of authored (see
+AGENTS.md "Default-free DOF"). This probe first replays that manifest
+(``_assembly_postbuild.author_dof_drives``, authoring each spec TRANSIENTLY
+and renaming it ``DRIVE_<key>``) to reconstitute a fully-defined baseline to
+probe against. The argument, per subassembly:
 
-  1. ``rest`` baseline -- with every park driver ACTIVE, no top-level component is
-     under-defined (all status 3 / fixed / pattern). That is mobility 0: the saved
-     pose is deterministic, which is what protects the render pipeline.
-  2. suppress ONE park driver, ForceRebuild3, and read the status again: the
-     component(s) that driver pins flip to under-defined (status 2). Mobility rose
-     by the freedom that driver was holding.
+  1. ``rest`` baseline -- with every replayed drive mate ACTIVE, no top-level
+     component is under-defined (all status 3 / fixed / pattern). That is
+     mobility 0: the saved pose is deterministic, which is what protects the
+     render pipeline.
+  2. suppress ONE drive mate, ForceRebuild3, and read the status again: the
+     component(s) that mate pins flip to under-defined (status 2). Mobility rose
+     by the freedom that mate was holding.
   3. unsuppress -> back to all-defined. ``rest`` is restored (the doc is never
-     saved, so the on-disk fully-defined state is untouched regardless).
+     saved, so the on-disk free model is untouched regardless).
 
-So with all park drivers active the device is 0-DOF (deterministic exports); drop
-the crank driver and the whole gear train is free to be turned (the 1 operating
-DOF); drop a setup driver (p0 amplitude / p1 cone swing / p2 pinion swing) and
-just that quasi-static freedom opens. The probe NEVER saves.
+So with every replayed drive mate active the device is 0-DOF (deterministic);
+drop the crank driver and the whole gear train is free to be turned (the 1
+operating DOF); drop a setup driver (p0 amplitude / p1 cone swing / p2 pinion
+swing) and just that quasi-static freedom opens. The probe NEVER saves.
 
-Park drivers live as TOP-LEVEL mates of each standalone subassembly (drive-train
+Drive mates land as TOP-LEVEL mates of each standalone subassembly (drive-train
 carries crank + p1 + p2; channel carries the 20 p0 amplitude slides), so they are
 suppressible by name without the flexible-sub indirection the motion study needs.
 
@@ -53,17 +59,17 @@ from build_motion_study import (
 import _telemetry
 
 # Mate features are auto-named by SolidWorks ("Distance34"), NOT by the build
-# script's label -- a park driver is identified the way the motion study does:
+# script's label -- a drive mate is identified the way the motion study does:
 # a DISTANCE/ANGLE mate that references exactly ONE real moving part (its pose
 # value, measured against a root plane). So the probe targets each operational
 # DOF by the PART FAMILY its drivers pin, suppresses every single-real driver on
 # that family, and checks the family goes free. (subassembly, family, label.)
 PROBES = [
     ("drive-train", "crank-handle", "crank input (the 1 operating DOF)"),
-    # p1: the swing park pins the PLATFORM (the post/tip block/shaft ride it by
+    # p1: the swing driver pins the PLATFORM (the post/tip block/shaft ride it by
     # seat mates, so no rider family carries a swing driver of its own).
     ("drive-train", "cone-swing-platform", "p1 cone swing-to-disengage"),
-    # p2: the swing park pins the FRONT STRAP (the pinion itself is tied to the
+    # p2: the swing driver pins the FRONT STRAP (the pinion itself is tied to the
     # strap by two-real mates, so its family carries no swing driver of its own).
     ("drive-train", "pinion-bracket", "p2 pinion swing-to-engage"),
     ("channel", "amplitude-bar", "p0 amplitude slides (all 20)"),
@@ -126,38 +132,26 @@ async def _probe_sub(adapter: Any, sub: str, probes: list[tuple]) -> list[str]:
     path = str(OUT_SLDASM / f"{sub}.SLDASM")
     check(f"open {sub}", await adapter.open_model(path))
 
-    # Default-`free` builds DEFER the freed-DOF park drivers (they are recorded, not
-    # authored -- see AGENTS.md "Default-free DOF"), so the saved model has none to
-    # probe. Replay the recorded specs (author them engaged, renamed PARK_*) so the
-    # baseline/suppress argument below has real drivers to work on. The doc is NEVER
-    # saved (this probe only reads status), so the on-disk free model is untouched.
-    from _assembly_postbuild import load_park_specs, replay_park_specs
+    # The saved free model carries no driver mates for its operational DOF --
+    # each is recorded into the assembly's DOF manifest instead (see AGENTS.md
+    # "Default-free DOF"). Replay the manifest (authors every spec TRANSIENTLY,
+    # renamed DRIVE_<key>) so the baseline/suppress argument below has real
+    # mates to work on. The doc is NEVER saved (this probe only reads status),
+    # so the on-disk free model is untouched.
+    from _assembly_postbuild import author_dof_drives, load_dof_manifest
 
-    specs = load_park_specs(sub)
+    specs = load_dof_manifest(sub)
     if specs:
-        log(f"{sub}: replaying {len(specs)} deferred park driver(s) for the probe")
-        await replay_park_specs(adapter, specs)
+        log(f"{sub}: replaying {len(specs)} recorded free-DOF driver(s) for the probe")
+        await author_dof_drives(adapter, specs)
 
-    log(f"{sub}: classifying single-real DISTANCE/ANGLE park drivers ...")
+    log(f"{sub}: classifying single-real DISTANCE/ANGLE drive mates ...")
     drivers = _drivers_by_family(adapter, adapter.currentModel, sub)
     log(f"{sub}: driver families {[(f, len(n)) for f, n in sorted(drivers.items())]}")
 
-    # The default-free build leaves operational PARK_* drivers (e.g. the crank
-    # angle) SUPPRESSED, so the saved rest pose is NOT 0-DOF. Re-engage every
-    # PARK_* mate first to establish the fully-defined baseline; the per-driver
-    # suppress/measure loop below then proves each one frees its own family.
-    from _assembly import find_park_drivers
-
-    re_engaged = 0
-    for pname, suppressed in await find_park_drivers(adapter):
-        if suppressed:
-            check(f"re-engage park {pname}", await adapter.suppress_mate(
-                SuppressMateParameters(name=pname, suppress=False)))
-            re_engaged += 1
-    if re_engaged:
-        adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
-        log(f"{sub}: re-engaged {re_engaged} suppressed PARK_* driver(s) for the baseline")
-
+    # author_dof_drives authors every recorded spec ENGAGED (never suppressed),
+    # so replaying the manifest already establishes the fully-defined baseline
+    # directly -- no separate re-engage pass is needed.
     base_under = _under(_component_status(adapter))
     log(f"{sub}: {len(base_under)} under-defined components at rest")
     if base_under:
@@ -172,7 +166,7 @@ async def _probe_sub(adapter: Any, sub: str, probes: list[tuple]) -> list[str]:
         names = drivers.get(family, [])
         if not names:
             raise RuntimeError(
-                f"{sub}: no single-real park driver references family {family!r} "
+                f"{sub}: no single-real drive mate references family {family!r} "
                 f"(have {sorted(drivers)})")
 
         for name in names:
@@ -209,9 +203,9 @@ async def build(adapter: Any) -> dict[str, str]:
         rows += await _probe_sub(adapter, sub, PROBES)
         adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
-    _telemetry.info("MOBILITY PROBE -- park driver -> freed DOF (rest = 0 DOF baseline):")
+    _telemetry.info("MOBILITY PROBE -- drive mate -> freed DOF (rest = 0 DOF baseline):")
     _telemetry.info("\n".join(rows))
-    _telemetry.success("rest is 0-DOF; each park driver controls a real freedom; "
+    _telemetry.success("rest is 0-DOF; each drive mate controls a real freedom; "
                        "every probe restored rest.")
     return {"probes": str(len(rows))}
 

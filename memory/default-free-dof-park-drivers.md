@@ -1,139 +1,72 @@
 ---
 name: default-free-dof-park-drivers
-description: Default build saves a working kinematic model (operational DOF FREE); PARK_* mates + build_lock flag + closure DOF gate
+description: Operational DOF are genuinely FREE — park machinery KILLED 2026-07-09 (no PARK_* mates, no locked mode, no closure proof); kinematic DOF manifest (.dof.json) + exact-set soundness gate replace it
 metadata:
   type: project
 ---
 
-> **UPDATE 2026-07-07 — round 2 (PR #201): summing + pen join; channel lever COUPLED.**
-> `summing: free` (1 DOF, lever knife-edge rock — the old rock-snapshot angle
-> driver re-keyed `free_dof_key="lever_rock"`; boss-hook rides via its lock
-> mate) and `pen: free` (1 DOF, carriage travel — `PARK_pen_travel`; the F5
-> pen-driver equation is NOT in the shipped free model: `verify:kinematics`
-> replays the deferred spec, installs the equation transiently on the replayed
-> mate — `base_mm` from the spec's `params.distance` — sweeps, discards
-> unsaved; a `locked` build installs at build time against the renamed
-> `PARK_pen_travel`). channel's LEVER is now COUPLED, not freed: J4 lost its
-> hard spin pin (`_revolute(pin_spin=False)`) and the new **J5 foot-on-arc
-> mate** (bar `Axis2` ↔ rocker `Axis3` arc-centre axis, per-channel as-solved
-> radius ≈806, cross-checked vs `solve_state` at 1e-3) closes rocker → bar →
-> lever, so the park count stays 3/channel while `channel-lever` joins the
-> necessity `required_stems`; in a locked build footX + J5 fully define
-> lever + bar (Jacobian non-singular at rest: coupling ⊥ the amplitude slide
-> but first-order in lever↔rocker). `preflight_release.FREE_ASSEMBLIES` +=
-> summing, pen. Also 2026-07-07: the magnifying-bracket is lock-mated to the
-> magnifying lever (it affixes the rod to the ROCKING summing bar — grounded
-> it clipped the rod over the knife rock), and the magnifier wheel-bar adopted
-> the paper-drive two-piece clamp (green one-piece `column-clamp` +
-> `pinch-screw` parts RETIRED; wheel-bar 10×9×234, back face −129.9, front
-> unchanged −138.9).
->
-> **UPDATE 2026-07-05 — paper-drive joins the free regime (1 DOF: crank spin).**
-> The crank-end T12 sprocket spins free (deferred `crank_spin` park driver,
-> `build_lock.yaml` `paper_drive: free`, `verify._expected_free_dof("paper-drive")`
-> → 1, `required_stems=("transgear-removable",)`). A native **Belt/Chain feature**
-> ([[belt-chain-feature-com-binding]], `adapter.insert_belt_chain`, EngageBelt)
-> couples T12↔T24; a **rack-pinion mate** feeds the platen off the knob axis at the
-> NET through-train travel. The engage is a documented KINEMATIC coupling at the
-> faithful ch30 rest geometry (the transgear keeps its 13.1 mm gap — Appendix C #8's
-> open riddle; the single latch arm can't serve both 66.05 rest and 51.0 engaged).
-> Build GREEN: necessity `7 under-constrained >= 1`, interference 0.
->
-> **UPDATE 2026-07-03 — cone-platform swing is now a FREED DOF (PR2 round 3).**
-> The p1 swing angle driver gained `free_dof_key="cone_swing"`, so drive-train's
-> free count is **2** (crank spin + platform swing) — `verify._expected_free_dof`
-> returns 2 when free, and `assert_free_dof_necessity(adapter, 2)` runs in the
-> assembly build. The plate swings on the physical `cone-pivot-screw`; the merged
-> `cone-pivot-post` column carries the crank rig WITH the swing (16T↔64T mesh
-> survives disengage), travel limited by the `swing-stop-screw` at 6.41°. The
-> "cone swing stays park-driven" statements below are STALE for drive-train.
->
-> **UPDATE 2026-07 — defer-and-replay (park mates added by release, not build).**
-> The freed-DOF park drivers are no longer *authored-then-suppressed* by the build.
-> They are NOT authored at all in a `free` build (skipping ~61 mate solves — 1
-> crank + 3×20 channel — is the build-time win); each is RECORDED as a resolved
-> spec (`free_dof_key=` on the `*_driver` helpers → `_assembly._record_park_spec`)
-> into a `.<stem>.park.json` sidecar beside the `.SLDASM` (a cached assembly
-> output). The opt-in **release preflight** (`preflight_release.py`, doit task
-> `preflight`, COM-spine, gates `release`, NOT in `build`) replays them
-> (`replay_park_specs`), runs the exact-DOF closure (`assert_park_closure`), then
-> DISCARDS the model unsaved — shipped `.SLDASM` stays free. Build-time `soundness`
-> now proves only necessity (`assert_free_dof_necessity`, ≥ N under-constrained);
-> the closure moved to preflight. ENGAGED setup drivers (`PARK_pinion_swing`) are
-> unchanged — still authored inline, never deferred (cone swing is now a DEFERRED
-> freed-DOF driver, per the 2026-07-03 update above). Diagnostics:
-> `build_mobility_probe.py` replays specs before its baseline;
-> `build_motion_setup_drives.py` treats an absent (deferred) driver as already-free;
-> `build_motion_study.py` (full-device, geometry-classifier) needs a seat re-check.
-> The prose below describes the ORIGINAL author-but-suppress mechanism.
+**2026-07-09 — the park machinery is KILLED (Pedro: "does not seem useful").**
+Everything below the divider is history of the removed system. What remains:
 
-**Inverted the always-0-DOF design (2026-06, drive-train first, PR stacked on #110
-`drive-train-unlock`; extended to channel 2026-06).** The default build now saves a
-WORKING kinematic model: the predetermined operational DOF are left FREE.
-- **drive-train** frees the **crank spin** (1 DOF — drag the crank, the whole geared
-  train turns). Cone-post swing stays park-driven. The alignment-pinion swing
-  (`PARK_pinion_swing`, restored 2026-07-02 with the ch30 GT re-anchor) is likewise a
-  park-driven SETUP DOF: the angle driver pins the FRONT strap (`pinion-bracket`
-  family — the drum itself is tied to the strap by two-real mates), stays ENGAGED in
-  `free` builds, and the free-DOF closure count stays 1 (crank only). p2 probe/motion
-  stages target family `pinion-bracket`, `only_type=ANGLE` (the straps also carry
-  single-real axial DISTANCE locators that must NOT be suppressed — the p1 cone-post
-  pattern).
-- **channel** frees, per active channel, **3 DOF** — rocker swing + connecting-rod
-  follow + amplitude-bar slide — so a 20-channel build saves 60 free DOF. Validated
-  full-scale 2026-06: `park_drivers=60 expected_free_dof=60 free_dof=60`, interference
-  hits=0, deep-health 165 targets clean. The reorg that introduced this (4 mate
-  changes, see below) replaced the rocker spin_driver + global-Front-Plane axial with:
-  rocker spin→`PARK_rocker_angle` + axial **distance to the neighbour pivot-bushing**
-  (PITCH/2, the #110 neighbour idiom — bushings pre-placed BEFORE the channel loop);
-  rod→**coaxial coincident on the rocker's rod-bore axis** + Z-distance to rocker Front
-  Plane + `PARK_rod_swing` (was `_pin_design_pose`'s 4 global-datum mates, now removed);
-  bar foot-X→`PARK_bar_amplitude`. Channel-level validated only — the top-level
-  cam-ring↔cylinder-gear-lobe interference (~0.39mm slack `_pin_design_pose` guarded) is
-  deferred to a `harmonic_analyzer` build.
+- Every part is inserted on its exact Python-solved transform and the real
+  contact mates hold it, so **the build is deterministic without fully
+  defining the assembly** (Pedro's argument for the kill). Freed operational
+  DOF (drive-train 4, channel 3/channel, magnifier 3, paper-drive/summing/pen
+  1 each) simply get NO driver mate.
+- **Kinematic DOF manifest** (the kept half): `free_dof_key=` on the
+  `*_driver` helpers ALWAYS records the drive spec (entities + rest value +
+  mate side) into `_assembly._DOF_SPECS` → `write_dof_manifest(stem)` →
+  `.<stem>.dof.json` sidecar (rides the remote cache). `_assembly_postbuild.
+  load_dof_manifest` / `author_dof_drives` author entries TRANSIENTLY (mates
+  named `DRIVE_<key>`) for verify:kinematics (pen Fourier sweep targets
+  `D1@DRIVE_pen_travel`, magnifier `lever_rock` chain sweep, paper-drive crank
+  instance lookup) and the mobility/motion diagnostics; callers discard the
+  model unsaved.
+- **Exact-set soundness gate** replaces the release closure proof:
+  `assert_free_dof_necessity(..., allowed_stems=...)` — necessity (≥ N
+  under-constrained, required families present) AND no under-constrained
+  component outside `verify._ALLOWED_FREE_STEMS[name]` (the freed families
+  plus everything coupled). Catches the one real thing the closure caught
+  (an unintended freedom) in every soundness pass instead of only at release.
+  The allowed lists were pinned from a live status dump; the gate names any
+  stray, so extending after a deliberate coupling change is a one-line fix.
+  drive-train/magnifier/paper-drive lists span the coupled trains.
+- **Deleted**: `PARK_PREFIX`, `mark_park_driver`, `find_park_drivers`,
+  `set_park_defer`/`park_deferred`, `assert_expected_free_dof`,
+  `assert_park_closure`, `is_locked_build`, `build_lock.yaml` (no locked
+  mode at all), the preflight closure stage (preflight = gear-ratios only),
+  `.park.json` sidecars (now `.dof.json`).
+- **Trap preserved**: mate `label=` strings that mention "PARK driver" (e.g.
+  drive-train's crank/cone/pinion/lift-rod drivers, pen's travel driver) were
+  deliberately NOT renamed — `_seed_flip` derives the recorded mate side from
+  the label signature and several are in `_FLIP_INVERT`; renaming would flip
+  replay sides. Labels are log strings, not machinery.
 
-**Mechanism — author-but-suppress.** Every reproducibility-locking mate is still
-authored, then its FEATURE renamed to `PARK_<key>` (e.g. `PARK_crank_angle`) — the
-mate `label=` is only a build-log string, SW auto-names the feature `Angle1`, so the
-gate would never find it without the rename. Default build SUPPRESSES the `PARK_*`
-mate (pins nothing → DOF free); a `locked` build leaves it ENGAGED (the old
-fully-defined, byte-reproducible snapshot — explicit opt-in for a pinned export).
+**Why:** the closure re-proved what insertion already fixed; locked mode was
+never used; the defer/replay path was a recurring bug source (replay flips,
+corpse mates, singularities — see [[park-driver-singularities]],
+[[paper-drive-park-closure-gate]], now historical).
 
-**Why:** the shipped default was a frozen 0-DOF model — you couldn't drag the crank
-and watch the gears turn, and the artefact didn't represent the device's kinematics.
+**How to apply:** freeing a new operational DOF = call the `*_driver` helper
+with `free_dof_key="<key>"` (records, never authors), bump
+`verify._expected_free_dof`, add the family to `_REQUIRED_FREE_STEMS` and its
+coupled families to `_ALLOWED_FREE_STEMS`. To drive a freed DOF in a gate or
+diagnostic: `author_dof_drives(adapter, [spec])` transiently, discard unsaved.
 
-**How to apply:**
-- Mode per assembly: `cad/config/machine/build_lock.yaml`, read as a STRING-LITERAL
-  `_config.machine("build_lock", "drive_train")`. Literal args tokenise it into that
-  assembly's doit `file_dep` + remote-cache digest (`_buildgraph._family_tokens`), so
-  flipping `free`↔`locked` rebuilds ONLY that assembly and keys the cache to a
-  distinct artefact. The flag MUST be the config value (in the digest), never an env
-  var — an env flag would collide free/locked under one key.
-- Helpers in `cad/scripts/_assembly.py`: `PARK_PREFIX`, `mark_park_driver(adapter,
-  mate, key)` (renames via the adapter's `rename_feature` → `IFeature.Name`),
-  `find_park_drivers` (`list_mates` → `[(name, suppressed)]` for `PARK_*`).
-- **DOF gate adapts, nothing else does.** SolidWorks has NO scalar DOF API. The build
-  and verify `soundness` both call `assert_expected_free_dof(adapter, N)` — the
-  **closure check**: assert exactly N `PARK_*` are suppressed → re-engage them →
-  ForceRebuild → assert 0 under-constrained (proves the drivers are the SOLE freedom,
-  so DOF count = N) → re-suppress → restore the free pose. `N == 0` (locked / no
-  parked DOF) reduces to the strict `assert_components_fully_defined`. Every NON-DOF
-  gate (over-constrained, model-healthy, interference, gear-ratios, component-count)
-  runs on the as-built model UNCHANGED. `assert_components_fully_defined` itself is
-  unchanged (the 8 build-script callers keep strict 0-DOF).
-- verify `_expected_free_dof(name)`: drive-train→1 (if free), channel→`3 *
-  _config.active_count()` (if free), else 0 (re-reads `build_lock.yaml`; freshness guard
-  guarantees the saved model matches). The gate routes to `report.agate(...)` (async)
-  for the closure when free, else the sync `report.gate(...)`.
-- `build_mobility_probe.py` re-engages all `PARK_*` BEFORE its 0-DOF baseline (the
-  default-free saved model is not 0-DOF), then suppresses each driver to show it frees
-  its own part family.
-- Editing `_assembly.py` flips the recipe digest of EVERY assembly (shared closure
-  dep), so `doit assembly:drive_train` rebuilds the whole COM spine up to drive_train
-  — a free regression check that the strict path still passes frame/channel/etc. See
-  [[single-assembly-fast-verify]] to iterate on one assembly faster.
+---
 
-No defensive locked-pose fallbacks were added — per [[no-untested-failure-assumptions]],
-all checks run on whatever mode is actually built. Full design in AGENTS.md
-"Default-free DOF (operational kinematics)". Related: [[fix-relations-last-resort]],
-[[channel-amplitude-state]].
+HISTORY (removed system, for archaeology): the original inversion authored a
+`PARK_<key>` mate per freed DOF, suppressed in `free` builds / engaged in
+`locked` builds (`build_lock.yaml`), gate = `assert_expected_free_dof`
+suppress/re-engage closure cycling. 2026-07 it became defer-and-replay:
+specs recorded to `.<stem>.park.json`, release preflight replayed them and
+proved 0-DOF closure (`assert_park_closure`), soundness kept necessity only.
+Freed-DOF growth: drive-train crank (2026-06) + cone swing (2026-07-03,
+PR2r3) + pinion swing + lift-rod/cam (PR8 → 4); channel 3/channel with the
+lever COUPLED via J5 foot-on-arc (2026-07-07, PR #201); paper-drive crank
+spin over the Belt/Chain + rack-pinion couplings (2026-07-05); summing lever
+rock + pen carriage travel (2026-07-07). Full-scale validation once read
+`park_drivers=60 expected_free_dof=60 free_dof=60` on channel.
+
+Related: [[fix-relations-last-resort]], [[channel-amplitude-state]],
+[[single-assembly-fast-verify]].

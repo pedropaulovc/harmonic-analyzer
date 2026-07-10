@@ -781,12 +781,12 @@ def _assembly_cache_outputs(stem: str) -> list[Path]:
     cascade this whole mechanism exists to kill (codex review on #83)."""
     sldasm = Path(_sldasm(stem))
     massprops = sldasm.parent / f".{sldasm.stem}.massprops.sha"
-    # The deferred park-driver specs sidecar (default-`free` builds of drive-train/
-    # channel; absent otherwise, skipped at pack time). It MUST ride the cache: a
-    # clean cache consumer restores the .SLDASM without it and the release preflight
-    # (preflight_release.py) would then find no specs to replay and fail loud.
-    park = sldasm.parent / f".{sldasm.stem}.park.json"
-    outs = [sldasm, _png_dir(stem), massprops, park]
+    # The free-DOF manifest sidecar (assemblies with freed operational DOF;
+    # absent otherwise, skipped at pack time). It MUST ride the cache: a clean
+    # cache consumer restores the .SLDASM without it and verify:kinematics
+    # would then find no drive specs to author transiently and fail loud.
+    dof = sldasm.parent / f".{sldasm.stem}.dof.json"
+    outs = [sldasm, _png_dir(stem), massprops, dof]
     if stem == "channel":
         outs += _channel_spring_variants()
     if stem == "harmonic_analyzer":
@@ -1175,12 +1175,12 @@ def task_verify():
         "kinematics": [
             _sldasm("pen"),
             # The magnifier live-chain sweep (verify._verify_live_chain_one)
-            # opens magnifier.SLDASM and replays its recorded lever park spec;
-            # without this dep a magnifier rebuild would leave a fresh
-            # verify-kinematics.ok stamp valid and SKIP the WIRE-1 gates
-            # (codex review, PR #177). The park sidecar needs no separate dep:
-            # it is written by the same assembly task from the same recipe the
-            # .SLDASM's content digest is keyed on.
+            # opens magnifier.SLDASM and authors its recorded lever drive spec
+            # transiently; without this dep a magnifier rebuild would leave a
+            # fresh verify-kinematics.ok stamp valid and SKIP the WIRE-1 gates
+            # (codex review, PR #177). The DOF-manifest sidecar needs no
+            # separate dep: it is written by the same assembly task from the
+            # same recipe the .SLDASM's content digest is keyed on.
             _sldasm("magnifier"),
             # The paper-feed kinematic proof (verify._verify_paper_feed_one) opens
             # paper-drive.SLDASM and drives the crank; without these deps a paper-drive
@@ -1206,7 +1206,7 @@ def task_verify():
         yield {
             "name": suite,
             # verify.py's gate LOGIC lives partly in _assembly_postbuild.py
-            # (load/replay_park_specs -- the kinematics WIRE-1 live-chain replay).
+            # (load_dof_manifest/author_dof_drives -- the kinematics replays).
             # Unlike verify's other helper imports (_assembly/_common/build_*),
             # that module is deliberately OUTSIDE every assembly recipe (it is on
             # NO build script's closure), so a change to the replay logic does NOT
@@ -1412,14 +1412,14 @@ def task_export():
 
 
 def task_preflight():
-    """Release preflight (OPT-IN, COM spine): replay each default-`free` assembly's
-    DEFERRED park drivers and re-run the exact-DOF closure, WITHOUT saving. Gates
-    `release` (its spine predecessor), so a release cannot publish a free model
-    whose operational DOF fail the sufficiency proof.
+    """Release preflight (OPT-IN, COM spine): the gear-ratios proof on the
+    reopened drive-train + channel (the only assemblies carrying real gear
+    meshes), WITHOUT saving. Gates `release` (its spine predecessor).
 
-    NOT in `build`/`default_tasks` -- the default build proves only DOF necessity
-    (fast); this strict closure runs at release time. On the spine after `export`
-    so it stays serial on the STA seat. Stamps `cad/out/reports/preflight.ok`.
+    NOT in `build`/`default_tasks` -- gear-ratios re-proves a property the
+    tooth-count config fixes (check:math validates it analytically), so it
+    runs at release time only. On the spine after `export` so it stays serial
+    on the STA seat. Stamps `cad/out/reports/preflight.ok`.
     """
     stamp = str(REPORTS / "preflight.ok")
     deps = [str(PREFLIGHT_PY), str(VERIFY_PY),
@@ -1429,13 +1429,8 @@ def task_preflight():
         "file_dep": deps,
         "targets": [stamp],
         "task_dep": _spine_dep("preflight"),
-        # Always run (like export/release): the closure reads the per-assembly
-        # `.<stem>.park.json` sidecars, which are NOT declared file_dep (they are
-        # absent for a `locked` build, so a declared dep would error). Were this
-        # gated on the stamp + .SLDASM digest, a deleted/incompletely-restored
-        # sidecar (recipe digest unchanged) would leave preflight.ok "fresh" and
-        # release would SKIP the only sufficiency check. Running unconditionally,
-        # preflight_release.py fails loud when specs are missing (codex review).
+        # Always run (like export/release), so a stale stamp can never let
+        # release skip the proof.
         "uptodate": [False],
         "actions": [(_run_stamped, [[sys.executable, str(PREFLIGHT_PY)],
                                     "release preflight", stamp])],
