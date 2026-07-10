@@ -713,6 +713,20 @@ async def build(adapter) -> dict[str, str]:
     log(f"timing: seed chain {t_seed:.1f}s vs slice copy avg "
         f"{sum(times) / len(times):.2f}s (first {times[0]:.2f}s, last "
         f"{times[-1]:.2f}s) + repair pass {t_fix:.1f}s total")
+    # Seed immutability: the production rework copies FROM a source
+    # channel, so nothing in the copy/repair workflow may perturb the seed
+    # slice itself (codex #220 round 4) -- every other check here excludes
+    # seed_names, so drift of the SOURCE would otherwise pass silently.
+    seed_drift = []
+    for part, name in comps.items():
+        m = component_transform(adapter, name)
+        rot_d = max(abs(m[k] - seed_tf[part][k]) for k in range(9))
+        xyz_d = max(abs((m[9 + a] - seed_tf[part][9 + a]) * 1000.0)
+                    for a in range(3))
+        if rot_d > 1e-6 or xyz_d > 1e-3:
+            seed_drift.append(f"{name}: rot_d={rot_d:.2e} xyz_d={xyz_d:.4f}mm")
+    log(f"seed slice: {'unmoved' if not seed_drift else 'MOVED -- ' + '; '.join(seed_drift)}")
+
     # Copied-mate HEALTH: the expected mate count and stable poses can hold
     # while a copied mate sits suppressed or in a hard error state with its
     # component parked at the inserted transform (codex #220 round 3 --
@@ -731,7 +745,7 @@ async def build(adapter) -> dict[str, str]:
         f"{'all clean' if not unhealthy else 'UNHEALTHY -- ' + '; '.join(unhealthy)}")
 
     ok = ((mates_after == want_mates) and not pose_fail and stable
-          and not unhealthy)
+          and not unhealthy and not seed_drift)
     if not ok:
         # Raise so the process exits non-zero -- a logged FAIL with exit 0
         # would let automation treat a failed validation as passing
@@ -739,7 +753,8 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(
             f"slice validation FAILED: mates {mates_after}/{want_mates}, "
             f"{len(pose_fail)} pose failures, stable={stable}, "
-            f"{len(unhealthy)} unhealthy copied mates (see log)")
+            f"{len(unhealthy)} unhealthy copied mates, "
+            f"{len(seed_drift)} seed drifts (see log)")
     log("VERDICT: PASS -- one call + flip repair replicates the whole chain")
     return {"verdict": "pass"}
 

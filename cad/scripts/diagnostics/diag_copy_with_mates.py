@@ -48,6 +48,7 @@ from win32com.client import VARIANT  # noqa: E402
 import _telemetry  # noqa: E402
 from _common import check, log, run_build  # noqa: E402
 from _assembly import (  # noqa: E402
+    _mate_hard_error,
     component_names,
     component_transform,
     place_component,
@@ -193,6 +194,8 @@ async def build(adapter) -> dict[str, str]:
     _, t_base2 = await _seat_baseline(adapter, 1)
     log(f"baseline production seat: {t_seed:.2f}s / {t_base2:.2f}s per bushing")
     mates_before = await _mate_count(adapter)
+    pre_copy_names = {m["name"]
+                      for m in ((await adapter.list_mates()).data or [])}
 
     # Q1: marshaling. The 'native' shape is the proven contract; 'list' and
     # 'variant' stay as regression probes for the two known-broken encodings.
@@ -284,6 +287,24 @@ async def build(adapter) -> dict[str, str]:
             f"{mates_post}, stations {zs} -> {zs_post}")
     log("ladder stable across closing rebuild")
 
+    # Copied-mate HEALTH (mirrors the slice probe; codex #220 round 4):
+    # count and stations can hold while a copied mate sits suppressed or
+    # in a hard error state with its bushing parked at the inserted
+    # transform. Scan every mate the ladder copies added (runs BEFORE Q5
+    # so only ladder copies are scanned).
+    unhealthy = []
+    for m in ((await adapter.list_mates()).data or []):
+        if m["name"] in pre_copy_names:
+            continue
+        code = _mate_hard_error(adapter, m["name"])
+        if m.get("suppressed") or code:
+            unhealthy.append(
+                f"{m['name']} (suppressed={m.get('suppressed')}, err={code})")
+    if unhealthy:
+        raise RuntimeError(
+            f"ladder copied mates unhealthy: {'; '.join(unhealthy)}")
+    log("ladder copied-mate health: all clean")
+
     # Q5: FlipDimension semantics. Pinned 2026-07-09: on the Repeat path a
     # re-valued dim's flip RESETS (the array is ignored -- both bits land a
     # +20 target on the SEED's side, -20), and the copy inherits the seed's
@@ -294,10 +315,12 @@ async def build(adapter) -> dict[str, str]:
     # re-validated (codex #220: log-only here let a contract change exit
     # 0). Runs AFTER Q2 so the +/-20 landings don't pollute the station
     # comparison.
+    q5_names: list[str] = []
     for flip in (False, True):
         before = set(component_names(adapter))
         _copy_with_mates(adapter, seed, 20.0, variant, flip_override=flip)
         new = [n for n in component_names(adapter) if n not in before]
+        q5_names.extend(new)
         landed = [round(component_transform(adapter, n)[11] * 1000.0, 3)
                   for n in new]
         log(f"Q5 flip={flip}: target +20.0 -> landed {landed}")
@@ -306,6 +329,17 @@ async def build(adapter) -> dict[str, str]:
                 f"Q5 contract broke: flip={flip} target +20.0 landed "
                 f"{landed}, expected the seed side (-20.0) -- CopyWithMates2 "
                 f"flip semantics changed; re-validate the seed-side rule")
+    # The Q5 copies land after the ladder's closing rebuild, so their
+    # landings need their own rebuild-stability proof (codex #220 round 4):
+    # one asserted rebuild, then both must still read the seed side.
+    if not bool(adapter._attempt(lambda: model.EditRebuild3(), default=False)):
+        raise RuntimeError("post-Q5 EditRebuild3 failed -- Q5 stability unproven")
+    for n in q5_names:
+        z = component_transform(adapter, n)[11] * 1000.0
+        if abs(z - (-20.0)) > 0.05:
+            raise RuntimeError(
+                f"Q5 copy {n} moved on rebuild: z={z:.3f}, expected -20.0")
+    log("Q5 landings rebuild-stable")
     return {"verdict": "pass"}
 
 
