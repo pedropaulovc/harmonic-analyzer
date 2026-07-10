@@ -5,10 +5,13 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
+import pytest
+
 import cut_release
 import export_part_drawing as drawing
 import build_fillister_screw as screw
 import build_platen as platen
+import build_paper_drive_assembly as paper_drive
 from _hole_wizard import BA6
 
 
@@ -28,6 +31,29 @@ def test_mating_hardware_uses_6ba() -> None:
     assert (screw.SLOT_W, screw.SLOT_D) == (0.448, 0.882)
     assert platen.SOCKET_DIA == BA6.tap_diameter_mm
     assert platen.SOCKET_THREAD_DEPTH < platen.SOCKET_DEPTH
+
+
+def test_threaded_guide_interference_allowance_is_exact() -> None:
+    allowed = {
+        frozenset(("platen-guide-1", f"fillister-screw-{index}"))
+        for index in range(15, 19)
+    }
+    volume = (
+        math.pi
+        * (
+            (screw.SHANK_DIA / 2.0) ** 2
+            - (BA6.tap_diameter_mm / 2.0) ** 2
+        )
+        * (screw.SHANK_LEN - paper_drive.LOCK_THICK)
+    )
+    message = "4 interference(s): " + "; ".join(
+        f"{' & '.join(sorted(pair))}: {volume:.2f} mm^3" for pair in allowed
+    )
+    paper_drive._validate_threaded_guide_contacts(message, allowed)
+    with pytest.raises(RuntimeError):
+        paper_drive._validate_threaded_guide_contacts(
+            message + "; platen-guide-1 & platen-rack-1: 0.10 mm^3", allowed
+        )
 
 
 def test_required_drawing_paths() -> None:
