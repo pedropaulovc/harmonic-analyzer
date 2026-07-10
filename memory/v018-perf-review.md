@@ -247,6 +247,25 @@ transcripts; thecadcoder prerequisite "both components fully constraint")
 copies a FULLY-DEFINED seed — the UI path never exercises under-constrained
 copies at all.
 
+**2026-07-09 cone-gear ladder GO (`diagnostics/diag_cwm_config_switch.py`):**
+drive-train's 20 cone gears measured 174.5s of the 1076.2s build body (60 mates
+136.8s + 20 inserts 37.7s; cylinder gears another 156.0s; gears = 31% of the
+build). The cone slice is the VENDOR-BLESSED CopyWithMates2 case — fully
+defined (coaxial + axial-seat dim + parallel anti-spin, all external to the
+shared shaft), so no free-DOF attractor and no put+driver landing needed. The
+one wrinkle, per-station part CONFIGURATIONS (T120..T006), is SOLVED: a copy
+can be re-pointed post-copy via `IComponent2.ReferencedConfiguration = cfg` +
+one EditRebuild3 — measured PASS x3 (T114/T108/T102): pose exact, 3 mates
+carried, status stays fully-defined (3), body truly resizes (box dia 62.20 ->
+59.14 -> 56.08 -> 53.02, exactly -3.06/step = 6 teeth / DP). ~0.7s/copy vs
+~8.7s/gear authored => est ~150s win. Cylinder gears DO NOT fit the Repeat
+path (each meshes a DIFFERENT cone gear — Repeat keeps the seed's references;
+the NewEntityToMateTo wizard path is unexplored). Flip note: a bare
+plane-plane distance to a Z-normal Front plane naturally lands -Z (both
+diagnostics hit the same flip-seed MISS at +Z; production drive-train keys
+gears at NEGATIVE stations so the authored seed should already be False-side —
+assert it in the slot audit like the channel does).
+
 **2026-07-09 minimal wander repro (`diagnostics/diag_cwm_min.py`, standalone
 pywin32, vendor-ticket grade):** the CopyWithMates2 parked-pose wander needs
 NOTHING: one part with ZERO features (default planes only), TWO root-plane
