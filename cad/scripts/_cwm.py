@@ -38,16 +38,13 @@ from __future__ import annotations
 
 from typing import Any
 
-import pythoncom
-from win32com.client import VARIANT
-
 import _telemetry
 from _common import _flag_only
-from solidworks_mcp.adapters.solidworks.assembly import (
-    _create_math_transform,
-    _mate_group_subfeatures,
-    _read_member,
-)
+
+# pywin32 / solidworks_mcp COM imports stay FUNCTION-LOCAL (the _assembly.py
+# convention): this module is imported by build_channel_assembly, which the
+# SolidWorks-free gates import for pure geometry helpers on machines where
+# pywin32 is not installed (it is a sys_platform == 'win32' dependency).
 
 
 def mates_with_owners(adapter: Any, known_prefixes: set[str]) -> list[dict]:
@@ -60,6 +57,11 @@ def mates_with_owners(adapter: Any, known_prefixes: set[str]) -> list[dict]:
     plane, whose ``ReferenceComponent`` is the assembly DOCUMENT (e.g.
     "Assem50"), not empty -- maps to ``"ROOT"``.
     """
+    from solidworks_mcp.adapters.solidworks.assembly import (
+        _mate_group_subfeatures,
+        _read_member,
+    )
+
     model = adapter.currentModel
     out: list[dict] = []
     for feat in _mate_group_subfeatures(adapter):
@@ -147,6 +149,8 @@ def component_mate_dump(adapter: Any, name: str) -> list[dict]:
     but positionally comparable between a seed chain and its copy (both
     authored/copied in the same mate order), which is what the copy-vs-seed
     divergence hunt needs."""
+    from solidworks_mcp.adapters.solidworks.assembly import _read_member
+
     comp = _component(adapter, name)
     _flag_only(comp, "GetMates")
     out: list[dict] = []
@@ -182,6 +186,8 @@ def put_component_pose(adapter: Any, name: str, array16: list[float]) -> None:
     the stored state, re-putting between adds (each add re-seats the still-
     free siblings), then deletes the drivers.
     """
+    from solidworks_mcp.adapters.solidworks.assembly import _create_math_transform
+
     comp = _component(adapter, name)
     xform = _create_math_transform(adapter, list(array16))
     comp.Transform2 = xform
@@ -202,6 +208,9 @@ def copy_with_mates(
     The call's return value is IGNORED (it lies); the caller validates from
     the model (component-name diff, mate recount, poses, health).
     """
+    import pythoncom
+    from win32com.client import VARIANT
+
     model = adapter.currentModel
     raw = []
     for name in comp_names:
