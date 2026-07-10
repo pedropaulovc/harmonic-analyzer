@@ -596,12 +596,20 @@ def test_kinematics_verify_depends_on_pen_driver_and_truth_model():
     recipe to dodo.task_verify's kinematics file_dep (see the comment block there).
     Pin that it's actually still wired up -- a dropped file_dep would leave a fresh
     verify-kinematics.ok stamp valid after a pen_driver/truth_model edit and SKIP
-    the re-authored equation entirely."""
+    the re-authored equation entirely. Ditto the config VALUES those modules read
+    (machine/output.yaml + channels.yaml): post-#221 they ride no pen .SLDASM
+    recipe either, so they must be direct file_deps too (codex #224). (_config.py
+    itself needs no direct dep -- it stays on pen's build closure, so it rides
+    the pen.SLDASM recipe digest.)"""
     dodo = _load_dodo()
     kinematics = next(t for t in dodo.task_verify() if t["name"] == "kinematics")
     deps = {Path(d).name for d in kinematics["file_dep"]}
     assert "pen_driver.py" in deps, deps
     assert "truth_model.py" in deps, deps
+    cfg = (REPO_ROOT / "cad" / "config").resolve()
+    cfg_rel = _rel(kinematics["file_dep"], cfg)
+    assert "machine/output.yaml" in cfg_rel, cfg_rel
+    assert "channels.yaml" in cfg_rel, cfg_rel
 
 
 def test_submodule_digest_is_location_independent(tmp_path):
