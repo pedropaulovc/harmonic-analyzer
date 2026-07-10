@@ -208,7 +208,7 @@ def _validate_thread_contacts(
             math.pi
             * (
                 (SHANK_DIA / 2.0) ** 2
-                - (THREAD.tap_drill_diameter_mm / 2.0) ** 2
+                - (THREAD.core_diameter_mm / 2.0) ** 2
             )
             * engagement_lengths[pair]
         )
