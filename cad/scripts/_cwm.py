@@ -15,10 +15,16 @@ pinned rules this module encodes:
   themselves; INTERNAL mates are re-bound between the copies and inherit
   their dims. Every external dim slot must carry its REAL value -- a 0.0
   re-values the copied dim to zero.
-* On the Repeat=True path a re-valued dim's FlipDimension RESETS to False
-  (the seed's state is not inherited and the flip array is ignored), so a
-  copied external dim must be formulated with the WANTED side as the False
-  side -- in practice: an always-positive ladder off a one-sided anchor.
+* FlipDimension is honoured per slot ONLY where that slot is copied with
+  Repeat=False + a NewEntityToMateTo entity. On the Repeat=True path a
+  re-valued dim's FlipDimension RESETS to False (the seed's state is not
+  inherited and the flip array is ignored). So a copied external dim that must
+  keep a non-False side, or reference its OWN neighbour instead of the seed's,
+  is re-pointed with Repeat=False + its own entity (:func:`resolve_entity`) and
+  the wanted ``flips`` -- NOT worked around with an always-positive ladder or a
+  post-copy ``ModifyDefinition`` flip-heal. A MIXED Repeat array is valid
+  (measured 2026-07-10): flip only the external DIM slot to Repeat=False and
+  leave the shared-reference slots on Repeat=True.
 * A copy of a slice with FREED operational DOF carries a solver-state
   ATTRACTOR: the solver returns the copied chain to one deterministic wrong
   pose on the free manifold from ANY start, even though every copied mate is
@@ -193,17 +199,60 @@ def put_component_pose(adapter: Any, name: str, array16: list[float]) -> None:
     comp.Transform2 = xform
 
 
+def resolve_entity(adapter: Any, ref: Any) -> Any:
+    """Resolve a :func:`~_assembly.named_ref` / ``MateEntityRef`` to its live COM
+    entity object -- the thing a ``NewEntityToMateTo`` slot wants.
+
+    Selects the ref (reusing the adapter's own per-mark selection logic) and
+    harvests it back with ``ISelectionMgr::GetSelectedObject6``, exactly as the
+    mate-creation path does. Clears the selection either side so the harvest is
+    unambiguous. Raises loud if the ref does not select/resolve -- a silent
+    ``None`` here would marshal as a null ``NewEntityToMateTo`` and drop the
+    copy's mate reference."""
+    from solidworks_mcp.adapters.solidworks.assembly import (
+        _harvest_selected,
+        _select_mate_entity,
+    )
+
+    model = adapter.currentModel
+    _flag_only(model, "ClearSelection2")
+    adapter._attempt(lambda: model.ClearSelection2(True), default=None)
+    if not _select_mate_entity(adapter, ref, 0):
+        raise RuntimeError(f"resolve_entity: select failed for {ref!r}")
+    ent = _harvest_selected(adapter, model, 1)[0]
+    adapter._attempt(lambda: model.ClearSelection2(True), default=None)
+    return ent
+
+
 def copy_with_mates(
     adapter: Any, comp_names: list[str], n_mates: int, values_m: list[float],
     flips: list[bool] | None = None,
+    repeat: list[bool] | None = None,
+    new_entities: list[Any] | None = None,
 ) -> None:
     """One native-typed ``CopyWithMates2`` of the given component slice.
 
     ``values_m`` (metres) maps positionally onto the slice's external-mate
     slots (:func:`external_mate_rows`); entries under dimension-less slots
-    are dead. ``flips`` is passed through for completeness -- measured as
-    IGNORED on the Repeat path (a re-valued dim resets to flip=False), so
-    the caller must formulate external dims False-side (see module doc).
+    are dead.
+
+    ``repeat`` (per external-mate slot) chooses each slot's reference source:
+    ``True`` reuses the seed's existing mate reference; ``False`` mates the copy
+    to ``new_entities[slot]`` instead. Default (``None``) = all-``True`` (the
+    seed's references), the legacy behaviour. ``new_entities`` is the matching
+    list of resolved COM entities (see :func:`resolve_entity`) or ``None`` per
+    slot; only the ``repeat=False`` slots are read. A **MIXED** array is valid
+    and measured (2026-07-10): switching only the external DIM slot to
+    ``repeat=False`` + own ``new_entities`` + ``flips`` HONOURS FlipDimension on
+    that slot while the other slots keep the seed's references untouched -- the
+    surgical way to re-point one external dim without re-plumbing the rest.
+
+    ``flips`` (per slot) is the FlipDimension array. It is HONOURED on a
+    ``repeat=False`` slot (the copy's re-valued dim lands on the requested side)
+    and IGNORED on a ``repeat=True`` slot (that path resets a re-valued dim to
+    flip=False -- see module doc). So a dim that must keep a non-False side is
+    re-pointed with ``repeat=False`` + its own entity, not left on the Repeat
+    path with an always-positive ladder.
 
     The call's return value is IGNORED (it lies); the caller validates from
     the model (component-name diff, mate recount, poses, health).
@@ -218,10 +267,13 @@ def copy_with_mates(
         if c is None:
             raise RuntimeError(f"copy_with_mates: component not found: {name!r}")
         raw.append(c._oleobj_)
+    rep = list(repeat) if repeat is not None else [True] * n_mates
+    ents_src = new_entities if new_entities is not None else [None] * n_mates
+    ents = [e._oleobj_ if e is not None else None for e in ents_src]
     args = (
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, raw),
-        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, [True] * n_mates),
-        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, [None] * n_mates),
+        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, rep),
+        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, ents),
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, list(values_m)),
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, [False] * n_mates),
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL,
