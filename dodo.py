@@ -113,7 +113,12 @@ from _buildgraph import (  # noqa: E402
 
 import _artifact_cache as _cache  # noqa: E402  (remote build-artefact cache)
 import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
-from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME  # noqa: E402
+from _drawing_registry import (  # noqa: E402
+    ASME_B_DRWDOT,
+    ASME_B_SLDDRT,
+    DRAWINGS,
+    DRAWINGS_BY_NAME,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent
 CONFIG_DIR = REPO_ROOT / "cad" / "config"
@@ -1453,8 +1458,20 @@ def task_check():
         },
         "recipe": {
             "file_dep": [str((REPO_ROOT / "dodo.py").resolve()),
-                         str((SCRIPTS_DIR / "test_dodo_recipe.py").resolve())],
-            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_dodo_recipe.py")],
+                         str((SCRIPTS_DIR / "test_dodo_recipe.py").resolve()),
+                         str((SCRIPTS_DIR / "test_platen_guide_drawing.py").resolve()),
+                         str((SCRIPTS_DIR / "test_solidworks_seat_provision.py").resolve()),
+                         str((SCRIPTS_DIR / "_drawing_common.py").resolve()),
+                         str((SCRIPTS_DIR / "_drawing_registry.py").resolve()),
+                         str((SCRIPTS_DIR / "draw_platen_guide.py").resolve()),
+                         str((SCRIPTS_DIR / "provision_solidworks_seat.py").resolve()),
+                         str((SCRIPTS_DIR / "cut_release.py").resolve()),
+                         str(ASME_B_DRWDOT.resolve()),
+                         str(ASME_B_SLDDRT.resolve())],
+            "cmd": [*pytest_cmd,
+                    str(SCRIPTS_DIR / "test_dodo_recipe.py"),
+                    str(SCRIPTS_DIR / "test_platen_guide_drawing.py"),
+                    str(SCRIPTS_DIR / "test_solidworks_seat_provision.py")],
         },
         "cache": {
             # The artefact-cache provenance/observability unit tests (issue #73):

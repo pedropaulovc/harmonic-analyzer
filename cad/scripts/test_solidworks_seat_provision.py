@@ -132,3 +132,30 @@ def test_migration_rejects_unknown_hole_wizard_schema(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match="unsupported Hole Wizard schema"):
         provision.validate_source_schema(database)
 
+
+def test_provisioned_toolbox_is_a_stable_rerun_source(tmp_path: Path) -> None:
+    source_root = tmp_path / "stock"
+    database = source_root / provision.DATABASE_RELATIVE
+    database.parent.mkdir(parents=True)
+    _fixture_database(database)
+    shared = tmp_path / "shared"
+
+    first, _ = provision.provision(
+        version="SOLIDWORKS 2026",
+        source_root=source_root,
+        shared_root=shared,
+        configure=False,
+        what_if=False,
+    )
+    second, _ = provision.provision(
+        version="SOLIDWORKS 2026",
+        source_root=first,
+        shared_root=shared,
+        configure=False,
+        what_if=False,
+    )
+
+    assert second == first
+    assert len(list((shared / "toolbox").iterdir())) == 1
+    provision.verify_database(second / provision.DATABASE_RELATIVE)
+
