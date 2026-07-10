@@ -636,15 +636,41 @@ _REQUIRED_FREE_STEMS = {
 # the built assemblies (`gate.dof_free_necessity` names any stray explicitly,
 # so extending them after a deliberate coupling change is a one-line fix).
 _ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
-    # channel validated live: 80 under-constrained = exactly these 4 stems x 20
-    # channels (diagnostics/dump_under_constrained.py, 2026-07-09).
+    # Every list pinned LIVE from built artefacts via
+    # diagnostics/dump_under_constrained.py (2026-07-09): channel read 80
+    # under-constrained = exactly these 4 stems x 20 channels; the other
+    # dumps are quoted per assembly below. Re-pin after a deliberate
+    # coupling change -- the gate names any stray.
     "channel": ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever"),
     "summing": ("summing-lever", "boss-hook"),
     "pen": ("pen-rod", "pen-marker", "pen-wire"),
-    # drive-train / magnifier / paper-drive: their coupled trains span many
-    # families; pin from `diagnostics/dump_under_constrained.py` on the next
-    # full build (their artefacts are not present on this seat). Absent here =
-    # the exact-set direction is skipped, necessity still runs.
+    # 63 under-constrained, 22 families: the crank chain, the geared train,
+    # the platform + its riders (cone set, tip hardware) and the pinion
+    # engage rig -- all coupled to the 4 freed DOF.
+    "drive-train": (
+        "alignment-pinion", "cone-gear", "cone-gear-shaft", "cone-pivot-post",
+        "cone-swing-platform", "cone-tip-adjuster", "cone-tip-block",
+        "cone-tip-bushing", "cone-tip-pinch-screw", "crank-arm",
+        "crank-drive-gear", "crank-handle", "crank-pinion", "crankshaft",
+        "cylinder-gear", "pinion-arbor", "pinion-bracket", "pinion-cam",
+        "pinion-cam-pin", "pinion-handle", "pinion-lever", "pinion-lift-rod",
+    ),
+    # 8 under-constrained: the lever carries the clamp/vertical-rod/fixture
+    # group + the bracket; the wire and yoke-coupled wheel articulate with it.
+    "magnifier": (
+        "lever-wire", "magnifying-bracket", "magnifying-clamp",
+        "magnifying-lever", "magnifying-vertical-rod", "magnifying-wheel",
+        "output-fixture", "thumb-screw",
+    ),
+    # 39 under-constrained, 12 families: the crank T12 + belt-coupled knob
+    # cluster, the reduction train down to the feed pinion, and the
+    # rack-coupled platen group with its riders.
+    "paper-drive": (
+        "fillister-screw", "guide-lock", "platen", "platen-clip",
+        "platen-guide", "platen-paper", "platen-rack", "rack-pinion",
+        "transgear-feed-pinion", "transgear-knob-shaft", "transgear-pinion",
+        "transgear-removable",
+    ),
 }
 
 
