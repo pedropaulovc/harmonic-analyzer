@@ -169,7 +169,11 @@ def _manufacturing_notes() -> str:
         (
             "UNLESS OTHERWISE SPECIFIED:",
             "1. DIMENSIONS ARE IN MILLIMETRES. INTERPRET PER ASME Y14.5.",
-            "2. TOLERANCES: X +/-0.5; X.X +/-0.25; X.XX +/-0.10; X.XXX +/-0.05; ANGLES +/-0.5 DEG.",
+            (
+                "2. TOLERANCES: LENGTH +/-0.5; STOCK SECTION +/-0.25; "
+                "HOLE CENTRES +/-0.10; CORE DIAMETERS +/-0.05; "
+                "ANGLES +/-0.5 DEG."
+            ),
             "3. REMOVE BURRS AND BREAK SHARP EDGES 0.2 MAX.",
             (
                 f"4. 6 BA BASIC: MAJOR DIA {BA6.major_diameter_mm:.2f}, "
@@ -189,13 +193,13 @@ def _add_hole_schedule(adapter: Any) -> None:
         adapter,
         rows=(
             (
-                "GROUP",
+                "HOLE SET",
                 "QTY",
                 "CENTRES: X FROM LEFT END; Y=2.50",
                 "THREAD / CORE",
             ),
             (
-                "A",
+                "T",
                 "4",
                 "53.00, 67.00, 233.00, 247.00",
                 (
@@ -292,7 +296,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_hole_group_tags(
         adapter,
         front,
-        "A",
+        "T",
         edge_points=_edge_points(THROUGH_X),
         note_positions=tuple(
             (x + (-0.004 if index % 2 == 0 else 0.004), 0.211)
@@ -308,6 +312,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_note(adapter, _manufacturing_notes(), 0.014, 0.105)
+    add_note(adapter, "PLATEN-MATING FACE — DATUM A", 0.144, 0.224)
     add_note(adapter, "SCALE 3:1", 0.352, 0.163)
     add_note(adapter, "REFERENCE — SCALE 1:4", 0.170, 0.014)
 

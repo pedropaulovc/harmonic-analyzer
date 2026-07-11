@@ -133,6 +133,15 @@ def test_required_drawing_paths() -> None:
     assert drawing.PNG.as_posix().endswith("/png/platen-guide_drawing.png")
 
 
+def test_drawing_tolerances_follow_feature_function_not_display_zeros() -> None:
+    notes = drawing._manufacturing_notes()
+    assert "LENGTH +/-0.5" in notes
+    assert "STOCK SECTION +/-0.25" in notes
+    assert "HOLE CENTRES +/-0.10" in notes
+    assert "CORE DIAMETERS +/-0.05" in notes
+    assert "X.XXX" not in notes
+
+
 def test_pdf_metadata_is_project_owned(tmp_path: Path) -> None:
     from pypdf import PdfReader, PdfWriter
 
