@@ -195,15 +195,16 @@ def _hole_table_template(adapter: Any) -> Path:
     )
     if not executable:
         raise RuntimeError("SolidWorks executable path is unavailable")
-    template = (
-        Path(str(executable)).parent
-        / "lang"
-        / "english"
-        / "standard hole table--letters.sldholtbt"
+    install_root = Path(str(executable)).parent
+    relative = Path("lang") / "english" / "standard hole table--letters.sldholtbt"
+    candidates = (install_root / relative, install_root / "SOLIDWORKS" / relative)
+    for template in candidates:
+        if template.is_file():
+            return template
+    raise FileNotFoundError(
+        "native hole-table template is missing; checked "
+        + ", ".join(str(path) for path in candidates)
     )
-    if not template.is_file():
-        raise FileNotFoundError(f"native hole-table template is missing: {template}")
-    return template
 
 
 def _select_hole_table_geometry(adapter: Any, front: Any) -> None:
