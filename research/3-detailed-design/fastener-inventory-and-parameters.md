@@ -1,5 +1,16 @@
 # Fastener Inventory & Period-Accurate Parameters — Michelson Harmonic Analyzer
 
+> [!WARNING]
+> **PERIOD-ACCURATE FASTENERS ARE ON HOLD — DO NOT IMPLEMENT (until further notice).**
+> The period thread systems referenced throughout this document (**Whitworth /
+> BSW**, **British Association / BA**, Sellers) are **suspended** for the CAD
+> build. **Code and CAD scripts must use US customary (inch) fasteners instead**
+> — standard UNC/UNF fractional-inch sizes. The Thread/Pitch/BA columns below are
+> reference only; ignore the BA/Whitworth thread-form choice until this notice is
+> lifted. See the sibling key
+> [`period-accurate-fastener-parameters.md`](period-accurate-fastener-parameters.md)
+> (same warning).
+
 Hand-off document for the CAD fastener-detailing pass. Cross-derives **every**
 fastener in the machine from three independent sources and assigns the most
 plausible period-correct parameters (thread system, pitch, length, head, drive,
