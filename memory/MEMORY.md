@@ -1,5 +1,7 @@
 # Memory index
 
+- [Bench Opus run setup](bench-opus-run-setup.md) — run comparisons/bench for Opus: source geometry from a release into cad/out (touch stl/boxes newer), regenerate 270 renders, `--effort high`, run-until-quota driver + periodic push to feat/bench-opus-high (PR #253)
+
 - [Fastener policy: US-customary UNC](fastener-policy-us-customary.md) — ALL threads/holes use ANSI inch UNC (1/4-20, #10-24, #5-40, 9/16-12), Hole Wizard features carry the designations; period BSW research file deliberately IGNORED; best-fit sizing when undefined
 - [Hole Wizard COM recipe](hole-wizard-com-recipe.md) — `_holes.wizard_holes` probe-verified 6/6; InitializeHole(blind) is BROKEN + poisons the session (blind ⇒ HoleWizard5 positional, V1=thread depth V6=drill angle rad V8=thread end); early-bind IWizardHoleFeatureData2 via gen_py (not CastTo); table dims read 0 — pinned tables in _holes.py; ThruHoleDiameter is the cbore through knob
 - [Parallel SW instances investigation](parallel-sw-instances-investigation.md) — QUEUED (post-PR #193): probe whether 2+ independent SolidWorks instances can run parallel COM builds on one seat (ROT-bind a specific instance, no flip flakiness); acceptance = 3× full COLD build must pass; would relax the `dodo.py` COM-spine serialization
