@@ -42,6 +42,7 @@ from _common import (
     set_global,
     volume_check,
 )
+from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
 
 PART_NAME = "pinion-pivot-block"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel block (p.68)
@@ -62,8 +63,13 @@ LIFT_BORE_DROP = 4.66  # the WEST (lift) bore sits this far BELOW the pivot
 # bottom at local -7.84 keeps a 4.2 web to the block bottom (-12). The
 # 4.66 (not the photo-first 4.51) buys the 0.15 park AIR between pin and
 # collar -- exact tangency tips the interference gate on FP noise.
-SCREW_HOLE_DIA = 4.2  # slotted-screw shank O4 (PR7: the p.69 close-up's two
-# bright hold-down heads per block)
+# Slotted-screw shank pass-throughs (PR7: the p.69 close-up's two bright
+# hold-down heads per block): #19 drill (Ø4.216) -- the wizard twin of the old
+# Ø4.2, matching the base's own #19 slotted-screw seats (build_harmonic_base
+# BlockScrewHoles) exactly.
+SCREW_HOLE_SPEC = HoleSpec("drilled_number", "#19")
+SCREW_HOLE_DIA = NUMBER_DRILL_MM[SCREW_HOLE_SPEC.size]  # 4.216; re-exposed for
+# the drive-train assembly's block-screw clearance assert
 SCREW_HALF_SPACING = 13.5  # hole centres out past the bores: 0.6 web to the
 # bore wall, 0.9 rim to the block end
 
@@ -85,8 +91,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "Bore", f"{BORE}mm")
     await set_global(adapter, "BoreHalfSpacing", f"{BORE_HALF_SPACING}mm")
     await set_global(adapter, "LiftBoreDrop", f"{LIFT_BORE_DROP}mm")
-    await set_global(adapter, "ScrewHoleDia", f"{SCREW_HOLE_DIA}mm")
-    await set_global(adapter, "ScrewHalfSpacing", f"{SCREW_HALF_SPACING}mm")
+    # (The old ScrewHoleDia/ScrewHalfSpacing knobs are gone: the two hold-down
+    # holes are now a native Hole Wizard #19 feature at literal stations.)
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -138,36 +144,20 @@ async def build(adapter) -> dict[str, str]:
     expected = area * DEPTH
     await volume_check(adapter, "block", expected, 0.005 * expected)
 
-    # Two vertical slotted-screw holes (PR7): O4.2 along Y through the block at
-    # (x +-SCREW_HALF_SPACING, z mid-depth) -- the p.69 close-up's bright
-    # hold-down pair. Top sketch (u, v) -> (X, -Z); mid-plane cut spans the
-    # 16-tall block about the bore plane.
-    holes = SketchDims()
-    check("create_sketch screw holes", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter, SCREW_HALF_SPACING, -DEPTH / 2.0, SCREW_HOLE_DIA / 2.0,
-        "screw hole east", dims=holes,
-        names=("ScrewEastX", "ScrewEastZ", "ScrewEastDia"),
-        drives=('"ScrewHalfSpacing"', '"BlockDepth" / 2', '"ScrewHoleDia"'),
+    # Two vertical slotted-screw hold-down holes (PR7): ONE native Hole Wizard
+    # #19 feature (2 through-all instances) along Y at (x +-SCREW_HALF_SPACING,
+    # z mid-depth), drilled from the block bottom (y = -BORE_UP) while the block
+    # is still prismatic (the two Z-bores exit the front/back faces, leaving the
+    # bottom face a clean rectangle). Top-sketch (u,v)->(X,-Z), so the sketch v
+    # -DEPTH/2 is model z = +DEPTH/2 -- the mid-depth line.
+    screw_dia = NUMBER_DRILL_MM[SCREW_HOLE_SPEC.size]
+    wizard_holes(
+        adapter, SCREW_HOLE_SPEC,
+        [[SCREW_HALF_SPACING, -BORE_UP, DEPTH / 2.0],
+         [-SCREW_HALF_SPACING, -BORE_UP, DEPTH / 2.0]],
+        (0.0, -1.0, 0.0), "hold-down screw holes (#19)", name="ScrewHoles",
     )
-    await define_circle(
-        adapter, -SCREW_HALF_SPACING, -DEPTH / 2.0, SCREW_HOLE_DIA / 2.0,
-        "screw hole west", dims=holes,
-        names=("ScrewWestX", "ScrewWestZ", "ScrewWestDia"),
-        drives=('"ScrewHalfSpacing"', '"BlockDepth" / 2', '"ScrewHoleDia"'),
-    )
-    await ensure_fully_defined(adapter, "screw holes sketch")
-    check("exit_sketch screw holes", await adapter.exit_sketch())
-    name_last_feature(adapter, "ScrewHolesProfile")
-    drive_jobs += holes.apply(adapter, "ScrewHolesProfile")
-    check(
-        "cut screw holes",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=4.0 * HEIGHT, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "ScrewHoles")
-    v_holes = 2.0 * math.pi * (SCREW_HOLE_DIA / 2.0) ** 2 * HEIGHT
+    v_holes = 2.0 * math.pi * (screw_dia / 2.0) ** 2 * HEIGHT
     expected -= v_holes
     await volume_check(adapter, "screw holes", expected, 0.02 * v_holes)
 

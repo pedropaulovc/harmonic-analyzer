@@ -18,16 +18,19 @@ import sys
 
 from _clamp_arc import build_arc
 from _common import run_build
+from _holes import HoleSpec
 
 PART_NAME = "column-clamp-back"
 
 DEPTH = 14.0  # column-axis plane to the back face (1.2 wall past the column)
-HOLE_DIA = 4.0  # the O3.9 clamp-screw shanks thread in
+# The O3.9 clamp-screw shanks THREAD IN here (back arc = last in the stack):
+# tapped #8-32 (nearest UNC to the ~Ø4 screw; memory/fastener-policy-us-customary).
+HOLE_SPEC = HoleSpec("tapped", "#8-32")
 
 
 async def build(adapter) -> dict[str, str]:
     return await build_arc(
-        adapter, part_name=PART_NAME, depth=DEPTH, front=False, hole_dia=HOLE_DIA
+        adapter, part_name=PART_NAME, depth=DEPTH, front=False, hole_spec=HOLE_SPEC
     )
 
 
