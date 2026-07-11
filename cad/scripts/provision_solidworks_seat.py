@@ -592,8 +592,17 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = _parse_args()
-    version, discovered_source = _registry_context()
-    source = (args.source_toolbox_root or discovered_source).resolve()
+    discovered_source: Path | None = None
+    version = "unconfigured"
+    needs_registry = args.source_toolbox_root is None or (
+        not args.no_configure and not args.what_if and not args.check
+    )
+    if needs_registry:
+        version, discovered_source = _registry_context()
+    source = args.source_toolbox_root or discovered_source
+    if source is None:
+        raise RuntimeError("a source Toolbox root is required")
+    source = source.resolve()
     shared = args.shared_root.resolve()
     if args.check:
         if _read_provision_manifest(source) is not None:

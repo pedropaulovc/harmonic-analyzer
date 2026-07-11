@@ -173,7 +173,6 @@ def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None
     stage.mkdir()
     staged = cut_release.stage_drawings(stage)
     assert staged == {
-        "platen_guide:slddrw": "slddrw/platen-guide.SLDDRW",
         "platen_guide:pdf": "pdf/platen-guide.pdf",
         "platen_guide:png": "png/platen-guide_drawing.png",
     }
@@ -193,7 +192,9 @@ def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None
     cut_release.RELEASE_DIR.mkdir()
     native = cut_release.package_drawings(object(), stage)
     assert native == {
-        "platen_guide:solidworks_slddrw": "solidworks/platen-guide.SLDDRW"
+        "platen_guide:solidworks_slddrw": "solidworks/platen-guide.SLDDRW",
+        "platen_guide:slddrw": "slddrw/platen-guide.SLDDRW",
     }
     assert (stage / "solidworks" / "platen-guide.SLDDRW").read_bytes() == b"slddrw"
     assert (stage / "solidworks" / "platen-guide.SLDPRT").read_bytes() == b"referenced model"
+    assert (stage / "slddrw" / "platen-guide.SLDDRW").read_bytes() == b"slddrw"

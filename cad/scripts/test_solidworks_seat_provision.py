@@ -6,6 +6,7 @@ import shutil
 import sqlite3
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -224,5 +225,33 @@ def test_powershell_what_if_runs_python_read_only_plan(tmp_path: Path) -> None:
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "provision plan:" in result.stdout + result.stderr
+    assert not shared.exists()
+
+
+def test_main_offline_plan_does_not_read_solidworks_registry(
+    tmp_path: Path, monkeypatch
+) -> None:
+    source_root = tmp_path / "stock"
+    database = source_root / provision.DATABASE_RELATIVE
+    database.parent.mkdir(parents=True)
+    _fixture_database(database)
+    shared = tmp_path / "shared"
+    monkeypatch.setattr(
+        provision,
+        "_parse_args",
+        lambda: SimpleNamespace(
+            source_toolbox_root=source_root,
+            shared_root=shared,
+            no_configure=True,
+            check=False,
+            what_if=True,
+        ),
+    )
+
+    def registry_forbidden():
+        raise AssertionError("offline --what-if attempted registry discovery")
+
+    monkeypatch.setattr(provision, "_registry_context", registry_forbidden)
+    assert provision.main() == 0
     assert not shared.exists()
 
