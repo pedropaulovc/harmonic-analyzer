@@ -30,7 +30,6 @@ from _drawing_common import (
     set_hidden_lines_removed,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _hole_wizard import BA6
 from build_platen_guide import HOLE_X as THROUGH_X
 from build_platen_guide import SCREW_STATION_X as BLIND_X
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
@@ -68,6 +67,10 @@ FRONT_HOLE_Y_M = 0.1111
 FRONT_BOTTOM_Y_M = FRONT_HOLE_Y_M - 0.0025
 HOLE_TABLE_X_M = 0.014
 HOLE_TABLE_Y_M = 0.258
+THREAD_DESIGNATION = "#4-40 UNC-2B"
+THREAD_MAJOR_DIA_MM = 2.845
+THREAD_PITCH_MM = 25.4 / 40.0
+THREAD_TAP_DRILL_MM = 2.261
 
 
 def _insert_marked_model_dimensions(adapter: Any, view: Any) -> list[Any]:
@@ -179,9 +182,9 @@ def _manufacturing_notes() -> str:
             ),
             "3. REMOVE BURRS AND BREAK SHARP EDGES 0.2 MAX.",
             (
-                f"4. 6 BA BASIC: MAJOR DIA {BA6.major_diameter_mm:.2f}, "
-                f"PITCH {BA6.pitch_mm:.2f}, CORE DIA {BA6.core_diameter_mm:.3f}, "
-                f"INCLUDED ANGLE {BA6.angle_deg:.1f} DEG."
+                f"4. {THREAD_DESIGNATION}: MAJOR DIA {THREAD_MAJOR_DIA_MM:.3f}; "
+                f"PITCH {THREAD_PITCH_MM:.3f}; TAP DRILL DIA "
+                f"{THREAD_TAP_DRILL_MM:.3f}."
             ),
             "5. DATUM A IS THE PLATEN-MATING FACE (BLIND-HOLE ENTRY FACE).",
             "6. DATUM A FACE: FLATNESS 0.10; SURFACE FINISH Ra 3.2 OR BETTER.",
@@ -322,7 +325,7 @@ async def build(adapter: Any) -> dict[str, str]:
         0: "Platen Guide Manufacturing Drawing",
         1: "Harmonic Analyzer hobby-machinist book drawing",
         2: "Harmonic Analyzer Project",
-        3: "platen guide; manufacturing drawing; 6 BA",
+        3: "platen guide; manufacturing drawing; #4-40 UNC",
         4: "Generated from the project-owned ASME B drawing standard",
     }
     model_doc = _sw_type_info.flagged(drawing_model, "IModelDoc2")
@@ -338,18 +341,14 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    thread_callout = (
-        f"{BA6.designation}, {BA6.pitch_mm:.2f} PITCH, "
-        f"{BA6.angle_deg:.1f} DEG INCLUDED ANGLE"
-    )
     thread_seeds, thread_instances = import_cosmetic_threads(adapter, front)
-    expected_thread_instances = len(THROUGH_X) + len(BLIND_X)
+    expected_thread_instances = len(BLIND_X)
     if thread_instances != expected_thread_instances:
         raise RuntimeError(
             f"front view has {thread_seeds} cosmetic-thread seed(s) / "
             f"{thread_instances} instance(s); expected {expected_thread_instances}"
         )
-    removed_thread_notes = remove_notes_matching(adapter, thread_callout)
+    removed_thread_notes = remove_notes_matching(adapter, "#4-40")
     _telemetry.info(
         f"front view imported {thread_seeds} cosmetic-thread seed(s) as "
         f"{thread_instances} instance(s); removed {removed_thread_notes} "

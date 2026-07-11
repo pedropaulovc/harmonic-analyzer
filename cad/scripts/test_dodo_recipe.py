@@ -93,16 +93,6 @@ def test_recipe_tracker_detects_any_recipe_member(tmp_path):
         member.write_text("v0\n")  # restore for next iteration
 
 
-def test_paper_drive_never_uses_generic_refresh_gate():
-    dodo = _load_dodo()
-    assert dodo._assembly_run_mode("paper_drive", False, False) == (
-        "full", "bounded thread-contact gate requires full rebuild"
-    )
-    assert dodo._assembly_run_mode("channel", False, False) == (
-        "refresh", "referenced artefact changed"
-    )
-
-
 def test_drawing_depends_on_actual_part_execution():
     dodo = _load_dodo()
     token = dodo._part_execution_token("platen_guide")
@@ -112,15 +102,6 @@ def test_drawing_depends_on_actual_part_execution():
     )
     assert token in part["targets"]
     assert token in drawing["file_dep"]
-
-
-def test_recipe_check_tracks_powershell_provisioning_wrapper():
-    dodo = _load_dodo()
-    recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
-    wrapper = (
-        dodo.REPO_ROOT / "scripts" / "solidworks" / "provision_seat.ps1"
-    ).resolve()
-    assert str(wrapper) in recipe["file_dep"]
 
 
 def test_content_checker_digest_ignores_yaml_noise(tmp_path):
@@ -384,7 +365,7 @@ def test_drawing_spine_boundary_and_source_dependency(monkeypatch):
         "draw_platen_guide.py",
         "_drawing_common.py",
         "_drawing_registry.py",
-        "_hole_wizard.py",
+        "_holes.py",
         "_common.py",
         ".solidworks-mcp-submodule.digest",
     } <= dep_names
@@ -742,15 +723,12 @@ def test_submodule_digest_is_location_independent(tmp_path):
 
 
 def test_recipe_gate_tracks_sources_imported_by_its_tests():
-    """Editing code exercised by the drawing/provision tests must stale the
+    """Editing code exercised by the drawing tests must stale the
     ``check:recipe`` stamp even when the test files themselves are unchanged."""
     dodo = _load_dodo()
     recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
     deps = {Path(path).name for path in recipe["file_dep"]}
     assert {
-        "_hole_wizard.py",
-        "build_fillister_screw.py",
-        "build_platen.py",
+        "_holes.py",
         "build_platen_guide.py",
-        "build_paper_drive_assembly.py",
     } <= deps
