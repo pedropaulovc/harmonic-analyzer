@@ -167,6 +167,16 @@ def set_hidden_lines_removed(adapter: Any, view: Any) -> None:
         raise RuntimeError("failed to set hidden-lines-removed drawing view")
 
 
+def set_hidden_lines_visible(adapter: Any, view: Any) -> None:
+    """Show hidden edges (greyed) in ``view`` — for a view whose job is to
+    communicate internal/cross-drilled features."""
+    ok = adapter._attempt(
+        lambda: view.SetDisplayMode4(False, 1, False, False, True), default=False
+    )
+    if not ok:
+        raise RuntimeError("failed to set hidden-lines-visible drawing view")
+
+
 def assert_asme_b_sheet(
     adapter: Any, sheet: Any, *, phase: str, scale: tuple[float, float] = (1.0, 1.0)
 ) -> None:
