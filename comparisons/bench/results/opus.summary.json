@@ -1,0 +1,324 @@
+{
+ "opus": {
+  "t1": {
+   "table": {
+    "P1": {
+     "n": 2,
+     "macro_sign": 1.0,
+     "ci": [
+      NaN,
+      NaN
+     ],
+     "per_param": {
+      "az": 1.0,
+      "el": 1.0,
+      "roll": 1.0,
+      "target_x": 1.0,
+      "target_y": 1.0,
+      "zoom": 1.0
+     },
+     "magnitude": 1.0,
+     "control_fp": NaN,
+     "confusion": {
+      "leaks": {},
+      "n_by_param": {
+       "az": 2
+      }
+     },
+     "median_tokens": 2095,
+     "mean_latency_s": 24.0
+    },
+    "P2": {
+     "n": 2,
+     "macro_sign": 0.9166666666666666,
+     "ci": [
+      NaN,
+      NaN
+     ],
+     "per_param": {
+      "az": 1.0,
+      "el": 0.5,
+      "roll": 1.0,
+      "target_x": 1.0,
+      "target_y": 1.0,
+      "zoom": 1.0
+     },
+     "magnitude": 1.0,
+     "control_fp": NaN,
+     "confusion": {
+      "leaks": {
+       "az->el": 1
+      },
+      "n_by_param": {
+       "az": 2
+      }
+     },
+     "median_tokens": 1366,
+     "mean_latency_s": 24.6
+    },
+    "P3": {
+     "n": 2,
+     "macro_sign": 1.0,
+     "ci": [
+      NaN,
+      NaN
+     ],
+     "per_param": {
+      "az": 1.0,
+      "el": 1.0,
+      "roll": 1.0,
+      "target_x": 1.0,
+      "target_y": 1.0,
+      "zoom": 1.0
+     },
+     "magnitude": 1.0,
+     "control_fp": NaN,
+     "confusion": {
+      "leaks": {},
+      "n_by_param": {
+       "az": 2
+      }
+     },
+     "median_tokens": 1768,
+     "mean_latency_s": 29.6
+    },
+    "P4": {
+     "n": 2,
+     "macro_sign": 1.0,
+     "ci": [
+      NaN,
+      NaN
+     ],
+     "per_param": {
+      "az": 1.0,
+      "el": 1.0,
+      "roll": 1.0,
+      "target_x": 1.0,
+      "target_y": 1.0,
+      "zoom": 1.0
+     },
+     "magnitude": 1.0,
+     "control_fp": NaN,
+     "confusion": {
+      "leaks": {},
+      "n_by_param": {
+       "az": 2
+      }
+     },
+     "median_tokens": 1306,
+     "mean_latency_s": 20.0
+    },
+    "P5": {
+     "n": 2,
+     "macro_sign": 1.0,
+     "ci": [
+      NaN,
+      NaN
+     ],
+     "per_param": {
+      "az": 1.0,
+      "el": 1.0,
+      "roll": 1.0,
+      "target_x": 1.0,
+      "target_y": 1.0,
+      "zoom": 1.0
+     },
+     "magnitude": 1.0,
+     "control_fp": NaN,
+     "confusion": {
+      "leaks": {},
+      "n_by_param": {
+       "az": 2
+      }
+     },
+     "median_tokens": 790,
+     "mean_latency_s": 18.4
+    },
+    "P6": {
+     "n": 2,
+     "macro_sign": 1.0,
+     "ci": [
+      NaN,
+      NaN
+     ],
+     "per_param": {
+      "az": 1.0,
+      "el": 1.0,
+      "roll": 1.0,
+      "target_x": 1.0,
+      "target_y": 1.0,
+      "zoom": 1.0
+     },
+     "magnitude": 0.5,
+     "control_fp": NaN,
+     "confusion": {
+      "leaks": {},
+      "n_by_param": {
+       "az": 2
+      }
+     },
+     "median_tokens": 800,
+     "mean_latency_s": 17.2
+    },
+    "P7": {
+     "n": 1,
+     "macro_sign": 0.5,
+     "ci": [
+      NaN,
+      NaN
+     ],
+     "per_param": {
+      "az": 1.0,
+      "el": 0.0,
+      "roll": 1.0,
+      "target_x": 0.0,
+      "target_y": 0.0,
+      "zoom": 1.0
+     },
+     "magnitude": 1.0,
+     "control_fp": NaN,
+     "confusion": {
+      "leaks": {
+       "az->el": 1,
+       "az->target_x": 1,
+       "az->target_y": 1
+      },
+      "n_by_param": {
+       "az": 1
+      }
+     },
+     "median_tokens": 2978,
+     "mean_latency_s": 49.0
+    },
+    "P8": {
+     "n": 1,
+     "macro_sign": 1.0,
+     "ci": [
+      NaN,
+      NaN
+     ],
+     "per_param": {
+      "az": 1.0,
+      "el": 1.0,
+      "roll": 1.0,
+      "target_x": 1.0,
+      "target_y": 1.0,
+      "zoom": 1.0
+     },
+     "magnitude": 1.0,
+     "control_fp": NaN,
+     "confusion": {
+      "leaks": {},
+      "n_by_param": {
+       "az": 1
+      }
+     },
+     "median_tokens": 759,
+     "mean_latency_s": 14.9
+    },
+    "P9": {
+     "n": 2,
+     "macro_sign": 1.0,
+     "ci": [
+      NaN,
+      NaN
+     ],
+     "per_param": {
+      "az": 1.0,
+      "el": 1.0,
+      "roll": 1.0,
+      "target_x": 1.0,
+      "target_y": 1.0,
+      "zoom": 1.0
+     },
+     "magnitude": 1.0,
+     "control_fp": NaN,
+     "confusion": {
+      "leaks": {},
+      "n_by_param": {
+       "az": 2
+      }
+     },
+     "median_tokens": 1349,
+     "mean_latency_s": 24.9
+    },
+    "P10": {
+     "n": 1,
+     "macro_sign": 1.0,
+     "ci": [
+      NaN,
+      NaN
+     ],
+     "per_param": {
+      "az": 1.0,
+      "el": 1.0,
+      "roll": 1.0,
+      "target_x": 1.0,
+      "target_y": 1.0,
+      "zoom": 1.0
+     },
+     "magnitude": 1.0,
+     "control_fp": NaN,
+     "confusion": {
+      "leaks": {},
+      "n_by_param": {
+       "az": 1
+      }
+     },
+     "median_tokens": 1301,
+     "mean_latency_s": 23.0
+    },
+    "P11": {
+     "n": 1,
+     "macro_sign": 0.8333333333333334,
+     "ci": [
+      NaN,
+      NaN
+     ],
+     "per_param": {
+      "az": 1.0,
+      "el": 1.0,
+      "roll": 1.0,
+      "target_x": 1.0,
+      "target_y": 0.0,
+      "zoom": 1.0
+     },
+     "magnitude": 1.0,
+     "control_fp": NaN,
+     "confusion": {
+      "leaks": {
+       "az->target_y": 1
+      },
+      "n_by_param": {
+       "az": 1
+      }
+     },
+     "median_tokens": 1503,
+     "mean_latency_s": 36.1
+    }
+   },
+   "ranking": [
+    "P1",
+    "P3",
+    "P4",
+    "P5",
+    "P6",
+    "P8",
+    "P9",
+    "P10",
+    "P2",
+    "P11",
+    "P7"
+   ]
+  },
+  "t3": {
+   "table": {},
+   "ranking": []
+  },
+  "t2": {
+   "table": {},
+   "ranking": [],
+   "n_total": 0
+  }
+ }
+}
