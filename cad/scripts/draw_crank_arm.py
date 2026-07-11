@@ -23,6 +23,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_edge_dimension,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -35,7 +36,6 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from build_crank_arm import ARM_END_X, HALF_WIDTH
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
-    add_overall_dimension,
     auto_center_marks,
     place_view,
 )
@@ -75,7 +75,7 @@ def _sheet_x(model_x_mm: float) -> float:
 # position.  Leadered diameters sit above the arm at each feature's station;
 # the linear chain stacks below the view, smallest span nearest the geometry.
 FRONT_KEEP = {
-    "ArmEndX": (_sheet_x(34.0), 0.088),
+    "ArmEndX": (0.190, 0.086),
     "PivotBoreX": (_sheet_x(33.0), 0.100),
     "DimpleX": (_sheet_x(15.0), 0.112),
     "BossRadius": (0.052, 0.162),
@@ -180,14 +180,23 @@ async def build(adapter: Any) -> dict[str, str]:
         [*front_annotations, *top_annotations, *right_annotations],
         DIMENSION_CALLOUTS,
     )
-    if add_overall_dimension(adapter, right, vertical=True, offset=0.014) is None:
-        raise RuntimeError("failed to add the arm-width overall dimension")
+    # Arm width (16): dimension the right view's flat top/bottom faces.  At 2:1
+    # the 16 x 8 stock section spans +/-0.016 (Y) x +/-0.008 (Z) around the view
+    # center, so the two horizontal silhouette edges sit exactly here.
+    add_edge_dimension(
+        adapter,
+        right,
+        p0=(RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.016),
+        p1=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.016),
+        text_xy=(RIGHT_CENTER[0] - 0.024, RIGHT_CENTER[1]),
+        label="arm-width overall",
+    )
 
     for view, label in ((front, "front"), (top, "top")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
-    add_note(adapter, _manufacturing_notes(), 0.014, 0.095)
+    add_note(adapter, _manufacturing_notes(), 0.014, 0.072)
     add_note(adapter, "ISOMETRIC VIEW SCALE 1:1", 0.330, 0.185)
 
     return await finalize_drawing(
