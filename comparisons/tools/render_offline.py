@@ -100,15 +100,56 @@ def pair_size(ref_img: Path, max_side: int) -> tuple[int, int]:
     return max(1, round(rw * scale)), max(1, round(rh * scale))
 
 
+def _run_worker(geom: dict, jobpairs: list[dict], tmpdir: Path, model: str,
+                probe: bool = False) -> str:
+    """Run one blender worker invocation; return stdout (raises on failure)."""
+    job_file = tmpdir / f"{model}.{'probe' if probe else 'render'}.json"
+    payload = geom | ({"probe": True} if probe else {}) | {"pairs": jobpairs}
+    job_file.write_text(json.dumps(payload), encoding="utf-8")
+    proc = subprocess.run(
+        [str(BLENDER), "-b", "--factory-startup", "-P", str(WORKER), "--", str(job_file)],
+        capture_output=True, text=True)
+    ok = proc.returncode == 0 and (probe or "RENDERED" in proc.stdout)
+    if not ok:
+        print(proc.stdout[-3000:])
+        print(proc.stderr[-2000:])
+        raise RuntimeError(f"blender {'probe' if probe else 'render'} failed for {model}")
+    return proc.stdout
+
+
+def _bench_paths(out_root: Path, pid: str) -> dict[str, Path]:
+    return {"ref": out_root / "ref" / f"{pid}.jpg",
+            "render": out_root / "render" / f"{pid}.jpg",
+            "sidecar": out_root / "render" / f"{pid}.meta.json"}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", help="comma-separated pair ids")
     ap.add_argument("--model")
     ap.add_argument("--stale-only", action="store_true")
+    # Bench (comparisons/bench) fixed-frame flags — see docs/pose-presentation-benchmark.md.
+    ap.add_argument("--manifest", help="alternate manifest json (bench synthetic cases)")
+    ap.add_argument("--out-root", help="write ref/render/sidecars under DIR/{ref,render}/ "
+                    "instead of the shipping comparisons/ tree")
+    ap.add_argument("--no-trim", action="store_true",
+                    help="skip content-trim (fixed framing — trimming cancels target/zoom signal)")
+    ap.add_argument("--canvas", help="fixed render canvas WxH (overrides per-ref sizing)")
+    ap.add_argument("--fixed-frame", action="store_true",
+                    help="honor each pair's frozen{need_w,canvas} — freeze the aim_camera fit")
+    ap.add_argument("--skip-composites", action="store_true",
+                    help="do not regenerate the gallery composites/scores")
+    ap.add_argument("--probe-out", help="compute base framing per pair, write json, render nothing")
     args = ap.parse_args()
     only = set(args.only.split(",")) if args.only else None
+    out_root = Path(args.out_root) if args.out_root else None
+    canvas = None
+    if args.canvas:
+        cw, ch = args.canvas.lower().split("x")
+        canvas = (int(cw), int(ch))
 
-    manifest = composite.load_manifest()
+    manifest = composite.load_manifest(Path(args.manifest)) if args.manifest \
+        else composite.load_manifest()
     max_side = int(manifest.get("defaults", {}).get("width", 1600))
     by_model: dict[str, list[dict]] = {}
     for pair in manifest["pairs"]:
@@ -117,58 +158,75 @@ def main() -> int:
         if args.model and pair["model"] != args.model:
             continue
         src, _geom = model_paths(pair["model"])
-        if args.stale_only and not is_stale(pair, src):
+        if args.stale_only and not out_root and not is_stale(pair, src):
             continue
         by_model.setdefault(pair["model"], []).append(pair)
     if not by_model:
         print("nothing to render")
         return 0
 
+    def size_for(pair) -> tuple[int, int]:
+        if args.fixed_frame and pair.get("frozen", {}).get("canvas"):
+            return tuple(pair["frozen"]["canvas"])
+        if canvas:
+            return canvas
+        ref = composite.prepare_reference(
+            pair, out=_bench_paths(out_root, pair["id"])["ref"] if out_root else None)
+        return pair_size(ref, max_side)
+
     n_total = sum(len(v) for v in by_model.values())
-    print(f"offline-rendering {n_total} pairs across {len(by_model)} models", flush=True)
-    rendered: set[str] = set()
     with tempfile.TemporaryDirectory(prefix="harm_render_") as tmp:
         tmpdir = Path(tmp)
+
+        # --- probe mode: emit base framing, render nothing ---
+        if args.probe_out:
+            framing: dict[str, dict] = {}
+            for model, pairs in sorted(by_model.items()):
+                _src, geom = model_paths(model)
+                sizes = {p["id"]: size_for(p) for p in pairs}
+                jobpairs = [{"id": p["id"], "camera": p["camera"],
+                             "width": sizes[p["id"]][0], "height": sizes[p["id"]][1]}
+                            for p in pairs]
+                out = _run_worker(geom, jobpairs, tmpdir, model, probe=True)
+                for line in out.splitlines():
+                    if line.startswith("PROBE "):
+                        d = json.loads(line[6:])
+                        d["canvas"] = list(sizes[d["id"]])
+                        framing[d["id"]] = d
+            Path(args.probe_out).write_text(json.dumps(framing, indent=1), encoding="utf-8")
+            print(f"probe framing for {len(framing)} pairs -> {args.probe_out}", flush=True)
+            return 0
+
+        print(f"offline-rendering {n_total} pairs across {len(by_model)} models", flush=True)
+        rendered: set[str] = set()
         for model, pairs in sorted(by_model.items()):
             src, geom = model_paths(model)
             jobs = []
             for pair in pairs:
-                ref = composite.prepare_reference(pair)
-                w, h = pair_size(ref, max_side)
-                jobs.append({"id": pair["id"], "camera": pair["camera"],
-                             "width": w, "height": h,
-                             "out": str(tmpdir / f"{pair['id']}.png"),
-                             "_size": (w, h)})
-            job_file = tmpdir / f"{model}.json"
-            job_file.write_text(json.dumps(
-                geom | {"pairs": [{k: v for k, v in j.items() if k != "_size"}
-                                  for j in jobs]}),
-                encoding="utf-8")
+                w, h = size_for(pair)
+                job = {"id": pair["id"], "camera": pair["camera"], "width": w, "height": h,
+                       "out": str(tmpdir / f"{pair['id'].replace('/', '_')}.png"), "_size": (w, h)}
+                if args.fixed_frame and pair.get("frozen", {}).get("need_w") is not None:
+                    job["frozen"] = {"need_w": pair["frozen"]["need_w"]}
+                jobs.append(job)
             print(f"  {model}: {len(pairs)} pairs, blender starting ...", flush=True)
-            proc = subprocess.run(
-                [str(BLENDER), "-b", "--factory-startup", "-P", str(WORKER),
-                 "--", str(job_file)],
-                capture_output=True, text=True)
-            if proc.returncode or "RENDERED" not in proc.stdout:
-                print(proc.stdout[-3000:])
-                print(proc.stderr[-2000:])
-                raise RuntimeError(f"blender failed for {model}")
-
+            out = _run_worker(geom, [{k: v for k, v in j.items() if k != "_size"} for j in jobs],
+                              tmpdir, model)
+            del out
             for pair, j in zip(pairs, jobs, strict=True):
-                png = Path(j["out"])
-                img = Image.open(png).convert("RGBA")
-                # background matches the reference photography: black studio
-                # by default, reference.background overrides (e.g. "white"
-                # for the white-backdrop book shots)
-                bg = Image.new("RGB", img.size,
-                               pair["reference"].get("background", "black"))
+                img = Image.open(Path(j["out"])).convert("RGBA")
+                bg = Image.new("RGB", img.size, pair["reference"].get("background", "black"))
                 bg.paste(img, mask=img.getchannel("A"))
-                out = composite.pair_paths(pair["id"])["render"]
-                out.parent.mkdir(parents=True, exist_ok=True)
-                bg.save(out, **composite.JPEG_OPTS)
-                composite.trim_render_file(
-                    out, background=pair["reference"].get("background", "black"))
-                _sidecar(pair["id"]).write_text(json.dumps({
+                paths = _bench_paths(out_root, pair["id"]) if out_root \
+                    else {"render": composite.pair_paths(pair["id"])["render"],
+                          "sidecar": _sidecar(pair["id"])}
+                paths["render"].parent.mkdir(parents=True, exist_ok=True)
+                bg.save(paths["render"], **composite.JPEG_OPTS)
+                if not args.no_trim:
+                    composite.trim_render_file(
+                        paths["render"],
+                        background=pair["reference"].get("background", "black"))
+                paths["sidecar"].write_text(json.dumps({
                     "camera": pair["camera"], "reference": pair["reference"],
                     "size": list(j["_size"]), "model_mtime": src.stat().st_mtime,
                     "engine": "blender",
@@ -179,7 +237,8 @@ def main() -> int:
                 rendered.add(pair["id"])
                 print(f"  OK  {pair['id']}", flush=True)
 
-    composite.regenerate(rendered)
+    if not args.skip_composites and not out_root:
+        composite.regenerate(rendered)
     return 0
 
 
