@@ -1452,6 +1452,7 @@ def task_check():
     recipe_test_deps = sorted({
         *(str(path.resolve()) for path in recipe_tests),
         *(dep for path in recipe_tests for dep in module_deps_of(path)),
+        str((REPO_ROOT / "scripts" / "solidworks" / "provision_seat.ps1").resolve()),
     })
     specs = {
         "math": {

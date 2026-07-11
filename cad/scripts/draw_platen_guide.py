@@ -32,6 +32,10 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_wizard import BA6
+from build_platen_guide import HOLE_X as THROUGH_X
+from build_platen_guide import SCREW_HOLE_DEPTH as BLIND_HOLE_DEPTH
+from build_platen_guide import SCREW_STATION_X as BLIND_X
+from build_platen_guide import SCREW_THREAD_DEPTH as BLIND_THREAD_DEPTH
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -57,11 +61,6 @@ OUTPUTS = DrawingOutputs(
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
-
-THROUGH_X = (53.0, 67.0, 233.0, 247.0)
-BLIND_X = (30.0, 90.0, 150.0, 210.0, 270.0)
-BLIND_HOLE_DEPTH = 3.0
-BLIND_THREAD_DEPTH = 2.4
 
 # The 1:1 front view is 300 mm long and centred at sheet X=0.190 m, so its
 # left end is X=0.040 m.  The circular-edge pick Y was measured and then

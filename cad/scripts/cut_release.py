@@ -953,6 +953,8 @@ def stage_drawings(stage: Path) -> dict[str, str]:
     staged: dict[str, str] = {}
     for drawing_name, outputs in DRAWING_OUTPUTS.items():
         for kind, source in outputs.items():
+            if kind == "slddrw":
+                continue
             if not source.is_file() or source.stat().st_size == 0:
                 raise RuntimeError(f"required drawing output is missing: {source}")
             destination_dir = stage / kind
@@ -1012,6 +1014,13 @@ def package_drawings(sw: Any, stage: Path) -> dict[str, str]:
             )
         staged[f"{drawing_name}:solidworks_slddrw"] = str(
             native_drawing.relative_to(stage)
+        ).replace("\\", "/")
+        drawing_dir = stage / "slddrw"
+        drawing_dir.mkdir(parents=True, exist_ok=True)
+        portable_drawing = drawing_dir / source.name
+        shutil.copy2(native_drawing, portable_drawing)
+        staged[f"{drawing_name}:slddrw"] = str(
+            portable_drawing.relative_to(stage)
         ).replace("\\", "/")
     return staged
 
