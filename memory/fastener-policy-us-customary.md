@@ -28,3 +28,17 @@ not "fix" hole sizes back toward BSW.
   number-drill sizes rather than inventing a diameter.
 - Screw parts' cosmetic threads switch from `ansi_metric` to `ansi_inch`
   UNC tokens so hole and screw designations agree.
+- A screw that THREADS INTO a tapped hole models its shank at the thread's
+  **tap-drill − ~0.3 mm** (lag precedent Ø12.0 in Ø12.304; #8-32 → 3.15,
+  #4-40 → 2.0, #6-32 → 2.4, #3-48 → 1.7), so interference gates pass while
+  the designations stay real.
+- **Precision-fit exception (do NOT wizard these):** engineered running/slip/
+  reamed fits stay plain dimensioned cuts — the crank-arm 3/8 reamed shaft
+  journal, fulcrum/pivot bearing bores (Ø6.5), the connecting-rod cam strap,
+  the magnifying-clamp lever/rod bores, the output-fixture rod slip bore.
+  Wizard drills are for DRILLED holes (fasteners, pins, seats); forcing a
+  0.2 mm engineered clearance to the nearest stock drill adds 0.5-0.95 mm of
+  slop a machinist would never accept ([[hole-wizard-com-recipe]]).
+- A blind seat's 118° drill point reaches depth + 0.30·dia beyond the
+  shoulder — check it against the remaining web (the platen socket at 3.5
+  pierced its 4.0 plate; 3.2 keeps 0.12 web).
