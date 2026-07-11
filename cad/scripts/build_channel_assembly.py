@@ -137,6 +137,7 @@ from _assembly import (
     component_names,
     component_transform,
     concentric_mate,
+    delete_assembly_feature,
     distance_driver,
     named_ref,
     parallel_mate,
@@ -360,25 +361,6 @@ def _verify_pattern_z(
     log(f"{label}: {len(got)} instances on-plane (z {got[0]:.1f}..{got[-1]:.1f})")
 
 
-def _delete_feature(adapter, name: str) -> None:
-    """Delete an assembly feature by name (Select2 + DeleteSelection2).
-
-    Used by the bank-pattern sense retry: a flipped pattern is removed whole
-    (instances go with the feature; the seed survives) before re-creating it
-    with ``FlipDir1``. Fails loud when the feature is still present after."""
-    model = adapter.currentModel
-    feat = adapter._attempt(lambda: model.FeatureByName(name), default=None)
-    if feat is None:
-        raise RuntimeError(f"feature to delete not found: {name!r}")
-    adapter._attempt(lambda: model.ClearSelection2(True), default=None)
-    if not adapter._attempt(lambda: feat.Select2(False, 0), default=False):
-        raise RuntimeError(f"failed to select feature for delete: {name!r}")
-    if not adapter._attempt(lambda: model.Extension.DeleteSelection2(0), default=False):
-        adapter._attempt(lambda: model.EditDelete(), default=None)
-    if adapter._attempt(lambda: model.FeatureByName(name), default=None) is not None:
-        raise RuntimeError(f"feature {name!r} still present after delete")
-
-
 def _instance_at_z(adapter, prefix: str, z_mm: float) -> str:
     """Name of the ``prefix`` instance whose origin sits on the ``z_mm`` plane."""
     for n in component_names(adapter):
@@ -432,7 +414,7 @@ async def _pattern_bank(
             if attempt == len(attempts) - 1:
                 raise
             log(f"!! {prefix} pattern sense flipped -- deleting + flip retry ({exc})")
-            _delete_feature(adapter, feature.name)
+            delete_assembly_feature(adapter, feature.name)
 
 
 # --- mate scheme (validated single-channel probe) ---------------------------
@@ -1526,7 +1508,7 @@ async def build(adapter) -> dict[str, str]:
                     verify=(rod_c, _tgt_mm("connecting-rod")))
                 drives.append(mate["name"])
                 for name in reversed(drives):
-                    _delete_feature(adapter, name)
+                    delete_assembly_feature(adapter, name)
         except Exception:
             if _CWM_DEBUG:
                 for part in CHAIN_PARTS:

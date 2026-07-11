@@ -90,6 +90,7 @@ import sys
 from _common import (
     OUT_SLDPRT,
     check,
+    log,
     run_build,
 )
 from _assembly import (
@@ -97,6 +98,9 @@ from _assembly import (
     assert_components_fully_defined,
     check_no_interference,
     coincident_mate,
+    component_names,
+    component_transform,
+    delete_assembly_feature,
     named_ref,
     parallel_mate,
     place_component,
@@ -104,6 +108,10 @@ from _assembly import (
     save_assembly_and_images,
 )
 from _transforms import ROT_Y_POS90
+from solidworks_mcp.adapters.base import (
+    ComponentLinearPatternParameters,
+    CreateAxisParameters,
+)
 
 ASM_NAME = "frame"
 
@@ -176,6 +184,54 @@ def _part(name: str) -> str:
     return str(path)
 
 
+def _instance_at(adapter, prefix: str, target: list[float]) -> str:
+    """Name of the ``prefix`` instance whose origin sits at ``target`` (mm)."""
+    for n in component_names(adapter):
+        if n.rsplit("-", 1)[0] != prefix:
+            continue
+        a = component_transform(adapter, n)
+        if all(abs(a[9 + k] * 1000.0 - target[k]) < 0.05 for k in range(3)):
+            return n
+    raise RuntimeError(f"no {prefix} instance at {target}")
+
+
+async def _pattern_pair(
+    adapter, seeds: list[str], axis_name: str, spacing: float,
+    prefix: str, targets: list[list[float]],
+) -> None:
+    """Replicate the real-mated ``seeds`` ONCE along ``axis_name`` by a local
+    linear component pattern and verify each copy landed on its expected
+    machine position (the channel ``_pattern_bank`` idiom): the axis fixes
+    only the LINE, SolidWorks infers the sign, and the inference is not
+    contractual -- a flipped pattern is deleted whole and re-created with
+    ``FlipDir1``, deterministic in at most two solves.
+
+    Flip seed TRUE: both frame patterns measured FLIPPED on their first solve
+    (Top ∩ Right resolves +Z, the copies go -Z; Top ∩ Front resolves -X, the
+    copies go +X), so ``FlipDir1=True`` lands in ONE solve; the untried value
+    stays as the verified retry (the channel ``_pattern_bank`` philosophy)."""
+    for attempt, flip in enumerate((True, False)):
+        tag = " (flip retry)" if attempt else ""
+        feature = check(
+            f"linear-pattern {prefix} pair{tag}",
+            await adapter.pattern_components_linear(
+                ComponentLinearPatternParameters(
+                    components=seeds, count=2, spacing=spacing,
+                    direction_name=axis_name, flip_direction=flip,
+                )
+            ),
+        )
+        try:
+            for target in targets:
+                _instance_at(adapter, prefix, target)
+            return
+        except RuntimeError as exc:
+            if attempt:
+                raise
+            log(f"!! {prefix} pattern sense flipped -- deleting + flip retry ({exc})")
+            delete_assembly_feature(adapter, feature.name)
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import InsertComponentParameters
 
@@ -196,10 +252,16 @@ async def build(adapter) -> dict[str, str]:
     if not res.data.get("fixed"):
         raise RuntimeError("base component was not auto-fixed")
 
-    # Columns at the four top-plate corners.
+    # Columns at the four top-plate corners: the two +Z corners are REAL-mated
+    # seeds; ONE local linear component pattern replicates the pair to the -Z
+    # corners (2 inserts + 6 mates + 1 pattern replace 4 inserts + 12 mates).
+    # The pattern instances are positioned rigidly by the feature -- they read
+    # fully defined (the channel bushing-bank precedent) and spacing 2*COLUMN_Z
+    # lands them exactly on the old mate-solved corners, so the top-frame ring
+    # bores and every render are unchanged. Sense handling in _pattern_pair.
     column_names: list[str] = []
-    for sx, sz in ((1, 1), (-1, 1), (1, -1), (-1, -1)):
-        target = [sx * COLUMN_X, BASE_TOP_Y, sz * COLUMN_Z]
+    for sx in (1, -1):
+        target = [sx * COLUMN_X, BASE_TOP_Y, COLUMN_Z]
         res = await adapter.insert_component(
             InsertComponentParameters(file_path=column_path, position=target)
         )
@@ -210,15 +272,15 @@ async def build(adapter) -> dict[str, str]:
             adapter, name, "Right Plane", "Right Plane", base_name, sx * COLUMN_X, target
         )
         await plane_distance_mate(
-            adapter, name, "Front Plane", "Front Plane", base_name, sz * COLUMN_Z, target
+            adapter, name, "Front Plane", "Front Plane", base_name, COLUMN_Z, target
         )
         # Foot seat: the column stands ON the base top -- a physical contact, so
         # coincident its foot (the column's Top Plane: it extrudes UPWARD from there,
         # so that default plane sits at the foot) to the base DeckTop datum, not a
         # measured distance. The Right/Front mates above are genuine free-space
         # corner offsets (the column touches nothing laterally); each is a SIGNED
-        # offset plane (sx/sz carry the corner's side) with a coincident, so the
-        # negative-side columns land in one solve with no flip recovery.
+        # offset plane (sx carries the corner's side) with a coincident, so the
+        # negative-x seed lands in one solve with no flip recovery.
         await coincident_mate(
             adapter,
             named_ref(f"Top Plane@{name}", "PLANE"),
@@ -227,6 +289,18 @@ async def build(adapter) -> dict[str, str]:
             verify=(name, target),
         )
         assert_component_placed(adapter, name, target, IDENTITY)
+    # Direction reference: EXPLICIT geometry (Top ∩ Right = the machine Z line),
+    # not a face/edge pick whose inference flipped the channel banks (#8 era).
+    frame_z = check(
+        "axis FrameZ (Top ∩ Right)",
+        await adapter.create_axis(
+            CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
+        ),
+    ).name
+    await _pattern_pair(
+        adapter, column_names, frame_z, 2.0 * COLUMN_Z, "tube-frame",
+        [[sx * COLUMN_X, BASE_TOP_Y, -COLUMN_Z] for sx in (1, -1)],
+    )
 
     # Rocker-pivot support: the windowed trapezoidal NORTH support
     # (build_rocker_arm_support.py), the faithful reproduction of the original
@@ -308,8 +382,8 @@ async def build(adapter) -> dict[str, str]:
     # recessed in the base underside counterbore -- into the O12.30 tapped foot
     # hole. Authored head-down (IDENTITY) on its exact machine transform,
     # mate-defined (ground=False), not grounded.
-    # Each screw is CONSTRAINED (not grounded) by its two physical contacts plus a
-    # spin pin -- no distance mate:
+    # Each SEED screw is CONSTRAINED (not grounded) by its two physical contacts
+    # plus a spin pin -- no distance mate:
     #   coincident  ScrewAxis@screw <-> HoleAxis{i}@base  collinear axes => coaxial
     #               in the bore (concentric is for cylindrical FACES; two reference
     #               AXES take a coincident/collinear mate, which AddMate5 rejects as
@@ -321,8 +395,13 @@ async def build(adapter) -> dict[str, str]:
     # base's pins the (physically immaterial) spin -- the one non-contact mate, and
     # still distance-free. Each is satisfied at the on-solution insert pose, so it
     # locks without moving; the readback assert confirms the screw did not jump.
-    # LAG_SCREW_XZ is in HOLE_XZ order, so screw i mates to HoleAxis{i}.
-    for i, (bx, bz) in enumerate(LAG_SCREW_XZ):
+    # Only the two x-55.44 screws are real-mated seeds (LAG_SCREW_XZ is in HOLE_XZ
+    # order, so seed i mates to HoleAxis{i}); ONE local linear component pattern
+    # replicates the pair to the x-90.36 stations -- faithful because the pattern
+    # spacing and the base hole grid derive from the SAME foot-pattern constants,
+    # so the instances land coaxial in holes 2/3 by construction.
+    screw_names: list[str] = []
+    for i, (bx, bz) in enumerate(LAG_SCREW_XZ[:2]):
         screw_target = [bx, LAG_SCREW_UNDER_HEAD_Y, bz]
         screw_name = await place_component(
             adapter,
@@ -357,6 +436,18 @@ async def build(adapter) -> dict[str, str]:
             verify=(screw_name, screw_target),
         )
         assert_component_placed(adapter, screw_name, screw_target, IDENTITY)
+        screw_names.append(screw_name)
+    frame_x = check(
+        "axis FrameX (Top ∩ Front)",
+        await adapter.create_axis(
+            CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Front Plane"])
+        ),
+    ).name
+    await _pattern_pair(
+        adapter, screw_names, frame_x,
+        LAG_SCREW_XZ[2][0] - LAG_SCREW_XZ[0][0], "lag-screw",
+        [[bx, LAG_SCREW_UNDER_HEAD_Y, bz] for bx, bz in LAG_SCREW_XZ[2:]],
+    )
 
     # Top-frame ring clamped around the four columns, mid-plane y 1020.2.
     target = [0.0, TOP_FRAME_MID_Y, 0.0]
