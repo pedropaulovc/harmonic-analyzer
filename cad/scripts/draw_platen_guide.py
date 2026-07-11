@@ -261,7 +261,7 @@ async def build(adapter: Any) -> dict[str, str]:
         model_doc.SummaryInfo(field, value)
         if model_doc.SummaryInfo(field) != value:
             raise RuntimeError(f"drawing summary field {field} did not persist")
-    front = place_view(adapter, str(SOURCE), "*Back", 0.190, 0.190, scale=(1, 1))
+    front = place_view(adapter, str(SOURCE), "*Front", 0.190, 0.190, scale=(1, 1))
     right = place_view(adapter, str(SOURCE), "*Right", 0.375, 0.190, scale=(3, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", 0.205, 0.043, scale=(1, 4))
     for view in (front, right, iso):
