@@ -39,7 +39,6 @@ from _common import (
     apply_material,
     check,
     define_centered_rectangle,
-    define_circle,
     define_polygon_chain,
     drive_dimension,
     ensure_fully_defined,
@@ -53,6 +52,7 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
 
 import _telemetry
 
@@ -66,7 +66,9 @@ STRAP_Z = (9.6, 12.6)  # strap 3 thick, flush with the block back (derived)
 STRAP_TOP_Y = 65.0  # machine 570: support bar top (derived)
 STRAP_TOP_X = (-16.0, 0.0)  # 16 wide at the bar (low; lean runs machine-east)
 STRAP_BOT_X = (-5.0, 5.0)  # 10 wide at the block (low)
-SCREW_HOLE_DIA = 3.6  # M6.10: hanger-screw hole near the strap top
+# M6.10: the hanger-screw SHANK passes through near the strap top, so this is a
+# #6 clearance Hole Wizard hole (normal fit Ø4.318; was a plain Ø3.6 cut) --
+# memory/fastener-policy-us-customary.
 SCREW_HOLE_XY = (-8.5, 60.0)  # machine (-5.5, 565) = block centre +3 + local:
 # within the 5-wide strap/bar overlap east of the bar's free end (machine
 # -8); strap band at y 60 is local -15.1..0.4, so the hole sits 4.8/7.1
@@ -96,9 +98,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "StrapBotXMax", f"{STRAP_BOT_X[1]}mm")
     await set_global(adapter, "StrapTopXMin", f"{STRAP_TOP_X[0]}mm")
     await set_global(adapter, "StrapTopXMax", f"{STRAP_TOP_X[1]}mm")
-    await set_global(adapter, "ScrewHoleDia", f"{SCREW_HOLE_DIA}mm")
-    await set_global(adapter, "ScrewHoleX", f"{SCREW_HOLE_XY[0]}mm")
-    await set_global(adapter, "ScrewHoleY", f"{SCREW_HOLE_XY[1]}mm")
+    # (The old ScrewHoleDia/ScrewHoleX/ScrewHoleY knobs are gone: the hole is
+    # now a native Hole Wizard #6 clearance feature placed by point.)
 
     # Drive equations collected as dims are recorded, applied in one deferred
     # batch after the whole model + a rebuild exists (every target must resolve).
@@ -205,33 +206,20 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"strap: added {added:.1f}, expected {v_strap:.1f}")
     expected = vol
 
-    # 3. Hanger-screw hole through the strap (mid-plane cut along Z: at
-    # local y 60 only the strap band 9.6..12.6 is material).
-    # Off-axis centre (both nonzero) -> define_circle records X, Z, diameter.
-    # The X centre sits at a NEGATIVE coordinate, so its dim is the magnitude and
-    # the drive negates the signed knob to stay positive.
-    screw = SketchDims()
-    check("create_sketch screw hole", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    await define_circle(
-        adapter, SCREW_HOLE_XY[0], SCREW_HOLE_XY[1], SCREW_HOLE_DIA / 2.0, "screw hole",
-        dims=screw,
-        names=("ScrewHoleCx", "ScrewHoleCy", "ScrewHoleDiaDim"),
-        drives=('-"ScrewHoleX"', '"ScrewHoleY"', '"ScrewHoleDia"'),
+    # 3. Hanger-screw hole through the strap: ONE native Hole Wizard #6
+    # clearance feature drilled from the strap BACK face (local z 9.6, outward
+    # normal -Z) -- the screw enters from behind. At local y 60 only the strap
+    # band 9.6..12.6 is material, so the through hole spans just the 3-thick
+    # strap.
+    screw_dia = CLEARANCE_MM[("#6", "normal")]
+    wizard_holes(
+        adapter,
+        HoleSpec("clearance", "#6"),
+        [[SCREW_HOLE_XY[0], SCREW_HOLE_XY[1], STRAP_Z[0]]],
+        (0.0, 0.0, -1.0),
+        "hanger-screw clearance hole (#6)", name="ScrewHole",
     )
-    set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "screw hole sketch")
-    check("exit_sketch screw hole", await adapter.exit_sketch())
-    name_last_feature(adapter, "ScrewHoleProfile")
-    drive_jobs += screw.apply(adapter, "ScrewHoleProfile")
-    check(
-        "cut screw hole",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=4.0 * STRAP_Z[1], both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "ScrewHole")
-    expected -= math.pi * (SCREW_HOLE_DIA / 2.0) ** 2 * (STRAP_Z[1] - STRAP_Z[0])
+    expected -= math.pi * (screw_dia / 2.0) ** 2 * (STRAP_Z[1] - STRAP_Z[0])
     vol = await _volume(adapter)
     _telemetry.info(f"volume after screw hole: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 1.0:

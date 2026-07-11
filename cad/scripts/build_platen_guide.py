@@ -29,7 +29,6 @@ from _common import (
     apply_color,
     apply_material,
     check,
-    define_circle,
     define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
@@ -39,8 +38,14 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
-    set_sketch_direct_db,
     volume_check,
+)
+from _holes import (
+    CLEARANCE_MM,
+    HoleSpec,
+    blind_cut_dia_mm,
+    blind_hole_volume_mm3,
+    wizard_holes,
 )
 
 PART_NAME = "platen-guide"
@@ -51,14 +56,16 @@ GUIDE_HEIGHT = 5.0
 GUIDE_DEPTH = 10.0  # 1.0 past the 9-deep bar so the lock plates clear it
 LOCK_STATION_X = (60.0, 240.0)  # lock-plate centres (2 per guide)
 LOCK_SCREW_DX = 7.0  # 2 screws per lock flank its centre
-HOLE_DIA = 3.0  # the fillister screws' O2.9 shanks thread in
 
 HOLE_X = tuple(s + d for s in LOCK_STATION_X for d in (-LOCK_SCREW_DX, LOCK_SCREW_DX))
 
 # Blind holes on the FRONT face (mid-height) where the row of 5 fastening
 # screws threads in: the platen counterbores its heads (build_platen), so the
-# O2.9 shanks reach 2.4 past the platen back into the rail. Stations = the
-# platen's GUIDE_HOLE_X (pinned by an assert in the assembly module).
+# fillister shanks reach 2.4 past the platen back into the rail. These become
+# #4-40 bottoming-tapped Hole Wizard holes (tap drill Ø2.261; was plain Ø3.0).
+# Stations = the platen's GUIDE_HOLE_X (pinned by an assert in the assembly
+# module). The lock-screw LockHoles above become #4 clearance (the fillister
+# lock screws pass through) -- memory/fastener-policy-us-customary.
 SCREW_STATION_X = (30.0, 90.0, 150.0, 210.0, 270.0)
 SCREW_HOLE_DEPTH = 3.0
 
@@ -73,7 +80,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "GuideLength", f"{GUIDE_LENGTH}mm")
     await set_global(adapter, "GuideHeight", f"{GUIDE_HEIGHT}mm")
     await set_global(adapter, "GuideDepth", f"{GUIDE_DEPTH}mm")
-    await set_global(adapter, "HoleDia", f"{HOLE_DIA}mm")
+    # (The old HoleDia knob is gone: the holes are now native Hole Wizard
+    # features whose diameters come from the #4 clearance / #4-40 tap standards.)
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -104,59 +112,35 @@ async def build(adapter) -> dict[str, str]:
     v_rail = GUIDE_LENGTH * GUIDE_HEIGHT * GUIDE_DEPTH
     await volume_check(adapter, "guide rail", v_rail, 0.005 * v_rail)
 
-    # Lock-screw holes: through along Z at the mid-height line (positions are
-    # the lock layout, named but undriven -- only the diameter is driven).
-    holes = SketchDims()
-    check("create_sketch holes", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    for n, x in enumerate(HOLE_X):
-        await define_circle(
-            adapter, x, GUIDE_HEIGHT / 2.0, HOLE_DIA / 2.0, f"lock hole x{x:.0f}",
-            dims=holes,
-            names=(f"H{n}X", f"H{n}Z", f"H{n}Dia"),
-            drives=(None, None, '"HoleDia"'),
-        )
-    set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "holes sketch")
-    check("exit_sketch holes", await adapter.exit_sketch())
-    name_last_feature(adapter, "HoleProfile")
-    drive_jobs += holes.apply(adapter, "HoleProfile")
-    check(
-        "cut holes",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=2.0 * GUIDE_DEPTH, both_directions=True)
-        ),
+    # Lock-screw holes: ONE native Hole Wizard #4 clearance feature (4 points)
+    # through along Z at the mid-height line, from the front face (local z 0,
+    # outward normal -Z) -- the fillister lock screws pass through.
+    lock_dia = CLEARANCE_MM[("#4", "normal")]
+    wizard_holes(
+        adapter,
+        HoleSpec("clearance", "#4"),
+        [[x, GUIDE_HEIGHT / 2.0, 0.0] for x in HOLE_X],
+        (0.0, 0.0, -1.0),
+        "lock-screw holes (#4 clearance)", name="LockHoles",
     )
-    name_last_feature(adapter, "LockHoles")
-    v_holes = len(HOLE_X) * math.pi * (HOLE_DIA / 2.0) ** 2 * GUIDE_DEPTH
+    v_holes = len(HOLE_X) * math.pi * (lock_dia / 2.0) ** 2 * GUIDE_DEPTH
     await volume_check(adapter, "guide with holes", v_rail - v_holes, 0.02 * v_holes)
 
-    # Blind screw holes on the front face (both-directions trick: 2x depth
-    # about the z=0 sketch plane lands 0..SCREW_HOLE_DEPTH in material).
-    screws = SketchDims()
-    check("create_sketch screw holes", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    for n, x in enumerate(SCREW_STATION_X):
-        await define_circle(
-            adapter, x, GUIDE_HEIGHT / 2.0, HOLE_DIA / 2.0, f"screw hole x{x:.0f}",
-            dims=screws,
-            names=(f"F{n}X", f"F{n}Z", f"F{n}Dia"),
-            drives=(None, None, '"HoleDia"'),
-        )
-    set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "screw holes sketch")
-    check("exit_sketch screw holes", await adapter.exit_sketch())
-    name_last_feature(adapter, "ScrewHoleProfile")
-    drive_jobs += screws.apply(adapter, "ScrewHoleProfile")
-    check(
-        "cut screw holes",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=2.0 * SCREW_HOLE_DEPTH, both_directions=True)
-        ),
+    # Fastening-screw holes: ONE native Hole Wizard #4-40 BOTTOMING-TAPPED blind
+    # feature (5 points) from the front face (outward normal -Z) -- the platen
+    # guide screws thread INTO these. A wizard blind hole ends in a 118° drill
+    # point, so the analytic expectation is blind_hole_volume_mm3.
+    screw_spec = HoleSpec(
+        "tapped_bottoming", "#4-40", end="blind", depth_mm=SCREW_HOLE_DEPTH
     )
-    name_last_feature(adapter, "ScrewHoles")
-    v_screws = (
-        len(SCREW_STATION_X) * math.pi * (HOLE_DIA / 2.0) ** 2 * SCREW_HOLE_DEPTH
+    wizard_holes(
+        adapter, screw_spec,
+        [[x, GUIDE_HEIGHT / 2.0, 0.0] for x in SCREW_STATION_X],
+        (0.0, 0.0, -1.0),
+        "fastening-screw tapped holes (#4-40)", name="ScrewHoles",
+    )
+    v_screws = len(SCREW_STATION_X) * blind_hole_volume_mm3(
+        blind_cut_dia_mm(screw_spec), SCREW_HOLE_DEPTH
     )
     v_final = v_rail - v_holes - v_screws
     await volume_check(adapter, "guide with screw holes", v_final, 0.02 * v_screws)
