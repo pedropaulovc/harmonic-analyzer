@@ -48,6 +48,13 @@ from _common import (
     set_global,
     volume_check,
 )
+from _holes import (
+    DRILL_POINT_H,
+    HoleSpec,
+    blind_cut_dia_mm,
+    blind_hole_volume_mm3,
+    wizard_holes,
+)
 
 PART_NAME = "cone-tip-block"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel, like the platform it rides
@@ -61,12 +68,26 @@ BORE_HEIGHT = 47.65  # + platform PLATE_T 6.35 = drive height 54 above base top
 BORE_RADIUS = BORE_DIA / 2.0
 
 # --- adjuster + pinch lock (item 5, v4_t00471 / 7:49) ------------------------
-ADJUSTER_BORE_DIA = 7.9  # threads the cone-tip-adjuster (line-to-line)
+# Adjuster interface: native 5/16-18 blind TAPPED hole from the NORTH face --
+# the Ø6.2 cone-tip-adjuster threads in. NOTE: the old bore was Ø7.9
+# line-to-line; the 5/16-18 tap drill is Ø6.528, so the cup narrows 7.9 ->
+# 6.528 (per fastener policy we take the true tap-drill, NOT an override to the
+# artefact Ø). ADJUSTER_BORE_DIA is the tap-drill, used by the slit + interlock
+# geometry below (NOT imported by the assembly, so the shrink is self-contained).
 ADJUSTER_BORE_DEPTH = 8.0  # from the NORTH face; 1/32" journal lip stays south
+ADJUSTER_BORE_SPEC = HoleSpec(
+    "tapped", "5/16-18", end="blind", depth_mm=ADJUSTER_BORE_DEPTH)
+ADJUSTER_BORE_DIA = blind_cut_dia_mm(ADJUSTER_BORE_SPEC)  # 6.528 tap drill
 SLIT_W = 1.2  # top slit width (the clamp flexure)
 SLIT_DEPTH = 8.0  # top face down past the bore line (55.0 -> 47.0)
-PINCH_BORE_DIA = 2.4  # pinch screw cross-bore, along local X
-PINCH_BORE_Y = 53.2  # between the counterbore top (51.6) and the block top
+# Pinch screw cross-bore, along local X: native #3-48 TAPPED hole -- the Ø1.7
+# cone-tip-pinch-screw threads in (build_cone_tip_pinch_screw SHANK_DIA = 1.7 =
+# 1.994 - 0.3; the drive-train assembly asserts bore - shank in [0.15, 0.45],
+# which needs this Ø1.994 tap-drill, not the old Ø2.4). PINCH_BORE_DIA is
+# imported by the assembly as TIP_PINCH_BORE_DIA.
+PINCH_BORE_SPEC = HoleSpec("tapped", "#3-48")
+PINCH_BORE_DIA = blind_cut_dia_mm(PINCH_BORE_SPEC)  # 1.994 tap drill
+PINCH_BORE_Y = 53.2  # between the counterbore top and the block top
 
 # The pinch cross-bore must land wholly in the material band between the
 # adjuster counterbore's top and the block top, and the slit must cross it.
@@ -79,20 +100,45 @@ if BLOCK_HEIGHT - SLIT_DEPTH > PINCH_BORE_Y - PINCH_BORE_DIA / 2.0:
 
 
 def _slit_removed() -> float:
-    """Slit volume net of the bores it crosses (counterbore band + journal)."""
+    """Slit volume net of the already-void bores it crosses: the adjuster
+    counterbore band, its blind-tap 118-degree DRILL-POINT cone past the
+    shoulder (the term whose omission failed the first wizard build by
+    +4.1 mm^3), and the 1/32" journal -- the cone and journal are concentric,
+    so each z-slice subtracts the UNION circle (max radius), never both."""
     r_cb, y_cb, y_bot = ADJUSTER_BORE_DIA / 2.0, BORE_HEIGHT, BLOCK_HEIGHT - SLIT_DEPTH
-    h = SLIT_W / 400.0
-    xs = [-SLIT_W / 2.0 + k * h for k in range(401)]
+    x_half = SLIT_W / 2.0
 
-    def f(x: float) -> float:
-        return (y_cb + math.sqrt(max(r_cb * r_cb - x * x, 0.0))) - y_bot
+    def a_void(r: float) -> float:
+        """In-slit void area of a concentric circle of radius r at bore height:
+        integral over |x| < min(x_half, r) of (circle top - max(slit bottom,
+        circle bottom)), Simpson."""
+        if r <= 0.0:
+            return 0.0
+        lim = min(x_half, r)
+        h = lim / 200.0
+        xs = [-lim + k * h for k in range(401)]
 
-    simpson = f(xs[0]) + f(xs[-1]) + 4.0 * sum(f(x) for x in xs[1:-1:2]) \
-        + 2.0 * sum(f(x) for x in xs[2:-1:2])
-    a_cb = simpson * h / 3.0
+        def f(x: float) -> float:
+            s = math.sqrt(max(r * r - x * x, 0.0))
+            return max((y_cb + s) - max(y_bot, y_cb - s), 0.0)
+
+        simpson = f(xs[0]) + f(xs[-1]) + 4.0 * sum(f(x) for x in xs[1:-1:2]) \
+            + 2.0 * sum(f(x) for x in xs[2:-1:2])
+        return simpson * h / 3.0
+
+    point_h = r_cb * DRILL_POINT_H  # 118-degree point height past the shoulder
     v = SLIT_W * BLOCK_Z * SLIT_DEPTH
-    v -= a_cb * ADJUSTER_BORE_DEPTH  # counterbore band already void
-    v -= math.pi * BORE_RADIUS**2 * (BLOCK_Z - ADJUSTER_BORE_DEPTH)  # journal band
+    v -= a_void(r_cb) * ADJUSTER_BORE_DEPTH  # counterbore band already void
+    # Past the shoulder the void slice is max(cone, journal) -- trapezoid in z.
+    n_z = 400
+    dz = (BLOCK_Z - ADJUSTER_BORE_DEPTH) / n_z
+    acc = 0.0
+    for k in range(n_z + 1):
+        z = k * dz  # 0 at the shoulder
+        r_cone = r_cb * max(1.0 - z / point_h, 0.0)
+        a = a_void(max(r_cone, BORE_RADIUS))
+        acc += a * (0.5 if k in (0, n_z) else 1.0)
+    v -= acc * dz
     return v
 
 
@@ -110,10 +156,11 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BlockHeight", f"{BLOCK_HEIGHT}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
     await set_global(adapter, "BoreHeight", f"{BORE_HEIGHT}mm")
-    await set_global(adapter, "AdjusterBoreDia", f"{ADJUSTER_BORE_DIA}mm")
+    # (The old AdjusterBoreDia/PinchBoreDia knobs are gone: both are now native
+    # Hole Wizard TAPPED features whose diameters come from the ANSI-inch tap
+    # tables, not driven dims.)
     await set_global(adapter, "SlitW", f"{SLIT_W}mm")
     await set_global(adapter, "PinchBoreY", f"{PINCH_BORE_Y}mm")
-    await set_global(adapter, "PinchBoreDia", f"{PINCH_BORE_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -162,33 +209,23 @@ async def build(adapter) -> dict[str, str]:
     v_bore = math.pi * BORE_RADIUS**2 * BLOCK_Z
     volume = await volume_check(adapter, "bore", volume - v_bore, 0.5 * v_bore)
 
-    # Adjuster counterbore (v4_t00471 / 7:49): O7.9 from the NORTH face, 8
-    # deep -- the partially hollow slotted adjuster screw threads in here and
-    # the shaft tip rests in its cup (axial end-play takeup). The 1/32"
-    # journal lip survives at the south 4.
-    check("create_plane NorthFace", await adapter.create_plane(
-        CreatePlaneParameters(mode="offset", base_plane="Front Plane",
-                              offset=BLOCK_Z / 2.0)))
-    name_last_feature(adapter, "NorthFace")
-    cbore = SketchDims()
-    check("create_sketch counterbore", await adapter.create_sketch("NorthFace"))
-    await define_circle(
-        adapter, 0.0, BORE_HEIGHT, ADJUSTER_BORE_DIA / 2.0, "counterbore",
-        dims=cbore, names=("CbX", "CbZ", "CbDia"),
-        drives=(None, '"BoreHeight"', '"AdjusterBoreDia"'),
+    # Adjuster interface (v4_t00471 / 7:49): ONE native Hole Wizard blind
+    # 5/16-18 TAPPED hole from the NORTH face (z = +BLOCK_Z/2), concentric with
+    # the journal, ADJUSTER_BORE_DEPTH deep -- the partially hollow Ø6.2 slotted
+    # adjuster screw threads in here and the shaft tip rests in its (own) cup
+    # (axial end-play takeup). Drilled while the body is still simple (block +
+    # journal). Removed = the blind tap-drill cylinder + drill point MINUS the
+    # journal already void within that envelope (the journal runs straight
+    # through it). The 1/32" journal survives at the south.
+    wizard_holes(
+        adapter, ADJUSTER_BORE_SPEC,
+        [[0.0, BORE_HEIGHT, BLOCK_Z / 2.0]],
+        (0.0, 0.0, 1.0), "adjuster tapped hole (5/16-18 blind)", name="AdjusterBore",
     )
-    await ensure_fully_defined(adapter, "counterbore sketch")
-    check("exit_sketch counterbore", await adapter.exit_sketch())
-    name_last_feature(adapter, "CounterboreProfile")
-    drive_jobs += cbore.apply(adapter, "CounterboreProfile")
-    # A CUT's default direction is OPPOSITE the sketch normal (FeatureCut4
-    # remarks), so from the north-face plane it already bores SOUTH into the block.
-    check("cut counterbore", await adapter.create_cut_extrude(
-        ExtrusionParameters(depth=ADJUSTER_BORE_DEPTH)))
-    name_last_feature(adapter, "AdjusterBore")
-    v_cb = (math.pi * (ADJUSTER_BORE_DIA / 2.0) ** 2 - math.pi * BORE_RADIUS**2) \
-        * ADJUSTER_BORE_DEPTH
-    volume = await volume_check(adapter, "counterbore", volume - v_cb, 0.02 * v_cb)
+    _adj_point = (ADJUSTER_BORE_DIA / 2.0) * DRILL_POINT_H
+    v_cb = blind_hole_volume_mm3(ADJUSTER_BORE_DIA, ADJUSTER_BORE_DEPTH) \
+        - math.pi * BORE_RADIUS**2 * (ADJUSTER_BORE_DEPTH + _adj_point)
+    volume = await volume_check(adapter, "adjuster bore", volume - v_cb, 0.03 * v_cb)
 
     # Top slit + perpendicular pinch screw (the McMaster 61815K41 pattern,
     # locking the ADJUSTER's threads): 1.2-wide slit from the top down past
@@ -217,20 +254,16 @@ async def build(adapter) -> dict[str, str]:
         adapter, "top slit", volume - _slit_removed(), 0.02 * _slit_removed()
     )
 
-    pinch = SketchDims()
-    check("create_sketch pinch bore", await adapter.create_sketch("Right"))
-    await define_circle(
-        adapter, 0.0, PINCH_BORE_Y, PINCH_BORE_DIA / 2.0, "pinch bore",
-        dims=pinch, names=("PinchX", "PinchZ", "PinchDia"),
-        drives=(None, '"PinchBoreY"', '"PinchBoreDia"'),
+    # Pinch screw cross-bore: ONE native Hole Wizard #3-48 TAPPED hole through
+    # along local X at (y = PINCH_BORE_Y, z = 0), drilled from the +X block face
+    # (a clean planar rectangle -- the top slit only removes the |x|<SLIT_W/2
+    # centre). The top slit splits it into two solid halves, so a through-all
+    # cut removes the tap-drill cylinder over (BLOCK_X - SLIT_W) of solid.
+    wizard_holes(
+        adapter, PINCH_BORE_SPEC,
+        [[BLOCK_X / 2.0, PINCH_BORE_Y, 0.0]],
+        (1.0, 0.0, 0.0), "pinch tapped hole (#3-48)", name="PinchBore",
     )
-    await ensure_fully_defined(adapter, "pinch bore sketch")
-    check("exit_sketch pinch bore", await adapter.exit_sketch())
-    name_last_feature(adapter, "PinchBoreProfile")
-    drive_jobs += pinch.apply(adapter, "PinchBoreProfile")
-    check("cut pinch bore", await adapter.create_cut_extrude(
-        ExtrusionParameters(depth=BLOCK_X + 4.0, both_directions=True)))
-    name_last_feature(adapter, "PinchBore")
     v_pinch = math.pi * (PINCH_BORE_DIA / 2.0) ** 2 * (BLOCK_X - SLIT_W)
     volume = await volume_check(adapter, "pinch bore", volume - v_pinch, 0.05 * v_pinch)
 

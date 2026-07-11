@@ -41,14 +41,27 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _holes import TAP_DRILL_MM
 
 PART_NAME = "output-fixture"
 MATERIAL = "Brass"  # see _common.apply_material docstring
 
 COLLAR_DIA = 10.0  # DIMENSIONS.md ch20: p.48 bottom close-up (low)
 COLLAR_HEIGHT = 8.0  # DIMENSIONS.md ch20 (low)
+# The Ø5 vertical rod slides through the coaxial bore -- an engineered 0.2 mm
+# running/slip fit, NOT a drilled hole, so it stays a plain dimensioned cut (the
+# Hole Wizard's standard drills are for drilled holes/pins/seats; a nearest-
+# drill fit would slop the slide).
 ROD_BORE_DIA = 5.2  # Ø5 vertical rod + clearance
-CROSS_HOLE_DIA = 3.0  # clamp screw / wire hook
+#
+# The cross hole is DESIGNED as a #4-40 tapped thumb-screw hole, but it pierces
+# the CURVED collar wall RADIALLY -- there is no planar seat for wizard_holes /
+# find_planar_face to place a Hole Wizard feature on -- so it stays a plain cut
+# at the #4-40 tap-drill diameter (Ø2.261) as the geometric stand-in (the real
+# thread designation can't be carried on the cylindrical wall with this helper).
+# No interference either way: the assembly OMITS this thumb screw (the cross
+# hole doubles as the wire tie), and the mating Ø2.0 shank fits Ø2.261 anyway.
+CROSS_HOLE_DIA = TAP_DRILL_MM["#4-40"]  # 2.261: #4-40 tap drill (was Ø3.0)
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > any extent crossed
 
 # HookAnchorPoint: where the lever-wire's hook BALL JOINT grabs the fixture.
@@ -107,7 +120,8 @@ async def build(adapter) -> dict[str, str]:
     v_collar = math.pi * (COLLAR_DIA / 2.0) ** 2 * COLLAR_HEIGHT
     await volume_check(adapter, "collar", v_collar, 0.005 * v_collar)
 
-    # Rod bore: on-axis circle, diameter dim only.
+    # Rod bore: on-axis circle, diameter dim only. A plain dimensioned slip cut
+    # (engineered 0.2 mm running fit, not a drilled hole).
     rod = SketchDims()
     check("create_sketch rod bore", await adapter.create_sketch("Top"))
     await define_circle(
@@ -129,9 +143,11 @@ async def build(adapter) -> dict[str, str]:
     v_bored = v_collar - math.pi * (ROD_BORE_DIA / 2.0) ** 2 * COLLAR_HEIGHT
     await volume_check(adapter, "rod bore", v_bored, 0.005 * v_collar)
 
-    # Cross hole along Z at mid-height (collar grows +Y from the Top plane). On
-    # the Front plane the centre is off-axis in y (height) only, so define_circle
-    # emits a z (height) dim then the diameter -- the x slot is ignored.
+    # Cross hole along Z at mid-height (collar grows +Y from the Top plane). Left
+    # a PLAIN CUT at the #4-40 tap-drill Ø -- a radial hole in the curved collar
+    # wall has no planar seat for the Hole Wizard (see the CROSS_HOLE_DIA note).
+    # On the Front plane the centre is off-axis in y (height) only, so
+    # define_circle emits a z (height) dim then the diameter -- x slot ignored.
     cross = SketchDims()
     check("create_sketch cross hole", await adapter.create_sketch("Front"))
     await define_circle(

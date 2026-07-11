@@ -45,7 +45,6 @@ from _common import (
     apply_material,
     check,
     define_centered_rectangle,
-    define_circle,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -54,9 +53,9 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
-    set_sketch_direct_db,
     volume_check,
 )
+from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
 
 PART_NAME = "wheel-bar"
 MATERIAL = "Plain Carbon Steel"
@@ -64,10 +63,13 @@ MATERIAL = "Plain Carbon Steel"
 BAR_SIDE = 10.0  # tall (Y) (low)
 BAR_DEPTH = 9.0  # deep (Z) -- support-bar stock; back face seats on the clamp arc
 BAR_LENGTH = 234.0  # clamped end 29 past the west column + free end (photo, med)
-SCREW_HOLE_DIA = 3.8  # M6.10: pen-hanger screw hole (see docstring)
 SCREW_HOLE_X = -114.5
-CLAMP_HOLE_DIA = 4.4  # clearance for the O3.9 clamp-screw shanks (support-bar idiom)
+# Pen-hanger screw passes through: #6 clearance, CLOSE fit (Ø3.912, the wizard
+# twin of the old Ø3.8 artefact dim; nearest UNC to the screw).
+SCREW_HOLE_SPEC = HoleSpec("clearance", "#6", fit="close")
 CLAMP_HOLE_X = (70.5, 105.5)  # local stations flanking the column line at +88
+# The O3.9 clamp-screw shanks pass through: #8 clearance (support-bar idiom).
+CLAMP_HOLE_SPEC = HoleSpec("clearance", "#8")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -81,12 +83,12 @@ async def build(adapter) -> dict[str, str]:
     # document units (an unsuffixed 200 = 200 in). BAR_DEPTH is the extrude
     # DEPTH (a feature parameter, not a sketch dim), so BarDepth is on record
     # for the GUI but the depth itself is static, matching the exemplars.
+    # (The old ScrewHoleDia/ScrewHoleX/ClampHoleDia knobs are gone: the holes are
+    # now native Hole Wizard features whose diameters come from the clearance
+    # tables and whose positions are the literal photo stations.)
     await set_global(adapter, "BarSide", f"{BAR_SIDE}mm")
     await set_global(adapter, "BarDepth", f"{BAR_DEPTH}mm")
     await set_global(adapter, "BarLength", f"{BAR_LENGTH}mm")
-    await set_global(adapter, "ScrewHoleDia", f"{SCREW_HOLE_DIA}mm")
-    await set_global(adapter, "ScrewHoleX", f"{SCREW_HOLE_X}mm")
-    await set_global(adapter, "ClampHoleDia", f"{CLAMP_HOLE_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -118,63 +120,29 @@ async def build(adapter) -> dict[str, str]:
     expected = BAR_LENGTH * BAR_SIDE * BAR_DEPTH
     await volume_check(adapter, "bar", expected, 0.005 * expected)
 
-    # Pen-hanger screw hole (mid-plane cut along Z, bar is z-symmetric). On-axis
-    # in Z (y 0): only X + diameter are dims, so define_circle records just those
-    # two -- the "Z" slot is ignored.
-    hole = SketchDims()
-    check("create_sketch screw hole", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    await define_circle(
-        adapter, SCREW_HOLE_X, 0.0, SCREW_HOLE_DIA / 2.0, "screw hole",
-        dims=hole,
-        names=("ScrewHoleCx", "ScrewHoleCz", "ScrewHoleDiaDim"),
-        # The centre-X dim is an unsigned distance from the origin, so drive it
-        # by the ABS value of the (negative) X station: -ScrewHoleX = +97.5.
-        drives=('-"ScrewHoleX"', None, '"ScrewHoleDia"'),
+    # All bores drilled through along Z from the bar FRONT face (local
+    # z = -BAR_DEPTH/2, the heads' side), while the bar is a plain prism:
+    # ONE pen-hanger #6 clearance hole + ONE 2-instance #8 clearance clamp
+    # feature (the support-bar stack: heads on the bar front face, shanks
+    # through the bar + front arc, threading into the back arc). Positions are
+    # the photo layout.
+    front_z = -BAR_DEPTH / 2.0
+    screw_dia = blind_cut_dia_mm(SCREW_HOLE_SPEC)
+    clamp_dia = blind_cut_dia_mm(CLAMP_HOLE_SPEC)
+    wizard_holes(
+        adapter, SCREW_HOLE_SPEC,
+        [[SCREW_HOLE_X, 0.0, front_z]],
+        (0.0, 0.0, -1.0), "pen-hanger screw hole (#6 clearance)", name="ScrewHole",
     )
-    set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "screw hole sketch")
-    check("exit_sketch screw hole", await adapter.exit_sketch())
-    name_last_feature(adapter, "ScrewHoleProfile")
-    drive_jobs += hole.apply(adapter, "ScrewHoleProfile")
-    check(
-        "cut screw hole",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=3.0 * BAR_SIDE, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "ScrewHole")
-    expected -= math.pi * (SCREW_HOLE_DIA / 2.0) ** 2 * BAR_DEPTH
+    expected -= math.pi * (screw_dia / 2.0) ** 2 * BAR_DEPTH
     await volume_check(adapter, "bar with screw hole", expected, 1.0)
 
-    # Clamp-screw through-holes (mid-plane cut along Z, like the screw hole):
-    # two O4.4 clearance bores flanking the column line at local 70.5 / 105.5
-    # (the support-bar stack: heads on the bar front face, shanks through the
-    # bar + front arc, threading into the back arc). Positions are the layout
-    # (named but undriven, the support-bar idiom); the diameter rides the global.
-    clamp = SketchDims()
-    check("create_sketch clamp holes", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    for n, x in enumerate(CLAMP_HOLE_X):
-        await define_circle(
-            adapter, x, 0.0, CLAMP_HOLE_DIA / 2.0, f"clamp hole x{x:.1f}",
-            dims=clamp,
-            names=(f"C{n}X", f"C{n}Z", f"C{n}Dia"),
-            drives=(None, None, '"ClampHoleDia"'),
-        )
-    set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "clamp holes sketch")
-    check("exit_sketch clamp holes", await adapter.exit_sketch())
-    name_last_feature(adapter, "ClampHolesProfile")
-    drive_jobs += clamp.apply(adapter, "ClampHolesProfile")
-    check(
-        "cut clamp holes",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=3.0 * BAR_SIDE, both_directions=True)
-        ),
+    wizard_holes(
+        adapter, CLAMP_HOLE_SPEC,
+        [[x, 0.0, front_z] for x in CLAMP_HOLE_X],
+        (0.0, 0.0, -1.0), "clamp-screw clearance holes (#8)", name="ClampHoles",
     )
-    name_last_feature(adapter, "ClampHoles")
-    expected -= 2.0 * math.pi * (CLAMP_HOLE_DIA / 2.0) ** 2 * BAR_DEPTH
+    expected -= 2.0 * math.pi * (clamp_dia / 2.0) ** 2 * BAR_DEPTH
     await volume_check(adapter, "bar with clamp holes", expected, 1.0)
 
     # Deferred drive equations after the model + a rebuild exists, then re-check:

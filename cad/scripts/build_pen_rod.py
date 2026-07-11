@@ -25,7 +25,6 @@ from _common import (
     add_line_chain,
     apply_material,
     check,
-    define_circle,
     define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
@@ -38,15 +37,14 @@ from _common import (
     set_global,
     volume_check,
 )
+from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
 
 PART_NAME = "pen-rod"
 MATERIAL = "Brass"  # see _common.apply_material docstring
 
 ROD_SECTION = 5.0  # DIMENSIONS.md ch24: square section (low)
 ROD_LENGTH = 120.0  # DIMENSIONS.md ch24: p.64 inset (low)
-WIRE_HOLE_DIA = 2.0  # wire tie-off near the top
-WIRE_HOLE_Y = 115.0
-THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > section
+WIRE_HOLE_Y = 115.0  # wire tie-off near the top (build_pen_assembly imports this)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -60,8 +58,9 @@ async def build(adapter) -> dict[str, str]:
     # unsuffixed 120 = 120 in, blowing the part up 25.4x).
     await set_global(adapter, "RodSection", f"{ROD_SECTION}mm")
     await set_global(adapter, "RodLength", f"{ROD_LENGTH}mm")
-    await set_global(adapter, "WireHoleDia", f"{WIRE_HOLE_DIA}mm")
-    await set_global(adapter, "WireHoleY", f"{WIRE_HOLE_Y}mm")
+    # (The old WireHoleDia/WireHoleY knobs are gone: the wire hole is now a native
+    # Hole Wizard feature whose diameter comes from the #47 drill standard, not an
+    # equation-driven sketch dim.)
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -96,29 +95,21 @@ async def build(adapter) -> dict[str, str]:
     v_rod = ROD_SECTION * ROD_SECTION * ROD_LENGTH
     await volume_check(adapter, "rod", v_rod, 0.005 * v_rod)
 
-    # Wire hole near the top (on-axis in X at y = WIRE_HOLE_Y): only the centre Z
-    # and the diameter are dims (the X is a relation), so define_circle records
-    # just those two -- the "X" slot is ignored.
-    wire = SketchDims()
-    check("create_sketch wire hole", await adapter.create_sketch("Front"))
-    await define_circle(
-        adapter, 0.0, WIRE_HOLE_Y, WIRE_HOLE_DIA / 2.0, "wire hole",
-        dims=wire,
-        names=("WireX", "WireZ", "WireDia"),
-        drives=(None, '"WireHoleY"', '"WireHoleDia"'),
+    # Wire tie-off hole near the top: was a plain Ø2.0 cut, now a native Hole
+    # Wizard #47 number drill (Ø1.994) so the model carries the real drill
+    # (memory/fastener-policy-us-customary). Drilled +Z through the 5 mm square
+    # section (Z 0..ROD_SECTION) at (0, WIRE_HOLE_Y); through-all is geometrically
+    # identical to the old mid-plane both-directions cut.
+    wizard_holes(
+        adapter,
+        HoleSpec("drilled_number", "#47"),
+        [[0.0, WIRE_HOLE_Y, ROD_SECTION]],
+        (0.0, 0.0, 1.0),
+        "wire tie-off hole (#47)",
+        name="WireHole",
     )
-    await ensure_fully_defined(adapter, "wire hole sketch")
-    check("exit_sketch wire hole", await adapter.exit_sketch())
-    name_last_feature(adapter, "WireProfile")
-    drive_jobs += wire.apply(adapter, "WireProfile")
-    check(
-        "cut wire hole",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "WireHole")
-    v_wire = math.pi * (WIRE_HOLE_DIA / 2.0) ** 2 * ROD_SECTION
+    wire_dia = NUMBER_DRILL_MM["#47"]
+    v_wire = math.pi * (wire_dia / 2.0) ** 2 * ROD_SECTION
     v_final = v_rod - v_wire
     await volume_check(adapter, "wire hole", v_final, 0.005 * v_rod)
 

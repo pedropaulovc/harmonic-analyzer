@@ -46,6 +46,7 @@ from _common import (
     set_global,
     volume_check,
 )
+from _holes import HoleSpec, wizard_holes
 
 import _telemetry
 
@@ -63,11 +64,14 @@ ARM_THICKNESS = 8.0  # DIMENSIONS.md ch11: ~half the arm width, p.12 photo (low)
 SQUARE_END_OVERHANG = 10.0  # DIMENSIONS.md ch11: square end past the pivot (low)
 SHAFT_BORE_DIA = 0.375 * IN  # 9.525: 3/8" crankshaft (med); the legacy 9.5
 # rounding left the bore 0.025 smaller than the shaft (caught in M6.2)
-PIVOT_BORE_DIA = 6.0  # DIMENSIONS.md ch11: handle pivot screw (low)
 DIMPLE_DIA = 8.0  # DIMENSIONS.md ch11: fiducial indentation (low)
 DIMPLE_DEPTH = 0.5  # DIMENSIONS.md ch11: fiducial indentation (low)
 DIMPLE_X = 30.0  # DIMENSIONS.md ch11: on the arm near the boss (low)
-PIN_HOLE_DIA = 5.0  # DIMENSIONS.md ch11: tapered-pin cross-hole, small end (low)
+# (The old PivotBoreDia Ø6.0 and PinHoleDia Ø5.0 constants are gone: the handle-
+# pivot hole and the tapered-pin cross-hole are now native Hole Wizard features
+# whose diameters come from the drill standard -- 15/64 (Ø5.953) and #9 (Ø4.978)
+# -- not equation-driven sketch dims. The 3/8 shaft bore stays a reamed circle
+# cut: it is a precision running fit, not a twist-drill hole.)
 
 ARM_END_X = ARM_C2C + SQUARE_END_OVERHANG
 HALF_WIDTH = ARM_WIDTH / 2.0
@@ -95,11 +99,9 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ArmThickness", f"{ARM_THICKNESS}mm")
     await set_global(adapter, "SquareEndOverhang", f"{SQUARE_END_OVERHANG}mm")
     await set_global(adapter, "ShaftBoreDia", f"{SHAFT_BORE_DIA}mm")
-    await set_global(adapter, "PivotBoreDia", f"{PIVOT_BORE_DIA}mm")
     await set_global(adapter, "DimpleDia", f"{DIMPLE_DIA}mm")
     await set_global(adapter, "DimpleDepth", f"{DIMPLE_DEPTH}mm")
     await set_global(adapter, "DimpleX", f"{DIMPLE_X}mm")
-    await set_global(adapter, "PinHoleDia", f"{PIN_HOLE_DIA}mm")
     await set_global(adapter, "ArmEndX", '"ArmC2C" + "SquareEndOverhang"')
 
     # Each sketch declares its dim names + drive equations as it is built; a
@@ -160,32 +162,40 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     _telemetry.info(f"volume after extrude: {vol:.1f} mm^3")
 
-    # Shaft bore + handle pivot bore, one through-cut. The shaft bore sits on the
-    # origin (only its diameter is a dim); the pivot bore is off-axis at +X
-    # (an X centre dim, then its diameter).
-    bores = SketchDims()
-    check("create_sketch bores", await adapter.create_sketch("Front"))
+    # Shaft bore: the 3/8 reamed journal the crankshaft runs in -- a precision
+    # running fit, kept a plain circle cut (NOT a twist-drill Hole Wizard hole).
+    # On the origin, so only its diameter is a dim.
+    shaft_bore = SketchDims()
+    check("create_sketch shaft bore", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, 0.0, SHAFT_BORE_DIA / 2.0, "shaft bore", dims=bores,
+        adapter, 0.0, 0.0, SHAFT_BORE_DIA / 2.0, "shaft bore", dims=shaft_bore,
         names=("ShaftBoreX", "ShaftBoreZ", "ShaftBoreDia"),
         drives=(None, None, '"ShaftBoreDia"'),
     )
-    await define_circle(
-        adapter, ARM_C2C, 0.0, PIVOT_BORE_DIA / 2.0, "pivot bore", dims=bores,
-        names=("PivotBoreX", "PivotBoreZ", "PivotBoreDia"),
-        drives=('"ArmC2C"', None, '"PivotBoreDia"'),
-    )
-    await ensure_fully_defined(adapter, "bores sketch")
-    check("exit_sketch bores", await adapter.exit_sketch())
-    name_last_feature(adapter, "BoreProfile")
-    drive_jobs += bores.apply(adapter, "BoreProfile")
+    await ensure_fully_defined(adapter, "shaft bore sketch")
+    check("exit_sketch shaft bore", await adapter.exit_sketch())
+    name_last_feature(adapter, "ShaftBoreProfile")
+    drive_jobs += shaft_bore.apply(adapter, "ShaftBoreProfile")
     check(
-        "cut bores",
+        "cut shaft bore",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
-    name_last_feature(adapter, "Bores")
+    name_last_feature(adapter, "ShaftBore")
+
+    # Handle-pivot hole: was a plain Ø6.0 cut, now a native Hole Wizard 15/64
+    # fractional drill (Ø5.953) at the handle-pivot centre (ARM_C2C), drilled +Z
+    # through the 8 mm plate (memory/fastener-policy-us-customary). Cut while the
+    # body is still prismatic (~15 faces) -- wizard_holes enumerates every face.
+    wizard_holes(
+        adapter,
+        HoleSpec("drilled_fractional", "15/64"),
+        [[ARM_C2C, 0.0, ARM_THICKNESS]],
+        (0.0, 0.0, 1.0),
+        "handle-pivot hole (15/64)",
+        name="PivotBore",
+    )
     vol = await _volume(adapter)
     _telemetry.info(f"volume after bores: {vol:.1f} mm^3")
 
@@ -213,31 +223,19 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     _telemetry.info(f"volume after dimple: {vol:.1f} mm^3")
 
-    # Tapered-pin cross-hole along global Y through boss and shaft bore at
-    # mid-thickness (global Z = ARM_THICKNESS/2 -> Top sketch y = -Z).
-    # On-axis in X (sketch x = 0), off-axis in Z (sketch y = -ArmThickness/2):
-    # define_circle emits a Z centre dim then the diameter. The centre sits at a
-    # NEGATIVE sketch y, but the dim displays the magnitude, so its drive must
-    # evaluate POSITIVE -- '"ArmThickness" / 2', not the signed value.
-    pin_hole = SketchDims()
-    check("create_sketch pin hole", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter, 0.0, -ARM_THICKNESS / 2.0, PIN_HOLE_DIA / 2.0, "pin hole",
-        dims=pin_hole,
-        names=("PinHoleX", "PinHoleZ", "PinHoleDia"),
-        drives=(None, '"ArmThickness" / 2', '"PinHoleDia"'),
+    # Tapered-pin cross-hole: was a plain Ø5.0 cut, now a native Hole Wizard #9
+    # number drill (Ø4.978) along global Y through the boss + shaft bore at
+    # mid-thickness (memory/fastener-policy-us-customary). Drilled from the +Y
+    # side face (a pristine planar face, normal +Y) at (x 0, z ArmThickness/2);
+    # through-all is geometrically identical to the old mid-plane cut.
+    wizard_holes(
+        adapter,
+        HoleSpec("drilled_number", "#9"),
+        [[0.0, HALF_WIDTH, ARM_THICKNESS / 2.0]],
+        (0.0, 1.0, 0.0),
+        "tapered-pin cross-hole (#9)",
+        name="PinHole",
     )
-    await ensure_fully_defined(adapter, "pin hole sketch")
-    check("exit_sketch pin hole", await adapter.exit_sketch())
-    name_last_feature(adapter, "PinHoleProfile")
-    drive_jobs += pin_hole.apply(adapter, "PinHoleProfile")
-    check(
-        "cut pin hole",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "PinHole")
     vol = await _volume(adapter)
     _telemetry.info(f"volume after pin hole: {vol:.1f} mm^3")
 

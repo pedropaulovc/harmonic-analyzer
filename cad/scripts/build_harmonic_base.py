@@ -32,7 +32,6 @@ from _common import (
     apply_material,
     check,
     define_centered_rectangle,
-    define_circle,
     drive_dimension,
     ensure_fully_defined,
     extrude_at_offset,
@@ -45,6 +44,7 @@ from _common import (
     set_global,
     volume_check,
 )
+from _holes import HoleSpec, blind_cut_dia_mm, blind_hole_volume_mm3, wizard_holes
 
 import _telemetry
 
@@ -88,15 +88,19 @@ CBORE_XZ = HOLE_XZ  # all four heads counterbored
 # gate proven: holes at the wrong x left both screws in solid base, 190.0 +
 # 75.4 mm^3, exactly the two embedded shank volumes.)
 PIVOT_SCREW_XZ = (-79.69, 103.29)
-PIVOT_SCREW_HOLE_DIA = 6.5  # O6.35 shoulder clearance
-STOP_SCREW_XZ = (-130.830, 9.887)  # past the DISENGAGED east taper edge. The
+# pivot seat: letter-F drill (O6.528, wizard) -- O6.35 shoulder clearance
+STOP_SCREW_XZ = (-130.433, 9.735)  # past the DISENGAGED east taper edge. The
+# centre sits one stop-screw shank RADIUS outside the swung edge, so the
+# US-customary shank resize (O4.0 -> 3.15, #8-32 tap-drill - 0.3) moved it
+# 0.425 mm along the disengaged east-edge outward normal N_M
+# (-0.933521, 0.358523): old (-130.830, 9.887) + N_M * (3.15 - 4.0)/2.
 # PR8 west-tip trim moved this only via the DISENGAGE angle (the notch mouth
 # is on the WEST edge, so the exit travel shortened); the contact edge itself
 # is the EAST taper line, unchanged at HALF_WIDTH_N 12. (An earlier PR8 pass
 # wrongly fed the west width into the east-edge derivation -- Codex catch.)
 # Disengage swing sweeps the plate EAST (machine -x); the first
 # derivation sat 19 inside the engaged plate -- interference-gate proven.
-STOP_SCREW_HOLE_DIA = 4.1  # O4 shank clearance
+# stop seat: #20 drill (O4.089, wizard) -- stop-screw O3.15 shank clearance
 SWING_HOLE_DEPTH = 6.0
 
 # Alignment-pinion rig hold-downs (PR7 items 2/11/12), blind from the TOP face
@@ -112,7 +116,7 @@ BLOCK_SCREW_XZ = (
     (-7.164, 82.0),    # back block, east screw
     (19.836, 82.0),    # back block, west screw
 )
-BLOCK_SCREW_HOLE_DIA = 4.2  # slotted-screw O4 shank clearance
+# block seats: #19 drill (O4.216, wizard) -- slotted-screw O3.15 shank clearance
 BLOCK_SCREW_HOLE_DEPTH = 3.5  # 18 shank - 16 block = 2 buried + 1.5 air
 FOOT_SCREW_XZ = (
     (20.467, 70.95),  # spring foot (build_pinion_spring hole: the west foot
@@ -121,18 +125,27 @@ FOOT_SCREW_XZ = (
     (-54.7, 102.5),   # NORTH arbor-pedestal flange (PR8, ch12 img09: the
     # mirrored base-standing clamp at z 97.5; ry180 flips its flange to +z)
 )
-FOOT_SCREW_HOLE_DIA = 3.2  # foot-screw O2.9 shank clearance
+# foot seats: 1/8 drill (O3.175, wizard) -- foot-screw O2.0 shank clearance
 FOOT_SCREW_HOLE_DEPTH = 7.7  # 8.0 shank under the 0.8 spring strip + air
 
+# The four seat specs, hoisted to module level so the drive-train assembly can
+# import the TRUE wizard cut diameters for its clearance assertions (the old
+# hand-authored *_HOLE_DIA constants are derived from the specs now -- one
+# chokepoint, no drift).
+PIVOT_SEAT_SPEC = HoleSpec(
+    "drilled_letter", "F", end="blind", depth_mm=SWING_HOLE_DEPTH)
+STOP_SEAT_SPEC = HoleSpec(
+    "drilled_number", "#20", end="blind", depth_mm=SWING_HOLE_DEPTH)
+BLOCK_SEAT_SPEC = HoleSpec(
+    "drilled_number", "#19", end="blind", depth_mm=BLOCK_SCREW_HOLE_DEPTH)
+FOOT_SEAT_SPEC = HoleSpec(
+    "drilled_fractional", "1/8", end="blind", depth_mm=FOOT_SCREW_HOLE_DEPTH)
+PIVOT_SCREW_HOLE_DIA = blind_cut_dia_mm(PIVOT_SEAT_SPEC)  # 6.528 (letter F)
+STOP_SCREW_HOLE_DIA = blind_cut_dia_mm(STOP_SEAT_SPEC)  # 4.089 (#20)
+BLOCK_SCREW_HOLE_DIA = blind_cut_dia_mm(BLOCK_SEAT_SPEC)  # 4.216 (#19)
+FOOT_SCREW_HOLE_DIA = blind_cut_dia_mm(FOOT_SEAT_SPEC)  # 3.175 (1/8)
+
 MM3_PER_IN3 = IN**3
-
-
-def _pos_drive(global_name: str, sketch_value: float) -> str:
-    """Drive expression for an UNSIGNED centre-distance dim whose global holds the
-    signed sketch coordinate. The dim displays the magnitude, so the equation must
-    evaluate POSITIVE -- negate the global when the coordinate is negative (driving
-    such a dim to a negative value fails loud at equation-add)."""
-    return f'-"{global_name}"' if sketch_value < 0.0 else f'"{global_name}"'
 
 
 async def _volume(adapter) -> float:
@@ -145,29 +158,21 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations): the two plate footprints + thicknesses,
-    # the hole/counterbore diameters, and each fastener-hole station. The mm
-    # suffix is load-bearing -- this is an INCH document and the equation manager
-    # reads BARE numbers in document units (an unsuffixed 457.2 = 457 inches and
-    # blows the part up 25.4x). The thicknesses / cbore depth are extrude/offset
-    # feature parameters (not sketch dims), exposed here as editable constants even
-    # though nothing in drive_jobs drives them.
+    # Editable knobs (Tools > Equations): the two plate footprints + thicknesses.
+    # The mm suffix is load-bearing -- this is an INCH document and the equation
+    # manager reads BARE numbers in document units (an unsuffixed 457.2 = 457
+    # inches and blows the part up 25.4x). The thicknesses are extrude/offset
+    # feature parameters (not sketch dims), exposed here as editable constants
+    # even though nothing in drive_jobs drives them.
     await set_global(adapter, "BottomLength", f"{BOTTOM_LENGTH}mm")
     await set_global(adapter, "BottomWidth", f"{BOTTOM_WIDTH}mm")
     await set_global(adapter, "BottomThickness", f"{BOTTOM_THICKNESS}mm")
     await set_global(adapter, "TopLength", f"{TOP_LENGTH}mm")
     await set_global(adapter, "TopWidth", f"{TOP_WIDTH}mm")
     await set_global(adapter, "TopThickness", f"{TOP_THICKNESS}mm")
-    await set_global(adapter, "HoleDia", f"{HOLE_DIA}mm")
-    await set_global(adapter, "CboreDia", f"{CBORE_DIA}mm")
-    await set_global(adapter, "CboreDepth", f"{CBORE_DEPTH}mm")
-    # One global per fastener-hole station, holding the SKETCH-space coordinate
-    # (define_circle receives (x, -z), so the z global is the negated machine z).
-    # The centre dims are unsigned distances -- _pos_drive negates a negative
-    # global so the equation evaluates positive.
-    for i, (x, z) in enumerate(HOLE_XZ):
-        await set_global(adapter, f"Hole{i}X", f"{x}mm")
-        await set_global(adapter, f"Hole{i}Z", f"{-z}mm")
+    # (The old HoleDia/CboreDia/Hole{i}X/Z knobs are gone: the fastener holes
+    # are now a native Hole Wizard feature whose dimensions come from the 9/16
+    # standard + explicit artefact overrides, not equation-driven sketch dims.)
 
     # Each sketch DECLARES its dim names + drive equations inline; a per-sketch
     # SketchDims records each dim in the helper's emission order. Drive equations
@@ -216,159 +221,74 @@ async def build(adapter) -> dict[str, str]:
     _telemetry.info(f"volume after top plate: {await _volume(adapter):.1f} mm^3")
     # expected: 99 + 17.5 * 10.5 * 1.5 = 374.625 in^3 = 6,139,003 mm^3
 
-    # M6.10 fastener holes: Top sketch (x, y) -> global (X, -Z), mid-plane
-    # cuts so the direction never matters (below y 0 is outside the part).
+    # M6.10 fastener holes + lag-head recesses: ONE native Hole Wizard
+    # counterbored 9/16 FILLISTER feature (4 placement points) drilled from
+    # the UNDERSIDE face, so the model carries the real fastener designation
+    # (memory/fastener-policy-us-customary; fillister = the round slotted head
+    # -- the hex-bolt table SKIPS 9/16, and the lag screw's round Ø22 head IS
+    # a fillister shape). The through Ø13 / recess Ø23x6.5 are the
+    # PHOTO-MEASURED artefact dims -- the standard table would cut Ø14.7/Ø21.4
+    # and visibly move the underside -- preserved as explicit definition
+    # overrides. CBORE_XZ == HOLE_XZ (all four heads recessed), so the pair of
+    # concentric cuts collapses into the one counterbore feature.
     total = BOTTOM_THICKNESS + TOP_THICKNESS
     pre_holes = await _volume(adapter)
-    holes = SketchDims()
-    check("create_sketch fastener holes", await adapter.create_sketch("Top"))
-    for i, (x, z) in enumerate(HOLE_XZ):
-        await define_circle(
-            adapter, x, -z, HOLE_DIA / 2.0, f"hole ({x:.2f}, {z:.1f})", dims=holes,
-            names=(f"Hole{i}Cx", f"Hole{i}Cz", f"Hole{i}Dia"),
-            drives=(
-                _pos_drive(f"Hole{i}X", x),
-                _pos_drive(f"Hole{i}Z", -z),
-                '"HoleDia"',
-            ),
-        )
-    await ensure_fully_defined(adapter, "fastener holes sketch")
-    check("exit_sketch fastener holes", await adapter.exit_sketch())
-    name_last_feature(adapter, "FastenerHoleProfile")
-    drive_jobs += holes.apply(adapter, "FastenerHoleProfile")
-    check(
-        "cut fastener holes",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=3.0 * total, both_directions=True)
-        ),
+    wizard_holes(
+        adapter,
+        HoleSpec("counterbore_fillister", "9/16", overrides_mm={
+            "HoleDiameter": HOLE_DIA,
+            "CounterBoreDiameter": CBORE_DIA,
+            "CounterBoreDepth": CBORE_DEPTH,
+        }),
+        [[x, 0.0, z] for x, z in HOLE_XZ],
+        (0.0, -1.0, 0.0),
+        "lag-screw counterbored holes (9/16)",
+        name="FastenerHoles",
     )
-    name_last_feature(adapter, "FastenerHoles")
-    before = await _volume(adapter)
-    v_holes = len(HOLE_XZ) * math.pi * (HOLE_DIA / 2.0) ** 2 * total
-    _telemetry.info(f"volume after holes: {before:.1f} mm^3 (removed analytic {v_holes:.1f})")
-    if abs((pre_holes - before) - v_holes) > 0.02 * v_holes:
-        raise RuntimeError(
-            f"holes removed {pre_holes - before:.1f}, expected {v_holes:.1f}"
-        )
-
-    # Lag-screw head counterbores up from the underside: a both-directions
-    # cut of 2x depth about the bottom plane lands exactly 0..4.5 in
-    # material (the lower half is air).
-    cbores = SketchDims()
-    check("create_sketch counterbores", await adapter.create_sketch("Top"))
-    # CBORE_XZ is HOLE_XZ (all four heads recessed), so each counterbore is
-    # concentric with its fastener hole -- reuse the same Hole{i}{X,Z} station
-    # globals so a station edit moves both. cbore_offset (0 here) aligns the names.
-    cbore_offset = len(HOLE_XZ) - len(CBORE_XZ)
-    for j, (x, z) in enumerate(CBORE_XZ):
-        i = cbore_offset + j
-        await define_circle(
-            adapter, x, -z, CBORE_DIA / 2.0, f"cbore ({x:.2f})", dims=cbores,
-            names=(f"Cbore{i}Cx", f"Cbore{i}Cz", f"Cbore{i}Dia"),
-            drives=(
-                _pos_drive(f"Hole{i}X", x),
-                _pos_drive(f"Hole{i}Z", -z),
-                '"CboreDia"',
-            ),
-        )
-    await ensure_fully_defined(adapter, "counterbores sketch")
-    check("exit_sketch counterbores", await adapter.exit_sketch())
-    name_last_feature(adapter, "CounterboreProfile")
-    drive_jobs += cbores.apply(adapter, "CounterboreProfile")
-    check(
-        "cut counterbores",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=2.0 * CBORE_DEPTH, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "Counterbores")
     after = await _volume(adapter)
-    v_cbore = (
-        len(CBORE_XZ)
-        * math.pi
-        * ((CBORE_DIA / 2.0) ** 2 - (HOLE_DIA / 2.0) ** 2)
-        * CBORE_DEPTH
+    v_holes = len(HOLE_XZ) * (
+        math.pi * (HOLE_DIA / 2.0) ** 2 * total
+        + math.pi * ((CBORE_DIA / 2.0) ** 2 - (HOLE_DIA / 2.0) ** 2) * CBORE_DEPTH
     )
-    _telemetry.info(f"volume after counterbores: {after:.1f} mm^3 (removed analytic {v_cbore:.1f})")
-    if abs((before - after) - v_cbore) > 0.02 * v_cbore:
+    _telemetry.info(
+        f"volume after fastener holes: {after:.1f} mm^3 (removed analytic {v_holes:.1f})")
+    if abs((pre_holes - after) - v_holes) > 0.02 * v_holes:
         raise RuntimeError(
-            f"counterbores removed {before - after:.1f}, expected {v_cbore:.1f}"
+            f"fastener holes removed {pre_holes - after:.1f}, expected {v_holes:.1f}"
         )
 
-    # Cone swing hardware holes, blind from the TOP face (see the constants
-    # block): pivot screw + swing-stop screw.
-    from solidworks_mcp.adapters.base import CreatePlaneParameters as _CPP
-
-    check(
-        "create_plane TopFace (swing holes)",
-        await adapter.create_plane(_CPP(
-            mode="offset", base_plane="Top Plane", offset=total,
-        )),
-    )
-    name_last_feature(adapter, "TopFace")
-    swing = SketchDims()
-    check("create_sketch swing holes", await adapter.create_sketch("TopFace"))
-    for tag, (sx, sz), dia in (
-        ("Pivot", PIVOT_SCREW_XZ, PIVOT_SCREW_HOLE_DIA),
-        ("Stop", STOP_SCREW_XZ, STOP_SCREW_HOLE_DIA),
+    # Cone swing hardware + alignment-pinion rig seats: native Hole Wizard
+    # BLIND drilled holes from the top face, at the nearest STANDARD DRILL to
+    # each artefact diameter (these are all shank-clearance SEATS, not tapped
+    # -- what a machinist drills; memory/fastener-policy-us-customary). A
+    # wizard blind hole ends in a 118-degree drill point, so the analytic
+    # expectation is blind_hole_volume_mm3 (cylinder + point), not a cylinder.
+    for tag, spec, xz, depth, label in (
+        ("PivotSeat", PIVOT_SEAT_SPEC,
+         (PIVOT_SCREW_XZ,), SWING_HOLE_DEPTH,
+         "cone-pivot screw seat (letter F)"),
+        ("StopSeat", STOP_SEAT_SPEC,
+         (STOP_SCREW_XZ,), SWING_HOLE_DEPTH,
+         "swing-stop screw seat (#20)"),
+        ("BlockScrewHoles", BLOCK_SEAT_SPEC,
+         BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DEPTH,
+         "pinion-pivot-block screw seats (#19)"),
+        ("FootScrewHoles", FOOT_SEAT_SPEC,
+         FOOT_SCREW_XZ, FOOT_SCREW_HOLE_DEPTH,
+         "foot-screw seats (1/8)"),
     ):
-        await define_circle(
-            adapter, sx, -sz, dia / 2.0, f"{tag.lower()} screw hole", dims=swing,
-            names=(f"{tag}HoleCx", f"{tag}HoleCz", f"{tag}HoleDia"),
-            drives=(None, None, None),
+        dia = blind_cut_dia_mm(spec)
+        wizard_holes(
+            adapter, spec,
+            [[sx, total, sz] for sx, sz in xz],
+            (0.0, 1.0, 0.0), label, name=tag,
         )
-    await ensure_fully_defined(adapter, "swing holes sketch")
-    check("exit_sketch swing holes", await adapter.exit_sketch())
-    name_last_feature(adapter, "SwingHoleProfile")
-    drive_jobs += swing.apply(adapter, "SwingHoleProfile")
-    # A CUT's default direction is OPPOSITE the sketch normal (FeatureCut4
-    # remarks), so from the top-face plane it already drills DOWN into the slab.
-    check(
-        "cut swing holes (blind)",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=SWING_HOLE_DEPTH)
-        ),
-    )
-    name_last_feature(adapter, "SwingHardwareHoles")
-    after_swing = await _volume(adapter)
-    v_swing = math.pi * ((PIVOT_SCREW_HOLE_DIA / 2.0) ** 2
-                         + (STOP_SCREW_HOLE_DIA / 2.0) ** 2) * SWING_HOLE_DEPTH
-    if abs((after - after_swing) - v_swing) > 0.02 * v_swing:
-        raise RuntimeError(
-            f"swing holes removed {after - after_swing:.1f}, expected {v_swing:.1f}")
-    after = after_swing
-
-    # Alignment-pinion rig hold-down holes (PR7), blind from the same top
-    # face (see the constants block): 4 block-screw + 2 foot-screw stations,
-    # one sketch + cut per diameter/depth group.
-    for tag, xz, dia, depth in (
-        ("BlockScrew", BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DIA, BLOCK_SCREW_HOLE_DEPTH),
-        ("FootScrew", FOOT_SCREW_XZ, FOOT_SCREW_HOLE_DIA, FOOT_SCREW_HOLE_DEPTH),
-    ):
-        rig = SketchDims()
-        check(f"create_sketch {tag} holes", await adapter.create_sketch("TopFace"))
-        for k, (sx, sz) in enumerate(xz):
-            await define_circle(
-                adapter, sx, -sz, dia / 2.0, f"{tag} hole ({sx:.2f}, {sz:.1f})",
-                dims=rig,
-                names=(f"{tag}{k}Cx", f"{tag}{k}Cz", f"{tag}{k}Dia"),
-                drives=(None, None, None),
-            )
-        await ensure_fully_defined(adapter, f"{tag} holes sketch")
-        check(f"exit_sketch {tag} holes", await adapter.exit_sketch())
-        name_last_feature(adapter, f"{tag}HoleProfile")
-        drive_jobs += rig.apply(adapter, f"{tag}HoleProfile")
-        check(
-            f"cut {tag} holes (blind)",
-            await adapter.create_cut_extrude(ExtrusionParameters(depth=depth)),
-        )
-        name_last_feature(adapter, f"{tag}Holes")
-        after_rig = await _volume(adapter)
-        v_rig = len(xz) * math.pi * (dia / 2.0) ** 2 * depth
-        if abs((after - after_rig) - v_rig) > 0.02 * v_rig:
+        after_cut = await _volume(adapter)
+        v_cut = len(xz) * blind_hole_volume_mm3(dia, depth)
+        if abs((after - after_cut) - v_cut) > 0.02 * v_cut:
             raise RuntimeError(
-                f"{tag} holes removed {after - after_rig:.1f}, expected {v_rig:.1f}")
-        after = after_rig
+                f"{tag} removed {after - after_cut:.1f}, expected {v_cut:.1f}")
+        after = after_cut
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves -- then re-check neutrality against the

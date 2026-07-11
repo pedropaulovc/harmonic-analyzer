@@ -45,7 +45,6 @@ import sys
 from _common import (
     SketchDims,
     anchor_point_to_origin,
-    define_circle,
     apply_material,
     check,
     dimension_between,
@@ -60,6 +59,7 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
 
 PART_NAME = "pinion-spring"
 MATERIAL = "Brass"  # p.68: the leaf reads brass against the steel strap
@@ -94,9 +94,13 @@ AXIS_OFFSET = 10.1  # strap axis -> blade centreline, east
 KINK_T = 32.0  # pivot -> kink start (the contact crest), along the strap axis
 FOOT_Y = 0.8  # foot centreline above the base top (= THICK: flush if the
 # thin side falls down, 0.8 float if up -- either passes the gates)
-HOLE_DIA = 3.2  # foot screw hole (PR7 item 11): the black foot screw
-# (build_foot_screw, O2.9 shank) bolts the foot down -- 0.4 rims in the
-# 4-wide strip (the O4 slotted-screw shank cannot fit this strip)
+# Foot screw hole (PR7 item 11): the black foot screw (build_foot_screw, O2.9
+# shank) bolts the foot down -- 0.4 rims in the 4-wide strip. #4 clearance
+# NORMAL fit (Ø3.251, the wizard twin of the old Ø3.2 artefact dim; same foot
+# screw as build_arbor_pedestal's flange hole).
+HOLE_SPEC = HoleSpec("clearance", "#4")
+HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)  # 3.251; re-exposed for the drive-train
+# assembly's foot-screw clearance assert (build_drive_train_assembly)
 HOLE_FROM_END = 3.1  # hole centre east of the foot's free (west) end: the
 # O5.5 head sits fully on the strip (0.35 rim to the end) yet 0.46 clear
 # of the lift rod's west flank crossing above (build_drive_train asserts)
@@ -243,7 +247,6 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch spring", await adapter.exit_sketch())
     name_last_feature(adapter, "SpringProfile")
     drive_jobs = spring.apply(adapter, "SpringProfile")
-    hole_jobs: list[tuple[str, str]] = []
 
     # Open profile -> thin mid-plane extrude: depth is the TOTAL width
     # (SolidWorks splits it), the 0.8 wall lands one-sided (side unknown).
@@ -261,36 +264,27 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Spring")
     volume = await volume_check(adapter, "spring", VOLUME, 0.01 * VOLUME)
 
-    # Foot screw hole (PR7 item 11): O3.2 through the foot strip near its
-    # free end. Top sketch (u, v) -> (X, -Z); mid-plane cut spans whichever
-    # y-band the one-sided thin wall landed in.
-    hole = SketchDims()
-    check("create_sketch foot hole", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter, FOOT_END[0] + HOLE_FROM_END, 0.0, HOLE_DIA / 2.0,
-        "foot hole", dims=hole,
-        names=("FootHoleX", "FootHoleZ", "FootHoleDia"),
-        drives=(None, None, None),
+    # Foot screw hole (PR7 item 11): ONE native Hole Wizard #4 clearance feature
+    # (through-all along Y) through the foot strip near its free end, drilled
+    # from the foot's underside (normal -Y). The foot centreline is at y=FOOT_Y;
+    # the one-sided thin wall lands EITHER y 0..0.8 OR 0.8..1.6, so the -Y face
+    # is within the 1.0 mm find_planar_face tolerance of the FOOT_Y point either
+    # way, and the -Y normal filter disambiguates it from the top face. (If the
+    # thin-wall side ever defeats face resolution it fails LOUD, not silently.)
+    screw_dia = blind_cut_dia_mm(HOLE_SPEC)
+    wizard_holes(
+        adapter, HOLE_SPEC,
+        [[FOOT_END[0] + HOLE_FROM_END, FOOT_Y, 0.0]],
+        (0.0, -1.0, 0.0), "foot screw hole (#4 clearance)", name="FootHole",
     )
-    await ensure_fully_defined(adapter, "foot hole sketch")
-    check("exit_sketch foot hole", await adapter.exit_sketch())
-    name_last_feature(adapter, "FootHoleProfile")
-    hole_jobs = hole.apply(adapter, "FootHoleProfile")
-    check(
-        "cut foot hole",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=8.0 * THICK, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "FootHole")
-    v_hole = math.pi * (HOLE_DIA / 2.0) ** 2 * THICK
+    v_hole = math.pi * (screw_dia / 2.0) ** 2 * THICK
     volume -= v_hole
     await volume_check(adapter, "foot hole", volume, 0.05 * v_hole)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to
     # the as-built value, so the geometry must not move).
     await force_rebuild(adapter)
-    for dim_name, expr in drive_jobs + hole_jobs:
+    for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(

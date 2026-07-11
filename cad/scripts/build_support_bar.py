@@ -38,7 +38,6 @@ from _common import (
     apply_material,
     check,
     define_centered_rectangle,
-    define_circle,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -47,9 +46,9 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
-    set_sketch_direct_db,
     volume_check,
 )
+from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
 
 PART_NAME = "support-bar"
 MATERIAL = "Plain Carbon Steel"
@@ -60,10 +59,12 @@ BAR_LENGTH = 452.0  # ends at x +-226, ~29 past each Ø25.4 column (ch30 p002)
 
 COLUMN_X = 197.0  # frame column line (frame assembly)
 CLAMP_SCREW_DX = 17.5  # clamp screws flank each column
-CLAMP_HOLE_DIA = 4.4  # O4 clamp-screw shanks pass through
+# The O3.9 clamp-screw shanks PASS THROUGH: #8 clearance (normal Ø4.978).
+CLAMP_HOLE_SPEC = HoleSpec("clearance", "#8")
 BRACKET_HOLE_X = (-22.0, -2.0)  # bracket screw line, MACHINE-handed (stud
 # at machine -12 +- 10; the bar is placed machine-handed, see docstring)
-BRACKET_HOLE_DIA = 4.0  # O4 bracket screws thread in
+# The ~Ø4 bracket screws THREAD IN: tapped #8-32 (nearest UNC coarse).
+BRACKET_HOLE_SPEC = HoleSpec("tapped", "#8-32")
 
 CLAMP_HOLE_X = tuple(
     s * (COLUMN_X + d) for s in (-1.0, 1.0) for d in (-CLAMP_SCREW_DX, CLAMP_SCREW_DX)
@@ -78,11 +79,12 @@ async def build(adapter) -> dict[str, str]:
     # Editable knobs (Tools > Equations): the section and the length. The
     # mm suffix is load-bearing -- this is an INCH document and the equation
     # manager reads BARE numbers in document units (an unsuffixed 452 = 452 in).
+    # (The old ClampHoleDia/BracketHoleDia knobs are gone: the screw holes are
+    # now native Hole Wizard features whose diameters come from the ANSI-inch
+    # clearance/tap tables, not driven dims.)
     await set_global(adapter, "BarHeight", f"{BAR_HEIGHT}mm")
     await set_global(adapter, "BarDepth", f"{BAR_DEPTH}mm")
     await set_global(adapter, "BarLength", f"{BAR_LENGTH}mm")
-    await set_global(adapter, "ClampHoleDia", f"{CLAMP_HOLE_DIA}mm")
-    await set_global(adapter, "BracketHoleDia", f"{BRACKET_HOLE_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -111,44 +113,29 @@ async def build(adapter) -> dict[str, str]:
     expected = BAR_HEIGHT * BAR_DEPTH * BAR_LENGTH
     await volume_check(adapter, "bar", expected, 0.005 * expected)
 
-    # Screw holes, all through along Z at the bar's mid-height: 4 clamp-screw
-    # clearance holes flanking the columns + 2 bracket-screw holes at the stud
-    # line (covered by the platen, so a through cut reads clean and avoids an
-    # offset blind cut). Off-axis circles emit centre-x + diameter dims (y = 0
-    # on the mid-height axis emits nothing); positions are the photo layout, so
-    # they are named but undriven -- only the diameters ride the globals.
-    holes = SketchDims()
-    check("create_sketch holes", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    for n, x in enumerate(CLAMP_HOLE_X):
-        await define_circle(
-            adapter, x, 0.0, CLAMP_HOLE_DIA / 2.0, f"clamp hole x{x:.0f}",
-            dims=holes,
-            names=(f"C{n}X", f"C{n}Z", f"C{n}Dia"),
-            drives=(None, None, '"ClampHoleDia"'),
-        )
-    for n, x in enumerate(BRACKET_HOLE_X):
-        await define_circle(
-            adapter, x, 0.0, BRACKET_HOLE_DIA / 2.0, f"bracket hole x{x:.0f}",
-            dims=holes,
-            names=(f"B{n}X", f"B{n}Z", f"B{n}Dia"),
-            drives=(None, None, '"BracketHoleDia"'),
-        )
-    set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "holes sketch")
-    check("exit_sketch holes", await adapter.exit_sketch())
-    name_last_feature(adapter, "HoleProfile")
-    drive_jobs += holes.apply(adapter, "HoleProfile")
-    check(
-        "cut holes",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=2.0 * BAR_DEPTH, both_directions=True)
-        ),
+    # Screw holes, all through along Z at the bar's mid-height, drilled from the
+    # bar FRONT face (local z = -BAR_DEPTH/2, where the clamp-screw heads sit --
+    # ch30 p002), while the bar is still a plain prism: TWO native Hole Wizard
+    # features -- 4 clamp-screw #8 CLEARANCE holes flanking the columns, and 2
+    # #8-32 TAPPED bracket-screw holes at the stud line (the bracket screws
+    # thread into the bar; covered by the platen, so a through cut reads clean).
+    # Positions are the photo layout.
+    front_z = -BAR_DEPTH / 2.0
+    clamp_dia = blind_cut_dia_mm(CLAMP_HOLE_SPEC)
+    bracket_dia = blind_cut_dia_mm(BRACKET_HOLE_SPEC)
+    wizard_holes(
+        adapter, CLAMP_HOLE_SPEC,
+        [[x, 0.0, front_z] for x in CLAMP_HOLE_X],
+        (0.0, 0.0, -1.0), "clamp-screw clearance holes (#8)", name="ClampHoles",
     )
-    name_last_feature(adapter, "ScrewHoles")
+    wizard_holes(
+        adapter, BRACKET_HOLE_SPEC,
+        [[x, 0.0, front_z] for x in BRACKET_HOLE_X],
+        (0.0, 0.0, -1.0), "bracket-screw tapped holes (#8-32)", name="BracketHoles",
+    )
     v_holes = (
-        len(CLAMP_HOLE_X) * math.pi * (CLAMP_HOLE_DIA / 2.0) ** 2
-        + len(BRACKET_HOLE_X) * math.pi * (BRACKET_HOLE_DIA / 2.0) ** 2
+        len(CLAMP_HOLE_X) * math.pi * (clamp_dia / 2.0) ** 2
+        + len(BRACKET_HOLE_X) * math.pi * (bracket_dia / 2.0) ** 2
     ) * BAR_DEPTH
     expected -= v_holes
     await volume_check(adapter, "bar with holes", expected, 0.02 * v_holes)

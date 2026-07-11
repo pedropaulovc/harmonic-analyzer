@@ -3,8 +3,8 @@ r"""Reproduction script: reeded thumb screw (book ch. 20, p. 48).
 The knurled ("reeded") thumb screw that locks the magnifying-lever clamp
 block (a second identical one locks the output fixture). M4 finishing
 pass: head reeded with 24 axial Ø1 mm grooves (tube-frame fluting recipe,
-``_features.add_reeded_head_and_thread``) and a cosmetic M3 thread on the
-shank (annotation only -- keeps M6 interference checks clean).
+``_features.add_reeded_head_and_thread``) and a cosmetic #4-40 UNC thread on
+the shank (annotation only -- keeps M6 interference checks clean).
 
 The stepped body is two coaxial merged extrusions (cone-gear-shaft
 recipe), NOT a profile revolve: circular patterns of cuts on stepped
@@ -49,7 +49,8 @@ MATERIAL = "Brass"  # see _common.apply_material docstring
 
 HEAD_DIA = 10.0  # DIMENSIONS.md ch20: knurled head, p.48 (low)
 HEAD_LENGTH = 5.0  # DIMENSIONS.md ch20 (low)
-SHANK_DIA = 3.0  # DIMENSIONS.md ch20: matches clamp screw hole (low)
+SHANK_DIA = 2.0  # shank: was Ø3.0, now 2.0 = #4-40 tap-drill 2.261 - 0.26
+# (threads #4-40 into the clamp block / output fixture)
 SHANK_LENGTH = 12.0  # DIMENSIONS.md ch20 (low)
 
 
