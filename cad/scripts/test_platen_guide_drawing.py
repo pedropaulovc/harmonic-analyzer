@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 import cut_release
+import create_drawing_standards
 import draw_platen_guide as drawing
 import build_fillister_screw as screw
 import build_platen as platen
@@ -54,9 +55,8 @@ def test_platen_guide_rebases_back_as_standard_front() -> None:
     assert adapter.currentModel.shown == [("", 2), ("", 1)]
     assert adapter.currentModel.Extension.updated == [("", 1)]
     assert adapter.zoomed == [adapter.currentModel]
-    assert 'place_view(adapter, str(SOURCE), "*Front"' in Path(
-        drawing.__file__
-    ).read_text(encoding="utf-8")
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '"*Front", 0.190, FRONT_VIEW_Y_M' in source
 
 
 def test_period_6ba_thread_form() -> None:
@@ -169,6 +169,20 @@ def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/platen-guide.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/platen-guide.pdf")
     assert drawing.PNG.as_posix().endswith("/png/platen-guide_drawing.png")
+
+
+def test_drawing_uses_native_hole_table_and_sheet_scale() -> None:
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    standards_source = Path(create_drawing_standards.__file__).read_text(
+        encoding="utf-8"
+    )
+    assert "InsertHoleTable3" in drawing_source
+    assert "draw_note_table" not in drawing_source
+    assert "add_hole_group_tags" not in drawing_source
+    assert "scale=(3, 1)" not in drawing_source
+    assert "scale=(1, 4)" not in drawing_source
+    assert '$PRP:"SW-Sheet Scale"' in standards_source
+    assert "SCALE 1:1 UNLESS NOTED" not in standards_source
 
 
 def test_drawing_tolerances_follow_feature_function_not_display_zeros() -> None:

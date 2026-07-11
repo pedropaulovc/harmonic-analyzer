@@ -13,15 +13,14 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 from typing import Any
 
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_hole_group_tags,
     assert_asme_b_sheet,
-    draw_note_table,
     import_cosmetic_threads,
     new_project_drawing,
     read_required_properties,
@@ -33,9 +32,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_wizard import BA6
 from build_platen_guide import HOLE_X as THROUGH_X
-from build_platen_guide import SCREW_HOLE_DEPTH as BLIND_HOLE_DEPTH
 from build_platen_guide import SCREW_STATION_X as BLIND_X
-from build_platen_guide import SCREW_THREAD_DEPTH as BLIND_THREAD_DEPTH
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -66,7 +63,11 @@ PNG = OUTPUTS.png
 # left end is X=0.040 m.  The circular-edge pick Y was measured and then
 # read-validated against every expected attached entity in live SolidWorks.
 FRONT_LEFT_X_M = 0.040
-FRONT_HOLE_Y_M = 0.1911
+FRONT_VIEW_Y_M = 0.110
+FRONT_HOLE_Y_M = 0.1111
+FRONT_BOTTOM_Y_M = FRONT_HOLE_Y_M - 0.0025
+HOLE_TABLE_X_M = 0.014
+HOLE_TABLE_Y_M = 0.258
 
 
 def _insert_marked_model_dimensions(adapter: Any, view: Any) -> list[Any]:
@@ -188,46 +189,90 @@ def _manufacturing_notes() -> str:
     )
 
 
-def _add_hole_schedule(adapter: Any) -> None:
-    draw_note_table(
-        adapter,
-        rows=(
-            (
-                "HOLE SET",
-                "QTY",
-                "CENTRES: X FROM LEFT END; Y=2.50",
-                "THREAD / CORE",
-            ),
-            (
-                "T",
-                "4",
-                "53.00, 67.00, 233.00, 247.00",
-                (
-                    f"6 BA THRU; CORE DIA {BA6.core_diameter_mm:.3f} THRU; "
-                    "TAP FROM REAR"
-                ),
-            ),
-            (
-                "B",
-                "5",
-                "30.00, 90.00, 150.00, 210.00, 270.00",
-                (
-                    f"6 BA x {BLIND_THREAD_DEPTH:g} FULL; CORE DIA "
-                    f"{BA6.core_diameter_mm:.3f} x {BLIND_HOLE_DEPTH:g} DEEP; "
-                    "ENTER PLATEN-MATING FACE"
-                ),
-            ),
-        ),
-        column_x=(0.014, 0.050, 0.071, 0.202),
-        row_y=(0.264, 0.254, 0.243),
+def _hole_table_template(adapter: Any) -> Path:
+    executable = adapter._attempt(
+        lambda: adapter.swApp.GetExecutablePath(), default=None
     )
+    if not executable:
+        raise RuntimeError("SolidWorks executable path is unavailable")
+    template = (
+        Path(str(executable)).parent
+        / "lang"
+        / "english"
+        / "standard hole table--letters.sldholtbt"
+    )
+    if not template.is_file():
+        raise FileNotFoundError(f"native hole-table template is missing: {template}")
+    return template
 
 
-def _edge_points(stations_mm: tuple[float, ...]) -> tuple[tuple[float, float], ...]:
-    return tuple(
-        (FRONT_LEFT_X_M + station / 1000.0, FRONT_HOLE_Y_M)
-        for station in stations_mm
+def _select_hole_table_geometry(adapter: Any, front: Any) -> None:
+    draw = adapter.currentModel
+    name = view_name(adapter, front)
+    if not draw.ActivateView(name):
+        raise RuntimeError(f"failed to activate hole-table view {name!r}")
+    draw.ClearSelection2(True)
+    datum = draw.Extension.SelectByID2(
+        "",
+        "VERTEX",
+        FRONT_LEFT_X_M,
+        FRONT_BOTTOM_Y_M,
+        0.0,
+        False,
+        1,
+        null_callout(),
+        0,
     )
+    if not datum:
+        raise RuntimeError("failed to select platen-guide hole-table datum vertex")
+    face = draw.Extension.SelectByID2(
+        "",
+        "FACE",
+        FRONT_LEFT_X_M + 0.010,
+        FRONT_VIEW_Y_M,
+        0.0,
+        True,
+        2,
+        null_callout(),
+        0,
+    )
+    if not face:
+        raise RuntimeError("failed to select platen-guide face for the hole table")
+
+
+def _insert_native_hole_table(adapter: Any, front: Any) -> Any:
+    """Insert the model-associated TAG/X LOC/Y LOC/SIZE hole table."""
+    _select_hole_table_geometry(adapter, front)
+    table = front.InsertHoleTable3(
+        False,
+        HOLE_TABLE_X_M,
+        HOLE_TABLE_Y_M,
+        1,  # swBOMConfigurationAnchor_TopLeft
+        "A",
+        str(_hole_table_template(adapter)),
+        1,  # swHoleTableTagOrder_XY
+        1,  # swHoleTable_AlphaNumericTags
+        None,
+    )
+    adapter.currentModel.ClearSelection2(True)
+    if table is None:
+        raise RuntimeError("SolidWorks failed to create the platen-guide hole table")
+    table = _sw_type_info.flagged(table, "ITableAnnotation")
+    rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
+    columns = int(adapter._get_attr_or_call(table, "ColumnCount") or 0)
+    if (rows, columns) != (1 + len(THROUGH_X) + len(BLIND_X), 4):
+        raise RuntimeError(
+            f"native hole table is {rows}x{columns}, expected 10x4"
+        )
+    header = tuple(
+        str(adapter._attempt(lambda column=column: table.DisplayedText(0, column)) or "")
+        for column in range(columns)
+    )
+    expected = ("TAG", "X LOC", "Y LOC", "SIZE")
+    if tuple(value.upper() for value in header) != expected:
+        raise RuntimeError(f"native hole-table header is unexpected: {header!r}")
+    _telemetry.success(f"native hole table inserted: {rows - 1} holes, header={header}")
+    return table
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -261,9 +306,11 @@ async def build(adapter: Any) -> dict[str, str]:
         model_doc.SummaryInfo(field, value)
         if model_doc.SummaryInfo(field) != value:
             raise RuntimeError(f"drawing summary field {field} did not persist")
-    front = place_view(adapter, str(SOURCE), "*Front", 0.190, 0.190, scale=(1, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", 0.375, 0.190, scale=(3, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", 0.205, 0.043, scale=(1, 4))
+    front = place_view(
+        adapter, str(SOURCE), "*Front", 0.190, FRONT_VIEW_Y_M, scale=(1, 1)
+    )
+    right = place_view(adapter, str(SOURCE), "*Right", 0.370, 0.110, scale=(1, 1))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", 0.285, 0.210, scale=(1, 1))
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
@@ -292,29 +339,10 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
 
-    _add_hole_schedule(adapter)
-    add_hole_group_tags(
-        adapter,
-        front,
-        "T",
-        edge_points=_edge_points(THROUGH_X),
-        note_positions=tuple(
-            (x + (-0.004 if index % 2 == 0 else 0.004), 0.211)
-            for index, (x, _y) in enumerate(_edge_points(THROUGH_X))
-        ),
-    )
-    add_hole_group_tags(
-        adapter,
-        front,
-        "B",
-        edge_points=_edge_points(BLIND_X),
-        note_positions=tuple((x, 0.173) for x, _y in _edge_points(BLIND_X)),
-    )
+    _insert_native_hole_table(adapter, front)
 
-    add_note(adapter, _manufacturing_notes(), 0.014, 0.105)
-    add_note(adapter, "PLATEN-MATING FACE — DATUM A", 0.144, 0.224)
-    add_note(adapter, "SCALE 3:1", 0.352, 0.163)
-    add_note(adapter, "REFERENCE — SCALE 1:4", 0.170, 0.014)
+    add_note(adapter, _manufacturing_notes(), 0.014, 0.075)
+    add_note(adapter, "PLATEN-MATING FACE — DATUM A", 0.144, 0.145)
 
     drawing_model.ClearSelection2(True)
     drawing_model.EditRebuild3()
