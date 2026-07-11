@@ -159,6 +159,11 @@ then `doit assembly:<stem>`.
 
 **Fail loud.** A refresh that hits a dangling mate, free DOF, or interference
 exits non-zero and leaves the `.SLDASM` untouched — never a stale artefact.
+A refresh whose mass-properties fingerprint is IDENTICAL to the last gated
+save (and that auto-repaired nothing) skips the three health/DOF/interference
+gates — they would re-prove what that save already proved (measured 274 s of
+a 780 s no-op top-assembly refresh) — while `verify:soundness` independently
+re-proves every saved assembly on each build.
 
 **Idempotent — artefact bytes don't drive rebuilds.** Saving an assembly makes
 SolidWorks rewrite volatile save metadata into every nested `.SLDPRT`/`.SLDASM`
