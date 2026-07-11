@@ -114,6 +114,15 @@ def test_drawing_depends_on_actual_part_execution():
     assert token in drawing["file_dep"]
 
 
+def test_recipe_check_tracks_powershell_provisioning_wrapper():
+    dodo = _load_dodo()
+    recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
+    wrapper = (
+        dodo.REPO_ROOT / "scripts" / "solidworks" / "provision_seat.ps1"
+    ).resolve()
+    assert str(wrapper) in recipe["file_dep"]
+
+
 def test_content_checker_digest_ignores_yaml_noise(tmp_path):
     """Option A: ContentChecker digests the PARSED yaml, so comment / whitespace /
     numeric-reflow edits to a shared cad/config/*.yaml leave the digest unchanged
