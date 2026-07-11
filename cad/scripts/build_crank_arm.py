@@ -39,6 +39,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -49,6 +50,11 @@ from _common import (
 from _holes import HoleSpec, wizard_holes
 
 import _telemetry
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
 
 PART_NAME = "crank-arm"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
@@ -76,6 +82,16 @@ DIMPLE_X = 30.0  # DIMENSIONS.md ch11: on the arm near the boss (low)
 ARM_END_X = ARM_C2C + SQUARE_END_OVERHANG
 HALF_WIDTH = ARM_WIDTH / 2.0
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > any extent it crosses
+
+# The manufacturing print's dimension set (draw_crank_arm.py imports exactly
+# these marked dimensions; its keep maps must stay in lockstep).
+DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    "ArmOutline": {"ArmEndX", "BossRadius"},
+    "Arm": {"Depth"},
+    "BoreProfile": {"ShaftBoreDia", "PivotBoreX", "PivotBoreDia"},
+    "DimpleProfile": {"DimpleX", "DimpleDia"},
+    "PinHoleProfile": {"PinHoleZ", "PinHoleDia"},
+}
 
 
 async def _volume(adapter) -> float:
@@ -159,6 +175,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=ARM_THICKNESS)),
     )
     name_last_feature(adapter, "Arm")
+    depth_dim = name_dimensions(adapter, "Arm", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"ArmThickness"')]
     vol = await _volume(adapter)
     _telemetry.info(f"volume after extrude: {vol:.1f} mm^3")
 
@@ -277,8 +295,16 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "HandleSeat")
 
+    # Manufacturing drawing support: mark exactly the print's dimensions (the
+    # drawing recipe imports the marked set and must find every one of these),
+    # and stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    apply_drawing_properties(adapter, PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)
 
 

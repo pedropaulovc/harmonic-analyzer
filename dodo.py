@@ -1111,6 +1111,18 @@ class _RecipeTracker:
         return (last is not None and last == self.digest)
 
 
+def _assembly_run_mode(stem: str, target_missing: bool,
+                       recipe_changed: bool) -> tuple[str, str]:
+    """Choose FULL/REFRESH without sending known contacts to the generic gate."""
+    if target_missing:
+        return "full", "target missing"
+    if recipe_changed:
+        return "full", "recipe changed"
+    if stem == "paper_drive":
+        return "full", "bounded thread-contact gate requires full rebuild"
+    return "refresh", "referenced artefact changed"
+
+
 def build_or_refresh(stem, dependencies, changed, targets):
     """FULL rebuild vs cheap REFRESH for one assembly stem.
 
@@ -1433,7 +1445,9 @@ def task_check():
     pytest_cmd = [sys.executable, "-m", "pytest", "-q"]
     recipe_tests = [
         SCRIPTS_DIR / "test_dodo_recipe.py",
-        SCRIPTS_DIR / "test_platen_guide_drawing.py",
+        # One offline contract file per manufacturing drawing (test_*_drawing.py),
+        # so registering a drawing auto-enrolls its contracts here.
+        *sorted(SCRIPTS_DIR.glob("test_*_drawing.py")),
     ]
     recipe_test_deps = sorted({
         *(str(path.resolve()) for path in recipe_tests),
