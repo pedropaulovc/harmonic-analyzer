@@ -37,7 +37,6 @@ from _common import (
     apply_color,
     BAR_STEEL,
     check,
-    define_circle,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -49,9 +48,9 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
-    set_sketch_direct_db,
     volume_check,
 )
+from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
 
 import _telemetry
 
@@ -65,11 +64,10 @@ BOTTOM_NOTCH_WIDTH = 0.125 * IN  # 3.175  DIMENSIONS.md ch15: legacy (med)
 BOTTOM_NOTCH_HEIGHT = 0.09375 * IN  # 2.381  DIMENSIONS.md ch15: legacy 3/32" (med)
 TOP_NOTCH_WIDTH = 0.125 * IN  # 3.175  DIMENSIONS.md ch15: legacy (med)
 TOP_NOTCH_HEIGHT = 0.5 * IN  # 12.7   DIMENSIONS.md ch15: legacy (med)
-TOP_PIN_HOLE_DIA = 2.0  # DIMENSIONS.md ch15: channel-lever bar pin (derived, M6.3)
+# top pin hole: was Ø2.0 drill, now #47 (Ø1.994) native Hole Wizard feature
 TOP_PIN_DROP = 0.25 * IN  # 6.35  DIMENSIONS.md ch15: hole centre below bar top (derived)
 
 NOTCH_OFFSET = (BAR_WIDTH - BOTTOM_NOTCH_WIDTH) / 2.0  # notches centred on width
-THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > bar width
 
 
 async def build(adapter) -> dict[str, str]:
@@ -90,7 +88,9 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BottomNotchHeight", f"{BOTTOM_NOTCH_HEIGHT}mm")
     await set_global(adapter, "TopNotchWidth", f"{TOP_NOTCH_WIDTH}mm")
     await set_global(adapter, "TopNotchHeight", f"{TOP_NOTCH_HEIGHT}mm")
-    await set_global(adapter, "TopPinHoleDia", f"{TOP_PIN_HOLE_DIA}mm")
+    # TopPinDrop stays a live knob: the top-pin bore AXIS drive references it
+    # ('"BarLength" - "TopPinDrop"'). The pin DIAMETER is now the #47 drill
+    # standard (Hole Wizard), so the old TopPinHoleDia knob is gone.
     await set_global(adapter, "TopPinDrop", f"{TOP_PIN_DROP}mm")
     await set_global(
         adapter, "NotchOffset", '("BarWidth" - "BottomNotchWidth") / 2'
@@ -183,67 +183,39 @@ async def build(adapter) -> dict[str, str]:
     # longer has. Evaluates to the as-built BAR_DEPTH, so it stays neutral.
     drive_jobs.append(("D1@Bar", '"BarDepth"'))
 
-    # Top pin hole: Ø2 along global X through the top-slot cheeks, hanging
-    # the bar from the channel lever's bar pin. Right-plane handedness is
-    # ambiguous: the wrong sketch-x sign puts the circle at Z = -3.175,
-    # outside the 0..6.35 body, and the cut removes nothing — probe by
-    # volume read-back and flip (a dead miss feature may stay in the tree,
-    # same precedent as the _common spring-hook flip retry). Inference OFF:
-    # with it on, the circle snapped onto the bar's top corner and resized
-    # to r 6.35 (live-caught via STL: cut surface fit centre (812.8, 0),
-    # r 6.353 — a 100.5 mm^3 corner round-off instead of the 10 mm^3 pin
-    # hole), so the removed volume is asserted within ±2 of analytic.
+    # Top pin hole: was a plain Ø2.0 cut, now a native Hole Wizard #47 number
+    # drill (Ø1.994) along global X through the top-slot cheeks, hanging the bar
+    # from the channel lever's bar pin (memory/fastener-policy-us-customary).
+    # Drilled from the +X side face (a clean planar face, normal +X) at mid-depth;
+    # through-all clears both cheeks, and the slot gap between them removes nothing.
+    # The removed volume is asserted against the two-cheek analytic (±2), so a
+    # mislocated hole fails LOUD.
     res = await adapter.get_mass_properties()
     vol_before = res.data.volume
     _telemetry.info(f"volume before top pin hole: {vol_before:.1f} mm^3")
     pin_y = BAR_LENGTH - TOP_PIN_DROP
-    # cheeks total = bar width - slot width
-    expected_removed = (
-        math.pi * (TOP_PIN_HOLE_DIA / 2.0) ** 2 * (BAR_WIDTH - TOP_NOTCH_WIDTH)
+    pin_dia = NUMBER_DRILL_MM["#47"]
+    # cheeks total = bar width - slot width (the bore removes material only in the
+    # two cheeks; the slot gap between them is already void)
+    expected_removed = math.pi * (pin_dia / 2.0) ** 2 * (BAR_WIDTH - TOP_NOTCH_WIDTH)
+    wizard_holes(
+        adapter,
+        HoleSpec("drilled_number", "#47"),
+        [[BAR_WIDTH, pin_y, BAR_DEPTH / 2.0]],
+        (1.0, 0.0, 0.0),
+        "top pin hole (#47)",
+        name="TopPinHole",
     )
-    # The bore runs along global X at mid-depth. This is a Right-plane sketch,
-    # whose local +X maps to global -Z (SolidWorks' standard Right-plane
-    # orientation), so the centre sits at sketch_x = -BarDepth/2 to land INSIDE
-    # the 0..BarDepth body -- a +BarDepth/2 centre lands at Z = -3.175, outside
-    # the body, and the cut removes nothing (or FeatureCut3 rejects the empty
-    # profile). The centre-X dim is an UNSIGNED distance from the origin, so it
-    # displays as its magnitude and the drive '"BarDepth" / 2' is positive.
-    # pin_y is the positive drop below the bar top. The removed volume is
-    # asserted against analytic (±2), so a wrong plane handedness or a
-    # mislocated/resized circle fails LOUD instead of boring the wrong place.
-    pin = SketchDims()
-    sketch_x = -BAR_DEPTH / 2.0
-    check("create_sketch top pin hole", await adapter.create_sketch("Right"))
-    set_sketch_direct_db(adapter, True)  # inference snaps to the top corner
-    await define_circle(
-        adapter, sketch_x, pin_y, TOP_PIN_HOLE_DIA / 2.0, "top pin hole",
-        dims=pin,
-        names=("TopPinX", "TopPinY", "TopPinDia"),
-        drives=('"BarDepth" / 2', '"BarLength" - "TopPinDrop"', '"TopPinHoleDia"'),
-    )
-    set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "top pin hole sketch")
-    check("exit_sketch top pin hole", await adapter.exit_sketch())
-    # Name + record-rename the profile before the cut absorbs it.
-    name_last_feature(adapter, "TopPinProfile")
-    drive_jobs += pin.apply(adapter, "TopPinProfile")
-    cut = await adapter.create_cut_extrude(
-        ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
-    )
-    if not cut.is_success:
-        raise RuntimeError(f"top pin hole cut failed: {cut.error}")
     res = await adapter.get_mass_properties()
     removed = vol_before - res.data.volume
     if abs(removed - expected_removed) >= 2.0:
         raise RuntimeError(
             f"top pin cut removed {removed:.1f} mm^3, expected"
-            f" {expected_removed:.1f} — circle misplaced/resized or wrong side"
+            f" {expected_removed:.1f} — hole misplaced/resized or wrong side"
         )
     _telemetry.success(
-        f"top pin hole at sketch x={sketch_x:+g}"
-        f" removed {removed:.1f} mm^3 (analytic {expected_removed:.1f})"
+        f"top pin hole removed {removed:.1f} mm^3 (analytic {expected_removed:.1f})"
     )
-    name_last_feature(adapter, "TopPinHole")
     vol_final = res.data.volume
 
     # Named axes (parallel to the top-pin bore, view-independent selection):
