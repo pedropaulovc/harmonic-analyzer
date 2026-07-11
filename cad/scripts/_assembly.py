@@ -2022,13 +2022,23 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
         # refresh; the residual cross-child clash a child-internal move could
         # introduce at an unchanged child pose is caught loud by
         # verify:soundness, which reopens every saved assembly on every build.
-        for name in sorted(component_names(adapter)):
-            a16 = component_transform(adapter, name)
-            rows.append((
-                cfg, name,
-                tuple(round(float(v), 6) for v in a16[0:9]),
-                tuple(round(float(v), 4) for v in a16[9:12]),
+        # ONE GetComponents walk reading Name2 + Transform2 off each live
+        # component -- a per-name component_transform() loop pays an O(n)
+        # GetComponentByName scan per component (measured ~140 s for the 122
+        # top-level components; this walk is ~seconds). Row shape and sort
+        # match the per-name form exactly, so the digest VALUE is unchanged.
+        asm = adapter.currentModel
+        comps = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
+        pose_rows = []
+        for comp in comps:
+            a16 = [float(v) for v in _read_member(
+                _read_member(comp, "Transform2"), "ArrayData")]
+            pose_rows.append((
+                str(_read_member(comp, "Name2")),
+                tuple(round(v, 6) for v in a16[0:9]),
+                tuple(round(v, 4) for v in a16[9:12]),
             ))
+        rows.extend((cfg, *pr) for pr in sorted(pose_rows))
     if multi and rest is not None:
         check(f"re-activate {rest}", await adapter.set_active_configuration(rest))
     return hashlib.sha256(repr(rows).encode("utf-8")).hexdigest()
