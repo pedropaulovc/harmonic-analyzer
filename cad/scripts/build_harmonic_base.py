@@ -89,14 +89,18 @@ CBORE_XZ = HOLE_XZ  # all four heads counterbored
 # 75.4 mm^3, exactly the two embedded shank volumes.)
 PIVOT_SCREW_XZ = (-79.69, 103.29)
 # pivot seat: letter-F drill (O6.528, wizard) -- O6.35 shoulder clearance
-STOP_SCREW_XZ = (-130.830, 9.887)  # past the DISENGAGED east taper edge. The
+STOP_SCREW_XZ = (-130.433, 9.735)  # past the DISENGAGED east taper edge. The
+# centre sits one stop-screw shank RADIUS outside the swung edge, so the
+# US-customary shank resize (O4.0 -> 3.15, #8-32 tap-drill - 0.3) moved it
+# 0.425 mm along the disengaged east-edge outward normal N_M
+# (-0.933521, 0.358523): old (-130.830, 9.887) + N_M * (3.15 - 4.0)/2.
 # PR8 west-tip trim moved this only via the DISENGAGE angle (the notch mouth
 # is on the WEST edge, so the exit travel shortened); the contact edge itself
 # is the EAST taper line, unchanged at HALF_WIDTH_N 12. (An earlier PR8 pass
 # wrongly fed the west width into the east-edge derivation -- Codex catch.)
 # Disengage swing sweeps the plate EAST (machine -x); the first
 # derivation sat 19 inside the engaged plate -- interference-gate proven.
-# stop seat: #20 drill (O4.089, wizard) -- O4 shank clearance
+# stop seat: #20 drill (O4.089, wizard) -- stop-screw O3.15 shank clearance
 SWING_HOLE_DEPTH = 6.0
 
 # Alignment-pinion rig hold-downs (PR7 items 2/11/12), blind from the TOP face
@@ -112,7 +116,7 @@ BLOCK_SCREW_XZ = (
     (-7.164, 82.0),    # back block, east screw
     (19.836, 82.0),    # back block, west screw
 )
-# block seats: #19 drill (O4.216, wizard) -- slotted-screw O4 shank clearance
+# block seats: #19 drill (O4.216, wizard) -- slotted-screw O3.15 shank clearance
 BLOCK_SCREW_HOLE_DEPTH = 3.5  # 18 shank - 16 block = 2 buried + 1.5 air
 FOOT_SCREW_XZ = (
     (20.467, 70.95),  # spring foot (build_pinion_spring hole: the west foot
@@ -121,8 +125,25 @@ FOOT_SCREW_XZ = (
     (-54.7, 102.5),   # NORTH arbor-pedestal flange (PR8, ch12 img09: the
     # mirrored base-standing clamp at z 97.5; ry180 flips its flange to +z)
 )
-# foot seats: 1/8 drill (O3.175, wizard) -- foot-screw O2.9 shank clearance
+# foot seats: 1/8 drill (O3.175, wizard) -- foot-screw O2.0 shank clearance
 FOOT_SCREW_HOLE_DEPTH = 7.7  # 8.0 shank under the 0.8 spring strip + air
+
+# The four seat specs, hoisted to module level so the drive-train assembly can
+# import the TRUE wizard cut diameters for its clearance assertions (the old
+# hand-authored *_HOLE_DIA constants are derived from the specs now -- one
+# chokepoint, no drift).
+PIVOT_SEAT_SPEC = HoleSpec(
+    "drilled_letter", "F", end="blind", depth_mm=SWING_HOLE_DEPTH)
+STOP_SEAT_SPEC = HoleSpec(
+    "drilled_number", "#20", end="blind", depth_mm=SWING_HOLE_DEPTH)
+BLOCK_SEAT_SPEC = HoleSpec(
+    "drilled_number", "#19", end="blind", depth_mm=BLOCK_SCREW_HOLE_DEPTH)
+FOOT_SEAT_SPEC = HoleSpec(
+    "drilled_fractional", "1/8", end="blind", depth_mm=FOOT_SCREW_HOLE_DEPTH)
+PIVOT_SCREW_HOLE_DIA = blind_cut_dia_mm(PIVOT_SEAT_SPEC)  # 6.528 (letter F)
+STOP_SCREW_HOLE_DIA = blind_cut_dia_mm(STOP_SEAT_SPEC)  # 4.089 (#20)
+BLOCK_SCREW_HOLE_DIA = blind_cut_dia_mm(BLOCK_SEAT_SPEC)  # 4.216 (#19)
+FOOT_SCREW_HOLE_DIA = blind_cut_dia_mm(FOOT_SEAT_SPEC)  # 3.175 (1/8)
 
 MM3_PER_IN3 = IN**3
 
@@ -243,20 +264,16 @@ async def build(adapter) -> dict[str, str]:
     # wizard blind hole ends in a 118-degree drill point, so the analytic
     # expectation is blind_hole_volume_mm3 (cylinder + point), not a cylinder.
     for tag, spec, xz, depth, label in (
-        ("PivotSeat", HoleSpec("drilled_letter", "F", end="blind",
-                               depth_mm=SWING_HOLE_DEPTH),
+        ("PivotSeat", PIVOT_SEAT_SPEC,
          (PIVOT_SCREW_XZ,), SWING_HOLE_DEPTH,
          "cone-pivot screw seat (letter F)"),
-        ("StopSeat", HoleSpec("drilled_number", "#20", end="blind",
-                              depth_mm=SWING_HOLE_DEPTH),
+        ("StopSeat", STOP_SEAT_SPEC,
          (STOP_SCREW_XZ,), SWING_HOLE_DEPTH,
          "swing-stop screw seat (#20)"),
-        ("BlockScrewHoles", HoleSpec("drilled_number", "#19", end="blind",
-                                     depth_mm=BLOCK_SCREW_HOLE_DEPTH),
+        ("BlockScrewHoles", BLOCK_SEAT_SPEC,
          BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DEPTH,
          "pinion-pivot-block screw seats (#19)"),
-        ("FootScrewHoles", HoleSpec("drilled_fractional", "1/8", end="blind",
-                                    depth_mm=FOOT_SCREW_HOLE_DEPTH),
+        ("FootScrewHoles", FOOT_SEAT_SPEC,
          FOOT_SCREW_XZ, FOOT_SCREW_HOLE_DEPTH,
          "foot-screw seats (1/8)"),
     ):
