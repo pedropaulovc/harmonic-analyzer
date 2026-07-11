@@ -41,7 +41,7 @@ from _common import (
 PART_NAME = "swing-stop-screw"
 MATERIAL = "Plain Carbon Steel"
 
-SHANK_DIA = 4.0
+SHANK_DIA = 3.15  # shank: was Ø4.0, now 3.15 = #8-32 tap-drill 3.454 - 0.3
 EMBED_LEN = 6.0  # into the base's stop hole
 PROUD_LEN = 8.0  # above the base top: covers the 6.35 plate band + margin
 HEAD_DIA = 8.0
