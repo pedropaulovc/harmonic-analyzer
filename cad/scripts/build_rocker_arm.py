@@ -72,6 +72,7 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
 
 PART_NAME = "rocker-arm"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
@@ -83,7 +84,7 @@ TOP_ARC_LEN = 292.1  # top edge arc length = 11.5" (ch.30 back view, manual)
 BOT_ARC_LEN = 266.7  # bottom edge arc length = 10.5" (ch.30 back-view sketch)
 TIP_FACE = 5.588  # 0.22" tip face, PERPENDICULAR to the top edge (ch.30 sketch)
 PIVOT_HOLE_DIA = 6.5  # rides the 6.35 pivot shaft (DIMENSIONS.md ch14, derived)
-ROD_HOLE_DIA = 2.0  # connecting-rod pin (photo-scaled, low)
+# rod pin hole: was Ø2.0 drill, now #47 (Ø1.994) native Hole Wizard feature
 ROD_HOLE_X = 127.3738  # rod pin near the +X (rod-side) tip, 5.4 inboard of the
 # bottom-arc end (132.76): solved so the pin sits DIRECTLY ABOVE the phased cam
 # lobe (machine -54.474 = drum -54.7 + ECC 8.64 x sin 1.5 deg, lobe UP at the
@@ -196,8 +197,10 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ArmThickness", f"{ARM_THICKNESS}mm")
     await set_global(adapter, "TipFaceLen", f"{TIP_FACE}mm")
     await set_global(adapter, "PivotHoleDia", f"{PIVOT_HOLE_DIA}mm")
-    await set_global(adapter, "RodHoleDia", f"{ROD_HOLE_DIA}mm")
-    await set_global(adapter, "RodHoleX", f"{ROD_HOLE_X}mm")
+    # (The old RodHoleDia/RodHoleX knobs are gone: the rod pin hole is now a native
+    # Hole Wizard #47 feature whose diameter comes from the drill standard; its
+    # location rides the ROD_HOLE_X/ROD_HOLE_Y module constants that the channel
+    # assembly imports.)
     await set_global(adapter, "ThroughCutDepth", f"{THROUGH_CUT_DEPTH}mm")
     await set_global(adapter, "RTop", '"CurveRadius"')
     await set_global(adapter, "RBottom", '"CurveRadius" + "ArmDepth"')
@@ -371,34 +374,22 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Connecting-rod pin hole near the rod-side tip, LOW in the strap (5.3 above
-    # the bottom edge, ch14 fan photo -- the pivot hole stays mid-depth).
-    # Off-axis centre: define_circle emits centre-X, centre-Z, then diameter --
-    # THREE dims. X is at +RodHoleX (positive, drives "RodHoleX"); the centre-Z
-    # is the bottom-arc height + the photo offset (trig-derived, no clean global
-    # knob) -> name/drive left None.
-    rod_x = ROD_HOLE_X
-    rod = SketchDims()
-    check("create_sketch rod hole", await adapter.create_sketch("Front"))
-    await define_circle(
-        adapter, rod_x, ROD_HOLE_Y, ROD_HOLE_DIA / 2.0, "rod hole",
-        dims=rod,
-        names=("RodPinX", None, "RodHoleDia"),
-        drives=('"RodHoleX"', None, '"RodHoleDia"'),
+    # the bottom edge, ch14 fan photo -- the pivot hole stays mid-depth): was a
+    # plain Ø2.0 cut, now a native Hole Wizard #47 number drill (Ø1.994) drilled
+    # +Z through the 2.5 strap at (ROD_HOLE_X, ROD_HOLE_Y)
+    # (memory/fastener-policy-us-customary). The pivot hole stays a Ø6.5 circle
+    # cut. Through-all is geometrically identical to the old mid-plane cut.
+    wizard_holes(
+        adapter,
+        HoleSpec("drilled_number", "#47"),
+        [[ROD_HOLE_X, ROD_HOLE_Y, ARM_THICKNESS / 2.0]],
+        (0.0, 0.0, 1.0),
+        "rod pin hole (#47)",
+        name="RodHole",
     )
-    await ensure_fully_defined(adapter, "rod hole sketch")
-    check("exit_sketch rod hole", await adapter.exit_sketch())
-    name_last_feature(adapter, "RodHoleProfile")
-    drive_jobs += rod.apply(adapter, "RodHoleProfile")
-    check(
-        "cut rod hole",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "RodHole")
-    # Named axis through the rod-pin bore (Axis2 = (Right+rod_x) ∩ (Top+hole_y)).
+    # Named axis through the rod-pin bore (Axis2 = (Right+ROD_HOLE_X) ∩ (Top+hole_y)).
     await name_bore_axis(
-        adapter, "Right Plane", rod_x, "Top Plane", ROD_HOLE_Y, "rod bore"
+        adapter, "Right Plane", ROD_HOLE_X, "Top Plane", ROD_HOLE_Y, "rod bore"
     )
     # Named axis on the R800 top-edge arc CENTRE (Axis3 = Right ∩ Top+816, a
     # free-space datum 808 above the pivot bore, along Z like the bores). The
@@ -413,8 +404,9 @@ async def build(adapter) -> dict[str, str]:
 
     # Both bores are full-thickness through the 2.5 strap, entirely inside the
     # material, so each removes pi*r^2*thickness.
+    rod_dia = NUMBER_DRILL_MM["#47"]
     v_pivot = math.pi * (PIVOT_HOLE_DIA / 2.0) ** 2 * ARM_THICKNESS
-    v_rod = math.pi * (ROD_HOLE_DIA / 2.0) ** 2 * ARM_THICKNESS
+    v_rod = math.pi * (rod_dia / 2.0) ** 2 * ARM_THICKNESS
     # The tip faces are cut into the SKETCH profile (not a 3D chamfer feature), so
     # _strap_area already accounts for them: the bored-strap volume is tight.
     v_measured = await volume_check(
