@@ -97,8 +97,6 @@ from _buildgraph import (  # noqa: E402
     part_scripts,
     part_stems,
     parts_registry_files,
-    placement_family_files,
-    placement_row_file,
     references_of,
     script_for,
     stamps_part_properties,
@@ -474,31 +472,6 @@ def _expand_parts_token(stem: str | None, kind: str | None, script: Path) -> lis
     return parts_registry_files()
 
 
-def _expand_placement_token(stem: str | None, kind: str | None) -> list[str]:
-    """Per-task expansion of the ``"placement/*"`` token (the dynamic part name in
-    ``_transforms.mirror_placement``, read by every assembly that imports
-    ``_transforms``):
-
-      * an ASSEMBLY depends on the placement rows of the parts it REFERENCES -- so a
-        ``placement/<part>.yaml`` edit lands in exactly the recipes of the assemblies
-        that PLACE that part (a FULL re-insert, which the mirror change needs), and
-        NOWHERE else (issue #156). A referenced sub-assembly has no placement file, so
-        it contributes nothing; its own leaf-part placement edits re-key the SUB, which
-        then propagates up as a REFRESH -- correct, the top never re-places a leaf.
-      * a PART reads no placement (placement is assembly-time only) -> no dep, so a
-        placement edit never rebuilds the part.
-      * any other caller -> the whole family (conservative).
-    """
-    if kind == "assembly" and stem is not None:
-        files: set[str] = set()
-        for ref in references_of(stem):
-            files.update(placement_row_file(ref.replace("_", "-")))
-        return sorted(files)
-    if kind == "part":
-        return []
-    return placement_family_files()
-
-
 def _config_deps(script, stem: str | None = None, kind: str | None = None) -> list[str]:
     """The cad/config FILES this build script actually reads (fine-grained;
     conservative whole-config fallback on any unclassifiable ``_config`` use).
@@ -516,8 +489,6 @@ def _config_deps(script, stem: str | None = None, kind: str | None = None) -> li
             out.update(machine_family_files())
         elif tok == "parts/*":
             out.update(_expand_parts_token(stem, kind, script))
-        elif tok == "placement/*":
-            out.update(_expand_placement_token(stem, kind))
         else:
             out.add(str((CONFIG_DIR / tok).resolve()))
     return sorted(out)
@@ -810,12 +781,12 @@ def _assembly_cache_outputs(stem: str) -> list[Path]:
     cascade this whole mechanism exists to kill (codex review on #83)."""
     sldasm = Path(_sldasm(stem))
     massprops = sldasm.parent / f".{sldasm.stem}.massprops.sha"
-    # The deferred park-driver specs sidecar (default-`free` builds of drive-train/
-    # channel; absent otherwise, skipped at pack time). It MUST ride the cache: a
-    # clean cache consumer restores the .SLDASM without it and the release preflight
-    # (preflight_release.py) would then find no specs to replay and fail loud.
-    park = sldasm.parent / f".{sldasm.stem}.park.json"
-    outs = [sldasm, _png_dir(stem), massprops, park]
+    # The free-DOF manifest sidecar (assemblies with freed operational DOF;
+    # absent otherwise, skipped at pack time). It MUST ride the cache: a clean
+    # cache consumer restores the .SLDASM without it and verify:kinematics
+    # would then find no drive specs to author transiently and fail loud.
+    dof = sldasm.parent / f".{sldasm.stem}.dof.json"
+    outs = [sldasm, _png_dir(stem), massprops, dof]
     if stem == "channel":
         outs += _channel_spring_variants()
     if stem == "harmonic_analyzer":
@@ -1197,28 +1168,54 @@ def task_verify():
     SolidWorks-free ``check:`` tasks).
     """
     asm_targets = [_sldasm(s) for s in ASSEMBLY_ORDER]
+
+    def _dof_json(stem: str) -> str:
+        sldasm = Path(_sldasm(stem))
+        return str(sldasm.parent / f".{sldasm.stem}.dof.json")
+
     suite_deps = {
-        "soundness": asm_targets,
+        # soundness reads paper-drive's DOF manifest directly (the exact crank
+        # instance for the necessity gate, codex #189). The manifest is NOT a
+        # declared target of any task (it is a cache-packed sidecar), so
+        # listing it as file_dep makes doit FAIL LOUD when it is missing/
+        # deleted while the .SLDASM digest is unchanged -- without it a fresh
+        # verify-soundness.ok stamp would silently skip the gate (codex #221).
+        "soundness": [*asm_targets, _dof_json("paper_drive")],
         # subsystems retired: its one unique gate (channel-independence) is folded
         # into soundness, which already opens `channel` (see verify._verify_static_one).
         "kinematics": [
             _sldasm("pen"),
             # The magnifier live-chain sweep (verify._verify_live_chain_one)
-            # opens magnifier.SLDASM and replays its recorded lever park spec;
-            # without this dep a magnifier rebuild would leave a fresh
-            # verify-kinematics.ok stamp valid and SKIP the WIRE-1 gates
-            # (codex review, PR #177). The park sidecar needs no separate dep:
-            # it is written by the same assembly task from the same recipe the
-            # .SLDASM's content digest is keyed on.
+            # opens magnifier.SLDASM and authors its recorded lever drive spec
+            # transiently; without this dep a magnifier rebuild would leave a
+            # fresh verify-kinematics.ok stamp valid and SKIP the WIRE-1 gates
+            # (codex review, PR #177).
             _sldasm("magnifier"),
             # The paper-feed kinematic proof (verify._verify_paper_feed_one) opens
             # paper-drive.SLDASM and drives the crank; without these deps a paper-drive
             # or probe change would leave a fresh verify-kinematics.ok stamp valid and
             # SKIP the crank->feed gate (codex #189).
             _sldasm("paper-drive"),
+            # The pen sweep + magnifier chain sweep read these manifests
+            # directly (the transient drive specs). Same rationale as
+            # soundness's paper-drive manifest dep above (codex #221).
+            _dof_json("pen"),
+            _dof_json("magnifier"),
             str((SCRIPTS_DIR / "build_kinematic_probe.py").resolve()),
             str((SCRIPTS_DIR / "pen_driver.py").resolve()),
             str((SCRIPTS_DIR / "truth_model.py").resolve()),
+            # The transient pen equation reads _config VALUES through
+            # pen_driver/truth_model (machine/output.yaml pen_rest_crank_deg /
+            # pen_trace_half_mm / magnify_factor + channels.yaml harmonics/
+            # phases/amplitudes). Post-#221 those files are no longer on pen's
+            # build recipe (the saved model carries no equation), so without
+            # these deps an amplitude edit would leave a fresh
+            # verify-kinematics.ok stamp valid and SKIP the sweep (codex #224).
+            # Derived by the same static analyzer as the build recipes, so a
+            # new config read in pen_driver/truth_model is picked up
+            # automatically. (_config.py itself needs no direct dep: it is on
+            # pen's build closure, so it rides the pen.SLDASM recipe digest.)
+            *_config_deps(SCRIPTS_DIR / "pen_driver.py"),
         ],
     }
     # Pass the graph's assemblies EXPLICITLY (dashed names) rather than letting
@@ -1235,7 +1232,7 @@ def task_verify():
         yield {
             "name": suite,
             # verify.py's gate LOGIC lives partly in _assembly_postbuild.py
-            # (load/replay_park_specs -- the kinematics WIRE-1 live-chain replay).
+            # (load_dof_manifest/author_dof_drives -- the kinematics replays).
             # Unlike verify's other helper imports (_assembly/_common/build_*),
             # that module is deliberately OUTSIDE every assembly recipe (it is on
             # NO build script's closure), so a change to the replay logic does NOT
@@ -1297,13 +1294,13 @@ def task_check():
             "cmd": [sys.executable, str(VERIFY_PY), "--suite", "config"],
         },
         "graph": {
-            # test_config_accessor_coverage reads _config.py AND _config_asm.py, so
-            # a new accessor added to EITHER (without an entry in _buildgraph) must
-            # invalidate this stamp -- else the "fails loud" coverage test silently
-            # never re-runs and the perf benefit is lost (codex review #193).
+            # test_config_accessor_coverage reads _config.py, so a new accessor
+            # added there (without an entry in _buildgraph) must invalidate this
+            # stamp -- else the "fails loud" coverage test silently never re-runs
+            # and the perf benefit is lost (codex review #193).
             "file_dep": [str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
                          str((SCRIPTS_DIR / "test_buildgraph.py").resolve()),
-                         config_py, str((SCRIPTS_DIR / "_config_asm.py").resolve())],
+                         config_py],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_buildgraph.py")],
         },
         "nameplate": {
@@ -1441,14 +1438,14 @@ def task_export():
 
 
 def task_preflight():
-    """Release preflight (OPT-IN, COM spine): replay each default-`free` assembly's
-    DEFERRED park drivers and re-run the exact-DOF closure, WITHOUT saving. Gates
-    `release` (its spine predecessor), so a release cannot publish a free model
-    whose operational DOF fail the sufficiency proof.
+    """Release preflight (OPT-IN, COM spine): the gear-ratios proof on the
+    reopened drive-train + channel (the only assemblies carrying real gear
+    meshes), WITHOUT saving. Gates `release` (its spine predecessor).
 
-    NOT in `build`/`default_tasks` -- the default build proves only DOF necessity
-    (fast); this strict closure runs at release time. On the spine after `export`
-    so it stays serial on the STA seat. Stamps `cad/out/reports/preflight.ok`.
+    NOT in `build`/`default_tasks` -- gear-ratios re-proves a property the
+    tooth-count config fixes (check:math validates it analytically), so it
+    runs at release time only. On the spine after `export` so it stays serial
+    on the STA seat. Stamps `cad/out/reports/preflight.ok`.
     """
     stamp = str(REPORTS / "preflight.ok")
     deps = [str(PREFLIGHT_PY), str(VERIFY_PY),
@@ -1458,13 +1455,8 @@ def task_preflight():
         "file_dep": deps,
         "targets": [stamp],
         "task_dep": _spine_dep("preflight"),
-        # Always run (like export/release): the closure reads the per-assembly
-        # `.<stem>.park.json` sidecars, which are NOT declared file_dep (they are
-        # absent for a `locked` build, so a declared dep would error). Were this
-        # gated on the stamp + .SLDASM digest, a deleted/incompletely-restored
-        # sidecar (recipe digest unchanged) would leave preflight.ok "fresh" and
-        # release would SKIP the only sufficiency check. Running unconditionally,
-        # preflight_release.py fails loud when specs are missing (codex review).
+        # Always run (like export/release), so a stale stamp can never let
+        # release skip the proof.
         "uptodate": [False],
         "actions": [(_run_stamped, [[sys.executable, str(PREFLIGHT_PY)],
                                     "release preflight", stamp])],

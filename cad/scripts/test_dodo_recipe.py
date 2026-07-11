@@ -168,8 +168,8 @@ def test_verify_gate_logic_off_build_closure_is_a_file_dep():
     """A verify/preflight gate whose LOGIC lives in a module on NO assembly's build
     closure (so it rides no .SLDASM digest) MUST list that module as a direct
     file_dep -- else a change to the gate logic leaves the verify-*.ok stamp
-    stale-fresh and SKIPS the gate (codex PR #193: replay_park_specs moved to
-    _assembly_postbuild.py, off every build closure). General guard: computes the
+    stale-fresh and SKIPS the gate (codex PR #193: the transient-drive replay
+    lives in _assembly_postbuild.py, off every build closure). General guard: computes the
     verify/preflight ``_*.py`` helpers that are on no assembly closure and asserts
     each task depends on them."""
     dodo = _load_dodo()
@@ -553,6 +553,31 @@ def test_part_digest_excludes_assembly_level_modules():
     assert excl(src / "adapters" / "com_variant.py") is True
     assert dodo._submodule_part_digest() != dodo._submodule_digest(), \
         "part slice must exclude real content, else the split is a no-op"
+
+
+def test_kinematics_verify_depends_on_pen_driver_and_truth_model():
+    """Post-#221 (park-driver machinery removed): build_pen_assembly no longer
+    imports pen_driver/truth_model, so those modules ride no assembly's .SLDASM
+    digest. The F5 chained-Fourier equation they define is now authored
+    TRANSIENTLY by verify:kinematics instead, so the guard for "an edit to
+    pen_driver/truth_model must invalidate the stamp" moved from the pen build
+    recipe to dodo.task_verify's kinematics file_dep (see the comment block there).
+    Pin that it's actually still wired up -- a dropped file_dep would leave a fresh
+    verify-kinematics.ok stamp valid after a pen_driver/truth_model edit and SKIP
+    the re-authored equation entirely. Ditto the config VALUES those modules read
+    (machine/output.yaml + channels.yaml): post-#221 they ride no pen .SLDASM
+    recipe either, so they must be direct file_deps too (codex #224). (_config.py
+    itself needs no direct dep -- it stays on pen's build closure, so it rides
+    the pen.SLDASM recipe digest.)"""
+    dodo = _load_dodo()
+    kinematics = next(t for t in dodo.task_verify() if t["name"] == "kinematics")
+    deps = {Path(d).name for d in kinematics["file_dep"]}
+    assert "pen_driver.py" in deps, deps
+    assert "truth_model.py" in deps, deps
+    cfg = (REPO_ROOT / "cad" / "config").resolve()
+    cfg_rel = _rel(kinematics["file_dep"], cfg)
+    assert "machine/output.yaml" in cfg_rel, cfg_rel
+    assert "channels.yaml" in cfg_rel, cfg_rel
 
 
 def test_submodule_digest_is_location_independent(tmp_path):

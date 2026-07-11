@@ -136,7 +136,7 @@ SUPPORT_ROWS = ROT_Y_POS90
 # head-down at IDENTITY, so the placement point is the station and y is the under-
 # head plane: machine y 6.5 (the base underside counterbore depth) sets the O22
 # head recessed in the base underside, the O12 shank rising through the base into
-# the O12.30 tapped foot hole. mirror=False (exact machine transform, like the
+# the O12.30 tapped foot hole. Placed on its exact machine transform (like the
 # support); constrained by concentric + seat + spin-pin mates (see build()).
 LAG_SCREW_XZ = ((55.44, 60.32), (55.44, -60.32), (90.36, 60.32), (90.36, -60.32))
 LAG_SCREW_UNDER_HEAD_Y = 6.5
@@ -236,7 +236,7 @@ async def build(adapter) -> dict[str, str]:
     # width) -> machine Z and the foot on the base top. Its origin is the casting
     # centre.
     #
-    # Inserted on-solution (mirror=False; single machine-handed casting) then
+    # Inserted on-solution (a single machine-handed casting) then
     # CONSTRAINED BY THREE ORTHOGONAL MATES against the base -- NOT grounded.
     # After the +90 turn the part's planes map onto the machine axes as:
     # local-Z-normal Front plane -> machine X, local-X-normal Right plane ->
@@ -265,7 +265,6 @@ async def build(adapter) -> dict[str, str]:
                        # seat + z-centre), NOT grounded: a redundant fix on top of
                        # them over-defines on a cold re-mate, exactly like the
                        # nameplate did. Same idiom as every other frame part.
-        mirror=False,
         label="rocker-arm-support",
     )
     # Pivot-x placement (x +72.9). A free-space offset with no physical contact,
@@ -307,7 +306,7 @@ async def build(adapter) -> dict[str, str]:
     # seat its foot exactly on the base top at the derived machine stations, so the
     # screw at each station rises through the base clearance hole -- its O22 head
     # recessed in the base underside counterbore -- into the O12.30 tapped foot
-    # hole. Authored head-down (IDENTITY), mirror=False (exact machine transform),
+    # hole. Authored head-down (IDENTITY) on its exact machine transform,
     # mate-defined (ground=False), not grounded.
     # Each screw is CONSTRAINED (not grounded) by its two physical contacts plus a
     # spin pin -- no distance mate:
@@ -333,7 +332,7 @@ async def build(adapter) -> dict[str, str]:
             IDENTITY,
             ground=False,  # defined by coaxial + under-head seat + spin pin below,
                            # NOT grounded (the redundant fix would over-define).
-            mirror=False,
+
             label=f"lag-screw hold-down ({bx:.2f}, {bz:+.2f})",
         )
         await coincident_mate(
@@ -399,7 +398,6 @@ async def build(adapter) -> dict[str, str]:
                        # a redundant fix on top of them over-defines the 3rd mate on
                        # a cold re-mate (AddMate5 rejects it). Same as every other
                        # frame part -- mate-defined, no fix.
-        mirror=False,  # single handed part: NAMEPLATE_POS is the exact transform
         label="nameplate",
     )
     # CONSTRAINED (not grounded) by its physical seating plus one free-space offset:

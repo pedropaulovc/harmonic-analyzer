@@ -223,11 +223,17 @@ def main() -> int:
                 paths["render"].parent.mkdir(parents=True, exist_ok=True)
                 bg.save(paths["render"], **composite.JPEG_OPTS)
                 if not args.no_trim:
-                    composite.trim_render_file(paths["render"])
+                    composite.trim_render_file(
+                        paths["render"],
+                        background=pair["reference"].get("background", "black"))
                 paths["sidecar"].write_text(json.dumps({
                     "camera": pair["camera"], "reference": pair["reference"],
                     "size": list(j["_size"]), "model_mtime": src.stat().st_mtime,
-                    "engine": "blender"}), encoding="utf-8")
+                    "engine": "blender",
+                    # exact uniform colour behind the render's pixels --
+                    # composite._content_mask seeds its knockout flood from it
+                    "render_bg": pair["reference"].get("background", "black"),
+                }), encoding="utf-8")
                 rendered.add(pair["id"])
                 print(f"  OK  {pair['id']}", flush=True)
 

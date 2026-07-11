@@ -24,8 +24,10 @@ from __future__ import annotations
 import sys
 
 from _common import (
+    CASTING_GREEN,
     SketchDims,
     add_line_chain,
+    apply_color,
     apply_material,
     check,
     define_circle,
@@ -233,6 +235,9 @@ async def build(adapter) -> dict[str, str]:
     )
 
     await apply_material(adapter, MATERIAL)
+    # The ch24 macro shows the cradle painted the machine green (manifest note
+    # "pen v-block authored brass vs green"); keep the brass mass model.
+    await apply_color(adapter, CASTING_GREEN)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

@@ -126,7 +126,13 @@ geometry is casting-shaped, not milling-shaped.
 
 > These are machinability flags, not tolerance rules — the fits/finish/GD&T for the same parts live in
 > [`tolerance-gdt-assessment.md`](./tolerance-gdt-assessment.md) §6, and the drawing/CAM outputs that
-> carry them to the bench in §11.
+> carry them to the bench in §11. Those drawings now carry the **full** GD&T vocabulary (runout,
+> position, profile, perpendicularity — ASME Y14.5-2018), not a runout-only "lite" subset. The DFM
+> consequence: **each geometric callout is itself a machinability + inspection cost** — a tight
+> runout or profile constrains the process (form-cut, single-setup, mandrel) and adds an inspection
+> step — so a frame is spent only where the error model rewards it (the knife edge, the 20 cams,
+> channel consistency), exactly the parts flagged T1 above. Over-calling GD&T is the same trap as
+> over-tolerancing: it limits the process and inflates inspection for no functional gain.
 
 ## How to get this reviewed (strategy — for future reference)
 
@@ -160,6 +166,16 @@ steps instead of one big engagement.
    the thin shaft) and inspect **before** committing to 20×. The only check that catches
    thin-wall/workholding — precisely Fusion's blind spot.
 3. Narrow paid consults / outsource-quotes only for whatever 1–2 leave open.
+
+**Inspecting the geometric callouts (what the first-article cut actually measures).** The full-GD&T
+frames map to concrete shop checks — this is part of the per-part inspection cost above, not free:
+**runout** (gears, cams, journals, wheel) → mandrel + dial gauge rotated per cross-section (a
+workflow the audience already knows as "indicating"); **flatness / straightness** (mount seats,
+shaft axes) → dial-indicator sweep on jacks / Vee-blocks; **position** of the hole patterns (support
+feet, the 20 spring holes) and **profile** (the R800 rocker, cam eccentric, gear-tooth flanks) →
+CMM against the basic-dimension grid / nominal curve, since a hand gauge can't hold a profile; any
+**angularity** → sine bar. The profile and position checks on the fragile T1 parts are where a CMM
+(or an outsourced inspection) earns its keep — budget for it rather than assuming calipers suffice.
 
 **Go/no-go — gear cutters: RESOLVED (they don't exist).** Off-the-shelf involute cutters for the
 cone/cylinder train's **DP 49.82** at these tooth counts do not exist (searched exhaustively). **Plan:

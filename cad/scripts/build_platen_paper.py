@@ -8,7 +8,11 @@ photo-tuning).
 
 Sized to sit between the two platen clips (clip bands at platen-local
 x 8..18 and 280..290 - see build_paper_drive_assembly CLIP_FRONT_DX) with a
-6 mm top/bottom margin, 0.5 mm proud of the platen front face.
+6 mm top/bottom margin. The front face sits 0.5 mm proud of the platen front
+face; the sheet is 0.25 thick so its BACK face keeps the standard 0.25 clear
+of the platen instead of landing coplanar on it — two coincident faces
+z-fight in the offline renders (the ch30 gallery views read as torn white
+shards where the black board and white sheet alternate per pixel).
 
 Layout: width along +X, height along +Y from the origin corner,
 thickness extruded +Z (same scheme as build_platen).
@@ -47,7 +51,9 @@ MATERIAL = "Oak"  # nearest wood-fibre entry in the SW database; colour overridd
 PAPER_WIDTH = 259.5  # spans platen-local x 20.25..279.75: 2.25 clear of
 # each clip band (8..18 / 280..290) per the 0.25-margin design rule
 PAPER_HEIGHT = 128.0  # platen 140 minus 6 top/bottom margins
-PAPER_THICKNESS = 0.5
+PAPER_THICKNESS = 0.25  # front face stays 0.5 proud (assembly plants it at
+# PLATE_FRONT_Z - 0.5); the thinner sheet leaves 0.25 air behind so the back
+# face never coincides with the platen front face (render z-fight)
 
 
 async def build(adapter) -> dict[str, str]:
