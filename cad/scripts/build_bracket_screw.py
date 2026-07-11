@@ -26,7 +26,8 @@ PART_NAME = "bracket-screw"
 
 HEAD_DIA = 8.0  # large slotted head (p.62/63, low)
 HEAD_H = 2.5
-SHANK_DIA = 3.9  # rides the bracket's O4.4 holes, threads the bar's O4.0 sockets
+SHANK_DIA = 3.15  # shank: was Ø3.9, now 3.15 = #8-32 tap-drill 3.454 - 0.3
+# (threads the bar's #8-32 sockets; rides the bracket's O4.4 clearance)
 SHANK_LEN = 12.0  # bracket plate 4 + 8 into the 9-deep bar
 
 

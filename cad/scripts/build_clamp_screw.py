@@ -26,7 +26,8 @@ PART_NAME = "clamp-screw"
 
 HEAD_DIA = 8.0  # large slotted head on the bar front (ch30 p002, low)
 HEAD_H = 2.5
-SHANK_DIA = 3.9  # rides the O4.4 bar/front-arc holes, threads the O4.0 back arc
+SHANK_DIA = 3.15  # shank: was Ø3.9, now 3.15 = #8-32 tap-drill 3.454 - 0.3
+# (threads the back-arc #8-32 tap; rides the O4.4 bar/front-arc clearance)
 SHANK_LEN = 28.0  # bar 9 + front arc 17.9 + 1.1 into the back arc
 
 

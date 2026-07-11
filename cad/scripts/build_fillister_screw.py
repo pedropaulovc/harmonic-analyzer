@@ -49,7 +49,8 @@ MATERIAL = "Brass"  # bright screws on the brass clips
 
 HEAD_DIA = 5.5  # fillister head (low)
 HEAD_H = 2.2
-SHANK_DIA = 2.9  # rides the clips' O3 holes / the flange's O3.2 holes
+SHANK_DIA = 2.0  # shank: was Ø2.9, now 2.0 = #4-40 tap-drill 2.261 - 0.26
+# (threads #4-40 into the platen sockets / flange; rides the clips' O3 clearance)
 SHANK_LEN = 4.0  # clip 1.2 + 2.8 platen socket; = flange thickness 4
 
 
