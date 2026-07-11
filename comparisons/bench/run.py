@@ -2,20 +2,22 @@
 # requires-python = ">=3.11"
 # dependencies = ["pillow"]
 # ///
-"""Dual-model runner for the pose-presentation benchmark (docs/pose-presentation-benchmark.md).
+"""Multi-model runner for the pose-presentation benchmark (docs/pose-presentation-benchmark.md).
 
-Fans out one fresh-context call per cell x subject model. Codex (gpt-5.5, high
-reasoning) via `codex exec` with `--output-schema` structured output in a
-sandbox cwd; Claude Opus via `claude -p --model opus` (explicit override) in the
-same sandbox. Deterministic side/order schedules, opaque stimulus ids (the
-id->delta map stays here, never served), N repeats, resumable (answered cells
-skipped), results appended to results.jsonl tagged by model. Ground truth is
-recorded on each row for the scorer but NEVER shown to a subject.
+Fans out one fresh-context call per cell x subject model. Two Codex variants
+(gpt-5.5 and gpt-5.6-sol, both high reasoning) via `codex exec` with
+`--output-schema` structured output in a sandbox cwd; Claude Opus via
+`claude -p --model opus` (explicit override) in the same sandbox. Deterministic
+side/order schedules, opaque stimulus ids (the id->delta map stays here, never
+served), N repeats, resumable (answered cells skipped), results appended to
+results.jsonl tagged by model. Ground truth is recorded on each row for the
+scorer but NEVER shown to a subject.
 
-    uv run comparisons/bench/run.py --task t1 --model codex          # T1 sub-grid, all arms
-    uv run comparisons/bench/run.py --task t1 --model codex --limit 10 --arms P1,P2   # smoke
-    uv run comparisons/bench/run.py --task t3 --model codex
-    uv run comparisons/bench/run.py --task t1 --model opus            # after codex
+    uv run comparisons/bench/run.py --task t1 --model codex               # T1, Codex gpt-5.5
+    uv run comparisons/bench/run.py --task t1 --model codex-sol           # T1, Codex gpt-5.6-sol
+    uv run comparisons/bench/run.py --task t1 --model codex-sol --limit 10 --arms P1,P2  # smoke
+    uv run comparisons/bench/run.py --task t3 --model codex-sol
+    uv run comparisons/bench/run.py --task t1 --model opus                # after codex
 
 Resume is automatic: rerun the same command; done cells are skipped.
 """
@@ -212,11 +214,12 @@ def write_schema(name: str, schema: dict) -> Path:
 
 
 def run_codex(prompt: str, images: list[Path], schema_path: Path, sandbox: Path,
+              codex_model: str = "gpt-5.5",
               timeout: int = 240) -> tuple[dict | None, int, str]:
     out_file = sandbox / "codex_out.json"
     # Prompt goes via STDIN, never as a positional: `-i FILE...` is variadic and
     # would otherwise swallow a trailing prompt arg as another image path.
-    cmd = ["codex", "exec", "--model", "gpt-5.5",
+    cmd = ["codex", "exec", "--model", codex_model,
            "-c", "model_reasoning_effort=high",
            "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules",
            "-C", str(sandbox), "-s", "read-only",
@@ -273,11 +276,23 @@ def run_opus(prompt: str, images: list[Path], sandbox: Path,
     return data, tokens, err, model_id
 
 
+# Subject models tagged onto every result row and cell_key. Opus is the
+# production pose agent; the two Codex variants are crossed generalization
+# checks, both at high reasoning. Keying each cell by its --model id keeps the
+# three subjects independently resumable and lets a future run reproduce any one
+# exactly from the recorded model_id -- add a variant here (+ argparse choices)
+# and it is a fully-crossed subject with no other change.
+CODEX_MODELS = {
+    "codex": "gpt-5.5",          # incumbent second subject
+    "codex-sol": "gpt-5.6-sol",  # added subject
+}
+
+
 def invoke(model: str, prompt: str, images: list[Path], schema: dict, sandbox: Path):
-    if model == "codex":
+    if model in CODEX_MODELS:
         sp = write_schema("t_" + opaque(prompt)[:8], schema)
-        data, tokens, err = run_codex(prompt, images, sp, sandbox)
-        return data, tokens, err, "gpt-5.5"
+        data, tokens, err = run_codex(prompt, images, sp, sandbox, CODEX_MODELS[model])
+        return data, tokens, err, CODEX_MODELS[model]
     data, tokens, err, mid = run_opus(prompt, images, sandbox)
     return data, tokens, err, mid
 
@@ -474,7 +489,7 @@ def exec_t2(cases, cell, model, server):
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--task", required=True, choices=["t1", "t3", "t2"])
-    ap.add_argument("--model", required=True, choices=["codex", "opus"])
+    ap.add_argument("--model", required=True, choices=["codex", "codex-sol", "opus"])
     ap.add_argument("--arms", help="comma list, default all 11")
     ap.add_argument("--pairs", help="comma list, default 6 first-pass")
     ap.add_argument("--n", type=int, default=3)

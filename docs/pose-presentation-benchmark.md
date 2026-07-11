@@ -54,7 +54,7 @@ No published work was found evaluating which composite lets a VLM estimate a
 ## Question under test
 
 Given a reference photo and a render from a perturbed camera, which
-presentation maximises a vision agent's ability (two subject models — see
+presentation maximises a vision agent's ability (three subject models — see
 "Subject models") to:
 
 1. **Detect** that the pose is off (vs an unperturbed control),
@@ -204,7 +204,7 @@ adopted, not its grid-less sibling.
   diverge between harnesses). Zoom corrections are a **multiplicative
   factor** on the current zoom (`new_zoom = zoom × factor`; az/el/roll and
   target are additive deltas), and the ±3% zoom gate is
-  `|log(zoom/zoom_true)| ≤ log 1.03`. Both subject models run T2
+  `|log(zoom/zoom_true)| ≤ log 1.03`. All three subject models run T2
   **stateless per round**: every round is a fresh call (fresh Opus
   subagent / fresh `codex exec`) whose prompt carries the **current
   stimulus image plus a text-only history of prior rounds' corrections** —
@@ -258,22 +258,23 @@ adopted, not its grid-less sibling.
 | T3 | psychometric threshold (delta ratio at 75% correct); AUC |
 | all | tokens + images per decision; latency |
 
-## Subject models (crossed factor — every cell runs on both)
+## Subject models (crossed factor — every cell runs on all three)
 
 | model | invocation | pinning |
 |---|---|---|
 | **Claude Opus** (the production pose agent) | Agent tool, one fresh subagent per cell | the runner passes `model: "opus"` **explicitly on every spawn** — never rely on inheritance (a subagent inherits the orchestrating session's model by default, which may not be Opus). `run.py` hard-codes the override; a smoke assertion checks the spawned model id before fan-out. |
-| **Codex CLI, gpt-5.5, high reasoning** | `codex exec` non-interactive, one invocation per cell (per **round** for T2 — see Tasks; both models run T2 stateless-per-round) | `--model gpt-5.5` + reasoning effort `high` (config flag, e.g. `-c model_reasoning_effort="high"`), stimulus images attached per cell (`-i`), same prompt template and the same JSON output schema (the runner parses the JSON from stdout). Two more pinned flags: `--skip-git-repo-check` (the sandbox workspace is deliberately NOT a git repo, and `codex exec` refuses to run outside one), and `--ignore-user-config --ignore-rules` (a seat's `$CODEX_HOME/config.toml` — MCP servers, web search, persistent instructions — must not silently vary the subject between seats); `run.py` also records the effective Codex config fingerprint per run. Exact flag spellings are verified against the installed `codex` version during harness build and committed in `run.py`. |
+| **Codex CLI, gpt-5.5, high reasoning** (`--model codex`) | `codex exec` non-interactive, one invocation per cell (per **round** for T2 — see Tasks; all three subjects run T2 stateless-per-round) | `--model gpt-5.5` + reasoning effort `high` (config flag, e.g. `-c model_reasoning_effort="high"`), stimulus images attached per cell (`-i`), same prompt template and the same JSON output schema (the runner parses the JSON from stdout). Two more pinned flags: `--skip-git-repo-check` (the sandbox workspace is deliberately NOT a git repo, and `codex exec` refuses to run outside one), and `--ignore-user-config --ignore-rules` (a seat's `$CODEX_HOME/config.toml` — MCP servers, web search, persistent instructions — must not silently vary the subject between seats); `run.py` also records the effective Codex config fingerprint per run. Exact flag spellings are verified against the installed `codex` version during harness build and committed in `run.py`. |
+| **Codex CLI, gpt-5.6-sol, high reasoning** (`--model codex-sol`) | identical to the gpt-5.5 row — same `codex exec` path, same pinned flags, same prompt/schema; only `--model gpt-5.6-sol` differs | same as above with `--model gpt-5.6-sol`. The two Codex variants share every pinned flag and the same sandbox/schema, so they differ by model id alone — a clean 5.5-vs-5.6-sol generalization contrast. `run.py` maps the `--model codex-sol` id to `gpt-5.6-sol` via the `CODEX_MODELS` registry and tags each result row with the resolved model id, so a future run reproduces this exact subject from the recorded id. |
 
 Model is fully crossed with arm × case × task: same stimuli, same prompts,
 same N. Report every table per model. The **decision rule applies to the
-Opus numbers** (Opus is what runs pose feedback in production); the Codex
-column is a generalization check — if the winning arm flips between models,
+Opus numbers** (Opus is what runs pose feedback in production); the two Codex
+columns are generalization checks — if the winning arm flips between models,
 report that prominently instead of averaging it away.
 
 ## Controls
 
-- Two fixed subject models (see above), temperature 0 where the backend
+- Three fixed subject models (see above), temperature 0 where the backend
   exposes it, fresh context per cell (no bleed), one fixed prompt template
   per arm (prompt text published with the benchmark; no per-arm or per-model
   tuning beyond describing the encoding).
@@ -285,7 +286,7 @@ report that prominently instead of averaging it away.
   (hashing the repeat digit does not work: CRC32 is linear, so changing the
   final digit XORs the hash by a constant whose parity is even — empirically
   the parity never flips across repeats 0/1/2 for ANY cell). Balanced across
-  cells, identical across executions and both subject models; each
+  cells, identical across executions and all subject models; each
   `results.jsonl` row records the assignment it used.
 - Equal pixel budget per stimulus; JPEG q90 everywhere.
 - N ≥ 3 repeats per cell — but at temperature 0 an identical-stimulus repeat
@@ -302,14 +303,14 @@ The grid is 45 cases/pair (3 rotation params × 8 levels = 24, 2 target axes ×
 stratified pairs × a 27-case sub-grid** (rotations ±3°/±15° = 12, targets
 ±15/±40 mm × 2 axes = 8, both zooms, the first 4 mixed, 1 control) × 11 arms
 ≈ 1.8k cells; with N = 3 repeats ≈ **5.3k calls ≈ 8.0M tokens per subject
-model** at ~1.5k tokens/cell, ≈ 10.7k calls / 16M tokens across both.
+model** at ~1.5k tokens/cell, ≈ 16k calls / 24M tokens across all three.
 T3: 6 pairs × 8 delta-pairs × 11 arms × N = 3 ≈ 1.6k calls per model. Grid
 phase: ≈ 1.5k calls per model (see "Presentation arms"). T2: ≤5 arms
 (top-3 + P1 + a winning grid variant, selected per subject model) × 6 pairs
 × 6 starts × ≤6 rounds ≈ 1.1k renders + calls per model worst case. First
 pass all-in (T1 sub-grid + grid phase + T3 + T2): ≈ **9.5k calls ≈ 14M
-tokens per model**, ~28M across both. Generation: 18 pairs × 45 ≈ 800 Blender renders once (shared by all
-arms **and both models**), minutes on the GPU seat.
+tokens per model**, ~42M across all three. Generation: 18 pairs × 45 ≈ 800 Blender renders once (shared by all
+arms **and all three models**), minutes on the GPU seat.
 
 **Full-grid confirmation is a separately approved phase, not part of the
 first-pass budget.** It covers the **top 3 arms, plus P1 whenever it is not
@@ -396,7 +397,7 @@ sufficient given this section. All decisions are pinned; do not re-ask them.
    (`doit export` is a COM-spine task on a SolidWorks seat). On a
    Blender-only seat, pull an already-built tree (remote cache / a seat that
    ran the export); do not attempt `doit export` locally. Also: `codex` CLI
-   installed and authenticated, with `gpt-5.5` available.
+   installed and authenticated, with both `gpt-5.5` and `gpt-5.6-sol` available.
 2. **Build the harness first** (nothing exists yet): the four
    `comparisons/bench/` files from the harness sketch, plus the four
    `render_offline.py` flags (`--manifest <path>`, `--no-trim --canvas WxH`,
@@ -416,12 +417,13 @@ sufficient given this section. All decisions are pinned; do not re-ask them.
    `harmonic_analyzer--ch12-p001-img02` (macro, white bg),
    `harmonic_analyzer--ch17-p002-img06` (macro, occlusion-heavy),
    `harmonic_analyzer--ch23-p004-img02` (down-look macro).
-4. **Runner config** (pinned): both subject models per "Subject models" —
+4. **Runner config** (pinned): all three subject models per "Subject models" —
    Opus subagents spawned with the **explicit `model: "opus"` override**
-   (never inherited), and `codex exec --model gpt-5.5` at high reasoning
-   effort; temperature 0 where exposed, fresh context per cell, structured
-   output, N = 3 repeats, prompt templates committed beside the runner
-   before the first full pass.
+   (never inherited), `codex exec --model gpt-5.5` (`--model codex`) and
+   `codex exec --model gpt-5.6-sol` (`--model codex-sol`), both at high
+   reasoning effort; temperature 0 where exposed, fresh context per cell,
+   structured output, N = 3 repeats, prompt templates committed beside the
+   runner before the first full pass.
 5. **Smoke before fan-out**: run ~10 hand-picked cells (one easy + one hard
    delta on two arms) **on each subject model**, verify the Opus spawn
    reports the Opus model id and the codex invocation returns parseable
@@ -429,7 +431,7 @@ sufficient given this section. All decisions are pinned; do not re-ask them.
    not launch 5k cells on an unsmoked harness.
 6. **Budget gate — per phase, not per benchmark**: the first pass all-in
    (T1 sub-grid ≈ 5.3k + grid phase ≈ 1.5k + T3 ≈ 1.6k + T2 ≤ 1.1k calls)
-   ≈ **9.5k calls / ~14M tokens per subject model** (~28M across both);
+   ≈ **9.5k calls / ~14M tokens per subject model** (~42M across all three);
    abort and report if its projected total exceeds 16M tokens per model.
    Phase order within the first pass: T1 → grid phase → T3 ∥ T2 (T2's arm
    set needs T1 + grid results). T3's ladder includes ±1°/±7°/±5 mm levels
@@ -442,5 +444,5 @@ sufficient given this section. All decisions are pinned; do not re-ask them.
 7. **Deliverables**: `results.jsonl` + the report tables per subject model
    (per-arm T1 sign accuracy with CIs, T3 thresholds, cost per decision),
    per-arm exemplar stimulus sheets, and a recommendation applying the
-   decision rule above to the Opus numbers, with the Codex column as the
-   generalization check.
+   decision rule above to the Opus numbers, with the two Codex columns as
+   generalization checks.
