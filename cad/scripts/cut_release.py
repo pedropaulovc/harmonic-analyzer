@@ -967,12 +967,13 @@ def stage_drawings(stage: Path) -> dict[str, str]:
     return staged
 
 
-def _merge_pack_and_go_zip(archive: Path, destination: Path) -> None:
+def _merge_pack_and_go_zip(archive: Path, destination: Path) -> tuple[str, ...]:
     """Merge a flat Pack-and-Go zip, rejecting conflicting duplicate files."""
     unpacked = archive.with_suffix("")
     if unpacked.exists():
         shutil.rmtree(unpacked)
     unpacked.mkdir(parents=True)
+    members: list[str] = []
     try:
         shutil.unpack_archive(str(archive), str(unpacked), "zip")
         for source in unpacked.iterdir():
@@ -983,13 +984,14 @@ def _merge_pack_and_go_zip(archive: Path, destination: Path) -> None:
             target = destination / source.name
             if not target.exists():
                 shutil.copy2(source, target)
-                continue
-            if _sha256(source) != _sha256(target):
+            elif _sha256(source) != _sha256(target):
                 raise RuntimeError(
                     f"Pack-and-Go filename collision has different content: {source.name}"
                 )
+            members.append(source.name)
     finally:
         shutil.rmtree(unpacked, ignore_errors=True)
+    return tuple(sorted(members))
 
 
 def package_drawings(sw: Any, stage: Path) -> dict[str, str]:
@@ -1003,7 +1005,7 @@ def package_drawings(sw: Any, stage: Path) -> dict[str, str]:
         archive.unlink(missing_ok=True)
         try:
             _pack_and_go_document(sw, source, SW_DOC_DRAWING, archive)
-            _merge_pack_and_go_zip(archive, native_dir)
+            packed_names = _merge_pack_and_go_zip(archive, native_dir)
         finally:
             archive.unlink(missing_ok=True)
 
@@ -1017,8 +1019,17 @@ def package_drawings(sw: Any, stage: Path) -> dict[str, str]:
         ).replace("\\", "/")
         drawing_dir = stage / "slddrw"
         drawing_dir.mkdir(parents=True, exist_ok=True)
+        for name in packed_names:
+            packed_source = native_dir / name
+            packed_copy = drawing_dir / name
+            if not packed_copy.exists():
+                shutil.copy2(packed_source, packed_copy)
+                continue
+            if _sha256(packed_source) != _sha256(packed_copy):
+                raise RuntimeError(
+                    f"drawing bundle filename collision has different content: {name}"
+                )
         portable_drawing = drawing_dir / source.name
-        shutil.copy2(native_drawing, portable_drawing)
         staged[f"{drawing_name}:slddrw"] = str(
             portable_drawing.relative_to(stage)
         ).replace("\\", "/")
