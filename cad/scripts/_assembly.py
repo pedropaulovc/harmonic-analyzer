@@ -1607,6 +1607,26 @@ def component_names(adapter: Any) -> list[str]:
         names.append(str(_read_member(component, "Name2")))
     return names
 
+
+def delete_assembly_feature(adapter: Any, name: str) -> None:
+    """Delete an assembly feature by name (Select2 + DeleteSelection2).
+
+    Used by the component-pattern sense retries (channel bushing banks, frame
+    column/screw pairs): a flipped pattern is removed whole (instances go with
+    the feature; the seeds survive) before re-creating it with ``FlipDir1``.
+    Fails loud when the feature is still present after."""
+    model = adapter.currentModel
+    feat = adapter._attempt(lambda: model.FeatureByName(name), default=None)
+    if feat is None:
+        raise RuntimeError(f"feature to delete not found: {name!r}")
+    adapter._attempt(lambda: model.ClearSelection2(True), default=None)
+    if not adapter._attempt(lambda: feat.Select2(False, 0), default=False):
+        raise RuntimeError(f"failed to select feature for delete: {name!r}")
+    if not adapter._attempt(lambda: model.Extension.DeleteSelection2(0), default=False):
+        adapter._attempt(lambda: model.EditDelete(), default=None)
+    if adapter._attempt(lambda: model.FeatureByName(name), default=None) is not None:
+        raise RuntimeError(f"feature {name!r} still present after delete")
+
 def check_no_interference(adapter: Any) -> None:
     """Run interference detection on the active assembly; raise on any hit.
 
