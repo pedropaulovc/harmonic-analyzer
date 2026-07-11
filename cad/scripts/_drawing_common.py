@@ -492,6 +492,17 @@ def set_dimension_precision(
         )
         if result is None:
             raise RuntimeError(f"failed to set precision on dimension {name!r}")
+        # SetPrecision3 reports rejection via its RETURN STATUS, not by raising, so a
+        # None-only check treats a failure code as success -- and the dim would ship
+        # at the 2-decimal sheet default (Ø9.53) against a Ø9.525 note (codex #246).
+        # The status enum's success value is undocumented, so verify the SIDE EFFECT:
+        # read the primary precision back and confirm it took.
+        applied = adapter._attempt(lambda d=display: d.GetPrimaryPrecision2())
+        if applied != digits:
+            raise RuntimeError(
+                f"precision override on dimension {name!r} did not take: "
+                f"requested {digits} decimals, dimension reports {applied}"
+            )
     if remaining:
         raise RuntimeError(
             f"dimension precision not applied: {sorted(remaining)}"
