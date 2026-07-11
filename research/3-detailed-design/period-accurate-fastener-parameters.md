@@ -1,5 +1,14 @@
 # Period-Accurate Fastener Parameters (c. 1890)
 
+> [!WARNING]
+> **PERIOD-ACCURATE FASTENERS ARE ON HOLD — DO NOT IMPLEMENT (until further notice).**
+> The period thread systems described below (**Whitworth / BSW**, **British
+> Association / BA**, Sellers) are **not** to be used in the CAD build for now.
+> **Code and CAD scripts must use US customary (inch) fasteners instead** —
+> standard UNC/UNF fractional-inch sizes. This document is retained as reference
+> only; treat every BA/Whitworth recommendation here as **suspended** until this
+> notice is lifted.
+
 Reference data for hand-modelling the analyzer's fasteners in SolidWorks with
 1890-correct thread forms and head/nut geometry. The SolidWorks Toolbox is **not**
 period-appropriate: every Toolbox library is keyed to a standards body founded
