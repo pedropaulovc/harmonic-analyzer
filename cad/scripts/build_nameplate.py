@@ -64,7 +64,6 @@ from _common import (
     apply_material,
     bbox_extent_check,
     check,
-    define_circle,
     define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
@@ -80,6 +79,7 @@ from _common import (
 from _features import (
     sketch_rounded_rect,
 )
+from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
 
 import _telemetry
 
@@ -131,7 +131,7 @@ ENGRAVING_POSITION = (
 )
 
 # Four corner mounting screws (the shared brass fillister part), in the border band.
-SCREW_DIA = 2.6
+# screw holes: #2-56 clearance, wizard normal fit O2.591 (was O2.6 artefact)
 SCREW_INSET = 4.5
 SCREW_XY = (
     (SCREW_INSET, SCREW_INSET),
@@ -166,8 +166,6 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BorderW", f"{BORDER_W}mm")
     await set_global(adapter, "RecessDepth", f"{RECESS_DEPTH}mm")
     await set_global(adapter, "EngraveDepth", f"{ENGRAVE_DEPTH}mm")
-    await set_global(adapter, "ScrewDia", f"{SCREW_DIA}mm")
-    await set_global(adapter, "ScrewInset", f"{SCREW_INSET}mm")
     await set_global(adapter, "FieldW", '"PlateWidth" - 2 * "BorderW"')
     await set_global(adapter, "FieldH", '"PlateHeight" - 2 * "BorderW"')
 
@@ -245,6 +243,33 @@ async def build(adapter) -> dict[str, str]:
     if abs(removed - v_field) > 0.02 * v_field:
         raise RuntimeError(f"field recess removed {removed:.1f}, expected {v_field:.1f}")
 
+    # Four corner screw through-holes: ONE native Hole Wizard clearance
+    # feature (4 placement points) for the #2-56 brass fillister mounting
+    # screws -- normal fit Ø2.591, the wizard-table twin of the old Ø2.6
+    # artefact dim (memory/fastener-policy-us-customary). Cut BEFORE the
+    # engraving import: wizard_holes locates its face by enumerating every
+    # face of the body (COM roundtrips per face), and the engraving cut
+    # explodes the body into thousands of groove wall/floor faces -- placing
+    # this feature after it measured >20 min of face-walk (both runs hung
+    # here, front and back face alike). Pre-engraving the body has ~15
+    # faces; the pristine back face at z=-PLATE_THICKNESS carries all four
+    # stations and through-all is geometrically identical from either side.
+    pre = await adapter.get_mass_properties()
+    wizard_holes(
+        adapter,
+        HoleSpec("clearance", "#2"),
+        [[x, y, -PLATE_THICKNESS] for x, y in SCREW_XY],
+        (0.0, 0.0, -1.0),
+        "mounting screw holes (#2 clearance)",
+        name="ScrewHoles",
+    )
+    screw_dia = CLEARANCE_MM[("#2", "normal")]
+    v_holes = len(SCREW_XY) * math.pi * (screw_dia / 2.0) ** 2 * PLATE_THICKNESS
+    removed = float(pre.data.volume) - float((await adapter.get_mass_properties()).data.volume)
+    _telemetry.info(f"screw holes removed {removed:.1f} mm^3 (analytic {v_holes:.1f})")
+    if abs(removed - v_holes) > 0.02 * v_holes:
+        raise RuntimeError(f"screw holes removed {removed:.1f}, expected {v_holes:.1f}")
+
     # Traced-photo engraving, IMPORTED from the vendored DXF (was native line-loops).
     # The whole artwork -- lettering, scroll cartouche AND pinstripe frame -- comes
     # from cad/references/nameplate-engraving.dxf as 112 closed-region ribbons (see
@@ -299,47 +324,6 @@ async def build(adapter) -> dict[str, str]:
             f"cut engraving: removed {removed:.1f} mm^3 -- implausibly deep "
             f"(> half the {slab_volume:.1f} mm^3 slab); check import scale/position"
         )
-
-    # Four corner screw through-holes (both-directions 2x thickness clears the slab).
-    # Every centre is off-axis (both coords non-zero), so define_circle emits three
-    # dims per circle -- centreX, centreZ, diameter -- all UNSIGNED distances from
-    # the origin. Each coord is positive (the pattern sits in the +X/+Y quadrant),
-    # so the drives evaluate positive directly: the near edge is "ScrewInset", the
-    # far edge "PlateWidth"/"PlateHeight" minus it. Drives align to SCREW_XY order.
-    screw_drives = (
-        ('"ScrewInset"', '"ScrewInset"'),
-        ('"PlateWidth" - "ScrewInset"', '"ScrewInset"'),
-        ('"ScrewInset"', '"PlateHeight" - "ScrewInset"'),
-        ('"PlateWidth" - "ScrewInset"', '"PlateHeight" - "ScrewInset"'),
-    )
-    screws = SketchDims()
-    pre = await adapter.get_mass_properties()
-    check("create_sketch screws", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    for n, ((x, y), (dx, dz)) in enumerate(zip(SCREW_XY, screw_drives, strict=True)):
-        await define_circle(
-            adapter, x, y, SCREW_DIA / 2.0, f"screw ({x:.1f}, {y:.1f})",
-            dims=screws,
-            names=(f"S{n}X", f"S{n}Z", f"S{n}Dia"),
-            drives=(dx, dz, '"ScrewDia"'),
-        )
-    set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "screws sketch")
-    check("exit_sketch screws", await adapter.exit_sketch())
-    name_last_feature(adapter, "ScrewProfile")
-    drive_jobs += screws.apply(adapter, "ScrewProfile")
-    check(
-        "cut screw holes",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=2.0 * PLATE_THICKNESS, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "ScrewHoles")
-    v_holes = len(SCREW_XY) * math.pi * (SCREW_DIA / 2.0) ** 2 * PLATE_THICKNESS
-    removed = float(pre.data.volume) - float((await adapter.get_mass_properties()).data.volume)
-    _telemetry.info(f"screw holes removed {removed:.1f} mm^3 (analytic {v_holes:.1f})")
-    if abs(removed - v_holes) > 0.02 * v_holes:
-        raise RuntimeError(f"screw holes removed {removed:.1f}, expected {v_holes:.1f}")
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just

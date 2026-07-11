@@ -39,5 +39,17 @@ Traps that cost 8 probe rounds — do not re-learn:
 - **Multi-point**: one auto placement point per feature; edit the placement
   sketch (`SetCoords` + `CreatePoint` via `ModelToSketchTransform`) — the
   rocker-arm-support foot-tap idiom, shared by both creation paths.
+- **Create wizard holes BEFORE face-exploding features**:
+  `find_planar_face` walks EVERY face of the body with 2-3 COM roundtrips
+  each; after the nameplate's engraving cut (112 buffered-ribbon grooves →
+  thousands of wall/floor faces) the walk ran >20 min — SolidWorks pegged
+  one core servicing the calls, python ~1.5% CPU marshaling, no dialog.
+  Looked like a wizard-solve hang but never reached the wizard (the
+  post-select phase log never fired); drilling from the opposite pristine
+  face changes nothing (the walk is normal-agnostic). Fix = feature order:
+  cut holes while the body is prismatic (~15 faces). `find_planar_face`
+  now logs the face count and warns >500; `wizard_holes` logs each phase
+  (`face selected` / `feature created` / `points placed, rebuilding`) so a
+  hang names its phase.
 - Table enumeration: `swApp.GetHoleStandardsData(type)` early-bound gives
   every ANSI-inch size token + diameter ([[fastener-policy-us-customary]]).
