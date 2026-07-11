@@ -50,10 +50,14 @@ def pair_paths(pair_id: str) -> dict[str, Path]:
     }
 
 
-def prepare_reference(pair: dict, max_px: int = 1600) -> Path:
-    """Copy the pair's source reference into ref/<id>.png (crop/rotate/cap)."""
+def prepare_reference(pair: dict, max_px: int = 1600, out: Path | None = None) -> Path:
+    """Copy the pair's source reference into ref/<id>.png (crop/rotate/cap).
+
+    ``out`` overrides the destination (bench comparisons/bench redirects refs
+    out of the shipping comparisons/ref/ tree cut_release ships wholesale).
+    """
     src = REPO / pair["reference"]["path"]
-    out = pair_paths(pair["id"])["ref"]
+    out = out or pair_paths(pair["id"])["ref"]
     out.parent.mkdir(parents=True, exist_ok=True)
     img = Image.open(src)
     img = ImageOps.exif_transpose(img)
