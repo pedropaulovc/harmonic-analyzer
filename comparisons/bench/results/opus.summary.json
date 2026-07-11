@@ -3,228 +3,238 @@
   "t1": {
    "table": {
     "P1": {
-     "n": 23,
-     "macro_sign": 0.8895061728395062,
+     "n": 46,
+     "macro_sign": 0.8750136728206903,
      "ci": [
-      NaN,
-      NaN
+      0.8119769119769119,
+      1.0
      ],
      "per_param": {
       "az": 0.8888888888888888,
-      "el": 0.8888888888888888,
-      "roll": 0.8888888888888888,
-      "target_x": 0.9833333333333334,
-      "target_y": 0.8703703703703703,
-      "zoom": 0.8166666666666668
+      "el": 0.8703703703703703,
+      "roll": 0.8857142857142857,
+      "target_x": 0.8903508771929824,
+      "target_y": 0.8972972972972973,
+      "zoom": 0.8174603174603176
      },
-     "magnitude": 0.8888888888888888,
-     "control_fp": NaN,
+     "magnitude": 0.9056603773584906,
+     "control_fp": 1.0,
      "confusion": {
       "leaks": {},
       "n_by_param": {
-       "az": 4,
-       "el": 4,
-       "roll": 4,
-       "target_x": 3,
-       "target_y": 4,
+       "az": 8,
+       "el": 8,
+       "roll": 8,
+       "target_x": 7,
+       "target_y": 8,
        "zoom": 2
       }
      },
-     "median_tokens": 1339,
-     "mean_latency_s": 37.1
+     "median_tokens": 1465,
+     "mean_latency_s": 35.5
     },
     "P2": {
-     "n": 25,
-     "macro_sign": 0.8644825447457026,
+     "n": 46,
+     "macro_sign": 0.8798407429986378,
      "ci": [
-      NaN,
-      NaN
+      0.8432074366856975,
+      0.9502314814814815
      ],
      "per_param": {
-      "az": 0.8555555555555555,
-      "el": 0.7631578947368421,
-      "roll": 0.9166666666666666,
-      "target_x": 0.7777777777777778,
-      "target_y": 0.8888888888888888,
-      "zoom": 0.9848484848484849
+      "az": 0.8425925925925926,
+      "el": 0.8240740740740741,
+      "roll": 0.9047619047619048,
+      "target_x": 0.790990990990991,
+      "target_y": 0.9245614035087719,
+      "zoom": 0.9920634920634921
      },
-     "magnitude": 0.8064516129032258,
-     "control_fp": NaN,
+     "magnitude": 0.8301886792452831,
+     "control_fp": 1.0,
      "confusion": {
       "leaks": {
+       "target_x->el": 2,
+       "roll->el": 2,
        "az->el": 1,
        "el->zoom": 1,
-       "target_x->el": 1,
        "zoom->el": 1,
-       "zoom->az": 1
+       "zoom->az": 1,
+       "el->target_y": 1,
+       "roll->az": 1
       },
       "n_by_param": {
-       "az": 4,
-       "el": 4,
-       "roll": 4,
-       "target_x": 4,
-       "target_y": 4,
+       "az": 8,
+       "el": 8,
+       "roll": 8,
+       "target_x": 8,
+       "target_y": 7,
        "zoom": 2
       }
      },
      "median_tokens": 1949,
-     "mean_latency_s": 36.3
+     "mean_latency_s": 38.7
     },
     "P3": {
-     "n": 23,
-     "macro_sign": 0.975471085120208,
+     "n": 43,
+     "macro_sign": 0.9132397740240877,
      "ci": [
-      NaN,
-      NaN
+      0.8806637806637806,
+      0.9910968660968661
      ],
      "per_param": {
-      "az": 0.9824561403508771,
-      "el": 0.8703703703703703,
-      "roll": 1.0,
-      "target_x": 1.0,
-      "target_y": 1.0,
+      "az": 0.8585858585858586,
+      "el": 0.8372549019607843,
+      "roll": 0.9523809523809524,
+      "target_x": 0.9071428571428571,
+      "target_y": 0.924074074074074,
       "zoom": 1.0
      },
-     "magnitude": 0.96,
-     "control_fp": NaN,
+     "magnitude": 0.94,
+     "control_fp": 1.0,
      "confusion": {
       "leaks": {
        "roll->az": 1,
-       "roll->el": 1
+       "roll->el": 1,
+       "az->el": 1,
+       "el->az": 1
       },
       "n_by_param": {
-       "az": 4,
-       "el": 4,
-       "roll": 4,
-       "target_x": 4,
-       "target_y": 4,
+       "az": 8,
+       "el": 7,
+       "roll": 8,
+       "target_x": 7,
+       "target_y": 6,
        "zoom": 2
       }
      },
-     "median_tokens": 2608,
-     "mean_latency_s": 48.2
+     "median_tokens": 2733,
+     "mean_latency_s": 52.5
     },
     "P4": {
-     "n": 24,
-     "macro_sign": 0.888276246170983,
+     "n": 46,
+     "macro_sign": 0.8767008863500091,
      "ci": [
-      NaN,
-      NaN
+      0.8315944120291946,
+      0.9838206627680313
      ],
      "per_param": {
-      "az": 0.8538011695906432,
-      "el": 0.8538011695906432,
-      "roll": 0.8888888888888888,
-      "target_x": 0.9666666666666667,
-      "target_y": 0.9649122807017544,
+      "az": 0.8518518518518517,
+      "el": 0.8518518518518517,
+      "roll": 0.8571428571428571,
+      "target_x": 0.9153153153153153,
+      "target_y": 0.9824561403508771,
       "zoom": 0.8015873015873015
      },
-     "magnitude": 0.8928571428571429,
-     "control_fp": NaN,
+     "magnitude": 0.8867924528301887,
+     "control_fp": 1.0,
      "confusion": {
       "leaks": {
        "el->target_x": 2,
+       "el->zoom": 2,
+       "target_x->el": 2,
        "el->target_y": 1,
-       "el->zoom": 1,
        "roll->az": 1,
        "roll->el": 1,
-       "target_x->el": 1,
-       "target_x->target_y": 1
+       "target_x->target_y": 1,
+       "target_x->az": 1
       },
       "n_by_param": {
-       "az": 4,
-       "el": 4,
-       "roll": 4,
-       "target_x": 4,
-       "target_y": 4,
+       "az": 8,
+       "el": 8,
+       "roll": 8,
+       "target_x": 8,
+       "target_y": 7,
        "zoom": 2
       }
      },
      "median_tokens": 1784,
-     "mean_latency_s": 45.1
+     "mean_latency_s": 42.3
     },
     "P5": {
-     "n": 25,
-     "macro_sign": 0.8807682083997874,
+     "n": 47,
+     "macro_sign": 0.8770362423973195,
      "ci": [
-      NaN,
-      NaN
+      0.8466962586527803,
+      0.9930555555555555
      ],
      "per_param": {
-      "az": 1.0,
-      "el": 0.7982456140350878,
-      "roll": 0.75,
-      "target_x": 0.9833333333333334,
-      "target_y": 0.9500000000000001,
-      "zoom": 0.8030303030303031
+      "az": 0.9444444444444445,
+      "el": 0.8708708708708709,
+      "roll": 0.8571428571428571,
+      "target_x": 0.9912280701754387,
+      "target_y": 0.9473684210526315,
+      "zoom": 0.6511627906976744
      },
-     "magnitude": 0.8387096774193549,
-     "control_fp": NaN,
+     "magnitude": 0.8518518518518519,
+     "control_fp": 0.0,
      "confusion": {
       "leaks": {
+       "el->target_y": 2,
        "zoom->el": 1,
        "zoom->target_y": 1
       },
       "n_by_param": {
-       "az": 4,
-       "el": 4,
-       "roll": 4,
-       "target_x": 4,
-       "target_y": 4,
+       "az": 8,
+       "el": 8,
+       "roll": 8,
+       "target_x": 8,
+       "target_y": 8,
        "zoom": 2
       }
      },
-     "median_tokens": 1074,
-     "mean_latency_s": 25.2
+     "median_tokens": 939,
+     "mean_latency_s": 23.0
     },
     "P6": {
-     "n": 25,
-     "macro_sign": 0.9059144072301967,
+     "n": 46,
+     "macro_sign": 0.8659285852268308,
      "ci": [
-      NaN,
-      NaN
+      0.8551618671183888,
+      0.9094907407407408
      ],
      "per_param": {
-      "az": 0.9666666666666667,
-      "el": 0.9824561403508771,
-      "roll": 0.8055555555555555,
-      "target_x": 0.8555555555555555,
-      "target_y": 0.8555555555555555,
-      "zoom": 0.9696969696969697
+      "az": 0.9259259259259259,
+      "el": 0.9814814814814815,
+      "roll": 0.7904761904761904,
+      "target_x": 0.781981981981982,
+      "target_y": 0.8982456140350877,
+      "zoom": 0.8174603174603176
      },
-     "magnitude": 0.7419354838709677,
-     "control_fp": NaN,
+     "magnitude": 0.7358490566037735,
+     "control_fp": 1.0,
      "confusion": {
-      "leaks": {},
+      "leaks": {
+       "target_x->el": 1,
+       "target_x->target_y": 1
+      },
       "n_by_param": {
-       "az": 4,
-       "el": 4,
-       "roll": 4,
-       "target_x": 4,
-       "target_y": 4,
+       "az": 8,
+       "el": 8,
+       "roll": 8,
+       "target_x": 8,
+       "target_y": 7,
        "zoom": 2
       }
      },
-     "median_tokens": 831,
-     "mean_latency_s": 18.4
+     "median_tokens": 817,
+     "mean_latency_s": 17.9
     },
     "P7": {
-     "n": 21,
-     "macro_sign": 0.9429239288307917,
+     "n": 43,
+     "macro_sign": 0.8575572394199845,
      "ci": [
-      NaN,
-      NaN
+      0.8038359788359788,
+      1.0
      ],
      "per_param": {
-      "az": 0.8888888888888888,
-      "el": 0.9814814814814815,
-      "roll": 1.0,
-      "target_x": 0.9607843137254902,
-      "target_y": 0.8263888888888888,
-      "zoom": 1.0
+      "az": 0.9444444444444445,
+      "el": 0.8568627450980392,
+      "roll": 0.9047619047619048,
+      "target_x": 0.8941176470588236,
+      "target_y": 0.8870370370370372,
+      "zoom": 0.6581196581196581
      },
-     "magnitude": 0.9130434782608695,
-     "control_fp": NaN,
+     "magnitude": 0.88,
+     "control_fp": 1.0,
      "confusion": {
       "leaks": {
        "az->el": 1,
@@ -235,172 +245,174 @@
        "zoom->target_y": 1
       },
       "n_by_param": {
-       "az": 4,
-       "el": 3,
-       "roll": 3,
-       "target_x": 4,
-       "target_y": 4,
+       "az": 8,
+       "el": 7,
+       "roll": 7,
+       "target_x": 8,
+       "target_y": 6,
        "zoom": 2
       }
      },
-     "median_tokens": 2262,
-     "mean_latency_s": 42.0
+     "median_tokens": 2298,
+     "mean_latency_s": 45.3
     },
     "P8": {
-     "n": 22,
-     "macro_sign": 0.9691358024691358,
+     "n": 46,
+     "macro_sign": 0.8818967463704306,
      "ci": [
-      NaN,
-      NaN
+      0.8486803856369073,
+      0.9722222222222222
      ],
      "per_param": {
-      "az": 1.0,
-      "el": 1.0,
-      "roll": 0.8333333333333334,
-      "target_x": 1.0,
-      "target_y": 0.9814814814814815,
-      "zoom": 1.0
+      "az": 0.9259259259259259,
+      "el": 0.9351851851851851,
+      "roll": 0.8571428571428571,
+      "target_x": 0.8486486486486488,
+      "target_y": 0.9070175438596492,
+      "zoom": 0.8174603174603176
      },
-     "magnitude": 1.0,
-     "control_fp": NaN,
+     "magnitude": 0.9245283018867925,
+     "control_fp": 1.0,
      "confusion": {
       "leaks": {
        "el->target_y": 1
       },
       "n_by_param": {
-       "az": 4,
-       "el": 4,
-       "roll": 4,
-       "target_x": 4,
-       "target_y": 4,
+       "az": 8,
+       "el": 8,
+       "roll": 8,
+       "target_x": 8,
+       "target_y": 7,
        "zoom": 2
       }
      },
-     "median_tokens": 1142,
-     "mean_latency_s": 24.3
+     "median_tokens": 1196,
+     "mean_latency_s": 31.7
     },
     "P9": {
-     "n": 23,
-     "macro_sign": 0.9078947368421053,
+     "n": 46,
+     "macro_sign": 0.8582334213913162,
      "ci": [
-      NaN,
-      NaN
+      0.8117364117364118,
+      1.0
      ],
      "per_param": {
-      "az": 0.9824561403508771,
-      "el": 0.8888888888888888,
-      "roll": 0.7777777777777778,
-      "target_x": 0.9824561403508771,
-      "target_y": 0.9824561403508771,
-      "zoom": 0.8333333333333334
+      "az": 0.9722222222222222,
+      "el": 0.861111111111111,
+      "roll": 0.8095238095238094,
+      "target_x": 0.9153153153153153,
+      "target_y": 0.9245614035087719,
+      "zoom": 0.6666666666666666
      },
-     "magnitude": 0.96,
-     "control_fp": NaN,
+     "magnitude": 0.8867924528301887,
+     "control_fp": 1.0,
      "confusion": {
       "leaks": {},
       "n_by_param": {
-       "az": 4,
-       "el": 4,
-       "roll": 4,
-       "target_x": 4,
-       "target_y": 4,
+       "az": 8,
+       "el": 8,
+       "roll": 8,
+       "target_x": 8,
+       "target_y": 7,
        "zoom": 2
       }
      },
-     "median_tokens": 1997,
-     "mean_latency_s": 42.6
+     "median_tokens": 1975,
+     "mean_latency_s": 43.3
     },
     "P10": {
-     "n": 24,
-     "macro_sign": 0.9157616262879421,
+     "n": 45,
+     "macro_sign": 0.872147679496845,
      "ci": [
-      NaN,
-      NaN
+      0.8413525132275131,
+      0.8750543739674175
      ],
      "per_param": {
-      "az": 0.9649122807017544,
-      "el": 0.8362573099415204,
-      "roll": 0.8888888888888888,
-      "target_x": 1.0,
-      "target_y": 0.8362573099415204,
-      "zoom": 0.9682539682539683
+      "az": 0.942857142857143,
+      "el": 0.8317460317460318,
+      "roll": 0.8095238095238094,
+      "target_x": 0.85,
+      "target_y": 0.8719298245614034,
+      "zoom": 0.9268292682926829
      },
-     "magnitude": 0.9285714285714286,
-     "control_fp": NaN,
+     "magnitude": 0.8846153846153846,
+     "control_fp": 1.0,
      "confusion": {
       "leaks": {
-       "az->el": 1,
-       "az->zoom": 1,
-       "target_x->az": 1,
-       "target_x->el": 1,
+       "az->zoom": 3,
+       "az->el": 2,
+       "target_x->az": 2,
+       "target_x->el": 2,
+       "roll->zoom": 2,
        "target_x->target_y": 1,
-       "zoom->target_y": 1
+       "zoom->target_y": 1,
+       "el->az": 1
       },
       "n_by_param": {
-       "az": 4,
-       "el": 4,
-       "roll": 4,
-       "target_x": 4,
-       "target_y": 4,
+       "az": 8,
+       "el": 8,
+       "roll": 8,
+       "target_x": 8,
+       "target_y": 6,
        "zoom": 2
       }
      },
-     "median_tokens": 1725,
-     "mean_latency_s": 33.8
+     "median_tokens": 1852,
+     "mean_latency_s": 34.5
     },
     "P11": {
-     "n": 22,
-     "macro_sign": 0.9324074074074074,
+     "n": 44,
+     "macro_sign": 0.8774708181570926,
      "ci": [
-      NaN,
-      NaN
+      0.8291172595520422,
+      0.9483157365510307
      ],
      "per_param": {
-      "az": 0.9629629629629629,
-      "el": 0.9814814814814815,
-      "roll": 1.0,
-      "target_x": 0.7592592592592592,
-      "target_y": 0.9074074074074074,
-      "zoom": 0.9833333333333334
+      "az": 0.8954248366013072,
+      "el": 0.8496732026143791,
+      "roll": 0.9047619047619048,
+      "target_x": 0.7870370370370371,
+      "target_y": 0.8612612612612613,
+      "zoom": 0.9666666666666667
      },
-     "magnitude": 1.0,
-     "control_fp": NaN,
+     "magnitude": 0.9215686274509803,
+     "control_fp": 1.0,
      "confusion": {
       "leaks": {
+       "el->target_y": 2,
        "zoom->target_x": 2,
        "zoom->target_y": 2,
        "az->target_y": 1,
        "el->target_x": 1,
-       "el->target_y": 1,
        "roll->az": 1,
        "roll->target_x": 1,
        "roll->target_y": 1
       },
       "n_by_param": {
-       "az": 4,
-       "el": 4,
-       "roll": 4,
-       "target_x": 4,
-       "target_y": 4,
+       "az": 8,
+       "el": 8,
+       "roll": 8,
+       "target_x": 7,
+       "target_y": 6,
        "zoom": 2
       }
      },
-     "median_tokens": 2454,
-     "mean_latency_s": 49.8
+     "median_tokens": 2368,
+     "mean_latency_s": 51.6
     }
    },
    "ranking": [
     "P3",
     "P8",
-    "P7",
+    "P2",
     "P11",
-    "P10",
-    "P9",
-    "P6",
-    "P1",
-    "P4",
     "P5",
-    "P2"
+    "P4",
+    "P1",
+    "P10",
+    "P6",
+    "P9",
+    "P7"
    ]
   },
   "t3": {
