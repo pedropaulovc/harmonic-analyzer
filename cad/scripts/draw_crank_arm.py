@@ -99,8 +99,8 @@ _NOTES_LEFT = (
     (
         "2. TOLERANCES: LINEAR +/-0.25; ANGLES +/-0.5\n"
         "   DEG; HOLE CENTRES +/-0.10; REAMED SHAFT BORE\n"
-        "   O9.525 +0.05/-0.00; DRILLED HOLES AND DIMPLE\n"
-        "   DIA/DEPTH/LOCATION +/-0.10."
+        "   O9.525 +0.05/-0.00; DRILLED HOLE DIAMETERS\n"
+        "   +/-0.10. DIMPLE PER NOTE 7."
     ),
     "3. REMOVE BURRS AND BREAK SHARP EDGES 0.2 MAX.",
     (
