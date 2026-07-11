@@ -75,9 +75,23 @@ CLEARANCE_MM = {          # (size, fit) -> hole diameter (CLOSE/NORMAL/LOOSE_FIT
     ("9/16", "close"): 14.684, ("9/16", "normal"): 15.080, ("9/16", "loose"): 15.479,
 }
 NUMBER_DRILL_MM = {       # number drills cut DIAMETER exactly
-    "#9": 4.978, "#21": 4.039, "#29": 3.454, "#37": 2.642, "#43": 2.261,
-    "#47": 1.994, "#54": 1.397,
+    "#9": 4.978, "#19": 4.216, "#20": 4.089, "#21": 4.039, "#29": 3.454,
+    "#37": 2.642, "#43": 2.261, "#47": 1.994, "#54": 1.397,
 }
+FRACTIONAL_DRILL_MM = {"1/8": 3.175, "3/16": 4.763, "15/64": 5.953}
+LETTER_DRILL_MM = {"F": 6.528}
+
+# 118-degree drill point: tip height = r * cot(59 deg). A BLIND wizard hole's
+# depth runs to the flat shoulder; the point extends beyond it (probe: #4-40
+# blind 6mm removed 25.0 vs 24.1 cylinder -- exactly the cone term).
+DRILL_POINT_H = 0.60086
+
+
+def blind_hole_volume_mm3(dia_mm: float, depth_mm: float) -> float:
+    """Analytic volume of one blind wizard hole (cylinder + drill point)."""
+    import math
+    r = dia_mm / 2.0
+    return math.pi * r * r * depth_mm + math.pi / 3.0 * r * r * (r * DRILL_POINT_H)
 
 
 @dataclass
@@ -147,7 +161,7 @@ def _early(obj, iface: str):
     return cls(obj._oleobj_)
 
 
-def _blind_cut_dia_mm(spec: HoleSpec) -> float:
+def blind_cut_dia_mm(spec: HoleSpec) -> float:
     """The pinned cut diameter a blind ``spec`` must pass to HoleWizard5."""
     if spec.kind in ("tapped", "tapped_bottoming"):
         table, key = TAP_DRILL_MM, spec.size
@@ -155,6 +169,10 @@ def _blind_cut_dia_mm(spec: HoleSpec) -> float:
         table, key = CLEARANCE_MM, (spec.size, spec.fit)
     elif spec.kind == "drilled_number":
         table, key = NUMBER_DRILL_MM, spec.size
+    elif spec.kind == "drilled_fractional":
+        table, key = FRACTIONAL_DRILL_MM, spec.size
+    elif spec.kind == "drilled_letter":
+        table, key = LETTER_DRILL_MM, spec.size
     else:
         raise ValueError(f"blind is not supported for kind {spec.kind!r}")
     if key not in table:
@@ -180,8 +198,20 @@ def find_planar_face(model, normal, points_mm, tol_mm: float = 1.0):
     others = [k for k in range(3) if k != axis]
     body = (model.GetBodies2(0, False) or [None])[0]
     _flag(body, "IBody2")
+    faces = body.GetFaces() or []
+    # O(faces) with 2-3 COM roundtrips each -- fine on a prismatic body
+    # (tens of faces), pathological after a face-exploding cut (the engraved
+    # nameplate: thousands of groove faces, >20 min). Callers must place
+    # wizard holes BEFORE such features; this log names the offender.
+    _telemetry.debug(f"find_planar_face: scanning {len(faces)} faces")
+    if len(faces) > 500:
+        _telemetry.warn(
+            f"find_planar_face: {len(faces)} faces -- the face walk is "
+            "O(faces) in COM roundtrips; create wizard holes before "
+            "face-exploding features"
+        )
     best = None
-    for f in (body.GetFaces() or []):
+    for f in faces:
         _flag(f, "IFace2")
         try:
             n = tuple(f.Normal)
@@ -243,6 +273,10 @@ def wizard_holes(
     model.ClearSelection2(True)
     if not face.Select2(False, 0):
         raise RuntimeError(f"hole wizard {label}: face Select failed")
+    # Phase logs: the wizard's create/rebuild calls can spin unbounded on a
+    # pathological face (the engraved nameplate front measured >20 min at
+    # 100% CPU with no dialog) -- keep the last-started phase visible.
+    _telemetry.debug(f"hole wizard {label}: face selected, creating feature")
 
     if spec.end == "blind":
         # BLIND holes go through the legacy positional HoleWizard5:
@@ -255,7 +289,7 @@ def wizard_holes(
         # type, V8=thread end condition; plain holes take V1=screw fit,
         # V2=bottom drill angle.
         d = spec.depth_mm / 1000.0
-        dia = _blind_cut_dia_mm(spec) / 1000.0
+        dia = blind_cut_dia_mm(spec) / 1000.0
         ang = 2.0594885  # 118-degree drill point
         if hole_type == 4:
             vals = [d, -1, -1, -1, -1, ang, 1, _ENDS["blind"], -1, -1, -1, -1]
@@ -293,6 +327,7 @@ def wizard_holes(
                 f"may be invalid for kind {spec.kind!r}"
             )
     _flag(feat, "IFeature")
+    _telemetry.debug(f"hole wizard {label}: feature created, placing points")
 
     # Locate the wizard's 1-point placement sketch.
     place_sk = place_name = None
@@ -338,6 +373,7 @@ def wizard_holes(
         sx, sy, sz = _sketch_xy(pt)
         sm.CreatePoint(sx, sy, sz)
     model.EditSketch()
+    _telemetry.debug(f"hole wizard {label}: points placed, rebuilding")
     model.EditRebuild3()
 
     npts = len(place_sk.GetSketchPoints2() or [])
