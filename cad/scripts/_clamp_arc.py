@@ -38,9 +38,9 @@ from _common import (
     report_mass_properties,
     save_part_and_images,
     set_global,
-    set_sketch_direct_db,
     volume_check,
 )
+from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
 
 ARC_WIDTH = 48.0  # lateral (Z) span, ear tip to ear tip (old collar OD)
 ARC_HALF_H = 8.0  # 16 tall along the column, like the old one-piece collar
@@ -55,21 +55,24 @@ async def build_arc(
     part_name: str,
     depth: float,
     front: bool,
-    hole_dia: float,
+    hole_spec: HoleSpec,
 ) -> dict[str, str]:
     """Build one semi-arc shell: ``front=True`` spans local x 0..depth (relief
-    cut opening -X toward the column), ``front=False`` spans x -depth..0."""
+    cut opening -X toward the column), ``front=False`` spans x -depth..0. Each
+    caller passes its own ear-hole ``HoleSpec`` (the back arc's ears are tapped
+    for the clamp screw, the front arc's are clearance)."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
     # Editable knobs (Tools > Equations). mm suffix is load-bearing -- INCH
     # document, the equation manager reads bare numbers in document units.
+    # (The old HoleDia knob is gone: the ear holes are now a native Hole Wizard
+    # feature whose diameter comes from the ANSI-inch table, not a driven dim.)
     await set_global(adapter, "ArcDepth", f"{depth}mm")
     await set_global(adapter, "ArcWidth", f"{ARC_WIDTH}mm")
     await set_global(adapter, "ArcHalfH", f"{ARC_HALF_H}mm")
     await set_global(adapter, "ColumnBore", f"{COLUMN_BORE}mm")
-    await set_global(adapter, "HoleDia", f"{hole_dia}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -134,32 +137,26 @@ async def build_arc(
     expected -= math.pi * (COLUMN_BORE / 2.0) ** 2 / 2.0 * 2.0 * ARC_HALF_H
     await volume_check(adapter, "column relief", expected, 0.01 * expected)
 
-    # Ear screw holes: along the clamp axis (local X) at z +-EAR_HOLE_Z, bar
-    # centre height. Right-plane sketch (x -> local Z, y -> local Y), cut
-    # through both ways -- the ears are outside the bore, so each hole removes
-    # a full-depth cylinder.
-    ears = SketchDims()
-    check("create_sketch ear holes", await adapter.create_sketch("Right"))
-    set_sketch_direct_db(adapter, True)
-    for label, z in (("Pos", EAR_HOLE_Z), ("Neg", -EAR_HOLE_Z)):
-        await define_circle(
-            adapter, z, 0.0, hole_dia / 2.0, f"ear hole {label}", dims=ears,
-            names=(f"Ear{label}Z", f"Ear{label}Y", f"Ear{label}Dia"),
-            drives=(None, None, '"HoleDia"'),
-        )
-    set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "ear holes sketch")
-    check("exit_sketch ear holes", await adapter.exit_sketch())
-    name_last_feature(adapter, "EarHoleProfile")
-    drive_jobs += ears.apply(adapter, "EarHoleProfile")
-    check(
-        "cut ear holes",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=2.5 * depth, both_directions=True)
-        ),
+    # Ear screw holes: ONE native Hole Wizard feature (2 instances) along the
+    # clamp axis (local X) at z +-EAR_HOLE_Z, bar centre height, drilled
+    # through the outer block face. The ears are outside the bore, so each
+    # hole removes a full-depth (block DEPTH) cylinder at the ANSI-inch table
+    # diameter. Placed while the body is still prismatic (block + half-cylinder
+    # relief), before any face-exploding feature. The outward normal is the
+    # block's outer X face: +X for the front arc (x 0..depth), -X for the back
+    # arc (x -depth..0).
+    ear_normal = (1.0, 0.0, 0.0) if front else (-1.0, 0.0, 0.0)
+    ear_face_x = depth if front else -depth
+    wizard_holes(
+        adapter,
+        hole_spec,
+        [[ear_face_x, 0.0, EAR_HOLE_Z], [ear_face_x, 0.0, -EAR_HOLE_Z]],
+        ear_normal,
+        f"clamp ear holes ({hole_spec.size} {hole_spec.kind})",
+        name="EarHoles",
     )
-    name_last_feature(adapter, "EarHoles")
-    expected -= 2.0 * math.pi * (hole_dia / 2.0) ** 2 * depth
+    ear_dia = blind_cut_dia_mm(hole_spec)
+    expected -= 2.0 * math.pi * (ear_dia / 2.0) ** 2 * depth
     await volume_check(adapter, "ear holes", expected, 0.01 * expected)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to

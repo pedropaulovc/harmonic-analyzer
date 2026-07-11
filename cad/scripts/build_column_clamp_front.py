@@ -18,16 +18,19 @@ import sys
 
 from _clamp_arc import build_arc
 from _common import run_build
+from _holes import HoleSpec
 
 PART_NAME = "column-clamp-front"
 
 DEPTH = 17.9  # bar back face to the column-axis plane
-HOLE_DIA = 4.4  # clearance for the O3.9 clamp-screw shanks
+# The O3.9 clamp-screw shanks PASS THROUGH here (front arc = bar side):
+# #8 clearance (normal fit Ø4.978; nearest UNC to the ~Ø4 screw).
+HOLE_SPEC = HoleSpec("clearance", "#8")
 
 
 async def build(adapter) -> dict[str, str]:
     return await build_arc(
-        adapter, part_name=PART_NAME, depth=DEPTH, front=True, hole_dia=HOLE_DIA
+        adapter, part_name=PART_NAME, depth=DEPTH, front=True, hole_spec=HOLE_SPEC
     )
 
 

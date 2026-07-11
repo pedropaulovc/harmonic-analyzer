@@ -29,7 +29,6 @@ from _common import (
     apply_color,
     apply_material,
     check,
-    define_circle,
     define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
@@ -41,6 +40,7 @@ from _common import (
     set_global,
     volume_check,
 )
+from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
 
 PART_NAME = "top-crossbar"
 MATERIAL = "Gray Cast Iron"  # green casting
@@ -48,7 +48,9 @@ MATERIAL = "Gray Cast Iron"  # green casting
 BAR_HALF_X = 11.0  # rail section 22 wide (DIMENSIONS.md ch6, med)
 BAR_HEIGHT = 41.0  # rail section 41 tall (med)
 BAR_HALF_Z = 101.0  # ends flush on the ring window faces at z +/-101 (derived)
-HOLE_DIA = 8.2  # knife-mount O8 stud passes through (low)
+# Knife-mount Ø8 stud passes through: 5/16 clearance, CLOSE fit (Ø8.331, the
+# wizard twin of the old Ø8.2 artefact dim).
+HOLE_SPEC = HoleSpec("clearance", "5/16", fit="close")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -60,10 +62,11 @@ async def build(adapter) -> dict[str, str]:
     # the half-span to the window faces, and the stud-hole diameter. The mm suffix
     # is load-bearing -- this is an INCH document and the equation manager reads
     # BARE numbers in document units (an unsuffixed 202 = 202 in, 25.4x too big).
+    # (The old HoleDia knob is gone: the stud hole is now a native Hole Wizard
+    # 5/16 clearance feature whose diameter comes from the table, not a dim.)
     await set_global(adapter, "BarHalfX", f"{BAR_HALF_X}mm")
     await set_global(adapter, "BarHeight", f"{BAR_HEIGHT}mm")
     await set_global(adapter, "BarHalfZ", f"{BAR_HALF_Z}mm")
-    await set_global(adapter, "HoleDia", f"{HOLE_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -98,31 +101,19 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Bar")
 
-    # Stud hole on the bar axis (origin): only the diameter is a dim -- the centre
-    # X + Z are relations -- so define_circle records just one, ignoring the unused
-    # centre name slots.
-    stud = SketchDims()
-    check("create_sketch stud hole", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter, 0.0, 0.0, HOLE_DIA / 2.0, "stud hole", dims=stud,
-        names=("StudCx", "StudCz", "StudDia"),
-        drives=(None, None, '"HoleDia"'),
+    # Stud hole on the bar axis (origin): ONE native Hole Wizard 5/16 clearance
+    # feature, through-all along Y, drilled from the bar's bottom face (y=0)
+    # while the bar is a plain prism.
+    hole_dia = blind_cut_dia_mm(HOLE_SPEC)
+    wizard_holes(
+        adapter, HOLE_SPEC,
+        [[0.0, 0.0, 0.0]],
+        (0.0, -1.0, 0.0), "knife-mount stud hole (5/16 clearance)", name="StudHole",
     )
-    await ensure_fully_defined(adapter, "stud hole sketch")
-    check("exit_sketch stud hole", await adapter.exit_sketch())
-    name_last_feature(adapter, "StudHoleProfile")
-    drive_jobs += stud.apply(adapter, "StudHoleProfile")
-    check(
-        "cut stud hole",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=2.0 * BAR_HEIGHT + 10.0, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "StudHole")
 
     expected = (
         2.0 * BAR_HALF_X * BAR_HEIGHT * 2.0 * BAR_HALF_Z
-        - math.pi * (HOLE_DIA / 2.0) ** 2 * BAR_HEIGHT
+        - math.pi * (hole_dia / 2.0) ** 2 * BAR_HEIGHT
     )
     await volume_check(adapter, "crossbar", expected, 0.005 * expected)
 
