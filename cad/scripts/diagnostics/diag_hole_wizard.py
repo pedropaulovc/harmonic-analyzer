@@ -46,6 +46,11 @@ CASES = [
      [[-10.0, BLOCK_T, -20.0]], 2.261, 6.0),
     ("clearance #8 normal x2", HoleSpec("clearance", "#8"),
      [[0.0, BLOCK_T, -20.0], [0.0, BLOCK_T, 20.0]], 4.978, BLOCK_T),
+    # A NON-normal fit: HoleFit is a no-op on a plain hole (API: cbore/csink
+    # only), so wizard_holes forces the pinned CLOSE dia -- regressed to 7.137
+    # (normal) before the 2026-07-11 HoleDiameter fix.
+    ("clearance 1/4 close", HoleSpec("clearance", "1/4", fit="close"),
+     [[-10.0, BLOCK_T, 10.0]], 6.756, BLOCK_T),
     ("number drill #47 x2", HoleSpec("drilled_number", "#47"),
      [[10.0, BLOCK_T, -20.0], [10.0, BLOCK_T, 20.0]], 1.994, BLOCK_T),
     ("cbore fillister #4 + overrides", HoleSpec(
