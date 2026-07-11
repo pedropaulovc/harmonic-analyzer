@@ -1,5 +1,8 @@
 rocker-arm-support:
   number: MHA-089
   material: Gray Cast Iron
+  material_specification: ASTM A48 Class 30 gray cast iron
+  finish: machine green enamel; foot seat and tapped holes masked
+  quantity: 1
   tolerance_class: machined_block
   process: "cast + machined"
