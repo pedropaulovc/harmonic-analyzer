@@ -392,7 +392,25 @@ def wizard_holes(
     # reads 0.0 for everything it did not set).
     edits: list[tuple[str, object]] = []
     if spec.kind == "clearance" and spec.end != "blind":
+        # HoleFit is a NO-OP on a plain (type-2) clearance hole: the API
+        # applies it to counterbore/countersink features only (per the
+        # IWizardHoleFeatureData2.HoleFit remarks), so a plain hole ships the
+        # NORMAL-fit diameter regardless of spec.fit -- probe 2026-07-11: a
+        # 1/4 "close" hole still cut 7.137 mm (the normal dia, not 6.756).
+        # Force the pinned close/normal/loose diameter directly so the cut
+        # geometry matches the analytic blind_cut_dia_mm the callers use.
+        # (Keep the HoleFit write too: harmless, and correct should a
+        # cbore/csink clearance ever route through here. An explicit
+        # HoleDiameter override still wins -- it is applied below.)
         edits.append(("HoleFit", _FITS[spec.fit]))  # blind bakes fit into HW5
+        if "HoleDiameter" not in spec.overrides_mm:
+            # On a plain hole the DRIVING knob is ThruHoleDiameter -- a
+            # HoleDiameter-only write is silently dropped (probe 2026-07-11:
+            # HoleDiameter-only still cut 7.137; setting BOTH cut 6.756). Set
+            # both, mirroring the counterbore override path below.
+            cut_m = blind_cut_dia_mm(spec) / 1000.0
+            edits.append(("HoleDiameter", cut_m))
+            edits.append(("ThruHoleDiameter", cut_m))
     for k, v in spec.overrides_mm.items():
         edits.append((k, v / 1000.0))
         if k == "HoleDiameter":
