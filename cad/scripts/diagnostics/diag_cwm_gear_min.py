@@ -59,12 +59,18 @@ One CopyWithMates2 call copies B with the distance slot re-valued one step
 and the GEAR slot re-pointed at C's axis (Repeat=false + NewEntityToMateTo
 -- each production station meshes a DIFFERENT partner; same wizard path).
 The copy lands translation-exact and SPUN off the seed; the spin survives a
-rebuild; a phase put is reverted by the next rebuild; delete-put-remesh
-lands it and HOLDS.
+rebuild; a raw phase put lands and holds through a plain rebuild but cannot
+rewrite the mesh relationship the copied mate recorded; delete-put-remesh
+heals it for real and HOLDS.
 
-pywin32 only -- NO repo imports. SolidWorks must already be open; the script
-creates its own throwaway documents, closes only those, and saves nothing
-except the tiny part in %TEMP%.
+pywin32 only -- NO repo imports, deliberately (the diag_cwm_min.py
+convention): the script must run unmodified on any machine with pywin32 --
+a vendor ticket, a clean seat -- so it cannot import ``_telemetry``, and
+its printed measurement trace IS its machine-readable output (the exemption
+AGENTS.md's log-don't-print rule reserves for stdout a caller consumes).
+SolidWorks must already be open; the script creates its own throwaway
+documents, closes only those, and saves nothing except the tiny part in
+%TEMP%.
 
 Run:  uv run python cad\scripts\diagnostics\diag_cwm_gear_min.py [--visible]
 
