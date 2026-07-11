@@ -3,7 +3,7 @@
   "t1": {
    "table": {
     "P1": {
-     "n": 2,
+     "n": 8,
      "macro_sign": 1.0,
      "ci": [
       NaN,
@@ -22,24 +22,82 @@
      "confusion": {
       "leaks": {},
       "n_by_param": {
-       "az": 2
+       "az": 4,
+       "el": 4
       }
      },
      "median_tokens": 2095,
-     "mean_latency_s": 24.0
+     "mean_latency_s": 35.9
     },
     "P2": {
-     "n": 2,
-     "macro_sign": 0.9166666666666666,
+     "n": 8,
+     "macro_sign": 0.9652777777777778,
      "ci": [
       NaN,
       NaN
      ],
      "per_param": {
       "az": 1.0,
-      "el": 0.5,
+      "el": 0.9166666666666666,
       "roll": 1.0,
       "target_x": 1.0,
+      "target_y": 1.0,
+      "zoom": 0.875
+     },
+     "magnitude": 1.0,
+     "control_fp": NaN,
+     "confusion": {
+      "leaks": {
+       "az->el": 1,
+       "el->zoom": 1
+      },
+      "n_by_param": {
+       "az": 4,
+       "el": 4
+      }
+     },
+     "median_tokens": 1982,
+     "mean_latency_s": 30.5
+    },
+    "P3": {
+     "n": 8,
+     "macro_sign": 1.0,
+     "ci": [
+      NaN,
+      NaN
+     ],
+     "per_param": {
+      "az": 1.0,
+      "el": 1.0,
+      "roll": 1.0,
+      "target_x": 1.0,
+      "target_y": 1.0,
+      "zoom": 1.0
+     },
+     "magnitude": 1.0,
+     "control_fp": NaN,
+     "confusion": {
+      "leaks": {},
+      "n_by_param": {
+       "az": 4,
+       "el": 4
+      }
+     },
+     "median_tokens": 1768,
+     "mean_latency_s": 36.7
+    },
+    "P4": {
+     "n": 7,
+     "macro_sign": 0.9761904761904762,
+     "ci": [
+      NaN,
+      NaN
+     ],
+     "per_param": {
+      "az": 1.0,
+      "el": 1.0,
+      "roll": 1.0,
+      "target_x": 0.8571428571428571,
       "target_y": 1.0,
       "zoom": 1.0
      },
@@ -47,69 +105,18 @@
      "control_fp": NaN,
      "confusion": {
       "leaks": {
-       "az->el": 1
+       "el->target_x": 1
       },
       "n_by_param": {
-       "az": 2
+       "az": 4,
+       "el": 3
       }
      },
-     "median_tokens": 1366,
-     "mean_latency_s": 24.6
-    },
-    "P3": {
-     "n": 2,
-     "macro_sign": 1.0,
-     "ci": [
-      NaN,
-      NaN
-     ],
-     "per_param": {
-      "az": 1.0,
-      "el": 1.0,
-      "roll": 1.0,
-      "target_x": 1.0,
-      "target_y": 1.0,
-      "zoom": 1.0
-     },
-     "magnitude": 1.0,
-     "control_fp": NaN,
-     "confusion": {
-      "leaks": {},
-      "n_by_param": {
-       "az": 2
-      }
-     },
-     "median_tokens": 1768,
-     "mean_latency_s": 29.6
-    },
-    "P4": {
-     "n": 2,
-     "macro_sign": 1.0,
-     "ci": [
-      NaN,
-      NaN
-     ],
-     "per_param": {
-      "az": 1.0,
-      "el": 1.0,
-      "roll": 1.0,
-      "target_x": 1.0,
-      "target_y": 1.0,
-      "zoom": 1.0
-     },
-     "magnitude": 1.0,
-     "control_fp": NaN,
-     "confusion": {
-      "leaks": {},
-      "n_by_param": {
-       "az": 2
-      }
-     },
-     "median_tokens": 1306,
-     "mean_latency_s": 20.0
+     "median_tokens": 1367,
+     "mean_latency_s": 32.2
     },
     "P5": {
-     "n": 2,
+     "n": 8,
      "macro_sign": 1.0,
      "ci": [
       NaN,
@@ -128,14 +135,15 @@
      "confusion": {
       "leaks": {},
       "n_by_param": {
-       "az": 2
+       "az": 4,
+       "el": 4
       }
      },
-     "median_tokens": 790,
-     "mean_latency_s": 18.4
+     "median_tokens": 815,
+     "mean_latency_s": 18.6
     },
     "P6": {
-     "n": 2,
+     "n": 8,
      "macro_sign": 1.0,
      "ci": [
       NaN,
@@ -149,30 +157,31 @@
       "target_y": 1.0,
       "zoom": 1.0
      },
-     "magnitude": 0.5,
+     "magnitude": 0.875,
      "control_fp": NaN,
      "confusion": {
       "leaks": {},
       "n_by_param": {
-       "az": 2
+       "az": 4,
+       "el": 4
       }
      },
      "median_tokens": 800,
-     "mean_latency_s": 17.2
+     "mean_latency_s": 17.0
     },
     "P7": {
-     "n": 1,
-     "macro_sign": 0.5,
+     "n": 7,
+     "macro_sign": 0.9384920634920634,
      "ci": [
       NaN,
       NaN
      ],
      "per_param": {
       "az": 1.0,
-      "el": 0.0,
+      "el": 0.9166666666666666,
       "roll": 1.0,
-      "target_x": 0.0,
-      "target_y": 0.0,
+      "target_x": 0.8571428571428571,
+      "target_y": 0.8571428571428571,
       "zoom": 1.0
      },
      "magnitude": 1.0,
@@ -184,14 +193,15 @@
        "az->target_y": 1
       },
       "n_by_param": {
-       "az": 1
+       "az": 4,
+       "el": 3
       }
      },
-     "median_tokens": 2978,
-     "mean_latency_s": 49.0
+     "median_tokens": 1582,
+     "mean_latency_s": 40.5
     },
     "P8": {
-     "n": 1,
+     "n": 7,
      "macro_sign": 1.0,
      "ci": [
       NaN,
@@ -210,14 +220,15 @@
      "confusion": {
       "leaks": {},
       "n_by_param": {
-       "az": 1
+       "az": 4,
+       "el": 3
       }
      },
-     "median_tokens": 759,
-     "mean_latency_s": 14.9
+     "median_tokens": 822,
+     "mean_latency_s": 20.4
     },
     "P9": {
-     "n": 2,
+     "n": 7,
      "macro_sign": 1.0,
      "ci": [
       NaN,
@@ -236,41 +247,46 @@
      "confusion": {
       "leaks": {},
       "n_by_param": {
-       "az": 2
+       "az": 4,
+       "el": 3
       }
      },
-     "median_tokens": 1349,
-     "mean_latency_s": 24.9
+     "median_tokens": 1835,
+     "mean_latency_s": 35.1
     },
     "P10": {
-     "n": 1,
-     "macro_sign": 1.0,
+     "n": 7,
+     "macro_sign": 0.9623015873015873,
      "ci": [
       NaN,
       NaN
      ],
      "per_param": {
       "az": 1.0,
-      "el": 1.0,
+      "el": 0.9166666666666666,
       "roll": 1.0,
       "target_x": 1.0,
       "target_y": 1.0,
-      "zoom": 1.0
+      "zoom": 0.8571428571428571
      },
      "magnitude": 1.0,
      "control_fp": NaN,
      "confusion": {
-      "leaks": {},
+      "leaks": {
+       "az->el": 1,
+       "az->zoom": 1
+      },
       "n_by_param": {
-       "az": 1
+       "az": 4,
+       "el": 3
       }
      },
-     "median_tokens": 1301,
-     "mean_latency_s": 23.0
+     "median_tokens": 1413,
+     "mean_latency_s": 25.8
     },
     "P11": {
-     "n": 1,
-     "macro_sign": 0.8333333333333334,
+     "n": 7,
+     "macro_sign": 0.9285714285714285,
      "ci": [
       NaN,
       NaN
@@ -279,36 +295,39 @@
       "az": 1.0,
       "el": 1.0,
       "roll": 1.0,
-      "target_x": 1.0,
-      "target_y": 0.0,
+      "target_x": 0.8571428571428571,
+      "target_y": 0.7142857142857143,
       "zoom": 1.0
      },
      "magnitude": 1.0,
      "control_fp": NaN,
      "confusion": {
       "leaks": {
-       "az->target_y": 1
+       "az->target_y": 1,
+       "el->target_x": 1,
+       "el->target_y": 1
       },
       "n_by_param": {
-       "az": 1
+       "az": 4,
+       "el": 3
       }
      },
-     "median_tokens": 1503,
+     "median_tokens": 1738,
      "mean_latency_s": 36.1
     }
    },
    "ranking": [
     "P1",
     "P3",
-    "P4",
     "P5",
     "P6",
     "P8",
     "P9",
-    "P10",
+    "P4",
     "P2",
-    "P11",
-    "P7"
+    "P10",
+    "P7",
+    "P11"
    ]
   },
   "t3": {
