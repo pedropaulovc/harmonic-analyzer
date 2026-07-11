@@ -51,7 +51,8 @@ MATERIAL = "Plain Carbon Steel"  # black hardware
 
 HEAD_AF = 7.0  # hex across-flats (low)
 HEAD_H = 2.5
-SHANK_DIA = 3.5  # rides the bar's O3.8 through-hole / strap's O3.6 hole
+SHANK_DIA = 2.4  # shank: was Ø3.5, now 2.4 = #6-32 tap-drill 2.705 - 0.3
+# (threads #6-32 into the strap; rides the bar's O3.8 / strap's O3.6 clearance)
 SHANK_LEN = 11.5  # bar 9 + 2.5 into the 3-thick strap (tip 0.5 recessed)
 
 # Every hex offset dim is linear in the across-flats (radius = AF/sqrt 3), so a

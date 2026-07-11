@@ -28,7 +28,6 @@ from _common import (
     add_line_chain,
     apply_material,
     check,
-    define_circle,
     define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
@@ -41,6 +40,7 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _holes import TAP_DRILL_MM, HoleSpec, wizard_holes
 
 PART_NAME = "pen-frame"
 MATERIAL = "Brass"  # see _common.apply_material docstring
@@ -55,11 +55,10 @@ TRIM_NEAR = 0.75  # local x = 0 edge pulled back: that rail faces the platen
 # (machine z = -143 - local x) and must clear the recording paper's front
 # face at -143.4 by the 0.25+ margin (M6.8 platen-paper)
 FRAME_DEPTH = 10.0  # Z
-SCREW_HOLE_DIA = 3.0  # set screw, bottom rail only
-
-# Mid-plane cut from the Top plane spans +-depth/2 in Y: deep enough for
-# the bottom rail, short of the top rail.
-SCREW_CUT_DEPTH = 30.0
+# The set screw threads INTO the bottom rail, so its hole is a #4-40 tapped
+# Hole Wizard hole (tap drill Ø2.261; was a plain Ø3.0 cut) drilled up from the
+# bottom face. THROUGH_NEXT (not through-all) stops at the window cavity so the
+# top rail is spared, matching the old mid-plane cut -- fastener-policy memory.
 
 
 async def build(adapter) -> dict[str, str]:
@@ -78,7 +77,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "RailEnd", f"{RAIL_END}mm")
     await set_global(adapter, "TrimNear", f"{TRIM_NEAR}mm")
     await set_global(adapter, "FrameDepth", f"{FRAME_DEPTH}mm")
-    await set_global(adapter, "ScrewHoleDia", f"{SCREW_HOLE_DIA}mm")
+    # (The old ScrewHoleDia knob is gone: the set-screw hole is now a native
+    # Hole Wizard #4-40 tapped feature placed by point.)
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -140,31 +140,22 @@ async def build(adapter) -> dict[str, str]:
     # served (a TRIM_NEAR corner snapping back to x = 0 reads untrimmed).
     await volume_check(adapter, "ring", ring_expected, 0.005 * ring_expected)
 
-    # Set-screw hole up through the bottom rail. Off-axis in both x (rail mid-
-    # span) and z (depth mid-plane), so define_circle emits X, Z, then diameter.
-    screw = SketchDims()
-    check("create_sketch screw hole", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter, OUTER_WIDTH / 2.0, -FRAME_DEPTH / 2.0, SCREW_HOLE_DIA / 2.0, "screw hole",
-        dims=screw,
-        names=("ScrewX", "ScrewZ", "ScrewHoleDiaDim"),
-        drives=('"OuterWidth" / 2', '"FrameDepth" / 2', '"ScrewHoleDia"'),
+    # Set-screw hole: ONE native Hole Wizard #4-40 tapped feature drilled up
+    # from the bottom face (Y=0, outward normal -Y). THROUGH_NEXT stops at the
+    # window cavity so only the bottom rail is pierced (the top rail is spared),
+    # matching the old mid-plane cut. The hole sits at the rail mid-span in X
+    # and the depth mid-plane in Z.
+    wizard_holes(
+        adapter,
+        HoleSpec("tapped", "#4-40", end="through_next"),
+        [[OUTER_WIDTH / 2.0, 0.0, FRAME_DEPTH / 2.0]],
+        (0.0, -1.0, 0.0),
+        "set-screw tapped hole (#4-40)", name="ScrewHole",
     )
-    await ensure_fully_defined(adapter, "screw hole sketch")
-    check("exit_sketch screw hole", await adapter.exit_sketch())
-    name_last_feature(adapter, "ScrewHoleProfile")
-    drive_jobs += screw.apply(adapter, "ScrewHoleProfile")
-    check(
-        "cut screw hole",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=SCREW_CUT_DEPTH, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "ScrewHole")
-    # The Ø3 column pierces only the bottom rail (Y 0..RailEnd; no material
-    # below Y=0), so it removes pi*r^2*RailEnd. Loose tol for the rounding /
-    # mesh at the cut walls.
-    v_screw = math.pi * (SCREW_HOLE_DIA / 2.0) ** 2 * RAIL_END
+    # The tapped column pierces only the bottom rail (Y 0..RailEnd), so it
+    # removes pi*r^2*RailEnd at the tap-drill diameter. Loose tol for the
+    # rounding / mesh at the cut walls.
+    v_screw = math.pi * (TAP_DRILL_MM["#4-40"] / 2.0) ** 2 * RAIL_END
     v_final = ring_expected - v_screw
     await volume_check(adapter, "screw hole", v_final, 15.0)
 

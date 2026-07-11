@@ -40,6 +40,12 @@ from _common import (
     set_global,
     volume_check,
 )
+from _holes import (
+    NUMBER_DRILL_MM,
+    HoleSpec,
+    cross_hole_volume_mm3,
+    wizard_hole_on_cylinder,
+)
 
 PART_NAME = "crankshaft"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
@@ -51,9 +57,9 @@ SHAFT_LENGTH = 145.0  # ch11: derived (crank seat + pedestal bearing + seats);
 # -145..-125) while the inboard 16T station stayed, so the shaft spans
 # -175..-30. The arm/handle sweep entirely in front of the chain plane and
 # cannot foul the chain when turning (book ch30 p005/p002).
-PIN_HOLE_DIA = 5.0  # ch11: tapered-pin cross-hole, pin small end (photo)
+# pin cross-hole: was Ø5.0 photo-read, now #9 drill (Ø4.978, wizard) -- the
+# nearest number drill; radial through the shaft at the crank-seat height.
 PIN_HOLE_HEIGHT = 12.0  # crank hub centre above the outboard end
-THROUGH_CUT_DEPTH = 30.0  # mid-plane total; > shaft dia
 # Keyed-chain seat stations (local +Y from the outboard origin): named datum
 # planes the T12 chain wheel and the 16T pinion mate COINCIDENT to in the
 # assembly (the frame CboreSeat idiom). Coincident replaces the old unsigned
@@ -85,8 +91,9 @@ async def build(adapter) -> dict[str, str]:
     # already mm (0.375 * IN), so it serialises as its mm value.
     await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
     await set_global(adapter, "ShaftLength", f"{SHAFT_LENGTH}mm")
-    await set_global(adapter, "PinHoleDia", f"{PIN_HOLE_DIA}mm")
-    await set_global(adapter, "PinHoleHeight", f"{PIN_HOLE_HEIGHT}mm")
+    # (The old PinHoleDia/PinHoleHeight knobs are gone: the cross-hole is a
+    # native Hole Wizard #9 feature; its size comes from the drill table and
+    # its station is baked into the placement point.)
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -111,31 +118,24 @@ async def build(adapter) -> dict[str, str]:
     v_shaft = math.pi * (SHAFT_DIA / 2.0) ** 2 * SHAFT_LENGTH
     await volume_check(adapter, "shaft", v_shaft, 0.005 * v_shaft)
 
-    # Tapered-pin cross-hole through the crank seat (along Z). On the Front
-    # plane the centre is off-axis in y (height) only, so define_circle emits a
-    # z (height) dim then the diameter -- the x slot is ignored.
-    pin = SketchDims()
-    check("create_sketch pin hole", await adapter.create_sketch("Front"))
-    await define_circle(
-        adapter, 0.0, PIN_HOLE_HEIGHT, PIN_HOLE_DIA / 2.0, "pin hole", dims=pin,
-        names=("PinCx", "PinHeight", "PinDiaDim"),
-        drives=(None, '"PinHoleHeight"', '"PinHoleDia"'),
+    # Tapered-pin cross-hole through the crank seat: a native Hole Wizard #9
+    # drill placed RADIALLY on the shaft's cylindrical face (3D-sketch
+    # placement; no planar face carries the drill axis). The placement point
+    # sits on the surface at the crank-seat height, +Z side; through-all
+    # drills diametrally out the -Z wall.
+    wizard_hole_on_cylinder(
+        adapter,
+        HoleSpec("drilled_number", "#9"),
+        [0.0, PIN_HOLE_HEIGHT, SHAFT_DIA / 2.0],
+        "tapered-pin cross-hole (#9)",
+        name="PinHole",
     )
-    await ensure_fully_defined(adapter, "pin hole sketch")
-    check("exit_sketch pin hole", await adapter.exit_sketch())
-    name_last_feature(adapter, "PinHoleProfile")
-    drive_jobs += pin.apply(adapter, "PinHoleProfile")
-    check(
-        "cut pin hole",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "PinHole")
-    # Cross-drill removal is the Ø5 cylinder clipped by the shaft surface
-    # (no clean closed form); the as-built drop is ~178 mm^3 (script comment).
-    v_final = v_shaft - 178.0
-    await volume_check(adapter, "shaft + pin hole", v_final, 50.0)
+    # Cross-drill removal = the perpendicular cylinder-cylinder intersection,
+    # integrated numerically (probe-exact; replaces the old ~178 as-built
+    # constant for the retired Ø5.0).
+    v_pin = cross_hole_volume_mm3(NUMBER_DRILL_MM["#9"], SHAFT_DIA)
+    v_final = v_shaft - v_pin
+    await volume_check(adapter, "shaft + pin hole", v_final, 0.02 * v_pin)
 
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built

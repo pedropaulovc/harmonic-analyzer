@@ -54,6 +54,7 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
 
 PART_NAME = "arbor-pedestal"
 MATERIAL = "Gray Cast Iron"  # black japanned casting (t00393)
@@ -64,8 +65,12 @@ FOOT_HEIGHT = 5.0  # the low flange under the strap (photo-scaled, low)
 STRAP_T = 10.0  # Z; thin strap FLUSH with the foot's +Z face (L, not T):
 # band local z (FOOT_DEPTH/2 - STRAP_T)..(FOOT_DEPTH/2) = -2..+8. Keeps the
 # arbor's 7.5 engagement from the north face; the -Z flange carries the screw
-SCREW_HOLE_DIA = 3.2  # foot-screw shank O2.9 (build_foot_screw, the flange
-# hold-down; its 8.0 shank reaches 3.0 into the base past this 5.0 flange)
+# Foot-screw shank O2.9 pass-through (build_foot_screw, the flange hold-down;
+# its 8.0 shank reaches 3.0 into the base past this 5.0 flange): #4 clearance
+# NORMAL fit (Ø3.251, the wizard twin of the old Ø3.2 artefact dim).
+SCREW_HOLE_SPEC = HoleSpec("clearance", "#4")
+SCREW_HOLE_DIA = blind_cut_dia_mm(SCREW_HOLE_SPEC)  # 3.251; re-exposed for the
+# drive-train assembly's foot-screw clearance assert (build_drive_train_assembly)
 SCREW_Z = -5.0  # hole centre on the exposed flange, local z (machine -95.5)
 TOP_RADIUS = 10.0  # dome radius = strap half-width at the top (24 -> 20 taper)
 BORE_DIA = 0.375 * IN  # 9.525: arbor diameter (ch. 13, legacy, med)
@@ -92,8 +97,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "TopRadius", f"{TOP_RADIUS}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
     await set_global(adapter, "BoreHeight", f"{BORE_HEIGHT}mm")
-    await set_global(adapter, "ScrewHoleDia", f"{SCREW_HOLE_DIA}mm")
-    await set_global(adapter, "ScrewZ", f"{-SCREW_Z}mm")
+    # (The old ScrewHoleDia/ScrewZ knobs are gone: the flange hold-down hole is
+    # now a native Hole Wizard #4 clearance feature at a literal station.)
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -239,28 +244,18 @@ async def build(adapter) -> dict[str, str]:
     v_bore = math.pi * BORE_RADIUS**2 * STRAP_T
     volume = await volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
 
-    # Flange hold-down screw hole (PR7): O3.2 through the exposed -Z flange at
-    # (x 0, z SCREW_Z) -- the fillister screw bolts the casting to the base.
-    # Top sketch (u, v) -> (X, -Z); mid-plane cut spans the 5-tall foot.
-    hole = SketchDims()
-    check("create_sketch screw hole", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter, 0.0, -SCREW_Z, SCREW_HOLE_DIA / 2.0, "screw hole", dims=hole,
-        names=("ScrewHoleX", "ScrewZ", "ScrewHoleDia"),
-        drives=(None, '"ScrewZ"', '"ScrewHoleDia"'),
+    # Flange hold-down screw hole (PR7): ONE native Hole Wizard #4 clearance
+    # feature (through-all along Y) through the exposed -Z flange at (x 0,
+    # z SCREW_Z), drilled from the foot bottom (y=0) -- the fillister screw
+    # bolts the casting to the base. The foot bottom is a clean rectangle (the
+    # strap/dome/bore are all above it), so find_planar_face resolves cleanly.
+    screw_dia = blind_cut_dia_mm(SCREW_HOLE_SPEC)
+    wizard_holes(
+        adapter, SCREW_HOLE_SPEC,
+        [[0.0, 0.0, SCREW_Z]],
+        (0.0, -1.0, 0.0), "flange hold-down hole (#4 clearance)", name="ScrewHole",
     )
-    await ensure_fully_defined(adapter, "screw hole sketch")
-    check("exit_sketch screw hole", await adapter.exit_sketch())
-    name_last_feature(adapter, "ScrewHoleProfile")
-    drive_jobs += hole.apply(adapter, "ScrewHoleProfile")
-    check(
-        "cut screw hole",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=4.0 * FOOT_HEIGHT, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "ScrewHole")
-    v_hole = math.pi * (SCREW_HOLE_DIA / 2.0) ** 2 * FOOT_HEIGHT
+    v_hole = math.pi * (screw_dia / 2.0) ** 2 * FOOT_HEIGHT
     volume = await volume_check(adapter, "screw hole", volume - v_hole, 0.02 * v_hole)
     v_final = volume
 

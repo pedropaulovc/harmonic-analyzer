@@ -89,6 +89,7 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
 
 PART_NAME = "summing-lever"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
@@ -284,33 +285,24 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     # march covers the field and a reversal runs off the plate, and the
     # analytic volume gate below resolves a single missing hole -- a flip
     # cannot pass silently.
-    # Top-plane sketch Y = -world Z, so world HOLE_Z[-1] sits at sketch
-    # -HOLE_Z[-1]; the cut runs through BOTH sides of the mid-plane plate
-    # (both_directions covers the +-PLATE_T/2 spread, + margin). The seed
-    # circle emits centre-X, centre-Z, diameter (3 dims): X is the shared
-    # HOLE_X column (driven to "HoleX"), diameter to "HoleDia"; the seed's Z
-    # anchor has no global knob, so its slot stays None (auto-named).
-    holes = SketchDims()
-    check("create_sketch spring hole seed", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter, HOLE_X, -HOLE_Z[-1], HOLE_DIA / 2.0,
-        f"spring hole seed (station j={HOLE_COUNT - 1})",
-        dims=holes,
-        names=("HoleSeedX", None, "HoleSeedDia"),
-        drives=('"HoleX"', None, '"HoleDia"'),
-    )
-    await ensure_fully_defined(adapter, "spring-hole seed sketch")
-    check("exit_sketch spring hole seed", await adapter.exit_sketch())
-    name_last_feature(adapter, "SpringHolesProfile")
-    drive_jobs += holes.apply(adapter, "SpringHolesProfile")
-    check(
-        "cut spring hole seed",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=PLATE_T + 2.0, both_directions=True)
-        ),
-    )
-    seed_cut = name_last_feature(adapter, "SpringHoleSeed")
-    v_hole = math.pi * (HOLE_DIA / 2.0) ** 2 * PLATE_T
+    # The seed was a plain Ø2.0 cut; it is now a native Hole Wizard #47 number
+    # drill (Ø1.994) so the model carries the real drill
+    # (memory/fastener-policy-us-customary). Drilled +Y from the plate TOP face
+    # (normal +Y, at model y = +PLATE_T/2) through the 5.08 plate. The Top-plane
+    # sketch mapped world Z to -sketchY, so the seed's world Z is HOLE_Z[-1]. The
+    # feature keeps the name "SpringHoleSeed" so the linear pattern below still
+    # references it by name; wizard_holes returns that name for the pattern's
+    # feature list.
+    seed_dia = NUMBER_DRILL_MM["#47"]
+    seed_cut = wizard_holes(
+        adapter,
+        HoleSpec("drilled_number", "#47"),
+        [[HOLE_X, PLATE_T / 2.0, HOLE_Z[-1]]],
+        (0.0, 1.0, 0.0),
+        f"spring hole seed (station j={HOLE_COUNT - 1}, #47)",
+        name="SpringHoleSeed",
+    ).name
+    v_hole = math.pi * (seed_dia / 2.0) ** 2 * PLATE_T
     await volume_check(adapter, "spring hole seed", v_plate - v_hole, 0.02 * v_hole)
     check(
         "linear pattern spring holes",
@@ -676,7 +668,9 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "AnchorR", f"{ANCHOR_R}mm")
     await set_global(adapter, "AnchorBoreR", f"{ANCHOR_BORE_R}mm")
     await set_global(adapter, "AnchorH", f"{ANCHOR_H}mm")
-    await set_global(adapter, "HoleDia", f"{HOLE_DIA}mm")
+    # (The old HoleDia knob is gone: the spring holes are now a native Hole Wizard
+    # #47 seed + linear pattern, diameter from the drill standard. HoleX stays --
+    # MidRibReach references it -- and ChannelPitch drives the pattern spacing.)
     await set_global(adapter, "HoleX", f"{HOLE_X}mm")
     await set_global(adapter, "ChannelPitch", f"{CHANNEL_PITCH}mm")
     await set_global(adapter, "HexW", f"{HEX_W}mm")

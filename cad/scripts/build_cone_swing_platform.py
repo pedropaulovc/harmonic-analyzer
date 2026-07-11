@@ -61,6 +61,7 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
 
 PART_NAME = "cone-swing-platform"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel plate (p.18 dark wedge)
@@ -80,8 +81,10 @@ PLATE_LEN = 214.0  # north edge -> south edge along the cone axis: covers the
 # crank column now RIDES this plate (one casting with the big-end journal),
 # so the old crank-pedestal edge-gap constraint is gone with the pedestal
 NORTH_OVERHANG = 7.0  # pivot -> north edge (plate continues past the pivot)
-PIVOT_HOLE_DIA = 6.5  # clearance over the O6.35 pivot-screw shoulder: the
-# plate swings ON the screw (build_cone_pivot_screw)
+# Clearance over the O6.35 pivot-screw shoulder: the plate swings ON the screw
+# (build_cone_pivot_screw). 1/4 clearance CLOSE fit (Ø6.756, the wizard twin of
+# the old Ø6.5 artefact dim).
+PIVOT_HOLE_SPEC = HoleSpec("clearance", "1/4", fit="close")
 
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total (both_directions splits it half per
 # side of the sketch plane); must exceed 2x any extent crossed
@@ -211,7 +214,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "WestHalfS", f"{WEST_HALF_S}mm")
     await set_global(adapter, "PlateLen", f"{PLATE_LEN}mm")
     await set_global(adapter, "NorthOverhang", f"{NORTH_OVERHANG}mm")
-    await set_global(adapter, "PivotHoleDia", f"{PIVOT_HOLE_DIA}mm")
+    # (The old PivotHoleDia knob is gone: the pivot hole is now a native Hole
+    # Wizard 1/4 clearance feature whose diameter comes from the table.)
     await set_global(adapter, "SlotW", f"{SLOT_W}mm")
 
     drive_jobs: list[tuple[str, str]] = []
@@ -253,26 +257,18 @@ async def build(adapter) -> dict[str, str]:
         * PLATE_LEN * PLATE_T
     volume = await volume_check(adapter, "plate", v_plate, 0.005 * v_plate)
 
-    # Pivot screw clearance hole at the origin. Origin circle: diameter only.
-    hole = SketchDims()
-    check("create_sketch pivot hole", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter, 0.0, 0.0, PIVOT_HOLE_DIA / 2.0, "pivot hole", dims=hole,
-        names=("PivotCx", "PivotCz", "PivotHoleDiaDim"),
-        drives=(None, None, '"PivotHoleDia"'),
+    # Pivot screw clearance hole at the origin: ONE native Hole Wizard 1/4
+    # clearance (close fit) feature, through-all along Y, drilled from the
+    # plate bottom (y=0) while the plate is still a plain trapezoidal slab
+    # (before the lock notch/fillets explode the face count). The plate swings
+    # ON the Ø6.35 pivot-screw shoulder, so a close 1/4 clearance (Ø6.756).
+    pivot_dia = blind_cut_dia_mm(PIVOT_HOLE_SPEC)
+    wizard_holes(
+        adapter, PIVOT_HOLE_SPEC,
+        [[0.0, 0.0, 0.0]],
+        (0.0, -1.0, 0.0), "pivot screw hole (1/4 clearance)", name="PivotHole",
     )
-    await ensure_fully_defined(adapter, "pivot hole sketch")
-    check("exit_sketch pivot hole", await adapter.exit_sketch())
-    name_last_feature(adapter, "PivotHoleProfile")
-    drive_jobs += hole.apply(adapter, "PivotHoleProfile")
-    check(
-        "cut pivot hole",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "PivotHole")
-    v_hole = math.pi * (PIVOT_HOLE_DIA / 2.0) ** 2 * PLATE_T
+    v_hole = math.pi * (pivot_dia / 2.0) ** 2 * PLATE_T
     volume = await volume_check(adapter, "pivot hole", volume - v_hole, 0.01 * v_hole)
 
     # Lock notch: open-ended channel = rotated rectangle cut (engaged seat ->
