@@ -30,6 +30,7 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -105,18 +106,19 @@ _NOTES_LEFT = (
     (
         "2. TOLERANCES: LINEAR +/-0.25; ANGLES +/-0.5\n"
         "   DEG; HOLE CENTRES +/-0.10; REAMED BORES\n"
-        "   +0.05/-0.00; PIN PILOT AND DIMPLE +/-0.10."
+        "   (O9.525, O6.00) +0.05/-0.00; O5 PIN PILOT\n"
+        "   DIA AND DIMPLE DIA/DEPTH/LOCATION +/-0.10."
     ),
     "3. REMOVE BURRS AND BREAK SHARP EDGES 0.2 MAX.",
     (
-        "4. BORES AND DIMPLE ON ARM CENTRELINE. OVERALL\n"
-        "   LENGTH 84.0; END R8 TANGENT TO SIDES AND\n"
-        "   CONCENTRIC WITH SHAFT BORE."
+        "4. BORE AND DIMPLE CENTRES LIE ON THE ARM\n"
+        "   CENTRELINE. OVERALL LENGTH 84.0 REF; END R8\n"
+        "   TANGENT TO SIDES, CENTRED ON SHAFT BORE."
     ),
     (
         "5. SHAFT BORE (O9.525): DRILL AND REAM 3/8 IN,\n"
-        "   Ra 1.6; CLOSE SLIDING FIT ON THE NOMINAL\n"
-        "   3/8 IN CRANKSHAFT."
+        "   Ra 1.6; CLOSE SLIDING FIT ON THE CRANKSHAFT\n"
+        "   (SHAFT IS 3/8 IN DRILL ROD, +0.00/-0.02)."
     ),
 )
 _NOTES_RIGHT = (
@@ -137,7 +139,10 @@ _NOTES_RIGHT = (
         "8. THE TWO 8 THICK BROAD FACES: PARALLEL\n"
         "   WITHIN 0.10."
     ),
-    "9. FINISH: BRIGHT MACHINED Ra 3.2; OIL.",
+    (
+        "9. FINISH: BRIGHT MACHINED Ra 3.2; OIL.\n"
+        "   ALL Ra VALUES IN MICROMETRES."
+    ),
 )
 
 
@@ -176,12 +181,17 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER)
-    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER)
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER)
+    # Explicit per-view scale: a view placed without one can silently
+    # auto-scale, which shifts every coordinate-based pick on it.
+    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
+    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
+    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    for view in (front, top, right, iso):
+    for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
+    # The top view exists to communicate the cross-drilling: greyed hidden
+    # lines show the pin pilot meeting the shaft bore.
+    set_hidden_lines_visible(adapter, top)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
