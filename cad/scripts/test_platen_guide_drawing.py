@@ -95,11 +95,15 @@ def test_required_drawing_paths() -> None:
 
 
 def test_drawing_uses_native_hole_table_and_sheet_scale() -> None:
+    import _drawing_common
+
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    common_source = Path(_drawing_common.__file__).read_text(encoding="utf-8")
     standards_source = Path(create_drawing_standards.__file__).read_text(
         encoding="utf-8"
     )
-    assert "InsertHoleTable3" in drawing_source
+    assert "insert_hole_table" in drawing_source
+    assert "InsertHoleTable3" in common_source
     assert "draw_note_table" not in drawing_source
     assert "add_hole_group_tags" not in drawing_source
     assert "scale=(3, 1)" not in drawing_source
