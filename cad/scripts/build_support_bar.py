@@ -16,8 +16,8 @@ Holes (all along local Z, the machine front-back axis):
   screws of the p.62/63 top/back views, flanking the stud at machine -12).
 
 The bracket holes make the bar x-ASYMMETRIC, so it is authored MACHINE-
-handed and placed with ``mirror=False`` (a bbox-x mirror would flip the
-holes to +2/+22, off the stud line).
+handed and placed on its exact machine transform (an x-mirrored insert
+would flip the holes to +2/+22, off the stud line).
 
 Layout: bar axis along X, origin at the bar centre; height along Y,
 depth along Z (front face local z -4.5). Dimensions: memory/
@@ -62,7 +62,7 @@ COLUMN_X = 197.0  # frame column line (frame assembly)
 CLAMP_SCREW_DX = 17.5  # clamp screws flank each column
 CLAMP_HOLE_DIA = 4.4  # O4 clamp-screw shanks pass through
 BRACKET_HOLE_X = (-22.0, -2.0)  # bracket screw line, MACHINE-handed (stud
-# at machine -12 +- 10; the bar is placed mirror=False, see docstring)
+# at machine -12 +- 10; the bar is placed machine-handed, see docstring)
 BRACKET_HOLE_DIA = 4.0  # O4 bracket screws thread in
 
 CLAMP_HOLE_X = tuple(

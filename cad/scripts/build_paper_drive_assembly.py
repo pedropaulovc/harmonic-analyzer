@@ -13,14 +13,14 @@ hanging platen (guides + locks), and the REAL six-gear power train:
       --(LOCK: stud stack)--> 12T DP30 feed pinion
       --(RACK-PINION mate, pi*10.16/rev)--> rack --(LOCK)--> platen
 
-Operational kinematics (default `free` build): the crank-end T12 sprocket spin
-is the ONE free operational DOF -- drag it and the whole feed train follows at
-1.596 mm of paper per crank revolution (T12/T24 mounted). Every stage is a real
-SolidWorks mate on real, geometrically meshed gears (the old NET rack-pinion
-shortcut across the fictitious rest gap is gone -- the latch arm pivots ON the
-stud, so the 12T:120T mesh is permanent and the old Appendix C #8 riddle
-dissolves). `locked` authors the crank-spin park engaged for a 0-DOF snapshot.
-Mode: cad/config/machine/build_lock.yaml (``paper_drive``).
+Operational kinematics: the crank-end T12 sprocket spin is the ONE free
+operational DOF -- drag it and the whole feed train follows at 1.596 mm of
+paper per crank revolution (T12/T24 mounted). Every stage is a real SolidWorks
+mate on real, geometrically meshed gears (the old NET rack-pinion shortcut
+across the fictitious rest gap is gone -- the latch arm pivots ON the stud, so
+the 12T:120T mesh is permanent and the old Appendix C #8 riddle dissolves).
+The crank-spin drive spec is recorded into the DOF manifest for the transient
+verify:kinematics replay, never authored.
 
 * ONE support bar (22 x 9 x 452, book p.62 "the bar that the platen rides on"),
   front face on the platen back, clamped to each column by a FRONT + BACK
@@ -62,7 +62,6 @@ from __future__ import annotations
 import math
 import sys
 
-import _config
 from _chain import (
     CENTRELINE_LEN,
     CRANK_CENTRE as CHAIN_CRANK_CENTRE,
@@ -84,7 +83,6 @@ from _common import (
 )
 from _assembly import (
     angle_driver,
-    assert_expected_free_dof,
     assert_free_dof_necessity,
     check_no_interference,
     component_names,
@@ -92,16 +90,15 @@ from _assembly import (
     component_transform,
     distance_driver,
     gear_mate,
-    is_locked_build,
     lock_mate,
     named_ref,
     place_component,
     rack_pinion_mate,
     reledger_to_solved,
     remap_front_to_machine_front,
+    reset_dof_manifest,
     save_assembly_and_images,
-    set_park_defer,
-    write_park_specs,
+    write_dof_manifest,
 )
 from _transforms import (  # noqa: E402
     IDENTITY,
@@ -109,26 +106,19 @@ from _transforms import (  # noqa: E402
     ROT_X_POS90,
     ROT_Y_POS90,
     rot_z_rows,
+    rows_from_euler,
 )
 
 ASM_NAME = "paper-drive"
 
-# Build mode (cad/config/machine/build_lock.yaml). `free` (default) leaves the
-# crank spin a FREE operational DOF (drag the crank sprocket and the whole
-# geared feed train follows); `locked` authors the spin-park engaged for a
-# byte-reproducible 0-DOF snapshot. Read as a STRING-LITERAL so the accessor
-# tokenises to machine/build_lock.yaml in the doit/cache digest (flipping the
-# mode rebuilds ONLY paper-drive). `is_locked_build` rejects any value other
-# than `free`/`locked`.
-LOCK = is_locked_build(_config.machine("build_lock", "paper_drive"))
-
 ROT_Y_180 = [[-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -1.0]]
+ROT_X_180 = [[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]]
 
 # --- machine anchors ---------------------------------------------------------
 from build_support_bar import (  # noqa: E402
     BAR_DEPTH,
     BAR_HEIGHT,
-    BRACKET_HOLE_X as BAR_BRACKET_HOLE_X,  # MACHINE-handed (bar mirror=False)
+    BRACKET_HOLE_X as BAR_BRACKET_HOLE_X,  # MACHINE-handed (machine -X holes)
     CLAMP_HOLE_X,
 )
 from build_column_clamp_front import DEPTH as ARC_FRONT_DEPTH  # noqa: E402
@@ -217,12 +207,14 @@ FEED_PD = FEED_TEETH / FEED_DP * IN  # 10.16 -- meshes the DP30 rack
 # rack crests' reach at nominal centres -- extend like the drive-train's
 # checker-arbitrated mesh slacks (rb - (PD/2 - addendum) = 0.685, +0.115).
 RACK_MESH_EXT = 0.8
-STUD_XY = (12.0, RACK_PITCH_Y - FEED_PD / 2.0 - RACK_MESH_EXT)  # (12, 297.9667)
-LATCH_ANGLE_DEG = -18.0  # knob swung low toward the crank (ch30 p002)
+STUD_XY = (-12.0, RACK_PITCH_Y - FEED_PD / 2.0 - RACK_MESH_EXT)  # machine (-12, 297.9667)
+LATCH_ANGLE_DEG = -162.0  # knob swung low toward the crank at machine -X (ch30
+# p002); the machine reflection of the pre-mirror -18 deg (theta -> 180 - theta,
+# x -> -x), so the arm reaches west/-X and down from the stud.
 KNOB_SHAFT_XY = (
     STUD_XY[0] + LATCH_C2C * math.cos(math.radians(LATCH_ANGLE_DEG)),
     STUD_XY[1] + LATCH_C2C * math.sin(math.radians(LATCH_ANGLE_DEG)),
-)  # (54.575, 284.133)
+)  # machine (-54.575, 284.133)
 
 # z stack on the stud (front -> back): collar | disc | feed pinion | latch arm
 # | bracket. The disc window clears the platen furniture: the guide-screw
@@ -249,16 +241,19 @@ REMOVABLE_TIP_R = {"T12": 14.0, "T18": 20.0, "T24": 26.0}  # m2: OD (T+2)*2
 # multiple of its 3-deg pitch, so a disc TOOTH points along the c2c line);
 # the third gear is spun so a GAP faces back along that line.
 THIRD_GAMMA = 360.0 / THIRD_TEETH  # 30
-_MESH_AZ = 180.0 + LATCH_ANGLE_DEG  # 162: from the knob axis toward the stud
+_MESH_AZ = 180.0 + LATCH_ANGLE_DEG  # 18: from the knob axis toward the stud
 THIRD_PHASE_DEG = (_MESH_AZ - THIRD_GAMMA / 2.0) % THIRD_GAMMA  # 27
 if THIRD_PHASE_DEG > THIRD_GAMMA / 2.0:
     THIRD_PHASE_DEG -= THIRD_GAMMA  # -3: nearest representative
 # The feed pinion keeps identity spin: its mesh line points straight up
 # (+90 deg is a tooth azimuth for 12T -- 90 = 3 * 30), and the rack is
 # phased so a GAP centre sits exactly on the stud's x (see RACK_X0).
-_k = math.floor((PLATE_X0 + PLATE_WIDTH - STUD_XY[0] - RACK_FIRST_GAP_X) / RACK_PITCH)
-RACK_X0 = STUD_XY[0] + RACK_FIRST_GAP_X + _k * RACK_PITCH  # 148.985: gap on the stud,
-# right edge ~1 west of the platen's
+# Machine-handed: the rack is teeth-down (Rx180), its tooth pattern marching +X
+# from RACK_X0, so a GAP sits over the machine stud (-X) near the platen's left
+# (-X) edge -- the reflection of the pre-mirror right-edge phasing.
+_k = math.floor((STUD_XY[0] - RACK_FIRST_GAP_X - PLATE_X0) / RACK_PITCH)
+RACK_X0 = STUD_XY[0] - RACK_FIRST_GAP_X - _k * RACK_PITCH  # -148.985: gap on the
+# stud, left edge ~1 east of the platen's
 
 # Net platen feed per CRANK revolution through the real train (T12/T24
 # mounted): 0.5 chain * (12/120) gear * pi*PD rack = 1.596 mm. Every stage is
@@ -272,7 +267,7 @@ NET_RACK_TRAVEL_PER_CRANK_REV = (
 # Rx(-90). A spare for this subsystem, so it rides here as a flat sibling of
 # the mounted T24; placing it loose at the TOP level would clash on leaf name
 # with the T12/T24 instances nested in drive-train / this sub.
-SPARE_GEAR_POS = (-160.0, 53.2, -15.0)
+SPARE_GEAR_POS = (160.0, 53.2, -15.0)  # machine +X (west) of the platen
 
 # --- fasteners ----------------------------------------------------------------
 # Platen-clip screws: through the clips' O3 end holes into the platen's edge
@@ -308,8 +303,9 @@ def _assert_rack_mesh() -> None:
     if abs(ext - RACK_MESH_EXT) > 1e-9:
         raise RuntimeError(f"rack mesh extension {ext:.3f} != {RACK_MESH_EXT}")
     # A rack GAP centre must sit exactly over the stud (the pinion's +90-deg
-    # tooth): gap centres sit at RACK_X0 - FIRST_GAP_X - k*PITCH (Rz180).
-    phase = math.remainder(RACK_X0 - RACK_FIRST_GAP_X - STUD_XY[0], RACK_PITCH)
+    # tooth): teeth-down Rx180, gap centres march +X at RACK_X0 + FIRST_GAP_X
+    # + k*PITCH (machine frame).
+    phase = math.remainder(STUD_XY[0] - RACK_X0 - RACK_FIRST_GAP_X, RACK_PITCH)
     if abs(phase) > 1e-9:
         raise RuntimeError(f"rack gap phase {phase:.4f} != 0 over the stud")
     if FEED_TEETH % 4:
@@ -363,12 +359,12 @@ def _assert_gear_mesh() -> None:
     slot = BAR_BACK_Z - RACK_BACK_Z
     if LATCH_THICK > slot - 0.3:
         raise RuntimeError(f"latch arm {LATCH_THICK} too thick for the {slot:.1f} slot")
-    # The bar's MACHINE-handed bracket sockets must land under the (mirrored)
-    # bracket screw line: pre-mirror stud +-dx reflects to -(STUD_X +- dx).
-    expected = {round(-(STUD_XY[0] + dx), 6) for dx in (-BRACKET_SCREW_DX, BRACKET_SCREW_DX)}
+    # The bar's MACHINE-handed bracket sockets must land under the bracket-screw
+    # line: both are the machine frame now, so stud +- dx matches directly.
+    expected = {round(STUD_XY[0] + dx, 6) for dx in (-BRACKET_SCREW_DX, BRACKET_SCREW_DX)}
     if expected != {round(x, 6) for x in BAR_BRACKET_HOLE_X}:
         raise RuntimeError(
-            f"support-bar bracket holes {BAR_BRACKET_HOLE_X} != mirrored screw"
+            f"support-bar bracket holes {BAR_BRACKET_HOLE_X} != screw"
             f" line {sorted(expected)}"
         )
     log(f"gear mesh 12:120 DP38: c2c {LATCH_C2C} (ext {ext:.2f}), third gear"
@@ -403,20 +399,21 @@ def _assert_knob_shaft_clearance() -> None:
 
 
 def _assert_chain_layout() -> None:
-    """_chain.py derives the loop from OUR anchors -- pin them together."""
-    knob_err = max(
-        abs(a - b) for a, b in zip(CHAIN_KNOB_CENTRE, KNOB_SHAFT_XY)
-    )
+    """_chain.py holds the loop in the PRE-MIRROR frame (its KNOB/CRANK centres
+    sit at machine +X); pin it to the reflection of OUR machine anchors so the
+    mirror_x=True loop lands on the machine (-X) chain wheels."""
+    knob_pre = (-KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1])
+    knob_err = max(abs(a - b) for a, b in zip(CHAIN_KNOB_CENTRE, knob_pre))
     if knob_err > 1e-3:
         raise RuntimeError(
-            f"_chain KNOB_CENTRE {CHAIN_KNOB_CENTRE} != KNOB_SHAFT_XY"
-            f" ({KNOB_SHAFT_XY[0]:.4f}, {KNOB_SHAFT_XY[1]:.4f})"
+            f"_chain KNOB_CENTRE {CHAIN_KNOB_CENTRE} != -KNOB_SHAFT_XY"
+            f" ({knob_pre[0]:.4f}, {knob_pre[1]:.4f})"
         )
     from build_drive_train_assembly import X_CRANK, Y_CRANK
-    if CHAIN_CRANK_CENTRE != (X_CRANK, Y_CRANK):
+    if CHAIN_CRANK_CENTRE != (-X_CRANK, Y_CRANK):
         raise RuntimeError(
-            f"_chain CRANK_CENTRE {CHAIN_CRANK_CENTRE} != drive-train crank"
-            f" ({X_CRANK}, {Y_CRANK})"
+            f"_chain CRANK_CENTRE {CHAIN_CRANK_CENTRE} != -drive-train crank"
+            f" ({-X_CRANK}, {Y_CRANK})"
         )
     if (TIP_R_T24, TIP_R_T12) != (REMOVABLE_TIP_R["T24"], REMOVABLE_TIP_R["T12"]):
         raise RuntimeError("_chain tip radii diverged from REMOVABLE_TIP_R")
@@ -430,20 +427,22 @@ def _assert_chain_layout() -> None:
 async def _place_chain_seed(adapter, part: str, station: int) -> str:
     """Seat ONE chain-pattern seed link at path ``station``, oriented along the
     forward CHORD (pin0->pin1) so both pin axes sit ~on the loop -- the connected
-    -linkage chain pattern then fills the rest of the loop. Authored directly in
-    post-mirror machine coordinates (``mirror_x=True``); the achiral link's
-    local-z symmetry makes that a pure-Z rotation, keeping the plates flat in the
-    chain plane. Returns the instance name."""
+    -linkage chain pattern then fills the rest of the loop. ``_chain`` holds the
+    loop in the PRE-MIRROR frame (anchor ``CHAIN_KNOB_CENTRE`` at machine +X), so
+    ``mirror_x=True`` reflects each point to the machine (-X) chain plane -- the
+    exact machine pose place_component now inserts directly (no mirror layer). The
+    achiral link's local-z symmetry keeps that a pure-Z rotation, so the plates
+    stay flat in the chain plane. Returns the instance name."""
     x0, y0, _ = loop_point_tangent(
-        station * LINK_PITCH, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1], mirror_x=True
+        station * LINK_PITCH, dx=CHAIN_KNOB_CENTRE[0], dy=CHAIN_KNOB_CENTRE[1], mirror_x=True
     )
     x1, y1, _ = loop_point_tangent(
-        (station + 1) * LINK_PITCH, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1], mirror_x=True
+        (station + 1) * LINK_PITCH, dx=CHAIN_KNOB_CENTRE[0], dy=CHAIN_KNOB_CENTRE[1], mirror_x=True
     )
     ang = math.degrees(math.atan2(y1 - y0, x1 - x0))
     return await place_component(
         adapter, part, [x0, y0, CHAIN_MID_Z], [0.0, 0.0, ang], rot_z_rows(ang),
-        mirror=False, ground=True, label=f"{part} seed @ station {station}",
+        ground=True, label=f"{part} seed @ station {station}",
     )
 
 
@@ -494,7 +493,7 @@ async def _insert_roller_chain(adapter) -> None:
     for i in range(n_samples):
         s = i * CENTRELINE_LEN / n_samples
         x, y, _ = loop_point_tangent(
-            s, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1], mirror_x=True)
+            s, dx=CHAIN_KNOB_CENTRE[0], dy=CHAIN_KNOB_CENTRE[1], mirror_x=True)
         pts.append({"x": x, "y": y})
     pts.append(pts[0])  # close the loop
     check("chain path spline", await adapter.add_spline(pts))
@@ -570,7 +569,7 @@ async def _insert_roller_chain(adapter) -> None:
         if abs(z - CHAIN_MID_Z) > 0.5:
             raise RuntimeError(f"{name}: link z {z:.3f} off the chain plane {CHAIN_MID_Z}")
         dist = centreline_distance(
-            x, y, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1], mirror_x=True)
+            x, y, dx=CHAIN_KNOB_CENTRE[0], dy=CHAIN_KNOB_CENTRE[1], mirror_x=True)
         worst = max(worst, dist)
     if worst > 2.0:
         raise RuntimeError(f"chain links sit up to {worst:.2f} mm off the loop centreline")
@@ -605,30 +604,32 @@ async def build(adapter) -> dict[str, str]:
     _assert_knob_shaft_clearance()
     _assert_chain_layout()
 
-    # `free` (default) DEFERS the freed crank-spin park driver (records, does not
-    # author); `locked` authors it engaged. Set before any *_driver(free_dof_key=).
-    set_park_defer(not LOCK)
+    # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
+    # call: each freed DOF is recorded (never authored) and persisted below.
+    reset_dof_manifest()
     check("create_assembly", await adapter.create_assembly())
 
     # --- support bar + two-piece clamps ---------------------------------------
     # The bar is FIRST so the auto-fixed seed is structure, not the mated platen.
-    # MACHINE-handed (mirror=False): its bracket-screw holes flank the stud at
-    # machine -12, which a bbox mirror would flip (see build_support_bar.py).
+    # Symmetric about machine x=0; its bracket-screw holes flank the stud at
+    # machine -12 (see build_support_bar.py).
     await place_component(adapter, "support-bar", [0.0, BAR_CY, BAR_Z],
-                          [0.0, 0.0, 0.0], IDENTITY, mirror=False,
+                          [0.0, 0.0, 0.0], IDENTITY,
                           label="support-bar (the platen bar)")
-    for sx in (-1.0, 1.0):
+    # Machine columns at +-197 (west first, to match the pose ledger's -1/-2).
+    for sx in (1.0, -1.0):
         # Ry(+90): the arcs' local +X (their depth axis) faces machine -Z.
         for arc in ("column-clamp-front", "column-clamp-back"):
             await place_component(adapter, arc, [sx * COLUMN_X, BAR_CY, COLUMN_Z],
                                   [0.0, 90.0, 0.0], ROT_Y_POS90,
                                   label=f"{arc} (x{sx * COLUMN_X:+.0f})")
     # Clamp screws: heads on the bar's FRONT face flanking each column (ch30
-    # p002), shanks through bar + front arc, threading into the back arc.
+    # p002), shanks through bar + front arc, threading into the back arc. The
+    # support-bar hole list is pre-mirror-ordered; negate to the machine hole.
     for x in CLAMP_HOLE_X:
-        await place_component(adapter, "clamp-screw", [x, BAR_CY, BAR_FRONT_Z],
+        await place_component(adapter, "clamp-screw", [-x, BAR_CY, BAR_FRONT_Z],
                               [0.0, 0.0, 0.0], IDENTITY,
-                              label=f"clamp-screw (x{x:+.1f})")
+                              label=f"clamp-screw (x{-x:+.1f})")
 
     # --- platen group (hangs on the bar) ---------------------------------------
     # The platen runs as a prismatic slider along X (the paper feed): its local
@@ -657,10 +658,11 @@ async def build(adapter) -> dict[str, str]:
                         named_ref(f"Front Plane@{platen}", "PLANE"),
                         label=f"{label} locked to platen")
 
-    # Rack: Rz(180) -> teeth point down, crests 2 below the platen edge.
+    # Rack: Rx(180) -> teeth point down, crests 2 below the platen edge (the
+    # machine reflection of the pre-mirror Rz180; z origin on the rack back).
     rack = await place_component(adapter, "platen-rack",
-                                 [RACK_X0, RACK_Y0, BAR_FRONT_Z],
-                                 [0.0, 0.0, 180.0], rot_z_rows(180.0), ground=False)
+                                 [RACK_X0, RACK_Y0, RACK_BACK_Z],
+                                 [180.0, 0.0, 0.0], ROT_X_180, ground=False)
     await _lock_to_platen(rack, "platen-rack")
     # Guide rails on the platen back, above/below the bar band -- the platen
     # HANGS by the top rail's underside on the bar's top edge.
@@ -678,66 +680,75 @@ async def build(adapter) -> dict[str, str]:
     # (identity, 7 overlap -- the 19-tall plate is sized by this station); the
     # two rows clear each other by 1.0 in y.
     for x_c in LOCK_STATION_X:
+        # Machine: the station is measured from the platen's +X edge (the mirror
+        # of the pre-mirror left-edge station PLATE_X0 + x_c).
+        station = PLATE_X0 + PLATE_WIDTH - x_c
         top = await place_component(
             adapter, "guide-lock",
-            [PLATE_X0 + x_c + LOCK_WIDTH / 2.0, GUIDE_Y[1] + GUIDE_HEIGHT, LOCK_Z0],
+            [station + LOCK_WIDTH / 2.0, GUIDE_Y[1] + GUIDE_HEIGHT, LOCK_Z0],
             [0.0, 0.0, 180.0], rot_z_rows(180.0), ground=False,
             label=f"guide-lock (top x{x_c:.0f})")
         await _lock_to_platen(top, f"guide-lock top x{x_c:.0f}")
         bot = await place_component(
             adapter, "guide-lock",
-            [PLATE_X0 + x_c - LOCK_WIDTH / 2.0, GUIDE_Y[0], LOCK_Z0],
+            [station - LOCK_WIDTH / 2.0, GUIDE_Y[0], LOCK_Z0],
             [0.0, 0.0, 0.0], IDENTITY, ground=False,
             label=f"guide-lock (bottom x{x_c:.0f})")
         await _lock_to_platen(bot, f"guide-lock bottom x{x_c:.0f}")
     # Paper clips: bright brass strips hugging the platen's left/right edges
-    # from the top edge down (ch22 front photo). Rz(+90) stands the +X-authored
-    # strip vertical; each lands 1 inside its edge with its holes on the
-    # platen's edge sockets.
+    # from the top edge down (ch22 front photo). Rz(-90) stands the +X-authored
+    # strip vertical (the machine reflection of the pre-mirror Rz+90); each lands
+    # 1 inside its edge with its holes on the platen's edge sockets.
     for sx in (PLATEN_SOCKET_XY[0][0], PLATEN_SOCKET_XY[2][0]):
-        clip_x = PLATE_X0 + sx + CLIP_WIDTH / 2.0  # hole line -> strip east edge
+        # pre-mirror hole line -> strip edge, negated to the machine (-X) frame.
+        clip_x = -(PLATE_X0 + sx + CLIP_WIDTH / 2.0)
+        # Rz(-90) hangs the strip from its top-edge origin (the pre-mirror Rz+90
+        # rose from the bottom; the reflection swaps the origin end).
         clip = await place_component(
             adapter, "platen-clip",
-            [clip_x, PLATE_Y0 + PLATE_HEIGHT - CLIP_LENGTH, PLATE_FRONT_Z - CLIP_THICKNESS],
-            [0.0, 0.0, 90.0], rot_z_rows(90.0), ground=False,
+            [clip_x, PLATE_Y0 + PLATE_HEIGHT, PLATE_FRONT_Z - CLIP_THICKNESS],
+            [0.0, 0.0, -90.0], rot_z_rows(-90.0), ground=False,
             label=f"platen-clip (x{clip_x:+.0f})")
         await _lock_to_platen(clip, f"platen-clip x{clip_x:+.0f}")
-    # Recording paper on the platen front face: 0.5 proud, clear of the edge
-    # clips, 6 top/bottom margin.
+    # Recording paper over the platen front face: front 0.5 proud, clear of the
+    # edge clips, 6 top/bottom margin. The 0.25-thick sheet leaves 0.25 air
+    # behind it (build_platen_paper) so no face lands coplanar on the platen.
     paper = await place_component(adapter, "platen-paper",
                                   [PLATE_X0 + 20.25, PLATE_Y0 + 6.0, PLATE_FRONT_Z - 0.5],
                                   [0.0, 0.0, 0.0], IDENTITY, ground=False)
     await _lock_to_platen(paper, "platen-paper")
 
     # --- platen-riding fasteners (ALL lock-mated -- rework E5) -----------------
+    # The socket lists are pre-mirror-ordered; negate x to the machine frame.
     for x, y in CLIP_SCREW_XY:
         screw = await place_component(
-            adapter, "fillister-screw", [x, y, PLATE_FRONT_Z - CLIP_THICKNESS],
+            adapter, "fillister-screw", [-x, y, PLATE_FRONT_Z - CLIP_THICKNESS],
             [0.0, 0.0, 0.0], IDENTITY,
-            ground=False, label=f"fillister-screw (clip x{x:+.0f} y{y:.0f})")
-        await _lock_to_platen(screw, f"clip screw x{x:+.0f} y{y:.0f}")
+            ground=False, label=f"fillister-screw (clip x{-x:+.0f} y{y:.0f})")
+        await _lock_to_platen(screw, f"clip screw x{-x:+.0f} y{y:.0f}")
     for x, y in GUIDE_SCREW_XY:
         # Seated on the counterbore floor: crown 0.2 sub-flush so the paper
         # lies flat; shank threads 2.4 into the rail's blind hole.
         screw = await place_component(
-            adapter, "fillister-screw", [x, y, PLATE_FRONT_Z + PLATEN_CBORE_DEPTH],
+            adapter, "fillister-screw", [-x, y, PLATE_FRONT_Z + PLATEN_CBORE_DEPTH],
             [0.0, 0.0, 0.0], IDENTITY,
-            ground=False, label=f"fillister-screw (guide x{x:+.0f} y{y:.0f})")
-        await _lock_to_platen(screw, f"guide screw x{x:+.0f} y{y:.0f}")
+            ground=False, label=f"fillister-screw (guide x{-x:+.0f} y{y:.0f})")
+        await _lock_to_platen(screw, f"guide screw x{-x:+.0f} y{y:.0f}")
     for x, y in LOCK_SCREW_XY:
         # Ry(180): shank points machine -Z, head on the lock plate's back.
         screw = await place_component(
-            adapter, "fillister-screw", [x, y, LOCK_Z0 + 2.0],
+            adapter, "fillister-screw", [-x, y, LOCK_Z0 + 2.0],
             [0.0, 180.0, 0.0], ROT_Y_180,
-            ground=False, label=f"fillister-screw (lock x{x:+.0f} y{y:.0f})")
-        await _lock_to_platen(screw, f"lock screw x{x:+.0f} y{y:.0f}")
+            ground=False, label=f"fillister-screw (lock x{-x:+.0f} y{y:.0f})")
+        await _lock_to_platen(screw, f"lock screw x{-x:+.0f} y{y:.0f}")
 
     # --- transgear group (the real train) --------------------------------------
     # Bracket on the bar's back face, stud bore below the bar.
     await place_component(adapter, "transgear-bracket",
                           [STUD_XY[0], STUD_XY[1], BRACKET_Z0],
                           [0.0, 0.0, 0.0], IDENTITY)
-    for dx in (-BRACKET_SCREW_DX, BRACKET_SCREW_DX):
+    # +dx first (screw at machine -2), to match the pose ledger's -1/-2.
+    for dx in (BRACKET_SCREW_DX, -BRACKET_SCREW_DX):
         # Ry(180): shank forward into the bar, head on the bracket back.
         await place_component(adapter, "bracket-screw",
                               [STUD_XY[0] + dx, BAR_CY, STUB_Z0],
@@ -748,9 +759,12 @@ async def build(adapter) -> dict[str, str]:
     await place_component(adapter, "transgear-stub", [STUD_XY[0], STUD_XY[1], STUB_Z0],
                           [-90.0, 0.0, 0.0], ROT_X_NEG90)
     # Latch arm in the slot between the rack's back face and the bar front,
-    # swung to the knob at LATCH_ANGLE (thickness centred about ARM_Z).
+    # swung to the knob at LATCH_ANGLE (thickness centred about ARM_Z). The 'z'-
+    # plane machine reflection flips the flat arm front-to-back, so the machine
+    # rows are Rx(180) . Rz(LATCH_ANGLE) -- euler [180, 0, LATCH_ANGLE_DEG].
     await place_component(adapter, "transgear-latch", [STUD_XY[0], STUD_XY[1], ARM_Z],
-                          [0.0, 0.0, LATCH_ANGLE_DEG], rot_z_rows(LATCH_ANGLE_DEG))
+                          [180.0, 0.0, LATCH_ANGLE_DEG],
+                          rows_from_euler([180.0, 0.0, LATCH_ANGLE_DEG]))
     # 120T DP38 reducer disc on the stud's O5 seat, FREE (revolute below) --
     # gear-mated to the third gear. Identity spin: a tooth points along the
     # c2c line (LATCH_ANGLE is a multiple of its 3-deg pitch).
@@ -803,13 +817,13 @@ async def build(adapter) -> dict[str, str]:
                     label="knob cluster: third gear locked to T24")
     # Crank-end T12 removable = the crank-shaft chain wheel, brought over from
     # drive-train so the chain seats on BOTH sprockets locally. Placed at the
-    # PRE-mirror crank centre (_chain CRANK_CENTRE == drive-train X_CRANK,Y_CRANK,
-    # the same anchor _assert_chain_layout pins) and reflected by the default
-    # mirror path. Coplanar with the T24 on the -155 chain plane; a spur gear is
-    # symmetric so identity rotation. FREE to spin -- this is the crank input,
-    # the single operational DOF.
+    # MACHINE crank centre = -CHAIN_CRANK_CENTRE (the pre-mirror _chain anchor,
+    # == -drive-train (X_CRANK, Y_CRANK); _assert_chain_layout pins this).
+    # Coplanar with the T24 on the -155 chain plane; a spur gear is symmetric so
+    # identity rotation. FREE to spin -- this is the crank input, the single
+    # operational DOF.
     t12 = await place_component(adapter, "transgear-removable",
-                                [CHAIN_CRANK_CENTRE[0], CHAIN_CRANK_CENTRE[1], REMOVABLE_Z0],
+                                [-CHAIN_CRANK_CENTRE[0], CHAIN_CRANK_CENTRE[1], REMOVABLE_Z0],
                                 [0.0, 0.0, 0.0], IDENTITY, configuration="T12",
                                 ground=False,
                                 label="transgear-removable (crank chain wheel T12)")
@@ -871,12 +885,11 @@ async def build(adapter) -> dict[str, str]:
         rack_travel_per_revolution=math.pi * FEED_PD,
         flip=True,
         label="platen feed (feed pinion on the rack)")
-    # (4) The crank spin is the FREED operational-DOF park driver. Deferred in
-    # the default `free` build (recorded, not authored) -> T12 spins free and
-    # drives the whole gear+rack train; authored + PARK_crank_spin in a
-    # `locked` build. A spur sprocket is symmetric so the spin pose is
-    # cosmetic; pin the local Right-plane dihedral (read live) like
-    # drive-train's crank_angle.
+    # (4) The crank spin is a FREED operational DOF: its drive spec is
+    # recorded into the DOF manifest, never authored -- T12 spins free and
+    # drives the whole gear+rack train. A spur sprocket is symmetric so the
+    # spin pose is cosmetic; pin the local Right-plane dihedral (read live)
+    # like drive-train's crank_angle.
     t12_o = component_origin(adapter, t12)
     a_t12 = component_transform(adapter, t12)
     crank_dihedral = math.degrees(math.acos(max(-1.0, min(1.0, a_t12[0]))))
@@ -893,22 +906,16 @@ async def build(adapter) -> dict[str, str]:
                           [-90.0, 0.0, 0.0], ROT_X_NEG90, configuration="T18",
                           label="transgear-removable (spare T18)")
 
-    # Certify the AS-BUILT model. `free` -> necessity only (the crank spin is
-    # genuinely free; the exact-count 0-DOF closure runs in the release preflight,
-    # where the recorded spec is replayed). `locked` -> strict 0-DOF. All other
-    # checks run on the as-built model unchanged.
-    if LOCK:
-        await assert_expected_free_dof(adapter, 0)
-    else:
-        # ONE freed operational DOF: the crank spin (the deferred PARK driver
-        # above), which drives the chain-coupled knob cluster, the gear-mated
-        # disc + feed pinion, and the rack-fed platen. Target the SPECIFIC T12
-        # crank instance (not the shared ``transgear-removable`` stem: the T24
-        # knob + T18 spare share it, so a stem check would pass even if T24
-        # were free and the crank T12 pinned -- codex #189).
-        assert_free_dof_necessity(
-            adapter, 1, required_instances=(t12,))
-        write_park_specs(ASM_NAME)
+    # Certify the AS-BUILT model. ONE freed operational DOF: the crank spin
+    # (its drive spec recorded above, never authored), which drives the
+    # chain-coupled knob cluster, the gear-mated disc + feed pinion, and the
+    # rack-fed platen. Target the SPECIFIC T12 crank instance (not the shared
+    # ``transgear-removable`` stem: the T24 knob + T18 spare share it, so a
+    # stem check would pass even if T24 were free and the crank T12 pinned --
+    # codex #189).
+    assert_free_dof_necessity(
+        adapter, 1, required_instances=(t12,))
+    write_dof_manifest(ASM_NAME)
     check_no_interference(adapter)
     # Machine coords put the output/paper side at -Z, so SolidWorks' native Front
     # renders the machine BACK (chain and transgear cluster mirrored). Re-base the

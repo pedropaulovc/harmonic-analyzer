@@ -14,7 +14,7 @@ strap/bar overlap at the bar's free end (walls >= 0.4, low).
 Layout: axis along Z, AUTHORED IN FINAL ORIENTATION (pointing -Z =
 machine south, into the bar's back face): under-head face on the Front
 plane at z = 0, hex head 0..+2.5, shank -11.5..0 (bar 9 + strap 2.5).
-Symmetric about local x = 0 (MIRROR_PLANE ("x", 0.0)).
+Symmetric about local x = 0.
 
 Run (SolidWorks already open)::
 

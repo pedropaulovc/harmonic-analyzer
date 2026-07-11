@@ -36,14 +36,14 @@ Seven features (the six .cs features + the hex knife edge):
 7. Middle rib          -- Front-plane elongated diamond spanning the lever, two
    tangent lines per side meeting two coradial arcs that wrap the cylinder.
 
-Part-local frame: origin = the knife-edge line (placed at machine (15, 990, 0)),
-+X = the channel-spring (coefficients-plate) arm, -X = the counter-spring
-(summation-anchor) arm, +Y up, +Z along the knife edge (channel direction). The
-.cs is authored with all X negated so this frame matches the M6.4 part the rest
-of the machine was built against: the spring holes stay at their registered
-local positions (so the 20 channel springs need no change) and the summation
-anchor lands where the counter-spring boss-hook attaches (local x -76 ~ machine
-91 ~ the M6.4 hook at 90.5). MIRROR_PLANE 'x0' (see _common) still applies.
+Part-local frame: origin = the knife-edge line, placed IDENTITY at machine
+(-15, 990, 0), so local axes ARE machine axes: +X = the channel-spring
+(coefficients-plate) arm (machine west), -X = the counter-spring
+(summation-anchor) arm (machine east), +Y up, +Z along the knife edge
+(channel direction). The spring holes sit at their registered local
+positions (so the 20 channel springs need no change) and the summation
+anchor lands where the counter-spring boss-hook attaches (local x -76 ->
+machine -91 ~ the M6.4 hook at -90.5).
 
 Sketches follow the repo fully-defined convention (cad/scripts/_common.py): the
 prismatic/polygon profiles via point-ref anchors + driving dims; each arc via
@@ -64,10 +64,12 @@ import math
 import sys
 
 from _common import (
+    CASTING_GREEN,
     IN,
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
+    apply_color,
     apply_material,
     check,
     define_circle,
@@ -690,6 +692,9 @@ async def build(adapter) -> dict[str, str]:
     await name_bore_axis(adapter, "Top Plane", HEX_H / 2.0, "Right Plane", 0.0, "knife axis")
 
     await apply_material(adapter, MATERIAL)
+    # Green-painted casting on the machine (ch17/ch18 macros show the same
+    # paint as the frame), not bare cast iron.
+    await apply_color(adapter, CASTING_GREEN)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

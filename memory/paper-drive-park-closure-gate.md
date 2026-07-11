@@ -1,9 +1,18 @@
 ---
 name: paper-drive-park-closure-gate
-description: paper-drive release park-closure fails because SW gear/belt-chain couplings read under-defined in mate-DOF accounting; geometry is CORRECT — it's a gate limitation (issue #205), skip via HARMONIC_PREFLIGHT_SKIP_PARK
+description: RESOLVED BY REMOVAL 2026-07-09 — the park-closure gate is deleted with the whole park machinery, so its unsatisfiable 0-DOF assert on gear/belt-coupled trains (issue #205) is moot; the SW fact stands — gear/belt-chain couplings never reduce the fully-defined count
 metadata:
   type: project
 ---
+
+> **2026-07-09 — RESOLVED BY REMOVAL.** `assert_park_closure`, the preflight
+> park stage and the `HARMONIC_PREFLIGHT_SKIP_PARK` hatch are all deleted with
+> the park machinery ([[default-free-dof-park-drivers]]); close issue #205.
+> The durable SolidWorks fact this incident pinned: **gear mates, rack-pinion
+> mates and Belt/Chain features are MOTION couplings that never reduce the
+> fully-defined count** — any future gate asserting 0-DOF over a gear-coupled
+> train is unsatisfiable by construction (the exact-set soundness gate instead
+> lists coupled families as allowed-under-constrained). History below.
 
 The v0.17.0 release (first since the #196 paper-drive rework — [[paper-drive-real-train]])
 failed the release preflight `gate.park_closure`:
