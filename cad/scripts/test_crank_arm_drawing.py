@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import crank_arm_spec
 import draw_crank_arm as drawing
 import build_crank_arm as arm
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -16,14 +17,24 @@ def test_required_drawing_paths() -> None:
     assert DRAWINGS_BY_NAME["crank_arm"].script == Path(drawing.__file__).resolve()
 
 
-def test_drawing_keeps_exactly_the_marked_dimension_set() -> None:
-    marked = set().union(*arm.DRAWING_DIMENSIONS.values())
+def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
+    # The drift alarm: the part-side mark set and the drawing-side keep set are BOTH
+    # the shared spec's map. build re-exports the SAME object (so it marks exactly the
+    # spec), and the drawing keeps exactly its union across the per-view keep-maps --
+    # a rename in one script that isn't mirrored in the other fails here, offline.
+    assert arm.DRAWING_DIMENSIONS is crank_arm_spec.DRAWING_DIMENSIONS
+    marked = set().union(*crank_arm_spec.DRAWING_DIMENSIONS.values())
     kept = (
         set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
     )
     assert kept == marked
     # A callout can only annotate a dimension the print actually shows.
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
+    # The drawing's view math reads the spec's nominal spans, not a divergent copy.
+    assert (drawing.ARM_END_X, drawing.HALF_WIDTH) == (
+        crank_arm_spec.ARM_END_X,
+        crank_arm_spec.HALF_WIDTH,
+    )
 
 
 def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:

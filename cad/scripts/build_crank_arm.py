@@ -29,7 +29,6 @@ from __future__ import annotations
 import sys
 
 from _common import (
-    IN,
     SketchDims,
     add_line_chain,
     apply_material,
@@ -55,42 +54,30 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from crank_arm_spec import (
+    ARM_C2C,
+    ARM_END_X,
+    ARM_THICKNESS,
+    ARM_WIDTH,
+    DIMPLE_DEPTH,
+    DIMPLE_DIA,
+    DIMPLE_X,
+    DRAWING_DIMENSIONS,
+    HALF_WIDTH,
+    SHAFT_BORE_DIA,
+    SQUARE_END_OVERHANG,
+)
 
 PART_NAME = "crank-arm"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
-ARM_C2C = 66.0  # DIMENSIONS.md ch11: shaft-to-handle-pivot centres -- REDERIVED
-# from the ch30 eight-views (angle 90 side view, scaled to the 280 mm base depth):
-# the crank hangs straight down, handle pivot 66 mm below the crankshaft axis,
-# landing the handle ~10 mm above the base top. The former 150 (cone-axial scaled,
-# low) was >2x too long -- a down-pointing 150 arm would drive the handle below
-# the table (med).
-ARM_WIDTH = 16.0  # DIMENSIONS.md ch11: arm width (low)
-ARM_THICKNESS = 8.0  # DIMENSIONS.md ch11: ~half the arm width, p.12 photo (low)
-SQUARE_END_OVERHANG = 10.0  # DIMENSIONS.md ch11: square end past the pivot (low)
-SHAFT_BORE_DIA = 0.375 * IN  # 9.525: 3/8" crankshaft (med); the legacy 9.5
-# rounding left the bore 0.025 smaller than the shaft (caught in M6.2)
-DIMPLE_DIA = 8.0  # DIMENSIONS.md ch11: fiducial indentation (low)
-DIMPLE_DEPTH = 0.5  # DIMENSIONS.md ch11: fiducial indentation (low)
-DIMPLE_X = 30.0  # DIMENSIONS.md ch11: on the arm near the boss (low)
 # (The old PivotBoreDia Ø6.0 and PinHoleDia Ø5.0 constants are gone: the handle-
 # pivot hole and the tapered-pin cross-hole are now native Hole Wizard features
 # whose diameters come from the drill standard -- 15/64 (Ø5.953) and #9 (Ø4.978)
 # -- not equation-driven sketch dims. The 3/8 shaft bore stays a reamed circle
 # cut: it is a precision running fit, not a twist-drill hole.)
 
-ARM_END_X = ARM_C2C + SQUARE_END_OVERHANG
-HALF_WIDTH = ARM_WIDTH / 2.0
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > any extent it crosses
-
-# The manufacturing print's dimension set (draw_crank_arm.py imports exactly
-# these marked dimensions; its keep maps must stay in lockstep).
-DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "ArmOutline": {"ArmEndX", "BossRadius"},
-    "Arm": {"Depth"},
-    "ShaftBoreProfile": {"ShaftBoreDia"},
-    "DimpleProfile": {"DimpleX", "DimpleDia"},
-}
 
 
 async def _volume(adapter) -> float:

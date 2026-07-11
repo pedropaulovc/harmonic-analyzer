@@ -34,7 +34,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from build_crank_arm import ARM_END_X, HALF_WIDTH
+from crank_arm_spec import ARM_C2C, ARM_END_X, DIMPLE_X, HALF_WIDTH
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
@@ -77,10 +77,10 @@ def _sheet_x(model_x_mm: float) -> float:
 # the linear chain stacks below the view, smallest span nearest the geometry.
 FRONT_KEEP = {
     "ArmEndX": (0.190, 0.086),
-    "DimpleX": (_sheet_x(15.0), 0.112),
+    "DimpleX": (_sheet_x(DIMPLE_X / 2.0), 0.112),
     "BossRadius": (0.052, 0.162),
     "ShaftBoreDia": (_sheet_x(0.0), 0.172),
-    "DimpleDia": (_sheet_x(30.0), 0.172),
+    "DimpleDia": (_sheet_x(DIMPLE_X), 0.172),
 }
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 TOP_KEEP = {}
@@ -112,7 +112,7 @@ _NOTES_LEFT = (
         "5. SHAFT BORE (O9.525): DRILL AND REAM 3/8 IN,\n"
         "   Ra 1.6; CLOSE SLIDING FIT ON THE CRANKSHAFT\n"
         "   (SHAFT IS 3/8 IN DRILL ROD, +0.00/-0.02).\n"
-        "   HANDLE PIVOT: 15/64 DRILL THRU; AXIS 66.00\n"
+        f"   HANDLE PIVOT: 15/64 DRILL THRU; AXIS {ARM_C2C:.2f}\n"
         "   FROM SHAFT AXIS ON THE ARM CENTRELINE."
     ),
 )
