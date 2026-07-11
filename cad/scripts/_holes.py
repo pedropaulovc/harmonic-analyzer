@@ -365,13 +365,25 @@ def wizard_holes(
     model.EditSketch()
     sm = model.SketchManager
     _flag(sm, "ISketchManager")
-    auto = (place_sk.GetSketchPoints2() or [None])[0]
-    _flag(auto, "ISketchPoint")
-    sx, sy, sz = _sketch_xy(points_mm[0])
-    auto.SetCoords(sx, sy, sz)
-    for pt in points_mm[1:]:
-        sx, sy, sz = _sketch_xy(pt)
-        sm.CreatePoint(sx, sy, sz)
+    # Add the placement points straight to the sketch DB (AddToDB): otherwise a
+    # point authored within snap distance of a reference SNAPS to it and picks
+    # up a coincident relation that rebuild re-applies. Bit us on support-bar's
+    # x=-2 bracket hole -- it snapped to the origin (x=0), the drilled hole
+    # landed 2 mm off, and the bracket screw plowed 43 mm^3 into solid bar
+    # (probe 2026-07-11). Holes far from any reference (the +-179.5 clamp holes)
+    # never snapped, which is why only the near-origin hole moved.
+    prev_add_to_db = bool(sm.AddToDB)
+    sm.AddToDB = True
+    try:
+        auto = (place_sk.GetSketchPoints2() or [None])[0]
+        _flag(auto, "ISketchPoint")
+        sx, sy, sz = _sketch_xy(points_mm[0])
+        auto.SetCoords(sx, sy, sz)
+        for pt in points_mm[1:]:
+            sx, sy, sz = _sketch_xy(pt)
+            sm.CreatePoint(sx, sy, sz)
+    finally:
+        sm.AddToDB = prev_add_to_db
     model.EditSketch()
     _telemetry.debug(f"hole wizard {label}: points placed, rebuilding")
     model.EditRebuild3()
