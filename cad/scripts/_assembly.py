@@ -1958,7 +1958,9 @@ def _massprops_sidecar(asm_name: str):
 async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
     """A deterministic fingerprint of an assembly's RESOLVED geometry across every
     configuration: exact-BREP mass properties (mass / volume / surface area / centre
-    of mass / moments of inertia). It changes iff a component's geometry changed and
+    of mass / moments of inertia) PLUS every top-level component's rounded pose (the
+    aggregates alone are blind to a light component re-solving elsewhere -- codex
+    #241). It changes iff a component's geometry changed or moved >= 0.1 mm and
     is immune to SolidWorks' volatile save metadata (unlike the ``.SLDASM`` bytes) and
     to tessellation noise (unlike an STL hash). Leaves the doc on the rest pose.
 
@@ -2008,6 +2010,35 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
             tuple(round(float(moi[k]), 4)
                   for k in ("Ixx", "Iyy", "Izz", "Ixy", "Ixz", "Iyz")),
         ))
+        # Per-top-level-component POSE rows (codex #241): the aggregates above
+        # are blind to a LIGHT component moving -- a 10 g screw re-solving 5 mm
+        # over shifts the whole-assembly COM by ~10 um, far under the 1e-4
+        # rounding -- exactly the branch-flip class the refresh gates exist to
+        # catch. Folding each top-level component's rounded pose makes any
+        # >= 0.1 mm rigid re-solve flip the fingerprint (-> gates + save),
+        # while a reload of unchanged parts re-solves to identical poses
+        # (solver noise ~1e-12 is absorbed by the rounding), so a true no-op
+        # stays byte-stable. Child-INTERNAL motion is gated by the child's own
+        # refresh; the residual cross-child clash a child-internal move could
+        # introduce at an unchanged child pose is caught loud by
+        # verify:soundness, which reopens every saved assembly on every build.
+        # ONE GetComponents walk reading Name2 + Transform2 off each live
+        # component -- a per-name component_transform() loop pays an O(n)
+        # GetComponentByName scan per component (measured ~140 s for the 122
+        # top-level components; this walk is ~seconds). Row shape and sort
+        # match the per-name form exactly, so the digest VALUE is unchanged.
+        asm = adapter.currentModel
+        comps = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
+        pose_rows = []
+        for comp in comps:
+            a16 = [float(v) for v in _read_member(
+                _read_member(comp, "Transform2"), "ArrayData")]
+            pose_rows.append((
+                str(_read_member(comp, "Name2")),
+                tuple(round(v, 6) for v in a16[0:9]),
+                tuple(round(v, 4) for v in a16[9:12]),
+            ))
+        rows.extend((cfg, *pr) for pr in sorted(pose_rows))
     if multi and rest is not None:
         check(f"re-activate {rest}", await adapter.set_active_configuration(rest))
     return hashlib.sha256(repr(rows).encode("utf-8")).hexdigest()
@@ -2159,15 +2190,19 @@ async def refresh_assembly(
     in-place ``AutoMateRepair`` (the broken mates re-bind in ~5 s instead of a
     ~500 s full re-insert/re-mate); only if the re-read is STILL faulted does the
     refresh raise, naming the config + the broken feature/mate. Then the
-    rest/export pose is re-activated and the
-    standard gates run: ``assert_components_fully_defined`` (free DOF),
-    ``check_no_interference`` (overlaps), ``assert_model_healthy`` (deep mate
-    health). Any gate raises a ``RuntimeError`` naming the culprit and the
-    ``.SLDASM`` is left untouched (the in-place save never runs) -- so an
-    UNHEALABLE dangling mate (AutoMateRepair could not re-bind it) or a geometry
-    change that grows into a neighbour (interference) HALTS the build rather than
-    saving a stale/broken artefact. The caller escalates to a full from-scratch
-    rebuild via the ``full`` escape (delete the target + ``doit assembly:<stem>``).
+    rest/export pose is re-activated and, when the refresh actually changed
+    the resolved geometry (mass-properties fingerprint moved, or a mate was
+    auto-repaired), the standard gates run: ``assert_components_fully_defined``
+    (free DOF), ``check_no_interference`` (overlaps), ``assert_model_healthy``
+    (deep mate health). Any gate raises a ``RuntimeError`` naming the culprit
+    and the ``.SLDASM`` is left untouched (the in-place save never runs) -- so
+    an UNHEALABLE dangling mate (AutoMateRepair could not re-bind it) or a
+    geometry change that grows into a neighbour (interference) HALTS the build
+    rather than saving a stale/broken artefact. A fingerprint-identical,
+    repair-free reload SKIPS the gates (they would re-prove the last gated
+    save; ``verify:soundness`` re-proves the artefact independently on every
+    build). The caller escalates to a full from-scratch rebuild via the
+    ``full`` escape (delete the target + ``doit assembly:<stem>``).
     """
     asm_path = (OUT_SLDASM / f"{asm_name}.SLDASM").resolve()
     if not asm_path.exists():
@@ -2219,18 +2254,19 @@ async def refresh_assembly(
         with _telemetry.span("reactivate", config=rest):
             check(f"re-activate {rest}", await adapter.set_active_configuration(rest))
 
-    # Gates -- each already raises a RuntimeError naming the culprit. No fallback.
-    assert_components_fully_defined(adapter)
-    check_no_interference(adapter)
-    assert_model_healthy(adapter, label=asm_name, deep=True)
-
-    # Decide whether this refresh actually changed the resolved geometry before
-    # saving: an in-place Save3 always rewrites a fresh md5, which would invalidate
-    # the parent even for a no-op reload of unchanged parts. Gate the bump on the
-    # mass-properties fingerprint so a true no-op leaves the .SLDASM byte-stable.
-    # A successful AutoMateRepair ALSO forces the save even when the fingerprint is
-    # unchanged (a PID-churn-only rebuild): the re-bound mate PIDs MUST persist, or
-    # every later refresh re-dangles and re-heals the same mates forever.
+    # Fingerprint BEFORE the gates (v0.18 perf finding 4): the mass-properties
+    # digest decides BOTH whether to save (an in-place Save3 always rewrites a
+    # fresh md5, which would invalidate the parent even for a no-op reload of
+    # unchanged parts) AND whether the gates must run at all. When the
+    # reloaded parts left the resolved geometry identical to what the last
+    # successful (gated) refresh/build saved -- and nothing was auto-repaired
+    # -- the three gates would re-prove exactly what that run already proved,
+    # and on the top assembly they are the bulk of the refresh wall-clock
+    # (measured 274 s of a 780 s no-op refresh: DOF 115 s + interference 12 s
+    # + deep health 147 s). A successful AutoMateRepair forces the changed
+    # path even on an unchanged fingerprint (a PID-churn-only rebuild): the
+    # re-bound mate state is new and must be re-gated AND re-saved, or every
+    # later refresh re-dangles and re-heals the same mates forever.
     digest = await assembly_geometry_digest(adapter, asm_name)
     sidecar = _massprops_sidecar(asm_name)
     try:
@@ -2238,6 +2274,23 @@ async def refresh_assembly(
     except OSError:
         prev = None
     geometry_changed = prev != digest or repaired_any
+
+    if geometry_changed:
+        # Gates -- each already raises a RuntimeError naming the culprit. No
+        # fallback: a failure leaves the .SLDASM untouched (the save below
+        # never runs).
+        assert_components_fully_defined(adapter)
+        check_no_interference(adapter)
+        assert_model_healthy(adapter, label=asm_name, deep=True)
+    else:
+        # No-op reload: the per-config rebuild-fault check above already ran
+        # clean, the geometry the gates would inspect is fingerprint-identical
+        # to the last gated save, and verify:soundness independently reopens
+        # the saved artefact and runs the full battery on every build.
+        _telemetry.event("refresh.noop_gates_skipped", asm=asm_name)
+        log(f"refresh {asm_name}: fingerprint unchanged, no repairs -- gates "
+            "skipped (proven by the last gated save; verify:soundness "
+            "re-proves the artefact independently)")
 
     with _telemetry.span("save", asm=asm_name, changed=geometry_changed):
         if geometry_changed:
