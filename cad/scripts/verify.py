@@ -781,22 +781,7 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
         f"{name}:model-healthy",
         lambda: assert_model_healthy(adapter, label=name, deep=True, rebuilt=rebuilt),
     )
-    if name == "paper-drive":
-        from build_paper_drive_assembly import (
-            _check_paper_drive_interference,
-            paper_drive_thread_engagement_lengths,
-        )
-
-        report.gate(
-            f"{name}:interference-free",
-            lambda: _check_paper_drive_interference(
-                adapter, paper_drive_thread_engagement_lengths()
-            ),
-        )
-    else:
-        report.gate(
-            f"{name}:interference-free", lambda: check_no_interference(adapter)
-        )
+    report.gate(f"{name}:interference-free", lambda: check_no_interference(adapter))
     # component-count REMOVED: every historical failure of that gate was a stale band
     # or a gate bug (never a real regression), so it cost more in false alarms than it
     # ever caught. The expected counts survive as reference data in `_COMPONENT_BAND`.

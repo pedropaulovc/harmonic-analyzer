@@ -221,7 +221,7 @@ def sanitize_pdf_metadata(pdf: Path, *, title: str) -> None:
         "/Title": title,
         "/Author": "Harmonic Analyzer Project",
         "/Subject": "Hobby-machinist manufacturing drawing",
-        "/Keywords": "harmonic analyzer, manufacturing drawing, 6 BA",
+        "/Keywords": "harmonic analyzer, manufacturing drawing, #4-40 UNC",
         "/Creator": "Harmonic Analyzer SolidWorks drawing pipeline",
         "/Producer": "Harmonic Analyzer Project",
     }

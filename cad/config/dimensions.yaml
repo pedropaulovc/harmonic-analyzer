@@ -1270,7 +1270,7 @@ sections:
         - scaled
         - low
       - - Bracket flange screws ×2 (M6.10)
-        - 'period 6 BA fillister Ø4.2 × 1.96 head + Ø2.8 × 4 shank, UP (Rx −90) through Ø3.2 flange holes on the z −67 line (machine x +33/+41, inset 4 from the flange ends): shanks fill the flange band 988.9..992.9, tips flush with the plate bottom (engagement into the summing-lever plate not modeled); heads in free air below, 0.25 off the arm face (z −70), 1.9 off spring j = 0'
+        - 'fillister Ø5.5 × 2.2 head + Ø2.9 × 4 shank, UP (Rx −90) through Ø3.2 flange holes on the z −67 line (machine x +33/+41, inset 4 from the flange ends): shanks fill the flange band 988.9..992.9, tips flush with the plate bottom (engagement into the summing-lever plate not modeled); heads in free air below, 0.25 off the arm face (z −70), 1.9 off spring j = 0'
         - —
         - p.47 close-up (screw heads visible under the flange)
         - scaled + derived
@@ -1427,7 +1427,7 @@ sections:
         - scaled + derived
         - med
       - - Platen guides + locks (rework E3, NEW)
-        - 'two black rails 300 × 5 × 10 screwed across the FULL platen back (bottom y 315.5..320.5, top 349.5..354.5 — the platen HANGS by the top rail''s underside on the bar''s top edge 349.5), each by 5 period 6 BA fillister screws whose heads show on the platen front (rows y 318/352, x −120..+120 step 60), seated in Ø5.2 × 2.16 counterbores (crowns 0.2 sub-flush so the paper lies flat) with Ø2.8 shanks engaging 2.16 into 2.4-deep blind Ø2.164 core holes on the rail fronts; 4 black lock plates 22 × 19 × 2 (2 per rail, stations ±90, 2 fillister screws each) on the rail backs (z −128.9..−126.9), bridging 1.0 behind the bar — the bottom pair spans the 7 open channel below the bar and overlaps its band by 7, the top pair hangs 14 over it — so the platen cannot fall off'
+        - 'two black rails 300 × 5 × 10 screwed across the FULL platen back (bottom y 315.5..320.5, top 349.5..354.5 — the platen HANGS by the top rail''s underside on the bar''s top edge 349.5), each by 5 fillister screws whose heads show on the platen front (rows y 318/352, x −120..+120 step 60), seated in Ø6.5 × 2.4 counterbores (crowns 0.2 sub-flush so the paper lies flat) with shanks threading 2.4 into blind Ø3 holes on the rail fronts; 4 black lock plates 22 × 19 × 2 (2 per rail, stations ±90, 2 fillister screws each) on the rail backs (z −128.9..−126.9), bridging 1.0 behind the bar — the bottom pair spans the 7 open channel below the bar and overlaps its band by 7, the top pair hangs 14 over it — so the platen cannot fall off'
         - —
         - 'ch22 p.54-55 back photo (rails + bright wear band + lock plates) + front photo (two rows of 5 screw heads)'
         - scaled + derived
@@ -1457,7 +1457,7 @@ sections:
         - scaled
         - med
       - - Clip screws ×4 + platen sockets
-        - brass period 6 BA fillister Ø4.2 × 1.96 head + Ø2.8 × 4 shank through each clip's own Ø3 end holes (machine x ±144, y 328/437) into Ø2.164 × 3.5 blind core sockets in the platen front face; under-head faces on the clip fronts (z −144.1); ALL platen-riding screws lock-mated to the platen (rework E5 — grounded screws floated while the platen fed); slots below render resolution — omitted
+        - brass fillister Ø5.5 × 2.2 head + Ø2.9 × 4 shank through each clip's own Ø3 end holes (machine x ±144, y 328/437) into Ø3 × 3.5 blind sockets in the platen front face; under-head faces on the clip fronts (z −144.1); ALL platen-riding screws lock-mated to the platen (rework E5 — grounded screws floated while the platen fed); slots below render resolution — omitted
         - —
         - p.55 front photo (clip end screws)
         - scaled + derived
