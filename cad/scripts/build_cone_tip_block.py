@@ -100,20 +100,45 @@ if BLOCK_HEIGHT - SLIT_DEPTH > PINCH_BORE_Y - PINCH_BORE_DIA / 2.0:
 
 
 def _slit_removed() -> float:
-    """Slit volume net of the bores it crosses (counterbore band + journal)."""
+    """Slit volume net of the already-void bores it crosses: the adjuster
+    counterbore band, its blind-tap 118-degree DRILL-POINT cone past the
+    shoulder (the term whose omission failed the first wizard build by
+    +4.1 mm^3), and the 1/32" journal -- the cone and journal are concentric,
+    so each z-slice subtracts the UNION circle (max radius), never both."""
     r_cb, y_cb, y_bot = ADJUSTER_BORE_DIA / 2.0, BORE_HEIGHT, BLOCK_HEIGHT - SLIT_DEPTH
-    h = SLIT_W / 400.0
-    xs = [-SLIT_W / 2.0 + k * h for k in range(401)]
+    x_half = SLIT_W / 2.0
 
-    def f(x: float) -> float:
-        return (y_cb + math.sqrt(max(r_cb * r_cb - x * x, 0.0))) - y_bot
+    def a_void(r: float) -> float:
+        """In-slit void area of a concentric circle of radius r at bore height:
+        integral over |x| < min(x_half, r) of (circle top - max(slit bottom,
+        circle bottom)), Simpson."""
+        if r <= 0.0:
+            return 0.0
+        lim = min(x_half, r)
+        h = lim / 200.0
+        xs = [-lim + k * h for k in range(401)]
 
-    simpson = f(xs[0]) + f(xs[-1]) + 4.0 * sum(f(x) for x in xs[1:-1:2]) \
-        + 2.0 * sum(f(x) for x in xs[2:-1:2])
-    a_cb = simpson * h / 3.0
+        def f(x: float) -> float:
+            s = math.sqrt(max(r * r - x * x, 0.0))
+            return max((y_cb + s) - max(y_bot, y_cb - s), 0.0)
+
+        simpson = f(xs[0]) + f(xs[-1]) + 4.0 * sum(f(x) for x in xs[1:-1:2]) \
+            + 2.0 * sum(f(x) for x in xs[2:-1:2])
+        return simpson * h / 3.0
+
+    point_h = r_cb * DRILL_POINT_H  # 118-degree point height past the shoulder
     v = SLIT_W * BLOCK_Z * SLIT_DEPTH
-    v -= a_cb * ADJUSTER_BORE_DEPTH  # counterbore band already void
-    v -= math.pi * BORE_RADIUS**2 * (BLOCK_Z - ADJUSTER_BORE_DEPTH)  # journal band
+    v -= a_void(r_cb) * ADJUSTER_BORE_DEPTH  # counterbore band already void
+    # Past the shoulder the void slice is max(cone, journal) -- trapezoid in z.
+    n_z = 400
+    dz = (BLOCK_Z - ADJUSTER_BORE_DEPTH) / n_z
+    acc = 0.0
+    for k in range(n_z + 1):
+        z = k * dz  # 0 at the shoulder
+        r_cone = r_cb * max(1.0 - z / point_h, 0.0)
+        a = a_void(max(r_cone, BORE_RADIUS))
+        acc += a * (0.5 if k in (0, n_z) else 1.0)
+    v -= acc * dz
     return v
 
 
