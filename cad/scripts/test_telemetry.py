@@ -241,6 +241,31 @@ def test_event_without_active_span_is_noop():
     _telemetry.event("orphan", foo="bar")  # must not raise
 
 
+def test_export_save_as_is_visible_during_long_com_call(capture, tmp_path):
+    """The multi-minute assembly SaveAs3 call must not be an opaque trace gap."""
+    import export_models
+
+    class Doc:
+        def SaveAs3(self, path, _version, _options):
+            Path(path).write_bytes(b"export")
+            return 0
+
+    spans, logs = capture
+    out = tmp_path / "machine.STEP"
+    assert export_models._save_as(Doc(), out) == 0
+
+    (span,) = [
+        item for item in spans.get_finished_spans() if item.name == "export.save_as"
+    ]
+    assert span.attributes["output"] == str(out)
+    assert span.attributes["format"] == "step"
+    assert span.attributes["save.rc"] == 0
+    assert any(
+        record.log_record.body == "SaveAs3 starting -> machine.STEP"
+        for record in logs.get_finished_logs()
+    )
+
+
 def test_set_service_relabels_resource_fallback_only():
     """``set_service`` swaps this process's resource ``service.name`` (the Aspire
     "resource" column) -- fallback-only by default (won't clobber a non-default
