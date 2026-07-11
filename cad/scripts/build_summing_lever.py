@@ -224,9 +224,10 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     natural sense silently reversed the field off the -Z plate edge -- only
     j=0 stayed cut -- and was replaced by cutting all 20 stations outright in
     one sketch. The pattern is back with the sense guarded, not
-    inference-trusted: a deliberate direction-edge pick, the seed at the -Z end
-    of the span so a reversal marches off the plate, and an analytic volume
-    gate that resolves a single missing hole.)
+    inference-trusted: a deliberate direction-edge pick whose -Z natural sense
+    is MEASURED, the seed at the +Z end of the span so a reversal marches off
+    the plate, and an analytic volume gate that resolves a single missing
+    hole.)
 
     Machine-y registration (the M6.4 plate-top-at-998 convention) is set at
     PLACEMENT, not baked here -- see PLATE_TOP_Y and the Phase 2/3 plan."""
@@ -269,29 +270,33 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     v_plate = PLATE_W * PLATE_L * PLATE_T
     await volume_check(adapter, "coefficients plate", v_plate, 1e-3 * v_plate)
 
-    # Spring-hole field: ONE seed hole at station j=0 + a native linear pattern
-    # marching the remaining stations up world +Z at CHANNEL_PITCH. History: an
-    # earlier FeatureLinearPattern5 marched along an AUTO-selected edge whose
-    # natural sense reversed the field off the -Z plate edge (all but j=0
-    # solid), and was replaced by cutting all 20 stations outright in one
-    # sketch. The pattern returns with the sense RISK managed, not
-    # inference-trusted (the platen-rack ToothPattern idiom): the direction
-    # reference is a DELIBERATE edge pick (the plate's +X top edge, mid-span),
-    # the seed sits at the -Z END of the station span so a reversed march runs
-    # off the plate, and the analytic volume gate below resolves a single
-    # missing hole -- a flip cannot pass silently.
-    # Top-plane sketch Y = -world Z, so world HOLE_Z[0] sits at sketch
-    # -HOLE_Z[0]; the cut runs through BOTH sides of the mid-plane plate
+    # Spring-hole field: ONE seed hole at station j=HOLE_COUNT-1 + a native
+    # linear pattern marching the remaining stations down world -Z at
+    # CHANNEL_PITCH. History: an earlier FeatureLinearPattern5 marched along an
+    # AUTO-selected edge whose natural sense reversed the field off the -Z
+    # plate edge (all but j=0 solid), and was replaced by cutting all 20
+    # stations outright in one sketch. The pattern returns with the sense RISK
+    # managed, not inference-trusted (the platen-rack ToothPattern idiom): the
+    # direction reference is a DELIBERATE edge pick (the plate's +X top edge,
+    # mid-span, natural sense MEASURED -Z on this seat -- a j=0 seed marched
+    # off the plate and failed the gate below with exactly one landed
+    # instance), the seed sits at the +Z END of the station span so the -Z
+    # march covers the field and a reversal runs off the plate, and the
+    # analytic volume gate below resolves a single missing hole -- a flip
+    # cannot pass silently.
+    # Top-plane sketch Y = -world Z, so world HOLE_Z[-1] sits at sketch
+    # -HOLE_Z[-1]; the cut runs through BOTH sides of the mid-plane plate
     # (both_directions covers the +-PLATE_T/2 spread, + margin). The seed
     # circle emits centre-X, centre-Z, diameter (3 dims): X is the shared
-    # HOLE_X column (driven to "HoleX"), diameter to "HoleDia"; the station-0 Z
+    # HOLE_X column (driven to "HoleX"), diameter to "HoleDia"; the seed's Z
     # anchor has no global knob, so its slot stays None (auto-named).
     holes = SketchDims()
     check("create_sketch spring hole seed", await adapter.create_sketch("Top"))
     await define_circle(
-        adapter, HOLE_X, -HOLE_Z[0], HOLE_DIA / 2.0, "spring hole 0",
+        adapter, HOLE_X, -HOLE_Z[-1], HOLE_DIA / 2.0,
+        f"spring hole seed (station j={HOLE_COUNT - 1})",
         dims=holes,
-        names=("Hole0X", None, "Hole0Dia"),
+        names=("HoleSeedX", None, "HoleSeedDia"),
         drives=('"HoleX"', None, '"HoleDia"'),
     )
     await ensure_fully_defined(adapter, "spring-hole seed sketch")
