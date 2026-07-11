@@ -79,7 +79,7 @@ NUMBER_DRILL_MM = {       # number drills cut DIAMETER exactly
     "#37": 2.642, "#43": 2.261, "#47": 1.994, "#54": 1.397,
 }
 FRACTIONAL_DRILL_MM = {"1/8": 3.175, "3/16": 4.763, "15/64": 5.953}
-LETTER_DRILL_MM = {"F": 6.528}
+LETTER_DRILL_MM = {"F": 6.528, "V": 9.576}  # V = 0.377in (transgear stud seat)
 
 # 118-degree drill point: tip height = r * cot(59 deg). A BLIND wizard hole's
 # depth runs to the flat shoulder; the point extends beyond it (probe: #4-40
@@ -457,3 +457,126 @@ def wizard_holes(
         f"(Ø{result.hole_dia_mm:.3f})"
     )
     return result
+
+
+def cross_hole_volume_mm3(hole_dia_mm: float, shaft_dia_mm: float,
+                          n: int = 20001) -> float:
+    """Removed volume of a radial THROUGH hole drilled diametrally through a
+    full cylinder (perpendicular cylinder-cylinder intersection, axes
+    crossing): V = integral 2*sqrt(R^2-x^2) * 2*sqrt(r^2-x^2) dx, numeric --
+    no clean closed form. Probe-verified 228.39 measured vs 228.41 analytic
+    (#9 through Ø12, diag_hole_wizard_cyl 2026-07-11)."""
+    import math
+    r, big_r = hole_dia_mm / 2.0, shaft_dia_mm / 2.0
+    total = 0.0
+    dx = 2.0 * r / (n - 1)
+    for i in range(n):
+        x = -r + i * dx
+        w = 0.5 if i in (0, n - 1) else 1.0
+        total += w * 2.0 * math.sqrt(max(big_r**2 - x * x, 0.0)) * \
+            2.0 * math.sqrt(max(r**2 - x * x, 0.0))
+    return total * dx
+
+
+def wizard_hole_on_cylinder(adapter, spec: HoleSpec, point_mm, label: str,
+                            *, name: str = "") -> None:
+    """ONE through wizard hole drilled RADIALLY into a cylindrical face at
+    ``point_mm`` (a model point ON the face; the drill axis is the surface
+    normal there, through the shaft axis).
+
+    The planar-face path cannot serve a radial cross-hole (no planar face
+    carries the drill axis); on a cylinder the wizard hangs its placement on
+    a 3D sketch whose point coords ARE model coords, so no
+    ModelToSketchTransform is involved (probe: diag_hole_wizard_cyl, volume
+    exact to 0.01%). Through-all only -- a blind radial hole would need the
+    HoleWizard5 positional path re-probed on a cylinder. Single-point: the
+    wizard's auto point is moved onto the station; multi-point radial holes
+    would each need their own feature anyway (one 3D-sketch point per face
+    parameterization is untested).
+
+    The face picked is the LARGEST cylindrical face of the body -- callers
+    with several cylinder faces (stepped shafts) must cut the hole while the
+    target section is the dominant cylinder, or extend this to face-pick by
+    the point.
+    """
+    if spec.end != "through_all":
+        raise ValueError("wizard_hole_on_cylinder supports through_all only")
+    hole_type, fastener = _KINDS[spec.kind]
+
+    model = adapter.currentModel
+    _flag(model, "IModelDoc2")
+    fm = model.FeatureManager
+    _flag(fm, "IFeatureManager")
+
+    body = (model.GetBodies2(0, False) or [None])[0]
+    _flag(body, "IBody2")
+    face = None
+    for f in body.GetFaces() or []:
+        _flag(f, "IFace2")
+        surf = f.GetSurface()
+        _flag(surf, "ISurface")
+        if not surf.IsCylinder():
+            continue
+        if face is None or f.GetArea() > face.GetArea():
+            face = f
+    if face is None:
+        raise RuntimeError(f"hole wizard {label}: no cylindrical face")
+    model.ClearSelection2(True)
+    if not face.Select2(False, 0):
+        raise RuntimeError(f"hole wizard {label}: cylinder Select2 failed")
+    _telemetry.debug(f"hole wizard {label}: cylinder selected, creating feature")
+
+    data = fm.CreateDefinition(SW_FM_HOLE_WZD)
+    _flag(data, "IWizardHoleFeatureData2")
+    data.InitializeHole(hole_type, _STD_ANSI_INCH, fastener, spec.size,
+                        _ENDS["through_all"])
+    feat = fm.CreateFeature(data)
+    if feat is None:
+        raise RuntimeError(
+            f"hole wizard {label}: CreateFeature (cylinder) failed -- size "
+            f"{spec.size!r} may be invalid for kind {spec.kind!r}")
+    _flag(feat, "IFeature")
+    _telemetry.debug(f"hole wizard {label}: feature created, placing point")
+
+    # The placement is a 3D sketch with one auto point; its coords are model
+    # coords -- pin it straight onto the station.
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    place = None
+    sub = feat.GetFirstSubFeature()
+    while sub is not None:
+        _flag(sub, "IFeature")
+        if "Profile" in str(sub.GetTypeName2()):
+            sk = sub.GetSpecificFeature2()
+            _flag(sk, "ISketch")
+            if bool(sk.Is3D()) and len(sk.GetSketchPoints2() or []) == 1:
+                place = (sub, sk)
+                break
+        sub = sub.GetNextSubFeature()
+    if place is None:
+        raise RuntimeError(f"hole wizard {label}: 3D placement sketch not found")
+    sub, sk = place
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+            str(sub.Name), "SKETCH", 0, 0, 0, False, 0, null_callout(), 0):
+        raise RuntimeError(f"hole wizard {label}: cannot edit {sub.Name}")
+    model.EditSketch()
+    pt = (sk.GetSketchPoints2() or [None])[0]
+    _flag(pt, "ISketchPoint")
+    pt.SetCoords(point_mm[0] / 1000.0, point_mm[1] / 1000.0,
+                 point_mm[2] / 1000.0)
+    model.EditSketch()
+    _telemetry.debug(f"hole wizard {label}: point placed, rebuilding")
+    model.EditRebuild3()
+
+    if name:
+        try:
+            feat.Name = name
+        except Exception:  # noqa: BLE001
+            _telemetry.warn(f"hole wizard {label}: rename to {name!r} failed")
+    _telemetry.event(
+        "hole_wizard.created", label=label, kind=spec.kind, size=spec.size,
+        points=1, placement="cylindrical",
+    )
+    _telemetry.success(
+        f"hole wizard {label}: radial {spec.size} {spec.kind} through cylinder")
