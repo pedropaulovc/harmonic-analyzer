@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import math
+import subprocess
+import sys
 import zipfile
 from pathlib import Path
 
@@ -35,6 +37,8 @@ def test_mating_hardware_uses_6ba() -> None:
     assert (screw.SLOT_W, screw.SLOT_D) == (0.448, 0.882)
     assert platen.SOCKET_DIA == BA6.core_diameter_mm
     assert platen.SOCKET_THREAD_DEPTH < platen.SOCKET_DEPTH
+    assert platen.CBORE_DIA == screw.HEAD_DIA + 1.0
+    assert platen.CBORE_DEPTH == screw.HEAD_H + 0.2
 
 
 def test_platen_guide_hole_stations_are_native_linear_patterns() -> None:
@@ -66,7 +70,7 @@ def test_threaded_interference_allowance_is_exact_by_engagement_length() -> None
         - (BA6.core_diameter_mm / 2.0) ** 2
     )
     contacts = {
-        pair: annular_area * engagement
+        pair: [annular_area * engagement]
         for pair, engagement in engagement_lengths.items()
     }
     paper_drive._validate_thread_contacts(contacts, engagement_lengths)
@@ -74,15 +78,40 @@ def test_threaded_interference_allowance_is_exact_by_engagement_length() -> None
         paper_drive._validate_thread_contacts(
             {
                 **contacts,
-                frozenset(("platen-guide-1", "platen-rack-1")): 0.10,
+                frozenset(("platen-guide-1", "platen-rack-1")): [0.10],
             },
             engagement_lengths,
         )
     wrong_volume = dict(contacts)
     first_pair = next(iter(wrong_volume))
-    wrong_volume[first_pair] *= 1.03
+    wrong_volume[first_pair] = [wrong_volume[first_pair][0] * 1.03]
     with pytest.raises(RuntimeError):
         paper_drive._validate_thread_contacts(wrong_volume, engagement_lengths)
+
+    duplicate = dict(contacts)
+    duplicate[first_pair] = [contacts[first_pair][0], contacts[first_pair][0]]
+    with pytest.raises(RuntimeError, match="2 interference bodies"):
+        paper_drive._validate_thread_contacts(duplicate, engagement_lengths)
+
+
+def test_drawing_contract_imports_without_pywin32() -> None:
+    script = """
+import builtins
+real_import = builtins.__import__
+def blocked(name, *args, **kwargs):
+    if name in {'pythoncom', 'pywintypes'} or name.startswith('win32com'):
+        raise ImportError(f'blocked {name}')
+    return real_import(name, *args, **kwargs)
+builtins.__import__ = blocked
+import test_platen_guide_drawing
+"""
+    subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=Path(__file__).parent,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
 
 def test_paper_drive_tracks_every_intended_thread_contact() -> None:
