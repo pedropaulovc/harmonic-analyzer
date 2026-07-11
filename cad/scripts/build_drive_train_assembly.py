@@ -668,8 +668,13 @@ if not (_ADJ_MOUTH + 0.5 <= _TIP_END_STATION <= _ADJ_MOUTH + ADJ_CUP_DEPTH - 0.5
     raise AssertionError("shaft tip end does not rest inside the adjuster cup")
 if ADJ_CUP_DIA < _STUB_DIA + 0.25:
     raise AssertionError("adjuster cup too tight around the tip stub")
-if abs(PINCH_SHANK_DIA - TIP_PINCH_BORE_DIA) > 0.05:
-    raise AssertionError("pinch-screw shank does not match the block cross-bore")
+# The pinch screw THREADS INTO the block's tapped #3-48 cross-bore: the
+# modeled shank rides at tap-drill - ~0.3 (memory/fastener-policy lag
+# precedent), so the fit is an engagement band, not the old equality.
+if not (0.15 <= TIP_PINCH_BORE_DIA - PINCH_SHANK_DIA <= 0.45):
+    raise AssertionError(
+        f"pinch-screw shank {PINCH_SHANK_DIA} does not thread-fit the block "
+        f"cross-bore {TIP_PINCH_BORE_DIA} (want bore - shank in [0.15, 0.45])")
 if PINCH_SHANK_LEN < TIP_BLOCK_X / 2.0 + 0.5:
     raise AssertionError("pinch screw too short to cross the top slit")
 # The crank pedestal is GONE as a separate base-mounted part: the cone pivot
