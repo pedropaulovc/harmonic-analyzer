@@ -30,15 +30,33 @@ Traps that cost 8 probe rounds — do not re-learn:
   regenerate with `diagnostics/diag_hole_wizard_tables.py`).
 - **Property knobs that actually work** (post-create `GetDefinition` →
   `AccessSelections(model, None)` → set → `ModifyDefinition(defn._oleobj_,
-  model, null_callout())`): `HoleFit`, `CounterBoreDiameter/Depth`,
-  `ThruHoleDiameter` (the cbore through-hole knob — `HoleDiameter` writes are
-  IGNORED there). `EndCondition`/`HoleDepth`/`Depth` writes no-op — hence the
+  model, null_callout())`): `CounterBoreDiameter/Depth`, `ThruHoleDiameter`,
+  `HoleDiameter`. `EndCondition`/`HoleDepth`/`Depth` writes no-op — hence the
   HoleWizard5 blind path. Early-bound calls take plain `None` for null
   dispatch params (a `null_callout()` VARIANT throws "Python instance can not
   be converted"); late-bound calls need the VARIANT.
+- **`HoleFit` is a NO-OP on a plain (type-2) clearance hole** — the API applies
+  it to counterbore/countersink features ONLY (per the
+  `IWizardHoleFeatureData2.HoleFit` remarks). So a plain clearance hole ships
+  the NORMAL-fit diameter regardless of `spec.fit`: probe 2026-07-11 a 1/4
+  "close" hole still cut Ø7.137 (normal), not Ø6.756. To set a plain hole's
+  fit, FORCE the pinned dia via BOTH `HoleDiameter` AND `ThruHoleDiameter` —
+  on a plain hole the DRIVING knob is `ThruHoleDiameter`; a `HoleDiameter`-only
+  write is silently dropped (setting only `HoleDiameter` still cut 7.137;
+  setting both cut 6.756). `wizard_holes` now does this for every clearance
+  hole so the cut matches `blind_cut_dia_mm` by construction. (On a cbore the
+  through-hole knob is likewise `ThruHoleDiameter` — `HoleDiameter` ignored.)
 - **Multi-point**: one auto placement point per feature; edit the placement
   sketch (`SetCoords` + `CreatePoint` via `ModelToSketchTransform`) — the
-  rocker-arm-support foot-tap idiom, shared by both creation paths.
+  rocker-arm-support foot-tap idiom, shared by both creation paths. Wrap the
+  point placement in `SketchManager.AddToDB=True`: a point authored within
+  snap distance of a reference otherwise INFERENCE-SNAPS to it and picks up a
+  coincidence that `EditRebuild3` re-applies, MOVING the drilled hole. Bit
+  support-bar's x=-2 bracket hole — it snapped to the origin (x=0), the
+  position-independent volume check still PASSED, and the misplaced hole only
+  surfaced as a 43 mm^3 screw/bar interference in the paper_drive assembly.
+  Holes far from any reference never snap (see
+  [[oblique-views-break-on-axis-occlusion]] for the sibling inference class).
 - **Create wizard holes BEFORE face-exploding features**:
   `find_planar_face` walks EVERY face of the body with 2-3 COM roundtrips
   each; after the nameplate's engraving cut (112 buffered-ribbon grooves →
