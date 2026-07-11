@@ -77,22 +77,15 @@ def _sheet_x(model_x_mm: float) -> float:
 # the linear chain stacks below the view, smallest span nearest the geometry.
 FRONT_KEEP = {
     "ArmEndX": (0.190, 0.086),
-    "PivotBoreX": (_sheet_x(33.0), 0.100),
     "DimpleX": (_sheet_x(15.0), 0.112),
     "BossRadius": (0.052, 0.162),
     "ShaftBoreDia": (_sheet_x(0.0), 0.172),
     "DimpleDia": (_sheet_x(30.0), 0.172),
-    "PivotBoreDia": (_sheet_x(66.0), 0.172),
 }
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
-TOP_KEEP = {
-    "PinHoleDia": (_sheet_x(0.0), 0.228),
-    "PinHoleZ": (0.250, 0.212),
-}
+TOP_KEEP = {}
 DIMENSION_CALLOUTS = {
     "ShaftBoreDia": "THRU - SEE NOTE 5",
-    "PivotBoreDia": "THRU",
-    "PinHoleDia": "THRU - SEE NOTE 6",
     "DimpleDia": "0.5 DEEP - SEE NOTE 7",
 }
 
@@ -105,9 +98,9 @@ _NOTES_LEFT = (
     ),
     (
         "2. TOLERANCES: LINEAR +/-0.25; ANGLES +/-0.5\n"
-        "   DEG; HOLE CENTRES +/-0.10; REAMED BORES\n"
-        "   (O9.525, O6.00) +0.05/-0.00; O5 PIN PILOT\n"
-        "   DIA AND DIMPLE DIA/DEPTH/LOCATION +/-0.10."
+        "   DEG; HOLE CENTRES +/-0.10; REAMED SHAFT BORE\n"
+        "   O9.525 +0.05/-0.00; DRILLED HOLES AND DIMPLE\n"
+        "   DIA/DEPTH/LOCATION +/-0.10."
     ),
     "3. REMOVE BURRS AND BREAK SHARP EDGES 0.2 MAX.",
     (
@@ -118,13 +111,15 @@ _NOTES_LEFT = (
     (
         "5. SHAFT BORE (O9.525): DRILL AND REAM 3/8 IN,\n"
         "   Ra 1.6; CLOSE SLIDING FIT ON THE CRANKSHAFT\n"
-        "   (SHAFT IS 3/8 IN DRILL ROD, +0.00/-0.02)."
+        "   (SHAFT IS 3/8 IN DRILL ROD, +0.00/-0.02).\n"
+        "   HANDLE PIVOT: 15/64 DRILL THRU; AXIS 66.00\n"
+        "   FROM SHAFT AXIS ON THE ARM CENTRELINE."
     ),
 )
 _NOTES_RIGHT = (
     (
-        "6. CROSS-PIN HOLE (O5.00, MID-THICKNESS, ON THE\n"
-        "   SHAFT BORE AXIS): DRILL THRU AS SHOWN.\n"
+        "6. CROSS-PIN HOLE (#9 DRILL, O4.978, MID-\n"
+        "   THICKNESS, ON SHAFT BORE AXIS): DRILL THRU.\n"
         "   TAPER-REAM AT ASSEMBLY WITH THE CRANKSHAFT\n"
         "   FOR A NO. 2 (0.193 IN) STANDARD TAPER PIN,\n"
         "   1:48 TAPER, LARGE END OUTBOARD."
@@ -187,11 +182,12 @@ async def build(adapter: Any) -> dict[str, str]:
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    for view in (front, right, iso):
+    for view in (right, iso):
         set_hidden_lines_removed(adapter, view)
-    # The top view exists to communicate the cross-drilling: greyed hidden
-    # lines show the pin pilot meeting the shaft bore.
-    set_hidden_lines_visible(adapter, top)
+    # The front view carries the far-side dimple dimensions; HLV exposes its
+    # circular edge. The top view exposes the #9 cross-drill meeting the shaft bore.
+    for view in (front, top):
+        set_hidden_lines_visible(adapter, view)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
@@ -201,7 +197,7 @@ async def build(adapter: Any) -> dict[str, str]:
     right_annotations = curate_view_dimensions(
         adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
-    # Top view: the cross-pin hole (diameter + mid-thickness location).
+    # Top view: cross-drill geometry is visible; its ANSI size/location are in note 6.
     top_annotations = curate_view_dimensions(
         adapter, top, keep=TOP_KEEP, view_label="top"
     )
