@@ -1958,7 +1958,9 @@ def _massprops_sidecar(asm_name: str):
 async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
     """A deterministic fingerprint of an assembly's RESOLVED geometry across every
     configuration: exact-BREP mass properties (mass / volume / surface area / centre
-    of mass / moments of inertia). It changes iff a component's geometry changed and
+    of mass / moments of inertia) PLUS every top-level component's rounded pose (the
+    aggregates alone are blind to a light component re-solving elsewhere -- codex
+    #241). It changes iff a component's geometry changed or moved >= 0.1 mm and
     is immune to SolidWorks' volatile save metadata (unlike the ``.SLDASM`` bytes) and
     to tessellation noise (unlike an STL hash). Leaves the doc on the rest pose.
 
@@ -2008,6 +2010,25 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
             tuple(round(float(moi[k]), 4)
                   for k in ("Ixx", "Iyy", "Izz", "Ixy", "Ixz", "Iyz")),
         ))
+        # Per-top-level-component POSE rows (codex #241): the aggregates above
+        # are blind to a LIGHT component moving -- a 10 g screw re-solving 5 mm
+        # over shifts the whole-assembly COM by ~10 um, far under the 1e-4
+        # rounding -- exactly the branch-flip class the refresh gates exist to
+        # catch. Folding each top-level component's rounded pose makes any
+        # >= 0.1 mm rigid re-solve flip the fingerprint (-> gates + save),
+        # while a reload of unchanged parts re-solves to identical poses
+        # (solver noise ~1e-12 is absorbed by the rounding), so a true no-op
+        # stays byte-stable. Child-INTERNAL motion is gated by the child's own
+        # refresh; the residual cross-child clash a child-internal move could
+        # introduce at an unchanged child pose is caught loud by
+        # verify:soundness, which reopens every saved assembly on every build.
+        for name in sorted(component_names(adapter)):
+            a16 = component_transform(adapter, name)
+            rows.append((
+                cfg, name,
+                tuple(round(float(v), 6) for v in a16[0:9]),
+                tuple(round(float(v), 4) for v in a16[9:12]),
+            ))
     if multi and rest is not None:
         check(f"re-activate {rest}", await adapter.set_active_configuration(rest))
     return hashlib.sha256(repr(rows).encode("utf-8")).hexdigest()
