@@ -88,9 +88,8 @@ THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > any extent it crosses
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ArmOutline": {"ArmEndX", "BossRadius"},
     "Arm": {"Depth"},
-    "BoreProfile": {"ShaftBoreDia", "PivotBoreX", "PivotBoreDia"},
+    "ShaftBoreProfile": {"ShaftBoreDia"},
     "DimpleProfile": {"DimpleX", "DimpleDia"},
-    "PinHoleProfile": {"PinHoleZ", "PinHoleDia"},
 }
 
 

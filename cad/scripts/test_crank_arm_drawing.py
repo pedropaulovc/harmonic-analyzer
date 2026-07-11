@@ -38,6 +38,9 @@ def test_notes_use_us_customary_fasteners_and_functional_tolerances() -> None:
     assert "TAPER PIN" in notes
     assert "1:48" in notes
     assert "3/8 IN" in notes
+    assert "15/64 DRILL THRU" in notes
+    assert "#9 DRILL" in notes
+    assert "O4.978" in notes
     assert "LINEAR +/-0.25" in notes
     assert "HOLE CENTRES +/-0.10" in notes
     # Pedro 2026-07-10: drawings spec the closest US-customary fastener, not
@@ -49,9 +52,15 @@ def test_notes_use_us_customary_fasteners_and_functional_tolerances() -> None:
 def test_hole_states_are_annotated() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
     assert callouts["ShaftBoreDia"].startswith("THRU")
-    assert callouts["PivotBoreDia"].startswith("THRU")
-    assert callouts["PinHoleDia"].startswith("THRU")
     assert callouts["DimpleDia"].startswith("0.5 DEEP")
+
+
+def test_wizard_holes_are_not_fake_marked_dimensions() -> None:
+    assert "BoreProfile" not in arm.DRAWING_DIMENSIONS
+    assert "PinHoleProfile" not in arm.DRAWING_DIMENSIONS
+    source = Path(arm.__file__).read_text(encoding="utf-8")
+    assert 'HoleSpec("drilled_fractional", "15/64")' in source
+    assert 'HoleSpec("drilled_number", "#9")' in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
