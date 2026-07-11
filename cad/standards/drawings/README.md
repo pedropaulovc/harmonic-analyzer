@@ -15,3 +15,23 @@ format. Build-seat provisioning copies both files and registers their directory.
 Regenerate only on a SolidWorks seat, then reopen and visually inspect a drawing
 before committing changed binary assets.
 
+## Title block
+
+The compact title block carries, top to bottom: Title; a **DRAWN / CHECKED /
+DATE** production-control row (DRAWN is `$PRPSHEET:"Drawn By"`; CHECKED and DATE
+are blank fill-ins a machinist signs on the printed copy); DWG number, revision,
+and revision description; material specification; finish and quantity; scale and
+projection; and the sheet count. The linked fields resolve from the source
+part's custom properties — `Drawn By` / `Revision Description` are stamped by
+`_drawing_marks.apply_drawing_properties`, `Number` / `Revision` / `Title` by
+`_common.part_properties`. (Consolidating those two stamping paths is tracked in
+issue #249.)
+
+## The "For Personal Use Only" watermark
+
+Sheets rendered on a **SolidWorks Maker / Student** seat carry a non-removable
+`SOLIDWORKS Maker Product. For Personal Use Only.` watermark — it is imposed by
+the licence, not by this template, and there is no API to suppress it. It is
+expected on every drawing produced on a Maker seat and is not a defect in the
+standard. A commercial seat would render without it.
+

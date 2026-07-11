@@ -67,22 +67,34 @@ def clear_dimensions_for_drawing(adapter: Any) -> None:
     _telemetry.success(f"cleared {cleared} model-dimension drawing marks")
 
 
+# Drafter shown in the title block DRAWN field. Checked/approval are left blank
+# on the sheet (a machinist signs them on the printed copy). See issue #249 for
+# the title-block property-provenance consolidation this path is part of.
+DRAWN_BY = "PPVC"
+
+
 def apply_drawing_properties(
     adapter: Any, part_name: str, extra: Mapping[str, str] | None = None
 ) -> None:
     """Stamp the make-critical custom properties a drawing title block reads.
 
     ``material_specification`` / ``finish`` / ``quantity`` come from the part's
-    config registry row; ``extra`` carries part-specific rows (e.g. a thread
-    spec).  The drawing recipe fails loud if any required property is blank.
+    config registry row; the production-control fields (``Drawn By``,
+    ``Revision Description``) are stamped here too so the title block's DRAWN /
+    revision rows resolve.  ``Checked By`` / ``Date`` are intentionally blank
+    fill-ins.  ``extra`` carries part-specific rows (e.g. a thread spec).  The
+    drawing recipe fails loud if any REQUIRED property is blank.
     """
     spec = _config.parts(part_name)
+    rev_desc = str(spec.get("revision_description") or "Initial release")
     apply_custom_properties(
         adapter,
         {
             "Material Specification": str(spec["material_specification"]),
             "Finish": str(spec["finish"]),
             "Quantity": str(spec["quantity"]),
+            "Drawn By": DRAWN_BY,
+            "Revision Description": rev_desc,
             **dict(extra or {}),
         },
     )

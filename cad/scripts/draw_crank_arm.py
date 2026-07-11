@@ -29,6 +29,7 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
+    set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -205,6 +206,14 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         [*front_annotations, *top_annotations, *right_annotations],
         DIMENSION_CALLOUTS,
+    )
+    # The shaft bore is an exact 3/8 in (Ø9.525) reamed bore; notes 2 & 5 cite it
+    # to 3 places, so display it to 3 as well (the sheet default is 2). Otherwise
+    # the view reads Ø9.53 against the notes' Ø9.525 — a false contradiction.
+    set_dimension_precision(
+        adapter,
+        [*front_annotations, *top_annotations, *right_annotations],
+        {"ShaftBoreDia": 3},
     )
     # Arm width (16): dimension the right view's flat top/bottom faces.  At 2:1
     # the 16 x 8 stock section spans +/-0.016 (Y) x +/-0.008 (Z) around the view
