@@ -204,8 +204,13 @@ async def _pattern_pair(
     machine position (the channel ``_pattern_bank`` idiom): the axis fixes
     only the LINE, SolidWorks infers the sign, and the inference is not
     contractual -- a flipped pattern is deleted whole and re-created with
-    ``FlipDir1``, deterministic in at most two solves."""
-    for attempt, flip in enumerate((False, True)):
+    ``FlipDir1``, deterministic in at most two solves.
+
+    Flip seed TRUE: both frame patterns measured FLIPPED on their first solve
+    (Top ∩ Right resolves +Z, the copies go -Z; Top ∩ Front resolves -X, the
+    copies go +X), so ``FlipDir1=True`` lands in ONE solve; the untried value
+    stays as the verified retry (the channel ``_pattern_bank`` philosophy)."""
+    for attempt, flip in enumerate((True, False)):
         tag = " (flip retry)" if attempt else ""
         feature = check(
             f"linear-pattern {prefix} pair{tag}",
