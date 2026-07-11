@@ -21,6 +21,44 @@ from _drawing_common import sanitize_pdf_metadata
 from _hole_wizard import BA6
 
 
+class _ViewExtension:
+    def __init__(self) -> None:
+        self.updated: list[tuple[str, int]] = []
+
+    def UpdateStandardViews(self, name: str, view_id: int) -> bool:
+        self.updated.append((name, view_id))
+        return True
+
+
+class _ViewModel:
+    def __init__(self) -> None:
+        self.Extension = _ViewExtension()
+        self.shown: list[tuple[str, int]] = []
+
+    def ShowNamedView2(self, name: str, view_id: int) -> None:
+        self.shown.append((name, view_id))
+
+
+class _ViewAdapter:
+    def __init__(self) -> None:
+        self.currentModel = _ViewModel()
+        self.zoomed: list[object] = []
+
+    def _zoom_to_fit(self, model: object) -> None:
+        self.zoomed.append(model)
+
+
+def test_platen_guide_rebases_back_as_standard_front() -> None:
+    adapter = _ViewAdapter()
+    guide._make_back_view_front(adapter)
+    assert adapter.currentModel.shown == [("", 2), ("", 1)]
+    assert adapter.currentModel.Extension.updated == [("", 1)]
+    assert adapter.zoomed == [adapter.currentModel]
+    assert 'place_view(adapter, str(SOURCE), "*Front"' in Path(
+        drawing.__file__
+    ).read_text(encoding="utf-8")
+
+
 def test_period_6ba_thread_form() -> None:
     assert BA6.designation == "6 BA"
     assert BA6.major_diameter_mm == 2.80
