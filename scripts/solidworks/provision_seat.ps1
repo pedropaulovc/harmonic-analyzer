@@ -34,7 +34,11 @@ if ($WhatIfPreference) {
     $arguments += '--what-if'
 }
 
-if (-not $PSCmdlet.ShouldProcess('SolidWorks build seat', 'Provision drawing and BA Hole Wizard standards')) {
+$shouldRun = $WhatIfPreference -or $PSCmdlet.ShouldProcess(
+    'SolidWorks build seat',
+    'Provision drawing and BA Hole Wizard standards'
+)
+if (-not $shouldRun) {
     return
 }
 

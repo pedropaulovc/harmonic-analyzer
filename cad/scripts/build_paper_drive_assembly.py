@@ -188,7 +188,7 @@ LOCK_Z0 = BAR_FRONT_Z + GUIDE_DEPTH  # -128.9: lock plates on the guide backs,
 
 
 def _validate_thread_contacts(
-    contacts: dict[frozenset[str], float],
+    contacts: dict[frozenset[str], list[float]],
     engagement_lengths: dict[frozenset[str], float],
 ) -> None:
     """Accept only the bounded screw-major/thread-tap engagement volumes."""
@@ -203,7 +203,13 @@ def _validate_thread_contacts(
         raise RuntimeError(
             f"6 BA thread engagement set differs: missing={missing}, extra={extra}"
         )
-    for pair, volume in contacts.items():
+    for pair, volumes in contacts.items():
+        if len(volumes) != 1:
+            raise RuntimeError(
+                f"thread engagement {' & '.join(sorted(pair))} has "
+                f"{len(volumes)} interference bodies; expected exactly 1"
+            )
+        volume = volumes[0]
         expected_volume = (
             math.pi
             * (
@@ -265,7 +271,7 @@ def _check_paper_drive_interference(
             )
 
         details: list[str] = []
-        threaded: dict[frozenset[str], float] = {}
+        threaded: dict[frozenset[str], list[float]] = {}
         chain_contacts: list[float] = []
         chain_mesh_contacts: list[float] = []
         for interference in list(interferences or []):
@@ -279,7 +285,7 @@ def _check_paper_drive_interference(
             volume = float(_read_member(interference, "Volume") or 0.0) * 1e9
             pair = frozenset(names)
             if pair in thread_engagement_lengths:
-                threaded[pair] = volume
+                threaded.setdefault(pair, []).append(volume)
                 continue
             if len(names) == 2 and all(
                 name.startswith(("chain-inner-link", "chain-outer-link"))
@@ -307,6 +313,10 @@ def _check_paper_drive_interference(
         _validate_thread_contacts(threaded, thread_engagement_lengths)
         span.set_attribute("hits", len(details))
         span.set_attribute("thread_engagements", len(threaded))
+        span.set_attribute(
+            "thread_interference_bodies",
+            sum(len(volumes) for volumes in threaded.values()),
+        )
         span.set_attribute("chain_contacts", len(chain_contacts))
         span.set_attribute("chain_mesh_contacts", len(chain_mesh_contacts))
         if details:

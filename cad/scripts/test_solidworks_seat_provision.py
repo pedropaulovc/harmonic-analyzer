@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shutil
 import sqlite3
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -187,5 +188,41 @@ def test_existing_provision_what_if_is_read_only(tmp_path: Path, monkeypatch) ->
 
     assert toolbox == source_root
     assert templates == shared / "templates"
+    assert not shared.exists()
+
+
+def test_powershell_what_if_runs_python_read_only_plan(tmp_path: Path) -> None:
+    powershell = shutil.which("pwsh") or shutil.which("powershell")
+    if powershell is None:
+        pytest.skip("PowerShell is unavailable")
+
+    source_root = tmp_path / "stock"
+    database = source_root / provision.DATABASE_RELATIVE
+    database.parent.mkdir(parents=True)
+    _fixture_database(database)
+    shared = tmp_path / "shared"
+    repo_root = Path(__file__).resolve().parents[2]
+    wrapper = repo_root / "scripts" / "solidworks" / "provision_seat.ps1"
+    result = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-File",
+            str(wrapper),
+            "-WhatIf",
+            "-NoConfigure",
+            "-SourceToolboxRoot",
+            str(source_root),
+            "-SharedRoot",
+            str(shared),
+        ],
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "provision plan:" in result.stdout + result.stderr
     assert not shared.exists()
 
