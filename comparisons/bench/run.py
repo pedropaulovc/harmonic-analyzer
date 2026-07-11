@@ -249,7 +249,8 @@ def run_opus(prompt: str, images: list[Path], sandbox: Path,
     imgs = ", ".join(f"./{im.name}" for im in images)
     full = (prompt + f"\n\nThe stimulus image(s) are in this directory: {imgs}. "
             "Use the Read tool to view each, then respond with ONLY the JSON object.")
-    cmd = ["claude", "-p", "--model", "opus", "--output-format", "json",
+    cmd = ["claude", "-p", "--model", "opus", "--effort", "high",
+           "--output-format", "json",
            "--permission-mode", "bypassPermissions", full]
     try:
         proc = subprocess.run(cmd, cwd=str(sandbox), capture_output=True, text=True,
