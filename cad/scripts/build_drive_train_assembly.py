@@ -2283,10 +2283,15 @@ async def build(adapter) -> dict[str, str]:
         label=f"cylinder-gear 0 axial anchor d={abs(seed_cyl_o[2]):.2f}",
         verify=(seed_cyl, seed_cyl_o),
     )
-    # Slot audit -- CHEAP (one IComponent2::GetMates; a MateGroup tree walk
-    # here would cost more than the ladder saves): the seed slice must be
-    # exactly the two mates above, the dim second, both external => the
-    # ladder's slot map is [radial=0, axial dim=1] in tree order.
+    # Slot audit, two layers (codex #240; a MateGroup tree walk here -- the
+    # cone path's external_mate_rows -- would cost ~100 s, more than the
+    # ladder saves). Layer 1, SHAPE (cheap, one IComponent2::GetMates): the
+    # seed slice must be exactly the two mates above with the dim second.
+    # GetMates order is not the CopyWithMates2 slot contract (that is
+    # MateGroup tree order), so layer 2 validates the ACTUAL slot source at
+    # runtime: every copy's pre-put translation is checked in the loop below
+    # -- a mis-slotted Values array re-values the live dim to 0.0 (the _cwm
+    # contract) and the copy lands on station 0, failing copy 1 immediately.
     dump = component_mate_dump(adapter, seed_cyl)
     if len(dump) != 2 or dump[0]["mm"] is not None or dump[1]["mm"] is None:
         raise RuntimeError(
@@ -2315,6 +2320,23 @@ async def build(adapter) -> dict[str, str]:
                 raise RuntimeError(
                     f"cylinder-gear copy {j}: expected 1 new component,"
                     f" got {new}")
+            # Layer-2 slot validation, BEFORE the put (which would mask the
+            # translation until the closing solve snapped it back): the copy
+            # must land translation-exact on its station off the re-valued
+            # axial dim alone. A wrong slot/side lands it on station 0 or
+            # 2 * the dim off -- fail on copy 1, naming the cause.
+            got = list(component_transform(adapter, new[0]))
+            err = math.dist(
+                [v * 1000.0 for v in got[9:12]],
+                [seed_cyl_arr[9] * 1000.0, seed_cyl_arr[10] * 1000.0,
+                 seed_cyl_arr[11] * 1000.0 + j * Z_PITCH])
+            if err > 0.05:
+                raise RuntimeError(
+                    f"cylinder-gear copy {j} landed {err:.3f} mm off its"
+                    " station pre-put -- the CopyWithMates2 slot order on"
+                    " this seat/model does not match the audited"
+                    " [radial, axial dim] map (or the flip side moved);"
+                    " re-derive the slot map (external_mate_rows)")
             put = list(seed_cyl_arr)
             put[11] += j * Z_PITCH / 1000.0
             put_component_pose(adapter, new[0], put)

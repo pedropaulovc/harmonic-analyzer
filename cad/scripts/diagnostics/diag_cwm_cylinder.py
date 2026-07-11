@@ -217,8 +217,14 @@ async def _probe(adapter: Any) -> dict[str, str]:
         raise RuntimeError(f"slot shapes off: {[r['type'] for r in ext]}")
     dist_slot, gear_slot = dist_slots[0], gear_slots[0]
     dist_row, gear_row = ext[dist_slot], ext[gear_slot]
-    pitch_mm, flip = float(dist_row["mm"]), bool(dist_row["flip"])
-    prev = next(i for i in dist_row["instances"] if i != seed)
+    flip = bool(dist_row["flip"])
+    # The one-pitch step comes from ADJACENT-by-z station transforms, NOT
+    # from the seed's own dim partner/value: under the production star
+    # ladder every copy's axial dim references STATION 0 (value j * pitch),
+    # so the dim partner is the far end of the drum and its value the whole
+    # stack span (codex #240). The dim's FLIP side still transfers to the
+    # one-pitch copies -- same plane pair, same +z side, any magnitude.
+    prev = cyls[-2]
     seed_cone = next(i for i in gear_row["instances"] if i != seed)
     # cyl instance -> (its cone, its authored mesh-mate name), for every
     # station: the copies' targets AND the stored-form ground truth.
@@ -239,9 +245,13 @@ async def _probe(adapter: Any) -> dict[str, str]:
     prev_a16 = list(component_transform(adapter, prev))
     seed_org, prev_org = _org_mm(seed_a16), _org_mm(prev_a16)
     step = [seed_org[k] - prev_org[k] for k in range(3)]
-    if abs(math.dist(seed_org, prev_org) - pitch_mm) > TOL_MM:
-        raise RuntimeError(f"stack step {math.dist(seed_org, prev_org):.3f}"
-                           f" != pitch dim {pitch_mm:.3f}")
+    pitch_mm = math.dist(seed_org, prev_org)
+    prev2_org = _org_mm(list(component_transform(adapter, cyls[-3])))
+    if abs(math.dist(prev_org, prev2_org) - pitch_mm) > TOL_MM:
+        raise RuntimeError(
+            f"stack pitch not uniform: {pitch_mm:.3f} vs"
+            f" {math.dist(prev_org, prev2_org):.3f} between the last three"
+            " stations -- adjacent-transform pitch derivation is invalid")
     log(f"seed {seed}: slots dist={dist_slot} gear={gear_slot}"
         f" pitch={pitch_mm:.3f} flip={flip} status={seed_status}")
     log(f"seed mesh '{gear_row['name']}' vs {seed_cone}"
