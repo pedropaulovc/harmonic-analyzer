@@ -191,7 +191,7 @@ def _draw_project_title_block(adapter: Any) -> None:
         ('DWG $PRPSHEET:"Number"    REV $PRPSHEET:"Revision"', 0.052),
         ('MATERIAL $PRPSHEET:"Material Specification"', 0.042),
         ('FINISH $PRPSHEET:"Finish"    QTY $PRPSHEET:"Quantity"', 0.032),
-        ("SCALE 1:1 UNLESS NOTED    THIRD ANGLE", 0.022),
+        ('SCALE $PRP:"SW-Sheet Scale"    THIRD ANGLE', 0.022),
         ("SHEET 1 OF 1", 0.011),
     )
     for text, y in rows:
