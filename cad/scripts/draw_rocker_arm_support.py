@@ -31,6 +31,7 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -72,9 +73,11 @@ ISO_CENTER = (0.360, 0.210)
 FRONT_KEEP = {
     "Depth": (0.075, 0.252),      # 177.8 overall width (extrude span), above
     "WinWidth": (0.075, 0.235),   # 165.1 window square, inside the opening
-    "WinHeight": (0.024, 0.200),
+    # Both window dims INSIDE the opening: outside the view a 165.1 vertical
+    # reads as an overall height and contradicts the 177.8 wall height.
+    "WinHeight": (0.042, 0.200),
     "CavWidth": (0.075, 0.172),   # 127 cavity square, seen through the window
-    "CavDepth": (0.052, 0.200),
+    "CavDepth": (0.056, 0.200),
 }
 RIGHT_KEEP = {
     "WallHeight": (0.182, 0.200),  # 177.8 wall height, right of the taper
@@ -106,11 +109,10 @@ _NOTES = (
     ),
     (
         "2. GRAY-IRON CASTING: AS-CAST\n"
-        "   SURFACES +/-0.8; MACHINED\n"
-        "   SURFACES +/-0.25; HOLE CENTRES\n"
-        "   +/-0.20; ANGLES +/-1.0 DEG. MAY\n"
-        "   BE MILLED FROM SOLID CLASS 30\n"
-        "   BAR (NO DRAFT IS MODELLED)."
+        "   +/-0.8; MACHINED +/-0.25; HOLE\n"
+        "   CENTRES +/-0.20; ANGLES +/-1.0\n"
+        "   DEG. MAY BE MILLED FROM SOLID\n"
+        "   CLASS 30 BAR (NO DRAFT MODELLED)."
     ),
     (
         "3. REMOVE BURRS AND BREAK SHARP\n"
@@ -122,32 +124,33 @@ _NOTES = (
         "   THE MOUNTING SEAT)."
     ),
     (
-        "5. 4X TAPPED HOLES 9/16-12 UNC-2B\n"
-        "   THRU THE 6.35 THICK FOOT LAND;\n"
-        "   TAP FROM THE FOOT BOTTOM FACE\n"
-        "   (DATUM A). SEE HOLE TABLE;\n"
-        "   ORIGIN AT THE FOOT CORNER.\n"
-        "   TABLE THREAD DEPTH 0.000 MEANS\n"
-        "   TAPPED THRU."
+        "5. TRAPEZOID TAPER IS SYMMETRIC\n"
+        "   ABOUT THE WALL CENTRELINE."
     ),
     (
-        "6. WINDOW RIM: CHAMFER 1.27 X 45\n"
+        "6. 4X TAPPED HOLES 9/16-12 UNC-2B\n"
+        "   THRU THE 6.35 FOOT LAND, FROM\n"
+        "   DATUM A. SEE HOLE TABLE; DEPTH\n"
+        "   0.000 MEANS TAPPED THRU. ORIGIN\n"
+        "   = SEAT CORNER (THE 1.27 CHAMFER\n"
+        "   TRIMS THE SEAT TO 175.26 X 60.96)."
+    ),
+    (
+        "7. WINDOW RIM: CHAMFER 1.27 X 45\n"
         "   DEG ALL AROUND, BOTH FACES AND\n"
         "   SLANT SURROUNDS."
     ),
     (
-        "7. INNER FRAME CORNERS: FILLET\n"
+        "8. INNER FRAME CORNERS: FILLET\n"
         "   R12.7, 4 PLACES."
     ),
     (
-        "8. CENTRAL WEB 6.35 THICK, CENTRED\n"
-        "   (WINDOW CUT FROM BOTH FACES).\n"
-        "   WINDOW AND CAVITY SQUARES ARE\n"
-        "   CENTRED BOTH WAYS ON THE WALL."
+        "9. CENTRAL WEB 6.35 THICK, CENTRED;\n"
+        "   WINDOW+CAVITY CENTRED ON WALL."
     ),
     (
-        "9. FINISH: MACHINE GREEN ENAMEL;\n"
-        "   MASK DATUM A AND TAPPED HOLES."
+        "10. FINISH: MACHINE GREEN ENAMEL;\n"
+        "    MASK DATUM A AND TAPPED HOLES."
     ),
 )
 
@@ -193,8 +196,12 @@ async def build(adapter: Any) -> dict[str, str]:
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 2))
     bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=(1, 2))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
-    for view in (front, right, bottom, iso):
+    for view in (front, bottom, iso):
         set_hidden_lines_removed(adapter, view)
+    # The taper view carries the internal story: greyed hidden lines show the
+    # central web band and cavity floor, so "window cut from both faces,
+    # leaving the web" is visible rather than prose-only.
+    set_hidden_lines_visible(adapter, right)
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
