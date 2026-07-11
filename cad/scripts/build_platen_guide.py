@@ -27,7 +27,6 @@ from _common import (
     SketchDims,
     add_line_chain,
     apply_color,
-    apply_custom_properties,
     apply_material,
     check,
     define_rectilinear_chain,
@@ -41,13 +40,13 @@ from _common import (
     save_part_and_images,
     set_global,
     volume_check,
-    _dim_owner_feature,
-    _feature_by_name,
-    _iter_features,
-    _read_member,
 )
-import _config
 import _telemetry
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
 from _holes import (
     CLEARANCE_MM,
     HoleSpec,
@@ -78,52 +77,8 @@ SCREW_STATION_X = (30.0, 90.0, 150.0, 210.0, 270.0)
 SCREW_HOLE_DEPTH = 3.0
 
 
-def _mark_dimensions_for_drawing(
-    adapter, feature_name: str, dimension_names: set[str]
-) -> None:
-    """Mark only explicit manufacturing dimensions for drawing import."""
-    feature = _feature_by_name(adapter, feature_name)
-    marked: set[str] = set()
-    display = _read_member(feature, "GetFirstDisplayDimension")
-    for _ in range(1000):
-        if not display:
-            break
-        dimension = display.GetDimension2(0)
-        name = str(_read_member(dimension, "Name"))
-        if _dim_owner_feature(dimension) == feature_name and name in dimension_names:
-            display.MarkedForDrawing = True
-            if not bool(_read_member(display, "MarkedForDrawing")):
-                raise RuntimeError(f"{name}@{feature_name}: mark-for-drawing failed")
-            marked.add(name)
-        display = feature.GetNextDisplayDimension(display)
-    missing = dimension_names - marked
-    if missing:
-        raise RuntimeError(
-            f"{feature_name}: dimensions not marked for drawing: {sorted(missing)}"
-        )
-
-
-def _clear_dimensions_for_drawing(adapter) -> None:
-    for feature in _iter_features(adapter):
-        display = _read_member(feature, "GetFirstDisplayDimension")
-        for _ in range(1000):
-            if not display:
-                break
-            if bool(_read_member(display, "MarkedForDrawing")):
-                display.MarkedForDrawing = False
-            display = feature.GetNextDisplayDimension(display)
-
-
 def _apply_drawing_properties(adapter) -> None:
-    spec = _config.parts(PART_NAME)
-    apply_custom_properties(
-        adapter,
-        {
-            "Material Specification": str(spec["material_specification"]),
-            "Finish": str(spec["finish"]),
-            "Quantity": str(spec["quantity"]),
-        },
-    )
+    apply_drawing_properties(adapter, PART_NAME)
 
 
 def _make_back_view_front(adapter) -> None:
@@ -226,9 +181,9 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven guide (equations neutral)", v_final, 0.02 * v_holes
     )
 
-    _clear_dimensions_for_drawing(adapter)
-    _mark_dimensions_for_drawing(adapter, "GuideProfile", {"Length", "Height"})
-    _mark_dimensions_for_drawing(adapter, "Guide", {"Depth"})
+    clear_dimensions_for_drawing(adapter)
+    mark_dimensions_for_drawing(adapter, "GuideProfile", {"Length", "Height"})
+    mark_dimensions_for_drawing(adapter, "Guide", {"Depth"})
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
