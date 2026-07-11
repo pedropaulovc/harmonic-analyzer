@@ -104,6 +104,7 @@ SW_TYPELIB = "{83A33D31-27C5-11CE-BFD4-00400513BB57}"
 SW_TYPELIB_VER = (34, 0)
 SW_DOC_PART = 1  # swDocumentTypes_e.swDocPART
 SW_DOC_ASSEMBLY = 2  # swDocumentTypes_e.swDocASSEMBLY
+SW_DOC_DRAWING = 3  # swDocumentTypes_e.swDocDRAWING
 SW_OPEN_SILENT = 1  # swOpenDocOptions_e.swOpenDocOptions_Silent
 
 # SaveAs3 Options bitmask (swSaveAsOptions_e): Silent suppresses the "rebuild the
@@ -496,23 +497,31 @@ def attach_solidworks() -> tuple[Any, str]:
     return sw, revision
 
 
-def package(sw: Any, revision: str, zip_path: Path) -> dict[str, Any]:
-    """Pack-and-Go the top assembly into ``zip_path``.
+def _pack_and_go_document(sw: Any, source: Path, doc_type: int,
+                          zip_path: Path) -> int:
+    """Pack-and-Go ``source`` and all references into a flat zip.
 
     Pack-and-Go bundles a document with every file it references; SetSaveToName2
     with a ``.zip`` target writes a single archive, FlattenToSingleFolder drops
     the original folder tree so the zip opens cleanly anywhere.
     """
-    top = OUT_SLDASM / f"{TOP_ASSEMBLY}.SLDASM"
-
     # Discard any open docs silently first: a dirty referenced child (left by a
     # prior motion verify) would make CloseAllDocuments(True) prompt.
     _discard_open_documents(sw)
     log("discarded any open documents (clean session)")
-    sw.OpenDoc6(str(top), SW_DOC_ASSEMBLY, SW_OPEN_SILENT, "", 0, 0)
-    log(f"opened {TOP_ASSEMBLY}")
+    sw.OpenDoc6(str(source), doc_type, SW_OPEN_SILENT, "", 0, 0)
+    log(f"opened {source.name}")
 
-    ext = sw.IActiveDoc2.Extension
+    active = sw.IActiveDoc2
+    if active is None:
+        raise RuntimeError(f"SolidWorks did not open {source}")
+    active_path = Path(str(active.GetPathName())).resolve()
+    if active_path != source.resolve():
+        raise RuntimeError(
+            f"active document {active_path} != Pack-and-Go source {source.resolve()}"
+        )
+
+    ext = active.Extension
     pg = ext.GetPackAndGo()
     if pg is None:
         raise RuntimeError("GetPackAndGo returned None")
@@ -537,6 +546,16 @@ def package(sw: Any, revision: str, zip_path: Path) -> dict[str, Any]:
     # Run-don't-build: the only proof Pack-and-Go succeeded is the file on disk.
     if not zip_path.exists() or zip_path.stat().st_size == 0:
         raise RuntimeError(f"Pack-and-Go produced no zip at {zip_path}")
+
+    return names_count
+
+
+def package(sw: Any, revision: str, zip_path: Path) -> dict[str, Any]:
+    """Pack-and-Go the top assembly into ``zip_path``."""
+    top = OUT_SLDASM / f"{TOP_ASSEMBLY}.SLDASM"
+    names_count = _pack_and_go_document(
+        sw, top, SW_DOC_ASSEMBLY, zip_path
+    )
 
     return {
         "zip": zip_path,
@@ -943,14 +962,57 @@ def stage_drawings(stage: Path) -> dict[str, str]:
             staged[f"{drawing_name}:{kind}"] = str(
                 destination.relative_to(stage)
             ).replace("\\", "/")
-            if kind == "slddrw":
-                native_dir = stage / "solidworks"
-                native_dir.mkdir(parents=True, exist_ok=True)
-                native_copy = native_dir / source.name
-                shutil.copy2(source, native_copy)
-                staged[f"{drawing_name}:solidworks_slddrw"] = str(
-                    native_copy.relative_to(stage)
-                ).replace("\\", "/")
+    return staged
+
+
+def _merge_pack_and_go_zip(archive: Path, destination: Path) -> None:
+    """Merge a flat Pack-and-Go zip, rejecting conflicting duplicate files."""
+    unpacked = archive.with_suffix("")
+    if unpacked.exists():
+        shutil.rmtree(unpacked)
+    unpacked.mkdir(parents=True)
+    try:
+        shutil.unpack_archive(str(archive), str(unpacked), "zip")
+        for source in unpacked.iterdir():
+            if not source.is_file():
+                raise RuntimeError(
+                    f"Pack-and-Go archive is not flat: {source.relative_to(unpacked)}"
+                )
+            target = destination / source.name
+            if not target.exists():
+                shutil.copy2(source, target)
+                continue
+            if _sha256(source) != _sha256(target):
+                raise RuntimeError(
+                    f"Pack-and-Go filename collision has different content: {source.name}"
+                )
+    finally:
+        shutil.rmtree(unpacked, ignore_errors=True)
+
+
+def package_drawings(sw: Any, stage: Path) -> dict[str, str]:
+    """Pack each native drawing with its model references into ``solidworks/``."""
+    native_dir = stage / "solidworks"
+    native_dir.mkdir(parents=True, exist_ok=True)
+    staged: dict[str, str] = {}
+    for drawing_name, outputs in DRAWING_OUTPUTS.items():
+        source = outputs["slddrw"]
+        archive = RELEASE_DIR / f"_{drawing_name}-drawing-packandgo.zip"
+        archive.unlink(missing_ok=True)
+        try:
+            _pack_and_go_document(sw, source, SW_DOC_DRAWING, archive)
+            _merge_pack_and_go_zip(archive, native_dir)
+        finally:
+            archive.unlink(missing_ok=True)
+
+        native_drawing = native_dir / source.name
+        if not native_drawing.is_file() or native_drawing.stat().st_size == 0:
+            raise RuntimeError(
+                f"drawing Pack-and-Go omitted its source document: {source.name}"
+            )
+        staged[f"{drawing_name}:solidworks_slddrw"] = str(
+            native_drawing.relative_to(stage)
+        ).replace("\\", "/")
     return staged
 
 
@@ -978,11 +1040,12 @@ def bundle(sw: Any, revision: str, version: str,
     sw_dir.mkdir()
     shutil.unpack_archive(str(pg_tmp), str(sw_dir), "zip")
     pg_tmp.unlink()
-    facts["solidworks_files"] = sum(1 for _ in sw_dir.iterdir())
 
     # 2. Neutral exports (STEP / STL / PNG) into the same stage.
     facts.update(export_neutral(sw, stage))
     facts["drawings"] = stage_drawings(stage)
+    facts["drawings"].update(package_drawings(sw, stage))
+    facts["solidworks_files"] = sum(1 for path in sw_dir.iterdir() if path.is_file())
 
     # 3. Scene graph (mm): per-component transforms + mesh keys + colours, so a
     #    consumer can render the bundle with render_offline.py (no SolidWorks).

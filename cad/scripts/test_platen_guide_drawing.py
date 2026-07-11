@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -141,9 +142,26 @@ def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None
     staged = cut_release.stage_drawings(stage)
     assert staged == {
         "platen_guide:slddrw": "slddrw/platen-guide.SLDDRW",
-        "platen_guide:solidworks_slddrw": "solidworks/platen-guide.SLDDRW",
         "platen_guide:pdf": "pdf/platen-guide.pdf",
         "platen_guide:png": "png/platen-guide_drawing.png",
     }
     for relpath in staged.values():
         assert (stage / relpath).is_file()
+
+    def fake_pack(_sw, source, doc_type, archive):
+        assert source == sources["slddrw"]
+        assert doc_type == cut_release.SW_DOC_DRAWING
+        with zipfile.ZipFile(archive, "w") as package:
+            package.writestr(source.name, source.read_bytes())
+            package.writestr("platen-guide.SLDPRT", b"referenced model")
+        return 2
+
+    monkeypatch.setattr(cut_release, "_pack_and_go_document", fake_pack)
+    monkeypatch.setattr(cut_release, "RELEASE_DIR", tmp_path / "release")
+    cut_release.RELEASE_DIR.mkdir()
+    native = cut_release.package_drawings(object(), stage)
+    assert native == {
+        "platen_guide:solidworks_slddrw": "solidworks/platen-guide.SLDDRW"
+    }
+    assert (stage / "solidworks" / "platen-guide.SLDDRW").read_bytes() == b"slddrw"
+    assert (stage / "solidworks" / "platen-guide.SLDPRT").read_bytes() == b"referenced model"

@@ -518,6 +518,12 @@ def provision(
     existing_manifest = _read_provision_manifest(source_root)
     if existing_manifest is not None:
         verify_database(source_database)
+        _telemetry.info(
+            f"provision plan: verify existing={source_root}; "
+            f"templates={template_dir}"
+        )
+        if what_if:
+            return source_root, template_dir
         _copy_templates(template_dir)
         if configure:
             configure_registry(version, source_root, template_dir)

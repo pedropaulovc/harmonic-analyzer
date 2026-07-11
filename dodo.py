@@ -402,6 +402,24 @@ def _sldasm(stem: str) -> str:
     return str(artefact_for(SCRIPTS_DIR / f"build_{stem}_assembly.py").resolve())
 
 
+def _part_execution_token(stem: str) -> str:
+    """Local signal changed whenever a part artefact is rebuilt or restored.
+
+    Recipe digests intentionally ignore SolidWorks persistent-reference IDs for
+    cross-seat cache stability.  Drawings need the orthogonal execution signal:
+    a same-recipe rebuild/cache restore may replace the model identity even when
+    the recipe digest is unchanged.
+    """
+    name = stem.replace("_", "-")
+    return str((CAD_OUT / "sldprt" / f".{name}.execution").resolve())
+
+
+def _stamp_part_execution(stem: str) -> None:
+    token = Path(_part_execution_token(stem))
+    token.parent.mkdir(parents=True, exist_ok=True)
+    token.write_text(f"{time.time_ns()}\n", encoding="utf-8")
+
+
 def _stage_name(label: str) -> str:
     """The telemetry ``service.name`` (Aspire "resource" column) a subprocess with
     this doit task ``label`` should advertise, so a trace groups by PIPELINE STAGE
@@ -902,6 +920,7 @@ def _cached_part_action(stem: str, script: Path) -> None:
         outputs = _part_cache_outputs(stem)
         if _cache.restore(key, outputs, label):
             sp.set_attribute("cache", "hit")
+            _stamp_part_execution(stem)
             return
         with _com_seat(label):
             # Re-probe under the seat: we may have blocked for the seat for minutes
@@ -909,9 +928,11 @@ def _cached_part_action(stem: str, script: Path) -> None:
             # rebuild (the fleet cache-split win; fable/codex review).
             if _cache.restore(key, outputs, label):
                 sp.set_attribute("cache", "hit-after-wait")
+                _stamp_part_execution(stem)
                 return
             sp.set_attribute("cache", "miss")
             _exec([sys.executable, str(script)], label, log_stem=f"part-{stem}")
+            _stamp_part_execution(stem)
         # Publish OUTSIDE the seat -- an Azure upload is network, not COM, so it must
         # not hold the seat the next task is waiting for.
         _cache.store(key, outputs, label)
@@ -1047,7 +1068,7 @@ def task_part():
         yield {
             "name": stem,
             "file_dep": _part_file_deps(script, stem),
-            "targets": [_sldprt(stem)],
+            "targets": [_sldprt(stem), _part_execution_token(stem)],
             # Remote-cache shortcut + COM seat lock wrap the build (_cached_part_action).
             "actions": [(_cached_part_action, [stem, script])],
             "clean": True,
@@ -1089,6 +1110,18 @@ class _RecipeTracker:
         last = values.get("_recipe_digest")
         _RECIPE_CHANGED[self.stem] = (last is None or last != self.digest)
         return (last is not None and last == self.digest)
+
+
+def _assembly_run_mode(stem: str, target_missing: bool,
+                       recipe_changed: bool) -> tuple[str, str]:
+    """Choose FULL/REFRESH without sending known contacts to the generic gate."""
+    if target_missing:
+        return "full", "target missing"
+    if recipe_changed:
+        return "full", "recipe changed"
+    if stem == "paper_drive":
+        return "full", "bounded thread-contact gate requires full rebuild"
+    return "refresh", "referenced artefact changed"
 
 
 def build_or_refresh(stem, dependencies, changed, targets):
@@ -1153,8 +1186,8 @@ def build_or_refresh(stem, dependencies, changed, targets):
 
             asm_script = SCRIPTS_DIR / f"build_{stem}_assembly.py"
             hooks = [SCRIPTS_DIR / h for h in POST_ASSEMBLY.get(stem, ())]
-            if target_missing or recipe_changed:
-                why = "target missing" if target_missing else "recipe changed"
+            mode, why = _assembly_run_mode(stem, target_missing, recipe_changed)
+            if mode == "full":
                 sp.set_attribute("mode", "full")
                 _exec([sys.executable, str(asm_script)], f"FULL build {stem} ({why})",
                       log_stem=f"assembly-{stem}")
@@ -1279,11 +1312,15 @@ def task_drawing():
         spec = DRAWINGS_BY_NAME[stem]
         script = spec.script.resolve()
         source = _sldprt(spec.part)
+        source_execution = _part_execution_token(spec.part)
         runtime = [*_helper_deps(script), _submodule_dep()]
         yield {
             "name": stem,
             "file_dep": sorted(
-                {str(script), source, *runtime, *(str(path.resolve()) for path in spec.assets)}
+                {
+                    str(script), source, source_execution, *runtime,
+                    *(str(path.resolve()) for path in spec.assets),
+                }
             ),
             "targets": [str(path.resolve()) for path in spec.outputs.values()],
             "actions": [
