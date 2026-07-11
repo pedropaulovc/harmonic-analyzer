@@ -33,7 +33,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 TITLE_X0 = 0.278
 TITLE_Y0 = 0.006
 TITLE_X1 = ASME_B_WIDTH_M - 0.006
-TITLE_Y1 = 0.070
+TITLE_Y1 = 0.080  # raised from 0.070 to fit the DRAWN/CHECKED production-control row
 
 
 def _point_xy(adapter: Any, point: Any) -> tuple[float, float] | None:
@@ -183,12 +183,15 @@ def _draw_project_title_block(adapter: Any) -> None:
         (TITLE_X0, TITLE_Y1, TITLE_X0, TITLE_Y0),
     ):
         _line(adapter, x0, y0, x1, y1)
-    for y in (0.017, 0.027, 0.037, 0.047, 0.057):
+    for y in (0.017, 0.027, 0.037, 0.047, 0.057, 0.067):
         _line(adapter, TITLE_X0, y, TITLE_X1, y)
 
+    # DRAWN carries the drafter ($PRPSHEET); CHECKED / DATE are blank fill-ins a
+    # machinist signs on the printed copy. Revision Description rides the DWG/REV row.
     rows = (
-        ('$PRPSHEET:"Title"', 0.064),
-        ('DWG $PRPSHEET:"Number"    REV $PRPSHEET:"Revision"', 0.052),
+        ('$PRPSHEET:"Title"', 0.074),
+        ('DRAWN $PRPSHEET:"Drawn By"    CHECKED    DATE', 0.062),
+        ('DWG $PRPSHEET:"Number"    REV $PRPSHEET:"Revision"    $PRPSHEET:"Revision Description"', 0.052),
         ('MATERIAL $PRPSHEET:"Material Specification"', 0.042),
         ('FINISH $PRPSHEET:"Finish"    QTY $PRPSHEET:"Quantity"', 0.032),
         ('SCALE $PRP:"SW-Sheet Scale"    THIRD ANGLE', 0.022),
