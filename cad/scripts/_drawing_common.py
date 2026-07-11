@@ -347,7 +347,9 @@ def insert_marked_dimensions(adapter: Any, view: Any) -> list[Any]:
     )
     if not result or isinstance(result, str):
         return []
-    annotations = list(result)
+    annotations = [
+        _sw_type_info.flagged(annotation, "IAnnotation") for annotation in result
+    ]
     names = sorted(
         name
         for name in (dimension_name(adapter, annotation) for annotation in annotations)
@@ -438,6 +440,44 @@ def set_dimension_callouts(
             f"dimension callouts not applied: {sorted(remaining)}"
         )
     adapter.currentModel.EditRebuild3()
+
+
+def add_edge_dimension(
+    adapter: Any,
+    view: Any,
+    *,
+    p0: tuple[float, float],
+    p1: tuple[float, float],
+    text_xy: tuple[float, float],
+    label: str,
+) -> Any:
+    """Dimension across two edges picked at explicit sheet points (meters).
+
+    The adapter's ``add_overall_dimension`` derives its picks from
+    ``IView.GetOutline``, which pads the geometry with a whitespace margin, so
+    its coordinate picks can miss.  Recipes know their layout exactly — the
+    explicit points make the pick deterministic.  Fails loud on either pick or
+    on dimension creation.
+    """
+    draw = adapter.currentModel
+    name = view_name(adapter, view)
+    if not draw.ActivateView(name):
+        raise RuntimeError(f"failed to activate drawing view {name!r}")
+    draw.ClearSelection2(True)
+    for index, (x, y) in enumerate((p0, p1)):
+        selected = draw.Extension.SelectByID2(
+            "", "EDGE", x, y, 0.0, index > 0, 0, null_callout(), 0
+        )
+        if not selected:
+            raise RuntimeError(
+                f"failed to select {label} edge {index} at sheet ({x:g}, {y:g})"
+            )
+    dimension = draw.AddDimension2(text_xy[0], text_xy[1], 0.0)
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    if dimension is None:
+        raise RuntimeError(f"failed to add the {label} dimension")
+    return dimension
 
 
 def hole_table_template(adapter: Any) -> Path:
