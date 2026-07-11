@@ -77,31 +77,58 @@ def prepare_reference(pair: dict, max_px: int = 1600, out: Path | None = None) -
     return out
 
 
-def _content_mask(img: Image.Image, thresh: int = 30) -> Image.Image:
+def _content_mask(img: Image.Image, thresh: int = 30,
+                  background: str | None = None) -> Image.Image:
     """255 where render content, 0 where viewport background.
 
     SolidWorks captures sit on a vertical-gradient background, so a plain
     corner-colour test fails; flood-filling from the corners follows the
     gradient and stops at content edges.
+
+    ``background`` (colour name/hex — the RENDER's own uniform backdrop, from
+    the renderer's sidecar ``render_bg``, NOT the manifest's presentation
+    colour): only corners actually SHOWING that colour seed the flood. Both
+    engines lay the model over an exact uniform colour (Blender: the pair's
+    reference background; SolidWorks: forced plain white), and a macro framing
+    can put model at a corner (ch12-p001: the teal base plate spans the bottom
+    edge) — an unconditional corner flood then starts inside the model and
+    eats every connected region within thresh of it (the base plate AND the
+    rocker-arm support). A corner showing model is simply skipped; if no
+    corner matches, the mask is all-content. ``None`` (pre-``render_bg``
+    sidecar) keeps the unconditional flood.
     """
-    from PIL import ImageChops, ImageDraw
+    from PIL import ImageChops, ImageColor, ImageDraw
 
     rgb = img.convert("RGB")
     sentinel = (255, 0, 255)
+    bg_rgb = ImageColor.getrgb(background) if background else None
     w, h = rgb.size
     for xy in ((0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)):
-        if rgb.getpixel(xy) != sentinel:
-            ImageDraw.floodfill(rgb, xy, sentinel, thresh=thresh)
+        px = rgb.getpixel(xy)
+        if px == sentinel:
+            continue
+        if bg_rgb is not None and max(
+                abs(a - b) for a, b in zip(px, bg_rgb)) > thresh:
+            continue  # corner shows model, not background -- don't seed here
+        ImageDraw.floodfill(rgb, xy, sentinel, thresh=thresh)
     bg = Image.new("RGB", rgb.size, sentinel)
     return ImageChops.difference(rgb, bg).convert("L").point(lambda v: 255 if v else 0)
 
 
-def trim_render_file(path: Path, margin_frac: float = 0.01) -> None:
+def trim_render_file(path: Path, margin_frac: float = 0.01,
+                     background: str | None = None) -> None:
     """Crop a captured render to its content + a small margin, in place.
 
     ViewZoomToFit2 fits the SolidWorks window aspect, not the capture canvas,
     so raw captures carry large background margins. render_compare captures
     on an oversized canvas and calls this to store a content-tight image.
+
+    ``background``: the capture's uniform backdrop colour, forwarded to
+    ``_content_mask`` so a model region touching a corner is not flood-eaten
+    out of the trim bbox (and thereby permanently cropped from the stored
+    render). Both callers know their backdrop — render_offline composites onto
+    the pair's reference colour, render_compare forces plain white — so pass
+    it; ``None`` keeps the legacy unconditional corner flood.
     """
     # Load + close the source handle BEFORE writing back to the same path:
     # Image.open is lazy and keeps `path` open for reading, so saving to the same
@@ -110,7 +137,7 @@ def trim_render_file(path: Path, margin_frac: float = 0.01) -> None:
     # JPEG makes it intermittent (random EINVAL/EACCES across a 400-file batch).
     with Image.open(path) as src:
         src.load()
-        bbox = _content_mask(src).getbbox()
+        bbox = _content_mask(src, background=background).getbbox()
         if not bbox:
             return
         m = round(max(src.size) * margin_frac)
@@ -126,6 +153,27 @@ def trim_render_file(path: Path, margin_frac: float = 0.01) -> None:
             time.sleep(0.25)
 
 
+def render_bg(pair_id: str) -> str | None:
+    """The uniform colour behind the render's pixels, recorded by the renderer
+    in its sidecar (``render_bg``). Fallbacks for pre-key sidecars: an
+    ``engine: blender`` tag proves the render used the pair's reference
+    background, and a sidecar with NO engine key is provably a legacy
+    SolidWorks capture (only render_compare ever wrote engine-less sidecars,
+    always under force_plain_white_background) — so it reads as white rather
+    than degrading to the model-corner-eating unconditional flood. Only a
+    missing/unreadable sidecar returns None (unconditional flood)."""
+    sc = pair_paths(pair_id)["render"].with_name(f"{pair_id}.meta.json")
+    try:
+        meta = json.loads(sc.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if "render_bg" in meta:
+        return meta["render_bg"]
+    if meta.get("engine") == "blender":
+        return meta.get("reference", {}).get("background", "black")
+    return "white"
+
+
 def _fitted_render(pair_id: str, ref_size: tuple[int, int], align: dict | None):
     """Content-trimmed render scaled to fit the ref frame.
 
@@ -136,7 +184,7 @@ def _fitted_render(pair_id: str, ref_size: tuple[int, int], align: dict | None):
     """
     align = align or {}
     ren = Image.open(pair_paths(pair_id)["render"])
-    mask = _content_mask(ren)
+    mask = _content_mask(ren, background=render_bg(pair_id))
     bbox = mask.getbbox() or (0, 0, ren.width, ren.height)
     ren, mask = ren.crop(bbox), mask.crop(bbox)
     rw, rh = ref_size

@@ -674,7 +674,13 @@ def feature_name_by_type(adapter: Any, type_name: str) -> str:
     for _ in range(5000):
         if not feat:
             break
-        _flag(feat, "IFeature")
+        # Flag only the two methods the walk calls (the c992057 pattern):
+        # full IFeature flagging is a GetIDsOfNames round-trip per method
+        # name per feature, uncached across walks (fresh CDispatch each
+        # GetNextFeature), which taxed every extrude_at_offset with an
+        # O(features) flag storm. GetTypeName2 must stay method-dispatched
+        # or the comparison below silently never matches.
+        _flag_only(feat, "GetTypeName2", "GetNextFeature")
         try:
             if _read_member(feat, "GetTypeName2") == type_name:
                 found = str(_read_member(feat, "Name"))
@@ -1013,7 +1019,8 @@ async def apply_material(adapter: Any, material: str) -> None:
     )
 
 
-CASTING_GREEN = (0.13, 0.45, 0.42)  # sampled from the ch30 studio photos
+CASTING_GREEN = (0.03, 0.45, 0.38)  # re-sampled from the ch30/ch17/ch18 plates
+# (2026-07-08): R≈0.05·G, B≈0.85·G — the previous 0.13 red channel rendered teal
 # M6.8 photo-tuning palette, all sampled from the ch30 plates:
 POLISHED_STEEL = (0.65, 0.64, 0.63)  # frame columns (p006 column average)
 PANEL_BLACK = (0.08, 0.08, 0.09)  # platen board / clips / knife hardware
@@ -1185,9 +1192,9 @@ async def report_mass_properties(adapter: Any) -> None:
 # Assembly helpers (M6)
 # ---------------------------------------------------------------------------
 
-# MIRROR_PLANE (the per-part machine-chirality table) moved to _transforms.py,
-# next to its only consumer mirror_placement -- it is assembly-placement data, no
-# part reads it, so keeping it off _common keeps it off every part's input hash.
+# The MIRROR_PLANE per-part chirality table and its consumer mirror_placement
+# are GONE (#151): every assembly is authored machine-handed and components
+# insert on their exact machine transforms (see _transforms.py).
 
 # swConstrainedStatus_e
 UNDER_CONSTRAINED = 2

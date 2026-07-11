@@ -13,7 +13,7 @@ Dimensions: cad/DIMENSIONS.md ch. 14 layout (M6.10) -- shank sized to the
 Layout: axis along Y, AUTHORED IN FINAL ORIENTATION (pointing up): head
 underside at y = -6 rising to the under-head plane y = 0, shank 0..+63
 (base 44.3 above the 6.5 cbore + ~18.7 into the support foot, inserted at
-machine y 6.5). Symmetric about local x = 0 (MIRROR_PLANE ("x", 0.0)).
+machine y 6.5). Symmetric about local x = 0.
 
 Run (SolidWorks already open)::
 

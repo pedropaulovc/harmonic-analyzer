@@ -15,17 +15,19 @@ run, then they hold:
 
 Each is proven the same way the crank is: a short Basic Motion sweep on the
 STANDALONE subassembly that carries the DOF (drive-train for p1/p2, channel for
-p0 -- far lighter than the flexible full device), with the park driver suppressed
-so the joint is free and a rotary motor on the swing axis. The sampled pose of
-the driven member must advance with the motor (``assert_motion_progressed``); a
-frozen member would mean the "DOF" is actually still pinned. The sub is NEVER
-saved (the on-disk rest pose stays bit-exact); each drive exports a short mp4.
+p0 -- far lighter than the flexible full device). The joint's drive spec is
+recorded into the DOF manifest, never authored, so the joint is already free --
+no suppression needed -- and a rotary motor drives the swing axis directly. The
+sampled pose of the driven member must advance with the motor
+(``assert_motion_progressed``); a frozen member would mean the "DOF" is actually
+still pinned. The sub is NEVER saved (the on-disk rest pose stays bit-exact);
+each drive exports a short mp4.
 
-Why the standalone sub and not the full device: these park drivers are TOP-LEVEL
-mates of the standalone sub, so they suppress by name with no flexible-sub
-indirection, and the swing axes are depth-1 component refs. The full-device study
-already covers the crank; layering three more heavy flexible solves onto it buys
-nothing the sub-level sweep does not prove.
+Why the standalone sub and not the full device: each freed DOF is a TOP-LEVEL
+joint of the standalone sub, so its swing axis is a depth-1 component ref with
+no flexible-sub indirection. The full-device study already covers the crank;
+layering three more heavy flexible solves onto it buys nothing the sub-level
+sweep does not prove.
 
 Run (SolidWorks already open)::
 
@@ -70,9 +72,9 @@ def _gear_mate_names(mates: list[dict[str, Any]]) -> list[str]:
 
 def _family_driver_names(adapter: Any, root: str, family: str,
                          only_type: int | None = None) -> list[str]:
-    """Names of the single-real-part DISTANCE/ANGLE park drivers on FAMILY.
+    """Names of the single-real-part DISTANCE/ANGLE drive mates on FAMILY.
 
-    A park driver references exactly one real part plus a root plane, so
+    A drive mate references exactly one real part plus a root plane, so
     ``_real_parts`` leaving a single name marks it. ``only_type`` narrows to the
     swing driver when a family also carries positional locators of the other
     type: the cone-swing-platform is LOCATED by three DISTANCE mates (height +
@@ -118,24 +120,21 @@ async def _suppress(adapter: Any, names: list[str], label: str) -> None:
             SuppressMateParameters(name=name, suppress=True)))
 
 
-async def _suppress_park_or_note_free(
-        adapter: Any, names: list[str], label: str) -> None:
-    """Suppress a freed-DOF family's park driver(s), or note the deferred case.
+def _assert_dof_already_free(names: list[str], label: str) -> None:
+    """Assert a freed-DOF family has no authored drive mate to suppress.
 
-    Under defer-and-replay (AGENTS.md "Default-free DOF") a freed family's
-    park driver is NOT authored in the default ``free`` build -- the DOF is
-    already free and there is nothing to suppress. Raising there (the p0 bug,
-    repeated for p2's pinion swing when PR8 deferred it -- Codex catch,
-    2026-07-05) breaks the diagnostic on exactly the builds it targets. A
-    ``locked`` build still authors the drivers, so a non-empty list keeps the
-    strict suppress path.
+    Every freed DOF's drive spec is recorded into the DOF manifest, never
+    authored (AGENTS.md "Default-free DOF") -- the family is already free.
+    A non-empty ``names`` means a driver got authored unexpectedly; fail loud
+    rather than silently suppressing it away (the p0 bug, repeated for p2's
+    pinion swing when PR8 deferred it -- Codex catch, 2026-07-05).
     """
-    if not names:
-        log(f"  {label}: DOF already free "
-            "(deferred park driver -- not authored in the free build)")
-        return
-    await _suppress(adapter, names, label)
-    log(f"  {label}: suppressed {len(names)} mate(s): {names}")
+    if names:
+        raise RuntimeError(
+            f"{label}: found {len(names)} authored drive mate(s) {names} -- "
+            "freed-DOF drivers are never authored; rebuild the assembly")
+    log(f"  {label}: DOF already free "
+        "(recorded in the DOF manifest, not authored)")
 
 
 async def _run_swing_study(adapter: Any, motor_axis, driven_needle: str,
@@ -187,7 +186,7 @@ async def _run_swing_study(adapter: Any, motor_axis, driven_needle: str,
     if span < SWING_MIN_DEG:
         raise RuntimeError(
             f"{label}: driven member swung only {span:.2f} deg (< {SWING_MIN_DEG}) "
-            f"-- the setup DOF is still pinned (park driver not freed?) or the "
+            f"-- the setup DOF is still pinned (drive spec not recorded free?) or the "
             f"motor did not couple to it")
 
     vid = (OUT_PNG.parent / f"{video_tag}.mp4").resolve()
@@ -203,17 +202,18 @@ async def _run_swing_study(adapter: Any, motor_axis, driven_needle: str,
 async def _drive_p1(adapter: Any) -> dict[str, str]:
     """p1: cone set swings out of mesh. Decouple the 21 gear meshes (the cone
     cluster cannot stay velocity-coupled to the cylinders while leaving mesh, so
-    suppress every gear mesh) and free the platform's swing (its lone ANGLE park
-    driver), then motor the plate about its tip-end vertical pivot (Axis1,
-    "swing pivot"). The driven needle is the pivot POST: it rides the plate
-    194.5 from the pivot, so its arc proves the riders follow the swing."""
+    suppress every gear mesh); the platform's swing is already free (its
+    ANGLE drive spec is recorded, never authored), then motor the plate about
+    its tip-end vertical pivot (Axis1, "swing pivot"). The driven needle is
+    the pivot POST: it rides the plate 194.5 from the pivot, so its arc
+    proves the riders follow the swing."""
     path = str(OUT_SLDASM / "drive-train.SLDASM")
     check("open drive-train", await adapter.open_model(path))
     mates = check("list mates", await adapter.list_mates())
     await _suppress(adapter, _gear_mate_names(mates), "p1 gear meshes")
-    await _suppress_park_or_note_free(adapter, _family_driver_names(
+    _assert_dof_already_free(_family_driver_names(
         adapter, "drive-train", "cone-swing-platform", only_type=ANGLE),
-        "p1 cone-platform swing park")
+        "p1 cone-platform swing")
     plate, plate_name = _find_one(adapter, "cone-swing-platform")
     if plate is None:
         raise RuntimeError("p1: cone-swing-platform not found")
@@ -225,15 +225,16 @@ async def _drive_p1(adapter: Any) -> dict[str, str]:
 
 async def _drive_p2(adapter: Any) -> dict[str, str]:
     """p2: the strap+pinion rigid group swings on the torque shaft to engage.
-    Free the swing (the front strap's lone ANGLE park driver, PARK_pinion_swing
-    -- the group's axial DISTANCE seats stay engaged, exactly the p1 locator
-    pattern), then motor a strap about its pivot bore (Axis1, collinear with
-    the torque shaft); the journaled pinion must ride the arc."""
+    The swing is already free (the front strap's lone ANGLE drive spec is
+    recorded, never authored -- the group's axial DISTANCE seats stay engaged,
+    exactly the p1 locator pattern), then motor a strap about its pivot bore
+    (Axis1, collinear with the torque shaft); the journaled pinion must ride
+    the arc."""
     path = str(OUT_SLDASM / "drive-train.SLDASM")
     check("open drive-train", await adapter.open_model(path))
-    await _suppress_park_or_note_free(adapter, _family_driver_names(
+    _assert_dof_already_free(_family_driver_names(
         adapter, "drive-train", "pinion-bracket", only_type=ANGLE),
-        "p2 pinion swing park")
+        "p2 pinion swing")
     bracket, bracket_name = _find_one(adapter, "pinion-bracket")
     if bracket is None:
         raise RuntimeError("p2: pinion-bracket not found")
@@ -245,23 +246,16 @@ async def _drive_p2(adapter: Any) -> dict[str, str]:
 
 async def _drive_p0(adapter: Any) -> dict[str, str]:
     """p0: an amplitude bar swings about its top pin (the channel's amplitude
-    coefficient). Free ONE bar (suppress its own single-real drivers, leaving the
-    other 19 pinned), then motor it about its top-pin bore (Axis1)."""
+    coefficient). ONE bar's amplitude DOF is already free (its drive spec is
+    recorded, never authored -- the other 19 bars stay pinned by their own
+    recorded specs), then motor it about its top-pin bore (Axis1)."""
     path = str(OUT_SLDASM / "channel.SLDASM")
     check("open channel", await adapter.open_model(path))
     bar, bar_name = _find_one(adapter, "amplitude-bar")
     if bar is None:
         raise RuntimeError("p0: amplitude-bar not found")
-    # In a default-`free` build the amplitude park driver is DEFERRED (recorded, not
-    # authored -- see AGENTS.md "Default-free DOF"), so the bar's amplitude slide is
-    # ALREADY free: there is nothing to suppress. Suppress only if the driver exists
-    # (a `locked` build, where it is authored + engaged).
-    driver_names = _part_driver_names(adapter, "channel", bar_name)
-    if driver_names:
-        await _suppress(adapter, driver_names, f"p0 amplitude park ({bar_name})")
-    else:
-        log(f"  p0: {bar_name} amplitude DOF already free "
-            "(deferred park driver -- not authored in the free build)")
+    _assert_dof_already_free(
+        _part_driver_names(adapter, "channel", bar_name), f"p0 amplitude ({bar_name})")
     motor_axis = _entity_ref(bar_name, "Axis1", "AXIS")
     return await _run_swing_study(
         adapter, motor_axis, bar_name,

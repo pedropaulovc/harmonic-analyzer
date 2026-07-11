@@ -1,13 +1,12 @@
-"""Placement math + STL bbox: Euler/rotation conversion, mirror transforms
-and the cached STL bounding-box reader. Split out of _common so assembly
-placement math can change without invalidating any part build.
+"""Placement math + STL bbox: Euler/rotation conversion, rotation-row
+constants and the cached STL bounding-box reader. Split out of _common so
+assembly placement math can change without invalidating any part build.
 """
 from __future__ import annotations
 
 import math
 import struct
 
-import _config_asm
 from _common import OUT_STL
 
 _STL_BBOX_CACHE: dict[str, tuple[tuple[float, float], ...]] = {}
@@ -91,6 +90,18 @@ def rot_z_rows(deg: float) -> list[list[float]]:
     c, s = math.cos(math.radians(deg)), math.sin(math.radians(deg))
     return [[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]]
 
+
+def compose_rows(
+    a: list[list[float]], b: list[list[float]]
+) -> list[list[float]]:
+    """Rows of the composed placement: rotate a part by ``a``, THEN by ``b``
+    (row-vector convention -- the matrix product ``a @ b``, matching how
+    ``rows_from_euler`` chains Rx, Ry, Rz)."""
+    return [
+        [sum(a[i][k] * b[k][j] for k in range(3)) for j in range(3)]
+        for i in range(3)
+    ]
+
 def euler_from_rows(rows: list[list[float]]) -> list[float]:
     """Inverse of rows_from_euler (degrees). At the b = +/-90 gimbal lock the
     g = 0 representative is returned."""
@@ -104,126 +115,25 @@ def euler_from_rows(rows: list[list[float]]) -> list[float]:
     g = math.atan2(rows[0][1], rows[0][0])
     return [math.degrees(a), math.degrees(b), math.degrees(g)]
 
-def _mirror_xform(
-    position: list[float], rows: list[list[float]], axis: int, c: float
-) -> tuple[list[float], list[list[float]]]:
-    """Reflect a placement about the machine YZ plane, realising the result
-    as a proper transform via the part-local mirror plane ``axis``-coord = c:
-    pos' = mirror_x(pos + 2c * rows[axis]), rows' = (I - 2 e e^T) R Mx."""
-    shifted = [position[k] + 2.0 * c * rows[axis][k] for k in range(3)]
-    pos2 = [-shifted[0], shifted[1], shifted[2]]
-    rows2 = [
-        [rows[i][j] * (-1.0 if (i == axis) != (j == 0) else 1.0) for j in range(3)]
-        for i in range(3)
-    ]
-    return pos2, rows2
+# Machine chirality (M6.8 -> #151). The assembly frame IS the real machine's:
+# the crank sits at machine -X (the viewer's RIGHT when facing the paper, per
+# every ch. 30 plate and the Altgeld Hall photogrammetry), the output side is
+# -Z. Every placement is authored DIRECTLY in this frame. History: the original
+# assembly was derived in the mirrored frame (crank +X) and reflected about the
+# machine YZ plane at the place_component boundary (``mirror_placement``, with a
+# per-part ``MIRROR_PLANE`` symmetry declaration under ``cad/config/placement/``);
+# issue #151 re-authored the derivation machine-handed and deleted that layer --
+# a reflection is not a rigid motion, so it demanded a symmetry claim per part
+# that nothing could validate (#153) and re-keyed every assembly on each new
+# part's entry (#156). Correctness is arbitrated by assert_component_placed
+# readback + the pose ledger, the zero-interference gate, the analytic gates,
+# and the photo comparison renders -- plus, for the #151 sweep itself, the
+# as-saved pose equivalence probe (diagnostics/probe_pose_dump.py).
 
-# Machine-chirality mirror (M6.8). The original assembly was built as the
-# mirror image of the real machine (crank at +X with the paper facing -Z;
-# every ch. 30 plate and the Altgeld Hall photogrammetry put the crank at the
-# viewer's RIGHT when facing the paper, i.e. machine -X). The fix reflects
-# every component placement about the machine YZ plane (x -> -x) at the
-# `_place()` boundary of each subassembly script, leaving all derivation
-# math, solvers and checker-arbitrated slacks untouched.
-#
-# A reflection is not a rigid placement, so each mirrored placement is
-# realised as M(T(part)) = (M o T o S)(part), valid only when S(part) == part
-# for a part-local mirror symmetry S. MIRROR_PLANE declares S per part:
-#
-#   'x'  -- local YZ plane through the part STL bbox x-centre (default:
-#           solids of revolution, x-symmetric castings, even-tooth gears
-#           seeded with a tooth on local +X);
-#   'z'  -- local XY plane through the bbox z-centre (flat or planar-XY
-#           x-asymmetric linkages and wire forms; helix springs flip hand,
-#           which is sub-visible at render scale);
-#   'x0' -- local x = 0 exactly (parts whose build script is itself
-#           mirrored as part of M6.8: summing-lever, magnifying-bracket,
-#           pen-hanger);
-#   ('x'|'z', c) -- explicit plane coordinate in mm, bypassing the STL
-#           bbox (amplitude-bar: modeled cornered at origin, exactly
-#           x-symmetric about BAR_WIDTH/2; its on-disk STL was a legacy
-#           inch-unit export).
-#
-# Cosmetic asymmetries knowingly mirrored: measuring-stick engraved scale
-# reads right-to-left (0.4 mm ticks), crank-arm fiducial dimple swaps face.
-# Correctness is arbitrated downstream by assert_component_placed readback,
-# the zero-interference gate, the analytic spring/rack/clearance gates and
-# the photo comparison renders.
-# ---------------------------------------------------------------------------
-#
-# The per-part mirror-plane symmetry declaration S now lives in its OWN config
-# family -- ``cad/config/placement/<dashed-name>.yaml`` (``mirror_plane:``) --
-# read via ``_config_asm.placement`` in ``mirror_placement`` below (issue #156).
-# It was a module-level dict here, which put it in EVERY assembly's helper
-# closure: adding one new part's entry re-keyed all 8 assemblies -> a full
-# spine of FULL rebuilds. Per-file, a placement edit now re-keys only the
-# assemblies that PLACE that part (``placement/*`` -> referenced-part rows in
-# dodo/_buildgraph), and never the part itself (placement is assembly-time).
-# A part with NO file takes the default bbox-``x`` plane, exactly as before.
-
-# In-process placement override for parts GENERATED at assembly-build time (no
-# config file, no STL yet) -- e.g. build_channel_assembly's per-channel stretched
-# springs (channel-spring-installed-stretchNN). Replaces the old mutate-the-shared-
-# MIRROR_PLANE-dict hack; keyed the same, read first by mirror_placement. Not a
-# config input, so it never touches the recipe/cache digest (these ephemeral parts
-# are rebuilt fresh each run anyway).
-_RUNTIME_PLACEMENT: dict[str, str | tuple[str, float]] = {}
+ROT_Y_180 = [[-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -1.0]]
 
 
-def set_runtime_placement(part: str, mirror_plane: str | tuple[str, float]) -> None:
-    """Register a mirror-plane symmetry for a dynamically-generated part (see
-    ``_RUNTIME_PLACEMENT``). ``mirror_plane`` uses the same vocabulary as the
-    ``placement/*.yaml`` ``mirror_plane`` field."""
-    _RUNTIME_PLACEMENT[part] = mirror_plane
-
-
-def mirror_placement(
-    part: str,
-    position: list[float],
-    rotation: list[float],
-    rows: list[list[float]] | None = None,
-    configuration: str = "",
-) -> tuple[list[float], list[float], list[list[float]]]:
-    """Mirror one component placement about the machine YZ plane.
-
-    Returns (position_mm, rotation_deg, rotation_rows) ready for
-    insert_component + assert_component_placed."""
-    if rows is None:
-        rows = rows_from_euler(rotation)
-    # Per-part symmetry S: a runtime override (dynamically-built parts) wins, else
-    # cad/config/placement/<part>.yaml (default 'x'). A tuple/list [axis, c] carries
-    # an explicit plane coordinate (YAML yields a list).
-    plane = _RUNTIME_PLACEMENT.get(part) or _config_asm.placement(part).get("mirror_plane", "x")
-    explicit_c = None
-    if isinstance(plane, (list, tuple)):
-        plane, explicit_c = plane[0], float(plane[1])
-    axis = 2 if plane == "z" else 0
-    if explicit_c is not None:
-        c = explicit_c
-    elif plane == "x0":
-        c = 0.0
-    else:
-        stem = f"{part}--{configuration}" if configuration else part
-        try:
-            bbox = stl_bbox_mm(stem)
-        except FileNotFoundError:
-            if not configuration:
-                raise
-            bbox = stl_bbox_mm(part)  # config STLs share the bbox centre
-        c = 0.5 * (bbox[axis][0] + bbox[axis][1])
-        if abs(c) < 2.0:
-            # Parts are modeled about their functional axis, so a sub-mm
-            # bbox centre is tessellation/tooth-seed noise (max seen 0.76,
-            # the pivot-ball-mount's coarse ball facets), while genuine
-            # mirror-plane offsets start at 3.0 (gooseneck-clamp). The
-            # noise matters: line-to-line bores turn a 2c shift of microns
-            # into real interference volumes (M6.8 drive-train rebuild:
-            # 19 slivers up to 1.16 mm^3). Snap to the exact axis.
-            c = 0.0
-    pos2, rows2 = _mirror_xform(position, rows, axis, c)
-    return pos2, euler_from_rows(rows2), rows2
-
-def _selftest_mirror_math() -> None:
+def _selftest_euler_roundtrip() -> None:
     cases = [
         [0.0, 0.0, 0.0],
         [90.0, 0.0, 0.0],
@@ -233,6 +143,7 @@ def _selftest_mirror_math() -> None:
         [90.0, 90.0, 0.0],
         [-90.0, -90.0, 0.0],
         [180.0, 30.0, 180.0],
+        [0.0, 180.0, 0.0],
     ]
     for euler in cases:
         rows = rows_from_euler(euler)
@@ -243,25 +154,6 @@ def _selftest_mirror_math() -> None:
         )
         if drift > 1e-9:
             raise AssertionError(f"euler roundtrip drift {drift} for {euler}")
-        for axis, c in ((0, 7.25), (2, -3.5)):
-            pos2, rows2 = _mirror_xform([11.0, -2.0, 5.0], rows, axis, c)
-            det = (
-                rows2[0][0] * (rows2[1][1] * rows2[2][2] - rows2[1][2] * rows2[2][1])
-                - rows2[0][1] * (rows2[1][0] * rows2[2][2] - rows2[1][2] * rows2[2][0])
-                + rows2[0][2] * (rows2[1][0] * rows2[2][1] - rows2[1][1] * rows2[2][0])
-            )
-            if abs(det - 1.0) > 1e-9:
-                raise AssertionError(f"mirror rows not proper (det {det}) for {euler}")
-            pos3, rows3 = _mirror_xform(pos2, rows2, axis, c)
-            drift = max(
-                max(abs(a - b) for a, b in zip(pos3, [11.0, -2.0, 5.0], strict=True)),
-                max(
-                    abs(a - b) for ra, rb in zip(rows3, rows, strict=True)
-                    for a, b in zip(ra, rb, strict=True)
-                ),
-            )
-            if drift > 1e-9:
-                raise AssertionError(f"mirror not involutive (drift {drift}) for {euler}")
 
 
-_selftest_mirror_math()
+_selftest_euler_roundtrip()

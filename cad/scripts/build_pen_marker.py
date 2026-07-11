@@ -19,8 +19,10 @@ import math
 import sys
 
 from _common import (
+    POLISHED_STEEL,
     SketchDims,
     add_line_chain,
+    apply_color,
     apply_material,
     check,
     define_polygon_chain,
@@ -41,7 +43,8 @@ MATERIAL = "Brass"
 
 BARREL_DIA = 8.0  # (low)
 BARREL_TOP_Y = 60.0
-CONE_H = 12.0  # tip cone (low)
+CONE_H = 5.0  # tip nose (low) — the ch24 macro shows a blunt bullet nose
+# (~0.6x dia), not the needle cone the old 12 gave; keep the same tip origin
 
 
 async def build(adapter) -> dict[str, str]:
@@ -105,6 +108,9 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "driven marker (equations neutral)", expected, 0.005 * expected)
 
     await apply_material(adapter, MATERIAL)
+    # The ch24 macro shows a bright nickel/steel marker body, not brass —
+    # keep the brass mass model, override the display colour.
+    await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 
