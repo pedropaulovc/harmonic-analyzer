@@ -159,3 +159,33 @@ def test_provisioned_toolbox_is_a_stable_rerun_source(tmp_path: Path) -> None:
     assert len(list((shared / "toolbox").iterdir())) == 1
     provision.verify_database(second / provision.DATABASE_RELATIVE)
 
+
+def test_existing_provision_what_if_is_read_only(tmp_path: Path, monkeypatch) -> None:
+    source_root = tmp_path / "provisioned"
+    database = source_root / provision.DATABASE_RELATIVE
+    database.parent.mkdir(parents=True)
+    _fixture_database(database)
+    provision.migrate_database(database)
+    (source_root / "harmonic-analyzer-standard.json").write_text(
+        "{}\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(provision, "_read_provision_manifest", lambda _root: object())
+
+    def mutation_forbidden(*_args, **_kwargs):
+        raise AssertionError("--what-if attempted to mutate the seat")
+
+    monkeypatch.setattr(provision, "_copy_templates", mutation_forbidden)
+    monkeypatch.setattr(provision, "configure_registry", mutation_forbidden)
+    shared = tmp_path / "shared"
+    toolbox, templates = provision.provision(
+        version="SOLIDWORKS 2026",
+        source_root=source_root,
+        shared_root=shared,
+        configure=True,
+        what_if=True,
+    )
+
+    assert toolbox == source_root
+    assert templates == shared / "templates"
+    assert not shared.exists()
+
