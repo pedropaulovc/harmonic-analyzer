@@ -89,40 +89,60 @@ TOP_KEEP = {
     "PinHoleZ": (0.250, 0.212),
 }
 DIMENSION_CALLOUTS = {
-    "ShaftBoreDia": "THRU - SEE NOTE 4",
+    "ShaftBoreDia": "THRU - SEE NOTE 5",
     "PivotBoreDia": "THRU",
-    "PinHoleDia": "THRU - SEE NOTE 5",
-    "DimpleDia": "0.5 DEEP - SEE NOTE 6",
+    "PinHoleDia": "THRU - SEE NOTE 6",
+    "DimpleDia": "0.5 DEEP - SEE NOTE 7",
 }
 
 
+_NOTES_LEFT = (
+    "UNLESS OTHERWISE SPECIFIED:",
+    (
+        "1. DIMENSIONS ARE IN MILLIMETRES.\n"
+        "   INTERPRET PER ASME Y14.5."
+    ),
+    (
+        "2. TOLERANCES: LINEAR +/-0.25; ANGLES +/-0.5\n"
+        "   DEG; HOLE CENTRES +/-0.10; REAMED BORES\n"
+        "   +0.05/-0.00; PIN PILOT AND DIMPLE +/-0.10."
+    ),
+    "3. REMOVE BURRS AND BREAK SHARP EDGES 0.2 MAX.",
+    (
+        "4. BORES AND DIMPLE ON ARM CENTRELINE. OVERALL\n"
+        "   LENGTH 84.0; END R8 TANGENT TO SIDES AND\n"
+        "   CONCENTRIC WITH SHAFT BORE."
+    ),
+    (
+        "5. SHAFT BORE (O9.525): DRILL AND REAM 3/8 IN,\n"
+        "   Ra 1.6; CLOSE SLIDING FIT ON THE NOMINAL\n"
+        "   3/8 IN CRANKSHAFT."
+    ),
+)
+_NOTES_RIGHT = (
+    (
+        "6. CROSS-PIN HOLE (O5.00, MID-THICKNESS, ON THE\n"
+        "   SHAFT BORE AXIS): DRILL THRU AS SHOWN.\n"
+        "   TAPER-REAM AT ASSEMBLY WITH THE CRANKSHAFT\n"
+        "   FOR A NO. 2 (0.193 IN) STANDARD TAPER PIN,\n"
+        "   1:48 TAPER, LARGE END OUTBOARD."
+    ),
+    (
+        "7. FIDUCIAL DIMPLE (O8.00 X 0.5 DEEP, FLAT\n"
+        "   BOTTOM, O8 END MILL): COSMETIC MARK IN THE\n"
+        "   FAR-SIDE FACE OF THE FRONT VIEW; LOCATION\n"
+        "   AND DEPTH NON-CRITICAL (+/-0.5)."
+    ),
+    (
+        "8. THE TWO 8 THICK BROAD FACES: PARALLEL\n"
+        "   WITHIN 0.10."
+    ),
+    "9. FINISH: BRIGHT MACHINED Ra 3.2; OIL.",
+)
+
+
 def _manufacturing_notes() -> str:
-    return "\n".join(
-        (
-            "UNLESS OTHERWISE SPECIFIED:",
-            "1. DIMENSIONS ARE IN MILLIMETRES. INTERPRET PER ASME Y14.5.",
-            (
-                "2. TOLERANCES: LINEAR +/-0.25; HOLE CENTRES +/-0.10;\n"
-                "   BORE DIAMETERS +0.05/-0.00; ANGLES +/-0.5 DEG."
-            ),
-            "3. REMOVE BURRS AND BREAK SHARP EDGES 0.2 MAX.",
-            (
-                "4. SHAFT BORE (O9.525): DRILL AND REAM 3/8 IN FOR A CLOSE\n"
-                "   SLIDING FIT ON THE 3/8 IN CRANKSHAFT."
-            ),
-            (
-                "5. CROSS-PIN HOLE (O5.00): DRILL THRU BOSS AND SHAFT AT\n"
-                "   ASSEMBLY; TAPER-REAM TO SUIT A NO. 2 (0.193 IN) STANDARD\n"
-                "   TAPER PIN, 1:48 TAPER."
-            ),
-            (
-                "6. FIDUCIAL DIMPLE (O8.00 X 0.5 DEEP): FACE DIMPLE ONLY;\n"
-                "   90 DEG SPOT DRILL TO DEPTH IS ACCEPTABLE."
-            ),
-            "7. ARM FACES: PARALLEL WITHIN 0.10 OVER FULL LENGTH.",
-            "8. FINISH: BRIGHT MACHINED; OIL AFTER MACHINING.",
-        )
-    )
+    return "\n".join((*_NOTES_LEFT, *_NOTES_RIGHT))
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -196,7 +216,8 @@ async def build(adapter: Any) -> dict[str, str]:
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
-    add_note(adapter, _manufacturing_notes(), 0.014, 0.072)
+    add_note(adapter, "\n".join(_NOTES_LEFT), 0.014, 0.078)
+    add_note(adapter, "\n".join(_NOTES_RIGHT), 0.140, 0.072)
     add_note(adapter, "ISOMETRIC VIEW SCALE 1:1", 0.330, 0.185)
 
     return await finalize_drawing(
