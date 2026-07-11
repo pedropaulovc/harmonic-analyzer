@@ -218,17 +218,19 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     (PLATE_T total, centred on the pivot at local y 0) so the whole casting stays
     coplanar with the cylinder and ribs.
 
-    The HOLE_COUNT spring holes are cut OUTRIGHT -- one Top-plane sketch holding
-    a circle at every registered station HOLE_Z[0..HOLE_COUNT-1], a single
-    cut-extrude. (Earlier this was a seed cut + FeatureLinearPattern5; the
-    pattern marches along an auto-selected plate edge whose natural sense is
-    ambiguous, and it silently reversed the field off the -Z plate edge -- only
-    j=0 stayed cut, so every other spring eye clashed the un-cut bore. Explicit
-    per-station circles are direction-free and deterministic.)
+    The HOLE_COUNT spring holes are ONE seed cut at station j=0 + a native
+    FeatureLinearPattern5 marching the remaining stations at CHANNEL_PITCH.
+    (An early pattern attempt marched along an AUTO-selected plate edge whose
+    natural sense silently reversed the field off the -Z plate edge -- only
+    j=0 stayed cut -- and was replaced by cutting all 20 stations outright in
+    one sketch. The pattern is back with the sense guarded, not
+    inference-trusted: a deliberate direction-edge pick, the seed at the -Z end
+    of the span so a reversal marches off the plate, and an analytic volume
+    gate that resolves a single missing hole.)
 
     Machine-y registration (the M6.4 plate-top-at-998 convention) is set at
     PLACEMENT, not baked here -- see PLATE_TOP_Y and the Phase 2/3 plan."""
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import ExtrusionParameters, LinearPatternParameters
 
     plate = SketchDims()
     check("create_sketch plate", await adapter.create_sketch("Top"))
@@ -261,37 +263,71 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
         ),
     )
     name_last_feature(adapter, "CoefficientsPlate")
+    # The plate is a plain rectangular prism, so an exact analytic volume gate
+    # anchors the hole-field tripwires below (the WHOLE part has no analytic
+    # gate -- organic arcs -- but this first feature does).
+    v_plate = PLATE_W * PLATE_L * PLATE_T
+    await volume_check(adapter, "coefficients plate", v_plate, 1e-3 * v_plate)
 
-    # All HOLE_COUNT spring holes in ONE sketch at the registered stations.
-    # Top-plane sketch Y = -world Z, so world HOLE_Z[j] sits at sketch -HOLE_Z[j];
-    # a single cut through BOTH sides of the mid-plane plate (both_directions
-    # covers the +-PLATE_T/2 spread, + margin). Cutting every station outright
-    # (no seed + linear pattern) keeps the field direction-free: a directional
-    # FeatureLinearPattern5 marched along an auto-selected edge whose natural
-    # sense reversed the field off the -Z plate edge, leaving all but j=0 solid.
-    # Each off-axis circle emits centre-X, centre-Z, diameter (3 dims): X is the
-    # shared HOLE_X column (driven to "HoleX"), diameter to "HoleDia"; the per-
-    # station Z has no single global knob, so its slot stays None (auto-named).
+    # Spring-hole field: ONE seed hole at station j=0 + a native linear pattern
+    # marching the remaining stations up world +Z at CHANNEL_PITCH. History: an
+    # earlier FeatureLinearPattern5 marched along an AUTO-selected edge whose
+    # natural sense reversed the field off the -Z plate edge (all but j=0
+    # solid), and was replaced by cutting all 20 stations outright in one
+    # sketch. The pattern returns with the sense RISK managed, not
+    # inference-trusted (the platen-rack ToothPattern idiom): the direction
+    # reference is a DELIBERATE edge pick (the plate's +X top edge, mid-span),
+    # the seed sits at the -Z END of the station span so a reversed march runs
+    # off the plate, and the analytic volume gate below resolves a single
+    # missing hole -- a flip cannot pass silently.
+    # Top-plane sketch Y = -world Z, so world HOLE_Z[0] sits at sketch
+    # -HOLE_Z[0]; the cut runs through BOTH sides of the mid-plane plate
+    # (both_directions covers the +-PLATE_T/2 spread, + margin). The seed
+    # circle emits centre-X, centre-Z, diameter (3 dims): X is the shared
+    # HOLE_X column (driven to "HoleX"), diameter to "HoleDia"; the station-0 Z
+    # anchor has no global knob, so its slot stays None (auto-named).
     holes = SketchDims()
-    check("create_sketch spring holes", await adapter.create_sketch("Top"))
-    for j in range(HOLE_COUNT):
-        await define_circle(
-            adapter, HOLE_X, -HOLE_Z[j], HOLE_DIA / 2.0, f"spring hole {j}",
-            dims=holes,
-            names=(f"Hole{j}X", None, f"Hole{j}Dia"),
-            drives=('"HoleX"', None, '"HoleDia"'),
-        )
-    await ensure_fully_defined(adapter, "spring-holes sketch")
-    check("exit_sketch spring holes", await adapter.exit_sketch())
+    check("create_sketch spring hole seed", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter, HOLE_X, -HOLE_Z[0], HOLE_DIA / 2.0, "spring hole 0",
+        dims=holes,
+        names=("Hole0X", None, "Hole0Dia"),
+        drives=('"HoleX"', None, '"HoleDia"'),
+    )
+    await ensure_fully_defined(adapter, "spring-hole seed sketch")
+    check("exit_sketch spring hole seed", await adapter.exit_sketch())
     name_last_feature(adapter, "SpringHolesProfile")
     drive_jobs += holes.apply(adapter, "SpringHolesProfile")
     check(
-        "cut spring holes",
+        "cut spring hole seed",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=PLATE_T + 2.0, both_directions=True)
         ),
     )
-    name_last_feature(adapter, "SpringHoles")
+    seed_cut = name_last_feature(adapter, "SpringHoleSeed")
+    v_hole = math.pi * (HOLE_DIA / 2.0) ** 2 * PLATE_T
+    await volume_check(adapter, "spring hole seed", v_plate - v_hole, 0.02 * v_hole)
+    check(
+        "linear pattern spring holes",
+        await adapter.linear_pattern_feature(
+            LinearPatternParameters(
+                direction_point=[PLATE_W, PLATE_T / 2.0, 0.0],
+                features=[seed_cut],
+                count=HOLE_COUNT,
+                spacing=CHANNEL_PITCH,
+            )
+        ),
+    )
+    name_last_feature(adapter, "SpringHolePattern")
+    # Drive the pattern's spacing dim from ChannelPitch so the pitch knob is
+    # live, not inert (the measuring-stick TickPattern Codex P2). The spacing
+    # is D3 (D1 is the pattern's direction-reference length, NOT the pitch);
+    # D3 == as-built CHANNEL_PITCH, so it stays neutral.
+    drive_jobs.append(("D3@SpringHolePattern", '"ChannelPitch"'))
+    await volume_check(
+        adapter, "spring-hole field", v_plate - HOLE_COUNT * v_hole,
+        0.01 * HOLE_COUNT * v_hole,
+    )
 
 
 async def _pivot_cylinder(adapter, drive_jobs: list[tuple[str, str]]) -> None:
@@ -637,6 +673,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "AnchorH", f"{ANCHOR_H}mm")
     await set_global(adapter, "HoleDia", f"{HOLE_DIA}mm")
     await set_global(adapter, "HoleX", f"{HOLE_X}mm")
+    await set_global(adapter, "ChannelPitch", f"{CHANNEL_PITCH}mm")
     await set_global(adapter, "HexW", f"{HEX_W}mm")
     await set_global(adapter, "HexH", f"{HEX_H}mm")
     await set_global(adapter, "HexDepth", f"{HEX_DEPTH}mm")
