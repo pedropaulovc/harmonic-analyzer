@@ -297,3 +297,33 @@ was WRONG for the circular-pattern path; strike that sub-claim). All volume
 gates + verify suites green, top-assembly render eye-passed. Remaining queue:
 finding 1 (release neutral export ~1,700s), cylinder-gear ladder via
 NewEntityToMateTo (~156s, unblocked by #236), finding 4 (no-op refresh gates).
+
+**2026-07-10 cylinder-gear ladder SHIPPED-pending-build (#240,
+`diagnostics/diag_cwm_cylinder.py` -- probed ON THE REAL BUILT drive-train,
+8/8 PASS):** the NewEntityToMateTo wizard path is now measured. (a) It DOES
+re-point a copied GEAR mate's external axis -- both probe copies meshed their
+new cone gear -- and the chained axial re-point (Repeat=false + previous
+station's Front Plane + FlipDimension=True, the authored pitch mate's
+measured side) lands translation-EXACT (0.0000 mm). (b) The copied mesh
+inherits the SEED's ratio; it IS editable via IGearMateFeatureData
+GetDefinition -> GearRatioNumerator/Denominator -> ModifyDefinition (typed
+VT_DISPATCH null third arg), but the stored form is NORMALIZED: setting
+12:120 reads back 120:12 -- judge an edit against an AUTHORED station mate's
+stored form, never the raw pair set. (c) THE DISQUALIFIER: a copy CARRYING
+the mesh parks SPUN 9.1229 deg off the seed (both copies, identical angle,
+stable across rebuilds) -- the parked-pose wander living in the copied gear
+mate's stored phase -- and NO post-copy spin fix is safe: through the mesh
+coupling a driver/drag would crank the whole free train and move every
+already-landed gear differentially (ratios differ per station). (d) THE
+RECIPE (variant 2, gated PASS): never copy the mesh. Replicate a 2-mate seed
+(radial Repeat + chained axial re-point; 1.35 s/copy), PUT the copy's spin at
+design via Transform2 (0.08 s -- a mesh-less copy stores NO spin state, so
+the put HOLDS through two rebuilds; contrast the multi-loop channel where
+puts revert), then author each station's gear mesh FRESH (1.8 s -- records
+the tuned tooth phase from the current pose, carries its ratio natively).
+No tree walk anywhere: the slot audit is one IComponent2::GetMates dump
+(a MateGroup walk on the near-final drive-train measured 95-153 s -- it
+would eat the ladder's win). ~3.3 s vs ~8.7 s per station => est ~100 s off
+the drive-train build (validation build pending). Also measured: a 2-mate
+copy of a SPUN source wanders ANOTHER ~9.12 deg (copy C off a 9.12-spun
+source landed 18.25 off) -- always copy from the design-posed seed.
