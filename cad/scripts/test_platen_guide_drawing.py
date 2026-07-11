@@ -198,3 +198,4 @@ def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None
     assert (stage / "solidworks" / "platen-guide.SLDDRW").read_bytes() == b"slddrw"
     assert (stage / "solidworks" / "platen-guide.SLDPRT").read_bytes() == b"referenced model"
     assert (stage / "slddrw" / "platen-guide.SLDDRW").read_bytes() == b"slddrw"
+    assert (stage / "slddrw" / "platen-guide.SLDPRT").read_bytes() == b"referenced model"
