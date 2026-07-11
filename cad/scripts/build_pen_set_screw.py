@@ -3,8 +3,8 @@ r"""Reproduction script: pen set screw (book ch. 24, pp. 64-65).
 The small screw with the black knurled knob that threads up through the
 pen frame's bottom rail to set the pen-to-paper angle. M4 finishing pass:
 knob reeded with 22 axial Ø1 mm grooves (tube-frame fluting recipe,
-``_features.add_reeded_head_and_thread``) and a cosmetic M3 thread on the
-shank (annotation only -- keeps M6 interference checks clean).
+``_features.add_reeded_head_and_thread``) and a cosmetic #4-40 UNC thread on
+the shank (annotation only -- keeps M6 interference checks clean).
 
 The stepped body is two coaxial merged extrusions, NOT a profile revolve:
 circular patterns of cuts on stepped REVOLVED bodies fail to create (see
@@ -47,7 +47,8 @@ MATERIAL = "Brass"  # see _common.apply_material docstring
 
 KNOB_DIA = 9.0  # DIMENSIONS.md ch24: black knurled knob (low)
 KNOB_LENGTH = 5.0
-SHANK_DIA = 3.0  # threads into the pen frame's Ø3 hole
+SHANK_DIA = 2.0  # shank: was Ø3.0, now 2.0 = #4-40 tap-drill 2.261 - 0.26
+# (threads #4-40 into the pen frame's bottom-rail tapped hole)
 SHANK_LENGTH = 15.0
 
 

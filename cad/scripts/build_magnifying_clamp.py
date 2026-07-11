@@ -42,6 +42,7 @@ from _common import (
     set_global,
     volume_check,
 )
+from _holes import TAP_DRILL_MM, HoleSpec, wizard_holes
 
 PART_NAME = "magnifying-clamp"
 MATERIAL = "Brass"  # see _common.apply_material docstring
@@ -49,11 +50,17 @@ MATERIAL = "Brass"  # see _common.apply_material docstring
 BLOCK_WIDTH = 20.0  # X  DIMENSIONS.md ch20: clamp block, p.48 (low)
 BLOCK_HEIGHT = 26.0  # Y
 BLOCK_DEPTH = 12.0  # Z
+# The two rod bores are engineered running/slip fits (0.2 mm clearance over
+# their rods), NOT drilled fastener holes, so they stay plain dimensioned cuts
+# -- the Hole Wizard's standard drills are for drilled holes/pins/seats, and a
+# nearest-drill fit would slop the magnifier train (same machined-fit exception
+# as the crank-arm reamed journal / rocker fulcrum bearings).
 LEVER_BORE_DIA = 6.2  # Ø6 lever + clearance
 LEVER_BORE_Y = 19.0  # bore centre height
 ROD_BORE_DIA = 5.2  # Ø5 vertical rod + clearance
 ROD_BORE_X = 6.5  # skew offset from the lever bore axis plane
-SCREW_HOLE_DIA = 3.0  # thumb-screw shank
+# The thumb-screw hole threads IN, so it IS a native #4-40 tapped Hole Wizard
+# hole (tap drill Ø2.261; the mating thumb screw's Ø2.0 shank fits it).
 
 THROUGH_CUT_DEPTH = 80.0  # mid-plane total; > any extent crossed
 
@@ -63,7 +70,7 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations): block envelope plus the three bore
+    # Editable knobs (Tools > Equations): block envelope plus the two rod-bore
     # diameters and their in-plane stations. The mm suffix is load-bearing --
     # this is an INCH document and the equation manager reads BARE numbers in
     # document units (an unsuffixed 20 = 20 in, blowing the part up 25.4x).
@@ -74,7 +81,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "LeverBoreY", f"{LEVER_BORE_Y}mm")
     await set_global(adapter, "RodBoreDia", f"{ROD_BORE_DIA}mm")
     await set_global(adapter, "RodBoreX", f"{ROD_BORE_X}mm")
-    await set_global(adapter, "ScrewHoleDia", f"{SCREW_HOLE_DIA}mm")
+    # (The old ScrewHoleDia knob is gone: the thumb-screw hole is now a native
+    # Hole Wizard #4-40 tapped feature placed by point.)
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -109,9 +117,10 @@ async def build(adapter) -> dict[str, str]:
     v_block = BLOCK_WIDTH * BLOCK_HEIGHT * BLOCK_DEPTH
     await volume_check(adapter, "block", v_block, 0.005 * v_block)
 
-    # Lever bore along Z. On-axis in X (centre x=0), off-axis in y (the bore
-    # height), so define_circle emits the Z/height dim then the diameter -- the X
-    # slot is ignored.
+    # Lever bore along Z: a plain dimensioned slip cut (engineered 0.2 mm
+    # running fit, not a drilled hole). On-axis in X (centre x=0), off-axis in y
+    # (the bore height), so define_circle emits the Z/height dim then the
+    # diameter -- the X slot is ignored.
     lever = SketchDims()
     check("create_sketch lever bore", await adapter.create_sketch("Front"))
     await define_circle(
@@ -134,45 +143,47 @@ async def build(adapter) -> dict[str, str]:
     v_lever = math.pi * (LEVER_BORE_DIA / 2.0) ** 2 * BLOCK_DEPTH
     await volume_check(adapter, "lever bore", v_block - v_lever, 0.005 * v_block)
 
-    # Vertical-rod bore + thumb-screw hole, both along Y from the Top plane
-    # (sketch y maps to global -Z; the block spans Z 0..BLOCK_DEPTH). The rod
-    # bore is off-axis in both x (skew station) and z (depth mid-plane), so it
-    # emits X, Z, then diameter; the screw hole is on-axis in x, so it emits only
-    # Z then diameter.
-    ybores = SketchDims()
-    check("create_sketch y-bores", await adapter.create_sketch("Top"))
+    # Vertical-rod slip bore along Y from the Top plane (sketch y maps to global
+    # -Z; the block spans Z 0..BLOCK_DEPTH). Also a plain dimensioned slip cut.
+    # Off-axis in both x (skew station) and z (depth mid-plane), so define_circle
+    # emits X, Z, then diameter.
+    rod = SketchDims()
+    check("create_sketch rod bore", await adapter.create_sketch("Top"))
     await define_circle(
         adapter, ROD_BORE_X, -BLOCK_DEPTH / 2.0, ROD_BORE_DIA / 2.0, "rod bore",
-        dims=ybores,
+        dims=rod,
         names=("RodBoreXDim", "RodBoreZ", "RodBoreDiaDim"),
         drives=('"RodBoreX"', '"BlockDepth" / 2', '"RodBoreDia"'),
     )
-    await define_circle(
-        adapter, 0.0, -BLOCK_DEPTH / 2.0, SCREW_HOLE_DIA / 2.0, "screw hole",
-        dims=ybores,
-        names=("ScrewCx", "ScrewHoleZ", "ScrewHoleDiaDim"),
-        drives=(None, '"BlockDepth" / 2', '"ScrewHoleDia"'),
-    )
-    await ensure_fully_defined(adapter, "y-bores sketch")
-    check("exit_sketch y-bores", await adapter.exit_sketch())
-    name_last_feature(adapter, "YBoresProfile")
-    drive_jobs += ybores.apply(adapter, "YBoresProfile")
+    await ensure_fully_defined(adapter, "rod bore sketch")
+    check("exit_sketch rod bore", await adapter.exit_sketch())
+    name_last_feature(adapter, "RodBoreProfile")
+    drive_jobs += rod.apply(adapter, "RodBoreProfile")
     check(
-        "cut y-bores",
+        "cut rod bore",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
-    name_last_feature(adapter, "YBores")
-    # The two Y bores run the full block height; their overlaps with the lever
-    # bore (the screw hole crosses it on the X axis) have no clean closed form,
-    # so a loose tol absorbs the double-counted intersections.
+    name_last_feature(adapter, "RodBore")
+
+    # Thumb-screw hole: ONE native Hole Wizard #4-40 tapped feature along Y
+    # (through_all) from the top face (Y=BLOCK_HEIGHT, outward normal +Y) -- the
+    # thumb screw threads in; its Ø2.0 shank fits the Ø2.261 tap drill. On the X
+    # axis, crossing the lever bore.
+    wizard_holes(
+        adapter,
+        HoleSpec("tapped", "#4-40"),
+        [[0.0, BLOCK_HEIGHT, BLOCK_DEPTH / 2.0]],
+        (0.0, 1.0, 0.0),
+        "thumb-screw tapped hole (#4-40)", name="ScrewHole",
+    )
+    # The two Y features run the full block height; the screw hole crosses the
+    # lever bore on the X axis with no clean closed form, so a loose tol absorbs
+    # the double-counted intersection while still catching a gross unit-blowup.
     v_rod = math.pi * (ROD_BORE_DIA / 2.0) ** 2 * BLOCK_HEIGHT
-    v_screw = math.pi * (SCREW_HOLE_DIA / 2.0) ** 2 * BLOCK_HEIGHT
+    v_screw = math.pi * (TAP_DRILL_MM["#4-40"] / 2.0) ** 2 * BLOCK_HEIGHT
     v_final = v_block - v_lever - v_rod - v_screw
-    # ~42 mm^3 of lever-bore x Y-bore intersection is double-subtracted above
-    # (no closed form), so the loose tol must clear it while still catching a
-    # gross (unit-blowup) error.
     await volume_check(adapter, "y-bores", v_final, 80.0)
 
     # Named lever-bore axis (local Z through (0, LEVER_BORE_Y)) so the clamp

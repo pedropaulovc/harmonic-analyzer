@@ -28,7 +28,6 @@ from _common import (
     apply_color,
     apply_material,
     check,
-    define_circle,
     define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
@@ -38,9 +37,9 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
-    set_sketch_direct_db,
     volume_check,
 )
+from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
 
 PART_NAME = "guide-lock"
 MATERIAL = "Plain Carbon Steel"
@@ -54,7 +53,10 @@ LOCK_WIDTH = 22.0
 # edge and retained nothing at the bottom stations).
 LOCK_HEIGHT = 19.0
 LOCK_THICK = 2.0
-HOLE_DIA = 3.0  # the fillister screws' O2.9 shanks pass through
+# The fillister screws' O2.9 shanks pass through: #4 clearance, CLOSE fit
+# (Ø3.048, the wizard-table twin of the old Ø3.0 artefact dim; nearest UNC to
+# the ~Ø2.9 screw -- memory/fastener-policy-us-customary).
+HOLE_SPEC = HoleSpec("clearance", "#4", fit="close")
 HOLE_XY = ((4.0, 2.5), (18.0, 2.5))  # on the guide band (guide holes x +-7)
 
 
@@ -64,11 +66,12 @@ async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
 
     # Editable knobs (Tools > Equations). mm suffix load-bearing (INCH document;
-    # the equation manager reads bare numbers in document units).
+    # the equation manager reads bare numbers in document units). (The old
+    # HoleDia knob is gone: the screw holes are now a native Hole Wizard feature
+    # whose diameter comes from the #4 clearance table, not a driven dim.)
     await set_global(adapter, "LockWidth", f"{LOCK_WIDTH}mm")
     await set_global(adapter, "LockHeight", f"{LOCK_HEIGHT}mm")
     await set_global(adapter, "LockThick", f"{LOCK_THICK}mm")
-    await set_global(adapter, "HoleDia", f"{HOLE_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -98,31 +101,19 @@ async def build(adapter) -> dict[str, str]:
     v_plate = LOCK_WIDTH * LOCK_HEIGHT * LOCK_THICK
     await volume_check(adapter, "lock plate", v_plate, 0.005 * v_plate)
 
-    # Screw holes on the guide-side band (positions are the guide layout,
-    # named but undriven -- only the diameter is driven).
-    holes = SketchDims()
-    check("create_sketch holes", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    for n, (x, y) in enumerate(HOLE_XY):
-        await define_circle(
-            adapter, x, y, HOLE_DIA / 2.0, f"screw hole ({x:.0f}, {y:.1f})",
-            dims=holes,
-            names=(f"H{n}X", f"H{n}Z", f"H{n}Dia"),
-            drives=(None, None, '"HoleDia"'),
-        )
-    set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "holes sketch")
-    check("exit_sketch holes", await adapter.exit_sketch())
-    name_last_feature(adapter, "HoleProfile")
-    drive_jobs += holes.apply(adapter, "HoleProfile")
-    check(
-        "cut holes",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=2.0 * LOCK_THICK, both_directions=True)
-        ),
+    # Screw holes on the guide-side band: ONE native Hole Wizard #4 clearance
+    # feature (2 through-all instances) drilled from the front face (z=0), while
+    # the plate is still a plain prismatic slab. Positions are the guide layout.
+    hole_dia = blind_cut_dia_mm(HOLE_SPEC)
+    wizard_holes(
+        adapter,
+        HOLE_SPEC,
+        [[x, y, 0.0] for x, y in HOLE_XY],
+        (0.0, 0.0, -1.0),
+        "guide-lock screw holes (#4 clearance)",
+        name="ScrewHoles",
     )
-    name_last_feature(adapter, "ScrewHoles")
-    v_holes = len(HOLE_XY) * math.pi * (HOLE_DIA / 2.0) ** 2 * LOCK_THICK
+    v_holes = len(HOLE_XY) * math.pi * (hole_dia / 2.0) ** 2 * LOCK_THICK
     v_final = v_plate - v_holes
     await volume_check(adapter, "lock with holes", v_final, 0.005 * v_plate)
 

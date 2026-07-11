@@ -28,7 +28,6 @@ from _common import (
     add_line_chain,
     apply_material,
     check,
-    define_circle,
     define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
@@ -40,6 +39,7 @@ from _common import (
     set_global,
     volume_check,
 )
+from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
 
 PART_NAME = "platen-clip"
 MATERIAL = "Brass"  # see _common.apply_material docstring
@@ -47,9 +47,10 @@ MATERIAL = "Brass"  # see _common.apply_material docstring
 CLIP_LENGTH = 125.0  # DIMENSIONS.md ch22: ~0.9x plate height, p.55 (low)
 CLIP_WIDTH = 10.0  # DIMENSIONS.md ch22 (low)
 CLIP_THICKNESS = 1.2  # DIMENSIONS.md ch22: thin spring strip (low)
-HOLE_DIA = 3.0  # DIMENSIONS.md ch22: end screws (low)
+# End screws: the brass fillister clip screws (Ø2.9 shank) pass THROUGH, so
+# each end hole is a #4 clearance Hole Wizard hole (normal fit Ø3.251; was a
+# plain Ø3.0 cut) -- memory/fastener-policy-us-customary.
 HOLE_INSET = 8.0  # from each end
-THROUGH_CUT_DEPTH = 10.0  # mid-plane total; > thickness
 
 
 async def build(adapter) -> dict[str, str]:
@@ -67,12 +68,9 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ClipLength", f"{CLIP_LENGTH}mm")
     await set_global(adapter, "ClipWidth", f"{CLIP_WIDTH}mm")
     await set_global(adapter, "ClipThickness", f"{CLIP_THICKNESS}mm")
-    await set_global(adapter, "HoleDia", f"{HOLE_DIA}mm")
-    await set_global(adapter, "HoleInset", f"{HOLE_INSET}mm")
-    # Mid-line of the strip (z 0..ClipWidth), the holes' common Y station.
-    await set_global(adapter, "HoleY", '"ClipWidth" / 2')
-    # Far hole's X = length minus the inset from the far end.
-    await set_global(adapter, "HoleFarX", '"ClipLength" - "HoleInset"')
+    # (The old HoleDia/HoleInset/HoleY/HoleFarX knobs are gone: the end holes
+    # are now a native Hole Wizard #4 clearance feature placed by point, not
+    # equation-driven sketch dims.)
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -106,34 +104,21 @@ async def build(adapter) -> dict[str, str]:
     v_strip = CLIP_LENGTH * CLIP_WIDTH * CLIP_THICKNESS
     await volume_check(adapter, "clip strip", v_strip, 0.005 * v_strip)
 
-    # End screw holes: both off-axis (x≠0, y≠0), so each circle records X, Z,
-    # diameter. Left hole at the near inset; right hole at length minus inset.
-    holes = SketchDims()
-    check("create_sketch holes", await adapter.create_sketch("Front"))
-    await define_circle(
-        adapter, HOLE_INSET, CLIP_WIDTH / 2.0, HOLE_DIA / 2.0, "left hole",
-        dims=holes,
-        names=("LeftX", "LeftZ", "LeftDia"),
-        drives=('"HoleInset"', '"HoleY"', '"HoleDia"'),
+    # End screw holes: ONE native Hole Wizard #4 clearance feature (2 points)
+    # from the front face (local z 0, outward normal -Z). Left hole at the near
+    # inset; right hole at length minus inset.
+    hole_dia = CLEARANCE_MM[("#4", "normal")]
+    wizard_holes(
+        adapter,
+        HoleSpec("clearance", "#4"),
+        [
+            [HOLE_INSET, CLIP_WIDTH / 2.0, 0.0],
+            [CLIP_LENGTH - HOLE_INSET, CLIP_WIDTH / 2.0, 0.0],
+        ],
+        (0.0, 0.0, -1.0),
+        "end screw holes (#4 clearance)", name="ScrewHoles",
     )
-    await define_circle(
-        adapter, CLIP_LENGTH - HOLE_INSET, CLIP_WIDTH / 2.0, HOLE_DIA / 2.0, "right hole",
-        dims=holes,
-        names=("RightX", "RightZ", "RightDia"),
-        drives=('"HoleFarX"', '"HoleY"', '"HoleDia"'),
-    )
-    await ensure_fully_defined(adapter, "holes sketch")
-    check("exit_sketch holes", await adapter.exit_sketch())
-    name_last_feature(adapter, "HoleProfile")
-    drive_jobs += holes.apply(adapter, "HoleProfile")
-    check(
-        "cut holes",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "ScrewHoles")
-    v_holes = 2.0 * math.pi * (HOLE_DIA / 2.0) ** 2 * CLIP_THICKNESS
+    v_holes = 2.0 * math.pi * (hole_dia / 2.0) ** 2 * CLIP_THICKNESS
     v_final = v_strip - v_holes
     await volume_check(adapter, "clip with holes", v_final, 0.005 * v_strip)
 

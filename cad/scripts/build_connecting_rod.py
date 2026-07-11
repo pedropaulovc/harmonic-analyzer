@@ -57,6 +57,7 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _holes import HoleSpec, wizard_holes
 
 import _telemetry
 
@@ -89,7 +90,8 @@ HEAD_HEIGHT = 10.5  # crown top -> shoulder root (photo ~10.5 < arm depth 16)
 HEAD_CROWN_ABOVE_PIN = 2.4  # crown top above the pin centre (photo ~2.4)
 HEAD_SHOULDER_RISE = 1.2  # shoulder taper height (width 8 -> 10, photo ~1.2)
 HEAD_THICKNESS = 2.5  # = arm thickness: pin joint stacks beside the arm (M6.3)
-PIN_HOLE_DIA = 2.0  # ch14: rocker arm rod-end pin
+# rocker-arm rod-end pin hole (ch14): was Ø2.0 drill, now #47 (Ø1.994) native
+# Hole Wizard feature
 THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > any local thickness
 
 RING_OUTER_RADIUS = RING_BORE_DIA / 2.0 + RING_WALL  # 20.4
@@ -122,7 +124,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HeadCrownAbovePin", f"{HEAD_CROWN_ABOVE_PIN}mm")
     await set_global(adapter, "HeadShoulderRise", f"{HEAD_SHOULDER_RISE}mm")
     await set_global(adapter, "HeadThickness", f"{HEAD_THICKNESS}mm")
-    await set_global(adapter, "PinHoleDia", f"{PIN_HOLE_DIA}mm")
+    # (The old PinHoleDia knob is gone: the rocker pin hole is now a native Hole
+    # Wizard #47 feature whose diameter comes from the drill standard.)
     await set_global(adapter, "RingOuterRadius", '"RingBoreDia" / 2 + "RingWall"')
     await set_global(adapter, "ShankStartY", '"RingBoreDia" / 2 - 0.5mm')
     await set_global(
@@ -328,30 +331,19 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "StrapBore")
 
-    # Rocker pin hole through the head (high in the crown: 2.4 below the crown
-    # top). Off-axis circle at (0, 147.67): the X is on-axis (a relation), so
-    # only the Z centre + diameter are dims. The Z dim is an unsigned distance
-    # and positive, so it drives directly.
-    pin_sd = SketchDims()
-    check("create_sketch pin hole", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)  # inference near the head edges
-    await define_circle(
-        adapter, 0.0, CENTER_DISTANCE, PIN_HOLE_DIA / 2.0, "pin hole", dims=pin_sd,
-        names=("PinCx", "PinCz", "PinHoleDiaDim"),
-        drives=(None, '"CenterDistance"', '"PinHoleDia"'),
+    # Rocker pin hole through the head (high in the crown, 2.4 below the crown
+    # top): was a plain Ø2.0 cut, now a native Hole Wizard #47 number drill
+    # (Ø1.994) at (0, CENTER_DISTANCE) drilled +Z through the 2.5 mm head
+    # (memory/fastener-policy-us-customary). Through-all is geometrically
+    # identical to the old mid-plane both-directions cut.
+    wizard_holes(
+        adapter,
+        HoleSpec("drilled_number", "#47"),
+        [[0.0, CENTER_DISTANCE, HEAD_THICKNESS / 2.0]],
+        (0.0, 0.0, 1.0),
+        "rocker pin hole (#47)",
+        name="PinHole",
     )
-    set_sketch_direct_db(adapter, False)
-    await ensure_fully_defined(adapter, "pin hole sketch")
-    check("exit_sketch pin hole", await adapter.exit_sketch())
-    name_last_feature(adapter, "PinHoleProfile")
-    drive_jobs += pin_sd.apply(adapter, "PinHoleProfile")
-    check(
-        "cut pin hole",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "PinHole")
     res = await adapter.get_mass_properties()
     v_built = float(res.data.volume)
     _telemetry.info(f"volume after cuts: {v_built:.1f} mm^3")

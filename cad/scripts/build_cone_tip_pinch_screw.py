@@ -42,7 +42,7 @@ MATERIAL = "Plain Carbon Steel"  # bright screw (t00471 chrome head)
 
 HEAD_DIA = 4.8
 HEAD_T = 2.0
-SHANK_DIA = 2.4
+SHANK_DIA = 1.7  # shank: was Ø2.4, now 1.7 = #3-48 tap-drill 1.994 - 0.3
 SHANK_LEN = 8.0
 SLOT_W = 0.8
 SLOT_D = 0.8

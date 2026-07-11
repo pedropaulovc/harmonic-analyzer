@@ -6,8 +6,14 @@ turning it takes up the shaft's axial end play (the 20 gears must stay
 registered against the cylinder set). The block's top slit + pinch screw
 lock the setting (see build_cone_tip_block).
 
-Body O7.9 x 14 authored along +Y from the SOUTH head face (origin):
+Body O6.2 x 14 authored along +Y from the SOUTH head face (origin):
 blind bore O2 x 6 from the NORTH (far) end, driver slot across the head.
+
+The Ø6.2 threaded shank is the repo's screw-in-tap convention -- tap-drill
+6.528 (5/16-18, the mating cone-tip-block AdjusterBore) minus 0.3, matching the
+lag-screw Ø12.0-in-Ø12.304 precedent (memory/fastener-policy-us-customary).
+(Was Ø7.9 line-to-line into a plain Ø7.9 bore, before that bore became a native
+5/16-18 Hole Wizard tapped hole.)
 
 Run (SolidWorks already open)::
 
@@ -40,7 +46,7 @@ from _common import (
 PART_NAME = "cone-tip-adjuster"
 MATERIAL = "Plain Carbon Steel"  # blued/black screw (t00471)
 
-BODY_DIA = 7.9
+BODY_DIA = 6.2  # 5/16-18 screw-in-tap shank (tap-drill 6.528 - 0.3); was 7.9
 BODY_LEN = 14.0
 CUP_DIA = 2.0  # blind bore the shaft tip rests in
 CUP_DEPTH = 6.0

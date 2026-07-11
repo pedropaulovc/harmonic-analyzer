@@ -57,6 +57,7 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
 
 PART_NAME = "channel-lever"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
@@ -66,12 +67,13 @@ LEVER_SPRING_X = 177.8  # DIMENSIONS.md ch17: fulcrum->spring-hole c2c, 7" (deri
 BAR_TALL = 9.5  # DIMENSIONS.md ch17: bar height, p.39 vs spring OD (low)
 LEVER_THICKNESS = 3.0  # DIMENSIONS.md ch17: fits 7.06 pitch + 3.2 bar slot (derived)
 PIVOT_HOLE_DIA = 6.5  # DIMENSIONS.md ch17: rides the 6.35 fulcrum shaft (derived)
-BAR_PIN_HOLE_DIA = 2.0  # DIMENSIONS.md ch17: amplitude-bar top pin (derived)
 BAR_PIN_X = 127.0  # 5" from the fulcrum (bar line -72.9, fulcrum -199.9)
-SPRING_HOLE_DIA = 4.0  # DIMENSIONS.md ch17: sized so the spring's O5.5-mean
-# O1-wire eye threads the tab with ~0.3 margins; the O3 photo read (low)
-# is infeasible (best margins ~0.05) - see build_channel_assembly.py
-# _assert_spring_threading
+# bar pin hole: was Ø2.0 drill, now #47 (Ø1.994) native Hole Wizard feature.
+# spring eye hole: was Ø4.0 drill, now #21 (Ø4.039) native Hole Wizard feature
+# -- sized so the spring's O5.5-mean O1-wire eye threads the tab with ~0.3
+# margins; the O3 photo read (low) is infeasible. build_channel_assembly.py
+# _assert_spring_threading checks threading against its own SPRING_HOLE_DIA=4.0
+# (the #21 bore is 0.039 wider -> slightly MORE clearance, still fine).
 TAB_START_X = 169.0  # bar steps down to the end tab (p.39/p.41, low)
 TAB_HALF = 3.0  # tab 6.0 tall, centred on the bar axis
 TIP_RADIUS = 3.0  # rounded tab tip; tip overhang = 182.8 + 3 - 177.8 = 8
@@ -96,9 +98,9 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BarTall", f"{BAR_TALL}mm")
     await set_global(adapter, "LeverThickness", f"{LEVER_THICKNESS}mm")
     await set_global(adapter, "PivotHoleDia", f"{PIVOT_HOLE_DIA}mm")
-    await set_global(adapter, "BarPinHoleDia", f"{BAR_PIN_HOLE_DIA}mm")
-    await set_global(adapter, "BarPinX", f"{BAR_PIN_X}mm")
-    await set_global(adapter, "SpringHoleDia", f"{SPRING_HOLE_DIA}mm")
+    # (The old BarPinHoleDia/SpringHoleDia/BarPinX knobs are gone: the bar-pin and
+    # spring holes are now native Hole Wizard features whose diameters come from
+    # the #47/#21 drill standard, not equation-driven sketch dims.)
     await set_global(adapter, "TabStartX", f"{TAB_START_X}mm")
     await set_global(adapter, "TabHalf", f"{TAB_HALF}mm")
     await set_global(adapter, "TipRadius", f"{TIP_RADIUS}mm")
@@ -215,50 +217,58 @@ async def build(adapter) -> dict[str, str]:
     expected = area * LEVER_THICKNESS
     await volume_check(adapter, "lever outline", expected, 0.005 * expected)
 
-    # Fulcrum hole + bar-pin hole + spring-hook hole, one mid-plane cut.
-    # Emission order across the three circles (all on the X axis, y=0):
-    #   fulcrum (origin) -> diameter only;
-    #   bar pin (127, 0) -> centre X, then diameter;
-    #   spring (177.8, 0) -> centre X, then diameter.  (5 dims total.)
-    holes = SketchDims()
-    check("create_sketch holes", await adapter.create_sketch("Front"))
+    # Fulcrum hole (Ø6.5, rides the fulcrum shaft): a bearing bore, kept a plain
+    # circle cut. On the origin, so only its diameter is a dim.
+    fulcrum = SketchDims()
+    check("create_sketch fulcrum hole", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, 0.0, PIVOT_HOLE_DIA / 2.0, "fulcrum hole", dims=holes,
+        adapter, 0.0, 0.0, PIVOT_HOLE_DIA / 2.0, "fulcrum hole", dims=fulcrum,
         names=("FulcrumCx", "FulcrumCz", "FulcrumDia"),
         drives=(None, None, '"PivotHoleDia"'),
     )
-    await define_circle(
-        adapter, BAR_PIN_X, 0.0, BAR_PIN_HOLE_DIA / 2.0, "bar pin hole", dims=holes,
-        names=("BarPinCx", "BarPinCz", "BarPinDia"),
-        drives=('"BarPinX"', None, '"BarPinHoleDia"'),
-    )
-    await define_circle(
-        adapter, LEVER_SPRING_X, 0.0, SPRING_HOLE_DIA / 2.0, "spring hole", dims=holes,
-        names=("SpringCx", "SpringCz", "SpringDia"),
-        drives=('"LeverSpringX"', None, '"SpringHoleDia"'),
-    )
-    await ensure_fully_defined(adapter, "holes sketch")
-    check("exit_sketch holes", await adapter.exit_sketch())
-    name_last_feature(adapter, "HoleProfile")
-    drive_jobs += holes.apply(adapter, "HoleProfile")
+    await ensure_fully_defined(adapter, "fulcrum hole sketch")
+    check("exit_sketch fulcrum hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "FulcrumProfile")
+    drive_jobs += fulcrum.apply(adapter, "FulcrumProfile")
     check(
-        "cut holes",
+        "cut fulcrum hole",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
         ),
     )
-    name_last_feature(adapter, "HoleCuts")
-    v_holes = (
-        math.pi
-        * (
-            (PIVOT_HOLE_DIA / 2.0) ** 2
-            + (BAR_PIN_HOLE_DIA / 2.0) ** 2
-            + (SPRING_HOLE_DIA / 2.0) ** 2
-        )
-        * LEVER_THICKNESS
+    name_last_feature(adapter, "FulcrumHole")
+    v_fulcrum = math.pi * (PIVOT_HOLE_DIA / 2.0) ** 2 * LEVER_THICKNESS
+    expected -= v_fulcrum
+    await volume_check(adapter, "fulcrum hole", expected, 0.005 * expected)
+
+    # Bar-pin hole (was Ø2.0 cut, now #47 Ø1.994) and spring-eye hole (was Ø4.0
+    # cut, now #21 Ø4.039): native Hole Wizard through-holes drilled +Z through
+    # the 3 mm lever (memory/fastener-policy-us-customary). Two specs -> two
+    # feature calls, both on the +Z front face; each is fully inside the material
+    # (the spring eye rides the 6.0 tab, Ø4.039 < 6.0), so removal is pi*r^2*t.
+    bar_dia = NUMBER_DRILL_MM["#47"]
+    wizard_holes(
+        adapter,
+        HoleSpec("drilled_number", "#47"),
+        [[BAR_PIN_X, 0.0, LEVER_THICKNESS / 2.0]],
+        (0.0, 0.0, 1.0),
+        "bar-pin hole (#47)",
+        name="BarPinHole",
     )
-    expected -= v_holes
-    await volume_check(adapter, "holes", expected, 0.005 * expected)
+    expected -= math.pi * (bar_dia / 2.0) ** 2 * LEVER_THICKNESS
+    await volume_check(adapter, "bar-pin hole", expected, 0.005 * expected)
+
+    spring_dia = NUMBER_DRILL_MM["#21"]
+    wizard_holes(
+        adapter,
+        HoleSpec("drilled_number", "#21"),
+        [[LEVER_SPRING_X, 0.0, LEVER_THICKNESS / 2.0]],
+        (0.0, 0.0, 1.0),
+        "spring-eye hole (#21)",
+        name="SpringHole",
+    )
+    expected -= math.pi * (spring_dia / 2.0) ** 2 * LEVER_THICKNESS
+    await volume_check(adapter, "spring-eye hole", expected, 0.005 * expected)
 
     # Named bore axes for assembly mates (view-independent name selection):
     # Axis1 = fulcrum bore (origin, rides the fulcrum shaft), Axis2 = bar-pin
