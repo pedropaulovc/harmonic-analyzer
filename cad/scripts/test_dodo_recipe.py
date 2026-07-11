@@ -93,6 +93,27 @@ def test_recipe_tracker_detects_any_recipe_member(tmp_path):
         member.write_text("v0\n")  # restore for next iteration
 
 
+def test_paper_drive_never_uses_generic_refresh_gate():
+    dodo = _load_dodo()
+    assert dodo._assembly_run_mode("paper_drive", False, False) == (
+        "full", "bounded thread-contact gate requires full rebuild"
+    )
+    assert dodo._assembly_run_mode("channel", False, False) == (
+        "refresh", "referenced artefact changed"
+    )
+
+
+def test_drawing_depends_on_actual_part_execution():
+    dodo = _load_dodo()
+    token = dodo._part_execution_token("platen_guide")
+    part = next(task for task in dodo.task_part() if task["name"] == "platen_guide")
+    drawing = next(
+        task for task in dodo.task_drawing() if task["name"] == "platen_guide"
+    )
+    assert token in part["targets"]
+    assert token in drawing["file_dep"]
+
+
 def test_content_checker_digest_ignores_yaml_noise(tmp_path):
     """Option A: ContentChecker digests the PARSED yaml, so comment / whitespace /
     numeric-reflow edits to a shared cad/config/*.yaml leave the digest unchanged
