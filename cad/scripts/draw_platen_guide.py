@@ -124,17 +124,14 @@ def _delete_unnamed_imports(adapter: Any, annotations: list[Any]) -> list[Any]:
 
 
 def _curate_front_dimensions(adapter: Any, annotations: list[Any]) -> list[Any]:
-    """Keep only overall size and common Y; X stations live in the schedule.
+    """Keep only overall length; hole coordinates live in the native table.
 
     The former print placed nine independent X dimensions from the same left
-    origin.  Moving text could not separate their coincident dimension lines.
-    A two-row coordinate schedule is both shorter and unambiguous.
+    origin.  The native Hole Table now owns every X/Y station and its view tags.
     """
-    keep = {"Length", "Height", "T0Y"}
+    keep = {"Length"}
     reposition = {
-        "Length": (0.190, 0.150),
-        "Height": (0.026, 0.190),
-        "T0Y": (0.046, 0.215),
+        "Length": (0.190, 0.135),
     }
     annotations = _delete_unnamed_imports(adapter, annotations)
     names = {dimension_name(adapter, ann) for ann in annotations}
@@ -154,15 +151,20 @@ def _curate_front_dimensions(adapter: Any, annotations: list[Any]) -> list[Any]:
 def _curate_right_dimensions(adapter: Any, annotations: list[Any]) -> None:
     annotations = _delete_unnamed_imports(adapter, annotations)
     names = {dimension_name(adapter, ann) for ann in annotations}
-    delete = tuple(sorted(name for name in names if name and name != "Depth"))
+    keep = {"Depth", "Height"}
+    delete = tuple(sorted(name for name in names if name and name not in keep))
     curated = curate_dimensions(
         adapter,
         annotations,
         delete=delete,
-        reposition={"Depth": (0.375, 0.151)},
+        reposition={"Depth": (0.370, 0.095), "Height": (0.385, 0.110)},
     )
-    if "Depth" not in {dimension_name(adapter, ann) for ann in curated}:
-        raise RuntimeError("drawing is missing the model-driven 10 mm depth")
+    present = {dimension_name(adapter, ann) for ann in curated}
+    missing = sorted(keep - present)
+    if missing:
+        raise RuntimeError(
+            f"right view is missing stock-section dimensions: {missing}"
+        )
 
 
 def _manufacturing_notes() -> str:
@@ -171,8 +173,8 @@ def _manufacturing_notes() -> str:
             "UNLESS OTHERWISE SPECIFIED:",
             "1. DIMENSIONS ARE IN MILLIMETRES. INTERPRET PER ASME Y14.5.",
             (
-                "2. TOLERANCES: LENGTH +/-0.5; STOCK SECTION +/-0.25; "
-                "HOLE CENTRES +/-0.10; CORE DIAMETERS +/-0.05; "
+                "2. TOLERANCES: LENGTH +/-0.5; STOCK SECTION +/-0.25;\n"
+                "   HOLE CENTRES +/-0.10; CORE DIAMETERS +/-0.05; "
                 "ANGLES +/-0.5 DEG."
             ),
             "3. REMOVE BURRS AND BREAK SHARP EDGES 0.2 MAX.",
@@ -226,19 +228,23 @@ def _select_hole_table_geometry(adapter: Any, front: Any) -> None:
     )
     if not datum:
         raise RuntimeError("failed to select platen-guide hole-table datum vertex")
-    face = draw.Extension.SelectByID2(
-        "",
-        "FACE",
-        FRONT_LEFT_X_M + 0.010,
-        FRONT_VIEW_Y_M,
-        0.0,
-        True,
-        2,
-        null_callout(),
-        0,
-    )
-    if not face:
-        raise RuntimeError("failed to select platen-guide face for the hole table")
+    stations = tuple(sorted((*THROUGH_X, *BLIND_X)))
+    for station in stations:
+        selected = draw.Extension.SelectByID2(
+            "",
+            "EDGE",
+            FRONT_LEFT_X_M + station / 1000.0,
+            FRONT_HOLE_Y_M,
+            0.0,
+            True,
+            2,
+            null_callout(),
+            0,
+        )
+        if not selected:
+            raise RuntimeError(
+                f"failed to select hole-table edge at X={station:g} mm"
+            )
 
 
 def _insert_native_hole_table(adapter: Any, front: Any) -> Any:
@@ -258,17 +264,34 @@ def _insert_native_hole_table(adapter: Any, front: Any) -> Any:
     adapter.currentModel.ClearSelection2(True)
     if table is None:
         raise RuntimeError("SolidWorks failed to create the platen-guide hole table")
+    table = _sw_type_info.flagged(table, "IHoleTableAnnotation")
+    feature = table.HoleTable
+    if feature is None:
+        raise RuntimeError("native hole table annotation has no feature")
+    feature = _sw_type_info.flagged(feature, "IHoleTable")
+    feature.CombineSameSize = False
+    feature.CombineTags = False
+    adapter.currentModel.EditRebuild3()
     table = _sw_type_info.flagged(table, "ITableAnnotation")
     rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
     columns = int(adapter._get_attr_or_call(table, "ColumnCount") or 0)
+    contents = tuple(
+        tuple(
+            str(
+                adapter._attempt(
+                    lambda row=row, column=column: table.DisplayedText(row, column)
+                )
+                or ""
+            )
+            for column in range(columns)
+        )
+        for row in range(rows)
+    )
     if (rows, columns) != (1 + len(THROUGH_X) + len(BLIND_X), 4):
         raise RuntimeError(
-            f"native hole table is {rows}x{columns}, expected 10x4"
+            f"native hole table is {rows}x{columns}, expected 10x4: {contents!r}"
         )
-    header = tuple(
-        str(adapter._attempt(lambda column=column: table.DisplayedText(0, column)) or "")
-        for column in range(columns)
-    )
+    header = contents[0]
     expected = ("TAG", "X LOC", "Y LOC", "SIZE")
     if tuple(value.upper() for value in header) != expected:
         raise RuntimeError(f"native hole-table header is unexpected: {header!r}")
