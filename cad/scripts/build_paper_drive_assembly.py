@@ -156,7 +156,7 @@ from build_platen_guide import (  # noqa: E402
     HOLE_X as GUIDE_LOCK_HOLE_X,
     LOCK_STATION_X,
     SCREW_STATION_X as GUIDE_SCREW_STATION_X,
-    SCREW_THREAD_DEPTH as GUIDE_SCREW_THREAD_DEPTH,
+    SCREW_THREAD_DEPTH as GUIDE_TAP_THREAD_DEPTH,
     THREAD,
 )
 from build_guide_lock import LOCK_THICK, LOCK_WIDTH  # noqa: E402
@@ -177,6 +177,11 @@ from build_platen_rack import (  # noqa: E402
 PLATE_X0 = -150.0  # centred between the columns (ch30 rest pose)
 PLATE_Y0 = 305.0
 PLATE_FRONT_Z = BAR_FRONT_Z - PLATE_THICKNESS  # -142.9
+GUIDE_SCREW_THREAD_DEPTH = SHANK_LEN - (
+    PLATE_THICKNESS - PLATEN_CBORE_DEPTH
+)
+if GUIDE_SCREW_THREAD_DEPTH > GUIDE_TAP_THREAD_DEPTH:
+    raise RuntimeError("guide screw engagement exceeds the available tapped depth")
 
 # The platen hangs: the bar's top edge carries the top guide's underside.
 GUIDE_Y = (315.5, 349.5)  # bottom / top rail seats (machine y)

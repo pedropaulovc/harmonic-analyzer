@@ -39,6 +39,9 @@ def test_mating_hardware_uses_6ba() -> None:
     assert platen.SOCKET_THREAD_DEPTH < platen.SOCKET_DEPTH
     assert platen.CBORE_DIA == screw.HEAD_DIA + 1.0
     assert platen.CBORE_DEPTH == screw.HEAD_H + 0.2
+    assert paper_drive.GUIDE_SCREW_THREAD_DEPTH == screw.SHANK_LEN - (
+        platen.PLATE_THICKNESS - platen.CBORE_DEPTH
+    )
 
 
 def test_platen_guide_hole_stations_are_native_linear_patterns() -> None:
