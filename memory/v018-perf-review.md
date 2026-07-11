@@ -327,3 +327,27 @@ would eat the ladder's win). ~3.3 s vs ~8.7 s per station => est ~100 s off
 the drive-train build (validation build pending). Also measured: a 2-mate
 copy of a SPUN source wanders ANOTHER ~9.12 deg (copy C off a 9.12-spun
 source landed 18.25 off) -- always copy from the design-posed seed.
+
+**2026-07-11 v0.19.0 SHIPPED + gear-phase minimal repro (`diagnostics/
+diag_cwm_gear_min.py`, standalone pywin32, vendor-ticket grade).** Release:
+diff vs v0.18.0 = 0 changed parts (the whole perf arc was geometry-neutral),
+cut job 35 min, PNG render cache 0/648 hits AS EXPECTED (every part's recipe
+legitimately moved -- #237 touched _common.py + the submodule bump -- plus
+the deliberate PNG_RENDER_REV retirement; the real cache test is the next
+geometry-quiet release). Gear-phase repro findings, all measured on SW 2026
+SP2: (a) the copied-gear-mate park angle is a SOLVER CONSTANT -- 9.1229 deg
+in a 1-part/0-solid/1-RefAxis/3-mate throwaway, EXACTLY the angle the
+122-component drive-train probe measured, ratio-independent (1:2 vs 120:6);
+(b) GetConstrainedStatus is NO GUARD: a seed geared to a FIXED partner reads
+FULLY-DEFINED and its copy still parks 9.1229 off -- the vendor-demo folk
+rule ("only copy fully-constrained seeds") cannot protect gear phase, no
+mate defines it; (c) nuance vs the production reasoning: a raw Transform2
+phase put on the mesh-CARRYING copy lands AND holds through a plain
+EditRebuild3 (rebuilds never move a free DOF -- "rebuild-stable park" and
+"stored-state enforcement" are different things); what a put cannot fix is
+the RELATIONSHIP recorded at copy time, and coupling-re-solving corrections
+(drag/drivers/kinematics) turn the partner train, so the shipped fresh-mesh
+recipe (delete copied mesh -> put -> author fresh) stays the right
+production answer -- re-validated in the minimal case (HEALS and HOLDS).
+The script's docstring carries step-by-step UI repro instructions
+(Insert > Component > Copy with Mates on a --visible marker cylinder).
