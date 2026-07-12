@@ -21,9 +21,14 @@ drawings):
   small OUTWARD ``allowance`` before flagging, rather than insetting a margin.
 * An isometric (or other pictorial) view's axis-aligned outline is mostly empty
   diagonal space, so a note sitting in that empty corner "overlaps" the box
-  without touching any geometry.  Such views are marked ``loose`` and excluded
-  from both the overlap and overflow tests -- their bounding box is not a
-  faithful footprint.
+  without touching any geometry.
+
+``overlap_exempt`` marks an element whose box is a faithful *extent* (so it is
+still audited for running off the sheet) but not a faithful *collision* footprint
+-- a pictorial view, a leadered callout that deliberately points at geometry, or
+a small tag sitting on its own view.  Such elements are skipped by the OVERLAP
+test only; they are still checked for OVERFLOW, so a pictorial view or leadered
+note mis-placed off the sheet is still caught (Codex #269).
 """
 
 from __future__ import annotations
@@ -47,9 +52,10 @@ DEFAULT_BOUNDARY_ALLOWANCE_M = 0.003
 class LayoutElement:
     """One laid-out drawing object and its sheet-space bounding box (meters).
 
-    ``loose`` marks an element whose axis-aligned box is NOT a faithful
-    footprint (an isometric/pictorial view): it is skipped by both the overlap
-    and overflow tests.
+    ``overlap_exempt`` marks an element whose box is a faithful extent but not a
+    faithful collision footprint (a pictorial view, a leadered callout, a tag on
+    its own view): it is skipped by the OVERLAP test but still audited for
+    OVERFLOW.
     """
 
     label: str
@@ -58,7 +64,7 @@ class LayoutElement:
     ymin: float
     xmax: float
     ymax: float
-    loose: bool = False
+    overlap_exempt: bool = False
 
     @property
     def box(self) -> tuple[float, float, float, float]:
@@ -110,10 +116,11 @@ def find_overlaps(
 
     A real 2D collision needs positive penetration on BOTH axes; requiring the
     *smaller* penetration to clear the tolerance rejects the whitespace padding
-    that ``GetOutline`` adds to adjacent views.  ``loose`` elements (pictorial
-    views) are skipped -- their box is not a faithful footprint.
+    that ``GetOutline`` adds to adjacent views.  ``overlap_exempt`` elements
+    (pictorial views, leadered callouts, tags on their own view) are skipped --
+    their box is not a faithful collision footprint.
     """
-    solid = [element for element in elements if not element.loose]
+    solid = [element for element in elements if not element.overlap_exempt]
     overlaps: list[Overlap] = []
     for i in range(len(solid)):
         for j in range(i + 1, len(solid)):
@@ -134,13 +141,13 @@ def find_overflows(
 
     The sheet origin is its lower-left corner (SolidWorks sheet space), so the
     usable region is ``[-allowance, width + allowance] x [-allowance, height +
-    allowance]``.  ``loose`` elements are skipped -- their padded pictorial box
-    routinely pokes past an edge without any geometry doing so.
+    allowance]``.  EVERY element is checked -- overlap-exempt elements (pictorial
+    views, leadered callouts) can still be mis-placed off the sheet, and the
+    outward ``allowance`` absorbs the routine ``GetOutline`` padding that pushes
+    an on-sheet pictorial box a millimetre or two past an edge (Codex #269).
     """
     overflows: list[Overflow] = []
     for element in elements:
-        if element.loose:
-            continue
         sides: list[tuple[str, float]] = []
         if element.xmin < -allowance:
             sides.append(("left", -allowance - element.xmin))

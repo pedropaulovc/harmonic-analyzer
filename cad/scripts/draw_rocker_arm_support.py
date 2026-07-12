@@ -32,7 +32,6 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     insert_hole_table,
-    remove_notes_matching,
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
@@ -44,6 +43,7 @@ from build_rocker_arm_support import BOSS_DEPTH, HALF_Y, HOLES, WIDE
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
+    remove_notes_matching,
 )
 
 
