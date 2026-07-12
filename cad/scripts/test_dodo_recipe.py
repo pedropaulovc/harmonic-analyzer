@@ -93,6 +93,17 @@ def test_recipe_tracker_detects_any_recipe_member(tmp_path):
         member.write_text("v0\n")  # restore for next iteration
 
 
+def test_drawing_depends_on_actual_part_execution():
+    dodo = _load_dodo()
+    token = dodo._part_execution_token("platen_guide")
+    part = next(task for task in dodo.task_part() if task["name"] == "platen_guide")
+    drawing = next(
+        task for task in dodo.task_drawing() if task["name"] == "platen_guide"
+    )
+    assert token in part["targets"]
+    assert token in drawing["file_dep"]
+
+
 def test_content_checker_digest_ignores_yaml_noise(tmp_path):
     """Option A: ContentChecker digests the PARSED yaml, so comment / whitespace /
     numeric-reflow edits to a shared cad/config/*.yaml leave the digest unchanged
@@ -311,14 +322,13 @@ def test_export_is_gated_on_the_sw_verify_suites():
     assert {"verify:soundness", "verify:kinematics"} <= deps, deps
 
 
-def test_release_is_gated_on_every_gate():
-    """release must depend on export + preflight + BOTH verify suites + EVERY offline
-    check -- explicit real edges now the spine no longer pulls them transitively, so a
-    release can't publish past a stale/failing gate."""
+def test_release_is_gated_on_every_gate_and_staged_drawing():
+    """Release has real edges to every gate and drawing artifact it stages."""
     dodo = _load_dodo()
     deps = set(dodo.task_release()["task_dep"])
     expected = {"export", "preflight", "verify:soundness", "verify:kinematics",
-                *(f"check:{c}" for c in dodo._CHECK_NAMES)}
+                *(f"check:{c}" for c in dodo._CHECK_NAMES),
+                *(f"drawing:{s}" for s in dodo._drawing_order())}
     assert expected <= deps, expected - deps
 
 
@@ -331,6 +341,47 @@ def test_part_tasks_cover_every_stem_once(monkeypatch):
     names = [t["name"] for t in dodo.task_part()]
     assert sorted(names) == sorted(dodo.part_stems())
     assert len(names) == len(set(names))
+
+
+def test_drawing_runtime_lock_and_source_dependency(monkeypatch):
+    """Drawings use the runtime COM lock and depend directly on their source part,
+    without false assembly/export ordering edges."""
+    dodo = _load_dodo()
+    monkeypatch.setenv("HARMONIC_BUILD_ORDER_SEED", "seat-A")
+    drawing = "drawing:platen_guide"
+
+    task = next(task for task in dodo.task_drawing() if task["name"] == "platen_guide")
+    assert "task_dep" not in task
+    cad_deps = [path for path in task["file_dep"] if path.lower().endswith(".sldprt")]
+    assert cad_deps == [dodo._sldprt("platen_guide")]
+    assert not any(path.lower().endswith(".sldasm") for path in task["file_dep"])
+    assert dodo._part_execution_token("platen_guide") in task["file_dep"]
+    action, args = task["actions"][0]
+    assert action is dodo._run
+    assert args[-1] is True
+    dep_names = {Path(path).name for path in task["file_dep"]}
+    assert {
+        "platen-guide.SLDPRT",
+        "draw_platen_guide.py",
+        "_drawing_common.py",
+        "_drawing_registry.py",
+        "_holes.py",
+        "_common.py",
+        ".solidworks-mcp-submodule.digest",
+    } <= dep_names
+    assert {Path(path).name for path in task["targets"]} == {
+        "platen-guide.SLDDRW",
+        "platen-guide.pdf",
+        "platen-guide_drawing.png",
+    }
+    assert {"asme-b-book.drwdot", "asme-b-book.slddrt"} <= {
+        name.lower() for name in dep_names
+    }
+
+    build_deps = set(dodo.task_build()["task_dep"])
+    bare_deps = set(dodo.task_build_bare()["task_dep"])
+    assert drawing in build_deps
+    assert drawing not in bare_deps
 
 
 def test_assembly_artefact_digest_folds_in_refs():
@@ -669,3 +720,15 @@ def test_submodule_digest_is_location_independent(tmp_path):
 
     assert digest_under(tmp_path / "A") == digest_under(tmp_path / "B"), \
         "identical submodule content must hash equally across checkout roots"
+
+
+def test_recipe_gate_tracks_sources_imported_by_its_tests():
+    """Editing code exercised by the drawing tests must stale the
+    ``check:recipe`` stamp even when the test files themselves are unchanged."""
+    dodo = _load_dodo()
+    recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
+    deps = {Path(path).name for path in recipe["file_dep"]}
+    assert {
+        "_holes.py",
+        "build_platen_guide.py",
+    } <= deps

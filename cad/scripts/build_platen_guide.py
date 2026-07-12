@@ -27,19 +27,27 @@ from _common import (
     SketchDims,
     add_line_chain,
     apply_color,
+    apply_custom_properties,
     apply_material,
     check,
     define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
     set_global,
     volume_check,
+    _dim_owner_feature,
+    _feature_by_name,
+    _iter_features,
+    _read_member,
 )
+import _config
+import _telemetry
 from _holes import (
     CLEARANCE_MM,
     HoleSpec,
@@ -68,6 +76,67 @@ HOLE_X = tuple(s + d for s in LOCK_STATION_X for d in (-LOCK_SCREW_DX, LOCK_SCRE
 # lock screws pass through) -- memory/fastener-policy-us-customary.
 SCREW_STATION_X = (30.0, 90.0, 150.0, 210.0, 270.0)
 SCREW_HOLE_DEPTH = 3.0
+
+
+def _mark_dimensions_for_drawing(
+    adapter, feature_name: str, dimension_names: set[str]
+) -> None:
+    """Mark only explicit manufacturing dimensions for drawing import."""
+    feature = _feature_by_name(adapter, feature_name)
+    marked: set[str] = set()
+    display = _read_member(feature, "GetFirstDisplayDimension")
+    for _ in range(1000):
+        if not display:
+            break
+        dimension = display.GetDimension2(0)
+        name = str(_read_member(dimension, "Name"))
+        if _dim_owner_feature(dimension) == feature_name and name in dimension_names:
+            display.MarkedForDrawing = True
+            if not bool(_read_member(display, "MarkedForDrawing")):
+                raise RuntimeError(f"{name}@{feature_name}: mark-for-drawing failed")
+            marked.add(name)
+        display = feature.GetNextDisplayDimension(display)
+    missing = dimension_names - marked
+    if missing:
+        raise RuntimeError(
+            f"{feature_name}: dimensions not marked for drawing: {sorted(missing)}"
+        )
+
+
+def _clear_dimensions_for_drawing(adapter) -> None:
+    for feature in _iter_features(adapter):
+        display = _read_member(feature, "GetFirstDisplayDimension")
+        for _ in range(1000):
+            if not display:
+                break
+            if bool(_read_member(display, "MarkedForDrawing")):
+                display.MarkedForDrawing = False
+            display = feature.GetNextDisplayDimension(display)
+
+
+def _apply_drawing_properties(adapter) -> None:
+    spec = _config.parts(PART_NAME)
+    apply_custom_properties(
+        adapter,
+        {
+            "Material Specification": str(spec["material_specification"]),
+            "Finish": str(spec["finish"]),
+            "Quantity": str(spec["quantity"]),
+        },
+    )
+
+
+def _make_back_view_front(adapter) -> None:
+    """Make the hole-entry face the standard drawing Front view."""
+    sw_front_view = 1
+    sw_back_view = 2
+    model = adapter.currentModel
+    model.ShowNamedView2("", sw_back_view)
+    if not model.Extension.UpdateStandardViews("", sw_front_view):
+        raise RuntimeError("platen-guide: failed to make Back the standard Front view")
+    model.ShowNamedView2("", sw_front_view)
+    adapter._zoom_to_fit(model)
+    _telemetry.success("standard views remapped: former Back is now Front")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -109,6 +178,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=GUIDE_DEPTH)),
     )
     name_last_feature(adapter, "Guide")
+    depth_dim = name_dimensions(adapter, "Guide", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"GuideDepth"')]
     v_rail = GUIDE_LENGTH * GUIDE_HEIGHT * GUIDE_DEPTH
     await volume_check(adapter, "guide rail", v_rail, 0.005 * v_rail)
 
@@ -155,9 +226,15 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven guide (equations neutral)", v_final, 0.02 * v_holes
     )
 
+    _clear_dimensions_for_drawing(adapter)
+    _mark_dimensions_for_drawing(adapter, "GuideProfile", {"Length", "Height"})
+    _mark_dimensions_for_drawing(adapter, "Guide", {"Depth"})
+
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)
+    _apply_drawing_properties(adapter)
+    _make_back_view_front(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 
 
