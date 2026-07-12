@@ -419,10 +419,6 @@ def wizard_holes(
         pinned_dia_mm = blind_cut_dia_mm(spec)
         initialized_dia_mm = float(defn.ThruHoleDiameter) * 1000.0
         diameter_drift = abs(initialized_dia_mm - pinned_dia_mm) > 0.05
-        if diameter_drift and spec.fit != "normal":
-            # HoleFit itself is harmless but ineffective on plain holes; keep
-            # the requested semantic where the interface accepts it.
-            edits.append(("HoleFit", _FITS[spec.fit]))
         if diameter_drift and "HoleDiameter" not in spec.overrides_mm:
             # On a plain hole the DRIVING knob is ThruHoleDiameter -- a
             # HoleDiameter-only write is silently dropped (probe 2026-07-11:

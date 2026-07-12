@@ -5,7 +5,8 @@ normal-clearance Hole Wizard feature and one #30 drilled Hole Wizard feature,
 then creates a drawing containing one front view and one native hole table. On
 the affected SolidWorks 2026 seat, each #4 SIZE cell contains the correct
 through-hole callout followed by the bogus ``DIAMETER 0.00 X 0 DEG, FAR SIDE``
-line, while the #30 comparison row is correct.
+line after a redundant ``HoleFit=normal`` ModifyDefinition, while the #30
+comparison row is correct.
 
 No table cell is edited and no custom column is added.  The script fails unless
 the native SIZE text contains both the correct through-hole size and the phantom
@@ -31,7 +32,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import _telemetry  # noqa: E402
 from _common import check, run_build  # noqa: E402
 from _drawing_common import insert_hole_table, set_hidden_lines_removed  # noqa: E402
-from _holes import HoleSpec, wizard_holes  # noqa: E402
+from _holes import HoleSpec, _early, wizard_holes  # noqa: E402
+from solidworks_mcp.adapters.pywin32_adapter import null_callout  # noqa: E402
 from solidworks_mcp.adapters.solidworks.drawing import (  # noqa: E402
     new_drawing,
     place_view,
@@ -109,6 +111,32 @@ def _assert_positive_repro(contents: tuple[tuple[str, ...], ...]) -> None:
         )
 
 
+def _apply_redundant_normal_fit(adapter: Any) -> None:
+    """Reproduce the old plain-hole edit that corrupts type 25 into type 26."""
+    model = adapter.currentModel
+    feature = model.FeatureByName("ClearanceHoles")
+    if feature is None:
+        raise RuntimeError("ClearanceHoles feature is missing")
+    definition = _early(feature.GetDefinition(), "IWizardHoleFeatureData2")
+    if int(definition.Type) != 25:
+        raise RuntimeError(f"expected initial swHoleThru type 25, got {definition.Type}")
+    if not definition.AccessSelections(model, None):
+        raise RuntimeError("AccessSelections failed for redundant HoleFit repro")
+    definition.HoleFit = 1  # swWzdHoleScrewClearanceNormal
+    if not feature.ModifyDefinition(
+        definition._oleobj_, model, null_callout()
+    ):
+        raise RuntimeError("redundant normal HoleFit ModifyDefinition failed")
+    model.EditRebuild3()
+    corrupted = _early(feature.GetDefinition(), "IWizardHoleFeatureData2")
+    if int(corrupted.Type) != 26 or bool(corrupted.FarSideCounterSink):
+        raise RuntimeError(
+            "redundant normal HoleFit did not reproduce type 26 / far-side false: "
+            f"type={corrupted.Type}, far={corrupted.FarSideCounterSink}"
+        )
+    _telemetry.success("redundant normal HoleFit reproduced type 25 -> 26 corruption")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -135,19 +163,13 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         wizard_holes(
             adapter,
-            HoleSpec(
-                "clearance",
-                "#4",
-                # Reproduce the old production path: writing the table-equivalent
-                # diameter back through ModifyDefinition corrupts the subtype from
-                # swHoleThru (25) to swHoleThruCounterSinkBottom (26).
-                overrides_mm={"HoleDiameter": 3.251},
-            ),
+            HoleSpec("clearance", "#4"),
             [[x, y, 0.0] for x, y in CLEARANCE_HOLES_MM],
             (0.0, 0.0, -1.0),
             "#4 normal-clearance through holes",
             name="ClearanceHoles",
         )
+        _apply_redundant_normal_fit(adapter)
         wizard_holes(
             adapter,
             HoleSpec("drilled_number", "#30"),
