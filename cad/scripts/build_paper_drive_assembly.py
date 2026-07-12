@@ -916,16 +916,65 @@ async def build(adapter) -> dict[str, str]:
 
     # --- transgear group (the real train) --------------------------------------
     # Bracket on the bar's back face, stud bore below the bar.
-    await place_component(adapter, "transgear-bracket",
-                          [STUD_XY[0], STUD_XY[1], BRACKET_Z0],
-                          [0.0, 0.0, 0.0], IDENTITY)
-    # +dx first (screw at machine -2), to match the pose ledger's -1/-2.
-    for dx in (BRACKET_SCREW_DX, -BRACKET_SCREW_DX):
-        # Ry(180): shank forward into the bar, head on the bracket back.
-        await place_component(adapter, "bracket-screw",
-                              [STUD_XY[0] + dx, BAR_CY, STUB_Z0],
-                              [0.0, 180.0, 0.0], ROT_Y_180,
-                              label=f"bracket-screw (x{STUD_XY[0] + dx:+.0f})")
+    bracket = await place_component(
+        adapter,
+        "transgear-bracket",
+        [STUD_XY[0], STUD_XY[1], BRACKET_Z0],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+    )
+    # One real-mated seed at machine -2; PatternAxisX forward runs toward -X
+    # and creates the second screw at -22. Ry(180) points both shanks into the
+    # support bar while their under-head planes bear on the bracket back face.
+    bracket_seed_target = [STUD_XY[0] + BRACKET_SCREW_DX, BAR_CY, STUB_Z0]
+    bracket_seed = await place_component(
+        adapter,
+        "bracket-screw",
+        bracket_seed_target,
+        [0.0, 180.0, 0.0],
+        ROT_Y_180,
+        ground=False,
+        label=f"bracket-screw seed (x{bracket_seed_target[0]:+.0f})",
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"ScrewAxis@{bracket_seed}", "AXIS"),
+        named_ref(f"ScrewAxis1@{bracket}", "AXIS"),
+        label="transgear bracket-screw seed coaxial",
+        verify=(bracket_seed, bracket_seed_target),
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"Front Plane@{bracket_seed}", "PLANE"),
+        named_ref(f"ScrewSeat@{bracket}", "PLANE"),
+        label="transgear bracket-screw seed under-head seat",
+        verify=(bracket_seed, bracket_seed_target),
+    )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Right Plane@{bracket_seed}", "PLANE"),
+        named_ref(f"Right Plane@{bracket}", "PLANE"),
+        label="transgear bracket-screw seed anti-spin",
+        verify=(bracket_seed, bracket_seed_target),
+    )
+    assert_component_placed(
+        adapter, bracket_seed, bracket_seed_target, ROT_Y_180
+    )
+    bracket_instances = await linear_component_pattern(
+        adapter,
+        [bracket_seed],
+        axis="x",
+        spacing_mm=2.0 * BRACKET_SCREW_DX,
+        instances=2,
+        label="transgear bracket-screw pattern",
+    )
+    _assert_pattern_targets(
+        adapter,
+        bracket_instances,
+        [[STUD_XY[0] - BRACKET_SCREW_DX, BAR_CY, STUB_Z0]],
+        ROT_Y_180,
+        "transgear bracket-screw pattern",
+    )
     # Rx(-90): stud +Y -> -Z; base z -125.9..-135, O5 seat to -148.8, collar
     # to -152.8.
     await place_component(adapter, "transgear-stub", [STUD_XY[0], STUD_XY[1], STUB_Z0],
