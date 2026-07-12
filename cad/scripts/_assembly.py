@@ -2456,6 +2456,24 @@ async def _export_assembly_images(
         for view in views:
             img_path = (png_dir / f"{asm_name}_{view}.png").resolve()
             async with _telemetry.aspan("export_image", view=view):
+                # A freshly created anonymous assembly can have a partially
+                # painted viewport even after ShowNamedView2/ZoomToFit. SaveBMP
+                # then captures large black tiles; reopening the saved copy
+                # fixes it only because activation forces a repaint. Stage and
+                # redraw the view here, then ask the adapter to capture CURRENT
+                # so it does not change orientation again after the repaint.
+                view_constants = {
+                    "front": 1, "back": 2, "left": 3, "right": 4,
+                    "top": 5, "bottom": 6, "isometric": 7,
+                    "dimetric": 8, "trimetric": 9,
+                }
+                view_const = view_constants.get(view.lower())
+                if view_const is None:
+                    raise ValueError(f"unsupported assembly render view: {view!r}")
+                model = adapter.currentModel
+                model.ShowNamedView2("", view_const)
+                adapter._zoom_to_fit(model)
+                model.GraphicsRedraw2()
                 check(
                     f"export_image {view}",
                     await adapter.export_image(
@@ -2464,7 +2482,7 @@ async def _export_assembly_images(
                             "format_type": "png",
                             "width": 1600,
                             "height": 1000,
-                            "view_orientation": view,
+                            "view_orientation": "current",
                         }
                     ),
                 )
