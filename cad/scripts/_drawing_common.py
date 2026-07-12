@@ -16,6 +16,7 @@ from xml.etree import ElementTree
 import _telemetry
 from _common import check
 from _drawing_layout_check import (
+    CollisionScope,
     LayoutElement,
     audit_layout,
     format_findings,
@@ -37,12 +38,37 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 
-# swAnnotationType_e.swNote -- the only view-owned annotation TYPE that becomes a
+# swAnnotationType_e.swNote -- the view-owned annotation TYPE that becomes a
 # free-standing layout element (the general-notes block, schedule cells). Tables
-# are enumerated separately via IView.GetTableAnnotations. Everything else a view
-# carries -- dimensions, center marks, GTols, cosmetic threads, bare leaders --
-# is detail bounded by the view outline, not a separate element.
+# are enumerated separately via IView.GetTableAnnotations.
 _ANNOT_NOTE = 6
+
+# swAnnotationType_e for the native GD&T symbols the recipes place at explicit
+# sheet coordinates (datum tags, feature-control frames, surface-finish symbols).
+# None of these interfaces expose a real bounding box (IDisplayData returns only
+# leader-polluted primitives in a non-sheet coordinate space), so each is boxed
+# as a nominal square around its GetPosition anchor. That nominal box is reliable
+# enough to catch a symbol placed clear OFF the sheet (overflow) but too coarse
+# to assert an OVERLAP without false positives -- a datum tag placed beside its
+# own feature-control frame, standard GD&T practice, would self-collide -- so the
+# symbols get ``NONE`` collision scope (overflow-checked, overlap-exempt).
+# (Codex #269 thread 5 overflow; overlap declined with this rationale.)
+_ANNOT_DATUM = 2
+_ANNOT_GTOL = 5
+_ANNOT_SFSYM = 7
+_GDT_TYPES = frozenset({_ANNOT_DATUM, _ANNOT_GTOL, _ANNOT_SFSYM})
+_NOMINAL_GDT_HALF_M = 0.008
+
+# The checked-in ASME B sheet format (asme-b-book.slddrt) bakes its title block
+# in as lines + notes rather than a queryable ITitleBlock (sheet.TitleBlock is
+# None), so its occupied region is reserved here as a fixed box: the bottom-right
+# corner, from the title-block's left rule (meters from the sheet's left edge)
+# and up to its top rule, extending to the sheet's right and bottom edges. Any
+# view / note / table / GD&T symbol overlapping it fails the audit, so content
+# can never land on the title block (Codex #269 thread 4). Tied to
+# asme-b-book.slddrt -- update if that sheet format's title block moves.
+_TITLE_BLOCK_LEFT_M = 0.2785
+_TITLE_BLOCK_TOP_M = 0.078
 
 
 ASME_B_WIDTH_M = 0.4318
@@ -1045,10 +1071,10 @@ def stamp_drawing_summary(adapter: Any, drawing_model: Any, fields: dict[int, st
 
 
 # An isometric/pictorial view's axis-aligned outline is mostly empty diagonal
-# space, so its box is not a faithful collision footprint -- mark such views
-# ``overlap_exempt``. ``GetOrientationName`` returns the predefined view name
-# (e.g. "*Isometric"); ortho views return "*Front"/"*Right"/... and projected /
-# section / detail views return "".
+# space, so its box is not a faithful collision footprint -- give such views
+# ``NONE`` collision scope. ``GetOrientationName`` returns the predefined view
+# name (e.g. "*Isometric"); ortho views return "*Front"/"*Right"/... and
+# projected / section / detail views return "".
 _PICTORIAL_ORIENTATIONS = frozenset({"*isometric", "*dimetric", "*trimetric"})
 
 # A note centered inside its owning view is treated as a hole tag / balloon
@@ -1059,9 +1085,12 @@ _PICTORIAL_ORIENTATIONS = frozenset({"*isometric", "*dimetric", "*trimetric"})
 _TAG_MAX_SPAN_M = 0.015
 
 
-def _view_is_loose(adapter: Any, view: Any) -> bool:
+def _view_scope(adapter: Any, view: Any) -> CollisionScope:
+    """``NONE`` for a pictorial view (empty diagonal box), ``ALL`` for an ortho view."""
     orientation = str(adapter._get_attr_or_call(view, "GetOrientationName") or "")
-    return orientation.strip().lower() in _PICTORIAL_ORIENTATIONS
+    if orientation.strip().lower() in _PICTORIAL_ORIENTATIONS:
+        return CollisionScope.NONE
+    return CollisionScope.ALL
 
 
 def _is_small_tag(element: LayoutElement) -> bool:
@@ -1084,9 +1113,9 @@ def _note_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | N
     """Box a free NOTE from ``INote.GetExtent`` (lower-left / upper-right in meters).
 
     A LEADERED note is deliberately pointing at (and sitting over) view geometry
-    -- e.g. an arrowed hole-group tag -- so it is marked ``overlap_exempt`` (kept
-    for the OVERFLOW audit, skipped for OVERLAP) rather than dropped, so a
-    mis-placed leadered callout hanging off the sheet is still caught.
+    -- e.g. an arrowed hole-group tag -- so it is given ``NON_VIEW`` scope: its
+    overlap with the view it points at is intended, but a collision with a free
+    note / table / title block (and any off-sheet placement) is still audited.
     """
     leadered = int(adapter._get_attr_or_call(annotation, "GetLeaderCount") or 0) > 0
     note = adapter._attempt(lambda: annotation.GetSpecificAnnotation())
@@ -1104,7 +1133,7 @@ def _note_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | N
         min(y0, y1),
         max(x0, x1),
         max(y0, y1),
-        overlap_exempt=leadered,
+        scope=CollisionScope.NON_VIEW if leadered else CollisionScope.ALL,
     )
 
 
@@ -1138,19 +1167,44 @@ def _table_element(adapter: Any, table: Any, name: str) -> LayoutElement | None:
     return LayoutElement(name, "table", x, y - height, x + width, y)
 
 
-def _iter_view_notes(adapter: Any, view: Any):
-    """Yield each note ``LayoutElement`` a real drawing view owns.
+def _gdt_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | None:
+    """Box a native GD&T symbol as a nominal square around its GetPosition anchor.
+
+    Datum tags / feature-control frames / surface-finish symbols expose no real
+    bounding box, so a fixed nominal half-span is used -- good enough to catch a
+    symbol placed clear off the sheet. Given ``NONE`` collision scope: the nominal
+    box is too coarse to assert an overlap (a datum tag placed beside its own
+    control frame would self-collide), so the symbol is overflow-checked only.
+    """
+    position = adapter._attempt(lambda: annotation.GetPosition())
+    if not position:
+        return None
+    x, y = float(position[0]), float(position[1])
+    half = _NOMINAL_GDT_HALF_M
+    return LayoutElement(
+        name, "gdt", x - half, y - half, x + half, y + half, scope=CollisionScope.NONE
+    )
+
+
+def _iter_view_annotations(adapter: Any, view: Any):
+    """Yield each free ``LayoutElement`` (note or GD&T symbol) a view owns.
 
     ``IView.GetAnnotations`` returns dimensions, center marks, cosmetic-thread
-    callouts and notes; only non-leadered NOTES become elements.
+    callouts, notes and GD&T symbols; only NOTES (swNote) and native GD&T symbols
+    (datum tag / feature-control frame / surface-finish) become elements. Tables
+    come from ``GetTableAnnotations`` instead.
     """
     annotations = adapter._attempt(lambda: view.GetAnnotations()) or []
     for annotation in annotations:
         annotation = _sw_type_info.flagged(annotation, "IAnnotation")
-        if int(adapter._get_attr_or_call(annotation, "GetType") or 0) != _ANNOT_NOTE:
-            continue
+        kind = int(adapter._get_attr_or_call(annotation, "GetType") or 0)
         name = str(adapter._get_attr_or_call(annotation, "GetName") or "")
-        element = _note_element(adapter, annotation, name)
+        if kind == _ANNOT_NOTE:
+            element = _note_element(adapter, annotation, name)
+        elif kind in _GDT_TYPES:
+            element = _gdt_element(adapter, annotation, name)
+        else:
+            continue
         if element is not None:
             yield element
 
@@ -1178,16 +1232,21 @@ def collect_layout_elements(
 
     Elements are:
 
-    * every real drawing view (``IView.GetOutline``), pictorial views flagged
-      ``loose`` so their empty diagonal box does not drive false collisions;
-    * each non-leadered NOTE a real view owns and that is positioned OUTSIDE its
-      owning view (the general-notes block and schedule cells) -- a note centered
-      inside its own view is a hole tag / balloon sitting on the geometry, not a
-      free element;
-    * every TABLE (hole tables land on the SHEET view, so it is scanned too).
+    * every real drawing view (``IView.GetOutline``), pictorial views given
+      ``NONE`` collision scope so their empty diagonal box does not drive false
+      collisions;
+    * each NOTE a real view owns (the general-notes block and schedule cells); a
+      SMALL note centered inside its own view is a hole tag / balloon sitting on
+      the geometry and is scoped ``NON_VIEW`` (does not collide with its view);
+    * every native GD&T symbol (datum tag / feature-control frame /
+      surface-finish), boxed nominally and scoped ``NONE`` (no real bbox API, so
+      the box is too coarse for overlap) -- only an off-sheet symbol is flagged;
+    * every TABLE (hole tables land on the SHEET view, so it is scanned too);
+    * one reserved box for the checked-in title block, so no content may land on
+      it.
 
-    Annotations owned by the SHEET view are otherwise the checked-in sheet-format
-    frame + title block (always at the sheet edges by design) and are excluded.
+    Notes owned by the SHEET view are the sheet-format frame + zone labels (at
+    the sheet edges by design) and are excluded.
     """
     drawing_model = adapter.currentModel
     sheet = adapter._get_attr_or_call(drawing_model, "GetCurrentSheet")
@@ -1213,23 +1272,24 @@ def collect_layout_elements(
                     name,
                     "view",
                     *view_box,
-                    overlap_exempt=_view_is_loose(adapter, view),
+                    scope=_view_scope(adapter, view),
                 )
             )
-        for note in _iter_view_notes(adapter, view):
+        for element in _iter_view_annotations(adapter, view):
             # A SMALL note centered inside its owning view is a hole tag / balloon
-            # sitting on the geometry -- exempt it from OVERLAP (but keep it for
-            # OVERFLOW). A LARGE note centered inside its view is a general-notes
-            # block accidentally dropped on the view, so it stays a full element
-            # and the audit reports the collision (Codex #269).
+            # sitting on the geometry -- give it NON_VIEW scope so it does not
+            # collide with the view it sits on (but still collides with a free
+            # note / table and is checked for OVERFLOW). A LARGE note centered in
+            # its view is a general-notes block accidentally dropped on the view,
+            # so it stays ALL-scope and the audit reports the collision (Codex #269).
             if (
-                view_box is not None
-                and _center_inside(note, view_box)
-                and _is_small_tag(note)
+                element.kind == "note"
+                and view_box is not None
+                and _center_inside(element, view_box)
+                and _is_small_tag(element)
             ):
-                elements.append(replace(note, overlap_exempt=True))
-                continue
-            elements.append(note)
+                element = replace(element, scope=CollisionScope.NON_VIEW)
+            elements.append(element)
         for table in _iter_tables(adapter, view):
             tables[table.label] = table
 
@@ -1241,6 +1301,17 @@ def collect_layout_elements(
             tables[table.label] = table
 
     elements.extend(tables.values())
+    # Reserve the checked-in title block: any element overlapping it is flagged.
+    elements.append(
+        LayoutElement(
+            "title-block",
+            "titleblock",
+            _TITLE_BLOCK_LEFT_M,
+            0.0,
+            width,
+            _TITLE_BLOCK_TOP_M,
+        )
+    )
     return elements, width, height
 
 
