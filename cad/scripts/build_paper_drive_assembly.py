@@ -153,6 +153,7 @@ from build_platen import (  # noqa: E402
 from build_platen_guide import (  # noqa: E402
     GUIDE_DEPTH,
     GUIDE_HEIGHT,
+    GUIDE_LENGTH,
     HOLE_X as GUIDE_LOCK_HOLE_X,
     LOCK_STATION_X,
     SCREW_STATION_X as GUIDE_SCREW_STATION_X,
@@ -707,9 +708,14 @@ async def build(adapter) -> dict[str, str]:
     # HANGS by the top rail's underside on the bar's top edge.
     guides = []
     for gy in GUIDE_Y:
+        # platen-guide is authored into -Z so its native Front is the
+        # machinist-facing hole-entry face. Ry(180) maps that local -Z depth
+        # back onto the unchanged machine +Z envelope and reverses the
+        # symmetric X station set; shifting to the far X end preserves every
+        # world-space hole and outside face exactly.
         guide = await place_component(adapter, "platen-guide",
-                                      [PLATE_X0, gy, BAR_FRONT_Z],
-                                      [0.0, 0.0, 0.0], IDENTITY, ground=False,
+                                      [PLATE_X0 + GUIDE_LENGTH, gy, BAR_FRONT_Z],
+                                      [0.0, 180.0, 0.0], ROT_Y_180, ground=False,
                                       label=f"platen-guide (y{gy:.1f})")
         await _lock_to_platen(guide, f"platen-guide y{gy:.1f}")
         guides.append(guide)
