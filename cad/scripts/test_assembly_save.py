@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
-from _assembly import _save_new_assembly_as_copy
+from _assembly import _discard_copy_source, _save_new_assembly_as_copy
 
 
 class _Model:
@@ -15,10 +15,19 @@ class _Model:
         Path(path).write_bytes(b"assembly")
         return 0
 
+    @staticmethod
+    def GetTitle() -> str:
+        return "Assembly1"
+
 
 class _App:
-    @staticmethod
-    def CloseDoc(path: str) -> None:
+    def __init__(self) -> None:
+        self.closed: list[str] = []
+
+    def CloseDoc(self, path: str) -> None:
+        self.closed.append(path)
+
+    def GetOpenDocument(self, title: str) -> None:
         return None
 
 
@@ -44,3 +53,12 @@ def test_new_assembly_save_is_silent_copy_without_references(tmp_path: Path) -> 
 
     assert adapter.currentModel.options == 1 | 2 | 8
     assert target.read_bytes() == b"assembly"
+
+
+def test_copy_source_is_discarded_by_document_title() -> None:
+    adapter = _Adapter()
+
+    _discard_copy_source(adapter)
+
+    assert adapter.swApp.closed == ["Assembly1"]
+    assert adapter.currentModel is None

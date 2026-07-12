@@ -2228,18 +2228,22 @@ async def save_assembly_and_images(
     # re-based Front/Back/etc. used by the gallery stay correct.
     set_isometric_view(adapter)
     _save_new_assembly_as_copy(adapter, asm_path)
-    # Record the resolved-geometry fingerprint of the just-built assembly so a later
-    # in-place refresh of it (unchanged) is a true no-op and never bumps the md5 --
-    # otherwise the first refresh after a from-scratch build would re-save once and
-    # cascade up the tree (see save_assembly_in_place / _massprops_sidecar).
-    digest = await assembly_geometry_digest(adapter, asm_name)
-    sidecar = _massprops_sidecar(asm_name)
-    sidecar.parent.mkdir(parents=True, exist_ok=True)
-    sidecar.write_text(digest + "\n", encoding="utf-8")
+    try:
+        # Record the resolved-geometry fingerprint of the just-built assembly so a
+        # later in-place refresh of it (unchanged) is a true no-op and never bumps
+        # the md5 -- otherwise the first refresh after a from-scratch build would
+        # re-save once and cascade up the tree (see save_assembly_in_place /
+        # _massprops_sidecar).
+        digest = await assembly_geometry_digest(adapter, asm_name)
+        sidecar = _massprops_sidecar(asm_name)
+        sidecar.parent.mkdir(parents=True, exist_ok=True)
+        sidecar.write_text(digest + "\n", encoding="utf-8")
 
-    artefacts = {"assembly": str(asm_path)}
-    artefacts.update(await _export_assembly_images(adapter, asm_name, views))
-    return artefacts
+        artefacts = {"assembly": str(asm_path)}
+        artefacts.update(await _export_assembly_images(adapter, asm_name, views))
+        return artefacts
+    finally:
+        _discard_copy_source(adapter)
 
 
 @_telemetry.traced("assembly.save_copy")
@@ -2273,6 +2277,24 @@ def _save_new_assembly_as_copy(adapter: Any, asm_path: Any) -> None:
             f"{asm_path} (rc={result!r})"
         )
     _telemetry.success(f"save assembly copy -> {asm_path} (rc={result!r})")
+
+
+@_telemetry.traced("assembly.discard_copy_source")
+def _discard_copy_source(adapter: Any) -> None:
+    """Close the dirty untitled source left active by ``SaveAs3(..., Copy)``."""
+    model = adapter.currentModel
+    title = adapter._attempt(lambda: str(model.GetTitle()), default="")
+    if not title:
+        raise RuntimeError("cannot discard copy-saved assembly without its title")
+
+    adapter.swApp.CloseDoc(title)
+    still_open = adapter._attempt(
+        lambda: adapter.swApp.GetOpenDocument(title), default=None
+    )
+    if still_open is not None:
+        raise RuntimeError(f"copy-saved assembly source remained open: {title}")
+    adapter.currentModel = None
+    _telemetry.success(f"discard dirty assembly source {title!r}")
 
 def _massprops_sidecar(asm_name: str):
     """Sidecar holding the last-saved resolved-geometry fingerprint of an assembly.
