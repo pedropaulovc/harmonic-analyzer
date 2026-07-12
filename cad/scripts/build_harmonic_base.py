@@ -148,6 +148,11 @@ FOOT_SCREW_HOLE_DIA = blind_cut_dia_mm(FOOT_SEAT_SPEC)  # #4-40 tap drill
 MM3_PER_IN3 = IN**3
 
 
+def _pos_drive(global_name: str, sketch_value: float) -> str:
+    """Positive equation for an unsigned centre-distance dimension."""
+    return f'-"{global_name}"' if sketch_value < 0.0 else f'"{global_name}"'
+
+
 async def _volume(adapter) -> float:
     res = await adapter.get_mass_properties()
     return res.data.volume if res.is_success and res.data else float("nan")
@@ -170,9 +175,9 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "TopLength", f"{TOP_LENGTH}mm")
     await set_global(adapter, "TopWidth", f"{TOP_WIDTH}mm")
     await set_global(adapter, "TopThickness", f"{TOP_THICKNESS}mm")
-    # (The old HoleDia/CboreDia/Hole{i}X/Z knobs are gone: the fastener holes
-    # are now a native Hole Wizard feature whose dimensions come from the 9/16
-    # standard + explicit artefact overrides, not equation-driven sketch dims.)
+    for i, (x, z) in enumerate(HOLE_XZ):
+        await set_global(adapter, f"Hole{i}X", f"{x}mm")
+        await set_global(adapter, f"Hole{i}Z", f"{-z}mm")
 
     # Each sketch DECLARES its dim names + drive equations inline; a per-sketch
     # SketchDims records each dim in the helper's emission order. Drive equations
@@ -233,7 +238,7 @@ async def build(adapter) -> dict[str, str]:
     # concentric cuts collapses into the one counterbore feature.
     total = BOTTOM_THICKNESS + TOP_THICKNESS
     pre_holes = await _volume(adapter)
-    wizard_holes(
+    fastener_cut = wizard_holes(
         adapter,
         HoleSpec("counterbore_fillister", "9/16", overrides_mm={
             "HoleDiameter": HOLE_DIA,
@@ -244,7 +249,15 @@ async def build(adapter) -> dict[str, str]:
         (0.0, -1.0, 0.0),
         "lag-screw counterbored holes (9/16)",
         name="FastenerHoles",
+        placement_dims=[
+            (
+                (f"Hole{i}Cx", _pos_drive(f"Hole{i}X", x)),
+                (f"Hole{i}Cz", _pos_drive(f"Hole{i}Z", -z)),
+            )
+            for i, (x, z) in enumerate(HOLE_XZ)
+        ],
     )
+    drive_jobs += fastener_cut.placement_drive_jobs
     after = await _volume(adapter)
     v_holes = len(HOLE_XZ) * (
         math.pi * (HOLE_DIA / 2.0) ** 2 * total

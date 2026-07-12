@@ -217,11 +217,13 @@ async def build(adapter) -> dict[str, str]:
     # journal). Removed = the blind tap-drill cylinder + drill point MINUS the
     # journal already void within that envelope (the journal runs straight
     # through it). The 1/32" journal survives at the south.
-    wizard_holes(
+    adjuster_cut = wizard_holes(
         adapter, ADJUSTER_BORE_SPEC,
         [[0.0, BORE_HEIGHT, BLOCK_Z / 2.0]],
         (0.0, 0.0, 1.0), "adjuster tapped hole (5/16-18 blind)", name="AdjusterBore",
+        placement_dims=[((None, None), ("CbZ", '"BoreHeight"'))],
     )
+    drive_jobs += adjuster_cut.placement_drive_jobs
     _adj_point = (ADJUSTER_BORE_DIA / 2.0) * DRILL_POINT_H
     v_cb = blind_hole_volume_mm3(ADJUSTER_BORE_DIA, ADJUSTER_BORE_DEPTH) \
         - math.pi * BORE_RADIUS**2 * (ADJUSTER_BORE_DEPTH + _adj_point)
@@ -259,11 +261,13 @@ async def build(adapter) -> dict[str, str]:
     # (a clean planar rectangle -- the top slit only removes the |x|<SLIT_W/2
     # centre). The top slit splits it into two solid halves, so a through-all
     # cut removes the tap-drill cylinder over (BLOCK_X - SLIT_W) of solid.
-    wizard_holes(
+    pinch_cut = wizard_holes(
         adapter, PINCH_BORE_SPEC,
         [[BLOCK_X / 2.0, PINCH_BORE_Y, 0.0]],
         (1.0, 0.0, 0.0), "pinch tapped hole (#3-48)", name="PinchBore",
+        placement_dims=[((None, None), ("PinchZ", '"PinchBoreY"'))],
     )
+    drive_jobs += pinch_cut.placement_drive_jobs
     v_pinch = math.pi * (PINCH_BORE_DIA / 2.0) ** 2 * (BLOCK_X - SLIT_W)
     volume = await volume_check(adapter, "pinch bore", volume - v_pinch, 0.05 * v_pinch)
 

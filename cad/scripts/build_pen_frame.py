@@ -145,13 +145,18 @@ async def build(adapter) -> dict[str, str]:
     # window cavity so only the bottom rail is pierced (the top rail is spared),
     # matching the old mid-plane cut. The hole sits at the rail mid-span in X
     # and the depth mid-plane in Z.
-    wizard_holes(
+    screw_cut = wizard_holes(
         adapter,
         HoleSpec("tapped", "#4-40", end="through_next"),
         [[OUTER_WIDTH / 2.0, 0.0, FRAME_DEPTH / 2.0]],
         (0.0, -1.0, 0.0),
         "set-screw tapped hole (#4-40)", name="ScrewHole",
+        placement_dims=[(
+            ("ScrewX", '"OuterWidth" / 2'),
+            ("ScrewZ", '"FrameDepth" / 2'),
+        )],
     )
+    drive_jobs += screw_cut.placement_drive_jobs
     # The tapped column pierces only the bottom rail (Y 0..RailEnd), so it
     # removes pi*r^2*RailEnd at the tap-drill diameter. Loose tol for the
     # rounding / mesh at the cut walls.
