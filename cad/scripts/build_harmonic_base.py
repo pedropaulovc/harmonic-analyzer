@@ -302,86 +302,10 @@ async def build(adapter) -> dict[str, str]:
                 f"{tag} removed {after - after_cut:.1f}, expected {v_cut:.1f}")
         after = after_cut
 
-    # DeckTop datum: a reference plane ON the top face (Y = total height), offset
-    # from the Top Plane (its normal is +Y; the base sits entirely at Y>=0).
-    # frame.SLDASM mates the support's FootSeat datum COINCIDENT to it to seat the
-    # foot physically -- a named datum on the contact face makes the seat mate
-    # robust (no coordinate pick, no face walk) and flip-free. Geometry-neutral.
-    from solidworks_mcp.adapters.base import CreatePlaneParameters
-
-    check(
-        "create_plane DeckTop (Top Plane, +height)",
-        await adapter.create_plane(
-            CreatePlaneParameters(
-                mode="offset",
-                base_plane="Top Plane",
-                offset=BOTTOM_THICKNESS + TOP_THICKNESS,
-            )
-        ),
-    )
-    name_last_feature(adapter, "DeckTop")
-
-    # CboreSeat datum: a reference plane on the counterbore SHOULDER (Y = cbore
-    # depth above the Top Plane / underside), the bearing face each lag-screw's
-    # under-head plane seats against. frame.SLDASM mates the screw's under-head
-    # plane (its Top Plane) COINCIDENT to this -- the hold-down's axial stop -- so
-    # a named datum on the bearing face keeps the seat robust and flip-free.
-    check(
-        "create_plane CboreSeat (Top Plane, +cbore depth)",
-        await adapter.create_plane(
-            CreatePlaneParameters(
-                mode="offset",
-                base_plane="Top Plane",
-                offset=CBORE_DEPTH,
-            )
-        ),
-    )
-    name_last_feature(adapter, "CboreSeat")
-
-    # Per-hole reference axes for the lag-screw concentric mates. Built as the
-    # INTERSECTION of a per-X and a per-Z reference plane (two_planes mode), NOT by
-    # picking the hole's cylindrical face -- deterministic, no point-on-curved-face
-    # selection (which is unreliable for a point on the analytic surface). The four
-    # Each hole gets its own planes: its two global coordinates remain independently
-    # editable, so sharing a plane between nominally aligned holes would make the
-    # assembly axis diverge when just one station is tuned.
-    # frame.SLDASM mates each lag-screw CONCENTRIC to its hole axis -- the physical
-    # coaxiality of the hold-down -- so the screws are constrained, not grounded,
-    # with no distance mate. HoleAxis{i} is at HOLE_XZ[i], the station frame.SLDASM's
-    # LAG_SCREW_XZ[i] sits at. (Reference geometry only -- volume-neutral.)
-    from solidworks_mcp.adapters.base import CreateAxisParameters
-
-    for i, (hx, hz) in enumerate(HOLE_XZ):
-        x_name = f"HoleAxis{i}XPlane"
-        check(
-            f"create_plane {x_name} (Right Plane, {hx:+.2f})",
-            await adapter.create_plane(
-                CreatePlaneParameters(mode="offset", base_plane="Right Plane", offset=hx)
-            ),
-        )
-        name_last_feature(adapter, x_name)
-        drive_jobs.append((f"D1@{x_name}", _pos_drive(f"Hole{i}X", hx)))
-
-        z_name = f"HoleAxis{i}ZPlane"
-        check(
-            f"create_plane {z_name} (Front Plane, {hz:+.2f})",
-            await adapter.create_plane(
-                CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=hz)
-            ),
-        )
-        name_last_feature(adapter, z_name)
-        drive_jobs.append((f"D1@{z_name}", _pos_drive(f"Hole{i}Z", -hz)))
-
-        check(
-            f"create_axis HoleAxis{i} ({hx:.2f}, {hz:+.2f})",
-            await adapter.create_axis(
-                CreateAxisParameters(mode="two_planes", planes=[x_name, z_name])
-            ),
-        )
-        name_last_feature(adapter, f"HoleAxis{i}")
-
-    # Apply the deferred drive equations after the whole model and assembly
-    # reference axes exist, then re-check neutrality against the as-built volume.
+    # Apply the deferred drive equations after the whole model exists, then
+    # re-check neutrality against the as-built volume. Frame components are
+    # inserted at verified transforms and lock-mated, so the old DeckTop,
+    # CboreSeat, and eight per-hole construction planes/axes are unnecessary.
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
