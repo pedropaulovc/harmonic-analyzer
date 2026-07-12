@@ -302,18 +302,6 @@ async def build(adapter) -> dict[str, str]:
                 f"{tag} removed {after - after_cut:.1f}, expected {v_cut:.1f}")
         after = after_cut
 
-    # Apply the deferred drive equations now -- after the whole model + a rebuild
-    # exists, so every target resolves -- then re-check neutrality against the
-    # as-built volume (each equation evaluates to the value just built, so the
-    # geometry must not move).
-    await force_rebuild(adapter)
-    for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(
-        adapter, "driven base (equations neutral)", after, 0.005 * after
-    )
-
     # DeckTop datum: a reference plane ON the top face (Y = total height), offset
     # from the Top Plane (its normal is +Y; the base sits entirely at Y>=0).
     # frame.SLDASM mates the support's FootSeat datum COINCIDENT to it to seat the
@@ -354,43 +342,53 @@ async def build(adapter) -> dict[str, str]:
     # INTERSECTION of a per-X and a per-Z reference plane (two_planes mode), NOT by
     # picking the hole's cylindrical face -- deterministic, no point-on-curved-face
     # selection (which is unreliable for a point on the analytic surface). The four
-    # holes share two X values and two Z values, so four planes yield the four axes.
+    # Each hole gets its own planes: its two global coordinates remain independently
+    # editable, so sharing a plane between nominally aligned holes would make the
+    # assembly axis diverge when just one station is tuned.
     # frame.SLDASM mates each lag-screw CONCENTRIC to its hole axis -- the physical
     # coaxiality of the hold-down -- so the screws are constrained, not grounded,
     # with no distance mate. HoleAxis{i} is at HOLE_XZ[i], the station frame.SLDASM's
     # LAG_SCREW_XZ[i] sits at. (Reference geometry only -- volume-neutral.)
     from solidworks_mcp.adapters.base import CreateAxisParameters
 
-    x_plane: dict[float, str] = {}
-    for k, hx in enumerate(sorted({hx for hx, _ in HOLE_XZ})):
+    for i, (hx, hz) in enumerate(HOLE_XZ):
+        x_name = f"HoleAxis{i}XPlane"
         check(
-            f"create_plane HoleX{k} (Right Plane, {hx:+.2f})",
+            f"create_plane {x_name} (Right Plane, {hx:+.2f})",
             await adapter.create_plane(
                 CreatePlaneParameters(mode="offset", base_plane="Right Plane", offset=hx)
             ),
         )
-        name_last_feature(adapter, f"HoleX{k}")
-        x_plane[hx] = f"HoleX{k}"
-    z_plane: dict[float, str] = {}
-    for k, hz in enumerate(sorted({hz for _, hz in HOLE_XZ})):
+        name_last_feature(adapter, x_name)
+        drive_jobs.append((f"D1@{x_name}", _pos_drive(f"Hole{i}X", hx)))
+
+        z_name = f"HoleAxis{i}ZPlane"
         check(
-            f"create_plane HoleZ{k} (Front Plane, {hz:+.2f})",
+            f"create_plane {z_name} (Front Plane, {hz:+.2f})",
             await adapter.create_plane(
                 CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=hz)
             ),
         )
-        name_last_feature(adapter, f"HoleZ{k}")
-        z_plane[hz] = f"HoleZ{k}"
-    for i, (hx, hz) in enumerate(HOLE_XZ):
+        name_last_feature(adapter, z_name)
+        drive_jobs.append((f"D1@{z_name}", _pos_drive(f"Hole{i}Z", -hz)))
+
         check(
             f"create_axis HoleAxis{i} ({hx:.2f}, {hz:+.2f})",
             await adapter.create_axis(
-                CreateAxisParameters(
-                    mode="two_planes", planes=[x_plane[hx], z_plane[hz]]
-                )
+                CreateAxisParameters(mode="two_planes", planes=[x_name, z_name])
             ),
         )
         name_last_feature(adapter, f"HoleAxis{i}")
+
+    # Apply the deferred drive equations after the whole model and assembly
+    # reference axes exist, then re-check neutrality against the as-built volume.
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(
+        adapter, "driven base (equations neutral)", after, 0.005 * after
+    )
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)

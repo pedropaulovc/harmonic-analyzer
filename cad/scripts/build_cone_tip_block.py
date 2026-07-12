@@ -271,21 +271,27 @@ async def build(adapter) -> dict[str, str]:
     v_pinch = math.pi * (PINCH_BORE_DIA / 2.0) ** 2 * (BLOCK_X - SLIT_W)
     volume = await volume_check(adapter, "pinch bore", volume - v_pinch, 0.05 * v_pinch)
 
-    # Apply the deferred drive equations after the model + a rebuild exist, then
-    # re-check: every equation evaluates to the value just built, so geometry
+    # Named bore axis for the view-independent coaxial mate: the shaft tip
+    # positions this block (coaxial + axial distance), no face picks.
+    await name_bore_axis(
+        adapter, "Top Plane", BORE_HEIGHT, "Right Plane", 0.0, "journal axis",
+        drive_a='"BoreHeight"', drive_jobs=drive_jobs,
+    )
+    # Second named axis (Axis2): the pinch-screw cross-bore, along local X at
+    # the slit -- the assembly journals the pinch screw on it.
+    await name_bore_axis(
+        adapter, "Top Plane", PINCH_BORE_Y, "Front Plane", 0.0, "pinch axis",
+        drive_a='"PinchBoreY"', drive_jobs=drive_jobs,
+    )
+
+    # Apply the deferred drive equations after the model + reference axes exist,
+    # then re-check: every equation evaluates to the value just built, so geometry
     # must not move.
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(adapter, "driven block (equations neutral)", volume, 0.5 * v_bore)
-
-    # Named bore axis for the view-independent coaxial mate: the shaft tip
-    # positions this block (coaxial + axial distance), no face picks.
-    await name_bore_axis(adapter, "Top Plane", BORE_HEIGHT, "Right Plane", 0.0, "journal axis")
-    # Second named axis (Axis2): the pinch-screw cross-bore, along local X at
-    # the slit -- the assembly journals the pinch screw on it.
-    await name_bore_axis(adapter, "Top Plane", PINCH_BORE_Y, "Front Plane", 0.0, "pinch axis")
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
