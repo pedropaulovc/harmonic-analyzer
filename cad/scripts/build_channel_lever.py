@@ -280,7 +280,14 @@ async def build(adapter) -> dict[str, str]:
     # bore (127, 0, the amplitude bar's top pin).
     await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "fulcrum bore")
     await name_bore_axis(
-        adapter, "Right Plane", BAR_PIN_X, "Top Plane", 0.0, "bar pin bore"
+        adapter,
+        "Right Plane",
+        BAR_PIN_X,
+        "Top Plane",
+        0.0,
+        "bar pin bore",
+        drive_a='"BarPinX"',
+        drive_jobs=drive_jobs,
     )
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild

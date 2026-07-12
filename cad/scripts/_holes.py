@@ -255,10 +255,11 @@ def wizard_holes(
     ``placement_dims`` optionally restores the parametric contract of the
     pre-Wizard placement sketches. It has one entry per point; each entry is
     ``((x_name, x_drive), (y_name, y_drive))`` in placement-sketch coordinates.
-    Every non-zero coordinate receives a driving dimension. Named dimensions
-    with equations are returned as deferred ``placement_drive_jobs`` so callers
-    can apply them with the same end-of-build ``drive_dimension`` pass used by
-    the rest of the part.
+    Every non-zero coordinate receives a driving dimension; a zero coordinate
+    receives the matching origin-axis relation because zero-valued dimensions
+    are invalid. Named dimensions with equations are returned as deferred
+    ``placement_drive_jobs`` so callers can apply them with the same end-of-build
+    ``drive_dimension`` pass used by the rest of the part.
 
     Returns the actual wizard dimensions for the caller's analytic volume
     check -- the check then verifies the CUT, independent of this readback.
@@ -413,6 +414,7 @@ def wizard_holes(
     if placement_dims is not None:
         from _common import SketchDims, check
         from solidworks_mcp.adapters.solidworks.sketch import (
+            _add_sketch_constraint_impl,
             _add_sketch_dimension_impl,
         )
 
@@ -427,6 +429,23 @@ def wizard_holes(
             for index, ((point, sx, sy), point_dims) in enumerate(
                     zip(placed_points, placement_dims, strict=True)):
                 point_id = adapter._register_sketch_entity("Point", point)
+                zero_x = abs(sx) < 1e-12
+                zero_y = abs(sy) < 1e-12
+                if zero_x and zero_y:
+                    relation = "coincident"
+                elif zero_x:
+                    relation = "vertical_points"
+                elif zero_y:
+                    relation = "horizontal_points"
+                else:
+                    relation = None
+                if relation is not None:
+                    check(
+                        f"constrain hole placement {label} point {index} {relation}",
+                        _add_sketch_constraint_impl(
+                            adapter, point_id, "origin", relation
+                        ),
+                    )
                 for axis, coord, dim_type, (dim_name, drive) in (
                     ("x", sx, "horizontal_distance", point_dims[0]),
                     ("y", sy, "vertical_distance", point_dims[1]),
