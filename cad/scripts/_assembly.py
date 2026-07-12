@@ -1191,7 +1191,7 @@ async def linear_component_pattern(
         raise ValueError("linear component pattern spacing must be positive")
 
     model = adapter.currentModel
-    direction = ensure_global_pattern_axis(adapter, axis)
+    direction_name = ensure_global_pattern_axis(adapter, axis)
     before = {
         str(_read_member(component, "Name2"))
         for component in (model.GetComponents(False) or [])
@@ -1200,7 +1200,7 @@ async def linear_component_pattern(
         f"pattern {label}", kind="linear", seed=seed_component,
         axis=axis.lower(), instances=instances, spacing_mm=spacing_mm,
     ):
-        _select_pattern_inputs(adapter, seed_component, direction, "AXIS")
+        _select_pattern_inputs(adapter, seed_component, direction_name, "AXIS")
         manager = model.FeatureManager
         _flag(manager, "IFeatureManager")
         definition = manager.CreateDefinition(_LOCAL_LINEAR_PATTERN)
