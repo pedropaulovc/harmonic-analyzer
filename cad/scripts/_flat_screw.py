@@ -99,6 +99,21 @@ async def build_flat_screw(
         adapter, f"driven {part_name} (equations neutral)", expected, 0.005 * v_shank
     )
 
+    # Stable assembly datum for physical coaxial mates.  The screw is built on
+    # the Front plane, so its shank runs along local Z at the intersection of
+    # the Top and Right planes.  A named reference axis avoids selecting a
+    # cylindrical face (fragile after feature rebuilds) and gives every user of
+    # this shared screw family the same mate contract.
+    from solidworks_mcp.adapters.base import CreateAxisParameters
+
+    check(
+        "create_axis ScrewAxis (Top ∩ Right)",
+        await adapter.create_axis(
+            CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
+        ),
+    )
+    name_last_feature(adapter, "ScrewAxis")
+
     await apply_material(adapter, material)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, part_name)
