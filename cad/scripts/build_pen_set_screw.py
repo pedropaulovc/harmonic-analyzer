@@ -114,6 +114,16 @@ async def build(adapter) -> dict[str, str]:
         adapter, KNOB_DIA, KNOB_LENGTH, SHANK_DIA, SHANK_LENGTH, groove_count=22
     )
 
+    from solidworks_mcp.adapters.base import CreateAxisParameters
+
+    check(
+        "create_axis ScrewAxis (Top ∩ Front)",
+        await adapter.create_axis(
+            CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Front Plane"])
+        ),
+    )
+    name_last_feature(adapter, "ScrewAxis")
+
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)

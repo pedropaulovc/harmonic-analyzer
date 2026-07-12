@@ -142,6 +142,16 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven hanger screw (equations neutral)", expected, 0.005 * v_head)
 
+    from solidworks_mcp.adapters.base import CreateAxisParameters
+
+    check(
+        "create_axis ScrewAxis (Top ∩ Right)",
+        await adapter.create_axis(
+            CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
+        ),
+    )
+    name_last_feature(adapter, "ScrewAxis")
+
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
