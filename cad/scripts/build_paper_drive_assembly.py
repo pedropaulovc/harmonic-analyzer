@@ -83,15 +83,21 @@ from _common import (
 )
 from _assembly import (
     angle_driver,
+    assert_component_placed,
+    assert_pattern_targets,
     assert_free_dof_necessity,
     check_no_interference,
+    coincident_mate,
     component_names,
     component_origin,
     component_transform,
     distance_driver,
     gear_mate,
+    linear_component_pattern,
     lock_mate,
     named_ref,
+    parallel_mate,
+    PatternDirection,
     place_component,
     rack_pinion_mate,
     reledger_to_solved,
@@ -613,9 +619,14 @@ async def build(adapter) -> dict[str, str]:
     # The bar is FIRST so the auto-fixed seed is structure, not the mated platen.
     # Symmetric about machine x=0; its bracket-screw holes flank the stud at
     # machine -12 (see build_support_bar.py).
-    await place_component(adapter, "support-bar", [0.0, BAR_CY, BAR_Z],
-                          [0.0, 0.0, 0.0], IDENTITY,
-                          label="support-bar (the platen bar)")
+    support_bar = await place_component(
+        adapter,
+        "support-bar",
+        [0.0, BAR_CY, BAR_Z],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        label="support-bar (the platen bar)",
+    )
     # Machine columns at +-197 (west first, to match the pose ledger's -1/-2).
     for sx in (1.0, -1.0):
         # Ry(+90): the arcs' local +X (their depth axis) faces machine -Z.
@@ -623,13 +634,59 @@ async def build(adapter) -> dict[str, str]:
             await place_component(adapter, arc, [sx * COLUMN_X, BAR_CY, COLUMN_Z],
                                   [0.0, 90.0, 0.0], ROT_Y_POS90,
                                   label=f"{arc} (x{sx * COLUMN_X:+.0f})")
-    # Clamp screws: heads on the bar's FRONT face flanking each column (ch30
-    # p002), shanks through bar + front arc, threading into the back arc. The
-    # support-bar hole list is pre-mirror-ordered; negate to the machine hole.
-    for x in CLAMP_HOLE_X:
-        await place_component(adapter, "clamp-screw", [-x, BAR_CY, BAR_FRONT_Z],
-                              [0.0, 0.0, 0.0], IDENTITY,
-                              label=f"clamp-screw (x{-x:+.1f})")
+    # Two physically mated clamp-screw seeds at the east column plus one native
+    # multi-seed pattern across the frame.  The pattern spacing is exactly the
+    # column pitch; each seed is coaxial with a Hole Wizard station, seated on
+    # the bar front face, and anti-spin constrained.
+    clamp_x = sorted(CLAMP_HOLE_X)
+    clamp_seeds: list[str] = []
+    for index, x in enumerate(clamp_x[:2]):
+        target = [x, BAR_CY, BAR_FRONT_Z]
+        seed = await place_component(
+            adapter,
+            "clamp-screw",
+            target,
+            [0.0, 0.0, 0.0],
+            IDENTITY,
+            ground=False,
+            label=f"clamp-screw seed (x{x:+.1f})",
+        )
+        await coincident_mate(
+            adapter,
+            named_ref(f"ScrewAxis@{seed}", "AXIS"),
+            named_ref(f"ClampAxis{index}@{support_bar}", "AXIS"),
+            label=f"support clamp-screw seed {index} coaxial",
+            verify=(seed, target),
+        )
+        await coincident_mate(
+            adapter,
+            named_ref(f"Front Plane@{seed}", "PLANE"),
+            named_ref(f"ClampSeat@{support_bar}", "PLANE"),
+            label=f"support clamp-screw seed {index} under-head seat",
+            verify=(seed, target),
+        )
+        await parallel_mate(
+            adapter,
+            named_ref(f"Right Plane@{seed}", "PLANE"),
+            named_ref(f"Right Plane@{support_bar}", "PLANE"),
+            label=f"support clamp-screw seed {index} anti-spin",
+            verify=(seed, target),
+        )
+        assert_component_placed(adapter, seed, target, IDENTITY)
+        clamp_seeds.append(seed)
+    clamp_targets = [[x, BAR_CY, BAR_FRONT_Z] for x in clamp_x[2:]]
+    clamp_instances = await linear_component_pattern(
+        adapter,
+        clamp_seeds,
+        axis="x",
+        spacing_mm=2.0 * COLUMN_X,
+        instances=2,
+        direction=PatternDirection.REVERSE,
+        label="support clamp-screw pattern",
+    )
+    assert_pattern_targets(
+        adapter, clamp_instances, clamp_targets, IDENTITY, "support clamp pattern"
+    )
 
     # --- platen group (hangs on the bar) ---------------------------------------
     # The platen runs as a prismatic slider along X (the paper feed): its local
@@ -718,42 +775,180 @@ async def build(adapter) -> dict[str, str]:
                                   [0.0, 0.0, 0.0], IDENTITY, ground=False)
     await _lock_to_platen(paper, "platen-paper")
 
-    # --- platen-riding fasteners (ALL lock-mated -- rework E5) -----------------
-    # The socket lists are pre-mirror-ordered; negate x to the machine frame.
-    for x, y in CLIP_SCREW_XY:
-        screw = await place_component(
-            adapter, "fillister-screw", [-x, y, PLATE_FRONT_Z - CLIP_THICKNESS],
-            [0.0, 0.0, 0.0], IDENTITY,
-            ground=False, label=f"fillister-screw (clip x{-x:+.0f} y{y:.0f})")
-        await _lock_to_platen(screw, f"clip screw x{-x:+.0f} y{y:.0f}")
-    for x, y in GUIDE_SCREW_XY:
-        # Seated on the counterbore floor: crown 0.2 sub-flush so the paper
-        # lies flat; shank threads 2.4 into the rail's blind hole.
-        screw = await place_component(
-            adapter, "fillister-screw", [-x, y, PLATE_FRONT_Z + PLATEN_CBORE_DEPTH],
-            [0.0, 0.0, 0.0], IDENTITY,
-            ground=False, label=f"fillister-screw (guide x{-x:+.0f} y{y:.0f})")
-        await _lock_to_platen(screw, f"guide screw x{-x:+.0f} y{y:.0f}")
-    for x, y in LOCK_SCREW_XY:
-        # Ry(180): shank points machine -Z, head on the lock plate's back.
-        screw = await place_component(
-            adapter, "fillister-screw", [-x, y, LOCK_Z0 + 2.0],
-            [0.0, 180.0, 0.0], ROT_Y_180,
-            ground=False, label=f"fillister-screw (lock x{-x:+.0f} y{y:.0f})")
-        await _lock_to_platen(screw, f"lock screw x{-x:+.0f} y{y:.0f}")
+    # --- platen-riding fasteners (lock-mated seeds + native patterns) ---------
+    # The platen owns the feed DOF, so each seed stays lock-mated to that moving
+    # body. Native X patterns replicate the regular grids and remain driven by
+    # their seeds as the platen travels.
+    clip_targets = [
+        [-x, y, PLATE_FRONT_Z - CLIP_THICKNESS] for x, y in CLIP_SCREW_XY
+    ]
+    clip_max_x = max(target[0] for target in clip_targets)
+    clip_seed_targets = [target for target in clip_targets if target[0] == clip_max_x]
+    clip_seeds: list[str] = []
+    for target in clip_seed_targets:
+        seed = await place_component(
+            adapter,
+            "fillister-screw",
+            target,
+            [0.0, 0.0, 0.0],
+            IDENTITY,
+            ground=False,
+            label=f"fillister-screw clip seed (x{target[0]:+.0f} y{target[1]:.0f})",
+        )
+        await _lock_to_platen(
+            seed, f"clip screw seed x{target[0]:+.0f} y{target[1]:.0f}"
+        )
+        clip_seeds.append(seed)
+    clip_instances = await linear_component_pattern(
+        adapter,
+        clip_seeds,
+        axis="x",
+        spacing_mm=clip_max_x - min(target[0] for target in clip_targets),
+        instances=2,
+        label="platen clip-screw pattern",
+    )
+    assert_pattern_targets(
+        adapter,
+        clip_instances,
+        [target for target in clip_targets if target not in clip_seed_targets],
+        IDENTITY,
+        "platen clip-screw pattern",
+    )
+
+    # One seed per row at machine +X; five instances at 60 mm pitch run to -X.
+    guide_targets = [
+        [-x, y, PLATE_FRONT_Z + PLATEN_CBORE_DEPTH] for x, y in GUIDE_SCREW_XY
+    ]
+    guide_max_x = max(target[0] for target in guide_targets)
+    guide_seed_targets = [
+        target for target in guide_targets if target[0] == guide_max_x
+    ]
+    guide_seeds: list[str] = []
+    for target in guide_seed_targets:
+        seed = await place_component(
+            adapter,
+            "fillister-screw",
+            target,
+            [0.0, 0.0, 0.0],
+            IDENTITY,
+            ground=False,
+            label=f"fillister-screw guide seed (x{target[0]:+.0f} y{target[1]:.0f})",
+        )
+        await _lock_to_platen(
+            seed, f"guide screw seed x{target[0]:+.0f} y{target[1]:.0f}"
+        )
+        guide_seeds.append(seed)
+    guide_instances = await linear_component_pattern(
+        adapter,
+        guide_seeds,
+        axis="x",
+        spacing_mm=60.0,
+        instances=5,
+        label="platen guide-screw pattern",
+    )
+    assert_pattern_targets(
+        adapter,
+        guide_instances,
+        [target for target in guide_targets if target not in guide_seed_targets],
+        IDENTITY,
+        "platen guide-screw pattern",
+    )
+
+    # Two positive-X seeds per row cross the centre in one 180 mm pattern.
+    lock_targets = [[-x, y, LOCK_Z0 + 2.0] for x, y in LOCK_SCREW_XY]
+    lock_seed_targets = [target for target in lock_targets if target[0] > 0.0]
+    lock_seeds: list[str] = []
+    for target in lock_seed_targets:
+        seed = await place_component(
+            adapter,
+            "fillister-screw",
+            target,
+            [0.0, 180.0, 0.0],
+            ROT_Y_180,
+            ground=False,
+            label=f"fillister-screw lock seed (x{target[0]:+.0f} y{target[1]:.0f})",
+        )
+        await _lock_to_platen(
+            seed, f"lock screw seed x{target[0]:+.0f} y{target[1]:.0f}"
+        )
+        lock_seeds.append(seed)
+    lock_instances = await linear_component_pattern(
+        adapter,
+        lock_seeds,
+        axis="x",
+        spacing_mm=180.0,
+        instances=2,
+        label="platen lock-screw pattern",
+    )
+    assert_pattern_targets(
+        adapter,
+        lock_instances,
+        [target for target in lock_targets if target not in lock_seed_targets],
+        ROT_Y_180,
+        "platen lock-screw pattern",
+    )
 
     # --- transgear group (the real train) --------------------------------------
     # Bracket on the bar's back face, stud bore below the bar.
-    await place_component(adapter, "transgear-bracket",
-                          [STUD_XY[0], STUD_XY[1], BRACKET_Z0],
-                          [0.0, 0.0, 0.0], IDENTITY)
-    # +dx first (screw at machine -2), to match the pose ledger's -1/-2.
-    for dx in (BRACKET_SCREW_DX, -BRACKET_SCREW_DX):
-        # Ry(180): shank forward into the bar, head on the bracket back.
-        await place_component(adapter, "bracket-screw",
-                              [STUD_XY[0] + dx, BAR_CY, STUB_Z0],
-                              [0.0, 180.0, 0.0], ROT_Y_180,
-                              label=f"bracket-screw (x{STUD_XY[0] + dx:+.0f})")
+    bracket = await place_component(
+        adapter,
+        "transgear-bracket",
+        [STUD_XY[0], STUD_XY[1], BRACKET_Z0],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+    )
+    # One real-mated seed at machine -2; PatternAxisX forward runs toward -X
+    # and creates the second screw at -22. Ry(180) points both shanks into the
+    # support bar while their under-head planes bear on the bracket back face.
+    bracket_seed_target = [STUD_XY[0] + BRACKET_SCREW_DX, BAR_CY, STUB_Z0]
+    bracket_seed = await place_component(
+        adapter,
+        "bracket-screw",
+        bracket_seed_target,
+        [0.0, 180.0, 0.0],
+        ROT_Y_180,
+        ground=False,
+        label=f"bracket-screw seed (x{bracket_seed_target[0]:+.0f})",
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"ScrewAxis@{bracket_seed}", "AXIS"),
+        named_ref(f"ScrewAxis1@{bracket}", "AXIS"),
+        label="transgear bracket-screw seed coaxial",
+        verify=(bracket_seed, bracket_seed_target),
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"Front Plane@{bracket_seed}", "PLANE"),
+        named_ref(f"ScrewSeat@{bracket}", "PLANE"),
+        label="transgear bracket-screw seed under-head seat",
+        verify=(bracket_seed, bracket_seed_target),
+    )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Right Plane@{bracket_seed}", "PLANE"),
+        named_ref(f"Right Plane@{bracket}", "PLANE"),
+        label="transgear bracket-screw seed anti-spin",
+        verify=(bracket_seed, bracket_seed_target),
+    )
+    assert_component_placed(
+        adapter, bracket_seed, bracket_seed_target, ROT_Y_180
+    )
+    bracket_instances = await linear_component_pattern(
+        adapter,
+        [bracket_seed],
+        axis="x",
+        spacing_mm=2.0 * BRACKET_SCREW_DX,
+        instances=2,
+        label="transgear bracket-screw pattern",
+    )
+    assert_pattern_targets(
+        adapter,
+        bracket_instances,
+        [[STUD_XY[0] - BRACKET_SCREW_DX, BAR_CY, STUB_Z0]],
+        ROT_Y_180,
+        "transgear bracket-screw pattern",
+    )
     # Rx(-90): stud +Y -> -Z; base z -125.9..-135, O5 seat to -148.8, collar
     # to -152.8.
     await place_component(adapter, "transgear-stub", [STUD_XY[0], STUD_XY[1], STUB_Z0],

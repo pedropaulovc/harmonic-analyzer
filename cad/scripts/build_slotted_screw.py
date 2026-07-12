@@ -5,8 +5,8 @@ pivot blocks down (p. 69 block close-up ``page002_img01``): two bright
 heads per block. (The dark screw at frame left -- the spring foot --
 is the smaller build_foot_screw: its Ø4 shank cannot fit the 4-wide
 spring strip.) Head bears on the block's top face, shank drops through
-its Ø4.2 hole into the harmonic base. Slot and thread not modeled (the
-M6.10 fillister convention -- below render resolution).
+its Ø4.2 hole into the harmonic base. The head carries its native driver
+slot; thread geometry is not modeled.
 
 Layout: axis along Y, AUTHORED IN FINAL ORIENTATION (pointing -Y =
 down into the base): under-head face on the Top plane at y = 0, head
@@ -24,6 +24,7 @@ from __future__ import annotations
 import math
 import sys
 
+from _fastener_catalog import fastener
 from _common import (
     POLISHED_STEEL,
     SketchDims,
@@ -42,15 +43,17 @@ from _common import (
     set_global,
     volume_check,
 )
+from _fastener_slot import FastenerAxis, add_slotted_drive
 
 PART_NAME = "slotted-screw"
-MATERIAL = "Plain Carbon Steel"
+SPEC = fastener(PART_NAME)
+MATERIAL = SPEC.material
 
 HEAD_DIA = 8.0  # p.69 close-up, scaled vs the 5-thick strap edge (low)
 HEAD_H = 2.5
-SHANK_DIA = 3.15  # shank: was Ø4.0, now 3.15 = #8-32 tap-drill 3.454 - 0.3
+SHANK_DIA = SPEC.model_diameter_mm  # #8-32 modeled thread minor diameter
 # (rides the Ø4.2 block holes as clearance, threads #8-32 into the base)
-SHANK_LEN = 18.0  # through the 16-tall block + 2 engagement into the base
+SHANK_LEN = SPEC.length_mm  # through the 16-tall block + 2 engagement into the base
 # (thread depth unmodeled, the pedestal-bolt precedent)
 
 
@@ -105,6 +108,17 @@ async def build(adapter) -> dict[str, str]:
     expected += v_shank
     await volume_check(adapter, "shank", expected, 0.005 * v_shank)
 
+    expected, slot_jobs = await add_slotted_drive(
+        adapter,
+        axis=FastenerAxis.Y,
+        head_radius_mm=HEAD_DIA / 2.0,
+        head_face_offset_mm=HEAD_H,
+        width_mm=1.2,
+        depth_mm=1.0,
+        expected_volume_mm3=expected,
+    )
+    drive_jobs += slot_jobs
+
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
     await force_rebuild(adapter)
@@ -114,6 +128,16 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven slotted screw (equations neutral)", expected, 0.005 * v_shank
     )
+
+    from solidworks_mcp.adapters.base import CreateAxisParameters
+
+    check(
+        "create_axis ScrewAxis (Front ∩ Right)",
+        await adapter.create_axis(
+            CreateAxisParameters(mode="two_planes", planes=["Front Plane", "Right Plane"])
+        ),
+    )
+    name_last_feature(adapter, "ScrewAxis")
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)

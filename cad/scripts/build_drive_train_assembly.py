@@ -148,12 +148,14 @@ from _assembly import (
     apply_component_color,
     assert_component_placed,
     assert_free_dof_necessity,
+    assert_pattern_targets,
     check_no_interference,
     coincident_mate,
     component_names,
     component_transform,
     distance_driver,
     gear_mate,
+    linear_component_pattern,
     lock_mate,
     named_ref,
     parallel_mate,
@@ -1698,10 +1700,10 @@ async def build(adapter) -> dict[str, str]:
         [APINION_X, APINION_Y, ARBOR_Z0], [0.0, 0.0, 0.0], IDENTITY,
         ground=False, label="pinion-arbor (steel, through the drum)",
     )
-    # Rig hold-downs (PR7 items 2/11/12): 4 bright block screws + 2 black foot
-    # screws, all base-bolted statics located to the machine datums below.
+    # Rig hold-downs (PR7 items 2/11/12): physically located seeds are patterned
+    # across the repeated block/pedestal stations in the joints section below.
     block_screws: list[str] = []
-    for k, (sx, sz) in enumerate(_BLOCK_SCREW_XZ):
+    for k, (sx, sz) in enumerate(_BLOCK_SCREW_XZ[:2]):
         scr = await place_component(
             adapter, "slotted-screw",
             [sx, BLOCK_TOP_Y, sz], [0.0, 0.0, 0.0], IDENTITY,
@@ -1712,7 +1714,6 @@ async def build(adapter) -> dict[str, str]:
     for tag, (sx, sz), seat_y in (
         ("spring foot", _FOOT_SCREW_XZ[0], Y_BASE_TOP + SPRING_T),
         ("pedestal flange", _FOOT_SCREW_XZ[1], Y_BASE_TOP + ARBOR_PED_FLANGE_T),
-        ("north pedestal flange", _FOOT_SCREW_XZ[2], Y_BASE_TOP + ARBOR_PED_FLANGE_T),
     ):
         scr = await place_component(
             adapter, "foot-screw",
@@ -2410,6 +2411,44 @@ async def build(adapter) -> dict[str, str]:
     await _locate_to_datum(adapter, spring)
     for scr in block_screws + foot_screws:
         await _locate_to_datum(adapter, scr)
+    block_targets = [
+        [sx, BLOCK_TOP_Y, sz] for sx, sz in _BLOCK_SCREW_XZ[2:]
+    ]
+    block_instances = await linear_component_pattern(
+        adapter,
+        block_screws,
+        axis="z",
+        spacing_mm=_BLOCK_SCREW_XZ[2][1] - _BLOCK_SCREW_XZ[0][1],
+        instances=2,
+        label="pinion block-screw pattern",
+    )
+    assert_pattern_targets(
+        adapter,
+        block_instances,
+        block_targets,
+        IDENTITY,
+        "pinion block-screw pattern",
+    )
+    pedestal_target = [
+        _FOOT_SCREW_XZ[2][0],
+        Y_BASE_TOP + ARBOR_PED_FLANGE_T,
+        _FOOT_SCREW_XZ[2][1],
+    ]
+    pedestal_instances = await linear_component_pattern(
+        adapter,
+        [foot_screws[1]],
+        axis="z",
+        spacing_mm=_FOOT_SCREW_XZ[2][1] - _FOOT_SCREW_XZ[1][1],
+        instances=2,
+        label="arbor pedestal foot-screw pattern",
+    )
+    assert_pattern_targets(
+        adapter,
+        pedestal_instances,
+        [pedestal_target],
+        IDENTITY,
+        "arbor pedestal foot-screw pattern",
+    )
     # Front strap: revolute on the torque shaft (coincident pivot bore + axial
     # seat) -- the swing DOF. The parked-lean ANGLE driver is a FREED
     # operational DOF (PR8 item 3, ``free_dof_key``): its spec is recorded

@@ -55,12 +55,15 @@ from _common import (
 )
 from _assembly import (
     angle_driver,
+    assert_component_placed,
     assert_free_dof_necessity,
     check_no_interference,
+    coincident_mate,
     component_origin,
     distance_driver,
     lock_mate,
     named_ref,
+    parallel_mate,
     place_component,
     reset_dof_manifest,
     save_assembly_and_images,
@@ -141,8 +144,9 @@ async def build(adapter) -> dict[str, str]:
     # manifest -- the travel stays live in the saved model. The marker rides
     # the rod via a Lock mate. Probed FULLY(3), probe_pen.py.
     # The hanger is FIRST so the auto-fixed seed is structure, not the rod.
-    await place_component(adapter, "pen-hanger", list(HANGER_POS),
-                          [0.0, 0.0, 0.0], IDENTITY)
+    hanger = await place_component(
+        adapter, "pen-hanger", list(HANGER_POS), [0.0, 0.0, 0.0], IDENTITY
+    )
     await place_component(adapter, "pen-v-block", list(VBLOCK_POS),
                           [0.0, 180.0, 0.0], ROT_Y_180)
     pen_rod = await place_component(adapter, "pen-rod", list(PEN_ROD_POS),
@@ -194,14 +198,78 @@ async def build(adapter) -> dict[str, str]:
     # Rx(-90)*Ry(+90) (gimbal representative [-90, 90, 0]): the ring lies flat
     # on the v-block top, long axis along X, window over the marker + pen rod
     # (see FRAME_POS comment).
-    await place_component(adapter, "pen-frame", list(FRAME_POS),
-                          [-90.0, 90.0, 0.0], FRAME_ROWS)
+    frame = await place_component(
+        adapter, "pen-frame", list(FRAME_POS), [-90.0, 90.0, 0.0], FRAME_ROWS
+    )
     # Ry(180): the screw's own axis presses east (-X) through the frame's
     # east end-rail hole toward the marker barrel.
-    await place_component(adapter, "pen-set-screw", list(SET_SCREW_POS),
-                          [0.0, 180.0, 0.0], ROT_Y_180)
-    await place_component(adapter, "hanger-screw", list(HANGER_SCREW_POS),
-                          [0.0, 0.0, 0.0], IDENTITY)
+    set_screw = await place_component(
+        adapter,
+        "pen-set-screw",
+        list(SET_SCREW_POS),
+        [0.0, 180.0, 0.0],
+        ROT_Y_180,
+        ground=False,
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"ScrewAxis@{set_screw}", "AXIS"),
+        named_ref(f"SetScrewAxis@{frame}", "AXIS"),
+        label="pen set-screw coaxial with frame tapped hole",
+        verify=(set_screw, list(SET_SCREW_POS)),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Right Plane@{set_screw}", "PLANE"),
+        named_ref("Right Plane", "PLANE"),
+        SET_SCREW_POS[0],
+        label="pen set-screw adjustment depth",
+        verify=(set_screw, list(SET_SCREW_POS)),
+    )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Top Plane@{set_screw}", "PLANE"),
+        named_ref("Top Plane", "PLANE"),
+        label="pen set-screw anti-spin",
+        verify=(set_screw, list(SET_SCREW_POS)),
+    )
+    assert_component_placed(
+        adapter, set_screw, list(SET_SCREW_POS), ROT_Y_180
+    )
+
+    hanger_screw = await place_component(
+        adapter,
+        "hanger-screw",
+        list(HANGER_SCREW_POS),
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"ScrewAxis@{hanger_screw}", "AXIS"),
+        named_ref(f"HangerScrewAxis@{hanger}", "AXIS"),
+        label="hanger screw coaxial with strap tapped hole",
+        verify=(hanger_screw, list(HANGER_SCREW_POS)),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Front Plane@{hanger_screw}", "PLANE"),
+        named_ref("Front Plane", "PLANE"),
+        HANGER_SCREW_POS[2],
+        label="hanger screw head plane",
+        verify=(hanger_screw, list(HANGER_SCREW_POS)),
+    )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Right Plane@{hanger_screw}", "PLANE"),
+        named_ref("Right Plane", "PLANE"),
+        label="hanger screw anti-spin",
+        verify=(hanger_screw, list(HANGER_SCREW_POS)),
+    )
+    assert_component_placed(
+        adapter, hanger_screw, list(HANGER_SCREW_POS), IDENTITY
+    )
 
     # Certify the AS-BUILT model. Necessity only: the freed pen travel is
     # genuinely free; the lock-mated marker + pen-wire MUST read

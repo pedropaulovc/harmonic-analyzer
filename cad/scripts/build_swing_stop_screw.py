@@ -20,6 +20,7 @@ from __future__ import annotations
 import math
 import sys
 
+from _fastener_catalog import fastener
 from _common import (
     SketchDims,
     apply_material,
@@ -39,11 +40,13 @@ from _common import (
 )
 
 PART_NAME = "swing-stop-screw"
-MATERIAL = "Plain Carbon Steel"
+SPEC = fastener(PART_NAME)
+MATERIAL = SPEC.material
 
-SHANK_DIA = 3.15  # shank: was Ø4.0, now 3.15 = #8-32 tap-drill 3.454 - 0.3
+SHANK_DIA = SPEC.model_diameter_mm  # #8-32 modeled thread minor diameter
 EMBED_LEN = 6.0  # into the base's stop hole
 PROUD_LEN = 8.0  # above the base top: covers the 6.35 plate band + margin
+assert EMBED_LEN + PROUD_LEN == SPEC.length_mm
 HEAD_DIA = 8.0
 HEAD_T = 2.5
 SLOT_W = 1.2

@@ -48,6 +48,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_bore_axis,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -73,7 +74,7 @@ CLAMP_HOLE_SPEC = HoleSpec("clearance", "#8")
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
@@ -147,6 +148,31 @@ async def build(adapter) -> dict[str, str]:
     )
     expected -= 2.0 * math.pi * (clamp_dia / 2.0) ** 2 * BAR_DEPTH
     await volume_check(adapter, "bar with clamp holes", expected, 1.0)
+
+    # Robust assembly datums for the clamp-screw seed.  The head seats on the
+    # front face (local -Z), and each screw axis is the intersection of an
+    # X-station plane with the Top Plane.  These are derived from the same
+    # constants as the Hole Wizard points, so the physical mate contract cannot
+    # drift away from the manufactured holes.
+    check(
+        "create_plane ClampSeat (Front Plane, front face)",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Front Plane", offset=front_z
+            )
+        ),
+    )
+    name_last_feature(adapter, "ClampSeat")
+    for index, x in enumerate(CLAMP_HOLE_X):
+        await name_bore_axis(
+            adapter,
+            "Right Plane",
+            x,
+            "Top Plane",
+            0.0,
+            f"clamp hole {index}",
+        )
+        name_last_feature(adapter, f"ClampAxis{index}")
 
     # Deferred drive equations after the model + a rebuild exists, then re-check:
     # each equation evaluates to the as-built value, so geometry must not move.

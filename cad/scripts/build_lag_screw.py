@@ -4,8 +4,9 @@ One of the four hold-down screws that come up through the base into the
 rocker-arm-support north upright's 9/16-12 tapped foot holes (O12.30376 tap
 drill; build_rocker_arm_support.py FootTappedHoles, 25.4 deep up to the window).
 The round head sits recessed in a counterbore on the base underside
-(build_harmonic_base.py); plain head and shank, thread not modeled (the O12
-shank rides the tap-drill foot hole, like the legacy socket fit).
+(build_harmonic_base.py); slotted round head and plain shank, with thread
+geometry not modeled (the O12 shank rides the tap-drill foot hole, like the
+legacy socket fit).
 
 Dimensions: cad/DIMENSIONS.md ch. 14 layout (M6.10) -- shank sized to the
 9/16-12 tap-drill foot hole; head sized to the O23 base counterbore (low).
@@ -25,6 +26,7 @@ from __future__ import annotations
 import math
 import sys
 
+from _fastener_catalog import fastener
 from _common import (
     SketchDims,
     apply_material,
@@ -41,14 +43,16 @@ from _common import (
     set_global,
     volume_check,
 )
+from _fastener_slot import FastenerAxis, add_slotted_drive
 
 PART_NAME = "lag-screw"
-MATERIAL = "Plain Carbon Steel"  # black hardware
+SPEC = fastener(PART_NAME)
+MATERIAL = SPEC.material  # black hardware
 
 HEAD_DIA = 22.0  # round head in the O23 base counterbore (low)
 HEAD_H = 6.0  # recessed 0.5 below the base bottom (counterbore 6.5)
-SHANK_DIA = 12.0  # rides the O13 base hole into the O12.30 9/16-12 tapped foot hole
-SHANK_LEN = 63.0  # 44.3 base (above the 6.5 cbore) + 18.7 into the support foot
+SHANK_DIA = SPEC.model_diameter_mm  # rides the O13 base hole into the O12.30 9/16-12 tap
+SHANK_LEN = SPEC.length_mm  # 44.3 base (above the 6.5 cbore) + 18.7 into the support foot
 
 
 async def build(adapter) -> dict[str, str]:
@@ -101,6 +105,17 @@ async def build(adapter) -> dict[str, str]:
     v_shank = math.pi * (SHANK_DIA / 2.0) ** 2 * SHANK_LEN
     expected += v_shank
     await volume_check(adapter, "shank", expected, 0.005 * v_shank)
+
+    expected, slot_jobs = await add_slotted_drive(
+        adapter,
+        axis=FastenerAxis.Y,
+        head_radius_mm=HEAD_DIA / 2.0,
+        head_face_offset_mm=-HEAD_H,
+        width_mm=2.0,
+        depth_mm=2.0,
+        expected_volume_mm3=expected,
+    )
+    drive_jobs += slot_jobs
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
