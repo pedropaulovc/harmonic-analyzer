@@ -1150,6 +1150,8 @@ def _select_pattern_inputs(
     seed_components: tuple[str, ...],
     direction_name: str,
     direction_type: str,
+    direction2_name: str | None = None,
+    direction2_type: str = "AXIS",
 ) -> None:
     from solidworks_mcp.adapters.com_variant import null_callout
 
@@ -1170,6 +1172,23 @@ def _select_pattern_inputs(
         raise RuntimeError(
             f"cannot select pattern direction {direction_type} {direction_name!r}"
         )
+    if direction2_name is not None:
+        selected = model.Extension.SelectByID2(
+            direction2_name,
+            direction2_type,
+            0.0,
+            0.0,
+            0.0,
+            True,
+            4,
+            null_callout(),
+            0,
+        )
+        if not selected:
+            raise RuntimeError(
+                "cannot select pattern direction 2 "
+                f"{direction2_type} {direction2_name!r}"
+            )
     for seed_component in seed_components:
         component = adapter._attempt(
             lambda name=seed_component: model.GetComponentByName(name), default=None
@@ -1280,6 +1299,86 @@ async def linear_component_pattern(
         names = []
         for component in created:
             component = _early_bound(component, "IComponent2", "IsPatternInstance")
+            name = str(_read_member(component, "Name2"))
+            if not component.IsPatternInstance():
+                raise RuntimeError(f"{name} is not owned by the component pattern")
+            names.append(name)
+        _telemetry.success(f"{label}: created {len(names)} pattern instances")
+        return names
+
+
+async def grid_component_pattern(
+    adapter: Any,
+    seed_components: Iterable[str],
+    *,
+    axis1: str,
+    spacing1_mm: float,
+    instances1: int,
+    axis2: str,
+    spacing2_mm: float,
+    instances2: int,
+    direction1: PatternDirection = PatternDirection.FORWARD,
+    direction2: PatternDirection = PatternDirection.FORWARD,
+    label: str = "rectangular component pattern",
+) -> list[str]:
+    """Pattern seeds as one native two-direction rectangular grid."""
+    if instances1 < 2 or instances2 < 2:
+        raise ValueError("grid component pattern requires two instances per axis")
+    if spacing1_mm <= 0.0 or spacing2_mm <= 0.0:
+        raise ValueError("grid component pattern spacing must be positive")
+    if axis1.lower() == axis2.lower():
+        raise ValueError("grid component pattern axes must differ")
+    seeds = tuple(seed_components)
+    if not seeds:
+        raise ValueError("grid component pattern requires at least one seed")
+    if len(set(seeds)) != len(seeds):
+        raise ValueError("grid component pattern seeds must be unique")
+
+    model = adapter.currentModel
+    direction1_name = ensure_global_pattern_axis(adapter, axis1)
+    direction2_name = ensure_global_pattern_axis(adapter, axis2)
+    before = {
+        str(_read_member(component, "Name2"))
+        for component in (model.GetComponents(False) or [])
+    }
+    async with _telemetry.aspan(
+        f"pattern {label}", kind="grid", seeds=",".join(seeds),
+        axis1=axis1.lower(), instances1=instances1, spacing1_mm=spacing1_mm,
+        axis2=axis2.lower(), instances2=instances2, spacing2_mm=spacing2_mm,
+    ):
+        _select_pattern_inputs(
+            adapter, seeds, direction1_name, "AXIS", direction2_name, "AXIS"
+        )
+        manager = model.FeatureManager
+        _flag(manager, "IFeatureManager")
+        definition = manager.CreateDefinition(_LOCAL_LINEAR_PATTERN)
+        if definition is None:
+            raise RuntimeError("cannot create local grid pattern definition")
+        _flag(definition, "ILocalLinearPatternFeatureData")
+        definition.D1ReverseDirection = direction1 is PatternDirection.REVERSE
+        definition.D1Spacing = spacing1_mm / 1000.0
+        definition.D1TotalInstances = instances1
+        definition.D2PatternSeedOnly = False
+        definition.D2ReverseDirection = direction2 is PatternDirection.REVERSE
+        definition.D2Spacing = spacing2_mm / 1000.0
+        definition.D2TotalInstances = instances2
+        definition.SynchronizeFlexibleComponents = False
+        feature = manager.CreateFeature(definition)
+        model.ClearSelection2(True)
+        if feature is None:
+            raise RuntimeError(f"SOLIDWORKS rejected {label}")
+        _flag(feature, "IFeature")
+        feature.Name = label
+
+        created = _new_pattern_components(model, before)
+        expected = len(seeds) * (instances1 * instances2 - 1)
+        if len(created) != expected:
+            raise RuntimeError(
+                f"{label} created {len(created)} components, expected {expected}"
+            )
+        names = []
+        for component in created:
+            _flag_only(component, "IsPatternInstance")
             name = str(_read_member(component, "Name2"))
             if not component.IsPatternInstance():
                 raise RuntimeError(f"{name} is not owned by the component pattern")
