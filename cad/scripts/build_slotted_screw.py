@@ -24,6 +24,7 @@ from __future__ import annotations
 import math
 import sys
 
+from _fastener_catalog import fastener
 from _common import (
     POLISHED_STEEL,
     SketchDims,
@@ -44,13 +45,14 @@ from _common import (
 )
 
 PART_NAME = "slotted-screw"
-MATERIAL = "Plain Carbon Steel"
+SPEC = fastener(PART_NAME)
+MATERIAL = SPEC.material
 
 HEAD_DIA = 8.0  # p.69 close-up, scaled vs the 5-thick strap edge (low)
 HEAD_H = 2.5
-SHANK_DIA = 3.15  # shank: was Ø4.0, now 3.15 = #8-32 tap-drill 3.454 - 0.3
+SHANK_DIA = SPEC.model_diameter_mm  # #8-32 modeled thread minor diameter
 # (rides the Ø4.2 block holes as clearance, threads #8-32 into the base)
-SHANK_LEN = 18.0  # through the 16-tall block + 2 engagement into the base
+SHANK_LEN = SPEC.length_mm  # through the 16-tall block + 2 engagement into the base
 # (thread depth unmodeled, the pedestal-bolt precedent)
 
 

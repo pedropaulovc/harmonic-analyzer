@@ -20,6 +20,7 @@ from __future__ import annotations
 import math
 import sys
 
+from _fastener_catalog import fastener
 from _common import (
     SketchDims,
     apply_material,
@@ -39,7 +40,8 @@ from _common import (
 )
 
 PART_NAME = "cone-pivot-screw"
-MATERIAL = "Plain Carbon Steel"  # bright steel screw (v4 stills)
+SPEC = fastener(PART_NAME)
+MATERIAL = SPEC.material  # bright steel screw (v4 stills)
 
 HEAD_DIA = 9.5  # covers the plate's O6.5 hole; r 4.75 clears the tip block's
 # north face 0.25 (pivot station 196 - block north 191 -- assembly-asserted;
@@ -47,8 +49,8 @@ HEAD_DIA = 9.5  # covers the plate's O6.5 hole; r 4.75 clears the tip block's
 HEAD_T = 3.0
 SLOT_W = 1.6  # driver slot width
 SLOT_D = 1.2  # driver slot depth into the head top
-SHANK_DIA = 6.35  # shoulder: the plate's O6.5 hole rides it
-SHANK_LEN = 12.35  # plate 6.35 + 6.0 engaged into the base's pivot hole
+SHANK_DIA = SPEC.model_diameter_mm  # shoulder: the plate's O6.5 hole rides it
+SHANK_LEN = SPEC.length_mm  # plate 6.35 + 6.0 engaged into the base's pivot hole
 
 
 def _slot_strip_area(r: float, w: float) -> float:

@@ -26,6 +26,7 @@ from __future__ import annotations
 import math
 import sys
 
+from _fastener_catalog import fastener
 from _common import (
     SketchDims,
     add_line_chain,
@@ -47,13 +48,14 @@ from _common import (
 )
 
 PART_NAME = "hanger-screw"
-MATERIAL = "Plain Carbon Steel"  # black hardware
+SPEC = fastener(PART_NAME)
+MATERIAL = SPEC.material  # black hardware
 
 HEAD_AF = 7.0  # hex across-flats (low)
 HEAD_H = 2.5
-SHANK_DIA = 2.4  # shank: was Ø3.5, now 2.4 = #6-32 tap-drill 2.705 - 0.3
+SHANK_DIA = SPEC.model_diameter_mm  # #6-32 modeled thread minor diameter
 # (threads #6-32 into the strap; rides the bar's O3.8 / strap's O3.6 clearance)
-SHANK_LEN = 11.5  # bar 9 + 2.5 into the 3-thick strap (tip 0.5 recessed)
+SHANK_LEN = SPEC.length_mm  # bar 9 + 2.5 into the 3-thick strap
 
 # Every hex offset dim is linear in the across-flats (radius = AF/sqrt 3), so a
 # single HeadAF global drives them all via dimensionless coefficients -- unit-safe
