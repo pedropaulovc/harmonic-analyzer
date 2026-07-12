@@ -29,7 +29,6 @@ from __future__ import annotations
 import sys
 
 from _common import (
-    IN,
     SketchDims,
     add_line_chain,
     apply_material,
@@ -39,6 +38,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -49,32 +49,34 @@ from _common import (
 from _holes import HoleSpec, wizard_holes
 
 import _telemetry
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from crank_arm_spec import (
+    ARM_C2C,
+    ARM_END_X,
+    ARM_THICKNESS,
+    ARM_WIDTH,
+    DIMPLE_DEPTH,
+    DIMPLE_DIA,
+    DIMPLE_X,
+    DRAWING_DIMENSIONS,
+    HALF_WIDTH,
+    SHAFT_BORE_DIA,
+    SQUARE_END_OVERHANG,
+)
 
 PART_NAME = "crank-arm"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
-ARM_C2C = 66.0  # DIMENSIONS.md ch11: shaft-to-handle-pivot centres -- REDERIVED
-# from the ch30 eight-views (angle 90 side view, scaled to the 280 mm base depth):
-# the crank hangs straight down, handle pivot 66 mm below the crankshaft axis,
-# landing the handle ~10 mm above the base top. The former 150 (cone-axial scaled,
-# low) was >2x too long -- a down-pointing 150 arm would drive the handle below
-# the table (med).
-ARM_WIDTH = 16.0  # DIMENSIONS.md ch11: arm width (low)
-ARM_THICKNESS = 8.0  # DIMENSIONS.md ch11: ~half the arm width, p.12 photo (low)
-SQUARE_END_OVERHANG = 10.0  # DIMENSIONS.md ch11: square end past the pivot (low)
-SHAFT_BORE_DIA = 0.375 * IN  # 9.525: 3/8" crankshaft (med); the legacy 9.5
-# rounding left the bore 0.025 smaller than the shaft (caught in M6.2)
-DIMPLE_DIA = 8.0  # DIMENSIONS.md ch11: fiducial indentation (low)
-DIMPLE_DEPTH = 0.5  # DIMENSIONS.md ch11: fiducial indentation (low)
-DIMPLE_X = 30.0  # DIMENSIONS.md ch11: on the arm near the boss (low)
 # (The old PivotBoreDia Ø6.0 and PinHoleDia Ø5.0 constants are gone: the handle-
 # pivot hole and the tapered-pin cross-hole are now native Hole Wizard features
 # whose diameters come from the drill standard -- 15/64 (Ø5.953) and #9 (Ø4.978)
 # -- not equation-driven sketch dims. The 3/8 shaft bore stays a reamed circle
 # cut: it is a precision running fit, not a twist-drill hole.)
 
-ARM_END_X = ARM_C2C + SQUARE_END_OVERHANG
-HALF_WIDTH = ARM_WIDTH / 2.0
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > any extent it crosses
 
 
@@ -159,6 +161,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=ARM_THICKNESS)),
     )
     name_last_feature(adapter, "Arm")
+    depth_dim = name_dimensions(adapter, "Arm", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"ArmThickness"')]
     vol = await _volume(adapter)
     _telemetry.info(f"volume after extrude: {vol:.1f} mm^3")
 
@@ -277,8 +281,16 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "HandleSeat")
 
+    # Manufacturing drawing support: mark exactly the print's dimensions (the
+    # drawing recipe imports the marked set and must find every one of these),
+    # and stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    apply_drawing_properties(adapter, PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)
 
 
