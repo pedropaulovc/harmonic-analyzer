@@ -1667,11 +1667,14 @@ def task_release():
     args after ``--``: ``doit release -- v0.2.0 --draft`` (default auto patch-bump).
     Gated on EVERY gate via REAL task_dep edges (the spine is gone, so these are now
     explicit): ``export`` (which itself pulls the parts/assemblies + the ``verify:*``
-    gates), ``preflight`` (gear-ratios), the ``verify:*`` suites, and every offline
-    ``check:*`` -- so a release cannot publish past a stale/failing gate.
+    gates), every registered ``drawing:*`` artifact that release stages,
+    ``preflight`` (gear-ratios), the ``verify:*`` suites, and every offline
+    ``check:*`` -- so a release cannot publish past a stale/failing gate or package
+    a missing/stale drawing.
     """
     return {
-        "task_dep": ["export", "preflight", *(f"verify:{s}" for s in _VERIFY_NAMES),
+        "task_dep": ["export", "preflight", *(f"drawing:{s}" for s in _drawing_order()),
+                     *(f"verify:{s}" for s in _VERIFY_NAMES),
                      *(f"check:{c}" for c in _CHECK_NAMES)],
         "uptodate": [False],
         "pos_arg": "relargs",
