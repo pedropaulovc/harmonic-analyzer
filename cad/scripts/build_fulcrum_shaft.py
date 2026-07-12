@@ -24,7 +24,6 @@ import math
 import sys
 
 from _common import (
-    IN,
     SketchDims,
     apply_material,
     check,
@@ -32,6 +31,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -39,13 +39,15 @@ from _common import (
     set_global,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from fulcrum_shaft_spec import DRAWING_DIMENSIONS, SHAFT_DIA, SHAFT_LENGTH
 
 PART_NAME = "fulcrum-shaft"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
-
-SHAFT_DIA = 0.25 * IN  # 6.35  DIMENSIONS.md channel layout (low)
-SHAFT_LENGTH = 182.0  # ends z +-91: clear of the west columns (derived, M6.5)
-
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
@@ -80,6 +82,8 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "Shaft")
+    depth_dim = name_dimensions(adapter, "Shaft", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"ShaftLength"')]
     v = math.pi * (SHAFT_DIA / 2.0) ** 2 * SHAFT_LENGTH
     await volume_check(adapter, "shaft", v, 0.001 * v)
 
@@ -93,6 +97,10 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(adapter, PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)
 
 
