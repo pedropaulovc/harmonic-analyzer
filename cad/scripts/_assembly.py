@@ -24,6 +24,7 @@ from _common import (
     _MATE_TOL_MM,
     _early_bound,
     _read_member,
+    active_configuration_name,
     check,
     log,
     set_isometric_view,
@@ -1090,13 +1091,13 @@ def _top_features(model: Any) -> list[Any]:
 @_telemetry.traced("assembly.pattern_axis", label_param="axis")
 def ensure_global_pattern_axis(adapter: Any, axis: str) -> str:
     """Create/reuse an assembly reference axis aligned to global X, Y, or Z."""
-    from solidworks_mcp.adapters.com_variant import null_callout
-
     key = axis.lower()
     try:
         planes = _GLOBAL_PATTERN_AXIS_PLANES[key]
     except KeyError as exc:
         raise ValueError(f"pattern axis must be x, y, or z; got {axis!r}") from exc
+
+    from solidworks_mcp.adapters.com_variant import null_callout
 
     model = adapter.currentModel
     name = f"PatternAxis{key.upper()}"
@@ -1104,7 +1105,6 @@ def ensure_global_pattern_axis(adapter: Any, axis: str) -> str:
     if existing is not None:
         return name
 
-    before = {str(_read_member(feature, "Name")) for feature in _top_features(model)}
     model.ClearSelection2(True)
     for index, plane in enumerate(planes):
         selected = model.Extension.SelectByID2(
@@ -1122,17 +1122,15 @@ def ensure_global_pattern_axis(adapter: Any, axis: str) -> str:
             raise RuntimeError(f"cannot select {plane} for global {key}-axis")
     if not model.InsertAxis2(True):
         raise RuntimeError(f"SOLIDWORKS rejected global {key}-axis creation")
-
-    created = [
-        feature for feature in _top_features(model)
-        if str(_read_member(feature, "Name")) not in before
-        and str(feature.GetTypeName2()) == "RefAxis"
-    ]
-    if len(created) != 1:
+    created = adapter._attempt(lambda: model.FeatureByPositionReverse(0), default=None)
+    if created is None:
+        raise RuntimeError(f"cannot read newly-created global {key}-axis")
+    _flag(created, "IFeature")
+    if str(created.GetTypeName2()) != "RefAxis":
         raise RuntimeError(
-            f"global {key}-axis created {len(created)} reference-axis features"
+            f"new global {key}-axis produced {created.GetTypeName2()!r}, expected RefAxis"
         )
-    created[0].Name = name
+    created.Name = name
     model.ClearSelection2(True)
     _telemetry.success(f"created assembly pattern axis {name}")
     return name
@@ -2256,6 +2254,10 @@ async def _export_assembly_images(
     png_dir.mkdir(parents=True, exist_ok=True)
     artefacts: dict[str, str] = {}
     views = list(views)
+    requested = {f"{asm_name}_{view}.png" for view in views}
+    for stale in png_dir.glob(f"{asm_name}_*.png"):
+        if stale.name not in requested:
+            stale.unlink()
     async with _telemetry.aspan("export_images", count=len(views)):
         for view in views:
             img_path = (png_dir / f"{asm_name}_{view}.png").resolve()
@@ -2514,7 +2516,7 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
     multi = len(configs) > 1
     rows: list[Any] = []
     for cfg in configs:
-        if multi:
+        if multi and active_configuration_name(adapter) != cfg:
             check(f"activate {cfg}", await adapter.set_active_configuration(cfg))
         res = await adapter.get_mass_properties()
         if not res.is_success:
@@ -2561,7 +2563,7 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
                 tuple(round(v, 4) for v in a16[9:12]),
             ))
         rows.extend((cfg, *pr) for pr in sorted(pose_rows))
-    if multi and rest is not None:
+    if multi and rest is not None and active_configuration_name(adapter) != rest:
         check(f"re-activate {rest}", await adapter.set_active_configuration(rest))
     return hashlib.sha256(repr(rows).encode("utf-8")).hexdigest()
 
@@ -2773,7 +2775,8 @@ async def refresh_assembly(
     with _telemetry.span("rebuild_configs", count=len(configs)):
         for cfg in configs:
             with _telemetry.span("rebuild_config", config=cfg):
-                check(f"activate {cfg}", await adapter.set_active_configuration(cfg))
+                if active_configuration_name(adapter) != cfg:
+                    check(f"activate {cfg}", await adapter.set_active_configuration(cfg))
                 adapter._attempt(
                     lambda: adapter.currentModel.ForceRebuild3(False), default=None)
                 faults = _rebuild_faults(adapter)
@@ -2799,7 +2802,7 @@ async def refresh_assembly(
 
     # Back to the rest pose for the gates + save: the saved active config and the
     # exported PNGs must match the from-scratch build's deterministic pose.
-    if rest is not None:
+    if rest is not None and active_configuration_name(adapter) != rest:
         with _telemetry.span("reactivate", config=rest):
             check(f"re-activate {rest}", await adapter.set_active_configuration(rest))
 

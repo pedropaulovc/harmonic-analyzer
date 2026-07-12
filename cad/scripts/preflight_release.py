@@ -20,7 +20,7 @@ from __future__ import annotations
 import sys
 from typing import Any
 
-from _common import OUT_SLDASM, check, run_build
+from _common import OUT_SLDASM, active_configuration_name, check, run_build
 from _assembly_postbuild import discard_open_documents as _discard_open_documents
 from verify import REST, assert_gear_ratios
 
@@ -49,7 +49,7 @@ async def _preflight_one(adapter: Any, name: str) -> str:
         async with _telemetry.aspan("preflight.open", name=name):
             check(f"open {name}", await adapter.open_model(str(sldasm)))
             configs = check("list configurations", await adapter.list_configurations())
-            if REST in (configs or []):
+            if REST in (configs or []) and active_configuration_name(adapter) != REST:
                 check(f"activate {REST}", await adapter.set_active_configuration(REST))
         assert_gear_ratios(adapter, name)
     finally:
