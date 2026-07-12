@@ -19,23 +19,24 @@ from __future__ import annotations
 
 import sys
 
+from _fastener_catalog import fastener
 from _flat_screw import build_flat_screw
 from _common import run_build
 
 PART_NAME = "clamp-screw"
-
+SPEC = fastener(PART_NAME)
 HEAD_DIA = 8.0  # large slotted head on the bar front (ch30 p002, low)
 HEAD_H = 2.5
-SHANK_DIA = 3.15  # shank: was Ø3.9, now 3.15 = #8-32 tap-drill 3.454 - 0.3
+SHANK_DIA = SPEC.model_diameter_mm  # #8-32 modeled thread minor diameter
 # (threads the back-arc #8-32 tap; rides the O4.4 bar/front-arc clearance)
-SHANK_LEN = 28.0  # bar 9 + front arc 17.9 + 1.1 into the back arc
+SHANK_LEN = SPEC.length_mm  # bar 9 + front arc 17.9 + 1.1 into the back arc
 
 
 async def build(adapter) -> dict[str, str]:
     return await build_flat_screw(
         adapter,
         part_name=PART_NAME,
-        material="Plain Carbon Steel",
+        material=SPEC.material,
         head_dia=HEAD_DIA,
         head_h=HEAD_H,
         shank_dia=SHANK_DIA,
