@@ -70,8 +70,6 @@ async def add_slotted_drive(
         drive_width=None,
         name_depth="SlotWidth",
         drive_depth=None,
-        name_corner=("SlotCx", "SlotCz"),
-        drive_corner=(None, None),
     )
     await ensure_fully_defined(adapter, "driver slot sketch")
     check("exit_sketch driver slot", await adapter.exit_sketch())

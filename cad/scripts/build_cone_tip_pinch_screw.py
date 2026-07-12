@@ -106,7 +106,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, HEAD_DIA / 2.0 + 0.5, SLOT_W / 2.0, "slot", dims=slot,
         name_width="SlotLen", drive_width=None,
         name_depth="SlotWDim", drive_depth=None,
-        name_corner=("SlotCx", "SlotCz"), drive_corner=(None, None),
     )
     await ensure_fully_defined(adapter, "slot sketch")
     check("exit_sketch slot", await adapter.exit_sketch())

@@ -95,8 +95,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, BAR_LENGTH / 2.0, BAR_HEIGHT / 2.0, "bar", dims=bar,
         name_width="Length", drive_width='"BarLength"',
         name_depth="Height", drive_depth='"BarHeight"',
-        name_corner=("CornerX", "CornerZ"),
-        drive_corner=('"BarLength" / 2', '"BarHeight" / 2'),
     )
     await ensure_fully_defined(adapter, "bar sketch")
     check("exit_sketch bar", await adapter.exit_sketch())

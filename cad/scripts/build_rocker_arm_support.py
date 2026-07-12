@@ -465,10 +465,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, BIG, BIG, "window", dims=windows,
         name_width="WinWidth", drive_width='2 * "WindowOuter"',
         name_depth="WinHeight", drive_depth='2 * "WindowOuter"',
-        name_corner=("WinCornerX", "WinCornerY"),
-        drive_corner=('"WindowOuter"', '"WindowOuter"'),
     )
-    _add_construction_diagonals(adapter, BIG)
     await ensure_fully_defined(adapter, "window")
     check("exit windows", await adapter.exit_sketch())
     name_last_feature(adapter, "WindowProfile")
@@ -480,10 +477,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, CAV, CAV, "cavity", dims=cavity,
         name_width="CavWidth", drive_width='2 * "CavHalf"',
         name_depth="CavDepth", drive_depth='2 * "CavHalf"',
-        name_corner=("CavCornerX", "CavCornerY"),
-        drive_corner=('"CavHalf"', '"CavHalf"'),
     )
-    _add_construction_diagonals(adapter, CAV)
     await ensure_fully_defined(adapter, "cavity")
     check("exit cavity", await adapter.exit_sketch())
     name_last_feature(adapter, "CavityProfile")
