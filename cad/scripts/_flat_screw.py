@@ -1,7 +1,8 @@
-r"""Shared builder for plain cylindrical-head machine screws.
+r"""Shared builder for slotted cylindrical-head machine screws.
 
 The fillister/slotted screw family is one shape -- a cylindrical head under
-a plain shank, slot and thread not modeled -- so the new paper-drive screws
+a plain shank with a native driver slot; thread geometry is not modeled. The
+new paper-drive screws
 (clamp-screw, bracket-screw) share this builder instead of cloning the
 fillister script again. Layout: axis along Z, under-head face on the Front
 plane at z = 0, head -head_h..0, shank 0..+shank_len; symmetric about

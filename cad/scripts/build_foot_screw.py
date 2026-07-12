@@ -10,9 +10,8 @@ Both seats are too small for the bright Ø4 block screw
 head. Head bears on the foot's top face, the Ø2.9 shank drops through
 the Ø3.2 holes into the harmonic base (5.0 pedestal flange + 3.0
 engagement; the spring instance buries the surplus below its 0.8 strip
--- thread depth unmodeled, the pedestal-bolt precedent). Slot and
-thread not modeled (the M6.10 fillister convention -- below render
-resolution).
+-- thread depth unmodeled, the pedestal-bolt precedent). The head carries
+its native driver slot; thread geometry is not modeled.
 
 Layout: axis along Y, AUTHORED IN FINAL ORIENTATION (pointing -Y =
 down into the base): under-head face on the Top plane at y = 0, head

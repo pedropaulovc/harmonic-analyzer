@@ -5,8 +5,8 @@ pivot blocks down (p. 69 block close-up ``page002_img01``): two bright
 heads per block. (The dark screw at frame left -- the spring foot --
 is the smaller build_foot_screw: its Ø4 shank cannot fit the 4-wide
 spring strip.) Head bears on the block's top face, shank drops through
-its Ø4.2 hole into the harmonic base. Slot and thread not modeled (the
-M6.10 fillister convention -- below render resolution).
+its Ø4.2 hole into the harmonic base. The head carries its native driver
+slot; thread geometry is not modeled.
 
 Layout: axis along Y, AUTHORED IN FINAL ORIENTATION (pointing -Y =
 down into the base): under-head face on the Top plane at y = 0, head

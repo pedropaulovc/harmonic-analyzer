@@ -6,8 +6,8 @@ sockets (ch. 22 p. 55 -- the platen's "fastener holes deferred to
 assembly" promise, resolved in the M6.10 fasteners pass), and 2x
 fastening the magnifying-lever bracket's flange up into the summing
 lever's coefficients plate (ch. 20 p. 47 "mounting screws omitted").
-Plain cylindrical head: the slot is ~0.8 mm, below comparison-render
-resolution (documented simplification); thread not modeled.
+The cylindrical head carries its native 0.8 mm driver slot; thread geometry
+is not modeled.
 
 Dimensions: cad/DIMENSIONS.md ch. 20/22 (M6.10) -- shank matches the
 clip holes (O3, scaled low); head photo-plausible fillister (low).
