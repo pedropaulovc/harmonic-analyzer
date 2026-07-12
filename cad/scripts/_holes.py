@@ -402,35 +402,41 @@ def wizard_holes(
     # Customize + read back through the EDIT flow: the created feature's
     # definition carries the populated table values (the pre-create object
     # reads 0.0 for everything it did not set).
+    defn = _early(feat.GetDefinition(), "IWizardHoleFeatureData2")
     edits: list[tuple[str, object]] = []
-    if (
-        spec.kind == "clearance"
-        and spec.end != "blind"
-        and spec.fit != "normal"
-    ):
+    if spec.kind == "clearance" and spec.end != "blind":
         # HoleFit is a NO-OP on a plain (type-2) clearance hole: the API
         # applies it to counterbore/countersink features only (per the
         # IWizardHoleFeatureData2.HoleFit remarks), so a plain hole ships the
         # NORMAL-fit diameter regardless of spec.fit -- probe 2026-07-11: a
         # 1/4 "close" hole still cut 7.137 mm (the normal dia, not 6.756).
-        # Force only a NON-normal pinned diameter so the cut geometry matches
-        # the analytic blind_cut_dia_mm the callers use. Leave normal fit on
-        # the initialized table value: redundantly writing that same diameter
-        # through ModifyDefinition corrupts swHoleThru (25) into
+        # Compare the initialized geometry to the pinned fit before editing.
+        # SolidWorks sometimes initializes the requested normal diameter (#4
+        # -> 3.2639 mm) and sometimes another fit (#8 probe -> too small).
+        # Redundantly writing the SAME diameter corrupts swHoleThru (25) into
         # swHoleThruCounterSinkBottom (26), which adds a bogus far-side
-        # countersink line to native hole tables.
-        # (Keep the HoleFit write too: harmless, and correct should a
-        # cbore/csink clearance ever route through here. An explicit
-        # HoleDiameter override still wins -- it is applied below.)
-        edits.append(("HoleFit", _FITS[spec.fit]))  # blind bakes fit into HW5
-        if "HoleDiameter" not in spec.overrides_mm:
+        # countersink line to native hole tables. Modify only on real drift.
+        pinned_dia_mm = blind_cut_dia_mm(spec)
+        initialized_dia_mm = float(defn.ThruHoleDiameter) * 1000.0
+        diameter_drift = abs(initialized_dia_mm - pinned_dia_mm) > 0.05
+        if diameter_drift and spec.fit != "normal":
+            # HoleFit itself is harmless but ineffective on plain holes; keep
+            # the requested semantic where the interface accepts it.
+            edits.append(("HoleFit", _FITS[spec.fit]))
+        if diameter_drift and "HoleDiameter" not in spec.overrides_mm:
             # On a plain hole the DRIVING knob is ThruHoleDiameter -- a
             # HoleDiameter-only write is silently dropped (probe 2026-07-11:
             # HoleDiameter-only still cut 7.137; setting BOTH cut 6.756). Set
             # both, mirroring the counterbore override path below.
-            cut_m = blind_cut_dia_mm(spec) / 1000.0
+            cut_m = pinned_dia_mm / 1000.0
             edits.append(("HoleDiameter", cut_m))
             edits.append(("ThruHoleDiameter", cut_m))
+            _telemetry.event(
+                "hole_wizard.diameter_override",
+                label=label,
+                initialized_mm=round(initialized_dia_mm, 4),
+                pinned_mm=round(pinned_dia_mm, 4),
+            )
     for k, v in spec.overrides_mm.items():
         edits.append((k, v / 1000.0))
         if k == "HoleDiameter":
@@ -438,7 +444,6 @@ def wizard_holes(
             # HoleDiameter writes are ignored there (probe) -- set both
             edits.append(("ThruHoleDiameter", v / 1000.0))
 
-    defn = _early(feat.GetDefinition(), "IWizardHoleFeatureData2")
     if edits:
         # Early-bound call: the params are DECLARED dispatches, so a plain
         # None marshals as a typed null -- a VARIANT wrapper here throws
