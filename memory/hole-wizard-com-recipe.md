@@ -43,9 +43,39 @@ Traps that cost 8 probe rounds — do not re-learn:
   fit, FORCE the pinned dia via BOTH `HoleDiameter` AND `ThruHoleDiameter` —
   on a plain hole the DRIVING knob is `ThruHoleDiameter`; a `HoleDiameter`-only
   write is silently dropped (setting only `HoleDiameter` still cut 7.137;
-  setting both cut 6.756). `wizard_holes` now does this for every clearance
-  hole so the cut matches `blind_cut_dia_mm` by construction. (On a cbore the
-  through-hole knob is likewise `ThruHoleDiameter` — `HoleDiameter` ignored.)
+  setting both cut 6.756). `wizard_holes` does this ONLY for non-normal fits;
+  the initialized normal fit must remain untouched. (On a cbore the through-
+  hole knob is likewise `ThruHoleDiameter` — `HoleDiameter` ignored.)
+- **Never redundantly write a NORMAL clearance diameter.** Platen-guide's #4
+  hole table exposed the failure: every B row showed the correct `Ø3.25 THRU
+  ALL` plus bogus `Ø0.00 X 0°, FAR SIDE`. An isolated native repro is
+  `diagnostics/repro_hole_table_zero_diameter.py`: A1-A4 use a #4 normal
+  clearance with an explicit table-equivalent `HoleDiameter=3.251` override
+  and reproduce the bad second line; B1 is a native #30 drill and stays clean.
+  Live definition state before the fix was contradictory: `Type=26`
+  (`swHoleThruCounterSinkBottom`), `FarSideCounterSink=False`, far diameter /
+  angle `-1/-1`. Pedro's decisive UI experiment — enable then disable **Far
+  side countersink** — normalized it to `Type=25` (`swHoleThru`), far-side
+  false, far dimensions `0/0`, and the table immediately became clean. The
+  recorded VBA macro did not include PropertyManager edits, so COM state was
+  the useful evidence. The documented `FarSideCounterSink` and `Type` setters
+  are get-only in this API build (the old official toggle example is stale):
+  `FarSideCounterSink=True` + valid dimensions + `ModifyDefinition` returned
+  success but the flag stayed false. Root cause was not missing UI automation:
+  the redundant `HoleDiameter` + `ThruHoleDiameter` ModifyDefinition itself
+  converted a correctly initialized type-25 normal hole into type 26. Fix:
+  skip the edit flow entirely for normal clearance fit; retain explicit writes
+  only for non-normal fits or deliberate overrides. Untouched #4 normal reads
+  `ThruHoleDiameter=0.0032639 m` (the #30 drill size), so pin
+  `CLEARANCE_MM[("#4", "normal")]=3.264`. Production rebuild proved type 25,
+  far-side false, Ø3.2639 geometry, volume green; regenerated platen-guide
+  drawing shows B1-B4 only `Ø3.26 THRU ALL`.
+- **What did not fix the phantom line:** custom/manual table text (rejected as
+  a hack); ANSI letter/number display; selecting the face or explicit visible
+  rims; reversing the drilling direction; flipping Front/Back drawing views;
+  setting countersink diameters/angles to `-1`; writing `Diameter`; pre-create
+  sentinel values; or trying the get-only far-side boolean setter. These
+  changed presentation or no-op'd because the corrupt type-26 subtype remained.
 - **Multi-point**: one auto placement point per feature; edit the placement
   sketch (`SetCoords` + `CreatePoint` via `ModelToSketchTransform`) — the
   rocker-arm-support foot-tap idiom, shared by both creation paths. Wrap the
