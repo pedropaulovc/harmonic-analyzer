@@ -336,14 +336,16 @@ async def build(adapter) -> dict[str, str]:
     # (Ø1.994) at (0, CENTER_DISTANCE) drilled +Z through the 2.5 mm head
     # (memory/fastener-policy-us-customary). Through-all is geometrically
     # identical to the old mid-plane both-directions cut.
-    wizard_holes(
+    pin_cut = wizard_holes(
         adapter,
         HoleSpec("drilled_number", "#47"),
         [[0.0, CENTER_DISTANCE, HEAD_THICKNESS / 2.0]],
         (0.0, 0.0, 1.0),
         "rocker pin hole (#47)",
         name="PinHole",
+        placement_dims=[((None, None), ("PinCz", '"CenterDistance"'))],
     )
+    drive_jobs += pin_cut.placement_drive_jobs
     res = await adapter.get_mass_properties()
     v_built = float(res.data.volume)
     _telemetry.info(f"volume after cuts: {v_built:.1f} mm^3")

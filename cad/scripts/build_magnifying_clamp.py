@@ -171,13 +171,15 @@ async def build(adapter) -> dict[str, str]:
     # (through_all) from the top face (Y=BLOCK_HEIGHT, outward normal +Y) -- the
     # thumb screw threads in; its Ø2.0 shank fits the Ø2.261 tap drill. On the X
     # axis, crossing the lever bore.
-    wizard_holes(
+    screw_cut = wizard_holes(
         adapter,
         HoleSpec("tapped", "#4-40"),
         [[0.0, BLOCK_HEIGHT, BLOCK_DEPTH / 2.0]],
         (0.0, 1.0, 0.0),
         "thumb-screw tapped hole (#4-40)", name="ScrewHole",
+        placement_dims=[((None, None), ("ScrewHoleZ", '"BlockDepth" / 2'))],
     )
+    drive_jobs += screw_cut.placement_drive_jobs
     # The two Y features run the full block height; the screw hole crosses the
     # lever bore on the X axis with no clean closed form, so a loose tol absorbs
     # the double-counted intersection while still catching a gross unit-blowup.

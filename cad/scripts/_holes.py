@@ -585,7 +585,9 @@ def cross_hole_volume_mm3(hole_dia_mm: float, shaft_dia_mm: float,
 
 
 def wizard_hole_on_cylinder(adapter, spec: HoleSpec, point_mm, label: str,
-                            *, name: str = "") -> None:
+                            *, name: str = "",
+                            y_dim: PlacementDimension | None = None
+                            ) -> list[tuple[str, str]]:
     """ONE through wizard hole drilled RADIALLY into a cylindrical face at
     ``point_mm`` (a model point ON the face; the drill axis is the surface
     normal there, through the shaft axis).
@@ -671,9 +673,38 @@ def wizard_hole_on_cylinder(adapter, spec: HoleSpec, point_mm, label: str,
     _flag(pt, "ISketchPoint")
     pt.SetCoords(point_mm[0] / 1000.0, point_mm[1] / 1000.0,
                  point_mm[2] / 1000.0)
+
+    placement_drive_jobs: list[tuple[str, str]] = []
+    if y_dim is not None:
+        from _common import SketchDims, check
+        from solidworks_mcp.adapters.solidworks.sketch import (
+            _add_sketch_dimension_impl,
+        )
+
+        dims = SketchDims()
+        previous_sketch_manager = adapter.currentSketchManager
+        adapter.currentSketchManager = model.SketchManager
+        adapter._sketch_origin_point = None
+        try:
+            point_id = adapter._register_sketch_entity("Point", pt)
+            check(
+                f"dimension radial hole placement {label} y",
+                _add_sketch_dimension_impl(
+                    adapter,
+                    point_id,
+                    "origin",
+                    "vertical_distance",
+                    abs(point_mm[1]),
+                ),
+            )
+            dims.record(*y_dim)
+        finally:
+            adapter.currentSketchManager = previous_sketch_manager
     model.EditSketch()
     _telemetry.debug(f"hole wizard {label}: point placed, rebuilding")
     model.EditRebuild3()
+    if y_dim is not None:
+        placement_drive_jobs = dims.apply_feature(adapter, sub, str(sub.Name))
 
     if name:
         try:
@@ -686,3 +717,4 @@ def wizard_hole_on_cylinder(adapter, spec: HoleSpec, point_mm, label: str,
     )
     _telemetry.success(
         f"hole wizard {label}: radial {spec.size} {spec.kind} through cylinder")
+    return placement_drive_jobs
