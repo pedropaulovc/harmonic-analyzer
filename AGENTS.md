@@ -221,8 +221,9 @@ The cross-machine extension of the above: COM tasks are keyed by their
 `file_dep` content hash and their outputs are pulled from / published to a shared
 **Azure Blob** cache (over 443) instead of rebuilt on the SolidWorks seat.
 Default role is `rw` — a clean checkout on an authorized seat pulls and publishes
-with **zero setup**. Set/override a seat's role with `HARMONIC_CACHE_MODE` or a
-gitignored `.harmonic-cache-mode` file at the repo root (`off`/`ro`/`rw`). Full
+with **zero setup**. Set/override a seat's role with `HARMONIC_REMOTE_CACHE_MODE`
+or a gitignored `.harmonic-remote-cache-mode` file at the repo root
+(`off`/`ro`/`rw`). Full
 details — roles, auth, salt-busting, provisioning, caveats — in
 [`DEVELOPING.md`](DEVELOPING.md).
 
