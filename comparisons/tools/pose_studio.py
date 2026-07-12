@@ -496,8 +496,22 @@ class HAC_OT_build_scene(bpy.types.Operator):
         context.scene.render.resolution_x = w
         context.scene.render.resolution_y = h
 
+        # Snapshot each part's as-built world matrix + its part stem so
+        # HAC_OT_export_deltas can diff a hand-posed part against its release
+        # position (the "move/resize a part to match the ref, read the shift
+        # back out" loop). Assembly components carry a `part`/`mesh` stem; a
+        # bare part maps to the model's dashed stem.
+        orig_world = {obj.name: obj.matrix_world.copy() for obj in objs}
+        if parts_dir is not None:
+            sd = json.loads(scene_json.read_text(encoding="utf-8"))
+            part_of = {c["name"]: (c.get("mesh") or c["part"])
+                       for c in sd.get("components", [])}
+        else:
+            part_of = {obj.name: pair["model"].replace("_", "-") for obj in objs}
+
         _STATE.update(built=True, objs=objs, boxes=boxes, cam=cam, cam_data=cam_data,
-                      mesh_lo=mesh_lo, mesh_hi=mesh_hi, ext=ext, w=w, h=h)
+                      mesh_lo=mesh_lo, mesh_hi=mesh_hi, ext=ext, w=w, h=h,
+                      orig_world=orig_world, part_of=part_of)
 
         # Seed sliders from the pair's stored pose (fires _aim via callbacks).
         c = pair.get("camera", {})
@@ -661,6 +675,69 @@ class HAC_OT_save_manifest(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class HAC_OT_export_deltas(bpy.types.Operator):
+    bl_idname = "hac.export_deltas"
+    bl_label = "Export Part Deltas"
+    bl_description = ("Diff every hand-moved/-scaled part against its release "
+                     "position and write the shifts to comparisons/findings/"
+                     "<pair>_deltas.json (for mapping back to SolidWorks dims)")
+
+    # Below-noise moves are dropped so the findings file lists only real edits.
+    # ~0.6 mm/px eyeball floor -> 0.5 mm; scale/rotation floors match.
+    _T_MM = 0.5
+    _S = 0.005
+    _R_DEG = 0.2
+
+    def execute(self, context):
+        if not _STATE.get("built"):
+            self.report({"ERROR"}, "Build Scene first")
+            return {"CANCELLED"}
+        props = context.scene.hac_pose
+        orig = _STATE.get("orig_world", {})
+        part_of = _STATE.get("part_of", {})
+
+        moved = []
+        for obj in _STATE.get("objs", []):
+            base = orig.get(obj.name)
+            if base is None:
+                continue
+            ot, orq, osc = base.decompose()
+            ct, crq, csc = obj.matrix_world.decompose()
+            dt = ct - ot                                   # world mm
+            sf = [c / o if abs(o) > 1e-9 else 1.0 for c, o in zip(csc, osc)]
+            dr = [math.degrees(a) for a in (crq @ orq.inverted()).to_euler()]
+            if (max(abs(v) for v in dt) < self._T_MM
+                    and max(abs(s - 1.0) for s in sf) < self._S
+                    and max(abs(a) for a in dr) < self._R_DEG):
+                continue
+            moved.append({
+                "name": obj.name,
+                "part": part_of.get(obj.name, obj.name),
+                "translate_mm": [round(v, 3) for v in dt],
+                "scale": [round(s, 4) for s in sf],
+                "rotate_deg": [round(a, 3) for a in dr],
+            })
+
+        out = {
+            "pair": props.pair_id,
+            "source": "release v0.20.0 boxes+stl (staged into cad/out)",
+            "units": "translate_mm=world mm · scale=factor vs release · rotate_deg=XYZ euler",
+            "pivot_hint": ("resize with Pivot=Individual Origins (period ','->3) so a "
+                           "pure size change doesn't leak into translate_mm"),
+            "camera": {"az_deg": round(props.az_deg, 2), "el_deg": round(props.el_deg, 2),
+                       "roll_deg": round(props.roll_deg, 2), "zoom": round(props.zoom, 3),
+                       "target_mm": [round(props.target_x, 2), round(props.target_y, 2),
+                                     round(props.target_z, 2)] if props.free_target else None,
+                       "focal_length_mm": round(props.focal_mm, 2) if props.perspective else None},
+            "moved": moved,
+        }
+        dst = _repo(props) / "comparisons" / "findings" / f"{props.pair_id}_deltas.json"
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_text(json.dumps(out, indent=2), encoding="utf-8")
+        self.report({"INFO"}, f"{len(moved)} part(s) moved -> {dst.name}")
+        return {"FINISHED"}
+
+
 class HAC_OT_new_pair(bpy.types.Operator):
     bl_idname = "hac.new_pair"
     bl_label = "Create Pair"
@@ -765,6 +842,11 @@ class HAC_PT_panel(bpy.types.Panel):
         layout.operator(HAC_OT_save_manifest.bl_idname, icon="FILE_TICK")
 
         box = layout.box()
+        box.label(text="Part fitting")
+        box.label(text="Select a part · G move · S resize", icon="INFO")
+        box.operator(HAC_OT_export_deltas.bl_idname, icon="EXPORT")
+
+        box = layout.box()
         box.label(text="New pair")
         box.prop(props, "new_id")
         box.prop(props, "new_model")
@@ -781,6 +863,7 @@ _CLASSES = (
     HAC_OT_toggle_camera,
     HAC_OT_frame_model,
     HAC_OT_save_manifest,
+    HAC_OT_export_deltas,
     HAC_OT_new_pair,
     HAC_PT_panel,
 )
