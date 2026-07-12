@@ -54,11 +54,11 @@ _KINDS = {
 _ENDS = {"blind": 0, "through_all": 1, "through_next": 2}
 _FITS = {"close": 0, "normal": 1, "loose": 2}  # swWzdHoleScrewClearanceTypes_e
 
-# Cut diameters (mm) straight from THIS seat's wizard database
-# (diag_hole_wizard_tables.py dump, cad/out/reports/hole-wizard-tables.txt).
-# The definition's table-derived doubles read back 0.0 (probe 2026-07-11), so
-# scripts take their analytic volume expectations from these pinned values;
-# diag_hole_wizard.py re-proves each by measured volume.
+# Cut diameters (mm) from this seat's wizard database and live feature probes.
+# HoleDiameter commonly reads 0.0; a plain through hole's usable value is in
+# ThruHoleDiameter (live #4 normal = 0.0032639 m). Scripts take analytic volume
+# expectations from these pinned values; diag_hole_wizard.py re-proves the
+# representative cases by measured volume.
 TAP_DRILL_MM = {          # taps cut the tap-drill diameter (TAP_DRILL column)
     "#2-56": 1.778, "#3-48": 1.994, "#4-40": 2.261, "#6-32": 2.705,
     "#8-32": 3.454, "#10-24": 3.797, "1/4-20": 5.105, "5/16-18": 6.528,
@@ -67,7 +67,7 @@ TAP_DRILL_MM = {          # taps cut the tap-drill diameter (TAP_DRILL column)
 CLEARANCE_MM = {          # (size, fit) -> hole diameter (CLOSE/NORMAL/LOOSE_FIT)
     ("#2", "close"): 2.388, ("#2", "normal"): 2.591, ("#2", "loose"): 2.946,
     ("#3", "close"): 2.692, ("#3", "normal"): 2.946, ("#3", "loose"): 3.251,
-    ("#4", "close"): 3.048, ("#4", "normal"): 3.251, ("#4", "loose"): 3.658,
+    ("#4", "close"): 3.048, ("#4", "normal"): 3.264, ("#4", "loose"): 3.658,
     ("#6", "close"): 3.912, ("#6", "normal"): 4.318, ("#6", "loose"): 4.699,
     ("#8", "close"): 4.572, ("#8", "normal"): 4.978, ("#8", "loose"): 5.410,
     ("1/4", "close"): 6.756, ("1/4", "normal"): 7.137, ("1/4", "loose"): 7.544,
@@ -402,6 +402,7 @@ def wizard_holes(
     # Customize + read back through the EDIT flow: the created feature's
     # definition carries the populated table values (the pre-create object
     # reads 0.0 for everything it did not set).
+    defn = _early(feat.GetDefinition(), "IWizardHoleFeatureData2")
     edits: list[tuple[str, object]] = []
     if spec.kind == "clearance" and spec.end != "blind":
         # HoleFit is a NO-OP on a plain (type-2) clearance hole: the API
@@ -409,20 +410,29 @@ def wizard_holes(
         # IWizardHoleFeatureData2.HoleFit remarks), so a plain hole ships the
         # NORMAL-fit diameter regardless of spec.fit -- probe 2026-07-11: a
         # 1/4 "close" hole still cut 7.137 mm (the normal dia, not 6.756).
-        # Force the pinned close/normal/loose diameter directly so the cut
-        # geometry matches the analytic blind_cut_dia_mm the callers use.
-        # (Keep the HoleFit write too: harmless, and correct should a
-        # cbore/csink clearance ever route through here. An explicit
-        # HoleDiameter override still wins -- it is applied below.)
-        edits.append(("HoleFit", _FITS[spec.fit]))  # blind bakes fit into HW5
-        if "HoleDiameter" not in spec.overrides_mm:
+        # Compare the initialized geometry to the pinned fit before editing.
+        # SolidWorks sometimes initializes the requested normal diameter (#4
+        # -> 3.2639 mm) and sometimes another fit (#8 probe -> too small).
+        # Redundantly writing the SAME diameter corrupts swHoleThru (25) into
+        # swHoleThruCounterSinkBottom (26), which adds a bogus far-side
+        # countersink line to native hole tables. Modify only on real drift.
+        pinned_dia_mm = blind_cut_dia_mm(spec)
+        initialized_dia_mm = float(defn.ThruHoleDiameter) * 1000.0
+        diameter_drift = abs(initialized_dia_mm - pinned_dia_mm) > 0.05
+        if diameter_drift and "HoleDiameter" not in spec.overrides_mm:
             # On a plain hole the DRIVING knob is ThruHoleDiameter -- a
             # HoleDiameter-only write is silently dropped (probe 2026-07-11:
             # HoleDiameter-only still cut 7.137; setting BOTH cut 6.756). Set
             # both, mirroring the counterbore override path below.
-            cut_m = blind_cut_dia_mm(spec) / 1000.0
+            cut_m = pinned_dia_mm / 1000.0
             edits.append(("HoleDiameter", cut_m))
             edits.append(("ThruHoleDiameter", cut_m))
+            _telemetry.event(
+                "hole_wizard.diameter_override",
+                label=label,
+                initialized_mm=round(initialized_dia_mm, 4),
+                pinned_mm=round(pinned_dia_mm, 4),
+            )
     for k, v in spec.overrides_mm.items():
         edits.append((k, v / 1000.0))
         if k == "HoleDiameter":
@@ -430,7 +440,6 @@ def wizard_holes(
             # HoleDiameter writes are ignored there (probe) -- set both
             edits.append(("ThruHoleDiameter", v / 1000.0))
 
-    defn = _early(feat.GetDefinition(), "IWizardHoleFeatureData2")
     if edits:
         # Early-bound call: the params are DECLARED dispatches, so a plain
         # None marshals as a typed null -- a VARIANT wrapper here throws

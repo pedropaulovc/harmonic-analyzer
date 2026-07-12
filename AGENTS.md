@@ -279,34 +279,51 @@ whole config — so it can only over-rebuild, never skip a real change. Don't ad
 new `_config` accessor without mapping it in `_buildgraph` (`check:graph`'s
 coverage test fails loud otherwise).
 
-## Two-tier submodule digest (part vs assembly)
+## Three-tier submodule digest (part vs assembly vs drawing)
 
 The vendored `SolidworksMCP-python` submodule is a runtime input of every COM task,
 so its source content is folded into each task's recipe/cache key (issue #144 —
-`_submodule_digest` in `dodo.py`). But it is NOT one blob: **parts fold the tree MINUS
-the two assembly/motion COM modules** (`_submodule_part_digest` — drops
-`adapters/solidworks/assembly.py` + `.../motion.py`), while **assemblies fold the whole
-tree** (`_submodule_digest`). Net: a bump touching only `assembly.py`/`motion.py`
-rebuilds the ~8 assemblies but leaves all ~100 parts cached, instead of a whole-fleet
-rebuild. The two sidecars are distinct files (`.solidworks-mcp-submodule.digest` vs
-`-part.digest`).
+`_submodule_digest` in `dodo.py`). But it is NOT one blob — three tiers, each dropping
+the modules that tier's build scripts never call:
 
-The exclusion is SAFE because a part only ever **CALLS** sketch/feature/export methods
-— never an assembly/motion method — so `assembly.py`/`motion.py` content can't change
-a part's geometry (they ARE loaded, via the PyWin32Adapter mixin, but loading ≠
-calling; those modules import `base`/`com_variant`, never the reverse). That
-"not-CALLED" basis is fully checkable from repo-local code, and `check:partiso`
-(`test_part_isolation.py`) ENFORCES it loud: it derives its forbidden set straight from
-`dodo._PART_DIGEST_EXCLUDE_FILES` and fails if any part script (or a repo-local helper
-it transitively imports — the full `module_deps_of` closure) directly imports an
-excluded module or the main-repo `_assembly` helper.
+- **drawing tasks fold the WHOLE tree** (`_submodule_digest` — the only tier with
+  `drawing.py`);
+- **assemblies fold the tree MINUS `drawing.py`** (`_submodule_assembly_digest` — see
+  `_ASSEMBLY_DIGEST_EXCLUDE_FILES`);
+- **parts fold the tree MINUS `{assembly.py, motion.py, drawing.py}`**
+  (`_submodule_part_digest` — see `_PART_DIGEST_EXCLUDE_FILES`).
 
-Only assembly/motion are excluded — **the MCP-server surface (`tools/`/`agents/`/`ui/`/
-`server*.py`) deliberately stays IN the part digest** (codex #191). Excluding it would
+Net: a bump touching only `assembly.py`/`motion.py` rebuilds the ~8 assemblies but
+leaves all ~100 parts cached; a bump touching only `drawing.py` rebuilds just the (few)
+drawing tasks, not the parts or assemblies. The three sidecars are distinct files
+(`.solidworks-mcp-submodule.digest` / `-assembly.digest` / `-part.digest`).
+
+Each exclusion is SAFE because the dropped module is never **CALLED** by that tier's
+build scripts:
+- `assembly.py`/`motion.py` — a part only ever calls sketch/feature/export methods, so
+  their content can't change a part's geometry (they ARE loaded, via the PyWin32Adapter
+  mixin, but loading ≠ calling). Assemblies DO call them, so they stay in the assembly +
+  drawing tiers.
+- `drawing.py` — a stronger case: it is NOT even mixed into the adapter (standalone
+  module-level `IDrawingDoc` helpers), so nothing in a part OR assembly build graph
+  imports it; only a `draw_*` drawing script does. Hence it drops from both the part and
+  assembly digests (matching `drawing.py`'s own docstring).
+
+`check:partiso` (`test_part_isolation.py`) ENFORCES both directions loud: it derives its
+forbidden sets straight from `dodo._PART_DIGEST_EXCLUDE_FILES` /
+`_ASSEMBLY_DIGEST_EXCLUDE_FILES` and fails if any part script imports an
+assembly/motion/drawing module (or the main-repo `_assembly` helper), or any assembly
+script imports the drawing module — each checked across the full `module_deps_of`
+closure.
+
+Only assembly/motion/drawing are excluded — **the MCP-server surface (`tools/`/`agents/`/
+`ui/`/`server*.py`) deliberately stays IN every digest** (codex #191). Excluding it would
 rest on a "not-REACHED through the submodule's own import graph" claim (a part-relevant
 module like `base.py` could start importing `solidworks_mcp.tools`), which the
 repo-local guard cannot see — so those modules are kept, accepting an over-rebuild on a
-rare MCP-tooling bump rather than risking a stale part.
+rare MCP-tooling bump rather than risking a stale part. (drawing.py's exclusion instead
+rests on "not-IMPORTED by any part/assembly build script", which IS repo-local
+checkable.)
 
 ## Verify suites (renamed)
 

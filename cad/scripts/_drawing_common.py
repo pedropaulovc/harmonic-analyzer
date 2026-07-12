@@ -105,7 +105,11 @@ def import_cosmetic_threads(adapter: Any, view: Any) -> tuple[int, int]:
 
 
 def new_project_drawing(
-    adapter: Any, *, property_view: str, scale: tuple[float, float] = (1.0, 1.0)
+    adapter: Any,
+    *,
+    property_view: str,
+    scale: tuple[float, float] = (1.0, 1.0),
+    decimals: int = 2,
 ) -> tuple[Any, Any]:
     for asset in (ASME_B_DRWDOT, ASME_B_SLDDRT):
         if not asset.is_file() or asset.stat().st_size == 0:
@@ -144,7 +148,10 @@ def new_project_drawing(
     )
     if not configured:
         raise RuntimeError("SetupSheet6 rejected the project ASME B sheet format")
-    set_units_mm(adapter, decimals=3)
+    # 2 decimals by default: 3-decimal display (76.000) reads as false precision
+    # next to the ±0.25 blanket tolerance. A drawing that genuinely needs finer
+    # display (an exact inch conversion like 9.525) can pass decimals=3.
+    set_units_mm(adapter, decimals=decimals)
     sheet = adapter._get_attr_or_call(draw, "GetCurrentSheet")
     if sheet is None or not sheet.SetScale(float(scale[0]), float(scale[1]), True, False):
         raise RuntimeError(f"failed to force ASME B sheet to {scale[0]:g}:{scale[1]:g}")
@@ -448,6 +455,57 @@ def set_dimension_callouts(
     if remaining:
         raise RuntimeError(
             f"dimension callouts not applied: {sorted(remaining)}"
+        )
+    adapter.currentModel.EditRebuild3()
+
+
+def set_dimension_precision(
+    adapter: Any, annotations: Iterable[Any], precision: dict[str, int]
+) -> None:
+    """Override the primary decimal places of specific NAMED dimensions.
+
+    The document default (``set_units_mm``) is 2 decimals, which reads as false
+    precision on most dims.  A dimension whose value is an exact conversion the
+    notes cite to 3 places — e.g. the crank shaft bore, Ø9.525 = 3/8 in — must
+    display 3 so the view matches the note (otherwise 9.53-on-view vs
+    9.525-in-note reads as a contradiction).  Keyed on the parametric dimension
+    name so a value collision can never repick the wrong dimension.
+    """
+    # swDimensionPrecisionSettings_e.swDoNotChangePrecisionSetting: leave the
+    # dual / tolerance precisions untouched, override only the primary.
+    do_not_change = -1
+    remaining = dict(precision)
+    for annotation in annotations:
+        annotation = _sw_type_info.flagged(annotation, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        digits = remaining.pop(name, None)
+        if digits is None:
+            continue
+        display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
+        if display is None:
+            raise RuntimeError(f"dimension {name!r} has no display annotation")
+        display = _sw_type_info.flagged(display, "IDisplayDimension")
+        result = adapter._attempt(
+            lambda d=display, n=digits: d.SetPrecision3(
+                n, do_not_change, do_not_change, do_not_change
+            )
+        )
+        if result is None:
+            raise RuntimeError(f"failed to set precision on dimension {name!r}")
+        # SetPrecision3 reports rejection via its RETURN STATUS, not by raising, so a
+        # None-only check treats a failure code as success -- and the dim would ship
+        # at the 2-decimal sheet default (Ø9.53) against a Ø9.525 note (codex #246).
+        # The status enum's success value is undocumented, so verify the SIDE EFFECT:
+        # read the primary precision back and confirm it took.
+        applied = adapter._attempt(lambda d=display: d.GetPrimaryPrecision2())
+        if applied != digits:
+            raise RuntimeError(
+                f"precision override on dimension {name!r} did not take: "
+                f"requested {digits} decimals, dimension reports {applied}"
+            )
+    if remaining:
+        raise RuntimeError(
+            f"dimension precision not applied: {sorted(remaining)}"
         )
     adapter.currentModel.EditRebuild3()
 

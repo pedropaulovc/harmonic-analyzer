@@ -1630,32 +1630,41 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
             reconfigure(encoding="utf-8", errors="replace")
 
     script = Path(sys.argv[0]).stem if sys.argv and sys.argv[0] else "build"
-    # The part/assembly this process is building -- surfaced in the span NAMES so
-    # the trace title + waterfall say WHICH target is processing, not a generic
-    # "build". A part script is build_<stem>.py; an assembly script is
-    # build_<stem>_assembly.py; refresh_assembly.py takes the stem as argv[1].
+    # The part/assembly/drawing this process is building -- surfaced in the span
+    # NAMES so the trace title + waterfall say WHICH target is processing, not a
+    # generic "build". A part script is build_<stem>.py; an assembly script is
+    # build_<stem>_assembly.py; a drawing script is draw_<stem>.py;
+    # refresh_assembly.py takes the stem as argv[1].
     if script == "refresh_assembly" and len(sys.argv) > 1:
         target = sys.argv[1].removesuffix(".SLDASM").replace("_", "-")
+    elif script.startswith("draw_"):
+        target = script.removeprefix("draw_")
     else:
         target = script.removeprefix("build_").removesuffix("_assembly")
 
     # Which pipeline stage this process is. ``run_build`` is also the entry for
-    # non-BUILD tools (verify.py, export_models.py, the diagnostics/ probes); only a
+    # non-BUILD tools (verify.py, export_models.py, the diagnostics/ probes); a
     # build_<stem>.py / build_<stem>_assembly.py / refresh_assembly.py is a genuine
-    # part/assembly build. ``kind`` (None for the others) drives BOTH the build-body
-    # grouping span below and the fallback resource label -- the non-build entries
-    # set their own richer label (verify: verify-<suite>) or inherit dodo's.
+    # part/assembly build, and a draw_<stem>.py is a drawing build. ``kind`` (None
+    # for the non-build tools) drives BOTH the build-body grouping span below and the
+    # fallback resource label -- the non-build entries set their own richer label
+    # (verify: verify-<suite>) or inherit dodo's.
     if script == "refresh_assembly":
         kind: str | None = "assembly"
     elif script.startswith("build_"):
         kind = "assembly" if script.endswith("_assembly") else "part"
+    elif script.startswith("draw_"):
+        kind = "drawing"
     else:
         kind = None
     # Resource label (Aspire "resource" column): dodo sets OTEL_SERVICE_NAME per
     # subprocess, so under the spine this is a fallback-only no-op that KEEPS dodo's
-    # precise stage name; run standalone it self-labels as part-build / assembly-build
-    # so the column is still meaningful.
-    if kind is not None:
+    # precise stage name; run standalone it self-labels so the column is still
+    # meaningful -- part-build / assembly-build, and drawing-export (matching dodo's
+    # ``_stage_name`` for ``drawing:`` tasks) for a drawing.
+    if kind == "drawing":
+        _telemetry.set_service("drawing-export")
+    elif kind is not None:
         _telemetry.set_service(f"{kind}-build")
 
     async def _run() -> dict[str, str]:
