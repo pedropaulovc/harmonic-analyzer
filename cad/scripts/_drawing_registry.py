@@ -62,6 +62,12 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="rocker-arm-support",
         script_name="draw_rocker_arm_support.py",
     ),
+    DrawingSpec(
+        name="lever_bushing",
+        part="lever_bushing",
+        artifact_stem="lever-bushing",
+        script_name="draw_lever_bushing.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}
