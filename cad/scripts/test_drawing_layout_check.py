@@ -190,6 +190,24 @@ def test_dimension_is_overflow_only():
     assert len(overflows) == 1 and "right" in {s for s, _ in overflows[0].sides}
 
 
+def test_exact_boxes_get_near_zero_overlap_slack():
+    # Codex #269: the 1.5 mm padding tolerance is for fuzzy GetOutline view
+    # boxes; two EXACT boxes overlapping by ~1 mm is a real collision. A note
+    # nudged 1 mm into a table (both exact) is flagged...
+    note = _el("N", 0.05, 0.10, 0.15, 0.15, kind="note")
+    table = _el("T", 0.149, 0.10, 0.25, 0.15, kind="table")  # 1 mm x-penetration
+    assert len(find_overlaps([note, table])) == 1
+    # ... and 1 mm into the title block too ...
+    title = _el("title-block", 0.278, 0.0, SHEET_W, 0.080, kind="titleblock")
+    stray = _el("N2", 0.20, 0.03, 0.279, 0.06, kind="note")  # 1 mm into the block
+    assert len(find_overlaps([title, stray])) == 1
+    # ... but two padded VIEW outlines overlapping by <1.5 mm stay clean (the
+    # GetOutline whitespace case the tolerance exists for).
+    v1 = _el("V1", 0.05, 0.05, 0.15, 0.15)
+    v2 = _el("V2", 0.1490, 0.05, 0.25, 0.15)  # 1 mm x-penetration, both views
+    assert find_overlaps([v1, v2]) == []
+
+
 def test_content_overlapping_title_block_is_flagged():
     # A reserved title-block box (bottom-right) plus a note that strays into it:
     # the collision must be reported so content never lands on the title block.
