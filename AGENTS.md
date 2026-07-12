@@ -7,8 +7,7 @@
 > reading this file isn't a substitute for loading it. If you've already produced
 > output this session without it, invoke it now rather than skipping it.
 
-Orientation for coding agents. Pairs with `docs/pipeline/` (flow diagrams + the
-refactor plan).
+Orientation for coding agents. Pairs with `docs/pipeline/` (flow diagrams).
 
 ## Clone with submodules
 
@@ -106,11 +105,11 @@ The SolidWorks-free `check:*` gates and the comparison/diff tooling run from thi
 
 ## Task groups — the prefix tells you if SolidWorks is needed
 
-| group | needs SolidWorks | on the COM spine |
+| group | needs SolidWorks | takes the COM seat lock |
 |-------|:---:|:---:|
 | `part:<stem>`, `assembly:<stem>` | yes | yes |
 | `verify:soundness`, `verify:kinematics` | yes | yes |
-| `export`, `release` | yes | yes |
+| `export`, `release`, `preflight` | yes | yes |
 | `check:math`, `check:config`, `check:graph`, `check:nameplate`, `check:recipe`, `check:cache`, `check:partiso` | **no** | no (parallel) |
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) |
 | `cache_status` | **no** | no (diagnostic) |
@@ -121,30 +120,44 @@ The SolidWorks-free `check:*` gates and the comparison/diff tooling run from thi
 - `build_bare` = parts + assemblies only (fast, no gates, no export).
 - `release` is opt-in: `doit release -- v0.2.0 [--draft]`.
 
-## The COM spine (do not break this)
+## The COM seat lock (do not break this)
 
-One SolidWorks STA seat ⇒ COM tasks must never run concurrently. Instead of
-forbidding `-n`, `dodo.py` chains every COM task into a single linear `task_dep`
-**spine** (`_COM_TAIL` + `_spine_dep` in `dodo.py`), a topological linearization
-of the COM sub-DAG:
+One SolidWorks STA seat ⇒ COM tasks must never run concurrently. Serialization is
+enforced at **runtime** by a cross-process **file lock** (`_com_seat` in `dodo.py`,
+backed by `filelock`), NOT by fake `task_dep` edges. Every COM subprocess acquires
+the machine-global seat lock right before it drives SolidWorks and releases it after,
+so at most one COM task touches the seat at a time **even under `-n N`** — while the
+SolidWorks-free `check:*` tasks (which never take the lock) fan out in parallel. The
+lock lives under `%PROGRAMDATA%/harmonic-analyzer/com-seat.lock` (override with
+`HARMONIC_COM_LOCK`) and, being machine-global, also serializes COM **across
+worktrees and concurrent `doit` invocations** on the seat.
 
-```
-part:a → … → assembly:harmonic_analyzer → verify:soundness
-        → verify:kinematics → export → preflight → release
-```
+The task graph now carries only **real** dependency edges (an assembly's `file_dep`
+on its parts, `verify`/`export` on the built `.SLDASM`, `release` on
+`export`+`verify:*`+`preflight`+`check:*`), so the DAG reads true and a COM failure
+no longer skips *unrelated* downstream COM tasks. (History: this replaced the old
+`task_dep` **spine** — `_COM_TAIL`/`_spine_dep`/`_assert_spine_complete`, a
+topological linearization of every COM task — which made the DAG lie and coupled
+ordering to serialization. See `memory/com-seat-lock.md`.)
 
-So at most one COM task is ever *ready* — the seat is never contended **even
-under `-n N`** — while `check:*` tasks (off the spine) run in parallel. Corollary:
-never launch two SolidWorks build scripts by hand at once.
+**Invariant:** any new COM-touching task MUST run its SolidWorks subprocess inside
+`_com_seat(...)` — for a part/assembly action wrap the `_exec` call; for a
+`_run`/`_run_stamped` gate pass `com=True`. A COM task that skips it would race the
+STA seat. This is enforced loud at runtime: a doit-launched build that reaches
+`sw.connect` without `HARMONIC_COM_SEAT` set raises in `_common.run_build` (the
+successor to the removed `_assert_spine_complete` tripwire). The cache RESTORE/STORE
+(Azure transfers) run **outside** the lock, so cache hits stay parallel; only the COM
+subprocess holds the seat.
 
-**Invariant:** any new COM-touching task MUST be inserted into the spine
-(extend `_COM_TAIL` / the spine order and give it `_spine_dep(...)`). A gap lets
-two COM tasks run at once and deadlocks the seat. `_assert_spine_complete()` is a
-tripwire, not a full proof — think before you add. The SolidWorks-free tasks must
-**not** be on the spine, or you lose the parallelism.
+**Serializes but does NOT isolate:** SolidWorks keys open documents by *filename* and
+carries session-global state, so the lock is a safety belt — not a green light for
+genuinely-independent concurrent builds on one machine. Still: never hand-launch two
+SolidWorks build scripts at once.
 
-Tradeoff (documented, accepted): a COM failure mid-spine skips the later COM
-tasks in that run. Fix and re-run; doit re-runs only what is still stale.
+Tradeoff (documented, accepted): under a cold `-n N` full build, workers that grab a
+COM task block on the seat, so the `check:*` gates can be starved toward the end of
+the run (they still run N-wide once COM drains) — a few tens of seconds on a ~25 min
+cold build; the incremental/cache-hit common case keeps restores parallel.
 
 ## Incremental rebuilds — refresh vs full
 
@@ -214,17 +227,21 @@ details — roles, auth, salt-busting, provisioning, caveats — in
 [`DEVELOPING.md`](DEVELOPING.md).
 
 **Per-seat part order — two cold builders split the work, not duplicate it.**
-Parts have no inter-part deps, so their order on the COM spine is free. Two seats
-cold-building in the *same* order march in lock-step, each MISS the shared cache on
-the same next part and build it in parallel (N seats ⇒ N× the COM work). So the
-parts fill the spine head in a **per-seat permutation** (`_seat_part_order` in
-`dodo.py`): seat A climbs one way, seat B another, so by the time the slower seat
-reaches a part the faster one has usually published it (a HIT) — the fleet builds
-each part ~once. The seed is the **hostname** (via `hashlib`, *not* the
-PYTHONHASHSEED-salted builtin `hash()`, so it is identical across the parent and
-every `-n` worker — a per-process seed would let two workers disagree on the spine
-and deadlock the seat). `HARMONIC_BUILD_ORDER_SEED` overrides it. Order never feeds
-a cache key or digest — it is purely scheduling, so permuting is always safe.
+Parts have no inter-part deps, so the order in which their tasks are offered to the
+scheduler is free. Two seats cold-building in the *same* order march in lock-step,
+each MISS the shared cache on the same next part and build it in parallel (N seats ⇒
+N× the COM work). So `task_part` YIELDS the parts in a **per-seat permutation**
+(`_seat_part_order` in `dodo.py`) and `build` lists them the same way: seat A climbs
+one way, seat B another, so by the time the slower seat reaches a part the faster one
+has usually published it (a HIT) — the fleet builds each part ~once. With the spine
+gone this is a best-effort **scheduling hint**: correctness comes from the COM seat
+lock plus a **re-probe of the cache after the seat is acquired** (`_cached_part_action`
+/ `build_or_refresh` restore again under the lock, in case a peer published while we
+waited), so an imperfectly-honored order costs a little cache-split efficiency, never
+a duplicated or skipped build. The seed is the **hostname** (via `hashlib`, *not* the
+PYTHONHASHSEED-salted builtin `hash()`, so it is identical across the parent and every
+`-n` worker). `HARMONIC_BUILD_ORDER_SEED` overrides it. Order never feeds a cache key
+or digest — it is purely scheduling, so permuting is always safe.
 
 **Debugging a miss.** A cache key is `sha256(epoch + salt + Σ(relpath, digest))`,
 so a key that shifts unexpectedly is usually one dep digest moving. Three tools
@@ -471,7 +488,7 @@ scripts that `from _common import log, check` are instrumented unchanged.
   ~40 mates + gates read as children of `assembly.build drive-train` instead of a
   flat run under the task span. This is a PHASE, not the removed `build.<target>`
   ROOT layer that mirrored the task span 1:1 — connect/teardown stay OUTSIDE it.
-  `build_session` still *continues* the task span under the spine (no second root)
+  `build_session` still *continues* the injected doit task span (no second root)
   and opens a local `build.<target>` root only when a build script runs standalone.
   Non-build entries (`verify.py`, `export_models.py`, the `diagnostics/` probes) get
   no phase wrapper (`kind is None`) — their gates already self-group.

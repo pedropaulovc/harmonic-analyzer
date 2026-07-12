@@ -5,7 +5,7 @@ metadata:
   type: feedback
 ---
 
-Running an assembly `build_*.py` **directly** (e.g. `uv run python cad/scripts/build_frame_assembly.py`, to exercise a mate change live without the doit spine) uses whatever part `.SLDPRT` files are already on disk — it does NOT rebuild stale parts first. `doit assembly:<stem>` would, because parts are its `file_dep`.
+Running an assembly `build_*.py` **directly** (e.g. `uv run python cad/scripts/build_frame_assembly.py`, to exercise a mate change live without going through doit) uses whatever part `.SLDPRT` files are already on disk — it does NOT rebuild stale parts first. `doit assembly:<stem>` would, because parts are its `file_dep`.
 
 **Symptom:** the assembly build fails at a mate with `Failed to select mate entity N (AXIS/PLANE at '<Datum>@<part>-1')` — e.g. `ScrewAxis@lag-screw-1`, `HoleAxis0@harmonic-base-1`, `RingTop@top-frame-1`, `Underside@nameplate-1`. Looks like a mate-code bug; it is actually a **stale part** on disk built before that named datum (`create_axis`/`create_plane` + `name_last_feature`) was added to the part's build script. A part can be *partially* stale (base had `DeckTop` but not `HoleAxis0..3`).
 
