@@ -98,6 +98,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "StrapBotXMax", f"{STRAP_BOT_X[1]}mm")
     await set_global(adapter, "StrapTopXMin", f"{STRAP_TOP_X[0]}mm")
     await set_global(adapter, "StrapTopXMax", f"{STRAP_TOP_X[1]}mm")
+    await set_global(adapter, "ScrewHoleX", f"{SCREW_HOLE_XY[0]}mm")
+    await set_global(adapter, "ScrewHoleY", f"{SCREW_HOLE_XY[1]}mm")
     # (The old ScrewHoleDia/ScrewHoleX/ScrewHoleY knobs are gone: the hole is
     # now a native Hole Wizard #6-32 tapped feature placed by point.)
 
@@ -212,13 +214,18 @@ async def build(adapter) -> dict[str, str]:
     # band 9.6..12.6 is material, so the through hole spans just the 3-thick
     # strap.
     screw_dia = TAP_DRILL_MM["#6-32"]
-    wizard_holes(
+    screw_cut = wizard_holes(
         adapter,
         HoleSpec("tapped", "#6-32"),
         [[SCREW_HOLE_XY[0], SCREW_HOLE_XY[1], STRAP_Z[0]]],
         (0.0, 0.0, -1.0),
         "hanger-screw tapped hole (#6-32)", name="ScrewHole",
+        placement_dims=[(
+            ("ScrewHoleCx", '-"ScrewHoleX"'),
+            ("ScrewHoleCy", '"ScrewHoleY"'),
+        )],
     )
+    drive_jobs += screw_cut.placement_drive_jobs
     expected -= math.pi * (screw_dia / 2.0) ** 2 * (STRAP_Z[1] - STRAP_Z[0])
     vol = await _volume(adapter)
     _telemetry.info(f"volume after screw hole: {vol:.1f} mm^3 (analytic {expected:.1f})")

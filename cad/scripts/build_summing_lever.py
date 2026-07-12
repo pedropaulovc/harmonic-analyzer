@@ -294,14 +294,17 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     # references it by name; wizard_holes returns that name for the pattern's
     # feature list.
     seed_dia = NUMBER_DRILL_MM["#47"]
-    seed_cut = wizard_holes(
+    seed_result = wizard_holes(
         adapter,
         HoleSpec("drilled_number", "#47"),
         [[HOLE_X, PLATE_T / 2.0, HOLE_Z[-1]]],
         (0.0, 1.0, 0.0),
         f"spring hole seed (station j={HOLE_COUNT - 1}, #47)",
         name="SpringHoleSeed",
-    ).name
+        placement_dims=[(("HoleSeedX", '"HoleX"'), (None, None))],
+    )
+    drive_jobs += seed_result.placement_drive_jobs
+    seed_cut = seed_result.name
     v_hole = math.pi * (seed_dia / 2.0) ** 2 * PLATE_T
     await volume_check(adapter, "spring hole seed", v_plate - v_hole, 0.02 * v_hole)
     check(
