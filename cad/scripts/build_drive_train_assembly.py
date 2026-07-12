@@ -2313,6 +2313,7 @@ async def build(adapter) -> dict[str, str]:
     # 2 * the dim off and fails the pose assert below.
     seed_front = resolve_entity(
         adapter, named_ref(f"Front Plane@{seed_cyl}", "PLANE"))
+    pending_cylinder_puts: list[tuple[str, list[float]]] = []
     with _telemetry.span("cylinder.replicate",
                          copies=_config.active_count() - 1):
         for j in range(1, _config.active_count()):
@@ -2345,8 +2346,14 @@ async def build(adapter) -> dict[str, str]:
                     " re-derive the slot map (external_mate_rows)")
             put = list(seed_cyl_arr)
             put[11] += j * Z_PITCH / 1000.0
-            put_component_pose(adapter, new[0], put)
+            pending_cylinder_puts.append((new[0], put))
             cyl_gears.append(new[0])
+        # Let every CopyWithMates2 call finish before correcting the copies'
+        # unconstrained spin. A later copy used to wake the solver and wander
+        # earlier transforms, so the v0.20.0 ladder paid for repeated corrections.
+        # Transform the complete bank once, then author the fresh gear mates below.
+        for name, put in pending_cylinder_puts:
+            put_component_pose(adapter, name, put)
     for j, cyl in enumerate(cyl_gears):
         teeth, cg = cone_gears[j]
         await gear_mate(
