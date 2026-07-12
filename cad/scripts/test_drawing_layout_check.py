@@ -27,8 +27,8 @@ SHEET_W = 0.4318
 SHEET_H = 0.2794
 
 
-def _el(label, x0, y0, x1, y1, kind="view", scope=CollisionScope.ALL):
-    return LayoutElement(label, kind, x0, y0, x1, y1, scope=scope)
+def _el(label, x0, y0, x1, y1, kind="view", scope=CollisionScope.ALL, owner=""):
+    return LayoutElement(label, kind, x0, y0, x1, y1, scope=scope, owner=owner)
 
 
 def test_disjoint_layout_is_clean():
@@ -136,15 +136,58 @@ def test_exact_note_barely_off_sheet_is_flagged():
     assert find_overflows([view], SHEET_W, SHEET_H) == []
 
 
-def test_leadered_callout_collides_with_notes_not_views():
+def test_leadered_callout_collides_with_notes_not_owner_view():
     # Codex #269 thread 6: a NON_VIEW leadered callout's overlap with the view
-    # geometry it points at is intended and suppressed, but a collision with a
-    # free note / table must still be reported.
-    callout = _el("C", 0.10, 0.18, 0.13, 0.20, kind="note", scope=CollisionScope.NON_VIEW)
+    # geometry it OWNS is intended and suppressed, but a collision with a free
+    # note / table must still be reported.
+    callout = _el("C", 0.10, 0.18, 0.13, 0.20, kind="note", scope=CollisionScope.NON_VIEW, owner="V")
     view = _el("V", 0.05, 0.15, 0.20, 0.23)
-    assert find_overlaps([view, callout]) == []  # over its own view: allowed
+    assert find_overlaps([view, callout]) == []  # over its OWNER view: allowed
     notes_block = _el("N", 0.09, 0.17, 0.14, 0.21, kind="note")  # ALL scope
     assert len(find_overlaps([callout, notes_block])) == 1  # over a free note: flagged
+
+
+def test_nonview_tag_collides_with_a_different_view():
+    # Codex #269 thread 3: the view exemption is owner-scoped -- a tag owned by
+    # V1 that strays onto a DIFFERENT view V2 is real drawing content overlapping
+    # and must be flagged; only the overlap with its own V1 is suppressed.
+    tag = _el("tag", 0.16, 0.18, 0.175, 0.19, kind="note", scope=CollisionScope.NON_VIEW, owner="V1")
+    v1 = _el("V1", 0.05, 0.15, 0.18, 0.23)  # owner -- exempt
+    v2 = _el("V2", 0.15, 0.15, 0.30, 0.23)  # different view -- audited
+    assert find_overlaps([v1, tag]) == []
+    assert len(find_overlaps([v2, tag])) == 1
+
+
+def test_titleblock_is_a_hard_keepout_for_exempt_elements():
+    # Codex #269 threads 1/2: NONE-scope elements (a pictorial view, a GD&T
+    # symbol, a dimension) bypass every ordinary collision -- but the title block
+    # is a hard keep-out that catches even them if they cover it.
+    title = _el("title-block", 0.278, 0.0, SHEET_W, 0.080, kind="titleblock")
+    iso = _el("iso", 0.30, 0.02, 0.40, 0.14, scope=CollisionScope.NONE)  # pictorial
+    gdt = _el("G", 0.30, 0.02, 0.316, 0.036, kind="gdt", scope=CollisionScope.NONE)
+    dim = _el("D", 0.30, 0.03, 0.308, 0.038, kind="dim", scope=CollisionScope.NONE)
+    for cover in (iso, gdt, dim):
+        assert len(find_overlaps([title, cover])) == 1
+
+
+def test_two_keepout_boxes_never_collide():
+    # The title block and its projection symbol overlap slightly by design; two
+    # keep-out boxes must not report a self-collision.
+    title = _el("title-block", 0.278, 0.0, SHEET_W, 0.080, kind="titleblock")
+    proj = _el("projection-symbol", 0.242, 0.019, 0.281, 0.035, kind="titleblock")
+    assert find_overlaps([title, proj]) == []
+
+
+def test_dimension_is_overflow_only():
+    # Codex #269 thread 1: display dimensions / hole callouts sit on the geometry
+    # they measure, so they are NONE-scope -- not overlap-checked against a view,
+    # but an off-sheet callout is caught by the overflow audit.
+    view = _el("V", 0.05, 0.15, 0.20, 0.23)
+    dim_on_view = _el("D", 0.10, 0.18, 0.108, 0.188, kind="dim", scope=CollisionScope.NONE)
+    assert find_overlaps([view, dim_on_view]) == []
+    dim_off = _el("D2", SHEET_W - 0.002, 0.15, SHEET_W + 0.006, 0.16, kind="dim", scope=CollisionScope.NONE)
+    overflows = find_overflows([dim_off], SHEET_W, SHEET_H)
+    assert len(overflows) == 1 and "right" in {s for s, _ in overflows[0].sides}
 
 
 def test_content_overlapping_title_block_is_flagged():

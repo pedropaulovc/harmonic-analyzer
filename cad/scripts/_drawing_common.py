@@ -59,16 +59,38 @@ _ANNOT_SFSYM = 7
 _GDT_TYPES = frozenset({_ANNOT_DATUM, _ANNOT_GTOL, _ANNOT_SFSYM})
 _NOMINAL_GDT_HALF_M = 0.008
 
+# swAnnotationType_e.swDisplayDimension -- every linear/diameter dimension AND
+# the native hole callouts (a diameter dim carrying "/ THRU" text). Like GD&T
+# they expose only a text-anchor GetPosition (no clean box) and by design sit
+# ON/ACROSS the view geometry they measure, so they get a small nominal box and
+# ``NONE`` scope: overflow-checked + title-block keep-out (a callout dragged off
+# the sheet or over the title block is caught) but NOT overlap-checked against
+# views. Half-span is smaller than GD&T's -- dimension text is compact, and a
+# tight box keeps the zero-slack overflow check false-positive-free on interior
+# dims (Codex #269 thread 1).
+_ANNOT_DIM = 4
+_NOMINAL_DIM_HALF_M = 0.004
+
 # The checked-in ASME B sheet format (asme-b-book.slddrt) bakes its title block
 # in as lines + notes rather than a queryable ITitleBlock (sheet.TitleBlock is
-# None), so its occupied region is reserved here as a fixed box: the bottom-right
-# corner, from the title-block's left rule (meters from the sheet's left edge)
-# and up to its top rule, extending to the sheet's right and bottom edges. Any
-# view / note / table / GD&T symbol overlapping it fails the audit, so content
-# can never land on the title block (Codex #269 thread 4). Tied to
-# asme-b-book.slddrt -- update if that sheet format's title block moves.
-_TITLE_BLOCK_LEFT_M = 0.2785
-_TITLE_BLOCK_TOP_M = 0.078
+# None), so its occupied region is reserved here as fixed keep-out boxes. Any
+# element overlapping one fails the audit, so content can never land on the title
+# block (Codex #269 threads 4). These MUST track create_drawing_standards.py --
+# update if that sheet format's title block / projection symbol moves.
+#
+# (1) The title block proper: from its left rule (TITLE_X0) up to its top rule
+# (TITLE_Y1), extending to the sheet's right and bottom edges (a conservative
+# superset of the drawn frame's right/bottom rules, which sit 6 mm inside).
+_TITLE_BLOCK_LEFT_M = 0.278  # create_drawing_standards.TITLE_X0
+_TITLE_BLOCK_TOP_M = 0.080  # create_drawing_standards.TITLE_Y1
+#
+# (2) The third-angle projection symbol, drawn LEFT of the title block at
+# create_drawing_standards.add_third_angle_symbol(0.252, 0.027, size=0.007). Its
+# glyph (concentric circles + trapezoid + axis) spans cx-1.4r .. cx+3.6r+0.4r in
+# x and cy±r in y; reserved with ~1 mm margin as its own box so the empty strip
+# between it and the title block is NOT reserved (a notes block legitimately
+# reaches x~253 mm at that height on top-crossbar).
+_PROJ_SYMBOL_BOX_M = (0.242, 0.019, 0.281, 0.035)
 
 
 ASME_B_WIDTH_M = 0.4318
@@ -1186,13 +1208,31 @@ def _gdt_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | No
     )
 
 
+def _dim_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | None:
+    """Box a display dimension / hole callout as a small nominal square (NONE scope).
+
+    Like GD&T, a dimension exposes only a text-anchor ``GetPosition`` and sits on
+    the geometry it measures, so it is overflow-checked and title-block-keep-out
+    checked only -- never overlap-checked against a view (Codex #269 thread 1).
+    """
+    position = adapter._attempt(lambda: annotation.GetPosition())
+    if not position:
+        return None
+    x, y = float(position[0]), float(position[1])
+    half = _NOMINAL_DIM_HALF_M
+    return LayoutElement(
+        name, "dim", x - half, y - half, x + half, y + half, scope=CollisionScope.NONE
+    )
+
+
 def _iter_view_annotations(adapter: Any, view: Any):
-    """Yield each free ``LayoutElement`` (note or GD&T symbol) a view owns.
+    """Yield each free ``LayoutElement`` (note, GD&T symbol or dimension) a view owns.
 
     ``IView.GetAnnotations`` returns dimensions, center marks, cosmetic-thread
-    callouts, notes and GD&T symbols; only NOTES (swNote) and native GD&T symbols
-    (datum tag / feature-control frame / surface-finish) become elements. Tables
-    come from ``GetTableAnnotations`` instead.
+    callouts, notes and GD&T symbols; NOTES (swNote), native GD&T symbols (datum
+    tag / feature-control frame / surface-finish) and DISPLAY DIMENSIONS / hole
+    callouts (swDisplayDimension) become elements. Tables come from
+    ``GetTableAnnotations`` instead.
     """
     annotations = adapter._attempt(lambda: view.GetAnnotations()) or []
     for annotation in annotations:
@@ -1203,6 +1243,8 @@ def _iter_view_annotations(adapter: Any, view: Any):
             element = _note_element(adapter, annotation, name)
         elif kind in _GDT_TYPES:
             element = _gdt_element(adapter, annotation, name)
+        elif kind == _ANNOT_DIM:
+            element = _dim_element(adapter, annotation, name)
         else:
             continue
         if element is not None:
@@ -1239,11 +1281,12 @@ def collect_layout_elements(
       SMALL note centered inside its own view is a hole tag / balloon sitting on
       the geometry and is scoped ``NON_VIEW`` (does not collide with its view);
     * every native GD&T symbol (datum tag / feature-control frame /
-      surface-finish), boxed nominally and scoped ``NONE`` (no real bbox API, so
-      the box is too coarse for overlap) -- only an off-sheet symbol is flagged;
+      surface-finish) and DISPLAY DIMENSION / hole callout, boxed nominally and
+      scoped ``NONE`` (no real bbox API, and they sit on the geometry they
+      annotate) -- overflow- and title-block-keep-out-checked only;
     * every TABLE (hole tables land on the SHEET view, so it is scanned too);
-    * one reserved box for the checked-in title block, so no content may land on
-      it.
+    * two reserved KEEP-OUT boxes -- the checked-in title block and its
+      projection symbol -- so no content may land on either.
 
     Notes owned by the SHEET view are the sheet-format frame + zone labels (at
     the sheet edges by design) and are excluded.
@@ -1276,12 +1319,17 @@ def collect_layout_elements(
                 )
             )
         for element in _iter_view_annotations(adapter, view):
+            # Record the owning view: a NON_VIEW annotation is exempt from
+            # colliding with THIS view only, not other drawing views (Codex #269
+            # thread 3).
+            element = replace(element, owner=name)
             # A SMALL note centered inside its owning view is a hole tag / balloon
             # sitting on the geometry -- give it NON_VIEW scope so it does not
             # collide with the view it sits on (but still collides with a free
-            # note / table and is checked for OVERFLOW). A LARGE note centered in
-            # its view is a general-notes block accidentally dropped on the view,
-            # so it stays ALL-scope and the audit reports the collision (Codex #269).
+            # note / table, a DIFFERENT view, and is checked for OVERFLOW). A LARGE
+            # note centered in its view is a general-notes block accidentally
+            # dropped on the view, so it stays ALL-scope and the audit reports the
+            # collision (Codex #269).
             if (
                 element.kind == "note"
                 and view_box is not None
@@ -1301,7 +1349,8 @@ def collect_layout_elements(
             tables[table.label] = table
 
     elements.extend(tables.values())
-    # Reserve the checked-in title block: any element overlapping it is flagged.
+    # Reserve the checked-in title block + its projection symbol as keep-outs: any
+    # element overlapping either is flagged (the two never collide with each other).
     elements.append(
         LayoutElement(
             "title-block",
@@ -1312,6 +1361,7 @@ def collect_layout_elements(
             _TITLE_BLOCK_TOP_M,
         )
     )
+    elements.append(LayoutElement("projection-symbol", "titleblock", *_PROJ_SYMBOL_BOX_M))
     return elements, width, height
 
 
