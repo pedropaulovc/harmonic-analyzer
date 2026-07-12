@@ -68,7 +68,7 @@ ALL_HOLES_MM = (*CLEARANCE_HOLES_MM, NUMBER_DRILL_HOLE_MM)
 VIEW_X_M = 0.100
 VIEW_Y_M = 0.110
 DATUM_XY_M = (0.060, 0.090)
-TABLE_XY_M = (0.125, 0.180)
+TABLE_XY_M = (0.125, 0.210)
 # #4 normal clearance is 3.251 mm on this ANSI-inch Hole Wizard table. Select
 # a point on the visible circular rim, not the hole centre.
 HOLE_RIM_DY_M = 0.0016255
