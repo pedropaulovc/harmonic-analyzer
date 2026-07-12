@@ -46,6 +46,7 @@ from _common import (
     run_build,
 )
 from _assembly import (
+    _discard_copy_source,
     assert_component_placed,
     assert_components_fully_defined,
     check_no_interference,
@@ -145,7 +146,16 @@ async def build(adapter) -> dict[str, str]:
     # machine front, and the file opens on it. Geometry is untouched.
     remap_front_to_machine_front(adapter)
     artefacts = await save_assembly_and_images(adapter, ASM_NAME)
-    artefacts.update(await export_gallery_and_bom(adapter))
+    # save_assembly_and_images deliberately discards the dirty anonymous source
+    # after its SaveAsCopy.  Reopen the clean copy for the top-only gallery/BOM;
+    # those exports dirty the reopened document, so discard it again without
+    # saving to keep the shipped assembly table-free.
+    asm_path = (OUT_SLDASM / f"{ASM_NAME}.SLDASM").resolve()
+    check(f"reopen {ASM_NAME} for gallery/BOM", await adapter.open_model(str(asm_path)))
+    try:
+        artefacts.update(await export_gallery_and_bom(adapter))
+    finally:
+        _discard_copy_source(adapter)
     return artefacts
 
 
