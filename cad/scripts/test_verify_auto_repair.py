@@ -2,17 +2,27 @@
 
 from __future__ import annotations
 
+import inspect
+import json
 from types import SimpleNamespace
 
 import pytest
 
 import verify
+from _assembly import (
+    assert_manifest_dof_state,
+    assert_saved_rebuild_clean,
+    final_rebuild_before_save,
+    save_assembly_and_images,
+    save_assembly_in_place,
+)
 
 
 class _Adapter:
-    def __init__(self) -> None:
+    def __init__(self, status: int = 0) -> None:
         self.currentModel = SimpleNamespace(
             ForceRebuild3=lambda _top_only: True,
+            Extension=SimpleNamespace(NeedsRebuild2=status),
         )
 
     @staticmethod
@@ -132,3 +142,78 @@ def test_health_failure_points_to_explicit_opt_in(monkeypatch) -> None:
     monkeypatch.setattr(verify, "assert_model_healthy", fail)
     with pytest.raises(RuntimeError, match=r"--auto-repair"):
         verify._assert_soundness_health(_Adapter(), "channel", True)
+
+
+def test_saved_rebuild_gate_reads_before_any_rebuild() -> None:
+    with pytest.raises(RuntimeError, match="NeedsRebuild2=1"):
+        assert_saved_rebuild_clean(_Adapter(status=1), "harmonic-analyzer")
+
+
+def test_final_rebuild_refuses_a_persistently_dirty_model() -> None:
+    with pytest.raises(RuntimeError, match="refusing save"):
+        final_rebuild_before_save(_Adapter(status=1), "harmonic-analyzer")
+
+
+def test_final_rebuild_accepts_fully_rebuilt_state() -> None:
+    final_rebuild_before_save(_Adapter(status=0), "harmonic-analyzer")
+
+
+def test_in_place_save_rebuilds_at_the_save_chokepoint() -> None:
+    source = inspect.getsource(save_assembly_in_place)
+    rebuild = source.index("final_rebuild_before_save(adapter, asm_name, asm)")
+    save = source.index("asm.Save3(options, err, warn)")
+    assert rebuild < source.index("asm.GetSaveFlag()") < save
+
+
+def test_fresh_build_rebuilds_after_gates_and_view_setup() -> None:
+    source = inspect.getsource(save_assembly_and_images)
+    assert source.count("final_rebuild_before_save(adapter, asm_name)") == 2
+    assert source.rindex("final_rebuild_before_save(adapter, asm_name)") < source.index(
+        "_save_new_assembly_as_copy(adapter, asm_path)"
+    )
+
+
+def test_refresh_dof_gate_uses_saved_manifest(tmp_path, monkeypatch) -> None:
+    import _assembly
+
+    component = SimpleNamespace(
+        Name2="crank-1",
+        IsFixed=False,
+        IsPatternInstance=lambda: False,
+        GetConstrainedStatus=lambda: 2,
+    )
+    adapter = _Adapter()
+    adapter.currentModel.GetComponents = lambda _top_only: [component]
+    monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
+    (tmp_path / ".free.dof.json").write_text(
+        json.dumps({"stem": "free", "specs": [{"verify": ["crank-1", []]}]}),
+        encoding="utf-8",
+    )
+    assert_manifest_dof_state(adapter, "free")
+
+
+def test_refresh_dof_gate_rejects_stray_free_component(tmp_path, monkeypatch) -> None:
+    import _assembly
+
+    def component(name):
+        return SimpleNamespace(
+            Name2=name,
+            IsFixed=False,
+            IsPatternInstance=lambda: False,
+            GetConstrainedStatus=lambda: 2,
+        )
+
+    adapter = _Adapter()
+    adapter.currentModel.GetComponents = lambda _top_only: [
+        component("rocker-arm-1"),
+        component("structural-bracket-1"),
+    ]
+    monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
+    (tmp_path / ".channel.dof.json").write_text(
+        json.dumps(
+            {"stem": "channel", "specs": [{"verify": ["rocker-arm-1", []]}]}
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(RuntimeError, match="structural-bracket-1"):
+        assert_manifest_dof_state(adapter, "channel")
