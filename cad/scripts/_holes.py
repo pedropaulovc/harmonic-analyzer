@@ -79,7 +79,7 @@ CLEARANCE_MM = {          # (size, fit) -> hole diameter (CLOSE/NORMAL/LOOSE_FIT
 }
 NUMBER_DRILL_MM = {       # number drills cut DIAMETER exactly
     "#9": 4.978, "#19": 4.216, "#20": 4.089, "#21": 4.039, "#29": 3.454,
-    "#37": 2.642, "#43": 2.261, "#47": 1.994, "#54": 1.397,
+    "#14": 4.623, "#37": 2.642, "#43": 2.261, "#47": 1.994, "#54": 1.397,
 }
 FRACTIONAL_DRILL_MM = {"1/8": 3.175, "3/16": 4.763, "15/64": 5.953}
 LETTER_DRILL_MM = {"F": 6.528, "V": 9.576}  # V = 0.377in (transgear stud seat)

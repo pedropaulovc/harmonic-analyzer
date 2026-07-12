@@ -10,27 +10,31 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_datum_feature,
+    add_feature_control_frame,
+    add_native_hole_callout,
+    add_property_linked_note,
+    add_surface_finish,
+    add_edge_dimension,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    set_basic_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
     auto_center_marks,
     place_view,
 )
 from top_crossbar_spec import (
     BAR_HEIGHT,
+    BAR_LENGTH,
     BAR_WIDTH,
     STUD_HOLE_DIA,
-    STUD_HOLE_DRILL,
-    STUD_HOLE_FIT,
-    STUD_HOLE_SIZE,
 )
 
 
@@ -54,53 +58,10 @@ ISO_CENTER = (0.355, 0.200)
 TOP_KEEP = {
     "Depth": (TOP_CENTER[0] - 0.035, TOP_CENTER[1]),
 }
-HOLE_CALLOUT = f"Ø{STUD_HOLE_DIA:.2f} ({STUD_HOLE_DRILL}) THRU - NOTE 4"
 FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.034),
     "Height": (FRONT_CENTER[0] - 0.035, FRONT_CENTER[1]),
 }
-
-_NOTES = (
-    "UNLESS OTHERWISE SPECIFIED:",
-    (
-        "1. DIMENSIONS ARE IN MILLIMETRES.\n"
-        "   INTERPRET PER ASME Y14.5."
-    ),
-    (
-        "2. GRAY-IRON CASTING: AS-CAST +/-0.8; MACHINED\n"
-        "   +/-0.25; HOLE AXIS LOCATION +/-0.10."
-    ),
-    "3. REMOVE BURRS AND BREAK SHARP EDGES 0.3 MAX.",
-    (
-        f"4. CLEARANCE HOLE FOR {STUD_HOLE_SIZE} STUD,\n"
-        f"   {STUD_HOLE_FIT.upper()} FIT: {STUD_HOLE_DRILL} DRILL THRU\n"
-        f"   (Ø{STUD_HOLE_DIA:.2f} NOMINAL). AXIS CENTERED\n"
-        "   BETWEEN ACTUAL SIDE FACES AND FINISHED END SEATS."
-    ),
-    (
-        f"5. MACHINE THE {BAR_WIDTH:.0f} X {BAR_HEIGHT:.0f} END SEATS\n"
-        "   SQUARE TO LONG AXIS WITHIN 0.10;\n"
-        "   END FACES PARALLEL 0.10."
-    ),
-    (
-        "6. MACHINE HOLE AND END SEATS Ra 3.2.\n"
-        "   OTHER SURFACES MAY REMAIN AS-CAST.\n"
-        "   ALL Ra VALUES IN MICROMETRES."
-    ),
-    (
-        "7. FINISH: MACHINE GREEN ENAMEL.\n"
-        "   MASK HOLE AND MACHINED END SEATS."
-    ),
-    (
-        "8. MAY BE MACHINED FROM SOLID CLASS 30\n"
-        "   BAR; NO DRAFT MODELLED."
-    ),
-)
-
-
-def _manufacturing_notes() -> str:
-    return "\n".join(_NOTES)
-
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
@@ -116,8 +77,19 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
+            "Top View Note",
+            "Isometric View Note",
         ),
-        required=("Number", "Material Specification", "Finish", "Quantity"),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "Top View Note",
+            "Isometric View Note",
+        ),
     )
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
@@ -146,11 +118,108 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to top-view stud hole")
 
-    add_note(adapter, "\n".join(_NOTES[:5]), 0.014, 0.090)
-    add_note(adapter, "\n".join(_NOTES[5:]), 0.150, 0.090)
-    add_note(adapter, "TOP VIEW SCALE 1:2", 0.045, 0.155)
-    add_note(adapter, HOLE_CALLOUT, 0.105, TOP_CENTER[1])
-    add_note(adapter, "ISOMETRIC VIEW SCALE 1:2", 0.330, 0.155)
+    hole_radius_sheet = STUD_HOLE_DIA / 4000.0
+    length_location = add_edge_dimension(
+        adapter,
+        top,
+        p0=(TOP_CENTER[0], TOP_CENTER[1] - BAR_LENGTH / 4000.0),
+        p1=(TOP_CENTER[0], TOP_CENTER[1] - hole_radius_sheet),
+        text_xy=(TOP_CENTER[0] + 0.030, TOP_CENTER[1] - 0.025),
+        label="stud-hole length location",
+    )
+    set_basic_dimension(adapter, length_location, label="stud-hole length location")
+
+    front_bottom = (
+        FRONT_CENTER[0],
+        FRONT_CENTER[1] - BAR_HEIGHT / 2000.0,
+    )
+    front_left = (
+        FRONT_CENTER[0] - BAR_WIDTH / 2000.0,
+        FRONT_CENTER[1],
+    )
+    lower_end = (TOP_CENTER[0], TOP_CENTER[1] - BAR_LENGTH / 4000.0)
+    upper_end = (TOP_CENTER[0], TOP_CENTER[1] + BAR_LENGTH / 4000.0)
+    hole_edge = (
+        TOP_CENTER[0] + STUD_HOLE_DIA / 4000.0,
+        TOP_CENTER[1],
+    )
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=front_bottom,
+        symbol_xy=(FRONT_CENTER[0], front_bottom[1] - 0.016),
+        datum="A",
+        label="crossbar bottom face",
+    )
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=front_left,
+        symbol_xy=(front_left[0] - 0.016, FRONT_CENTER[1]),
+        datum="B",
+        label="crossbar side face",
+    )
+    add_datum_feature(
+        adapter,
+        top,
+        edge_xy=lower_end,
+        symbol_xy=(TOP_CENTER[0] + 0.018, lower_end[1]),
+        datum="C",
+        label="crossbar reference end seat",
+    )
+    add_feature_control_frame(
+        adapter,
+        top,
+        edge_xy=hole_edge,
+        frame_xy=(0.112, 0.235),
+        characteristic="position",
+        tolerance="0.20",
+        datums=("A", "B", "C"),
+        diameter=True,
+        label="crossbar stud-hole position",
+    )
+    add_feature_control_frame(
+        adapter,
+        top,
+        edge_xy=lower_end,
+        frame_xy=(0.115, 0.175),
+        characteristic="perpendicularity",
+        tolerance="0.10",
+        datums=("A", "B"),
+        label="crossbar reference-end squareness",
+    )
+    add_feature_control_frame(
+        adapter,
+        top,
+        edge_xy=upper_end,
+        frame_xy=(0.115, 0.255),
+        characteristic="parallelism",
+        tolerance="0.10",
+        datums=("C",),
+        label="crossbar end-seat parallelism",
+    )
+    for edge, y, label in (
+        (lower_end, 0.165, "lower end-seat finish"),
+        (upper_end, 0.245, "upper end-seat finish"),
+    ):
+        add_surface_finish(
+            adapter,
+            top,
+            edge_xy=edge,
+            symbol_xy=(0.175, y),
+            roughness_ra="3.2",
+            label=label,
+        )
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.090)
+    add_property_linked_note(adapter, "Top View Note", 0.045, 0.155)
+    add_native_hole_callout(
+        adapter,
+        top,
+        edge_xy=hole_edge,
+        callout_xy=(0.125, TOP_CENTER[1] - 0.010),
+        label="crossbar stud hole",
+    )
+    add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.155)
 
     return await finalize_drawing(
         adapter,

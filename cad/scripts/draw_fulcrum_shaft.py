@@ -10,6 +10,10 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_datum_feature,
+    add_feature_control_frame,
+    add_property_linked_note,
+    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -21,7 +25,6 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from fulcrum_shaft_spec import SHAFT_DIA, SHAFT_LENGTH
 from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
     auto_center_marks,
     place_view,
 )
@@ -59,39 +62,6 @@ RIGHT_KEEP = {
 }
 DIMENSION_CALLOUTS = {"ShaftDia": "+0.00/-0.02"}
 
-_NOTES = (
-    "UNLESS OTHERWISE SPECIFIED:",
-    "1. DIMENSIONS ARE IN MILLIMETRES. INTERPRET PER ASME Y14.5.",
-    (
-        "2. LENGTH +/-0.25. SHAFT DIAMETER TOLERANCE\n"
-        "   IS SHOWN DIRECTLY ON THE END VIEW."
-    ),
-    (
-        "3. REMOVE BURRS AND BREAK END EDGES 0.15 MAX.\n"
-        "   CENTER-DRILL MARKS PERMITTED, 1.0 DEEP MAX."
-    ),
-    (
-        "4. TURN OR CENTRELESS-GRIND THE FULL BEARING LENGTH.\n"
-        "   NO LOCAL FLATS, STEPS, OR TOOL ROLLOVER."
-    ),
-    (
-        "5. CYLINDRICITY 0.03 OVER FULL LENGTH. BOTH END\n"
-        "   FACES SQUARE TO AXIS WITHIN 0.05."
-    ),
-    (
-        "6. BEARING SURFACE Ra 1.6; END FACES Ra 3.2.\n"
-        "   ALL Ra VALUES IN MICROMETRES."
-    ),
-    (
-        "7. MATING O6.50 BUSHINGS GIVE 0.15-0.20\n"
-        "   DIAMETRAL CLEARANCE. LIGHTLY OIL."
-    ),
-)
-
-
-def _manufacturing_notes() -> str:
-    return "\n".join(_NOTES)
-
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
@@ -107,8 +77,17 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
+            "End View Note",
         ),
-        required=("Number", "Material Specification", "Finish", "Quantity"),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "End View Note",
+        ),
     )
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
@@ -142,9 +121,66 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to shaft end view")
 
-    add_note(adapter, "\n".join(_NOTES[:4]), 0.014, 0.108)
-    add_note(adapter, "\n".join(_NOTES[4:]), 0.175, 0.105)
-    add_note(adapter, "END VIEW SCALE 2:1", 0.020, 0.170)
+    end_circle = (
+        FRONT_CENTER[0] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
+        FRONT_CENTER[1],
+    )
+    left_end = (RIGHT_CENTER[0] - SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
+    right_end = (RIGHT_CENTER[0] + SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=end_circle,
+        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
+        datum="A",
+        label="fulcrum shaft axis",
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=end_circle,
+        frame_xy=(RIGHT_CENTER[0], 0.232),
+        characteristic="cylindricity",
+        tolerance="0.01",
+        label="fulcrum bearing cylindricity",
+    )
+    for edge, x, label in (
+        (left_end, left_end[0] - 0.014, "left end perpendicularity"),
+        (right_end, right_end[0] + 0.014, "right end perpendicularity"),
+    ):
+        add_feature_control_frame(
+            adapter,
+            right,
+            edge_xy=edge,
+            frame_xy=(x, 0.180),
+            characteristic="perpendicularity",
+            tolerance="0.05",
+            datums=("A",),
+            label=label,
+        )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=end_circle,
+        symbol_xy=(RIGHT_CENTER[0], 0.245),
+        roughness_ra="1.6",
+        label="fulcrum bearing finish",
+    )
+    for edge, x, label in (
+        (left_end, left_end[0] - 0.020, "left end finish"),
+        (right_end, right_end[0] + 0.020, "right end finish"),
+    ):
+        add_surface_finish(
+            adapter,
+            right,
+            edge_xy=edge,
+            symbol_xy=(x, 0.218),
+            roughness_ra="3.2",
+            label=label,
+        )
+
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.108)
+    add_property_linked_note(adapter, "End View Note", 0.020, 0.170)
 
     return await finalize_drawing(
         adapter,

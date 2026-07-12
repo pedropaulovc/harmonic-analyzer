@@ -30,16 +30,28 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     )
 
 
-def test_notes_define_a_buildable_turned_part() -> None:
-    notes = drawing._manufacturing_notes()
-    assert "REAM O6.50 THRU" in notes
+def test_linked_notes_define_remaining_turned_part_operations() -> None:
+    notes = lever_bushing_spec.DRAWING_NOTES
+    assert "REAM BORE THRU" in notes
     assert drawing.DIMENSION_CALLOUTS["Depth"] == "+/-0.03"
-    assert "0.05 TIR" in notes
-    assert "0.15-0.20 DIAMETRAL CLEARANCE" in notes
-    assert "CONCENTRICITY" not in notes
-    assert "MAKE 19" in notes
-    assert "Ra 1.6" in notes
+    assert "+0.03/-0.00" in drawing.DIMENSION_CALLOUTS["BoreDia"]
+    clearance_min = lever_bushing_spec.BORE_DIA - 6.35
+    clearance_max = clearance_min + 0.03 + 0.02
+    assert round(clearance_min, 2) == 0.15
+    assert round(clearance_max, 2) == 0.20
     assert "X.XX" not in notes
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert "def _manufacturing_notes" not in source
+
+
+def test_native_gdt_controls_bushing_functional_surfaces() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.count("add_datum_feature(") == 2
+    assert source.count("add_feature_control_frame(") == 2
+    assert "characteristic=\"circular_runout\"" in source
+    assert "characteristic=\"parallelism\"" in source
+    assert source.count("add_surface_finish(") == 4
 
 
 def test_sheet_and_views_pin_scale() -> None:
