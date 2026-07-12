@@ -10,6 +10,13 @@ metadata:
 (dangling) INSIDE cache-restored subassembly instances, e.g.
 `summing-1:Coincident1; magnifier-1:Coincident2`.
 
+The fast, operator-judged first retry is now:
+
+`uv run python cad/scripts/verify.py <assembly> --suite soundness --auto-repair`
+
+It saves locally only after the full soundness battery passes. If it cannot
+repair cleanly, use the cache-off full-rebuild remedy below.
+
 **Cause** — the AGENTS.md "recipe ≠ PID identity" limitation, triggered by a
 *partial cache mix*: some `part:*` MISSED (rebuilt locally → fresh SolidWorks
 persistent IDs) while assemblies containing them HIT stale entries another
