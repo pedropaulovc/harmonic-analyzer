@@ -28,6 +28,7 @@ from _common import (
     set_global,
     volume_check,
 )
+from _fastener_slot import FastenerAxis, add_slotted_drive
 
 
 async def build_flat_screw(
@@ -88,6 +89,17 @@ async def build_flat_screw(
     v_shank = math.pi * (shank_dia / 2.0) ** 2 * shank_len
     expected += v_shank
     await volume_check(adapter, "shank", expected, 0.005 * v_shank)
+
+    expected, slot_jobs = await add_slotted_drive(
+        adapter,
+        axis=FastenerAxis.Z,
+        head_radius_mm=head_dia / 2.0,
+        head_face_offset_mm=-head_h,
+        width_mm=1.2,
+        depth_mm=min(1.0, head_h * 0.4),
+        expected_volume_mm3=expected,
+    )
+    drive_jobs += slot_jobs
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
