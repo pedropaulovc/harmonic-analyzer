@@ -57,20 +57,12 @@ local X +/-60.32, Z +/-17.46 -> machine x 55.44/90.36, z +/-60.32; see
 build_harmonic_base.py HOLE_XZ) with O23 head counterbores on its underside, and
 the lag screws (build_lag_screw.py, resized to the 9/16-12 foot tap) are
 CONSTRAINED coaxial with each (concentric to the hole axis + a head-seat
-coincident + a spin pin). The screws do NOT constrain the support -- three
-orthogonal mates already fully constrain it (one pivot-x offset-plane placement +
-two flip-free coincident mates: the z-centring symmetry planes and the
-FootSeat<->DeckTop datum seat) -- they are structure, constrained by their own
-contacts like the columns.
-
-Every component is fixed (base) or fully defined by three orthogonal mates
-against the base part. Free-space placements (the corner/pivot offsets) go
-through ``plane_distance_mate``: a SIGNED offset builds a reference plane on the
-correct side of the base datum and the part is mated coincident to it, so it
-lands in ONE solve with no flip and no delete-and-re-add recovery. The readback
-of ``Transform2`` against each part's insertion pose stays as a fail-loud
-tripwire. Final asserts: every component fixed or ``swFullyConstrained``, and
-zero interferences (tangent/coincident contact allowed).
+coincident + a spin pin). The screws do NOT constrain the support; the rigid
+frame members are inserted on their exact authored transforms and each uses one
+lock mate to the fixed base. This replaces three solve-triggering datum mates and
+their assembly reference planes without changing geometry. Transform readback
+remains the fail-loud placement tripwire. Final asserts: every component fixed
+or ``swFullyConstrained``, and zero interferences.
 
 The 20-channel pitch stations live in the channel subassembly.
 
@@ -103,11 +95,11 @@ from _assembly import (
     component_transform,
     delete_assembly_feature,
     linear_component_pattern,
+    lock_mate,
     named_ref,
     parallel_mate,
     PatternDirection,
     place_component,
-    plane_distance_mate,
     save_assembly_and_images,
 )
 from _transforms import ROT_Y_POS90
@@ -271,25 +263,11 @@ async def build(adapter) -> dict[str, str]:
         check(f"insert_component tube-frame @ {target}", res)
         name = res.data["name"]
         column_names.append(name)
-        await plane_distance_mate(
-            adapter, name, "Right Plane", "Right Plane", base_name, sx * COLUMN_X, target
-        )
-        await plane_distance_mate(
-            adapter, name, "Front Plane", "Front Plane", base_name, COLUMN_Z, target
-        )
-        # Foot seat: the column stands ON the base top -- a physical contact, so
-        # coincident its foot (the column's Top Plane: it extrudes UPWARD from there,
-        # so that default plane sits at the foot) to the base DeckTop datum, not a
-        # measured distance. The Right/Front mates above are genuine free-space
-        # corner offsets (the column touches nothing laterally); each is a SIGNED
-        # offset plane (sx carries the corner's side) with a coincident, so the
-        # negative-x seed lands in one solve with no flip recovery.
-        await coincident_mate(
+        await lock_mate(
             adapter,
-            named_ref(f"Top Plane@{name}", "PLANE"),
-            named_ref(f"DeckTop@{base_name}", "PLANE"),
-            label=f"column {name} foot seats on base top (Top Plane <-> DeckTop)",
-            verify=(name, target),
+            named_ref(f"Right Plane@{name}", "PLANE"),
+            named_ref(f"Right Plane@{base_name}", "PLANE"),
+            label=f"column {name} fixed to base",
         )
         assert_component_placed(adapter, name, target, IDENTITY)
     # Direction reference: EXPLICIT geometry (Top ∩ Right = the machine Z line),
@@ -352,29 +330,11 @@ async def build(adapter) -> dict[str, str]:
     # inverts the support's Front-plane normal, so it leaned on the delete-and-re-add
     # flip recovery (a visible there-and-back jump); coincident-to-a-signed-plane
     # is immune -- the plane's position, not the part's plane normal, fixes the side.
-    await plane_distance_mate(
-        adapter, support_name, "Front Plane", "Right Plane", base_name,
-        SUPPORT_X, support_target,
-    )
-    # Foot seat (y): a PHYSICAL coincident between two NAMED datum planes on the
-    # contact -- the support's FootSeat (on its foot bottom face) and the base's
-    # DeckTop (on its top face). Flip-free: the part is inserted on-solution (foot
-    # already at base top) so the already-satisfied mate just locks the DOF.
-    # Named datums make this robust with no coordinate pick and no face walk --
-    # the datums exist in the parts precisely to be mated here.
-    await coincident_mate(
+    await lock_mate(
         adapter,
-        named_ref(f"FootSeat@{support_name}", "PLANE"),
-        named_ref(f"DeckTop@{base_name}", "PLANE"),
-        label="seat rocker-arm-support foot on base top (FootSeat <-> DeckTop)",
-        verify=(support_name, support_target),
-    )
-    await coincident_mate(
-        adapter,
-        named_ref(f"Right Plane@{support_name}", "PLANE"),
-        named_ref(f"Front Plane@{base_name}", "PLANE"),
-        label="centre rocker-arm-support in z (symmetry planes)",
-        verify=(support_name, support_target),
+        named_ref(f"Front Plane@{support_name}", "PLANE"),
+        named_ref(f"Right Plane@{base_name}", "PLANE"),
+        label="rocker-arm-support fixed to base",
     )
     assert_component_placed(adapter, support_name, support_target, SUPPORT_ROWS)
 
@@ -467,23 +427,11 @@ async def build(adapter) -> dict[str, str]:
     )
     check(f"insert_component top-frame @ {target}", res)
     name = res.data["name"]
-    await plane_distance_mate(
-        adapter, name, "Right Plane", "Right Plane", base_name, 0.0, target
-    )
-    await plane_distance_mate(
-        adapter, name, "Front Plane", "Front Plane", base_name, 0.0, target
-    )
-    # Vertical seat: the ring CAPS the columns -- its top face is flush with the
-    # column top ends (docstring: column tops flush with the ring top at 1040.7).
-    # Express that physical joint as a COINCIDENT of the ring's RingTop datum to a
-    # column's TopEnd datum, NOT a measured distance from the base. One column pins
-    # the ring's Y; the two d=0 plane mates above already pin x/z and keep it level.
-    await coincident_mate(
+    await lock_mate(
         adapter,
-        named_ref(f"RingTop@{name}", "PLANE"),
-        named_ref(f"TopEnd@{column_names[0]}", "PLANE"),
-        label="top-frame caps columns (ring top flush with column top end)",
-        verify=(name, target),
+        named_ref(f"Right Plane@{name}", "PLANE"),
+        named_ref(f"Right Plane@{base_name}", "PLANE"),
+        label="top-frame fixed to base",
     )
     assert_component_placed(adapter, name, target, IDENTITY)
 
@@ -518,23 +466,11 @@ async def build(adapter) -> dict[str, str]:
     # the +X side and the plate's Top Plane is mated coincident to it -- landing at
     # x 214.25 in one solve regardless of which way the plate's Top-plane normal
     # (local Y -> machine -X) points, so no flip and no recovery.
-    await coincident_mate(
+    await lock_mate(
         adapter,
-        named_ref(f"Underside@{nameplate_name}", "PLANE"),
-        named_ref(f"DeckTop@{base_name}", "PLANE"),
-        label="nameplate rests flat on base top (Underside <-> DeckTop)",
-        verify=(nameplate_name, NAMEPLATE_POS),
-    )
-    await coincident_mate(
-        adapter,
-        named_ref(f"MidLength@{nameplate_name}", "PLANE"),
-        named_ref(f"Front Plane@{base_name}", "PLANE"),
-        label="nameplate length centres on base z-axis (MidLength <-> Front)",
-        verify=(nameplate_name, NAMEPLATE_POS),
-    )
-    await plane_distance_mate(
-        adapter, nameplate_name, "Top Plane", "Right Plane", base_name,
-        NAMEPLATE_POS[0], NAMEPLATE_POS,
+        named_ref(f"Top Plane@{nameplate_name}", "PLANE"),
+        named_ref(f"Right Plane@{base_name}", "PLANE"),
+        label="nameplate fixed to base",
     )
     assert_component_placed(adapter, nameplate_name, NAMEPLATE_POS, NAMEPLATE_ROWS)
 
