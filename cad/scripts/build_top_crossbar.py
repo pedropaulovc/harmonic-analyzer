@@ -33,6 +33,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -40,17 +41,27 @@ from _common import (
     set_global,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
 from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
+from top_crossbar_spec import (
+    BAR_HALF_X,
+    BAR_HALF_Z,
+    BAR_HEIGHT,
+    DRAWING_DIMENSIONS,
+    STUD_HOLE_FIT,
+    STUD_HOLE_SIZE,
+)
 
 PART_NAME = "top-crossbar"
 MATERIAL = "Gray Cast Iron"  # green casting
 
-BAR_HALF_X = 11.0  # rail section 22 wide (DIMENSIONS.md ch6, med)
-BAR_HEIGHT = 41.0  # rail section 41 tall (med)
-BAR_HALF_Z = 101.0  # ends flush on the ring window faces at z +/-101 (derived)
 # Knife-mount Ø8 stud passes through: 5/16 clearance, CLOSE fit (Ø8.331, the
 # wizard twin of the old Ø8.2 artefact dim).
-HOLE_SPEC = HoleSpec("clearance", "5/16", fit="close")
+HOLE_SPEC = HoleSpec("clearance", STUD_HOLE_SIZE, fit=STUD_HOLE_FIT)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -100,6 +111,8 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "Bar")
+    depth_dim = name_dimensions(adapter, "Bar", ["Depth"])
+    drive_jobs += [(depth_dim[0], '2 * "BarHalfZ"')]
 
     # Stud hole on the bar axis (origin): ONE native Hole Wizard 5/16 clearance
     # feature, through-all along Y, drilled from the bar's bottom face (y=0)
@@ -128,6 +141,10 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(adapter, PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)
 
 
