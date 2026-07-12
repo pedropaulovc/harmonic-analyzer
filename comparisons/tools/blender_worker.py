@@ -156,6 +156,10 @@ def build_assembly(job):
         bpy.context.scene.collection.objects.link(obj)
         obj.matrix_world = sw_matrix(comp["xform"])
         obj.color = (*(comp.get("rgb") or DEFAULT_RGB), 1.0)
+        # Stamp the true part stem so pose_studio's delta export maps back to
+        # the CAD source even after Blender renames a duplicate (platen-1.001)
+        # or the object name carries a parametric/instance suffix.
+        obj["hac_part"] = comp["part"]
         objs.append(obj)
     boxes = [(e["name"], e["box"]) for e in scene_data.get("boxes", [])]
     return objs, boxes
