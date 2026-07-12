@@ -236,44 +236,44 @@
      "mean_latency_s": 18.4
     },
     "P7": {
-     "n": 82,
-     "macro_sign": 0.7951527379290061,
+     "n": 84,
+     "macro_sign": 0.797831584065106,
      "ci": [
-      0.770696980328703,
+      0.7719248560249753,
       0.8686894586894587
      ],
      "per_param": {
-      "az": 0.8166666666666668,
-      "el": 0.7999287749287749,
-      "roll": 0.7956574675324676,
-      "target_x": 0.8278018278018279,
-      "target_y": 0.7137464387464387,
-      "zoom": 0.8171152518978606
+      "az": 0.8168458781362008,
+      "el": 0.8148989898989899,
+      "roll": 0.8016899766899767,
+      "target_x": 0.8243853096794274,
+      "target_y": 0.7113736871199557,
+      "zoom": 0.8177956628660854
      },
-     "magnitude": 0.8058252427184466,
+     "magnitude": 0.8095238095238095,
      "control_fp": 1.0,
      "confusion": {
       "leaks": {
+       "el->target_y": 4,
        "target_x->target_y": 3,
        "zoom->target_y": 3,
-       "el->target_y": 3,
        "zoom->target_x": 2,
+       "el->target_x": 2,
        "roll->target_y": 2,
        "az->el": 1,
-       "az->target_x": 1,
-       "az->target_y": 1
+       "az->target_x": 1
       },
       "n_by_param": {
        "az": 15,
-       "el": 12,
-       "roll": 11,
+       "el": 13,
+       "roll": 12,
        "target_x": 12,
        "target_y": 12,
        "zoom": 6
       }
      },
      "median_tokens": 2064,
-     "mean_latency_s": 40.3
+     "mean_latency_s": 40.4
     },
     "P8": {
      "n": 83,
@@ -444,8 +444,8 @@
     "P1",
     "P4",
     "P11",
-    "P2",
     "P7",
+    "P2",
     "P6"
    ]
   },
