@@ -321,6 +321,15 @@ def t3_cells(cases, pairs, arms, n):
                     yield ("t3", pid, dclass, (c1, c2), arm, rep)
 
 
+def t3_key(model, cell) -> str:
+    # cell = ("t3", pid, dclass, (c1, c2), arm, rep). The key discriminates on the
+    # DELTA-PAIR tag (c1's "az+1"/"az+3"/... suffix), NOT dclass alone -- three az
+    # and two ty pairs share a dclass, so keying on dclass would collide them and a
+    # resumable --limit run would drop the graded-difficulty pairs (see report).
+    _t, pid, _dclass, (c1, _c2), arm, rep = cell
+    return f"t3:{model}:{pid}:{c1.split('+', 1)[1]}:{arm}:{rep}"
+
+
 def exec_t1(cases, cell, model):
     _t, cid, arm, rep, grid = cell
     row = cases[cid]
@@ -347,7 +356,7 @@ def exec_t1(cases, cell, model):
 
 def exec_t3(cases, cell, model):
     _t, pid, dclass, (c1, c2), arm, rep = cell
-    cell_key = f"t3:{model}:{pid}:{dclass}:{arm}:{rep}"
+    cell_key = t3_key(model, cell)
     sb = SANDBOX_ROOT / cell_key.replace(":", "_")
     sb.mkdir(parents=True, exist_ok=True)
     order = (crc(pid, arm, "t3", dclass) + rep) % 2   # which delta is shown first
@@ -526,7 +535,7 @@ def main() -> int:
         if args.task == "t1":
             key = f"t1:{args.model}:{c[1]}:{c[2]}:{c[3]}:{int(c[4])}"
         elif args.task == "t3":
-            key = f"t3:{args.model}:{c[1]}:{c[2]}:{c[4]}:{c[5]}"
+            key = t3_key(args.model, c)
         else:
             key = f"t2:{args.model}:{c[1]}:{c[2]}:{c[4]}"
         if key not in done:
