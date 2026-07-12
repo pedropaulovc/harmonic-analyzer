@@ -489,6 +489,88 @@ def wizard_holes(
     return result
 
 
+@_telemetry.traced("feature.normalize_plain_through_hole", label_param="label")
+def normalize_plain_through_hole(adapter, feature_name: str, label: str) -> None:
+    """Clear contradictory far-side countersink state on a plain through hole.
+
+    SolidWorks 2026 can create an ANSI-inch screw-clearance hole as type 26
+    (``swHoleThruCounterSinkBottom``) while reporting ``FarSideCounterSink=False``.
+    A native hole table trusts the subtype and emits a bogus
+    ``DIAMETER 0.00 X 0 DEG, FAR SIDE`` line. Toggling the PropertyManager option
+    on and back off normalizes the feature to type 25 (``swHoleThru``).
+
+    Reproduce that exact documented API transition: enable with valid temporary
+    dimensions and ModifyDefinition, then disable and ModifyDefinition again.
+    Already-normal type-25 holes are a no-op; any other subtype fails loud.
+    """
+    import math
+
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    sw_hole_thru = 25
+    sw_hole_thru_countersink_bottom = 26
+    model = adapter.currentModel
+    _flag(model, "IModelDoc2")
+    feat = model.FeatureByName(feature_name)
+    if feat is None:
+        raise RuntimeError(f"{label}: feature {feature_name!r} not found")
+    _flag(feat, "IFeature")
+
+    def _definition():
+        return _early(feat.GetDefinition(), "IWizardHoleFeatureData2")
+
+    defn = _definition()
+    initial_type = int(defn.Type)
+    far_enabled = bool(defn.FarSideCounterSink)
+    if initial_type == sw_hole_thru and not far_enabled:
+        _telemetry.debug(f"{label}: plain through-hole metadata already normalized")
+        return
+    if initial_type != sw_hole_thru_countersink_bottom or far_enabled:
+        raise RuntimeError(
+            f"{label}: expected contradictory type 26 / far-side false, got "
+            f"type {initial_type} / far-side {far_enabled}"
+        )
+
+    if not defn.AccessSelections(model, None):
+        raise RuntimeError(f"{label}: AccessSelections failed while enabling far side")
+    through_dia = float(defn.ThruHoleDiameter)
+    defn.FarSideCounterSink = True
+    defn.FarCounterSinkDiameter = max(through_dia * 1.5, through_dia + 0.001)
+    defn.FarCounterSinkAngle = math.pi / 2.0
+    if not feat.ModifyDefinition(defn._oleobj_, model, null_callout()):
+        raise RuntimeError(f"{label}: enabling far-side countersink failed")
+    model.EditRebuild3()
+
+    defn = _definition()
+    if not bool(defn.FarSideCounterSink):
+        raise RuntimeError(f"{label}: far-side countersink did not enable")
+    if not defn.AccessSelections(model, None):
+        raise RuntimeError(f"{label}: AccessSelections failed while disabling far side")
+    defn.FarSideCounterSink = False
+    if not feat.ModifyDefinition(defn._oleobj_, model, null_callout()):
+        raise RuntimeError(f"{label}: disabling far-side countersink failed")
+    model.EditRebuild3()
+
+    final = _definition()
+    final_type = int(final.Type)
+    final_far = bool(final.FarSideCounterSink)
+    if final_type != sw_hole_thru or final_far:
+        raise RuntimeError(
+            f"{label}: normalization ended at type {final_type} / "
+            f"far-side {final_far}, expected type 25 / false"
+        )
+    _telemetry.event(
+        "hole_wizard.metadata_normalized",
+        label=label,
+        feature=feature_name,
+        type_before=initial_type,
+        type_after=final_type,
+    )
+    _telemetry.success(
+        f"{label}: normalized plain through-hole metadata (type 26 -> 25)"
+    )
+
+
 def cross_hole_volume_mm3(hole_dia_mm: float, shaft_dia_mm: float,
                           n: int = 20001) -> float:
     """Removed volume of a radial THROUGH hole drilled diametrally through a
