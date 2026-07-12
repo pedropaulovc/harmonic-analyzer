@@ -301,7 +301,13 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
         (0.0, 1.0, 0.0),
         f"spring hole seed (station j={HOLE_COUNT - 1}, #47)",
         name="SpringHoleSeed",
-        placement_dims=[(("HoleSeedX", '"HoleX"'), (None, None))],
+        placement_dims=[(
+            ("HoleSeedX", '"HoleX"'),
+            (
+                "HoleSeedStation",
+                f'"ChannelZ0" + {HOLE_COUNT - 1} * "ChannelPitch" + "HoleZOffset"',
+            ),
+        )],
     )
     drive_jobs += seed_result.placement_drive_jobs
     seed_cut = seed_result.name
@@ -673,9 +679,12 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "AnchorH", f"{ANCHOR_H}mm")
     # (The old HoleDia knob is gone: the spring holes are now a native Hole Wizard
     # #47 seed + linear pattern, diameter from the drill standard. HoleX stays --
-    # MidRibReach references it -- and ChannelPitch drives the pattern spacing.)
+    # MidRibReach references it -- and the three station globals drive the seed
+    # while ChannelPitch also drives the pattern spacing.)
     await set_global(adapter, "HoleX", f"{HOLE_X}mm")
+    await set_global(adapter, "ChannelZ0", f"{CHANNEL_Z0}mm")
     await set_global(adapter, "ChannelPitch", f"{CHANNEL_PITCH}mm")
+    await set_global(adapter, "HoleZOffset", f"{HOLE_Z_OFFSET}mm")
     await set_global(adapter, "HexW", f"{HEX_W}mm")
     await set_global(adapter, "HexH", f"{HEX_H}mm")
     await set_global(adapter, "HexDepth", f"{HEX_DEPTH}mm")
