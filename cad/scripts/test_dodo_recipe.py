@@ -322,14 +322,13 @@ def test_export_is_gated_on_the_sw_verify_suites():
     assert {"verify:soundness", "verify:kinematics"} <= deps, deps
 
 
-def test_release_is_gated_on_every_gate():
-    """release must depend on export + preflight + BOTH verify suites + EVERY offline
-    check -- explicit real edges now the spine no longer pulls them transitively, so a
-    release can't publish past a stale/failing gate."""
+def test_release_is_gated_on_every_gate_and_staged_drawing():
+    """Release has real edges to every gate and drawing artifact it stages."""
     dodo = _load_dodo()
     deps = set(dodo.task_release()["task_dep"])
     expected = {"export", "preflight", "verify:soundness", "verify:kinematics",
-                *(f"check:{c}" for c in dodo._CHECK_NAMES)}
+                *(f"check:{c}" for c in dodo._CHECK_NAMES),
+                *(f"drawing:{s}" for s in dodo._drawing_order())}
     assert expected <= deps, expected - deps
 
 
