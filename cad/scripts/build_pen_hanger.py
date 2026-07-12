@@ -52,7 +52,7 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
-from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
+from _holes import TAP_DRILL_MM, HoleSpec, wizard_holes
 
 import _telemetry
 
@@ -66,8 +66,8 @@ STRAP_Z = (9.6, 12.6)  # strap 3 thick, flush with the block back (derived)
 STRAP_TOP_Y = 65.0  # machine 570: support bar top (derived)
 STRAP_TOP_X = (-16.0, 0.0)  # 16 wide at the bar (low; lean runs machine-east)
 STRAP_BOT_X = (-5.0, 5.0)  # 10 wide at the block (low)
-# M6.10: the hanger-screw SHANK passes through near the strap top, so this is a
-# #6 clearance Hole Wizard hole (normal fit Ø4.318; was a plain Ø3.6 cut) --
+# M6.10: the hanger screw threads into the strap near its top, so this is a
+# #6-32 tapped Hole Wizard hole (tap drill Ø2.705) --
 # memory/fastener-policy-us-customary.
 SCREW_HOLE_XY = (-8.5, 60.0)  # machine (-5.5, 565) = block centre +3 + local:
 # within the 5-wide strap/bar overlap east of the bar's free end (machine
@@ -99,7 +99,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "StrapTopXMin", f"{STRAP_TOP_X[0]}mm")
     await set_global(adapter, "StrapTopXMax", f"{STRAP_TOP_X[1]}mm")
     # (The old ScrewHoleDia/ScrewHoleX/ScrewHoleY knobs are gone: the hole is
-    # now a native Hole Wizard #6 clearance feature placed by point.)
+    # now a native Hole Wizard #6-32 tapped feature placed by point.)
 
     # Drive equations collected as dims are recorded, applied in one deferred
     # batch after the whole model + a rebuild exists (every target must resolve).
@@ -206,18 +206,18 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"strap: added {added:.1f}, expected {v_strap:.1f}")
     expected = vol
 
-    # 3. Hanger-screw hole through the strap: ONE native Hole Wizard #6
-    # clearance feature drilled from the strap BACK face (local z 9.6, outward
+    # 3. Hanger-screw hole through the strap: ONE native Hole Wizard #6-32
+    # tapped feature drilled from the strap BACK face (local z 9.6, outward
     # normal -Z) -- the screw enters from behind. At local y 60 only the strap
     # band 9.6..12.6 is material, so the through hole spans just the 3-thick
     # strap.
-    screw_dia = CLEARANCE_MM[("#6", "normal")]
+    screw_dia = TAP_DRILL_MM["#6-32"]
     wizard_holes(
         adapter,
-        HoleSpec("clearance", "#6"),
+        HoleSpec("tapped", "#6-32"),
         [[SCREW_HOLE_XY[0], SCREW_HOLE_XY[1], STRAP_Z[0]]],
         (0.0, 0.0, -1.0),
-        "hanger-screw clearance hole (#6)", name="ScrewHole",
+        "hanger-screw tapped hole (#6-32)", name="ScrewHole",
     )
     expected -= math.pi * (screw_dia / 2.0) ** 2 * (STRAP_Z[1] - STRAP_Z[0])
     vol = await _volume(adapter)

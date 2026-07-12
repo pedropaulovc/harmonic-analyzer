@@ -116,7 +116,7 @@ BLOCK_SCREW_XZ = (
     (-7.164, 82.0),    # back block, east screw
     (19.836, 82.0),    # back block, west screw
 )
-# block seats: #19 drill (O4.216, wizard) -- slotted-screw O3.15 shank clearance
+# block seats: #8-32 tap drill -- the slotted screws thread into the base
 BLOCK_SCREW_HOLE_DEPTH = 3.5  # 18 shank - 16 block = 2 buried + 1.5 air
 FOOT_SCREW_XZ = (
     (20.467, 70.95),  # spring foot (build_pinion_spring hole: the west foot
@@ -125,7 +125,7 @@ FOOT_SCREW_XZ = (
     (-54.7, 102.5),   # NORTH arbor-pedestal flange (PR8, ch12 img09: the
     # mirrored base-standing clamp at z 97.5; ry180 flips its flange to +z)
 )
-# foot seats: 1/8 drill (O3.175, wizard) -- foot-screw O2.0 shank clearance
+# foot seats: #4-40 tap drill -- the foot screws thread into the base
 FOOT_SCREW_HOLE_DEPTH = 7.7  # 8.0 shank under the 0.8 spring strip + air
 
 # The four seat specs, hoisted to module level so the drive-train assembly can
@@ -135,15 +135,15 @@ FOOT_SCREW_HOLE_DEPTH = 7.7  # 8.0 shank under the 0.8 spring strip + air
 PIVOT_SEAT_SPEC = HoleSpec(
     "drilled_letter", "F", end="blind", depth_mm=SWING_HOLE_DEPTH)
 STOP_SEAT_SPEC = HoleSpec(
-    "drilled_number", "#20", end="blind", depth_mm=SWING_HOLE_DEPTH)
+    "tapped", "#8-32", end="blind", depth_mm=SWING_HOLE_DEPTH)
 BLOCK_SEAT_SPEC = HoleSpec(
-    "drilled_number", "#19", end="blind", depth_mm=BLOCK_SCREW_HOLE_DEPTH)
+    "tapped", "#8-32", end="blind", depth_mm=BLOCK_SCREW_HOLE_DEPTH)
 FOOT_SEAT_SPEC = HoleSpec(
-    "drilled_fractional", "1/8", end="blind", depth_mm=FOOT_SCREW_HOLE_DEPTH)
+    "tapped", "#4-40", end="blind", depth_mm=FOOT_SCREW_HOLE_DEPTH)
 PIVOT_SCREW_HOLE_DIA = blind_cut_dia_mm(PIVOT_SEAT_SPEC)  # 6.528 (letter F)
-STOP_SCREW_HOLE_DIA = blind_cut_dia_mm(STOP_SEAT_SPEC)  # 4.089 (#20)
-BLOCK_SCREW_HOLE_DIA = blind_cut_dia_mm(BLOCK_SEAT_SPEC)  # 4.216 (#19)
-FOOT_SCREW_HOLE_DIA = blind_cut_dia_mm(FOOT_SEAT_SPEC)  # 3.175 (1/8)
+STOP_SCREW_HOLE_DIA = blind_cut_dia_mm(STOP_SEAT_SPEC)  # #8-32 tap drill
+BLOCK_SCREW_HOLE_DIA = blind_cut_dia_mm(BLOCK_SEAT_SPEC)  # #8-32 tap drill
+FOOT_SCREW_HOLE_DIA = blind_cut_dia_mm(FOOT_SEAT_SPEC)  # #4-40 tap drill
 
 MM3_PER_IN3 = IN**3
 
@@ -258,24 +258,23 @@ async def build(adapter) -> dict[str, str]:
         )
 
     # Cone swing hardware + alignment-pinion rig seats: native Hole Wizard
-    # BLIND drilled holes from the top face, at the nearest STANDARD DRILL to
-    # each artefact diameter (these are all shank-clearance SEATS, not tapped
-    # -- what a machinist drills; memory/fastener-policy-us-customary). A
-    # wizard blind hole ends in a 118-degree drill point, so the analytic
-    # expectation is blind_hole_volume_mm3 (cylinder + point), not a cylinder.
+    # blind holes from the top face. The pivot remains a clearance seat so the
+    # platform can swing. The stop, block and foot screws thread into tapped
+    # base seats. A wizard blind hole ends in a 118-degree drill point, so the
+    # analytic expectation is blind_hole_volume_mm3 (cylinder + point).
     for tag, spec, xz, depth, label in (
         ("PivotSeat", PIVOT_SEAT_SPEC,
          (PIVOT_SCREW_XZ,), SWING_HOLE_DEPTH,
          "cone-pivot screw seat (letter F)"),
         ("StopSeat", STOP_SEAT_SPEC,
          (STOP_SCREW_XZ,), SWING_HOLE_DEPTH,
-         "swing-stop screw seat (#20)"),
+         "swing-stop tapped seat (#8-32)"),
         ("BlockScrewHoles", BLOCK_SEAT_SPEC,
          BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DEPTH,
-         "pinion-pivot-block screw seats (#19)"),
+         "pinion-pivot-block tapped seats (#8-32)"),
         ("FootScrewHoles", FOOT_SEAT_SPEC,
          FOOT_SCREW_XZ, FOOT_SCREW_HOLE_DEPTH,
-         "foot-screw seats (1/8)"),
+         "foot-screw tapped seats (#4-40)"),
     ):
         dia = blind_cut_dia_mm(spec)
         wizard_holes(
