@@ -99,6 +99,35 @@ def _tag(comment: str) -> str:
     return m.group(1) if m else "?"
 
 
+def _cross(a, b):
+    return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0])
+
+
+def _camera_basis(cam: dict):
+    """(right, up, depth) unit axes for a manifest euler camera -- the pure part
+    of blender_worker.camera_axes (no bpy). depth points toward the camera; a
+    free viewport drag has ~0 depth component, so it exposes the true 2-DOF move
+    and flags that the shift carries NO front-back (depth) information."""
+    import math
+    az, el, roll = (math.radians(cam.get(k, 0.0))
+                    for k in ("az_deg", "el_deg", "roll_deg"))
+    o = (math.sin(az) * math.cos(el), math.sin(el), math.cos(az) * math.cos(el))
+    up = (0.0, 1.0, 0.0)
+    rx = _cross(up, o)
+    n = math.sqrt(sum(c * c for c in rx)) or 1.0
+    r = tuple(c / n for c in rx)
+    u0 = _cross(o, r)
+    cr, sr = math.cos(roll), math.sin(roll)
+    rr = tuple(cr * a + sr * b for a, b in zip(r, u0))
+    uu = tuple(-sr * a + cr * b for a, b in zip(r, u0))
+    return rr, uu, o
+
+
+def _dot(a, b):
+    return sum(x * y for x, y in zip(a, b))
+
+
 def _group_key(entry: dict) -> tuple:
     return (tuple(round(v, 1) for v in entry["translate_mm"]),
             tuple(round(s, 3) for s in entry["scale"]))
@@ -118,6 +147,8 @@ def main() -> int:
 
     data = json.loads(path.read_text(encoding="utf-8"))
     moved = data.get("moved", [])
+    cam = data.get("camera") or {}
+    basis = _camera_basis(cam) if cam.get("az_deg") is not None else None
     # Group parts that moved by the same delta (a rigid-group drag).
     groups: dict[tuple, list[dict]] = {}
     for e in moved:
@@ -148,6 +179,12 @@ def main() -> int:
                     print(f"     [{stem}] {name:<18} = {val:<8} ({t}){mark}")
 
         if max(abs(v) for v in dt) >= _T_MM:
+            if basis is not None:
+                r, u, o = basis
+                print(f"   in-view: right {_dot(dt, r):+.1f}  up {_dot(dt, u):+.1f}  "
+                      f"depth {_dot(dt, o):+.1f} mm  "
+                      f"({'≈0 depth: 2-DOF drag, front-back UNCONSTRAINED — confirm in a 2nd view'
+                        if abs(_dot(dt, o)) < 1.0 else 'has depth: verify it is real, not view-plane'})")
             asms = sorted({a for stem in stems for a in _positioning_assemblies(stem)})
             print(f"   SHIFT   translate_mm = {list(dt)}  -> positioned by mates in:")
             for a in asms:
