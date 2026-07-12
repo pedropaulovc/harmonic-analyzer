@@ -1,10 +1,11 @@
 """Minimal native SolidWorks repro for a bogus hole-table diameter line.
 
 Creates an isolated rectangular plate with one four-position ANSI-inch #4
-normal-clearance Hole Wizard feature, then creates a drawing containing one
-front view and one native hole table.  On the affected SolidWorks 2026 seat,
-each SIZE cell contains the correct through-hole callout followed by the bogus
-``DIAMETER 0.00 X 0 DEG, FAR SIDE`` line.
+normal-clearance Hole Wizard feature and one #30 drilled Hole Wizard feature,
+then creates a drawing containing one front view and one native hole table. On
+the affected SolidWorks 2026 seat, each #4 SIZE cell contains the correct
+through-hole callout followed by the bogus ``DIAMETER 0.00 X 0 DEG, FAR SIDE``
+line, while the #30 comparison row is correct.
 
 No table cell is edited and no custom column is added.  The script fails unless
 the native SIZE text contains both the correct through-hole size and the phantom
@@ -53,7 +54,14 @@ PDF_PATH = REPRO_DIR / "hole-table-zero-diameter.pdf"
 PLATE_WIDTH_MM = 80.0
 PLATE_HEIGHT_MM = 40.0
 PLATE_THICKNESS_MM = 10.0
-HOLES_MM = ((-25.0, -10.0), (-25.0, 10.0), (25.0, -10.0), (25.0, 10.0))
+CLEARANCE_HOLES_MM = (
+    (-25.0, -10.0),
+    (-25.0, 10.0),
+    (25.0, -10.0),
+    (25.0, 10.0),
+)
+NUMBER_DRILL_HOLE_MM = (0.0, 0.0)
+ALL_HOLES_MM = (*CLEARANCE_HOLES_MM, NUMBER_DRILL_HOLE_MM)
 
 # A-size landscape sheet coordinates.  The 1:1 front view is centered here;
 # its geometry therefore spans x=0.060..0.140 and y=0.090..0.130 metres.
@@ -84,15 +92,20 @@ def _table_contents(adapter: Any, table: Any) -> tuple[tuple[str, ...], ...]:
 
 
 def _assert_positive_repro(contents: tuple[tuple[str, ...], ...]) -> None:
-    if len(contents) != 5 or any(len(row) != 4 for row in contents):
+    if len(contents) != 6 or any(len(row) != 4 for row in contents):
         raise RuntimeError(f"unexpected native hole-table shape: {contents!r}")
 
     size_cells = tuple(row[3] for row in contents[1:])
-    missing_thru = tuple(text for text in size_cells if "THRU ALL" not in text.upper())
-    missing_zero = tuple(text for text in size_cells if "0.00" not in text)
-    if missing_thru or missing_zero:
+    bad_clearance = tuple(
+        text for text in size_cells if "3.25 THRU ALL" in text and "0.00" in text
+    )
+    good_number_drill = tuple(
+        text for text in size_cells if "3.26 THRU ALL" in text and "0.00" not in text
+    )
+    if len(bad_clearance) != 4 or len(good_number_drill) != 1:
         raise RuntimeError(
-            f"native table did not reproduce the expected bad SIZE text: {size_cells!r}"
+            "native table did not show four bad #4-clearance rows and one "
+            f"clean #30 comparison row: {size_cells!r}"
         )
 
 
@@ -123,10 +136,18 @@ async def build(adapter: Any) -> dict[str, str]:
         wizard_holes(
             adapter,
             HoleSpec("clearance", "#4"),
-            [[x, y, 0.0] for x, y in HOLES_MM],
+            [[x, y, 0.0] for x, y in CLEARANCE_HOLES_MM],
             (0.0, 0.0, -1.0),
             "#4 normal-clearance through holes",
             name="ClearanceHoles",
+        )
+        wizard_holes(
+            adapter,
+            HoleSpec("drilled_number", "#30"),
+            [[*NUMBER_DRILL_HOLE_MM, 0.0]],
+            (0.0, 0.0, -1.0),
+            "#30 drilled through hole",
+            name="NumberDrillHole",
         )
         check(
             f"save repro part -> {PART_PATH}", await adapter.save_file(str(PART_PATH))
@@ -153,10 +174,10 @@ async def build(adapter: Any) -> dict[str, str]:
                     VIEW_X_M + x / 1000.0,
                     VIEW_Y_M + y / 1000.0 + HOLE_RIM_DY_M,
                 )
-                for x, y in HOLES_MM
+                for x, y in ALL_HOLES_MM
             ),
             anchor_xy=TABLE_XY_M,
-            label="minimal #4-clearance repro",
+            label="minimal #4-clearance / #30 comparison repro",
         )
         contents = _table_contents(adapter, table)
         _telemetry.info(f"native hole-table contents: {contents!r}")
