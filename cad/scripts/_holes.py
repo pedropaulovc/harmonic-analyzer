@@ -54,11 +54,11 @@ _KINDS = {
 _ENDS = {"blind": 0, "through_all": 1, "through_next": 2}
 _FITS = {"close": 0, "normal": 1, "loose": 2}  # swWzdHoleScrewClearanceTypes_e
 
-# Cut diameters (mm) straight from THIS seat's wizard database
-# (diag_hole_wizard_tables.py dump, cad/out/reports/hole-wizard-tables.txt).
-# The definition's table-derived doubles read back 0.0 (probe 2026-07-11), so
-# scripts take their analytic volume expectations from these pinned values;
-# diag_hole_wizard.py re-proves each by measured volume.
+# Cut diameters (mm) from this seat's wizard database and live feature probes.
+# HoleDiameter commonly reads 0.0; a plain through hole's usable value is in
+# ThruHoleDiameter (live #4 normal = 0.0032639 m). Scripts take analytic volume
+# expectations from these pinned values; diag_hole_wizard.py re-proves the
+# representative cases by measured volume.
 TAP_DRILL_MM = {          # taps cut the tap-drill diameter (TAP_DRILL column)
     "#2-56": 1.778, "#3-48": 1.994, "#4-40": 2.261, "#6-32": 2.705,
     "#8-32": 3.454, "#10-24": 3.797, "1/4-20": 5.105, "5/16-18": 6.528,
@@ -67,7 +67,7 @@ TAP_DRILL_MM = {          # taps cut the tap-drill diameter (TAP_DRILL column)
 CLEARANCE_MM = {          # (size, fit) -> hole diameter (CLOSE/NORMAL/LOOSE_FIT)
     ("#2", "close"): 2.388, ("#2", "normal"): 2.591, ("#2", "loose"): 2.946,
     ("#3", "close"): 2.692, ("#3", "normal"): 2.946, ("#3", "loose"): 3.251,
-    ("#4", "close"): 3.048, ("#4", "normal"): 3.251, ("#4", "loose"): 3.658,
+    ("#4", "close"): 3.048, ("#4", "normal"): 3.264, ("#4", "loose"): 3.658,
     ("#6", "close"): 3.912, ("#6", "normal"): 4.318, ("#6", "loose"): 4.699,
     ("#8", "close"): 4.572, ("#8", "normal"): 4.978, ("#8", "loose"): 5.410,
     ("1/4", "close"): 6.756, ("1/4", "normal"): 7.137, ("1/4", "loose"): 7.544,
