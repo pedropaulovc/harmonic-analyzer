@@ -56,13 +56,14 @@ Design notes / invariants:
   (issue #73). Three knobs, all best-effort and never able to fail a build:
   ``HARMONIC_CACHE_DEBUG=1`` logs every ``(relpath, digest)`` that feeds a key plus
   the final key, so a key shift is a readable diff; every restore/store event is
-  appended to ``cad/out/reports/cache.jsonl`` (key + inputs digest + event), so
+  appended to ``cad/out/reports/cache.jsonl`` (key + per-dependency inputs on
+  miss/drift + event), so
   post-hoc debugging reads a file instead of the terminal; and a per-label
-  ``cad/out/reports/cache-keys/<label>.key`` sidecar records the last key THIS seat
-  published, so on a HIT under a different key we WARN -- surfacing the
-  store-skip-on-hit drift (a HIT returns early and never re-stores, so the seat can
-  serve a key it never published) directly. ``cache_status`` (a doit task) prints
-  all of the above per part/assembly in one command.
+  ``cad/out/reports/cache-keys/<label>.key`` sidecar records the last key and input
+  provenance THIS seat published, so on a HIT under a different key we WARN. This
+  surfaces store-skip-on-hit drift (a HIT returns early and never re-stores, so the
+  seat can serve a key it never published) directly. ``cache_status`` (a doit task)
+  prints all of the above per part/assembly in one command.
 
 Backend: an **Azure Blob container** reached over HTTPS (443). Speaks plain object
 storage, so it works from anywhere -- including networks (e.g. residential ISPs)
@@ -142,6 +143,11 @@ _DEFAULT_MODE = "rw"
 _REPORTS = REPO_ROOT / "cad" / "out" / "reports"
 _EVENTS_LOG = _REPORTS / "cache.jsonl"
 _KEYDIR = _REPORTS / "cache-keys"
+
+# Per-process provenance carried from cache_key() into restore()/store(). A task
+# computes its key immediately before those calls, so this stays bounded to the
+# current doit process and avoids threading a second return value through dodo.
+_KEY_INPUTS: dict[tuple[str, str], list[tuple[str, str]]] = {}
 
 
 def _log(msg: str) -> None:
@@ -235,6 +241,8 @@ def cache_key(file_deps: list[str], digest_one, label: str | None = None) -> str
     key and the resulting key, tagged by ``label`` -- so a debugger can see exactly
     which dep digest moved when a key shifts (issue #73)."""
     key, pairs = key_inputs(file_deps, digest_one)
+    if label:
+        _KEY_INPUTS[(label, key)] = pairs
     if _debug():
         head = label or "?"
         _log(f"key provenance {head} (epoch={_CACHE_EPOCH} salt={_salt()}):")
@@ -366,13 +374,24 @@ def config_summary() -> dict:
 # so each swallows OSError and returns a benign default.
 # --------------------------------------------------------------------------- #
 def _record(event: str, label: str, key: str) -> None:
-    """Append one cache event to cad/out/reports/cache.jsonl. The key encodes the
-    full input set (epoch + salt + every (relpath, digest)), so logging it makes a
-    later key diff explainable without scrollback."""
+    """Append one cache event to cache.jsonl, including readable provenance for
+    miss/drift outcomes so a historical key shift remains explainable even after
+    the last-published sidecar advances to the newly built key (issue #255)."""
     try:
         _REPORTS.mkdir(parents=True, exist_ok=True)
         rec = {"ts": round(time.time(), 3), "event": event, "label": label,
                "key": key, "epoch": _CACHE_EPOCH, "salt": _salt()}
+        if event in ("restore_miss", "restore_hit_drift"):
+            pairs = _KEY_INPUTS.get((label, key))
+            if pairs is not None:
+                rec["inputs"] = [{"path": path, "digest": digest} for path, digest in pairs]
+            previous = _stored_provenance(label)
+            if previous and previous["key"] != key:
+                rec["previous_key"] = previous["key"]
+                rec["previous_inputs"] = [
+                    {"path": path, "digest": digest}
+                    for path, digest in previous["inputs"]
+                ]
         with _EVENTS_LOG.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(rec) + "\n")
     except OSError:
@@ -387,16 +406,49 @@ def last_stored_key(label: str) -> str | None:
     """The last key THIS seat actually PUBLISHED for ``label`` (None if never).
     Updated only by a successful ``store`` -- a HIT does NOT update it, so a HIT
     under a different key reveals the store-skip-on-hit drift."""
+    saved = _stored_provenance(label)
+    return saved["key"] if saved else None
+
+
+def last_stored_inputs(label: str) -> list[tuple[str, str]]:
+    """Per-dependency provenance for the last key this seat published."""
+    saved = _stored_provenance(label)
+    return list(saved["inputs"]) if saved else []
+
+
+def _stored_provenance(label: str) -> dict | None:
+    """Read the JSON sidecar, accepting legacy plain-key files from issue #73."""
     try:
-        return _key_sidecar(label).read_text(encoding="utf-8").strip() or None
-    except OSError:
+        raw = _key_sidecar(label).read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeError):
         return None
+    if not raw:
+        return None
+    try:
+        saved = json.loads(raw)
+    except json.JSONDecodeError:
+        return {"key": raw, "inputs": []}
+    if not isinstance(saved, dict) or not isinstance(saved.get("key"), str):
+        return None
+    inputs = saved.get("inputs", [])
+    if not isinstance(inputs, list):
+        inputs = []
+    pairs = [
+        (pair[0], pair[1])
+        for pair in inputs
+        if isinstance(pair, list)
+        and len(pair) == 2
+        and isinstance(pair[0], str)
+        and isinstance(pair[1], str)
+    ]
+    return {"key": saved["key"], "inputs": pairs}
 
 
 def _save_stored_key(label: str, key: str) -> None:
     try:
         _KEYDIR.mkdir(parents=True, exist_ok=True)
-        _key_sidecar(label).write_text(key + "\n", encoding="utf-8")
+        saved = {"key": key, "inputs": _KEY_INPUTS.get((label, key), [])}
+        _key_sidecar(label).write_text(json.dumps(saved) + "\n", encoding="utf-8")
     except OSError:
         pass
 
