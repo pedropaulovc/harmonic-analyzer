@@ -395,6 +395,9 @@ comparisons/render/
 comparisons/composite/
 comparisons/scores.json
 comparisons/index.html
+# Per-iteration part-fit deltas (pose_studio.py Export Part Deltas -> map_deltas.py);
+# scratch tied to one geometry snapshot, consumed into a build-script edit then discarded.
+comparisons/findings/
 
 # Mesa OSMesa software-GL DLL fetched on demand for headless VTK rendering
 # (comparisons/tools/osmesa_win.py; ~55 MB, regenerable from pal1000/mesa-dist-win)
