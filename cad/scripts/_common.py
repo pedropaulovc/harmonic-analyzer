@@ -375,14 +375,27 @@ class SketchDims:
         helper's emission ever drifts from what it recorded, instead of silently
         mis-naming."""
         feat = _feature_by_name(adapter, feature_name)
-        actual = len(list(_display_dimensions(feat, feature_name)))
+        return self.apply_feature(adapter, feat, feature_name)
+
+    def apply_feature(
+        self, adapter: Any, feature: Any, feature_name: str
+    ) -> list[tuple[str, str]]:
+        """Apply this record to an already-resolved feature dispatch.
+
+        Hole Wizard placement sketches are subfeatures and therefore absent
+        from the document's top-level feature walk. Callers that already hold
+        the subfeature use this path; ordinary sketches keep :meth:`apply`.
+        """
+        actual = len(list(_display_dimensions(feature, feature_name)))
         if actual != len(self._rows):
             raise RuntimeError(
                 f"{feature_name}: recorded {len(self._rows)} dims but the feature "
                 f"has {actual} -- a define_* helper's dim emission drifted from "
                 "what it recorded into SketchDims"
             )
-        name_dimensions(adapter, feature_name, [name for name, _ in self._rows])
+        _name_dimensions_feature(
+            feature, feature_name, [name for name, _ in self._rows]
+        )
         return [
             (f"{name}@{feature_name}", drive)
             for name, drive in self._rows
@@ -1372,6 +1385,13 @@ def name_dimensions(adapter: Any, feature_name: str, names: list[str | None]) ->
     sketch's dimensioning ever changes, cross-check against
     :func:`dump_dimensions`. Returns the new ``leaf@feature`` names."""
     feat = _feature_by_name(adapter, feature_name)
+    return _name_dimensions_feature(feat, feature_name, names)
+
+
+def _name_dimensions_feature(
+    feat: Any, feature_name: str, names: list[str | None]
+) -> list[str]:
+    """Rename dimensions on an already-resolved feature dispatch."""
     dims = list(_display_dimensions(feat, feature_name))
     if len(names) > len(dims):
         raise RuntimeError(
