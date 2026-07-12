@@ -22,7 +22,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, run_build
+from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -33,7 +33,7 @@ from _drawing_common import (
     finalize_drawing,
     insert_hole_table,
     new_project_drawing,
-    read_required_view_properties,
+    read_required_properties,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -113,6 +113,26 @@ async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
+    check("open rocker-arm-support source", await adapter.open_model(str(SOURCE)))
+    read_required_properties(
+        adapter.currentModel,
+        (
+            "Number",
+            "Revision",
+            "Title",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+        ),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+        ),
+    )
     drawing_model, sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -130,18 +150,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # Explicit per-view scale: a view placed without one can silently
     # auto-scale, which shifts every coordinate-based pick on it.
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 2))
-    read_required_view_properties(
-        adapter,
-        front,
-        (
-            "Number", "Revision", "Title", "Material Specification", "Finish",
-            "Quantity", "Manufacturing Notes",
-        ),
-        required=(
-            "Number", "Material Specification", "Finish", "Quantity",
-            "Manufacturing Notes",
-        ),
-    )
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 2))
     bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=(1, 2))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
