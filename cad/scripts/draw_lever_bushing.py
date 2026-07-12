@@ -50,18 +50,18 @@ ISO_CENTER = (0.315, 0.205)
 
 FRONT_KEEP = {
     "OuterDia": (
-        FRONT_CENTER[0],
-        FRONT_CENTER[1] + OUTER_DIA * SHEET_SCALE[0] / 1000.0,
+        FRONT_CENTER[0] - 0.035,
+        FRONT_CENTER[1] + 0.010,
     ),
     "BoreDia": (
-        FRONT_CENTER[0],
-        FRONT_CENTER[1] + BORE_DIA * SHEET_SCALE[0] / 1000.0,
+        FRONT_CENTER[0] + OUTER_DIA * SHEET_SCALE[0] / 1000.0 + 0.020,
+        FRONT_CENTER[1] - 0.010,
     ),
 }
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.040),
 }
-DIMENSION_CALLOUTS = {"BoreDia": "THRU - REAM, SEE NOTE 5"}
+DIMENSION_CALLOUTS = {"BoreDia": "THRU (NOTE 5)"}
 
 _NOTES = (
     "UNLESS OTHERWISE SPECIFIED:",
@@ -83,7 +83,11 @@ _NOTES = (
         "6. CONCENTRICITY OF OD TO BORE: 0.05 TIR.\n"
         "   OD AND END FACES Ra 3.2. ALL Ra VALUES IN MICROMETRES."
     ),
-    "7. MAKE 19 IDENTICAL PIECES; DEBURR BORE EDGES WITHOUT BELL-MOUTH.",
+    (
+        "7. MAKE 19 IDENTICAL PIECES.\n"
+        "   DEBURR BORE EDGES;\n"
+        "   AVOID BELL-MOUTH."
+    ),
 )
 
 
@@ -142,7 +146,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center marks to front view")
 
     add_note(adapter, "\n".join(_NOTES[:4]), 0.014, 0.112)
-    add_note(adapter, "\n".join(_NOTES[4:]), 0.190, 0.105)
+    add_note(adapter, "\n".join(_NOTES[4:]), 0.170, 0.105)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
