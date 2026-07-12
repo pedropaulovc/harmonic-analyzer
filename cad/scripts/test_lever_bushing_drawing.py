@@ -35,7 +35,7 @@ def test_notes_define_a_buildable_turned_part() -> None:
     assert "REAM O6.50 THRU" in notes
     assert drawing.DIMENSION_CALLOUTS["Depth"] == "+/-0.03"
     assert "0.05 TIR" in notes
-    assert "0.15-0.18 DIAMETRAL CLEARANCE" in notes
+    assert "0.15-0.20 DIAMETRAL CLEARANCE" in notes
     assert "CONCENTRICITY" not in notes
     assert "MAKE 19" in notes
     assert "Ra 1.6" in notes
