@@ -8,6 +8,7 @@ import hashlib
 import json
 import re
 from collections.abc import Iterable
+from enum import StrEnum
 from typing import Any
 
 import _telemetry
@@ -454,6 +455,7 @@ _FLIP_INVERT: frozenset[str] = frozenset({
     "foot screw datum Z",
     "fulcrum shaft datum x",
     "fulcrum shaft datum y",
+    "hanger screw head plane",
     "knob wheel axial",
     "lever axial seat",
     "lever bushing axial z",
@@ -1056,6 +1058,285 @@ async def place_component(
         assert_component_placed(adapter, name, position, rows)
         _ledger_record(name, position, rows)
         return name
+
+
+_LOCAL_LINEAR_PATTERN = 108  # swFeatureNameID_e.swFmLocalLPattern
+_LOCAL_CIRCULAR_PATTERN = 109  # swFeatureNameID_e.swFmLocalCirPattern
+_GLOBAL_PATTERN_AXIS_PLANES = {
+    "x": ("Top Plane", "Front Plane"),
+    "y": ("Front Plane", "Right Plane"),
+    "z": ("Top Plane", "Right Plane"),
+}
+
+
+class PatternDirection(StrEnum):
+    FORWARD = "forward"
+    REVERSE = "reverse"
+
+
+def _top_features(model: Any) -> list[Any]:
+    features = []
+    feature = _read_member(model, "FirstFeature")
+    while feature is not None:
+        _flag(feature, "IFeature")
+        features.append(feature)
+        feature = feature.GetNextFeature()
+    return features
+
+
+@_telemetry.traced("assembly.pattern_axis", label_param="axis")
+def ensure_global_pattern_axis(adapter: Any, axis: str) -> str:
+    """Create/reuse an assembly reference axis aligned to global X, Y, or Z."""
+    from solidworks_mcp.adapters.com_variant import null_callout
+
+    key = axis.lower()
+    try:
+        planes = _GLOBAL_PATTERN_AXIS_PLANES[key]
+    except KeyError as exc:
+        raise ValueError(f"pattern axis must be x, y, or z; got {axis!r}") from exc
+
+    model = adapter.currentModel
+    name = f"PatternAxis{key.upper()}"
+    existing = adapter._attempt(lambda: model.FeatureByName(name), default=None)
+    if existing is not None:
+        return name
+
+    before = {str(_read_member(feature, "Name")) for feature in _top_features(model)}
+    model.ClearSelection2(True)
+    for index, plane in enumerate(planes):
+        selected = model.Extension.SelectByID2(
+            plane,
+            "PLANE",
+            0.0,
+            0.0,
+            0.0,
+            index > 0,
+            0,
+            null_callout(),
+            0,
+        )
+        if not selected:
+            raise RuntimeError(f"cannot select {plane} for global {key}-axis")
+    if not model.InsertAxis2(True):
+        raise RuntimeError(f"SOLIDWORKS rejected global {key}-axis creation")
+
+    created = [
+        feature for feature in _top_features(model)
+        if str(_read_member(feature, "Name")) not in before
+        and str(feature.GetTypeName2()) == "RefAxis"
+    ]
+    if len(created) != 1:
+        raise RuntimeError(
+            f"global {key}-axis created {len(created)} reference-axis features"
+        )
+    created[0].Name = name
+    model.ClearSelection2(True)
+    _telemetry.success(f"created assembly pattern axis {name}")
+    return name
+
+
+def _select_pattern_inputs(
+    adapter: Any,
+    seed_components: tuple[str, ...],
+    direction_name: str,
+    direction_type: str,
+) -> None:
+    from solidworks_mcp.adapters.com_variant import null_callout
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    selected = model.Extension.SelectByID2(
+        direction_name,
+        direction_type,
+        0.0,
+        0.0,
+        0.0,
+        False,
+        2,
+        null_callout(),
+        0,
+    )
+    if not selected:
+        raise RuntimeError(
+            f"cannot select pattern direction {direction_type} {direction_name!r}"
+        )
+    for seed_component in seed_components:
+        component = adapter._attempt(
+            lambda name=seed_component: model.GetComponentByName(name), default=None
+        )
+        if component is None or not component.Select2(True, 1):
+            raise RuntimeError(
+                f"cannot select pattern seed component {seed_component!r}"
+            )
+
+
+def _new_pattern_components(model: Any, before: set[str]) -> list[Any]:
+    components = model.GetComponents(False) or []
+    return [
+        component for component in components
+        if str(_read_member(component, "Name2")) not in before
+    ]
+
+
+def assert_pattern_targets(
+    adapter: Any,
+    instances: Iterable[str],
+    targets: Iterable[list[float]],
+    rows: list[list[float]],
+    label: str,
+) -> None:
+    """Match unordered native-pattern instances to authored poses and gate each."""
+    unmatched = set(instances)
+    for target in targets:
+        matching = [
+            name
+            for name in unmatched
+            if all(
+                abs(component_transform(adapter, name)[9 + axis] * 1000.0 - target[axis])
+                < 0.05
+                for axis in range(3)
+            )
+        ]
+        if len(matching) != 1:
+            raise RuntimeError(f"{label} has {len(matching)} instances at {target}")
+        name = matching[0]
+        assert_component_placed(adapter, name, target, rows)
+        _ledger_record(name, target, rows)
+        unmatched.remove(name)
+    if unmatched:
+        raise RuntimeError(f"{label} has unexpected instances: {sorted(unmatched)}")
+
+
+async def linear_component_pattern(
+    adapter: Any,
+    seed_components: Iterable[str],
+    *,
+    axis: str,
+    spacing_mm: float,
+    instances: int,
+    direction: PatternDirection = PatternDirection.FORWARD,
+    label: str = "linear fastener pattern",
+) -> list[str]:
+    """Pattern one or more seed components along a global assembly axis."""
+    if instances < 2:
+        raise ValueError("linear component pattern requires at least two instances")
+    if spacing_mm <= 0.0:
+        raise ValueError("linear component pattern spacing must be positive")
+    seeds = tuple(seed_components)
+    if not seeds:
+        raise ValueError("linear component pattern requires at least one seed")
+    if len(set(seeds)) != len(seeds):
+        raise ValueError("linear component pattern seeds must be unique")
+
+    model = adapter.currentModel
+    direction_name = ensure_global_pattern_axis(adapter, axis)
+    before = {
+        str(_read_member(component, "Name2"))
+        for component in (model.GetComponents(False) or [])
+    }
+    async with _telemetry.aspan(
+        f"pattern {label}", kind="linear", seeds=",".join(seeds),
+        axis=axis.lower(), instances=instances, spacing_mm=spacing_mm,
+    ):
+        _select_pattern_inputs(adapter, seeds, direction_name, "AXIS")
+        manager = model.FeatureManager
+        _flag(manager, "IFeatureManager")
+        definition = manager.CreateDefinition(_LOCAL_LINEAR_PATTERN)
+        if definition is None:
+            raise RuntimeError("cannot create local linear pattern definition")
+        _flag(definition, "ILocalLinearPatternFeatureData")
+        definition.D1ReverseDirection = direction is PatternDirection.REVERSE
+        definition.D1Spacing = spacing_mm / 1000.0
+        definition.D1TotalInstances = instances
+        definition.D2PatternSeedOnly = False
+        definition.D2ReverseDirection = False
+        definition.D2Spacing = 0.001
+        definition.D2TotalInstances = 1
+        definition.SynchronizeFlexibleComponents = False
+        feature = manager.CreateFeature(definition)
+        model.ClearSelection2(True)
+        if feature is None:
+            raise RuntimeError(f"SOLIDWORKS rejected {label}")
+        _flag(feature, "IFeature")
+        feature.Name = label
+
+        created = _new_pattern_components(model, before)
+        expected = len(seeds) * (instances - 1)
+        if len(created) != expected:
+            raise RuntimeError(
+                f"{label} created {len(created)} components, expected {expected}"
+            )
+        names = []
+        for component in created:
+            _flag_only(component, "IsPatternInstance")
+            name = str(_read_member(component, "Name2"))
+            if not component.IsPatternInstance():
+                raise RuntimeError(f"{name} is not owned by the component pattern")
+            names.append(name)
+        _telemetry.success(f"{label}: created {len(names)} pattern instances")
+        return names
+
+
+async def circular_component_pattern(
+    adapter: Any,
+    seed_components: Iterable[str],
+    *,
+    axis_name: str,
+    instances: int,
+    direction: PatternDirection = PatternDirection.FORWARD,
+    label: str = "circular fastener pattern",
+) -> list[str]:
+    """Pattern seed components equally through 360 degrees around a named axis."""
+    if instances < 2:
+        raise ValueError("circular component pattern requires at least two instances")
+    seeds = tuple(seed_components)
+    if not seeds:
+        raise ValueError("circular component pattern requires at least one seed")
+    if len(set(seeds)) != len(seeds):
+        raise ValueError("circular component pattern seeds must be unique")
+
+    model = adapter.currentModel
+    before = {
+        str(_read_member(component, "Name2"))
+        for component in (model.GetComponents(False) or [])
+    }
+    async with _telemetry.aspan(
+        f"pattern {label}", kind="circular", seeds=",".join(seeds),
+        axis=axis_name, instances=instances,
+    ):
+        _select_pattern_inputs(adapter, seeds, axis_name, "AXIS")
+        manager = model.FeatureManager
+        _flag(manager, "IFeatureManager")
+        definition = manager.CreateDefinition(_LOCAL_CIRCULAR_PATTERN)
+        if definition is None:
+            raise RuntimeError("cannot create local circular pattern definition")
+        _flag(definition, "ILocalCircularPatternFeatureData")
+        definition.TotalInstances = instances
+        definition.EqualSpacing = True
+        definition.ReverseDirection = direction is PatternDirection.REVERSE
+        definition.SynchronizeFlexibleComponents = False
+        feature = manager.CreateFeature(definition)
+        model.ClearSelection2(True)
+        if feature is None:
+            raise RuntimeError(f"SOLIDWORKS rejected {label}")
+        _flag(feature, "IFeature")
+        feature.Name = label
+
+        created = _new_pattern_components(model, before)
+        expected = len(seeds) * (instances - 1)
+        if len(created) != expected:
+            raise RuntimeError(
+                f"{label} created {len(created)} components, expected {expected}"
+            )
+        names = []
+        for component in created:
+            _flag_only(component, "IsPatternInstance")
+            name = str(_read_member(component, "Name2"))
+            if not component.IsPatternInstance():
+                raise RuntimeError(f"{name} is not owned by the component pattern")
+            names.append(name)
+        _telemetry.success(f"{label}: created {len(names)} pattern instances")
+        return names
 
 def _placement_transform(rows: list[list[float]], position_mm: list[float]) -> list[float]:
     """The 16-double ``IMathTransform`` for a component at ``rows``/``position_mm``.
@@ -1946,19 +2227,74 @@ async def save_assembly_and_images(
     # remap_front_to_machine_front (which re-bases the standard views) so the
     # re-based Front/Back/etc. used by the gallery stay correct.
     set_isometric_view(adapter)
-    check(f"save_file -> {asm_path}", await adapter.save_file(str(asm_path)))
-    # Record the resolved-geometry fingerprint of the just-built assembly so a later
-    # in-place refresh of it (unchanged) is a true no-op and never bumps the md5 --
-    # otherwise the first refresh after a from-scratch build would re-save once and
-    # cascade up the tree (see save_assembly_in_place / _massprops_sidecar).
-    digest = await assembly_geometry_digest(adapter, asm_name)
-    sidecar = _massprops_sidecar(asm_name)
-    sidecar.parent.mkdir(parents=True, exist_ok=True)
-    sidecar.write_text(digest + "\n", encoding="utf-8")
+    _save_new_assembly_as_copy(adapter, asm_path)
+    try:
+        # Record the resolved-geometry fingerprint of the just-built assembly so a
+        # later in-place refresh of it (unchanged) is a true no-op and never bumps
+        # the md5 -- otherwise the first refresh after a from-scratch build would
+        # re-save once and cascade up the tree (see save_assembly_in_place /
+        # _massprops_sidecar).
+        digest = await assembly_geometry_digest(adapter, asm_name)
+        sidecar = _massprops_sidecar(asm_name)
+        sidecar.parent.mkdir(parents=True, exist_ok=True)
+        sidecar.write_text(digest + "\n", encoding="utf-8")
 
-    artefacts = {"assembly": str(asm_path)}
-    artefacts.update(await _export_assembly_images(adapter, asm_name, views))
-    return artefacts
+        artefacts = {"assembly": str(asm_path)}
+        artefacts.update(await _export_assembly_images(adapter, asm_name, views))
+        return artefacts
+    finally:
+        _discard_copy_source(adapter)
+
+
+@_telemetry.traced("assembly.save_copy")
+def _save_new_assembly_as_copy(adapter: Any, asm_path: Any) -> None:
+    """Save a freshly built assembly without rewriting referenced artifacts.
+
+    Creating a native component pattern marks its seed component document dirty.
+    A plain ``SaveAs3(..., options=0)`` then raises the blocking "Component
+    documents must be saved" dialog. Save the new assembly as a copy with
+    Silent (1) | Copy (2) | AvoidRebuildOnSave (8): Copy writes the assembly
+    while leaving the dirty seed documents alone, and the assembly task never
+    rewrites artifacts owned by part or child-assembly tasks. The full-build path
+    always owns a new, unsaved assembly document; refreshes use
+    :func:`save_assembly_in_place` instead.
+
+    ``SaveAs3``'s integer return is unreliable across late-bound COM, so success
+    is gated on this call producing a new, non-empty target file.
+    """
+    options = 1 | 2 | 8
+    model = adapter.currentModel
+    if asm_path.exists():
+        adapter._attempt(lambda: adapter.swApp.CloseDoc(str(asm_path)), default=None)
+        asm_path.unlink()
+
+    result = adapter._attempt(
+        lambda: model.SaveAs3(str(asm_path), 0, options), default=None
+    )
+    if not asm_path.exists() or asm_path.stat().st_size <= 0:
+        raise RuntimeError(
+            f"SaveAs3(Silent|Copy|AvoidRebuild) produced no file: "
+            f"{asm_path} (rc={result!r})"
+        )
+    _telemetry.success(f"save assembly copy -> {asm_path} (rc={result!r})")
+
+
+@_telemetry.traced("assembly.discard_copy_source")
+def _discard_copy_source(adapter: Any) -> None:
+    """Close the dirty untitled source left active by ``SaveAs3(..., Copy)``."""
+    model = adapter.currentModel
+    title = adapter._attempt(lambda: str(model.GetTitle()), default="")
+    if not title:
+        raise RuntimeError("cannot discard copy-saved assembly without its title")
+
+    adapter.swApp.CloseDoc(title)
+    still_open = adapter._attempt(
+        lambda: adapter.swApp.GetOpenDocument(title), default=None
+    )
+    if still_open is not None:
+        raise RuntimeError(f"copy-saved assembly source remained open: {title}")
+    adapter.currentModel = None
+    _telemetry.success(f"discard dirty assembly source {title!r}")
 
 def _massprops_sidecar(asm_name: str):
     """Sidecar holding the last-saved resolved-geometry fingerprint of an assembly.

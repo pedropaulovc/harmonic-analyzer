@@ -67,13 +67,17 @@ from _assembly import (
     angle_driver,
     assert_component_placed,
     assert_free_dof_necessity,
+    assert_pattern_targets,
     check_no_interference,
     coincident_mate,
     component_named_ref,
     component_origin,
     distance_driver,
+    linear_component_pattern,
     lock_mate,
     named_ref,
+    parallel_mate,
+    PatternDirection,
     place_component,
     reset_dof_manifest,
     save_assembly_and_images,
@@ -271,8 +275,13 @@ async def build(adapter) -> dict[str, str]:
     # at ONE column with a free end just past the pen hanger -- M6.8
     # 8-view pass). Span -8..+192 covers the axle (+53) and the hanger
     # strap top (+3..+19).
-    await place_component(adapter, "wheel-bar", [WHEEL_BAR_X0, WHEEL_BAR_Y, BAR_Z],
-                          [0.0, 0.0, 0.0], IDENTITY)
+    wheel_bar = await place_component(
+        adapter,
+        "wheel-bar",
+        [WHEEL_BAR_X0, WHEEL_BAR_Y, BAR_Z],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+    )
     # Two-piece clamp at the west column -- the SAME black arcs as the platen
     # support bar (ch30 p005 / paper-drive PR #196 E2): the front arc's face
     # carries the bar's back face, the back arc closes on the column, and two
@@ -282,10 +291,60 @@ async def build(adapter) -> dict[str, str]:
         await place_component(adapter, arc, [COLUMN_X, WHEEL_BAR_Y, COLUMN_Z],
                               [0.0, 90.0, 0.0], ROT_Y_POS90,
                               label=f"{arc} (wheel x{COLUMN_X:.0f})")
-    for x in CLAMP_SCREW_X:
-        await place_component(adapter, "clamp-screw", [x, WHEEL_BAR_Y, BAR_FRONT_Z],
-                              [0.0, 0.0, 0.0], IDENTITY,
-                              label=f"clamp-screw (wheel x{x:+.1f})")
+    # One physically mated seed plus a native component pattern.  Seed at the
+    # lower-X hole so PatternAxisX FORWARD lands the generated instance on the
+    # second Hole Wizard station; both stations derive from the same bar
+    # constants.  Coaxial + under-head seat are the real contacts.  The plane
+    # parallel mate removes only the immaterial spin of this revolved screw.
+    seed_x, patterned_x = sorted(CLAMP_SCREW_X)
+    seed_target = [seed_x, WHEEL_BAR_Y, BAR_FRONT_Z]
+    clamp_seed = await place_component(
+        adapter,
+        "clamp-screw",
+        seed_target,
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label=f"clamp-screw seed (wheel x{seed_x:+.1f})",
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"ScrewAxis@{clamp_seed}", "AXIS"),
+        named_ref(f"ClampAxis0@{wheel_bar}", "AXIS"),
+        label="wheel clamp-screw seed coaxial with clamp hole 0",
+        verify=(clamp_seed, seed_target),
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"Front Plane@{clamp_seed}", "PLANE"),
+        named_ref(f"ClampSeat@{wheel_bar}", "PLANE"),
+        label="wheel clamp-screw seed under-head seats on wheel bar",
+        verify=(clamp_seed, seed_target),
+    )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Right Plane@{clamp_seed}", "PLANE"),
+        named_ref(f"Right Plane@{wheel_bar}", "PLANE"),
+        label="wheel clamp-screw seed anti-spin",
+        verify=(clamp_seed, seed_target),
+    )
+    assert_component_placed(adapter, clamp_seed, seed_target, IDENTITY)
+    clamp_instances = await linear_component_pattern(
+        adapter,
+        [clamp_seed],
+        axis="x",
+        spacing_mm=patterned_x - seed_x,
+        instances=2,
+        direction=PatternDirection.REVERSE,
+        label="wheel clamp-screw pattern",
+    )
+    assert_pattern_targets(
+        adapter,
+        clamp_instances,
+        [[patterned_x, WHEEL_BAR_Y, BAR_FRONT_Z]],
+        IDENTITY,
+        "wheel clamp-screw pattern",
+    )
 
     # --- magnifying group ----------------------------------------------------
     # The lever pivots about the summing bar's knife-edge ridge (see the

@@ -32,6 +32,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_bore_axis,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -163,6 +164,16 @@ async def build(adapter) -> dict[str, str]:
     v_screw = math.pi * (TAP_DRILL_MM["#4-40"] / 2.0) ** 2 * RAIL_END
     v_final = ring_expected - v_screw
     await volume_check(adapter, "screw hole", v_final, 15.0)
+
+    await name_bore_axis(
+        adapter,
+        "Right Plane",
+        OUTER_WIDTH / 2.0,
+        "Front Plane",
+        FRAME_DEPTH / 2.0,
+        "set-screw hole",
+    )
+    name_last_feature(adapter, "SetScrewAxis")
 
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built

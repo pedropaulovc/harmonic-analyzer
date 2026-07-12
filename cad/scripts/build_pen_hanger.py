@@ -44,6 +44,7 @@ from _common import (
     ensure_fully_defined,
     extrude_at_offset,
     force_rebuild,
+    name_bore_axis,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -231,6 +232,16 @@ async def build(adapter) -> dict[str, str]:
     _telemetry.info(f"volume after screw hole: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 1.0:
         raise RuntimeError(f"screw hole volume {vol:.1f} != {expected:.1f}")
+
+    await name_bore_axis(
+        adapter,
+        "Right Plane",
+        SCREW_HOLE_XY[0],
+        "Top Plane",
+        SCREW_HOLE_XY[1],
+        "hanger-screw hole",
+    )
+    name_last_feature(adapter, "HangerScrewAxis")
 
     # Apply the deferred drive equations after the model + a rebuild exists, then
     # re-check neutrality: every equation evaluates to the as-built value, so the

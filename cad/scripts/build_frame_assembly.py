@@ -96,13 +96,16 @@ from _common import (
 from _assembly import (
     assert_component_placed,
     assert_components_fully_defined,
+    assert_pattern_targets,
     check_no_interference,
     coincident_mate,
     component_names,
     component_transform,
     delete_assembly_feature,
+    linear_component_pattern,
     named_ref,
     parallel_mate,
+    PatternDirection,
     place_component,
     plane_distance_mate,
     save_assembly_and_images,
@@ -437,16 +440,24 @@ async def build(adapter) -> dict[str, str]:
         )
         assert_component_placed(adapter, screw_name, screw_target, IDENTITY)
         screw_names.append(screw_name)
-    frame_x = check(
-        "axis FrameX (Top ∩ Front)",
-        await adapter.create_axis(
-            CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Front Plane"])
-        ),
-    ).name
-    await _pattern_pair(
-        adapter, screw_names, frame_x,
-        LAG_SCREW_XZ[2][0] - LAG_SCREW_XZ[0][0], "lag-screw",
-        [[bx, LAG_SCREW_UNDER_HEAD_Y, bz] for bx, bz in LAG_SCREW_XZ[2:]],
+    screw_targets = [
+        [bx, LAG_SCREW_UNDER_HEAD_Y, bz] for bx, bz in LAG_SCREW_XZ[2:]
+    ]
+    pattern_instances = await linear_component_pattern(
+        adapter,
+        screw_names,
+        axis="x",
+        spacing_mm=LAG_SCREW_XZ[2][0] - LAG_SCREW_XZ[0][0],
+        instances=2,
+        direction=PatternDirection.REVERSE,
+        label="lag-screw hold-down pattern",
+    )
+    assert_pattern_targets(
+        adapter,
+        pattern_instances,
+        screw_targets,
+        IDENTITY,
+        "lag-screw hold-down pattern",
     )
 
     # Top-frame ring clamped around the four columns, mid-plane y 1020.2.

@@ -19,6 +19,7 @@ from __future__ import annotations
 import math
 import sys
 
+from _fastener_catalog import fastener
 from _common import (
     SketchDims,
     apply_material,
@@ -38,12 +39,13 @@ from _common import (
 )
 
 PART_NAME = "cone-tip-pinch-screw"
-MATERIAL = "Plain Carbon Steel"  # bright screw (t00471 chrome head)
+SPEC = fastener(PART_NAME)
+MATERIAL = SPEC.material  # bright screw (t00471 chrome head)
 
 HEAD_DIA = 4.8
 HEAD_T = 2.0
-SHANK_DIA = 1.7  # shank: was Ø2.4, now 1.7 = #3-48 tap-drill 1.994 - 0.3
-SHANK_LEN = 8.0
+SHANK_DIA = SPEC.model_diameter_mm  # #3-48 modeled thread minor diameter
+SHANK_LEN = SPEC.length_mm
 SLOT_W = 0.8
 SLOT_D = 0.8
 
