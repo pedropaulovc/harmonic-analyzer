@@ -28,12 +28,16 @@ collision footprint, keep the audit from either false-positiving or missing a
 real defect (Codex #269):
 
 * ``CollisionScope`` says *which* other elements an element may collide with.
-  A pictorial view's axis-aligned outline is mostly empty diagonal space, so it
-  collides with ``NONE``.  A leadered callout / GD&T symbol / on-view tag
-  legitimately sits over the view geometry it points at, but must NOT overlap a
-  free note, a table, or the title block -- it collides with ``NON_VIEW``
-  elements only.  Everything else (ortho views, free notes, tables, the reserved
-  title block) collides with ``ALL``.
+  A pictorial view's axis-aligned outline is mostly empty diagonal space, and a
+  GD&T symbol / dimension carries only a coarse nominal box, so both collide with
+  ``NONE``.  A leadered callout / on-view tag legitimately sits over the ONE view
+  it points at (its ``owner``) but must NOT overlap a free note, a table, a
+  DIFFERENT view, or the title block -- it collides with ``NON_VIEW``.  Everything
+  else (ortho views, free notes, tables) collides with ``ALL``.  The reserved
+  ``titleblock`` boxes are a hard KEEP-OUT: every element is checked against them
+  regardless of its scope (so an otherwise-exempt pictorial view / GD&T / dim
+  dropped on the title block is still caught), and they never collide with each
+  other.
 * The OVERFLOW allowance applies only to ``view`` boxes.  ``IView.GetOutline``
   pads whitespace, so an on-sheet view can poke a millimetre or two past an edge;
   notes / tables / GD&T carry EXACT extents, so any overhang is a real clip and
@@ -84,12 +88,15 @@ class LayoutElement:
     """
 
     label: str
-    kind: str  # "view" | "note" | "table" | "gdt" | "titleblock"
+    kind: str  # "view" | "note" | "table" | "dim" | "gdt" | "titleblock"
     xmin: float
     ymin: float
     xmax: float
     ymax: float
     scope: CollisionScope = CollisionScope.ALL
+    # For a NON_VIEW annotation, the label of the view it points at / sits on --
+    # it is exempt from colliding with THAT view only, not other drawing views.
+    owner: str = ""
 
     @property
     def box(self) -> tuple[float, float, float, float]:
@@ -137,16 +144,26 @@ def _penetration(a: LayoutElement, b: LayoutElement) -> tuple[float, float]:
 def _may_collide(a: LayoutElement, b: LayoutElement) -> bool:
     """True if the pair ``(a, b)`` is eligible for overlap auditing.
 
-    A ``NONE``-scope element never collides.  A ``NON_VIEW`` element collides
-    with anything except a ``view`` (its overlap with the view geometry it
-    points at / attaches to is intended), so a leadered callout or GD&T symbol
-    that strays onto a free note, a table, or the title block is still caught.
+    A ``titleblock`` element is a hard KEEP-OUT: nothing may cover it whatever
+    its scope (a pictorial view, GD&T symbol, or dimension dropped on the title
+    block is caught even though it is otherwise overlap-exempt) -- but two
+    keep-out boxes do not collide with each other.
+
+    Otherwise a ``NONE``-scope element never collides.  A ``NON_VIEW`` element
+    collides with anything except the ONE view it owns (points at / sits on),
+    so a leadered callout or tag that strays onto a free note, a table, or a
+    DIFFERENT drawing view is still caught.
     """
+    a_keep, b_keep = a.kind == "titleblock", b.kind == "titleblock"
+    if a_keep and b_keep:
+        return False
+    if a_keep or b_keep:
+        return True
     if a.scope is CollisionScope.NONE or b.scope is CollisionScope.NONE:
         return False
-    if a.scope is CollisionScope.NON_VIEW and b.kind == "view":
+    if a.scope is CollisionScope.NON_VIEW and b.kind == "view" and b.label == a.owner:
         return False
-    if b.scope is CollisionScope.NON_VIEW and a.kind == "view":
+    if b.scope is CollisionScope.NON_VIEW and a.kind == "view" and a.label == b.owner:
         return False
     return True
 
