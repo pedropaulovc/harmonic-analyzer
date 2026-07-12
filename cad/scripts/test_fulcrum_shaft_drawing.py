@@ -28,16 +28,27 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     )
 
 
-def test_notes_define_a_buildable_bearing_shaft() -> None:
-    notes = drawing._manufacturing_notes()
+def test_linked_notes_define_remaining_bearing_shaft_operations() -> None:
+    notes = fulcrum_shaft_spec.DRAWING_NOTES
     assert drawing.DIMENSION_CALLOUTS["ShaftDia"] == "+0.00/-0.02"
-    assert "CYLINDRICITY 0.03" in notes
-    assert "STRAIGHTNESS" not in notes
-    assert "Ra 1.6" in notes
-    assert "MATING O6.50 BUSHINGS" in notes
-    assert "0.15-0.20" in notes
-    assert "CENTER-DRILL MARKS PERMITTED" in notes
+    clearance_min = 6.50 - fulcrum_shaft_spec.SHAFT_DIA
+    clearance_max = clearance_min + 0.02 + 0.03
+    assert round(clearance_min, 2) == 0.15
+    assert round(clearance_max, 2) == 0.20
+    assert "CENTRE MARKS" in notes
     assert "X.XX" not in notes
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert "def _manufacturing_notes" not in source
+
+
+def test_native_gdt_controls_shaft_form_orientation_and_finish() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.count("add_datum_feature(") == 1
+    assert source.count("add_feature_control_frame(") == 2
+    assert "characteristic=\"cylindricity\"" in source
+    assert source.count("characteristic=\"perpendicularity\"") == 1
+    assert source.count("add_surface_finish(") == 2
 
 
 def test_view_scales_are_explicit() -> None:
@@ -45,7 +56,8 @@ def test_view_scales_are_explicit() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("scale=(1, 1)") == 2
     assert "scale=(2, 1)" in source
-    assert "END VIEW SCALE 2:1" in source
+    assert fulcrum_shaft_spec.END_VIEW_NOTE == "END VIEW SCALE 2:1"
+    assert 'add_property_linked_note(adapter, "End View Note"' in source
 
 
 def test_part_stamps_make_critical_properties() -> None:
