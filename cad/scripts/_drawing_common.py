@@ -481,6 +481,22 @@ def read_required_properties(
     return properties
 
 
+def read_required_view_properties(
+    adapter: Any, view: Any, names: Sequence[str], *, required: Iterable[str]
+) -> dict[str, str]:
+    """Validate source properties through a drawing view's loaded reference.
+
+    ``CreateDrawViewFromModelView3`` accepts a closed model's full path and loads
+    the reference as part of view creation. Reading ``ReferencedDocument`` avoids
+    a redundant explicit ``OpenDoc6`` before creating the drawing.
+    """
+    view = _sw_type_info.flagged(view, "IView")
+    model = adapter._get_attr_or_call(view, "ReferencedDocument")
+    if model is None:
+        raise RuntimeError("drawing view has no referenced source document")
+    return read_required_properties(model, names, required=required)
+
+
 def import_cosmetic_threads(adapter: Any, view: Any) -> tuple[int, int]:
     """Import a view's cosmetic threads and count seed plus pattern instances.
 

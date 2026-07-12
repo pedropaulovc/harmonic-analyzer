@@ -7,7 +7,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -19,7 +19,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
-    read_required_properties,
+    read_required_view_properties,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     set_basic_dimension,
@@ -67,30 +67,6 @@ async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open top-crossbar source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
-        adapter.currentModel,
-        (
-            "Number",
-            "Revision",
-            "Title",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-            "Top View Note",
-            "Isometric View Note",
-        ),
-        required=(
-            "Number",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-            "Top View Note",
-            "Isometric View Note",
-        ),
-    )
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
     )
@@ -107,6 +83,19 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
+    read_required_view_properties(
+        adapter,
+        top,
+        (
+            "Number", "Revision", "Title", "Material Specification", "Finish",
+            "Quantity", "Manufacturing Notes", "Top View Note",
+            "Isometric View Note",
+        ),
+        required=(
+            "Number", "Material Specification", "Finish", "Quantity",
+            "Manufacturing Notes", "Top View Note", "Isometric View Note",
+        ),
+    )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
     for view in (top, iso):
