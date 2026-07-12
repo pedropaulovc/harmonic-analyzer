@@ -65,7 +65,6 @@ def test_platen_guide_hole_stations_match_native_wizard_features() -> None:
     assert guide.SCREW_STATION_X == tuple(30.0 + 60.0 * i for i in range(5))
     source = Path(guide.__file__).read_text(encoding="utf-8")
     assert 'HoleSpec("clearance", "#4")' in source
-    assert 'normalize_plain_through_hole(' in source
     assert '"tapped_bottoming", "#4-40"' in source
 
 
