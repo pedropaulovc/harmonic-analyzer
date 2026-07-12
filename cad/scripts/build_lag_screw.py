@@ -42,6 +42,7 @@ from _common import (
     set_global,
     volume_check,
 )
+from _fastener_slot import FastenerAxis, add_slotted_drive
 
 PART_NAME = "lag-screw"
 SPEC = fastener(PART_NAME)
@@ -103,6 +104,17 @@ async def build(adapter) -> dict[str, str]:
     v_shank = math.pi * (SHANK_DIA / 2.0) ** 2 * SHANK_LEN
     expected += v_shank
     await volume_check(adapter, "shank", expected, 0.005 * v_shank)
+
+    expected, slot_jobs = await add_slotted_drive(
+        adapter,
+        axis=FastenerAxis.Y,
+        head_radius_mm=HEAD_DIA / 2.0,
+        head_face_offset_mm=-HEAD_H,
+        width_mm=2.0,
+        depth_mm=2.0,
+        expected_volume_mm3=expected,
+    )
+    drive_jobs += slot_jobs
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
