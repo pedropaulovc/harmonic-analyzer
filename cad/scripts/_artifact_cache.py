@@ -40,8 +40,9 @@ Design notes / invariants:
   ``HARMONIC_CACHE_*`` env var (CI, tests, an unlanded salt bump).
 
 * **Read/write roles.** The role is ``ro`` (pull only), ``rw`` (pull + push), or
-  ``off`` (disabled). It comes from ``HARMONIC_CACHE_MODE`` or, failing that, a
-  gitignored one-line ``.harmonic-cache-mode`` file at the repo root, or finally
+  ``off`` (disabled). It comes from ``HARMONIC_REMOTE_CACHE_MODE`` or, failing
+  that, a gitignored one-line ``.harmonic-remote-cache-mode`` file at the repo
+  root, or finally
   ``_DEFAULT_MODE`` = ``rw``: both dev seats publish what they build by default,
   so neither rebuilds an artefact the other already produced. Drop a seat to
   ``ro``/``off`` via the file or env. A miss -- or an unauthorised push (RBAC
@@ -127,13 +128,13 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # overwriting tracked SOURCE (e.g. cad/scripts/*.py) that a later doit task runs.
 _CACHE_OUTPUT_ROOT = REPO_ROOT / "cad" / "out"
 
-# A machine's role (off | ro | rw). Read from HARMONIC_CACHE_MODE, else this
+# A machine's role (off | ro | rw). Read from HARMONIC_REMOTE_CACHE_MODE, else this
 # gitignored one-line file at the repo root, else _DEFAULT_MODE. Default is rw:
 # both dev seats build and PUBLISH, so each other's artefacts -- including private
 # / experimental ones (content-addressed, so a unique input set => a unique key
 # that never collides with the canonical cache) -- are pulled instead of rebuilt.
 # Set the file/env to `ro` (pull only) or `off` (disabled) to downgrade a seat.
-_MODE_FILE = REPO_ROOT / ".harmonic-cache-mode"
+_MODE_FILE = REPO_ROOT / ".harmonic-remote-cache-mode"
 _DEFAULT_MODE = "rw"
 
 # Observability sinks (issue #73), all under the gitignored cad/out/reports/.
@@ -340,7 +341,7 @@ class _BlobBackend:
 # Public surface
 # --------------------------------------------------------------------------- #
 def _mode() -> str:
-    env = os.environ.get("HARMONIC_CACHE_MODE")
+    env = os.environ.get("HARMONIC_REMOTE_CACHE_MODE")
     if env:
         return env.lower()
     try:
