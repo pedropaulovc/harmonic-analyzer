@@ -86,7 +86,7 @@ for _stream in (sys.stdout, sys.stderr):
         _reconfigure(encoding="utf-8", errors="replace")
 
 import yaml as _yaml
-from doit.dependency import CHECKERS, Dependency, JsonDB, MD5Checker, get_file_md5
+from doit.dependency import CHECKERS, Dependency, JsonDB, MD5Checker
 from filelock import FileLock, Timeout  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "cad" / "scripts"))
@@ -287,12 +287,28 @@ def _seat_part_order() -> list[str]:
 # NB: changing the checker class re-stamps every task's `checker:` field, which
 # doit treats as changed -> run `doit reset-dep` once after this lands to migrate
 # the db in place WITHOUT a rebuild (the on-disk artefacts are already current).
+def _canonical_file_md5(file_path: str) -> str:
+    """MD5 of Git-canonical content, independent of Windows checkout EOLs.
+
+    ``core.autocrlf=true`` may materialise a tracked text blob's LF as CRLF (or a
+    conflict/patch can leave a mixed file) while Git still considers the content
+    unchanged. Git's text heuristic is a NUL check in the first 8 KiB; mirror that
+    boundary and clean CRLF to LF before hashing. Binary inputs retain their exact
+    byte digest. This avoids a subprocess per dependency on the cache hot path.
+    """
+    data = Path(file_path).read_bytes()
+    if b"\0" not in data[:8000]:
+        data = data.replace(b"\r\n", b"\n")
+    return hashlib.md5(data).hexdigest()
+
+
 class ContentChecker(MD5Checker):
     """MD5Checker with two churn-immunities: it digests the PARSED form of YAML
     configs (comment-/whitespace-insensitive), and keys ``.SLDPRT``/``.SLDASM``
     artefacts on their producing task's build-input recipe rather than SolidWorks'
     volatile output bytes (build idempotency -- see ``_stable_artefact_digest``).
-    Byte-identical to MD5Checker for every other file."""
+    Text deps are Git-EOL-canonical; binary deps remain byte-identical to
+    MD5Checker."""
 
     @staticmethod
     def _digest(file_path: str) -> str:
@@ -308,14 +324,14 @@ class ContentChecker(MD5Checker):
             # geometry's inputs change. None -> not a declared target (e.g. the
             # channel stretch-spring variants) -> stock byte md5.
             recipe = _stable_artefact_digest(file_path)
-            return recipe if recipe is not None else get_file_md5(file_path)
+            return recipe if recipe is not None else _canonical_file_md5(file_path)
         if not file_path.endswith((".yaml", ".yml")):
-            return get_file_md5(file_path)
+            return _canonical_file_md5(file_path)
         try:
             with open(file_path, "rb") as fh:
                 data = _yaml.safe_load(fh)
         except _yaml.YAMLError:
-            return get_file_md5(file_path)  # malformed -> fall back; build fails loud later
+            return _canonical_file_md5(file_path)  # malformed -> build fails loud later
         canon = _yaml.safe_dump(
             data, default_flow_style=False, sort_keys=False, allow_unicode=True
         )
@@ -792,12 +808,13 @@ def _is_assembly_relevant_submodule_file(f: Path) -> bool:
 
 def _digest_submodule_files(files: list[Path]) -> str:
     """Fold a list of submodule files into one md5, each keyed by its REPO-RELATIVE
-    tag (``_rel_tag``) + raw content md5 -- identical across checkout roots, exactly
-    like ``_digest_files``, so the derived cache key is cross-machine stable."""
+    tag (``_rel_tag``) + Git-EOL-canonical content md5 -- identical across checkout
+    roots and Windows checkout materialisations, exactly like ``_digest_files``, so
+    the derived cache key is cross-machine stable."""
     h = hashlib.md5()
     for f in files:
         h.update(_rel_tag(str(f)).encode())
-        h.update(get_file_md5(str(f)).encode())
+        h.update(_canonical_file_md5(str(f)).encode())
     return h.hexdigest()
 
 
@@ -1854,6 +1871,13 @@ def _cache_status(statusargs):
         drift = f"  DRIFT(last published {last[:12]})" if last and last != key else ""
         emit = _telemetry.warn if present is False else _telemetry.info
         emit(f"{mark} {key[:12]}  {label}{drift}")
+        if drift:
+            previous = dict(_cache.last_stored_inputs(label))
+            current = dict(inputs)
+            for rel in sorted(previous.keys() | current.keys()):
+                before, after = previous.get(rel, "<absent>"), current.get(rel, "<absent>")
+                if before != after:
+                    _telemetry.debug(f"         {before} -> {after}  {rel}")
         if show_all or present is False:
             for rel, digest in inputs:
                 _telemetry.debug(f"         {digest}  {rel}")
