@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
 import pytest
 
@@ -150,3 +151,20 @@ def test_pattern_targets_join_final_pose_ledger(
     position[0] += 1.0
     with pytest.raises(RuntimeError, match="pattern-1"):
         assert_pose_ledger(None)
+
+
+@pytest.mark.parametrize(
+    "builder",
+    [
+        "build_drive_train_assembly.py",
+        "build_frame_assembly.py",
+        "build_magnifier_assembly.py",
+        "build_paper_drive_assembly.py",
+    ],
+)
+def test_every_native_pattern_records_authored_targets(builder: str) -> None:
+    source = (Path(__file__).parent / builder).read_text(encoding="utf-8")
+    pattern_calls = source.count("linear_component_pattern(")
+    pattern_calls += source.count("circular_component_pattern(")
+    assert pattern_calls > 0
+    assert source.count("assert_pattern_targets(") == pattern_calls
