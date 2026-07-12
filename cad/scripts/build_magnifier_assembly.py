@@ -76,6 +76,7 @@ from _assembly import (
     lock_mate,
     named_ref,
     parallel_mate,
+    PatternDirection,
     place_component,
     reset_dof_manifest,
     save_assembly_and_images,
@@ -333,6 +334,7 @@ async def build(adapter) -> dict[str, str]:
         axis="x",
         spacing_mm=patterned_x - seed_x,
         instances=2,
+        direction=PatternDirection.REVERSE,
         label="wheel clamp-screw pattern",
     )
     assert_component_placed(
