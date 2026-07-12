@@ -1122,23 +1122,22 @@ def ensure_global_pattern_axis(adapter: Any, axis: str) -> str:
             raise RuntimeError(f"cannot select {plane} for global {key}-axis")
     if not model.InsertAxis2(True):
         raise RuntimeError(f"SOLIDWORKS rejected global {key}-axis creation")
-    # InsertAxis2 places reference geometry before trailing MateGroup/pattern
-    # features, so reverse position zero is not necessarily the new axis. Walk
-    # backward only until the nearest RefAxis (normally 2-4 entries), avoiding
-    # the old two full O(n) feature-tree scans (18-78 s on the traced assemblies).
-    created = None
-    count = int(adapter._attempt(lambda: model.GetFeatureCount(), default=0) or 0)
-    for index in range(min(count, 64)):
-        candidate = adapter._attempt(
-            lambda i=index: model.FeatureByPositionReverse(i), default=None)
-        if candidate is None:
-            continue
-        _flag(candidate, "IFeature")
-        if str(candidate.GetTypeName2()) == "RefAxis":
-            created = candidate
-            break
+    # InsertAxis2 selects the feature it just created. Read that identity
+    # directly: reference geometry is inserted near the front of an assembly's
+    # feature tree, so searching backward from the tail took 39-78 seconds on
+    # large mechanisms and any fixed scan bound eventually failed.
+    selection = model.SelectionManager
+    _flag(selection, "ISelectionMgr")
+    created = adapter._attempt(
+        lambda: selection.GetSelectedObject6(1, -1), default=None
+    )
     if created is None:
         raise RuntimeError(f"cannot read newly-created global {key}-axis")
+    _flag(created, "IFeature")
+    if str(created.GetTypeName2()) != "RefAxis":
+        raise RuntimeError(
+            f"new global {key}-axis selected {created.GetTypeName2()!r}, expected RefAxis"
+        )
     created.Name = name
     model.ClearSelection2(True)
     _telemetry.success(f"created assembly pattern axis {name}")
