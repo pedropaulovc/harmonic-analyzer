@@ -135,7 +135,14 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         wizard_holes(
             adapter,
-            HoleSpec("clearance", "#4"),
+            HoleSpec(
+                "clearance",
+                "#4",
+                # Reproduce the old production path: writing the table-equivalent
+                # diameter back through ModifyDefinition corrupts the subtype from
+                # swHoleThru (25) to swHoleThruCounterSinkBottom (26).
+                overrides_mm={"HoleDiameter": 3.251},
+            ),
             [[x, y, 0.0] for x, y in CLEARANCE_HOLES_MM],
             (0.0, 0.0, -1.0),
             "#4 normal-clearance through holes",
