@@ -60,6 +60,9 @@ VIEW_X_M = 0.100
 VIEW_Y_M = 0.110
 DATUM_XY_M = (0.060, 0.090)
 TABLE_XY_M = (0.155, 0.180)
+# #4 normal clearance is 3.251 mm on this ANSI-inch Hole Wizard table. Select
+# a point on the visible circular rim, not the hole centre.
+HOLE_RIM_DY_M = 0.0016255
 
 
 def _table_contents(adapter: Any, table: Any) -> tuple[tuple[str, ...], ...]:
@@ -144,7 +147,11 @@ async def build(adapter: Any) -> dict[str, str]:
             front,
             datum_xy=DATUM_XY_M,
             hole_points=tuple(
-                (VIEW_X_M + x / 1000.0, VIEW_Y_M + y / 1000.0) for x, y in HOLES_MM
+                (
+                    VIEW_X_M + x / 1000.0,
+                    VIEW_Y_M + y / 1000.0 + HOLE_RIM_DY_M,
+                )
+                for x, y in HOLES_MM
             ),
             anchor_xy=TABLE_XY_M,
             label="minimal #4-clearance repro",
