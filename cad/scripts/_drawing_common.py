@@ -8,7 +8,7 @@ Part-specific views, dimensions, and notes belong in ``draw_<part>.py``.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 from xml.etree import ElementTree
@@ -31,7 +31,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
     iter_views,
     new_drawing,
-    remove_notes_matching,
     save_drawing,
     set_units_mm,
     view_name,
@@ -1046,16 +1045,31 @@ def stamp_drawing_summary(adapter: Any, drawing_model: Any, fields: dict[int, st
 
 
 # An isometric/pictorial view's axis-aligned outline is mostly empty diagonal
-# space, so its box is not a faithful footprint -- mark such views ``loose`` so
-# the audit skips them. ``GetOrientationName`` returns the predefined view name
+# space, so its box is not a faithful collision footprint -- mark such views
+# ``overlap_exempt``. ``GetOrientationName`` returns the predefined view name
 # (e.g. "*Isometric"); ortho views return "*Front"/"*Right"/... and projected /
 # section / detail views return "".
 _PICTORIAL_ORIENTATIONS = frozenset({"*isometric", "*dimetric", "*trimetric"})
+
+# A note centered inside its owning view is treated as a hole tag / balloon
+# (detail on the view) only when it is also SMALL: native hole-table tags span
+# ~6 mm, whereas the general-notes block is >50 mm on a side. The size gate keeps
+# the exemption narrow so a large general note accidentally dropped onto its own
+# view is still audited as a collision (Codex #269).
+_TAG_MAX_SPAN_M = 0.015
 
 
 def _view_is_loose(adapter: Any, view: Any) -> bool:
     orientation = str(adapter._get_attr_or_call(view, "GetOrientationName") or "")
     return orientation.strip().lower() in _PICTORIAL_ORIENTATIONS
+
+
+def _is_small_tag(element: LayoutElement) -> bool:
+    """True if ``element`` is small enough to be a hole tag / balloon, not a block."""
+    return (
+        element.xmax - element.xmin <= _TAG_MAX_SPAN_M
+        and element.ymax - element.ymin <= _TAG_MAX_SPAN_M
+    )
 
 
 def _center_inside(element: LayoutElement, outline: tuple[float, float, float, float]) -> bool:
@@ -1069,12 +1083,12 @@ def _center_inside(element: LayoutElement, outline: tuple[float, float, float, f
 def _note_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | None:
     """Box a free NOTE from ``INote.GetExtent`` (lower-left / upper-right in meters).
 
-    Leadered notes are skipped: a leader means the callout is deliberately
-    pointing at (and sitting over) view geometry -- e.g. the arrowed hole-group
-    tags -- so treating it as a colliding element would be a false positive.
+    A LEADERED note is deliberately pointing at (and sitting over) view geometry
+    -- e.g. an arrowed hole-group tag -- so it is marked ``overlap_exempt`` (kept
+    for the OVERFLOW audit, skipped for OVERLAP) rather than dropped, so a
+    mis-placed leadered callout hanging off the sheet is still caught.
     """
-    if int(adapter._get_attr_or_call(annotation, "GetLeaderCount") or 0) > 0:
-        return None
+    leadered = int(adapter._get_attr_or_call(annotation, "GetLeaderCount") or 0) > 0
     note = adapter._attempt(lambda: annotation.GetSpecificAnnotation())
     if note is None:
         return None
@@ -1084,7 +1098,13 @@ def _note_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | N
         return None
     x0, y0, _z0, x1, y1, _z1 = (float(v) for v in extent)
     return LayoutElement(
-        name, "note", min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)
+        name,
+        "note",
+        min(x0, x1),
+        min(y0, y1),
+        max(x0, x1),
+        max(y0, y1),
+        overlap_exempt=leadered,
     )
 
 
@@ -1190,14 +1210,24 @@ def collect_layout_elements(
             view_box = tuple(float(v) for v in outline)  # xmin,ymin,xmax,ymax
             elements.append(
                 LayoutElement(
-                    name, "view", *view_box, loose=_view_is_loose(adapter, view)
+                    name,
+                    "view",
+                    *view_box,
+                    overlap_exempt=_view_is_loose(adapter, view),
                 )
             )
         for note in _iter_view_notes(adapter, view):
-            # A note centered inside its owning view is detail on that view (a
-            # hole tag / balloon), not a free element -- excluding it avoids a
-            # tag-on-its-own-view false collision.
-            if view_box is not None and _center_inside(note, view_box):
+            # A SMALL note centered inside its owning view is a hole tag / balloon
+            # sitting on the geometry -- exempt it from OVERLAP (but keep it for
+            # OVERFLOW). A LARGE note centered inside its view is a general-notes
+            # block accidentally dropped on the view, so it stays a full element
+            # and the audit reports the collision (Codex #269).
+            if (
+                view_box is not None
+                and _center_inside(note, view_box)
+                and _is_small_tag(note)
+            ):
+                elements.append(replace(note, overlap_exempt=True))
                 continue
             elements.append(note)
         for table in _iter_tables(adapter, view):
