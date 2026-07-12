@@ -26,6 +26,10 @@ requires-python = ">=3.11"
 #               extra exporter package is required for the default console path.
 dependencies = [
     "doit>=0.36",
+    # filelock - the cross-process COM seat lock in dodo.py (_com_seat): serializes
+    #            the single SolidWorks STA seat at runtime (replaces the old task_dep
+    #            spine). Was only transitive; declared direct so a dep bump can't drop it.
+    "filelock>=3.13",
     "pyyaml>=6.0",
     "pillow>=10.0",
     "numpy>=1.26",

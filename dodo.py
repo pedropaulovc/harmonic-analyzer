@@ -23,10 +23,15 @@ Task groups (the prefix says whether SolidWorks is required):
   build              EVERY part + assembly + EVERY gate -- the one safe entry
   build_bare         parts + assemblies only -- a quick rebuild
 
-COM serialization (the single SolidWorks STA seat) is enforced by a linear
-``task_dep`` *spine* through every COM task, NOT by forbidding -n -- so the
-SolidWorks-free ``check:*`` tasks fan out in parallel while COM stays serial.
-``doit -n N`` is now SAFE (see the _spine_dep / _COM_TAIL block below).
+COM serialization (the single SolidWorks STA seat) is enforced at RUNTIME by a
+cross-process file lock (``_com_seat`` / ``filelock``), NOT by fake ``task_dep``
+edges: every COM subprocess acquires the machine-global seat lock before it drives
+SolidWorks and releases it after, so at most one COM task touches the seat at a
+time even under ``doit -n N`` -- while the SolidWorks-free ``check:*`` tasks (which
+never take the lock) fan out in parallel. The task graph therefore carries only
+REAL dependency edges (an assembly's file_dep on its parts, verify/export on the
+built ``.SLDASM``, release on export+verify+preflight), so the DAG reads true and a
+COM failure no longer skips unrelated downstream COM tasks as a spine side effect.
 
 Install (this repo is a uv project -- pyproject.toml + uv.lock at the root)::
 
@@ -56,12 +61,14 @@ build_or_refresh takes the FULL branch when the target is absent)::
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import os
 import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -79,6 +86,7 @@ for _stream in (sys.stdout, sys.stderr):
 
 import yaml as _yaml
 from doit.dependency import CHECKERS, Dependency, JsonDB, MD5Checker, get_file_md5
+from filelock import FileLock, Timeout  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "cad" / "scripts"))
 
@@ -116,58 +124,126 @@ CONFIG_DIR = REPO_ROOT / "cad" / "config"
 # busts the cache key and forces a rebuild (issue #144).
 SUBMODULE_SRC = REPO_ROOT / "SolidworksMCP-python" / "src" / "solidworks_mcp"
 
-# --- COM spine: keep SolidWorks serial WITHOUT changing how COM work runs.
+# --- COM seat: serialize SolidWorks at RUNTIME with a cross-process file lock.
 #
-# There is one SolidWorks STA seat, so COM tasks must never run concurrently.
-# Rather than the old global -n hard-fail (which also blocked the SolidWorks-FREE
-# work), every COM task is chained into a single linear ``task_dep`` spine -- a
-# topological linearization of the COM sub-DAG:
+# There is one SolidWorks STA seat, so no two COM tasks may drive it at once. The
+# old approach chained every COM task into a linear ``task_dep`` *spine* (fake edges
+# that made the DAG lie and let a mid-spine COM failure skip unrelated downstream COM
+# work). Instead each COM subprocess now acquires a single file lock right before it
+# touches SolidWorks (``_com_seat``) and releases it after. ``doit -n N`` runs COM
+# tasks in separate PROCESSES (MRunner -> multiprocessing.Process, spawn on Windows),
+# so the lock MUST be cross-process: ``filelock`` uses OS advisory locks
+# (msvcrt/fcntl) that release automatically when the holder dies, so a killed/crashed
+# build never strands the seat (no stale lockfile to clean).
 #
-#   part:... -> part:... -> assembly:frame -> ... -> assembly:harmonic_analyzer
-#          -> verify:soundness -> verify:kinematics
-#          -> export -> preflight -> release
+# The lock is MACHINE-GLOBAL (default under %PROGRAMDATA%/tmp; override with
+# ``HARMONIC_COM_LOCK``), so it also serializes COM across worktrees and concurrent
+# ``doit`` invocations on the one seat -- the spine only serialized within a single
+# invocation. NB it serializes but does NOT isolate: SolidWorks keys open documents
+# by FILENAME (not path) and carries session-global state, so genuinely-independent
+# concurrent builds on one machine remain unsafe. The lock is a safety belt, not a
+# green light for parallel independent builds.
 #
-# The parts fill the head of the spine in a PER-SEAT order (``_seat_part_order``),
-# not sorted, so two machines cold-building at once diverge and split the work via
-# the shared cache instead of duplicating it -- see that block for the seed rules.
-#
-# Because each COM task waits on its predecessor, at most ONE COM task is ever
-# "ready", so the seat is never contended even under ``doit -n N`` -- identical
-# runtime behaviour to the old serial run, just enforced by DAG edges instead of
-# -n=1. Subprocess-per-task isolation is UNCHANGED. The SolidWorks-free ``check:*``
-# tasks depend only on real artefacts (never the spine), so they fan out in
-# parallel. Tradeoff: a COM failure mid-spine skips the later COM tasks in that
-# run; fix-and-rerun recovers (doit skips up-to-date tasks).
-_COM_TAIL = [
-    "verify:soundness",
-    "verify:kinematics",
-    "export",
-    "preflight",
-    "release",
-]
+# Only the actual COM subprocess is wrapped: the remote-cache RESTORE (an Azure
+# download) and STORE (upload) run OUTSIDE the lock, so cache hits stay fully
+# parallel and a publish never holds the seat. The SolidWorks-free ``check:*`` tasks
+# never call ``_com_seat``, so they fan out under ``-n``.
+def _com_lock_path() -> Path:
+    override = os.environ.get("HARMONIC_COM_LOCK")
+    if override:
+        return Path(override)
+    base = os.environ.get("PROGRAMDATA") or tempfile.gettempdir()
+    return Path(base) / "harmonic-analyzer" / "com-seat.lock"
+
+
+_COM_LOCK_PATH = _com_lock_path()
+_COM_HOLDER_PATH = _COM_LOCK_PATH.with_suffix(".holder")
+_COM_LOCK = FileLock(str(_COM_LOCK_PATH))
+# Poll interval while blocked on the seat: log who holds it this often, so a wedged
+# build (e.g. a modal SolidWorks dialog on the holder) is VISIBLE instead of N
+# workers sitting silently in a timeout=-1 acquire.
+_COM_SEAT_POLL_S = 30.0
+# Set in the environment while the seat is held (inherited by the COM subprocess via
+# ``_telemetry.inject_env``): a COM build launched under doit WITHOUT it trips the
+# ``_common`` guard loud -- the runtime successor to the removed spine tripwire.
+_COM_SEAT_HELD_ENV = "HARMONIC_COM_SEAT"
+
+
+def _read_seat_holder() -> str | None:
+    try:
+        return _COM_HOLDER_PATH.read_text(encoding="utf-8").strip() or None
+    except OSError:
+        return None
+
+
+def _write_seat_holder(holder: str) -> None:
+    try:
+        _COM_HOLDER_PATH.write_text(holder, encoding="utf-8")
+    except OSError:
+        pass  # best-effort diagnostic only
+
+
+def _clear_seat_holder(holder: str) -> None:
+    try:
+        if _read_seat_holder() == holder:
+            _COM_HOLDER_PATH.unlink()
+    except OSError:
+        pass
+
+
+@contextlib.contextmanager
+def _com_seat(label: str):
+    """Hold the single SolidWorks seat for the duration of a COM subprocess.
+
+    Blocks until the machine-global seat lock is free, then yields with it held.
+    While blocked it logs the current holder every ``_COM_SEAT_POLL_S`` so a wedged
+    seat is diagnosable rather than a silent hang. Sets ``HARMONIC_COM_SEAT`` in this
+    process's environment (inherited by the COM subprocess) so a COM build launched
+    WITHOUT the seat trips ``_common``'s guard loud -- the runtime successor to the
+    removed ``_assert_spine_complete`` tripwire. Reentrancy-safe (``filelock`` counts
+    same-process acquisitions), though no COM action nests it."""
+    _COM_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+    holder = f"{label} pid={os.getpid()}"
+    with _telemetry.span("com.seat.wait", label=label, lock=str(_COM_LOCK_PATH)):
+        while True:
+            try:
+                _COM_LOCK.acquire(timeout=_COM_SEAT_POLL_S)
+                break
+            except Timeout:
+                other = _read_seat_holder()
+                _telemetry.warn(f"[com.seat] {label} waiting for the SolidWorks seat"
+                                + (f" (held by {other})" if other else ""))
+    _write_seat_holder(holder)
+    prev = os.environ.get(_COM_SEAT_HELD_ENV)
+    os.environ[_COM_SEAT_HELD_ENV] = holder
+    _telemetry.event("com.seat.acquired", label=label)
+    try:
+        yield
+    finally:
+        if prev is None:
+            os.environ.pop(_COM_SEAT_HELD_ENV, None)
+        else:
+            os.environ[_COM_SEAT_HELD_ENV] = prev
+        _clear_seat_holder(holder)
+        _COM_LOCK.release()
 
 
 # --- Per-seat part order: diverge two cold builders so they SPLIT the work.
 #
 # Parts have NO inter-part deps (``_part_file_deps`` never lists another part's
-# .SLDPRT), so the order parts occupy on the spine is free -- any permutation with
-# every part before every assembly is a valid COM linearization. We exploit that:
-# two machines doing the same cold build in the SAME order (the old sorted order)
-# march in lock-step, each MISSING the shared remote cache on the same next part
-# and building it in parallel -- N machines do N x the COM work. Permuting the part
-# order per SEAT breaks the lock-step: seat A climbs one way, seat B another, so by
-# the time the slower seat reaches a part the faster one has usually published it
-# (a cache HIT), and the fleet builds each part ~once instead of once-per-seat.
-#
-# The seed MUST be stable across every process of ONE ``doit`` invocation (the
-# parent AND every ``-n`` worker), or two workers would compute DIFFERENT spines,
-# disagree on a part's predecessor, and let two COM tasks go ready at once --
-# deadlocking the single STA seat (the whole point of the spine). So it is keyed on
-# the HOSTNAME (identical for every process on a seat, different across seats), via
-# hashlib -- NOT the builtin ``hash()``, whose str hashing is PYTHONHASHSEED-salted
-# and so differs between the parent and a spawned worker. ``HARMONIC_BUILD_ORDER_SEED``
-# overrides it (reproducible order in tests / a pinned build). Order never feeds a
-# cache key or a digest -- it is purely scheduling -- so permuting is always safe.
+# .SLDPRT), so the order in which their tasks are offered to the scheduler is free.
+# Two machines cold-building in the SAME order march in lock-step, each MISSING the
+# shared remote cache on the same next part and building it in parallel -- N machines
+# do N x the COM work. Permuting the part order per SEAT breaks the lock-step: seat A
+# climbs one way, seat B another, so by the time the slower seat reaches a part the
+# faster one has usually published it (a cache HIT), and the fleet builds each part
+# ~once. With the spine gone this is a best-effort SCHEDULING HINT (it orders the
+# ``task_part`` yield and the ``build`` task_dep list); correctness comes from the
+# seat lock and the re-probe under it (``_cached_part_action``), so an imperfectly
+# honored order costs a little cache-split efficiency, never a duplicated/skipped
+# build. ``filelock`` grants no FIFO fairness anyway, so strict order was never on
+# offer under ``-n``. Keyed on the HOSTNAME via ``hashlib`` (stable across a seat's
+# processes, distinct across seats); ``HARMONIC_BUILD_ORDER_SEED`` overrides it.
 def _build_order_seed() -> str:
     return os.environ.get("HARMONIC_BUILD_ORDER_SEED") or socket.gethostname()
 
@@ -177,38 +253,6 @@ def _seat_part_order() -> list[str]:
     seed = _build_order_seed()
     return sorted(part_stems(),
                   key=lambda s: hashlib.md5(f"{seed}\0{s}".encode()).hexdigest())
-
-
-def _com_spine_order() -> list[str]:
-    """The full COM task order: parts (in per-seat order), then assemblies, then
-    the SW tail."""
-    parts = [f"part:{stem}" for stem in _seat_part_order()]
-    asms = [f"assembly:{stem}" for stem in ASSEMBLY_ORDER]
-    return parts + asms + _COM_TAIL
-
-
-_SPINE = _com_spine_order()
-_SPINE_PRED = {name: _SPINE[i - 1] for i, name in enumerate(_SPINE) if i > 0}
-
-
-def _spine_dep(name: str) -> list[str]:
-    """The one ``task_dep`` edge that keeps ``name`` serial on the COM seat
-    (empty for the first COM task)."""
-    pred = _SPINE_PRED.get(name)
-    return [pred] if pred else []
-
-
-def _assert_spine_complete() -> None:
-    """Tripwire: a gap in the spine would let ``doit -n N`` run two COM tasks at
-    once and deadlock the single STA seat. Fail loud before any task runs."""
-    order = _com_spine_order()
-    if len(order) != len(set(order)):
-        raise SystemExit("dodo: duplicate task in COM spine")
-    if not part_stems():
-        raise SystemExit("dodo: no part scripts found -- COM spine is empty")
-
-
-_assert_spine_complete()
 
 
 # --- Comment/whitespace-insensitive content hashing for cad/config/*.yaml.
@@ -401,14 +445,21 @@ def _exec(cmd: list[str], label: str, log_stem: str | None = None) -> None:
         raise RuntimeError(f"{label} failed (exit {rc})")
 
 
-def _run(cmd: list[str], label: str, log_stem: str | None = None) -> None:
+def _run(cmd: list[str], label: str, log_stem: str | None = None,
+         com: bool = False) -> None:
     """Open a ``task <label>`` span and run the subprocess inside it (see
     :func:`_exec`). One span per task action, NAMED for the doit task
     (``task part:cone_gear``) so the trace reads as the task itself; the build
     subprocess CONTINUES this span (via the injected TRACEPARENT) instead of adding a
-    duplicate root layer under it."""
+    duplicate root layer under it.
+
+    ``com=True`` marks a SolidWorks-touching task: the subprocess runs holding the
+    single COM seat (``_com_seat``), so it is serialized against every other COM task
+    on the machine. SolidWorks-free tasks (the ``check:*`` gates) pass ``com=False``
+    and never take the lock, so they fan out under ``-n``."""
     with _telemetry.span(f"task {label}", label=label, cmd=" ".join(cmd)):
-        _exec(cmd, label, log_stem)
+        with (_com_seat(label) if com else contextlib.nullcontext()):
+            _exec(cmd, label, log_stem)
 
 
 # --- Per-script helper dependencies, computed from each build script's REAL
@@ -525,10 +576,12 @@ _CHECK_NAMES = ("math", "config", "graph", "nameplate", "recipe", "cache", "tele
 _OPTIONAL_CHECK_NAMES = ("verify_telemetry",)
 
 
-def _run_stamped(cmd: list[str], label: str, stamp: str) -> None:
+def _run_stamped(cmd: list[str], label: str, stamp: str, com: bool = False) -> None:
     """Run a gate subprocess; on success write its stamp target. _run raises on
-    non-zero, so a failed gate never writes a stamp (stays stale -> re-runs)."""
-    _run(cmd, label, log_stem=Path(stamp).stem)
+    non-zero, so a failed gate never writes a stamp (stays stale -> re-runs).
+    ``com=True`` runs it holding the COM seat (SolidWorks ``verify:*``/preflight);
+    the offline ``check:*`` gates pass ``com=False`` and stay parallel."""
+    _run(cmd, label, log_stem=Path(stamp).stem, com=com)
     Path(stamp).parent.mkdir(parents=True, exist_ok=True)
     Path(stamp).write_text(f"{label}\n", encoding="utf-8")
 
@@ -829,8 +882,17 @@ def _cached_part_action(stem: str, script: Path) -> None:
         if _cache.restore(key, outputs, label):
             sp.set_attribute("cache", "hit")
             return
-        sp.set_attribute("cache", "miss")
-        _exec([sys.executable, str(script)], label, log_stem=f"part-{stem}")
+        with _com_seat(label):
+            # Re-probe under the seat: we may have blocked for the seat for minutes
+            # while a peer builder published this exact part -- restore it rather than
+            # rebuild (the fleet cache-split win; fable/codex review).
+            if _cache.restore(key, outputs, label):
+                sp.set_attribute("cache", "hit-after-wait")
+                return
+            sp.set_attribute("cache", "miss")
+            _exec([sys.executable, str(script)], label, log_stem=f"part-{stem}")
+        # Publish OUTSIDE the seat -- an Azure upload is network, not COM, so it must
+        # not hold the seat the next task is waiting for.
         _cache.store(key, outputs, label)
 
 
@@ -950,16 +1012,22 @@ def _stable_artefact_digest(path: str) -> str | None:
 
 
 def task_part():
-    """One task per part stem; addressable as ``part:<stem>``."""
-    for script in part_scripts():
-        stem = script.stem.removeprefix("build_")
+    """One task per part stem; addressable as ``part:<stem>``.
+
+    Parts have NO inter-part deps, so they carry no ``task_dep``: SolidWorks
+    serialization is enforced at runtime by the COM seat lock inside
+    ``_cached_part_action``, not by DAG edges. The tasks are YIELDED in per-seat
+    order (``_seat_part_order``) as a best-effort scheduling hint so two cold
+    builders diverge and split the fleet cache.
+    """
+    scripts = {s.stem.removeprefix("build_"): s for s in part_scripts()}
+    for stem in _seat_part_order():
+        script = scripts[stem]
         yield {
             "name": stem,
             "file_dep": _part_file_deps(script, stem),
             "targets": [_sldprt(stem)],
-            # COM spine: serialize parts on the single SW seat (see _spine_dep).
-            "task_dep": _spine_dep(f"part:{stem}"),
-            # Remote-cache shortcut wraps the COM build (no-op when cache is off).
+            # Remote-cache shortcut + COM seat lock wrap the build (_cached_part_action).
             "actions": [(_cached_part_action, [stem, script])],
             "clean": True,
             "verbosity": 2,
@@ -1034,43 +1102,57 @@ def build_or_refresh(stem, dependencies, changed, targets):
         # success tail does, to keep the next run's FULL/REFRESH decision correct.
         cache_key = _cache_key(_assembly_file_deps(stem), label)
         cache_outputs = _assembly_cache_outputs(stem)
-        if _cache.restore(cache_key, cache_outputs, label):
-            sp.set_attribute("cache", "hit")
+
+        def _record_recipe_digest() -> None:
             sidecar.parent.mkdir(parents=True, exist_ok=True)
             sidecar.write_text(digest + "\n", encoding="utf-8")
+
+        if _cache.restore(cache_key, cache_outputs, label):
+            sp.set_attribute("cache", "hit")
+            _record_recipe_digest()
             return
-        sp.set_attribute("cache", "miss")
 
-        target_missing = not Path(targets[0]).exists()
-        try:
-            last = sidecar.read_text(encoding="utf-8").strip()
-        except OSError:
-            last = None
-        recipe_changed = (last is None or last != digest)  # missing sidecar = FULL
+        with _com_seat(label):
+            # Re-probe under the seat: a peer builder may have published this assembly
+            # while we blocked for the seat (fable/codex review) -> restore, don't
+            # rebuild. The FULL+hooks (or REFRESH) run HOLDING the seat, so the hooks
+            # operate on the just-built model without another COM task interleaving.
+            if _cache.restore(cache_key, cache_outputs, label):
+                sp.set_attribute("cache", "hit-after-wait")
+                _record_recipe_digest()
+                return
+            sp.set_attribute("cache", "miss")
 
-        asm_script = SCRIPTS_DIR / f"build_{stem}_assembly.py"
-        hooks = [SCRIPTS_DIR / h for h in POST_ASSEMBLY.get(stem, ())]
-        if target_missing or recipe_changed:
-            why = "target missing" if target_missing else "recipe changed"
-            sp.set_attribute("mode", "full")
-            _exec([sys.executable, str(asm_script)], f"FULL build {stem} ({why})",
-                  log_stem=f"assembly-{stem}")
-            for hook in hooks:
-                _exec([sys.executable, str(hook)], f"hook {hook.name}",
-                      log_stem=f"hook-{stem}-{hook.stem}")
-        else:
-            sp.set_attribute("mode", "refresh")
-            _exec([sys.executable, str(SCRIPTS_DIR / "refresh_assembly.py"), stem],
-                  f"REFRESH {stem}", log_stem=f"assembly-{stem}")
-        # _exec raised if the build failed, so we only get here on success: record this
-        # build's recipe digest for the next run's FULL/REFRESH decision.
-        sidecar.parent.mkdir(parents=True, exist_ok=True)
-        sidecar.write_text(digest + "\n", encoding="utf-8")
-        # Publish the fresh artefacts for other machines (no-op unless mode=rw).
-        # RECOMPUTE the output set here, not reuse the one from the top: the channel
-        # stretch parts and the top-level gallery PNGs are glob-discovered and DID NOT
-        # EXIST yet on a clean builder when cache_outputs was first computed, so the
-        # early list would publish an incomplete archive (codex review). They exist now.
+            target_missing = not Path(targets[0]).exists()
+            try:
+                last = sidecar.read_text(encoding="utf-8").strip()
+            except OSError:
+                last = None
+            recipe_changed = (last is None or last != digest)  # missing sidecar = FULL
+
+            asm_script = SCRIPTS_DIR / f"build_{stem}_assembly.py"
+            hooks = [SCRIPTS_DIR / h for h in POST_ASSEMBLY.get(stem, ())]
+            if target_missing or recipe_changed:
+                why = "target missing" if target_missing else "recipe changed"
+                sp.set_attribute("mode", "full")
+                _exec([sys.executable, str(asm_script)], f"FULL build {stem} ({why})",
+                      log_stem=f"assembly-{stem}")
+                for hook in hooks:
+                    _exec([sys.executable, str(hook)], f"hook {hook.name}",
+                          log_stem=f"hook-{stem}-{hook.stem}")
+            else:
+                sp.set_attribute("mode", "refresh")
+                _exec([sys.executable, str(SCRIPTS_DIR / "refresh_assembly.py"), stem],
+                      f"REFRESH {stem}", log_stem=f"assembly-{stem}")
+            # _exec raised if the build failed, so we only get here on success: record
+            # this build's recipe digest for the next run's FULL/REFRESH decision.
+            _record_recipe_digest()
+        # Publish the fresh artefacts for other machines OUTSIDE the seat (an Azure
+        # upload is network, not COM). RECOMPUTE the output set here, not reuse the one
+        # from the top: the channel stretch parts and the top-level gallery PNGs are
+        # glob-discovered and DID NOT EXIST yet on a clean builder when cache_outputs
+        # was first computed, so the early list would publish an incomplete archive
+        # (codex review). They exist now.
         _cache.store(cache_key, _assembly_cache_outputs(stem), label)
 
 
@@ -1151,8 +1233,9 @@ def task_assembly():
             "file_dep": [*recipe_files, *ref_targets],
             "targets": [_sldasm(stem)],
             "uptodate": [_RecipeTracker(stem, recipe_files)],
-            # COM spine: serialize assemblies after every part on the SW seat.
-            "task_dep": _spine_dep(f"assembly:{stem}"),
+            # No spine: ordering (parts + sub-assemblies before this one) comes from
+            # the real file_dep on their targets above; SolidWorks serialization is
+            # the COM seat lock inside build_or_refresh.
             "actions": [(build_or_refresh, [stem])],
             "clean": [(_clean_assembly, [stem])],
             "verbosity": 2,
@@ -1160,7 +1243,7 @@ def task_assembly():
 
 
 def task_verify():
-    """SolidWorks verification suites -- need SW open, run on the COM spine.
+    """SolidWorks verification suites -- need SW open, serialized on the COM seat lock.
 
     ``verify:soundness`` / ``verify:subsystems`` / ``verify:kinematics`` each wrap
     ``verify.py --suite <x>`` and stamp ``cad/out/reports/verify-<x>.ok`` on
@@ -1242,8 +1325,9 @@ def task_verify():
             # constants need no such dep: they ride their .SLDPRT -> .SLDASM digest.
             "file_dep": [str(VERIFY_PY), str(POSTBUILD_PY), *deps],
             "targets": [stamp],
-            "task_dep": _spine_dep(f"verify:{suite}"),
-            "actions": [(_run_stamped, [cmd, f"verify {suite}", stamp])],
+            # No spine: the file_dep on the built .SLDASM above orders this after the
+            # assemblies; the COM seat lock (com=True) serializes it on the SW seat.
+            "actions": [(_run_stamped, [cmd, f"verify {suite}", stamp, True])],
             "clean": True,
             "verbosity": 2,
         }
@@ -1255,7 +1339,7 @@ def task_check():
     ``check:math`` / ``check:config`` wrap ``verify.py --suite ...`` (verify.py
     runs those two without connecting to SolidWorks); ``check:graph`` /
     ``check:nameplate`` / ``check:recipe`` wrap the pure-python unit tests via
-    pytest. None is on the COM spine.
+    pytest. None takes the COM seat lock, so they fan out under ``-n``.
     """
     config_py = str((SCRIPTS_DIR / "_config.py").resolve())
     # The tolerance audit (check:config) scans every build_*.py for PART_NAME, so a
@@ -1407,7 +1491,7 @@ def task_check():
 
 
 def task_export():
-    """Neutral-format export (STEP / STL / scene boxes). Needs SW; COM spine.
+    """Neutral-format export (STEP / STL / scene boxes). Needs SW; COM seat lock.
 
     Always runs ``export_models.py`` (``uptodate: False``) -- it self-checks every
     output's per-file staleness cheaply and prints "all exports fresh" when there
@@ -1425,27 +1509,32 @@ def task_export():
     return {
         "file_dep": [str(EXPORT_PY), *deps],
         "targets": [target],
-        "task_dep": _spine_dep("export"),
+        # REAL gate edge (was implicit via the spine): export writes neutral formats +
+        # refreshes the comparison gallery into cad/out, side effects that must NOT be
+        # generated from a model that then fails soundness/kinematics. So export waits
+        # on the SW verify gates -- a genuine dependency, not a serialization hack.
+        "task_dep": ["verify:soundness", "verify:kinematics"],
         "uptodate": [False],
-        # --record-digests: this task runs on the COM spine AFTER every part/assembly
-        # is (re)built, so the natives are current and their recipe digests are safe to
-        # RECORD as the export-freshness cache (a bare standalone run must not -- see
-        # export_models.main).
+        # --record-digests: this runs AFTER every part/assembly is (re)built (its
+        # file_dep) and the verify gates, so the natives are current and their recipe
+        # digests are safe to RECORD as the export-freshness cache (a bare standalone
+        # run must not -- see export_models.main). com=True: holds the COM seat.
         "actions": [(_run, [[sys.executable, str(EXPORT_PY), "--record-digests"],
-                            "export", "export"])],
+                            "export", "export", True])],
         "verbosity": 2,
     }
 
 
 def task_preflight():
-    """Release preflight (OPT-IN, COM spine): the gear-ratios proof on the
+    """Release preflight (OPT-IN, COM seat): the gear-ratios proof on the
     reopened drive-train + channel (the only assemblies carrying real gear
-    meshes), WITHOUT saving. Gates `release` (its spine predecessor).
+    meshes), WITHOUT saving. Gates `release`.
 
     NOT in `build`/`default_tasks` -- gear-ratios re-proves a property the
     tooth-count config fixes (check:math validates it analytically), so it
-    runs at release time only. On the spine after `export` so it stays serial
-    on the STA seat. Stamps `cad/out/reports/preflight.ok`.
+    runs at release time only. Its file_dep on the two .SLDASM orders it after
+    them; the COM seat lock keeps it serial on the STA seat. Stamps
+    `cad/out/reports/preflight.ok`.
     """
     stamp = str(REPORTS / "preflight.ok")
     deps = [str(PREFLIGHT_PY), str(VERIFY_PY),
@@ -1454,34 +1543,42 @@ def task_preflight():
     return {
         "file_dep": deps,
         "targets": [stamp],
-        "task_dep": _spine_dep("preflight"),
+        # No spine: the file_dep on drive-train + channel .SLDASM orders this after
+        # those assemblies; the COM seat lock (com=True) serializes it on the SW seat.
         # Always run (like export/release), so a stale stamp can never let
         # release skip the proof.
         "uptodate": [False],
         "actions": [(_run_stamped, [[sys.executable, str(PREFLIGHT_PY)],
-                                    "release preflight", stamp])],
+                                    "release preflight", stamp, True])],
         "clean": True,
         "verbosity": 2,
     }
 
 
 def _run_release(relargs):
-    """Run cut_release.py, forwarding any positional args (``doit release -- v0.2.0``)."""
-    _run([sys.executable, str(RELEASE_PY), *relargs], "cut release")
+    """Run cut_release.py, forwarding any positional args (``doit release -- v0.2.0``).
+
+    com=True: the release job holds the COM seat for its ENTIRE duration -- including
+    its non-COM tail (renders, zip, ``gh`` upload) -- so it blocks any other worktree's
+    COM work until the release finishes. Accepted: a release is a serialized,
+    machine-owning operation."""
+    _run([sys.executable, str(RELEASE_PY), *relargs], "cut release", com=True)
 
 
 def task_release():
     """Cut a tagged release (Pack-and-Go + neutral exports + diff + GitHub
-    release). OPT-IN -- not in default_tasks. Needs SW + gh; spine tail.
+    release). OPT-IN -- not in default_tasks. Needs SW + gh; holds the COM seat.
 
     Publishing is a side effect (no doit target), so it always runs. Forward
     args after ``--``: ``doit release -- v0.2.0 --draft`` (default auto patch-bump).
-    Gated on EVERY gate: ``export`` pulls the SW ``verify:*`` chain via the spine,
-    and the offline ``check:*`` gates are added explicitly so a release cannot
-    publish past a stale/failing math/config/unit-test gate (codex review).
+    Gated on EVERY gate via REAL task_dep edges (the spine is gone, so these are now
+    explicit): ``export`` (which itself pulls the parts/assemblies + the ``verify:*``
+    gates), ``preflight`` (gear-ratios), the ``verify:*`` suites, and every offline
+    ``check:*`` -- so a release cannot publish past a stale/failing gate.
     """
     return {
-        "task_dep": [*_spine_dep("release"), *(f"check:{c}" for c in _CHECK_NAMES)],
+        "task_dep": ["export", "preflight", *(f"verify:{s}" for s in _VERIFY_NAMES),
+                     *(f"check:{c}" for c in _CHECK_NAMES)],
         "uptodate": [False],
         "pos_arg": "relargs",
         "actions": [(_run_release,)],
@@ -1493,27 +1590,33 @@ def task_build():
     """THE fully-safe entry point (also ``default_tasks``): every part + assembly
     + every gate (SolidWorks ``verify:*`` and offline ``check:*``).
 
-    No neutral export / Pack-and-Go -- those are downstream on the spine, and doit
-    only runs a selected task's upstream prerequisites. Use ``doit -n N`` to fan
-    out the ``check:*`` work alongside the serial COM stream.
+    No neutral export / Pack-and-Go -- doit only runs a selected task's upstream
+    prerequisites. Use ``doit -n N`` to fan out the ``check:*`` work alongside the
+    COM stream (serialized by the seat lock, not a spine).
+
+    Ordering here is a SCHEDULING HINT only (real deps drive correctness): the
+    offline ``check:*`` gates are listed FIRST so workers burn through that ~1 min of
+    SolidWorks-free work before piling onto the COM seat, and the parts are in
+    per-seat order so two cold builders diverge and split the fleet cache.
     """
     return {
         "actions": None,
         "task_dep": (
-            [f"part:{s}" for s in part_stems()]
+            [f"check:{s}" for s in _CHECK_NAMES]
+            + [f"part:{s}" for s in _seat_part_order()]
             + [f"assembly:{s}" for s in ASSEMBLY_ORDER]
             + [f"verify:{s}" for s in _VERIFY_NAMES]
-            + [f"check:{s}" for s in _CHECK_NAMES]
         ),
     }
 
 
 def task_build_bare():
-    """Quick rebuild: parts + assemblies only -- no verification, no export."""
+    """Quick rebuild: parts + assemblies only -- no verification, no export.
+    Parts in per-seat order (scheduling hint); the seat lock keeps COM serial."""
     return {
         "actions": None,
         "task_dep": (
-            [f"part:{s}" for s in part_stems()]
+            [f"part:{s}" for s in _seat_part_order()]
             + [f"assembly:{s}" for s in ASSEMBLY_ORDER]
         ),
     }
@@ -1521,9 +1624,9 @@ def task_build_bare():
 
 # --- Cache diagnostic (issue #73): explain any miss in ONE command.
 #
-# SolidWorks-FREE and OFF the COM spine -- it computes the same key/file_dep set the
-# build does and PROBES the backend (a presence check, no download), so it never
-# touches the seat. For every part + assembly it prints HIT/MISS + key + (for a miss,
+# SolidWorks-FREE and never takes the COM seat lock -- it computes the same
+# key/file_dep set the build does and PROBES the backend (a presence check, no
+# download), so it never touches the seat. For every part + assembly it prints HIT/MISS + key + (for a miss,
 # or with `all`) the per-dep digests that produced the key, plus a drift flag when
 # this seat's last-published key differs from the current one. That is the ad-hoc
 # script we hand-wrote cutting v0.9.0, kept.
@@ -1576,8 +1679,8 @@ def _cache_status(statusargs):
 
 def task_cache_status():
     """Diagnostic: per part/assembly, the cache key + dep digests + backend HIT/MISS,
-    so any miss is explainable in one command (issue #73). SolidWorks-FREE, off the
-    COM spine, never in default_tasks.
+    so any miss is explainable in one command (issue #73). SolidWorks-FREE, never
+    takes the COM seat lock, never in default_tasks.
 
     Positional args (after ``--``): label substrings to filter (e.g. ``cone_gear``);
     ``miss`` to show only misses; ``all`` to dump dep digests for every task (default:
