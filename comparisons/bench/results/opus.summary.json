@@ -3,185 +3,185 @@
   "t1": {
    "table": {
     "P1": {
-     "n": 127,
-     "macro_sign": 0.797730067464273,
+     "n": 141,
+     "macro_sign": 0.7917069750256042,
      "ci": [
-      0.7638071894823462,
-      0.8473601242350827
+      0.7629977021937132,
+      0.8489583973728987
      ],
      "per_param": {
-      "az": 0.7568354264782836,
-      "el": 0.8766276627662766,
-      "roll": 0.8960437710437711,
-      "target_x": 0.795065220807795,
-      "target_y": 0.7250117868929751,
-      "zoom": 0.7367965367965369
+      "az": 0.7448692485931812,
+      "el": 0.8523351648351648,
+      "roll": 0.8814362108479755,
+      "target_x": 0.7776718856364875,
+      "target_y": 0.7400793650793651,
+      "zoom": 0.7538499751614506
      },
-     "magnitude": 0.8026315789473685,
+     "magnitude": 0.783625730994152,
      "control_fp": 1.0,
      "confusion": {
       "leaks": {
        "el->target_y": 5,
-       "zoom->target_y": 3,
+       "zoom->target_y": 4,
        "target_x->az": 3,
        "target_x->target_y": 3,
        "target_x->zoom": 3,
+       "zoom->target_x": 2,
        "target_x->el": 2,
-       "target_x->roll": 2,
-       "zoom->target_x": 1
+       "target_x->roll": 2
       },
       "n_by_param": {
-       "az": 20,
-       "el": 20,
+       "az": 24,
+       "el": 22,
        "roll": 20,
        "target_x": 20,
-       "target_y": 19,
-       "zoom": 8
+       "target_y": 20,
+       "zoom": 10
       }
      },
-     "median_tokens": 1128,
-     "mean_latency_s": 29.4
+     "median_tokens": 1081,
+     "mean_latency_s": 28.7
     },
     "P2": {
-     "n": 127,
-     "macro_sign": 0.7843467196013165,
+     "n": 141,
+     "macro_sign": 0.7597870093123295,
      "ci": [
-      0.7577219247130023,
-      0.8233717216222288
+      0.7242059719581775,
+      0.804489624154927
      ],
      "per_param": {
-      "az": 0.7624934589220304,
-      "el": 0.7661766176617663,
-      "roll": 0.837121212121212,
-      "target_x": 0.6931478862171931,
-      "target_y": 0.812942008486563,
-      "zoom": 0.8341991341991343
+      "az": 0.7279667328699105,
+      "el": 0.7451923076923078,
+      "roll": 0.8195823784059079,
+      "target_x": 0.6579835110808562,
+      "target_y": 0.7755952380952381,
+      "zoom": 0.8324018877297567
      },
-     "magnitude": 0.8289473684210527,
+     "magnitude": 0.8245614035087719,
      "control_fp": 1.0,
      "confusion": {
       "leaks": {
        "el->zoom": 6,
        "target_x->zoom": 6,
        "target_x->el": 5,
+       "zoom->el": 5,
        "roll->zoom": 5,
-       "zoom->el": 4,
-       "el->target_y": 4,
-       "roll->el": 4,
-       "target_x->az": 4
+       "az->el": 4,
+       "zoom->az": 4,
+       "el->target_y": 4
       },
       "n_by_param": {
-       "az": 20,
-       "el": 20,
+       "az": 24,
+       "el": 22,
        "roll": 20,
        "target_x": 20,
-       "target_y": 19,
-       "zoom": 8
+       "target_y": 20,
+       "zoom": 10
       }
      },
-     "median_tokens": 1485,
-     "mean_latency_s": 33.4
+     "median_tokens": 1476,
+     "mean_latency_s": 32.9
     },
     "P3": {
-     "n": 127,
-     "macro_sign": 0.8331935840540271,
+     "n": 141,
+     "macro_sign": 0.8052875934687332,
      "ci": [
-      0.8117810165391894,
-      0.8686487484525105
+      0.7473364938252635,
+      0.8554642943984994
      ],
      "per_param": {
-      "az": 0.7330259026687598,
-      "el": 0.8057805780578057,
-      "roll": 0.8613215488215488,
-      "target_x": 0.8088951752318089,
-      "target_y": 0.8710906804966211,
-      "zoom": 0.919047619047619
+      "az": 0.7228566699768288,
+      "el": 0.7868589743589745,
+      "roll": 0.815380697733639,
+      "target_x": 0.7690946221919673,
+      "target_y": 0.855952380952381,
+      "zoom": 0.881582215598609
      },
-     "magnitude": 0.8552631578947368,
+     "magnitude": 0.8362573099415205,
      "control_fp": 1.0,
      "confusion": {
       "leaks": {
        "roll->az": 3,
        "roll->el": 3,
        "el->az": 3,
+       "zoom->el": 3,
        "roll->zoom": 3,
        "target_y->el": 2,
        "target_x->el": 2,
-       "zoom->el": 2,
-       "az->el": 1
+       "zoom->az": 2
       },
       "n_by_param": {
-       "az": 20,
-       "el": 20,
+       "az": 24,
+       "el": 22,
        "roll": 20,
        "target_x": 20,
-       "target_y": 19,
-       "zoom": 8
+       "target_y": 20,
+       "zoom": 10
       }
      },
-     "median_tokens": 2361,
-     "mean_latency_s": 51.3
+     "median_tokens": 2151,
+     "mean_latency_s": 49.1
     },
     "P4": {
-     "n": 127,
-     "macro_sign": 0.8095060878624056,
+     "n": 141,
+     "macro_sign": 0.7860468528560961,
      "ci": [
-      0.7741454096283885,
-      0.8577443744710389
+      0.7440857107212101,
+      0.8361743093975053
      ],
      "per_param": {
-      "az": 0.8003335949764522,
-      "el": 0.809080908090809,
-      "roll": 0.8438552188552189,
-      "target_x": 0.771923620933522,
-      "target_y": 0.8777306302058777,
-      "zoom": 0.7541125541125542
+      "az": 0.7706678252234359,
+      "el": 0.8136446886446888,
+      "roll": 0.7852559205500382,
+      "target_x": 0.7361772936994176,
+      "target_y": 0.8557539682539682,
+      "zoom": 0.7547814207650273
      },
-     "magnitude": 0.8157894736842105,
+     "magnitude": 0.7894736842105263,
      "control_fp": 1.0,
      "confusion": {
       "leaks": {
+       "az->zoom": 7,
        "target_x->zoom": 7,
+       "el->zoom": 6,
        "roll->zoom": 6,
-       "el->zoom": 5,
        "target_x->target_y": 5,
+       "target_y->zoom": 5,
        "target_x->el": 4,
-       "az->zoom": 4,
-       "roll->target_x": 4,
-       "target_y->zoom": 4
+       "roll->target_x": 4
       },
       "n_by_param": {
-       "az": 20,
-       "el": 20,
+       "az": 24,
+       "el": 22,
        "roll": 20,
        "target_x": 20,
-       "target_y": 19,
-       "zoom": 8
+       "target_y": 20,
+       "zoom": 10
       }
      },
-     "median_tokens": 1848,
-     "mean_latency_s": 40.7
+     "median_tokens": 1749,
+     "mean_latency_s": 39.6
     },
     "P5": {
-     "n": 127,
-     "macro_sign": 0.8414807932694544,
+     "n": 141,
+     "macro_sign": 0.8270120231287592,
      "ci": [
-      0.8267480609138246,
-      0.8790074659639876
+      0.8110737656750203,
+      0.8625206451043922
      ],
      "per_param": {
-      "az": 0.8033097854526426,
-      "el": 0.861006100610061,
-      "roll": 0.8789983164983165,
-      "target_x": 0.8393446487505893,
-      "target_y": 0.8380873801665881,
-      "zoom": 0.8281385281385281
+      "az": 0.8070796094008607,
+      "el": 0.8642399267399267,
+      "roll": 0.8135217723453018,
+      "target_x": 0.8210120263217608,
+      "target_y": 0.8188492063492063,
+      "zoom": 0.8373695976154992
      },
-     "magnitude": 0.8092105263157895,
-     "control_fp": 0.5,
+     "magnitude": 0.7953216374269005,
+     "control_fp": 0.6,
      "confusion": {
       "leaks": {
-       "el->target_y": 6,
+       "el->target_y": 7,
        "target_x->target_y": 2,
        "target_x->zoom": 2,
        "zoom->el": 1,
@@ -191,268 +191,269 @@
        "target_x->az": 1
       },
       "n_by_param": {
-       "az": 20,
-       "el": 20,
+       "az": 24,
+       "el": 22,
        "roll": 20,
        "target_x": 20,
-       "target_y": 19,
-       "zoom": 8
+       "target_y": 20,
+       "zoom": 10
       }
      },
-     "median_tokens": 815,
-     "mean_latency_s": 20.8
+     "median_tokens": 799,
+     "mean_latency_s": 20.6
     },
     "P6": {
-     "n": 126,
-     "macro_sign": 0.8032327537630506,
+     "n": 141,
+     "macro_sign": 0.7841779970795417,
      "ci": [
-      0.7468199942547228,
-      0.8916479356273829
+      0.7308496965227347,
+      0.8388326553978037
      ],
      "per_param": {
-      "az": 0.8033141686492202,
-      "el": 0.8933333333333334,
-      "roll": 0.8544501133786847,
-      "target_x": 0.7722222222222221,
-      "target_y": 0.8249539239638249,
-      "zoom": 0.6711227610310179
+      "az": 0.788356504468719,
+      "el": 0.8898809523809524,
+      "roll": 0.792742551566081,
+      "target_x": 0.7582331139853263,
+      "target_y": 0.7847222222222222,
+      "zoom": 0.6911326378539493
      },
-     "magnitude": 0.7152317880794702,
-     "control_fp": 0.5,
+     "magnitude": 0.7192982456140351,
+     "control_fp": 0.6,
      "confusion": {
       "leaks": {
        "target_x->el": 5,
        "target_x->target_y": 5,
        "target_x->zoom": 4,
        "target_x->az": 4,
-       "el->target_y": 2,
+       "el->target_y": 3,
        "az->zoom": 1,
-       "target_x->roll": 1
+       "target_x->roll": 1,
+       "zoom->az": 1
       },
       "n_by_param": {
-       "az": 20,
-       "el": 20,
+       "az": 24,
+       "el": 22,
        "roll": 20,
        "target_x": 20,
-       "target_y": 18,
-       "zoom": 8
+       "target_y": 20,
+       "zoom": 10
       }
      },
-     "median_tokens": 778,
-     "mean_latency_s": 19.1
+     "median_tokens": 758,
+     "mean_latency_s": 19.3
     },
     "P7": {
-     "n": 125,
-     "macro_sign": 0.7998561825875742,
+     "n": 141,
+     "macro_sign": 0.7884532509648768,
      "ci": [
-      0.7611407232938882,
-      0.8631625786934252
+      0.7640435164225466,
+      0.8307727492899691
      ],
      "per_param": {
-      "az": 0.8167735042735043,
-      "el": 0.8484848484848485,
-      "roll": 0.8195160366552119,
-      "target_x": 0.8151755651755651,
-      "target_y": 0.7160301744460161,
-      "zoom": 0.7831569664902999
+      "az": 0.8404915590863952,
+      "el": 0.8493589743589745,
+      "roll": 0.7864272981920041,
+      "target_x": 0.7939944028439604,
+      "target_y": 0.656547619047619,
+      "zoom": 0.803899652260308
      },
-     "magnitude": 0.8,
-     "control_fp": 0.75,
+     "magnitude": 0.7894736842105263,
+     "control_fp": 0.8,
      "confusion": {
       "leaks": {
-       "el->target_y": 5,
+       "el->target_y": 6,
+       "zoom->target_y": 5,
        "target_x->target_y": 4,
-       "zoom->target_y": 4,
-       "zoom->target_x": 3,
-       "target_y->target_x": 2,
+       "zoom->target_x": 4,
+       "target_y->target_x": 3,
        "el->target_x": 2,
        "roll->target_y": 2,
        "target_x->roll": 2
       },
       "n_by_param": {
-       "az": 20,
-       "el": 20,
+       "az": 24,
+       "el": 22,
        "roll": 20,
        "target_x": 20,
-       "target_y": 17,
-       "zoom": 8
+       "target_y": 20,
+       "zoom": 10
       }
      },
-     "median_tokens": 1852,
-     "mean_latency_s": 38.6
+     "median_tokens": 1654,
+     "mean_latency_s": 37.5
     },
     "P8": {
-     "n": 126,
-     "macro_sign": 0.8157950226047745,
+     "n": 141,
+     "macro_sign": 0.7857032429054714,
      "ci": [
-      0.7879574147666508,
-      0.8531693377366759
+      0.7231673859411122,
+      0.8439370527866102
      ],
      "per_param": {
-      "az": 0.7998777425323818,
-      "el": 0.8763636363636363,
-      "roll": 0.8302154195011338,
-      "target_x": 0.7987301587301587,
-      "target_y": 0.8184604174703184,
-      "zoom": 0.7711227610310178
+      "az": 0.7787777226084079,
+      "el": 0.8523351648351648,
+      "roll": 0.7701044053985231,
+      "target_x": 0.7572952121624689,
+      "target_y": 0.8039682539682539,
+      "zoom": 0.75173869846001
      },
-     "magnitude": 0.847682119205298,
+     "magnitude": 0.8362573099415205,
      "control_fp": 1.0,
      "confusion": {
       "leaks": {
-       "el->target_y": 8,
+       "el->target_y": 9,
+       "zoom->az": 2,
+       "zoom->el": 2,
        "el->zoom": 2,
        "target_y->az": 1,
-       "zoom->az": 1,
-       "zoom->el": 1,
        "roll->az": 1,
        "roll->el": 1,
        "zoom->roll": 1
       },
       "n_by_param": {
-       "az": 20,
-       "el": 20,
+       "az": 24,
+       "el": 22,
        "roll": 20,
        "target_x": 20,
-       "target_y": 18,
-       "zoom": 8
+       "target_y": 20,
+       "zoom": 10
       }
      },
-     "median_tokens": 1145,
-     "mean_latency_s": 30.8
+     "median_tokens": 1121,
+     "mean_latency_s": 30.5
     },
     "P9": {
-     "n": 126,
-     "macro_sign": 0.8144852222239759,
+     "n": 141,
+     "macro_sign": 0.8000728813344229,
      "ci": [
-      0.8036709898992708,
-      0.8327208185760031
+      0.7705752911957228,
+      0.8349490344495393
      ],
      "per_param": {
-      "az": 0.8232388316151202,
-      "el": 0.8952525252525252,
-      "roll": 0.8195861678004536,
-      "target_x": 0.7825396825396825,
-      "target_y": 0.8084522737988085,
-      "zoom": 0.7578418523372652
+      "az": 0.8186238000662032,
+      "el": 0.8701923076923078,
+      "roll": 0.7999745352686528,
+      "target_x": 0.7441192042961955,
+      "target_y": 0.7890873015873016,
+      "zoom": 0.7784401390958768
      },
-     "magnitude": 0.8079470198675497,
+     "magnitude": 0.8011695906432749,
      "control_fp": 1.0,
      "confusion": {
       "leaks": {
-       "el->target_y": 5,
-       "zoom->target_x": 3,
+       "el->target_y": 7,
+       "zoom->target_x": 4,
+       "zoom->target_y": 3,
        "el->target_x": 3,
        "roll->target_x": 3,
        "target_x->target_y": 3,
-       "zoom->target_y": 2,
        "az->target_x": 2,
        "roll->target_y": 2
       },
       "n_by_param": {
-       "az": 20,
-       "el": 20,
+       "az": 24,
+       "el": 22,
        "roll": 20,
        "target_x": 20,
-       "target_y": 18,
-       "zoom": 8
+       "target_y": 20,
+       "zoom": 10
       }
      },
-     "median_tokens": 1394,
-     "mean_latency_s": 33.4
+     "median_tokens": 1349,
+     "mean_latency_s": 33.2
     },
     "P10": {
-     "n": 126,
-     "macro_sign": 0.825692303973978,
+     "n": 141,
+     "macro_sign": 0.799146737919739,
      "ci": [
-      0.8088450758435859,
-      0.854949482657497
+      0.7619656000383763,
+      0.8362196574184878
      ],
      "per_param": {
-      "az": 0.8548109965635738,
-      "el": 0.84,
-      "roll": 0.8443877551020408,
-      "target_x": 0.7842857142857143,
-      "target_y": 0.7822639406797823,
-      "zoom": 0.8484054172127568
+      "az": 0.8318437603442569,
+      "el": 0.8184523809523809,
+      "roll": 0.8025719378660555,
+      "target_x": 0.7464034490583163,
+      "target_y": 0.7547619047619047,
+      "zoom": 0.8408469945355191
      },
-     "magnitude": 0.8278145695364238,
+     "magnitude": 0.8187134502923976,
      "control_fp": 1.0,
      "confusion": {
       "leaks": {
-       "az->zoom": 8,
+       "az->zoom": 12,
        "target_x->zoom": 8,
        "target_x->el": 7,
        "target_x->target_y": 7,
-       "az->el": 5,
+       "az->el": 6,
        "target_x->az": 5,
        "target_x->roll": 5,
        "roll->zoom": 4
       },
       "n_by_param": {
-       "az": 20,
-       "el": 20,
+       "az": 24,
+       "el": 22,
        "roll": 20,
        "target_x": 20,
-       "target_y": 18,
-       "zoom": 8
+       "target_y": 20,
+       "zoom": 10
       }
      },
-     "median_tokens": 1798,
-     "mean_latency_s": 37.5
+     "median_tokens": 1795,
+     "mean_latency_s": 37.3
     },
     "P11": {
-     "n": 126,
-     "macro_sign": 0.7990545142803404,
+     "n": 140,
+     "macro_sign": 0.7846719562122555,
      "ci": [
-      0.7722109988914889,
-      0.8488971703677586
+      0.7679399780409805,
+      0.8085033171967454
      ],
      "per_param": {
-      "az": 0.8188606925720329,
-      "el": 0.7852525252525252,
-      "roll": 0.8820861678004536,
-      "target_x": 0.7992063492063491,
-      "target_y": 0.7353521066392353,
-      "zoom": 0.773569244211446
+      "az": 0.7945384294068504,
+      "el": 0.7668650793650794,
+      "roll": 0.8213579009585485,
+      "target_x": 0.784035409035409,
+      "target_y": 0.7567996567996568,
+      "zoom": 0.7844352617079889
      },
-     "magnitude": 0.8609271523178808,
+     "magnitude": 0.8470588235294118,
      "control_fp": 1.0,
      "confusion": {
       "leaks": {
-       "zoom->target_y": 8,
+       "zoom->target_y": 9,
        "el->target_y": 7,
+       "zoom->az": 5,
+       "zoom->el": 5,
        "az->zoom": 5,
        "target_x->zoom": 5,
        "roll->zoom": 4,
-       "zoom->az": 4,
-       "zoom->el": 4,
-       "target_y->zoom": 4
+       "zoom->target_x": 4
       },
       "n_by_param": {
-       "az": 20,
-       "el": 20,
+       "az": 24,
+       "el": 21,
        "roll": 20,
        "target_x": 20,
-       "target_y": 18,
-       "zoom": 8
+       "target_y": 20,
+       "zoom": 10
       }
      },
-     "median_tokens": 2144,
-     "mean_latency_s": 46.7
+     "median_tokens": 2142,
+     "mean_latency_s": 45.8
     }
    },
    "ranking": [
     "P5",
     "P3",
-    "P10",
-    "P8",
     "P9",
-    "P4",
-    "P6",
-    "P7",
-    "P11",
+    "P10",
     "P1",
+    "P7",
+    "P4",
+    "P8",
+    "P11",
+    "P6",
     "P2"
    ]
   },
