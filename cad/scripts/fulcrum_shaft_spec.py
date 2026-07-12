@@ -12,3 +12,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SectionProfile": {"ShaftDia"},
     "Shaft": {"Depth"},
 }
+
+DRAWING_NOTES = "\n".join(
+    (
+        "UOS, DIMENSIONS IN MM: LENGTH +/-0.25. DEBURR; BREAK ENDS 0.15 MAX; CENTRE MARKS "
+        "1.0 DEEP MAX.",
+        "TURN OR CENTRELESS-GRIND FULL BEARING LENGTH; NO FLATS OR STEPS.",
+    )
+)
+END_VIEW_NOTE = "END VIEW SCALE 2:1"
