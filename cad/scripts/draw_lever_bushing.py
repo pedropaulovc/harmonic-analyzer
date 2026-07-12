@@ -68,7 +68,7 @@ _NOTES = (
     "1. DIMENSIONS ARE IN MILLIMETRES. INTERPRET PER ASME Y14.5.",
     (
         "2. TOLERANCES: LINEAR +/-0.10; DIAMETERS +/-0.05;\n"
-        "   BORE O6.50 +0.03/-0.00."
+        f"   BORE O{BORE_DIA:.2f} +0.03/-0.00."
     ),
     "3. REMOVE BURRS AND BREAK SHARP EDGES 0.15 MAX.",
     (
@@ -76,7 +76,7 @@ _NOTES = (
         "   END FACES PARALLEL WITHIN 0.03; TOTAL LENGTH +/-0.03."
     ),
     (
-        "5. DRILL UNDERSIZE AND REAM O6.50 THRU; Ra 1.6.\n"
+        f"5. DRILL UNDERSIZE AND REAM O{BORE_DIA:.2f} THRU; Ra 1.6.\n"
         "   FREE RUNNING FIT ON O6.35 FULCRUM SHAFT."
     ),
     (
