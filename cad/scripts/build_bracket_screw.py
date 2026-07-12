@@ -19,23 +19,25 @@ from __future__ import annotations
 
 import sys
 
+from _fastener_catalog import fastener
 from _flat_screw import build_flat_screw
 from _common import run_build
 
 PART_NAME = "bracket-screw"
+SPEC = fastener(PART_NAME)
 
 HEAD_DIA = 8.0  # large slotted head (p.62/63, low)
 HEAD_H = 2.5
-SHANK_DIA = 3.15  # shank: was Ø3.9, now 3.15 = #8-32 tap-drill 3.454 - 0.3
+SHANK_DIA = SPEC.model_diameter_mm  # #8-32 modeled thread minor diameter
 # (threads the bar's #8-32 sockets; rides the bracket's O4.4 clearance)
-SHANK_LEN = 12.0  # bracket plate 4 + 8 into the 9-deep bar
+SHANK_LEN = SPEC.length_mm  # bracket plate 4 + 8 into the 9-deep bar
 
 
 async def build(adapter) -> dict[str, str]:
     return await build_flat_screw(
         adapter,
         part_name=PART_NAME,
-        material="Plain Carbon Steel",
+        material=SPEC.material,
         head_dia=HEAD_DIA,
         head_h=HEAD_H,
         shank_dia=SHANK_DIA,
