@@ -34,13 +34,15 @@ and especially across the 3 repeats:
   the per-process cap is 10k and multiple instances multiply the pressure. A GDI climb that
   doesn't reset between builds is a blocker even if geometry is correct.
 
-**Why it matters:** the entire `dodo.py` architecture serializes every COM task into a
-linear "spine" (`_COM_TAIL` + `_spine_dep`) precisely because of the invariant "one
+**Why it matters:** `dodo.py` serializes every COM task on the single STA seat with a
+cross-process file lock (`_com_seat`; see [[com-seat-lock]], which replaced the old
+`_COM_TAIL`/`_spine_dep` spine 2026-07-11) precisely because of the invariant "one
 SolidWorks STA seat ⇒ COM tasks must never run concurrently." If N independent instances
 are viable, that invariant relaxes and the COM build parallelizes (N× speedup on the
-slowest stage). See [[mate-flip-determinism]] for the flip nondeterminism that parallel
-builds could re-expose, and [[per-seat-part-order]] for the existing cross-SEAT (not
-cross-instance) parallelism the cache already exploits.
+slowest stage) — concretely, you would key the lock PER INSTANCE (or use N lock slots)
+instead of one machine-global seat. See [[mate-flip-determinism]] for the flip
+nondeterminism that parallel builds could re-expose, and [[per-seat-part-order]] for the
+existing cross-SEAT (not cross-instance) parallelism the cache already exploits.
 
 **Resource knobs to give breathing room (researched 2026-07-06)** — raise these BEFORE
 running parallel instances, then watch whether they hold across the 3 repeats:
@@ -65,5 +67,6 @@ between the 3 cold builds as a leak/blocker even if geometry passes.
 
 **How to apply:** consult the `developing-solidworks` skill's `./learnings/` and `./docs/`
 for ROT/multi-instance COM binding before writing code. Prototype the ROT-enumeration bind
-in `SolidworksMCP-python` (the COM adapter). Do NOT weaken the spine in `dodo.py` until the
-3× cold-build bar is met — a false "it works" here silently corrupts every build.
+in `SolidworksMCP-python` (the COM adapter). Do NOT relax the `_com_seat` serialization in
+`dodo.py` (widen from one seat lock to N slots) until the 3× cold-build bar is met — a
+false "it works" here silently corrupts every build.

@@ -105,12 +105,14 @@ $py = "C:\src\SolidworksMCP-python\.venv\Scripts\python.exe"
 ```
 
 **Parallelism.** There is one SolidWorks STA seat, so COM work must stay serial — but
-the SolidWorks-*free* `check:*` gates need not. `dodo.py` chains every COM task into a
-single linear `task_dep` **spine**, so at most one COM task is ever runnable: the seat is
-never contended **even under `-n N`**, while `check:*` tasks fan out in parallel. (This
-replaces the old "never pass `-n`" rule — `-n` is now safe.) Tradeoff: a COM failure
-mid-spine skips the later COM tasks in that run; fix and re-run (doit re-runs only what is
-still stale). Outputs land in `cad/out/` (gitignored).
+the SolidWorks-*free* `check:*` gates need not. Serialization is enforced at runtime by a
+cross-process **file lock** (the COM seat lock): every COM subprocess grabs it before
+driving SolidWorks, so at most one COM task touches the seat **even under `-n N`**, while
+`check:*` tasks (which never take the lock) fan out in parallel. (This replaces both the
+old "never pass `-n`" rule *and* the later `task_dep` **spine** that linearized every COM
+task — the graph now carries only real dependency edges.) The lock is machine-global
+(`%PROGRAMDATA%/harmonic-analyzer/com-seat.lock`, override `HARMONIC_COM_LOCK`), so it also
+serializes COM across worktrees on the seat. Outputs land in `cad/out/` (gitignored).
 
 **Force a full from-scratch rebuild of one assembly** (bypass the cheap refresh) by deleting
 its target — a missing target makes doit take the FULL branch (hooks included):
