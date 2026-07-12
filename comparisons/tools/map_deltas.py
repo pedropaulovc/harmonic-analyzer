@@ -137,6 +137,10 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--pair", required=True, help="pair id (matches the deltas filename)")
     ap.add_argument("--findings", default=None, help="override deltas json path")
+    ap.add_argument("--merge-tol", type=float, default=0.0, metavar="MM",
+                    help="merge groups whose shift deltas are within MM of each "
+                         "other (default 0 = exact). Use to fold an imprecise "
+                         "multi-select back into one intended move.")
     args = ap.parse_args()
 
     path = Path(args.findings) if args.findings else (
@@ -149,17 +153,40 @@ def main() -> int:
     moved = data.get("moved", [])
     cam = data.get("camera") or {}
     basis = _camera_basis(cam) if cam.get("az_deg") is not None else None
-    # Group parts that moved by the same delta (a rigid-group drag).
-    groups: dict[tuple, list[dict]] = {}
+    # Group parts that moved by the same delta (a rigid-group drag), then
+    # optionally merge near-equal groups (--merge-tol) so an imprecise
+    # multi-select folds back into one intended move. Only groups with the same
+    # scale key merge; the merged shift is the mean of its members' translates.
+    exact: dict[tuple, list[dict]] = {}
     for e in moved:
-        groups.setdefault(_group_key(e), []).append(e)
+        exact.setdefault(_group_key(e), []).append(e)
+
+    clusters: list[list[dict]] = []
+    refs: list[tuple] = []
+    for (dt, sf), members in exact.items():
+        hit = None
+        for i, (rdt, rsf) in enumerate(refs):
+            if rsf == sf and args.merge_tol > 0 and \
+                    max(abs(a - b) for a, b in zip(dt, rdt)) <= args.merge_tol:
+                hit = i
+                break
+        if hit is None:
+            refs.append((dt, sf))
+            clusters.append(list(members))
+        else:
+            clusters[hit].extend(members)
 
     print(f"# {path.name}  ({data.get('source', '?')})")
-    print(f"# {len(moved)} moved part(s) in {len(groups)} rigid group(s) · "
+    tol_note = f" · merge-tol {args.merge_tol:g} mm" if args.merge_tol > 0 else ""
+    print(f"# {len(moved)} moved part(s) in {len(clusters)} group(s){tol_note} · "
           f"{data.get('units', '')}\n")
 
-    for gi, (key, members) in enumerate(groups.items(), 1):
-        (dt, sf) = key
+    for gi, members in enumerate(clusters, 1):
+        n = len(members)
+        dt = tuple(round(sum(m["translate_mm"][i] for m in members) / n, 3)
+                   for i in range(3))
+        sf = tuple(round(sum(m["scale"][i] for m in members) / n, 4)
+                   for i in range(3))
         stems = sorted({_canonical(m["part"]) for m in members})
         names = ", ".join(sorted(m["name"] for m in members))
         print(f"== group {gi}: {len(members)} part(s) -> {', '.join(stems)} ==")
