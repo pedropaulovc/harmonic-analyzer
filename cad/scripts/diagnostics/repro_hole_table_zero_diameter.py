@@ -35,6 +35,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (  # noqa: E402
     new_drawing,
     place_view,
     save_drawing,
+    set_units_mm,
 )
 
 
@@ -133,6 +134,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     with _telemetry.span("repro.drawing"):
         new_drawing(adapter)
+        set_units_mm(adapter, decimals=2)
         front = place_view(
             adapter,
             str(PART_PATH),
