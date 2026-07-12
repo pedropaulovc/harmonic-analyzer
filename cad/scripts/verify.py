@@ -79,10 +79,12 @@ from _common import (
     run_build,
 )
 from _assembly import (
+    _ALLOWED_FREE_STEMS,
     _export_assembly_images,
     assert_components_fully_defined,
     assert_free_dof_necessity,
     assert_model_healthy,
+    assert_saved_rebuild_clean,
     check_no_interference,
     component_names,
     component_transform,
@@ -633,52 +635,6 @@ _REQUIRED_FREE_STEMS = {
     "pen": ("pen-rod", "pen-marker", "pen-wire"),
 }
 
-# EXACT-SET allowed lists (the sufficiency direction, replacing the retired
-# release park-closure): every under-constrained component's stem must be in
-# its assembly's list -- the freed DOF's own families PLUS everything coupled
-# to them. A stray (a forgotten mate on a structural part) fails soundness
-# loud instead of shipping. The lists are pinned from a live status dump of
-# the built assemblies (`gate.dof_free_necessity` names any stray explicitly,
-# so extending them after a deliberate coupling change is a one-line fix).
-_ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
-    # Every list pinned LIVE from built artefacts via
-    # diagnostics/dump_under_constrained.py (2026-07-09): channel read 80
-    # under-constrained = exactly these 4 stems x 20 channels; the other
-    # dumps are quoted per assembly below. Re-pin after a deliberate
-    # coupling change -- the gate names any stray.
-    "channel": ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever"),
-    "summing": ("summing-lever", "boss-hook"),
-    "pen": ("pen-rod", "pen-marker", "pen-wire"),
-    # 63 under-constrained, 22 families: the crank chain, the geared train,
-    # the platform + its riders (cone set, tip hardware) and the pinion
-    # engage rig -- all coupled to the 4 freed DOF.
-    "drive-train": (
-        "alignment-pinion", "cone-gear", "cone-gear-shaft", "cone-pivot-post",
-        "cone-swing-platform", "cone-tip-adjuster", "cone-tip-block",
-        "cone-tip-bushing", "cone-tip-pinch-screw", "crank-arm",
-        "crank-drive-gear", "crank-handle", "crank-pinion", "crankshaft",
-        "cylinder-gear", "pinion-arbor", "pinion-bracket", "pinion-cam",
-        "pinion-cam-pin", "pinion-handle", "pinion-lever", "pinion-lift-rod",
-    ),
-    # 8 under-constrained: the lever carries the clamp/vertical-rod/fixture
-    # group + the bracket; the wire and yoke-coupled wheel articulate with it.
-    "magnifier": (
-        "lever-wire", "magnifying-bracket", "magnifying-clamp",
-        "magnifying-lever", "magnifying-vertical-rod", "magnifying-wheel",
-        "output-fixture", "thumb-screw",
-    ),
-    # 39 under-constrained, 12 families: the crank T12 + belt-coupled knob
-    # cluster, the reduction train down to the feed pinion, and the
-    # rack-coupled platen group with its riders.
-    "paper-drive": (
-        "fillister-screw", "guide-lock", "platen", "platen-clip",
-        "platen-guide", "platen-paper", "platen-rack", "rack-pinion",
-        "transgear-feed-pinion", "transgear-knob-shaft", "transgear-pinion",
-        "transgear-removable",
-    ),
-}
-
-
 def _required_free_instances(name: str) -> tuple[str, ...]:
     """Exact component instances that must read under-constrained, sourced from
     the DOF manifest (each freed-DOF drive's ``verify`` target). Used where a
@@ -929,6 +885,12 @@ async def _verify_static_one(
     # work per assembly that otherwise sits in an unspanned gap between gates.
     async with _telemetry.aspan("verify.open", name=name):
         check(f"open {name}", await adapter.open_model(str(sldasm)))
+        # Capture the persisted flag before configuration activation, whose adapter
+        # path rebuilds and can clear the evidence in memory.
+        report.gate(
+            f"{name}:saved-rebuild-clean",
+            lambda: assert_saved_rebuild_clean(adapter, name),
+        )
         configs = check("list configurations", await adapter.list_configurations())
         if REST in (configs or []):
             check(f"activate {REST}", await adapter.set_active_configuration(REST))
