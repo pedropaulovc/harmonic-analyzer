@@ -84,6 +84,7 @@ from _common import (
 from _assembly import (
     angle_driver,
     assert_component_placed,
+    assert_pattern_targets,
     assert_free_dof_necessity,
     check_no_interference,
     coincident_mate,
@@ -603,33 +604,6 @@ async def _sprocket_revolute(adapter, name: str, label: str) -> None:
                           label=f"{label} axial", verify=(name, o))
 
 
-def _assert_pattern_targets(
-    adapter,
-    instances: list[str],
-    targets: list[list[float]],
-    rows: list[list[float]],
-    label: str,
-) -> None:
-    """Match unordered pattern instances to authored target poses and gate each."""
-    unmatched = set(instances)
-    for target in targets:
-        matching = [
-            name
-            for name in unmatched
-            if all(
-                abs(component_transform(adapter, name)[9 + axis] * 1000.0 - target[axis])
-                < 0.05
-                for axis in range(3)
-            )
-        ]
-        if len(matching) != 1:
-            raise RuntimeError(f"{label} has {len(matching)} instances at {target}")
-        assert_component_placed(adapter, matching[0], target, rows)
-        unmatched.remove(matching[0])
-    if unmatched:
-        raise RuntimeError(f"{label} has unexpected instances: {sorted(unmatched)}")
-
-
 async def build(adapter) -> dict[str, str]:
     _assert_rack_mesh()
     _assert_gear_mesh()
@@ -710,7 +684,7 @@ async def build(adapter) -> dict[str, str]:
         direction=PatternDirection.REVERSE,
         label="support clamp-screw pattern",
     )
-    _assert_pattern_targets(
+    assert_pattern_targets(
         adapter, clamp_instances, clamp_targets, IDENTITY, "support clamp pattern"
     )
 
@@ -833,7 +807,7 @@ async def build(adapter) -> dict[str, str]:
         instances=2,
         label="platen clip-screw pattern",
     )
-    _assert_pattern_targets(
+    assert_pattern_targets(
         adapter,
         clip_instances,
         [target for target in clip_targets if target not in clip_seed_targets],
@@ -872,7 +846,7 @@ async def build(adapter) -> dict[str, str]:
         instances=5,
         label="platen guide-screw pattern",
     )
-    _assert_pattern_targets(
+    assert_pattern_targets(
         adapter,
         guide_instances,
         [target for target in guide_targets if target not in guide_seed_targets],
@@ -906,7 +880,7 @@ async def build(adapter) -> dict[str, str]:
         instances=2,
         label="platen lock-screw pattern",
     )
-    _assert_pattern_targets(
+    assert_pattern_targets(
         adapter,
         lock_instances,
         [target for target in lock_targets if target not in lock_seed_targets],
@@ -968,7 +942,7 @@ async def build(adapter) -> dict[str, str]:
         instances=2,
         label="transgear bracket-screw pattern",
     )
-    _assert_pattern_targets(
+    assert_pattern_targets(
         adapter,
         bracket_instances,
         [[STUD_XY[0] - BRACKET_SCREW_DX, BAR_CY, STUB_Z0]],
