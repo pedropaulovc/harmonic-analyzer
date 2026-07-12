@@ -23,17 +23,42 @@ drawings):
   diagonal space, so a note sitting in that empty corner "overlaps" the box
   without touching any geometry.
 
-``overlap_exempt`` marks an element whose box is a faithful *extent* (so it is
-still audited for running off the sheet) but not a faithful *collision* footprint
--- a pictorial view, a leadered callout that deliberately points at geometry, or
-a small tag sitting on its own view.  Such elements are skipped by the OVERLAP
-test only; they are still checked for OVERFLOW, so a pictorial view or leadered
-note mis-placed off the sheet is still caught (Codex #269).
+Two axes of element behaviour, both driven by *why* a box is not a faithful
+collision footprint, keep the audit from either false-positiving or missing a
+real defect (Codex #269):
+
+* ``CollisionScope`` says *which* other elements an element may collide with.
+  A pictorial view's axis-aligned outline is mostly empty diagonal space, so it
+  collides with ``NONE``.  A leadered callout / GD&T symbol / on-view tag
+  legitimately sits over the view geometry it points at, but must NOT overlap a
+  free note, a table, or the title block -- it collides with ``NON_VIEW``
+  elements only.  Everything else (ortho views, free notes, tables, the reserved
+  title block) collides with ``ALL``.
+* The OVERFLOW allowance applies only to ``view`` boxes.  ``IView.GetOutline``
+  pads whitespace, so an on-sheet view can poke a millimetre or two past an edge;
+  notes / tables / GD&T carry EXACT extents, so any overhang is a real clip and
+  gets zero slack.
+
+Every element -- whatever its scope -- is still checked for OVERFLOW, so a
+pictorial view or leadered note mis-placed off the sheet is always caught.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
+
+
+class CollisionScope(Enum):
+    """Which other elements an element is allowed to collide with.
+
+    Overlap is symmetric: a pair is audited only when *both* elements admit the
+    other (see :func:`_may_collide`).
+    """
+
+    ALL = "all"  # ortho views, free notes, tables, the reserved title block
+    NON_VIEW = "non_view"  # leadered callouts, GD&T, on-view tags: not vs views
+    NONE = "none"  # pictorial views: box is empty diagonal space, never collides
 
 
 # A collision is only reported when two boxes penetrate each other by more than
@@ -52,19 +77,19 @@ DEFAULT_BOUNDARY_ALLOWANCE_M = 0.003
 class LayoutElement:
     """One laid-out drawing object and its sheet-space bounding box (meters).
 
-    ``overlap_exempt`` marks an element whose box is a faithful extent but not a
-    faithful collision footprint (a pictorial view, a leadered callout, a tag on
-    its own view): it is skipped by the OVERLAP test but still audited for
-    OVERFLOW.
+    ``scope`` says which other elements this one may collide with (a pictorial
+    view collides with ``NONE``; a leadered callout / GD&T / on-view tag with
+    ``NON_VIEW`` only; everything else with ``ALL``).  ``kind == "view"`` boxes
+    are ``GetOutline``-padded, so only they receive the OVERFLOW allowance.
     """
 
     label: str
-    kind: str  # "view" | "note" | "table"
+    kind: str  # "view" | "note" | "table" | "gdt" | "titleblock"
     xmin: float
     ymin: float
     xmax: float
     ymax: float
-    overlap_exempt: bool = False
+    scope: CollisionScope = CollisionScope.ALL
 
     @property
     def box(self) -> tuple[float, float, float, float]:
@@ -109,24 +134,42 @@ def _penetration(a: LayoutElement, b: LayoutElement) -> tuple[float, float]:
     return depth_x, depth_y
 
 
+def _may_collide(a: LayoutElement, b: LayoutElement) -> bool:
+    """True if the pair ``(a, b)`` is eligible for overlap auditing.
+
+    A ``NONE``-scope element never collides.  A ``NON_VIEW`` element collides
+    with anything except a ``view`` (its overlap with the view geometry it
+    points at / attaches to is intended), so a leadered callout or GD&T symbol
+    that strays onto a free note, a table, or the title block is still caught.
+    """
+    if a.scope is CollisionScope.NONE or b.scope is CollisionScope.NONE:
+        return False
+    if a.scope is CollisionScope.NON_VIEW and b.kind == "view":
+        return False
+    if b.scope is CollisionScope.NON_VIEW and a.kind == "view":
+        return False
+    return True
+
+
 def find_overlaps(
     elements: list[LayoutElement], *, overlap_tol: float = DEFAULT_OVERLAP_TOL_M
 ) -> list[Overlap]:
-    """Every pair of elements that mutually penetrate by more than ``overlap_tol``.
+    """Every eligible pair of elements that mutually penetrate by > ``overlap_tol``.
 
     A real 2D collision needs positive penetration on BOTH axes; requiring the
     *smaller* penetration to clear the tolerance rejects the whitespace padding
-    that ``GetOutline`` adds to adjacent views.  ``overlap_exempt`` elements
-    (pictorial views, leadered callouts, tags on their own view) are skipped --
-    their box is not a faithful collision footprint.
+    that ``GetOutline`` adds to adjacent views.  Pair eligibility follows each
+    element's ``CollisionScope`` (see :func:`_may_collide`).
     """
-    solid = [element for element in elements if not element.overlap_exempt]
     overlaps: list[Overlap] = []
-    for i in range(len(solid)):
-        for j in range(i + 1, len(solid)):
-            depth_x, depth_y = _penetration(solid[i], solid[j])
+    for i in range(len(elements)):
+        for j in range(i + 1, len(elements)):
+            a, b = elements[i], elements[j]
+            if not _may_collide(a, b):
+                continue
+            depth_x, depth_y = _penetration(a, b)
             if min(depth_x, depth_y) > overlap_tol:
-                overlaps.append(Overlap(solid[i], solid[j], depth_x, depth_y))
+                overlaps.append(Overlap(a, b, depth_x, depth_y))
     return overlaps
 
 
@@ -137,26 +180,28 @@ def find_overflows(
     *,
     allowance: float = DEFAULT_BOUNDARY_ALLOWANCE_M,
 ) -> list[Overflow]:
-    """Every element whose box runs past the sheet edge by more than ``allowance``.
+    """Every element whose box runs past the sheet edge by more than its slack.
 
     The sheet origin is its lower-left corner (SolidWorks sheet space), so the
-    usable region is ``[-allowance, width + allowance] x [-allowance, height +
-    allowance]``.  EVERY element is checked -- overlap-exempt elements (pictorial
-    views, leadered callouts) can still be mis-placed off the sheet, and the
-    outward ``allowance`` absorbs the routine ``GetOutline`` padding that pushes
-    an on-sheet pictorial box a millimetre or two past an edge (Codex #269).
+    usable region is ``[-slack, width + slack] x [-slack, height + slack]``.
+    EVERY element is checked -- a pictorial view or leadered callout can still be
+    mis-placed off the sheet.  The outward ``allowance`` applies ONLY to ``view``
+    boxes, which ``IView.GetOutline`` pads a millimetre or two past an on-sheet
+    edge; notes / tables / GD&T carry EXACT extents, so they get zero slack and
+    any real off-sheet clip is flagged (Codex #269 thread 7).
     """
     overflows: list[Overflow] = []
     for element in elements:
+        slack = allowance if element.kind == "view" else 0.0
         sides: list[tuple[str, float]] = []
-        if element.xmin < -allowance:
-            sides.append(("left", -allowance - element.xmin))
-        if element.ymin < -allowance:
-            sides.append(("bottom", -allowance - element.ymin))
-        if element.xmax > sheet_width + allowance:
-            sides.append(("right", element.xmax - (sheet_width + allowance)))
-        if element.ymax > sheet_height + allowance:
-            sides.append(("top", element.ymax - (sheet_height + allowance)))
+        if element.xmin < -slack:
+            sides.append(("left", -slack - element.xmin))
+        if element.ymin < -slack:
+            sides.append(("bottom", -slack - element.ymin))
+        if element.xmax > sheet_width + slack:
+            sides.append(("right", element.xmax - (sheet_width + slack)))
+        if element.ymax > sheet_height + slack:
+            sides.append(("top", element.ymax - (sheet_height + slack)))
         if sides:
             overflows.append(Overflow(element, tuple(sides)))
     return overflows

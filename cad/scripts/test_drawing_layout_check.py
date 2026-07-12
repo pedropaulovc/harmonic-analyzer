@@ -15,6 +15,7 @@ from __future__ import annotations
 from _drawing_layout_check import (
     DEFAULT_BOUNDARY_ALLOWANCE_M,
     DEFAULT_OVERLAP_TOL_M,
+    CollisionScope,
     LayoutElement,
     audit_layout,
     find_overflows,
@@ -26,8 +27,8 @@ SHEET_W = 0.4318
 SHEET_H = 0.2794
 
 
-def _el(label, x0, y0, x1, y1, kind="view", overlap_exempt=False):
-    return LayoutElement(label, kind, x0, y0, x1, y1, overlap_exempt=overlap_exempt)
+def _el(label, x0, y0, x1, y1, kind="view", scope=CollisionScope.ALL):
+    return LayoutElement(label, kind, x0, y0, x1, y1, scope=scope)
 
 
 def test_disjoint_layout_is_clean():
@@ -74,23 +75,25 @@ def test_penetration_must_clear_tolerance_on_both_axes():
     assert find_overlaps([a, b]) == []
 
 
-def test_overlap_exempt_view_never_collides():
-    # An isometric view's box swallows a nearby label, but an overlap-exempt
-    # element is excluded from overlap detection so it does not false-positive.
-    iso = _el("ISO", 0.17, 0.14, 0.40, 0.28, overlap_exempt=True)
+def test_pictorial_view_scope_none_never_collides():
+    # An isometric view's box swallows a nearby label, but a NONE-scope element
+    # is excluded from overlap detection so it does not false-positive.
+    iso = _el("ISO", 0.17, 0.14, 0.40, 0.28, scope=CollisionScope.NONE)
     label = _el("LBL", 0.14, 0.14, 0.22, 0.145, kind="note")
     assert find_overlaps([iso, label]) == []
-    # ... but the same box NOT exempt WOULD be flagged, proving the exclusion is
+    # ... but the same box at ALL scope WOULD be flagged, proving the scope is
     # what suppresses it (not a tolerance fluke).
-    solid = _el("ISO", 0.17, 0.14, 0.40, 0.28, overlap_exempt=False)
+    solid = _el("ISO", 0.17, 0.14, 0.40, 0.28, scope=CollisionScope.ALL)
     assert len(find_overlaps([solid, label])) == 1
 
 
-def test_overlap_exempt_element_still_checked_for_overflow():
-    # Codex #269: exemption suppresses collisions only -- a pictorial view or
-    # leadered note mis-placed OFF the sheet must still be flagged.
-    iso_off = _el("ISO", 0.17, 0.14, 0.40, SHEET_H + 0.02, overlap_exempt=True)
-    note_off = _el("N", -0.03, 0.10, 0.05, 0.12, kind="note", overlap_exempt=True)
+def test_scope_exempt_element_still_checked_for_overflow():
+    # Codex #269: collision scope suppresses collisions only -- a pictorial view
+    # or leadered note mis-placed OFF the sheet must still be flagged.
+    iso_off = _el("ISO", 0.17, 0.14, 0.40, SHEET_H + 0.02, scope=CollisionScope.NONE)
+    note_off = _el(
+        "N", -0.03, 0.10, 0.05, 0.12, kind="note", scope=CollisionScope.NON_VIEW
+    )
     overflows = find_overflows([iso_off, note_off], SHEET_W, SHEET_H)
     flagged = {o.element.label: {side for side, _ in o.sides} for o in overflows}
     assert flagged == {"ISO": {"top"}, "N": {"left"}}
@@ -116,9 +119,57 @@ def test_overflow_off_each_sheet_edge():
 def test_view_padding_within_allowance_is_not_overflow():
     # A view whose padded outline pokes ~1.5 mm past the top edge (measured on
     # the platen-guide iso view) must NOT be flagged -- the outward allowance
-    # absorbs GetOutline padding, even for an overlap-exempt pictorial view.
-    view = _el("V", 0.05, 0.10, 0.15, SHEET_H + 0.0015, overlap_exempt=True)
+    # absorbs GetOutline padding on a (kind == "view") pictorial box.
+    view = _el("V", 0.05, 0.10, 0.15, SHEET_H + 0.0015, scope=CollisionScope.NONE)
     assert find_overflows([view], SHEET_W, SHEET_H) == []
+
+
+def test_exact_note_barely_off_sheet_is_flagged():
+    # Codex #269 thread 7: the GetOutline padding allowance applies only to view
+    # boxes; an exact note/table poking even 1 mm past the edge is a real clip in
+    # the exported PDF/PNG and must be flagged.
+    note = _el("N", 0.05, SHEET_H - 0.02, 0.15, SHEET_H + 0.001, kind="note")
+    (overflow,) = find_overflows([note], SHEET_W, SHEET_H)
+    assert {side for side, _ in overflow.sides} == {"top"}
+    # ... the same 1 mm overhang on a padded VIEW box is absorbed by the allowance.
+    view = _el("V", 0.05, SHEET_H - 0.02, 0.15, SHEET_H + 0.001, kind="view")
+    assert find_overflows([view], SHEET_W, SHEET_H) == []
+
+
+def test_leadered_callout_collides_with_notes_not_views():
+    # Codex #269 thread 6: a NON_VIEW leadered callout's overlap with the view
+    # geometry it points at is intended and suppressed, but a collision with a
+    # free note / table must still be reported.
+    callout = _el("C", 0.10, 0.18, 0.13, 0.20, kind="note", scope=CollisionScope.NON_VIEW)
+    view = _el("V", 0.05, 0.15, 0.20, 0.23)
+    assert find_overlaps([view, callout]) == []  # over its own view: allowed
+    notes_block = _el("N", 0.09, 0.17, 0.14, 0.21, kind="note")  # ALL scope
+    assert len(find_overlaps([callout, notes_block])) == 1  # over a free note: flagged
+
+
+def test_content_overlapping_title_block_is_flagged():
+    # A reserved title-block box (bottom-right) plus a note that strays into it:
+    # the collision must be reported so content never lands on the title block.
+    title = _el("title-block", 0.2785, 0.0, SHEET_W, 0.078, kind="titleblock")
+    stray = _el("N", 0.30, 0.03, 0.36, 0.06, kind="note")
+    clear = _el("N2", 0.05, 0.03, 0.20, 0.06, kind="note")
+    assert len(find_overlaps([title, stray])) == 1
+    assert find_overlaps([title, clear]) == []
+
+
+def test_gdt_symbol_is_overflow_only():
+    # GD&T symbols carry only a coarse NOMINAL box (no real bbox API), so they
+    # are scoped NONE: never an overlap source (not vs a view, and not vs a note
+    # -- two nominal boxes would false-collide), but an off-sheet symbol is still
+    # caught by the overflow audit (Codex #269 thread 5).
+    gdt = _el("G", 0.10, 0.18, 0.116, 0.196, kind="gdt", scope=CollisionScope.NONE)
+    view = _el("V", 0.05, 0.15, 0.20, 0.23)  # gdt sits over its geometry
+    assert find_overlaps([view, gdt]) == []
+    note = _el("N", 0.10, 0.185, 0.14, 0.205, kind="note")  # gdt also overlaps a note
+    assert find_overlaps([gdt, note]) == []  # nominal box is not overlap-checked
+    gdt_off = _el("G2", 0.42, 0.15, 0.44, 0.17, kind="gdt", scope=CollisionScope.NONE)
+    overflows = find_overflows([gdt_off], SHEET_W, SHEET_H)
+    assert len(overflows) == 1 and "right" in {s for s, _ in overflows[0].sides}
 
 
 def test_large_note_on_its_own_view_is_still_flagged():
@@ -132,11 +183,11 @@ def test_large_note_on_its_own_view_is_still_flagged():
 
 def test_lever_bushing_real_boxes_are_clean():
     # Measured element boxes from the shipped lever-bushing drawing (meters):
-    # 3 views (V3 is the isometric -> overlap-exempt) + the 2 general-notes blocks.
+    # 3 views (V3 is the isometric -> NONE scope) + the 2 general-notes blocks.
     elements = [
         _el("V1", 0.05041, 0.17541, 0.10959, 0.23459),
         _el("V2", 0.17553, 0.17541, 0.20293, 0.23459),
-        _el("V3", 0.28670, 0.16671, 0.34330, 0.24329, overlap_exempt=True),
+        _el("V3", 0.28670, 0.16671, 0.34330, 0.24329, scope=CollisionScope.NONE),
         _el("N18", 0.01390, 0.08939, 0.15347, 0.11211, kind="note"),
         _el("N19", 0.16970, 0.06440, 0.32193, 0.10529, kind="note"),
     ]
@@ -147,15 +198,15 @@ def test_lever_bushing_real_boxes_are_clean():
 
 def test_platen_guide_real_boxes_are_clean():
     # Measured off the shipped platen-guide drawing: 2 ortho views, the iso view
-    # (overlap-exempt), the general-notes block, the "PLATEN-MATING FACE" label
+    # (NONE scope), the general-notes block, the "PLATEN-MATING FACE" label
     # (which bbox-overlaps the iso view), and the 10x4 hole table on the sheet.
     # The iso view's outline reaches ymax=280.9 mm on a 279.4 mm sheet -- within
-    # the 3 mm overflow allowance, so it does not false-positive despite now
-    # being overflow-checked.
+    # the 3 mm overflow allowance for a padded view box, so it does not
+    # false-positive despite now being overflow-checked.
     elements = [
         _el("V1", 0.03441, 0.10191, 0.34559, 0.11809),
         _el("V2", 0.35941, 0.10191, 0.38059, 0.11809),
-        _el("V3", 0.16981, 0.13910, 0.40019, 0.28090, overlap_exempt=True),
+        _el("V3", 0.16981, 0.13910, 0.40019, 0.28090, scope=CollisionScope.NONE),
         _el("N46", 0.01390, 0.02999, 0.17262, 0.07511, kind="note"),
         _el("N47", 0.14373, 0.14067, 0.22163, 0.14522, kind="note"),
         _el("T45", 0.01400, 0.16874, 0.15876, 0.25800, kind="table"),
