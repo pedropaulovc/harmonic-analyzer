@@ -16,7 +16,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -28,7 +28,7 @@ from _drawing_common import (
     import_cosmetic_threads,
     insert_hole_table,
     new_project_drawing,
-    read_required_properties,
+    read_required_view_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -73,27 +73,6 @@ async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open platen-guide source", await adapter.open_model(str(SOURCE)))
-    source_model = adapter.currentModel
-    read_required_properties(
-        source_model,
-        (
-            "Number",
-            "Revision",
-            "Title",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-        ),
-        required=(
-            "Number",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-        ),
-    )
     drawing_model, sheet = new_project_drawing(adapter, property_view=PART_STEM)
     stamp_drawing_summary(
         adapter,
@@ -108,6 +87,18 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     front = place_view(
         adapter, str(SOURCE), "*Front", 0.190, FRONT_VIEW_Y_M, scale=(1, 1)
+    )
+    read_required_view_properties(
+        adapter,
+        front,
+        (
+            "Number", "Revision", "Title", "Material Specification", "Finish",
+            "Quantity", "Manufacturing Notes",
+        ),
+        required=(
+            "Number", "Material Specification", "Finish", "Quantity",
+            "Manufacturing Notes",
+        ),
     )
     right = place_view(adapter, str(SOURCE), "*Right", 0.370, 0.110, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", 0.285, 0.210, scale=(1, 1))
