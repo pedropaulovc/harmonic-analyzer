@@ -1,5 +1,8 @@
 crank-arm:
   number: MHA-020
   material: Plain Carbon Steel
+  material_specification: AISI 1018 cold-rolled steel
+  finish: bright machined, oiled
+  quantity: 1
   tolerance_class: machined_block
   process: "machined (steel)"
