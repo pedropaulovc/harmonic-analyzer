@@ -94,6 +94,7 @@ from _assembly import (
     distance_driver,
     gear_mate,
     linear_component_pattern,
+    grid_component_pattern,
     lock_mate,
     named_ref,
     parallel_mate,
@@ -783,36 +784,45 @@ async def build(adapter) -> dict[str, str]:
         [-x, y, PLATE_FRONT_Z - CLIP_THICKNESS] for x, y in CLIP_SCREW_XY
     ]
     clip_max_x = max(target[0] for target in clip_targets)
-    clip_seed_targets = [target for target in clip_targets if target[0] == clip_max_x]
-    clip_seeds: list[str] = []
-    for target in clip_seed_targets:
-        seed = await place_component(
-            adapter,
-            "fillister-screw",
-            target,
-            [0.0, 0.0, 0.0],
-            IDENTITY,
-            ground=False,
-            label=f"fillister-screw clip seed (x{target[0]:+.0f} y{target[1]:.0f})",
-        )
-        await _lock_to_platen(
-            seed, f"clip screw seed x{target[0]:+.0f} y{target[1]:.0f}"
-        )
-        clip_seeds.append(seed)
-    clip_instances = await linear_component_pattern(
+    clip_seed_target = min(
+        (target for target in clip_targets if target[0] == clip_max_x),
+        key=lambda target: target[1],
+    )
+    clip_seed = await place_component(
         adapter,
-        clip_seeds,
-        axis="x",
-        spacing_mm=clip_max_x - min(target[0] for target in clip_targets),
-        instances=2,
-        label="platen clip-screw pattern",
+        "fillister-screw",
+        clip_seed_target,
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label=(
+            f"fillister-screw clip seed "
+            f"(x{clip_seed_target[0]:+.0f} y{clip_seed_target[1]:.0f})"
+        ),
+    )
+    await _lock_to_platen(
+        clip_seed,
+        f"clip screw seed x{clip_seed_target[0]:+.0f} y{clip_seed_target[1]:.0f}",
+    )
+    clip_instances = await grid_component_pattern(
+        adapter,
+        [clip_seed],
+        axis1="x",
+        spacing1_mm=clip_max_x - min(target[0] for target in clip_targets),
+        instances1=2,
+        axis2="y",
+        spacing2_mm=max(target[1] for target in clip_targets) - clip_seed_target[1],
+        instances2=2,
+        direction1=PatternDirection.FORWARD,
+        direction2=PatternDirection.REVERSE,
+        label="platen clip-screw grid",
     )
     assert_pattern_targets(
         adapter,
         clip_instances,
-        [target for target in clip_targets if target not in clip_seed_targets],
+        [target for target in clip_targets if target != clip_seed_target],
         IDENTITY,
-        "platen clip-screw pattern",
+        "platen clip-screw grid",
     )
 
     # One seed per row at machine +X; five instances at 60 mm pitch run to -X.
@@ -820,43 +830,54 @@ async def build(adapter) -> dict[str, str]:
         [-x, y, PLATE_FRONT_Z + PLATEN_CBORE_DEPTH] for x, y in GUIDE_SCREW_XY
     ]
     guide_max_x = max(target[0] for target in guide_targets)
-    guide_seed_targets = [
-        target for target in guide_targets if target[0] == guide_max_x
-    ]
-    guide_seeds: list[str] = []
-    for target in guide_seed_targets:
-        seed = await place_component(
-            adapter,
-            "fillister-screw",
-            target,
-            [0.0, 0.0, 0.0],
-            IDENTITY,
-            ground=False,
-            label=f"fillister-screw guide seed (x{target[0]:+.0f} y{target[1]:.0f})",
-        )
-        await _lock_to_platen(
-            seed, f"guide screw seed x{target[0]:+.0f} y{target[1]:.0f}"
-        )
-        guide_seeds.append(seed)
-    guide_instances = await linear_component_pattern(
+    guide_seed_target = min(
+        (target for target in guide_targets if target[0] == guide_max_x),
+        key=lambda target: target[1],
+    )
+    guide_seed = await place_component(
         adapter,
-        guide_seeds,
-        axis="x",
-        spacing_mm=60.0,
-        instances=5,
-        label="platen guide-screw pattern",
+        "fillister-screw",
+        guide_seed_target,
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label=(
+            f"fillister-screw guide seed "
+            f"(x{guide_seed_target[0]:+.0f} y{guide_seed_target[1]:.0f})"
+        ),
+    )
+    await _lock_to_platen(
+        guide_seed,
+        f"guide screw seed x{guide_seed_target[0]:+.0f} y{guide_seed_target[1]:.0f}",
+    )
+    guide_instances = await grid_component_pattern(
+        adapter,
+        [guide_seed],
+        axis1="x",
+        spacing1_mm=60.0,
+        instances1=5,
+        axis2="y",
+        spacing2_mm=max(target[1] for target in guide_targets) - guide_seed_target[1],
+        instances2=2,
+        direction1=PatternDirection.FORWARD,
+        direction2=PatternDirection.REVERSE,
+        label="platen guide-screw grid",
     )
     assert_pattern_targets(
         adapter,
         guide_instances,
-        [target for target in guide_targets if target not in guide_seed_targets],
+        [target for target in guide_targets if target != guide_seed_target],
         IDENTITY,
-        "platen guide-screw pattern",
+        "platen guide-screw grid",
     )
 
     # Two positive-X seeds per row cross the centre in one 180 mm pattern.
     lock_targets = [[-x, y, LOCK_Z0 + 2.0] for x, y in LOCK_SCREW_XY]
-    lock_seed_targets = [target for target in lock_targets if target[0] > 0.0]
+    lock_min_y = min(target[1] for target in lock_targets)
+    lock_seed_targets = [
+        target for target in lock_targets
+        if target[0] > 0.0 and target[1] == lock_min_y
+    ]
     lock_seeds: list[str] = []
     for target in lock_seed_targets:
         seed = await place_component(
@@ -872,20 +893,25 @@ async def build(adapter) -> dict[str, str]:
             seed, f"lock screw seed x{target[0]:+.0f} y{target[1]:.0f}"
         )
         lock_seeds.append(seed)
-    lock_instances = await linear_component_pattern(
+    lock_instances = await grid_component_pattern(
         adapter,
         lock_seeds,
-        axis="x",
-        spacing_mm=180.0,
-        instances=2,
-        label="platen lock-screw pattern",
+        axis1="x",
+        spacing1_mm=180.0,
+        instances1=2,
+        axis2="y",
+        spacing2_mm=max(target[1] for target in lock_targets) - lock_min_y,
+        instances2=2,
+        direction1=PatternDirection.FORWARD,
+        direction2=PatternDirection.REVERSE,
+        label="platen lock-screw grid",
     )
     assert_pattern_targets(
         adapter,
         lock_instances,
         [target for target in lock_targets if target not in lock_seed_targets],
         ROT_Y_180,
-        "platen lock-screw pattern",
+        "platen lock-screw grid",
     )
 
     # --- transgear group (the real train) --------------------------------------

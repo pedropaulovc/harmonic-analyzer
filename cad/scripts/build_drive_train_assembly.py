@@ -156,9 +156,11 @@ from _assembly import (
     distance_driver,
     gear_mate,
     linear_component_pattern,
+    grid_component_pattern,
     lock_mate,
     named_ref,
     parallel_mate,
+    PatternDirection,
     place_component,
     reledger_to_solved,
     reset_dof_manifest,
@@ -1702,14 +1704,12 @@ async def build(adapter) -> dict[str, str]:
     )
     # Rig hold-downs (PR7 items 2/11/12): physically located seeds are patterned
     # across the repeated block/pedestal stations in the joints section below.
-    block_screws: list[str] = []
-    for k, (sx, sz) in enumerate(_BLOCK_SCREW_XZ[:2]):
-        scr = await place_component(
-            adapter, "slotted-screw",
-            [sx, BLOCK_TOP_Y, sz], [0.0, 0.0, 0.0], IDENTITY,
-            ground=False, label=f"slotted-screw block hold-down {k}",
-        )
-        block_screws.append(scr)
+    sx, sz = _BLOCK_SCREW_XZ[0]
+    block_screw = await place_component(
+        adapter, "slotted-screw",
+        [sx, BLOCK_TOP_Y, sz], [0.0, 0.0, 0.0], IDENTITY,
+        ground=False, label="slotted-screw block hold-down seed",
+    )
     foot_screws: list[str] = []
     for tag, (sx, sz), seat_y in (
         ("spring foot", _FOOT_SCREW_XZ[0], Y_BASE_TOP + SPRING_T),
@@ -2416,25 +2416,27 @@ async def build(adapter) -> dict[str, str]:
         await _locate_to_datum(adapter, blk)
     await _locate_to_datum(adapter, pivot_shaft)
     await _locate_to_datum(adapter, spring)
-    for scr in block_screws + foot_screws:
+    for scr in [block_screw, *foot_screws]:
         await _locate_to_datum(adapter, scr)
-    block_targets = [
-        [sx, BLOCK_TOP_Y, sz] for sx, sz in _BLOCK_SCREW_XZ[2:]
-    ]
-    block_instances = await linear_component_pattern(
+    block_instances = await grid_component_pattern(
         adapter,
-        block_screws,
-        axis="z",
-        spacing_mm=_BLOCK_SCREW_XZ[2][1] - _BLOCK_SCREW_XZ[0][1],
-        instances=2,
-        label="pinion block-screw pattern",
+        [block_screw],
+        axis1="x",
+        spacing1_mm=_BLOCK_SCREW_XZ[1][0] - _BLOCK_SCREW_XZ[0][0],
+        instances1=2,
+        axis2="z",
+        spacing2_mm=_BLOCK_SCREW_XZ[2][1] - _BLOCK_SCREW_XZ[0][1],
+        instances2=2,
+        direction1=PatternDirection.REVERSE,
+        direction2=PatternDirection.FORWARD,
+        label="pinion block-screw grid",
     )
     assert_pattern_targets(
         adapter,
         block_instances,
-        block_targets,
+        [[x, BLOCK_TOP_Y, z] for x, z in _BLOCK_SCREW_XZ[1:]],
         IDENTITY,
-        "pinion block-screw pattern",
+        "pinion block-screw grid",
     )
     pedestal_target = [
         _FOOT_SCREW_XZ[2][0],
