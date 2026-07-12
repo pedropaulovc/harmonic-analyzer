@@ -721,7 +721,7 @@ if PSCREW_HEAD_DIA / 2.0 > (
 
 
 # --- cone lock knob (v4_t00411; clamps the swing plate through its notch) ----
-# The knob is a base-bolted STATIC (pedestal pattern: located to the machine
+# The knob is a base-bolted STATIC (pedestal pattern: locked to the static
 # datums); the plate's open lock notch sweeps around its stationary stud and,
 # past the mouth, clear of it (t00417: the bolt stands past the plate edge
 # when disengaged). Its machine position is DERIVED from the platform's
@@ -1366,27 +1366,21 @@ def _org(adapter, name: str) -> list[float]:
     return [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
 
 
-async def _locate_to_datum(adapter, name: str) -> None:
-    """Locate a static mount to the machine datum planes (three orthogonal plane
-    distances), replacing an explicit fix for a part with no in-subassembly
-    contact partner. A free-space position relative to the machine origin
-    (strictly necessary) -- the frame-column idiom. The mount is inserted at
-    IDENTITY, so its principal planes are parallel to the assembly's and the
-    three distances are just its origin coordinates."""
-    o = _org(adapter, name)
-    for axis, plane, coord in (
-        ("Y", "Top Plane", o[1]),
-        ("X", "Right Plane", o[0]),
-        ("Z", "Front Plane", o[2]),
-    ):
-        await distance_driver(
-            adapter,
-            named_ref(f"{plane}@{name}", "PLANE"),
-            named_ref(plane, "PLANE"),
-            coord,
-            label=f"{name} datum {axis} d={abs(coord):.2f}",
-            verify=(name, o),
-        )
+async def _lock_static(adapter, name: str, reference: str) -> None:
+    """Rigidly retain an authored static pose with one mate.
+
+    These base-bolted mounts have no contact partner inside this subassembly.
+    Their exact machine-frame transform is already authored at insertion, so
+    three assembly-datum distance mates only make the solver rediscover six
+    coordinates it already has. Locking each mount to the fixed seed arbor
+    preserves the same relative transform in one branch-free relationship.
+    """
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{name}", "PLANE"),
+        named_ref(f"Front Plane@{reference}", "PLANE"),
+        label=f"{name} fixed to static reference",
+    )
 
 
 async def _key_to_shaft(
@@ -1484,7 +1478,7 @@ async def build(adapter) -> dict[str, str]:
     reset_dof_manifest()
     check("create_assembly", await adapter.create_assembly())
 
-    # =================== structure (located, not fixed) ====================
+    # =================== structure (static lock + moving joints) ===========
     # The stationary arbor is the reference frame the moving train mates
     # against. Inserted FIRST, so SolidWorks auto-fixes it as the seed (the one
     # allowed fixed component, mirroring frame's harmonic-base) -- no explicit fix.
@@ -1494,10 +1488,9 @@ async def build(adapter) -> dict[str, str]:
         [90.0, 0.0, 0.0], ROT_X_POS90, ground=False, label="cylinder arbor (seed)",
     )
     # The arbor-pedestal is a static mount bolted to the (absent) base. With
-    # no in-subassembly contact partner, it is LOCATED to the machine datum
-    # planes by three orthogonal plane distances (a free-space machine-frame
-    # position, strictly necessary) -- the frame-column pattern, replacing the
-    # explicit fix. (The old separate crank-pedestal is GONE: the merged green
+    # no in-subassembly contact partner, its authored machine-frame pose is
+    # retained by one lock to the fixed seed arbor. (The old separate
+    # crank-pedestal is GONE: the merged green
     # column below rides the swing platform.)
     # South arbor pedestal only (2026-06-19): the rocker support's arbor-clamp
     # boss is gone with the portal unification, AND the now-solid portal north
@@ -1511,7 +1504,7 @@ async def build(adapter) -> dict[str, str]:
         [X_DRUM, Y_BASE_TOP, -ARBOR_PEDESTAL_Z], [0.0, 0.0, 0.0], IDENTITY, ground=False,
         label=f"arbor-pedestal z={-ARBOR_PEDESTAL_Z:g}",
     )
-    await _locate_to_datum(adapter, arbor_pedestal)
+    await _lock_static(adapter, arbor_pedestal, arbor)
     # NORTH pedestal (PR8, ch12 img09): the same casting rotated 180 about Y
     # so its strap face looks south at the drum's north end; the arbor's +97
     # end seats 7.5 into its bore band. Base-bolted static like the south one.
@@ -1521,7 +1514,7 @@ async def build(adapter) -> dict[str, str]:
         [[-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -1.0]], ground=False,
         label=f"arbor-pedestal north z={ARBOR_PEDESTAL_NORTH_Z:g}",
     )
-    await _locate_to_datum(adapter, north_pedestal)
+    await _lock_static(adapter, north_pedestal, arbor)
     # The cone SWING PLATFORM is the swing bracket (ch.12, p.18 "pivot"):
     # floated so the whole cone set can swing horizontally out of mesh about
     # its tip-end vertical pivot (p1). Pinned at the engaged rest pose by a
@@ -1586,7 +1579,7 @@ async def build(adapter) -> dict[str, str]:
         [KNOB_X, Y_BASE_TOP + PLAT_T, KNOB_Z], [0.0, 0.0, 0.0], IDENTITY,
         ground=False, label="cone-lock-knob (platform clamp, engaged end)",
     )
-    await _locate_to_datum(adapter, lock_knob)
+    await _lock_static(adapter, lock_knob, arbor)
     # The platform pivot screw (item 2, p.18 "pivot"): a base-threaded STATIC
     # like the knob -- head seated on the plate top at the swing pivot, its
     # shoulder dropping through the plate's clearance hole into the base's
@@ -1596,7 +1589,7 @@ async def build(adapter) -> dict[str, str]:
         [ppivot[0], Y_BASE_TOP + PLAT_T, ppivot[2]], [0.0, 0.0, 0.0], IDENTITY,
         ground=False, label="cone-pivot-screw (p1 pivot pin)",
     )
-    await _locate_to_datum(adapter, pivot_screw)
+    await _lock_static(adapter, pivot_screw, arbor)
     # The swing-stop screw (item 6): a base-threaded STATIC just past the
     # DISENGAGED pose -- the plate's west edge bumps its proud shank, limiting
     # the p1 swing to exactly the knob-clear travel (STOP_X/STOP_Z derived at
@@ -1606,12 +1599,12 @@ async def build(adapter) -> dict[str, str]:
         [STOP_X, Y_BASE_TOP, STOP_Z], [0.0, 0.0, 0.0], IDENTITY,
         ground=False, label="swing-stop-screw (p1 travel limit)",
     )
-    await _locate_to_datum(adapter, stop_screw)
+    await _lock_static(adapter, stop_screw, arbor)
 
     # ============ alignment pinion swing group (ch.25, p.66; p2) ============
     # Floated straps + drum, joined and parked DISENGAGED in the joints
     # section. The pivot blocks and torque shaft are base-bolted statics
-    # (located to the machine datums below); the lift rod is a REVOLUTE in
+    # (locked to the fixed seed arbor below); the lift rod is a REVOLUTE in
     # the blocks' dropped west bores carrying the two eccentric cams and the
     # lever (PR8 -- all semantically mated, spinning as one family on the
     # freed pinion_cam DOF). The tee handle is LOCKED to the arbor in
@@ -2422,15 +2415,15 @@ async def build(adapter) -> dict[str, str]:
     # The two straps + the pinion drum swing as ONE group on the torque shaft to
     # mesh the cylinder train (ch.25, p.66); parked DISENGAGED (p.68 "gap").
     # Statics first: the pivot blocks and torque shaft are base-bolted mounts at
-    # IDENTITY -> located to the machine datums (the frame-column idiom). The
+    # their authored transforms -> locked once to the fixed seed arbor. The
     # lift rod is NOT static any more (PR8): it journals in the blocks' dropped
     # west bores as a revolute below, carrying the cams + lever.
     for blk in pinion_blocks:
-        await _locate_to_datum(adapter, blk)
-    await _locate_to_datum(adapter, pivot_shaft)
-    await _locate_to_datum(adapter, spring)
+        await _lock_static(adapter, blk, arbor)
+    await _lock_static(adapter, pivot_shaft, arbor)
+    await _lock_static(adapter, spring, arbor)
     for scr in [block_screw, *foot_screws]:
-        await _locate_to_datum(adapter, scr)
+        await _lock_static(adapter, scr, arbor)
     block_instances = await grid_component_pattern(
         adapter,
         [block_screw],
