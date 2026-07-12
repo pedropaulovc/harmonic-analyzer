@@ -79,12 +79,16 @@ from _common import (
     run_build,
 )
 from _assembly import (
+    _export_assembly_images,
     assert_components_fully_defined,
     assert_free_dof_necessity,
     assert_model_healthy,
     check_no_interference,
     component_names,
     component_transform,
+    repair_dangling_mates,
+    save_assembly_in_place,
+    whats_wrong,
 )
 from _assembly_postbuild import (
     author_dof_drives,
@@ -104,6 +108,7 @@ from solidworks_mcp.adapters.solidworks.assembly import _gear_mate_links
 
 REST = "Default"  # the deterministic, fully-defined, render/photo-gated pose
 OVER_CONSTRAINED = 4  # swConstrainedStatus_e
+DANGLING_ENTITY_NOT_FOUND = 48  # What's Wrong: mate reference PID not found
 
 # The gear mates live in this sub-assembly's MateGroup. The top assembly
 # references it flexibly, so its own MateGroup has none -- they are verified
@@ -694,7 +699,217 @@ def _fail(msg: str) -> None:
     raise RuntimeError(msg)
 
 
-async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
+def _dangling_faults(adapter: Any) -> list[str]:
+    """Return active-assembly mate faults eligible for the opt-in repair.
+
+    What's Wrong code 48 is the observed persistent-reference failure from a
+    cache-restored assembly whose mates were authored against another seat's
+    part PIDs.  Do not broaden this to arbitrary rebuild errors:
+    ``AutoMateRepair`` is an operator-chosen escape hatch for that narrow case,
+    not a general-purpose way to make a red model green.
+    """
+    return [
+        f"{label}:{fault_name}"
+        for label, _model, fault_name, code in _deep_mate_faults(adapter)
+        if code == DANGLING_ENTITY_NOT_FOUND
+    ]
+
+
+def _fault_name(value: Any) -> str:
+    """Normalize the real ``whats_wrong`` string contract and test doubles."""
+    if isinstance(value, str):
+        return value
+    return str(_read_member(value, "Name") or "?")
+
+
+def _deep_mate_faults(adapter: Any) -> list[tuple[str, Any, str, int]]:
+    """Return non-warning faults from the active assembly and child assemblies."""
+    top = adapter.currentModel
+    targets: list[tuple[str, Any]] = [("top", top)]
+    seen: set[str] = set()
+    components = adapter._attempt(lambda: top.GetComponents(False), default=None) or []
+    for component in components:
+        _flag_only(component, "GetModelDoc2")
+        instance = str(_read_member(component, "Name2") or "?")
+        if "/" in instance:
+            continue
+        model = adapter._attempt(lambda c=component: c.GetModelDoc2(), default=None)
+        if model is None or model is top:
+            continue
+        if int(adapter._attempt(lambda m=model: m.GetType(), default=0) or 0) != 2:
+            continue  # swDocASSEMBLY only; parts cannot own a MateGroup
+        key = str(adapter._attempt(lambda m=model: m.GetPathName(), default="") or instance)
+        if key in seen:
+            continue
+        seen.add(key)
+        targets.append((instance, model))
+
+    faults: list[tuple[str, Any, str, int]] = []
+    for label, model in targets:
+        for feature, code, warning in whats_wrong(adapter, model):
+            if not warning:
+                faults.append((label, model, _fault_name(feature), int(code)))
+    return faults
+
+
+def _byref_i4() -> Any:
+    """Late-bound ``out int`` storage for ``ISldWorks.ActivateDoc3``."""
+    import pythoncom
+    from win32com.client import VARIANT
+
+    return VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
+
+
+def _activate_document(adapter: Any, model: Any, label: str) -> Any:
+    """Bring ``model`` to the foreground before any selection-based COM call."""
+    title = str(_read_member(model, "GetTitle") or "")
+    if not title:
+        raise RuntimeError(f"{label}: cannot activate a document without a title")
+    errors = _byref_i4()
+    activated = adapter._attempt(
+        lambda: adapter.swApp.ActivateDoc3(title, False, 2, errors), default=None
+    )
+    if activated is None or int(errors.value) != 0:
+        raise RuntimeError(
+            f"{label}: ActivateDoc3({title!r}) failed (errors={errors.value})"
+        )
+    adapter.currentModel = activated
+    return activated
+
+
+def _repair_cache_dangles(adapter: Any, name: str) -> Any:
+    """Repair code-48 mate dangles, rebuild, and prove the active model clean.
+
+    The caller still runs the complete DOF/interference/deep-health battery and
+    saves only after every gate passes.  A successful repair remains local; it
+    is deliberately not republished under the foreign remote-cache key.
+    """
+    faults = _deep_mate_faults(adapter)
+    before = [fault for fault in faults if fault[3] == DANGLING_ENTITY_NOT_FOUND]
+    if not before:
+        return None
+    ineligible = [f"{label}:{mate} [{code}]" for label, _doc, mate, code in faults if code != DANGLING_ENTITY_NOT_FOUND]
+    if ineligible:
+        raise RuntimeError(
+            f"{name}: refusing AutoMateRepair because non-48 faults coexist: "
+            + ", ".join(ineligible)
+        )
+    top = adapter.currentModel
+    with _telemetry.span("verify.auto_repair", name=name, faults=len(before)) as sp:
+        repaired = 0
+        repaired_docs: dict[str, tuple[str, Any]] = {}
+        try:
+            for label, model, _mate, _code in before:
+                key = str(
+                    adapter._attempt(lambda m=model: m.GetPathName(), default="")
+                    or label
+                )
+                if key in repaired_docs:
+                    continue
+                stem = name if model is top else Path(key).stem
+                active = _activate_document(adapter, model, stem)
+                repaired_docs[key] = (stem, active)
+                repaired += repair_dangling_mates(adapter, active)
+                adapter._attempt(
+                    lambda m=active: m.ForceRebuild3(False), default=None
+                )
+        finally:
+            _activate_document(adapter, top, name)
+        rebuilt = adapter._attempt(
+            lambda: top.ForceRebuild3(False), default=None
+        )
+        remaining = [
+            f"{label}:{mate} [{code}]"
+            for label, _doc, mate, code in _deep_mate_faults(adapter)
+        ]
+        sp.set_attribute("repaired", repaired)
+        sp.set_attribute("remaining_faults", len(remaining))
+        if repaired <= 0 or remaining:
+            raise RuntimeError(
+                f"{name}: AutoMateRepair did not produce a clean assembly "
+                f"(reported repaired={repaired}, remaining={remaining})"
+            )
+        _telemetry.event(
+            "verify.auto_repair.completed", asm=name, repaired=repaired
+        )
+        _telemetry.warn(
+            f"{name}: opt-in AutoMateRepair re-bound {repaired} mate(s); "
+            "running the full soundness battery before saving locally"
+        )
+        return {
+            "rebuilt": rebuilt,
+            "documents": tuple(repaired_docs.values()),
+        }
+
+
+def _assert_soundness_health(adapter: Any, name: str, rebuilt: Any) -> None:
+    """Run deep health and give code-48 failures an actionable retry."""
+    try:
+        assert_model_healthy(adapter, label=name, deep=True, rebuilt=rebuilt)
+    except RuntimeError as exc:
+        if "[48]" in str(exc):
+            raise RuntimeError(
+                f"{exc}; cache/PID mate dangle detected — retry explicitly with "
+                f"`uv run python cad/scripts/verify.py {name} --suite soundness "
+                "--auto-repair` (the repair can re-bind wrong topology, so it "
+                "is never automatic)"
+            ) from exc
+        raise
+
+
+def _run_soundness_battery(
+    adapter: Any, name: str, report: Report, rebuilt: Any
+) -> None:
+    """Run the complete per-document soundness battery on the active assembly."""
+    free_dof = _expected_free_dof(name)
+    if free_dof:
+        insts = _required_free_instances(name) if name == "paper-drive" else ()
+        if name == "paper-drive" and not insts:
+            report.gate(
+                f"{name}:dof-free-necessity",
+                lambda: _fail(
+                    "free paper-drive but .paper-drive.dof.json records no "
+                    "crank_spin instance -- stale/missing DOF manifest; refusing "
+                    "the weak stem fallback. Rebuild paper-drive to regenerate it."
+                ),
+            )
+        else:
+            stems = () if insts else _REQUIRED_FREE_STEMS.get(name, ())
+            report.gate(
+                f"{name}:dof-free-necessity",
+                lambda: assert_free_dof_necessity(
+                    adapter,
+                    free_dof,
+                    resolve=False,
+                    required_stems=stems,
+                    required_instances=insts,
+                    allowed_stems=_ALLOWED_FREE_STEMS.get(name, ()),
+                ),
+            )
+    else:
+        report.gate(
+            f"{name}:dof-fully-defined",
+            lambda: assert_components_fully_defined(adapter, resolve=False),
+        )
+    report.gate(
+        f"{name}:no-over-constrained",
+        lambda: assert_no_over_constrained(adapter, resolve=False),
+    )
+    report.gate(
+        f"{name}:model-healthy",
+        lambda: _assert_soundness_health(adapter, name, rebuilt),
+    )
+    report.gate(f"{name}:interference-free", lambda: check_no_interference(adapter))
+    if name == CHANNEL_OWNER:
+        report.gate(
+            f"{name}:channel-independence",
+            lambda: assert_channel_independence(adapter),
+        )
+
+
+async def _verify_static_one(
+    adapter: Any, name: str, report: Report, *, auto_repair: bool = False
+) -> None:
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
     if not sldasm.exists():
         report.failed.append((f"{name}:open", f"not built: {sldasm}"))
@@ -731,6 +946,24 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
         rebuilt = adapter._attempt(
             lambda: adapter.currentModel.ForceRebuild3(False), default=None
         )
+
+    repaired = False
+    if auto_repair and _dangling_faults(adapter):
+        state: dict[str, Any] = {}
+
+        def _repair() -> None:
+            state["rebuilt"] = _repair_cache_dangles(adapter, name)
+
+        failures_before = len(report.failed)
+        report.gate(f"{name}:auto-repair", _repair)
+        if len(report.failed) != failures_before:
+            return
+        repair_result = state["rebuilt"]
+        rebuilt = repair_result["rebuilt"]
+        repaired_documents = repair_result["documents"]
+        repaired = True
+
+    assembly_failures_before = len(report.failed)
 
     free_dof = _expected_free_dof(name)
     if free_dof:
@@ -779,7 +1012,7 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
     )
     report.gate(
         f"{name}:model-healthy",
-        lambda: assert_model_healthy(adapter, label=name, deep=True, rebuilt=rebuilt),
+        lambda: _assert_soundness_health(adapter, name, rebuilt),
     )
     report.gate(f"{name}:interference-free", lambda: check_no_interference(adapter))
     # component-count REMOVED: every historical failure of that gate was a stale band
@@ -797,6 +1030,83 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
             f"{name}:channel-independence",
             lambda: assert_channel_independence(adapter),
         )
+
+    if repaired:
+        if len(report.failed) != assembly_failures_before:
+            _telemetry.warn(
+                f"{name}: repaired mate state NOT saved because a soundness gate failed"
+            )
+            discard_open_documents(adapter)
+            adapter.currentModel = None
+            return
+        else:
+            # Persist each document whose own MateGroup was repaired. SaveReferenced
+            # remains deliberately off: unrelated child artifacts still belong to
+            # their producing tasks. Temporarily route the adapter to the explicit
+            # document so both Save3 and image export target the child, not the parent.
+            parent = adapter.currentModel
+            rendered: set[str] = set()
+            for repaired_name, model in repaired_documents:
+                activated: dict[str, Any] = {}
+                report.gate(
+                    f"{repaired_name}:auto-repair-activate",
+                    lambda n=repaired_name, m=model: activated.setdefault(
+                        "model", _activate_document(adapter, m, n)
+                    ),
+                )
+                if len(report.failed) != assembly_failures_before:
+                    discard_open_documents(adapter)
+                    adapter.currentModel = None
+                    return
+                active = activated["model"]
+                if active is not parent:
+                    rebuilt_child = adapter._attempt(
+                        lambda m=active: m.ForceRebuild3(False), default=None
+                    )
+                    child_failures_before = len(report.failed)
+                    _run_soundness_battery(
+                        adapter, repaired_name, report, rebuilt_child
+                    )
+                    if len(report.failed) != child_failures_before:
+                        _telemetry.warn(
+                            f"{repaired_name}: repaired child NOT saved because "
+                            "its standalone soundness battery failed"
+                        )
+                        discard_open_documents(adapter)
+                        adapter.currentModel = None
+                        return
+                report.gate(
+                    f"{repaired_name}:auto-repair-save",
+                    lambda n=repaired_name, m=active: save_assembly_in_place(
+                        adapter, n, geometry_changed=True, model=m
+                    ),
+                )
+                if len(report.failed) != assembly_failures_before:
+                    discard_open_documents(adapter)
+                    adapter.currentModel = None
+                    return
+                await report.agate(
+                    f"{repaired_name}:auto-repair-renders",
+                    lambda n=repaired_name: _export_assembly_images(
+                        adapter, n, ("front", "top", "isometric")
+                    ),
+                )
+                rendered.add(repaired_name)
+                if len(report.failed) != assembly_failures_before:
+                    discard_open_documents(adapter)
+                    adapter.currentModel = None
+                    return
+                if active is not parent:
+                    _activate_document(adapter, parent, name)
+            # A child repair can change the parent-level visual solution even when
+            # the parent MateGroup itself was untouched, so refresh its renders too.
+            if name not in rendered:
+                await report.agate(
+                    f"{name}:auto-repair-renders",
+                    lambda: _export_assembly_images(
+                        adapter, name, ("front", "top", "isometric")
+                    ),
+                )
 
 
 def _rebuild(adapter: Any) -> None:
@@ -1613,7 +1923,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
     if suite == "soundness":
         for name in names:
-            await _verify_static_one(adapter, name, report)
+            await _verify_static_one(
+                adapter, name, report, auto_repair=_ARGS.auto_repair
+            )
     if suite == "kinematics":
         await _verify_motion_one(adapter, report)
         await _verify_live_chain_one(adapter, report)
@@ -1651,7 +1963,17 @@ def _parse_args() -> argparse.Namespace:
     ap.add_argument("names", nargs="*", help="assembly stem(s); default = all built")
     ap.add_argument("--suite", default="soundness",
                     choices=["soundness", "kinematics", "math", "config"])
+    ap.add_argument(
+        "--auto-repair",
+        action="store_true",
+        help=(
+            "opt in to AutoMateRepair for What's Wrong [48] cache/PID mate "
+            "dangles; soundness only, saved locally only after every gate passes"
+        ),
+    )
     args = ap.parse_args()
+    if args.auto_repair and args.suite != "soundness":
+        ap.error("--auto-repair is valid only with --suite soundness")
     if not args.names:
         # math/config need no model; kinematics targets MOTION_OWNER (pen);
         # soundness defaults to all built. (There is no aggregate "all" suite --
