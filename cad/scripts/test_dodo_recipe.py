@@ -107,9 +107,7 @@ def test_drawing_depends_on_actual_part_execution():
 def test_content_checker_digest_ignores_yaml_noise(tmp_path):
     """Option A: ContentChecker digests the PARSED yaml, so comment / whitespace /
     numeric-reflow edits to a shared cad/config/*.yaml leave the digest unchanged
-    (no spurious part rebuild); a real value change still flips it. Non-YAML deps
-    fall through to the stock raw md5 untouched."""
-    from doit.dependency import get_file_md5
+    (no spurious part rebuild); a real value change still flips it."""
 
     dodo = _load_dodo()
     digest = dodo.ContentChecker._digest
@@ -126,7 +124,46 @@ def test_content_checker_digest_ignores_yaml_noise(tmp_path):
 
     nonyaml = tmp_path / "build_x.py"
     nonyaml.write_text("WIDTH = 3.0\n")
-    assert digest(str(nonyaml)) == get_file_md5(str(nonyaml)), "non-yaml == stock md5"
+    assert digest(str(nonyaml)) == dodo._canonical_file_md5(str(nonyaml))
+
+
+def test_content_checker_digest_is_checkout_eol_independent(tmp_path):
+    """Issue #255: Git-equivalent text content must produce one digest whether a
+    Windows checkout materialises LF, CRLF, or mixed line endings. Binary inputs
+    remain byte-sensitive -- newline bytes can be meaningful inside a binary."""
+    dodo = _load_dodo()
+    digest = dodo.ContentChecker._digest
+
+    source = tmp_path / "build_x.py"
+    source.write_bytes(b"WIDTH = 3.0\nHEIGHT = 4.0\n")
+    lf = digest(str(source))
+    source.write_bytes(b"WIDTH = 3.0\r\nHEIGHT = 4.0\r\n")
+    assert digest(str(source)) == lf
+    source.write_bytes(b"WIDTH = 3.0\r\nHEIGHT = 4.0\n")
+    assert digest(str(source)) == lf
+
+    source.write_bytes(b"WIDTH = 3.1\r\nHEIGHT = 4.0\r\n")
+    assert digest(str(source)) != lf, "a real source edit must still invalidate"
+
+    binary = tmp_path / "input.bin"
+    binary.write_bytes(b"\x00row\n")
+    binary_lf = digest(str(binary))
+    binary.write_bytes(b"\x00row\r\n")
+    assert digest(str(binary)) != binary_lf
+
+
+def test_part_cache_key_is_checkout_eol_independent(tmp_path):
+    """Exercise #255 through the real cache-key boundary, not only its digest
+    helper: changing one Python dep's checkout representation must leave the final
+    task key unchanged while a semantic source edit must move it."""
+    dodo = _load_dodo()
+    source = tmp_path / "build_x.py"
+    source.write_bytes(b"VALUE = 1\n")
+    lf = dodo._cache_key([str(source)], "part:x")
+    source.write_bytes(b"VALUE = 1\r\n")
+    assert dodo._cache_key([str(source)], "part:x") == lf
+    source.write_bytes(b"VALUE = 2\r\n")
+    assert dodo._cache_key([str(source)], "part:x") != lf
 
 
 def test_content_checker_check_modified_ignores_comment(tmp_path):
@@ -799,3 +836,16 @@ def test_recipe_gate_tracks_sources_imported_by_its_tests():
         "_holes.py",
         "build_platen_guide.py",
     } <= deps
+
+
+def test_submodule_digest_is_checkout_eol_independent(tmp_path):
+    """Issue #255 also covers the synthetic submodule sidecars: raw hashing here
+    would move every COM key when core.autocrlf rematerialises vendored Python."""
+    dodo = _load_dodo()
+    src = _redirect_submodule(dodo, tmp_path)
+    module = src / "adapters.py"
+    module.write_bytes(b"def mate():\n    return 1\n")
+    lf = dodo._submodule_digest()
+    module.write_bytes(b"def mate():\r\n    return 1\r\n")
+    _reset_submodule_memo(dodo)
+    assert dodo._submodule_digest() == lf
