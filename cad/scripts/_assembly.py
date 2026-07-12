@@ -1136,7 +1136,7 @@ def ensure_global_pattern_axis(adapter: Any, axis: str) -> str:
 
 def _select_pattern_inputs(
     adapter: Any,
-    seed_component: str,
+    seed_components: tuple[str, ...],
     direction_name: str,
     direction_type: str,
 ) -> None:
@@ -1159,11 +1159,14 @@ def _select_pattern_inputs(
         raise RuntimeError(
             f"cannot select pattern direction {direction_type} {direction_name!r}"
         )
-    component = adapter._attempt(
-        lambda: model.GetComponentByName(seed_component), default=None
-    )
-    if component is None or not component.Select2(True, 1):
-        raise RuntimeError(f"cannot select pattern seed component {seed_component!r}")
+    for seed_component in seed_components:
+        component = adapter._attempt(
+            lambda name=seed_component: model.GetComponentByName(name), default=None
+        )
+        if component is None or not component.Select2(True, 1):
+            raise RuntimeError(
+                f"cannot select pattern seed component {seed_component!r}"
+            )
 
 
 def _new_pattern_components(model: Any, before: set[str]) -> list[Any]:
@@ -1176,7 +1179,7 @@ def _new_pattern_components(model: Any, before: set[str]) -> list[Any]:
 
 async def linear_component_pattern(
     adapter: Any,
-    seed_component: str,
+    seed_components: Iterable[str],
     *,
     axis: str,
     spacing_mm: float,
@@ -1184,11 +1187,16 @@ async def linear_component_pattern(
     direction: PatternDirection = PatternDirection.FORWARD,
     label: str = "linear fastener pattern",
 ) -> list[str]:
-    """Pattern one component along a global assembly axis using a native feature."""
+    """Pattern one or more seed components along a global assembly axis."""
     if instances < 2:
         raise ValueError("linear component pattern requires at least two instances")
     if spacing_mm <= 0.0:
         raise ValueError("linear component pattern spacing must be positive")
+    seeds = tuple(seed_components)
+    if not seeds:
+        raise ValueError("linear component pattern requires at least one seed")
+    if len(set(seeds)) != len(seeds):
+        raise ValueError("linear component pattern seeds must be unique")
 
     model = adapter.currentModel
     direction_name = ensure_global_pattern_axis(adapter, axis)
@@ -1197,10 +1205,10 @@ async def linear_component_pattern(
         for component in (model.GetComponents(False) or [])
     }
     async with _telemetry.aspan(
-        f"pattern {label}", kind="linear", seed=seed_component,
+        f"pattern {label}", kind="linear", seeds=",".join(seeds),
         axis=axis.lower(), instances=instances, spacing_mm=spacing_mm,
     ):
-        _select_pattern_inputs(adapter, seed_component, direction_name, "AXIS")
+        _select_pattern_inputs(adapter, seeds, direction_name, "AXIS")
         manager = model.FeatureManager
         _flag(manager, "IFeatureManager")
         definition = manager.CreateDefinition(_LOCAL_LINEAR_PATTERN)
@@ -1223,9 +1231,10 @@ async def linear_component_pattern(
         feature.Name = label
 
         created = _new_pattern_components(model, before)
-        if len(created) != instances - 1:
+        expected = len(seeds) * (instances - 1)
+        if len(created) != expected:
             raise RuntimeError(
-                f"{label} created {len(created)} components, expected {instances - 1}"
+                f"{label} created {len(created)} components, expected {expected}"
             )
         names = []
         for component in created:
@@ -1240,16 +1249,21 @@ async def linear_component_pattern(
 
 async def circular_component_pattern(
     adapter: Any,
-    seed_component: str,
+    seed_components: Iterable[str],
     *,
     axis_name: str,
     instances: int,
     direction: PatternDirection = PatternDirection.FORWARD,
     label: str = "circular fastener pattern",
 ) -> list[str]:
-    """Pattern one component equally through 360 degrees around a named axis."""
+    """Pattern seed components equally through 360 degrees around a named axis."""
     if instances < 2:
         raise ValueError("circular component pattern requires at least two instances")
+    seeds = tuple(seed_components)
+    if not seeds:
+        raise ValueError("circular component pattern requires at least one seed")
+    if len(set(seeds)) != len(seeds):
+        raise ValueError("circular component pattern seeds must be unique")
 
     model = adapter.currentModel
     before = {
@@ -1257,10 +1271,10 @@ async def circular_component_pattern(
         for component in (model.GetComponents(False) or [])
     }
     async with _telemetry.aspan(
-        f"pattern {label}", kind="circular", seed=seed_component,
+        f"pattern {label}", kind="circular", seeds=",".join(seeds),
         axis=axis_name, instances=instances,
     ):
-        _select_pattern_inputs(adapter, seed_component, axis_name, "AXIS")
+        _select_pattern_inputs(adapter, seeds, axis_name, "AXIS")
         manager = model.FeatureManager
         _flag(manager, "IFeatureManager")
         definition = manager.CreateDefinition(_LOCAL_CIRCULAR_PATTERN)
@@ -1279,9 +1293,10 @@ async def circular_component_pattern(
         feature.Name = label
 
         created = _new_pattern_components(model, before)
-        if len(created) != instances - 1:
+        expected = len(seeds) * (instances - 1)
+        if len(created) != expected:
             raise RuntimeError(
-                f"{label} created {len(created)} components, expected {instances - 1}"
+                f"{label} created {len(created)} components, expected {expected}"
             )
         names = []
         for component in created:

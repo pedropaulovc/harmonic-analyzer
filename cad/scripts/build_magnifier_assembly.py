@@ -330,7 +330,7 @@ async def build(adapter) -> dict[str, str]:
     assert_component_placed(adapter, clamp_seed, seed_target, IDENTITY)
     clamp_instances = await linear_component_pattern(
         adapter,
-        clamp_seed,
+        [clamp_seed],
         axis="x",
         spacing_mm=patterned_x - seed_x,
         instances=2,
