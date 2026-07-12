@@ -67,7 +67,7 @@ STRAP_TOP_Y = 65.0  # machine 570: support bar top (derived)
 STRAP_TOP_X = (-16.0, 0.0)  # 16 wide at the bar (low; lean runs machine-east)
 STRAP_BOT_X = (-5.0, 5.0)  # 10 wide at the block (low)
 # M6.10: the hanger screw threads into the strap near its top, so this is a
-# #6-32 tapped Hole Wizard hole (tap drill Ø2.743) --
+# #6-32 tapped Hole Wizard hole (tap drill Ø2.705) --
 # memory/fastener-policy-us-customary.
 SCREW_HOLE_XY = (-8.5, 60.0)  # machine (-5.5, 565) = block centre +3 + local:
 # within the 5-wide strap/bar overlap east of the bar's free end (machine
