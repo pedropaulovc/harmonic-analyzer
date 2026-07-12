@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
-from _assembly import _save_new_assembly_with_references
+from _assembly import _save_new_assembly_as_copy
 
 
 class _Model:
@@ -35,12 +35,12 @@ class _Adapter:
             return default
 
 
-def test_new_assembly_save_is_silent_and_saves_references(tmp_path: Path) -> None:
+def test_new_assembly_save_is_silent_copy_without_references(tmp_path: Path) -> None:
     target = tmp_path / "patterned.SLDASM"
     target.write_bytes(b"stale")
     adapter = _Adapter()
 
-    _save_new_assembly_with_references(adapter, target)
+    _save_new_assembly_as_copy(adapter, target)
 
-    assert adapter.currentModel.options == 1 | 4 | 8
+    assert adapter.currentModel.options == 1 | 2 | 8
     assert target.read_bytes() == b"assembly"
