@@ -320,7 +320,7 @@ async def build(adapter) -> dict[str, str]:
     # spacing and the base hole grid derive from the SAME foot-pattern constants,
     # so the instances land coaxial in holes 2/3 by construction.
     screw_names: list[str] = []
-    for bx, bz in LAG_SCREW_XZ[:2]:
+    for i, (bx, bz) in enumerate(LAG_SCREW_XZ[:2]):
         screw_target = [bx, LAG_SCREW_UNDER_HEAD_Y, bz]
         screw_name = await place_component(
             adapter,
