@@ -15,6 +15,11 @@ from xml.etree import ElementTree
 
 import _telemetry
 from _common import check
+from _drawing_layout_check import (
+    LayoutElement,
+    audit_layout,
+    format_findings,
+)
 from _drawing_registry import ASME_B_DRWDOT, ASME_B_SLDDRT
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import dispatch_array
@@ -24,12 +29,21 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     curate_dimensions,
     dimension_name,
+    iter_views,
     new_drawing,
     remove_notes_matching,
     save_drawing,
     set_units_mm,
     view_name,
 )
+
+
+# swAnnotationType_e.swNote -- the only view-owned annotation TYPE that becomes a
+# free-standing layout element (the general-notes block, schedule cells). Tables
+# are enumerated separately via IView.GetTableAnnotations. Everything else a view
+# carries -- dimensions, center marks, GTols, cosmetic threads, bare leaders --
+# is detail bounded by the view outline, not a separate element.
+_ANNOT_NOTE = 6
 
 
 ASME_B_WIDTH_M = 0.4318
@@ -1031,6 +1045,203 @@ def stamp_drawing_summary(adapter: Any, drawing_model: Any, fields: dict[int, st
             raise RuntimeError(f"drawing summary field {field} did not persist")
 
 
+# An isometric/pictorial view's axis-aligned outline is mostly empty diagonal
+# space, so its box is not a faithful footprint -- mark such views ``loose`` so
+# the audit skips them. ``GetOrientationName`` returns the predefined view name
+# (e.g. "*Isometric"); ortho views return "*Front"/"*Right"/... and projected /
+# section / detail views return "".
+_PICTORIAL_ORIENTATIONS = frozenset({"*isometric", "*dimetric", "*trimetric"})
+
+
+def _view_is_loose(adapter: Any, view: Any) -> bool:
+    orientation = str(adapter._get_attr_or_call(view, "GetOrientationName") or "")
+    return orientation.strip().lower() in _PICTORIAL_ORIENTATIONS
+
+
+def _center_inside(element: LayoutElement, outline: tuple[float, float, float, float]) -> bool:
+    """True if ``element``'s center lies within the ``(xmin,ymin,xmax,ymax)`` box."""
+    cx = (element.xmin + element.xmax) / 2.0
+    cy = (element.ymin + element.ymax) / 2.0
+    xmin, ymin, xmax, ymax = outline
+    return xmin <= cx <= xmax and ymin <= cy <= ymax
+
+
+def _note_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | None:
+    """Box a free NOTE from ``INote.GetExtent`` (lower-left / upper-right in meters).
+
+    Leadered notes are skipped: a leader means the callout is deliberately
+    pointing at (and sitting over) view geometry -- e.g. the arrowed hole-group
+    tags -- so treating it as a colliding element would be a false positive.
+    """
+    if int(adapter._get_attr_or_call(annotation, "GetLeaderCount") or 0) > 0:
+        return None
+    note = adapter._attempt(lambda: annotation.GetSpecificAnnotation())
+    if note is None:
+        return None
+    note = _sw_type_info.flagged(note, "INote")
+    extent = adapter._attempt(lambda: note.GetExtent())
+    if not extent:
+        return None
+    x0, y0, _z0, x1, y1, _z1 = (float(v) for v in extent)
+    return LayoutElement(
+        name, "note", min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)
+    )
+
+
+def _table_element(adapter: Any, table: Any, name: str) -> LayoutElement | None:
+    """Box a TABLE (``ITableAnnotation``) from its anchor plus column/row spans.
+
+    The project's hole tables are inserted top-left-anchored
+    (``swBOMConfigurationAnchor_TopLeft``), so the anchor position (read off the
+    table's underlying ``IAnnotation``) is the top-left corner and the box grows
+    right and DOWN from it.
+    """
+    table = _sw_type_info.flagged(table, "ITableAnnotation")
+    inner = adapter._attempt(lambda: table.GetAnnotation())
+    if inner is None:
+        return None
+    inner = _sw_type_info.flagged(inner, "IAnnotation")
+    position = adapter._attempt(lambda: inner.GetPosition())
+    if not position:
+        return None
+    rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
+    columns = int(adapter._get_attr_or_call(table, "ColumnCount") or 0)
+    width = sum(
+        float(adapter._attempt(lambda i=i: table.GetColumnWidth(i)) or 0.0)
+        for i in range(columns)
+    )
+    height = sum(
+        float(adapter._attempt(lambda i=i: table.GetRowHeight(i)) or 0.0)
+        for i in range(rows)
+    )
+    x, y = float(position[0]), float(position[1])
+    return LayoutElement(name, "table", x, y - height, x + width, y)
+
+
+def _iter_view_notes(adapter: Any, view: Any):
+    """Yield each note ``LayoutElement`` a real drawing view owns.
+
+    ``IView.GetAnnotations`` returns dimensions, center marks, cosmetic-thread
+    callouts and notes; only non-leadered NOTES become elements.
+    """
+    annotations = adapter._attempt(lambda: view.GetAnnotations()) or []
+    for annotation in annotations:
+        annotation = _sw_type_info.flagged(annotation, "IAnnotation")
+        if int(adapter._get_attr_or_call(annotation, "GetType") or 0) != _ANNOT_NOTE:
+            continue
+        name = str(adapter._get_attr_or_call(annotation, "GetName") or "")
+        element = _note_element(adapter, annotation, name)
+        if element is not None:
+            yield element
+
+
+def _iter_tables(adapter: Any, view: Any):
+    """Yield each table ``LayoutElement`` owned by ``view`` (or the sheet view)."""
+    tables = adapter._attempt(lambda: view.GetTableAnnotations()) or []
+    for table in tables:
+        table = _sw_type_info.flagged(table, "ITableAnnotation")
+        inner = adapter._attempt(lambda: table.GetAnnotation())
+        name = (
+            str(adapter._get_attr_or_call(_sw_type_info.flagged(inner, "IAnnotation"), "GetName") or "")
+            if inner is not None
+            else "table"
+        )
+        element = _table_element(adapter, table, name)
+        if element is not None:
+            yield element
+
+
+def collect_layout_elements(
+    adapter: Any,
+) -> tuple[list[LayoutElement], float, float]:
+    """Gather every free-standing drawing element and the sheet size (meters).
+
+    Elements are:
+
+    * every real drawing view (``IView.GetOutline``), pictorial views flagged
+      ``loose`` so their empty diagonal box does not drive false collisions;
+    * each non-leadered NOTE a real view owns and that is positioned OUTSIDE its
+      owning view (the general-notes block and schedule cells) -- a note centered
+      inside its own view is a hole tag / balloon sitting on the geometry, not a
+      free element;
+    * every TABLE (hole tables land on the SHEET view, so it is scanned too).
+
+    Annotations owned by the SHEET view are otherwise the checked-in sheet-format
+    frame + title block (always at the sheet edges by design) and are excluded.
+    """
+    drawing_model = adapter.currentModel
+    sheet = adapter._get_attr_or_call(drawing_model, "GetCurrentSheet")
+    if sheet is None:
+        raise RuntimeError("drawing has no current sheet to audit layout on")
+    properties = list(adapter._get_attr_or_call(sheet, "GetProperties") or [])
+    if len(properties) < 7:
+        raise RuntimeError(f"cannot read sheet size to audit layout: {properties!r}")
+    width, height = float(properties[5]), float(properties[6])
+
+    elements: list[LayoutElement] = []
+    # Tables are deduped by name: SolidWorks can surface the same table under both
+    # its owning view and the sheet, and a duplicated box would self-collide.
+    tables: dict[str, LayoutElement] = {}
+    for view in iter_views(adapter):
+        name = view_name(adapter, view)
+        outline = adapter._attempt(lambda v=view: v.GetOutline())
+        view_box: tuple[float, float, float, float] | None = None
+        if outline:
+            view_box = tuple(float(v) for v in outline)  # xmin,ymin,xmax,ymax
+            elements.append(
+                LayoutElement(
+                    name, "view", *view_box, loose=_view_is_loose(adapter, view)
+                )
+            )
+        for note in _iter_view_notes(adapter, view):
+            # A note centered inside its owning view is detail on that view (a
+            # hole tag / balloon), not a free element -- excluding it avoids a
+            # tag-on-its-own-view false collision.
+            if view_box is not None and _center_inside(note, view_box):
+                continue
+            elements.append(note)
+        for table in _iter_tables(adapter, view):
+            tables[table.label] = table
+
+    # Hole tables anchor to the SHEET view, not a drawing view -- scan it for
+    # tables only (its notes are the sheet-format frame + title block).
+    sheet_view = adapter._attempt(lambda: drawing_model.GetFirstView())
+    if sheet_view is not None:
+        for table in _iter_tables(adapter, _sw_type_info.flagged(sheet_view, "IView")):
+            tables[table.label] = table
+
+    elements.extend(tables.values())
+    return elements, width, height
+
+
+def check_drawing_layout(adapter: Any) -> None:
+    """Fail loud if any two drawing elements collide or one runs off the sheet.
+
+    Runs at the end of every recipe's layout, right before the drawing is saved
+    (see :func:`finalize_drawing`), so a print can never ship with a note landed
+    on a view or a table hanging over the border -- defects the dimensional and
+    format gates cannot see.
+    """
+    with _telemetry.span("drawing.layout_audit") as span:
+        elements, width, height = collect_layout_elements(adapter)
+        overlaps, overflows = audit_layout(elements, width, height)
+        if span is not None:
+            span.set_attribute("elements", len(elements))
+            span.set_attribute("overlaps", len(overlaps))
+            span.set_attribute("overflows", len(overflows))
+        if not overlaps and not overflows:
+            _telemetry.success(
+                f"drawing layout clean: {len(elements)} elements, "
+                "no overlaps or overflows"
+            )
+            return
+        raise RuntimeError(
+            "drawing layout audit failed "
+            f"({len(overlaps)} overlap(s), {len(overflows)} overflow(s)):\n"
+            + format_findings(overlaps, overflows)
+        )
+
+
 async def finalize_drawing(
     adapter: Any,
     outputs: DrawingOutputs,
@@ -1056,6 +1267,11 @@ async def finalize_drawing(
     if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
         raise RuntimeError("failed to set final drawing sheet scale")
     assert_asme_b_sheet(adapter, sheet, phase="before save", scale=scale)
+
+    # The layout is now complete -- audit element collisions / sheet overflow on
+    # the finished sheet before the first save, so a broken layout never reaches
+    # the saved SLDDRW / PDF / PNG.
+    check_drawing_layout(adapter)
 
     artifacts = save_drawing(adapter, str(outputs.slddrw))
     drawing_model, sheet = await reopen_drawing(adapter, outputs.slddrw)
