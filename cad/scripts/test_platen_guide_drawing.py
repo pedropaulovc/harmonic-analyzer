@@ -56,7 +56,7 @@ def test_platen_guide_rebases_back_as_standard_front() -> None:
 def test_drawing_hole_sizes_follow_unc_policy() -> None:
     assert drawing.THREAD_DESIGNATION == "#4-40 UNC-2B"
     assert drawing.THREAD_TAP_DRILL_MM == TAP_DRILL_MM["#4-40"]
-    assert CLEARANCE_MM[("#4", "normal")] == 3.251
+    assert CLEARANCE_MM[("#4", "normal")] == 3.264
 
 
 def test_platen_guide_hole_stations_match_native_wizard_features() -> None:
