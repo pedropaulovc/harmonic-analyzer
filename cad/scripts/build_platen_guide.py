@@ -180,7 +180,11 @@ async def build(adapter) -> dict[str, str]:
         blind_cut_dia_mm(screw_spec), SCREW_HOLE_DEPTH
     )
     v_final = v_rail - v_holes - v_screws
-    await volume_check(adapter, "guide with screw holes", v_final, 0.02 * v_screws)
+    # The short bottoming-tap table profile differs slightly from the ideal
+    # cylinder-plus-118-degree point (about 0.54 mm^3 per hole on SW 2026).
+    # Keep the gate tight enough to catch a missing/extra station while covering
+    # that native table/profile variation.
+    await volume_check(adapter, "guide with screw holes", v_final, 0.05 * v_screws)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).

@@ -95,7 +95,7 @@ FRONT_KEEP = {
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 TOP_KEEP = {}
 DIMENSION_CALLOUTS = {
-    "ShaftBoreDia": "THRU - REAM 3/8 IN",
+    "ShaftBoreDia": "THRU - REAM 3/8 IN\n+0.05/-0.00",
     "DimpleDia": "0.5 DEEP",
 }
 
@@ -170,9 +170,8 @@ async def build(adapter: Any) -> dict[str, str]:
         [*front_annotations, *top_annotations, *right_annotations],
         DIMENSION_CALLOUTS,
     )
-    # The shaft bore is an exact 3/8 in (Ø9.525) reamed bore; notes 2 & 5 cite it
-    # to 3 places, so display it to 3 as well (the sheet default is 2). Otherwise
-    # the view reads Ø9.53 against the notes' Ø9.525 — a false contradiction.
+    # The shaft bore is an exact 3/8 in (Ø9.525) reamed bore; its native
+    # dimension callout cites that conversion, so preserve three decimals.
     set_dimension_precision(
         adapter,
         [*front_annotations, *top_annotations, *right_annotations],
@@ -245,12 +244,12 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=shaft_edge,
-        symbol_xy=(0.070, 0.190),
+        symbol_xy=(0.140, 0.235),
         roughness_ra="1.6",
         label="shaft bore finish",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.075)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.185)
 
     return await finalize_drawing(

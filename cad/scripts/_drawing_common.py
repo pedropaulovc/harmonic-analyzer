@@ -44,6 +44,8 @@ class DrawingOutputs:
 
 
 _GTOL_SYMBOLS = {
+    "circular_runout": "GTOL-CIRC",
+    "cylindricity": "GTOL-CYL",
     "flatness": "GTOL-FLAT",
     "parallelism": "GTOL-PARA",
     "position": "GTOL-POSI",
@@ -150,7 +152,7 @@ def add_feature_control_frame(
     diameter: bool = False,
     label: str,
 ) -> Any:
-    """Attach a native SOLIDWORKS-2022+ feature-control frame to an edge."""
+    """Attach a native feature-control frame to a drawing-view edge."""
     _select_view_entity(adapter, view, "EDGE", edge_xy, label=label)
     draw = adapter.currentModel
     gtol = draw.InsertGtol()
@@ -164,18 +166,46 @@ def add_feature_control_frame(
         frame_count = int(gtol.GetFrameCount() or 0)
     if frame_count < 1:
         raise RuntimeError(f"feature-control frame has no frame ({label})")
-    frame = _sw_type_info.flagged(gtol.GetFrame(1), "IGtolFrame")
-    xml = _gtol_frame_xml(
-        characteristic, tolerance, datums=datums, diameter=diameter
-    )
-    if not frame.SetSymbolXml(xml):
-        raise RuntimeError(f"SOLIDWORKS rejected feature-control frame XML ({label})")
+    frame = gtol.GetFrame(1)
+    if frame is not None:
+        frame = _sw_type_info.flagged(frame, "IGtolFrame")
+        xml = _gtol_frame_xml(
+            characteristic, tolerance, datums=datums, diameter=diameter
+        )
+        if not frame.SetSymbolXml(xml):
+            raise RuntimeError(
+                f"SOLIDWORKS rejected feature-control frame XML ({label})"
+            )
+        applied = str(frame.GetSymbolXml() or "")
+        if _GTOL_SYMBOLS[characteristic] not in applied or tolerance not in applied:
+            raise RuntimeError(f"feature-control frame did not persist ({label})")
+    else:
+        # InsertGtol can still create a pre-2022 frame on current seats/templates.
+        # That representation has no IGtolFrame object and must use the legacy,
+        # documented symbol/value methods instead of SetSymbolXml.
+        datum_values = [*datums[:3], "", "", ""][:3]
+        gtol.SetFrameSymbols2(
+            1,
+            f"<{_GTOL_SYMBOLS[characteristic]}>",
+            diameter,
+            "",
+            False,
+            "",
+            "",
+            "",
+            "",
+        )
+        if not gtol.SetFrameValues2(1, tolerance, "", *datum_values):
+            raise RuntimeError(
+                f"SOLIDWORKS rejected legacy feature-control frame ({label})"
+            )
+        applied = [str(value or "") for value in (gtol.GetFrameValues(1) or [])]
+        symbols = [str(value or "") for value in (gtol.GetFrameSymbols2(1) or [])]
+        if tolerance not in applied or not symbols or not symbols[0]:
+            raise RuntimeError(f"legacy feature-control frame did not persist ({label})")
     annotation = _sw_type_info.flagged(gtol.GetAnnotation(), "IAnnotation")
     if not annotation.SetPosition2(frame_xy[0], frame_xy[1], 0.0):
         raise RuntimeError(f"failed to position feature-control frame ({label})")
-    applied = str(frame.GetSymbolXml() or "")
-    if _GTOL_SYMBOLS[characteristic] not in applied or tolerance not in applied:
-        raise RuntimeError(f"feature-control frame did not persist ({label})")
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     return gtol
@@ -212,6 +242,7 @@ def add_surface_finish(
     )
     if symbol is None:
         raise RuntimeError(f"failed to insert Ra {roughness_ra} symbol ({label})")
+    symbol = _sw_type_info.flagged(symbol, "ISFSymbol")
     annotation = _sw_type_info.flagged(symbol.GetAnnotation(), "IAnnotation")
     if not annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
         raise RuntimeError(f"failed to position surface-finish symbol ({label})")
@@ -228,6 +259,50 @@ def add_property_linked_note(
     note = add_note(adapter, property_link(property_name), x, y)
     if note is None:
         raise RuntimeError(f"failed to add linked drawing note {property_name!r}")
+    return note
+
+
+@_telemetry.traced("drawing.linked_callout", label_param="property_name")
+def add_property_linked_callout(
+    adapter: Any,
+    view: Any,
+    *,
+    property_name: str,
+    edge_xy: tuple[float, float],
+    note_xy: tuple[float, float],
+) -> Any:
+    """Attach one arrowed callout whose text resolves from the source SLDPRT."""
+    draw = adapter.currentModel
+    name = view_name(adapter, view)
+    if not draw.ActivateView(name):
+        raise RuntimeError(f"failed to activate linked-callout view {name!r}")
+    draw.ClearSelection2(True)
+    edge = _select_edge(adapter, *edge_xy, append=False)
+    note = draw.InsertNote(property_link(property_name))
+    if note is None:
+        raise RuntimeError(f"failed to insert linked callout {property_name!r}")
+    note = _sw_type_info.flagged(note, "INote")
+    annotation = note.GetAnnotation()
+    if annotation is None:
+        raise RuntimeError(f"linked callout has no annotation: {property_name!r}")
+    annotation = _sw_type_info.flagged(annotation, "IAnnotation")
+    if int(annotation.GetAttachedEntityCount3()) != 1:
+        if not annotation.SetAttachedEntities(dispatch_array([edge])):
+            raise RuntimeError(f"failed to attach linked callout {property_name!r}")
+    status = annotation.SetLeader3(1, 0, True, False, False, False)
+    if status != 0:
+        raise RuntimeError(
+            f"failed to create linked-callout leader {property_name!r}: {status}"
+        )
+    if not annotation.SetPosition2(note_xy[0], note_xy[1], 0.0):
+        raise RuntimeError(f"failed to position linked callout {property_name!r}")
+    draw.EditRebuild3()
+    if (
+        int(annotation.GetAttachedEntityCount3()) != 1
+        or int(annotation.GetLeaderCount()) != 1
+    ):
+        raise RuntimeError(f"linked callout {property_name!r} lacks one arrow")
+    draw.ClearSelection2(True)
     return note
 
 

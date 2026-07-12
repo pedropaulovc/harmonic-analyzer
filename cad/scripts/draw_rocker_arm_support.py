@@ -241,7 +241,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="support mounting-seat finish",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.090)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.060)
 
     return await finalize_drawing(
         adapter,
