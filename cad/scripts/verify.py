@@ -82,9 +82,13 @@ from _assembly import (
     assert_components_fully_defined,
     assert_free_dof_necessity,
     assert_model_healthy,
+    assert_saved_rebuild_clean,
     check_no_interference,
     component_names,
     component_transform,
+    repair_dangling_mates,
+    save_assembly_in_place,
+    whats_wrong,
 )
 from _assembly_postbuild import (
     author_dof_drives,
@@ -104,6 +108,7 @@ from solidworks_mcp.adapters.solidworks.assembly import _gear_mate_links
 
 REST = "Default"  # the deterministic, fully-defined, render/photo-gated pose
 OVER_CONSTRAINED = 4  # swConstrainedStatus_e
+DANGLING_ENTITY_NOT_FOUND = 48  # What's Wrong: mate reference PID not found
 
 # The gear mates live in this sub-assembly's MateGroup. The top assembly
 # references it flexibly, so its own MateGroup has none -- they are verified
@@ -694,7 +699,77 @@ def _fail(msg: str) -> None:
     raise RuntimeError(msg)
 
 
-async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
+def _dangling_faults(adapter: Any) -> list[str]:
+    """Return active-assembly mate faults eligible for the opt-in repair.
+
+    What's Wrong code 48 is the observed persistent-reference failure from a
+    cache-restored assembly whose mates were authored against another seat's
+    part PIDs.  Do not broaden this to arbitrary rebuild errors:
+    ``AutoMateRepair`` is an operator-chosen escape hatch for that narrow case,
+    not a general-purpose way to make a red model green.
+    """
+    return [
+        str(_read_member(feature, "Name") or "?")
+        for feature, code, warning in whats_wrong(adapter, adapter.currentModel)
+        if not warning and code == DANGLING_ENTITY_NOT_FOUND
+    ]
+
+
+def _repair_cache_dangles(adapter: Any, name: str) -> Any:
+    """Repair code-48 mate dangles, rebuild, and prove the active model clean.
+
+    The caller still runs the complete DOF/interference/deep-health battery and
+    saves only after every gate passes.  A successful repair remains local; it
+    is deliberately not republished under the foreign remote-cache key.
+    """
+    before = _dangling_faults(adapter)
+    if not before:
+        return None
+    with _telemetry.span("verify.auto_repair", name=name, faults=len(before)) as sp:
+        repaired = repair_dangling_mates(adapter)
+        rebuilt = adapter._attempt(
+            lambda: adapter.currentModel.ForceRebuild3(False), default=None
+        )
+        remaining = [
+            f"{_read_member(feature, 'Name') or '?'} [{code}]"
+            for feature, code, warning in whats_wrong(adapter, adapter.currentModel)
+            if not warning
+        ]
+        sp.set_attribute("repaired", repaired)
+        sp.set_attribute("remaining_faults", len(remaining))
+        if repaired <= 0 or remaining:
+            raise RuntimeError(
+                f"{name}: AutoMateRepair did not produce a clean assembly "
+                f"(reported repaired={repaired}, remaining={remaining})"
+            )
+        _telemetry.event(
+            "verify.auto_repair.completed", asm=name, repaired=repaired
+        )
+        _telemetry.warn(
+            f"{name}: opt-in AutoMateRepair re-bound {repaired} mate(s); "
+            "running the full soundness battery before saving locally"
+        )
+        return rebuilt
+
+
+def _assert_soundness_health(adapter: Any, name: str, rebuilt: Any) -> None:
+    """Run deep health and give code-48 failures an actionable retry."""
+    try:
+        assert_model_healthy(adapter, label=name, deep=True, rebuilt=rebuilt)
+    except RuntimeError as exc:
+        if "[48]" in str(exc):
+            raise RuntimeError(
+                f"{exc}; cache/PID mate dangle detected — retry explicitly with "
+                f"`uv run python cad/scripts/verify.py {name} --suite soundness "
+                "--auto-repair` (the repair can re-bind wrong topology, so it "
+                "is never automatic)"
+            ) from exc
+        raise
+
+
+async def _verify_static_one(
+    adapter: Any, name: str, report: Report, *, auto_repair: bool = False
+) -> None:
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
     if not sldasm.exists():
         report.failed.append((f"{name}:open", f"not built: {sldasm}"))
@@ -719,6 +794,14 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
             check(f"activate {REST}", await adapter.set_active_configuration(REST))
     log(f"--- verifying {name} ({REST} pose) ---")
 
+    # Read BEFORE the shared ForceRebuild3 below. Otherwise soundness repairs the
+    # evidence in memory and can pass an artefact that always opens with the GUI's
+    # rebuild indicator set (issue #202).
+    report.gate(
+        f"{name}:saved-rebuild-clean",
+        lambda: assert_saved_rebuild_clean(adapter, name),
+    )
+
     # Single shared re-solve for the whole static battery. The DOF, over-constrained
     # and model-healthy gates below EACH used to ForceRebuild3 this same model (three
     # deep rebuilds where one suffices -- ~50 s x3 on the top assembly). The static
@@ -731,6 +814,22 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
         rebuilt = adapter._attempt(
             lambda: adapter.currentModel.ForceRebuild3(False), default=None
         )
+
+    repaired = False
+    if auto_repair and _dangling_faults(adapter):
+        state: dict[str, Any] = {}
+
+        def _repair() -> None:
+            state["rebuilt"] = _repair_cache_dangles(adapter, name)
+
+        failures_before = len(report.failed)
+        report.gate(f"{name}:auto-repair", _repair)
+        if len(report.failed) != failures_before:
+            return
+        rebuilt = state["rebuilt"]
+        repaired = True
+
+    assembly_failures_before = len(report.failed)
 
     free_dof = _expected_free_dof(name)
     if free_dof:
@@ -779,7 +878,7 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
     )
     report.gate(
         f"{name}:model-healthy",
-        lambda: assert_model_healthy(adapter, label=name, deep=True, rebuilt=rebuilt),
+        lambda: _assert_soundness_health(adapter, name, rebuilt),
     )
     report.gate(f"{name}:interference-free", lambda: check_no_interference(adapter))
     # component-count REMOVED: every historical failure of that gate was a stale band
@@ -797,6 +896,19 @@ async def _verify_static_one(adapter: Any, name: str, report: Report) -> None:
             f"{name}:channel-independence",
             lambda: assert_channel_independence(adapter),
         )
+
+    if repaired:
+        if len(report.failed) != assembly_failures_before:
+            _telemetry.warn(
+                f"{name}: repaired mate state NOT saved because a soundness gate failed"
+            )
+        else:
+            # Persist only after DOF, over-constraint, deep-health, interference,
+            # and channel-independence all prove that the PID re-bind is sound.
+            report.gate(
+                f"{name}:auto-repair-save",
+                lambda: save_assembly_in_place(adapter, name, geometry_changed=True),
+            )
 
 
 def _rebuild(adapter: Any) -> None:
@@ -1613,7 +1725,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
     if suite == "soundness":
         for name in names:
-            await _verify_static_one(adapter, name, report)
+            await _verify_static_one(
+                adapter, name, report, auto_repair=_ARGS.auto_repair
+            )
     if suite == "kinematics":
         await _verify_motion_one(adapter, report)
         await _verify_live_chain_one(adapter, report)
@@ -1651,7 +1765,17 @@ def _parse_args() -> argparse.Namespace:
     ap.add_argument("names", nargs="*", help="assembly stem(s); default = all built")
     ap.add_argument("--suite", default="soundness",
                     choices=["soundness", "kinematics", "math", "config"])
+    ap.add_argument(
+        "--auto-repair",
+        action="store_true",
+        help=(
+            "opt in to AutoMateRepair for What's Wrong [48] cache/PID mate "
+            "dangles; soundness only, saved locally only after every gate passes"
+        ),
+    )
     args = ap.parse_args()
+    if args.auto_repair and args.suite != "soundness":
+        ap.error("--auto-repair is valid only with --suite soundness")
     if not args.names:
         # math/config need no model; kinematics targets MOTION_OWNER (pen);
         # soundness defaults to all built. (There is no aggregate "all" suite --

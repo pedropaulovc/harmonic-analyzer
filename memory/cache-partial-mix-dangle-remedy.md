@@ -1,6 +1,6 @@
 ---
 name: cache-partial-mix-dangle-remedy
-description: Remote-cache partial mix (local part rebuild + foreign cached assembly) dangles mates; delete alone RE-RESTORES the broken artifact — rebuild with HARMONIC_CACHE_MODE=off
+description: Remote-cache partial mix (local part rebuild + foreign cached assembly) dangles mates; delete alone RE-RESTORES the broken artifact — rebuild with HARMONIC_REMOTE_CACHE_MODE=off
 metadata:
   type: project
 ---
@@ -9,6 +9,13 @@ metadata:
 `assembly:harmonic_analyzer`'s deep-health gate with mate errors `[48]`
 (dangling) INSIDE cache-restored subassembly instances, e.g.
 `summing-1:Coincident1; magnifier-1:Coincident2`.
+
+The fast, operator-judged first retry is now:
+
+`uv run python cad/scripts/verify.py <assembly> --suite soundness --auto-repair`
+
+It saves locally only after the full soundness battery passes. If it cannot
+repair cleanly, use the cache-off full-rebuild remedy below.
 
 **Cause** — the AGENTS.md "recipe ≠ PID identity" limitation, triggered by a
 *partial cache mix*: some `part:*` MISSED (rebuilt locally → fresh SolidWorks
@@ -35,7 +42,7 @@ doesn't know the entry is PID-incompatible with local parts.
 2. Delete each foreign `.SLDASM` + its `.<stem>.massprops.sha` /
    `.<stem>.recipe.md5` sidecars (and `.<stem>.park.json` if present).
 3. Rebuild those assemblies with the cache OFF so the stale key can't restore:
-   `$env:HARMONIC_CACHE_MODE='off'; uv run python -m doit assembly:<a> assembly:<b>`
+   `$env:HARMONIC_REMOTE_CACHE_MODE='off'; uv run python -m doit assembly:<a> assembly:<b>`
    (mode=off also skips store — the foreign entries stay in the blob; a future
    fresh seat on the same recipe state can hit this again until someone
    republishes.)

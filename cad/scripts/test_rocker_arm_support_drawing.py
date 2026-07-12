@@ -29,8 +29,8 @@ def test_tapped_holes_use_customary_us_thread() -> None:
     # Pedro 2026-07-10: closest customary US thread, not the period series.
     assert support.HOLE_SSIZE == "9/16-12"
     assert support.HOLE_THREAD_CLASS == "2B"
-    notes = drawing._manufacturing_notes()
-    assert "9/16-12 UNC-2B" in notes
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "insert_hole_table(" in source
 
 
 def test_hole_table_covers_every_foot_hole() -> None:
@@ -45,14 +45,24 @@ def test_hole_table_covers_every_foot_hole() -> None:
 
 
 def test_notes_cover_casting_specifics() -> None:
-    notes = drawing._manufacturing_notes()
+    notes = support.DRAWING_NOTES
     assert "GRAY-IRON CASTING" in notes
-    assert "DATUM A" in notes
     assert "CHAMFER 1.27 X 45" in notes
     assert "FILLET" in notes and "R12.7" in notes
     assert "WEB 6.35" in notes
-    assert "GREEN ENAMEL" in notes
     assert "X.XX" not in notes
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert "def _manufacturing_notes" not in source
+
+
+def test_native_gdt_defines_mounting_reference_frame() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.count("add_datum_feature(") == 3
+    assert source.count("add_feature_control_frame(") == 2
+    assert "characteristic=\"flatness\"" in source
+    assert "characteristic=\"position\"" in source
+    assert "add_surface_finish(" in source
 
 
 def test_sheet_runs_1_to_2_with_explicit_view_scales() -> None:

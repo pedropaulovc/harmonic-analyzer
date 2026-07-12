@@ -76,9 +76,20 @@ HOLE_X = tuple(s + d for s in LOCK_STATION_X for d in (-LOCK_SCREW_DX, LOCK_SCRE
 SCREW_STATION_X = (30.0, 90.0, 150.0, 210.0, 270.0)
 SCREW_HOLE_DEPTH = 3.0
 
+DRAWING_NOTES = "\n".join(
+    (
+        "UNLESS OTHERWISE SPECIFIED:",
+        "1. LENGTH +/-0.5; STOCK SECTION +/-0.25; HOLE POSITION PER FCF; "
+        "ANGLES +/-0.5 DEG.",
+        "2. REMOVE BURRS AND BREAK SHARP EDGES 0.2 MAX.",
+    )
+)
+
 
 def _apply_drawing_properties(adapter) -> None:
-    apply_drawing_properties(adapter, PART_NAME)
+    apply_drawing_properties(
+        adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES}
+    )
 
 
 def _make_back_view_front(adapter) -> None:

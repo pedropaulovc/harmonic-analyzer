@@ -41,29 +41,41 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 1)" in source  # the isometric override
-    assert "ISOMETRIC VIEW SCALE 1:1" in source
+    assert crank_arm_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
+    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
-def test_notes_use_us_customary_fasteners_and_functional_tolerances() -> None:
-    notes = drawing._manufacturing_notes()
+def test_linked_notes_use_us_customary_fasteners_and_functional_tolerances() -> None:
+    notes = crank_arm_spec.DRAWING_NOTES
     assert "TAPER PIN" in notes
     assert "1:48" in notes
     assert "3/8 IN" in notes
     assert "15/64 DRILL THRU" in notes
     assert "#9 DRILL" in notes
-    assert "O4.978" in notes
     assert "LINEAR +/-0.25" in notes
     assert "HOLE CENTRES +/-0.10" in notes
     # Pedro 2026-07-10: drawings spec the closest US-customary fastener, not
     # the period British Association series.
     assert "BA" not in notes
     assert "X.XX" not in notes
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert "_NOTES_" not in source
 
 
 def test_hole_states_are_annotated() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
     assert callouts["ShaftBoreDia"].startswith("THRU")
-    assert callouts["DimpleDia"].startswith("0.5 DEEP")
+    assert callouts["DimpleDia"] == "0.5 DEEP"
+
+
+def test_native_gdt_replaces_form_orientation_notes() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.count("add_datum_feature(") == 2
+    assert source.count("add_feature_control_frame(") == 2
+    assert "characteristic=\"parallelism\"" in source
+    assert "characteristic=\"position\"" in source
+    assert "add_surface_finish(" in source
 
 
 def test_wizard_holes_are_not_fake_marked_dimensions() -> None:

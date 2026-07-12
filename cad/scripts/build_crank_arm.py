@@ -62,8 +62,10 @@ from crank_arm_spec import (
     DIMPLE_DEPTH,
     DIMPLE_DIA,
     DIMPLE_X,
+    DRAWING_NOTES,
     DRAWING_DIMENSIONS,
     HALF_WIDTH,
+    ISOMETRIC_VIEW_NOTE,
     SHAFT_BORE_DIA,
     SQUARE_END_OVERHANG,
 )
@@ -301,7 +303,14 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    apply_drawing_properties(adapter, PART_NAME)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

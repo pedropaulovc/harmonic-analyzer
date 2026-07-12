@@ -12,7 +12,7 @@ import create_drawing_standards
 import draw_platen_guide as drawing
 import build_platen_guide as guide
 from _drawing_registry import DRAWINGS, ASME_B_DRWDOT, ASME_B_SLDDRT
-from _drawing_common import sanitize_pdf_metadata
+from _drawing_common import _gtol_frame_xml, property_link, sanitize_pdf_metadata
 from _holes import CLEARANCE_MM, TAP_DRILL_MM
 
 
@@ -113,12 +113,33 @@ def test_drawing_uses_native_hole_table_and_sheet_scale() -> None:
 
 
 def test_drawing_tolerances_follow_feature_function_not_display_zeros() -> None:
-    notes = drawing._manufacturing_notes()
+    notes = guide.DRAWING_NOTES
     assert "LENGTH +/-0.5" in notes
     assert "STOCK SECTION +/-0.25" in notes
-    assert "HOLE CENTRES +/-0.10" in notes
-    assert "CORE DIAMETERS +/-0.05" in notes
+    assert "HOLE POSITION PER FCF" in notes
     assert "X.XXX" not in notes
+
+
+def test_native_gdt_replaces_datum_flatness_parallelism_notes() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.count("add_datum_feature(") == 3
+    assert source.count("add_feature_control_frame(") == 3
+    assert "characteristic=\"flatness\"" in source
+    assert "characteristic=\"parallelism\"" in source
+    assert "characteristic=\"position\"" in source
+    assert "add_surface_finish(" in source
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert "def _manufacturing_notes" not in source
+
+
+def test_gdt_xml_and_note_links_use_native_drawing_contracts() -> None:
+    xml = _gtol_frame_xml(
+        "position", "0.20", datums=("A", "B", "C"), diameter=True
+    )
+    assert "GTOL-POSI" in xml
+    assert "<PrimaryRangeSymbol>phi</PrimaryRangeSymbol>" in xml
+    assert xml.count("<DatumCompartment>") == 3
+    assert property_link("Manufacturing Notes") == '$PRPSHEET:"Manufacturing Notes"'
 
 
 def test_pdf_metadata_is_project_owned(tmp_path: Path) -> None:

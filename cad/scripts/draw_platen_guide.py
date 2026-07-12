@@ -19,6 +19,10 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_datum_feature,
+    add_feature_control_frame,
+    add_property_linked_note,
+    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     import_cosmetic_threads,
@@ -32,7 +36,6 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from build_platen_guide import HOLE_X as THROUGH_X
 from build_platen_guide import SCREW_STATION_X as BLIND_X
 from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
     auto_center_marks,
     place_view,
     remove_notes_matching,
@@ -66,30 +69,6 @@ THREAD_PITCH_MM = 25.4 / 40.0
 THREAD_TAP_DRILL_MM = 2.261
 
 
-def _manufacturing_notes() -> str:
-    return "\n".join(
-        (
-            "UNLESS OTHERWISE SPECIFIED:",
-            "1. DIMENSIONS ARE IN MILLIMETRES. INTERPRET PER ASME Y14.5.",
-            (
-                "2. TOLERANCES: LENGTH +/-0.5; STOCK SECTION +/-0.25;\n"
-                "   HOLE CENTRES +/-0.10; CORE DIAMETERS +/-0.05; "
-                "ANGLES +/-0.5 DEG."
-            ),
-            "3. REMOVE BURRS AND BREAK SHARP EDGES 0.2 MAX.",
-            (
-                f"4. {THREAD_DESIGNATION}: MAJOR DIA {THREAD_MAJOR_DIA_MM:.3f}; "
-                f"PITCH {THREAD_PITCH_MM:.3f}; TAP DRILL DIA "
-                f"{THREAD_TAP_DRILL_MM:.3f}."
-            ),
-            "5. DATUM A IS THE PLATEN-MATING FACE (BLIND-HOLE ENTRY FACE).",
-            "6. DATUM A FACE: FLATNESS 0.10; SURFACE FINISH Ra 3.2 OR BETTER.",
-            "7. OPPOSITE FACE: PARALLELISM 0.10 TO DATUM A.",
-            "8. APPLY BLACK OXIDE AFTER MACHINING.",
-        )
-    )
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -105,8 +84,15 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
         ),
-        required=("Number", "Material Specification", "Finish", "Quantity"),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+        ),
     )
     drawing_model, sheet = new_project_drawing(adapter, property_view=PART_STEM)
     stamp_drawing_summary(
@@ -168,8 +154,75 @@ async def build(adapter: Any) -> dict[str, str]:
         label="platen-guide",
     )
 
-    add_note(adapter, _manufacturing_notes(), 0.014, 0.075)
-    add_note(adapter, "PLATEN-MATING FACE — DATUM A", 0.144, 0.145)
+    # Native datum reference frame and feature controls replace former notes 5-7.
+    # Right view shows the 10 mm depth: left edge is the blind-hole entry face A.
+    datum_a_edge = (0.365, 0.110)
+    datum_b_edge = (0.190, FRONT_BOTTOM_Y_M)
+    datum_c_edge = (FRONT_LEFT_X_M, FRONT_HOLE_Y_M)
+    add_datum_feature(
+        adapter,
+        right,
+        edge_xy=datum_a_edge,
+        symbol_xy=(0.350, 0.132),
+        datum="A",
+        label="platen-mating face",
+    )
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=datum_b_edge,
+        symbol_xy=(0.190, 0.098),
+        datum="B",
+        label="guide bottom edge",
+    )
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=datum_c_edge,
+        symbol_xy=(0.028, FRONT_HOLE_Y_M),
+        datum="C",
+        label="guide end edge",
+    )
+    add_feature_control_frame(
+        adapter,
+        right,
+        edge_xy=datum_a_edge,
+        frame_xy=(0.325, 0.145),
+        characteristic="flatness",
+        tolerance="0.10",
+        label="platen-mating face flatness",
+    )
+    add_feature_control_frame(
+        adapter,
+        right,
+        edge_xy=(0.375, 0.110),
+        frame_xy=(0.382, 0.145),
+        characteristic="parallelism",
+        tolerance="0.10",
+        datums=("A",),
+        label="guide opposite-face parallelism",
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=(FRONT_LEFT_X_M + BLIND_X[0] / 1000.0, FRONT_HOLE_Y_M),
+        frame_xy=(0.105, 0.155),
+        characteristic="position",
+        tolerance="0.20",
+        datums=("A", "B", "C"),
+        diameter=True,
+        label="guide hole-pattern position",
+    )
+    add_surface_finish(
+        adapter,
+        right,
+        edge_xy=datum_a_edge,
+        symbol_xy=(0.335, 0.170),
+        roughness_ra="3.2",
+        label="platen-mating face finish",
+    )
+
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.075)
 
     return await finalize_drawing(
         adapter, OUTPUTS, pdf_title="Platen Guide Manufacturing Drawing"
