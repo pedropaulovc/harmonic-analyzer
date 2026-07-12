@@ -74,6 +74,12 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="fulcrum-shaft",
         script_name="draw_fulcrum_shaft.py",
     ),
+    DrawingSpec(
+        name="top_crossbar",
+        part="top_crossbar",
+        artifact_stem="top-crossbar",
+        script_name="draw_top_crossbar.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}
