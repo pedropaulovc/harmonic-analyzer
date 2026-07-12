@@ -215,6 +215,7 @@ class MockModel:
             if stems:
                 self._comps[j]._name = f"{stems[(j - 1) % len(stems)]}-{j + 1}"
         self.InterferenceDetectionManager = MockIDM()
+        self.Extension = types.SimpleNamespace(NeedsRebuild2=0)
         # Whether this model is in its freed-DOF pose (non-fixed components read
         # under-constrained). Set by open_model for the free drive-train.
         self._free_pose = False
