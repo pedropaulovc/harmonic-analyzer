@@ -2,7 +2,7 @@ top-crossbar:
   number: MHA-076
   material: Gray Cast Iron
   material_specification: ASTM A48 Class 30 gray cast iron
-  finish: machine green enamel; bore and seats masked
+  finish: green enamel; bore + seats masked
   quantity: 1
   tolerance_class: machined_block
   process: "cast + machined"

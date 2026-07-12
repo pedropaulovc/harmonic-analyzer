@@ -22,19 +22,21 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     marked = set().union(*top_crossbar_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.TOP_KEEP) | set(drawing.FRONT_KEEP)
     assert kept == marked
-    assert (drawing.BAR_WIDTH, drawing.BAR_HEIGHT, drawing.BAR_LENGTH) == (
+    assert (drawing.BAR_WIDTH, drawing.BAR_HEIGHT) == (
         top_crossbar_spec.BAR_WIDTH,
         top_crossbar_spec.BAR_HEIGHT,
-        top_crossbar_spec.BAR_LENGTH,
     )
 
 
 def test_notes_define_a_buildable_cast_crossbar() -> None:
     notes = drawing._manufacturing_notes()
     assert "GRAY-IRON CASTING" in notes
-    assert "5/16 IN CLOSE-FIT" in notes
-    assert "O8.331" in notes
-    assert "AXIS CENTRED" in notes
+    assert "FOR 5/16 STUD" in notes
+    assert "CLOSE FIT" in notes
+    assert "21/64 DRILL THRU" in notes
+    assert "Ø8.33 NOMINAL" in notes
+    assert "ACTUAL SIDE FACES" in notes
+    assert drawing.HOLE_CALLOUT == "Ø8.33 (21/64) THRU - NOTE 4"
     assert "END FACES PARALLEL 0.10" in notes
     assert "GREEN ENAMEL" in notes
     assert "NO DRAFT MODELLED" in notes
@@ -44,8 +46,9 @@ def test_notes_define_a_buildable_cast_crossbar() -> None:
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("scale=(1, 1)") == 2
-    assert "scale=(1, 2)" in source
+    assert source.count("scale=(1, 1)") == 1
+    assert source.count("scale=(1, 2)") == 2
+    assert "TOP VIEW SCALE 1:2" in source
     assert "ISOMETRIC VIEW SCALE 1:2" in source
 
 
