@@ -8,6 +8,7 @@ import hashlib
 import json
 import re
 from collections.abc import Iterable
+from enum import StrEnum
 from typing import Any
 
 import _telemetry
@@ -1056,6 +1057,241 @@ async def place_component(
         assert_component_placed(adapter, name, position, rows)
         _ledger_record(name, position, rows)
         return name
+
+
+_LOCAL_LINEAR_PATTERN = 108  # swFeatureNameID_e.swFmLocalLPattern
+_LOCAL_CIRCULAR_PATTERN = 109  # swFeatureNameID_e.swFmLocalCirPattern
+_GLOBAL_PATTERN_AXIS_PLANES = {
+    "x": ("Top Plane", "Front Plane"),
+    "y": ("Front Plane", "Right Plane"),
+    "z": ("Top Plane", "Right Plane"),
+}
+
+
+class PatternDirection(StrEnum):
+    FORWARD = "forward"
+    REVERSE = "reverse"
+
+
+def _top_features(model: Any) -> list[Any]:
+    features = []
+    feature = _read_member(model, "FirstFeature")
+    while feature is not None:
+        _flag(feature, "IFeature")
+        features.append(feature)
+        feature = feature.GetNextFeature()
+    return features
+
+
+@_telemetry.traced("assembly.pattern_axis", label_param="axis")
+def ensure_global_pattern_axis(adapter: Any, axis: str) -> str:
+    """Create/reuse an assembly reference axis aligned to global X, Y, or Z."""
+    from solidworks_mcp.adapters.com_variant import null_callout
+
+    key = axis.lower()
+    try:
+        planes = _GLOBAL_PATTERN_AXIS_PLANES[key]
+    except KeyError as exc:
+        raise ValueError(f"pattern axis must be x, y, or z; got {axis!r}") from exc
+
+    model = adapter.currentModel
+    name = f"PatternAxis{key.upper()}"
+    existing = adapter._attempt(lambda: model.FeatureByName(name), default=None)
+    if existing is not None:
+        return name
+
+    before = {str(_read_member(feature, "Name")) for feature in _top_features(model)}
+    model.ClearSelection2(True)
+    for index, plane in enumerate(planes):
+        selected = model.Extension.SelectByID2(
+            plane,
+            "PLANE",
+            0.0,
+            0.0,
+            0.0,
+            index > 0,
+            0,
+            null_callout(),
+            0,
+        )
+        if not selected:
+            raise RuntimeError(f"cannot select {plane} for global {key}-axis")
+    if not model.InsertAxis2(True):
+        raise RuntimeError(f"SOLIDWORKS rejected global {key}-axis creation")
+
+    created = [
+        feature for feature in _top_features(model)
+        if str(_read_member(feature, "Name")) not in before
+        and str(feature.GetTypeName2()) == "RefAxis"
+    ]
+    if len(created) != 1:
+        raise RuntimeError(
+            f"global {key}-axis created {len(created)} reference-axis features"
+        )
+    created[0].Name = name
+    model.ClearSelection2(True)
+    _telemetry.success(f"created assembly pattern axis {name}")
+    return name
+
+
+def _select_pattern_inputs(
+    adapter: Any,
+    seed_component: str,
+    direction_name: str,
+    direction_type: str,
+) -> None:
+    from solidworks_mcp.adapters.com_variant import null_callout
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    selected = model.Extension.SelectByID2(
+        direction_name,
+        direction_type,
+        0.0,
+        0.0,
+        0.0,
+        False,
+        2,
+        null_callout(),
+        0,
+    )
+    if not selected:
+        raise RuntimeError(
+            f"cannot select pattern direction {direction_type} {direction_name!r}"
+        )
+    component = adapter._attempt(
+        lambda: model.GetComponentByName(seed_component), default=None
+    )
+    if component is None or not component.Select2(True, 1):
+        raise RuntimeError(f"cannot select pattern seed component {seed_component!r}")
+
+
+def _new_pattern_components(model: Any, before: set[str]) -> list[Any]:
+    components = model.GetComponents(False) or []
+    return [
+        component for component in components
+        if str(_read_member(component, "Name2")) not in before
+    ]
+
+
+async def linear_component_pattern(
+    adapter: Any,
+    seed_component: str,
+    *,
+    axis: str,
+    spacing_mm: float,
+    instances: int,
+    direction: PatternDirection = PatternDirection.FORWARD,
+    label: str = "linear fastener pattern",
+) -> list[str]:
+    """Pattern one component along a global assembly axis using a native feature."""
+    if instances < 2:
+        raise ValueError("linear component pattern requires at least two instances")
+    if spacing_mm <= 0.0:
+        raise ValueError("linear component pattern spacing must be positive")
+
+    model = adapter.currentModel
+    direction = ensure_global_pattern_axis(adapter, axis)
+    before = {
+        str(_read_member(component, "Name2"))
+        for component in (model.GetComponents(False) or [])
+    }
+    async with _telemetry.aspan(
+        f"pattern {label}", kind="linear", seed=seed_component,
+        axis=axis.lower(), instances=instances, spacing_mm=spacing_mm,
+    ):
+        _select_pattern_inputs(adapter, seed_component, direction, "AXIS")
+        manager = model.FeatureManager
+        _flag(manager, "IFeatureManager")
+        definition = manager.CreateDefinition(_LOCAL_LINEAR_PATTERN)
+        if definition is None:
+            raise RuntimeError("cannot create local linear pattern definition")
+        _flag(definition, "ILocalLinearPatternFeatureData")
+        definition.D1ReverseDirection = direction is PatternDirection.REVERSE
+        definition.D1Spacing = spacing_mm / 1000.0
+        definition.D1TotalInstances = instances
+        definition.D2PatternSeedOnly = False
+        definition.D2ReverseDirection = False
+        definition.D2Spacing = 0.001
+        definition.D2TotalInstances = 1
+        definition.SynchronizeFlexibleComponents = False
+        feature = manager.CreateFeature(definition)
+        model.ClearSelection2(True)
+        if feature is None:
+            raise RuntimeError(f"SOLIDWORKS rejected {label}")
+        _flag(feature, "IFeature")
+        feature.Name = label
+
+        created = _new_pattern_components(model, before)
+        if len(created) != instances - 1:
+            raise RuntimeError(
+                f"{label} created {len(created)} components, expected {instances - 1}"
+            )
+        names = []
+        for component in created:
+            _flag_only(component, "IsPatternInstance")
+            name = str(_read_member(component, "Name2"))
+            if not component.IsPatternInstance():
+                raise RuntimeError(f"{name} is not owned by the component pattern")
+            names.append(name)
+        _telemetry.success(f"{label}: created {len(names)} pattern instances")
+        return names
+
+
+async def circular_component_pattern(
+    adapter: Any,
+    seed_component: str,
+    *,
+    axis_name: str,
+    instances: int,
+    direction: PatternDirection = PatternDirection.FORWARD,
+    label: str = "circular fastener pattern",
+) -> list[str]:
+    """Pattern one component equally through 360 degrees around a named axis."""
+    if instances < 2:
+        raise ValueError("circular component pattern requires at least two instances")
+
+    model = adapter.currentModel
+    before = {
+        str(_read_member(component, "Name2"))
+        for component in (model.GetComponents(False) or [])
+    }
+    async with _telemetry.aspan(
+        f"pattern {label}", kind="circular", seed=seed_component,
+        axis=axis_name, instances=instances,
+    ):
+        _select_pattern_inputs(adapter, seed_component, axis_name, "AXIS")
+        manager = model.FeatureManager
+        _flag(manager, "IFeatureManager")
+        definition = manager.CreateDefinition(_LOCAL_CIRCULAR_PATTERN)
+        if definition is None:
+            raise RuntimeError("cannot create local circular pattern definition")
+        _flag(definition, "ILocalCircularPatternFeatureData")
+        definition.TotalInstances = instances
+        definition.EqualSpacing = True
+        definition.ReverseDirection = direction is PatternDirection.REVERSE
+        definition.SynchronizeFlexibleComponents = False
+        feature = manager.CreateFeature(definition)
+        model.ClearSelection2(True)
+        if feature is None:
+            raise RuntimeError(f"SOLIDWORKS rejected {label}")
+        _flag(feature, "IFeature")
+        feature.Name = label
+
+        created = _new_pattern_components(model, before)
+        if len(created) != instances - 1:
+            raise RuntimeError(
+                f"{label} created {len(created)} components, expected {instances - 1}"
+            )
+        names = []
+        for component in created:
+            _flag_only(component, "IsPatternInstance")
+            name = str(_read_member(component, "Name2"))
+            if not component.IsPatternInstance():
+                raise RuntimeError(f"{name} is not owned by the component pattern")
+            names.append(name)
+        _telemetry.success(f"{label}: created {len(names)} pattern instances")
+        return names
 
 def _placement_transform(rows: list[list[float]], position_mm: list[float]) -> list[float]:
     """The 16-double ``IMathTransform`` for a component at ``rows``/``position_mm``.
