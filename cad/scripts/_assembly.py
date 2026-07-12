@@ -455,6 +455,7 @@ _FLIP_INVERT: frozenset[str] = frozenset({
     "foot screw datum Z",
     "fulcrum shaft datum x",
     "fulcrum shaft datum y",
+    "hanger screw head plane",
     "knob wheel axial",
     "lever axial seat",
     "lever bushing axial z",
