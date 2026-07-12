@@ -2400,14 +2400,15 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
     return hashlib.sha256(repr(rows).encode("utf-8")).hexdigest()
 
 
-def select_mates_folder(adapter: Any) -> bool:
+def select_mates_folder(adapter: Any, model: Any = None) -> bool:
     """Select the active assembly's Mates folder -- the precondition for
     ``IAssemblyDoc.AutoMateRepair``. The folder is a ``MateGroup`` feature that sits
     at/near the END of the top-level tree, so scan from the back (a couple of COM
     round-trips) instead of walking all ~150 component features forward (~50 s).
     Falls back to a full forward walk if an in-context feature pushed it off the
     tail."""
-    model = adapter.currentModel
+    if model is None:
+        model = adapter.currentModel
     count = int(adapter._attempt(lambda: model.GetFeatureCount(), default=0) or 0)
     for i in range(min(count, 8)):  # MateGroup is the last top-level feature (i=0)
         feat = adapter._attempt(lambda i=i: model.FeatureByPositionReverse(i), default=None)
@@ -2430,7 +2431,7 @@ def _rebuild_faults(adapter: Any) -> list[str]:
         for name, code, warn in whats_wrong(adapter, adapter.currentModel)
         if not warn
     ]
-def repair_dangling_mates(adapter: Any) -> int:
+def repair_dangling_mates(adapter: Any, model: Any = None) -> int:
     """Auto-heal mates whose referenced topology was re-IDed by a from-scratch part
     rebuild (the "sharp edge"): ``IAssemblyDoc.AutoMateRepair`` re-binds the broken
     mates in place (~5 s) instead of a ~500 s full re-insert/re-mate.
@@ -2441,9 +2442,9 @@ def repair_dangling_mates(adapter: Any) -> int:
     successful heal -- so the CALLER must judge success from a fresh ``whats_wrong``
     + the standard DOF/interference/health gates, never from this code.
     """
-    asm = adapter.currentModel
+    asm = adapter.currentModel if model is None else model
     _flag(asm, "IAssemblyDoc")
-    if not select_mates_folder(adapter):
+    if not select_mates_folder(adapter, asm):
         log("AutoMateRepair: could not select the Mates folder -- skipping repair")
         return 0
     processed, failed = _byref_variant(), _byref_variant()
@@ -2453,7 +2454,13 @@ def repair_dangling_mates(adapter: Any) -> int:
     log(f"AutoMateRepair: ret={ret} (1=PartialSuccess is normal) "
         f"re-bound {n_proc} mate(s), {n_fail} already-valid skipped")
     return n_proc
-def save_assembly_in_place(adapter: Any, asm_name: str, geometry_changed: bool) -> None:
+def save_assembly_in_place(
+    adapter: Any,
+    asm_name: str,
+    geometry_changed: bool,
+    *,
+    model: Any = None,
+) -> None:
     """Save ``<asm_name>.SLDASM`` in place with a silent ``ModelDoc2.Save3``.
 
     For an assembly OPENED from its own path (a refresh or a config-hook reopen)
@@ -2503,7 +2510,7 @@ def save_assembly_in_place(adapter: Any, asm_name: str, geometry_changed: bool) 
     import pythoncom
     from win32com.client import VARIANT
 
-    asm = adapter.currentModel
+    asm = adapter.currentModel if model is None else model
     sldasm = OUT_SLDASM / f"{asm_name}.SLDASM"
     if not geometry_changed:
         # No-op refresh: resolved geometry identical to the last save. Do NOT

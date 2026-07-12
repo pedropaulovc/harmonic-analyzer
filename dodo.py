@@ -1527,6 +1527,7 @@ def task_check():
     pytest_cmd = [sys.executable, "-m", "pytest", "-q"]
     recipe_tests = [
         SCRIPTS_DIR / "test_dodo_recipe.py",
+        SCRIPTS_DIR / "test_verify_auto_repair.py",
         # One offline contract file per manufacturing drawing (test_*_drawing.py),
         # so registering a drawing auto-enrolls its contracts here.
         *sorted(SCRIPTS_DIR.glob("test_*_drawing.py")),

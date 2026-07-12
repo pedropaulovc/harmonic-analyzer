@@ -14,13 +14,18 @@ called only from `refresh_assembly` @ 2261) but never fires on a cache HIT
 (never marked stale — the `dodo.py:940-959` KNOWN LIMITATION).
 
 **Decision (Pedro, 2026-07-08, cutting v0.17.0):** do NOT wire a silent
-auto-heal. Keep the loud failure as default; add an **opt-in `--auto-repair`**
-flag the operator passes on retry, so they consciously weigh AutoMateRepair's
-risk (it can re-bind a mate to the WRONG topology → subtly-wrong shipped
-geometry) against the ~500 s→~5 s perf gain, case by case. **Not implemented yet**
-— tracked in **issue #204** (flag placement, whether a heal re-publishes to
-cache, and how it composes with the `dodo.py:955` orchestration-signal "proper
-fix" are open there).
+auto-heal. Keep the loud failure as default; expose an **opt-in `--auto-repair`**
+flag on `verify.py --suite soundness`, so the operator consciously weighs
+AutoMateRepair's risk (it can re-bind a mate to the WRONG topology →
+subtly-wrong shipped geometry) against the ~500 s→~5 s gain, case by case.
 
-**How to apply:** if asked to make cache dangles heal faster, implement #204's
-opt-in flag — don't add an unconditional heal to verify or the refresh path.
+**Implemented for issue #204:** only non-warning
+What's Wrong code 48 is eligible. The repair is rebuilt and re-read, then the
+normal DOF / over-constraint / deep-health / interference / channel-independence
+battery runs. The `.SLDASM` is saved locally only if every gate passes; it is not
+republished under the foreign remote-cache key. Default soundness still fails
+loud and includes the exact opt-in retry command.
+
+**How to apply:** retry one affected assembly with, for example,
+`uv run python cad/scripts/verify.py channel --suite soundness --auto-repair`.
+Never turn this into an unconditional verify/cache heal.
