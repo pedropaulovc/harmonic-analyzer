@@ -55,7 +55,7 @@ left "deferred":
 - **2D shop drawings — IN SCOPE (planned).** A hobby machinist builds from a dimensioned, toleranced
   print, so generated PDF drawings (Tier-1 precision-critical parts first) are the vehicle that
   carries the tolerances to the bench. Same `SaveAs3` path the STEP/STL export already uses; a new
-  `drawing:<stem>` doit task on the COM spine.
+  `drawing:<stem>` doit task that takes the COM seat lock.
 - **CAM (STEP→CAM→G-code) — IN SCOPE, deferred until the nominal model is frozen and validated.**
   The build is manual-primary for fidelity, with the PM-30MV **CNC** cutting the repetitive high-count
   parts (20 cams, 19+19 spacer bushings, cone/cylinder gear train). The primary feed is the **3D solid
