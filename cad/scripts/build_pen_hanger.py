@@ -116,8 +116,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, BLOCK_HALF, BLOCK_HALF, "block", dims=block,
         name_width="BlockWidth", drive_width='2 * "BlockHalf"',
         name_depth="BlockDepth", drive_depth='2 * "BlockHalf"',
-        name_corner=("BlockCornerX", "BlockCornerZ"),
-        drive_corner=('"BlockHalf"', '"BlockHalf"'),
     )
     await ensure_fully_defined(adapter, "block sketch")
     check("exit_sketch block", await adapter.exit_sketch())
@@ -140,8 +138,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, GUIDE_HOLE_HALF, GUIDE_HOLE_HALF, "channel", dims=channel,
         name_width="ChannelWidth", drive_width='2 * "GuideHoleHalf"',
         name_depth="ChannelDepth", drive_depth='2 * "GuideHoleHalf"',
-        name_corner=("ChannelCornerX", "ChannelCornerZ"),
-        drive_corner=('"GuideHoleHalf"', '"GuideHoleHalf"'),
     )
     await ensure_fully_defined(adapter, "channel sketch")
     check("exit_sketch channel", await adapter.exit_sketch())
