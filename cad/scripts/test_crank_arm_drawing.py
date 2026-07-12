@@ -49,7 +49,7 @@ def test_linked_notes_use_us_customary_fasteners_and_functional_tolerances() -> 
     notes = crank_arm_spec.DRAWING_NOTES
     assert "TAPER PIN" in notes
     assert "1:48" in notes
-    assert "3/8 IN" in notes
+    assert "3/8 IN" in drawing.DIMENSION_CALLOUTS["ShaftBoreDia"]
     assert "15/64 DRILL THRU" in notes
     assert "#9 DRILL" in notes
     assert "LINEAR +/-0.25" in notes

@@ -10,6 +10,10 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_datum_feature,
+    add_feature_control_frame,
+    add_property_linked_note,
+    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -22,7 +26,6 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from lever_bushing_spec import BORE_DIA, LENGTH, OUTER_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
     auto_center_marks,
     place_view,
 )
@@ -62,40 +65,9 @@ RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.040),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDia": "THRU (NOTE 5)",
+    "BoreDia": "THRU - REAM\n+0.03/-0.00",
     "Depth": "+/-0.03",
 }
-
-_NOTES = (
-    "UNLESS OTHERWISE SPECIFIED:",
-    "1. DIMENSIONS ARE IN MILLIMETRES. INTERPRET PER ASME Y14.5.",
-    (
-        "2. TOLERANCES: DIAMETERS +/-0.05;\n"
-        f"   BORE O{BORE_DIA:.2f} +0.03/-0.00."
-    ),
-    "3. REMOVE BURRS AND BREAK SHARP EDGES 0.15 MAX.",
-    (
-        "4. TURN OD AND BOTH END FACES IN ONE SETUP WHERE PRACTICAL.\n"
-        "   END FACES PARALLEL WITHIN 0.03."
-    ),
-    (
-        f"5. DRILL UNDERSIZE AND REAM O{BORE_DIA:.2f} THRU; Ra 1.6.\n"
-        "   O6.35 MATING SHAFT: 0.15-0.20 DIAMETRAL CLEARANCE."
-    ),
-    (
-        "6. CIRCULAR RUNOUT OF OD TO BORE AXIS: 0.05 TIR.\n"
-        "   OD AND END FACES Ra 3.2. ALL Ra VALUES IN MICROMETRES."
-    ),
-    (
-        "7. MAKE 19 IDENTICAL PIECES.\n"
-        "   DEBURR BORE EDGES;\n"
-        "   AVOID BELL-MOUTH."
-    ),
-)
-
-
-def _manufacturing_notes() -> str:
-    return "\n".join(_NOTES)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -112,8 +84,15 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
         ),
-        required=("Number", "Material Specification", "Finish", "Quantity"),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+        ),
     )
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
@@ -148,8 +127,79 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
 
-    add_note(adapter, "\n".join(_NOTES[:4]), 0.014, 0.112)
-    add_note(adapter, "\n".join(_NOTES[4:]), 0.170, 0.105)
+    outer_edge = (
+        FRONT_CENTER[0] + OUTER_DIA * SHEET_SCALE[0] / 2000.0,
+        FRONT_CENTER[1],
+    )
+    bore_edge = (
+        FRONT_CENTER[0] + BORE_DIA * SHEET_SCALE[0] / 2000.0,
+        FRONT_CENTER[1],
+    )
+    half_depth = LENGTH * SHEET_SCALE[0] / 2000.0
+    left_end = (RIGHT_CENTER[0] - half_depth, RIGHT_CENTER[1])
+    right_end = (RIGHT_CENTER[0] + half_depth, RIGHT_CENTER[1])
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=bore_edge,
+        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.037),
+        datum="A",
+        label="bushing bore axis",
+    )
+    add_datum_feature(
+        adapter,
+        right,
+        edge_xy=left_end,
+        symbol_xy=(left_end[0] - 0.018, RIGHT_CENTER[1]),
+        datum="B",
+        label="bushing reference end",
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=outer_edge,
+        frame_xy=(0.115, 0.255),
+        characteristic="circular_runout",
+        tolerance="0.05",
+        datums=("A",),
+        label="bushing OD runout",
+    )
+    add_feature_control_frame(
+        adapter,
+        right,
+        edge_xy=right_end,
+        frame_xy=(right_end[0] + 0.014, 0.180),
+        characteristic="parallelism",
+        tolerance="0.03",
+        datums=("B",),
+        label="bushing end-face parallelism",
+    )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=bore_edge,
+        symbol_xy=(0.160, 0.225),
+        roughness_ra="1.6",
+        label="bushing bore finish",
+    )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=outer_edge,
+        symbol_xy=(0.140, 0.165),
+        roughness_ra="3.2",
+        label="bushing OD finish",
+    )
+    add_surface_finish(
+        adapter,
+        right,
+        edge_xy=left_end,
+        symbol_xy=(right_end[0] + 0.025, 0.245),
+        roughness_ra="3.2",
+        label="bushing end-face finish",
+    )
+
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.095)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
