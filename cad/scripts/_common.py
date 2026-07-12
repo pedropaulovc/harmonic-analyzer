@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import os
 import sys
 import time
 from collections.abc import Awaitable, Callable, Iterable
@@ -1658,6 +1659,18 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
         _telemetry.set_service(f"{kind}-build")
 
     async def _run() -> dict[str, str]:
+        # Runtime successor to dodo's removed ``_assert_spine_complete`` tripwire:
+        # a COM build launched BY doit (which injects TRACEPARENT into every child)
+        # must hold the single SolidWorks seat lock -- dodo's ``_com_seat`` sets
+        # HARMONIC_COM_SEAT while held. If a doit-launched COM process reaches connect
+        # WITHOUT it, some COM task is missing its ``_com_seat`` wrapper and would race
+        # the STA seat -- fail loud rather than corrupt it. A standalone run (no
+        # TRACEPARENT) is exempt, so hand-run build/diagnostic scripts still work.
+        if os.environ.get("TRACEPARENT") and not os.environ.get("HARMONIC_COM_SEAT"):
+            raise RuntimeError(
+                "COM build launched under doit without holding the SolidWorks seat "
+                "(HARMONIC_COM_SEAT unset) -- a COM task is missing _com_seat(); "
+                "see dodo.py._com_seat")
         adapter = PyWin32Adapter({})
         async with _telemetry.aspan("sw.connect"):
             _telemetry.info("connecting to SolidWorks")

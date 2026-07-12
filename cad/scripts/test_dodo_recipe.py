@@ -231,9 +231,10 @@ def test_seat_part_order_is_a_permutation(monkeypatch):
 
 
 def test_seat_part_order_deterministic_per_seed(monkeypatch):
-    """Same seed -> identical order on every call. This is the LOAD-BEARING property:
-    every process of one ``doit -n`` invocation (parent + workers) must compute the
-    SAME spine, or two COM tasks go ready at once and deadlock the single STA seat."""
+    """Same seed -> identical order on every call. The COM seat lock (not the order)
+    now guarantees correctness, so a diverging order can no longer deadlock; but a
+    stable per-seat order keeps the fleet cache-split hint coherent across a seat's
+    parent + ``-n`` worker processes."""
     dodo = _load_dodo()
     monkeypatch.setenv("HARMONIC_BUILD_ORDER_SEED", "seat-A")
     first = dodo._seat_part_order()
@@ -253,17 +254,83 @@ def test_seat_part_order_diverges_across_seats(monkeypatch):
     assert a != b, "distinct seats must not build parts in the same order"
 
 
-def test_spine_parts_precede_all_assemblies(monkeypatch):
-    """Whatever the per-seat part order, EVERY part must still come before EVERY
-    assembly on the spine (parts are the assemblies' file_dep prerequisites), and the
-    spine stays duplicate-free (the _assert_spine_complete invariant)."""
+# --- COM seat lock (replaced the spine): serialize the single SW seat at runtime.
+
+def test_com_seat_acquires_sets_env_and_releases(tmp_path, monkeypatch):
+    """``_com_seat`` acquires the machine-global file lock, marks the seat held via
+    HARMONIC_COM_SEAT (inherited by the COM subprocess -> _common's tripwire), and
+    releases both on exit. Lock path is overridable so the test never touches the
+    real %PROGRAMDATA% lock."""
+    monkeypatch.setenv("HARMONIC_COM_LOCK", str(tmp_path / "seat.lock"))
+    monkeypatch.delenv("HARMONIC_COM_SEAT", raising=False)
     dodo = _load_dodo()
+    assert dodo._COM_LOCK_PATH == tmp_path / "seat.lock"
+    assert not dodo._COM_LOCK.is_locked
+    with dodo._com_seat("part:x"):
+        assert dodo._COM_LOCK.is_locked
+        assert os.environ["HARMONIC_COM_SEAT"].startswith("part:x")
+        assert dodo._read_seat_holder().startswith("part:x")
+    assert not dodo._COM_LOCK.is_locked
+    assert "HARMONIC_COM_SEAT" not in os.environ
+
+
+def test_com_seat_is_reentrant_within_a_process(tmp_path, monkeypatch):
+    """filelock counts same-process acquisitions, so a nested ``_com_seat`` (defensive
+    -- no COM action nests today) neither deadlocks nor releases the seat early: the
+    lock stays held until the OUTERMOST exit."""
+    monkeypatch.setenv("HARMONIC_COM_LOCK", str(tmp_path / "seat.lock"))
+    dodo = _load_dodo()
+    with dodo._com_seat("a"):
+        with dodo._com_seat("b"):
+            assert dodo._COM_LOCK.is_locked
+        assert dodo._COM_LOCK.is_locked, "inner exit must not free the seat"
+    assert not dodo._COM_LOCK.is_locked
+
+
+def test_com_tasks_carry_no_inter_com_task_dep():
+    """DAG accuracy: with the spine gone, part/assembly/verify/preflight tasks must
+    carry NO ``task_dep`` on another COM task -- ordering comes from their real
+    file_dep on built artefacts, serialization from the seat lock. (export/release
+    DO carry real gate edges -- asserted separately below.)"""
+    dodo = _load_dodo()
+    for t in dodo.task_part():
+        assert not t.get("task_dep"), f"part:{t['name']} has a stray task_dep"
+    for t in dodo.task_assembly():
+        assert not t.get("task_dep"), f"assembly:{t['name']} has a stray task_dep"
+    for t in dodo.task_verify():
+        assert not t.get("task_dep"), f"verify:{t['name']} has a stray task_dep"
+    assert not dodo.task_preflight().get("task_dep"), "preflight has a stray task_dep"
+
+
+def test_export_is_gated_on_the_sw_verify_suites():
+    """export writes neutral formats + refreshes the comparison gallery into cad/out,
+    so it must run only AFTER the SW verify gates pass -- a real edge that used to be
+    implicit in the spine (fable review)."""
+    dodo = _load_dodo()
+    deps = set(dodo.task_export()["task_dep"])
+    assert {"verify:soundness", "verify:kinematics"} <= deps, deps
+
+
+def test_release_is_gated_on_every_gate():
+    """release must depend on export + preflight + BOTH verify suites + EVERY offline
+    check -- explicit real edges now the spine no longer pulls them transitively, so a
+    release can't publish past a stale/failing gate."""
+    dodo = _load_dodo()
+    deps = set(dodo.task_release()["task_dep"])
+    expected = {"export", "preflight", "verify:soundness", "verify:kinematics",
+                *(f"check:{c}" for c in dodo._CHECK_NAMES)}
+    assert expected <= deps, expected - deps
+
+
+def test_part_tasks_cover_every_stem_once(monkeypatch):
+    """The per-seat yield order must still emit EXACTLY every part stem once -- a
+    dropped/duplicated stem would silently never build (the old
+    _assert_spine_complete coverage check, reframed for the yield order)."""
     monkeypatch.setenv("HARMONIC_BUILD_ORDER_SEED", "seat-A")
-    spine = dodo._com_spine_order()
-    assert len(spine) == len(set(spine))
-    last_part = max(i for i, n in enumerate(spine) if n.startswith("part:"))
-    first_asm = min(i for i, n in enumerate(spine) if n.startswith("assembly:"))
-    assert last_part < first_asm
+    dodo = _load_dodo()
+    names = [t["name"] for t in dodo.task_part()]
+    assert sorted(names) == sorted(dodo.part_stems())
+    assert len(names) == len(set(names))
 
 
 def test_assembly_artefact_digest_folds_in_refs():
