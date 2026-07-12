@@ -344,6 +344,8 @@ cad/**/thumbnail.png
 # `doit` (dodo.py); snapshot binaries only at tagged releases (see README).
 cad/out/sldprt/
 cad/out/sldasm/
+cad/out/slddrw/
+cad/out/pdf/
 cad/out/png/
 cad/out/demo/
 cad/out/*.mp4

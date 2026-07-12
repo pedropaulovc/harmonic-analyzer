@@ -49,6 +49,8 @@ dependencies = [
     # all `from solidworks_mcp...`) lives in the sibling repo. Pulled in editable so
     # the whole pipeline runs from this one uv venv.
     "solidworks-mcp-python",
+    "pypdfium2>=5.11.0",
+    "pypdf>=6.14.2",
 ]
 
 [dependency-groups]

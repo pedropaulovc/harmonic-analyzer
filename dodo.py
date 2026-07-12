@@ -16,6 +16,7 @@ Task groups (the prefix says whether SolidWorks is required):
 
   part:<stem>        build one part            (COM -- needs SolidWorks)
   assembly:<stem>    build/refresh one assembly (COM)
+  drawing:<stem>     build one manufacturing drawing (COM)
   verify:<suite>     soundness/subsystems/kinematics gates (COM)
   check:<name>       math/config/graph/nameplate/recipe gates (NO SolidWorks)
   export             neutral STEP/STL/scene export (COM)
@@ -112,6 +113,11 @@ from _buildgraph import (  # noqa: E402
 
 import _artifact_cache as _cache  # noqa: E402  (remote build-artefact cache)
 import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
+from _drawing_registry import (  # noqa: E402
+    ASME_B_DRWDOT,
+    ASME_B_SLDDRT,
+    DRAWINGS_BY_NAME,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent
 CONFIG_DIR = REPO_ROOT / "cad" / "config"
@@ -226,6 +232,18 @@ def _com_seat(label: str):
             os.environ[_COM_SEAT_HELD_ENV] = prev
         _clear_seat_holder(holder)
         _COM_LOCK.release()
+
+# Drawing tasks declare only their source model as CAD input, while their code
+# recipe follows the exporter's complete repo-local import closure and the full
+# SolidWorks adapter submodule digest.
+# Their order is derived from the source part producer for stable scheduling;
+# the runtime COM-seat lock provides serialization without adding false DAG edges.
+def _drawing_order() -> list[str]:
+    producer_order = {stem: i for i, stem in enumerate(_seat_part_order())}
+    return sorted(
+        DRAWINGS_BY_NAME,
+        key=lambda name: (producer_order[DRAWINGS_BY_NAME[name].part], name),
+    )
 
 
 # --- Per-seat part order: diverge two cold builders so they SPLIT the work.
@@ -383,6 +401,24 @@ def _sldasm(stem: str) -> str:
     return str(artefact_for(SCRIPTS_DIR / f"build_{stem}_assembly.py").resolve())
 
 
+def _part_execution_token(stem: str) -> str:
+    """Local signal changed whenever a part artefact is rebuilt or restored.
+
+    Recipe digests intentionally ignore SolidWorks persistent-reference IDs for
+    cross-seat cache stability.  Drawings need the orthogonal execution signal:
+    a same-recipe rebuild/cache restore may replace the model identity even when
+    the recipe digest is unchanged.
+    """
+    name = stem.replace("_", "-")
+    return str((CAD_OUT / "sldprt" / f".{name}.execution").resolve())
+
+
+def _stamp_part_execution(stem: str) -> None:
+    token = Path(_part_execution_token(stem))
+    token.parent.mkdir(parents=True, exist_ok=True)
+    token.write_text(f"{time.time_ns()}\n", encoding="utf-8")
+
+
 def _stage_name(label: str) -> str:
     """The telemetry ``service.name`` (Aspire "resource" column) a subprocess with
     this doit task ``label`` should advertise, so a trace groups by PIPELINE STAGE
@@ -394,6 +430,8 @@ def _stage_name(label: str) -> str:
         return "part-build"
     if label.startswith(("assembly:", "FULL build", "REFRESH", "hook ")):
         return "assembly-build"
+    if label.startswith(("drawing:", "drawing ")):
+        return "drawing-export"
     if label.startswith("verify "):
         return "verify-" + label.split(None, 2)[1]
     if label.startswith("check "):
@@ -881,6 +919,7 @@ def _cached_part_action(stem: str, script: Path) -> None:
         outputs = _part_cache_outputs(stem)
         if _cache.restore(key, outputs, label):
             sp.set_attribute("cache", "hit")
+            _stamp_part_execution(stem)
             return
         with _com_seat(label):
             # Re-probe under the seat: we may have blocked for the seat for minutes
@@ -888,9 +927,11 @@ def _cached_part_action(stem: str, script: Path) -> None:
             # rebuild (the fleet cache-split win; fable/codex review).
             if _cache.restore(key, outputs, label):
                 sp.set_attribute("cache", "hit-after-wait")
+                _stamp_part_execution(stem)
                 return
             sp.set_attribute("cache", "miss")
             _exec([sys.executable, str(script)], label, log_stem=f"part-{stem}")
+            _stamp_part_execution(stem)
         # Publish OUTSIDE the seat -- an Azure upload is network, not COM, so it must
         # not hold the seat the next task is waiting for.
         _cache.store(key, outputs, label)
@@ -1026,7 +1067,7 @@ def task_part():
         yield {
             "name": stem,
             "file_dep": _part_file_deps(script, stem),
-            "targets": [_sldprt(stem)],
+            "targets": [_sldprt(stem), _part_execution_token(stem)],
             # Remote-cache shortcut + COM seat lock wrap the build (_cached_part_action).
             "actions": [(_cached_part_action, [stem, script])],
             "clean": True,
@@ -1242,6 +1283,49 @@ def task_assembly():
         }
 
 
+def _clean_drawing(stem: str) -> None:
+    for target in DRAWINGS_BY_NAME[stem].outputs.values():
+        _force_remove(Path(target))
+
+
+def task_drawing():
+    """Curated manufacturing drawings, serialized by the runtime COM-seat lock.
+
+    A drawing depends on its authoritative SLDPRT plus explicitly declared
+    drawing inputs. It is independently selectable as
+    ``drawing:<stem>`` and deliberately excluded from ``build_bare``.
+    """
+    for stem in _drawing_order():
+        spec = DRAWINGS_BY_NAME[stem]
+        script = spec.script.resolve()
+        source = _sldprt(spec.part)
+        source_execution = _part_execution_token(spec.part)
+        runtime = [*_helper_deps(script), _submodule_dep()]
+        yield {
+            "name": stem,
+            "file_dep": sorted(
+                {
+                    str(script), source, source_execution, *runtime,
+                    *(str(path.resolve()) for path in spec.assets),
+                }
+            ),
+            "targets": [str(path.resolve()) for path in spec.outputs.values()],
+            "actions": [
+                (
+                    _run,
+                    [
+                        [sys.executable, str(script), spec.artifact_stem],
+                        f"drawing {stem}",
+                        None,
+                        True,
+                    ],
+                )
+            ],
+            "clean": [(_clean_drawing, [stem])],
+            "verbosity": 2,
+        }
+
+
 def task_verify():
     """SolidWorks verification suites -- need SW open, serialized on the COM seat lock.
 
@@ -1347,6 +1431,14 @@ def task_check():
     # invalidate the stamp (codex review).
     part_script_deps = [str(p.resolve()) for p in part_scripts()]
     pytest_cmd = [sys.executable, "-m", "pytest", "-q"]
+    recipe_tests = [
+        SCRIPTS_DIR / "test_dodo_recipe.py",
+        SCRIPTS_DIR / "test_platen_guide_drawing.py",
+    ]
+    recipe_test_deps = sorted({
+        *(str(path.resolve()) for path in recipe_tests),
+        *(dep for path in recipe_tests for dep in module_deps_of(path)),
+    })
     specs = {
         "math": {
             # truth_model reads harmonics/phases/amplitudes/magnification from
@@ -1398,8 +1490,10 @@ def task_check():
         },
         "recipe": {
             "file_dep": [str((REPO_ROOT / "dodo.py").resolve()),
-                         str((SCRIPTS_DIR / "test_dodo_recipe.py").resolve())],
-            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_dodo_recipe.py")],
+                         *recipe_test_deps,
+                         str(ASME_B_DRWDOT.resolve()),
+                         str(ASME_B_SLDDRT.resolve())],
+            "cmd": [*pytest_cmd, *(str(path) for path in recipe_tests)],
         },
         "cache": {
             # The artefact-cache provenance/observability unit tests (issue #73):
@@ -1573,11 +1667,14 @@ def task_release():
     args after ``--``: ``doit release -- v0.2.0 --draft`` (default auto patch-bump).
     Gated on EVERY gate via REAL task_dep edges (the spine is gone, so these are now
     explicit): ``export`` (which itself pulls the parts/assemblies + the ``verify:*``
-    gates), ``preflight`` (gear-ratios), the ``verify:*`` suites, and every offline
-    ``check:*`` -- so a release cannot publish past a stale/failing gate.
+    gates), every registered ``drawing:*`` artifact that release stages,
+    ``preflight`` (gear-ratios), the ``verify:*`` suites, and every offline
+    ``check:*`` -- so a release cannot publish past a stale/failing gate or package
+    a missing/stale drawing.
     """
     return {
-        "task_dep": ["export", "preflight", *(f"verify:{s}" for s in _VERIFY_NAMES),
+        "task_dep": ["export", "preflight", *(f"drawing:{s}" for s in _drawing_order()),
+                     *(f"verify:{s}" for s in _VERIFY_NAMES),
                      *(f"check:{c}" for c in _CHECK_NAMES)],
         "uptodate": [False],
         "pos_arg": "relargs",
@@ -1605,6 +1702,7 @@ def task_build():
             [f"check:{s}" for s in _CHECK_NAMES]
             + [f"part:{s}" for s in _seat_part_order()]
             + [f"assembly:{s}" for s in ASSEMBLY_ORDER]
+            + [f"drawing:{s}" for s in _drawing_order()]
             + [f"verify:{s}" for s in _VERIFY_NAMES]
         ),
     }

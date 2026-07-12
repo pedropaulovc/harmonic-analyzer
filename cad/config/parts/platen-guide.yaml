@@ -1,5 +1,8 @@
 platen-guide:
   number: MHA-111
   material: Plain Carbon Steel
+  material_specification: AISI 1018 cold-rolled steel
+  finish: black oxide
+  quantity: 2
   tolerance_class: machined_block
   process: "machined (steel)"
