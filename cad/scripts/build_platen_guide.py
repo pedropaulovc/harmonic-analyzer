@@ -74,11 +74,23 @@ HOLE_X = tuple(s + d for s in LOCK_STATION_X for d in (-LOCK_SCREW_DX, LOCK_SCRE
 # module). The lock-screw LockHoles above become #4 clearance (the fillister
 # lock screws pass through) -- memory/fastener-policy-us-customary.
 SCREW_STATION_X = (30.0, 90.0, 150.0, 210.0, 270.0)
-SCREW_HOLE_DEPTH = 3.0
+SCREW_HOLE_DEPTH = 4.0
+
+DRAWING_NOTES = "\n".join(
+    (
+        "UNLESS OTHERWISE SPECIFIED, DIMENSIONS IN MM:",
+        "1. LENGTH +/-0.5; STOCK SECTION +/-0.25; HOLE POSITION PER FCF; "
+        "ANGLES +/-0.5 DEG.",
+        "2. REMOVE BURRS AND BREAK SHARP EDGES 0.2 MAX.",
+        "3. DRILLED DIAMETERS +0.10/-0.00.",
+    )
+)
 
 
 def _apply_drawing_properties(adapter) -> None:
-    apply_drawing_properties(adapter, PART_NAME)
+    apply_drawing_properties(
+        adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES}
+    )
 
 
 def _make_back_view_front(adapter) -> None:
@@ -157,7 +169,8 @@ async def build(adapter) -> dict[str, str]:
     # guide screws thread INTO these. A wizard blind hole ends in a 118° drill
     # point, so the analytic expectation is blind_hole_volume_mm3.
     screw_spec = HoleSpec(
-        "tapped_bottoming", "#4-40", end="blind", depth_mm=SCREW_HOLE_DEPTH
+        "tapped_bottoming", "#4-40", end="blind", depth_mm=SCREW_HOLE_DEPTH,
+        overrides_mm={"ThreadDepth": 2.4},
     )
     wizard_holes(
         adapter, screw_spec,
@@ -169,7 +182,11 @@ async def build(adapter) -> dict[str, str]:
         blind_cut_dia_mm(screw_spec), SCREW_HOLE_DEPTH
     )
     v_final = v_rail - v_holes - v_screws
-    await volume_check(adapter, "guide with screw holes", v_final, 0.02 * v_screws)
+    # The short bottoming-tap table profile differs slightly from the ideal
+    # cylinder-plus-118-degree point (about 0.54 mm^3 per hole on SW 2026).
+    # Keep the gate tight enough to catch a missing/extra station while covering
+    # that native table/profile variation.
+    await volume_check(adapter, "guide with screw holes", v_final, 0.05 * v_screws)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).

@@ -62,8 +62,10 @@ from crank_arm_spec import (
     DIMPLE_DEPTH,
     DIMPLE_DIA,
     DIMPLE_X,
+    DRAWING_NOTES,
     DRAWING_DIMENSIONS,
     HALF_WIDTH,
+    ISOMETRIC_VIEW_NOTE,
     SHAFT_BORE_DIA,
     SQUARE_END_OVERHANG,
 )
@@ -73,7 +75,7 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 # (The old PivotBoreDia Ø6.0 and PinHoleDia Ø5.0 constants are gone: the handle-
 # pivot hole and the tapered-pin cross-hole are now native Hole Wizard features
-# whose diameters come from the drill standard -- 15/64 (Ø5.953) and #9 (Ø4.978)
+# whose diameters come from the drill standard -- 15/64 (Ø5.953) and #14 (Ø4.623)
 # -- not equation-driven sketch dims. The 3/8 shaft bore stays a reamed circle
 # cut: it is a precision running fit, not a twist-drill hole.)
 
@@ -229,17 +231,18 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     _telemetry.info(f"volume after dimple: {vol:.1f} mm^3")
 
-    # Tapered-pin cross-hole: was a plain Ø5.0 cut, now a native Hole Wizard #9
+    # Tapered-pin cross-hole: pilot below the No. 2 taper pin's small end, then
+    # taper-reamed with the shaft at assembly.
     # number drill (Ø4.978) along global Y through the boss + shaft bore at
     # mid-thickness (memory/fastener-policy-us-customary). Drilled from the +Y
     # side face (a pristine planar face, normal +Y) at (x 0, z ArmThickness/2);
     # through-all is geometrically identical to the old mid-plane cut.
     pin_cut = wizard_holes(
         adapter,
-        HoleSpec("drilled_number", "#9"),
+        HoleSpec("drilled_number", "#14"),
         [[0.0, HALF_WIDTH, ARM_THICKNESS / 2.0]],
         (0.0, 1.0, 0.0),
-        "tapered-pin cross-hole (#9)",
+        "tapered-pin cross-hole (#14)",
         name="PinHole",
         placement_dims=[((None, None), ("PinHoleZ", '"ArmThickness" / 2'))],
     )
@@ -301,7 +304,14 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    apply_drawing_properties(adapter, PART_NAME)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

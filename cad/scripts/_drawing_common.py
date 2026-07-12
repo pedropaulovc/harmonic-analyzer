@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Sequence
+from xml.etree import ElementTree
 
 import _telemetry
 from _common import check
@@ -19,10 +20,12 @@ from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import dispatch_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
+    TOL_BASIC,
     add_note,
     curate_dimensions,
     dimension_name,
     new_drawing,
+    remove_notes_matching,
     save_drawing,
     set_units_mm,
     view_name,
@@ -40,6 +43,339 @@ class DrawingOutputs:
     slddrw: Path
     pdf: Path
     png: Path
+
+
+_GTOL_SYMBOLS = {
+    "circular_runout": "GTOL-SRUN",
+    "cylindricity": "GTOL-CYL",
+    "flatness": "GTOL-FLAT",
+    "parallelism": "GTOL-PARA",
+    "position": "GTOL-POSI",
+    "perpendicularity": "GTOL-PERP",
+}
+
+
+def property_link(property_name: str) -> str:
+    """Return a source-model property link suitable for a drawing note."""
+    if not property_name or '"' in property_name:
+        raise ValueError(f"invalid drawing property name: {property_name!r}")
+    return f'$PRPSHEET:"{property_name}"'
+
+
+def _gtol_frame_xml(
+    characteristic: str,
+    tolerance: str,
+    *,
+    datums: Sequence[str] = (),
+    diameter: bool = False,
+) -> str:
+    """Build the SOLIDWORKS-2022+ feature-control-frame XML payload."""
+    symbol = _GTOL_SYMBOLS.get(characteristic)
+    if symbol is None:
+        raise ValueError(f"unsupported geometric characteristic: {characteristic!r}")
+    if not tolerance:
+        raise ValueError("feature-control-frame tolerance cannot be blank")
+    if len(datums) > 3 or any(not d or len(d) > 2 for d in datums):
+        raise ValueError(f"invalid datum reference sequence: {tuple(datums)!r}")
+    root = ElementTree.Element("GtolFrame")
+    ElementTree.SubElement(root, "ToleranceSymbol").text = symbol
+    range_info = ElementTree.SubElement(root, "ToleranceRangeInfo")
+    ElementTree.SubElement(range_info, "PrimaryToleranceValue").text = tolerance
+    if diameter:
+        ElementTree.SubElement(range_info, "PrimaryRangeSymbol").text = "phi"
+    for datum in datums:
+        compartment = ElementTree.SubElement(root, "DatumCompartment")
+        detail = ElementTree.SubElement(compartment, "DatumDetail")
+        ElementTree.SubElement(detail, "DatumLetter").text = datum
+    return ElementTree.tostring(root, encoding="unicode", short_empty_elements=True)
+
+
+def _select_view_entity(
+    adapter: Any,
+    view: Any,
+    entity_type: str,
+    xy: tuple[float, float],
+    *,
+    label: str,
+) -> Any:
+    draw = adapter.currentModel
+    name = view_name(adapter, view)
+    if not draw.ActivateView(name):
+        raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
+    draw.ClearSelection2(True)
+    if not draw.Extension.SelectByID2(
+        "", entity_type, xy[0], xy[1], 0.0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError(
+            f"failed to select {label} {entity_type.lower()} at "
+            f"sheet ({xy[0]:g}, {xy[1]:g})"
+        )
+    count = int(draw.SelectionManager.GetSelectedObjectCount2(-1))
+    entity = draw.SelectionManager.GetSelectedObject6(count, -1)
+    if entity is None:
+        raise RuntimeError(f"selected {label} {entity_type.lower()} has no entity")
+    return entity
+
+
+@_telemetry.traced("drawing.datum_feature", label_param="label")
+def add_datum_feature(
+    adapter: Any,
+    view: Any,
+    *,
+    edge_xy: tuple[float, float],
+    symbol_xy: tuple[float, float],
+    datum: str,
+    label: str,
+) -> Any:
+    """Attach a native datum-feature symbol to a drawing-view edge."""
+    _select_view_entity(adapter, view, "EDGE", edge_xy, label=label)
+    draw = adapter.currentModel
+    tag = draw.InsertDatumTag2()
+    if tag is None:
+        raise RuntimeError(f"failed to insert datum {datum} ({label})")
+    tag = _sw_type_info.flagged(tag, "IDatumTag")
+    if not tag.SetLabel(datum):
+        raise RuntimeError(f"failed to label datum feature {datum} ({label})")
+    annotation = _sw_type_info.flagged(tag.GetAnnotation(), "IAnnotation")
+    if not annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
+        raise RuntimeError(f"failed to position datum {datum} ({label})")
+    if str(tag.GetLabel()) != datum:
+        raise RuntimeError(f"datum feature label did not persist ({label})")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    return tag
+
+
+@_telemetry.traced("drawing.feature_control_frame", label_param="label")
+def add_feature_control_frame(
+    adapter: Any,
+    view: Any,
+    *,
+    edge_xy: tuple[float, float],
+    frame_xy: tuple[float, float],
+    characteristic: str,
+    tolerance: str,
+    datums: Sequence[str] = (),
+    diameter: bool = False,
+    quantity: str = "",
+    label: str,
+) -> Any:
+    """Attach a native feature-control frame to a drawing-view edge."""
+    edge = _select_view_entity(adapter, view, "EDGE", edge_xy, label=label)
+    draw = adapter.currentModel
+    gtol = draw.InsertGtol()
+    if gtol is None:
+        raise RuntimeError(f"failed to insert feature-control frame ({label})")
+    gtol = _sw_type_info.flagged(gtol, "IGtol")
+    frame_count = int(gtol.GetFrameCount() or 0)
+    if frame_count == 0:
+        if not gtol.AddFrame():
+            raise RuntimeError(f"failed to create feature-control frame ({label})")
+        frame_count = int(gtol.GetFrameCount() or 0)
+    if frame_count < 1:
+        raise RuntimeError(f"feature-control frame has no frame ({label})")
+    frame = gtol.GetFrame(1)
+    migrated = frame is None
+    if migrated:
+        # Current SOLIDWORKS can instantiate an old-format empty GTol from the
+        # project template. Seed its simple compartments before conversion:
+        # SW 2026 drops tolerance display when an empty frame is converted first
+        # and populated afterward. The saved annotation is still required to be
+        # current-format IGtolFrame/XML below.
+        datum_values = [*datums[:3], "", "", ""][:3]
+        gtol.SetFrameSymbols2(
+            1,
+            f"<{_GTOL_SYMBOLS[characteristic]}>",
+            diameter,
+            "",
+            False,
+            "",
+            "",
+            "",
+            "",
+        )
+        if not gtol.SetFrameValues2(1, tolerance, "", *datum_values):
+            raise RuntimeError(
+                f"failed to seed feature-control frame for migration ({label})"
+            )
+        if not gtol.CanConvertFormat():
+            raise RuntimeError(
+                f"feature-control frame cannot migrate to current format ({label})"
+            )
+        conversion_error = int(gtol.ConvertFormat())
+        if conversion_error != 0:
+            raise RuntimeError(
+                f"feature-control frame migration failed ({label}): "
+                f"error {conversion_error}"
+            )
+        frame = gtol.GetFrame(1)
+    if frame is None:
+        raise RuntimeError(
+            f"current feature-control frame is unavailable after migration ({label})"
+        )
+    frame = _sw_type_info.flagged(frame, "IGtolFrame")
+    xml = _gtol_frame_xml(
+        characteristic, tolerance, datums=datums, diameter=diameter
+    )
+    if not migrated and not frame.SetSymbolXml(xml):
+        raise RuntimeError(f"SOLIDWORKS rejected feature-control frame XML ({label})")
+    applied = str(frame.GetSymbolXml() or "")
+    if _GTOL_SYMBOLS[characteristic] not in applied or tolerance not in applied:
+        raise RuntimeError(f"feature-control frame did not persist ({label})")
+    if int(gtol.GetFormat()) != 2:  # swGtolFormatType_e.GTOL_SW2022 (current)
+        raise RuntimeError(f"feature-control frame remained in old format ({label})")
+    if quantity:
+        if not gtol.InsertBelowFrameTextAt(1, quantity):
+            raise RuntimeError(f"failed to add feature quantity {quantity!r} ({label})")
+        if str(gtol.GetBelowFrameTextAt(1) or "") != quantity:
+            raise RuntimeError(f"feature quantity did not persist ({label})")
+    annotation = _sw_type_info.flagged(gtol.GetAnnotation(), "IAnnotation")
+    if int(annotation.GetAttachedEntityCount3()) != 1:
+        if not annotation.SetAttachedEntities(dispatch_array([edge])):
+            raise RuntimeError(f"failed to attach feature-control frame ({label})")
+    gtol.SetLeader(True, 0, False, False)  # swLeaderSide_e.swLS_SMART
+    if not annotation.SetPosition2(frame_xy[0], frame_xy[1], 0.0):
+        raise RuntimeError(f"failed to position feature-control frame ({label})")
+    draw.EditRebuild3()
+    if (
+        int(annotation.GetAttachedEntityCount3()) != 1
+        or not bool(gtol.IsAttached())
+        or int(gtol.GetLeaderCount()) != 1
+    ):
+        raise RuntimeError(f"feature-control frame lacks one attached leader ({label})")
+    draw.ClearSelection2(True)
+    return gtol
+
+
+@_telemetry.traced("drawing.surface_finish", label_param="label")
+def add_surface_finish(
+    adapter: Any,
+    view: Any,
+    *,
+    edge_xy: tuple[float, float],
+    symbol_xy: tuple[float, float],
+    roughness_ra: str,
+    label: str,
+) -> Any:
+    """Attach a native machining-required surface-finish symbol to an edge."""
+    _select_view_entity(adapter, view, "EDGE", edge_xy, label=label)
+    draw = adapter.currentModel
+    symbol = draw.Extension.InsertSurfaceFinishSymbol3(
+        1,  # installed R2026x swSFSymType_e.swSFMachining_Req
+        1,  # swLeaderStyle_e.swSTRAIGHT
+        symbol_xy[0],
+        symbol_xy[1],
+        0.0,
+        0,  # swSFLaySym_e.swSFNone
+        10,  # swArrowStyle_e.swNO_ARROWHEAD
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+    )
+    if symbol is None:
+        raise RuntimeError(f"failed to insert Ra {roughness_ra} symbol ({label})")
+    symbol = _sw_type_info.flagged(symbol, "ISFSymbol")
+    if not symbol.SetText(8, f"Ra {roughness_ra}"):  # current-profile roughness value
+        raise RuntimeError(f"failed to set Ra {roughness_ra} ({label})")
+    if int(symbol.GetSymbol()) != 1:
+        raise RuntimeError(f"surface-finish symbol type did not persist ({label})")
+    if str(symbol.GetText(8) or "").strip() != f"Ra {roughness_ra}":
+        raise RuntimeError(f"surface-finish roughness did not persist ({label})")
+    annotation = _sw_type_info.flagged(symbol.GetAnnotation(), "IAnnotation")
+    if not annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
+        raise RuntimeError(f"failed to position surface-finish symbol ({label})")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    return symbol
+
+
+@_telemetry.traced("drawing.linked_note", label_param="property_name")
+def add_property_linked_note(
+    adapter: Any, property_name: str, x: float, y: float
+) -> Any:
+    """Place one note whose displayed text resolves from the source SLDPRT."""
+    note = add_note(adapter, property_link(property_name), x, y)
+    if note is None:
+        raise RuntimeError(f"failed to add linked drawing note {property_name!r}")
+    return note
+
+
+@_telemetry.traced("drawing.linked_callout", label_param="property_name")
+def add_property_linked_callout(
+    adapter: Any,
+    view: Any,
+    *,
+    property_name: str,
+    edge_xy: tuple[float, float],
+    note_xy: tuple[float, float],
+) -> Any:
+    """Attach one arrowed callout whose text resolves from the source SLDPRT."""
+    draw = adapter.currentModel
+    name = view_name(adapter, view)
+    if not draw.ActivateView(name):
+        raise RuntimeError(f"failed to activate linked-callout view {name!r}")
+    draw.ClearSelection2(True)
+    edge = _select_edge(adapter, *edge_xy, append=False)
+    note = draw.InsertNote(property_link(property_name))
+    if note is None:
+        raise RuntimeError(f"failed to insert linked callout {property_name!r}")
+    note = _sw_type_info.flagged(note, "INote")
+    annotation = note.GetAnnotation()
+    if annotation is None:
+        raise RuntimeError(f"linked callout has no annotation: {property_name!r}")
+    annotation = _sw_type_info.flagged(annotation, "IAnnotation")
+    if int(annotation.GetAttachedEntityCount3()) != 1:
+        if not annotation.SetAttachedEntities(dispatch_array([edge])):
+            raise RuntimeError(f"failed to attach linked callout {property_name!r}")
+    status = annotation.SetLeader3(1, 0, True, False, False, False)
+    if status != 0:
+        raise RuntimeError(
+            f"failed to create linked-callout leader {property_name!r}: {status}"
+        )
+    if not annotation.SetPosition2(note_xy[0], note_xy[1], 0.0):
+        raise RuntimeError(f"failed to position linked callout {property_name!r}")
+    draw.EditRebuild3()
+    if (
+        int(annotation.GetAttachedEntityCount3()) != 1
+        or int(annotation.GetLeaderCount()) != 1
+    ):
+        raise RuntimeError(f"linked callout {property_name!r} lacks one arrow")
+    draw.ClearSelection2(True)
+    return note
+
+
+@_telemetry.traced("drawing.hole_callout", label_param="label")
+def add_native_hole_callout(
+    adapter: Any,
+    view: Any,
+    *,
+    edge_xy: tuple[float, float],
+    callout_xy: tuple[float, float],
+    label: str,
+) -> Any:
+    """Insert an associative Hole Wizard callout on a selected drawing edge."""
+    _select_view_entity(adapter, view, "EDGE", edge_xy, label=label)
+    draw = adapter.currentModel
+    display = draw.AddHoleCallout2(callout_xy[0], callout_xy[1], 0.0)
+    if display is None:
+        raise RuntimeError(f"failed to insert native hole callout ({label})")
+    # AddHoleCallout2 leaves its PropertyManager page open.  Accept it through
+    # the documented swCommands_PmOK command so doit remains unattended.
+    if not adapter.swApp.RunCommand(-2, ""):  # swCommands_e.swCommands_PmOK
+        raise RuntimeError(f"failed to accept native hole callout ({label})")
+    display = _sw_type_info.flagged(display, "IDisplayDimension")
+    if not display.IsHoleCallout():
+        raise RuntimeError(f"inserted annotation is not a hole callout ({label})")
+    annotation = _sw_type_info.flagged(display.GetAnnotation(), "IAnnotation")
+    if not annotation.SetPosition2(callout_xy[0], callout_xy[1], 0.0):
+        raise RuntimeError(f"failed to position native hole callout ({label})")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    return display
 
 
 def read_required_properties(
@@ -548,6 +884,18 @@ def add_edge_dimension(
     return dimension
 
 
+def set_basic_dimension(adapter: Any, dimension: Any, *, label: str) -> Any:
+    """Box a drawing-native locating dimension as BASIC and verify the result."""
+    display = _sw_type_info.flagged(dimension, "IDisplayDimension")
+    model_dimension = _sw_type_info.flagged(display.GetDimension(), "IDimension")
+    if not model_dimension.SetToleranceType(TOL_BASIC):
+        raise RuntimeError(f"failed to make {label} dimension BASIC")
+    if int(model_dimension.GetToleranceType()) != TOL_BASIC:
+        raise RuntimeError(f"{label} dimension did not retain BASIC tolerance")
+    adapter.currentModel.EditRebuild3()
+    return dimension
+
+
 def hole_table_template(adapter: Any) -> Path:
     executable = adapter._attempt(
         lambda: adapter.swApp.GetExecutablePath(), default=None
@@ -573,6 +921,7 @@ def insert_hole_table(
     datum_xy: tuple[float, float],
     hole_points: Sequence[tuple[float, float]],
     anchor_xy: tuple[float, float],
+    basic_locations: bool = True,
     label: str,
 ) -> Any:
     """Insert the model-associated TAG/X LOC/Y LOC/SIZE hole table on ``view``.
@@ -622,6 +971,22 @@ def insert_hole_table(
     feature.CombineTags = False
     adapter.currentModel.EditRebuild3()
     table = _sw_type_info.flagged(table, "ITableAnnotation")
+    # Indexed COM properties such as Text2 are omitted by the late-bound
+    # dispatch returned from IHoleTableAnnotation.  Wrap the same dispatch in
+    # its generated early-bound interface before using the setter.
+    _sw_type_info._ensure_loaded()
+    table = _sw_type_info._wrapper_module.ITableAnnotation(table._oleobj_)
+    if basic_locations:
+        for column, heading in ((1, "X LOC (BASIC)"), (2, "Y LOC (BASIC)")):
+            if not table.IsCellTextEditable(0, column):
+                raise RuntimeError(f"native hole-table header column {column} is not editable")
+            table.SetText2(0, column, False, heading)
+            applied_heading = str(table.DisplayedText2(0, column, False) or "")
+            if applied_heading.upper() != heading:
+                raise RuntimeError(
+                    f"native hole-table header did not persist: {applied_heading!r}"
+                )
+        adapter.currentModel.EditRebuild3()
     rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
     columns = int(adapter._get_attr_or_call(table, "ColumnCount") or 0)
     contents = tuple(
@@ -643,7 +1008,12 @@ def insert_hole_table(
             f"expected {expected_rows}x4: {contents!r}"
         )
     header = contents[0]
-    expected = ("TAG", "X LOC", "Y LOC", "SIZE")
+    expected = (
+        "TAG",
+        "X LOC (BASIC)" if basic_locations else "X LOC",
+        "Y LOC (BASIC)" if basic_locations else "Y LOC",
+        "SIZE",
+    )
     if tuple(value.upper() for value in header) != expected:
         raise RuntimeError(f"native hole-table header is unexpected: {header!r}")
     _telemetry.success(
