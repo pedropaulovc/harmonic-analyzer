@@ -43,9 +43,12 @@ Traps that cost 8 probe rounds — do not re-learn:
   fit, FORCE the pinned dia via BOTH `HoleDiameter` AND `ThruHoleDiameter` —
   on a plain hole the DRIVING knob is `ThruHoleDiameter`; a `HoleDiameter`-only
   write is silently dropped (setting only `HoleDiameter` still cut 7.137;
-  setting both cut 6.756). `wizard_holes` does this ONLY for non-normal fits;
-  the initialized normal fit must remain untouched. (On a cbore the through-
-  hole knob is likewise `ThruHoleDiameter` — `HoleDiameter` ignored.)
+  setting both cut 6.756). `wizard_holes` first reads the initialized
+  `ThruHoleDiameter` and writes both knobs ONLY when it differs from the pinned
+  target by >0.05 mm. This is not simply normal-vs-non-normal: untouched #4
+  normal is correct, but the live #8-normal probe cut 317.5 mm^3 instead of
+  389.3 until forced. (On a cbore the through-hole knob is likewise
+  `ThruHoleDiameter` — `HoleDiameter` ignored.)
 - **Never redundantly write a NORMAL clearance diameter.** Platen-guide's #4
   hole table exposed the failure: every B row showed the correct `Ø3.25 THRU
   ALL` plus bogus `Ø0.00 X 0°, FAR SIDE`. An isolated native repro is
@@ -64,8 +67,9 @@ Traps that cost 8 probe rounds — do not re-learn:
   success but the flag stayed false. Root cause was not missing UI automation:
   the redundant `HoleDiameter` + `ThruHoleDiameter` ModifyDefinition itself
   converted a correctly initialized type-25 normal hole into type 26. Fix:
-  skip the edit flow entirely for normal clearance fit; retain explicit writes
-  only for non-normal fits or deliberate overrides. Untouched #4 normal reads
+  compare initialized `ThruHoleDiameter` against the pinned target and skip the
+  edit flow when already correct; retain explicit writes only for real diameter
+  drift or deliberate overrides. Untouched #4 normal reads
   `ThruHoleDiameter=0.0032639 m` (the #30 drill size), so pin
   `CLEARANCE_MM[("#4", "normal")]=3.264`. Production rebuild proved type 25,
   far-side false, Ø3.2639 geometry, volume green; regenerated platen-guide
@@ -76,6 +80,14 @@ Traps that cost 8 probe rounds — do not re-learn:
   setting countersink diameters/angles to `-1`; writing `Diameter`; pre-create
   sentinel values; or trying the get-only far-side boolean setter. These
   changed presentation or no-op'd because the corrupt type-26 subtype remained.
+- **Override audit (2026-07-11):** only two production `overrides_mm` call
+  sites exist and both are intentional physical-artefact geometry, not standard
+  table restatements: harmonic-base keeps Ø13 through + Ø23 x 6.5 lag-head
+  recess instead of the 9/16 fillister table's Ø14.7/Ø21.4; platen keeps Ø3
+  through + Ø6.5 x 2.4 fillister recess so heads sit sub-flush. The diagnostic
+  cbore override proves the mechanism; the hole-table repro's Ø3.251 override
+  is deliberately bad to reproduce the subtype corruption. Do not add another
+  override without a documented nonstandard geometry reason and volume proof.
 - **Multi-point**: one auto placement point per feature; edit the placement
   sketch (`SetCoords` + `CreatePoint` via `ModelToSketchTransform`) — the
   rocker-arm-support foot-tap idiom, shared by both creation paths. Wrap the
