@@ -4,8 +4,9 @@ One of the four hold-down screws that come up through the base into the
 rocker-arm-support north upright's 9/16-12 tapped foot holes (O12.30376 tap
 drill; build_rocker_arm_support.py FootTappedHoles, 25.4 deep up to the window).
 The round head sits recessed in a counterbore on the base underside
-(build_harmonic_base.py); plain head and shank, thread not modeled (the O12
-shank rides the tap-drill foot hole, like the legacy socket fit).
+(build_harmonic_base.py); slotted round head and plain shank, with thread
+geometry not modeled (the O12 shank rides the tap-drill foot hole, like the
+legacy socket fit).
 
 Dimensions: cad/DIMENSIONS.md ch. 14 layout (M6.10) -- shank sized to the
 9/16-12 tap-drill foot hole; head sized to the O23 base counterbore (low).
