@@ -81,21 +81,6 @@ STICK_POS = (-212.0, 53.8, -100.0)
 STICK_EULER = [90.0, -90.0, 0.0]
 STICK_ROWS = [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]]
 
-# Render gallery mirroring the book's ch. 30 "Eight Views" chapter: the six
-# orthographic faces plus two 3/4 views (the photos walk 45-degree steps
-# around the machine; axonometric views are the CAD equivalent).
-EIGHT_VIEWS = (
-    "front",
-    "back",
-    "left",
-    "right",
-    "top",
-    "bottom",
-    "isometric",
-    "trimetric",
-)
-
-
 def _subassembly(name: str) -> str:
     path = (OUT_SLDASM / f"{name}.SLDASM").resolve()
     if not path.exists():
@@ -160,31 +145,17 @@ async def build(adapter) -> dict[str, str]:
 
 
 async def export_gallery_and_bom(adapter) -> dict[str, str]:
-    """The top-only artefacts beyond the standard save + DEFAULT_VIEWS: the Ch.30
-    eight-views gallery and the parts-only BOM CSV.
+    """Export the top-level parts-only BOM CSV.
 
     Factored out of :func:`build` so the cheap REFRESH path (refresh_assembly.py)
     regenerates them after a subassembly change -- otherwise the generic refresh
     saves only the .SLDASM + three default views and these top-level deliverables
     go stale (codex review #6). The standard-view remap is already baked into the
     saved .SLDASM, so the gallery's ShowNamedView2 views are correct on reopen; the
-    gallery + BOM leave the doc dirty but the .SLDASM on disk stays table-free."""
+    BOM export leaves the doc dirty but the .SLDASM on disk stays table-free."""
     artefacts: dict[str, str] = {}
-    for view in EIGHT_VIEWS:
-        img_path = (OUT_PNG / f"eight-views-{view}.png").resolve()
-        check(
-            f"export_image eight-views {view}",
-            await adapter.export_image(
-                {
-                    "file_path": str(img_path),
-                    "format_type": "png",
-                    "width": 1920,
-                    "height": 1200,
-                    "view_orientation": view,
-                }
-            ),
-        )
-        artefacts[f"eight-views-{view}"] = str(img_path)
+    for stale in OUT_PNG.glob("eight-views-*.png"):
+        stale.unlink()
 
     from solidworks_mcp.adapters.base import CreateBomParameters
 
