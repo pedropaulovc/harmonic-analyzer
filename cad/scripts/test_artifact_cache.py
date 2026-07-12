@@ -128,9 +128,49 @@ def test_store_then_restore_logs_events_and_stamps_key(tmp_path, fake):
     assert all(e["key"] == key for e in _events(tmp_path))
 
 
+def test_store_retains_last_published_input_provenance(tmp_path, fake):
+    """Issue #255: after the working tree moves to a new key, the old per-dep
+    digests must remain available beside the last published key for a readable
+    historical diff."""
+    dep = _make_dep(tmp_path, "input.py", "VALUE = 1\n")
+    key = cache.cache_key([dep], _digest_one, label="part:x")
+    out = tmp_path / "out.bin"
+    out.write_text("payload", encoding="utf-8")
+    cache.store(key, [out], "part:x")
+
+    assert cache.last_stored_key("part:x") == key
+    assert cache.last_stored_inputs("part:x") == [("input.py", "VALUE = 1\n")]
+
+    Path(dep).write_text("VALUE = 2\n", encoding="utf-8")
+    cache.cache_key([dep], _digest_one, label="part:x")
+    assert cache.last_stored_inputs("part:x") == [("input.py", "VALUE = 1\n")]
+
+
 def test_restore_miss_logs_event(tmp_path, fake):
-    assert cache.restore("d" * 64, [], "part:x") is False
-    assert [e["event"] for e in _events(tmp_path)] == ["restore_miss"]
+    dep = _make_dep(tmp_path, "input.py", "VALUE = 1\n")
+    key = cache.cache_key([dep], _digest_one, label="part:x")
+    assert cache.restore(key, [], "part:x") is False
+    events = _events(tmp_path)
+    assert [e["event"] for e in events] == ["restore_miss"]
+    assert events[0]["inputs"] == [{"path": "input.py", "digest": "VALUE = 1\n"}]
+
+
+def test_miss_retains_previous_and_current_inputs(tmp_path, fake):
+    """Once a rebuild publishes the new key, its sidecar advances; the miss event
+    must therefore preserve both sides of the drift for later diagnosis."""
+    dep = _make_dep(tmp_path, "input.py", "VALUE = 1\n")
+    old_key = cache.cache_key([dep], _digest_one, label="part:x")
+    out = tmp_path / "out.bin"
+    out.write_text("payload", encoding="utf-8")
+    cache.store(old_key, [out], "part:x")
+
+    Path(dep).write_text("VALUE = 2\n", encoding="utf-8")
+    new_key = cache.cache_key([dep], _digest_one, label="part:x")
+    assert cache.restore(new_key, [], "part:x") is False
+    event = _events(tmp_path)[-1]
+    assert event["previous_key"] == old_key
+    assert event["previous_inputs"] == [{"path": "input.py", "digest": "VALUE = 1\n"}]
+    assert event["inputs"] == [{"path": "input.py", "digest": "VALUE = 2\n"}]
 
 
 def test_store_nothing_on_disk_logs_empty(tmp_path, fake):
