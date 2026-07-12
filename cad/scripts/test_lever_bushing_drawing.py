@@ -33,8 +33,10 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 def test_notes_define_a_buildable_turned_part() -> None:
     notes = drawing._manufacturing_notes()
     assert "REAM O6.50 THRU" in notes
-    assert "TOTAL LENGTH +/-0.03" in notes
+    assert drawing.DIMENSION_CALLOUTS["Depth"] == "+/-0.03"
     assert "0.05 TIR" in notes
+    assert "0.15-0.18 DIAMETRAL CLEARANCE" in notes
+    assert "CONCENTRICITY" not in notes
     assert "MAKE 19" in notes
     assert "Ra 1.6" in notes
     assert "X.XX" not in notes
