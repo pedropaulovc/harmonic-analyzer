@@ -131,6 +131,18 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "WindowProfile": {"WinWidth", "WinHeight"},
     "CavityProfile": {"CavWidth", "CavDepth"},
 }
+
+DRAWING_NOTES = "\n".join(
+    (
+        "UNLESS OTHERWISE SPECIFIED:",
+        "1. GRAY-IRON CASTING: AS-CAST +/-0.8; MACHINED +/-0.25; "
+        "ANGLES +/-1 DEG. REMOVE BURRS; BREAK EDGES 0.3 MAX.",
+        "2. TAPER SYMMETRIC ABOUT WALL CENTRELINE. WINDOW RIM CHAMFER "
+        "1.27 X 45 DEG ALL AROUND; INNER-CORNER FILLET R12.7, 4 PLACES.",
+        "3. CENTRAL WEB 6.35 THICK AND CENTRED. PART MAY BE MILLED FROM "
+        "SOLID CLASS 30 BAR; NO DRAFT MODELLED.",
+    )
+)
 # Hole Wizard constants (resolved from the SW type library on this seat):
 SW_FM_HOLE_WZD = 25            # swFeatureNameID_e.swFmHoleWzd (CreateDefinition)
 SW_WZD_TAP = 4                 # swWzdGeneralHoleTypes_e.swWzdTap (straight tap)
@@ -540,7 +552,9 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)  # green-painted casting, like the base/top-frame
     await report_mass_properties(adapter)
-    apply_drawing_properties(adapter, PART_NAME)
+    apply_drawing_properties(
+        adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES}
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

@@ -911,7 +911,7 @@ def _submodule_part_dep() -> str:
 # shared cache by that hash and download a prebuilt .SLDPRT/.SLDASM instead of
 # driving SolidWorks. Keys fold each file with ContentChecker._digest -- IDENTICAL
 # to the doit staleness check -- so a cache hit and "doit up-to-date" agree, and a
-# comment-only YAML edit changes neither. A seat-less machine (HARMONIC_CACHE_MODE
+# comment-only YAML edit changes neither. A seat-less machine (HARMONIC_REMOTE_CACHE_MODE
 # =ro) pulls; a builder (rw) pulls+pushes. Disabled (off) => zero behaviour change.
 def _png_dir(stem: str) -> Path:
     return CAD_OUT / "png" / stem.replace("_", "-")
@@ -1527,6 +1527,7 @@ def task_check():
     pytest_cmd = [sys.executable, "-m", "pytest", "-q"]
     recipe_tests = [
         SCRIPTS_DIR / "test_dodo_recipe.py",
+        SCRIPTS_DIR / "test_verify_auto_repair.py",
         # One offline contract file per manufacturing drawing (test_*_drawing.py),
         # so registering a drawing auto-enrolls its contracts here.
         *sorted(SCRIPTS_DIR.glob("test_*_drawing.py")),

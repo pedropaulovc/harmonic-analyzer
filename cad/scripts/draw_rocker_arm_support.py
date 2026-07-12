@@ -25,6 +25,10 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_datum_feature,
+    add_feature_control_frame,
+    add_property_linked_note,
+    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     insert_hole_table,
@@ -35,9 +39,8 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from build_rocker_arm_support import BOSS_DEPTH, HOLES, WIDE
+from build_rocker_arm_support import BOSS_DEPTH, HALF_Y, HOLES, WIDE
 from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
     auto_center_marks,
     place_view,
 )
@@ -101,64 +104,6 @@ def _bottom_sheet_xy(hole_xz: tuple[float, float]) -> tuple[float, float]:
     )
 
 
-_NOTES = (
-    "UNLESS OTHERWISE SPECIFIED:",
-    (
-        "1. DIMENSIONS ARE IN MILLIMETRES.\n"
-        "   INTERPRET PER ASME Y14.5."
-    ),
-    (
-        "2. GRAY-IRON CASTING: AS-CAST\n"
-        "   +/-0.8; MACHINED +/-0.25; HOLE\n"
-        "   CENTRES +/-0.20; ANGLES +/-1.0\n"
-        "   DEG. MAY BE MILLED FROM SOLID\n"
-        "   CLASS 30 BAR (NO DRAFT MODELLED)."
-    ),
-    (
-        "3. REMOVE BURRS AND BREAK SHARP\n"
-        "   EDGES 0.3 MAX."
-    ),
-    (
-        "4. MACHINE THE FOOT BOTTOM FACE\n"
-        "   FLAT 0.10, Ra 3.2 (DATUM A -\n"
-        "   THE MOUNTING SEAT)."
-    ),
-    (
-        "5. TRAPEZOID TAPER IS SYMMETRIC\n"
-        "   ABOUT THE WALL CENTRELINE."
-    ),
-    (
-        "6. 4X TAPPED HOLES 9/16-12 UNC-2B\n"
-        "   THRU THE 6.35 FOOT LAND, FROM\n"
-        "   DATUM A. SEE HOLE TABLE; DEPTH\n"
-        "   0.000 MEANS TAPPED THRU. ORIGIN\n"
-        "   = SEAT CORNER (THE 1.27 CHAMFER\n"
-        "   TRIMS THE SEAT TO 175.26 X 60.96)."
-    ),
-    (
-        "7. WINDOW RIM: CHAMFER 1.27 X 45\n"
-        "   DEG ALL AROUND, BOTH FACES AND\n"
-        "   SLANT SURROUNDS."
-    ),
-    (
-        "8. INNER FRAME CORNERS: FILLET\n"
-        "   R12.7, 4 PLACES."
-    ),
-    (
-        "9. CENTRAL WEB 6.35 THICK, CENTRED;\n"
-        "   WINDOW+CAVITY CENTRED ON WALL."
-    ),
-    (
-        "10. FINISH: MACHINE GREEN ENAMEL;\n"
-        "    MASK DATUM A AND TAPPED HOLES."
-    ),
-)
-
-
-def _manufacturing_notes() -> str:
-    return "\n".join(_NOTES)
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -173,8 +118,15 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
         ),
-        required=("Number", "Material Specification", "Finish", "Quantity"),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+        ),
     )
     drawing_model, sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
@@ -222,9 +174,74 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rocker-arm-support",
     )
 
-    add_note(adapter, "\n".join(_NOTES[:5]), 0.014, 0.090)
-    add_note(adapter, "\n".join(_NOTES[5:]), 0.150, 0.090)
-    add_note(adapter, "FOOT SEAT - DATUM A (SEE NOTE 4)", 0.122, 0.112)
+    # Native datum reference frame, flatness/position controls, and Ra symbol
+    # replace former notes 4 and 6. The bottom view supplies the hole-table DRF.
+    datum_a_edge = (
+        RIGHT_CENTER[0],
+        RIGHT_CENTER[1] - HALF_Y * VIEW_SCALE / 1000.0,
+    )
+    datum_b_edge = (
+        BOTTOM_CENTER[0] - BOSS_DEPTH / 2.0 * VIEW_SCALE / 1000.0,
+        BOTTOM_CENTER[1],
+    )
+    datum_c_edge = (
+        BOTTOM_CENTER[0],
+        BOTTOM_CENTER[1] - WIDE * VIEW_SCALE / 1000.0,
+    )
+    add_datum_feature(
+        adapter,
+        right,
+        edge_xy=datum_a_edge,
+        symbol_xy=(0.210, datum_a_edge[1]),
+        datum="A",
+        label="support mounting seat",
+    )
+    add_datum_feature(
+        adapter,
+        bottom,
+        edge_xy=datum_b_edge,
+        symbol_xy=(datum_b_edge[0] - 0.014, BOTTOM_CENTER[1]),
+        datum="B",
+        label="support seat side",
+    )
+    add_datum_feature(
+        adapter,
+        bottom,
+        edge_xy=datum_c_edge,
+        symbol_xy=(BOTTOM_CENTER[0], datum_c_edge[1] - 0.012),
+        datum="C",
+        label="support seat end",
+    )
+    add_feature_control_frame(
+        adapter,
+        right,
+        edge_xy=datum_a_edge,
+        frame_xy=(0.205, 0.175),
+        characteristic="flatness",
+        tolerance="0.10",
+        label="support mounting-seat flatness",
+    )
+    add_feature_control_frame(
+        adapter,
+        bottom,
+        edge_xy=_bottom_sheet_xy(HOLES[0]),
+        frame_xy=(0.120, 0.090),
+        characteristic="position",
+        tolerance="0.40",
+        datums=("A", "B", "C"),
+        diameter=True,
+        label="support hole-pattern position",
+    )
+    add_surface_finish(
+        adapter,
+        right,
+        edge_xy=datum_a_edge,
+        symbol_xy=(0.225, 0.145),
+        roughness_ra="3.2",
+        label="support mounting-seat finish",
+    )
+
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.090)
 
     return await finalize_drawing(
         adapter,

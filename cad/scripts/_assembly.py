@@ -1946,6 +1946,7 @@ async def save_assembly_and_images(
     # remap_front_to_machine_front (which re-bases the standard views) so the
     # re-based Front/Back/etc. used by the gallery stay correct.
     set_isometric_view(adapter)
+    final_rebuild_before_save(adapter, asm_name)
     check(f"save_file -> {asm_path}", await adapter.save_file(str(asm_path)))
     # Record the resolved-geometry fingerprint of the just-built assembly so a later
     # in-place refresh of it (unchanged) is a true no-op and never bumps the md5 --
@@ -1973,6 +1974,51 @@ def _massprops_sidecar(asm_name: str):
     no-op refresh byte-stable, so the build reaches a true fixpoint. Lives under the
     gitignored ``cad/out/sldasm`` next to the recipe sidecar."""
     return OUT_SLDASM / f".{asm_name}.massprops.sha"
+
+
+def saved_rebuild_status(adapter: Any) -> int:
+    """Read ``IModelDocExtension.NeedsRebuild2`` from the active document."""
+    extension = _read_member(adapter.currentModel, "Extension")
+    if extension is None:
+        raise RuntimeError("active document has no IModelDocExtension")
+    status = _read_member(extension, "NeedsRebuild2")
+    if status is None:
+        raise RuntimeError("IModelDocExtension.NeedsRebuild2 is unavailable")
+    return int(status)
+
+
+def assert_saved_rebuild_clean(adapter: Any, label: str) -> None:
+    """Fail when a freshly opened saved assembly still requests a rebuild."""
+    status = saved_rebuild_status(adapter)
+    if status != 0:  # swModelRebuildStatus_e bitmask: 1 non-frozen, 2 frozen
+        raise RuntimeError(
+            f"{label}.SLDASM opens with NeedsRebuild2={status}; "
+            "the persisted model was not fully rebuilt before save"
+        )
+    _telemetry.success(f"saved rebuild state clean ({label})")
+
+
+def final_rebuild_before_save(adapter: Any, label: str) -> None:
+    """Deep-rebuild after all gates and prove the exact state being saved clean.
+
+    Interference/health inspection can touch solve state after an earlier
+    rebuild.  This final chokepoint runs after every mutating/gating operation,
+    immediately before Save3/SaveAs3, so the persisted assembly cannot inherit
+    a non-frozen ``NeedsRebuild2`` flag (issue #202).
+    """
+    with _telemetry.span("assembly.final_rebuild", asm=label) as sp:
+        rebuilt = adapter._attempt(
+            lambda: adapter.currentModel.ForceRebuild3(False), default=None
+        )
+        status = saved_rebuild_status(adapter)
+        sp.set_attribute("needs_rebuild", status)
+        if rebuilt is False or rebuilt is None:
+            raise RuntimeError(f"{label}: final ForceRebuild3 returned {rebuilt!r}")
+        if status != 0:
+            raise RuntimeError(
+                f"{label}: final rebuild left NeedsRebuild2={status}; refusing save"
+            )
+        _telemetry.success(f"final rebuild clean before save ({label})")
 
 
 async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
@@ -2174,6 +2220,8 @@ def save_assembly_in_place(adapter: Any, asm_name: str, geometry_changed: bool) 
         # rewrite -- a fresh md5 here would invalidate the parent for nothing.
         log(f"{sldasm.name}: geometry unchanged -- .SLDASM left intact (no md5 bump)")
         return
+
+    final_rebuild_before_save(adapter, asm_name)
 
     if not bool(adapter._attempt(lambda: asm.GetSaveFlag(), default=True)):
         log(f"{sldasm.name} reported clean -- forcing rewrite for md5 propagation")

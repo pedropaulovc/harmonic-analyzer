@@ -23,7 +23,11 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_datum_feature,
     add_edge_dimension,
+    add_feature_control_frame,
+    add_property_linked_note,
+    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -35,9 +39,14 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from crank_arm_spec import ARM_C2C, ARM_END_X, DIMPLE_X, HALF_WIDTH
+from crank_arm_spec import (
+    ARM_C2C,
+    ARM_END_X,
+    DIMPLE_X,
+    HALF_WIDTH,
+    SHAFT_BORE_DIA,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
     auto_center_marks,
     place_view,
 )
@@ -86,64 +95,9 @@ FRONT_KEEP = {
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 TOP_KEEP = {}
 DIMENSION_CALLOUTS = {
-    "ShaftBoreDia": "THRU - SEE NOTE 5",
-    "DimpleDia": "0.5 DEEP - SEE NOTE 7",
+    "ShaftBoreDia": "THRU - REAM 3/8 IN",
+    "DimpleDia": "0.5 DEEP",
 }
-
-
-_NOTES_LEFT = (
-    "UNLESS OTHERWISE SPECIFIED:",
-    (
-        "1. DIMENSIONS ARE IN MILLIMETRES.\n"
-        "   INTERPRET PER ASME Y14.5."
-    ),
-    (
-        "2. TOLERANCES: LINEAR +/-0.25; ANGLES +/-0.5\n"
-        "   DEG; HOLE CENTRES +/-0.10; REAMED SHAFT BORE\n"
-        "   O9.525 +0.05/-0.00; DRILLED HOLE DIAMETERS\n"
-        "   +/-0.10. DIMPLE PER NOTE 7."
-    ),
-    "3. REMOVE BURRS AND BREAK SHARP EDGES 0.2 MAX.",
-    (
-        "4. BORE AND DIMPLE CENTRES LIE ON THE ARM\n"
-        "   CENTRELINE. OVERALL LENGTH 84.0 REF; END R8\n"
-        "   TANGENT TO SIDES, CENTRED ON SHAFT BORE."
-    ),
-    (
-        "5. SHAFT BORE (O9.525): DRILL AND REAM 3/8 IN,\n"
-        "   Ra 1.6; CLOSE SLIDING FIT ON THE CRANKSHAFT\n"
-        "   (SHAFT IS 3/8 IN DRILL ROD, +0.00/-0.02).\n"
-        f"   HANDLE PIVOT: 15/64 DRILL THRU; AXIS {ARM_C2C:.2f}\n"
-        "   FROM SHAFT AXIS ON THE ARM CENTRELINE."
-    ),
-)
-_NOTES_RIGHT = (
-    (
-        "6. CROSS-PIN HOLE (#9 DRILL, O4.978, MID-\n"
-        "   THICKNESS, ON SHAFT BORE AXIS): DRILL THRU.\n"
-        "   TAPER-REAM AT ASSEMBLY WITH THE CRANKSHAFT\n"
-        "   FOR A NO. 2 (0.193 IN) STANDARD TAPER PIN,\n"
-        "   1:48 TAPER, LARGE END OUTBOARD."
-    ),
-    (
-        "7. FIDUCIAL DIMPLE (O8.00 X 0.5 DEEP, FLAT\n"
-        "   BOTTOM, O8 END MILL): COSMETIC MARK IN THE\n"
-        "   FAR-SIDE FACE OF THE FRONT VIEW; LOCATION\n"
-        "   AND DEPTH NON-CRITICAL (+/-0.5)."
-    ),
-    (
-        "8. THE TWO 8 THICK BROAD FACES: PARALLEL\n"
-        "   WITHIN 0.10."
-    ),
-    (
-        "9. FINISH: BRIGHT MACHINED Ra 3.2; OIL.\n"
-        "   ALL Ra VALUES IN MICROMETRES."
-    ),
-)
-
-
-def _manufacturing_notes() -> str:
-    return "\n".join((*_NOTES_LEFT, *_NOTES_RIGHT))
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -160,8 +114,17 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
+            "Isometric View Note",
         ),
-        required=("Number", "Material Specification", "Finish", "Quantity"),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "Isometric View Note",
+        ),
     )
     drawing_model, sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE
@@ -231,9 +194,64 @@ async def build(adapter: Any) -> dict[str, str]:
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
-    add_note(adapter, "\n".join(_NOTES_LEFT), 0.014, 0.078)
-    add_note(adapter, "\n".join(_NOTES_RIGHT), 0.140, 0.072)
-    add_note(adapter, "ISOMETRIC VIEW SCALE 1:1", 0.330, 0.185)
+    # Native datum/GD&T/surface annotations replace the former prose notes 5/8/9.
+    # Right view is the 16 x 8 stock section: its left broad face is datum A.
+    add_datum_feature(
+        adapter,
+        right,
+        edge_xy=(RIGHT_CENTER[0] - 0.008, RIGHT_CENTER[1]),
+        symbol_xy=(RIGHT_CENTER[0] - 0.024, RIGHT_CENTER[1]),
+        datum="A",
+        label="crank broad face",
+    )
+    shaft_edge = (
+        _sheet_x(0.0),
+        FRONT_CENTER[1] + SHAFT_BORE_DIA * SHEET_SCALE[0] / 2000.0,
+    )
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=shaft_edge,
+        symbol_xy=(shaft_edge[0] - 0.022, FRONT_CENTER[1] + 0.025),
+        datum="B",
+        label="crank shaft axis",
+    )
+    handle_edge = (
+        _sheet_x(ARM_C2C),
+        FRONT_CENTER[1] + (15.0 / 64.0 * 25.4) * SHEET_SCALE[0] / 2000.0,
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=handle_edge,
+        frame_xy=(0.222, 0.158),
+        characteristic="position",
+        tolerance="0.20",
+        datums=("A", "B"),
+        diameter=True,
+        label="handle pivot position",
+    )
+    add_feature_control_frame(
+        adapter,
+        right,
+        edge_xy=(RIGHT_CENTER[0] + 0.008, RIGHT_CENTER[1]),
+        frame_xy=(0.316, 0.118),
+        characteristic="parallelism",
+        tolerance="0.10",
+        datums=("A",),
+        label="crank broad-face parallelism",
+    )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=shaft_edge,
+        symbol_xy=(0.070, 0.190),
+        roughness_ra="1.6",
+        label="shaft bore finish",
+    )
+
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.075)
+    add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.185)
 
     return await finalize_drawing(
         adapter,

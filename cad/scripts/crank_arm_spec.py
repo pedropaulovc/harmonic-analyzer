@@ -61,3 +61,22 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftBoreProfile": {"ShaftBoreDia"},
     "DimpleProfile": {"DimpleX", "DimpleDia"},
 }
+
+# True free-text instructions only. Geometry, datum structure, form/orientation,
+# and roughness live in native dimensions / datum tags / FCFs / surface symbols.
+# The part build stamps these strings into the SLDPRT; the drawing displays only
+# $PRPSHEET links, so the print cannot silently diverge from its source model.
+DRAWING_NOTES = "\n".join(
+    (
+        "UNLESS OTHERWISE SPECIFIED:",
+        "1. LINEAR +/-0.25; ANGLES +/-0.5 DEG; HOLE CENTRES +/-0.10; "
+        "DRILLED DIAMETERS +/-0.10. REMOVE BURRS; BREAK EDGES 0.2 MAX.",
+        "2. SHAFT BORE: DRILL AND REAM 3/8 IN FOR A CLOSE SLIDING FIT "
+        "ON 3/8 IN DRILL ROD (+0.00/-0.02). HANDLE PIVOT: 15/64 DRILL THRU.",
+        "3. CROSS-PIN: #9 DRILL THRU; TAPER-REAM WITH CRANKSHAFT AT "
+        "ASSEMBLY FOR NO. 2 (0.193 IN) TAPER PIN, 1:48 TAPER, LARGE END OUTBOARD.",
+        "4. FIDUCIAL DIMPLE: O8 END MILL, FLAT BOTTOM; LOCATION AND "
+        "DEPTH NON-CRITICAL (+/-0.5).",
+    )
+)
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
