@@ -210,8 +210,8 @@ async def build(adapter) -> dict[str, str]:
         [column_name],
         axis1="x", spacing1_mm=2.0 * COLUMN_X, instances1=2,
         axis2="z", spacing2_mm=2.0 * COLUMN_Z, instances2=2,
-        direction1=PatternDirection.REVERSE,
-        direction2=PatternDirection.REVERSE,
+        direction1=PatternDirection.FORWARD,
+        direction2=PatternDirection.FORWARD,
         label="tube-frame column grid",
     )
     assert_pattern_targets(
@@ -293,7 +293,7 @@ async def build(adapter) -> dict[str, str]:
         spacing2_mm=2.0 * abs(LAG_SCREW_XZ[0][1]),
         instances2=2,
         direction1=PatternDirection.REVERSE,
-        direction2=PatternDirection.REVERSE,
+        direction2=PatternDirection.FORWARD,
         label="lag-screw hold-down grid",
     )
     assert_pattern_targets(
