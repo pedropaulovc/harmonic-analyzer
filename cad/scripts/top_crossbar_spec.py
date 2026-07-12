@@ -12,7 +12,8 @@ BAR_LENGTH = 2.0 * BAR_HALF_Z
 
 STUD_HOLE_SIZE = "5/16"
 STUD_HOLE_FIT = "close"
-STUD_HOLE_DIA = 8.331
+STUD_HOLE_DRILL = "21/64"
+STUD_HOLE_DIA = 8.33
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarProfile": {"Width", "Height"},
