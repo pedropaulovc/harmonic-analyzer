@@ -2406,9 +2406,10 @@ async def save_assembly_and_images(
     # remap_front_to_machine_front (which re-bases the standard views) so the
     # re-based Front/Back/etc. used by the gallery stay correct.
     set_isometric_view(adapter)
-    # Gate reads and view setup can touch solve state. Rebuild again at the actual
-    # save chokepoint; the earlier solve+pose check proves this solve is idempotent.
-    final_rebuild_before_save(adapter, asm_name)
+    # View setup dirties the document so the camera persists, but does not dirty
+    # the solve state. Avoid repeating the 7-32 s deep rebuild unless SolidWorks
+    # explicitly reports that a gate or view operation requested one.
+    rebuild_if_needed_before_save(adapter, asm_name)
     _save_new_assembly_as_copy(adapter, asm_path)
     try:
         # Record the resolved-geometry fingerprint of the just-built assembly so a
@@ -2584,6 +2585,23 @@ async def reconcile_saved_rebuild_state(adapter: Any, asm_name: str, asm_path: A
                 f"{asm_name}: reconcile left NeedsRebuild2={in_mem} after EditRebuild3+Save3 "
                 f"(save result={result!r})")
         _telemetry.success(f"reconciled saved rebuild state ({asm_name}, was {status})")
+
+
+def rebuild_if_needed_before_save(adapter: Any, label: str, model: Any = None) -> None:
+    """Rebuild at the save chokepoint only when the solve state became dirty.
+
+    ``GetSaveFlag`` is deliberately not consulted: changing the active view sets
+    that flag because the camera must be saved, but it does not invalidate model
+    geometry. ``NeedsRebuild2`` is the authoritative geometry/solve signal.
+    """
+    target = adapter.currentModel if model is None else model
+    status = saved_rebuild_status(adapter, target)
+    if status != 0:
+        _telemetry.event("assembly.final_rebuild_required", asm=label, status=status)
+        final_rebuild_before_save(adapter, label, target)
+        return
+    _telemetry.event("assembly.final_rebuild_skipped", asm=label)
+    _telemetry.success(f"solve state already clean before save ({label})")
 
 
 async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:

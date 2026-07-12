@@ -13,6 +13,7 @@ from _assembly import (
     assert_manifest_dof_state,
     assert_saved_rebuild_clean,
     final_rebuild_before_save,
+    rebuild_if_needed_before_save,
     save_assembly_and_images,
     save_assembly_in_place,
 )
@@ -158,6 +159,14 @@ def test_final_rebuild_accepts_fully_rebuilt_state() -> None:
     final_rebuild_before_save(_Adapter(status=0), "harmonic-analyzer")
 
 
+def test_save_chokepoint_skips_rebuild_when_solve_state_is_clean() -> None:
+    calls = []
+    adapter = _Adapter(status=0)
+    adapter.currentModel.ForceRebuild3 = lambda _top_only: calls.append(True) or True
+    rebuild_if_needed_before_save(adapter, "harmonic-analyzer")
+    assert calls == []
+
+
 def test_in_place_save_rebuilds_at_the_save_chokepoint() -> None:
     source = inspect.getsource(save_assembly_in_place)
     rebuild = source.index("final_rebuild_before_save(adapter, asm_name, asm)")
@@ -165,10 +174,11 @@ def test_in_place_save_rebuilds_at_the_save_chokepoint() -> None:
     assert rebuild < source.index("asm.GetSaveFlag()") < save
 
 
-def test_fresh_build_rebuilds_after_gates_and_view_setup() -> None:
+def test_fresh_build_checks_solve_state_after_gates_and_view_setup() -> None:
     source = inspect.getsource(save_assembly_and_images)
-    assert source.count("final_rebuild_before_save(adapter, asm_name)") == 2
-    assert source.rindex("final_rebuild_before_save(adapter, asm_name)") < source.index(
+    assert source.count("final_rebuild_before_save(adapter, asm_name)") == 1
+    assert source.count("rebuild_if_needed_before_save(adapter, asm_name)") == 1
+    assert source.index("rebuild_if_needed_before_save(adapter, asm_name)") < source.index(
         "_save_new_assembly_as_copy(adapter, asm_path)"
     )
 
