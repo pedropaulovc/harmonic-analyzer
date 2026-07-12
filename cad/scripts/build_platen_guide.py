@@ -52,6 +52,7 @@ from _holes import (
     HoleSpec,
     blind_cut_dia_mm,
     blind_hole_volume_mm3,
+    normalize_plain_through_hole,
     wizard_holes,
 )
 
@@ -148,6 +149,9 @@ async def build(adapter) -> dict[str, str]:
         [[x, GUIDE_HEIGHT / 2.0, 0.0] for x in HOLE_X],
         (0.0, 0.0, -1.0),
         "lock-screw holes (#4 clearance)", name="LockHoles",
+    )
+    normalize_plain_through_hole(
+        adapter, "LockHoles", "lock-screw holes (#4 clearance)"
     )
     v_holes = len(HOLE_X) * math.pi * (lock_dia / 2.0) ** 2 * GUIDE_DEPTH
     await volume_check(adapter, "guide with holes", v_rail - v_holes, 0.02 * v_holes)
