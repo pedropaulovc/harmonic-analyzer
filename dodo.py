@@ -911,7 +911,7 @@ def _submodule_part_dep() -> str:
 # shared cache by that hash and download a prebuilt .SLDPRT/.SLDASM instead of
 # driving SolidWorks. Keys fold each file with ContentChecker._digest -- IDENTICAL
 # to the doit staleness check -- so a cache hit and "doit up-to-date" agree, and a
-# comment-only YAML edit changes neither. A seat-less machine (HARMONIC_CACHE_MODE
+# comment-only YAML edit changes neither. A seat-less machine (HARMONIC_REMOTE_CACHE_MODE
 # =ro) pulls; a builder (rw) pulls+pushes. Disabled (off) => zero behaviour change.
 def _png_dir(stem: str) -> Path:
     return CAD_OUT / "png" / stem.replace("_", "-")

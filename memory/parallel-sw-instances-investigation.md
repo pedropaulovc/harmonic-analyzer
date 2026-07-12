@@ -20,7 +20,7 @@ Concretely, three questions to answer empirically:
 
 **Acceptance bar (hard):** run a full **PARALLEL** cold build (the multi-instance mode
 being tested, N instances driving COM tasks at once) **3×** and all three must pass before
-claiming success. Cold = no remote-cache hits (bust the salt / `HARMONIC_CACHE_MODE=off`).
+claiming success. Cold = no remote-cache hits (bust the salt / `HARMONIC_REMOTE_CACHE_MODE=off`).
 
 **Measure the speedup** — wall-clock of the parallel cold build vs **past releases**
 (historical serial-spine release build times; pull from release logs / `cad/out/reports/`

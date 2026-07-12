@@ -99,21 +99,21 @@ and the build proceeds normally (a miss/error never fails a build).
 
 Role is one of `off` | `ro` (pull only) | `rw` (pull + push). Resolved in order:
 
-1. `HARMONIC_CACHE_MODE` env var, if set
-2. `.harmonic-cache-mode` — a **gitignored one-line file at the repo root**
-   (`C:\src\harmonic-analyzer\.harmonic-cache-mode`), contents just `off`/`ro`/`rw`
+1. `HARMONIC_REMOTE_CACHE_MODE` env var, if set
+2. `.harmonic-remote-cache-mode` — a **gitignored one-line file at the repo root**
+   (`C:\src\harmonic-analyzer\.harmonic-remote-cache-mode`), contents just `off`/`ro`/`rw`
 3. `_DEFAULT_MODE` = **`rw`** (the fallback)
 
-`.harmonic-cache-mode` is **per-clone** (not global) and never committed. To
+`.harmonic-remote-cache-mode` is **per-clone** (not global) and never committed. To
 downgrade a seat — e.g. a collaborator without Azure access — drop the file at the
 repo root:
 
 ```powershell
-Set-Content .harmonic-cache-mode off    # disable (no pull, no push)
-Set-Content .harmonic-cache-mode ro     # pull only
+Set-Content .harmonic-remote-cache-mode off    # disable (no pull, no push)
+Set-Content .harmonic-remote-cache-mode ro     # pull only
 ```
 
-Or, equivalently, without a file: `$env:HARMONIC_CACHE_MODE = 'off'`.
+Or, equivalently, without a file: `$env:HARMONIC_REMOTE_CACHE_MODE = 'off'`.
 
 Check the resolved role:
 
@@ -159,7 +159,7 @@ subscription.
 
 - The `rw` default means *any* clone attempts a push. Safe (RBAC denies an
   unauthorized seat, fail-soft), but an unauthorized seat pays a credential-probe
-  delay per build — set `.harmonic-cache-mode off` there.
+  delay per build — set `.harmonic-remote-cache-mode off` there.
 - Cross-machine hit rate depends on identical input **bytes**. Without a
   `.gitattributes` normalizing line endings, a `.py` re-materialized with
   different EOLs hashes differently → a miss (never a wrong artefact). Add
