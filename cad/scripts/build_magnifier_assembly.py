@@ -67,6 +67,7 @@ from _assembly import (
     angle_driver,
     assert_component_placed,
     assert_free_dof_necessity,
+    assert_pattern_targets,
     check_no_interference,
     coincident_mate,
     component_named_ref,
@@ -337,11 +338,12 @@ async def build(adapter) -> dict[str, str]:
         direction=PatternDirection.REVERSE,
         label="wheel clamp-screw pattern",
     )
-    assert_component_placed(
+    assert_pattern_targets(
         adapter,
-        clamp_instances[0],
-        [patterned_x, WHEEL_BAR_Y, BAR_FRONT_Z],
+        clamp_instances,
+        [[patterned_x, WHEEL_BAR_Y, BAR_FRONT_Z]],
         IDENTITY,
+        "wheel clamp-screw pattern",
     )
 
     # --- magnifying group ----------------------------------------------------

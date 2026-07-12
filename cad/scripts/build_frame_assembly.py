@@ -96,6 +96,7 @@ from _common import (
 from _assembly import (
     assert_component_placed,
     assert_components_fully_defined,
+    assert_pattern_targets,
     check_no_interference,
     coincident_mate,
     component_names,
@@ -442,7 +443,7 @@ async def build(adapter) -> dict[str, str]:
     screw_targets = [
         [bx, LAG_SCREW_UNDER_HEAD_Y, bz] for bx, bz in LAG_SCREW_XZ[2:]
     ]
-    await linear_component_pattern(
+    pattern_instances = await linear_component_pattern(
         adapter,
         screw_names,
         axis="x",
@@ -451,10 +452,13 @@ async def build(adapter) -> dict[str, str]:
         direction=PatternDirection.REVERSE,
         label="lag-screw hold-down pattern",
     )
-    for target in screw_targets:
-        assert_component_placed(
-            adapter, _instance_at(adapter, "lag-screw", target), target, IDENTITY
-        )
+    assert_pattern_targets(
+        adapter,
+        pattern_instances,
+        screw_targets,
+        IDENTITY,
+        "lag-screw hold-down pattern",
+    )
 
     # Top-frame ring clamped around the four columns, mid-plane y 1020.2.
     target = [0.0, TOP_FRAME_MID_Y, 0.0]
