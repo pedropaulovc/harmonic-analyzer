@@ -70,7 +70,7 @@ def test_linear_pattern_rejects_single_instance_before_com() -> None:
         asyncio.run(
             linear_component_pattern(
                 None,
-                "seed-1",
+                ["seed-1"],
                 axis="x",
                 spacing_mm=10.0,
                 instances=1,
@@ -83,7 +83,7 @@ def test_linear_pattern_rejects_nonpositive_spacing_before_com() -> None:
         asyncio.run(
             linear_component_pattern(
                 None,
-                "seed-1",
+                ["seed-1"],
                 axis="x",
                 spacing_mm=0.0,
                 instances=2,
@@ -100,7 +100,7 @@ def test_linear_pattern_preserves_reverse_direction(monkeypatch: pytest.MonkeyPa
     names = asyncio.run(
         linear_component_pattern(
             adapter,
-            "seed-1",
+            ["seed-1"],
             axis="x",
             spacing_mm=35.0,
             instances=2,
@@ -117,7 +117,7 @@ def test_circular_pattern_rejects_single_instance_before_com() -> None:
         asyncio.run(
             circular_component_pattern(
                 None,
-                "seed-1",
+                ["seed-1"],
                 axis_name="Axis1",
                 instances=1,
             )
