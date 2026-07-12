@@ -83,15 +83,20 @@ from _common import (
 )
 from _assembly import (
     angle_driver,
+    assert_component_placed,
     assert_free_dof_necessity,
     check_no_interference,
+    coincident_mate,
     component_names,
     component_origin,
     component_transform,
     distance_driver,
     gear_mate,
+    linear_component_pattern,
     lock_mate,
     named_ref,
+    parallel_mate,
+    PatternDirection,
     place_component,
     rack_pinion_mate,
     reledger_to_solved,
@@ -613,9 +618,14 @@ async def build(adapter) -> dict[str, str]:
     # The bar is FIRST so the auto-fixed seed is structure, not the mated platen.
     # Symmetric about machine x=0; its bracket-screw holes flank the stud at
     # machine -12 (see build_support_bar.py).
-    await place_component(adapter, "support-bar", [0.0, BAR_CY, BAR_Z],
-                          [0.0, 0.0, 0.0], IDENTITY,
-                          label="support-bar (the platen bar)")
+    support_bar = await place_component(
+        adapter,
+        "support-bar",
+        [0.0, BAR_CY, BAR_Z],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        label="support-bar (the platen bar)",
+    )
     # Machine columns at +-197 (west first, to match the pose ledger's -1/-2).
     for sx in (1.0, -1.0):
         # Ry(+90): the arcs' local +X (their depth axis) faces machine -Z.
@@ -623,13 +633,71 @@ async def build(adapter) -> dict[str, str]:
             await place_component(adapter, arc, [sx * COLUMN_X, BAR_CY, COLUMN_Z],
                                   [0.0, 90.0, 0.0], ROT_Y_POS90,
                                   label=f"{arc} (x{sx * COLUMN_X:+.0f})")
-    # Clamp screws: heads on the bar's FRONT face flanking each column (ch30
-    # p002), shanks through bar + front arc, threading into the back arc. The
-    # support-bar hole list is pre-mirror-ordered; negate to the machine hole.
-    for x in CLAMP_HOLE_X:
-        await place_component(adapter, "clamp-screw", [-x, BAR_CY, BAR_FRONT_Z],
-                              [0.0, 0.0, 0.0], IDENTITY,
-                              label=f"clamp-screw (x{-x:+.1f})")
+    # Two physically mated clamp-screw seeds at the east column plus one native
+    # multi-seed pattern across the frame.  The pattern spacing is exactly the
+    # column pitch; each seed is coaxial with a Hole Wizard station, seated on
+    # the bar front face, and anti-spin constrained.
+    clamp_x = sorted(CLAMP_HOLE_X)
+    clamp_seeds: list[str] = []
+    for index, x in enumerate(clamp_x[:2]):
+        target = [x, BAR_CY, BAR_FRONT_Z]
+        seed = await place_component(
+            adapter,
+            "clamp-screw",
+            target,
+            [0.0, 0.0, 0.0],
+            IDENTITY,
+            ground=False,
+            label=f"clamp-screw seed (x{x:+.1f})",
+        )
+        await coincident_mate(
+            adapter,
+            named_ref(f"ScrewAxis@{seed}", "AXIS"),
+            named_ref(f"ClampAxis{index}@{support_bar}", "AXIS"),
+            label=f"support clamp-screw seed {index} coaxial",
+            verify=(seed, target),
+        )
+        await coincident_mate(
+            adapter,
+            named_ref(f"Front Plane@{seed}", "PLANE"),
+            named_ref(f"ClampSeat@{support_bar}", "PLANE"),
+            label=f"support clamp-screw seed {index} under-head seat",
+            verify=(seed, target),
+        )
+        await parallel_mate(
+            adapter,
+            named_ref(f"Right Plane@{seed}", "PLANE"),
+            named_ref(f"Right Plane@{support_bar}", "PLANE"),
+            label=f"support clamp-screw seed {index} anti-spin",
+            verify=(seed, target),
+        )
+        assert_component_placed(adapter, seed, target, IDENTITY)
+        clamp_seeds.append(seed)
+    clamp_targets = [[x, BAR_CY, BAR_FRONT_Z] for x in clamp_x[2:]]
+    clamp_instances = await linear_component_pattern(
+        adapter,
+        clamp_seeds,
+        axis="x",
+        spacing_mm=2.0 * COLUMN_X,
+        instances=2,
+        direction=PatternDirection.REVERSE,
+        label="support clamp-screw pattern",
+    )
+    for target in clamp_targets:
+        matching = [
+            name
+            for name in clamp_instances
+            if all(
+                abs(component_transform(adapter, name)[9 + axis] * 1000.0 - target[axis])
+                < 0.05
+                for axis in range(3)
+            )
+        ]
+        if len(matching) != 1:
+            raise RuntimeError(
+                f"support clamp pattern has {len(matching)} instances at {target}"
+            )
+        assert_component_placed(adapter, matching[0], target, IDENTITY)
 
     # --- platen group (hangs on the bar) ---------------------------------------
     # The platen runs as a prismatic slider along X (the paper feed): its local
