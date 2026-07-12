@@ -89,7 +89,11 @@ RIGHT_KEEP = {
     "TopSpan": (0.155, 0.252),     # 16.93 top section, above the view
 }
 
-HOLE_TABLE_ANCHOR = (0.284, 0.135)
+# Top-left anchor (meters); the table grows down. Raised from 0.135 so the table
+# bottom (~83 mm) clears the title block's top rule (80 mm) with a ~3 mm gap
+# instead of sharing/crossing it -- the layout audit flags the 0.6 mm overlap the
+# old 0.135 produced; the table top (~139 mm) still clears the iso view (~143 mm).
+HOLE_TABLE_ANCHOR = (0.284, 0.139)
 
 
 # 9/16-12 tap drill (the modeled hole) — the edge pick must land ON the rim.

@@ -168,15 +168,36 @@ def _may_collide(a: LayoutElement, b: LayoutElement) -> bool:
     return True
 
 
+# Kinds whose box is an EXACT extent -- no GetOutline padding, no nominal guess.
+# Two of them overlapping by any real amount is a true collision, so the padding
+# tolerance (calibrated for fuzzy view outlines) must NOT apply: a note shifted
+# 1 mm into a table or the title block has to be caught (Codex #269).
+_EXACT_KINDS = frozenset({"note", "table", "titleblock"})
+# A hair of slack for exact pairs too, only to swallow floating-point noise on
+# boxes that merely touch -- far below the ~1 mm real overlaps we must catch.
+_EXACT_OVERLAP_TOL_M = 0.0002
+
+
+def _pair_overlap_tol(a: LayoutElement, b: LayoutElement, padded_tol: float) -> float:
+    """The padding tolerance applies only when a FUZZY box (a padded view outline
+    or a nominal GD&T / dimension box) is in the pair; two EXACT boxes (note /
+    table / title block) get near-zero slack."""
+    if a.kind in _EXACT_KINDS and b.kind in _EXACT_KINDS:
+        return _EXACT_OVERLAP_TOL_M
+    return padded_tol
+
+
 def find_overlaps(
     elements: list[LayoutElement], *, overlap_tol: float = DEFAULT_OVERLAP_TOL_M
 ) -> list[Overlap]:
-    """Every eligible pair of elements that mutually penetrate by > ``overlap_tol``.
+    """Every eligible pair of elements that mutually penetrate past their slack.
 
     A real 2D collision needs positive penetration on BOTH axes; requiring the
     *smaller* penetration to clear the tolerance rejects the whitespace padding
-    that ``GetOutline`` adds to adjacent views.  Pair eligibility follows each
-    element's ``CollisionScope`` (see :func:`_may_collide`).
+    that ``GetOutline`` adds to adjacent views.  That padding slack applies only
+    to pairs involving a fuzzy box -- two EXACT boxes get near-zero slack (see
+    :func:`_pair_overlap_tol`).  Pair eligibility follows each element's
+    ``CollisionScope`` (see :func:`_may_collide`).
     """
     overlaps: list[Overlap] = []
     for i in range(len(elements)):
@@ -185,7 +206,7 @@ def find_overlaps(
             if not _may_collide(a, b):
                 continue
             depth_x, depth_y = _penetration(a, b)
-            if min(depth_x, depth_y) > overlap_tol:
+            if min(depth_x, depth_y) > _pair_overlap_tol(a, b, overlap_tol):
                 overlaps.append(Overlap(a, b, depth_x, depth_y))
     return overlaps
 
