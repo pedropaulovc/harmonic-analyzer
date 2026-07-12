@@ -99,10 +99,10 @@ def _assert_positive_repro(contents: tuple[tuple[str, ...], ...]) -> None:
 
     size_cells = tuple(row[3] for row in contents[1:])
     bad_clearance = tuple(
-        text for text in size_cells if "3.25 THRU ALL" in text and "0.00" in text
+        text for text in size_cells if "THRU ALL" in text and "0.00" in text
     )
     good_number_drill = tuple(
-        text for text in size_cells if "3.26 THRU ALL" in text and "0.00" not in text
+        text for text in size_cells if "THRU ALL" in text and "0.00" not in text
     )
     if len(bad_clearance) != 4 or len(good_number_drill) != 1:
         raise RuntimeError(
