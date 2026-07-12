@@ -712,7 +712,7 @@ class HAC_OT_export_deltas(bpy.types.Operator):
                 continue
             moved.append({
                 "name": obj.name,
-                "part": part_of.get(obj.name, obj.name),
+                "part": obj.get("hac_part") or part_of.get(obj.name, obj.name),
                 "translate_mm": [round(v, 3) for v in dt],
                 "scale": [round(s, 4) for s in sf],
                 "rotate_deg": [round(a, 3) for a in dr],
