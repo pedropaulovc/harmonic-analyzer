@@ -2182,7 +2182,7 @@ async def save_assembly_and_images(
     # remap_front_to_machine_front (which re-bases the standard views) so the
     # re-based Front/Back/etc. used by the gallery stay correct.
     set_isometric_view(adapter)
-    check(f"save_file -> {asm_path}", await adapter.save_file(str(asm_path)))
+    _save_new_assembly_with_references(adapter, asm_path)
     # Record the resolved-geometry fingerprint of the just-built assembly so a later
     # in-place refresh of it (unchanged) is a true no-op and never bumps the md5 --
     # otherwise the first refresh after a from-scratch build would re-save once and
@@ -2195,6 +2195,39 @@ async def save_assembly_and_images(
     artefacts = {"assembly": str(asm_path)}
     artefacts.update(await _export_assembly_images(adapter, asm_name, views))
     return artefacts
+
+
+@_telemetry.traced("assembly.save_with_references")
+def _save_new_assembly_with_references(adapter: Any, asm_path: Any) -> None:
+    """Save a freshly built assembly and every dirty referenced component.
+
+    Creating a native component pattern marks its seed component document dirty.
+    A plain ``SaveAs3(..., options=0)`` then raises the blocking "Component
+    documents must be saved" dialog.  Native assembly saves support the required
+    bitmask directly: Silent (1) | SaveReferenced (4) |
+    AvoidRebuildOnSave (8).  The full-build path always owns a new, unsaved
+    assembly document; refreshes use :func:`save_assembly_in_place` instead.
+
+    ``SaveAs3``'s integer return is unreliable across late-bound COM, so success
+    is gated on this call producing a new, non-empty target file.
+    """
+    options = 1 | 4 | 8
+    model = adapter.currentModel
+    if asm_path.exists():
+        adapter._attempt(lambda: adapter.swApp.CloseDoc(str(asm_path)), default=None)
+        asm_path.unlink()
+
+    result = adapter._attempt(
+        lambda: model.SaveAs3(str(asm_path), 0, options), default=None
+    )
+    if not asm_path.exists() or asm_path.stat().st_size <= 0:
+        raise RuntimeError(
+            f"SaveAs3(Silent|SaveReferenced|AvoidRebuild) produced no file: "
+            f"{asm_path} (rc={result!r})"
+        )
+    _telemetry.success(
+        f"save assembly + referenced components -> {asm_path} (rc={result!r})"
+    )
 
 def _massprops_sidecar(asm_name: str):
     """Sidecar holding the last-saved resolved-geometry fingerprint of an assembly.
