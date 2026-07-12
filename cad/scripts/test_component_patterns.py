@@ -7,6 +7,8 @@ import pytest
 import _assembly
 from _assembly import (
     PatternDirection,
+    assert_pattern_targets,
+    assert_pose_ledger,
     circular_component_pattern,
     ensure_global_pattern_axis,
     linear_component_pattern,
@@ -122,3 +124,29 @@ def test_circular_pattern_rejects_single_instance_before_com() -> None:
                 instances=1,
             )
         )
+
+
+def test_pattern_targets_join_final_pose_ledger(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    position = [10.0, 20.0, 30.0]
+    rows = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+
+    def transform(*_: object) -> list[float]:
+        return [
+            1.0, 0.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 0.0, 1.0,
+            position[0] / 1000.0,
+            position[1] / 1000.0,
+            position[2] / 1000.0,
+            1.0, 0.0, 0.0, 0.0,
+        ]
+
+    _assembly._POSE_LEDGER.clear()
+    monkeypatch.setattr(_assembly, "component_transform", transform)
+    assert_pattern_targets(None, ["pattern-1"], [position.copy()], rows, "pattern")
+
+    position[0] += 1.0
+    with pytest.raises(RuntimeError, match="pattern-1"):
+        assert_pose_ledger(None)
