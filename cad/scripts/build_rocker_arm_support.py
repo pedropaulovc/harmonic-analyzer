@@ -83,12 +83,18 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
     set_global,
     volume_check,
+)
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
 )
 
 PART_NAME = "rocker-arm-support"
@@ -116,6 +122,15 @@ FILLET_EDGES = [  # four inner-frame corner edges (run along Z through the web)
 ]
 
 HOLES = [(60.32, 17.46), (-60.32, 17.46), (60.32, -17.46), (-60.32, -17.46)]
+
+# The manufacturing print's dimension set (draw_rocker_arm_support.py imports
+# exactly these marked dimensions; its keep maps must stay in lockstep).
+DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    "WallProfile": {"FootSpan", "TopSpan", "WallHeight"},
+    "Wall": {"Depth"},
+    "WindowProfile": {"WinWidth", "WinHeight"},
+    "CavityProfile": {"CavWidth", "CavDepth"},
+}
 # Hole Wizard constants (resolved from the SW type library on this seat):
 SW_FM_HOLE_WZD = 25            # swFeatureNameID_e.swFmHoleWzd (CreateDefinition)
 SW_WZD_TAP = 4                 # swWzdGeneralHoleTypes_e.swWzdTap (straight tap)
@@ -123,7 +138,7 @@ SW_STD_ANSI_INCH = 0           # swWzdHoleStandards_e.swStandardAnsiInch
 SW_HOLE_FASTENER_TYPE = 26     # ANSI-inch "Bottoming Tapped Hole"
 SW_END_THROUGH_NEXT = 2        # swEndCondThroughNext / swEndThreadTypeTHROUGH_NEXT
 HOLE_SSIZE = "9/16-12"
-HOLE_THREAD_CLASS = "1B"
+HOLE_THREAD_CLASS = "2B"  # customary US class for a general tapped hole
 
 CHAMFER = 1.27     # leg, 45°
 CHAMFER_EDGES = [  # 12 inner-frame opening edges, both web faces (Z = ±WEB)
@@ -368,6 +383,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HalfHeight", f"{HALF_Y}mm")  # trapezoid half-height (Y)
     await set_global(adapter, "CavHalf", f"{CAV}mm")        # cavity square half
     await set_global(adapter, "WindowOuter", f"{BIG}mm")    # window square half
+    await set_global(adapter, "WallWidth", f"{BOSS_DEPTH}mm")  # mid-plane extrude span (X)
 
     # Each sketch records its dim names + drive equations inline as it is drawn
     # (per-sketch SketchDims); the (dim@feature, expr) jobs are collected here and
@@ -398,6 +414,8 @@ async def build(adapter) -> dict[str, str]:
     check("boss", await adapter.create_extrusion(
         ExtrusionParameters(depth=BOSS_DEPTH, both_directions=True)))
     name_last_feature(adapter, "Wall")
+    depth_dim = name_dimensions(adapter, "Wall", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"WallWidth"')]
     await volume_check(adapter, "Wall", 1_271_363, 200)
 
     # 2-4. Two sketches drive three cuts, exactly as the source tree does (only
@@ -513,9 +531,16 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "FootSeat")
 
+    # Manufacturing drawing support: mark exactly the print's dimensions and
+    # stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)  # green-painted casting, like the base/top-frame
     await report_mass_properties(adapter)
+    apply_drawing_properties(adapter, PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)
 
 
