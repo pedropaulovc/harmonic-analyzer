@@ -25,6 +25,7 @@ from __future__ import annotations
 import math
 import sys
 
+from _fastener_catalog import fastener
 from _common import (
     SketchDims,
     apply_material,
@@ -43,12 +44,13 @@ from _common import (
 )
 
 PART_NAME = "lag-screw"
-MATERIAL = "Plain Carbon Steel"  # black hardware
+SPEC = fastener(PART_NAME)
+MATERIAL = SPEC.material  # black hardware
 
 HEAD_DIA = 22.0  # round head in the O23 base counterbore (low)
 HEAD_H = 6.0  # recessed 0.5 below the base bottom (counterbore 6.5)
-SHANK_DIA = 12.0  # rides the O13 base hole into the O12.30 9/16-12 tapped foot hole
-SHANK_LEN = 63.0  # 44.3 base (above the 6.5 cbore) + 18.7 into the support foot
+SHANK_DIA = SPEC.model_diameter_mm  # rides the O13 base hole into the O12.30 9/16-12 tap
+SHANK_LEN = SPEC.length_mm  # 44.3 base (above the 6.5 cbore) + 18.7 into the support foot
 
 
 async def build(adapter) -> dict[str, str]:

@@ -27,6 +27,7 @@ from __future__ import annotations
 import math
 import sys
 
+from _fastener_catalog import fastener
 from _common import (
     SketchDims,
     add_line_chain,
@@ -47,12 +48,13 @@ from _common import (
 )
 
 PART_NAME = "hex-bolt"
-MATERIAL = "Plain Carbon Steel"  # black hardware
+SPEC = fastener(PART_NAME)
+MATERIAL = SPEC.material  # black hardware
 
 HEAD_AF = 12.7  # hex across-flats, 1/2" wrench size for a 5/16" bolt (low)
 HEAD_H = 5.5  # head height (low)
-SHANK_DIA = 7.8  # rides the O8.2 rail/base holes (5/16" nominal 7.94 - fit)
-SHANK_LEN = 32.0  # rail 20 + 12 reach into the base top plate
+SHANK_DIA = SPEC.model_diameter_mm  # rides the O8.2 rail/base holes
+SHANK_LEN = SPEC.length_mm  # rail 20 + 12 reach into the base top plate
 
 # Every hex offset dim is linear in the across-flats (radius = AF/sqrt 3), so a
 # single HeadAF global drives them all via dimensionless coefficients -- unit-safe

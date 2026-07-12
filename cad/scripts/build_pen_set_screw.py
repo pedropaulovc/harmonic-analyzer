@@ -25,6 +25,7 @@ from __future__ import annotations
 import math
 import sys
 
+from _fastener_catalog import fastener
 from _common import (
     SketchDims,
     apply_material,
@@ -43,13 +44,14 @@ from _common import (
 from _features import add_reeded_head_and_thread
 
 PART_NAME = "pen-set-screw"
-MATERIAL = "Brass"  # see _common.apply_material docstring
+SPEC = fastener(PART_NAME)
+MATERIAL = SPEC.material
 
 KNOB_DIA = 9.0  # DIMENSIONS.md ch24: black knurled knob (low)
 KNOB_LENGTH = 5.0
-SHANK_DIA = 2.0  # shank: was Ø3.0, now 2.0 = #4-40 tap-drill 2.261 - 0.26
+SHANK_DIA = SPEC.model_diameter_mm  # #4-40 modeled thread minor diameter
 # (threads #4-40 into the pen frame's bottom-rail tapped hole)
-SHANK_LENGTH = 15.0
+SHANK_LENGTH = SPEC.length_mm
 
 
 async def build(adapter) -> dict[str, str]:

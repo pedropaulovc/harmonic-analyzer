@@ -30,6 +30,7 @@ from __future__ import annotations
 import math
 import sys
 
+from _fastener_catalog import fastener
 from _common import (
     PANEL_BLACK,
     SketchDims,
@@ -50,13 +51,14 @@ from _common import (
 )
 
 PART_NAME = "foot-screw"
-MATERIAL = "Plain Carbon Steel"  # black-finished (img01's dark head)
+SPEC = fastener(PART_NAME)
+MATERIAL = SPEC.material  # black-finished (img01's dark head)
 
 HEAD_DIA = 5.5  # fillister-size head: fits the pedestal's 6-long flange
 HEAD_H = 2.2
-SHANK_DIA = 2.0  # shank: was Ø2.9, now 2.0 = #4-40 tap-drill 2.261 - 0.26
+SHANK_DIA = SPEC.model_diameter_mm  # #4-40 modeled thread minor diameter
 # (threads #4-40 into the base; rides the Ø3.2 spring-foot / pedestal-flange clearance)
-SHANK_LEN = 8.0  # pedestal: 5.0 flange + 3.0 engagement; the spring
+SHANK_LEN = SPEC.length_mm  # pedestal: 5.0 flange + 3.0 engagement; the spring
 # instance buries the surplus in the base (its strip is only 0.8)
 
 
