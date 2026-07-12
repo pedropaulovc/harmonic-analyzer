@@ -171,8 +171,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, BLOCK_X / 2.0, BLOCK_Z / 2.0, "block", dims=block,
         name_width="Width", drive_width='"BlockX"',
         name_depth="Depth", drive_depth='"BlockZ"',
-        name_corner=("CornerX", "CornerZ"),
-        drive_corner=('"BlockX" / 2', '"BlockZ" / 2'),
     )
     await ensure_fully_defined(adapter, "block sketch")
     check("exit_sketch block", await adapter.exit_sketch())
@@ -243,7 +241,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, SLIT_W / 2.0, BLOCK_Z / 2.0 + 1.0, "slit", dims=slit,
         name_width="SlitW", drive_width='"SlitW"',
         name_depth="SlitSpan", drive_depth=None,
-        name_corner=("SlitCx", "SlitCz"), drive_corner=(None, None),
     )
     await ensure_fully_defined(adapter, "slit sketch")
     check("exit_sketch slit", await adapter.exit_sketch())

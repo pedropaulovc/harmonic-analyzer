@@ -192,8 +192,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, BOTTOM_LENGTH / 2.0, BOTTOM_WIDTH / 2.0, "bottom plate", dims=bottom,
         name_width="BottomLen", drive_width='"BottomLength"',
         name_depth="BottomWid", drive_depth='"BottomWidth"',
-        name_corner=("BottomCornerX", "BottomCornerZ"),
-        drive_corner=('"BottomLength" / 2', '"BottomWidth" / 2'),
     )
     await ensure_fully_defined(adapter, "bottom plate sketch")
     check("exit_sketch bottom", await adapter.exit_sketch())
@@ -214,8 +212,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, TOP_LENGTH / 2.0, TOP_WIDTH / 2.0, "top plate", dims=top,
         name_width="TopLen", drive_width='"TopLength"',
         name_depth="TopWid", drive_depth='"TopWidth"',
-        name_corner=("TopCornerX", "TopCornerZ"),
-        drive_corner=('"TopLength" / 2', '"TopWidth" / 2'),
     )
     await ensure_fully_defined(adapter, "top plate sketch")
     check("exit_sketch top", await adapter.exit_sketch())
