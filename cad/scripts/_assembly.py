@@ -1750,6 +1750,69 @@ def write_dof_manifest(name: str) -> Any:
     return path
 
 
+# Exact under-constrained component families allowed for assemblies that ship
+# with operational free DOF. Shared by incremental refresh and verify:soundness
+# so neither path can save/approve a stray freedom the other rejects.
+_ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
+    "channel": ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever"),
+    "summing": ("summing-lever", "boss-hook"),
+    "pen": ("pen-rod", "pen-marker", "pen-wire"),
+    "drive-train": (
+        "alignment-pinion", "cone-gear", "cone-gear-shaft", "cone-pivot-post",
+        "cone-swing-platform", "cone-tip-adjuster", "cone-tip-block",
+        "cone-tip-bushing", "cone-tip-pinch-screw", "crank-arm",
+        "crank-drive-gear", "crank-handle", "crank-pinion", "crankshaft",
+        "cylinder-gear", "pinion-arbor", "pinion-bracket", "pinion-cam",
+        "pinion-cam-pin", "pinion-handle", "pinion-lever", "pinion-lift-rod",
+    ),
+    "magnifier": (
+        "lever-wire", "magnifying-bracket", "magnifying-clamp",
+        "magnifying-lever", "magnifying-vertical-rod", "magnifying-wheel",
+        "output-fixture", "thumb-screw",
+    ),
+    "paper-drive": (
+        "fillister-screw", "guide-lock", "platen", "platen-clip",
+        "platen-guide", "platen-paper", "platen-rack", "rack-pinion",
+        "transgear-feed-pinion", "transgear-knob-shaft", "transgear-pinion",
+        "transgear-removable",
+    ),
+}
+
+
+def assert_manifest_dof_state(adapter: Any, asm_name: str) -> None:
+    """Apply the refresh DOF gate that matches the assembly's saved contract.
+
+    A non-empty DOF manifest means the assembly intentionally ships with those
+    operational freedoms. Prove their exact recorded witness instances remain
+    under-constrained; assemblies without a manifest retain the strict 0-DOF gate.
+    The exhaustive coupled-family check remains in ``verify:soundness``.
+    """
+    path = dof_manifest_path(asm_name)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        assert_components_fully_defined(adapter)
+        return
+    except (OSError, ValueError, TypeError) as exc:
+        raise RuntimeError(f"invalid free-DOF manifest {path}: {exc}") from exc
+    specs = payload.get("specs") if isinstance(payload, dict) else None
+    if not isinstance(specs, list) or not specs:
+        raise RuntimeError(f"free-DOF manifest {path} has no specs")
+    instances: list[str] = []
+    for spec in specs:
+        verify = spec.get("verify") if isinstance(spec, dict) else None
+        instance = verify[0] if isinstance(verify, list) and verify else None
+        if not isinstance(instance, str) or not instance:
+            raise RuntimeError(f"free-DOF manifest {path} has a spec without a witness")
+        instances.append(instance)
+    assert_free_dof_necessity(
+        adapter,
+        len(specs),
+        required_instances=tuple(dict.fromkeys(instances)),
+        allowed_stems=_ALLOWED_FREE_STEMS.get(asm_name, ()),
+    )
+
+
 
 
 
@@ -2212,12 +2275,14 @@ async def save_assembly_and_images(
     adapter: Any, asm_name: str, views: Iterable[str] = DEFAULT_VIEWS
 ) -> dict[str, str]:
     """Save the assembly to ``cad/out/sldasm`` and PNG views to ``cad/out/png``."""
+    # Establish a clean solved state for the health and pose gates.
+    final_rebuild_before_save(adapter, asm_name)
     # Fail fast: never save a broken assembly. Catches mate errors (e.g. a gear
     # mate whose entity went suppressed = the silent drive-train corruption) that
     # the DOF and interference gates miss -- a fixed/grounded component passes
     # the DOF gate even with broken mates. deep=True also inspects each
     # subassembly's own document, where a sub's internal mate errors live.
-    assert_model_healthy(adapter, label=asm_name, deep=True)
+    assert_model_healthy(adapter, label=asm_name, deep=True, rebuilt=True)
     # ... and never save a solver-drifted one: every placed component must
     # still sit at its authored pose after the FINAL solve (see _POSE_LEDGER).
     assert_pose_ledger(adapter)
@@ -2227,6 +2292,9 @@ async def save_assembly_and_images(
     # remap_front_to_machine_front (which re-bases the standard views) so the
     # re-based Front/Back/etc. used by the gallery stay correct.
     set_isometric_view(adapter)
+    # Gate reads and view setup can touch solve state. Rebuild again at the actual
+    # save chokepoint; the earlier solve+pose check proves this solve is idempotent.
+    final_rebuild_before_save(adapter, asm_name)
     _save_new_assembly_as_copy(adapter, asm_path)
     try:
         # Record the resolved-geometry fingerprint of the just-built assembly so a
@@ -2238,7 +2306,6 @@ async def save_assembly_and_images(
         sidecar = _massprops_sidecar(asm_name)
         sidecar.parent.mkdir(parents=True, exist_ok=True)
         sidecar.write_text(digest + "\n", encoding="utf-8")
-
         artefacts = {"assembly": str(asm_path)}
         artefacts.update(await _export_assembly_images(adapter, asm_name, views))
         return artefacts
@@ -2309,6 +2376,53 @@ def _massprops_sidecar(asm_name: str):
     no-op refresh byte-stable, so the build reaches a true fixpoint. Lives under the
     gitignored ``cad/out/sldasm`` next to the recipe sidecar."""
     return OUT_SLDASM / f".{asm_name}.massprops.sha"
+
+
+def saved_rebuild_status(adapter: Any, model: Any = None) -> int:
+    """Read ``IModelDocExtension.NeedsRebuild2`` from the active document."""
+    target = adapter.currentModel if model is None else model
+    extension = _read_member(target, "Extension")
+    if extension is None:
+        raise RuntimeError("active document has no IModelDocExtension")
+    status = _read_member(extension, "NeedsRebuild2")
+    if status is None:
+        raise RuntimeError("IModelDocExtension.NeedsRebuild2 is unavailable")
+    return int(status)
+
+
+def assert_saved_rebuild_clean(adapter: Any, label: str) -> None:
+    """Fail when a freshly opened saved assembly still requests a rebuild."""
+    status = saved_rebuild_status(adapter)
+    if status != 0:  # swModelRebuildStatus_e bitmask: 1 non-frozen, 2 frozen
+        raise RuntimeError(
+            f"{label}.SLDASM opens with NeedsRebuild2={status}; "
+            "the persisted model was not fully rebuilt before save"
+        )
+    _telemetry.success(f"saved rebuild state clean ({label})")
+
+
+def final_rebuild_before_save(adapter: Any, label: str, model: Any = None) -> None:
+    """Deep-rebuild after all gates and prove the exact state being saved clean.
+
+    Interference/health inspection can touch solve state after an earlier
+    rebuild.  This final chokepoint runs after every mutating/gating operation,
+    immediately before Save3/SaveAs3, so the persisted assembly cannot inherit
+    a non-frozen ``NeedsRebuild2`` flag (issue #202).
+    """
+    target = adapter.currentModel if model is None else model
+    with _telemetry.span("assembly.final_rebuild", asm=label) as sp:
+        rebuilt = adapter._attempt(
+            lambda: target.ForceRebuild3(False), default=None
+        )
+        status = saved_rebuild_status(adapter, target)
+        sp.set_attribute("needs_rebuild", status)
+        if rebuilt is False or rebuilt is None:
+            raise RuntimeError(f"{label}: final ForceRebuild3 returned {rebuilt!r}")
+        if status != 0:
+            raise RuntimeError(
+                f"{label}: final rebuild left NeedsRebuild2={status}; refusing save"
+            )
+        _telemetry.success(f"final rebuild clean before save ({label})")
 
 
 async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
@@ -2518,6 +2632,10 @@ def save_assembly_in_place(
         log(f"{sldasm.name}: geometry unchanged -- .SLDASM left intact (no md5 bump)")
         return
 
+    # This is the shared last-mile chokepoint for refreshes, config hooks, and
+    # verify --auto-repair. Nothing geometry-touching may run between it and Save3.
+    final_rebuild_before_save(adapter, asm_name, asm)
+
     if not bool(adapter._attempt(lambda: asm.GetSaveFlag(), default=True)):
         log(f"{sldasm.name} reported clean -- forcing rewrite for md5 propagation")
         adapter._attempt(lambda: asm.SetSaveFlag(), default=None)
@@ -2573,6 +2691,7 @@ async def refresh_assembly(
             f"missing assembly {asm_path}; build it from scratch first")
     with _telemetry.span("open", asm=asm_name):
         check(f"open {asm_name}", await adapter.open_model(str(asm_path)))
+        opened_rebuild_status = saved_rebuild_status(adapter)
         configs = check("list configurations", await adapter.list_configurations())
     log(f"refresh {asm_name}: {len(configs)} configuration(s): {configs}")
     # The deterministic export/rest pose: Default is the saved, rendered pose the
@@ -2617,6 +2736,10 @@ async def refresh_assembly(
         with _telemetry.span("reactivate", config=rest):
             check(f"re-activate {rest}", await adapter.set_active_configuration(rest))
 
+    # Establish the solved state inspected by the fingerprint and gates. The save
+    # chokepoint performs one final idempotent rebuild after those reads.
+    final_rebuild_before_save(adapter, asm_name)
+
     # Fingerprint BEFORE the gates (v0.18 perf finding 4): the mass-properties
     # digest decides BOTH whether to save (an in-place Save3 always rewrites a
     # fresh md5, which would invalidate the parent even for a no-op reload of
@@ -2636,13 +2759,19 @@ async def refresh_assembly(
         prev = sidecar.read_text(encoding="utf-8").strip()
     except OSError:
         prev = None
-    geometry_changed = prev != digest or repaired_any
+    persisted_dirty = opened_rebuild_status != 0
+    geometry_changed = prev != digest or repaired_any or persisted_dirty
+    if persisted_dirty:
+        _telemetry.warn(
+            f"refresh {asm_name}: saved artifact opened with "
+            f"NeedsRebuild2={opened_rebuild_status}; forcing gates + clean re-save"
+        )
 
     if geometry_changed:
         # Gates -- each already raises a RuntimeError naming the culprit. No
         # fallback: a failure leaves the .SLDASM untouched (the save below
         # never runs).
-        assert_components_fully_defined(adapter)
+        assert_manifest_dof_state(adapter, asm_name)
         check_no_interference(adapter)
         assert_model_healthy(adapter, label=asm_name, deep=True)
     else:
