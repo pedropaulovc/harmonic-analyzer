@@ -389,12 +389,19 @@ def _save_as(doc: Any, out: Path) -> int:
     (SolidWorks can drop one before an export failure) -- the release exporter already
     treats size 0 as a failed save; the digest-cached path must too, or the empty output
     gets recorded fresh (codex review). Returns the SaveAs3 status for logging."""
-    out.unlink(missing_ok=True)
-    ok = doc.SaveAs3(str(out), 0, 0)
-    if not out.exists() or out.stat().st_size == 0:
-        out.unlink(missing_ok=True)  # never leave a zero-byte placeholder behind
-        raise RuntimeError(f"SaveAs3 produced no/empty file: {out} (rc={ok})")
-    return ok
+    with _telemetry.span(
+        "export.save_as",
+        output=str(out),
+        format=out.suffix.lstrip(".").lower(),
+    ) as sp:
+        out.unlink(missing_ok=True)
+        _telemetry.info(f"SaveAs3 starting -> {out.name}")
+        ok = doc.SaveAs3(str(out), 0, 0)
+        sp.set_attribute("save.rc", int(ok))
+        if not out.exists() or out.stat().st_size == 0:
+            out.unlink(missing_ok=True)  # never leave a zero-byte placeholder behind
+            raise RuntimeError(f"SaveAs3 produced no/empty file: {out} (rc={ok})")
+        return ok
 
 
 def validated_outputs(parts: list[str], assemblies: list[str]) -> set[Path]:
