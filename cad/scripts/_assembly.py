@@ -1177,6 +1177,33 @@ def _new_pattern_components(model: Any, before: set[str]) -> list[Any]:
     ]
 
 
+def assert_pattern_targets(
+    adapter: Any,
+    instances: Iterable[str],
+    targets: Iterable[list[float]],
+    rows: list[list[float]],
+    label: str,
+) -> None:
+    """Match unordered native-pattern instances to authored poses and gate each."""
+    unmatched = set(instances)
+    for target in targets:
+        matching = [
+            name
+            for name in unmatched
+            if all(
+                abs(component_transform(adapter, name)[9 + axis] * 1000.0 - target[axis])
+                < 0.05
+                for axis in range(3)
+            )
+        ]
+        if len(matching) != 1:
+            raise RuntimeError(f"{label} has {len(matching)} instances at {target}")
+        assert_component_placed(adapter, matching[0], target, rows)
+        unmatched.remove(matching[0])
+    if unmatched:
+        raise RuntimeError(f"{label} has unexpected instances: {sorted(unmatched)}")
+
+
 async def linear_component_pattern(
     adapter: Any,
     seed_components: Iterable[str],
