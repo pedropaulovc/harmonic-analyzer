@@ -58,6 +58,7 @@ async def build(adapter) -> dict[str, str]:
     # unsuffixed 120 = 120 in, blowing the part up 25.4x).
     await set_global(adapter, "RodSection", f"{ROD_SECTION}mm")
     await set_global(adapter, "RodLength", f"{ROD_LENGTH}mm")
+    await set_global(adapter, "WireHoleY", f"{WIRE_HOLE_Y}mm")
     # (The old WireHoleDia/WireHoleY knobs are gone: the wire hole is now a native
     # Hole Wizard feature whose diameter comes from the #47 drill standard, not an
     # equation-driven sketch dim.)
@@ -100,14 +101,16 @@ async def build(adapter) -> dict[str, str]:
     # (memory/fastener-policy-us-customary). Drilled +Z through the 5 mm square
     # section (Z 0..ROD_SECTION) at (0, WIRE_HOLE_Y); through-all is geometrically
     # identical to the old mid-plane both-directions cut.
-    wizard_holes(
+    wire_cut = wizard_holes(
         adapter,
         HoleSpec("drilled_number", "#47"),
         [[0.0, WIRE_HOLE_Y, ROD_SECTION]],
         (0.0, 0.0, 1.0),
         "wire tie-off hole (#47)",
         name="WireHole",
+        placement_dims=[((None, None), ("WireZ", '"WireHoleY"'))],
     )
+    drive_jobs += wire_cut.placement_drive_jobs
     wire_dia = NUMBER_DRILL_MM["#47"]
     v_wire = math.pi * (wire_dia / 2.0) ** 2 * ROD_SECTION
     v_final = v_rod - v_wire

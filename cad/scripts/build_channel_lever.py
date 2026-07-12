@@ -98,6 +98,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BarTall", f"{BAR_TALL}mm")
     await set_global(adapter, "LeverThickness", f"{LEVER_THICKNESS}mm")
     await set_global(adapter, "PivotHoleDia", f"{PIVOT_HOLE_DIA}mm")
+    await set_global(adapter, "BarPinX", f"{BAR_PIN_X}mm")
     # (The old BarPinHoleDia/SpringHoleDia/BarPinX knobs are gone: the bar-pin and
     # spring holes are now native Hole Wizard features whose diameters come from
     # the #47/#21 drill standard, not equation-driven sketch dims.)
@@ -247,26 +248,30 @@ async def build(adapter) -> dict[str, str]:
     # feature calls, both on the +Z front face; each is fully inside the material
     # (the spring eye rides the 6.0 tab, Ø4.039 < 6.0), so removal is pi*r^2*t.
     bar_dia = NUMBER_DRILL_MM["#47"]
-    wizard_holes(
+    bar_pin_cut = wizard_holes(
         adapter,
         HoleSpec("drilled_number", "#47"),
         [[BAR_PIN_X, 0.0, LEVER_THICKNESS / 2.0]],
         (0.0, 0.0, 1.0),
         "bar-pin hole (#47)",
         name="BarPinHole",
+        placement_dims=[(("BarPinCx", '"BarPinX"'), (None, None))],
     )
+    drive_jobs += bar_pin_cut.placement_drive_jobs
     expected -= math.pi * (bar_dia / 2.0) ** 2 * LEVER_THICKNESS
     await volume_check(adapter, "bar-pin hole", expected, 0.005 * expected)
 
     spring_dia = NUMBER_DRILL_MM["#21"]
-    wizard_holes(
+    spring_cut = wizard_holes(
         adapter,
         HoleSpec("drilled_number", "#21"),
         [[LEVER_SPRING_X, 0.0, LEVER_THICKNESS / 2.0]],
         (0.0, 0.0, 1.0),
         "spring-eye hole (#21)",
         name="SpringHole",
+        placement_dims=[(("SpringCx", '"LeverSpringX"'), (None, None))],
     )
+    drive_jobs += spring_cut.placement_drive_jobs
     expected -= math.pi * (spring_dia / 2.0) ** 2 * LEVER_THICKNESS
     await volume_check(adapter, "spring-eye hole", expected, 0.005 * expected)
 
@@ -275,7 +280,14 @@ async def build(adapter) -> dict[str, str]:
     # bore (127, 0, the amplitude bar's top pin).
     await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "fulcrum bore")
     await name_bore_axis(
-        adapter, "Right Plane", BAR_PIN_X, "Top Plane", 0.0, "bar pin bore"
+        adapter,
+        "Right Plane",
+        BAR_PIN_X,
+        "Top Plane",
+        0.0,
+        "bar pin bore",
+        drive_a='"BarPinX"',
+        drive_jobs=drive_jobs,
     )
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild

@@ -192,14 +192,16 @@ async def build(adapter) -> dict[str, str]:
     # fractional drill (Ø5.953) at the handle-pivot centre (ARM_C2C), drilled +Z
     # through the 8 mm plate (memory/fastener-policy-us-customary). Cut while the
     # body is still prismatic (~15 faces) -- wizard_holes enumerates every face.
-    wizard_holes(
+    pivot_cut = wizard_holes(
         adapter,
         HoleSpec("drilled_fractional", "15/64"),
         [[ARM_C2C, 0.0, ARM_THICKNESS]],
         (0.0, 0.0, 1.0),
         "handle-pivot hole (15/64)",
         name="PivotBore",
+        placement_dims=[(("PivotBoreX", '"ArmC2C"'), (None, None))],
     )
+    drive_jobs += pivot_cut.placement_drive_jobs
     vol = await _volume(adapter)
     _telemetry.info(f"volume after bores: {vol:.1f} mm^3")
 
@@ -232,16 +234,37 @@ async def build(adapter) -> dict[str, str]:
     # mid-thickness (memory/fastener-policy-us-customary). Drilled from the +Y
     # side face (a pristine planar face, normal +Y) at (x 0, z ArmThickness/2);
     # through-all is geometrically identical to the old mid-plane cut.
-    wizard_holes(
+    pin_cut = wizard_holes(
         adapter,
         HoleSpec("drilled_number", "#9"),
         [[0.0, HALF_WIDTH, ARM_THICKNESS / 2.0]],
         (0.0, 1.0, 0.0),
         "tapered-pin cross-hole (#9)",
         name="PinHole",
+        placement_dims=[((None, None), ("PinHoleZ", '"ArmThickness" / 2'))],
     )
+    drive_jobs += pin_cut.placement_drive_jobs
     vol = await _volume(adapter)
     _telemetry.info(f"volume after pin hole: {vol:.1f} mm^3")
+
+    # Named bore/central axis for view-independent assembly mate
+    # selection (M6 mated-DOF drive train). Axis1 = shaft bore (on origin);
+    # Axis2 = the handle PIVOT bore at +X (ARM_C2C), so the drive-train assembly
+    # can journal the crank handle COAXIAL to its real pivot pin (replacing the
+    # handle's lock with a semantic pin joint). Order is load-bearing: the shaft
+    # axis is created first so it stays Axis1@<arm>.
+    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "shaft bore axis")
+    pivot_axis = await name_bore_axis(
+        adapter,
+        "Top Plane",
+        0.0,
+        "Right Plane",
+        ARM_C2C,
+        "pivot bore axis",
+        drive_b='"ArmC2C"',
+        drive_jobs=drive_jobs,
+    )
+    _telemetry.info(f"handle pivot bore axis -> {pivot_axis} (expect Axis2)")
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
@@ -252,18 +275,6 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(adapter, "driven crank arm (equations neutral)", vol, 0.001 * vol)
-
-    # Named bore/central axis for view-independent assembly mate
-    # selection (M6 mated-DOF drive train). Axis1 = shaft bore (on origin);
-    # Axis2 = the handle PIVOT bore at +X (ARM_C2C), so the drive-train assembly
-    # can journal the crank handle COAXIAL to its real pivot pin (replacing the
-    # handle's lock with a semantic pin joint). Order is load-bearing: the shaft
-    # axis is created first so it stays Axis1@<arm>.
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "shaft bore axis")
-    pivot_axis = await name_bore_axis(
-        adapter, "Top Plane", 0.0, "Right Plane", ARM_C2C, "pivot bore axis"
-    )
-    _telemetry.info(f"handle pivot bore axis -> {pivot_axis} (expect Axis2)")
 
     # HandleSeat datum: the plate face OPPOSITE the origin plane (z =
     # ARM_THICKNESS). The chirality-mirrored drive-train maps part +z to

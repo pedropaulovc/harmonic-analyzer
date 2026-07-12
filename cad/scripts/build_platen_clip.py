@@ -68,6 +68,9 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ClipLength", f"{CLIP_LENGTH}mm")
     await set_global(adapter, "ClipWidth", f"{CLIP_WIDTH}mm")
     await set_global(adapter, "ClipThickness", f"{CLIP_THICKNESS}mm")
+    await set_global(adapter, "HoleInset", f"{HOLE_INSET}mm")
+    await set_global(adapter, "HoleY", '"ClipWidth" / 2')
+    await set_global(adapter, "HoleFarX", '"ClipLength" - "HoleInset"')
     # (The old HoleDia/HoleInset/HoleY/HoleFarX knobs are gone: the end holes
     # are now a native Hole Wizard #4 clearance feature placed by point, not
     # equation-driven sketch dims.)
@@ -108,7 +111,7 @@ async def build(adapter) -> dict[str, str]:
     # from the front face (local z 0, outward normal -Z). Left hole at the near
     # inset; right hole at length minus inset.
     hole_dia = CLEARANCE_MM[("#4", "normal")]
-    wizard_holes(
+    hole_cut = wizard_holes(
         adapter,
         HoleSpec("clearance", "#4"),
         [
@@ -117,7 +120,12 @@ async def build(adapter) -> dict[str, str]:
         ],
         (0.0, 0.0, -1.0),
         "end screw holes (#4 clearance)", name="ScrewHoles",
+        placement_dims=[
+            (("LeftX", '"HoleInset"'), ("LeftZ", '"HoleY"')),
+            (("RightX", '"HoleFarX"'), ("RightZ", '"HoleY"')),
+        ],
     )
+    drive_jobs += hole_cut.placement_drive_jobs
     v_holes = 2.0 * math.pi * (hole_dia / 2.0) ** 2 * CLIP_THICKNESS
     v_final = v_strip - v_holes
     await volume_check(adapter, "clip with holes", v_final, 0.005 * v_strip)

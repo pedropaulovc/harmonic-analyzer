@@ -29,6 +29,9 @@ from dataclasses import dataclass, field
 
 import _telemetry
 
+PlacementDimension = tuple[str | None, str | None]
+PlacementDimensions = tuple[PlacementDimension, PlacementDimension]
+
 # swFeatureNameID_e / swWzdGeneralHoleTypes_e / swWzdHoleStandards_e /
 # swWzdHoleStandardFastenerTypes_e / swEndConditions_e -- values verified
 # against the offline API reference (developing-solidworks bundle) and the
@@ -134,6 +137,7 @@ class WizardHoleResult:
     depth_mm: float
     cbore_dia_mm: float = 0.0
     cbore_depth_mm: float = 0.0
+    placement_drive_jobs: list[tuple[str, str]] = field(default_factory=list)
 
 
 def _flag(obj, iface: str) -> None:
@@ -241,11 +245,21 @@ def wizard_holes(
     *,
     name: str = "",
     expect_dia_mm: float = 0.0,
+    placement_dims: list[PlacementDimensions] | None = None,
 ) -> WizardHoleResult:
     """Create ONE ``HoleWzd`` feature with an instance at each of ``points_mm``
     (model X,Y,Z in mm, all on the planar face whose outward normal is
     ``normal``), per ``spec``. Optionally rename the feature to ``name`` and
     assert the wizard-table hole diameter is ``expect_dia_mm`` (+/- 0.05 mm).
+
+    ``placement_dims`` optionally restores the parametric contract of the
+    pre-Wizard placement sketches. It has one entry per point; each entry is
+    ``((x_name, x_drive), (y_name, y_drive))`` in placement-sketch coordinates.
+    Every non-zero coordinate receives a driving dimension; a zero coordinate
+    receives the matching origin-axis relation because zero-valued dimensions
+    are invalid. Named dimensions with equations are returned as deferred
+    ``placement_drive_jobs`` so callers can apply them with the same end-of-build
+    ``drive_dimension`` pass used by the rest of the part.
 
     Returns the actual wizard dimensions for the caller's analytic volume
     check -- the check then verifies the CUT, independent of this readback.
@@ -259,6 +273,11 @@ def wizard_holes(
         raise ValueError(f"unknown hole kind {spec.kind!r} (of {sorted(_KINDS)})")
     if spec.end not in _ENDS:
         raise ValueError(f"unknown end {spec.end!r} (of {sorted(_ENDS)})")
+    if placement_dims is not None and len(placement_dims) != len(points_mm):
+        raise ValueError(
+            f"hole wizard {label}: placement_dims has {len(placement_dims)} "
+            f"entries for {len(points_mm)} points"
+        )
     hole_type, fastener = _KINDS[spec.kind]
     end = _ENDS[spec.end]
 
@@ -374,19 +393,85 @@ def wizard_holes(
     # never snapped, which is why only the near-origin hole moved.
     prev_add_to_db = bool(sm.AddToDB)
     sm.AddToDB = True
+    placed_points = []
     try:
         auto = (place_sk.GetSketchPoints2() or [None])[0]
         _flag(auto, "ISketchPoint")
         sx, sy, sz = _sketch_xy(points_mm[0])
         auto.SetCoords(sx, sy, sz)
+        placed_points.append((auto, sx, sy))
         for pt in points_mm[1:]:
             sx, sy, sz = _sketch_xy(pt)
-            sm.CreatePoint(sx, sy, sz)
+            created = sm.CreatePoint(sx, sy, sz)
+            if created is None:
+                raise RuntimeError(f"hole wizard {label}: CreatePoint failed")
+            _flag(created, "ISketchPoint")
+            placed_points.append((created, sx, sy))
     finally:
         sm.AddToDB = prev_add_to_db
+
+    placement_drive_jobs: list[tuple[str, str]] = []
+    if placement_dims is not None:
+        from _common import SketchDims, check
+        from solidworks_mcp.adapters.solidworks.sketch import (
+            _add_sketch_constraint_impl,
+            _add_sketch_dimension_impl,
+        )
+
+        dims = SketchDims()
+        # Direct EditSketch bypasses the adapter's create_sketch registry reset;
+        # force the reserved "origin" reference to resolve in THIS placement
+        # sketch rather than reusing a prior sketch's cached dispatch.
+        adapter._sketch_origin_point = None
+        previous_sketch_manager = adapter.currentSketchManager
+        adapter.currentSketchManager = sm
+        try:
+            for index, ((point, sx, sy), point_dims) in enumerate(
+                    zip(placed_points, placement_dims, strict=True)):
+                point_id = adapter._register_sketch_entity("Point", point)
+                zero_x = abs(sx) < 1e-12
+                zero_y = abs(sy) < 1e-12
+                if zero_x and zero_y:
+                    relation = "coincident"
+                elif zero_x:
+                    relation = "vertical_points"
+                elif zero_y:
+                    relation = "horizontal_points"
+                else:
+                    relation = None
+                if relation is not None:
+                    check(
+                        f"constrain hole placement {label} point {index} {relation}",
+                        _add_sketch_constraint_impl(
+                            adapter, point_id, "origin", relation
+                        ),
+                    )
+                for axis, coord, dim_type, (dim_name, drive) in (
+                    ("x", sx, "horizontal_distance", point_dims[0]),
+                    ("y", sy, "vertical_distance", point_dims[1]),
+                ):
+                    if abs(coord) < 1e-12:
+                        if dim_name is not None or drive is not None:
+                            raise ValueError(
+                                f"hole wizard {label}: point {index} {axis} is zero "
+                                "and cannot carry a distance dimension"
+                            )
+                        continue
+                    check(
+                        f"dimension hole placement {label} point {index} {axis}",
+                        _add_sketch_dimension_impl(
+                            adapter, point_id, "origin", dim_type, abs(coord) * 1000.0
+                        ),
+                    )
+                    dims.record(dim_name, drive)
+        finally:
+            adapter.currentSketchManager = previous_sketch_manager
     model.EditSketch()
     _telemetry.debug(f"hole wizard {label}: points placed, rebuilding")
     model.EditRebuild3()
+
+    if placement_dims is not None:
+        placement_drive_jobs = dims.apply_feature(adapter, sub, place_name)
 
     npts = len(place_sk.GetSketchPoints2() or [])
     if npts != len(points_mm):
@@ -481,6 +566,7 @@ def wizard_holes(
         depth_mm=_dim("HoleDepth"),
         cbore_dia_mm=_dim("CounterBoreDiameter"),
         cbore_depth_mm=_dim("CounterBoreDepth"),
+        placement_drive_jobs=placement_drive_jobs,
     )
     if expect_dia_mm and abs(result.hole_dia_mm - expect_dia_mm) > 0.05:
         raise RuntimeError(
@@ -518,7 +604,9 @@ def cross_hole_volume_mm3(hole_dia_mm: float, shaft_dia_mm: float,
 
 
 def wizard_hole_on_cylinder(adapter, spec: HoleSpec, point_mm, label: str,
-                            *, name: str = "") -> None:
+                            *, name: str = "",
+                            y_dim: PlacementDimension | None = None
+                            ) -> list[tuple[str, str]]:
     """ONE through wizard hole drilled RADIALLY into a cylindrical face at
     ``point_mm`` (a model point ON the face; the drill axis is the surface
     normal there, through the shaft axis).
@@ -604,9 +692,38 @@ def wizard_hole_on_cylinder(adapter, spec: HoleSpec, point_mm, label: str,
     _flag(pt, "ISketchPoint")
     pt.SetCoords(point_mm[0] / 1000.0, point_mm[1] / 1000.0,
                  point_mm[2] / 1000.0)
+
+    placement_drive_jobs: list[tuple[str, str]] = []
+    if y_dim is not None:
+        from _common import SketchDims, check
+        from solidworks_mcp.adapters.solidworks.sketch import (
+            _add_sketch_dimension_impl,
+        )
+
+        dims = SketchDims()
+        previous_sketch_manager = adapter.currentSketchManager
+        adapter.currentSketchManager = model.SketchManager
+        adapter._sketch_origin_point = None
+        try:
+            point_id = adapter._register_sketch_entity("Point", pt)
+            check(
+                f"dimension radial hole placement {label} y",
+                _add_sketch_dimension_impl(
+                    adapter,
+                    point_id,
+                    "origin",
+                    "vertical_distance",
+                    abs(point_mm[1]),
+                ),
+            )
+            dims.record(*y_dim)
+        finally:
+            adapter.currentSketchManager = previous_sketch_manager
     model.EditSketch()
     _telemetry.debug(f"hole wizard {label}: point placed, rebuilding")
     model.EditRebuild3()
+    if y_dim is not None:
+        placement_drive_jobs = dims.apply_feature(adapter, sub, str(sub.Name))
 
     if name:
         try:
@@ -619,3 +736,4 @@ def wizard_hole_on_cylinder(adapter, spec: HoleSpec, point_mm, label: str,
     )
     _telemetry.success(
         f"hole wizard {label}: radial {spec.size} {spec.kind} through cylinder")
+    return placement_drive_jobs
