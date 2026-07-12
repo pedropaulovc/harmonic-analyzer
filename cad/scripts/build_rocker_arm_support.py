@@ -131,12 +131,23 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "WindowProfile": {"WinWidth", "WinHeight"},
     "CavityProfile": {"CavWidth", "CavDepth"},
 }
+
+DRAWING_NOTES = "\n".join(
+    (
+        "UOS, DIMENSIONS IN MM; GRAY-IRON CASTING: AS-CAST +/-0.8; "
+        "MACHINED +/-0.25; ANGLES +/-1 DEG.",
+        "DEBURR; BREAK EDGES 0.3 MAX.",
+        "WINDOW: CHAMFER 1.27 X 45 DEG ALL AROUND; FILLET R12.7, 4X.",
+        "WINDOW AND CAVITY CENTRED.",
+        "CENTRAL WEB 6.35 THICK AND CENTRED.",
+    )
+)
 # Hole Wizard constants (resolved from the SW type library on this seat):
 SW_FM_HOLE_WZD = 25            # swFeatureNameID_e.swFmHoleWzd (CreateDefinition)
 SW_WZD_TAP = 4                 # swWzdGeneralHoleTypes_e.swWzdTap (straight tap)
 SW_STD_ANSI_INCH = 0           # swWzdHoleStandards_e.swStandardAnsiInch
-SW_HOLE_FASTENER_TYPE = 26     # ANSI-inch "Bottoming Tapped Hole"
-SW_END_THROUGH_NEXT = 2        # swEndCondThroughNext / swEndThreadTypeTHROUGH_NEXT
+SW_HOLE_FASTENER_TYPE = 27     # ANSI-inch straight tapped hole
+SW_END_THROUGH_ALL = 1         # swEndCondThroughAll / swEndThreadTypeTHROUGH_ALL
 HOLE_SSIZE = "9/16-12"
 HOLE_THREAD_CLASS = "2B"  # customary US class for a general tapped hole
 
@@ -160,6 +171,14 @@ def _flag(obj, iface: str) -> None:
         sw_type_info.flag_methods(obj, iface)
     except Exception:  # noqa: BLE001
         pass
+
+
+def _early(obj, iface: str):
+    """Wrap a feature definition in its generated early-bound COM interface."""
+    from solidworks_mcp.adapters import sw_type_info
+
+    sw_type_info._ensure_loaded()
+    return getattr(sw_type_info._wrapper_module, iface)(obj._oleobj_)
 
 
 def _add_construction_diagonals(adapter, half_mm: float) -> None:
@@ -293,10 +312,10 @@ def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
     _flag(data, "IWizardHoleFeatureData2")
     data.InitializeHole(
         SW_WZD_TAP, SW_STD_ANSI_INCH, SW_HOLE_FASTENER_TYPE,
-        HOLE_SSIZE, SW_END_THROUGH_NEXT)
+        HOLE_SSIZE, SW_END_THROUGH_ALL)
     for prop, val in (("ThreadClass", HOLE_THREAD_CLASS),
-                      ("EndCondition", SW_END_THROUGH_NEXT),
-                      ("ThreadEndCondition", SW_END_THROUGH_NEXT)):
+                      ("EndCondition", SW_END_THROUGH_ALL),
+                      ("ThreadEndCondition", SW_END_THROUGH_ALL)):
         try:
             setattr(data, prop, val)
         except Exception:  # noqa: BLE001
@@ -364,6 +383,28 @@ def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
     if npts != len(holes_xz):
         raise RuntimeError(
             f"hole wizard: expected {len(holes_xz)} placement points, got {npts}")
+
+    # Pre-create late-bound writes can silently drop on SW 2026.  Persist the
+    # thread contract through the documented feature-edit flow, then verify the
+    # values that drive native hole callouts/tables.
+    definition = _early(feat.GetDefinition(), "IWizardHoleFeatureData2")
+    if not definition.AccessSelections(model, None):
+        raise RuntimeError("hole wizard: AccessSelections failed")
+    definition.ThreadClass = HOLE_THREAD_CLASS
+    definition.EndCondition = SW_END_THROUGH_ALL
+    definition.ThreadEndCondition = SW_END_THROUGH_ALL
+    if not feat.ModifyDefinition(definition._oleobj_, model, null_callout()):
+        raise RuntimeError("hole wizard: ModifyDefinition failed")
+    model.EditRebuild3()
+    persisted = _early(feat.GetDefinition(), "IWizardHoleFeatureData2")
+    if str(persisted.ThreadClass) != HOLE_THREAD_CLASS:
+        raise RuntimeError(
+            f"hole wizard: thread class did not persist: {persisted.ThreadClass!r}"
+        )
+    if int(persisted.ThreadEndCondition) != SW_END_THROUGH_ALL:
+        raise RuntimeError(
+            "hole wizard: through-all thread end condition did not persist"
+        )
     return feat
 
 
@@ -487,9 +528,9 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "CornerFillet", 246_685, 200)
 
     # 6. FootTappedHoles: ONE Hole Wizard (HoleWzd) feature with four placement
-    #    points, 9/16-12 ANSI-inch bottoming tapped holes drilled up through the
+    #    points, 9/16-12 UNC-2B straight tapped holes drilled up through the
     #    foot from the bottom face (Y=-HALF_Y) at (X ±60.32, Z ±17.46),
-    #    through-next. Only the 6.35 mm foot tip (Y -88.9..-82.55) carries
+    #    through-all. Only the 6.35 mm foot tip (Y -88.9..-82.55) carries
     #    material along the bore -- the window cuts opened everything above -- so
     #    through-next drills exactly that band, matching the source's measured
     #    volume. One feature, no separate placement sketch (matches the source).
@@ -540,7 +581,9 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)  # green-painted casting, like the base/top-frame
     await report_mass_properties(adapter)
-    apply_drawing_properties(adapter, PART_NAME)
+    apply_drawing_properties(
+        adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES}
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 
