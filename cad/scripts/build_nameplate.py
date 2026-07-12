@@ -161,6 +161,7 @@ async def build(adapter) -> dict[str, str]:
     # envelope minus the border so the field re-centres when a knob changes.
     await set_global(adapter, "PlateWidth", f"{PLATE_WIDTH}mm")
     await set_global(adapter, "PlateHeight", f"{PLATE_HEIGHT}mm")
+    await set_global(adapter, "ScrewInset", f"{SCREW_INSET}mm")
     await set_global(adapter, "PlateThickness", f"{PLATE_THICKNESS}mm")
     await set_global(adapter, "CornerR", f"{CORNER_R}mm")
     await set_global(adapter, "BorderW", f"{BORDER_W}mm")
@@ -255,14 +256,25 @@ async def build(adapter) -> dict[str, str]:
     # faces; the pristine back face at z=-PLATE_THICKNESS carries all four
     # stations and through-all is geometrically identical from either side.
     pre = await adapter.get_mass_properties()
-    wizard_holes(
+    screw_drives = (
+        ('"ScrewInset"', '"ScrewInset"'),
+        ('"PlateWidth" - "ScrewInset"', '"ScrewInset"'),
+        ('"ScrewInset"', '"PlateHeight" - "ScrewInset"'),
+        ('"PlateWidth" - "ScrewInset"', '"PlateHeight" - "ScrewInset"'),
+    )
+    screw_cut = wizard_holes(
         adapter,
         HoleSpec("clearance", "#2"),
         [[x, y, -PLATE_THICKNESS] for x, y in SCREW_XY],
         (0.0, 0.0, -1.0),
         "mounting screw holes (#2 clearance)",
         name="ScrewHoles",
+        placement_dims=[
+            ((f"S{n}X", dx), (f"S{n}Z", dy))
+            for n, (dx, dy) in enumerate(screw_drives)
+        ],
     )
+    drive_jobs += screw_cut.placement_drive_jobs
     screw_dia = CLEARANCE_MM[("#2", "normal")]
     v_holes = len(SCREW_XY) * math.pi * (screw_dia / 2.0) ** 2 * PLATE_THICKNESS
     removed = float(pre.data.volume) - float((await adapter.get_mass_properties()).data.volume)

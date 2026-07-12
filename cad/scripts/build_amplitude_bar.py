@@ -198,14 +198,19 @@ async def build(adapter) -> dict[str, str]:
     # cheeks total = bar width - slot width (the bore removes material only in the
     # two cheeks; the slot gap between them is already void)
     expected_removed = math.pi * (pin_dia / 2.0) ** 2 * (BAR_WIDTH - TOP_NOTCH_WIDTH)
-    wizard_holes(
+    pin_cut = wizard_holes(
         adapter,
         HoleSpec("drilled_number", "#47"),
         [[BAR_WIDTH, pin_y, BAR_DEPTH / 2.0]],
         (1.0, 0.0, 0.0),
         "top pin hole (#47)",
         name="TopPinHole",
+        placement_dims=[(
+            ("TopPinX", '"BarDepth" / 2'),
+            ("TopPinY", '"BarLength" - "TopPinDrop"'),
+        )],
     )
+    drive_jobs += pin_cut.placement_drive_jobs
     res = await adapter.get_mass_properties()
     removed = vol_before - res.data.volume
     if abs(removed - expected_removed) >= 2.0:

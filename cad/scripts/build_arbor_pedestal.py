@@ -97,8 +97,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "TopRadius", f"{TOP_RADIUS}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
     await set_global(adapter, "BoreHeight", f"{BORE_HEIGHT}mm")
-    # (The old ScrewHoleDia/ScrewZ knobs are gone: the flange hold-down hole is
-    # now a native Hole Wizard #4 clearance feature at a literal station.)
+    await set_global(adapter, "ScrewZ", f"{-SCREW_Z}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -250,11 +249,13 @@ async def build(adapter) -> dict[str, str]:
     # bolts the casting to the base. The foot bottom is a clean rectangle (the
     # strap/dome/bore are all above it), so find_planar_face resolves cleanly.
     screw_dia = blind_cut_dia_mm(SCREW_HOLE_SPEC)
-    wizard_holes(
+    screw_cut = wizard_holes(
         adapter, SCREW_HOLE_SPEC,
         [[0.0, 0.0, SCREW_Z]],
         (0.0, -1.0, 0.0), "flange hold-down hole (#4 clearance)", name="ScrewHole",
+        placement_dims=[((None, None), ("ScrewZ", '"ScrewZ"'))],
     )
+    drive_jobs += screw_cut.placement_drive_jobs
     v_hole = math.pi * (screw_dia / 2.0) ** 2 * FOOT_HEIGHT
     volume = await volume_check(adapter, "screw hole", volume - v_hole, 0.02 * v_hole)
     v_final = volume
