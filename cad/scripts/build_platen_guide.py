@@ -9,7 +9,9 @@ plates (build_guide_lock.py) that bridge behind the bar so the platen cannot
 fall off. 10 deep so the lock plates clear the 9-deep bar.
 
 Layout: length along +X, height along +Y from the origin corner, depth
-extruded +Z (the assembly seats local z 0 on the platen back). The 4 lock
+extruded -Z so native Front looks directly at the hole-entry face. The
+assembly seats local z 0 on the platen back and rotates the part 180 about Y
+to preserve the machine-space rail envelope. The 4 lock
 screw holes run through along Z at the two lock stations (x 60/240 +- 7).
 
 Run (SolidWorks already open)::
@@ -41,7 +43,6 @@ from _common import (
     set_global,
     volume_check,
 )
-import _telemetry
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -93,19 +94,6 @@ def _apply_drawing_properties(adapter) -> None:
     )
 
 
-def _make_back_view_front(adapter) -> None:
-    """Make the hole-entry face the standard drawing Front view."""
-    sw_front_view = 1
-    sw_back_view = 2
-    model = adapter.currentModel
-    model.ShowNamedView2("", sw_back_view)
-    if not model.Extension.UpdateStandardViews("", sw_front_view):
-        raise RuntimeError("platen-guide: failed to make Back the standard Front view")
-    model.ShowNamedView2("", sw_front_view)
-    adapter._zoom_to_fit(model)
-    _telemetry.success("standard views remapped: former Back is now Front")
-
-
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -142,7 +130,9 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += outline.apply(adapter, "GuideProfile")
     check(
         "extrude guide",
-        await adapter.create_extrusion(ExtrusionParameters(depth=GUIDE_DEPTH)),
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=GUIDE_DEPTH, reverse_direction=True)
+        ),
     )
     name_last_feature(adapter, "Guide")
     depth_dim = name_dimensions(adapter, "Guide", ["Depth"])
@@ -151,21 +141,21 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "guide rail", v_rail, 0.005 * v_rail)
 
     # Lock-screw holes: ONE native Hole Wizard #4 clearance feature (4 points)
-    # through along Z at the mid-height line, from the front face (local z 0,
-    # outward normal -Z) -- the fillister lock screws pass through.
+    # through along Z at the mid-height line, from the native Front face
+    # (local z 0, outward normal +Z) -- the fillister lock screws pass through.
     lock_dia = CLEARANCE_MM[("#4", "normal")]
     wizard_holes(
         adapter,
         HoleSpec("clearance", "#4"),
         [[x, GUIDE_HEIGHT / 2.0, 0.0] for x in HOLE_X],
-        (0.0, 0.0, -1.0),
+        (0.0, 0.0, 1.0),
         "lock-screw holes (#4 clearance)", name="LockHoles",
     )
     v_holes = len(HOLE_X) * math.pi * (lock_dia / 2.0) ** 2 * GUIDE_DEPTH
     await volume_check(adapter, "guide with holes", v_rail - v_holes, 0.02 * v_holes)
 
     # Fastening-screw holes: ONE native Hole Wizard #4-40 BOTTOMING-TAPPED blind
-    # feature (5 points) from the front face (outward normal -Z) -- the platen
+    # feature (5 points) from the front face (outward normal +Z) -- the platen
     # guide screws thread INTO these. A wizard blind hole ends in a 118° drill
     # point, so the analytic expectation is blind_hole_volume_mm3.
     screw_spec = HoleSpec(
@@ -175,7 +165,7 @@ async def build(adapter) -> dict[str, str]:
     wizard_holes(
         adapter, screw_spec,
         [[x, GUIDE_HEIGHT / 2.0, 0.0] for x in SCREW_STATION_X],
-        (0.0, 0.0, -1.0),
+        (0.0, 0.0, 1.0),
         "fastening-screw tapped holes (#4-40)", name="ScrewHoles",
     )
     v_screws = len(SCREW_STATION_X) * blind_hole_volume_mm3(
@@ -206,7 +196,6 @@ async def build(adapter) -> dict[str, str]:
     await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)
     _apply_drawing_properties(adapter)
-    _make_back_view_front(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 
 
