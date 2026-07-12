@@ -7,7 +7,7 @@ metadata:
 
 When a remote-cache **partial-mix dangle** fails `verify:soundness`
 (`[48]` dangling mates on a foreign cached `.SLDASM`), the remedy today is the
-slow `HARMONIC_CACHE_MODE=off` FULL rebuild (~500 s/assembly) — see
+slow `HARMONIC_REMOTE_CACHE_MODE=off` FULL rebuild (~500 s/assembly) — see
 [[cache-partial-mix-dangle-remedy]]. The `AutoMateRepair` primitive that would
 heal it in ~5 s already exists (`repair_dangling_mates` @ `_assembly.py:2103`,
 called only from `refresh_assembly` @ 2261) but never fires on a cache HIT

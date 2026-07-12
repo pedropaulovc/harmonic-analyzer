@@ -1,6 +1,6 @@
 ---
 name: cache-partial-mix-dangle-remedy
-description: Remote-cache partial mix (local part rebuild + foreign cached assembly) dangles mates; delete alone RE-RESTORES the broken artifact — rebuild with HARMONIC_CACHE_MODE=off
+description: Remote-cache partial mix (local part rebuild + foreign cached assembly) dangles mates; delete alone RE-RESTORES the broken artifact — rebuild with HARMONIC_REMOTE_CACHE_MODE=off
 metadata:
   type: project
 ---
@@ -35,7 +35,7 @@ doesn't know the entry is PID-incompatible with local parts.
 2. Delete each foreign `.SLDASM` + its `.<stem>.massprops.sha` /
    `.<stem>.recipe.md5` sidecars (and `.<stem>.park.json` if present).
 3. Rebuild those assemblies with the cache OFF so the stale key can't restore:
-   `$env:HARMONIC_CACHE_MODE='off'; uv run python -m doit assembly:<a> assembly:<b>`
+   `$env:HARMONIC_REMOTE_CACHE_MODE='off'; uv run python -m doit assembly:<a> assembly:<b>`
    (mode=off also skips store — the foreign entries stay in the blob; a future
    fresh seat on the same recipe state can hit this again until someone
    republishes.)

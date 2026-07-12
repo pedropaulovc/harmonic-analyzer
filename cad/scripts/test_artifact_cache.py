@@ -43,7 +43,7 @@ class _FakeBackend:
 def fake(tmp_path, monkeypatch):
     """rw cache wired to an in-memory backend with all sinks under tmp_path.
     _unpack is a no-op (we test event/drift bookkeeping, not tar extraction)."""
-    monkeypatch.setenv("HARMONIC_CACHE_MODE", "rw")
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
     monkeypatch.delenv("HARMONIC_CACHE_DEBUG", raising=False)
     monkeypatch.setattr(cache, "_REPORTS", tmp_path)
     monkeypatch.setattr(cache, "_EVENTS_LOG", tmp_path / "cache.jsonl")
@@ -213,14 +213,14 @@ def test_hit_under_same_key_is_not_drift(tmp_path, fake):
 # Mode gating: off writes nothing; ro pulls but records a publish-skip
 # --------------------------------------------------------------------------- #
 def test_mode_off_is_silent(tmp_path, fake, monkeypatch):
-    monkeypatch.setenv("HARMONIC_CACHE_MODE", "off")
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "off")
     assert cache.restore("k" * 64, [], "part:x") is False
     cache.store("k" * 64, [tmp_path / "out.bin"], "part:x")
     assert _events(tmp_path) == []                            # no jsonl on a disabled seat
 
 
 def test_mode_ro_records_store_skip(tmp_path, fake, monkeypatch):
-    monkeypatch.setenv("HARMONIC_CACHE_MODE", "ro")
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "ro")
     cache.store("k" * 64, [tmp_path / "out.bin"], "part:x")
     assert [e["event"] for e in _events(tmp_path)] == ["store_skip"]
 
@@ -230,7 +230,7 @@ def test_probe_presence_and_disabled(tmp_path, fake, monkeypatch):
     fake.blobs[key] = b"x"
     assert cache.probe(key) is True
     assert cache.probe("q" * 64) is False
-    monkeypatch.setenv("HARMONIC_CACHE_MODE", "off")
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "off")
     assert cache.probe(key) is None                          # disabled -> unknown
 
 
