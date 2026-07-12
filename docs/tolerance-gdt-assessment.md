@@ -573,8 +573,8 @@ so supplying them is the single highest-value contribution this supplement makes
   one pass; nothing dead-ends in metadata.
 - **Scope by tier.** Generate drawings for the **Tier-1 precision-critical parts first** (the ~10
   in §6/§9), which carry the `precision` grade, runout, finish, and critical-feature notes; then
-  expand to all parts. New doit task `drawing:<stem>` on the **COM spine** (it needs SolidWorks),
-  feeding a `release` PDF set.
+  expand to all parts. New doit task `drawing:<stem>` **takes the COM seat lock** (it needs
+  SolidWorks — wrap its subprocess in `_com_seat`), feeding a `release` PDF set.
 - **Caveat.** Programmatic drawing layout is brittle; expect to hand-finish view placement / leader
   routing on the first pass and capture the working recipe — the repo already hand-tunes render
   cameras the same way.
