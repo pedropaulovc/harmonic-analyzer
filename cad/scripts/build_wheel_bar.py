@@ -89,6 +89,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BarSide", f"{BAR_SIDE}mm")
     await set_global(adapter, "BarDepth", f"{BAR_DEPTH}mm")
     await set_global(adapter, "BarLength", f"{BAR_LENGTH}mm")
+    await set_global(adapter, "ScrewHoleX", f"{SCREW_HOLE_X}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -129,11 +130,13 @@ async def build(adapter) -> dict[str, str]:
     front_z = -BAR_DEPTH / 2.0
     screw_dia = blind_cut_dia_mm(SCREW_HOLE_SPEC)
     clamp_dia = blind_cut_dia_mm(CLAMP_HOLE_SPEC)
-    wizard_holes(
+    screw_cut = wizard_holes(
         adapter, SCREW_HOLE_SPEC,
         [[SCREW_HOLE_X, 0.0, front_z]],
         (0.0, 0.0, -1.0), "pen-hanger screw hole (#6 clearance)", name="ScrewHole",
+        placement_dims=[(("ScrewHoleCx", '-"ScrewHoleX"'), (None, None))],
     )
+    drive_jobs += screw_cut.placement_drive_jobs
     expected -= math.pi * (screw_dia / 2.0) ** 2 * BAR_DEPTH
     await volume_check(adapter, "bar with screw hole", expected, 1.0)
 

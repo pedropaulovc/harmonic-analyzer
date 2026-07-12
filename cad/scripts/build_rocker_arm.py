@@ -197,6 +197,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ArmThickness", f"{ARM_THICKNESS}mm")
     await set_global(adapter, "TipFaceLen", f"{TIP_FACE}mm")
     await set_global(adapter, "PivotHoleDia", f"{PIVOT_HOLE_DIA}mm")
+    await set_global(adapter, "RodHoleX", f"{ROD_HOLE_X}mm")
     # (The old RodHoleDia/RodHoleX knobs are gone: the rod pin hole is now a native
     # Hole Wizard #47 feature whose diameter comes from the drill standard; its
     # location rides the ROD_HOLE_X/ROD_HOLE_Y module constants that the channel
@@ -379,17 +380,26 @@ async def build(adapter) -> dict[str, str]:
     # +Z through the 2.5 strap at (ROD_HOLE_X, ROD_HOLE_Y)
     # (memory/fastener-policy-us-customary). The pivot hole stays a Ø6.5 circle
     # cut. Through-all is geometrically identical to the old mid-plane cut.
-    wizard_holes(
+    rod_cut = wizard_holes(
         adapter,
         HoleSpec("drilled_number", "#47"),
         [[ROD_HOLE_X, ROD_HOLE_Y, ARM_THICKNESS / 2.0]],
         (0.0, 0.0, 1.0),
         "rod pin hole (#47)",
         name="RodHole",
+        placement_dims=[(("RodPinX", '"RodHoleX"'), (None, None))],
     )
+    drive_jobs += rod_cut.placement_drive_jobs
     # Named axis through the rod-pin bore (Axis2 = (Right+ROD_HOLE_X) ∩ (Top+hole_y)).
     await name_bore_axis(
-        adapter, "Right Plane", ROD_HOLE_X, "Top Plane", ROD_HOLE_Y, "rod bore"
+        adapter,
+        "Right Plane",
+        ROD_HOLE_X,
+        "Top Plane",
+        ROD_HOLE_Y,
+        "rod bore",
+        drive_a='"RodHoleX"',
+        drive_jobs=drive_jobs,
     )
     # Named axis on the R800 top-edge arc CENTRE (Axis3 = Right ∩ Top+816, a
     # free-space datum 808 above the pivot bore, along Z like the bores). The

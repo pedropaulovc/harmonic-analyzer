@@ -91,6 +91,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "Bore", f"{BORE}mm")
     await set_global(adapter, "BoreHalfSpacing", f"{BORE_HALF_SPACING}mm")
     await set_global(adapter, "LiftBoreDrop", f"{LIFT_BORE_DROP}mm")
+    await set_global(adapter, "ScrewHalfSpacing", f"{SCREW_HALF_SPACING}mm")
     # (The old ScrewHoleDia/ScrewHalfSpacing knobs are gone: the two hold-down
     # holes are now a native Hole Wizard #19 feature at literal stations.)
 
@@ -151,12 +152,19 @@ async def build(adapter) -> dict[str, str]:
     # bottom face a clean rectangle). Top-sketch (u,v)->(X,-Z), so the sketch v
     # -DEPTH/2 is model z = +DEPTH/2 -- the mid-depth line.
     screw_dia = NUMBER_DRILL_MM[SCREW_HOLE_SPEC.size]
-    wizard_holes(
+    screw_cut = wizard_holes(
         adapter, SCREW_HOLE_SPEC,
         [[SCREW_HALF_SPACING, -BORE_UP, DEPTH / 2.0],
          [-SCREW_HALF_SPACING, -BORE_UP, DEPTH / 2.0]],
         (0.0, -1.0, 0.0), "hold-down screw holes (#19)", name="ScrewHoles",
+        placement_dims=[
+            (("ScrewEastX", '"ScrewHalfSpacing"'),
+             ("ScrewEastZ", '"BlockDepth" / 2')),
+            (("ScrewWestX", '"ScrewHalfSpacing"'),
+             ("ScrewWestZ", '"BlockDepth" / 2')),
+        ],
     )
+    drive_jobs += screw_cut.placement_drive_jobs
     v_holes = 2.0 * math.pi * (screw_dia / 2.0) ** 2 * HEIGHT
     expected -= v_holes
     await volume_check(adapter, "screw holes", expected, 0.02 * v_holes)

@@ -91,6 +91,7 @@ async def build(adapter) -> dict[str, str]:
     # already mm (0.375 * IN), so it serialises as its mm value.
     await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
     await set_global(adapter, "ShaftLength", f"{SHAFT_LENGTH}mm")
+    await set_global(adapter, "PinHoleHeight", f"{PIN_HOLE_HEIGHT}mm")
     # (The old PinHoleDia/PinHoleHeight knobs are gone: the cross-hole is a
     # native Hole Wizard #9 feature; its size comes from the drill table and
     # its station is baked into the placement point.)
@@ -123,12 +124,13 @@ async def build(adapter) -> dict[str, str]:
     # placement; no planar face carries the drill axis). The placement point
     # sits on the surface at the crank-seat height, +Z side; through-all
     # drills diametrally out the -Z wall.
-    wizard_hole_on_cylinder(
+    drive_jobs += wizard_hole_on_cylinder(
         adapter,
         HoleSpec("drilled_number", "#9"),
         [0.0, PIN_HOLE_HEIGHT, SHAFT_DIA / 2.0],
         "tapered-pin cross-hole (#9)",
         name="PinHole",
+        y_dim=("PinHeight", '"PinHoleHeight"'),
     )
     # Cross-drill removal = the perpendicular cylinder-cylinder intersection,
     # integrated numerically (probe-exact; replaces the old ~178 as-built
