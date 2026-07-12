@@ -117,7 +117,12 @@ def _apply_redundant_normal_fit(adapter: Any) -> None:
     feature = model.FeatureByName("ClearanceHoles")
     if feature is None:
         raise RuntimeError("ClearanceHoles feature is missing")
-    definition = _early(feature.GetDefinition(), "IWizardHoleFeatureData2")
+
+    def _definition():
+        raw = adapter._get_attr_or_call(feature, "GetDefinition")
+        return _early(raw, "IWizardHoleFeatureData2")
+
+    definition = _definition()
     if int(definition.Type) != 25:
         raise RuntimeError(f"expected initial swHoleThru type 25, got {definition.Type}")
     if not definition.AccessSelections(model, None):
@@ -128,7 +133,7 @@ def _apply_redundant_normal_fit(adapter: Any) -> None:
     ):
         raise RuntimeError("redundant normal HoleFit ModifyDefinition failed")
     model.EditRebuild3()
-    corrupted = _early(feature.GetDefinition(), "IWizardHoleFeatureData2")
+    corrupted = _definition()
     if int(corrupted.Type) != 26 or bool(corrupted.FarSideCounterSink):
         raise RuntimeError(
             "redundant normal HoleFit did not reproduce type 26 / far-side false: "
