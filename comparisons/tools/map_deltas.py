@@ -47,20 +47,18 @@ def _dim_constants(stem: str) -> list[tuple[str, str, str]]:
 
 
 def _positioning_assemblies(stem: str) -> list[str]:
-    """Assembly build scripts that INSERT+mate this part -- i.e. call
-    ``place_component(adapter, "<stem>", ...)`` (or list it in a
-    ``place_components_batch`` block). A bare textual mention (a neighbouring
-    wire/motion-study that only references the stem) does NOT count."""
+    """Assembly build scripts that INSERT+mate this part. An assembly qualifies
+    when it calls ``place_component`` AND the stem literal ``"<stem>"`` appears
+    anywhere in it -- this catches the multi-line call form (stem on its own
+    line), loop-variable placement (``for arc in ("column-clamp-front", ...)``)
+    and batch blocks alike. Scoped to ``build_*_assembly.py`` so a neighbouring
+    part/wire/motion script that merely name-drops the stem doesn't count. A
+    reused part may list >1 assembly (it's placed in each)."""
     quoted = f'"{stem}"'
     hits = []
     for script in sorted(_SCRIPTS.glob("build_*_assembly.py")):
         text = script.read_text(encoding="utf-8")
-        placed = any(quoted in line and "place_component" in line
-                     for line in text.splitlines())
-        if not placed and "place_components_batch" in text:
-            placed = any(line.strip().rstrip(",") == quoted
-                         for line in text.splitlines())
-        if placed:
+        if "place_component" in text and quoted in text:
             hits.append(script.name)
     return hits
 
