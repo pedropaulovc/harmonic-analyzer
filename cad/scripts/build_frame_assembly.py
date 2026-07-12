@@ -79,7 +79,6 @@ import sys
 from _common import (
     OUT_SLDPRT,
     check,
-    log,
     run_build,
 )
 from _assembly import (
@@ -87,10 +86,7 @@ from _assembly import (
     assert_components_fully_defined,
     assert_pattern_targets,
     check_no_interference,
-    component_names,
-    component_transform,
-    delete_assembly_feature,
-    linear_component_pattern,
+    grid_component_pattern,
     lock_mate,
     named_ref,
     PatternDirection,
@@ -98,10 +94,6 @@ from _assembly import (
     save_assembly_and_images,
 )
 from _transforms import ROT_Y_POS90
-from solidworks_mcp.adapters.base import (
-    ComponentLinearPatternParameters,
-    CreateAxisParameters,
-)
 
 ASM_NAME = "frame"
 
@@ -174,54 +166,6 @@ def _part(name: str) -> str:
     return str(path)
 
 
-def _instance_at(adapter, prefix: str, target: list[float]) -> str:
-    """Name of the ``prefix`` instance whose origin sits at ``target`` (mm)."""
-    for n in component_names(adapter):
-        if n.rsplit("-", 1)[0] != prefix:
-            continue
-        a = component_transform(adapter, n)
-        if all(abs(a[9 + k] * 1000.0 - target[k]) < 0.05 for k in range(3)):
-            return n
-    raise RuntimeError(f"no {prefix} instance at {target}")
-
-
-async def _pattern_pair(
-    adapter, seeds: list[str], axis_name: str, spacing: float,
-    prefix: str, targets: list[list[float]],
-) -> None:
-    """Replicate the real-mated ``seeds`` ONCE along ``axis_name`` by a local
-    linear component pattern and verify each copy landed on its expected
-    machine position (the channel ``_pattern_bank`` idiom): the axis fixes
-    only the LINE, SolidWorks infers the sign, and the inference is not
-    contractual -- a flipped pattern is deleted whole and re-created with
-    ``FlipDir1``, deterministic in at most two solves.
-
-    Flip seed TRUE: both frame patterns measured FLIPPED on their first solve
-    (Top ∩ Right resolves +Z, the copies go -Z; Top ∩ Front resolves -X, the
-    copies go +X), so ``FlipDir1=True`` lands in ONE solve; the untried value
-    stays as the verified retry (the channel ``_pattern_bank`` philosophy)."""
-    for attempt, flip in enumerate((True, False)):
-        tag = " (flip retry)" if attempt else ""
-        feature = check(
-            f"linear-pattern {prefix} pair{tag}",
-            await adapter.pattern_components_linear(
-                ComponentLinearPatternParameters(
-                    components=seeds, count=2, spacing=spacing,
-                    direction_name=axis_name, flip_direction=flip,
-                )
-            ),
-        )
-        try:
-            for target in targets:
-                _instance_at(adapter, prefix, target)
-            return
-        except RuntimeError as exc:
-            if attempt:
-                raise
-            log(f"!! {prefix} pattern sense flipped -- deleting + flip retry ({exc})")
-            delete_assembly_feature(adapter, feature.name)
-
-
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import InsertComponentParameters
 
@@ -242,40 +186,44 @@ async def build(adapter) -> dict[str, str]:
     if not res.data.get("fixed"):
         raise RuntimeError("base component was not auto-fixed")
 
-    # Columns at the four top-plate corners: the two +Z corners are REAL-mated
-    # seeds; ONE local linear component pattern replicates the pair to the -Z
-    # corners (2 inserts + 6 mates + 1 pattern replace 4 inserts + 12 mates).
+    # Columns at the four top-plate corners: one lock-mated seed and one native
+    # two-direction grid replace four inserts and four independent mates.
     # The pattern instances are positioned rigidly by the feature -- they read
     # fully defined (the channel bushing-bank precedent) and spacing 2*COLUMN_Z
     # lands them exactly on the old mate-solved corners, so the top-frame ring
-    # bores and every render are unchanged. Sense handling in _pattern_pair.
-    column_names: list[str] = []
-    for sx in (1, -1):
-        target = [sx * COLUMN_X, BASE_TOP_Y, COLUMN_Z]
-        res = await adapter.insert_component(
-            InsertComponentParameters(file_path=column_path, position=target)
-        )
-        check(f"insert_component tube-frame @ {target}", res)
-        name = res.data["name"]
-        column_names.append(name)
-        await lock_mate(
-            adapter,
-            named_ref(f"Right Plane@{name}", "PLANE"),
-            named_ref(f"Right Plane@{base_name}", "PLANE"),
-            label=f"column {name} fixed to base",
-        )
-        assert_component_placed(adapter, name, target, IDENTITY)
-    # Direction reference: EXPLICIT geometry (Top ∩ Right = the machine Z line),
-    # not a face/edge pick whose inference flipped the channel banks (#8 era).
-    frame_z = check(
-        "axis FrameZ (Top ∩ Right)",
-        await adapter.create_axis(
-            CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
-        ),
-    ).name
-    await _pattern_pair(
-        adapter, column_names, frame_z, 2.0 * COLUMN_Z, "tube-frame",
-        [[sx * COLUMN_X, BASE_TOP_Y, -COLUMN_Z] for sx in (1, -1)],
+    # bores and every render are unchanged.
+    column_target = [COLUMN_X, BASE_TOP_Y, COLUMN_Z]
+    res = await adapter.insert_component(
+        InsertComponentParameters(file_path=column_path, position=column_target)
+    )
+    check(f"insert_component tube-frame @ {column_target}", res)
+    column_name = res.data["name"]
+    await lock_mate(
+        adapter,
+        named_ref(f"Right Plane@{column_name}", "PLANE"),
+        named_ref(f"Right Plane@{base_name}", "PLANE"),
+        label=f"column {column_name} fixed to base",
+    )
+    assert_component_placed(adapter, column_name, column_target, IDENTITY)
+    column_instances = await grid_component_pattern(
+        adapter,
+        [column_name],
+        axis1="x", spacing1_mm=2.0 * COLUMN_X, instances1=2,
+        axis2="z", spacing2_mm=2.0 * COLUMN_Z, instances2=2,
+        direction1=PatternDirection.REVERSE,
+        direction2=PatternDirection.REVERSE,
+        label="tube-frame column grid",
+    )
+    assert_pattern_targets(
+        adapter,
+        column_instances,
+        [
+            [-COLUMN_X, BASE_TOP_Y, COLUMN_Z],
+            [COLUMN_X, BASE_TOP_Y, -COLUMN_Z],
+            [-COLUMN_X, BASE_TOP_Y, -COLUMN_Z],
+        ],
+        IDENTITY,
+        "tube-frame column grid",
     )
 
     # Rocker-pivot support: the windowed trapezoidal NORTH support
@@ -314,49 +262,49 @@ async def build(adapter) -> dict[str, str]:
     # hole. Authored head-down (IDENTITY) on its exact machine transform,
     # not grounded. Each seed uses one lock mate to the fixed base; its exact
     # transform carries the physical coaxiality and head-seat position, and the
-    # readback assertion proves the mate did not move it. Only the two x-55.44
-    # screws are real-mated seeds; ONE local linear component pattern
-    # replicates the pair to the x-90.36 stations -- faithful because the pattern
-    # spacing and the base hole grid derive from the SAME foot-pattern constants,
-    # so the instances land coaxial in holes 2/3 by construction.
-    screw_names: list[str] = []
-    for i, (bx, bz) in enumerate(LAG_SCREW_XZ[:2]):
-        screw_target = [bx, LAG_SCREW_UNDER_HEAD_Y, bz]
-        screw_name = await place_component(
-            adapter,
-            "lag-screw",
-            screw_target,
-            [0.0, 0.0, 0.0],
-            IDENTITY,
-            ground=False,
-            label=f"lag-screw hold-down ({bx:.2f}, {bz:+.2f})",
-        )
-        await lock_mate(
-            adapter,
-            named_ref(f"Right Plane@{screw_name}", "PLANE"),
-            named_ref(f"Right Plane@{base_name}", "PLANE"),
-            label=f"lag-screw {i} fixed to base",
-        )
-        assert_component_placed(adapter, screw_name, screw_target, IDENTITY)
-        screw_names.append(screw_name)
-    screw_targets = [
-        [bx, LAG_SCREW_UNDER_HEAD_Y, bz] for bx, bz in LAG_SCREW_XZ[2:]
-    ]
-    pattern_instances = await linear_component_pattern(
+    # readback assertion proves the mate did not move it. One real-mated seed and
+    # one native two-direction grid populate the other three holes; both spacings
+    # derive from the same foot-pattern constants as the base hole grid.
+    bx, bz = LAG_SCREW_XZ[0]
+    screw_target = [bx, LAG_SCREW_UNDER_HEAD_Y, bz]
+    screw_name = await place_component(
         adapter,
-        screw_names,
-        axis="x",
-        spacing_mm=LAG_SCREW_XZ[2][0] - LAG_SCREW_XZ[0][0],
-        instances=2,
-        direction=PatternDirection.REVERSE,
-        label="lag-screw hold-down pattern",
+        "lag-screw",
+        screw_target,
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label=f"lag-screw hold-down ({bx:.2f}, {bz:+.2f})",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Right Plane@{screw_name}", "PLANE"),
+        named_ref(f"Right Plane@{base_name}", "PLANE"),
+        label="lag-screw seed fixed to base",
+    )
+    assert_component_placed(adapter, screw_name, screw_target, IDENTITY)
+    pattern_instances = await grid_component_pattern(
+        adapter,
+        [screw_name],
+        axis1="x",
+        spacing1_mm=LAG_SCREW_XZ[2][0] - LAG_SCREW_XZ[0][0],
+        instances1=2,
+        axis2="z",
+        spacing2_mm=2.0 * abs(LAG_SCREW_XZ[0][1]),
+        instances2=2,
+        direction1=PatternDirection.REVERSE,
+        direction2=PatternDirection.REVERSE,
+        label="lag-screw hold-down grid",
     )
     assert_pattern_targets(
         adapter,
         pattern_instances,
-        screw_targets,
+        [
+            [x, LAG_SCREW_UNDER_HEAD_Y, z]
+            for x, z in LAG_SCREW_XZ[1:]
+        ],
         IDENTITY,
-        "lag-screw hold-down pattern",
+        "lag-screw hold-down grid",
     )
 
     # Top-frame ring clamped around the four columns, mid-plane y 1020.2.
