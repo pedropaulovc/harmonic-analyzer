@@ -392,7 +392,14 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += rod_cut.placement_drive_jobs
     # Named axis through the rod-pin bore (Axis2 = (Right+ROD_HOLE_X) ∩ (Top+hole_y)).
     await name_bore_axis(
-        adapter, "Right Plane", ROD_HOLE_X, "Top Plane", ROD_HOLE_Y, "rod bore"
+        adapter,
+        "Right Plane",
+        ROD_HOLE_X,
+        "Top Plane",
+        ROD_HOLE_Y,
+        "rod bore",
+        drive_a='"RodHoleX"',
+        drive_jobs=drive_jobs,
     )
     # Named axis on the R800 top-edge arc CENTRE (Axis3 = Right ∩ Top+816, a
     # free-space datum 808 above the pivot bore, along Z like the bores). The

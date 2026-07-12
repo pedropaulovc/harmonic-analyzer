@@ -247,6 +247,25 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     _telemetry.info(f"volume after pin hole: {vol:.1f} mm^3")
 
+    # Named bore/central axis for view-independent assembly mate
+    # selection (M6 mated-DOF drive train). Axis1 = shaft bore (on origin);
+    # Axis2 = the handle PIVOT bore at +X (ARM_C2C), so the drive-train assembly
+    # can journal the crank handle COAXIAL to its real pivot pin (replacing the
+    # handle's lock with a semantic pin joint). Order is load-bearing: the shaft
+    # axis is created first so it stays Axis1@<arm>.
+    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "shaft bore axis")
+    pivot_axis = await name_bore_axis(
+        adapter,
+        "Top Plane",
+        0.0,
+        "Right Plane",
+        ARM_C2C,
+        "pivot bore axis",
+        drive_b='"ArmC2C"',
+        drive_jobs=drive_jobs,
+    )
+    _telemetry.info(f"handle pivot bore axis -> {pivot_axis} (expect Axis2)")
+
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
     # built, so the geometry must not move; the as-built volume captured above is
@@ -256,18 +275,6 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(adapter, "driven crank arm (equations neutral)", vol, 0.001 * vol)
-
-    # Named bore/central axis for view-independent assembly mate
-    # selection (M6 mated-DOF drive train). Axis1 = shaft bore (on origin);
-    # Axis2 = the handle PIVOT bore at +X (ARM_C2C), so the drive-train assembly
-    # can journal the crank handle COAXIAL to its real pivot pin (replacing the
-    # handle's lock with a semantic pin joint). Order is load-bearing: the shaft
-    # axis is created first so it stays Axis1@<arm>.
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "shaft bore axis")
-    pivot_axis = await name_bore_axis(
-        adapter, "Top Plane", 0.0, "Right Plane", ARM_C2C, "pivot bore axis"
-    )
-    _telemetry.info(f"handle pivot bore axis -> {pivot_axis} (expect Axis2)")
 
     # HandleSeat datum: the plate face OPPOSITE the origin plane (z =
     # ARM_THICKNESS). The chirality-mirrored drive-train maps part +z to
