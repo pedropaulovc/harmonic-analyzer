@@ -344,21 +344,22 @@ def test_part_tasks_cover_every_stem_once(monkeypatch):
     assert len(names) == len(set(names))
 
 
-def test_drawing_spine_boundary_and_source_dependency(monkeypatch):
-    """Drawings stay out of build_bare, yet remain serialized after its final
-    assembly and before verification. Their only CAD input is the source SLDPRT,
-    while the full runtime recipe remains conservative."""
+def test_drawing_runtime_lock_and_source_dependency(monkeypatch):
+    """Drawings use the runtime COM lock and depend directly on their source part,
+    without false assembly/export ordering edges."""
     dodo = _load_dodo()
     monkeypatch.setenv("HARMONIC_BUILD_ORDER_SEED", "seat-A")
-    spine = dodo._com_spine_order()
     drawing = "drawing:platen_guide"
-    assert max(i for i, name in enumerate(spine) if name.startswith("assembly:")) \
-        < spine.index(drawing) < spine.index("verify:soundness")
 
     task = next(task for task in dodo.task_drawing() if task["name"] == "platen_guide")
+    assert "task_dep" not in task
     cad_deps = [path for path in task["file_dep"] if path.lower().endswith(".sldprt")]
     assert cad_deps == [dodo._sldprt("platen_guide")]
     assert not any(path.lower().endswith(".sldasm") for path in task["file_dep"])
+    assert dodo._part_execution_token("platen_guide") in task["file_dep"]
+    action, args = task["actions"][0]
+    assert action is dodo._run
+    assert args[-1] is True
     dep_names = {Path(path).name for path in task["file_dep"]}
     assert {
         "platen-guide.SLDPRT",

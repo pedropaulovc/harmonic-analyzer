@@ -116,7 +116,6 @@ import _telemetry  # noqa: E402  (observability spine: console logging + tracing
 from _drawing_registry import (  # noqa: E402
     ASME_B_DRWDOT,
     ASME_B_SLDDRT,
-    DRAWINGS,
     DRAWINGS_BY_NAME,
 )
 
@@ -1174,8 +1173,8 @@ def build_or_refresh(stem, dependencies, changed, targets):
 
             asm_script = SCRIPTS_DIR / f"build_{stem}_assembly.py"
             hooks = [SCRIPTS_DIR / h for h in POST_ASSEMBLY.get(stem, ())]
-            mode, why = _assembly_run_mode(stem, target_missing, recipe_changed)
-            if mode == "full":
+            if target_missing or recipe_changed:
+                why = "target missing" if target_missing else "recipe changed"
                 sp.set_attribute("mode", "full")
                 _exec([sys.executable, str(asm_script)], f"FULL build {stem} ({why})",
                       log_stem=f"assembly-{stem}")
