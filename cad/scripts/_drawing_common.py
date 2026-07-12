@@ -491,14 +491,9 @@ def read_required_view_properties(
     a redundant explicit ``OpenDoc6`` before creating the drawing.
     """
     view = _sw_type_info.flagged(view, "IView")
-    model_path = str(view.GetReferencedModelName() or "")
-    model = adapter._attempt(
-        lambda: adapter.swApp.GetOpenDocumentByName(model_path), default=None
-    )
+    model = adapter._get_attr_or_call(view, "ReferencedDocument")
     if model is None:
-        raise RuntimeError(
-            f"drawing view reference is not loaded in session: {model_path!r}"
-        )
+        raise RuntimeError("drawing view has no referenced source document")
     return read_required_properties(model, names, required=required)
 
 
