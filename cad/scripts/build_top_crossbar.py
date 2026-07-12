@@ -52,8 +52,11 @@ from top_crossbar_spec import (
     BAR_HALF_Z,
     BAR_HEIGHT,
     DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    ISOMETRIC_VIEW_NOTE,
     STUD_HOLE_FIT,
     STUD_HOLE_SIZE,
+    TOP_VIEW_NOTE,
 )
 
 PART_NAME = "top-crossbar"
@@ -144,7 +147,15 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    apply_drawing_properties(adapter, PART_NAME)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Top View Note": TOP_VIEW_NOTE,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

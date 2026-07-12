@@ -28,19 +28,28 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     )
 
 
-def test_notes_define_a_buildable_cast_crossbar() -> None:
-    notes = drawing._manufacturing_notes()
+def test_linked_notes_define_remaining_casting_requirements() -> None:
+    notes = top_crossbar_spec.DRAWING_NOTES
     assert "GRAY-IRON CASTING" in notes
-    assert "FOR 5/16 STUD" in notes
-    assert "CLOSE FIT" in notes
-    assert "21/64 DRILL THRU" in notes
-    assert "Ø8.33 NOMINAL" in notes
-    assert "ACTUAL SIDE FACES" in notes
-    assert drawing.HOLE_CALLOUT == "Ø8.33 (21/64) THRU - NOTE 4"
-    assert "END FACES PARALLEL 0.10" in notes
-    assert "GREEN ENAMEL" in notes
     assert "NO DRAFT MODELLED" in notes
     assert "X.XX" not in notes
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert "add_native_hole_callout(" in source
+    assert "def _manufacturing_notes" not in source
+
+
+def test_native_gdt_controls_crossbar_end_seats_and_hole() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.count("add_datum_feature(") == 3
+    assert source.count("add_feature_control_frame(") == 3
+    assert "characteristic=\"position\"" in source
+    assert "characteristic=\"perpendicularity\"" in source
+    assert "characteristic=\"parallelism\"" in source
+    assert source.count("add_surface_finish(") == 1
+    assert '"lower end-seat finish"' in source
+    assert '"upper end-seat finish"' in source
+    assert '"crossbar stud-hole finish"' not in source
 
 
 def test_view_scales_are_explicit() -> None:
@@ -48,8 +57,10 @@ def test_view_scales_are_explicit() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("scale=(1, 1)") == 1
     assert source.count("scale=(1, 2)") == 2
-    assert "TOP VIEW SCALE 1:2" in source
-    assert "ISOMETRIC VIEW SCALE 1:2" in source
+    assert top_crossbar_spec.TOP_VIEW_NOTE == "TOP VIEW SCALE 1:2"
+    assert top_crossbar_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
+    assert 'add_property_linked_note(adapter, "Top View Note"' in source
+    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
 def test_part_stamps_make_critical_properties() -> None:
