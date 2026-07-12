@@ -135,10 +135,7 @@ _EXPORT_TOGGLES = {TOGGLE_STL_BINARY: True, TOGGLE_STL_ONE_FILE: True,
 # Preview renders per document: (name, swStandardViews_e id). SaveBMP captures
 # the active viewport at an exact pixel size (the only screenshot API that does);
 # Pillow then transcodes the BMP to compressed PNG.
-PNG_VIEWS = (
-    ("isometric", 7), ("front", 1), ("back", 2),
-    ("left", 3), ("right", 4), ("top", 5),
-)
+PNG_VIEWS = (("isometric", 7),)
 PNG_WIDTH, PNG_HEIGHT = 1600, 1000
 
 # Incremental PNG render cache (gitignored, under the release dir). Rendering the
@@ -152,7 +149,7 @@ PNG_WIDTH, PNG_HEIGHT = 1600, 1000
 PNG_CACHE_DIR = RELEASE_DIR / "png-cache"
 # Bump when _export_pngs' rendering (views, pixel size, framing) changes so a code
 # change invalidates every cached render rather than shipping a stale-format image.
-PNG_RENDER_REV = "2"  # rev 2: src term switched raw-bytes -> recipe digest
+PNG_RENDER_REV = "3"  # rev 3: isometric-only previews
 
 
 # --------------------------------------------------------------------------- #
@@ -733,16 +730,16 @@ def _staged_pngs(doc: Any, stem: str, png_root: Path, key: str) -> bool:
 
 
 def export_neutral(sw: Any, stage: Path) -> dict[str, Any]:
-    """Export every built part and assembly to STEP + STL + PNGs under ``stage``.
+    """Export part STEP, every-document STL, and isometric PNGs under ``stage``.
 
     Alongside the Pack-and-Go native files (``stage/solidworks``), this fills the
     *neutral* CAD a consumer without SolidWorks can open -- ``stage/step`` AP214 STEP
-    (exact archival B-rep, colours carried), ``stage/stl`` fine binary STL (mm), and
-    ``stage/png`` a multi-angle PNG preview set (PNG_VIEWS), one of each per part and
-    per assembly. The caller zips the whole ``stage`` into the single release bundle.
+    for parts (exact archival B-rep, colours carried), ``stage/stl`` fine binary STL
+    (mm) for parts and assemblies, and one isometric PNG per document. The caller
+    zips the whole ``stage`` into the single release bundle.
 
     Each document is opened from cad/out and SaveAs3-exported; assemblies write a
-    monolithic STL + assembly STEP, multi-config parts (cone gears / transgears) an
+    monolithic STL only, multi-config parts (cone gears / transgears) an
     extra STL per referenced config. STEP/STL are exported HERE, not copied from
     cad/out: cad/out is the manifest-driven render cache (per-mesh STLs + only the top
     assembly's STEP -- see export_models), NOT the full 81-document neutral set the
@@ -788,7 +785,10 @@ def export_neutral(sw: Any, stage: Path) -> dict[str, Any]:
         for i, (src, doc_type) in enumerate(docs, 1):
             doc = _open_and_verify(sw, src, doc_type)
             stl_out = stl_dir / f"{src.stem}.STL"
-            for out in (step_dir / f"{src.stem}.STEP", stl_out):
+            outputs = [stl_out]
+            if doc_type == SW_DOC_PART:
+                outputs.insert(0, step_dir / f"{src.stem}.STEP")
+            for out in outputs:
                 rc = doc.SaveAs3(str(out), 0, SW_SAVE_OPTS)
                 if not out.exists() or out.stat().st_size == 0:
                     raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={rc})")
@@ -798,14 +798,15 @@ def export_neutral(sw: Any, stage: Path) -> dict[str, Any]:
             for cfg, mesh in cfg_meshes.get(src.stem, ()):
                 # ShowConfiguration2 returns False when cfg is ALREADY active (the part
                 # opened in it) -- a real failure only if it's still not active after.
-                if _active_config(doc) != cfg and not doc.ShowConfiguration2(cfg) \
-                        and _active_config(doc) != cfg:
+                switched = _active_config(doc) != cfg
+                if switched and not doc.ShowConfiguration2(cfg) and _active_config(doc) != cfg:
                     raise RuntimeError(f"{src.name}: ShowConfiguration2({cfg!r}) failed")
                 # Config switches regenerate LAZILY: force a full rebuild so SaveAs3
                 # captures THIS config, not the prior one's stale tessellation (the
                 # race that shipped --t18 as 12-tooth geometry in v0.5.1).
-                doc.ForceRebuild3(False)
-                doc.EditRebuild3()
+                if switched:
+                    doc.ForceRebuild3(False)
+                    doc.EditRebuild3()
                 out = stl_dir / f"{mesh}.STL"
                 rc = doc.SaveAs3(str(out), 0, SW_SAVE_OPTS)
                 if not out.exists() or out.stat().st_size == 0:
@@ -1099,7 +1100,7 @@ def bundle(sw: Any, revision: str, version: str,
         raise RuntimeError(f"release bundle not produced at {zip_path}")
     facts["size_mb"] = zip_path.stat().st_size / 1e6
     log(f"release bundle: {zip_path.name} ({facts['size_mb']:.1f} MB) -- "
-        f"solidworks/ + {facts['documents']} docs x STEP+STL "
+        f"solidworks/ + {facts['parts']} part STEP + {facts['documents']} doc STL "
         f"(+{facts['config_meshes']} per-config STLs) + {facts['pngs']} PNGs + boxes/")
     return zip_path, facts
 
@@ -1150,14 +1151,14 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         f"rebuilding -- with or without SolidWorks:\n\n"
         f"- `solidworks/` -- native Pack-and-Go ({facts['documents']} referenced "
         f"documents, flattened): open `{TOP_ASSEMBLY}.SLDASM` as-is\n"
-        f"- `step/` -- AP214 STEP + `stl/` fine binary STL (mm), one per "
-        f"document ({facts['parts']} parts + {facts['assemblies']} assemblies) "
+        f"- `step/` -- AP214 STEP for {facts['parts']} parts; `stl/` fine binary "
+        f"STL (mm) for all {facts['parts']} parts + {facts['assemblies']} assemblies "
         f"plus {facts['config_meshes']} per-configuration STLs (cone gears / "
         f"transgears)\n"
         f"- `boxes/{TOP_ASSEMBLY}.json` -- assembly scene graph (mm): per-component "
         f"transform, mesh key and colour, so the comparison gallery renders from "
         f"this bundle with `comparisons/tools/render_offline.py` (no SolidWorks)\n"
-        f"- `png/` -- {facts['views']}-angle preview renders "
+        f"- `png/` -- isometric preview renders "
         f"({facts['pngs']} images)\n"
         + (f"- `comparisons/` -- this model overlaid on Michelson's ch30 photos "
            f"({facts['comparisons']['pairs']} pairs"

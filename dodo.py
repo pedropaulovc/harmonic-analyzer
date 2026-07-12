@@ -639,6 +639,12 @@ def _run_stamped(cmd: list[str], label: str, stamp: str, com: bool = False) -> N
     Path(stamp).write_text(f"{label}\n", encoding="utf-8")
 
 
+def _write_stamp(label: str, stamp: str) -> None:
+    """Write a dependency-aggregation stamp after all child gates succeeded."""
+    Path(stamp).parent.mkdir(parents=True, exist_ok=True)
+    Path(stamp).write_text(f"{label}\n", encoding="utf-8")
+
+
 def _rel_tag(f: str) -> str:
     """Repo-relative, ``/``-normalised path tag for a recipe member, so
     ``_digest_files`` is LOCATION-INDEPENDENT: identical sources checked out under
@@ -942,7 +948,7 @@ def _part_cache_outputs(stem: str) -> list[Path]:
 def _assembly_cache_outputs(stem: str) -> list[Path]:
     """Everything an assembly build emits beyond its file_dep: the .SLDASM + renders,
     plus the per-stem extras a hit would otherwise leave missing/stale -- the channel
-    stretch-spring components, and the top assembly's gallery PNGs + parts BOM (which
+    stretch-spring components and the top assembly's parts BOM (which
     export_gallery_and_bom writes into cad/out, OUTSIDE _png_dir).
 
     Includes the `.<stem>.massprops.sha` fingerprint sidecar (refresh_assembly's
@@ -962,7 +968,6 @@ def _assembly_cache_outputs(stem: str) -> list[Path]:
     if stem == "channel":
         outs += _channel_spring_variants()
     if stem == "harmonic_analyzer":
-        outs += sorted((CAD_OUT / "png").glob("eight-views-*.png"))
         outs.append(CAD_OUT / "harmonic-analyzer-bom.csv")
     return outs
 
@@ -1419,6 +1424,31 @@ def task_drawing():
         }
 
 
+def task_verify_soundness():
+    """One independently stamped soundness gate per assembly.
+
+    A change to one assembly no longer invalidates a monolithic gate that reopens
+    all eight models. The public ``verify:soundness`` task below aggregates these
+    child stamps, preserving the existing CLI and release dependency.
+    """
+    for stem in ASSEMBLY_ORDER:
+        name = stem.replace("_", "-")
+        sldasm = Path(_sldasm(stem))
+        deps = [str(VERIFY_PY), str(POSTBUILD_PY), str(sldasm)]
+        if stem == "paper_drive":
+            deps.append(str(sldasm.parent / f".{sldasm.stem}.dof.json"))
+        stamp = str(REPORTS / f"verify-soundness-{name}.ok")
+        cmd = [sys.executable, str(VERIFY_PY), name, "--suite", "soundness"]
+        yield {
+            "name": stem,
+            "file_dep": deps,
+            "targets": [stamp],
+            "actions": [(_run_stamped, [cmd, f"verify soundness {name}", stamp, True])],
+            "clean": True,
+            "verbosity": 2,
+        }
+
+
 def task_verify():
     """SolidWorks verification suites -- need SW open, serialized on the COM seat lock.
 
@@ -1427,20 +1457,11 @@ def task_verify():
     success. The ``verify:`` prefix marks them as SolidWorks-dependent (vs the
     SolidWorks-free ``check:`` tasks).
     """
-    asm_targets = [_sldasm(s) for s in ASSEMBLY_ORDER]
-
     def _dof_json(stem: str) -> str:
         sldasm = Path(_sldasm(stem))
         return str(sldasm.parent / f".{sldasm.stem}.dof.json")
 
     suite_deps = {
-        # soundness reads paper-drive's DOF manifest directly (the exact crank
-        # instance for the necessity gate, codex #189). The manifest is NOT a
-        # declared target of any task (it is a cache-packed sidecar), so
-        # listing it as file_dep makes doit FAIL LOUD when it is missing/
-        # deleted while the .SLDASM digest is unchanged -- without it a fresh
-        # verify-soundness.ok stamp would silently skip the gate (codex #221).
-        "soundness": [*asm_targets, _dof_json("paper_drive")],
         # subsystems retired: its one unique gate (channel-independence) is folded
         # into soundness, which already opens `channel` (see verify._verify_static_one).
         "kinematics": [
@@ -1482,12 +1503,25 @@ def task_verify():
     # verify.py glob every *.SLDASM under cad/out/sldasm -- a stray/scratch
     # assembly left in a worktree must not be verified (codex review). kinematics
     # targets the pen + magnifier subs (verify.py's own defaults), no names.
-    asm_names = [s.replace("_", "-") for s in ASSEMBLY_ORDER]
-    suite_names = {"soundness": asm_names}
+    child_stamps = [
+        str(REPORTS / f"verify-soundness-{stem.replace('_', '-')}.ok")
+        for stem in ASSEMBLY_ORDER
+    ]
+    soundness_stamp = str(REPORTS / "verify-soundness.ok")
+    yield {
+        "name": "soundness",
+        # Child stamps are targets of verify_soundness:* tasks, so doit derives
+        # the real producer edges from file_dep without a synthetic task_dep.
+        "file_dep": [str(VERIFY_PY), str(POSTBUILD_PY), *child_stamps],
+        "targets": [soundness_stamp],
+        "actions": [(_write_stamp, ["verify soundness", soundness_stamp])],
+        "clean": True,
+        "verbosity": 2,
+    }
+
     for suite, deps in suite_deps.items():
         stamp = str(REPORTS / f"verify-{suite}.ok")
         cmd = [sys.executable, str(VERIFY_PY)]
-        cmd += suite_names.get(suite, [])
         cmd += ["--suite", suite]
         yield {
             "name": suite,
