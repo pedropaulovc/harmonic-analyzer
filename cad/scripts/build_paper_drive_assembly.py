@@ -87,7 +87,6 @@ from _assembly import (
     assert_pattern_targets,
     assert_free_dof_necessity,
     check_no_interference,
-    coincident_mate,
     component_names,
     component_origin,
     component_transform,
@@ -97,7 +96,6 @@ from _assembly import (
     grid_component_pattern,
     lock_mate,
     named_ref,
-    parallel_mate,
     PatternDirection,
     place_component,
     rack_pinion_mate,
@@ -635,10 +633,8 @@ async def build(adapter) -> dict[str, str]:
             await place_component(adapter, arc, [sx * COLUMN_X, BAR_CY, COLUMN_Z],
                                   [0.0, 90.0, 0.0], ROT_Y_POS90,
                                   label=f"{arc} (x{sx * COLUMN_X:+.0f})")
-    # Two physically mated clamp-screw seeds at the east column plus one native
-    # multi-seed pattern across the frame.  The pattern spacing is exactly the
-    # column pitch; each seed is coaxial with a Hole Wizard station, seated on
-    # the bar front face, and anti-spin constrained.
+    # Two exact-pose clamp-screw seeds at the east column plus one native
+    # multi-seed pattern across the frame. Each rigid seed uses one lock mate.
     clamp_x = sorted(CLAMP_HOLE_X)
     clamp_seeds: list[str] = []
     for index, x in enumerate(clamp_x[:2]):
@@ -652,26 +648,11 @@ async def build(adapter) -> dict[str, str]:
             ground=False,
             label=f"clamp-screw seed (x{x:+.1f})",
         )
-        await coincident_mate(
-            adapter,
-            named_ref(f"ScrewAxis@{seed}", "AXIS"),
-            named_ref(f"ClampAxis{index}@{support_bar}", "AXIS"),
-            label=f"support clamp-screw seed {index} coaxial",
-            verify=(seed, target),
-        )
-        await coincident_mate(
-            adapter,
-            named_ref(f"Front Plane@{seed}", "PLANE"),
-            named_ref(f"ClampSeat@{support_bar}", "PLANE"),
-            label=f"support clamp-screw seed {index} under-head seat",
-            verify=(seed, target),
-        )
-        await parallel_mate(
+        await lock_mate(
             adapter,
             named_ref(f"Right Plane@{seed}", "PLANE"),
             named_ref(f"Right Plane@{support_bar}", "PLANE"),
-            label=f"support clamp-screw seed {index} anti-spin",
-            verify=(seed, target),
+            label=f"support clamp-screw seed {index} fixed to bar",
         )
         assert_component_placed(adapter, seed, target, IDENTITY)
         clamp_seeds.append(seed)
@@ -923,7 +904,7 @@ async def build(adapter) -> dict[str, str]:
         [0.0, 0.0, 0.0],
         IDENTITY,
     )
-    # One real-mated seed at machine -2; PatternAxisX forward runs toward -X
+    # One exact-pose seed at machine -2; PatternAxisX forward runs toward -X
     # and creates the second screw at -22. Ry(180) points both shanks into the
     # support bar while their under-head planes bear on the bracket back face.
     bracket_seed_target = [STUD_XY[0] + BRACKET_SCREW_DX, BAR_CY, STUB_Z0]
@@ -936,26 +917,11 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label=f"bracket-screw seed (x{bracket_seed_target[0]:+.0f})",
     )
-    await coincident_mate(
-        adapter,
-        named_ref(f"ScrewAxis@{bracket_seed}", "AXIS"),
-        named_ref(f"ScrewAxis1@{bracket}", "AXIS"),
-        label="transgear bracket-screw seed coaxial",
-        verify=(bracket_seed, bracket_seed_target),
-    )
-    await coincident_mate(
-        adapter,
-        named_ref(f"Front Plane@{bracket_seed}", "PLANE"),
-        named_ref(f"ScrewSeat@{bracket}", "PLANE"),
-        label="transgear bracket-screw seed under-head seat",
-        verify=(bracket_seed, bracket_seed_target),
-    )
-    await parallel_mate(
+    await lock_mate(
         adapter,
         named_ref(f"Right Plane@{bracket_seed}", "PLANE"),
         named_ref(f"Right Plane@{bracket}", "PLANE"),
-        label="transgear bracket-screw seed anti-spin",
-        verify=(bracket_seed, bracket_seed_target),
+        label="transgear bracket-screw seed fixed to bracket",
     )
     assert_component_placed(
         adapter, bracket_seed, bracket_seed_target, ROT_Y_180

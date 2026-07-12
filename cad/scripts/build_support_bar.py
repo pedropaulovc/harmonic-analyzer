@@ -41,7 +41,6 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
-    name_bore_axis,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -73,7 +72,7 @@ CLAMP_HOLE_X = tuple(
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
+    from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
@@ -140,39 +139,6 @@ async def build(adapter) -> dict[str, str]:
     ) * BAR_DEPTH
     expected -= v_holes
     await volume_check(adapter, "bar with holes", expected, 0.02 * v_holes)
-
-    # Named physical mate datums for patterned fasteners.  Both screw families
-    # run along local Z; their axes derive from the same X stations as the Hole
-    # Wizard points.  The clamp heads bear on the bar's front face.
-    check(
-        "create_plane ClampSeat (Front Plane, front face)",
-        await adapter.create_plane(
-            CreatePlaneParameters(
-                mode="offset", base_plane="Front Plane", offset=front_z
-            )
-        ),
-    )
-    name_last_feature(adapter, "ClampSeat")
-    for index, x in enumerate(sorted(CLAMP_HOLE_X)):
-        await name_bore_axis(
-            adapter,
-            "Right Plane",
-            x,
-            "Top Plane",
-            0.0,
-            f"clamp hole {index}",
-        )
-        name_last_feature(adapter, f"ClampAxis{index}")
-    for index, x in enumerate(sorted(BRACKET_HOLE_X)):
-        await name_bore_axis(
-            adapter,
-            "Right Plane",
-            x,
-            "Top Plane",
-            0.0,
-            f"bracket hole {index}",
-        )
-        name_last_feature(adapter, f"BracketAxis{index}")
 
     # Apply the deferred drive equations after the model exists, then re-check:
     # every equation evaluates to the value just built, so geometry must not move.
