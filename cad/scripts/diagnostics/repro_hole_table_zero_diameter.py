@@ -32,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import _telemetry  # noqa: E402
 from _common import check, run_build  # noqa: E402
 from _drawing_common import insert_hole_table, set_hidden_lines_removed  # noqa: E402
-from _holes import HoleSpec, _early, wizard_holes  # noqa: E402
+from _holes import HoleSpec, _early, _flag, wizard_holes  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import null_callout  # noqa: E402
 from solidworks_mcp.adapters.solidworks.drawing import (  # noqa: E402
     new_drawing,
@@ -117,9 +117,10 @@ def _apply_redundant_normal_fit(adapter: Any) -> None:
     feature = model.FeatureByName("ClearanceHoles")
     if feature is None:
         raise RuntimeError("ClearanceHoles feature is missing")
+    _flag(feature, "IFeature")
 
     def _definition():
-        raw = adapter._get_attr_or_call(feature, "GetDefinition")
+        raw = feature.GetDefinition()
         return _early(raw, "IWizardHoleFeatureData2")
 
     definition = _definition()
