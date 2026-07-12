@@ -14,6 +14,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -56,28 +57,35 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
 }
+DIMENSION_CALLOUTS = {"ShaftDia": "+0.00/-0.02"}
 
 _NOTES = (
     "UNLESS OTHERWISE SPECIFIED:",
     "1. DIMENSIONS ARE IN MILLIMETRES. INTERPRET PER ASME Y14.5.",
     (
-        f"2. SHAFT DIAMETER O{SHAFT_DIA:.2f} +0.00/-0.02;\n"
-        "   LENGTH +/-0.25."
+        "2. LENGTH +/-0.25. SHAFT DIAMETER TOLERANCE\n"
+        "   IS SHOWN DIRECTLY ON THE END VIEW."
     ),
-    "3. REMOVE BURRS AND BREAK END EDGES 0.15 MAX.",
+    (
+        "3. REMOVE BURRS AND BREAK END EDGES 0.15 MAX.\n"
+        "   CENTER-DRILL MARKS PERMITTED, 1.0 DEEP MAX."
+    ),
     (
         "4. TURN OR CENTRELESS-GRIND THE FULL BEARING LENGTH.\n"
         "   NO LOCAL FLATS, STEPS, OR TOOL ROLLOVER."
     ),
     (
-        "5. CYLINDRICITY 0.03 OVER FULL LENGTH; STRAIGHTNESS\n"
-        "   0.05 TOTAL. BOTH END FACES SQUARE TO AXIS WITHIN 0.05."
+        "5. CYLINDRICITY 0.03 OVER FULL LENGTH. BOTH END\n"
+        "   FACES SQUARE TO AXIS WITHIN 0.05."
     ),
     (
         "6. BEARING SURFACE Ra 1.6; END FACES Ra 3.2.\n"
         "   ALL Ra VALUES IN MICROMETRES."
     ),
-    "7. FIT: FREE RUNNING IN O6.50 LEVER BUSHINGS. LIGHTLY OIL.",
+    (
+        "7. MATING O6.50 BUSHINGS GIVE 0.15-0.20\n"
+        "   DIAMETRAL CLEARANCE. LIGHTLY OIL."
+    ),
 )
 
 
@@ -123,9 +131,15 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    front_annotations = curate_view_dimensions(
+        adapter, front, keep=FRONT_KEEP, view_label="front"
+    )
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
-    if not auto_center_marks(adapter, front, holes=False, size=0.0025):
+    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    # SolidWorks classifies a solid circular end silhouette under the same
+    # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit
+    # makes the API a guaranteed no-op even though the end view is circular.
+    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to shaft end view")
 
     add_note(adapter, "\n".join(_NOTES[:4]), 0.014, 0.108)

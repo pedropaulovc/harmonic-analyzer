@@ -30,11 +30,13 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 def test_notes_define_a_buildable_bearing_shaft() -> None:
     notes = drawing._manufacturing_notes()
-    assert "O6.35 +0.00/-0.02" in notes
+    assert drawing.DIMENSION_CALLOUTS["ShaftDia"] == "+0.00/-0.02"
     assert "CYLINDRICITY 0.03" in notes
-    assert "STRAIGHTNESS" in notes
+    assert "STRAIGHTNESS" not in notes
     assert "Ra 1.6" in notes
-    assert "O6.50 LEVER BUSHINGS" in notes
+    assert "MATING O6.50 BUSHINGS" in notes
+    assert "0.15-0.20" in notes
+    assert "CENTER-DRILL MARKS PERMITTED" in notes
     assert "X.XX" not in notes
 
 
