@@ -73,7 +73,7 @@ IN = 25.4  # inch -> mm
 # articulating-mechanism contact, not an interference fault (check_no_interference).
 _CHAIN_LINK_PREFIXES = ("chain-inner-link", "chain-outer-link")
 
-DEFAULT_VIEWS = ("front", "top", "isometric")
+DEFAULT_VIEWS = ("isometric",)
 
 
 _T0 = time.perf_counter()
@@ -899,6 +899,11 @@ async def save_part_and_images(
 
     png_dir = OUT_PNG / part_name
     png_dir.mkdir(parents=True, exist_ok=True)
+    views = list(views)
+    requested = {f"{part_name}_{view}.png" for view in views}
+    for stale in png_dir.glob(f"{part_name}_*.png"):
+        if stale.name not in requested:
+            stale.unlink()
     apply_custom_properties(adapter, part_properties(part_name))
     check(f"re-save with properties -> {part_path}", await adapter.save_file(str(part_path)))
 
@@ -922,6 +927,14 @@ async def save_part_and_images(
         )
         artefacts[view] = str(img_path)
     return artefacts
+
+
+def active_configuration_name(adapter: Any, model: Any = None) -> str:
+    """Return the active configuration name without switching or rebuilding."""
+    model = model or adapter.currentModel
+    manager = _read_member(model, "ConfigurationManager")
+    active = _read_member(manager, "ActiveConfiguration") if manager is not None else None
+    return str(_read_member(active, "Name") or "") if active is not None else ""
 
 
 _SW_CUSTOM_TEXT = 30  # swCustomInfoType_e.swCustomInfoText
