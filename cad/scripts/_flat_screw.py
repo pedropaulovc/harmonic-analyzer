@@ -1,7 +1,8 @@
-r"""Shared builder for plain cylindrical-head machine screws.
+r"""Shared builder for slotted cylindrical-head machine screws.
 
 The fillister/slotted screw family is one shape -- a cylindrical head under
-a plain shank, slot and thread not modeled -- so the new paper-drive screws
+a plain shank with a native driver slot; thread geometry is not modeled. The
+new paper-drive screws
 (clamp-screw, bracket-screw) share this builder instead of cloning the
 fillister script again. Layout: axis along Z, under-head face on the Front
 plane at z = 0, head -head_h..0, shank 0..+shank_len; symmetric about
@@ -28,6 +29,7 @@ from _common import (
     set_global,
     volume_check,
 )
+from _fastener_slot import FastenerAxis, add_slotted_drive
 
 
 async def build_flat_screw(
@@ -89,6 +91,17 @@ async def build_flat_screw(
     expected += v_shank
     await volume_check(adapter, "shank", expected, 0.005 * v_shank)
 
+    expected, slot_jobs = await add_slotted_drive(
+        adapter,
+        axis=FastenerAxis.Z,
+        head_radius_mm=head_dia / 2.0,
+        head_face_offset_mm=-head_h,
+        width_mm=1.2,
+        depth_mm=min(1.0, head_h * 0.4),
+        expected_volume_mm3=expected,
+    )
+    drive_jobs += slot_jobs
+
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
     await force_rebuild(adapter)
@@ -98,6 +111,21 @@ async def build_flat_screw(
     await volume_check(
         adapter, f"driven {part_name} (equations neutral)", expected, 0.005 * v_shank
     )
+
+    # Stable assembly datum for physical coaxial mates.  The screw is built on
+    # the Front plane, so its shank runs along local Z at the intersection of
+    # the Top and Right planes.  A named reference axis avoids selecting a
+    # cylindrical face (fragile after feature rebuilds) and gives every user of
+    # this shared screw family the same mate contract.
+    from solidworks_mcp.adapters.base import CreateAxisParameters
+
+    check(
+        "create_axis ScrewAxis (Top ∩ Right)",
+        await adapter.create_axis(
+            CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
+        ),
+    )
+    name_last_feature(adapter, "ScrewAxis")
 
     await apply_material(adapter, material)
     await report_mass_properties(adapter)

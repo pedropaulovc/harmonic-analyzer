@@ -34,6 +34,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_bore_axis,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -69,7 +70,7 @@ GROOVE_HALF_W = PLATE_HALF_W + 1.0  # overshoot past both plate edges
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
@@ -185,6 +186,30 @@ async def build(adapter) -> dict[str, str]:
     v_groove = 2.0 * PLATE_HALF_W * (GROOVE_Y[1] - GROOVE_Y[0]) * GROOVE_DEPTH
     expected -= v_groove
     await volume_check(adapter, "groove", expected, 0.02 * v_groove)
+
+    # Assembly mate contract for the two bracket screws. Their heads bear on
+    # the plate back face (local +Z), and both shanks run through the Hole
+    # Wizard stations along Z. Named datums keep the seed independent of face
+    # IDs and derive from the same station constants as the manufactured holes.
+    check(
+        "create_plane ScrewSeat (Front Plane, plate back)",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Front Plane", offset=PLATE_THICK
+            )
+        ),
+    )
+    name_last_feature(adapter, "ScrewSeat")
+    for index, x in enumerate((-SCREW_HOLE_DX, SCREW_HOLE_DX)):
+        await name_bore_axis(
+            adapter,
+            "Right Plane",
+            x,
+            "Top Plane",
+            SCREW_HOLE_Y,
+            f"bracket screw hole {index}",
+        )
+        name_last_feature(adapter, f"ScrewAxis{index}")
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).

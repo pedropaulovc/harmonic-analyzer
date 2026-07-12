@@ -25,6 +25,7 @@ from __future__ import annotations
 import math
 import sys
 
+from _fastener_catalog import fastener
 from _common import (
     SketchDims,
     apply_material,
@@ -44,10 +45,11 @@ from _common import (
 )
 
 PART_NAME = "cone-tip-adjuster"
-MATERIAL = "Plain Carbon Steel"  # blued/black screw (t00471)
+SPEC = fastener(PART_NAME)
+MATERIAL = SPEC.material  # blued/black screw (t00471)
 
-BODY_DIA = 6.2  # 5/16-18 screw-in-tap shank (tap-drill 6.528 - 0.3); was 7.9
-BODY_LEN = 14.0
+BODY_DIA = SPEC.model_diameter_mm  # 5/16-18 modeled thread minor diameter
+BODY_LEN = SPEC.length_mm
 CUP_DIA = 2.0  # blind bore the shaft tip rests in
 CUP_DEPTH = 6.0
 SLOT_W = 1.5

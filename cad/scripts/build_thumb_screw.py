@@ -27,6 +27,7 @@ from __future__ import annotations
 import math
 import sys
 
+from _fastener_catalog import fastener
 from _common import (
     SketchDims,
     apply_material,
@@ -45,13 +46,14 @@ from _common import (
 from _features import add_reeded_head_and_thread
 
 PART_NAME = "thumb-screw"
-MATERIAL = "Brass"  # see _common.apply_material docstring
+SPEC = fastener(PART_NAME)
+MATERIAL = SPEC.material
 
 HEAD_DIA = 10.0  # DIMENSIONS.md ch20: knurled head, p.48 (low)
 HEAD_LENGTH = 5.0  # DIMENSIONS.md ch20 (low)
-SHANK_DIA = 2.0  # shank: was Ø3.0, now 2.0 = #4-40 tap-drill 2.261 - 0.26
+SHANK_DIA = SPEC.model_diameter_mm  # #4-40 modeled thread minor diameter
 # (threads #4-40 into the clamp block / output fixture)
-SHANK_LENGTH = 12.0  # DIMENSIONS.md ch20 (low)
+SHANK_LENGTH = SPEC.length_mm  # DIMENSIONS.md ch20 (low)
 
 
 async def build(adapter) -> dict[str, str]:

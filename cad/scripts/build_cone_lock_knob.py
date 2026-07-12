@@ -32,6 +32,7 @@ from __future__ import annotations
 import math
 import sys
 
+from _fastener_catalog import fastener
 from _common import (
     SketchDims,
     apply_material,
@@ -50,7 +51,8 @@ from _common import (
 )
 
 PART_NAME = "cone-lock-knob"
-MATERIAL = "Plain Carbon Steel"  # bright/chromed steel (the pinion-handle
+SPEC = fastener(PART_NAME)
+MATERIAL = SPEC.material  # bright/chromed steel (the pinion-handle
 # precedent for chrome-look hardware; v4_t00411 shows worn chrome plate)
 
 WASHER_DIA = 18.0  # clamp washer flange, seats on the plate top
@@ -59,8 +61,8 @@ BODY_DIA = 13.0  # knob body -- ONE straight wall (t00411: no mid step)
 BODY_TOP = 13.5  # body top above the washer seat; height ~ diameter
 DOME_R = 5.0  # top-edge fillet radius: the domed crown (leaves a O3 flat
 # at the apex, the still's slightly-flattened dome)
-STUD_DIA = 6.35  # 1/4" clamp stud -- rides the platform's SLOT_W notch
-STUD_LEN = 6.35  # plate thickness exactly: stud ends FLUSH with the base
+STUD_DIA = SPEC.model_diameter_mm  # 1/4" clamp stud -- rides the platform's SLOT_W notch
+STUD_LEN = SPEC.length_mm  # plate thickness exactly: stud ends FLUSH with the base
 # top (thread engagement into the absent base unmodeled, see docstring)
 
 def _dome_fillet_volume(body_r: float, r: float) -> float:

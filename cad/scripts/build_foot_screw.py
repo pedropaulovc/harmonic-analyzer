@@ -10,9 +10,8 @@ Both seats are too small for the bright Ø4 block screw
 head. Head bears on the foot's top face, the Ø2.9 shank drops through
 the Ø3.2 holes into the harmonic base (5.0 pedestal flange + 3.0
 engagement; the spring instance buries the surplus below its 0.8 strip
--- thread depth unmodeled, the pedestal-bolt precedent). Slot and
-thread not modeled (the M6.10 fillister convention -- below render
-resolution).
+-- thread depth unmodeled, the pedestal-bolt precedent). The head carries
+its native driver slot; thread geometry is not modeled.
 
 Layout: axis along Y, AUTHORED IN FINAL ORIENTATION (pointing -Y =
 down into the base): under-head face on the Top plane at y = 0, head
@@ -30,6 +29,7 @@ from __future__ import annotations
 import math
 import sys
 
+from _fastener_catalog import fastener
 from _common import (
     PANEL_BLACK,
     SketchDims,
@@ -48,15 +48,17 @@ from _common import (
     set_global,
     volume_check,
 )
+from _fastener_slot import FastenerAxis, add_slotted_drive
 
 PART_NAME = "foot-screw"
-MATERIAL = "Plain Carbon Steel"  # black-finished (img01's dark head)
+SPEC = fastener(PART_NAME)
+MATERIAL = SPEC.material  # black-finished (img01's dark head)
 
 HEAD_DIA = 5.5  # fillister-size head: fits the pedestal's 6-long flange
 HEAD_H = 2.2
-SHANK_DIA = 2.0  # shank: was Ø2.9, now 2.0 = #4-40 tap-drill 2.261 - 0.26
+SHANK_DIA = SPEC.model_diameter_mm  # #4-40 modeled thread minor diameter
 # (threads #4-40 into the base; rides the Ø3.2 spring-foot / pedestal-flange clearance)
-SHANK_LEN = 8.0  # pedestal: 5.0 flange + 3.0 engagement; the spring
+SHANK_LEN = SPEC.length_mm  # pedestal: 5.0 flange + 3.0 engagement; the spring
 # instance buries the surplus in the base (its strip is only 0.8)
 
 
@@ -111,6 +113,17 @@ async def build(adapter) -> dict[str, str]:
     expected += v_shank
     await volume_check(adapter, "shank", expected, 0.005 * v_shank)
 
+    expected, slot_jobs = await add_slotted_drive(
+        adapter,
+        axis=FastenerAxis.Y,
+        head_radius_mm=HEAD_DIA / 2.0,
+        head_face_offset_mm=HEAD_H,
+        width_mm=0.8,
+        depth_mm=0.7,
+        expected_volume_mm3=expected,
+    )
+    drive_jobs += slot_jobs
+
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
     await force_rebuild(adapter)
@@ -120,6 +133,16 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven foot screw (equations neutral)", expected, 0.005 * v_shank
     )
+
+    from solidworks_mcp.adapters.base import CreateAxisParameters
+
+    check(
+        "create_axis ScrewAxis (Front ∩ Right)",
+        await adapter.create_axis(
+            CreateAxisParameters(mode="two_planes", planes=["Front Plane", "Right Plane"])
+        ),
+    )
+    name_last_feature(adapter, "ScrewAxis")
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)

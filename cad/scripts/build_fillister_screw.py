@@ -6,8 +6,8 @@ sockets (ch. 22 p. 55 -- the platen's "fastener holes deferred to
 assembly" promise, resolved in the M6.10 fasteners pass), and 2x
 fastening the magnifying-lever bracket's flange up into the summing
 lever's coefficients plate (ch. 20 p. 47 "mounting screws omitted").
-Plain cylindrical head: the slot is ~0.8 mm, below comparison-render
-resolution (documented simplification); thread not modeled.
+The cylindrical head carries its native 0.8 mm driver slot; thread geometry
+is not modeled.
 
 Dimensions: cad/DIMENSIONS.md ch. 20/22 (M6.10) -- shank matches the
 clip holes (O3, scaled low); head photo-plausible fillister (low).
@@ -27,6 +27,7 @@ from __future__ import annotations
 import math
 import sys
 
+from _fastener_catalog import fastener
 from _common import (
     SketchDims,
     apply_material,
@@ -43,15 +44,17 @@ from _common import (
     set_global,
     volume_check,
 )
+from _fastener_slot import FastenerAxis, add_slotted_drive
 
 PART_NAME = "fillister-screw"
-MATERIAL = "Brass"  # bright screws on the brass clips
+SPEC = fastener(PART_NAME)
+MATERIAL = SPEC.material  # bright screws on the brass clips
 
 HEAD_DIA = 5.5  # fillister head (low)
 HEAD_H = 2.2
-SHANK_DIA = 2.0  # shank: was Ø2.9, now 2.0 = #4-40 tap-drill 2.261 - 0.26
+SHANK_DIA = SPEC.model_diameter_mm  # #4-40 modeled thread minor diameter
 # (threads #4-40 into the platen sockets / flange; rides the clips' O3 clearance)
-SHANK_LEN = 4.0  # clip 1.2 + 2.8 platen socket; = flange thickness 4
+SHANK_LEN = SPEC.length_mm  # clip 1.2 + 2.8 platen socket; = flange thickness 4
 
 
 async def build(adapter) -> dict[str, str]:
@@ -104,6 +107,17 @@ async def build(adapter) -> dict[str, str]:
     v_shank = math.pi * (SHANK_DIA / 2.0) ** 2 * SHANK_LEN
     expected += v_shank
     await volume_check(adapter, "shank", expected, 0.005 * v_shank)
+
+    expected, slot_jobs = await add_slotted_drive(
+        adapter,
+        axis=FastenerAxis.Z,
+        head_radius_mm=HEAD_DIA / 2.0,
+        head_face_offset_mm=-HEAD_H,
+        width_mm=0.8,
+        depth_mm=0.7,
+        expected_volume_mm3=expected,
+    )
+    drive_jobs += slot_jobs
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
