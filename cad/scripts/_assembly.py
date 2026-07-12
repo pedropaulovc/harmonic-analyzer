@@ -8,6 +8,7 @@ import hashlib
 import json
 import re
 from collections.abc import Iterable
+from contextlib import contextmanager
 from enum import StrEnum
 from typing import Any
 
@@ -320,6 +321,25 @@ def named_ref(name: str, entity_type: str) -> Any:
     from solidworks_mcp.adapters.base import MateEntityRef
 
     return MateEntityRef(entity_type=entity_type, name=name)
+
+
+@contextmanager
+def suspend_automatic_assembly_rebuilds(adapter: Any):
+    """Defer automatic root-assembly rebuilds across a mutation batch.
+
+    SOLIDWORKS' unusually named ``IAssemblyDoc.EnableAssemblyRebuild`` is
+    ``True`` when automatic rebuilding is *suspended*.  Restore the caller's
+    state even when a COM write fails; the caller remains responsible for one
+    explicit closing solve after the complete batch.
+    """
+    assembly = adapter.currentModel
+    _flag_only(assembly, "EnableAssemblyRebuild")
+    previous = bool(_read_member(assembly, "EnableAssemblyRebuild"))
+    assembly.EnableAssemblyRebuild = True
+    try:
+        yield
+    finally:
+        assembly.EnableAssemblyRebuild = previous
 
 def component_named_ref(
     component: str, name: str, entity_type: str = "AXIS",
@@ -957,6 +977,73 @@ async def gear_mate(
     return await _mate(
         adapter, label, "gear", [ref_a, ref_b], gear_ratio=ratio, alignment=alignment
     )
+
+
+def gear_mates_batch(
+    adapter: Any,
+    specs: Iterable[tuple[Any, Any, Iterable[float], str]],
+    *,
+    label: str = "gear-mate bank",
+) -> list[dict[str, Any]]:
+    """Create a bank of gear mates with one closing assembly solve.
+
+    The normal adapter path ends every mate with ``EditRebuild3``.  That is a
+    severe quadratic cost in a mature assembly and is redundant here:
+    ``IAssemblyDoc.CreateMate`` seats each new gear relationship immediately,
+    while one closing rebuild proves the complete coupled system.  This is the
+    production form of ``diagnostics/diag_mate_rebuild_cost.py``'s H4 result.
+    """
+    from solidworks_mcp.adapters.base import AddMateParameters
+    from solidworks_mcp.adapters.solidworks import assembly as _sw_asm
+
+    rows = list(specs)
+    model = adapter.currentModel
+    results: list[dict[str, Any]] = []
+    names: list[tuple[str, str]] = []
+    with _telemetry.span(label, mates=len(rows)):
+        with suspend_automatic_assembly_rebuilds(adapter):
+            for ref_a, ref_b, raw_ratio, mate_label in rows:
+                ratio = [float(value) for value in raw_ratio]
+                if len(ratio) != 2:
+                    raise ValueError(f"{mate_label}: gear ratio must have two values")
+                params = AddMateParameters(
+                    mate_type="gear",
+                    entities=[ref_a, ref_b],
+                    alignment="closest",
+                    gear_ratio=ratio,
+                )
+                model.ClearSelection2(True)
+                for ref in params.entities:
+                    if not _sw_asm._select_mate_entity(adapter, ref, 1):
+                        located = ref.name or ref.point
+                        raise RuntimeError(
+                            f"{mate_label}: failed to select gear entity {located!r}"
+                        )
+                _sw_asm._flag_feature_methods(model, "IAssemblyDoc")
+                mate = _sw_asm._create_standard_mate(
+                    adapter, model, params, _sw_asm._MATE_TYPES["gear"]
+                )
+                model.ClearSelection2(True)
+                name = _sw_asm._mate_feature_name(adapter, mate)
+                names.append((name, mate_label))
+                results.append({
+                    "name": name,
+                    "mate_type": "gear",
+                    "alignment": "closest",
+                    "entities": 2,
+                    "gear_ratio": ratio,
+                })
+                _telemetry.event("mate.created", label=mate_label, kind="gear")
+
+        if not bool(adapter._attempt(lambda: model.EditRebuild3(), default=False)):
+            raise RuntimeError(f"{label}: closing EditRebuild3 failed")
+        for name, mate_label in names:
+            error = _mate_hard_error(adapter, name)
+            if error:
+                raise RuntimeError(
+                    f"{label}: {mate_label!r} has hard feature error {error}"
+                )
+    return results
 
 async def cam_follower_mate(
     adapter: Any, cam_ref: Any, follower_ref: Any, *, label: str = "cam_follower"
