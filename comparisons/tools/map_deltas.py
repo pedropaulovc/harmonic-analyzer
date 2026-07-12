@@ -27,9 +27,11 @@ from pathlib import Path
 
 _REPO = Path(__file__).resolve().parents[2]
 _SCRIPTS = _REPO / "cad" / "scripts"
-# UPPER_SNAKE = <number>  # ... trailing comment (carries the (high)/(low) tag)
-_CONST = re.compile(r"^([A-Z][A-Z0-9_]+)\s*=\s*(-?\d+\.?\d*)\s*#\s*(.*)$")
-_T_MM, _S = 0.5, 0.005  # noise floors (match the exporter)
+# UPPER_SNAKE = <value>  # ... trailing comment (carries the (high)/(low) tag).
+# Value is captured up to the '#' so expression-valued dims (0.375 * IN,
+# BAR_FRONT_Z - 6.0, (315.5, 349.5)) are surfaced too, not just bare numbers.
+_CONST = re.compile(r"^([A-Z][A-Z0-9_]+)\s*=\s*(.+?)\s*#\s*(.*)$")
+_T_MM, _S, _R_DEG = 0.5, 0.005, 0.2  # noise floors (match the exporter)
 
 
 def _stem_candidates(raw: str) -> list[str]:
@@ -130,7 +132,8 @@ def _dot(a, b):
 
 def _group_key(entry: dict) -> tuple:
     return (tuple(round(v, 1) for v in entry["translate_mm"]),
-            tuple(round(s, 3) for s in entry["scale"]))
+            tuple(round(s, 3) for s in entry["scale"]),
+            tuple(round(a, 1) for a in entry.get("rotate_deg", [0, 0, 0])))
 
 
 def main() -> int:
@@ -163,15 +166,15 @@ def main() -> int:
 
     clusters: list[list[dict]] = []
     refs: list[tuple] = []
-    for (dt, sf), members in exact.items():
+    for (dt, sf, dr), members in exact.items():
         hit = None
-        for i, (rdt, rsf) in enumerate(refs):
-            if rsf == sf and args.merge_tol > 0 and \
+        for i, (rdt, rsf, rdr) in enumerate(refs):
+            if rsf == sf and rdr == dr and args.merge_tol > 0 and \
                     max(abs(a - b) for a, b in zip(dt, rdt)) <= args.merge_tol:
                 hit = i
                 break
         if hit is None:
-            refs.append((dt, sf))
+            refs.append((dt, sf, dr))
             clusters.append(list(members))
         else:
             clusters[hit].extend(members)
@@ -186,6 +189,8 @@ def main() -> int:
         dt = tuple(round(sum(m["translate_mm"][i] for m in members) / n, 3)
                    for i in range(3))
         sf = tuple(round(sum(m["scale"][i] for m in members) / n, 4)
+                   for i in range(3))
+        dr = tuple(round(sum(m.get("rotate_deg", [0, 0, 0])[i] for m in members) / n, 3)
                    for i in range(3))
         stems = sorted({_canonical(m["part"]) for m in members})
         names = ", ".join(sorted(m["name"] for m in members))
@@ -220,6 +225,19 @@ def main() -> int:
                 print("     (no assembly places these stems -- check the names)")
             print("     (no free offset: trace to an upstream driving dim; "
                   "verify:soundness polices interference/DOF)")
+
+        if max(abs(a) for a in dr) >= _R_DEG:
+            asms = sorted({a for stem in stems for a in _positioning_assemblies(stem)})
+            print(f"   ROTATE  rotate_deg = {list(dr)}  -> mate ORIENTATION "
+                  f"(angle/axis of the placing mate) in:")
+            for a in asms:
+                print(f"     {a}")
+            if not asms:
+                print("     (no assembly places these stems -- check the names)")
+
+        if (max(abs(s - 1.0) for s in sf) < _S and max(abs(v) for v in dt) < _T_MM
+                and max(abs(a) for a in dr) < _R_DEG):
+            print("   (sub-noise-floor: nothing actionable)")
         print()
     return 0
 
