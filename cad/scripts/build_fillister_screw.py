@@ -27,6 +27,7 @@ from __future__ import annotations
 import math
 import sys
 
+from _fastener_catalog import fastener
 from _common import (
     SketchDims,
     apply_material,
@@ -45,13 +46,14 @@ from _common import (
 )
 
 PART_NAME = "fillister-screw"
-MATERIAL = "Brass"  # bright screws on the brass clips
+SPEC = fastener(PART_NAME)
+MATERIAL = SPEC.material  # bright screws on the brass clips
 
 HEAD_DIA = 5.5  # fillister head (low)
 HEAD_H = 2.2
-SHANK_DIA = 2.0  # shank: was Ø2.9, now 2.0 = #4-40 tap-drill 2.261 - 0.26
+SHANK_DIA = SPEC.model_diameter_mm  # #4-40 modeled thread minor diameter
 # (threads #4-40 into the platen sockets / flange; rides the clips' O3 clearance)
-SHANK_LEN = 4.0  # clip 1.2 + 2.8 platen socket; = flange thickness 4
+SHANK_LEN = SPEC.length_mm  # clip 1.2 + 2.8 platen socket; = flange thickness 4
 
 
 async def build(adapter) -> dict[str, str]:
