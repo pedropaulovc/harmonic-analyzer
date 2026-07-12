@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
+import _telemetry
 from _common import check
 from _drawing_registry import ASME_B_DRWDOT, ASME_B_SLDDRT
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
@@ -19,7 +20,10 @@ from solidworks_mcp.adapters.com_variant import dispatch_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
+    curate_dimensions,
+    dimension_name,
     new_drawing,
+    save_drawing,
     set_units_mm,
     view_name,
 )
@@ -100,7 +104,9 @@ def import_cosmetic_threads(adapter: Any, view: Any) -> tuple[int, int]:
     return seed_count, instance_count
 
 
-def new_project_drawing(adapter: Any, *, property_view: str) -> tuple[Any, Any]:
+def new_project_drawing(
+    adapter: Any, *, property_view: str, scale: tuple[float, float] = (1.0, 1.0)
+) -> tuple[Any, Any]:
     for asset in (ASME_B_DRWDOT, ASME_B_SLDDRT):
         if not asset.is_file() or asset.stat().st_size == 0:
             raise FileNotFoundError(f"project drawing standard is missing: {asset}")
@@ -121,8 +127,8 @@ def new_project_drawing(adapter: Any, *, property_view: str) -> tuple[Any, Any]:
         sheet_name,
         2,  # swDwgPaperBsize
         12,  # swDwgTemplateCustom
-        1.0,
-        1.0,
+        float(scale[0]),
+        float(scale[1]),
         False,
         str(ASME_B_SLDDRT.resolve()),
         ASME_B_WIDTH_M,
@@ -140,14 +146,14 @@ def new_project_drawing(adapter: Any, *, property_view: str) -> tuple[Any, Any]:
         raise RuntimeError("SetupSheet6 rejected the project ASME B sheet format")
     set_units_mm(adapter, decimals=3)
     sheet = adapter._get_attr_or_call(draw, "GetCurrentSheet")
-    if sheet is None or not sheet.SetScale(1.0, 1.0, True, False):
-        raise RuntimeError("failed to force ASME B sheet to 1:1")
+    if sheet is None or not sheet.SetScale(float(scale[0]), float(scale[1]), True, False):
+        raise RuntimeError(f"failed to force ASME B sheet to {scale[0]:g}:{scale[1]:g}")
     template_name = str(adapter._get_attr_or_call(sheet, "GetTemplateName") or "")
     if Path(template_name).resolve() != ASME_B_SLDDRT.resolve():
         raise RuntimeError(
             f"sheet format provenance mismatch: {template_name!r} != {ASME_B_SLDDRT}"
         )
-    assert_asme_b_sheet(adapter, sheet, phase="initial setup")
+    assert_asme_b_sheet(adapter, sheet, phase="initial setup", scale=scale)
     draw.ForceRebuild3(False)
     draw.EditRebuild3()
     return draw, sheet
@@ -161,12 +167,27 @@ def set_hidden_lines_removed(adapter: Any, view: Any) -> None:
         raise RuntimeError("failed to set hidden-lines-removed drawing view")
 
 
-def assert_asme_b_sheet(adapter: Any, sheet: Any, *, phase: str) -> None:
+def set_hidden_lines_visible(adapter: Any, view: Any) -> None:
+    """Show hidden edges (greyed) in ``view`` — for a view whose job is to
+    communicate internal/cross-drilled features."""
+    ok = adapter._attempt(
+        lambda: view.SetDisplayMode4(False, 1, False, False, True), default=False
+    )
+    if not ok:
+        raise RuntimeError("failed to set hidden-lines-visible drawing view")
+
+
+def assert_asme_b_sheet(
+    adapter: Any, sheet: Any, *, phase: str, scale: tuple[float, float] = (1.0, 1.0)
+) -> None:
     properties = list(adapter._get_attr_or_call(sheet, "GetProperties") or [])
     if len(properties) < 7:
         raise RuntimeError(f"{phase}: incomplete drawing sheet properties {properties!r}")
-    if properties[2:4] != [1.0, 1.0]:
-        raise RuntimeError(f"{phase}: drawing sheet scale is not 1:1: {properties!r}")
+    if properties[2:4] != [float(scale[0]), float(scale[1])]:
+        raise RuntimeError(
+            f"{phase}: drawing sheet scale is not "
+            f"{scale[0]:g}:{scale[1]:g}: {properties!r}"
+        )
     if (
         abs(properties[5] - ASME_B_WIDTH_M) > 1e-6
         or abs(properties[6] - ASME_B_HEIGHT_M) > 1e-6
@@ -306,6 +327,325 @@ def add_hole_group_tags(
         notes.append(note)
     draw.ClearSelection2(True)
     return notes
+
+
+def insert_marked_dimensions(adapter: Any, view: Any) -> list[Any]:
+    """Import the source part's marked-for-drawing dimensions into ``view``.
+
+    Parts mark exactly their manufacturing dimensions
+    (``_drawing_marks.mark_dimensions_for_drawing``), so the import mask is
+    ``swInsertDimensionsMarkedForDrawing`` only.
+    """
+    draw = adapter.currentModel
+    name = view_name(adapter, view)
+    draw.ActivateView(name)
+    draw.ClearSelection2(True)
+    selected = draw.Extension.SelectByID2(
+        name, "DRAWINGVIEW", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+    )
+    if not selected:
+        raise RuntimeError(f"failed to select drawing view {name!r}")
+    result = adapter._attempt(
+        lambda: draw.InsertModelAnnotations3(
+            0,       # swImportModelItemsFromEntireModel
+            0x8000,  # swInsertDimensionsMarkedForDrawing
+            False,
+            True,
+            True,
+            False,
+        )
+    )
+    if not result or isinstance(result, str):
+        return []
+    annotations = [
+        _sw_type_info.flagged(annotation, "IAnnotation") for annotation in result
+    ]
+    names = sorted(
+        name
+        for name in (dimension_name(adapter, annotation) for annotation in annotations)
+        if name
+    )
+    _telemetry.info(
+        f"model-item import {name}: annotations={len(annotations)}, "
+        f"dimensions={names}"
+    )
+    return annotations
+
+
+def delete_unnamed_imports(adapter: Any, annotations: list[Any]) -> list[Any]:
+    """Remove automatic cosmetic-thread callouts from model annotation import."""
+    draw = adapter.currentModel
+    survivors: list[Any] = []
+    for annotation in annotations:
+        annotation = _sw_type_info.flagged(annotation, "IAnnotation")
+        if dimension_name(adapter, annotation):
+            survivors.append(annotation)
+            continue
+        draw.ClearSelection2(True)
+        if not annotation.Select2(False, 0):
+            raise RuntimeError("failed to select an automatic model annotation")
+        draw.EditDelete()
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    return survivors
+
+
+def curate_view_dimensions(
+    adapter: Any,
+    view: Any,
+    *,
+    keep: dict[str, tuple[float, float]],
+    view_label: str,
+) -> list[Any]:
+    """Import a view's marked model dimensions and keep exactly ``keep``.
+
+    ``keep`` maps each surviving dimension's parametric name to its sheet
+    position (meters).  Everything else the import produced is deleted; a
+    missing expected dimension fails loud — the print must carry every
+    manufacturing dimension the recipe promises.
+    """
+    annotations = delete_unnamed_imports(
+        adapter, insert_marked_dimensions(adapter, view)
+    )
+    names = {dimension_name(adapter, annotation) for annotation in annotations}
+    delete = tuple(sorted(name for name in names if name and name not in keep))
+    curated = curate_dimensions(
+        adapter, annotations, delete=delete, reposition=dict(keep)
+    )
+    present = {dimension_name(adapter, annotation) for annotation in curated}
+    missing = sorted(set(keep) - present)
+    if missing:
+        raise RuntimeError(
+            f"{view_label} view is missing model dimensions: {missing}; "
+            f"available={sorted(present)}"
+        )
+    return curate_dimensions(adapter, curated, reposition=dict(keep))
+
+
+def set_dimension_callouts(
+    adapter: Any, annotations: Iterable[Any], below_text: dict[str, str]
+) -> None:
+    """Append callout text below named dimensions (e.g. THRU / depth notes).
+
+    A bare Ø does not tell the machinist whether a hole is through or blind;
+    ASME hole callouts carry that below the value.  Keyed on the parametric
+    dimension name, so a value collision can never stamp the wrong hole.
+    """
+    remaining = dict(below_text)
+    for annotation in annotations:
+        annotation = _sw_type_info.flagged(annotation, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        text = remaining.pop(name, None)
+        if text is None:
+            continue
+        display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
+        if display is None:
+            raise RuntimeError(f"dimension {name!r} has no display annotation")
+        display = _sw_type_info.flagged(display, "IDisplayDimension")
+        adapter._attempt(
+            lambda d=display, s=text: d.SetText(4, s)  # swDimensionTextCalloutBelow
+        )
+    if remaining:
+        raise RuntimeError(
+            f"dimension callouts not applied: {sorted(remaining)}"
+        )
+    adapter.currentModel.EditRebuild3()
+
+
+def add_edge_dimension(
+    adapter: Any,
+    view: Any,
+    *,
+    p0: tuple[float, float],
+    p1: tuple[float, float],
+    text_xy: tuple[float, float],
+    label: str,
+) -> Any:
+    """Dimension across two edges picked at explicit sheet points (meters).
+
+    The adapter's ``add_overall_dimension`` derives its picks from
+    ``IView.GetOutline``, which pads the geometry with a whitespace margin, so
+    its coordinate picks can miss.  Recipes know their layout exactly — the
+    explicit points make the pick deterministic.  Fails loud on either pick or
+    on dimension creation.
+    """
+    draw = adapter.currentModel
+    name = view_name(adapter, view)
+    if not draw.ActivateView(name):
+        raise RuntimeError(f"failed to activate drawing view {name!r}")
+    draw.ClearSelection2(True)
+    for index, (x, y) in enumerate((p0, p1)):
+        selected = draw.Extension.SelectByID2(
+            "", "EDGE", x, y, 0.0, index > 0, 0, null_callout(), 0
+        )
+        if not selected:
+            raise RuntimeError(
+                f"failed to select {label} edge {index} at sheet ({x:g}, {y:g})"
+            )
+    dimension = draw.AddDimension2(text_xy[0], text_xy[1], 0.0)
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    if dimension is None:
+        raise RuntimeError(f"failed to add the {label} dimension")
+    return dimension
+
+
+def hole_table_template(adapter: Any) -> Path:
+    executable = adapter._attempt(
+        lambda: adapter.swApp.GetExecutablePath(), default=None
+    )
+    if not executable:
+        raise RuntimeError("SolidWorks executable path is unavailable")
+    install_root = Path(str(executable)).parent
+    relative = Path("lang") / "english" / "standard hole table--letters.sldholtbt"
+    candidates = (install_root / relative, install_root / "SOLIDWORKS" / relative)
+    for template in candidates:
+        if template.is_file():
+            return template
+    raise FileNotFoundError(
+        "native hole-table template is missing; checked "
+        + ", ".join(str(path) for path in candidates)
+    )
+
+
+def insert_hole_table(
+    adapter: Any,
+    view: Any,
+    *,
+    datum_xy: tuple[float, float],
+    hole_points: Sequence[tuple[float, float]],
+    anchor_xy: tuple[float, float],
+    label: str,
+) -> Any:
+    """Insert the model-associated TAG/X LOC/Y LOC/SIZE hole table on ``view``.
+
+    ``datum_xy`` picks the origin VERTEX and each ``hole_points`` entry picks a
+    hole EDGE, all in sheet meters.  The table lands with its top-left corner at
+    ``anchor_xy`` and is validated (row/column count + header) before returning.
+    """
+    draw = adapter.currentModel
+    name = view_name(adapter, view)
+    if not draw.ActivateView(name):
+        raise RuntimeError(f"failed to activate hole-table view {name!r}")
+    draw.ClearSelection2(True)
+    datum = draw.Extension.SelectByID2(
+        "", "VERTEX", datum_xy[0], datum_xy[1], 0.0, False, 1, null_callout(), 0
+    )
+    if not datum:
+        raise RuntimeError(f"failed to select {label} hole-table datum vertex")
+    for x, y in hole_points:
+        selected = draw.Extension.SelectByID2(
+            "", "EDGE", x, y, 0.0, True, 2, null_callout(), 0
+        )
+        if not selected:
+            raise RuntimeError(
+                f"failed to select {label} hole-table edge at sheet ({x:g}, {y:g})"
+            )
+    table = view.InsertHoleTable3(
+        False,
+        anchor_xy[0],
+        anchor_xy[1],
+        1,  # swBOMConfigurationAnchor_TopLeft
+        "A",
+        str(hole_table_template(adapter)),
+        1,  # swHoleTableTagOrder_XY
+        1,  # swHoleTable_AlphaNumericTags
+        None,
+    )
+    draw.ClearSelection2(True)
+    if table is None:
+        raise RuntimeError(f"SolidWorks failed to create the {label} hole table")
+    table = _sw_type_info.flagged(table, "IHoleTableAnnotation")
+    feature = table.HoleTable
+    if feature is None:
+        raise RuntimeError("native hole table annotation has no feature")
+    feature = _sw_type_info.flagged(feature, "IHoleTable")
+    feature.CombineSameSize = False
+    feature.CombineTags = False
+    adapter.currentModel.EditRebuild3()
+    table = _sw_type_info.flagged(table, "ITableAnnotation")
+    rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
+    columns = int(adapter._get_attr_or_call(table, "ColumnCount") or 0)
+    contents = tuple(
+        tuple(
+            str(
+                adapter._attempt(
+                    lambda row=row, column=column: table.DisplayedText(row, column)
+                )
+                or ""
+            )
+            for column in range(columns)
+        )
+        for row in range(rows)
+    )
+    expected_rows = 1 + len(hole_points)
+    if (rows, columns) != (expected_rows, 4):
+        raise RuntimeError(
+            f"native hole table is {rows}x{columns}, "
+            f"expected {expected_rows}x4: {contents!r}"
+        )
+    header = contents[0]
+    expected = ("TAG", "X LOC", "Y LOC", "SIZE")
+    if tuple(value.upper() for value in header) != expected:
+        raise RuntimeError(f"native hole-table header is unexpected: {header!r}")
+    _telemetry.success(
+        f"native hole table inserted: {rows - 1} holes, header={header}"
+    )
+    return table
+
+
+def stamp_drawing_summary(adapter: Any, drawing_model: Any, fields: dict[int, str]) -> None:
+    """Write and read-verify the drawing document summary metadata."""
+    model_doc = _sw_type_info.flagged(drawing_model, "IModelDoc2")
+    for field, value in fields.items():
+        model_doc.SummaryInfo(field, value)
+        if model_doc.SummaryInfo(field) != value:
+            raise RuntimeError(f"drawing summary field {field} did not persist")
+
+
+async def finalize_drawing(
+    adapter: Any,
+    outputs: DrawingOutputs,
+    *,
+    pdf_title: str,
+    scale: tuple[float, float] = (1.0, 1.0),
+) -> dict[str, str]:
+    """Save, reopen-validate, and export the finished drawing (SLDDRW/PDF/PNG).
+
+    The reopen round-trips make the saved artifact prove its own sheet scale
+    and format; the PDF is metadata-sanitized and rendered to the exact ASME B
+    PNG.  Returns the artifact dict every drawing recipe returns from build().
+    """
+    drawing_model = adapter.currentModel
+    drawing_model.ClearSelection2(True)
+    drawing_model.EditRebuild3()
+    sheet = adapter._get_attr_or_call(drawing_model, "GetCurrentSheet")
+    if sheet is None:
+        raise RuntimeError("finished drawing has no current sheet")
+    sheet_name = adapter._get_attr_or_call(sheet, "GetName")
+    if not sheet_name or not drawing_model.ActivateSheet(sheet_name):
+        raise RuntimeError("failed to activate drawing sheet for export")
+    if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
+        raise RuntimeError("failed to set final drawing sheet scale")
+    assert_asme_b_sheet(adapter, sheet, phase="before save", scale=scale)
+
+    artifacts = save_drawing(adapter, str(outputs.slddrw))
+    drawing_model, sheet = await reopen_drawing(adapter, outputs.slddrw)
+    if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
+        raise RuntimeError("failed to persist reopened drawing sheet scale")
+    check(
+        "save final drawing sheet scale",
+        await adapter.save_file(str(outputs.slddrw)),
+    )
+    drawing_model, sheet = await reopen_drawing(adapter, outputs.slddrw)
+    assert_asme_b_sheet(adapter, sheet, phase="post-save reopen", scale=scale)
+    artifacts.update(save_drawing(adapter, "", pdf_path=str(outputs.pdf)))
+    sanitize_pdf_metadata(outputs.pdf, title=pdf_title)
+    render_pdf_png(outputs.pdf, outputs.png)
+    artifacts["png"] = str(outputs.png.resolve())
+    if set(artifacts) != {"drawing", "pdf", "png"}:
+        raise RuntimeError(f"drawing export incomplete: {artifacts!r}")
+    return artifacts
 
 
 def draw_note_table(
