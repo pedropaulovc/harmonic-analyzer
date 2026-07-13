@@ -550,6 +550,16 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "FootSeat")
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        "FootSeat", "PLANE", 0, 0, 0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError("cannot select FootSeat to hide reference geometry")
+    model.BlankRefGeom()
+    model.ClearSelection2(True)
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.
