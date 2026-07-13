@@ -5,10 +5,12 @@ Practical, machine-local development notes that don't belong in `AGENTS.md`
 
 ## Remote build-artifact cache
 
-The COM/SolidWorks tasks (`part:<stem>`, `assembly:<stem>`) are the slow part of
-the pipeline — a part is ~20 s, a full assembly ~500 s. Their outputs are a pure
+The COM/SolidWorks tasks (`part:<stem>`, `assembly:<stem>`, `drawing:<stem>`) are
+the slow part of the pipeline — a part is ~20 s and a full assembly ~500 s. Their
+outputs are a pure
 function of their hashed inputs, so a shared cache lets one machine **download a
-prebuilt `.SLDPRT`/`.SLDASM`/`.STL`** for an unchanged input set instead of
+prebuilt `.SLDPRT`/`.SLDASM`/`.SLDDRW`/`.STL`/`.PDF`** for an unchanged input set
+instead of
 driving SolidWorks. A seat-less machine can pull; a builder pulls **and**
 publishes. Implementation: `cad/scripts/_artifact_cache.py`.
 
@@ -55,7 +57,8 @@ without reconstructing build history from terminal scrollback (none can fail a
 build):
 
 - **`doit cache_status`** — the one-command answer to *"why did this miss?"*. For
-  every part/assembly it prints `HIT`/`MISS` (a backend presence probe — a HEAD,
+  every part/assembly/drawing it prints `HIT`/`MISS` (a backend presence probe — a
+  HEAD,
   not a download) + the 12-char key, and for a miss the full `(digest, relpath)`
   list that produced the key. Compare two seats' output and the moved digest is the
   culprit. Args after `--`:
