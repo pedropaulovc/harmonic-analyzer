@@ -28,6 +28,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import _telemetry
+from _common import _early_bound
 
 PlacementDimension = tuple[str | None, str | None]
 PlacementDimensions = tuple[PlacementDimension, PlacementDimension]
@@ -140,31 +141,6 @@ class WizardHoleResult:
     placement_drive_jobs: list[tuple[str, str]] = field(default_factory=list)
 
 
-def _flag(obj, iface: str) -> None:
-    from solidworks_mcp.adapters import sw_type_info
-    try:
-        sw_type_info.flag_methods(obj, iface)
-    except Exception:  # noqa: BLE001
-        pass
-
-
-def _early(obj, iface: str):
-    """Wrap a raw dispatch in the gen_py early-bound class for ``iface``.
-
-    The wizard definition's double-valued properties (``HoleDiameter``,
-    ``HoleDepth``, ...) mis-marshal through late binding -- reads return 0.0
-    and several writes are silently dropped (probe 2026-07-11). The
-    early-bound wrapper carries the real DISPIDs and property maps, so reads
-    and writes both behave. (``CastTo`` cannot resolve these dispatches --
-    'Invalid index' -- hence the direct gen_py wrap.)
-    """
-    from solidworks_mcp.adapters import sw_type_info
-
-    sw_type_info._ensure_loaded()
-    cls = getattr(sw_type_info._wrapper_module, iface)
-    return cls(obj._oleobj_)
-
-
 def blind_cut_dia_mm(spec: HoleSpec) -> float:
     """The pinned cut diameter a blind ``spec`` must pass to HoleWizard5."""
     if spec.kind in ("tapped", "tapped_bottoming"):
@@ -201,7 +177,7 @@ def find_planar_face(model, normal, points_mm, tol_mm: float = 1.0):
     plane_mm = points_mm[0][axis]
     others = [k for k in range(3) if k != axis]
     body = (model.GetBodies2(0, False) or [None])[0]
-    _flag(body, "IBody2")
+    body = _early_bound(body, "IBody2")
     faces = body.GetFaces() or []
     # O(faces) with 2-3 COM roundtrips each -- fine on a prismatic body
     # (tens of faces), pathological after a face-exploding cut (the engraved
@@ -216,7 +192,7 @@ def find_planar_face(model, normal, points_mm, tol_mm: float = 1.0):
         )
     best = None
     for f in faces:
-        _flag(f, "IFace2")
+        f = _early_bound(f, "IFace2")
         try:
             n = tuple(f.Normal)
         except Exception:  # noqa: BLE001
@@ -282,9 +258,9 @@ def wizard_holes(
     end = _ENDS[spec.end]
 
     model = adapter.currentModel
-    _flag(model, "IModelDoc2")
+    model = _early_bound(model, "IModelDoc2")
     fm = model.FeatureManager
-    _flag(fm, "IFeatureManager")
+    fm = _early_bound(fm, "IFeatureManager")
 
     face = find_planar_face(model, normal, points_mm)
     if face is None:
@@ -327,7 +303,7 @@ def wizard_holes(
                 f"{spec.size!r} may be invalid for kind {spec.kind!r}")
     else:
         data = fm.CreateDefinition(SW_FM_HOLE_WZD)
-        _flag(data, "IWizardHoleFeatureData2")
+        data = _early_bound(data, "IWizardHoleFeatureData2")
         data.InitializeHole(hole_type, _STD_ANSI_INCH, fastener, spec.size, end)
         if hole_type == 4:  # taps carry a class + their own thread end condition
             # Pre-create sets are the support-foot precedent for these two;
@@ -345,17 +321,17 @@ def wizard_holes(
                 f"hole wizard {label}: CreateFeature failed -- size {spec.size!r} "
                 f"may be invalid for kind {spec.kind!r}"
             )
-    _flag(feat, "IFeature")
+    feat = _early_bound(feat, "IFeature")
     _telemetry.debug(f"hole wizard {label}: feature created, placing points")
 
     # Locate the wizard's 1-point placement sketch.
     place_sk = place_name = None
     sub = feat.GetFirstSubFeature()
     while sub is not None:
-        _flag(sub, "IFeature")
+        sub = _early_bound(sub, "IFeature")
         if str(sub.GetTypeName2()) == "ProfileFeature":
             sk = sub.GetSpecificFeature2()
-            _flag(sk, "ISketch")
+            sk = _early_bound(sk, "ISketch")
             if len(sk.GetSketchPoints2() or []) == 1:
                 place_sk, place_name = sk, str(sub.Name)
                 break
@@ -364,17 +340,17 @@ def wizard_holes(
         raise RuntimeError(f"hole wizard {label}: placement sketch not found")
 
     math_util = adapter.swApp.GetMathUtility()
-    _flag(math_util, "IMathUtility")
+    math_util = _early_bound(math_util, "IMathUtility")
     xform = place_sk.ModelToSketchTransform
-    _flag(xform, "IMathTransform")
+    xform = _early_bound(xform, "IMathTransform")
 
     def _sketch_xy(pt_mm):
         arr = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8,
                       [v / 1000.0 for v in pt_mm])
         mpt = math_util.CreatePoint(arr)
-        _flag(mpt, "IMathPoint")
+        mpt = _early_bound(mpt, "IMathPoint")
         spt = mpt.MultiplyTransform(xform)
-        _flag(spt, "IMathPoint")
+        spt = _early_bound(spt, "IMathPoint")
         return list(spt.ArrayData)[:3]
 
     model.ClearSelection2(True)
@@ -383,7 +359,7 @@ def wizard_holes(
         raise RuntimeError(f"hole wizard {label}: cannot edit {place_name}")
     model.EditSketch()
     sm = model.SketchManager
-    _flag(sm, "ISketchManager")
+    sm = _early_bound(sm, "ISketchManager")
     # Add the placement points straight to the sketch DB (AddToDB): otherwise a
     # point authored within snap distance of a reference SNAPS to it and picks
     # up a coincident relation that rebuild re-applies. Bit us on support-bar's
@@ -396,7 +372,7 @@ def wizard_holes(
     placed_points = []
     try:
         auto = (place_sk.GetSketchPoints2() or [None])[0]
-        _flag(auto, "ISketchPoint")
+        auto = _early_bound(auto, "ISketchPoint")
         sx, sy, sz = _sketch_xy(points_mm[0])
         auto.SetCoords(sx, sy, sz)
         placed_points.append((auto, sx, sy))
@@ -405,7 +381,7 @@ def wizard_holes(
             created = sm.CreatePoint(sx, sy, sz)
             if created is None:
                 raise RuntimeError(f"hole wizard {label}: CreatePoint failed")
-            _flag(created, "ISketchPoint")
+            created = _early_bound(created, "ISketchPoint")
             placed_points.append((created, sx, sy))
     finally:
         sm.AddToDB = prev_add_to_db
@@ -487,7 +463,7 @@ def wizard_holes(
     # Customize + read back through the EDIT flow: the created feature's
     # definition carries the populated table values (the pre-create object
     # reads 0.0 for everything it did not set).
-    defn = _early(feat.GetDefinition(), "IWizardHoleFeatureData2")
+    defn = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
     edits: list[tuple[str, object]] = []
     if spec.kind == "clearance" and spec.end != "blind":
         # HoleFit is a NO-OP on a plain (type-2) clearance hole: the API
@@ -540,13 +516,12 @@ def wizard_holes(
                 # or no-op. The caller's analytic volume check is the hard
                 # gate that the surviving writes produced the right geometry.
                 _telemetry.debug(f"hole wizard {label}: property {prop} rejected")
-        # feat is late-bound; a gen_py wrapper instance does not marshal into
-        # its call ("The Python instance can not be converted to a COM
-        # object") -- pass the raw dispatch.
+        # ModifyDefinition wants the definition as its underlying dispatch --
+        # hand it defn._oleobj_ (the raw IDispatch) rather than the wrapper.
         if not feat.ModifyDefinition(defn._oleobj_, model, null_callout()):
             raise RuntimeError(f"hole wizard {label}: ModifyDefinition failed")
         model.EditRebuild3()
-        defn = _early(feat.GetDefinition(), "IWizardHoleFeatureData2")
+        defn = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
 
     def _dim(prop: str) -> float:
         try:
@@ -631,17 +606,17 @@ def wizard_hole_on_cylinder(adapter, spec: HoleSpec, point_mm, label: str,
     hole_type, fastener = _KINDS[spec.kind]
 
     model = adapter.currentModel
-    _flag(model, "IModelDoc2")
+    model = _early_bound(model, "IModelDoc2")
     fm = model.FeatureManager
-    _flag(fm, "IFeatureManager")
+    fm = _early_bound(fm, "IFeatureManager")
 
     body = (model.GetBodies2(0, False) or [None])[0]
-    _flag(body, "IBody2")
+    body = _early_bound(body, "IBody2")
     face = None
     for f in body.GetFaces() or []:
-        _flag(f, "IFace2")
+        f = _early_bound(f, "IFace2")
         surf = f.GetSurface()
-        _flag(surf, "ISurface")
+        surf = _early_bound(surf, "ISurface")
         if not surf.IsCylinder():
             continue
         if face is None or f.GetArea() > face.GetArea():
@@ -654,7 +629,7 @@ def wizard_hole_on_cylinder(adapter, spec: HoleSpec, point_mm, label: str,
     _telemetry.debug(f"hole wizard {label}: cylinder selected, creating feature")
 
     data = fm.CreateDefinition(SW_FM_HOLE_WZD)
-    _flag(data, "IWizardHoleFeatureData2")
+    data = _early_bound(data, "IWizardHoleFeatureData2")
     data.InitializeHole(hole_type, _STD_ANSI_INCH, fastener, spec.size,
                         _ENDS["through_all"])
     feat = fm.CreateFeature(data)
@@ -662,7 +637,7 @@ def wizard_hole_on_cylinder(adapter, spec: HoleSpec, point_mm, label: str,
         raise RuntimeError(
             f"hole wizard {label}: CreateFeature (cylinder) failed -- size "
             f"{spec.size!r} may be invalid for kind {spec.kind!r}")
-    _flag(feat, "IFeature")
+    feat = _early_bound(feat, "IFeature")
     _telemetry.debug(f"hole wizard {label}: feature created, placing point")
 
     # The placement is a 3D sketch with one auto point; its coords are model
@@ -672,10 +647,10 @@ def wizard_hole_on_cylinder(adapter, spec: HoleSpec, point_mm, label: str,
     place = None
     sub = feat.GetFirstSubFeature()
     while sub is not None:
-        _flag(sub, "IFeature")
+        sub = _early_bound(sub, "IFeature")
         if "Profile" in str(sub.GetTypeName2()):
             sk = sub.GetSpecificFeature2()
-            _flag(sk, "ISketch")
+            sk = _early_bound(sk, "ISketch")
             if bool(sk.Is3D()) and len(sk.GetSketchPoints2() or []) == 1:
                 place = (sub, sk)
                 break
@@ -689,7 +664,7 @@ def wizard_hole_on_cylinder(adapter, spec: HoleSpec, point_mm, label: str,
         raise RuntimeError(f"hole wizard {label}: cannot edit {sub.Name}")
     model.EditSketch()
     pt = (sk.GetSketchPoints2() or [None])[0]
-    _flag(pt, "ISketchPoint")
+    pt = _early_bound(pt, "ISketchPoint")
     pt.SetCoords(point_mm[0] / 1000.0, point_mm[1] / 1000.0,
                  point_mm[2] / 1000.0)
 

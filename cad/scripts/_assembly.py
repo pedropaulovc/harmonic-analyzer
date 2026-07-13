@@ -22,8 +22,7 @@ from _common import (
     _CHAIN_LINK_PREFIXES,
     _FEATURE_ERROR,
     _MATE_TOL_MM,
-    _flag,
-    _flag_only,
+    _early_bound,
     _read_member,
     check,
     log,
@@ -392,19 +391,22 @@ def _mate_hard_error(adapter: Any, name: str) -> int:
     replay authored "OK", left the wire at pose, and the closure gate found the
     corpse (2026-07-05). One FeatureByName + GetErrorCode2 per mate; warnings
     (e.g. legitimate over-define co-flags) stay tolerated."""
-    import pythoncom
-    from win32com.client import VARIANT
-
     if not name:
         return 0
     model = adapter.currentModel
     feat = adapter._attempt(lambda: model.FeatureByName(name), default=None)
     if feat is None:
         return 0
-    _flag_only(feat, "GetErrorCode2")
-    warn = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_BOOL, False)
-    code = int(adapter._attempt(lambda: feat.GetErrorCode2(warn), default=0) or 0)
-    if code and bool(warn.value):
+    # Early-bound IFeature::GetErrorCode2 returns the [out] IsWarning in the tuple
+    # (code, is_warning) -- pass nothing, consume the tuple. The old byref-VARIANT
+    # arg is a dynamic-dispatch idiom; under InvokeTypes the call returns the tuple
+    # regardless, so int(result) would crash on it.
+    feat = _early_bound(feat, "IFeature")
+    result = adapter._attempt(lambda: feat.GetErrorCode2(), default=None)
+    if not result:
+        return 0
+    code = int(result[0] or 0)
+    if code and bool(result[1]):
         return 0
     return code
 
@@ -1075,10 +1077,11 @@ class PatternDirection(StrEnum):
 
 
 def _top_features(model: Any) -> list[Any]:
+    model = _early_bound(model, "IModelDoc2", "FirstFeature")
     features = []
     feature = _read_member(model, "FirstFeature")
     while feature is not None:
-        _flag(feature, "IFeature")
+        feature = _early_bound(feature, "IFeature", "GetNextFeature")
         features.append(feature)
         feature = feature.GetNextFeature()
     return features
@@ -1239,12 +1242,13 @@ async def linear_component_pattern(
         axis=axis.lower(), instances=instances, spacing_mm=spacing_mm,
     ):
         _select_pattern_inputs(adapter, seeds, direction_name, "AXIS")
-        manager = model.FeatureManager
-        _flag(manager, "IFeatureManager")
+        manager = _early_bound(
+            model.FeatureManager, "IFeatureManager", "CreateDefinition", "CreateFeature"
+        )
         definition = manager.CreateDefinition(_LOCAL_LINEAR_PATTERN)
         if definition is None:
             raise RuntimeError("cannot create local linear pattern definition")
-        _flag(definition, "ILocalLinearPatternFeatureData")
+        definition = _early_bound(definition, "ILocalLinearPatternFeatureData")
         definition.D1ReverseDirection = direction is PatternDirection.REVERSE
         definition.D1Spacing = spacing_mm / 1000.0
         definition.D1TotalInstances = instances
@@ -1257,7 +1261,7 @@ async def linear_component_pattern(
         model.ClearSelection2(True)
         if feature is None:
             raise RuntimeError(f"SOLIDWORKS rejected {label}")
-        _flag(feature, "IFeature")
+        feature = _early_bound(feature, "IFeature")
         feature.Name = label
 
         created = _new_pattern_components(model, before)
@@ -1268,7 +1272,7 @@ async def linear_component_pattern(
             )
         names = []
         for component in created:
-            _flag_only(component, "IsPatternInstance")
+            component = _early_bound(component, "IComponent2", "IsPatternInstance")
             name = str(_read_member(component, "Name2"))
             if not component.IsPatternInstance():
                 raise RuntimeError(f"{name} is not owned by the component pattern")
@@ -1305,12 +1309,13 @@ async def circular_component_pattern(
         axis=axis_name, instances=instances,
     ):
         _select_pattern_inputs(adapter, seeds, axis_name, "AXIS")
-        manager = model.FeatureManager
-        _flag(manager, "IFeatureManager")
+        manager = _early_bound(
+            model.FeatureManager, "IFeatureManager", "CreateDefinition", "CreateFeature"
+        )
         definition = manager.CreateDefinition(_LOCAL_CIRCULAR_PATTERN)
         if definition is None:
             raise RuntimeError("cannot create local circular pattern definition")
-        _flag(definition, "ILocalCircularPatternFeatureData")
+        definition = _early_bound(definition, "ILocalCircularPatternFeatureData")
         definition.TotalInstances = instances
         definition.EqualSpacing = True
         definition.ReverseDirection = direction is PatternDirection.REVERSE
@@ -1319,7 +1324,7 @@ async def circular_component_pattern(
         model.ClearSelection2(True)
         if feature is None:
             raise RuntimeError(f"SOLIDWORKS rejected {label}")
-        _flag(feature, "IFeature")
+        feature = _early_bound(feature, "IFeature")
         feature.Name = label
 
         created = _new_pattern_components(model, before)
@@ -1330,7 +1335,7 @@ async def circular_component_pattern(
             )
         names = []
         for component in created:
-            _flag_only(component, "IsPatternInstance")
+            component = _early_bound(component, "IComponent2", "IsPatternInstance")
             name = str(_read_member(component, "Name2"))
             if not component.IsPatternInstance():
                 raise RuntimeError(f"{name} is not owned by the component pattern")
@@ -1431,8 +1436,9 @@ async def place_components_batch(
         expected_rows.append([c for row in rows for c in row])
         grounds.append(bool(spec.get("ground", True)))
 
-    asm = adapter.currentModel
-    _flag(asm, "IAssemblyDoc")
+    raw_model = adapter.currentModel
+    asm = _early_bound(raw_model, "IAssemblyDoc", "AddComponents3")
+    model_doc = _early_bound(raw_model, "IModelDoc2", "ClearSelection2")
     names_arg = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BSTR, names)
     xforms_arg = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, transforms)
     coordsys_arg = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BSTR, [""] * len(names))
@@ -1534,7 +1540,7 @@ async def place_components_batch(
         # bool/int -- nothing to marshal -- so it is the late-binding-safe path.
         if grounded_comps:
             with _telemetry.span("batch.fix", grounded=len(grounded_comps)):
-                adapter._attempt(lambda: asm.ClearSelection2(True), default=None)
+                adapter._attempt(lambda: model_doc.ClearSelection2(True), default=None)
                 n_sel = sum(
                     1
                     for comp in grounded_comps
@@ -1546,7 +1552,7 @@ async def place_components_batch(
                         f"grounded components"
                     )
                 adapter._attempt(lambda: asm.FixComponent(), default=None)
-                adapter._attempt(lambda: asm.ClearSelection2(True), default=None)
+                adapter._attempt(lambda: model_doc.ClearSelection2(True), default=None)
 
     _telemetry.success(
         f"{label}: inserted {len(specs)} components"
@@ -1565,9 +1571,8 @@ def assert_components_fully_defined(adapter: Any, *, resolve: bool = True) -> No
     instances (chain pattern beads) report under-constrained even though
     the owning feature drives their transforms -- ``IsPatternInstance``
     exempts them; their actual positions are gate-asserted by the pattern
-    creator. ``GetComponents`` hands back unflagged dispatches, so the
-    IComponent2 methods must be flagged first or the call resolves as a
-    property and raises.
+    creator. ``GetComponents`` hands back transient dispatches, so each is
+    wrapped as ``IComponent2`` before its zero-argument methods are invoked.
     """
     asm = adapter.currentModel
     # Inserting/fixing a component marks the mate solver dirty: until the
@@ -1598,9 +1603,11 @@ def assert_components_fully_defined(adapter: Any, *, resolve: bool = True) -> No
         # this gate's span records. Same de-noising as health.whats_wrong below.
         fixed = pattern = 0
         for component in components:
-            # Flag ONLY the two zero-arg methods called below; Name2/IsFixed are
-            # property reads (issue #87 -- not the 165-method IComponent2 flag).
-            _flag_only(component, "IsPatternInstance", "GetConstrainedStatus")
+            # Wrap once as IComponent2 so both zero-arg methods invoke known
+            # DISPIDs; Name2/IsFixed remain property reads.
+            component = _early_bound(
+                component, "IComponent2", "IsPatternInstance", "GetConstrainedStatus"
+            )
             comp_name = str(_read_member(component, "Name2"))
             if bool(_read_member(component, "IsFixed")):
                 fixed += 1
@@ -1830,7 +1837,9 @@ def _under_constrained_components(adapter: Any, *, resolve: bool = True) -> list
     components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
     under = []
     for component in components:
-        _flag_only(component, "IsPatternInstance", "GetConstrainedStatus")
+        component = _early_bound(
+            component, "IComponent2", "IsPatternInstance", "GetConstrainedStatus"
+        )
         comp_name = str(_read_member(component, "Name2"))
         if bool(_read_member(component, "IsFixed")):
             continue
@@ -1943,7 +1952,7 @@ def assert_free_dof_necessity(
 
 def component_names(adapter: Any) -> list[str]:
     """Top-level component names (``Name2``) of the active assembly."""
-    asm = adapter.currentModel
+    asm = _early_bound(adapter.currentModel, "IAssemblyDoc", "GetComponents")
     components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
     names = []
     for component in components:
@@ -1986,15 +1995,19 @@ def check_no_interference(adapter: Any) -> None:
     way the gate already tolerates face-flush and tangent contacts). Any link
     touching a NON-link part is still a hard fault.
     """
-    asm = adapter.currentModel
+    asm = _early_bound(
+        adapter.currentModel,
+        "IAssemblyDoc",
+        "ToolsCheckInterference",
+        "InterferenceDetectionManager",
+    )
     with _telemetry.span("gate.interference") as isp:
         log("interference detection: starting ...")
-        _flag(asm, "IAssemblyDoc")
         adapter._attempt(lambda: asm.ToolsCheckInterference(), default=None)
         mgr = _read_member(asm, "InterferenceDetectionManager")
         if mgr is None:
             raise RuntimeError("InterferenceDetectionManager unavailable")
-        _flag(mgr, "IInterferenceDetectionMgr")
+        mgr = _early_bound(mgr, "IInterferenceDetectionMgr", "GetInterferences")
         mgr.TreatCoincidenceAsInterference = False
         mgr.TreatSubAssembliesAsComponents = True
         mgr.IncludeMultibodyPartInterferences = True
@@ -2008,7 +2021,7 @@ def check_no_interference(adapter: Any) -> None:
         chain_contacts = []
         chain_mesh_contacts = []
         for interference in list(interferences or []):
-            _flag(interference, "IInterference")
+            interference = _early_bound(interference, "IInterference")
             names = []
             configs = []
             for comp in list(_read_member(interference, "Components") or []):
@@ -2055,37 +2068,25 @@ def check_no_interference(adapter: Any) -> None:
             )
         _telemetry.success("interference check: none found")
 
-def _byref_variant() -> Any:
-    """An in/out ``VT_BYREF | VT_VARIANT`` for ``out object`` COM params.
-
-    ``IModelDocExtension::GetWhatsWrong`` takes three ``out object`` arrays;
-    under pywin32 late binding a bare call RAISES and bare ``None`` mis-types.
-    Mirrors :func:`com_variant.byref_long`; read the filled value via ``.value``.
-    """
-    import pythoncom
-    from win32com.client import VARIANT
-
-    return VARIANT(pythoncom.VT_BYREF | pythoncom.VT_VARIANT, None)
-
 def whats_wrong(adapter: Any, model: Any) -> list[tuple[str, int, bool]]:
     """Return ``[(feature_name, error_code, is_warning), ...]`` for a model.
 
-    Reads the What's Wrong dialog via ``GetWhatsWrong`` (byref out-params).
-    Empty when the model is clean or the call is unavailable.
+    Reads the What's Wrong dialog via ``GetWhatsWrong``. Early-bound
+    ``IModelDocExtension::GetWhatsWrong`` collects its three ``out object`` arrays
+    into the return tuple ``(retval, features, codes, warnings)`` -- pass nothing
+    and consume the tuple. The old byref-VARIANT idiom leaves those VARIANTs
+    UNWRITTEN under InvokeTypes, so it silently reported every model clean (a
+    broken assembly would slip the deep-health gate). Empty when the model is
+    clean or the call is unavailable.
     """
     ext = _read_member(model, "Extension")
     if ext is None:
         return []
-    f, e, w = _byref_variant(), _byref_variant(), _byref_variant()
-
-    def _call() -> tuple[Any, Any, Any]:
-        ext.GetWhatsWrong(f, e, w)
-        return f.value, e.value, w.value
-
-    res = adapter._attempt(_call, default=None)
+    ext = _early_bound(ext, "IModelDocExtension")
+    res = adapter._attempt(lambda: ext.GetWhatsWrong(), default=None)
     if not res:
         return []
-    feats, codes, warns = res
+    _retval, feats, codes, warns = res
     feats = list(feats or [])
     codes = list(codes or [])
     warns = list(warns or [])
@@ -2093,7 +2094,7 @@ def whats_wrong(adapter: Any, model: Any) -> list[tuple[str, int, bool]]:
     for i, feat in enumerate(feats):
         name = "?"
         if feat is not None:
-            _flag(feat, "IFeature")
+            feat = _early_bound(feat, "IFeature")
             name = str(_read_member(feat, "Name"))
         code = int(codes[i]) if i < len(codes) else -1
         warn = bool(warns[i]) if i < len(warns) else False
@@ -2121,8 +2122,9 @@ def assert_model_healthy(
     also checked -- a flexible subassembly's internal mate error does NOT appear
     in the parent's What's Wrong, only in the sub document's.
     """
-    model = model or adapter.currentModel
-    _flag(model, "IModelDoc2")
+    raw_model = model or adapter.currentModel
+    model_doc = _early_bound(raw_model, "IModelDoc2", "ForceRebuild3")
+    asm_doc = _early_bound(raw_model, "IAssemblyDoc", "GetComponents")
     with _telemetry.span("gate.health", label=label or "top", deep=deep) as hsp:
         # The deep ForceRebuild3 + sub-document collection is the bulk of the
         # gate's wall-clock; span it so it is not an unspanned leading gap before
@@ -2133,20 +2135,24 @@ def assert_model_healthy(
             # ForceRebuild3 here when it was NOT (standalone/build/motion callers).
             # A False result -- from either path -- is still a hard health fault.
             if rebuilt is _REBUILD_UNSET:
-                rebuilt = adapter._attempt(lambda: model.ForceRebuild3(False), default=None)
+                rebuilt = adapter._attempt(
+                    lambda: model_doc.ForceRebuild3(False), default=None
+                )
 
-            targets = [(label or "top", model)]
+            targets = [(label or "top", model_doc)]
             if deep:
-                comps = adapter._attempt(lambda: model.GetComponents(False), default=None) or []
+                comps = adapter._attempt(
+                    lambda: asm_doc.GetComponents(False), default=None
+                ) or []
                 for comp in comps:
-                    # Flag ONLY GetModelDoc2 (zero-arg); Name2 is a property
-                    # read (issue #87 -- not the 165-method IComponent2 flag).
-                    _flag_only(comp, "GetModelDoc2")
+                    # Wrap once as IComponent2 so GetModelDoc2 invokes its known
+                    # DISPID; Name2 remains a property read.
+                    comp = _early_bound(comp, "IComponent2", "GetModelDoc2")
                     name = str(_read_member(comp, "Name2"))
                     if "/" in name:  # top-level instances only; their docs cover nested parts
                         continue
                     sub = adapter._attempt(lambda c=comp: c.GetModelDoc2(), default=None)
-                    if sub is not None and sub is not model:
+                    if sub is not None and sub is not raw_model:
                         targets.append((name, sub))
 
         errors: list[str] = []
@@ -2198,11 +2204,11 @@ def body_faults(adapter: Any, model: Any) -> list[tuple[str, int]]:
     for body in bodies:
         if body is None:
             continue
-        _flag(body, "IBody2")
+        body = _early_bound(body, "IBody2")
         fault = adapter._attempt(lambda b=body: b.Check3, default=None)
         if fault is None:
             continue
-        _flag(fault, "IFaultEntity")
+        fault = _early_bound(fault, "IFaultEntity")
         count = int(_read_member(fault, "Count") or 0)
         if count > 0:
             faults.append((str(_read_member(body, "Name")), count))
@@ -2223,8 +2229,7 @@ def remap_front_to_machine_front(adapter: Any) -> None:
     change. Leaves Front active so the saved document opens on the machine front.
     """
     SW_FRONT, SW_BACK = 1, 2  # swStandardViews_e
-    model = adapter.currentModel
-    _flag(model, "IModelDoc2")
+    model = _early_bound(adapter.currentModel, "IModelDoc2", "ShowNamedView2")
     model.ShowNamedView2("", SW_BACK)  # orient to the machine front
     ok = model.Extension.UpdateStandardViews("", SW_FRONT)
     if not ok:
@@ -2308,9 +2313,15 @@ async def save_assembly_and_images(
         sidecar.write_text(digest + "\n", encoding="utf-8")
         artefacts = {"assembly": str(asm_path)}
         artefacts.update(await _export_assembly_images(adapter, asm_name, views))
-        return artefacts
     finally:
         _discard_copy_source(adapter)
+    # Reopen the just-saved artifact and reconcile its persisted rebuild mark
+    # (issue #267): the ForceRebuild3(False) above dirtied every referenced child
+    # part IN MEMORY, so the copy-save recorded a rebuild stamp absent from the
+    # on-disk parts and a fresh open would report NeedsRebuild2 != 0. Runs after
+    # the copy source is discarded so the reopen loads clean children from disk.
+    await reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
+    return artefacts
 
 
 @_telemetry.traced("assembly.save_copy")
@@ -2425,6 +2436,47 @@ def final_rebuild_before_save(adapter: Any, label: str, model: Any = None) -> No
         _telemetry.success(f"final rebuild clean before save ({label})")
 
 
+async def reconcile_saved_rebuild_state(adapter: Any, asm_name: str, asm_path: Any) -> None:
+    """Reopen a just-saved assembly and, if it loads needing a rebuild, EditRebuild3
+    + in-place Save3 so the persisted artifact reopens clean (issue #267).
+
+    Root cause (proven by ``diagnostics/probe_rebuild_matrix.py`` /
+    ``probe_child_dirty.py``): ``final_rebuild_before_save`` and the deep health
+    gate each ``ForceRebuild3(False)`` -- a DEEP rebuild that descends into every
+    subassembly and marks every referenced child part document dirty IN MEMORY
+    (``GetSaveFlag`` -> True). The ensuing copy/in-place save then records rebuild
+    stamps that don't exist on the untouched on-disk parts, so a later fresh open
+    reports ``NeedsRebuild2 != 0`` even though geometry is correct and nothing is
+    faulted (``GetWhatsWrong`` clean, all components fully constrained). Neither
+    ``EditRebuild3`` nor ``ForceRebuild3(True)`` (TopOnly) dirties the children, so
+    reopening from disk (children clean) + ``EditRebuild3`` reconciles the assembly,
+    and the in-place ``Save3`` persists the clean mark WITHOUT rewriting any part
+    file. A post-``ForceRebuild3(False)`` rebuild in the SAME document instance
+    cannot un-dirty it -- the reopen is required. ``verify:soundness``'s
+    ``saved-rebuild-clean`` gate is the independent backstop that this held.
+    """
+    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+    with _telemetry.span("assembly.reconcile_rebuild", asm=asm_name) as sp:
+        await adapter.open_model(str(asm_path))
+        model = _early_bound(adapter.currentModel, "IModelDoc2")
+        status = saved_rebuild_status(adapter, model)
+        sp.set_attribute("needs_rebuild_on_open", status)
+        if status == 0:
+            _telemetry.success(f"saved artifact already clean, no reconcile ({asm_name})")
+            return
+        rebuilt = adapter._attempt(lambda: model.EditRebuild3(), default=None)
+        if rebuilt is False or rebuilt is None:
+            raise RuntimeError(
+                f"{asm_name}: reconcile EditRebuild3 returned {rebuilt!r}")
+        result = adapter._attempt(lambda: model.Save3(1, 0, 0), default=None)  # Silent, in place
+        in_mem = saved_rebuild_status(adapter, model)
+        if in_mem != 0:
+            raise RuntimeError(
+                f"{asm_name}: reconcile left NeedsRebuild2={in_mem} after EditRebuild3+Save3 "
+                f"(save result={result!r})")
+        _telemetry.success(f"reconciled saved rebuild state ({asm_name}, was {status})")
+
+
 async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
     """A deterministic fingerprint of an assembly's RESOLVED geometry across every
     configuration: exact-BREP mass properties (mass / volume / surface area / centre
@@ -2523,17 +2575,26 @@ def select_mates_folder(adapter: Any, model: Any = None) -> bool:
     tail."""
     if model is None:
         model = adapter.currentModel
+    model = _early_bound(
+        model,
+        "IModelDoc2",
+        "GetFeatureCount",
+        "FeatureByPositionReverse",
+        "FirstFeature",
+    )
     count = int(adapter._attempt(lambda: model.GetFeatureCount(), default=0) or 0)
     for i in range(min(count, 8)):  # MateGroup is the last top-level feature (i=0)
         feat = adapter._attempt(lambda i=i: model.FeatureByPositionReverse(i), default=None)
         if feat is None:
             continue
-        _flag(feat, "IFeature")
+        feat = _early_bound(feat, "IFeature", "GetTypeName2", "Select2")
         if str(adapter._attempt(lambda f=feat: f.GetTypeName2(), default="")) == "MateGroup":
             return bool(adapter._attempt(lambda f=feat: f.Select2(False, 0), default=False))
     feat = adapter._attempt(lambda: model.FirstFeature(), default=None)
     while feat is not None:
-        _flag(feat, "IFeature")
+        feat = _early_bound(
+            feat, "IFeature", "GetTypeName2", "Select2", "GetNextFeature"
+        )
         if str(adapter._attempt(lambda f=feat: f.GetTypeName2(), default="")) == "MateGroup":
             return bool(adapter._attempt(lambda f=feat: f.Select2(False, 0), default=False))
         feat = adapter._attempt(lambda f=feat: f.GetNextFeature(), default=None)
@@ -2556,15 +2617,21 @@ def repair_dangling_mates(adapter: Any, model: Any = None) -> int:
     successful heal -- so the CALLER must judge success from a fresh ``whats_wrong``
     + the standard DOF/interference/health gates, never from this code.
     """
-    asm = adapter.currentModel if model is None else model
-    _flag(asm, "IAssemblyDoc")
-    if not select_mates_folder(adapter, asm):
+    raw_model = adapter.currentModel if model is None else model
+    asm = _early_bound(
+        raw_model,
+        "IAssemblyDoc",
+        "AutoMateRepair",
+    )
+    if not select_mates_folder(adapter, raw_model):
         log("AutoMateRepair: could not select the Mates folder -- skipping repair")
         return 0
-    processed, failed = _byref_variant(), _byref_variant()
-    ret = adapter._attempt(lambda: asm.AutoMateRepair(processed, failed), default=-1)
-    n_proc = len(list(processed.value or [])) if processed.value is not None else 0
-    n_fail = len(list(failed.value or [])) if failed.value is not None else 0
+    # Early-bound IAssemblyDoc::AutoMateRepair returns its two [out] arrays in the
+    # tuple (retval, processed, failed) -- pass nothing, consume the tuple.
+    result = adapter._attempt(lambda: asm.AutoMateRepair(), default=None)
+    ret, processed, failed = result if result else (-1, None, None)
+    n_proc = len(list(processed or [])) if processed is not None else 0
+    n_fail = len(list(failed or [])) if failed is not None else 0
     log(f"AutoMateRepair: ret={ret} (1=PartialSuccess is normal) "
         f"re-bound {n_proc} mate(s), {n_fail} already-valid skipped")
     return n_proc
@@ -2621,10 +2688,7 @@ def save_assembly_in_place(
     can read false): ``SetSaveFlag`` + ``Save3`` push the new geometry's md5 to the
     parent (codex review #5).
     """
-    import pythoncom
-    from win32com.client import VARIANT
-
-    asm = adapter.currentModel if model is None else model
+    asm = _early_bound(adapter.currentModel if model is None else model, "IModelDoc2")
     sldasm = OUT_SLDASM / f"{asm_name}.SLDASM"
     if not geometry_changed:
         # No-op refresh: resolved geometry identical to the last save. Do NOT
@@ -2641,18 +2705,21 @@ def save_assembly_in_place(
         adapter._attempt(lambda: asm.SetSaveFlag(), default=None)
 
     before = sldasm.stat().st_mtime
-    err = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
-    warn = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
     options = 1 | 8  # swSaveAsOptions_Silent | swSaveAsOptions_AvoidRebuildOnSave
-    ret = adapter._attempt(lambda: asm.Save3(options, err, warn), default=False)
+    # Early-bound IModelDoc2::Save3 returns its two [out] codes in the tuple
+    # (retval, errors, warnings) -- pass literal 0 for the [out] slots and consume
+    # the tuple (mirrors io.py's in-place Save3). The byref-VARIANT idiom leaves
+    # err/warn unwritten and makes `ret` a truthy tuple under InvokeTypes.
+    result = adapter._attempt(lambda: asm.Save3(options, 0, 0), default=None)
+    ret, err, warn = result if result else (False, None, None)
 
     after = sldasm.stat().st_mtime
     if after <= before:
         raise RuntimeError(
             f"{sldasm.name} mtime unchanged after Save3(Silent) "
-            f"(ret={ret}, err={err.value}, warn={warn.value})")
-    log(f"saved {sldasm.name} via Save3(Silent) (ret={ret}, err={err.value}, "
-        f"warn={warn.value})")
+            f"(ret={ret}, err={err}, warn={warn})")
+    log(f"saved {sldasm.name} via Save3(Silent) (ret={ret}, err={err}, "
+        f"warn={warn})")
 async def refresh_assembly(
     adapter: Any, asm_name: str, views: Iterable[str] = DEFAULT_VIEWS
 ) -> dict[str, str]:
@@ -2793,4 +2860,11 @@ async def refresh_assembly(
 
     artefacts = {"assembly": str(asm_path)}
     artefacts.update(await _export_assembly_images(adapter, asm_name, views))
+    # Same #267 reconcile the full-build path runs: the in-place Save3 followed a
+    # final_rebuild_before_save (ForceRebuild3(False)) that dirtied the children in
+    # memory, so a fresh open would report needs-rebuild. Only when we actually
+    # re-saved -- a no-op reload left the (already-reconciled) artifact untouched
+    # and byte-stable, and reopening it would needlessly bump the parent's md5.
+    if geometry_changed:
+        await reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
     return artefacts

@@ -12,6 +12,9 @@ print.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+import _drawing_common as drawing_common
 from _drawing_layout_check import (
     DEFAULT_BOUNDARY_ALLOWANCE_M,
     DEFAULT_OVERLAP_TOL_M,
@@ -27,8 +30,84 @@ SHEET_W = 0.4318
 SHEET_H = 0.2794
 
 
+class _FakeAdapter:
+    def __init__(self, model):
+        self.currentModel = model
+
+    @staticmethod
+    def _attempt(callback, default=None):
+        try:
+            return callback()
+        except Exception:
+            return default
+
+    @staticmethod
+    def _get_attr_or_call(obj, name):
+        member = getattr(obj, name, None)
+        return member() if callable(member) else member
+
+
 def _el(label, x0, y0, x1, y1, kind="view", scope=CollisionScope.ALL, owner=""):
     return LayoutElement(label, kind, x0, y0, x1, y1, scope=scope, owner=owner)
+
+
+def test_live_collector_never_flags_transient_dispatches(monkeypatch):
+    """The audit must not pay whole-interface flagging for fresh COM wrappers."""
+
+    def _unexpected_flag(*_args, **_kwargs):
+        raise AssertionError("layout collection must not call flagged()")
+
+    monkeypatch.setattr(drawing_common._sw_type_info, "flagged", _unexpected_flag)
+
+    note = SimpleNamespace(GetExtent=[0.01, 0.09, 0.0, 0.04, 0.10, 0.0])
+    note_annotation = SimpleNamespace(
+        GetLeaderCount=0,
+        GetSpecificAnnotation=note,
+        GetType=6,
+        GetName="general-note",
+    )
+    dim_annotation = SimpleNamespace(
+        GetPosition=[0.12, 0.22, 0.0],
+        GetType=lambda: 4,
+        GetName=lambda: "dimension",
+    )
+    table_annotation = SimpleNamespace(GetPosition=lambda: [0.18, 0.12, 0.0])
+    table = SimpleNamespace(
+        GetAnnotation=lambda: table_annotation,
+        RowCount=2,
+        ColumnCount=2,
+        GetColumnWidth=lambda _index: 0.02,
+        GetRowHeight=lambda _index: 0.01,
+    )
+    table_annotation.GetName = "hole-table"
+
+    view = SimpleNamespace(
+        GetName2="Front",
+        GetOrientationName=lambda: "*Front",
+        GetOutline=[0.05, 0.15, 0.15, 0.25],
+        GetAnnotations=lambda: [note_annotation, dim_annotation],
+        GetTableAnnotations=[table],
+        GetNextView=None,
+    )
+    sheet_view = SimpleNamespace(GetNextView=lambda: view, GetTableAnnotations=[])
+    sheet = SimpleNamespace(
+        GetProperties=lambda: [0.0, 0.0, 1.0, 1.0, 0.0, SHEET_W, SHEET_H]
+    )
+    model = SimpleNamespace(GetCurrentSheet=sheet, GetFirstView=lambda: sheet_view)
+
+    elements, width, height = drawing_common.collect_layout_elements(
+        _FakeAdapter(model)
+    )
+
+    assert (width, height) == (SHEET_W, SHEET_H)
+    assert [(element.label, element.kind) for element in elements] == [
+        ("Front", "view"),
+        ("general-note", "note"),
+        ("dimension", "dim"),
+        ("hole-table", "table"),
+        ("title-block", "titleblock"),
+        ("projection-symbol", "titleblock"),
+    ]
 
 
 def test_disjoint_layout_is_clean():

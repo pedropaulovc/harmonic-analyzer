@@ -40,6 +40,7 @@ from _common import (  # noqa: E402
     OUT_SLDASM,
     OUT_SLDPRT,
     CAD_ROOT,
+    _early_bound,
     _read_member,
     check,
     log,
@@ -57,31 +58,6 @@ VIEW_CONSTANTS = {
     "front": 1, "back": 2, "left": 3, "right": 4, "top": 5,
     "bottom": 6, "isometric": 7, "dimetric": 8, "trimetric": 9,
 }
-
-
-def _flag(obj: Any, iface: str) -> None:
-    from solidworks_mcp.adapters import sw_type_info
-
-    try:
-        sw_type_info.flag_methods(obj, iface)
-    except Exception:
-        pass
-
-
-def _flag_only(obj: Any, *method_names: str) -> None:
-    """Flag ONLY the named zero-arg methods on ``obj`` -- not its whole
-    interface. Avoids the ~165-round-trip whole-interface ``IComponent2`` flag
-    in per-component loops when only one or two zero-arg methods are called
-    (issue #87). ``_FlagAsMethod`` is a pywin32 ``CDispatch`` method, so this
-    needs no gen_py wrapper; unknown names raise inside it and are skipped."""
-    flag = getattr(obj, "_FlagAsMethod", None)
-    if flag is None:
-        return
-    for name in method_names:
-        try:
-            flag(name)
-        except Exception:
-            pass
 
 
 def _put_object(obj: Any, prop: str, value: Any) -> None:
@@ -202,8 +178,7 @@ def force_plain_white_background(adapter: Any) -> dict:
     The default scene background is a gradient with an elliptical highlight,
     which defeats both content trimming and the blend's background knockout.
     """
-    sw = adapter.swApp
-    _flag(sw, "ISldWorks")
+    sw = _early_bound(adapter.swApp, "ISldWorks")
     old = {
         "appearance": int(sw.GetUserPreferenceIntegerValue(SW_PREF_BG_APPEARANCE)),
         "viewport": int(sw.GetUserPreferenceIntegerValue(SW_PREF_VIEWPORT_BG)),
@@ -231,8 +206,9 @@ def component_boxes(adapter: Any) -> list[tuple[str, tuple[float, ...]]]:
     metres) for every component at every level. Suppressed/graphics-less
     instances return no box and are skipped."""
     model = adapter.currentModel
-    _flag(model, "IModelDoc2")
-    _flag(model, "IAssemblyDoc")
+    # IModelDoc2's early-bound wrapper forwards GetComponents (an IAssemblyDoc
+    # member) to a lazily-built late-bound dispatch, so one wrapper covers both.
+    model = _early_bound(model, "IModelDoc2")
     try:
         comps = model.GetComponents(False)
     except Exception as exc:
@@ -243,8 +219,8 @@ def component_boxes(adapter: Any) -> list[tuple[str, tuple[float, ...]]]:
     for i, comp in enumerate(comps or [], 1):
         if i % 50 == 0:
             log(f"component boxes {i}/{total} ...")
-        # No flag: Name2 is a property read and GetBox is called WITH args, so
-        # late binding dispatches it as a method unambiguously (issue #87).
+        # No early-bind: Name2 is a property read and GetBox is called WITH
+        # args, so late binding dispatches it as a method unambiguously (#87).
         try:
             name = str(_read_member(comp, "Name2") or "")
             box = comp.GetBox(False, False)
@@ -307,7 +283,7 @@ def set_camera(adapter: Any, cam: dict) -> None:
     from solidworks_mcp.adapters.com_variant import double_array
 
     model = adapter.currentModel
-    _flag(model, "IModelDoc2")
+    model = _early_bound(model, "IModelDoc2")
 
     if cam.get("mode", "euler") == "named":
         model.ShowNamedView2("", VIEW_CONSTANTS[cam["view"]])
@@ -316,15 +292,14 @@ def set_camera(adapter: Any, cam: dict) -> None:
         return
 
     view = _read_member(model, "ActiveView")
-    _flag(view, "IModelView")
-    mu = adapter.swApp.GetMathUtility()
-    _flag(mu, "IMathUtility")
+    view = _early_bound(view, "IModelView")
+    mu = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
 
     r, u, o = camera_axes(cam.get("az_deg", 0.0), cam.get("el_deg", 0.0), cam.get("roll_deg", 0.0))
     vecs = [mu.CreateVector(double_array(list(v))) for v in (r, u, o)]
     origin_vec = mu.CreateVector(double_array([0.0, 0.0, 0.0]))
     xform = mu.ComposeTransform(*vecs, origin_vec, 1.0)
-    _flag(xform, "IMathTransform")
+    xform = _early_bound(xform, "IMathTransform")
     orient = _read_member(xform, "Inverse")
     _put_object(view, "Orientation3", orient)
     model.ViewZoomToFit2()  # normalise Scale2/Translation3 for the new rotation
@@ -525,7 +500,7 @@ def main() -> int:
             # and edge ink swamps fine geometry at capture scale (the fluted
             # columns render solid black from 32 full-length groove edges).
             mdl = adapter.currentModel
-            _flag(mdl, "IModelDoc2")
+            mdl = _early_bound(mdl, "IModelDoc2")
             mdl.ViewDisplayShaded()
             boxes = []
             if mpath.suffix.lower() == ".sldasm" and any(

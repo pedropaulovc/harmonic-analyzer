@@ -74,6 +74,7 @@ import sys
 from _common import (
     CASTING_GREEN,
     SketchDims,
+    _early_bound,
     add_line_chain,
     apply_color,
     apply_material,
@@ -165,22 +166,6 @@ CHAMFER_FACES = [  # whole faces whose every edge is chamfered (tangent-propagat
 ]
 
 
-def _flag(obj, iface: str) -> None:
-    from solidworks_mcp.adapters import sw_type_info
-    try:
-        sw_type_info.flag_methods(obj, iface)
-    except Exception:  # noqa: BLE001
-        pass
-
-
-def _early(obj, iface: str):
-    """Wrap a feature definition in its generated early-bound COM interface."""
-    from solidworks_mcp.adapters import sw_type_info
-
-    sw_type_info._ensure_loaded()
-    return getattr(sw_type_info._wrapper_module, iface)(obj._oleobj_)
-
-
 def _add_construction_diagonals(adapter, half_mm: float) -> None:
     """Add the two corner-to-corner CONSTRUCTION diagonals that the center-
     rectangle tool draws, so a ``define_centered_rectangle`` square matches the
@@ -192,14 +177,14 @@ def _add_construction_diagonals(adapter, half_mm: float) -> None:
     fully defined.
     """
     sm = adapter.currentSketchManager
-    _flag(sm, "ISketchManager")
+    sm = _early_bound(sm, "ISketchManager")
     h = half_mm / 1000.0
     prev = bool(sm.AddToDB)
     sm.AddToDB = True
     try:
         for (x1, y1), (x2, y2) in (((-h, -h), (h, h)), ((-h, h), (h, -h))):
             seg = sm.CreateLine(x1, y1, 0.0, x2, y2, 0.0)
-            _flag(seg, "ISketchSegment")
+            seg = _early_bound(seg, "ISketchSegment")
             seg.ConstructionGeometry = True
     finally:
         sm.AddToDB = prev
@@ -230,9 +215,9 @@ def _cut_through_all(adapter, sketch_name: str, *, both: bool, reverse_dir: bool
     ``FromOffsetDistance``/``ReverseDirection`` pair.
     """
     model = adapter.currentModel
-    _flag(model, "IModelDoc2")
+    model = _early_bound(model, "IModelDoc2")
     fm = model.FeatureManager
-    _flag(fm, "IFeatureManager")
+    fm = _early_bound(fm, "IFeatureManager")
     _select_sketch(adapter, sketch_name)
 
     through = adapter.constants.get("swEndCondThroughAll", 1)
@@ -264,10 +249,10 @@ def _find_bottom_face(model, holes_xz, y_face_mm: float):
     is the reliable path.
     """
     body = (model.GetBodies2(0, False) or [None])[0]
-    _flag(body, "IBody2")
+    body = _early_bound(body, "IBody2")
     best = None
     for f in (body.GetFaces() or []):
-        _flag(f, "IFace2")
+        f = _early_bound(f, "IFace2")
         try:
             n = tuple(f.Normal)
         except Exception:  # noqa: BLE001
@@ -304,12 +289,12 @@ def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
     model = adapter.currentModel
-    _flag(model, "IModelDoc2")
+    model = _early_bound(model, "IModelDoc2")
     fm = model.FeatureManager
-    _flag(fm, "IFeatureManager")
+    fm = _early_bound(fm, "IFeatureManager")
 
     data = fm.CreateDefinition(SW_FM_HOLE_WZD)
-    _flag(data, "IWizardHoleFeatureData2")
+    data = _early_bound(data, "IWizardHoleFeatureData2")
     data.InitializeHole(
         SW_WZD_TAP, SW_STD_ANSI_INCH, SW_HOLE_FASTENER_TYPE,
         HOLE_SSIZE, SW_END_THROUGH_ALL)
@@ -330,16 +315,16 @@ def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
     feat = fm.CreateFeature(data)
     if feat is None:
         raise RuntimeError("hole wizard: CreateFeature returned None")
-    _flag(feat, "IFeature")
+    feat = _early_bound(feat, "IFeature")
 
     # locate the wizard's 1-point placement sketch
     place_sk = place_name = None
     sub = feat.GetFirstSubFeature()
     while sub is not None:
-        _flag(sub, "IFeature")
+        sub = _early_bound(sub, "IFeature")
         if str(sub.GetTypeName2()) == "ProfileFeature":
             sk = sub.GetSpecificFeature2()
-            _flag(sk, "ISketch")
+            sk = _early_bound(sk, "ISketch")
             if len(sk.GetSketchPoints2() or []) == 1:
                 place_sk, place_name = sk, str(sub.Name)
                 break
@@ -348,18 +333,18 @@ def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
         raise RuntimeError("hole wizard: placement sketch not found")
 
     math = adapter.swApp.GetMathUtility()
-    _flag(math, "IMathUtility")
+    math = _early_bound(math, "IMathUtility")
     xform = place_sk.ModelToSketchTransform  # model -> sketch
-    _flag(xform, "IMathTransform")
+    xform = _early_bound(xform, "IMathTransform")
     y_face = y_face_mm / 1000.0
 
     def _sketch_xy(hx, hz):
         arr = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8,
                       [hx / 1000.0, y_face, hz / 1000.0])
         mpt = math.CreatePoint(arr)
-        _flag(mpt, "IMathPoint")
+        mpt = _early_bound(mpt, "IMathPoint")
         spt = mpt.MultiplyTransform(xform)
-        _flag(spt, "IMathPoint")
+        spt = _early_bound(spt, "IMathPoint")
         return list(spt.ArrayData)[:3]
 
     model.ClearSelection2(True)
@@ -368,9 +353,9 @@ def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
         raise RuntimeError(f"hole wizard: cannot edit {place_name}")
     model.EditSketch()
     sm = model.SketchManager
-    _flag(sm, "ISketchManager")
+    sm = _early_bound(sm, "ISketchManager")
     auto = (place_sk.GetSketchPoints2() or [None])[0]
-    _flag(auto, "ISketchPoint")
+    auto = _early_bound(auto, "ISketchPoint")
     sx, sy, sz = _sketch_xy(*holes_xz[0])
     auto.SetCoords(sx, sy, sz)  # move auto point to hole #0
     for hx, hz in holes_xz[1:]:
@@ -387,7 +372,7 @@ def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
     # Pre-create late-bound writes can silently drop on SW 2026.  Persist the
     # thread contract through the documented feature-edit flow, then verify the
     # values that drive native hole callouts/tables.
-    definition = _early(feat.GetDefinition(), "IWizardHoleFeatureData2")
+    definition = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
     if not definition.AccessSelections(model, None):
         raise RuntimeError("hole wizard: AccessSelections failed")
     definition.ThreadClass = HOLE_THREAD_CLASS
@@ -396,7 +381,7 @@ def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
     if not feat.ModifyDefinition(definition._oleobj_, model, null_callout()):
         raise RuntimeError("hole wizard: ModifyDefinition failed")
     model.EditRebuild3()
-    persisted = _early(feat.GetDefinition(), "IWizardHoleFeatureData2")
+    persisted = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
     if str(persisted.ThreadClass) != HOLE_THREAD_CLASS:
         raise RuntimeError(
             f"hole wizard: thread class did not persist: {persisted.ThreadClass!r}"
