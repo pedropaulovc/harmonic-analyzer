@@ -450,7 +450,10 @@ class _PartIdentityTracker:
     def __init__(self, stem: str):
         self.stem = stem
 
-    def __call__(self, _task, _values) -> bool:
+    def __call__(self, task, values) -> bool:
+        # doit injects these arguments by their RESERVED NAMES. Keep `task` and
+        # `values` even though this validator does not otherwise need them.
+        del task, values
         try:
             identity = Path(_part_execution_token(self.stem)).read_text(
                 encoding="utf-8"
