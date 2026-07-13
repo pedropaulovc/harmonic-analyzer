@@ -154,7 +154,11 @@ def doc_rgb(doc: Any) -> tuple[float, float, float]:
     doc = _early_bound(doc, "IPartDoc")
     name = ""
     try:
-        res = doc.GetMaterialPropertyName2("", "")
+        # Early-bound IPartDoc::GetMaterialPropertyName2(ConfigName) returns the
+        # material name as the retval plus the [out] Database in the tuple
+        # (name, database). ConfigName "" = active config. Passing a second
+        # positional (the old dummy Database) collides with the [out] byref slot.
+        res = doc.GetMaterialPropertyName2("")
         names = list(res) if isinstance(res, (tuple, list)) else [res]
         # pywin32 may return (name, [out] database) in either order
         name = next((s for s in names
