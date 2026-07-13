@@ -1528,6 +1528,9 @@ def task_check():
     recipe_tests = [
         SCRIPTS_DIR / "test_dodo_recipe.py",
         SCRIPTS_DIR / "test_verify_auto_repair.py",
+        # The SolidWorks-free geometry contract for the drawing layout audit
+        # (collision / sheet-overflow logic run before every drawing saves).
+        SCRIPTS_DIR / "test_drawing_layout_check.py",
         # One offline contract file per manufacturing drawing (test_*_drawing.py),
         # so registering a drawing auto-enrolls its contracts here.
         *sorted(SCRIPTS_DIR.glob("test_*_drawing.py")),
