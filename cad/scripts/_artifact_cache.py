@@ -1,12 +1,12 @@
 r"""Remote build-artefact cache for the COM (SolidWorks) tasks.
 
-The expensive tasks in this pipeline -- ``part:<stem>`` / ``assembly:<stem>`` --
-drive a live SolidWorks seat (a part is ~20 s, a full assembly ~500 s). Their
+The expensive tasks in this pipeline -- ``part:<stem>`` / ``assembly:<stem>`` /
+``drawing:<stem>`` -- drive a live SolidWorks seat. Their
 outputs are a pure function of *hashed inputs*: a part's ``.SLDPRT`` is determined
 by its build script + helper closure + the cad/config files it reads; an
 assembly's ``.SLDASM`` by its recipe files + the content of the referenced part
-artefacts. ``dodo.py`` already computes exactly those input sets as each task's
-``file_dep``.
+artefacts; and a drawing by its script/assets plus the exact restored part-identity
+token. ``dodo.py`` computes those input sets as each task's ``file_dep``.
 
 This module turns that into a *shared* cache: key a task by the content hash of
 its ``file_dep`` (repo-relative, parsed-YAML-normalised -- identical across
