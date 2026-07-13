@@ -19,6 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _assembly  # noqa: E402
+import _telemetry  # noqa: E402
 from _common import _early_bound, _read_member  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter  # noqa: E402
 
@@ -51,27 +52,29 @@ async def main() -> None:
     stem = path.stem
 
     adapter = PyWin32Adapter({})
-    await adapter.connect()
+    with _telemetry.span("probe.reconcile", target=str(path), stem=stem):
+        await adapter.connect()
 
-    before_open = await _open(adapter, path)
-    print(f"[{stem}] NeedsRebuild2 BEFORE reconcile = {_nr(before_open)}", flush=True)
-    parts_before = _child_md5s()
+        before_open = await _open(adapter, path)
+        _telemetry.info(f"[{stem}] NeedsRebuild2 BEFORE reconcile = {_nr(before_open)}")
+        parts_before = _child_md5s()
 
-    # Production helper (opens fresh itself, reconciles, leaves doc open).
-    await _assembly.reconcile_saved_rebuild_state(adapter, stem, path)
+        # Production helper (opens fresh itself, reconciles, leaves doc open).
+        await _assembly.reconcile_saved_rebuild_state(adapter, stem, path)
 
-    # Independent fresh reopen -> did the clean mark persist to disk?
-    after_open = await _open(adapter, path)
-    persisted = _nr(after_open)
-    print(f"[{stem}] NeedsRebuild2 AFTER reconcile (independent reopen) = {persisted}"
-          f"  {'<-- CLEAN' if persisted == 0 else '(STILL DIRTY)'}", flush=True)
+        # Independent fresh reopen -> did the clean mark persist to disk?
+        after_open = await _open(adapter, path)
+        persisted = _nr(after_open)
+        msg = (f"[{stem}] NeedsRebuild2 AFTER reconcile (independent reopen) = {persisted}"
+               f"  {'<-- CLEAN' if persisted == 0 else '(STILL DIRTY)'}")
+        (_telemetry.success if persisted == 0 else _telemetry.warn)(msg)
 
-    parts_after = _child_md5s()
-    changed = [n for n in parts_before if parts_before[n] != parts_after.get(n)]
-    print(f"[{stem}] child .SLDPRT files rewritten by reconcile: {changed or 'NONE'}",
-          flush=True)
+        parts_after = _child_md5s()
+        changed = [n for n in parts_before if parts_before[n] != parts_after.get(n)]
+        rewritten = f"[{stem}] child .SLDPRT files rewritten by reconcile: {changed or 'NONE'}"
+        (_telemetry.warn if changed else _telemetry.success)(rewritten)
 
-    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+        adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
 
 if __name__ == "__main__":
