@@ -322,6 +322,35 @@ def test_com_seat_acquires_sets_env_and_releases(tmp_path, monkeypatch):
     assert "HARMONIC_COM_SEAT" not in os.environ
 
 
+def test_com_seat_wait_logs_without_opening_a_span(tmp_path, monkeypatch):
+    """A busy-seat poll stays visible in logs without adding a noisy wait span."""
+    monkeypatch.setenv("HARMONIC_COM_LOCK", str(tmp_path / "seat.lock"))
+    dodo = _load_dodo()
+    acquire = dodo._COM_LOCK.acquire
+    attempts = 0
+
+    def acquire_after_one_timeout(*args, **kwargs):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise dodo.Timeout(str(dodo._COM_LOCK_PATH))
+        return acquire(*args, **kwargs)
+
+    def reject_span(*args, **kwargs):
+        raise AssertionError("_com_seat must not open a telemetry span while waiting")
+
+    warnings = []
+    monkeypatch.setattr(dodo._COM_LOCK, "acquire", acquire_after_one_timeout)
+    monkeypatch.setattr(dodo._telemetry, "span", reject_span)
+    monkeypatch.setattr(dodo._telemetry, "warn", warnings.append)
+
+    with dodo._com_seat("part:x"):
+        pass
+
+    assert attempts == 2
+    assert warnings == ["[com.seat] part:x waiting for the SolidWorks seat"]
+
+
 def test_com_seat_is_reentrant_within_a_process(tmp_path, monkeypatch):
     """filelock counts same-process acquisitions, so a nested ``_com_seat`` (defensive
     -- no COM action nests today) neither deadlocks nor releases the seat early: the
