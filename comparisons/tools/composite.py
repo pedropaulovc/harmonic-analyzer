@@ -245,7 +245,12 @@ def score_pair(pair_id: str, align: dict | None) -> float:
     mcanvas = Image.new("L", ref.size, 0)
     mcanvas.paste(mask, offset)
     total = n = 0
-    for rv, cv, mv in zip(ref.getdata(), canvas.getdata(), mcanvas.getdata(), strict=True):
+    for rv, cv, mv in zip(
+        ref.get_flattened_data(),
+        canvas.get_flattened_data(),
+        mcanvas.get_flattened_data(),
+        strict=True,
+    ):
         if mv:  # render content only
             d = rv - cv
             total += d * d

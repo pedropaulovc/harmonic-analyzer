@@ -41,7 +41,7 @@ def iou(a: Image.Image, b: Image.Image) -> float:
     ca.paste(a, ((w - a.width) // 2, 0))
     cb.paste(b, ((w - b.width) // 2, 0))
     inter = union = 0
-    for va, vb in zip(ca.getdata(), cb.getdata(), strict=True):
+    for va, vb in zip(ca.get_flattened_data(), cb.get_flattened_data(), strict=True):
         if va and vb:
             inter += 1
         if va or vb:
