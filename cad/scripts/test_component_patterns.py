@@ -98,8 +98,7 @@ def test_linear_pattern_preserves_reverse_direction(monkeypatch: pytest.MonkeyPa
     adapter = _PatternAdapter()
     monkeypatch.setattr(_assembly, "ensure_global_pattern_axis", lambda *_: "PatternAxisX")
     monkeypatch.setattr(_assembly, "_select_pattern_inputs", lambda *_: None)
-    monkeypatch.setattr(_assembly, "_flag", lambda *_: None)
-    monkeypatch.setattr(_assembly, "_flag_only", lambda *_: None)
+    monkeypatch.setattr(_assembly, "_early_bound", lambda obj, *_: obj)
     names = asyncio.run(
         linear_component_pattern(
             adapter,
