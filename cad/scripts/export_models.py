@@ -411,7 +411,7 @@ def _save_as(doc: Any, out: Path) -> int:
 def validated_outputs(parts: list[str], assemblies: list[str]) -> set[Path]:
     """Every render-cache output whose freshness THIS run establishes for the current
     manifest: each manifest part's STL + STEP; each manifest assembly's boxes JSON +
-    mono STL + STEP and every part-mesh STL its scene references; plus the colours /
+    mono STL and every part-mesh STL its scene references; plus the colours /
     digests sidecars. Only existing files are returned. Used to SCOPE the stamp so it
     can't refresh a non-manifest leftover (a stale subassembly scene) it never checked."""
     out: set[Path] = {COLORS, SRC_DIGESTS}
@@ -421,7 +421,7 @@ def validated_outputs(parts: list[str], assemblies: list[str]) -> set[Path]:
     for m in assemblies:
         d = m.replace("_", "-")
         bj = OUT_BOXES / f"{d}.json"
-        out |= {bj, OUT_STL / f"{d}.STL", OUT_STEP / f"{d}.STEP"}
+        out |= {bj, OUT_STL / f"{d}.STL"}
         if bj.exists():
             try:
                 comps = json.loads(bj.read_text(encoding="utf-8")).get("components") or []
@@ -478,11 +478,10 @@ def asm_source_changed(dashed: str, src: Path, digests: dict[str, str]) -> bool:
         return True
     cur = src_digest(src)
     if cur is None:
-        # Digest-unavailable fallback: check EVERY assembly output's mtime vs the
-        # source, not just the boxes JSON -- a fresh scene JSON alongside a stale mono
-        # STL/STEP must still read stale (codex review).
-        outs = (OUT_BOXES / f"{dashed}.json", OUT_STL / f"{dashed}.STL",
-                OUT_STEP / f"{dashed}.STEP")
+        # Digest-unavailable fallback: check every assembly output that is still
+        # produced. Assembly STEP was retired; requiring it here would make every
+        # standalone export stale forever.
+        outs = (OUT_BOXES / f"{dashed}.json", OUT_STL / f"{dashed}.STL")
         return any(not o.exists() or o.stat().st_mtime < src.stat().st_mtime
                    for o in outs)
     return digests.get(dashed) != cur
@@ -658,11 +657,11 @@ def main() -> int:
     for m in assemblies:
         src, dashed = model_path(m), m.replace("_", "-")
         bj = OUT_BOXES / f"{dashed}.json"
-        mono, step = OUT_STL / f"{dashed}.STL", OUT_STEP / f"{dashed}.STEP"
+        mono = OUT_STL / f"{dashed}.STL"
         # Assembly source (its .SLDASM digest folds every referenced part, recursively),
         # so any leaf-part recipe change flips it -> re-export. Missing outputs re-export
         # regardless (why the export task runs `uptodate: False`).
-        if (force or not bj.exists() or not mono.exists() or not step.exists()
+        if (force or not bj.exists() or not mono.exists()
                 or asm_source_changed(dashed, src, digests)):
             stale_asms.append(m)
             continue
@@ -703,7 +702,8 @@ def main() -> int:
             doc = adapter.currentModel
             crc_by_mesh: dict[str, int] = {}
             for cfg, mesh in cfg_meshes:
-                if cfg and cfg.lower() != "default" and active_cfg(doc) != cfg:
+                switched = bool(cfg and cfg.lower() != "default" and active_cfg(doc) != cfg)
+                if switched:
                     ok_cfg = doc.ShowConfiguration2(cfg)
                     # ShowConfiguration2 returns False when cfg was already
                     # active — only fail if it's genuinely not active now
@@ -719,8 +719,9 @@ def main() -> int:
                 # solid, so a config's STL non-deterministically holds an adjacent
                 # configuration (observed: --t18.STL carrying 12-tooth geometry). Force
                 # a full rebuild so THIS config is applied before the mesh is written.
-                adapter._attempt(lambda: doc.ForceRebuild3(False), default=None)
-                adapter._attempt(lambda: doc.EditRebuild3(), default=None)
+                if switched:
+                    adapter._attempt(lambda: doc.ForceRebuild3(False), default=None)
+                    adapter._attempt(lambda: doc.EditRebuild3(), default=None)
                 out = OUT_STL / f"{mesh}.STL"
                 _save_as(doc, out)
                 crc_by_mesh[mesh] = zlib.crc32(out.read_bytes()) & 0xFFFFFFFF
@@ -758,9 +759,11 @@ def main() -> int:
                 src = model_path(m)
                 check(f"open {src.name}", await adapter.open_model(str(src)))
                 doc = adapter.currentModel
-                out = OUT_STEP / f"{dashed}.STEP"
-                _save_as(doc, out)
-                log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB)")
+                # Assembly STEP is deliberately omitted: native Pack-and-Go plus
+                # the monolithic STL/scene graph cover assembly consumption, while
+                # assembly STEP was the dominant export cost (413 s top, 379 s frame
+                # in v0.20.0). Part STEP remains the archival exact-BREP surface.
+                (OUT_STEP / f"{dashed}.STEP").unlink(missing_ok=True)
                 mono = OUT_STL / f"{dashed}.STL"  # mm, like every other STL
                 _save_as(doc, mono)
                 log(f"saved {mono.name} ({mono.stat().st_size / 1e6:.1f} MB, mm)")

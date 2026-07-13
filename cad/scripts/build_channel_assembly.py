@@ -1465,24 +1465,44 @@ async def build(adapter) -> dict[str, str]:
             target = list(seed_arrays[part])
             target[11] += dz_m
             targets[part] = target
+        copied.append({"j": j, "seed_j": seed_j, "comps": comps,
+                       "targets": targets, "slice_info": slice_info,
+                       "own_bushing": own_bushing})
+
+    # Copy every free chain first, then settle their solver-state attractors in
+    # one post-copy phase. Driving each copy immediately made every later
+    # CopyWithMates2 addition re-wander already-settled free siblings; the v0.20.0
+    # trace spent 173 s across those repeated pose-drive spans. Re-putting the
+    # complete copied bank before each transient driver keeps every still-free
+    # chain on its design branch while the current channel is committed.
+    def _put_all_copies() -> None:
+        for rec in copied:
+            for part in CHAIN_PARTS:
+                put_component_pose(
+                    adapter, rec["comps"][part], rec["targets"][part])
+
+    for rec in copied:
+        j = rec["j"]
+        seed_j = rec["seed_j"]
+        comps = rec["comps"]
+        targets = rec["targets"]
+        slice_info = rec["slice_info"]
         rocker_c = comps["rocker-arm"]
         rod_c = comps["connecting-rod"]
         bar_c = comps["amplitude-bar"]
+
         def _tgt_mm(part: str) -> list[float]:
             a = targets[part]
             return [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
+
         off = slice_info["rocker_off"]
         ring = slice_info["rod_ring"]
         pin = slice_info["rod_pin"]
         foot = slice_info["foot"]
-        def _put_chain() -> None:
-            for part in CHAIN_PARTS:
-                put_component_pose(adapter, comps[part], targets[part])
-
         try:
             with _telemetry.span("cwm.pose_drive", channel=j):
                 drives: list[str] = []
-                _put_chain()
+                _put_all_copies()
                 mate = await spin_driver(
                     adapter, named_ref(f"Axis2@{rocker_c}", "AXIS"),
                     pivot_w, (off[0], off[1]),
@@ -1490,7 +1510,7 @@ async def build(adapter) -> dict[str, str]:
                            f" {off[0]:.1f},{off[1]:.1f}"),
                     verify=(rocker_c, _tgt_mm("rocker-arm")))
                 drives.append(mate["name"])
-                _put_chain()  # each add re-seats the still-free siblings
+                _put_all_copies()
                 mate = await distance_driver(
                     adapter, named_ref(f"Axis2@{bar_c}", "AXIS"),
                     named_ref("Right Plane", "PLANE"), foot[0],
@@ -1499,7 +1519,7 @@ async def build(adapter) -> dict[str, str]:
                            f" {amplitudes[j]:+.1f})"),
                     verify=(bar_c, _tgt_mm("amplitude-bar")))
                 drives.append(mate["name"])
-                _put_chain()
+                _put_all_copies()
                 mate = await spin_driver(
                     adapter, named_ref(f"Axis1@{rod_c}", "AXIS"),
                     (pin[0], pin[1]), (ring[0], ring[1]),
@@ -1523,10 +1543,8 @@ async def build(adapter) -> dict[str, str]:
                 await _debug_png(adapter, f"drive-fail-ch{j:02d}")
             raise
         log(f"ch{j:02d} <- CopyWithMates2 of ch{seed_j:02d}"
-            f" (J1a PITCH/2 {PITCH / 2.0:.2f} mm <- own bushing {own_bushing},"
-            f" driven to pose + freed)")
-        copied.append({"j": j, "seed_j": seed_j, "comps": comps,
-                       "targets": targets})
+            f" (J1a PITCH/2 {PITCH / 2.0:.2f} mm <- own bushing"
+            f" {rec['own_bushing']}, driven to pose + freed)")
 
     # End-state validation of the replicated channels: ONE closing solve, then
     # prove each copy from the model (the CopyWithMates2 return value LIES):

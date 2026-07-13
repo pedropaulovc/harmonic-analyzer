@@ -8,6 +8,7 @@ import hashlib
 import json
 import re
 from collections.abc import Iterable
+from contextlib import contextmanager
 from enum import StrEnum
 from typing import Any
 
@@ -24,6 +25,7 @@ from _common import (
     _MATE_TOL_MM,
     _early_bound,
     _read_member,
+    active_configuration_name,
     check,
     log,
     set_isometric_view,
@@ -319,6 +321,24 @@ def named_ref(name: str, entity_type: str) -> Any:
     from solidworks_mcp.adapters.base import MateEntityRef
 
     return MateEntityRef(entity_type=entity_type, name=name)
+
+
+@contextmanager
+def suspend_automatic_assembly_rebuilds(adapter: Any):
+    """Defer automatic root-assembly rebuilds across a mutation batch.
+
+    SOLIDWORKS' unusually named ``IAssemblyDoc.EnableAssemblyRebuild`` is
+    ``True`` when automatic rebuilding is *suspended*.  Restore the caller's
+    state even when a COM write fails; the caller remains responsible for one
+    explicit closing solve after the complete batch.
+    """
+    assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
+    previous = bool(_read_member(assembly, "EnableAssemblyRebuild"))
+    assembly.EnableAssemblyRebuild = True
+    try:
+        yield
+    finally:
+        assembly.EnableAssemblyRebuild = previous
 
 def component_named_ref(
     component: str, name: str, entity_type: str = "AXIS",
@@ -957,6 +977,73 @@ async def gear_mate(
         adapter, label, "gear", [ref_a, ref_b], gear_ratio=ratio, alignment=alignment
     )
 
+
+def gear_mates_batch(
+    adapter: Any,
+    specs: Iterable[tuple[Any, Any, Iterable[float], str]],
+    *,
+    label: str = "gear-mate bank",
+) -> list[dict[str, Any]]:
+    """Create a bank of gear mates with one closing assembly solve.
+
+    The normal adapter path ends every mate with ``EditRebuild3``.  That is a
+    severe quadratic cost in a mature assembly and is redundant here:
+    ``IAssemblyDoc.CreateMate`` seats each new gear relationship immediately,
+    while one closing rebuild proves the complete coupled system.  This is the
+    production form of ``diagnostics/diag_mate_rebuild_cost.py``'s H4 result.
+    """
+    from solidworks_mcp.adapters.base import AddMateParameters
+    from solidworks_mcp.adapters.solidworks import assembly as _sw_asm
+
+    rows = list(specs)
+    model = adapter.currentModel
+    results: list[dict[str, Any]] = []
+    names: list[tuple[str, str]] = []
+    with _telemetry.span(label, mates=len(rows)):
+        with suspend_automatic_assembly_rebuilds(adapter):
+            for ref_a, ref_b, raw_ratio, mate_label in rows:
+                ratio = [float(value) for value in raw_ratio]
+                if len(ratio) != 2:
+                    raise ValueError(f"{mate_label}: gear ratio must have two values")
+                params = AddMateParameters(
+                    mate_type="gear",
+                    entities=[ref_a, ref_b],
+                    alignment="closest",
+                    gear_ratio=ratio,
+                )
+                model.ClearSelection2(True)
+                for ref in params.entities:
+                    if not _sw_asm._select_mate_entity(adapter, ref, 1):
+                        located = ref.name or ref.point
+                        raise RuntimeError(
+                            f"{mate_label}: failed to select gear entity {located!r}"
+                        )
+                _sw_asm._flag_feature_methods(model, "IAssemblyDoc")
+                mate = _sw_asm._create_standard_mate(
+                    adapter, model, params, _sw_asm._MATE_TYPES["gear"]
+                )
+                model.ClearSelection2(True)
+                name = _sw_asm._mate_feature_name(adapter, mate)
+                names.append((name, mate_label))
+                results.append({
+                    "name": name,
+                    "mate_type": "gear",
+                    "alignment": "closest",
+                    "entities": 2,
+                    "gear_ratio": ratio,
+                })
+                _telemetry.event("mate.created", label=mate_label, kind="gear")
+
+        if not bool(adapter._attempt(lambda: model.EditRebuild3(), default=False)):
+            raise RuntimeError(f"{label}: closing EditRebuild3 failed")
+        for name, mate_label in names:
+            error = _mate_hard_error(adapter, name)
+            if error:
+                raise RuntimeError(
+                    f"{label}: {mate_label!r} has hard feature error {error}"
+                )
+    return results
+
 async def cam_follower_mate(
     adapter: Any, cam_ref: Any, follower_ref: Any, *, label: str = "cam_follower"
 ) -> Any:
@@ -1090,13 +1177,13 @@ def _top_features(model: Any) -> list[Any]:
 @_telemetry.traced("assembly.pattern_axis", label_param="axis")
 def ensure_global_pattern_axis(adapter: Any, axis: str) -> str:
     """Create/reuse an assembly reference axis aligned to global X, Y, or Z."""
-    from solidworks_mcp.adapters.com_variant import null_callout
-
     key = axis.lower()
     try:
         planes = _GLOBAL_PATTERN_AXIS_PLANES[key]
     except KeyError as exc:
         raise ValueError(f"pattern axis must be x, y, or z; got {axis!r}") from exc
+
+    from solidworks_mcp.adapters.com_variant import null_callout
 
     model = adapter.currentModel
     name = f"PatternAxis{key.upper()}"
@@ -1104,7 +1191,6 @@ def ensure_global_pattern_axis(adapter: Any, axis: str) -> str:
     if existing is not None:
         return name
 
-    before = {str(_read_member(feature, "Name")) for feature in _top_features(model)}
     model.ClearSelection2(True)
     for index, plane in enumerate(planes):
         selected = model.Extension.SelectByID2(
@@ -1122,17 +1208,24 @@ def ensure_global_pattern_axis(adapter: Any, axis: str) -> str:
             raise RuntimeError(f"cannot select {plane} for global {key}-axis")
     if not model.InsertAxis2(True):
         raise RuntimeError(f"SOLIDWORKS rejected global {key}-axis creation")
-
-    created = [
-        feature for feature in _top_features(model)
-        if str(_read_member(feature, "Name")) not in before
-        and str(feature.GetTypeName2()) == "RefAxis"
-    ]
-    if len(created) != 1:
+    # InsertAxis2 selects the feature it just created. Read that identity
+    # directly: reference geometry is inserted near the front of an assembly's
+    # feature tree, so searching backward from the tail took 39-78 seconds on
+    # large mechanisms and any fixed scan bound eventually failed.
+    selection = _early_bound(
+        model.SelectionManager, "ISelectionMgr", "GetSelectedObject6"
+    )
+    created = adapter._attempt(
+        lambda: selection.GetSelectedObject6(1, -1), default=None
+    )
+    if created is None:
+        raise RuntimeError(f"cannot read newly-created global {key}-axis")
+    created = _early_bound(created, "IFeature", "GetTypeName2")
+    if str(created.GetTypeName2()) != "RefAxis":
         raise RuntimeError(
-            f"global {key}-axis created {len(created)} reference-axis features"
+            f"new global {key}-axis selected {created.GetTypeName2()!r}, expected RefAxis"
         )
-    created[0].Name = name
+    created.Name = name
     model.ClearSelection2(True)
     _telemetry.success(f"created assembly pattern axis {name}")
     return name
@@ -1143,6 +1236,8 @@ def _select_pattern_inputs(
     seed_components: tuple[str, ...],
     direction_name: str,
     direction_type: str,
+    direction2_name: str | None = None,
+    direction2_type: str = "AXIS",
 ) -> None:
     from solidworks_mcp.adapters.com_variant import null_callout
 
@@ -1163,6 +1258,23 @@ def _select_pattern_inputs(
         raise RuntimeError(
             f"cannot select pattern direction {direction_type} {direction_name!r}"
         )
+    if direction2_name is not None:
+        selected = model.Extension.SelectByID2(
+            direction2_name,
+            direction2_type,
+            0.0,
+            0.0,
+            0.0,
+            True,
+            4,
+            null_callout(),
+            0,
+        )
+        if not selected:
+            raise RuntimeError(
+                "cannot select pattern direction 2 "
+                f"{direction2_type} {direction2_name!r}"
+            )
     for seed_component in seed_components:
         component = adapter._attempt(
             lambda name=seed_component: model.GetComponentByName(name), default=None
@@ -1266,6 +1378,87 @@ async def linear_component_pattern(
 
         created = _new_pattern_components(model, before)
         expected = len(seeds) * (instances - 1)
+        if len(created) != expected:
+            raise RuntimeError(
+                f"{label} created {len(created)} components, expected {expected}"
+            )
+        names = []
+        for component in created:
+            component = _early_bound(component, "IComponent2", "IsPatternInstance")
+            name = str(_read_member(component, "Name2"))
+            if not component.IsPatternInstance():
+                raise RuntimeError(f"{name} is not owned by the component pattern")
+            names.append(name)
+        _telemetry.success(f"{label}: created {len(names)} pattern instances")
+        return names
+
+
+async def grid_component_pattern(
+    adapter: Any,
+    seed_components: Iterable[str],
+    *,
+    axis1: str,
+    spacing1_mm: float,
+    instances1: int,
+    axis2: str,
+    spacing2_mm: float,
+    instances2: int,
+    direction1: PatternDirection = PatternDirection.FORWARD,
+    direction2: PatternDirection = PatternDirection.FORWARD,
+    label: str = "rectangular component pattern",
+) -> list[str]:
+    """Pattern seeds as one native two-direction rectangular grid."""
+    if instances1 < 2 or instances2 < 2:
+        raise ValueError("grid component pattern requires two instances per axis")
+    if spacing1_mm <= 0.0 or spacing2_mm <= 0.0:
+        raise ValueError("grid component pattern spacing must be positive")
+    if axis1.lower() == axis2.lower():
+        raise ValueError("grid component pattern axes must differ")
+    seeds = tuple(seed_components)
+    if not seeds:
+        raise ValueError("grid component pattern requires at least one seed")
+    if len(set(seeds)) != len(seeds):
+        raise ValueError("grid component pattern seeds must be unique")
+
+    model = adapter.currentModel
+    direction1_name = ensure_global_pattern_axis(adapter, axis1)
+    direction2_name = ensure_global_pattern_axis(adapter, axis2)
+    before = {
+        str(_read_member(component, "Name2"))
+        for component in (model.GetComponents(False) or [])
+    }
+    async with _telemetry.aspan(
+        f"pattern {label}", kind="grid", seeds=",".join(seeds),
+        axis1=axis1.lower(), instances1=instances1, spacing1_mm=spacing1_mm,
+        axis2=axis2.lower(), instances2=instances2, spacing2_mm=spacing2_mm,
+    ):
+        _select_pattern_inputs(
+            adapter, seeds, direction1_name, "AXIS", direction2_name, "AXIS"
+        )
+        manager = _early_bound(
+            model.FeatureManager, "IFeatureManager", "CreateDefinition", "CreateFeature"
+        )
+        definition = manager.CreateDefinition(_LOCAL_LINEAR_PATTERN)
+        if definition is None:
+            raise RuntimeError("cannot create local grid pattern definition")
+        definition = _early_bound(definition, "ILocalLinearPatternFeatureData")
+        definition.D1ReverseDirection = direction1 is PatternDirection.REVERSE
+        definition.D1Spacing = spacing1_mm / 1000.0
+        definition.D1TotalInstances = instances1
+        definition.D2PatternSeedOnly = False
+        definition.D2ReverseDirection = direction2 is PatternDirection.REVERSE
+        definition.D2Spacing = spacing2_mm / 1000.0
+        definition.D2TotalInstances = instances2
+        definition.SynchronizeFlexibleComponents = False
+        feature = manager.CreateFeature(definition)
+        model.ClearSelection2(True)
+        if feature is None:
+            raise RuntimeError(f"SOLIDWORKS rejected {label}")
+        feature = _early_bound(feature, "IFeature")
+        feature.Name = label
+
+        created = _new_pattern_components(model, before)
+        expected = len(seeds) * (instances1 * instances2 - 1)
         if len(created) != expected:
             raise RuntimeError(
                 f"{label} created {len(created)} components, expected {expected}"
@@ -2256,10 +2449,32 @@ async def _export_assembly_images(
     png_dir.mkdir(parents=True, exist_ok=True)
     artefacts: dict[str, str] = {}
     views = list(views)
+    requested = {f"{asm_name}_{view}.png" for view in views}
+    for stale in png_dir.glob(f"{asm_name}_*.png"):
+        if stale.name not in requested:
+            stale.unlink()
     async with _telemetry.aspan("export_images", count=len(views)):
         for view in views:
             img_path = (png_dir / f"{asm_name}_{view}.png").resolve()
             async with _telemetry.aspan("export_image", view=view):
+                # A freshly created anonymous assembly can have a partially
+                # painted viewport even after ShowNamedView2/ZoomToFit. SaveBMP
+                # then captures large black tiles; reopening the saved copy
+                # fixes it only because activation forces a repaint. Stage and
+                # redraw the view here, then ask the adapter to capture CURRENT
+                # so it does not change orientation again after the repaint.
+                view_constants = {
+                    "front": 1, "back": 2, "left": 3, "right": 4,
+                    "top": 5, "bottom": 6, "isometric": 7,
+                    "dimetric": 8, "trimetric": 9,
+                }
+                view_const = view_constants.get(view.lower())
+                if view_const is None:
+                    raise ValueError(f"unsupported assembly render view: {view!r}")
+                model = adapter.currentModel
+                model.ShowNamedView2("", view_const)
+                adapter._zoom_to_fit(model)
+                model.GraphicsRedraw2()
                 check(
                     f"export_image {view}",
                     await adapter.export_image(
@@ -2268,7 +2483,7 @@ async def _export_assembly_images(
                             "format_type": "png",
                             "width": 1600,
                             "height": 1000,
-                            "view_orientation": view,
+                            "view_orientation": "current",
                         }
                     ),
                 )
@@ -2297,9 +2512,10 @@ async def save_assembly_and_images(
     # remap_front_to_machine_front (which re-bases the standard views) so the
     # re-based Front/Back/etc. used by the gallery stay correct.
     set_isometric_view(adapter)
-    # Gate reads and view setup can touch solve state. Rebuild again at the actual
-    # save chokepoint; the earlier solve+pose check proves this solve is idempotent.
-    final_rebuild_before_save(adapter, asm_name)
+    # View setup dirties the document so the camera persists, but does not dirty
+    # the solve state. Avoid repeating the 7-32 s deep rebuild unless SolidWorks
+    # explicitly reports that a gate or view operation requested one.
+    rebuild_if_needed_before_save(adapter, asm_name)
     _save_new_assembly_as_copy(adapter, asm_path)
     try:
         # Record the resolved-geometry fingerprint of the just-built assembly so a
@@ -2477,6 +2693,23 @@ async def reconcile_saved_rebuild_state(adapter: Any, asm_name: str, asm_path: A
         _telemetry.success(f"reconciled saved rebuild state ({asm_name}, was {status})")
 
 
+def rebuild_if_needed_before_save(adapter: Any, label: str, model: Any = None) -> None:
+    """Rebuild at the save chokepoint only when the solve state became dirty.
+
+    ``GetSaveFlag`` is deliberately not consulted: changing the active view sets
+    that flag because the camera must be saved, but it does not invalidate model
+    geometry. ``NeedsRebuild2`` is the authoritative geometry/solve signal.
+    """
+    target = adapter.currentModel if model is None else model
+    status = saved_rebuild_status(adapter, target)
+    if status != 0:
+        _telemetry.event("assembly.final_rebuild_required", asm=label, status=status)
+        final_rebuild_before_save(adapter, label, target)
+        return
+    _telemetry.event("assembly.final_rebuild_skipped", asm=label)
+    _telemetry.success(f"solve state already clean before save ({label})")
+
+
 async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
     """A deterministic fingerprint of an assembly's RESOLVED geometry across every
     configuration: exact-BREP mass properties (mass / volume / surface area / centre
@@ -2514,7 +2747,7 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
     multi = len(configs) > 1
     rows: list[Any] = []
     for cfg in configs:
-        if multi:
+        if multi and active_configuration_name(adapter) != cfg:
             check(f"activate {cfg}", await adapter.set_active_configuration(cfg))
         res = await adapter.get_mass_properties()
         if not res.is_success:
@@ -2561,7 +2794,7 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
                 tuple(round(v, 4) for v in a16[9:12]),
             ))
         rows.extend((cfg, *pr) for pr in sorted(pose_rows))
-    if multi and rest is not None:
+    if multi and rest is not None and active_configuration_name(adapter) != rest:
         check(f"re-activate {rest}", await adapter.set_active_configuration(rest))
     return hashlib.sha256(repr(rows).encode("utf-8")).hexdigest()
 
@@ -2773,7 +3006,8 @@ async def refresh_assembly(
     with _telemetry.span("rebuild_configs", count=len(configs)):
         for cfg in configs:
             with _telemetry.span("rebuild_config", config=cfg):
-                check(f"activate {cfg}", await adapter.set_active_configuration(cfg))
+                if active_configuration_name(adapter) != cfg:
+                    check(f"activate {cfg}", await adapter.set_active_configuration(cfg))
                 adapter._attempt(
                     lambda: adapter.currentModel.ForceRebuild3(False), default=None)
                 faults = _rebuild_faults(adapter)
@@ -2799,7 +3033,7 @@ async def refresh_assembly(
 
     # Back to the rest pose for the gates + save: the saved active config and the
     # exported PNGs must match the from-scratch build's deterministic pose.
-    if rest is not None:
+    if rest is not None and active_configuration_name(adapter) != rest:
         with _telemetry.span("reactivate", config=rest):
             check(f"re-activate {rest}", await adapter.set_active_configuration(rest))
 
