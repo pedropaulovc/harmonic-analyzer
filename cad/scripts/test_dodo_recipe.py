@@ -4,6 +4,7 @@
 compared against the value saved on the last SUCCESSFUL run -- never from doit's
 injected ``changed`` arg, which is corrupted after an intervening failed task.
 """
+import contextlib
 import importlib.util
 import os
 from pathlib import Path
@@ -102,6 +103,100 @@ def test_drawing_depends_on_actual_part_execution():
     )
     assert token in part["targets"]
     assert token in drawing["file_dep"]
+
+
+def test_part_execution_identity_is_stable_for_same_artifact(tmp_path, monkeypatch):
+    dodo = _load_dodo()
+    part = tmp_path / "part.SLDPRT"
+    token = tmp_path / ".part.execution"
+    monkeypatch.setattr(dodo, "_sldprt", lambda _stem: str(part))
+    monkeypatch.setattr(dodo, "_part_execution_token", lambda _stem: str(token))
+
+    part.write_bytes(b"cached artifact A")
+    dodo._stamp_part_execution("part")
+    first = token.read_text()
+    dodo._stamp_part_execution("part")
+    assert token.read_text() == first
+
+    part.write_bytes(b"same recipe, different SolidWorks identity")
+    dodo._stamp_part_execution("part")
+    assert token.read_text() != first
+
+
+def test_part_identity_tracker_migrates_legacy_timestamp(tmp_path, monkeypatch):
+    dodo = _load_dodo()
+    token = tmp_path / ".part.execution"
+    monkeypatch.setattr(dodo, "_part_execution_token", lambda _stem: str(token))
+    tracker = dodo._PartIdentityTracker("part")
+
+    assert tracker(None, {}) is False
+    token.write_text("1720860000000000000\n")
+    assert tracker(None, {}) is False
+    token.write_text("a" * 64 + "\n")
+    assert tracker(None, {}) is True
+
+
+def test_cached_drawing_hit_never_builds(tmp_path, monkeypatch):
+    dodo = _load_dodo()
+    output = tmp_path / "platen-guide.SLDDRW"
+    restores = []
+    stores = []
+
+    monkeypatch.setattr(dodo, "_drawing_file_deps", lambda _stem: [str(tmp_path / "dep")])
+    monkeypatch.setattr(dodo, "_drawing_cache_outputs", lambda _stem: [output])
+    monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
+    monkeypatch.setattr(
+        dodo._cache, "restore",
+        lambda key, outputs, label: restores.append((key, outputs, label)) or True,
+    )
+    monkeypatch.setattr(
+        dodo._cache, "store",
+        lambda key, outputs, label: stores.append((key, outputs, label)),
+    )
+    monkeypatch.setattr(
+        dodo, "_exec",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("cache HIT built drawing")),
+    )
+
+    dodo._cached_drawing_action("platen_guide")
+
+    assert len(restores) == 1
+    assert not stores
+
+
+def test_cached_drawing_miss_builds_once_then_stores(tmp_path, monkeypatch):
+    dodo = _load_dodo()
+    output = tmp_path / "platen-guide.SLDDRW"
+    outcomes = iter((False, False))
+    restores = []
+    builds = []
+    stores = []
+
+    monkeypatch.setattr(dodo, "_drawing_file_deps", lambda _stem: [str(tmp_path / "dep")])
+    monkeypatch.setattr(dodo, "_drawing_cache_outputs", lambda _stem: [output])
+    monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
+    monkeypatch.setattr(
+        dodo._cache, "restore",
+        lambda key, outputs, label: restores.append((key, outputs, label)) or next(outcomes),
+    )
+    monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext())
+
+    def build(*_args, **_kwargs):
+        builds.append(True)
+        output.write_bytes(b"drawing")
+
+    monkeypatch.setattr(dodo, "_exec", build)
+    monkeypatch.setattr(
+        dodo._cache, "store",
+        lambda key, outputs, label: stores.append((key, outputs, label)),
+    )
+
+    dodo._cached_drawing_action("platen_guide")
+
+    assert len(restores) == 2
+    assert builds == [True]
+    assert len(stores) == 1
+    assert stores[0][1] == [output]
 
 
 def test_content_checker_digest_ignores_yaml_noise(tmp_path):
@@ -423,8 +518,8 @@ def test_drawing_runtime_lock_and_source_dependency(monkeypatch):
     assert not any(path.lower().endswith(".sldasm") for path in task["file_dep"])
     assert dodo._part_execution_token("platen_guide") in task["file_dep"]
     action, args = task["actions"][0]
-    assert action is dodo._run
-    assert args[-1] is True
+    assert action is dodo._cached_drawing_action
+    assert args == ["platen_guide"]
     dep_names = {Path(path).name for path in task["file_dep"]}
     assert {
         "platen-guide.SLDPRT",

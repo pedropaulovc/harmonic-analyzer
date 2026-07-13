@@ -1,7 +1,7 @@
 r"""Remote build-artefact cache for the COM (SolidWorks) tasks.
 
-The expensive tasks in this pipeline -- ``part:<stem>`` / ``assembly:<stem>`` --
-drive a live SolidWorks seat (a part is ~20 s, a full assembly ~500 s). Their
+The expensive tasks in this pipeline -- ``part:<stem>`` / ``assembly:<stem>`` /
+``drawing:<stem>`` -- drive a live SolidWorks seat. Their
 outputs are a pure function of *hashed inputs*: a part's ``.SLDPRT`` is determined
 by its build script + helper closure + the cad/config files it reads; an
 assembly's ``.SLDASM`` by its recipe files + the content of the referenced part
