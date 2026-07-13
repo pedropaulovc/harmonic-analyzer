@@ -75,7 +75,6 @@ from _assembly import (
     component_named_ref,
     named_ref,
 )
-from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
 
 # A point on the connecting-rod's Ø51 ring-bore circular edge (part-local mm); its
 # arc centre is the ring centre = the rod origin (the cam pin point). See the
@@ -575,7 +574,7 @@ async def _replay_setup_drives(adapter):
         _, model = _sub_model(adapter, sub)
         sub_title = str(_read_member(model, "GetTitle"))
         adapter._attempt(
-            lambda t=sub_title: adapter.swApp.ActivateDoc3(t, False, 2, _byref_i4()),
+            lambda t=sub_title: adapter.swApp.ActivateDoc3(t, False, 2, 0),
             default=None)
         adapter.currentModel = adapter._attempt(
             lambda: adapter.swApp.ActiveDoc, default=model)
@@ -583,7 +582,7 @@ async def _replay_setup_drives(adapter):
             f"(engaged): {[s['key'] for s in specs]}")
         await author_dof_drives(adapter, specs)
     adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()),
+        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, 0),
         default=None)
     adapter.currentModel = top
 
@@ -753,13 +752,13 @@ async def _add_ring_centre_point(adapter):
         raise RuntimeError("connecting-rod part doc unresolved")
     part_title = str(_read_member(part, "GetTitle"))
     adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, _byref_i4()), default=None)
+        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, 0), default=None)
     adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
     pt = check("create ring-centre RefPoint", await adapter.create_reference_point(
         CreateReferencePointParameters(mode="arc_center", edge_point=ROD_BORE_EDGE_MM)))
     name = pt.get("name") if isinstance(pt, dict) else getattr(pt, "name", None)
     adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()), default=None)
+        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, 0), default=None)
     adapter.currentModel = top
     if not name:
         raise RuntimeError("ring-centre RefPoint creation returned no name")
@@ -876,7 +875,7 @@ async def _make_rocker_foot_axis(adapter, rk_comp, coeff):
     part_title = str(_read_member(part, "GetTitle"))
     y_off = _arc_y(coeff)
     adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, _byref_i4()), default=None)
+        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, 0), default=None)
     adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
     try:
         px = ("Right Plane" if abs(coeff) <= 1e-9 else
@@ -890,7 +889,7 @@ async def _make_rocker_foot_axis(adapter, rk_comp, coeff):
             mode="two_planes", planes=[px, py]))).name
     finally:
         adapter._attempt(
-            lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()), default=None)
+            lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, 0), default=None)
         adapter.currentModel = top
     log(f"  rocker foot-pin axis = {ax!r} at part-local ({coeff:.2f}, {y_off:.2f})")
     return ax
