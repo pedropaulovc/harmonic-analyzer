@@ -45,7 +45,7 @@ from __future__ import annotations
 from typing import Any
 
 import _telemetry
-from _common import _flag_only
+from _common import _early_bound, _flag_only
 
 # pywin32 / solidworks_mcp COM imports stay FUNCTION-LOCAL (the _assembly.py
 # convention): this module is imported by build_channel_assembly, which the
@@ -102,7 +102,7 @@ def mates_with_owners(adapter: Any, known_prefixes: set[str]) -> list[dict]:
 
 
 def _component(adapter: Any, name: str) -> Any:
-    comp = adapter.currentModel.GetComponentByName(name)
+    comp = _early_bound(adapter.currentModel, "IAssemblyDoc").GetComponentByName(name)
     if comp is None:
         raise RuntimeError(f"component not found: {name!r}")
     return comp
@@ -260,7 +260,7 @@ def copy_with_mates(
     import pythoncom
     from win32com.client import VARIANT
 
-    model = adapter.currentModel
+    model = _early_bound(adapter.currentModel, "IAssemblyDoc")  # IAssemblyDoc: GetComponentByName + CopyWithMates2 only
     raw = []
     for name in comp_names:
         c = model.GetComponentByName(name)

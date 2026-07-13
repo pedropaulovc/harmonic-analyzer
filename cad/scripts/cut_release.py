@@ -598,7 +598,7 @@ def _export_pngs(doc: Any, png_dir: Path, stem: str) -> int:
     png_dir.mkdir(parents=True, exist_ok=True)
     for name, view_const in PNG_VIEWS:
         doc.ShowNamedView2("", view_const)
-        doc.ViewZoomToFit2()
+        doc.ViewZoomtofit2()  # makepy spelling of ViewZoomToFit2 (IModelDoc2)
         bmp = png_dir / f"{stem}_{name}.bmp"
         if not doc.SaveBMP(str(bmp), PNG_WIDTH, PNG_HEIGHT) or not bmp.exists():
             raise RuntimeError(f"SaveBMP produced no file: {bmp}")
