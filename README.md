@@ -95,9 +95,9 @@ $py = "C:\src\SolidworksMCP-python\.venv\Scripts\python.exe"
 & $py -m doit verify:soundness        # one SW gate
 & $py -m doit check:math              # one offline gate
 
-# Neutral export, then cut a release (args after `--`; opt-in)
+# Neutral export, then cut the next vNN release (explicit tag after `--` is optional)
 & $py -m doit export
-& $py -m doit release -- v0.2.0
+& $py -m doit release
 
 # Inspect the graph / clean
 & $py -m doit list --all
