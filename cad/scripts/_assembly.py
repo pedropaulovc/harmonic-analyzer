@@ -1018,9 +1018,12 @@ def gear_mates_batch(
                         raise RuntimeError(
                             f"{mate_label}: failed to select gear entity {located!r}"
                         )
-                _sw_asm._flag_feature_methods(model, "IAssemblyDoc")
+                # CreateMate/CreateMateData are IAssemblyDoc members; the flagged
+                # handle MUST be reassigned and passed on (a discarded result is a
+                # silent no-op → the mate calls fall back on the IModelDoc2 model).
+                asm_h = _sw_asm._flag_feature_methods(model, "IAssemblyDoc")
                 mate = _sw_asm._create_standard_mate(
-                    adapter, model, params, _sw_asm._MATE_TYPES["gear"]
+                    adapter, asm_h, params, _sw_asm._MATE_TYPES["gear"]
                 )
                 model.ClearSelection2(True)
                 name = _sw_asm._mate_feature_name(adapter, mate)
