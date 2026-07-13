@@ -2313,9 +2313,15 @@ async def save_assembly_and_images(
         sidecar.write_text(digest + "\n", encoding="utf-8")
         artefacts = {"assembly": str(asm_path)}
         artefacts.update(await _export_assembly_images(adapter, asm_name, views))
-        return artefacts
     finally:
         _discard_copy_source(adapter)
+    # Reopen the just-saved artifact and reconcile its persisted rebuild mark
+    # (issue #267): the ForceRebuild3(False) above dirtied every referenced child
+    # part IN MEMORY, so the copy-save recorded a rebuild stamp absent from the
+    # on-disk parts and a fresh open would report NeedsRebuild2 != 0. Runs after
+    # the copy source is discarded so the reopen loads clean children from disk.
+    await reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
+    return artefacts
 
 
 @_telemetry.traced("assembly.save_copy")
@@ -2428,6 +2434,47 @@ def final_rebuild_before_save(adapter: Any, label: str, model: Any = None) -> No
                 f"{label}: final rebuild left NeedsRebuild2={status}; refusing save"
             )
         _telemetry.success(f"final rebuild clean before save ({label})")
+
+
+async def reconcile_saved_rebuild_state(adapter: Any, asm_name: str, asm_path: Any) -> None:
+    """Reopen a just-saved assembly and, if it loads needing a rebuild, EditRebuild3
+    + in-place Save3 so the persisted artifact reopens clean (issue #267).
+
+    Root cause (proven by ``diagnostics/probe_rebuild_matrix.py`` /
+    ``probe_child_dirty.py``): ``final_rebuild_before_save`` and the deep health
+    gate each ``ForceRebuild3(False)`` -- a DEEP rebuild that descends into every
+    subassembly and marks every referenced child part document dirty IN MEMORY
+    (``GetSaveFlag`` -> True). The ensuing copy/in-place save then records rebuild
+    stamps that don't exist on the untouched on-disk parts, so a later fresh open
+    reports ``NeedsRebuild2 != 0`` even though geometry is correct and nothing is
+    faulted (``GetWhatsWrong`` clean, all components fully constrained). Neither
+    ``EditRebuild3`` nor ``ForceRebuild3(True)`` (TopOnly) dirties the children, so
+    reopening from disk (children clean) + ``EditRebuild3`` reconciles the assembly,
+    and the in-place ``Save3`` persists the clean mark WITHOUT rewriting any part
+    file. A post-``ForceRebuild3(False)`` rebuild in the SAME document instance
+    cannot un-dirty it -- the reopen is required. ``verify:soundness``'s
+    ``saved-rebuild-clean`` gate is the independent backstop that this held.
+    """
+    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+    with _telemetry.span("assembly.reconcile_rebuild", asm=asm_name) as sp:
+        await adapter.open_model(str(asm_path))
+        model = _early_bound(adapter.currentModel, "IModelDoc2")
+        status = saved_rebuild_status(adapter, model)
+        sp.set_attribute("needs_rebuild_on_open", status)
+        if status == 0:
+            _telemetry.success(f"saved artifact already clean, no reconcile ({asm_name})")
+            return
+        rebuilt = adapter._attempt(lambda: model.EditRebuild3(), default=None)
+        if rebuilt is False or rebuilt is None:
+            raise RuntimeError(
+                f"{asm_name}: reconcile EditRebuild3 returned {rebuilt!r}")
+        result = adapter._attempt(lambda: model.Save3(1, 0, 0), default=None)  # Silent, in place
+        in_mem = saved_rebuild_status(adapter, model)
+        if in_mem != 0:
+            raise RuntimeError(
+                f"{asm_name}: reconcile left NeedsRebuild2={in_mem} after EditRebuild3+Save3 "
+                f"(save result={result!r})")
+        _telemetry.success(f"reconciled saved rebuild state ({asm_name}, was {status})")
 
 
 async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
@@ -2813,4 +2860,11 @@ async def refresh_assembly(
 
     artefacts = {"assembly": str(asm_path)}
     artefacts.update(await _export_assembly_images(adapter, asm_name, views))
+    # Same #267 reconcile the full-build path runs: the in-place Save3 followed a
+    # final_rebuild_before_save (ForceRebuild3(False)) that dirtied the children in
+    # memory, so a fresh open would report needs-rebuild. Only when we actually
+    # re-saved -- a no-op reload left the (already-reconciled) artifact untouched
+    # and byte-stable, and reopening it would needlessly bump the parent's md5.
+    if geometry_changed:
+        await reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
     return artefacts
