@@ -210,15 +210,14 @@ def _com_seat(label: str):
     same-process acquisitions), though no COM action nests it."""
     _COM_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
     holder = f"{label} pid={os.getpid()}"
-    with _telemetry.span("com.seat.wait", label=label, lock=str(_COM_LOCK_PATH)):
-        while True:
-            try:
-                _COM_LOCK.acquire(timeout=_COM_SEAT_POLL_S)
-                break
-            except Timeout:
-                other = _read_seat_holder()
-                _telemetry.warn(f"[com.seat] {label} waiting for the SolidWorks seat"
-                                + (f" (held by {other})" if other else ""))
+    while True:
+        try:
+            _COM_LOCK.acquire(timeout=_COM_SEAT_POLL_S)
+            break
+        except Timeout:
+            other = _read_seat_holder()
+            _telemetry.warn(f"[com.seat] {label} waiting for the SolidWorks seat"
+                            + (f" (held by {other})" if other else ""))
     _write_seat_holder(holder)
     prev = os.environ.get(_COM_SEAT_HELD_ENV)
     os.environ[_COM_SEAT_HELD_ENV] = holder
