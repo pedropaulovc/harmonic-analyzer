@@ -98,7 +98,7 @@ from _assembly_postbuild import (
     load_dof_manifest,
 )
 from _common import (  # component iteration helpers (read-only)
-    _flag_only,
+    _early_bound,
     _read_member,
 )
 
@@ -305,9 +305,9 @@ def assert_no_over_constrained(adapter: Any, *, resolve: bool = True) -> None:
             components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
             over = []
             for comp in components:
-                # Flag ONLY GetConstrainedStatus (zero-arg); Name2 is a property
-                # read (issue #87 -- not the 165-method IComponent2 flag).
-                _flag_only(comp, "GetConstrainedStatus")
+                # Wrap once as IComponent2 so GetConstrainedStatus invokes its
+                # known DISPID; Name2 remains a property read.
+                comp = _early_bound(comp, "IComponent2", "GetConstrainedStatus")
                 status = int(
                     adapter._attempt(lambda c=comp: c.GetConstrainedStatus(), default=-1)
                 )
@@ -685,7 +685,7 @@ def _deep_mate_faults(adapter: Any) -> list[tuple[str, Any, str, int]]:
     seen: set[str] = set()
     components = adapter._attempt(lambda: top.GetComponents(False), default=None) or []
     for component in components:
-        _flag_only(component, "GetModelDoc2")
+        component = _early_bound(component, "IComponent2", "GetModelDoc2")
         instance = str(_read_member(component, "Name2") or "?")
         if "/" in instance:
             continue
@@ -708,27 +708,27 @@ def _deep_mate_faults(adapter: Any) -> list[tuple[str, Any, str, int]]:
     return faults
 
 
-def _byref_i4() -> Any:
-    """Late-bound ``out int`` storage for ``ISldWorks.ActivateDoc3``."""
-    import pythoncom
-    from win32com.client import VARIANT
-
-    return VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
-
-
 def _activate_document(adapter: Any, model: Any, label: str) -> Any:
     """Bring ``model`` to the foreground before any selection-based COM call."""
     title = str(_read_member(model, "GetTitle") or "")
     if not title:
         raise RuntimeError(f"{label}: cannot activate a document without a title")
-    errors = _byref_i4()
-    activated = adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(title, False, 2, errors), default=None
+    # Early-bound ISldWorks::ActivateDoc3 returns (model, errors): pass literal 0
+    # for the [out] Errors and consume the tuple. The retval is a DYNAMIC dispatch
+    # (no resultCLSID in the wrapper), so rebind it to IModelDoc2 before storing it
+    # as currentModel -- else its .Extension.SelectByID2(..., None, ...) re-triggers
+    # the VT_NULL callout failure on the dynamic path.
+    result = adapter._attempt(
+        lambda: adapter.swApp.ActivateDoc3(title, False, 2, 0), default=None
     )
-    if activated is None or int(errors.value) != 0:
+    if not result:
+        raise RuntimeError(f"{label}: ActivateDoc3({title!r}) failed")
+    activated, errors = result
+    if activated is None or int(errors) != 0:
         raise RuntimeError(
-            f"{label}: ActivateDoc3({title!r}) failed (errors={errors.value})"
+            f"{label}: ActivateDoc3({title!r}) failed (errors={errors})"
         )
+    activated = _early_bound(activated, "IModelDoc2")
     adapter.currentModel = activated
     return activated
 

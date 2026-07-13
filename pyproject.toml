@@ -58,6 +58,7 @@ dependencies = [
 # Synced by default with `uv sync`.
 dev = [
     "pytest>=8.0",
+    "pytest-asyncio>=0.21.0",
     "ruff>=0.15.20",
 ]
 

@@ -13,7 +13,6 @@ import asyncio
 import _telemetry
 from _common import _flag, _read_member, check, log
 from build_motion_study import _find_one
-from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
 
 # candidate points on the bore circular edge (mm) -- try a few Z in case the ring
 # faces are not at +/-1.5 exactly.
@@ -46,7 +45,7 @@ async def main():
 
     # activate the part doc so SelectByID2 resolves in it.
     act = adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(title, False, 2, _byref_i4()), default=None)
+        lambda: adapter.swApp.ActivateDoc3(title, False, 2, 0), default=None)
     active_now = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=None)
     log(f"  activated; ActiveDoc now = {str(_read_member(active_now, 'GetTitle'))!r}")
     adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
@@ -64,7 +63,7 @@ async def main():
 
     # restore assembly active.
     adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()), default=None)
+        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, 0), default=None)
     log(f"  re-activated {top_title!r}; success={made is not None}")
 
     await adapter.disconnect()

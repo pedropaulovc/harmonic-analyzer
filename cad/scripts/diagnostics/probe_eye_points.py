@@ -22,7 +22,6 @@ import asyncio
 import _telemetry
 from _common import _flag, _read_member, log
 from build_motion_study import _find_one
-from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
 
 CANDIDATES = [
     ("channel-lever-1", [179.8, 0.0, 0.0]),
@@ -44,7 +43,7 @@ async def _try_point(adapter, top, top_title, comp_needle, edge_point):
         return
     part_title = str(_read_member(part, "GetTitle"))
     adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, _byref_i4()), default=None)
+        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, 0), default=None)
     adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
     try:
         res = await adapter.create_reference_point(
@@ -56,7 +55,7 @@ async def _try_point(adapter, top, top_title, comp_needle, edge_point):
         log(f"  {comp_needle} edge={edge_point} -> EXC {exc}")
     finally:
         adapter._attempt(
-            lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()), default=None)
+            lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, 0), default=None)
         adapter.currentModel = top
 
 
