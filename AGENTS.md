@@ -118,7 +118,8 @@ The SolidWorks-free `check:*` gates and the comparison/diff tooling run from thi
 - `build` is the **one** fully-safe entry: every part + assembly + every gate.
   (`verify.py` has no `--suite all` anymore — `build` replaced it.)
 - `build_bare` = parts + assemblies only (fast, no gates, no export).
-- `release` is opt-in: `doit release -- v0.2.0 [--draft]`.
+- `release` is opt-in: `doit release` defaults to the next `vNN`; pass an
+  explicit tag/options after `--` (for example, `doit release -- v22 --draft`).
 
 ## The COM seat lock (do not break this)
 
