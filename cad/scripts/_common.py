@@ -1147,27 +1147,25 @@ async def bbox_extent_check(
     that varies after rebuilds, so a 0.05 mm gate on it can pass/fail
     nondeterministically (codex review #9).
     """
-    import pythoncom
-    from win32com.client import VARIANT
-
     index = {"x": 0, "y": 1, "z": 2}[axis]
     pos = [1.0 if i == index else 0.0 for i in range(3)]
     neg = [-v for v in pos]
 
     def _extreme(body: Any, direction: list[float]) -> float:
-        # IBody2::GetExtremePoint(Px,Py,Pz, &X,&Y,&Z): direction in, the extreme
-        # point comes back through three [out] byref doubles (metres). Returns the
-        # axis coordinate in mm.
-        out = [VARIANT(pythoncom.VT_BYREF | pythoncom.VT_R8, 0.0) for _ in range(3)]
+        # IBody2::GetExtremePoint(Px,Py,Pz): direction in, the extreme point
+        # comes back through three [out] doubles (metres). The early-bound makepy
+        # wrapper collects the [out] params into the return tuple
+        # (retval_bool, X, Y, Z), so pass only the 3 [in] direction components --
+        # NOT the late-binding byref VARIANTs. Returns the axis coord in mm.
+        body = _early_bound(body, "IBody2")
         res = adapter._attempt(
-            lambda: body.GetExtremePoint(
-                direction[0], direction[1], direction[2], out[0], out[1], out[2]),
-            default="__err__")
-        if res == "__err__":
+            lambda: body.GetExtremePoint(direction[0], direction[1], direction[2]),
+            default=None)
+        if not res or len(res) < 4:
             raise RuntimeError(f"bbox {label}: GetExtremePoint failed")
-        return out[index].value * 1000.0
+        return res[1 + index] * 1000.0
 
-    doc = adapter.currentModel
+    doc = _early_bound(adapter.currentModel, "IPartDoc")
     bodies = adapter._attempt(lambda: doc.GetBodies2(0, False)) or []  # solid
     if not bodies:
         raise RuntimeError(f"bbox {label}: part has no solid bodies")
