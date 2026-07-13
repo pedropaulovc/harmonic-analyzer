@@ -1229,7 +1229,8 @@ async def apply_color(adapter: Any, rgb: tuple[float, float, float]) -> None:
         raise RuntimeError(f"colour readback mismatch: set {rgb}, got {back}")
     n_bodies = 0
     try:
-        bodies = doc.GetBodies2(0, True) or []  # solid bodies
+        part_h = _early_bound(doc, "IPartDoc")  # IPartDoc for GetBodies2; keep `doc` for MaterialPropertyValues
+        bodies = part_h.GetBodies2(0, True) or []  # solid bodies
         for body in bodies:
             body.MaterialPropertyValues2 = values
             n_bodies += 1
