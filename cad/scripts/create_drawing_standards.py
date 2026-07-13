@@ -112,14 +112,11 @@ def _strip_native_template(adapter: Any) -> int:
     segments = list(adapter._get_attr_or_call(sketch, "GetSketchSegments") or [])
     delete_segments: list[Any] = []
     for segment in segments:
-        segment = _sw_type_info.early_bound_or_flag(
-            segment,
-            "ISketchSegment",
-            "GetStartPoint2",
-            "GetEndPoint2",
-            "GetCenterPoint2",
-            "Select4",
-        )
+        # Bind to the DERIVED ISketchLine/ISketchArc/... where the point accessors
+        # (GetStartPoint2/GetEndPoint2/GetCenterPoint2) are declared. Binding to the
+        # base ISketchSegment leaves them off-interface, so _segment_points reads
+        # <2 points and a border segment is misclassified as interior -> DELETED.
+        segment = _sw_type_info.concrete_sketch_segment(segment)
         if not _is_native_border_segment(_segment_points(adapter, segment)):
             delete_segments.append(segment)
 
@@ -137,13 +134,7 @@ def _strip_native_template(adapter: Any) -> int:
     )
     remaining_interior = []
     for segment in remaining_segments:
-        segment = _sw_type_info.early_bound_or_flag(
-            segment,
-            "ISketchSegment",
-            "GetStartPoint2",
-            "GetEndPoint2",
-            "GetCenterPoint2",
-        )
+        segment = _sw_type_info.concrete_sketch_segment(segment)
         if not _is_native_border_segment(_segment_points(adapter, segment)):
             remaining_interior.append(segment)
     if remaining_interior:
