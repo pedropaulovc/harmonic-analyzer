@@ -176,7 +176,7 @@ def find_planar_face(model, normal, points_mm, tol_mm: float = 1.0):
     sign = 1.0 if normal[axis] > 0 else -1.0
     plane_mm = points_mm[0][axis]
     others = [k for k in range(3) if k != axis]
-    body = (model.GetBodies2(0, False) or [None])[0]
+    body = (_early_bound(model, "IPartDoc").GetBodies2(0, False) or [None])[0]
     body = _early_bound(body, "IBody2")
     faces = body.GetFaces() or []
     # O(faces) with 2-3 COM roundtrips each -- fine on a prismatic body
@@ -266,7 +266,7 @@ def wizard_holes(
     if face is None:
         raise RuntimeError(f"hole wizard {label}: placement face not found")
     model.ClearSelection2(True)
-    if not face.Select2(False, 0):
+    if not _early_bound(face, "IEntity").Select2(False, 0):
         raise RuntimeError(f"hole wizard {label}: face Select failed")
     # Phase logs: the wizard's create/rebuild calls can spin unbounded on a
     # pathological face (the engraved nameplate front measured >20 min at
@@ -610,7 +610,7 @@ def wizard_hole_on_cylinder(adapter, spec: HoleSpec, point_mm, label: str,
     fm = model.FeatureManager
     fm = _early_bound(fm, "IFeatureManager")
 
-    body = (model.GetBodies2(0, False) or [None])[0]
+    body = (_early_bound(model, "IPartDoc").GetBodies2(0, False) or [None])[0]
     body = _early_bound(body, "IBody2")
     face = None
     for f in body.GetFaces() or []:
@@ -624,7 +624,7 @@ def wizard_hole_on_cylinder(adapter, spec: HoleSpec, point_mm, label: str,
     if face is None:
         raise RuntimeError(f"hole wizard {label}: no cylindrical face")
     model.ClearSelection2(True)
-    if not face.Select2(False, 0):
+    if not _early_bound(face, "IEntity").Select2(False, 0):
         raise RuntimeError(f"hole wizard {label}: cylinder Select2 failed")
     _telemetry.debug(f"hole wizard {label}: cylinder selected, creating feature")
 

@@ -64,6 +64,7 @@ import _config
 from _common import (
     OUT_PNG,
     OUT_SLDASM,
+    _early_bound,
     _flag,
     _read_member,
     check,
@@ -153,6 +154,7 @@ def _components(adapter, model=None, toplevel=False):
     """``[(comp, Name2), ...]`` for every component; logs the walk + its cost."""
     import time as _t
     model = model or adapter.currentModel
+    model = _early_bound(model, "IAssemblyDoc")  # IAssemblyDoc for GetComponents (same dispatch)
     t0 = _t.perf_counter()
     raw = adapter._attempt(lambda: model.GetComponents(bool(toplevel)), default=None) or []
     out = []

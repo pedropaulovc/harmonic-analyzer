@@ -217,7 +217,7 @@ def scan_assembly(adapter: Any, part_colors: dict) -> tuple[list, list, set[tupl
     The SolidWorks API reports boxes and transforms in metres (system units);
     they are scaled to MILLIMETRES here so the persisted scene graph matches the
     millimetre STL meshes it is rendered against."""
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    model = _early_bound(adapter.currentModel, "IAssemblyDoc")  # IAssemblyDoc for GetComponents (same dispatch)
     comps = model.GetComponents(False) or []
     boxes, scene, stems = [], [], set()
     for i, comp in enumerate(comps, 1):
