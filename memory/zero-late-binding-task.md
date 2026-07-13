@@ -1,9 +1,29 @@
 ---
 name: zero-late-binding-task
-description: In-progress task #7 — eliminate ALL late-binding fallback (flip _fallback_subclass.__getattr__ to RAISE); the 25-site empirical surface + plan
+description: DONE 2026-07-13 — task #7 eliminated ALL late-binding fallback; _strict_subclass __getattr__/__setattr__ now RAISE on off-interface access. On main via #283/#87/#281/#88/#287
 metadata:
   type: project
 ---
+
+## COMPLETE 2026-07-13
+
+Task #7 is DONE and on `main`. Merge chain: **#283** (determinism), **#87**
+(SUBMOD rebinds→personal), **#281** (BUILD-tier rebinds + pointer→main), **#88**
+(the fail-loud flip→personal), **#287** (`ConstructionGeometry`→ISketchSegment
+fix + submodule pointer bump to `4f4fa8f`→main, merge `287c0865`). Plus **#286**
+(unrelated: wired the submodule `ui` extra into the harmonic venv so UI tests
+collect locally). `_strict_subclass` (was `_fallback_subclass`) now RAISES
+`AttributeError` on any off-interface member from BOTH `__getattr__` and
+`__setattr__`. Validated by a cold `HARMONIC_REMOTE_CACHE_MODE=off doit -n 4`
+(100 parts + 8 assemblies + 6 drawings + verify:soundness + verify:kinematics)
+green with the wrapper live. The `__setattr__` flip caught one real latent site
+the getattr-only metric could NEVER see — a blind property SET of
+`ConstructionGeometry` (base ISketchSegment) through a derived ISketchLine
+binding in `define_centered_rectangle`; every other build-phase setter was safe
+because its corresponding GETTER was already proven on-interface (makepy declares
+get+put on the same class). [DIAG] tier deliberately NOT rebound (owner call) —
+hand-run probes fail loud with an actionable message if run. See history below.
+
 
 Follow-on to the early-bound COM migration (PRs #86/#269/#278 merged 2026-07-13).
 User decision: **zero late binding** — convert `_fallback_subclass.__getattr__`
