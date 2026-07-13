@@ -1,6 +1,6 @@
 r"""Cut a tagged release of the harmonic-analyzer and attach its CAD bundle.
 
-doit task: ``release`` (spine tail, opt-in) -- ``doit release -- v0.2.0 [--draft]``
+doit task: ``release`` (opt-in) -- ``doit release -- [vNN] [--draft]``
 forwards args here. Runnable standalone too.
 
 
@@ -12,8 +12,8 @@ matching GitHub release so a consumer can open the model without rebuilding.
 
 What it does, in order:
 
-  1. Resolve the version (``vX.Y.Z``): explicit positional, or auto-bump the
-     latest ``v*`` tag (``--bump major|minor|patch``, default patch).
+  1. Resolve the version (``vNN``): explicit positional, or increment the latest
+     compact release tag (``v21`` -> ``v22``).
   2. Pre-flight: tag must not already exist; the committed tree must be clean
      (``--allow-dirty`` to override); harmonic-analyzer.SLDASM must be built.
   3. SolidWorks (COM): open harmonic-analyzer.SLDASM, run Pack-and-Go flattened,
@@ -41,7 +41,7 @@ What it does, in order:
 Run (SolidWorks already open, NOTHING else driving it -- single STA COM server,
 a concurrent build_all/verify deadlocks):
 
-    uv run python cad\scripts\cut_release.py [vX.Y.Z] [--bump patch|minor|major] [--allow-dirty] [--draft]
+    uv run python cad\scripts\cut_release.py [vNN] [--allow-dirty] [--draft]
 
 ``--draft`` makes the GitHub release a draft (asset uploaded, not published).
 """
@@ -96,7 +96,7 @@ DRAWING_OUTPUTS = {drawing.name: drawing.outputs for drawing in DRAWINGS}
 COMPARISONS_DIR = REPO_ROOT / "comparisons"
 _GALLERY_STAGE = ("ref", "render", "composite", "scores.json", "index.html",
                   "manifest.json", "ATTRIBUTION.md")
-_VERSION_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
+_VERSION_RE = re.compile(r"^v([1-9]\d*)$")
 
 # SolidWorks COM type library (SldWorks); the version pins the same revision the
 # pywin32 gen_py module exposes (...x0x34x0) so comtypes generates matching stubs.
@@ -175,44 +175,38 @@ def _gh(*args: str) -> str:
     return proc.stdout.strip()
 
 
-def _existing_tags() -> list[tuple[int, int, int]]:
+def _existing_tags() -> list[int]:
     raw = _git("tag", "--list", "v*").splitlines()
-    out = []
+    out: list[int] = []
     for line in raw:
         m = _VERSION_RE.match(line.strip())
         if m:
-            out.append((int(m[1]), int(m[2]), int(m[3])))
+            out.append(int(m[1]))
     return sorted(out)
 
 
-def resolve_version(explicit: str | None, bump: str) -> str:
-    """Pick the release tag: validate an explicit one, else bump the latest."""
+def resolve_version(explicit: str | None) -> str:
+    """Validate an explicit compact tag, or increment the latest one."""
     if explicit is not None:
         if not _VERSION_RE.match(explicit):
-            raise SystemExit(f"!!  version must look like vX.Y.Z, got {explicit!r}")
+            raise SystemExit(f"!!  version must look like vNN, got {explicit!r}")
         return explicit
 
     tags = _existing_tags()
     if not tags:
-        return "v0.1.0"
-    major, minor, patch = tags[-1]
-    if bump == "major":
-        return f"v{major + 1}.0.0"
-    if bump == "minor":
-        return f"v{major}.{minor + 1}.0"
-    return f"v{major}.{minor}.{patch + 1}"
+        return "v1"
+    return f"v{tags[-1] + 1}"
 
 
 def previous_tag(version: str) -> str | None:
-    """Highest existing ``vX.Y.Z`` tag strictly below ``version`` (or None)."""
+    """Highest existing compact tag strictly below ``version`` (or None)."""
     m = _VERSION_RE.match(version)
-    assert m is not None, f"previous_tag: version must match vX.Y.Z, got {version!r}"
-    cur = (int(m[1]), int(m[2]), int(m[3]))
+    assert m is not None, f"previous_tag: version must match vNN, got {version!r}"
+    cur = int(m[1])
     prior = [t for t in _existing_tags() if t < cur]
     if not prior:
         return None
-    a, b, c = prior[-1]
-    return f"v{a}.{b}.{c}"
+    return f"v{prior[-1]}"
 
 
 def _repo_slug() -> str:
@@ -1337,9 +1331,7 @@ def _start_release_log(version: str) -> tuple[Path, Any]:
 # --------------------------------------------------------------------------- #
 def main() -> int:
     ap = argparse.ArgumentParser(description="Cut a tagged harmonic-analyzer release.")
-    ap.add_argument("version", nargs="?", help="release tag vX.Y.Z (default: auto-bump)")
-    ap.add_argument("--bump", choices=("major", "minor", "patch"), default="patch",
-                    help="how to bump the latest tag when version is omitted")
+    ap.add_argument("version", nargs="?", help="release tag vNN (default: next compact tag)")
     ap.add_argument("--allow-dirty", action="store_true",
                     help="tag even with uncommitted (tracked) changes")
     ap.add_argument("--draft", action="store_true",
@@ -1349,7 +1341,7 @@ def main() -> int:
                          "(dry run -- nothing leaves the machine)")
     opts = ap.parse_args()
 
-    version = resolve_version(opts.version, opts.bump)
+    version = resolve_version(opts.version)
     RELEASE_DIR.mkdir(parents=True, exist_ok=True)
 
     # Tee everything below to the per-version release log BEFORE preflight, so the

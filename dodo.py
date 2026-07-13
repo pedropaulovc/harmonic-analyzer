@@ -48,7 +48,7 @@ Run through uv (SolidWorks already open for the COM tasks)::
     uv run python -m doit part:summing_lever    # just that part
     uv run python -m doit verify:soundness      # one SW gate; check:math one offline gate
     uv run python -m doit export                # neutral STEP/STL/scene export
-    uv run python -m doit release -- v0.2.0     # cut a release (args after --; opt-in)
+    uv run python -m doit release               # cut the next vNN release (opt-in)
     uv run python -m doit list --all            # every task
     uv run python -m doit clean                 # remove targets (+ wipe png/<asm>)
 
@@ -1624,6 +1624,7 @@ def task_check():
     pytest_cmd = [sys.executable, "-m", "pytest", "-q"]
     recipe_tests = [
         SCRIPTS_DIR / "test_dodo_recipe.py",
+        SCRIPTS_DIR / "test_cut_release_version.py",
         SCRIPTS_DIR / "test_verify_auto_repair.py",
         # The SolidWorks-free geometry contract for the drawing layout audit
         # (collision / sheet-overflow logic run before every drawing saves).
@@ -1853,7 +1854,7 @@ def task_preflight():
 
 
 def _run_release(relargs):
-    """Run cut_release.py, forwarding any positional args (``doit release -- v0.2.0``).
+    """Run cut_release.py, forwarding any positional args (``doit release -- v22``).
 
     com=True: the release job holds the COM seat for its ENTIRE duration -- including
     its non-COM tail (renders, zip, ``gh`` upload) -- so it blocks any other worktree's
@@ -1867,7 +1868,8 @@ def task_release():
     release). OPT-IN -- not in default_tasks. Needs SW + gh; holds the COM seat.
 
     Publishing is a side effect (no doit target), so it always runs. Forward
-    args after ``--``: ``doit release -- v0.2.0 --draft`` (default auto patch-bump).
+    Args after ``--``: ``doit release -- v22 --draft``. With no version, the
+    latest compact release tag is incremented (for example, ``v21`` -> ``v22``).
     Gated on EVERY gate via REAL task_dep edges (the spine is gone, so these are now
     explicit): ``export`` (which itself pulls the parts/assemblies + the ``verify:*``
     gates), every registered ``drawing:*`` artifact that release stages,
