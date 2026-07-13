@@ -29,6 +29,13 @@ parsed-YAML for configs), so a cache hit and "doit up-to-date" always agree and 
 comment-only YAML edit busts neither. Paths are tagged **repo-relative**, so the
 key is identical across machines and worktrees.
 
+Drawing keys also include the SHA-256 identity token of the exact `.SLDPRT`
+artifact that was built or restored. SolidWorks persistent-reference IDs may
+differ between two same-recipe part builds, so a recipe key alone is unsafe for a
+drawing. Restoring the same cached part reproduces the same identity token and can
+restore its matched `.SLDDRW`/PDF/PNG with no COM work; another part artifact
+misses and regenerates the drawing once.
+
 The `file_dep` set for a COM task also folds the **`SolidworksMCP-python`
 submodule** — the vendored COM adapter (`solidworks_mcp`) is imported at runtime
 by `_common`/`_assembly` (mate/plane/feature creation), so its source is a genuine
