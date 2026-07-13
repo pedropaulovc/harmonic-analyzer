@@ -48,11 +48,13 @@ from _common import (  # noqa: E402
     TOGGLE_STL_BINARY,
     TOGGLE_STL_NO_TRANSLATE,
     TOGGLE_STL_ONE_FILE,
+    _early_bound,
+    _read_member,
     check,
     log,
     run_build,
 )
-from render_compare import _flag, _flag_only, _read_member, model_path  # noqa: E402
+from render_compare import model_path  # noqa: E402
 
 import _telemetry  # noqa: E402
 
@@ -149,7 +151,7 @@ def doc_rgb(doc: Any) -> tuple[float, float, float]:
     rgb = _valid_rgb(_read_member(doc, "MaterialPropertyValues") or ())
     if rgb:
         return rgb
-    _flag(doc, "IPartDoc")
+    doc = _early_bound(doc, "IPartDoc")
     name = ""
     try:
         res = doc.GetMaterialPropertyName2("", "")
@@ -211,19 +213,17 @@ def scan_assembly(adapter: Any, part_colors: dict) -> tuple[list, list, set[tupl
     The SolidWorks API reports boxes and transforms in metres (system units);
     they are scaled to MILLIMETRES here so the persisted scene graph matches the
     millimetre STL meshes it is rendered against."""
-    model = adapter.currentModel
-    _flag(model, "IModelDoc2")
-    _flag(model, "IAssemblyDoc")
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
     comps = model.GetComponents(False) or []
     boxes, scene, stems = [], [], set()
     for i, comp in enumerate(comps, 1):
         if i % 50 == 0:
             log(f"component scan {i}/{len(comps)} ...")
-        # Flag ONLY the zero-arg methods called below (GetPathName always;
-        # GetXform in comp_xform's fallback). Name2/Visible/Transform2 are
-        # property reads and GetBox/GetMaterialPropertyValues2 take args, so
-        # none of those need flagging (issue #87 -- not the 165-method flag).
-        _flag_only(comp, "GetPathName", "GetXform")
+        # Early-bind to IComponent2 so the members read below (GetPathName,
+        # GetXform, Name2/Visible/Transform2 properties, GetBox/GetModelDoc2/
+        # GetMaterialPropertyValues2) invoke by DISPID; off-interface members
+        # fall through the wrapper's late-bound fallback.
+        comp = _early_bound(comp, "IComponent2")
         try:
             name = str(_read_member(comp, "Name2") or "")
             box = comp.GetBox(False, False)
