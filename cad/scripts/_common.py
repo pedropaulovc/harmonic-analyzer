@@ -519,8 +519,13 @@ async def define_centered_rectangle(
             sketch_mgr.AddToDB = previous_add_to_db
         segments = list(raw or [])
         edges: list[tuple[str, float, float]] = []
+        diagonal_id: str | None = None
         for segment in segments:
             if bool(_read_member(segment, "ConstructionGeometry")):
+                # CreateCenterRectangle returns two corner-to-corner construction
+                # diagonals; keep one to anchor the centre to the origin below.
+                if diagonal_id is None:
+                    diagonal_id = adapter._register_sketch_entity("Line", segment)
                 continue
             entity_id = adapter._register_sketch_entity("Line", segment)
             start = _read_member(segment, "GetStartPoint2")
@@ -562,6 +567,37 @@ async def define_centered_rectangle(
             abs(vertical[2]),
             f"{label} depth",
         )
+        # Deterministically anchor the rectangle centre to the origin.
+        # SolidWorks only auto-adds the centre->origin coincidence when the
+        # "add constraints to sketched rectangles" system option
+        # (swSketchAddConstToRectEntity) is ON. It is OFF on some seats, which
+        # leaves the native centre rectangle free to translate (under_defined)
+        # even with width+depth dims — the build must not depend on a per-seat
+        # UI toggle. If the profile is not already fully defined, pin one
+        # construction diagonal's midpoint to the origin. Idempotent: skipped
+        # when the native anchor already fixed it, so it never over-defines the
+        # seat where the option is on.
+        rect_state = await adapter.check_sketch_fully_defined()
+        already_defined = bool(
+            rect_state.is_success
+            and rect_state.data
+            and rect_state.data.get("definition_state") == "fully_defined"
+        )
+        if not already_defined:
+            _telemetry.warn(
+                f"{label}: native centre rectangle under-defined after width+depth "
+                "dims — the seat's 'add constraints to sketched rectangles' option "
+                "(swSketchAddConstToRectEntity) is off, so no centre->origin anchor "
+                "was auto-added; pinning one construction diagonal's midpoint to the "
+                "origin explicitly."
+            )
+            if diagonal_id is not None:
+                check(
+                    f"{label} centre -> origin",
+                    await adapter.add_sketch_constraint(
+                        "origin", diagonal_id, "midpoint"
+                    ),
+                )
         if dims is not None:
             dims.record(name_width, drive_width)
             dims.record(name_depth, drive_depth)
