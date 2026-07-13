@@ -187,7 +187,24 @@ async def dimension_between(
     """Driving dimension between two point refs (``horizontal_distance``,
     ``vertical_distance``, or aligned ``distance``); value in mm."""
     result = await adapter.add_sketch_dimension(ref1, ref2, kind, value)
-    return check(f"{kind} {label} = {value:g}", result)
+    dimension_id = check(f"{kind} {label} = {value:g}", result)
+    display = adapter._sketch_entities.get(dimension_id)
+    dimension = adapter._attempt(
+        lambda: display.GetDimension2(0), default=None
+    ) if display is not None else None
+    if dimension is not None:
+        driven_state = int(
+            adapter._attempt(lambda: dimension.DrivenState, default=0) or 0
+        )
+        if driven_state != 2:  # swDimensionDriving
+            dimension.DrivenState = 2
+            adapter._set_display_dimension_value(display, value)
+            driven_state = int(
+                adapter._attempt(lambda: dimension.DrivenState, default=0) or 0
+            )
+            if driven_state != 2:
+                raise RuntimeError(f"{label}: SolidWorks kept dimension reference-driven")
+    return dimension_id
 
 
 async def anchor_point_to_origin(
@@ -485,65 +502,66 @@ async def define_centered_rectangle(
     drive_width: str | None = None,
     drive_depth: str | None = None,
 ) -> list[str]:
-    """Draw a native center rectangle coincident with the sketch origin.
+    """Draw an origin-centred rectangle with two construction diagonals.
 
-    ``ISketchManager.CreateCenterRectangle`` authors the four sides, its two
-    construction diagonals, and the center-to-origin relation. Only width and
-    depth remain as driving dimensions; the former corner-X/corner-Z equations
-    redundantly re-derived centering and made every edit solve four dimensions.
+    The midpoint of one corner-to-corner diagonal is coincident with the sketch
+    origin, so width and depth are the only driving dimensions. This mirrors a
+    native center rectangle without its cursor-inference side effects: an exact
+    square passed to ``CreateCenterRectangle`` can acquire a redundant SAME
+    LENGTH relation or duplicate origin coincidence and turn dimensions into
+    references, which later makes equation assignment warn or fail.
     """
+    points = [
+        (-half_x, -half_z),
+        (half_x, -half_z),
+        (half_x, half_z),
+        (-half_x, half_z),
+    ]
+    edges = await add_line_chain(adapter, points)
     sketch_mgr = adapter.currentSketchManager
     previous_add_to_db = bool(sketch_mgr.AddToDB)
-    sketch_mgr.AddToDB = False
+    sketch_mgr.AddToDB = True
+    diagonals: list[str] = []
     try:
-        raw = sketch_mgr.CreateCenterRectangle(
-            0.0, 0.0, 0.0, half_x / 1000.0, half_z / 1000.0, 0.0
-        )
+        for start, end in ((points[0], points[2]), (points[1], points[3])):
+            result = await adapter.add_line(*start, *end)
+            diagonal_id = check(f"add construction diagonal {label}", result)
+            diagonal = adapter._sketch_entities[diagonal_id]
+            diagonal.ConstructionGeometry = True
+            diagonals.append(diagonal_id)
     finally:
         sketch_mgr.AddToDB = previous_add_to_db
-    segments = list(raw or [])
-    if not segments:
-        raise RuntimeError(f"{label}: CreateCenterRectangle returned no segments")
-
-    edges: list[tuple[str, float, float]] = []
-    for segment in segments:
-        if bool(_read_member(segment, "ConstructionGeometry")):
-            continue
-        entity_id = adapter._register_sketch_entity("Line", segment)
-        start = _read_member(segment, "GetStartPoint2")
-        end = _read_member(segment, "GetEndPoint2")
-        dx = (float(_read_member(end, "X")) - float(_read_member(start, "X"))) * 1000.0
-        dz = (float(_read_member(end, "Y")) - float(_read_member(start, "Y"))) * 1000.0
-        edges.append((entity_id, dx, dz))
-    if len(edges) != 4:
-        raise RuntimeError(
-            f"{label}: center rectangle returned {len(edges)} profile edges, expected 4"
+    for edge, direction in zip(
+        edges, ("horizontal", "vertical", "horizontal", "vertical"), strict=True
+    ):
+        check(
+            f"{label} {direction} {edge}",
+            await adapter.add_sketch_constraint(edge, None, direction),
         )
-
-    horizontal = next((row for row in edges if abs(row[1]) > 1e-9 and abs(row[2]) < 1e-9), None)
-    vertical = next((row for row in edges if abs(row[2]) > 1e-9 and abs(row[1]) < 1e-9), None)
-    if horizontal is None or vertical is None:
-        raise RuntimeError(f"{label}: native center rectangle has no orthogonal edge pair")
+    check(
+        f"{label} midpoint -> origin",
+        await adapter.add_sketch_constraint("origin", diagonals[0], "midpoint"),
+    )
     await dimension_between(
         adapter,
-        f"{horizontal[0]}.start",
-        f"{horizontal[0]}.end",
+        f"{edges[0]}.start",
+        f"{edges[0]}.end",
         "horizontal_distance",
-        abs(horizontal[1]),
+        2.0 * half_x,
         f"{label} width",
     )
     await dimension_between(
         adapter,
-        f"{vertical[0]}.start",
-        f"{vertical[0]}.end",
+        f"{edges[1]}.start",
+        f"{edges[1]}.end",
         "vertical_distance",
-        abs(vertical[2]),
+        2.0 * half_z,
         f"{label} depth",
     )
     if dims is not None:
         dims.record(name_width, drive_width)
         dims.record(name_depth, drive_depth)
-    return [entity_id for entity_id, _, _ in edges]
+    return edges
 
 
 async def add_line_chain(
