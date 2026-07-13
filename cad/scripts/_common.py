@@ -511,6 +511,66 @@ async def define_centered_rectangle(
     LENGTH relation or duplicate origin coincidence and turn dimensions into
     references, which later makes equation assignment warn or fail.
     """
+    if abs(half_x - half_z) >= 1e-9:
+        sketch_mgr = adapter.currentSketchManager
+        previous_add_to_db = bool(sketch_mgr.AddToDB)
+        sketch_mgr.AddToDB = False
+        try:
+            raw = sketch_mgr.CreateCenterRectangle(
+                0.0, 0.0, 0.0, half_x / 1000.0, half_z / 1000.0, 0.0
+            )
+        finally:
+            sketch_mgr.AddToDB = previous_add_to_db
+        segments = list(raw or [])
+        edges: list[tuple[str, float, float]] = []
+        for segment in segments:
+            if bool(_read_member(segment, "ConstructionGeometry")):
+                continue
+            entity_id = adapter._register_sketch_entity("Line", segment)
+            start = _read_member(segment, "GetStartPoint2")
+            end = _read_member(segment, "GetEndPoint2")
+            dx = (
+                float(_read_member(end, "X")) - float(_read_member(start, "X"))
+            ) * 1000.0
+            dz = (
+                float(_read_member(end, "Y")) - float(_read_member(start, "Y"))
+            ) * 1000.0
+            edges.append((entity_id, dx, dz))
+        if len(edges) != 4:
+            raise RuntimeError(
+                f"{label}: center rectangle returned {len(edges)} profile edges, expected 4"
+            )
+        horizontal = next(
+            (row for row in edges if abs(row[1]) > 1e-9 and abs(row[2]) < 1e-9),
+            None,
+        )
+        vertical = next(
+            (row for row in edges if abs(row[2]) > 1e-9 and abs(row[1]) < 1e-9),
+            None,
+        )
+        if horizontal is None or vertical is None:
+            raise RuntimeError(f"{label}: native center rectangle has no orthogonal edge pair")
+        await dimension_between(
+            adapter,
+            f"{horizontal[0]}.start",
+            f"{horizontal[0]}.end",
+            "horizontal_distance",
+            abs(horizontal[1]),
+            f"{label} width",
+        )
+        await dimension_between(
+            adapter,
+            f"{vertical[0]}.start",
+            f"{vertical[0]}.end",
+            "vertical_distance",
+            abs(vertical[2]),
+            f"{label} depth",
+        )
+        if dims is not None:
+            dims.record(name_width, drive_width)
+            dims.record(name_depth, drive_depth)
+        return [entity_id for entity_id, _, _ in edges]
+
     points = [
         (-half_x, -half_z),
         (half_x, -half_z),
