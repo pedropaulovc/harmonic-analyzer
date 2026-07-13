@@ -303,7 +303,8 @@ def assert_no_over_constrained(adapter: Any, *, resolve: bool = True) -> None:
             if resolve:
                 adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
         with _telemetry.span("over.scan") as ssp:
-            components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
+            asm_h = _early_bound(asm, "IAssemblyDoc")  # IAssemblyDoc for GetComponents; keep `asm` for ForceRebuild3
+            components = adapter._attempt(lambda: asm_h.GetComponents(True), default=None) or []
             over = []
             for comp in components:
                 # Wrap once as IComponent2 so GetConstrainedStatus invokes its
@@ -682,9 +683,10 @@ def _fault_name(value: Any) -> str:
 def _deep_mate_faults(adapter: Any) -> list[tuple[str, Any, str, int]]:
     """Return non-warning faults from the active assembly and child assemblies."""
     top = adapter.currentModel
+    top_asm = _early_bound(top, "IAssemblyDoc")  # IAssemblyDoc for GetComponents; keep `top` for the `model is top` identity compare
     targets: list[tuple[str, Any]] = [("top", top)]
     seen: set[str] = set()
-    components = adapter._attempt(lambda: top.GetComponents(False), default=None) or []
+    components = adapter._attempt(lambda: top_asm.GetComponents(False), default=None) or []
     for component in components:
         component = _early_bound(component, "IComponent2", "GetModelDoc2")
         instance = str(_read_member(component, "Name2") or "?")

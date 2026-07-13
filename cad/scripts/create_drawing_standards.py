@@ -15,7 +15,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import run_build
+from _common import _early_bound, run_build
 from _drawing_common import ASME_B_HEIGHT_M, ASME_B_WIDTH_M, assert_asme_b_sheet
 from _drawing_registry import ASME_B_DRWDOT, ASME_B_SLDDRT
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
@@ -76,7 +76,8 @@ def _is_native_border_segment(points: list[tuple[float, float]]) -> bool:
 def _delete_native_sheet_annotations(adapter: Any) -> int:
     """Delete stock notes before entering sheet-format edit mode."""
     draw = adapter.currentModel
-    sheet_view = adapter._attempt(lambda: draw.GetFirstView())
+    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    sheet_view = adapter._attempt(lambda: ddoc.GetFirstView())
     if sheet_view is None:
         raise RuntimeError("native drawing has no sheet view")
     sheet_view = _sw_type_info.early_bound_or_flag(
@@ -104,7 +105,8 @@ def _delete_native_sheet_annotations(adapter: Any) -> int:
 def _strip_native_template(adapter: Any) -> int:
     """Retain only native border/zone sketch segments."""
     draw = adapter.currentModel
-    sheet = adapter._get_attr_or_call(draw, "GetCurrentSheet")
+    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
     sheet = _sw_type_info.early_bound_or_flag(sheet, "ISheet", "GetTemplateSketch")
     sheet.SheetFormatVisible = True
     sketch = adapter._get_attr_or_call(sheet, "GetTemplateSketch")
@@ -123,7 +125,8 @@ def _strip_native_template(adapter: Any) -> int:
     for segment in delete_segments:
         draw.ClearSelection2(True)
         selected = adapter._attempt(
-            lambda item=segment: item.Select4(False, null_callout()), default=False
+            lambda item=segment: _early_bound(item, "IEntity").Select4(False, null_callout()),
+            default=False,
         )
         if not selected:
             raise RuntimeError("failed to select native title-block segment")
@@ -213,7 +216,7 @@ def _draw_project_title_block(adapter: Any) -> None:
 
 
 def _assert_no_banned_sheet_text(adapter: Any) -> None:
-    draw = adapter.currentModel
+    draw = _early_bound(adapter.currentModel, "IDrawingDoc")  # IDrawingDoc view: only GetFirstView used here
     sheet_view = adapter._attempt(lambda: draw.GetFirstView())
     if sheet_view is None:
         raise RuntimeError("drawing has no sheet view")
@@ -250,7 +253,8 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         raise RuntimeError("failed to create native SolidWorks B-size sheet")
     draw = adapter.currentModel
-    sheet = adapter._get_attr_or_call(draw, "GetCurrentSheet")
+    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
     if sheet is None:
         raise RuntimeError("native drawing has no current sheet")
     sheet = _sw_type_info.early_bound_or_flag(sheet, "ISheet")
@@ -278,7 +282,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ASME_B_SLDDRT.parent.mkdir(parents=True, exist_ok=True)
     ASME_B_SLDDRT.unlink(missing_ok=True)
     sheet_name = adapter._get_attr_or_call(sheet, "GetName")
-    if not sheet_name or not draw.ActivateSheet(sheet_name):
+    if not sheet_name or not ddoc.ActivateSheet(sheet_name):
         raise RuntimeError("failed to activate project drawing sheet")
     if not sheet.SaveFormat(str(ASME_B_SLDDRT.resolve())):
         raise RuntimeError(f"ISheet.SaveFormat failed: {ASME_B_SLDDRT}")
