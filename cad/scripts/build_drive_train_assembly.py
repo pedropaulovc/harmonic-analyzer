@@ -139,6 +139,7 @@ import sys
 import _config
 import _telemetry
 from _common import (
+    _early_bound,
     check,
     run_build,
 )
@@ -2185,7 +2186,7 @@ async def build(adapter) -> dict[str, str]:
             copy_with_mates(adapter, [seed_cg], 3, values, flips=flips,
                             repeat=repeat, new_entities=new_ents)
             cg = f"cone-gear-{j + 1}"
-            if adapter.currentModel.GetComponentByName(cg) is None:
+            if _early_bound(adapter.currentModel, "IAssemblyDoc").GetComponentByName(cg) is None:
                 raise RuntimeError(
                     f"cone-gear copy {j}: expected deterministic instance {cg!r}"
                     " after CopyWithMates2, but it is absent")
@@ -2206,7 +2207,7 @@ async def build(adapter) -> dict[str, str]:
                     " (or the flip side moved); re-derive the slot map"
                 )
             model = adapter.currentModel
-            model.GetComponentByName(cg).ReferencedConfiguration = cfg
+            _early_bound(model, "IAssemblyDoc").GetComponentByName(cg).ReferencedConfiguration = cfg
             if teeth in TIP_TEETH:  # the four hard yellow tip gears
                 await apply_component_color(adapter, cg, MUNTZ_YELLOW)
             cone_gears.append((teeth, cg))
@@ -2232,7 +2233,7 @@ async def build(adapter) -> dict[str, str]:
             adapter, cg, tgt,
             [list(seed_arr[0:3]), list(seed_arr[3:6]), list(seed_arr[6:9])],
         )
-        got_cfg = str(model.GetComponentByName(cg).ReferencedConfiguration)
+        got_cfg = str(_early_bound(model, "IAssemblyDoc").GetComponentByName(cg).ReferencedConfiguration)
         if got_cfg != f"T{teeth:03d}":
             raise RuntimeError(
                 f"{cg}: configuration {got_cfg!r}, expected T{teeth:03d}")
@@ -2326,7 +2327,7 @@ async def build(adapter) -> dict[str, str]:
                 flips=[False, True], repeat=[True, False],
                 new_entities=[None, seed_front])
             new_name = f"cylinder-gear-{j + 1}"
-            if adapter.currentModel.GetComponentByName(new_name) is None:
+            if _early_bound(adapter.currentModel, "IAssemblyDoc").GetComponentByName(new_name) is None:
                 raise RuntimeError(
                     f"cylinder-gear copy {j}: expected deterministic instance"
                     f" {new_name!r} after CopyWithMates2, but it is absent")

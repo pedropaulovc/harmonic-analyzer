@@ -248,7 +248,7 @@ def _find_bottom_face(model, holes_xz, y_face_mm: float):
     drill axis comes out along X. Selecting the face OBJECT found by enumeration
     is the reliable path.
     """
-    body = (model.GetBodies2(0, False) or [None])[0]
+    body = (_early_bound(model, "IPartDoc").GetBodies2(0, False) or [None])[0]  # IPartDoc for GetBodies2
     body = _early_bound(body, "IBody2")
     best = None
     for f in (body.GetFaces() or []):
@@ -310,7 +310,7 @@ def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
     if bottom is None:
         raise RuntimeError("hole wizard: foot bottom face not found")
     model.ClearSelection2(True)
-    if not bottom.Select2(False, 0):
+    if not _early_bound(bottom, "IEntity").Select2(False, 0):
         raise RuntimeError("hole wizard: bottom face Select failed")
     feat = fm.CreateFeature(data)
     if feat is None:
